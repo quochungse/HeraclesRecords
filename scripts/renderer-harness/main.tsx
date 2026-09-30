@@ -30,6 +30,7 @@ import { ChatSettingsPanel } from "../../src/chat/ChatSettingsPanel";
 import { ChatSettingsModal } from "../../src/chat/ChatSettingsModal";
 import type { ChatSettings } from "../../electron/types";
 import { RunningView } from "../../src/running/RunningView";
+import { CyclingView } from "../../src/cycling/CyclingView";
 import { ActivitiesSummary } from "../../src/training/components/ActivitiesSummary";
 import { ActivityRouteMap } from "../../src/training/components/ActivityRouteMap";
 import { SleepDetailsView } from "../../src/sleep/SleepDetailsView";
@@ -326,6 +327,37 @@ const MOUNTS: Record<string, (options: Record<string, unknown>) => ReactElement>
         }}
       >
         <RunningView
+          api={api}
+          activities={(options.activities as never) ?? []}
+          connected={(options.connected as boolean | undefined) ?? true}
+          restoring={false}
+          activitiesStatus={(options.activitiesStatus as never) ?? "ready"}
+          detail={(options.detail as never) ?? null}
+          detailRequest={(options.detailRequest as never) ?? null}
+          snapshot={(options.snapshot as never) ?? null}
+          busy={(options.busy as string | null | undefined) ?? null}
+          onSelectActivity={spy("onSelectActivity")}
+          onRetryActivities={spy("onRetryActivities")}
+          onOpenOverview={spy("onOpenOverview")}
+          openRequest={(options.openRequest as never) ?? null}
+          onOpenRequestHandled={spy("onOpenRequestHandled")}
+          onReturn={spy("onReturn")}
+        />
+      </main>
+    );
+  },
+  /** Running's page built for a bike, in the same fixed-height column. */
+  CyclingView: (options) => {
+    loadAppStyles();
+    return (
+      <main
+        className="content content-fill"
+        style={{
+          height: `${(options.height as number | undefined) ?? 700}px`,
+          ...(typeof options.width === "number" ? { width: `${options.width}px` } : {})
+        }}
+      >
+        <CyclingView
           api={api}
           activities={(options.activities as never) ?? []}
           connected={(options.connected as boolean | undefined) ?? true}

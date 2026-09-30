@@ -26,9 +26,11 @@ import { useUnitSystem } from "../../units/UnitSystemProvider";
 import {
   distanceUnit,
   elevationUnit,
+  kmhToDisplaySpeed,
   metersToDisplayDistance,
   metersToElevation,
-  secondsPerKmToDisplayPace
+  secondsPerKmToDisplayPace,
+  speedUnit
 } from "../../units/units";
 import { formatDurationSeconds } from "../formatters";
 import { useChartColors } from "../useChartColors";
@@ -39,7 +41,10 @@ import {
   activityChannel,
   activityChannelColors,
   toggleActivityChannel,
-  type ActivityChannelKey
+  withSpeed,
+  type ActivityChannelKey,
+  type ActivityChannelPoint,
+  type ActivityMotion
 } from "../activityChannels";
 
 /**
@@ -74,10 +79,25 @@ interface ActivitySeriesChartProps {
    * stacked washed every line in the plot out to grey.
    */
   embedded?: boolean;
+  /**
+   * Pace for a run, speed for a ride. Also decides the cadence unit — steps a
+   * minute on foot, revolutions on a bike — and what the whole of it is called.
+   */
+  motion?: ActivityMotion;
 }
 
-interface ChartRow extends TrainingHubActivitySeriesPoint {
+type ChartRow = ActivityChannelPoint & {
   x: number;
+};
+
+/** What one whole activity is called, by how it moves. */
+const ACTIVITY_NOUN: Record<ActivityMotion, string> = {
+  pace: "run",
+  speed: "ride"
+};
+
+function cadenceUnit(motion: ActivityMotion): string {
+  return motion === "speed" ? "rpm" : "spm";
 }
 
 function formatPaceTick(secondsPerKm: number, unitSystem: UnitSystem): string {
@@ -90,12 +110,19 @@ function formatPaceTick(secondsPerKm: number, unitSystem: UnitSystem): string {
 function formatChannelValue(
   key: ActivityChannelKey,
   value: number,
-  unitSystem: UnitSystem
+  unitSystem: UnitSystem,
+  motion: ActivityMotion
 ): string {
   const definition = activityChannel(key);
 
   if (key === "pace" || key === "adjustedPace") {
     return `${formatPaceTick(value, unitSystem)} /${distanceUnit(unitSystem)}`;
+  }
+  if (key === "speed") {
+    return `${kmhToDisplaySpeed(value, unitSystem).toFixed(1)} ${speedUnit(unitSystem)}`;
+  }
+  if (key === "cadence") {
+    return `${value.toFixed(definition.decimals)} ${cadenceUnit(motion)}`;
   }
   if (key === "altitude") {
     return `${Math.round(metersToElevation(value, unitSystem))} ${elevationUnit(unitSystem)}`;
@@ -111,6 +138,9 @@ function formatAxisTick(
 ): string {
   if (key === "pace" || key === "adjustedPace") {
     return formatPaceTick(value, unitSystem);
+  }
+  if (key === "speed") {
+    return kmhToDisplaySpeed(value, unitSystem).toFixed(0);
   }
   if (key === "altitude") {
     return String(Math.round(metersToElevation(value, unitSystem)));
@@ -198,19 +228,23 @@ export function ActivitySeriesChart({
   focusLapIndex,
   onFocusLapHandled,
   activityTime,
-  embedded = false
+  embedded = false,
+  motion = "pace"
 }: ActivitySeriesChartProps) {
   const { unitSystem } = useUnitSystem();
   const { theme } = useTheme();
   const { colors } = useChartColors();
   const palette = useMemo(() => activityChannelColors(theme), [theme]);
 
-  const points = useMemo(
-    () => downsampleActivitySeries([...series], CHART_POINTS),
-    [series]
-  );
+  const points = useMemo<ActivityChannelPoint[]>(() => {
+    const sampled = downsampleActivitySeries([...series], CHART_POINTS);
+    return motion === "speed" ? withSpeed(sampled) : sampled;
+  }, [motion, series]);
 
-  const available = useMemo(() => availableActivityChannels(points), [points]);
+  const available = useMemo(
+    () => availableActivityChannels(points, motion),
+    [motion, points]
+  );
   const hasAltitude = available.some((channel) => channel.key === "altitude");
   const hasDistance = points.some((point) => typeof point.distance === "number");
   const hasElapsed = points.some((point) => typeof point.elapsed === "number");
@@ -229,9 +263,9 @@ export function ActivitySeriesChart({
   const availableRef = useRef(available);
   availableRef.current = available;
   useEffect(() => {
-    setSelected(defaultSelectedChannels(availableRef.current));
+    setSelected(defaultSelectedChannels(availableRef.current, motion));
     setRange(null);
-  }, [availableKey]);
+  }, [availableKey, motion]);
 
   useEffect(() => {
     if (!hasElapsed && hasDistance) {
@@ -300,10 +334,23 @@ export function ActivitySeriesChart({
     }
     const first = visible[0]!;
     const last = visible[visible.length - 1]!;
-    const mean = (key: ActivityChannelKey) => {
-      const values = visible
+    // Averages come off the recorded samples inside the stretch, not the
+    // chart's downsampled rows: a row is a bucket's mean, so one that holds
+    // ten seconds of pedalling and twenty of freewheeling reads 30 rpm, and
+    // no zero to skip — the segment then sat 10 rpm under the ride's figure.
+    const axisKey = axis === "elapsed" ? "elapsed" : "distance";
+    const recorded = series.filter((point) => {
+      const at = point[axisKey];
+      return typeof at === "number" && at >= first.x && at <= last.x;
+    });
+    const source: readonly ActivityChannelPoint[] = recorded.length >= 2 ? recorded : visible;
+    const mean = (key: ActivityChannelKey, skipZeros = false) => {
+      const values = source
         .map((row) => row[key])
-        .filter((value): value is number => typeof value === "number");
+        .filter(
+          (value): value is number =>
+            typeof value === "number" && (!skipZeros || value > 0)
+        );
       return values.length === 0
         ? undefined
         : values.reduce((sum, value) => sum + value, 0) / values.length;
@@ -320,20 +367,31 @@ export function ActivitySeriesChart({
           ? last.elapsed - first.elapsed
           : undefined;
 
+    // The segment's own pace, from its own distance and clock, rather than
+    // the mean of per-sample paces — a run that stopped would otherwise read
+    // faster than it was, since a stopped sample carries no pace at all.
+    const pace =
+      distance !== undefined && duration !== undefined && distance > 0
+        ? duration / (distance / 1000)
+        : mean("pace");
+
     return {
       distance,
       duration,
-      // The segment's own pace, from its own distance and clock, rather than
-      // the mean of per-sample paces — a run that stopped would otherwise read
-      // faster than it was, since a stopped sample carries no pace at all.
-      pace:
-        distance !== undefined && duration !== undefined && distance > 0
-          ? duration / (distance / 1000)
-          : mean("pace"),
+      pace,
+      // A ride's speed is that same figure the other way up, not the mean of
+      // the samples' speeds, for the same reason.
+      speed: pace !== undefined && pace > 0 ? 3600 / pace : undefined,
       hr: mean("hr"),
-      cadence: mean("cadence")
+      // A ride's cadence is averaged over the pedalling, as the watch states it:
+      // every coasting second reads 0, and counting them put the segment 15 rpm
+      // under the ride's own figure on the same page.
+      cadence: mean("cadence", motion === "speed"),
+      // Only a ride states it: a run's power is the watch's own estimate, and
+      // the Running screen has never put it beside the segment's figures.
+      power: motion === "speed" ? mean("power") : undefined
     };
-  }, [activityTime, range, visible]);
+  }, [activityTime, axis, motion, range, series, visible]);
 
   const surfaceClass = embedded
     ? "activity-chart-panel is-embedded"
@@ -349,8 +407,8 @@ export function ActivitySeriesChart({
       <section className={surfaceClass}>
         {heading}
         <p className="activity-chart-empty">
-          COROS returned no per-sample readings for this run, so there is nothing
-          to plot. The summary above is everything it sent.
+          COROS returned no per-sample readings for this {ACTIVITY_NOUN[motion]},
+          so there is nothing to plot. The summary above is everything it sent.
         </p>
       </section>
     );
@@ -521,6 +579,7 @@ export function ActivitySeriesChart({
                   {...props}
                   axis={axis}
                   unitSystem={unitSystem}
+                  motion={motion}
                   showAltitude={showAltitude && altitudeDomain !== null}
                   palette={palette}
                 />
@@ -553,7 +612,7 @@ export function ActivitySeriesChart({
       {segment ? (
         <div className="activity-chart-segment">
           <span className="activity-chart-segment-label">
-            {range === null ? "Whole run" : "Selection"}
+            {range === null ? `Whole ${ACTIVITY_NOUN[motion]}` : "Selection"}
           </span>
           {segment.distance !== undefined ? (
             <span>
@@ -564,14 +623,22 @@ export function ActivitySeriesChart({
           {segment.duration !== undefined ? (
             <span>{formatDurationSeconds(segment.duration)}</span>
           ) : null}
-          {segment.pace !== undefined ? (
-            <span>{formatChannelValue("pace", segment.pace, unitSystem)}</span>
+          {motion === "pace" && segment.pace !== undefined ? (
+            <span>{formatChannelValue("pace", segment.pace, unitSystem, motion)}</span>
+          ) : null}
+          {motion === "speed" && segment.speed !== undefined ? (
+            <span>{formatChannelValue("speed", segment.speed, unitSystem, motion)}</span>
+          ) : null}
+          {segment.power !== undefined ? (
+            <span>{Math.round(segment.power)} W</span>
           ) : null}
           {segment.hr !== undefined ? (
             <span>{Math.round(segment.hr)} bpm</span>
           ) : null}
           {segment.cadence !== undefined ? (
-            <span>{Math.round(segment.cadence)} spm</span>
+            <span>
+              {Math.round(segment.cadence)} {cadenceUnit(motion)}
+            </span>
           ) : null}
         </div>
       ) : null}
@@ -582,6 +649,7 @@ export function ActivitySeriesChart({
 interface RunChartTooltipProps extends TooltipContentProps {
   axis: ActivitySeriesAxis;
   unitSystem: UnitSystem;
+  motion: ActivityMotion;
   showAltitude: boolean;
   palette: Record<ActivityChannelKey, { stroke: string; fill: string }>;
 }
@@ -592,6 +660,7 @@ function RunChartTooltip({
   label,
   axis,
   unitSystem,
+  motion,
   showAltitude,
   palette
 }: RunChartTooltipProps) {
@@ -637,7 +706,9 @@ function RunChartTooltip({
               <i aria-hidden="true" style={{ background: reading.color }} />
               {activityChannel(reading.key).label}
             </span>
-            <strong>{formatChannelValue(reading.key, reading.value, unitSystem)}</strong>
+            <strong>
+              {formatChannelValue(reading.key, reading.value, unitSystem, motion)}
+            </strong>
           </li>
         ))}
         {showAltitude && typeof row.altitude === "number" ? (
@@ -648,7 +719,9 @@ function RunChartTooltip({
               <i aria-hidden="true" style={{ background: "var(--text-muted)" }} />
               {activityChannel("altitude").label}
             </span>
-            <strong>{formatChannelValue("altitude", row.altitude, unitSystem)}</strong>
+            <strong>
+              {formatChannelValue("altitude", row.altitude, unitSystem, motion)}
+            </strong>
           </li>
         ) : null}
       </ul>

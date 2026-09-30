@@ -589,7 +589,7 @@ export function RunningView({
             <div className="running-columns">
               {zonesSettled ? (
                 <RunIntensityPanel
-                  runs={runs}
+                  sessions={runs}
                   zoneScale={zoneScale}
                   zoneModelLabel={zoneModel?.title}
                   summaries={summaries}

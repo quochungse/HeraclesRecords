@@ -201,7 +201,8 @@ export function RunningHero({ runs, allRuns, snapshot, filtered, nowMs }: Runnin
   );
 }
 
-function DeltaChip({ ratio }: { ratio: number }) {
+/** A week against its baseline, as a signed chip. Cycling's hero wears it too. */
+export function DeltaChip({ ratio }: { ratio: number }) {
   const percent = Math.round(ratio * 100);
   // Within a couple of percent a delta is noise dressed as news.
   if (Math.abs(percent) < 2) {

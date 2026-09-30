@@ -64,6 +64,7 @@ import {
   whitenColor,
   passesBy,
   performanceColoring,
+  performanceZones,
   rampColorAt,
   routeHeat,
   routeRamp,
@@ -1260,7 +1261,7 @@ function useRouteAnalysis(
       const zones = zoneColoring(
         stretches.values,
         metric,
-        metric === "hr" ? detail?.hrZones : detail?.paceZones
+        performanceZones(metric, detail, speed)
       );
       return zones
         ? { kind: "zones", coloring: zones }

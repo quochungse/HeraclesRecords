@@ -375,6 +375,14 @@ import {
   getSleepHistory
 } from "./sleepHistoryService";
 import { clearSleepSeriesCache, getSleepNightSeries } from "./sleepSeriesService";
+import {
+  isSampleRideId,
+  sampleRideDetail,
+  sampleRidesEnabled,
+  setSampleRiderFtp,
+  withSampleRides,
+  withSampleRideSummaries
+} from "./sampleRides";
 import type {
   AnthropicApiConfig,
   ChatMessage,
@@ -2088,10 +2096,21 @@ function registerIpcHandlers(): void {
     (_event, patch: CorosProfilePatch) => updateCorosProfile(patch)
   );
 
+  // HERACLES_SAMPLE_RIDES=1 adds simulated rides here, at the window's door
+  // and nowhere behind it — see electron/sampleRides.ts.
   ipcMain.handle(
     "trainingHub:listActivities",
-    (_event, page: number, size: number, startDay?: string, endDay?: string) =>
-      listTrainingHubActivities(page, size, startDay, endDay)
+    async (_event, page: number, size: number, startDay?: string, endDay?: string) => {
+      const activities = await listTrainingHubActivities(page, size, startDay, endDay);
+      if (!sampleRidesEnabled()) {
+        return activities;
+      }
+      // Ridden at the account's FTP, so the ride page's IF and TSS read true.
+      // The same cached read the Cycling screen makes for its zones.
+      const snapshot = await getCorosProfileSnapshot().catch(() => null);
+      setSampleRiderFtp(snapshot?.profile.thresholds.ftp);
+      return withSampleRides(activities, { page, startDay, endDay });
+    }
   );
 
   ipcMain.handle(
@@ -2270,7 +2289,10 @@ function registerIpcHandlers(): void {
       activityId: string,
       sportType: number,
       listActivity?: TrainingHubActivity
-    ) => getTrainingHubActivityDetail(activityId, sportType, listActivity)
+    ) =>
+      sampleRidesEnabled() && isSampleRideId(activityId)
+        ? sampleRideDetail(activityId)
+        : getTrainingHubActivityDetail(activityId, sportType, listActivity)
   );
 
   // The unparsed payload, on its own channel: it is ~2.2 MB and only the
@@ -2278,7 +2300,9 @@ function registerIpcHandlers(): void {
   ipcMain.handle(
     "trainingHub:getActivityDetailRaw",
     (_event, activityId: string, sportType: number) =>
-      getTrainingHubActivityDetailRaw(activityId, sportType)
+      sampleRidesEnabled() && isSampleRideId(activityId)
+        ? { simulated: true, detail: sampleRideDetail(activityId) }
+        : getTrainingHubActivityDetailRaw(activityId, sportType)
   );
 
   // The list-level figures that only a detail payload knows. Two channels
@@ -2296,7 +2320,10 @@ function registerIpcHandlers(): void {
 
   ipcMain.handle(
     "trainingHub:getActivityDetailSummaries",
-    (_event, activityIds: string[]) => readActivityDetailSummaries(activityIds)
+    (_event, activityIds: string[]) =>
+      sampleRidesEnabled()
+        ? withSampleRideSummaries(activityIds, readActivityDetailSummaries(activityIds))
+        : readActivityDetailSummaries(activityIds)
   );
 
   ipcMain.handle(

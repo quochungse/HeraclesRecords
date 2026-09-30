@@ -337,6 +337,27 @@ export function zoneOf(
  * same buckets its zone bar is drawn from, so the map and the bar agree. Null
  * when the activity has no zones for the metric.
  */
+/**
+ * The zones a timed metric is coloured against, or none for the ramp.
+ *
+ * A ride has none for its speed. COROS scores every activity against the
+ * account's **running** threshold-pace zones — the type-130 list arrives on a
+ * trainer ride too, 7:53/km down to 2:44/km — so a road ride at 30 km/h, 2:00
+ * a kilometre, sat in the top zone from start to finish and the map drew it
+ * in one colour. The ramp colours a ride against itself, which is the reading
+ * a rider wants of their speed anyway.
+ */
+export function performanceZones(
+  metric: "pace" | "hr",
+  detail: { hrZones?: readonly TrainingHubActivityZoneBucket[]; paceZones?: readonly TrainingHubActivityZoneBucket[] } | undefined,
+  speed: boolean
+): readonly TrainingHubActivityZoneBucket[] | undefined {
+  if (metric === "hr") {
+    return detail?.hrZones;
+  }
+  return speed ? undefined : detail?.paceZones;
+}
+
 export function zoneColoring(
   values: readonly (number | null)[],
   metric: "pace" | "hr",
