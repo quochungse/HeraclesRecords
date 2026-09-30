@@ -52,9 +52,15 @@ import {
 } from "./coachAnalysisStore";
 import {
   listCoachActivityRowsAfter,
+  listCoachActivityRowsBetween,
   sumCoachAnalysisTokensSince
 } from "./database";
-import type { CoachUnseenActivityRow as CoachActivityRow } from "./database";
+import type {
+  CoachPrecedingActivityRow,
+  CoachUnseenActivityRow as CoachActivityRow
+} from "./database";
+import { corosText, loadCorosLocale } from "./corosLocale";
+import { EXERCISE_SEARCH_MUSCLES, classifyWorkoutExerciseName } from "./exerciseCatalogSearch";
 import { getTrainingHubStatus, reconnectTrainingHub } from "./trainingHubService";
 import { corosSportName } from "./corosSportTypes";
 import { runExclusively } from "./sync/automationLease";
@@ -81,7 +87,9 @@ import type {
   PlanBrief,
   ScheduleChangeSet,
   ConversationSettings,
-  ProviderAuthVerdict
+  ProviderAuthVerdict,
+  StrengthDetail,
+  StrengthExercise
 } from "./types";
 
 // ---------------------------------------------------------------------------
@@ -587,6 +595,15 @@ export interface CoachAnalysisRunnerDeps {
     afterEpochSeconds: number | undefined,
     limit: number
   ): CoachActivityRow[];
+  /**
+   * Activities that started in `[from, to)`, oldest first, with their cached
+   * strength breakdowns: the training before an analysed activity. Optional,
+   * for a suite with no database.
+   */
+  listActivitiesBetween?(
+    fromEpochSeconds: number,
+    toEpochSeconds: number
+  ): Promise<CoachPrecedingActivityRow[]>;
   recordRun(input: Omit<CoachAnalysisRun, "id" | "startedAt">): CoachAnalysisRun;
   updateRun(
     id: string,
@@ -764,6 +781,11 @@ function createDefaultDeps(): CoachAnalysisRunnerDeps {
     },
     listRuns: (filter) => listCoachAnalysisRuns(filter),
     listActivitiesAfter: (after, limit) => listCoachActivityRowsAfter(after, limit),
+    // The locale table turns an exercise code (T1041) into its name.
+    listActivitiesBetween: async (from, to) => {
+      await loadCorosLocale().catch(() => undefined);
+      return listCoachActivityRowsBetween(from, to);
+    },
     recordRun: (input) => recordCoachAnalysisRun(input),
     updateRun: (id, patch) => updateCoachAnalysisRun(id, patch),
     getSessionEntries: (sessionId) => {
@@ -1338,10 +1360,87 @@ function describeActivity(activity: CoachActivityRow): string {
   return parts.join(" · ");
 }
 
-function buildPlaybookTurn(
-  queued: QueuedRun,
-  deps: CoachAnalysisRunnerDeps
+/** How far back the focus line looks for training that bears on the activity. */
+export const PRECEDING_TRAINING_HOURS = 72;
+const MAX_LISTED_EXERCISES = 8;
+const EXERCISE_CODE = /^[TS]\d/;
+
+function exerciseLabel(exercise: StrengthExercise): string {
+  const raw = exercise.rawName?.trim();
+  return raw && !EXERCISE_CODE.test(raw) ? raw : corosText(exercise.nameKey);
+}
+
+function strengthExercises(json: string | null): StrengthExercise[] | undefined {
+  if (!json) return undefined;
+  try {
+    const exercises = (JSON.parse(json) as Partial<StrengthDetail>).exercises;
+    return Array.isArray(exercises) && exercises.length > 0 ? exercises : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/** "Muscles: chest, hamstrings. Exercises: Bench Press, Deadlifts.", muscles in body order. */
+function describeStrength(exercises: StrengthExercise[]): string {
+  const names = [...new Set(exercises.map(exerciseLabel))];
+  const worked = new Set(names.flatMap((name) => classifyWorkoutExerciseName(name).targetMuscles));
+  const muscles = EXERCISE_SEARCH_MUSCLES.filter((muscle) => worked.has(muscle)).map((muscle) =>
+    muscle.replace("_", " ")
+  );
+  const more = names.length > MAX_LISTED_EXERCISES ? `, +${names.length - MAX_LISTED_EXERCISES} more` : "";
+  return (
+    (muscles.length > 0 ? ` Muscles: ${muscles.join(", ")}.` : "") +
+    ` Exercises: ${names.slice(0, MAX_LISTED_EXERCISES).join(", ")}${more}.`
+  );
+}
+
+/**
+ * What the athlete did in the days before the activity, for the focus line.
+ *
+ * Handed over rather than left to a tool call: a debrief compares a run with
+ * other runs, and the COROS training load it reasons with scores a 90-minute
+ * gym session near a 10-minute jog, so the leg day before a flat run went
+ * unmentioned. Strength sessions carry the muscles they worked, read from the
+ * breakdown already cached for the Strength screen; nothing here asks COROS.
+ */
+export function formatPrecedingTraining(
+  activity: CoachActivityRow,
+  rows: CoachPrecedingActivityRow[]
 ): string {
+  const start = activity.start_time ?? 0;
+  const lines = rows
+    .filter((row) => row.activity_id !== activity.activity_id && row.start_time !== null)
+    .map((row) => {
+      const ended = (row.start_time ?? 0) + (row.duration ?? 0);
+      const hours = Math.max(0, Math.round((start - ended) / 3_600));
+      const sport = corosSportName(row.sport_type, row.sport_name) ?? `sport type ${row.sport_type}`;
+      const name = asText(row.name);
+      const figures = [
+        row.duration ? `${Math.round(row.duration / 60)} min` : undefined,
+        row.avg_hr ? `avg HR ${row.avg_hr}` : undefined
+      ].filter(Boolean);
+      const exercises = strengthExercises(row.strength_json);
+      return (
+        `- ${sport}${name && name !== sport ? ` "${name}"` : ""} (id ${row.activity_id}), ended ${hours} h before` +
+        `${figures.length > 0 ? `: ${figures.join(", ")}` : ""}.` +
+        (exercises ? describeStrength(exercises) : "")
+      );
+    });
+  if (lines.length === 0) {
+    return `No other training in the ${PRECEDING_TRAINING_HOURS} h before it.`;
+  }
+  return [
+    `Training in the ${PRECEDING_TRAINING_HOURS} h before it, oldest first. ` +
+      "COROS training load undercounts strength; judge it by duration and the muscles worked:",
+    ...lines
+  ].join("\n");
+}
+
+async function buildPlaybookTurn(
+  queued: QueuedRun,
+  deps: CoachAnalysisRunnerDeps,
+  conversation: ConversationSettings | undefined
+): Promise<string> {
   const body = renderAnalysisTemplate(
     queued.analysis.playbook,
     templateVars(queued, deps)
@@ -1350,10 +1449,26 @@ function buildPlaybookTurn(
   // has to name its own subject or the three answers would be interchangeable.
   // The sport type rides along so get_activity_detail is the run's first call,
   // not a list lookup to find it.
-  const focus = queued.activity
-    ? `\n\nAnalyse this activity specifically: ${describeActivity(queued.activity)}` +
-      ` (activity id ${queued.activity.activity_id}, sport type ${queued.activity.sport_type}).`
-    : "";
+  let focus = "";
+  const activity = queued.activity;
+  if (activity) {
+    focus =
+      `\n\nAnalyse this activity specifically: ${describeActivity(activity)}` +
+      ` (activity id ${activity.activity_id}, sport type ${activity.sport_type}).`;
+    // A conversation that withholds activities withholds these too. Best-effort:
+    // a read that fails leaves the line out rather than claiming there was none.
+    if (activity.start_time && conversation?.sources.activities !== false) {
+      try {
+        const rows = await deps.listActivitiesBetween?.(
+          activity.start_time - PRECEDING_TRAINING_HOURS * 3_600,
+          activity.start_time
+        );
+        if (rows) focus += `\n\n${formatPrecedingTraining(activity, rows)}`;
+      } catch {
+        // The run goes ahead with the activity alone.
+      }
+    }
+  }
   return `${body}${focus}\n\n${AUTOMATION_OUTPUT_CONTRACT}`;
 }
 
@@ -1630,7 +1745,7 @@ async function runInConversation(
     triggerLabel: triggerLabel(analysis.trigger)
   };
 
-  const playbook = buildPlaybookTurn(step, resolved);
+  const playbook = await buildPlaybookTurn(step, resolved, conversation);
   const collector = resolved.createCollector(marker);
   const watchdog = createIdleWatchdog(resolved.idleTimeoutMs);
   const sink = createTeeSink(collector, watchdog.touch);

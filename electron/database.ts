@@ -2001,6 +2001,33 @@ export function listCoachActivityRowsAfter(
   return rows.reverse();
 }
 
+export interface CoachPrecedingActivityRow extends CoachUnseenActivityRow {
+  avg_hr: number | null;
+  /** The cached strength breakdown (`StrengthDetail` JSON), when there is one. */
+  strength_json: string | null;
+}
+
+/**
+ * Activities that started in `[from, to)`, oldest first, each with its cached
+ * strength breakdown. Local only: what an analysis says about the days before
+ * an activity must not cost a COROS request.
+ */
+export function listCoachActivityRowsBetween(
+  fromEpochSeconds: number,
+  toEpochSeconds: number
+): CoachPrecedingActivityRow[] {
+  return requireDatabase()
+    .prepare(
+      `SELECT a.activity_id, a.name, a.sport_type, a.sport_name, a.start_time,
+              a.duration, a.distance, a.avg_hr, s.detail_json AS strength_json
+       FROM training_activities a
+       LEFT JOIN strength_sessions s ON s.activity_id = a.activity_id
+       WHERE a.start_time >= ? AND a.start_time < ?
+       ORDER BY a.start_time`
+    )
+    .all(fromEpochSeconds, toEpochSeconds) as CoachPrecedingActivityRow[];
+}
+
 export function markCoachActivitiesSeen(activityIds: string[]): void {
   if (!activityIds.length) {
     return;

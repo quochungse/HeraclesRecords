@@ -1379,6 +1379,13 @@ Overview, Media, Data, and Settings are in the main bundle.
   is simply read. `test:coach-analysis-runner`, `test:sync-engine`, `test:sync-twoway`,
   `test:analysis-startup-order`.
 
+  **An activity run is handed the 72 hours before its activity** (`formatPrecedingTraining`,
+  in the focus line): every other session, local rows only, a strength one with the muscles
+  its cached exercises work (`classifyWorkoutExerciseName` over `corosText` names). A debrief
+  compared a run with runs, and COROS's load scores a 90-minute gym session near a jog, so
+  the leg day before a flat run went unmentioned. A conversation withholding activities
+  gets none of it; a failed read leaves the line out rather than saying there was nothing.
+
   The pause and the monthly budget live in **Coach's settings dialog** (`ChatSettingsModal`
   over `ChatSettingsPanel`, with Coach Models, display, suggestions, instructions and
   compaction — how much is kept word for word and which model condenses, `CompactContextSection`), which Coach's header gear and the sign-in gates open: they are feature-wide and

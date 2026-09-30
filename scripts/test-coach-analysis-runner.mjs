@@ -52,6 +52,8 @@ const {
   resetAnalysisQueueForTests,
   runAnalysisNow,
   runAnalysisTrigger,
+  formatPrecedingTraining,
+  PRECEDING_TRAINING_HOURS,
   noteConversationsChangedBySync,
   ANALYSIS_STOPPED_BY_SYNC,
   ANALYSIS_SESSION_DELETED_BY_SYNC
@@ -1553,6 +1555,82 @@ const analysedIds = (world) =>
   const again = await runAnalysisTrigger({ analysisId: "a1", kind: "activity" }, world.deps);
   assert.deepEqual(again, [], "an automatic trigger with nothing to say stays silent");
   assert.equal(world.runs.length, 3, "and logs no non-event");
+}
+
+// --- the focus line carries the training before the activity ----------------
+{
+  // A debrief compares a run with runs, and COROS's load scores a leg day near
+  // nothing, so the strength before a run has to be handed over or it is missed.
+  resetAnalysisQueueForTests();
+  const world = createWorld();
+  addAnalysis(world, "a1", { trigger: ACTIVITY_TRIGGER, conditions: NO_LIMITS });
+  addSession(world, "s1");
+  addAttachment(world, "b1", { sessionId: "s1", lastActivityAt: RUNNER_NOW_EPOCH - 8 * 86_400 });
+  addActivity(world, "run", 1);
+  const runStart = RUNNER_NOW_EPOCH - 86_400;
+  const legDay = {
+    activity_id: "gym",
+    name: "Leg day",
+    sport_type: 402,
+    sport_name: "Strength",
+    start_time: runStart - 26 * 3_600,
+    duration: 3_600,
+    distance: 0,
+    avg_hr: 118,
+    strength_json: JSON.stringify({
+      exercises: [
+        { nameKey: "T9999", rawName: "Back Squat" },
+        { nameKey: "T9998", rawName: "Romanian Deadlift" }
+      ]
+    })
+  };
+  const asked = [];
+  world.deps.listActivitiesBetween = async (from, to) => {
+    asked.push([from, to]);
+    return [legDay, { ...legDay, activity_id: "run", start_time: runStart }];
+  };
+
+  await runAnalysisTrigger({ analysisId: "a1", kind: "activity" }, world.deps);
+  assert.deepEqual(asked, [[runStart - PRECEDING_TRAINING_HOURS * 3_600, runStart]]);
+  const turn = world.streamCalls[0].messages.at(-1).content;
+  assert.match(
+    turn,
+    /- Strength "Leg day" \(id gym\), ended 25 h before: 60 min, avg HR 118\. Muscles: lower back, glutes, quads, hamstrings\. Exercises: Back Squat, Romanian Deadlift\./
+  );
+  assert.match(turn, /undercounts strength/);
+  assert.doesNotMatch(turn, /\(id run\)/, "the analysed activity is not its own context");
+  assert.ok(turn.indexOf("Leg day") < turn.indexOf("Two house rules"), "the context sits in the focus, not after the contract");
+
+  // Nothing before it is said, rather than left for the model to guess.
+  assert.equal(
+    formatPrecedingTraining({ activity_id: "run", start_time: runStart }, []),
+    `No other training in the ${PRECEDING_TRAINING_HOURS} h before it.`
+  );
+
+  // A conversation withholding activities withholds these; a failed read says nothing.
+  for (const variant of ["withheld", "throws"]) {
+    resetAnalysisQueueForTests();
+    const other = createWorld();
+    addAnalysis(other, "a1", { trigger: ACTIVITY_TRIGGER, conditions: NO_LIMITS });
+    addSession(other, "s1");
+    addAttachment(other, "b1", { sessionId: "s1", lastActivityAt: RUNNER_NOW_EPOCH - 8 * 86_400 });
+    addActivity(other, "run", 1);
+    if (variant === "withheld") {
+      other.deps.getConversationSettings = (sessionId) => ({
+        sessionId,
+        sources: { activities: false, sleep: true, zones: true }
+      });
+      other.deps.listActivitiesBetween = async () => [legDay];
+    } else {
+      other.deps.listActivitiesBetween = async () => {
+        throw new Error("no database");
+      };
+    }
+    const [run] = await runAnalysisTrigger({ analysisId: "a1", kind: "activity" }, other.deps);
+    assert.equal(run.status, "success", `${variant}: the run goes ahead`);
+    const content = other.streamCalls[0].messages.at(-1).content;
+    assert.doesNotMatch(content, /h before it/, `${variant}: no context line`);
+  }
 }
 
 // --- a backlog past the cap keeps its *newest* entries -----------------------
