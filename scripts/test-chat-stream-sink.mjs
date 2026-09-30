@@ -652,10 +652,15 @@ assert.deepEqual(persisted[1].automation, marker);
 
   const whole = readSource(repoRoot, "electron", "chatService.ts");
   const turn = whole.slice(whole.indexOf("async function streamChatTurn("), whole.indexOf("function toolsForRun("));
+  // The context and the tool surface are read through the turn's own two
+  // wrappers, which skip both for a text job and otherwise are the real calls.
+  const through = { prepareToolSurface: "turnToolSurface", buildTrainingContext: "turnContext" };
   for (const step of ["inspectClaudeCodeStatus", "prepareToolSurface", "buildTrainingContext", "getValidToken"]) {
     assert.doesNotMatch(turn, new RegExp(`await ${step}\\(`), `${step} is awaited through prepare() in a turn`);
-    assert.match(turn, new RegExp(`await prepare\\(${step}\\(`), `${step} is prepared in a turn`);
+    assert.match(turn, new RegExp(`await prepare\\(${through[step] ?? step}\\(`), `${step} is prepared in a turn`);
   }
+  assert.match(turn, /const turnToolSurface = \(\): Promise<void> => \(job \? Promise\.resolve\(\) : prepareToolSurface\(\)\);/);
+  assert.match(turn, /const turnContext: typeof buildTrainingContext = \(\.\.\.args\) =>\s*job \? [\s\S]{0,120}?: buildTrainingContext\(\.\.\.args\);/);
   // The MCP connections ride inside prepareToolSurface, with the profile read
   // that decides the tool list, so Stop reaches them through the same prepare().
   assert.doesNotMatch(turn, /await ensureAllMcpConnected\(/, "the MCP connections are not awaited bare in a turn");

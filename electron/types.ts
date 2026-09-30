@@ -1900,11 +1900,35 @@ export interface CompactContextSettings {
    * this only ever trims the context window.
    */
   enabled: boolean;
-  /** How far past the summary a transcript may run before it is rolled. */
+  /**
+   * The entry window: how far past the summary a transcript may run before it
+   * is rolled, and how many recent entries survive a roll. A ceiling now, not
+   * the knob — `detail` is what the athlete chooses, and Settings no longer
+   * shows these two.
+   */
   limit: number;
-  /** How many recent entries survive a roll and go to the model verbatim. */
   keep: number;
+  /** How much reaches the model as written (`CONTEXT_BUDGETS`). Absent is `balanced`. */
+  detail?: ContextDetail;
+  /** The model that condenses and summarises. Absent is `auto`. */
+  model?: CompactModelChoice;
 }
+
+/** See `CONTEXT_BUDGETS` in `chatContextCompaction.ts`. */
+export type ContextDetail = "lean" | "balanced" | "full";
+
+/**
+ * Which model makes the digests and the rolling summary.
+ *
+ * `auto` is the smallest model the conversation's own AI lists
+ * (`compressionModelFor`), falling back to the conversation's model;
+ * `conversation` is always the conversation's model; `fixed` names one, and
+ * every conversation is compressed with it whatever AI it answers with.
+ */
+export type CompactModelChoice =
+  | { kind: "auto" }
+  | { kind: "conversation" }
+  | { kind: "fixed"; provider: ChatProvider; model: string };
 
 export interface ChatSettings {
   provider: ChatProvider;
@@ -1951,6 +1975,11 @@ export type { CoachStyle } from "./coachStyles";
 export interface ChatContextCompaction {
   /** Prepended to the tail as a labelled user turn, when there is one. */
   summary?: string;
+  /**
+   * The condensed layer, as it goes on the wire between the summary and the
+   * tail: the athlete's words as written, each coach answer as its digest.
+   */
+  middle?: ChatMessage[];
   /** Where the verbatim tail begins in the entries that were sent. */
   tailStart: number;
   /** Entries the stored summary now accounts for. */
@@ -1999,10 +2028,12 @@ export interface ChatContextInspection {
   tailStart: number;
   /** Turns the next message would fold into the summary before sending. */
   pending: ChatMessage[];
+  /** Turns sent condensed, each answer as its digest where one has been made. */
+  middle?: ChatMessage[];
   /** Turns sent verbatim. */
   tail: ChatMessage[];
   /**
-   * Characters across the summary turn, `pending` and `tail` — what this turn
+   * Characters across the summary turn, `pending`, `middle` and `tail` — what this turn
    * costs if the roll has not happened yet, which is the number worth seeing.
    */
   characterCount: number;

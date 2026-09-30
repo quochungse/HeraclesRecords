@@ -226,6 +226,18 @@ export function initializeDatabase(userDataPath: string): Database.Database {
     CREATE INDEX IF NOT EXISTS idx_chat_sessions_provider_updated
       ON chat_sessions(provider, updated_at DESC);
 
+    -- The digest of a coach answer, keyed by a hash of the answer's text, for
+    -- the condensed layer of a long conversation (answerDigest.ts). NULL digest:
+    -- one was tried and refused, so the answer goes out whole and is not tried
+    -- on every turn.
+    CREATE TABLE IF NOT EXISTS chat_answer_digests (
+      answer_key TEXT PRIMARY KEY,
+      session_id TEXT NOT NULL,
+      digest TEXT,
+      model TEXT,
+      created_at TEXT NOT NULL
+    );
+
     CREATE TABLE IF NOT EXISTS chat_conversation_settings (
       session_id TEXT PRIMARY KEY,
       sources_json TEXT,
@@ -519,6 +531,9 @@ export function initializeDatabase(userDataPath: string): Database.Database {
   // and the summary is a fact about the conversation.
   ensureColumn(db, "chat_sessions", "coach_summary", "TEXT");
   ensureColumn(db, "chat_sessions", "coach_summary_through", "INTEGER");
+  // Where the verbatim turns begin: the entries between coach_summary_through
+  // and this are sent condensed (CONTEXT_BUDGETS in chatContextCompaction.ts).
+  ensureColumn(db, "chat_sessions", "coach_condensed_through", "INTEGER");
   // A coach's creation has versions (docs/coach-plan-canvas.md, P1.1): each is
   // a row of its own, `artifact_id` groups them, and `document_json` holds the
   // plan as the library reads it. Columns rather than fields inside the JSON,
@@ -1231,6 +1246,7 @@ export interface ChatSessionRow {
 export interface ChatSessionCoachSummaryRow {
   coach_summary: string | null;
   coach_summary_through: number | null;
+  coach_condensed_through: number | null;
 }
 
 export function getChatSessionCoachSummaryRow(
@@ -1238,7 +1254,7 @@ export function getChatSessionCoachSummaryRow(
 ): ChatSessionCoachSummaryRow | undefined {
   return requireDatabase()
     .prepare(
-      "SELECT coach_summary, coach_summary_through FROM chat_sessions WHERE id = ?"
+      "SELECT coach_summary, coach_summary_through, coach_condensed_through FROM chat_sessions WHERE id = ?"
     )
     .get(id) as ChatSessionCoachSummaryRow | undefined;
 }
@@ -1261,6 +1277,55 @@ export function setChatSessionCoachSummaryRow(
        WHERE id = ?`
     )
     .run(summary, through, id);
+}
+
+/** Where the verbatim turns begin; written on its own for the reason the summary is. */
+export function setChatSessionCondensedThroughRow(id: string, condensedThrough: number | null): void {
+  requireDatabase()
+    .prepare("UPDATE chat_sessions SET coach_condensed_through = ? WHERE id = ?")
+    .run(condensedThrough, id);
+}
+
+export interface ChatAnswerDigestRow {
+  answer_key: string;
+  digest: string | null;
+  model: string | null;
+}
+
+export function getChatAnswerDigestRows(keys: readonly string[]): ChatAnswerDigestRow[] {
+  if (!keys.length) return [];
+  const database = requireDatabase();
+  const rows: ChatAnswerDigestRow[] = [];
+  // SQLite caps bound parameters; a long conversation holds more answers than that.
+  for (let index = 0; index < keys.length; index += 500) {
+    const chunk = keys.slice(index, index + 500);
+    rows.push(
+      ...(database
+        .prepare(
+          `SELECT answer_key, digest, model FROM chat_answer_digests WHERE answer_key IN (${chunk.map(() => "?").join(",")})`
+        )
+        .all(...chunk) as ChatAnswerDigestRow[])
+    );
+  }
+  return rows;
+}
+
+export function putChatAnswerDigestRow(
+  answerKey: string,
+  sessionId: string,
+  digest: string | null,
+  model: string | null
+): void {
+  requireDatabase()
+    .prepare(
+      `INSERT OR REPLACE INTO chat_answer_digests (answer_key, session_id, digest, model, created_at)
+       VALUES (?, ?, ?, ?, ?)`
+    )
+    .run(answerKey, sessionId, digest, model, new Date().toISOString());
+}
+
+export function deleteChatAnswerDigestsOf(sessionId: string): void {
+  requireDatabase().prepare("DELETE FROM chat_answer_digests WHERE session_id = ?").run(sessionId);
 }
 
 /** A provider's conversations, or every conversation when it is absent. */

@@ -3440,6 +3440,8 @@ export function ChatView({
     const wireMessages = withCreationIndex(
       [
         ...(context?.summary ? [summaryContextMessage(context.summary)] : []),
+        // The condensed layer, as the main process built it: it holds the digests.
+        ...(context?.middle ?? []),
         ...toWireMessages(persisted.slice(context?.tailStart ?? 0))
       ],
       persisted,

@@ -2,7 +2,12 @@ import type {
   InlineSuggestionsMode, AnthropicEffort, ChatProvider, ChatSettings } from "./types";
 import { normalizeCoachStyle } from "./coachStyles";
 import { MAX_CUSTOM_COACH_INSTRUCTIONS } from "./types";
-import { normalizeContextWindow } from "./chatContextCompaction";
+import {
+  normalizeCompactModelChoice,
+  normalizeContextDetail,
+  normalizeContextWindow,
+  serializeCompactModelChoice
+} from "./chatContextCompaction";
 import {
   DEFAULT_LOCAL_CHAT_BASE_URL,
   normalizeLocalChatBaseUrl
@@ -53,7 +58,9 @@ export const CHAT_SETTINGS_KEYS = {
   coachStyle: "chat.coach.style",
   compactContextEnabled: "chat.compactContext.enabled",
   compactContextLimit: "chat.compactContext.limit",
-  compactContextKeep: "chat.compactContext.keep"
+  compactContextKeep: "chat.compactContext.keep",
+  compactContextDetail: "chat.compactContext.detail",
+  compactContextModel: "chat.compactContext.model"
 } as const;
 
 function inlineSuggestionsMode(value: unknown): InlineSuggestionsMode {
@@ -177,7 +184,9 @@ export function readChatSettingsFromStore(
       ...normalizeContextWindow({
         limit: readNumber(store.get(CHAT_SETTINGS_KEYS.compactContextLimit)),
         keep: readNumber(store.get(CHAT_SETTINGS_KEYS.compactContextKeep))
-      })
+      }),
+      detail: normalizeContextDetail(store.get(CHAT_SETTINGS_KEYS.compactContextDetail)),
+      model: normalizeCompactModelChoice(store.get(CHAT_SETTINGS_KEYS.compactContextModel))
     }
   };
 }
@@ -336,6 +345,15 @@ export function saveChatSettingsToStore(
     const window = normalizeContextWindow(settings.compactContext);
     store.set(CHAT_SETTINGS_KEYS.compactContextLimit, String(window.limit));
     store.set(CHAT_SETTINGS_KEYS.compactContextKeep, String(window.keep));
+    if (settings.compactContext.detail !== undefined) {
+      store.set(CHAT_SETTINGS_KEYS.compactContextDetail, normalizeContextDetail(settings.compactContext.detail));
+    }
+    if (settings.compactContext.model !== undefined) {
+      store.set(
+        CHAT_SETTINGS_KEYS.compactContextModel,
+        serializeCompactModelChoice(normalizeCompactModelChoice(settings.compactContext.model))
+      );
+    }
   }
 
   if (typeof settings.customInstructions === "string") {

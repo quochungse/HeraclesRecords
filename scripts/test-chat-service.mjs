@@ -1163,19 +1163,47 @@ assert.equal(settingsValues.has("chat.customInstructions"), false);
 assert.deepEqual(scopedByDefault.compactContext, {
   enabled: true,
   limit: 60,
-  keep: 20
+  keep: 20,
+  detail: "balanced",
+  model: { kind: "auto" }
 });
 
 const compact = saveChatSettingsToStore(fakeStore, fakeKeyStores, {
   ...withoutCustom,
   compactContext: { enabled: true, limit: 120, keep: 30 }
 });
-assert.deepEqual(compact.compactContext, { enabled: true, limit: 120, keep: 30 });
+const unchosen = { detail: "balanced", model: { kind: "auto" } };
+assert.deepEqual(compact.compactContext, { enabled: true, limit: 120, keep: 30, ...unchosen });
 assert.deepEqual(
   readChatSettingsFromStore(fakeStore, fakeKeyStores).compactContext,
-  { enabled: true, limit: 120, keep: 30 },
+  { enabled: true, limit: 120, keep: 30, ...unchosen },
   "and survives the round trip"
 );
+
+// How much is kept word for word, and what condenses it, are stored too — a
+// fixed model as its provider and id, anything half-named as automatic.
+const chosen = saveChatSettingsToStore(fakeStore, fakeKeyStores, {
+  ...withoutCustom,
+  compactContext: {
+    enabled: true,
+    limit: 60,
+    keep: 20,
+    detail: "lean",
+    model: { kind: "fixed", provider: "claude-code", model: "haiku" }
+  }
+});
+assert.equal(chosen.compactContext.detail, "lean");
+assert.deepEqual(chosen.compactContext.model, { kind: "fixed", provider: "claude-code", model: "haiku" });
+assert.equal(settingsValues.get("chat.compactContext.model"), JSON.stringify({ kind: "fixed", provider: "claude-code", model: "haiku" }));
+assert.deepEqual(
+  saveChatSettingsToStore(fakeStore, fakeKeyStores, {
+    ...withoutCustom,
+    compactContext: { enabled: true, limit: 60, keep: 20, detail: "nonsense", model: { kind: "fixed", provider: "claude-code" } }
+  }).compactContext,
+  { enabled: true, limit: 60, keep: 20, ...unchosen },
+  "an unknown detail and a half-named model read as the defaults"
+);
+saveChatSettingsToStore(fakeStore, fakeKeyStores, { ...withoutCustom, compactContext: { enabled: true, limit: 120, keep: 30, ...unchosen } });
 
 // A pair that disagrees is repaired on the way in, not stored as typed: a
 // `limit` at or below `keep` would roll on every single turn, which is the
@@ -1217,7 +1245,7 @@ assert.deepEqual(
     },
     fakeKeyStores
   ).compactContext,
-  { enabled: true, limit: 60, keep: 20 },
+  { enabled: true, limit: 60, keep: 20, ...unchosen },
   "an unreadable pair reads as the default, never as NaN"
 );
 

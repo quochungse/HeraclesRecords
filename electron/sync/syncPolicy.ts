@@ -55,6 +55,9 @@ export const TABLE_POLICY: Readonly<Record<string, TablePolicy>> = {
   // --- Coach: the reason this feature exists -------------------------------
   chat_sessions: "personal",
   chat_plan_drafts: "personal",
+  // Digests of coach answers for the condensed layer: made again from the
+  // transcript by whichever machine needs one.
+  chat_answer_digests: "derived",
   // What one conversation reads and which AI answers it (P2.0): the
   // athlete's choice about that conversation, so it follows it.
   chat_conversation_settings: "personal",
@@ -229,6 +232,8 @@ export const SETTING_POLICY: Readonly<Record<string, SyncTier>> = {
   "chat.compactContext.enabled": "preference",
   "chat.compactContext.limit": "preference",
   "chat.compactContext.keep": "preference",
+  "chat.compactContext.detail": "preference",
+  "chat.compactContext.model": "preference",
   "updater.autoCheck": "preference",
   "updater.autoDownload": "preference",
   "hevy.includeWarmups": "preference",

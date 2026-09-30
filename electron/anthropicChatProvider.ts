@@ -165,6 +165,8 @@ export interface AnthropicRuntimeConfig {
   effort: AnthropicEffort;
   /** The model's row in the account's list, when that list has been read. */
   listed?: ModelCatalogEntry;
+  /** A thinking budget for a model without adaptive thinking (Haiku 4.5); otherwise ignored. */
+  thinkingBudget?: number;
 }
 
 interface AnthropicRequestTuning {
@@ -189,6 +191,10 @@ export function buildAnthropicRequestTuning(
     // "summarized" so the Coach transcript can show reasoning; the default
     // omits it and reads as a long pause before the answer appears.
     tuning.thinking = { type: "adaptive", display: "summarized" };
+  } else if (config.thinkingBudget && config.thinkingBudget >= 1024 && config.thinkingBudget < capabilities.maxOutputTokens) {
+    // A budget has a floor of 1,024 and must sit under `max_tokens`; outside
+    // that it is a 400, so it is not sent at all.
+    tuning.thinking = { type: "enabled", budget_tokens: config.thinkingBudget };
   }
   const effort = capabilities.effort
     ? effortForModel(config.effort, capabilities.efforts)

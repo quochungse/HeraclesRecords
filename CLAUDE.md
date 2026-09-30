@@ -1147,21 +1147,51 @@ Overview, Media, Data, and Settings are in the main bundle.
   words against the two draft tools it is always offered beside; a revised plan is validated as
   a new draft. That was a third 15 kB copy, ~3.8k tokens a round.
 
-  **A long conversation is sent as a summary and a tail, and the tail is held to tokens as well
-  as entries** (`planTranscriptContext`, `chatContextCompaction.ts`). The entry window (60 past
-  the summary, keep 20 — the athlete's setting) could not see what an entry weighs: measured on
-  2026-09-29, a 16-entry conversation sent ~16k tokens a turn and was never compacted, nine tenths
-  of it the coach's own answers. So `DEFAULT_CONTEXT_BUDGET` rolls once the part past the summary
-  is over ~12k estimated tokens (`estimateTokens`, three characters a token, between English and
-  Vietnamese) and keeps a ~4k tail — never less than the question and the answer before it, and
-  not a roll at all until it would fold four entries away, or one huge answer rolls every turn.
-  Counted on the wire, so cards cost nothing. Replayed over that account's 120 turns it cut the
-  history sent by a fifth, the rolls' own input included. **What a roll folds away stays
-  readable**: `recall_conversation` (`chatConversationTools.ts`, the search in node-free
-  `chatRecall.ts`) searches the summarised part word for word — accents folded, whole words,
-  neighbouring terms ranked up, at most five exchanges, a long answer cut to its opening and the
-  paragraphs that match. It is offered only while the conversation has a summary (`toolsForRun`),
-  never to a pipeline step, and is read-only. The summariser is told to keep every figure exactly.
+  **A long conversation is sent in three layers, each held to tokens** (`planTranscriptContext`,
+  `chatContextCompaction.ts`): the newest turns word for word, the ones before them **condensed** —
+  the athlete's words as written, each coach answer as a digest of its figures and decisions,
+  marked `[condensed]` — and everything older as the running summary. The entry window (60/20)
+  could not see what an entry weighs: measured 2026-09-29, a 16-entry conversation sent ~16k
+  tokens a turn and was never compacted, nine tenths of it the coach's answers. It is now a
+  ceiling Settings no longer shows; the athlete picks `chat.compactContext.detail` (Less ·
+  Balanced · More, `CONTEXT_BUDGETS`), counted on the wire (`estimateTokens`, three characters a
+  token) so cards cost nothing. Turns move between layers **in batches** — the verbatim part
+  condenses once past `rollAt` and only four entries at a time, the condensed layer rolls into
+  the summary once past `middle`, down to half — so a provider's cached prefix changes a few
+  times a conversation, not every turn. The boundary is `chat_sessions.coach_condensed_through`
+  (beside `coach_summary_through`, written on its own like it). Replayed over the account's 32
+  conversations, Balanced sent 3.0k a turn where summary-and-tail at 12k/4k sent 3.7k, with fewer
+  rolls; a `middle` of 4k rolled 11 times, which is 11 waits — the layer's own budget is what
+  keeps the summariser rare.
+  **A digest is made in the background and never trusted as written** (`answerDigest.ts`,
+  `chatCompression.ts`): `applyTranscriptContext` hands the condensed layer's undigested answers
+  to `requestDigests` without awaiting it, and until a digest lands its answer goes out whole.
+  Measured on eight real answers: Haiku 4.5 with thinking **off** ran twice the length, switched
+  to English and read the weekdays "T7"/"T5" as the dates "7/7"/"5/9"; with its default thinking
+  it spent 5–13k output tokens on a 400-character digest. So a Haiku-class model runs with a
+  **1,500-token thinking budget** (`budget_tokens` on the Messages API, `thinking: {type:
+  "enabled"}` through the Agent SDK — `effort` does not reach a model that takes none), and
+  `digestProblems` refuses a digest stating a date or a figure its answer does not; one retry
+  with the reasons, then it is stored as refused (NULL) and not tried again. Digests are keyed
+  by a hash of the answer's text (`chat_answer_digests`, `derived`: another machine makes its
+  own) and deleted with the conversation.
+  **Digests and the rolling summary are text jobs** (`StreamChatOptions.textJob`, `runTextJob`):
+  their own system prompt, no snapshot, no MCP connections, no tools — the roll used to run as a
+  turn of Coach, reading COROS for the snapshot to compress text it was handed. They run on
+  `chat.compactContext.model` (`resolveCompressionRuntime`): `auto` is the smallest family the
+  **conversation's** AI lists (`compressionModelFor`, matched against the provider's own list —
+  Haiku, then Sonnet; ChatGPT's and OpenRouter's names say nothing about size, so their
+  conversations use their own model), `conversation`, or a `fixed` provider and model. The roll
+  used to take Coach's default AI whatever the conversation answered with. Everything about the
+  condensed layer is best-effort: a digest or a budget that cannot be read leaves a turn or an
+  analysis sending what it always sent (the runner wraps its optional deps, because
+  `resolveDeps` spreads the defaults under a suite's fakes).
+  **What is not sent word for word stays readable**: `recall_conversation`
+  (`chatConversationTools.ts`, the search in node-free `chatRecall.ts`) searches up to
+  `recallableThrough` — the summary or the condensed layer, whichever reaches further — accents
+  folded, whole words, neighbouring terms ranked up, two exchanges by default and five at most,
+  a long answer cut to its opening and the paragraphs that match. It is offered only while there
+  is something to recall (`toolsForRun`), never to a pipeline step, and is read-only.
   **Claude Code's prompt cuts to the last 30 messages, and the summary rides ahead of the cut**
   (`formatClaudePrompt`): it is the first message, and the cut used to take it.
 
@@ -1343,7 +1373,7 @@ Overview, Media, Data, and Settings are in the main bundle.
 
   The pause and the monthly budget live in **Coach's settings dialog** (`ChatSettingsModal`
   over `ChatSettingsPanel`, with Coach Models, display, suggestions, instructions and
-  compaction), which Coach's header gear and the sign-in gates open: they are feature-wide and
+  compaction — how much is kept word for word and which model condenses, `CompactContextSection`), which Coach's header gear and the sign-in gates open: they are feature-wide and
   the screen that used to host them is gone, so without a home a paused world would have no
   Resume button. R3 moved the panel into the app's Settings as a section; UAT moved it back,
   because shown whole there it buried that page's content.

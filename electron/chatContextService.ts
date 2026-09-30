@@ -1,30 +1,32 @@
-import { randomUUID } from "node:crypto";
-import {
-  cancelChat,
-  createCollectorSink,
-  createIdleWatchdog,
-  getChatSettings,
-  streamChat,
-  type ChatStreamSink
-} from "./chatService";
+import { getChatSettings } from "./chatService";
 import {
   getChatSessionCoachSummaryRow,
-  setChatSessionCoachSummaryRow
+  setChatSessionCoachSummaryRow,
+  setChatSessionCondensedThroughRow
 } from "./database";
 import { chatSessionExists, getChatSession } from "./chatHistoryStore";
 import {
   applyTranscriptContext,
   buildRollingSummaryTurn,
+  CONTEXT_BUDGETS,
+  normalizeContextDetail,
   normalizeContextWindow,
   planTranscriptContext,
   summaryContextMessage,
   toWireMessages,
+  type AnswerDigestLookup,
+  type ContextBudget,
   type ContextWindow,
   type StoredTranscriptSummary,
   type TranscriptContextResult
 } from "./chatContextCompaction";
 import {
-  ANALYSIS_DEFAULT_EFFORT,
+  requestDigests,
+  resolveCompressionRuntime,
+  runTextJob,
+  transcriptDigests
+} from "./chatCompression";
+import {
   type AnalysisRuntime,
   type ChatContextCompaction,
   type ChatContextInspection,
@@ -69,7 +71,10 @@ export function readSessionSummary(sessionId: string): StoredTranscriptSummary {
       typeof row?.coach_summary_through === "number" &&
       Number.isFinite(row.coach_summary_through)
         ? row.coach_summary_through
-        : 0
+        : 0,
+    ...(typeof row?.coach_condensed_through === "number" && Number.isFinite(row.coach_condensed_through)
+      ? { condensedThrough: row.coach_condensed_through }
+      : {})
   };
 }
 
@@ -83,12 +88,15 @@ export function writeSessionSummary(
 
 export interface RollSummaryOptions {
   /**
-   * The provider, model and effort the roll runs on. An analysis passes its
-   * own (its tokens land on its run's row, and its provider is the one that was
-   * pre-flighted); the interactive chat passes nothing and inherits the saved
-   * settings.
+   * What the conversation answers with, which the roll's model is chosen from
+   * (`resolveCompressionRuntime`). An analysis passes its own; the interactive
+   * chat passes nothing, and the conversation's own AI is read from
+   * `sessionId` — it used to be Coach's default, whatever the conversation used.
    */
   runtime?: AnalysisRuntime;
+  sessionId?: string;
+  /** Answers already condensed are summarised from their digests. */
+  digestOf?: AnswerDigestLookup;
   idleTimeoutMs?: number;
 }
 
@@ -107,88 +115,28 @@ export async function rollTranscriptSummary(
   entries: PersistedChatEntry[],
   options: RollSummaryOptions = {}
 ): Promise<{ summary: string | null; usage?: ChatTokenUsage; reason?: string }> {
-  // Its own request id, never the caller's: an analysis roll happens while a
-  // run is still being prepared and has no row yet, and an interactive roll
-  // must not be cancelled by a Stop aimed at the turn it is preparing for.
-  const requestId = `coach-summary-${randomUUID()}`;
-  const collector = createCollectorSink();
-  const watchdog = createIdleWatchdog(
-    options.idleTimeoutMs ?? SUMMARISER_IDLE_TIMEOUT_MS
-  );
-  const sink: ChatStreamSink = {
-    emit(channel, payload) {
-      watchdog.touch();
-      collector.emit(channel, payload);
-    }
+  const job = await runTextJob({
+    system: SUMMARISER_SYSTEM,
+    prompt: buildRollingSummaryTurn(previous, entries, options.digestOf),
+    compression: resolveCompressionRuntime(options.sessionId, options.runtime),
+    label: "rolling summary",
+    idleTimeoutMs: options.idleTimeoutMs ?? SUMMARISER_IDLE_TIMEOUT_MS
+  });
+  return {
+    summary: job.text,
+    ...(job.usage ? { usage: job.usage } : {}),
+    ...(job.reason ? { reason: `the summariser ${job.reason}` } : {})
   };
-  // Whatever the roll spent goes back with it on every exit, including the ones
-  // that produce nothing.
-  const spent = () => {
-    const usage = collector.usage();
-    return usage ? { usage } : {};
-  };
-  /**
-   * Every exit that produced no summary comes through here, so no failure can
-   * reach a caller as a bare null. It also lands in the main-process log: the
-   * caller may choose not to show the reason, and a reason nobody can read is
-   * how "nothing was compacted" became a message with no cause attached.
-   */
-  const failed = (reason: string) => {
-    console.warn(`[coach] rolling summary failed: ${reason}`);
-    return { reason, ...spent() };
-  };
-  try {
-    const streaming = streamChat(
-      sink,
-      requestId,
-      [{ role: "user", content: buildRollingSummaryTurn(previous, entries) }],
-      {
-        // Nothing to look up: it is compressing text it was handed, and a tool
-        // round-trip here is both slower and a way to wander off.
-        toolPolicy: "none",
-        // Effort is the one thing that does not inherit. It is cost rather than
-        // capability, and a summariser compressing text it was handed has
-        // nothing to think harder about — so a coach set to `high` gets a
-        // `high` answer and a `low` summary.
-        runtime: { ...(options.runtime ?? {}), effort: ANALYSIS_DEFAULT_EFFORT }
-      }
-    );
-    streaming.catch(() => undefined);
-    let timedOut = false;
-    await Promise.race([
-      streaming,
-      watchdog.expired.then(() => {
-        timedOut = true;
-      })
-    ]);
-    if (timedOut) {
-      cancelChat(requestId);
-      return { summary: null, ...failed("the summariser stopped responding") };
-    }
-    const providerError = collector.error();
-    if (providerError) {
-      return { summary: null, ...failed(providerError) };
-    }
-    if (collector.cancelled()) {
-      return { summary: null, ...failed("the summariser turn was cancelled") };
-    }
-    const text = collector.text().trim();
-    if (!text) {
-      return {
-        summary: null,
-        ...failed("the summariser answered with nothing")
-      };
-    }
-    return { summary: text, ...spent() };
-  } catch (caught) {
-    return {
-      summary: null,
-      ...failed(caught instanceof Error ? caught.message : String(caught))
-    };
-  } finally {
-    watchdog.stop();
-  }
 }
+
+/**
+ * The summariser's own prompt. It used to run as a turn of Coach — Coach's
+ * rules, the athlete's snapshot read from COROS, the MCP connections — for a
+ * job that compresses text it is handed; the turn itself carries the rules.
+ */
+const SUMMARISER_SYSTEM =
+  "You keep the running summary of a conversation between an athlete and their running coach. " +
+  "Follow the instructions in the message and reply with the summary only.";
 
 export interface CompactSessionOptions {
   /** Roll now, whatever the limit says — the conversation menu's action. */
@@ -196,6 +144,15 @@ export interface CompactSessionOptions {
   runtime?: AnalysisRuntime;
   window?: ContextWindow;
   idleTimeoutMs?: number;
+}
+
+/** The budgets the athlete chose (`chat.compactContext.detail`). */
+export function getContextBudget(): ContextBudget {
+  return CONTEXT_BUDGETS[normalizeContextDetail(getChatSettings().compactContext?.detail)];
+}
+
+export function writeCondensedThrough(sessionId: string, condensedThrough: number): void {
+  setChatSessionCondensedThroughRow(sessionId, condensedThrough);
 }
 
 /**
@@ -212,20 +169,38 @@ export async function compactSessionContext(
   entries: PersistedChatEntry[],
   options: CompactSessionOptions = {}
 ): Promise<TranscriptContextResult> {
+  // Digests that cannot be read leave the answers whole; they never cost the
+  // conversation its compaction.
+  let digestOf: AnswerDigestLookup | undefined;
+  try {
+    digestOf = transcriptDigests(entries);
+  } catch {
+    digestOf = undefined;
+  }
   return applyTranscriptContext({
     entries,
     stored: readSessionSummary(sessionId),
     window: options.window ?? getContextWindow(),
+    budget: getContextBudget(),
+    ...(digestOf ? { digestOf } : {}),
     ...(options.force ? { force: true } : {}),
     roll: (previous, toSummarise) =>
       rollTranscriptSummary(previous, toSummarise, {
+        sessionId,
+        ...(digestOf ? { digestOf } : {}),
         ...(options.runtime ? { runtime: options.runtime } : {}),
         ...(options.idleTimeoutMs !== undefined
           ? { idleTimeoutMs: options.idleTimeoutMs }
           : {})
       }),
     store: (summary, through) =>
-      writeSessionSummary(sessionId, summary, through)
+      writeSessionSummary(sessionId, summary, through),
+    storeCondensed: (condensedThrough) => writeCondensedThrough(sessionId, condensedThrough),
+    digest: (requests) => {
+      requestDigests(sessionId, requests, options.runtime).catch((caught: unknown) => {
+        console.warn(`[coach] digests not requested: ${caught instanceof Error ? caught.message : String(caught)}`);
+      });
+    }
   });
 }
 
@@ -296,6 +271,7 @@ export async function compactChatSessionContext(
   );
   return {
     ...(result.summary ? { summary: result.summary } : {}),
+    ...(result.middle?.length ? { middle: result.middle } : {}),
     tailStart: result.tailStart,
     through: result.through,
     rolled: result.rolled,
@@ -316,6 +292,10 @@ export interface InspectChatSessionDeps {
   window(): ContextWindow;
   stored(sessionId: string): StoredTranscriptSummary;
   loadEntries(sessionId: string): PersistedChatEntry[];
+  /** The budgets in force; the default ones when absent. */
+  budget?(): ContextBudget;
+  /** The digests made so far for this transcript's answers. */
+  digests?(entries: PersistedChatEntry[]): AnswerDigestLookup;
 }
 
 export function createDefaultInspectDeps(): InspectChatSessionDeps {
@@ -324,7 +304,9 @@ export function createDefaultInspectDeps(): InspectChatSessionDeps {
     window: getContextWindow,
     stored: readSessionSummary,
     loadEntries: (sessionId) =>
-      chatSessionExists(sessionId) ? getChatSession(sessionId) : []
+      chatSessionExists(sessionId) ? getChatSession(sessionId) : [],
+    budget: getContextBudget,
+    digests: transcriptDigests
   };
 }
 
@@ -346,8 +328,14 @@ export function inspectChatSessionContext(
 ): ChatContextInspection {
   const transcript = entries ?? deps.loadEntries(sessionId);
   const window = deps.window();
-  const plan = planTranscriptContext(transcript, deps.stored(sessionId), window);
-  const pending = toWireMessages(plan.toSummarise);
+  const budget = deps.budget?.();
+  const digestOf = deps.digests?.(transcript);
+  const plan = planTranscriptContext(transcript, deps.stored(sessionId), window, {
+    ...(budget ? { budget } : {}),
+    ...(digestOf ? { digestOf } : {})
+  });
+  const pending = toWireMessages(plan.toSummarise, digestOf);
+  const middle = toWireMessages(plan.middle, digestOf);
   const tail = toWireMessages(plan.tail);
   const head = plan.summary ? [summaryContextMessage(plan.summary)] : [];
   return {
@@ -356,14 +344,15 @@ export function inspectChatSessionContext(
     // that count becomes after a pending roll. An inspector that reported the
     // future value would say a summary covers turns it has never seen, and the
     // half of this view that matters is the difference between the two.
-    through: transcript.length - plan.toSummarise.length - plan.tail.length,
+    through: transcript.length - plan.toSummarise.length - plan.middle.length - plan.tail.length,
     window,
     enabled: deps.enabled(),
     entryCount: transcript.length,
     tailStart: transcript.length - plan.tail.length,
     pending,
+    ...(middle.length ? { middle } : {}),
     tail,
-    characterCount: [...head, ...pending, ...tail].reduce(
+    characterCount: [...head, ...pending, ...middle, ...tail].reduce(
       (total, message) => total + message.content.length,
       0
     )

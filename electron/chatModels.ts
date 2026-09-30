@@ -278,6 +278,32 @@ export function providerModelOptions(
 }
 
 /**
+ * The families `auto` compresses with, smallest first (`CompactModelChoice`).
+ * Matched against the provider's own list, never a model id written here: a
+ * family the provider stops listing is simply not found, and one it adds under
+ * the same name is. A provider whose names say nothing about size (OpenRouter's
+ * routers, ChatGPT's Sol/Terra/Luna, a local server) has no entry, and a
+ * conversation there is compressed with its own model.
+ */
+const COMPRESSION_FAMILIES: Partial<Record<ChatProvider, readonly RegExp[]>> = {
+  "claude-code": [/haiku/i, /sonnet/i],
+  "claude-api": [/haiku/i, /sonnet/i],
+  chatgpt: [/nano/i, /mini/i]
+};
+
+/** The smallest model `options` lists for `provider`, or nothing when its names do not say. */
+export function compressionModelFor(
+  provider: ChatProvider,
+  options: readonly ChatModelOption[]
+): ChatModelOption | undefined {
+  for (const family of COMPRESSION_FAMILIES[provider] ?? []) {
+    const match = options.find((option) => option.value && (family.test(option.value) || family.test(option.label)));
+    if (match) return match;
+  }
+  return undefined;
+}
+
+/**
  * The options with the chosen model kept in them. A model the provider no
  * longer lists is still what a conversation is set to, and dropping it from
  * the menu would show another model as chosen while this one keeps being

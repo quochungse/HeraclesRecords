@@ -5,6 +5,7 @@ import http from "node:http";
 import path from "node:path";
 import type { AddressInfo } from "node:net";
 import {
+  deleteChatAnswerDigestsOf,
   deleteChatConversationSettingsRow,
   deleteChatScheduleChangesOf,
   deleteSettings,
@@ -114,7 +115,7 @@ import {
   handleChatConversationTool,
   isChatConversationTool,
   RECALL_CONVERSATION_TOOL,
-  summarisedThrough,
+  recallableThrough,
   type ChatConversationToolName
 } from "./chatConversationTools";
 import { parseFunctionCallArguments } from "./chatToolArguments";
@@ -785,6 +786,7 @@ export function deleteChatSessionById(id: string): void {
   deletePlanBriefs(briefIds);
   deleteChatConversationSettingsRow(id);
   deleteChatScheduleChangesOf(id);
+  deleteChatAnswerDigestsOf(id);
   // Section 2.4: the analyses inside this conversation go with it. An analysis
   // lives in exactly one conversation and cannot be moved, so there is nothing
   // to re-point and nothing left for one to be about.
@@ -1349,6 +1351,22 @@ export interface StreamChatOptions {
   toolPolicy?: ChatToolPolicy;
   /** Analysis role, injected as its own hardened instruction block. */
   roleInstructions?: string;
+  /**
+   * A text job — a digest, a rolling summary — rather than a turn of Coach:
+   * this system prompt instead of Coach's, and no snapshot, no MCP
+   * connections and no tools (pass `toolPolicy: "none"`). A job compressing
+   * text it was handed has no use for the athlete's training data, and reading
+   * it from COROS for every digest would cost a round trip each time.
+   */
+  textJob?: {
+    system: string;
+    /**
+     * Thinking tokens for a model that takes a budget rather than an effort
+     * (Haiku 4.5, measured in `answerDigest.ts`). Ignored where the model
+     * takes an effort, and by providers that have neither.
+     */
+    thinkingBudget?: number;
+  };
 }
 
 /**
@@ -1804,6 +1822,12 @@ async function streamChatTurn(
       : "interactive";
   const roleInstructions = options.roleInstructions;
   const runtime = options.runtime ?? {};
+  const job = options.textJob;
+  // Every provider below reads its context and tool surface through these two,
+  // so a text job skips both in one place rather than in five.
+  const turnContext: typeof buildTrainingContext = (...args) =>
+    job ? Promise.resolve({ head: job.system, live: "", hasData: false }) : buildTrainingContext(...args);
+  const turnToolSurface = (): Promise<void> => (job ? Promise.resolve() : prepareToolSurface());
   // What this turn cost, summed across its tool rounds and across whichever
   // provider answered. Left undefined when nobody reported: a run that cost
   // nothing and a run nobody counted are different facts, and a budget that
@@ -1904,12 +1928,12 @@ async function streamChatTurn(
         );
       }
 
-      await prepare(prepareToolSurface());
+      await prepare(turnToolSurface());
       const chatTools = toolsForRun(
         requestId,
         getClaudeCodeTools(settings.claudeCode.permissions, toolPolicy)
       );
-      const { hasData, ...context } = await prepare(buildTrainingContext(
+      const { hasData, ...context } = await prepare(turnContext(
         settings.claudeCode.permissions,
         unitSystem,
         settings.customInstructions,
@@ -1939,6 +1963,8 @@ async function streamChatTurn(
         signal: controller.signal,
         model: runtime.model ?? settings.claudeCode.model,
         effort: runtime.effort ?? settings.claudeCode.effort,
+        ...(job ? { plainPrompt: true } : {}),
+        ...(job?.thinkingBudget ? { thinkingBudget: job.thinkingBudget } : {}),
         configDir: claudeConfigDir,
         onModelResolved: (model) => {
           // Noted first and unconditionally: this is the only place Claude Code
@@ -2011,7 +2037,7 @@ async function streamChatTurn(
       if (!apiKey) {
         throw new Error("Add an OpenRouter API key in Coach settings first.");
       }
-      const { hasData, ...context } = await prepare(buildTrainingContext(
+      const { hasData, ...context } = await prepare(turnContext(
         undefined,
         unitSystem,
         settings.customInstructions,
@@ -2020,7 +2046,7 @@ async function streamChatTurn(
         settings.coachStyle
       ));
 
-      await prepare(prepareToolSurface());
+      await prepare(turnToolSurface());
       const chatTools = toolsForRun(requestId, applyChatToolPolicy(getAllChatTools(), toolPolicy));
       const systemPrompt = coachSystemPrompt(
         context,
@@ -2098,7 +2124,8 @@ async function streamChatTurn(
       };
       const runtimeConfig: AnthropicRuntimeConfig = {
         ...baseConfig,
-        listed: listedAnthropicModel(settings, baseConfig.model)
+        listed: listedAnthropicModel(settings, baseConfig.model),
+        ...(job?.thinkingBudget ? { thinkingBudget: job.thinkingBudget } : {})
       };
       if (!runtimeConfig.apiKey) {
         throw new AnthropicProviderError(
@@ -2107,9 +2134,9 @@ async function streamChatTurn(
         );
       }
 
-      await prepare(prepareToolSurface());
+      await prepare(turnToolSurface());
       const chatTools = toolsForRun(requestId, applyChatToolPolicy(getAllChatTools(), toolPolicy));
-      const { hasData, ...context } = await prepare(buildTrainingContext(
+      const { hasData, ...context } = await prepare(turnContext(
         undefined,
         unitSystem,
         settings.customInstructions,
@@ -2184,7 +2211,7 @@ async function streamChatTurn(
     }
 
     if (provider === "local") {
-      const { hasData, ...context } = await prepare(buildTrainingContext(
+      const { hasData, ...context } = await prepare(turnContext(
         undefined,
         unitSystem,
         settings.customInstructions,
@@ -2198,7 +2225,7 @@ async function streamChatTurn(
       };
 
       if (runtimeConfig.toolsEnabled) {
-        await prepare(prepareToolSurface());
+        await prepare(turnToolSurface());
       }
       const chatTools = toolsForRun(
         requestId,
@@ -2283,7 +2310,7 @@ async function streamChatTurn(
     }
 
     const token = await prepare(getValidToken());
-    const { hasData, ...context } = await prepare(buildTrainingContext(
+    const { hasData, ...context } = await prepare(turnContext(
       undefined,
       unitSystem,
       settings.customInstructions,
@@ -2294,8 +2321,10 @@ async function streamChatTurn(
 
     // Reconnect a previously-authorized COROS MCP session, then expose its tools
     // to the model as function tools so it can pull data on demand.
-    await prepare(prepareToolSurface());
-    const tools = buildChatFunctionTools(toolsForRun(requestId, getAllChatTools()));
+    await prepare(turnToolSurface());
+    // Under the turn's policy, as every other provider's list is: a text job
+    // runs with `none`, and a list of every tool would be offered to it.
+    const tools = buildChatFunctionTools(toolsForRun(requestId, applyChatToolPolicy(getAllChatTools(), toolPolicy)));
 
     // When live tools are available, steer the model to use them rather than
     // leaning on the brief snapshot in `instructions`.
@@ -2500,9 +2529,10 @@ const runTools = new Map<string, RunTools>();
 
 function toolsForRun(requestId: string, tools: CorosMcpTool[]): CorosMcpTool[] {
   const run = runTools.get(requestId);
-  // Recall reads what a summary stands in for, so a conversation without one
-  // has nothing for it to find, and its schema would ride on every round.
-  const offered = summarisedThrough(turnSessions.get(requestId)) > 0
+  // Recall reads what is not sent word for word, so a conversation with no
+  // summary and no condensed layer has nothing for it to find, and its schema
+  // would ride on every round.
+  const offered = recallableThrough(turnSessions.get(requestId)) > 0
     ? tools
     : tools.filter((tool) => tool.name !== RECALL_CONVERSATION_TOOL);
   return run ? [...offered.filter((tool) => run.allow(tool.name)), ...run.extra] : offered;
@@ -3666,9 +3696,10 @@ export function withLiveToolInstructions(
   }
   if (has(RECALL_CONVERSATION_TOOL)) {
     sections.push(
-      "The start of this conversation reaches you as a summary. When the athlete refers back to something " +
-        "the summary does not hold word for word — a figure, a prescription, what they said — read it with " +
-        "recall_conversation before answering, rather than guessing or asking them to repeat it."
+      "The start of this conversation reaches you as a summary, and your older answers marked [condensed] " +
+        "as digests. When the athlete refers back to something they do not hold word for word — a figure, a " +
+        "prescription, what they said — read it with recall_conversation before answering, rather than " +
+        "guessing or asking them to repeat it."
     );
   }
   if (interactionTools.length > 0) {

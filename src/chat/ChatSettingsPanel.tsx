@@ -3,20 +3,23 @@ import { createPortal } from "react-dom";
 import { BrainCircuit, ChevronRight, Loader2, TriangleAlert, X } from "lucide-react";
 import type {
   InlineSuggestionsMode,
+  ChatProvider,
   ChatSettings,
   CoachStyle,
   CoachAnalysisPause,
-  CoachAnalysisSpend
+  CoachAnalysisSpend,
+  CompactModelChoice,
+  ContextDetail
 } from "../../electron/types";
 import { MAX_CUSTOM_COACH_INSTRUCTIONS } from "../../electron/types";
 import {
+  CONTEXT_BUDGETS,
   DEFAULT_COMPACT_CONTEXT,
-  DEFAULT_CONTEXT_BUDGET,
-  MAX_CONTEXT_LIMIT,
-  MIN_CONTEXT_GAP,
-  MIN_CONTEXT_KEEP,
-  normalizeContextWindow
+  normalizeCompactModelChoice,
+  normalizeContextDetail
 } from "../../electron/chatContextCompaction";
+import { compressionModelFor, providerModelOptions } from "../../electron/chatModels";
+import { COACH_PROVIDER_LABELS } from "./CoachModelsPanel";
 import type { CorosLinkApi } from "../coroslink-api";
 import { formatTokens } from "./analyses/analysisLabels";
 import { OptionGroup } from "../components/OptionGroup";
@@ -58,30 +61,8 @@ export function ChatSettingsPanel({
 
   const compactContext = chatSettings.compactContext ?? DEFAULT_COMPACT_CONTEXT;
   const compactEnabled = compactContext.enabled !== false;
-  // Held as text so a half-typed number is not clamped out from under the
-  // cursor: "1" on the way to "120" is a valid keystroke and an invalid window.
-  const [limitDraft, setLimitDraft] = useState(String(compactContext.limit));
-  const [keepDraft, setKeepDraft] = useState(String(compactContext.keep));
-
-  useEffect(() => {
-    setLimitDraft(String(compactContext.limit));
-    setKeepDraft(String(compactContext.keep));
-  }, [compactContext.limit, compactContext.keep]);
-
-  const commitWindow = () => {
-    // The same normaliser the store uses, so what the box snaps back to is
-    // exactly what was saved rather than a second opinion about it.
-    const next = normalizeContextWindow({
-      limit: Number(limitDraft),
-      keep: Number(keepDraft)
-    });
-    setLimitDraft(String(next.limit));
-    setKeepDraft(String(next.keep));
-    if (next.limit === compactContext.limit && next.keep === compactContext.keep) {
-      return;
-    }
-    onUpdateChatSettings({ compactContext: { ...compactContext, ...next } });
-  };
+  const updateCompact = (patch: Partial<typeof compactContext>) =>
+    onUpdateChatSettings({ compactContext: { ...compactContext, ...patch } });
 
   const [baseInstructionsOpen, setBaseInstructionsOpen] = useState(false);
   const [baseInstructions, setBaseInstructions] = useState<string | null>(null);
@@ -232,97 +213,13 @@ export function ChatSettingsPanel({
         ) : null}
       </section>
 
-      <section className="chat-settings-section">
-        <h3>Compact context</h3>
-        <p className="chat-settings-copy">
-          A conversation grows with every turn, and every turn sends the whole
-          thing. Past a point the older turns are summarised into a running note
-          and only the recent ones go over in full, so a year-old thread still
-          costs about what a new one does. This trims what is sent — never the
-          transcript, which stays complete on disk and on screen.
-        </p>
-        <p className="chat-settings-copy">
-          The same window applies to your own messages and to scheduled coach
-          runs, and the summary lives on the conversation, so whichever of the
-          two rolls it, both use it.
-        </p>
-        <label className="chat-local-tools">
-          <input
-            type="checkbox"
-            checked={compactEnabled}
-            onChange={(event) =>
-              onUpdateChatSettings({
-                compactContext: {
-                  ...compactContext,
-                  enabled: event.target.checked
-                }
-              })
-            }
-          />
-          <span>Compact long conversations automatically</span>
-        </label>
-        <div className="chat-compact-fields">
-          <label className="chat-local-field">
-            <span>Compact after</span>
-            <input
-              type="number"
-              inputMode="numeric"
-              min={MIN_CONTEXT_KEEP + MIN_CONTEXT_GAP}
-              max={MAX_CONTEXT_LIMIT}
-              step={1}
-              disabled={!compactEnabled}
-              value={limitDraft}
-              onChange={(event) => setLimitDraft(event.target.value)}
-              onBlur={commitWindow}
-              onKeyDown={(event) => {
-                if (event.key === "Enter") commitWindow();
-              }}
-            />
-          </label>
-          <label className="chat-local-field">
-            <span>Keep in full</span>
-            <input
-              type="number"
-              inputMode="numeric"
-              min={MIN_CONTEXT_KEEP}
-              max={MAX_CONTEXT_LIMIT - MIN_CONTEXT_GAP}
-              step={1}
-              disabled={!compactEnabled}
-              value={keepDraft}
-              onChange={(event) => setKeepDraft(event.target.value)}
-              onBlur={commitWindow}
-              onKeyDown={(event) => {
-                if (event.key === "Enter") commitWindow();
-              }}
-            />
-          </label>
-        </div>
-        <p className="chat-settings-copy">
-          Entries, not messages — a chart or a plan card counts as one. Once the
-          conversation runs {compactContext.limit} entries past what the summary
-          already covers, everything but the last {compactContext.keep} is folded
-          into it. That leaves roughly{" "}
-          {Math.max(1, Math.round((compactContext.limit - compactContext.keep) / 2))}{" "}
-          exchanges between one summariser call and the next; a smaller gap
-          between the two numbers means summarising more often, and a summary of
-          a summary keeps less each time.
-        </p>
-        <p className="chat-settings-copy">
-          Long answers are compacted sooner, whatever the count: once the
-          conversation holds about {DEFAULT_CONTEXT_BUDGET.rollAt / 1000}k tokens
-          past the summary, it is folded down to the last{" "}
-          {DEFAULT_CONTEXT_BUDGET.keep / 1000}k — never less than your question and
-          the answer before it. Nothing folded is lost: Coach can search the
-          earlier turns and read them word for word when the summary is not enough.
-        </p>
-        <p className="chat-settings-copy">
-          Between {MIN_CONTEXT_KEEP + MIN_CONTEXT_GAP} and {MAX_CONTEXT_LIMIT},
-          and &ldquo;compact after&rdquo; must stay at least {MIN_CONTEXT_GAP}{" "}
-          above &ldquo;keep in full&rdquo;. Out-of-range values are pulled back
-          into it when you click away or press Enter. Compact one conversation right now from
-          its &ldquo;⋯&rdquo; menu in the sidebar.
-        </p>
-      </section>
+      <CompactContextSection
+        chatSettings={chatSettings}
+        enabled={compactEnabled}
+        detail={normalizeContextDetail(compactContext.detail)}
+        model={normalizeCompactModelChoice(compactContext.model)}
+        onChange={updateCompact}
+      />
 
       <AnalysesSettingsSection
         api={api}
@@ -331,6 +228,175 @@ export function ChatSettingsPanel({
         savedSpend={savedSpend}
       />
     </div>
+  );
+}
+
+const DETAIL_OPTIONS: { value: ContextDetail; label: string }[] = [
+  { value: "lean", label: "Less" },
+  { value: "balanced", label: "Balanced" },
+  { value: "full", label: "More" }
+];
+
+type ModelChoiceKind = CompactModelChoice["kind"];
+
+const MODEL_CHOICE_OPTIONS: { value: ModelChoiceKind; label: string }[] = [
+  { value: "auto", label: "Automatic" },
+  { value: "conversation", label: "Conversation’s model" },
+  { value: "fixed", label: "Choose" }
+];
+
+/** Providers a model can be chosen from here: a local server lists none. */
+const CHOOSABLE_PROVIDERS: ChatProvider[] = ["claude-code", "claude-api", "chatgpt", "openrouter"];
+
+const thousands = (tokens: number) => `${Math.round(tokens / 1000)}k`;
+
+/**
+ * How a long conversation is sent (`CONTEXT_BUDGETS`) and what condenses it
+ * (`CompactModelChoice`). It replaced two number fields counted in entries —
+ * "compact after 60, keep 20" — which could not say what a turn weighs, the
+ * thing that decides what a conversation costs.
+ */
+function CompactContextSection({
+  chatSettings,
+  enabled,
+  detail,
+  model,
+  onChange
+}: {
+  chatSettings: ChatSettings;
+  enabled: boolean;
+  detail: ContextDetail;
+  model: CompactModelChoice;
+  onChange: (patch: Partial<ChatSettings["compactContext"]>) => void;
+}) {
+  const budget = CONTEXT_BUDGETS[detail];
+  const coachProvider = chatSettings.provider;
+  const automatic = compressionModelFor(coachProvider, providerModelOptions(coachProvider, chatSettings));
+  const fixedProvider = model.kind === "fixed" ? model.provider : null;
+  const fixedOptions = fixedProvider
+    ? providerModelOptions(fixedProvider, chatSettings).filter((option) => option.value)
+    : [];
+  const fixedModelKnown = model.kind === "fixed" && fixedOptions.some((option) => option.value === model.model);
+
+  const chooseKind = (kind: ModelChoiceKind) => {
+    if (kind !== "fixed") {
+      onChange({ model: { kind } });
+      return;
+    }
+    const provider = CHOOSABLE_PROVIDERS.includes(coachProvider) ? coachProvider : "claude-code";
+    const options = providerModelOptions(provider, chatSettings).filter((option) => option.value);
+    const first = compressionModelFor(provider, options) ?? options[0];
+    if (first) onChange({ model: { kind: "fixed", provider, model: first.value } });
+  };
+  const chooseProvider = (provider: ChatProvider) => {
+    const options = providerModelOptions(provider, chatSettings).filter((option) => option.value);
+    const first = compressionModelFor(provider, options) ?? options[0];
+    if (first) onChange({ model: { kind: "fixed", provider, model: first.value } });
+  };
+
+  return (
+    <section className="chat-settings-section">
+      <h3>Compact context</h3>
+      <p className="chat-settings-copy">
+        A long conversation is sent in three layers: the newest turns word for
+        word; the ones before them condensed — your messages as you wrote them,
+        each of Coach&rsquo;s answers as a short digest of its figures and
+        decisions; and everything older as a running summary. Only what is sent
+        changes. The conversation stays complete on screen, and Coach can read
+        any earlier turn word for word when it needs to.
+      </p>
+      <label className="chat-local-tools">
+        <input
+          type="checkbox"
+          checked={enabled}
+          onChange={(event) => onChange({ enabled: event.target.checked })}
+        />
+        <span>Compact long conversations automatically</span>
+      </label>
+
+      <div className="chat-local-field">
+        <span>Kept word for word</span>
+        <OptionGroup<ContextDetail>
+          label="How much of a conversation is sent word for word"
+          size="md"
+          fill
+          disabled={!enabled}
+          value={detail}
+          onChange={(next) => onChange({ detail: next })}
+          options={DETAIL_OPTIONS}
+        />
+      </div>
+      <p className="chat-settings-copy">
+        About the last {thousands(budget.keep)} tokens go as written. Once the
+        recent turns pass {thousands(budget.rollAt)}, the older ones are
+        condensed; once the condensed part passes {thousands(budget.middle)}, its
+        oldest turns go into the summary.{" "}
+        {detail === "lean"
+          ? "The cheapest, and Coach looks back more often."
+          : detail === "full"
+            ? "Costs more on every turn of a long conversation."
+            : "The default."}
+      </p>
+
+      <div className="chat-local-field">
+        <span>Condense with</span>
+        <OptionGroup<ModelChoiceKind>
+          label="The model that makes digests and summaries"
+          size="md"
+          fill
+          disabled={!enabled}
+          value={model.kind}
+          onChange={chooseKind}
+          options={MODEL_CHOICE_OPTIONS}
+        />
+      </div>
+      {model.kind === "fixed" ? (
+        <div className="chat-compact-fields">
+          <div className="chat-local-field">
+            <span>Provider</span>
+            <OptionGroup<ChatProvider>
+              label="Provider of the condensing model"
+              mode="dropdown"
+              disabled={!enabled}
+              value={model.provider}
+              onChange={chooseProvider}
+              options={CHOOSABLE_PROVIDERS.map((provider) => ({
+                value: provider,
+                label: COACH_PROVIDER_LABELS[provider]
+              }))}
+            />
+          </div>
+          <div className="chat-local-field">
+            <span>Model</span>
+            <OptionGroup<string>
+              label="Condensing model"
+              mode="dropdown"
+              disabled={!enabled}
+              value={model.model}
+              onChange={(next) => onChange({ model: { kind: "fixed", provider: model.provider, model: next } })}
+              options={[
+                ...fixedOptions.map((option) => ({ value: option.value, label: option.label })),
+                ...(fixedModelKnown ? [] : [{ value: model.model, label: `${model.model} (not listed)` }])
+              ]}
+            />
+          </div>
+        </div>
+      ) : null}
+      <p className="chat-settings-copy">
+        {model.kind === "auto"
+          ? automatic
+            ? `The smallest model the conversation’s AI offers — for ${COACH_PROVIDER_LABELS[coachProvider]}, ${automatic.label}. A conversation on an AI whose models say nothing about their size uses its own model.`
+            : `The smallest model the conversation’s AI offers. ${COACH_PROVIDER_LABELS[coachProvider]} lists none by size, so its conversations use their own model.`
+          : model.kind === "conversation"
+            ? "The model each conversation answers with. It costs more, and digests and summaries read no better for it."
+            : "Every conversation is condensed with this model, whatever AI it answers with."}{" "}
+        A digest that states a figure its answer does not is refused, and that
+        answer is sent whole.
+      </p>
+      <p className="chat-settings-copy">
+        Compact one conversation right now from its &ldquo;⋯&rdquo; menu in the sidebar.
+      </p>
+    </section>
   );
 }
 

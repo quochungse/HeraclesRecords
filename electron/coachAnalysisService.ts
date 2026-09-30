@@ -16,15 +16,21 @@ import {
   summaryContextMessage,
   toWireMessages,
   withCreationIndex,
+  type AnswerDigestLookup,
+  type ContextBudget,
   type ContextWindow,
+  type DigestRequest,
   type StoredTranscriptSummary
 } from "./chatContextCompaction";
 import {
+  getContextBudget,
   getContextWindow,
   readSessionSummary,
   rollTranscriptSummary,
+  writeCondensedThrough,
   writeSessionSummary
 } from "./chatContextService";
+import { requestDigests, transcriptDigests } from "./chatCompression";
 import {
   chatSessionExists,
   createChatSession,
@@ -633,8 +639,20 @@ export interface CoachAnalysisRunnerDeps {
   rollSummary(
     previous: string | undefined,
     entries: PersistedChatEntry[],
-    runtime: AnalysisRuntime
+    runtime: AnalysisRuntime,
+    /** Answers already condensed are summarised from their digests. */
+    digestOf?: AnswerDigestLookup
   ): Promise<{ summary: string | null; usage?: ChatTokenUsage }>;
+  /**
+   * The condensed layer (`CONTEXT_BUDGETS`): the budgets the athlete chose, the
+   * digests made so far, where the verbatim turns begin, and a way to ask for
+   * the digests still missing. Optional, so a suite that does not care leaves
+   * the layer out and the run sends what it always sent.
+   */
+  getContextBudget?(): ContextBudget;
+  getDigests?(entries: PersistedChatEntry[]): AnswerDigestLookup;
+  setCondensedThrough?(sessionId: string, condensedThrough: number): void;
+  requestDigests?(sessionId: string, requests: DigestRequest[], runtime: AnalysisRuntime): void;
   createSession(provider: ChatProvider): string;
   saveSession(sessionId: string, entries: PersistedChatEntry[]): void;
   setSessionTitle(sessionId: string, title: string): void;
@@ -790,7 +808,7 @@ function createDefaultDeps(): CoachAnalysisRunnerDeps {
       writeSessionSummary(sessionId, summary, through);
     },
     getContextWindow: () => getContextWindow(),
-    rollSummary: (previous, entries, runtime) =>
+    rollSummary: (previous, entries, runtime, digestOf) =>
       // The run's own provider and model (decision 2), not the interactive
       // chat's. A roll is a turn taken on this analysis's behalf: its cost
       // lands on this run's row (13), guard rail 3 pre-flighted *this* provider
@@ -798,8 +816,15 @@ function createDefaultDeps(): CoachAnalysisRunnerDeps {
       // quietly spend on the first.
       rollTranscriptSummary(previous, entries, {
         runtime,
+        ...(digestOf ? { digestOf } : {}),
         idleTimeoutMs: ANALYSIS_IDLE_TIMEOUT_MS
       }),
+    getContextBudget: () => getContextBudget(),
+    getDigests: (entries) => transcriptDigests(entries),
+    setCondensedThrough: (sessionId, condensedThrough) => writeCondensedThrough(sessionId, condensedThrough),
+    requestDigests: (sessionId, requests, runtime) => {
+      requestDigests(sessionId, requests, runtime).catch(() => undefined);
+    },
     createSession: (provider) => createChatSession(provider).id,
     saveSession: (sessionId, entries) => {
       saveChatSession(sessionId, entries);
@@ -1521,18 +1546,35 @@ async function runInConversation(
   // 5.7: a year-old briefing thread must still cost one turn. Done here, while
   // the run is still being prepared, so the mid-preparation Stop check below
   // covers the window a roll opens — a roll is itself a model call.
+  // The condensed layer is an optimisation, and an optimisation that fails a
+  // run is a bug with a good excuse: a budget or a digest that cannot be read
+  // leaves the run sending what it always sent.
+  const optional = <T,>(read: () => T): T | undefined => {
+    try {
+      return read();
+    } catch {
+      return undefined;
+    }
+  };
+  const budget = optional(() => resolved.getContextBudget?.());
+  const digestOf = optional(() => resolved.getDigests?.(session.entries));
   const context = await applyTranscriptContext({
     entries: session.entries,
     stored: resolved.getSessionSummary(session.sessionId),
     window: resolved.getContextWindow(),
+    ...(budget ? { budget } : {}),
+    ...(digestOf ? { digestOf } : {}),
     roll: (previous, toSummarise) =>
       resolved.rollSummary(
         previous,
         toSummarise,
-        resolveAnalysisRuntime(analysis)
+        resolveAnalysisRuntime(analysis),
+        digestOf
       ),
     store: (rolled, through) =>
-      resolved.setSessionSummary(session.sessionId, rolled, through)
+      resolved.setSessionSummary(session.sessionId, rolled, through),
+    storeCondensed: (condensedThrough) => optional(() => resolved.setCondensedThrough?.(session.sessionId, condensedThrough)),
+    digest: (requests) => optional(() => resolved.requestDigests?.(session.sessionId, requests, resolveAnalysisRuntime(analysis)))
   });
   const summary = context.summary;
   const tail = context.tail;
@@ -1692,6 +1734,7 @@ async function runInConversation(
       withCreationIndex(
         [
           ...(summary ? [summaryContextMessage(summary)] : []),
+          ...context.middle,
           ...toWireMessages(tail),
           { role: "user", content: playbook }
         ],

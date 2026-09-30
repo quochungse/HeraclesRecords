@@ -15,9 +15,12 @@ import type { CorosMcpTool } from "./types";
  * themselves. That is what lets the budget in `chatContextCompaction.ts` be
  * tight without the conversation losing anything for good.
  *
- * Offered only to a turn whose conversation has a summary (`toolsForRun` in
- * `chatService.ts`): before the first roll every turn is already on the wire,
- * and the schema would be paid for on every round for nothing.
+ * The same holds for the condensed layer, where an answer goes out as its
+ * digest: the digest keeps the figures, and the whole answer is one search away.
+ *
+ * Offered only to a turn whose conversation has a summary or a condensed layer
+ * (`toolsForRun` in `chatService.ts`): before either every turn is already on
+ * the wire, and the schema would be paid for on every round for nothing.
  */
 export const RECALL_CONVERSATION_TOOL = "recall_conversation";
 
@@ -34,9 +37,9 @@ export function getChatConversationTools(): CorosMcpTool[] {
     {
       name: RECALL_CONVERSATION_TOOL,
       description:
-        "Search the earlier part of this conversation — the turns the summary stands in for — and read " +
-        "the matching exchanges word for word, dated. For a figure, a prescription or something the " +
-        "athlete said that the summary does not hold.",
+        "Search the earlier part of this conversation — the turns the summary stands in for, and the " +
+        "answers sent [condensed] — and read the matching exchanges word for word, dated. For a figure, a " +
+        "prescription or something the athlete said that the summary or a digest does not hold.",
       inputSchema: {
         type: "object",
         properties: {
@@ -58,14 +61,16 @@ export function getChatConversationTools(): CorosMcpTool[] {
   ];
 }
 
-/** How far into a conversation its summary reaches; 0 when it has none. */
-export function summarisedThrough(sessionId: string | undefined): number {
+/**
+ * How far into a conversation the part not sent word for word reaches: the
+ * summary, and the condensed layer after it. 0 when there is neither.
+ */
+export function recallableThrough(sessionId: string | undefined): number {
   if (!sessionId) return 0;
   const row = getChatSessionCoachSummaryRow(sessionId);
-  const through = row?.coach_summary_through;
-  return row?.coach_summary?.trim() && typeof through === "number" && Number.isFinite(through) && through > 0
-    ? through
-    : 0;
+  const whole = (value: unknown) => (typeof value === "number" && Number.isFinite(value) && value > 0 ? value : 0);
+  const summarised = row?.coach_summary?.trim() ? whole(row.coach_summary_through) : 0;
+  return Math.max(summarised, whole(row?.coach_condensed_through));
 }
 
 export function handleChatConversationTool(
@@ -78,7 +83,7 @@ export function handleChatConversationTool(
   }
   const query = typeof args.query === "string" ? args.query.trim() : "";
   const limit = typeof args.limit === "number" && Number.isFinite(args.limit) ? args.limit : DEFAULT_RECALLED;
-  // Only the part the summary stands in for: the tail is on the wire already.
-  const earlier = getChatSession(sessionId).slice(0, summarisedThrough(sessionId));
+  // Only the part not sent word for word: the tail is on the wire already.
+  const earlier = getChatSession(sessionId).slice(0, recallableThrough(sessionId));
   return recallEarlierTurns(earlier, query, limit);
 }
