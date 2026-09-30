@@ -17191,6 +17191,11 @@ tr.data-intervals-row-missing {
   font-size: 12px;
 }
 
+/* Says why Save is unavailable, rather than a grey button on its own. */
+.chat-settings-modal-footer .chat-settings-footer-status.is-warning {
+  color: var(--warning-text);
+}
+
 .chat-settings-button {
   display: inline-flex;
   align-items: center;
@@ -33001,6 +33006,32 @@ body.is-backgrounded .training-backup-progress-track.is-indeterminate span {
   /* Reserve the scrollbar's width on the tab that does not need one, or the
      content reflows sideways by its width on every switch. */
   scrollbar-gutter: stable;
+}
+
+/* The detail keeps its actions in a footer, as Coach settings does, so the
+   body stops scrolling and the detail inside it scrolls instead. */
+.coach-analyses-modal-body.is-detail {
+  display: flex;
+  flex-direction: column;
+  padding: 0;
+  overflow: hidden;
+}
+
+.coach-analyses-modal-body.is-detail > .coach-analysis-detail {
+  flex: 1;
+  min-height: 0;
+  align-content: start;
+  padding: 16px;
+  overflow-y: auto;
+  scrollbar-gutter: stable;
+}
+
+/* `.danger-button` alone loses its hover to `.secondary-button`'s, which is
+   the same specificity and later in the file. */
+.coach-analysis-detail-footer .danger-button:hover:not(:disabled) {
+  border-color: var(--error-text);
+  background: var(--error-bg);
+  color: var(--error-text);
 }/* ----- Create screen ----- */
 
 .coach-analysis-create {
@@ -33168,44 +33199,7 @@ body.is-backgrounded .training-backup-progress-track.is-indeterminate span {
   color: var(--accent);
 }
 
-.coach-analysis-save-row {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  flex-wrap: wrap;
-}
-
-/* Says why the save button is unavailable, instead of leaving a grey button
-   with no explanation. */
-.coach-analysis-save-reason {
-  font-size: 12px;
-  color: var(--warning-text);
-}
-
 /* ----- Deleting an analysis ----- */
-
-.coach-analysis-danger-zone {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 14px;
-  margin-top: 6px;
-  padding: 12px;
-  border: 1px solid color-mix(in srgb, var(--error-border) 60%, var(--glass-border));
-  border-radius: var(--radius-md);
-}
-
-.coach-analysis-danger-zone strong {
-  font-size: 13px;
-  color: var(--text-primary);
-}
-
-.coach-analysis-danger-zone p {
-  margin: 3px 0 0;
-  max-width: 52ch;
-  font-size: 13px;
-  color: var(--text-secondary);
-}
 
 .coach-analysis-confirm {
   min-height: 0;
