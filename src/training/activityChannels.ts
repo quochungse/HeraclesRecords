@@ -26,21 +26,27 @@ export type ActivityChannelKey =
   | "groundTime"
   | "verticalOscillation"
   | "verticalRatio"
+  | "verticalSpeed"
   | "altitude";
 
 /**
- * How an activity's movement is read: as a pace, the way a run is, or as a
- * speed, the way a ride is. The samples are the same — COROS sends every sport
- * a `pace` in seconds per kilometre — but a cyclist reads 32 km/h, not 1:52/km,
- * and a pace axis also runs the wrong way for them. Speed is worked out from
- * that pace (`withSpeed`), so no parser has to know about it.
+ * How an activity's movement is read: as a pace, the way a run is, as a
+ * speed, the way a ride is, or as a hike — a speed along the trail and a rate
+ * up it. The samples are the same — COROS sends every sport a `pace` in
+ * seconds per kilometre — but a cyclist reads 32 km/h, not 1:52/km, and a
+ * pace axis also runs the wrong way for them; a walker reads 3 km/h and
+ * 450 m an hour, and a 19:40/km pace says nothing to them at all. Speed and
+ * the climbing rate are worked out from the samples (`withSpeed`,
+ * `withVerticalSpeed`), so no parser has to know about either.
  */
-export type ActivityMotion = "pace" | "speed";
+export type ActivityMotion = "pace" | "speed" | "hike";
 
-/** A sample as the chart reads it: the series point, plus its speed on a ride. */
+/** A sample as the chart reads it: the series point, plus what the chart derives from it. */
 export type ActivityChannelPoint = TrainingHubActivitySeriesPoint & {
   /** Kilometres per hour, from `pace`. Only set by `withSpeed`. */
   speed?: number;
+  /** Metres gained an hour, negative on the way down. Only set by `withVerticalSpeed`. */
+  verticalSpeed?: number;
 };
 
 export interface ActivityChannelDefinition {
@@ -89,6 +95,7 @@ const ACTIVITY_CHANNELS: readonly ActivityChannelDefinition[] = [
     decimals: 1
   },
   { key: "verticalRatio", label: "Vertical ratio", unit: "%", decimals: 1 },
+  { key: "verticalSpeed", label: "Climbing rate", unit: "", decimals: 0 },
   { key: "altitude", label: "Elevation", unit: "m", decimals: 0, background: true }
 ];
 
@@ -117,15 +124,21 @@ const MIN_CHANNEL_SAMPLES = 2;
  */
 const MIN_ALTITUDE_RANGE_METERS = 10;
 
-/** Pace channels are read one way, speed the other; never both on one chart. */
-const MOTION_CHANNELS: Record<ActivityMotion, readonly ActivityChannelKey[]> = {
-  pace: ["pace", "adjustedPace"],
-  speed: ["speed"]
+/**
+ * The channels that belong to one way of reading movement and no other. Pace
+ * is read one way, speed the other, never both on one chart; the climbing rate
+ * is a hike's. A channel not listed here is offered whenever it was recorded.
+ */
+const MOTION_ONLY: Partial<Record<ActivityChannelKey, readonly ActivityMotion[]>> = {
+  pace: ["pace"],
+  adjustedPace: ["pace"],
+  speed: ["speed", "hike"],
+  verticalSpeed: ["hike"]
 };
 
 function isOtherMotion(key: ActivityChannelKey, motion: ActivityMotion): boolean {
-  const other: ActivityMotion = motion === "pace" ? "speed" : "pace";
-  return MOTION_CHANNELS[other].includes(key);
+  const owners = MOTION_ONLY[key];
+  return owners !== undefined && !owners.includes(motion);
 }
 
 /**
@@ -141,6 +154,68 @@ export function withSpeed(
       ? { ...point, speed: 3600 / point.pace }
       : point
   );
+}
+
+/** At least this far either side of a sample, its climbing rate is taken over. */
+const VERTICAL_SPEED_WINDOW_SECONDS = 60;
+
+/**
+ * Metres gained an hour on every sample, over at least two minutes centred on
+ * it. A barometer steps in whole metres, so a rate from one second to the next
+ * is either 0 or 3,600 m/h; over a minute it is still every breather on the
+ * pitch; over two it is the climb. The window reaches to the first sample at
+ * least a minute either side, so the chart's downsampled rows
+ * — one every fifty seconds on a long day — are read against their
+ * neighbours rather than not at all. Standing still reads 0, which is what it
+ * was; a gap in the clock several times the usual step (a dropout) is never
+ * spanned, since a climb read across it would be a climb made in no time.
+ */
+export function withVerticalSpeed(
+  series: readonly ActivityChannelPoint[]
+): ActivityChannelPoint[] {
+  const timed = series.flatMap((point, index) =>
+    typeof point.elapsed === "number" &&
+    Number.isFinite(point.elapsed) &&
+    typeof point.altitude === "number" &&
+    Number.isFinite(point.altitude)
+      ? [{ index, elapsed: point.elapsed, altitude: point.altitude }]
+      : []
+  );
+  if (timed.length < 3) {
+    return [...series];
+  }
+  const steps = timed
+    .slice(1)
+    .map((point, at) => point.elapsed - timed[at]!.elapsed)
+    .filter((step) => step > 0)
+    .sort((left, right) => left - right);
+  const usualStep = steps[Math.floor(steps.length / 2)] ?? 1;
+  const longestSpan = VERTICAL_SPEED_WINDOW_SECONDS * 2 + usualStep * 3;
+
+  const rates = new Map<number, number>();
+  let low = 0;
+  let high = 0;
+  for (let at = 0; at < timed.length; at += 1) {
+    const here = timed[at]!;
+    while (low < at && timed[low + 1]!.elapsed <= here.elapsed - VERTICAL_SPEED_WINDOW_SECONDS) {
+      low += 1;
+    }
+    if (high < at) high = at;
+    while (high < timed.length - 1 && timed[high]!.elapsed < here.elapsed + VERTICAL_SPEED_WINDOW_SECONDS) {
+      high += 1;
+    }
+    const from = timed[low]!;
+    const to = timed[high]!;
+    const span = to.elapsed - from.elapsed;
+    if (span <= 0 || span > longestSpan) {
+      continue;
+    }
+    rates.set(here.index, ((to.altitude - from.altitude) / span) * 3600);
+  }
+  return series.map((point, index) => {
+    const rate = rates.get(index);
+    return rate === undefined ? point : { ...point, verticalSpeed: rate };
+  });
 }
 
 function channelRange(
@@ -204,7 +279,11 @@ export function availableActivityChannels(
  */
 const PREFERRED_CHANNELS: Record<ActivityMotion, readonly ActivityChannelKey[]> = {
   pace: ["pace", "hr"],
-  speed: ["power", "hr"]
+  speed: ["power", "hr"],
+  // A hike opens on how fast height was gained against what it cost, over the
+  // elevation backdrop: the climbs are where the day was decided, and a speed
+  // along the trail mostly says how steep it was.
+  hike: ["verticalSpeed", "hr"]
 };
 
 export function defaultSelectedChannels(
@@ -270,6 +349,7 @@ const DARK_CHANNEL_COLORS: Record<ActivityChannelKey, ActivityChannelColors> = {
   groundTime: { stroke: "#fb923c", fill: "rgba(251, 146, 60, 0.18)" },
   verticalOscillation: { stroke: "#f472b6", fill: "rgba(244, 114, 182, 0.18)" },
   verticalRatio: { stroke: "#a3e635", fill: "rgba(163, 230, 53, 0.18)" },
+  verticalSpeed: { stroke: "#38bdf8", fill: "rgba(56, 189, 248, 0.18)" },
   altitude: { stroke: "rgba(255, 255, 255, 0.22)", fill: "rgba(255, 255, 255, 0.07)" }
 };
 
@@ -284,6 +364,7 @@ const PAPER_CHANNEL_COLORS: Record<ActivityChannelKey, ActivityChannelColors> = 
   groundTime: { stroke: "#b45309", fill: "rgba(180, 83, 9, 0.16)" },
   verticalOscillation: { stroke: "#be185d", fill: "rgba(190, 24, 93, 0.16)" },
   verticalRatio: { stroke: "#4d7c0f", fill: "rgba(77, 124, 15, 0.16)" },
+  verticalSpeed: { stroke: "#0369a1", fill: "rgba(3, 105, 161, 0.16)" },
   // The one channel that is a backdrop rather than a series, so it takes the
   // theme's ink the way every border and well does — rgb(19, 26, 40) here,
   // white-alpha in the dark table. It was the cream theme's warm ink and got

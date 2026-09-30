@@ -172,15 +172,16 @@ export const HEART_RATE_BASIS_LABELS: Readonly<Record<WorkoutHeartRateBasis, str
 
 /**
  * Per-sport builder identity: an icon plus the user's (customizable) sport
- * color token. Categories mirror sportColorCategory() — run/trail/bike/
- * strength get their own hue, everything else falls back to "other".
+ * color token. Categories mirror sportColorCategory() — run (a trail run
+ * included)/bike/strength get their own hue, everything else falls back to
+ * "other"; no workout sport is a hike.
  */
 export const BUILDER_SPORT_META: Record<WorkoutSport, { Icon: LucideIcon; colorVar: string }> = {
   run: { Icon: RunnerIcon, colorVar: "var(--sport-run)" },
   bike: { Icon: Bike, colorVar: "var(--sport-bike)" },
   swim: { Icon: Waves, colorVar: "var(--sport-other)" },
   strength: { Icon: Dumbbell, colorVar: "var(--sport-strength)" },
-  trailRun: { Icon: Mountain, colorVar: "var(--sport-trail)" },
+  trailRun: { Icon: Mountain, colorVar: "var(--sport-run)" },
   indoorClimb: { Icon: Grip, colorVar: "var(--sport-other)" },
   bouldering: { Icon: Hand, colorVar: "var(--sport-other)" },
   xcSki: { Icon: Snowflake, colorVar: "var(--sport-other)" },

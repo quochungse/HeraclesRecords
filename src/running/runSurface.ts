@@ -37,9 +37,11 @@ export const RUN_SURFACE_LABELS: Record<RunSurface, string> = {
 };
 
 /**
- * Hike and mountain climb are deliberately absent. They share the trail colour
- * elsewhere in the app, but a hiking pace in a running pace distribution is
- * noise, and the athlete asking "how is my running going" did not mean them.
+ * Hike and mountain climb are deliberately absent. A hiking pace in a running
+ * pace distribution is noise, and the athlete asking "how is my running going"
+ * did not mean them.
+ * They have a screen of their own, Hiking (`isHikeSportType`). A trail run
+ * stays here: it is running, on a surface of its own.
  */
 export function isRunSportType(sportType: number | undefined): boolean {
   return sportType !== undefined && sportType in SPORT_TYPE_SURFACE;

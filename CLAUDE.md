@@ -246,7 +246,7 @@ each one. Do not put the payload back on the detail to save a round trip.
 ### Feature domains
 
 Each is a main-process service plus a renderer view. `src/App.tsx` lazy-loads the heavy
-ones (Training Hub, Training Library, Running, Cycling, Strength, Calendar, Coach, Where you've been);
+ones (Training Hub, Training Library, Running, Cycling, Hiking, Strength, Calendar, Coach, Where you've been);
 Overview, Media and Settings are in the main bundle.
 **Calendar and Training Library open on their own shimmer, never the generic spinner.**
 They are `preloadableLazy`: fetched once the first paint is idle, and a mount after that
@@ -744,14 +744,19 @@ lives at module level for the same visit-to-visit reason — see `useCalendarDat
   See [docs/training-library-architecture.md](docs/training-library-architecture.md).
 - **Activities** (`src/training/ActivitiesView.tsx`) — the all-sport log: every session COROS
   has, in one list, with a detail pane beside it. It is the only screen some sports ever
-  reach — Running covers sport codes 100–103, Cycling 200–205 and 299, and Strength 400/402,
-  so a hike, a swim or a Hybrid Fitness session has no other home — and the only one that can
-  compare sports against each other, which is what the summary's mix bar is for. Depth per
-  sport belongs on Running, Cycling and Strength; **a link out carries the session, not just
-  the screen** — Activities hands a `SportScreenRequest` to `App.tsx`, which holds it until
-  the lazy screen mounts and takes it (Running and Cycling open their full-page detail;
-  Strength selects the row, widening its own window first if the session predates it). A
-  ride's channel chart here reads speed and rpm, as it does on Cycling (`motion="speed"`).
+  reach — Running covers sport codes 100–103, Cycling 200–205 and 299, Hiking 104/105 and
+  Strength 400/402, so a swim or a Hybrid Fitness session has no other home — and the only one
+  that can compare sports against each other, which is what the summary's mix bar is for.
+  Depth per sport belongs on Running, Cycling, Hiking and Strength; **a link out carries the
+  session, not just the screen** — Activities hands a `SportScreenRequest` to `App.tsx`, which
+  holds it until the lazy screen mounts and takes it (Running, Cycling and Hiking open their
+  full-page detail; Strength selects the row, widening its own window first if the session
+  predates it). A ride's channel chart here reads speed and rpm, as it does on Cycling
+  (`motion="speed"`), and a hike's km/h and metres an hour, as on Hiking (`motion="hike"`).
+  **A hike is read in km/h everywhere, never as a pace** — the row's facts, the pane's
+  headline and laps, the older `ActivityDetailPanel` and the route map all ask `isSpeedSport`
+  (`sportTypes.ts`), which answers yes for 104/105; the pane keeps `cycling` apart for the
+  cadence unit, since a hike's cadence is still steps.
   The arithmetic is out of the view on purpose, because it is the only part a test can reach:
   `activityFilters.ts` (periods cut at a Monday, sport categories, search, week grouping,
   totals), `activityFacts.ts` (which figures a row shows, per sport) and `activityDetail.ts`
@@ -826,6 +831,71 @@ lives at module level for the same visit-to-visit reason — see `useCalendarDat
   **window's door only** — the list, detail, raw and summaries IPC handlers in `main.ts` —
   and reach no store, sweep, Coach tool or watcher; `npm run test:sample-rides` holds that,
   that every list row agrees with its own page, and the FTP scaling.
+- **Hiking** (`src/hiking/`, built 2026-09-30) — hikes (104) and mountain climbs (105),
+  which `isRunSportType` leaves out of Running on purpose, on Running's page built again for a
+  trail, the way Cycling was: `.running-view`, `running.css`, and `hiking.css` for the two
+  kinds' colours (`--hike-*`, off `--sport-hiking`, mirrored in `hikeTypeColors.ts` — change
+  both) and the hike page's marks. A trail run (102) is a run and stays on Running; 106
+  "Climb" is left out — nothing seen says what COROS records under it. Shared rather than
+  copied, as Cycling did: `RunIntensityPanel sport="hike"` (which **drops the 80/20 aside** —
+  `SportWords.target` — a walker is not keeping four fifths of a mountain easy), the
+  skeletons, `DeltaChip`, the period cut (`hikeWindowStartMs`), and `.sport-volume-aside`
+  (moved to `running.css` from Cycling's `.ride-volume-aside`; `test:cycling-renderer` reads
+  the new name).
+  What a walker reads instead of a runner: **height and hours before distance** — the hero is
+  this week's recorded time, this week's ascent against its 4-week average, the biggest
+  day of the last twelve weeks, and **ascent per hour** (median m/h over hikes of 300 m+,
+  against the twelve weeks before); the volume chart **opens on Ascent**; the list's columns
+  are Ascent and Ascent/h where a run has pace; the Kinds panel shares **time**. **Left out on
+  purpose:** VO₂max and threshold pace (running estimates), the **load ratio** (hiking comes
+  a weekend at a time, so a trip after three weekends at home read "Sharp jump" every time),
+  the efficiency chart and decoupling (on a trail they measure the gradient), and any pace.
+  **The list's time is COROS's activity time, which on a hike is usually the whole day**:
+  COROS's hike mode ships with auto-pause off, so lunch at the camp is in it. The screen calls
+  it *recorded* time (the UI does not say "trail", which here means a trail run), and **the
+  hike page finds the moving time in the samples** (`hikeAnalysis.ts`, node-free, on the
+  wall-clock series): a stop is 20 s or more with the distance held over a ±5 s window that
+  always reaches one sample either side, a sample holds until the next with **COROS's
+  pauses taken out of the gap** (held across a pause, the pause would count as moving) and
+  a gap over 30 s with no pause in it is a dropout that stands for one second — so a
+  smart-recorded stretch a sample every few seconds still adds up. Stops of 2 min+ are listed as **Rests** with the clock time, the km and the altitude (a pause marked
+  *Paused*). Beside them: **Terrain** (climbing / flat / descending by the grade of every
+  25 m, ±4%, on the *moving* clock so a rest is not time spent on the 25 m it was taken
+  beside — the descent rate is the half of a mountain a run's page never asks about), the
+  **ascents and descents** (zigzag over the smoothed trail, 30 m to turn, 60 m to count,
+  flat approach and flat top trimmed at 3% over 100 m), the highest point, and **Vs
+  Naismith** (moving time over an hour per 5 km plus an hour per 600 m). Splits are COROS's
+  1 km laps, rests inside them. The channel chart takes `motion="hike"`: Speed in km/h and a
+  **Climbing rate** channel (`verticalSpeed` from `withVerticalSpeed` — metres an hour over at
+  least a minute either side, reaching to neighbouring rows so the chart's 400 downsampled
+  rows still get one, never across a gap several times the usual step), cadence in spm over
+  the walking, the segment line adding the stretch's ascent; it opens on climbing rate
+  against heart rate. The route map reads a hike's pace as speed on the **ramp**, off
+  COROS's running pace zones, through `isSpeedSport`. `npm run test:hike-metrics` holds the
+  arithmetic, the chart channel and the km/h reading elsewhere; `npm run
+  test:hiking-renderer` mounts the page (scale pinned to 1, as Cycling's).
+  **`npm run dev:sample-hikes`** (`HERACLES_SAMPLE_HIKES=1`, `electron/sampleHikes.ts`) adds
+  thirteen hikes over twelve weeks for screenshots — Hàm Lợn most weekends, Tam Đảo's Rùng
+  Rình, Ba Vì to Đền Thượng, Fansipan up the Trạm Tôn trail (the watch stops on top: down by
+  cable car) and Pu Ta Leng's summit day — on **real trails** (`sampleHikeRoutes.ts`, from
+  `npm run sample-hikes:fetch`: OSM footpaths through BRouter's hiking-mountain profile, SRTM
+  every 50 m, the profile lifted so the summit reads its surveyed height as a calibrated watch
+  would; Lảo Thẩn, Tà Xùa and Bạch Mộc were left out because OSM had no trail there and the
+  router fell back to roads). Walked by Tobler's function scaled for the trail and capped by
+  a climbing rate, with breathers, photos and planned rests recorded through (one walker has
+  auto-pause on), heart rate following the climbing rate and the altitude, weekends dated
+  back from today. The same door as the rides — only `main.ts` imports it, in the list,
+  detail, raw and summaries handlers — and the same athlete: `electron/sampleActivityKit.ts`
+  holds what the two samples share (the athlete's heart-rate figures, seeded randomness,
+  polylines, load and zones) and nothing else imports it. `npm run test:sample-hikes`.
+  **The sport colour Settings called "Trail" is "Hiking"** (`hiking`, `--sport-hiking`): it
+  held COROS's hike and mountain-climb codes all along, and the trail run it also held is a
+  run, on Running — so 102 moved to `run` (a trail-run workout too, `trailRun` in
+  `workoutSport.ts`, the builder and the library's sport theme), and Running's trail surface
+  is mixed off the run colour like track and treadmill (`--run-trail`, `runSurfaceColors`).
+  One group was renamed, none added: `parseSportColors` reads a colour stored under the old
+  `trail` key as `hiking` (`LEGACY_CATEGORY_KEYS`), so a customised colour is kept.
+  `test:sport-colors` holds the codes and the carry-over.
 - **Workout defaults** (`electron/workoutDefaults.ts`) — what a step holds before
   anyone types. `workoutCapabilities.ts` says what a step *may* hold; this says where
   it starts, and the two are different questions. `emptyRow` used to answer the second
@@ -1977,9 +2047,9 @@ either since Watch Faces and Gear were removed — the first one to need them ag
 the flag.
 
 Styling is plain CSS with custom properties — no Tailwind, no CSS modules.
-`src/styles.css` (~31k lines) holds the design tokens and most rules; eleven feature
+`src/styles.css` (~31k lines) holds the design tokens and most rules; twelve feature
 stylesheets sit beside their components (strength ×3, training ×2, profile, running, cycling,
-sleep, training-library, activity globe). Thirteen in all, counting `fonts.css` — which is the number
+sleep, training-library, activity globe, hiking). Fourteen in all, counting `fonts.css` — which is the number
 the four CSS suites report. Themes are `dark` | `paper` via `src/theme/`, persisted to localStorage,
 and `THEME_WINDOW_BACKGROUND` must stay in sync with `--bg-base`. Sport colors live in both
 `src/styles.css` and `src/training/sportColors.ts` (the source of truth) —

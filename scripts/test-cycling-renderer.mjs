@@ -296,10 +296,10 @@ async function main() {
         true
       );
     assert.match(await heading(), /^\d+ h\b/, "hours first, as the hero's week is read");
-    assert.equal(await harness("clickText", ".ride-volume-aside button", "Distance"), true);
+    assert.equal(await harness("clickText", ".sport-volume-aside button", "Distance"), true);
     await settle();
     assert.match(await heading(), /\d+ km/, "kilometres once Distance is picked");
-    assert.equal(await harness("clickText", ".ride-volume-aside button", "Climb"), true);
+    assert.equal(await harness("clickText", ".sport-volume-aside button", "Climb"), true);
     await settle();
     assert.match(await heading(), /^\d+ m\b/, "metres once Climb is picked");
     assert.equal(await hasText("Hilliest ride"), true, "the dashed line follows the measure");

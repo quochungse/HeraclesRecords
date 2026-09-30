@@ -22,102 +22,84 @@ import {
   metersToElevation
 } from "../units/units";
 import {
-  buildRideWeeks,
-  rideWindowStartMs,
-  summariseRides,
-  type RideTotals,
-  type RideWeek
-} from "./rideMetrics";
-import { RIDE_TYPE_LABELS, type RideType } from "./rideType";
-import { rideTypeColors } from "./rideTypeColors";
+  buildHikeWeeks,
+  hikeWindowStartMs,
+  summariseHikes,
+  type HikeTotals,
+  type HikeWeek
+} from "./hikeMetrics";
+import { HIKE_TYPE_LABELS, type HikeType } from "./hikeType";
+import { hikeTypeColors } from "./hikeTypeColors";
 
 /**
- * What a week of riding is measured in.
+ * What a week of hiking is measured in.
  *
- * A run's week is kilometres and nothing else needs saying. A ride's is not:
- * an hour on the trainer covers whatever the trainer says it did, an hour of
- * singletrack half the road's ground, and a week in the hills is best read in
- * metres climbed. So the chart offers all three, and the bars, the average and
- * the heading all follow the one chosen. It opens on time, the one measure
- * every kind of ride counts in full — and the one the hero's week is read in.
+ * It opens on ascent, where a ride's chart opens on time: ten kilometres by a
+ * lake and ten kilometres up Fansipan are not the same week, and the height
+ * gained is what tells them apart. Time on the trail and distance are a switch
+ * away, and the bars, the average and the heading all follow the one chosen.
  */
-export type RideVolumeMeasure = "distance" | "time" | "climb";
+export type HikeVolumeMeasure = "ascent" | "time" | "distance";
 
-const MEASURE_OPTIONS: readonly { value: RideVolumeMeasure; label: string }[] = [
+const MEASURE_OPTIONS: readonly { value: HikeVolumeMeasure; label: string }[] = [
+  { value: "ascent", label: "Ascent" },
   { value: "time", label: "Time" },
-  { value: "distance", label: "Distance" },
-  { value: "climb", label: "Climb" }
+  { value: "distance", label: "Distance" }
 ];
 
-interface RideVolumeChartProps {
-  /** Rides inside the chosen period, already narrowed to the chosen kind. */
-  rides: readonly TrainingHubActivity[];
+interface HikeVolumeChartProps {
+  /** Hikes inside the chosen period, already narrowed to the chosen kind. */
+  hikes: readonly TrainingHubActivity[];
   /** The same kind, but the whole history — for the year-ago comparison. */
-  ridesAllTime: readonly TrainingHubActivity[];
+  hikesAllTime: readonly TrainingHubActivity[];
   weeks: number;
   /** Kinds present in the period, so the stack only holds real ones. */
-  types: readonly RideType[];
+  types: readonly HikeType[];
   nowMs: number;
 }
 
-/** Weeks the trailing average is taken over. */
 const MOVING_AVERAGE_WEEKS = 4;
-/** "A year ago" in whole weeks, so the comparison starts on a Monday too. */
 const WEEKS_PER_YEAR = 52;
 const SECONDS_PER_HOUR = 3600;
 
 interface VolumeRow extends Record<string, number | string> {
   label: string;
   total: number;
-  longest: number;
+  biggest: number;
 }
 
-/** A total in the chosen measure, in the unit the chart draws. */
-function weekTotal(week: RideTotals, measure: RideVolumeMeasure, unitSystem: UnitSystem): number {
-  if (measure === "time") {
-    return week.duration / SECONDS_PER_HOUR;
-  }
-  if (measure === "climb") {
-    return metersToElevation(week.elevationGain, unitSystem);
-  }
+function weekTotal(week: HikeTotals, measure: HikeVolumeMeasure, unitSystem: UnitSystem): number {
+  if (measure === "time") return week.duration / SECONDS_PER_HOUR;
+  if (measure === "ascent") return metersToElevation(week.elevationGain, unitSystem);
   return metersToDisplayDistance(week.distance, unitSystem);
 }
 
-function weekLongest(week: RideWeek, measure: RideVolumeMeasure, unitSystem: UnitSystem): number {
-  if (measure === "time") {
-    return week.longestRideSeconds / SECONDS_PER_HOUR;
-  }
-  if (measure === "climb") {
-    return metersToElevation(week.biggestClimbMeters, unitSystem);
-  }
-  return metersToDisplayDistance(week.longestRideMeters, unitSystem);
+function weekBiggest(week: HikeWeek, measure: HikeVolumeMeasure, unitSystem: UnitSystem): number {
+  if (measure === "time") return week.longestHikeSeconds / SECONDS_PER_HOUR;
+  if (measure === "ascent") return metersToElevation(week.biggestAscentMeters, unitSystem);
+  return metersToDisplayDistance(week.longestHikeMeters, unitSystem);
 }
 
 function typeVolume(
-  week: RideWeek,
-  type: RideType,
-  measure: RideVolumeMeasure,
+  week: HikeWeek,
+  type: HikeType,
+  measure: HikeVolumeMeasure,
   unitSystem: UnitSystem
 ): number {
   const volume = week.byType[type];
-  if (measure === "time") {
-    return volume.duration / SECONDS_PER_HOUR;
-  }
-  if (measure === "climb") {
-    return metersToElevation(volume.elevationGain, unitSystem);
-  }
+  if (measure === "time") return volume.duration / SECONDS_PER_HOUR;
+  if (measure === "ascent") return metersToElevation(volume.elevationGain, unitSystem);
   return metersToDisplayDistance(volume.distance, unitSystem);
 }
 
-function measureUnit(measure: RideVolumeMeasure, unitSystem: UnitSystem): string {
+function measureUnit(measure: HikeVolumeMeasure, unitSystem: UnitSystem): string {
   if (measure === "time") return "h";
-  if (measure === "climb") return elevationUnit(unitSystem);
+  if (measure === "ascent") return elevationUnit(unitSystem);
   return distanceUnit(unitSystem);
 }
 
-/** One decimal where the numbers are small enough for it to matter. */
-function formatMeasure(value: number, measure: RideVolumeMeasure, unitSystem: UnitSystem): string {
-  const digits = measure === "climb" ? 0 : 1;
+function formatMeasure(value: number, measure: HikeVolumeMeasure, unitSystem: UnitSystem): string {
+  const digits = measure === "ascent" ? 0 : 1;
   return `${value.toFixed(digits)} ${measureUnit(measure, unitSystem)}`;
 }
 
@@ -127,58 +109,35 @@ function shiftWeeks(timestampMs: number, weeks: number): number {
   return date.getTime();
 }
 
-/**
- * The chart's own window, a year back — or nothing when the window is longer
- * than a year and "a year ago" would overlap the bars above it. The same rule
- * as the Running chart's.
- */
+/** The chart's own window a year back, as Running's and Cycling's charts take it. */
 function oneYearEarlier(
-  rides: readonly TrainingHubActivity[],
+  hikes: readonly TrainingHubActivity[],
   weeks: number,
   nowMs: number
-): RideTotals | undefined {
+): HikeTotals | undefined {
   const back = Math.max(WEEKS_PER_YEAR, weeks);
   if (back > WEEKS_PER_YEAR + 1) {
     return undefined;
   }
-
-  const start = shiftWeeks(rideWindowStartMs(weeks, nowMs), back) / 1000;
+  const start = shiftWeeks(hikeWindowStartMs(weeks, nowMs), back) / 1000;
   const end = shiftWeeks(nowMs, back) / 1000;
-  const inWindow = rides.filter(
+  const inWindow = hikes.filter(
     (activity) =>
-      activity.startTime !== undefined &&
-      activity.startTime >= start &&
-      activity.startTime <= end
+      activity.startTime !== undefined && activity.startTime >= start && activity.startTime <= end
   );
-  return inWindow.length > 0 ? summariseRides(inWindow) : undefined;
+  return inWindow.length > 0 ? summariseHikes(inWindow) : undefined;
 }
 
-export function RideVolumeChart({
-  rides,
-  ridesAllTime,
-  weeks,
-  types,
-  nowMs
-}: RideVolumeChartProps) {
+export function HikeVolumeChart({ hikes, hikesAllTime, weeks, types, nowMs }: HikeVolumeChartProps) {
   const { unitSystem } = useUnitSystem();
   const { colors } = useChartColors();
-  const palette = useMemo(() => rideTypeColors(), []);
-  const [measure, setMeasure] = useState<RideVolumeMeasure>("time");
+  const palette = useMemo(() => hikeTypeColors(), []);
+  const [measure, setMeasure] = useState<HikeVolumeMeasure>("ascent");
 
-  const weekBuckets = useMemo(
-    () => buildRideWeeks(rides, { weeks, nowMs }),
-    [nowMs, rides, weeks]
-  );
-
-  // The same kind over the whole history, reaching three weeks before the
-  // chart, so its first point is a four-week average like every other one.
+  const weekBuckets = useMemo(() => buildHikeWeeks(hikes, { weeks, nowMs }), [hikes, nowMs, weeks]);
   const averageBuckets = useMemo(
-    () =>
-      buildRideWeeks(ridesAllTime, {
-        weeks: weeks + MOVING_AVERAGE_WEEKS - 1,
-        nowMs
-      }),
-    [nowMs, ridesAllTime, weeks]
+    () => buildHikeWeeks(hikesAllTime, { weeks: weeks + MOVING_AVERAGE_WEEKS - 1, nowMs }),
+    [hikesAllTime, nowMs, weeks]
   );
 
   const rows = useMemo<VolumeRow[]>(
@@ -192,7 +151,7 @@ export function RideVolumeChart({
         const row: VolumeRow = {
           label: week.label,
           total: weekTotal(week, measure, unitSystem),
-          longest: weekLongest(week, measure, unitSystem),
+          biggest: weekBiggest(week, measure, unitSystem),
           average
         };
         for (const type of types) {
@@ -203,20 +162,12 @@ export function RideVolumeChart({
     [averageBuckets, measure, types, unitSystem, weekBuckets]
   );
 
-  // What the bars add up to, not every ride in the period — see the Running
-  // chart: under "All" the chart stops at two years.
-  const total = useMemo(
-    () => rows.reduce((sum, row) => sum + row.total, 0),
-    [rows]
-  );
-
-  const lastYear = useMemo(
-    () => oneYearEarlier(ridesAllTime, weeks, nowMs),
-    [nowMs, ridesAllTime, weeks]
-  );
+  const total = useMemo(() => rows.reduce((sum, row) => sum + row.total, 0), [rows]);
+  const lastYear = useMemo(() => oneYearEarlier(hikesAllTime, weeks, nowMs), [hikesAllTime, nowMs, weeks]);
 
   const unit = measureUnit(measure, unitSystem);
-  const longestLabel = measure === "climb" ? "Hilliest ride" : "Longest ride";
+  const biggestLabel =
+    measure === "ascent" ? "Biggest ascent" : measure === "time" ? "Longest day" : "Longest hike";
 
   return (
     <section className="panel run-block">
@@ -242,7 +193,7 @@ export function RideVolumeChart({
             label="Measure"
             value={measure}
             options={MEASURE_OPTIONS}
-            onChange={(next) => setMeasure(next as RideVolumeMeasure)}
+            onChange={(next) => setMeasure(next as HikeVolumeMeasure)}
           />
         </div>
       </header>
@@ -262,9 +213,6 @@ export function RideVolumeChart({
               stroke={colors.grid}
               tickFormatter={(value: number) => value.toFixed(0)}
             />
-
-            {/* One segment per kind of ride in the period. Under a kind filter
-                that is a single segment: its volume, not its share. */}
             {types.map((type) => (
               <Bar
                 key={type}
@@ -276,7 +224,6 @@ export function RideVolumeChart({
                 isAnimationActive={false}
               />
             ))}
-
             <Line
               dataKey="average"
               type="monotone"
@@ -285,10 +232,10 @@ export function RideVolumeChart({
               dot={false}
               isAnimationActive={false}
             />
-            {/* The week's single biggest ride in the chosen measure: the long
-                ride a build is steered by, which a weekly total hides. */}
+            {/* The week's single biggest day: the long day a hike is trained
+                for, which a weekly total hides behind two short ones. */}
             <Line
-              dataKey="longest"
+              dataKey="biggest"
               type="monotone"
               stroke={colors.gold}
               strokeWidth={1.5}
@@ -296,7 +243,6 @@ export function RideVolumeChart({
               dot={false}
               isAnimationActive={false}
             />
-
             <Tooltip
               cursor={{ fill: colors.cursorBand }}
               content={(props: TooltipContentProps) => (
@@ -306,7 +252,7 @@ export function RideVolumeChart({
                   palette={palette}
                   measure={measure}
                   unitSystem={unitSystem}
-                  longestLabel={longestLabel}
+                  biggestLabel={biggestLabel}
                 />
               )}
             />
@@ -318,7 +264,7 @@ export function RideVolumeChart({
         {types.map((type) => (
           <span key={type}>
             <i className="is-bar" style={{ background: palette[type] }} />
-            {RIDE_TYPE_LABELS[type]}
+            {HIKE_TYPE_LABELS[type]}
           </span>
         ))}
         <span>
@@ -326,7 +272,7 @@ export function RideVolumeChart({
         </span>
         <span>
           <i className="is-dashed" style={{ background: colors.gold }} />
-          {longestLabel}
+          {biggestLabel}
         </span>
       </div>
     </section>
@@ -334,11 +280,11 @@ export function RideVolumeChart({
 }
 
 interface VolumeTooltipProps extends TooltipContentProps {
-  types: readonly RideType[];
-  palette: Record<RideType, string>;
-  measure: RideVolumeMeasure;
+  types: readonly HikeType[];
+  palette: Record<HikeType, string>;
+  measure: HikeVolumeMeasure;
   unitSystem: UnitSystem;
-  longestLabel: string;
+  biggestLabel: string;
 }
 
 function VolumeTooltip({
@@ -349,7 +295,7 @@ function VolumeTooltip({
   palette,
   measure,
   unitSystem,
-  longestLabel
+  biggestLabel
 }: VolumeTooltipProps) {
   if (!active || !payload?.length) {
     return null;
@@ -358,7 +304,6 @@ function VolumeTooltip({
   if (!row) {
     return null;
   }
-
   return (
     <div className="training-chart-tooltip" style={trainingChartTooltipStyle}>
       <span>Week of {label}</span>
@@ -367,11 +312,11 @@ function VolumeTooltip({
         .filter((type) => Number(row[type]) > 0)
         .map((type) => (
           <span key={type} style={{ color: palette[type] }}>
-            {RIDE_TYPE_LABELS[type]} {formatMeasure(Number(row[type]), measure, unitSystem)}
+            {HIKE_TYPE_LABELS[type]} {formatMeasure(Number(row[type]), measure, unitSystem)}
           </span>
         ))}
       <span>
-        {longestLabel} {formatMeasure(Number(row.longest), measure, unitSystem)}
+        {biggestLabel} {formatMeasure(Number(row.biggest), measure, unitSystem)}
       </span>
     </div>
   );

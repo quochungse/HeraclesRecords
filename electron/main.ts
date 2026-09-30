@@ -383,6 +383,13 @@ import {
   withSampleRides,
   withSampleRideSummaries
 } from "./sampleRides";
+import {
+  isSampleHikeId,
+  sampleHikeDetail,
+  sampleHikesEnabled,
+  withSampleHikes,
+  withSampleHikeSummaries
+} from "./sampleHikes";
 import type {
   AnthropicApiConfig,
   ChatMessage,
@@ -2096,20 +2103,24 @@ function registerIpcHandlers(): void {
     (_event, patch: CorosProfilePatch) => updateCorosProfile(patch)
   );
 
-  // HERACLES_SAMPLE_RIDES=1 adds simulated rides here, at the window's door
-  // and nowhere behind it — see electron/sampleRides.ts.
+  // HERACLES_SAMPLE_RIDES=1 and HERACLES_SAMPLE_HIKES=1 add simulated rides
+  // and hikes here, at the window's door and nowhere behind it — see
+  // electron/sampleRides.ts and electron/sampleHikes.ts.
   ipcMain.handle(
     "trainingHub:listActivities",
     async (_event, page: number, size: number, startDay?: string, endDay?: string) => {
-      const activities = await listTrainingHubActivities(page, size, startDay, endDay);
-      if (!sampleRidesEnabled()) {
-        return activities;
+      let activities = await listTrainingHubActivities(page, size, startDay, endDay);
+      if (sampleRidesEnabled()) {
+        // Ridden at the account's FTP, so the ride page's IF and TSS read true.
+        // The same cached read the Cycling screen makes for its zones.
+        const snapshot = await getCorosProfileSnapshot().catch(() => null);
+        setSampleRiderFtp(snapshot?.profile.thresholds.ftp);
+        activities = withSampleRides(activities, { page, startDay, endDay });
       }
-      // Ridden at the account's FTP, so the ride page's IF and TSS read true.
-      // The same cached read the Cycling screen makes for its zones.
-      const snapshot = await getCorosProfileSnapshot().catch(() => null);
-      setSampleRiderFtp(snapshot?.profile.thresholds.ftp);
-      return withSampleRides(activities, { page, startDay, endDay });
+      if (sampleHikesEnabled()) {
+        activities = withSampleHikes(activities, { page, startDay, endDay });
+      }
+      return activities;
     }
   );
 
@@ -2292,7 +2303,9 @@ function registerIpcHandlers(): void {
     ) =>
       sampleRidesEnabled() && isSampleRideId(activityId)
         ? sampleRideDetail(activityId)
-        : getTrainingHubActivityDetail(activityId, sportType, listActivity)
+        : sampleHikesEnabled() && isSampleHikeId(activityId)
+          ? sampleHikeDetail(activityId)
+          : getTrainingHubActivityDetail(activityId, sportType, listActivity)
   );
 
   // The unparsed payload, on its own channel: it is ~2.2 MB and only the
@@ -2302,7 +2315,9 @@ function registerIpcHandlers(): void {
     (_event, activityId: string, sportType: number) =>
       sampleRidesEnabled() && isSampleRideId(activityId)
         ? { simulated: true, detail: sampleRideDetail(activityId) }
-        : getTrainingHubActivityDetailRaw(activityId, sportType)
+        : sampleHikesEnabled() && isSampleHikeId(activityId)
+          ? { simulated: true, detail: sampleHikeDetail(activityId) }
+          : getTrainingHubActivityDetailRaw(activityId, sportType)
   );
 
   // The list-level figures that only a detail payload knows. Two channels
@@ -2320,10 +2335,16 @@ function registerIpcHandlers(): void {
 
   ipcMain.handle(
     "trainingHub:getActivityDetailSummaries",
-    (_event, activityIds: string[]) =>
-      sampleRidesEnabled()
-        ? withSampleRideSummaries(activityIds, readActivityDetailSummaries(activityIds))
-        : readActivityDetailSummaries(activityIds)
+    (_event, activityIds: string[]) => {
+      let summaries = readActivityDetailSummaries(activityIds);
+      if (sampleRidesEnabled()) {
+        summaries = withSampleRideSummaries(activityIds, summaries);
+      }
+      if (sampleHikesEnabled()) {
+        summaries = withSampleHikeSummaries(activityIds, summaries);
+      }
+      return summaries;
+    }
   );
 
   ipcMain.handle(

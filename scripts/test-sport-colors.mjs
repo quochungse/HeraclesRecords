@@ -20,10 +20,10 @@ const {
 // and never consulted). Unknown or missing codes → "other".
 assert.equal(sportColorCategory(100), "run"); //      Run
 assert.equal(sportColorCategory(101), "run"); //      Indoor Run
-assert.equal(sportColorCategory(102), "trail"); //    Trail Run
+assert.equal(sportColorCategory(102), "run"); //      Trail Run — a run, on Running
 assert.equal(sportColorCategory(103), "run"); //      Track Run
-assert.equal(sportColorCategory(104), "trail"); //    Hike
-assert.equal(sportColorCategory(105), "trail"); //    Mountain Climb
+assert.equal(sportColorCategory(104), "hiking"); //   Hike
+assert.equal(sportColorCategory(105), "hiking"); //   Mountain Climb
 assert.equal(sportColorCategory(200), "bike"); //     Bike
 assert.equal(sportColorCategory(204), "bike"); //     Mountain Bike
 assert.equal(sportColorCategory(400), "strength"); // Gym Cardio
@@ -38,9 +38,14 @@ assert.equal(sportColorCategory(undefined), "other");
 assert.deepEqual(parseSportColors(null), DEFAULT_SPORT_COLORS);
 assert.equal(parseSportColors('{"run":"#123456"}').run, "#123456");
 assert.equal(
-  parseSportColors('{"run":"#123456"}').trail,
-  DEFAULT_SPORT_COLORS.trail
+  parseSportColors('{"run":"#123456"}').hiking,
+  DEFAULT_SPORT_COLORS.hiking
 );
+// "hiking" was stored as "trail": a colour picked for it then carries over,
+// and the new key wins once it is written.
+assert.equal(parseSportColors('{"trail":"#654321"}').hiking, "#654321");
+assert.equal(parseSportColors('{"trail":"#654321","hiking":"#abcdef"}').hiking, "#abcdef");
+assert.equal("trail" in parseSportColors('{"trail":"#654321"}'), false, "no trail category is left behind");
 assert.equal(
   parseSportColors('{"run":"not-a-color"}').run,
   DEFAULT_SPORT_COLORS.run
@@ -72,15 +77,15 @@ const dominant = buildDominantSportByDay([
   // Same day: run (TL 40) vs strength (TL 90) → strength wins.
   { activityId: "a", sportType: 100, trainingLoad: 40, startTime: noonMs },
   { activityId: "b", sportType: 402, trainingLoad: 90, startTime: noonMs },
-  // Different day, single trail.
-  { activityId: "c", sportType: 102, trainingLoad: 55, startTime: new Date(2026, 6, 15, 9).getTime() },
+  // Different day, single hike.
+  { activityId: "c", sportType: 104, trainingLoad: 55, startTime: new Date(2026, 6, 15, 9).getTime() },
   // No TL and an unknown sportType → "other".
   { activityId: "d", sportType: 999, startTime: new Date(2026, 6, 16, 9).getTime() },
   // No startTime → skipped entirely.
   { activityId: "e", sportType: 100 }
 ]);
 assert.equal(dominant.get("20260714"), "strength");
-assert.equal(dominant.get("20260715"), "trail");
+assert.equal(dominant.get("20260715"), "hiking");
 assert.equal(dominant.get("20260716"), "other");
 assert.equal(dominant.size, 3);
 
@@ -94,8 +99,8 @@ assert.equal(tie.get("20260714"), "bike");
 // buildSportCategoriesByDay: distinct categories per day, canonical order,
 // same-category activities collapse to one slice.
 const cats = buildSportCategoriesByDay([
-  // One day: trail + bike + a second bike → 2 slices (trail, bike).
-  { activityId: "h", sportType: 102, trainingLoad: 30, startTime: noonMs },
+  // One day: hike + bike + a second bike → 2 slices (hiking, bike).
+  { activityId: "h", sportType: 104, trainingLoad: 30, startTime: noonMs },
   { activityId: "i", sportType: 201, trainingLoad: 20, startTime: noonMs },
   { activityId: "j", sportType: 200, trainingLoad: 25, startTime: noonMs },
   // Another day: single run.
@@ -103,7 +108,7 @@ const cats = buildSportCategoriesByDay([
   // No startTime → skipped.
   { activityId: "l", sportType: 100 }
 ]);
-assert.deepEqual([...cats.get("20260714")], ["trail", "bike"]); // canonical order
+assert.deepEqual([...cats.get("20260714")], ["hiking", "bike"]); // canonical order
 assert.deepEqual([...cats.get("20260715")], ["run"]);
 assert.equal(cats.size, 2);
 

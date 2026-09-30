@@ -19,7 +19,7 @@ import {
   formatElevationMeters,
   formatPaceSecondsPerKm
 } from "./formatters";
-import { isCyclingSportType, isSwimSportType } from "./sportTypes";
+import { isSpeedSport, isSwimSportType } from "./sportTypes";
 import { formatSpeedValue } from "../units/units";
 
 export interface ActivityFact {
@@ -29,9 +29,12 @@ export interface ActivityFact {
   title: string;
 }
 
-/** Foot sports where a seconds-per-kilometre pace is the natural reading. */
+/**
+ * Foot sports where a seconds-per-kilometre pace is the natural reading — not
+ * a ride, not a swim, and not a hike, which is read in km/h (`isSpeedSport`).
+ */
 function isPacedSport(sportType: number | undefined): boolean {
-  return !isCyclingSportType(sportType) && !isSwimSportType(sportType);
+  return !isSpeedSport(sportType) && !isSwimSportType(sportType);
 }
 
 /**
@@ -58,7 +61,7 @@ export function activityRowFacts(
   const { sportType, distance, duration, avgHr, trainingLoad, elevationGain } =
     activity;
   const swim = isSwimSportType(sportType);
-  const cycling = isCyclingSportType(sportType);
+  const speed = isSpeedSport(sportType);
   const facts: ActivityFact[] = [];
 
   if (duration && duration > 0) {
@@ -77,7 +80,7 @@ export function activityRowFacts(
     });
 
     if (duration && duration > 0) {
-      if (cycling) {
+      if (speed) {
         facts.push({
           key: "speed",
           value: formatSpeedValue(distance / 1000 / (duration / 3600), unitSystem),

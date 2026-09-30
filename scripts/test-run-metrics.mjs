@@ -69,7 +69,7 @@ const run = (overrides = {}) => ({
 
 // ---------------------------------------------------------------------------
 // Surfaces. Road, treadmill, trail and track are the four running codes; hike
-// and mountain climb share the trail colour elsewhere in the app but are not
+// and mountain climb have the Hiking screen and colour of their own and are not
 // runs, and a hiking pace in a running pace chart is noise.
 // ---------------------------------------------------------------------------
 

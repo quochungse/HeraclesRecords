@@ -42,6 +42,7 @@ import {
   activityChannelColors,
   toggleActivityChannel,
   withSpeed,
+  withVerticalSpeed,
   type ActivityChannelKey,
   type ActivityChannelPoint,
   type ActivityMotion
@@ -80,8 +81,9 @@ interface ActivitySeriesChartProps {
    */
   embedded?: boolean;
   /**
-   * Pace for a run, speed for a ride. Also decides the cadence unit — steps a
-   * minute on foot, revolutions on a bike — and what the whole of it is called.
+   * Pace for a run, speed for a ride, speed and climbing rate for a hike. Also
+   * decides the cadence unit — steps a minute on foot, revolutions on a bike —
+   * and what the whole of it is called.
    */
   motion?: ActivityMotion;
 }
@@ -93,7 +95,8 @@ type ChartRow = ActivityChannelPoint & {
 /** What one whole activity is called, by how it moves. */
 const ACTIVITY_NOUN: Record<ActivityMotion, string> = {
   pace: "run",
-  speed: "ride"
+  speed: "ride",
+  hike: "hike"
 };
 
 function cadenceUnit(motion: ActivityMotion): string {
@@ -121,6 +124,9 @@ function formatChannelValue(
   if (key === "speed") {
     return `${kmhToDisplaySpeed(value, unitSystem).toFixed(1)} ${speedUnit(unitSystem)}`;
   }
+  if (key === "verticalSpeed") {
+    return `${Math.round(metersToElevation(value, unitSystem))} ${elevationUnit(unitSystem)}/h`;
+  }
   if (key === "cadence") {
     return `${value.toFixed(definition.decimals)} ${cadenceUnit(motion)}`;
   }
@@ -142,10 +148,32 @@ function formatAxisTick(
   if (key === "speed") {
     return kmhToDisplaySpeed(value, unitSystem).toFixed(0);
   }
-  if (key === "altitude") {
+  if (key === "altitude" || key === "verticalSpeed") {
     return String(Math.round(metersToElevation(value, unitSystem)));
   }
   return value.toFixed(activityChannel(key).decimals);
+}
+
+/**
+ * Metres climbed in a stretch, as a barometric watch counts them: a rise is
+ * only counted once it has held for 2 m, so the altimeter's own wobble on the
+ * flat adds nothing.
+ */
+function stretchGain(points: readonly ActivityChannelPoint[]): number | undefined {
+  let gain = 0;
+  let anchor: number | undefined;
+  for (const point of points) {
+    if (typeof point.altitude !== "number") continue;
+    if (anchor === undefined) {
+      anchor = point.altitude;
+    } else if (point.altitude - anchor >= 2) {
+      gain += point.altitude - anchor;
+      anchor = point.altitude;
+    } else if (anchor - point.altitude >= 2) {
+      anchor = point.altitude;
+    }
+  }
+  return anchor === undefined ? undefined : gain;
 }
 
 function formatXTick(
@@ -238,6 +266,9 @@ export function ActivitySeriesChart({
 
   const points = useMemo<ActivityChannelPoint[]>(() => {
     const sampled = downsampleActivitySeries([...series], CHART_POINTS);
+    if (motion === "hike") {
+      return withVerticalSpeed(withSpeed(sampled));
+    }
     return motion === "speed" ? withSpeed(sampled) : sampled;
   }, [motion, series]);
 
@@ -385,11 +416,14 @@ export function ActivitySeriesChart({
       hr: mean("hr"),
       // A ride's cadence is averaged over the pedalling, as the watch states it:
       // every coasting second reads 0, and counting them put the segment 15 rpm
-      // under the ride's own figure on the same page.
-      cadence: mean("cadence", motion === "speed"),
+      // under the ride's own figure on the same page. A hike's over the walking,
+      // for the same reason: its watch keeps recording through every rest.
+      cadence: mean("cadence", motion !== "pace"),
       // Only a ride states it: a run's power is the watch's own estimate, and
       // the Running screen has never put it beside the segment's figures.
-      power: motion === "speed" ? mean("power") : undefined
+      power: motion === "speed" ? mean("power") : undefined,
+      // What a walker asks of a stretch first: how much height it gained.
+      gain: motion === "hike" ? stretchGain(source) : undefined
     };
   }, [activityTime, axis, motion, range, series, visible]);
 
@@ -626,8 +660,13 @@ export function ActivitySeriesChart({
           {motion === "pace" && segment.pace !== undefined ? (
             <span>{formatChannelValue("pace", segment.pace, unitSystem, motion)}</span>
           ) : null}
-          {motion === "speed" && segment.speed !== undefined ? (
+          {motion !== "pace" && segment.speed !== undefined ? (
             <span>{formatChannelValue("speed", segment.speed, unitSystem, motion)}</span>
+          ) : null}
+          {segment.gain !== undefined && segment.gain > 0 ? (
+            <span>
+              +{Math.round(metersToElevation(segment.gain, unitSystem))} {elevationUnit(unitSystem)}
+            </span>
           ) : null}
           {segment.power !== undefined ? (
             <span>{Math.round(segment.power)} W</span>

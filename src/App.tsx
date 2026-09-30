@@ -140,6 +140,7 @@ import {
 } from "./watchModels";
 import { isRunSportType } from "./running/runSurface";
 import { isRideSportType } from "./cycling/rideType";
+import { isHikeSportType } from "./hiking/hikeType";
 import { isStrengthSportType } from "./training/sportTypes";
 import appLogo from "../build/icon.png";
 import changelogMarkdown from "../CHANGELOG.md?raw";
@@ -235,6 +236,11 @@ const LazyRunningView = lazy(() =>
 const LazyCyclingView = lazy(() =>
   import("./cycling/CyclingView").then(({ CyclingView }) => ({
     default: CyclingView,
+  })),
+);
+const LazyHikingView = lazy(() =>
+  import("./hiking/HikingView").then(({ HikingView }) => ({
+    default: HikingView,
   })),
 );
 const LazyStrengthView = lazy(() =>
@@ -518,7 +524,7 @@ export default function App() {
   const [selectedTrainingHubActivity, setSelectedTrainingHubActivity] =
     useState<TrainingHubActivity | null>(null);
   /*
-   * A session Activities handed to Running, Cycling or Strength, waiting for that screen
+   * A session Activities handed to a sport's own screen, waiting for that screen
    * to mount and take it. It is held here rather than passed as an argument
    * because those screens are lazy: the view switches first and the component
    * arrives a tick later, with nowhere for an argument to have waited.
@@ -1112,7 +1118,8 @@ export default function App() {
       (activeView !== "training" &&
         activeView !== "overview" &&
         activeView !== "running" &&
-        activeView !== "cycling")
+        activeView !== "cycling" &&
+        activeView !== "hiking")
     ) {
       return;
     }
@@ -2713,7 +2720,7 @@ export default function App() {
           className={[
             "content",
             isOverviewDashboard && "content-overview",
-            (activeView === "media" || activeView === "coach" || activeView === "library" || activeView === "training" || activeView === "running" || activeView === "cycling") && "content-fill",
+            (activeView === "media" || activeView === "coach" || activeView === "library" || activeView === "training" || activeView === "running" || activeView === "cycling" || activeView === "hiking") && "content-fill",
           ]
             .filter(Boolean)
             .join(" ")}
@@ -2941,6 +2948,9 @@ export default function App() {
                       } else if (activity && isRideSportType(activity.sportType)) {
                         setSportScreenRequest({ view: "cycling", activityId, startTime: activity.startTime, from: "library" });
                         setActiveView("cycling");
+                      } else if (activity && isHikeSportType(activity.sportType)) {
+                        setSportScreenRequest({ view: "hiking", activityId, startTime: activity.startTime, from: "library" });
+                        setActiveView("hiking");
                       } else if (activity && isStrengthSportType(activity.sportType)) {
                         setSportScreenRequest({ view: "strength", activityId, startTime: activity.startTime, from: "library" });
                         setActiveView("strength");
@@ -2999,6 +3009,32 @@ export default function App() {
                   onOpenOverview={() => setActiveView("overview")}
                   openRequest={
                     sportScreenRequest?.view === "cycling"
+                      ? sportScreenRequest
+                      : null
+                  }
+                  onOpenRequestHandled={() => setSportScreenRequest(null)}
+                  onReturn={setActiveView}
+                  onAskCoach={askCoach}
+                />
+              </Suspense>
+            ) : null}
+            {activeView === "hiking" ? (
+              <Suspense fallback={<DeferredSurfaceFallback label="hiking" />}>
+                <LazyHikingView
+                  api={api}
+                  activities={trainingHubActivities}
+                  connected={Boolean(trainingHubStatus?.authenticated)}
+                  restoring={Boolean(trainingHubStatus?.restoring)}
+                  activitiesStatus={trainingHubActivitiesStatus}
+                  detail={trainingHubActivityDetail}
+                  detailRequest={trainingHubDetailRequest}
+                  snapshot={trainingHubSnapshot}
+                  busy={busy}
+                  onRetryActivities={() => void handleRunningActivitiesRetry()}
+                  onSelectActivity={handleTrainingHubActivityDetail}
+                  onOpenOverview={() => setActiveView("overview")}
+                  openRequest={
+                    sportScreenRequest?.view === "hiking"
                       ? sportScreenRequest
                       : null
                   }

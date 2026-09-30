@@ -240,8 +240,8 @@
   --sport-mix-color: var(--sport-strength);
 }
 
-.activities-view [data-sport="trail"] {
-  --sport-mix-color: var(--sport-trail);
+.activities-view [data-sport="hiking"] {
+  --sport-mix-color: var(--sport-hiking);
 }
 
 .activities-view [data-sport="run"] {

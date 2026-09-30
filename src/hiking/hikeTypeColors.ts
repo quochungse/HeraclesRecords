@@ -1,19 +1,16 @@
 import { readStoredSportColors } from "../training/sportColors";
-import type { RunSurface } from "./runSurface";
+import type { HikeType } from "./hikeType";
 
 /**
- * Surface colours as concrete hex, for the charts.
+ * Hike-kind colours as concrete hex, for the charts — `var()` does not resolve
+ * in the SVG attributes recharts writes; see `rideTypeColors`.
  *
- * The stylesheet reads the `--sport-*` custom properties directly, but recharts
- * writes `fill` and `stroke` as SVG *attributes*, where `var()` does not
- * resolve — so the same palette has to be resolved in JavaScript. It comes from
- * the same stored record the root variables are written from, which is what
- * keeps the chart and the chips around it the same colour.
+ * A hike is the athlete's own hiking colour, which COROS's hike and mountain
+ * codes already wear everywhere else in the app (`sportColorCategory`); a
+ * mountain climb is mixed off it towards violet, so the two read as one family
+ * and follow the athlete when they recolour hiking in Settings.
  *
- * Road is the athlete's own run colour; trail, track and treadmill have no
- * token of their own, so they are mixed off it: the family stays recognisable
- * without inventing hues that could collide with a palette the athlete is free
- * to change. The mixes must match `.running-view` in running.css.
+ * The mix must match `.hiking-view` in hiking.css.
  */
 
 function parseHex(hex: string): [number, number, number] | null {
@@ -45,12 +42,10 @@ function mixHex(from: string, to: string, ratio: number): string {
   ]);
 }
 
-export function runSurfaceColors(): Record<RunSurface, string> {
+export function hikeTypeColors(): Record<HikeType, string> {
   const sport = readStoredSportColors();
   return {
-    road: sport.run,
-    trail: mixHex(sport.run, "#8a5a2b", 0.5),
-    track: mixHex(sport.run, "#d89b22", 0.55),
-    treadmill: mixHex(sport.run, "#8a8a90", 0.35)
+    hike: sport.hiking,
+    mountain: mixHex(sport.hiking, "#8a5cf6", 0.45)
   };
 }
