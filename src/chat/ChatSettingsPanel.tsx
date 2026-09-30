@@ -155,12 +155,13 @@ export function ChatSettingsPanel({
         <h3>Workout suggestions</h3>
         <OptionGroup<InlineSuggestionsMode>
           label="Workout cards Coach offers unasked"
-          size="sm"
+          size="md"
+          fill
           value={chatSettings.inlineSuggestions ?? "auto"}
           onChange={(inlineSuggestions) => onUpdateChatSettings({ inlineSuggestions })}
           options={[
-            { value: "auto", label: "Automatic" },
             { value: "on", label: "On" },
+            { value: "auto", label: "Automatic" },
             { value: "off", label: "Off" }
           ]}
         />

@@ -1,8 +1,13 @@
 import { useEffect, useMemo, useState } from "react";
+import { createPortal } from "react-dom";
 import { Loader2, Settings2, X } from "lucide-react";
 import type { ChatSettings, CoachAnalysisSpend } from "../../electron/types";
 import type { CorosLinkApi } from "../coroslink-api";
 import { CoachModelsModal } from "../settings/CoachModelsModal";
+import { ConfirmDialog } from "../training-library/ConfirmDialog";
+// The confirmation's chrome is the library's `tl-dialog`, as Coach's other
+// ConfirmDialogs are.
+import "../training-library/trainingLibrary.css";
 import { ChatSettingsPanel } from "./ChatSettingsPanel";
 import {
   coachModelsSummaryLine,
@@ -40,9 +45,13 @@ export function settingsDraftChanges(saved: ChatSettings, draft: SettingsDraft):
  * when it lost focus — so a half-written instruction went into the next turn's
  * prompt, a style tried and not liked went out to every machine through sync
  * before it could be taken back, and there was no way back at all. Now the
- * dialog holds the edits, Discard throws them away, and closing with edits
- * held asks first. The Coach Models row opens a dialog that saves on its own,
- * and Resume is an action, not a setting; neither waits for Save.
+ * dialog holds the edits and Save writes them. Throwing them away — Discard,
+ * or a close (the X, Escape) — is asked first in a dialog of its own, and a
+ * yes closes Coach settings too; a press outside the dialog with edits held
+ * does nothing, since a stray click is not a decision. The footer keeps
+ * Discard and Save throughout.
+ * The Coach Models row opens a dialog that saves on its own, and Resume is an
+ * action, not a setting; neither waits for Save.
  */
 export function ChatSettingsModal({
   api,
@@ -77,7 +86,8 @@ export function ChatSettingsModal({
   const [savedSpend, setSavedSpend] = useState<CoachAnalysisSpend | null>(null);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
-  const [confirmingClose, setConfirmingClose] = useState(false);
+  /** The discard question is on screen: after Discard, or after a close. */
+  const [confirming, setConfirming] = useState(false);
 
   // Every opening starts from what is saved.
   useEffect(() => {
@@ -85,7 +95,7 @@ export function ChatSettingsModal({
     setDraft({});
     setPendingBudget(undefined);
     setSaveError(null);
-    setConfirmingClose(false);
+    setConfirming(false);
   }, [open]);
 
   const changes = useMemo(() => settingsDraftChanges(chatSettings, draft), [chatSettings, draft]);
@@ -119,9 +129,15 @@ export function ChatSettingsModal({
   /** Close, or ask first when there are edits a close would throw away. */
   const requestClose = () => {
     if (dirty) {
-      setConfirmingClose(true);
+      setConfirming(true);
       return;
     }
+    onClose();
+  };
+
+  const confirmDiscard = () => {
+    discard();
+    setConfirming(false);
     onClose();
   };
 
@@ -132,14 +148,10 @@ export function ChatSettingsModal({
 
     // Escape belongs to whichever dialog is on top. Both listen on the
     // document, so one calling stopPropagation would not spare the other —
-    // this one stands down while the models dialog is open, and steps back
-    // from the discard question before it closes anything.
+    // this one stands down while the models dialog or the discard question
+    // is open (the question takes Escape itself, in the capture phase).
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key !== "Escape" || coachModelsOpen) return;
-      if (confirmingClose) {
-        setConfirmingClose(false);
-        return;
-      }
+      if (event.key !== "Escape" || coachModelsOpen || confirming) return;
       requestClose();
     };
 
@@ -185,7 +197,9 @@ export function ChatSettingsModal({
       role="dialog"
       aria-modal="true"
       aria-labelledby="chat-settings-title"
-      onClick={requestClose}
+      onClick={() => {
+        if (!dirty) onClose();
+      }}
     >
       <section
         className="panel chat-settings-modal"
@@ -220,55 +234,44 @@ export function ChatSettingsModal({
           />
         </div>
         <footer className="app-modal-footer chat-settings-modal-footer">
-          {confirmingClose ? (
-            <>
-              <span className="chat-settings-footer-status" role="alert">
-                Discard your unsaved changes?
-              </span>
-              <button
-                type="button"
-                className="secondary-button"
-                autoFocus
-                onClick={() => setConfirmingClose(false)}
-              >
-                Keep editing
-              </button>
-              <button
-                type="button"
-                className="secondary-button chat-settings-discard-close"
-                onClick={() => {
-                  discard();
-                  onClose();
-                }}
-              >
-                Discard and close
-              </button>
-            </>
-          ) : (
-            <>
-              <span className="chat-settings-footer-status" role="status">
-                {saveError ?? (dirty ? "Unsaved changes" : "All changes saved")}
-              </span>
-              <button
-                type="button"
-                className="secondary-button"
-                disabled={!dirty || saving}
-                onClick={discard}
-              >
-                Discard
-              </button>
-              <button
-                type="button"
-                className="primary-button"
-                disabled={!dirty || saving}
-                onClick={() => void save()}
-              >
-                {saving ? <Loader2 className="chat-spinner" size={14} aria-hidden="true" /> : null}
-                Save
-              </button>
-            </>
-          )}
+          <span className="chat-settings-footer-status" role="status">
+            {saveError ?? (dirty ? "Unsaved changes" : "All changes saved")}
+          </span>
+          <button
+            type="button"
+            className="secondary-button"
+            disabled={!dirty || saving}
+            onClick={() => setConfirming(true)}
+          >
+            Discard
+          </button>
+          <button
+            type="button"
+            className="primary-button"
+            disabled={!dirty || saving}
+            onClick={() => void save()}
+          >
+            {saving ? <Loader2 className="chat-spinner" size={14} aria-hidden="true" /> : null}
+            Save
+          </button>
         </footer>
+        {/* Portalled, so no ancestor's stacking or containing block holds it
+            under the sheet; still inside the section in React's tree, whose
+            stopPropagation keeps its clicks from reaching the backdrop. */}
+        {confirming
+          ? createPortal(
+              <ConfirmDialog
+                title="Discard unsaved changes?"
+                description="Your edits to Coach settings have not been saved. Discarding them closes Coach settings."
+                confirmLabel="Discard changes"
+                cancelLabel="Keep editing"
+                danger
+                onConfirm={confirmDiscard}
+                onCancel={() => setConfirming(false)}
+              />,
+              document.body
+            )
+          : null}
       </section>
 
       <CoachModelsModal

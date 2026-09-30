@@ -1391,8 +1391,9 @@ Overview, Media, Data, and Settings are in the main bundle.
   **Coach style** (`electron/coachStyles.ts`, `chat.coach.style`, `preference`) is the one place
   a tone is chosen, since the base prompt carries none. Chips, warmest to harshest with Neutral
   in the middle (`COACH_STYLES` is that order): Friendly, Motivating, Neutral (adds nothing),
-  Analytical, Straight talk, No filter (swearing allowed, aimed at excuses and never at the
-  person, dropped the moment pain, injury or distress comes up). Each is one line — it is sent
+  Straight talk, No filter (swearing allowed, aimed at excuses and never at the
+  person, dropped the moment pain, injury or distress comes up); a saved style no longer
+  offered (Analytical) reads as Neutral. Each is one line — it is sent
   every turn, and `test:chat-service` bounds it. Its block goes
   after the base rules and before the athlete's own instructions, which can still tune it, and
   it says outright that it changes tone only and never what goes onto a card — names and

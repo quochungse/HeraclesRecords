@@ -17185,15 +17185,10 @@ tr.data-intervals-row-missing {
 }
 
 /* The status reads at the start of the row, the actions at its end. */
-.chat-settings-footer-status {
+.chat-settings-modal-footer .chat-settings-footer-status {
   margin-right: auto;
   color: var(--text-muted);
   font-size: 12px;
-}
-
-.chat-settings-footer-status[role="alert"] {
-  color: var(--text-primary);
-  font-weight: 600;
 }
 
 .chat-settings-button {
@@ -18276,7 +18271,11 @@ tr.data-intervals-row-missing {
   min-width: 0;
 }
 
-.chat-local-field span,
+/* The field's own label only: a field that holds an OptionGroup has a span
+   in every chip, and a descendant rule drew them all in this muted 11px ink —
+   chips that read as switched off. */
+.chat-local-field > span,
+.chat-local-field > label > span,
 .chat-local-tools span {
   color: var(--text-muted);
   font-size: 11px;

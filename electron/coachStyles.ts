@@ -18,14 +18,13 @@
 
 /**
  * In the order the picker draws them: from the warmest to the harshest, with
- * Neutral in the middle. Analytical sits on the cool side of it — no warmth,
- * no edge, just the figures.
+ * Neutral in the middle. A style saved that is no longer here (Analytical,
+ * taken out) reads as Neutral through `normalizeCoachStyle`.
  */
 export const COACH_STYLES = [
   "friendly",
   "motivating",
   "neutral",
-  "analytical",
   "straight",
   "unfiltered"
 ] as const;
@@ -72,11 +71,6 @@ export const COACH_STYLE_CATALOG: Record<CoachStyle, CoachStyleEntry> = {
     prompt:
       `${STRAIGHT_TALK} Swear freely in the athlete's language — at excuses and effort, never at the person; ` +
       "no slurs. Drop it at any mention of pain, injury, illness or distress."
-  },
-  analytical: {
-    label: "Analytical",
-    detail: "Numbers first, few words: figures, deltas and the reason for each call.",
-    prompt: "Terse: the deciding figures first, then the call and its reason; lists over prose."
   }
 };
 

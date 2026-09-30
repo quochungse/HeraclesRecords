@@ -745,10 +745,12 @@ async function main() {
     await waitFor(async () => /Unsaved changes/.test(await footer()), "an edit is said to be unsaved");
     assert.equal(await harness("callCount", "prop:onSaveChatSettings"), 0, "typing writes nothing");
 
-    // Discard puts the box back to what is saved.
+    // Discard asks first, and Keep editing keeps the edit.
     await harness("clickText", ".chat-settings-modal-footer button", "Discard");
-    await waitFor(async () => (await harness("value", ".chat-custom-instructions")) === "", "Discard restores the saved text");
-    assert.match(await footer(), /All changes saved/);
+    await waitFor(() => harness("exists", ".tl-dialog"), "Discard asks before throwing the edits away");
+    await harness("clickText", ".tl-dialog button", "Keep editing");
+    await waitFor(async () => !(await harness("exists", ".tl-dialog")), "Keep editing closes the question");
+    assert.equal(await harness("value", ".chat-custom-instructions"), "  I race in October.  ", "and keeps the edit");
 
     // The style and the instructions go out together, once, on Save — trimmed.
     await harness("setValue", ".chat-custom-instructions", "  I race in October.  ");
@@ -756,7 +758,7 @@ async function main() {
     const chips = await win.webContents.executeJavaScript(
       `Array.from(document.querySelectorAll('.chat-settings-modal [aria-label="How Coach sounds"] button')).map((chip) => chip.textContent.trim())`
     );
-    assert.deepEqual(chips, ["Friendly", "Motivating", "Neutral", "Analytical", "Straight talk", "No filter"]);
+    assert.deepEqual(chips, ["Friendly", "Motivating", "Neutral", "Straight talk", "No filter"]);
     await harness("clickText", '.chat-settings-modal [aria-label="How Coach sounds"] button', "No filter");
     await harness("clickText", ".chat-settings-modal-footer button", "Save");
     const [saved] = await waitFor(async () => {
@@ -767,17 +769,36 @@ async function main() {
     await waitFor(async () => /All changes saved/.test(await footer()), "and the dialog is clean again");
     assert.match(await harness("text", ".chat-settings-panel"), /strong language and swearing/i, "the chosen style says what it does");
 
-    // Closing with an edit held asks first; Keep editing keeps it.
+    // A press outside with an edit held does nothing, and the footer stays as it is.
     await harness("setValue", ".chat-custom-instructions", "Something else");
+    await harness("click", ".chat-settings-backdrop");
+    assert.equal(await harness("callCount", "prop:onClose"), 0, "a stray click outside does not close");
+    assert.equal(await harness("exists", ".tl-dialog"), false, "nor ask anything");
+    assert.match(await footer(), /Unsaved changes/);
+    assert.match(await footer(), /Discard/);
+    assert.match(await footer(), /Save/);
+    // Closing with an edit held asks first; Keep editing keeps it.
     await harness("click", '.chat-settings-modal [aria-label="Close settings"]');
-    await waitFor(async () => /Discard your unsaved changes\?/.test(await footer()), "a close with edits held asks first");
+    await waitFor(() => harness("exists", ".tl-dialog"), "a close with edits held asks first");
     assert.equal(await harness("callCount", "prop:onClose"), 0, "and does not close");
-    await harness("clickText", ".chat-settings-modal-footer button", "Keep editing");
+    await harness("clickText", ".tl-dialog button", "Keep editing");
+    await waitFor(async () => !(await harness("exists", ".tl-dialog")), "Keep editing closes the question");
     assert.equal(await harness("value", ".chat-custom-instructions"), "Something else", "Keep editing keeps the edit");
     await harness("click", '.chat-settings-modal [aria-label="Close settings"]');
-    await harness("clickText", ".chat-settings-modal-footer button", "Discard and close");
-    await waitFor(() => harness("callCount", "prop:onClose"), "Discard and close closes");
+    await waitFor(() => harness("exists", ".tl-dialog"), "the close asks again");
+    await harness("clickText", ".tl-dialog button", "Discard changes");
+    await waitFor(() => harness("callCount", "prop:onClose"), "a confirmed close closes");
     assert.equal(await harness("callCount", "prop:onSaveChatSettings"), 1, "and saves nothing");
+    // Discard confirmed closes Coach settings too, saving nothing.
+    await harness("mount", "ChatSettingsModal", {}, { getCoachAnalysisPause: null, getCoachAnalysisSpend: null });
+    await waitFor(() => harness("exists", ".chat-settings-modal .chat-custom-instructions"), "the dialog opens again");
+    await harness("setValue", ".chat-custom-instructions", "Yet another");
+    await waitFor(async () => /Unsaved changes/.test(await footer()), "an edit is held");
+    await harness("clickText", ".chat-settings-modal-footer button", "Discard");
+    await waitFor(() => harness("exists", ".tl-dialog"), "Discard asks");
+    await harness("clickText", ".tl-dialog button", "Discard changes");
+    await waitFor(() => harness("callCount", "prop:onClose"), "a confirmed Discard closes Coach settings");
+    assert.equal(await harness("callCount", "prop:onSaveChatSettings"), 0, "and saves nothing");
     await assertQuietConsole("Coach settings' Save and Discard");
   }
 
