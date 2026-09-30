@@ -304,6 +304,16 @@ assert.deepEqual(
   }),
   { value: "", label: "Default (Sonnet 4.6)" }
 );
+// 2.1.284: the description is the qualifier alone; the name is not in it.
+assert.deepEqual(
+  toClaudeModelOption({
+    value: "opus",
+    displayName: "Opus 5.5",
+    resolvedModel: "claude-opus-5-5",
+    description: "For complex work and everyday tasks"
+  }),
+  { value: "opus", label: "Opus 5.5", detail: "For complex work and everyday tasks" }
+);
 // No description: fall back to the resolved id, then to the display name.
 assert.deepEqual(
   toClaudeModelOption({

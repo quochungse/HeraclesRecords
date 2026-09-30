@@ -735,9 +735,11 @@ export function toClaudeModelOption(model: {
 }
 
 /**
- * Splits a CLI model description into its parts. They arrive as
+ * Splits a CLI model description into its parts. Up to 2.1.283 they arrived as
  * "Sonnet 4.6 · Efficient for routine tasks · ~2× usage vs Sonnet": the version
- * leads, and the rest qualifies it.
+ * leads, and the rest qualifies it. From 2.1.284 only the default row keeps that
+ * shape; every other row names the model in `displayName` and its description is
+ * the qualifier alone, so a description with no "·" is never read as a name.
  */
 function claudeModelLabel(model: {
   value: string;
@@ -745,10 +747,11 @@ function claudeModelLabel(model: {
   description?: string;
   resolvedModel?: string;
 }): { label: string; detail?: string } {
-  const [versioned, ...rest] = (model.description ?? "")
+  const parts = (model.description ?? "")
     .split("·")
     .map((part) => part.trim())
     .filter(Boolean);
+  const [versioned, ...rest] = parts.length > 1 ? parts : ["", ...parts];
   const named =
     versioned ||
     (model.resolvedModel ? formatClaudeModelName(model.resolvedModel) : "") ||

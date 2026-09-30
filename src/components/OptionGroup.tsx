@@ -103,6 +103,11 @@ export interface OptionGroupProps<T extends string> {
    * Nothing in `dropdown` mode, which already fills whatever holds it.
    */
   fill?: boolean;
+  /**
+   * The open menu's floor in `dropdown` mode. A menu whose options carry a
+   * `detail` wraps at its floor, which is otherwise the trigger's own width.
+   */
+  minMenuWidth?: number;
   className?: string;
   disabled?: boolean;
 }
@@ -123,6 +128,7 @@ export function OptionGroup<T extends string>({
   tone = "accent",
   iconOnly = false,
   fill = false,
+  minMenuWidth,
   className,
   disabled = false
 }: OptionGroupProps<T>) {
@@ -250,6 +256,7 @@ export function OptionGroup<T extends string>({
           .filter(Boolean)
           .join(" ")}
         {...(renderIcon ? { renderIcon } : {})}
+        {...(minMenuWidth ? { minMenuWidth } : {})}
       />
     );
   }
