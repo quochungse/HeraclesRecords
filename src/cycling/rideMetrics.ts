@@ -6,7 +6,7 @@ import {
   isRideSportType,
   type RideType
 } from "./rideType";
-import { startOfRunWeekMs } from "../running/runMetrics";
+import { acuteChronicLoad, startOfRunWeekMs, type LoadBalance } from "../running/runMetrics";
 
 // "The last N weeks" is one definition across the sport screens: calendar
 // weeks from a Monday, this one included. The run module owns it and nothing
@@ -17,11 +17,11 @@ export {
   runWindowStartMs as rideWindowStartMs
 } from "../running/runMetrics";
 
-const MS_PER_DAY = 86_400_000;
 const METERS_PER_KM = 1000;
 const SECONDS_PER_HOUR = 3600;
 
-function positive(value: number | undefined): number | undefined {
+/** A figure COROS actually recorded: a zero on the list is a field left empty. */
+export function positive(value: number | undefined): number | undefined {
   return typeof value === "number" && Number.isFinite(value) && value > 0
     ? value
     : undefined;
@@ -244,67 +244,12 @@ export function buildRideWeeks(
   );
 }
 
-export interface RideLoadBalance {
-  /** Training load over the last 7 days. */
-  acute: number;
-  /** Weekly-equivalent load over the last 28 days. */
-  chronic: number;
-  /** acute ÷ chronic. Absent while there is nothing to divide by. */
-  ratio?: number;
-  /**
-   * How far back the oldest ride is, across the whole list — under ~21 days the
-   * chronic figure is averaging over history that does not exist. See
-   * `RunLoadBalance.oldestRunDaysAgo` for why it is the list and not the window.
-   */
-  oldestRideDaysAgo?: number;
-}
-
-/**
- * Acute-to-chronic load, riding only.
- *
- * COROS's own `trainingLoadRatio` is taken across every sport, so a heavy
- * week of running moves it. The question this screen answers is whether the
- * *riding* has jumped, so it is tallied from ride load alone.
- */
+/** Acute-to-chronic load, riding only — a heavy week of running does not move it. */
 export function rideLoadBalance(
   activities: readonly TrainingHubActivity[],
   nowMs: number = Date.now()
-): RideLoadBalance {
-  let acute = 0;
-  let chronicTotal = 0;
-  let oldestAt: number | undefined;
-
-  for (const activity of activities) {
-    const at = startedAtMs(activity);
-    if (at === undefined || !isRideSportType(activity.sportType) || at > nowMs) {
-      continue;
-    }
-
-    if (oldestAt === undefined || at < oldestAt) {
-      oldestAt = at;
-    }
-
-    const daysAgo = (nowMs - at) / MS_PER_DAY;
-    if (daysAgo > 28) {
-      continue;
-    }
-
-    const load = positive(activity.trainingLoad) ?? 0;
-    chronicTotal += load;
-    if (daysAgo <= 7) {
-      acute += load;
-    }
-  }
-
-  const chronic = chronicTotal / 4;
-  return {
-    acute,
-    chronic,
-    ...(chronic > 0 ? { ratio: acute / chronic } : {}),
-    ...(oldestAt !== undefined
-      ? { oldestRideDaysAgo: (nowMs - oldestAt) / MS_PER_DAY }
-      : {})
-  };
+): LoadBalance {
+  return acuteChronicLoad(activities, isRideSportType, nowMs);
 }
 
 /** The kinds of ride actually present in a list, in render order. */

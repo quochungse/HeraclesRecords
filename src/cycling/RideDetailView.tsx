@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { ArrowLeft, CloudOff, MessageCircle, RefreshCw } from "lucide-react";
 import type {
   CoachOpenRequest,
@@ -25,10 +25,12 @@ import { formatSpeedValue, formatTemperatureValue } from "../units/units";
 import { ActivitySeriesChart } from "../training/components/ActivitySeriesChart";
 import { withPausesRemoved } from "../../electron/activityMetrics";
 import { RunDetailSkeleton } from "../running/RunningSkeleton";
+import { useBackGesture } from "../running/sportPage";
 import { rideMaxSpeedKmh } from "./rideAnalysis";
 import { RideClimbsPanel } from "./RideClimbsPanel";
 import { rideSeconds, speedKmh } from "./rideMetrics";
 import { RidePowerPanel } from "./RidePowerPanel";
+import { StatGrid, type Stat } from "./StatGrid";
 import {
   RIDE_TYPE_LABELS,
   classifyRideType,
@@ -62,15 +64,6 @@ const MIN_PAUSED_SECONDS_SHOWN = 60;
 
 /** The band at the top of the route cover the heading leaves clear; see running.css. */
 const COVER_VISIBLE_BAND = 0.15;
-
-/** `MouseEvent.button` for the mouse's back button. */
-const MOUSE_BACK_BUTTON = 3;
-
-interface Stat {
-  label: string;
-  value: string;
-  title?: string;
-}
 
 /** A lap's own speed, from its distance and clock, or its pace turned over. */
 function lapSpeedKmh(lap: TrainingHubActivityLap): number | undefined {
@@ -123,26 +116,7 @@ export function RideDetailView({
   const failed = detailStatus === "failed" && detail === null;
   const awaitingRoute = loading && type !== null && isOutdoorRideType(type);
 
-  useEffect(() => {
-    const onMouseUp = (event: MouseEvent) => {
-      if (event.button === MOUSE_BACK_BUTTON) {
-        event.preventDefault();
-        onBack();
-      }
-    };
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "BrowserBack") {
-        event.preventDefault();
-        onBack();
-      }
-    };
-    window.addEventListener("mouseup", onMouseUp);
-    window.addEventListener("keydown", onKeyDown);
-    return () => {
-      window.removeEventListener("mouseup", onMouseUp);
-      window.removeEventListener("keydown", onKeyDown);
-    };
-  }, [onBack]);
+  useBackGesture(onBack);
 
   const headline = useMemo<Stat[]>(() => {
     const distance = detail?.distance ?? activity.distance;
@@ -288,14 +262,7 @@ export function RideDetailView({
             </div>
           </header>
 
-          <div className="run-detail-stats">
-            {headline.map((stat) => (
-              <div className="running-stat" key={stat.label} title={stat.title}>
-                <span>{stat.label}</span>
-                <strong>{stat.value}</strong>
-              </div>
-            ))}
-          </div>
+          <StatGrid stats={headline} />
         </div>
 
         {hasRoute ? (
@@ -341,14 +308,7 @@ export function RideDetailView({
       {conditions.length > 0 ? (
         <section className="panel run-detail-panel">
           <p className="running-eyebrow">Effect and conditions</p>
-          <div className="run-detail-stats">
-            {conditions.map((stat) => (
-              <div className="running-stat" key={stat.label}>
-                <span>{stat.label}</span>
-                <strong>{stat.value}</strong>
-              </div>
-            ))}
-          </div>
+          <StatGrid stats={conditions} />
         </section>
       ) : null}
 

@@ -278,7 +278,7 @@ export function buildRunWeeks(
   );
 }
 
-export interface RunLoadBalance {
+export interface LoadBalance {
   /** Training load over the last 7 days. */
   acute: number;
   /** Weekly-equivalent load over the last 28 days. */
@@ -286,35 +286,36 @@ export interface RunLoadBalance {
   /** acute ÷ chronic. Absent while there is nothing to divide by. */
   ratio?: number;
   /**
-   * How far back the athlete's oldest run is — across the whole list, not the
-   * window. Under ~21 days the chronic figure is averaging over history that
-   * does not exist, so the ratio reads high and the screen says so. Measured
-   * inside the window it said the same about a comeback: three weeks off leaves
-   * nothing in the window before this week, but those weeks are zeros that
-   * happened, and they are exactly why the ratio is high.
+   * How far back the athlete's oldest session of the sport is — across the
+   * whole list, not the window. Under ~21 days the chronic figure is averaging
+   * over history that does not exist, so the ratio reads high and the screen
+   * says so. Measured inside the window it said the same about a comeback:
+   * three weeks off leaves nothing in the window before this week, but those
+   * weeks are zeros that happened, and they are exactly why the ratio is high.
    */
-  oldestRunDaysAgo?: number;
+  oldestDaysAgo?: number;
 }
 
 /**
- * Acute-to-chronic load, running only.
+ * Acute-to-chronic load, for one sport only.
  *
  * COROS ships a `trainingLoadRatio` of its own, but it is taken across every
- * sport — a heavy week of lifting moves it. The question this screen answers is
- * whether *running* volume has jumped, so it is tallied here from run load
- * alone.
+ * sport — a heavy week of lifting moves it. The question a sport screen answers
+ * is whether *that sport's* volume has jumped, so it is tallied here from its
+ * own load alone.
  */
-export function runLoadBalance(
+export function acuteChronicLoad(
   activities: readonly TrainingHubActivity[],
+  isSport: (sportType: number | undefined) => boolean,
   nowMs: number = Date.now()
-): RunLoadBalance {
+): LoadBalance {
   let acute = 0;
   let chronicTotal = 0;
   let oldestAt: number | undefined;
 
   for (const activity of activities) {
     const at = startedAtMs(activity);
-    if (at === undefined || !isRunSportType(activity.sportType) || at > nowMs) {
+    if (at === undefined || !isSport(activity.sportType) || at > nowMs) {
       continue;
     }
 
@@ -339,10 +340,16 @@ export function runLoadBalance(
     acute,
     chronic,
     ...(chronic > 0 ? { ratio: acute / chronic } : {}),
-    ...(oldestAt !== undefined
-      ? { oldestRunDaysAgo: (nowMs - oldestAt) / MS_PER_DAY }
-      : {})
+    ...(oldestAt !== undefined ? { oldestDaysAgo: (nowMs - oldestAt) / MS_PER_DAY } : {})
   };
+}
+
+/** Acute-to-chronic load, running only. */
+export function runLoadBalance(
+  activities: readonly TrainingHubActivity[],
+  nowMs: number = Date.now()
+): LoadBalance {
+  return acuteChronicLoad(activities, isRunSportType, nowMs);
 }
 
 export type RunIntensity = "easy" | "moderate" | "hard";

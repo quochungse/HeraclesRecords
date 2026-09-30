@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { CloudOff, LockKeyhole, RefreshCw } from "lucide-react";
 import type {
   CoachOpenRequest,
@@ -27,7 +27,7 @@ import {
 } from "../preferences/periodScale";
 import { useHeartRateZoneModel } from "../training/useHeartRateZoneModel";
 import { useUnitSystem } from "../units/UnitSystemProvider";
-import { PRIMARY_NAV_ITEMS, type PrimaryView } from "../navigation/primaryNav";
+import type { PrimaryView } from "../navigation/primaryNav";
 import { RunDetailView } from "./RunDetailView";
 import { RunEfficiencyChart } from "./RunEfficiencyChart";
 import { RunIntensityPanel } from "./RunIntensityPanel";
@@ -37,12 +37,12 @@ import { RunBlockSkeleton, RunningPageSkeleton } from "./RunningSkeleton";
 import { RunVolumeChart } from "./RunVolumeChart";
 import { DEFAULT_RUN_SORT, RunList, type RunSort } from "./RunList";
 import {
-  runWindowStartMs,
   summariseRuns,
   surfacesPresent,
   type RunZoneScale
 } from "./runMetrics";
 import { useActivityDetailSummaries } from "../training/useActivityDetailSummaries";
+import { useSessionPage, weeksForPeriod, withinPeriod } from "./sportPage";
 import { RunnerIcon } from "./runnerIcon";
 import {
   RUN_SURFACE_LABELS,
@@ -94,52 +94,6 @@ const PERIOD_OPTIONS = periodGroupOptions([28, 90, 365, null]);
 
 const DEFAULT_PERIOD_DAYS = 90;
 
-/** Keys that scroll a page — the ones that mean the athlete took over. */
-const SCROLL_KEYS = new Set([
-  "ArrowUp",
-  "ArrowDown",
-  "PageUp",
-  "PageDown",
-  "Home",
-  "End",
-  " "
-]);
-
-/**
- * Weeks the charts draw for a period.
- *
- * "All" is capped rather than unbounded: an athlete with six years of history
- * would get three hundred bars two pixels wide, which is a texture rather than
- * a chart, and the years before last are not what this screen is for.
- */
-const MAX_ALL_TIME_WEEKS = 104;
-
-function weeksForPeriod(days: number | null): number {
-  return days === null
-    ? MAX_ALL_TIME_WEEKS
-    : Math.max(1, Math.ceil(days / 7));
-}
-
-/**
- * The runs a period covers, cut at the same Monday the charts start on — see
- * `runWindowStartMs`. "4 weeks" is four calendar weeks, this one included, for
- * the totals strip, the list and every chart alike.
- */
-function withinPeriod(
-  activities: readonly TrainingHubActivity[],
-  days: number | null,
-  nowMs: number
-): TrainingHubActivity[] {
-  if (days === null) {
-    return [...activities];
-  }
-
-  const cutoff = runWindowStartMs(weeksForPeriod(days), nowMs) / 1000;
-  return activities.filter(
-    (activity) => activity.startTime !== undefined && activity.startTime >= cutoff
-  );
-}
-
 /**
  * Running on a screen of its own.
  *
@@ -171,16 +125,22 @@ export function RunningView({
   const { unitSystem } = useUnitSystem();
   const [surface, setSurface] = useState<RunSurface | null>(null);
   const [periodDays, setPeriodDays] = useState<number | null>(DEFAULT_PERIOD_DAYS);
-  const [selectedRunId, setSelectedRunId] = useState<string | null>(null);
-  // Where Back goes from the run open: the screen that handed it over, or,
-  // for a run opened from this list, the list.
-  const [returnTo, setReturnTo] = useState<PrimaryView | null>(null);
   const [sort, setSort] = useState<RunSort>(DEFAULT_RUN_SORT);
-  // The whole page is one scroll, title and filters included, so nothing sits
-  // pinned over the content. The position is kept so the drill-down returns to
-  // exactly where it left.
-  const pageRef = useRef<HTMLElement>(null);
-  const pageScrollTop = useRef(0);
+  const {
+    pageRef,
+    selected: selectedRun,
+    selectedId: selectedRunId,
+    backLabel,
+    open: openRun,
+    close: closeRun
+  } = useSessionPage({
+    activities,
+    onSelectActivity,
+    openRequest,
+    onOpenRequestHandled,
+    onReturn,
+    listLabel: "Running"
+  });
 
   // Every activity list call pushes a new array, so the clock is pinned to that
   // rather than read per render — otherwise "the last 90 days" moves under the
@@ -223,7 +183,6 @@ export function RunningView({
     [allRuns, surface]
   );
 
-
   const chartWeeks = useMemo(() => weeksForPeriod(periodDays), [periodDays]);
   // The zones the account is actually scored against — the model picked on the
   // Personal screen. The dashboard only ever carries LTHR zones, and reading
@@ -254,14 +213,6 @@ export function RunningView({
     }
   }, [availableSurfaces, surface]);
 
-  const selectedRun = useMemo(
-    () =>
-      selectedRunId === null
-        ? null
-        : (activities.find((a) => a.activityId === selectedRunId) ?? null),
-    [activities, selectedRunId]
-  );
-
   // Time in zone and pace:HR drift, which live in the 2.5 MB detail payload and
   // are kept as a row per run so a whole list can show them. Read for the runs
   // on screen; missing ones are computed in the background and appear as they
@@ -271,118 +222,6 @@ export function RunningView({
     activities: runs,
     enabled: connected && selectedRunId === null
   });
-
-  const openRun = useCallback(
-    (activity: TrainingHubActivity) => {
-      pageScrollTop.current = pageRef.current?.scrollTop ?? 0;
-      setSelectedRunId(activity.activityId);
-      setReturnTo(null);
-      onSelectActivity(activity);
-    },
-    [onSelectActivity]
-  );
-
-  const closeRun = useCallback(() => {
-    setSelectedRunId(null);
-    setReturnTo(null);
-    if (returnTo && onReturn) {
-      onReturn(returnTo);
-    }
-  }, [onReturn, returnTo]);
-
-  /*
-   * A run handed over from Activities.
-   *
-   * The id is taken straight rather than looked up first: this screen mounts
-   * with whatever `activities` the app already holds, and `selectedRun` reads
-   * the full history rather than the filtered list, so a run outside the
-   * current period opens just the same. The request is cleared as soon as it is
-   * taken — leaving it standing would re-open the run the moment the athlete
-   * closed it.
-   */
-  useEffect(() => {
-    if (!openRequest) {
-      return;
-    }
-
-    const activity = activities.find(
-      (row) => row.activityId === openRequest.activityId
-    );
-    setSelectedRunId(openRequest.activityId);
-    setReturnTo(openRequest.from ?? null);
-    if (activity) {
-      onSelectActivity(activity);
-    }
-    onOpenRequestHandled?.();
-  }, [activities, onOpenRequestHandled, onSelectActivity, openRequest]);
-
-  // Restoring the scroll is what makes a full-page detail feel like a drill-down
-  // rather than a trip back to the top of the list.
-  useLayoutEffect(() => {
-    const page = pageRef.current;
-    if (selectedRun !== null || !page) {
-      return;
-    }
-
-    const target = pageScrollTop.current;
-    page.scrollTop = target;
-    if (page.scrollTop >= target - 1) {
-      return;
-    }
-
-    // The remounted page can still be growing at this moment, and a position
-    // past its current end is clamped short — seen once in a real window as a
-    // run opened at 2000px coming back at 798px. So the position is re-applied
-    // until it lands, the athlete scrolls on their own, or a second has passed.
-    // Never longer: fighting a scroll the athlete started is worse than landing
-    // a little high.
-    //
-    // A timer, not a ResizeObserver. An observer only reports during a rendering
-    // frame, and a window that is not being given frames — an occluded GNOME
-    // Wayland window, which this app has met before — never reports, so the
-    // restore quietly gave up. Writing `scrollTop` forces layout synchronously,
-    // so a timer lands whether or not anything is being painted.
-    const pageEvents = ["wheel", "touchstart", "pointerdown"] as const;
-    let finished = false;
-    const interval = window.setInterval(() => {
-      page.scrollTop = target;
-      if (page.scrollTop >= target - 1) {
-        finish();
-      }
-    }, 50);
-    const deadline = window.setTimeout(finish, 1000);
-
-    // Only keys that scroll count. Escape is what closes the detail page, and
-    // its keydown is still travelling up to the window when this effect runs —
-    // listening for any key here would catch the very press that brought the
-    // athlete back and cancel the restore on arrival.
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (SCROLL_KEYS.has(event.key)) {
-        finish();
-      }
-    };
-
-    function finish() {
-      if (finished) {
-        return;
-      }
-      finished = true;
-      window.clearInterval(interval);
-      window.clearTimeout(deadline);
-      for (const type of pageEvents) {
-        page?.removeEventListener(type, finish);
-      }
-      window.removeEventListener("keydown", onKeyDown);
-    }
-
-    for (const type of pageEvents) {
-      page.addEventListener(type, finish, { passive: true });
-    }
-    // Keyboard scrolling reaches the window, not the page, when focus sits on
-    // the document body.
-    window.addEventListener("keydown", onKeyDown);
-    return finish;
-  }, [selectedRun]);
 
   if (!connected) {
     return (
@@ -423,10 +262,7 @@ export function RunningView({
         detail={ownDetail}
         detailStatus={detailStatus}
         onBack={closeRun}
-        backLabel={
-          (returnTo && onReturn && PRIMARY_NAV_ITEMS.find((item) => item.id === returnTo)?.label) ||
-          "Running"
-        }
+        backLabel={backLabel}
         onRetry={() => onSelectActivity(selectedRun)}
         onAskCoach={onAskCoach}
       />

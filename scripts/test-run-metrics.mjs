@@ -273,7 +273,7 @@ assert.equal(balance.acute, 180, "strength load stays out of the running ratio")
 assert.equal(balance.chronic, 60, "240 across 28 days is 60 a week");
 assert.equal(balance.ratio, 3);
 assert.ok(
-  Math.abs(balance.oldestRunDaysAgo - 40) < 0.01,
+  Math.abs(balance.oldestDaysAgo - 40) < 0.01,
   "history depth is the oldest run anywhere, not the oldest inside the window"
 );
 
@@ -291,17 +291,17 @@ const comeback = runLoadBalance(
   NOW
 );
 assert.equal(comeback.ratio, 4, "the ramp the ratio exists to flag");
-assert.ok(comeback.oldestRunDaysAgo > 21, "and not a thin history");
+assert.ok(comeback.oldestDaysAgo > 21, "and not a thin history");
 const newcomer = runLoadBalance(
   [run({ activityId: "n1", startTime: secondsAgo(6), trainingLoad: 90 })],
   NOW
 );
-assert.ok(newcomer.oldestRunDaysAgo < 21, "an account a week old still is one");
+assert.ok(newcomer.oldestDaysAgo < 21, "an account a week old still is one");
 
 const emptyBalance = runLoadBalance([], NOW);
 assert.equal(emptyBalance.acute, 0);
 assert.equal(emptyBalance.ratio, undefined, "nothing to divide by");
-assert.equal(emptyBalance.oldestRunDaysAgo, undefined);
+assert.equal(emptyBalance.oldestDaysAgo, undefined);
 
 // ---------------------------------------------------------------------------
 // Zones. COROS states a zone by its ceiling and caps the top one with a

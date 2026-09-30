@@ -25,7 +25,7 @@ import {
   buildRideWeeks,
   rideWindowStartMs,
   summariseRides,
-  type RideTotals,
+  type RideTypeVolume,
   type RideWeek
 } from "./rideMetrics";
 import { RIDE_TYPE_LABELS, type RideType } from "./rideType";
@@ -72,34 +72,16 @@ interface VolumeRow extends Record<string, number | string> {
   longest: number;
 }
 
-/** A total in the chosen measure, in the unit the chart draws. */
-function weekTotal(week: RideTotals, measure: RideVolumeMeasure, unitSystem: UnitSystem): number {
-  if (measure === "time") {
-    return week.duration / SECONDS_PER_HOUR;
-  }
-  if (measure === "climb") {
-    return metersToElevation(week.elevationGain, unitSystem);
-  }
-  return metersToDisplayDistance(week.distance, unitSystem);
-}
-
-function weekLongest(week: RideWeek, measure: RideVolumeMeasure, unitSystem: UnitSystem): number {
-  if (measure === "time") {
-    return week.longestRideSeconds / SECONDS_PER_HOUR;
-  }
-  if (measure === "climb") {
-    return metersToElevation(week.biggestClimbMeters, unitSystem);
-  }
-  return metersToDisplayDistance(week.longestRideMeters, unitSystem);
-}
-
-function typeVolume(
-  week: RideWeek,
-  type: RideType,
+/**
+ * A volume in the chosen measure, in the unit the chart draws. A week's total,
+ * one kind's share of it and its biggest ride all carry the same three
+ * figures, so one reading serves all of them.
+ */
+function measured(
+  volume: RideTypeVolume,
   measure: RideVolumeMeasure,
   unitSystem: UnitSystem
 ): number {
-  const volume = week.byType[type];
   if (measure === "time") {
     return volume.duration / SECONDS_PER_HOUR;
   }
@@ -107,6 +89,15 @@ function typeVolume(
     return metersToElevation(volume.elevationGain, unitSystem);
   }
   return metersToDisplayDistance(volume.distance, unitSystem);
+}
+
+/** The week's single biggest ride, by each measure — not one ride's three figures. */
+function biggestRide(week: RideWeek): RideTypeVolume {
+  return {
+    distance: week.longestRideMeters,
+    duration: week.longestRideSeconds,
+    elevationGain: week.biggestClimbMeters
+  };
 }
 
 function measureUnit(measure: RideVolumeMeasure, unitSystem: UnitSystem): string {
@@ -136,7 +127,7 @@ function oneYearEarlier(
   rides: readonly TrainingHubActivity[],
   weeks: number,
   nowMs: number
-): RideTotals | undefined {
+): RideTypeVolume | undefined {
   const back = Math.max(WEEKS_PER_YEAR, weeks);
   if (back > WEEKS_PER_YEAR + 1) {
     return undefined;
@@ -187,16 +178,16 @@ export function RideVolumeChart({
         const end = index + MOVING_AVERAGE_WEEKS - 1;
         const window = averageBuckets.slice(Math.max(0, end - MOVING_AVERAGE_WEEKS + 1), end + 1);
         const average =
-          window.reduce((sum, bucket) => sum + weekTotal(bucket, measure, unitSystem), 0) /
+          window.reduce((sum, bucket) => sum + measured(bucket, measure, unitSystem), 0) /
           Math.max(1, window.length);
         const row: VolumeRow = {
           label: week.label,
-          total: weekTotal(week, measure, unitSystem),
-          longest: weekLongest(week, measure, unitSystem),
+          total: measured(week, measure, unitSystem),
+          longest: measured(biggestRide(week), measure, unitSystem),
           average
         };
         for (const type of types) {
-          row[type] = typeVolume(week, type, measure, unitSystem);
+          row[type] = measured(week.byType[type], measure, unitSystem);
         }
         return row;
       }),
@@ -235,7 +226,7 @@ export function RideVolumeChart({
           {lastYear !== undefined ? (
             <p className="run-block-aside">
               Same span a year ago:{" "}
-              <strong>{weekTotal(lastYear, measure, unitSystem).toFixed(0)} {unit}</strong>
+              <strong>{measured(lastYear, measure, unitSystem).toFixed(0)} {unit}</strong>
             </p>
           ) : null}
           <OptionGroup

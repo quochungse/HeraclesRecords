@@ -1,4 +1,5 @@
 import type {
+  TrainingHubActivityDetail,
   TrainingHubActivitySeriesPoint,
   TrainingHubActivityZoneBucket
 } from "../../../electron/types";
@@ -349,7 +350,7 @@ export function zoneOf(
  */
 export function performanceZones(
   metric: "pace" | "hr",
-  detail: { hrZones?: readonly TrainingHubActivityZoneBucket[]; paceZones?: readonly TrainingHubActivityZoneBucket[] } | undefined,
+  detail: Partial<Pick<TrainingHubActivityDetail, "hrZones" | "paceZones">> | undefined,
   speed: boolean
 ): readonly TrainingHubActivityZoneBucket[] | undefined {
   if (metric === "hr") {

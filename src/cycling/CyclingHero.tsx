@@ -6,7 +6,7 @@ import {
   formatElevationMeters
 } from "../training/formatters";
 import { useUnitSystem } from "../units/UnitSystemProvider";
-import { DeltaChip } from "../running/RunningHero";
+import { DeltaChip, LoadRatioCard } from "../running/RunningHero";
 import { buildRideWeeks, rideLoadBalance } from "./rideMetrics";
 
 interface CyclingHeroProps {
@@ -32,22 +32,6 @@ interface CyclingHeroProps {
 
 /** Weeks the baseline averages over, plus the current one being compared. */
 const BASELINE_WEEKS = 4;
-
-interface LoadBand {
-  label: string;
-  tone: "low" | "steady" | "high" | "spike";
-}
-
-/**
- * The acute-to-chronic bands, as Running draws them — a prompt to look, not a
- * diagnosis, so the copy says what the number is rather than what to do.
- */
-function loadBand(ratio: number): LoadBand {
-  if (ratio < 0.8) return { label: "Backing off", tone: "low" };
-  if (ratio <= 1.3) return { label: "Steady", tone: "steady" };
-  if (ratio <= 1.5) return { label: "Ramping up", tone: "high" };
-  return { label: "Sharp jump", tone: "spike" };
-}
 
 /**
  * The four figures a rider opens the screen for. It borrows Running's hero
@@ -97,11 +81,6 @@ export function CyclingHero({
 
   const balance = useMemo(() => rideLoadBalance(allRides, nowMs), [allRides, nowMs]);
 
-  const thinHistory =
-    balance.ratio !== undefined &&
-    balance.oldestRideDaysAgo !== undefined &&
-    balance.oldestRideDaysAgo < 21;
-
   const wattsPerKilo =
     ftp !== undefined && weightKg !== undefined && weightKg > 0
       ? ftp / weightKg
@@ -129,36 +108,7 @@ export function CyclingHero({
         </div>
       </div>
 
-      <div className="run-hero-card">
-        <span className="run-hero-label">
-          Load ratio{filtered ? " · all rides" : ""}
-        </span>
-        {balance.ratio === undefined ? (
-          <>
-            <strong className="run-hero-value">—</strong>
-            <div className="run-hero-foot">
-              <span>No riding load in the last four weeks</span>
-            </div>
-          </>
-        ) : (
-          <>
-            <strong className={`run-hero-value tone-${loadBand(balance.ratio).tone}`}>
-              {balance.ratio.toFixed(2)}
-            </strong>
-            <div className="run-hero-foot">
-              <span>{loadBand(balance.ratio).label}</span>
-              {thinHistory ? (
-                <span
-                  className="run-hero-note"
-                  title="The four-week average is being taken over history that is not there yet, so the ratio reads high."
-                >
-                  short history
-                </span>
-              ) : null}
-            </div>
-          </>
-        )}
-      </div>
+      <LoadRatioCard balance={balance} filtered={filtered} sessions="rides" doing="riding" />
 
       <div className="run-hero-card">
         <span className="run-hero-label">FTP</span>

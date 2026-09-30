@@ -13,7 +13,7 @@ import {
 } from "../training/formatters";
 import { buildVo2Trend, formatPlateauDuration, type Vo2Reading } from "../training/vo2Trend";
 import { useUnitSystem } from "../units/UnitSystemProvider";
-import { buildRunWeeks, runLoadBalance } from "./runMetrics";
+import { buildRunWeeks, runLoadBalance, type LoadBalance } from "./runMetrics";
 
 interface RunningHeroProps {
   /**
@@ -122,10 +122,6 @@ export function RunningHero({ runs, allRuns, snapshot, filtered, nowMs }: Runnin
   // averaging over history that does not exist, so the ratio reads high for a
   // reason that is not training. Saying so beats showing an alarming number
   // with no explanation. A ratio implies a run, which implies an oldest run.
-  const thinHistory =
-    balance.ratio !== undefined &&
-    balance.oldestRunDaysAgo !== undefined &&
-    balance.oldestRunDaysAgo < 21;
 
   return (
     <section className="run-hero">
@@ -145,36 +141,7 @@ export function RunningHero({ runs, allRuns, snapshot, filtered, nowMs }: Runnin
         </div>
       </div>
 
-      <div className="run-hero-card">
-        <span className="run-hero-label">
-          Load ratio{filtered ? " · all runs" : ""}
-        </span>
-        {balance.ratio === undefined ? (
-          <>
-            <strong className="run-hero-value">—</strong>
-            <div className="run-hero-foot">
-              <span>No running load in the last four weeks</span>
-            </div>
-          </>
-        ) : (
-          <>
-            <strong className={`run-hero-value tone-${loadBand(balance.ratio).tone}`}>
-              {balance.ratio.toFixed(2)}
-            </strong>
-            <div className="run-hero-foot">
-              <span>{loadBand(balance.ratio).label}</span>
-              {thinHistory ? (
-                <span
-                  className="run-hero-note"
-                  title="The four-week average is being taken over history that is not there yet, so the ratio reads high."
-                >
-                  short history
-                </span>
-              ) : null}
-            </div>
-          </>
-        )}
-      </div>
+      <LoadRatioCard balance={balance} filtered={filtered} sessions="runs" doing="running" />
 
       <div className="run-hero-card">
         <span className="run-hero-label">VO₂max</span>
@@ -223,5 +190,57 @@ export function DeltaChip({ ratio }: { ratio: number }) {
       )}
       {Math.abs(percent)}%
     </span>
+  );
+}
+
+/** Under this much history the four-week baseline is averaging weeks that are not there. */
+const THIN_HISTORY_DAYS = 21;
+
+interface LoadRatioCardProps {
+  balance: LoadBalance;
+  /** Whether a filter narrows the figures beside it — the ratio is always the whole sport's. */
+  filtered: boolean;
+  /** The sport's sessions and the doing of it, as the card words them: "rides", "riding". */
+  sessions: string;
+  doing: string;
+}
+
+/** The acute-to-chronic card, as every sport screen's hero draws it. */
+export function LoadRatioCard({ balance, filtered, sessions, doing }: LoadRatioCardProps) {
+  const band = balance.ratio === undefined ? undefined : loadBand(balance.ratio);
+  const thinHistory =
+    band !== undefined &&
+    balance.oldestDaysAgo !== undefined &&
+    balance.oldestDaysAgo < THIN_HISTORY_DAYS;
+
+  return (
+    <div className="run-hero-card">
+      <span className="run-hero-label">
+        Load ratio{filtered ? ` · all ${sessions}` : ""}
+      </span>
+      {balance.ratio === undefined || band === undefined ? (
+        <>
+          <strong className="run-hero-value">—</strong>
+          <div className="run-hero-foot">
+            <span>No {doing} load in the last four weeks</span>
+          </div>
+        </>
+      ) : (
+        <>
+          <strong className={`run-hero-value tone-${band.tone}`}>{balance.ratio.toFixed(2)}</strong>
+          <div className="run-hero-foot">
+            <span>{band.label}</span>
+            {thinHistory ? (
+              <span
+                className="run-hero-note"
+                title="The four-week average is being taken over history that is not there yet, so the ratio reads high."
+              >
+                short history
+              </span>
+            ) : null}
+          </div>
+        </>
+      )}
+    </div>
   );
 }

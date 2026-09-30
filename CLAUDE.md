@@ -221,7 +221,9 @@ ride has no track in it, so the first open of an indoor ride sat on its placehol
 the export was done; reopened, it was instant (payload cached, track remembered absent),
 which read as "stuck the first time". `isIndoorSportType` (`corosSportTypes.ts`) skips it,
 and `GPX_FALLBACK_TIMEOUT_MS` bounds it for the outdoor activity whose payload lost its
-track; `test:activity-detail-cache` holds both.
+track. **Running out of time is not remembered as "no track"** (`GPX_TIMED_OUT`): COROS keeps
+the export it was slow to build, so the next open asks again; only an answer lands in
+`tracklessActivities`. `test:activity-detail-cache` holds all three.
 **Nothing about the file may enter the row.** `training_activity_summaries` is `derived`, and
 a column saying "cached, 131 KB" would reach another machine as a promise it cannot keep if
 it were ever reclassified — the trap `coach_analysis_local_triggers` exists to avoid. The
@@ -783,8 +785,14 @@ lives at module level for the same visit-to-visit reason — see `useCalendarDat
   `RunIntensityPanel` takes `sport="ride"` over `intensityMix` (the sport-agnostic body
   `runIntensityMix` now wraps — heart-rate zones belong to the athlete, so a ride is banded
   exactly as a run is), the skeletons take a `label`, `DeltaChip` comes from `RunningHero`,
-  the period cut is `runWindowStartMs` re-exported as `rideWindowStartMs`, and FTP and weight
-  come off the same profile answer as the zone model (`useHeartRateZoneModel().profile`).
+  the load-ratio card is `LoadRatioCard` over `acuteChronicLoad` (one tally, asked of a
+  sport), and FTP and weight come off the same profile answer as the zone model
+  (`useHeartRateZoneModel().profile`). **What every sport screen does the same way lives in
+  `src/running/sportPage.ts`** — the period cut (`weeksForPeriod`, `withinPeriod`), the list
+  that opens a session on the whole page and restores its scroll on the way back
+  (`useSessionPage`, with the handed-over session and Back's label), and the mouse's back
+  button (`useBackGesture`). Running, Cycling and Hiking each carried their own copy of all
+  of it; a fix to one belongs there now, not in a screen.
   What differs is what a rider reads: **speed over the time that recorded a distance**
   (`distanceDuration` — a trainer that measured nothing is riding time, not an hour at
   0 km/h); **a week read in hours** — the hero's "This week" and its delta, and the volume

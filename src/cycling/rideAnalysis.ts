@@ -117,19 +117,39 @@ export interface RidePower {
   peaks: RidePeakPower[];
 }
 
-/** Absent when the ride carries no power: no meter, or a meter that never spoke. */
-export function ridePower(
-  series: readonly TrainingHubActivitySeriesPoint[]
-): RidePower | undefined {
-  const watts = perSecond(series, (point) =>
+/**
+ * The ride's power a second at a time, `undefined` in a gap. Worked out once
+ * and handed to `ridePower` and `powerZoneTime`, which both read it: on a long
+ * day it is tens of thousands of seconds.
+ */
+export type PowerSeconds = readonly (number | undefined)[];
+
+export function powerSeconds(series: readonly TrainingHubActivitySeriesPoint[]): PowerSeconds {
+  return perSecond(series, (point) =>
     typeof point.power === "number" && point.power >= 0 ? point.power : undefined
   );
-  const recorded = watts.filter((value): value is number => value !== undefined);
-  if (recorded.length < 2 || !recorded.some((value) => value > 0)) {
+}
+
+/** Absent when the ride carries no power: no meter, or a meter that never spoke. */
+export function ridePower(watts: PowerSeconds): RidePower | undefined {
+  // One pass for the counts: a 600 km brevet is a hundred thousand seconds,
+  // past what `Math.max(...values)` can spread onto the stack.
+  let seconds = 0;
+  let total = 0;
+  let max = 0;
+  let coastingSeconds = 0;
+  for (const value of watts) {
+    if (value === undefined) {
+      continue;
+    }
+    seconds += 1;
+    total += value;
+    if (value > max) max = value;
+    if (value === 0) coastingSeconds += 1;
+  }
+  if (seconds < 2 || max <= 0) {
     return undefined;
   }
-
-  const total = recorded.reduce((sum, value) => sum + value, 0);
 
   let normalized: number | undefined;
   if (watts.length >= NORMALIZED_WINDOW_SECONDS) {
@@ -150,12 +170,12 @@ export function ridePower(
   }
 
   return {
-    seconds: recorded.length,
-    average: total / recorded.length,
-    max: Math.max(...recorded),
+    seconds,
+    average: total / seconds,
+    max,
     ...(normalized !== undefined ? { normalized } : {}),
     workKj: total / 1000,
-    coastingSeconds: recorded.filter((value) => value === 0).length,
+    coastingSeconds,
     peaks: PEAK_POWER_WINDOWS.flatMap((window) => {
       const best = bestAverage(watts, window.seconds);
       return best === undefined ? [] : [{ ...window, watts: best }];
@@ -245,11 +265,11 @@ export interface PowerZoneTime extends PowerZoneBound {
  * riding, and it is reported beside the zones on its own.
  */
 export function powerZoneTime(
-  series: readonly TrainingHubActivitySeriesPoint[],
+  watts: PowerSeconds,
   bounds: readonly PowerZoneBound[]
 ): PowerZoneTime[] {
   const seconds = bounds.map(() => 0);
-  for (const value of perSecond(series, (point) => point.power)) {
+  for (const value of watts) {
     if (value === undefined || value <= 0) {
       continue;
     }
@@ -377,12 +397,14 @@ function roadProfile(series: readonly TrainingHubActivitySeriesPoint[]): RoadPoi
   }
 
   const reach = Math.round(CLIMB_SMOOTH_METERS / CLIMB_STEP_METERS);
+  const prefix = [0];
+  for (const point of raw) {
+    prefix.push(prefix[prefix.length - 1]! + point.altitude);
+  }
   return raw.map((point, index) => {
-    const window = raw.slice(Math.max(0, index - reach), index + reach + 1);
-    return {
-      ...point,
-      altitude: window.reduce((sum, entry) => sum + entry.altitude, 0) / window.length
-    };
+    const from = Math.max(0, index - reach);
+    const to = Math.min(raw.length, index + reach + 1);
+    return { ...point, altitude: (prefix[to]! - prefix[from]!) / (to - from) };
   });
 }
 

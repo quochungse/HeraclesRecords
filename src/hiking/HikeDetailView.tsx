@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { ArrowLeft, CloudOff, MessageCircle, RefreshCw } from "lucide-react";
 import type {
   CoachOpenRequest,
@@ -29,6 +29,7 @@ import {
 import { ActivitySeriesChart } from "../training/components/ActivitySeriesChart";
 import { withPausesRemoved } from "../../electron/activityMetrics";
 import { RunDetailSkeleton } from "../running/RunningSkeleton";
+import { useBackGesture } from "../running/sportPage";
 import {
   altitudeRange,
   hikeLegs,
@@ -62,9 +63,6 @@ const MIN_STOPPED_SECONDS_SHOWN = 60;
 
 /** The band at the top of the route cover the heading leaves clear; see running.css. */
 const COVER_VISIBLE_BAND = 0.15;
-
-/** `MouseEvent.button` for the mouse's back button. */
-const MOUSE_BACK_BUTTON = 3;
 
 interface Stat {
   label: string;
@@ -145,26 +143,7 @@ export function HikeDetailView({
   const loading = detailStatus === "pending" && detail === null;
   const failed = detailStatus === "failed" && detail === null;
 
-  useEffect(() => {
-    const onMouseUp = (event: MouseEvent) => {
-      if (event.button === MOUSE_BACK_BUTTON) {
-        event.preventDefault();
-        onBack();
-      }
-    };
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "BrowserBack") {
-        event.preventDefault();
-        onBack();
-      }
-    };
-    window.addEventListener("mouseup", onMouseUp);
-    window.addEventListener("keydown", onKeyDown);
-    return () => {
-      window.removeEventListener("mouseup", onMouseUp);
-      window.removeEventListener("keydown", onKeyDown);
-    };
-  }, [onBack]);
+  useBackGesture(onBack);
 
   const hasSamples = movement.recordedSeconds > 0;
   const movingSeconds = hasSamples ? movement.movingSeconds : undefined;

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Bike, CloudOff, LockKeyhole, RefreshCw } from "lucide-react";
 import type {
   CoachOpenRequest,
@@ -28,22 +28,18 @@ import { useHeartRateZoneModel } from "../training/useHeartRateZoneModel";
 import { useActivityDetailSummaries } from "../training/useActivityDetailSummaries";
 import { useUnitSystem } from "../units/UnitSystemProvider";
 import { formatSpeedValue } from "../units/units";
-import { PRIMARY_NAV_ITEMS, type PrimaryView } from "../navigation/primaryNav";
+import type { PrimaryView } from "../navigation/primaryNav";
 import { runningThresholdZones } from "../running/RunningHero";
 import { RunIntensityPanel } from "../running/RunIntensityPanel";
 import { RunBlockSkeleton, RunningPageSkeleton } from "../running/RunningSkeleton";
 import type { RunZoneScale } from "../running/runMetrics";
+import { useSessionPage, weeksForPeriod, withinPeriod } from "../running/sportPage";
 import { CyclingHero } from "./CyclingHero";
 import { RideDetailView } from "./RideDetailView";
 import { DEFAULT_RIDE_SORT, RideList, type RideSort } from "./RideList";
 import { RideTypePanel } from "./RideTypePanel";
 import { RideVolumeChart } from "./RideVolumeChart";
-import {
-  rideTypesPresent,
-  rideWindowStartMs,
-  summariseRides,
-  totalsSpeedKmh
-} from "./rideMetrics";
+import { rideTypesPresent, summariseRides, totalsSpeedKmh } from "./rideMetrics";
 import { RIDE_TYPE_LABELS, ridesOfType, type RideType } from "./rideType";
 import "../running/running.css";
 import "./cycling.css";
@@ -79,42 +75,6 @@ export interface CyclingViewProps {
 const PERIOD_OPTIONS = periodGroupOptions([28, 90, 365, null]);
 
 const DEFAULT_PERIOD_DAYS = 90;
-
-/** Keys that scroll a page — the ones that mean the athlete took over. */
-const SCROLL_KEYS = new Set([
-  "ArrowUp",
-  "ArrowDown",
-  "PageUp",
-  "PageDown",
-  "Home",
-  "End",
-  " "
-]);
-
-/** "All" is capped at two years of weekly bars, for Running's reason. */
-const MAX_ALL_TIME_WEEKS = 104;
-
-function weeksForPeriod(days: number | null): number {
-  return days === null
-    ? MAX_ALL_TIME_WEEKS
-    : Math.max(1, Math.ceil(days / 7));
-}
-
-/** The rides a period covers, cut at the Monday the charts start on. */
-function withinPeriod(
-  activities: readonly TrainingHubActivity[],
-  days: number | null,
-  nowMs: number
-): TrainingHubActivity[] {
-  if (days === null) {
-    return [...activities];
-  }
-
-  const cutoff = rideWindowStartMs(weeksForPeriod(days), nowMs) / 1000;
-  return activities.filter(
-    (activity) => activity.startTime !== undefined && activity.startTime >= cutoff
-  );
-}
 
 /**
  * Cycling on a screen of its own.
@@ -153,11 +113,22 @@ export function CyclingView({
   const { unitSystem } = useUnitSystem();
   const [rideType, setRideType] = useState<RideType | null>(null);
   const [periodDays, setPeriodDays] = useState<number | null>(DEFAULT_PERIOD_DAYS);
-  const [selectedRideId, setSelectedRideId] = useState<string | null>(null);
-  const [returnTo, setReturnTo] = useState<PrimaryView | null>(null);
   const [sort, setSort] = useState<RideSort>(DEFAULT_RIDE_SORT);
-  const pageRef = useRef<HTMLElement>(null);
-  const pageScrollTop = useRef(0);
+  const {
+    pageRef,
+    selected: selectedRide,
+    selectedId: selectedRideId,
+    backLabel,
+    open: openRide,
+    close: closeRide
+  } = useSessionPage({
+    activities,
+    onSelectActivity,
+    openRequest,
+    onOpenRequestHandled,
+    onReturn,
+    listLabel: "Cycling"
+  });
 
   // Pinned to the list rather than read per render, so "the last 90 days"
   // does not move under the filter while nobody is touching it.
@@ -222,14 +193,6 @@ export function CyclingView({
     }
   }, [availableTypes, rideType]);
 
-  const selectedRide = useMemo(
-    () =>
-      selectedRideId === null
-        ? null
-        : (activities.find((a) => a.activityId === selectedRideId) ?? null),
-    [activities, selectedRideId]
-  );
-
   // Time in zone, out of the detail payload and kept as a row per ride, so the
   // intensity panel can split an interval session across its bands.
   const summaries = useActivityDetailSummaries({
@@ -237,93 +200,6 @@ export function CyclingView({
     activities: rides,
     enabled: connected && selectedRideId === null
   });
-
-  const openRide = useCallback(
-    (activity: TrainingHubActivity) => {
-      pageScrollTop.current = pageRef.current?.scrollTop ?? 0;
-      setSelectedRideId(activity.activityId);
-      setReturnTo(null);
-      onSelectActivity(activity);
-    },
-    [onSelectActivity]
-  );
-
-  const closeRide = useCallback(() => {
-    setSelectedRideId(null);
-    setReturnTo(null);
-    if (returnTo && onReturn) {
-      onReturn(returnTo);
-    }
-  }, [onReturn, returnTo]);
-
-  // A ride handed over from Activities or the Library: taken straight by id,
-  // so one outside the current period opens just the same, and cleared at once
-  // so closing it does not open it again.
-  useEffect(() => {
-    if (!openRequest) {
-      return;
-    }
-
-    const activity = activities.find(
-      (row) => row.activityId === openRequest.activityId
-    );
-    setSelectedRideId(openRequest.activityId);
-    setReturnTo(openRequest.from ?? null);
-    if (activity) {
-      onSelectActivity(activity);
-    }
-    onOpenRequestHandled?.();
-  }, [activities, onOpenRequestHandled, onSelectActivity, openRequest]);
-
-  // Back from a ride lands where the list was left. Re-applied on a timer
-  // until it takes, for the reasons written out in RunningView.
-  useLayoutEffect(() => {
-    const page = pageRef.current;
-    if (selectedRide !== null || !page) {
-      return;
-    }
-
-    const target = pageScrollTop.current;
-    page.scrollTop = target;
-    if (page.scrollTop >= target - 1) {
-      return;
-    }
-
-    const pageEvents = ["wheel", "touchstart", "pointerdown"] as const;
-    let finished = false;
-    const interval = window.setInterval(() => {
-      page.scrollTop = target;
-      if (page.scrollTop >= target - 1) {
-        finish();
-      }
-    }, 50);
-    const deadline = window.setTimeout(finish, 1000);
-
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (SCROLL_KEYS.has(event.key)) {
-        finish();
-      }
-    };
-
-    function finish() {
-      if (finished) {
-        return;
-      }
-      finished = true;
-      window.clearInterval(interval);
-      window.clearTimeout(deadline);
-      for (const type of pageEvents) {
-        page?.removeEventListener(type, finish);
-      }
-      window.removeEventListener("keydown", onKeyDown);
-    }
-
-    for (const type of pageEvents) {
-      page.addEventListener(type, finish, { passive: true });
-    }
-    window.addEventListener("keydown", onKeyDown);
-    return finish;
-  }, [selectedRide]);
 
   if (!connected) {
     return (
@@ -362,10 +238,7 @@ export function CyclingView({
         detail={ownDetail}
         detailStatus={detailStatus}
         onBack={closeRide}
-        backLabel={
-          (returnTo && onReturn && PRIMARY_NAV_ITEMS.find((item) => item.id === returnTo)?.label) ||
-          "Cycling"
-        }
+        backLabel={backLabel}
         onRetry={() => onSelectActivity(selectedRide)}
         onAskCoach={onAskCoach}
         ftp={profile?.thresholds.ftp}

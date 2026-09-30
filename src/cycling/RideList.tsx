@@ -9,7 +9,7 @@ import {
 } from "../training/formatters";
 import { useUnitSystem } from "../units/UnitSystemProvider";
 import { formatSpeedValue } from "../units/units";
-import { rideSeconds, speedKmh } from "./rideMetrics";
+import { positive, rideSeconds, speedKmh } from "./rideMetrics";
 import { RIDE_TYPE_LABELS, classifyRideType, type RideType } from "./rideType";
 
 interface RideListProps {
@@ -92,12 +92,6 @@ const FIRST_DIRECTION: Record<RideSortKey, "asc" | "desc"> = {
   avgHr: "desc",
   load: "desc"
 };
-
-function positive(value: number | undefined): number | undefined {
-  return typeof value === "number" && Number.isFinite(value) && value > 0
-    ? value
-    : undefined;
-}
 
 function buildRow(activity: TrainingHubActivity): RideRow | null {
   const type = classifyRideType(activity.sportType);

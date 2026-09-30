@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { ArrowLeft, CloudOff, MessageCircle, RefreshCw } from "lucide-react";
 import type {
   CoachOpenRequest,
@@ -23,6 +23,7 @@ import { useUnitSystem } from "../units/UnitSystemProvider";
 import { formatTemperatureValue } from "../units/units";
 import { ActivitySeriesChart } from "../training/components/ActivitySeriesChart";
 import { RunDetailSkeleton } from "./RunningSkeleton";
+import { useBackGesture } from "./sportPage";
 import {
   paceHrDecoupling,
   paceSecondsPerKm,
@@ -71,9 +72,6 @@ interface Stat {
   title?: string;
 }
 
-/** `MouseEvent.button` for the mouse's back button. */
-const MOUSE_BACK_BUTTON = 3;
-
 /**
  * One run, on the whole page.
  *
@@ -119,29 +117,7 @@ export function RunDetailView({
   const awaitingRoute =
     loading && surface !== null && isOutdoorRunSurface(surface);
 
-  useEffect(() => {
-    // Taken on the way up and cancelled, where Chromium would otherwise go
-    // back in the window's own history. A mouse whose driver sends its back
-    // button as the Browser Back key arrives as that key instead.
-    const onMouseUp = (event: MouseEvent) => {
-      if (event.button === MOUSE_BACK_BUTTON) {
-        event.preventDefault();
-        onBack();
-      }
-    };
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "BrowserBack") {
-        event.preventDefault();
-        onBack();
-      }
-    };
-    window.addEventListener("mouseup", onMouseUp);
-    window.addEventListener("keydown", onKeyDown);
-    return () => {
-      window.removeEventListener("mouseup", onMouseUp);
-      window.removeEventListener("keydown", onKeyDown);
-    };
-  }, [onBack]);
+  useBackGesture(onBack);
 
   const headline = useMemo<Stat[]>(() => {
     const distance = detail?.distance ?? activity.distance;

@@ -46,6 +46,7 @@ const {
 
 const {
   climbCategory,
+  powerSeconds,
   powerZoneBounds,
   powerZoneTime,
   rideClimbs,
@@ -198,7 +199,7 @@ assert.equal(
   assert.equal(balance.acute, 200, "the run's load is not riding load");
   assert.equal(balance.chronic, 100, "four weeks of ride load, per week");
   assert.equal(balance.ratio, 2);
-  assert.ok(Math.abs(balance.oldestRideDaysAgo - 40) < 0.01, "measured over the whole list");
+  assert.ok(Math.abs(balance.oldestDaysAgo - 40) < 0.01, "measured over the whole list");
   assert.equal(rideLoadBalance([run()], NOW).ratio, undefined);
 }
 
@@ -314,7 +315,7 @@ assert.equal(
 {
   // An hour at exactly 200 W: every figure has one right answer.
   const steady = Array.from({ length: 3600 }, (_, t) => ({ elapsed: t, power: 200 }));
-  const power = ridePower(steady);
+  const power = ridePower(powerSeconds(steady));
   assert.equal(power.seconds, 3600);
   assert.equal(power.average, 200);
   assert.ok(Math.abs(power.normalized - 200) < 1e-9, "a steady effort normalises to itself");
@@ -340,7 +341,7 @@ assert.equal(
     elapsed: t,
     power: Math.floor(t / 30) % 2 === 0 ? 400 : 0
   }));
-  const surged = ridePower(surging);
+  const surged = ridePower(powerSeconds(surging));
   assert.equal(surged.average, 200);
   assert.ok(surged.normalized > 240, `surges normalise high (${surged.normalized.toFixed(0)} W)`);
   assert.equal(surged.coastingSeconds, 1800);
@@ -348,20 +349,27 @@ assert.equal(
 
   // Smart recording: one sample every 3 s is still an hour of 200 W.
   const sparse = ridePower(
-    Array.from({ length: 1200 }, (_, index) => ({ elapsed: index * 3, power: 200 }))
+    powerSeconds(Array.from({ length: 1200 }, (_, index) => ({ elapsed: index * 3, power: 200 })))
   );
   assert.ok(sparse.seconds >= 3598 && sparse.seconds <= 3600, `held between samples (${sparse.seconds})`);
   // A dropout longer than a few seconds is a gap, not the last reading held.
-  const dropout = ridePower([
-    { elapsed: 0, power: 300 },
-    { elapsed: 60, power: 300 },
-    { elapsed: 61, power: 300 }
-  ]);
+  const dropout = ridePower(
+    powerSeconds([
+      { elapsed: 0, power: 300 },
+      { elapsed: 60, power: 300 },
+      { elapsed: 61, power: 300 }
+    ])
+  );
   assert.ok(dropout.seconds < 10, "a minute's dropout is not a minute at 300 W");
 
-  assert.equal(ridePower(steady.map(({ elapsed }) => ({ elapsed }))), undefined, "no meter, no power");
+  const brevet = ridePower(
+    powerSeconds(Array.from({ length: 150_000 }, (_, t) => ({ elapsed: t, power: 150 + (t % 7) })))
+  );
+  assert.equal(brevet.max, 156, "a 40-hour brevet is counted without spreading it onto the stack");
+
+  assert.equal(ridePower(powerSeconds(steady.map(({ elapsed }) => ({ elapsed })))), undefined, "no meter, no power");
   assert.equal(
-    ridePower(steady.map(({ elapsed }) => ({ elapsed, power: 0 }))),
+    ridePower(powerSeconds(steady.map(({ elapsed }) => ({ elapsed, power: 0 })))),
     undefined,
     "a meter that read zero throughout never spoke"
   );
@@ -401,7 +409,7 @@ assert.equal(
     ...Array.from({ length: 60 }, (_, t) => ({ elapsed: 180 + t, power: 189 })),
     ...Array.from({ length: 30 }, (_, t) => ({ elapsed: 240 + t, power: 500 }))
   ];
-  const time = powerZoneTime(series, bounds);
+  const time = powerZoneTime(powerSeconds(series), bounds);
   assert.deepEqual(
     time.map((zone) => zone.seconds),
     [0, 0, 120, 60, 0, 0, 30],

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { CloudOff, LockKeyhole, Mountain, RefreshCw } from "lucide-react";
 import type {
   CoachOpenRequest,
@@ -28,11 +28,12 @@ import { useHeartRateZoneModel } from "../training/useHeartRateZoneModel";
 import { useActivityDetailSummaries } from "../training/useActivityDetailSummaries";
 import { useUnitSystem } from "../units/UnitSystemProvider";
 import { formatSpeedValue } from "../units/units";
-import { PRIMARY_NAV_ITEMS, type PrimaryView } from "../navigation/primaryNav";
+import type { PrimaryView } from "../navigation/primaryNav";
 import { runningThresholdZones } from "../running/RunningHero";
 import { RunIntensityPanel } from "../running/RunIntensityPanel";
 import { RunBlockSkeleton, RunningPageSkeleton } from "../running/RunningSkeleton";
 import type { RunZoneScale } from "../running/runMetrics";
+import { useSessionPage, weeksForPeriod, withinPeriod } from "../running/sportPage";
 import { HikeDetailView } from "./HikeDetailView";
 import { DEFAULT_HIKE_SORT, HikeList, type HikeSort } from "./HikeList";
 import { HikeTypePanel } from "./HikeTypePanel";
@@ -40,7 +41,6 @@ import { HikeVolumeChart } from "./HikeVolumeChart";
 import { HikingHero } from "./HikingHero";
 import {
   hikeTypesPresent,
-  hikeWindowStartMs,
   summariseHikes,
   totalsSpeedKmh
 } from "./hikeMetrics";
@@ -80,29 +80,6 @@ const PERIOD_OPTIONS = periodGroupOptions([28, 90, 365, null]);
 
 const DEFAULT_PERIOD_DAYS = 90;
 
-const SCROLL_KEYS = new Set(["ArrowUp", "ArrowDown", "PageUp", "PageDown", "Home", "End", " "]);
-
-const MAX_ALL_TIME_WEEKS = 104;
-
-function weeksForPeriod(days: number | null): number {
-  return days === null ? MAX_ALL_TIME_WEEKS : Math.max(1, Math.ceil(days / 7));
-}
-
-/** The hikes a period covers, cut at the Monday the charts start on. */
-function withinPeriod(
-  activities: readonly TrainingHubActivity[],
-  days: number | null,
-  nowMs: number
-): TrainingHubActivity[] {
-  if (days === null) {
-    return [...activities];
-  }
-  const cutoff = hikeWindowStartMs(weeksForPeriod(days), nowMs) / 1000;
-  return activities.filter(
-    (activity) => activity.startTime !== undefined && activity.startTime >= cutoff
-  );
-}
-
 /**
  * Hikes and mountain climbs on a screen of their own.
  *
@@ -140,11 +117,22 @@ export function HikingView({
   const { unitSystem } = useUnitSystem();
   const [hikeType, setHikeType] = useState<HikeType | null>(null);
   const [periodDays, setPeriodDays] = useState<number | null>(DEFAULT_PERIOD_DAYS);
-  const [selectedHikeId, setSelectedHikeId] = useState<string | null>(null);
-  const [returnTo, setReturnTo] = useState<PrimaryView | null>(null);
   const [sort, setSort] = useState<HikeSort>(DEFAULT_HIKE_SORT);
-  const pageRef = useRef<HTMLElement>(null);
-  const pageScrollTop = useRef(0);
+  const {
+    pageRef,
+    selected: selectedHike,
+    selectedId: selectedHikeId,
+    backLabel,
+    open: openHike,
+    close: closeHike
+  } = useSessionPage({
+    activities,
+    onSelectActivity,
+    openRequest,
+    onOpenRequestHandled,
+    onReturn,
+    listLabel: "Hiking"
+  });
 
   // Pinned to the list, so "the last year" does not move under the filter.
   const nowMs = useMemo(() => Date.now(), [activities]);
@@ -189,97 +177,11 @@ export function HikingView({
     }
   }, [availableTypes, hikeType]);
 
-  const selectedHike = useMemo(
-    () =>
-      selectedHikeId === null
-        ? null
-        : (activities.find((a) => a.activityId === selectedHikeId) ?? null),
-    [activities, selectedHikeId]
-  );
-
   const summaries = useActivityDetailSummaries({
     api,
     activities: hikes,
     enabled: connected && selectedHikeId === null
   });
-
-  const openHike = useCallback(
-    (activity: TrainingHubActivity) => {
-      pageScrollTop.current = pageRef.current?.scrollTop ?? 0;
-      setSelectedHikeId(activity.activityId);
-      setReturnTo(null);
-      onSelectActivity(activity);
-    },
-    [onSelectActivity]
-  );
-
-  const closeHike = useCallback(() => {
-    setSelectedHikeId(null);
-    setReturnTo(null);
-    if (returnTo && onReturn) {
-      onReturn(returnTo);
-    }
-  }, [onReturn, returnTo]);
-
-  // A hike handed over from Activities or the Library: taken straight by id and
-  // cleared at once, as Running takes a run.
-  useEffect(() => {
-    if (!openRequest) {
-      return;
-    }
-    const activity = activities.find((row) => row.activityId === openRequest.activityId);
-    setSelectedHikeId(openRequest.activityId);
-    setReturnTo(openRequest.from ?? null);
-    if (activity) {
-      onSelectActivity(activity);
-    }
-    onOpenRequestHandled?.();
-  }, [activities, onOpenRequestHandled, onSelectActivity, openRequest]);
-
-  // Back from a hike lands where the list was left — re-applied on a timer
-  // until it takes, for the reasons written out in RunningView.
-  useLayoutEffect(() => {
-    const page = pageRef.current;
-    if (selectedHike !== null || !page) {
-      return;
-    }
-    const target = pageScrollTop.current;
-    page.scrollTop = target;
-    if (page.scrollTop >= target - 1) {
-      return;
-    }
-    const pageEvents = ["wheel", "touchstart", "pointerdown"] as const;
-    let finished = false;
-    const interval = window.setInterval(() => {
-      page.scrollTop = target;
-      if (page.scrollTop >= target - 1) {
-        finish();
-      }
-    }, 50);
-    const deadline = window.setTimeout(finish, 1000);
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (SCROLL_KEYS.has(event.key)) {
-        finish();
-      }
-    };
-    function finish() {
-      if (finished) {
-        return;
-      }
-      finished = true;
-      window.clearInterval(interval);
-      window.clearTimeout(deadline);
-      for (const type of pageEvents) {
-        page?.removeEventListener(type, finish);
-      }
-      window.removeEventListener("keydown", onKeyDown);
-    }
-    for (const type of pageEvents) {
-      page.addEventListener(type, finish, { passive: true });
-    }
-    window.addEventListener("keydown", onKeyDown);
-    return finish;
-  }, [selectedHike]);
 
   if (!connected) {
     return (
@@ -315,10 +217,7 @@ export function HikingView({
         detail={ownDetail}
         detailStatus={detailStatus}
         onBack={closeHike}
-        backLabel={
-          (returnTo && onReturn && PRIMARY_NAV_ITEMS.find((item) => item.id === returnTo)?.label) ||
-          "Hiking"
-        }
+        backLabel={backLabel}
         onRetry={() => onSelectActivity(selectedHike)}
         onAskCoach={onAskCoach}
       />

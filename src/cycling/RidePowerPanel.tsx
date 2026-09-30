@@ -7,12 +7,14 @@ import type {
 import { formatDurationSeconds, formatDurationSpan } from "../training/formatters";
 import { zoneColor } from "../training/components/routeColoring";
 import {
+  powerSeconds,
   powerZoneBounds,
   powerZoneTime,
   rideLoadFromPower,
   ridePower,
   type PowerZoneBound
 } from "./rideAnalysis";
+import { StatGrid, type Stat } from "./StatGrid";
 
 interface RidePowerPanelProps {
   /** The ride's samples on activity time. */
@@ -23,12 +25,6 @@ interface RidePowerPanelProps {
   ftp?: number;
   /** The account's cycling power zones, as COROS states them. */
   powerZones?: readonly CorosProfileZone[];
-}
-
-interface Stat {
-  label: string;
-  value: string;
-  title?: string;
 }
 
 function zoneRange(bound: PowerZoneBound): string {
@@ -55,13 +51,13 @@ function zoneRange(bound: PowerZoneBound): string {
  * sensor still records; without either it draws nothing.
  */
 export function RidePowerPanel({ series, dynamics, ftp, powerZones }: RidePowerPanelProps) {
-  const power = useMemo(() => ridePower(series), [series]);
+  const watts = useMemo(() => powerSeconds(series), [series]);
+  const power = useMemo(() => ridePower(watts), [watts]);
   const load = useMemo(() => (power ? rideLoadFromPower(power, ftp) : undefined), [ftp, power]);
-  const bounds = useMemo(() => powerZoneBounds(powerZones, ftp), [ftp, powerZones]);
-  const zones = useMemo(
-    () => (power && bounds ? powerZoneTime(series, bounds) : []),
-    [bounds, power, series]
-  );
+  const zones = useMemo(() => {
+    const bounds = power ? powerZoneBounds(powerZones, ftp) : undefined;
+    return bounds ? powerZoneTime(watts, bounds) : [];
+  }, [ftp, power, powerZones, watts]);
 
   const cadence: Stat[] = [];
   if (dynamics?.avgCadence !== undefined) {
@@ -203,18 +199,5 @@ export function RidePowerPanel({ series, dynamics, ftp, powerZones }: RidePowerP
           : ""}
       </p>
     </section>
-  );
-}
-
-function StatGrid({ stats }: { stats: readonly Stat[] }) {
-  return (
-    <div className="run-detail-stats">
-      {stats.map((stat) => (
-        <div className="running-stat" key={stat.label} title={stat.title}>
-          <span>{stat.label}</span>
-          <strong>{stat.value}</strong>
-        </div>
-      ))}
-    </div>
   );
 }
