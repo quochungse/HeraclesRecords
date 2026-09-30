@@ -2,6 +2,8 @@ import type {
   ChatMessage,
   ChatTokenUsage,
   CompactContextSettings,
+  CompactModelChoice,
+  ContextDetail,
   PersistedChatEntry,
   PlanArtifactVersion,
   PlanBrief,
@@ -12,6 +14,8 @@ import type {
   ScheduleRef
 } from "./types";
 import { briefLine, outlineLine } from "./planBrief";
+import { stripChartPlaceholders } from "./chartPlacement";
+import { isChatProvider } from "./chatModels";
 
 /**
  * Context compaction — the rolling summary that stands in for the head of a
@@ -94,6 +98,169 @@ export const DEFAULT_COMPACT_CONTEXT: CompactContextSettings = {
   ...DEFAULT_CONTEXT_WINDOW
 };
 
+/**
+ * How much of a conversation reaches the model as it was written.
+ *
+ * The entry window above cannot see what an entry weighs, and an entry is a
+ * line or four thousand words: measured on a real account (2026-09-29), a
+ * 16-entry conversation sent ~16k tokens of history on every turn and was never
+ * compacted, while a 110-entry one sent ~12k — nine tenths of it the coach's
+ * own answers. So a conversation goes out in three layers, each held to a
+ * budget measured on the wire (the cards are dropped there, and they are most
+ * of a row's bytes):
+ *
+ *   * the newest turns, word for word (`keep`);
+ *   * the ones before them **condensed** — the athlete's words as written, and
+ *     each coach answer as a digest of its figures and decisions
+ *     (`answerDigest.ts`), since the answers are what grows and what the coach
+ *     can say again (`middle`);
+ *   * everything older, as the running summary.
+ *
+ * Turns move from the first layer to the second in a batch, once the verbatim
+ * part runs past `rollAt`, and from the second to the summary once it runs
+ * past `middle` — in batches so the prefix a provider caches changes a few
+ * times a conversation rather than every turn. A digest is made in the
+ * background, so moving a turn costs no wait; only the summary's roll is a
+ * model call the athlete waits on. Nothing is lost on the way: every earlier
+ * turn stays readable through `recall_conversation`.
+ *
+ * Replayed turn by turn over that account's 32 conversations (2026-09-30,
+ * digests stood in for by a 400-character cut), against a summary and tail
+ * alone at 12k / 4k: `balanced` sent 3.0k a turn where that sent 3.7k — 6.4k
+ * against 8.1k on the 110-entry one — and rolled 3 times where it rolled 4,
+ * with 45 digests made in the background; `lean` sent 2.4k with 4 rolls;
+ * `full` sent 4.2k, the price of keeping more. A `lean` whose condensed layer
+ * held only 4k rolled 11 times, which is 11 waits: the layer's own budget is
+ * what keeps the summariser rare.
+ */
+export interface ContextBudget {
+  /** Estimated tokens of verbatim turns past which the older ones are condensed. */
+  rollAt: number;
+  /** Estimated tokens the verbatim tail is held to. */
+  keep: number;
+  /** Estimated tokens the condensed layer may hold before its oldest part is summarised. */
+  middle: number;
+}
+
+export const CONTEXT_BUDGETS: Readonly<Record<ContextDetail, ContextBudget>> = {
+  lean: { rollAt: 4_000, keep: 2_000, middle: 6_000 },
+  balanced: { rollAt: 6_000, keep: 3_000, middle: 6_000 },
+  full: { rollAt: 12_000, keep: 6_000, middle: 10_000 }
+};
+
+const DEFAULT_CONTEXT_DETAIL: ContextDetail = "balanced";
+export const DEFAULT_CONTEXT_BUDGET: ContextBudget = CONTEXT_BUDGETS[DEFAULT_CONTEXT_DETAIL];
+
+export function normalizeContextDetail(value: unknown): ContextDetail {
+  return value === "lean" || value === "balanced" || value === "full" ? value : DEFAULT_CONTEXT_DETAIL;
+}
+
+/**
+ * Reads a stored or handed model choice. A `fixed` choice with no provider or
+ * no model reads as `auto`: compressing with a half-named model would fail on
+ * every turn, and failing quietly back to the default is what a compaction
+ * that is only an optimisation should do.
+ */
+export function normalizeCompactModelChoice(value: unknown): CompactModelChoice {
+  let raw: unknown = value;
+  if (typeof raw === "string") {
+    if (raw === "auto" || raw === "conversation") return { kind: raw };
+    try {
+      raw = JSON.parse(raw);
+    } catch {
+      return { kind: "auto" };
+    }
+  }
+  if (!raw || typeof raw !== "object") return { kind: "auto" };
+  const choice = raw as { kind?: unknown; provider?: unknown; model?: unknown };
+  if (choice.kind === "conversation") return { kind: "conversation" };
+  if (
+    choice.kind === "fixed" &&
+    isChatProvider(choice.provider) &&
+    typeof choice.model === "string" &&
+    choice.model.trim()
+  ) {
+    return { kind: "fixed", provider: choice.provider, model: choice.model.trim() };
+  }
+  return { kind: "auto" };
+}
+
+/** How a choice is written to its setting. */
+export function serializeCompactModelChoice(choice: CompactModelChoice): string {
+  return choice.kind === "fixed" ? JSON.stringify(choice) : choice.kind;
+}
+
+/**
+ * A rough token count: English runs about four characters a token and
+ * Vietnamese, which most of these conversations are written in, nearer two
+ * and a half. Three is between them, and a budget needs no more than that.
+ */
+function estimateTokens(text: string): number {
+  return Math.ceil(text.length / 3);
+}
+
+/**
+ * The digest of a coach answer, when one has been made (`requestDigests`).
+ * A lookup rather than a map so this module stays free of the hashing the
+ * store keys digests by — the renderer imports it.
+ */
+export type AnswerDigestLookup = (answer: string) => string | undefined;
+
+/** A coach answer the condensed layer holds and no digest has been made of yet. */
+export interface DigestRequest {
+  answer: string;
+  /** The athlete's message it answered, for the digest's context. */
+  question?: string;
+}
+
+/** What one entry costs on the wire. A card costs nothing: it is not sent. */
+function entryTokens(entry: PersistedChatEntry, digestOf?: AnswerDigestLookup): number {
+  return toWireMessages([entry], digestOf).reduce(
+    (total, message) => total + estimateTokens(message.content),
+    0
+  );
+}
+
+function tokensOf(entries: readonly PersistedChatEntry[], digestOf?: AnswerDigestLookup): number {
+  return entries.reduce((total, entry) => total + entryTokens(entry, digestOf), 0);
+}
+
+/**
+ * How many of the newest entries the verbatim tail holds: at most `keep`
+ * entries and `budget` tokens, but never fewer than `MIN_CONTEXT_KEEP` entries
+ * that say something — the athlete's question and what came before it go in
+ * whole, however long the answer was.
+ */
+function tailLengthWithin(entries: PersistedChatEntry[], keep: number, budget: number): number {
+  let spent = 0;
+  let spoken = 0;
+  let taken = 0;
+  for (let index = entries.length - 1; index >= 0 && taken < keep; index -= 1) {
+    const cost = entryTokens(entries[index]!);
+    if (spoken >= MIN_CONTEXT_KEEP && spent + cost > budget) break;
+    spent += cost;
+    taken += 1;
+    if (cost > 0) spoken += 1;
+  }
+  return taken;
+}
+
+/** The condensed layer's coach answers with no digest yet, each with the question it answered. */
+function undigested(entries: readonly PersistedChatEntry[], digestOf: AnswerDigestLookup): DigestRequest[] {
+  const pending: DigestRequest[] = [];
+  let question: string | undefined;
+  for (const entry of entries) {
+    for (const message of toWireMessages([entry])) {
+      if (message.role === "user") {
+        question = message.content;
+      } else if (entry.kind === "message" && !digestOf(message.content)) {
+        pending.push({ answer: message.content, ...(question ? { question } : {}) });
+      }
+    }
+  }
+  return pending;
+}
+
 function clamp(value: number, low: number, high: number): number {
   return Math.min(high, Math.max(low, value));
 }
@@ -139,7 +306,17 @@ export function normalizeContextWindow(
  * a coach that cannot see what it asked (or what it was told) re-asks. So is a
  * `planEvent`: it is the one thing about a creation the coach did not write.
  */
-export function toWireMessages(entries: PersistedChatEntry[]): ChatMessage[] {
+/**
+ * How a condensed answer reads to the model: marked, so the coach knows it is
+ * reading its own answer in brief and where the whole of it is.
+ */
+const CONDENSED_ANSWER_MARK = "[condensed]";
+
+export function toWireMessages(
+  entries: readonly PersistedChatEntry[],
+  /** Answers with a digest are sent as the digest (the condensed layer). */
+  digestOf?: AnswerDigestLookup
+): ChatMessage[] {
   const wire: ChatMessage[] = [];
   // What the athlete or COROS did to a creation, where it happened: the card
   // itself is dropped like every card, and this is the part of it the coach
@@ -169,14 +346,14 @@ export function toWireMessages(entries: PersistedChatEntry[]): ChatMessage[] {
   };
   for (const entry of entries) {
     if (entry.kind === "message") {
-      if (entry.content.trim()) push({ role: entry.role, content: entry.content });
-    } else if (entry.kind === "planEvent") {
-      events.push(planEventNote(entry.event));
-    } else if (entry.kind === "planRefs") {
-      // Rides on the question it was attached to, which follows it.
-      events.push(planRefsNote(entry.refs));
-    } else if (entry.kind === "scheduleRefs") {
-      events.push(scheduleRefsNote(entry.refs));
+      // A placeholder names a chart of the turn it was written in; on a later
+      // turn it would name nothing, or the wrong chart.
+      const content = entry.role === "assistant" ? stripChartPlaceholders(entry.content) : entry.content;
+      const digest = entry.role === "assistant" && content.trim() ? digestOf?.(content) : undefined;
+      if (digest) push({ role: entry.role, content: `${CONDENSED_ANSWER_MARK} ${digest}` });
+      else if (content.trim()) push({ role: entry.role, content });
+    } else if (ridesOnNextMessage(entry)) {
+      events.push(wireNote(entry));
     } else if (entry.kind === "coachPrompt") {
       const choices = entry.prompt.choices
         .map((choice) => `- ${choice.label}`)
@@ -190,6 +367,23 @@ export function toWireMessages(entries: PersistedChatEntry[]): ChatMessage[] {
   }
   flushEvents();
   return wire;
+}
+
+type WireNoteEntry = Extract<PersistedChatEntry, { kind: "planEvent" | "planRefs" | "scheduleRefs" }>;
+
+/**
+ * An entry the wire sends as a note on the athlete's next message rather than
+ * as a message of its own: what happened to a creation, and what a question
+ * points at (which rides on the question it was attached to, after it).
+ */
+export function ridesOnNextMessage(entry: PersistedChatEntry): entry is WireNoteEntry {
+  return entry.kind === "planEvent" || entry.kind === "planRefs" || entry.kind === "scheduleRefs";
+}
+
+function wireNote(entry: WireNoteEntry): string {
+  if (entry.kind === "planEvent") return planEventNote(entry.event);
+  if (entry.kind === "planRefs") return planRefsNote(entry.refs);
+  return scheduleRefsNote(entry.refs);
 }
 
 /** What the athlete pointed at, as a line in front of their question. */
@@ -381,32 +575,55 @@ export interface StoredTranscriptSummary {
   summary?: string;
   /** Entries at the head of the transcript the summary accounts for. */
   through: number;
+  /**
+   * Where the verbatim turns begin: the entries between `through` and this are
+   * the condensed layer. Absent, or anything outside `[through, length]`, reads
+   * as no condensed layer at all.
+   */
+  condensedThrough?: number;
 }
 
 export interface TranscriptContextPlan {
-  /** Sent ahead of the tail, standing in for everything before it. */
+  /** Sent ahead of the rest, standing in for everything before it. */
   summary?: string;
+  /** Sent condensed: the athlete's words as written, each coach answer as its digest. */
+  middle: PersistedChatEntry[];
   /** Sent verbatim. */
   tail: PersistedChatEntry[];
   /** Entries that have to be folded into the summary first; usually empty. */
   toSummarise: PersistedChatEntry[];
   /** What `through` becomes once they are folded in. */
   through: number;
+  /** Where the verbatim turns begin. */
+  condensedThrough: number;
+  /** The condensed layer's answers with no digest yet; empty without a lookup. */
+  toDigest: DigestRequest[];
 }
 
 export interface PlanTranscriptOptions {
   /**
-   * Roll now, whatever the limit says — "Compact context" from the
-   * conversation menu. The tail is still `keep` entries, so a forced compact
-   * and one the window triggered leave the conversation in the same shape.
+   * Roll now, whatever the budgets say — "Compact context" from the
+   * conversation menu. Everything before the verbatim tail goes into the
+   * summary, the condensed layer included.
    */
   force?: boolean;
+  /** The token budgets; `DEFAULT_CONTEXT_BUDGET` when absent. */
+  budget?: ContextBudget;
+  /** The digests made so far; without one, no answer counts as condensed. */
+  digestOf?: AnswerDigestLookup;
 }
 
 /**
  * What of a transcript this turn should send, and what has to be folded into
  * the summary first. Pure: the folding itself is a model call and belongs to
- * the caller.
+ * the caller, and so is making a digest.
+ *
+ * Two steps, in this order. The verbatim part condenses its older turns once
+ * it runs past `rollAt` tokens or past the entry window, keeping a tail within
+ * `keep`. Then the condensed layer folds its oldest part into the summary once
+ * it runs past `middle` tokens — until half of that is left — or the whole of
+ * it once everything past the summary runs past the entry window, which is
+ * what the window has always meant.
  *
  * A `through` past the end of the transcript describes a conversation that is
  * no longer there, so the summary is abandoned rather than trusted. It should
@@ -433,32 +650,62 @@ export function planTranscriptContext(
     Boolean(stored.summary);
   const through = valid ? stored.through : 0;
   const summary = valid ? stored.summary : undefined;
+  const budget = options.budget ?? DEFAULT_CONTEXT_BUDGET;
+  const { digestOf } = options;
 
-  const live = entries.length - through;
-  // A forced compact still has a floor: below `keep` there is nothing the roll
-  // could remove, and rolling anyway would spend a model call to summarise
-  // turns it then sends in full anyway.
-  const ceiling = options.force ? window.keep : window.limit;
-  if (live <= ceiling) {
-    return {
-      ...(summary ? { summary } : {}),
-      tail: entries.slice(through),
-      toSummarise: [],
-      through
-    };
+  const storedCondensed = stored.condensedThrough;
+  let condensed =
+    typeof storedCondensed === "number" &&
+    Number.isInteger(storedCondensed) &&
+    storedCondensed >= through &&
+    storedCondensed <= entries.length
+      ? storedCondensed
+      : through;
+
+  // 1. The verbatim part. Past its budget, only once a batch of four entries
+  // would move: a tail over budget on its own (one very long answer) would
+  // otherwise be condensed a turn at a time.
+  const verbatim = entries.slice(condensed);
+  const keep = tailLengthWithin(verbatim, window.keep, budget.keep);
+  const condense = options.force
+    ? verbatim.length > keep
+    : verbatim.length > window.limit ||
+      (verbatim.length - keep >= MIN_CONTEXT_GAP && tokensOf(verbatim) > budget.rollAt);
+  if (condense) condensed = entries.length - keep;
+
+  // 2. The condensed layer.
+  let nextThrough = through;
+  if (options.force || entries.length - through > window.limit) {
+    nextThrough = condensed;
+  } else {
+    let cost = tokensOf(entries.slice(through, condensed), digestOf);
+    if (cost > budget.middle) {
+      while (nextThrough < condensed && cost > budget.middle / 2) {
+        cost -= entryTokens(entries[nextThrough]!, digestOf);
+        nextThrough += 1;
+      }
+    }
   }
 
-  const nextThrough = entries.length - window.keep;
+  const middle = entries.slice(nextThrough, condensed);
   return {
     ...(summary ? { summary } : {}),
-    tail: entries.slice(nextThrough),
+    middle,
+    tail: entries.slice(condensed),
     toSummarise: entries.slice(through, nextThrough),
-    through: nextThrough
+    through: nextThrough,
+    condensedThrough: condensed,
+    toDigest: digestOf ? undigested(middle, digestOf) : []
   };
 }
 
 /** How a summary turn begins, and so how one is recognised. */
 const SUMMARY_HEADER = "[Earlier in this conversation, summarised]";
+
+/** Whether a wire message is the summary `summaryContextMessage` built. */
+export function isSummaryContextMessage(message: ChatMessage): boolean {
+  return message.role === "user" && message.content.startsWith(SUMMARY_HEADER);
+}
 
 /** How many messages before its own a pipeline step's turn carries (P2.4). */
 export const PIPELINE_RECENT_MESSAGES = 6;
@@ -485,7 +732,7 @@ export function pipelineWire(
 ): ChatMessage[] {
   const last = messages.map((message) => message.role).lastIndexOf("user");
   const before = (last < 0 ? messages : messages.slice(0, last)).filter(
-    (message) => !(message.role === "user" && message.content.startsWith(SUMMARY_HEADER))
+    (message) => !isSummaryContextMessage(message)
   );
   const kept = before.slice(Math.max(0, before.length - recent));
   while (kept.length && kept[0]!.role !== "user") kept.shift();
@@ -504,7 +751,8 @@ export function summaryContextMessage(summary: string): ChatMessage {
     content: [
       SUMMARY_HEADER,
       summary,
-      "[End of summary. The messages that follow are the recent turns in full.]"
+      "[End of summary. The messages that follow are the recent turns in full; an answer of yours marked " +
+        `${CONDENSED_ANSWER_MARK} is its digest.]`
     ].join("\n\n")
   };
 }
@@ -512,9 +760,11 @@ export function summaryContextMessage(summary: string): ChatMessage {
 /** The turn that folds new entries into the running summary. */
 export function buildRollingSummaryTurn(
   previous: string | undefined,
-  entries: PersistedChatEntry[]
+  entries: PersistedChatEntry[],
+  /** Answers already condensed are summarised from their digests. */
+  digestOf?: AnswerDigestLookup
 ): string {
-  const transcript = toWireMessages(entries)
+  const transcript = toWireMessages(entries, digestOf)
     .map((message) => `${message.role === "user" ? "Athlete" : "Coach"}: ${message.content}`)
     .join("\n\n");
   return [
@@ -530,8 +780,12 @@ export function buildRollingSummaryTurn(
     "newer turns. It is the only record of these turns the coach will have on",
     "future runs, so keep what a coach would need: the athlete's goals, races,",
     "injuries and constraints, decisions taken, and how the training has",
-    "actually gone. Drop pleasantries and anything already superseded. Write it",
-    "as notes, not as a letter, and reply with the summary and nothing else."
+    "actually gone. Keep every figure exactly as it was given — paces, heart",
+    "rates, distances, weights, dates — and what the coach prescribed, with its",
+    "numbers: those are what a summary of a summary loses first. Drop",
+    "pleasantries, explanations the coach can give again, and anything already",
+    "superseded. Write it as notes, not as a letter, and reply with the summary",
+    "and nothing else."
   ].join("\n");
 }
 
@@ -540,8 +794,14 @@ export function buildRollingSummaryTurn(
 // ---------------------------------------------------------------------------
 
 export interface TranscriptContextResult {
-  /** Sent ahead of the tail, when there is one. */
+  /** Sent ahead of the rest, when there is one. */
   summary?: string;
+  /**
+   * The condensed layer as it goes on the wire, between the summary and the
+   * tail: the athlete's words as written, each coach answer as its digest
+   * where one has been made.
+   */
+  middle: ChatMessage[];
   /** Sent verbatim. */
   tail: PersistedChatEntry[];
   /** Index into `entries` where `tail` begins, for callers that slice again. */
@@ -593,6 +853,20 @@ export interface ApplyTranscriptContextParams {
   }>;
   /** Persists the pair. Called only when a roll produced a summary. */
   store(summary: string, through: number): void;
+  /** Budgets and digests; see `PlanTranscriptOptions`. */
+  budget?: ContextBudget;
+  digestOf?: AnswerDigestLookup;
+  /**
+   * Persists where the verbatim turns begin. Called when it moves, whether or
+   * not a roll ran — condensing a batch is not a model call.
+   */
+  storeCondensed?(condensedThrough: number): void;
+  /**
+   * Asks for digests of the condensed layer's answers that have none. Not
+   * awaited: a digest is made in the background and read on a later turn, and
+   * until then its answer goes out whole.
+   */
+  digest?(requests: DigestRequest[]): void;
 }
 
 /**
@@ -609,17 +883,20 @@ export interface ApplyTranscriptContextParams {
 export async function applyTranscriptContext(
   params: ApplyTranscriptContextParams
 ): Promise<TranscriptContextResult> {
-  const plan = planTranscriptContext(
-    params.entries,
-    params.stored,
-    params.window ?? DEFAULT_CONTEXT_WINDOW,
-    params.force ? { force: true } : {}
-  );
+  const plan = planTranscriptContext(params.entries, params.stored, params.window ?? DEFAULT_CONTEXT_WINDOW, {
+    ...(params.force ? { force: true } : {}),
+    ...(params.budget ? { budget: params.budget } : {}),
+    ...(params.digestOf ? { digestOf: params.digestOf } : {})
+  });
+  if (plan.toDigest.length) params.digest?.(plan.toDigest);
+  const moved = plan.condensedThrough !== params.stored.condensedThrough;
+  const settled = { tail: plan.tail, tailStart: plan.condensedThrough };
   if (!plan.toSummarise.length) {
+    if (moved) params.storeCondensed?.(plan.condensedThrough);
     return {
       ...(plan.summary ? { summary: plan.summary } : {}),
-      tail: plan.tail,
-      tailStart: params.entries.length - plan.tail.length,
+      middle: toWireMessages(plan.middle, params.digestOf),
+      ...settled,
       through: plan.through,
       rolled: false,
       failed: false
@@ -627,12 +904,13 @@ export async function applyTranscriptContext(
   }
 
   const rolled = await params.roll(plan.summary, plan.toSummarise);
+  if (moved) params.storeCondensed?.(plan.condensedThrough);
   if (!rolled.summary) {
-    const tail = [...plan.toSummarise, ...plan.tail];
     return {
       ...(plan.summary ? { summary: plan.summary } : {}),
-      tail,
-      tailStart: params.entries.length - tail.length,
+      // Nothing is dropped: what the roll would have folded goes out condensed.
+      middle: toWireMessages([...plan.toSummarise, ...plan.middle], params.digestOf),
+      ...settled,
       through: params.stored.through,
       rolled: true,
       failed: true,
@@ -644,8 +922,8 @@ export async function applyTranscriptContext(
   params.store(rolled.summary, plan.through);
   return {
     summary: rolled.summary,
-    tail: plan.tail,
-    tailStart: params.entries.length - plan.tail.length,
+    middle: toWireMessages(plan.middle, params.digestOf),
+    ...settled,
     through: plan.through,
     rolled: true,
     failed: false,
@@ -653,12 +931,13 @@ export async function applyTranscriptContext(
   };
 }
 
-/** The messages a resolved context becomes: the summary, then the tail. */
+/** The messages a resolved context becomes: the summary, the condensed layer, then the tail. */
 export function contextMessages(
-  result: Pick<TranscriptContextResult, "summary" | "tail">
+  result: Pick<TranscriptContextResult, "summary" | "tail"> & { middle?: ChatMessage[] }
 ): ChatMessage[] {
   return [
     ...(result.summary ? [summaryContextMessage(result.summary)] : []),
+    ...(result.middle ?? []),
     ...toWireMessages(result.tail)
   ];
 }

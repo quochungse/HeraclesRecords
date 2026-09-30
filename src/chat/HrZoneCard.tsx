@@ -1,6 +1,7 @@
-import { useMemo } from "react";
+import { memo, useMemo } from "react";
 import { Heart } from "lucide-react";
-import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from "recharts";
+import { Cell, Pie, PieChart, Tooltip } from "recharts";
+import { ChartWhenNear } from "./charts/ChartWhenNear";
 import type { TooltipContentProps } from "recharts";
 import type { HrZonePreview } from "../../electron/types";
 import {
@@ -105,7 +106,8 @@ function ZoneTooltip({ active, payload }: TooltipContentProps) {
   );
 }
 
-export function HrZoneCard({ preview }: HrZoneCardProps) {
+/** Memoised on `preview`, as `ActivityVisualCard` is and for the same reason. */
+export const HrZoneCard = memo(function HrZoneCard({ preview }: HrZoneCardProps) {
   const { unitSystem } = useUnitSystem();
   const rows = useMemo((): ZoneRow[] => {
     return preview.zones.map((zone, index) => ({
@@ -158,7 +160,7 @@ export function HrZoneCard({ preview }: HrZoneCardProps) {
             <div className="chat-zone-donut-wrap">
               <div className="chat-zone-donut" aria-hidden="true">
                 {chartData.length > 0 ? (
-                  <ResponsiveContainer width="100%" height="100%">
+                  <ChartWhenNear>
                     <PieChart>
                       <Pie
                         data={chartData}
@@ -179,7 +181,7 @@ export function HrZoneCard({ preview }: HrZoneCardProps) {
                         contentStyle={trainingChartTooltipStyle}
                       />
                     </PieChart>
-                  </ResponsiveContainer>
+                  </ChartWhenNear>
                 ) : (
                   <div className="chat-zone-empty-ring" />
                 )}
@@ -241,4 +243,4 @@ export function HrZoneCard({ preview }: HrZoneCardProps) {
       )}
     </div>
   );
-}
+});

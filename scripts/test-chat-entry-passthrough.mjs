@@ -186,6 +186,28 @@ function throughWindow(json, edit = (timeline) => timeline) {
   assert.ok(saved[3].mrev > row[3].mrev, "and outranks the unanswered copy");
 }
 
+// The line a run sync stopped leaves is a kind this build knows too: drawn,
+// and saved back byte for byte by a window that did nothing to it.
+{
+  const stoppedJson = JSON.stringify([
+    {
+      kind: "automationStopped",
+      automation: { runId: "run-1", automationId: "a1", name: "Debrief", triggerLabel: "New activity" },
+      at: 1790560942617,
+      reason: "sync",
+      mid: "1-00000000000b",
+      mrev: "1-00000000000b"
+    }
+  ]);
+  const [entry] = fromPersistedEntries(structuredClone(parseChatTranscriptJson(stoppedJson)));
+  assert.equal(entry.kind, "automationStopped");
+  assert.equal(entry.reason, "sync");
+  assert.equal(entry.extra, undefined, "every field it carries is one this build reads");
+  const database = memoryDatabase(stoppedJson);
+  saveChatSession("chat-1", throughWindow(stoppedJson), database, { knownEntryCount: 1 });
+  assert.equal(database.row.messages_json, stoppedJson);
+}
+
 // A planEvent (P1.3) is a kind this build knows: parsed, not wrapped as
 // opaque, and carried through all four rebuilds with a field it does not know.
 {

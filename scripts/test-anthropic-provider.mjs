@@ -12,6 +12,7 @@ const {
   DEFAULT_ANTHROPIC_MODEL,
   anthropicModelEntry,
   buildAnthropicMessages,
+  buildAnthropicSystem,
   buildAnthropicRequestTuning,
   buildAnthropicTools,
   getAnthropicModelCapabilities,
@@ -23,6 +24,21 @@ const {
 assert.equal(resolveAnthropicModel(), DEFAULT_ANTHROPIC_MODEL);
 assert.equal(resolveAnthropicModel("   "), DEFAULT_ANTHROPIC_MODEL);
 assert.equal(resolveAnthropicModel(" claude-sonnet-5 "), "claude-sonnet-5");
+
+// The rules and the tool guide are cached; the snapshot after them is not, so
+// a new recovery figure does not re-send the tool guide uncached.
+assert.deepEqual(buildAnthropicSystem("Rules.", "Today is…"), [
+  { type: "text", text: "Rules.", cache_control: { type: "ephemeral" } },
+  { type: "text", text: "Today is…" }
+]);
+assert.deepEqual(buildAnthropicSystem("Rules.", "  "), [
+  { type: "text", text: "Rules.", cache_control: { type: "ephemeral" } }
+], "an empty snapshot is no block (the API refuses an empty text block)");
+const providerSource = (await import("node:fs")).readFileSync(
+  path.join(repoRoot, "electron", "anthropicChatProvider.ts"),
+  "utf8"
+);
+assert.match(providerSource, /system: buildAnthropicSystem\(options\.instructions, options\.liveInstructions\),\s*cache_control: \{ type: "ephemeral" \}/, "the request caches its system prompt and its conversation");
 
 // Adaptive thinking and effort are 400s on models that do not support them.
 const opus = buildAnthropicRequestTuning({

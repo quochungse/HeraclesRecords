@@ -155,7 +155,15 @@ export function GeneratorProviderPanel({
               // at 40); past a handful, chips are a wall rather than a choice.
               mode={models.length > MODEL_CHIP_LIMIT ? "dropdown" : "expanded"}
               value={models.some((option) => option.value === runtime.model) ? runtime.model : (models[0]?.value ?? "")}
-              options={models.map((option) => ({ value: option.value, label: modelChipLabel(option.label), title: option.label }))}
+              options={models.map((option) => ({
+                value: option.value,
+                label: modelChipLabel(option.label),
+                title: option.label,
+                ...(option.detail ? { detail: option.detail } : {})
+              }))}
+              // As ModelSwitch: a qualifier wraps at the menu's floor, and the
+              // trigger alone is too narrow to read one in.
+              minMenuWidth={models.some((option) => option.detail) ? 420 : undefined}
               onChange={(model) => onChange({ ...runtime, model })}
             />
           )}

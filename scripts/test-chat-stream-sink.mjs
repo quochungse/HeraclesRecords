@@ -26,7 +26,15 @@ Module._load = function patchedLoad(request, ...rest) {
   return originalLoad.call(this, request, ...rest);
 };
 
-const { countableUsage, createCollectorSink, createWindowSink, untilAborted } = require(
+const {
+  countableUsage,
+  createCollectorSink,
+  createWindowSink,
+  drawChartForTests,
+  endRunForTests,
+  untilAborted,
+  withLiveToolInstructions
+} = require(
   path.join(repoRoot, "dist-electron", "chatService.js")
 );
 const { parseChatTranscriptJson } = require(
@@ -174,12 +182,133 @@ assert.equal(collector.cancelled(), false);
 assert.equal(collector.error(), undefined);
 assert.equal(collector.text(), "Easy 40min.");
 
-// Cards land as they stream; at done the assistant message goes in front of the
-// turn's cards, which it introduces, and prompts after them — the order
+// Cards land as they stream; at done the assistant message goes under the
+// turn's charts and above its other cards, and prompts after them — the order
 // ChatView's `settleTurnEntries` produces.
 assert.deepEqual(
   built.map((entry) => entry.kind),
-  ["message", "fitnessTrend", "coachPrompt"]
+  ["fitnessTrend", "message", "coachPrompt"]
+);
+
+// A chart leads the answer and a creation follows it, whichever arrived first.
+const mixed = createCollectorSink();
+runStream(mixed, [
+  ["chat:streamStart", {}],
+  ["chat:streamInfo", { kind: "planDraft", draft: { draftId: "d1", entries: [] } }],
+  ["chat:streamInfo", { kind: "activityVisual", preview: { previewId: "v1" } }],
+  ["chat:streamInfo", { kind: "scheduleChange", changeSet: { changeSetId: "s1" } }],
+  ["chat:streamInfo", { kind: "hrZoneSummary", preview: { previewId: "z1" } }],
+  ["chat:streamDone", { fullText: "Here is why." }]
+]);
+assert.deepEqual(
+  mixed.entries().map((entry) => entry.kind),
+  ["activityVisual", "hrZoneSummary", "message", "planDraft", "scheduleChange"]
+);
+// A second turn in the same run leaves the first where it is.
+runStream(mixed, [
+  ["chat:streamStart", {}],
+  ["chat:streamInfo", { kind: "fitnessTrend", preview: { previewId: "t2" } }],
+  ["chat:streamDone", { fullText: "And the trend." }]
+]);
+assert.deepEqual(
+  mixed.entries().map((entry) => entry.kind),
+  ["activityVisual", "hrZoneSummary", "message", "planDraft", "scheduleChange", "fitnessTrend", "message"]
+);
+
+// --- a turn's charts are named in the order drawn --------------------------
+// The handle is the chart's place among the turn's stored charts, so it is
+// given when the chart is drawn and a chart drawn again keeps it.
+assert.equal(drawChartForTests("turn-a", "run:1"), "c1");
+assert.equal(drawChartForTests("turn-a", "trend"), "c2");
+assert.equal(drawChartForTests("turn-a", "run:1"), "c1", "the same chart keeps its handle");
+assert.equal(drawChartForTests("turn-b", "run:1"), "c1", "each turn counts its own");
+endRunForTests("turn-a");
+assert.equal(drawChartForTests("turn-a", "trend"), "c1", "a finished turn's handles go with it");
+endRunForTests("turn-a");
+endRunForTests("turn-b");
+const chartGuide = withLiveToolInstructions("Coach.", [
+  { name: "get_activity_detail", description: "", inputSchema: {} }
+]);
+assert.match(chartGuide, /write \[\[chart:c1\]\] on a line of its own/, "the prompt says how to place a chart");
+assert.doesNotMatch(
+  withLiveToolInstructions("Coach.", [{ name: "draft_workout", description: "", inputSchema: {} }]),
+  /\[\[chart:/,
+  "and says nothing of charts to a turn that cannot draw one"
+);
+
+// --- the tool guide says each rule once, beside its tool -------------------
+const tool = (name) => ({ name, description: "", inputSchema: {} });
+const everyWorkoutTool = [
+  "search_coros_exercises", "draft_workout", "draft_training_plan", "revise_training_plan",
+  "get_plan_draft", "list_scheduled_workouts", "delete_workout", "propose_schedule_changes",
+  "request_plan_brief", "list_training_plans", "get_training_plan", "request_coach_input"
+].map(tool);
+const fullGuide = withLiveToolInstructions("Coach.", everyWorkoutTool, { inlineSuggestions: true });
+for (const rule of [
+  /One standalone workout[^\n]*→ draft_workout/,
+  /Workout Library or the Calendar/,
+  /Never wrap a one-off workout in a plan/,
+  /Longer than two weeks → request_plan_brief/,
+  /revise_training_plan with its newest draft_id/,
+  /propose_schedule_changes once/,
+  /list_scheduled_workouts, then delete_workout/,
+  /call search_coros_exercises first/,
+  /naming mismatch alone is never a reason/,
+  /exercise_resolution_required/,
+  /call the same draft tool again in the same response/,
+  /typed intensity field/,
+  /request_coach_input — at most once per turn/,
+  /Nothing you call writes to COROS/,
+  /Every sport takes step kinds/
+]) {
+  assert.match(fullGuide, rule);
+}
+for (const [rule, times] of [[/typed intensity/g, 1], [/search_coros_exercises first/g, 1], [/request_coach_input/g, 1]]) {
+  assert.equal((fullGuide.match(rule) ?? []).length, times, `${rule} is said once`);
+}
+assert.doesNotMatch(fullGuide, /Authoring tools:/, "the model has the tool list already");
+assert.doesNotMatch(fullGuide, /Delete from COROS/);
+
+// A read-only turn without the writing tools is told nothing about them.
+const readOnlyGuide = withLiveToolInstructions(
+  "Coach.",
+  ["get_plan_draft", "list_scheduled_workouts", "list_training_plans", "get_training_plan"].map(tool)
+);
+for (const absent of [/draft_workout/, /delete_workout/, /propose_schedule_changes/, /search_coros_exercises/, /Writing a workout/, /request_coach_input/]) {
+  assert.doesNotMatch(readOnlyGuide, absent, `a turn without the tool hears nothing of ${absent}`);
+}
+assert.match(readOnlyGuide, /list_training_plans and get_training_plan/);
+assert.doesNotMatch(readOnlyGuide, /recall_conversation/, "a conversation with no summary hears nothing of recall");
+// Recall is a local tool: its rule is stated beside it, and it is never listed as a server's.
+{
+  const recallGuide = withLiveToolInstructions("Coach.", [tool("recall_conversation")]);
+  assert.match(recallGuide, /read it with\s+recall_conversation before answering/);
+  assert.doesNotMatch(recallGuide, /Other connected MCP server tools/);
+}
+// Every provider sends the rules, then the tool guide, then what the turn read;
+// the Anthropic one keeps the last apart so the cache marker falls before it.
+{
+  const service = readSource(repoRoot, "electron", "chatService.ts");
+  assert.equal((service.match(/const systemPrompt = coachSystemPrompt\(/g) ?? []).length, 5, "all five providers");
+  assert.doesNotMatch(service, /text: instructions, hasData/, "no provider sends the old snapshot-in-the-middle prompt");
+  assert.match(service, /instructions: systemPrompt\.stable,\s*liveInstructions: systemPrompt\.live,/);
+  assert.match(service, /const sections: string\[\] = \[today, ""\];/, "the date heads the part that changes");
+  // One `turnContext` builds every provider's context, the chosen style with it.
+  assert.match(
+    service,
+    /buildTrainingContext\(\s*permissions,[\s\S]*?runTools\.get\(requestId\)\?\.context,\s*settings\.coachStyle\s*\)/,
+    "the turn's context carries the chosen Coach style"
+  );
+  assert.equal(
+    (service.match(/await prepare\(turnContext\(/g) ?? []).length,
+    5,
+    "every provider's prompt is built through it"
+  );
+}
+// A plan with no brief tool is drafted at any length.
+assert.match(
+  withLiveToolInstructions("Coach.", [tool("draft_training_plan")]),
+  /A multi-day or multi-week schedule → draft_training_plan\./
 );
 
 // --- a re-emitted card replaces the first rather than appending ------------
@@ -198,15 +327,16 @@ runStream(upserts, [
   ["chat:streamDone", {}]
 ]);
 const upserted = upserts.entries();
+// Charts lead even with no answer to put between them and the rest.
 assert.deepEqual(
   upserted.map((entry) => entry.kind),
-  ["planDraft", "planDraft", "scheduleChange", "activityVisual", "hrZoneSummary"]
+  ["activityVisual", "hrZoneSummary", "planDraft", "planDraft", "scheduleChange"]
 );
-assert.deepEqual(upserted[0].draft.entries, ["x"], "same draftId replaced in place");
-assert.equal(upserted[1].draft.draftId, "d2", "a different id appends");
-assert.deepEqual(upserted[2], { kind: "scheduleChange", changeSetId: "s1" }, "a change set is an anchor, once");
-assert.equal(upserted[3].preview.n, 2);
-assert.equal(upserted[4].preview.n, 2);
+assert.equal(upserted[0].preview.n, 2);
+assert.equal(upserted[1].preview.n, 2);
+assert.deepEqual(upserted[2].draft.entries, ["x"], "same draftId replaced in place");
+assert.equal(upserted[3].draft.draftId, "d2", "a different id appends");
+assert.deepEqual(upserted[4], { kind: "scheduleChange", changeSetId: "s1" }, "a change set is an anchor, once");
 // A coachPrompt re-emitted under the same id collapses to one entry too.
 const dedupedPrompts = createCollectorSink();
 runStream(dedupedPrompts, [
@@ -218,7 +348,7 @@ runStream(dedupedPrompts, [
 assert.equal(dedupedPrompts.entries().length, 1);
 assert.equal(dedupedPrompts.entries()[0].prompt.v, 2);
 
-const assistant = built[0];
+const assistant = built[1];
 assert.equal(assistant.role, "assistant");
 assert.equal(assistant.content, "Easy 40min.");
 assert.equal(assistant.reasoningSummary, "checking yesterday");
@@ -319,7 +449,7 @@ assert.equal(copies.entries().length, 1);
 // parser drops would vanish the moment the athlete reopens the conversation.
 const persisted = parseChatTranscriptJson(JSON.stringify(built));
 assert.deepEqual(persisted, built, "every collected entry survives the store");
-assert.deepEqual(persisted[0].automation, marker);
+assert.deepEqual(persisted[1].automation, marker);
 
 // --- 13: a failed turn is not a refund -------------------------------------
 // Usage used to reach the collector only on `chat:streamDone`, which a stream
@@ -528,10 +658,22 @@ assert.deepEqual(persisted[0].automation, marker);
 
   const whole = readSource(repoRoot, "electron", "chatService.ts");
   const turn = whole.slice(whole.indexOf("async function streamChatTurn("), whole.indexOf("function toolsForRun("));
+  // The context and the tool surface are read through the turn's own two
+  // wrappers, which skip both for a text job and otherwise are the real calls;
+  // the Claude Code status through one that lets a text job reuse a recent one.
+  const through = {
+    inspectClaudeCodeStatus: "claudeCodeStatusForTurn",
+    prepareToolSurface: "turnToolSurface",
+    buildTrainingContext: "turnContext"
+  };
   for (const step of ["inspectClaudeCodeStatus", "prepareToolSurface", "buildTrainingContext", "getValidToken"]) {
     assert.doesNotMatch(turn, new RegExp(`await ${step}\\(`), `${step} is awaited through prepare() in a turn`);
-    assert.match(turn, new RegExp(`await prepare\\(${step}\\(`), `${step} is prepared in a turn`);
+    assert.match(turn, new RegExp(`await prepare\\(${through[step] ?? step}\\(`), `${step} is prepared in a turn`);
   }
+  assert.match(turn, /const turnToolSurface = \(\): Promise<void> => \(job \? Promise\.resolve\(\) : prepareToolSurface\(\)\);/);
+  assert.match(turn, /const turnContext = \([\s\S]{0,160}?=>\s*job\s*\? [\s\S]{0,120}?: buildTrainingContext\(/);
+  const statusProbe = whole.slice(whole.indexOf("async function claudeCodeStatusForTurn("), whole.indexOf("function recordClaudeCodeStatus("));
+  assert.match(statusProbe, /if \(textJob && [\s\S]*?return held\.status;[\s\S]*?await inspectClaudeCodeStatus\(/, "only a text job reuses a status; a turn asks afresh");
   // The MCP connections ride inside prepareToolSurface, with the profile read
   // that decides the tool list, so Stop reaches them through the same prepare().
   assert.doesNotMatch(turn, /await ensureAllMcpConnected\(/, "the MCP connections are not awaited bare in a turn");

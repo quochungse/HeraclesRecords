@@ -102,7 +102,10 @@ interface StoredPlanDraft {
   author: ChatPlanDraftAuthor;
   /** What this version changed, in the words of whoever made it. */
   changeSummary?: string;
-  /** Follow-ups Coach offered with this version, as chips (P1.8). */
+  /**
+   * Follow-ups Coach offered with this version (P1.8). No longer asked for or
+   * drawn; kept so a row an earlier build wrote goes back out unchanged.
+   */
   refinements?: string[];
   /**
    * The plan with its COROS identity — the plan id and version, and each
@@ -120,7 +123,7 @@ interface StoredPlanDraft {
  * be a chip, none repeated. Anything else is left out rather than trimmed into
  * something Coach did not say.
  */
-export function refinementsFrom(value: unknown): string[] | undefined {
+function refinementsFrom(value: unknown): string[] | undefined {
   if (!Array.isArray(value)) return undefined;
   const seen = new Set<string>();
   const chips = value.flatMap((item) => {
@@ -368,7 +371,7 @@ export function getChatWorkoutTools(): CorosMcpTool[] {
         "Put prescribed HR, pace, power, cadence, stroke, weight, RPE, or grade in each step's typed intensity field. " +
         "For Strength and Hybrid Fitness, call search_coros_exercises first and pass its exact exercise IDs and names. " +
         "Returns a workout card where the athlete can choose Workout Library or Calendar and confirm.",
-      inputSchema: withRefinements(buildDraftWorkoutInputSchema())
+      inputSchema: buildDraftWorkoutInputSchema()
     },
     {
       name: "draft_training_plan",
@@ -390,7 +393,7 @@ export function getChatWorkoutTools(): CorosMcpTool[] {
         "draft_id must be the newest version's; if it is not, the newest is returned to revise instead. " +
         "Sessions are named by their key. A single workout takes only replace_session (with the whole new workout) and rename. " +
         "The revised plan is checked like a new draft; a refusal lists every problem, and nothing is changed.",
-      inputSchema: buildRevisePlanToolSchema()
+      inputSchema: buildRevisePlanInputSchema()
     },
     {
       name: "get_plan_draft",
@@ -825,8 +828,7 @@ function handleDraftWorkout(
         ...workout,
         schedule_date: calendarDate,
         save_to_library: true
-      }],
-      ...(args.suggested_refinements ? { suggested_refinements: args.suggested_refinements } : {})
+      }]
     },
     onPlanDraft,
     allowUpcomingWorkouts,
@@ -1040,9 +1042,8 @@ async function handleDraftTrainingPlan(
   });
   if (!prepared.ok) return prepared.response;
 
-  const refinements = refinementsFrom(args.suggested_refinements);
   if (target?.ok) {
-    return storeRevision(target.latest, prepared, unitSystem, "Rewritten by Coach.", onPlanDraft, refinements);
+    return storeRevision(target.latest, prepared, unitSystem, "Rewritten by Coach.", onPlanDraft);
   }
 
   const draftId = crypto.randomUUID();
@@ -1060,8 +1061,7 @@ async function handleDraftTrainingPlan(
     createdAt: Date.now(),
     artifactId: draftId,
     version: 1,
-    author: "coach",
-    ...(refinements ? { refinements } : {})
+    author: "coach"
   };
   if (planRequest) {
     // The sessions step (P2.3): version 1 of the brief's artifact. The step
@@ -1221,8 +1221,7 @@ function storeRevision(
   prepared: Extract<PreparedDraft, { ok: true }>,
   unitSystem: UnitSystem,
   changeSummary: string,
-  onPlanDraft?: (preview: PlanDraftPreview) => void,
-  refinements?: string[]
+  onPlanDraft?: (preview: PlanDraftPreview) => void
 ): string {
   const artifactType = latest.preview.artifactType ?? "plan";
   const draftId = crypto.randomUUID();
@@ -1243,8 +1242,7 @@ function storeRevision(
     version: latest.version + 1,
     parentDraftId: latest.draftId,
     author: "coach",
-    changeSummary,
-    ...(refinements ? { refinements } : {})
+    changeSummary
   };
   withCorosIdentityOf(stored, latest);
   persistPlanDraft(stored);
@@ -1365,8 +1363,7 @@ async function handleRevisePlan(
     prepared,
     unitSystem,
     summary.slice(0, 200),
-    onPlanDraft,
-    refinementsFrom(args.suggested_refinements)
+    onPlanDraft
   );
   if (!synced) return answer;
   // Said to the model, which named the version before COROS's: its changes
@@ -1514,30 +1511,13 @@ async function readPlanDraftFromCoros(
   };
 }
 
-/** The optional follow-ups field (P1.8), the same on every tool that makes a version. */
-const SUGGESTED_REFINEMENTS = {
-  type: "array",
-  minItems: 2,
-  maxItems: 4,
-  items: { type: "string", maxLength: 40 },
-  description:
-    "Optional: 2–4 short follow-ups the athlete might want next, each under 40 characters and in the athlete's words (e.g. \"Lighter week 3\", \"Long run on Sunday\"). Shown as buttons under the card."
-};
-
-function withRefinements(schema: Record<string, unknown>): Record<string, unknown> {
-  return {
-    ...schema,
-    properties: { ...((schema.properties ?? {}) as Record<string, unknown>), suggested_refinements: SUGGESTED_REFINEMENTS }
-  };
-}
-
+/** The optional `revises` field, the same on every tool that makes a version. */
 function withRevises(schema: Record<string, unknown>): Record<string, unknown> {
   const properties = (schema.properties ?? {}) as Record<string, unknown>;
   return {
     ...schema,
     properties: {
       ...properties,
-      suggested_refinements: SUGGESTED_REFINEMENTS,
       revises: {
         type: "string",
         description:
@@ -1547,9 +1527,29 @@ function withRevises(schema: Record<string, unknown>): Record<string, unknown> {
   };
 }
 
+/**
+ * `ops[].workout` is an open object, not the workout schema again.
+ *
+ * The full schema is ~15 kB, and it was the third copy in every request —
+ * `draft_workout` and `draft_training_plan` carry it already, and they are
+ * offered wherever this tool is — so ~3.8k tokens went out on every round of
+ * every conversation to describe a field most revisions never touch (a move,
+ * a rename, a stage). The shape is named in words instead, and nothing about
+ * it goes unchecked: a revised plan is validated as a new draft
+ * (`prepareDraft` after `applyPlanRevision`), and a refusal hands every
+ * problem back. `additionalProperties: true` is load-bearing for Claude Code,
+ * whose tool bridge rebuilds each property through `z.fromJSONSchema`; an
+ * object that stripped unknown keys would arrive empty.
+ */
+const REVISION_WORKOUT_FIELD = {
+  type: "object",
+  additionalProperties: true,
+  description:
+    "The whole new workout, in exactly the shape draft_workout and draft_training_plan take one (name, sport, steps…). " +
+    "Its key is kept from the session it replaces."
+};
+
 export function buildRevisePlanInputSchema(): Record<string, unknown> {
-  const workout = (buildDraftWorkoutInputSchema() as { properties: { workout: Record<string, unknown> } })
-    .properties.workout;
   return {
     type: "object",
     properties: {
@@ -1573,7 +1573,7 @@ export function buildRevisePlanInputSchema(): Record<string, unknown> {
             week: { type: "integer", minimum: 1, maximum: 52 },
             day: { type: "string", enum: [...PLAN_DAYS] },
             schedule_date: { type: "string", pattern: "^\\d{8}$" },
-            workout: { ...workout, description: "The whole new workout; its key is kept from the session it replaces." },
+            workout: REVISION_WORKOUT_FIELD,
             stage: { type: "string", enum: COROS_WEEK_STAGES.map((stage) => stage.slug) },
             name: { type: "string" },
             description: { type: "string" }
@@ -1584,10 +1584,6 @@ export function buildRevisePlanInputSchema(): Record<string, unknown> {
     },
     required: ["draft_id", "summary", "ops"]
   };
-}
-
-export function buildRevisePlanToolSchema(): Record<string, unknown> {
-  return withRefinements(buildRevisePlanInputSchema());
 }
 
 async function handleListScheduledWorkouts(
@@ -2386,8 +2382,7 @@ export function planArtifacts(draftIds: readonly string[]): PlanArtifactVersion[
             ...(stored.preview.editedAt ? { editedAt: stored.preview.editedAt } : {}),
             ...(stored.changeSummary ? { changeSummary: stored.changeSummary } : {}),
             ...(stored.preview.uploadResult?.planId ? { remotePlanId: stored.preview.uploadResult.planId } : {}),
-            ...(stored.author === "coros" && !draftDocument(stored).remoteId ? { detached: true } : {}),
-            ...(stored.refinements?.length ? { refinements: stored.refinements } : {})
+            ...(stored.author === "coros" && !draftDocument(stored).remoteId ? { detached: true } : {})
           }
         ];
       } catch {

@@ -95,6 +95,7 @@ export function AnalysisDetailView({
   onBack,
   onChanged,
   onEditingChange,
+  onDiscard,
   onOpenConversation
 }: {
   api: CorosLinkApi | undefined;
@@ -105,6 +106,11 @@ export function AnalysisDetailView({
   onChanged: () => void | Promise<void>;
   /** Guards the modal's backdrop while there are unsaved edits. */
   onEditingChange?: (editing: boolean) => void;
+  /**
+   * Discard was pressed with edits held. The modal asks first and, on a yes,
+   * closes — as Coach settings does. Without it the edits are simply reset.
+   */
+  onDiscard?: () => void;
   /**
    * Opens the conversation a run wrote into. The run log says what the
    * analysis found; reading it is the obvious next thing to do, and the answer
@@ -215,28 +221,31 @@ export function AnalysisDetailView({
     setSaving(true);
     setError(null);
     try {
-      const result = await api.updateCoachAnalysis(analysisId, {
+      await api.updateCoachAnalysis(analysisId, {
         ...draft,
         trigger: trigger.trigger,
         conditions: trigger.conditions,
         deviceOnly: trigger.deviceOnly
       });
-      // The store clamps and normalizes, so show what was stored rather than
-      // leaving the form displaying a value that was never accepted.
-      if (result) {
-        const input = toInput(result);
-        const triggerDraft = toTriggerDraft(result);
-        setDraft(input);
-        setTrigger(triggerDraft);
-        setSaved(fingerprint(input, triggerDraft));
-      }
-      await refresh();
+      // Saving closes the analysis, so there is no form left to show the
+      // stored values in, and nothing to read again.
       await onChanged();
+      onBack();
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : String(caught));
     } finally {
       setSaving(false);
     }
+  };
+
+  const discard = () => {
+    if (onDiscard) {
+      onDiscard();
+      return;
+    }
+    if (!analysis) return;
+    setDraft(toInput(analysis));
+    setTrigger(toTriggerDraft(analysis));
   };
 
   const stopRun = async (runId: string) => {
@@ -265,176 +274,188 @@ export function AnalysisDetailView({
   const inFlight = runs.find((run) => run.status === "running") ?? null;
 
   return (
-    <div className="coach-analysis-detail">
-      <nav className="coach-analysis-tabs" role="tablist">
-        {TABS.map((entry) => (
-          <button
-            key={entry.id}
-            type="button"
-            role="tab"
-            aria-selected={tab === entry.id}
-            className={
-              tab === entry.id ? "coach-analysis-tab is-active" : "coach-analysis-tab"
-            }
-            onClick={() => setTab(entry.id)}
-          >
-            {entry.label}
-          </button>
-        ))}
-        {/* No "Run now" here. It sits on the analysis's own row in the
-            conversation, one click from where the answer will appear, and a
-            second copy behind a modal only made it possible to start the same
-            run twice. Stop stays: it is only ever offered while a run this
-            screen is showing is in flight, and there is nothing to duplicate
-            about ending it. */}
-        {inFlight ? (
-          <div className="coach-analysis-detail-actions">
+    <>
+      <div className="coach-analysis-detail">
+        <nav className="coach-analysis-tabs" role="tablist">
+          {TABS.map((entry) => (
             <button
+              key={entry.id}
               type="button"
-              className="chat-local-action"
-              disabled={!api}
-              title="Stop this run"
-              onClick={() => void stopRun(inFlight.id)}
+              role="tab"
+              aria-selected={tab === entry.id}
+              className={
+                tab === entry.id ? "coach-analysis-tab is-active" : "coach-analysis-tab"
+              }
+              onClick={() => setTab(entry.id)}
             >
-              <Loader2 className="chat-spinner" size={14} aria-hidden="true" />
-              Stop
+              {entry.label}
             </button>
+          ))}
+          {/* No "Run now" here. It sits on the analysis's own row in the
+              conversation, one click from where the answer will appear, and a
+              second copy behind a modal only made it possible to start the same
+              run twice. Stop stays: it is only ever offered while a run this
+              screen is showing is in flight, and there is nothing to duplicate
+              about ending it. */}
+          {inFlight ? (
+            <div className="coach-analysis-detail-actions">
+              <button
+                type="button"
+                className="chat-local-action"
+                disabled={!api}
+                title="Stop this run"
+                onClick={() => void stopRun(inFlight.id)}
+              >
+                <Loader2 className="chat-spinner" size={14} aria-hidden="true" />
+                Stop
+              </button>
+            </div>
+          ) : null}
+        </nav>
+
+        {error ? <p className="coach-analysis-error">{error}</p> : null}
+
+        {tab === "settings" ? (
+          <div className="coach-analysis-tabpanel">
+            <AnalysisDefinitionForm
+              draft={draft}
+              provider={provider}
+              disabled={saving}
+              onChange={(patch) =>
+                setDraft((current) => (current ? { ...current, ...patch } : current))
+              }
+            />
+
+            <TriggerForm draft={trigger} disabled={saving} onChange={setTrigger} />
           </div>
         ) : null}
-      </nav>
 
-      {error ? <p className="coach-analysis-error">{error}</p> : null}
-
-      {tab === "settings" ? (
-        <div className="coach-analysis-tabpanel">
-          <AnalysisDefinitionForm
-            draft={draft}
-            provider={provider}
-            disabled={saving}
-            onChange={(patch) =>
-              setDraft((current) => (current ? { ...current, ...patch } : current))
-            }
-          />
-
-          <TriggerForm draft={trigger} disabled={saving} onChange={setTrigger} />
-
-          <div className="coach-analysis-save-row">
-            {/* The label and the enabled state must answer to the same
-                condition. Driving the label off `dirty` alone left the button
-                reading "Save changes" while still greyed out because the
-                playbook was empty, with nothing on screen saying why. */}
-            {!complete ? (
-              <span className="coach-analysis-save-reason">
-                A name and a playbook are required before this can be saved.
-              </span>
-            ) : null}
-            <button
-              type="button"
-              className="primary-button"
-              disabled={saving || !dirty || !complete}
-              onClick={() => void save()}
-            >
-              {saving ? (
-                <Loader2 className="chat-spinner" size={14} aria-hidden="true" />
-              ) : null}
-              {dirty || !complete ? "Save changes" : "Saved"}
-            </button>
-          </div>
-
-          <div className="coach-analysis-danger-zone">
-            <div>
-              <strong>Delete this analysis</strong>
-              <p>
-                The conversation and everything it already wrote there are kept.
+        {tab === "runs" ? (
+          <div className="coach-analysis-tabpanel">
+            {/* No filter. Every run belongs to this analysis and lands in the
+                one conversation it lives in, so there was nothing left to
+                filter by once "where it runs" became a single answer. */}
+            {runs.length === 0 ? (
+              <p className="chat-settings-copy">
+                No runs yet. Every run is logged here, including the ones that
+                found nothing to report.
               </p>
-            </div>
-            <button
-              type="button"
-              className="chat-local-action is-danger"
-              disabled={saving || !api}
-              onClick={() => setDeleteOpen(true)}
-            >
-              <Trash2 size={14} aria-hidden="true" /> Delete
-            </button>
-          </div>
-        </div>
-      ) : null}
-
-      {tab === "runs" ? (
-        <div className="coach-analysis-tabpanel">
-          {/* No filter. Every run belongs to this analysis and lands in the
-              one conversation it lives in, so there was nothing left to
-              filter by once "where it runs" became a single answer. */}
-          {runs.length === 0 ? (
-            <p className="chat-settings-copy">
-              No runs yet. Every run is logged here, including the ones that
-              found nothing to report.
-            </p>
-          ) : (
-            <ul className="coach-analysis-run-list">
-              {runs.map((run) => {
-                // Whatever conversation the run names — a skip records the one
-                // it would have written into, and that is still the place the
-                // athlete would go to see why nothing arrived. Whether it
-                // still exists is settled on the way out, not here.
-                const opensInto = onOpenConversation ? run.sessionId : undefined;
-                const runTokens = formatRunTokens(run);
-                const body = (
-                  <>
-                    <span
-                      className="coach-analysis-run-status"
-                      data-status={run.status}
-                    >
-                      {runStatusLabel(run)}
-                    </span>
-                    <div className="coach-analysis-run-body">
-                      <span className="coach-analysis-run-summary">
-                        {run.summary ??
-                          (run.skipReason
-                            ? `Skipped — ${skipReasonLabel(run.skipReason)}`
-                            : run.error ?? "—")}
-                      </span>
-                      <span className="coach-analysis-run-meta">
-                        {formatTimeAgo(run.startedAt)} · {formatDuration(run)}
-                        {run.model ? ` · ${run.model}` : ""}
-                        {run.effort ? ` · effort ${run.effort}` : ""}
-                        {/* 13. Absent rather than zero when the provider
-                            reported nothing: a run whose cost nobody knows
-                            must not read as a free one. */}
-                        {runTokens ? ` · ${runTokens} tokens` : ""}
-                      </span>
-                    </div>
-                    {opensInto ? (
-                      <ChevronRight
-                        className="coach-analysis-run-open-icon"
-                        size={15}
-                        aria-hidden="true"
-                      />
-                    ) : null}
-                  </>
-                );
-
-                return (
-                  <li key={run.id}>
-                    {opensInto ? (
-                      <button
-                        type="button"
-                        className="coach-analysis-run-row coach-analysis-run-open"
-                        title="Open the conversation this run wrote into"
-                        onClick={() => onOpenConversation?.(opensInto)}
+            ) : (
+              <ul className="coach-analysis-run-list">
+                {runs.map((run) => {
+                  // Whatever conversation the run names — a skip records the one
+                  // it would have written into, and that is still the place the
+                  // athlete would go to see why nothing arrived. Whether it
+                  // still exists is settled on the way out, not here.
+                  const opensInto = onOpenConversation ? run.sessionId : undefined;
+                  const runTokens = formatRunTokens(run);
+                  const body = (
+                    <>
+                      <span
+                        className="coach-analysis-run-status"
+                        data-status={run.status}
                       >
-                        {body}
-                      </button>
-                    ) : (
-                      <div className="coach-analysis-run-row">{body}</div>
-                    )}
-                  </li>
-                );
-              })}
-            </ul>
-          )}
-        </div>
-      ) : null}
+                        {runStatusLabel(run)}
+                      </span>
+                      <div className="coach-analysis-run-body">
+                        <span className="coach-analysis-run-summary">
+                          {run.summary ??
+                            (run.skipReason
+                              ? `Skipped — ${skipReasonLabel(run.skipReason)}`
+                              : run.error ?? "—")}
+                        </span>
+                        <span className="coach-analysis-run-meta">
+                          {formatTimeAgo(run.startedAt)} · {formatDuration(run)}
+                          {run.model ? ` · ${run.model}` : ""}
+                          {run.effort ? ` · effort ${run.effort}` : ""}
+                          {/* 13. Absent rather than zero when the provider
+                              reported nothing: a run whose cost nobody knows
+                              must not read as a free one. */}
+                          {runTokens ? ` · ${runTokens} tokens` : ""}
+                        </span>
+                      </div>
+                      {opensInto ? (
+                        <ChevronRight
+                          className="coach-analysis-run-open-icon"
+                          size={15}
+                          aria-hidden="true"
+                        />
+                      ) : null}
+                    </>
+                  );
+
+                  return (
+                    <li key={run.id}>
+                      {opensInto ? (
+                        <button
+                          type="button"
+                          className="coach-analysis-run-row coach-analysis-run-open"
+                          title="Open the conversation this run wrote into"
+                          onClick={() => onOpenConversation?.(opensInto)}
+                        >
+                          {body}
+                        </button>
+                      ) : (
+                        <div className="coach-analysis-run-row">{body}</div>
+                      )}
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </div>
+        ) : null}
+      </div>
+
+      {/* The analysis's actions, as Coach settings keeps its own: outside the
+          scroll, on both tabs, so Save is in reach wherever the form was left
+          and a run log read to the end still ends in Delete. */}
+      <footer className="app-modal-footer chat-settings-modal-footer coach-analysis-detail-footer">
+        <button
+          type="button"
+          className="secondary-button danger-button"
+          disabled={saving || !api}
+          title="The conversation and everything it already wrote there are kept."
+          onClick={() => setDeleteOpen(true)}
+        >
+          <Trash2 size={14} aria-hidden="true" /> Delete
+        </button>
+        {/* The status and Save's enabled state answer to the same condition,
+            so a greyed-out Save always has its reason beside it. */}
+        <span
+          className={
+            complete
+              ? "chat-settings-footer-status"
+              : "chat-settings-footer-status is-warning"
+          }
+          role="status"
+        >
+          {!complete
+            ? "A name and a playbook are required."
+            : dirty
+              ? "Unsaved changes"
+              : "All changes saved"}
+        </span>
+        <button
+          type="button"
+          className="secondary-button"
+          disabled={!dirty || saving}
+          onClick={discard}
+        >
+          Discard
+        </button>
+        <button
+          type="button"
+          className="primary-button"
+          disabled={saving || !dirty || !complete}
+          onClick={() => void save()}
+        >
+          {saving ? (
+            <Loader2 className="chat-spinner" size={14} aria-hidden="true" />
+          ) : null}
+          Save
+        </button>
+      </footer>
 
       {deleteOpen ? (
         <DeleteAnalysisDialog
@@ -449,6 +470,6 @@ export function AnalysisDetailView({
           }}
         />
       ) : null}
-    </div>
+    </>
   );
 }

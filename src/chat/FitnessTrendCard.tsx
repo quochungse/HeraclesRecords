@@ -1,13 +1,14 @@
+import { memo } from "react";
 import {
   Area,
   AreaChart,
   ComposedChart,
   Line,
-  ResponsiveContainer,
   Tooltip,
   XAxis,
   YAxis
 } from "recharts";
+import { ChartWhenNear } from "./charts/ChartWhenNear";
 import type { TooltipContentProps } from "recharts";
 import type { FitnessTrendPreview } from "../../electron/types";
 import {
@@ -38,7 +39,10 @@ function TrendTooltip({ active, payload, label }: TooltipContentProps) {
   );
 }
 
-export function FitnessTrendCard({ preview }: FitnessTrendCardProps) {
+/** Memoised on `preview`, as `ActivityVisualCard` is and for the same reason. */
+export const FitnessTrendCard = memo(function FitnessTrendCard({
+  preview
+}: FitnessTrendCardProps) {
   const { colors, activeDot } = useChartColors();
   const loadPoints = preview.trendPoints.filter(
     (point) => point.trainingLoad !== undefined
@@ -63,7 +67,7 @@ export function FitnessTrendCard({ preview }: FitnessTrendCardProps) {
         <section className="chat-visual-section">
           <h5>Training load</h5>
           <div className="chat-visual-chart-shell">
-            <ResponsiveContainer width="100%" height="100%">
+            <ChartWhenNear>
               <AreaChart data={loadPoints} margin={trainingChartMargin}>
                 <defs>
                   <ChartAreaGradient id={`chatLoadFill-${preview.previewId}`} />
@@ -96,7 +100,7 @@ export function FitnessTrendCard({ preview }: FitnessTrendCardProps) {
                   isAnimationActive={false}
                 />
               </AreaChart>
-            </ResponsiveContainer>
+            </ChartWhenNear>
           </div>
         </section>
       ) : null}
@@ -105,7 +109,7 @@ export function FitnessTrendCard({ preview }: FitnessTrendCardProps) {
         <section className="chat-visual-section">
           <h5>HRV vs baseline</h5>
           <div className="chat-visual-chart-shell">
-            <ResponsiveContainer width="100%" height="100%">
+            <ChartWhenNear>
               <ComposedChart data={hrvPoints} margin={trainingChartMargin}>
                 <defs>
                   <ChartAreaGradient id={`chatHrvFill-${preview.previewId}`} />
@@ -150,7 +154,7 @@ export function FitnessTrendCard({ preview }: FitnessTrendCardProps) {
                   isAnimationActive={false}
                 />
               </ComposedChart>
-            </ResponsiveContainer>
+            </ChartWhenNear>
           </div>
         </section>
       ) : null}
@@ -159,7 +163,7 @@ export function FitnessTrendCard({ preview }: FitnessTrendCardProps) {
         <section className="chat-visual-section">
           <h5>Resting heart rate</h5>
           <div className="chat-visual-chart-shell">
-            <ResponsiveContainer width="100%" height="100%">
+            <ChartWhenNear>
               <AreaChart data={rhrPoints} margin={trainingChartMargin}>
                 <defs>
                   <ChartAreaGradient id={`chatRhrFill-${preview.previewId}`} />
@@ -193,7 +197,7 @@ export function FitnessTrendCard({ preview }: FitnessTrendCardProps) {
                   isAnimationActive={false}
                 />
               </AreaChart>
-            </ResponsiveContainer>
+            </ChartWhenNear>
           </div>
         </section>
       ) : null}
@@ -205,4 +209,4 @@ export function FitnessTrendCard({ preview }: FitnessTrendCardProps) {
       ) : null}
     </div>
   );
-}
+});

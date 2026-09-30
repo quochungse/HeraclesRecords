@@ -1,9 +1,53 @@
 import type {
+  AnalysisRuntime,
   AnthropicEffort,
   ChatProvider,
   ChatSettings,
   ClaudeCodeStatus
 } from "./types";
+
+/** Every provider Coach can answer with. */
+export const CHAT_PROVIDERS: readonly ChatProvider[] = ["claude-code", "claude-api", "chatgpt", "openrouter", "local"];
+
+export function isChatProvider(value: unknown): value is ChatProvider {
+  return CHAT_PROVIDERS.includes(value as ChatProvider);
+}
+
+/** The model Coach has chosen for a provider, as its picker holds it (`""` is the provider's default). */
+export function settingsModel(settings: ChatSettings, provider: ChatProvider): string {
+  switch (provider) {
+    case "claude-api":
+      return settings.anthropic.model;
+    case "claude-code":
+      return settings.claudeCode.model ?? "";
+    case "openrouter":
+      return settings.openRouter.model;
+    case "chatgpt":
+      return settings.chatgpt.model ?? "";
+    case "local":
+      return settings.local.model;
+  }
+}
+
+/**
+ * One runtime over another — an analysis's over its conversation's (P2.0,
+ * D14), a text job's base over the conversation's. A provider and a model are
+ * one choice — a model picked for Claude means nothing to OpenRouter — so the
+ * pair comes whole from whichever side made it, `over` first; effort stands
+ * alone and is taken the same way.
+ */
+export function runtimeOver(
+  over: AnalysisRuntime,
+  under: AnalysisRuntime | undefined
+): AnalysisRuntime {
+  const pair = over.provider || over.model ? over : under ?? {};
+  const effort = over.effort || under?.effort;
+  return {
+    ...(pair.provider ? { provider: pair.provider } : {}),
+    ...(pair.model ? { model: pair.model } : {}),
+    ...(effort ? { effort } : {})
+  };
+}
 
 export interface ChatModelOption {
   value: string;
@@ -275,6 +319,32 @@ export function providerModelOptions(
         : CHATGPT_MODEL_OPTIONS;
     }
   }
+}
+
+/**
+ * The families `auto` compresses with, smallest first (`CompactModelChoice`).
+ * Matched against the provider's own list, never a model id written here: a
+ * family the provider stops listing is simply not found, and one it adds under
+ * the same name is. A provider whose names say nothing about size (OpenRouter's
+ * routers, ChatGPT's Sol/Terra/Luna, a local server) has no entry, and a
+ * conversation there is compressed with its own model.
+ */
+const COMPRESSION_FAMILIES: Partial<Record<ChatProvider, readonly RegExp[]>> = {
+  "claude-code": [/haiku/i, /sonnet/i],
+  "claude-api": [/haiku/i, /sonnet/i],
+  chatgpt: [/nano/i, /mini/i]
+};
+
+/** The smallest model `options` lists for `provider`, or nothing when its names do not say. */
+export function compressionModelFor(
+  provider: ChatProvider,
+  options: readonly ChatModelOption[]
+): ChatModelOption | undefined {
+  for (const family of COMPRESSION_FAMILIES[provider] ?? []) {
+    const match = options.find((option) => option.value && (family.test(option.value) || family.test(option.label)));
+    if (match) return match;
+  }
+  return undefined;
 }
 
 /**

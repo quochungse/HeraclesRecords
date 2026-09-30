@@ -532,9 +532,10 @@ Overview, Media, Data, and Settings are in the main bundle.
   question for the model. The Library reader's ⋯ offers **Ask Coach about this plan** for a plan
   Coach wrote, opening the conversation it came from (`chat:findDraftSession`, by any version's
   draft id) — or, when that conversation is gone, a new one with no chip, since the drafts went
-  with it. **Under a creation, follow-ups** (P1.8): the chips Coach offered with that version
-  (`suggested_refinements`, kept in the row's `refinements_json`) or a set that fits its kind
-  (`refinementChips`); a press sends the chip's words as a question about the creation.
+  with it. **A creation has no follow-up chips** (P1.8, removed 2026-09-30 as clutter): the
+  tools no longer take `suggested_refinements`; `refinements_json` is kept only so an older row
+  goes back out unchanged. **What Coach offers next is a next step instead** — see the chart
+  placement paragraph.
   **Coach may attach up to two workout cards unasked** (P1.9, `chat.coach.inlineSuggestions`:
   Automatic — on for the Claude providers, off for the rest — On, Off), decided for the provider
   a turn actually runs on and said in words only (`INLINE_SUGGESTIONS_GUIDE`); the cost footer is
@@ -550,7 +551,7 @@ Overview, Media, Data, and Settings are in the main bundle.
   conversation is not appended there (`appendVersion` takes the conversation it was asked from).
   **A creation is read in the Workbench** (`CoachCanvas`, `.chat-workbench`, lazy with the
   library's stylesheet; Coach Workbench review R2): one panel beside the conversation that is the
-  index while nothing is open (grouped Not saved · Saved · On the calendar) and a creation's
+  index while nothing is open (one list, newest first — no groups by state) and a creation's
   details once one is — the reader's ridge, week cards and session view, a version picker, a
   Versions tab whose lines come from `electron/planDiff.ts` (node-free, shared with
   `restorePlanDraftVersion`'s `planEvent`), and Restore, which writes the old content as a new
@@ -1081,6 +1082,39 @@ Overview, Media, Data, and Settings are in the main bundle.
   only a turn that produced nothing is undone. `streamedTextRef` exists for this —
   `streamingText` is state, stale inside the subscription.
 
+  **A turn reads chart, answer, then creations.** Cards arrive while a turn runs and the
+  answer last, so where the answer goes is decided at the end: under the turn's charts
+  (`activityVisual`, `fitnessTrend`, `hrZoneSummary` — what it reads from) and above its
+  other cards (a plan, a workout, a change set — what it proposes). `orderTurn` and the chart
+  kind list (`isChartKind`) live in node-free `electron/chartPlacement.ts`, and all three
+  readers go through them — a settle and the streaming bubble (`chatTypes.ts`), so nothing
+  moves when a turn ends, and `createCollectorSink` for a headless run, so a chart handle
+  names the same chart in both. From 2026-09-26 (e5d2b36) to this rule
+  the answer went ahead of every card, charts included; rows written then are left as they
+  are. `test:chat-stream-sink`, `test:chat-plan-card-renderer`.
+  **That is the default; the answer may place a chart among its words**
+  (`electron/chartPlacement.ts`). A tool result that drew charts names them — `c1`, `c2`… in
+  the order drawn (`drawnChartHandle`, given when the chart is drawn, not when its tool
+  returns) — and the answer writes `[[chart:c2]]` on a line of its own. **Nothing is stored
+  beside the entry**: a handle is the chart's place among the chart entries just above its
+  answer, which is exactly what the default order makes them, so no field goes onto an
+  existing kind; an older build shows the placeholder as text and the chart above. The
+  fallback is code, not prompt: an unknown handle is dropped, a chart is placed once, one
+  named inside a sentence, list or table waits for the block's end, a code fence is not read,
+  and a chart not placed keeps its row. While streaming, the start of a placeholder is held
+  back (`holdBackPartialPlaceholder`) and a chart moves into the bubble when named. Every
+  reader of the words as text strips them (`stripChartPlaceholders`): the run's summary,
+  the list preview, the live analysis bubble, and `toWireMessages` — a handle means nothing
+  on a later turn.
+  **Next steps ride the same way** (`splitNextSteps`, same file): an answer may end with up
+  to three `[[next:…]]` lines — only for a concrete change Coach found and did not make (a
+  hard session after poor recovery, missed or clashing sessions, the other side of a
+  trade-off), one sentence of the base prompt. They are drawn as chips under the
+  conversation's **last** answer only, a press sends the chip's words with no refs (the
+  answer above is always sent word for word, and the chip names its day), and the same
+  strip keeps them off the wire, so they cost nothing after their turn. No tool, no table,
+  no field. `test:chat-chart-placement`, `test:chat-transcript-race`.
+
   **Rows a turn's settle mounts do not animate in (`ChatRow`, `.is-settled`).**
   `chat-row-enter` and `chat-avatar-pop` start from `opacity: 0` with `fill-mode:
   both`, so a row is invisible until its animation runs, and it only runs while the
@@ -1097,6 +1131,13 @@ Overview, Media, Data, and Settings are in the main bundle.
   `test:chat-transcript-race` fails on either shortcut. When checking a paint bug
   over CDP, trust `getComputedStyle` read *before* `Page.captureScreenshot` — the
   capture forces a frame and finishes the animation it was meant to catch.
+  **Every row `reloadTranscript` mounts is settled too, and every timeline row is a
+  `ChatRow`** — cards and the analysis chips included. An analysis ends in a reload,
+  not a settle, so its prompt chip, answer and cards used to fade in from nothing in
+  place of its live bubble; reported 2026-09-28 as an answer that vanished the moment
+  the run finished (the window had just come back from the browser's Google sign-in)
+  and appeared only when the conversation was opened again. The live bubble now stays
+  until the reload has landed.
 
   **A tool schema is sent on every request round, so the draft schemas do not branch per
   sport.** `buildDraftTrainingPlanInputSchema` used to `oneOf` over all nine sports, and since
@@ -1110,7 +1151,79 @@ Overview, Media, Data, and Settings are in the main bundle.
   `test:chat-workout-tools` guards the size (< 20 kB per schema) and `test:workout-intensity-codec`
   asserts the refusals come from the validator. Collapsing the step's last copy needs
   `$defs`/`$ref`, deliberately not used on the main write path: not every provider resolves a
-  `$ref` well when *writing* arguments.
+  `$ref` well when *writing* arguments. **`revise_training_plan` carries no copy at all**: its
+  `ops[].workout` is an open object (`additionalProperties: true` — Claude Code's bridge rebuilds
+  each property through `z.fromJSONSchema`, and a stripping object would arrive empty), named in
+  words against the two draft tools it is always offered beside; a revised plan is validated as
+  a new draft. That was a third 15 kB copy, ~3.8k tokens a round.
+
+  **A long conversation is sent in three layers, each held to tokens** (`planTranscriptContext`,
+  `chatContextCompaction.ts`): the newest turns word for word, the ones before them **condensed** —
+  the athlete's words as written, each coach answer as a digest of its figures and decisions,
+  marked `[condensed]` — and everything older as the running summary. The entry window (60/20)
+  could not see what an entry weighs: measured 2026-09-29, a 16-entry conversation sent ~16k
+  tokens a turn and was never compacted, nine tenths of it the coach's answers. It is now a
+  ceiling Settings no longer shows; the athlete picks `chat.compactContext.detail` (Less ·
+  Balanced · More, `CONTEXT_BUDGETS`), counted on the wire (`estimateTokens`, three characters a
+  token) so cards cost nothing. Turns move between layers **in batches** — the verbatim part
+  condenses once past `rollAt` and only four entries at a time, the condensed layer rolls into
+  the summary once past `middle`, down to half — so a provider's cached prefix changes a few
+  times a conversation, not every turn. The boundary is `chat_sessions.coach_condensed_through`
+  (beside `coach_summary_through`, written on its own like it). Replayed over the account's 32
+  conversations, Balanced sent 3.0k a turn where summary-and-tail at 12k/4k sent 3.7k, with fewer
+  rolls; a `middle` of 4k rolled 11 times, which is 11 waits — the layer's own budget is what
+  keeps the summariser rare.
+  **A digest is made in the background and never trusted as written** (`answerDigest.ts`,
+  `chatCompression.ts`): `applyTranscriptContext` hands the condensed layer's undigested answers
+  to `requestDigests` without awaiting it, and until a digest lands its answer goes out whole.
+  Measured on eight real answers: Haiku 4.5 with thinking **off** ran twice the length, switched
+  to English and read the weekdays "T7"/"T5" as the dates "7/7"/"5/9"; with its default thinking
+  it spent 5–13k output tokens on a 400-character digest. So a Haiku-class model runs with a
+  **1,500-token thinking budget** (`budget_tokens` on the Messages API, `thinking: {type:
+  "enabled"}` through the Agent SDK — `effort` does not reach a model that takes none), and
+  `digestProblems` refuses a digest stating a date or a figure its answer does not; one retry
+  with the reasons, then it is stored as refused (NULL) and not tried again. A job that could
+  not run at all stores nothing, stops its batch and stands that model down for ten minutes
+  (`DIGEST_BACKOFF_MS`), or a signed-out provider fails the same batch every turn. Digests are keyed
+  by a hash of the answer's text (`chat_answer_digests`, `derived`: another machine makes its
+  own) and deleted with the conversation.
+  **Digests and the rolling summary are text jobs** (`StreamChatOptions.textJob`, `runTextJob`):
+  their own system prompt, no snapshot, no MCP connections, no tools — the roll used to run as a
+  turn of Coach, reading COROS for the snapshot to compress text it was handed. They run on
+  `chat.compactContext.model` (`resolveCompressionRuntime`): `auto` is the smallest family the
+  **conversation's** AI lists (`compressionModelFor`, matched against the provider's own list —
+  Haiku, then Sonnet; ChatGPT's and OpenRouter's names say nothing about size, so their
+  conversations use their own model), `conversation`, or a `fixed` provider and model. The roll
+  used to take Coach's default AI whatever the conversation answered with. Everything about the
+  condensed layer is best-effort: a digest or a budget that cannot be read leaves a turn or an
+  analysis sending what it always sent (the runner wraps its optional deps, because
+  `resolveDeps` spreads the defaults under a suite's fakes).
+  **What is not sent word for word stays readable**: `recall_conversation`
+  (`chatConversationTools.ts`, the search in node-free `chatRecall.ts`) searches up to
+  `recallableThrough` — the summary or the condensed layer, whichever reaches further — accents
+  folded, whole words, neighbouring terms ranked up, two exchanges by default and five at most,
+  a long answer cut to its opening and the paragraphs that match. It is offered only while there
+  is something to recall (`toolsForRun`), never to a pipeline step, and is read-only.
+  **Claude Code's prompt is every message it is handed** (`formatClaudePrompt`), as every other
+  provider's is: what a conversation sends is bounded where it is planned. A cut to the last 30
+  used to take the condensed layer between the summary and the tail — turns neither sent nor
+  summarised, and past what recall could reach.
+
+  **The system prompt is three parts in a fixed order, and the order is for the cache.**
+  `buildBaseCoachInstructions` is who the coach is and how it coaches, and **names no tool** — it
+  is sent whatever a turn holds (an analysis is read-only, a pipeline step gets one writing
+  tool) and it is what Settings shows the athlete, so a tool rule there promised a tool the turn
+  might not have; `test:chat-service` fails on a tool name in it. Every tool rule is written once
+  in `withLiveToolInstructions`, each only when its tool is on offer (`test:chat-stream-sink`).
+  Then `buildTrainingContext`'s `live` part — **today's date** (`formatCoachToday`: day and time
+  zone, never the time, which would change the prompt every turn) and the COROS snapshot — comes
+  **last**, through `coachSystemPrompt`. Nothing else tells the model the date: Claude Code is
+  given a system prompt of our own, which replaces the one that would carry it. The snapshot
+  used to sit between the rules and the tool guide, so a new recovery figure invalidated the
+  ~2k-token guide behind it in any prefix cache. The Anthropic provider sends the parts as two
+  blocks, a cache marker on the first (`buildAnthropicSystem`), plus top-level `cache_control`
+  for the conversation — it cached nothing before, so every round of a tool loop paid for
+  ~20k tokens of tools and prompt again.
 
   **The screen's frame follows the Coach Workbench review** (2026-09-26). The head is the
   open conversation's (`ChatConversationHeader`: its name, renamed in place, a Reads chip
@@ -1148,9 +1261,8 @@ Overview, Media, Data, and Settings are in the main bundle.
   conversation" states the AI as it stands too — provider, model and effort, whether it is
   Coach's default or chosen here, and whether it is set up. The sign-in gates keep the full
   pickers, scoped to Coach's own settings, because a gate is about Coach's provider. There is
-  no All · Needs you filter over the list; the row's badge says it. The newest creation's follow-up chips
-  sit inside the empty box as "Try …", not under every card, giving way to the words and to a
-  ref; a saved one-off workout has none. A question's `planRefs`/`scheduleRefs` anchors are
+  no All · Needs you filter over the list; the row's badge says it. The empty box offers no follow-up
+  chips. A question's `planRefs`/`scheduleRefs` anchors are
   drawn as a header line inside its bubble (`refsJoinQuestion`), the plan named once, with
   a way back to the creation in the Workbench. `test:ref-preview` holds the previews. One avatar per turn, none for the athlete. An ordinary turn shows
   its `runTrail` lines too (`StepRun.step === "turn"`); every local tool has a line there.
@@ -1168,6 +1280,18 @@ Overview, Media, Data, and Settings are in the main bundle.
   opened at its end used to settle with the last card under the composer. Only a move *up* from
   where the view was last put lets go (a scroll event can land after the thread grew and read
   as "not at the end"), so a streaming answer no longer drags an athlete reading above it.
+  **Only the tail of a conversation is drawn, and a chart only near the screen** (measured on a
+  110-entry transcript: 2.3 s of main-thread work to open, ~440 ms to collapse the list, up to
+  340 ms per resize step, most of it charts and rows nobody could see). A conversation opens on
+  its last `TRANSCRIPT_TAIL` (40) entries; `TranscriptEarlier` brings forty more as the
+  transcript is scrolled up to it, held in place by scroll anchoring. The window is fixed per
+  conversation and only lowered, and a row above it is a `null` in the mapped list, so a row's
+  index is still its entry's — **anything that scrolls to an entry goes through `withEntryRow`**,
+  which draws the entries down to it first; a `querySelector` on `data-chat-entry-index` alone
+  finds nothing above the window. Every recharts chart in a card sits in `ChartWhenNear`, which
+  mounts it once its fixed-height shell is within 800px of the transcript's visible part (so a
+  renderer suite in a hidden window, where no observer fires, sees the card and not the chart),
+  and the three chart cards are `memo`'d on their entry's `preview`.
   **Stop has to reach a turn that has not reached a provider yet.** The Claude status check,
   the MCP connections and the snapshot read from COROS run first and take seconds; nothing
   in that phase listened for the abort, and `streamClaudeCodeCompletion` subscribes to the
@@ -1244,12 +1368,56 @@ Overview, Media, Data, and Settings are in the main bundle.
   stored chat entry — every transcript an athlete has spells them that way, and renaming
   either costs historical runs their attribution.
 
+  **An analysis answers the conversation as sync left it, or not at all.** The watcher and
+  the scheduler start only once start-up has re-logged in, opened the vault and pulled once
+  (`startCoachAnalysesAfterSync` in `main.ts`, the pull capped at `STARTUP_SYNC_WAIT_MS`;
+  sync off or unreachable starts them at once). They used to start alongside the vault, so a
+  machine opened after a day away could debrief an activity the other one already had, into
+  a transcript missing the turns written there.
+  After start-up, a pull that changes a running analysis's conversation stops it: the
+  `chat_sessions` merger reports `changed` (content only — a rename, lent ids or a reorder
+  do not count), `SqliteSyncTarget.takeContentChanges` lists the record (a delete too), the
+  loop hands it to `onApplied`, and `noteConversationsChangedBySync` aborts the run. It
+  writes an `automationStopped` anchor (`reason: "sync"`) at the end of the re-read
+  conversation and is logged `cancelled`, moving neither the watermark, `lastRunAt` nor
+  the backoff, so the activity is still owed. A change that lands before a model is asked
+  is simply read. `test:coach-analysis-runner`, `test:sync-engine`, `test:sync-twoway`,
+  `test:analysis-startup-order`.
+
+  **An activity run is handed the 72 hours before its activity** (`formatPrecedingTraining`,
+  in the focus line): every other session, local rows only, a strength one with the muscles
+  its cached exercises work (`classifyWorkoutExerciseName` over `corosText` names). A debrief
+  compared a run with runs, and COROS's load scores a 90-minute gym session near a jog, so
+  the leg day before a flat run went unmentioned. A conversation withholding activities
+  gets none of it; a failed read leaves the line out rather than saying there was nothing.
+
   The pause and the monthly budget live in **Coach's settings dialog** (`ChatSettingsModal`
   over `ChatSettingsPanel`, with Coach Models, display, suggestions, instructions and
-  compaction), which Coach's header gear and the sign-in gates open: they are feature-wide and
+  compaction — how much is kept word for word and which model condenses, `CompactContextSection`), which the composer's gear and the sign-in gates open: they are feature-wide and
   the screen that used to host them is gone, so without a home a paused world would have no
   Resume button. R3 moved the panel into the app's Settings as a section; UAT moved it back,
   because shown whole there it buried that page's content.
+  **The dialog edits a draft and writes it on Save** (`ChatSettingsModal`): the panel is handed
+  the saved settings with the draft laid over them and changes only the draft, the monthly
+  budget included (written through `setCoachAnalysisBudget` on Save, which closes the dialog);
+  Discard drops it, and closing with a draft held asks first. Every control used to
+  save on change and the instructions box on blur, so a half-written instruction reached the
+  next turn and went out through sync with no way back. The Coach Models row and Resume are not
+  part of the draft — one is its own dialog, the other an action. `test:coach-analysis-renderer`.
+  **The dialog wears the app's colours, not Coach's.** It is mounted inside `.chat-view`, whose
+  grey `--accent` and own `--surface` it inherited unseen, so every chip and the Save button drew
+  grey; `.chat-settings-backdrop` points them back at `--palette-accent*` and `--palette-surface`
+  (declared on `:root` as `var(--surface)`, so it resolves per theme).
+  **Coach style** (`electron/coachStyles.ts`, `chat.coach.style`, `preference`) is the one place
+  a tone is chosen, since the base prompt carries none. Chips, warmest to harshest with Neutral
+  in the middle (`COACH_STYLES` is that order): Friendly, Motivating, Neutral (adds nothing),
+  Straight talk, No filter (swearing allowed, aimed at excuses and never at the
+  person, dropped the moment pain, injury or distress comes up); a saved style no longer
+  offered (Analytical) reads as Neutral. Each is one line — it is sent
+  every turn, and `test:chat-service` bounds it. Its block goes
+  after the base rules and before the athlete's own instructions, which can still tune it, and
+  it says outright that it changes tone only and never what goes onto a card — names and
+  descriptions are saved to COROS and shown on the watch.
 
 - **Sleep** (`sleepDataService`, `sleepHistoryService`, `sleepSeriesService`, `src/sleep/`) —
   nights from the COROS MCP server, cached in `sleep_nights` because COROS keeps only ~9
@@ -1401,9 +1569,11 @@ Overview, Media, Data, and Settings are in the main bundle.
   B-spline **bounded** to 2 m of the recorded one (`routeSmoothing.ts`: a control 6 m in from
   each end of every longer chord), since a simplified route runs long chords into junctions
   and an unbounded spline cut those by a sixth of the chord. Zones are coloured and named
-  **bucket for bucket as the zone bar is** (`zoneColor`/`zoneLabel`, bucket 0 "Below Z1"), so
-  the map, the bar beside it and the coach call a stretch the same thing; renumbering them to
-  COROS's own zone 1–6 is one change across all three, not a map change.
+  **bucket for bucket as the zone bar is** (`zoneColor`/`zoneLabel`), so the map, the bar
+  beside it and the coach call a stretch the same thing — and all three number it as COROS
+  does, bucket n being Z(n+1). Bucket 0 used to be "Below Z1", which put every zone one step
+  easier than COROS and than the coach's own `get_training_zones` (a run at 155–168 on a
+  heart-rate-reserve account read "71% in Z2" where COROS says Z3).
   `test:route-coloring` holds the arithmetic, `test:activity-detail` the clock and the
   untouched `points`.
 - **Where you've been** (`reverseGeocodeService.ts`, `src/trainingMap/`) — the globe clusters

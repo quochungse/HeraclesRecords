@@ -46,6 +46,7 @@ const {
   buildCoachSportCapabilityGuide,
   formatAthleteProfile,
   formatCoachDashboard,
+  formatCoachToday,
   formatPersonalRecords,
   formatRecentActivityMix,
   formatUpcomingWorkoutSport,
@@ -134,15 +135,30 @@ assert.match(coachInstructions, /multi-sport endurance and strength-training coa
 assert.match(coachInstructions, /Honor every sport the athlete explicitly requests/);
 assert.match(coachInstructions, /Never add an unfamiliar sport merely for variety/);
 assert.match(coachInstructions, /Open Water Swim is not Pool Swim/);
-assert.match(coachInstructions, /exactly one standalone workout/);
-assert.match(coachInstructions, /call draft_workout/);
-assert.match(coachInstructions, /Workout Library or Calendar/);
-assert.match(coachInstructions, /never disguise it as a one-workout training plan/);
-assert.match(coachInstructions, /exercise_resolution_required/);
-assert.match(coachInstructions, /call search_coros_exercises first/);
-assert.match(coachInstructions, /naming mismatch alone is never a reason/);
-assert.match(coachInstructions, /call the same draft tool again in the same response/);
-assert.match(coachInstructions, /request_coach_input/);
+assert.match(coachInstructions, /concise, practical advice/);
+assert.match(coachInstructions, /Answer in the language the athlete writes in/, "the prompt and snapshot are English; the athlete may not be");
+assert.doesNotMatch(coachInstructions, /friendly|encouraging|knowledgeable/i, "form that changes the answer, not temperament");
+assert.match(coachInstructions, /belong with a professional/);
+// The base block is sent whatever tools a turn holds, and shown to the athlete
+// in Settings: a rule naming a tool belongs beside that tool, in the guide
+// `withLiveToolInstructions` writes (held by test:chat-stream-sink).
+for (const tool of [
+  "draft_workout",
+  "draft_training_plan",
+  "revise_training_plan",
+  "search_coros_exercises",
+  "request_coach_input",
+  "list_scheduled_workouts",
+  "delete_workout",
+  "exercise_resolution_required"
+]) {
+  assert.doesNotMatch(coachInstructions, new RegExp(tool), `the base prompt names no tool (${tool})`);
+}
+assert.doesNotMatch(coachInstructions, /Delete from COROS/, "a button that no longer exists");
+
+const todayLine = formatCoachToday(new Date(2026, 8, 29, 23, 30));
+assert.match(todayLine, /^Today is Tuesday 2026-09-29 \(20260929\), local time zone \S+\.$/);
+assert.doesNotMatch(todayLine, /23:30|23\b/, "the day, not the time: the time would change the prompt every turn");
 
 const { MAX_CUSTOM_COACH_INSTRUCTIONS } = await import(
   `${distUrl("types.js")}?cacheBust=${Date.now()}`
@@ -267,6 +283,9 @@ for (const sport of [
 ]) {
   assert.match(capabilityGuide, new RegExp(`sport=${sport}(?:\\)|;)`));
 }
+assert.match(capabilityGuide, /^Every sport takes step kinds warmup, training, rest, cooldown, interval\./);
+assert.match(capabilityGuide, /\(sport=swim\): [^\n]*also step kind sendOff/, "a sport's own kinds are still said");
+assert.equal((capabilityGuide.match(/warmup/g) ?? []).length, 1, "the shared kinds are said once, not once per sport");
 
 const activityMix = formatRecentActivityMix(
   [
@@ -1144,19 +1163,47 @@ assert.equal(settingsValues.has("chat.customInstructions"), false);
 assert.deepEqual(scopedByDefault.compactContext, {
   enabled: true,
   limit: 60,
-  keep: 20
+  keep: 20,
+  detail: "balanced",
+  model: { kind: "auto" }
 });
 
 const compact = saveChatSettingsToStore(fakeStore, fakeKeyStores, {
   ...withoutCustom,
   compactContext: { enabled: true, limit: 120, keep: 30 }
 });
-assert.deepEqual(compact.compactContext, { enabled: true, limit: 120, keep: 30 });
+const unchosen = { detail: "balanced", model: { kind: "auto" } };
+assert.deepEqual(compact.compactContext, { enabled: true, limit: 120, keep: 30, ...unchosen });
 assert.deepEqual(
   readChatSettingsFromStore(fakeStore, fakeKeyStores).compactContext,
-  { enabled: true, limit: 120, keep: 30 },
+  { enabled: true, limit: 120, keep: 30, ...unchosen },
   "and survives the round trip"
 );
+
+// How much is kept word for word, and what condenses it, are stored too — a
+// fixed model as its provider and id, anything half-named as automatic.
+const chosen = saveChatSettingsToStore(fakeStore, fakeKeyStores, {
+  ...withoutCustom,
+  compactContext: {
+    enabled: true,
+    limit: 60,
+    keep: 20,
+    detail: "lean",
+    model: { kind: "fixed", provider: "claude-code", model: "haiku" }
+  }
+});
+assert.equal(chosen.compactContext.detail, "lean");
+assert.deepEqual(chosen.compactContext.model, { kind: "fixed", provider: "claude-code", model: "haiku" });
+assert.equal(settingsValues.get("chat.compactContext.model"), JSON.stringify({ kind: "fixed", provider: "claude-code", model: "haiku" }));
+assert.deepEqual(
+  saveChatSettingsToStore(fakeStore, fakeKeyStores, {
+    ...withoutCustom,
+    compactContext: { enabled: true, limit: 60, keep: 20, detail: "nonsense", model: { kind: "fixed", provider: "claude-code" } }
+  }).compactContext,
+  { enabled: true, limit: 60, keep: 20, ...unchosen },
+  "an unknown detail and a half-named model read as the defaults"
+);
+saveChatSettingsToStore(fakeStore, fakeKeyStores, { ...withoutCustom, compactContext: { enabled: true, limit: 120, keep: 30, ...unchosen } });
 
 // A pair that disagrees is repaired on the way in, not stored as typed: a
 // `limit` at or below `keep` would roll on every single turn, which is the
@@ -1198,7 +1245,7 @@ assert.deepEqual(
     },
     fakeKeyStores
   ).compactContext,
-  { enabled: true, limit: 60, keep: 20 },
+  { enabled: true, limit: 60, keep: 20, ...unchosen },
   "an unreadable pair reads as the default, never as NaN"
 );
 
@@ -1214,6 +1261,51 @@ assert.equal(
   readChatSettingsFromStore(fakeStore, fakeKeyStores).compactContext.enabled,
   false
 );
+
+// Coach style: tone only, set in Coach settings, and nothing at all for Neutral.
+{
+  const { COACH_STYLES, COACH_STYLE_CATALOG, coachStyleInstructions, normalizeCoachStyle } = await import(
+    `${distUrl("coachStyles.js")}?cacheBust=${Date.now()}`
+  );
+  assert.equal(buildCoachInstructions(undefined, undefined, undefined, "neutral"), baseCoachInstructions, "Neutral is the prompt as it was");
+  assert.equal(buildCoachInstructions(undefined, undefined, undefined, undefined), baseCoachInstructions);
+  assert.equal(normalizeCoachStyle("shouty"), "neutral", "an unknown style reads as Neutral");
+  for (const style of COACH_STYLES) {
+    assert.ok(COACH_STYLE_CATALOG[style].label && COACH_STYLE_CATALOG[style].detail, `${style} has a label and a detail`);
+    const block = coachStyleInstructions(style);
+    if (style === "neutral") {
+      assert.equal(block, undefined);
+      continue;
+    }
+    assert.match(block, /^## Coach style\n/);
+    assert.match(block, /Tone only: facts, advice and safety rules are unchanged/, `${style} changes tone, not facts`);
+    assert.match(block, /card text \(names, descriptions\) stays plain/, `${style} never reaches a card`);
+  }
+  const unfiltered = coachStyleInstructions("unfiltered");
+  assert.match(unfiltered, /Swear freely in the athlete's language/);
+  assert.match(unfiltered, /never at the person/);
+  assert.match(unfiltered, /no slurs/);
+  assert.match(unfiltered, /Drop it at any mention of pain, injury, illness or distress/, "and it stands down when the athlete is hurt");
+  assert.doesNotMatch(coachStyleInstructions("straight"), /[Ss]wear/, "Straight talk is blunt without the language");
+  for (const style of COACH_STYLES) {
+    assert.ok((COACH_STYLE_CATALOG[style].prompt ?? "").length < 260, `${style} is a line, not a paragraph: it is sent every turn`);
+  }
+
+  // The style sits after the rules and before the athlete's own words, which
+  // may still tune it.
+  const styled = buildCoachInstructions("Keep it short.", undefined, undefined, "unfiltered");
+  assert.ok(styled.startsWith(baseCoachInstructions));
+  assert.ok(styled.indexOf("## Coach style") < styled.indexOf("<athlete_custom_instructions>"));
+
+  const values = new Map();
+  const store = { get: (key) => values.get(key), set: (key, value) => values.set(key, value), delete: (key) => values.delete(key) };
+  const keys = { get: () => undefined, set: () => undefined, delete: () => undefined, hasApiKey: () => false };
+  const keyStores = { anthropic: keys, openRouter: keys, local: keys };
+  assert.equal(readChatSettingsFromStore(store, keyStores).coachStyle, "neutral", "Neutral until chosen");
+  saveChatSettingsToStore(store, keyStores, { ...readChatSettingsFromStore(store, keyStores), coachStyle: "unfiltered" });
+  assert.equal(values.get("chat.coach.style"), "unfiltered");
+  assert.equal(readChatSettingsFromStore(store, keyStores).coachStyle, "unfiltered");
+}
 
 // Unasked workout cards (P1.9, D4): said in the prompt when the setting is on
 // for the turn's provider, and only when the turn can make one.

@@ -825,11 +825,18 @@ const { SqliteSyncTarget } = await load("sync/sqliteSyncTarget.js");
     clearTimer: () => {},
     conditions: () => ({ appActive: true, online: true }),
     recordVersions: createMemoryRecordVersions(),
-    outbox: createMemoryOutbox()
+    outbox: createMemoryOutbox(),
+    onApplied: (applied) => appliedCalls.push(applied)
   });
+  const appliedCalls = [];
 
   const result = await sqliteLoop.pull();
   assert.equal(result.applied, 2, "both entries land in the real database");
+  assert.deepEqual(
+    appliedCalls.map((applied) => applied.contentChanges),
+    [[{ table: "chat_sessions", recordId: "real", removed: false }]],
+    "the pull says which conversation now reads differently, and a setting is not one"
+  );
   assert.equal(
     db.prepare("SELECT title FROM chat_sessions WHERE id = ?").get("real").title,
     "Written on another machine"
@@ -840,6 +847,47 @@ const { SqliteSyncTarget } = await load("sync/sqliteSyncTarget.js");
     true,
     "and the pull records when it happened"
   );
+
+  // What a coach analysis streaming into "real" would be told: a rename is not
+  // its business, a turn written over there is.
+  const conversation = (title, messages) => ({
+    id: "real",
+    provider: "claude-code",
+    title,
+    messages_json: JSON.stringify(messages),
+    created_at: "2026-09-04T00:00:00Z",
+    updated_at: "2026-09-05T00:00:00Z"
+  });
+  const renamed = remote.builder();
+  renamed.row("chat_sessions", "real", conversation("Renamed over there", []));
+  remote.loop.enqueue(renamed.entries);
+  await remote.loop.flush();
+  appliedCalls.length = 0;
+  await sqliteLoop.pull();
+  assert.deepEqual(
+    appliedCalls.map((applied) => applied.contentChanges),
+    [[]],
+    "a rename lands and changes no conversation's content"
+  );
+
+  const turn = remote.builder();
+  turn.row(
+    "chat_sessions",
+    "real",
+    conversation("Renamed over there", [
+      { kind: "message", role: "user", content: "A turn from the other machine", mid: "1-a", mrev: "1-a" }
+    ])
+  );
+  remote.loop.enqueue(turn.entries);
+  await remote.loop.flush();
+  appliedCalls.length = 0;
+  const pulled = await sqliteLoop.pull();
+  assert.deepEqual(
+    pulled.contentChanges,
+    [{ table: "chat_sessions", recordId: "real", removed: false }],
+    "a turn written over there is"
+  );
+  assert.deepEqual(appliedCalls.map((applied) => applied.contentChanges), [pulled.contentChanges]);
 }
 
 // ===========================================================================

@@ -7399,9 +7399,9 @@ function tenthsToUnits(value?: number): number | undefined {
 }
 
 /**
- * The activity's own HR zone split. Bucket 0 is COROS's below-zone-1 time and
- * repeats zone 1's bounds instead of carrying its own, so its `low` is dropped
- * and only the ceiling is kept.
+ * The activity's own HR zone split. Bucket 0 is COROS's Zone 1, the time under
+ * the first bound, and repeats zone 2's bounds instead of carrying its own, so
+ * its `low` is dropped and only the ceiling is kept.
  */
 export function parseActivityHrZones(
   raw: Record<string, unknown>

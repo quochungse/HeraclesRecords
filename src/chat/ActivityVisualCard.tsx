@@ -1,12 +1,12 @@
-import { useMemo } from "react";
+import { memo, useMemo } from "react";
 import {
   Bar,
   BarChart,
-  ResponsiveContainer,
   Tooltip,
   XAxis,
   YAxis
 } from "recharts";
+import { ChartWhenNear } from "./charts/ChartWhenNear";
 import type { TooltipContentProps } from "recharts";
 import type {
   ActivityVisualLapPoint,
@@ -86,7 +86,7 @@ function ChatLapBarChart({
 
   return (
     <div className="chat-visual-chart-shell">
-      <ResponsiveContainer width="100%" height="100%">
+      <ChartWhenNear>
         <BarChart data={data} margin={trainingChartMargin}>
           <XAxis
             dataKey="label"
@@ -117,7 +117,7 @@ function ChatLapBarChart({
             isAnimationActive={false}
           />
         </BarChart>
-      </ResponsiveContainer>
+      </ChartWhenNear>
     </div>
   );
 }
@@ -133,7 +133,14 @@ function buildLapBarData(
     );
 }
 
-export function ActivityVisualCard({ preview }: ActivityVisualCardProps) {
+/**
+ * Memoised on `preview`, which is the transcript entry's own object: Coach
+ * re-renders on every token, keystroke and settings change, and a card whose
+ * entry did not change has nothing to redraw.
+ */
+export const ActivityVisualCard = memo(function ActivityVisualCard({
+  preview
+}: ActivityVisualCardProps) {
   const { unitSystem } = useUnitSystem();
   const swim = preview.sportType === 300 || preview.sportType === 301;
   const cycling = isCyclingSportType(preview.sportType);
@@ -373,4 +380,4 @@ export function ActivityVisualCard({ preview }: ActivityVisualCardProps) {
       ) : null}
     </div>
   );
-}
+});

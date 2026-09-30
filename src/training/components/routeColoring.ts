@@ -280,17 +280,22 @@ export const ZONE_COLORS = [
 ] as const;
 
 /**
- * A bucket's colour and name, numbered as the zone bar numbers them — bucket 0
- * "Below Z1", bucket n "Zn" — so the map and the bar beside it read a stretch
- * the same way, heart rate and pace alike. Clamped like the bar's
+ * A bucket's colour and name, numbered as COROS and the zone bar number them —
+ * bucket n is Z(n+1) — so the map, the bar beside it and the coach read a
+ * stretch the same way, heart rate and pace alike. Clamped like the bar's
  * `data-zone`, for a list longer than seven.
  */
 export function zoneColor(bucket: number): string {
   return ZONE_COLORS[Math.min(ZONE_COLORS.length - 1, Math.max(0, bucket))]!;
 }
 
+/** COROS's own zone number for a bucket: bucket 0 is Zone 1, the one under the first bound. */
+export function zoneNumber(bucket: number): number {
+  return Math.max(0, bucket) + 1;
+}
+
 export function zoneLabel(bucket: number): string {
-  return bucket <= 0 ? "Below Z1" : `Z${bucket}`;
+  return `Z${zoneNumber(bucket)}`;
 }
 
 export interface RouteZoneColoring {

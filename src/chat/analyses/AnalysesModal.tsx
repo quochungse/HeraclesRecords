@@ -1,10 +1,15 @@
 import { useCallback, useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import { X, Zap } from "lucide-react";
 import type { ChatProvider } from "../../../electron/types";
 import type { CorosLinkApi } from "../../coroslink-api";
 import { AnalysisCreate } from "./AnalysisCreate";
 import { AnalysisDetailView } from "./AnalysisDetail";
 import { AnalysesTitleProvider } from "./analysesTitle";
+import { ConfirmDialog } from "../../training-library/ConfirmDialog";
+// The confirmation's chrome is the library's `tl-dialog`, as Coach settings'
+// is.
+import "../../training-library/trainingLibrary.css";
 
 /**
  * The full-screen host for one analysis — either the one being written, or the
@@ -39,26 +44,38 @@ export function AnalysesModal({
   onOpenConversation?: (sessionId: string) => void;
 }) {
   // An analysis is a paragraph of coaching instructions plus a trigger.
-  // Clicking the backdrop — or tapping Escape — while writing one must not
-  // discard it; the header's X and the screen's own Cancel stay as the
-  // deliberate ways out.
+  // Clicking the backdrop while it holds edits does nothing — a stray click is
+  // not a decision — and the deliberate ways out (the X, Escape, the detail's
+  // Discard) ask first, as Coach settings does; a yes closes.
   const [editing, setEditing] = useState(false);
+  /** The discard question is on screen. */
+  const [confirming, setConfirming] = useState(false);
   /** Set by whichever screen is open, so it names itself up here. */
   const [title, setTitle] = useState<string | null>(null);
 
+  const requestClose = useCallback(() => {
+    if (editing) {
+      setConfirming(true);
+      return;
+    }
+    onClose();
+  }, [editing, onClose]);
+
   useEffect(() => {
     if (!target) return;
+    // The question takes Escape itself, in the capture phase.
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape" && !editing) onClose();
+      if (event.key === "Escape" && !confirming) requestClose();
     };
     document.addEventListener("keydown", onKeyDown);
     return () => document.removeEventListener("keydown", onKeyDown);
-  }, [target, editing, onClose]);
+  }, [target, confirming, requestClose]);
 
   // Reset when the modal is dismissed, so reopening never starts out guarded.
   useEffect(() => {
     if (!target) {
       setEditing(false);
+      setConfirming(false);
       setTitle(null);
     }
   }, [target]);
@@ -93,12 +110,18 @@ export function AnalysesModal({
             type="button"
             className="icon-button"
             aria-label="Close analysis"
-            onClick={onClose}
+            onClick={requestClose}
           >
             <X size={18} aria-hidden="true" />
           </button>
         </header>
-        <div className="chat-settings-modal-body coach-analyses-modal-body">
+        <div
+          className={
+            target.kind === "detail"
+              ? "chat-settings-modal-body coach-analyses-modal-body is-detail"
+              : "chat-settings-modal-body coach-analyses-modal-body"
+          }
+        >
           <AnalysesTitleProvider value={setTitle}>
             {target.kind === "create" ? (
               <AnalysisCreate
@@ -119,11 +142,32 @@ export function AnalysesModal({
                 onBack={onClose}
                 onChanged={() => onChanged?.()}
                 onEditingChange={handleEditingChange}
+                onDiscard={() => setConfirming(true)}
                 {...(onOpenConversation ? { onOpenConversation } : {})}
               />
             )}
           </AnalysesTitleProvider>
         </div>
+        {/* Portalled, so no ancestor's stacking holds it under the sheet;
+            still inside the section in React's tree, whose stopPropagation
+            keeps its clicks from reaching the backdrop. */}
+        {confirming
+          ? createPortal(
+              <ConfirmDialog
+                title="Discard unsaved changes?"
+                description="Your edits to this analysis have not been saved. Discarding them closes the analysis."
+                confirmLabel="Discard changes"
+                cancelLabel="Keep editing"
+                danger
+                onConfirm={() => {
+                  setConfirming(false);
+                  onClose();
+                }}
+                onCancel={() => setConfirming(false)}
+              />,
+              document.body
+            )
+          : null}
       </section>
     </div>
   );

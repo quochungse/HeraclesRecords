@@ -166,7 +166,8 @@ assert.equal(
     ...dist("chatAnalyticsTools.js").CHAT_ANALYTICS_TOOL_NAMES,
     ...dist("chatSleepTools.js").CHAT_SLEEP_TOOL_NAMES,
     ...dist("chatWorkoutTools.js").CHAT_WORKOUT_TOOL_NAMES,
-    ...dist("chatInteractionTools.js").CHAT_INTERACTION_TOOL_NAMES
+    ...dist("chatInteractionTools.js").CHAT_INTERACTION_TOOL_NAMES,
+    ...dist("chatConversationTools.js").CHAT_CONVERSATION_TOOL_NAMES
   ];
   // Twelve: `upload_training_plan`, which never wrote anything, was removed,
   // and `revise_training_plan` and `get_plan_draft` were added.
@@ -195,7 +196,9 @@ assert.equal(
     "get_workout_library",
     // A proposal the athlete applies; it writes nothing (P3.3).
     "propose_schedule_changes",
-    "request_coach_input"
+    "request_coach_input",
+    // The conversation's own earlier turns, read back.
+    "recall_conversation"
   ]);
   // A brief is set out for the athlete to check and edit — nobody is there
   // to during a run, so an analysis may not start one (P2.1).
@@ -227,22 +230,29 @@ assert.equal(
   );
 }
 
-// The one caller of "none" is the rolling summariser, and every suite that
-// reaches it injects that dep — so nothing executes the policy the real one
-// asks for. This is the shape test-ipc-surface.mjs exists for: a wire that
-// type-checks either way and silently costs a tool round-trip per roll if it
-// rots. It moved out of the runner when the interactive chat started sharing
-// it, so the assertion follows it rather than the file it used to live in.
+// The callers of "none" are the text jobs — the rolling summariser and the
+// digests — and every suite that reaches them injects that dep, so nothing
+// executes the policy the real ones ask for. This is the shape
+// test-ipc-surface.mjs exists for: a wire that type-checks either way and
+// silently costs a tool round-trip per job if it rots. Both go through
+// `runTextJob`, so the assertion is made there and on the roll's use of it.
 {
   const summariser = readFileSync(
     path.join(repoRoot, "electron", "chatContextService.ts"),
     "utf8"
   );
+  const jobs = readFileSync(path.join(repoRoot, "electron", "chatCompression.ts"), "utf8");
+  assert.match(
+    jobs.slice(jobs.indexOf("export async function runTextJob(")),
+    /streamChat\([\s\S]{0,200}?toolPolicy: "none"[\s\S]{0,200}?textJob:/,
+    "a text job must ask for no tools at all, and for no snapshot"
+  );
   assert.match(
     summariser,
-    /buildRollingSummaryTurn\(previous, entries\)[\s\S]{0,400}?toolPolicy: "none"/,
-    "the rolling summariser must ask for no tools at all"
+    /runTextJob\(\{[\s\S]{0,200}?buildRollingSummaryTurn\(previous, entries/,
+    "the rolling summariser runs as a text job"
   );
+  assert.match(jobs, /runTextJob\(\{\s*system: digestSystemPrompt\(\)/, "and so does a digest");
   assert.doesNotMatch(
     readFileSync(
       path.join(repoRoot, "electron", "coachAnalysisService.ts"),

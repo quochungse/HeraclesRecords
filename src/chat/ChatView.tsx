@@ -4,6 +4,8 @@ import {
   memo,
   useCallback,
   useEffect,
+  useLayoutEffect,
+  useMemo,
   useRef,
   useState,
   type CSSProperties,
@@ -14,6 +16,7 @@ import {
   ArrowUpRight,
   CalendarRange,
   Cloud,
+  CornerDownRight,
   Database,
   ExternalLink,
   FileDown,
@@ -79,7 +82,14 @@ import type {
   TrainingPlanDataSources
 } from "../../electron/types";
 import { NOTHING_TO_REPORT } from "../../electron/types";
-import { keyFromDate, mondayOf as mondayOfDate, weekRangeLabel } from "../calendar/dateUtils";
+import {
+  chartHandle,
+  holdBackPartialPlaceholder,
+  placeCharts,
+  splitNextSteps,
+  stripChartPlaceholders,
+  type AnswerSegment
+} from "../../electron/chartPlacement";
 import { sportTheme } from "../training-library/sportTheme";
 import { ActivityVisualCard } from "./ActivityVisualCard";
 import { FitnessTrendCard } from "./FitnessTrendCard";
@@ -109,7 +119,6 @@ import { createPortal } from "react-dom";
 import { firstPlanMonday } from "../../electron/trainingPlanGeneration";
 import { defaultPlanBriefRequest } from "../../electron/planBrief";
 import { creationCalendar, localDayKey } from "./creationCalendar";
-import { refinementChips } from "./creationChoices";
 import {
   requestRuntime,
   runtimeFromSettings,
@@ -138,7 +147,6 @@ import { ChatConversationHeader } from "./ChatConversationHeader";
 import {
   ChatComposer,
   isLatestActivityFileRequest,
-  type AboutOption,
   type ChatComposerHandle
 } from "./ChatComposer";
 import { formatSessionRelativeTime } from "./chatSessionGroups";
@@ -146,6 +154,7 @@ import { detectAndAdoptLocalServer } from "./localModelDetection";
 import { ContextHistoryDialog } from "./ContextHistoryDialog";
 import { EffortSwitch } from "./EffortSwitch";
 import { ModelSwitch } from "./ModelSwitch";
+import { TranscriptEarlier } from "./TranscriptEarlier";
 import { ModelOptionsContext } from "./modelOptionsContext";
 import { ProviderSwitch } from "./ProviderSwitch";
 import {
@@ -157,8 +166,12 @@ import {
   upsertHrZoneEntry,
   upsertPlanDraftEntry,
   isChatVisualEntry,
+  orderTurn,
   settleTurnEntries,
+  type ChatActivityVisualEntry,
   type ChatEntry,
+  type ChatFitnessTrendEntry,
+  type ChatHrZoneEntry,
   type SourceInfo
 } from "./chatTypes";
 import { formatTurnCost, formatTurnCostDetail } from "./turnCost";
@@ -218,6 +231,18 @@ const EMPTY_INTENTS: readonly {
 const WORKBENCH_FOLD_WIDTH = 1600;
 /** Below this window width the Workbench is a sheet over the conversation. */
 const WORKBENCH_SHEET_WIDTH = 1180;
+/**
+ * How many entries a conversation opens with, from its end; the rest come in
+ * `TRANSCRIPT_STEP` at a time as the transcript is scrolled up to them.
+ *
+ * Every drawn row is laid out again on every width change, so a 110-entry
+ * conversation cost a full layout of ~12.8k boxes per step of a window resize
+ * (~100 ms) and its whole mount on every switch to it, for rows several
+ * screens above anything on view. Forty entries is several screens of any
+ * conversation, and every suite's transcript fits inside it.
+ */
+const TRANSCRIPT_TAIL = 40;
+const TRANSCRIPT_STEP = 40;
 
 const DEFAULT_CHAT_SETTINGS: ChatSettings = {
   provider: "chatgpt",
@@ -282,6 +307,129 @@ const AssistantMarkdown = memo(function AssistantMarkdown({
     </div>
   );
 });
+
+type ChatChartEntry = ChatActivityVisualEntry | ChatFitnessTrendEntry | ChatHrZoneEntry;
+
+/** A chart card, drawn the same in a row of its own and inside an answer. */
+function ChartCard({ entry }: { entry: ChatChartEntry }) {
+  if (entry.kind === "activityVisual") return <ActivityVisualCard preview={entry.preview} />;
+  if (entry.kind === "fitnessTrend") return <FitnessTrendCard preview={entry.preview} />;
+  return <HrZoneCard preview={entry.preview} />;
+}
+
+/** An answer cut where it places charts, and the charts it places by handle. */
+interface PlacedAnswer {
+  segments: AnswerSegment[];
+  charts: Map<string, ChatChartEntry>;
+}
+
+interface TurnChart {
+  entry: ChatChartEntry;
+  index: number;
+}
+
+/** The chart entries just above `index`, in order: the charts of the answer there. */
+function chartsAbove(timeline: ChatEntry[], index: number): TurnChart[] {
+  const charts: TurnChart[] = [];
+  for (let at = index - 1; at >= 0; at -= 1) {
+    const entry = timeline[at];
+    if (!isChatVisualEntry(entry)) break;
+    charts.unshift({ entry, index: at });
+  }
+  return charts;
+}
+
+/**
+ * Where an answer places its turn's charts (`chartPlacement.ts`), or nothing
+ * when it names none. A handle is a chart's place among `charts`; every chart
+ * placed goes into `placed`, and its own row is then not drawn.
+ */
+function placeAnswerCharts(
+  content: string,
+  charts: readonly TurnChart[],
+  placed: Set<number>
+): PlacedAnswer | undefined {
+  if (!content.includes("[[chart:")) return undefined;
+  const byHandle = new Map(charts.map((chart, ordinal) => [chartHandle(ordinal), chart]));
+  const segments = placeCharts(content, (handle) => byHandle.has(handle));
+  const drawn = new Map<string, ChatChartEntry>();
+  for (const segment of segments) {
+    if (segment.kind !== "chart") continue;
+    const chart = byHandle.get(segment.handle);
+    if (!chart) continue;
+    drawn.set(segment.handle, chart.entry);
+    placed.add(chart.index);
+  }
+  return { segments, charts: drawn };
+}
+
+/** An answer's words, with the charts it placed among them. */
+function AnswerBody({
+  content,
+  placement,
+  streaming = false
+}: {
+  content: string;
+  placement?: PlacedAnswer;
+  streaming?: boolean;
+}) {
+  if (!placement) return <AssistantMarkdown content={content} streaming={streaming} />;
+  const last = placement.segments.length - 1;
+  return (
+    <>
+      {placement.segments.map((segment, at) => {
+        if (segment.kind === "text") {
+          return (
+            <AssistantMarkdown
+              key={`text-${at}`}
+              content={segment.text}
+              streaming={streaming && at === last}
+            />
+          );
+        }
+        const entry = placement.charts.get(segment.handle);
+        return entry ? (
+          <div key={`chart-${segment.handle}`} className="chat-inline-chart">
+            <ChartCard entry={entry} />
+          </div>
+        ) : null;
+      })}
+    </>
+  );
+}
+
+/**
+ * What Coach offers to do next, under its last answer. A press sends the
+ * chip's words as the athlete's question — about the answer just above it,
+ * not about whatever the composer points at.
+ */
+function NextSteps({
+  steps,
+  disabled,
+  onPick
+}: {
+  steps: readonly string[];
+  disabled: boolean;
+  onPick: (text: string) => void;
+}) {
+  if (!steps.length) return null;
+  return (
+    <div className="chat-next-steps" aria-label="Next steps">
+      {steps.map((text) => (
+        <button
+          key={text}
+          type="button"
+          className="chat-next-step"
+          disabled={disabled}
+          onClick={() => onPick(text)}
+        >
+          <CornerDownRight size={13} aria-hidden="true" />
+          <span>{text}</span>
+        </button>
+      ))}
+    </div>
+  );
+}
 
 const ThinkingDisclosure = memo(function ThinkingDisclosure({
   content,
@@ -715,16 +863,20 @@ function AnalysisPromptChip({
   marker,
   prompt,
   index,
-  highlighted
+  highlighted,
+  settled
 }: {
   marker: ChatEntryAnalysisMarker;
   prompt: string;
   index: number;
   highlighted: boolean;
+  /** See `ChatRow`: a row a reload mounts is drawn as it is. */
+  settled: boolean;
 }) {
   const [expanded, setExpanded] = useState(false);
   return (
-    <div
+    <ChatRow
+      settled={settled}
       className={`chat-row chat-row-analysis${
         highlighted ? " is-chat-jump-target" : ""
       }`}
@@ -741,65 +893,94 @@ function AnalysisPromptChip({
         <span className="chat-analysis-chip-trigger">· {marker.triggerLabel}</span>
       </button>
       {expanded ? <pre className="chat-analysis-prompt">{prompt}</pre> : null}
-    </div>
+    </ChatRow>
   );
 }
 
 /**
- * When the coach looked. Absolute, not relative: a transcript entry is read
- * long after it was written, and "2h ago" becomes a lie the moment the
- * conversation is reopened.
+ * When an entry was written: a message, or when the coach looked. Absolute,
+ * not relative: a transcript entry is read long after it was written, and
+ * "2h ago" becomes a lie the moment the conversation is reopened.
+ *
+ * The formatters are built once — every message row asks on every render,
+ * a token of a streaming answer included (see `chatSessionGroups.ts`).
  */
-function formatLookedAt(at: number): string {
+const ENTRY_TIME = new Intl.DateTimeFormat(undefined, { hour: "numeric", minute: "2-digit" });
+const ENTRY_DAY = new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric" });
+const ENTRY_DAY_YEAR = new Intl.DateTimeFormat(undefined, {
+  year: "numeric",
+  month: "short",
+  day: "numeric"
+});
+const ENTRY_FULL = new Intl.DateTimeFormat(undefined, { dateStyle: "full", timeStyle: "short" });
+
+function formatEntryTime(at: number): string {
   const when = new Date(at);
   if (Number.isNaN(when.getTime())) {
     return "";
   }
-  const time = when.toLocaleTimeString(undefined, {
-    hour: "numeric",
-    minute: "2-digit"
-  });
-  if (when.toDateString() === new Date().toDateString()) {
+  const time = ENTRY_TIME.format(when);
+  const now = new Date();
+  if (when.toDateString() === now.toDateString()) {
     return time;
   }
-  const day = when.toLocaleDateString(undefined, {
-    month: "short",
-    day: "numeric"
-  });
+  const day = (when.getFullYear() === now.getFullYear() ? ENTRY_DAY : ENTRY_DAY_YEAR).format(when);
   return `${day}, ${time}`;
 }
 
+/** A message's time, quiet, with the full date on hover. */
+function MessageTime({ at }: { at?: number }) {
+  if (at === undefined) return null;
+  const when = new Date(at);
+  if (Number.isNaN(when.getTime())) return null;
+  return (
+    <time className="chat-message-time" dateTime={when.toISOString()} title={ENTRY_FULL.format(when)}>
+      {formatEntryTime(at)}
+    </time>
+  );
+}
+
 /**
- * 5.5: an analysis looked and had nothing to say. One line, the same pill as
- * the playbook chip, but nothing to open — the whole point is that there is no
- * content behind it.
+ * An analysis that left a line and no answer — the same pill as the playbook
+ * chip, but nothing to open. It looked and had nothing to say (5.5), or it
+ * stopped because sync brought changes to this conversation from another
+ * device while it ran; that one sits where the answer would have, at the end
+ * of the conversation as sync left it, so the athlete reads both what arrived
+ * and why no answer followed.
  */
-function AnalysisSilentChip({
+function AnalysisNoticeChip({
   marker,
   at,
   index,
-  highlighted
+  highlighted,
+  settled,
+  stopped = false
 }: {
   marker: ChatEntryAnalysisMarker;
   at: number;
   index: number;
   highlighted: boolean;
+  /** See `ChatRow`: a row a reload mounts is drawn as it is. */
+  settled: boolean;
+  stopped?: boolean;
 }) {
   return (
-    <div
+    <ChatRow
+      settled={settled}
       className={`chat-row chat-row-analysis${
         highlighted ? " is-chat-jump-target" : ""
       }`}
       data-chat-entry-index={index}
     >
-      <span className="chat-analysis-chip chat-analysis-chip-static">
-        <Zap size={12} aria-hidden="true" />
-        {marker.name} looked, nothing new
+      <span className={`chat-analysis-chip chat-analysis-chip-static${stopped ? " chat-analysis-chip-stopped" : ""}`}>
+        {stopped ? <RefreshCw size={12} aria-hidden="true" /> : <Zap size={12} aria-hidden="true" />}
+        {marker.name}{" "}
+        {stopped ? "stopped: this conversation changed on another device while it ran" : "looked, nothing new"}
         <span className="chat-analysis-chip-trigger">
-          · {formatLookedAt(at)}
+          · {formatEntryTime(at)}
         </span>
       </span>
-    </div>
+    </ChatRow>
   );
 }
 
@@ -1150,9 +1331,11 @@ export function ChatView({
   // nothing else, so a run heading for silence has no other text in flight.
   // What has arrived is held back while it could still be that marker: it is a
   // control token, and the athlete watching the bubble must never read it.
+  // Its charts are drawn when the run's answer is read back, so a placeholder
+  // is only taken out here.
   const liveAnalysisText =
     liveAnalysis && !NOTHING_TO_REPORT.startsWith(liveAnalysis.text.trim())
-      ? liveAnalysis.text
+      ? stripChartPlaceholders(holdBackPartialPlaceholder(liveAnalysis.text))
       : "";
 
   // Ref so the push-event handlers filter on the current request without
@@ -1205,6 +1388,55 @@ export function ChatView({
       if (!before.has(entry)) settledEntriesRef.current.add(entry);
     }
   };
+  /**
+   * The first entry drawn, per conversation (`TRANSCRIPT_TAIL`). Fixed when a
+   * conversation is first drawn and only ever lowered after that: a window
+   * that followed the tail would take rows away from above a reader while a
+   * turn appends below. Never above the tail's own start, so a window taken
+   * against another conversation's length cannot leave this one blank.
+   */
+  const [transcriptWindow, setTranscriptWindow] = useState<{
+    sessionId: string | null;
+    from: number;
+  }>({ sessionId: null, from: 0 });
+  const tailFrom = Math.max(0, timeline.length - TRANSCRIPT_TAIL);
+  if (transcriptWindow.sessionId !== activeSessionId) {
+    setTranscriptWindow({ sessionId: activeSessionId, from: tailFrom });
+  }
+  const renderFrom =
+    transcriptWindow.sessionId === activeSessionId
+      ? Math.min(transcriptWindow.from, tailFrom)
+      : tailFrom;
+  const revealTranscriptFrom = (index: number) => {
+    const from = Math.max(0, index);
+    if (from >= renderFrom) return;
+    // Drawn as they are, like a reload's rows (see `ChatRow`): they were
+    // always there, and a fade from nothing never finishes on a window that
+    // gets no frames.
+    for (const entry of timeline.slice(from, renderFrom)) settledEntriesRef.current.add(entry);
+    setTranscriptWindow({ sessionId: activeSessionId, from });
+  };
+  const pendingEntryScrollRef = useRef<(() => void) | null>(null);
+  /** Hands an entry's row to `scroll`, drawing the entries down to it first when it is above the window. */
+  const withEntryRow = (index: number, scroll: (row: HTMLElement) => void) => {
+    const run = () => {
+      const row = scrollRef.current?.querySelector<HTMLElement>(
+        `[data-chat-entry-index="${index}"]`
+      );
+      if (row) scroll(row);
+    };
+    if (index >= renderFrom) {
+      run();
+      return;
+    }
+    pendingEntryScrollRef.current = run;
+    revealTranscriptFrom(index);
+  };
+  useLayoutEffect(() => {
+    const run = pendingEntryScrollRef.current;
+    pendingEntryScrollRef.current = null;
+    run?.();
+  }, [renderFrom]);
   // Interaction cards are appended after the assistant's final text so the
   // question and its choices stay in a natural reading order.
   const pendingCoachPromptsRef = useRef<CoachInputPrompt[]>([]);
@@ -1642,7 +1874,16 @@ export function ChatView({
       // The athlete may have switched conversations while this was in flight.
       if (activeSessionIdRef.current !== sessionId) return;
       persistedBaseRef.current = entries.length;
-      setTimeline(fromPersistedEntries(entries));
+      const next = fromPersistedEntries(entries);
+      // Drawn as they are, never faded in (see `ChatRow`). What a reload adds
+      // is an analysis's answer in place of its live bubble, or turns sync
+      // brought — and a fade that starts from nothing never finishes on a
+      // window that has stopped getting frames, which is exactly the window a
+      // run finishes behind: the athlete was in the browser a moment ago
+      // signing in to Google. The bubble went, the answer stayed invisible,
+      // and it only appeared once the conversation was opened again.
+      for (const entry of next) settledEntriesRef.current.add(entry);
+      setTimeline(next);
     } catch {
       // Keep what is on screen rather than blanking a readable transcript.
     }
@@ -1857,20 +2098,31 @@ export function ChatView({
         return;
       }
 
-      if (liveAnalysisRef.current?.runId === run.id) {
-        setLiveAnalysis(null);
-      }
+      const endLive = () =>
+        setLiveAnalysis((current) => (current?.runId === run.id ? null : current));
 
       // A skip never reached the model and adds nothing. A silent run does add
       // something now — the one-line trace saying the coach looked (5.5) — so
       // it reloads on the same path as an answer, and the trace is what
-      // explains the live bubble disappearing.
-      if (run.status !== "success" && run.status !== "silent") return;
+      // explains the live bubble disappearing. So does a run sync stopped: it
+      // leaves a line saying why, under the turns sync brought.
+      if (
+        run.status !== "success" &&
+        run.status !== "silent" &&
+        run.status !== "cancelled"
+      ) {
+        endLive();
+        return;
+      }
       // Reloaded straight away even mid-turn. Waiting for the athlete's turn to
       // end is worse than useless: their turn persists the whole timeline, so
       // the copy on screen — which predates the run — would be written over the
       // coach's answer before the deferred reload ever got to see it.
-      void reloadTranscript(run.sessionId);
+      //
+      // The live bubble goes only once the answer is in the timeline: taken
+      // down first, the conversation ended on the answer before this one for
+      // as long as the read took.
+      void reloadTranscript(run.sessionId).finally(endLive);
     });
   }, [api, showLiveAnalysis]);
 
@@ -2018,6 +2270,24 @@ export function ChatView({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [streaming, exportingLatestActivity]);
 
+  /**
+   * Coach's settings and the Claude account as the main process holds them.
+   * `isCurrent` lets an effect drop an answer that lands after it was torn down.
+   */
+  const reloadCoachSettings = useCallback(
+    async (isCurrent: () => boolean = () => true) => {
+      if (!api) return;
+      const [settings, claude] = await Promise.allSettled([
+        api.getChatSettings(),
+        api.getClaudeCodeStatus()
+      ]);
+      if (!isCurrent()) return;
+      if (settings.status === "fulfilled") setChatSettings(settings.value);
+      if (claude.status === "fulfilled") setClaudeStatus(claude.value);
+    },
+    [api]
+  );
+
   // Provider settings and the Claude account are edited in Settings now, under
   // Connections, so re-read them whenever Coach comes back to the front. This
   // panel stays mounted once opened; without this the provider picker would
@@ -2025,21 +2295,11 @@ export function ChatView({
   useEffect(() => {
     if (!api || !active || checkingAuth) return;
     let cancelled = false;
-
-    void (async () => {
-      const [settings, claude] = await Promise.allSettled([
-        api.getChatSettings(),
-        api.getClaudeCodeStatus()
-      ]);
-      if (cancelled) return;
-      if (settings.status === "fulfilled") setChatSettings(settings.value);
-      if (claude.status === "fulfilled") setClaudeStatus(claude.value);
-    })();
-
+    void reloadCoachSettings(() => !cancelled);
     return () => {
       cancelled = true;
     };
-  }, [active, api, checkingAuth]);
+  }, [active, api, checkingAuth, reloadCoachSettings]);
 
   // Ask about dead MCP sessions here rather than at launch: nothing opens an
   // OAuth window on the athlete's behalf any more, so this is the one place
@@ -2219,7 +2479,8 @@ export function ChatView({
               // preparing for, and a cost the athlete can only see until they
               // switch conversations is not one they can act on.
               ...(usage ? { usage } : {}),
-              ...(model ? { model } : {})
+              ...(model ? { model } : {}),
+              at: Date.now()
             });
           }
           let next = settleTurnEntries(prev, turnStartRef.current, closing);
@@ -2433,7 +2694,8 @@ export function ChatView({
                       source,
                       reasoningSummary,
                       ...(payload.usage ? { usage: payload.usage } : {}),
-                      ...(payload.model ? { model: payload.model } : {})
+                      ...(payload.model ? { model: payload.model } : {}),
+                      at: Date.now()
                     }
                   ]
                 : []
@@ -2862,6 +3124,20 @@ export function ChatView({
     }
   };
 
+  /**
+   * Coach settings' Save. Unlike the quick toggles elsewhere, it is written
+   * before it is shown, and a failure goes back to the dialog to say so: the
+   * athlete pressed Save and is owed an answer.
+   */
+  const saveChatSettingsPatch = async (patch: Partial<ChatSettings>) => {
+    if (!api) throw new Error("Could not save Coach settings.");
+    try {
+      setChatSettings(await api.saveChatSettings({ ...chatSettings, ...patch }));
+    } catch (caught) {
+      throw new Error(remoteErrorMessage(caught, "Could not save Coach settings."));
+    }
+  };
+
   const handleUpdateChatSettings = async (patch: Partial<ChatSettings>) => {
     const nextSettings = { ...chatSettings, ...patch };
     setChatSettings(nextSettings);
@@ -3106,7 +3382,7 @@ export function ChatView({
           ...(scheduleRefs.length
             ? [{ kind: "scheduleRefs" as const, refs: scheduleRefs.map(({ detail: _detail, sport: _sport, ...ref }) => ref) }]
             : []),
-          { kind: "message", role: "user", content: trimmed }
+          { kind: "message", role: "user", content: trimmed, at: Date.now() }
         ];
     if (refs.length && !aboutRefs) setPendingRefs([]);
     if (scheduleRefs.length) setPendingScheduleRefs([]);
@@ -3164,6 +3440,8 @@ export function ChatView({
     const wireMessages = withCreationIndex(
       [
         ...(context?.summary ? [summaryContextMessage(context.summary)] : []),
+        // The condensed layer, as the main process built it: it holds the digests.
+        ...(context?.middle ?? []),
         ...toWireMessages(persisted.slice(context?.tailStart ?? 0))
       ],
       persisted,
@@ -3485,29 +3763,28 @@ export function ChatView({
     // The card itself: it is drawn in the conversation, under its answer.
     const targetIndex = planIndex;
 
-    const transcript = scrollRef.current;
-    const target = transcript?.querySelector<HTMLElement>(
-      `[data-chat-entry-index="${targetIndex}"]`
-    );
-    if (!transcript || !target) return;
+    withEntryRow(targetIndex, (target) => {
+      const transcript = scrollRef.current;
+      if (!transcript) return;
 
-    const transcriptRect = transcript.getBoundingClientRect();
-    const targetRect = target.getBoundingClientRect();
-    const targetTop =
-      transcript.scrollTop +
-      targetRect.top -
-      transcriptRect.top -
-      Math.max(24, (transcript.clientHeight - targetRect.height) / 2);
+      const transcriptRect = transcript.getBoundingClientRect();
+      const targetRect = target.getBoundingClientRect();
+      const targetTop =
+        transcript.scrollTop +
+        targetRect.top -
+        transcriptRect.top -
+        Math.max(24, (transcript.clientHeight - targetRect.height) / 2);
 
-    transcript.scrollTo({ top: Math.max(0, targetTop), behavior: "smooth" });
-    setHighlightedChatEntryIndex(targetIndex);
-    if (chatHighlightTimeoutRef.current) {
-      clearTimeout(chatHighlightTimeoutRef.current);
-    }
-    chatHighlightTimeoutRef.current = setTimeout(() => {
-      setHighlightedChatEntryIndex(null);
-      chatHighlightTimeoutRef.current = null;
-    }, 1800);
+      transcript.scrollTo({ top: Math.max(0, targetTop), behavior: "smooth" });
+      setHighlightedChatEntryIndex(targetIndex);
+      if (chatHighlightTimeoutRef.current) {
+        clearTimeout(chatHighlightTimeoutRef.current);
+      }
+      chatHighlightTimeoutRef.current = setTimeout(() => {
+        setHighlightedChatEntryIndex(null);
+        chatHighlightTimeoutRef.current = null;
+      }, 1800);
+    });
   };
 
   const settleScheduleChange = async (changeSetId: string, lineId: string | undefined, apply: boolean) => {
@@ -3539,7 +3816,7 @@ export function ChatView({
 
     const nextEntries: ChatEntry[] = [
       ...timeline,
-      { kind: "message", role: "user", content: trimmed }
+      { kind: "message", role: "user", content: trimmed, at: Date.now() }
     ];
     setTimeline(nextEntries);
     persistHistory(activeSessionIdRef.current, nextEntries, true);
@@ -3554,7 +3831,8 @@ export function ChatView({
           {
             kind: "message",
             role: "assistant",
-            content: formatLatestActivityExportMessage(result)
+            content: formatLatestActivityExportMessage(result),
+            at: Date.now()
           }
         ];
         persistHistory(activeSessionIdRef.current, next, true);
@@ -3570,7 +3848,8 @@ export function ChatView({
           {
             kind: "message",
             role: "assistant",
-            content: `I couldn't download the latest activity FIT file: ${message}`
+            content: `I couldn't download the latest activity FIT file: ${message}`,
+            at: Date.now()
           }
         ];
         persistHistory(activeSessionIdRef.current, next, true);
@@ -3640,85 +3919,11 @@ export function ChatView({
   const listedCreations = planDrafts.filter((draft) =>
     isLatestVersion(versionIndex, draft.draftId)
   );
-  /** The whole of a creation, as a question points at it. */
-  const wholeCreationRef = (draft: PlanDraftPreview): PlanRef => {
-    const versionInfo = versionIndex.get(draft.draftId);
-    return {
-      artifactId: versionInfo?.artifactId ?? draft.draftId,
-      draftId: draft.draftId,
-      ...(versionInfo ? { version: versionInfo.version } : {}),
-      name: draft.name,
-      artifactType: draft.artifactType === "workout" ? "workout" : "plan",
-      scope: "plan",
-      label: draft.artifactType === "workout" ? "the whole workout" : "the whole plan"
-    };
-  };
-  /*
-   * The follow-ups of the conversation's newest creation, above the composer
-   * (R1). They were under every card, so an old version's chips stayed on
-   * screen asking to change a plan that had since moved on. A saved one-off
-   * workout has none: nothing on COROS would follow.
-   */
-  const newestCreation = [...listedCreations].reverse().find((draft) => !draft.removedAt);
+
   /** Versions an event line already speaks for, so their own line is not drawn too. */
   const eventedDraftIds = new Set(
     timeline.flatMap((entry) => (entry.kind === "planEvent" ? [entry.event.draftId] : []))
   );
-  const newestSavedWorkout =
-    newestCreation?.artifactType === "workout" &&
-    Boolean(newestCreation.uploadedAt || newestCreation.uploadResult || uploadedPlans[newestCreation.draftId]);
-  const composerFollowUps =
-    newestCreation && !newestSavedWorkout && api
-      ? {
-          subject: newestCreation.name,
-          chips: refinementChips(
-            newestCreation,
-            versionIndex
-              .get(newestCreation.draftId)
-              ?.siblings.find((item) => item.draftId === newestCreation.draftId)?.refinements
-          ),
-          onPick: (text: string) => void sendMessage(text, undefined, [wholeCreationRef(newestCreation)])
-        }
-      : null;
-  /*
-   * What "About…" offers (R1): a week or a day of the calendar, and anything
-   * made in this conversation — the chips Ask Coach from the Calendar and the
-   * Library put here, reachable from the composer itself.
-   */
-  const aboutOptions: AboutOption[] = (() => {
-    const today = new Date();
-    const thisMonday = mondayOfDate(today);
-    const nextMonday = new Date(thisMonday);
-    nextMonday.setDate(nextMonday.getDate() + 7);
-    const weekRef = (monday: Date): ScheduleRef => {
-      const keys = Array.from({ length: 7 }, (_, index) => {
-        const day = new Date(monday);
-        day.setDate(day.getDate() + index);
-        return keyFromDate(day);
-      });
-      return { scope: "week", day: keys[0], label: `Week of ${weekRangeLabel(keys)}` };
-    };
-    const addScheduleRef = (ref: ScheduleRef) =>
-      setPendingScheduleRefs((current) =>
-        current.some((item) => scheduleRefKey(item) === scheduleRefKey(ref)) ? current : [...current, ref]
-      );
-    return [
-      {
-        key: "today",
-        group: "Your calendar",
-        label: "Today",
-        onPick: () => addScheduleRef({ scope: "day", day: keyFromDate(today), label: "Today" })
-      },
-      { key: "this-week", group: "Your calendar", label: "This week", onPick: () => addScheduleRef(weekRef(thisMonday)) },
-      { key: "next-week", group: "Your calendar", label: "Next week", onPick: () => addScheduleRef(weekRef(nextMonday)) },
-      ...listedCreations.map((draft) => ({
-        key: `creation:${draft.draftId}`,
-        group: "Made in this conversation",
-        label: draft.name,
-        onPick: () => addRef(wholeCreationRef(draft))
-      }))
-    ];
-  })();
   const activeSession = sessions.find((session) => session.id === activeSessionId);
   /** Under the conversation's name: what it has made, and when it last moved. */
   const conversationSubtitle = [
@@ -3995,9 +4200,32 @@ export function ChatView({
       open={settingsOpen}
       chatSettings={chatSettings}
       onClose={() => setSettingsOpen(false)}
-      onUpdateChatSettings={(patch: Partial<ChatSettings>) => void handleUpdateChatSettings(patch)}
+      onSaveChatSettings={saveChatSettingsPatch}
+      onCoachModelsChange={() => void reloadCoachSettings()}
     />
   );
+
+  // Answers that place their charts, and the chart rows that then have no row
+  // of their own: a settled answer's charts are the ones just above it. Worked
+  // out once per timeline rather than on every streamed token, with each
+  // answer's words split from its next steps once for the row that draws them.
+  const settledAnswers = useMemo(() => {
+    const placedCharts = new Set<number>();
+    const placedAnswers = new Map<number, PlacedAnswer>();
+    const answerParts = new Map<number, { text: string; steps: string[] }>();
+    timeline.forEach((entry, index) => {
+      if (entry.kind !== "message" || entry.role !== "assistant") return;
+      const parts = splitNextSteps(entry.content);
+      answerParts.set(index, parts);
+      const placement = placeAnswerCharts(
+        parts.text,
+        chatSettings.visualizationsEnabled ? chartsAbove(timeline, index) : [],
+        placedCharts
+      );
+      if (placement) placedAnswers.set(index, placement);
+    });
+    return { placedCharts, placedAnswers, answerParts };
+  }, [timeline, chatSettings.visualizationsEnabled]);
 
   if (checkingAuth) {
     return (
@@ -4292,9 +4520,9 @@ export function ChatView({
     );
   }
 
-  /* The running turn's bubble sits where the turn began, above the cards it
-     produces as it runs, so its answer reads before them — as it will once
-     settled (`settleTurnEntries`). One array with keys, so nothing remounts.
+  /* The running turn's bubble sits under the charts its turn draws and above
+     its other cards, as it will once settled (`settleTurnEntries`). One array
+     with keys, so nothing remounts.
 
      A pipeline step is the exception for its progress (UAT): the trail that
      says Coach is drawing the outline or writing the sessions is a row of its
@@ -4326,32 +4554,60 @@ export function ChatView({
       {thinkingText ? <ThinkingDisclosure content={thinkingText} live /> : null}
     </div>
   );
+  // The streaming answer's charts are the ones its turn has drawn so far, which
+  // is why a chart moves into the bubble when its placeholder arrives; it adds
+  // them to a copy, so the settled answers' placement stays as it was worked out.
+  const { placedAnswers, answerParts } = settledAnswers;
+  const placedCharts = new Set(settledAnswers.placedCharts);
+  const shownStreamingText = splitNextSteps(holdBackPartialPlaceholder(streamingText)).text;
+  // The conversation's last answer, the only one whose next steps are drawn:
+  // an earlier one's were offered about a moment that has passed.
+  const lastAnswerIndex = (() => {
+    for (let at = timeline.length - 1; at >= 0; at -= 1) {
+      const entry = timeline[at];
+      if (entry.kind === "message") return entry.role === "assistant" ? at : -1;
+    }
+    return -1;
+  })();
+  const turnCharts: TurnChart[] = [];
+  if (turnHere && chatSettings.visualizationsEnabled) {
+    timeline.forEach((entry, index) => {
+      if (index >= turnStartRef.current && isChatVisualEntry(entry)) turnCharts.push({ entry, index });
+    });
+  }
+  const streamingPlacement =
+    turnHere && shownStreamingText
+      ? placeAnswerCharts(shownStreamingText, turnCharts, placedCharts)
+      : undefined;
   const streamedAnswer = streamingText ? (
     <>
       {thinkingText ? <ThinkingDisclosure content={thinkingText} live /> : null}
-      <AssistantMarkdown content={streamingText} streaming />
+      <AnswerBody content={shownStreamingText} placement={streamingPlacement} streaming />
     </>
   ) : null;
-  const assistantRow = (key: string, children: ReactNode) => (
+  const assistantRow = (key: string, children: ReactNode, withCharts = false) => (
     <div key={key} className="chat-row chat-row-assistant">
       <div className="chat-avatar chat-avatar-assistant">
         <Sparkles size={16} aria-hidden="true" />
       </div>
-      <div className="chat-bubble chat-bubble-streaming">{children}</div>
+      <div className={`chat-bubble chat-bubble-streaming${withCharts ? " chat-bubble-with-charts" : ""}`}>
+        {children}
+      </div>
     </div>
   );
   const streamingRow = !turnHere
     ? null
     : stepActive
       ? streamedAnswer
-        ? assistantRow("streaming-turn", streamedAnswer)
+        ? assistantRow("streaming-turn", streamedAnswer, Boolean(streamingPlacement?.charts.size))
         : null
       : assistantRow(
           "streaming-turn",
           <>
             {streamedAnswer ?? pendingStatus}
             {currentSource ? <SourceBadge source={currentSource} /> : null}
-          </>
+          </>,
+          Boolean(streamingPlacement?.charts.size)
         );
   const stepTrailRow =
     stepActive && stepRun
@@ -4364,9 +4620,21 @@ export function ChatView({
           </>
         )
       : null;
+  // `rows` is the timeline mapped one to one, so a row's index is its entry's.
+  // The answer streams where it will settle (`settleTurnEntries`): under the
+  // turn's charts, above its other cards.
   const withStreamingRow = (rows: ReactNode[]): ReactNode[] => {
     const at = Math.min(Math.max(0, turnStartRef.current), rows.length);
-    const placed = streamingRow ? [...rows.slice(0, at), streamingRow, ...rows.slice(at)] : rows;
+    const placed = streamingRow
+      ? [
+          ...rows.slice(0, at),
+          ...orderTurn(
+            rows.slice(at).map((row, offset) => ({ row, chart: isChatVisualEntry(timeline[at + offset]) })),
+            [{ row: streamingRow, chart: false }],
+            (item) => item.chart
+          ).map((item) => item.row)
+        ]
+      : rows;
     return stepTrailRow ? [...placed, stepTrailRow] : placed;
   };
 
@@ -4404,7 +4672,6 @@ export function ChatView({
         creations={listedCreations.length}
         creationsOpen={workbenchOpen}
         onToggleCreations={() => (workbenchOpen ? closeWorkbench() : setPlanPanelOpen(true))}
-        onOpenSettings={() => openSettings()}
         trailing={
           isChatGptProvider ? (
             <button
@@ -4435,14 +4702,21 @@ export function ChatView({
               onClick={() => {
                 const target = waitingIndices[waitingCursor % waitingIndices.length];
                 setWaitingCursor((value) => value + 1);
-                scrollRef.current
-                  ?.querySelector(`[data-chat-entry-index="${target}"]`)
-                  ?.scrollIntoView({ block: "center", behavior: "smooth" });
+                withEntryRow(target, (row) =>
+                  row.scrollIntoView({ block: "center", behavior: "smooth" })
+                );
               }}
             >
               {/* No arrow: what waits is as often above the reader as below. */}
               {waitingCount === 1 ? "1 thing waiting on you" : `${waitingCount} things waiting on you`} · Jump
             </button>
+          ) : null}
+          {renderFrom > 0 ? (
+            <TranscriptEarlier
+              hidden={renderFrom}
+              onReveal={() => revealTranscriptFrom(renderFrom - TRANSCRIPT_STEP)}
+              scrollRef={scrollRef}
+            />
           ) : null}
           {timeline.length === 0 && !turnHere ? (
             <div className="chat-empty">
@@ -4487,16 +4761,23 @@ export function ChatView({
           ) : null}
 
           {withStreamingRow(timeline.map((entry, index) => {
+            // Above the window: brought in by `TranscriptEarlier`. The row
+            // stays in the list as a null so a row's index is still its entry's.
+            if (index < renderFrom) return null;
             if (!chatSettings.visualizationsEnabled && isChatVisualEntry(entry)) {
               return null;
             }
+            // Drawn inside the answer that placed it.
+            if (placedCharts.has(index)) return null;
             if (isAutomaticOutlineStep(timeline, index)) return null;
+            // See `ChatRow`: every row a settle or a reload mounts is drawn as it is.
+            const settled = settledEntriesRef.current.has(entry);
 
             if (entry.kind === "toolNotice") {
               return (
                 <ChatRow
                   key={`tool-notice-${index}`}
-                  settled={settledEntriesRef.current.has(entry)}
+                  settled={settled}
                   className="chat-row chat-row-assistant"
                 >
                   <div className="chat-avatar chat-avatar-assistant">
@@ -4518,8 +4799,9 @@ export function ChatView({
                   (choice) => choice.id === entry.prompt.selectedChoiceId
                 );
                 return (
-                  <div
+                  <ChatRow
                     key={entry.prompt.promptId}
+                    settled={settled}
                     className="chat-row chat-row-assistant chat-asked-row"
                     data-chat-entry-index={index}
                   >
@@ -4528,13 +4810,13 @@ export function ChatView({
                     <span className="chat-asked-answer">
                       {chosen?.label ?? entry.prompt.answer ?? ""}
                     </span>
-                  </div>
+                  </ChatRow>
                 );
               }
               return (
                 <ChatRow
                   key={entry.prompt.promptId}
-                  settled={settledEntriesRef.current.has(entry)}
+                  settled={settled}
                   className="chat-row chat-row-assistant"
                   data-chat-entry-index={index}
                 >
@@ -4563,8 +4845,9 @@ export function ChatView({
 
             if (entry.kind === "planRefs") {
               return (
-                <div
+                <ChatRow
                   key={`refs#${index}`}
+                  settled={settled}
                   className="chat-row chat-row-user chat-refs-row"
                   data-chat-entry-index={index}
                 >
@@ -4575,14 +4858,15 @@ export function ChatView({
                       {ref.scope === "plan" ? "" : ` · ${ref.label}`}
                     </span>
                   ))}
-                </div>
+                </ChatRow>
               );
             }
 
             if (entry.kind === "scheduleRefs") {
               return (
-                <div
+                <ChatRow
                   key={`scheduleRefs#${index}`}
+                  settled={settled}
                   className="chat-row chat-row-user chat-refs-row"
                   data-chat-entry-index={index}
                 >
@@ -4592,7 +4876,7 @@ export function ChatView({
                       {ref.label}
                     </span>
                   ))}
-                </div>
+                </ChatRow>
               );
             }
 
@@ -4600,8 +4884,9 @@ export function ChatView({
               const brief = planBriefs[entry.artifactId];
               if (!brief) return null;
               return (
-                <div
+                <ChatRow
                   key={`brief:${entry.artifactId}#${index}`}
+                  settled={settled}
                   className="chat-row chat-row-assistant"
                   data-chat-entry-index={index}
                 >
@@ -4632,7 +4917,7 @@ export function ChatView({
                       busy={streaming}
                     />
                   </div>
-                </div>
+                </ChatRow>
               );
             }
 
@@ -4642,21 +4927,23 @@ export function ChatView({
               if (outlineAnchors.get(entry.artifactId) !== index) {
                 // Redrawn below: the artifact keeps one outline, the latest card draws it.
                 return (
-                  <div
+                  <ChatRow
                     key={`outline:${entry.artifactId}:${entry.outlineVersion}#${index}`}
+                    settled={settled}
                     className="chat-row chat-row-assistant chat-asked-row chat-plan-event-row"
                     data-chat-entry-index={index}
                   >
                     <span className="chat-asked-kicker">Outline</span>
                     <span className="chat-asked-question">v{entry.outlineVersion}</span>
                     <span className="chat-version-note">Redrawn below</span>
-                  </div>
+                  </ChatRow>
                 );
               }
               const outlined = brief as PlanBrief & { outline: NonNullable<PlanBrief["outline"]> };
               return (
-                <div
+                <ChatRow
                   key={`outline:${entry.artifactId}#${index}`}
+                  settled={settled}
                   className="chat-row chat-row-assistant"
                   data-chat-entry-index={index}
                 >
@@ -4678,7 +4965,7 @@ export function ChatView({
                       onRedraw={(note) => void drawOutline(brief.artifactId, note)}
                     />
                   </div>
-                </div>
+                </ChatRow>
               );
             }
 
@@ -4709,8 +4996,9 @@ export function ChatView({
                       ? "Changed in the Library"
                       : "Deleted on COROS";
               return (
-                <div
+                <ChatRow
                   key={`${event.eventId}#${index}`}
+                  settled={settled}
                   className="chat-row chat-row-assistant chat-asked-row chat-plan-event-row"
                   data-chat-entry-index={index}
                 >
@@ -4740,7 +5028,7 @@ export function ChatView({
                       Undo
                     </button>
                   ) : null}
-                </div>
+                </ChatRow>
               );
             }
 
@@ -4760,8 +5048,9 @@ export function ChatView({
                 // import made already has that event's line just before it.
                 if (eventedDraftIds.has(draft.draftId)) return null;
                 return (
-                  <div
+                  <ChatRow
                     key={`${draft.draftId}#${index}`}
+                    settled={settled}
                     className="chat-row chat-row-assistant chat-asked-row chat-version-row"
                     data-chat-entry-index={index}
                   >
@@ -4777,7 +5066,7 @@ export function ChatView({
                     >
                       View
                     </button>
-                  </div>
+                  </ChatRow>
                 );
               }
               const documentKey = `${draft.draftId}:${draft.editedAt ?? 0}`;
@@ -4785,8 +5074,9 @@ export function ChatView({
               // copy that used to live here was chosen by a width test, and
               // that test also decided whether the Creations button existed.
               return (
-                <div
+                <ChatRow
                   key={`${draft.draftId}#${index}`}
+                  settled={settled}
                   className="chat-row chat-row-assistant"
                   data-chat-entry-index={index}
                 >
@@ -4823,14 +5113,15 @@ export function ChatView({
                       }}
                     />
                   </div>
-                </div>
+                </ChatRow>
               );
             }
 
             if (entry.kind === "workoutDelete") {
               return (
-                <div
+                <ChatRow
                   key={entry.preview.requestId}
+                  settled={settled}
                   className="chat-row chat-row-assistant"
                 >
                   <div className="chat-avatar chat-avatar-assistant">
@@ -4839,7 +5130,7 @@ export function ChatView({
                   <div className="chat-bubble chat-bubble-plan">
                     <DeletePreviewCard preview={entry.preview} />
                   </div>
-                </div>
+                </ChatRow>
               );
             }
 
@@ -4849,8 +5140,9 @@ export function ChatView({
               const busyLine = applyingChange?.changeSetId === entry.changeSetId ? applyingChange.lineId : null;
               return (
                 // Position as well as id, as the preview rows key: a merged-in duplicate must not collapse.
-                <div
+                <ChatRow
                   key={`scheduleChange:${entry.changeSetId}#${index}`}
+                  settled={settled}
                   className="chat-row chat-row-assistant"
                   data-chat-entry-index={index}
                 >
@@ -4866,11 +5158,11 @@ export function ChatView({
                       onDismiss={(lineId) => void settleScheduleChange(entry.changeSetId, lineId, false)}
                     />
                   </div>
-                </div>
+                </ChatRow>
               );
             }
 
-            if (entry.kind === "activityVisual") {
+            if (isChatVisualEntry(entry)) {
               return (
                 // Position as well as id. A `previewId` is unique by
                 // construction and duplicates are always a bug elsewhere — but
@@ -4879,60 +5171,44 @@ export function ChatView({
                 // the row rather than to show what the transcript holds. The
                 // id still carries identity across an in-place upsert, which is
                 // what it is here for.
-                <div
+                <ChatRow
                   key={`${entry.preview.previewId}#${index}`}
+                  settled={settled}
                   className="chat-row chat-row-assistant"
                 >
                   <div className="chat-avatar chat-avatar-assistant">
                     <Sparkles size={16} aria-hidden="true" />
                   </div>
                   <div className="chat-bubble chat-bubble-plan">
-                    <ActivityVisualCard preview={entry.preview} />
+                    <ChartCard entry={entry} />
                   </div>
-                </div>
-              );
-            }
-
-            if (entry.kind === "fitnessTrend") {
-              return (
-                <div
-                  key={`${entry.preview.previewId}#${index}`}
-                  className="chat-row chat-row-assistant"
-                >
-                  <div className="chat-avatar chat-avatar-assistant">
-                    <Sparkles size={16} aria-hidden="true" />
-                  </div>
-                  <div className="chat-bubble chat-bubble-plan">
-                    <FitnessTrendCard preview={entry.preview} />
-                  </div>
-                </div>
-              );
-            }
-
-            if (entry.kind === "hrZoneSummary") {
-              return (
-                <div
-                  key={`${entry.preview.previewId}#${index}`}
-                  className="chat-row chat-row-assistant"
-                >
-                  <div className="chat-avatar chat-avatar-assistant">
-                    <Sparkles size={16} aria-hidden="true" />
-                  </div>
-                  <div className="chat-bubble chat-bubble-plan">
-                    <HrZoneCard preview={entry.preview} />
-                  </div>
-                </div>
+                </ChatRow>
               );
             }
 
             if (entry.kind === "automationSilent") {
               return (
-                <AnalysisSilentChip
+                <AnalysisNoticeChip
                   key={`analysis-silent-${index}`}
                   marker={entry.automation}
                   at={entry.at}
                   index={index}
                   highlighted={highlightedChatEntryIndex === index}
+                  settled={settled}
+                />
+              );
+            }
+
+            if (entry.kind === "automationStopped") {
+              return (
+                <AnalysisNoticeChip
+                  key={`analysis-stopped-${index}`}
+                  marker={entry.automation}
+                  at={entry.at}
+                  index={index}
+                  highlighted={highlightedChatEntryIndex === index}
+                  settled={settled}
+                  stopped
                 />
               );
             }
@@ -4952,6 +5228,7 @@ export function ChatView({
                   prompt={entry.content}
                   index={index}
                   highlighted={highlightedChatEntryIndex === index}
+                  settled={settled}
                 />
               );
             }
@@ -4959,7 +5236,7 @@ export function ChatView({
             return (
               <ChatRow
                 key={`message-${index}`}
-                settled={settledEntriesRef.current.has(entry)}
+                settled={settled}
                 className={`chat-row chat-row-${entry.role}${
                   highlightedChatEntryIndex === index
                     ? " is-chat-jump-target"
@@ -4974,7 +5251,11 @@ export function ChatView({
                     <User size={16} aria-hidden="true" />
                   )}
                 </div>
-                <div className="chat-bubble">
+                <div
+                  className={`chat-bubble${
+                    placedAnswers.get(index)?.charts.size ? " chat-bubble-with-charts" : ""
+                  }`}
+                >
                   {entry.automation ? (
                     <AnalysisAttribution marker={entry.automation} />
                   ) : null}
@@ -4983,11 +5264,22 @@ export function ChatView({
                       {entry.reasoningSummary ? (
                         <ThinkingDisclosure content={entry.reasoningSummary} />
                       ) : null}
-                      <AssistantMarkdown content={entry.content} />
+                      <AnswerBody
+                        content={answerParts.get(index)?.text ?? entry.content}
+                        placement={placedAnswers.get(index)}
+                      />
+                      {index === lastAnswerIndex && !turnHere ? (
+                        <NextSteps
+                          steps={answerParts.get(index)?.steps ?? []}
+                          disabled={streaming || !api}
+                          onPick={(text) => void sendMessage(text, undefined, [])}
+                        />
+                      ) : null}
                       {/* Where the answer came from and what it cost, as one
                           quiet line under it rather than two rows of pills. */}
-                      {entry.source || entry.usage ? (
+                      {entry.source || entry.usage || entry.at !== undefined ? (
                         <div className="chat-answer-foot">
+                          <MessageTime at={entry.at} />
                           {entry.source ? <SourceBadge source={entry.source} /> : null}
                           <TurnCostFooter usage={entry.usage} model={entry.model} />
                         </div>
@@ -5009,6 +5301,7 @@ export function ChatView({
                     </>
                   )}
                 </div>
+                {entry.role === "user" ? <MessageTime at={entry.at} /> : null}
               </ChatRow>
             );
           }))}
@@ -5059,8 +5352,7 @@ export function ChatView({
               composerRefs.length ? <ComposerRefs refs={composerRefs} /> : null
             }
             placeholder={refPlaceholder(composerRefs.map((item) => item.preview))}
-            aboutOptions={aboutOptions}
-            followUps={composerFollowUps}
+            onOpenSettings={() => openSettings()}
             initialDraft={composerDraftRef.current}
             apiAvailable={Boolean(api)}
             streaming={turnHere}

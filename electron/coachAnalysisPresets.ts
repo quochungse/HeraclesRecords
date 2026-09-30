@@ -63,7 +63,8 @@ const POST_ACTIVITY_DEBRIEF: CoachAnalysisPreset = {
       "Look at the activity against the athlete's recent training:\n" +
       "- How it compares with similar recent sessions (pace, heart rate, load, duration).\n" +
       "- Whether it fits the week's pattern, or breaks it.\n" +
-      "- Anything in recovery or accumulated load that this session changes.\n\n" +
+      "- Anything in recovery or accumulated load that this session changes.\n" +
+      "- Whether fatigue from the sessions listed before it — any sport, judged by duration, intensity and the muscles worked — shows in this one.\n\n" +
       "Only raise something if it is materially different from recent history. " +
       "If it means a session in the next few days should move, change or go, propose that with " +
       "propose_schedule_changes — the athlete applies it from the card — rather than only saying so.",

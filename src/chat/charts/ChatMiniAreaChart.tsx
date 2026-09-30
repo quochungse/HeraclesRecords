@@ -1,11 +1,11 @@
 import {
   Area,
   AreaChart,
-  ResponsiveContainer,
   Tooltip,
   XAxis,
   YAxis
 } from "recharts";
+import { ChartWhenNear } from "./ChartWhenNear";
 import type { TooltipContentProps } from "recharts";
 import {
   trainingChartMargin,
@@ -73,7 +73,7 @@ export function ChatMiniAreaChart({
 
   return (
     <div className="chat-visual-chart-shell">
-      <ResponsiveContainer width="100%" height="100%">
+      <ChartWhenNear>
         <AreaChart data={data} margin={trainingChartMargin}>
           <defs>
             <ChartAreaGradient id={gradientId} />
@@ -112,7 +112,7 @@ export function ChatMiniAreaChart({
             isAnimationActive={false}
           />
         </AreaChart>
-      </ResponsiveContainer>
+      </ChartWhenNear>
     </div>
   );
 }

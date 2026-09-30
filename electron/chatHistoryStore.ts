@@ -9,6 +9,7 @@ import {
   setChatSessionTitleRow,
   updateChatSessionRow
 } from "./database";
+import { stripChartPlaceholders } from "./chartPlacement";
 import type {
   ActivityHrTrendPreview,
   ActivityVisualChannelSection,
@@ -1131,7 +1132,8 @@ const KNOWN_ENTRY_KINDS = new Set([
   "activityHrTrend",
   "fitnessTrend",
   "hrZoneSummary",
-  "automationSilent"
+  "automationSilent",
+  "automationStopped"
 ]);
 
 function opaqueEntry(
@@ -1309,6 +1311,23 @@ function parseEntryShape(value: Record<string, unknown>): PersistedChatEntry | n
       : null;
   }
 
+  if (value.kind === "automationStopped") {
+    // Held to the reasons this build knows how to say. One it does not reads
+    // as a shape it cannot parse, which is kept whole and not drawn.
+    const automation = parseAnalysisMarker(value.automation);
+    const at =
+      typeof value.at === "number" && Number.isFinite(value.at)
+        ? value.at
+        : null;
+    return automation && at !== null && value.reason === "sync"
+      ? keepUnknownKeys(
+          { kind: "automationStopped" as const, automation, at, reason: "sync" as const },
+          value,
+          [...ENTRY_META_KEYS, "automation", "at", "reason"]
+        )
+      : null;
+  }
+
   return parseMessageEntry(value);
 }
 
@@ -1429,8 +1448,8 @@ export function deriveSessionTitleFromEntries(
 function derivePreviewFromEntries(entries: PersistedChatEntry[]): string {
   for (let index = entries.length - 1; index >= 0; index -= 1) {
     const entry = entries[index];
-    if (entry.kind === "message" && entry.content.trim()) {
-      const preview = entry.content.trim().replace(/\s+/g, " ");
+    if (entry.kind === "message" && stripChartPlaceholders(entry.content).trim()) {
+      const preview = stripChartPlaceholders(entry.content).trim().replace(/\s+/g, " ");
       return preview.length > 80 ? `${preview.slice(0, 80)}…` : preview;
     }
     if (entry.kind === "coachPrompt" && !entry.prompt.answeredAt) {

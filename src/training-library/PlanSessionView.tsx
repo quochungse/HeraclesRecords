@@ -62,6 +62,11 @@ interface PlanSessionViewProps {
   onAskCoach?: () => void;
   /** Absent where the session is the whole of what is shown — a one-off workout. */
   onBack?: () => void;
+  /**
+   * What the way back says; the plan's name by default. Coach's Workbench
+   * names the plan right above the session, so it says where it goes instead.
+   */
+  backLabel?: string;
   onStep: (direction: -1 | 1) => void;
 }
 
@@ -106,6 +111,7 @@ export function PlanSessionView({
   api,
   onOpenActivity,
   onBack,
+  backLabel,
   onStep,
   onAskCoach
 }: PlanSessionViewProps) {
@@ -206,11 +212,16 @@ export function PlanSessionView({
       <header className="plan-reader-head plan-session-head">
         {onBack ? (
           <button type="button" className="ghost-button plan-session-back" onClick={onBack}>
-            <ArrowLeft size={14} /> <span>{planName}</span>
+            <ArrowLeft size={14} /> <span>{backLabel ?? planName}</span>
           </button>
         ) : null}
         {onAskCoach ? (
-          <button type="button" className="ghost-button plan-session-ask" onClick={onAskCoach}>
+          <button
+            type="button"
+            className="ghost-button plan-session-ask"
+            title="Ask Coach about this session"
+            onClick={onAskCoach}
+          >
             <MessageCircle size={14} aria-hidden="true" /> <span>Ask Coach</span>
           </button>
         ) : null}

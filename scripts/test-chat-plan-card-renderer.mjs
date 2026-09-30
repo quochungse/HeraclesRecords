@@ -9,8 +9,8 @@
 //     decided whether the Creations button existed;
 //   * an undated plan reads as its weeks, off the document the draft becomes,
 //     not as one "Unscheduled" pile with "0 weeks";
-//   * a turn's answer sits above the cards the turn produced, while it streams
-//     and once it has settled.
+//   * a turn's answer sits under the charts the turn produced and above its
+//     other cards, while it streams and once it has settled.
 import assert from "node:assert/strict";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -21,7 +21,10 @@ const { app, BrowserWindow } = require("electron");
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
-app.commandLine.appendSwitch("no-sandbox");
+// No `no-sandbox`, unlike the other harness suites: this window is offscreen
+// (see `main`), and an offscreen window under `no-sandbox` dies at start-up on
+// Linux ("Creating shared memory in /dev/shm … failed", then the GPU process)
+// and leaves the suite waiting forever.
 app.disableHardwareAcceleration();
 
 const CHAT_SETTINGS = {
@@ -195,11 +198,17 @@ function threadOrder() {
 
 async function main() {
   await app.whenReady();
+  // Offscreen, because the stick-to-end steps below need a ResizeObserver to
+  // fire, and observers only run on a frame: with hardware acceleration off, a
+  // hidden window on Linux gets none at all — measured, not one rAF, RO or IO
+  // callback in two seconds — so the transcript was left 276px short of its
+  // end in the suite while the app, which gets frames, stayed there. An
+  // offscreen window keeps its own frame clock whatever its visibility.
   win = new BrowserWindow({
     show: false,
     width: 1400,
     height: 1100,
-    webPreferences: { backgroundThrottling: false }
+    webPreferences: { backgroundThrottling: false, offscreen: true }
   });
   await win.loadFile(path.join(repoRoot, "dist-harness", "index.html"));
   assert.equal(await harness("dev"), true, "the harness must be the dev build");
@@ -316,7 +325,7 @@ async function main() {
   );
 
   // -------------------------------------------------------------------------
-  // A turn's answer sits above the cards it produced
+  // A turn's answer sits under its charts and above its other cards
   // -------------------------------------------------------------------------
   await harness("mount", "ChatView", {}, {
     ...BASE_SCRIPT,
@@ -338,12 +347,25 @@ async function main() {
     kind: "planDraft",
     draft: { ...PREVIEW, draftId: "plan-2", name: "Four weeks" }
   });
+  // The chart arrives after the plan and is still drawn above the answer.
+  await harness("emit", "onChatStreamInfo", {
+    requestId,
+    kind: "fitnessTrend",
+    preview: {
+      previewId: "trend-1",
+      windowDays: 7,
+      trendPoints: [
+        { date: "2026-09-09", label: "Wed", trainingLoad: 120, rhr: 47 },
+        { date: "2026-09-10", label: "Thu", trainingLoad: 240, rhr: 48 }
+      ]
+    }
+  });
   await harness("emit", "onChatStreamToken", { requestId, delta: "Here is a four-week block." });
   await waitFor(() => harness("exists", ".chat-bubble-streaming"), "the answer is streaming");
   assert.deepEqual(
-    (await threadOrder()).slice(-3),
-    ["user", "streaming", "card"],
-    "while it streams, the answer is above the card it produced"
+    (await threadOrder()).slice(-4),
+    ["user", "visual", "streaming", "card"],
+    "while it streams, the answer is under the chart and above the card"
   );
 
   await harness("emit", "onChatStreamDone", {
@@ -352,15 +374,15 @@ async function main() {
   });
   await waitFor(async () => !(await harness("exists", ".chat-bubble-streaming")), "the turn settles");
   assert.deepEqual(
-    (await threadOrder()).slice(-3),
-    ["user", "assistant", "card"],
-    "once settled, the answer is still above the card"
+    (await threadOrder()).slice(-4),
+    ["user", "visual", "assistant", "card"],
+    "once settled, the answer is still between the chart and the card"
   );
   await settle();
   const saved = (await harness("calls", "saveChatSession")).at(-1)?.args[1] ?? [];
   assert.deepEqual(
-    saved.slice(-2).map((entry) => entry.kind),
-    ["message", "planDraft"],
+    saved.slice(-3).map((entry) => entry.kind),
+    ["fitnessTrend", "message", "planDraft"],
     "and it is saved in that order"
   );
 
@@ -923,25 +945,39 @@ async function main() {
   );
 
   // -------------------------------------------------------------------------
-  // A follow-up under the card is a question about it (P1.8)
+  // Next steps: chips under the last answer only, and a press sends its words
   // -------------------------------------------------------------------------
   await harness("mount", "ChatView", {}, {
     ...BASE_SCRIPT,
-    getPlanArtifacts: [
-      { artifactId: "plan-1", draftId: "plan-1", version: 1, author: "coach", createdAt: 1, refinements: ["Lighter week 3", "Add hills"] }
+    getChatSession: [
+      { kind: "message", role: "user", content: "How is my recovery?" },
+      { kind: "message", role: "assistant", content: "Fine.\n\n[[next:An old step]]" },
+      { kind: "message", role: "user", content: "And tomorrow?" },
+      {
+        kind: "message",
+        role: "assistant",
+        content: "HRV is down 18%.\n\n[[next:Swap Thu tempo for easy 40′]]\n[[next:Move Sat long run to Sun]]"
+      }
     ]
   });
-  await waitFor(
-    async () => (await harness("count", ".chat-composer-followups .chat-refine-chip")) === 2,
-    "Coach's own follow-ups, above the composer (R1)"
+  await waitFor(async () => (await harness("count", ".chat-next-step")) === 2, "the last answer's two next steps");
+  assert.equal(await page(`document.body.innerText.includes("[[next:")`), false, "no marker is drawn as words");
+  assert.equal(await page(`document.body.innerText.includes("An old step")`), false, "an earlier answer offers none");
+  await harness("click", ".chat-next-step");
+  const stepped = await waitFor(async () => (await harness("calls", "sendChat"))[0], "a press asks");
+  assert.match(stepped.args[1].at(-1).content, /Swap Thu tempo for easy 40′$/);
+  assert.equal(
+    stepped.args[1].some((message) => message.content.includes("[[next:")),
+    false,
+    "nor does one reach the model"
   );
-  assert.equal(await harness("exists", ".chat-creation-card .chat-refine-chip"), false, "and not under the card");
-  await harness("click", ".chat-composer-followups .chat-refine-chip");
-  const refined = await waitFor(async () => (await harness("calls", "sendChat"))[0], "a press asks");
-  assert.match(refined.args[1].at(-1).content, /asking about the plan "Hanoi Half base" v1 \(draft_id plan-1\) — the whole of it\.[\s\S]*Lighter week 3$/);
-  const afterRefine = (await harness("calls", "saveChatSession")).at(-1)?.args[1] ?? [];
-  assert.deepEqual(afterRefine.slice(-2).map((entry) => entry.kind), ["planRefs", "message"]);
-  assert.equal(afterRefine.at(-1).content, "Lighter week 3", "in the chip's own words");
+  const afterStep = (await harness("calls", "saveChatSession")).at(-1)?.args[1] ?? [];
+  assert.deepEqual(
+    [afterStep.at(-1).kind, afterStep.at(-1).content],
+    ["message", "Swap Thu tempo for easy 40′"],
+    "in the chip's own words, and nothing about it attached"
+  );
+  assert.equal(await harness("count", ".chat-next-step"), 0, "gone once it is asked");
 
   // -------------------------------------------------------------------------
   // A conversation says what it reads and which AI answers, and turns take it (P2.0)
@@ -1447,7 +1483,6 @@ async function main() {
   );
   const workoutCard = '[data-draft-id="workout-saved"]';
   await waitFor(() => harness("exists", workoutCard), "the saved workout is drawn");
-  assert.equal(await harness("exists", ".chat-composer-followups"), false, "a saved one-off workout offers no follow-ups");
   assert.equal(
     (await harness("text", `${workoutCard} .chat-creation-steps`)).includes("Not set"),
     false,
@@ -1505,18 +1540,7 @@ async function main() {
   // Build me a base block · Three easy weeks · card · answered question line
   assert.deepEqual(avatars.slice(0, 3), ["none", "visible", "hidden"]);
 
-  await harness("click", ".chat-about-trigger");
-  await waitFor(() => harness("exists", ".chat-about-menu"), "About… opens");
-  await page(`[...document.querySelectorAll(".chat-about-option")].find((b) => b.textContent === "This week").click()`);
-  await waitFor(() => harness("exists", ".chat-composer .chat-ref-header"), "the week waits in the composer");
-  assert.match(await harness("text", ".chat-composer .chat-ref-header"), /Week of /);
-  assert.match(await harness("text", ".chat-composer .chat-ref-header"), /Week of /);
-  assert.equal(await harness("exists", ".chat-composer .chat-ref-header-kicker"), false, "no Asking about line (UAT)");
-  assert.equal(
-    await page(`[...document.querySelectorAll(".chat-about-option")].some((b) => b.textContent === "Hanoi Half base")`),
-    false,
-    "the menu closed on the pick"
-  );
+  assert.equal(await harness("exists", ".chat-about-trigger"), false, "the composer has no About menu");
 
   await harness("setValue", ".chat-composer textarea", "How does this week look?");
   await harness("click", ".chat-send");
@@ -1528,9 +1552,6 @@ async function main() {
   assert.equal(await page(`document.body.textContent.includes("Using list scheduled workouts")`), false);
   await harness("emit", "onChatStreamDone", { requestId: traced.args[0], fullText: "Looks balanced.", finishReason: "stop" });
   await settle();
-  const sentWithRefs = (await harness("calls", "saveChatSession")).at(-1)?.args[1] ?? [];
-  assert.ok(sentWithRefs.some((entry) => entry.kind === "scheduleRefs"), "the week travels as the question's anchor");
-  await waitFor(() => harness("exists", ".chat-row-user .chat-refs-row .chat-ref-chip"), "and is drawn inside the question");
 
   // -------------------------------------------------------------------------
   // R3: what waits on the athlete, Coach's settings in the app's Settings,
@@ -1561,8 +1582,9 @@ async function main() {
   assert.equal(await harness("count", ".chat-session-row"), 2, "every conversation is listed, whichever AI answers it");
   assert.equal(await harness("text", ".chat-session-row-waiting"), "Question", "and the row says what waits");
   assert.equal(await harness("exists", ".chat-history-filters"), false, "the list has no All · Needs you filter (UAT)");
-  // The gear opens Coach's own settings as a dialog, not the app's Settings (UAT).
-  await harness("click", '.chat-header-icon[aria-label="Open settings"]');
+  // The gear in the composer opens Coach's own settings as a dialog, not the app's Settings (UAT).
+  assert.equal(await harness("exists", '.chat-header [aria-label="Open settings"]'), false, "the gear left the head");
+  await harness("click", '.chat-composer-settings[aria-label="Open settings"]');
   await waitFor(() => harness("exists", ".chat-settings-modal .chat-settings-panel"), "Coach's settings open in their dialog");
   await harness("click", '.chat-settings-modal [aria-label="Close settings"]');
   await waitFor(async () => !(await harness("exists", ".chat-settings-modal")), "and close");

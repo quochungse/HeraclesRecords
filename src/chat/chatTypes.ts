@@ -1,5 +1,6 @@
 import type {
   ActivityVisualPreview,
+  AnalysisStopReason,
   ChatEntryAnalysisMarker,
   ChatMessage,
   ChatTokenUsage,
@@ -13,6 +14,10 @@ import type {
   ScheduleRef,
   WorkoutDeletePreview
 } from "../../electron/types";
+import { isChartKind, orderTurn } from "../../electron/chartPlacement";
+import { entryTimeFromMid } from "../../electron/chatEntryTime";
+
+export { orderTurn };
 
 /** Where an assistant answer's data came from, for the source indicator. */
 export interface SourceInfo {
@@ -45,6 +50,14 @@ export interface ChatMessageEntry {
    */
   usage?: ChatTokenUsage;
   model?: string;
+  /**
+   * When this message was written, epoch milliseconds, for the time under it.
+   * Never stored: `toPersistedEntries` leaves it out, so no field goes onto the
+   * stored entry. A message read back takes it from the store's `mid`
+   * (`entryTimeFromMid`); one written in this window takes it at creation.
+   * Absent on a message from before `mid` existed, which has no time to show.
+   */
+  at?: number;
 }
 
 export interface ChatPlanDraftEntry {
@@ -90,6 +103,15 @@ export interface ChatAnalysisSilentEntry {
   automation: ChatEntryAnalysisMarker;
   /** Epoch milliseconds. */
   at: number;
+}
+
+/** An analysis stopped before answering, and why (sync, today). */
+export interface ChatAnalysisStoppedEntry {
+  kind: "automationStopped";
+  automation: ChatEntryAnalysisMarker;
+  /** Epoch milliseconds. */
+  at: number;
+  reason: AnalysisStopReason;
 }
 
 export interface ChatToolNoticeEntry {
@@ -157,6 +179,7 @@ export type ChatEntry = (
   | ChatFitnessTrendEntry
   | ChatHrZoneEntry
   | ChatAnalysisSilentEntry
+  | ChatAnalysisStoppedEntry
   | ChatToolNoticeEntry
   | ChatOpaqueEntry
 ) & {
@@ -171,21 +194,17 @@ export type ChatEntry = (
 export function isChatVisualEntry(
   entry: ChatEntry
 ): entry is ChatActivityVisualEntry | ChatFitnessTrendEntry | ChatHrZoneEntry {
-  return (
-    entry.kind === "activityVisual" ||
-    entry.kind === "fitnessTrend" ||
-    entry.kind === "hrZoneSummary"
-  );
+  return isChartKind(entry.kind);
 }
 
 /**
- * A finished turn's answer, put where the turn began.
+ * A finished turn's answer, put among the entries the turn produced.
  *
- * The cards a turn produces (a plan, a chart) arrive while it runs and are
- * appended as they come; the answer arrives last. Appended too, it read below
- * the plan it introduces. `turnStart` is the timeline's length when the turn
- * was sent, so everything from there on is this turn's, and `closing` goes in
- * front of it. Clamped, so a timeline replaced mid-turn cannot throw.
+ * The cards a turn produces arrive while it runs and are appended as they
+ * come; the answer arrives last, and `orderTurn` says where it goes.
+ * `turnStart` is the timeline's length when the turn was sent, so everything
+ * from there on is this turn's. Clamped, so a timeline replaced mid-turn
+ * cannot throw.
  */
 export function settleTurnEntries(
   timeline: ChatEntry[],
@@ -193,7 +212,10 @@ export function settleTurnEntries(
   closing: ChatEntry[]
 ): ChatEntry[] {
   const at = Math.min(Math.max(0, Math.floor(turnStart)), timeline.length);
-  return [...timeline.slice(0, at), ...closing, ...timeline.slice(at)];
+  return [
+    ...timeline.slice(0, at),
+    ...orderTurn(timeline.slice(at), closing, isChatVisualEntry)
+  ];
 }
 
 /** A replacement keeps what a newer build stored beside the entry it replaces. */
@@ -328,6 +350,7 @@ const HANDLED_KEYS: Record<string, readonly string[]> = {
   fitnessTrend: ["preview"],
   hrZoneSummary: ["preview"],
   automationSilent: ["automation", "at"],
+  automationStopped: ["automation", "at", "reason"],
   opaque: ["raw"]
 };
 
@@ -392,6 +415,14 @@ function persistKnownEntry(entry: ChatEntry): PersistedChatEntry | null {
       kind: "automationSilent",
       automation: entry.automation,
       at: entry.at
+    };
+  }
+  if (entry.kind === "automationStopped") {
+    return {
+      kind: "automationStopped",
+      automation: entry.automation,
+      at: entry.at,
+      reason: entry.reason
     };
   }
   if (entry.kind === "toolNotice") {
@@ -495,6 +526,14 @@ function fromPersistedEntry(entry: PersistedChatEntry): ChatEntry {
       at: entry.at
     };
   }
+  if (entry.kind === "automationStopped") {
+    return {
+      kind: "automationStopped",
+      automation: entry.automation,
+      at: entry.at,
+      reason: entry.reason
+    };
+  }
   return {
     kind: "message",
     role: entry.role,
@@ -505,6 +544,12 @@ function fromPersistedEntry(entry: PersistedChatEntry): ChatEntry {
       : {}),
     ...(entry.usage ? { usage: entry.usage } : {}),
     ...(entry.model ? { model: entry.model } : {}),
-    ...(entry.automation ? { automation: entry.automation } : {})
+    ...(entry.automation ? { automation: entry.automation } : {}),
+    ...entryTimeOf(entry.mid)
   };
+}
+
+function entryTimeOf(mid: string | undefined): { at?: number } {
+  const at = entryTimeFromMid(mid);
+  return at === undefined ? {} : { at };
 }

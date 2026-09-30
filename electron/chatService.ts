@@ -5,6 +5,7 @@ import http from "node:http";
 import path from "node:path";
 import type { AddressInfo } from "node:net";
 import {
+  deleteChatAnswerDigestsOf,
   deleteChatConversationSettingsRow,
   deleteChatScheduleChangesOf,
   deleteSettings,
@@ -109,6 +110,14 @@ import {
   isChatInteractionTool,
   type ChatInteractionToolName
 } from "./chatInteractionTools";
+import {
+  getChatConversationTools,
+  handleChatConversationTool,
+  isChatConversationTool,
+  RECALL_CONVERSATION_TOOL,
+  recallableThrough,
+  type ChatConversationToolName
+} from "./chatConversationTools";
 import { parseFunctionCallArguments } from "./chatToolArguments";
 import {
   buildResponsesRequest,
@@ -164,6 +173,7 @@ import {
 } from "./chatSettingsStore";
 import { getChatGptModelCandidates } from "./chatModels";
 import { inlineSuggestionsSection } from "./chatCoachContext";
+import { chartHandle, chartHandleNote, isChartKind, orderTurn } from "./chartPlacement";
 import {
   createChatSession,
   deleteChatSession,
@@ -220,6 +230,7 @@ import type {
   TrainingPlanGenerationRequest,
   TrainingPlanOutlineRevision,
   ScheduleChangeSet,
+  CoachStyle,
   UnitSystem
 } from "./types";
 import { formatDistanceValue, normalizeUnitSystem } from "./unitSystem.js";
@@ -230,6 +241,7 @@ import {
   buildCoachWorkoutDefaultsGuide,
   formatAthleteProfile,
   formatCoachDashboard,
+  formatCoachToday,
   formatRecentActivityMix,
   formatUpcomingWorkoutSport
 } from "./chatCoachContext";
@@ -576,6 +588,31 @@ export async function testClaudeCodeConnection(): Promise<ClaudeCodeConnectionTe
   return { ...result, status };
 }
 
+/**
+ * How long a signed-in Claude Code status is taken as read for a text job. A
+ * digest batch runs its jobs one after another, each up to twice, and every
+ * probe starts `claude auth status` before the SDK starts a CLI of its own.
+ */
+const TEXT_JOB_STATUS_TTL_MS = 60_000;
+let lastClaudeCodeStatus: { key: string; at: number; status: ClaudeCodeStatus } | undefined;
+
+/** The status a turn checks before it runs; a text job may reuse a recent signed-in one. */
+async function claudeCodeStatusForTurn(
+  executablePath: string | undefined,
+  configDir: string | undefined,
+  textJob: boolean
+): Promise<ClaudeCodeStatus> {
+  const key = `${executablePath ?? ""}\n${configDir ?? ""}`;
+  const held = lastClaudeCodeStatus;
+  if (textJob && held?.key === key && held.status.authenticated && Date.now() - held.at < TEXT_JOB_STATUS_TTL_MS) {
+    return held.status;
+  }
+  const status = await inspectClaudeCodeStatus(executablePath, configDir);
+  lastClaudeCodeStatus = { key, at: Date.now(), status };
+  recordClaudeCodeStatus(status);
+  return status;
+}
+
 function recordClaudeCodeStatus(status: ClaudeCodeStatus): void {
   const current = getChatSettings();
   const next: ClaudeCodeConfig = {
@@ -774,6 +811,7 @@ export function deleteChatSessionById(id: string): void {
   deletePlanBriefs(briefIds);
   deleteChatConversationSettingsRow(id);
   deleteChatScheduleChangesOf(id);
+  deleteChatAnswerDigestsOf(id);
   // Section 2.4: the analyses inside this conversation go with it. An analysis
   // lives in exactly one conversation and cannot be moved, so there is nothing
   // to re-point and nothing left for one to be about.
@@ -1338,6 +1376,22 @@ export interface StreamChatOptions {
   toolPolicy?: ChatToolPolicy;
   /** Analysis role, injected as its own hardened instruction block. */
   roleInstructions?: string;
+  /**
+   * A text job — a digest, a rolling summary — rather than a turn of Coach:
+   * this system prompt instead of Coach's, and no snapshot, no MCP
+   * connections and no tools (pass `toolPolicy: "none"`). A job compressing
+   * text it was handed has no use for the athlete's training data, and reading
+   * it from COROS for every digest would cost a round trip each time.
+   */
+  textJob?: {
+    system: string;
+    /**
+     * Thinking tokens for a model that takes a budget rather than an effort
+     * (Haiku 4.5, measured in `answerDigest.ts`). Ignored where the model
+     * takes an effort, and by providers that have neither.
+     */
+    thinkingBudget?: number;
+  };
 }
 
 /**
@@ -1417,7 +1471,7 @@ export function createCollectorSink(
   let failureWasAuth = false;
   let tokenUsage: ChatTokenUsage | undefined;
   let tokenModel: string | undefined;
-  /** Where the running turn's entries begin; its answer goes in front of its cards. */
+  /** Where the running turn's entries begin; its answer goes between its charts and its other cards. */
   let turnStart = 0;
 
   const reset = () => {
@@ -1591,10 +1645,13 @@ export function createCollectorSink(
     const prompts = pendingCoachPrompts;
     const turnSource = source ?? undefined;
 
+    // Under the charts this turn produced and above its other cards, as
+    // ChatView settles an interactive turn (`orderTurn`): a chart is what the
+    // answer reads from, a creation is what it proposes.
+    const turn = entries.splice(Math.min(turnStart, entries.length));
+    const answer: PersistedChatEntry[] = [];
     if (fullText) {
-      // Before the cards this turn produced, as ChatView settles an
-      // interactive turn (`settleTurnEntries`): the answer introduces them.
-      entries.splice(Math.min(turnStart, entries.length), 0, {
+      answer.push({
         kind: "message",
         role: "assistant",
         content: fullText,
@@ -1610,6 +1667,7 @@ export function createCollectorSink(
         ...(marker ? { automation: marker } : {})
       });
     }
+    entries.push(...orderTurn(turn, answer, (entry) => isChartKind(entry.kind)));
     for (const prompt of prompts) {
       upsertEntry(
         entries,
@@ -1687,6 +1745,7 @@ export async function streamChat(
     if (ownsReach) runTools.delete(requestId);
     turnSessions.delete(requestId);
     runCards.delete(requestId);
+    turnCharts.delete(requestId);
   }
 }
 
@@ -1704,6 +1763,30 @@ const turnSessions = new Map<string, string>();
 const runCards = new Map<string, Set<string>>();
 const ANALYSIS_CARD_LIMIT = 2;
 const CARD_TOOLS: ReadonlySet<string> = new Set(["draft_workout", "draft_training_plan", "propose_schedule_changes"]);
+
+/**
+ * The charts each turn in flight has drawn, by `previewId`, with the handle
+ * the answer places them by (`chartPlacement.ts`). A handle is given when the
+ * chart is drawn, not when its tool returns: the chart is stored either way,
+ * and a handle is its place among the turn's stored charts. Drawn again under
+ * the same id, it is the same chart and keeps its handle.
+ */
+const turnCharts = new Map<string, Map<string, string>>();
+
+function drawnChartHandle(requestId: string, previewId: string): string {
+  const handles = turnCharts.get(requestId) ?? new Map<string, string>();
+  turnCharts.set(requestId, handles);
+  const known = handles.get(previewId);
+  if (known) return known;
+  const handle = chartHandle(handles.size);
+  handles.set(previewId, handle);
+  return handle;
+}
+
+/** A tool's result, told which charts the call drew. Untouched when it drew none. */
+function withChartHandles(result: string, handles: readonly string[]): string {
+  return handles.length > 0 ? `${result}\n\n${chartHandleNote(handles)}` : result;
+}
 
 /**
  * A conversation's sources as a turn's reach (P2.0): the tools that read a
@@ -1755,6 +1838,10 @@ async function streamChatTurn(
       : "interactive";
   const roleInstructions = options.roleInstructions;
   const runtime = options.runtime ?? {};
+  const job = options.textJob;
+  // Every provider below reads its tool surface through this, and its context
+  // through `turnContext`, so a text job skips both in one place rather than in five.
+  const turnToolSurface = (): Promise<void> => (job ? Promise.resolve() : prepareToolSurface());
   // What this turn cost, summed across its tool rounds and across whichever
   // provider answered. Left undefined when nobody reported: a run that cost
   // nothing and a run nobody counted are different facts, and a budget that
@@ -1838,16 +1925,29 @@ async function streamChatTurn(
   let fullText = "";
   try {
     const settings = getChatSettings();
+    const turnContext = (
+      permissions?: Parameters<typeof buildTrainingContext>[0]
+    ): ReturnType<typeof buildTrainingContext> =>
+      job
+        ? Promise.resolve({ head: job.system, live: "", hasData: false })
+        : buildTrainingContext(
+            permissions,
+            unitSystem,
+            settings.customInstructions,
+            roleInstructions,
+            runTools.get(requestId)?.context,
+            settings.coachStyle
+          );
     // An analysis may run on a different provider than the interactive chat
     // without touching the saved settings (decision 2).
     const provider = runtime.provider ?? settings.provider;
     if (provider === "claude-code") {
       const claudeConfigDir = getClaudeCodeConfigDir(settings);
-      const status = await prepare(inspectClaudeCodeStatus(
+      const status = await prepare(claudeCodeStatusForTurn(
         settings.claudeCode.executablePath,
-        claudeConfigDir
+        claudeConfigDir,
+        Boolean(job)
       ));
-      recordClaudeCodeStatus(status);
       if (!status.authenticated || !status.executablePath) {
         throw new ClaudeCodeProviderError(
           status.message,
@@ -1855,20 +1955,14 @@ async function streamChatTurn(
         );
       }
 
-      await prepare(prepareToolSurface());
+      await prepare(turnToolSurface());
       const chatTools = toolsForRun(
         requestId,
         getClaudeCodeTools(settings.claudeCode.permissions, toolPolicy)
       );
-      const { text: instructions, hasData } = await prepare(buildTrainingContext(
-        settings.claudeCode.permissions,
-        unitSystem,
-        settings.customInstructions,
-        roleInstructions,
-        runTools.get(requestId)?.context
-      ));
-      const effectiveInstructions = withLiveToolInstructions(
-        instructions,
+      const { hasData, ...context } = await prepare(turnContext(settings.claudeCode.permissions));
+      const systemPrompt = coachSystemPrompt(
+        context,
         chatTools,
         { inlineSuggestions: inlineSuggestionsEnabled(settings.inlineSuggestions, "claude-code") }
       );
@@ -1883,12 +1977,14 @@ async function streamChatTurn(
 
       const result = await streamClaudeCodeCompletion({
         executablePath: status.executablePath,
-        instructions: effectiveInstructions,
+        instructions: joinSystemPrompt(systemPrompt),
         messages,
         tools: chatTools,
         signal: controller.signal,
         model: runtime.model ?? settings.claudeCode.model,
         effort: runtime.effort ?? settings.claudeCode.effort,
+        ...(job ? { plainPrompt: true } : {}),
+        ...(job?.thinkingBudget ? { thinkingBudget: job.thinkingBudget } : {}),
         configDir: claudeConfigDir,
         onModelResolved: (model) => {
           // Noted first and unconditionally: this is the only place Claude Code
@@ -1961,18 +2057,12 @@ async function streamChatTurn(
       if (!apiKey) {
         throw new Error("Add an OpenRouter API key in Coach settings first.");
       }
-      const { text: instructions, hasData } = await prepare(buildTrainingContext(
-        undefined,
-        unitSystem,
-        settings.customInstructions,
-        roleInstructions,
-        runTools.get(requestId)?.context
-      ));
+      const { hasData, ...context } = await prepare(turnContext());
 
-      await prepare(prepareToolSurface());
+      await prepare(turnToolSurface());
       const chatTools = toolsForRun(requestId, applyChatToolPolicy(getAllChatTools(), toolPolicy));
-      const effectiveInstructions = withLiveToolInstructions(
-        instructions,
+      const systemPrompt = coachSystemPrompt(
+        context,
         chatTools,
         { inlineSuggestions: inlineSuggestionsEnabled(settings.inlineSuggestions, "openrouter") }
       );
@@ -1990,8 +2080,8 @@ async function streamChatTurn(
           model: runtime.model ?? settings.openRouter.model,
           apiKey
         },
-        instructions: effectiveInstructions,
-        fallbackInstructions: instructions,
+        instructions: joinSystemPrompt(systemPrompt),
+        fallbackInstructions: joinSystemPrompt(coachSystemPrompt(context, [])),
         messages,
         tools: chatTools,
         maxToolRounds: MAX_TOOL_ROUNDS,
@@ -2047,7 +2137,8 @@ async function streamChatTurn(
       };
       const runtimeConfig: AnthropicRuntimeConfig = {
         ...baseConfig,
-        listed: listedAnthropicModel(settings, baseConfig.model)
+        listed: listedAnthropicModel(settings, baseConfig.model),
+        ...(job?.thinkingBudget ? { thinkingBudget: job.thinkingBudget } : {})
       };
       if (!runtimeConfig.apiKey) {
         throw new AnthropicProviderError(
@@ -2056,17 +2147,11 @@ async function streamChatTurn(
         );
       }
 
-      await prepare(prepareToolSurface());
+      await prepare(turnToolSurface());
       const chatTools = toolsForRun(requestId, applyChatToolPolicy(getAllChatTools(), toolPolicy));
-      const { text: instructions, hasData } = await prepare(buildTrainingContext(
-        undefined,
-        unitSystem,
-        settings.customInstructions,
-        roleInstructions,
-        runTools.get(requestId)?.context
-      ));
-      const effectiveInstructions = withLiveToolInstructions(
-        instructions,
+      const { hasData, ...context } = await prepare(turnContext());
+      const systemPrompt = coachSystemPrompt(
+        context,
         chatTools,
         { inlineSuggestions: inlineSuggestionsEnabled(settings.inlineSuggestions, "claude-api") }
       );
@@ -2081,7 +2166,8 @@ async function streamChatTurn(
 
       const result = await streamAnthropicChatCompletion({
         config: runtimeConfig,
-        instructions: effectiveInstructions,
+        instructions: systemPrompt.stable,
+        liveInstructions: systemPrompt.live,
         messages,
         tools: chatTools,
         maxToolRounds: MAX_TOOL_ROUNDS,
@@ -2131,32 +2217,26 @@ async function streamChatTurn(
     }
 
     if (provider === "local") {
-      const { text: instructions, hasData } = await prepare(buildTrainingContext(
-        undefined,
-        unitSystem,
-        settings.customInstructions,
-        roleInstructions,
-        runTools.get(requestId)?.context
-      ));
+      const { hasData, ...context } = await prepare(turnContext());
       const runtimeConfig = {
         ...getLocalRuntimeConfig(settings.local),
         ...(runtime.model ? { model: runtime.model } : {})
       };
 
       if (runtimeConfig.toolsEnabled) {
-        await prepare(prepareToolSurface());
+        await prepare(turnToolSurface());
       }
       const chatTools = toolsForRun(
         requestId,
         applyChatToolPolicy(
           runtimeConfig.toolsEnabled
             ? getAllChatTools()
-            : [...getChatWorkoutTools(), ...getChatInteractionTools()],
+            : [...getChatWorkoutTools(), ...getChatInteractionTools(), ...getChatConversationTools()],
           toolPolicy
         )
       );
-      const effectiveInstructions = withLiveToolInstructions(
-        instructions,
+      const systemPrompt = coachSystemPrompt(
+        context,
         chatTools,
         { inlineSuggestions: inlineSuggestionsEnabled(settings.inlineSuggestions, "local") }
       );
@@ -2171,8 +2251,8 @@ async function streamChatTurn(
 
       const result = await streamLocalChatCompletion({
         config: runtimeConfig,
-        instructions: effectiveInstructions,
-        fallbackInstructions: instructions,
+        instructions: joinSystemPrompt(systemPrompt),
+        fallbackInstructions: joinSystemPrompt(coachSystemPrompt(context, [])),
         messages,
         tools: chatTools,
         maxToolRounds: MAX_TOOL_ROUNDS,
@@ -2229,24 +2309,21 @@ async function streamChatTurn(
     }
 
     const token = await prepare(getValidToken());
-    const { text: instructions, hasData } = await prepare(buildTrainingContext(
-      undefined,
-      unitSystem,
-      settings.customInstructions,
-      roleInstructions,
-      runTools.get(requestId)?.context
-    ));
+    const { hasData, ...context } = await prepare(turnContext());
 
     // Reconnect a previously-authorized COROS MCP session, then expose its tools
     // to the model as function tools so it can pull data on demand.
-    await prepare(prepareToolSurface());
-    const tools = buildChatFunctionTools(toolsForRun(requestId, getAllChatTools()));
+    await prepare(turnToolSurface());
+    // Under the turn's policy, as every other provider's list is: a text job
+    // runs with `none`, and a list of every tool would be offered to it.
+    const chatTools = toolsForRun(requestId, applyChatToolPolicy(getAllChatTools(), toolPolicy));
+    const tools = buildChatFunctionTools(chatTools);
 
     // When live tools are available, steer the model to use them rather than
     // leaning on the brief snapshot in `instructions`.
-    const effectiveInstructions = withLiveToolInstructions(
-      instructions,
-      toolsForRun(requestId, applyChatToolPolicy(getAllChatTools(), toolPolicy)),
+    const systemPrompt = coachSystemPrompt(
+      context,
+      chatTools,
       { inlineSuggestions: inlineSuggestionsEnabled(settings.inlineSuggestions, "chatgpt") }
     );
 
@@ -2266,7 +2343,7 @@ async function streamChatTurn(
       const opened = await resolveModelAndOpenStream(
         token,
         requestId,
-        effectiveInstructions,
+        joinSystemPrompt(systemPrompt),
         input,
         tools,
         controller.signal,
@@ -2445,7 +2522,13 @@ const runTools = new Map<string, RunTools>();
 
 function toolsForRun(requestId: string, tools: CorosMcpTool[]): CorosMcpTool[] {
   const run = runTools.get(requestId);
-  return run ? [...tools.filter((tool) => run.allow(tool.name)), ...run.extra] : tools;
+  // Recall reads what is not sent word for word, so a conversation with no
+  // summary and no condensed layer has nothing for it to find, and its schema
+  // would ride on every round.
+  const offered = recallableThrough(turnSessions.get(requestId)) > 0
+    ? tools
+    : tools.filter((tool) => tool.name !== RECALL_CONVERSATION_TOOL);
+  return run ? [...offered.filter((tool) => run.allow(tool.name)), ...run.extra] : offered;
 }
 
 /** What the simulated turn reads before it thinks, by the source each tool belongs to. */
@@ -2583,7 +2666,9 @@ const PIPELINE_WITHHELD_TOOLS = new Set([
   "draft_training_plan",
   "draft_workout",
   "revise_training_plan",
-  PLAN_BRIEF_TOOL
+  PLAN_BRIEF_TOOL,
+  // Nor the conversation's past: the brief and the outline carry what it needs (P2.4).
+  RECALL_CONVERSATION_TOOL
 ]);
 
 /** What the sessions step withholds: every writing tool but the one it writes the plan with. */
@@ -2864,7 +2949,8 @@ function getAllChatTools(): CorosMcpTool[] {
     ...getChatAnalyticsTools(),
     ...getChatSleepTools(),
     ...getChatWorkoutTools(),
-    ...getChatInteractionTools()
+    ...getChatInteractionTools(),
+    ...getChatConversationTools()
   ]);
 }
 
@@ -3086,7 +3172,9 @@ const READ_ONLY_ALLOWED_TOOLS = new Set([
   "get_workout_library",
   // A proposal the athlete applies from its card; it writes nothing (P3.3).
   "propose_schedule_changes",
-  "request_coach_input"
+  "request_coach_input",
+  // The conversation's own earlier turns, read back.
+  RECALL_CONVERSATION_TOOL
 ]);
 
 /**
@@ -3181,7 +3269,8 @@ export function getClaudeCodeTools(
       ...analyticsTools,
       ...sleepTools,
       ...workoutTools,
-      ...getChatInteractionTools()
+      ...getChatInteractionTools(),
+      ...getChatConversationTools()
     ]),
     toolPolicy
   );
@@ -3220,6 +3309,11 @@ async function executeChatTool(
     );
   }
 
+  if (isChatConversationTool(name)) {
+    return handleChatConversationTool(name as ChatConversationToolName, args, {
+      sessionId: turnSessions.get(requestId)
+    });
+  }
   if (isChatInteractionTool(name)) {
     return handleChatInteractionTool(
       name as ChatInteractionToolName,
@@ -3301,10 +3395,12 @@ async function executeChatTool(
     }
   };
   if (isChatActivityTool(name)) {
-    return reportingFailure(() =>
+    const drawn: string[] = [];
+    const result = await reportingFailure(() =>
       handleChatActivityTool(name as ChatActivityToolName, args, {
         requestId,
         onActivityVisual: (preview) => {
+          drawn.push(drawnChartHandle(requestId, preview.previewId));
           send("chat:streamInfo", {
             requestId,
             kind: "activityVisual",
@@ -3314,12 +3410,15 @@ async function executeChatTool(
         unitSystem
       })
     );
+    return withChartHandles(result, drawn);
   }
   if (isChatAnalyticsTool(name)) {
-    return reportingFailure(() =>
+    const drawn: string[] = [];
+    const result = await reportingFailure(() =>
       handleChatAnalyticsTool(name as ChatAnalyticsToolName, args, {
         requestId,
         onFitnessTrend: (preview) => {
+          drawn.push(drawnChartHandle(requestId, preview.previewId));
           send("chat:streamInfo", {
             requestId,
             kind: "fitnessTrend",
@@ -3327,6 +3426,7 @@ async function executeChatTool(
           });
         },
         onHrZoneSummary: (preview) => {
+          drawn.push(drawnChartHandle(requestId, preview.previewId));
           send("chat:streamInfo", {
             requestId,
             kind: "hrZoneSummary",
@@ -3336,6 +3436,7 @@ async function executeChatTool(
         unitSystem
       })
     );
+    return withChartHandles(result, drawn);
   }
   if (isChatSleepTool(name)) {
     return reportingFailure(() =>
@@ -3359,8 +3460,14 @@ export function callChatToolForTests(
   return executeChatTool(name, args, () => undefined, requestId, "metric", undefined, toolPolicy);
 }
 
+/** A chart drawn in a turn, for suites: the handle `executeChatTool` gives it. */
+export function drawChartForTests(requestId: string, previewId: string): string {
+  return drawnChartHandle(requestId, previewId);
+}
+
 export function endRunForTests(requestId: string): void {
   turnSessions.delete(requestId);
+  turnCharts.delete(requestId);
   runCards.delete(requestId);
 }
 
@@ -3515,7 +3622,8 @@ export function withLiveToolInstructions(
       !isChatActivityTool(tool.name) &&
       !isChatAnalyticsTool(tool.name) &&
       !isChatSleepTool(tool.name) &&
-      !isChatInteractionTool(tool.name)
+      !isChatInteractionTool(tool.name) &&
+      !isChatConversationTool(tool.name)
   );
   const corosMcpTools = mcpTools.filter((tool) =>
     tool.name.startsWith("coros__")
@@ -3524,24 +3632,25 @@ export function withLiveToolInstructions(
     (tool) => !tool.name.startsWith("coros__")
   );
   const planTools = tools.filter((tool) => isChatWorkoutTool(tool.name));
+  const has = (name: string) => tools.some((tool) => tool.name === name);
   const sections = [instructions, "", "## Live training data and tools"];
   const readsData =
     activityTools.length + analyticsTools.length + sleepTools.length + corosMcpTools.length > 0;
   // What follows is only what a tool's own schema cannot say: the rules across
-  // all of them, and the mapping from a question to the sections that answer
-  // it. Each tool's arguments, defaults and units stay in its schema, which is
-  // sent on every round anyway — repeating them here cost tokens twice over and
-  // left two places to update whenever a default moved.
+  // all of them, and the mapping from a question to the tool that answers it.
+  // Each tool's arguments, defaults and units stay in its schema, which is sent
+  // on every round anyway — repeating them here cost tokens twice over and left
+  // two places to update whenever a default moved. And every rule is said once,
+  // here, only when its tool is on offer: the base prompt used to restate half
+  // of them, naming tools a read-only run was never given.
   if (readsData) {
     sections.push(
-      "Read before you fetch. The training snapshot above, when present, already " +
-        "holds the latest activities, the athlete's thresholds, fitness and " +
-        "recovery status and the next 14 days of schedule — answer from it when it " +
-        "covers the question. Across every tool below: ask for only the period, " +
-        "sport and sections the question is about, never fetch the same data twice " +
-        "in one answer, read the totals and averages a tool has already computed " +
-        "rather than recomputing them, and say when a value is missing instead of " +
-        "estimating it."
+      "Read before you fetch. The training snapshot at the end of these instructions, when present, " +
+        "already holds the latest activities, the athlete's thresholds, fitness and recovery status and " +
+        "the next 14 days of schedule — answer from it when it covers the question. Across every tool: ask " +
+        "for only the period, sport and sections the question is about, never fetch the same data twice in " +
+        "one answer, read the totals and averages a tool has already computed rather than recomputing them, " +
+        "and say when a value is missing instead of estimating it."
     );
   }
   if (activityTools.length > 0) {
@@ -3553,13 +3662,17 @@ export function withLiveToolInstructions(
     );
   }
   if (activityTools.length + analyticsTools.length > 0) {
-    sections.push("Charts are drawn from these tools automatically.");
+    sections.push(
+      "Charts are drawn from these tools automatically, and a result that drew one names it: chart c1, c2… " +
+        "in the order drawn. They appear above your answer. To show one where it makes your point instead, " +
+        "write [[chart:c1]] on a line of its own at that place — each chart once, and only charts this answer " +
+        "drew. A chart you do not place stays above."
+    );
   }
   if (corosMcpTools.length > 0) {
     sections.push(
       `COROS MCP tools: ${corosMcpTools.map((tool) => tool.name).join(", ")}. ` +
-        "Prefer the local tools above for anything they cover; reach for these " +
-        "only for what they do not, such as daytime stress or a wellness check."
+        "Reach for these only for what the local tools do not cover."
     );
   }
   if (otherMcpTools.length > 0) {
@@ -3572,79 +3685,148 @@ export function withLiveToolInstructions(
     );
   }
   if (planTools.length > 0) {
+    sections.push(...workoutToolGuide(has, inlineSuggestions, planTools.map((tool) => tool.name)));
+  }
+  if (has(RECALL_CONVERSATION_TOOL)) {
     sections.push(
-      "",
-      "## Workout and training plan tools",
-      `Authoring tools: ${planTools.map((tool) => tool.name).join(", ")}. ` +
-        "Use draft_workout for exactly one standalone workout. Its card lets the athlete choose Workout Library or Calendar; set calendar_date only when the athlete names a date. " +
-        "Use draft_training_plan only for multi-day or multi-week schedules. Never wrap a one-off workout in a plan. " +
-        "Before drafting Strength or Hybrid Fitness workouts, call search_coros_exercises once with all intended " +
-        "exercise queries, or with target muscles, movement patterns, and known equipment; then use the " +
-        "returned exact exercise IDs and names. A COROS naming mismatch alone never requires an athlete question. " +
-        "For Strength exercises, set sets explicitly, use target_reps or target_duration_seconds per set, " +
-        "and set rest_type=1 plus rest_value in seconds. Do not hide the prescription only in the step name. " +
-        "Always provide sport on every new workout, including sport=run. " +
-        "Use distance_km only for a simple Run or Trail Run; use steps for anything structured. " +
-        "Pick each step's target " +
-        "deliberately: distance for easy/long/tempo blocks, time for duration-based reps " +
-        "and recovery jogs, load only when prescribing by training-load budget, and open " +
-        "(no value, run-until-lap) for by-feel warmups/cooldowns or fartlek surges. Put every " +
-        "prescribed HR, pace, effort pace, power, cadence, stroke, weight, RPE, or grade in " +
-        "the typed intensity field; do not leave it only in workout prose or the name. " +
-        "Place draft_training_plan sessions one way for the whole plan: sessions for this week " +
-        "or the next few days get a schedule_date (YYYYMMDD) each; a programme the athlete " +
-        "will start later gets a week (from 1) and a day (mon…sun) for each session instead. " +
-        "A dated plan within two weeks is offered first as sessions on the calendar; any other " +
-        "plan is offered first as one COROS plan (give it a description and, for a periodised " +
-        "block, week_stages). The card is shown under your reply and the athlete saves, edits " +
-        "or schedules it from there — nothing you call writes to COROS. " +
-        "With a draft or a revision you may pass suggested_refinements: two to four follow-ups the athlete " +
-        "is likely to want next, each a few words, which appear as buttons under the card. " +
-        "To change a plan or workout already drafted in this conversation, call revise_training_plan " +
-        "with its newest draft_id and only the changes, rather than drafting it again: the card becomes " +
-        "its next version instead of a second card. " +
-        (planTools.some((tool) => tool.name === "delete_workout")
-          ? "Use list_scheduled_workouts + delete_workout to stage deletions. " +
-            "The athlete applies them from the card under your reply; nothing is deleted until they do. "
-          : "") +
-        (planTools.some((tool) => tool.name === "propose_schedule_changes")
-          ? "To rearrange the calendar — a missed day, an illness, a busy week — read it with list_scheduled_workouts " +
-            "and call propose_schedule_changes once with every move, replacement, removal and addition the week needs, " +
-            "rather than drafting new workouts: a session of a plan stays in its plan when moved or replaced that way."
-          : ""),
-      ...(planTools.some((tool) => tool.name === "list_training_plans")
-        ? [
-            "The athlete's own COROS plans — those they made or saved from COROS, not only yours — are read with " +
-              "list_training_plans and get_training_plan. A plan on the calendar is read as the calendar holds it: " +
-              "dates, and each session done, missed or ahead. A plan you made in this conversation is listed with " +
-              "its draft_id: change it with revise_training_plan, not by redrafting it."
-          ]
-        : []),
-      ...(planTools.some((tool) => tool.name === PLAN_BRIEF_TOOL)
-        ? [
-            "A plan longer than two weeks starts as a brief, not a draft: call request_plan_brief with what you " +
-              "already know and stop, rather than asking question after question. The athlete corrects the brief on " +
-              "its card and asks for the outline from there. Draft a plan of two weeks or less straight away."
-          ]
-        : []),
-      ...inlineSuggestionsSection(inlineSuggestions, planTools.map((tool) => tool.name)),
-      "",
-      "Supported workout capabilities (generated from the validator):",
-      buildCoachSportCapabilityGuide(),
-      "",
-      buildCoachWorkoutDefaultsGuide()
+      "The start of this conversation reaches you as a summary, and your older answers marked [condensed] " +
+        "as digests. When the athlete refers back to something they do not hold word for word — a figure, a " +
+        "prescription, what they said — read it with recall_conversation before answering, rather than " +
+        "guessing or asking them to repeat it."
     );
   }
   if (interactionTools.length > 0) {
     sections.push(
       "",
       "## Athlete questions",
-      "When you need an answer before continuing, call request_coach_input with one concise question and 2–5 distinct choices. " +
-        "Put the recommended choice first and explain important tradeoffs in each choice description. " +
-        "Do not ask a clarification question only in prose. After calling request_coach_input, stop and wait for the athlete's next message."
+      "When you need an answer before continuing, call request_coach_input — at most once per turn — with one " +
+        "concise question and 2–5 distinct choices, the recommended one first, each description stating the " +
+        "tradeoff that matters. Never ask a clarifying question only in prose. After calling it, stop and wait " +
+        "for the athlete's next message."
     );
   }
   return sections.join("\n");
+}
+
+/**
+ * The workout and plan half of the tool guide, a line per tool on offer.
+ *
+ * A pipeline step is handed one writing tool, an analysis runs read-only and a
+ * Claude Code permission can take the calendar away, so a rule is stated only
+ * beside the tool it is about — telling the model to "call delete_workout" on
+ * a turn without it was a promise it could not keep.
+ */
+function workoutToolGuide(
+  has: (name: string) => boolean,
+  inlineSuggestions: boolean,
+  toolNames: string[]
+): string[] {
+  const writes = has("draft_workout") || has("draft_training_plan") || has("revise_training_plan");
+  const choosing = [
+    has("draft_workout")
+      ? "- One standalone workout (today's session, a reusable one) → draft_workout. Its card offers the " +
+        "Workout Library or the Calendar; set calendar_date only when the athlete names a date. Never wrap a " +
+        "one-off workout in a plan."
+      : undefined,
+    has("draft_training_plan")
+      ? has(PLAN_BRIEF_TOOL)
+        ? "- A multi-day or multi-week schedule of two weeks or less → draft_training_plan, straight away. " +
+          "Longer than two weeks → request_plan_brief with what you already know, then stop, rather than " +
+          "asking question after question: the athlete corrects the brief on its card and asks for the " +
+          "outline from there."
+        : "- A multi-day or multi-week schedule → draft_training_plan."
+      : undefined,
+    has("revise_training_plan")
+      ? "- Changing a plan or workout drafted in this conversation → revise_training_plan with its newest " +
+        "draft_id and only the changes, rather than drafting it again: the card becomes its next version."
+      : undefined,
+    has("propose_schedule_changes")
+      ? "- Rearranging the calendar (a missed day, an illness, a busy week) → read it with " +
+        "list_scheduled_workouts, then call propose_schedule_changes once with every move, replacement, removal " +
+        "and addition the week needs, rather than drafting new workouts: a plan's session moved or replaced " +
+        "that way stays in its plan."
+      : undefined,
+    has("delete_workout")
+      ? "- Removing a workout → find it with list_scheduled_workouts, then delete_workout."
+      : undefined,
+    has("list_training_plans")
+      ? "- The athlete's own COROS plans — those they made or saved from COROS, not only yours → " +
+        "list_training_plans and get_training_plan. A plan on the calendar is read as the calendar holds it: " +
+        "dates, and each session done, missed or ahead. A plan you made here is listed with its draft_id; " +
+        "change it with revise_training_plan."
+      : undefined
+  ].filter((line): line is string => Boolean(line));
+
+  const lines = ["", "## Workouts and training plans"];
+  if (writes || has("propose_schedule_changes") || has("delete_workout")) {
+    lines.push(
+      "Nothing you call writes to COROS. Every draft, proposal and deletion becomes a card under your reply, " +
+        "and the athlete saves, applies or dismisses it there — never say something was saved, scheduled or " +
+        "removed until they have."
+    );
+  }
+  if (choosing.length > 0) lines.push(...choosing);
+  if (!writes) return lines;
+
+  lines.push(
+    "",
+    "Writing a workout:",
+    "- Always set sport, sport=run included. Use distance_km only for a simple Run or Trail Run; anything " +
+      "structured goes in steps.",
+    "- Pick each step's target deliberately: distance for easy, long and tempo blocks; time for duration-based " +
+      "reps and recovery jogs; load only when prescribing by training-load budget; open (run until lap) for " +
+      "by-feel warm-ups, cool-downs and fartlek surges. " +
+      buildCoachWorkoutDefaultsGuide(),
+    "- Put every prescribed HR, pace, effort pace, power, cadence, stroke, weight, RPE or grade in the step's " +
+      "typed intensity field, never only in the name or the prose.",
+    ...(has("search_coros_exercises")
+      ? [
+          "- Strength and Hybrid Fitness: call search_coros_exercises first, once, with every intended movement " +
+            "(or the target muscles, movement patterns and known equipment), and use the exact exercise IDs and " +
+            "names it returns. A Strength exercise states its sets, target_reps or target_duration_seconds per " +
+            "set, rest_type=1 with rest_value in seconds, and its weight intensity. A COROS naming mismatch alone " +
+            "is never a reason to question the athlete. If a draft tool answers exercise_resolution_required, " +
+            "take one of its candidates (or search again), fix those steps and call the same draft tool again in " +
+            "the same response; ask the athlete only when the alternatives change the movement, conflict with " +
+            "their equipment or need a real training decision."
+        ]
+      : []),
+    ...(has("draft_training_plan")
+      ? [
+          "- Place a plan's sessions one way throughout: a schedule_date (YYYYMMDD) on each for this week or the " +
+            "next few days, or a week (from 1) and a day (mon…sun) for a programme to start later. A dated plan " +
+            "within two weeks is offered first as sessions on the calendar; any other as one COROS plan — give it " +
+            "a description and, for a periodised block, week_stages."
+        ]
+      : []),
+    ...inlineSuggestionsSection(inlineSuggestions, toolNames),
+    "",
+    "What each sport accepts (generated from the validator):",
+    buildCoachSportCapabilityGuide()
+  );
+  return lines;
+}
+
+/**
+ * The system prompt a turn is sent: the rules that do not change, then the
+ * tool guide, then what this turn read. `stable` is everything before the
+ * snapshot, which is where a provider that caches by prefix puts its marker.
+ */
+interface CoachSystemPrompt {
+  stable: string;
+  live: string;
+}
+
+function coachSystemPrompt(
+  context: Pick<TrainingContext, "head" | "live">,
+  tools: CorosMcpTool[],
+  options: { inlineSuggestions?: boolean } = {}
+): CoachSystemPrompt {
+  return { stable: withLiveToolInstructions(context.head, tools, options), live: context.live };
+}
+
+function joinSystemPrompt({ stable, live }: CoachSystemPrompt): string {
+  return live ? `${stable}\n\n${live}` : stable;
 }
 
 interface FunctionCall {
@@ -3705,25 +3887,47 @@ interface TrainingContextScope {
   announce?: boolean;
 }
 
+/**
+ * A turn's system prompt in two parts, by how often each changes.
+ *
+ * `head` is the same on every turn of a conversation: the coach's rules, the
+ * athlete's instructions and units. `live` is what this turn read — the date
+ * and the COROS snapshot — and changes with the day, the recovery figure and
+ * the calendar. The tool guide goes between them (`coachSystemPrompt`), so the
+ * part that never changes comes first and the part that does comes last. A
+ * prompt cache is a prefix match: with the snapshot in the middle, as it was,
+ * every change to a recovery percentage re-sent the ~2k-token tool guide
+ * behind it uncached.
+ */
+interface TrainingContext {
+  head: string;
+  live: string;
+  hasData: boolean;
+}
+
 async function buildTrainingContext(
   permissions?: ClaudeCodePermissions,
   unitSystem: UnitSystem = "metric",
   customInstructions?: string,
   roleInstructions?: string,
-  scope?: TrainingContextScope
-): Promise<{ text: string; hasData: boolean }> {
+  scope?: TrainingContextScope,
+  style?: CoachStyle
+): Promise<TrainingContext> {
   // Rebuilt per request so edits to the athlete's custom instructions apply live.
   const coachInstructions = buildCoachInstructions(
     customInstructions,
     roleInstructions,
     scope?.announce
       ? { activities: scope.activities === false, sleep: scope.sleep === false, zones: scope.zones === false }
-      : undefined
+      : undefined,
+    style
   );
   const unitInstruction =
     `The athlete selected ${unitSystem === "imperial" ? "Imperial" : "Metric"} units. ` +
     `Use ${unitSystem === "imperial" ? "miles, feet, min/mi, mph, pounds, and yards for swims" : "kilometres, metres, min/km, km/h, and kilograms"} in every user-facing answer and tool summary. ` +
     "Keep tool-schema distance, elevation, pace, and weight fields canonical internally; do not reinterpret their numeric values.";
+  const head = `${coachInstructions}\n\n${unitInstruction}`;
+  const today = formatCoachToday();
   let status: Awaited<ReturnType<typeof getTrainingHubStatus>>;
   try {
     status = getTrainingHubStatus();
@@ -3732,14 +3936,14 @@ async function buildTrainingContext(
   }
   if (!status.authenticated) {
     return {
+      head,
       hasData: false,
-      text:
-        `${coachInstructions}\n\n${unitInstruction}\n\n` +
+      live:
+        `${today}\n\n` +
         "NOTE: The athlete is not signed in to COROS Training Hub, so no training " +
         "data is available. Encourage them to connect it for personalised advice."
     };
   }
-
   const includeActivities = permissions?.recentActivities !== false && scope?.activities !== false;
   const includeMetrics = permissions?.trainingMetrics !== false;
   const includeDashboard = includeMetrics && scope?.activities !== false;
@@ -3761,7 +3965,7 @@ async function buildTrainingContext(
       : Promise.resolve(null as CorosProfile | null)
   ]);
 
-  const sections: string[] = [coachInstructions, "", unitInstruction, ""];
+  const sections: string[] = [today, ""];
   let hasData = false;
 
   if (activities.status === "fulfilled" && activities.value.length > 0) {
@@ -3818,7 +4022,7 @@ async function buildTrainingContext(
     );
   }
 
-  return { text: sections.join("\n").trim(), hasData };
+  return { head, live: sections.join("\n").trim(), hasData };
 }
 
 function formatUpcomingVolume(

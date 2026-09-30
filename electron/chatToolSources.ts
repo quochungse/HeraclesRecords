@@ -55,7 +55,9 @@ export const LOCAL_CHAT_TOOL_SOURCES: ReadonlyMap<string, Exclude<ChatToolSource
     ["get_workout_library", "coros"],
     // Writes a brief; reads nothing.
     ["request_plan_brief", null],
-    ["request_coach_input", null]
+    ["request_coach_input", null],
+    // The conversation's earlier turns, from this machine's store.
+    ["recall_conversation", "db"]
   ]);
 
 /**

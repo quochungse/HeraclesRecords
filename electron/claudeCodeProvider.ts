@@ -86,6 +86,14 @@ export interface StreamClaudeCodeOptions extends ClaudeCodeToolCallbacks {
   /** Reasoning effort; the SDK downgrades a level the model cannot serve. */
   effort?: AnthropicEffort;
   /**
+   * A fixed thinking budget, for a model that takes no effort (Haiku 4.5). Left
+   * to itself Claude Code thinks for 5–13k tokens to write a 400-character
+   * digest (measured), and an effort does not reach a model that takes none.
+   */
+  thinkingBudget?: number;
+  /** Send the last message as the prompt, without the Coach conversation's framing (a text job). */
+  plainPrompt?: boolean;
+  /**
    * Receives the model Claude Code actually ran. Only meaningful as "the
    * account default" when `model` was left unset, since otherwise it just
    * echoes the requested one.
@@ -726,9 +734,11 @@ export function toClaudeModelOption(model: {
 }
 
 /**
- * Splits a CLI model description into its parts. They arrive as
+ * Splits a CLI model description into its parts. Up to 2.1.283 they arrived as
  * "Sonnet 4.6 · Efficient for routine tasks · ~2× usage vs Sonnet": the version
- * leads, and the rest qualifies it.
+ * leads, and the rest qualifies it. From 2.1.284 only the default row keeps that
+ * shape; every other row names the model in `displayName` and its description is
+ * the qualifier alone, so a description with no "·" is never read as a name.
  */
 function claudeModelLabel(model: {
   value: string;
@@ -736,10 +746,11 @@ function claudeModelLabel(model: {
   description?: string;
   resolvedModel?: string;
 }): { label: string; detail?: string } {
-  const [versioned, ...rest] = (model.description ?? "")
+  const parts = (model.description ?? "")
     .split("·")
     .map((part) => part.trim())
     .filter(Boolean);
+  const [versioned, ...rest] = parts.length > 1 ? parts : ["", ...parts];
   const named =
     versioned ||
     (model.resolvedModel ? formatClaudeModelName(model.resolvedModel) : "") ||
@@ -894,13 +905,18 @@ export async function streamClaudeCodeCompletion(
     );
 
     const stream = sdk.query({
-      prompt: formatClaudePrompt(options.messages),
+      prompt: options.plainPrompt
+        ? options.messages.map((message) => message.content).join("\n\n")
+        : formatClaudePrompt(options.messages),
       options: {
         abortController: controller,
         pathToClaudeCodeExecutable: options.executablePath,
         systemPrompt: options.instructions,
         ...(options.model ? { model: options.model } : {}),
         ...(options.effort ? { effort: options.effort } : {}),
+        ...(options.thinkingBudget
+          ? { thinking: { type: "enabled" as const, budgetTokens: options.thinkingBudget } }
+          : {}),
         tools: [],
         allowedTools,
         permissionMode: "dontAsk",
@@ -1063,8 +1079,11 @@ function jsonSchemaToZodShape(
 }
 
 function formatClaudePrompt(messages: ChatMessage[]): string {
+  // Every message, as every other provider sends them: what a conversation
+  // sends is bounded where it is planned (`planTranscriptContext`). A cut to the
+  // last 30 here took the condensed layer between the summary and the tail —
+  // turns neither sent nor summarised, and past what recall could reach.
   const transcript = messages
-    .slice(-30)
     .map(
       (message) =>
         `${message.role === "assistant" ? "Assistant" : "Athlete"}: ${message.content}`

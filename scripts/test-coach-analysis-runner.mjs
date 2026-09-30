@@ -51,7 +51,12 @@ const {
   renderAnalysisTemplate,
   resetAnalysisQueueForTests,
   runAnalysisNow,
-  runAnalysisTrigger
+  runAnalysisTrigger,
+  formatPrecedingTraining,
+  PRECEDING_TRAINING_HOURS,
+  noteConversationsChangedBySync,
+  ANALYSIS_STOPPED_BY_SYNC,
+  ANALYSIS_SESSION_DELETED_BY_SYNC
 } = require(path.join(repoRoot, "dist-electron", "coachAnalysisService.js"));
 
 // ---------------------------------------------------------------------------
@@ -74,6 +79,11 @@ assert.equal(
   parseAnalysisOutput(`${"x".repeat(300)}\nmore`).summary.length,
   140,
   "the summary is capped for the badge"
+);
+assert.equal(
+  parseAnalysisOutput("[[chart:c1]]\nDecoupling came back.\n\n[[chart:c2]]").summary,
+  "Decoupling came back.",
+  "a chart placed on the first line is not the headline"
 );
 assert.deepEqual(parseAnalysisOutput("Just some prose.\nSecond line."), {
   silent: false,
@@ -173,8 +183,9 @@ assert.match(AUTOMATION_OUTPUT_CONTRACT, new RegExp(NOTHING_TO_REPORT));
   );
   assert.match(
     chatView,
-    /run\.status !== "success" && run\.status !== "silent"/,
-    "a silent run must reload the transcript, like an answer does"
+    /run\.status !== "success" &&\s*run\.status !== "silent" &&\s*run\.status !== "cancelled"/,
+    "a silent run must reload the transcript, like an answer does — and so " +
+      "must a stopped one, which may have left the line saying sync stopped it"
   );
 
   // The renderer rebuilds entries field by field in both directions. A missing
@@ -1544,6 +1555,82 @@ const analysedIds = (world) =>
   const again = await runAnalysisTrigger({ analysisId: "a1", kind: "activity" }, world.deps);
   assert.deepEqual(again, [], "an automatic trigger with nothing to say stays silent");
   assert.equal(world.runs.length, 3, "and logs no non-event");
+}
+
+// --- the focus line carries the training before the activity ----------------
+{
+  // A debrief compares a run with runs, and COROS's load scores a leg day near
+  // nothing, so the strength before a run has to be handed over or it is missed.
+  resetAnalysisQueueForTests();
+  const world = createWorld();
+  addAnalysis(world, "a1", { trigger: ACTIVITY_TRIGGER, conditions: NO_LIMITS });
+  addSession(world, "s1");
+  addAttachment(world, "b1", { sessionId: "s1", lastActivityAt: RUNNER_NOW_EPOCH - 8 * 86_400 });
+  addActivity(world, "run", 1);
+  const runStart = RUNNER_NOW_EPOCH - 86_400;
+  const legDay = {
+    activity_id: "gym",
+    name: "Leg day",
+    sport_type: 402,
+    sport_name: "Strength",
+    start_time: runStart - 26 * 3_600,
+    duration: 3_600,
+    distance: 0,
+    avg_hr: 118,
+    strength_json: JSON.stringify({
+      exercises: [
+        { nameKey: "T9999", rawName: "Back Squat" },
+        { nameKey: "T9998", rawName: "Romanian Deadlift" }
+      ]
+    })
+  };
+  const asked = [];
+  world.deps.listActivitiesBetween = async (from, to) => {
+    asked.push([from, to]);
+    return [legDay, { ...legDay, activity_id: "run", start_time: runStart }];
+  };
+
+  await runAnalysisTrigger({ analysisId: "a1", kind: "activity" }, world.deps);
+  assert.deepEqual(asked, [[runStart - PRECEDING_TRAINING_HOURS * 3_600, runStart]]);
+  const turn = world.streamCalls[0].messages.at(-1).content;
+  assert.match(
+    turn,
+    /- Strength "Leg day" \(id gym\), ended 25 h before: 60 min, avg HR 118\. Muscles: lower back, glutes, quads, hamstrings\. Exercises: Back Squat, Romanian Deadlift\./
+  );
+  assert.match(turn, /undercounts strength/);
+  assert.doesNotMatch(turn, /\(id run\)/, "the analysed activity is not its own context");
+  assert.ok(turn.indexOf("Leg day") < turn.indexOf("Two house rules"), "the context sits in the focus, not after the contract");
+
+  // Nothing before it is said, rather than left for the model to guess.
+  assert.equal(
+    formatPrecedingTraining({ activity_id: "run", start_time: runStart }, []),
+    `No other training in the ${PRECEDING_TRAINING_HOURS} h before it.`
+  );
+
+  // A conversation withholding activities withholds these; a failed read says nothing.
+  for (const variant of ["withheld", "throws"]) {
+    resetAnalysisQueueForTests();
+    const other = createWorld();
+    addAnalysis(other, "a1", { trigger: ACTIVITY_TRIGGER, conditions: NO_LIMITS });
+    addSession(other, "s1");
+    addAttachment(other, "b1", { sessionId: "s1", lastActivityAt: RUNNER_NOW_EPOCH - 8 * 86_400 });
+    addActivity(other, "run", 1);
+    if (variant === "withheld") {
+      other.deps.getConversationSettings = (sessionId) => ({
+        sessionId,
+        sources: { activities: false, sleep: true, zones: true }
+      });
+      other.deps.listActivitiesBetween = async () => [legDay];
+    } else {
+      other.deps.listActivitiesBetween = async () => {
+        throw new Error("no database");
+      };
+    }
+    const [run] = await runAnalysisTrigger({ analysisId: "a1", kind: "activity" }, other.deps);
+    assert.equal(run.status, "success", `${variant}: the run goes ahead`);
+    const content = other.streamCalls[0].messages.at(-1).content;
+    assert.doesNotMatch(content, /h before it/, `${variant}: no context line`);
+  }
 }
 
 // --- a backlog past the cap keeps its *newest* entries -----------------------
@@ -3783,6 +3870,158 @@ Module._load = originalLoad;
     { summary: "Stale.", through: 80 },
     "the orphaned summary is left exactly where it was, not tidied up here"
   );
+}
+
+// ---------------------------------------------------------------------------
+// Sync rewriting the conversation a run is answering
+//
+// A run reads the transcript once and streams for minutes. A pull landing in
+// that window with a turn from the other machine — the machine that was just
+// reconnected publishing its backlog — makes the answer one about a
+// conversation that is no longer on disk. The run stops and says so; a pull
+// about some other conversation leaves it alone; and a change that lands
+// before anything was asked of a model is simply read.
+// ---------------------------------------------------------------------------
+
+const laptopTurn = { kind: "message", role: "user", content: "Written on the laptop" };
+
+// --- mid-stream: stopped, the line says why, and nothing is owed less -------
+{
+  resetAnalysisQueueForTests();
+  const world = createWorld();
+  addAnalysis(world, "a1", {
+    trigger: { ...ACTIVITY_TRIGGER, multiActivity: true },
+    conditions: NO_LIMITS
+  });
+  addSession(world, "s1", [{ kind: "message", role: "user", content: "Earlier question" }]);
+  addAttachment(world, "b1", {
+    sessionId: "s1",
+    lastActivityAt: RUNNER_NOW_EPOCH - 8 * 86_400,
+    backoffLevel: 1,
+    backoffUntil: new Date(world.now.getTime() - 60_000).toISOString()
+  });
+  addActivity(world, "t4", 4);
+  addActivity(world, "t5", 3);
+
+  world.deps.streamChat = async (_sink, runId) => {
+    world.streamCalls.push({ runId });
+    // The pull: the other machine's turn merged into the row, then the loop's
+    // owner naming the conversations it changed.
+    const session = world.sessions.get("s1");
+    session.entries = [...session.entries, laptopTurn];
+    noteConversationsChangedBySync(["s-elsewhere", "s1"]);
+    // A provider slow to honour the abort must not hold the run: it never
+    // settles here, and the run returns anyway.
+    await new Promise(() => {});
+  };
+
+  const runs = await runAnalysisTrigger({ analysisId: "a1", kind: "activity" }, world.deps);
+  assert.equal(runs.length, 1, "the catch-up sequence stops with the run sync stopped");
+  const [run] = runs;
+  assert.equal(run.status, "cancelled");
+  assert.equal(run.error, ANALYSIS_STOPPED_BY_SYNC, "the run log says sync stopped it");
+  assert.ok(world.cancelledRunIds.includes(run.id), "the stream is aborted");
+  assert.equal(world.updates.at(-1).status, "cancelled", "and the window hears it end");
+
+  const entries = world.sessions.get("s1").entries;
+  assert.deepEqual(
+    entries.slice(0, 2).map((entry) => entry.content),
+    ["Earlier question", "Written on the laptop"],
+    "the conversation is the one sync left, with the other machine's turn kept"
+  );
+  assert.equal(entries.length, 3, "no playbook turn and no answer are appended");
+  assert.equal(entries[2].kind, "automationStopped");
+  assert.equal(entries[2].reason, "sync");
+  assert.equal(entries[2].automation.runId, run.id, "the line names the run it stopped");
+  assert.equal(entries[2].at, world.now.getTime());
+
+  const analysis = world.analyses.get("a1");
+  assert.equal(
+    analysis.lastActivityAt,
+    RUNNER_NOW_EPOCH - 8 * 86_400,
+    "the watermark stays put, so t4 is still owed and comes back with the next trigger"
+  );
+  assert.equal(analysis.lastRunAt, undefined, "and no cooldown is started by a run that never answered");
+  assert.equal(analysis.backoffLevel, 1, "a sync says nothing about the provider, so the backoff is untouched");
+}
+
+// --- a pull about another conversation leaves the run alone ----------------
+{
+  resetAnalysisQueueForTests();
+  const world = createWorld();
+  addAnalysis(world, "a1", { conditions: NO_LIMITS });
+  addSession(world, "s1", [{ kind: "message", role: "user", content: "Earlier question" }]);
+  addAttachment(world, "b1", { sessionId: "s1" });
+  const stream = world.deps.streamChat;
+  world.deps.streamChat = async (...args) => {
+    noteConversationsChangedBySync(["s-elsewhere"]);
+    noteConversationsChangedBySync([]);
+    return stream(...args);
+  };
+
+  const [run] = await runAnalysisNow("a1", world.deps);
+  assert.equal(run.status, "success");
+  assert.deepEqual(world.cancelledRunIds, []);
+  assert.equal(world.sessions.get("s1").entries.at(-1).content, world.outcome.text);
+
+  // The run's interest ends with it: a later pull naming the same conversation
+  // aborts nothing, and the next run there starts clean.
+  noteConversationsChangedBySync(["s1"]);
+  assert.deepEqual(world.cancelledRunIds, [], "a finished run is not aborted after the fact");
+  world.deps.streamChat = stream;
+  const [next] = await runAnalysisNow("a1", world.deps);
+  assert.equal(next.status, "success", "and the next run is not stopped by a change it never saw");
+}
+
+// --- before a model is asked: the run reads the conversation again ---------
+{
+  resetAnalysisQueueForTests();
+  const world = createWorld();
+  addAnalysis(world, "a1", { conditions: NO_LIMITS });
+  addSession(world, "s1", [{ kind: "message", role: "user", content: "Earlier question" }]);
+  addAttachment(world, "b1", { sessionId: "s1" });
+  // The COROS check is the round trip where this lands in practice.
+  world.deps.ensureCorosSession = async () => {
+    const session = world.sessions.get("s1");
+    session.entries = [...session.entries, laptopTurn];
+    noteConversationsChangedBySync(["s1"]);
+    return { ok: true };
+  };
+
+  const [run] = await runAnalysisNow("a1", world.deps);
+  assert.equal(run.status, "success", "nothing was spent, so nothing is stopped");
+  assert.ok(
+    world.streamCalls[0].messages.some((message) => message.content === laptopTurn.content),
+    "the model is sent the conversation as sync left it"
+  );
+  assert.deepEqual(
+    world.sessions.get("s1").entries.map((entry) => entry.kind),
+    ["message", "message", "message", "message"],
+    "and the answer follows the turn sync brought"
+  );
+  assert.equal(world.sessions.get("s1").entries[1].content, laptopTurn.content);
+}
+
+// --- the conversation deleted over there -------------------------------------
+{
+  resetAnalysisQueueForTests();
+  const world = createWorld();
+  addAnalysis(world, "a1", { conditions: NO_LIMITS });
+  addSession(world, "s1", [{ kind: "message", role: "user", content: "Earlier question" }]);
+  addAttachment(world, "b1", { sessionId: "s1" });
+  world.deps.streamChat = async () => {
+    world.sessions.delete("s1");
+    noteConversationsChangedBySync(["s1"]);
+  };
+
+  const [run] = await runAnalysisNow("a1", world.deps);
+  assert.equal(run.status, "cancelled");
+  assert.equal(
+    run.error,
+    ANALYSIS_SESSION_DELETED_BY_SYNC,
+    "there is nowhere to write the line, so the run log is where it says so"
+  );
+  assert.equal(world.sessions.has("s1"), false, "and nothing brings the conversation back");
 }
 
 console.log("coach analysis runner tests passed");

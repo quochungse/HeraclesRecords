@@ -344,6 +344,183 @@ async function main() {
   }
 
   // -------------------------------------------------------------------------
+  // An analysis's answer replaces its live bubble in place, and at once
+  // -------------------------------------------------------------------------
+  // Reported 2026-09-28: an auto analysis streamed into its live bubble, the
+  // run finished, and the answer vanished — it appeared only when the
+  // conversation was opened again. The athlete had just come back from the
+  // browser after signing in to Google, so the window was the kind that stops
+  // getting frames. The settle above was fixed for a turn the athlete asked;
+  // an analysis ends in a reload instead, which mounted the prompt chip, the
+  // answer and its cards under `chat-row-enter` — from `opacity: 0` — and took
+  // the bubble down before the read had even come back.
+  {
+    const marker = {
+      runId: "r-live",
+      automationId: "a1",
+      name: "Post-activity debrief",
+      triggerLabel: "New activity"
+    };
+    const history = [{ kind: "message", role: "user", content: "Tuần trước thế nào?" }];
+    await harness("mount", "ChatView", {}, {
+      ...BASE_SCRIPT,
+      __persistChatSessions: false,
+      getChatSession: history,
+      listCoachAnalysisRuns: [],
+      getCoachAnalysis: null
+    });
+    await waitFor(
+      () => harness("callCount", "getChatSession"),
+      "the conversation is open"
+    );
+    await settle();
+    const settledBefore = await harness("count", ".chat-row.is-settled");
+
+    await harness("emit", "onCoachAnalysisRunUpdate", {
+      id: "r-live",
+      analysisId: "a1",
+      status: "running",
+      triggerKind: "activity",
+      sessionId: "s1",
+      startedAt: "2026-09-28T02:00:55.103Z"
+    });
+    await harness("emit", "onChatStreamStart", { requestId: "r-live" });
+    await harness("emit", "onChatStreamToken", {
+      requestId: "r-live",
+      delta: "Buổi dài 14km, decoupling lại lớn."
+    });
+    await settle();
+    assert.match(
+      (await harness("text", ".chat-transcript")) ?? "",
+      /running now[\s\S]*Buổi dài 14km/,
+      "the run streams into its live bubble"
+    );
+
+    // What the runner wrote into the row: the playbook turn, the answer, and
+    // the card it drew — the answer first, as the 2026-09-28 run stored them.
+    await harness("setScript", {
+      getChatSession: [
+        ...history,
+        { kind: "message", role: "user", content: "Một hoạt động mới vừa được đồng bộ…", automation: marker },
+        { kind: "message", role: "assistant", content: "Buổi dài 14km, decoupling lại lớn.", automation: marker },
+        {
+          kind: "fitnessTrend",
+          preview: {
+            previewId: "trend-run",
+            windowDays: 7,
+            trendPoints: [
+              { date: "2026-09-26", label: "Sat", trainingLoad: 180, rhr: 48 },
+              { date: "2026-09-27", label: "Sun", trainingLoad: 60, rhr: 47 }
+            ]
+          }
+        }
+      ]
+    });
+    await harness("emit", "onCoachAnalysisRunUpdate", {
+      id: "r-live",
+      analysisId: "a1",
+      status: "success",
+      triggerKind: "activity",
+      sessionId: "s1",
+      startedAt: "2026-09-28T02:00:55.103Z"
+    });
+    await settle();
+
+    const text = (await harness("text", ".chat-transcript")) ?? "";
+    assert.doesNotMatch(text, /running now/, "the live bubble is gone");
+    assert.match(text, /Buổi dài 14km/, "and the answer is in its place");
+    assert.equal(
+      (await harness("count", ".chat-row.is-settled")) - settledBefore,
+      3,
+      "the prompt chip, the answer and its card are drawn as they are, not faded in from nothing"
+    );
+  }
+
+  // -------------------------------------------------------------------------
+  // An answer places a chart where it names it
+  // -------------------------------------------------------------------------
+  // A tool result names each chart it drew (c1, c2… in the order drawn) and
+  // the answer may put one among its words with `[[chart:c2]]`. The chart then
+  // has no row of its own; one it does not place stays above the answer, and
+  // the placeholder itself is never on screen — not even half-streamed.
+  {
+    const trend = (previewId, load) => ({
+      kind: "fitnessTrend",
+      preview: {
+        previewId,
+        windowDays: 7,
+        trendPoints: [
+          { date: "2026-09-26", label: "Sat", trainingLoad: load, rhr: 48 },
+          { date: "2026-09-27", label: "Sun", trainingLoad: load / 2, rhr: 47 }
+        ]
+      }
+    });
+    const order = () =>
+      win.webContents.executeJavaScript(
+        `[...document.querySelectorAll(".chat-thread > .chat-row")].slice(-3).map((row) => {
+          if (row.querySelector(".chat-bubble-plan .chat-visual-card")) return "chart";
+          if (row.classList.contains("chat-row-user")) return "user";
+          const bubble = row.querySelector(".chat-bubble");
+          if (!bubble) return "other";
+          return [...bubble.children]
+            .filter((child) => child.matches(".chat-markdown, .chat-inline-chart"))
+            .map((child) => (child.matches(".chat-inline-chart") ? "[chart]" : "text"))
+            .join(" ");
+        })`,
+        true
+      );
+
+    await harness("mount", "ChatView", {}, {
+      ...BASE_SCRIPT,
+      __persistChatSessions: false,
+      getChatSession: [
+        { kind: "message", role: "user", content: "Tải tuần này thế nào?" },
+        trend("trend-a", 180),
+        trend("trend-b", 240),
+        { kind: "message", role: "assistant", content: "Tải tuần tăng.\n\n[[chart:c2]]\n\nRHR vẫn ổn." }
+      ]
+    });
+    await waitFor(() => harness("exists", ".chat-inline-chart"), "the placed chart is drawn inside the answer");
+    await settle();
+    assert.deepEqual(await order(), ["user", "chart", "text [chart] text"], "c1 above, c2 among the words");
+    assert.doesNotMatch((await harness("text", ".chat-transcript")) ?? "", /\[\[chart/, "the placeholder is not on screen");
+
+    await harness("setValue", ".chat-composer textarea", "Còn HRV?");
+    await harness("click", ".chat-send");
+    const sent = await waitFor(async () => (await harness("calls", "sendChat"))[0], "the turn reaches main");
+    const requestId = sent.args[0];
+    await harness("emit", "onChatStreamStart", { requestId });
+    await harness("emit", "onChatStreamInfo", { requestId, ...trend("trend-c", 90) });
+    await harness("emit", "onChatStreamToken", { requestId, delta: "Nhìn biểu đồ:\n\n[[cha" });
+    await waitFor(() => harness("exists", ".chat-bubble-streaming .chat-markdown"), "the answer is streaming");
+    assert.doesNotMatch(
+      (await harness("text", ".chat-bubble-streaming")) ?? "",
+      /\[/,
+      "a placeholder half-streamed is held back"
+    );
+    assert.deepEqual((await order()).slice(-2), ["chart", "text"], "until it is placed, the chart is above the answer");
+
+    await harness("emit", "onChatStreamToken", { requestId, delta: "rt:c1]]\n\nHRV ổn." });
+    await waitFor(
+      () => harness("exists", ".chat-bubble-streaming .chat-inline-chart"),
+      "once named, it moves into the streaming answer"
+    );
+    assert.deepEqual((await order()).slice(-1), ["text [chart] text"]);
+
+    await harness("emit", "onChatStreamDone", { requestId, fullText: "Nhìn biểu đồ:\n\n[[chart:c1]]\n\nHRV ổn." });
+    await waitFor(async () => !(await harness("exists", ".chat-bubble-streaming")), "the turn settles");
+    await settle();
+    assert.deepEqual((await order()).slice(-1), ["text [chart] text"], "and it stays there once settled");
+    assert.equal(await harness("count", ".chat-inline-chart"), 2);
+    const saved = (await harness("calls", "saveChatSession")).at(-1)?.args[1] ?? [];
+    assert.deepEqual(
+      saved.slice(-2).map((entry) => entry.kind === "message" ? entry.content : entry.preview.previewId),
+      ["trend-c", "Nhìn biểu đồ:\n\n[[chart:c1]]\n\nHRV ổn."],
+      "the row keeps the chart as an entry and the placeholder in the words"
+    );
+  }
+
+  // -------------------------------------------------------------------------
   // A turn that fails after answering keeps the answer
   // -------------------------------------------------------------------------
   // Reported: ask → answer and a question card → pick a choice → the coach

@@ -14,7 +14,11 @@ const distUrl = (file) =>
   pathToFileURL(path.join(repoRoot, "dist-electron", file)).href;
 
 const {
+  CONTEXT_BUDGETS,
+  DEFAULT_CONTEXT_BUDGET,
   DEFAULT_COMPACT_CONTEXT,
+  normalizeCompactModelChoice,
+  normalizeContextDetail,
   DEFAULT_CONTEXT_KEEP,
   DEFAULT_CONTEXT_LIMIT,
   DEFAULT_CONTEXT_WINDOW,
@@ -34,6 +38,9 @@ const {
   withCreationIndex
 } = await import(
   `${distUrl("chatContextCompaction.js")}?cacheBust=${Date.now()}`
+);
+const { foldForSearch, recallEarlierTurns } = await import(
+  `${distUrl("chatRecall.js")}?cacheBust=${Date.now()}`
 );
 
 const message = (index) => ({
@@ -145,6 +152,15 @@ assert.deepEqual(
 assert.deepEqual(
   toWireMessages([{ kind: "message", role: "user", content: "   " }]),
   []
+);
+
+// A chart placeholder names a chart of its own turn, so it is not replayed:
+// on a later turn it would name nothing, or the wrong chart.
+assert.deepEqual(
+  toWireMessages([
+    { kind: "message", role: "assistant", content: "The pace fell.\n\n[[chart:c1]]\n\nHR held [[chart:c2]] flat." }
+  ]),
+  [{ role: "assistant", content: "The pace fell.\n\nHR held flat." }]
 );
 
 // A coachPrompt is a turn of the conversation and is expanded, not dropped.
@@ -282,6 +298,294 @@ for (const stored of [
   assert.deepEqual(contentsOf(alsoForced.tail), contentsOf(triggered.tail));
 }
 
+// The budgets: a handful of long answers is condensed, and then summarised,
+// long before the entry window would notice. Measured, a 16-entry
+// conversation sent ~16k tokens a turn and was never rolled.
+{
+  const long = (index, chars) => ({
+    kind: "message",
+    role: index % 2 === 0 ? "user" : "assistant",
+    content: `${index} `.padEnd(chars, "x")
+  });
+  const tokensIn = (entries) => entries.reduce((total, entry) => total + Math.ceil(entry.content.length / 3), 0);
+  // 16 entries, every answer ~2.7k tokens: over `rollAt`, far under the limit.
+  const heavy = Array.from({ length: 16 }, (_, index) => long(index, index % 2 ? 8_000 : 300));
+  const plan = planTranscriptContext(heavy, { through: 0 });
+  assert.ok(plan.condensedThrough > 0, "the verbatim part is condensed below the entry limit");
+  assert.ok(
+    tokensIn(plan.tail) <= DEFAULT_CONTEXT_BUDGET.keep,
+    `the tail is held to the budget (${tokensIn(plan.tail)} > ${DEFAULT_CONTEXT_BUDGET.keep})`
+  );
+  assert.ok(plan.toSummarise.length > 0, "with no digests the condensed part is over its budget too, and rolls");
+  assert.deepEqual(
+    [...contentsOf(plan.toSummarise), ...contentsOf(plan.middle), ...contentsOf(plan.tail)],
+    contentsOf(heavy),
+    "nothing is dropped"
+  );
+
+  // With digests, the condensed part fits, so nothing is summarised: the
+  // athlete's words go as written and each answer as its digest.
+  const digests = new Map(heavy.filter((entry) => entry.role === "assistant").map((entry) => [entry.content, `digest of ${entry.content.slice(0, 2).trim()}`]));
+  const digestOf = (answer) => digests.get(answer);
+  const condensed = planTranscriptContext(heavy, { through: 0 }, DEFAULT_CONTEXT_WINDOW, { digestOf });
+  assert.deepEqual(condensed.toSummarise, [], "a digested condensed layer is under its budget");
+  assert.equal(condensed.condensedThrough, plan.condensedThrough, "the batch boundary does not depend on the digests");
+  assert.deepEqual(condensed.toDigest, [], "and every answer in it has one");
+  const wire = toWireMessages(condensed.middle, digestOf);
+  assert.ok(wire.every((message) => message.role === "user" || message.content.startsWith("[condensed] digest of")));
+  assert.ok(wire.some((message) => message.role === "user" && message.content.startsWith("0 ")), "the athlete's words go as written");
+
+  // What has no digest yet is asked for, with the question it answered.
+  const missing = planTranscriptContext(heavy, { through: 0 }, DEFAULT_CONTEXT_WINDOW, { digestOf: () => undefined });
+  assert.ok(missing.toDigest.length > 0);
+  for (const request of missing.toDigest) {
+    const at = heavy.findIndex((entry) => entry.content === request.answer);
+    assert.ok(at >= missing.through && at < missing.condensedThrough, "only the condensed layer's answers");
+    assert.equal(request.question, heavy[at - 1].content, "each with the question it answered");
+  }
+
+  // The boundary is stored and moves in batches: one more short turn does not
+  // move it, so what a provider caches ahead of it stays put.
+  const next = planTranscriptContext(
+    [...heavy, long(16, 60), long(17, 60)],
+    { through: 0, condensedThrough: condensed.condensedThrough },
+    DEFAULT_CONTEXT_WINDOW,
+    { digestOf }
+  );
+  assert.equal(next.condensedThrough, condensed.condensedThrough);
+  assert.equal(next.tail.length, heavy.length - condensed.condensedThrough + 2);
+  // A stored boundary outside the transcript, or before the summary, is not trusted.
+  assert.equal(planTranscriptContext(transcript(4), { through: 0, condensedThrough: 99 }).condensedThrough, 0);
+
+  // A forced compact folds the condensed layer into the summary as well.
+  const forcedAll = planTranscriptContext(heavy, { through: 0, condensedThrough: condensed.condensedThrough }, DEFAULT_CONTEXT_WINDOW, {
+    force: true,
+    digestOf
+  });
+  assert.deepEqual(forcedAll.middle, []);
+  assert.equal(forcedAll.through, forcedAll.condensedThrough);
+
+  // Each preset is a whole budget, and an unknown one reads as the default.
+  for (const detail of ["lean", "balanced", "full"]) {
+    const budget = CONTEXT_BUDGETS[detail];
+    assert.ok(budget.keep < budget.rollAt && budget.middle > 0, detail);
+  }
+  assert.equal(normalizeContextDetail("nonsense"), "balanced");
+  assert.equal(CONTEXT_BUDGETS.lean.keep < CONTEXT_BUDGETS.full.keep, true);
+
+  // The question and the answer before it go in whole, however long.
+  const huge = [long(0, 300), long(1, 60_000), long(2, 300)];
+  const kept = planTranscriptContext(huge, { through: 0 }, DEFAULT_CONTEXT_WINDOW, { force: true });
+  assert.equal(kept.tail.length, 2, "the last answer is kept whole even past the budget");
+
+  // Over budget with barely anything to fold is not a roll: one long answer
+  // would otherwise be summarised a turn at a time.
+  const lone = [long(0, 300), long(1, 40_000), long(2, 300), long(3, 300), long(4, 300)];
+  assert.deepEqual(planTranscriptContext(lone, { through: 0 }).toSummarise, []);
+
+  // Cards cost nothing: they are not sent.
+  const cards = Array.from({ length: 40 }, () => ({
+    kind: "planDraft",
+    draft: { draftId: "d", name: "x".repeat(20_000) }
+  }));
+  assert.deepEqual(
+    planTranscriptContext([...cards, ...transcript(4)], { through: 0 }).toSummarise,
+    [],
+    "a transcript of cards is not over budget"
+  );
+
+  // A budget passed in is obeyed; the default leaves short transcripts alone.
+  assert.ok(
+    planTranscriptContext(transcript(30), { through: 0 }, DEFAULT_CONTEXT_WINDOW, {
+      budget: { rollAt: 10, keep: 5, middle: 5 }
+    }).toSummarise.length > 0
+  );
+  assert.deepEqual(planTranscriptContext(transcript(30), { through: 0 }).toSummarise, []);
+
+  // Applying a plan stores the moved boundary even without a roll, asks for the
+  // missing digests without waiting on them, and sends the condensed layer
+  // between the summary and the tail.
+  const stored = [];
+  const asked = [];
+  const applied = await applyTranscriptContext({
+    entries: heavy,
+    stored: { through: 0 },
+    digestOf,
+    roll: async () => ({ summary: "rolled" }),
+    store: () => stored.push("summary"),
+    storeCondensed: (through) => stored.push(through),
+    digest: (requests) => asked.push(...requests)
+  });
+  assert.equal(applied.rolled, false);
+  assert.deepEqual(stored, [condensed.condensedThrough]);
+  assert.deepEqual(asked, []);
+  assert.equal(applied.tailStart, condensed.condensedThrough);
+  const sent = contextMessages(applied);
+  assert.equal(sent.length, applied.middle.length + toWireMessages(applied.tail).length);
+  assert.ok(sent[0].role === "user" && sent.slice(0, applied.middle.length).some((message) => message.content.startsWith("[condensed]")));
+
+  const unasked = [];
+  const failedRoll = await applyTranscriptContext({
+    entries: heavy,
+    stored: { through: 0 },
+    roll: async () => ({ summary: null, reason: "no" }),
+    store: () => assert.fail("a failed roll stores nothing"),
+    digestOf: () => undefined,
+    digest: (requests) => unasked.push(...requests)
+  });
+  assert.equal(failedRoll.failed, true);
+  assert.ok(unasked.length > 0, "the digests still missing are asked for");
+  assert.equal(
+    failedRoll.middle.length + toWireMessages(failedRoll.tail).length,
+    toWireMessages(heavy).length,
+    "a failed roll sends everything the summary does not cover"
+  );
+
+  // A stored model choice: named, or automatic when it cannot be read.
+  assert.deepEqual(normalizeCompactModelChoice("conversation"), { kind: "conversation" });
+  assert.deepEqual(normalizeCompactModelChoice('{"kind":"fixed","provider":"claude-code","model":"haiku"}'), {
+    kind: "fixed",
+    provider: "claude-code",
+    model: "haiku"
+  });
+  for (const unreadable of [undefined, "", "{", '{"kind":"fixed","provider":"nope","model":"x"}', { kind: "fixed", provider: "chatgpt" }]) {
+    assert.deepEqual(normalizeCompactModelChoice(unreadable), { kind: "auto" }, JSON.stringify(unreadable));
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Digests: the check a digest passes before it stands in for its answer
+// ---------------------------------------------------------------------------
+
+{
+  const { digestProblems, digestUserPrompt, DIGEST_CHARS } = await import(
+    `${distUrl("answerDigest.js")}?cacheBust=${Date.now()}`
+  );
+  const answer = [
+    "Buổi easy 25/08: pace TB 7:19/km, HR TB 152, max 160, load 183 (20/08: 204).",
+    "Nếu long run T7 decoupling >5%, Tuần 2 giữ nguyên khối lượng. T5 chạy như kê, 10.4 km.",
+    "Mục tiêu sub 4:30 tháng 3/2027."
+  ].join("\n\n");
+  // The shapes measured on real answers: each passes.
+  for (const good of [
+    "Easy 25/08: 7:19/km, HR 152/160, load 183. Long run T7 decoupling >5% → giữ khối lượng Tuần 2. T5 như kê.",
+    "25/8: pace 7:19, HR 152 (max 160), 10,4 km. Mục tiêu 4:30 T3/27.",
+    "Load 183 < 204 (20/08). Sub-4:30 3/2027."
+  ]) {
+    assert.deepEqual(digestProblems(good, answer), [], good);
+  }
+  // A weekday read as a date — "T7" as 7/7, "T5" as 5/9 — is refused.
+  assert.match(digestProblems("Long run 7/7: decoupling >5%. 5/9 run as planned.", answer).join(), /dates the answer does not \(7\/7, 5\/9\)/);
+  // So is a date turned round (US order), and a figure the answer never gave.
+  assert.match(digestProblems("Easy 08/25/2026.", answer).join(), /figures|dates/);
+  assert.match(digestProblems("HR 152, max 165.", answer).join(), /figures the answer does not \(165\)/);
+  // And one that ignores the length it was asked for.
+  assert.match(digestProblems("x".repeat(DIGEST_CHARS * 2), answer).join(), /characters/);
+  assert.deepEqual(digestProblems("   ", answer), ["it was empty"]);
+  // A question's figures count as known: the digest may restate them.
+  assert.deepEqual(digestProblems("Long run 13km 19/09.", "Kỷ luật HR tốt.", "Long run 13km ngày 19/09"), []);
+  // A retry carries the reasons.
+  assert.match(digestUserPrompt("a", "q", ["it states dates the answer does not (7/7)"]), /refused: it states dates[\s\S]*Copy every figure/);
+}
+
+// Which model `auto` compresses with: the smallest family the provider's own
+// list names, never an id written in the build.
+{
+  const { compressionModelFor } = await import(`${distUrl("chatModels.js")}?cacheBust=${Date.now()}`);
+  const claudeCode = [
+    { value: "", label: "Default (Opus 5.5)" },
+    { value: "opus", label: "Opus 5.5" },
+    { value: "sonnet", label: "Sonnet 5.5" },
+    { value: "haiku", label: "Haiku 4.5" }
+  ];
+  assert.equal(compressionModelFor("claude-code", claudeCode)?.value, "haiku");
+  assert.equal(compressionModelFor("claude-code", claudeCode.slice(0, 3))?.value, "sonnet", "no Haiku listed: the next family");
+  assert.equal(compressionModelFor("claude-code", claudeCode.slice(0, 2)), undefined, "none listed: the conversation's own");
+  assert.equal(compressionModelFor("claude-api", [{ value: "claude-opus-5-5", label: "Claude Opus 5.5" }, { value: "claude-haiku-4-5", label: "Claude Haiku 4.5" }])?.value, "claude-haiku-4-5");
+  assert.equal(compressionModelFor("chatgpt", [{ value: "gpt-5.6-sol", label: "GPT-5.6 Sol" }, { value: "gpt-5.6-terra", label: "GPT-5.6 Terra" }]), undefined, "names that say nothing about size");
+  assert.equal(compressionModelFor("openrouter", [{ value: "anthropic/claude-haiku-4.5", label: "Haiku" }]), undefined);
+}
+
+// ---------------------------------------------------------------------------
+// Recall
+// ---------------------------------------------------------------------------
+
+{
+  assert.equal(foldForSearch("Tốc độ ĐẠP xe"), "toc do dap xe", "accents, đ and case fold away");
+
+  const earlier = [
+    { kind: "message", role: "user", content: "Pace easy của tôi nên là bao nhiêu?", mid: "1-019a0b1c2d3e-0001-aa" },
+    { kind: "message", role: "assistant", content: "Easy pace: 6:40–7:00/km, HR dưới 145." },
+    { kind: "activityVisual", preview: { previewId: "p1" } },
+    { kind: "message", role: "user", content: "Tuần sau tôi bị đau bắp chân." },
+    {
+      kind: "message",
+      role: "assistant",
+      content: ["Nghỉ hai ngày.", ...Array.from({ length: 30 }, (_, i) => `Đoạn ${i} `.padEnd(400, "y")), "Bắp chân: giãn cơ mỗi tối."].join("\n\n")
+    },
+    {
+      kind: "coachPrompt",
+      prompt: { promptId: "q", question: "Long run ngày nào?", choices: [{ label: "Chủ nhật" }], answer: "Chủ nhật" }
+    }
+  ];
+
+  // Accents optional, and the date comes off the entry's `mid`.
+  const pace = recallEarlierTurns(earlier, "toc do pace easy");
+  assert.match(pace, /1 of the 3 earlier exchanges/);
+  assert.match(pace, /Exchange 1 · 20\d\d-\d\d-\d\d/);
+  assert.match(pace, /6:40–7:00\/km/);
+
+  // A long answer is cut to its opening and the paragraphs that match.
+  const calf = recallEarlierTurns(earlier, "bap chan");
+  assert.match(calf, /Nghỉ hai ngày\./);
+  assert.match(calf, /giãn cơ mỗi tối/);
+  assert.ok(calf.length < 5_000, "a recall costs a bounded amount");
+
+  // A question Coach asked, and its answer, are an exchange too.
+  const asked = recallEarlierTurns(earlier, "long run");
+  assert.match(asked, /1 of the 3 earlier exchanges/);
+  assert.match(asked, /Coach: I need the athlete's answer[\s\S]*Long run ngày nào\?[\s\S]*\nAthlete: Chủ nhật/);
+
+  // Nothing found says so, rather than returning the nearest miss.
+  assert.match(recallEarlierTurns(earlier, "marathon"), /No earlier exchange mentions/);
+  assert.match(recallEarlierTurns([], "pace"), /Nothing in this conversation/);
+
+  // Best matches first, returned in the order they happened, and capped.
+  const many = Array.from({ length: 12 }, (_, i) => ({
+    kind: "message",
+    role: i % 2 ? "assistant" : "user",
+    content: i === 10 ? "tempo tempo threshold" : `tempo ${i}`
+  }));
+  const both = recallEarlierTurns(many, "tempo threshold", 5);
+  assert.match(both, /1 of the 6 earlier exchanges/, "a near miss is not returned beside a full match");
+  assert.match(both, /tempo tempo threshold/);
+  const ranked = recallEarlierTurns(many, "tempo");
+  assert.match(ranked, /2 of the 6 earlier exchanges/, "two by default");
+  assert.ok(ranked.indexOf("Exchange 5") < ranked.indexOf("Exchange 6"), "oldest first");
+  assert.match(recallEarlierTurns(many, "tempo", 99), /5 of the 6/, "capped at five");
+
+  // Terms side by side as the query has them outrank the same terms apart.
+  const apart = [
+    { kind: "message", role: "user", content: "chân tôi ổn, bắp tay hơi mỏi" },
+    { kind: "message", role: "user", content: "bắp chân phải căng" },
+    { kind: "message", role: "user", content: "chân trái ổn, bắp đùi mỏi" }
+  ];
+  assert.match(recallEarlierTurns(apart, "bắp chân", 1), /Exchange 2[\s\S]*bắp chân phải căng/);
+
+  // What a question points at stays on it, across a card, as it does on the wire.
+  const pointed = [
+    { kind: "message", role: "user", content: "hello" },
+    { kind: "message", role: "assistant", content: "hi" },
+    { kind: "scheduleRefs", refs: [{ scope: "session", label: "Tempo on Tuesday", day: "20260929" }] },
+    { kind: "activityVisual", preview: { previewId: "p2" } },
+    { kind: "message", role: "user", content: "what pace for this?" },
+    { kind: "message", role: "assistant", content: "4:50/km" }
+  ];
+  const onQuestion = recallEarlierTurns(pointed, "pace");
+  assert.match(onQuestion, /1 of the 2 earlier exchanges/, "the note opens no exchange of its own");
+  assert.match(onQuestion, /Tempo on Tuesday[\s\S]*what pace for this\?[\s\S]*4:50\/km/);
+}
+
 // ---------------------------------------------------------------------------
 // The summariser's own turn
 // ---------------------------------------------------------------------------
@@ -386,8 +690,15 @@ function harness({ result = "Rolled.", usage, reason } = {}) {
   assert.equal(result.summary, "Earlier.", "the stored summary still stands");
   assert.equal(result.through, 10, "and the count does not move");
   assert.deepEqual(world.state.writes, [], "nothing is stored that was not written");
-  assert.equal(result.tailStart, 10);
-  assert.equal(result.tail.length, 90);
+  // What the roll would have folded goes out in the condensed layer, ahead of
+  // the verbatim tail, so the caller still sends all 90.
+  assert.equal(result.tailStart, 80);
+  assert.equal(result.tail.length, 20);
+  assert.equal(result.middle.length, 70);
+  assert.deepEqual(
+    contextMessages(result).slice(1).map((message) => message.content),
+    contentsOf(transcript(100).slice(10))
+  );
   assert.deepEqual(
     result.usage,
     { inputTokens: 40, outputTokens: 0 },

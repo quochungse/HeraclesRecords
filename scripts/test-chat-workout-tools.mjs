@@ -170,6 +170,14 @@ for (const [label, built] of [["plan", schema], ["workout", workoutSchema], ["re
     `the ${label} schema is ${size} chars; it was 67,000 when it branched per sport`
   );
 }
+// The revision does not carry a third copy of the workout schema: the two
+// draft tools beside it have it, and a revised plan is validated as a new
+// draft. It was 16 kB of the ~66 kB of schemas sent every round.
+const reviseWorkout = buildRevisePlanInputSchema().properties.ops.items.properties.workout;
+assert.equal(reviseWorkout.type, "object");
+assert.equal(reviseWorkout.properties, undefined, "an open object, not the workout schema again");
+assert.equal(reviseWorkout.additionalProperties, true, "Claude Code rebuilds it through zod, which must keep its keys");
+assert.ok(JSON.stringify(buildRevisePlanInputSchema()).length < 2_500, "the revision schema is its ops, not a workout");
 
 // Representative typed result for: “Create a 5 km run at 135–145 bpm.”
 const heartRateDraft = {
