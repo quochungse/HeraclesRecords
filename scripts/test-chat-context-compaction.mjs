@@ -571,6 +571,19 @@ for (const stored of [
     { kind: "message", role: "user", content: "chân trái ổn, bắp đùi mỏi" }
   ];
   assert.match(recallEarlierTurns(apart, "bắp chân", 1), /Exchange 2[\s\S]*bắp chân phải căng/);
+
+  // What a question points at stays on it, across a card, as it does on the wire.
+  const pointed = [
+    { kind: "message", role: "user", content: "hello" },
+    { kind: "message", role: "assistant", content: "hi" },
+    { kind: "scheduleRefs", refs: [{ scope: "session", label: "Tempo on Tuesday", day: "20260929" }] },
+    { kind: "activityVisual", preview: { previewId: "p2" } },
+    { kind: "message", role: "user", content: "what pace for this?" },
+    { kind: "message", role: "assistant", content: "4:50/km" }
+  ];
+  const onQuestion = recallEarlierTurns(pointed, "pace");
+  assert.match(onQuestion, /1 of the 2 earlier exchanges/, "the note opens no exchange of its own");
+  assert.match(onQuestion, /Tempo on Tuesday[\s\S]*what pace for this\?[\s\S]*4:50\/km/);
 }
 
 // ---------------------------------------------------------------------------

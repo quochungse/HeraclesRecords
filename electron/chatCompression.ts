@@ -88,8 +88,12 @@ export function resolveCompressionRuntime(
   settings: ChatSettings = getChatSettings()
 ): CompressionRuntime {
   const conversation = sessionId ? getConversationSettings(sessionId).runtime : undefined;
-  const provider = base.provider ?? conversation?.provider ?? settings.provider;
-  const model = base.model ?? conversation?.model ?? savedModel(provider, settings);
+  // A provider and a model are one choice, taken whole from whichever side
+  // made it (as `analysisRuntimeOver` does): a base naming only its provider
+  // must not borrow a model the conversation picked for another one.
+  const pair = base.provider || base.model ? base : conversation ?? {};
+  const provider = pair.provider ?? settings.provider;
+  const model = pair.model ?? savedModel(provider, settings);
   const choice = normalizeCompactModelChoice(settings.compactContext?.model);
   const picked =
     choice.kind === "fixed"

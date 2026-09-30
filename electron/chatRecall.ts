@@ -30,6 +30,11 @@ function entryTime(entry: PersistedChatEntry): number | undefined {
   return match ? parseInt(match[1]!, 16) : undefined;
 }
 
+/** Entries `toWireMessages` folds into the athlete message after them rather than sending as their own. */
+const RIDES_ON_NEXT = new Set<PersistedChatEntry["kind"]>(["planRefs", "scheduleRefs", "planEvent"]);
+/** Entries that are words on the wire; every other kind (a card) sends nothing. */
+const SENDS_WORDS = new Set<PersistedChatEntry["kind"]>(["message", "coachPrompt"]);
+
 /**
  * The entries as exchanges. One opens at each athlete message — except that a
  * question Coach asked on a card opens its own, so the answer the athlete
@@ -38,9 +43,13 @@ function entryTime(entry: PersistedChatEntry): number | undefined {
 function exchangesOf(entries: PersistedChatEntry[]): Exchange[] {
   const exchanges: Exchange[] = [];
   let current: Exchange | undefined;
-  for (const entry of entries) {
-    // One entry at a time, so each message keeps the time of the entry it came from.
-    toWireMessages([entry]).forEach((message, index) => {
+  let held: PersistedChatEntry[] = [];
+  const add = (entry: PersistedChatEntry) => {
+    // One entry at a time, so each message keeps the time of the entry it came
+    // from — with the notes before it, so "asking about" stays on its question.
+    const group = [...held, entry];
+    held = [];
+    toWireMessages(group).forEach((message, index) => {
       const opens = entry.kind === "coachPrompt" ? index === 0 : message.role === "user";
       if (opens || !current) {
         const at = entryTime(entry);
@@ -51,7 +60,13 @@ function exchangesOf(entries: PersistedChatEntry[]): Exchange[] {
       if (last?.role === message.role) last.content = `${last.content}\n\n${message.content}`;
       else current.lines.push({ ...message });
     });
+  };
+  for (const entry of entries) {
+    if (SENDS_WORDS.has(entry.kind)) add(entry);
+    else if (RIDES_ON_NEXT.has(entry.kind)) held.push(entry);
   }
+  const trailing = held.pop();
+  if (trailing) add(trailing);
   return exchanges;
 }
 

@@ -1673,6 +1673,16 @@ async function runInConversation(
   };
   const budget = optional(() => resolved.getContextBudget?.());
   const digestOf = optional(() => resolved.getDigests?.(session.entries));
+  // Section 7's default is resolved once, here, so the run log records what the
+  // run actually used rather than what the definition happened to leave blank —
+  // and so the roll and the digests run on the AI the run itself answers with,
+  // not the analysis's bare definition (which, naming no provider, meant
+  // Coach's default whatever the conversation used).
+  const conversation = resolved.getConversationSettings?.(analysis.sessionId);
+  const runtime = resolveAnalysisRuntime({
+    ...analysis,
+    runtime: analysisRuntimeOver(analysis.runtime, conversation?.runtime)
+  });
   const context = await applyTranscriptContext({
     entries: session.entries,
     stored: resolved.getSessionSummary(session.sessionId),
@@ -1683,13 +1693,13 @@ async function runInConversation(
       resolved.rollSummary(
         previous,
         toSummarise,
-        resolveAnalysisRuntime(analysis),
+        runtime,
         digestOf
       ),
     store: (rolled, through) =>
       resolved.setSessionSummary(session.sessionId, rolled, through),
     storeCondensed: (condensedThrough) => optional(() => resolved.setCondensedThrough?.(session.sessionId, condensedThrough)),
-    digest: (requests) => optional(() => resolved.requestDigests?.(session.sessionId, requests, resolveAnalysisRuntime(analysis)))
+    digest: (requests) => optional(() => resolved.requestDigests?.(session.sessionId, requests, runtime))
   });
   const summary = context.summary;
   const tail = context.tail;
@@ -1707,13 +1717,6 @@ async function runInConversation(
       : {};
   };
 
-  // Section 7's default is resolved once, here, so the run log records what the
-  // run actually used rather than what the definition happened to leave blank.
-  const conversation = resolved.getConversationSettings?.(analysis.sessionId);
-  const runtime = resolveAnalysisRuntime({
-    ...analysis,
-    runtime: analysisRuntimeOver(analysis.runtime, conversation?.runtime)
-  });
   const startedAt = resolved.now().toISOString();
   let run = resolved.recordRun({
     analysisId: analysis.id,

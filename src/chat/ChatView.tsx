@@ -5,6 +5,7 @@ import {
   useCallback,
   useEffect,
   useLayoutEffect,
+  useMemo,
   useRef,
   useState,
   type CSSProperties,
@@ -4237,6 +4238,28 @@ export function ChatView({
     />
   );
 
+  // Answers that place their charts, and the chart rows that then have no row
+  // of their own: a settled answer's charts are the ones just above it. Worked
+  // out once per timeline rather than on every streamed token, with each
+  // answer's words split from its next steps once for the row that draws them.
+  const settledAnswers = useMemo(() => {
+    const placedCharts = new Set<number>();
+    const placedAnswers = new Map<number, PlacedAnswer>();
+    const answerParts = new Map<number, { text: string; steps: string[] }>();
+    timeline.forEach((entry, index) => {
+      if (entry.kind !== "message" || entry.role !== "assistant") return;
+      const parts = splitNextSteps(entry.content);
+      answerParts.set(index, parts);
+      const placement = placeAnswerCharts(
+        parts.text,
+        chatSettings.visualizationsEnabled ? chartsAbove(timeline, index) : [],
+        placedCharts
+      );
+      if (placement) placedAnswers.set(index, placement);
+    });
+    return { placedCharts, placedAnswers, answerParts };
+  }, [timeline, chatSettings.visualizationsEnabled]);
+
   if (checkingAuth) {
     return (
       <div className="chat-view chat-view-centered">
@@ -4564,21 +4587,11 @@ export function ChatView({
       {thinkingText ? <ThinkingDisclosure content={thinkingText} live /> : null}
     </div>
   );
-  // Answers that place their charts, and the chart rows that then have no row
-  // of their own. A settled answer's charts are the ones just above it; the
-  // streaming answer's are the ones its turn has drawn so far, which is why a
-  // chart moves into the bubble when its placeholder arrives.
-  const placedCharts = new Set<number>();
-  const placedAnswers = new Map<number, PlacedAnswer>();
-  timeline.forEach((entry, index) => {
-    if (entry.kind !== "message" || entry.role !== "assistant") return;
-    const placement = placeAnswerCharts(
-      splitNextSteps(entry.content).text,
-      chatSettings.visualizationsEnabled ? chartsAbove(timeline, index) : [],
-      placedCharts
-    );
-    if (placement) placedAnswers.set(index, placement);
-  });
+  // The streaming answer's charts are the ones its turn has drawn so far, which
+  // is why a chart moves into the bubble when its placeholder arrives; it adds
+  // them to a copy, so the settled answers' placement stays as it was worked out.
+  const { placedAnswers, answerParts } = settledAnswers;
+  const placedCharts = new Set(settledAnswers.placedCharts);
   const shownStreamingText = splitNextSteps(holdBackPartialPlaceholder(streamingText)).text;
   // The conversation's last answer, the only one whose next steps are drawn:
   // an earlier one's were offered about a moment that has passed.
@@ -5282,12 +5295,12 @@ export function ChatView({
                         <ThinkingDisclosure content={entry.reasoningSummary} />
                       ) : null}
                       <AnswerBody
-                        content={splitNextSteps(entry.content).text}
+                        content={answerParts.get(index)?.text ?? entry.content}
                         placement={placedAnswers.get(index)}
                       />
                       {index === lastAnswerIndex && !turnHere ? (
                         <NextSteps
-                          steps={splitNextSteps(entry.content).steps}
+                          steps={answerParts.get(index)?.steps ?? []}
                           disabled={streaming || !api}
                           onPick={(text) => void sendMessage(text, undefined, [])}
                         />
