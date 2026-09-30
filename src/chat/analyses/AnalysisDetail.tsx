@@ -238,6 +238,7 @@ export function AnalysisDetailView({
       }
       await refresh();
       await onChanged();
+      onBack();
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : String(caught));
     } finally {
