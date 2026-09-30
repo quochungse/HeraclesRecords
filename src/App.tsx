@@ -139,6 +139,7 @@ import {
   type WatchPresentation,
 } from "./watchModels";
 import { isRunSportType } from "./running/runSurface";
+import { isRideSportType } from "./cycling/rideType";
 import { isStrengthSportType } from "./training/sportTypes";
 import appLogo from "../build/icon.png";
 import changelogMarkdown from "../CHANGELOG.md?raw";
@@ -229,6 +230,11 @@ const LazyTrainingLibraryView = preloadableLazy(() =>
 const LazyRunningView = lazy(() =>
   import("./running/RunningView").then(({ RunningView }) => ({
     default: RunningView,
+  })),
+);
+const LazyCyclingView = lazy(() =>
+  import("./cycling/CyclingView").then(({ CyclingView }) => ({
+    default: CyclingView,
   })),
 );
 const LazyStrengthView = lazy(() =>
@@ -512,7 +518,7 @@ export default function App() {
   const [selectedTrainingHubActivity, setSelectedTrainingHubActivity] =
     useState<TrainingHubActivity | null>(null);
   /*
-   * A session Activities handed to Running or Strength, waiting for that screen
+   * A session Activities handed to Running, Cycling or Strength, waiting for that screen
    * to mount and take it. It is held here rather than passed as an argument
    * because those screens are lazy: the view switches first and the component
    * arrives a tick later, with nowhere for an argument to have waited.
@@ -1105,7 +1111,8 @@ export default function App() {
       !api ||
       (activeView !== "training" &&
         activeView !== "overview" &&
-        activeView !== "running")
+        activeView !== "running" &&
+        activeView !== "cycling")
     ) {
       return;
     }
@@ -2706,7 +2713,7 @@ export default function App() {
           className={[
             "content",
             isOverviewDashboard && "content-overview",
-            (activeView === "media" || activeView === "coach" || activeView === "library" || activeView === "training" || activeView === "running") && "content-fill",
+            (activeView === "media" || activeView === "coach" || activeView === "library" || activeView === "training" || activeView === "running" || activeView === "cycling") && "content-fill",
           ]
             .filter(Boolean)
             .join(" ")}
@@ -2922,7 +2929,7 @@ export default function App() {
                      * A planned session that was trained, opened as the activity
                      * it became — on the screen built for its sport, the way
                      * Activities hands one over, and in Activities itself for a
-                     * ride or a swim, which have no screen of their own.
+                     * swim or anything else with no screen of its own.
                      */
                     onOpenActivity={(activityId) => {
                       const activity = trainingHubActivities.find(
@@ -2931,6 +2938,9 @@ export default function App() {
                       if (activity && isRunSportType(activity.sportType)) {
                         setSportScreenRequest({ view: "running", activityId, startTime: activity.startTime, from: "library" });
                         setActiveView("running");
+                      } else if (activity && isRideSportType(activity.sportType)) {
+                        setSportScreenRequest({ view: "cycling", activityId, startTime: activity.startTime, from: "library" });
+                        setActiveView("cycling");
                       } else if (activity && isStrengthSportType(activity.sportType)) {
                         setSportScreenRequest({ view: "strength", activityId, startTime: activity.startTime, from: "library" });
                         setActiveView("strength");
@@ -2963,6 +2973,32 @@ export default function App() {
                   onOpenOverview={() => setActiveView("overview")}
                   openRequest={
                     sportScreenRequest?.view === "running"
+                      ? sportScreenRequest
+                      : null
+                  }
+                  onOpenRequestHandled={() => setSportScreenRequest(null)}
+                  onReturn={setActiveView}
+                  onAskCoach={askCoach}
+                />
+              </Suspense>
+            ) : null}
+            {activeView === "cycling" ? (
+              <Suspense fallback={<DeferredSurfaceFallback label="cycling" />}>
+                <LazyCyclingView
+                  api={api}
+                  activities={trainingHubActivities}
+                  connected={Boolean(trainingHubStatus?.authenticated)}
+                  restoring={Boolean(trainingHubStatus?.restoring)}
+                  activitiesStatus={trainingHubActivitiesStatus}
+                  detail={trainingHubActivityDetail}
+                  detailRequest={trainingHubDetailRequest}
+                  snapshot={trainingHubSnapshot}
+                  busy={busy}
+                  onRetryActivities={() => void handleRunningActivitiesRetry()}
+                  onSelectActivity={handleTrainingHubActivityDetail}
+                  onOpenOverview={() => setActiveView("overview")}
+                  openRequest={
+                    sportScreenRequest?.view === "cycling"
                       ? sportScreenRequest
                       : null
                   }

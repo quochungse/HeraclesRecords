@@ -90,6 +90,37 @@ export const COROS_KNOWN_SPORT_TYPES: Readonly<Record<number, string>> = {
   65535: "All Sports"
 };
 
+/**
+ * Sports recorded without GPS: a trainer, a treadmill, a gym, a pool. COROS has
+ * no track for one of these anywhere — not in the payload and not in the GPX
+ * export built from the same recording — so asking for it only costs the wait.
+ */
+const INDOOR_SPORT_TYPES: ReadonlySet<number> = new Set([
+  101, //  Indoor Run
+  201, //  Indoor Bike
+  300, //  Pool Swim
+  400, //  Gym Cardio
+  402, //  Strength
+  701, //  Indoor Rowing
+  800, //  Indoor Climb
+  801, //  Bouldering
+  901, //  Jump Rope
+  902, //  Climb Stairs
+  903, //  Elliptical
+  904, //  Yoga
+  905, //  Pilates
+  906, //  Boxing
+  9900, // Custom Indoor Ball
+  9901, // Custom Indoor Strength
+  9902, // Custom Indoor Shape
+  9903, // Custom Indoor Dance
+  9904 //  Custom Indoor Other
+]);
+
+export function isIndoorSportType(sportType: number | undefined): boolean {
+  return sportType !== undefined && INDOOR_SPORT_TYPES.has(sportType);
+}
+
 export function corosSportName(
   sportType: number,
   explicitName?: string | null,

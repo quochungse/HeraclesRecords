@@ -324,11 +324,15 @@ database.upsertActivityDetailSummary(summary);
 // ---------------------------------------------------------------------------
 // 3b. A cached open asks COROS for nothing
 //
-// The payload coming off disk is only half of it: an activity with no GPS in
-// its payload — every strength session and treadmill run — falls back to
-// fetching a GPX file, two requests that would then be the *only* network calls
-// left on the path. Reopened offline, the run would sit through both timing out
-// to arrive exactly where it started.
+// The payload coming off disk is only half of it: an outdoor activity with no
+// GPS in its payload falls back to fetching a GPX file, two requests that would
+// then be the *only* network calls left on the path. Reopened offline, the run
+// would sit through both timing out to arrive exactly where it started.
+//
+// An indoor session does not fall back at all. COROS builds the GPX export on
+// request — the slowest thing on the path — and a trainer ride or a treadmill
+// run has no track in it to find; the first open of an indoor ride sat on its
+// placeholder for as long as the export took.
 // ---------------------------------------------------------------------------
 
 // A session with a token, pointed at a port nothing answers on, so any request
@@ -357,22 +361,62 @@ globalThis.fetch = async (...args) => {
   throw new Error("offline");
 };
 
-const first = await service.getTrainingHubActivityDetail(
+const indoorOpen = await service.getTrainingHubActivityDetail(
   indoor.activityId,
   indoor.sportType,
   indoor
+);
+assert.ok(indoorOpen.laps !== undefined, "the cached payload still parses");
+assert.equal(fetches, 0, "an indoor session asks for no GPX track, even the first time");
+
+const indoorRide = {
+  ...run,
+  activityId: "ride-indoor",
+  name: "Trainer hour",
+  sportType: 201
+};
+database.upsertTrainingActivities([indoorRide]);
+cache.writeCachedActivityDetail(
+  indoorRide.activityId,
+  cache.activityDetailFingerprint(indoorRide),
+  { summary: { totalTime: 360000, distance: 3000000 }, frequencyList: drifting }
+);
+await service.getTrainingHubActivityDetail(
+  indoorRide.activityId,
+  indoorRide.sportType,
+  indoorRide
+);
+assert.equal(fetches, 0, "nor does a ride on the trainer");
+
+// An outdoor run whose payload happens to carry no GPS still asks, once.
+const noGps = {
+  ...run,
+  activityId: "run-no-gps",
+  name: "Road run the payload lost the track of"
+};
+database.upsertTrainingActivities([noGps]);
+cache.writeCachedActivityDetail(
+  noGps.activityId,
+  cache.activityDetailFingerprint(noGps),
+  { summary: { totalTime: 357000, distance: 800000 }, frequencyList: drifting }
+);
+
+const first = await service.getTrainingHubActivityDetail(
+  noGps.activityId,
+  noGps.sportType,
+  noGps
 );
 assert.ok(first.laps !== undefined, "the cached payload still parses");
 const afterFirst = fetches;
 assert.ok(
   afterFirst > 0,
-  "the first open still asks whether COROS has a GPX track for it"
+  "the first open of an outdoor activity still asks whether COROS has a GPX track for it"
 );
 
 const second = await service.getTrainingHubActivityDetail(
-  indoor.activityId,
-  indoor.sportType,
-  indoor
+  noGps.activityId,
+  noGps.sportType,
+  noGps
 );
 assert.equal(second.laps !== undefined, true);
 assert.equal(
@@ -380,6 +424,30 @@ assert.equal(
   afterFirst,
   "reopening it asks COROS for nothing at all — payload cached, track known absent"
 );
+
+// A GPX fallback that never answers does not hold the detail: the track is a
+// refinement of a page that is otherwise complete.
+const hung = { ...run, activityId: "run-hung-export", name: "Export COROS never finished" };
+database.upsertTrainingActivities([hung]);
+cache.writeCachedActivityDetail(
+  hung.activityId,
+  cache.activityDetailFingerprint(hung),
+  { summary: { totalTime: 357000, distance: 800000 }, frequencyList: drifting }
+);
+globalThis.fetch = () => new Promise(() => {});
+const startedAt = Date.now();
+const hungOpen = await service.getTrainingHubActivityDetail(
+  hung.activityId,
+  hung.sportType,
+  hung
+);
+const waited = Date.now() - startedAt;
+assert.ok(hungOpen.laps !== undefined, "the detail arrives without its track");
+assert.ok(waited < 15_000, `a hung export is waited on for a bounded time, not ${waited}ms`);
+globalThis.fetch = async (...args) => {
+  fetches += 1;
+  throw new Error("offline");
+};
 
 // --- The mirror decides the fingerprint, not the caller's copy -------------
 //

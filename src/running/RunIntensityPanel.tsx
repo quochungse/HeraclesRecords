@@ -1,10 +1,16 @@
 import { useMemo } from "react";
 import type { ActivityDetailSummary, TrainingHubActivity } from "../../electron/types";
 import { formatDurationSeconds } from "../training/formatters";
-import { runIntensityMix, type RunIntensityMix, type RunZoneScale } from "./runMetrics";
+import { intensityMix, type RunIntensityMix, type RunZoneScale } from "./runMetrics";
+
+/** The sports this panel is drawn for, which change its words and nothing else. */
+export type IntensitySport = "run" | "ride";
 
 interface RunIntensityPanelProps {
-  runs: readonly TrainingHubActivity[];
+  /** Sessions of one sport, already narrowed by the screen's own filters. */
+  sessions: readonly TrainingHubActivity[];
+  /** Defaults to running, the screen this panel was built for. */
+  sport?: IntensitySport;
   zoneScale: RunZoneScale;
   /** The account's zone model, named — "Heart Rate Reserve". */
   zoneModelLabel?: string;
@@ -13,6 +19,19 @@ interface RunIntensityPanelProps {
 }
 
 type Band = "easy" | "moderate" | "hard";
+
+interface SportWords {
+  /** One session. */
+  one: string;
+  many: string;
+  /** The activity itself, as in "of running time". */
+  doing: string;
+}
+
+const WORDS: Record<IntensitySport, SportWords> = {
+  run: { one: "run", many: "runs", doing: "running" },
+  ride: { one: "ride", many: "rides", doing: "riding" }
+};
 
 const BANDS: readonly { key: Band; label: string }[] = [
   { key: "easy", label: "Easy" },
@@ -47,14 +66,16 @@ function shares(mix: RunIntensityMix, by: "count" | "duration") {
  * most of a week.
  */
 export function RunIntensityPanel({
-  runs,
+  sessions,
+  sport = "run",
   zoneScale,
   zoneModelLabel,
   summaries
 }: RunIntensityPanelProps) {
+  const words = WORDS[sport];
   const mix = useMemo(
-    () => runIntensityMix(runs, zoneScale, summaries),
-    [runs, summaries, zoneScale]
+    () => intensityMix(sessions, zoneScale, summaries),
+    [sessions, summaries, zoneScale]
   );
   const byTime = useMemo(() => shares(mix, "duration"), [mix]);
   const byCount = useMemo(() => shares(mix, "count"), [mix]);
@@ -76,8 +97,8 @@ export function RunIntensityPanel({
       <section className="panel run-block">
         <p className="running-eyebrow">Intensity mix</p>
         <p className="run-block-empty">
-          No runs with a heart rate in this window, so none of them can be
-          placed in a zone.
+          No {words.many} with a heart rate in this window, so none of them can
+          be placed in a zone.
         </p>
       </section>
     );
@@ -95,7 +116,7 @@ export function RunIntensityPanel({
           <p className="running-eyebrow">Intensity mix</p>
           <h3>
             {Math.round(easyTimeShare * 100)}%
-            <span className="run-block-sub"> of running time is easy</span>
+            <span className="run-block-sub"> of {words.doing} time is easy</span>
           </h3>
         </div>
         <p className="run-block-aside">
@@ -111,18 +132,18 @@ export function RunIntensityPanel({
       <IntensityBar
         title="By session"
         split={byCount}
-        format={(value) => `${value} ${value === 1 ? "run" : "runs"}`}
+        format={(value) => `${value} ${value === 1 ? words.one : words.many}`}
       />
 
       <p className="run-block-note">
         {zoneModelLabel ? `${zoneModelLabel} zones. ` : ""}
         {placed === 0
-          ? "Each run is placed by its average heart rate."
+          ? `Each ${words.one} is placed by its average heart rate.`
           : placed === byCount.total
-            ? "Every run is split by its time in each zone."
-            : `${placed} of ${byCount.total} runs are split by their time in each zone; the rest are placed by their average heart rate.`}
+            ? `Every ${words.one} is split by its time in each zone.`
+            : `${placed} of ${byCount.total} ${words.many} are split by their time in each zone; the rest are placed by their average heart rate.`}
         {mix.unrated.count > 0
-          ? ` ${mix.unrated.count} ${mix.unrated.count === 1 ? "run" : "runs"} recorded no heart rate and ${
+          ? ` ${mix.unrated.count} ${mix.unrated.count === 1 ? words.one : words.many} recorded no heart rate and ${
               mix.unrated.count === 1 ? "is" : "are"
             } left out.`
           : ""}

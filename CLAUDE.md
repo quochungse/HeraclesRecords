@@ -215,6 +215,13 @@ sweeps have no list row, and two sources let a stale renderer array write a file
 next sweep read as stale and deleted. A payload with none of `summary`/`lapList`/
 `frequencyList`/`graphList`/`zoneList` is neither cached nor summarised: COROS's `data: {}`
 parses as success and would otherwise be permanent.
+**A detail with no GPS asks for the GPX export, but never for an indoor sport and never for
+long.** COROS builds that export on request — the slowest thing on the path — and a trainer
+ride has no track in it, so the first open of an indoor ride sat on its placeholder until
+the export was done; reopened, it was instant (payload cached, track remembered absent),
+which read as "stuck the first time". `isIndoorSportType` (`corosSportTypes.ts`) skips it,
+and `GPX_FALLBACK_TIMEOUT_MS` bounds it for the outdoor activity whose payload lost its
+track; `test:activity-detail-cache` holds both.
 **Nothing about the file may enter the row.** `training_activity_summaries` is `derived`, and
 a column saying "cached, 131 KB" would reach another machine as a promise it cannot keep if
 it were ever reclassified — the trap `coach_analysis_local_triggers` exists to avoid. The
@@ -239,7 +246,7 @@ each one. Do not put the payload back on the detail to save a round trip.
 ### Feature domains
 
 Each is a main-process service plus a renderer view. `src/App.tsx` lazy-loads the heavy
-ones (Training Hub, Training Library, Strength, Calendar, Coach, Where you've been);
+ones (Training Hub, Training Library, Running, Cycling, Strength, Calendar, Coach, Where you've been);
 Overview, Media and Settings are in the main bundle.
 **Calendar and Training Library open on their own shimmer, never the generic spinner.**
 They are `preloadableLazy`: fetched once the first paint is idle, and a mount after that
@@ -737,13 +744,14 @@ lives at module level for the same visit-to-visit reason — see `useCalendarDat
   See [docs/training-library-architecture.md](docs/training-library-architecture.md).
 - **Activities** (`src/training/ActivitiesView.tsx`) — the all-sport log: every session COROS
   has, in one list, with a detail pane beside it. It is the only screen some sports ever
-  reach — Running covers sport codes 100–103 and Strength 400/402, so a ride, a hike, a swim
-  or a Hybrid Fitness session has no other home — and the only one that can compare sports
-  against each other, which is what the summary's mix bar is for. Depth per sport belongs on
-  Running and Strength; **a link out carries the session, not just the screen** — Activities
-  hands a `SportScreenRequest` to `App.tsx`, which holds it until the lazy screen mounts and
-  takes it (Running opens its full-page detail; Strength selects the row, widening its own
-  window first if the session predates it).
+  reach — Running covers sport codes 100–103, Cycling 200–205 and 299, and Strength 400/402,
+  so a hike, a swim or a Hybrid Fitness session has no other home — and the only one that can
+  compare sports against each other, which is what the summary's mix bar is for. Depth per
+  sport belongs on Running, Cycling and Strength; **a link out carries the session, not just
+  the screen** — Activities hands a `SportScreenRequest` to `App.tsx`, which holds it until
+  the lazy screen mounts and takes it (Running and Cycling open their full-page detail;
+  Strength selects the row, widening its own window first if the session predates it). A
+  ride's channel chart here reads speed and rpm, as it does on Cycling (`motion="speed"`).
   The arithmetic is out of the view on purpose, because it is the only part a test can reach:
   `activityFilters.ts` (periods cut at a Monday, sport categories, search, week grouping,
   totals), `activityFacts.ts` (which figures a row shows, per sport) and `activityDetail.ts`
@@ -759,6 +767,65 @@ lives at module level for the same visit-to-visit reason — see `useCalendarDat
   with Running and were moved out of `src/running/` for that — none of them ever asked what
   sport they were reading. Anything else that both screens need goes the same way rather than
   being copied.
+- **Cycling** (`src/cycling/`, built 2026-09-30) — Running's page built again for a bike: the
+  same shape (a kind filter and a period, a hero, totals, a weekly chart, intensity beside a
+  split by kind, a sortable list, a full-page detail that keeps the list's scroll) and **the
+  same stylesheet** — it carries `.running-view` and imports `running.css`, so the two sport
+  screens cannot drift apart; `cycling.css` holds only the five bike kinds' colours
+  (`--ride-*`, mixed off `--sport-bike` and mirrored as hex in `rideTypeColors.ts` — change
+  both). Rides split by **kind** (`rideType.ts`: Road 200/299, Gravel 203, Mountain 204,
+  Indoor 201, E-bike 202/205), not surface. Pieces are shared, not copied:
+  `RunIntensityPanel` takes `sport="ride"` over `intensityMix` (the sport-agnostic body
+  `runIntensityMix` now wraps — heart-rate zones belong to the athlete, so a ride is banded
+  exactly as a run is), the skeletons take a `label`, `DeltaChip` comes from `RunningHero`,
+  the period cut is `runWindowStartMs` re-exported as `rideWindowStartMs`, and FTP and weight
+  come off the same profile answer as the zone model (`useHeartRateZoneModel().profile`).
+  What differs is what a rider reads: **speed over the time that recorded a distance**
+  (`distanceDuration` — a trainer that measured nothing is riding time, not an hour at
+  0 km/h); **a week read in hours** — the hero's "This week" and its delta, and the volume
+  chart's opening measure, with distance and metres climbed a switch away — because an
+  indoor ride may record no distance and an hour off-road covers half the road's; a kind's
+  share **of riding time**, not distance; FTP and W/kg and the week's climb in the hero
+  instead of VO₂max and threshold pace; and `ActivitySeriesChart motion="speed"` —
+  **Speed** (km/h, worked out from the samples' `pace` by `withSpeed`) replaces Pace and
+  GAP, cadence reads rpm and averages over the pedalling, and the chart opens on power
+  against heart rate where a meter was fitted.
+  **The ride page reads what a run's has no equivalent for** (`rideAnalysis.ts`, node-free,
+  from the samples on activity time): a top speed held for five seconds, so one GPS jump is
+  not it; a **Power** panel (`RidePowerPanel`) with normalised power, IF and TSS against the
+  profile's FTP — *today's*: COROS keeps no FTP history, and the note under the panel says
+  so — variability, work in kJ, peak 5 s … 60 min and time in **COROS's own power zones**
+  (`cyclePower`, ceilings with a 900 W sentinel, read like every other COROS zone family;
+  COROS's default seven off the FTP when the account has none), coasting at 0 W left out of
+  the zones and stated beside them; and the **climbs** (`RideClimbsPanel`), found in the
+  altitude samples and kept once length × grade earns a category as Strava scores one.
+  **COROS's own `np`, `bicycleIf`, `work` and `trackClimbInfo` are not read**: they come back
+  0 or empty on every payload this account has, so their units are unverified — worked out
+  here, a test can hold them. A ride with no meter gets a Cadence panel instead; a single lap
+  draws no lap table (it is the ride again). **Left out on purpose:** the
+  aerobic-efficiency chart and decoupling, which on a bike measure the road and the wind as
+  much as the rider. Two things shared with other screens changed for rides: the route map
+  colours a ride's speed on the **ramp, never COROS's pace zones** (`performanceZones`) —
+  COROS scores every activity against the account's *running* threshold-pace zones, so a
+  road ride at 2:00/km sat in the top zone throughout and the line was one colour; and the
+  chart's segment line averages the **recorded samples** in its stretch, not the
+  downsampled rows, whose bucket means hid coasting from the zero-skip and put a ride's
+  cadence 10 rpm under the panel's. `npm run test:ride-metrics` holds the arithmetic, the
+  power, the zones and the climbs; `npm run test:cycling-renderer` mounts the page (it
+  pins `force-device-scale-factor` to 1, because on a display scaled to 125% every box is a
+  few thousandths of a pixel off — which is also why `test:running-renderer` fails its
+  "Expand holds the corner" on such a display, on code that is fine).
+  **`npm run dev:sample-rides`** (`HERACLES_SAMPLE_RIDES=1`, `electron/sampleRides.ts`) adds
+  twelve weeks of simulated outdoor rides around Hà Nội for working on and screenshotting the
+  screen: real roads (`sampleRideRoutes.ts`, generated by `npm run sample-rides:fetch` from
+  OSM through a bicycle router and SRTM, committed like the fonts), ridden a second at a time
+  by a power model, seeded so the figures hold across launches, and **ridden at the
+  account's FTP** (`setSampleRiderFtp`, read from the cached profile before the list goes
+  out; every watt scales, the effort does not), so the ride page's IF and TSS land where a
+  tempo ride's should. They are added at the
+  **window's door only** — the list, detail, raw and summaries IPC handlers in `main.ts` —
+  and reach no store, sweep, Coach tool or watcher; `npm run test:sample-rides` holds that,
+  that every list row agrees with its own page, and the FTP scaling.
 - **Workout defaults** (`electron/workoutDefaults.ts`) — what a step holds before
   anyone types. `workoutCapabilities.ts` says what a step *may* hold; this says where
   it starts, and the two are different questions. `emptyRow` used to answer the second
@@ -1910,9 +1977,9 @@ either since Watch Faces and Gear were removed — the first one to need them ag
 the flag.
 
 Styling is plain CSS with custom properties — no Tailwind, no CSS modules.
-`src/styles.css` (~31k lines) holds the design tokens and most rules; ten feature
-stylesheets sit beside their components (strength ×3, training ×2, profile, running, sleep,
-training-library, activity globe). Twelve in all, counting `fonts.css` — which is the number
+`src/styles.css` (~31k lines) holds the design tokens and most rules; eleven feature
+stylesheets sit beside their components (strength ×3, training ×2, profile, running, cycling,
+sleep, training-library, activity globe). Thirteen in all, counting `fonts.css` — which is the number
 the four CSS suites report. Themes are `dark` | `paper` via `src/theme/`, persisted to localStorage,
 and `THEME_WINDOW_BACKGROUND` must stay in sync with `--bg-base`. Sport colors live in both
 `src/styles.css` and `src/training/sportColors.ts` (the source of truth) —
@@ -2136,7 +2203,7 @@ neutralised, so the concept has to be reintroduced deliberately. A hardcoded `#8
 `var(--success-text)` and follows the theme.
 
 **The primary rail is an index, not a control panel.** `PRIMARY_NAV_SECTIONS`
-(`primaryNav.ts`) is four standing headings — Today, Plan, History, Device — over eleven
+(`primaryNav.ts`) is four standing headings — Today, Plan, History, Device — over twelve
 destinations, and a heading is a label: it does not open, close or remember anything. The
 disclosure groups this replaced existed only because eighteen equal rows did not fit, and
 they cost two rows, a chevron, a stored open/closed state, a rule that reopened a group
@@ -2180,7 +2247,7 @@ close to the ink (14.4:1 on dark, 11.7:1 on paper, measured in the running app) 
 of flattening it. Active still separates at 18.4:1 with weight 600, the accent icon and the
 bar. The heading sits between the two, one step quieter than a row rather than two.
 The scrollbar is gone because a 6px thumb sat a few pixels inside the rail's own hairline, so
-a short window drew **two vertical lines down the same edge** — for a list of eleven rows
+a short window drew **two vertical lines down the same edge** — for a list of twelve rows
 that fits whenever the window is not cramped. What a reader needs there is not a handle to
 drag but a sign that the list continues, so the cut edge fades: `--fade-top` / `--fade-bottom`
 are opened by `has-fade-top` / `has-fade-bottom`, which the rail sets from a **measured**

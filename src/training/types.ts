@@ -225,11 +225,11 @@ export type ActivitiesViewProps = Pick<
  *
  * It carries the session rather than only the screen name because arriving on
  * Running's list with nothing open is not what the button says it does: the
- * athlete was already looking at that run. Running opens its full-page detail;
- * Strength selects the session in its list.
+ * athlete was already looking at that run. Running and Cycling open their
+ * full-page detail; Strength selects the session in its list.
  */
 export interface SportScreenRequest {
-  view: "running" | "strength";
+  view: "running" | "cycling" | "strength";
   activityId: string;
   /**
    * Epoch seconds, as COROS sends it. Strength keeps a window of its own — 30
@@ -237,7 +237,7 @@ export interface SportScreenRequest {
    * is asked to select from; this is what lets it widen first.
    */
   startTime?: number;
-  /** The screen it was handed from, which Running's Back returns to. */
+  /** The screen it was handed from, which Running's and Cycling's Back return to. */
   from?: PrimaryView;
 }
 

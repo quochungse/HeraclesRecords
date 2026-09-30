@@ -18,6 +18,7 @@ import type { TrainingHubActivitySeriesPoint } from "../../electron/types";
 export type ActivityChannelKey =
   | "pace"
   | "adjustedPace"
+  | "speed"
   | "hr"
   | "cadence"
   | "power"
@@ -26,6 +27,21 @@ export type ActivityChannelKey =
   | "verticalOscillation"
   | "verticalRatio"
   | "altitude";
+
+/**
+ * How an activity's movement is read: as a pace, the way a run is, or as a
+ * speed, the way a ride is. The samples are the same — COROS sends every sport
+ * a `pace` in seconds per kilometre — but a cyclist reads 32 km/h, not 1:52/km,
+ * and a pace axis also runs the wrong way for them. Speed is worked out from
+ * that pace (`withSpeed`), so no parser has to know about it.
+ */
+export type ActivityMotion = "pace" | "speed";
+
+/** A sample as the chart reads it: the series point, plus its speed on a ride. */
+export type ActivityChannelPoint = TrainingHubActivitySeriesPoint & {
+  /** Kilometres per hour, from `pace`. Only set by `withSpeed`. */
+  speed?: number;
+};
 
 export interface ActivityChannelDefinition {
   key: ActivityChannelKey;
@@ -60,6 +76,7 @@ const ACTIVITY_CHANNELS: readonly ActivityChannelDefinition[] = [
     decimals: 0,
     reversed: true
   },
+  { key: "speed", label: "Speed", unit: "", decimals: 1 },
   { key: "hr", label: "Heart rate", unit: "bpm", decimals: 0 },
   { key: "cadence", label: "Cadence", unit: "spm", decimals: 0 },
   { key: "power", label: "Power", unit: "W", decimals: 0 },
@@ -100,8 +117,34 @@ const MIN_CHANNEL_SAMPLES = 2;
  */
 const MIN_ALTITUDE_RANGE_METERS = 10;
 
+/** Pace channels are read one way, speed the other; never both on one chart. */
+const MOTION_CHANNELS: Record<ActivityMotion, readonly ActivityChannelKey[]> = {
+  pace: ["pace", "adjustedPace"],
+  speed: ["speed"]
+};
+
+function isOtherMotion(key: ActivityChannelKey, motion: ActivityMotion): boolean {
+  const other: ActivityMotion = motion === "pace" ? "speed" : "pace";
+  return MOTION_CHANNELS[other].includes(key);
+}
+
+/**
+ * Kilometres per hour on every sample that has a pace. A sample stopped at a
+ * junction carries no pace, and gets no speed rather than a zero: the line
+ * bridges it the way it bridges a heart-rate dropout.
+ */
+export function withSpeed(
+  series: readonly TrainingHubActivitySeriesPoint[]
+): ActivityChannelPoint[] {
+  return series.map((point) =>
+    typeof point.pace === "number" && Number.isFinite(point.pace) && point.pace > 0
+      ? { ...point, speed: 3600 / point.pace }
+      : point
+  );
+}
+
 function channelRange(
-  series: readonly TrainingHubActivitySeriesPoint[],
+  series: readonly ActivityChannelPoint[],
   key: ActivityChannelKey
 ): number {
   let min = Number.POSITIVE_INFINITY;
@@ -118,7 +161,7 @@ function channelRange(
 
 /** How many samples a channel actually has in this run. */
 function countChannelSamples(
-  series: readonly TrainingHubActivitySeriesPoint[],
+  series: readonly ActivityChannelPoint[],
   key: ActivityChannelKey
 ): number {
   let count = 0;
@@ -132,9 +175,13 @@ function countChannelSamples(
 
 /** The channels this run can actually draw, in the order they are offered. */
 export function availableActivityChannels(
-  series: readonly TrainingHubActivitySeriesPoint[]
+  series: readonly ActivityChannelPoint[],
+  motion: ActivityMotion = "pace"
 ): ActivityChannelDefinition[] {
   return ACTIVITY_CHANNELS.filter((channel) => {
+    if (isOtherMotion(channel.key, motion)) {
+      return false;
+    }
     if (countChannelSamples(series, channel.key) < MIN_CHANNEL_SAMPLES) {
       return false;
     }
@@ -149,17 +196,26 @@ export function availableActivityChannels(
  * What the chart opens on: pace against heart rate, the pair that says whether
  * the run went the way it was meant to. Falls back to whatever the watch did
  * record, so an indoor run with no pace still opens on something.
+ *
+ * A ride opens on power against heart rate where a power meter was fitted —
+ * speed on a bike is as much the road and the wind as the rider — and on speed
+ * against heart rate where it was not, which the fallback below arrives at on
+ * its own because speed is offered ahead of heart rate.
  */
-const PREFERRED_CHANNELS: readonly ActivityChannelKey[] = ["pace", "hr"];
+const PREFERRED_CHANNELS: Record<ActivityMotion, readonly ActivityChannelKey[]> = {
+  pace: ["pace", "hr"],
+  speed: ["power", "hr"]
+};
 
 export function defaultSelectedChannels(
-  available: readonly ActivityChannelDefinition[]
+  available: readonly ActivityChannelDefinition[],
+  motion: ActivityMotion = "pace"
 ): ActivityChannelKey[] {
   const axisKeys = available
     .filter((channel) => !channel.background)
     .map((channel) => channel.key);
 
-  const chosen = PREFERRED_CHANNELS.filter((key) => axisKeys.includes(key));
+  const chosen = PREFERRED_CHANNELS[motion].filter((key) => axisKeys.includes(key));
 
   // Pace and heart rate are not a fixed pair — they are the pair *worth*
   // opening on. Whatever the watch did record fills any gap, so an indoor run
@@ -204,6 +260,9 @@ export interface ActivityChannelColors {
 const DARK_CHANNEL_COLORS: Record<ActivityChannelKey, ActivityChannelColors> = {
   pace: { stroke: "#74c08f", fill: "rgba(116, 192, 143, 0.18)" },
   adjustedPace: { stroke: "#4fd1c5", fill: "rgba(79, 209, 197, 0.18)" },
+  // Speed takes pace's colour: the two are one channel read two ways, and are
+  // never offered together.
+  speed: { stroke: "#74c08f", fill: "rgba(116, 192, 143, 0.18)" },
   hr: { stroke: "#f87171", fill: "rgba(248, 113, 113, 0.18)" },
   cadence: { stroke: "#b79bff", fill: "rgba(183, 155, 255, 0.18)" },
   power: { stroke: "#f3bf5c", fill: "rgba(243, 191, 92, 0.18)" },
@@ -217,6 +276,7 @@ const DARK_CHANNEL_COLORS: Record<ActivityChannelKey, ActivityChannelColors> = {
 const PAPER_CHANNEL_COLORS: Record<ActivityChannelKey, ActivityChannelColors> = {
   pace: { stroke: "#1f7a55", fill: "rgba(31, 122, 85, 0.16)" },
   adjustedPace: { stroke: "#0f766e", fill: "rgba(15, 118, 110, 0.16)" },
+  speed: { stroke: "#1f7a55", fill: "rgba(31, 122, 85, 0.16)" },
   hr: { stroke: "#c2410c", fill: "rgba(194, 65, 12, 0.16)" },
   cadence: { stroke: "#6d28d9", fill: "rgba(109, 40, 217, 0.16)" },
   power: { stroke: "#a16207", fill: "rgba(161, 98, 7, 0.16)" },

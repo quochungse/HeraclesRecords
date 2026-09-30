@@ -15,6 +15,7 @@ import {
 import {
   corosSportName,
   enrichActivitiesWithSportNames,
+  isIndoorSportType,
   mergeSportTypeEntries
 } from "./corosSportTypes";
 import {
@@ -1817,7 +1818,15 @@ export async function getTrainingHubActivityDetail(
       (point) => point.lat !== undefined && point.lon !== undefined
     ).length ?? 0;
 
-  if (gpsPointCount < 2 && !knownTrackless(activityId, fingerprint)) {
+  // An indoor session is not asked: COROS builds the GPX export on request,
+  // which is the slowest thing on this path, and on a trainer ride or a
+  // treadmill run it holds no track to find. The first open of an indoor ride
+  // sat on its placeholder for as long as that took.
+  if (
+    gpsPointCount < 2 &&
+    !isIndoorSportType(detail.sportType ?? sportType) &&
+    !knownTrackless(activityId, fingerprint)
+  ) {
     const gpxTrack = await fetchActivityTrackFromGpx(activityId, sportType);
     if (gpxTrack) {
       detail = {
@@ -1851,13 +1860,15 @@ export async function getTrainingHubActivityDetailRaw(
 }
 
 /**
- * Activities whose GPX was asked for and came back with nothing.
+ * Activities whose GPX was asked for and came back with nothing — or with
+ * nothing in time (`GPX_FALLBACK_TIMEOUT_MS`).
  *
- * A payload with no GPS is normal — every strength session and treadmill run —
- * and the fallback above is two requests: a signed URL, then the file. Once the
- * payload itself is served from disk those two are the *only* network calls
- * left on the path, so an indoor session reopened offline would sit through
- * both timing out to end up exactly where it started.
+ * Indoor sessions never get here (`isIndoorSportType`); this is the outdoor
+ * activity whose payload happens to carry no GPS. The fallback is two requests:
+ * a signed URL, then the file. Once the payload itself is served from disk
+ * those two are the *only* network calls left on the path, so such an activity
+ * reopened offline would sit through both timing out to end up exactly where it
+ * started.
  *
  * Keyed by fingerprint, so an upload COROS was still processing is asked again
  * the moment its figures change — and held in memory only, because "COROS had
@@ -6177,21 +6188,44 @@ function mergeActivityTracks(
   return existing.points.length >= incoming.points.length ? existing : incoming;
 }
 
+/**
+ * How long a detail waits on its GPX fallback. The track is a refinement of a
+ * page that is otherwise complete, and neither request on the way to it has a
+ * timeout of its own — so without this an export COROS was slow to build held
+ * the whole detail on its placeholder, however long that took.
+ */
+const GPX_FALLBACK_TIMEOUT_MS = 10_000;
+
 async function fetchActivityTrackFromGpx(
   activityId: string,
   sportType: number
 ): Promise<TrainingHubActivityTrack | undefined> {
-  try {
-    const fileUrl = await getTrainingHubActivityFileUrl(activityId, sportType, 1);
-    const response = await fetch(fileUrl);
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timedOut = new Promise<undefined>((resolve) => {
+    timer = setTimeout(() => resolve(undefined), GPX_FALLBACK_TIMEOUT_MS);
+  });
 
-    if (!response.ok) {
+  const fetched = (async () => {
+    try {
+      const fileUrl = await getTrainingHubActivityFileUrl(activityId, sportType, 1);
+      const response = await fetch(fileUrl, {
+        signal: AbortSignal.timeout(GPX_FALLBACK_TIMEOUT_MS)
+      });
+
+      if (!response.ok) {
+        return undefined;
+      }
+
+      return parseGpxTrack(await response.text());
+    } catch {
       return undefined;
     }
+  })();
 
-    return parseGpxTrack(await response.text());
-  } catch {
-    return undefined;
+  try {
+    return await Promise.race([fetched, timedOut]);
+  } finally {
+    clearTimeout(timer);
   }
 }
 

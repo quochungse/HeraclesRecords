@@ -599,6 +599,24 @@ export function runIntensityMix(
   zoneScale: RunZoneScale,
   summaries?: ReadonlyMap<string, ActivityDetailSummary>
 ): RunIntensityMix {
+  return intensityMix(
+    activities.filter((activity) => isRunSportType(activity.sportType)),
+    zoneScale,
+    summaries
+  );
+}
+
+/**
+ * The same split for any list of sessions, whatever the sport — the caller has
+ * already narrowed it. Heart-rate zones belong to the athlete, not to a sport:
+ * COROS scores a ride against the same model as a run, so Cycling reads its
+ * mix through the one banding rather than a copy of it a zone off.
+ */
+export function intensityMix(
+  activities: readonly TrainingHubActivity[],
+  zoneScale: RunZoneScale,
+  summaries?: ReadonlyMap<string, ActivityDetailSummary>
+): RunIntensityMix {
   const mix: RunIntensityMix = {
     easy: { count: 0, duration: 0 },
     moderate: { count: 0, duration: 0 },
@@ -608,10 +626,6 @@ export function runIntensityMix(
   };
 
   for (const activity of activities) {
-    if (!isRunSportType(activity.sportType)) {
-      continue;
-    }
-
     const duration = runSeconds(activity) ?? 0;
     const zoneSeconds = summaries?.get(activity.activityId)?.zoneSeconds;
     const scored = zoneSeconds?.reduce((sum, value) => sum + value, 0) ?? 0;

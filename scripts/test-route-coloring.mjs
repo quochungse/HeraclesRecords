@@ -334,6 +334,24 @@ assert.equal(coloring.elevationColor(400, false), coloring.elevationColor(400, f
     "one bucket with a floor is not a scale"
   );
 
+  // A ride's speed has no zones: COROS scores it against the running pace
+  // zones, and a road ride at 2:00/km then sat in the top one throughout.
+  const detail = { hrZones, paceZones };
+  assert.equal(coloring.performanceZones("pace", detail, false), paceZones, "a run is coloured by its pace zones");
+  assert.equal(coloring.performanceZones("pace", detail, true), undefined, "a ride's speed falls back to the ramp");
+  assert.equal(coloring.performanceZones("hr", detail, true), hrZones, "a ride keeps its heart-rate zones");
+  const rideSeries = series.map((point) => ({ ...point, pace: point.elapsed < 500 ? 120 : 110 }));
+  const rideValues = coloring.stretchValues(replay, rideSeries, "pace").values;
+  assert.equal(
+    new Set(coloring.zoneColoring(rideValues, "pace", paceZones).steps).size,
+    1,
+    "(which is the bug: every stretch of a 30 km/h ride lands in one running zone)"
+  );
+  assert.equal(
+    coloring.zoneColoring(rideValues, "pace", coloring.performanceZones("pace", detail, true)),
+    null
+  );
+
   // The map's copy of the zone colours is the zone bar's, bucket 0's grey
   // included, and a bucket past the last takes the last colour as the bar's
   // clamped `data-zone` does.

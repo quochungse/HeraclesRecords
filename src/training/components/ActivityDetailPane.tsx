@@ -34,6 +34,7 @@ import {
   resolveSportName
 } from "../sportTypes";
 import { isRunSportType } from "../../running/runSurface";
+import { isRideSportType } from "../../cycling/rideType";
 import { useUnitSystem } from "../../units/UnitSystemProvider";
 import { formatTemperatureValue } from "../../units/units";
 import { formatSpeedValue } from "../../units/units";
@@ -76,6 +77,13 @@ const ELEVATION_PROFILE_MIN_GAIN_M = 30;
 
 /** Paused time worth reporting, in seconds. Below this it is a traffic light. */
 const PAUSE_NOTICE_S = 60;
+
+/** What the "Open in …" button names, per screen built for a sport. */
+const SPORT_SCREEN_LABELS: Record<SportScreenRequest["view"], string> = {
+  running: "Running",
+  cycling: "Cycling",
+  strength: "Strength"
+};
 
 export function ActivityDetailPane({
   detail: incomingDetail,
@@ -400,16 +408,18 @@ export function ActivityDetailPane({
 
   /*
    * Which screen, if any, is built for this sport. Both answers are taken from
-   * the module that owns them rather than re-decided here — `isRunSportType`
+   * the modules that own them rather than re-decided here — `isRunSportType`
    * is where the deliberate exclusion of hikes and mountain climbs is written
    * down, and a door that disagrees with the room behind it is worse than no
    * door.
    */
   const sportScreen = isRunSportType(sportType)
     ? ("running" as const)
-    : isStrengthSportType(sportType)
-      ? ("strength" as const)
-      : null;
+    : isRideSportType(sportType)
+      ? ("cycling" as const)
+      : isStrengthSportType(sportType)
+        ? ("strength" as const)
+        : null;
 
   return (
     <div className="activity-detail-pane">
@@ -470,7 +480,7 @@ export function ActivityDetailPane({
                 })
               }
             >
-              Open in {sportScreen === "running" ? "Running" : "Strength"}
+              Open in {SPORT_SCREEN_LABELS[sportScreen]}
               <ArrowUpRight size={14} aria-hidden="true" />
             </button>
           ) : null}
@@ -523,6 +533,8 @@ export function ActivityDetailPane({
               onFocusLapHandled={() => setFocusLapIndex(null)}
               activityTime={duration}
               embedded
+              // A ride reads in km/h and rpm here as it does on Cycling.
+              motion={isRideSportType(sportType) ? "speed" : "pace"}
             />
           ) : null}
 

@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import type { CorosProfile } from "../../electron/types";
 import type { CorosLinkApi } from "../coroslink-api";
 import {
   heartRateZoneModelFromProfile,
@@ -22,6 +23,12 @@ export interface HeartRateZoneModelState {
    * time the screen mounted.
    */
   settled: boolean;
+  /**
+   * The profile the model was read from, for a screen that wants another
+   * threshold off the same answer — Cycling's FTP and weight — rather than a
+   * second request for it. Null until it arrives, and on a failure.
+   */
+  profile: CorosProfile | null;
 }
 
 /**
@@ -43,9 +50,10 @@ export function useHeartRateZoneModel({
   // Null until the request this connection made has answered. Cleared on
   // disconnect, so a reconnect waits for its own answer instead of reading the
   // last one.
-  const [answer, setAnswer] = useState<{ model: HeartRateZoneModel | null } | null>(
-    null
-  );
+  const [answer, setAnswer] = useState<{
+    model: HeartRateZoneModel | null;
+    profile: CorosProfile | null;
+  } | null>(null);
   const active = Boolean(api) && corosConnected;
 
   useEffect(() => {
@@ -60,12 +68,15 @@ export function useHeartRateZoneModel({
       .getCorosProfileSnapshot()
       .then((snapshot) => {
         if (!cancelled) {
-          setAnswer({ model: heartRateZoneModelFromProfile(snapshot.profile) });
+          setAnswer({
+            model: heartRateZoneModelFromProfile(snapshot.profile),
+            profile: snapshot.profile
+          });
         }
       })
       .catch(() => {
         if (!cancelled) {
-          setAnswer({ model: null });
+          setAnswer({ model: null, profile: null });
         }
       });
 
@@ -76,6 +87,7 @@ export function useHeartRateZoneModel({
 
   return {
     model: active ? (answer?.model ?? null) : null,
-    settled: !active || answer !== null
+    settled: !active || answer !== null,
+    profile: active ? (answer?.profile ?? null) : null
   };
 }

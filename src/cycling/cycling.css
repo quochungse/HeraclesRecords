@@ -1,0 +1,97 @@
+/*
+ * Cycling view.
+ *
+ * The page is Running's: it carries `.running-view` and draws with running.css,
+ * so the two sport screens share one layout and cannot drift apart in how a
+ * hero card, a block or a list row looks. This file holds only what a ride has
+ * and a run does not — the five kinds of bike and their colours, and the ride
+ * page's power and climb panels.
+ *
+ * Road is the athlete's own cycling colour, so recolouring cycling in Settings
+ * reaches this screen. The other four have no token of their own and are mixed
+ * off it, as a run's track and treadmill are off the run colour, so they read
+ * as one family. The same mixes are resolved to hex for the charts in
+ * rideTypeColors.ts; change both together.
+ */
+
+.cycling-view {
+  --ride-road: var(--sport-bike, #e6b800);
+  --ride-gravel: color-mix(in srgb, var(--sport-bike, #e6b800) 50%, #b0643c);
+  --ride-mountain: color-mix(in srgb, var(--sport-bike, #e6b800) 45%, #3f9b5c);
+  --ride-indoor: color-mix(in srgb, var(--sport-bike, #e6b800) 35%, var(--text-secondary));
+  --ride-ebike: color-mix(in srgb, var(--sport-bike, #e6b800) 30%, #4c8dff);
+}
+
+/* The chip is `.run-surface-chip` — its size and type are Running's — worn in
+   the ride's colour. */
+.ride-type-road {
+  background: color-mix(in srgb, var(--ride-road) 22%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ride-road) 45%, transparent);
+}
+
+.ride-type-gravel {
+  background: color-mix(in srgb, var(--ride-gravel) 22%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ride-gravel) 45%, transparent);
+}
+
+.ride-type-mountain {
+  background: color-mix(in srgb, var(--ride-mountain) 22%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ride-mountain) 45%, transparent);
+}
+
+.ride-type-indoor {
+  background: color-mix(in srgb, var(--ride-indoor) 22%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ride-indoor) 45%, transparent);
+}
+
+.ride-type-ebike {
+  background: color-mix(in srgb, var(--ride-ebike) 22%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ride-ebike) 45%, transparent);
+}
+
+/* A ride page states more than a run's — descent, calories — and its speed
+   carries a longer unit than a pace, which at Running's 120px wrapped
+   "20.4 km/h" onto two lines. */
+.cycling-view .run-detail-stats {
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+}
+
+/* The volume block's right-hand side: the year-ago figure and the measure
+   switch, which wrap under each other before either is squeezed. */
+.ride-volume-aside {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px 16px;
+}
+
+/* A section inside the power panel — peak power, the zones — under a small
+   heading of the intensity panel's kind. */
+.ride-power-section {
+  display: grid;
+  gap: 8px;
+}
+
+/* A climb's category, hottest first. Colour is the datum here, as a zone's is:
+   the ramp is the power zones' top end, so HC reads as the hardest thing on the
+   page. */
+.ride-climb-cat {
+  display: inline-block;
+  min-width: 44px;
+  margin-right: 8px;
+  padding: 2px 6px;
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--climb-color) 24%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--climb-color) 55%, transparent);
+  color: var(--text-primary);
+  font-size: 11px;
+  font-weight: 700;
+  text-align: center;
+}
+
+.ride-climb-cat[data-category="HC"] { --climb-color: #b4405c; }
+.ride-climb-cat[data-category="1"] { --climb-color: #dd5f4b; }
+.ride-climb-cat[data-category="2"] { --climb-color: #e08a3c; }
+.ride-climb-cat[data-category="3"] { --climb-color: #d8b13a; }
+.ride-climb-cat[data-category="4"] { --climb-color: #3fb27f; }
