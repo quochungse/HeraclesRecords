@@ -78,6 +78,7 @@ import { PlanDraftMark, type PlanDraftMarkKind } from "./PlanDraftMark";
 import { ConfirmDialog } from "./ConfirmDialog";
 import { resumeDraft, type PlanDraft } from "./planDraft";
 import { WorkoutWorkspace } from "./WorkoutWorkspace";
+import { TrainingLibrarySkeleton } from "./TrainingLibrarySkeleton";
 import {
   defineSelectionPreference,
   selectionIsOneOf,
@@ -285,18 +286,7 @@ export function TrainingLibraryView({
   }
 
   if (!snapshot && loading) {
-    return (
-      <section className="training-library-view">
-        <header className="tl-masthead">
-          <h1>Training Library</h1>
-        </header>
-        <div className="tl-skeleton" aria-label="Loading the training library">
-          {Array.from({ length: 7 }, (_, index) => (
-            <span key={index} style={{ "--tl-row-index": index } as React.CSSProperties} />
-          ))}
-        </div>
-      </section>
-    );
+    return <TrainingLibrarySkeleton />;
   }
 
   if (!snapshot && fatalError) {

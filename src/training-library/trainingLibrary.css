@@ -2748,8 +2748,10 @@
 
 .tl-skeleton {
   display: flex;
+  flex: 1 1 auto;
   flex-direction: column;
   gap: 1px;
+  min-height: 0;
   border: 1px solid var(--surface-line, var(--glass-border));
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-card);
@@ -2758,6 +2760,7 @@
 
 .tl-skeleton span {
   position: relative;
+  flex: none;
   height: 64px;
   background: var(--glass-bg);
   overflow: hidden;

@@ -233,6 +233,15 @@ each one. Do not put the payload back on the detail to save a round trip.
 Each is a main-process service plus a renderer view. `src/App.tsx` lazy-loads the heavy
 ones (Training Hub, Training Library, Strength, Calendar, Coach, Where you've been);
 Overview, Media, Data, and Settings are in the main bundle.
+**Calendar and Training Library open on their own shimmer, never the generic spinner.**
+They are `preloadableLazy`: fetched once the first paint is idle, and a mount after that
+renders the module directly — `lazy()` alone suspends a frame even on a warm module. A
+visit before it gets the screen's own skeleton as the Suspense fallback
+(`CalendarSkeleton`, `TrainingLibrarySkeleton`), built from the same pieces the screen
+draws before its data lands, so the chunk arriving moves nothing (`test:calendar-renderer`
+holds the grid's box). That is why `trainingLibrary.css` is imported by `main.tsx`, after
+`styles.css`: a fallback cannot wait on the chunk for its styles. The Calendar's range cache
+lives at module level for the same visit-to-visit reason — see `useCalendarData.ts`.
 
 - **Training Hub** (`trainingHubService.ts`, ~6.5k lines) — COROS `teamapi.coros.com` auth
   (password + 2FA ticket flow, multi-region base URL resolution), activities, analytics.

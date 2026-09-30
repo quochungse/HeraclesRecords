@@ -44,6 +44,7 @@ import { TrainingLibraryView } from "../../src/training-library/TrainingLibraryV
 import { ExercisePickerDialog } from "../../src/calendar/ExercisePickerDialog";
 import { AddWorkoutModal } from "../../src/calendar/AddWorkoutModal";
 import { CalendarView } from "../../src/calendar/CalendarView";
+import { CalendarSkeleton } from "../../src/calendar/CalendarSkeleton";
 import type { CorosLinkApi } from "../../src/coroslink-api";
 
 // ---------------------------------------------------------------------------
@@ -526,6 +527,8 @@ const MOUNTS: Record<string, (options: Record<string, unknown>) => ReactElement>
       />
     );
   },
+  /** App's Suspense fallback for the screen, drawn before its chunk loads. */
+  CalendarSkeleton: () => <CalendarSkeleton />,
   /** The whole screen, signed in. Its removal questions portal to
       `document.body`, so the driver finds them there. */
   CalendarView: () => {

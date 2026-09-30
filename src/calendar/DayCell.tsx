@@ -23,6 +23,7 @@ import {
 import type { CalendarDay, PlannedActualPair } from "./calendarTypes";
 import { formatPlannedVolume } from "./scheduledStructure";
 import { dayNumber } from "./dateUtils";
+import { DaySkeletonChips } from "./CalendarSkeleton";
 import {
   scheduledSportCategory,
   scheduledWorkoutSport
@@ -41,6 +42,11 @@ interface DayCellProps {
   onDropEntry: (payload: CalendarDragPayload, targetDay: string) => void;
   selectionMode: boolean;
   busy: boolean;
+  /**
+   * Set while the range has not been read: the day draws stand-in chips,
+   * their shimmer started this many milliseconds into the wave.
+   */
+  placeholderDelayMs?: number;
 }
 
 // Color a completed activity chip by sport, matching the training heatmap.
@@ -318,7 +324,8 @@ export function DayCell({
   onSelectDay,
   onDropEntry,
   selectionMode,
-  busy
+  busy,
+  placeholderDelayMs
 }: DayCellProps) {
   const { unitSystem } = useUnitSystem();
   const [dropTarget, setDropTarget] = useState(false);
@@ -326,6 +333,11 @@ export function DayCell({
   /* Only a day with something on it opens (UAT); an empty one has nothing to
      show but its + button. */
   const opens = !selectionMode && day.pairs.length + day.unplannedActivities.length > 0;
+  /* A day that already holds something (a week shared with the month before,
+     still on screen) shows it; only an empty one waits. */
+  const waiting =
+    placeholderDelayMs !== undefined &&
+    day.pairs.length + day.unplannedActivities.length === 0;
 
   return (
     <div
@@ -410,6 +422,13 @@ export function DayCell({
       </div>
 
       <div className="calendar-day-items">
+        {waiting ? (
+          <DaySkeletonChips
+            dateKey={day.dateKey}
+            mode={mode}
+            delayMs={placeholderDelayMs ?? 0}
+          />
+        ) : null}
         {day.pairs.map((pair) => (
           <PairChip
             key={`pair-${pair.scheduled.planId}-${pair.scheduled.idInPlan}`}

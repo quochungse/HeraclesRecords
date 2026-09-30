@@ -4,6 +4,7 @@ import {
   formatDurationSeconds
 } from "../training/formatters";
 import type { WeeklyStats } from "./calendarTypes";
+import { WeekStatsSkeleton } from "./CalendarSkeleton";
 import { useUnitSystem } from "../units/UnitSystemProvider";
 import {
   distanceUnit,
@@ -16,6 +17,8 @@ interface WeekStatsCellProps {
   stats: WeeklyStats;
   /** Whether the range on screen has been read, so an empty week is known to be empty. */
   loaded: boolean;
+  /** Set while the range has not been read: the cell shimmers, this far into the grid's wave. */
+  placeholderDelayMs?: number;
   onAskCoach: () => void;
 }
 
@@ -86,7 +89,12 @@ function loadBandTone(
   return { tone: "ok", title: `Inside the ${min}–${max} TL COROS recommends for this week.` };
 }
 
-export function WeekStatsCell({ stats, loaded, onAskCoach }: WeekStatsCellProps) {
+export function WeekStatsCell({
+  stats,
+  loaded,
+  placeholderDelayMs,
+  onAskCoach
+}: WeekStatsCellProps) {
   const { unitSystem } = useUnitSystem();
   const hasAny =
     stats.actualLoad > 0 ||
@@ -103,7 +111,13 @@ export function WeekStatsCell({ stats, loaded, onAskCoach }: WeekStatsCellProps)
        on every launch that their month was empty, then took it back. The cell
        stays, so the grid keeps its column, and says nothing. */
     if (!loaded) {
-      return <div className="calendar-weekstats" aria-hidden="true" />;
+      return (
+        <div className="calendar-weekstats" aria-hidden="true">
+          {placeholderDelayMs !== undefined ? (
+            <WeekStatsSkeleton delayMs={placeholderDelayMs} />
+          ) : null}
+        </div>
+      );
     }
     return (
       <div className="calendar-weekstats is-empty">
