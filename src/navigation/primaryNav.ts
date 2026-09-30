@@ -2,7 +2,6 @@ import {
   Activity,
   BookOpen,
   CalendarDays,
-  Database,
   Dumbbell,
   Gauge,
   Globe,
@@ -26,7 +25,6 @@ export type PrimaryView =
   | "library"
   | "strength"
   | "sleep"
-  | "data"
   | "calendar"
   | "coach"
   | "places"
@@ -57,7 +55,7 @@ export interface PrimaryNavSection {
 }
 
 /**
- * The rail reads as an index: four standing headings, twelve destinations,
+ * The rail reads as an index: four standing headings, eleven destinations,
  * nothing to open first.
  *
  * The sections answer *when the athlete reaches for a screen*, not where the
@@ -120,7 +118,6 @@ export const PRIMARY_NAV_SECTIONS: PrimaryNavSection[] = [
     items: [
       { id: "coros-overview", label: "Coros Overview", icon: Gauge },
       { id: "media", label: "Media", icon: Music },
-      { id: "data", label: "Data", icon: Database },
     ],
   },
 ];
@@ -129,7 +126,7 @@ export const PRIMARY_NAV_SECTIONS: PrimaryNavSection[] = [
  * The two destinations that are about the person rather than the training.
  * They sit in the identity row at the foot of the rail, which is where an
  * account and its settings are looked for — and keeping them out of the index
- * is what brings it down to twelve rows that fit without folding.
+ * is what brings it down to eleven rows that fit without folding.
  */
 export const PRIMARY_NAV_ACCOUNT_ITEMS: PrimaryNavItem[] = [
   { id: "profile", label: "Personal", icon: User },

@@ -15,7 +15,6 @@ import type {
   RestoreResult as BackupRestoreResult
 } from "./backup/backupTypes";
 import type {
-  ActivityBackupProgress,
   ActivityDetailSummary,
   ActivityDetailSummarySync,
   BinaryStatus,
@@ -152,8 +151,6 @@ import type {
   McpServerStatus,
   CorosTrainingPlanDraftInput,
   UploadPlanResult,
-  IntervalsStatus,
-  IntervalsActivityWithStatus,
   ScheduleChangeSet,
   ManualActivityInput
 } from "./types";
@@ -581,17 +578,6 @@ const api = {
     fileType: TrainingHubActivityFileType = 4
   ): Promise<TrainingHubExportResult> =>
     ipcRenderer.invoke("trainingHub:exportLatestActivityFile", fileType),
-  chooseActivityBackupFolder: (): Promise<string | null> =>
-    ipcRenderer.invoke("trainingHub:chooseBackupFolder"),
-  startActivityBackup: (
-    folder: string,
-    fileType: TrainingHubActivityFileType = 4
-  ): Promise<ActivityBackupProgress> =>
-    ipcRenderer.invoke("trainingHub:startActivityBackup", folder, fileType),
-  cancelActivityBackup: (): Promise<ActivityBackupProgress | null> =>
-    ipcRenderer.invoke("trainingHub:cancelActivityBackup"),
-  getActivityBackupProgress: (): Promise<ActivityBackupProgress | null> =>
-    ipcRenderer.invoke("trainingHub:getActivityBackupProgress"),
   onTrainingHubSessionChanged: (
     callback: (status: TrainingHubStatus) => void
   ): (() => void) => {
@@ -604,19 +590,6 @@ const api = {
     ipcRenderer.on("trainingHub:sessionChanged", listener);
     return () =>
       ipcRenderer.removeListener("trainingHub:sessionChanged", listener);
-  },
-  onActivityBackupProgress: (
-    callback: (progress: ActivityBackupProgress) => void
-  ): (() => void) => {
-    const listener = (
-      _event: Electron.IpcRendererEvent,
-      progress: ActivityBackupProgress
-    ) => {
-      callback(progress);
-    };
-    ipcRenderer.on("trainingHub:backupProgress", listener);
-    return () =>
-      ipcRenderer.removeListener("trainingHub:backupProgress", listener);
   },
   getTrainingAnalytics: (): Promise<TrainingHubAnalytics> =>
     ipcRenderer.invoke("trainingHub:getTrainingAnalytics"),
@@ -667,24 +640,6 @@ const api = {
     unitSystem: UnitSystem
   ): Promise<UploadPlanResult> =>
     ipcRenderer.invoke("trainingHub:uploadTrainingPlan", draft, unitSystem),
-  getIntervalsStatus: (): Promise<IntervalsStatus> =>
-    ipcRenderer.invoke("intervals:getStatus"),
-  connectIntervals: (
-    apiKey: string,
-    athleteId: string
-  ): Promise<IntervalsStatus> =>
-    ipcRenderer.invoke("intervals:connect", apiKey, athleteId),
-  disconnectIntervals: (): Promise<void> =>
-    ipcRenderer.invoke("intervals:disconnect"),
-  listMissingIntervalsActivities: (
-    daysBack: number
-  ): Promise<IntervalsActivityWithStatus[]> =>
-    ipcRenderer.invoke("intervals:listMissing", daysBack),
-  importIntervalsActivity: (
-    intervalsId: string,
-    fileExt: "fit" | "tcx" | "unknown"
-  ): Promise<{ importId: string }> =>
-    ipcRenderer.invoke("intervals:import", intervalsId, fileExt),
   addManualActivityToCoros: (
     input: ManualActivityInput
   ): Promise<{ importId: string }> =>

@@ -14,7 +14,6 @@ import type {
   RestoreResult as BackupRestoreResult
 } from "../electron/backup/backupTypes";
 import type {
-  ActivityBackupProgress,
   BinaryStatus,
   CoachAnalysisSessionAttention,
   CombinedDownloadProgressEvent,
@@ -149,8 +148,6 @@ import type {
   McpServerStatus,
   CorosTrainingPlanDraftInput,
   UploadPlanResult,
-  IntervalsStatus,
-  IntervalsActivityWithStatus,
   ScheduleChangeSet,
   ManualActivityInput,
   ActivityDetailSummary,
@@ -437,16 +434,6 @@ export interface CorosLinkApi {
   exportLatestTrainingHubActivityFile: (
     fileType?: TrainingHubActivityFileType
   ) => Promise<TrainingHubExportResult>;
-  chooseActivityBackupFolder: () => Promise<string | null>;
-  startActivityBackup: (
-    folder: string,
-    fileType?: TrainingHubActivityFileType
-  ) => Promise<ActivityBackupProgress>;
-  cancelActivityBackup: () => Promise<ActivityBackupProgress | null>;
-  getActivityBackupProgress: () => Promise<ActivityBackupProgress | null>;
-  onActivityBackupProgress: (
-    callback: (progress: ActivityBackupProgress) => void
-  ) => () => void;
   /** The COROS session changed without anyone clicking for it: a start-up
    *  re-login from saved credentials, or a token another of the athlete's
    *  machines invalidated by signing in. Every click-driven change comes back
@@ -484,16 +471,6 @@ export interface CorosLinkApi {
     draft: CorosTrainingPlanDraftInput,
     unitSystem: UnitSystem
   ) => Promise<UploadPlanResult>;
-  getIntervalsStatus: () => Promise<IntervalsStatus>;
-  connectIntervals: (apiKey: string, athleteId: string) => Promise<IntervalsStatus>;
-  disconnectIntervals: () => Promise<void>;
-  listMissingIntervalsActivities: (
-    daysBack: number
-  ) => Promise<IntervalsActivityWithStatus[]>;
-  importIntervalsActivity: (
-    intervalsId: string,
-    fileExt: "fit" | "tcx" | "unknown"
-  ) => Promise<{ importId: string }>;
   addManualActivityToCoros: (
     input: ManualActivityInput
   ) => Promise<{ importId: string }>;

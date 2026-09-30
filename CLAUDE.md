@@ -60,6 +60,14 @@ chooser, and the macOS location entitlement. **The base map code survived the Ma
 and moved** — see `src/mapBase/` below. So did reverse geocoding, as `places:reverseGeocode`
 (`reverseGeocodeService.ts`), because "Where you've been" names its clusters with it.
 
+**The Data screen went the same way on 2026-09-30**, with both of its tools: the bulk
+activity backup (`activityBackupService`, a folder of every activity file) and the
+intervals.icu import (`intervalsService`, `intervalsMatch`), nine IPC channels, the
+backup's progress push and four suites. The three `intervals.*` settings — an API key among them — are deleted on open by
+`dropRetiredIntervalsSettings`. What stays is what other screens use:
+`uploadActivityFitToCoros` (the Calendar's manual activity), exporting a single activity
+file, and `.data-connect-panel`, the "connect COROS first" panel four screens draw.
+
 **The "Website" and "Support the project" links still point upstream on purpose** —
 [ResourcesMenu.tsx](src/components/ResourcesMenu.tsx) and
 [SettingsView.tsx](src/settings/SettingsView.tsx). Only "Source on GitHub" and "Report an
@@ -232,7 +240,7 @@ each one. Do not put the payload back on the detail to save a round trip.
 
 Each is a main-process service plus a renderer view. `src/App.tsx` lazy-loads the heavy
 ones (Training Hub, Training Library, Strength, Calendar, Coach, Where you've been);
-Overview, Media, Data, and Settings are in the main bundle.
+Overview, Media and Settings are in the main bundle.
 **Calendar and Training Library open on their own shimmer, never the generic spinner.**
 They are `preloadableLazy`: fetched once the first paint is idle, and a mount after that
 renders the module directly — `lazy()` alone suspends a frame even on a warm module. A
@@ -1996,10 +2004,10 @@ reads as chrome under a panel and as a tint under a sheet hanging over the page.
 shorthand resets it, so the declared size sat there doing nothing and every trigger in the app
 drew at the page's 16px, a size that is not on the scale and two steps above the chips a pill
 trigger stands in a row with.
-**Twelve controls are exempt**, each named in the test by file *and* by a string from the
+**Thirteen controls are exempt**, each named in the test by file *and* by a string from the
 element, so an exemption covers one control rather than a whole file. They are four kinds and
 none is a row of options: a grid whose arrangement carries meaning (sports, a month of days),
-cards that need a sentence (export formats, plan difficulty, analysis starters), a list of
+cards that need a sentence (plan difficulty, analysis starters), a list of
 records (places, search results, exercise facets, muscle layers) and a menu (the base-map
 popup, the start-up view).
 
@@ -2128,7 +2136,7 @@ neutralised, so the concept has to be reintroduced deliberately. A hardcoded `#8
 `var(--success-text)` and follows the theme.
 
 **The primary rail is an index, not a control panel.** `PRIMARY_NAV_SECTIONS`
-(`primaryNav.ts`) is four standing headings — Today, Plan, History, Device — over twelve
+(`primaryNav.ts`) is four standing headings — Today, Plan, History, Device — over eleven
 destinations, and a heading is a label: it does not open, close or remember anything. The
 disclosure groups this replaced existed only because eighteen equal rows did not fit, and
 they cost two rows, a chevron, a stored open/closed state, a rule that reopened a group
@@ -2172,7 +2180,7 @@ close to the ink (14.4:1 on dark, 11.7:1 on paper, measured in the running app) 
 of flattening it. Active still separates at 18.4:1 with weight 600, the accent icon and the
 bar. The heading sits between the two, one step quieter than a row rather than two.
 The scrollbar is gone because a 6px thumb sat a few pixels inside the rail's own hairline, so
-a short window drew **two vertical lines down the same edge** — for a list of twelve rows
+a short window drew **two vertical lines down the same edge** — for a list of eleven rows
 that fits whenever the window is not cramped. What a reader needs there is not a handle to
 drag but a sign that the list continues, so the cut edge fades: `--fade-top` / `--fade-bottom`
 are opened by `has-fade-top` / `has-fade-bottom`, which the rail sets from a **measured**

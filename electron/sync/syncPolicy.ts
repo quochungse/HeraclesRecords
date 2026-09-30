@@ -199,8 +199,6 @@ export const SETTING_POLICY: Readonly<Record<string, SyncTier>> = {
   "appleMusic.credentialsJson": "device",
   "hevy.apiKey": "device",
   "hevy.identity": "device",
-  "intervals.apiKey": "device",
-  "intervals.athleteId": "device",
   "corosMcp.tokens": "device",
   "corosMcp.clientInfo": "device",
   // Just the server address, and it mirrors mcp_servers.url.
@@ -270,7 +268,6 @@ export const SETTING_POLICY: Readonly<Record<string, SyncTier>> = {
   "hevy.eventCursor": "device",
   "hevy.coverageSince": "device",
   "hevy.lastSyncedAt": "device",
-  "intervals.importedAt": "device",
   "coachAutomation.activityWatcherInitializedAt": "device",
   "coachAutomation.dailySamplesCapturedAt": "device",
   // Names this machine's own oplog directory. Two installs sharing one id would
@@ -341,7 +338,6 @@ export const DEVICE_ENCRYPTED_SETTINGS: ReadonlySet<string> = new Set([
   "chat.openRouter.apiKey", // chatService
   "chat.local.apiKey", // chatService
   "hevy.apiKey", // hevyService
-  "intervals.apiKey", // intervalsService
   "corosMcp.tokens", // mcpClientManager
   "corosMcp.clientInfo", // mcpClientManager
   "sync.google.clientKey", // googleOAuth
