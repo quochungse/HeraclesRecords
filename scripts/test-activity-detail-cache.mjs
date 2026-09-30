@@ -449,6 +449,12 @@ globalThis.fetch = async (...args) => {
   throw new Error("offline");
 };
 
+// Running out of time is not an answer: COROS keeps the export it was slow to
+// build, so the next open asks again rather than being told there is no track.
+const beforeRetry = fetches;
+await service.getTrainingHubActivityDetail(hung.activityId, hung.sportType, hung);
+assert.ok(fetches > beforeRetry, "a timed-out export is asked for again on the next open");
+
 // --- The mirror decides the fingerprint, not the caller's copy -------------
 //
 // A renderer still holding the list from before a correction landed passes a

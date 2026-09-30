@@ -1827,11 +1827,14 @@ export async function getTrainingHubActivityDetail(
     !isIndoorSportType(detail.sportType ?? sportType) &&
     !knownTrackless(activityId, fingerprint)
   ) {
-    const gpxTrack = await fetchActivityTrackFromGpx(activityId, sportType);
-    if (gpxTrack) {
+    const gpx = await fetchActivityTrackFromGpx(activityId, sportType);
+    if (gpx === GPX_TIMED_OUT) {
+      // Not remembered: COROS builds the export on request and keeps it, so the
+      // next open is likely to find it ready. Only an answer is an answer.
+    } else if (gpx) {
       detail = {
         ...detail,
-        track: mergeActivityTracks(detail.track, gpxTrack)
+        track: mergeActivityTracks(detail.track, gpx)
       };
     } else {
       rememberTrackless(activityId, fingerprint);
@@ -1860,8 +1863,9 @@ export async function getTrainingHubActivityDetailRaw(
 }
 
 /**
- * Activities whose GPX was asked for and came back with nothing — or with
- * nothing in time (`GPX_FALLBACK_TIMEOUT_MS`).
+ * Activities whose GPX was asked for and came back with nothing. One that did
+ * not come back in time (`GPX_FALLBACK_TIMEOUT_MS`) is not among them: it is
+ * asked again on the next open.
  *
  * Indoor sessions never get here (`isIndoorSportType`); this is the outdoor
  * activity whose payload happens to carry no GPS. The fallback is two requests:
@@ -6196,13 +6200,20 @@ function mergeActivityTracks(
  */
 const GPX_FALLBACK_TIMEOUT_MS = 10_000;
 
+/** What the fallback answers when COROS had not answered in time — unlike `undefined`, not a "no". */
+const GPX_TIMED_OUT = "timed-out";
+
+/**
+ * The activity's track out of its GPX export: the track, `undefined` when COROS
+ * answered without one (or the request failed), or `GPX_TIMED_OUT`.
+ */
 async function fetchActivityTrackFromGpx(
   activityId: string,
   sportType: number
-): Promise<TrainingHubActivityTrack | undefined> {
+): Promise<TrainingHubActivityTrack | undefined | typeof GPX_TIMED_OUT> {
   let timer: ReturnType<typeof setTimeout> | undefined;
-  const timedOut = new Promise<undefined>((resolve) => {
-    timer = setTimeout(() => resolve(undefined), GPX_FALLBACK_TIMEOUT_MS);
+  const timedOut = new Promise<typeof GPX_TIMED_OUT>((resolve) => {
+    timer = setTimeout(() => resolve(GPX_TIMED_OUT), GPX_FALLBACK_TIMEOUT_MS);
   });
 
   const fetched = (async () => {
