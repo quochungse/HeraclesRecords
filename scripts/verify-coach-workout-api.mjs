@@ -15,6 +15,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
+import { openSecretSetting } from "./lib/open-secret-setting.mjs";
 
 const repoRoot = path.resolve(import.meta.dirname, "..");
 const distUrl = (file) =>
@@ -51,7 +52,7 @@ const setting = (key) =>
     { encoding: "utf8" }
   ).trim() || undefined;
 const auth = {
-  accessToken: setting("trainingHub.accessToken"),
+  accessToken: openSecretSetting(setting("trainingHub.accessToken")),
   userId: setting("trainingHub.userId"),
   baseUrl: setting("trainingHub.baseUrl")
 };
@@ -173,7 +174,7 @@ function flattenExerciseCatalog(value) {
 }
 
 const probeSuffix = Date.now().toString(36);
-const probeName = `CorosLink coach structured probe ${probeSuffix}`;
+const probeName = `Heracles Records coach structured probe ${probeSuffix}`;
 const happenDay = futureDay(61);
 let programId;
 let scheduledIdInPlan;

@@ -387,6 +387,17 @@ interface YouTubeDownloadItem {
 export default function App() {
   const api: CorosLinkApi | undefined = window.corosLink;
   const [activeView, setActiveView] = useState<View>(readStartupView);
+  /**
+   * `.content` is one scroller shared by every screen, so a screen used to open
+   * at whatever depth the last one was left at — leaving Settings scrolled down
+   * opened Overview with its title cut off. Each screen opens at its top; the
+   * screens that keep a scroll of their own (a sport page's list) keep it in
+   * their own scroller.
+   */
+  const contentRef = useRef<HTMLElement>(null);
+  useEffect(() => {
+    contentRef.current?.scrollTo({ top: 0 });
+  }, [activeView]);
   const [startupView, setStartupView] = useState<View>(readStartupView);
   const [hiddenSportScreens, setHiddenSportScreens] = useState<SportScreen[]>(
     readHiddenSportScreens,
@@ -2760,6 +2771,7 @@ export default function App() {
         />
 
         <main
+          ref={contentRef}
           className={[
             "content",
             isOverviewDashboard && "content-overview",
@@ -4582,7 +4594,7 @@ function YouTubeBrowserView({
               className="youtube-webview"
               src={webviewSrc}
               partition="persist:coroslink-youtube"
-              webpreferences="contextIsolation=yes,nodeIntegration=no,sandbox=no"
+              webpreferences="contextIsolation=yes,nodeIntegration=no,sandbox=yes"
             />
 
             {loadError ? (
@@ -4979,7 +4991,7 @@ function YouTubeMusicLoginBrowser() {
           className="youtube-webview"
           src={YOUTUBE_MUSIC_URL}
           partition="persist:coroslink-ytmusic"
-          webpreferences="contextIsolation=yes,nodeIntegration=no,sandbox=no"
+          webpreferences="contextIsolation=yes,nodeIntegration=no,sandbox=yes"
         />
         {loading ? (
           <div className="browser-loading">
@@ -7076,7 +7088,7 @@ function AppleMusicLoginBrowser() {
           className="youtube-webview apple-music-webview"
           src={APPLE_MUSIC_LOGIN_URL}
           partition="persist:coroslink-apple"
-          webpreferences="contextIsolation=yes,nodeIntegration=no,sandbox=no"
+          webpreferences="contextIsolation=yes,nodeIntegration=no,sandbox=yes"
         />
         {loading ? (
           <div className="browser-loading">

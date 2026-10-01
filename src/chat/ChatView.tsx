@@ -1,5 +1,6 @@
 import {
   Suspense,
+  isValidElement,
   lazy,
   memo,
   useCallback,
@@ -117,6 +118,7 @@ import { latestOutlineAnchors, outlineStepText } from "./planOutlineModel";
 import { ConfirmDialog } from "../training-library/ConfirmDialog";
 import { createPortal } from "react-dom";
 import { firstPlanMonday } from "../../electron/trainingPlanGeneration";
+import { linkDestination } from "../../electron/externalLinks";
 import { defaultPlanBriefRequest } from "../../electron/planBrief";
 import { creationCalendar, localDayKey } from "./creationCalendar";
 import {
@@ -278,13 +280,66 @@ const DEFAULT_CHAT_SETTINGS: ChatSettings = {
 };
 
 const CHAT_MARKDOWN_REMARK_PLUGINS = [remarkGfm];
+
+/** A rendered node's text, for comparing a link's words with its address. */
+function plainText(node: ReactNode): string {
+  if (typeof node === "string" || typeof node === "number") return String(node);
+  if (Array.isArray(node)) return node.map(plainText).join("");
+  if (isValidElement<{ children?: ReactNode }>(node)) return plainText(node.props.children);
+  return "";
+}
+
+/** The destination beside a link, unless the link's own words already name it. */
+function LinkDestination({ label, destination }: { label: ReactNode; destination: string }) {
+  if (plainText(label).toLowerCase().includes(destination.toLowerCase())) return null;
+  return <span className="chat-link-host"> ({destination})</span>;
+}
+
+/**
+ * An answer's words are the model's, and so can be a third-party tool's: a link
+ * can read "Open plan" over any address. So every link says where it goes — its
+ * host beside it and the whole address in its tooltip — opens in the browser
+ * on a click, and is not a link at all unless it is a web or mail address (a
+ * relative one resolves to `file://` in a packaged build; `externalLinks.ts`).
+ */
 const CHAT_MARKDOWN_COMPONENTS: Components = {
-  // Render links in the user's browser, not inside the app window.
-  a: ({ children, ...props }) => (
-    <a {...props} target="_blank" rel="noreferrer">
-      {children}
-    </a>
-  )
+  a: ({ children, href }) => {
+    const destination = linkDestination(href);
+    if (!href || !destination) {
+      return (
+        <span className="chat-link-refused" title={href ? `Not a web link: ${href}` : undefined}>
+          {children}
+        </span>
+      );
+    }
+    return (
+      <>
+        <a href={href} target="_blank" rel="noreferrer" title={href}>
+          {children}
+        </a>
+        <LinkDestination label={children} destination={destination} />
+      </>
+    );
+  },
+  // An image is not fetched. Loading it would send a request to whatever host
+  // the answer names, with no click, and its address can carry anything — so it
+  // is drawn as a link to the picture instead.
+  img: ({ src, alt }) => {
+    const source = typeof src === "string" ? src : undefined;
+    const destination = linkDestination(source);
+    const label = alt?.trim() || "Image";
+    if (!source || !destination) {
+      return <span className="chat-link-refused">{label}</span>;
+    }
+    return (
+      <>
+        <a href={source} target="_blank" rel="noreferrer" title={source}>
+          {label}
+        </a>
+        <span className="chat-link-host"> ({destination})</span>
+      </>
+    );
+  }
 };
 
 const AssistantMarkdown = memo(function AssistantMarkdown({

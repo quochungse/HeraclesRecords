@@ -68,10 +68,27 @@ backup's progress push and four suites. The three `intervals.*` settings — an 
 `uploadActivityFitToCoros` (the Calendar's manual activity), exporting a single activity
 file, and `.data-connect-panel`, the "connect COROS first" panel four screens draw.
 
-**The "Website" and "Support the project" links still point upstream on purpose** —
-[ResourcesMenu.tsx](src/components/ResourcesMenu.tsx) and
-[SettingsView.tsx](src/settings/SettingsView.tsx). Only "Source on GitHub" and "Report an
-issue" were repointed at this fork, because issues belong here.
+**Every link in the app points at this fork** (since 2026-10-01). Settings → About's
+"Website" goes to the fork's repository until there is a site of its own, beside "Source on
+GitHub" and "Report an issue"; the upstream "Support the project" link and `DonateButton`
+went in 85219aa. `.github/FUNDING.yml` (Buy Me a Coffee `quochungse`) and `CODEOWNERS`
+(`@quochungse`) are the fork's. **`LICENSE` keeps upstream's `Copyright (c) 2026 AtoZ` line
+beside the fork's own** — MIT requires that notice in every copy, so it is not branding to
+clean up. What else ships with the app is credited in `THIRD_PARTY_NOTICES.md`, and
+`scripts/collect-licenses.mjs` (the last step of `build:renderer`) writes `dist/licenses/`:
+`LICENSE.txt`, the notices, and `THIRD_PARTY_LICENSES.txt` — the license text of every
+non-dev package in `package-lock.json` and of the three fonts (`src/assets/fonts/licenses`,
+OFL). electron-builder installs it as `resources/licenses`; Settings → About's **Licenses**
+opens it (`app:openLicenses`). FFmpeg's GPLv3 text and README are copied beside the binary
+by `prepare-binaries` (`ffmpeg-LICENSE.txt`, `ffmpeg-README.txt`). A package added later is
+covered by the next build; a bundled program or asset added later needs its own entry in the
+notices.
+
+**Internal names keep `coroslink` where renaming would cost users data**: `coroslink.sqlite`,
+the `coroslink.*` localStorage keys and the `persist:coroslink-*` webview partitions (the
+YouTube and Apple Music sign-ins). Names that only leave the machine were renamed — the
+Claude Agent SDK client app (`heracles-records-coach`), its MCP server (`heracles`, so tools
+are `mcp__heracles__*`), the manual activity's upload file name, the build's User-Agent.
 
 **`website/` is left untouched, branding included.** `website/public/icon.png` and
 `og-image.png` are still byte-identical to upstream's, and the site is not deployed from this
@@ -154,6 +171,45 @@ electron/main.ts        →  ~212 ipcMain.handle registrations + app lifecycle
                         ↓
 electron/*Service.ts    →  the actual work; electron/database.ts owns SQLite
 ```
+
+### What the window may reach (hardened for 1.0)
+
+- **No URL reaches `shell.openExternal` unchecked.** `electron/externalLinks.ts` (node-free,
+  shared with the renderer) allows `https:`, `http:` and `mailto:` and nothing else; the main
+  window's `setWindowOpenHandler` goes through it. The page is `file://` in a packaged build,
+  so a relative link in a Coach answer — `[Open plan](/C:/Windows/System32/calc.exe)` — used
+  to resolve to a program the OS would launch, and `//host/share` to an SMB request.
+  `test:external-links` holds the refusals.
+- **A Coach answer's links say where they go** (`CHAT_MARKDOWN_COMPONENTS` in `ChatView`):
+  the host beside the words unless the words already name it, the whole address as the
+  tooltip, and a link that is not a web or mail address drawn as plain text. **Images in an
+  answer are not fetched** — loading one sent a request to any host the answer named, with no
+  click — and are drawn as a link to the picture.
+- **The main window navigates nowhere** (`will-navigate` allows only its own page or the dev
+  server), so a dropped link or file cannot get the preload bridge. It runs `sandbox: true`
+  — the preload imports nothing but `electron`, and must keep it that way.
+- **A `<webview>` gets no preload, no Node and a sandbox** whatever its markup says
+  (`will-attach-webview`), and only a web URL; its popups open as sandboxed windows when they
+  are web pages and not at all otherwise (`guardWebviewPopups`).
+- **The built page carries a Content-Security-Policy** (a meta tag `vite.config.ts` writes at
+  build time only; the dev server needs inline scripts). Its point is `script-src 'self'
+  'wasm-unsafe-eval'` — nothing runs that did not ship; images, connections and media take any
+  https because album art, tiles and avatars come from many hosts. A `<webview>` guest is not
+  governed by it.
+- **A packaged build ignores the development switches.** `main.ts` deletes
+  `VITE_DEV_SERVER_URL`, `HERACLES_SAMPLE_*`, `HERACLES_SIMULATE_PLAN_AI` and
+  `COROS_WATCH_PATH` from the environment before anything reads them (each is read at run
+  time, so that is the whole gate), and refuses the mock-watch and sample-data IPC.
+- **Session tokens are encrypted at rest** through `electron/secretSettings.ts`: the COROS
+  access token, Spotify's client secret and tokens, Apple Music's captured headers. A value is
+  `enc:v1:` + `safeStorage` ciphertext; a plain one from an earlier build is read and
+  re-encrypted on the spot. Unlike the API keys these **fall back to plain text without a
+  keyring**: refusing to keep the COROS token would mean a login every launch, and each login
+  signs the athlete out on their other computer. `safeStorage` is required lazily, so suites
+  under `ELECTRON_RUN_AS_NODE` read and write plain values. The live-API probes open the
+  token through `scripts/lib/open-secret-setting.mjs`, which asks a short Electron process
+  (with the app's name, so the keyring entry matches). YouTube Music's auth file stays plain —
+  ytmusicapi reads and rewrites it — and is chmod 600.
 
 ### `rendererReady` gates everything main pushes unasked
 
@@ -2459,7 +2515,19 @@ selector meaning "light".
 
 ## Releases
 
-`npm run release:prepare -- v0.1.31` syncs the version into `package.json` and the lockfile,
-then prints the commit/tag/push commands. Tag pushes trigger `release.yml`, which re-checks
-that the tag and `package.json` agree before building. `verify-release-artifacts.mjs` gates
-the updater metadata per platform.
+`npm run release:prepare -- v1.0.1` syncs the version into `package.json` and the lockfile,
+then prints the commit/tag/push commands. **Push only the release tag** (`git push origin
+v1.0.1`), never all tags: the upstream `v0.1.*` tags were deleted locally on 2026-10-01 and
+`remote.vendor.tagOpt` is `--no-tags` so a fetch does not bring them back, because each one
+pushed would run `release.yml` and publish upstream's code as a release here. Tag pushes
+trigger `release.yml`, whose `preflight` job checks — and no longer rewrites — that the tag and
+`package.json` agree (it used to `--sync` first, which made the check unable to fail), and
+fails when the Google OAuth secrets are empty, since Drive is the only sync destination. The
+macOS job signs and notarizes when the Apple secrets are set and otherwise builds ad-hoc with
+the switches `build.yml` uses, so a release without an Apple account still ships Windows and
+Linux; the updater already sends an ad-hoc build to the download page (`isMacAdHocSigned`).
+The release text is the tag's `## [x.y.z]` section of `CHANGELOG.md`
+(`scripts/release-notes.mjs`), which fails the job when the section is missing. The
+changelog starts at 1.0.0; upstream's history is in `vendor-main`. `verify-release-artifacts.mjs`
+gates the updater metadata per platform. The `dist*` scripts clean `dist-electron/` first —
+`tsc` never deletes the output of a removed module, and a local package would ship it.

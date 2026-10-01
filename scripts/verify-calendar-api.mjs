@@ -6,16 +6,18 @@
 //   3. Scheduling a workout on a past day — accepted or rejected?
 //
 // Reuses the app's stored session from coroslink.sqlite (read-only). Creates a
-// temporary workout ("CorosLink API Probe — delete me"), schedules/moves it on
+// temporary workout ("Heracles Records API Probe — delete me"), schedules/moves it on
 // far-future dates, then removes both the schedule entries and the library
 // program. Nothing else on the account is touched.
 //
 // Usage: npm run build:electron && node scripts/verify-calendar-api.mjs
 
+import fs from "node:fs";
 import path from "node:path";
 import os from "node:os";
 import { pathToFileURL } from "node:url";
 import { execFileSync } from "node:child_process";
+import { openSecretSetting } from "./lib/open-secret-setting.mjs";
 
 const repoRoot = path.resolve(import.meta.dirname, "..");
 
@@ -28,10 +30,17 @@ const { buildWorkoutPayloadFromEntry, resetProgramForCreate } = await import(
 // --- session from the app's settings DB (token is stored in plain text).
 // The repo's better-sqlite3 is compiled for Electron's ABI, so use the
 // system sqlite3 CLI to read the settings instead.
-const dbPath = path.join(
-  os.homedir(),
-  "Library/Application Support/coroslink/coroslink.sqlite"
-);
+/* userData is named after package.json's top-level `name` — see CLAUDE.md.
+   This was a hard-coded macOS path to the pre-rename `coroslink` folder, which
+   the app no longer reads. */
+function userDataDir() {
+  if (process.env.HERACLES_USER_DATA) return process.env.HERACLES_USER_DATA;
+  const name = JSON.parse(fs.readFileSync(new URL("../package.json", import.meta.url), "utf8")).name;
+  if (process.platform === "darwin") return path.join(os.homedir(), "Library/Application Support", name);
+  if (process.platform === "win32") return path.join(process.env.APPDATA ?? "", name);
+  return path.join(process.env.XDG_CONFIG_HOME ?? path.join(os.homedir(), ".config"), name);
+}
+const dbPath = path.join(userDataDir(), "coroslink.sqlite");
 const setting = (key) =>
   execFileSync(
     "sqlite3",
@@ -39,7 +48,7 @@ const setting = (key) =>
     { encoding: "utf8" }
   ).trim() || undefined;
 const auth = {
-  accessToken: setting("trainingHub.accessToken"),
+  accessToken: openSecretSetting(setting("trainingHub.accessToken")),
   userId: setting("trainingHub.userId"),
   baseUrl: setting("trainingHub.baseUrl")
 };
@@ -88,7 +97,7 @@ async function querySchedule(startDate, endDate) {
   return res.data ?? {};
 }
 
-const PROBE_NAME = "CorosLink API Probe — delete me";
+const PROBE_NAME = "Heracles Records API Probe — delete me";
 const DAY_A = day(55);
 const DAY_B = day(56);
 const PAST_DAY = day(-2);

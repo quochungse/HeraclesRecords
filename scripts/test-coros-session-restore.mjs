@@ -70,6 +70,18 @@ const SETTINGS = {
   baseUrl: "trainingHub.baseUrl"
 };
 
+/**
+ * The stored session token as the app reads it. Since 1.0 it is kept as
+ * `enc:v1:` + a `safeStorage` blob (`secretSettings.ts`); the stand-in keychain
+ * above stores the plain bytes, so opening it is a base64 decode.
+ */
+function storedToken() {
+  const value = database.getSetting(SETTINGS.accessToken);
+  return value?.startsWith("enc:v1:")
+    ? Buffer.from(value.slice("enc:v1:".length), "base64").toString("utf8")
+    : value;
+}
+
 const HOME = "https://teamapi.coros.com";
 const ACCOUNT = "runner@example.com";
 const PASSWORD_HASH = credentialStore.hashCorosPassword("correct horse");
@@ -161,9 +173,14 @@ test("saved credentials bring a lost session back", async () => {
   assert.equal(result.status.authenticated, true);
   assert.equal(result.status.email, ACCOUNT);
   assert.equal(
-    database.getSetting(SETTINGS.accessToken),
+    storedToken(),
     "fresh-token",
     "the new token has to be persisted, or the next launch restores again"
+  );
+  assert.match(
+    database.getSetting(SETTINGS.accessToken),
+    /^enc:v1:/,
+    "and kept encrypted at rest when the OS offers encryption"
   );
   assert.equal(coros.countOf("/account/login"), 1);
   // One announcement, not two: with no token on disk there was never a
@@ -199,7 +216,7 @@ test("a session already in hand is not re-minted", async () => {
     "asking whether the token is still live is a read, and the only way to know"
   );
   assert.deepEqual(announced, [], "nothing changed, so there is nothing to say");
-  assert.equal(database.getSetting(SETTINGS.accessToken), "live-token");
+  assert.equal(storedToken(), "live-token");
 });
 
 // The launch right after another machine took the session. Nothing local says
@@ -236,7 +253,7 @@ test("a token killed elsewhere is re-minted at the next launch", async () => {
   assert.equal(result.restored, true);
   assert.equal(result.status.authenticated, true);
   assert.equal(
-    database.getSetting(SETTINGS.accessToken),
+    storedToken(),
     "fresh-token",
     "the dead token has to be replaced, not kept alongside the new one"
   );
@@ -262,7 +279,7 @@ test("an unreachable COROS leaves the session alone", async () => {
   assert.deepEqual(result, { restored: false, reason: "already-signed-in" });
   assert.equal(coros.countOf("/account/login"), 0);
   assert.equal(
-    database.getSetting(SETTINGS.accessToken),
+    storedToken(),
     "offline-token",
     "an offline launch is not a reason to throw the session away"
   );
@@ -284,7 +301,7 @@ test("a dropped stale session is reported even when the re-login fails", async (
 
   assert.deepEqual(result, { restored: false, reason: "failed" });
   assert.equal(
-    database.getSetting(SETTINGS.accessToken),
+    storedToken(),
     undefined,
     "a token COROS has disowned is not worth keeping"
   );
@@ -379,7 +396,7 @@ test("a two-factor account is reported, not half signed in", async () => {
 
   assert.deepEqual(result, { restored: false, reason: "two-factor-required" });
   assert.equal(
-    database.getSetting(SETTINGS.accessToken),
+    storedToken(),
     undefined,
     "a challenge is not a session"
   );
@@ -403,7 +420,7 @@ test("a rejected password leaves the credentials for the athlete to fix", async 
   const result = await trainingHub.restoreTrainingHubSessionAtStartup();
 
   assert.deepEqual(result, { restored: false, reason: "failed" });
-  assert.equal(database.getSetting(SETTINGS.accessToken), undefined);
+  assert.equal(storedToken(), undefined);
   assert.deepEqual(
     credentialStore.getStoredCorosCredentials(),
     { account: ACCOUNT, pwdHash: PASSWORD_HASH },
@@ -477,7 +494,7 @@ test("the state a kick leaves behind is the one start-up restores from", async (
 
   assert.equal(result.restored, true);
   assert.equal(
-    database.getSetting(SETTINGS.accessToken),
+    storedToken(),
     "token-after-restart"
   );
 });
@@ -735,13 +752,13 @@ test("a stale reply does not wipe the session that replaced it", async () => {
 
   const result = await trainingHub.restoreTrainingHubSessionAtStartup();
   assert.equal(result.restored, true, "start-up should have signed back in");
-  assert.equal(database.getSetting(SETTINGS.accessToken), "fresh-token");
+  assert.equal(storedToken(), "fresh-token");
 
   releaseRendererLoad();
   await rendererLoad;
 
   assert.equal(
-    database.getSetting(SETTINGS.accessToken),
+    storedToken(),
     "fresh-token",
     "the stale failure belongs to a session that is already gone; clearing " +
       "here signs the athlete out of the one that just replaced it"
@@ -769,7 +786,7 @@ test("a dead token still ends the session it actually belongs to", async () => {
   await assert.rejects(trainingHub.listTrainingHubActivities(1, 1));
 
   assert.equal(
-    database.getSetting(SETTINGS.accessToken),
+    storedToken(),
     undefined,
     "the guard is about *which* session, not about keeping dead ones"
   );

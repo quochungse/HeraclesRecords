@@ -12,6 +12,7 @@ import {
   ExternalLink,
   FolderOpen,
   Globe2,
+  Scale,
   HardDrive,
   Link2,
   Loader2,
@@ -70,7 +71,7 @@ import { BackupPanel } from "./BackupPanel";
 const ABOUT_LINKS = [
   {
     label: "Website",
-    href: "https://coros-link.vercel.app/",
+    href: "https://github.com/quochungse/HeraclesRecords",
     icon: Globe2,
   },
   {
@@ -535,6 +536,18 @@ export function SettingsView({
               <ExternalLink size={12} aria-hidden="true" />
             </a>
           ))}
+          <button
+            type="button"
+            className="settings-about-link"
+            onClick={() => {
+              void api.openLicenses().catch((caught: unknown) => {
+                onError(caught instanceof Error ? caught.message : "Could not open the licenses.");
+              });
+            }}
+          >
+            <Scale size={15} aria-hidden="true" />
+            <span>Licenses</span>
+          </button>
           <ResourcesMenu />
         </div>
 

@@ -1068,10 +1068,6 @@ export function CoachModelsPanel({ api, onChange }: CoachModelsPanelProps) {
               <span>{label}</span>
             </label>
           ))}
-          <label className="chat-local-tools is-disabled">
-            <input type="checkbox" checked={false} disabled />
-            <span>Full activity files (not available in beta)</span>
-          </label>
         </div>
         <p className="chat-settings-copy">
           These selections control built-in COROS and Training Hub data.

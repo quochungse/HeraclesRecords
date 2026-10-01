@@ -120,7 +120,7 @@ process.env.ANTHROPIC_BASE_URL = "https://example.invalid";
 const subscriptionEnv = createClaudeSubscriptionEnvironment();
 assert.equal(subscriptionEnv.ANTHROPIC_API_KEY, undefined);
 assert.equal(subscriptionEnv.ANTHROPIC_BASE_URL, undefined);
-assert.equal(subscriptionEnv.CLAUDE_AGENT_SDK_CLIENT_APP, "coroslink-coach");
+assert.equal(subscriptionEnv.CLAUDE_AGENT_SDK_CLIENT_APP, "heracles-records-coach");
 // Without an explicit dir, Claude Code keeps using the machine-wide login.
 assert.equal(subscriptionEnv.CLAUDE_CONFIG_DIR, undefined);
 const scopedEnv = createClaudeSubscriptionEnvironment("/tmp/coroslink-claude");

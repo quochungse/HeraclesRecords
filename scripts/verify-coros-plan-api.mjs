@@ -27,6 +27,7 @@ import os from "node:os";
 import path from "node:path";
 import { createRequire } from "node:module";
 import { fileURLToPath, pathToFileURL } from "node:url";
+import { openSecretSetting } from "./lib/open-secret-setting.mjs";
 
 if (!process.argv.includes("--live")) {
   console.error(
@@ -57,6 +58,8 @@ const source = new Database(sourceDb, { readonly: true, fileMustExist: true });
 const session = Object.fromEntries(
   SESSION_KEYS.map((key) => [key, source.prepare("SELECT value FROM app_settings WHERE key = ?").get(key)?.value])
 );
+// The token is encrypted at rest; the scratch copy below takes it opened.
+session["trainingHub.accessToken"] = openSecretSetting(session["trainingHub.accessToken"]);
 source.close();
 if (SESSION_KEYS.some((key) => !session[key])) {
   console.error(`No saved COROS session in ${sourceDb}. Sign in through the app first.`);

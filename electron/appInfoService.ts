@@ -104,6 +104,25 @@ export async function getAppInfo(): Promise<AppInfo> {
   };
 }
 
+/**
+ * Opens the folder holding the app's license, the third-party notices and the
+ * license text of everything that ships with it. A packaged build has it under
+ * `resources/licenses` (electron-builder's `extraResources`); a development run
+ * reads what the last `npm run build` wrote into dist/.
+ */
+export async function openLicensesFolder(): Promise<void> {
+  const folder = app.isPackaged
+    ? path.join(process.resourcesPath, "licenses")
+    : path.join(app.getAppPath(), "dist", "licenses");
+  if (!fs.existsSync(folder)) {
+    throw new Error("The license files are written by `npm run build`; this build has none yet.");
+  }
+  const failure = await shell.openPath(folder);
+  if (failure) {
+    throw new Error(failure);
+  }
+}
+
 export async function openAppStorageLocation(id: string): Promise<void> {
   const spec = STORAGE_LOCATION_SPECS.find((entry) => entry.id === id);
   if (!spec) {

@@ -46,6 +46,7 @@ import {
   upsertStrengthSessionDetail,
   upsertTrainingActivities
 } from "./database";
+import { getSecretSetting, setSecretSetting } from "./secretSettings";
 import { simplifyRoute } from "./routeSimplification";
 import { buildRpeDistribution, dailyRpeLoad } from "./rpeLoad";
 import type {
@@ -538,7 +539,7 @@ function finalizeTrainingHubLogin(
 /** The one place a session is written. Stays on this machine: the four keys are
  *  `device` in syncPolicy, so no backup and no oplog entry carries them. */
 function persistTrainingHubSession(session: TrainingHubAuthState): void {
-  setSetting(SETTINGS.accessToken, session.accessToken);
+  setSecretSetting(SETTINGS.accessToken, session.accessToken);
   setSetting(SETTINGS.userId, session.userId);
   setSetting(SETTINGS.regionId, session.regionId);
   setSetting(SETTINGS.baseUrl, session.baseUrl);
@@ -8383,7 +8384,7 @@ async function fetchJson<T>(
 }
 
 function getStoredAuth(): TrainingHubAuthState | null {
-  const accessToken = getSetting(SETTINGS.accessToken);
+  const accessToken = getSecretSetting(SETTINGS.accessToken);
   const userId = getSetting(SETTINGS.userId);
   const regionId = getSetting(SETTINGS.regionId);
   const baseUrl = getSetting(SETTINGS.baseUrl);

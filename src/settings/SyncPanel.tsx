@@ -347,9 +347,11 @@ export function SyncPanel({ api }: SyncPanelProps) {
         {/* Before anything about the destination. Sync merges two machines'
             records into one log, and the tables have no owner column — so
             whose data it is has to be settled first, and connecting Drive
-            before that would be work the app then refuses to use. */}
+            before that would be work the app then refuses to use. A step
+            still to take, not a fault, so it is drawn in the neutral tone: in
+            the error tone it greeted every new install as something broken. */}
         {status.state === "signed-out" ? (
-          <div className="settings-nav-row is-static sync-row-alert">
+          <div className="settings-nav-row is-static">
             <span className="settings-nav-row-icon" aria-hidden="true">
               <UserRound size={20} strokeWidth={1.9} />
             </span>

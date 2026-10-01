@@ -4,8 +4,6 @@ import {
   ChevronDown,
   ExternalLink,
   LifeBuoy,
-  Map as MapIcon,
-  MapPin,
   Newspaper,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
@@ -16,8 +14,10 @@ interface ResourceLink {
   icon: LucideIcon;
 }
 
-// Curated from GitHub issue #8 (COROS resources). The fork's own links live in
-// Settings → App Info alongside this menu, so only vendor documentation is here.
+// COROS's own documentation. The app's links live in Settings → About beside
+// this menu. The two map entries went with the Maps screen: nothing in the app
+// handles maps any more, so pointing at COROS's map downloads from here read as
+// a feature that was not there.
 const COROS_LINKS: ResourceLink[] = [
   {
     label: "Getting started",
@@ -28,16 +28,6 @@ const COROS_LINKS: ResourceLink[] = [
     label: "Release notes",
     href: "https://support.coros.com/hc/en-us/sections/20082056631700-Release-Notes-for-COROS-Devices",
     icon: Newspaper,
-  },
-  {
-    label: "Download maps",
-    href: "https://us.coros.com/maps",
-    icon: MapIcon,
-  },
-  {
-    label: "Offline maps guide",
-    href: "https://support.coros.com/hc/en-us/articles/4405711354900-Downloading-Maps-to-Your-COROS-Watch",
-    icon: MapPin,
   },
   {
     label: "Help & support",

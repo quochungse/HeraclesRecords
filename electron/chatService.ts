@@ -1249,7 +1249,7 @@ async function getValidToken(): Promise<StoredChatToken> {
   return token;
 }
 
-// ----- Encrypted token persistence (safeStorage, like trainingHubService) -----
+// ----- Encrypted token persistence (safeStorage) -----
 
 function storeToken(token: StoredChatToken): void {
   if (!safeStorage.isEncryptionAvailable()) {

@@ -46,7 +46,7 @@ jobs:
       - name: Upload macOS artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: coroslink-macos
+          name: heracles-macos
           path: |
             release/*.dmg
             release/*.dmg.blockmap
@@ -86,7 +86,7 @@ jobs:
       - name: Upload Linux artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: coroslink-linux
+          name: heracles-linux
           path: |
             release/*.AppImage
             release/latest-linux.yml
@@ -123,7 +123,7 @@ jobs:
       - name: Upload Windows artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: coroslink-windows
+          name: heracles-windows
           path: |
             release/*.exe
             release/*.exe.blockmap

@@ -482,6 +482,8 @@ export interface CorosLinkApi {
   ) => Promise<{ importId: string }>;
   getAppInfo: () => Promise<AppInfo>;
   openAppStorageLocation: (id: string) => Promise<void>;
+  /** Opens the folder with the app's license and every third-party license. */
+  openLicenses: () => Promise<void>;
   getAppUpdateStatus: () => Promise<AppUpdateSnapshot>;
   checkForAppUpdates: () => Promise<AppUpdateSnapshot>;
   downloadAppUpdate: () => Promise<AppUpdateSnapshot>;

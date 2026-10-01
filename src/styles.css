@@ -2092,7 +2092,9 @@ input::placeholder {
   padding: 12px;
   border: 1px solid var(--surface-line, var(--glass-border));
   border-radius: var(--radius-md);
-  background: rgba(18, 18, 20, 0.98);
+  /* The menus' own ground, opaque: a near-black literal here let the chips
+     and the accent's name in the row below show through the list. */
+  background: var(--menu-surface);
   box-shadow: var(--shadow-card);
 }
 
@@ -19183,6 +19185,18 @@ td span {
   text-decoration-color: var(--chat-signal);
 }
 
+/* Where a link goes, beside the words the answer chose for it. */
+.chat-markdown .chat-link-host {
+  color: var(--text-muted);
+  font-size: 0.9em;
+}
+
+/* A link whose address is not a web or mail one: its words stay, unlinked. */
+.chat-markdown .chat-link-refused {
+  text-decoration: underline dotted;
+  text-underline-offset: 2px;
+}
+
 /* Inline code chip */
 .chat-markdown code {
   font-family: var(--font-mono);
@@ -23272,6 +23286,57 @@ td span {
 :root[data-theme="paper"] .training-login-remember input:checked {
   background: var(--accent);
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 14%, transparent);
+}
+
+/* The rest of the card was written in white-on-dark literals and never given
+   a paper colour, so on the white card the remember hint, the "or" rule, the
+   browser button and the footer were close to invisible — on the first screen
+   a light-theme user sees. */
+:root[data-theme="paper"] .training-login-remember small {
+  color: var(--text-muted);
+}
+
+:root[data-theme="paper"] .training-login-divider {
+  color: var(--text-muted);
+}
+
+:root[data-theme="paper"] .training-login-divider::before,
+:root[data-theme="paper"] .training-login-divider::after {
+  background: var(--glass-border);
+}
+
+:root[data-theme="paper"] .training-login-browser-link {
+  border-color: var(--glass-border);
+  background: rgba(19, 26, 40, 0.03);
+  color: var(--text-primary);
+}
+
+:root[data-theme="paper"] .training-login-browser-link:hover {
+  color: var(--text-primary);
+}
+
+:root[data-theme="paper"] .training-login-browser-link:focus-visible {
+  color: var(--text-primary);
+  outline: var(--focus-ring);
+  outline-offset: 2px;
+}
+
+:root[data-theme="paper"] .training-login-footer {
+  color: var(--text-muted);
+}
+
+:root[data-theme="paper"] .training-login-text-button {
+  color: var(--text-secondary);
+}
+
+:root[data-theme="paper"] .training-login-text-button:hover:not(:disabled) {
+  color: var(--text-primary);
+}
+
+:root[data-theme="paper"] .training-login-text-button:focus-visible {
+  color: var(--text-primary);
+  outline: var(--focus-ring);
+  outline-offset: 2px;
 }
 
 /* ==========================================================================
