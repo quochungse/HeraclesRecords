@@ -69,9 +69,10 @@ backup's progress push and four suites. The three `intervals.*` settings — an 
 file, and `.data-connect-panel`, the "connect COROS first" panel four screens draw.
 
 **Every link in the app points at this fork** (since 2026-10-01). Settings → About holds
-"Website" (the fork's repository until there is a site of its own), "Report an issue" and a
-**Buy me a coffee** button (`buymeacoffee.com/quochungse`, in that service's own yellow, set
-apart at the row's end). "Source on GitHub", the COROS Help menu (`ResourcesMenu`) and a
+"Website" (`heraclesrecords.github.io`) and "Report an issue" under the tagline, and a
+**Buy me a coffee** button (`buymeacoffee.com/quochungse`, drawn as the Color mode switch's
+chosen chip, at the About header's far end; the Updates button sits beside the version). The
+platform and runtime versions are not shown; the screen ends on a one-line footer. "Source on GitHub", the COROS Help menu (`ResourcesMenu`) and a
 Licenses button were taken out of that row on purpose; the upstream "Support the project"
 link and `DonateButton` went in 85219aa. `.github/FUNDING.yml` (Buy Me a Coffee
 `quochungse`) and `CODEOWNERS` (`@quochungse`) are the fork's. **`LICENSE` keeps upstream's `Copyright (c) 2026 AtoZ` line
@@ -2234,7 +2235,8 @@ chip and differ only in which chips are on screen: `expanded` (all of them — t
 `collapsible` (the selected one, opening in place and pushing what sits beside it) and
 `dropdown` (a floating menu, through `SelectDropdown`). Multi-select is `OptionChips`, a
 separate export rather than a flag, because several pressed chips inside one track read as a
-segmented control gone wrong. It replaced ~30 hand-written versions whose chips disagreed
+segmented control gone wrong. Its `appearance="tiles"` lays the same chips out as equal tiles
+with a tick, for a short set switched on once (Settings' sport screens) rather than a filter. It replaced ~30 hand-written versions whose chips disagreed
 about height, weight, radius, how the chosen one is marked (`.is-active`, `.is-selected`,
 `.active`, `[data-active]`) and which ARIA role a row of exclusive buttons takes.
 **A collapsible group is one row holding every option once, clipped by the group's own

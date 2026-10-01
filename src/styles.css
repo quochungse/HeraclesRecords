@@ -4921,6 +4921,67 @@ input::placeholder {
   background: var(--option-chip-color, var(--accent));
 }
 
+/*
+ * Tiles: the same multi-select as equal tiles in a grid, each with its icon and
+ * a tick at the far end. A row of pills as wide as their words reads as loose
+ * odds and ends; equal tiles read as one set of switches. The selectors carry
+ * both classes so they outrank `.option-chips.option-group--md button`.
+ */
+.option-chips.option-chips--tiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(128px, 1fr));
+  gap: 8px;
+}
+
+.option-chips.option-chips--tiles button {
+  gap: 10px;
+  min-width: 0;
+  min-height: 44px;
+  padding: 0 10px 0 12px;
+  border-radius: var(--radius-md);
+  color: var(--text-muted);
+}
+
+.option-chips.option-chips--tiles button > svg {
+  flex: none;
+}
+
+.option-chips.option-chips--tiles .option-group-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.option-chip-tick {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 16px;
+  height: 16px;
+  margin-left: auto;
+  border: 1.5px solid var(--option-edge);
+  border-radius: var(--radius-pill);
+  transition:
+    background var(--dur-fast) var(--ease),
+    border-color var(--dur-fast) var(--ease);
+}
+
+.option-chips.option-chips--tiles button[aria-pressed="true"] {
+  border-color: color-mix(in srgb, var(--accent) 45%, var(--option-edge));
+  background: var(--accent-soft);
+  color: var(--text-primary);
+}
+
+.option-chips.option-chips--tiles button[aria-pressed="true"] > svg {
+  color: var(--accent-strong);
+}
+
+.option-chips.option-chips--tiles button[aria-pressed="true"] .option-chip-tick {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--bg-base);
+}
+
 /* There is no caret here on purpose. The dropdown mode gets one from
    SelectDropdown, which is a trigger for a floating menu; a collapsible chip
    carries no mark, because at rest it has to read as the current value first
@@ -30289,22 +30350,62 @@ td span {
   font-size: 13px;
 }
 
-.settings-about-copy .settings-update-status {
-  color: var(--accent);
-  font-weight: 700;
+/* Name, version, what the updater knows and the Updates button, in one line.
+   The button is a step smaller here than its 34px elsewhere, so it sits in a
+   line of 18px type without making the line taller than the name. */
+.settings-about-title {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
 }
 
-.settings-about-header .secondary-button,
-.settings-about-header .update-chip {
-  flex-shrink: 0;
-  white-space: nowrap;
+.settings-about-version {
+  padding: 4px 8px;
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-pill);
+  color: var(--text-secondary);
+  font-family: var(--font-display);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
 }
 
-/* The Update button is a popover trigger, so it anchors its own menu. The
-   popover opens leftward because the button sits at the header's right edge.
-   `white-space` stays off this wrapper on purpose: the chip inside sets its
-   own nowrap, and inheriting it here would reach the popover and stop the
-   preference hints from wrapping, overflowing the 260px menu. */
+.settings-about-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.settings-about-status::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-radius: var(--radius-pill);
+  background: var(--accent);
+}
+
+.settings-about-status[data-tone="success"]::before {
+  background: var(--success-text);
+}
+
+.settings-about-title .update-settings-trigger--labeled,
+.settings-about-title .update-chip {
+  height: 28px;
+  min-height: 28px;
+  padding: 0 10px;
+}
+
+/* The Update button is a popover trigger, so it anchors its own menu. It sits
+   beside the version, near the header's left, so the popover opens rightward
+   from the button's own edge. `white-space` stays off this wrapper on purpose:
+   the chip inside sets its own nowrap, and inheriting it here would reach the
+   popover and stop the preference hints from wrapping, overflowing the 260px
+   menu. */
 .settings-update-menu {
   position: relative;
   display: inline-flex;
@@ -30312,6 +30413,8 @@ td span {
 }
 
 .settings-update-menu .update-settings-popover {
+  right: auto;
+  left: 0;
   white-space: normal;
 }
 
@@ -30319,87 +30422,57 @@ td span {
   border-color: var(--accent);
 }
 
-.settings-version-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
-  gap: 12px;
-  margin: 0;
-  padding: 14px 16px;
-  border: 1px solid var(--glass-border);
-  border-radius: var(--radius-sm);
-  background: var(--glass-bg);
-}
-
-.settings-version-grid dt {
-  color: var(--text-muted);
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-}
-
-.settings-version-grid dd {
-  margin: 4px 0 0;
-  font-weight: 700;
-  font-variant-numeric: tabular-nums;
-}
-
+/* Website and Report an issue, as the header's third line. */
 .settings-about-links {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  align-items: center;
+  gap: 6px 16px;
+  margin-top: 8px;
 }
 
 .settings-about-link {
   display: inline-flex;
   align-items: center;
-  gap: 7px;
-  padding: 9px 13px;
-  border: 1px solid var(--glass-border);
-  border-radius: var(--radius-sm);
-  background: var(--glass-bg);
-  color: var(--text-primary);
+  gap: 6px;
+  color: var(--text-secondary);
   font-size: 13px;
   font-weight: 600;
   text-decoration: none;
-  transition:
-    border-color var(--dur-fast) var(--ease),
-    color var(--dur-fast) var(--ease);
+  transition: color var(--dur-fast) var(--ease);
+}
+
+.settings-about-link > svg:last-child {
+  opacity: 0.6;
 }
 
 .settings-about-link:hover {
-  border-color: var(--accent);
   color: var(--accent);
 }
 
-/* Buy Me a Coffee, said quietly. The row's own shape and type, so it sits with
-   the links beside it; the service's yellow only as a warm hairline, a wash
-   faint enough to read as cream on paper, and the small round mark that makes
-   it recognisable. Pushed to the row's end, it reads as an invitation rather
-   than one more link. A solid yellow pill was tried first and shouted over the
-   whole About card. */
+.settings-about-link:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: 2px;
+}
+
+/* Buy Me a Coffee, drawn as the Color mode switch with only its chosen chip:
+   the same track (.option-group) around the same md chip in the accent wash
+   (.option-group--md button[aria-checked="true"]). It is a link, not a choice,
+   so it takes the look and none of the radio semantics. */
 .settings-about-coffee {
-  --coffee: #ffdd00;
   display: inline-flex;
+  flex-shrink: 0;
   align-items: center;
-  gap: 9px;
-  margin-left: auto;
-  padding: 5px 14px 5px 6px;
-  border: 1px solid color-mix(in srgb, var(--coffee) 30%, var(--glass-border));
+  padding: 3px;
+  border: 1px solid var(--option-edge);
   border-radius: var(--radius-pill);
-  background: color-mix(in srgb, var(--coffee) 6%, transparent);
-  color: var(--text-primary);
-  font-size: 13px;
-  font-weight: 600;
+  background: var(--option-well);
   text-decoration: none;
-  transition:
-    border-color var(--dur-fast) var(--ease),
-    background var(--dur-fast) var(--ease);
+  transition: border-color var(--dur-fast) var(--ease);
 }
 
 .settings-about-coffee:hover {
-  border-color: color-mix(in srgb, var(--coffee) 58%, var(--glass-border));
-  background: color-mix(in srgb, var(--coffee) 12%, transparent);
+  border-color: var(--accent);
 }
 
 .settings-about-coffee:focus-visible {
@@ -30407,43 +30480,49 @@ td span {
   outline-offset: 2px;
 }
 
-.settings-about-coffee-mark {
-  display: grid;
-  flex: none;
-  place-items: center;
-  width: 24px;
-  height: 24px;
+.settings-about-coffee-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 32px;
+  padding: 0 14px;
   border-radius: var(--radius-pill);
-  background: var(--coffee);
-  color: #0d0c22;
-  transition: transform var(--dur-base) var(--ease);
+  background: var(--accent-soft);
+  color: var(--accent-strong);
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1;
+  white-space: nowrap;
 }
 
-/* A sip: the cup tips as the pointer arrives. */
-.settings-about-coffee:hover .settings-about-coffee-mark {
-  transform: rotate(-12deg);
+/* The Settings screen's last line: which build this is, and whose. */
+.settings-footer {
+  padding: 4px 0 8px;
+  color: var(--text-muted);
+  font-size: 12px;
+  text-align: center;
 }
 
 /* Navigation: a section of the About card, headed like Appearance under it.
-   Two rows of label and control — where the app opens, which sport screens the
-   rail lists — with the labels in one column so both controls start on the
-   same line. Each label is as tall as the startup trigger, so it sits level
-   with the first line of its control however that control wraps. */
+   Two settings — where the app opens, which sport screens the rail lists —
+   each a label with its control on the line below, so both controls start at
+   the section's left edge. */
 .settings-navigation-rows {
   display: grid;
-  grid-template-columns: 112px minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr);
   align-items: start;
-  gap: 12px 16px;
+  gap: 8px;
   margin: 14px 0 18px;
 }
 
 .settings-navigation-label {
-  display: flex;
-  align-items: center;
-  min-height: 34px;
   color: var(--text-secondary);
   font-size: 13px;
   font-weight: 500;
+}
+
+.settings-navigation-label:not(:first-child) {
+  margin-top: 10px;
 }
 
 .settings-navigation-rows .startup-view-menu {
@@ -30457,8 +30536,8 @@ td span {
   left: 0;
 }
 
-.settings-navigation-rows .option-chips {
-  min-height: 34px;
+.settings-navigation-rows .option-chips--tiles {
+  max-width: 560px;
 }
 
 .settings-navigation-note {

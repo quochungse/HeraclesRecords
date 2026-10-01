@@ -8,6 +8,7 @@ import {
   useRef,
   useState
 } from "react";
+import { Check } from "lucide-react";
 import { SelectDropdown, type SelectOption } from "./SelectDropdown";
 
 /**
@@ -422,6 +423,13 @@ export interface OptionChipsProps<T extends string> {
    * stage. Hue here is data, so it is the caller's to supply; chrome has none.
    */
   colorOf?: (value: T) => string | undefined;
+  /**
+   * `tiles` lays a short, fixed set of on/off switches out as equal tiles, each
+   * with a tick, instead of a row of pills that are as wide as their words.
+   * For things switched on and off once, like which screens the sidebar
+   * lists, not for filters pressed while reading.
+   */
+  appearance?: "chips" | "tiles";
 }
 
 /** The multi-select variant: separate chips, no shared track, `aria-pressed`. */
@@ -433,11 +441,18 @@ export function OptionChips<T extends string>({
   size = "sm",
   className,
   disabled = false,
-  colorOf
+  colorOf,
+  appearance = "chips"
 }: OptionChipsProps<T>) {
+  const tiles = appearance === "tiles";
   return (
     <div
-      className={["option-chips", `option-group--${size}`, className]
+      className={[
+        "option-chips",
+        `option-group--${size}`,
+        tiles ? "option-chips--tiles" : null,
+        className
+      ]
         .filter(Boolean)
         .join(" ")}
       role="group"
@@ -465,6 +480,11 @@ export function OptionChips<T extends string>({
             {color ? <i className="option-chip-dot" aria-hidden="true" /> : null}
             {option.icon}
             <span className="option-group-label">{option.label}</span>
+            {tiles ? (
+              <span className="option-chip-tick" aria-hidden="true">
+                {pressed ? <Check size={11} strokeWidth={3.5} /> : null}
+              </span>
+            ) : null}
           </button>
         );
       })}
