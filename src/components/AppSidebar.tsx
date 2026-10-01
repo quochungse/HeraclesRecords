@@ -100,11 +100,15 @@ function initialsFrom(name: string): string {
   return letters.toLocaleUpperCase();
 }
 
+const NO_HIDDEN_VIEWS: readonly PrimaryView[] = [];
+
 export interface AppSidebarProps {
   activeView: PrimaryView;
   onChange: (view: PrimaryView) => void;
   coachBusy?: boolean;
   showDevelopmentItems?: boolean;
+  /** Destinations taken off the rail in Settings → Navigation. */
+  hiddenViews?: readonly PrimaryView[];
   /** Name of the watch on USB, shown beside the Device heading. */
   connectedWatchName?: string | null;
   /** COROS nickname, or whatever the account is best known by. */
@@ -123,6 +127,7 @@ export function AppSidebar({
   onChange,
   coachBusy = false,
   showDevelopmentItems = false,
+  hiddenViews = NO_HIDDEN_VIEWS,
   connectedWatchName = null,
   athleteName = null,
   athleteAvatarUrl = null,
@@ -133,7 +138,13 @@ export function AppSidebar({
   onOverlayOpenChange,
 }: AppSidebarProps) {
   const overlayMode = useMediaQuery("(max-width: 720px)");
-  const sections = visiblePrimaryNavSections(showDevelopmentItems);
+  const sections = visiblePrimaryNavSections(showDevelopmentItems, hiddenViews);
+  /** Which rows are drawn, as a value: a row shown or hidden moves the ones
+      below it and may start or stop the index scrolling, without the nav's own
+      box changing size — so the measuring effects re-run on it. */
+  const rowsKey = sections
+    .map((section) => section.items.map((item) => item.id).join())
+    .join("|");
   const reducedMotion = useMediaQuery("(prefers-reduced-motion: reduce)");
   const navRef = useRef<HTMLElement>(null);
   const itemRefs = useRef(new Map<PrimaryView, HTMLButtonElement>());
@@ -203,7 +214,7 @@ export function AppSidebar({
   useLayoutEffect(() => {
     updateIndicator();
     updateNavFade();
-  }, [updateIndicator, updateNavFade]);
+  }, [updateIndicator, updateNavFade, rowsKey]);
 
   useEffect(() => {
     const nav = navRef.current;
@@ -231,7 +242,7 @@ export function AppSidebar({
       observer.disconnect();
       window.removeEventListener("resize", handleChange);
     };
-  }, [updateIndicator, updateNavFade]);
+  }, [updateIndicator, updateNavFade, rowsKey]);
 
   useEffect(() => {
     if (!overlayMode || !overlayOpen) {

@@ -6,6 +6,7 @@ import {
   Check,
   ChevronRight,
   Code2,
+  Compass,
   Dumbbell,
   Ellipsis,
   ExternalLink,
@@ -31,10 +32,11 @@ import type {
 } from "../../electron/types";
 import { AppUpdateControl } from "../components/AppUpdateControls";
 import { ResourcesMenu } from "../components/ResourcesMenu";
-import { OptionGroup } from "../components/OptionGroup";
+import { OptionChips, OptionGroup } from "../components/OptionGroup";
 import { StartupViewMenu } from "../components/StartupViewMenu";
 import type { PrimaryView } from "../navigation/primaryNav";
-import { getPrimaryViewIcon } from "../navigation/startupView";
+import { getPrimaryViewLabel } from "../navigation/startupView";
+import { SPORT_SCREENS, type SportScreen } from "../navigation/sportScreens";
 import { RunnerIcon } from "../running/runnerIcon";
 import {
   coachModelsSummaryLine,
@@ -178,6 +180,9 @@ interface SettingsViewProps {
       stays with the rest of the app-level messaging. */
   startupView: PrimaryView;
   onStartupViewChange: (view: PrimaryView) => void;
+  /** Sport screens taken off the rail. App owns it, because the rail reads it. */
+  hiddenSportScreens: SportScreen[];
+  onHiddenSportScreensChange: (hidden: SportScreen[]) => void;
   showDevelopmentTools: boolean;
   /** COROS Training Hub session, shown as the connected-account card up top. */
   trainingStatus: TrainingHubStatus | null;
@@ -206,6 +211,8 @@ export function SettingsView({
   onError,
   startupView,
   onStartupViewChange,
+  hiddenSportScreens,
+  onHiddenSportScreensChange,
   showDevelopmentTools,
   trainingStatus,
   trainingBusy,
@@ -227,6 +234,7 @@ export function SettingsView({
   const [coachRefreshVersion, setCoachRefreshVersion] = useState(0);
   const { theme, setTheme, accent, setAccent } = useTheme();
   const [sportColors, setSportColors] = useState(() => readStoredSportColors());
+  const [hevyConnected, setHevyConnected] = useState(false);
 
   function updateSportColor(cat: SportColorCategory, value: string) {
     const next = { ...sportColors, [cat]: value };
@@ -241,6 +249,28 @@ export function SettingsView({
     storeSportColors(next);
     applySportColors(next);
   }
+
+  // Whether Hevy is connected, because a workout only Hevy knows — and the
+  // connection itself — live on Strength alone, so "every session stays in
+  // Activities" is not true of them. A local read, no request to Hevy.
+  useEffect(() => {
+    let cancelled = false;
+
+    void (async () => {
+      try {
+        const status = await api.getHevyStatus();
+        if (!cancelled) {
+          setHevyConnected(status.connected);
+        }
+      } catch {
+        // Unknown reads as not connected: the note keeps its general line.
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [api]);
 
   // The row's own summary. It reads the same two calls the panel does rather
   // than the panel reporting upward, so the number is right before the dialog
@@ -333,8 +363,13 @@ export function SettingsView({
     }
   }
 
-  // Capitalised so JSX renders it as a component, not an element name.
-  const StartupViewIcon = getPrimaryViewIcon(startupView);
+  function toggleSportScreen(screen: SportScreen) {
+    onHiddenSportScreensChange(
+      hiddenSportScreens.includes(screen)
+        ? hiddenSportScreens.filter((hidden) => hidden !== screen)
+        : [...hiddenSportScreens, screen]
+    );
+  }
 
   const updateStatusText =
     updateSnapshot.status === "available" ||
@@ -503,22 +538,61 @@ export function SettingsView({
           <ResourcesMenu />
         </div>
 
-        <div className="settings-startup">
+        {/* Where the app opens and which sport screens the rail lists: both
+            are how the app is arranged, so they share one heading. The sport
+            screens are not a facet of Activity colors below — a sport keeps
+            its colour in Activities and the Calendar when its screen is off
+            the rail, and Other has a colour but no screen. For the same
+            reason the chips wear the accent, not the sports' hues: this is
+            chrome, and the colours are spent on the row just below. */}
+        <div className="settings-navigation">
           <div className="settings-section-head">
             <span className="settings-section-icon" aria-hidden="true">
-              <StartupViewIcon size={18} strokeWidth={1.9} />
+              <Compass size={18} strokeWidth={1.9} />
             </span>
             <div>
-              <h2>Startup view</h2>
-              <p>The screen Heracles Records opens on next launch.</p>
+              <h2>Navigation</h2>
+              <p>Where the app opens, and which sport screens the sidebar lists.</p>
             </div>
           </div>
-          <StartupViewMenu
-            labeled
-            value={startupView}
-            onChange={onStartupViewChange}
-            showDevelopmentItems={showDevelopmentTools}
-          />
+          <div className="settings-navigation-rows">
+            <span className="settings-navigation-label">Opens on</span>
+            <StartupViewMenu
+              labeled
+              value={startupView}
+              onChange={onStartupViewChange}
+              showDevelopmentItems={showDevelopmentTools}
+              hiddenViews={hiddenSportScreens}
+            />
+            <span className="settings-navigation-label">Sport screens</span>
+            <div>
+              <OptionChips
+                label="Sport screens"
+                size="md"
+                options={SPORT_SCREENS.map((screen) => ({
+                  value: screen,
+                  label: getPrimaryViewLabel(screen)
+                }))}
+                values={SPORT_SCREENS.filter(
+                  (screen) => !hiddenSportScreens.includes(screen)
+                )}
+                onToggle={toggleSportScreen}
+              />
+              {/* Toned as a warning only once it has happened: Strength hidden
+                  with Hevy connected takes Hevy's workouts off the screen. */}
+              <p
+                className={`settings-navigation-note${
+                  hevyConnected && hiddenSportScreens.includes("strength")
+                    ? " is-warning"
+                    : ""
+                }`}
+              >
+                {hevyConnected
+                  ? "Every COROS session stays in Activities. Hevy workouts are only on Strength."
+                  : "Every session stays in Activities."}
+              </p>
+            </div>
+          </div>
         </div>
 
         {/* Appearance lives inside the About card rather than a card of its

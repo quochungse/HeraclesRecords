@@ -2350,6 +2350,20 @@ process's hour-long cache and so costs no request; it falls back to the account 
 local part, then to "Personal". Because one row shows a name and the other is icon-only,
 neither is findable by its text — both carry **`data-nav-label`**, and
 `probe-ui-cdp.mjs` navigates by it.
+**The four sport screens can be taken off the rail** (Settings → Navigation,
+`src/navigation/sportScreens.ts`, `coroslink.hiddenSportScreens`, `preference`), because
+Activities holds every COROS session. **Strength is the exception**: a workout only Hevy
+knows, and the Hevy connection itself, live on Strength alone, so with Hevy connected the
+note under the chips says so, in the warning tone once Strength is hidden. The *hidden* list
+is what is stored, so a sport screen added later reaches everyone's rail, and an id this
+build does not know is written back untouched. A hidden screen is not offered as a start and
+opens Overview at launch (`readStartupView`), but the stored start is never rewritten, so
+showing the screen again brings it back. Every door to a sport screen goes through
+`openSportScreen` in `App.tsx`, which refuses a hidden one, and `sportScreenFor` is the one
+sport-code → screen answer (Activities' "Open in …" disappears, the Library's "Planned and
+done" opens Activities). A pull re-reads the list into state, since a toggle builds on it.
+It is not a facet of Activity colors: a sport keeps its colour wherever it is drawn, Other
+has a colour and no screen, and the chips wear the accent because this is chrome.
 
 **Chrome is quiet, and three devices carry the whole rail.** `.app-sidebar` draws one
 hairline down its right edge and nothing else — no fill, no shell blur, no highlight

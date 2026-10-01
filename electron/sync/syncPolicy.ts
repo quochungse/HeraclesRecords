@@ -415,6 +415,9 @@ export const LOCAL_STORAGE_POLICY: Readonly<Record<string, SyncTier>> = {
   "coroslink.temperatureUnit": "derived",
   "coroslink.sportColors": "preference",
   "coroslink.startupView": "preference",
+  // The sport screens taken off the rail — which sports the athlete reads,
+  // so it follows them to the next machine.
+  "coroslink.hiddenSportScreens": "preference",
   // Which muscle layers the strength body map draws.
   "coroslink-strength-muscle-layers-v2": "preference",
 

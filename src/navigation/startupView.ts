@@ -1,5 +1,5 @@
-import { LayoutGrid, type LucideIcon } from "lucide-react";
 import { PRIMARY_NAV_ITEMS, type PrimaryView } from "./primaryNav";
+import { readHiddenSportScreens, type SportScreen } from "./sportScreens";
 
 const DEFAULT_STARTUP_VIEW: PrimaryView = "overview";
 const STARTUP_VIEW_STORAGE_KEY = "coroslink.startupView";
@@ -24,13 +24,6 @@ export function getPrimaryViewLabel(view: PrimaryView): string {
   );
 }
 
-/** The selected destination's own icon, so the row shows what will open. */
-export function getPrimaryViewIcon(view: PrimaryView): LucideIcon {
-  return (
-    PRIMARY_NAV_ITEMS.find((item) => item.id === view)?.icon ?? LayoutGrid
-  );
-}
-
 export function readStartupView(): PrimaryView {
   if (typeof window === "undefined") {
     return DEFAULT_STARTUP_VIEW;
@@ -38,7 +31,12 @@ export function readStartupView(): PrimaryView {
 
   try {
     const storedView = window.localStorage.getItem(STARTUP_VIEW_STORAGE_KEY);
-    return isPrimaryView(storedView) ? storedView : DEFAULT_STARTUP_VIEW;
+    // A sport screen taken off the rail opens Overview instead. The stored
+    // choice is left as it is, so showing the screen again brings it back.
+    return isPrimaryView(storedView) &&
+      !readHiddenSportScreens().includes(storedView as SportScreen)
+      ? storedView
+      : DEFAULT_STARTUP_VIEW;
   } catch {
     return DEFAULT_STARTUP_VIEW;
   }
