@@ -100,11 +100,15 @@ function initialsFrom(name: string): string {
   return letters.toLocaleUpperCase();
 }
 
+const NO_HIDDEN_VIEWS: readonly PrimaryView[] = [];
+
 export interface AppSidebarProps {
   activeView: PrimaryView;
   onChange: (view: PrimaryView) => void;
   coachBusy?: boolean;
   showDevelopmentItems?: boolean;
+  /** Destinations taken off the rail in Settings → Navigation. */
+  hiddenViews?: readonly PrimaryView[];
   /** Name of the watch on USB, shown beside the Device heading. */
   connectedWatchName?: string | null;
   /** COROS nickname, or whatever the account is best known by. */
@@ -123,6 +127,7 @@ export function AppSidebar({
   onChange,
   coachBusy = false,
   showDevelopmentItems = false,
+  hiddenViews = NO_HIDDEN_VIEWS,
   connectedWatchName = null,
   athleteName = null,
   athleteAvatarUrl = null,
@@ -133,7 +138,7 @@ export function AppSidebar({
   onOverlayOpenChange,
 }: AppSidebarProps) {
   const overlayMode = useMediaQuery("(max-width: 720px)");
-  const sections = visiblePrimaryNavSections(showDevelopmentItems);
+  const sections = visiblePrimaryNavSections(showDevelopmentItems, hiddenViews);
   const reducedMotion = useMediaQuery("(prefers-reduced-motion: reduce)");
   const navRef = useRef<HTMLElement>(null);
   const itemRefs = useRef(new Map<PrimaryView, HTMLButtonElement>());

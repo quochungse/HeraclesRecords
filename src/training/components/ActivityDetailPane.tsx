@@ -55,6 +55,8 @@ interface ActivityDetailPaneProps {
   onRetry: (activity: TrainingHubActivity) => void;
   /** Hands a run or a lifting session to the screen built for that sport. */
   onOpenSportScreen?: (request: SportScreenRequest) => void;
+  /** Sport screens taken off the rail; their door is not offered. */
+  hiddenSportScreens?: readonly SportScreenRequest["view"][];
   /** Asks Coach about this session, as the Calendar's Ask Coach does. */
   onAskCoach?: (request: CoachOpenRequest) => void;
 }
@@ -95,6 +97,7 @@ export function ActivityDetailPane({
   api = null,
   onRetry,
   onOpenSportScreen,
+  hiddenSportScreens,
   onAskCoach
 }: ActivityDetailPaneProps) {
   const { unitSystem, temperatureUnit } = useUnitSystem();
@@ -475,7 +478,10 @@ export function ActivityDetailPane({
               Ask Coach
             </button>
           ) : null}
-          {sportScreen && onOpenSportScreen && activityId !== undefined ? (
+          {sportScreen &&
+          !hiddenSportScreens?.includes(sportScreen) &&
+          onOpenSportScreen &&
+          activityId !== undefined ? (
             <button
               type="button"
               className="secondary-button"

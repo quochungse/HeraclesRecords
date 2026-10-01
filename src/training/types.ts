@@ -216,6 +216,8 @@ export type ActivitiesViewProps = Pick<
    * is the door between them.
    */
   onOpenSportScreen?: (request: SportScreenRequest) => void;
+  /** Sport screens taken off the rail; their door is not offered. */
+  hiddenSportScreens?: readonly SportScreenRequest["view"][];
   /** Asks Coach about the session open, as the Calendar's Ask Coach does. */
   onAskCoach?: (request: CoachOpenRequest) => void;
 };

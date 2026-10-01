@@ -23352,7 +23352,7 @@ td span {
 
 /* The About card's two preference sections, each opened by a hairline that
    divides rather than encloses. */
-.settings-startup,
+.settings-navigation,
 .settings-appearance {
   padding-top: 18px;
   border-top: 1px solid var(--glass-border);
@@ -30425,21 +30425,48 @@ button.settings-about-link {
   color: var(--accent);
 }
 
-/* Startup view: a section of the About card, headed like Appearance under it,
-   with the menu trigger at the end of its heading line. */
-.settings-startup {
+/* Navigation: a section of the About card, headed like Appearance under it.
+   Two rows of label and control — where the app opens, which sport screens the
+   rail lists — with the labels in one column so both controls start on the
+   same line. Each label is as tall as the startup trigger, so it sits level
+   with the first line of its control however that control wraps. */
+.settings-navigation-rows {
+  display: grid;
+  grid-template-columns: 112px minmax(0, 1fr);
+  align-items: start;
+  gap: 12px 16px;
+  margin: 14px 0 18px;
+}
+
+.settings-navigation-label {
   display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 16px;
+  align-items: center;
+  min-height: 34px;
+  color: var(--text-secondary);
+  font-size: 13px;
+  font-weight: 500;
 }
 
-.settings-startup > .settings-section-head {
-  min-width: 0;
+.settings-navigation-rows .startup-view-menu {
+  justify-self: start;
 }
 
-.settings-startup > .startup-view-menu {
-  flex: 0 0 auto;
+/* The trigger now starts its row instead of ending a heading line, so the
+   menu opens from its left edge. */
+.settings-navigation-rows .startup-view-popover {
+  right: auto;
+  left: 0;
+}
+
+.settings-navigation-rows .option-chips {
+  min-height: 34px;
+}
+
+.settings-navigation-note {
+  margin: 6px 0 0;
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1.45;
 }
 
 /* The navigable settings row: icon, copy, control. Every row in Connections

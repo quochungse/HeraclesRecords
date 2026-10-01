@@ -150,21 +150,35 @@ export const PRIMARY_NAV_ITEMS: PrimaryNavItem[] = [
   ...PRIMARY_NAV_ACCOUNT_ITEMS,
 ];
 
-export function visiblePrimaryNavItems(
+/** `hiddenViews` is what the athlete took off the rail in Settings → Navigation. */
+function isVisible(
+  item: PrimaryNavItem,
   showDevelopmentItems: boolean,
-): PrimaryNavItem[] {
-  return PRIMARY_NAV_ITEMS.filter(
-    (item) => !item.developmentOnly || showDevelopmentItems,
+  hiddenViews: readonly PrimaryView[],
+): boolean {
+  return (
+    (!item.developmentOnly || showDevelopmentItems) &&
+    !hiddenViews.includes(item.id)
   );
 }
 
-/** The sections with development-only destinations — and any they empty — removed. */
+export function visiblePrimaryNavItems(
+  showDevelopmentItems: boolean,
+  hiddenViews: readonly PrimaryView[] = [],
+): PrimaryNavItem[] {
+  return PRIMARY_NAV_ITEMS.filter((item) =>
+    isVisible(item, showDevelopmentItems, hiddenViews),
+  );
+}
+
+/** The sections with development-only and hidden destinations — and any they empty — removed. */
 export function visiblePrimaryNavSections(
   showDevelopmentItems: boolean,
+  hiddenViews: readonly PrimaryView[] = [],
 ): PrimaryNavSection[] {
   return PRIMARY_NAV_SECTIONS.flatMap((section) => {
-    const items = section.items.filter(
-      (item) => !item.developmentOnly || showDevelopmentItems,
+    const items = section.items.filter((item) =>
+      isVisible(item, showDevelopmentItems, hiddenViews),
     );
     return items.length > 0 ? [{ ...section, items }] : [];
   });

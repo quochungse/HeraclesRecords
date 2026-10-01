@@ -2350,6 +2350,15 @@ process's hour-long cache and so costs no request; it falls back to the account 
 local part, then to "Personal". Because one row shows a name and the other is icon-only,
 neither is findable by its text — both carry **`data-nav-label`**, and
 `probe-ui-cdp.mjs` navigates by it.
+**The four sport screens can be taken off the rail** (Settings → Navigation,
+`src/navigation/sportScreens.ts`, `coroslink.hiddenSportScreens`, `preference`), because
+Activities holds every sport and nothing else reads less for it. The *hidden* list is what
+is stored, so a sport screen added later reaches everyone's rail. A hidden screen is not
+offered as a start (hiding the current one resets it to Overview, and `readStartupView`
+refuses one a sync left behind), Activities drops its "Open in …" for it, and the Library's
+"Planned and done" opens the session in Activities instead. It is not a facet of Activity
+colors: a sport keeps its colour wherever it is drawn, Other has a colour and no screen, and
+the chips wear the accent rather than the sports' hues because this is chrome.
 
 **Chrome is quiet, and three devices carry the whole rail.** `.app-sidebar` draws one
 hairline down its right edge and nothing else — no fill, no shell blur, no highlight

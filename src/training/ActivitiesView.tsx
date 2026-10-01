@@ -56,6 +56,7 @@ export function ActivitiesView({
   onConnect,
   onRetry,
   onOpenSportScreen,
+  hiddenSportScreens,
   onAskCoach
 }: ActivitiesViewProps) {
   const connected = Boolean(status?.authenticated);
@@ -260,6 +261,7 @@ export function ActivitiesView({
       detailRequest={detailRequest}
       onRetry={onLoadDetail}
       onOpenSportScreen={onOpenSportScreen}
+      hiddenSportScreens={hiddenSportScreens}
       onAskCoach={onAskCoach}
     />
   );

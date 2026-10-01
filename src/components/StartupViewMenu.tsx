@@ -10,6 +10,8 @@ interface StartupViewMenuProps {
   value: PrimaryView;
   onChange: (view: PrimaryView) => void;
   showDevelopmentItems?: boolean;
+  /** Sport screens taken off the rail, which are not offered as a start either. */
+  hiddenViews?: readonly PrimaryView[];
   /** Settings renders the trigger with the current view spelled out; the
       icon-only form is kept for compact placements. */
   labeled?: boolean;
@@ -19,6 +21,7 @@ export function StartupViewMenu({
   value,
   onChange,
   showDevelopmentItems = false,
+  hiddenViews,
   labeled = false,
 }: StartupViewMenuProps) {
   const [open, setOpen] = useState(false);
@@ -75,7 +78,7 @@ export function StartupViewMenu({
         <div className="startup-view-popover" role="menu">
           <p className="update-settings-heading">Startup view</p>
           <div className="startup-view-options">
-            {visiblePrimaryNavItems(showDevelopmentItems).filter(
+            {visiblePrimaryNavItems(showDevelopmentItems, hiddenViews).filter(
               (item) => !item.excludeFromStartup,
             ).map(({ id, label, icon: Icon, beta }) => {
               const active = id === value;
