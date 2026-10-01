@@ -263,12 +263,6 @@
   color: var(--error-text);
 }
 
-.strength-notice.is-sample {
-  border-color: var(--warning-border);
-  background: var(--warning-bg);
-  color: var(--warning-text);
-}
-
 .strength-notice.is-warning {
   border-color: var(--warning-border);
   background: var(--warning-bg);
@@ -283,17 +277,6 @@
 .strength-notice.is-attribution svg {
   flex: 0 0 auto;
   margin-top: 2px;
-}
-
-.strength-notice.is-sample button {
-  margin-left: auto;
-  padding: 0;
-  border: 0;
-  background: none;
-  color: inherit;
-  font-size: 12px;
-  font-weight: 700;
-  text-decoration: underline;
 }
 
 /* ---------- Hero: figure + muscle panel ---------- */

@@ -3064,7 +3064,6 @@ export default function App() {
                     showDevelopmentTools &&
                     strengthSampleMode
                   }
-                  onExitSampleMode={() => setStrengthSampleMode(false)}
                   onOpenTraining={() => setActiveView("overview")}
                   openRequest={
                     sportScreenRequest?.view === "strength"

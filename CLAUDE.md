@@ -2201,12 +2201,12 @@ reads as chrome under a panel and as a tint under a sheet hanging over the page.
 shorthand resets it, so the declared size sat there doing nothing and every trigger in the app
 drew at the page's 16px, a size that is not on the scale and two steps above the chips a pill
 trigger stands in a row with.
-**Thirteen controls are exempt**, each named in the test by file *and* by a string from the
+**Fourteen controls are exempt**, each named in the test by file *and* by a string from the
 element, so an exemption covers one control rather than a whole file. They are four kinds and
 none is a row of options: a grid whose arrangement carries meaning (sports, a month of days),
 cards that need a sentence (plan difficulty, analysis starters), a list of
 records (places, search results, exercise facets, muscle layers) and a menu (the base-map
-popup, the start-up view).
+popup, the start-up view, the developer toolbar's sample switches).
 
 **A feature stylesheet must not restate type for whole element types.** The Training Library
 had `.training-library-view :is(button, input, select, textarea) { font: inherit }` — one class

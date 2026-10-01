@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
-  FlaskConical,
   Info,
   Link2,
   Loader2,
@@ -60,7 +59,6 @@ interface StrengthViewProps {
   showDevelopmentTools?: boolean;
   /** Generated sample history, switched from the developer toolbar. */
   sampleMode?: boolean;
-  onExitSampleMode?: () => void;
   /**
    * A session Activities handed over, to be selected rather than merely
    * listed. "Open in Strength" is pressed while looking at that session.
@@ -93,7 +91,6 @@ export function StrengthView({
   onOpenTraining,
   showDevelopmentTools = false,
   sampleMode: sampleModeRequested = false,
-  onExitSampleMode,
   openRequest = null,
   onOpenRequestHandled,
   onAskCoach
@@ -397,16 +394,6 @@ export function StrengthView({
     <section className="strength-view">
       {renderHeader(true)}
       {hevyDialog}
-
-      {sampleMode ? (
-        <p className="strength-notice is-sample" role="status">
-          <FlaskConical size={14} aria-hidden="true" />
-          Showing generated sample data, not your training.
-          <button type="button" onClick={onExitSampleMode}>
-            Exit preview
-          </button>
-        </p>
-      ) : null}
 
       {error && !sampleMode ? (
         <p className="strength-notice is-error" role="alert">
