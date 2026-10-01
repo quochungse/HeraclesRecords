@@ -190,7 +190,7 @@ function emptyTotals(): RunTotals {
   };
 }
 
-function emptySurfaceDistances(): Record<RunSurface, number> {
+function zeroBySurface(): Record<RunSurface, number> {
   return { road: 0, trail: 0, track: 0, treadmill: 0 };
 }
 
@@ -260,9 +260,9 @@ export function buildRunWeeks(
       longestRunMeters: 0,
       longestRunSeconds: 0,
       biggestClimbMeters: 0,
-      distanceBySurface: emptySurfaceDistances(),
-      durationBySurface: emptySurfaceDistances(),
-      climbBySurface: emptySurfaceDistances(),
+      distanceBySurface: zeroBySurface(),
+      durationBySurface: zeroBySurface(),
+      climbBySurface: zeroBySurface(),
       ...emptyTotals()
     });
   }

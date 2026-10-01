@@ -916,10 +916,10 @@ lives at module level for the same visit-to-visit reason — see `useCalendarDat
   is a way of reading: pressing **Trail** in the surface filter (`surface === "trail"` in
   `RunningView`) changes the blocks, not only the rows. The hero is `TrailRunningHero` —
   this week in **hours** against its 4-week average, the week's climb, the load ratio **over
-  every run** (labelled "all runs"), and ascent per hour over twelve weeks (Hiking's
+  every run** (labelled "all runs"), and climb per hour over twelve weeks (Hiking's
   `climbingRateOf`, over trail runs of 300 m+) — in place of VO₂max and threshold pace,
   which are the road's. The totals state climb per km where the road states an average
-  pace; the volume chart **opens on Time** (`RunVolumeChart` has a Distance · Time · Ascent
+  pace; the volume chart **opens on Time** (`RunVolumeChart` has a Distance · Time · Climb
   switch on every surface, opening on Distance elsewhere, keyed on the mode so leaving Trail
   gives the road's back; `buildRunWeeks` carries time and climb per surface and the longest
   run by time and by climb for it); the **efficiency chart is not drawn**; and the list
@@ -931,7 +931,10 @@ lives at module level for the same visit-to-visit reason — see `useCalendarDat
   chart with `motion="trail"`: pace and GAP as a run, plus the climbing-rate channel,
   opening on GAP against heart rate (raw pace takes GAP's slot when the watch sent none —
   a `PREFERRED_CHANNELS` slot may list alternatives). It drops decoupling, whose two halves
-  differ by their gradient. Rests and a worked-out moving time are left to Hiking: a run's
+  differ by their gradient. Activities draws a 102's chart with the same `motion="trail"`,
+  as it draws a ride's and a hike's as their own screens do. **Running's word for height
+  gained is "Climb"** — the totals, the list, the hero and the chart's switch — where
+  Hiking's is "Ascent". Rests and a worked-out moving time are left to Hiking: a run's
   time stays COROS's activity time, as everywhere else on Running. `test:run-metrics` holds the weeks, the rate and the chart
   channels; `test:running-renderer` holds the view and the page.
   **`npm run dev:sample-trail-runs`** (`HERACLES_SAMPLE_TRAIL_RUNS=1`,
@@ -947,7 +950,8 @@ lives at module level for the same visit-to-visit reason — see `useCalendarDat
   cadence, ground contact and oscillation follow the speed and the gait (a hiked sample
   states no contact time), so every panel of the trail page has something to draw. Dated
   from the Monday of last week back, plus the last weekday before today, so the hero's
-  "This week" always holds a run. `npm run test:sample-trail-runs`.
+  "This week" holds a run on every day but a Monday (the suite skips that check then).
+  `npm run test:sample-trail-runs`.
 - **Workout defaults** (`electron/workoutDefaults.ts`) — what a step holds before
   anyone types. `workoutCapabilities.ts` says what a step *may* hold; this says where
   it starts, and the two are different questions. `emptyRow` used to answer the second

@@ -216,7 +216,7 @@ export function RunDetailView({
         stats.push({
           label: "Climbing rate",
           value: `${Math.round(metersToElevation(up.verticalRate, unitSystem))} ${elevationUnit(unitSystem)}/h`,
-          title: "Metres gained an hour on the climbing stretches, stops out"
+          title: `${unitSystem === "imperial" ? "Feet" : "Metres"} gained an hour on the climbing stretches, stops out`
         });
       }
     }

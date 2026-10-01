@@ -40,12 +40,12 @@ import { runSurfaceColors } from "./runSurfaceColors";
  * apart — so under the Trail filter the chart opens on time. The bars, the
  * average, the dashed line and the heading all follow the one chosen.
  */
-export type RunVolumeMeasure = "distance" | "time" | "ascent";
+export type RunVolumeMeasure = "distance" | "time" | "climb";
 
 const MEASURE_OPTIONS: readonly { value: RunVolumeMeasure; label: string }[] = [
   { value: "distance", label: "Distance" },
   { value: "time", label: "Time" },
-  { value: "ascent", label: "Ascent" }
+  { value: "climb", label: "Climb" }
 ];
 
 interface RunVolumeChartProps {
@@ -79,14 +79,14 @@ interface VolumeRow extends Record<string, number | string> {
 /** A week's (or any total's) volume in the chosen measure, in display units. */
 function measureTotal(totals: RunTotals, measure: RunVolumeMeasure, unitSystem: UnitSystem): number {
   if (measure === "time") return totals.duration / SECONDS_PER_HOUR;
-  if (measure === "ascent") return metersToElevation(totals.elevationGain, unitSystem);
+  if (measure === "climb") return metersToElevation(totals.elevationGain, unitSystem);
   return metersToDisplayDistance(totals.distance, unitSystem);
 }
 
 /** The week's single biggest run in the chosen measure. */
 function measureLongest(week: RunWeek, measure: RunVolumeMeasure, unitSystem: UnitSystem): number {
   if (measure === "time") return week.longestRunSeconds / SECONDS_PER_HOUR;
-  if (measure === "ascent") return metersToElevation(week.biggestClimbMeters, unitSystem);
+  if (measure === "climb") return metersToElevation(week.biggestClimbMeters, unitSystem);
   return metersToDisplayDistance(week.longestRunMeters, unitSystem);
 }
 
@@ -98,25 +98,25 @@ function measureSurface(
   unitSystem: UnitSystem
 ): number {
   if (measure === "time") return week.durationBySurface[surface] / SECONDS_PER_HOUR;
-  if (measure === "ascent") return metersToElevation(week.climbBySurface[surface], unitSystem);
+  if (measure === "climb") return metersToElevation(week.climbBySurface[surface], unitSystem);
   return metersToDisplayDistance(week.distanceBySurface[surface], unitSystem);
 }
 
 function measureUnit(measure: RunVolumeMeasure, unitSystem: UnitSystem): string {
   if (measure === "time") return "h";
-  if (measure === "ascent") return elevationUnit(unitSystem);
+  if (measure === "climb") return elevationUnit(unitSystem);
   return distanceUnit(unitSystem);
 }
 
 function formatMeasure(value: number, measure: RunVolumeMeasure, unitSystem: UnitSystem): string {
-  return `${value.toFixed(measure === "ascent" ? 0 : 1)} ${measureUnit(measure, unitSystem)}`;
+  return `${value.toFixed(measure === "climb" ? 0 : 1)} ${measureUnit(measure, unitSystem)}`;
 }
 
 /** The dashed line: the week's longest run, or its biggest climb when height is the measure. */
 const LONGEST_LABELS: Record<RunVolumeMeasure, string> = {
   distance: "Longest run",
   time: "Longest run",
-  ascent: "Biggest climb"
+  climb: "Biggest climb"
 };
 
 /**
@@ -317,8 +317,8 @@ export function RunVolumeChart({
               isAnimationActive={false}
             />
             {/* The week's single longest run: the figure a marathon build is
-                actually steered by, and one a total hides completely. In
-                ascent, the week's biggest climb. */}
+                actually steered by, and one a total hides completely.
+                Measured in climb, the week's biggest climb. */}
             <Line
               dataKey="longest"
               type="monotone"

@@ -33,7 +33,7 @@ import {
   isSwimSportType,
   resolveSportName
 } from "../sportTypes";
-import { isRunSportType } from "../../running/runSurface";
+import { classifyRunSurface, isRunSportType } from "../../running/runSurface";
 import { isRideSportType } from "../../cycling/rideType";
 import { isHikeSportType } from "../../hiking/hikeType";
 import { useUnitSystem } from "../../units/UnitSystemProvider";
@@ -540,14 +540,17 @@ export function ActivityDetailPane({
               onFocusLapHandled={() => setFocusLapIndex(null)}
               activityTime={duration}
               embedded
-              // A ride reads in km/h and rpm here as it does on Cycling, and a
-              // hike in km/h and metres an hour as it does on Hiking.
+              // A ride reads in km/h and rpm here as it does on Cycling, a
+              // hike in km/h and metres an hour as it does on Hiking, and a
+              // trail run in pace and metres an hour as it does on Running.
               motion={
                 isRideSportType(sportType)
                   ? "speed"
                   : isHikeSportType(sportType)
                     ? "hike"
-                    : "pace"
+                    : classifyRunSurface(sportType) === "trail"
+                      ? "trail"
+                      : "pace"
               }
             />
           ) : null}
