@@ -420,9 +420,8 @@ import type {
 
 // userData lives at <appData>/heracles-records: Electron names it after the
 // top-level `name` in package.json (`productName` sits under `build`, which
-// Electron never reads). Data from the pre-rename <appData>/coroslink folder
-// was copied across once, by hand, in August 2026; that folder is still on disk
-// and is not read any more.
+// Electron never reads). Data from the folder an earlier name used was copied
+// across once, by hand, in August 2026; that folder is not read any more.
 
 /**
  * Development switches, which a packaged build does not obey. Each is read

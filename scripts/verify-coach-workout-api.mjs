@@ -34,9 +34,7 @@ const {
   workoutDraftsMatch
 } = await import(`${distUrl("corosWorkoutEditor.js")}?cacheBust=${Date.now()}`);
 
-/* userData is named after package.json's top-level `name` — see CLAUDE.md.
-   It was a hard-coded macOS path to the pre-rename `coroslink` folder, which
-   the app no longer reads. */
+/* userData is named after package.json's top-level `name` — see CLAUDE.md. */
 function userDataDir() {
   if (process.env.HERACLES_USER_DATA) return process.env.HERACLES_USER_DATA;
   const name = JSON.parse(fs.readFileSync(path.join(repoRoot, "package.json"), "utf8")).name;

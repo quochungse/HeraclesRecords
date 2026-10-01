@@ -30,9 +30,7 @@ const { buildWorkoutPayloadFromEntry, resetProgramForCreate } = await import(
 // --- session from the app's settings DB (token is stored in plain text).
 // The repo's better-sqlite3 is compiled for Electron's ABI, so use the
 // system sqlite3 CLI to read the settings instead.
-/* userData is named after package.json's top-level `name` — see CLAUDE.md.
-   This was a hard-coded macOS path to the pre-rename `coroslink` folder, which
-   the app no longer reads. */
+/* userData is named after package.json's top-level `name` — see CLAUDE.md. */
 function userDataDir() {
   if (process.env.HERACLES_USER_DATA) return process.env.HERACLES_USER_DATA;
   const name = JSON.parse(fs.readFileSync(new URL("../package.json", import.meta.url), "utf8")).name;

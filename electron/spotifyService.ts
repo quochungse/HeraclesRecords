@@ -548,7 +548,12 @@ function waitForAuthorizationCode(
         }
       });
 
-      authWindow.webContents.session.setCertificateVerifyProc((request, callback) => {
+      // The callback server's certificate is self-signed, so it is accepted
+      // for as long as this window is open. The window shares the app's
+      // default session, so the exception is taken down with the window
+      // rather than left standing for every later request to 127.0.0.1.
+      const authSession = authWindow.webContents.session;
+      authSession.setCertificateVerifyProc((request, callback) => {
         if (request.hostname === "127.0.0.1") {
           callback(0);
           return;
@@ -558,6 +563,7 @@ function waitForAuthorizationCode(
       });
 
       authWindow.on("closed", () => {
+        authSession.setCertificateVerifyProc(null);
         authWindow = undefined;
         rejectOnce(new Error("Spotify login window was closed."));
       });

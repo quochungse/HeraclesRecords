@@ -1869,7 +1869,10 @@ lives at module level for the same visit-to-visit reason — see `useCalendarDat
   first for its `display_name`; a provider that could not be reached is **stood down for five
   minutes** rather than retried per cluster, or one blocked domain costs the screenful the
   globe asks about all at once one timeout each. Both providers are keyless, like the base
-  map styles, and for the same reason.
+  map styles, and for the same reason. **They are asked about the point rounded to two
+  decimals** (`lookupCoordinate`, about a kilometre): a cluster of runs from home has its
+  centre at the door, the name wanted is the town's, and the published privacy policy says
+  only an approximate location is sent.
   **A lookup that failed is not an answer, and must not be cached as one.** The two cases are
   deliberately different return values: a provider that answered about nowhere (open water)
   returns a coordinate label, which the renderer remembers; nobody answering *throws*, and the
@@ -2532,5 +2535,9 @@ Linux; the updater already sends an ad-hoc build to the download page (`isMacAdH
 The release text is the tag's `## [x.y.z]` section of `CHANGELOG.md`
 (`scripts/release-notes.mjs`), which fails the job when the section is missing. The
 changelog starts at 1.0.0; upstream's history is in `vendor-main`. `verify-release-artifacts.mjs`
-gates the updater metadata per platform. The `dist*` scripts clean `dist-electron/` first —
+gates each platform's output before upload: every file `latest*.yml` names must be there with
+the size and sha512 it states (electron-updater refuses anything else, so a step that touches an
+installer after electron-builder — a signing service, say — must rewrite the metadata), and the
+installers must carry the names the `artifactName` patterns give, which `test:release-artifacts`
+also holds `updaterService.ts`'s hand-built download links to. The `dist*` scripts clean `dist-electron/` first —
 `tsc` never deletes the output of a removed module, and a local package would ship it.
