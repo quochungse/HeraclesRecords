@@ -16,18 +16,16 @@ import { trainingChartTooltipStyle } from "../training/chartConfig";
 import { useChartColors } from "../training/useChartColors";
 import { useUnitSystem } from "../units/UnitSystemProvider";
 import {
-  distanceUnit,
-  elevationUnit,
-  metersToDisplayDistance,
-  metersToElevation
-} from "../units/units";
-import {
-  buildHikeWeeks,
-  hikeWindowStartMs,
-  summariseHikes,
-  type HikeTotals,
-  type HikeWeek
-} from "./hikeMetrics";
+  MOVING_AVERAGE_WEEKS,
+  formatMeasure,
+  measureUnit,
+  measured,
+  oneYearEarlier,
+  trailingAverage,
+  type Volume,
+  type VolumeMeasure
+} from "../running/sportVolume";
+import { buildHikeWeeks, summariseHikes, type HikeWeek } from "./hikeMetrics";
 import { HIKE_TYPE_LABELS, type HikeType } from "./hikeType";
 import { hikeTypeColors } from "./hikeTypeColors";
 
@@ -39,10 +37,8 @@ import { hikeTypeColors } from "./hikeTypeColors";
  * gained is what tells them apart. Time on the trail and distance are a switch
  * away, and the bars, the average and the heading all follow the one chosen.
  */
-export type HikeVolumeMeasure = "ascent" | "time" | "distance";
-
-const MEASURE_OPTIONS: readonly { value: HikeVolumeMeasure; label: string }[] = [
-  { value: "ascent", label: "Ascent" },
+const MEASURE_OPTIONS: readonly { value: VolumeMeasure; label: string }[] = [
+  { value: "climb", label: "Ascent" },
   { value: "time", label: "Time" },
   { value: "distance", label: "Distance" }
 ];
@@ -58,81 +54,26 @@ interface HikeVolumeChartProps {
   nowMs: number;
 }
 
-const MOVING_AVERAGE_WEEKS = 4;
-const WEEKS_PER_YEAR = 52;
-const SECONDS_PER_HOUR = 3600;
-
 interface VolumeRow extends Record<string, number | string> {
   label: string;
   total: number;
   biggest: number;
 }
 
-function weekTotal(week: HikeTotals, measure: HikeVolumeMeasure, unitSystem: UnitSystem): number {
-  if (measure === "time") return week.duration / SECONDS_PER_HOUR;
-  if (measure === "ascent") return metersToElevation(week.elevationGain, unitSystem);
-  return metersToDisplayDistance(week.distance, unitSystem);
-}
-
-function weekBiggest(week: HikeWeek, measure: HikeVolumeMeasure, unitSystem: UnitSystem): number {
-  if (measure === "time") return week.longestHikeSeconds / SECONDS_PER_HOUR;
-  if (measure === "ascent") return metersToElevation(week.biggestAscentMeters, unitSystem);
-  return metersToDisplayDistance(week.longestHikeMeters, unitSystem);
-}
-
-function typeVolume(
-  week: HikeWeek,
-  type: HikeType,
-  measure: HikeVolumeMeasure,
-  unitSystem: UnitSystem
-): number {
-  const volume = week.byType[type];
-  if (measure === "time") return volume.duration / SECONDS_PER_HOUR;
-  if (measure === "ascent") return metersToElevation(volume.elevationGain, unitSystem);
-  return metersToDisplayDistance(volume.distance, unitSystem);
-}
-
-function measureUnit(measure: HikeVolumeMeasure, unitSystem: UnitSystem): string {
-  if (measure === "time") return "h";
-  if (measure === "ascent") return elevationUnit(unitSystem);
-  return distanceUnit(unitSystem);
-}
-
-function formatMeasure(value: number, measure: HikeVolumeMeasure, unitSystem: UnitSystem): string {
-  const digits = measure === "ascent" ? 0 : 1;
-  return `${value.toFixed(digits)} ${measureUnit(measure, unitSystem)}`;
-}
-
-function shiftWeeks(timestampMs: number, weeks: number): number {
-  const date = new Date(timestampMs);
-  date.setDate(date.getDate() - weeks * 7);
-  return date.getTime();
-}
-
-/** The chart's own window a year back, as Running's and Cycling's charts take it. */
-function oneYearEarlier(
-  hikes: readonly TrainingHubActivity[],
-  weeks: number,
-  nowMs: number
-): HikeTotals | undefined {
-  const back = Math.max(WEEKS_PER_YEAR, weeks);
-  if (back > WEEKS_PER_YEAR + 1) {
-    return undefined;
-  }
-  const start = shiftWeeks(hikeWindowStartMs(weeks, nowMs), back) / 1000;
-  const end = shiftWeeks(nowMs, back) / 1000;
-  const inWindow = hikes.filter(
-    (activity) =>
-      activity.startTime !== undefined && activity.startTime >= start && activity.startTime <= end
-  );
-  return inWindow.length > 0 ? summariseHikes(inWindow) : undefined;
+/** The week's single biggest hike, by each measure — not one hike's three figures. */
+function weekBiggest(week: HikeWeek): Volume {
+  return {
+    distance: week.longestHikeMeters,
+    duration: week.longestHikeSeconds,
+    elevationGain: week.biggestAscentMeters
+  };
 }
 
 export function HikeVolumeChart({ hikes, hikesAllTime, weeks, types, nowMs }: HikeVolumeChartProps) {
   const { unitSystem } = useUnitSystem();
   const { colors } = useChartColors();
   const palette = useMemo(() => hikeTypeColors(), []);
-  const [measure, setMeasure] = useState<HikeVolumeMeasure>("ascent");
+  const [measure, setMeasure] = useState<VolumeMeasure>("climb");
 
   const weekBuckets = useMemo(() => buildHikeWeeks(hikes, { weeks, nowMs }), [hikes, nowMs, weeks]);
   const averageBuckets = useMemo(
@@ -143,19 +84,20 @@ export function HikeVolumeChart({ hikes, hikesAllTime, weeks, types, nowMs }: Hi
   const rows = useMemo<VolumeRow[]>(
     () =>
       weekBuckets.map((week, index) => {
-        const end = index + MOVING_AVERAGE_WEEKS - 1;
-        const window = averageBuckets.slice(Math.max(0, end - MOVING_AVERAGE_WEEKS + 1), end + 1);
-        const average =
-          window.reduce((sum, bucket) => sum + weekTotal(bucket, measure, unitSystem), 0) /
-          Math.max(1, window.length);
+        const average = trailingAverage(
+          averageBuckets,
+          index + MOVING_AVERAGE_WEEKS - 1,
+          measure,
+          unitSystem
+        );
         const row: VolumeRow = {
           label: week.label,
-          total: weekTotal(week, measure, unitSystem),
-          biggest: weekBiggest(week, measure, unitSystem),
+          total: measured(week, measure, unitSystem),
+          biggest: measured(weekBiggest(week), measure, unitSystem),
           average
         };
         for (const type of types) {
-          row[type] = typeVolume(week, type, measure, unitSystem);
+          row[type] = measured(week.byType[type], measure, unitSystem);
         }
         return row;
       }),
@@ -163,11 +105,11 @@ export function HikeVolumeChart({ hikes, hikesAllTime, weeks, types, nowMs }: Hi
   );
 
   const total = useMemo(() => rows.reduce((sum, row) => sum + row.total, 0), [rows]);
-  const lastYear = useMemo(() => oneYearEarlier(hikesAllTime, weeks, nowMs), [hikesAllTime, nowMs, weeks]);
+  const lastYear = useMemo(() => oneYearEarlier(hikesAllTime, { weeks, nowMs }, summariseHikes), [hikesAllTime, nowMs, weeks]);
 
   const unit = measureUnit(measure, unitSystem);
   const biggestLabel =
-    measure === "ascent" ? "Biggest ascent" : measure === "time" ? "Longest day" : "Longest hike";
+    measure === "climb" ? "Biggest ascent" : measure === "time" ? "Longest day" : "Longest hike";
 
   return (
     <section className="panel run-block">
@@ -186,14 +128,14 @@ export function HikeVolumeChart({ hikes, hikesAllTime, weeks, types, nowMs }: Hi
           {lastYear !== undefined ? (
             <p className="run-block-aside">
               Same span a year ago:{" "}
-              <strong>{weekTotal(lastYear, measure, unitSystem).toFixed(0)} {unit}</strong>
+              <strong>{measured(lastYear, measure, unitSystem).toFixed(0)} {unit}</strong>
             </p>
           ) : null}
           <OptionGroup
             label="Measure"
             value={measure}
             options={MEASURE_OPTIONS}
-            onChange={(next) => setMeasure(next as HikeVolumeMeasure)}
+            onChange={(next) => setMeasure(next as VolumeMeasure)}
           />
         </div>
       </header>
@@ -282,7 +224,7 @@ export function HikeVolumeChart({ hikes, hikesAllTime, weeks, types, nowMs }: Hi
 interface VolumeTooltipProps extends TooltipContentProps {
   types: readonly HikeType[];
   palette: Record<HikeType, string>;
-  measure: HikeVolumeMeasure;
+  measure: VolumeMeasure;
   unitSystem: UnitSystem;
   biggestLabel: string;
 }

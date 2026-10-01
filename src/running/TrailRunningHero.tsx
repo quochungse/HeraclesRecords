@@ -6,7 +6,7 @@ import {
   formatElevationMeters
 } from "../training/formatters";
 import { useUnitSystem } from "../units/UnitSystemProvider";
-import { elevationUnit, metersToElevation } from "../units/units";
+import { formatVerticalRate } from "../units/units";
 import { DeltaChip, LoadRatioCard } from "./RunningHero";
 import {
   CLIMBING_RATE_MIN_GAIN_M,
@@ -75,8 +75,8 @@ export function TrailRunningHero({ trailRuns, allRuns, nowMs }: TrailRunningHero
 
   const count = thisWeek?.current.count ?? 0;
   const climb = thisWeek?.current.elevationGain ?? 0;
-  const perHour = (meters: number) =>
-    `${Math.round(metersToElevation(meters, unitSystem))} ${elevationUnit(unitSystem)}/h`;
+  // The floor in the athlete's units, as the rate beside it is.
+  const floor = formatElevationMeters(CLIMBING_RATE_MIN_GAIN_M, unitSystem);
 
   return (
     <section className="run-hero">
@@ -114,17 +114,17 @@ export function TrailRunningHero({ trailRuns, allRuns, nowMs }: TrailRunningHero
 
       <div
         className="run-hero-card"
-        title={`Median metres climbed an hour over the trail runs of the last twelve weeks that climbed ${CLIMBING_RATE_MIN_GAIN_M} m or more, over the whole run.`}
+        title={`Median ${unitSystem === "imperial" ? "feet" : "metres"} climbed an hour over the trail runs of the last twelve weeks that climbed ${floor} or more, over the whole run.`}
       >
-        <span className="run-hero-label">Ascent per hour · 12 weeks</span>
+        <span className="run-hero-label">Climb per hour · 12 weeks</span>
         <strong className="run-hero-value">
-          {rate.rate === undefined ? "—" : perHour(rate.rate)}
+          {rate.rate === undefined ? "—" : formatVerticalRate(rate.rate, unitSystem)}
         </strong>
         <div className="run-hero-foot">
           <span>
             {rate.rate === undefined
-              ? `No trail run over ${CLIMBING_RATE_MIN_GAIN_M} m of climb yet`
-              : `${rate.count} ${rate.count === 1 ? "run" : "runs"} over ${CLIMBING_RATE_MIN_GAIN_M} m`}
+              ? `No trail run over ${floor} of climb yet`
+              : `${rate.count} ${rate.count === 1 ? "run" : "runs"} over ${floor}`}
           </span>
           {rate.rate !== undefined && rate.previousRate !== undefined && rate.previousRate > 0 ? (
             <DeltaChip ratio={(rate.rate - rate.previousRate) / rate.previousRate} />

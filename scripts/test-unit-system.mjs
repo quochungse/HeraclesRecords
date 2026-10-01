@@ -8,6 +8,7 @@ import {
   formatElevationValue,
   formatPaceValue,
   formatSpeedValue,
+  formatVerticalRate,
   formatWeightValue,
   metersToDisplayDistance,
   metersToElevation,
@@ -31,6 +32,11 @@ assert.equal(formatDistanceValue(1_000, "metric"), "1.00 km");
 assert.equal(formatDistanceValue(1_000, "imperial"), "0.62 mi");
 assert.equal(formatDistanceValue(100, "imperial", { swim: true }), "109 yd");
 assert.equal(formatElevationValue(100, "imperial"), "328 ft");
+assert.equal(formatVerticalRate(457.4, "metric"), "457 m/h");
+assert.equal(formatVerticalRate(457.4, "imperial"), "1501 ft/h");
+// A chart's descents and flat stretches are stated, not blanked.
+assert.equal(formatVerticalRate(-900, "metric"), "-900 m/h");
+assert.equal(formatVerticalRate(0, "metric"), "0 m/h");
 assert.equal(formatWeightValue(10, "imperial", 1), "22.0 lb");
 assert.equal(formatPaceValue(300, "metric"), "5:00 /km");
 assert.equal(formatPaceValue(300, "imperial"), "8:03 /mi");

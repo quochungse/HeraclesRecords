@@ -2,7 +2,7 @@ import { useMemo } from "react";
 import type { TrainingHubActivitySeriesPoint } from "../../electron/types";
 import { formatDistanceMeters, formatDurationSeconds, formatElevationMeters } from "../training/formatters";
 import { useUnitSystem } from "../units/UnitSystemProvider";
-import { elevationUnit, metersToElevation } from "../units/units";
+import { formatVerticalRate } from "../units/units";
 import { rideClimbs, type ClimbCategory } from "./rideAnalysis";
 
 interface RideClimbsPanelProps {
@@ -92,7 +92,7 @@ export function RideClimbsPanel({ series }: RideClimbsPanelProps) {
                 <td className="is-numeric">
                   {climb.vam === undefined
                     ? "—"
-                    : `${Math.round(metersToElevation(climb.vam, unitSystem))} ${elevationUnit(unitSystem)}/h`}
+                    : formatVerticalRate(climb.vam, unitSystem)}
                 </td>
                 {withPower ? (
                   <td className="is-numeric">

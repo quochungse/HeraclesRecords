@@ -60,8 +60,8 @@ export function activeStrengthWindow(days: number) {
 interface UseStrengthDataOptions {
   api: CorosLinkApi;
   corosConnected: boolean;
-  /** Dev view unlocks the generated sample history; leaving it drops the preview. */
-  showDevelopmentTools?: boolean;
+  /** Development builds only: generated sample history in place of the athlete's. */
+  sampleMode?: boolean;
 }
 
 export interface StrengthData {
@@ -92,7 +92,6 @@ export interface StrengthData {
   error: string | null;
   warnings: string[];
   sampleMode: boolean;
-  setSampleMode: (sampleMode: boolean) => void;
   runSync: (force: boolean) => Promise<void>;
   /** Hevy account writes. They throw, so callers own their own error surface. */
   connectHevy: (apiKey: string) => Promise<void>;
@@ -109,7 +108,7 @@ export interface StrengthData {
 export function useStrengthData({
   api,
   corosConnected,
-  showDevelopmentTools = false
+  sampleMode = false
 }: UseStrengthDataOptions): StrengthData {
   const [days, setDays] = useSelectionPreference(STRENGTH_DAYS_PREFERENCE);
   const [source, setSource, sourcePreference] = useSelectionPreference(
@@ -118,7 +117,6 @@ export function useStrengthData({
   const [hevyStatus, setHevyStatus] = useState<HevyStatus | null>(null);
   const [hevyStatusLoading, setHevyStatusLoading] = useState(true);
   const [loadedSessions, setLoadedSessions] = useState<StrengthSession[]>([]);
-  const [sampleMode, setSampleMode] = useState(false);
   const [pending, setPending] = useState(0);
   const [loading, setLoading] = useState(false);
   const [settled, setSettled] = useState(false);
@@ -246,14 +244,6 @@ export function useStrengthData({
     };
   }, [runSync]);
 
-  // Leaving dev view drops the preview, so generated data can never linger in
-  // the production view.
-  useEffect(() => {
-    if (!showDevelopmentTools) {
-      setSampleMode(false);
-    }
-  }, [showDevelopmentTools]);
-
   const connectHevy = useCallback(
     async (apiKey: string) => {
       const next = await api.connectHevy(apiKey);
@@ -316,7 +306,6 @@ export function useStrengthData({
     error,
     warnings,
     sampleMode,
-    setSampleMode,
     runSync,
     connectHevy,
     setHevyWarmups,

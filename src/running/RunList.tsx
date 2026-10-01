@@ -105,6 +105,9 @@ function columnTitle(column: ColumnDefinition, unitSystem: UnitSystem): string {
       ? "Feet climbed per mile"
       : "Metres climbed per kilometre";
   }
+  if (column.key === "ascentRate") {
+    return `${unitSystem === "imperial" ? "Feet" : "Metres"} climbed an hour, over the whole run`;
+  }
   return column.title ?? `Sort by ${column.label.toLowerCase()}`;
 }
 
@@ -152,12 +155,7 @@ const TRAIL_COLUMNS: readonly ColumnDefinition[] = [
   { key: "pace", label: "Pace", numeric: true },
   { key: "elevationGain", label: "Climb", numeric: true, title: "Sort by the height climbed" },
   { key: "elevationPerKm", label: "Climb", numeric: true },
-  {
-    key: "ascentRate",
-    label: "Climb/h",
-    numeric: true,
-    title: "Metres climbed an hour, over the whole run"
-  },
+  { key: "ascentRate", label: "Climb/h", numeric: true },
   { key: "avgHr", label: "Avg HR", numeric: true }
 ];
 

@@ -52,6 +52,13 @@ export type WatchModelId =
   | "apex-pro"
   | "apex";
 
+/** Development builds only: which simulated activity sets are mixed into the list. */
+export interface SampleDataState {
+  rides: boolean;
+  hikes: boolean;
+  trailRuns: boolean;
+}
+
 export type WatchConnectionSmokeOptionId =
   | "auto"
   | "none"

@@ -40,13 +40,13 @@ import {
   SAMPLE_ATHLETE,
   climbOf,
   decimate,
-  decodePolyline,
-  haversine,
   heartRateFigures,
   insideDayWindow,
   mean,
+  routeModel,
   seededRandom,
-  wander
+  wander,
+  type RouteModel
 } from "./sampleActivityKit";
 import { SAMPLE_HIKE_ROUTES, type SampleHikeRouteKey } from "./sampleHikeRoutes";
 
@@ -373,83 +373,11 @@ const PLANS: readonly HikePlan[] = [
 
 // --------------------------------------------------------------- the trail --
 
-/** A trail as a function of distance: position, ground height and grade. */
-interface TrailModel {
-  length: number;
-  at(distance: number): { lat: number; lon: number; elevation: number };
-  grade(distance: number): number;
-  /** Metres along the trail where it first reaches a height, or its top. */
-  distanceAtElevation(meters: number): number | undefined;
-  summitDistance: number;
-}
+/** The trail, as the kit reads it for the trail runs too. */
+type TrailModel = RouteModel;
 
 function trailModel(key: SampleHikeRouteKey): TrailModel {
-  const source = SAMPLE_HIKE_ROUTES[key];
-  const points = decodePolyline(source.polyline);
-  const along = [0];
-  for (let index = 1; index < points.length; index += 1) {
-    along.push(along[index - 1]! + haversine(points[index - 1]!, points[index]!));
-  }
-  const length = along[along.length - 1]!;
-
-  // SRTM reads the canopy and the next cell's slope, several metres either way
-  // from one reading to the next — on a trail that zigzags up a ridge, more.
-  // A barometric altimeter is far smoother, so the ground is averaged over
-  // 350 m before anything is read from it — less, and a forest ridge counts a
-  // third again of climbing that nobody did.
-  const raw = source.elevations;
-  const smooth = raw.map((_, index) => {
-    const window = raw.slice(Math.max(0, index - 3), index + 4);
-    return window.reduce((sum, value) => sum + value, 0) / window.length;
-  });
-
-  // And it reads a summit low: a 30 m cell averages the top with its flanks.
-  // A watch calibrated at the trailhead reads close to the surveyed height, so
-  // the profile is lifted towards the top — the trailhead untouched, the
-  // summit on its true height, everything between in proportion.
-  const top = Math.max(...smooth);
-  const base = Math.min(...smooth);
-  const lift = Math.max(0, source.summit - top);
-  const ground = smooth.map((value) =>
-    top > base ? value + (lift * (value - base)) / (top - base) : value
-  );
-
-  const elevationAt = (distance: number) => {
-    const position = Math.min(Math.max(distance, 0), length) / source.elevationStep;
-    const low = Math.floor(position);
-    const high = Math.min(low + 1, ground.length - 1);
-    const t = position - low;
-    return (ground[Math.min(low, ground.length - 1)] ?? 0) * (1 - t) + (ground[high] ?? 0) * t;
-  };
-
-  let cursor = 0;
-  const locate = (distance: number) => {
-    const target = Math.min(Math.max(distance, 0), length);
-    if (along[cursor]! > target) cursor = 0;
-    while (cursor < along.length - 2 && along[cursor + 1]! < target) cursor += 1;
-    const span = along[cursor + 1]! - along[cursor]!;
-    const t = span > 0 ? (target - along[cursor]!) / span : 0;
-    const from = points[cursor]!;
-    const to = points[cursor + 1] ?? from;
-    return { lat: from[0] + (to[0] - from[0]) * t, lon: from[1] + (to[1] - from[1]) * t };
-  };
-
-  const summitIndex = ground.indexOf(Math.max(...ground));
-
-  return {
-    length,
-    at: (distance) => ({ ...locate(distance), elevation: elevationAt(distance) }),
-    grade: (distance) => {
-      const ahead = Math.min(distance + 60, length);
-      const behind = Math.max(distance - 60, 0);
-      return ahead > behind ? (elevationAt(ahead) - elevationAt(behind)) / (ahead - behind) : 0;
-    },
-    distanceAtElevation: (meters) => {
-      const index = ground.findIndex((value) => value >= meters);
-      return index === -1 ? undefined : index * source.elevationStep;
-    },
-    summitDistance: Math.min(summitIndex * source.elevationStep, length)
-  };
+  return routeModel(SAMPLE_HIKE_ROUTES[key]);
 }
 
 /**

@@ -98,6 +98,7 @@ import type {
   AppInfo,
   AppUpdateSnapshot,
   WatchConnectionSmokeOptionId,
+  SampleDataState,
   WatchStatus,
   WatchTransferProgress,
   YouTubeHistoryEntry,
@@ -172,6 +173,13 @@ const api = {
     optionId: WatchConnectionSmokeOptionId
   ): Promise<WatchStatus> =>
     ipcRenderer.invoke("watch:setConnectionSmokeOption", optionId),
+  getSampleData: (): Promise<SampleDataState> =>
+    ipcRenderer.invoke("dev:getSampleData"),
+  setSampleData: (
+    kind: keyof SampleDataState,
+    enabled: boolean
+  ): Promise<SampleDataState> =>
+    ipcRenderer.invoke("dev:setSampleData", kind, enabled),
   deleteWatchTrack: (relativePath: string): Promise<WatchStatus> =>
     ipcRenderer.invoke("watch:deleteTrack", relativePath),
   transferLocalTrack: (id: string): Promise<TransferResult> =>

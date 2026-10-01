@@ -792,7 +792,11 @@ lives at module level for the same visit-to-visit reason — see `useCalendarDat
   that opens a session on the whole page and restores its scroll on the way back
   (`useSessionPage`, with the handed-over session and Back's label), and the mouse's back
   button (`useBackGesture`). Running, Cycling and Hiking each carried their own copy of all
-  of it; a fix to one belongs there now, not in a screen.
+  of it; a fix to one belongs there now, not in a screen. Their weekly volume charts share
+  `src/running/sportVolume.ts` the same way — the three measures (`VolumeMeasure`, the label
+  is the screen's: Hiking calls `climb` "Ascent"), the four-week `trailingAverage` and the
+  same span `oneYearEarlier` — and a height gained an hour is `formatVerticalRate`
+  (`unitSystem.ts`) wherever it is written.
   What differs is what a rider reads: **speed over the time that recorded a distance**
   (`distanceDuration` — a trainer that measured nothing is riding time, not an hour at
   0 km/h); **a week read in hours** — the hero's "This week" and its delta, and the volume
@@ -898,8 +902,9 @@ lives at module level for the same visit-to-visit reason — see `useCalendarDat
   auto-pause on), heart rate following the climbing rate and the altitude, weekends dated
   back from today. The same door as the rides — only `main.ts` imports it, in the list,
   detail, raw and summaries handlers — and the same athlete: `electron/sampleActivityKit.ts`
-  holds what the two samples share (the athlete's heart-rate figures, seeded randomness,
-  polylines, load and zones) and nothing else imports it. `npm run test:sample-hikes`.
+  holds what the samples share (the athlete's heart-rate figures, seeded randomness,
+  polylines, the trail model `routeModel`, load and zones) and nothing else imports it.
+  `npm run test:sample-hikes`.
   **The sport colour Settings called "Trail" is "Hiking"** (`hiking`, `--sport-hiking`): it
   held COROS's hike and mountain-climb codes all along, and the trail run it also held is a
   run, on Running — so 102 moved to `run` (a trail-run workout too, `trailRun` in
@@ -915,10 +920,10 @@ lives at module level for the same visit-to-visit reason — see `useCalendarDat
   is a way of reading: pressing **Trail** in the surface filter (`surface === "trail"` in
   `RunningView`) changes the blocks, not only the rows. The hero is `TrailRunningHero` —
   this week in **hours** against its 4-week average, the week's climb, the load ratio **over
-  every run** (labelled "all runs"), and ascent per hour over twelve weeks (Hiking's
+  every run** (labelled "all runs"), and climb per hour over twelve weeks (Hiking's
   `climbingRateOf`, over trail runs of 300 m+) — in place of VO₂max and threshold pace,
   which are the road's. The totals state climb per km where the road states an average
-  pace; the volume chart **opens on Time** (`RunVolumeChart` has a Distance · Time · Ascent
+  pace; the volume chart **opens on Time** (`RunVolumeChart` has a Distance · Time · Climb
   switch on every surface, opening on Distance elsewhere, keyed on the mode so leaving Trail
   gives the road's back; `buildRunWeeks` carries time and climb per surface and the longest
   run by time and by climb for it); the **efficiency chart is not drawn**; and the list
@@ -930,9 +935,27 @@ lives at module level for the same visit-to-visit reason — see `useCalendarDat
   chart with `motion="trail"`: pace and GAP as a run, plus the climbing-rate channel,
   opening on GAP against heart rate (raw pace takes GAP's slot when the watch sent none —
   a `PREFERRED_CHANNELS` slot may list alternatives). It drops decoupling, whose two halves
-  differ by their gradient. Rests and a worked-out moving time are left to Hiking: a run's
+  differ by their gradient. Activities draws a 102's chart with the same `motion="trail"`,
+  as it draws a ride's and a hike's as their own screens do. **Running's word for height
+  gained is "Climb"** — the totals, the list, the hero and the chart's switch — where
+  Hiking's is "Ascent". Rests and a worked-out moving time are left to Hiking: a run's
   time stays COROS's activity time, as everywhere else on Running. `test:run-metrics` holds the weeks, the rate and the chart
   channels; `test:running-renderer` holds the view and the page.
+  **`npm run dev:sample-trail-runs`** (`HERACLES_SAMPLE_TRAIL_RUNS=1`,
+  `electron/sampleTrailRuns.ts`) adds fifteen trail runs over twelve weeks for screenshots,
+  through the rides' and hikes' door and on the hikes' trails (no route of its own to fetch):
+  Hàm Lợn loops and doubles, repeats on its one runnable climb (`repeatClimb`, 500 m at
+  7–16% — its steepest pitches are over 25%, a hike), Ba Vì and Tam Đảo long runs, and a 21K
+  on Hàm Lợn run as a race. A run is a list of legs, each at its own share of the aerobic
+  reserve, run a second at a time: speed by **Minetti's cost of running on a grade**, a
+  power-hike at walking's cost past the runner's grade, descents capped by the ground,
+  climbs by a vertical rate; heart rate follows what a second *cost*, so it rises on the
+  climbs and falls on the way down; GAP is that cost read back as a flat speed. Power,
+  cadence, ground contact and oscillation follow the speed and the gait (a hiked sample
+  states no contact time), so every panel of the trail page has something to draw. Dated
+  from the Monday of last week back, plus the last weekday before today, so the hero's
+  "This week" holds a run on every day but a Monday (the suite skips that check then).
+  `npm run test:sample-trail-runs`.
 - **Workout defaults** (`electron/workoutDefaults.ts`) — what a step holds before
   anyone types. `workoutCapabilities.ts` says what a step *may* hold; this says where
   it starts, and the two are different questions. `emptyRow` used to answer the second
@@ -2178,12 +2201,12 @@ reads as chrome under a panel and as a tint under a sheet hanging over the page.
 shorthand resets it, so the declared size sat there doing nothing and every trigger in the app
 drew at the page's 16px, a size that is not on the scale and two steps above the chips a pill
 trigger stands in a row with.
-**Thirteen controls are exempt**, each named in the test by file *and* by a string from the
+**Fourteen controls are exempt**, each named in the test by file *and* by a string from the
 element, so an exemption covers one control rather than a whole file. They are four kinds and
 none is a row of options: a grid whose arrangement carries meaning (sports, a month of days),
 cards that need a sentence (plan difficulty, analysis starters), a list of
 records (places, search results, exercise facets, muscle layers) and a menu (the base-map
-popup, the start-up view).
+popup, the start-up view, the developer toolbar's sample switches).
 
 **A feature stylesheet must not restate type for whole element types.** The Training Library
 had `.training-library-view :is(button, input, select, textarea) { font: inherit }` — one class

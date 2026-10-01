@@ -1227,7 +1227,7 @@ async function main() {
 
     await pickSurface("Trail");
     await settle();
-    for (const label of ["Climb this week", "Ascent per hour · 12 weeks", "Load ratio · all runs"]) {
+    for (const label of ["Climb this week", "Climb per hour · 12 weeks", "Load ratio · all runs"]) {
       assert.equal(await hasText(label), true, `the trail hero states ${label}`);
     }
     assert.equal(await hasText("VO₂max"), false, "VO₂max and threshold pace are the road's");

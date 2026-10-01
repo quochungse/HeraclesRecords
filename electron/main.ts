@@ -192,6 +192,7 @@ import type {
   TrainingHubActivityFileType,
   TrainingHubExportResult,
   WatchConnectionSmokeOptionId,
+  SampleDataState,
   YouTubeMusicConfig,
   ManualActivityInput,
   WatchTransferProgress
@@ -390,6 +391,13 @@ import {
   withSampleHikes,
   withSampleHikeSummaries
 } from "./sampleHikes";
+import {
+  isSampleTrailRunId,
+  sampleTrailRunDetail,
+  sampleTrailRunsEnabled,
+  withSampleTrailRuns,
+  withSampleTrailRunSummaries
+} from "./sampleTrailRuns";
 import type {
   AnthropicApiConfig,
   ChatMessage,
@@ -1432,6 +1440,41 @@ function registerIpcHandlers(): void {
       setWatchConnectionSmokeOption(optionId)
   );
 
+  // The developer toolbar's switches for the simulated activities. They set the
+  // same environment flags `npm run dev:sample-*` does, which the handlers read
+  // on every call; a packaged build refuses them.
+  const SAMPLE_DATA_FLAGS: Record<keyof SampleDataState, string> = {
+    rides: "HERACLES_SAMPLE_RIDES",
+    hikes: "HERACLES_SAMPLE_HIKES",
+    trailRuns: "HERACLES_SAMPLE_TRAIL_RUNS"
+  };
+  const readSampleData = (): SampleDataState => ({
+    rides: sampleRidesEnabled(),
+    hikes: sampleHikesEnabled(),
+    trailRuns: sampleTrailRunsEnabled()
+  });
+
+  ipcMain.handle("dev:getSampleData", () => readSampleData());
+
+  ipcMain.handle(
+    "dev:setSampleData",
+    (_event, kind: keyof SampleDataState, enabled: boolean) => {
+      if (app.isPackaged) {
+        throw new Error("Sample data is only available in development builds.");
+      }
+      if (!Object.hasOwn(SAMPLE_DATA_FLAGS, kind)) {
+        throw new Error(`Unknown sample data set: ${String(kind)}`);
+      }
+      const flag = SAMPLE_DATA_FLAGS[kind];
+      if (enabled) {
+        process.env[flag] = "1";
+      } else {
+        delete process.env[flag];
+      }
+      return readSampleData();
+    }
+  );
+
   ipcMain.handle("watch:deleteTrack", async (_event, relativePath: string) => {
     await deleteWatchTrack(relativePath);
     clearDownloadTransferredByFileName(path.basename(relativePath));
@@ -2103,9 +2146,10 @@ function registerIpcHandlers(): void {
     (_event, patch: CorosProfilePatch) => updateCorosProfile(patch)
   );
 
-  // HERACLES_SAMPLE_RIDES=1 and HERACLES_SAMPLE_HIKES=1 add simulated rides
-  // and hikes here, at the window's door and nowhere behind it — see
-  // electron/sampleRides.ts and electron/sampleHikes.ts.
+  // HERACLES_SAMPLE_RIDES=1, HERACLES_SAMPLE_HIKES=1 and
+  // HERACLES_SAMPLE_TRAIL_RUNS=1 add simulated rides, hikes and trail runs
+  // here, at the window's door and nowhere behind it — see
+  // electron/sampleRides.ts, sampleHikes.ts and sampleTrailRuns.ts.
   ipcMain.handle(
     "trainingHub:listActivities",
     async (_event, page: number, size: number, startDay?: string, endDay?: string) => {
@@ -2119,6 +2163,9 @@ function registerIpcHandlers(): void {
       }
       if (sampleHikesEnabled()) {
         activities = withSampleHikes(activities, { page, startDay, endDay });
+      }
+      if (sampleTrailRunsEnabled()) {
+        activities = withSampleTrailRuns(activities, { page, startDay, endDay });
       }
       return activities;
     }
@@ -2305,7 +2352,9 @@ function registerIpcHandlers(): void {
         ? sampleRideDetail(activityId)
         : sampleHikesEnabled() && isSampleHikeId(activityId)
           ? sampleHikeDetail(activityId)
-          : getTrainingHubActivityDetail(activityId, sportType, listActivity)
+          : sampleTrailRunsEnabled() && isSampleTrailRunId(activityId)
+            ? sampleTrailRunDetail(activityId)
+            : getTrainingHubActivityDetail(activityId, sportType, listActivity)
   );
 
   // The unparsed payload, on its own channel: it is ~2.2 MB and only the
@@ -2317,7 +2366,9 @@ function registerIpcHandlers(): void {
         ? { simulated: true, detail: sampleRideDetail(activityId) }
         : sampleHikesEnabled() && isSampleHikeId(activityId)
           ? { simulated: true, detail: sampleHikeDetail(activityId) }
-          : getTrainingHubActivityDetailRaw(activityId, sportType)
+          : sampleTrailRunsEnabled() && isSampleTrailRunId(activityId)
+            ? { simulated: true, detail: sampleTrailRunDetail(activityId) }
+            : getTrainingHubActivityDetailRaw(activityId, sportType)
   );
 
   // The list-level figures that only a detail payload knows. Two channels
@@ -2342,6 +2393,9 @@ function registerIpcHandlers(): void {
       }
       if (sampleHikesEnabled()) {
         summaries = withSampleHikeSummaries(activityIds, summaries);
+      }
+      if (sampleTrailRunsEnabled()) {
+        summaries = withSampleTrailRunSummaries(activityIds, summaries);
       }
       return summaries;
     }
