@@ -296,32 +296,6 @@
   text-decoration: underline;
 }
 
-.strength-sample-cta {
-  display: flex;
-}
-
-.strength-sample-button {
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  min-height: 34px;
-  padding: 0 14px;
-  border: 1px dashed var(--warning-border);
-  border-radius: var(--radius-pill);
-  background: transparent;
-  color: var(--warning-text);
-  font-size: 13px;
-  font-weight: 700;
-  transition:
-    background var(--dur-fast) var(--ease),
-    border-color var(--dur-fast) var(--ease);
-}
-
-.strength-sample-button:hover {
-  border-style: solid;
-  background: var(--warning-bg);
-}
-
 /* ---------- Hero: figure + muscle panel ---------- */
 
 .strength-hero {

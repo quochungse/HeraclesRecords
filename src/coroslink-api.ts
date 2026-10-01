@@ -95,6 +95,7 @@ import type {
   AppInfo,
   AppUpdateSnapshot,
   WatchConnectionSmokeOptionId,
+  SampleDataState,
   WatchStatus,
   WatchTransferProgress,
   YouTubeHistoryEntry,
@@ -173,6 +174,12 @@ export interface CorosLinkApi {
   setWatchConnectionSmokeOption: (
     optionId: WatchConnectionSmokeOptionId
   ) => Promise<WatchStatus>;
+  /** Development builds only: the simulated rides, hikes and trail runs. */
+  getSampleData: () => Promise<SampleDataState>;
+  setSampleData: (
+    kind: keyof SampleDataState,
+    enabled: boolean
+  ) => Promise<SampleDataState>;
   deleteWatchTrack: (relativePath: string) => Promise<WatchStatus>;
   transferLocalTrack: (id: string) => Promise<TransferResult>;
   onWatchTransferProgress: (

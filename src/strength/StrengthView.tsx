@@ -56,8 +56,11 @@ interface StrengthViewProps {
   api: CorosLinkApi;
   status: TrainingHubStatus | null;
   onOpenTraining: () => void;
-  /** Dev view unlocks the generated sample history. */
+  /** Dev view unlocks the muscle map's layer controls. */
   showDevelopmentTools?: boolean;
+  /** Generated sample history, switched from the developer toolbar. */
+  sampleMode?: boolean;
+  onExitSampleMode?: () => void;
   /**
    * A session Activities handed over, to be selected rather than merely
    * listed. "Open in Strength" is pressed while looking at that session.
@@ -89,6 +92,8 @@ export function StrengthView({
   status,
   onOpenTraining,
   showDevelopmentTools = false,
+  sampleMode: sampleModeRequested = false,
+  onExitSampleMode,
   openRequest = null,
   onOpenRequestHandled,
   onAskCoach
@@ -113,12 +118,11 @@ export function StrengthView({
     error,
     warnings,
     sampleMode,
-    setSampleMode,
     runSync,
     connectHevy,
     setHevyWarmups,
     disconnectHevy
-  } = useStrengthData({ api, corosConnected, showDevelopmentTools });
+  } = useStrengthData({ api, corosConnected, sampleMode: sampleModeRequested });
 
   const [hevyDialogOpen, setHevyDialogOpen] = useState(false);
   const [selectedExerciseName, setSelectedExerciseName] = useState<string | null>(null);
@@ -241,17 +245,6 @@ export function StrengthView({
         : "Nothing with weight on it yet"
     }
   ];
-
-  const sampleButton = showDevelopmentTools ? (
-    <button
-      type="button"
-      className="strength-sample-button"
-      onClick={() => setSampleMode(true)}
-    >
-      <FlaskConical size={14} aria-hidden="true" />
-      Preview with sample data
-    </button>
-  ) : null;
 
   const hevyDialog = hevyDialogOpen ? (
     <StrengthHevyDialog
@@ -395,9 +388,6 @@ export function StrengthView({
           </div>
         </section>
 
-        {sampleButton ? (
-          <div className="strength-sample-cta">{sampleButton}</div>
-        ) : null}
         {hevyDialog}
       </section>
     );
@@ -412,7 +402,7 @@ export function StrengthView({
         <p className="strength-notice is-sample" role="status">
           <FlaskConical size={14} aria-hidden="true" />
           Showing generated sample data, not your training.
-          <button type="button" onClick={() => setSampleMode(false)}>
+          <button type="button" onClick={onExitSampleMode}>
             Exit preview
           </button>
         </p>
@@ -449,10 +439,6 @@ export function StrengthView({
             } only as Full Body, so ${genericSetCount === 1 ? "it is" : "they are"} excluded from the map. Specific attribution is available for ${attributedSetCount.toLocaleString()} of ${workingSetCount.toLocaleString()} working sets.`}
           </span>
         </p>
-      ) : null}
-
-      {sampleButton && !sampleMode ? (
-        <div className="strength-sample-cta">{sampleButton}</div>
       ) : null}
 
       {awaitingFirstSessions ? (

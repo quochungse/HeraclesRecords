@@ -2,6 +2,7 @@ import { Sparkles } from "lucide-react";
 import type { CorosLinkApi } from "../coroslink-api";
 import type { WatchStatus } from "../../electron/types";
 import { StatusDot } from "./StatusDot";
+import { SampleDataControls } from "./SampleDataControls";
 import { WatchConnectionSmokeControls } from "./WatchConnectionSmokeControls";
 
 interface DeveloperToolbarProps {
@@ -13,6 +14,9 @@ interface DeveloperToolbarProps {
   /** Non-null while a fake "update available" state is being simulated. */
   updateSimulationActive: boolean;
   onToggleUpdateSimulation: () => void;
+  /** The Strength screen's generated sample history. */
+  strengthSampleActive: boolean;
+  onStrengthSampleChange: (active: boolean) => void;
   onWatchStatusChange: (status: WatchStatus) => void;
   onError: (message: string) => void;
 }
@@ -30,6 +34,8 @@ export function DeveloperToolbar({
   onDevelopmentViewToggle,
   updateSimulationActive,
   onToggleUpdateSimulation,
+  strengthSampleActive,
+  onStrengthSampleChange,
   onWatchStatusChange,
   onError,
 }: DeveloperToolbarProps) {
@@ -66,6 +72,13 @@ export function DeveloperToolbar({
               <Sparkles size={13} aria-hidden="true" />
               {updateSimulationActive ? "Clear test" : "Test update"}
             </button>
+
+            <SampleDataControls
+              api={api}
+              strengthSampleActive={strengthSampleActive}
+              onStrengthSampleChange={onStrengthSampleChange}
+              onError={onError}
+            />
 
             <WatchConnectionSmokeControls
               api={api}

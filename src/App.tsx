@@ -404,6 +404,8 @@ export default function App() {
    */
   const [devUpdateSimulation, setDevUpdateSimulation] =
     useState<AppUpdateSnapshot | null>(null);
+  /** The Strength screen's generated sample history, switched from the toolbar. */
+  const [strengthSampleMode, setStrengthSampleMode] = useState(false);
   const [sidebarOverlayOpen, setSidebarOverlayOpen] = useState(() => {
     if (typeof window === "undefined") {
       return false;
@@ -2603,6 +2605,9 @@ export default function App() {
     const nextVisible = !showDevelopmentTools;
     setShowDevelopmentTools(nextVisible);
     if (!nextVisible) {
+      // Leaving dev view drops the preview, so generated data can never
+      // linger in the production view.
+      setStrengthSampleMode(false);
       const developmentOnlyViews = new Set(
         PRIMARY_NAV_ITEMS.filter((item) => item.developmentOnly).map(
           (item) => item.id,
@@ -2689,6 +2694,8 @@ export default function App() {
           onDevelopmentViewToggle={handleDevelopmentViewToggle}
           updateSimulationActive={devUpdateSimulation !== null}
           onToggleUpdateSimulation={toggleDevUpdateSimulation}
+          strengthSampleActive={strengthSampleMode}
+          onStrengthSampleChange={setStrengthSampleMode}
           onWatchStatusChange={setWatchStatus}
           onError={setError}
         />
@@ -3052,6 +3059,12 @@ export default function App() {
                   showDevelopmentTools={
                     IS_DEVELOPMENT_BUILD && showDevelopmentTools
                   }
+                  sampleMode={
+                    IS_DEVELOPMENT_BUILD &&
+                    showDevelopmentTools &&
+                    strengthSampleMode
+                  }
+                  onExitSampleMode={() => setStrengthSampleMode(false)}
                   onOpenTraining={() => setActiveView("overview")}
                   openRequest={
                     sportScreenRequest?.view === "strength"

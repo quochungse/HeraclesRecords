@@ -192,6 +192,7 @@ import type {
   TrainingHubActivityFileType,
   TrainingHubExportResult,
   WatchConnectionSmokeOptionId,
+  SampleDataState,
   YouTubeMusicConfig,
   ManualActivityInput,
   WatchTransferProgress
@@ -1437,6 +1438,41 @@ function registerIpcHandlers(): void {
     "watch:setConnectionSmokeOption",
     (_event, optionId: WatchConnectionSmokeOptionId) =>
       setWatchConnectionSmokeOption(optionId)
+  );
+
+  // The developer toolbar's switches for the simulated activities. They set the
+  // same environment flags `npm run dev:sample-*` does, which the handlers read
+  // on every call; a packaged build refuses them.
+  const SAMPLE_DATA_FLAGS: Record<keyof SampleDataState, string> = {
+    rides: "HERACLES_SAMPLE_RIDES",
+    hikes: "HERACLES_SAMPLE_HIKES",
+    trailRuns: "HERACLES_SAMPLE_TRAIL_RUNS"
+  };
+  const readSampleData = (): SampleDataState => ({
+    rides: sampleRidesEnabled(),
+    hikes: sampleHikesEnabled(),
+    trailRuns: sampleTrailRunsEnabled()
+  });
+
+  ipcMain.handle("dev:getSampleData", () => readSampleData());
+
+  ipcMain.handle(
+    "dev:setSampleData",
+    (_event, kind: keyof SampleDataState, enabled: boolean) => {
+      if (app.isPackaged) {
+        throw new Error("Sample data is only available in development builds.");
+      }
+      if (!Object.hasOwn(SAMPLE_DATA_FLAGS, kind)) {
+        throw new Error(`Unknown sample data set: ${String(kind)}`);
+      }
+      const flag = SAMPLE_DATA_FLAGS[kind];
+      if (enabled) {
+        process.env[flag] = "1";
+      } else {
+        delete process.env[flag];
+      }
+      return readSampleData();
+    }
   );
 
   ipcMain.handle("watch:deleteTrack", async (_event, relativePath: string) => {
