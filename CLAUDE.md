@@ -68,18 +68,21 @@ backup's progress push and four suites. The three `intervals.*` settings — an 
 `uploadActivityFitToCoros` (the Calendar's manual activity), exporting a single activity
 file, and `.data-connect-panel`, the "connect COROS first" panel four screens draw.
 
-**Every link in the app points at this fork** (since 2026-10-01). Settings → About's
-"Website" goes to the fork's repository until there is a site of its own, beside "Source on
-GitHub" and "Report an issue"; the upstream "Support the project" link and `DonateButton`
-went in 85219aa. `.github/FUNDING.yml` (Buy Me a Coffee `quochungse`) and `CODEOWNERS`
-(`@quochungse`) are the fork's. **`LICENSE` keeps upstream's `Copyright (c) 2026 AtoZ` line
+**Every link in the app points at this fork** (since 2026-10-01). Settings → About holds
+"Website" (the fork's repository until there is a site of its own), "Report an issue" and a
+**Buy me a coffee** button (`buymeacoffee.com/quochungse`, in that service's own yellow, set
+apart at the row's end). "Source on GitHub", the COROS Help menu (`ResourcesMenu`) and a
+Licenses button were taken out of that row on purpose; the upstream "Support the project"
+link and `DonateButton` went in 85219aa. `.github/FUNDING.yml` (Buy Me a Coffee
+`quochungse`) and `CODEOWNERS` (`@quochungse`) are the fork's. **`LICENSE` keeps upstream's `Copyright (c) 2026 AtoZ` line
 beside the fork's own** — MIT requires that notice in every copy, so it is not branding to
 clean up. What else ships with the app is credited in `THIRD_PARTY_NOTICES.md`, and
 `scripts/collect-licenses.mjs` (the last step of `build:renderer`) writes `dist/licenses/`:
 `LICENSE.txt`, the notices, and `THIRD_PARTY_LICENSES.txt` — the license text of every
 non-dev package in `package-lock.json` and of the three fonts (`src/assets/fonts/licenses`,
-OFL). electron-builder installs it as `resources/licenses`; Settings → About's **Licenses**
-opens it (`app:openLicenses`). FFmpeg's GPLv3 text and README are copied beside the binary
+OFL). electron-builder installs it as `resources/licenses` — shipping the files with every
+copy is what the licenses ask for; no screen in the app opens them (a Licenses button was
+removed by decision, and would need its IPC channel back). FFmpeg's GPLv3 text and README are copied beside the binary
 by `prepare-binaries` (`ffmpeg-LICENSE.txt`, `ffmpeg-README.txt`). A package added later is
 covered by the next build; a bundled program or asset added later needs its own entry in the
 notices.

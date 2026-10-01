@@ -5,14 +5,13 @@ import {
   Bug,
   Check,
   ChevronRight,
-  Code2,
+  Coffee,
   Compass,
   Dumbbell,
   Ellipsis,
   ExternalLink,
   FolderOpen,
   Globe2,
-  Scale,
   HardDrive,
   Link2,
   Loader2,
@@ -32,7 +31,6 @@ import type {
   TrainingHubStatus,
 } from "../../electron/types";
 import { AppUpdateControl } from "../components/AppUpdateControls";
-import { ResourcesMenu } from "../components/ResourcesMenu";
 import { OptionChips, OptionGroup } from "../components/OptionGroup";
 import { StartupViewMenu } from "../components/StartupViewMenu";
 import type { PrimaryView } from "../navigation/primaryNav";
@@ -68,16 +66,13 @@ import appLogo from "../../build/icon.png";
 import { SyncPanel } from "./SyncPanel";
 import { BackupPanel } from "./BackupPanel";
 
+const BUY_ME_A_COFFEE_URL = "https://buymeacoffee.com/quochungse";
+
 const ABOUT_LINKS = [
   {
     label: "Website",
     href: "https://github.com/quochungse/HeraclesRecords",
     icon: Globe2,
-  },
-  {
-    label: "Source on GitHub",
-    href: "https://github.com/quochungse/HeraclesRecords",
-    icon: Code2,
   },
   {
     label: "Report an issue",
@@ -536,19 +531,18 @@ export function SettingsView({
               <ExternalLink size={12} aria-hidden="true" />
             </a>
           ))}
-          <button
-            type="button"
-            className="settings-about-link"
-            onClick={() => {
-              void api.openLicenses().catch((caught: unknown) => {
-                onError(caught instanceof Error ? caught.message : "Could not open the licenses.");
-              });
-            }}
+          {/* Set apart at the row's end: an invitation, not one more link. */}
+          <a
+            className="settings-about-coffee"
+            href={BUY_ME_A_COFFEE_URL}
+            target="_blank"
+            rel="noreferrer"
           >
-            <Scale size={15} aria-hidden="true" />
-            <span>Licenses</span>
-          </button>
-          <ResourcesMenu />
+            <span className="settings-about-coffee-mark" aria-hidden="true">
+              <Coffee size={13} strokeWidth={2.4} />
+            </span>
+            <span>Buy me a coffee</span>
+          </a>
         </div>
 
         {/* Where the app opens and which sport screens the rail lists: both

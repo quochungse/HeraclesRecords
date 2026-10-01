@@ -100,11 +100,7 @@ import {
   saveSpotifyConfig,
   syncSpotifyPlaylist
 } from "./spotifyService";
-import {
-  getAppInfo,
-  openAppStorageLocation,
-  openLicensesFolder
-} from "./appInfoService";
+import { getAppInfo, openAppStorageLocation } from "./appInfoService";
 import {
   backfillFeelTypes,
   getDailyMetrics,
@@ -2700,8 +2696,6 @@ function registerIpcHandlers(): void {
   ipcMain.handle("app:openStorageLocation", (_event, id: string) =>
     openAppStorageLocation(id)
   );
-
-  ipcMain.handle("app:openLicenses", () => openLicensesFolder());
 
   // ----- Sync -----
   //

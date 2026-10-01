@@ -3,8 +3,8 @@
 //
 // Runs after `vite build` (which empties dist/), as the last step of
 // `npm run build:renderer`. electron-builder installs the folder as
-// `resources/licenses` (see `extraResources` in package.json), and Settings →
-// About opens it.
+// `resources/licenses` (see `extraResources` in package.json), which is how the
+// licenses travel with every copy of the app.
 //
 // Which packages ship is read from package-lock.json: every entry not marked
 // `dev`, present on disk. electron-builder packs exactly the production

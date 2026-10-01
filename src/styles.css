@@ -1978,84 +1978,6 @@ input::placeholder {
   }
 }
 
-.resources-menu {
-  position: relative;
-  display: inline-flex;
-}
-
-.resources-popover {
-  position: absolute;
-  top: calc(100% + 8px);
-  right: 0;
-  z-index: 20;
-  display: grid;
-  gap: 14px;
-  width: 240px;
-  padding: 14px;
-  border: 1px solid var(--surface-line, var(--glass-border));
-  border-radius: var(--radius-md);
-  background: rgba(18, 18, 20, 0.98);
-  box-shadow: var(--shadow-card);
-}
-
-.resources-group {
-  display: grid;
-  gap: 2px;
-}
-
-.resources-group .update-settings-heading {
-  margin-bottom: 4px;
-}
-
-.resources-link {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 7px 8px;
-  margin: 0 -4px;
-  border-radius: var(--radius-sm);
-  color: var(--text-primary);
-  font-size: 13px;
-  font-weight: 500;
-  text-decoration: none;
-  cursor: pointer;
-  transition:
-    background var(--dur-fast) var(--ease),
-    color var(--dur-fast) var(--ease);
-}
-
-.resources-link:hover {
-  background: var(--glass-bg-hover);
-  outline: none;
-}
-
-.resources-link:focus-visible {
-  background: var(--glass-bg-hover);
-  outline: var(--focus-ring);
-  outline-offset: 2px;
-}
-
-.resources-link svg:first-child {
-  flex-shrink: 0;
-  color: var(--text-secondary);
-}
-
-.resources-link-label {
-  flex: 1;
-}
-
-.resources-link-external {
-  flex-shrink: 0;
-  opacity: 0;
-  color: var(--text-secondary);
-  transition: opacity var(--dur-fast) var(--ease);
-}
-
-.resources-link:hover .resources-link-external,
-.resources-link:focus-visible .resources-link-external {
-  opacity: 1;
-}
-
 .startup-view-menu {
   position: relative;
   display: inline-flex;
@@ -22092,7 +22014,6 @@ td span {
   background: rgba(19, 26, 40, 0.07);
 }
 
-:root[data-theme="paper"] .resources-popover,
 :root[data-theme="paper"] .startup-view-popover,
 :root[data-theme="paper"] .update-settings-popover {
   background: var(--glass-bg-elevated);
@@ -22100,12 +22021,10 @@ td span {
   box-shadow: var(--shadow-elevated);
 }
 
-:root[data-theme="paper"] .resources-link:hover,
 :root[data-theme="paper"] .startup-view-option:hover {
   background: rgba(19, 26, 40, 0.06);
 }
 
-:root[data-theme="paper"] .resources-link:focus-visible,
 :root[data-theme="paper"] .startup-view-option:focus-visible {
   background: rgba(19, 26, 40, 0.06);
   outline: var(--focus-ring);
@@ -30453,19 +30372,56 @@ td span {
   color: var(--accent);
 }
 
-button.settings-about-link {
-  cursor: pointer;
-  font-family: inherit;
+/* Buy Me a Coffee, said quietly. The row's own shape and type, so it sits with
+   the links beside it; the service's yellow only as a warm hairline, a wash
+   faint enough to read as cream on paper, and the small round mark that makes
+   it recognisable. Pushed to the row's end, it reads as an invitation rather
+   than one more link. A solid yellow pill was tried first and shouted over the
+   whole About card. */
+.settings-about-coffee {
+  --coffee: #ffdd00;
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  margin-left: auto;
+  padding: 5px 14px 5px 6px;
+  border: 1px solid color-mix(in srgb, var(--coffee) 30%, var(--glass-border));
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--coffee) 6%, transparent);
+  color: var(--text-primary);
+  font-size: 13px;
+  font-weight: 600;
+  text-decoration: none;
+  transition:
+    border-color var(--dur-fast) var(--ease),
+    background var(--dur-fast) var(--ease);
 }
 
-.settings-about-links .resources-popover {
-  right: auto;
-  left: 0;
+.settings-about-coffee:hover {
+  border-color: color-mix(in srgb, var(--coffee) 58%, var(--glass-border));
+  background: color-mix(in srgb, var(--coffee) 12%, transparent);
 }
 
-.settings-about-links .resources-menu-trigger[aria-expanded="true"] {
-  border-color: var(--accent);
-  color: var(--accent);
+.settings-about-coffee:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: 2px;
+}
+
+.settings-about-coffee-mark {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: var(--radius-pill);
+  background: var(--coffee);
+  color: #0d0c22;
+  transition: transform var(--dur-base) var(--ease);
+}
+
+/* A sip: the cup tips as the pointer arrives. */
+.settings-about-coffee:hover .settings-about-coffee-mark {
+  transform: rotate(-12deg);
 }
 
 /* Navigation: a section of the About card, headed like Appearance under it.
