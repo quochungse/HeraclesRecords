@@ -6,7 +6,7 @@
  * present; it cannot say it runs, and three of those assertions passed against
  * genuinely broken code until they were mutated.
  *
- * This page mounts the **real** components against a stubbed `CorosLinkApi`
+ * This page mounts the **real** components against a stubbed `HeraclesRecordsApi`
  * and exposes a small command surface on `window.__harness`. The driver
  * (`scripts/test-coach-analysis-renderer.mjs`) runs in Electron's main
  * process, loads this page into a hidden window, and asserts in node. Nothing
@@ -47,7 +47,7 @@ import { ExercisePickerDialog } from "../../src/calendar/ExercisePickerDialog";
 import { AddWorkoutModal } from "../../src/calendar/AddWorkoutModal";
 import { CalendarView } from "../../src/calendar/CalendarView";
 import { CalendarSkeleton } from "../../src/calendar/CalendarSkeleton";
-import type { CorosLinkApi } from "../../src/coroslink-api";
+import type { HeraclesRecordsApi } from "../../src/heraclesrecords-api";
 
 // ---------------------------------------------------------------------------
 // What the driver said should happen
@@ -95,7 +95,7 @@ function scriptedAnswer(method: string, args: unknown[]): unknown {
 
 /**
  * Every method the components reach for, recorded and answered. A Proxy rather
- * than a hand-written double on purpose: `CorosLinkApi` is ~200 methods and a
+ * than a hand-written double on purpose: `HeraclesRecordsApi` is ~200 methods and a
  * component reaching for one nobody thought to stub should get `undefined` and
  * carry on, not take the harness down — the same as a preload that is one
  * version behind.
@@ -129,9 +129,9 @@ function chatRowAnswer(method: string, args: unknown[]): unknown | undefined {
   return undefined;
 }
 
-function createStubApi(): CorosLinkApi {
+function createStubApi(): HeraclesRecordsApi {
   const cache = new Map<string, unknown>();
-  return new Proxy({} as CorosLinkApi, {
+  return new Proxy({} as HeraclesRecordsApi, {
     get(_target, property) {
       if (typeof property !== "string") return undefined;
       const cached = cache.get(property);

@@ -16,7 +16,7 @@
 // and even then the main process usually finds nothing new — a merged value
 // from the other machine, for instance, is already recorded as published.
 
-import type { CorosLinkApi } from "../coroslink-api";
+import type { HeraclesRecordsApi } from "../heraclesrecords-api";
 import { collectSyncableLocalStorage } from "./syncLocalStorage";
 
 /**
@@ -49,7 +49,7 @@ function fingerprint(entries: Record<string, string>): string {
  * only just joined, the localStorage half of the seed the main process does for
  * rows and settings.
  */
-export function startLocalStoragePublisher(api: CorosLinkApi): () => void {
+export function startLocalStoragePublisher(api: HeraclesRecordsApi): () => void {
   let lastSent: string | null = null;
   let stopped = false;
   let inFlight = false;

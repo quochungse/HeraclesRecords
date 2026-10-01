@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Check, ChevronDown } from "lucide-react";
 import type { SampleDataState } from "../../electron/types";
-import type { CorosLinkApi } from "../coroslink-api";
+import type { HeraclesRecordsApi } from "../heraclesrecords-api";
 
 type MainSampleKind = keyof SampleDataState;
 type SampleKind = MainSampleKind | "strength";
@@ -22,7 +22,7 @@ const SAMPLE_OPTIONS: readonly { value: SampleKind; label: string; title: string
 ];
 
 interface SampleDataControlsProps {
-  api: CorosLinkApi | undefined;
+  api: HeraclesRecordsApi | undefined;
   strengthSampleActive: boolean;
   onStrengthSampleChange: (active: boolean) => void;
   onError: (message: string) => void;

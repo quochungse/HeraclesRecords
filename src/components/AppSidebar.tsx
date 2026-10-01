@@ -18,7 +18,7 @@ import {
 } from "../navigation/primaryNav";
 import { useMediaQuery } from "../hooks/useMediaQuery";
 
-const SIDEBAR_COLLAPSED_KEY = "coroslink.sidebarCollapsed";
+const SIDEBAR_COLLAPSED_KEY = "heraclesrecords.sidebarCollapsed";
 
 const widthSpring = {
   type: "spring" as const,
@@ -138,6 +138,19 @@ export function AppSidebar({
   onOverlayOpenChange,
 }: AppSidebarProps) {
   const overlayMode = useMediaQuery("(max-width: 720px)");
+  /**
+   * Under 1024px the rail stands as icons whatever the athlete chose. The
+   * window's minimum is 900px, and a 236px column there left the screen beside
+   * it one or two words a line. The stored choice is untouched: the toggle
+   * opens the rail for the moment (`compactPeek`), and a wider window brings
+   * the athlete's own setting back.
+   */
+  const compact = useMediaQuery("(max-width: 1024px)");
+  const [compactPeek, setCompactPeek] = useState(false);
+  useEffect(() => {
+    if (!compact) setCompactPeek(false);
+  }, [compact]);
+  const railExpanded = compact ? compactPeek : expanded;
   const sections = visiblePrimaryNavSections(showDevelopmentItems, hiddenViews);
   /** Which rows are drawn, as a value: a row shown or hidden moves the ones
       below it and may start or stop the index scrolling, without the nav's own
@@ -162,10 +175,10 @@ export function AppSidebar({
   const [navFade, setNavFade] = useState({ top: false, bottom: false });
 
   const isOpen = overlayMode ? overlayOpen : true;
-  const showLabels = overlayMode ? true : expanded;
+  const showLabels = overlayMode ? true : railExpanded;
   const shellWidth = overlayMode
     ? 0
-    : expanded
+    : railExpanded
       ? SIDEBAR_EXPANDED_WIDTH
       : SIDEBAR_COLLAPSED_WIDTH;
 
@@ -193,7 +206,7 @@ export function AppSidebar({
       height: activeItem.offsetHeight,
       ready: true,
     });
-  }, [activeView, coachBusy, connectedWatchName, expanded, isOpen, overlayMode]);
+  }, [activeView, coachBusy, connectedWatchName, railExpanded, isOpen, overlayMode]);
 
   const updateNavFade = useCallback(() => {
     const nav = navRef.current;
@@ -267,6 +280,10 @@ export function AppSidebar({
   };
 
   const handleToggleExpanded = () => {
+    if (compact) {
+      setCompactPeek((open) => !open);
+      return;
+    }
     const nextExpanded = !expanded;
     onExpandedChange(nextExpanded);
     writeSidebarCollapsed(!nextExpanded);
@@ -355,7 +372,7 @@ export function AppSidebar({
       className={[
         "app-sidebar",
         overlayMode ? "is-overlay" : "",
-        !overlayMode && !expanded ? "is-collapsed" : "",
+        !overlayMode && !railExpanded ? "is-collapsed" : "",
         isOpen ? "is-open" : "",
       ]
         .filter(Boolean)
@@ -416,12 +433,12 @@ export function AppSidebar({
             <button
               type="button"
               className="app-sidebar-brand-toggle"
-              aria-expanded={expanded}
-              aria-label={expanded ? "Collapse sidebar" : "Expand sidebar"}
-              title={expanded ? "Collapse sidebar" : "Expand sidebar"}
+              aria-expanded={railExpanded}
+              aria-label={railExpanded ? "Collapse sidebar" : "Expand sidebar"}
+              title={railExpanded ? "Collapse sidebar" : "Expand sidebar"}
               onClick={handleToggleExpanded}
             >
-              {expanded ? (
+              {railExpanded ? (
                 <PanelLeftClose size={16} aria-hidden="true" />
               ) : (
                 <PanelLeft size={16} aria-hidden="true" />

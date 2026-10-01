@@ -45,7 +45,7 @@ import type {
   WorkoutIntensityInput,
   WorkoutSport
 } from "../../electron/types";
-import type { CorosLinkApi } from "../coroslink-api";
+import type { HeraclesRecordsApi } from "../heraclesrecords-api";
 import { useUnitSystem } from "../units/UnitSystemProvider";
 import { RunnerIcon } from "../running/runnerIcon";
 import { distanceUnit, swimDistanceUnit } from "../units/units";
@@ -1129,7 +1129,7 @@ export interface UseWorkoutBuilderOptions {
  * an edit, and reading it as one would ask "discard changes?" of a dialog
  * nobody had touched.
  */
-export function useWorkoutBuilder(api: CorosLinkApi, options: UseWorkoutBuilderOptions = {}) {
+export function useWorkoutBuilder(api: HeraclesRecordsApi, options: UseWorkoutBuilderOptions = {}) {
   const { unitSystem } = useUnitSystem();
   const { seed } = options;
   const [builderSport, setBuilderSportState] = useState<WorkoutSport>(

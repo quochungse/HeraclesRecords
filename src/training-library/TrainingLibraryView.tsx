@@ -29,7 +29,7 @@ import {
 } from "../../electron/trainingPlanDomain";
 import { defaultPlanBriefRequest } from "../../electron/planBrief";
 import { firstPlanMonday } from "../../electron/trainingPlanGeneration";
-import type { CorosLinkApi } from "../coroslink-api";
+import type { HeraclesRecordsApi } from "../heraclesrecords-api";
 import { OptionGroup } from "../components/OptionGroup";
 import { useUnitSystem } from "../units/UnitSystemProvider";
 import { CollapsibleSearch } from "./LibrarySearch";
@@ -87,7 +87,7 @@ import {
 import "./trainingLibrary.css";
 
 interface TrainingLibraryViewProps {
-  api: CorosLinkApi;
+  api: HeraclesRecordsApi;
   status: TrainingHubStatus | null;
   onOpenTraining: () => void;
   /** Coach, with a prompt — or a Coach plan to ask about in its own conversation (P1.7). */

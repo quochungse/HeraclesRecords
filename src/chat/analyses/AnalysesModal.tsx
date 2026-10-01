@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { X, Zap } from "lucide-react";
 import type { ChatProvider } from "../../../electron/types";
-import type { CorosLinkApi } from "../../coroslink-api";
+import type { HeraclesRecordsApi } from "../../heraclesrecords-api";
 import { AnalysisCreate } from "./AnalysisCreate";
 import { AnalysisDetailView } from "./AnalysisDetail";
 import { AnalysesTitleProvider } from "./analysesTitle";
@@ -33,7 +33,7 @@ export function AnalysesModal({
   onChanged,
   onOpenConversation
 }: {
-  api: CorosLinkApi | undefined;
+  api: HeraclesRecordsApi | undefined;
   /** null is closed. */
   target: AnalysesModalTarget | null;
   provider: ChatProvider;

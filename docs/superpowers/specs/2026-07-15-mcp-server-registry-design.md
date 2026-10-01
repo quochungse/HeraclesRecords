@@ -93,7 +93,7 @@ Providers are untouched — they still receive one aggregated `CorosMcpTool[]`.
 New handlers mirroring the existing `watchfaces:*` / `trainingHub:*` pattern:
 `mcp:listServers`, `mcp:addServer`, `mcp:updateServer`, `mcp:removeServer`,
 `mcp:connect`, `mcp:disconnect`, `mcp:status`, `mcp:listTools`. Exposed via
-`preload.ts` and typed in `src/coroslink-api.ts`.
+`preload.ts` and typed in `src/heraclesrecords-api.ts`.
 
 ### 5. Settings UI (`src/chat/McpServersPanel.tsx` or Settings section)
 

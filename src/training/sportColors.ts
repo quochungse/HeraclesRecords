@@ -28,7 +28,7 @@ export const SPORT_COLOR_LABELS: Record<SportColorCategory, string> = {
   other: "Other"
 };
 
-const STORAGE_KEY = "coroslink.sportColors";
+const STORAGE_KEY = "heraclesrecords.sportColors";
 
 /**
  * Categories stored under an earlier name. "hiking" was stored as "trail" —

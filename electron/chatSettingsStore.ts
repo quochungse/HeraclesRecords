@@ -33,7 +33,6 @@ export const CHAT_SETTINGS_KEYS = {
   anthropicEffort: "chat.anthropic.effort",
   anthropicApiKey: "chat.anthropic.apiKey",
   claudeExecutablePath: "chat.claudeCode.executablePath",
-  claudeUseAppScopedAuth: "chat.claudeCode.useAppScopedAuth",
   claudeModel: "chat.claudeCode.model",
   claudeEffort: "chat.claudeCode.effort",
   claudeDefaultModel: "chat.claudeCode.defaultModel",
@@ -126,9 +125,6 @@ export function readChatSettingsFromStore(
     claudeCode: {
       executablePath:
         store.get(CHAT_SETTINGS_KEYS.claudeExecutablePath) || undefined,
-      // Defaults on: the app should not silently use another account's login.
-      useAppScopedAuth:
-        store.get(CHAT_SETTINGS_KEYS.claudeUseAppScopedAuth) !== "false",
       model: store.get(CHAT_SETTINGS_KEYS.claudeModel) || undefined,
       effort: normalizeAnthropicEffort(store.get(CHAT_SETTINGS_KEYS.claudeEffort)),
       defaultModel:
@@ -239,10 +235,6 @@ export function saveChatSettingsToStore(
   } else {
     store.delete([CHAT_SETTINGS_KEYS.claudeExecutablePath]);
   }
-  store.set(
-    CHAT_SETTINGS_KEYS.claudeUseAppScopedAuth,
-    settings.claudeCode?.useAppScopedAuth === false ? "false" : "true"
-  );
   store.set(
     CHAT_SETTINGS_KEYS.claudeEffort,
     normalizeAnthropicEffort(settings.claudeCode?.effort)

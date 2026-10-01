@@ -215,6 +215,7 @@ export async function saveYouTubeMusicAuth(
   const authPath = getAuthPath();
   await fs.promises.mkdir(path.dirname(authPath), { recursive: true });
   await runBridge(check.pythonCommand, "setup", [authPath], trimmedHeaders);
+  await restrictToOwner(authPath);
   setSetting(SETTINGS.authUpdatedAt, new Date().toISOString());
 
   return getYouTubeMusicStatus();
@@ -250,6 +251,20 @@ export async function syncYouTubeMusicLibrary(): Promise<YouTubeMusicSyncResult>
 
 function getAuthPath(): string {
   return path.join(app.getPath("userData"), "ytmusicapi-browser.json");
+}
+
+/**
+ * The auth file holds a signed-in Google session (cookies, or OAuth tokens),
+ * in the clear because ytmusicapi — a Python process — reads it and rewrites it
+ * on refresh. Owner-only is what can be done for it; `writeFile`'s `mode`
+ * applies only when the file is created, and the bridge creates it on setup.
+ */
+async function restrictToOwner(filePath: string): Promise<void> {
+  try {
+    await fs.promises.chmod(filePath, 0o600);
+  } catch {
+    // Windows ignores POSIX modes, and a missing file has nothing to protect.
+  }
 }
 
 async function requestYouTubeMusicDeviceCode(
@@ -365,8 +380,10 @@ async function saveYouTubeMusicOAuthToken(
       },
       null,
       4
-    )
+    ),
+    { mode: 0o600 }
   );
+  await restrictToOwner(authPath);
   setSetting(SETTINGS.authUpdatedAt, new Date().toISOString());
 }
 

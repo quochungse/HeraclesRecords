@@ -1,12 +1,12 @@
 import { Loader2 } from "lucide-react";
 import type { TrainingHubStatus } from "../../electron/types";
-import type { CorosLinkApi } from "../coroslink-api";
+import type { HeraclesRecordsApi } from "../heraclesrecords-api";
 import { StrengthHero } from "./StrengthHero";
 import { activeStrengthWindow, useStrengthData } from "./useStrengthData";
 import "./strength.css";
 
 interface StrengthDistributionSectionProps {
-  api: CorosLinkApi;
+  api: HeraclesRecordsApi;
   status: TrainingHubStatus | null;
 }
 

@@ -8,7 +8,7 @@
 //
 // This suite mounts the real components in a real Chromium — Electron's, which
 // the repo already depends on and already runs `coach-analysis-sql` under, so
-// it costs no new dependency — against a stubbed `CorosLinkApi`. It drives them
+// it costs no new dependency — against a stubbed `HeraclesRecordsApi`. It drives them
 // through the DOM and asserts here, in node, so a failure reads like every
 // other suite.
 //
@@ -39,7 +39,6 @@ const CHAT_SETTINGS = {
   chatgpt: {},
   anthropic: { model: "claude-opus-5", effort: "high", hasApiKey: false },
   claudeCode: {
-    useAppScopedAuth: true,
     effort: "high",
     permissions: {
       recentActivities: true,

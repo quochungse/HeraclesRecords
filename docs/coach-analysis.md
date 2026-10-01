@@ -216,7 +216,7 @@ the old schema, and asserts the conversation and its chip survive.
 ## IPC
 
 Channels are `analysis:*`, and the three-file invariant is unchanged — a name
-is a bare string in `main.ts`, `preload.ts` and `src/coroslink-api.ts`, and
+is a bare string in `main.ts`, `preload.ts` and `src/heraclesrecords-api.ts`, and
 `npm run test:ipc-surface` scrapes all three. That suite also fails on any
 bridge method still spelling `Automation` or `Attach`, so neither rename can
 half-happen.

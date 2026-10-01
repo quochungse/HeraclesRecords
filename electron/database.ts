@@ -86,26 +86,8 @@ interface TrainingActivityRow {
 
 let db: Database.Database | undefined;
 
-function migrateLegacyDatabase(userDataPath: string, dbPath: string): void {
-  if (fs.existsSync(dbPath)) {
-    return;
-  }
-
-  const legacyPath = path.join(userDataPath, "coros-desktop.sqlite");
-  if (!fs.existsSync(legacyPath)) {
-    return;
-  }
-
-  fs.renameSync(legacyPath, dbPath);
-
-  for (const suffix of ["-wal", "-shm"]) {
-    const legacySidecar = `${legacyPath}${suffix}`;
-    const nextSidecar = `${dbPath}${suffix}`;
-    if (fs.existsSync(legacySidecar)) {
-      fs.renameSync(legacySidecar, nextSidecar);
-    }
-  }
-}
+/** The database's file name inside userData. */
+export const DATABASE_FILE_NAME = "heraclesrecords.sqlite";
 
 export function initializeDatabase(userDataPath: string): Database.Database {
   if (db) {
@@ -113,8 +95,7 @@ export function initializeDatabase(userDataPath: string): Database.Database {
   }
 
   fs.mkdirSync(userDataPath, { recursive: true });
-  const dbPath = path.join(userDataPath, "coroslink.sqlite");
-  migrateLegacyDatabase(userDataPath, dbPath);
+  const dbPath = path.join(userDataPath, DATABASE_FILE_NAME);
   db = new Database(dbPath);
   db.pragma("journal_mode = WAL");
   db.exec(`
@@ -1222,13 +1203,22 @@ function notifySyncedDelete(table: string, ...values: string[]): void {
 }
 
 export function setSetting(key: string, value: string): void {
-  requireDatabase()
+  const result = requireDatabase()
     .prepare(
       `INSERT INTO app_settings (key, value)
        VALUES (?, ?)
-       ON CONFLICT(key) DO UPDATE SET value = excluded.value`
+       ON CONFLICT(key) DO UPDATE SET value = excluded.value
+       WHERE app_settings.value IS NOT excluded.value`
     )
     .run(key, value);
+  // Writing back the value already stored is not a change, and must not reach
+  // sync as one. Plenty of code rewrites a setting it did not change — the MCP
+  // client stores its server's resource URL on every connect, a settings save
+  // writes every key — and each of those used to go out as a fresh entry: a
+  // queue that was never empty after launch, and worse, a newer timestamp on
+  // this machine's stale copy that could undo a change made on the other one
+  // and not yet pulled here.
+  if (result.changes === 0) return;
   // The single choke point every settings write in the app passes through, so
   // the sync loop learns about all of them from one hook. A no-op until sync
   // is attached, and it swallows its own errors — a sync problem must never

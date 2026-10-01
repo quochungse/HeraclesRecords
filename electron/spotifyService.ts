@@ -14,6 +14,7 @@ import {
   setSetting,
   upsertSpotifySyncTrack
 } from "./database";
+import { getSecretSetting, setSecretSetting } from "./secretSettings";
 import { downloadAudioSearch } from "./downloadService";
 import { transferFileToWatch } from "./watchService";
 import {
@@ -51,7 +52,7 @@ const SETTINGS = {
 export function getSpotifyConfig(): SpotifyConfig {
   return {
     clientId: getSetting(SETTINGS.clientId) ?? "",
-    clientSecret: getSetting(SETTINGS.clientSecret) ?? "",
+    clientSecret: getSecretSetting(SETTINGS.clientSecret) ?? "",
     redirectUri: REDIRECT_URI
   };
 }
@@ -62,7 +63,7 @@ export function saveSpotifyConfig(config: SpotifyConfig): SpotifyStatus {
   const clientSecret = config.clientSecret.trim();
 
   setSetting(SETTINGS.clientId, clientId);
-  setSetting(SETTINGS.clientSecret, clientSecret);
+  setSecretSetting(SETTINGS.clientSecret, clientSecret);
 
   if (
     previous.clientId !== clientId ||
@@ -77,7 +78,7 @@ export function saveSpotifyConfig(config: SpotifyConfig): SpotifyStatus {
 export function getSpotifyStatus(): SpotifyStatus {
   const config = getSpotifyConfig();
   const expiresAt = getSetting(SETTINGS.expiresAt);
-  const refreshToken = getSetting(SETTINGS.refreshToken);
+  const refreshToken = getSecretSetting(SETTINGS.refreshToken);
 
   return {
     configured: Boolean(config.clientId && config.clientSecret),
@@ -105,8 +106,8 @@ export async function loginSpotify(
   const code = await waitForAuthorizationCode(authUrl, state, parentWindow);
   const authorization = await api.authorizationCodeGrant(code);
 
-  setSetting(SETTINGS.accessToken, authorization.body.access_token);
-  setSetting(SETTINGS.refreshToken, authorization.body.refresh_token);
+  setSecretSetting(SETTINGS.accessToken, authorization.body.access_token);
+  setSecretSetting(SETTINGS.refreshToken, authorization.body.refresh_token);
   setSetting(
     SETTINGS.expiresAt,
     String(Date.now() + authorization.body.expires_in * 1000)
@@ -374,8 +375,8 @@ function firstDownloadedTrack(tracks: LocalTrack[]): LocalTrack {
 
 async function getAuthorizedSpotifyApi(): Promise<SpotifyWebApi> {
   const api = createConfiguredApi();
-  const accessToken = getSetting(SETTINGS.accessToken);
-  const refreshToken = getSetting(SETTINGS.refreshToken);
+  const accessToken = getSecretSetting(SETTINGS.accessToken);
+  const refreshToken = getSecretSetting(SETTINGS.refreshToken);
   const expiresAt = Number(getSetting(SETTINGS.expiresAt) ?? 0);
 
   if (!refreshToken) {
@@ -391,7 +392,7 @@ async function getAuthorizedSpotifyApi(): Promise<SpotifyWebApi> {
 
   const refreshed = await api.refreshAccessToken();
   api.setAccessToken(refreshed.body.access_token);
-  setSetting(SETTINGS.accessToken, refreshed.body.access_token);
+  setSecretSetting(SETTINGS.accessToken, refreshed.body.access_token);
   setSetting(
     SETTINGS.expiresAt,
     String(Date.now() + refreshed.body.expires_in * 1000)
@@ -547,7 +548,12 @@ function waitForAuthorizationCode(
         }
       });
 
-      authWindow.webContents.session.setCertificateVerifyProc((request, callback) => {
+      // The callback server's certificate is self-signed, so it is accepted
+      // for as long as this window is open. The window shares the app's
+      // default session, so the exception is taken down with the window
+      // rather than left standing for every later request to 127.0.0.1.
+      const authSession = authWindow.webContents.session;
+      authSession.setCertificateVerifyProc((request, callback) => {
         if (request.hostname === "127.0.0.1") {
           callback(0);
           return;
@@ -557,6 +563,7 @@ function waitForAuthorizationCode(
       });
 
       authWindow.on("closed", () => {
+        authSession.setCertificateVerifyProc(null);
         authWindow = undefined;
         rejectOnce(new Error("Spotify login window was closed."));
       });

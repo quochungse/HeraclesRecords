@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import type { ActivityDetailSummary, TrainingHubActivity } from "../../electron/types";
-import type { CorosLinkApi } from "../coroslink-api";
+import type { HeraclesRecordsApi } from "../heraclesrecords-api";
 
 /**
  * The per-activity figures that only a detail payload knows — time in each
@@ -37,7 +37,7 @@ function toMap(
 }
 
 export interface ActivityDetailSummariesInput {
-  api: CorosLinkApi | null;
+  api: HeraclesRecordsApi | null;
   activities: readonly TrainingHubActivity[];
   /** False while a session's own detail is loading: that payload wants the
    *  connection, and nothing on screen is reading these meanwhile. */

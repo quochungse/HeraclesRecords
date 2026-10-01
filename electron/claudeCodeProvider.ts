@@ -316,7 +316,7 @@ export function createClaudeSubscriptionEnvironment(
   for (const key of SUBSCRIPTION_ENV_KEYS) {
     delete env[key];
   }
-  env.CLAUDE_AGENT_SDK_CLIENT_APP = "coroslink-coach";
+  env.CLAUDE_AGENT_SDK_CLIENT_APP = "heracles-records-coach";
   env.CLAUDE_CODE_DISABLE_AUTO_MEMORY = "1";
   env.CLAUDE_CODE_SKIP_PROMPT_HISTORY = "1";
   if (configDir?.trim()) {
@@ -826,6 +826,13 @@ export async function testClaudeCodeConnection(
   }
 }
 
+/**
+ * The in-process MCP server that carries the app's tools to Claude Code. Its
+ * name is the `mcp__<name>__` prefix on every tool Claude is offered, so it is
+ * sent to Anthropic on each request; nothing stored depends on it.
+ */
+const CLAUDE_MCP_SERVER_NAME = "heracles";
+
 export async function streamClaudeCodeCompletion(
   options: StreamClaudeCodeOptions
 ): Promise<{ fullText: string; usage?: ChatTokenUsage }> {
@@ -893,7 +900,7 @@ export async function streamClaudeCodeCompletion(
       );
     });
     const mcpServer = sdk.createSdkMcpServer({
-      name: "coroslink",
+      name: CLAUDE_MCP_SERVER_NAME,
       version: "1.0.0",
       instructions:
         "Use only these Heracles Records tools for approved training data, plan drafts, and calendar changes. Uploads and deletions always require explicit athlete confirmation via the buttons in chat.",
@@ -901,7 +908,7 @@ export async function streamClaudeCodeCompletion(
       alwaysLoad: true
     });
     const allowedTools = options.tools.map(
-      (sourceTool) => `mcp__coroslink__${sourceTool.name}`
+      (sourceTool) => `mcp__${CLAUDE_MCP_SERVER_NAME}__${sourceTool.name}`
     );
 
     const stream = sdk.query({
@@ -920,7 +927,7 @@ export async function streamClaudeCodeCompletion(
         tools: [],
         allowedTools,
         permissionMode: "dontAsk",
-        mcpServers: { coroslink: mcpServer },
+        mcpServers: { [CLAUDE_MCP_SERVER_NAME]: mcpServer },
         strictMcpConfig: true,
         settingSources: [],
         includePartialMessages: true,

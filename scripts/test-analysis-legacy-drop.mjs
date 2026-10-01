@@ -28,7 +28,7 @@ const distUrl = (file) =>
   `${pathToFileURL(path.join(repoRoot, "dist-electron", file)).href}?cacheBust=${Date.now()}`;
 
 const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "heracles-legacy-drop-"));
-const dbPath = path.join(tempRoot, "coroslink.sqlite");
+const dbPath = path.join(tempRoot, "heraclesrecords.sqlite");
 
 const CONVERSATION_ID = "sess-kept";
 const TRANSCRIPT = JSON.stringify([

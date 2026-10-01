@@ -993,7 +993,7 @@ bị ngắt chỉ nhớ trong RAM (P3.3 có thể dùng cùng cơ chế lưu k�
 
 ## 6. IPC
 
-Mỗi channel mới sửa đủ `main.ts`, `preload.ts`, `coroslink-api.ts`, rồi chạy
+Mỗi channel mới sửa đủ `main.ts`, `preload.ts`, `heraclesrecords-api.ts`, rồi chạy
 `npm run test:ipc-surface`.
 
 | Channel | Phase | Việc |

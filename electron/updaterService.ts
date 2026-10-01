@@ -99,10 +99,13 @@ function formatUpdaterError(error: unknown): string {
 
   if (message.includes("404")) {
     const version = snapshot.availableVersion;
-    const target = version
-      ? `Heracles Records ${version}`
-      : "the latest Heracles Records release";
-    return `Update download failed. Download ${target} from GitHub: ${getReleasePageUrl(version)}`;
+    // No version yet means the check itself found nothing: no release has
+    // been published for this platform (true of every build before the first
+    // one), not a download that failed.
+    if (!version) {
+      return `No published release was found to check against. Releases are listed at ${RELEASES_URL}.`;
+    }
+    return `Update download failed. Download Heracles Records ${version} from GitHub: ${getReleasePageUrl(version)}`;
   }
 
   return message;

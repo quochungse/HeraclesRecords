@@ -32,7 +32,6 @@ const CHAT_SETTINGS = {
   chatgpt: {},
   anthropic: { model: "claude-opus-5", effort: "high", hasApiKey: false },
   claudeCode: {
-    useAppScopedAuth: true,
     effort: "high",
     permissions: {
       recentActivities: true,
@@ -939,7 +938,7 @@ async function main() {
   await harness("setValue", ".chat-composer textarea", "");
   await settle();
   assert.equal(
-    await page(`"s1" in JSON.parse(localStorage.getItem("coroslink.coach.composerDrafts.v1") ?? "{}")`),
+    await page(`"s1" in JSON.parse(localStorage.getItem("heraclesrecords.coach.composerDrafts.v1") ?? "{}")`),
     false,
     "an emptied draft is not kept"
   );

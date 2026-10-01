@@ -12,6 +12,7 @@ import {
   getSetting,
   setSetting
 } from "./database";
+import { getSecretSetting, setSecretSetting } from "./secretSettings";
 import type {
   AppleMusicPlaylist,
   AppleMusicStatus,
@@ -50,7 +51,7 @@ export function getAppleMusicStatus(): AppleMusicStatus {
 /** Parses pasted headers, stores the credentials, and returns the new status. */
 export function saveAppleMusicAuth(headersRaw: string): AppleMusicStatus {
   const credentials = parseAppleMusicCredentials(headersRaw);
-  setSetting(SETTINGS.credentialsJson, JSON.stringify(credentials));
+  setSecretSetting(SETTINGS.credentialsJson, JSON.stringify(credentials));
   setSetting(SETTINGS.authUpdatedAt, new Date().toISOString());
   return getAppleMusicStatus();
 }
@@ -98,7 +99,7 @@ export function saveAppleMusicCapturedHeaders(headers: {
     existing.cookie !== merged.cookie;
 
   if (changed) {
-    setSetting(SETTINGS.credentialsJson, JSON.stringify(merged));
+    setSecretSetting(SETTINGS.credentialsJson, JSON.stringify(merged));
     setSetting(SETTINGS.authUpdatedAt, new Date().toISOString());
   }
 
@@ -214,7 +215,7 @@ function requireStoredCredentials(): AppleMusicCredentials {
 }
 
 function readStoredCredentials(): AppleMusicCredentials | undefined {
-  const raw = getSetting(SETTINGS.credentialsJson);
+  const raw = getSecretSetting(SETTINGS.credentialsJson);
   if (!raw) {
     return undefined;
   }

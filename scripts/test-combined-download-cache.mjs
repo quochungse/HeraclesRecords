@@ -37,7 +37,7 @@ assert.notEqual(
 );
 
 const root = fs.mkdtempSync(
-  path.join(os.tmpdir(), "coroslink-combined-cache-test-")
+  path.join(os.tmpdir(), "heraclesrecords-combined-cache-test-")
 );
 
 try {

@@ -6,7 +6,7 @@ import {
   type SetStateAction
 } from "react";
 
-const SELECTION_STORAGE_PREFIX = "coroslink.selection.v1";
+const SELECTION_STORAGE_PREFIX = "heraclesrecords.selection.v1";
 
 export interface SelectionPreferenceStorage {
   getItem: (key: string) => string | null;

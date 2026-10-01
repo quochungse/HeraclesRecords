@@ -227,7 +227,31 @@ await assert.rejects(
 );
 
 // ---------------------------------------------------------------------------
-// 5. Coordinates that are not coordinates never reach a provider.
+// 5. A provider is asked about the point rounded to about a kilometre, never
+//    the cluster's centre to the metre — a cluster of runs from home has its
+//    centre at the door. The answer still carries the caller's coordinates.
+
+resetReverseGeocodeProviders();
+{
+  const home = { lat: 21.028793, lon: 105.852413 };
+  const asked = [];
+  const result = await reverseGeocodeLocation(home.lat, home.lon, {
+    fetch: async (url) => {
+      asked.push(new URL(url));
+      return jsonResponse(PHOTON_PAYLOAD);
+    }
+  });
+  assert.ok(asked.length > 0, "a provider was asked");
+  for (const url of asked) {
+    assert.equal(url.searchParams.get("lat"), "21.03", `${url.hostname} gets a rounded latitude`);
+    assert.equal(url.searchParams.get("lon"), "105.85", `${url.hostname} gets a rounded longitude`);
+  }
+  assert.equal(result.lat, home.lat, "the answer keeps the caller's latitude");
+  assert.equal(result.lon, home.lon, "the answer keeps the caller's longitude");
+}
+
+// ---------------------------------------------------------------------------
+// 6. Coordinates that are not coordinates never reach a provider.
 
 resetReverseGeocodeProviders();
 await assert.rejects(

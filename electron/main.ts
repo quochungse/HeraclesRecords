@@ -14,6 +14,7 @@ import type { OpenDialogOptions } from "electron";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { pathToFileURL } from "node:url";
 import {
   createDefaultSyncDeps,
   SyncService
@@ -182,6 +183,7 @@ import {
 } from "./trainingLibraryService";
 import { normalizeUnitSystem } from "./unitSystem.js";
 import { reverseGeocodeLocation } from "./reverseGeocodeService";
+import { isWebUrl, openableExternalUrl } from "./externalLinks";
 import { buildManualTcx } from "./tcxBuilder";
 import type {
   CombinedDownloadResult,
@@ -416,10 +418,37 @@ import type {
   WorkoutEditRef
 } from "./types";
 
-// userData lives at <appData>/Heracles Records, the default Electron derives
-// from the product name. Data from the pre-rename <appData>/coroslink folder
-// was copied across once, by hand, in August 2026; that folder is still on disk
-// and is not read any more.
+// userData lives at <appData>/heracles-records: Electron names it after the
+// top-level `name` in package.json (`productName` sits under `build`, which
+// Electron never reads). Data from the folder an earlier name used was copied
+// across once, by hand, in August 2026; that folder is not read any more.
+
+/**
+ * Development switches, which a packaged build does not obey. Each is read
+ * where it is used, at run time, so clearing them here before anything runs is
+ * the whole gate. Set in a user's environment they would load another page
+ * with the preload bridge and DevTools (`VITE_DEV_SERVER_URL`), fill the
+ * screens with simulated activities (`HERACLES_SAMPLE_*`), script Coach's plan
+ * turns through the real tools that write to COROS
+ * (`HERACLES_SIMULATE_PLAN_AI`), or treat a folder as a watch
+ * (`COROS_WATCH_PATH`).
+ */
+const DEVELOPMENT_ONLY_ENV = [
+  "VITE_DEV_SERVER_URL",
+  "HERACLES_SAMPLE_RIDES",
+  "HERACLES_SAMPLE_HIKES",
+  "HERACLES_SAMPLE_TRAIL_RUNS",
+  "HERACLES_SIMULATE_PLAN_AI",
+  "COROS_WATCH_PATH"
+] as const;
+if (app.isPackaged) {
+  for (const name of DEVELOPMENT_ONLY_ENV) delete process.env[name];
+}
+
+/** The Vite dev server, when this is a development run. */
+function devServerUrl(): string | undefined {
+  return process.env.VITE_DEV_SERVER_URL || undefined;
+}
 
 let mainWindow: BrowserWindow | undefined;
 let rendererReady = false;
@@ -605,6 +634,54 @@ function configureAppPermissions(): void {
   );
 }
 
+/** Hands a URL to the system browser, if it is one a browser should open. */
+function openExternalLink(url: string): void {
+  if (!openableExternalUrl(url)) {
+    console.warn(`[links] refused to open ${url.slice(0, 120)}`);
+    return;
+  }
+  void shell.openExternal(url);
+}
+
+/** The app's own page: the dev server in development, the bundled file otherwise. */
+function isAppPageUrl(url: string): boolean {
+  try {
+    const target = new URL(url);
+    // Compared as origins, not as text: `http://127.0.0.1:5173` is a prefix of
+    // `http://127.0.0.1:51730`, which is someone else's server.
+    const devServer = devServerUrl();
+    if (devServer) return target.origin === new URL(devServer).origin;
+    const page = pathToFileURL(path.join(__dirname, "../dist/index.html"));
+    return target.protocol === "file:" && target.pathname === page.pathname;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Popups from a <webview> (a sign-in window, a share dialog) open as sandboxed
+ * windows when they are web pages, and not at all otherwise.
+ */
+function guardWebviewPopups(): void {
+  app.on("web-contents-created", (_event, contents) => {
+    if (contents.getType() !== "webview") return;
+    contents.setWindowOpenHandler(({ url }) =>
+      isWebUrl(url)
+        ? {
+            action: "allow",
+            overrideBrowserWindowOptions: {
+              webPreferences: {
+                contextIsolation: true,
+                nodeIntegration: false,
+                sandbox: true
+              }
+            }
+          }
+        : { action: "deny" }
+    );
+  });
+}
+
 function createWindow(): void {
   const iconPath = getAppIconPath();
 
@@ -629,13 +706,36 @@ function createWindow(): void {
       contextIsolation: true,
       nodeIntegration: false,
       webviewTag: true,
-      sandbox: false
+      // The preload imports nothing but `electron`, so it runs sandboxed: a
+      // script that ever ran in the page would get the bridge and nothing
+      // more.
+      sandbox: true
     }
   });
 
+  // Every link the page opens goes to the system browser, and only once its
+  // scheme is one a browser handles — see `externalLinks.ts` for the relative
+  // link in a Coach answer that would otherwise resolve to `file://`.
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
-    shell.openExternal(url);
+    openExternalLink(url);
     return { action: "deny" };
+  });
+  // The window holds the app and nothing else. A link or a file dropped on it
+  // used to navigate the frame there, handing the dropped page the preload
+  // bridge.
+  mainWindow.webContents.on("will-navigate", (event, url) => {
+    if (!isAppPageUrl(url)) event.preventDefault();
+  });
+  // A <webview> runs third-party pages (YouTube, YouTube Music, Apple Music):
+  // whatever the markup asks for, it gets no preload, no Node and a sandbox.
+  mainWindow.webContents.on("will-attach-webview", (event, webPreferences, params) => {
+    delete webPreferences.preload;
+    webPreferences.nodeIntegration = false;
+    webPreferences.contextIsolation = true;
+    webPreferences.sandbox = true;
+    if (params.src && params.src !== "about:blank" && !isWebUrl(params.src)) {
+      event.preventDefault();
+    }
   });
   mainWindow.webContents.on("did-start-loading", () => {
     rendererReady = false;
@@ -669,8 +769,9 @@ function createWindow(): void {
     notifyWindowFullscreen(false);
   });
 
-  if (process.env.VITE_DEV_SERVER_URL) {
-    mainWindow.loadURL(process.env.VITE_DEV_SERVER_URL);
+  const devServer = devServerUrl();
+  if (devServer) {
+    mainWindow.loadURL(devServer);
     mainWindow.webContents.openDevTools({ mode: "detach" });
   } else {
     mainWindow.loadFile(path.join(__dirname, "../dist/index.html"));
@@ -745,6 +846,7 @@ app.whenReady().then(() => {
   if (!hasSingleInstanceLock) return;
   hideDefaultApplicationMenu();
   configureAppPermissions();
+  guardWebviewPopups();
   configureYouTubeBrowserSession();
   registerYouTubeBrowserHandlers();
   configureYouTubeMusicBrowserSession();
@@ -1217,9 +1319,9 @@ function stopSyncLoop(): void {
 /**
  * Check the destination and start the loop.
  *
- * This is the whole of "turn sync on": it runs at launch and again whenever the
- * folder or the backend changes. Nothing is asked of the user, so the only
- * reason it comes back short of "ready" is a destination that did not answer.
+ * This is the whole of "turn sync on": it runs at launch and again whenever
+ * Drive is connected. Nothing is asked of the user, so the only reason it comes
+ * back short of "ready" is a destination that did not answer.
  */
 async function prepareSync(): Promise<SyncVaultState> {
   const state = await syncService().prepare();
@@ -1436,8 +1538,14 @@ function registerIpcHandlers(): void {
 
   ipcMain.handle(
     "watch:setConnectionSmokeOption",
-    (_event, optionId: WatchConnectionSmokeOptionId) =>
-      setWatchConnectionSmokeOption(optionId)
+    (_event, optionId: WatchConnectionSmokeOptionId) => {
+      // The developer toolbar's mock watch; a packaged build refuses it, as it
+      // refuses the sample data below.
+      if (app.isPackaged) {
+        throw new Error("The mock watch is only available in development builds.");
+      }
+      return setWatchConnectionSmokeOption(optionId);
+    }
   );
 
   // The developer toolbar's switches for the simulated activities. They set the
@@ -2527,7 +2635,7 @@ function registerIpcHandlers(): void {
       const tcx = buildManualTcx(sanitized);
       const tmp = path.join(
         os.tmpdir(),
-        `coroslink-manual-${Date.now()}.tcx`
+        `heracles-manual-${Date.now()}.tcx`
       );
       fs.writeFileSync(tmp, tcx, "utf8");
       try {
@@ -2595,26 +2703,6 @@ function registerIpcHandlers(): void {
   // localStorage lives in the renderer, so it travels as an argument on the way
   // out and as a return value on the way back: the main process never reaches
   // into the window to read it.
-
-  ipcMain.handle("sync:chooseFolder", async () => {
-    const options: OpenDialogOptions = {
-      title: "Choose a folder for your sync vault",
-      properties: ["openDirectory", "createDirectory"]
-    };
-    const result =
-      mainWindow && !mainWindow.isDestroyed()
-        ? await dialog.showOpenDialog(mainWindow, options)
-        : await dialog.showOpenDialog(options);
-    if (result.canceled) return null;
-    const folder = result.filePaths[0] ?? null;
-    if (folder) {
-      syncService().setFolder(folder);
-      // Choosing the folder is the whole setup for a folder vault, so it is
-      // ready by the time this returns rather than after a second click.
-      await prepareSync();
-    }
-    return folder;
-  });
 
   // Two halves, joined here: the destination is the service's to answer, the
   // change loop is this file's. Neither knows about the other, which is why
@@ -2728,16 +2816,6 @@ function registerIpcHandlers(): void {
       return result;
     }
   );
-
-  ipcMain.handle("sync:setBackend", async (_event, backend: "local" | "google") => {
-    // A different backend is a different vault, so the loop must not keep
-    // writing into the old one.
-    stopSyncLoop();
-    syncService().setBackend(backend);
-    // Not returned: the renderer reads the new state from `sync:getStatus` like
-    // every other row, and this channel stays void on all three sides.
-    await prepareSync();
-  });
 
   // The deliberate answer to `wrong-owner`. Claiming clears the seed flag, so
   // the loop that starts afterwards publishes this account's whole state into

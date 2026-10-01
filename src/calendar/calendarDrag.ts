@@ -1,5 +1,5 @@
 export const CALENDAR_DRAG_MIME =
-  "application/x-coroslink-scheduled-workout";
+  "application/x-heraclesrecords-scheduled-workout";
 
 export interface CalendarDragPayload {
   planId: string;

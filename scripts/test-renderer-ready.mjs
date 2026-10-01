@@ -28,7 +28,7 @@ const read = (file) => fs.readFileSync(path.join(repoRoot, file), "utf8");
 
 const main = read("electron/main.ts");
 const preload = read("electron/preload.ts");
-const api = read("src/coroslink-api.ts");
+const api = read("src/heraclesrecords-api.ts");
 const app = read("src/App.tsx");
 
 const CHANNEL = "app:rendererReady";

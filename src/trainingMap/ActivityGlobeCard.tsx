@@ -640,7 +640,7 @@ export function ActivityGlobeCard({
 
   // Background-load visit centroids + route polylines for recent activities.
   useEffect(() => {
-    const api = window.corosLink;
+    const api = window.heraclesRecords;
     const list = activitiesRef.current;
     if (!api || !connected || list.length === 0) {
       setVisits(getCachedVisitPoints(list));

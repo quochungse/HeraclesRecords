@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { CorosLinkApi } from "../coroslink-api";
+import type { HeraclesRecordsApi } from "../heraclesrecords-api";
 import type { SleepHistorySnapshot } from "../../electron/types";
 
 /** The window the screen opens on. Wide enough for a month's shape, cheap to hold. */
@@ -19,7 +19,7 @@ export interface SleepHistoryState {
  * this hook is free to ask on every mount.
  */
 export function useSleepHistory(
-  api: CorosLinkApi | null,
+  api: HeraclesRecordsApi | null,
   enabled: boolean
 ): SleepHistoryState {
   const [snapshot, setSnapshot] = useState<SleepHistorySnapshot | null>(null);

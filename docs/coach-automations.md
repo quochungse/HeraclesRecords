@@ -33,7 +33,7 @@
 > Vocabulary below is pre-rename throughout. The `app_settings` keys and the
 > stored transcript-marker keys did **not** change and still read as written.
 
-Status: **all three phases shipped, and reviewed**. Target: CorosLink desktop (Electron main + React renderer). Written 2026-08-21, revised 2026-08-25 against the built code, reconciled 2026-08-27 after the review below.
+Status: **all three phases shipped, and reviewed**. Target: Heracles Records desktop (Electron main + React renderer). Written 2026-08-21, revised 2026-08-25 against the built code, reconciled 2026-08-27 after the review below.
 
 Every section describes what exists. Nothing here is design any more — the two that were, 3.3 and 5.7, shipped in phase 3. Where the build diverged from the original design the divergence is written down with its reason; those reasons are the useful part.
 
@@ -1058,7 +1058,7 @@ The habits this feature earned the hard way:
 
 **A mutation that does not compile is not a detection.** Twice here a mutation was recorded as caught when the suite had never run — `tsc` rejected the edit first. Both had to be rewritten as variants that compile and are still wrong. The same discipline applied to the source-level assertions while they were the renderer's only cover: three of them passed against genuinely broken code because the regex matched a *different* call site, or asserted that a query existed without asserting where its answer went. Those three are gone now — they are the reason the harness below exists.
 
-**Renderer wiring is executed now, not grepped.** `test:coach-automation-renderer` mounts the real components in a hidden Electron `BrowserWindow` against a stubbed `CorosLinkApi`, drives them through the DOM, and asserts in node so a failure reads like every other suite. Electron rather than a DOM emulation because it is already a dev dependency and already hosts a suite, so the harness costs nothing new — and because the bugs being chased are the kind a real browser has.
+**Renderer wiring is executed now, not grepped.** `test:coach-automation-renderer` mounts the real components in a hidden Electron `BrowserWindow` against a stubbed `HeraclesRecordsApi`, drives them through the DOM, and asserts in node so a failure reads like every other suite. Electron rather than a DOM emulation because it is already a dev dependency and already hosts a suite, so the harness costs nothing new — and because the bugs being chased are the kind a real browser has.
 
 **What is left at the source level is source that is about source**, and each of the survivors now carries a line saying which kind it is. A regex earns its keep for a contract between two files that never run in the same process — the preload/main pair, where an argument dropped on either side type-checks and compiles into a call that quietly does the wrong thing. The harness cannot see across that bridge, because the harness *is* the stub standing in for it. The same goes for the marker held back from the live bubble (5.5) and the pair of `chatTypes` converters, which are claims about shape rather than behaviour.
 

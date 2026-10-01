@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { isLastNightHappenDay } from "./sleepFreshness";
-import type { CorosLinkApi } from "../coroslink-api";
+import type { HeraclesRecordsApi } from "../heraclesrecords-api";
 import type { SleepNightSeries } from "../../electron/types";
 
 /**
@@ -53,7 +53,7 @@ export interface SleepNightSeriesState {
  * function of that name below, and the two answers it refuses.
  */
 export function useSleepNightSeries(
-  api: CorosLinkApi | null,
+  api: HeraclesRecordsApi | null,
   happenDay: string | null
 ): SleepNightSeriesState {
   const [series, setSeries] = useState<SleepNightSeries | null>(null);

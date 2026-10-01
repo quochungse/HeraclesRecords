@@ -1,12 +1,12 @@
 import { AlertTriangle, CalendarPlus, CheckCircle2, LoaderCircle, RefreshCw, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import type { TrainingPlanCalendarPreview, TrainingPlanDocument } from "../../electron/types";
-import type { CorosLinkApi } from "../coroslink-api";
+import type { HeraclesRecordsApi } from "../heraclesrecords-api";
 import { dateFromKey, keyFromDate } from "../calendar/dateUtils";
 import { MonthDayPicker } from "./MonthDayPicker";
 
 interface TrainingPlanCalendarDialogProps {
-  api: CorosLinkApi;
+  api: HeraclesRecordsApi;
   plan: TrainingPlanDocument;
   onClose: () => void;
   /** Answers the running copy COROS made of the plan. */

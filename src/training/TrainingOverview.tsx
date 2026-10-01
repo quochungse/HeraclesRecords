@@ -294,7 +294,10 @@ export function TrainingOverview({
           ) : (
           <form className="training-login-panel" onSubmit={onLogin}>
             <div className="training-login-panel-header">
-              <strong>Welcome back</strong>
+              {/* "Welcome back" only to someone this machine has seen sign in. */}
+              <strong>
+                {canReconnect || status?.email ? "Welcome back" : "Connect your COROS account"}
+              </strong>
               <p>Sign in to access your COROS Training Hub data</p>
             </div>
 

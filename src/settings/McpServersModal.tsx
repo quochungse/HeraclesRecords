@@ -1,10 +1,10 @@
 import { useEffect } from "react";
 import { Server, X } from "lucide-react";
-import type { CorosLinkApi } from "../coroslink-api";
+import type { HeraclesRecordsApi } from "../heraclesrecords-api";
 import { McpServersPanel } from "../chat/McpServersPanel";
 
 export interface McpServersModalProps {
-  api: CorosLinkApi | undefined;
+  api: HeraclesRecordsApi | undefined;
   open: boolean;
   onClose: () => void;
   /** Re-runs the panel's fetch; bumped by the caller after an external change. */

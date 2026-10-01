@@ -15,7 +15,7 @@ import type {
   UnitSystem,
   WorkoutEditorDocument
 } from "../../electron/types";
-import type { CorosLinkApi } from "../coroslink-api";
+import type { HeraclesRecordsApi } from "../heraclesrecords-api";
 import { OptionGroup } from "../components/OptionGroup";
 import { CollapsibleSearch } from "./LibrarySearch";
 import { formatHappenDayLabel } from "../training/formatters";
@@ -40,7 +40,7 @@ import {
 } from "../preferences/selectionPreferences";
 
 interface WorkoutWorkspaceProps {
-  api: CorosLinkApi;
+  api: HeraclesRecordsApi;
   workouts: TrainingLibraryWorkout[];
   onRefresh: () => Promise<void>;
   onMessage: (message: string) => void;
@@ -492,7 +492,7 @@ export function WorkoutWorkspace({
     };
   }, [api, activeId, onError, unitSystem]);
 
-  const updateMetadata = async (ids: string[], patch: Parameters<CorosLinkApi["updateWorkoutMetadata"]>[1]) => {
+  const updateMetadata = async (ids: string[], patch: Parameters<HeraclesRecordsApi["updateWorkoutMetadata"]>[1]) => {
     setBusy("metadata");
     try {
       await api.updateWorkoutMetadata(ids, patch);

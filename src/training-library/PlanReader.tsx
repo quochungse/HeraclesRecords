@@ -50,7 +50,7 @@ import type {
   TrainingPlanEntry
 } from "../../electron/types";
 import { summarizeTrainingPlan } from "../../electron/trainingPlanDomain";
-import type { CorosLinkApi } from "../coroslink-api";
+import type { HeraclesRecordsApi } from "../heraclesrecords-api";
 import { useUnitSystem } from "../units/UnitSystemProvider";
 import { formatDistanceValue } from "../units/units";
 import { describeCompliance, formatCompliance, planCompliance } from "./planCompliance";
@@ -73,7 +73,7 @@ interface PlanReaderProps {
   offline?: boolean;
   /** Only so a session can name its exercises and read the account's pool
       length; without it a session still opens and draws its steps. */
-  api?: CorosLinkApi;
+  api?: HeraclesRecordsApi;
   /**
    * The plan is being read in full behind this one. Edit waits: a save writes
    * every session's program back, and the shallow copy has none.

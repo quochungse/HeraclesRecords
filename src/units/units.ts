@@ -50,7 +50,7 @@ export type { UnitSystem } from "../../electron/types";
  * one account, which is why it is classified `derived` in `syncPolicy.ts`
  * rather than travelling as a setting of its own.
  */
-export const UNIT_SYSTEM_STORAGE_KEY = "coroslink.unitSystem";
+export const UNIT_SYSTEM_STORAGE_KEY = "heraclesrecords.unitSystem";
 
 export function readCachedUnitSystem(): UnitSystem {
   try {
@@ -77,7 +77,7 @@ export function cacheUnitSystem(unitSystem: UnitSystem): void {
  * account did not say", and leave what is on screen alone in the second case.
  */
 /** Where the last temperature unit the account reported is kept. See above. */
-export const TEMPERATURE_UNIT_STORAGE_KEY = "coroslink.temperatureUnit";
+export const TEMPERATURE_UNIT_STORAGE_KEY = "heraclesrecords.temperatureUnit";
 
 export function readCachedTemperatureUnit(): TemperatureUnit {
   try {

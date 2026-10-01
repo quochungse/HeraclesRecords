@@ -7,7 +7,7 @@ const read = (file) => fs.readFileSync(path.join(repoRoot, file), "utf8");
 
 const mainSource = read("electron/main.ts");
 const preloadSource = read("electron/preload.ts");
-const apiSource = read("src/coroslink-api.ts");
+const apiSource = read("src/heraclesrecords-api.ts");
 
 // A channel name is a plain string in three separate files, so a typo in any
 // one of them typechecks cleanly and fails only at runtime. These are the
@@ -162,8 +162,8 @@ for (const [file, call] of [
 }
 
 // --- preload's shape and the renderer's view of it must agree --------------
-// electron/preload.ts exports `CorosLinkApi = typeof api` while
-// src/coroslink-api.ts declares its own interface of the same name. Nothing
+// electron/preload.ts exports `HeraclesRecordsApi = typeof api` while
+// src/heraclesrecords-api.ts declares its own interface of the same name. Nothing
 // links the two at compile time, so they are compared here instead.
 function topLevelKeys(source, startPattern, closing) {
   const start = new RegExp(startPattern).exec(source);
@@ -179,18 +179,18 @@ function topLevelKeys(source, startPattern, closing) {
 }
 
 const preloadKeys = topLevelKeys(preloadSource, "const api = \\{", "\n};");
-const apiKeys = topLevelKeys(apiSource, "export interface CorosLinkApi \\{", "\n}");
+const apiKeys = topLevelKeys(apiSource, "export interface HeraclesRecordsApi \\{", "\n}");
 assert.ok(preloadKeys.size > 200, "preload key scrape has drifted");
 
 assert.deepEqual(
   [...preloadKeys].filter((key) => !apiKeys.has(key)).sort(),
   [],
-  "preload exposes a method the renderer's CorosLinkApi does not declare"
+  "preload exposes a method the renderer's HeraclesRecordsApi does not declare"
 );
 assert.deepEqual(
   [...apiKeys].filter((key) => !preloadKeys.has(key)).sort(),
   [],
-  "the renderer's CorosLinkApi declares a method preload does not expose"
+  "the renderer's HeraclesRecordsApi declares a method preload does not expose"
 );
 
 // Every analysis method reaches the renderer under a name it can call.
@@ -215,7 +215,7 @@ for (const method of [
   "getCoachAnalysisSpend",
   "setCoachAnalysisBudget"
 ]) {
-  assert.ok(apiKeys.has(method), `CorosLinkApi is missing ${method}`);
+  assert.ok(apiKeys.has(method), `HeraclesRecordsApi is missing ${method}`);
 }
 
 // The pre-rename names must be gone, not merely unused. A leftover

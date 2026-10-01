@@ -29,7 +29,7 @@ import type {
   UnitSystem,
   WorkoutSwimStroke
 } from "../../electron/types";
-import type { CorosLinkApi } from "../coroslink-api";
+import type { HeraclesRecordsApi } from "../heraclesrecords-api";
 import { SelectDropdown } from "../components/SelectDropdown";
 import { useUnitSystem } from "../units/UnitSystemProvider";
 import { RunnerIcon } from "../running/runnerIcon";
@@ -354,7 +354,7 @@ function describeLogSportOption(option: LogSportOption): string {
 }
 
 interface AddWorkoutModalProps {
-  api: CorosLinkApi;
+  api: HeraclesRecordsApi;
   dateKey: string;
   sportTypes: TrainingHubSportType[];
   onClose: () => void;

@@ -42,7 +42,7 @@ import type {
   WorkoutIntensityInput,
   WorkoutSport
 } from "../../electron/types";
-import type { CorosLinkApi } from "../coroslink-api";
+import type { HeraclesRecordsApi } from "../heraclesrecords-api";
 import { SelectDropdown } from "../components/SelectDropdown";
 import { useUnitSystem } from "../units/UnitSystemProvider";
 import {
@@ -94,7 +94,7 @@ import {
  * passed.
  */
 interface WorkoutEditorModalProps {
-  api: CorosLinkApi;
+  api: HeraclesRecordsApi;
   editRef: WorkoutEditRef;
   /**
    * Opens the same surface with every control inert and no Save.

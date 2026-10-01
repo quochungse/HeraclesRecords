@@ -27,7 +27,7 @@ const require = createRequire(import.meta.url);
 const execFileAsync = promisify(execFile);
 const gunzipAsync = promisify(gunzip);
 const repoRoot = path.resolve(import.meta.dirname, "..");
-const userAgent = "coroslink";
+const userAgent = "HeraclesRecords-build";
 const PINNED_YT_DLP_VERSION = "2026.08.19";
 const PINNED_YTMUSICAPI_VERSION = "1.12.1";
 const BUNDLED_PYTHON_VERSION = "310";
@@ -69,6 +69,7 @@ let skipped = 0;
 
 await downloadYtDlp(path.join(outputDir, ytDlpOutput), ytDlpAsset);
 await copyFfmpeg(path.join(outputDir, ffmpegOutput), targetPlatform, targetArch);
+await copyFfmpegNotices(outputDir, targetPlatform, targetArch);
 await installPythonRuntime(
   path.join(outputDir, "python-runtime"),
   targetPlatform,
@@ -320,6 +321,25 @@ async function copyFfmpeg(destination, platform, arch) {
   await fs.promises.chmod(destination, 0o755);
   await recordStep("ffmpeg", want);
   console.log(`Copied ffmpeg-static binary from ${path.relative(repoRoot, ffmpegPath)}`);
+}
+
+/**
+ * The FFmpeg builds are GPLv3, and the license has to travel with the binary.
+ * Copied on every run, not behind the manifest: an existing bin/ directory
+ * prepared before this step existed would otherwise never get them. The README
+ * names the build's version and components, so it is copied only when the
+ * binary is the one ffmpeg-static installed for this machine.
+ */
+async function copyFfmpegNotices(directory, platform, arch) {
+  const packageDir = path.dirname(require.resolve("ffmpeg-static/package.json"));
+  await fs.promises.copyFile(
+    path.join(packageDir, "ffmpeg.LICENSE"),
+    path.join(directory, "ffmpeg-LICENSE.txt")
+  );
+  const readme = path.join(packageDir, "ffmpeg.README");
+  if (platform === process.platform && arch === process.arch && fs.existsSync(readme)) {
+    await fs.promises.copyFile(readme, path.join(directory, "ffmpeg-README.txt"));
+  }
 }
 
 async function installPythonPackages(destination) {

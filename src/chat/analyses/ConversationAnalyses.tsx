@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Loader2, MoreHorizontal, Play, Plus, Zap } from "lucide-react";
-import type { CorosLinkApi } from "../../coroslink-api";
+import type { HeraclesRecordsApi } from "../../heraclesrecords-api";
 import type { CoachAnalysisSummary } from "../../../electron/types";
 import { describeTrigger, formatTimeAgo } from "./analysisLabels";
 import { announceRunNow } from "./runNow";
@@ -26,7 +26,7 @@ export function ConversationAnalyses({
   onCreateAnalysis,
   onOpenAnalysis
 }: {
-  api: CorosLinkApi | undefined;
+  api: HeraclesRecordsApi | undefined;
   sessionId: string | null;
   /** Bumped by the detail screen so the rows follow what it changed. */
   refreshVersion?: number;
@@ -261,7 +261,7 @@ export function ConversationAnalyses({
                         disabled={busy || !api}
                         onChange={(event) =>
                           void withBusy(analysis.id, () =>
-                            (api as CorosLinkApi).setCoachAnalysisEnabled(
+                            (api as HeraclesRecordsApi).setCoachAnalysisEnabled(
                               analysis.id,
                               event.target.checked
                             )

@@ -34,7 +34,7 @@ import type {
   WorkoutEditorDocument,
   WorkoutSport
 } from "../../electron/types";
-import type { CorosLinkApi } from "../coroslink-api";
+import type { HeraclesRecordsApi } from "../heraclesrecords-api";
 import {
   editorDraftToPlanWorkoutInput,
   planWorkoutInputToEditorDraft
@@ -52,7 +52,7 @@ export type WorkoutBuilderSource =
   | { kind: "library"; editRef: WorkoutEditRef };
 
 export interface WorkoutBuilderModalProps {
-  api: CorosLinkApi;
+  api: HeraclesRecordsApi;
   source: WorkoutBuilderSource;
   /** The line above the title (the plan and the day), and the title. */
   heading: { eyebrow?: string; title: string };

@@ -4,7 +4,7 @@ import type {
   StrengthDataSource,
   StrengthSession
 } from "../../electron/types";
-import type { CorosLinkApi } from "../coroslink-api";
+import type { HeraclesRecordsApi } from "../heraclesrecords-api";
 import {
   periodOptions,
   type PeriodDays
@@ -58,7 +58,7 @@ export function activeStrengthWindow(days: number) {
 }
 
 interface UseStrengthDataOptions {
-  api: CorosLinkApi;
+  api: HeraclesRecordsApi;
   corosConnected: boolean;
   /** Development builds only: generated sample history in place of the athlete's. */
   sampleMode?: boolean;

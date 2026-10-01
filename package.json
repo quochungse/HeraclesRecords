@@ -4,6 +4,8 @@
   "private": true,
   "description": "Personal training records with unofficial COROS companion \u2014 media, watch sync, and training analytics.",
   "author": "quochungse",
+  "license": "MIT",
+  "homepage": "https://github.com/quochungse/HeraclesRecords",
   "main": "dist-electron/main.js",
   "scripts": {
     "dev": "concurrently -k \"npm:dev:renderer\" \"npm:dev:electron\"",
@@ -24,7 +26,8 @@
     "binaries:prepare:linux": "node scripts/prepare-binaries.mjs --platform=linux --arch=x64",
     "build": "npm run build:electron && npm run build:renderer",
     "build:electron": "npm run prepare:google-client && tsc -p tsconfig.electron.json",
-    "build:renderer": "tsc -p tsconfig.json --noEmit && vite build",
+    "clean:electron": "node -e \"require('node:fs').rmSync('dist-electron', { recursive: true, force: true })\"",
+    "build:renderer": "tsc -p tsconfig.json --noEmit && vite build && node scripts/collect-licenses.mjs",
     "smoke:watch": "npm run build:electron && node scripts/smoke-watch-service.mjs",
     "test:watch-models": "npm run build:electron && node scripts/test-watch-models.mjs",
     "test:base-layers": "cross-env ELECTRON_RUN_AS_NODE=1 electron --experimental-strip-types --import ./scripts/register-ts-ext.mjs scripts/test-base-layers.mjs",
@@ -194,16 +197,16 @@
     "icons:generate": "node scripts/generate-icons.mjs",
     "dmg:background": "python3 scripts/generate-dmg-background.py",
     "rebuild": "electron-builder install-app-deps",
-    "dist": "npm run binaries:prepare && npm run build && electron-builder --publish never",
-    "dist:mac": "npm run binaries:prepare:mac && npm run build && electron-builder --mac --arm64 --x64 --publish never",
-    "dist:win": "npm run binaries:prepare:win && npm run build && electron-builder --win nsis --x64 --publish never",
-    "dist:linux": "npm run binaries:prepare:linux && npm run build && electron-builder --linux AppImage --x64 --publish never",
+    "dist": "npm run binaries:prepare && npm run clean:electron && npm run build && electron-builder --publish never",
+    "dist:mac": "npm run binaries:prepare:mac && npm run clean:electron && npm run build && electron-builder --mac --arm64 --x64 --publish never",
+    "dist:win": "npm run binaries:prepare:win && npm run clean:electron && npm run build && electron-builder --win nsis --x64 --publish never",
+    "dist:linux": "npm run binaries:prepare:linux && npm run clean:electron && npm run build && electron-builder --linux AppImage --x64 --publish never",
     "release:prepare": "node scripts/prepare-release.mjs",
     "release:check-version": "node scripts/sync-release-version.mjs --check",
+    "migrate:legacy-names": "node scripts/run-electron-gui.mjs scripts/migrate-legacy-names.mjs",
     "release:verify-artifacts": "node scripts/verify-release-artifacts.mjs",
     "test:release-artifacts": "node scripts/test-verify-release-artifacts.mjs",
-    "website:dev": "npm run dev --prefix website",
-    "website:build": "npm run build --prefix website"
+    "test:external-links": "npm run build:electron && node scripts/test-external-links.mjs"
   },
   "build": {
     "appId": "app.heraclesrecords",
@@ -220,8 +223,11 @@
     },
     "files": [
       "dist/**/*",
+      "!dist/licenses/**",
       "dist-electron/**/*",
-      "package.json"
+      "build/icon.png",
+      "package.json",
+      "!node_modules/@anthropic-ai/claude-agent-sdk-*/**"
     ],
     "extraResources": [
       {
@@ -231,6 +237,10 @@
           "**/*",
           "!**/.prepared.json"
         ]
+      },
+      {
+        "from": "dist/licenses",
+        "to": "licenses"
       }
     ],
     "asarUnpack": [

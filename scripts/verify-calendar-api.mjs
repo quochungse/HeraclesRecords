@@ -5,17 +5,18 @@
 //   2. /activity/query — does it accept startDay/endDay filters?
 //   3. Scheduling a workout on a past day — accepted or rejected?
 //
-// Reuses the app's stored session from coroslink.sqlite (read-only). Creates a
-// temporary workout ("CorosLink API Probe — delete me"), schedules/moves it on
+// Reuses the app's stored session from heraclesrecords.sqlite (read-only). Creates a
+// temporary workout ("Heracles Records API Probe — delete me"), schedules/moves it on
 // far-future dates, then removes both the schedule entries and the library
 // program. Nothing else on the account is touched.
 //
 // Usage: npm run build:electron && node scripts/verify-calendar-api.mjs
 
 import path from "node:path";
-import os from "node:os";
 import { pathToFileURL } from "node:url";
 import { execFileSync } from "node:child_process";
+import { openSecretSetting } from "./lib/open-secret-setting.mjs";
+import { appDatabasePath } from "./lib/app-user-data.mjs";
 
 const repoRoot = path.resolve(import.meta.dirname, "..");
 
@@ -25,13 +26,10 @@ const { buildWorkoutPayloadFromEntry, resetProgramForCreate } = await import(
   `${distUrl("corosWorkoutBuilder.js")}?cacheBust=${Date.now()}`
 );
 
-// --- session from the app's settings DB (token is stored in plain text).
+// --- session from the app's settings DB (the token opened as the app stores it).
 // The repo's better-sqlite3 is compiled for Electron's ABI, so use the
 // system sqlite3 CLI to read the settings instead.
-const dbPath = path.join(
-  os.homedir(),
-  "Library/Application Support/coroslink/coroslink.sqlite"
-);
+const dbPath = appDatabasePath();
 const setting = (key) =>
   execFileSync(
     "sqlite3",
@@ -39,7 +37,7 @@ const setting = (key) =>
     { encoding: "utf8" }
   ).trim() || undefined;
 const auth = {
-  accessToken: setting("trainingHub.accessToken"),
+  accessToken: openSecretSetting(setting("trainingHub.accessToken")),
   userId: setting("trainingHub.userId"),
   baseUrl: setting("trainingHub.baseUrl")
 };
@@ -88,7 +86,7 @@ async function querySchedule(startDate, endDate) {
   return res.data ?? {};
 }
 
-const PROBE_NAME = "CorosLink API Probe — delete me";
+const PROBE_NAME = "Heracles Records API Probe — delete me";
 const DAY_A = day(55);
 const DAY_B = day(56);
 const PAST_DAY = day(-2);

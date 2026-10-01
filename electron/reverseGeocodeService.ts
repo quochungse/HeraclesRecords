@@ -17,6 +17,18 @@ const REQUEST_TIMEOUT_MS = 12_000;
 const USER_AGENT =
   "HeraclesRecords/1.0 (https://github.com/quochungse/HeraclesRecords)";
 
+// A place is named by its town, so the providers are asked about the point
+// rounded to two decimals (about a kilometre) rather than the cluster's centre
+// to the metre. A cluster of runs that start at home has its centre near the
+// door, and a third-party server does not need that to answer "Hà Nội". The
+// answer still describes the caller's own coordinates.
+const LOOKUP_DECIMALS = 2;
+
+export function lookupCoordinate(value: number): number {
+  const scale = 10 ** LOOKUP_DECIMALS;
+  return Math.round(value * scale) / scale;
+}
+
 // A provider that could not be reached is stood down for a while rather than
 // retried per cluster. The globe asks about a screenful at once, and paying a
 // dead host's timeout eight times over is what turns one blocked domain into a
@@ -309,10 +321,11 @@ export async function reverseGeocodeLocation(
       failures.push(`${provider.id}: standing down`);
       continue;
     }
+    const url = provider.buildUrl(lookupCoordinate(lat), lookupCoordinate(lon));
     let payload: unknown;
     try {
       const response = await queue.run(() =>
-        deps.fetch(provider.buildUrl(lat, lon), {
+        deps.fetch(url, {
           headers: {
             "User-Agent": USER_AGENT,
             Accept: "application/json"

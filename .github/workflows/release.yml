@@ -10,20 +10,41 @@ permissions:
   contents: write
 
 jobs:
-  macos:
-    name: macOS DMG
-    runs-on: macos-latest
+  # Settled once, before three platforms spend twenty minutes building. The
+  # version is checked, never rewritten: `npm run release:prepare` is what puts
+  # the tag's version into package.json, and a tag that disagrees with the
+  # commit it points at is a mistake to stop on. (This used to sync the version
+  # from the tag and then check it, which could not fail.)
+  preflight:
+    name: Preflight
+    runs-on: ubuntu-latest
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
 
-      - name: Sync version from release tag
-        if: startsWith(github.ref, 'refs/tags/v')
-        run: node scripts/sync-release-version.mjs --from-tag "${{ github.ref_name }}" --sync
-
       - name: Verify release version matches tag
         if: startsWith(github.ref, 'refs/tags/v')
         run: node scripts/sync-release-version.mjs --from-tag "${{ github.ref_name }}" --check
+
+      # Google Drive is the only sync destination, so a build without the
+      # OAuth client ships with no sync at all — and builds without a word.
+      - name: Require the Google OAuth client
+        env:
+          HERACLES_GOOGLE_OAUTH_ID: ${{ secrets.HERACLES_GOOGLE_OAUTH_ID }}
+          HERACLES_GOOGLE_OAUTH_KEY: ${{ secrets.HERACLES_GOOGLE_OAUTH_KEY }}
+        run: |
+          if [ -z "$HERACLES_GOOGLE_OAUTH_ID" ] || [ -z "$HERACLES_GOOGLE_OAUTH_KEY" ]; then
+            echo "::error::Set the HERACLES_GOOGLE_OAUTH_ID and HERACLES_GOOGLE_OAUTH_KEY repository secrets: without them the release has no sync."
+            exit 1
+          fi
+
+  macos:
+    name: macOS DMG
+    needs: preflight
+    runs-on: macos-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
@@ -37,7 +58,28 @@ jobs:
       - name: Rebuild native modules
         run: npm run rebuild
 
+      # Signed and notarized when the Apple Developer secrets are set; ad-hoc
+      # signed otherwise, so a release without an Apple account still ships the
+      # other two platforms instead of failing here. An ad-hoc build opens only
+      # after the user allows it in System Settings → Privacy & Security, and
+      # the updater sends it to the download page rather than installing
+      # (`isMacAdHocSigned` in updaterService.ts).
+      - name: Check Apple signing secrets
+        id: apple
+        env:
+          APPLE_CERTIFICATE_BASE64: ${{ secrets.APPLE_CERTIFICATE_BASE64 }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          if [ -n "$APPLE_CERTIFICATE_BASE64" ] && [ -n "$APPLE_ID" ] && [ -n "$APPLE_TEAM_ID" ]; then
+            echo "signed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "signed=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::Apple Developer secrets are not set; the macOS build is ad-hoc signed and not notarized."
+          fi
+
       - name: Import Apple Developer certificate
+        if: steps.apple.outputs.signed == 'true'
         uses: apple-actions/import-codesign-certs@v3
         with:
           p12-file-base64: ${{ secrets.APPLE_CERTIFICATE_BASE64 }}
@@ -51,7 +93,14 @@ jobs:
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
           HERACLES_GOOGLE_OAUTH_ID: ${{ secrets.HERACLES_GOOGLE_OAUTH_ID }}
           HERACLES_GOOGLE_OAUTH_KEY: ${{ secrets.HERACLES_GOOGLE_OAUTH_KEY }}
-        run: npm run dist:mac
+        run: |
+          if [ "${{ steps.apple.outputs.signed }}" = "true" ]; then
+            npm run dist:mac
+          else
+            # The same switches build.yml uses for its unsigned macOS check.
+            CSC_IDENTITY_AUTO_DISCOVERY=false npm run dist:mac -- \
+              -c.mac.identity=- -c.mac.notarize=false -c.mac.hardenedRuntime=false
+          fi
 
       - name: Verify macOS update artifacts
         run: node scripts/verify-release-artifacts.mjs macos
@@ -59,7 +108,7 @@ jobs:
       - name: Upload macOS artifact
         uses: actions/upload-artifact@v4
         with:
-          name: coroslink-macos
+          name: heracles-macos
           path: |
             release/*.dmg
             release/*.dmg.blockmap
@@ -69,18 +118,11 @@ jobs:
 
   linux:
     name: Linux AppImage
+    needs: preflight
     runs-on: ubuntu-latest
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
-
-      - name: Sync version from release tag
-        if: startsWith(github.ref, 'refs/tags/v')
-        run: node scripts/sync-release-version.mjs --from-tag "${{ github.ref_name }}" --sync
-
-      - name: Verify release version matches tag
-        if: startsWith(github.ref, 'refs/tags/v')
-        run: node scripts/sync-release-version.mjs --from-tag "${{ github.ref_name }}" --check
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
@@ -107,25 +149,18 @@ jobs:
       - name: Upload Linux artifact
         uses: actions/upload-artifact@v4
         with:
-          name: coroslink-linux
+          name: heracles-linux
           path: |
             release/*.AppImage
             release/latest-linux.yml
 
   windows:
     name: Windows installer
+    needs: preflight
     runs-on: windows-latest
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
-
-      - name: Sync version from release tag
-        if: startsWith(github.ref, 'refs/tags/v')
-        run: node scripts/sync-release-version.mjs --from-tag "${{ github.ref_name }}" --sync
-
-      - name: Verify release version matches tag
-        if: startsWith(github.ref, 'refs/tags/v')
-        run: node scripts/sync-release-version.mjs --from-tag "${{ github.ref_name }}" --check
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
@@ -152,7 +187,7 @@ jobs:
       - name: Upload Windows artifact
         uses: actions/upload-artifact@v4
         with:
-          name: coroslink-windows
+          name: heracles-windows
           path: |
             release/*.exe
             release/*.exe.blockmap
@@ -163,22 +198,31 @@ jobs:
     needs: [macos, linux, windows]
     runs-on: ubuntu-latest
     steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      # The tag's section of CHANGELOG.md is the release text. GitHub's
+      # generated notes list pull requests since the last release, which says
+      # nothing for a repository whose history arrived as a fork.
+      - name: Write release notes from CHANGELOG.md
+        run: node scripts/release-notes.mjs "${{ github.ref_name }}" > release-notes.md
+
       - name: Download macOS artifact
         uses: actions/download-artifact@v4
         with:
-          name: coroslink-macos
+          name: heracles-macos
           path: release/macos
 
       - name: Download Linux artifact
         uses: actions/download-artifact@v4
         with:
-          name: coroslink-linux
+          name: heracles-linux
           path: release/linux
 
       - name: Download Windows artifact
         uses: actions/download-artifact@v4
         with:
-          name: coroslink-windows
+          name: heracles-windows
           path: release/windows
 
       - name: Create GitHub Release
@@ -187,7 +231,7 @@ jobs:
           GITHUB_TOKEN: ${{ github.token }}
         with:
           draft: false
-          generate_release_notes: true
+          body_path: release-notes.md
           files: |
             release/macos/*
             release/linux/*

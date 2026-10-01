@@ -1,4 +1,4 @@
-"""Export the CorosLink anatomy assets directly from the Z-Anatomy Blender atlas.
+"""Export the Heracles Records anatomy assets directly from the Z-Anatomy Blender atlas.
 
 Run with Blender, not the system Python:
 
@@ -187,7 +187,7 @@ def decimate_to_budget(obj: bpy.types.Object, face_budget: int) -> None:
     if face_count <= face_budget:
         return
     make_active(obj)
-    modifier = obj.modifiers.new(name="CorosLink surface budget", type="DECIMATE")
+    modifier = obj.modifiers.new(name="Heracles Records surface budget", type="DECIMATE")
     modifier.decimate_type = "COLLAPSE"
     modifier.ratio = max(0.02, face_budget / face_count)
     modifier.use_collapse_triangulate = True
@@ -305,8 +305,8 @@ def export_skeleton(out_dir: Path) -> None:
     skeleton.name = "skeletal_context"
     skeleton.data.name = "skeletal_context"
     skeleton.data.materials.clear()
-    material = bpy.data.materials.get("CorosLink Bone") or bpy.data.materials.new(
-        "CorosLink Bone"
+    material = bpy.data.materials.get("Heracles Records Bone") or bpy.data.materials.new(
+        "Heracles Records Bone"
     )
     skeleton.data.materials.append(material)
     decimate_to_budget(skeleton, SKELETON_TOTAL_FACE_BUDGET)

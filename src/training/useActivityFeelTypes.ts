@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import type { TrainingHubActivity } from "../../electron/types";
-import type { CorosLinkApi } from "../coroslink-api";
+import type { HeraclesRecordsApi } from "../heraclesrecords-api";
 
 /**
  * The end-of-activity feeling COROS holds for each session, read from this
@@ -26,7 +26,7 @@ const EMPTY: ActivityFeelMap = new Map();
  * the ids, so filtering on a narrower set would re-read on every keystroke.
  */
 export function useActivityFeelTypes(
-  api: CorosLinkApi | null | undefined,
+  api: HeraclesRecordsApi | null | undefined,
   activities: readonly TrainingHubActivity[]
 ): ActivityFeelMap {
   const [feels, setFeels] = useState<Record<string, number>>({});

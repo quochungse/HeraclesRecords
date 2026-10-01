@@ -27,6 +27,8 @@ import os from "node:os";
 import path from "node:path";
 import { createRequire } from "node:module";
 import { fileURLToPath, pathToFileURL } from "node:url";
+import { openSecretSetting } from "./lib/open-secret-setting.mjs";
+import { appDatabasePath } from "./lib/app-user-data.mjs";
 
 if (!process.argv.includes("--live")) {
   console.error(
@@ -41,22 +43,16 @@ const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), ".."
 const distUrl = (file) =>
   `${pathToFileURL(path.join(repoRoot, "dist-electron", file)).href}?cacheBust=${Date.now()}`;
 
-/* userData is named after package.json's top-level `name` — see CLAUDE.md. */
-function userDataDir() {
-  if (process.env.HERACLES_USER_DATA) return process.env.HERACLES_USER_DATA;
-  const name = JSON.parse(fs.readFileSync(path.join(repoRoot, "package.json"), "utf8")).name;
-  if (process.platform === "darwin") return path.join(os.homedir(), "Library/Application Support", name);
-  if (process.platform === "win32") return path.join(process.env.APPDATA ?? "", name);
-  return path.join(process.env.XDG_CONFIG_HOME ?? path.join(os.homedir(), ".config"), name);
-}
 
 const SESSION_KEYS = ["trainingHub.accessToken", "trainingHub.userId", "trainingHub.regionId", "trainingHub.baseUrl"];
-const sourceDb = path.join(userDataDir(), "coroslink.sqlite");
+const sourceDb = appDatabasePath();
 const Database = require("better-sqlite3");
 const source = new Database(sourceDb, { readonly: true, fileMustExist: true });
 const session = Object.fromEntries(
   SESSION_KEYS.map((key) => [key, source.prepare("SELECT value FROM app_settings WHERE key = ?").get(key)?.value])
 );
+// The token is encrypted at rest; the scratch copy below takes it opened.
+session["trainingHub.accessToken"] = openSecretSetting(session["trainingHub.accessToken"]);
 source.close();
 if (SESSION_KEYS.some((key) => !session[key])) {
   console.error(`No saved COROS session in ${sourceDb}. Sign in through the app first.`);

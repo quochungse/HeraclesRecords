@@ -18,7 +18,7 @@ import type {
   TrainingHubStatus,
   WorkoutEditRef
 } from "../../electron/types";
-import type { CorosLinkApi } from "../coroslink-api";
+import type { HeraclesRecordsApi } from "../heraclesrecords-api";
 import { formatHappenDayLabel } from "../training/formatters";
 import { scheduledWorkoutSport } from "../training/workoutSport";
 import { activityWorkoutSport } from "../training/askCoachAbout";
@@ -55,7 +55,7 @@ import { useSelectionPreference } from "../preferences/selectionPreferences";
 import { CALENDAR_MODE_PREFERENCE } from "./CalendarSkeleton";
 
 interface CalendarViewProps {
-  api: CorosLinkApi;
+  api: HeraclesRecordsApi;
   status: TrainingHubStatus | null;
   sportTypes: TrainingHubSportType[];
   refreshToken: number;
@@ -82,7 +82,7 @@ function scheduledWorkoutRemovalRef(entry: TrainingHubScheduledWorkoutEntry) {
 }
 
 async function removeScheduledWorkoutEntries(
-  api: CorosLinkApi,
+  api: HeraclesRecordsApi,
   entries: TrainingHubScheduledWorkoutEntry[],
   onProgress: (done: number) => void
 ): Promise<

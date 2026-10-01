@@ -1,5 +1,6 @@
 import {
   Suspense,
+  isValidElement,
   lazy,
   memo,
   useCallback,
@@ -36,7 +37,7 @@ import {
 } from "lucide-react";
 import ReactMarkdown, { type Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
-import type { CorosLinkApi } from "../coroslink-api";
+import type { HeraclesRecordsApi } from "../heraclesrecords-api";
 import { showToast } from "../toast";
 import { useUnitSystem } from "../units/UnitSystemProvider";
 import type {
@@ -117,6 +118,7 @@ import { latestOutlineAnchors, outlineStepText } from "./planOutlineModel";
 import { ConfirmDialog } from "../training-library/ConfirmDialog";
 import { createPortal } from "react-dom";
 import { firstPlanMonday } from "../../electron/trainingPlanGeneration";
+import { linkDestination } from "../../electron/externalLinks";
 import { defaultPlanBriefRequest } from "../../electron/planBrief";
 import { creationCalendar, localDayKey } from "./creationCalendar";
 import {
@@ -140,7 +142,6 @@ import {
   toWireMessages,
   withCreationIndex
 } from "../../electron/chatContextCompaction";
-import { ClaudeAuthScopeToggle } from "./ClaudeAuthScopeToggle";
 import { ClaudeCodeLoginCard } from "./ClaudeCodeLoginCard";
 import { ChatSidebar } from "./ChatSidebar";
 import { ChatConversationHeader } from "./ChatConversationHeader";
@@ -253,7 +254,6 @@ const DEFAULT_CHAT_SETTINGS: ChatSettings = {
     hasApiKey: false
   },
   claudeCode: {
-    useAppScopedAuth: true,
     effort: "high",
     permissions: {
       recentActivities: true,
@@ -280,13 +280,66 @@ const DEFAULT_CHAT_SETTINGS: ChatSettings = {
 };
 
 const CHAT_MARKDOWN_REMARK_PLUGINS = [remarkGfm];
+
+/** A rendered node's text, for comparing a link's words with its address. */
+function plainText(node: ReactNode): string {
+  if (typeof node === "string" || typeof node === "number") return String(node);
+  if (Array.isArray(node)) return node.map(plainText).join("");
+  if (isValidElement<{ children?: ReactNode }>(node)) return plainText(node.props.children);
+  return "";
+}
+
+/** The destination beside a link, unless the link's own words already name it. */
+function LinkDestination({ label, destination }: { label: ReactNode; destination: string }) {
+  if (plainText(label).toLowerCase().includes(destination.toLowerCase())) return null;
+  return <span className="chat-link-host"> ({destination})</span>;
+}
+
+/**
+ * An answer's words are the model's, and so can be a third-party tool's: a link
+ * can read "Open plan" over any address. So every link says where it goes — its
+ * host beside it and the whole address in its tooltip — opens in the browser
+ * on a click, and is not a link at all unless it is a web or mail address (a
+ * relative one resolves to `file://` in a packaged build; `externalLinks.ts`).
+ */
 const CHAT_MARKDOWN_COMPONENTS: Components = {
-  // Render links in the user's browser, not inside the app window.
-  a: ({ children, ...props }) => (
-    <a {...props} target="_blank" rel="noreferrer">
-      {children}
-    </a>
-  )
+  a: ({ children, href }) => {
+    const destination = linkDestination(href);
+    if (!href || !destination) {
+      return (
+        <span className="chat-link-refused" title={href ? `Not a web link: ${href}` : undefined}>
+          {children}
+        </span>
+      );
+    }
+    return (
+      <>
+        <a href={href} target="_blank" rel="noreferrer" title={href}>
+          {children}
+        </a>
+        <LinkDestination label={children} destination={destination} />
+      </>
+    );
+  },
+  // An image is not fetched. Loading it would send a request to whatever host
+  // the answer names, with no click, and its address can carry anything — so it
+  // is drawn as a link to the picture instead.
+  img: ({ src, alt }) => {
+    const source = typeof src === "string" ? src : undefined;
+    const destination = linkDestination(source);
+    const label = alt?.trim() || "Image";
+    if (!source || !destination) {
+      return <span className="chat-link-refused">{label}</span>;
+    }
+    return (
+      <>
+        <a href={source} target="_blank" rel="noreferrer" title={source}>
+          {label}
+        </a>
+        <span className="chat-link-host"> ({destination})</span>
+      </>
+    );
+  }
 };
 
 const AssistantMarkdown = memo(function AssistantMarkdown({
@@ -522,7 +575,7 @@ interface LiveAnalysisRun {
 }
 
 interface ChatViewProps {
-  api: CorosLinkApi | undefined;
+  api: HeraclesRecordsApi | undefined;
   onError: (message: string | null) => void;
   /** An informational toast (UAT): a send refused while another conversation answers. */
   onMessage?: (message: string | null) => void;
@@ -2863,44 +2916,6 @@ export function ChatView({
     }
   };
 
-  const handleUpdateClaudeCode = async (
-    patch: Partial<ChatSettings["claudeCode"]>
-  ) => {
-    const nextClaudeCode = {
-      ...chatSettings.claudeCode,
-      ...patch,
-      permissions: {
-        ...chatSettings.claudeCode.permissions,
-        ...(patch.permissions ?? {})
-      }
-    };
-    const nextSettings = { ...chatSettings, claudeCode: nextClaudeCode };
-    setChatSettings(nextSettings);
-    // Only a different binary or credential store can invalidate the
-    // connection. Clearing the status for a model, effort or permission change
-    // made showClaudeGate true and dropped the athlete out of the conversation.
-    const invalidatesConnection =
-      patch.executablePath !== undefined ||
-      patch.useAppScopedAuth !== undefined;
-    if (invalidatesConnection) {
-      setClaudeStatus(null);
-    }
-    if (!api) return;
-    try {
-      const saved = await api.saveChatSettings(nextSettings);
-      setChatSettings(saved);
-      // Switching credential stores can flip the sign-in state, so re-read it
-      // instead of leaving the caller staring at a cleared status.
-      if (invalidatesConnection) {
-        setClaudeStatus(await api.getClaudeCodeStatus());
-      }
-    } catch (caught) {
-      onError(
-        remoteErrorMessage(caught, "Could not save Claude settings.")
-      );
-    }
-  };
-
   /**
    * Whether the open conversation holds nothing and nothing hangs off it: no
    * entry, and no analysis attached. Such a conversation is a blank page, not
@@ -4324,25 +4339,15 @@ export function ChatView({
           <div className="chat-main chat-main-login">
             <div className="panel chat-login-panel chat-claude-login-panel">
               <Terminal size={32} aria-hidden="true" />
-              <div className="chat-login-title-row">
-                <h2>Claude Code</h2>
-                <span className="chat-beta-badge">Beta</span>
-              </div>
+              <h2>Claude Code</h2>
               <p>
                 Coach with your Claude subscription through the Claude Code CLI
                 on this computer.
               </p>
-              <ClaudeAuthScopeToggle
-                appScoped={chatSettings.claudeCode.useAppScopedAuth !== false}
-                disabled={checkingClaude}
-                onChange={(next) =>
-                  void handleUpdateClaudeCode({ useAppScopedAuth: next })
-                }
-              />
               <p className="chat-login-note">
-                {chatSettings.claudeCode.useAppScopedAuth !== false
-                  ? "Signing in here creates credentials that belong to Heracles Records alone. Any Claude account you use elsewhere on this computer — including in a terminal — is left alone."
-                  : "Heracles Records will use the machine-wide Claude login in your home folder, shared with your terminal. Signing in here replaces that login."}
+                Signing in here creates a login that belongs to Heracles Records
+                alone. Any Claude account you use elsewhere on this computer —
+                including in a terminal — is left alone.
               </p>
               <div className="chat-login-actions">
                 {notInstalled ? (

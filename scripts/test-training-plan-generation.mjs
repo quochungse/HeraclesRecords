@@ -426,14 +426,15 @@ await test("the outline step offers its tool alone and withholds every writing t
   assert.match(fn, /finally \{\s*runTools\.delete\(requestId\);/, "a run's tools go when it ends, however it ends");
   assert.match(
     source,
-    /const PIPELINE_WITHHELD_TOOLS = new Set\(\[\s*"draft_training_plan",\s*"draft_workout",\s*"revise_training_plan",\s*PLAN_BRIEF_TOOL\s*\]\)/
+    /const PIPELINE_WITHHELD_TOOLS = new Set\(\[\s*"draft_training_plan",\s*"draft_workout",\s*"revise_training_plan",\s*PLAN_BRIEF_TOOL,(?:\s*\/\/[^\n]*)?\s*RECALL_CONVERSATION_TOOL\s*\]\)/
   );
   const execute = source.slice(source.indexOf("async function executeChatTool("));
   assert.ok(
     execute.indexOf("runTools.get(requestId)") < execute.indexOf("isToolAllowedUnderPolicy(name, toolPolicy)"),
     "a withheld tool is refused, and a run's own tool answered, before the policy is asked"
   );
-  assert.equal((source.match(/toolsForRun\(/g) ?? []).length >= 7, true, "every provider's tool list goes through the run");
+  // Five providers, one call each (a8ef9da took the per-step copies out).
+  assert.equal((source.match(/const chatTools = toolsForRun\(/g) ?? []).length, 5, "every provider's tool list goes through the run");
 });
 
 // --- What Coach may read -------------------------------------------------
@@ -484,7 +485,10 @@ await test("both pipeline steps withhold what the conversation does not share, f
   assert.match(source, /allow: \(name\) => !withheld\.has\(name\) && !toolReadsWithheldSource\(name, sources\)/);
   assert.match(source, /runTools\.set\(requestId, \{ extra: \[\], \.\.\.pipelineReach\(sources, SESSIONS_STEP_WITHHELD_TOOLS\) \}\)/);
   assert.match(source, /\.\.\.pipelineReach\(sources\),/);
-  assert.equal((source.match(/runTools\.get\(requestId\)\?\.context/g) ?? []).length, 5, "every provider's snapshot is built with the run's scope");
+  // One helper builds the snapshot with the run's scope, and every provider
+  // builds its snapshot through it (a8ef9da folded five copies into one).
+  assert.equal((source.match(/runTools\.get\(requestId\)\?\.context/g) ?? []).length, 1, "the snapshot is built with the run's scope in one place");
+  assert.equal((source.match(/await prepare\(turnContext\(/g) ?? []).length, 5, "every provider's snapshot goes through it");
   const context = source.slice(source.indexOf("async function buildTrainingContext("));
   assert.match(context, /includeActivities = permissions\?\.recentActivities !== false && scope\?\.activities !== false/);
   assert.match(context, /includeDashboard = includeMetrics && scope\?\.activities !== false/, "records and predictions come from the history");

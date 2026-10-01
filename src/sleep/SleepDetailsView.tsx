@@ -7,12 +7,12 @@ import { useSleepHistory } from "./useSleepHistory";
 import { useSleepNightSeries } from "./useSleepNightSeries";
 import { HrvBaselineChart } from "../training/components/HrvBaselineChart";
 import { MCP_SLEEP_SUBJECT, mcpNotice } from "../mcp/mcpNotice";
-import type { CorosLinkApi } from "../coroslink-api";
+import type { HeraclesRecordsApi } from "../heraclesrecords-api";
 import type { TrainingTrendPoint } from "../training/types";
 import "./sleep.css";
 
 interface SleepDetailsViewProps {
-  api: CorosLinkApi | null;
+  api: HeraclesRecordsApi | null;
   connected: boolean;
   /**
    * Nightly HRV and its baseline, from the training snapshot App.tsx already

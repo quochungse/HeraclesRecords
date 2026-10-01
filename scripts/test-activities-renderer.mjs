@@ -370,8 +370,8 @@ async function main() {
   // -------------------------------------------------------------------------
   {
     const selectionKeys = [
-      "coroslink.selection.v1.training.activityRoute.colorMode",
-      "coroslink.selection.v1.training.activityRoute.metric"
+      "heraclesrecords.selection.v1.training.activityRoute.colorMode",
+      "heraclesrecords.selection.v1.training.activityRoute.metric"
     ];
     await win.webContents.executeJavaScript(
       `localStorage.setItem(${JSON.stringify(selectionKeys[0])}, '"performance"');

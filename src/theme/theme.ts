@@ -48,7 +48,7 @@ export function applyTheme(theme: Theme): void {
     root.dataset.theme = theme;
   }
 
-  window.corosLink?.setWindowBackground?.(THEME_WINDOW_BACKGROUND[theme]);
+  window.heraclesRecords?.setWindowBackground?.(THEME_WINDOW_BACKGROUND[theme]);
 }
 
 /** Where the theme change should visually originate (the toggle button). */
@@ -102,7 +102,13 @@ export function runThemeTransition(
     commit();
   });
 
-  void transition.finished.finally(() => {
-    root.classList.remove("theme-transitioning");
-  });
+  // A transition the browser abandons (a skipped frame budget, a window that
+  // is not being painted) rejects these; the theme has been committed either
+  // way, so the rejection says nothing worth an uncaught error.
+  transition.ready.catch(() => undefined);
+  void transition.finished
+    .catch(() => undefined)
+    .finally(() => {
+      root.classList.remove("theme-transitioning");
+    });
 }

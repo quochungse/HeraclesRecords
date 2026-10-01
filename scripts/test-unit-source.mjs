@@ -99,12 +99,12 @@ assert.ok(
 const policy = read("electron/sync/syncPolicy.ts");
 assert.match(
   policy,
-  /"coroslink\.unitSystem":\s*"derived"/,
+  /"heraclesrecords\.unitSystem":\s*"derived"/,
   "the cached unit is derived, not a preference that syncs"
 );
 assert.match(
   policy,
-  /"coroslink\.temperatureUnit":\s*"derived"/,
+  /"heraclesrecords\.temperatureUnit":\s*"derived"/,
   "and so is the cached temperature unit"
 );
 

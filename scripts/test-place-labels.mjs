@@ -14,9 +14,9 @@ import path from "node:path";
 import { pathToFileURL } from "node:url";
 
 const repoRoot = path.resolve(import.meta.dirname, "..");
-const STORAGE_KEY = "coroslink.activity-globe.place-labels.v1";
+const STORAGE_KEY = "heraclesrecords.activity-globe.place-labels.v1";
 
-// A localStorage and a `window.corosLink` the module can find.
+// A localStorage and a `window.heraclesRecords` the module can find.
 class MemoryStorage {
   #map = new Map();
   getItem(key) {
@@ -41,7 +41,7 @@ const asked = [];
 
 globalThis.window = {
   localStorage: storage,
-  corosLink: {
+  heraclesRecords: {
     reverseGeocodeLocation: async (lat, lon) => {
       asked.push([lat, lon]);
       return answer(lat, lon);

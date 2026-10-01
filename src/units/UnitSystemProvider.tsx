@@ -72,7 +72,7 @@ export function UnitSystemProvider({ children }: { children: ReactNode }) {
 
   const refreshUnitSystem = useCallback(
     async (options?: { refresh?: boolean }) => {
-      const api = window.corosLink;
+      const api = window.heraclesRecords;
       if (!api) {
         return;
       }
@@ -105,7 +105,7 @@ export function UnitSystemProvider({ children }: { children: ReactNode }) {
     // Signing in is when the account first becomes askable, and a restored
     // session arrives after mount, so the status change is the only signal
     // that the answer may have changed.
-    return window.corosLink?.onTrainingHubSessionChanged(() => {
+    return window.heraclesRecords?.onTrainingHubSessionChanged(() => {
       void refreshUnitSystem();
     });
   }, [refreshUnitSystem]);

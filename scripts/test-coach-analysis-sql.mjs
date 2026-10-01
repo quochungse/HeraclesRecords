@@ -14,7 +14,7 @@ const distUrl = (file) =>
   `${pathToFileURL(path.join(repoRoot, "dist-electron", file)).href}?cacheBust=${Date.now()}`;
 const database = await import(distUrl("database.js"));
 
-const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "coroslink-coach-sql-"));
+const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "heraclesrecords-coach-sql-"));
 database.initializeDatabase(tempRoot);
 
 const run = (patch) => ({
@@ -324,7 +324,7 @@ assert.match(
 
   assert.deepEqual(
     database.getChatSessionCoachSummaryRow("sess-long"),
-    { coach_summary: null, coach_summary_through: null },
+    { coach_summary: null, coach_summary_through: null, coach_condensed_through: null },
     "a conversation nobody has summarised says so"
   );
 
@@ -335,7 +335,8 @@ assert.match(
   );
   assert.deepEqual(database.getChatSessionCoachSummaryRow("sess-long"), {
     coach_summary: "Marathon in October. Calf grumbling since July.",
-    coach_summary_through: 80
+    coach_summary_through: 80,
+    coach_condensed_through: null
   });
 
   // Rolling it forward replaces both halves together: a summary and the count
@@ -344,7 +345,8 @@ assert.match(
   database.setChatSessionCoachSummaryRow("sess-long", "Calf settled.", 130);
   assert.deepEqual(database.getChatSessionCoachSummaryRow("sess-long"), {
     coach_summary: "Calf settled.",
-    coach_summary_through: 130
+    coach_summary_through: 130,
+    coach_condensed_through: null
   });
 
   // The transcript is untouched by any of it — 5.7 trims the context window,

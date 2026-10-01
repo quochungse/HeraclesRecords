@@ -49,7 +49,7 @@ const distUrl = (file) =>
   `${pathToFileURL(path.join(repoRoot, "dist-electron", file)).href}?cacheBust=${Date.now()}`;
 
 const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "heracles-library-migrations-"));
-const dbPath = path.join(tempRoot, "coroslink.sqlite");
+const dbPath = path.join(tempRoot, "heraclesrecords.sqlite");
 
 const PLAN_ID = "plan-local";
 const TEMPLATE_ID = "plan-template";

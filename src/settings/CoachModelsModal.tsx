@@ -1,10 +1,10 @@
 import { useEffect, type MouseEvent } from "react";
 import { BrainCircuit, X } from "lucide-react";
-import type { CorosLinkApi } from "../coroslink-api";
+import type { HeraclesRecordsApi } from "../heraclesrecords-api";
 import { CoachModelsPanel } from "../chat/CoachModelsPanel";
 
 export interface CoachModelsModalProps {
-  api: CorosLinkApi | undefined;
+  api: HeraclesRecordsApi | undefined;
   open: boolean;
   onClose: () => void;
   onChange?: () => void | Promise<void>;

@@ -1,6 +1,6 @@
 import { app, session, type WebContents } from "electron";
 
-export const YOUTUBE_PARTITION = "persist:coroslink-youtube";
+export const YOUTUBE_PARTITION = "persist:heraclesrecords-youtube";
 
 function buildChromeUserAgent(): string {
   const chromeVersion = process.versions.chrome;

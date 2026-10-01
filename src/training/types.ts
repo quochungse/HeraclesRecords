@@ -16,7 +16,7 @@ import type {
   TrainingHubStatus,
   TrainingHubUpcomingWorkout
 } from "../../electron/types";
-import type { CorosLinkApi } from "../coroslink-api";
+import type { HeraclesRecordsApi } from "../heraclesrecords-api";
 import type { PrimaryView } from "../navigation/primaryNav";
 import type { SportScreen } from "../navigation/sportScreens";
 
@@ -124,7 +124,7 @@ export interface HeatmapGrid {
  * it, and it stays as the single place that spells the surface out.
  */
 export interface TrainingHubViewProps {
-  api: CorosLinkApi;
+  api: HeraclesRecordsApi;
   status: TrainingHubStatus | null;
   email: string;
   password: string;

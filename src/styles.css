@@ -1978,84 +1978,6 @@ input::placeholder {
   }
 }
 
-.resources-menu {
-  position: relative;
-  display: inline-flex;
-}
-
-.resources-popover {
-  position: absolute;
-  top: calc(100% + 8px);
-  right: 0;
-  z-index: 20;
-  display: grid;
-  gap: 14px;
-  width: 240px;
-  padding: 14px;
-  border: 1px solid var(--surface-line, var(--glass-border));
-  border-radius: var(--radius-md);
-  background: rgba(18, 18, 20, 0.98);
-  box-shadow: var(--shadow-card);
-}
-
-.resources-group {
-  display: grid;
-  gap: 2px;
-}
-
-.resources-group .update-settings-heading {
-  margin-bottom: 4px;
-}
-
-.resources-link {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 7px 8px;
-  margin: 0 -4px;
-  border-radius: var(--radius-sm);
-  color: var(--text-primary);
-  font-size: 13px;
-  font-weight: 500;
-  text-decoration: none;
-  cursor: pointer;
-  transition:
-    background var(--dur-fast) var(--ease),
-    color var(--dur-fast) var(--ease);
-}
-
-.resources-link:hover {
-  background: var(--glass-bg-hover);
-  outline: none;
-}
-
-.resources-link:focus-visible {
-  background: var(--glass-bg-hover);
-  outline: var(--focus-ring);
-  outline-offset: 2px;
-}
-
-.resources-link svg:first-child {
-  flex-shrink: 0;
-  color: var(--text-secondary);
-}
-
-.resources-link-label {
-  flex: 1;
-}
-
-.resources-link-external {
-  flex-shrink: 0;
-  opacity: 0;
-  color: var(--text-secondary);
-  transition: opacity var(--dur-fast) var(--ease);
-}
-
-.resources-link:hover .resources-link-external,
-.resources-link:focus-visible .resources-link-external {
-  opacity: 1;
-}
-
 .startup-view-menu {
   position: relative;
   display: inline-flex;
@@ -2092,7 +2014,9 @@ input::placeholder {
   padding: 12px;
   border: 1px solid var(--surface-line, var(--glass-border));
   border-radius: var(--radius-md);
-  background: rgba(18, 18, 20, 0.98);
+  /* The menus' own ground, opaque: a near-black literal here let the chips
+     and the accent's name in the row below show through the list. */
+  background: var(--menu-surface);
   box-shadow: var(--shadow-card);
 }
 
@@ -4995,6 +4919,67 @@ input::placeholder {
   flex: none;
   border-radius: var(--radius-pill);
   background: var(--option-chip-color, var(--accent));
+}
+
+/*
+ * Tiles: the same multi-select as equal tiles in a grid, each with its icon and
+ * a tick at the far end. A row of pills as wide as their words reads as loose
+ * odds and ends; equal tiles read as one set of switches. The selectors carry
+ * both classes so they outrank `.option-chips.option-group--md button`.
+ */
+.option-chips.option-chips--tiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(128px, 1fr));
+  gap: 8px;
+}
+
+.option-chips.option-chips--tiles button {
+  gap: 10px;
+  min-width: 0;
+  min-height: 44px;
+  padding: 0 10px 0 12px;
+  border-radius: var(--radius-md);
+  color: var(--text-muted);
+}
+
+.option-chips.option-chips--tiles button > svg {
+  flex: none;
+}
+
+.option-chips.option-chips--tiles .option-group-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.option-chip-tick {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 16px;
+  height: 16px;
+  margin-left: auto;
+  border: 1.5px solid var(--option-edge);
+  border-radius: var(--radius-pill);
+  transition:
+    background var(--dur-fast) var(--ease),
+    border-color var(--dur-fast) var(--ease);
+}
+
+.option-chips.option-chips--tiles button[aria-pressed="true"] {
+  border-color: color-mix(in srgb, var(--accent) 45%, var(--option-edge));
+  background: var(--accent-soft);
+  color: var(--text-primary);
+}
+
+.option-chips.option-chips--tiles button[aria-pressed="true"] > svg {
+  color: var(--accent-strong);
+}
+
+.option-chips.option-chips--tiles button[aria-pressed="true"] .option-chip-tick {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--bg-base);
 }
 
 /* There is no caret here on purpose. The dropdown mode gets one from
@@ -16465,12 +16450,11 @@ td span {
 
 /* The Claude subscription section is the longest one in the dialog and its
    `.chat-settings-section` gap spaces every child the same 10px, so its
-   groups — what the section is, which credentials to run on, what the
-   connection is doing, and which model to use — ran together as one list.
-   Only what *starts* a group takes the extra margin, so it lands on the seam
-   rather than inside a group: the executable field stays tucked under the
-   switch that reveals it, and a group's heading carries the seam rather than
-   the control underneath it. */
+   groups — what the section is, what the connection is doing, and which
+   model to use — ran together as one list. Only what *starts* a group takes
+   the extra margin, so it lands on the seam rather than inside a group: the
+   executable field stays tucked under the status that asks for it, and a
+   group's heading carries the seam rather than the control underneath it. */
 .coach-models-panel .chat-claude-section > .chat-claude-group-title,
 .coach-models-panel .chat-claude-section > .chat-claude-status {
   margin-top: 14px;
@@ -17418,10 +17402,6 @@ td span {
   font-size: 12px;
 }
 
-.chat-local-tools.is-disabled {
-  opacity: 0.48;
-}
-
 .chat-login-actions {
   display: flex;
   justify-content: center;
@@ -17441,10 +17421,6 @@ td span {
 
 .chat-openrouter-login-panel > svg {
   color: #a7b4ff;
-}
-
-.chat-claude-login-panel .chat-login-title-row h2 {
-  margin: 0;
 }
 
 .chat-settings-copy {
@@ -18005,23 +17981,6 @@ td span {
 
 .chat-local-result.is-error {
   color: var(--error-text);
-}
-
-/* Where a provider's model list came from, and the button that reads it
-   again: one line under the model fields, the sentence taking what the
-   button leaves and wrapping above it on a narrow dialog. */
-.chat-model-list-status {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px 12px;
-}
-
-.chat-model-list-status > p {
-  flex: 1 1 240px;
-  min-width: 0;
-  margin: 0;
 }
 
 @media (max-width: 1080px) {
@@ -19203,6 +19162,18 @@ td span {
 .chat-markdown a:hover {
   color: var(--chat-signal);
   text-decoration-color: var(--chat-signal);
+}
+
+/* Where a link goes, beside the words the answer chose for it. */
+.chat-markdown .chat-link-host {
+  color: var(--text-muted);
+  font-size: 0.9em;
+}
+
+/* A link whose address is not a web or mail one: its words stay, unlinked. */
+.chat-markdown .chat-link-refused {
+  text-decoration: underline dotted;
+  text-underline-offset: 2px;
 }
 
 /* Inline code chip */
@@ -22100,7 +22071,6 @@ td span {
   background: rgba(19, 26, 40, 0.07);
 }
 
-:root[data-theme="paper"] .resources-popover,
 :root[data-theme="paper"] .startup-view-popover,
 :root[data-theme="paper"] .update-settings-popover {
   background: var(--glass-bg-elevated);
@@ -22108,12 +22078,10 @@ td span {
   box-shadow: var(--shadow-elevated);
 }
 
-:root[data-theme="paper"] .resources-link:hover,
 :root[data-theme="paper"] .startup-view-option:hover {
   background: rgba(19, 26, 40, 0.06);
 }
 
-:root[data-theme="paper"] .resources-link:focus-visible,
 :root[data-theme="paper"] .startup-view-option:focus-visible {
   background: rgba(19, 26, 40, 0.06);
   outline: var(--focus-ring);
@@ -23294,6 +23262,57 @@ td span {
 :root[data-theme="paper"] .training-login-remember input:checked {
   background: var(--accent);
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 14%, transparent);
+}
+
+/* The rest of the card was written in white-on-dark literals and never given
+   a paper colour, so on the white card the remember hint, the "or" rule, the
+   browser button and the footer were close to invisible — on the first screen
+   a light-theme user sees. */
+:root[data-theme="paper"] .training-login-remember small {
+  color: var(--text-muted);
+}
+
+:root[data-theme="paper"] .training-login-divider {
+  color: var(--text-muted);
+}
+
+:root[data-theme="paper"] .training-login-divider::before,
+:root[data-theme="paper"] .training-login-divider::after {
+  background: var(--glass-border);
+}
+
+:root[data-theme="paper"] .training-login-browser-link {
+  border-color: var(--glass-border);
+  background: rgba(19, 26, 40, 0.03);
+  color: var(--text-primary);
+}
+
+:root[data-theme="paper"] .training-login-browser-link:hover {
+  color: var(--text-primary);
+}
+
+:root[data-theme="paper"] .training-login-browser-link:focus-visible {
+  color: var(--text-primary);
+  outline: var(--focus-ring);
+  outline-offset: 2px;
+}
+
+:root[data-theme="paper"] .training-login-footer {
+  color: var(--text-muted);
+}
+
+:root[data-theme="paper"] .training-login-text-button {
+  color: var(--text-secondary);
+}
+
+:root[data-theme="paper"] .training-login-text-button:hover:not(:disabled) {
+  color: var(--text-primary);
+}
+
+:root[data-theme="paper"] .training-login-text-button:focus-visible {
+  color: var(--text-primary);
+  outline: var(--focus-ring);
+  outline-offset: 2px;
 }
 
 /* ==========================================================================
@@ -30327,22 +30346,62 @@ td span {
   font-size: 13px;
 }
 
-.settings-about-copy .settings-update-status {
-  color: var(--accent);
-  font-weight: 700;
+/* Name, version, what the updater knows and the Updates button, in one line.
+   The button is a step smaller here than its 34px elsewhere, so it sits in a
+   line of 18px type without making the line taller than the name. */
+.settings-about-title {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
 }
 
-.settings-about-header .secondary-button,
-.settings-about-header .update-chip {
-  flex-shrink: 0;
-  white-space: nowrap;
+.settings-about-version {
+  padding: 4px 8px;
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-pill);
+  color: var(--text-secondary);
+  font-family: var(--font-display);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
 }
 
-/* The Update button is a popover trigger, so it anchors its own menu. The
-   popover opens leftward because the button sits at the header's right edge.
-   `white-space` stays off this wrapper on purpose: the chip inside sets its
-   own nowrap, and inheriting it here would reach the popover and stop the
-   preference hints from wrapping, overflowing the 260px menu. */
+.settings-about-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.settings-about-status::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-radius: var(--radius-pill);
+  background: var(--accent);
+}
+
+.settings-about-status[data-tone="success"]::before {
+  background: var(--success-text);
+}
+
+.settings-about-title .update-settings-trigger--labeled,
+.settings-about-title .update-chip {
+  height: 28px;
+  min-height: 28px;
+  padding: 0 10px;
+}
+
+/* The Update button is a popover trigger, so it anchors its own menu. It sits
+   beside the version, near the header's left, so the popover opens rightward
+   from the button's own edge. `white-space` stays off this wrapper on purpose:
+   the chip inside sets its own nowrap, and inheriting it here would reach the
+   popover and stop the preference hints from wrapping, overflowing the 260px
+   menu. */
 .settings-update-menu {
   position: relative;
   display: inline-flex;
@@ -30350,6 +30409,8 @@ td span {
 }
 
 .settings-update-menu .update-settings-popover {
+  right: auto;
+  left: 0;
   white-space: normal;
 }
 
@@ -30357,94 +30418,107 @@ td span {
   border-color: var(--accent);
 }
 
-.settings-version-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
-  gap: 12px;
-  margin: 0;
-  padding: 14px 16px;
-  border: 1px solid var(--glass-border);
-  border-radius: var(--radius-sm);
-  background: var(--glass-bg);
-}
-
-.settings-version-grid dt {
-  color: var(--text-muted);
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-}
-
-.settings-version-grid dd {
-  margin: 4px 0 0;
-  font-weight: 700;
-  font-variant-numeric: tabular-nums;
-}
-
+/* Website and Report an issue, as the header's third line. */
 .settings-about-links {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  align-items: center;
+  gap: 6px 16px;
+  margin-top: 8px;
 }
 
 .settings-about-link {
   display: inline-flex;
   align-items: center;
-  gap: 7px;
-  padding: 9px 13px;
-  border: 1px solid var(--glass-border);
-  border-radius: var(--radius-sm);
-  background: var(--glass-bg);
-  color: var(--text-primary);
+  gap: 6px;
+  color: var(--text-secondary);
   font-size: 13px;
   font-weight: 600;
   text-decoration: none;
-  transition:
-    border-color var(--dur-fast) var(--ease),
-    color var(--dur-fast) var(--ease);
+  transition: color var(--dur-fast) var(--ease);
+}
+
+.settings-about-link > svg:last-child {
+  opacity: 0.6;
 }
 
 .settings-about-link:hover {
-  border-color: var(--accent);
   color: var(--accent);
 }
 
-button.settings-about-link {
-  cursor: pointer;
-  font-family: inherit;
+.settings-about-link:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: 2px;
 }
 
-.settings-about-links .resources-popover {
-  right: auto;
-  left: 0;
+/* Buy Me a Coffee, drawn as the Color mode switch with only its chosen chip:
+   the same track (.option-group) around the same md chip in the accent wash
+   (.option-group--md button[aria-checked="true"]). It is a link, not a choice,
+   so it takes the look and none of the radio semantics. */
+.settings-about-coffee {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  padding: 3px;
+  border: 1px solid var(--option-edge);
+  border-radius: var(--radius-pill);
+  background: var(--option-well);
+  text-decoration: none;
+  transition: border-color var(--dur-fast) var(--ease);
 }
 
-.settings-about-links .resources-menu-trigger[aria-expanded="true"] {
+.settings-about-coffee:hover {
   border-color: var(--accent);
-  color: var(--accent);
+}
+
+.settings-about-coffee:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: 2px;
+}
+
+.settings-about-coffee-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 32px;
+  padding: 0 14px;
+  border-radius: var(--radius-pill);
+  background: var(--accent-soft);
+  color: var(--accent-strong);
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+/* The Settings screen's last line: which build this is, and whose. */
+.settings-footer {
+  padding: 4px 0 8px;
+  color: var(--text-muted);
+  font-size: 12px;
+  text-align: center;
 }
 
 /* Navigation: a section of the About card, headed like Appearance under it.
-   Two rows of label and control — where the app opens, which sport screens the
-   rail lists — with the labels in one column so both controls start on the
-   same line. Each label is as tall as the startup trigger, so it sits level
-   with the first line of its control however that control wraps. */
+   Two settings — where the app opens, which sport screens the rail lists —
+   each a label with its control on the line below, so both controls start at
+   the section's left edge. */
 .settings-navigation-rows {
   display: grid;
-  grid-template-columns: 112px minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr);
   align-items: start;
-  gap: 12px 16px;
+  gap: 8px;
   margin: 14px 0 18px;
 }
 
 .settings-navigation-label {
-  display: flex;
-  align-items: center;
-  min-height: 34px;
   color: var(--text-secondary);
   font-size: 13px;
   font-weight: 500;
+}
+
+.settings-navigation-label:not(:first-child) {
+  margin-top: 10px;
 }
 
 .settings-navigation-rows .startup-view-menu {
@@ -30458,8 +30532,8 @@ button.settings-about-link {
   left: 0;
 }
 
-.settings-navigation-rows .option-chips {
-  min-height: 34px;
+.settings-navigation-rows .option-chips--tiles {
+  max-width: 560px;
 }
 
 .settings-navigation-note {
@@ -30539,11 +30613,11 @@ button.settings-about-link {
   display: grid;
   gap: 8px;
   margin-top: 14px;
-  /* Measured for the rules below. A row's third column holds a segmented switch
-     or three buttons, and a viewport media query is the wrong ruler for it:
-     Settings sits beside a 250px sidebar, so the list runs out of room long
-     before the window does. At 760px wide the destination row's description was
-     a five-word column beside a switch at full size. */
+  /* Measured for the rules below. A row's third column can hold three buttons,
+     and a viewport media query is the wrong ruler for it: Settings sits beside
+     a 250px sidebar, so the list runs out of room long before the window does.
+     At 760px wide a row's description was a five-word column beside controls
+     at full size. */
   container-type: inline-size;
   container-name: settings-rows;
 }
@@ -30551,13 +30625,11 @@ button.settings-about-link {
 /* Below this the wide controls take a line of their own. Rows whose third
    column is a chevron are left alone — a chevron never crowds anything. */
 @container settings-rows (max-width: 600px) {
-  .settings-nav-row:has(> .sync-backend-switch),
   .settings-nav-row:has(> .settings-connection-actions) {
     grid-template-columns: 40px minmax(0, 1fr);
     row-gap: 10px;
   }
 
-  .settings-nav-row > .sync-backend-switch,
   .settings-nav-row > .settings-connection-actions {
     grid-column: 1 / -1;
     justify-self: end;
@@ -30835,10 +30907,9 @@ button.settings-about-link {
   border-top: 1px solid var(--glass-border);
 }
 
-/* The concrete answer — a filesystem path or an account address. Louder than
-   the sentence above it, because it is the part worth checking at a glance,
-   and free to break mid-token: a vault path is long and has no spaces to
-   break at, and left alone it pushes the row wider than the panel. */
+/* The line beside a footer's button. Louder than the sentence above it,
+   because it is the part worth acting on, and free to break mid-token so a
+   long one cannot push the row wider than the panel. */
 .sync-destination-detail {
   min-width: 0;
   color: var(--text-secondary);
@@ -30854,19 +30925,8 @@ button.settings-about-link {
   flex: 0 0 auto;
 }
 
-/* The destination row while a switch is in flight. Dashed rather than replaced
-   by a placeholder: the row keeps its size, so nothing below it jumps. */
-.settings-sync-panel .sync-row-pending {
-  border-style: dashed;
-  background: transparent;
-}
-
-.settings-sync-panel .sync-row-pending .settings-nav-row-copy strong {
-  color: var(--text-secondary);
-}
-
-/* Rows that need attention: an unreachable destination, a restore about to
-   overwrite, a backup about to be deleted. */
+/* Rows that need attention: Drive not answering, another account's vault, a
+   publish that failed. */
 .settings-sync-panel .sync-row-alert {
   border-color: var(--error-border);
   background: var(--error-bg);

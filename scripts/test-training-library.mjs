@@ -382,14 +382,14 @@ assert.equal(manual[1].status, "skipped");
 // --- storage ------------------------------------------------------------------
 
 const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "heracles-training-library-"));
-const legacyPath = path.join(tempRoot, "coros-desktop.sqlite");
-const legacy = new Database(legacyPath);
-legacy.exec("CREATE TABLE app_settings (key TEXT PRIMARY KEY, value TEXT NOT NULL)");
-legacy.prepare("INSERT INTO app_settings (key, value) VALUES (?, ?)").run("preserved", "yes");
-legacy.close();
+// A database written before the library's tables existed.
+const existingPath = path.join(tempRoot, "heraclesrecords.sqlite");
+const existing = new Database(existingPath);
+existing.exec("CREATE TABLE app_settings (key TEXT PRIMARY KEY, value TEXT NOT NULL)");
+existing.prepare("INSERT INTO app_settings (key, value) VALUES (?, ?)").run("preserved", "yes");
+existing.close();
 
 const db = databaseModule.initializeDatabase(tempRoot);
-assert.equal(fs.existsSync(path.join(tempRoot, "coroslink.sqlite")), true);
 assert.equal(db.prepare("SELECT value FROM app_settings WHERE key = ?").get("preserved").value, "yes");
 const tableNames = new Set(
   db.prepare("SELECT name FROM sqlite_master WHERE type = 'table'").all().map((row) => row.name)

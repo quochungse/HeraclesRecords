@@ -2,13 +2,13 @@ import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { CalendarPlus, Eye, Library, LoaderCircle, RefreshCw, Search, X } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import type { TrainingHubLibraryWorkout } from "../../electron/types";
-import type { CorosLinkApi } from "../coroslink-api";
+import type { HeraclesRecordsApi } from "../heraclesrecords-api";
 import { formatHappenDayLabel, getLocalHappenDayKey } from "../training/formatters";
 import { scheduledWorkoutSport, workoutSportLabel } from "../training/workoutSport";
 import { refreshWorkoutExerciseCatalogs } from "./useWorkoutExerciseCatalog";
 
 interface WorkoutLibraryModalProps {
-  api: CorosLinkApi;
+  api: HeraclesRecordsApi;
   onClose: () => void;
   /**
    * Opens a library workout to be read. The calendar does not offer to change

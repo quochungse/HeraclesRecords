@@ -69,6 +69,14 @@ assert.equal(captured[0].scope, "setting");
 assert.equal(captured[0].key, "chat.provider");
 assert.equal(captured[0].payload.value, "anthropic");
 
+// Writing back the stored value is not a change. The MCP client rewrites its
+// server's resource URL on every connect, and each rewrite used to go out as a
+// fresh entry — a queue that was never empty after launch, and a newer stamp on
+// this machine's copy that could undo the other machine's unpulled change.
+captured = [];
+database.setSetting("chat.provider", "anthropic");
+assert.deepEqual(captured, [], "rewriting the same value queues nothing");
+
 captured = [];
 database.setSetting("chat.claudeCode.executablePath", "/usr/local/bin/claude");
 assert.deepEqual(

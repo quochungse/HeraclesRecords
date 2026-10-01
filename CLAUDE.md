@@ -68,14 +68,46 @@ backup's progress push and four suites. The three `intervals.*` settings — an 
 `uploadActivityFitToCoros` (the Calendar's manual activity), exporting a single activity
 file, and `.data-connect-panel`, the "connect COROS first" panel four screens draw.
 
-**The "Website" and "Support the project" links still point upstream on purpose** —
-[ResourcesMenu.tsx](src/components/ResourcesMenu.tsx) and
-[SettingsView.tsx](src/settings/SettingsView.tsx). Only "Source on GitHub" and "Report an
-issue" were repointed at this fork, because issues belong here.
+**Every link in the app points at this fork** (since 2026-10-01). Settings → About holds
+"Website" (`heraclesrecords.github.io`) and "Report an issue" under the tagline, and a
+**Buy me a coffee** button (`buymeacoffee.com/quochungse`, drawn as the Color mode switch's
+chosen chip, at the About header's far end; the Updates button sits beside the version). The
+platform and runtime versions are not shown; the screen ends on a one-line footer. "Source on GitHub", the COROS Help menu (`ResourcesMenu`) and a
+Licenses button were taken out of that row on purpose; the upstream "Support the project"
+link and `DonateButton` went in 85219aa. `.github/FUNDING.yml` (Buy Me a Coffee
+`quochungse`) and `CODEOWNERS` (`@quochungse`) are the fork's. **`LICENSE` keeps upstream's `Copyright (c) 2026 AtoZ` line
+beside the fork's own** — MIT requires that notice in every copy, so it is not branding to
+clean up. What else ships with the app is credited in `THIRD_PARTY_NOTICES.md`, and
+`scripts/collect-licenses.mjs` (the last step of `build:renderer`) writes `dist/licenses/`:
+`LICENSE.txt`, the notices, and `THIRD_PARTY_LICENSES.txt` — the license text of every
+non-dev package in `package-lock.json` and of the three fonts (`src/assets/fonts/licenses`,
+OFL). electron-builder installs it as `resources/licenses` — shipping the files with every
+copy is what the licenses ask for; no screen in the app opens them (a Licenses button was
+removed by decision, and would need its IPC channel back). FFmpeg's GPLv3 text and README are copied beside the binary
+by `prepare-binaries` (`ffmpeg-LICENSE.txt`, `ffmpeg-README.txt`). A package added later is
+covered by the next build; a bundled program or asset added later needs its own entry in the
+notices.
 
-**`website/` is left untouched, branding included.** `website/public/icon.png` and
-`og-image.png` are still byte-identical to upstream's, and the site is not deployed from this
-fork. Do not sync them to `build/icon.png` — the fork's icon changes stop at the desktop app.
+**No name in the code or in what the app stores is upstream's any more** (since 1.0). The
+database is `heraclesrecords.sqlite`, localStorage keys are `heraclesrecords.*`, the YouTube,
+YouTube Music and Apple Music sign-ins live in `persist:heraclesrecords-*` partitions, the
+bridge is `window.heraclesRecords` typed by `HeraclesRecordsApi` in
+`src/heraclesrecords-api.ts`. **The app carries no migration from the old names**: it opens
+these and nothing else, so a profile from before 1.0 started as is gets an empty database.
+Existing data was moved by a one-off script, `npm run migrate:legacy-names`
+(`scripts/migrate-legacy-names.mjs`, `-- --dry-run` to report only), run once per machine with
+the app closed: it backs up the database and Local Storage into
+`<userData>/pre-rename-backup-<time>/`, moves the database with its WAL folded in, renames the
+partition folders, and renames the keys in both renderer origins (`file://` and the dev
+server's), dropping the two place-name caches. The first machine was moved on 2026-10-01.
+Sync needs nothing: the old keys are unclassified, so they neither go out nor come in, and the
+new names are published on the next pass. Names that leave the machine were renamed earlier —
+the Claude Agent SDK client app (`heracles-records-coach`), its MCP server (`heracles`, so
+tools are `mcp__heracles__*`), the manual activity's upload file name, the build's User-Agent.
+
+**There is no website in this repository.** Upstream's `website/` (its own site, branding
+included) was deleted on 2026-10-01; the homepage and privacy policy Google's OAuth consent
+screen links to are served from a separate repository, `heraclesrecords.github.io`.
 
 Release identity **is** renamed: `build.publish` targets `quochungse/HeraclesRecords`, and
 the `artifactName` patterns spell `HeraclesRecords` without a space on purpose — GitHub
@@ -146,7 +178,7 @@ Electron app in three layers. `electron/` compiles to **CommonJS** (`tsconfig.el
 resolution). Both are `strict`.
 
 ```
-src/ (renderer, React)  →  src/coroslink-api.ts (types only, window.coroslink)
+src/ (renderer, React)  →  src/heraclesrecords-api.ts (types only, window.heraclesRecords)
                         ↓
 electron/preload.ts     →  contextBridge, ~212 ipcRenderer.invoke wrappers
                         ↓
@@ -154,6 +186,47 @@ electron/main.ts        →  ~212 ipcMain.handle registrations + app lifecycle
                         ↓
 electron/*Service.ts    →  the actual work; electron/database.ts owns SQLite
 ```
+
+### What the window may reach (hardened for 1.0)
+
+- **No URL reaches `shell.openExternal` unchecked.** `electron/externalLinks.ts` (node-free,
+  shared with the renderer) allows `https:`, `http:` and `mailto:` and nothing else; the main
+  window's `setWindowOpenHandler` goes through it. The page is `file://` in a packaged build,
+  so a relative link in a Coach answer — `[Open plan](/C:/Windows/System32/calc.exe)` — used
+  to resolve to a program the OS would launch, and `//host/share` to an SMB request.
+  `test:external-links` holds the refusals.
+- **A Coach answer's links say where they go** (`CHAT_MARKDOWN_COMPONENTS` in `ChatView`):
+  the host beside the words unless the words already name it, the whole address as the
+  tooltip, and a link that is not a web or mail address drawn as plain text. **Images in an
+  answer are not fetched** — loading one sent a request to any host the answer named, with no
+  click — and are drawn as a link to the picture.
+- **The main window navigates nowhere** (`will-navigate` allows only its own page or the dev
+  server), so a dropped link or file cannot get the preload bridge. It runs `sandbox: true`
+  — the preload imports nothing but `electron`, and must keep it that way.
+- **A `<webview>` gets no preload, no Node and a sandbox** whatever its markup says
+  (`will-attach-webview`), and only a web URL; its popups open as sandboxed windows when they
+  are web pages and not at all otherwise (`guardWebviewPopups`).
+- **The built page carries a Content-Security-Policy** (a meta tag `vite.config.ts` writes at
+  build time only; the dev server needs inline scripts). Its point is `script-src 'self'
+  'wasm-unsafe-eval'` — nothing runs that did not ship; images, connections and media take any
+  https because album art, tiles and avatars come from many hosts, and images plain http too
+  (a podcast feed's artwork often is). A `<webview>` guest is not governed by it.
+- **A packaged build ignores the development switches.** `main.ts` deletes
+  `VITE_DEV_SERVER_URL`, `HERACLES_SAMPLE_*`, `HERACLES_SIMULATE_PLAN_AI` and
+  `COROS_WATCH_PATH` from the environment before anything reads them (each is read at run
+  time, so that is the whole gate), and refuses the mock-watch and sample-data IPC.
+- **Session tokens are encrypted at rest** through `electron/secretSettings.ts`: the COROS
+  access token, Spotify's client secret and tokens, Apple Music's captured headers. A value is
+  `enc:v1:` + `safeStorage` ciphertext; a plain one from an earlier build is read and
+  re-encrypted on the spot. Unlike the API keys these **fall back to plain text without a
+  keyring**: refusing to keep the COROS token would mean a login every launch, and each login
+  signs the athlete out on their other computer. `safeStorage` is required lazily, so suites
+  under `ELECTRON_RUN_AS_NODE` read and write plain values. The live-API probes open the
+  token through `scripts/lib/open-secret-setting.mjs`, which asks a short Electron process
+  (with the app's name, so the keyring entry matches); `sample:coach`, which drives the
+  compiled services under `ELECTRON_RUN_AS_NODE`, hands what it opens to them through
+  `lendOpenedSecret` — without it `--live` and `--cleanup` read no session at all. YouTube Music's auth file stays plain —
+  ytmusicapi reads and rewrites it — and is chmod 600.
 
 ### `rendererReady` gates everything main pushes unasked
 
@@ -175,7 +248,7 @@ tick past mount so subscriptions declared below it are attached first.
 ### The IPC contract is a three-file invariant
 
 A channel name is a bare string in `electron/main.ts`, `electron/preload.ts`, and
-`src/coroslink-api.ts`. A typo in any one typechecks cleanly and fails only at runtime.
+`src/heraclesrecords-api.ts`. A typo in any one typechecks cleanly and fails only at runtime.
 `scripts/test-ipc-surface.mjs` scrapes all three and asserts the sets match exactly in both
 directions — a handler nothing invokes fails just as loudly as an invoke with no handler.
 
@@ -1113,8 +1186,10 @@ lives at module level for the same visit-to-visit reason — see `useCalendarDat
   `server-side-fallback-2026-06-01` beta, which is what makes each row carry
   `allowed_fallback_models`), OpenRouter's `/models/user` and the Codex backend's
   `/codex/models` are read into `chat.modelCatalog.*` (`device`) and read again once a day
-  (`chat:refreshModels`, fired in the background by Coach and Coach settings) or on **Refresh
-  models**; Claude Code's list (`supportedModels()`) keeps its own key and now the same one-day
+  (`chat:refreshModels`, fired in the background by Coach and Coach settings) or when Coach
+  Models asks the provider something anyway — **there is no Refresh models button**: Claude's
+  **Check** and **Test connection**, and a key's **Save** or **Test** (with the saved key), read
+  that provider's list again with `force`; Claude Code's list (`supportedModels()`) keeps its own key and now the same one-day
   clock (`availableModelsAt`). The shipped lists are what a picker shows before a list has
   ever been read, and **a failed or empty read never replaces a list held** — an offline
   launch keeps yesterday's menu. `ChatSettings.modelCatalogs` — and Claude Code's
@@ -1140,8 +1215,15 @@ lives at module level for the same visit-to-visit reason — see `useCalendarDat
   how a native 2.1.266 kept an npm 2.1.283 and its Opus 5.5 out of the picker. So nothing
   detected is stored any more, and a stored path at a standard location
   (`isStandardClaudeLocation`) is read as that leftover and let go; only a path detection would
-  not find is the athlete's choice. The list remembers the CLI it was read from
+  not find is the athlete's choice — which is why Coach Models shows the path field only when
+  detection finds nothing or a path is already set. The list remembers the CLI it was read from
   (`availableModelsFrom`, `<path>@<version>`) and is read again as soon as that changes.
+  **Claude Code always runs against the app's own login** (`<userData>/claude-code` as
+  `CLAUDE_CONFIG_DIR`, `getClaudeCodeConfigDir`). Settings used to offer "This device" — the
+  machine-wide `~/.claude` login the terminal shares — and the choice read as noise to anyone
+  who has never opened a terminal, so it was removed on 2026-10-01 with
+  `chat.claudeCode.useAppScopedAuth`. A machine that had picked it signs in once more, inside
+  the app; the stored key is left in place and read by nothing.
 
   **A conversation carries its own sources and AI** (`chat_conversation_settings`, `personal`;
   P2.0 of docs/coach-plan-canvas.md). **A conversation keeps the provider it was started with**
@@ -1453,7 +1535,7 @@ lives at module level for the same visit-to-visit reason — see `useCalendarDat
   "Asking about ·" line having been taken out (UAT); two or three fold to one line of chips
   under "About", a plan or week chip drawn with the calendar week. **The question being
   written is a draft per conversation** (`composerDrafts.ts`, localStorage
-  `coroslink.coach.composerDrafts.v1`, `device` tier): its words and its references are
+  `heraclesrecords.coach.composerDrafts.v1`, `device` tier): its words and its references are
   saved as they change and restored by `resetEphemeralChatState(sessionId)` whenever that
   conversation is opened, emptied drafts are removed, a deleted conversation's goes with it,
   and a blank conversation holding a draft is not blank. A Coach creation's
@@ -1801,7 +1883,10 @@ lives at module level for the same visit-to-visit reason — see `useCalendarDat
   first for its `display_name`; a provider that could not be reached is **stood down for five
   minutes** rather than retried per cluster, or one blocked domain costs the screenful the
   globe asks about all at once one timeout each. Both providers are keyless, like the base
-  map styles, and for the same reason.
+  map styles, and for the same reason. **They are asked about the point rounded to two
+  decimals** (`lookupCoordinate`, about a kilometre): a cluster of runs from home has its
+  centre at the door, the name wanted is the town's, and the published privacy policy says
+  only an approximate location is sent.
   **A lookup that failed is not an answer, and must not be cached as one.** The two cases are
   deliberately different return values: a provider that answered about nowhere (open water)
   returns a coordinate label, which the renderer remembers; nobody answering *throws*, and the
@@ -1817,7 +1902,7 @@ lives at module level for the same visit-to-visit reason — see `useCalendarDat
   holds the caches out of the view for the reason `activityFilters.ts` sits outside
   `ActivitiesView` — it is the only part of naming a place a test can reach. A cluster key is
   a ~55 km grid cell (`GEO_HEAT_STEP`) and the name of the city in it does not change, so a
-  resolved name is written to localStorage (`coroslink.activity-globe.place-labels.v1`,
+  resolved name is written to localStorage (`heraclesrecords.activity-globe.place-labels.v1`,
   `derived`) and is on the screen in the first paint of the next launch. Held only in memory,
   every launch re-asked about every place on the screen, serialised behind the provider
   throttle, and the screen read coordinates for the ten-odd seconds that took.
@@ -1832,9 +1917,16 @@ lives at module level for the same visit-to-visit reason — see `useCalendarDat
   strength sessions merged with Hevy imports.
 - **Watch USB** (`watchService.ts`) — model fixture table drives detection; renderer polls
   status, so results are cached (`invalidateWatchStatusCache`).
-- **Sync** (`electron/sync/`) — continuous two-way sync to a local folder or Google Drive,
-  so two machines hold the same user data. `syncService` owns the destination and nothing
-  else; `syncLoop` owns the oplog (append-only per-device change log, merged by HLC
+- **Sync** (`electron/sync/`) — continuous two-way sync through Google Drive, so two
+  machines hold the same user data. **Drive is the only destination**: a local folder was
+  offered beside it until 2026-10-01 and was removed because a folder kept by Dropbox,
+  Syncthing or Drive Desktop rewrites files under two machines writing at once. With it went
+  `sync:chooseFolder`, `sync:setBackend`, `SyncBackend` and the panel's Local / Google Drive
+  switch; `sync.folder` and `sync.backend` are no longer read, so a machine that had a
+  folder reads as not configured until it connects Drive (its data never left SQLite and
+  is published then). `LocalFolderProvider` stays only as the suites' storage backend. A
+  build with no OAuth client therefore offers no sync at all, and the panel says so.
+  `syncService` owns the destination and nothing else; `syncLoop` owns the oplog (append-only per-device change log, merged by HLC
   last-writer-wins); `fullState.ts` republishes everything at once, which is what seeds a
   vault on first join and what makes a restore visible to the other machines.
   `syncableStore.ts` is the shared floor both this and backup read rows through, so a record
@@ -1998,6 +2090,18 @@ lives at module level for the same visit-to-visit reason — see `useCalendarDat
     "Sync now" calls both directly. `flushBeforeQuit` deliberately goes *past* that
     turnstile: quit is bounded by a timeout and its one job is to get the queue out, not
     to wait on a pull nobody needs finished.
+  - **A setting written back unchanged is not a change.** `setSetting` notifies the bridge only
+    when the row moved (`ON CONFLICT … WHERE value IS NOT excluded.value`, then `changes`).
+    It used to notify on every write, so the MCP client's resource URL, stored on every
+    connect, queued an entry on every launch — a queue never empty after start-up, which held
+    the Sync panel polling Drive (and showing "Checking…") behind the minute-long first pull —
+    and gave this machine's stale copy a newer stamp than the other machine's unpulled change.
+    The panel's own poll and post-pull re-read are `quiet` for the same reason.
+    **Two renderer origins share one published snapshot.** `npm run dev` serves
+    `http://127.0.0.1:5173`, `npm start` and a packaged build load `file://`, and each has its
+    own localStorage over the same userData — so switching between them republishes (and
+    deletes) every view preference the other origin lacks. A development hazard only; a real
+    install has one origin.
   - **A change made before the vault opens is held, not dropped.** `prepareSync()` waits on
     the COROS re-login at start-up — the vault's owner is the account, so it must — and until
     it returns `syncBridge` has no sink. It used to discard what the hooks handed it: the
@@ -2087,8 +2191,8 @@ lives at module level for the same visit-to-visit reason — see `useCalendarDat
   A packaged build needs `HERACLES_GOOGLE_OAUTH_ID` / `_KEY` for Drive to be offered at all.
   `scripts/prepare-google-client.mjs` bakes them into a git-ignored generated module before
   every `tsc` run, reading a repo-root `.env` when the environment is empty; a build from
-  source gets empty values and the UI disables the Drive option. Both CI workflows pass them
-  to every platform job — keep it that way, or one platform ships without Drive.
+  source gets empty values and the Sync panel says sync is not available. Both CI workflows
+  pass them to every platform job — keep it that way, or one platform ships without Drive.
 
 ### Testability convention in the main process
 
@@ -2133,7 +2237,8 @@ chip and differ only in which chips are on screen: `expanded` (all of them — t
 `collapsible` (the selected one, opening in place and pushing what sits beside it) and
 `dropdown` (a floating menu, through `SelectDropdown`). Multi-select is `OptionChips`, a
 separate export rather than a flag, because several pressed chips inside one track read as a
-segmented control gone wrong. It replaced ~30 hand-written versions whose chips disagreed
+segmented control gone wrong. Its `appearance="tiles"` lays the same chips out as equal tiles
+with a tick, for a short set switched on once (Settings' sport screens) rather than a filter. It replaced ~30 hand-written versions whose chips disagreed
 about height, weight, radius, how the chosen one is marked (`.is-active`, `.is-selected`,
 `.active`, `[data-active]`) and which ARIA role a row of exclusive buttons takes.
 **A collapsible group is one row holding every option once, clipped by the group's own
@@ -2161,7 +2266,7 @@ label in the row" catches it. The reveal fade is scoped `button:not([aria-checke
 exactly that reason — without it a folded group is a blank pill, because the one chip it shows
 is the one the fade had hidden. `npm run test:option-groups` holds the measured width, the
 single copy and the fade; `test:library-renderer` reads `--og-shift` and both positions, from a
-mount with **every** `coroslink.selection.v1` key cleared (the bare preference name is not the
+mount with **every** `heraclesrecords.selection.v1` key cleared (the bare preference name is not the
 storage key, so removing that alone leaves the last choice standing).
 **There is deliberately no automatic fallback** from `expanded` to `collapsible` when a row
 does not fit: it was written that way first and it oscillates, because the measurement that
@@ -2339,7 +2444,7 @@ disclosure groups this replaced existed only because eighteen equal rows did not
 they cost two rows, a chevron, a stored open/closed state, a rule that reopened a group
 whenever the app navigated into it, and a second indicator key for a collapsed group's
 header. The sections answer *when* a screen is reached for rather than where its data comes
-from, which is the grouping the athlete already has. `coroslink.sidebarCollapsedGroups` is
+from, which is the grouping the athlete already has. `heraclesrecords.sidebarCollapsedGroups` is
 gone from `syncPolicy.ts` with the state it classified — `test:sync-policy` fails on a
 localStorage key that `src/` no longer writes, in both directions.
 **Personal and Settings are not in the index.** They are about the person rather than the
@@ -2351,7 +2456,7 @@ local part, then to "Personal". Because one row shows a name and the other is ic
 neither is findable by its text — both carry **`data-nav-label`**, and
 `probe-ui-cdp.mjs` navigates by it.
 **The four sport screens can be taken off the rail** (Settings → Navigation,
-`src/navigation/sportScreens.ts`, `coroslink.hiddenSportScreens`, `preference`), because
+`src/navigation/sportScreens.ts`, `heraclesrecords.hiddenSportScreens`, `preference`), because
 Activities holds every COROS session. **Strength is the exception**: a workout only Hevy
 knows, and the Hevy connection itself, live on Strength alone, so with Hevy connected the
 note under the chips says so, in the warning tone once Strength is hidden. The *hidden* list
@@ -2431,7 +2536,23 @@ selector meaning "light".
 
 ## Releases
 
-`npm run release:prepare -- v0.1.31` syncs the version into `package.json` and the lockfile,
-then prints the commit/tag/push commands. Tag pushes trigger `release.yml`, which re-checks
-that the tag and `package.json` agree before building. `verify-release-artifacts.mjs` gates
-the updater metadata per platform.
+`npm run release:prepare -- v1.0.1` syncs the version into `package.json` and the lockfile,
+then prints the commit/tag/push commands. **Push only the release tag** (`git push origin
+v1.0.1`), never all tags: the upstream `v0.1.*` tags were deleted locally on 2026-10-01 and
+`remote.vendor.tagOpt` is `--no-tags` so a fetch does not bring them back, because each one
+pushed would run `release.yml` and publish upstream's code as a release here. Tag pushes
+trigger `release.yml`, whose `preflight` job checks — and no longer rewrites — that the tag and
+`package.json` agree (it used to `--sync` first, which made the check unable to fail), and
+fails when the Google OAuth secrets are empty, since Drive is the only sync destination. The
+macOS job signs and notarizes when the Apple secrets are set and otherwise builds ad-hoc with
+the switches `build.yml` uses, so a release without an Apple account still ships Windows and
+Linux; the updater already sends an ad-hoc build to the download page (`isMacAdHocSigned`).
+The release text is the tag's `## [x.y.z]` section of `CHANGELOG.md`
+(`scripts/release-notes.mjs`), which fails the job when the section is missing. The
+changelog starts at 1.0.0; upstream's history is in `vendor-main`. `verify-release-artifacts.mjs`
+gates each platform's output before upload: every file `latest*.yml` names must be there with
+the size and sha512 it states (electron-updater refuses anything else, so a step that touches an
+installer after electron-builder — a signing service, say — must rewrite the metadata), and the
+installers must carry the names the `artifactName` patterns give, which `test:release-artifacts`
+also holds `updaterService.ts`'s hand-built download links to. The `dist*` scripts clean `dist-electron/` first —
+`tsc` never deletes the output of a removed module, and a local package would ship it.

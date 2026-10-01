@@ -7,7 +7,7 @@ import type {
   TrainingHubSportType,
   TrainingHubUpcomingWorkout
 } from "../../../electron/types";
-import type { CorosLinkApi } from "../../coroslink-api";
+import type { HeraclesRecordsApi } from "../../heraclesrecords-api";
 import { ScheduledWorkoutDetail } from "../../calendar/ScheduledWorkoutDetail";
 import { formatHappenDayLabel } from "../formatters";
 import {
@@ -16,7 +16,7 @@ import {
 } from "../upcomingWorkoutMatch";
 
 interface UpcomingWorkoutDetailPanelProps {
-  api: CorosLinkApi;
+  api: HeraclesRecordsApi;
   workout: TrainingHubUpcomingWorkout | null;
   sportTypes: TrainingHubSportType[];
   onClose: () => void;

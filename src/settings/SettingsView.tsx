@@ -5,7 +5,7 @@ import {
   Bug,
   Check,
   ChevronRight,
-  Code2,
+  Coffee,
   Compass,
   Dumbbell,
   Ellipsis,
@@ -31,10 +31,9 @@ import type {
   TrainingHubStatus,
 } from "../../electron/types";
 import { AppUpdateControl } from "../components/AppUpdateControls";
-import { ResourcesMenu } from "../components/ResourcesMenu";
 import { OptionChips, OptionGroup } from "../components/OptionGroup";
 import { StartupViewMenu } from "../components/StartupViewMenu";
-import type { PrimaryView } from "../navigation/primaryNav";
+import { PRIMARY_NAV_ITEMS, type PrimaryView } from "../navigation/primaryNav";
 import { getPrimaryViewLabel } from "../navigation/startupView";
 import { SPORT_SCREENS, type SportScreen } from "../navigation/sportScreens";
 import { RunnerIcon } from "../running/runnerIcon";
@@ -44,7 +43,7 @@ import {
   type CoachModelsSummary
 } from "../chat/CoachModelsPanel";
 import { summarizeMcpStatuses } from "../chat/McpServersPanel";
-import type { CorosLinkApi } from "../coroslink-api";
+import type { HeraclesRecordsApi } from "../heraclesrecords-api";
 import { CoachModelsModal } from "./CoachModelsModal";
 import { McpServersModal } from "./McpServersModal";
 import { formatBytes } from "../media/libraryUtils";
@@ -67,16 +66,13 @@ import appLogo from "../../build/icon.png";
 import { SyncPanel } from "./SyncPanel";
 import { BackupPanel } from "./BackupPanel";
 
+const BUY_ME_A_COFFEE_URL = "https://buymeacoffee.com/quochungse";
+
 const ABOUT_LINKS = [
   {
     label: "Website",
-    href: "https://coros-link.vercel.app/",
+    href: "https://heraclesrecords.github.io",
     icon: Globe2,
-  },
-  {
-    label: "Source on GitHub",
-    href: "https://github.com/quochungse/HeraclesRecords",
-    icon: Code2,
   },
   {
     label: "Report an issue",
@@ -105,12 +101,6 @@ function mcpSummaryLine(summary: McpSummary | null): string {
     : servers;
 }
 
-const PLATFORM_LABELS: Record<string, string> = {
-  darwin: "macOS",
-  win32: "Windows",
-  linux: "Linux",
-};
-
 /** The mark each sport wears elsewhere in the app, so the colour is picked
     against the figure it will be seen on. The sentence of examples that used to
     sit beside each one is gone with the rows it needed: the label already names
@@ -122,6 +112,16 @@ const SPORT_COLOR_ICONS: Record<SportColorCategory, LucideIcon> = {
   bike: Bike,
   other: Ellipsis,
 };
+
+/** The sport screens as tiles, each wearing the icon it has on the sidebar. */
+const SPORT_SCREEN_OPTIONS = SPORT_SCREENS.map((screen) => {
+  const Icon = PRIMARY_NAV_ITEMS.find((item) => item.id === screen)?.icon;
+  return {
+    value: screen,
+    label: getPrimaryViewLabel(screen),
+    icon: Icon ? <Icon size={18} aria-hidden="true" /> : undefined,
+  };
+});
 
 /**
  * A row in the Connections list that opens something: an icon, what it is, what
@@ -158,13 +158,8 @@ function SettingsNavRow({
   );
 }
 
-function platformLabel(info: AppInfo): string {
-  const name = PLATFORM_LABELS[info.platform] ?? info.platform;
-  return `${name} (${info.arch})`;
-}
-
 interface SettingsViewProps {
-  api: CorosLinkApi;
+  api: HeraclesRecordsApi;
   updateSnapshot: AppUpdateSnapshot;
   updateBusy: boolean;
   updateDownloading: boolean;
@@ -371,15 +366,17 @@ export function SettingsView({
     );
   }
 
-  const updateStatusText =
-    updateSnapshot.status === "available" ||
-    updateSnapshot.status === "downloading"
-      ? `Version ${updateSnapshot.availableVersion} is available.`
+  // Said beside the version, ahead of the Updates button. An available or
+  // downloading update needs no words here: the button itself then reads
+  // "Update 1.2.0" or "Downloading 40%".
+  const updateStatus =
+    updateSnapshot.status === "not-available"
+      ? { tone: "success", label: "Up to date" }
       : updateSnapshot.status === "downloaded"
-        ? `Version ${updateSnapshot.availableVersion} is ready to install.`
-        : updateSnapshot.status === "not-available"
-          ? "You're on the latest version."
-          : null;
+        ? { tone: "accent", label: "Ready to install" }
+        : null;
+
+  const appVersion = appInfo?.version ?? updateSnapshot.currentVersion;
 
   if (settingsPage === "storage") {
     return (
@@ -479,63 +476,59 @@ export function SettingsView({
             aria-hidden="true"
           />
           <div className="settings-about-copy">
-            <h3>Heracles Records</h3>
-            <p>
-              Unofficial COROS companion for training analytics.
-            </p>
-            {updateStatusText ? (
-              <p className="settings-update-status">{updateStatusText}</p>
-            ) : null}
+            {/* The version, what the updater knows about it and the button that
+                acts on it, in one line: they are one subject. */}
+            <div className="settings-about-title">
+              <h3>Heracles Records</h3>
+              <span className="settings-about-version">{appVersion}</span>
+              {updateStatus ? (
+                <span
+                  className="settings-about-status"
+                  data-tone={updateStatus.tone}
+                >
+                  {updateStatus.label}
+                </span>
+              ) : null}
+              <AppUpdateControl
+                snapshot={updateSnapshot}
+                busy={updateBusy}
+                downloading={updateDownloading}
+                onCheck={onCheckForUpdates}
+                onDownload={onDownloadUpdate}
+                onInstall={onInstallUpdate}
+                onPreferencesChange={onUpdatePreferencesChange}
+              />
+            </div>
+            <p>Unofficial COROS companion for training analytics.</p>
+            <div className="settings-about-links">
+              {ABOUT_LINKS.map(({ label, href, icon: Icon }) => (
+                <a
+                  key={href}
+                  className="settings-about-link"
+                  href={href}
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  <Icon size={15} aria-hidden="true" />
+                  <span>{label}</span>
+                  <ExternalLink size={12} aria-hidden="true" />
+                </a>
+              ))}
+            </div>
           </div>
-          <AppUpdateControl
-            snapshot={updateSnapshot}
-            busy={updateBusy}
-            downloading={updateDownloading}
-            onCheck={onCheckForUpdates}
-            onDownload={onDownloadUpdate}
-            onInstall={onInstallUpdate}
-            onPreferencesChange={onUpdatePreferencesChange}
-          />
-        </div>
-
-        <dl className="settings-version-grid">
-          <div>
-            <dt>App version</dt>
-            <dd>{appInfo?.version ?? updateSnapshot.currentVersion}</dd>
-          </div>
-          <div>
-            <dt>Platform</dt>
-            <dd>{appInfo ? platformLabel(appInfo) : "Not available"}</dd>
-          </div>
-          <div>
-            <dt>Electron</dt>
-            <dd>{appInfo?.electronVersion ?? "Not available"}</dd>
-          </div>
-          <div>
-            <dt>Chromium</dt>
-            <dd>{appInfo?.chromeVersion ?? "Not available"}</dd>
-          </div>
-          <div>
-            <dt>Node.js</dt>
-            <dd>{appInfo?.nodeVersion ?? "Not available"}</dd>
-          </div>
-        </dl>
-
-        <div className="settings-about-links">
-          {ABOUT_LINKS.map(({ label, href, icon: Icon }) => (
-            <a
-              key={href}
-              className="settings-about-link"
-              href={href}
-              target="_blank"
-              rel="noreferrer"
-            >
-              <Icon size={15} aria-hidden="true" />
-              <span>{label}</span>
-              <ExternalLink size={12} aria-hidden="true" />
-            </a>
-          ))}
-          <ResourcesMenu />
+          {/* The header's far end, apart from the app's own controls. Drawn as
+              the Color mode switch's chosen chip in a track of its own. */}
+          <a
+            className="settings-about-coffee"
+            href={BUY_ME_A_COFFEE_URL}
+            target="_blank"
+            rel="noreferrer"
+          >
+            <span className="settings-about-coffee-chip">
+              <Coffee size={15} aria-hidden="true" />
+              <span>Buy me a coffee</span>
+            </span>
+          </a>
         </div>
 
         {/* Where the app opens and which sport screens the rail lists: both
@@ -569,10 +562,8 @@ export function SettingsView({
               <OptionChips
                 label="Sport screens"
                 size="md"
-                options={SPORT_SCREENS.map((screen) => ({
-                  value: screen,
-                  label: getPrimaryViewLabel(screen)
-                }))}
+                appearance="tiles"
+                options={SPORT_SCREEN_OPTIONS}
                 values={SPORT_SCREENS.filter(
                   (screen) => !hiddenSportScreens.includes(screen)
                 )}
@@ -840,6 +831,10 @@ export function SettingsView({
         onClose={() => setCoachModelsOpen(false)}
         onChange={() => setCoachRefreshVersion((version) => version + 1)}
       />
+
+      <footer className="settings-footer">
+        Heracles Records {appVersion} · Made by quochungse
+      </footer>
     </section>
   );
 }
