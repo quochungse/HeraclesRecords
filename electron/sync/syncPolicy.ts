@@ -273,9 +273,6 @@ export const SETTING_POLICY: Readonly<Record<string, SyncTier>> = {
   // put two writers in the same directory — the one thing the log's
   // conflict-free design depends on never happening.
   "sync.deviceId": "device",
-  // Where this machine's vault folder sits. A path, so it means nothing
-  // elsewhere; and syncing it would let one computer redirect another's backups.
-  "sync.folder": "device",
   // Which vault this machine has already published its pre-existing data into.
   // Per-machine by definition: it records what *this* computer has done, and a
   // second machine that adopted the flag would skip the one publish that puts
@@ -286,10 +283,6 @@ export const SETTING_POLICY: Readonly<Record<string, SyncTier>> = {
   // computer has published, and syncing it would make another device believe
   // it had already sent values it never had.
   "sync.publishedLocalStorage": "device",
-  // Which backend this machine uses. A laptop may back up to Drive while a
-  // desktop uses a NAS folder; syncing the choice would drag one onto the
-  // other's vault and overwrite it with a stranger's history.
-  "sync.backend": "device",
   // The last logical timestamp this device issued. Two machines sharing one
   // would issue colliding timestamps and break the merge order outright.
   "sync.clock": "device",

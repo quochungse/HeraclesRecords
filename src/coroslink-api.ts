@@ -1,7 +1,6 @@
 import type {
   GoogleAccountInfo,
   LocalStoragePublishResult,
-  SyncBackend,
   SyncChangedEvent,
   SyncPresenceClaim,
   SyncStatus,
@@ -707,15 +706,13 @@ export interface CorosLinkApi {
   applyScheduleChange: (changeSetId: string, lineId?: string) => Promise<ScheduleChangeSet>;
   dismissScheduleChange: (changeSetId: string, lineId?: string) => Promise<ScheduleChangeSet>;
   // ----- Sync -----
-  chooseSyncFolder: () => Promise<string | null>;
   getSyncStatus: () => Promise<SyncStatus>;
-  /** Open the vault, creating it in the chosen destination if it is not there.
+  /** Open the vault, creating it in the connected Drive if it is not there.
    *  This is the whole of setting sync up; nothing is asked of the user. */
   prepareSyncVault: () => Promise<SyncVaultState>;
   /** Take a vault belonging to another account. Clears the seed flag, so this
    *  machine republishes its whole state into it. */
   claimSyncVault: () => Promise<SyncVaultState>;
-  setSyncBackend: (backend: SyncBackend) => Promise<void>;
   /** Who the connected Google account belongs to, and how much room it has
    *  left. Null when nothing is connected, or when Drive would not say — it is
    *  decoration, so it never fails the panel. */

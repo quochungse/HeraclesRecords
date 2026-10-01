@@ -1841,9 +1841,16 @@ lives at module level for the same visit-to-visit reason — see `useCalendarDat
   strength sessions merged with Hevy imports.
 - **Watch USB** (`watchService.ts`) — model fixture table drives detection; renderer polls
   status, so results are cached (`invalidateWatchStatusCache`).
-- **Sync** (`electron/sync/`) — continuous two-way sync to a local folder or Google Drive,
-  so two machines hold the same user data. `syncService` owns the destination and nothing
-  else; `syncLoop` owns the oplog (append-only per-device change log, merged by HLC
+- **Sync** (`electron/sync/`) — continuous two-way sync through Google Drive, so two
+  machines hold the same user data. **Drive is the only destination**: a local folder was
+  offered beside it until 2026-10-01 and was removed because a folder kept by Dropbox,
+  Syncthing or Drive Desktop rewrites files under two machines writing at once. With it went
+  `sync:chooseFolder`, `sync:setBackend`, `SyncBackend` and the panel's Local / Google Drive
+  switch; `sync.folder` and `sync.backend` are no longer read, so a machine that had a
+  folder reads as not configured until it connects Drive (its data never left SQLite and
+  is published then). `LocalFolderProvider` stays only as the suites' storage backend. A
+  build with no OAuth client therefore offers no sync at all, and the panel says so.
+  `syncService` owns the destination and nothing else; `syncLoop` owns the oplog (append-only per-device change log, merged by HLC
   last-writer-wins); `fullState.ts` republishes everything at once, which is what seeds a
   vault on first join and what makes a restore visible to the other machines.
   `syncableStore.ts` is the shared floor both this and backup read rows through, so a record
@@ -2007,6 +2014,18 @@ lives at module level for the same visit-to-visit reason — see `useCalendarDat
     "Sync now" calls both directly. `flushBeforeQuit` deliberately goes *past* that
     turnstile: quit is bounded by a timeout and its one job is to get the queue out, not
     to wait on a pull nobody needs finished.
+  - **A setting written back unchanged is not a change.** `setSetting` notifies the bridge only
+    when the row moved (`ON CONFLICT … WHERE value IS NOT excluded.value`, then `changes`).
+    It used to notify on every write, so the MCP client's resource URL, stored on every
+    connect, queued an entry on every launch — a queue never empty after start-up, which held
+    the Sync panel polling Drive (and showing "Checking…") behind the minute-long first pull —
+    and gave this machine's stale copy a newer stamp than the other machine's unpulled change.
+    The panel's own poll and post-pull re-read are `quiet` for the same reason.
+    **Two renderer origins share one published snapshot.** `npm run dev` serves
+    `http://127.0.0.1:5173`, `npm start` and a packaged build load `file://`, and each has its
+    own localStorage over the same userData — so switching between them republishes (and
+    deletes) every view preference the other origin lacks. A development hazard only; a real
+    install has one origin.
   - **A change made before the vault opens is held, not dropped.** `prepareSync()` waits on
     the COROS re-login at start-up — the vault's owner is the account, so it must — and until
     it returns `syncBridge` has no sink. It used to discard what the hooks handed it: the
@@ -2096,8 +2115,8 @@ lives at module level for the same visit-to-visit reason — see `useCalendarDat
   A packaged build needs `HERACLES_GOOGLE_OAUTH_ID` / `_KEY` for Drive to be offered at all.
   `scripts/prepare-google-client.mjs` bakes them into a git-ignored generated module before
   every `tsc` run, reading a repo-root `.env` when the environment is empty; a build from
-  source gets empty values and the UI disables the Drive option. Both CI workflows pass them
-  to every platform job — keep it that way, or one platform ships without Drive.
+  source gets empty values and the Sync panel says sync is not available. Both CI workflows
+  pass them to every platform job — keep it that way, or one platform ships without Drive.
 
 ### Testability convention in the main process
 

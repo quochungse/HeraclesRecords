@@ -1,8 +1,10 @@
 // StorageProvider backed by an ordinary directory.
 //
 // It exists so the sync engine can be built and tested with no network, no
-// OAuth and no waiting on anyone's review queue — and it stays useful after
-// that, for people who point the app at a Nextcloud or Syncthing folder.
+// OAuth and no waiting on anyone's review queue. **It is not a destination the
+// app offers** — Settings let people point sync at a folder until 2026-10-01,
+// and a folder kept by Dropbox, Syncthing or Drive Desktop rewrote files under
+// two machines writing at once. The suites still run the engine against it.
 
 import crypto from "node:crypto";
 import fs from "node:fs";

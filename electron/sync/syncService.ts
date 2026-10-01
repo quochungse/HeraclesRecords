@@ -29,29 +29,34 @@
 // `syncObfuscation.ts` is blunt about the difference and the Settings copy
 // repeats it.
 //
+// **The vault is Google Drive, and only Google Drive.** A local folder was
+// offered beside it until 2026-10-01 — pointed at a Dropbox or Drive Desktop
+// folder, it let two machines meet through a file-sync client that rewrites
+// files behind the app's back, and with two machines writing at once that was
+// where things went wrong. `sync.folder` and `sync.backend` are no longer read;
+// a machine that had chosen a folder reads as not configured until it connects
+// Drive, and its data, which never left SQLite, is published then.
+//
 // Everything with a side effect arrives through `SyncDeps`, so the suite can
-// run the whole flow against a temp folder instead of a real Drive account.
+// run the whole flow against a temp folder (`LocalFolderProvider`) instead of
+// a real Drive account.
 
 import crypto from "node:crypto";
 
 import { currentOwner, isOwnerFingerprint } from "../dataOwner";
 import { deviceId } from "./deviceIdentity";
-import { LocalFolderProvider } from "./localFolderProvider";
 import { ObfuscatedProvider } from "./obfuscatedProvider";
 import type { StorageProvider } from "./storageProvider";
 import type {
-  SyncBackend,
   SyncVaultOwnership,
   SyncVaultStatus,
   SyncVaultState
 } from "./syncTypes";
 
 export const SYNC_SETTINGS = {
-  folder: "sync.folder",
-  backend: "sync.backend",
   /** The vault this machine has already published its existing data into.
-   *  Compared against `vaultId()` rather than against the folder or the
-   *  backend, so moving a vault does not look like a new one and pointing at a
+   *  Compared against `vaultId()` rather than against the Drive account, so
+   *  reconnecting to the same vault does not look like a new one and a
    *  genuinely different vault does. */
   seededVaultId: "sync.seededVaultId"
 } as const;
@@ -103,13 +108,13 @@ function ownerOf(identity: VaultIdentity): string | null {
 export interface SyncDeps {
   readonly getSetting: (key: string) => string | undefined;
   readonly setSetting: (key: string, value: string) => void;
-  /** Built from whichever backend is selected. Injected so the suite can hand
-   *  over a temp directory, and so a new backend is one function away. */
-  readonly makeProvider: (target: SyncTarget) => StorageProvider;
+  /** The vault's storage: Google Drive in the app. Injected so the suite can
+   *  hand over a temp directory. */
+  readonly makeProvider: () => StorageProvider;
   /** Whether a Google account is connected, and whether this build has OAuth
    *  credentials at all. Kept in deps so the service never imports the OAuth
    *  module, which would drag `node:http` into every suite that touches it. */
-  readonly google?: {
+  readonly google: {
     readonly isConnected: () => boolean;
     readonly isClientConfigured: () => boolean;
   };
@@ -119,13 +124,6 @@ export interface SyncDeps {
    *  database, and so this class never reaches into the COROS service. */
   readonly owner: () => string | null;
   readonly now: () => Date;
-}
-
-/** What `makeProvider` is asked to build. */
-export interface SyncTarget {
-  readonly backend: SyncBackend;
-  /** Set for the local backend, null for Google. */
-  readonly folder: string | null;
 }
 
 export class SyncNotReadyError extends Error {
@@ -147,68 +145,32 @@ export class SyncService {
 
   // --- Configuration ---------------------------------------------------------
 
-  get folder(): string | null {
-    return this.#deps.getSetting(SYNC_SETTINGS.folder) ?? null;
-  }
-
-  /**
-   * Point the vault at a folder.
-   *
-   * The seed flag is deliberately left alone. It names a vault by id, so moving
-   * one — a renamed folder, a copy onto another disk, the same files reached
-   * through Drive instead — is still the same vault and needs no second
-   * publish. Pointing at a genuinely different vault fails the id comparison on
-   * its own, so there is nothing to clear in advance.
-   */
-  setFolder(folder: string): void {
-    this.#deps.setSetting(SYNC_SETTINGS.folder, folder);
-  }
-
-  get backend(): SyncBackend {
-    return this.#deps.getSetting(SYNC_SETTINGS.backend) === "google"
-      ? "google"
-      : "local";
-  }
-
-  /** Same reasoning as `setFolder`: the vault's id outlives the route taken to
-   *  reach it, so switching backends does not by itself mean a new vault. */
-  setBackend(backend: SyncBackend): void {
-    this.#deps.setSetting(SYNC_SETTINGS.backend, backend);
-  }
-
   #isConfigured(): boolean {
-    return this.backend === "google"
-      ? Boolean(this.#deps.google?.isConnected())
-      : Boolean(this.folder);
+    return this.#deps.google.isConnected();
   }
 
-  /** The configured backend, unwrapped. Nothing outside `#provider()` should
-   *  use this: a caller that reached past the wrapper would write payloads the
-   *  rest of the engine cannot read back. */
+  /** The storage, unwrapped. Nothing outside `#provider()` should use this: a
+   *  caller that reached past the wrapper would write payloads the rest of the
+   *  engine cannot read back. */
   #rawProvider(): StorageProvider {
     if (!this.#isConfigured()) {
       throw new SyncNotReadyError(
         "not-configured",
-        this.backend === "google"
-          ? "Connect a Google account before syncing."
-          : "Choose a folder for the sync vault first."
+        "Connect a Google account before syncing."
       );
     }
-    return this.#deps.makeProvider({
-      backend: this.backend,
-      folder: this.folder
-    });
+    return this.#deps.makeProvider();
   }
 
   /**
    * Everything reads and writes through here.
    *
    * The wrapper seals every write and opens anything that arrives sealed, so a
-   * folder that still holds plain payloads from an earlier build reads
+   * vault that still holds plain payloads from an earlier build reads
    * correctly rather than failing.
    *
-   * Built per call rather than cached: the backend and folder are settings the
-   * user can change at any moment, and providers are cheap.
+   * Built per call rather than cached: the account can be disconnected at any
+   * moment, and providers are cheap.
    */
   #provider(): StorageProvider {
     return new ObfuscatedProvider(this.#rawProvider());
@@ -227,7 +189,7 @@ export class SyncService {
   }
 
   /** The provider, for the sync loop. Exposed rather than making the loop
-   *  rebuild the backend selection and the seal wiring itself. */
+   *  rebuild the seal wiring itself. */
   dataProvider(): StorageProvider {
     return this.#provider();
   }
@@ -237,21 +199,17 @@ export class SyncService {
   /**
    * Check the destination, and settle who the vault belongs to.
    *
-   * This is the whole of setting sync up: choosing a folder or connecting a
-   * Drive account points the service somewhere, and there is nothing to mint or
-   * unlock afterwards. What is left worth doing at launch is finding out early
-   * whether the destination answers and whose data is in it, so the panel can
-   * say "that share is offline" or "that vault is another account's" instead of
-   * looking fine until the first change fails to arrive.
+   * This is the whole of setting sync up: connecting a Drive account points the
+   * service somewhere, and there is nothing to mint or unlock afterwards. What
+   * is left worth doing at launch is finding out early whether Drive answers
+   * and whose data is in it, so the panel can say "Drive did not answer" or
+   * "that vault is another account's" instead of looking fine until the first
+   * change fails to arrive.
    *
    * Unlike `status()` this may **write**: a vault nobody has claimed gets
    * claimed here, which is how the first signed-in machine takes ownership. It
-   * runs on every launch and after the folder or backend changes, so it has to
-   * be safe to repeat — claiming an already-claimed vault does nothing.
-   *
-   * Two cases reachability cannot catch, both surfacing at write time instead: a
-   * folder that is readable but not writable, and a mount point whose drive is
-   * gone, which looks exactly like an empty folder.
+   * runs on every launch and after Drive is connected, so it has to be safe to
+   * repeat — claiming an already-claimed vault does nothing.
    */
   async prepare(): Promise<SyncVaultState> {
     const owner = this.#deps.owner();
@@ -278,8 +236,8 @@ export class SyncService {
    * Read the vault's identity, or null when there is not one there yet.
    *
    * Throws when the destination cannot be reached at all, which is the signal
-   * `prepare()` passes to the UI verbatim — "EACCES" says far more than "setup
-   * failed".
+   * `prepare()` passes to the UI verbatim — Drive's own reason says far more
+   * than "setup failed".
    */
   async #readIdentity(): Promise<VaultIdentity | null> {
     const stored = await this.#provider().get(VAULT_ID_PATH);
@@ -390,10 +348,8 @@ export class SyncService {
   async status(): Promise<SyncVaultStatus> {
     const owner = this.#deps.owner();
     const base = {
-      backend: this.backend,
-      folder: this.folder,
-      googleConnected: Boolean(this.#deps.google?.isConnected()),
-      googleClientConfigured: Boolean(this.#deps.google?.isClientConfigured()),
+      googleConnected: this.#deps.google.isConnected(),
+      googleClientConfigured: this.#deps.google.isClientConfigured(),
       deviceId: this.#deps.deviceId(),
       signedIn: owner !== null
     };
@@ -410,9 +366,8 @@ export class SyncService {
 
     // One small object answers reachability, identity and ownership together.
     // This used to list the whole vault so it could report a snapshot count —
-    // every status read digested every file in the folder, and the panel then
-    // asked for the same listing again. Two full walks per refresh was most of
-    // what made switching backends feel like a freeze.
+    // every status read digested every file in the vault, and the panel then
+    // asked for the same listing again — two full walks per refresh.
     //
     // Unlike `prepare()` this only reads, and it swallows the failure: a panel
     // that cannot say "offline" because asking threw is worse than a panel with
@@ -445,7 +400,7 @@ export function createDefaultSyncDeps(
     getSetting: (key: string) => string | undefined;
     setSetting: (key: string, value: string) => void;
   },
-  google?: {
+  google: {
     readonly isConnected: () => boolean;
     readonly isClientConfigured: () => boolean;
     readonly makeProvider: () => StorageProvider;
@@ -454,19 +409,11 @@ export function createDefaultSyncDeps(
   return {
     getSetting: database.getSetting,
     setSetting: database.setSetting,
-    makeProvider: (target) => {
-      if (target.backend === "google") {
-        if (!google) {
-          throw new Error("This build has no Google Drive support compiled in.");
-        }
-        return google.makeProvider();
-      }
-      if (!target.folder) {
-        throw new Error("The local backend needs a folder.");
-      }
-      return new LocalFolderProvider({ root: target.folder });
+    makeProvider: google.makeProvider,
+    google: {
+      isConnected: google.isConnected,
+      isClientConfigured: google.isClientConfigured
     },
-    google,
     deviceId,
     owner: currentOwner,
     now: () => new Date()

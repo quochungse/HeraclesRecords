@@ -1217,9 +1217,9 @@ function stopSyncLoop(): void {
 /**
  * Check the destination and start the loop.
  *
- * This is the whole of "turn sync on": it runs at launch and again whenever the
- * folder or the backend changes. Nothing is asked of the user, so the only
- * reason it comes back short of "ready" is a destination that did not answer.
+ * This is the whole of "turn sync on": it runs at launch and again whenever
+ * Drive is connected. Nothing is asked of the user, so the only reason it comes
+ * back short of "ready" is a destination that did not answer.
  */
 async function prepareSync(): Promise<SyncVaultState> {
   const state = await syncService().prepare();
@@ -2596,26 +2596,6 @@ function registerIpcHandlers(): void {
   // out and as a return value on the way back: the main process never reaches
   // into the window to read it.
 
-  ipcMain.handle("sync:chooseFolder", async () => {
-    const options: OpenDialogOptions = {
-      title: "Choose a folder for your sync vault",
-      properties: ["openDirectory", "createDirectory"]
-    };
-    const result =
-      mainWindow && !mainWindow.isDestroyed()
-        ? await dialog.showOpenDialog(mainWindow, options)
-        : await dialog.showOpenDialog(options);
-    if (result.canceled) return null;
-    const folder = result.filePaths[0] ?? null;
-    if (folder) {
-      syncService().setFolder(folder);
-      // Choosing the folder is the whole setup for a folder vault, so it is
-      // ready by the time this returns rather than after a second click.
-      await prepareSync();
-    }
-    return folder;
-  });
-
   // Two halves, joined here: the destination is the service's to answer, the
   // change loop is this file's. Neither knows about the other, which is why
   // `SyncService` can be exercised without one running.
@@ -2728,16 +2708,6 @@ function registerIpcHandlers(): void {
       return result;
     }
   );
-
-  ipcMain.handle("sync:setBackend", async (_event, backend: "local" | "google") => {
-    // A different backend is a different vault, so the loop must not keep
-    // writing into the old one.
-    stopSyncLoop();
-    syncService().setBackend(backend);
-    // Not returned: the renderer reads the new state from `sync:getStatus` like
-    // every other row, and this channel stays void on all three sides.
-    await prepareSync();
-  });
 
   // The deliberate answer to `wrong-owner`. Claiming clears the seed flag, so
   // the loop that starts afterwards publishes this account's whole state into

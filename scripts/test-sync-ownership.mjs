@@ -50,18 +50,24 @@ const BOB = fingerprintOwner("coros-bob");
 /** A machine, with its own idea of who is signed in. Settings are shared,
  *  which is realistic for the two-accounts-one-computer case and harmless for
  *  the rest: nothing here reads a setting the other machine writes except the
- *  seed flag, which is exactly what the claim test is about. */
+ *  seed flag, which is exactly what the claim test is about.
+ *
+ *  The vault is Drive in the app; here a temp folder stands in for it, and
+ *  `folder: null` is a machine with no Drive account connected. */
 function makeMachine(owner, { folder = vault } = {}) {
   const state = { owner };
   const service = new SyncService({
     getSetting: database.getSetting,
     setSetting: database.setSetting,
-    makeProvider: (target) => new LocalFolderProvider({ root: target.folder }),
+    makeProvider: () => new LocalFolderProvider({ root: folder }),
+    google: {
+      isConnected: () => folder !== null,
+      isClientConfigured: () => true
+    },
     deviceId: () => "device-under-test",
     owner: () => state.owner,
     now: () => new Date("2026-09-08T12:00:00.000Z")
   });
-  if (folder) service.setFolder(folder);
   return { service, state };
 }
 
@@ -84,12 +90,22 @@ function makeMachine(owner, { folder = vault } = {}) {
   );
 
   // Reported ahead of the destination even when there is no destination
-  // either: choosing a folder first would be work the app then refuses to use.
+  // either: connecting Drive first would be work the app then refuses to use.
   const unconfigured = makeMachine(null, { folder: null });
-  unconfigured.service.setFolder("");
   assert.equal(await unconfigured.service.prepare(), "signed-out");
 }
 console.log("ok  with nobody signed in, sync refuses before anything else");
+
+// Signed in, but no Drive account: the only vault there is, so nothing to do.
+{
+  const { service } = makeMachine(ALICE, { folder: null });
+  assert.equal(await service.prepare(), "not-configured");
+  const status = await service.status();
+  assert.equal(status.state, "not-configured");
+  assert.equal(status.googleConnected, false);
+  assert.equal(service.isReady, false);
+}
+console.log("ok  signed in with no Drive connected, sync waits for Drive");
 
 // ---------------------------------------------------------------------------
 // An empty vault is claimed by the first signed-in machine

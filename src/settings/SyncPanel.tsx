@@ -3,19 +3,14 @@ import {
   AlertTriangle,
   Check,
   Cloud,
+  CloudOff,
   CloudUpload,
-  HardDrive,
   Loader2,
   RefreshCw,
   UserRound
 } from "lucide-react";
-import { OptionGroup } from "../components/OptionGroup";
 import type { CorosLinkApi } from "../coroslink-api";
-import type {
-  GoogleAccountInfo,
-  SyncBackend,
-  SyncStatus
-} from "../../electron/sync/syncTypes";
+import type { GoogleAccountInfo, SyncStatus } from "../../electron/sync/syncTypes";
 import { formatBytes, formatWhen } from "./formatters";
 
 interface SyncPanelProps {
@@ -39,29 +34,26 @@ interface SyncPanelProps {
 let cachedStatus: SyncStatus | null = null;
 let cachedAccount: GoogleAccountInfo | null = null;
 
-const BACKENDS: ReadonlyArray<{
-  readonly value: SyncBackend;
-  readonly label: string;
-  readonly Icon: typeof HardDrive;
-}> = [
-  { value: "local", label: "Local", Icon: HardDrive },
-  { value: "google", label: "Google Drive", Icon: Cloud }
-];
-
 /** How long a read may be out before the corner chip says so. */
 const REFRESH_NOTICE_DELAY_MS = 400;
 
 const SYNC_DESCRIPTION =
   "Keeps your conversations, plans and preferences the same on every computer " +
-  "signed in to the same COROS account. Sign-ins never leave this machine.";
+  "signed in to the same COROS account, through your Google Drive. Sign-ins " +
+  "never leave this machine.";
 
 /**
  * Where this machine's data meets the other one's.
  *
- * Only the destination and the state of the connection. Backups are a separate
- * panel and a separate idea — a file the person saves somewhere of their own —
- * and the two lived here together for as long as a backup was a copy inside
- * this vault. It no longer is.
+ * Two rows when all is well: the Drive account, and how the changes are
+ * moving. Google Drive is the only destination — a local folder was offered
+ * beside it, behind a Local / Google Drive switch, and was removed because two
+ * machines meeting through a file-sync client is where sync went wrong — so
+ * there is nothing to choose, only an account to connect.
+ *
+ * Backups are a separate panel and a separate idea — a file the person saves
+ * somewhere of their own — and the two lived here together for as long as a
+ * backup was a copy inside this vault. It no longer is.
  */
 export function SyncPanel({ api }: SyncPanelProps) {
   const [status, setStatus] = useState<SyncStatus | null>(() => cachedStatus);
@@ -73,10 +65,6 @@ export function SyncPanel({ api }: SyncPanelProps) {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
-  // Set the instant the switch is clicked and cleared when the refresh that
-  // follows lands. Everything that renders the destination reads this first, so
-  // the chip moves under the cursor instead of after the round trip.
-  const [pendingBackend, setPendingBackend] = useState<SyncBackend | null>(null);
   // Fetched on its own schedule, never inside `refresh`. It is one Drive round
   // trip and the panel does not need it to render, so making the rows wait for
   // it would trade a working panel for a decorated one.
@@ -85,8 +73,8 @@ export function SyncPanel({ api }: SyncPanelProps) {
   );
 
   // A refresh that resolves after the component is gone, or after a newer one
-  // already landed, must not write its stale answer into state. Switching
-  // backends fires exactly that race.
+  // already landed, must not write its stale answer into state. Connecting
+  // Drive fires exactly that race.
   const liveRef = useRef(true);
   const refreshSeq = useRef(0);
   const refreshTimer = useRef<number | null>(null);
@@ -100,12 +88,18 @@ export function SyncPanel({ api }: SyncPanelProps) {
     };
   }, []);
 
-  const refresh = useCallback(async () => {
+  // `quiet` is for the reads nobody asked for — the poll while changes are
+  // queued, the re-read after a pull. Each one asks Drive (a second or more),
+  // so flagging them put "Checking…" on and off every three seconds for as
+  // long as a change waited, which read as sync stuck rather than working.
+  const refresh = useCallback(async ({ quiet = false }: { quiet?: boolean } = {}) => {
     const seq = ++refreshSeq.current;
     if (refreshTimer.current !== null) window.clearTimeout(refreshTimer.current);
-    refreshTimer.current = window.setTimeout(() => {
-      if (liveRef.current && seq === refreshSeq.current) setRefreshing(true);
-    }, REFRESH_NOTICE_DELAY_MS);
+    refreshTimer.current = quiet
+      ? null
+      : window.setTimeout(() => {
+          if (liveRef.current && seq === refreshSeq.current) setRefreshing(true);
+        }, REFRESH_NOTICE_DELAY_MS);
     try {
       const next = await api.getSyncStatus();
       // Written outside the liveness guard on purpose: a reply that lands after
@@ -142,7 +136,7 @@ export function SyncPanel({ api }: SyncPanelProps) {
           (change.deleted > 0 ? `, ${change.deleted} removed` : "") +
           ". Some screens catch up on their own; restart if one looks stale."
       );
-      void refresh();
+      void refresh({ quiet: true });
     });
   }, [api, refresh]);
 
@@ -160,8 +154,8 @@ export function SyncPanel({ api }: SyncPanelProps) {
       try {
         await api.prepareSyncVault();
       } catch (cause) {
-        // Almost always a folder that cannot be reached. Worth showing
-        // verbatim: "EACCES" says far more than "setup failed".
+        // Almost always Drive not answering. Worth showing verbatim: its own
+        // reason says far more than "setup failed".
         if (liveRef.current) {
           setError(cause instanceof Error ? cause.message : String(cause));
         }
@@ -180,7 +174,7 @@ export function SyncPanel({ api }: SyncPanelProps) {
     (loop.seed.state === "publishing" || loop.pendingChanges > 0);
   useEffect(() => {
     if (!inFlight) return;
-    const timer = window.setInterval(() => void refresh(), 3000);
+    const timer = window.setInterval(() => void refresh({ quiet: true }), 3000);
     return () => window.clearInterval(timer);
   }, [inFlight, refresh]);
 
@@ -229,28 +223,10 @@ export function SyncPanel({ api }: SyncPanelProps) {
     [refresh]
   );
 
-  const chooseFolder = () =>
-    run("folder", async () => {
-      const folder = await api.chooseSyncFolder();
-      if (folder) setMessage(`Vault folder set to ${folder}`);
-    });
-
   const retryPrepare = () =>
     run("prepare", async () => {
       await api.prepareSyncVault();
     });
-
-  const switchBackend = (backend: SyncBackend) => {
-    setPendingBackend(backend);
-    // Cleared only once `run` has finished, which includes its refresh — so the
-    // optimistic value is dropped after the real status has caught up rather
-    // than before it, and the chip never flickers back through the old value.
-    // On failure the refresh leaves the old backend in place and the chip
-    // returns to it, which is the correct answer too.
-    void run("backend", () => api.setSyncBackend(backend)).finally(() => {
-      if (liveRef.current) setPendingBackend(null);
-    });
-  };
 
   const claimVault = () =>
     run("claim", async () => {
@@ -306,68 +282,59 @@ export function SyncPanel({ api }: SyncPanelProps) {
     );
   }
 
-  // What the panel draws. During a switch this leads the server by one round
-  // trip on purpose; `switching` is what keeps the rows below honest about it.
-  const backend = pendingBackend ?? status.backend;
-  const switching = pendingBackend !== null;
+  // A build with no Google OAuth client cannot offer Drive, and Drive is the
+  // only vault — so there is nothing to set up, and the panel says so once
+  // rather than drawing a Connect button that cannot work.
+  if (!status.googleClientConfigured) {
+    return (
+      <div className="panel settings-connections-panel settings-sync-panel">
+        {head}
+        <div className="settings-connections-list">
+          <div className="settings-nav-row is-static">
+            <span className="settings-nav-row-icon" aria-hidden="true">
+              <CloudOff size={20} strokeWidth={1.9} />
+            </span>
+            <span className="settings-nav-row-copy">
+              <strong>Sync is not available in this build</strong>
+              <span>
+                This copy of the app was built without a Google sign-in, and
+                Google Drive is where sync keeps your data.
+              </span>
+            </span>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   const seed = status.loop?.seed ?? null;
 
-  // What the loop has actually been doing, rather than a promise about what it
-  // will do. The row used to say "changes go out within a minute or so", which
-  // is true and unfalsifiable — it reads the same whether sync has been working
-  // for a week or has never once succeeded.
-  const activity = !status.loop
-    ? "The change loop is not running."
-    : [
-        status.loop.lastPulledAt
-          ? `Last received ${formatWhen(status.loop.lastPulledAt)}`
-          : "Nothing received from another computer yet",
-        status.loop.pendingChanges > 0
-          ? `${status.loop.pendingChanges} change${
-              status.loop.pendingChanges === 1 ? "" : "s"
-            } waiting to go out`
-          : null
-      ]
-        .filter(Boolean)
-        .join(" · ");
-
   // Drive's usage line, when the account call has landed. Decoration: the row
-  // below names the account without it.
+  // names the account without it.
   const googleQuota = account?.quota
     ? account.quota.limit === null
       ? `${formatBytes(account.quota.used)} used`
       : `${formatBytes(account.quota.used)} of ${formatBytes(account.quota.limit)} used`
     : null;
+  const googleDetail = status.googleConnected
+    ? [account?.email, googleQuota].filter(Boolean).join(" · ") || "Connected"
+    : "Not connected. Connecting opens your browser to Google; the app can only see the folder it creates there.";
 
-  // The line under the switch: the concrete place, and the button that changes
-  // it. Mid-switch it says what is happening instead of naming a destination —
-  // the old one is no longer the answer and the new one is not confirmed yet.
-  const destinationDetail = switching
-    ? "Checking that the destination answers…"
-    : backend === "google"
-      ? status.googleConnected
-        ? [account?.email, account?.name, googleQuota]
-            .filter(Boolean)
-            .join(" · ") || "Connected."
-        : "No Google account connected yet."
-      : (status.folder ?? "No folder chosen yet.");
-
-  // What kind of place this backend is — and only while the question is still
-  // open. Once a destination is set, the row's second line is the destination
-  // itself, which is the answer; a paragraph explaining what kind of place it
-  // is sat above that answer for the life of the install, saying the same thing
-  // every time. Mid-switch it stays, because nothing is settled yet.
-  const destinationSettled =
-    !switching &&
-    (backend === "google" ? status.googleConnected : Boolean(status.folder));
-  const destinationHint = destinationSettled
-    ? null
-    : backend === "google"
-      ? status.googleConnected || switching
-        ? "Your Google Drive, in a folder this app creates and can only see its own files in."
-        : "Connecting opens your browser to Google — consent happens there, never inside the app."
-      : "A folder on this computer. One kept in sync by Dropbox or Drive Desktop works too, though two machines may then run the same scheduled analysis — connecting Google Drive directly avoids that.";
+  // What the loop has actually been doing, rather than a promise about what it
+  // will do. The row used to say "changes go out within a minute or so", which
+  // is true and unfalsifiable — it reads the same whether sync has been working
+  // for a week or has never once succeeded.
+  const pending = status.loop?.pendingChanges ?? 0;
+  const activityTitle = !status.loop
+    ? "Not running yet"
+    : pending > 0
+      ? `${pending} change${pending === 1 ? "" : "s"} waiting to go out`
+      : "All changes sent";
+  const activityDetail = !status.loop
+    ? "Sync now starts it."
+    : status.loop.lastPulledAt
+      ? `Last received from another computer ${formatWhen(status.loop.lastPulledAt)}`
+      : "Nothing received from another computer yet";
 
   return (
     <div
@@ -377,105 +344,9 @@ export function SyncPanel({ api }: SyncPanelProps) {
       {head}
 
       <div className="settings-connections-list">
-        {/* One row answers one question. The switch picks the kind of place,
-            the line under it names the actual one and carries the button that
-            changes it. */}
-        <div
-          className={`settings-nav-row is-static sync-row-stacked${
-            switching ? " sync-row-pending" : ""
-          }`}
-        >
-          <span className="settings-nav-row-icon" aria-hidden="true">
-            {switching ? (
-              <Loader2 size={20} strokeWidth={1.9} className="spin" />
-            ) : backend === "google" ? (
-              <Cloud size={20} strokeWidth={1.9} />
-            ) : (
-              <HardDrive size={20} strokeWidth={1.9} />
-            )}
-          </span>
-          <span className="settings-nav-row-copy">
-            <strong>Where this machine syncs</strong>
-            {destinationHint ? <span>{destinationHint}</span> : null}
-          </span>
-          {/* Only the switch is held during a switch, and the already-selected
-              side stays clickable-looking rather than greyed: a disabled
-              control is how this row used to read as broken. A build with no
-              OAuth client is the one real block — it cannot offer Drive at
-              all. */}
-          <OptionGroup
-            label="Where this machine syncs"
-            className="sync-backend-switch"
-            value={backend}
-            options={BACKENDS.map(({ value, label, Icon }) => ({
-              value,
-              label,
-              disabled:
-                busy === "backend" ||
-                (value === "google" && !status.googleClientConfigured),
-              ...(value === "google" && !status.googleClientConfigured
-                ? {
-                    title:
-                      "This build ships no Google OAuth client, so Drive cannot be offered."
-                  }
-                : {}),
-              icon:
-                backend === value && busy === "backend" ? (
-                  <Loader2 size={14} strokeWidth={2} className="spin" />
-                ) : (
-                  <Icon size={14} strokeWidth={2} />
-                )
-            }))}
-            onChange={(next) => {
-              if (next !== backend) switchBackend(next);
-            }}
-          />
-
-          <span className="sync-row-footer">
-            <span className="sync-destination-detail">{destinationDetail}</span>
-            {/* Withheld mid-switch on purpose: it would act on the destination
-                being left, not the one being moved to. */}
-            {switching ? null : backend === "google" ? (
-              <button
-                type="button"
-                className={
-                  status.googleConnected
-                    ? "secondary-button danger-button"
-                    : "primary-button"
-                }
-                disabled={busy === "google"}
-                onClick={() =>
-                  void run("google", () =>
-                    status.googleConnected
-                      ? api.disconnectGoogleDrive()
-                      : api.connectGoogleDrive()
-                  )
-                }
-              >
-                {busy === "google" ? (
-                  <Loader2 size={15} strokeWidth={2} className="spin" />
-                ) : null}
-                {status.googleConnected ? "Disconnect" : "Connect"}
-              </button>
-            ) : (
-              <button
-                type="button"
-                className={status.folder ? "secondary-button" : "primary-button"}
-                onClick={chooseFolder}
-                disabled={busy === "folder"}
-              >
-                {busy === "folder" ? (
-                  <Loader2 size={15} strokeWidth={2} className="spin" />
-                ) : null}
-                {status.folder ? "Change" : "Choose"}
-              </button>
-            )}
-          </span>
-        </div>
-
         {/* Before anything about the destination. Sync merges two machines'
             records into one log, and the tables have no owner column — so
-            whose data it is has to be settled first, and choosing a folder
+            whose data it is has to be settled first, and connecting Drive
             before that would be work the app then refuses to use. */}
         {status.state === "signed-out" ? (
           <div className="settings-nav-row is-static sync-row-alert">
@@ -491,6 +362,45 @@ export function SyncPanel({ api }: SyncPanelProps) {
             </span>
           </div>
         ) : null}
+
+        {/* The one destination: the account, and the button that connects or
+            lets it go. Tinted like the COROS row when connected — the tint is
+            what says so without spending a line on it. */}
+        <div className="settings-nav-row is-static">
+          <span
+            className={`settings-nav-row-icon${
+              status.googleConnected ? " is-connected" : ""
+            }`}
+            aria-hidden="true"
+          >
+            <Cloud size={20} strokeWidth={1.9} />
+          </span>
+          <span className="settings-nav-row-copy">
+            <strong>Google Drive</strong>
+            <span>{googleDetail}</span>
+          </span>
+          <button
+            type="button"
+            className={
+              status.googleConnected
+                ? "secondary-button danger-button"
+                : "primary-button"
+            }
+            disabled={busy === "google"}
+            onClick={() =>
+              void run("google", () =>
+                status.googleConnected
+                  ? api.disconnectGoogleDrive()
+                  : api.connectGoogleDrive()
+              )
+            }
+          >
+            {busy === "google" ? (
+              <Loader2 size={15} strokeWidth={2} className="spin" />
+            ) : null}
+            {status.googleConnected ? "Disconnect" : "Connect"}
+          </button>
+        </div>
 
         {status.state === "wrong-owner" ? (
           <div className="settings-nav-row is-static sync-row-alert sync-row-stacked">
@@ -527,17 +437,16 @@ export function SyncPanel({ api }: SyncPanelProps) {
           </div>
         ) : null}
 
-        {status.state === "unreachable" && !switching ? (
+        {status.state === "unreachable" ? (
           <div className="settings-nav-row is-static sync-row-alert">
             <span className="settings-nav-row-icon" aria-hidden="true">
               <AlertTriangle size={20} strokeWidth={1.9} />
             </span>
             <span className="settings-nav-row-copy">
-              <strong>That destination did not answer</strong>
+              <strong>Google Drive did not answer</strong>
               <span>
-                {status.backend === "google"
-                  ? "Your Drive could not be read. Disconnecting and connecting the account again is the usual fix."
-                  : `${status.folder} could not be read. Check that the folder still exists and that you can reach it — a drive that was unplugged or a share that went offline is the usual reason.`}
+                Check that this computer is online. If it is, disconnecting and
+                connecting the account again is the usual fix.
               </span>
             </span>
             <button
@@ -587,7 +496,7 @@ export function SyncPanel({ api }: SyncPanelProps) {
           </div>
         ) : null}
 
-        {status.state === "ready" && !switching ? (
+        {status.state === "ready" ? (
           <div className="settings-nav-row is-static">
             <span className="settings-nav-row-icon" aria-hidden="true">
               {busy === "syncnow" ? (
@@ -597,8 +506,8 @@ export function SyncPanel({ api }: SyncPanelProps) {
               )}
             </span>
             <span className="settings-nav-row-copy">
-              <strong>Sync now</strong>
-              <span>{activity}</span>
+              <strong>{activityTitle}</strong>
+              <span>{activityDetail}</span>
             </span>
             <button
               type="button"

@@ -2,7 +2,6 @@ import { contextBridge, ipcRenderer } from "electron";
 import type {
   GoogleAccountInfo,
   LocalStoragePublishResult,
-  SyncBackend,
   SyncChangedEvent,
   SyncPresenceClaim,
   SyncStatus,
@@ -991,8 +990,6 @@ const api = {
   dismissScheduleChange: (changeSetId: string, lineId?: string): Promise<ScheduleChangeSet> =>
     ipcRenderer.invoke("chat:dismissScheduleChange", changeSetId, lineId),
   // ----- Sync -----
-  chooseSyncFolder: (): Promise<string | null> =>
-    ipcRenderer.invoke("sync:chooseFolder"),
   getSyncStatus: (): Promise<SyncStatus> => ipcRenderer.invoke("sync:getStatus"),
   prepareSyncVault: (): Promise<SyncVaultState> =>
     ipcRenderer.invoke("sync:prepare"),
@@ -1010,8 +1007,6 @@ const api = {
     ipcRenderer.invoke("backup:restore", filePath, mode, allowOtherOwner),
   claimSyncVault: (): Promise<SyncVaultState> =>
     ipcRenderer.invoke("sync:claimVault"),
-  setSyncBackend: (backend: SyncBackend): Promise<void> =>
-    ipcRenderer.invoke("sync:setBackend", backend),
   googleDriveAccount: (): Promise<GoogleAccountInfo | null> =>
     ipcRenderer.invoke("sync:googleAccount"),
   connectGoogleDrive: (): Promise<void> =>

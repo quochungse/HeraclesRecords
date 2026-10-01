@@ -30517,11 +30517,11 @@ button.settings-about-link {
   display: grid;
   gap: 8px;
   margin-top: 14px;
-  /* Measured for the rules below. A row's third column holds a segmented switch
-     or three buttons, and a viewport media query is the wrong ruler for it:
-     Settings sits beside a 250px sidebar, so the list runs out of room long
-     before the window does. At 760px wide the destination row's description was
-     a five-word column beside a switch at full size. */
+  /* Measured for the rules below. A row's third column can hold three buttons,
+     and a viewport media query is the wrong ruler for it: Settings sits beside
+     a 250px sidebar, so the list runs out of room long before the window does.
+     At 760px wide a row's description was a five-word column beside controls
+     at full size. */
   container-type: inline-size;
   container-name: settings-rows;
 }
@@ -30529,13 +30529,11 @@ button.settings-about-link {
 /* Below this the wide controls take a line of their own. Rows whose third
    column is a chevron are left alone — a chevron never crowds anything. */
 @container settings-rows (max-width: 600px) {
-  .settings-nav-row:has(> .sync-backend-switch),
   .settings-nav-row:has(> .settings-connection-actions) {
     grid-template-columns: 40px minmax(0, 1fr);
     row-gap: 10px;
   }
 
-  .settings-nav-row > .sync-backend-switch,
   .settings-nav-row > .settings-connection-actions {
     grid-column: 1 / -1;
     justify-self: end;
@@ -30813,10 +30811,9 @@ button.settings-about-link {
   border-top: 1px solid var(--glass-border);
 }
 
-/* The concrete answer — a filesystem path or an account address. Louder than
-   the sentence above it, because it is the part worth checking at a glance,
-   and free to break mid-token: a vault path is long and has no spaces to
-   break at, and left alone it pushes the row wider than the panel. */
+/* The line beside a footer's button. Louder than the sentence above it,
+   because it is the part worth acting on, and free to break mid-token so a
+   long one cannot push the row wider than the panel. */
 .sync-destination-detail {
   min-width: 0;
   color: var(--text-secondary);
@@ -30832,19 +30829,8 @@ button.settings-about-link {
   flex: 0 0 auto;
 }
 
-/* The destination row while a switch is in flight. Dashed rather than replaced
-   by a placeholder: the row keeps its size, so nothing below it jumps. */
-.settings-sync-panel .sync-row-pending {
-  border-style: dashed;
-  background: transparent;
-}
-
-.settings-sync-panel .sync-row-pending .settings-nav-row-copy strong {
-  color: var(--text-secondary);
-}
-
-/* Rows that need attention: an unreachable destination, a restore about to
-   overwrite, a backup about to be deleted. */
+/* Rows that need attention: Drive not answering, another account's vault, a
+   publish that failed. */
 .settings-sync-panel .sync-row-alert {
   border-color: var(--error-border);
   background: var(--error-bg);

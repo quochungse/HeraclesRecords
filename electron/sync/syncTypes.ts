@@ -16,10 +16,6 @@
 // modelled as "sync, but manual". It is not: sync is a place two machines meet,
 // a backup is a file someone owns.
 
-/** Where the vault lives. A local folder needs a path; Google needs a
- *  connected account. */
-export type SyncBackend = "local" | "google";
-
 /** Nothing is encrypted and nothing is locked, so there is no locked state and
  *  no unlocked one either. What is left is whether anyone is signed in, whether
  *  a destination is chosen, whether it answers, and whose it is. */
@@ -28,15 +24,15 @@ export type SyncVaultState =
    * Nobody is signed in to COROS.
    *
    * Checked before the destination, and reported ahead of it even when no
-   * folder has been chosen either: sync mixes two machines' records together,
-   * so it needs to know whose they are before it needs to know where they go.
-   * Choosing a folder first would be work the app then refuses to use.
+   * Drive account is connected either: sync mixes two machines' records
+   * together, so it needs to know whose they are before it needs to know where
+   * they go. Connecting Drive first would be work the app then refuses to use.
    */
   | "signed-out"
-  /** No folder chosen, or no Drive account connected. */
+  /** No Drive account connected. */
   | "not-configured"
-  /** A destination is set but did not answer — an unplugged drive, an offline
-   *  share, a Drive request that failed. */
+  /** Drive is connected but did not answer — offline, or a request that
+   *  failed. */
   | "unreachable"
   /**
    * The vault belongs to a different COROS account.
@@ -63,12 +59,9 @@ export type SyncVaultOwnership =
  *  without knowing whether a change loop is running over it. */
 export interface SyncVaultStatus {
   readonly state: SyncVaultState;
-  readonly backend: SyncBackend;
-  readonly folder: string | null;
-  /** Only meaningful when `backend` is "google". */
   readonly googleConnected: boolean;
   /** True when this build ships OAuth credentials, or the user supplied their
-   *  own. False means the Google option cannot be offered at all. */
+   *  own. False means sync cannot be offered at all: Drive is the only vault. */
   readonly googleClientConfigured: boolean;
   readonly deviceId: string;
   /** Whether anyone is signed in to COROS. Sync needs an owner before it needs
