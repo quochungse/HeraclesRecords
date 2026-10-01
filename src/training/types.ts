@@ -18,6 +18,7 @@ import type {
 } from "../../electron/types";
 import type { CorosLinkApi } from "../coroslink-api";
 import type { PrimaryView } from "../navigation/primaryNav";
+import type { SportScreen } from "../navigation/sportScreens";
 
 export interface TrainingTrendPoint {
   date: string;
@@ -217,7 +218,7 @@ export type ActivitiesViewProps = Pick<
    */
   onOpenSportScreen?: (request: SportScreenRequest) => void;
   /** Sport screens taken off the rail; their door is not offered. */
-  hiddenSportScreens?: readonly SportScreenRequest["view"][];
+  hiddenSportScreens?: readonly SportScreen[];
   /** Asks Coach about the session open, as the Calendar's Ask Coach does. */
   onAskCoach?: (request: CoachOpenRequest) => void;
 };
@@ -231,7 +232,7 @@ export type ActivitiesViewProps = Pick<
  * their full-page detail; Strength selects the session in its list.
  */
 export interface SportScreenRequest {
-  view: "running" | "cycling" | "hiking" | "strength";
+  view: SportScreen;
   activityId: string;
   /**
    * Epoch seconds, as COROS sends it. Strength keeps a window of its own — 30

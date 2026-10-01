@@ -30469,6 +30469,10 @@ button.settings-about-link {
   line-height: 1.45;
 }
 
+.settings-navigation-note.is-warning {
+  color: var(--warning-text);
+}
+
 /* The navigable settings row: icon, copy, control. Every row in Connections
    and Sync is one of these, so they line up down the whole screen. */
 .settings-nav-row {

@@ -29,13 +29,13 @@ import { detailMatchesActivity } from "../activityDetail";
 import { sportColorCategory } from "../sportColors";
 import {
   isCyclingSportType,
-  isStrengthSportType,
   isSwimSportType,
   resolveSportName
 } from "../sportTypes";
-import { classifyRunSurface, isRunSportType } from "../../running/runSurface";
+import { classifyRunSurface } from "../../running/runSurface";
 import { isRideSportType } from "../../cycling/rideType";
 import { isHikeSportType } from "../../hiking/hikeType";
+import { sportScreenFor, type SportScreen } from "../../navigation/sportScreens";
 import { useUnitSystem } from "../../units/UnitSystemProvider";
 import { formatTemperatureValue } from "../../units/units";
 import { formatSpeedValue } from "../../units/units";
@@ -56,7 +56,7 @@ interface ActivityDetailPaneProps {
   /** Hands a run or a lifting session to the screen built for that sport. */
   onOpenSportScreen?: (request: SportScreenRequest) => void;
   /** Sport screens taken off the rail; their door is not offered. */
-  hiddenSportScreens?: readonly SportScreenRequest["view"][];
+  hiddenSportScreens?: readonly SportScreen[];
   /** Asks Coach about this session, as the Calendar's Ask Coach does. */
   onAskCoach?: (request: CoachOpenRequest) => void;
 }
@@ -82,7 +82,7 @@ const ELEVATION_PROFILE_MIN_GAIN_M = 30;
 const PAUSE_NOTICE_S = 60;
 
 /** What the "Open in …" button names, per screen built for a sport. */
-const SPORT_SCREEN_LABELS: Record<SportScreenRequest["view"], string> = {
+const SPORT_SCREEN_LABELS: Record<SportScreen, string> = {
   running: "Running",
   cycling: "Cycling",
   hiking: "Hiking",
@@ -414,22 +414,13 @@ export function ActivityDetailPane({
     gpsPoints > 1 &&
     (detail.elevationGain ?? 0) >= ELEVATION_PROFILE_MIN_GAIN_M;
 
-  /*
-   * Which screen, if any, is built for this sport. Every answer is taken from
-   * the module that owns it rather than re-decided here — `isRunSportType` is
-   * where hikes and mountain climbs are left out of Running, and
-   * `isHikeSportType` where Hiking takes them in — and a door that disagrees
-   * with the room behind it is worse than no door.
-   */
-  const sportScreen = isRunSportType(sportType)
-    ? ("running" as const)
-    : isRideSportType(sportType)
-      ? ("cycling" as const)
-      : isHikeSportType(sportType)
-        ? ("hiking" as const)
-        : isStrengthSportType(sportType)
-          ? ("strength" as const)
-          : null;
+  // Which screen, if any, is built for this sport — and none when the athlete
+  // took it off the rail.
+  const builtScreen = sportScreenFor(sportType);
+  const sportScreen =
+    builtScreen && !hiddenSportScreens?.includes(builtScreen)
+      ? builtScreen
+      : null;
 
   return (
     <div className="activity-detail-pane">
@@ -478,10 +469,7 @@ export function ActivityDetailPane({
               Ask Coach
             </button>
           ) : null}
-          {sportScreen &&
-          !hiddenSportScreens?.includes(sportScreen) &&
-          onOpenSportScreen &&
-          activityId !== undefined ? (
+          {sportScreen && onOpenSportScreen && activityId !== undefined ? (
             <button
               type="button"
               className="secondary-button"

@@ -1,5 +1,5 @@
 import { PRIMARY_NAV_ITEMS, type PrimaryView } from "./primaryNav";
-import { isHiddenSportScreen, readHiddenSportScreens } from "./sportScreens";
+import { readHiddenSportScreens, type SportScreen } from "./sportScreens";
 
 const DEFAULT_STARTUP_VIEW: PrimaryView = "overview";
 const STARTUP_VIEW_STORAGE_KEY = "coroslink.startupView";
@@ -31,10 +31,10 @@ export function readStartupView(): PrimaryView {
 
   try {
     const storedView = window.localStorage.getItem(STARTUP_VIEW_STORAGE_KEY);
-    // A sport screen taken off the rail is not opened on launch either — the
-    // pair can disagree when another machine synced only one of them.
+    // A sport screen taken off the rail opens Overview instead. The stored
+    // choice is left as it is, so showing the screen again brings it back.
     return isPrimaryView(storedView) &&
-      !isHiddenSportScreen(storedView, readHiddenSportScreens())
+      !readHiddenSportScreens().includes(storedView as SportScreen)
       ? storedView
       : DEFAULT_STARTUP_VIEW;
   } catch {

@@ -139,6 +139,12 @@ export function AppSidebar({
 }: AppSidebarProps) {
   const overlayMode = useMediaQuery("(max-width: 720px)");
   const sections = visiblePrimaryNavSections(showDevelopmentItems, hiddenViews);
+  /** Which rows are drawn, as a value: a row shown or hidden moves the ones
+      below it and may start or stop the index scrolling, without the nav's own
+      box changing size — so the measuring effects re-run on it. */
+  const rowsKey = sections
+    .map((section) => section.items.map((item) => item.id).join())
+    .join("|");
   const reducedMotion = useMediaQuery("(prefers-reduced-motion: reduce)");
   const navRef = useRef<HTMLElement>(null);
   const itemRefs = useRef(new Map<PrimaryView, HTMLButtonElement>());
@@ -208,7 +214,7 @@ export function AppSidebar({
   useLayoutEffect(() => {
     updateIndicator();
     updateNavFade();
-  }, [updateIndicator, updateNavFade]);
+  }, [updateIndicator, updateNavFade, rowsKey]);
 
   useEffect(() => {
     const nav = navRef.current;
@@ -236,7 +242,7 @@ export function AppSidebar({
       observer.disconnect();
       window.removeEventListener("resize", handleChange);
     };
-  }, [updateIndicator, updateNavFade]);
+  }, [updateIndicator, updateNavFade, rowsKey]);
 
   useEffect(() => {
     if (!overlayMode || !overlayOpen) {

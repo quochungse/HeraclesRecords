@@ -234,6 +234,7 @@ export function SettingsView({
   const [coachRefreshVersion, setCoachRefreshVersion] = useState(0);
   const { theme, setTheme, accent, setAccent } = useTheme();
   const [sportColors, setSportColors] = useState(() => readStoredSportColors());
+  const [hevyConnected, setHevyConnected] = useState(false);
 
   function updateSportColor(cat: SportColorCategory, value: string) {
     const next = { ...sportColors, [cat]: value };
@@ -248,6 +249,28 @@ export function SettingsView({
     storeSportColors(next);
     applySportColors(next);
   }
+
+  // Whether Hevy is connected, because a workout only Hevy knows — and the
+  // connection itself — live on Strength alone, so "every session stays in
+  // Activities" is not true of them. A local read, no request to Hevy.
+  useEffect(() => {
+    let cancelled = false;
+
+    void (async () => {
+      try {
+        const status = await api.getHevyStatus();
+        if (!cancelled) {
+          setHevyConnected(status.connected);
+        }
+      } catch {
+        // Unknown reads as not connected: the note keeps its general line.
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [api]);
 
   // The row's own summary. It reads the same two calls the panel does rather
   // than the panel reporting upward, so the number is right before the dialog
@@ -555,8 +578,18 @@ export function SettingsView({
                 )}
                 onToggle={toggleSportScreen}
               />
-              <p className="settings-navigation-note">
-                Every session stays in Activities.
+              {/* Toned as a warning only once it has happened: Strength hidden
+                  with Hevy connected takes Hevy's workouts off the screen. */}
+              <p
+                className={`settings-navigation-note${
+                  hevyConnected && hiddenSportScreens.includes("strength")
+                    ? " is-warning"
+                    : ""
+                }`}
+              >
+                {hevyConnected
+                  ? "Every COROS session stays in Activities. Hevy workouts are only on Strength."
+                  : "Every session stays in Activities."}
               </p>
             </div>
           </div>

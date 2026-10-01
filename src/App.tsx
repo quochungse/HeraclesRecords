@@ -114,6 +114,7 @@ import {
 import {
   readHiddenSportScreens,
   saveHiddenSportScreens,
+  sportScreenFor,
   type SportScreen,
 } from "./navigation/sportScreens";
 import { CalendarSkeleton } from "./calendar/CalendarSkeleton";
@@ -143,10 +144,6 @@ import {
   type WatchFeatureIcon,
   type WatchPresentation,
 } from "./watchModels";
-import { isRunSportType } from "./running/runSurface";
-import { isRideSportType } from "./cycling/rideType";
-import { isHikeSportType } from "./hiking/hikeType";
-import { isStrengthSportType } from "./training/sportTypes";
 import appLogo from "../build/icon.png";
 import changelogMarkdown from "../CHANGELOG.md?raw";
 
@@ -597,6 +594,13 @@ export default function App() {
     if (!api) return;
     return api.onSyncChanged((change) => {
       applySyncedLocalStorageOps(change.localStorage);
+      // The rail is drawn from state, and a toggle builds on that state: left
+      // stale, the next one would write back over what the other machine hid.
+      const hidden = readHiddenSportScreens();
+      setHiddenSportScreens((current) =>
+        current.join() === hidden.join() ? current : hidden,
+      );
+      setStartupView(readStartupView());
     });
   }, [api]);
 
@@ -2612,12 +2616,24 @@ export default function App() {
   function handleHiddenSportScreensChange(hidden: SportScreen[]) {
     setHiddenSportScreens(hidden);
     saveHiddenSportScreens(hidden);
-    // A screen off the rail is not opened on launch either, and the menu says
-    // so now rather than on the next launch.
-    if (hidden.includes(startupView as SportScreen)) {
-      setStartupView("overview");
-      saveStartupView("overview");
+    // A hidden startup screen opens Overview, and the menu says so now rather
+    // than on the next launch. The stored choice is not rewritten, so showing
+    // the screen again brings it back.
+    setStartupView(readStartupView());
+  }
+
+  /**
+   * Hands a session to the screen built for its sport. Every door to a sport
+   * screen goes through here, so none of them opens one the athlete took off
+   * the rail: that answers false and opens nothing.
+   */
+  function openSportScreen(request: SportScreenRequest): boolean {
+    if (hiddenSportScreens.includes(request.view)) {
+      return false;
     }
+    setSportScreenRequest(request);
+    setActiveView(request.view);
+    return true;
   }
 
   function handleDevelopmentViewToggle() {
@@ -2934,8 +2950,7 @@ export default function App() {
                   onRetry={() => void handleRunningActivitiesRetry()}
                   hiddenSportScreens={hiddenSportScreens}
                   onOpenSportScreen={(request) => {
-                    setSportScreenRequest({ ...request, from: "training" });
-                    setActiveView(request.view);
+                    openSportScreen({ ...request, from: "training" });
                   }}
                   onAskCoach={askCoach}
                 />
@@ -2971,19 +2986,17 @@ export default function App() {
                       const activity = trainingHubActivities.find(
                         (candidate) => candidate.activityId === activityId
                       );
-                      if (activity && isRunSportType(activity.sportType) && !hiddenSportScreens.includes("running")) {
-                        setSportScreenRequest({ view: "running", activityId, startTime: activity.startTime, from: "library" });
-                        setActiveView("running");
-                      } else if (activity && isRideSportType(activity.sportType) && !hiddenSportScreens.includes("cycling")) {
-                        setSportScreenRequest({ view: "cycling", activityId, startTime: activity.startTime, from: "library" });
-                        setActiveView("cycling");
-                      } else if (activity && isHikeSportType(activity.sportType) && !hiddenSportScreens.includes("hiking")) {
-                        setSportScreenRequest({ view: "hiking", activityId, startTime: activity.startTime, from: "library" });
-                        setActiveView("hiking");
-                      } else if (activity && isStrengthSportType(activity.sportType) && !hiddenSportScreens.includes("strength")) {
-                        setSportScreenRequest({ view: "strength", activityId, startTime: activity.startTime, from: "library" });
-                        setActiveView("strength");
-                      } else if (activity) {
+                      const view = activity
+                        ? sportScreenFor(activity.sportType)
+                        : null;
+                      if (
+                        activity &&
+                        view &&
+                        openSportScreen({ view, activityId, startTime: activity.startTime, from: "library" })
+                      ) {
+                        return;
+                      }
+                      if (activity) {
                         void handleTrainingHubActivityDetail(activity);
                         setActiveView("training");
                       } else {
