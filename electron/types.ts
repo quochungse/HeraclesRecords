@@ -1499,11 +1499,6 @@ export interface AppStorageLocation {
 
 export interface AppInfo {
   version: string;
-  electronVersion: string;
-  chromeVersion: string;
-  nodeVersion: string;
-  platform: string;
-  arch: string;
   userDataPath: string;
   storageLocations: AppStorageLocation[];
 }

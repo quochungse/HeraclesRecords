@@ -62,9 +62,10 @@
 // HERACLES_USER_DATA=/path/to/userData overrides where the database is.
 
 import fs from "node:fs";
-import os from "node:os";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
+import { DATABASE_FILE_NAME, userDataDir } from "./lib/app-user-data.mjs";
+import { openSecretSetting } from "./lib/open-secret-setting.mjs";
 
 const LIVE = process.argv.includes("--live");
 const CLEANUP = process.argv.includes("--cleanup");
@@ -80,17 +81,8 @@ if (![...PHASES].every((phase) => ["p0", "p1", "p2", "p3"].includes(phase))) {
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const dist = (file) => import(`${pathToFileURL(path.join(repoRoot, "dist-electron", file)).href}?cacheBust=${Date.now()}`);
 
-/* userData is named after package.json's top-level `name` — see CLAUDE.md. */
-function userDataDir() {
-  if (process.env.HERACLES_USER_DATA) return process.env.HERACLES_USER_DATA;
-  const name = JSON.parse(fs.readFileSync(path.join(repoRoot, "package.json"), "utf8")).name;
-  if (process.platform === "darwin") return path.join(os.homedir(), "Library/Application Support", name);
-  if (process.platform === "win32") return path.join(process.env.APPDATA ?? "", name);
-  return path.join(process.env.XDG_CONFIG_HOME ?? path.join(os.homedir(), ".config"), name);
-}
-
 const userData = userDataDir();
-if (!fs.existsSync(path.join(userData, "heraclesrecords.sqlite"))) {
+if (!fs.existsSync(path.join(userData, DATABASE_FILE_NAME))) {
   console.error(`No app database in ${userData}. Run the app once, or set HERACLES_USER_DATA.`);
   process.exit(1);
 }
@@ -113,7 +105,18 @@ const adapter = await dist("corosTrainingPlanAdapter.js");
 const library = await dist("trainingLibraryService.js");
 const planTools = await dist("chatPlanTools.js");
 
-const signedIn = () => Boolean(database.getSetting("trainingHub.accessToken") && database.getSetting("trainingHub.userId"));
+const secrets = await dist("secretSettings.js");
+
+const TOKEN_KEY = "trainingHub.accessToken";
+const signedIn = () => Boolean(database.getSetting(TOKEN_KEY) && database.getSetting("trainingHub.userId"));
+
+/* The session token is encrypted at rest, and this process — Electron run as
+   Node — has no `safeStorage` to open it, so the services would read no
+   session at all. It is opened by a short Electron process and lent to them
+   for this run, only before COROS is asked something. */
+function openCorosSession() {
+  secrets.lendOpenedSecret(TOKEN_KEY, openSecretSetting(database.getSetting(TOKEN_KEY)));
+}
 
 // ---------------------------------------------------------------------------
 // Days
@@ -218,8 +221,12 @@ async function cleanup() {
     }
     for (const id of manifest.corosPlans ?? []) windows.planIds.add(id);
   }
-  if (signedIn()) await sweepCoros(windows);
-  else console.log("Not signed in to COROS: anything a sample put there is left. Sign in and run --cleanup again to take it off.");
+  if (signedIn()) {
+    openCorosSession();
+    await sweepCoros(windows);
+  } else {
+    console.log("Not signed in to COROS: anything a sample put there is left. Sign in and run --cleanup again to take it off.");
+  }
   for (const file of manifests) fs.rmSync(file);
   console.log("Sample removed.");
 }
@@ -242,6 +249,7 @@ if (LIVE && !signedIn()) {
   console.error("--live needs COROS: sign in in the app first. Nothing was made.");
   process.exit(1);
 }
+if (LIVE) openCorosSession();
 
 // ---------------------------------------------------------------------------
 // Conversations

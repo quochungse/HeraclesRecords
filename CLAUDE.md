@@ -209,8 +209,8 @@ electron/*Service.ts    →  the actual work; electron/database.ts owns SQLite
 - **The built page carries a Content-Security-Policy** (a meta tag `vite.config.ts` writes at
   build time only; the dev server needs inline scripts). Its point is `script-src 'self'
   'wasm-unsafe-eval'` — nothing runs that did not ship; images, connections and media take any
-  https because album art, tiles and avatars come from many hosts. A `<webview>` guest is not
-  governed by it.
+  https because album art, tiles and avatars come from many hosts, and images plain http too
+  (a podcast feed's artwork often is). A `<webview>` guest is not governed by it.
 - **A packaged build ignores the development switches.** `main.ts` deletes
   `VITE_DEV_SERVER_URL`, `HERACLES_SAMPLE_*`, `HERACLES_SIMULATE_PLAN_AI` and
   `COROS_WATCH_PATH` from the environment before anything reads them (each is read at run
@@ -223,7 +223,9 @@ electron/*Service.ts    →  the actual work; electron/database.ts owns SQLite
   signs the athlete out on their other computer. `safeStorage` is required lazily, so suites
   under `ELECTRON_RUN_AS_NODE` read and write plain values. The live-API probes open the
   token through `scripts/lib/open-secret-setting.mjs`, which asks a short Electron process
-  (with the app's name, so the keyring entry matches). YouTube Music's auth file stays plain —
+  (with the app's name, so the keyring entry matches); `sample:coach`, which drives the
+  compiled services under `ELECTRON_RUN_AS_NODE`, hands what it opens to them through
+  `lendOpenedSecret` — without it `--live` and `--cleanup` read no session at all. YouTube Music's auth file stays plain —
   ytmusicapi reads and rewrites it — and is chmod 600.
 
 ### `rendererReady` gates everything main pushes unasked

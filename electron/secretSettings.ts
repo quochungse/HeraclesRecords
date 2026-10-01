@@ -51,6 +51,19 @@ function encode(value: string): string {
   return ENCRYPTED_PREFIX + storage.encryptString(value).toString("base64");
 }
 
+/**
+ * Values opened by another process, held for this one only. A script that
+ * drives the compiled services under `ELECTRON_RUN_AS_NODE` has no
+ * `safeStorage`, so it cannot open what the app encrypted: it opens the value
+ * through a short Electron process (`scripts/lib/open-secret-setting.mjs`) and
+ * lends it here. Nothing lent is written anywhere.
+ */
+const lentSecrets = new Map<string, string>();
+
+export function lendOpenedSecret(key: string, value: string): void {
+  lentSecrets.set(key, value);
+}
+
 /** Writes a credential, encrypted when the OS can. */
 export function setSecretSetting(key: string, value: string): void {
   setSetting(key, encode(value));
@@ -58,8 +71,8 @@ export function setSecretSetting(key: string, value: string): void {
 
 /**
  * Reads a credential. Undefined when there is none, or when it was encrypted
- * and cannot be opened here — a keyring that changed is a sign-in to do again,
- * not a value to guess at.
+ * and cannot be opened here (and nothing was lent) — a keyring that changed is
+ * a sign-in to do again, not a value to guess at.
  */
 export function getSecretSetting(key: string): string | undefined {
   const stored = getSetting(key);
@@ -67,7 +80,7 @@ export function getSecretSetting(key: string): string | undefined {
 
   if (stored.startsWith(ENCRYPTED_PREFIX)) {
     const storage = safeStorage();
-    if (!encryptionAvailable(storage)) return undefined;
+    if (!encryptionAvailable(storage)) return lentSecrets.get(key);
     try {
       return storage.decryptString(
         Buffer.from(stored.slice(ENCRYPTED_PREFIX.length), "base64")

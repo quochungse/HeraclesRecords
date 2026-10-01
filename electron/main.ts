@@ -645,10 +645,12 @@ function openExternalLink(url: string): void {
 
 /** The app's own page: the dev server in development, the bundled file otherwise. */
 function isAppPageUrl(url: string): boolean {
-  const devServer = devServerUrl();
-  if (devServer) return url.startsWith(new URL(devServer).origin);
   try {
     const target = new URL(url);
+    // Compared as origins, not as text: `http://127.0.0.1:5173` is a prefix of
+    // `http://127.0.0.1:51730`, which is someone else's server.
+    const devServer = devServerUrl();
+    if (devServer) return target.origin === new URL(devServer).origin;
     const page = pathToFileURL(path.join(__dirname, "../dist/index.html"));
     return target.protocol === "file:" && target.pathname === page.pathname;
   } catch {

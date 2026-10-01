@@ -17402,10 +17402,6 @@ td span {
   font-size: 12px;
 }
 
-.chat-local-tools.is-disabled {
-  opacity: 0.48;
-}
-
 .chat-login-actions {
   display: flex;
   justify-content: center;

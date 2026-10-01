@@ -9,7 +9,9 @@ import react from "@vitejs/plugin-react";
  * What it buys is the script line: nothing runs that did not ship in the
  * bundle, so a string that ever reached the DOM cannot become code. The rest is
  * as wide as the app needs. Images come from many hosts (album art, map tiles,
- * COROS avatars), so `img-src` takes any https; MapLibre and the Draco decoder
+ * COROS avatars), so `img-src` takes any https — and plain http, because a
+ * podcast feed's own artwork (`itunes:image`) is often served that way and an
+ * image runs nothing; MapLibre and the Draco decoder
  * start workers from blobs; the decoder needs `wasm-unsafe-eval`; React writes
  * inline styles. A <webview> is a guest of its own and not governed by this.
  */
@@ -18,7 +20,7 @@ const CONTENT_SECURITY_POLICY = [
   "script-src 'self' 'wasm-unsafe-eval'",
   "worker-src 'self' blob:",
   "style-src 'self' 'unsafe-inline'",
-  "img-src 'self' data: blob: https:",
+  "img-src 'self' data: blob: https: http:",
   "font-src 'self' data:",
   "connect-src 'self' https: data: blob:",
   "media-src 'self' data: blob: https:",

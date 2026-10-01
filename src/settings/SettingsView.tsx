@@ -113,6 +113,16 @@ const SPORT_COLOR_ICONS: Record<SportColorCategory, LucideIcon> = {
   other: Ellipsis,
 };
 
+/** The sport screens as tiles, each wearing the icon it has on the sidebar. */
+const SPORT_SCREEN_OPTIONS = SPORT_SCREENS.map((screen) => {
+  const Icon = PRIMARY_NAV_ITEMS.find((item) => item.id === screen)?.icon;
+  return {
+    value: screen,
+    label: getPrimaryViewLabel(screen),
+    icon: Icon ? <Icon size={18} aria-hidden="true" /> : undefined,
+  };
+});
+
 /**
  * A row in the Connections list that opens something: an icon, what it is, what
  * state it is in, and a chevron. Three copies of this markup sat inline, which
@@ -553,17 +563,7 @@ export function SettingsView({
                 label="Sport screens"
                 size="md"
                 appearance="tiles"
-                options={SPORT_SCREENS.map((screen) => {
-                  // The icon the screen wears on the sidebar it is listed in.
-                  const Icon = PRIMARY_NAV_ITEMS.find(
-                    (item) => item.id === screen
-                  )?.icon;
-                  return {
-                    value: screen,
-                    label: getPrimaryViewLabel(screen),
-                    icon: Icon ? <Icon size={18} aria-hidden="true" /> : undefined
-                  };
-                })}
+                options={SPORT_SCREEN_OPTIONS}
                 values={SPORT_SCREENS.filter(
                   (screen) => !hiddenSportScreens.includes(screen)
                 )}

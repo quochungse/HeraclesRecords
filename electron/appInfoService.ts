@@ -95,11 +95,6 @@ export async function getAppInfo(): Promise<AppInfo> {
 
   return {
     version: app.getVersion(),
-    electronVersion: process.versions.electron,
-    chromeVersion: process.versions.chrome,
-    nodeVersion: process.versions.node,
-    platform: process.platform,
-    arch: process.arch,
     userDataPath: app.getPath("userData"),
     storageLocations
   };
