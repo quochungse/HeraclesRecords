@@ -35,7 +35,7 @@ import type {
 } from "../../electron/types";
 import { planWorkoutInputToEditorDraft } from "../../electron/planWorkoutEditor";
 import { formatWorkoutSport } from "../../electron/workoutCapabilities";
-import type { CorosLinkApi } from "../coroslink-api";
+import type { HeraclesRecordsApi } from "../heraclesrecords-api";
 import { WorkoutReadOnlyBody } from "../calendar/WorkoutEditorModal";
 import { useWorkoutExerciseCatalog } from "../calendar/useWorkoutExerciseCatalog";
 import { formatDurationSeconds, formatHappenDayLabel } from "../training/formatters";
@@ -55,7 +55,7 @@ interface PlanSessionViewProps {
   planName: string;
   position: { index: number; of: number };
   unitSystem: UnitSystem;
-  api?: CorosLinkApi;
+  api?: HeraclesRecordsApi;
   /** Leaves the library for the activity this session became. */
   onOpenActivity?: (activityId: string) => void;
   /** Opens Coach with this session beside the composer (P3.5); absent for a session COROS has no id for yet. */

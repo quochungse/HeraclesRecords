@@ -6,7 +6,7 @@ import type {
   TrainingLibraryWorkout,
   TrainingPlanDocument
 } from "../../electron/types";
-import type { CorosLinkApi } from "../coroslink-api";
+import type { HeraclesRecordsApi } from "../heraclesrecords-api";
 import { PlanEditor } from "../training-library/PlanEditor";
 import { NewerVersionDialog } from "./NewerVersionDialog";
 import { startDraft, type PlanDraft } from "../training-library/planDraft";
@@ -14,7 +14,7 @@ import { useUnitSystem } from "../units/UnitSystemProvider";
 import "../training-library/trainingLibrary.css";
 
 interface CoachPlanEditorProps {
-  api: CorosLinkApi;
+  api: HeraclesRecordsApi;
   draftId: string;
   /** The version the edit became. */
   onSaved: (written: PlanVersionWritten) => void;

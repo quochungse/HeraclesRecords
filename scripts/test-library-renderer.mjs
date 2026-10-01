@@ -2323,12 +2323,12 @@ async function main() {
      * preference an earlier section may have left pointing elsewhere.
      */
     /* Every stored selection, by prefix: `selectionPreferences` keys them
-       under `coroslink.selection.v1`, so removing the bare preference name
+       under `heraclesrecords.selection.v1`, so removing the bare preference name
        removes nothing and the mount comes up on whatever was last chosen. */
     await evaluate(
       `(() => {
          for (const key of Object.keys(localStorage)) {
-           if (key.startsWith("coroslink.selection.v1")) localStorage.removeItem(key);
+           if (key.startsWith("heraclesrecords.selection.v1")) localStorage.removeItem(key);
          }
          return true;
        })()`

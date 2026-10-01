@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import type { TrainingPlanDocument } from "../../electron/types";
-import type { CorosLinkApi } from "../coroslink-api";
+import type { HeraclesRecordsApi } from "../heraclesrecords-api";
 import { remoteErrorMessage } from "./remoteError";
 import { TrainingPlanCalendarDialog } from "../training-library/TrainingPlanCalendarDialog";
 import "../training-library/trainingLibrary.css";
@@ -26,7 +26,7 @@ export default function CoachCalendarDialog({
   onAdded,
   onError
 }: {
-  api: CorosLinkApi;
+  api: HeraclesRecordsApi;
   draftId: string;
   /** This version is on COROS already. */
   saved: boolean;

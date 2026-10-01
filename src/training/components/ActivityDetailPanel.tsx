@@ -15,7 +15,7 @@ import {
   formatTrainingTimestamp
 } from "../formatters";
 import { isSpeedSport, isSwimSportType, resolveSportName } from "../sportTypes";
-import type { CorosLinkApi } from "../../coroslink-api";
+import type { HeraclesRecordsApi } from "../../heraclesrecords-api";
 import type { TrainingHubDetailRequest } from "../types";
 import { useUnitSystem } from "../../units/UnitSystemProvider";
 import { formatSpeedValue } from "../../units/units";
@@ -43,7 +43,7 @@ interface ActivityDetailPanelProps {
    * payload is ~2.2 MB and no longer rides along on `detail`. Without an api
    * the button is not offered.
    */
-  api?: CorosLinkApi | null;
+  api?: HeraclesRecordsApi | null;
 }
 
 function DetailStat({ label, value }: { label: string; value: string }) {

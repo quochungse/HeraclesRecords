@@ -17,7 +17,7 @@ import type {
   TrainingPlanDocument
 } from "../../electron/types";
 import { planDiff } from "../../electron/planDiff";
-import type { CorosLinkApi } from "../coroslink-api";
+import type { HeraclesRecordsApi } from "../heraclesrecords-api";
 import { OptionGroup } from "../components/OptionGroup";
 import { useUnitSystem } from "../units/UnitSystemProvider";
 import { WeekCard } from "../training-library/PlanReader";
@@ -77,7 +77,7 @@ export default function CoachCanvas({
   onAsk,
   planSportStyle
 }: {
-  api?: CorosLinkApi;
+  api?: HeraclesRecordsApi;
   /** Any version's draft id of the creation whose details are open, or null. */
   artifactId: string | null;
   /** The newest version of each creation, in the order they were made. */
@@ -292,7 +292,7 @@ function ArtifactView({
   calendar,
   onAsk
 }: {
-  api?: CorosLinkApi;
+  api?: HeraclesRecordsApi;
   newest: PlanDraftPreview;
   cards: PlanDraftPreview[];
   versionIndex: ReadonlyMap<string, CreationVersion>;

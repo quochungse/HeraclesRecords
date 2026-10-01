@@ -5,7 +5,7 @@
  */
 export type AccentPalette = "gold" | "teal" | "indigo" | "rose" | "sky";
 
-export const ACCENT_STORAGE_KEY = "coroslink.accentPalette";
+export const ACCENT_STORAGE_KEY = "heraclesrecords.accentPalette";
 
 const DEFAULT_ACCENT: AccentPalette = "gold";
 

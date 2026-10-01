@@ -13,7 +13,7 @@ import {
   Unplug
 } from "lucide-react";
 import { OptionGroup } from "../components/OptionGroup";
-import type { CorosLinkApi } from "../coroslink-api";
+import type { HeraclesRecordsApi } from "../heraclesrecords-api";
 import type {
   McpServerConfig,
   McpServerInput,
@@ -64,7 +64,7 @@ export function McpServersPanel({
   refreshVersion = 0,
   onChange
 }: {
-  api: CorosLinkApi | undefined;
+  api: HeraclesRecordsApi | undefined;
   refreshVersion?: number;
   onChange?: () => void | Promise<void>;
 }) {

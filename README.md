@@ -198,7 +198,7 @@ and so on. `npm run | grep test:` lists them.
 
 Three layers: `src/` is a React 19 + Vite renderer, `electron/preload.ts` bridges ~254 IPC
 channels, and `electron/*Service.ts` does the work with `electron/database.ts` owning SQLite.
-Adding a channel means editing `main.ts`, `preload.ts` and `src/coroslink-api.ts` together,
+Adding a channel means editing `main.ts`, `preload.ts` and `src/heraclesrecords-api.ts` together,
 then running `npm run test:ipc-surface`.
 
 See [CLAUDE.md](CLAUDE.md) for the architecture in full, and [docs/](docs/) for the

@@ -336,9 +336,9 @@ class McpOAuthProvider implements OAuthClientProvider {
     try {
       await this.authWindow.webContents.executeJavaScript(
         `(() => {
-          if (document.getElementById("coroslink-mcp-close")) return;
+          if (document.getElementById("heraclesrecords-mcp-close")) return;
           const button = document.createElement("button");
-          button.id = "coroslink-mcp-close";
+          button.id = "heraclesrecords-mcp-close";
           button.type = "button";
           button.setAttribute("aria-label", "Close");
           button.title = "Close";

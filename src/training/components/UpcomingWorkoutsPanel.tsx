@@ -4,7 +4,7 @@ import type {
   TrainingHubSportType,
   TrainingHubUpcomingWorkout
 } from "../../../electron/types";
-import type { CorosLinkApi } from "../../coroslink-api";
+import type { HeraclesRecordsApi } from "../../heraclesrecords-api";
 import { useUnitSystem } from "../../units/UnitSystemProvider";
 import {
   filterUpcomingWorkoutsFromToday,
@@ -18,7 +18,7 @@ import { planTag } from "../workoutSport";
 import { UpcomingWorkoutDetailPanel } from "./UpcomingWorkoutDetailPanel";
 
 interface UpcomingWorkoutsPanelProps {
-  api: CorosLinkApi;
+  api: HeraclesRecordsApi;
   workouts: TrainingHubUpcomingWorkout[];
   sportTypes: TrainingHubSportType[];
 }

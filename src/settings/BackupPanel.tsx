@@ -7,7 +7,7 @@ import {
   Loader2,
   Upload
 } from "lucide-react";
-import type { CorosLinkApi } from "../coroslink-api";
+import type { HeraclesRecordsApi } from "../heraclesrecords-api";
 import type {
   BackupImportCandidate,
   RestoreMode
@@ -21,7 +21,7 @@ import { BackupRestoreModal } from "./BackupRestoreModal";
 import { formatBytes, formatWhen } from "./formatters";
 
 interface BackupPanelProps {
-  api: CorosLinkApi;
+  api: HeraclesRecordsApi;
 }
 
 /**

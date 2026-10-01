@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import type { WorkoutExerciseOption, WorkoutSport } from "../../electron/types";
-import type { CorosLinkApi } from "../coroslink-api";
+import type { HeraclesRecordsApi } from "../heraclesrecords-api";
 import { isStrengthStyleWorkout } from "../training/workoutSport";
 
 /**
@@ -72,7 +72,7 @@ export interface WorkoutExerciseCatalog {
 const EMPTY: WorkoutExerciseOption[] = [];
 
 export function useWorkoutExerciseCatalog(
-  api: CorosLinkApi | undefined,
+  api: HeraclesRecordsApi | undefined,
   sport: WorkoutSport | undefined
 ): WorkoutExerciseCatalog {
   const wanted = isStrengthStyleWorkout(sport) ? sport : undefined;

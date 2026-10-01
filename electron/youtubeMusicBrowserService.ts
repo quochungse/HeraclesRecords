@@ -8,7 +8,7 @@
 import { app, session, type WebContents } from "electron";
 import crypto from "node:crypto";
 
-export const YOUTUBE_MUSIC_PARTITION = "persist:coroslink-ytmusic";
+export const YOUTUBE_MUSIC_PARTITION = "persist:heraclesrecords-ytmusic";
 
 // Watch YouTube + Google traffic: the private API lives under
 // music.youtube.com/youtubei/… (for credential capture), and the Google

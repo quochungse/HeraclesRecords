@@ -9,12 +9,12 @@ import {
   RefreshCw,
   UserRound
 } from "lucide-react";
-import type { CorosLinkApi } from "../coroslink-api";
+import type { HeraclesRecordsApi } from "../heraclesrecords-api";
 import type { GoogleAccountInfo, SyncStatus } from "../../electron/sync/syncTypes";
 import { formatBytes, formatWhen } from "./formatters";
 
 interface SyncPanelProps {
-  api: CorosLinkApi;
+  api: HeraclesRecordsApi;
 }
 
 /**

@@ -93,7 +93,7 @@ import type {
   TrainingHubLoadStatus,
   TrainingHubSnapshot,
 } from "./training/types";
-import type { CorosLinkApi } from "./coroslink-api";
+import type { HeraclesRecordsApi } from "./heraclesrecords-api";
 import { applySyncedLocalStorageOps } from "./settings/syncLocalStorage";
 import { startLocalStoragePublisher } from "./settings/localStoragePublisher";
 import { subscribeToToasts } from "./toast";
@@ -170,9 +170,9 @@ const MEDIA_TAB_PREFERENCE = defineSelectionPreference<MediaTab>({
 });
 
 const YOUTUBE_HOME_URL = "https://www.youtube.com/";
-const YOUTUBE_DOWNLOAD_CONSOLE_PREFIX = "__COROSLINK_YOUTUBE_DOWNLOAD__";
+const YOUTUBE_DOWNLOAD_CONSOLE_PREFIX = "__HERACLESRECORDS_YOUTUBE_DOWNLOAD__";
 const APPLE_MUSIC_SELECTED_PLAYLIST_STORAGE_KEY =
-  "coroslink.appleMusic.selectedPlaylistId";
+  "heraclesrecords.appleMusic.selectedPlaylistId";
 const IS_DEVELOPMENT_BUILD = import.meta.env.DEV;
 
 const LazyTrainingOverview = lazy(() =>
@@ -360,7 +360,7 @@ const TRAINING_HISTORY_PAGE_SIZE = 100;
 const TRAINING_HISTORY_MAX_PAGES = 100;
 
 async function listAllTrainingHubActivities(
-  api: CorosLinkApi
+  api: HeraclesRecordsApi
 ): Promise<TrainingHubActivity[]> {
   const activities: TrainingHubActivity[] = [];
   for (let page = 1; page <= TRAINING_HISTORY_MAX_PAGES; page += 1) {
@@ -385,7 +385,7 @@ interface YouTubeDownloadItem {
 }
 
 export default function App() {
-  const api: CorosLinkApi | undefined = window.corosLink;
+  const api: HeraclesRecordsApi | undefined = window.heraclesRecords;
   const [activeView, setActiveView] = useState<View>(readStartupView);
   /**
    * `.content` is one scroller shared by every screen, so a screen used to open
@@ -4307,7 +4307,7 @@ function YouTubeBrowserView({
 
     if (resetSession) {
       domReadyRef.current = false;
-      await window.corosLink?.resetYouTubeBrowserSession();
+      await window.heraclesRecords?.resetYouTubeBrowserSession();
       setWebviewSrc(nextUrl);
       setWebviewKey((value) => value + 1);
       setLoadError(null);
@@ -4495,7 +4495,7 @@ function YouTubeBrowserView({
 
       webview
         .executeJavaScript(
-          "window.__corosLinkDrainDownloads ? window.__corosLinkDrainDownloads() : []",
+          "window.__heraclesRecordsDrainDownloads ? window.__heraclesRecordsDrainDownloads() : []",
         )
         .then((items: unknown) => {
           if (Array.isArray(items) && items.length > 0) {
@@ -4593,7 +4593,7 @@ function YouTubeBrowserView({
               }}
               className="youtube-webview"
               src={webviewSrc}
-              partition="persist:coroslink-youtube"
+              partition="persist:heraclesrecords-youtube"
               webpreferences="contextIsolation=yes,nodeIntegration=no,sandbox=yes"
             />
 
@@ -4934,7 +4934,7 @@ function YouTubeMusicLoginBrowser() {
     setResetting(true);
     setLoading(true);
     try {
-      await window.corosLink?.resetYouTubeMusicBrowserSession();
+      await window.heraclesRecords?.resetYouTubeMusicBrowserSession();
     } finally {
       setResetting(false);
       // Remount the webview so it reloads from the freshly cleared session.
@@ -4990,7 +4990,7 @@ function YouTubeMusicLoginBrowser() {
           }}
           className="youtube-webview"
           src={YOUTUBE_MUSIC_URL}
-          partition="persist:coroslink-ytmusic"
+          partition="persist:heraclesrecords-ytmusic"
           webpreferences="contextIsolation=yes,nodeIntegration=no,sandbox=yes"
         />
         {loading ? (
@@ -5727,7 +5727,7 @@ function SpotifySyncView({
   onCombinedDownload,
   combinedDownloads,
 }: SpotifySyncViewProps) {
-  const api = window.corosLink;
+  const api = window.heraclesRecords;
   const [jobs, setJobs] = useState<DownloadJob[]>([]);
   const [refreshing, setRefreshing] = useState(false);
   const selectedPlaylist = playlists.find(
@@ -6504,7 +6504,7 @@ function ApplePodcastsView({
   onMessage: (message: string) => void;
   onError: (message: string) => void;
 }) {
-  const api = window.corosLink;
+  const api = window.heraclesRecords;
   const [input, setInput] = useState("");
   const [results, setResults] = useState<ApplePodcastShow[]>([]);
   const [show, setShow] = useState<ApplePodcastShowDetail | null>(null);
@@ -7031,7 +7031,7 @@ function AppleMusicLoginBrowser() {
     setResetting(true);
     setLoading(true);
     try {
-      await window.corosLink?.resetAppleMusicBrowserSession();
+      await window.heraclesRecords?.resetAppleMusicBrowserSession();
     } finally {
       setResetting(false);
       // Remount the webview so it reloads from the freshly cleared session.
@@ -7087,7 +7087,7 @@ function AppleMusicLoginBrowser() {
           }}
           className="youtube-webview apple-music-webview"
           src={APPLE_MUSIC_LOGIN_URL}
-          partition="persist:coroslink-apple"
+          partition="persist:heraclesrecords-apple"
           webpreferences="contextIsolation=yes,nodeIntegration=no,sandbox=yes"
         />
         {loading ? (
@@ -7117,7 +7117,7 @@ function AppleMusicView({
   ) => void;
   combinedDownloads: CombinedDownloadMap;
 }) {
-  const api = window.corosLink;
+  const api = window.heraclesRecords;
   const [status, setStatus] = useState<AppleMusicStatus | null>(null);
   const [headersRaw, setHeadersRaw] = useState("");
   const [playlists, setPlaylists] = useState<AppleMusicPlaylist[]>([]);
@@ -8151,20 +8151,20 @@ function injectYouTubeDownloadButton(webview: WebviewElement): Promise<void> {
   const script = `
 (() => {
   const marker = ${JSON.stringify(YOUTUBE_DOWNLOAD_CONSOLE_PREFIX)};
-  const styleId = "coroslink-youtube-download-style";
-  const btnClass = "coroslink-yt-dl-btn";
+  const styleId = "heraclesrecords-youtube-download-style";
+  const btnClass = "heraclesrecords-yt-dl-btn";
   const rowSelector =
     "ytd-video-renderer, ytd-grid-video-renderer, ytd-rich-item-renderer";
 
-  window.__corosLinkDrainDownloads = () => {
-    const pending = window.__corosLinkPendingDownloads || [];
-    window.__corosLinkPendingDownloads = [];
+  window.__heraclesRecordsDrainDownloads = () => {
+    const pending = window.__heraclesRecordsPendingDownloads || [];
+    window.__heraclesRecordsPendingDownloads = [];
     return pending;
   };
 
   const emitDownload = (items) => {
     try {
-      window.__corosLinkPendingDownloads = (window.__corosLinkPendingDownloads || []).concat(items);
+      window.__heraclesRecordsPendingDownloads = (window.__heraclesRecordsPendingDownloads || []).concat(items);
     } catch (err) {}
     try {
       console.info(marker + JSON.stringify({ items }));
@@ -8186,7 +8186,7 @@ function injectYouTubeDownloadButton(webview: WebviewElement): Promise<void> {
     document.documentElement.appendChild(style);
   };
 
-  const previewStyleId = "coroslink-youtube-disable-preview-style";
+  const previewStyleId = "heraclesrecords-youtube-disable-preview-style";
   const previewSelectors =
     "#inline-preview-player, ytd-video-preview, .ytd-video-preview, .ytp-inline-preview, #preview ytd-video-preview, ytd-thumbnail-overlay-hover-text-renderer";
   const previewHoverSelectors =
@@ -8237,12 +8237,12 @@ function injectYouTubeDownloadButton(webview: WebviewElement): Promise<void> {
   };
 
   const ensurePreviewGuards = () => {
-    if (window.__corosLinkYoutubePreviewDisabled) {
+    if (window.__heraclesRecordsYoutubePreviewDisabled) {
       ensurePreviewDisabled();
       return;
     }
 
-    window.__corosLinkYoutubePreviewDisabled = true;
+    window.__heraclesRecordsYoutubePreviewDisabled = true;
     window.addEventListener("mouseenter", blockPreviewHover, true);
     window.addEventListener("mouseover", blockPreviewHover, true);
     window.addEventListener("pointerenter", blockPreviewHover, true);
@@ -8369,8 +8369,8 @@ function injectYouTubeDownloadButton(webview: WebviewElement): Promise<void> {
     });
   };
 
-  if (!window.__corosLinkYoutubeDownloadInjected) {
-    window.__corosLinkYoutubeDownloadInjected = true;
+  if (!window.__heraclesRecordsYoutubeDownloadInjected) {
+    window.__heraclesRecordsYoutubeDownloadInjected = true;
     window.addEventListener("yt-navigate-finish", upsert);
     new MutationObserver(upsert).observe(
       document.body || document.documentElement,

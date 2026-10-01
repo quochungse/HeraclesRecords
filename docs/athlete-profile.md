@@ -131,7 +131,7 @@ Quy tắc:
 
 ## 8. IPC
 
-Ba kênh mới (luật ba file: `main.ts`, `preload.ts`, `coroslink-api.ts`, rồi
+Ba kênh mới (luật ba file: `main.ts`, `preload.ts`, `heraclesrecords-api.ts`, rồi
 `npm run test:ipc-surface`):
 
 - `profile:get` → `AthleteProfile`

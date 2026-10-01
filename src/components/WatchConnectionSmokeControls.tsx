@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import type { WatchConnectionSmokeOptionId, WatchStatus } from "../../electron/types";
-import type { CorosLinkApi } from "../coroslink-api";
+import type { HeraclesRecordsApi } from "../heraclesrecords-api";
 import { SelectDropdown, type SelectOption } from "./SelectDropdown";
 
 const WATCH_SMOKE_OPTIONS: SelectOption<WatchConnectionSmokeOptionId>[] = [
@@ -23,7 +23,7 @@ const WATCH_SMOKE_OPTIONS: SelectOption<WatchConnectionSmokeOptionId>[] = [
 ];
 
 interface WatchConnectionSmokeControlsProps {
-  api: CorosLinkApi | undefined;
+  api: HeraclesRecordsApi | undefined;
   onWatchStatusChange: (status: WatchStatus) => void;
   onError: (message: string) => void;
 }

@@ -45,7 +45,7 @@ const VISIT_CONCURRENCY = 5;
 const MAX_CACHED_ROUTE_POINTS = 280;
 /** Keep only recent, downsampled coordinates in the renderer's local storage. */
 const MAX_PERSISTED_GEO_ACTIVITIES = 80;
-const GEO_CACHE_STORAGE_KEY = "coroslink.activity-globe.geo-cache.v1";
+const GEO_CACHE_STORAGE_KEY = "heraclesrecords.activity-globe.geo-cache.v1";
 /** ~0.5° geographic grid for visit density (~55 km). */
 const GEO_HEAT_STEP = 0.5;
 

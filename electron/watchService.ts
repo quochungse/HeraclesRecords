@@ -259,7 +259,7 @@ export async function setWatchConnectionSmokeOption(
 
   try {
     const tempRoot = await fs.promises.mkdtemp(
-      path.join(os.tmpdir(), `coroslink-watch-smoke-${optionId}-`)
+      path.join(os.tmpdir(), `heraclesrecords-watch-smoke-${optionId}-`)
     );
     const watchRoot = path.join(tempRoot, fixture.volumeName);
     await fs.promises.mkdir(watchRoot, { recursive: true });

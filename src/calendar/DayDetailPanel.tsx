@@ -6,7 +6,7 @@ import type {
   TrainingHubActivityDetail,
   TrainingHubSportType
 } from "../../electron/types";
-import type { CorosLinkApi } from "../coroslink-api";
+import type { HeraclesRecordsApi } from "../heraclesrecords-api";
 import { ActivityDetailPanel } from "../training/components/ActivityDetailPanel";
 import { ConfirmDialog } from "../training-library/ConfirmDialog";
 import { formatHappenDayLabel } from "../training/formatters";
@@ -21,7 +21,7 @@ import { ScheduledWorkoutDetail } from "./ScheduledWorkoutDetail";
 import { scheduledWorkoutSport } from "../training/workoutSport";
 
 interface DayDetailPanelProps {
-  api: CorosLinkApi;
+  api: HeraclesRecordsApi;
   selection: CalendarSelection | null;
   sportTypes: TrainingHubSportType[];
   deleting: boolean;

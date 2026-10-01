@@ -18,7 +18,7 @@ import {
 } from "../navigation/primaryNav";
 import { useMediaQuery } from "../hooks/useMediaQuery";
 
-const SIDEBAR_COLLAPSED_KEY = "coroslink.sidebarCollapsed";
+const SIDEBAR_COLLAPSED_KEY = "heraclesrecords.sidebarCollapsed";
 
 const widthSpring = {
   type: "spring" as const,

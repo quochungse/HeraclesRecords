@@ -15,7 +15,7 @@ import type {
   TrainingHubActivityDetail,
   TrainingHubSportType
 } from "../../../electron/types";
-import type { CorosLinkApi } from "../../coroslink-api";
+import type { HeraclesRecordsApi } from "../../heraclesrecords-api";
 import type { SportScreenRequest, TrainingHubDetailRequest } from "../types";
 import {
   formatDistanceMeters,
@@ -51,7 +51,7 @@ interface ActivityDetailPaneProps {
   listActivity: TrainingHubActivity | null;
   sportTypes: TrainingHubSportType[];
   detailRequest: TrainingHubDetailRequest | null;
-  api?: CorosLinkApi | null;
+  api?: HeraclesRecordsApi | null;
   onRetry: (activity: TrainingHubActivity) => void;
   /** Hands a run or a lifting session to the screen built for that sport. */
   onOpenSportScreen?: (request: SportScreenRequest) => void;

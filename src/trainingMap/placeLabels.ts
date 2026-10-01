@@ -33,7 +33,7 @@ const PLACE_LABEL_FAILURES = new Map<string, number>();
 // persisted: it is what the screen shows when nobody answered, and storing it
 // would bake one blocked launch in permanently — the same bug as caching a
 // failure, made to survive a restart.
-const PLACE_LABEL_STORAGE_KEY = "coroslink.activity-globe.place-labels.v1";
+const PLACE_LABEL_STORAGE_KEY = "heraclesrecords.activity-globe.place-labels.v1";
 const MAX_PERSISTED_PLACE_LABELS = 200;
 const PLACE_LABEL_NAMED = new Set<string>();
 
@@ -204,7 +204,7 @@ export function loadPlaceLabel(
   if (failedAt !== undefined && Date.now() - failedAt < PLACE_LABEL_RETRY_MS) {
     return Promise.resolve(coordinateLabel(point));
   }
-  const api = window.corosLink;
+  const api = window.heraclesRecords;
   if (!api?.reverseGeocodeLocation) {
     return Promise.resolve(coordinateLabel(point));
   }

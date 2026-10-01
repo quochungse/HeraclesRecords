@@ -30,7 +30,7 @@ const distUrl = (file) =>
   `${pathToFileURL(path.join(repoRoot, "dist-electron", file)).href}?cacheBust=${Date.now()}`;
 
 const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "heracles-map-drop-"));
-const dbPath = path.join(tempRoot, "coroslink.sqlite");
+const dbPath = path.join(tempRoot, "heraclesrecords.sqlite");
 
 // --- what the Maps build left on disk --------------------------------------
 // Written out in full rather than derived from today's schema: the point is to

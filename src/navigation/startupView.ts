@@ -2,7 +2,7 @@ import { PRIMARY_NAV_ITEMS, type PrimaryView } from "./primaryNav";
 import { readHiddenSportScreens, type SportScreen } from "./sportScreens";
 
 const DEFAULT_STARTUP_VIEW: PrimaryView = "overview";
-const STARTUP_VIEW_STORAGE_KEY = "coroslink.startupView";
+const STARTUP_VIEW_STORAGE_KEY = "heraclesrecords.startupView";
 
 function isPrimaryView(value: string | null): value is PrimaryView {
   return PRIMARY_NAV_ITEMS.some(

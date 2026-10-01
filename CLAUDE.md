@@ -87,15 +87,26 @@ by `prepare-binaries` (`ffmpeg-LICENSE.txt`, `ffmpeg-README.txt`). A package add
 covered by the next build; a bundled program or asset added later needs its own entry in the
 notices.
 
-**Internal names keep `coroslink` where renaming would cost users data**: `coroslink.sqlite`,
-the `coroslink.*` localStorage keys and the `persist:coroslink-*` webview partitions (the
-YouTube and Apple Music sign-ins). Names that only leave the machine were renamed — the
-Claude Agent SDK client app (`heracles-records-coach`), its MCP server (`heracles`, so tools
-are `mcp__heracles__*`), the manual activity's upload file name, the build's User-Agent.
+**No name in the code or in what the app stores is upstream's any more** (since 1.0). The
+database is `heraclesrecords.sqlite`, localStorage keys are `heraclesrecords.*`, the YouTube,
+YouTube Music and Apple Music sign-ins live in `persist:heraclesrecords-*` partitions, the
+bridge is `window.heraclesRecords` typed by `HeraclesRecordsApi` in
+`src/heraclesrecords-api.ts`. **The app carries no migration from the old names**: it opens
+these and nothing else, so a profile from before 1.0 started as is gets an empty database.
+Existing data was moved by a one-off script, `npm run migrate:legacy-names`
+(`scripts/migrate-legacy-names.mjs`, `-- --dry-run` to report only), run once per machine with
+the app closed: it backs up the database and Local Storage into
+`<userData>/pre-rename-backup-<time>/`, moves the database with its WAL folded in, renames the
+partition folders, and renames the keys in both renderer origins (`file://` and the dev
+server's), dropping the two place-name caches. The first machine was moved on 2026-10-01.
+Sync needs nothing: the old keys are unclassified, so they neither go out nor come in, and the
+new names are published on the next pass. Names that leave the machine were renamed earlier —
+the Claude Agent SDK client app (`heracles-records-coach`), its MCP server (`heracles`, so
+tools are `mcp__heracles__*`), the manual activity's upload file name, the build's User-Agent.
 
-**`website/` is left untouched, branding included.** `website/public/icon.png` and
-`og-image.png` are still byte-identical to upstream's, and the site is not deployed from this
-fork. Do not sync them to `build/icon.png` — the fork's icon changes stop at the desktop app.
+**There is no website in this repository.** Upstream's `website/` (its own site, branding
+included) was deleted on 2026-10-01; the homepage and privacy policy Google's OAuth consent
+screen links to are served from a separate repository, `heraclesrecords.github.io`.
 
 Release identity **is** renamed: `build.publish` targets `quochungse/HeraclesRecords`, and
 the `artifactName` patterns spell `HeraclesRecords` without a space on purpose — GitHub
@@ -166,7 +177,7 @@ Electron app in three layers. `electron/` compiles to **CommonJS** (`tsconfig.el
 resolution). Both are `strict`.
 
 ```
-src/ (renderer, React)  →  src/coroslink-api.ts (types only, window.coroslink)
+src/ (renderer, React)  →  src/heraclesrecords-api.ts (types only, window.heraclesRecords)
                         ↓
 electron/preload.ts     →  contextBridge, ~212 ipcRenderer.invoke wrappers
                         ↓
@@ -234,7 +245,7 @@ tick past mount so subscriptions declared below it are attached first.
 ### The IPC contract is a three-file invariant
 
 A channel name is a bare string in `electron/main.ts`, `electron/preload.ts`, and
-`src/coroslink-api.ts`. A typo in any one typechecks cleanly and fails only at runtime.
+`src/heraclesrecords-api.ts`. A typo in any one typechecks cleanly and fails only at runtime.
 `scripts/test-ipc-surface.mjs` scrapes all three and asserts the sets match exactly in both
 directions — a handler nothing invokes fails just as loudly as an invoke with no handler.
 
@@ -1521,7 +1532,7 @@ lives at module level for the same visit-to-visit reason — see `useCalendarDat
   "Asking about ·" line having been taken out (UAT); two or three fold to one line of chips
   under "About", a plan or week chip drawn with the calendar week. **The question being
   written is a draft per conversation** (`composerDrafts.ts`, localStorage
-  `coroslink.coach.composerDrafts.v1`, `device` tier): its words and its references are
+  `heraclesrecords.coach.composerDrafts.v1`, `device` tier): its words and its references are
   saved as they change and restored by `resetEphemeralChatState(sessionId)` whenever that
   conversation is opened, emptied drafts are removed, a deleted conversation's goes with it,
   and a blank conversation holding a draft is not blank. A Coach creation's
@@ -1888,7 +1899,7 @@ lives at module level for the same visit-to-visit reason — see `useCalendarDat
   holds the caches out of the view for the reason `activityFilters.ts` sits outside
   `ActivitiesView` — it is the only part of naming a place a test can reach. A cluster key is
   a ~55 km grid cell (`GEO_HEAT_STEP`) and the name of the city in it does not change, so a
-  resolved name is written to localStorage (`coroslink.activity-globe.place-labels.v1`,
+  resolved name is written to localStorage (`heraclesrecords.activity-globe.place-labels.v1`,
   `derived`) and is on the screen in the first paint of the next launch. Held only in memory,
   every launch re-asked about every place on the screen, serialised behind the provider
   throttle, and the screen read coordinates for the ten-odd seconds that took.
@@ -2251,7 +2262,7 @@ label in the row" catches it. The reveal fade is scoped `button:not([aria-checke
 exactly that reason — without it a folded group is a blank pill, because the one chip it shows
 is the one the fade had hidden. `npm run test:option-groups` holds the measured width, the
 single copy and the fade; `test:library-renderer` reads `--og-shift` and both positions, from a
-mount with **every** `coroslink.selection.v1` key cleared (the bare preference name is not the
+mount with **every** `heraclesrecords.selection.v1` key cleared (the bare preference name is not the
 storage key, so removing that alone leaves the last choice standing).
 **There is deliberately no automatic fallback** from `expanded` to `collapsible` when a row
 does not fit: it was written that way first and it oscillates, because the measurement that
@@ -2429,7 +2440,7 @@ disclosure groups this replaced existed only because eighteen equal rows did not
 they cost two rows, a chevron, a stored open/closed state, a rule that reopened a group
 whenever the app navigated into it, and a second indicator key for a collapsed group's
 header. The sections answer *when* a screen is reached for rather than where its data comes
-from, which is the grouping the athlete already has. `coroslink.sidebarCollapsedGroups` is
+from, which is the grouping the athlete already has. `heraclesrecords.sidebarCollapsedGroups` is
 gone from `syncPolicy.ts` with the state it classified — `test:sync-policy` fails on a
 localStorage key that `src/` no longer writes, in both directions.
 **Personal and Settings are not in the index.** They are about the person rather than the
@@ -2441,7 +2452,7 @@ local part, then to "Personal". Because one row shows a name and the other is ic
 neither is findable by its text — both carry **`data-nav-label`**, and
 `probe-ui-cdp.mjs` navigates by it.
 **The four sport screens can be taken off the rail** (Settings → Navigation,
-`src/navigation/sportScreens.ts`, `coroslink.hiddenSportScreens`, `preference`), because
+`src/navigation/sportScreens.ts`, `heraclesrecords.hiddenSportScreens`, `preference`), because
 Activities holds every COROS session. **Strength is the exception**: a workout only Hevy
 knows, and the Hevy connection itself, live on Strength alone, so with Hevy connected the
 note under the chips says so, in the warning tone once Strength is hidden. The *hidden* list

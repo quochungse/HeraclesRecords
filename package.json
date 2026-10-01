@@ -203,11 +203,10 @@
     "dist:linux": "npm run binaries:prepare:linux && npm run clean:electron && npm run build && electron-builder --linux AppImage --x64 --publish never",
     "release:prepare": "node scripts/prepare-release.mjs",
     "release:check-version": "node scripts/sync-release-version.mjs --check",
+    "migrate:legacy-names": "node scripts/run-electron-gui.mjs scripts/migrate-legacy-names.mjs",
     "release:verify-artifacts": "node scripts/verify-release-artifacts.mjs",
     "test:release-artifacts": "node scripts/test-verify-release-artifacts.mjs",
-    "test:external-links": "npm run build:electron && node scripts/test-external-links.mjs",
-    "website:dev": "npm run dev --prefix website",
-    "website:build": "npm run build --prefix website"
+    "test:external-links": "npm run build:electron && node scripts/test-external-links.mjs"
   },
   "build": {
     "appId": "app.heraclesrecords",

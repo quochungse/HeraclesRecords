@@ -7,7 +7,7 @@ import remarkGfm from "remark-gfm";
 import type { AppUpdateSnapshot } from "../../electron/types";
 
 const DISMISSED_UPDATE_VERSION_KEY =
-  "coroslink.updatePrompt.dismissedVersion";
+  "heraclesrecords.updatePrompt.dismissedVersion";
 
 interface UpdateAvailablePromptProps {
   snapshot: AppUpdateSnapshot;

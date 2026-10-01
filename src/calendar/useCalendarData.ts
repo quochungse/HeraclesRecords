@@ -4,7 +4,7 @@ import type {
   TrainingHubDailyMetric,
   TrainingHubScheduledWorkoutEntry
 } from "../../electron/types";
-import type { CorosLinkApi } from "../coroslink-api";
+import type { HeraclesRecordsApi } from "../heraclesrecords-api";
 import { useUnitSystem } from "../units/UnitSystemProvider";
 import { getLocalHappenDayKey, happenDayFromTimestamp } from "../training/formatters";
 import {
@@ -43,7 +43,7 @@ interface CalendarRangeData {
 }
 
 interface UseCalendarDataOptions {
-  api: CorosLinkApi | undefined;
+  api: HeraclesRecordsApi | undefined;
   authenticated: boolean;
   /** Rows of 7 dateKeys covering the visible range. */
   weekKeys: string[][];
@@ -67,9 +67,9 @@ interface UseCalendarDataOptions {
  * one window moves between COROS accounts.
  */
 const MAX_CACHED_RANGES = 12;
-const rangeCaches = new WeakMap<CorosLinkApi, Map<string, CalendarRangeData>>();
+const rangeCaches = new WeakMap<HeraclesRecordsApi, Map<string, CalendarRangeData>>();
 
-function rangeCacheFor(api: CorosLinkApi): Map<string, CalendarRangeData> {
+function rangeCacheFor(api: HeraclesRecordsApi): Map<string, CalendarRangeData> {
   let cache = rangeCaches.get(api);
   if (!cache) {
     cache = new Map();

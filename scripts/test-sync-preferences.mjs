@@ -52,7 +52,7 @@ store.set("coros-theme", "paper");
 // Measurement field and every machine of one account resolves the same answer
 // from the account itself. Publishing the cache would let a machine that has
 // not refreshed yet write a stale unit over one that has.
-store.set("coroslink.unitSystem", "metric");
+store.set("heraclesrecords.unitSystem", "metric");
 
 const calls = [];
 let syncing = false;

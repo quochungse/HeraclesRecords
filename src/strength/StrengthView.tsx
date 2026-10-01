@@ -8,7 +8,7 @@ import {
   Settings2
 } from "lucide-react";
 import type { CoachOpenRequest, TrainingHubStatus } from "../../electron/types";
-import type { CorosLinkApi } from "../coroslink-api";
+import type { HeraclesRecordsApi } from "../heraclesrecords-api";
 import type { SportScreenRequest } from "../training/types";
 import { epochMsFromCorosTime } from "../training/activityWindow";
 import { StrengthHero } from "./StrengthHero";
@@ -52,7 +52,7 @@ import "./exerciseExplorer.css";
 import { useUnitSystem } from "../units/UnitSystemProvider";
 
 interface StrengthViewProps {
-  api: CorosLinkApi;
+  api: HeraclesRecordsApi;
   status: TrainingHubStatus | null;
   onOpenTraining: () => void;
   /** Dev view unlocks the muscle map's layer controls. */

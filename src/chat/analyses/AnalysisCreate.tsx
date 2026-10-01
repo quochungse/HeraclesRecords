@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Check, Loader2, Zap } from "lucide-react";
-import type { CorosLinkApi } from "../../coroslink-api";
+import type { HeraclesRecordsApi } from "../../heraclesrecords-api";
 import type {
   ChatProvider,
   CoachAnalysis,
@@ -36,7 +36,7 @@ export function AnalysisCreate({
   onCancel,
   onCreated
 }: {
-  api: CorosLinkApi | undefined;
+  api: HeraclesRecordsApi | undefined;
   provider: ChatProvider;
   /** The conversation this analysis will belong to, and cannot leave. */
   sessionId: string;

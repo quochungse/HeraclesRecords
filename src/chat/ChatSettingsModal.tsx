@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import { Loader2, Settings2, X } from "lucide-react";
 import type { ChatSettings } from "../../electron/types";
-import type { CorosLinkApi } from "../coroslink-api";
+import type { HeraclesRecordsApi } from "../heraclesrecords-api";
 import { CoachModelsModal } from "../settings/CoachModelsModal";
 import { ConfirmDialog } from "../training-library/ConfirmDialog";
 // The confirmation's chrome is the library's `tl-dialog`, as Coach's other
@@ -61,7 +61,7 @@ export function ChatSettingsModal({
   onSaveChatSettings,
   onCoachModelsChange
 }: {
-  api: CorosLinkApi | undefined;
+  api: HeraclesRecordsApi | undefined;
   open: boolean;
   chatSettings: ChatSettings;
   onClose: () => void;

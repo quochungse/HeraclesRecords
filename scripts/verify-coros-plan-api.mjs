@@ -52,7 +52,7 @@ function userDataDir() {
 }
 
 const SESSION_KEYS = ["trainingHub.accessToken", "trainingHub.userId", "trainingHub.regionId", "trainingHub.baseUrl"];
-const sourceDb = path.join(userDataDir(), "coroslink.sqlite");
+const sourceDb = path.join(userDataDir(), "heraclesrecords.sqlite");
 const Database = require("better-sqlite3");
 const source = new Database(sourceDb, { readonly: true, fileMustExist: true });
 const session = Object.fromEntries(

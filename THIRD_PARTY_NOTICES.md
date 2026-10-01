@@ -6,12 +6,11 @@ data that ship with it. The full license text of every JavaScript package and
 font in a build is in `THIRD_PARTY_LICENSES.txt`, generated at build time and
 installed beside this file in the app's `resources/licenses` folder.
 
-## CorosLink
+## Original code
 
-Heracles Records began as a fork of
-[CorosLink](https://github.com/JunAkerBuilds/CorosLink), Copyright (c) 2026
-AtoZ, released under the MIT License. That copyright notice and the MIT
-permission notice are kept in `LICENSE`, as the license requires.
+Part of Heracles Records' code is Copyright (c) 2026 AtoZ, released under the
+MIT License. That copyright notice and the MIT permission notice are kept in
+`LICENSE`, as the license requires.
 
 ## Programs that ship with the app
 
@@ -67,10 +66,9 @@ licensed under the
 Z-Anatomy includes material derived from BodyParts3D, copyright The Database
 Center for Life Science (DBCLS), also licensed under CC BY-SA 4.0.
 
-The CorosLink project, from which Heracles Records is forked, exported the
-required structures from Z-Anatomy's upstream Blender atlas, attached
-strength-group metadata, decimated and Draco-compressed the geometry; the app
-recolors it at runtime. The resulting `muscular_lite.glb` and
+AtoZ exported the required structures from Z-Anatomy's upstream Blender
+atlas, attached strength-group metadata, decimated and Draco-compressed the
+geometry; the app recolors it at runtime. The resulting `muscular_lite.glb` and
 `skeletal_lite.glb` derivatives are distributed under CC BY-SA 4.0.
 
 ### Body figure

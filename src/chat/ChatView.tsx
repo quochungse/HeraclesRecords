@@ -37,7 +37,7 @@ import {
 } from "lucide-react";
 import ReactMarkdown, { type Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
-import type { CorosLinkApi } from "../coroslink-api";
+import type { HeraclesRecordsApi } from "../heraclesrecords-api";
 import { showToast } from "../toast";
 import { useUnitSystem } from "../units/UnitSystemProvider";
 import type {
@@ -575,7 +575,7 @@ interface LiveAnalysisRun {
 }
 
 interface ChatViewProps {
-  api: CorosLinkApi | undefined;
+  api: HeraclesRecordsApi | undefined;
   onError: (message: string | null) => void;
   /** An informational toast (UAT): a send refused while another conversation answers. */
   onMessage?: (message: string | null) => void;

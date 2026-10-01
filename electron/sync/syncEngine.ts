@@ -485,7 +485,7 @@ export class ChangeBuilder {
    * write: localStorage is written from a dozen places in the renderer, so the
    * renderer hands over everything policy allows and the main process works out
    * what moved. That is the whole outbound half — theme, units, accent palette,
-   * sport colours, startup view and every `coroslink.selection.v1.*` — and it
+   * sport colours, startup view and every `heraclesrecords.selection.v1.*` — and it
    * meets `SqliteSyncTarget.setLocalStorage` / `drainLocalStorage` /
    * `applySyncedLocalStorageOps` coming the other way.
    */

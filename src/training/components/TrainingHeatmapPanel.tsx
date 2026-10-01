@@ -237,7 +237,7 @@ export function TrainingHeatmapPanel({
       return;
     }
 
-    const api = window.corosLink;
+    const api = window.heraclesRecords;
     if (!api?.syncStrengthHistory) {
       return;
     }

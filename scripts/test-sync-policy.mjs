@@ -210,7 +210,7 @@ for (const { text } of rendererSources) {
   for (const match of text.matchAll(
     /defineSelectionPreference[^(]*\(\s*\{\s*key:\s*"([^"]+)"/g
   )) {
-    storageKeys.add(`coroslink.selection.v1.${match[1]}`);
+    storageKeys.add(`heraclesrecords.selection.v1.${match[1]}`);
   }
 }
 
@@ -223,7 +223,7 @@ const localStorageBlock = objectLiteral("LOCAL_STORAGE_POLICY");
 const classifiedStorage = new Set(
   [...localStorageBlock.matchAll(/^\s{2}"([^"]+)":\s*"/gm)].map((m) => m[1])
 );
-const dynamicStoragePatterns = [/^coroslink\.selection\.v1\..+$/];
+const dynamicStoragePatterns = [/^heraclesrecords\.selection\.v1\..+$/];
 
 const storageResolves = (key) =>
   classifiedStorage.has(key) ||

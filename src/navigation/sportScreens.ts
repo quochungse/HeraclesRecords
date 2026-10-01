@@ -28,7 +28,7 @@ export const SPORT_SCREENS: readonly SportScreen[] = [
  * later reaches the rail for everyone without a migration — and an athlete who
  * never opened the setting has nothing stored at all.
  */
-const HIDDEN_SPORT_SCREENS_KEY = "coroslink.hiddenSportScreens";
+const HIDDEN_SPORT_SCREENS_KEY = "heraclesrecords.hiddenSportScreens";
 
 /** Every string stored, this build's screens or not. */
 function readStoredIds(): string[] {

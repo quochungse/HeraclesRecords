@@ -14,7 +14,7 @@ const distUrl = (file) =>
   `${pathToFileURL(path.join(repoRoot, "dist-electron", file)).href}?cacheBust=${Date.now()}`;
 const database = await import(distUrl("database.js"));
 
-const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "coroslink-coach-sql-"));
+const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "heraclesrecords-coach-sql-"));
 database.initializeDatabase(tempRoot);
 
 const run = (patch) => ({

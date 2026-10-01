@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ChevronRight, Loader2, Trash2 } from "lucide-react";
-import type { CorosLinkApi } from "../../coroslink-api";
+import type { HeraclesRecordsApi } from "../../heraclesrecords-api";
 import type {
   ChatProvider,
   CoachAnalysis,
@@ -98,7 +98,7 @@ export function AnalysisDetailView({
   onDiscard,
   onOpenConversation
 }: {
-  api: CorosLinkApi | undefined;
+  api: HeraclesRecordsApi | undefined;
   provider: ChatProvider;
   analysisId: string;
   initialTab?: Tab;

@@ -9,9 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 The first release of Heracles Records: a desktop companion for COROS athletes,
 for reading your training, planning it with a coach, and keeping your watch
-stocked with music. It began as a fork of
-[CorosLink](https://github.com/JunAkerBuilds/CorosLink) and has been rebuilt
-around those goals.
+stocked with music.
 
 ### Training
 

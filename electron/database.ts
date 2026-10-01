@@ -86,26 +86,8 @@ interface TrainingActivityRow {
 
 let db: Database.Database | undefined;
 
-function migrateLegacyDatabase(userDataPath: string, dbPath: string): void {
-  if (fs.existsSync(dbPath)) {
-    return;
-  }
-
-  const legacyPath = path.join(userDataPath, "coros-desktop.sqlite");
-  if (!fs.existsSync(legacyPath)) {
-    return;
-  }
-
-  fs.renameSync(legacyPath, dbPath);
-
-  for (const suffix of ["-wal", "-shm"]) {
-    const legacySidecar = `${legacyPath}${suffix}`;
-    const nextSidecar = `${dbPath}${suffix}`;
-    if (fs.existsSync(legacySidecar)) {
-      fs.renameSync(legacySidecar, nextSidecar);
-    }
-  }
-}
+/** The database's file name inside userData. */
+export const DATABASE_FILE_NAME = "heraclesrecords.sqlite";
 
 export function initializeDatabase(userDataPath: string): Database.Database {
   if (db) {
@@ -113,8 +95,7 @@ export function initializeDatabase(userDataPath: string): Database.Database {
   }
 
   fs.mkdirSync(userDataPath, { recursive: true });
-  const dbPath = path.join(userDataPath, "coroslink.sqlite");
-  migrateLegacyDatabase(userDataPath, dbPath);
+  const dbPath = path.join(userDataPath, DATABASE_FILE_NAME);
   db = new Database(dbPath);
   db.pragma("journal_mode = WAL");
   db.exec(`

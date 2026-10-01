@@ -43,7 +43,7 @@ import {
   type CoachModelsSummary
 } from "../chat/CoachModelsPanel";
 import { summarizeMcpStatuses } from "../chat/McpServersPanel";
-import type { CorosLinkApi } from "../coroslink-api";
+import type { HeraclesRecordsApi } from "../heraclesrecords-api";
 import { CoachModelsModal } from "./CoachModelsModal";
 import { McpServersModal } from "./McpServersModal";
 import { formatBytes } from "../media/libraryUtils";
@@ -160,7 +160,7 @@ function platformLabel(info: AppInfo): string {
 }
 
 interface SettingsViewProps {
-  api: CorosLinkApi;
+  api: HeraclesRecordsApi;
   updateSnapshot: AppUpdateSnapshot;
   updateBusy: boolean;
   updateDownloading: boolean;

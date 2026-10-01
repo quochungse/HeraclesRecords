@@ -8,7 +8,7 @@
 
 import { app, session, type WebContents } from "electron";
 
-export const APPLE_MUSIC_PARTITION = "persist:coroslink-apple";
+export const APPLE_MUSIC_PARTITION = "persist:heraclesrecords-apple";
 
 // amp-api is served from a few hostnames (amp-api, amp-api-edge, …); a
 // subdomain wildcard matches them all. Chromium match patterns only allow `*`

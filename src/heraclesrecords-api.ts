@@ -153,7 +153,7 @@ import type {
   ActivityDetailSummary,
   ActivityDetailSummarySync
 } from "../electron/types";
-export interface CorosLinkApi {
+export interface HeraclesRecordsApi {
   platform: string;
   getWatchStatus: () => Promise<WatchStatus>;
   /** Coordinates → a place name, for "Where you've been". */
@@ -762,7 +762,7 @@ export interface CorosLinkApi {
 
 declare global {
   interface Window {
-    corosLink?: CorosLinkApi;
+    heraclesRecords?: HeraclesRecordsApi;
   }
 }
 

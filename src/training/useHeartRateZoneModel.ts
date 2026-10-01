@@ -1,13 +1,13 @@
 import { useEffect, useState } from "react";
 import type { CorosProfile } from "../../electron/types";
-import type { CorosLinkApi } from "../coroslink-api";
+import type { HeraclesRecordsApi } from "../heraclesrecords-api";
 import {
   heartRateZoneModelFromProfile,
   type HeartRateZoneModel
 } from "./heartRateZoneModel";
 
 interface UseHeartRateZoneModelOptions {
-  api: CorosLinkApi | null;
+  api: HeraclesRecordsApi | null;
   corosConnected: boolean;
 }
 

@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { ExternalLink, Loader2, Terminal, X } from "lucide-react";
 import type { ClaudeCodeStatus } from "../../electron/types";
-import type { CorosLinkApi } from "../coroslink-api";
+import type { HeraclesRecordsApi } from "../heraclesrecords-api";
 
 const STATUS_POLL_INTERVAL_MS = 3_000;
 
@@ -20,7 +20,7 @@ export function ClaudeCodeLoginCard({
   onSignedIn,
   onError
 }: {
-  api: CorosLinkApi | undefined;
+  api: HeraclesRecordsApi | undefined;
   disabled?: boolean;
   onSignedIn: (status: ClaudeCodeStatus) => void;
   onError: (message: string | null) => void;

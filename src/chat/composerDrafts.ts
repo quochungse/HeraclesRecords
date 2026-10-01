@@ -10,7 +10,7 @@
  */
 import type { PlanRef, ScheduleRef } from "../../electron/types";
 
-export const COMPOSER_DRAFTS_KEY = "coroslink.coach.composerDrafts.v1";
+export const COMPOSER_DRAFTS_KEY = "heraclesrecords.coach.composerDrafts.v1";
 /** Conversations whose drafts are kept; the oldest go first. */
 const MAX_DRAFTS = 40;
 

@@ -77,7 +77,7 @@ import {
 } from "../../electron/trainingPlanDomain";
 import { formatWorkoutSport } from "../../electron/workoutCapabilities";
 import { replaceTrainingPlanEntryWorkout } from "../../electron/planWorkoutEditor";
-import type { CorosLinkApi } from "../coroslink-api";
+import type { HeraclesRecordsApi } from "../heraclesrecords-api";
 import { WorkoutBuilderModal } from "../calendar/WorkoutBuilderModal";
 import { OptionGroup } from "../components/OptionGroup";
 import { SelectDropdown } from "../components/SelectDropdown";
@@ -123,7 +123,7 @@ import {
 import { PlanOriginBadge, SportMixDots, dominantSport, sportAccentStyle, sportChipStyle, sportTheme } from "./sportTheme";
 
 interface PlanEditorProps {
-  api: CorosLinkApi;
+  api: HeraclesRecordsApi;
   /**
    * The edit in progress, held by the caller so it survives a tab switch. The
    * editor draws it and reports every change back; it owns no history of its

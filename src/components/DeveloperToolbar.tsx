@@ -1,12 +1,12 @@
 import { Sparkles } from "lucide-react";
-import type { CorosLinkApi } from "../coroslink-api";
+import type { HeraclesRecordsApi } from "../heraclesrecords-api";
 import type { WatchStatus } from "../../electron/types";
 import { StatusDot } from "./StatusDot";
 import { SampleDataControls } from "./SampleDataControls";
 import { WatchConnectionSmokeControls } from "./WatchConnectionSmokeControls";
 
 interface DeveloperToolbarProps {
-  api: CorosLinkApi | undefined;
+  api: HeraclesRecordsApi | undefined;
   watchStatus: WatchStatus | null;
   /** Dev view exposes development-only destinations and the tools below. */
   developmentViewActive: boolean;

@@ -5,7 +5,7 @@
 //   2. /activity/query — does it accept startDay/endDay filters?
 //   3. Scheduling a workout on a past day — accepted or rejected?
 //
-// Reuses the app's stored session from coroslink.sqlite (read-only). Creates a
+// Reuses the app's stored session from heraclesrecords.sqlite (read-only). Creates a
 // temporary workout ("Heracles Records API Probe — delete me"), schedules/moves it on
 // far-future dates, then removes both the schedule entries and the library
 // program. Nothing else on the account is touched.
@@ -38,7 +38,7 @@ function userDataDir() {
   if (process.platform === "win32") return path.join(process.env.APPDATA ?? "", name);
   return path.join(process.env.XDG_CONFIG_HOME ?? path.join(os.homedir(), ".config"), name);
 }
-const dbPath = path.join(userDataDir(), "coroslink.sqlite");
+const dbPath = path.join(userDataDir(), "heraclesrecords.sqlite");
 const setting = (key) =>
   execFileSync(
     "sqlite3",

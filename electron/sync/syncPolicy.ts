@@ -396,39 +396,39 @@ export function policyForSetting(key: string): SyncTier | undefined {
 export const LOCAL_STORAGE_POLICY: Readonly<Record<string, SyncTier>> = {
   // Appearance and units — the settings people expect to follow them.
   "coros-theme": "preference",
-  "coroslink.accentPalette": "preference",
+  "heraclesrecords.accentPalette": "preference",
   // Not a preference any more: the switch is the COROS account's own
   // Measurement field, and this is the last answer it gave, cached so the next
   // launch's first paint is already in the right unit. Every machine of one
   // account recomputes the same value from the account itself.
-  "coroslink.unitSystem": "derived",
+  "heraclesrecords.unitSystem": "derived",
   // COROS's other display setting, cached for the same reason and on the same
   // terms as the one above.
-  "coroslink.temperatureUnit": "derived",
-  "coroslink.sportColors": "preference",
-  "coroslink.startupView": "preference",
+  "heraclesrecords.temperatureUnit": "derived",
+  "heraclesrecords.sportColors": "preference",
+  "heraclesrecords.startupView": "preference",
   // The sport screens taken off the rail — which sports the athlete reads,
   // so it follows them to the next machine.
-  "coroslink.hiddenSportScreens": "preference",
+  "heraclesrecords.hiddenSportScreens": "preference",
   // Which muscle layers the strength body map draws.
-  "coroslink-strength-muscle-layers-v2": "preference",
+  "heraclesrecords-strength-muscle-layers-v2": "preference",
 
   // Window chrome, sized to whatever display this machine has.
-  "coroslink.sidebarCollapsed": "device",
+  "heraclesrecords.sidebarCollapsed": "device",
   // A transient pick in the Apple Music browser.
-  "coroslink.appleMusic.selectedPlaylistId": "device",
+  "heraclesrecords.appleMusic.selectedPlaylistId": "device",
   // "I dismissed the prompt for version X" — about this install, not the person.
-  "coroslink.updatePrompt.dismissedVersion": "device",
+  "heraclesrecords.updatePrompt.dismissedVersion": "device",
   // What was being written in each Coach conversation, and what it pointed at:
   // an unsent question on this machine, not the athlete's record.
-  "coroslink.coach.composerDrafts.v1": "device",
+  "heraclesrecords.coach.composerDrafts.v1": "device",
 
   // Visit centroids and route polylines for the activity globe, read back out
   // of the activity details; refetched on demand.
-  "coroslink.activity-globe.geo-cache.v1": "derived",
+  "heraclesrecords.activity-globe.geo-cache.v1": "derived",
   // Place names for the globe's visit clusters, as a public geocoder answered
   // them. Refetched on demand, and about the map rather than the athlete.
-  "coroslink.activity-globe.place-labels.v1": "derived"
+  "heraclesrecords.activity-globe.place-labels.v1": "derived"
 };
 
 export const DYNAMIC_LOCAL_STORAGE_RULES: ReadonlyArray<{
@@ -441,7 +441,7 @@ export const DYNAMIC_LOCAL_STORAGE_RULES: ReadonlyArray<{
     // active tab, sort order, filter and layout choices across the app. No
     // credentials, and carrying them to a new machine is the friendlier
     // default.
-    pattern: /^coroslink\.selection\.v1\..+$/,
+    pattern: /^heraclesrecords\.selection\.v1\..+$/,
     tier: "preference",
     description: "Per-view tab, sort, filter and layout selections."
   }

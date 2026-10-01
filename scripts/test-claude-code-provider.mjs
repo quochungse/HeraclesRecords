@@ -123,8 +123,8 @@ assert.equal(subscriptionEnv.ANTHROPIC_BASE_URL, undefined);
 assert.equal(subscriptionEnv.CLAUDE_AGENT_SDK_CLIENT_APP, "heracles-records-coach");
 // Without an explicit dir, Claude Code keeps using the machine-wide login.
 assert.equal(subscriptionEnv.CLAUDE_CONFIG_DIR, undefined);
-const scopedEnv = createClaudeSubscriptionEnvironment("/tmp/coroslink-claude");
-assert.equal(scopedEnv.CLAUDE_CONFIG_DIR, "/tmp/coroslink-claude");
+const scopedEnv = createClaudeSubscriptionEnvironment("/tmp/heraclesrecords-claude");
+assert.equal(scopedEnv.CLAUDE_CONFIG_DIR, "/tmp/heraclesrecords-claude");
 assert.equal(scopedEnv.ANTHROPIC_API_KEY, undefined);
 assert.equal(
   createClaudeSubscriptionEnvironment("   ").CLAUDE_CONFIG_DIR,
@@ -176,7 +176,7 @@ if (process.platform !== "win32") {
   // The fake CLIs are written at run time rather than committed, so no stub
   // scripts linger in the repo. Each one stands in for a real `claude auth
   // login` shape that has already broken the sign-in flow.
-  const stubDir = fs.mkdtempSync(path.join(os.tmpdir(), "coroslink-stub-"));
+  const stubDir = fs.mkdtempSync(path.join(os.tmpdir(), "heraclesrecords-stub-"));
   const stub = (name, loginBody) => {
     const file = path.join(stubDir, name);
     fs.writeFileSync(
@@ -208,7 +208,7 @@ if (process.platform !== "win32") {
     '    mkdir -p "$DIR"; echo \'{}\' > "$DIR/.credentials.json"';
 
   // 1. The CLI writes credentials and exits.
-  const exitDir = fs.mkdtempSync(path.join(os.tmpdir(), "coroslink-exit-"));
+  const exitDir = fs.mkdtempSync(path.join(os.tmpdir(), "heraclesrecords-exit-"));
   const exiting = await startClaudeCodeLogin({
     executablePath: stub(
       "writes-then-exits",
@@ -230,7 +230,7 @@ if (process.platform !== "win32") {
 
   // 2. Exit code 0 is not proof of a sign-in: the CLI also exits 0 when it gives
   //    up. Trusting it reported success while no credentials existed.
-  const abandonedDir = fs.mkdtempSync(path.join(os.tmpdir(), "coroslink-gone-"));
+  const abandonedDir = fs.mkdtempSync(path.join(os.tmpdir(), "heraclesrecords-gone-"));
   const abandoned = await startClaudeCodeLogin({
     executablePath: stub(
       "exits-without-signing-in",
@@ -251,7 +251,7 @@ if (process.platform !== "win32") {
   // 3. The real shape: credentials are written but the CLI stays parked on its
   //    paste-code prompt forever. Waiting on the process alone spins here, which
   //    is what left the sign-in card stuck on "Waiting for your browser…".
-  const parkedDir = fs.mkdtempSync(path.join(os.tmpdir(), "coroslink-parked-"));
+  const parkedDir = fs.mkdtempSync(path.join(os.tmpdir(), "heraclesrecords-parked-"));
   const parked = await startClaudeCodeLogin({
     executablePath: stub(
       "writes-then-parks",

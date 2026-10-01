@@ -106,7 +106,7 @@ assert.deepEqual(extractYtDlpErrors(noisyOutput), [
 
 console.log("yt-dlp error extraction tests passed");
 
-const downloadDir = fs.mkdtempSync(path.join(os.tmpdir(), "coroslink-download-test-"));
+const downloadDir = fs.mkdtempSync(path.join(os.tmpdir(), "heraclesrecords-download-test-"));
 const absoluteMp3 = path.join(downloadDir, "Song [abc123].mp3");
 const relativeMp3Name = "Another Song [def456].mp3";
 const relativeMp3 = path.join(downloadDir, relativeMp3Name);

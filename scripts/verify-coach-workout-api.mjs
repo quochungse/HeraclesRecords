@@ -42,7 +42,7 @@ function userDataDir() {
   if (process.platform === "win32") return path.join(process.env.APPDATA ?? "", name);
   return path.join(process.env.XDG_CONFIG_HOME ?? path.join(os.homedir(), ".config"), name);
 }
-const dbPath = path.join(userDataDir(), "coroslink.sqlite");
+const dbPath = path.join(userDataDir(), "heraclesrecords.sqlite");
 const setting = (key) =>
   execFileSync(
     "sqlite3",

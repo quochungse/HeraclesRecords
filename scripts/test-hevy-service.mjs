@@ -10,7 +10,7 @@ const distUrl = (file) =>
 const database = await import(distUrl("database.js"));
 const hevy = await import(distUrl("hevyService.js"));
 
-const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "coroslink-hevy-test-"));
+const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "heraclesrecords-hevy-test-"));
 database.initializeDatabase(tempRoot);
 
 let encryptionAvailable = true;

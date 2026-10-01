@@ -17,7 +17,7 @@ import {
   formatElevationMeters,
   formatPaceSecondsPerKm
 } from "../training/formatters";
-import type { CorosLinkApi } from "../coroslink-api";
+import type { HeraclesRecordsApi } from "../heraclesrecords-api";
 import { OptionGroup } from "../components/OptionGroup";
 import {
   periodDaysFromValue,
@@ -55,7 +55,7 @@ import {
 import "./running.css";
 
 export interface RunningViewProps {
-  api: CorosLinkApi | null;
+  api: HeraclesRecordsApi | null;
   activities: TrainingHubActivity[];
   connected: boolean;
   /** A start-up re-login in flight: signed out now, probably not in a moment. */

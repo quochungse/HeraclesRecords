@@ -1053,6 +1053,6 @@ const api = {
   }
 };
 
-contextBridge.exposeInMainWorld("corosLink", api);
+contextBridge.exposeInMainWorld("heraclesRecords", api);
 
-export type CorosLinkApi = typeof api;
+export type HeraclesRecordsApi = typeof api;

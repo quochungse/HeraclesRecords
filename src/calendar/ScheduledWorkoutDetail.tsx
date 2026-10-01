@@ -14,7 +14,7 @@ import type {
   TrainingHubSportType,
   UnitSystem
 } from "../../electron/types";
-import type { CorosLinkApi } from "../coroslink-api";
+import type { HeraclesRecordsApi } from "../heraclesrecords-api";
 import { useUnitSystem } from "../units/UnitSystemProvider";
 import { useWorkoutExerciseCatalog } from "./useWorkoutExerciseCatalog";
 import {
@@ -50,7 +50,7 @@ interface ScheduledWorkoutDetailProps {
    * opened from the Calendar's library named all nine. Omit it and the panel
    * draws exactly as it did before; the clips go with it.
    */
-  api?: CorosLinkApi;
+  api?: HeraclesRecordsApi;
 }
 
 function formatDetailVolume(volume: string | undefined, unitSystem: UnitSystem): string {

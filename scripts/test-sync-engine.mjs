@@ -507,7 +507,7 @@ function fakeTarget() {
       {
         ...entry(at(7)),
         scope: "localStorage",
-        key: "coroslink.sidebarCollapsed",
+        key: "heraclesrecords.sidebarCollapsed",
         recordId: undefined,
         payload: { value: "true" }
       }
@@ -866,10 +866,10 @@ const { deviceId, isValidDeviceId, DEVICE_ID_SETTING } = await load(
 
   // localStorage is queued for the renderer, never written here.
   target.setLocalStorage("coros-theme", "dark");
-  target.deleteLocalStorage("coroslink.startupView");
+  target.deleteLocalStorage("heraclesrecords.startupView");
   assert.deepEqual(target.drainLocalStorage(), [
     { op: "set", key: "coros-theme", value: "dark" },
-    { op: "delete", key: "coroslink.startupView" }
+    { op: "delete", key: "heraclesrecords.startupView" }
   ]);
   assert.deepEqual(
     target.drainLocalStorage(),

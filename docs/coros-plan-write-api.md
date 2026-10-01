@@ -12,7 +12,7 @@ with `userId`) against the regional `teamapi*.coros.com` host.
 
 This is the private API used by the first-party Training Hub web app. It is not
 the partner-only COROS OpenAPI training-plan push API, and it is not the COROS
-MCP service. The COROS MCP is currently read-only; CorosLink performs writes
+MCP service. The COROS MCP is currently read-only; Heracles Records performs writes
 through the athlete's authenticated Training Hub session.
 
 ## Endpoints
@@ -273,7 +273,7 @@ watch waits until the athlete's heart rate reaches that bpm.
 All new callers use the typed intensity objects in `electron/types.ts`; legacy
 raw fields remain read-compatible but cannot be mixed with typed intensity on
 one step. Percentage values are written in COROS's official ×1000 format and
-the reader accepts both scaled values and older CorosLink unscaled values.
+the reader accepts both scaled values and older unscaled values from earlier builds.
 
 The issue #72 absolute-heart-rate form is deliberately encoded as
 `intensityType: 2`, `hrType: 2`, `isIntensityPercent: false`,
@@ -333,7 +333,7 @@ sport-aware editor does not understand remain on their original raw objects.
 ```
 
 `status: 2` is the first-party Training Hub's occurrence-edit operation. It is
-not the move operation; CorosLink still moves workouts by add-then-delete.
+not the move operation; Heracles Records still moves workouts by add-then-delete.
 Library and scheduled programs are independent copies, so neither edit flow
 propagates into the other.
 
@@ -407,7 +407,7 @@ See `scripts/fixtures/coros-plan-write/` for redacted request/response samples:
 avatars replaced). `npm run verify:coros-plan-api -- --live` is the live check
 for native plans.
 For a cleanup-safe live contract check of workouts, run `npm run verify:coach-workout-api`
-while a COROS session is saved in CorosLink. The verifier creates, schedules,
+while a COROS session is saved in Heracles Records. The verifier creates, schedules,
 edits, reads back, checks library/calendar isolation for Run, then creates,
 round-trips, edits, and deletes a representative workout for every supported
 sport. All temporary artifacts are deleted in `finally`.

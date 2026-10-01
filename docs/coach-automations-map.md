@@ -107,7 +107,7 @@ looks like.
 
 Handlers: [main.ts:1486–1613](../electron/main.ts#L1486).
 Preload: [preload.ts:985–1076](../electron/preload.ts#L985).
-Renderer files are call sites found by grep; `src/coroslink-api.ts` declares the
+Renderer files are call sites found by grep; `src/heraclesrecords-api.ts` declares the
 type for every one and is omitted from the caller column.
 
 | Channel | Main handler | Preload method | Renderer callers | Doc §8 |
@@ -153,7 +153,7 @@ Also on the feature's path but not owned by it: `chat:saveSession`
 | `CoachActivityWatcherDeps` | [coachActivityWatcher.ts:54](../electron/coachActivityWatcher.ts#L54), 13 members | clock, `refreshActivityIndex`, unseen rows, `markSeen`/`markAllSeen`, automations, COROS auth, settings get/set, `runTrigger`, `readDailySamples`/`writeDailySamples`, `dailySampleTimeoutMs`, `onError` | `test:coach-activity-watcher` |
 | `ChatStreamSink` | [chatService.ts:859](../electron/chatService.ts#L859); `createWindowSink` :884, `createCollectorSink` :941 | where a stream's events go (5.2) | `test:chat-stream-sink` |
 | `ChatSessionDatabase` | `chatHistoryStore.ts`, threaded into `saveChatSession` :1057, `createChatSession` :1009, `setChatSessionTitle` :1119 | the conversation rows the runner appends into | `test:chat-history-store` |
-| `CorosLinkApi` stub | `scripts/test-coach-automation-renderer.mjs` fixtures | the whole preload bridge, for mounted components | `test:coach-automation-renderer` |
+| `HeraclesRecordsApi` stub | `scripts/test-coach-automation-renderer.mjs` fixtures | the whole preload bridge, for mounted components | `test:coach-automation-renderer` |
 
 Not a seam but the same shape: `getClaudeCodeTools(permissions, policy)`
 ([chatService.ts:1812](../electron/chatService.ts#L1812)) is a pure function of
@@ -216,7 +216,7 @@ Every suite is `scripts/test-*.mjs`, per the `package.json` convention.
 |---|---|
 | `test:coach-automation-store` | It drives an in-memory `CoachAutomationDatabase`, so any SQL in `database.ts` that disagrees with the fake — a wrong `WHERE`, a column mapped to the wrong index — passes here untouched. |
 | `test:coach-automation-bindings` | Its remaining renderer regexes assert *text*, not execution: the `setStartingId` call-count check is satisfied by two calls anywhere in the file, including two wrong ones. |
-| `test:coach-automation-renderer` | The stub `CorosLinkApi` **is** the bridge, so nothing on the main side of it is visible — a preload/main argument mismatch, or a store returning a correctly-shaped but wrong answer, looks identical to correct. |
+| `test:coach-automation-renderer` | The stub `HeraclesRecordsApi` **is** the bridge, so nothing on the main side of it is visible — a preload/main argument mismatch, or a store returning a correctly-shaped but wrong answer, looks identical to correct. |
 | `test:coach-automation-sql` | It issues the queries itself against real SQLite; it cannot say the runner or scheduler ever call them, or call them with those arguments. |
 | `test:coach-automation-guards` | It checks the allowlist as a pure function; it cannot say `streamChat` actually threads `toolPolicy` into each of the four provider paths. |
 | `test:coach-automation-runner` | `createDefaultDeps` is never exercised — every one of the 30 members is replaced — so a default wired to the wrong store function type-checks and is never run here. |
@@ -301,7 +301,7 @@ preload method name.
 §8 lists it as "Clear the unread badge". Nothing in `src/` calls
 `markCoachAutomationRunsSeen` — `ChatView` clears marks through
 `markCoachAutomationSessionSeen` (§9.3's "reading it means opening it"). The
-channel, its preload method and its `CorosLinkApi` declaration are all live;
+channel, its preload method and its `HeraclesRecordsApi` declaration are all live;
 only the caller is missing.
 
 ### 7.5 Section 4's manual-bypass list omits guard rail 1

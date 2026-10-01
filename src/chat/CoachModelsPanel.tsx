@@ -35,7 +35,7 @@ import {
 } from "../../electron/chatModels";
 import { ClaudeCodeLoginCard } from "./ClaudeCodeLoginCard";
 import { detectAndAdoptLocalServer } from "./localModelDetection";
-import type { CorosLinkApi } from "../coroslink-api";
+import type { HeraclesRecordsApi } from "../heraclesrecords-api";
 
 function claudeStatusLabel(status: ClaudeCodeStatus | null): string {
   if (!status) return "Not checked";
@@ -167,7 +167,7 @@ export function modelListLine(
 type ModelListProvider = "claude-code" | "claude-api" | "openrouter";
 
 export interface CoachModelsPanelProps {
-  api: CorosLinkApi | undefined;
+  api: HeraclesRecordsApi | undefined;
   /** Fired after anything is persisted, so callers can re-read what changed. */
   onChange?: () => void | Promise<void>;
 }

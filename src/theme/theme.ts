@@ -48,7 +48,7 @@ export function applyTheme(theme: Theme): void {
     root.dataset.theme = theme;
   }
 
-  window.corosLink?.setWindowBackground?.(THEME_WINDOW_BACKGROUND[theme]);
+  window.heraclesRecords?.setWindowBackground?.(THEME_WINDOW_BACKGROUND[theme]);
 }
 
 /** Where the theme change should visually originate (the toggle button). */

@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { AlertTriangle, Loader2, X } from "lucide-react";
-import type { CorosLinkApi } from "../../coroslink-api";
+import type { HeraclesRecordsApi } from "../../heraclesrecords-api";
 
 /**
  * Deleting an analysis. The conversation survives — it is the athlete's chat
@@ -18,7 +18,7 @@ export function DeleteAnalysisDialog({
   onClose,
   onDeleted
 }: {
-  api: CorosLinkApi | undefined;
+  api: HeraclesRecordsApi | undefined;
   analysisId: string;
   analysisName: string;
   onClose: () => void;

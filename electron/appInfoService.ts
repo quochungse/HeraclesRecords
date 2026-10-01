@@ -1,6 +1,7 @@
 import { app, shell } from "electron";
 import fs from "node:fs";
 import path from "node:path";
+import { DATABASE_FILE_NAME } from "./database";
 import type { AppInfo, AppStorageLocation } from "./types";
 
 interface StorageLocationSpec {
@@ -28,7 +29,7 @@ const STORAGE_LOCATION_SPECS: StorageLocationSpec[] = [
     description:
       "SQLite database holding the track library, download history, and coach sessions.",
     kind: "file",
-    resolvePath: () => path.join(app.getPath("userData"), "coroslink.sqlite")
+    resolvePath: () => path.join(app.getPath("userData"), DATABASE_FILE_NAME)
   },
   {
     id: "user-data",

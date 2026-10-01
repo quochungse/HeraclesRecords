@@ -1,12 +1,12 @@
 import { Check, Link2, SkipForward, Undo2 } from "lucide-react";
 import { useState } from "react";
 import type { TrainingHubActivity } from "../../electron/types";
-import type { CorosLinkApi } from "../coroslink-api";
+import type { HeraclesRecordsApi } from "../heraclesrecords-api";
 import { SelectDropdown } from "../components/SelectDropdown";
 import type { CalendarDay, PlannedActualPair } from "./calendarTypes";
 
 interface PlanStatusBlockProps {
-  api: CorosLinkApi;
+  api: HeraclesRecordsApi;
   day: CalendarDay;
   pair: PlannedActualPair;
   /** Re-reads the range, so the override the athlete just made is on screen. */

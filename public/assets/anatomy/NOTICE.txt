@@ -9,8 +9,7 @@ Science (DBCLS), also licensed CC BY-SA 4.0.
 
 The models were exported from the upstream Blender atlas at revision
 b16b4c2eb7de824722f5eef9d5f56c5569a3d640, then decimated, Draco-compressed,
-and adapted to the strength view by the CorosLink project, from which
-Heracles Records is forked. The muscular_lite.glb export retains
+and adapted to the strength view by AtoZ. The muscular_lite.glb export retains
 Z-Anatomy's original linea alba mesh. Both GLB derivatives are distributed
 under the same CC BY-SA 4.0 license:
 https://creativecommons.org/licenses/by-sa/4.0/

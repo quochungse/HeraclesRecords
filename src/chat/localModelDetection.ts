@@ -3,7 +3,7 @@ import type {
   LocalChatConnectionTest,
   LocalChatDiscovery
 } from "../../electron/types";
-import type { CorosLinkApi } from "../coroslink-api";
+import type { HeraclesRecordsApi } from "../heraclesrecords-api";
 
 export interface LocalDetectionResult {
   /** Every server probed, which is what fills the server and model pickers. */
@@ -23,7 +23,7 @@ export interface LocalDetectionResult {
  * chosen yet. Duplicating it would let the two drift on which server wins.
  */
 export async function detectAndAdoptLocalServer(
-  api: CorosLinkApi,
+  api: HeraclesRecordsApi,
   chatSettings: ChatSettings,
   apiKeyDraft: string
 ): Promise<LocalDetectionResult> {

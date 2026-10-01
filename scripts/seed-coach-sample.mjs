@@ -90,7 +90,7 @@ function userDataDir() {
 }
 
 const userData = userDataDir();
-if (!fs.existsSync(path.join(userData, "coroslink.sqlite"))) {
+if (!fs.existsSync(path.join(userData, "heraclesrecords.sqlite"))) {
   console.error(`No app database in ${userData}. Run the app once, or set HERACLES_USER_DATA.`);
   process.exit(1);
 }

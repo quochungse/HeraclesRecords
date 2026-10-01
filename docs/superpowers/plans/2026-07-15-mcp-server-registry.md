@@ -29,7 +29,7 @@
 - Modify `electron/database.ts` — create `mcp_servers` table + seed built-in COROS row.
 - Modify `electron/corosMcpService.ts` — re-export/delegate to the manager for back-compat (or fold in).
 - Modify `electron/chatService.ts` — aggregate + route through the manager.
-- Modify `electron/main.ts`, `electron/preload.ts`, `src/coroslink-api.ts` — `mcp:*` IPC.
+- Modify `electron/main.ts`, `electron/preload.ts`, `src/heraclesrecords-api.ts` — `mcp:*` IPC.
 - Modify `electron/types.ts` — `McpServerConfig`, `McpServerStatus`, `McpServerInput`.
 - Create `src/chat/McpServersPanel.tsx` + wire into Settings — registry UI.
 - Create `scripts/test-mcp-tool-names.mjs`, `scripts/test-mcp-servers-store.mjs`.
@@ -471,7 +471,7 @@ Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
 **Files:**
 - Modify: `electron/main.ts` (register `mcp:*` handlers, import manager + store)
 - Modify: `electron/preload.ts` (expose `mcp*` methods)
-- Modify: `src/coroslink-api.ts` (type the methods)
+- Modify: `src/heraclesrecords-api.ts` (type the methods)
 
 **Interfaces (renderer-facing api):**
 ```ts
@@ -497,12 +497,12 @@ ipcMain.handle("mcp:statuses", () => getMcpStatuses());
 ipcMain.handle("mcp:setBearer", (_e, id, token) => setMcpBearer(id, token));
 ```
 - [ ] **Step 2:** `preload.ts`: add the eight methods calling `ipcRenderer.invoke("mcp:...", ...)`.
-- [ ] **Step 3:** `src/coroslink-api.ts`: add the typed method signatures (Interfaces block) + import `McpServerConfig`, `McpServerInput`, `McpServerStatus`.
+- [ ] **Step 3:** `src/heraclesrecords-api.ts`: add the typed method signatures (Interfaces block) + import `McpServerConfig`, `McpServerInput`, `McpServerStatus`.
 - [ ] **Step 4:** Build: `npm run build` → no errors.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add electron/main.ts electron/preload.ts src/coroslink-api.ts
+git add electron/main.ts electron/preload.ts src/heraclesrecords-api.ts
 git commit -m "feat(mcp): IPC + preload + api for the MCP registry
 
 Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"

@@ -20,7 +20,7 @@ import {
 } from "../../electron/chatContextCompaction";
 import { compressionModelFor, providerModelOptions } from "../../electron/chatModels";
 import { COACH_PROVIDER_LABELS } from "./CoachModelsPanel";
-import type { CorosLinkApi } from "../coroslink-api";
+import type { HeraclesRecordsApi } from "../heraclesrecords-api";
 import { formatTokens } from "./analyses/analysisLabels";
 import { OptionGroup } from "../components/OptionGroup";
 import {
@@ -43,7 +43,7 @@ export function ChatSettingsPanel({
   pendingBudget,
   onPendingBudgetChange
 }: {
-  api: CorosLinkApi | undefined;
+  api: HeraclesRecordsApi | undefined;
   chatSettings: ChatSettings;
   /** One line describing what is connected, or null while it is being read. */
   coachModelsSummary: string | null;
@@ -406,7 +406,7 @@ function AnalysesSettingsSection({
   pendingBudget,
   onPendingBudgetChange
 }: {
-  api: CorosLinkApi | undefined;
+  api: HeraclesRecordsApi | undefined;
   pendingBudget: number | null | undefined;
   onPendingBudgetChange: (budget: number | null | undefined) => void;
 }) {

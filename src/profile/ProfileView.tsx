@@ -20,7 +20,7 @@ import type {
   TrainingHubDashboard,
   TrainingHubStatus
 } from "../../electron/types";
-import type { CorosLinkApi } from "../coroslink-api";
+import type { HeraclesRecordsApi } from "../heraclesrecords-api";
 import { FitnessScoresPanel } from "../training/components/FitnessScoresPanel";
 import { PersonalRecordsPanel } from "../training/components/PersonalRecordsPanel";
 import { Vo2MaxWidget } from "../training/components/Vo2MaxWidget";
@@ -44,7 +44,7 @@ import {
 import "./profile.css";
 
 interface ProfileViewProps {
-  api: CorosLinkApi;
+  api: HeraclesRecordsApi;
   status: TrainingHubStatus | null;
   /**
    * The snapshot Overview reads. VO2 max history lives in its day lists, which

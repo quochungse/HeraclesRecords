@@ -6,7 +6,7 @@ import type {
   PlanWorkoutEntryInput,
   TrainingPlanEntry
 } from "../../electron/types";
-import type { CorosLinkApi } from "../coroslink-api";
+import type { HeraclesRecordsApi } from "../heraclesrecords-api";
 import { WorkoutBuilderModal } from "../calendar/WorkoutBuilderModal";
 import { ConfirmDialog } from "../training-library/ConfirmDialog";
 import { NewerVersionDialog } from "./NewerVersionDialog";
@@ -27,7 +27,7 @@ export default function CoachWorkoutEditor({
   onClose,
   onError
 }: {
-  api: CorosLinkApi;
+  api: HeraclesRecordsApi;
   draft: PlanDraftPreview;
   /** The workout as the coach wrote it, steps and all. */
   workout: PlanWorkoutEntryInput;

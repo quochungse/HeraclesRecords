@@ -127,7 +127,7 @@ seedDatabase();
     owner: fingerprintOwner("coros-user-1"),
     localStorage: {
       "coros-theme": "paper", // preference — carried
-      "coroslink.sidebarCollapsed": "true" // device — not
+      "heraclesrecords.sidebarCollapsed": "true" // device — not
     }
   });
 

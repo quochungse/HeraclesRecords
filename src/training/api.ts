@@ -2,7 +2,7 @@ import type {
   TrainingHubDashboard,
   TrainingHubUpcomingWorkout
 } from "../../electron/types";
-import type { CorosLinkApi } from "../coroslink-api";
+import type { HeraclesRecordsApi } from "../heraclesrecords-api";
 
 function fallbackDashboard(
   racePredictor: TrainingHubDashboard["racePredictor"]
@@ -17,7 +17,7 @@ function fallbackDashboard(
 }
 
 export async function fetchTrainingDashboard(
-  api: CorosLinkApi
+  api: HeraclesRecordsApi
 ): Promise<TrainingHubDashboard> {
   if (typeof api.getTrainingDashboard === "function") {
     return api.getTrainingDashboard();
@@ -27,7 +27,7 @@ export async function fetchTrainingDashboard(
 }
 
 export async function fetchUpcomingWorkouts(
-  api: CorosLinkApi,
+  api: HeraclesRecordsApi,
   days = 14
 ): Promise<TrainingHubUpcomingWorkout[]> {
   if (typeof api.getUpcomingWorkouts === "function") {
