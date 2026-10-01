@@ -6,7 +6,7 @@ import {
   formatElevationMeters
 } from "../training/formatters";
 import { useUnitSystem } from "../units/UnitSystemProvider";
-import { elevationUnit, metersToElevation } from "../units/units";
+import { formatVerticalRate } from "../units/units";
 import { DeltaChip } from "../running/RunningHero";
 import {
   CLIMBING_RATE_MIN_GAIN_M,
@@ -73,8 +73,6 @@ export function HikingHero({ hikes, nowMs }: HikingHeroProps) {
   const rate = useMemo(() => climbingRate(hikes, { days: RECENT_DAYS, nowMs }), [hikes, nowMs]);
 
   const count = thisWeek?.current.count ?? 0;
-  const perHour = (meters: number) =>
-    `${Math.round(metersToElevation(meters, unitSystem))} ${elevationUnit(unitSystem)}/h`;
 
   return (
     <section className="run-hero">
@@ -134,7 +132,7 @@ export function HikingHero({ hikes, nowMs }: HikingHeroProps) {
       >
         <span className="run-hero-label">Ascent per hour · 12 weeks</span>
         <strong className="run-hero-value">
-          {rate.rate === undefined ? "—" : perHour(rate.rate)}
+          {rate.rate === undefined ? "—" : formatVerticalRate(rate.rate, unitSystem)}
         </strong>
         <div className="run-hero-foot">
           <span>

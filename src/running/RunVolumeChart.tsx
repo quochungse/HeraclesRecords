@@ -15,21 +15,19 @@ import { OptionGroup } from "../components/OptionGroup";
 import { trainingChartTooltipStyle } from "../training/chartConfig";
 import { useChartColors } from "../training/useChartColors";
 import { useUnitSystem } from "../units/UnitSystemProvider";
-import {
-  distanceUnit,
-  elevationUnit,
-  metersToDisplayDistance,
-  metersToElevation
-} from "../units/units";
-import {
-  buildRunWeeks,
-  runWindowStartMs,
-  summariseRuns,
-  type RunTotals,
-  type RunWeek
-} from "./runMetrics";
+import { buildRunWeeks, summariseRuns, type RunWeek } from "./runMetrics";
 import { RUN_SURFACE_LABELS, type RunSurface } from "./runSurface";
 import { runSurfaceColors } from "./runSurfaceColors";
+import {
+  MOVING_AVERAGE_WEEKS,
+  formatMeasure,
+  measureUnit,
+  measured,
+  oneYearEarlier,
+  trailingAverage,
+  type Volume,
+  type VolumeMeasure
+} from "./sportVolume";
 
 /**
  * What a week of running is measured in.
@@ -40,9 +38,7 @@ import { runSurfaceColors } from "./runSurfaceColors";
  * apart — so under the Trail filter the chart opens on time. The bars, the
  * average, the dashed line and the heading all follow the one chosen.
  */
-export type RunVolumeMeasure = "distance" | "time" | "climb";
-
-const MEASURE_OPTIONS: readonly { value: RunVolumeMeasure; label: string }[] = [
+const MEASURE_OPTIONS: readonly { value: VolumeMeasure; label: string }[] = [
   { value: "distance", label: "Distance" },
   { value: "time", label: "Time" },
   { value: "climb", label: "Climb" }
@@ -58,17 +54,8 @@ interface RunVolumeChartProps {
   surfaces: readonly RunSurface[];
   nowMs: number;
   /** What the chart opens on. Read on mount; the switch owns it from there. */
-  defaultMeasure?: RunVolumeMeasure;
+  defaultMeasure?: VolumeMeasure;
 }
-
-/** Weeks the trailing average is taken over. */
-const MOVING_AVERAGE_WEEKS = 4;
-/**
- * How far back "a year ago" is, in whole weeks, so the comparison window starts
- * on a Monday exactly as the chart's own window does.
- */
-const WEEKS_PER_YEAR = 52;
-const SECONDS_PER_HOUR = 3600;
 
 interface VolumeRow extends Record<string, number | string> {
   label: string;
@@ -76,108 +63,30 @@ interface VolumeRow extends Record<string, number | string> {
   longest: number;
 }
 
-/** A week's (or any total's) volume in the chosen measure, in display units. */
-function measureTotal(totals: RunTotals, measure: RunVolumeMeasure, unitSystem: UnitSystem): number {
-  if (measure === "time") return totals.duration / SECONDS_PER_HOUR;
-  if (measure === "climb") return metersToElevation(totals.elevationGain, unitSystem);
-  return metersToDisplayDistance(totals.distance, unitSystem);
+/** The week's single biggest run, by each measure — not one run's three figures. */
+function biggestRun(week: RunWeek): Volume {
+  return {
+    distance: week.longestRunMeters,
+    duration: week.longestRunSeconds,
+    elevationGain: week.biggestClimbMeters
+  };
 }
 
-/** The week's single biggest run in the chosen measure. */
-function measureLongest(week: RunWeek, measure: RunVolumeMeasure, unitSystem: UnitSystem): number {
-  if (measure === "time") return week.longestRunSeconds / SECONDS_PER_HOUR;
-  if (measure === "climb") return metersToElevation(week.biggestClimbMeters, unitSystem);
-  return metersToDisplayDistance(week.longestRunMeters, unitSystem);
-}
-
-/** One surface's part of the week in the chosen measure. */
-function measureSurface(
-  week: RunWeek,
-  surface: RunSurface,
-  measure: RunVolumeMeasure,
-  unitSystem: UnitSystem
-): number {
-  if (measure === "time") return week.durationBySurface[surface] / SECONDS_PER_HOUR;
-  if (measure === "climb") return metersToElevation(week.climbBySurface[surface], unitSystem);
-  return metersToDisplayDistance(week.distanceBySurface[surface], unitSystem);
-}
-
-function measureUnit(measure: RunVolumeMeasure, unitSystem: UnitSystem): string {
-  if (measure === "time") return "h";
-  if (measure === "climb") return elevationUnit(unitSystem);
-  return distanceUnit(unitSystem);
-}
-
-function formatMeasure(value: number, measure: RunVolumeMeasure, unitSystem: UnitSystem): string {
-  return `${value.toFixed(measure === "climb" ? 0 : 1)} ${measureUnit(measure, unitSystem)}`;
+/** One surface's part of the week. */
+function surfaceVolume(week: RunWeek, surface: RunSurface): Volume {
+  return {
+    distance: week.distanceBySurface[surface],
+    duration: week.durationBySurface[surface],
+    elevationGain: week.climbBySurface[surface]
+  };
 }
 
 /** The dashed line: the week's longest run, or its biggest climb when height is the measure. */
-const LONGEST_LABELS: Record<RunVolumeMeasure, string> = {
+const LONGEST_LABELS: Record<VolumeMeasure, string> = {
   distance: "Longest run",
   time: "Longest run",
   climb: "Biggest climb"
 };
-
-/**
- * The trailing average ending at `index` of `buckets`, which must start
- * `MOVING_AVERAGE_WEEKS - 1` weeks before the chart does. Taken over a window
- * that reaches before the chart rather than one clipped to it: clipped, the
- * first three points of every chart were one-, two- and three-week averages
- * drawn under a legend calling all of them four-week.
- */
-function movingAverage(
-  buckets: readonly RunWeek[],
-  index: number,
-  measure: RunVolumeMeasure,
-  unitSystem: UnitSystem
-): number {
-  const window = buckets.slice(
-    Math.max(0, index - MOVING_AVERAGE_WEEKS + 1),
-    index + 1
-  );
-  return (
-    window.reduce((sum, week) => sum + measureTotal(week, measure, unitSystem), 0) /
-    window.length
-  );
-}
-
-function shiftWeeks(timestampMs: number, weeks: number): number {
-  const date = new Date(timestampMs);
-  date.setDate(date.getDate() - weeks * 7);
-  return date.getTime();
-}
-
-/**
- * The chart's own window, a year back — or nothing, when the window is longer
- * than a year and "a year ago" would overlap the bars above it. Under "All" the
- * chart spans two years, and half of the old figure was the same running the
- * chart was drawing.
- *
- * Answered against the whole history rather than the filtered period, because
- * the period is what the athlete is looking at now and the comparison is
- * explicitly about a window they are not looking at.
- */
-function oneYearEarlier(
-  runs: readonly TrainingHubActivity[],
-  weeks: number,
-  nowMs: number
-): RunTotals | undefined {
-  // "1 year" is 53 calendar weeks; stepping back 53 keeps it clear of itself.
-  const back = Math.max(WEEKS_PER_YEAR, weeks);
-  if (back > WEEKS_PER_YEAR + 1) {
-    return undefined;
-  }
-
-  const start = shiftWeeks(runWindowStartMs(weeks, nowMs), back) / 1000;
-  const end = shiftWeeks(nowMs, back) / 1000;
-  const inWindow = runs.filter(
-    (activity) =>
-      activity.startTime !== undefined && activity.startTime >= start && activity.startTime <= end
-  );
-
-  return inWindow.length > 0 ? summariseRuns(inWindow) : undefined;
-}
 
 export function RunVolumeChart({
   runs,
@@ -190,7 +99,7 @@ export function RunVolumeChart({
   const { unitSystem } = useUnitSystem();
   const { colors } = useChartColors();
   const palette = useMemo(() => runSurfaceColors(), []);
-  const [measure, setMeasure] = useState<RunVolumeMeasure>(defaultMeasure);
+  const [measure, setMeasure] = useState<VolumeMeasure>(defaultMeasure);
 
   const weekBuckets = useMemo(
     () => buildRunWeeks(runs, { weeks, nowMs }),
@@ -213,9 +122,9 @@ export function RunVolumeChart({
       weekBuckets.map((week, index) => {
         const row: VolumeRow = {
           label: week.label,
-          total: measureTotal(week, measure, unitSystem),
-          longest: measureLongest(week, measure, unitSystem),
-          average: movingAverage(
+          total: measured(week, measure, unitSystem),
+          longest: measured(biggestRun(week), measure, unitSystem),
+          average: trailingAverage(
             averageBuckets,
             index + MOVING_AVERAGE_WEEKS - 1,
             measure,
@@ -223,7 +132,7 @@ export function RunVolumeChart({
           )
         };
         for (const surface of surfaces) {
-          row[surface] = measureSurface(week, surface, measure, unitSystem);
+          row[surface] = measured(surfaceVolume(week, surface), measure, unitSystem);
         }
         return row;
       }),
@@ -234,12 +143,12 @@ export function RunVolumeChart({
   // chart stops at two years, and a heading counting six years of runs "over
   // 104 weeks" was a figure no bar on the chart could account for.
   const total = useMemo(
-    () => weekBuckets.reduce((sum, week) => sum + measureTotal(week, measure, unitSystem), 0),
+    () => weekBuckets.reduce((sum, week) => sum + measured(week, measure, unitSystem), 0),
     [measure, unitSystem, weekBuckets]
   );
 
   const lastYear = useMemo(
-    () => oneYearEarlier(runsAllTime, weeks, nowMs),
+    () => oneYearEarlier(runsAllTime, { weeks, nowMs }, summariseRuns),
     [nowMs, runsAllTime, weeks]
   );
 
@@ -264,7 +173,7 @@ export function RunVolumeChart({
             <p className="run-block-aside">
               Same span a year ago:{" "}
               <strong>
-                {measureTotal(lastYear, measure, unitSystem).toFixed(0)} {unit}
+                {measured(lastYear, measure, unitSystem).toFixed(0)} {unit}
               </strong>
             </p>
           ) : null}
@@ -272,7 +181,7 @@ export function RunVolumeChart({
             label="Measure"
             value={measure}
             options={MEASURE_OPTIONS}
-            onChange={(next) => setMeasure(next as RunVolumeMeasure)}
+            onChange={(next) => setMeasure(next as VolumeMeasure)}
           />
         </div>
       </header>
@@ -370,7 +279,7 @@ export function RunVolumeChart({
 interface VolumeTooltipProps extends TooltipContentProps {
   surfaces: readonly RunSurface[];
   palette: Record<RunSurface, string>;
-  measure: RunVolumeMeasure;
+  measure: VolumeMeasure;
   unitSystem: UnitSystem;
   longestLabel: string;
 }

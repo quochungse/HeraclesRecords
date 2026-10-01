@@ -792,7 +792,11 @@ lives at module level for the same visit-to-visit reason — see `useCalendarDat
   that opens a session on the whole page and restores its scroll on the way back
   (`useSessionPage`, with the handed-over session and Back's label), and the mouse's back
   button (`useBackGesture`). Running, Cycling and Hiking each carried their own copy of all
-  of it; a fix to one belongs there now, not in a screen.
+  of it; a fix to one belongs there now, not in a screen. Their weekly volume charts share
+  `src/running/sportVolume.ts` the same way — the three measures (`VolumeMeasure`, the label
+  is the screen's: Hiking calls `climb` "Ascent"), the four-week `trailingAverage` and the
+  same span `oneYearEarlier` — and a height gained an hour is `formatVerticalRate`
+  (`unitSystem.ts`) wherever it is written.
   What differs is what a rider reads: **speed over the time that recorded a distance**
   (`distanceDuration` — a trainer that measured nothing is riding time, not an hour at
   0 km/h); **a week read in hours** — the hero's "This week" and its delta, and the volume

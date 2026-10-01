@@ -5,12 +5,7 @@ import {
   formatPaceSecondsPerKm
 } from "../training/formatters";
 import { useUnitSystem } from "../units/UnitSystemProvider";
-import {
-  elevationUnit,
-  formatSpeedValue,
-  metersToElevation,
-  type UnitSystem
-} from "../units/units";
+import { formatSpeedValue, formatVerticalRate, metersToElevation } from "../units/units";
 import type { HikeLeg, TerrainKind, TerrainShare } from "./hikeAnalysis";
 
 /**
@@ -30,10 +25,6 @@ const TERRAIN_LABELS: Record<TerrainKind, string> = {
   flat: "Flat",
   down: "Descending"
 };
-
-function perHour(meters: number, unitSystem: UnitSystem): string {
-  return `${Math.round(metersToElevation(meters, unitSystem))} ${elevationUnit(unitSystem)}/h`;
-}
 
 /**
  * Climbing, flat and descending, by the grade of every 25 m and on the moving
@@ -106,7 +97,7 @@ export function TerrainPanel({
                     : `${share.kind === "up" ? "+" : "−"}${formatElevationMeters(share.height, unitSystem)}`}
                 </td>
                 <td className="is-numeric">
-                  {share.verticalRate === undefined ? "—" : perHour(share.verticalRate, unitSystem)}
+                  {share.verticalRate === undefined ? "—" : formatVerticalRate(share.verticalRate, unitSystem)}
                 </td>
                 <td className="is-numeric">
                   {share.avgHr === undefined ? "—" : Math.round(share.avgHr)}
@@ -181,7 +172,7 @@ export function ClimbsPanel({ legs }: { legs: readonly HikeLeg[] }) {
                 <td className="is-numeric">{`${(leg.grade * 100).toFixed(0)}%`}</td>
                 <td className="is-numeric">{formatDurationSeconds(leg.seconds)}</td>
                 <td className="is-numeric">
-                  {leg.verticalRate === undefined ? "—" : perHour(leg.verticalRate, unitSystem)}
+                  {leg.verticalRate === undefined ? "—" : formatVerticalRate(leg.verticalRate, unitSystem)}
                 </td>
                 {withHr ? (
                   <td className="is-numeric">

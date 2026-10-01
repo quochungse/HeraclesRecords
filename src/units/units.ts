@@ -23,6 +23,7 @@ export {
   formatElevationValue,
   formatPaceValue,
   formatSpeedValue,
+  formatVerticalRate,
   formatWeightValue,
   kilogramsToDisplayWeight,
   kmhToDisplaySpeed,

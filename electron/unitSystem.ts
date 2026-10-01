@@ -205,6 +205,15 @@ export function formatElevationValue(
   return `${Math.round(metersToElevation(meters ?? 0, unitSystem))} ${elevationUnit(unitSystem)}`;
 }
 
+/**
+ * Height gained an hour — a climbing rate, a VAM — in the athlete's units.
+ * Negative on the way down, and a zero is stated, because a chart reading
+ * this off a sample can be crossing a flat stretch.
+ */
+export function formatVerticalRate(metersPerHour: number, unitSystem: UnitSystem): string {
+  return `${Math.round(metersToElevation(metersPerHour, unitSystem))} ${elevationUnit(unitSystem)}/h`;
+}
+
 export function formatPaceValue(
   secondsPerKm: number | undefined,
   unitSystem: UnitSystem,

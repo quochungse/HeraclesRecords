@@ -26,6 +26,7 @@ import { useUnitSystem } from "../../units/UnitSystemProvider";
 import {
   distanceUnit,
   elevationUnit,
+  formatVerticalRate,
   kmhToDisplaySpeed,
   metersToDisplayDistance,
   metersToElevation,
@@ -131,7 +132,7 @@ function formatChannelValue(
     return `${kmhToDisplaySpeed(value, unitSystem).toFixed(1)} ${speedUnit(unitSystem)}`;
   }
   if (key === "verticalSpeed") {
-    return `${Math.round(metersToElevation(value, unitSystem))} ${elevationUnit(unitSystem)}/h`;
+    return formatVerticalRate(value, unitSystem);
   }
   if (key === "cadence") {
     return `${value.toFixed(definition.decimals)} ${cadenceUnit(motion)}`;

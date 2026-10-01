@@ -16,18 +16,16 @@ import { trainingChartTooltipStyle } from "../training/chartConfig";
 import { useChartColors } from "../training/useChartColors";
 import { useUnitSystem } from "../units/UnitSystemProvider";
 import {
-  distanceUnit,
-  elevationUnit,
-  metersToDisplayDistance,
-  metersToElevation
-} from "../units/units";
-import {
-  buildRideWeeks,
-  rideWindowStartMs,
-  summariseRides,
-  type RideTypeVolume,
-  type RideWeek
-} from "./rideMetrics";
+  MOVING_AVERAGE_WEEKS,
+  formatMeasure,
+  measureUnit,
+  measured,
+  oneYearEarlier,
+  trailingAverage,
+  type Volume,
+  type VolumeMeasure
+} from "../running/sportVolume";
+import { buildRideWeeks, summariseRides, type RideWeek } from "./rideMetrics";
 import { RIDE_TYPE_LABELS, type RideType } from "./rideType";
 import { rideTypeColors } from "./rideTypeColors";
 
@@ -41,9 +39,7 @@ import { rideTypeColors } from "./rideTypeColors";
  * the heading all follow the one chosen. It opens on time, the one measure
  * every kind of ride counts in full — and the one the hero's week is read in.
  */
-export type RideVolumeMeasure = "distance" | "time" | "climb";
-
-const MEASURE_OPTIONS: readonly { value: RideVolumeMeasure; label: string }[] = [
+const MEASURE_OPTIONS: readonly { value: VolumeMeasure; label: string }[] = [
   { value: "time", label: "Time" },
   { value: "distance", label: "Distance" },
   { value: "climb", label: "Climb" }
@@ -60,88 +56,19 @@ interface RideVolumeChartProps {
   nowMs: number;
 }
 
-/** Weeks the trailing average is taken over. */
-const MOVING_AVERAGE_WEEKS = 4;
-/** "A year ago" in whole weeks, so the comparison starts on a Monday too. */
-const WEEKS_PER_YEAR = 52;
-const SECONDS_PER_HOUR = 3600;
-
 interface VolumeRow extends Record<string, number | string> {
   label: string;
   total: number;
   longest: number;
 }
 
-/**
- * A volume in the chosen measure, in the unit the chart draws. A week's total,
- * one kind's share of it and its biggest ride all carry the same three
- * figures, so one reading serves all of them.
- */
-function measured(
-  volume: RideTypeVolume,
-  measure: RideVolumeMeasure,
-  unitSystem: UnitSystem
-): number {
-  if (measure === "time") {
-    return volume.duration / SECONDS_PER_HOUR;
-  }
-  if (measure === "climb") {
-    return metersToElevation(volume.elevationGain, unitSystem);
-  }
-  return metersToDisplayDistance(volume.distance, unitSystem);
-}
-
 /** The week's single biggest ride, by each measure — not one ride's three figures. */
-function biggestRide(week: RideWeek): RideTypeVolume {
+function biggestRide(week: RideWeek): Volume {
   return {
     distance: week.longestRideMeters,
     duration: week.longestRideSeconds,
     elevationGain: week.biggestClimbMeters
   };
-}
-
-function measureUnit(measure: RideVolumeMeasure, unitSystem: UnitSystem): string {
-  if (measure === "time") return "h";
-  if (measure === "climb") return elevationUnit(unitSystem);
-  return distanceUnit(unitSystem);
-}
-
-/** One decimal where the numbers are small enough for it to matter. */
-function formatMeasure(value: number, measure: RideVolumeMeasure, unitSystem: UnitSystem): string {
-  const digits = measure === "climb" ? 0 : 1;
-  return `${value.toFixed(digits)} ${measureUnit(measure, unitSystem)}`;
-}
-
-function shiftWeeks(timestampMs: number, weeks: number): number {
-  const date = new Date(timestampMs);
-  date.setDate(date.getDate() - weeks * 7);
-  return date.getTime();
-}
-
-/**
- * The chart's own window, a year back — or nothing when the window is longer
- * than a year and "a year ago" would overlap the bars above it. The same rule
- * as the Running chart's.
- */
-function oneYearEarlier(
-  rides: readonly TrainingHubActivity[],
-  weeks: number,
-  nowMs: number
-): RideTypeVolume | undefined {
-  const back = Math.max(WEEKS_PER_YEAR, weeks);
-  if (back > WEEKS_PER_YEAR + 1) {
-    return undefined;
-  }
-
-  const start = shiftWeeks(rideWindowStartMs(weeks, nowMs), back) / 1000;
-  const end = shiftWeeks(nowMs, back) / 1000;
-  const inWindow = rides.filter(
-    (activity) =>
-      activity.startTime !== undefined &&
-      activity.startTime >= start &&
-      activity.startTime <= end
-  );
-  return inWindow.length > 0 ? summariseRides(inWindow) : undefined;
 }
 
 export function RideVolumeChart({
@@ -154,7 +81,7 @@ export function RideVolumeChart({
   const { unitSystem } = useUnitSystem();
   const { colors } = useChartColors();
   const palette = useMemo(() => rideTypeColors(), []);
-  const [measure, setMeasure] = useState<RideVolumeMeasure>("time");
+  const [measure, setMeasure] = useState<VolumeMeasure>("time");
 
   const weekBuckets = useMemo(
     () => buildRideWeeks(rides, { weeks, nowMs }),
@@ -175,11 +102,12 @@ export function RideVolumeChart({
   const rows = useMemo<VolumeRow[]>(
     () =>
       weekBuckets.map((week, index) => {
-        const end = index + MOVING_AVERAGE_WEEKS - 1;
-        const window = averageBuckets.slice(Math.max(0, end - MOVING_AVERAGE_WEEKS + 1), end + 1);
-        const average =
-          window.reduce((sum, bucket) => sum + measured(bucket, measure, unitSystem), 0) /
-          Math.max(1, window.length);
+        const average = trailingAverage(
+          averageBuckets,
+          index + MOVING_AVERAGE_WEEKS - 1,
+          measure,
+          unitSystem
+        );
         const row: VolumeRow = {
           label: week.label,
           total: measured(week, measure, unitSystem),
@@ -202,7 +130,7 @@ export function RideVolumeChart({
   );
 
   const lastYear = useMemo(
-    () => oneYearEarlier(ridesAllTime, weeks, nowMs),
+    () => oneYearEarlier(ridesAllTime, { weeks, nowMs }, summariseRides),
     [nowMs, ridesAllTime, weeks]
   );
 
@@ -233,7 +161,7 @@ export function RideVolumeChart({
             label="Measure"
             value={measure}
             options={MEASURE_OPTIONS}
-            onChange={(next) => setMeasure(next as RideVolumeMeasure)}
+            onChange={(next) => setMeasure(next as VolumeMeasure)}
           />
         </div>
       </header>
@@ -327,7 +255,7 @@ export function RideVolumeChart({
 interface VolumeTooltipProps extends TooltipContentProps {
   types: readonly RideType[];
   palette: Record<RideType, string>;
-  measure: RideVolumeMeasure;
+  measure: VolumeMeasure;
   unitSystem: UnitSystem;
   longestLabel: string;
 }

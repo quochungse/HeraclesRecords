@@ -5,7 +5,7 @@ import {
   formatPaceSecondsPerKm
 } from "../training/formatters";
 import { useUnitSystem } from "../units/UnitSystemProvider";
-import { distanceUnit, elevationUnit, metersToElevation } from "../units/units";
+import { distanceUnit, elevationUnit, formatVerticalRate } from "../units/units";
 import { climbPerDistanceUnit, runSurfaceBreakdown } from "./runMetrics";
 import { RUN_SURFACE_LABELS } from "./runSurface";
 import { runSurfaceColors } from "./runSurfaceColors";
@@ -88,7 +88,7 @@ export function RunSurfacePanel({ runs }: RunSurfacePanelProps) {
               <td className="is-numeric">
                 {entry.verticalSpeed === undefined
                   ? "—"
-                  : `${Math.round(metersToElevation(entry.verticalSpeed, unitSystem))} ${elevationUnit(unitSystem)}/h`}
+                  : formatVerticalRate(entry.verticalSpeed, unitSystem)}
               </td>
             </tr>
           ))}

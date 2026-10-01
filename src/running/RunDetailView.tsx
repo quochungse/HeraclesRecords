@@ -20,11 +20,7 @@ import {
   formatTrainingTimestamp
 } from "../training/formatters";
 import { useUnitSystem } from "../units/UnitSystemProvider";
-import {
-  elevationUnit,
-  formatTemperatureValue,
-  metersToElevation
-} from "../units/units";
+import { formatTemperatureValue, formatVerticalRate } from "../units/units";
 import { ActivitySeriesChart } from "../training/components/ActivitySeriesChart";
 import {
   altitudeRange,
@@ -215,7 +211,7 @@ export function RunDetailView({
       if (up?.verticalRate !== undefined) {
         stats.push({
           label: "Climbing rate",
-          value: `${Math.round(metersToElevation(up.verticalRate, unitSystem))} ${elevationUnit(unitSystem)}/h`,
+          value: formatVerticalRate(up.verticalRate, unitSystem),
           title: `${unitSystem === "imperial" ? "Feet" : "Metres"} gained an hour on the climbing stretches, stops out`
         });
       }
