@@ -26,7 +26,6 @@ export function ClaudeCodeLoginCard({
   onError: (message: string | null) => void;
 }) {
   const [pending, setPending] = useState(false);
-  const [scope, setScope] = useState<"app" | "machine">("app");
   const [code, setCode] = useState("");
   const [starting, setStarting] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -102,9 +101,8 @@ export function ClaudeCodeLoginCard({
     try {
       // Claude Code opens the sign-in page itself; opening it here too would
       // give the athlete two tabs.
-      const started = await api.startClaudeCodeLogin();
+      await api.startClaudeCodeLogin();
       if (!mounted.current) return;
-      setScope(started.scope);
       setPending(true);
     } catch (caught) {
       onError(
@@ -199,10 +197,9 @@ export function ClaudeCodeLoginCard({
         </button>
       </div>
       <p className="chat-settings-copy">
-        {scope === "app"
-          ? "Approve on Claude's page, picking the account you want Heracles Records to use — it is kept separate from any other Claude login on this computer."
-          : "Approve on Claude's page. This replaces the machine-wide Claude login in your home directory."}{" "}
-        If Claude shows you a code, paste it below. Otherwise this card closes by
+        Approve on Claude&apos;s page, picking the account you want Heracles
+        Records to use — it is kept separate from any other Claude login on this
+        computer. If Claude shows you a code, paste it below. Otherwise this card closes by
         itself once you are back.
       </p>
       <button

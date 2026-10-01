@@ -1113,8 +1113,10 @@ lives at module level for the same visit-to-visit reason — see `useCalendarDat
   `server-side-fallback-2026-06-01` beta, which is what makes each row carry
   `allowed_fallback_models`), OpenRouter's `/models/user` and the Codex backend's
   `/codex/models` are read into `chat.modelCatalog.*` (`device`) and read again once a day
-  (`chat:refreshModels`, fired in the background by Coach and Coach settings) or on **Refresh
-  models**; Claude Code's list (`supportedModels()`) keeps its own key and now the same one-day
+  (`chat:refreshModels`, fired in the background by Coach and Coach settings) or when Coach
+  Models asks the provider something anyway — **there is no Refresh models button**: Claude's
+  **Check** and **Test connection**, and a key's **Save** or **Test** (with the saved key), read
+  that provider's list again with `force`; Claude Code's list (`supportedModels()`) keeps its own key and now the same one-day
   clock (`availableModelsAt`). The shipped lists are what a picker shows before a list has
   ever been read, and **a failed or empty read never replaces a list held** — an offline
   launch keeps yesterday's menu. `ChatSettings.modelCatalogs` — and Claude Code's
@@ -1140,8 +1142,15 @@ lives at module level for the same visit-to-visit reason — see `useCalendarDat
   how a native 2.1.266 kept an npm 2.1.283 and its Opus 5.5 out of the picker. So nothing
   detected is stored any more, and a stored path at a standard location
   (`isStandardClaudeLocation`) is read as that leftover and let go; only a path detection would
-  not find is the athlete's choice. The list remembers the CLI it was read from
+  not find is the athlete's choice — which is why Coach Models shows the path field only when
+  detection finds nothing or a path is already set. The list remembers the CLI it was read from
   (`availableModelsFrom`, `<path>@<version>`) and is read again as soon as that changes.
+  **Claude Code always runs against the app's own login** (`<userData>/claude-code` as
+  `CLAUDE_CONFIG_DIR`, `getClaudeCodeConfigDir`). Settings used to offer "This device" — the
+  machine-wide `~/.claude` login the terminal shares — and the choice read as noise to anyone
+  who has never opened a terminal, so it was removed on 2026-10-01 with
+  `chat.claudeCode.useAppScopedAuth`. A machine that had picked it signs in once more, inside
+  the app; the stored key is left in place and read by nothing.
 
   **A conversation carries its own sources and AI** (`chat_conversation_settings`, `personal`;
   P2.0 of docs/coach-plan-canvas.md). **A conversation keeps the provider it was started with**

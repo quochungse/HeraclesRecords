@@ -35,7 +35,6 @@ const CHAT_SETTINGS = {
   chatgpt: {},
   anthropic: { model: "claude-opus-5", effort: "high", hasApiKey: false },
   claudeCode: {
-    useAppScopedAuth: true,
     effort: "high",
     permissions: {
       recentActivities: true,

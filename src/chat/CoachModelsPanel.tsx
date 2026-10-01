@@ -21,6 +21,7 @@ import type {
   ClaudeCodeStatus,
   LocalChatConnectionTest,
   LocalChatDiscovery,
+  ModelCatalogRefresh,
   OpenRouterConnectionTest
 } from "../../electron/types";
 import {
@@ -32,7 +33,6 @@ import {
   withCurrentModel,
   type ChatModelOption
 } from "../../electron/chatModels";
-import { ClaudeAuthScopeToggle } from "./ClaudeAuthScopeToggle";
 import { ClaudeCodeLoginCard } from "./ClaudeCodeLoginCard";
 import { detectAndAdoptLocalServer } from "./localModelDetection";
 import type { CorosLinkApi } from "../coroslink-api";
@@ -140,13 +140,18 @@ export function coachModelsSummaryLine(
   return `${active} · ${summary.connected} of ${summary.total} providers connected`;
 }
 
-/** Where a provider's model list stands: read from the account and when, or the shipped one. */
+/**
+ * Where a provider's model list stands: read from the account and when, or the
+ * shipped one. There is no refresh button of its own — `readBy` names the
+ * provider's own action that reads it (Check, a key's Save or Test).
+ */
 export function modelListLine(
   source: { fetchedAt?: string; count: number } | undefined,
+  readBy: string,
   now = new Date()
 ): string {
   if (!source) {
-    return "Showing the built-in list. Refresh to read the models your account offers.";
+    return `Showing the built-in list. ${readBy} to read the models your account offers.`;
   }
   const models = `${source.count} model${source.count === 1 ? "" : "s"} from your account`;
   // A list kept by a build that did not record when it was read.
@@ -202,6 +207,7 @@ export function CoachModelsPanel({ api, onChange }: CoachModelsPanelProps) {
   const [testingAnthropic, setTestingAnthropic] = useState(false);
 
   const [claudeLoginError, setClaudeLoginError] = useState<string | null>(null);
+  const [claudeExecutableEdited, setClaudeExecutableEdited] = useState(false);
 
   const [localApiKey, setLocalApiKey] = useState("");
   const [localConnection, setLocalConnection] =
@@ -211,7 +217,10 @@ export function CoachModelsPanel({ api, onChange }: CoachModelsPanelProps) {
   const [testingLocal, setTestingLocal] = useState(false);
   const [detectingLocal, setDetectingLocal] = useState(false);
 
-  const [refreshingModels, setRefreshingModels] = useState<ModelListProvider | null>(null);
+  // Per provider: a key's Save and Claude's Check can each be reading a list at once.
+  const [refreshingModels, setRefreshingModels] = useState<
+    Partial<Record<ModelListProvider, boolean>>
+  >({});
   const [modelListErrors, setModelListErrors] = useState<
     Partial<Record<ModelListProvider, string>>
   >({});
@@ -284,31 +293,51 @@ export function CoachModelsPanel({ api, onChange }: CoachModelsPanelProps) {
 
   const busy = savingSettings;
 
+  const setRefreshing = (provider: ModelListProvider, refreshing: boolean) =>
+    setRefreshingModels((current) => ({ ...current, [provider]: refreshing }));
+
+  /** Only the lists are taken from fresh settings: the panel may hold an unsaved field. */
+  const takeModelLists = (settings: ChatSettings) => {
+    const { modelCatalogs, claudeCode } = settings;
+    setChatSettings((current) =>
+      current
+        ? {
+            ...current,
+            modelCatalogs,
+            claudeCode: {
+              ...current.claudeCode,
+              availableModels: claudeCode.availableModels,
+              availableModelsAt: claudeCode.availableModelsAt
+            }
+          }
+        : current
+    );
+  };
+
+  const applyModelRefresh = (provider: ModelListProvider, result: ModelCatalogRefresh) => {
+    takeModelLists(result.settings);
+    if (result.claudeStatus) setClaudeStatus(result.claudeStatus);
+    setModelListErrors((current) => ({ ...current, [provider]: result.errors[provider] }));
+  };
+
+  /** Lists the main process read on its own (a sign-in, a connection test). */
+  const rereadModelLists = async () => {
+    try {
+      takeModelLists(await api.getChatSettings());
+    } catch {
+      // The lists already held stay on screen.
+    }
+  };
+
   /**
-   * Reads one provider's model list again now, whatever its age. Only the
-   * list is taken from the answer: the panel may hold an unsaved field.
+   * Reads one provider's model list again now, whatever its age — after a
+   * key is saved or tested, since there is no button for it alone.
    */
   const refreshModels = async (provider: ModelListProvider) => {
-    if (refreshingModels) return;
-    setRefreshingModels(provider);
+    if (refreshingModels[provider]) return;
+    setRefreshing(provider, true);
     try {
-      const result = await api.refreshChatModels({ provider, force: true });
-      const { modelCatalogs, claudeCode } = result.settings;
-      setChatSettings((current) =>
-        current
-          ? {
-              ...current,
-              modelCatalogs,
-              claudeCode: {
-                ...current.claudeCode,
-                availableModels: claudeCode.availableModels,
-                availableModelsAt: claudeCode.availableModelsAt
-              }
-            }
-          : current
-      );
-      if (result.claudeStatus) setClaudeStatus(result.claudeStatus);
-      setModelListErrors((current) => ({ ...current, [provider]: result.errors[provider] }));
+      applyModelRefresh(provider, await api.refreshChatModels({ provider, force: true }));
       await onChange?.();
     } catch (caught) {
       setModelListErrors((current) => ({
@@ -316,7 +345,7 @@ export function CoachModelsPanel({ api, onChange }: CoachModelsPanelProps) {
         [provider]: caught instanceof Error ? caught.message : "Could not read the model list."
       }));
     } finally {
-      setRefreshingModels(null);
+      setRefreshing(provider, false);
     }
   };
 
@@ -331,27 +360,18 @@ export function CoachModelsPanel({ api, onChange }: CoachModelsPanelProps) {
     return catalog ? { fetchedAt: catalog.fetchedAt, count: catalog.models.length } : undefined;
   };
 
-  const renderModelListStatus = (provider: ModelListProvider, enabled: boolean) => (
-    <div className="chat-model-list-status">
-      <p
-        className={modelListErrors[provider] ? "chat-local-result is-error" : "chat-settings-copy"}
-      >
-        {modelListErrors[provider] ?? modelListLine(modelListSource(provider))}
-      </p>
-      <button
-        type="button"
-        className="chat-local-action"
-        onClick={() => void refreshModels(provider)}
-        disabled={!enabled || refreshingModels !== null || busy}
-      >
-        {refreshingModels === provider ? (
-          <Loader2 className="chat-spinner" size={14} aria-hidden="true" />
-        ) : (
-          <RefreshCw size={14} aria-hidden="true" />
-        )}
-        Refresh models
-      </button>
-    </div>
+  const renderModelListStatus = (provider: ModelListProvider, readBy: string) => (
+    <p
+      className={`chat-model-list-status ${
+        modelListErrors[provider] && !refreshingModels[provider]
+          ? "chat-local-result is-error"
+          : "chat-settings-copy"
+      }`}
+    >
+      {refreshingModels[provider]
+        ? "Reading the models your account offers…"
+        : (modelListErrors[provider] ?? modelListLine(modelListSource(provider), readBy))}
+    </p>
   );
 
   /** A dropdown's rows for a provider, the chosen model kept even when no longer listed. */
@@ -399,12 +419,17 @@ export function CoachModelsPanel({ api, onChange }: CoachModelsPanelProps) {
     }
   };
 
+  /** Check also reads the account's model list again — it is the section's refresh. */
   const refreshClaudeCodeStatus = async () => {
     if (checkingClaude) return;
     setCheckingClaude(true);
+    setRefreshing("claude-code", true);
     setError(null);
     try {
-      setClaudeStatus(await api.getClaudeCodeStatus());
+      applyModelRefresh(
+        "claude-code",
+        await api.refreshChatModels({ provider: "claude-code", force: true })
+      );
       await onChange?.();
     } catch (caught) {
       setError(
@@ -412,11 +437,14 @@ export function CoachModelsPanel({ api, onChange }: CoachModelsPanelProps) {
       );
     } finally {
       setCheckingClaude(false);
+      setRefreshing("claude-code", false);
     }
   };
 
   const handleClaudeSignedIn = (status: ClaudeCodeStatus) => {
     setClaudeStatus(status);
+    // Signing in reads the list on the main side; show it here.
+    void rereadModelLists();
     void onChange?.();
   };
 
@@ -441,11 +469,15 @@ export function CoachModelsPanel({ api, onChange }: CoachModelsPanelProps) {
   const handleTestClaudeCode = async () => {
     if (testingClaude) return;
     setTestingClaude(true);
+    setRefreshing("claude-code", true);
     setError(null);
     try {
+      // The test reads the model list again on the main side as well.
       const result = await api.testClaudeCodeConnection();
       setClaudeStatus(result.status);
+      setModelListErrors((current) => ({ ...current, "claude-code": undefined }));
       if (!result.ok) setError(result.message);
+      await rereadModelLists();
       await onChange?.();
     } catch (caught) {
       setError(
@@ -453,6 +485,7 @@ export function CoachModelsPanel({ api, onChange }: CoachModelsPanelProps) {
       );
     } finally {
       setTestingClaude(false);
+      setRefreshing("claude-code", false);
     }
   };
 
@@ -530,12 +563,17 @@ export function CoachModelsPanel({ api, onChange }: CoachModelsPanelProps) {
     setOpenRouterConnection(null);
     setError(null);
     try {
+      const typedKey = openRouterApiKey.trim();
       const result = await api.testOpenRouterConnection({
         ...chatSettings.openRouter,
-        apiKey: openRouterApiKey.trim() || undefined
+        apiKey: typedKey || undefined
       });
       setOpenRouterConnection(result);
       if (!result.ok) setError(result.message);
+      // The list is read with the saved key; a typed one is read once saved.
+      if (result.ok && !typedKey && chatSettings.openRouter.hasApiKey) {
+        void refreshModels("openrouter");
+      }
     } catch (caught) {
       setError(
         caught instanceof Error
@@ -609,13 +647,17 @@ export function CoachModelsPanel({ api, onChange }: CoachModelsPanelProps) {
     try {
       // An unsaved key in the field is tested as typed so the athlete can
       // verify it before committing it to storage.
-      setAnthropicConnection(
-        await api.testAnthropicConnection({
-          model: chatSettings.anthropic.model,
-          effort: chatSettings.anthropic.effort,
-          apiKey: anthropicApiKey.trim() || undefined
-        })
-      );
+      const typedKey = anthropicApiKey.trim();
+      const result = await api.testAnthropicConnection({
+        model: chatSettings.anthropic.model,
+        effort: chatSettings.anthropic.effort,
+        apiKey: typedKey || undefined
+      });
+      setAnthropicConnection(result);
+      // The list is read with the saved key; a typed one is read once saved.
+      if (result.ok && !typedKey && chatSettings.anthropic.hasApiKey) {
+        void refreshModels("claude-api");
+      }
     } catch (caught) {
       setAnthropicConnection({
         ok: false,
@@ -744,7 +786,13 @@ export function CoachModelsPanel({ api, onChange }: CoachModelsPanelProps) {
     }
   };
 
-  const appScopedAuth = chatSettings.claudeCode.useAppScopedAuth !== false;
+  // Asked only when detection finds nothing, or a path is already set: an
+  // install the usual places miss is the one case it is for. Once typed in, it
+  // stays on screen even when emptied, so clearing it does not make it vanish.
+  const showClaudeExecutable =
+    claudeStatus?.state === "not-installed" ||
+    Boolean(chatSettings.claudeCode.executablePath) ||
+    claudeExecutableEdited;
   const availableLocalServers =
     localDiscovery?.servers.filter(
       (server) => server.ok && server.models.length > 0
@@ -814,49 +862,14 @@ export function CoachModelsPanel({ api, onChange }: CoachModelsPanelProps) {
       </section>
 
       <section className="chat-settings-section chat-claude-section">
-        <div className="chat-settings-section-title">
-          <h3>Claude subscription</h3>
-          <span className="chat-beta-badge">Beta</span>
-        </div>
+        <h3>Claude subscription</h3>
         <p className="chat-settings-copy">
           Runs the Claude Code CLI installed on this computer against your Claude
-          subscription. Heracles Records never sees your Claude password — sign-in
-          happens in your browser and Claude Code stores the credentials.
+          subscription. Heracles Records signs in with a Claude login of its own,
+          so any Claude account you use elsewhere on this computer — including in
+          a terminal — is left alone. Sign-in happens in your browser; Heracles
+          Records never sees your Claude password.
         </p>
-
-        <strong className="chat-claude-group-title">Claude session</strong>
-        <ClaudeAuthScopeToggle
-          appScoped={appScopedAuth}
-          disabled={busy}
-          onChange={(next) => updateClaudeCode({ useAppScopedAuth: next })}
-        />
-        <p className="chat-settings-copy">
-          {appScopedAuth
-            ? "Heracles Records keeps its own Claude credentials in its app data folder. Any Claude account you use elsewhere on this computer — including in a terminal — is left alone."
-            : "Heracles Records will use the machine-wide Claude login in your home folder, shared with the terminal. Signing in here replaces that login."}
-        </p>
-
-        {/* Only offered alongside the machine-wide login: pointing at a
-            specific CLI is a "which Claude on this device" question, and it is
-            the device side of the switch that raises it. A path saved here
-            stays in effect either way — the app-scoped runtime spawns the same
-            binary, just against its own credential directory. */}
-        {!appScopedAuth ? (
-          <label className="chat-local-field">
-            <span>Claude executable</span>
-            <div className="chat-claude-path-row">
-              <Terminal size={15} aria-hidden="true" />
-              <input
-                value={chatSettings.claudeCode.executablePath ?? ""}
-                onChange={(event) =>
-                  updateClaudeCode({ executablePath: event.target.value })
-                }
-                placeholder="Auto-detect Claude Code"
-                spellCheck={false}
-              />
-            </div>
-          </label>
-        ) : null}
 
         <div className="chat-claude-status" data-state={claudeStatus?.state}>
           {checkingClaude ? (
@@ -884,6 +897,24 @@ export function CoachModelsPanel({ api, onChange }: CoachModelsPanelProps) {
             ) : null}
           </div>
         </div>
+
+        {showClaudeExecutable ? (
+          <label className="chat-local-field">
+            <span>Claude executable</span>
+            <div className="chat-claude-path-row">
+              <Terminal size={15} aria-hidden="true" />
+              <input
+                value={chatSettings.claudeCode.executablePath ?? ""}
+                onChange={(event) => {
+                  setClaudeExecutableEdited(true);
+                  updateClaudeCode({ executablePath: event.target.value });
+                }}
+                placeholder="Auto-detect Claude Code"
+                spellCheck={false}
+              />
+            </div>
+          </label>
+        ) : null}
 
         <div className="chat-local-actions chat-claude-actions">
           <button
@@ -932,7 +963,7 @@ export function CoachModelsPanel({ api, onChange }: CoachModelsPanelProps) {
               Test connection
             </button>
           ) : null}
-          {appScopedAuth && claudeStatus?.authenticated ? (
+          {claudeStatus?.authenticated ? (
             <button
               type="button"
               className="chat-local-action is-danger"
@@ -952,7 +983,7 @@ export function CoachModelsPanel({ api, onChange }: CoachModelsPanelProps) {
               ) : (
                 <LogOut size={14} aria-hidden="true" />
               )}
-              Revoke
+              Sign out
             </button>
           ) : null}
           <button
@@ -1003,7 +1034,7 @@ export function CoachModelsPanel({ api, onChange }: CoachModelsPanelProps) {
         </div>
         {renderModelListStatus(
           "claude-code",
-          claudeStatus?.state === "connected" || claudeStatus?.authenticated === true
+          claudeStatus?.authenticated ? "Press Check" : "Sign in"
         )}
         <p className="chat-settings-copy">
           Higher effort means deeper reasoning per answer and more of your
@@ -1121,7 +1152,7 @@ export function CoachModelsPanel({ api, onChange }: CoachModelsPanelProps) {
               ? `${anthropicModel.label} takes no effort setting; it answers the same at every level.`
               : "Higher effort spends more tokens on reasoning before answering. Lower effort is cheaper and faster for routine questions. A level the model does not offer is sent as the nearest one below it."}
           </p>
-          {renderModelListStatus("claude-api", chatSettings.anthropic.hasApiKey)}
+          {renderModelListStatus("claude-api", "Save or test your key")}
 
           <div className="chat-local-actions">
             <button
@@ -1301,7 +1332,7 @@ export function CoachModelsPanel({ api, onChange }: CoachModelsPanelProps) {
               {openRouterConnection.message}
             </p>
           ) : null}
-          {renderModelListStatus("openrouter", chatSettings.openRouter.hasApiKey)}
+          {renderModelListStatus("openrouter", "Save or test your key")}
         </div>
         <p className="chat-settings-copy">
           Coaching prompts and requested COROS data are sent through OpenRouter

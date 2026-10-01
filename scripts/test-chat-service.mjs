@@ -966,7 +966,6 @@ const saved = saveChatSettingsToStore(fakeStore, fakeKeyStores, {
   },
   claudeCode: {
     model: "sonnet",
-    useAppScopedAuth: false,
     effort: "max",
     defaultModel: "claude-sonnet-4-6",
     availableModels: [
@@ -1002,7 +1001,6 @@ assert.equal(saved.openRouter.apiKey, undefined);
 assert.equal(saved.claudeCode.executablePath, "/opt/claude/bin/claude");
 assert.equal(saved.claudeCode.model, "sonnet");
 assert.equal(saved.claudeCode.lastConnectionStatus, "connected");
-assert.equal(saved.claudeCode.useAppScopedAuth, false);
 assert.equal(saved.claudeCode.effort, "max");
 assert.equal(saved.claudeCode.defaultModel, "claude-sonnet-4-6");
 // The account model list round-trips as JSON so the picker can name versions.
@@ -1035,9 +1033,8 @@ assert.equal(storedAnthropicKey, "sk-ant-secret");
 const loaded = readChatSettingsFromStore(fakeStore, fakeKeyStores);
 assert.deepEqual(loaded, saved);
 
-// An app-scoped Claude login is the default, so the app never silently borrows
-// whichever account the machine's CLI happens to be signed into.
-const scopedByDefault = readChatSettingsFromStore(
+// An empty store reads as the defaults.
+const fromEmptyStore = readChatSettingsFromStore(
   {
     get: () => undefined,
     set: () => {},
@@ -1045,10 +1042,9 @@ const scopedByDefault = readChatSettingsFromStore(
   },
   fakeKeyStores
 );
-assert.equal(scopedByDefault.claudeCode.useAppScopedAuth, true);
-assert.equal(scopedByDefault.claudeCode.effort, "high");
-assert.equal(scopedByDefault.claudeCode.defaultModel, undefined);
-assert.equal(scopedByDefault.claudeCode.availableModels, undefined);
+assert.equal(fromEmptyStore.claudeCode.effort, "high");
+assert.equal(fromEmptyStore.claudeCode.defaultModel, undefined);
+assert.equal(fromEmptyStore.claudeCode.availableModels, undefined);
 // A corrupt or wrongly-shaped payload falls back rather than breaking the picker.
 for (const bad of ['not json', '{"a":1}', "[]", '[{"value":1}]']) {
   assert.equal(
@@ -1063,7 +1059,7 @@ for (const bad of ['not json', '{"a":1}', "[]", '[{"value":1}]']) {
 assert.equal(
   withNamedDefaultModel(
     CLAUDE_MODEL_OPTIONS,
-    scopedByDefault.claudeCode.defaultModel
+    fromEmptyStore.claudeCode.defaultModel
   )[0].label,
   "Default model"
 );
@@ -1072,11 +1068,6 @@ assert.equal(
   withNamedDefaultModel(CLAUDE_MODEL_OPTIONS, "claude-sonnet-4-6")[0].label,
   "Default (Sonnet 4.6)"
 );
-const reScoped = saveChatSettingsToStore(fakeStore, fakeKeyStores, {
-  ...loaded,
-  claudeCode: { ...loaded.claudeCode, useAppScopedAuth: true }
-});
-assert.equal(reScoped.claudeCode.useAppScopedAuth, true);
 
 // A provider's model list is read with the settings, and a save from a
 // window never writes one back: the window's copy may be older than a list
@@ -1111,7 +1102,7 @@ assert.equal(savedFromStaleWindow.modelCatalogs["claude-api"].models[0].value, "
 assert.equal(savedFromStaleWindow.modelCatalogs.openrouter.models[0].value, "a/b");
 
 const cleared = saveChatSettingsToStore(fakeStore, fakeKeyStores, {
-  ...reScoped,
+  ...loaded,
   openRouter: { ...loaded.openRouter, clearApiKey: true },
   local: { ...loaded.local, clearApiKey: true }
 });
@@ -1160,7 +1151,7 @@ assert.equal(settingsValues.has("chat.customInstructions"), false);
 // --- the compaction window is a stored setting ------------------------------
 // Defaults on, and on the shipped pair, for a store that has never seen these
 // keys — an athlete who upgrades gets compaction without opting in.
-assert.deepEqual(scopedByDefault.compactContext, {
+assert.deepEqual(fromEmptyStore.compactContext, {
   enabled: true,
   limit: 60,
   keep: 20,

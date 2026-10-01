@@ -140,7 +140,6 @@ import {
   toWireMessages,
   withCreationIndex
 } from "../../electron/chatContextCompaction";
-import { ClaudeAuthScopeToggle } from "./ClaudeAuthScopeToggle";
 import { ClaudeCodeLoginCard } from "./ClaudeCodeLoginCard";
 import { ChatSidebar } from "./ChatSidebar";
 import { ChatConversationHeader } from "./ChatConversationHeader";
@@ -253,7 +252,6 @@ const DEFAULT_CHAT_SETTINGS: ChatSettings = {
     hasApiKey: false
   },
   claudeCode: {
-    useAppScopedAuth: true,
     effort: "high",
     permissions: {
       recentActivities: true,
@@ -2863,44 +2861,6 @@ export function ChatView({
     }
   };
 
-  const handleUpdateClaudeCode = async (
-    patch: Partial<ChatSettings["claudeCode"]>
-  ) => {
-    const nextClaudeCode = {
-      ...chatSettings.claudeCode,
-      ...patch,
-      permissions: {
-        ...chatSettings.claudeCode.permissions,
-        ...(patch.permissions ?? {})
-      }
-    };
-    const nextSettings = { ...chatSettings, claudeCode: nextClaudeCode };
-    setChatSettings(nextSettings);
-    // Only a different binary or credential store can invalidate the
-    // connection. Clearing the status for a model, effort or permission change
-    // made showClaudeGate true and dropped the athlete out of the conversation.
-    const invalidatesConnection =
-      patch.executablePath !== undefined ||
-      patch.useAppScopedAuth !== undefined;
-    if (invalidatesConnection) {
-      setClaudeStatus(null);
-    }
-    if (!api) return;
-    try {
-      const saved = await api.saveChatSettings(nextSettings);
-      setChatSettings(saved);
-      // Switching credential stores can flip the sign-in state, so re-read it
-      // instead of leaving the caller staring at a cleared status.
-      if (invalidatesConnection) {
-        setClaudeStatus(await api.getClaudeCodeStatus());
-      }
-    } catch (caught) {
-      onError(
-        remoteErrorMessage(caught, "Could not save Claude settings.")
-      );
-    }
-  };
-
   /**
    * Whether the open conversation holds nothing and nothing hangs off it: no
    * entry, and no analysis attached. Such a conversation is a blank page, not
@@ -4324,25 +4284,15 @@ export function ChatView({
           <div className="chat-main chat-main-login">
             <div className="panel chat-login-panel chat-claude-login-panel">
               <Terminal size={32} aria-hidden="true" />
-              <div className="chat-login-title-row">
-                <h2>Claude Code</h2>
-                <span className="chat-beta-badge">Beta</span>
-              </div>
+              <h2>Claude Code</h2>
               <p>
                 Coach with your Claude subscription through the Claude Code CLI
                 on this computer.
               </p>
-              <ClaudeAuthScopeToggle
-                appScoped={chatSettings.claudeCode.useAppScopedAuth !== false}
-                disabled={checkingClaude}
-                onChange={(next) =>
-                  void handleUpdateClaudeCode({ useAppScopedAuth: next })
-                }
-              />
               <p className="chat-login-note">
-                {chatSettings.claudeCode.useAppScopedAuth !== false
-                  ? "Signing in here creates credentials that belong to Heracles Records alone. Any Claude account you use elsewhere on this computer — including in a terminal — is left alone."
-                  : "Heracles Records will use the machine-wide Claude login in your home folder, shared with your terminal. Signing in here replaces that login."}
+                Signing in here creates a login that belongs to Heracles Records
+                alone. Any Claude account you use elsewhere on this computer —
+                including in a terminal — is left alone.
               </p>
               <div className="chat-login-actions">
                 {notInstalled ? (

@@ -16465,12 +16465,11 @@ td span {
 
 /* The Claude subscription section is the longest one in the dialog and its
    `.chat-settings-section` gap spaces every child the same 10px, so its
-   groups — what the section is, which credentials to run on, what the
-   connection is doing, and which model to use — ran together as one list.
-   Only what *starts* a group takes the extra margin, so it lands on the seam
-   rather than inside a group: the executable field stays tucked under the
-   switch that reveals it, and a group's heading carries the seam rather than
-   the control underneath it. */
+   groups — what the section is, what the connection is doing, and which
+   model to use — ran together as one list. Only what *starts* a group takes
+   the extra margin, so it lands on the seam rather than inside a group: the
+   executable field stays tucked under the status that asks for it, and a
+   group's heading carries the seam rather than the control underneath it. */
 .coach-models-panel .chat-claude-section > .chat-claude-group-title,
 .coach-models-panel .chat-claude-section > .chat-claude-status {
   margin-top: 14px;
@@ -17443,10 +17442,6 @@ td span {
   color: #a7b4ff;
 }
 
-.chat-claude-login-panel .chat-login-title-row h2 {
-  margin: 0;
-}
-
 .chat-settings-copy {
   margin: 0;
   color: var(--text-muted);
@@ -18005,23 +18000,6 @@ td span {
 
 .chat-local-result.is-error {
   color: var(--error-text);
-}
-
-/* Where a provider's model list came from, and the button that reads it
-   again: one line under the model fields, the sentence taking what the
-   button leaves and wrapping above it on a narrow dialog. */
-.chat-model-list-status {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px 12px;
-}
-
-.chat-model-list-status > p {
-  flex: 1 1 240px;
-  min-width: 0;
-  margin: 0;
 }
 
 @media (max-width: 1080px) {

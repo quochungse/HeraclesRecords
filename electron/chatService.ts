@@ -358,15 +358,13 @@ export async function testAnthropicApiConnection(
 }
 
 /**
- * Directory Claude Code keeps Heracles Records's own credentials in. Returning
- * undefined lets Claude Code fall back to the machine-wide ~/.claude login.
+ * Directory Claude Code keeps Heracles Records's own credentials in. Always
+ * this one: the app never borrows the machine-wide ~/.claude login the
+ * terminal uses. Settings once offered that ("This device"), and the switch
+ * read as noise to anyone who has never opened a terminal; a stored
+ * `chat.claudeCode.useAppScopedAuth` is no longer read.
  */
-function getClaudeCodeConfigDir(
-  settings = getChatSettings()
-): string | undefined {
-  if (settings.claudeCode.useAppScopedAuth === false) {
-    return undefined;
-  }
+function getClaudeCodeConfigDir(): string {
   const dir = path.join(app.getPath("userData"), "claude-code");
   // The CLI writes credentials here, so keep it owner-only.
   fs.mkdirSync(dir, { recursive: true, mode: 0o700 });
@@ -375,15 +373,16 @@ function getClaudeCodeConfigDir(
 
 /**
  * `forceModels` reads the account's model list again even when the one held
- * is fresh — the refresh button's way in; everything else waits for the day.
+ * is fresh — the way in for Coach Models' Check; everything else waits for the day.
  */
 export async function getClaudeCodeConnectionStatus(
   options: { forceModels?: boolean } = {}
 ): Promise<ClaudeCodeStatus> {
   const settings = getChatSettings();
+  const configDir = getClaudeCodeConfigDir();
   const status = await inspectClaudeCodeStatus(
     settings.claudeCode.executablePath,
-    getClaudeCodeConfigDir(settings)
+    configDir
   );
   // Only a real turn reports the model, so carry the cached one through. Without
   // this the renderer never learns a default discovered during a chat.
@@ -393,7 +392,6 @@ export async function getClaudeCodeConnectionStatus(
     availableModels:
       status.availableModels || settings.claudeCode.availableModels
   };
-  const configDir = getClaudeCodeConfigDir(settings);
   // A list is read again when there is none, when it is a day old, or when it
   // came from another CLI than the one now in use — an upgrade, or a newer
   // install found beside the old one, is exactly when the models change. At
@@ -404,7 +402,7 @@ export async function getClaudeCodeConnectionStatus(
     !merged.availableModels?.length ||
     isStale(settings.claudeCode.availableModelsAt) ||
     settings.claudeCode.availableModelsFrom !== source;
-  const probeKey = `${configDir ?? "machine"}|${source}`;
+  const probeKey = `${configDir}|${source}`;
   if (
     listDue &&
     merged.executablePath &&
@@ -467,7 +465,7 @@ export async function openClaudeCodeLoginUrl(): Promise<void> {
 
 export async function beginClaudeCodeLogin(): Promise<ClaudeCodeLoginStart> {
   const settings = getChatSettings();
-  const configDir = getClaudeCodeConfigDir(settings);
+  const configDir = getClaudeCodeConfigDir();
   const status = await inspectClaudeCodeStatus(
     settings.claudeCode.executablePath,
     configDir
@@ -486,7 +484,7 @@ export async function beginClaudeCodeLogin(): Promise<ClaudeCodeLoginStart> {
   // Claude Code opens the sign-in page itself as soon as it prints the URL.
   // Opening it here as well produced two browser tabs, so the automatic open is
   // left to the CLI and the app only re-opens it on request.
-  return { url: session.url, scope: configDir ? "app" : "machine" };
+  return { url: session.url };
 }
 
 /**
@@ -532,19 +530,12 @@ export function cancelClaudeCodeLogin(): void {
 
 /**
  * Clears the app's own Claude credentials so a different account can sign in.
- *
- * Deliberately refuses when the athlete opted into the machine-wide login: that
- * store is shared with their terminal and is not ours to sign out.
+ * The machine-wide login the terminal uses is never touched: it is not the
+ * store the app runs against.
  */
 export async function revokeClaudeCodeLogin(): Promise<ClaudeCodeStatus> {
   const settings = getChatSettings();
-  const configDir = getClaudeCodeConfigDir(settings);
-  if (!configDir) {
-    throw new ClaudeCodeProviderError(
-      "Revoking only applies to the Heracles Records-only Claude login. Turn that on first, or sign out from your terminal.",
-      "auth"
-    );
-  }
+  const configDir = getClaudeCodeConfigDir();
 
   // Any half-finished sign-in is against the credentials we are about to drop.
   cancelClaudeCodeLogin();
@@ -569,14 +560,14 @@ export async function revokeClaudeCodeLogin(): Promise<ClaudeCodeStatus> {
 
 export async function testClaudeCodeConnection(): Promise<ClaudeCodeConnectionTest> {
   const settings = getChatSettings();
-  const configDir = getClaudeCodeConfigDir(settings);
+  const configDir = getClaudeCodeConfigDir();
   const result = await runClaudeCodeConnectionTest(
     settings.claudeCode.executablePath,
     configDir
   );
   // An explicit connection test is always worth re-reading the list for.
   const source = claudeListSource(result.status);
-  probedModelDirs.add(`${configDir ?? "machine"}|${source}`);
+  probedModelDirs.add(`${configDir}|${source}`);
   const status: ClaudeCodeStatus = {
     ...result.status,
     availableModels: result.status.executablePath
@@ -1942,7 +1933,7 @@ async function streamChatTurn(
     // without touching the saved settings (decision 2).
     const provider = runtime.provider ?? settings.provider;
     if (provider === "claude-code") {
-      const claudeConfigDir = getClaudeCodeConfigDir(settings);
+      const claudeConfigDir = getClaudeCodeConfigDir();
       const status = await prepare(claudeCodeStatusForTurn(
         settings.claudeCode.executablePath,
         claudeConfigDir,

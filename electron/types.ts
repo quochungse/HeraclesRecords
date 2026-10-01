@@ -1682,12 +1682,6 @@ export interface ClaudeCodePermissions {
 export interface ClaudeCodeConfig {
   /** Optional user-selected path. Heracles Records never reads Claude credential files. */
   executablePath?: string;
-  /**
-   * When true (the default) Claude Code runs against a Heracles Records-only
-   * CLAUDE_CONFIG_DIR, so the app signs in to its own account instead of
-   * borrowing whichever one the machine's CLI is using.
-   */
-  useAppScopedAuth: boolean;
   /** Model alias (e.g. "opus", "sonnet", "haiku") or full id. Empty = account default. */
   model?: string;
   /** Reasoning effort. The Agent SDK downgrades levels a model cannot serve. */
@@ -1738,8 +1732,6 @@ export interface ClaudeCodeConnectionTest {
 /** Pending `claude auth login` waiting for the code from the callback page. */
 export interface ClaudeCodeLoginStart {
   url: string;
-  /** Directory the resulting credentials land in, for display only. */
-  scope: "app" | "machine";
 }
 
 /**

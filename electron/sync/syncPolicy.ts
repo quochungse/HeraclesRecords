@@ -216,7 +216,6 @@ export const SETTING_POLICY: Readonly<Record<string, SyncTier>> = {
   "chat.anthropic.effort": "preference",
   "chat.claudeCode.model": "preference",
   "chat.claudeCode.effort": "preference",
-  "chat.claudeCode.useAppScopedAuth": "preference",
   "chat.claudeCode.permissions.recentActivities": "preference",
   "chat.claudeCode.permissions.trainingMetrics": "preference",
   "chat.claudeCode.permissions.upcomingWorkouts": "preference",
