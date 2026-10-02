@@ -663,6 +663,43 @@ input::placeholder {
   -webkit-app-region: drag;
 }
 
+/* A layer drawn over the whole window has to take itself out of that drag
+   region, or the strip under it keeps eating clicks: on macOS a button in the
+   top 40px of a dialog or a sheet moved the window instead of pressing
+   (upstream CorosLink 0.1.42, found on the Calendar's detail panel). Electron
+   subtracts a no-drag box from the drag boxes laid out before it, so naming
+   the backdrop clears the strip for as long as the layer is open. Only layers
+   that are mounted while open belong here: the two drawer scrims stay mounted
+   at opacity 0, so they are named by their open state, or the window could
+   never be dragged. A framed window (Windows, Linux) has no drag region. */
+.app-sidebar-overlay.is-visible,
+.chat-sidebar-overlay.is-visible,
+.update-prompt-backdrop,
+.ors-help-backdrop,
+.activity-route-modal-backdrop,
+.training-raw-modal-backdrop,
+.chat-settings-backdrop,
+.app-modal-backdrop,
+.chat-base-instructions-backdrop,
+.coach-sheet,
+.calendar-detail-backdrop,
+.calendar-detail-panel,
+.calendar-modal-backdrop,
+.exercise-picker-scrim,
+.exercise-picker-clip-scrim,
+.workout-editor-backdrop,
+.coach-analysis-dialog-backdrop,
+.mcp-session-backdrop,
+.profile-dialog-backdrop,
+.tl-plan-modal-backdrop,
+.tl-dialog-backdrop,
+.plan-generator-backdrop,
+.plan-calendar-backdrop,
+.strength-hevy-backdrop,
+.exercise-explorer-backdrop {
+  -webkit-app-region: no-drag;
+}
+
 .app-dev-view-toggle {
   min-height: 30px;
   border: 1px solid color-mix(in srgb, var(--accent) 42%, var(--glass-border));
