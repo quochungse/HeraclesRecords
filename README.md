@@ -169,7 +169,7 @@ npm run build        # tsc electron + tsc --noEmit renderer + vite build  (the o
 npm start            # build, then run the packaged-style app
 ```
 
-There is no linter and no test runner. Tests are ~91 standalone `scripts/test-*.mjs` files,
+There is no linter and no test runner. Tests are ~165 standalone `scripts/test-*.mjs` files,
 each wired to its own npm script — `npm run test:chat-service`, `npm run test:ipc-surface`,
 and so on. `npm run | grep test:` lists them.
 

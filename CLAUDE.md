@@ -151,7 +151,7 @@ npm run sample:coach     # app closed: writes sample Coach conversations for P0�
 npm start                # build, then run the packaged-style app
 ```
 
-There is **no linter and no test runner**. Tests are ~143 standalone `scripts/test-*.mjs`
+There is **no linter and no test runner**. Tests are ~165 standalone `scripts/test-*.mjs`
 files using `node:assert/strict`, each wired to its own npm script. `npm run build` is the
 only typecheck. CI (`.github/workflows/build.yml`, `release.yml`) **builds installers but
 runs no tests** — nothing catches a broken test except running it.
@@ -2237,7 +2237,7 @@ by construction. Wire it where a test can see it.
 
 ### Renderer
 
-`src/App.tsx` is a ~8.5k-line monolith holding view routing and most cross-cutting state.
+`src/App.tsx` (~2.3k lines) holds view routing and most cross-cutting state.
 `src/navigation/primaryNav.ts` defines `PrimaryView`. Its `developmentOnly` and `beta` flags
 are still honoured by the rail, the tab bar and the start-up picker, but no destination sets
 either since Watch Faces and Gear were removed — the first one to need them again just sets
