@@ -20,8 +20,14 @@ export interface RecordsNotices {
   visitNew: ReadonlySet<string>;
   toasts: Array<{ announcement: Announcement; labour: LabourState }>;
   dismissToast: (key: string) => void;
-  celebration: { labour: LabourState; completed: number } | null;
+  /** The labour completed, shown one at a time when two complete at once. */
+  celebration: Celebration | null;
   closeCelebration: () => void;
+}
+
+interface Celebration {
+  labour: LabourState;
+  completed: number;
 }
 
 /**
@@ -40,7 +46,7 @@ export function useRecordsNotices({
   const [freshCount, setFreshCount] = useState(0);
   const [visitNew, setVisitNew] = useState<ReadonlySet<string>>(() => new Set());
   const [toasts, setToasts] = useState<Array<{ announcement: Announcement; labour: LabourState }>>([]);
-  const [celebration, setCelebration] = useState<RecordsNotices["celebration"]>(null);
+  const [celebrations, setCelebrations] = useState<Celebration[]>([]);
   const timers = useRef(new Map<string, number>());
   const { result, labours, settled } = records;
 
@@ -66,35 +72,33 @@ export function useRecordsNotices({
     const reckoning = reckonNotices(stored, result.milestones, labours, getLocalHappenDayKey());
     let next = reckoning.next ?? stored;
     let fresh = reckoning.fresh;
-    let write = Boolean(reckoning.next);
     if (onRecordsScreen && next && fresh.length > 0) {
       const shown = fresh;
       setVisitNew((current) => new Set([...current, ...shown]));
-      const seen = markSeen(next, fresh);
-      if (seen) {
-        next = seen;
-        write = true;
-      }
+      next = markSeen(next, fresh) ?? next;
       fresh = [];
     }
-    if (write && next) writeNoticeState(next);
+    // Written whenever there is a state, not only when this reckoning moved
+    // it: the synced copy may be the other machine's, short of what this one
+    // holds, and writing the union back is what mends it. A no-op otherwise.
+    if (next) writeNoticeState(next);
     setFreshCount(fresh.length);
 
-    // A labour completed is one celebration; its other stages reached at the
-    // same moment are not toasted beside it.
-    const completing = reckoning.announce.find((entry) => entry.completes);
-    if (completing) {
-      const labour = labourOf.get(completing.labourId);
-      if (labour) {
-        setCelebration({
-          labour,
-          completed: labours.filter((candidate) => candidate.complete).length
-        });
-      }
-    }
-    const toasted = reckoning.announce.filter(
-      (entry) => !entry.completes && entry.labourId !== completing?.labourId
+    // A labour completed is one celebration — each of them, in turn, when two
+    // complete at once — and its other stages reached at the same moment are
+    // not toasted beside it.
+    const completingIds = new Set(
+      reckoning.announce.filter((entry) => entry.completes).map((entry) => entry.labourId)
     );
+    const completed = labours.filter((candidate) => candidate.complete).length;
+    const celebrated = [...completingIds].flatMap((labourId) => {
+      const labour = labourOf.get(labourId);
+      return labour ? [{ labour, completed }] : [];
+    });
+    if (celebrated.length > 0) {
+      setCelebrations((current) => [...current, ...celebrated]);
+    }
+    const toasted = reckoning.announce.filter((entry) => !completingIds.has(entry.labourId));
     if (toasted.length > 0) {
       setToasts((current) => [
         ...current,
@@ -130,7 +134,7 @@ export function useRecordsNotices({
     visitNew,
     toasts,
     dismissToast,
-    celebration,
-    closeCelebration: useCallback(() => setCelebration(null), [])
+    celebration: celebrations[0] ?? null,
+    closeCelebration: useCallback(() => setCelebrations((current) => current.slice(1)), [])
   };
 }

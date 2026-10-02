@@ -5,6 +5,14 @@
 // announced on one machine is not announced again on the other, and a
 // milestone seen there is not "new" here.
 //
+// **Two copies, unioned.** Sync carries a localStorage value whole and the
+// last writer wins, so the other machine's copy, written before it had pulled
+// this one, would wipe what this machine had seen and announced — the rail
+// said "N new" again and a stage was toasted twice. Both sets only ever grow,
+// so this machine also keeps its own copy (`device` tier, never synced), reads
+// the union of the two, and writes the union back to both whenever the synced
+// copy lacks something: the other machine's copy is folded in, never obeyed.
+//
 // Three rules, each held by test:records:
 //
 //  * **The first reckoning announces nothing.** An athlete opening a build
@@ -24,6 +32,8 @@ import { labourStageKey } from "./labours";
 import { dateOfDay, type Milestone } from "./milestones";
 
 export const NOTICES_STORAGE_KEY = "heraclesrecords.records.notices.v1";
+/** This machine's own copy of the same record, for the union. */
+const NOTICES_LOCAL_KEY = "heraclesrecords.records.notices.local.v1";
 export const NEW_WITHIN_DAYS = 30;
 export const ANNOUNCE_WITHIN_DAYS = 14;
 /** Plenty for years of milestones; a bound so the record cannot grow forever. */
@@ -163,17 +173,64 @@ export function parseNoticeState(raw: string | null): NoticeState | null {
   }
 }
 
-export function readNoticeState(): NoticeState | null {
+/** Every id either copy holds. Both sets only grow, so a union loses nothing. */
+export function unionNoticeStates(
+  left: NoticeState | null,
+  right: NoticeState | null
+): NoticeState | null {
+  if (!left) return right;
+  if (!right) return left;
+  return {
+    v: 1,
+    seen: capped(new Set([...left.seen, ...right.seen])),
+    announced: [...new Set([...left.announced, ...right.announced])]
+  };
+}
+
+function sameNoticeState(left: NoticeState, right: NoticeState): boolean {
+  const same = (a: readonly string[], b: readonly string[]) => {
+    if (a.length !== b.length) return false;
+    const held = new Set(a);
+    return b.every((id) => held.has(id));
+  };
+  return same(left.seen, right.seen) && same(left.announced, right.announced);
+}
+
+function readKey(key: string): NoticeState | null {
   try {
-    return parseNoticeState(window.localStorage.getItem(NOTICES_STORAGE_KEY));
+    return parseNoticeState(window.localStorage.getItem(key));
   } catch {
     return null;
   }
 }
 
+/** The synced copy and this machine's own, as one. */
+export function readNoticeState(): NoticeState | null {
+  try {
+    return unionNoticeStates(
+      parseNoticeState(window.localStorage.getItem(NOTICES_STORAGE_KEY)),
+      parseNoticeState(window.localStorage.getItem(NOTICES_LOCAL_KEY))
+    );
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Write to both copies, each only where it differs — an unchanged write is not
+ * a sync change, and the synced copy is rewritten exactly when the other
+ * machine's version of it lacked something this one holds.
+ */
 export function writeNoticeState(state: NoticeState): void {
   try {
-    window.localStorage.setItem(NOTICES_STORAGE_KEY, JSON.stringify(state));
+    const synced = readKey(NOTICES_STORAGE_KEY);
+    if (!synced || !sameNoticeState(synced, state)) {
+      window.localStorage.setItem(NOTICES_STORAGE_KEY, JSON.stringify(state));
+    }
+    const local = readKey(NOTICES_LOCAL_KEY);
+    if (!local || !sameNoticeState(local, state)) {
+      window.localStorage.setItem(NOTICES_LOCAL_KEY, JSON.stringify(state));
+    }
   } catch {
     // Private storage or a full quota: the hall still draws, it only forgets
     // what it told the athlete, and the next reckoning starts from scratch.

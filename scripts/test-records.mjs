@@ -617,6 +617,45 @@ const hydra = notices
 assert.equal(hydra.length, 3, "first swim, 1.5 km and 3.8 km on one day");
 assert.ok(hydra.every((entry) => entry.completes), "each of them completes the labour, so the screen celebrates once");
 
+// Sync carries the record whole and the last writer wins, so the other
+// machine's copy can land short of what this one was told. This machine reads
+// the union with its own copy and writes the union back — and only then.
+{
+  const store = new Map();
+  let writes = 0;
+  globalThis.window = {
+    localStorage: {
+      getItem: (key) => (store.has(key) ? store.get(key) : null),
+      setItem: (key, value) => {
+        writes += 1;
+        store.set(key, String(value));
+      },
+      removeItem: (key) => store.delete(key)
+    }
+  };
+  const here = { v: 1, seen: ["start", "first:ride"], announced: ["birds:1"] };
+  notices.writeNoticeState(here);
+  assert.equal(writes, 2, "both copies are written");
+  writes = 0;
+  notices.writeNoticeState(here);
+  assert.equal(writes, 0, "an unchanged write is no write, so no sync change");
+
+  // The other machine, which had not pulled this one, publishes its own copy.
+  store.set(notices.NOTICES_STORAGE_KEY, JSON.stringify({ v: 1, seen: ["start", "first:swim"], announced: ["hydra:1"] }));
+  const union = notices.readNoticeState();
+  assert.deepEqual(new Set(union.seen), new Set(["start", "first:ride", "first:swim"]), "nothing seen here is unseen by the pull");
+  assert.deepEqual(new Set(union.announced), new Set(["birds:1", "hydra:1"]), "and no stage is announced twice");
+  writes = 0;
+  notices.writeNoticeState(union);
+  assert.equal(writes, 2, "the union goes back out, mending the synced copy");
+  assert.deepEqual(
+    new Set(JSON.parse(store.get(notices.NOTICES_STORAGE_KEY)).seen),
+    new Set(union.seen)
+  );
+  assert.equal(notices.unionNoticeStates(null, null), null, "nothing either side is a first reckoning");
+  delete globalThis.window;
+}
+
 assert.equal(notices.parseNoticeState("{oops"), null);
 assert.equal(notices.parseNoticeState(JSON.stringify({ v: 2, seen: [], announced: [] })), null);
 assert.deepEqual(

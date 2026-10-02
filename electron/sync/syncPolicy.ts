@@ -400,6 +400,9 @@ export const LOCAL_STORAGE_POLICY: Readonly<Record<string, SyncTier>> = {
   // seen and the labour stages already announced. It follows them, so a stage
   // celebrated on one machine is not celebrated again on the other.
   "heraclesrecords.records.notices.v1": "personal",
+  // This machine's own copy of it, never synced: what it reads is the union of
+  // the two, so the other machine's copy cannot wipe what this one was told.
+  "heraclesrecords.records.notices.local.v1": "device",
 
   // Window chrome, sized to whatever display this machine has.
   "heraclesrecords.sidebarCollapsed": "device",
