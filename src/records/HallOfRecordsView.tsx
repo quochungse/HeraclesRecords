@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { ChevronDown, LockKeyhole } from "lucide-react";
+import { ChevronDown, CloudOff, LockKeyhole, RefreshCw } from "lucide-react";
 import type { TrainingHubActivity } from "../../electron/types";
 import type { HeraclesRecordsApi } from "../heraclesrecords-api";
 import { OptionGroup } from "../components/OptionGroup";
@@ -45,6 +45,9 @@ interface HallOfRecordsViewProps {
   newIds: ReadonlySet<string>;
   onOpenActivity: (activity: MilestoneActivity) => void;
   onOpenOverview: () => void;
+  /** The activity list is being asked for again. */
+  retrying?: boolean;
+  onRetryActivities?: () => void;
   /** A tab something sent the athlete to — the celebration's "See the Twelve Labours". */
   requestedTab?: RecordsTab | null;
   onTabRequestHandled?: () => void;
@@ -70,6 +73,8 @@ export function HallOfRecordsView({
   newIds,
   onOpenActivity,
   onOpenOverview,
+  retrying = false,
+  onRetryActivities,
   requestedTab,
   onTabRequestHandled
 }: HallOfRecordsViewProps) {
@@ -103,17 +108,9 @@ export function HallOfRecordsView({
     () => result.milestones.filter((milestone) => matchesFilter(milestone, filter)),
     [result.milestones, filter]
   );
-  const focusMonth = focus
-    ? result.milestones.find((milestone) => milestone.id === focus)?.day.slice(0, 6)
-    : undefined;
   const timeline = useMemo(
-    () =>
-      foldTimeline(
-        groupTimeline(shown),
-        openGaps,
-        new Set([...openMonths, ...(focusMonth ? [focusMonth] : [])])
-      ),
-    [shown, openGaps, openMonths, focusMonth]
+    () => foldTimeline(groupTimeline(shown), openGaps, openMonths),
+    [shown, openGaps, openMonths]
   );
 
   // A stage's date on the Labours tab jumps to the milestone that reached it.
@@ -137,7 +134,11 @@ export function HallOfRecordsView({
   const completeLabours = labours.filter((labour) => labour.complete).length;
   const first = result.milestones.find((milestone) => milestone.id === "start");
 
+  // The month is opened for good, not for the jump: held open only while
+  // `focus` was set, it folded back into its gap a frame after the scroll began.
   const showMilestone = (id: string) => {
+    const month = result.milestones.find((milestone) => milestone.id === id)?.day.slice(0, 6);
+    if (month) setOpenMonths((current) => new Set(current).add(month));
     setFilter("all");
     setTab("timeline");
     setFocus(id);
@@ -174,7 +175,9 @@ export function HallOfRecordsView({
           <p>
             {ready && first
               ? `${result.milestones.length} milestones since ${formatDayShort(first.day)} · ${reachedStages} of ${TOTAL_STAGES} labour stages`
-              : "Reading your history…"}
+              : ready || records.failed
+                ? "Every milestone of your training, and the Twelve Labours."
+                : "Reading your history…"}
           </p>
         </div>
         <OptionGroup<RecordsTab>
@@ -196,7 +199,29 @@ export function HallOfRecordsView({
         </p>
       ) : null}
 
-      {!ready ? (
+      {records.failed ? (
+        <section className="panel data-connect-panel">
+          <CloudOff size={24} aria-hidden="true" />
+          <div>
+            <h3>Your activities did not load</h3>
+            <p>
+              COROS did not return the activity list the hall is worked out from. This is
+              usually the connection; nothing on this machine was lost.
+            </p>
+          </div>
+          {onRetryActivities ? (
+            <button
+              type="button"
+              className="primary-button"
+              disabled={retrying}
+              onClick={onRetryActivities}
+            >
+              <RefreshCw size={14} aria-hidden="true" className={retrying ? "spin" : undefined} />
+              {retrying ? "Loading" : "Try again"}
+            </button>
+          ) : null}
+        </section>
+      ) : !ready ? (
         <RecordsSkeleton />
       ) : result.milestones.length === 0 ? (
         <section className="panel records-empty">
@@ -250,7 +275,7 @@ export function HallOfRecordsView({
                     <MonthBlock
                       key={block.month.key}
                       month={block.month}
-                      expanded={openMonths.has(block.month.key) || focusMonth === block.month.key}
+                      expanded={openMonths.has(block.month.key)}
                       onExpand={() =>
                         setOpenMonths((current) => new Set(current).add(block.month.key))
                       }

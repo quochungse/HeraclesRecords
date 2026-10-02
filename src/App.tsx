@@ -1539,6 +1539,7 @@ export default function App() {
     snapshot: trainingHubSnapshot,
     snapshotStatus: trainingHubSnapshotStatus,
     connected: Boolean(trainingHubStatus?.authenticated),
+    visible: activeView === "records",
     unitSystem,
   });
   const recordsNotices = useRecordsNotices({
@@ -2044,6 +2045,8 @@ export default function App() {
                     openActivityFrom(activity.activityId, "records")
                   }
                   onOpenOverview={() => setActiveView("overview")}
+                  retrying={busy === "training-refresh"}
+                  onRetryActivities={() => void handleRunningActivitiesRetry()}
                 />
               </Suspense>
             ) : null}

@@ -425,6 +425,7 @@ const api = {
   getSleepHistory: (request?: {
     days?: number;
     refresh?: boolean;
+    cacheOnly?: boolean;
   }): Promise<SleepHistorySnapshot> =>
     ipcRenderer.invoke("sleep:getHistory", request),
   getSleepNightSeries: (request: {

@@ -170,8 +170,6 @@ export interface RecordsResult {
   toRemember: RememberedMilestone[];
   /** Every cell trained in, busiest first, so the screen can name them. */
   places: PlaceCell[];
-  /** Runs whose summary does not yet carry best efforts and a start point. */
-  pendingSummaries: number;
 }
 
 // --- Thresholds -------------------------------------------------------------
@@ -970,9 +968,6 @@ export function computeRecords(input: RecordsInput): RecordsResult {
   // --- Records: best efforts, and COROS's own -----------------------------------------
   const records = recordMilestones(activities, input);
   for (const milestone of records.milestones) emit.push(milestone);
-  const pendingSummaries = activities.filter((activity) =>
-    needsRecordsSummary(activity, input.summaries.get(activity.activityId))
-  ).length;
 
   // --- VO2max ---------------------------------------------------------------------------
   const toRemember: RememberedMilestone[] = [];
@@ -1115,8 +1110,7 @@ export function computeRecords(input: RecordsInput): RecordsResult {
     progress,
     withinReach,
     toRemember,
-    places: places.cells,
-    pendingSummaries
+    places: places.cells
   };
 }
 

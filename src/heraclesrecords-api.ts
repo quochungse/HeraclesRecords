@@ -362,6 +362,7 @@ export interface HeraclesRecordsApi {
   getSleepHistory: (request?: {
     days?: number;
     refresh?: boolean;
+    cacheOnly?: boolean;
   }) => Promise<SleepHistorySnapshot>;
   getSleepNightSeries: (request: {
     happenDay: string;

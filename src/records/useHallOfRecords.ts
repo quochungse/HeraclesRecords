@@ -5,6 +5,7 @@ import type {
   TrainingHubActivity,
   UnitSystem
 } from "../../electron/types";
+import { RECORDS_SUMMARY_VERSION } from "../../electron/activityMetrics";
 import { isSleepDayRecord, totalSleepMinutes } from "../../electron/sleepMetrics";
 import type { HeraclesRecordsApi } from "../heraclesrecords-api";
 import { knownPlaceLabels, loadPlaceLabel } from "../trainingMap/placeLabels";
@@ -42,6 +43,8 @@ export interface HallOfRecordsState {
   labours: LabourState[];
   /** False until the activity list has answered — an empty hall is not yet a fact. */
   ready: boolean;
+  /** The list failed and nothing is held: a failure to say, not a load to wait on. */
+  failed: boolean;
   /**
    * Every source has answered once: the list, the stored summaries, the
    * remembered ledger, the snapshot and the sleep cache. The notifications wait
@@ -73,9 +76,15 @@ function namedPlaceLabels(): Record<string, PlaceLabelLookup> {
  * reached while the athlete is on any other screen.
  *
  * It asks for nothing COROS has to compute: stored summaries, the remembered
- * ledger and the sleep cache are all local reads. What costs a request — the
- * records backfill and the place names — runs only while the screen is open
+ * ledger and the sleep cache (read `cacheOnly` — the Sleep screen and Overview
+ * keep it filled) are all local reads. What costs a request — the records
+ * backfill and the place names — runs only while the screen is open
  * (`useRecordsBackfill`, `usePlaceNames`).
+ *
+ * The ledger and the sleep cache move without telling anyone — a plan run
+ * finishes in the plan cache, a night lands from the Sleep screen — so both
+ * are read again on every visit to the hall and whenever the activity list
+ * does, which is when there is something new to count.
  */
 export function useHallOfRecords({
   api,
@@ -84,6 +93,7 @@ export function useHallOfRecords({
   snapshot,
   snapshotStatus,
   connected,
+  visible,
   unitSystem
 }: {
   api: HeraclesRecordsApi | undefined;
@@ -92,6 +102,8 @@ export function useHallOfRecords({
   snapshot: TrainingHubSnapshot | null;
   snapshotStatus: TrainingHubLoadStatus;
   connected: boolean;
+  /** The hall is the screen on show. */
+  visible: boolean;
   unitSystem: UnitSystem;
 }): HallOfRecordsState {
   const [summaries, setSummaries] = useState<ReadonlyMap<string, ActivityDetailSummary>>(
@@ -116,7 +128,22 @@ export function useHallOfRecords({
       .getActivityDetailSummaries(activityIds)
       .then((stored) => {
         if (cancelled) return;
-        setSummaries(new Map(stored.map((summary) => [summary.activityId, summary])));
+        // Merged, not replaced: a backfill pass may have landed since this read
+        // went out, and its rows are newer than what the read found.
+        setSummaries((current) => {
+          const next = new Map(current);
+          for (const summary of stored) {
+            const held = next.get(summary.activityId);
+            if (
+              held?.recordsVersion === RECORDS_SUMMARY_VERSION &&
+              summary.recordsVersion !== RECORDS_SUMMARY_VERSION
+            ) {
+              continue;
+            }
+            next.set(summary.activityId, summary);
+          }
+          return next;
+        });
         setSummariesLoaded(true);
       })
       .catch(() => setSummariesLoaded(true));
@@ -134,22 +161,17 @@ export function useHallOfRecords({
       .finally(() => setRememberedLoaded(true));
   }, [api]);
 
+  // A finished plan run is worked out from the plan cache and the matches as
+  // the ledger is read, and neither says when it moved.
   useEffect(() => {
     loadRemembered();
-  }, [loadRemembered, connected]);
+  }, [loadRemembered, connected, visible, activityIds]);
 
-  // The other machine's memory arrives by sync; so do the plan matches a
-  // finished run is judged on.
+  // The other machine's memory arrives by sync.
   useEffect(() => {
     if (!api?.onSyncChanged) return;
     return api.onSyncChanged((change) => {
-      if (
-        change.tables?.some(
-          (table) => table === "athlete_milestones" || table === "training_activity_matches"
-        )
-      ) {
-        loadRemembered();
-      }
+      if (change.tables?.includes("athlete_milestones")) loadRemembered();
     });
   }, [api, loadRemembered]);
 
@@ -157,7 +179,7 @@ export function useHallOfRecords({
     if (!api || !connected) return;
     let cancelled = false;
     void api
-      .getSleepHistory({ days: SLEEP_DAYS })
+      .getSleepHistory({ days: SLEEP_DAYS, cacheOnly: true })
       .then((history) => {
         if (cancelled) return;
         setSleepNights(
@@ -176,7 +198,7 @@ export function useHallOfRecords({
     return () => {
       cancelled = true;
     };
-  }, [api, connected]);
+  }, [api, connected, visible, activityIds]);
 
   const vo2Readings = useMemo(
     () =>
@@ -249,6 +271,7 @@ export function useHallOfRecords({
     summaries,
     labours,
     ready: activitiesStatus === "ready" || activities.length > 0,
+    failed: activitiesStatus === "failed" && activities.length === 0,
     settled:
       connected &&
       activitiesStatus === "ready" &&
@@ -307,23 +330,41 @@ export function useRecordsBackfill({
     }
     let cancelled = false;
     let timer: number | undefined;
+    // A chunk at a time, not the whole list each pass: main fingerprints every
+    // id it is handed, and handing it thousands to fetch four is the cost.
+    let cursor = 0;
     const step = async () => {
       if (cancelled) return;
-      if (fetchedThisSession >= SESSION_FETCH_CAP) {
-        setPaused(true);
+      if (cursor >= pendingIds.length) {
+        setRemaining(0);
         return;
       }
+      if (fetchedThisSession >= SESSION_FETCH_CAP) {
+        setPaused(true);
+        setRemaining(pendingIds.length - cursor);
+        return;
+      }
+      const chunk = pendingIds.slice(cursor, cursor + BACKFILL_CHUNK);
       try {
-        const pass = await api.syncActivityDetailSummaries(pendingIds, BACKFILL_CHUNK, {
+        const pass = await api.syncActivityDetailSummaries(chunk, BACKFILL_CHUNK, {
           requireRecords: true
         });
-        if (cancelled) return;
+        // Taken even when this loop has been superseded: main has stored these
+        // and counts them as done, so no later pass would hand them over again.
         fetchedThisSession += pass.computed + pass.failed;
         onSummaries(pass.summaries);
-        setRemaining(pass.remaining);
-        if (pass.remaining > 0 && pass.computed + pass.failed > 0) {
-          timer = window.setTimeout(() => void step(), BACKFILL_PAUSE_MS);
+        if (cancelled) return;
+        cursor += chunk.length;
+        setRemaining(pendingIds.length - cursor);
+        if (pass.failed > 0 && pass.computed === 0) {
+          // Every fetch in the chunk failed: COROS is not answering.
+          setPaused(true);
+          return;
         }
+        timer = window.setTimeout(
+          () => void step(),
+          pass.computed + pass.failed > 0 ? BACKFILL_PAUSE_MS : 0
+        );
       } catch {
         // Offline, or COROS said no: the next visit tries again.
         setPaused(true);
@@ -354,23 +395,36 @@ export function usePlaceNames({
   onNamed: () => void;
 }): void {
   const asked = useRef(new Set<string>());
+  // Counted for the visit (the screen's mount), not per run of the effect: a
+  // name landing recomputes the places, and a cap per run would be no cap.
+  const askedThisVisit = useRef(0);
+  const cellsRef = useRef(cells);
+  cellsRef.current = cells;
+  // The cells as a set of places, so a recompute that names one does not start
+  // the queue again.
+  const cellKeys = cells.map((cell) => cell.key).join(",");
   useEffect(() => {
     if (!enabled) return;
     let cancelled = false;
     const known = knownPlaceLabels();
-    const queue = cells
+    const queue = cellsRef.current
       .filter((cell) => !known[cell.key] && !asked.current.has(cell.key))
-      .slice(0, PLACE_NAMES_PER_VISIT);
+      .slice(0, Math.max(0, PLACE_NAMES_PER_VISIT - askedThisVisit.current));
     void (async () => {
       for (const cell of queue) {
         if (cancelled) return;
         asked.current.add(cell.key);
-        await loadPlaceLabel(cell.key, { lat: cell.lat, lon: cell.lon }).catch(() => undefined);
-        if (!cancelled) onNamed();
+        askedThisVisit.current += 1;
+        const named = await loadPlaceLabel(cell.key, { lat: cell.lat, lon: cell.lon }).then(
+          () => true,
+          () => false
+        );
+        // Told even when superseded: the name is in the cache either way.
+        if (named) onNamed();
       }
     })();
     return () => {
       cancelled = true;
     };
-  }, [cells, enabled, onNamed]);
+  }, [cellKeys, enabled, onNamed]);
 }

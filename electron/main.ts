@@ -2248,7 +2248,7 @@ function registerIpcHandlers(): void {
 
   ipcMain.handle(
     "sleep:getHistory",
-    (_event, request?: { days?: number; refresh?: boolean }) =>
+    (_event, request?: { days?: number; refresh?: boolean; cacheOnly?: boolean }) =>
       getSleepHistory(request ?? {})
   );
 

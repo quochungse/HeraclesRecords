@@ -520,6 +520,13 @@ export interface SleepHistoryRequest {
   days?: number;
   /** Skip every freshness check and ask COROS. The screen's Refresh button. */
   refresh?: boolean;
+  /**
+   * Answer from what is on disk and never ask COROS. For a reader that is not
+   * the sleep screen — the Hall of Records counts streaks over 400 days on
+   * every launch, and a stale night there is not worth a COROS fetch of the
+   * whole window; the Sleep screen and Overview keep the cache filled.
+   */
+  cacheOnly?: boolean;
 }
 
 export async function getSleepHistory(
@@ -532,7 +539,8 @@ export async function getSleepHistory(
 
   hydrate(deps, retentionFrom);
 
-  const wantsNetwork = request.refresh === true || needsNetwork(days, now);
+  const wantsNetwork =
+    request.cacheOnly !== true && (request.refresh === true || needsNetwork(days, now));
 
   // A cache hit skips the network, and a flat `true` there reported a server
   // that had gone away as fine — for as long as the cache stayed fresh, which
