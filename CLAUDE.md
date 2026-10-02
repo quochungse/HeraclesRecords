@@ -336,6 +336,12 @@ lives at module level for the same visit-to-visit reason — see `useCalendarDat
 - **Training Hub** (`trainingHubService.ts`, ~6.5k lines) — COROS `teamapi.coros.com` auth
   (password + 2FA ticket flow, multi-region base URL resolution), activities, analytics.
   The only component that sends credentials off-machine.
+  **After the password step everything follows the account's `regionId`**
+  (`REGION_BASE_URLS`: 1 US, 2 CN, 3 EU, 4 SG — whichever region's `/account/login`
+  answered): the 2FA code, its check and the session. What is remembered is the email
+  typed, never the challenge's `account`, which is an opaque COROS value. And no probe
+  answering leaves the session on the account's region, not the US one.
+  `npm run test:coros-login` drives the whole flow against a fake COROS.
   **There is exactly one automatic login, and it runs once per launch.** COROS keeps a
   single live access token per account, so minting one kills the token every other machine
   holds — two computers that each re-logged in on an expired request took the session off
