@@ -350,14 +350,16 @@ import {
   OPENROUTER_KEYS_URL,
   OPENROUTER_MODELS_URL
 } from "./openRouterProvider";
+import { getCorosMcpAccount } from "./corosMcpAccount";
 import {
   connectCorosMcp,
+  connectMcpServerWithCorosAccount,
   disconnectCorosMcp,
   getCorosMcpStatus,
-  listCorosMcpTools
+  listCorosMcpTools,
+  setCorosMcpAccountSource
 } from "./corosMcpService";
 import {
-  connectMcpServer,
   disconnectMcpServer,
   ensureAllMcpConnected,
   getMcpStatuses,
@@ -904,6 +906,7 @@ app.whenReady().then(() => {
   setTrainingHubSessionListener((status) => {
     announceTrainingHubSessionChanged(status);
   });
+  setCorosMcpAccountSource(getCorosMcpAccount);
   createWindow();
   applyAppIcon();
   void removeRetiredFeatureStorage();
@@ -2070,8 +2073,9 @@ function registerIpcHandlers(): void {
     removeMcpServer(id);
   });
   ipcMain.handle("mcp:connect", (_event, id: string) =>
-    connectMcpServer(id, true, mainWindow)
+    connectMcpServerWithCorosAccount(id, true, mainWindow)
   );
+  ipcMain.handle("mcp:corosAccount", () => getCorosMcpAccount());
   ipcMain.handle("mcp:disconnect", async (_event, id: string) => {
     const server = getMcpServer(id);
     await disconnectMcpServer(id);

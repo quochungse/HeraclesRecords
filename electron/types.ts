@@ -2453,6 +2453,17 @@ export interface CorosMcpTool {
   inputSchema: Record<string, unknown>;
 }
 
+/** An account region with its own COROS MCP deployment. */
+export type CorosMcpRegion = "us" | "eu" | "cn";
+
+/** The COROS account the Training Hub session is signed in with. */
+export interface CorosMcpAccount {
+  /** Remembered login email, filled in on COROS's sign-in page. */
+  email?: string;
+  /** The session's region, which picks the built-in server's endpoint. */
+  region?: CorosMcpRegion;
+}
+
 export interface CorosMcpStatus {
   /** A live MCP client session is open. */
   connected: boolean;
@@ -2475,7 +2486,10 @@ export interface McpServerConfig {
   authType: McpAuthType;
   scope?: string;
   enabled: boolean;
-  /** Built-in (COROS): non-deletable, url/id immutable, can be disabled. */
+  /**
+   * Built-in (COROS): non-deletable, id immutable, url limited to COROS's
+   * regional endpoints, can be disabled.
+   */
   builtin: boolean;
   sortOrder: number;
 }

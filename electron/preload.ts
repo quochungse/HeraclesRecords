@@ -144,6 +144,7 @@ import type {
   LocalChatDiscovery,
   OpenRouterConfig,
   OpenRouterConnectionTest,
+  CorosMcpAccount,
   CorosMcpStatus,
   CorosMcpTool,
   McpServerConfig,
@@ -930,6 +931,8 @@ const api = {
     ipcRenderer.invoke("mcp:removeServer", id),
   connectMcpServer: (id: string): Promise<McpServerStatus> =>
     ipcRenderer.invoke("mcp:connect", id),
+  getCorosMcpAccount: (): Promise<CorosMcpAccount> =>
+    ipcRenderer.invoke("mcp:corosAccount"),
   disconnectMcpServer: (id: string): Promise<void> =>
     ipcRenderer.invoke("mcp:disconnect", id),
   getMcpStatuses: (): Promise<McpServerStatus[]> =>

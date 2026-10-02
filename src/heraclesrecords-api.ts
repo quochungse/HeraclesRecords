@@ -141,6 +141,7 @@ import type {
   LocalChatDiscovery,
   OpenRouterConfig,
   OpenRouterConnectionTest,
+  CorosMcpAccount,
   CorosMcpStatus,
   CorosMcpTool,
   McpServerConfig,
@@ -649,6 +650,7 @@ export interface HeraclesRecordsApi {
   ) => Promise<McpServerConfig>;
   removeMcpServer: (id: string) => Promise<void>;
   connectMcpServer: (id: string) => Promise<McpServerStatus>;
+  getCorosMcpAccount: () => Promise<CorosMcpAccount>;
   disconnectMcpServer: (id: string) => Promise<void>;
   getMcpStatuses: () => Promise<McpServerStatus[]>;
   /** Silent reconnect from stored auth; never opens an OAuth window. */

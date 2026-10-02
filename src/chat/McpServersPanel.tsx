@@ -10,11 +10,18 @@ import {
   Server,
   ShieldCheck,
   Trash2,
-  Unplug
+  Unplug,
+  UserRound
 } from "lucide-react";
 import { OptionGroup } from "../components/OptionGroup";
 import type { HeraclesRecordsApi } from "../heraclesrecords-api";
+import {
+  COROS_MCP_REGION_LABELS,
+  corosMcpRegion
+} from "../../electron/corosMcpRegions";
 import type {
+  CorosMcpAccount,
+  CorosMcpRegion,
   McpServerConfig,
   McpServerInput,
   McpServerStatus
@@ -70,6 +77,7 @@ export function McpServersPanel({
 }) {
   const [servers, setServers] = useState<McpServerConfig[]>([]);
   const [statuses, setStatuses] = useState<Record<string, McpServerStatus>>({});
+  const [corosAccount, setCorosAccount] = useState<CorosMcpAccount | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -80,12 +88,14 @@ export function McpServersPanel({
   const refresh = useCallback(async () => {
     if (!api) return;
     try {
-      const [list, statusList] = await Promise.all([
+      const [list, statusList, account] = await Promise.all([
         api.listMcpServers(),
-        api.getMcpStatuses()
+        api.getMcpStatuses(),
+        loadCorosAccount(api)
       ]);
       setServers(list);
       setStatuses(Object.fromEntries(statusList.map((s) => [s.id, s])));
+      setCorosAccount(account);
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : String(caught));
     } finally {
@@ -161,6 +171,11 @@ export function McpServersPanel({
                   : state === "disabled"
                     ? "Disabled"
                     : "Not connected";
+            // Only a first authorization opens COROS sign-in.
+            const corosRegion =
+              status?.connected || status?.authenticated
+                ? null
+                : corosMcpRegion(server.url);
 
             return (
               <li
@@ -183,6 +198,13 @@ export function McpServersPanel({
                     <code className="mcp-server-url">{server.url}</code>
                     <span>{authLabel(server.authType)}</span>
                   </div>
+                  {corosRegion && corosAccount ? (
+                    <CorosAccountNote
+                      account={corosAccount}
+                      builtin={server.builtin}
+                      serverRegion={corosRegion}
+                    />
+                  ) : null}
                   {status?.error ? (
                     <span className="mcp-server-row-error">
                       <AlertCircle size={13} aria-hidden="true" />
@@ -384,6 +406,56 @@ function authLabel(authType: McpServerConfig["authType"]): string {
   if (authType === "oauth") return "OAuth";
   if (authType === "bearer") return "API key";
   return "No authentication";
+}
+
+async function loadCorosAccount(
+  api: HeraclesRecordsApi
+): Promise<CorosMcpAccount | null> {
+  try {
+    return await api.getCorosMcpAccount();
+  } catch {
+    // It only personalises COROS sign-in, so it must never hide the list.
+    return null;
+  }
+}
+
+function CorosAccountNote({
+  account,
+  builtin,
+  serverRegion
+}: {
+  account: CorosMcpAccount;
+  builtin: boolean;
+  serverRegion: CorosMcpRegion;
+}) {
+  if (!account.email && !account.region) return null;
+  // The built-in server moves to the account's region when it connects.
+  const region = builtin ? account.region ?? serverRegion : serverRegion;
+  const regionLabel = COROS_MCP_REGION_LABELS[region];
+  const accountElsewhere =
+    account.region && account.region !== region ? account.region : null;
+  return (
+    <div className="mcp-server-coros-account">
+      <UserRound size={15} aria-hidden="true" />
+      <div>
+        <span>COROS account</span>
+        {account.email ? <strong>{account.email}</strong> : null}
+        <small>
+          {account.email
+            ? `Connect opens COROS sign-in on the ${regionLabel} server with this email filled in. COROS asks for your password there once.`
+            : accountElsewhere
+              ? `Connect opens COROS sign-in on the ${regionLabel} server.`
+              : `Connect opens COROS sign-in on the ${regionLabel} server, your account’s region.`}
+        </small>
+        {accountElsewhere ? (
+          <small className="is-warning">
+            Your COROS account is on the{" "}
+            {COROS_MCP_REGION_LABELS[accountElsewhere]} server.
+          </small>
+        ) : null}
+      </div>
+    </div>
+  );
 }
 
 function BearerField({

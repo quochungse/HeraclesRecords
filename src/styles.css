@@ -31370,6 +31370,54 @@ body.is-backgrounded .spin {
   margin-top: 1px;
 }
 
+/* Which COROS account and region Connect will sign in with, on a COROS MCP
+   row that has not been authorised yet. */
+.mcp-server-coros-account {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: start;
+  gap: 8px;
+  padding: 9px 10px;
+  border: 1px solid color-mix(in srgb, var(--accent) 26%, var(--glass-border));
+  border-radius: var(--radius-sm);
+  /* Opaque, so its small text keeps 4.5:1 on paper's grey rows. */
+  background: color-mix(in srgb, var(--accent) 6%, var(--surface));
+  color: var(--accent-strong);
+}
+
+.mcp-server-coros-account > svg {
+  margin-top: 1px;
+}
+
+.mcp-server-coros-account > div {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.mcp-server-coros-account > div > span {
+  color: var(--text-secondary);
+  font-size: 10px;
+  font-weight: 600;
+}
+
+.mcp-server-coros-account strong {
+  overflow-wrap: anywhere;
+  color: var(--text-primary);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.mcp-server-coros-account small {
+  color: var(--text-secondary);
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.mcp-server-coros-account small.is-warning {
+  color: var(--warning-text);
+}
+
 .mcp-server-actions {
   display: flex;
   align-items: center;

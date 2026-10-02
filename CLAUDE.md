@@ -1777,6 +1777,13 @@ lives at module level for the same visit-to-visit reason — see `useCalendarDat
   heart rate and minutes fold onto a night only where its `Total` is that
   episode's window (`dailyHealthEpisode`). A day with no sleep window asks for no
   HRV or stress series — COROS has none for it ("No data").
+  **Connecting COROS MCP uses the Training Hub account** (`connectMcpServerWithCorosAccount`,
+  `corosMcpRegions.ts`): the remembered email is filled in on COROS's sign-in page, and
+  the built-in server moves to the account's regional endpoint (`mcpus`/`mcpeu`/`mcpcn`)
+  while it holds no tokens — an EU account used to need an `mcpeu` server added by hand.
+  Once authorised a server stays where it is, and a silent reconnect neither moves nor
+  fills anything. The password is still typed there: COROS's form takes the plain one,
+  and only its digest is stored here. `test:coros-mcp-account`, `test:coros-mcp-regions`.
   **The COROS tool list is read on connect and not again unless a caller's tool
   is missing from it** (`corosMcpToolsHaving`): a `tools/list` is ~185 KB since
   the server grew to 34 tools, and the sleep fill, the daily-health read and the
