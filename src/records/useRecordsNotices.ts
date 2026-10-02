@@ -6,7 +6,8 @@ import {
   readNoticeState,
   reckonNotices,
   writeNoticeState,
-  type Announcement
+  type Announcement,
+  type NoticeState
 } from "./recordsNotices";
 import type { HallOfRecordsState } from "./useHallOfRecords";
 
@@ -35,6 +36,12 @@ interface Celebration {
  * reached — once every source has answered (`settled`), and again whenever
  * the milestones change. Opening the hall marks its new milestones seen, while
  * keeping them marked "New" for the rest of that visit.
+ *
+ * A sample history (`records.sample`) is told against a record held in memory
+ * and started empty — not the first reckoning's "all of it was lived", so the
+ * last month is news and the last fortnight's stages are announced — and the
+ * athlete's own record is never read or written while it is on. Switching a
+ * sample on again tells it all again.
  */
 export function useRecordsNotices({
   records,
@@ -48,7 +55,19 @@ export function useRecordsNotices({
   const [toasts, setToasts] = useState<Array<{ announcement: Announcement; labour: LabourState }>>([]);
   const [celebrations, setCelebrations] = useState<Celebration[]>([]);
   const timers = useRef(new Map<string, number>());
-  const { result, labours, settled } = records;
+  const { result, labours, settled, sample } = records;
+  const sampleState = useRef<NoticeState | null>(null);
+
+  // Declared before the reckoning, so a switch clears the last one's news
+  // before the new milestones are told.
+  useEffect(() => {
+    sampleState.current = sample ? { v: 1, seen: [], announced: [] } : null;
+    setVisitNew(new Set());
+    setToasts([]);
+    setCelebrations([]);
+    for (const timer of timers.current.values()) window.clearTimeout(timer);
+    timers.current.clear();
+  }, [sample]);
 
   const labourOf = useMemo(
     () => new Map<LabourId, LabourState>(labours.map((labour) => [labour.definition.id, labour])),
@@ -68,7 +87,7 @@ export function useRecordsNotices({
     if (!settled) return;
     // Read every time rather than held: a sync pull may have written the
     // other machine's copy since the last reckoning.
-    const stored = readNoticeState();
+    const stored = sample ? sampleState.current : readNoticeState();
     const reckoning = reckonNotices(stored, result.milestones, labours, getLocalHappenDayKey());
     let next = reckoning.next ?? stored;
     let fresh = reckoning.fresh;
@@ -81,7 +100,8 @@ export function useRecordsNotices({
     // Written whenever there is a state, not only when this reckoning moved
     // it: the synced copy may be the other machine's, short of what this one
     // holds, and writing the union back is what mends it. A no-op otherwise.
-    if (next) writeNoticeState(next);
+    if (next && sample) sampleState.current = next;
+    else if (next) writeNoticeState(next);
     setFreshCount(fresh.length);
 
     // A labour completed is one celebration — each of them, in turn, when two
@@ -114,7 +134,7 @@ export function useRecordsNotices({
         );
       }
     }
-  }, [settled, result.milestones, labours, labourOf, onRecordsScreen, dismissToast]);
+  }, [settled, sample, result.milestones, labours, labourOf, onRecordsScreen, dismissToast]);
 
   // Leaving the hall ends the visit: what was new on it has been seen.
   useEffect(() => {

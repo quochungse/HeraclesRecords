@@ -8,6 +8,7 @@ import type {
 import { RECORDS_SUMMARY_VERSION } from "../../electron/activityMetrics";
 import { isSleepDayRecord, totalSleepMinutes } from "../../electron/sleepMetrics";
 import type { HeraclesRecordsApi } from "../heraclesrecords-api";
+import { getLocalHappenDayKey } from "../training/formatters";
 import { knownPlaceLabels, loadPlaceLabel } from "../trainingMap/placeLabels";
 import { mergeTrainingDayLists } from "../training/parsers";
 import type { TrainingHubLoadStatus, TrainingHubSnapshot } from "../training/types";
@@ -18,6 +19,7 @@ import {
   type PlaceLabelLookup,
   type RecordsResult
 } from "./milestones";
+import { sampleRecordsInput, type RecordsSamplePreset } from "./sampleRecords";
 
 /** The nights the sleep cache keeps (`HISTORY_RETENTION_DAYS`). */
 const SLEEP_DAYS = 400;
@@ -38,6 +40,11 @@ let fetchedThisSession = 0;
 const PLACE_NAMES_PER_VISIT = 40;
 
 export interface HallOfRecordsState {
+  /**
+   * The developer toolbar's sample history standing in for the athlete's own,
+   * or null. Nothing a sample produces is remembered or announced for real.
+   */
+  sample: RecordsSamplePreset | null;
   result: RecordsResult;
   summaries: ReadonlyMap<string, ActivityDetailSummary>;
   labours: LabourState[];
@@ -98,7 +105,8 @@ export function useHallOfRecords({
   snapshotStatus,
   connected,
   visible,
-  unitSystem
+  unitSystem,
+  sample = null
 }: {
   api: HeraclesRecordsApi | undefined;
   activities: readonly TrainingHubActivity[];
@@ -109,6 +117,7 @@ export function useHallOfRecords({
   /** The hall is the screen on show. */
   visible: boolean;
   unitSystem: UnitSystem;
+  sample?: RecordsSamplePreset | null;
 }): HallOfRecordsState {
   const [summaries, setSummaries] = useState<ReadonlyMap<string, ActivityDetailSummary>>(
     () => new Map()
@@ -221,19 +230,27 @@ export function useHallOfRecords({
     return namedPlaceLabels();
   }, [labelVersion]);
 
+  // Built back from the day it is switched on, so its dates stay current.
+  const sampleInput = useMemo(
+    () => (sample ? sampleRecordsInput(sample, getLocalHappenDayKey()) : null),
+    [sample]
+  );
+
   const result = useMemo(
     () =>
-      computeRecords({
-        activities,
-        summaries,
-        personalRecords: snapshot?.dashboard?.personalRecords,
-        vo2Readings,
-        sleepNights,
-        remembered,
-        placeLabels,
-        unitSystem
-      }),
-    [activities, summaries, snapshot, vo2Readings, sleepNights, remembered, placeLabels, unitSystem]
+      sampleInput
+        ? computeRecords({ ...sampleInput, unitSystem })
+        : computeRecords({
+            activities,
+            summaries,
+            personalRecords: snapshot?.dashboard?.personalRecords,
+            vo2Readings,
+            sleepNights,
+            remembered,
+            placeLabels,
+            unitSystem
+          }),
+    [sampleInput, activities, summaries, snapshot, vo2Readings, sleepNights, remembered, placeLabels, unitSystem]
   );
 
   const labours = useMemo(
@@ -244,7 +261,7 @@ export function useHallOfRecords({
   // What a source will forget goes to the ledger — only when it says something
   // the ledger does not already hold, so a recompute is not a write.
   useEffect(() => {
-    if (!api) return;
+    if (!api || sampleInput) return;
     const held = new Map(remembered.map((row) => [row.id, row.day]));
     const fresh = result.toRemember.filter((row) => {
       const day = held.get(row.id);
@@ -257,7 +274,7 @@ export function useHallOfRecords({
         if (moved > 0) loadRemembered();
       })
       .catch(() => undefined);
-  }, [api, result.toRemember, remembered, loadRemembered]);
+  }, [api, sampleInput, result.toRemember, remembered, loadRemembered]);
 
   const mergeSummaries = useCallback((incoming: readonly ActivityDetailSummary[]) => {
     if (incoming.length === 0) return;
@@ -270,7 +287,21 @@ export function useHallOfRecords({
 
   const refreshPlaceLabels = useCallback(() => setLabelVersion((version) => version + 1), []);
 
+  if (sampleInput) {
+    return {
+      sample,
+      result,
+      summaries: sampleInput.summaries,
+      labours,
+      ready: true,
+      failed: false,
+      settled: true,
+      mergeSummaries,
+      refreshPlaceLabels
+    };
+  }
   return {
+    sample: null,
     result,
     summaries,
     labours,

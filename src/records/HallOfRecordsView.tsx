@@ -90,16 +90,19 @@ export function HallOfRecordsView({
   const [focus, setFocus] = useState<string | null>(null);
   const { result, labours, ready } = records;
 
+  // A sample's activities are nobody's: nothing about them is asked of COROS
+  // or of a geocoder.
+  const live = connected && !records.sample;
   const backfill = useRecordsBackfill({
     api,
     activities,
     summaries: records.summaries,
-    enabled: connected,
+    enabled: live,
     onSummaries: records.mergeSummaries
   });
   usePlaceNames({
     cells: result.places,
-    enabled: connected,
+    enabled: live,
     onNamed: records.refreshPlaceLabels
   });
 
@@ -144,7 +147,7 @@ export function HallOfRecordsView({
     setFocus(id);
   };
 
-  if (!connected) {
+  if (!connected && !records.sample) {
     return (
       <section className="records-view">
         <header className="records-page-header">
@@ -190,6 +193,12 @@ export function HallOfRecordsView({
           ]}
         />
       </header>
+
+      {records.sample ? (
+        <p className="records-backfill" role="status">
+          A sample history from the developer toolbar — not yours, and nothing in it is kept.
+        </p>
+      ) : null}
 
       {backfill.remaining !== undefined && backfill.remaining > 0 ? (
         <p className="records-backfill" role="status">

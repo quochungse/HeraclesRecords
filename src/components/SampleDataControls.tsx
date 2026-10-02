@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Check, ChevronDown } from "lucide-react";
 import type { SampleDataState } from "../../electron/types";
 import type { HeraclesRecordsApi } from "../heraclesrecords-api";
+import { RECORDS_SAMPLE_PRESETS, type RecordsSamplePreset } from "../records/sampleRecords";
 
 type MainSampleKind = keyof SampleDataState;
 type SampleKind = MainSampleKind | "strength";
@@ -25,6 +26,8 @@ interface SampleDataControlsProps {
   api: HeraclesRecordsApi | undefined;
   strengthSampleActive: boolean;
   onStrengthSampleChange: (active: boolean) => void;
+  recordsSample: RecordsSamplePreset | null;
+  onRecordsSampleChange: (preset: RecordsSamplePreset | null) => void;
   onError: (message: string) => void;
 }
 
@@ -34,12 +37,17 @@ interface SampleDataControlsProps {
  * runs are added by the main process, so a change there reloads the window:
  * the activity list, the Calendar's range cache and the summaries all hold
  * what they read, and a reload is the one way to have every one of them read
- * again. Strength's is renderer state and switches in place.
+ * again. Strength's is renderer state and switches in place, and so is the
+ * Hall of Records' — one preset at a time (`sampleRecords.ts`), standing in for
+ * the athlete's whole history there, so a second press on the chosen one
+ * switches it off.
  */
 export function SampleDataControls({
   api,
   strengthSampleActive,
   onStrengthSampleChange,
+  recordsSample,
+  onRecordsSampleChange,
   onError,
 }: SampleDataControlsProps) {
   const [state, setState] = useState<SampleDataState | null>(null);
@@ -106,7 +114,8 @@ export function SampleDataControls({
     }
   }
 
-  const activeCount = SAMPLE_OPTIONS.filter((option) => isOn(option.value)).length;
+  const activeCount =
+    SAMPLE_OPTIONS.filter((option) => isOn(option.value)).length + (recordsSample ? 1 : 0);
   const triggerLabel = activeCount > 0 ? `Sample · ${activeCount}` : "Sample";
 
   return (
@@ -151,6 +160,32 @@ export function SampleDataControls({
                 >
                   <span className="app-select-option-content">
                     <span className="app-select-option-label">{option.label}</span>
+                  </span>
+                  {checked ? (
+                    <Check
+                      className="app-select-option-check"
+                      size={15}
+                      strokeWidth={2.6}
+                      aria-hidden="true"
+                    />
+                  ) : null}
+                </button>
+              );
+            })}
+            {RECORDS_SAMPLE_PRESETS.map((preset) => {
+              const checked = recordsSample === preset.value;
+              return (
+                <button
+                  key={preset.value}
+                  className={`app-select-option${checked ? " is-selected" : ""}`}
+                  type="button"
+                  role="menuitemradio"
+                  aria-checked={checked}
+                  title={preset.title}
+                  onClick={() => onRecordsSampleChange(checked ? null : preset.value)}
+                >
+                  <span className="app-select-option-content">
+                    <span className="app-select-option-label">{preset.label}</span>
                   </span>
                   {checked ? (
                     <Check

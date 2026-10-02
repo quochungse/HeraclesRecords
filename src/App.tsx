@@ -75,6 +75,10 @@ import { selectOverviewGreeting } from "./overviewGreeting";
 import { useUnitSystem } from "./units/UnitSystemProvider";
 import { useHallOfRecords } from "./records/useHallOfRecords";
 import { useRecordsNotices } from "./records/useRecordsNotices";
+import {
+  isSampleRecordsActivity,
+  type RecordsSamplePreset,
+} from "./records/sampleRecords";
 import { LabourCelebration, LabourToastCard } from "./records/LabourNotices";
 import appLogo from "../build/icon.png";
 import changelogMarkdown from "../CHANGELOG.md?raw";
@@ -326,6 +330,8 @@ export default function App() {
     useState<AppUpdateSnapshot | null>(null);
   /** The Strength screen's generated sample history, switched from the toolbar. */
   const [strengthSampleMode, setStrengthSampleMode] = useState(false);
+  /** The Hall of Records' sample history, switched from the toolbar. */
+  const [recordsSample, setRecordsSample] = useState<RecordsSamplePreset | null>(null);
   const [sidebarOverlayOpen, setSidebarOverlayOpen] = useState(() => {
     if (typeof window === "undefined") {
       return false;
@@ -1541,6 +1547,7 @@ export default function App() {
     connected: Boolean(trainingHubStatus?.authenticated),
     visible: activeView === "records",
     unitSystem,
+    sample: recordsSample,
   });
   const recordsNotices = useRecordsNotices({
     records: hallOfRecords,
@@ -1683,6 +1690,7 @@ export default function App() {
       // Leaving dev view drops the preview, so generated data can never
       // linger in the production view.
       setStrengthSampleMode(false);
+      setRecordsSample(null);
       const developmentOnlyViews = new Set(
         PRIMARY_NAV_ITEMS.filter((item) => item.developmentOnly).map(
           (item) => item.id,
@@ -1751,6 +1759,8 @@ export default function App() {
           onToggleUpdateSimulation={toggleDevUpdateSimulation}
           strengthSampleActive={strengthSampleMode}
           onStrengthSampleChange={setStrengthSampleMode}
+          recordsSample={recordsSample}
+          onRecordsSampleChange={setRecordsSample}
           onError={setError}
         />
       ) : (
@@ -2042,7 +2052,11 @@ export default function App() {
                   requestedTab={recordsTabRequest}
                   onTabRequestHandled={() => setRecordsTabRequest(null)}
                   onOpenActivity={(activity) =>
-                    openActivityFrom(activity.activityId, "records")
+                    isSampleRecordsActivity(activity.activityId)
+                      ? setMessage(
+                          "A sample milestone: its activity exists only in the sample, so there is no page to open.",
+                        )
+                      : openActivityFrom(activity.activityId, "records")
                   }
                   onOpenOverview={() => setActiveView("overview")}
                   retrying={busy === "training-refresh"}

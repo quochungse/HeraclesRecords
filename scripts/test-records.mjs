@@ -663,4 +663,61 @@ assert.deepEqual(
   { v: 1, seen: ["a"], announced: ["lion:1"] }
 );
 
+// --- The developer toolbar's sample histories -------------------------------------------------------
+//
+// What they are for is seeing every kind of thing the hall draws, so that is
+// what is held: every category and filter, labours open, begun and complete,
+// and — whatever day it is switched on — two labours completed in the last
+// fortnight (the celebration queue), stages to toast, and a month of news.
+
+const samples = await import(moduleUrl("records", "sampleRecords.ts"));
+for (const today of ["20261002", "20261001", "20261004", "20260301", "20270115"]) {
+  const input = samples.sampleRecordsInput("full", today);
+  const full = computeRecords({ ...input, unitSystem: "metric", today });
+  const fullLabours = buildLabours(full.milestones, full.progress);
+  assert.ok(
+    input.activities.every((entry) => samples.isSampleRecordsActivity(entry.activityId)),
+    "every sample activity says it is one, so App does not try to open it"
+  );
+  assert.deepEqual(
+    timeline.filtersInUse(full.milestones),
+    timeline.TIMELINE_FILTERS,
+    `${today}: the full history has something behind every filter`
+  );
+  const kinds = new Set(full.milestones.map((milestone) => milestone.id.split(":")[0]));
+  for (const kind of ["start", "first", "distance", "climb", "longest", "week", "streak", "lifetime", "anniversary", "pr", "vo2max", "sleep", "plan", "place"]) {
+    assert.ok(kinds.has(kind), `${today}: the full history has a ${kind} milestone`);
+  }
+  assert.ok(full.milestones.some((milestone) => milestone.title.startsWith("Your ")), "COROS's record standing");
+  assert.ok(full.milestones.some((milestone) => /^New .* records$/.test(milestone.title)), "several records on one run");
+  assert.ok(full.milestones.some((milestone) => milestone.labour?.also), "one milestone reaching two stages");
+  const complete = fullLabours.filter((state) => state.complete).map((state) => state.definition.id);
+  const begun = fullLabours.filter((state) => !state.complete && state.reached > 0);
+  assert.equal(complete.length + begun.length, 12, `${today}: every labour begun in the full history`);
+  assert.ok(begun.length >= 3 && complete.length >= 3, "and some of each");
+  const told = notices.reckonNotices({ v: 1, seen: [], announced: [] }, full.milestones, fullLabours, today);
+  assert.deepEqual(
+    told.announce.filter((entry) => entry.completes).map((entry) => entry.labourId).sort(),
+    ["boar", "hydra"],
+    `${today}: two labours complete in the last fortnight — the celebration queue`
+  );
+  assert.ok(told.announce.filter((entry) => !entry.completes).length >= 2, `${today}: stages to toast`);
+  assert.ok(told.fresh.length >= 5, `${today}: a month of news for the rail and the badges`);
+  assert.ok(full.withinReach.length >= 2, "something within reach");
+}
+
+const firstWeeksToday = "20261002";
+const firstWeeks = computeRecords({ ...samples.sampleRecordsInput("beginner", firstWeeksToday), unitSystem: "metric", today: firstWeeksToday });
+const firstLabours = buildLabours(firstWeeks.milestones, firstWeeks.progress);
+assert.ok(firstLabours.filter((state) => state.reached === 0).length >= 4, "the first weeks leave labours open, drawn dashed");
+assert.ok(
+  notices.reckonNotices({ v: 1, seen: [], announced: [] }, firstWeeks.milestones, firstLabours, firstWeeksToday).announce.length >= 2,
+  "and stack a few first stages as toasts"
+);
+assert.deepEqual(
+  computeRecords({ ...samples.sampleRecordsInput("empty", firstWeeksToday), unitSystem: "metric", today: firstWeeksToday }).milestones,
+  [],
+  "the empty preset is the empty hall"
+);
+
 console.log("records: OK");
