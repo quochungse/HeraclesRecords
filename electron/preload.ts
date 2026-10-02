@@ -24,6 +24,7 @@ import type {
   CorosProfile,
   CorosProfilePatch,
   CorosProfileSnapshot,
+  RememberedMilestone,
   ReverseGeocodeResult,
   SaveChatSessionOptions,
   HevySettingsInput,
@@ -139,6 +140,10 @@ const api = {
     lon: number
   ): Promise<ReverseGeocodeResult> =>
     ipcRenderer.invoke("places:reverseGeocode", lat, lon),
+  listRememberedMilestones: (): Promise<RememberedMilestone[]> =>
+    ipcRenderer.invoke("records:list"),
+  rememberMilestones: (entries: RememberedMilestone[]): Promise<number> =>
+    ipcRenderer.invoke("records:remember", entries),
   notifyRendererReady: (): Promise<void> =>
     ipcRenderer.invoke("app:rendererReady"),
   getSampleData: (): Promise<SampleDataState> =>

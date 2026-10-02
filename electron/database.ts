@@ -426,6 +426,21 @@ export function initializeDatabase(userDataPath: string): Database.Database {
       payload    TEXT NOT NULL,
       fetched_at INTEGER NOT NULL
     );
+
+    -- The Hall of Records' memory: milestones whose source forgets them.
+    -- Almost every milestone is worked out again from the activity list on
+    -- every launch, and none of those is here. What is here is what that
+    -- cannot answer for ever — a VO2max reading COROS keeps for a year, a night
+    -- this machine kept for 400 days and another machine never saw, a plan run
+    -- that leaves COROS's list — so it is kept the first time it is seen, at
+    -- the earliest day it is seen for, and travels with the athlete.
+    CREATE TABLE IF NOT EXISTS athlete_milestones (
+      id          TEXT PRIMARY KEY,  -- "vo2max:high:48", "sleep:streak:7", "plan:<id>"
+      kind        TEXT NOT NULL,     -- vo2max | sleep | plan
+      happen_day  TEXT NOT NULL,     -- local "YYYYMMDD" it was reached
+      payload     TEXT NOT NULL,     -- JSON object, the figures it was reached with
+      recorded_at INTEGER NOT NULL   -- epoch ms it was first written here
+    );
   `);
 
   // feel_type caches the COROS end-of-activity feeling (sportFeelInfo.feelType,
@@ -3245,6 +3260,82 @@ function toTrainingActivityMatch(row: TrainingActivityMatchRow): TrainingActivit
     completedTrainingLoad: row.completed_training_load ?? undefined,
     updatedAt: row.updated_at
   };
+}
+
+export interface AthleteMilestoneRow {
+  id: string;
+  kind: string;
+  happenDay: string;
+  payload: Record<string, unknown>;
+  recordedAt: number;
+}
+
+export function listAthleteMilestones(): AthleteMilestoneRow[] {
+  return (
+    requireDatabase()
+      .prepare(
+        `SELECT id, kind, happen_day, payload, recorded_at
+         FROM athlete_milestones
+         ORDER BY happen_day, id`
+      )
+      .all() as Array<{
+      id: string;
+      kind: string;
+      happen_day: string;
+      payload: string;
+      recorded_at: number;
+    }>
+  ).map((row) => {
+    const payload = parseStoredJson<unknown>(row.payload, {});
+    return {
+      id: row.id,
+      kind: row.kind,
+      happenDay: row.happen_day,
+      payload:
+        payload && typeof payload === "object" && !Array.isArray(payload)
+          ? (payload as Record<string, unknown>)
+          : {},
+      recordedAt: row.recorded_at
+    };
+  });
+}
+
+/**
+ * Keep each milestone the first time it is seen, and at the earliest day it is
+ * ever seen for: a fact reached in March and seen again in May was reached in
+ * March. A row that moves nothing is not written, so it does not go out to
+ * sync as a change. Answers how many rows moved.
+ */
+export function rememberAthleteMilestones(
+  rows: ReadonlyArray<Omit<AthleteMilestoneRow, "recordedAt">>,
+  now = Date.now()
+): number {
+  const database = requireDatabase();
+  const upsert = database.prepare(
+    `INSERT INTO athlete_milestones (id, kind, happen_day, payload, recorded_at)
+     VALUES (?, ?, ?, ?, ?)
+     ON CONFLICT(id) DO UPDATE SET
+       happen_day = excluded.happen_day,
+       payload = excluded.payload
+     WHERE excluded.happen_day < athlete_milestones.happen_day`
+  );
+  const changed: string[] = [];
+  database.transaction(() => {
+    for (const row of rows) {
+      const result = upsert.run(
+        row.id,
+        row.kind,
+        row.happenDay,
+        JSON.stringify(row.payload),
+        now
+      );
+      if (result.changes > 0) changed.push(row.id);
+    }
+  })();
+  for (const id of changed) {
+    notifySyncedRow("athlete_milestones", ["id"], [id]);
+  }
+  return changed.length;
 }
 
 export function listTrainingActivityMatches(): TrainingActivityMatch[] {

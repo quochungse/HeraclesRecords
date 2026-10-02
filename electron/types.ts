@@ -3681,3 +3681,18 @@ export interface ManualActivityInput {
   calories?: number;
   avgHr?: number;
 }
+
+// ----- Hall of Records -----
+
+/**
+ * A milestone kept in `athlete_milestones` because its source forgets it — see
+ * `electron/recordsLedger.ts`. `day` is the local `YYYYMMDD` it was reached,
+ * the earliest it was ever seen for.
+ */
+export interface RememberedMilestone {
+  id: string;
+  kind: "vo2max" | "sleep" | "plan";
+  day: string;
+  data: Record<string, unknown>;
+  recordedAt?: number;
+}

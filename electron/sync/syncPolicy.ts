@@ -126,6 +126,12 @@ export const TABLE_POLICY: Readonly<Record<string, TablePolicy>> = {
   // classified would let a row from a machine still on the old build recreate
   // the table on the merge path.
   training_workout_metadata: "personal",
+  // The Hall of Records' memory: a milestone whose source forgets it — a
+  // VO2max reading past COROS's year, a night past what this machine kept, a
+  // plan run gone from COROS's list. Not rebuildable once forgotten, which is
+  // the whole reason it exists, and it is what lets the other machine show the
+  // same labours.
+  athlete_milestones: "personal",
   // Server config only. The bearer tokens and OAuth client info live in
   // app_settings under `mcp.<id>.*`, and stay on the machine that authorised
   // them — so a restored machine lists its servers and signs in to them again.

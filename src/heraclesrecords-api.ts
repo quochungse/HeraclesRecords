@@ -21,6 +21,7 @@ import type {
   CorosProfile,
   CorosProfilePatch,
   CorosProfileSnapshot,
+  RememberedMilestone,
   ReverseGeocodeResult,
   SaveChatSessionOptions,
   HevySettingsInput,
@@ -137,6 +138,13 @@ export interface HeraclesRecordsApi {
     lat: number,
     lon: number
   ) => Promise<ReverseGeocodeResult>;
+  /**
+   * The Hall of Records' memory: milestones whose source forgets them, with
+   * the finished plan runs the plan cache can vouch for added first.
+   */
+  listRememberedMilestones: () => Promise<RememberedMilestone[]>;
+  /** Keep VO2max and sleep milestones; answers how many rows moved. */
+  rememberMilestones: (entries: RememberedMilestone[]) => Promise<number>;
   /**
    * Tell the main process this window has its IPC listeners attached.
    *
