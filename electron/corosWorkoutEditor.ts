@@ -1019,10 +1019,6 @@ export function parseWorkoutEditorContext(
   };
 }
 
-export function paceSecondsForDisplay(secondsPerKm: number, unit: "km" | "mi"): number {
-  return unit === "mi" ? secondsPerKm / MILES_PER_KILOMETER : secondsPerKm;
-}
-
 export function displayPaceToSecondsPerKm(seconds: number, unit: "km" | "mi"): number {
   return unit === "mi" ? seconds * MILES_PER_KILOMETER : seconds;
 }

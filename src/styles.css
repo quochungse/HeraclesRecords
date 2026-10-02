@@ -1358,97 +1358,6 @@ input::placeholder {
   }
 }
 
-.primary-tabs {
-  position: relative;
-  display: flex;
-  flex-wrap: nowrap;
-  gap: 4px;
-  border: 1px solid var(--glass-border);
-  border-radius: var(--radius-lg);
-  background: rgba(255, 255, 255, 0.04);
-  padding: 4px;
-  isolation: isolate;
-}
-
-.primary-tabs-select {
-  flex: 1 1 auto;
-  min-width: 0;
-  max-width: min(100%, 240px);
-}
-
-.app-select--nav .app-select-trigger {
-  min-height: 36px;
-  border-radius: calc(var(--radius-lg) - 2px);
-  background: rgba(255, 255, 255, 0.04);
-  padding: 0 12px;
-  font-size: 14px;
-  font-weight: 500;
-}
-
-.app-select--nav .app-select-trigger:hover,
-.app-select--nav .app-select-trigger[aria-expanded="true"] {
-  background: rgba(255, 255, 255, 0.08);
-}
-
-.app-select--nav .app-select-menu {
-  min-width: 220px;
-}
-
-.primary-tabs-indicator {
-  position: absolute;
-  top: 0;
-  left: 0;
-  z-index: 0;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: calc(var(--radius-lg) - 4px);
-  background: rgba(255, 255, 255, 0.12);
-  box-shadow: var(--glass-inset);
-  pointer-events: none;
-  will-change: transform, width, height;
-  transition:
-    transform var(--dur-slow) cubic-bezier(0.22, 1, 0.36, 1),
-    width var(--dur-slow) cubic-bezier(0.22, 1, 0.36, 1),
-    height var(--dur-slow) cubic-bezier(0.22, 1, 0.36, 1),
-    opacity var(--dur-base) var(--ease);
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .primary-tabs-indicator {
-    transition: none;
-  }
-}
-
-.primary-tab {
-  position: relative;
-  z-index: 1;
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  min-height: 36px;
-  border: 1px solid transparent;
-  border-radius: calc(var(--radius-lg) - 4px);
-  background: transparent;
-  color: var(--text-secondary);
-  padding: 0 14px;
-  font-size: 14px;
-  font-weight: 500;
-  transition:
-    color var(--dur-fast) var(--ease),
-    background var(--dur-fast) var(--ease);
-}
-
-.primary-tab:hover:not(.is-active) {
-  background: rgba(255, 255, 255, 0.05);
-  color: var(--text-primary);
-}
-
-.primary-tab.is-active {
-  border-color: transparent;
-  background: transparent;
-  color: var(--text-primary);
-  box-shadow: none;
-}
-
 .primary-tab-activity {
   width: 7px;
   height: 7px;
@@ -1485,35 +1394,6 @@ input::placeholder {
   text-transform: uppercase;
 }
 
-.primary-tab.is-active .primary-tab-beta {
-  border-color: rgba(216, 155, 34, 0.46);
-  background: rgba(216, 155, 34, 0.2);
-  color: #ffe3a3;
-}
-
-@media (max-width: 1080px) {
-  .primary-tab {
-    gap: 0;
-    padding: 0 10px;
-  }
-
-  /* Scoped to the tab strip. Unscoped, this also hid the rail's Beta badge at
-     any window under 1080px — a stylesheet with no scoping means a class name
-     belongs to whoever wrote it first. */
-  .primary-tab .primary-tab-label,
-  .primary-tab .primary-tab-beta {
-    position: absolute;
-    width: 1px;
-    height: 1px;
-    padding: 0;
-    margin: -1px;
-    overflow: hidden;
-    clip: rect(0, 0, 0, 0);
-    white-space: nowrap;
-    border: 0;
-  }
-}
-
 @media (max-width: 560px) {
   .dev-toolbar {
     padding: 8px 12px;
@@ -1534,10 +1414,6 @@ input::placeholder {
   .brand-mark {
     width: 36px;
     height: 36px;
-  }
-
-  .primary-tabs-select {
-    max-width: none;
   }
 }
 
@@ -13030,7 +12906,6 @@ td span {
   .chat-row.is-chat-jump-target,
   .chat-avatar,
   .chat-thinking summary i,
-  .chat-mcp-panel,
   .chat-sidebar-expand-button,
   .chat-plan-list-header,
   .chat-plan-list {
@@ -16414,74 +16289,6 @@ td span {
   outline: var(--focus-ring);
   outline-offset: 2px;
 }
-
-/* COROS MCP connect control */
-.chat-mcp-panel {
-  position: absolute;
-  top: calc(100% + 8px);
-  right: 0;
-  z-index: 20;
-  width: 340px;
-  max-height: 360px;
-  overflow-y: auto;
-  padding: 12px;
-  border: 1px solid var(--surface-line, var(--glass-border));
-  border-radius: var(--radius-md);
-  background: var(--glass-bg-elevated);
-  -webkit-backdrop-filter: blur(var(--glass-blur-shell)) saturate(140%);
-  backdrop-filter: blur(var(--glass-blur-shell)) saturate(140%);
-  box-shadow: var(--shadow-card), var(--glass-inset);
-  animation: chat-empty-enter 0.22s var(--ease) both;
-}
-
-.chat-mcp-panel-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 8px;
-  font-family: var(--font-display);
-  font-size: 12px;
-  font-weight: 600;
-  letter-spacing: 0;
-  color: var(--text-primary);
-}
-
-.chat-mcp-panel-head button {
-  border: 1px solid var(--error-border);
-  background: transparent;
-  color: var(--error-text);
-  border-radius: var(--radius-pill);
-  padding: 3px 10px;
-  font-size: 11px;
-  cursor: pointer;
-}
-
-.chat-mcp-panel ul {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.chat-mcp-panel li {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.chat-mcp-panel li code {
-  font-family: var(--font-mono);
-  font-size: 12px;
-  color: var(--chat-signal-strong);
-}
-
-.chat-mcp-panel li span {
-  font-size: 11px;
-  color: var(--text-muted);
-  line-height: 1.45;
-}
 .basemap-menu,
 .basemap-toggle {
   background: rgba(12, 16, 21, 0.85);
@@ -16609,17 +16416,6 @@ td span {
 }
 
 /* --- Shell / header ------------------------------------------------------- */
-:root[data-theme="paper"] .primary-tabs {
-  background: rgba(19, 26, 40, 0.05);
-  border-color: var(--glass-border);
-}
-
-:root[data-theme="paper"] .primary-tabs-indicator {
-  border-color: rgba(19, 26, 40, 0.15);
-  background: rgba(19, 26, 40, 0.1);
-  box-shadow: var(--shadow-inset);
-}
-
 :root[data-theme="paper"] .update-chip {
   background: rgba(19, 26, 40, 0.05);
 }
@@ -16655,22 +16451,8 @@ td span {
   background: rgba(34, 197, 94, 0.1);
 }
 
-:root[data-theme="paper"] .primary-tab:hover:not(.is-active) {
-  background: rgba(19, 26, 40, 0.06);
-}
-
-:root[data-theme="paper"] .primary-tab.is-active {
-  background: transparent;
-  border-color: transparent;
-  box-shadow: none;
-}
-
 :root[data-theme="paper"] .primary-tab-beta {
   color: #8a5f10;
-}
-
-:root[data-theme="paper"] .primary-tab.is-active .primary-tab-beta {
-  color: #7a520c;
 }
 
 /* --- Chat (Coach) --------------------------------------------------------- */

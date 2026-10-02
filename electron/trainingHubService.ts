@@ -2513,40 +2513,6 @@ export async function getUpcomingWorkouts(
 }
 
 /**
- * GROUNDWORK (not yet wired to the UI): push a generated route to the user's
- * COROS account so it syncs to the watch through the COROS phone app over
- * Bluetooth — the only viable one-click path from the desktop, since COROS
- * watches do not import routes over USB.
- *
- * This reuses the existing Training Hub session via `trainingHubRequest`
- * (handles token, region base-URL failover, and re-auth), so the only missing
- * piece is the actual COROS route/course upload endpoint + payload, which is
- * undocumented.
- *
- * To finish it, capture the request the COROS web app makes:
- *   1. Log into web.coros.com and open DevTools → Network.
- *   2. Import a GPX route (or create one) and watch for the upload request.
- *   3. Note the path (likely under `/route` / `/course` / `/nav`), HTTP method,
- *      and body shape (JSON vs. multipart form-data with the GPX/`.kml`).
- * Then replace the placeholder below with that path/body and remove the throw.
- */
-export async function uploadRouteToCorosAccount(
-  _name: string,
-  _gpx: string
-): Promise<void> {
-  // Example of the intended call once the endpoint is known:
-  //
-  //   await trainingHubRequest<{ result: string }>("/route/import", {
-  //     method: "POST",
-  //     body: JSON.stringify({ name: _name, fileType: "gpx", content: _gpx })
-  //   });
-  //
-  throw new Error(
-    "Uploading routes to your COROS account is not available yet. Export the GPX and import it in the COROS phone app for now."
-  );
-}
-
-/**
  * Upload a local .fit or .tcx activity file to the signed-in COROS account.
  * Reuses the stored Training Hub session (no separate COROS login).
  * Flow: STS credentials → zip the file → S3 PUT → POST /activity/fit/import.
@@ -2795,12 +2761,6 @@ export async function deleteWorkoutProgram(programId: string): Promise<void> {
   }
   await trainingHubPostVoid("/training/program/delete", [id]);
   invalidateLibraryWorkoutPrograms();
-}
-
-export async function listWorkoutPrograms(): Promise<Record<string, unknown>[]> {
-  // Handed out whole, so it is copied: the list is cached now, and a caller
-  // that edited a row in place would be editing every later read of it.
-  return structuredClone(await listLibraryWorkoutPrograms());
 }
 
 export async function listLibraryWorkouts(): Promise<TrainingHubLibraryWorkout[]> {

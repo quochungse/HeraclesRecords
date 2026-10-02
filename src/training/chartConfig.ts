@@ -202,7 +202,6 @@ export function getTrainingMetricPalettes(
 
 /** Back-compat static exports (dark palette) for any non-theme-aware callers. */
 export const trainingChartColors = DARK_CHART_COLORS;
-export const trainingChartFillStops = getTrainingChartFillStops("dark");
 export const trainingChartActiveDot = getTrainingChartActiveDot("dark");
 
 export const trainingChartMargin = {

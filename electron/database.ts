@@ -2582,18 +2582,6 @@ export function chatSessionMentionsDraft(sessionId: string, draftIds: readonly s
   return draftIds.some((draftId) => Boolean(statement.get(sessionId, `"draftId":"${draftId}"`)));
 }
 
-export function listChatPlanDrafts(): StoredChatPlanDraftRecord[] {
-  const rows = requireDatabase()
-    .prepare(
-      `SELECT ${CHAT_PLAN_DRAFT_COLUMNS}
-       FROM chat_plan_drafts
-       ORDER BY created_at DESC`
-    )
-    .all() as ChatPlanDraftRow[];
-
-  return rows.map(chatPlanDraftRecord);
-}
-
 export function markChatPlanDraftUploaded(
   draftId: string,
   uploadedAt: number

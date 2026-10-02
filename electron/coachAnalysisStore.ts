@@ -1089,14 +1089,6 @@ export function updateCoachAnalysisRun(
   return nextRow ? toRun(nextRow) : null;
 }
 
-export function getCoachAnalysisRun(
-  id: string,
-  database: CoachAnalysisDatabase = defaultDatabase
-): CoachAnalysisRun | null {
-  const row = database.getRun(id);
-  return row ? toRun(row) : null;
-}
-
 export function listCoachAnalysisRuns(
   filter: CoachAnalysisRunQuery = {},
   database: CoachAnalysisDatabase = defaultDatabase

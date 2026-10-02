@@ -255,23 +255,6 @@ export function upsertCoachPromptEntry(
   return [...entries, { kind: "coachPrompt", prompt }];
 }
 
-export function upsertWorkoutDeleteEntry(
-  entries: ChatEntry[],
-  preview: WorkoutDeletePreview
-): ChatEntry[] {
-  const index = entries.findIndex(
-    (entry) =>
-      entry.kind === "workoutDelete" &&
-      entry.preview.requestId === preview.requestId
-  );
-  if (index >= 0) {
-    const next = [...entries];
-    next[index] = { kind: "workoutDelete", preview, ...keepExtra(entries[index]) };
-    return next;
-  }
-  return [...entries, { kind: "workoutDelete", preview }];
-}
-
 export function upsertActivityVisualEntry(
   entries: ChatEntry[],
   preview: ActivityVisualPreview

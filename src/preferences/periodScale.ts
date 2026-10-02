@@ -53,10 +53,6 @@ export function periodLabel(days: PeriodDays): string {
   return PERIOD_SCALE.find((option) => option.days === days)?.label ?? "All";
 }
 
-export function periodPhrase(days: PeriodDays): string {
-  return PERIOD_SCALE.find((option) => option.days === days)?.phrase ?? "all time";
-}
-
 /**
  * Periods as `OptionGroup` takes them. The value is a string because that is
  * what an option value is everywhere else in the app; `periodDaysFromValue`

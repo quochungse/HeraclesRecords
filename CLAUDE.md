@@ -2239,7 +2239,7 @@ by construction. Wire it where a test can see it.
 
 `src/App.tsx` (~2.3k lines) holds view routing and most cross-cutting state.
 `src/navigation/primaryNav.ts` defines `PrimaryView`. Its `developmentOnly` and `beta` flags
-are still honoured by the rail, the tab bar and the start-up picker, but no destination sets
+are still honoured by the rail and the start-up picker, but no destination sets
 either since Watch Faces and Gear were removed — the first one to need them again just sets
 the flag.
 

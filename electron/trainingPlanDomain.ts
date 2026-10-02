@@ -356,11 +356,6 @@ function workoutMetrics(workout?: PlanWorkoutEntryInput): {
   return { durationSeconds, distanceMeters, trainingLoad, strengthSets };
 }
 
-/** A session's length, where its steps state one: a step given as a distance or reps adds nothing. */
-export function workoutDurationSeconds(workout?: PlanWorkoutEntryInput): number {
-  return workoutMetrics(workout).durationSeconds;
-}
-
 /**
  * What one planned session amounts to.
  *

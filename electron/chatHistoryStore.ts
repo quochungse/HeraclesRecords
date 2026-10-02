@@ -2000,14 +2000,6 @@ export function chatSessionExists(
   return database.getSession(id) !== undefined;
 }
 
-/** The conversation's current title, or null when it no longer exists. */
-export function getChatSessionTitle(
-  id: string,
-  database: ChatSessionDatabase = defaultDatabase
-): string | null {
-  return database.getSession(id)?.title ?? null;
-}
-
 export function deleteChatSession(
   id: string,
   database: ChatSessionDatabase = defaultDatabase
