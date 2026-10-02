@@ -1762,6 +1762,7 @@ export default function App() {
                         onRememberChange={setTrainingHubRemember}
                         onLogin={handleTrainingHubLogin}
                         onReconnect={handleTrainingHubReconnect}
+                        showStrength={!hiddenSportScreens.includes("strength")}
                       />
                     </Suspense>
                   </div>

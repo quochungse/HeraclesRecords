@@ -215,6 +215,16 @@
   .strength-session-detail .strength-hero {
     grid-template-columns: minmax(0, 1fr);
   }
+
+  .strength-session-detail .strength-muscle-panel {
+    contain: none;
+  }
+
+  .strength-session-detail .strength-body-panel {
+    border-right: 0;
+    border-bottom: 1px solid var(--body-stage-border);
+    border-radius: calc(var(--radius-md) - 1px) calc(var(--radius-md) - 1px) 0 0;
+  }
 }
 
 @media (max-width: 1040px) {

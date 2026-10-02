@@ -66,7 +66,8 @@ export function TrainingOverview({
   onVerifyTwoFactor,
   onResendTwoFactor,
   onCancelTwoFactor,
-  onReconnect
+  onReconnect,
+  showStrength = true
 }: TrainingOverviewProps) {
   const connected = Boolean(status?.authenticated);
   // Every panel below draws from one of these two loads, and each answers an
@@ -483,9 +484,11 @@ export function TrainingOverview({
             analytics={snapshot?.analytics ?? null}
             loading={snapshotPending || activitiesPending}
           />
-          <Suspense fallback={null}>
-            <LazyStrengthDistributionSection api={api} status={status} />
-          </Suspense>
+          {showStrength ? (
+            <Suspense fallback={null}>
+              <LazyStrengthDistributionSection api={api} status={status} />
+            </Suspense>
+          ) : null}
           <TrainingTrendCharts
             points={snapshot?.trendPoints ?? []}
             mcpState={snapshot?.sleep?.mcpState}

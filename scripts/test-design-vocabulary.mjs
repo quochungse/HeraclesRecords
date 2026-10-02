@@ -130,12 +130,6 @@ const DURATION_TOKENS = new Set(["--dur-fast", "--dur-base", "--dur-slow"]);
  * selector, and the property. Each rule carries a comment saying which kind.
  */
 const DESIGNED_LENGTHS = [
-  // Springs: the curve overshoots, and its length is part of that shape.
-  // Strength's header pickers had three of these — the bloom that opened them
-  // on hover. They are gone with the pickers themselves: OptionGroup's
-  // collapsible mode opens on a click and animates a grid column, which is a
-  // reaction time and spends --dur-base like everything else.
-  ["src/strength/strength.css", ".strength-flip", "transform"],
   // Fills growing to their value.
   ["src/strength/strength.css", ".muscle-ranking-fill", "transform"],
   ["src/strength/strength.css", ".muscle-ranking-fill", "background"],

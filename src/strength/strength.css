@@ -281,17 +281,14 @@
 
 /* ---------- Hero: figure + muscle panel ---------- */
 
-.strength-hero {
+/* One card: the figure takes 35% of it and the muscle breakdown the rest,
+   divided by a hairline rather than set apart as two cards. */
+.panel.strength-hero {
   display: grid;
-  grid-template-columns: minmax(300px, 0.95fr) minmax(0, 1.05fr);
-  gap: 18px;
+  grid-template-columns: minmax(300px, 35fr) minmax(0, 65fr);
+  gap: 0;
   align-items: stretch;
-}
-
-@media (max-width: 1040px) {
-  .strength-hero {
-    grid-template-columns: minmax(0, 1fr);
-  }
+  padding: 0;
 }
 
 .strength-body-panel {
@@ -299,17 +296,35 @@
   min-height: 620px;
   padding: 0;
   overflow: hidden;
+  position: relative;
   isolation: isolate;
-  border-color: var(--body-stage-border);
+  border-right: 1px solid var(--body-stage-border);
+  border-radius: calc(var(--radius-md) - 1px) 0 0 calc(var(--radius-md) - 1px);
   background: linear-gradient(
     180deg,
     var(--body-stage-top) 0%,
     var(--body-stage-middle) 54%,
     var(--body-stage-bottom) 100%
   );
-  box-shadow:
-    var(--shadow-card),
-    inset 0 1px 0 var(--body-stage-edge);
+  box-shadow: inset 0 1px 0 var(--body-stage-edge);
+}
+
+/* Stacked, the hairline moves from the figure's right edge to its foot, and
+   the muscle half takes the height of what it holds again. */
+@media (max-width: 1040px) {
+  .panel.strength-hero {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .strength-hero .strength-muscle-panel {
+    contain: none;
+  }
+
+  .strength-body-panel {
+    border-right: 0;
+    border-bottom: 1px solid var(--body-stage-border);
+    border-radius: calc(var(--radius-md) - 1px) calc(var(--radius-md) - 1px) 0 0;
+  }
 }
 
 /* A cool studio backdrop behind the figure: broad overhead light, one quiet
@@ -347,8 +362,8 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 10px;
-  flex-wrap: wrap;
+  gap: 4px;
+  flex-wrap: nowrap;
   pointer-events: none;
 }
 
@@ -356,33 +371,23 @@
   pointer-events: auto;
 }
 
-.strength-body-controls .option-group,
-.strength-body-controls .strength-flip {
+/* Smaller than the shared chip, so both switches fit one row over a figure
+   column that is 35% of the card. */
+.strength-body-controls .option-group {
+  flex: 0 0 auto;
+  padding: 2px;
+}
+
+.strength-body-controls .option-group button {
+  min-height: 22px;
+  padding: 0 7px;
+  font-size: 11px;
+}
+
+.strength-body-controls .option-group {
   -webkit-backdrop-filter: blur(14px);
   backdrop-filter: blur(14px);
   box-shadow: var(--shadow-soft);
-}
-
-.strength-flip {
-  display: inline-grid;
-  width: 32px;
-  height: 32px;
-  place-items: center;
-  border: 1px solid var(--glass-border);
-  border-radius: var(--radius-pill);
-  background: var(--glass-bg);
-  color: var(--text-secondary);
-  /* The length belongs to the spring curve: a designed length, not a reaction time. */
-  transition:
-    transform 0.35s cubic-bezier(0.32, 0.8, 0.36, 1),
-    color var(--dur-fast) var(--ease),
-    background var(--dur-fast) var(--ease);
-}
-
-.strength-flip:hover {
-  background: var(--glass-bg-hover);
-  color: var(--text-primary);
-  transform: rotate(180deg);
 }
 
 /* A development-only control, so it sits where the figure is not: the bottom
@@ -791,6 +796,10 @@
   display: flex;
   min-height: 0;
   padding: 18px 16px 14px;
+  /* Side by side, the figure sets the card's height and this half scrolls
+     inside it: a muscle's detail is taller than the ranking, and letting it
+     grow the card brought the page's scrollbar in and out on every click. */
+  contain: size;
 }
 
 .muscle-panel {
@@ -909,6 +918,7 @@
   overflow-y: auto;
   overscroll-behavior-y: auto;
   scrollbar-gutter: stable;
+  scrollbar-width: thin;
   min-height: 0;
 }
 
@@ -1076,6 +1086,10 @@
 
   gap: 16px;
   overflow-y: auto;
+  /* The gutter is held whether or not the detail overflows, so opening one
+     muscle after another never moves the readout sideways. */
+  scrollbar-gutter: stable;
+  scrollbar-width: thin;
   padding-right: 2px;
 }
 

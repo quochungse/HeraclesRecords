@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { Info, RotateCw } from "lucide-react";
+import { Info } from "lucide-react";
 import type { StrengthDataSource } from "../../electron/types";
 import { OptionGroup } from "../components/OptionGroup";
 import {
@@ -116,7 +116,7 @@ export function StrengthHero({
 
   return (
     <div
-      className="strength-hero"
+      className="panel strength-hero"
       onKeyDown={(event) => {
         if (event.key === "Escape" && selectedMuscle) {
           event.preventDefault();
@@ -124,7 +124,7 @@ export function StrengthHero({
         }
       }}
     >
-      <section className="panel strength-body-panel">
+      <section className="strength-body-panel">
         <div className="strength-body-controls">
           <OptionGroup
             label="Body view"
@@ -136,16 +136,9 @@ export function StrengthHero({
             ]}
             onChange={(next) => requestView(next as BodyView)}
           />
-          <button
-            type="button"
-            className="strength-flip"
-            aria-label="Flip the figure"
-            onClick={() => requestView(view === "front" ? "back" : "front")}
-          >
-            <RotateCw size={15} aria-hidden="true" />
-          </button>
           <OptionGroup
             label="Heat metric"
+            mode="collapsible"
             tone="quiet"
             value={metric}
             options={METRIC_OPTIONS.filter(
@@ -170,7 +163,7 @@ export function StrengthHero({
         />
       </section>
 
-      <section className="panel strength-muscle-panel">
+      <section className="strength-muscle-panel">
         {hasSessions && coverage.working > 0 && coverage.attributed <= 0 ? (
           <div className="muscle-panel is-unattributed">
             <span className="muscle-panel-unattributed-icon" aria-hidden="true">

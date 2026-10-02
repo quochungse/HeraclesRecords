@@ -183,6 +183,12 @@ export type TrainingOverviewProps = Omit<
   snapshotStatus?: TrainingHubLoadStatus;
   /** Whether `activities` has arrived; the same question, for the other load. */
   activitiesStatus?: TrainingHubLoadStatus;
+  /**
+   * Whether Strength Distribution is drawn. Off when the Strength screen is
+   * hidden in Settings → Navigation, so a sport the athlete took off the rail
+   * does not keep a panel on the Overview.
+   */
+  showStrength?: boolean;
 };
 
 /** The Activities screen: the activity list plus its detail pane. */
