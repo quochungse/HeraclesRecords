@@ -2,7 +2,7 @@ import { useEffect, useRef } from "react";
 import { X } from "lucide-react";
 import { STAGE_NUMERALS, type LabourState } from "./labours";
 import { formatDayShort } from "./milestones";
-import { LAUREL_PATH, LabourGlyph, LabourMedal } from "./recordsIcons";
+import { LabourGlyph, LabourMedal, LaurelWreath } from "./recordsIcons";
 import type { Announcement } from "./recordsNotices";
 import "./recordsNotices.css";
 
@@ -94,11 +94,9 @@ export function LabourCelebration({
           <X size={18} aria-hidden="true" />
         </button>
         <div className="labour-celebration-art" aria-hidden="true">
-          <svg width="200" height="200" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={0.42} strokeLinecap="round" strokeLinejoin="round">
-            <path d={LAUREL_PATH} />
-          </svg>
+          <LaurelWreath size={200} />
           <span className="labour-celebration-medal">
-            <LabourGlyph id={definition.id} size={46} />
+            <LabourGlyph id={definition.id} size={42} />
           </span>
         </div>
         <p className="labour-celebration-eyebrow">

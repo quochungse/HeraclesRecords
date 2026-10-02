@@ -212,13 +212,13 @@
 
 .labour-celebration-medal {
   position: absolute;
-  left: 56px;
-  top: 69px;
+  left: 60px;
+  top: 50px;
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 88px;
-  height: 88px;
+  width: 80px;
+  height: 80px;
   border-radius: var(--radius-pill);
   background: var(--accent);
   color: var(--bg-base);

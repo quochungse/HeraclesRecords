@@ -116,11 +116,11 @@ export const PRIMARY_NAV_SECTIONS: PrimaryNavSection[] = [
     id: "journey",
     label: "Your journey",
     // The same history seen from above: not a session or a week but every
-    // place the training has taken the athlete, and every milestone it has
-    // reached — reached for at a different moment from the log above it.
+    // milestone the training has reached, and every place it has taken the
+    // athlete — reached for at a different moment from the log above it.
     items: [
-      { id: "places", label: "Where you’ve been", icon: Globe },
       { id: "records", label: "Hall of Records", icon: LaurelIcon },
+      { id: "places", label: "Where you’ve been", icon: Globe },
     ],
   },
 ];

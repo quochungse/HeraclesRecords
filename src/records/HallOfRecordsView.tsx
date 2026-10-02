@@ -14,7 +14,7 @@ import {
   type Milestone,
   type WithinReach
 } from "./milestones";
-import { LAUREL_PATH, LabourMedal } from "./recordsIcons";
+import { LabourMedal, LaurelWreath } from "./recordsIcons";
 import {
   FILTER_LABELS,
   filtersInUse,
@@ -553,9 +553,7 @@ function LaboursBoard({
     <>
       <section className="panel records-apotheosis" aria-labelledby="records-apotheosis-title">
         <span className="records-laurel" aria-hidden="true">
-          <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.3} strokeLinecap="round" strokeLinejoin="round">
-            <path d={LAUREL_PATH} />
-          </svg>
+          <LaurelWreath size={40} />
         </span>
         <div className="records-apotheosis-copy">
           <h2 id="records-apotheosis-title" className="records-section-label is-accent">
