@@ -9,6 +9,7 @@ import {
   notifySettingChanged,
   notifySettingsDeleted
 } from "./sync/syncBridge";
+import { compareMilestoneCopies } from "./milestoneOrder";
 import { RECORD_ID_SEPARATOR } from "./sync/syncPolicy";
 import type {
   ActivityDetailSummary,
@@ -3303,33 +3304,46 @@ export function listAthleteMilestones(): AthleteMilestoneRow[] {
 /**
  * Keep each milestone the first time it is seen, and at the earliest day it is
  * ever seen for: a fact reached in March and seen again in May was reached in
- * March. A row that moves nothing is not written, so it does not go out to
- * sync as a change. Answers how many rows moved.
+ * March. A copy replaces the stored one only when `compareMilestoneCopies`
+ * prefers it — the rule the sync merge applies to the other machine's copy —
+ * so a plan run's better-settled reading is taken and nothing else moves. A
+ * row that moves nothing is not written, so it does not go out to sync as a
+ * change. Answers how many rows moved.
  */
 export function rememberAthleteMilestones(
   rows: ReadonlyArray<Omit<AthleteMilestoneRow, "recordedAt">>,
   now = Date.now()
 ): number {
   const database = requireDatabase();
-  const upsert = database.prepare(
+  const read = database.prepare(
+    `SELECT kind, happen_day, payload FROM athlete_milestones WHERE id = ?`
+  );
+  const write = database.prepare(
     `INSERT INTO athlete_milestones (id, kind, happen_day, payload, recorded_at)
      VALUES (?, ?, ?, ?, ?)
      ON CONFLICT(id) DO UPDATE SET
        happen_day = excluded.happen_day,
-       payload = excluded.payload
-     WHERE excluded.happen_day < athlete_milestones.happen_day`
+       payload = excluded.payload,
+       recorded_at = excluded.recorded_at`
   );
   const changed: string[] = [];
   database.transaction(() => {
     for (const row of rows) {
-      const result = upsert.run(
-        row.id,
-        row.kind,
-        row.happenDay,
-        JSON.stringify(row.payload),
-        now
-      );
-      if (result.changes > 0) changed.push(row.id);
+      const held = read.get(row.id) as
+        | { kind: string; happen_day: string; payload: string }
+        | undefined;
+      if (
+        held &&
+        compareMilestoneCopies(row, {
+          kind: held.kind,
+          happenDay: held.happen_day,
+          payload: parseStoredJson<Record<string, unknown>>(held.payload, {})
+        }) <= 0
+      ) {
+        continue;
+      }
+      write.run(row.id, row.kind, row.happenDay, JSON.stringify(row.payload), now);
+      changed.push(row.id);
     }
   })();
   for (const id of changed) {

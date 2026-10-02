@@ -34,9 +34,15 @@
 // `SyncTarget.takeRepublish`. Otherwise the vault's newest entry for the row is
 // still the incoming one, which does not hold the local half, and compaction
 // eventually folds the local half away.
+//
+// One more table is merged rather than replaced, for a different reason: a
+// remembered milestone (`athlete_milestones`) keeps its earliest day, so the
+// copy kept is chosen by that rule rather than by who wrote last. It is at the
+// end of the file, with the same three properties.
 
 import crypto from "node:crypto";
 
+import { compareMilestoneCopies, parseMilestonePayload } from "../milestoneOrder";
 import type { PersistedChatEntry } from "../types";
 
 /** What a merger is handed and what it returns: whole rows, column by column. */
@@ -411,8 +417,38 @@ const mergeChatSession: RowMerger = (local, incoming, { winner }) => {
   };
 };
 
+/**
+ * A remembered milestone keeps its earliest day, whichever machine saw it.
+ *
+ * Not an accumulating record but a monotone one: last-writer-wins let a machine
+ * that keeps nine weeks of nights overwrite a streak first reached last
+ * November with the same streak reached last week, and once the first
+ * machine's own nights had aged out nothing could put November back. The copy
+ * kept is `compareMilestoneCopies`' choice, the rule the ledger's own write
+ * applies, so every machine settles on the same row in either order.
+ *
+ * Every column belongs to the copy, so the row is whole whichever side wins —
+ * which compaction needs too, since it folds two entries into one through this.
+ */
+const mergeAthleteMilestone: RowMerger = (local, incoming) => {
+  if (!local) return { row: incoming, republish: false, changed: true };
+  const copyOf = (row: SyncRow) => ({
+    kind: String(row.kind ?? ""),
+    happenDay: String(row.happen_day ?? ""),
+    payload: parseMilestonePayload(row.payload)
+  });
+  const order = compareMilestoneCopies(copyOf(incoming), copyOf(local));
+  if (order >= 0) {
+    return { row: incoming, republish: false, changed: order > 0 };
+  }
+  // This machine holds the better copy and the vault's newest entry does not:
+  // keep it, and send it back out.
+  return { row: { ...local, id: incoming.id }, republish: true, changed: false };
+};
+
 const MERGERS: Readonly<Record<string, RowMerger>> = {
-  chat_sessions: mergeChatSession
+  chat_sessions: mergeChatSession,
+  athlete_milestones: mergeAthleteMilestone
 };
 
 export function rowMergerFor(table: string): RowMerger | undefined {
@@ -420,7 +456,8 @@ export function rowMergerFor(table: string): RowMerger | undefined {
 }
 
 /**
- * Whether this table's rows accumulate.
+ * Whether this table's rows accumulate — or, for `athlete_milestones`, only
+ * ever move towards one answer, which needs the same fold.
  *
  * Asked by the merge itself, which folds every entry for such a record instead
  * of only the one that won last-writer-wins. Two machines appending to one

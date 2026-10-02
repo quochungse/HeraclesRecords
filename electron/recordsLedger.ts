@@ -15,7 +15,8 @@
 // The renderer works out the first two and hands them over (`rememberMilestones`);
 // plan runs are worked out here, from the cache and the stored matches, the
 // two things the Library's compliance figure is read from already. Every row
-// is `personal`, so the other machine shows the same labours.
+// is `personal`, so the other machine shows the same labours, and which copy
+// of a row is kept — here and in the sync merge — is `milestoneOrder.ts`.
 
 import {
   listAthleteMilestones,
@@ -25,6 +26,7 @@ import {
   type AthleteMilestoneRow
 } from "./database";
 import { planCompliance } from "./planCompliance";
+import { formatPlanDay, parsePlanDay } from "./trainingPlanDomain";
 import type { RememberedMilestone, TrainingPlanDocument } from "./types";
 
 /** The kinds the renderer may write. Plan runs are this module's alone. */
@@ -49,28 +51,20 @@ function toRemembered(row: AthleteMilestoneRow): RememberedMilestone {
   };
 }
 
-function happenDayOf(date: Date): string {
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
-  return `${date.getFullYear()}${month}${day}`;
-}
-
 /**
  * The day a plan run's last session fell on: its week 1 Monday plus the
  * furthest session's week and day. Nothing when the run has no start or no
  * sessions to count from.
  */
 export function planRunLastDay(plan: TrainingPlanDocument): string | undefined {
-  if (!plan.startDate || plan.entries.length === 0) return undefined;
-  const [year, month, day] = plan.startDate.split("-").map(Number);
-  if (!year || !month || !day) return undefined;
+  const date = parsePlanDay(plan.startDate);
+  if (!date || plan.entries.length === 0) return undefined;
   const last = plan.entries.reduce(
     (furthest, entry) => Math.max(furthest, entry.weekIndex * 7 + entry.dayIndex),
     0
   );
-  const date = new Date(year, month - 1, day);
   date.setDate(date.getDate() + last);
-  return happenDayOf(date);
+  return formatPlanDay(date, false);
 }
 
 /**

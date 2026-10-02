@@ -13,7 +13,10 @@
 //     matches, and a window cannot claim one.
 //  3. **A plan run earns a milestone only when finished, long and kept.**
 //     COROS's `finished` (never `stopped`, a run taken off early), four weeks
-//     or more, 80% of what settled — dated at its last session.
+//     or more, 80% of what settled — dated at its last session. Its reading
+//     moves on as the matches settle, and never back.
+//  4. **The other machine's copy is merged by the same rule**, not by who wrote
+//     last, so a machine with a shorter memory cannot move a day forward.
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import os from "node:os";
@@ -27,6 +30,7 @@ const distUrl = (file) =>
 const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "heracles-records-ledger-"));
 const database = await import(distUrl("database.js"));
 const ledger = await import(distUrl("recordsLedger.js"));
+const mergers = await import(distUrl("sync/rowMergers.js"));
 const policy = await import(distUrl("sync/syncPolicy.js"));
 const bridge = await import(distUrl("sync/syncBridge.js"));
 
@@ -209,7 +213,59 @@ assert.ok(
   "and stays once the cache lets it go"
 );
 
+// A run is first seen while the matcher is still catching up on its last week;
+// the reading that settles more sessions replaces it, and an older one never
+// comes back.
+const reading = (settled, ratio) => ({
+  id: "plan:catching-up",
+  kind: "plan",
+  happenDay: "20260830",
+  payload: { name: "Base", weeks: 12, ratio, done: Math.round(settled * ratio), settled }
+});
+assert.equal(database.rememberAthleteMilestones([reading(20, 0.86)]), 1);
+assert.equal(database.rememberAthleteMilestones([reading(24, 0.93)]), 1, "the settled reading replaces the early one");
+assert.equal(database.rememberAthleteMilestones([reading(20, 0.86)]), 0, "and the early one does not come back");
+assert.equal(
+  ledger.listRememberedMilestones().find((row) => row.id === "plan:catching-up").data.ratio,
+  0.93
+);
+
 assert.ok(outgoing() >= 4, "every row that moved went out to sync");
 bridge.attachSyncSink(null);
+
+// --- 4. The other machine's copy -------------------------------------------------
+
+const merge = mergers.rowMergerFor("athlete_milestones");
+assert.ok(merge, "the table is merged, not last-writer-wins");
+assert.equal(mergers.isMergedTable("athlete_milestones"), true);
+const row = (happenDay, payload, recordedAt = 1) => ({
+  id: "sleep:streak:7",
+  kind: "sleep",
+  happen_day: happenDay,
+  payload: JSON.stringify(payload),
+  recorded_at: recordedAt
+});
+const november = row("20251104", { nights: 7 });
+const september = row("20260901", { nights: 7 }, 99);
+
+const kept1 = merge(november, september, { winner: true });
+assert.equal(kept1.row.happen_day, "20251104", "a later copy from a shorter memory does not move the day");
+assert.equal(kept1.republish, true, "and this machine's copy goes back out");
+assert.equal(kept1.changed, false);
+const taken = merge(september, november, { winner: false });
+assert.equal(taken.row.happen_day, "20251104", "an earlier copy is taken, winner of the log or not");
+assert.equal(taken.republish, false);
+assert.equal(taken.changed, true);
+assert.deepEqual(
+  merge(november, november, { winner: true }),
+  { row: november, republish: false, changed: false },
+  "the same copy is no change"
+);
+assert.deepEqual(merge(undefined, september, { winner: true }).row, september, "a row never seen is taken whole");
+// Either order, the same row: what makes the merge safe on both machines.
+assert.equal(
+  merge(november, september, { winner: true }).row.happen_day,
+  merge(september, november, { winner: true }).row.happen_day
+);
 
 console.log("records ledger: OK");
