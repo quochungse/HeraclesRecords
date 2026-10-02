@@ -673,6 +673,19 @@ function createYouTubeMusicLibrary(
   const albums = mergeAlbums(albumMetadata, songs);
   const playlists = normalizePlaylists(payload.playlists ?? []);
 
+  // The screen lists songs only inside a playlist, and the bridge swallows a
+  // failed playlist read (ytmusicapi falls behind YouTube Music's markup), so a
+  // library of songs with no playlists drew nothing at all. Hold them in one.
+  if (playlists.length === 0 && songs.length > 0) {
+    playlists.push({
+      id: createId("heraclesrecords:library-songs"),
+      title: "Your songs",
+      description: "Liked and saved songs. Your playlists could not be read.",
+      songCount: songs.length,
+      songs
+    });
+  }
+
   return {
     albums,
     songs,

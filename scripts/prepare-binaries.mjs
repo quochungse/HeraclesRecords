@@ -29,7 +29,7 @@ const gunzipAsync = promisify(gunzip);
 const repoRoot = path.resolve(import.meta.dirname, "..");
 const userAgent = "HeraclesRecords-build";
 const PINNED_YT_DLP_VERSION = "2026.08.19";
-const PINNED_YTMUSICAPI_VERSION = "1.12.1";
+const PINNED_YTMUSICAPI_VERSION = "1.12.3";
 const BUNDLED_PYTHON_VERSION = "310";
 // Self-contained CPython shipped with the app so users don't need Python
 // installed. Sourced from astral-sh/python-build-standalone (relocatable,
