@@ -124,7 +124,7 @@ const pushedFromMain = new Set(
   )
 );
 assert.ok(
-  pushedFromMain.size > 5,
+  pushedFromMain.size >= 3,
   "main.ts push scrape found too little; the regex has drifted"
 );
 assert.deepEqual(
@@ -180,7 +180,7 @@ function topLevelKeys(source, startPattern, closing) {
 
 const preloadKeys = topLevelKeys(preloadSource, "const api = \\{", "\n};");
 const apiKeys = topLevelKeys(apiSource, "export interface HeraclesRecordsApi \\{", "\n}");
-assert.ok(preloadKeys.size > 200, "preload key scrape has drifted");
+assert.ok(preloadKeys.size > 150, "preload key scrape has drifted");
 
 assert.deepEqual(
   [...preloadKeys].filter((key) => !apiKeys.has(key)).sort(),

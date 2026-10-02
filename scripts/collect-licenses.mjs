@@ -86,9 +86,8 @@ const header = [
   "Heracles Records — third-party licenses",
   "",
   "The license texts of the fonts and npm packages that ship inside this build,",
-  "generated from package-lock.json at build time. The programs bundled beside the",
-  "app (FFmpeg, yt-dlp, the Python runtime) carry their own license files; see",
-  "THIRD_PARTY_NOTICES.md in this folder for those and for artwork and data.",
+  "generated from package-lock.json at build time. See THIRD_PARTY_NOTICES.md in",
+  "this folder for artwork and data.",
   ""
 ].join("\n");
 

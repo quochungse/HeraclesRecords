@@ -109,8 +109,6 @@ export interface AppSidebarProps {
   showDevelopmentItems?: boolean;
   /** Destinations taken off the rail in Settings → Navigation. */
   hiddenViews?: readonly PrimaryView[];
-  /** Name of the watch on USB, shown beside the Device heading. */
-  connectedWatchName?: string | null;
   /** COROS nickname, or whatever the account is best known by. */
   athleteName?: string | null;
   /** COROS-hosted avatar; initials stand in when there is none. */
@@ -128,7 +126,6 @@ export function AppSidebar({
   coachBusy = false,
   showDevelopmentItems = false,
   hiddenViews = NO_HIDDEN_VIEWS,
-  connectedWatchName = null,
   athleteName = null,
   athleteAvatarUrl = null,
   appLogo,
@@ -206,7 +203,7 @@ export function AppSidebar({
       height: activeItem.offsetHeight,
       ready: true,
     });
-  }, [activeView, coachBusy, connectedWatchName, railExpanded, isOpen, overlayMode]);
+  }, [activeView, coachBusy, railExpanded, isOpen, overlayMode]);
 
   const updateNavFade = useCallback(() => {
     const nav = navRef.current;
@@ -328,10 +325,6 @@ export function AppSidebar({
     const Icon = item.icon;
     const isActive = activeView === item.id;
     const tooltip = item.beta ? `${item.label} (Beta)` : item.label;
-    // A watch on USB tints the screen that reports it, which is the one signal
-    // the collapsed rail can still show once the Device heading is hidden.
-    const watchConnected =
-      item.id === "coros-overview" && Boolean(connectedWatchName);
 
     return (
       <button
@@ -340,7 +333,6 @@ export function AppSidebar({
         className={[
           "app-sidebar-nav-item",
           isActive ? "active" : "",
-          watchConnected ? "is-watch-connected" : "",
         ]
           .filter(Boolean)
           .join(" ")}
@@ -471,8 +463,6 @@ export function AppSidebar({
 
           {sections.map((section) => {
             const headingId = `app-sidebar-section-${section.id}`;
-            const watchLabel =
-              section.id === "device" ? connectedWatchName : null;
 
             return (
               <div
@@ -485,15 +475,6 @@ export function AppSidebar({
                   <span className="app-sidebar-section-name">
                     {section.label}
                   </span>
-                  {watchLabel ? (
-                    <span className="app-sidebar-section-note" title={watchLabel}>
-                      <span
-                        className="app-sidebar-section-dot"
-                        aria-hidden="true"
-                      />
-                      {watchLabel}
-                    </span>
-                  ) : null}
                 </p>
                 {section.items.map(renderNavItem)}
               </div>

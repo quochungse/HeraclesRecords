@@ -17,26 +17,12 @@ import type {
   RendererDiagnosticError
 } from "../electron/diagnosticsTypes";
 import type {
-  BinaryStatus,
   CoachAnalysisSessionAttention,
-  CombinedDownloadProgressEvent,
-  CombinedDownloadResult,
   CorosProfile,
   CorosProfilePatch,
   CorosProfileSnapshot,
-  DownloadAudioResult,
-  DownloadJob,
-  DownloadQueueItem,
-  LocalTrack,
   ReverseGeocodeResult,
   SaveChatSessionOptions,
-  SpotifyConfig,
-  SpotifyPlaylist,
-  SpotifyPlaylistTrack,
-  SpotifyStatus,
-  SpotifySyncResult,
-  SpotifySyncTrack,
-  SpotifySyncUpdate,
   HevySettingsInput,
   HevyStatus,
   StrengthHistory,
@@ -94,23 +80,9 @@ import type {
   WorkoutEditorDocument,
   WorkoutExerciseOption,
   WorkoutSport,
-  TransferResult,
   AppInfo,
   AppUpdateSnapshot,
-  WatchConnectionSmokeOptionId,
   SampleDataState,
-  WatchStatus,
-  WatchTransferProgress,
-  YouTubeHistoryEntry,
-  YouTubeMusicAuthCapture,
-  YouTubeMusicConfig,
-  YouTubeMusicLibrary,
-  YouTubeMusicStatus,
-  YouTubeMusicSyncResult,
-  AppleMusicPlaylist,
-  AppleMusicStatus,
-  ApplePodcastShow,
-  ApplePodcastShowDetail,
   ChatAuthStatus,
   ChatContextCompaction,
   ChatContextInspection,
@@ -160,7 +132,6 @@ import type {
 } from "../electron/types";
 export interface HeraclesRecordsApi {
   platform: string;
-  getWatchStatus: () => Promise<WatchStatus>;
   /** Coordinates → a place name, for "Where you've been". */
   reverseGeocodeLocation: (
     lat: number,
@@ -174,101 +145,12 @@ export interface HeraclesRecordsApi {
    * arrives, and dropped forever if it never does.
    */
   notifyRendererReady: () => Promise<void>;
-  getWatchConnectionSmokeOption: () => Promise<WatchConnectionSmokeOptionId>;
-  setWatchConnectionSmokeOption: (
-    optionId: WatchConnectionSmokeOptionId
-  ) => Promise<WatchStatus>;
   /** Development builds only: the simulated rides, hikes and trail runs. */
   getSampleData: () => Promise<SampleDataState>;
   setSampleData: (
     kind: keyof SampleDataState,
     enabled: boolean
   ) => Promise<SampleDataState>;
-  deleteWatchTrack: (relativePath: string) => Promise<WatchStatus>;
-  transferLocalTrack: (id: string) => Promise<TransferResult>;
-  onWatchTransferProgress: (
-    callback: (progress: WatchTransferProgress) => void
-  ) => () => void;
-  listDownloads: () => Promise<LocalTrack[]>;
-  downloadAudio: (url: string) => Promise<DownloadAudioResult>;
-  deleteDownload: (id: string, removeFile: boolean) => Promise<LocalTrack[]>;
-  getBinaryStatus: () => Promise<BinaryStatus>;
-  listYouTubeHistory: () => Promise<YouTubeHistoryEntry[]>;
-  recordYouTubeVisit: (
-    url: string,
-    title?: string
-  ) => Promise<YouTubeHistoryEntry>;
-  downloadFromYouTubeBrowser: (
-    url: string,
-    title?: string
-  ) => Promise<DownloadAudioResult>;
-  downloadMultipleFromYouTubeBrowser: (
-    items: Array<{ url: string; title?: string }>
-  ) => Promise<DownloadAudioResult>;
-  enqueueYouTubeDownloads: (
-    items: DownloadQueueItem[]
-  ) => Promise<DownloadJob[]>;
-  downloadCombinedPlaylist: (
-    id: string,
-    name: string,
-    items: DownloadQueueItem[]
-  ) => Promise<CombinedDownloadResult>;
-  onCombinedDownloadProgress: (
-    callback: (update: CombinedDownloadProgressEvent) => void
-  ) => () => void;
-  listYouTubeJobs: () => Promise<DownloadJob[]>;
-  clearYouTubeJob: (id: string) => Promise<DownloadJob[]>;
-  cancelYouTubeJob: (id: string) => Promise<DownloadJob[]>;
-  clearCompletedYouTubeJobs: () => Promise<DownloadJob[]>;
-  onYouTubeJobsUpdate: (
-    callback: (jobs: DownloadJob[]) => void
-  ) => () => void;
-  resetYouTubeBrowserSession: () => Promise<void>;
-  getYouTubeMusicConfig: () => Promise<YouTubeMusicConfig>;
-  saveYouTubeMusicConfig: (
-    config: YouTubeMusicConfig
-  ) => Promise<YouTubeMusicStatus>;
-  getYouTubeMusicStatus: () => Promise<YouTubeMusicStatus>;
-  saveYouTubeMusicAuth: (headersRaw: string) => Promise<YouTubeMusicStatus>;
-  loginYouTubeMusic: () => Promise<YouTubeMusicStatus>;
-  logoutYouTubeMusic: () => Promise<YouTubeMusicStatus>;
-  resetYouTubeMusicBrowserSession: () => Promise<void>;
-  onYouTubeMusicAuthCaptured: (
-    callback: (result: YouTubeMusicAuthCapture) => void
-  ) => () => void;
-  listYouTubeMusicLibrary: () => Promise<YouTubeMusicLibrary>;
-  syncYouTubeMusicLibrary: () => Promise<YouTubeMusicSyncResult>;
-  getAppleMusicStatus: () => Promise<AppleMusicStatus>;
-  saveAppleMusicAuth: (headersRaw: string) => Promise<AppleMusicStatus>;
-  logoutAppleMusic: () => Promise<AppleMusicStatus>;
-  resetAppleMusicBrowserSession: () => Promise<void>;
-  onAppleMusicAuthCaptured: (
-    callback: (status: AppleMusicStatus) => void
-  ) => () => void;
-  listAppleMusicPlaylists: () => Promise<AppleMusicPlaylist[]>;
-  fetchAppleMusicPlaylist: (playlist: string) => Promise<AppleMusicPlaylist>;
-  searchApplePodcasts: (query: string) => Promise<ApplePodcastShow[]>;
-  loadApplePodcast: (
-    showIdOrUrl: string,
-    offset?: number
-  ) => Promise<ApplePodcastShowDetail>;
-  getSpotifyConfig: () => Promise<SpotifyConfig>;
-  saveSpotifyConfig: (config: SpotifyConfig) => Promise<SpotifyStatus>;
-  getSpotifyStatus: () => Promise<SpotifyStatus>;
-  loginSpotify: () => Promise<SpotifyStatus>;
-  logoutSpotify: () => Promise<SpotifyStatus>;
-  listSpotifyPlaylists: () => Promise<SpotifyPlaylist[]>;
-  listSpotifyPlaylistTracks: (
-    playlistId: string
-  ) => Promise<SpotifyPlaylistTrack[]>;
-  listSpotifySyncState: (playlistId: string) => Promise<SpotifySyncTrack[]>;
-  syncSpotifyPlaylist: (
-    playlistId: string,
-    autoTransfer: boolean
-  ) => Promise<SpotifySyncResult>;
-  onSpotifySyncUpdate: (
-    callback: (update: SpotifySyncUpdate) => void
-  ) => () => void;
   getTrainingHubStatus: () => Promise<TrainingHubStatus>;
   loginTrainingHub: (
     email: string,

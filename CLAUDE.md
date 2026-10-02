@@ -68,6 +68,21 @@ backup's progress push and four suites. The three `intervals.*` settings — an 
 `uploadActivityFitToCoros` (the Calendar's manual activity), exporting a single activity
 file, and `.data-connect-panel`, the "connect COROS first" panel four screens draw.
 
+**Coros Overview and Media went the same way on 2026-10-02, and with them every connection
+to a watch over USB.** The app reads the watch through COROS's API and nothing else. Gone:
+`watchService` and `watchModels` (drive detection, the model table, the product shots in
+`public/assets`), the mock watch (`COROS_WATCH_PATH`, `smoke:watch`, the developer toolbar's
+watch switch and chip), the rail's Device heading, every music source (`youtube*Service`,
+`spotify*`, `appleMusic*`, `applePodcastsService`) and the pipeline under them
+(`downloadQueue`, `downloadService`, `combinedDownloadCache`, `musicFileNames`), the bundled
+`yt-dlp`, FFmpeg, Python runtime and `ytmusicapi` (`prepare-binaries`, `bin/`,
+`binaries:prepare*`, the `extraResources` entry), the `<webview>` tag and its guards, 46 IPC
+channels and six pushes, six suites, and the `spotify-web-api-node`, `fast-xml-parser` and
+`ffmpeg-static` packages. Overview keeps its training panels, and its greeting no longer
+speaks of a watch or a library. A "Your device" banner, if one comes, reads COROS's API —
+`queryDevices` on COROS MCP (firmware, battery), or the `deviceList` every activity detail
+carries (name, model `type`, icon) — never a drive.
+
 **Every link in the app points at this fork** (since 2026-10-01). Settings → About holds
 "Website" (`heraclesrecords.github.io`) and "Report an issue" under the tagline, and a
 **Buy me a coffee** button (`buymeacoffee.com/quochungse`, drawn as the Color mode switch's
@@ -83,14 +98,12 @@ clean up. What else ships with the app is credited in `THIRD_PARTY_NOTICES.md`, 
 non-dev package in `package-lock.json` and of the three fonts (`src/assets/fonts/licenses`,
 OFL). electron-builder installs it as `resources/licenses` — shipping the files with every
 copy is what the licenses ask for; no screen in the app opens them (a Licenses button was
-removed by decision, and would need its IPC channel back). FFmpeg's GPLv3 text and README are copied beside the binary
-by `prepare-binaries` (`ffmpeg-LICENSE.txt`, `ffmpeg-README.txt`). A package added later is
+removed by decision, and would need its IPC channel back). A package added later is
 covered by the next build; a bundled program or asset added later needs its own entry in the
 notices.
 
 **No name in the code or in what the app stores is upstream's any more** (since 1.0). The
-database is `heraclesrecords.sqlite`, localStorage keys are `heraclesrecords.*`, the YouTube,
-YouTube Music and Apple Music sign-ins live in `persist:heraclesrecords-*` partitions, the
+database is `heraclesrecords.sqlite`, localStorage keys are `heraclesrecords.*`, the
 bridge is `window.heraclesRecords` typed by `HeraclesRecordsApi` in
 `src/heraclesrecords-api.ts`. **The app carries no migration from the old names**: it opens
 these and nothing else, so a profile from before 1.0 started as is gets an empty database.
@@ -120,10 +133,9 @@ Those URLs and these patterns must change together.
 ```sh
 npm install
 npm run rebuild          # electron-builder install-app-deps — rebuilds better-sqlite3 against Electron's ABI. Required after install.
-npm run binaries:prepare # downloads pinned yt-dlp + copies ffmpeg-static into bin/<platform>-<arch>/
 npm run fonts:fetch      # re-downloads the three faces into src/assets/fonts + rewrites src/fonts.css. Not part of a build: the files are committed so a build never needs the network.
 npm run body-shapes:fetch # regenerates src/calendar/bodyShapes.ts from react-native-body-highlighter (MIT). Same rule as fonts: the output is committed, the package is not a dependency, and a build never runs this.
-npm run dev              # Vite on 127.0.0.1:5173 + Electron; runs binaries:prepare and build:electron first
+npm run dev              # Vite on 127.0.0.1:5173 + Electron; runs build:electron first
 npm run build            # tsc electron (emits dist-electron) + tsc --noEmit renderer + vite build
 npm run sample:coach     # app closed: writes sample Coach conversations for P0–P3 of docs/coach-plan-canvas.md into the app's database, no model asked (-- --only p0,p2 picks phases; -- --live adds temporary COROS data; -- --cleanup removes it all, and sweeps COROS for "Sample" names). sample:coach-p3 is --only p3.
 npm start                # build, then run the packaged-style app
@@ -168,9 +180,6 @@ defeat the ESM module cache between fixtures. Keep that when adding tests.
 > header when that is the reason. Fix by installing an official Node 22+
 > build (nodejs.org tarball or nvm), which ships Amaro; the distro package does not.
 
-Hardware-free watch detection: set `COROS_WATCH_PATH=/path/to/mock-watch` (containing a
-`Music` folder), or run `npm run smoke:watch`.
-
 ## Architecture
 
 Electron app in three layers. `electron/` compiles to **CommonJS** (`tsconfig.electron.json`,
@@ -180,9 +189,9 @@ resolution). Both are `strict`.
 ```
 src/ (renderer, React)  →  src/heraclesrecords-api.ts (types only, window.heraclesRecords)
                         ↓
-electron/preload.ts     →  contextBridge, ~212 ipcRenderer.invoke wrappers
+electron/preload.ts     →  contextBridge, ~184 ipcRenderer.invoke wrappers
                         ↓
-electron/main.ts        →  ~212 ipcMain.handle registrations + app lifecycle
+electron/main.ts        →  ~184 ipcMain.handle registrations + app lifecycle
                         ↓
 electron/*Service.ts    →  the actual work; electron/database.ts owns SQLite
 ```
@@ -203,30 +212,26 @@ electron/*Service.ts    →  the actual work; electron/database.ts owns SQLite
 - **The main window navigates nowhere** (`will-navigate` allows only its own page or the dev
   server), so a dropped link or file cannot get the preload bridge. It runs `sandbox: true`
   — the preload imports nothing but `electron`, and must keep it that way.
-- **A `<webview>` gets no preload, no Node and a sandbox** whatever its markup says
-  (`will-attach-webview`), and only a web URL; its popups open as sandboxed windows when they
-  are web pages and not at all otherwise (`guardWebviewPopups`).
+- **There is no `<webview>`.** `webviewTag` is off, so a page that ever reached the DOM
+  cannot embed one.
 - **The built page carries a Content-Security-Policy** (a meta tag `vite.config.ts` writes at
   build time only; the dev server needs inline scripts). Its point is `script-src 'self'
   'wasm-unsafe-eval'` — nothing runs that did not ship; images, connections and media take any
-  https because album art, tiles and avatars come from many hosts, and images plain http too
-  (a podcast feed's artwork often is). A `<webview>` guest is not governed by it.
+  https because tiles and avatars come from many hosts, and images plain http too.
 - **A packaged build ignores the development switches.** `main.ts` deletes
-  `VITE_DEV_SERVER_URL`, `HERACLES_SAMPLE_*`, `HERACLES_SIMULATE_PLAN_AI` and
-  `COROS_WATCH_PATH` from the environment before anything reads them (each is read at run
-  time, so that is the whole gate), and refuses the mock-watch and sample-data IPC.
-- **Session tokens are encrypted at rest** through `electron/secretSettings.ts`: the COROS
-  access token, Spotify's client secret and tokens, Apple Music's captured headers. A value is
+  `VITE_DEV_SERVER_URL`, `HERACLES_SAMPLE_*` and `HERACLES_SIMULATE_PLAN_AI` from the
+  environment before anything reads them (each is read at run time, so that is the whole
+  gate), and refuses the sample-data IPC.
+- **The COROS session token is encrypted at rest** through `electron/secretSettings.ts`. A value is
   `enc:v1:` + `safeStorage` ciphertext; a plain one from an earlier build is read and
-  re-encrypted on the spot. Unlike the API keys these **fall back to plain text without a
+  re-encrypted on the spot. Unlike the API keys it **falls back to plain text without a
   keyring**: refusing to keep the COROS token would mean a login every launch, and each login
   signs the athlete out on their other computer. `safeStorage` is required lazily, so suites
   under `ELECTRON_RUN_AS_NODE` read and write plain values. The live-API probes open the
   token through `scripts/lib/open-secret-setting.mjs`, which asks a short Electron process
   (with the app's name, so the keyring entry matches); `sample:coach`, which drives the
   compiled services under `ELECTRON_RUN_AS_NODE`, hands what it opens to them through
-  `lendOpenedSecret` — without it `--live` and `--cleanup` read no session at all. YouTube Music's auth file stays plain —
-  ytmusicapi reads and rewrites it — and is chmod 600.
+  `lendOpenedSecret` — without it `--live` and `--cleanup` read no session at all.
 
 ### `rendererReady` gates everything main pushes unasked
 
@@ -331,7 +336,7 @@ each one. Do not put the payload back on the detail to save a round trip.
 
 Each is a main-process service plus a renderer view. `src/App.tsx` lazy-loads the heavy
 ones (Training Hub, Training Library, Running, Cycling, Hiking, Strength, Calendar, Coach, Where you've been);
-Overview, Media and Settings are in the main bundle.
+Overview and Settings are in the main bundle.
 **Calendar and Training Library open on their own shimmer, never the generic spinner.**
 They are `preloadableLazy`: fetched once the first paint is idle, and a mount after that
 renders the module directly — `lazy()` alone suspends a frame even on a warm module. A
@@ -1811,9 +1816,6 @@ lives at module level for the same visit-to-visit reason — see `useCalendarDat
   names its subject and nothing else. `undefined` — nothing has answered yet — must blame
   nobody. `npm run test:mcp-notice` asserts both sentences for all three subjects and fails
   wherever the unreachable one starts telling people to connect something.
-- **Media** (`youtubeService`, `spotify*`, `appleMusic*`, `applePodcastsService`,
-  `downloadQueue`) — everything funnels through bundled `yt-dlp` + `ffmpeg` to MP3, then to
-  the watch's `Music` folder over USB.
 - **Base maps** (`src/mapBase/`) — not a screen. The Maps screen that owned this code was
   removed, but two surfaces still draw a Leaflet map: the activity detail replay
   (`ActivityRouteMap`) and the globe's street view (`ActivityGlobeStreetMap`). What they need
@@ -1937,12 +1939,6 @@ lives at module level for the same visit-to-visit reason — see `useCalendarDat
   shortcut.
 - **Strength** (`strengthHistoryService`, `hevyService`, `strengthSessionMerge`) — COROS
   strength sessions merged with Hevy imports.
-- **Watch USB** (`watchService.ts`) — model fixture table drives detection; renderer polls
-  status, so results are cached (`invalidateWatchStatusCache`).
-  **A drive is the watch only when its whole label names one** (`WATCH_VOLUME_PATTERN`):
-  Media writes to it and deletes MP3s from it, and a Music folder is no proof — any backup
-  drive has one. A recognised watch counts with neither folder yet; `COROS_WATCH_PATH`
-  skips the label but still needs a `Music` or `map` folder. `npm run test:watch-detection`.
 - **Sync** (`electron/sync/`) — continuous two-way sync through Google Drive, so two
   machines hold the same user data. **Drive is the only destination**: a local folder was
   offered beside it until 2026-10-01 and was removed because a folder kept by Dropbox,
@@ -2237,7 +2233,7 @@ either since Watch Faces and Gear were removed — the first one to need them ag
 the flag.
 
 Styling is plain CSS with custom properties — no Tailwind, no CSS modules.
-`src/styles.css` (~31k lines) holds the design tokens and most rules; twelve feature
+`src/styles.css` (~28k lines) holds the design tokens and most rules; twelve feature
 stylesheets sit beside their components (strength ×3, training ×2, profile, running, cycling,
 sleep, training-library, activity globe, hiking). Fourteen in all, counting `fonts.css` — which is the number
 the four CSS suites report. Themes are `dark` | `paper` via `src/theme/`, persisted to localStorage,
@@ -2332,11 +2328,11 @@ reads as chrome under a panel and as a tint under a sheet hanging over the page.
 shorthand resets it, so the declared size sat there doing nothing and every trigger in the app
 drew at the page's 16px, a size that is not on the scale and two steps above the chips a pill
 trigger stands in a row with.
-**Fourteen controls are exempt**, each named in the test by file *and* by a string from the
+**Thirteen controls are exempt**, each named in the test by file *and* by a string from the
 element, so an exemption covers one control rather than a whole file. They are four kinds and
 none is a row of options: a grid whose arrangement carries meaning (sports, a month of days),
 cards that need a sentence (plan difficulty, analysis starters), a list of
-records (places, search results, exercise facets, muscle layers) and a menu (the base-map
+records (places, exercise facets, muscle layers) and a menu (the base-map
 popup, the start-up view, the developer toolbar's sample switches).
 
 **A feature stylesheet must not restate type for whole element types.** The Training Library
@@ -2464,7 +2460,7 @@ neutralised, so the concept has to be reintroduced deliberately. A hardcoded `#8
 `var(--success-text)` and follows the theme.
 
 **The primary rail is an index, not a control panel.** `PRIMARY_NAV_SECTIONS`
-(`primaryNav.ts`) is four standing headings — Today, Plan, History, Device — over twelve
+(`primaryNav.ts`) is three standing headings — Today, Plan, History — over eleven
 destinations, and a heading is a label: it does not open, close or remember anything. The
 disclosure groups this replaced existed only because eighteen equal rows did not fit, and
 they cost two rows, a chevron, a stored open/closed state, a rule that reopened a group
@@ -2522,7 +2518,7 @@ close to the ink (14.4:1 on dark, 11.7:1 on paper, measured in the running app) 
 of flattening it. Active still separates at 18.4:1 with weight 600, the accent icon and the
 bar. The heading sits between the two, one step quieter than a row rather than two.
 The scrollbar is gone because a 6px thumb sat a few pixels inside the rail's own hairline, so
-a short window drew **two vertical lines down the same edge** — for a list of twelve rows
+a short window drew **two vertical lines down the same edge** — for a list of eleven rows
 that fits whenever the window is not cramped. What a reader needs there is not a handle to
 drag but a sign that the list continues, so the cut edge fades: `--fade-top` / `--fade-bottom`
 are opened by `has-fade-top` / `has-fade-bottom`, which the rail sets from a **measured**

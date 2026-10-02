@@ -2,7 +2,7 @@
   "name": "heracles-records",
   "version": "1.0.0",
   "private": true,
-  "description": "Personal training records with unofficial COROS companion \u2014 media, watch sync, and training analytics.",
+  "description": "Personal training records with an unofficial COROS companion — training analytics and an AI coach.",
   "author": "quochungse",
   "license": "MIT",
   "homepage": "https://github.com/quochungse/HeraclesRecords",
@@ -14,29 +14,19 @@
     "dev:sample-hikes": "cross-env HERACLES_SAMPLE_HIKES=1 npm run dev",
     "dev:sample-trail-runs": "cross-env HERACLES_SAMPLE_TRAIL_RUNS=1 npm run dev",
     "dev:renderer": "vite --host 127.0.0.1",
-    "dev:electron": "wait-on tcp:5173 && npm run binaries:prepare && npm run build:electron && cross-env VITE_DEV_SERVER_URL=http://127.0.0.1:5173 electron .",
-    "binaries:prepare": "node scripts/prepare-binaries.mjs",
+    "dev:electron": "wait-on tcp:5173 && npm run build:electron && cross-env VITE_DEV_SERVER_URL=http://127.0.0.1:5173 electron .",
     "sample-rides:fetch": "node scripts/fetch-sample-rides.mjs",
     "sample-hikes:fetch": "node scripts/fetch-sample-hikes.mjs",
     "fonts:fetch": "node scripts/fetch-fonts.mjs",
     "body-shapes:fetch": "node scripts/fetch-body-shapes.mjs",
     "prepare:google-client": "node scripts/prepare-google-client.mjs",
-    "binaries:prepare:mac": "node scripts/prepare-binaries.mjs --platform=darwin --arch=arm64 && node scripts/prepare-binaries.mjs --platform=darwin --arch=x64",
-    "binaries:prepare:win": "node scripts/prepare-binaries.mjs --platform=win32 --arch=x64",
-    "binaries:prepare:linux": "node scripts/prepare-binaries.mjs --platform=linux --arch=x64",
     "build": "npm run build:electron && npm run build:renderer",
     "build:electron": "npm run prepare:google-client && tsc -p tsconfig.electron.json",
     "clean:electron": "node -e \"require('node:fs').rmSync('dist-electron', { recursive: true, force: true })\"",
     "build:renderer": "tsc -p tsconfig.json --noEmit && vite build && node scripts/collect-licenses.mjs",
-    "smoke:watch": "npm run build:electron && node scripts/smoke-watch-service.mjs",
-    "test:watch-detection": "npm run build:electron && node scripts/test-watch-detection.mjs",
-    "test:watch-models": "npm run build:electron && node scripts/test-watch-models.mjs",
     "test:base-layers": "cross-env ELECTRON_RUN_AS_NODE=1 electron --experimental-strip-types --import ./scripts/register-ts-ext.mjs scripts/test-base-layers.mjs",
     "test:route-coloring": "cross-env ELECTRON_RUN_AS_NODE=1 electron --experimental-strip-types scripts/test-route-coloring.mjs",
     "test:oneway-arrows": "cross-env ELECTRON_RUN_AS_NODE=1 electron --experimental-strip-types scripts/test-oneway-arrows.mjs",
-    "test:apple-podcasts": "npm run build:electron && node scripts/test-apple-podcasts.mjs",
-    "test:combined-download-cache": "npm run build:electron && node scripts/test-combined-download-cache.mjs",
-    "test:download-progress": "npm run build:electron && node scripts/test-download-progress.mjs",
     "test:greetings": "node --experimental-strip-types scripts/test-greetings.mjs",
     "test:overview-greeting": "cross-env ELECTRON_RUN_AS_NODE=1 electron --experimental-strip-types --import ./scripts/register-ts-ext.mjs scripts/test-overview-greeting.mjs",
     "test:distance-zones": "cross-env ELECTRON_RUN_AS_NODE=1 electron --experimental-strip-types --import ./scripts/register-ts-ext.mjs scripts/test-distance-zones.mjs",
@@ -201,10 +191,10 @@
     "icons:generate": "node scripts/generate-icons.mjs",
     "dmg:background": "python3 scripts/generate-dmg-background.py",
     "rebuild": "electron-builder install-app-deps",
-    "dist": "npm run binaries:prepare && npm run clean:electron && npm run build && electron-builder --publish never",
-    "dist:mac": "npm run binaries:prepare:mac && npm run clean:electron && npm run build && electron-builder --mac --arm64 --x64 --publish never",
-    "dist:win": "npm run binaries:prepare:win && npm run clean:electron && npm run build && electron-builder --win nsis --x64 --publish never",
-    "dist:linux": "npm run binaries:prepare:linux && npm run clean:electron && npm run build && electron-builder --linux AppImage --x64 --publish never",
+    "dist": "npm run clean:electron && npm run build && electron-builder --publish never",
+    "dist:mac": "npm run clean:electron && npm run build && electron-builder --mac --arm64 --x64 --publish never",
+    "dist:win": "npm run clean:electron && npm run build && electron-builder --win nsis --x64 --publish never",
+    "dist:linux": "npm run clean:electron && npm run build && electron-builder --linux AppImage --x64 --publish never",
     "release:prepare": "node scripts/prepare-release.mjs",
     "release:check-version": "node scripts/sync-release-version.mjs --check",
     "migrate:legacy-names": "node scripts/run-electron-gui.mjs scripts/migrate-legacy-names.mjs",
@@ -234,14 +224,6 @@
       "!node_modules/@anthropic-ai/claude-agent-sdk-*/**"
     ],
     "extraResources": [
-      {
-        "from": "bin",
-        "to": "bin",
-        "filter": [
-          "**/*",
-          "!**/.prepared.json"
-        ]
-      },
       {
         "from": "dist/licenses",
         "to": "licenses"
@@ -277,7 +259,7 @@
         "zip"
       ],
       "artifactName": "HeraclesRecords-${version}-${arch}.${ext}",
-      "category": "public.app-category.music",
+      "category": "public.app-category.healthcare-fitness",
       "icon": "build/icon.icns",
       "hardenedRuntime": true,
       "gatekeeperAssess": false,
@@ -302,7 +284,7 @@
         "AppImage"
       ],
       "artifactName": "HeraclesRecords-${version}.${ext}",
-      "category": "AudioVideo",
+      "category": "Utility",
       "icon": "build/icon.png"
     }
   },
@@ -316,7 +298,6 @@
     "better-sqlite3": "^12.11.1",
     "d3-geo": "^3.1.1",
     "electron-updater": "^6.8.9",
-    "fast-xml-parser": "^5.9.3",
     "leaflet": "^1.9.4",
     "lucide-react": "^1.21.0",
     "maplibre-gl": "^6.9.0",
@@ -329,7 +310,6 @@
     "rehype-raw": "^7.0.0",
     "rehype-sanitize": "^6.0.0",
     "remark-gfm": "^4.0.1",
-    "spotify-web-api-node": "^5.0.2",
     "three": "^0.185.1",
     "topojson-client": "^3.1.0",
     "unzipper": "^0.12.5",
@@ -344,7 +324,6 @@
     "@types/node": "^26.0.1",
     "@types/react": "^19.2.17",
     "@types/react-dom": "^19.2.3",
-    "@types/spotify-web-api-node": "^5.0.11",
     "@types/three": "^0.185.1",
     "@types/topojson-client": "^3.1.5",
     "@types/topojson-specification": "^1.0.5",
@@ -353,7 +332,6 @@
     "cross-env": "^10.1.0",
     "electron": "^42.5.0",
     "electron-builder": "^26.15.6",
-    "ffmpeg-static": "^5.3.0",
     "typescript": "^6.0.3",
     "vite": "^8.1.0",
     "wait-on": "^9.0.10"
@@ -362,7 +340,6 @@
     "better-sqlite3@12.11.1": true,
     "electron@42.5.0": true,
     "electron-winstaller@5.4.0": true,
-    "ffmpeg-static@5.3.0": true,
     "fsevents@2.3.3": true
   }
 }

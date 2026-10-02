@@ -1,13 +1,9 @@
 import { Sparkles } from "lucide-react";
 import type { HeraclesRecordsApi } from "../heraclesrecords-api";
-import type { WatchStatus } from "../../electron/types";
-import { StatusDot } from "./StatusDot";
 import { SampleDataControls } from "./SampleDataControls";
-import { WatchConnectionSmokeControls } from "./WatchConnectionSmokeControls";
 
 interface DeveloperToolbarProps {
   api: HeraclesRecordsApi | undefined;
-  watchStatus: WatchStatus | null;
   /** Dev view exposes development-only destinations and the tools below. */
   developmentViewActive: boolean;
   onDevelopmentViewToggle: () => void;
@@ -17,7 +13,6 @@ interface DeveloperToolbarProps {
   /** The Strength screen's generated sample history. */
   strengthSampleActive: boolean;
   onStrengthSampleChange: (active: boolean) => void;
-  onWatchStatusChange: (status: WatchStatus) => void;
   onError: (message: string) => void;
 }
 
@@ -29,14 +24,12 @@ interface DeveloperToolbarProps {
  */
 export function DeveloperToolbar({
   api,
-  watchStatus,
   developmentViewActive,
   onDevelopmentViewToggle,
   updateSimulationActive,
   onToggleUpdateSimulation,
   strengthSampleActive,
   onStrengthSampleChange,
-  onWatchStatusChange,
   onError,
 }: DeveloperToolbarProps) {
   return (
@@ -79,26 +72,8 @@ export function DeveloperToolbar({
               onStrengthSampleChange={onStrengthSampleChange}
               onError={onError}
             />
-
-            <WatchConnectionSmokeControls
-              api={api}
-              onWatchStatusChange={onWatchStatusChange}
-              onError={onError}
-            />
           </>
         ) : null}
-
-        <div
-          className={`watch-status-chip${watchStatus?.connected ? " connected" : ""}`}
-          title={watchStatus?.rootPath ?? "No watch volume found"}
-        >
-          <StatusDot connected={Boolean(watchStatus?.connected)} />
-          <span>
-            {watchStatus?.connected
-              ? (watchStatus.name ?? "Connected")
-              : "No watch"}
-          </span>
-        </div>
       </div>
     </header>
   );

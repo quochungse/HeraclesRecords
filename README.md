@@ -29,8 +29,7 @@ every night of sleep — and puts a coach next to it that has actually read all 
 Everything lives in a SQLite file on your machine. The only thing that leaves is what you
 send to your chosen AI provider, and what a COROS sign-in needs.
 
-It also talks to a COROS watch over USB, to put music on it. That part is a convenience,
-not the point.
+> Unofficial. Not affiliated with or endorsed by COROS.
 
 ---
 
@@ -107,24 +106,6 @@ Google Drive; backup is a single file you save where you like and restore when y
 
 ---
 
-## COROS Connect
-
-Secondary features for people who own a COROS watch. Connect over USB:
-
-| | |
-|---|---|
-| **Media** | Download MP3s from YouTube, Spotify, YouTube Music, Apple Music or Apple Podcasts and copy them to the watch |
-| **Data** | Browse the raw records the app holds |
-
-<p align="center">
-  <img src="docs/screenshots/coros-connect.png" alt="COROS Connect" width="900" />
-</p>
-
-> Unofficial. Not affiliated with or endorsed by COROS.
-> Only download media you have the rights to.
-
----
-
 ## Install
 
 Grab an installer from [Releases](https://github.com/quochungse/HeraclesRecords/releases):
@@ -153,7 +134,6 @@ git clone https://github.com/quochungse/HeraclesRecords.git
 cd HeraclesRecords
 npm install
 npm run rebuild            # native SQLite bindings for Electron's ABI
-npm run binaries:prepare   # yt-dlp + ffmpeg into bin/
 npm run dev                # Vite on 127.0.0.1:5173 + Electron
 ```
 
@@ -166,8 +146,6 @@ Nothing but the app to start. Everything else is optional and only for the featu
 
 - **COROS account** — activities, analytics, plans, calendar
 - **An AI provider** — Claude subscription, Anthropic key, OpenRouter key, or a local model
-- **USB cable** — music on the watch
-- **Spotify / Google OAuth apps, Apple Music headers, `ytmusicapi`** — the matching media source
 
 ---
 
@@ -189,14 +167,13 @@ Nothing but the app to start. Everything else is optional and only for the featu
 ```sh
 npm run build        # tsc electron + tsc --noEmit renderer + vite build  (the only typecheck)
 npm start            # build, then run the packaged-style app
-npm run smoke:watch  # hardware-free watch detection
 ```
 
 There is no linter and no test runner. Tests are ~91 standalone `scripts/test-*.mjs` files,
 each wired to its own npm script — `npm run test:chat-service`, `npm run test:ipc-surface`,
 and so on. `npm run | grep test:` lists them.
 
-Three layers: `src/` is a React 19 + Vite renderer, `electron/preload.ts` bridges ~254 IPC
+Three layers: `src/` is a React 19 + Vite renderer, `electron/preload.ts` bridges ~184 IPC
 channels, and `electron/*Service.ts` does the work with `electron/database.ts` owning SQLite.
 Adding a channel means editing `main.ts`, `preload.ts` and `src/heraclesrecords-api.ts` together,
 then running `npm run test:ipc-surface`.
@@ -208,20 +185,6 @@ feature-level notes.
 
 <details>
 <summary><strong>Optional integrations</strong></summary>
-
-**Spotify** — create an app in the [Spotify Developer Dashboard](https://developer.spotify.com/dashboard),
-add the redirect URI `https://127.0.0.1:4567/callback`, paste the Client ID and Secret into
-the Spotify Sync view.
-
-**YouTube Playlists** — create an OAuth 2.0 Client ID in the
-[Google Cloud Console](https://console.cloud.google.com/apis/credentials), enable the YouTube
-Data API v3, add the redirect URI `http://127.0.0.1:4568`.
-
-**YouTube Music** — `python3 -m pip install ytmusicapi`, then copy a `browse` POST request
-from [music.youtube.com](https://music.youtube.com/library) as cURL and paste it in.
-
-**Apple Music** — copy any `amp-api` request from [music.apple.com](https://music.apple.com)
-as cURL and paste it in. Streams are DRM-protected, so tracks are resolved via YouTube.
 
 **Google Drive sync** — a packaged build needs `HERACLES_GOOGLE_OAUTH_ID` and
 `HERACLES_GOOGLE_OAUTH_KEY` at build time, or the Drive option stays disabled.

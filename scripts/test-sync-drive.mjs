@@ -301,7 +301,7 @@ const checks = await runStorageProviderContract({
   assert.equal(
     url.searchParams.get("redirect_uri"),
     "http://127.0.0.1:5599/callback",
-    "the redirect is plain http loopback, not https like Spotify's"
+    "the redirect is plain http loopback, which is what Google accepts"
   );
   assert.equal(
     url.searchParams.get("access_type"),

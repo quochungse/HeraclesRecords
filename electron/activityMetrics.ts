@@ -2,7 +2,7 @@
 // can hold.
 //
 // This module lives in `electron/` but is written for both layers, like
-// `unitSystem.ts` and `watchModels.ts`: the main process computes a summary
+// `unitSystem.ts`: the main process computes a summary
 // once when it has the payload, and the renderer computes the same figures live
 // for the run it has open. Two implementations of a drift percentage would
 // disagree the first time either was touched, and the disagreement would show

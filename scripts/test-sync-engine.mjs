@@ -494,7 +494,7 @@ function fakeTarget() {
       entry(at(1), { recordId: "keep" }),
       // A machine that should never have sent these:
       { ...entry(at(2)), key: "training_activities", recordId: "cached" },
-      { ...entry(at(3)), key: "downloads", recordId: "local-file" },
+      { ...entry(at(3)), key: "coros_plan_cache", recordId: "cached-plan" },
       { ...entry(at(4)), key: "app_settings", recordId: "sneaky" },
       { ...entry(at(5)), key: "no_such_table", recordId: "x" },
       {
@@ -519,7 +519,7 @@ function fakeTarget() {
   assert.deepEqual(
     result.rejected.map((item) => item.reason).sort(),
     [
-      // training_activities (derived), downloads (device),
+      // training_activities (derived), coros_plan_cache (device),
       // chat.claudeCode.executablePath (device), sidebarCollapsed (device)
       "not-syncable",
       "not-syncable",

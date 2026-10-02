@@ -63,7 +63,7 @@ function seedDatabase() {
   for (const table of [
     "chat_sessions",
     "training_activities",
-    "downloads",
+    "coros_plan_cache",
     "training_workout_metadata"
   ]) {
     db.prepare(`DELETE FROM ${table}`).run();
@@ -95,11 +95,11 @@ function seedDatabase() {
     "INSERT INTO training_activities (activity_id, sport_type, synced_at) VALUES (?, ?, ?)"
   ).run("act-1", 100, "2026-09-01T00:00:00Z");
 
-  // device — absolute paths belonging to this machine only
+  // device — this machine's last copy of a COROS answer
   db.prepare(
-    "INSERT INTO downloads (id, url, title, file_path, size_bytes, created_at) " +
-      "VALUES (?, ?, ?, ?, ?, ?)"
-  ).run("d1", "https://x", "A track", "/home/me/Music/a.mp3", 1, "2026-09-01");
+    "INSERT INTO coros_plan_cache (remote_id, document_json, fetched_at) " +
+      "VALUES (?, ?, ?)"
+  ).run("plan-1", "{}", "2026-09-01T00:00:00Z");
 
   // Signed in: a backup belongs to an account, and both directions refuse
   // without one. `userId` is `device` tier, so it is never in the file — what
@@ -110,7 +110,7 @@ function seedDatabase() {
   database.setSetting("chat.customInstructions", "Be terse."); // personal
   // Credentials, both kinds: stored in the clear, and sealed by the keychain.
   // Both are `device`, so neither may appear in a backup.
-  database.setSetting("spotify.clientId", "spotify-id-123");
+  database.setSetting("chat.anthropic.apiKey", "anthropic-key-123");
   database.setSetting("hevy.apiKey", "k:sealed-to-this-machine");
   database.setSetting("chat.claudeCode.executablePath", "/usr/local/bin/claude");
 }
@@ -142,14 +142,14 @@ seedDatabase();
     undefined,
     "a derived table is not in the file at all"
   );
-  assert.equal(document.tables.downloads, undefined, "nor a device one");
+  assert.equal(document.tables.coros_plan_cache, undefined, "nor a device one");
   // Two of the person's own, plus the built-in MCP server every install has.
   assert.equal(rowCount, 3, "one conversation, one workout's metadata, one built-in");
 
   assert.equal(document.settings["chat.provider"], "claude-code");
   assert.equal(document.settings["chat.customInstructions"], "Be terse.");
   for (const credential of [
-    "spotify.clientId",
+    "chat.anthropic.apiKey",
     "hevy.apiKey",
     "chat.claudeCode.executablePath"
   ]) {
@@ -169,7 +169,7 @@ seedDatabase();
   // The serialised form carries nothing a credential could travel in.
   const serialised = JSON.stringify(document);
   assert.equal(
-    /spotify-id-123|k:sealed-to-this-machine/.test(serialised),
+    /anthropic-key-123|k:sealed-to-this-machine/.test(serialised),
     false,
     "no credential value appears anywhere in the payload"
   );
@@ -517,7 +517,7 @@ console.log("ok  with nobody signed in, both directions refuse");
     settings: {
       "chat.provider": "anthropic",
       "hevy.apiKey": "leaked-from-another-machine",
-      "spotify.refreshToken": "also-leaked"
+      "corosMcp.tokens": "also-leaked"
     },
     localStorage: {},
     // Fields this build does not read, and must not start reading.
@@ -545,7 +545,7 @@ console.log("ok  with nobody signed in, both directions refuse");
     preview.refused.includes("setting:hevy.apiKey"),
     "a credential in an old backup is refused, not written"
   );
-  assert.ok(preview.refused.includes("setting:spotify.refreshToken"));
+  assert.ok(preview.refused.includes("setting:corosMcp.tokens"));
 
   await restoreBackupFile(legacyPath, "replace");
   assert.equal(

@@ -46,8 +46,8 @@ import { summarizeMcpStatuses } from "../chat/McpServersPanel";
 import type { HeraclesRecordsApi } from "../heraclesrecords-api";
 import { CoachModelsModal } from "./CoachModelsModal";
 import { DiagnosticsSettings } from "./DiagnosticsSettings";
+import { formatBytes } from "./formatters";
 import { McpServersModal } from "./McpServersModal";
-import { formatBytes } from "../media/libraryUtils";
 import { useTheme } from "../theme/ThemeProvider";
 import {
   ACCENT_PALETTES,
@@ -821,8 +821,8 @@ export function SettingsView({
             <strong>Storage on this computer</strong>
             <span>
               {appInfo
-                ? `Downloads, projects, caches and app data — ${appInfo.storageLocations.length} locations.`
-                : "Downloads, projects, caches and app data."}
+                ? `The database and the app's data folder — ${appInfo.storageLocations.length} locations.`
+                : "The database and the app's data folder."}
             </span>
           </span>
           <ChevronRight

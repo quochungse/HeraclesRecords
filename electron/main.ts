@@ -70,43 +70,12 @@ import {
 } from "./activityDetailCache";
 import { initializeCorosLocale } from "./corosLocale";
 import {
-  clearDownloadTransferredByFileName,
-  deleteDownload,
-  getDownloadById,
-  hasAvailableDownloadForUrl,
   deleteSettings,
   getSetting,
   initializeDatabase,
-  listDownloads,
-  markDownloadTransferred,
   readTrainingActivityFeelTypes,
   setSetting
 } from "./database";
-import {
-  downloadAudio,
-  downloadCombinedTrack,
-  getBinaryStatus
-} from "./downloadService";
-import {
-  cancelJob,
-  clearCompletedJobs,
-  clearJob,
-  clearTerminalJobsForUrl,
-  enqueueDownloads,
-  listJobs,
-  setJobListener
-} from "./downloadQueue";
-import {
-  getSpotifyConfig,
-  getSpotifyStatus,
-  listSpotifyPlaylists,
-  listSpotifyPlaylistTracks,
-  listSpotifySyncState,
-  loginSpotify,
-  logoutSpotify,
-  saveSpotifyConfig,
-  syncSpotifyPlaylist
-} from "./spotifyService";
 import { getAppInfo, openAppStorageLocation } from "./appInfoService";
 import {
   backfillFeelTypes,
@@ -190,72 +159,15 @@ import {
 } from "./trainingLibraryService";
 import { normalizeUnitSystem } from "./unitSystem.js";
 import { reverseGeocodeLocation } from "./reverseGeocodeService";
-import { isWebUrl, openableExternalUrl } from "./externalLinks";
+import { openableExternalUrl } from "./externalLinks";
 import { buildManualTcx } from "./tcxBuilder";
 import type {
-  CombinedDownloadResult,
-  DownloadJob,
-  DownloadQueueItem,
-  SpotifyConfig,
   TrainingHubActivity,
   TrainingHubActivityFileType,
   TrainingHubExportResult,
-  WatchConnectionSmokeOptionId,
   SampleDataState,
-  YouTubeMusicConfig,
-  ManualActivityInput,
-  WatchTransferProgress
+  ManualActivityInput
 } from "./types";
-import {
-  deleteWatchTrack,
-  getWatchConnectionSmokeOption,
-  getWatchStatus,
-  setWatchConnectionSmokeOption,
-  transferFileToWatch
-} from "./watchService";
-import {
-  configureYouTubeBrowserSession,
-  registerYouTubeBrowserHandlers,
-  resetYouTubeBrowserSession
-} from "./youtubeBrowserService";
-import {
-  configureYouTubeMusicBrowserSession,
-  registerYouTubeMusicBrowserHandlers,
-  resetYouTubeMusicBrowserSession
-} from "./youtubeMusicBrowserService";
-import {
-  downloadFromYouTubeBrowser,
-  downloadMultipleFromYouTubeBrowser,
-  getYouTubeHistory,
-  saveYouTubeVisit
-} from "./youtubeService";
-import {
-  logoutYouTubeMusic,
-  getYouTubeMusicConfig,
-  getYouTubeMusicStatus,
-  loginYouTubeMusic,
-  listYouTubeMusicLibrary,
-  saveYouTubeMusicConfig,
-  saveYouTubeMusicAuth,
-  syncYouTubeMusicLibrary
-} from "./youtubeMusicService";
-import {
-  fetchAppleMusicPlaylist,
-  getAppleMusicStatus,
-  listAppleMusicPlaylists,
-  logoutAppleMusic,
-  saveAppleMusicAuth,
-  saveAppleMusicCapturedHeaders
-} from "./appleMusicService";
-import {
-  configureAppleMusicBrowserSession,
-  registerAppleMusicBrowserHandlers,
-  resetAppleMusicBrowserSession
-} from "./appleMusicBrowserService";
-import {
-  loadApplePodcast,
-  searchApplePodcasts
-} from "./applePodcastsService";
 import {
   checkForAppUpdates,
   downloadAppUpdate,
@@ -439,16 +351,14 @@ import type {
  * with the preload bridge and DevTools (`VITE_DEV_SERVER_URL`), fill the
  * screens with simulated activities (`HERACLES_SAMPLE_*`), script Coach's plan
  * turns through the real tools that write to COROS
- * (`HERACLES_SIMULATE_PLAN_AI`), or treat a folder as a watch
- * (`COROS_WATCH_PATH`).
+ * (`HERACLES_SIMULATE_PLAN_AI`).
  */
 const DEVELOPMENT_ONLY_ENV = [
   "VITE_DEV_SERVER_URL",
   "HERACLES_SAMPLE_RIDES",
   "HERACLES_SAMPLE_HIKES",
   "HERACLES_SAMPLE_TRAIL_RUNS",
-  "HERACLES_SIMULATE_PLAN_AI",
-  "COROS_WATCH_PATH"
+  "HERACLES_SIMULATE_PLAN_AI"
 ] as const;
 if (app.isPackaged) {
   for (const name of DEVELOPMENT_ONLY_ENV) delete process.env[name];
@@ -605,8 +515,7 @@ function applyAppIcon(): void {
 }
 
 const ALLOWED_PERMISSIONS = new Set([
-  // Lets the renderer copy text (e.g. the Spotify Redirect URI) via
-  // navigator.clipboard.writeText.
+  // Lets the renderer copy text via navigator.clipboard.writeText.
   "clipboard-sanitized-write"
 ]);
 
@@ -667,30 +576,6 @@ function isAppPageUrl(url: string): boolean {
   }
 }
 
-/**
- * Popups from a <webview> (a sign-in window, a share dialog) open as sandboxed
- * windows when they are web pages, and not at all otherwise.
- */
-function guardWebviewPopups(): void {
-  app.on("web-contents-created", (_event, contents) => {
-    if (contents.getType() !== "webview") return;
-    contents.setWindowOpenHandler(({ url }) =>
-      isWebUrl(url)
-        ? {
-            action: "allow",
-            overrideBrowserWindowOptions: {
-              webPreferences: {
-                contextIsolation: true,
-                nodeIntegration: false,
-                sandbox: true
-              }
-            }
-          }
-        : { action: "deny" }
-    );
-  });
-}
-
 function createWindow(): void {
   const iconPath = getAppIconPath();
 
@@ -714,7 +599,6 @@ function createWindow(): void {
       preload: path.join(__dirname, "preload.js"),
       contextIsolation: true,
       nodeIntegration: false,
-      webviewTag: true,
       // The preload imports nothing but `electron`, so it runs sandboxed: a
       // script that ever ran in the page would get the bridge and nothing
       // more.
@@ -736,17 +620,6 @@ function createWindow(): void {
 
   mainWindow.webContents.on("will-navigate", (event, url) => {
     if (!isAppPageUrl(url)) event.preventDefault();
-  });
-  // A <webview> runs third-party pages (YouTube, YouTube Music, Apple Music):
-  // whatever the markup asks for, it gets no preload, no Node and a sandbox.
-  mainWindow.webContents.on("will-attach-webview", (event, webPreferences, params) => {
-    delete webPreferences.preload;
-    webPreferences.nodeIntegration = false;
-    webPreferences.contextIsolation = true;
-    webPreferences.sandbox = true;
-    if (params.src && params.src !== "about:blank" && !isWebUrl(params.src)) {
-      event.preventDefault();
-    }
   });
   mainWindow.webContents.on("did-start-loading", () => {
     rendererReady = false;
@@ -857,44 +730,6 @@ app.whenReady().then(() => {
   if (!hasSingleInstanceLock) return;
   hideDefaultApplicationMenu();
   configureAppPermissions();
-  guardWebviewPopups();
-  configureYouTubeBrowserSession();
-  registerYouTubeBrowserHandlers();
-  configureYouTubeMusicBrowserSession();
-  // Saving runs the ytmusicapi Python bridge, so guard against overlapping runs
-  // if several youtubei requests slip through before the first save finishes.
-  let youtubeMusicCaptureInFlight = false;
-  registerYouTubeMusicBrowserHandlers((headerBlock) => {
-    if (youtubeMusicCaptureInFlight) {
-      return;
-    }
-    youtubeMusicCaptureInFlight = true;
-    void saveYouTubeMusicAuth(headerBlock)
-      .then((status) => {
-        if (mainWindow && !mainWindow.isDestroyed()) {
-          mainWindow.webContents.send("youtubeMusic:authCaptured", { status });
-        }
-      })
-      .catch((error) => {
-        if (mainWindow && !mainWindow.isDestroyed()) {
-          mainWindow.webContents.send("youtubeMusic:authCaptured", {
-            error: error instanceof Error ? error.message : String(error)
-          });
-        }
-      })
-      .finally(() => {
-        youtubeMusicCaptureInFlight = false;
-      });
-  });
-  configureAppleMusicBrowserSession();
-  registerAppleMusicBrowserHandlers((headers) => {
-    // Fires on every amp-api call; only tell the renderer when the stored
-    // credentials actually change (e.g. the media-user-token first appears).
-    const { status, changed } = saveAppleMusicCapturedHeaders(headers);
-    if (changed && mainWindow && !mainWindow.isDestroyed()) {
-      mainWindow.webContents.send("appleMusic:authCaptured", status);
-    }
-  });
   initializeDatabase(app.getPath("userData"));
   // COROS's string table, for official plans that name their sessions by key.
   initializeCorosLocale(app.getPath("userData"));
@@ -908,11 +743,6 @@ app.whenReady().then(() => {
   sweepActivityDetailCache();
   initializeDiagnostics(() => mainWindow);
   registerIpcHandlers();
-  setJobListener((jobs) => {
-    if (mainWindow && !mainWindow.isDestroyed()) {
-      mainWindow.webContents.send("youtube:jobsUpdate", jobs);
-    }
-  });
   setTrainingHubSessionListener((status) => {
     announceTrainingHubSessionChanged(status);
   });
@@ -1543,24 +1373,6 @@ function registerIpcHandlers(): void {
 
   ipcMain.handle("window:isFullscreen", () => mainWindow?.isFullScreen() ?? false);
 
-  ipcMain.handle("watch:getStatus", () => getWatchStatus());
-
-  ipcMain.handle("watch:getConnectionSmokeOption", () =>
-    getWatchConnectionSmokeOption()
-  );
-
-  ipcMain.handle(
-    "watch:setConnectionSmokeOption",
-    (_event, optionId: WatchConnectionSmokeOptionId) => {
-      // The developer toolbar's mock watch; a packaged build refuses it, as it
-      // refuses the sample data below.
-      if (app.isPackaged) {
-        throw new Error("The mock watch is only available in development builds.");
-      }
-      return setWatchConnectionSmokeOption(optionId);
-    }
-  );
-
   // The developer toolbar's switches for the simulated activities. They set the
   // same environment flags `npm run dev:sample-*` does, which the handlers read
   // on every call; a packaged build refuses them.
@@ -1595,141 +1407,6 @@ function registerIpcHandlers(): void {
       return readSampleData();
     }
   );
-
-  ipcMain.handle("watch:deleteTrack", async (_event, relativePath: string) => {
-    await deleteWatchTrack(relativePath);
-    clearDownloadTransferredByFileName(path.basename(relativePath));
-    return getWatchStatus();
-  });
-
-  ipcMain.handle("watch:transferLocalTrack", async (_event, id: string) => {
-    const download = getDownloadById(id);
-    if (!download) {
-      throw new Error("Local track was not found.");
-    }
-
-    const trackName = path.basename(download.filePath);
-    const copiedTrack = await transferFileToWatch(
-      download.filePath,
-      ({ copiedBytes, totalBytes }) => {
-        if (!mainWindow || mainWindow.isDestroyed()) {
-          return;
-        }
-        mainWindow.webContents.send("watch:transferProgress", {
-          id,
-          name: trackName,
-          copiedBytes,
-          totalBytes,
-          progress: totalBytes > 0 ? Math.min(copiedBytes / totalBytes, 1) : 0
-        } satisfies WatchTransferProgress);
-      }
-    );
-    markDownloadTransferred(id);
-
-    return {
-      copiedTrack,
-      watch: await getWatchStatus()
-    };
-  });
-
-  ipcMain.handle("downloads:list", () => listDownloads());
-
-  ipcMain.handle("downloads:downloadAudio", (_event, url: string) =>
-    downloadAudio(url)
-  );
-
-  ipcMain.handle(
-    "downloads:delete",
-    (_event, id: string, removeFile: boolean) => {
-      const download = getDownloadById(id);
-      deleteDownload(id, removeFile);
-
-      if (download && !hasAvailableDownloadForUrl(download.url)) {
-        clearTerminalJobsForUrl(download.url);
-      }
-
-      return listDownloads();
-    }
-  );
-
-  ipcMain.handle("binaries:getStatus", () => getBinaryStatus());
-
-  ipcMain.handle("youtube:listHistory", () => getYouTubeHistory());
-
-  ipcMain.handle(
-    "youtube:recordVisit",
-    (_event, url: string, title?: string) => saveYouTubeVisit(url, title)
-  );
-
-  ipcMain.handle(
-    "youtube:download",
-    (_event, url: string, title?: string) =>
-      downloadFromYouTubeBrowser(url, title)
-  );
-
-  ipcMain.handle("youtube:downloadMultiple", (_event, items) =>
-    downloadMultipleFromYouTubeBrowser(items)
-  );
-
-  ipcMain.handle(
-    "youtube:enqueueDownload",
-    (_event, items: DownloadQueueItem[]): DownloadJob[] =>
-      enqueueDownloads(items)
-  );
-
-  ipcMain.handle(
-    "music:downloadCombined",
-    (
-      event,
-      id: string,
-      name: string,
-      items: DownloadQueueItem[]
-    ): Promise<CombinedDownloadResult> =>
-      downloadCombinedTrack(id, name, items, (update) => {
-        event.sender.send("music:combinedProgress", { id, ...update });
-      })
-  );
-
-  ipcMain.handle("youtube:listJobs", (): DownloadJob[] => listJobs());
-
-  ipcMain.handle("youtube:clearJob", (_event, id: string): DownloadJob[] =>
-    clearJob(id)
-  );
-
-  ipcMain.handle("youtube:cancelJob", (_event, id: string): DownloadJob[] =>
-    cancelJob(id)
-  );
-
-  ipcMain.handle("youtube:clearCompletedJobs", (): DownloadJob[] =>
-    clearCompletedJobs()
-  );
-
-  ipcMain.handle("youtube:resetSession", () => resetYouTubeBrowserSession());
-
-  ipcMain.handle("youtubeMusic:getConfig", () => getYouTubeMusicConfig());
-
-  ipcMain.handle(
-    "youtubeMusic:saveConfig",
-    (_event, config: YouTubeMusicConfig) => saveYouTubeMusicConfig(config)
-  );
-
-  ipcMain.handle("youtubeMusic:getStatus", () => getYouTubeMusicStatus());
-
-  ipcMain.handle("youtubeMusic:saveAuth", (_event, headersRaw: string) =>
-    saveYouTubeMusicAuth(headersRaw)
-  );
-
-  ipcMain.handle("youtubeMusic:login", () => loginYouTubeMusic());
-
-  ipcMain.handle("youtubeMusic:resetBrowserSession", () =>
-    resetYouTubeMusicBrowserSession()
-  );
-
-  ipcMain.handle("youtubeMusic:logout", () => logoutYouTubeMusic());
-
-  ipcMain.handle("youtubeMusic:listLibrary", () => listYouTubeMusicLibrary());
-
-  ipcMain.handle("youtubeMusic:syncLibrary", () => syncYouTubeMusicLibrary());
 
   ipcMain.handle("chat:getAuthStatus", () => getChatAuthStatus());
 
@@ -2159,62 +1836,6 @@ function registerIpcHandlers(): void {
     "trainingHub:uploadTrainingPlan",
     (_event, draft: CorosTrainingPlanDraftInput, unitSystem?: UnitSystem) =>
       uploadTrainingPlan(draft, normalizeUnitSystem(unitSystem))
-  );
-
-  ipcMain.handle("appleMusic:getStatus", () => getAppleMusicStatus());
-
-  ipcMain.handle("appleMusic:saveAuth", (_event, headersRaw: string) =>
-    saveAppleMusicAuth(headersRaw)
-  );
-
-  ipcMain.handle("appleMusic:logout", () => logoutAppleMusic());
-
-  ipcMain.handle("appleMusic:resetBrowserSession", () =>
-    resetAppleMusicBrowserSession()
-  );
-
-  ipcMain.handle("appleMusic:listPlaylists", () => listAppleMusicPlaylists());
-
-  ipcMain.handle("appleMusic:fetchPlaylist", (_event, playlist: string) =>
-    fetchAppleMusicPlaylist(playlist)
-  );
-
-  ipcMain.handle("applePodcasts:search", (_event, query: string) =>
-    searchApplePodcasts(query)
-  );
-
-  ipcMain.handle("applePodcasts:load", (_event, showIdOrUrl: string, offset?: number) =>
-    loadApplePodcast(showIdOrUrl, offset)
-  );
-
-  ipcMain.handle("spotify:getConfig", () => getSpotifyConfig());
-
-  ipcMain.handle("spotify:saveConfig", (_event, config: SpotifyConfig) =>
-    saveSpotifyConfig(config)
-  );
-
-  ipcMain.handle("spotify:getStatus", () => getSpotifyStatus());
-
-  ipcMain.handle("spotify:login", () => loginSpotify(mainWindow));
-
-  ipcMain.handle("spotify:logout", () => logoutSpotify());
-
-  ipcMain.handle("spotify:listPlaylists", () => listSpotifyPlaylists());
-
-  ipcMain.handle("spotify:listPlaylistTracks", (_event, playlistId: string) =>
-    listSpotifyPlaylistTracks(playlistId)
-  );
-
-  ipcMain.handle("spotify:listSyncState", (_event, playlistId: string) =>
-    listSpotifySyncState(playlistId)
-  );
-
-  ipcMain.handle(
-    "spotify:syncPlaylist",
-    (event, playlistId: string, autoTransfer: boolean) =>
-      syncSpotifyPlaylist(playlistId, autoTransfer, (update) => {
-        event.sender.send("spotify:syncUpdate", update);
-      })
   );
 
   ipcMain.handle("trainingHub:getStatus", () => getTrainingHubStatus());

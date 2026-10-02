@@ -1,8 +1,8 @@
 # Third-party notices
 
 Heracles Records is released under the MIT License — see `LICENSE`. This file
-names the work it is built on and the third-party software, fonts, artwork and
-data that ship with it. The full license text of every JavaScript package and
+names the work it is built on and the third-party fonts, artwork and data that
+ship with it. The full license text of every JavaScript package and
 font in a build is in `THIRD_PARTY_LICENSES.txt`, generated at build time and
 installed beside this file in the app's `resources/licenses` folder.
 
@@ -11,42 +11,6 @@ installed beside this file in the app's `resources/licenses` folder.
 Part of Heracles Records' code is Copyright (c) 2026 AtoZ, released under the
 MIT License. That copyright notice and the MIT permission notice are kept in
 `LICENSE`, as the license requires.
-
-## Programs that ship with the app
-
-The app runs these as separate programs; it does not link against them.
-
-### FFmpeg
-
-A static FFmpeg executable, from the builds the
-[ffmpeg-static](https://github.com/eugeneware/ffmpeg-static) project
-distributes: Linux by [John Van Sickle](https://johnvansickle.com/ffmpeg/),
-macOS by [Helmut K. C. Tessarek](https://evermeet.cx/ffmpeg/) (Intel) and
-[OSXExperts](https://osxexperts.net/) (Apple silicon), Windows by
-[Gyan Doshi](https://www.gyan.dev/ffmpeg/builds/). These builds are licensed
-under the **GNU General Public License, version 3**. The license text and the
-build's own README, which names its version and components, are installed next
-to the executable as `ffmpeg-LICENSE.txt` and `ffmpeg-README.txt`. FFmpeg's
-source code is available from <https://ffmpeg.org/download.html>, and each
-builder publishes the sources and scripts of its builds at the links above.
-
-### yt-dlp
-
-The [yt-dlp](https://github.com/yt-dlp/yt-dlp) executable, released into the
-public domain under the Unlicense. Its standalone executables bundle
-third-party components under their own licenses, which the yt-dlp repository
-lists.
-
-### Python runtime and ytmusicapi
-
-A self-contained CPython 3.11 from
-[python-build-standalone](https://github.com/astral-sh/python-build-standalone),
-under the Python Software Foundation License (the text is inside the
-`python-runtime` folder), running
-[ytmusicapi](https://github.com/sigma67/ytmusicapi) (MIT) and its dependencies
-requests (Apache-2.0), urllib3 (MIT), idna (BSD-3-Clause), charset-normalizer
-(MIT) and certifi (MPL-2.0). Each package's license file is inside its
-`.dist-info` folder in `bin/<platform>/python`.
 
 ## Fonts
 
@@ -100,6 +64,6 @@ license and license text, in `THIRD_PARTY_LICENSES.txt`.
 ## Trademarks
 
 COROS is a trademark of COROS Wearables Inc. Heracles Records is an independent,
-unofficial app; it is not made, endorsed or supported by COROS. YouTube, YouTube
-Music, Apple Music, Spotify, Strava, Hevy, Google Drive, ChatGPT, Claude and the
-other services the app connects to are trademarks of their respective owners.
+unofficial app; it is not made, endorsed or supported by COROS. Strava, Hevy,
+Google Drive, ChatGPT, Claude and the other services the app connects to are
+trademarks of their respective owners.
