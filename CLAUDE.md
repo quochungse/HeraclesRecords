@@ -151,7 +151,7 @@ npm run sample:coach     # app closed: writes sample Coach conversations for P0�
 npm start                # build, then run the packaged-style app
 ```
 
-There is **no linter and no test runner**. Tests are ~165 standalone `scripts/test-*.mjs`
+There is **no linter and no test runner**. Tests are ~167 standalone `scripts/test-*.mjs`
 files using `node:assert/strict`, each wired to its own npm script. `npm run build` is the
 only typecheck. CI (`.github/workflows/build.yml`, `release.yml`) **builds installers but
 runs no tests** — nothing catches a broken test except running it.
@@ -346,7 +346,8 @@ each one. Do not put the payload back on the detail to save a round trip.
 ### Feature domains
 
 Each is a main-process service plus a renderer view. `src/App.tsx` lazy-loads the heavy
-ones (Training Hub, Training Library, Running, Cycling, Hiking, Strength, Calendar, Coach, Where you've been);
+ones (Training Hub, Training Library, Running, Cycling, Hiking, Strength, Calendar, Coach, Where you've been,
+Hall of Records);
 Overview and Settings are in the main bundle.
 **Calendar and Training Library open on their own shimmer, never the generic spinner.**
 They are `preloadableLazy`: fetched once the first paint is idle, and a mount after that
@@ -1948,6 +1949,62 @@ lives at module level for the same visit-to-visit reason — see `useCalendarDat
   `coordinateLabel` instead of looking for letters: `21.0° N` has letters in it.
   `npm run test:place-labels` drives all of this against a fake `window`, and fails on either
   shortcut.
+- **Hall of Records** (`src/records/`, built 2026-10-02; mockup and decisions in the memory
+  note `hall-of-records-decisions`) — every milestone the athlete has reached, newest first by
+  year and month, and **the Twelve Labours**: twelve kinds of achievement (Nemean Lion =
+  strength, Hydra = swimming, Hind = week streaks, Boar = climbing, Stables = hours, Birds =
+  cycling, Bull = long runs, Mares = records, Hippolyta = plans, Geryon = places, Hesperides =
+  VO2max, Cerberus = sleep), three stages each, all twelve being Apotheosis. Under Your journey,
+  with a laurel drawn through `createLucideIcon` like `RunnerIcon`.
+  **Worked out, not stored.** `milestones.ts` (`computeRecords`) walks every activity oldest
+  first — the list is complete, COROS keeps it for good — and finds the beginning, a first per
+  sport, the ladder distances (1% slack for GPS), a longest or biggest climb once there is a
+  history to beat, the biggest week, week streaks, lifetime totals in the athlete's units and
+  anniversaries. **An id is the fact, not the moment** (`first:ride`, `streak:weeks:26`,
+  `pr:<activityId>`): computing twice gives the same ids, which is what the "New" badge and
+  the notifications are keyed on. `labours.ts` only names the labours and folds the stage tags
+  the milestones carry (`labour`, with `also` when one milestone reaches several stages at
+  once — a 12-week plan at 91% is all three of the Girdle's) into a state per labour; stages
+  may be reached in any order. `timelineModel.ts` folds it: the newest four months and the
+  month the beginning sits in open, the rest of each year one line, a month's rows past four
+  behind "+ N more" **where the first of them would have been** (never after the beginning,
+  which closes the timeline). `test:records` holds all three.
+  **Records are improvements, and they were noise until three rules**: on real data a beginner
+  broke the 1K, 5K and 10K on most runs. One run's records are one milestone; nothing counts
+  in the first four weeks at a distance or under a 1% gain; COROS's own all-time record stands
+  in for our figure on the same run, is shown on its own before any backfill (`record:<d>:<id>`),
+  and an effort under 97% of it is a GPS fault. Best efforts come from the summary: an outdoor
+  run's fastest 1K/5K/10K/half/marathon on activity time, start interpolated, anything past
+  2:12/km refused (`bestEfforts` in `activityMetrics.ts`), with the start point rounded to two
+  decimals — both under `RECORDS_SUMMARY_VERSION`, **versioned apart from the zone split and
+  the drift** so adding them staled nothing on the run screens. `syncActivityDetailSummaries`
+  takes `requireRecords` to ask for rows that lack them; the hall backfills oldest first (so a
+  record's history is right as far as it reaches), 4 at a time, 400 per session, only while it
+  is open. The first activity is the beginning *and* the first of its sport: one milestone.
+  **What a source forgets is remembered** in `athlete_milestones` (`personal`,
+  `electron/recordsLedger.ts`, `records:list` / `records:remember`): VO2max past COROS's year,
+  nights past what a machine kept, finished plan runs (worked out in main from the plan cache
+  and the matches — `finished`, never `stopped`, 4+ weeks, 80%+ — dated at the last session).
+  The earliest day ever seen wins, a sighting that moves nothing is not a sync change, and the
+  window may write only VO2max and sleep. Remembered VO2max rows are fed back as readings, so
+  "five above your first" keeps its first. `test:records-ledger`.
+  **Computed in App, not in the screen** (`useHallOfRecords`): the rail's count and the
+  notifications need it on every screen. It is local reads only; the backfill and the place
+  names (through the globe's own `placeLabels` cache, busiest cells first, 40 a visit) run
+  only while the hall is open. **Notifications** (`recordsNotices.ts`, `useRecordsNotices`,
+  `LabourNotices.tsx` in the main bundle with `recordsNotices.css`): "N new" on the rail,
+  cleared by a visit that keeps them marked "New" while it lasts; a stage reached is a toast in
+  the app's stack, a labour completed one celebration dialog. What was told is
+  `heraclesrecords.records.notices.v1` (`personal`, so one machine's celebration is not
+  repeated on the other). **The first reckoning announces nothing** — that history was lived —
+  and waits for `settled` (every source answered once), or what arrived later would read as
+  new; a milestone older than 30 days is seen without a badge, a stage older than 14 days
+  announced without a toast. A title opens its session (no Open button) through
+  `openActivityFrom` in App, which the Library's trained sessions use too.
+  **Left out on purpose**: a strength 1RM stage (Lion III is 100 sessions — Hevy's sets are not
+  read here) and a sport other than the five families for firsts. Dev sample activities reach
+  the hall through the window's door like every other screen, so a run with them on marks
+  their milestones seen.
 - **Strength** (`strengthHistoryService`, `hevyService`, `strengthSessionMerge`) — COROS
   strength sessions merged with Hevy imports.
 - **Sync** (`electron/sync/`) — continuous two-way sync through Google Drive, so two
@@ -2244,9 +2301,9 @@ either since Watch Faces and Gear were removed — the first one to need them ag
 the flag.
 
 Styling is plain CSS with custom properties — no Tailwind, no CSS modules.
-`src/styles.css` (~28k lines) holds the design tokens and most rules; twelve feature
-stylesheets sit beside their components (strength ×3, training ×2, profile, running, cycling,
-sleep, training-library, activity globe, hiking). Fourteen in all, counting `fonts.css` — which is the number
+`src/styles.css` (~28k lines) holds the design tokens and most rules; fourteen feature
+stylesheets sit beside their components (strength ×3, training ×2, records ×2, profile, running,
+cycling, sleep, training-library, activity globe, hiking). Sixteen in all, counting `fonts.css` — which is the number
 the four CSS suites report. Themes are `dark` | `paper` via `src/theme/`, persisted to localStorage,
 and `THEME_WINDOW_BACKGROUND` must stay in sync with `--bg-base`. Sport colors live in both
 `src/styles.css` and `src/training/sportColors.ts` (the source of truth) —
@@ -2472,7 +2529,7 @@ neutralised, so the concept has to be reintroduced deliberately. A hardcoded `#8
 
 **The primary rail is an index, not a control panel.** `PRIMARY_NAV_SECTIONS`
 (`primaryNav.ts`) is four standing headings — Today, Plan, History, Your journey — over
-eleven destinations, and a heading is a label: it does not open, close or remember anything. The
+twelve destinations, and a heading is a label: it does not open, close or remember anything. The
 disclosure groups this replaced existed only because eighteen equal rows did not fit, and
 they cost two rows, a chevron, a stored open/closed state, a rule that reopened a group
 whenever the app navigated into it, and a second indicator key for a collapsed group's
