@@ -14,6 +14,10 @@ import type {
   RestoreResult as BackupRestoreResult
 } from "./backup/backupTypes";
 import type {
+  DiagnosticsSnapshot,
+  RendererDiagnosticError
+} from "./diagnosticsTypes";
+import type {
   ActivityDetailSummary,
   ActivityDetailSummarySync,
   BinaryStatus,
@@ -933,6 +937,14 @@ const api = {
     ipcRenderer.invoke("mcp:connect", id),
   getCorosMcpAccount: (): Promise<CorosMcpAccount> =>
     ipcRenderer.invoke("mcp:corosAccount"),
+  getDiagnostics: (): Promise<DiagnosticsSnapshot> =>
+    ipcRenderer.invoke("diagnostics:get"),
+  copyDiagnostics: (): Promise<DiagnosticsSnapshot> =>
+    ipcRenderer.invoke("diagnostics:copy"),
+  clearDiagnostics: (): Promise<DiagnosticsSnapshot> =>
+    ipcRenderer.invoke("diagnostics:clear"),
+  reportRendererError: (error: RendererDiagnosticError): void =>
+    ipcRenderer.send("diagnostics:rendererError", error),
   disconnectMcpServer: (id: string): Promise<void> =>
     ipcRenderer.invoke("mcp:disconnect", id),
   getMcpStatuses: (): Promise<McpServerStatus[]> =>

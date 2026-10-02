@@ -256,6 +256,15 @@ directions — a handler nothing invokes fails just as loudly as an invoke with 
 `npm run test:ipc-surface`.** Channels are namespaced `domain:verb` (`chat:`,
 `trainingHub:`, `analysis:`, `trainingLibrary:`, `places:`, …).
 
+**`ipcMain` in `main.ts` is not Electron's**: it is `diagnosticIpcMain`
+(`diagnosticsService.ts`), whose `handle` logs a failure — `cause` chain and all, before
+Electron flattens it to a message — to `<userData>/diagnostics/errors.json`, the log behind
+Settings → Error logs. That file is redacted before it is written (`diagnosticsLog.ts`:
+credentials, emails, paths, URL queries), holds 200 entries / 7 days / 512 KB, and is in no
+setting or localStorage key, so sync never sees it. The adapter has `handle` only; anything
+else (`on`, the renderer's `diagnostics:rendererError` send) lives in `diagnosticsService.ts`.
+`npm run test:diagnostics`.
+
 ### Data
 
 `electron/database.ts` is the single SQLite owner (`better-sqlite3`, in the Electron user

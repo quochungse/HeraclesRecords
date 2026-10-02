@@ -2,7 +2,6 @@ import {
   app,
   BrowserWindow,
   dialog,
-  ipcMain,
   Menu,
   net,
   powerMonitor,
@@ -10,6 +9,14 @@ import {
   session,
   shell
 } from "electron";
+import {
+  clearDiagnostics,
+  copyDiagnostics,
+  diagnosticIpcMain as ipcMain,
+  getDiagnostics,
+  initializeDiagnostics,
+  observeDiagnosticWindow
+} from "./diagnosticsService";
 import type { OpenDialogOptions } from "electron";
 import fs from "node:fs";
 import os from "node:os";
@@ -725,6 +732,8 @@ function createWindow(): void {
   // The window holds the app and nothing else. A link or a file dropped on it
   // used to navigate the frame there, handing the dropped page the preload
   // bridge.
+  observeDiagnosticWindow(mainWindow);
+
   mainWindow.webContents.on("will-navigate", (event, url) => {
     if (!isAppPageUrl(url)) event.preventDefault();
   });
@@ -897,6 +906,7 @@ app.whenReady().then(() => {
   // then stops opening runs — or signs out — keeps whatever is there for good.
   // A scan of a few thousand files costs a millisecond or two.
   sweepActivityDetailCache();
+  initializeDiagnostics(() => mainWindow);
   registerIpcHandlers();
   setJobListener((jobs) => {
     if (mainWindow && !mainWindow.isDestroyed()) {
@@ -2076,6 +2086,10 @@ function registerIpcHandlers(): void {
     connectMcpServerWithCorosAccount(id, true, mainWindow)
   );
   ipcMain.handle("mcp:corosAccount", () => getCorosMcpAccount());
+
+  ipcMain.handle("diagnostics:get", (event) => getDiagnostics(event));
+  ipcMain.handle("diagnostics:copy", (event) => copyDiagnostics(event));
+  ipcMain.handle("diagnostics:clear", (event) => clearDiagnostics(event));
   ipcMain.handle("mcp:disconnect", async (_event, id: string) => {
     const server = getMcpServer(id);
     await disconnectMcpServer(id);

@@ -13,6 +13,10 @@ import type {
   RestoreResult as BackupRestoreResult
 } from "../electron/backup/backupTypes";
 import type {
+  DiagnosticsSnapshot,
+  RendererDiagnosticError
+} from "../electron/diagnosticsTypes";
+import type {
   BinaryStatus,
   CoachAnalysisSessionAttention,
   CombinedDownloadProgressEvent,
@@ -651,6 +655,10 @@ export interface HeraclesRecordsApi {
   removeMcpServer: (id: string) => Promise<void>;
   connectMcpServer: (id: string) => Promise<McpServerStatus>;
   getCorosMcpAccount: () => Promise<CorosMcpAccount>;
+  getDiagnostics: () => Promise<DiagnosticsSnapshot>;
+  copyDiagnostics: () => Promise<DiagnosticsSnapshot>;
+  clearDiagnostics: () => Promise<DiagnosticsSnapshot>;
+  reportRendererError: (error: RendererDiagnosticError) => void;
   disconnectMcpServer: (id: string) => Promise<void>;
   getMcpStatuses: () => Promise<McpServerStatus[]>;
   /** Silent reconnect from stored auth; never opens an OAuth window. */

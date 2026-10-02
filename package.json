@@ -47,6 +47,7 @@
     "test:ride-metrics": "cross-env ELECTRON_RUN_AS_NODE=1 electron --experimental-strip-types --import ./scripts/register-ts-ext.mjs scripts/test-ride-metrics.mjs",
     "test:hike-metrics": "cross-env ELECTRON_RUN_AS_NODE=1 electron --experimental-strip-types --import ./scripts/register-ts-ext.mjs scripts/test-hike-metrics.mjs",
     "test:globe-framing": "cross-env ELECTRON_RUN_AS_NODE=1 electron --experimental-strip-types scripts/test-globe-framing.mjs",
+    "test:diagnostics": "npm run build:electron && node scripts/test-diagnostics.mjs",
     "test:design-vocabulary": "node scripts/test-design-vocabulary.mjs",
     "test:elevation": "node scripts/test-elevation.mjs",
     "test:css-tokens": "node scripts/test-css-tokens.mjs",

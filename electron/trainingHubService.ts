@@ -47,6 +47,7 @@ import {
   upsertTrainingActivities
 } from "./database";
 import { getSecretSetting, setSecretSetting } from "./secretSettings";
+import { annotateDiagnosticRequest } from "./diagnosticsLog";
 import { simplifyRoute } from "./routeSimplification";
 import { buildRpeDistribution, dailyRpeLoad } from "./rpeLoad";
 import type {
@@ -8410,16 +8411,21 @@ async function fetchJson<T>(
   options: RequestInit,
   fetchOptions?: { allowEmptyData?: boolean; contextPath?: string }
 ): Promise<T> {
-  const response = await fetch(url, options);
-  if (!response.ok) {
-    throw new Error(
-      `COROS API request failed: ${response.status} ${response.statusText}`
-    );
-  }
+  try {
+    const response = await fetch(url, options);
+    if (!response.ok) {
+      throw new Error(
+        `COROS API request failed: ${response.status} ${response.statusText}`
+      );
+    }
 
-  const payload = (await response.json()) as TrainingHubApiResponse<T>;
-  const data = parseTrainingHubApiResponse<T>(payload, fetchOptions);
-  return data as T;
+    const payload = (await response.json()) as TrainingHubApiResponse<T>;
+    const data = parseTrainingHubApiResponse<T>(payload, fetchOptions);
+    return data as T;
+  } catch (error) {
+    // Which endpoint failed, for the error log; its query is cut when written.
+    throw annotateDiagnosticRequest(error, options.method ?? "GET", url);
+  }
 }
 
 function getStoredAuth(): TrainingHubAuthState | null {
