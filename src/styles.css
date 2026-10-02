@@ -2224,6 +2224,7 @@ input::placeholder {
 .strength-title h2,
 .activities-head h2,
 .training-map-page-header h1,
+.records-page-header h1,
 .tl-masthead h1,
 .calendar-headline {
   font-family: var(--font-title);

@@ -64,7 +64,8 @@ const ladder = computeRecords({
 });
 
 assert.equal(find(ladder, "start").activity.activityId, firstRun.activityId, "the beginning is the oldest activity, whatever order they arrive in");
-assert.ok(find(ladder, "first:run"));
+assert.equal(find(ladder, "first:run"), undefined, "the beginning is also the first run — one milestone, not two");
+assert.equal(find(ladder, "start").sport, "run");
 assert.equal(find(ladder, "first:ride").labour.id, "birds", "a first ride is the Birds' first stage");
 assert.deepEqual(find(ladder, "first:swim").labour, { id: "hydra", stage: 1 });
 assert.ok(find(ladder, "first:openwater"), "an open-water swim is a first of its own");
@@ -181,27 +182,27 @@ const prs = computeRecords({
 const prIds = ids(prs).filter((id) => id.startsWith("pr:"));
 assert.deepEqual(
   prIds,
-  [`pr:5000:${r2.activityId}`, `pr:10000:${r3.activityId}`, `pr:21097.5:${r4.activityId}`],
-  "a first effort at a distance beats nothing; each later one that is faster is a record"
+  [`pr:${r2.activityId}`, `pr:${r3.activityId}`, `pr:${r4.activityId}`],
+  "a first effort at a distance beats nothing; each later run that is faster is a record"
 );
 assert.equal(
-  find(prs, `pr:5000:${r2.activityId}`).title,
+  find(prs, `pr:${r2.activityId}`).title,
   "New 5K record — 23:50",
   "COROS's figure stands in for ours where it names the same run"
 );
-assert.ok(!prIds.includes(`pr:5000:${glitch.activityId}`), "an effort far under COROS's own record is a GPS fault");
-assert.deepEqual(find(prs, `pr:5000:${r2.activityId}`).labour, { id: "mares", stage: 1 });
+assert.ok(!prIds.includes(`pr:${glitch.activityId}`), "an effort far under COROS's own record is a GPS fault");
+assert.deepEqual(find(prs, `pr:${r2.activityId}`).labour, { id: "mares", stage: 1 });
 assert.deepEqual(
-  find(prs, `pr:10000:${r3.activityId}`).labour,
+  find(prs, `pr:${r3.activityId}`).labour,
   { id: "mares", stage: 3 },
   "the 10K record had stood over a year"
 );
 assert.deepEqual(
-  find(prs, `pr:21097.5:${r4.activityId}`).labour,
+  find(prs, `pr:${r4.activityId}`).labour,
   { id: "mares", stage: 2 },
   "the half completes the set of three"
 );
-assert.match(find(prs, `pr:21097.5:${r4.activityId}`).detail, /^17:09 faster than the record from 26 Apr 2025/);
+assert.match(find(prs, `pr:${r4.activityId}`).detail, /^17:09 faster than the record from 26 Apr 2025/);
 
 const corosOnly = computeRecords({
   ...base,
@@ -210,12 +211,43 @@ const corosOnly = computeRecords({
     { type: 4, label: "All", records: [{ type: 5, label: "5K", duration: 1430, happenDay: "20250614", activityId: r2.activityId }] }
   ]
 });
+const current = find(corosOnly, `record:5000:${r2.activityId}`);
 assert.equal(
-  find(corosOnly, `pr:5000:${r2.activityId}`).title,
+  current.title,
   "Your 5K record — 23:50",
   "before any backfill, COROS's current record is still on the timeline"
 );
-assert.equal(find(corosOnly, `pr:5000:${r2.activityId}`).labour, undefined, "but it improved nothing, so it is no labour stage");
+assert.equal(current.labour, undefined, "but it improved nothing, so it is no labour stage");
+
+// A beginner breaks a record every other run. The first four weeks at a
+// distance set the bar; a gain under 1% is noise; one run's records are one
+// milestone.
+const b1 = activity(at(2026, 7, 9), 100);
+const b2 = activity(at(2026, 7, 15), 100);
+const b3 = activity(at(2026, 8, 18), 100);
+const b4 = activity(at(2026, 8, 25), 100);
+const beginner = computeRecords({
+  ...base,
+  activities: [b1, b2, b3, b4],
+  summaries: new Map([
+    [b1.activityId, { recordsVersion: 1, bestEfforts: [{ distance: 1000, seconds: 400 }, { distance: 5000, seconds: 2200 }] }],
+    [b2.activityId, { recordsVersion: 1, bestEfforts: [{ distance: 1000, seconds: 380 }, { distance: 5000, seconds: 2100 }] }],
+    [b3.activityId, { recordsVersion: 1, bestEfforts: [{ distance: 1000, seconds: 350 }, { distance: 5000, seconds: 1900 }] }],
+    [b4.activityId, { recordsVersion: 1, bestEfforts: [{ distance: 1000, seconds: 348 }, { distance: 5000, seconds: 1800 }] }]
+  ])
+});
+assert.deepEqual(
+  ids(beginner).filter((id) => id.startsWith("pr:")),
+  [`pr:${b3.activityId}`, `pr:${b4.activityId}`],
+  "nothing in the first four weeks at a distance"
+);
+assert.equal(find(beginner, `pr:${b3.activityId}`).title, "New 1K and 5K records", "one run, one milestone");
+assert.match(find(beginner, `pr:${b3.activityId}`).detail, /^1K 5:50 · 5K 31:40$/);
+assert.equal(
+  find(beginner, `pr:${b4.activityId}`).title,
+  "New 5K record — 30:00",
+  "2 s off a 5:50 kilometre is under 1%, so only the 5K counts"
+);
 
 // --- VO2max, and what is remembered ---------------------------------------------------------------
 
@@ -396,5 +428,88 @@ const miles = computeRecords({
 });
 assert.ok(find(miles, "lifetime:run:100mi"), "a lifetime distance is counted in the athlete's own unit");
 assert.equal(dayOfEpochSeconds(at(2026, 1, 1)), "20260101");
+
+// --- The timeline's layout -----------------------------------------------------------------------------
+
+const timeline = await import(moduleUrl("records", "timelineModel.ts"));
+const spread = [];
+for (let month = 1; month <= 12; month += 1) {
+  spread.push(activity(at(2025, month, 3), 100, { distance: 4000 }));
+}
+for (let month = 1; month <= 9; month += 1) {
+  spread.push(activity(at(2026, month, 3), 200, { distance: 4000 }));
+}
+// Milestones in every month: anniversaries and strength firsts are not enough,
+// so stamp one row a month by hand.
+const monthly = computeRecords({ ...base, activities: spread }).milestones.concat(
+  spread.map((entry, index) => ({
+    id: `m${index}`,
+    category: "streak",
+    day: dayOfEpochSeconds(entry.startTime),
+    at: entry.startTime,
+    kind: "Streak",
+    title: `Row ${index}`,
+    major: false
+  }))
+);
+const years = timeline.groupTimeline(monthly);
+assert.deepEqual(years.map((year) => year.year), ["2026", "2025"], "newest year first");
+assert.equal(years[0].months[0].key, "202609", "newest month first");
+const folded = timeline.foldTimeline(years, new Set());
+const open2026 = folded[0].blocks.filter((block) => block.kind === "month").map((block) => block.month.key);
+assert.deepEqual(open2026, ["202609", "202608", "202607", "202606"], "the newest four months are open");
+const gap2026 = folded[0].blocks.find((block) => block.kind === "gap");
+assert.equal(gap2026.label, "May – January");
+const blocks2025 = folded[1].blocks;
+assert.equal(blocks2025[blocks2025.length - 1].kind, "month", "the month the beginning sits in stays open");
+assert.ok(
+  blocks2025[blocks2025.length - 1].month.milestones.some((milestone) => milestone.id === "start")
+);
+assert.equal(blocks2025[0].kind, "gap", "the rest of that year folds into one line");
+const reopened = timeline.foldTimeline(years, new Set([gap2026.id]));
+assert.equal(
+  reopened[0].blocks.filter((block) => block.kind === "month").length,
+  9,
+  "an opened gap draws its months"
+);
+
+const crowded = {
+  key: "202609",
+  label: "September",
+  milestones: Array.from({ length: 7 }, (_, index) => ({
+    id: `r${index}`,
+    category: "lifetime",
+    day: "20260910",
+    at: 100 - index,
+    kind: "Lifetime",
+    title: `Row ${index}`,
+    major: index === 5
+  }))
+};
+const entries = timeline.visibleInMonth(crowded, false);
+const drawn = entries.filter((entry) => entry.kind === "milestone").map((entry) => entry.milestone.id);
+assert.deepEqual(drawn, ["r0", "r1", "r2", "r3", "r5"], "every card and four rows");
+const more = entries.find((entry) => entry.kind === "more");
+assert.deepEqual(more.hidden.map((milestone) => milestone.id), ["r4", "r6"]);
+assert.equal(entries.indexOf(more), 4, "the fold sits where its first row would have been");
+assert.ok(timeline.visibleInMonth(crowded, true).every((entry) => entry.kind === "milestone"));
+
+// The beginning closes its month, whatever else that day held — and a fold
+// never lands after it.
+const opening = timeline.groupTimeline([
+  { id: "start", category: "first", day: "20250709", at: 100, kind: "The beginning", title: "Start", major: false },
+  ...Array.from({ length: 6 }, (_, index) => ({
+    id: `x${index}`, category: "record", day: "20250709", at: 50 + index, kind: "Record", title: `X${index}`, major: false
+  }))
+])[0].months[0];
+assert.equal(opening.milestones[opening.milestones.length - 1].id, "start");
+const openingEntries = timeline.visibleInMonth(opening, false);
+assert.equal(openingEntries[openingEntries.length - 1].milestone?.id, "start");
+
+assert.deepEqual(
+  timeline.filtersInUse(monthly),
+  ["all", "firsts", "totals", "streaks"],
+  "only filters with something behind them"
+);
 
 console.log("records: OK");

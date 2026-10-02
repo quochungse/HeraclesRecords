@@ -338,6 +338,10 @@ const COROS_ALL_TIME_GROUP = 4;
 const EFFORT_FLOOR_OF_COROS_RECORD = 0.97;
 /** The three records the Mares' second stage asks to have improved. */
 const MARES_SET = [5000, 10000, 21097.5];
+/** How long a distance's first efforts set the bar before beating it is news. */
+const RECORD_SETTLE_DAYS = 28;
+/** And how much it has to be beaten by: a 1% gain on a 25-minute 5K is 15 s. */
+const RECORD_MIN_GAIN = 0.01;
 
 // --- Days -------------------------------------------------------------------
 
@@ -585,23 +589,30 @@ export function computeRecords(input: RecordsInput): RecordsResult {
     const ref = activityRef(activity);
     const line = activityLine(activity, unitSystem);
 
+    const sessions = (countBySport.get(sport) ?? 0) + 1;
+    countBySport.set(sport, sessions);
+    let firedHere = false;
+    const isFirstOfSport = sessions === 1;
+
     if (activityCount === 0) {
+      // The very first activity is the beginning, and it is also the first of
+      // its sport: one milestone, not two, carrying the labour stage a first
+      // of that sport reaches.
+      if (sport !== "other") firstBySport.add(sport);
       emit.push({
         id: "start",
         category: "first",
         day,
-        at: startTime,
+        at: startTime - 1,
         kind: "The beginning",
         title: "Your first activity on COROS",
         detail: [activity.sportName ?? SPORT_NOUN[sport], line].filter(Boolean).join(" · "),
         sport,
-        activity: ref
+        activity: ref,
+        ...(FIRST_LABOUR[sport] ? { labour: FIRST_LABOUR[sport] } : {})
       });
+      firedHere = true;
     }
-
-    const sessions = (countBySport.get(sport) ?? 0) + 1;
-    countBySport.set(sport, sessions);
-    let firedHere = false;
 
     if (sport !== "other" && !firstBySport.has(sport)) {
       firstBySport.add(sport);
@@ -641,6 +652,9 @@ export function computeRecords(input: RecordsInput): RecordsResult {
       const key = `${sport}:${step.key}`;
       if (ladderReached.has(key) || distance < step.distance * LADDER_TOLERANCE) continue;
       ladderReached.add(key);
+      // A first run that is also a first 10K is one milestone, not two; a
+      // first that reaches a labour stage or a card's distance still says so.
+      if (isFirstOfSport && !step.major && !step.labour) continue;
       const previous = longestBySport.get(sport) ?? 0;
       emit.push({
         id: `distance:${key}`,
@@ -1145,108 +1159,36 @@ function recordMilestones(
   const progress = new Map<string, StageProgress>();
   const coros = corosAllTimeRecords(input.personalRecords);
   const best = new Map<number, { seconds: number; day: string }>();
+  const firstEffort = new Map<number, string>();
   const improved = new Set<number>();
   let maresFirst = false;
   let maresSet = false;
   let maresYear = false;
-
-  const recordTitle = (distance: number, seconds: number) => {
-    const label = RECORD_DISTANCES.find((entry) => entry.distance === distance)?.label ?? `${distance} m`;
-    return `New ${label} record — ${formatDurationSeconds(seconds)}`;
-  };
-
-  const improvement = (
-    distance: number,
-    seconds: number,
-    day: string,
-    at: number,
-    activity: Pick<TrainingHubActivity, "activityId" | "sportType" | "startTime"> | undefined,
-    source: "effort" | "coros"
-  ) => {
-    const previous = best.get(distance);
-    if (previous && seconds >= previous.seconds) return;
-    best.set(distance, { seconds, day });
-    const ref = activity
-      ? {
-          activity: {
-            activityId: activity.activityId,
-            sportType: activity.sportType,
-            ...(activity.startTime ? { startTime: activity.startTime } : {})
-          }
-        }
-      : {};
-    if (!previous) {
-      // The first effort at a distance beats nothing, so it is no record — but
-      // COROS's own current record is shown however little history the
-      // backfill has reached, since it is the one the athlete has seen.
-      if (source === "coros") {
-        const label = RECORD_DISTANCES.find((entry) => entry.distance === distance)?.label ?? "";
-        milestones.push({
-          id: `pr:${distance}:${activity?.activityId ?? day}`,
-          category: "record",
-          day,
-          at,
-          kind: "Record · Running",
-          title: `Your ${label} record — ${formatDurationSeconds(seconds)}`,
-          detail: "COROS's current record",
-          sport: "run",
-          major: false,
-          ...ref
-        });
-      }
-      return;
-    }
-    improved.add(distance);
-    const stood = daysBetween(previous.day, day);
-    let labour: MilestoneLabour | undefined;
-    if (!maresFirst) {
-      maresFirst = true;
-      labour = withStage(labour, "mares", 1);
-    }
-    if (!maresSet && MARES_SET.every((entry) => improved.has(entry))) {
-      maresSet = true;
-      labour = withStage(labour, "mares", 2);
-    }
-    if (!maresYear && stood >= 365) {
-      maresYear = true;
-      labour = withStage(labour, "mares", 3);
-    }
-    milestones.push({
-      id: `pr:${distance}:${activity?.activityId ?? day}`,
-      category: "record",
-      day,
-      at,
-      kind: "Record · Running",
-      title: recordTitle(distance, seconds),
-      detail: `${formatGap(previous.seconds - seconds)} faster than the record from ${formatDayShort(previous.day)}${
-        source === "coros" ? " · COROS's own record" : ""
-      }`,
-      sport: "run",
-      major: distance >= 21097.5,
-      ...ref,
-      ...(labour ? { labour } : {})
-    });
-  };
+  const labelOf = (distance: number) =>
+    RECORD_DISTANCES.find((entry) => entry.distance === distance)?.label ?? `${distance} m`;
 
   // Every effort, in the order it was run.
-  const efforts: Array<{
+  type Entry = {
     distance: number;
     seconds: number;
     day: string;
     at: number;
     activity: TrainingHubActivity;
-  }> = [];
+    source: "effort" | "coros";
+  };
+  const entries: Entry[] = [];
   for (const activity of activities) {
     const summary = input.summaries.get(activity.activityId);
     for (const effort of summary?.bestEfforts ?? ([] as BestEffort[])) {
       const record = coros.get(effort.distance);
       if (record && effort.seconds < record.seconds * EFFORT_FLOOR_OF_COROS_RECORD) continue;
-      efforts.push({
+      entries.push({
         distance: effort.distance,
         seconds: effort.seconds,
         day: dayOfEpochSeconds(activity.startTime as number),
         at: (activity.startTime as number) + 20,
-        activity
+        activity,
+        source: "effort"
       });
     }
   }
@@ -1255,15 +1197,13 @@ function recordMilestones(
   // have been — and in place of ours where it names the same activity, since
   // COROS's figure is the one the athlete has seen.
   const byId = new Map(activities.map((activity) => [activity.activityId, activity]));
-  type Entry = (typeof efforts)[number] & { source: "effort" | "coros" };
-  const entries: Entry[] = efforts.map((effort) => ({ ...effort, source: "effort" }));
   for (const [distance, record] of coros) {
-    const at = entries.findIndex(
+    const index = entries.findIndex(
       (entry) => entry.distance === distance && entry.activity.activityId === record.activityId
     );
     const activity = record.activityId ? byId.get(record.activityId) : undefined;
-    if (at >= 0) {
-      entries[at] = { ...entries[at], seconds: record.seconds, source: "coros" };
+    if (index >= 0) {
+      entries[index] = { ...entries[index], seconds: record.seconds, source: "coros" };
     } else if (activity) {
       entries.push({
         distance,
@@ -1276,8 +1216,100 @@ function recordMilestones(
     }
   }
   entries.sort((left, right) => left.day.localeCompare(right.day) || left.at - right.at);
+
+  // Improvements, gathered per run: one run that sets three records is one
+  // milestone, not three.
+  type Gain = { distance: number; seconds: number; previous: { seconds: number; day: string }; source: Entry["source"] };
+  const gains = new Map<string, { entry: Entry; gains: Gain[] }>();
   for (const entry of entries) {
-    improvement(entry.distance, entry.seconds, entry.day, entry.at, entry.activity, entry.source);
+    const previous = best.get(entry.distance);
+    if (previous && entry.seconds >= previous.seconds) continue;
+    best.set(entry.distance, { seconds: entry.seconds, day: entry.day });
+    if (!firstEffort.has(entry.distance)) firstEffort.set(entry.distance, entry.day);
+
+    if (!previous) {
+      // The first effort at a distance beats nothing, so it is no record — but
+      // COROS's own current record is shown however little history the
+      // backfill has reached, since it is the one the athlete has seen.
+      if (entry.source === "coros") {
+        milestones.push({
+          id: `record:${entry.distance}:${entry.activity.activityId}`,
+          category: "record",
+          day: entry.day,
+          at: entry.at,
+          kind: "Record · Running",
+          title: `Your ${labelOf(entry.distance)} record — ${formatDurationSeconds(entry.seconds)}`,
+          detail: "COROS's current record",
+          sport: "run",
+          major: false,
+          activity: activityRef(entry.activity)
+        });
+      }
+      continue;
+    }
+    // A record a beginner breaks every other run is no milestone: the first
+    // four weeks at a distance set the bar, and a sliver under it is noise.
+    const settled = daysBetween(firstEffort.get(entry.distance) as string, entry.day) >= RECORD_SETTLE_DAYS;
+    const meaningful = (previous.seconds - entry.seconds) / previous.seconds >= RECORD_MIN_GAIN;
+    if (!settled || !meaningful) continue;
+    const key = entry.activity.activityId;
+    const group = gains.get(key) ?? { entry, gains: [] };
+    group.gains.push({ distance: entry.distance, seconds: entry.seconds, previous, source: entry.source });
+    gains.set(key, group);
+  }
+
+  const groups = [...gains.values()].sort(
+    (left, right) => left.entry.day.localeCompare(right.entry.day) || left.entry.at - right.entry.at
+  );
+  for (const { entry, gains: list } of groups) {
+    list.sort((left, right) => left.distance - right.distance);
+    let labour: MilestoneLabour | undefined;
+    for (const gain of list) {
+      improved.add(gain.distance);
+      if (!maresYear && daysBetween(gain.previous.day, entry.day) >= 365) {
+        maresYear = true;
+        labour = withStage(labour, "mares", 3);
+      }
+    }
+    if (!maresFirst) {
+      maresFirst = true;
+      labour = withStage(labour, "mares", 1);
+    }
+    if (!maresSet && MARES_SET.every((distance) => improved.has(distance))) {
+      maresSet = true;
+      labour = withStage(labour, "mares", 2);
+    }
+    const labels = list.map((gain) => labelOf(gain.distance));
+    const named =
+      labels.length === 1
+        ? labels[0]
+        : `${labels.slice(0, -1).join(", ")} and ${labels[labels.length - 1]}`;
+    const describe = (gain: Gain) =>
+      `${formatGap(gain.previous.seconds - gain.seconds)} faster than the record from ${formatDayShort(gain.previous.day)}`;
+    milestones.push({
+      id: `pr:${entry.activity.activityId}`,
+      category: "record",
+      day: entry.day,
+      at: entry.at,
+      kind: "Record · Running",
+      title:
+        list.length === 1
+          ? `New ${named} record — ${formatDurationSeconds(list[0].seconds)}`
+          : `New ${named} records`,
+      detail:
+        list.length === 1
+          ? `${describe(list[0])}${list[0].source === "coros" ? " · COROS's own record" : ""}`
+          : list
+              .map((gain) => `${labelOf(gain.distance)} ${formatDurationSeconds(gain.seconds)}`)
+              .join(" · "),
+      ...(list.length > 1
+        ? { context: list.map((gain) => `${labelOf(gain.distance)}: ${describe(gain)}.`).join(" ") }
+        : {}),
+      sport: "run",
+      major: list.some((gain) => gain.distance >= 21097.5),
+      activity: activityRef(entry.activity),
+      ...(labour ? { labour } : {})
+    });
   }
 
   // Progress: the Mares' open stages.
@@ -1292,14 +1324,12 @@ function recordMilestones(
     if (!oldest || record.day < oldest.day) oldest = { distance, day: record.day };
   }
   if (oldest) {
-    const label = RECORD_DISTANCES.find((entry) => entry.distance === oldest.distance)?.label ?? "";
     const age = daysBetween(oldest.day, today);
-    const birthday = addDays(oldest.day, 365);
     progress.set(labourStageKey("mares", 3), {
       text:
         age >= 365
-          ? `Your ${label} record has stood since ${formatDayShort(oldest.day)}`
-          : `Your ${label} record turns one on ${formatDayShort(birthday)}`,
+          ? `Your ${labelOf(oldest.distance)} record has stood since ${formatDayShort(oldest.day)}`
+          : `Your ${labelOf(oldest.distance)} record turns one on ${formatDayShort(addDays(oldest.day, 365))}`,
       ratio: Math.min(1, age / 365)
     });
   }

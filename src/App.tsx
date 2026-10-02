@@ -72,6 +72,7 @@ import { SettingsView } from "./settings/SettingsView";
 import { useTimeOfDayGreeting } from "./hooks/useTimeOfDayGreeting";
 import { selectOverviewGreeting } from "./overviewGreeting";
 import { useUnitSystem } from "./units/UnitSystemProvider";
+import { useHallOfRecords } from "./records/useHallOfRecords";
 import appLogo from "../build/icon.png";
 import changelogMarkdown from "../CHANGELOG.md?raw";
 
@@ -176,6 +177,11 @@ const LazyTrainingMapView = lazy(() =>
     default: TrainingMapView,
   })),
 );
+const LazyHallOfRecordsView = lazy(() =>
+  import("./records/HallOfRecordsView").then(({ HallOfRecordsView }) => ({
+    default: HallOfRecordsView,
+  })),
+);
 
 function DeferredSurfaceFallback({ label }: { label: string }) {
   return (
@@ -259,6 +265,7 @@ function getLatestReleasePreview(changelog: string): {
 }
 
 const DEV_UPDATE_PREVIEW = getLatestReleasePreview(changelogMarkdown);
+const EMPTY_ID_SET: ReadonlySet<string> = new Set();
 const TRAINING_HISTORY_PAGE_SIZE = 100;
 const TRAINING_HISTORY_MAX_PAGES = 100;
 
@@ -1516,6 +1523,22 @@ export default function App() {
     trainingHubDailyHealthData,
   ]);
 
+  const { unitSystem } = useUnitSystem();
+  /*
+   * The Hall of Records is worked out here rather than in its screen: the
+   * rail's "new" count and the labour notifications have to know what was
+   * reached while the athlete is somewhere else. It is all local reads; what
+   * costs a request runs only while the screen is open.
+   */
+  const hallOfRecords = useHallOfRecords({
+    api,
+    activities: trainingHubActivities,
+    activitiesStatus: trainingHubActivitiesStatus,
+    snapshot: trainingHubSnapshot,
+    connected: Boolean(trainingHubStatus?.authenticated),
+    unitSystem,
+  });
+
   // Kick the RPE backfill and poll until the window is fully fetched, merging
   // freshly-cached sRPE into the daily metrics so the trend chart's RPE series
   // fills in live.
@@ -1610,6 +1633,34 @@ export default function App() {
     setSportScreenRequest(request);
     setActiveView(request.view);
     return true;
+  }
+
+  /*
+   * An activity opened from another screen — a session the Library's plan
+   * was trained as, a milestone in the Hall of Records: on the screen built for
+   * its sport, the way Activities hands one over, and in Activities itself for
+   * a swim, anything else with no screen of its own, or a sport whose screen
+   * the athlete took off the rail.
+   */
+  function openActivityFrom(activityId: string, from: PrimaryView) {
+    const activity = trainingHubActivities.find(
+      (candidate) => candidate.activityId === activityId
+    );
+    const view = activity ? sportScreenFor(activity.sportType) : null;
+    if (
+      activity &&
+      view &&
+      openSportScreen({ view, activityId, startTime: activity.startTime, from })
+    ) {
+      return;
+    }
+    if (activity) {
+      void handleTrainingHubActivityDetail(activity);
+      setActiveView("training");
+    } else {
+      setMessage("That activity is not in the loaded history yet. Opening Activities.");
+      setActiveView("training");
+    }
   }
 
   function handleDevelopmentViewToggle() {
@@ -1817,35 +1868,9 @@ export default function App() {
                     onMessage={setMessage}
                     onError={setError}
                     onScheduleChanged={handleExternalScheduleChange}
-                    /*
-                     * A planned session that was trained, opened as the activity
-                     * it became — on the screen built for its sport, the way
-                     * Activities hands one over, and in Activities itself for a
-                     * swim, anything else with no screen of its own, or a sport
-                     * whose screen the athlete took off the rail.
-                     */
-                    onOpenActivity={(activityId) => {
-                      const activity = trainingHubActivities.find(
-                        (candidate) => candidate.activityId === activityId
-                      );
-                      const view = activity
-                        ? sportScreenFor(activity.sportType)
-                        : null;
-                      if (
-                        activity &&
-                        view &&
-                        openSportScreen({ view, activityId, startTime: activity.startTime, from: "library" })
-                      ) {
-                        return;
-                      }
-                      if (activity) {
-                        void handleTrainingHubActivityDetail(activity);
-                        setActiveView("training");
-                      } else {
-                        setMessage("That activity is not in the loaded history yet. Opening Activities.");
-                        setActiveView("training");
-                      }
-                    }}
+                    /* A planned session that was trained, opened as the
+                       activity it became. */
+                    onOpenActivity={(activityId) => openActivityFrom(activityId, "library")}
                   />
                 </Suspense>
               </TrainingLibraryErrorBoundary>
@@ -1986,6 +2011,23 @@ export default function App() {
                   connected={Boolean(trainingHubStatus?.authenticated)}
                   detail={trainingHubActivityDetail}
                   onSelectActivity={handleTrainingHubActivityDetail}
+                  onOpenOverview={() => setActiveView("overview")}
+                />
+              </Suspense>
+            ) : null}
+            {activeView === "records" ? (
+              <Suspense
+                fallback={<DeferredSurfaceFallback label="Hall of Records" />}
+              >
+                <LazyHallOfRecordsView
+                  api={api}
+                  records={hallOfRecords}
+                  activities={trainingHubActivities}
+                  connected={Boolean(trainingHubStatus?.authenticated)}
+                  newIds={EMPTY_ID_SET}
+                  onOpenActivity={(activity) =>
+                    openActivityFrom(activity.activityId, "records")
+                  }
                   onOpenOverview={() => setActiveView("overview")}
                 />
               </Suspense>
