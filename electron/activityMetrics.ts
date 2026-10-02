@@ -12,9 +12,11 @@
 
 import type {
   ActivityDetailSummary,
+  BestEffort,
   TrainingHubActivityDetail,
   TrainingHubActivityPause,
-  TrainingHubActivitySeriesPoint
+  TrainingHubActivitySeriesPoint,
+  TrainingHubTrackPoint
 } from "./types";
 
 const METERS_PER_KM = 1000;
@@ -30,6 +32,35 @@ const HR_BUCKET_COUNT = 6;
  * no drift percentage, because nothing about it looks wrong.
  */
 export const ACTIVITY_SUMMARY_VERSION = 2;
+
+/**
+ * The Hall of Records' share of a summary — best efforts and a start point —
+ * versioned apart from the figures above. Bumping `ACTIVITY_SUMMARY_VERSION`
+ * to add them would have withheld every stored zone split and drift figure on
+ * Running, Cycling and Activities until each run was fetched again; this way a
+ * row keeps serving those while the records backfill fills in the rest.
+ */
+export const RECORDS_SUMMARY_VERSION = 1;
+
+/** 1K, 5K, 10K, half and full marathon, in metres. */
+export const BEST_EFFORT_DISTANCES: readonly number[] = [
+  1000, 5000, 10000, 21097.5, 42195
+];
+
+/**
+ * Faster than this over a stretch is the GPS jumping, not the athlete running:
+ * 7.6 m/s is 2:12/km, the world record over 1 000 m. A watch that loses its fix
+ * under a bridge and finds it 300 m on would otherwise hand that run a 1K no
+ * one has ever run.
+ */
+const MAX_PLAUSIBLE_RUN_SPEED = 7.6;
+
+/**
+ * Outdoor runs, track included. An indoor run's distance is the footpod's or
+ * the wrist's estimate, which is a calibration rather than a measurement, so a
+ * treadmill session never sets a record here.
+ */
+const BEST_EFFORT_SPORT_TYPES: ReadonlySet<number> = new Set([100, 102, 103]);
 
 function positive(value: number | undefined): number | undefined {
   return typeof value === "number" && Number.isFinite(value) && value > 0
@@ -249,10 +280,126 @@ export function hrZoneSeconds(
   return scored ? seconds : undefined;
 }
 
+/**
+ * The fastest stretch over each distance, on activity time.
+ *
+ * Two pointers over the cumulative distance: for every sample taken as the end
+ * of a stretch, the start moves up to the last sample that still leaves the
+ * distance covered, and the exact start is interpolated between it and the
+ * next. Interpolating the start alone keeps the figure a whisker generous on a
+ * sparse series rather than a whole sample interval slow.
+ *
+ * Pass the series on activity time (`withPausesRemoved`) — on the wall clock a
+ * wait at a crossing is part of the stretch. A distance the run never covered
+ * has no entry, and neither has one the GPS could only have covered by jumping.
+ */
+export function bestEfforts(
+  series: readonly TrainingHubActivitySeriesPoint[] | undefined,
+  distances: readonly number[] = BEST_EFFORT_DISTANCES
+): BestEffort[] {
+  const times: number[] = [];
+  const dists: number[] = [];
+  let furthest = 0;
+  for (const point of series ?? []) {
+    const elapsed = point.elapsed;
+    const distance = point.distance;
+    if (
+      typeof elapsed !== "number" ||
+      typeof distance !== "number" ||
+      !Number.isFinite(elapsed) ||
+      !Number.isFinite(distance) ||
+      elapsed < 0 ||
+      distance < 0
+    ) {
+      continue;
+    }
+    if (times.length > 0 && elapsed < times[times.length - 1]) {
+      continue;
+    }
+    // Cumulative distance never goes back; a sample that reads less than one
+    // before it is a correction, and holding the furthest keeps the pointers
+    // honest.
+    furthest = Math.max(furthest, distance);
+    times.push(elapsed);
+    dists.push(furthest);
+  }
+
+  if (times.length < 2) {
+    return [];
+  }
+
+  const efforts: BestEffort[] = [];
+  for (const target of distances) {
+    if (dists[dists.length - 1] - dists[0] < target) {
+      continue;
+    }
+    let best = Number.POSITIVE_INFINITY;
+    let start = 0;
+    for (let end = 1; end < times.length; end += 1) {
+      while (start + 1 < end && dists[end] - dists[start + 1] >= target) {
+        start += 1;
+      }
+      const covered = dists[end] - dists[start];
+      if (covered < target) {
+        continue;
+      }
+      // The start lies between `start` and `start + 1`: as late as it can be
+      // while the stretch still measures the whole distance.
+      const from = dists[end] - target;
+      const next = start + 1;
+      const span = dists[next] - dists[start];
+      const startTime =
+        next <= end && span > 0
+          ? times[start] + ((from - dists[start]) / span) * (times[next] - times[start])
+          : times[start];
+      const seconds = times[end] - startTime;
+      if (seconds > 0 && seconds < best) {
+        best = seconds;
+      }
+    }
+    if (Number.isFinite(best) && target / best <= MAX_PLAUSIBLE_RUN_SPEED) {
+      efforts.push({ distance: target, seconds: Math.round(best * 10) / 10 });
+    }
+  }
+
+  return efforts;
+}
+
+/** Two decimals of a degree: about a kilometre, which names a town and not a door. */
+function roundCoordinate(value: number): number {
+  return Math.round(value * 100) / 100;
+}
+
+/**
+ * Where an activity began, as coarsely as the Hall of Records needs it: which
+ * town, and how far from home. The first located point of the track, rounded.
+ */
+export function activityStartPoint(
+  points: readonly TrainingHubTrackPoint[] | undefined
+): { lat: number; lon: number } | undefined {
+  for (const point of points ?? []) {
+    const { lat, lon } = point;
+    if (
+      typeof lat === "number" &&
+      typeof lon === "number" &&
+      Number.isFinite(lat) &&
+      Number.isFinite(lon) &&
+      Math.abs(lat) <= 90 &&
+      Math.abs(lon) <= 180 &&
+      // 0,0 is where a missing fix lands, not a place anyone trained.
+      (lat !== 0 || lon !== 0)
+    ) {
+      return { lat: roundCoordinate(lat), lon: roundCoordinate(lon) };
+    }
+  }
+  return undefined;
+}
+
 export interface ActivityDetailSummaryInput {
   activityId: string;
   fingerprint: string;
-  detail: Pick<TrainingHubActivityDetail, "hrZones" | "series" | "pauses">;
+  detail: Pick<TrainingHubActivityDetail, "hrZones" | "series" | "pauses"> &
+    Partial<Pick<TrainingHubActivityDetail, "sportType" | "track">>;
   /** The payload as COROS sent it, for the fields the parser has no use for. */
   raw?: Record<string, unknown>;
   now?: number;
@@ -270,10 +417,14 @@ export function summarizeActivityDetail(
   input: ActivityDetailSummaryInput
 ): ActivityDetailSummary {
   const { activityId, fingerprint, detail, raw, now } = input;
-  const drift = paceHrDecoupling(
-    withPausesRemoved(detail.series ?? [], detail.pauses)
-  );
+  const active = withPausesRemoved(detail.series ?? [], detail.pauses);
+  const drift = paceHrDecoupling(active);
   const lastUpload = raw?.lastUploadTime;
+  const efforts =
+    detail.sportType !== undefined && BEST_EFFORT_SPORT_TYPES.has(detail.sportType)
+      ? bestEfforts(active)
+      : [];
+  const startPoint = activityStartPoint(detail.track?.points);
 
   return {
     activityId,
@@ -285,6 +436,9 @@ export function summarizeActivityDetail(
       typeof lastUpload === "number" && Number.isFinite(lastUpload) && lastUpload > 0
         ? lastUpload
         : undefined,
+    recordsVersion: RECORDS_SUMMARY_VERSION,
+    ...(efforts.length > 0 ? { bestEfforts: efforts } : {}),
+    ...(startPoint ? { startPoint } : {}),
     computedAt: now ?? Date.now()
   };
 }

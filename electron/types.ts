@@ -657,8 +657,27 @@ export interface ActivityDetailSummary {
   decouplingPercent?: number;
   /** COROS's own upload stamp, epoch seconds — informational. */
   lastUploadTime?: number;
+  /**
+   * The Hall of Records' figures, versioned on their own
+   * (`RECORDS_SUMMARY_VERSION`) so adding them did not make every stored zone
+   * split and drift figure stale. Absent on a row computed before they existed,
+   * which is what the records backfill looks for.
+   */
+  recordsVersion?: number;
+  /** Fastest time over each standard distance, on activity time. Runs only. */
+  bestEfforts?: BestEffort[];
+  /** Where the activity began, rounded to two decimals (about a kilometre). */
+  startPoint?: { lat: number; lon: number };
   /** Epoch milliseconds. */
   computedAt: number;
+}
+
+/** The fastest stretch of one run over a standard distance. */
+export interface BestEffort {
+  /** Metres: 1 000, 5 000, 10 000, 21 097.5 or 42 195. */
+  distance: number;
+  /** Seconds of activity time the stretch took. */
+  seconds: number;
 }
 
 /** What one pass of the summary backfill did. `remaining` is the caller's cue

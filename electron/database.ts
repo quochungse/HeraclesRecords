@@ -12,6 +12,7 @@ import {
 import { RECORD_ID_SEPARATOR } from "./sync/syncPolicy";
 import type {
   ActivityDetailSummary,
+  BestEffort,
   CoachAnalysisRunQuery,
   StrengthDetail,
   StrengthSession,
@@ -430,6 +431,14 @@ export function initializeDatabase(userDataPath: string): Database.Database {
   // feel_type caches the COROS end-of-activity feeling (sportFeelInfo.feelType,
   // 1..5; 0 = unrated). NULL = never fetched from the detail endpoint yet.
   ensureColumn(db, "training_activities", "feel_type", "INTEGER");
+  // The Hall of Records' share of a summary, versioned apart from the zone
+  // split and the drift (RECORDS_SUMMARY_VERSION in activityMetrics.ts): a row
+  // written before these existed keeps serving the run screens, and NULL here
+  // is what the records backfill looks for. Both `derived`, like the row.
+  ensureColumn(db, "training_activity_summaries", "records_version", "INTEGER");
+  ensureColumn(db, "training_activity_summaries", "best_efforts", "TEXT");
+  ensureColumn(db, "training_activity_summaries", "start_lat", "REAL");
+  ensureColumn(db, "training_activity_summaries", "start_lon", "REAL");
   migrateChatSessionProviderConstraint(db);
   // pinned_at holds the ISO timestamp a conversation was pinned; NULL = unpinned.
   ensureColumn(db, "chat_sessions", "pinned_at", "TEXT");
@@ -2046,10 +2055,33 @@ interface ActivitySummaryRow {
   zone_seconds: string | null;
   decoupling_percent: number | null;
   last_upload_time: number | null;
+  records_version: number | null;
+  best_efforts: string | null;
+  start_lat: number | null;
+  start_lon: number | null;
   computed_at: number;
 }
 
+function parseBestEfforts(value: string | null): BestEffort[] | undefined {
+  if (!value) return undefined;
+  try {
+    const parsed: unknown = JSON.parse(value);
+    if (!Array.isArray(parsed)) return undefined;
+    const efforts = parsed.filter(
+      (entry): entry is BestEffort =>
+        typeof entry === "object" &&
+        entry !== null &&
+        typeof (entry as BestEffort).distance === "number" &&
+        typeof (entry as BestEffort).seconds === "number"
+    );
+    return efforts.length > 0 ? efforts : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 function toActivityDetailSummary(row: ActivitySummaryRow): ActivityDetailSummary {
+  const bestEfforts = parseBestEfforts(row.best_efforts);
   let zoneSeconds: number[] | undefined;
   if (row.zone_seconds) {
     try {
@@ -2076,6 +2108,11 @@ function toActivityDetailSummary(row: ActivitySummaryRow): ActivityDetailSummary
     ...(row.last_upload_time === null
       ? {}
       : { lastUploadTime: row.last_upload_time }),
+    ...(row.records_version === null ? {} : { recordsVersion: row.records_version }),
+    ...(bestEfforts ? { bestEfforts } : {}),
+    ...(row.start_lat === null || row.start_lon === null
+      ? {}
+      : { startPoint: { lat: row.start_lat, lon: row.start_lon } }),
     computedAt: row.computed_at
   };
 }
@@ -2102,7 +2139,8 @@ export function getActivityDetailSummaries(
     const rows = database
       .prepare(
         `SELECT activity_id, fingerprint, summary_version, zone_seconds,
-                decoupling_percent, last_upload_time, computed_at
+                decoupling_percent, last_upload_time, records_version,
+                best_efforts, start_lat, start_lon, computed_at
          FROM training_activity_summaries
          WHERE activity_id IN (${chunk.map(() => "?").join(", ")})`
       )
@@ -2122,16 +2160,22 @@ export function upsertActivityDetailSummary(
     .prepare(
       `INSERT INTO training_activity_summaries (
          activity_id, fingerprint, summary_version, zone_seconds,
-         decoupling_percent, last_upload_time, computed_at
+         decoupling_percent, last_upload_time, records_version,
+         best_efforts, start_lat, start_lon, computed_at
        )
        VALUES (@activityId, @fingerprint, @summaryVersion, @zoneSeconds,
-               @decouplingPercent, @lastUploadTime, @computedAt)
+               @decouplingPercent, @lastUploadTime, @recordsVersion,
+               @bestEfforts, @startLat, @startLon, @computedAt)
        ON CONFLICT(activity_id) DO UPDATE SET
          fingerprint = excluded.fingerprint,
          summary_version = excluded.summary_version,
          zone_seconds = excluded.zone_seconds,
          decoupling_percent = excluded.decoupling_percent,
          last_upload_time = excluded.last_upload_time,
+         records_version = excluded.records_version,
+         best_efforts = excluded.best_efforts,
+         start_lat = excluded.start_lat,
+         start_lon = excluded.start_lon,
          computed_at = excluded.computed_at`
     )
     .run({
@@ -2143,6 +2187,12 @@ export function upsertActivityDetailSummary(
         : null,
       decouplingPercent: summary.decouplingPercent ?? null,
       lastUploadTime: summary.lastUploadTime ?? null,
+      recordsVersion: summary.recordsVersion ?? null,
+      bestEfforts: summary.bestEfforts?.length
+        ? JSON.stringify(summary.bestEfforts)
+        : null,
+      startLat: summary.startPoint?.lat ?? null,
+      startLon: summary.startPoint?.lon ?? null,
       computedAt: summary.computedAt
     });
 }

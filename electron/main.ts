@@ -91,6 +91,7 @@ import {
   getTrainingHubActivityDetailRaw,
   readActivityDetailSummaries,
   syncActivityDetailSummaries,
+  type ActivityDetailSummarySyncOptions,
   getCorosProfileSnapshot,
   getTrainingHubStatus,
   getUpcomingWorkouts,
@@ -2159,8 +2160,12 @@ function registerIpcHandlers(): void {
 
   ipcMain.handle(
     "trainingHub:syncActivityDetailSummaries",
-    (_event, activityIds: string[], limit?: number) =>
-      syncActivityDetailSummaries(activityIds, limit)
+    (
+      _event,
+      activityIds: string[],
+      limit?: number,
+      options?: ActivityDetailSummarySyncOptions
+    ) => syncActivityDetailSummaries(activityIds, limit, options)
   );
 
   ipcMain.handle(

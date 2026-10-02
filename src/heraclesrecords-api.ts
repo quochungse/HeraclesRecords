@@ -313,10 +313,12 @@ export interface HeraclesRecordsApi {
     activityIds: string[]
   ) => Promise<ActivityDetailSummary[]>;
   /** Compute the missing ones, a few per call. Call again while `remaining`
-   *  is above zero. */
+   *  is above zero. `requireRecords` also counts a summary as missing until it
+   *  carries the Hall of Records' best efforts and start point. */
   syncActivityDetailSummaries: (
     activityIds: string[],
-    limit?: number
+    limit?: number,
+    options?: { requireRecords?: boolean }
   ) => Promise<ActivityDetailSummarySync>;
   exportTrainingHubActivityFile: (
     activityId: string,

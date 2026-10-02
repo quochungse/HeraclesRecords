@@ -348,12 +348,14 @@ const api = {
     ipcRenderer.invoke("trainingHub:getActivityDetailSummaries", activityIds),
   syncActivityDetailSummaries: (
     activityIds: string[],
-    limit?: number
+    limit?: number,
+    options?: { requireRecords?: boolean }
   ): Promise<ActivityDetailSummarySync> =>
     ipcRenderer.invoke(
       "trainingHub:syncActivityDetailSummaries",
       activityIds,
-      limit
+      limit,
+      options
     ),
   exportTrainingHubActivityFile: (
     activityId: string,
