@@ -672,7 +672,6 @@ input::placeholder {
 .app-sidebar-overlay.is-visible,
 .chat-sidebar-overlay.is-visible,
 .update-prompt-backdrop,
-.ors-help-backdrop,
 .activity-route-modal-backdrop,
 .training-raw-modal-backdrop,
 .chat-settings-backdrop,
@@ -1542,7 +1541,6 @@ input::placeholder {
   }
 }
 
-.app-version-chip,
 .update-chip {
   display: inline-flex;
   align-items: center;
@@ -1555,24 +1553,6 @@ input::placeholder {
   padding: 0 12px;
   font-size: 12px;
   white-space: nowrap;
-}
-
-.app-version-chip.button {
-  cursor: pointer;
-  transition:
-    background var(--dur-fast) var(--ease),
-    border-color var(--dur-fast) var(--ease),
-    color var(--dur-fast) var(--ease);
-}
-
-.app-version-chip.button:hover:not(:disabled) {
-  background: var(--glass-bg-hover);
-  color: var(--text-primary);
-}
-
-.app-version-chip.button:disabled {
-  cursor: default;
-  opacity: 0.72;
 }
 
 .update-chip.ready {
@@ -1598,17 +1578,6 @@ input::placeholder {
 .update-chip.ready:disabled {
   cursor: default;
   opacity: 0.72;
-}
-
-.app-update-controls {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.update-settings {
-  position: relative;
-  display: inline-flex;
 }
 
 .update-settings-trigger {
@@ -2154,37 +2123,6 @@ input::placeholder {
   color: var(--text-primary);
 }
 
-.sidebar-status {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
-  align-items: center;
-  gap: 10px;
-  margin-top: auto;
-  border: 1px solid var(--glass-border);
-  border-radius: var(--radius-md);
-  background: var(--glass-bg);
-  -webkit-backdrop-filter: blur(var(--glass-blur));
-  backdrop-filter: blur(var(--glass-blur));
-  padding: 12px;
-}
-
-.sidebar-status strong,
-.sidebar-status span {
-  display: block;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.sidebar-status strong {
-  font-size: 14px;
-}
-
-.sidebar-status span {
-  color: var(--text-muted);
-  font-size: 12px;
-}
-
 /*
  * One measure for the app (§5). The cap is on the padding rather than a
  * max-width so the scrollbar stays at the window's edge where it belongs and
@@ -2264,24 +2202,10 @@ input::placeholder {
   min-height: 0;
 }
 
-.topbar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 18px;
-  margin-bottom: 22px;
-}
-
-.topbar h1,
 .section-heading h2 {
   margin: 0;
   letter-spacing: 0;
   color: var(--text-primary);
-}
-
-.topbar h1 {
-  font-size: 28px;
-  line-height: 1.2;
 }
 
 .section-heading h2 {
@@ -2349,10 +2273,6 @@ input::placeholder {
 
 .content-overview {
   padding-top: 0;
-}
-
-.overview-section {
-  gap: 16px;
 }
 
 .dashboard {
@@ -3134,56 +3054,6 @@ input::placeholder {
   overflow: auto;
 }
 
-.url-field {
-  display: grid;
-  gap: 8px;
-  color: var(--text-secondary);
-  font-size: 13px;
-  font-weight: 700;
-}
-
-.input-shell {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
-  align-items: center;
-  gap: 10px;
-  min-height: 44px;
-  border: 1px solid var(--glass-border);
-  border-radius: var(--radius-sm);
-  background: var(--glass-bg);
-  -webkit-backdrop-filter: blur(var(--glass-blur));
-  backdrop-filter: blur(var(--glass-blur));
-  padding: 0 12px;
-  transition:
-    border-color var(--dur-fast) var(--ease),
-    box-shadow var(--dur-fast) var(--ease);
-}
-
-.input-shell:focus-within {
-  border-color: var(--accent);
-  box-shadow: 0 0 0 3px var(--accent-glow);
-}
-
-.input-shell input {
-  width: 100%;
-  border: 0;
-  outline: none;
-  background: transparent;
-}
-
-.check-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  min-height: 44px;
-  color: var(--text-secondary);
-  white-space: nowrap;
-}
-
-.check-row input[type="checkbox"] {
-  accent-color: var(--accent);
-}
-
 /* ==========================================================================
  * OptionGroup — the one way to offer a choice between options.
  *
@@ -3641,12 +3511,6 @@ input::placeholder {
   margin-bottom: 8px;
 }
 
-.section-heading-actions {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
 .danger-button {
   border-color: var(--error-border);
   color: var(--error-text);
@@ -3656,18 +3520,6 @@ input::placeholder {
   border-color: var(--error-text);
   background: var(--error-bg);
   color: var(--error-text);
-}
-
-.select-column {
-  width: 44px;
-  padding-right: 0;
-}
-
-.select-column input[type="checkbox"] {
-  width: 16px;
-  height: 16px;
-  accent-color: var(--accent);
-  cursor: pointer;
 }
 
 tbody tr.is-selected {
@@ -3934,13 +3786,6 @@ td span {
   white-space: nowrap;
 }
 
-.settings-grid {
-  display: grid;
-  grid-template-columns: minmax(160px, 1fr) minmax(160px, 1fr) minmax(220px, 1fr) auto;
-  align-items: end;
-  gap: 14px;
-}
-
 .field {
   display: grid;
   gap: 8px;
@@ -4026,33 +3871,6 @@ td span {
   color: var(--accent);
   box-shadow: var(--shadow-soft);
   transform: translateY(-1px);
-}
-.local-map-install {
-  display: grid;
-  gap: 10px;
-  margin-top: 16px;
-}
-
-.local-map-selection {
-  display: grid;
-  gap: 3px;
-  min-width: 0;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: var(--radius-sm);
-  background: rgba(255, 255, 255, 0.04);
-  padding: 10px 12px;
-}
-
-.local-map-selection strong,
-.local-map-selection span {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.local-map-selection span {
-  color: var(--text-muted);
-  font-size: 12px;
 }
 .app-select {
   position: relative;
@@ -4253,10 +4071,6 @@ td span {
   color: var(--accent);
 }
 
-.app-select--maps {
-  width: 100%;
-}
-
 .app-select--pill {
   --app-select-font-size: 12px;
 }
@@ -4294,129 +4108,6 @@ td span {
 .app-select--pill .app-select-menu {
   min-width: 100%;
   width: max-content;
-}
-.ors-key-guide {
-  display: grid;
-  gap: 14px;
-  margin-top: 16px;
-  border: 1px solid color-mix(in srgb, var(--accent-muted) 24%, transparent);
-  border-radius: var(--radius-sm);
-  background:
-    linear-gradient(135deg, color-mix(in srgb, var(--accent-muted) 14%, transparent), rgba(216, 155, 34, 0.08)),
-    rgba(0, 0, 0, 0.22);
-  padding: 14px;
-}
-
-.ors-key-guide-header {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
-  align-items: center;
-  gap: 12px;
-}
-
-.ors-key-guide-icon {
-  display: grid;
-  width: 42px;
-  height: 42px;
-  place-items: center;
-  border-radius: var(--radius-sm);
-  background: color-mix(in srgb, var(--accent-muted) 18%, transparent);
-  color: var(--accent);
-}
-
-.ors-key-guide-header h3 {
-  margin: 2px 0 0;
-  font-size: 18px;
-}
-
-.ors-key-guide-copy {
-  margin: 0;
-  color: var(--text-secondary);
-  font-size: 13px;
-  line-height: 1.45;
-}
-
-.ors-key-steps {
-  display: grid;
-  gap: 8px;
-  margin: 0;
-  padding-left: 20px;
-  color: var(--text-secondary);
-  font-size: 13px;
-  line-height: 1.45;
-}
-
-.ors-key-guide-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
-}
-
-.ors-help-backdrop {
-  position: fixed;
-  inset: 0;
-  z-index: 80;
-  display: grid;
-  place-items: center;
-  background: rgba(4, 7, 6, 0.72);
-  padding: 22px;
-}
-
-.ors-help-modal {
-  display: flex;
-  flex-direction: column;
-  width: min(1100px, 96vw);
-  height: min(760px, 88vh);
-  min-height: 420px;
-  overflow: hidden;
-  padding: 0;
-}
-
-.ors-help-toolbar {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
-  align-items: center;
-  gap: 12px;
-  min-height: 58px;
-  border-bottom: 1px solid var(--glass-border);
-  padding: 10px 14px;
-}
-
-.ors-help-address {
-  display: grid;
-  min-width: 0;
-  gap: 2px;
-}
-
-.ors-help-address strong,
-.ors-help-address span {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.ors-help-address strong {
-  font-size: 14px;
-}
-
-.ors-help-address span {
-  color: var(--text-muted);
-  font-size: 12px;
-}
-
-.ors-help-webview-frame {
-  position: relative;
-  flex: 1;
-  min-height: 0;
-  overflow: hidden;
-  background: #101211;
-}
-
-.ors-help-webview {
-  display: flex;
-  width: 100%;
-  height: 100%;
-  border: 0;
 }
 .training-command-center {
   display: grid;
@@ -4569,7 +4260,6 @@ td span {
   line-height: 1.45;
 }
 
-.training-command-panel,
 .training-login-panel {
   display: grid;
   min-width: 0;
@@ -4577,41 +4267,6 @@ td span {
   padding-left: 22px;
 }
 
-.training-command-panel {
-  align-content: center;
-  gap: 12px;
-}
-
-.training-command-status {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-}
-
-.training-status-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px;
-}
-
-.training-status-item {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
-  gap: 1px 9px;
-  min-width: 0;
-  border: 1px solid rgba(255, 255, 255, 0.09);
-  border-radius: var(--radius-sm);
-  background: rgba(255, 255, 255, 0.035);
-  padding: 8px 11px;
-}
-
-.training-status-item svg {
-  grid-row: 1 / span 2;
-  color: var(--accent);
-}
-
-.training-status-item span,
 .training-login-panel-header span {
   color: var(--text-muted);
   font-size: 11px;
@@ -4620,22 +4275,12 @@ td span {
   text-transform: uppercase;
 }
 
-.training-status-item strong,
 .training-login-panel-header strong {
   overflow: hidden;
   color: var(--text-primary);
   font-size: 14px;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-.training-status-host {
-  grid-column: 1 / -1;
-}
-
-.training-command-actions {
-  flex-wrap: wrap;
-  justify-content: flex-end;
 }
 
 .training-login-panel {
@@ -4986,77 +4631,6 @@ td span {
   cursor: default;
 }
 
-.metric-grid {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 18px;
-}
-
-.metric-panel {
-  display: grid;
-  gap: 14px;
-  min-height: 190px;
-  padding: 16px;
-}
-
-.metric-heading {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 12px;
-}
-
-.metric-heading h2 {
-  max-width: 100%;
-  margin: 0;
-  overflow-wrap: anywhere;
-  color: var(--text-primary);
-  font-size: 22px;
-  line-height: 1.2;
-}
-
-.metric-heading svg {
-  color: var(--accent);
-}
-
-.metric-list {
-  display: grid;
-  gap: 8px;
-  margin: 0;
-}
-
-.metric-list div {
-  display: flex;
-  justify-content: space-between;
-  gap: 12px;
-  border-top: 1px solid var(--glass-border);
-  padding-top: 8px;
-}
-
-.metric-list dt,
-.metric-list dd,
-.metric-empty {
-  color: var(--text-muted);
-  font-size: 12px;
-}
-
-.metric-list dt {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.metric-list dd {
-  margin: 0;
-  color: var(--text-secondary);
-  font-weight: 700;
-  text-align: right;
-}
-
-.compact-check {
-  min-height: 36px;
-}
-
 .empty-state {
   display: grid;
   min-height: 140px;
@@ -5075,9 +4649,7 @@ td span {
   display: block;
 }
 
-.training-file-panel,
 .training-detail-panel,
-.training-activities-panel,
 .training-activities-split-panel,
 .training-upcoming-panel,
 .training-records-panel,
@@ -5101,6 +4673,19 @@ td span {
   gap: 12px;
 }
 
+/*
+ * There is deliberately no per-tile hue here.
+ *
+ * These four tiles held five Tailwind pastels — mint for stamina, peach for
+ * load, pink for distance, sky for steps, lavender for duration — plus a dead
+ * set for recovery states that nothing ever rendered. None of it said
+ * anything: they are four totals of the same kind for the same week, and a
+ * step count is not "more blue" than a distance. Colour in this app is spent
+ * on things where hue *is* the datum — sport, sleep stage, heart-rate zone,
+ * load band, the strength heatmap — and chrome gets the neutral surface and
+ * the one accent. So the --stat-* properties are gone and the fallbacks in
+ * `.training-stat-card__icon` and `::before` are the treatment.
+ */
 .training-stat-card {
   position: relative;
   display: grid;
@@ -5187,26 +4772,6 @@ td span {
   white-space: nowrap;
 }
 
-/*
- * There is deliberately no per-tile hue here.
- *
- * These four tiles held five Tailwind pastels — mint for stamina, peach for
- * load, pink for distance, sky for steps, lavender for duration — plus a dead
- * set for recovery states that nothing ever rendered. None of it said
- * anything: they are four totals of the same kind for the same week, and a
- * step count is not "more blue" than a distance. Colour in this app is spent
- * on things where hue *is* the datum — sport, sleep stage, heart-rate zone,
- * load band, the strength heatmap — and chrome gets the neutral surface and
- * the one accent. So the --stat-* properties are gone and the fallbacks in
- * `.training-stat-card__icon` and `::before` are the treatment.
- */
-.training-dashboard-grid {
-  display: grid;
-  grid-template-columns: minmax(250px, 0.72fr) minmax(0, 2fr);
-  align-items: stretch;
-  gap: 18px;
-}
-
 /* ── Training Intelligence (Recovery + Fitness Trend) ───────────────── */
 /* A heading over a grid, not a frame. It was a card around three cards, which
    put the tiles inside them a third layer deep; now the three are the cards,
@@ -5274,22 +4839,6 @@ td span {
 
 .training-intelligence-column > :last-child {
   flex: 1 1 auto;
-}
-
-.training-performance-grid {
-  display: grid;
-  grid-template-columns: minmax(0, 1.05fr) minmax(220px, 0.72fr) minmax(210px, 0.55fr);
-  align-items: stretch;
-  gap: 14px;
-  height: 100%;
-  min-width: 0;
-  min-height: 0;
-}
-
-.training-performance-grid > .training-fitness-panel,
-.training-performance-grid > .sleep-panel,
-.training-performance-grid > .vo2-widget-panel {
-  height: 100%;
 }
 
 .training-summary-tiles.is-stack {
@@ -6945,20 +6494,6 @@ td span {
   justify-content: flex-end;
 }
 
-.training-heatmap-loading {
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  margin-top: 10px;
-  padding: 5px 11px;
-  border-radius: var(--radius-pill);
-  background: var(--glass-bg);
-  border: 1px solid var(--glass-border);
-  color: var(--text-secondary);
-  font-size: 12px;
-  font-weight: 600;
-}
-
 .training-heatmap-scroll {
   width: 100%;
   /* overflow must stay visible so the hover tooltip (which pops above the
@@ -8085,33 +7620,6 @@ td span {
   min-width: 0;
 }
 
-.training-zone-info {
-  display: inline-grid;
-  width: 22px;
-  height: 22px;
-  flex: 0 0 auto;
-  place-items: center;
-  border-radius: 50%;
-  background: rgba(255, 255, 255, 0.2);
-  color: rgba(18, 18, 20, 0.95);
-  font-size: 14px;
-  font-style: italic;
-  font-weight: 700;
-  line-height: 1;
-}
-
-.training-zone-metric-pill {
-  width: fit-content;
-  min-width: 190px;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: var(--radius-sm);
-  background: rgba(255, 255, 255, 0.05);
-  color: var(--text-primary);
-  padding: 12px 16px;
-  font-size: 14px;
-  font-weight: 600;
-}
-
 .sr-only {
   position: absolute;
   width: 1px;
@@ -8495,10 +8003,6 @@ td span {
   color: var(--text-primary);
   font-size: 22px;
   font-weight: 600;
-}
-
-.training-activities-panel {
-  overflow: hidden;
 }
 
 .training-activities-split-panel {
@@ -9387,34 +8891,6 @@ td span {
   fill: rgba(255, 255, 255, 0.06);
 }
 
-.training-dashboard-meta {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 10px;
-}
-
-.training-dashboard-meta div {
-  display: grid;
-  gap: 4px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: var(--radius-sm);
-  background: rgba(255, 255, 255, 0.03);
-  padding: 10px 12px;
-}
-
-.training-dashboard-meta span {
-  color: var(--text-muted);
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-}
-
-.training-dashboard-meta strong {
-  color: var(--text-primary);
-  font-size: 18px;
-}
-
 .training-export-menu {
   position: relative;
   display: inline-flex;
@@ -10227,9 +9703,7 @@ td span {
 @media (prefers-reduced-motion: reduce) {
   .dashboard-block,
   .training-command-center,
-  .training-file-panel,
   .training-detail-panel,
-  .training-activities-panel,
   .training-activities-split-panel,
   .training-scores-panel,
   .training-chart-panel,
@@ -10349,7 +9823,6 @@ td span {
     grid-template-columns: 1fr;
   }
 
-  .training-command-panel,
   .training-login-panel {
     border-top: 1px solid var(--glass-border);
     border-left: 0;
@@ -10442,11 +9915,6 @@ td span {
 
   .training-zone-body-empty {
     min-height: 260px;
-  }
-
-  .training-status-grid,
-  .settings-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
   }}
 @media (max-width: 1100px) {
 
@@ -10521,15 +9989,9 @@ td span {
     font-size: 28px;
   }
 
-  .ors-help-toolbar,
-.settings-grid,
-.metric-grid,
-.training-command-center,
+  .training-command-center,
 .training-login-fields,
-.training-status-grid,
-.training-dashboard-grid,
 .training-chart-grid,
-.training-performance-grid,
 .training-intelligence-grid {
     grid-template-columns: 1fr;
   }
@@ -10569,14 +10031,11 @@ td span {
     height: 52px;
   }
 
-  .training-command-status,
-  .training-command-actions,
   .training-login-actions {
     align-items: stretch;
     flex-direction: column;
   }
 
-  .training-command-actions .secondary-button,
   .training-login-actions .primary-button {
     width: 100%;
   }
@@ -10591,8 +10050,7 @@ td span {
     padding: 18px 20px;
   }
 
-  .training-zone-header-actions,
-  .training-zone-metric-pill {
+  .training-zone-header-actions {
     width: 100%;
   }
 
@@ -10613,20 +10071,6 @@ td span {
     font-size: 13px;
   }
 
-  .ors-help-backdrop {
-    padding: 12px;
-  }
-
-  .ors-help-modal {
-    width: 100%;
-    height: 92vh;
-  }
-
-  .ors-help-toolbar {
-    align-items: stretch;
-  }
-
-  .topbar,
   .section-heading {
     align-items: flex-start;
     flex-direction: column;
@@ -11858,12 +11302,6 @@ td span {
   transform: translateX(0);
 }
 
-.chat-sidebar-body {
-  flex: 1;
-  min-height: 0;
-  overflow: hidden;
-}
-
 .chat-history-panel,
 .chat-settings-panel {
   display: flex;
@@ -12702,17 +12140,6 @@ td span {
   background: transparent;
 }
 
-.chat-settings-mcp {
-  display: grid;
-  gap: 10px;
-}
-
-.chat-mcp-panel-settings {
-  position: static;
-  width: 100%;
-  margin-top: 0;
-}
-
 .chat-header-end {
   display: flex;
   align-items: center;
@@ -12773,36 +12200,6 @@ td span {
   font-weight: 700;
   /* Its own line height, for the reason `.chat-coaches-count` states. */
   line-height: 1;
-}
-
-.chat-account {
-  font-size: 12px;
-  color: var(--text-muted);
-}
-
-.chat-local-status {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  border: 1px solid var(--glass-border);
-  border-radius: var(--radius-pill);
-  background: transparent;
-  color: var(--text-secondary);
-  padding: 6px 12px;
-  font-size: 12px;
-  font-weight: 700;
-}
-
-.chat-local-status.is-ready {
-  background: var(--accent-soft);
-  border-color: var(--accent-glow);
-  color: var(--accent-strong);
-}
-
-.chat-local-status.is-error {
-  background: var(--error-bg);
-  border-color: var(--error-border);
-  color: var(--error-text);
 }
 
 .chat-signout {
@@ -13422,30 +12819,6 @@ td span {
   animation: chat-caret-blink 1s steps(2, start) infinite;
 }
 
-/* Typing indicator */
-.chat-typing {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  height: 22px;
-}
-
-.chat-typing span {
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: var(--accent);
-  animation: chat-blink 1.3s infinite cubic-bezier(0.45, 0, 0.55, 1) both;
-}
-
-.chat-typing span:nth-child(2) { animation-delay: 0.2s; }
-.chat-typing span:nth-child(3) { animation-delay: 0.4s; }
-
-@keyframes chat-blink {
-  0%, 80%, 100% { opacity: 0.25; transform: translateY(0); }
-  40% { opacity: 1; transform: translateY(-3px); }
-}
-
 /* Streaming placeholder: shimmering status + live thinking preview */
 .chat-stream-pending {
   display: flex;
@@ -13656,7 +13029,6 @@ td span {
   .chat-row,
   .chat-row.is-chat-jump-target,
   .chat-avatar,
-  .chat-typing span,
   .chat-thinking summary i,
   .chat-mcp-panel,
   .chat-sidebar-expand-button,
@@ -13738,14 +13110,6 @@ td span {
   font-weight: 600;
   font-size: 22px;
   letter-spacing: -0.02em;
-}
-
-.chat-suggestions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 9px;
-  justify-content: center;
-  max-width: 480px;
 }
 
 /* Three intents, each a few ways in (R3). */
@@ -16494,7 +15858,6 @@ td span {
   }
 }
 
-.chat-hr-trend-card,
 .chat-visual-card {
   border: 1px solid var(--glass-border);
   border-radius: var(--radius-md);
@@ -16511,12 +15874,12 @@ td span {
    card's percentage had nothing to resolve against: Fitness trends drew 133px
    wide, a chart 103px across, which read as missing. The bubble that holds a
    chart takes the row instead, and the card fills it. */
-.chat-bubble-plan:has(> :is(.chat-visual-card, .chat-hr-trend-card)) {
+.chat-bubble-plan:has(> .chat-visual-card) {
   flex: 1 1 auto;
   min-width: 0;
 }
 
-.chat-bubble-plan > :is(.chat-visual-card, .chat-hr-trend-card) {
+.chat-bubble-plan > .chat-visual-card {
   width: 100%;
   box-sizing: border-box;
 }
@@ -16537,7 +15900,6 @@ td span {
   box-sizing: border-box;
 }
 
-.chat-hr-trend-card-header,
 .chat-visual-card-header {
   display: flex;
   align-items: flex-start;
@@ -16545,20 +15907,17 @@ td span {
   gap: 12px;
 }
 
-.chat-hr-trend-card-header h4,
 .chat-visual-card-header h4 {
   margin: 0 0 4px;
   font-size: 14px;
   font-weight: 600;
 }
 
-.chat-hr-trend-card-subtitle,
 .chat-visual-card-subtitle {
   font-size: 12px;
   color: var(--text-secondary);
 }
 
-.chat-hr-stats,
 .chat-visual-stats {
   display: flex;
   flex-wrap: wrap;
@@ -16566,7 +15925,6 @@ td span {
   flex-shrink: 0;
 }
 
-.chat-hr-stat,
 .chat-visual-stat {
   font-size: 11px;
   color: var(--text-secondary);
@@ -16576,13 +15934,11 @@ td span {
   white-space: nowrap;
 }
 
-.chat-hr-stat strong,
 .chat-visual-stat strong {
   color: var(--text-primary);
   font-weight: 700;
 }
 
-.chat-hr-chart-shell,
 .chat-visual-chart-shell {
   height: 140px;
 }
@@ -16594,7 +15950,6 @@ td span {
   height: 100%;
 }
 
-.chat-hr-trend-empty,
 .chat-visual-empty {
   margin: 0;
   font-size: 12px;
@@ -16824,35 +16179,6 @@ td span {
   font-weight: 700;
   color: var(--text-primary);
   text-align: right;
-}
-
-.chat-zone-donut-shell {
-  height: 180px;
-}
-
-.chat-zone-legend {
-  display: grid;
-  gap: 6px;
-}
-
-.chat-zone-legend-item {
-  display: grid;
-  grid-template-columns: 12px 1fr auto;
-  align-items: center;
-  gap: 8px;
-  font-size: 12px;
-  color: var(--text-secondary);
-}
-
-.chat-zone-legend-swatch {
-  width: 12px;
-  height: 12px;
-  border-radius: var(--radius-pill);
-}
-
-.chat-zone-legend-item strong {
-  color: var(--text-primary);
-  font-weight: 600;
 }
 
 @media (max-width: 560px) {
@@ -17278,7 +16604,7 @@ td span {
 
 /* An input has to out-read the controls beside it while it is being typed in,
    and on this theme that means going white rather than lighting up. */
-:root[data-theme="paper"] :is(.input-shell:focus-within, .field input:focus, .field textarea:focus) {
+:root[data-theme="paper"] :is(.field input:focus, .field textarea:focus) {
   background: #ffffff;
 }
 
@@ -17294,7 +16620,6 @@ td span {
   box-shadow: var(--shadow-inset);
 }
 
-:root[data-theme="paper"] .app-version-chip,
 :root[data-theme="paper"] .update-chip {
   background: rgba(19, 26, 40, 0.05);
 }
@@ -17922,16 +17247,6 @@ td span {
 /* --- Training Hub: zone distribution --------------------------------------- */
 :root[data-theme="paper"] .training-zone-panel {
   box-shadow: var(--shadow-card);
-}
-
-:root[data-theme="paper"] .training-zone-info {
-  background: rgba(19, 26, 40, 0.1);
-  color: var(--text-secondary);
-}
-
-:root[data-theme="paper"] .training-zone-metric-pill {
-  border-color: var(--glass-border);
-  background: rgba(19, 26, 40, 0.06);
 }
 
 :root[data-theme="paper"] .training-zone-track {
@@ -20265,11 +19580,6 @@ td span {
 .calendar-builder-save-card {
   display: none;
 }
-.calendar-builder-field-label {
-  color: var(--text-secondary);
-  font-size: 12px;
-  font-weight: 600;
-}
 
 .calendar-modal-header {
   display: flex;
@@ -21976,13 +21286,6 @@ td span {
 .calendar-builder-repeat-add button:active:not(:disabled),
 .calendar-builder-repeat-child-actions button:active:not(:disabled) {
   transform: translateY(1px);
-}
-
-.calendar-builder-intro {
-  margin: -2px 0 0;
-  color: var(--text-muted);
-  font-size: 12px;
-  line-height: 1.45;
 }
 
 .calendar-builder-description > span {
