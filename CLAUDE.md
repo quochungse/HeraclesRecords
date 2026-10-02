@@ -227,7 +227,8 @@ electron/*Service.ts    →  the actual work; electron/database.ts owns SQLite
 - **The built page carries a Content-Security-Policy** (a meta tag `vite.config.ts` writes at
   build time only; the dev server needs inline scripts). Its point is `script-src 'self'
   'wasm-unsafe-eval'` — nothing runs that did not ship; images, connections and media take any
-  https because tiles and avatars come from many hosts, and images plain http too.
+  https because tiles and avatars come from many hosts. Plain http went with the podcast
+  artwork that needed it; every image the app draws now is https.
 - **A packaged build ignores the development switches.** `main.ts` deletes
   `VITE_DEV_SERVER_URL`, `HERACLES_SAMPLE_*` and `HERACLES_SIMULATE_PLAN_AI` from the
   environment before anything reads them (each is read at run time, so that is the whole
