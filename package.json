@@ -313,7 +313,6 @@
     "remark-gfm": "^4.0.1",
     "three": "^0.185.1",
     "topojson-client": "^3.1.0",
-    "unzipper": "^0.12.5",
     "world-atlas": "^2.0.2",
     "zod": "^4.4.3"
   },
@@ -334,6 +333,7 @@
     "electron": "^42.5.0",
     "electron-builder": "^26.15.6",
     "typescript": "^6.0.3",
+    "unzipper": "^0.12.5",
     "vite": "^8.1.0",
     "wait-on": "^9.0.10"
   },
