@@ -312,6 +312,33 @@ assert.equal(
   "Here is the week."
 );
 deleteChatSession(charted.id, db);
+// Nor is Markdown: it would spend the 80 characters and could be cut mid-mark.
+const formatted = createChatSession("chatgpt", db);
+assert.equal(
+  saveChatSession(
+    formatted.id,
+    [{
+      kind: "message",
+      role: "assistant",
+      content: "## Week 3\n\n- **Tuesday:** `6 × 800 m` at [threshold](https://example.com)\n---"
+    }],
+    db
+  ).preview,
+  "Week 3 Tuesday: 6 × 800 m at threshold"
+);
+assert.equal(
+  saveChatSession(
+    formatted.id,
+    [
+      { kind: "message", role: "user", content: "Plan my week" },
+      { kind: "message", role: "assistant", content: "```\n---\n```" }
+    ],
+    db
+  ).preview,
+  "Plan my week",
+  "an answer with no words left falls back to the one before it"
+);
+deleteChatSession(formatted.id, db);
 
 assert.deepEqual(getChatSession(first.id, db), [
   { kind: "message", role: "user", content: "Build a 5K plan" }
