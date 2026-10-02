@@ -42,6 +42,13 @@ export interface HallOfRecordsState {
   labours: LabourState[];
   /** False until the activity list has answered — an empty hall is not yet a fact. */
   ready: boolean;
+  /**
+   * Every source has answered once: the list, the stored summaries, the
+   * remembered ledger, the snapshot and the sleep cache. The notifications wait
+   * for it — reckoned on half the sources, the other half would arrive later
+   * as "new".
+   */
+  settled: boolean;
   /** The renderer's own copy of the summaries, merged as the backfill lands. */
   mergeSummaries: (summaries: readonly ActivityDetailSummary[]) => void;
   /** Ask the place-name cache again, once a name has been resolved. */
@@ -75,6 +82,7 @@ export function useHallOfRecords({
   activities,
   activitiesStatus,
   snapshot,
+  snapshotStatus,
   connected,
   unitSystem
 }: {
@@ -82,6 +90,7 @@ export function useHallOfRecords({
   activities: readonly TrainingHubActivity[];
   activitiesStatus: TrainingHubLoadStatus;
   snapshot: TrainingHubSnapshot | null;
+  snapshotStatus: TrainingHubLoadStatus;
   connected: boolean;
   unitSystem: UnitSystem;
 }): HallOfRecordsState {
@@ -91,6 +100,9 @@ export function useHallOfRecords({
   const [remembered, setRemembered] = useState<RememberedMilestone[]>([]);
   const [sleepNights, setSleepNights] = useState<Array<{ day: string; minutes: number }>>([]);
   const [labelVersion, setLabelVersion] = useState(0);
+  const [summariesLoaded, setSummariesLoaded] = useState(false);
+  const [rememberedLoaded, setRememberedLoaded] = useState(false);
+  const [sleepLoaded, setSleepLoaded] = useState(false);
 
   const activityIds = useMemo(
     () => activities.map((activity) => activity.activityId),
@@ -103,9 +115,11 @@ export function useHallOfRecords({
     void api
       .getActivityDetailSummaries(activityIds)
       .then((stored) => {
-        if (!cancelled) setSummaries(new Map(stored.map((summary) => [summary.activityId, summary])));
+        if (cancelled) return;
+        setSummaries(new Map(stored.map((summary) => [summary.activityId, summary])));
+        setSummariesLoaded(true);
       })
-      .catch(() => undefined);
+      .catch(() => setSummariesLoaded(true));
     return () => {
       cancelled = true;
     };
@@ -116,7 +130,8 @@ export function useHallOfRecords({
     void api
       .listRememberedMilestones()
       .then(setRemembered)
-      .catch(() => undefined);
+      .catch(() => undefined)
+      .finally(() => setRememberedLoaded(true));
   }, [api]);
 
   useEffect(() => {
@@ -154,7 +169,10 @@ export function useHallOfRecords({
           })
         );
       })
-      .catch(() => undefined);
+      .catch(() => undefined)
+      .finally(() => {
+        if (!cancelled) setSleepLoaded(true);
+      });
     return () => {
       cancelled = true;
     };
@@ -231,6 +249,13 @@ export function useHallOfRecords({
     summaries,
     labours,
     ready: activitiesStatus === "ready" || activities.length > 0,
+    settled:
+      connected &&
+      activitiesStatus === "ready" &&
+      (summariesLoaded || activityIds.length === 0) &&
+      rememberedLoaded &&
+      sleepLoaded &&
+      snapshotStatus !== "pending",
     mergeSummaries,
     refreshPlaceLabels
   };

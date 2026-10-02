@@ -396,6 +396,11 @@ export const LOCAL_STORAGE_POLICY: Readonly<Record<string, SyncTier>> = {
   // Which muscle layers the strength body map draws.
   "heraclesrecords-strength-muscle-layers-v2": "preference",
 
+  // What the Hall of Records has told the athlete: the milestones they have
+  // seen and the labour stages already announced. It follows them, so a stage
+  // celebrated on one machine is not celebrated again on the other.
+  "heraclesrecords.records.notices.v1": "personal",
+
   // Window chrome, sized to whatever display this machine has.
   "heraclesrecords.sidebarCollapsed": "device",
   // "I dismissed the prompt for version X" — about this install, not the person.

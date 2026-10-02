@@ -1,0 +1,330 @@
+/*
+ * What the Hall of Records shows outside its own screen: the labour medal
+ * (also drawn by the hall), the labour toast in the app's stack, the
+ * celebration when a labour is complete, and the rail's "new" count. In the
+ * main bundle because any screen can raise them; `records.css` is the hall's
+ * own and arrives with its chunk.
+ */
+
+.records-medal {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  border-radius: var(--radius-pill);
+  border: 1.5px dashed var(--glass-border);
+  color: var(--text-muted);
+}
+
+.records-medal.is-badge { width: 20px; height: 20px; border-width: 1px; }
+.records-medal.is-chip { width: 34px; height: 34px; }
+.records-medal.is-card { width: 52px; height: 52px; }
+.records-medal.is-hero { width: 88px; height: 88px; }
+
+.records-medal.is-begun {
+  border-style: solid;
+  border-color: color-mix(in srgb, var(--accent) 45%, transparent);
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.records-medal.is-complete {
+  border-style: solid;
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--bg-base);
+}
+
+/* --- The toast ------------------------------------------------------------ */
+
+.labour-toast {
+  position: relative;
+  display: grid;
+  justify-items: start;
+  gap: 8px;
+  pointer-events: auto;
+  padding: 16px;
+  border-radius: var(--radius-md);
+  background: var(--menu-surface);
+  box-shadow: var(--shadow-elevated);
+}
+
+.labour-toast-close {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.labour-toast-close:hover {
+  color: var(--text-primary);
+}
+
+.labour-toast-close:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: -2px;
+}
+
+.labour-toast-eyebrow {
+  margin: 4px 0 0;
+  color: var(--accent);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+.labour-toast-title {
+  margin: 0;
+  padding-right: 24px;
+  color: var(--text-primary);
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+.labour-toast-text {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.labour-toast-pips {
+  display: flex;
+  gap: 4px;
+}
+
+.labour-toast-pips span {
+  display: block;
+  width: 22px;
+  height: 4px;
+  border-radius: var(--radius-pill);
+  background: var(--glass-border);
+}
+
+.labour-toast-pips span.is-reached {
+  background: var(--accent);
+}
+
+.labour-toast-link {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--accent);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1;
+  cursor: pointer;
+  text-decoration: underline;
+  text-decoration-color: transparent;
+  text-underline-offset: 3px;
+}
+
+.labour-toast-link:hover {
+  text-decoration-color: currentColor;
+}
+
+.labour-toast-link:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: 2px;
+}
+
+/* --- The celebration ------------------------------------------------------- */
+
+.labour-celebration-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1300;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px 16px;
+  background: color-mix(in srgb, var(--bg-base) 72%, transparent);
+}
+
+.labour-celebration {
+  position: relative;
+  width: min(520px, 100%);
+  max-height: 100%;
+  overflow-y: auto;
+  box-sizing: border-box;
+  padding: 24px 36px 30px;
+  border-radius: var(--radius-xl);
+  background: var(--menu-surface);
+  box-shadow: var(--shadow-elevated);
+  text-align: center;
+}
+
+.labour-celebration-close {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.labour-celebration-close:hover {
+  color: var(--text-primary);
+}
+
+.labour-celebration-close:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: -2px;
+}
+
+.labour-celebration-art {
+  position: relative;
+  width: 200px;
+  height: 200px;
+  margin: 0 auto;
+  color: var(--accent);
+}
+
+/* The wreath only: the glyph inside the medal is an svg too, and must stay
+   centred in its own box. */
+.labour-celebration-art > svg {
+  position: absolute;
+  inset: 0;
+}
+
+.labour-celebration-medal {
+  position: absolute;
+  left: 56px;
+  top: 69px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 88px;
+  height: 88px;
+  border-radius: var(--radius-pill);
+  background: var(--accent);
+  color: var(--bg-base);
+  box-shadow: 0 0 0 6px var(--accent-soft);
+}
+
+.labour-celebration-eyebrow {
+  margin: 0;
+  color: var(--accent);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+.labour-celebration h2 {
+  margin: 12px 0 0;
+  color: var(--text-primary);
+  font-size: 22px;
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+.labour-celebration-myth {
+  max-width: 380px;
+  margin: 10px auto 0;
+  color: var(--text-secondary);
+  font-size: 14px;
+  line-height: 1.45;
+}
+
+.labour-celebration-stages {
+  display: grid;
+  gap: 10px;
+  margin: 22px 0 0;
+  padding: 14px 16px;
+  border-radius: var(--radius-md);
+  background: var(--glass-bg);
+  list-style: none;
+  text-align: left;
+}
+
+.labour-celebration-stages li {
+  display: grid;
+  grid-template-columns: 22px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  color: var(--text-primary);
+  font-size: 13px;
+  line-height: 1.3;
+}
+
+.labour-celebration-pip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: var(--radius-pill);
+  background: var(--accent);
+  color: var(--bg-base);
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.labour-celebration-date {
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+.labour-celebration-actions {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  margin-top: 24px;
+}
+
+/* --- The rail ---------------------------------------------------------------- */
+
+/* The row's copy grows to the rail's edge so the count sits at it. */
+.app-sidebar-nav-copy:has(> .app-sidebar-nav-count) {
+  flex: 1 1 auto;
+}
+
+.app-sidebar-nav-count {
+  margin-left: auto;
+  padding: 3px 6px;
+  border-radius: var(--radius-pill);
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.app-sidebar-nav-dot {
+  position: absolute;
+  top: -1px;
+  right: 0;
+  width: 6px;
+  height: 6px;
+  border-radius: var(--radius-pill);
+  background: var(--accent);
+}

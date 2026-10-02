@@ -1,5 +1,6 @@
 import { AlertCircle, CheckCircle2, Loader2, RefreshCw, X } from "lucide-react";
 import {
+  Children,
   Component,
   type ComponentProps,
   type ComponentType,
@@ -73,6 +74,8 @@ import { useTimeOfDayGreeting } from "./hooks/useTimeOfDayGreeting";
 import { selectOverviewGreeting } from "./overviewGreeting";
 import { useUnitSystem } from "./units/UnitSystemProvider";
 import { useHallOfRecords } from "./records/useHallOfRecords";
+import { useRecordsNotices } from "./records/useRecordsNotices";
+import { LabourCelebration, LabourToastCard } from "./records/LabourNotices";
 import appLogo from "../build/icon.png";
 import changelogMarkdown from "../CHANGELOG.md?raw";
 
@@ -265,7 +268,6 @@ function getLatestReleasePreview(changelog: string): {
 }
 
 const DEV_UPDATE_PREVIEW = getLatestReleasePreview(changelogMarkdown);
-const EMPTY_ID_SET: ReadonlySet<string> = new Set();
 const TRAINING_HISTORY_PAGE_SIZE = 100;
 const TRAINING_HISTORY_MAX_PAGES = 100;
 
@@ -1535,9 +1537,19 @@ export default function App() {
     activities: trainingHubActivities,
     activitiesStatus: trainingHubActivitiesStatus,
     snapshot: trainingHubSnapshot,
+    snapshotStatus: trainingHubSnapshotStatus,
     connected: Boolean(trainingHubStatus?.authenticated),
     unitSystem,
   });
+  const recordsNotices = useRecordsNotices({
+    records: hallOfRecords,
+    onRecordsScreen: activeView === "records",
+  });
+  /* The tab the hall opens on when something sent the athlete to a part of
+     it — the celebration's "See the Twelve Labours". Taken once, on mount. */
+  const [recordsTabRequest, setRecordsTabRequest] = useState<
+    "timeline" | "labours" | null
+  >(null);
 
   // Kick the RPE backfill and poll until the window is fully fetched, merging
   // freshly-cached sRPE into the daily metrics so the trend chart's RPE series
@@ -1753,6 +1765,7 @@ export default function App() {
           activeView={activeView}
           onChange={setActiveView}
           coachBusy={coachBusy}
+          newCounts={{ records: recordsNotices.freshCount }}
           showDevelopmentItems={showDevelopmentTools}
           hiddenViews={hiddenSportScreens}
           athleteName={athleteName}
@@ -2024,7 +2037,9 @@ export default function App() {
                   records={hallOfRecords}
                   activities={trainingHubActivities}
                   connected={Boolean(trainingHubStatus?.authenticated)}
-                  newIds={EMPTY_ID_SET}
+                  newIds={recordsNotices.visitNew}
+                  requestedTab={recordsTabRequest}
+                  onTabRequestHandled={() => setRecordsTabRequest(null)}
                   onOpenActivity={(activity) =>
                     openActivityFrom(activity.activityId, "records")
                   }
@@ -2122,7 +2137,32 @@ export default function App() {
         }
         previewKey={devUpdatePreviewKey}
       />
-      <Toaster toasts={toasts} onDismiss={dismissToast} />
+      <Toaster toasts={toasts} onDismiss={dismissToast}>
+        {recordsNotices.toasts.map(({ announcement, labour }) => (
+          <LabourToastCard
+            key={announcement.key}
+            announcement={announcement}
+            labour={labour}
+            onOpen={() => {
+              recordsNotices.dismissToast(announcement.key);
+              setActiveView("records");
+            }}
+            onDismiss={() => recordsNotices.dismissToast(announcement.key)}
+          />
+        ))}
+      </Toaster>
+      {recordsNotices.celebration ? (
+        <LabourCelebration
+          labour={recordsNotices.celebration.labour}
+          completed={recordsNotices.celebration.completed}
+          onSeeLabours={() => {
+            recordsNotices.closeCelebration();
+            setRecordsTabRequest("labours");
+            setActiveView("records");
+          }}
+          onClose={recordsNotices.closeCelebration}
+        />
+      ) : null}
     </div>
   );
 }
@@ -2298,16 +2338,21 @@ function useToaster(message: string | null, error: string | null) {
 function Toaster({
   toasts,
   onDismiss,
+  children,
 }: {
   toasts: ToastItem[];
   onDismiss: (id: number) => void;
+  /** Toasts of another shape that share the stack: the labour notices. */
+  children?: ReactNode;
 }) {
-  if (toasts.length === 0) {
+  const hasExtra = Children.toArray(children).length > 0;
+  if (toasts.length === 0 && !hasExtra) {
     return null;
   }
 
   return (
     <div className="toast-stack" role="region" aria-label="Notifications">
+      {children}
       {toasts.map((toast) => (
         <ToastCard key={toast.id} toast={toast} onDismiss={onDismiss} />
       ))}

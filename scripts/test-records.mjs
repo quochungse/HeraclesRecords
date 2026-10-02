@@ -512,4 +512,72 @@ assert.deepEqual(
   "only filters with something behind them"
 );
 
+// --- What the athlete is told ------------------------------------------------------------------------
+
+const notices = await import(moduleUrl("records", "recordsNotices.ts"));
+const told = computeRecords({
+  ...base,
+  today: "20261002",
+  activities: [
+    activity(at(2025, 3, 12), 100, { distance: 5000 }),
+    activity(at(2026, 9, 25), 200, { distance: 30000 }),
+    activity(at(2026, 9, 28), 200, { distance: 101000 })
+  ]
+});
+const toldLabours = buildLabours(told.milestones, told.progress);
+
+const first = notices.reckonNotices(null, told.milestones, toldLabours, "20261002");
+assert.deepEqual(first.announce, [], "the first reckoning announces nothing: that history was lived, not news");
+assert.deepEqual(first.fresh, []);
+assert.deepEqual(new Set(first.next.seen), new Set(ids(told)), "it marks every milestone seen");
+assert.ok(first.next.announced.includes("birds:2"));
+
+const empty = { v: 1, seen: [], announced: [] };
+const reckoned = notices.reckonNotices(empty, told.milestones, toldLabours, "20261002");
+assert.deepEqual(
+  reckoned.announce.map((entry) => entry.key).sort(),
+  ["birds:1", "birds:2"],
+  "stages reached in the last fortnight are announced; the first run of 2025 is not"
+);
+assert.ok(!reckoned.fresh.includes("start"), "a milestone from last year is marked seen, not new");
+assert.ok(reckoned.fresh.includes("first:ride"));
+assert.ok(reckoned.next.seen.includes("start"));
+assert.equal(
+  notices.reckonNotices(reckoned.next, told.milestones, toldLabours, "20261002").announce.length,
+  0,
+  "a stage is announced once"
+);
+assert.equal(
+  notices.reckonNotices(reckoned.next, told.milestones, toldLabours, "20261002").next,
+  undefined,
+  "and a reckoning that moves nothing writes nothing"
+);
+
+const seenNow = notices.markSeen(reckoned.next, reckoned.fresh);
+assert.deepEqual(notices.reckonNotices(seenNow, told.milestones, toldLabours, "20261002").fresh, []);
+assert.equal(notices.markSeen(seenNow, reckoned.fresh), undefined, "seeing them twice moves nothing");
+
+// A labour finished in one milestone is the celebration, not three toasts.
+const swims = computeRecords({
+  ...base,
+  today: "20261002",
+  activities: [
+    activity(at(2025, 1, 1), 100),
+    activity(at(2026, 9, 30), 300, { distance: 4000 })
+  ]
+});
+const swimLabours = buildLabours(swims.milestones, swims.progress);
+const hydra = notices
+  .reckonNotices({ ...empty, announced: [] }, swims.milestones, swimLabours, "20261002")
+  .announce.filter((entry) => entry.labourId === "hydra");
+assert.equal(hydra.length, 3, "first swim, 1.5 km and 3.8 km on one day");
+assert.ok(hydra.every((entry) => entry.completes), "each of them completes the labour, so the screen celebrates once");
+
+assert.equal(notices.parseNoticeState("{oops"), null);
+assert.equal(notices.parseNoticeState(JSON.stringify({ v: 2, seen: [], announced: [] })), null);
+assert.deepEqual(
+  notices.parseNoticeState(JSON.stringify({ v: 1, seen: ["a", 3], announced: ["lion:1"] })),
+  { v: 1, seen: ["a"], announced: ["lion:1"] }
+);
+
 console.log("records: OK");

@@ -32,7 +32,7 @@ import {
 } from "./useHallOfRecords";
 import "./records.css";
 
-type RecordsTab = "timeline" | "labours";
+export type RecordsTab = "timeline" | "labours";
 
 export type MilestoneActivity = NonNullable<Milestone["activity"]>;
 
@@ -45,6 +45,9 @@ interface HallOfRecordsViewProps {
   newIds: ReadonlySet<string>;
   onOpenActivity: (activity: MilestoneActivity) => void;
   onOpenOverview: () => void;
+  /** A tab something sent the athlete to — the celebration's "See the Twelve Labours". */
+  requestedTab?: RecordsTab | null;
+  onTabRequestHandled?: () => void;
 }
 
 const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -66,9 +69,16 @@ export function HallOfRecordsView({
   connected,
   newIds,
   onOpenActivity,
-  onOpenOverview
+  onOpenOverview,
+  requestedTab,
+  onTabRequestHandled
 }: HallOfRecordsViewProps) {
-  const [tab, setTab] = useState<RecordsTab>("timeline");
+  const [tab, setTab] = useState<RecordsTab>(requestedTab ?? "timeline");
+  useEffect(() => {
+    if (!requestedTab) return;
+    setTab(requestedTab);
+    onTabRequestHandled?.();
+  }, [requestedTab, onTabRequestHandled]);
   const [filter, setFilter] = useState<TimelineFilter>("all");
   const [openGaps, setOpenGaps] = useState<Set<string>>(() => new Set());
   const [openMonths, setOpenMonths] = useState<Set<string>>(() => new Set());
