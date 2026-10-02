@@ -45,8 +45,9 @@ import {
 import { summarizeMcpStatuses } from "../chat/McpServersPanel";
 import type { HeraclesRecordsApi } from "../heraclesrecords-api";
 import { CoachModelsModal } from "./CoachModelsModal";
+import { DiagnosticsSettings } from "./DiagnosticsSettings";
+import { formatBytes } from "./formatters";
 import { McpServersModal } from "./McpServersModal";
-import { formatBytes } from "../media/libraryUtils";
 import { useTheme } from "../theme/ThemeProvider";
 import {
   ACCENT_PALETTES,
@@ -220,7 +221,7 @@ export function SettingsView({
   const [openingLocationId, setOpeningLocationId] = useState<string | null>(
     null,
   );
-  const [settingsPage, setSettingsPage] = useState<"main" | "storage">("main");
+  const [settingsPage, setSettingsPage] = useState<"main" | "storage" | "errors">("main");
   const [mcpModalOpen, setMcpModalOpen] = useState(false);
   const [mcpSummary, setMcpSummary] = useState<McpSummary | null>(null);
   const [mcpRefreshVersion, setMcpRefreshVersion] = useState(0);
@@ -377,6 +378,22 @@ export function SettingsView({
         : null;
 
   const appVersion = appInfo?.version ?? updateSnapshot.currentVersion;
+
+  if (settingsPage === "errors" && api) {
+    return (
+      <section className="settings-view settings-subpage">
+        <button
+          className="settings-subpage-back"
+          type="button"
+          onClick={() => setSettingsPage("main")}
+        >
+          <ArrowLeft size={16} strokeWidth={2} aria-hidden="true" />
+          Settings
+        </button>
+        <DiagnosticsSettings api={api} />
+      </section>
+    );
+  }
 
   if (settingsPage === "storage") {
     return (
@@ -804,8 +821,8 @@ export function SettingsView({
             <strong>Storage on this computer</strong>
             <span>
               {appInfo
-                ? `Downloads, projects, caches and app data — ${appInfo.storageLocations.length} locations.`
-                : "Downloads, projects, caches and app data."}
+                ? `The database and the app's data folder — ${appInfo.storageLocations.length} locations.`
+                : "The database and the app's data folder."}
             </span>
           </span>
           <ChevronRight
@@ -816,6 +833,32 @@ export function SettingsView({
           />
         </button>
       </div>
+
+      {api ? (
+        <div className="panel settings-compact-panel">
+          <button
+            className="settings-compact-head is-link"
+            type="button"
+            onClick={() => setSettingsPage("errors")}
+          >
+            <span className="settings-compact-icon" aria-hidden="true">
+              <Bug size={18} strokeWidth={1.9} />
+            </span>
+            <span className="settings-compact-copy">
+              <strong>Error logs</strong>
+              <span>
+                Recent errors, kept on this computer, to copy into an issue.
+              </span>
+            </span>
+            <ChevronRight
+              className="settings-row-chevron"
+              size={18}
+              strokeWidth={2}
+              aria-hidden="true"
+            />
+          </button>
+        </div>
+      ) : null}
 
       <McpServersModal
         api={api}

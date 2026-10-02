@@ -47,6 +47,7 @@ import {
   upsertTrainingActivities
 } from "./database";
 import { getSecretSetting, setSecretSetting } from "./secretSettings";
+import { annotateDiagnosticRequest } from "./diagnosticsLog";
 import { simplifyRoute } from "./routeSimplification";
 import { buildRpeDistribution, dailyRpeLoad } from "./rpeLoad";
 import type {
@@ -184,25 +185,30 @@ const TWO_FACTOR_REQUIRED_CODE = "COROS_TWO_FACTOR_REQUIRED";
 const TWO_FACTOR_CODE_TYPE = 20;
 const TWO_FACTOR_CODE_LENGTH = 2;
 const COROS_LOGIN_LANGUAGE = "en-US";
-const COROS_DEV_PREVIEW_COOKIE =
-  "x-app-req-env=202607/; x-app-req-dev=feature-202607-dev; CPL-coros-region=1";
 
+// The `regionId` a login answers with, as the production Training Hub
+// (training.coros.com) numbers them — taken from upstream CorosLink 0.1.31.
+// The table this replaced had 2 as Europe and 3 as `teamapiap.coros.com`, a
+// host that does not resolve, so an EU, China or Singapore account's 2FA code
+// was asked of the wrong region.
 const REGION_BASE_URLS: Record<string, string> = {
-  "0": "https://teamapi.coros.com",
-  "1": "https://teamapi.coros.com",
-  "2": "https://teameuapi.coros.com",
-  "3": "https://teamapiap.coros.com",
+  "0": GLOBAL_BASE_URL,
+  "1": GLOBAL_BASE_URL,
+  "2": "https://teamcnapi.coros.com",
+  "3": "https://teameuapi.coros.com",
+  "4": "https://teamsgapi.coros.com",
   cn: "https://teamcnapi.coros.com",
-  us: "https://teamapi.coros.com",
+  us: GLOBAL_BASE_URL,
   eu: "https://teameuapi.coros.com",
-  global: "https://teamapi.coros.com"
+  sg: "https://teamsgapi.coros.com",
+  global: GLOBAL_BASE_URL
 };
 
 const REGION_PROBE_URLS = [
-  "https://teamapi.coros.com",
+  GLOBAL_BASE_URL,
   "https://teameuapi.coros.com",
   "https://teamcnapi.coros.com",
-  "https://teamapiap.coros.com"
+  "https://teamsgapi.coros.com"
 ];
 
 const SETTINGS = {
@@ -267,6 +273,9 @@ interface TrainingHubLoginData {
 // A login that stopped at the 2FA challenge. Held in memory between the
 // password step and the code-verify step (never persisted to disk).
 interface PendingTwoFactorLogin {
+  /** The email the athlete typed — what is remembered for the next login. */
+  loginAccount: string;
+  /** COROS's own identifier for the challenge, an opaque value, not the email. */
   account: string;
   pwdHash: string;
   loginBaseUrl: string;
@@ -497,7 +506,7 @@ export async function verifyTrainingHubTwoFactor(
 
   finalizeTrainingHubLogin(
     session,
-    pending.account,
+    pending.loginAccount,
     pending.pwdHash,
     pending.remember
   );
@@ -562,11 +571,15 @@ async function beginTrainingHubLogin(
   );
   const regionId =
     loginData.regionId === undefined ? "1" : String(loginData.regionId);
+  // Any region's login endpoint can answer for an account kept in another, so
+  // everything after it — the code, its check, the session — goes where the
+  // account lives, as the web app does.
+  const accountBaseUrl = accountRegionBaseUrl(loginData, loginBaseUrl);
 
   if (loginData.accessToken) {
     const session = await completeSessionFromLogin(
       loginData,
-      loginBaseUrl,
+      accountBaseUrl,
       regionId
     );
     return { kind: "authenticated", session };
@@ -584,11 +597,12 @@ async function beginTrainingHubLogin(
 
   const challengeAccount = String(loginData.account ?? "").trim() || account;
   const accountType = String(loginData.accountType2fa ?? "").trim() || "2";
-  await requestTwoFactorCode(loginBaseUrl, challengeAccount, accountType);
+  await requestTwoFactorCode(accountBaseUrl, challengeAccount, accountType);
   pendingTwoFactor = {
+    loginAccount: account,
     account: challengeAccount,
     pwdHash,
-    loginBaseUrl,
+    loginBaseUrl: accountBaseUrl,
     loginTicket,
     appKey,
     accountType,
@@ -599,7 +613,15 @@ async function beginTrainingHubLogin(
         : String(loginData.userId).trim(),
     remember: options.remember
   };
-  return { kind: "twoFactor", account: challengeAccount };
+  return { kind: "twoFactor", account };
+}
+
+/** Where a login's account lives: its stated region, else the host that answered. */
+function accountRegionBaseUrl(
+  loginData: TrainingHubLoginData,
+  loginBaseUrl: string
+): string {
+  return REGION_BASE_URLS[String(loginData.regionId ?? "")] ?? loginBaseUrl;
 }
 
 // Turn a login/verify response that carries an accessToken into a full session
@@ -627,7 +649,7 @@ async function completeSessionFromLogin(
 
   const baseUrl = await resolveTrainingHubBaseUrl(
     accessToken,
-    loginBaseUrl,
+    accountRegionBaseUrl(loginData, loginBaseUrl),
     userId
   );
 
@@ -666,6 +688,7 @@ async function loginViaAnyBase(
   );
 
   let lastError: unknown;
+  let apiError: CorosPasswordLoginError | undefined;
 
   for (const [loginBaseUrl, loginUrl] of loginTargets) {
     try {
@@ -678,9 +701,21 @@ async function loginViaAnyBase(
       return { loginData, loginBaseUrl };
     } catch (error) {
       lastError = error;
+      // A region that understood the request and said no ("1030, wrong
+      // password") outranks a later one's 1031 or a network failure, which
+      // would otherwise be the message the athlete reads.
+      if (
+        error instanceof CorosPasswordLoginError &&
+        (!apiError || apiError.result === "1031")
+      ) {
+        apiError = error;
+      }
     }
   }
 
+  if (apiError) {
+    throw apiError;
+  }
   if (lastError instanceof Error && lastError.message) {
     throw lastError;
   }
@@ -749,13 +784,14 @@ export function buildCorosLoginHeaders(options?: {
   if (options?.suppressApiWarning) {
     headers["X-No-Warnning"] = "1";
   }
-  // COROS currently gates the new 2FA API response behind its 202607 preview
-  // environment. Only opt into that routing while running `npm run dev`;
-  // packaged builds must follow COROS's normal production rollout.
-  if (process.env.VITE_DEV_SERVER_URL) {
-    headers.Cookie = COROS_DEV_PREVIEW_COOKIE;
-  }
   return headers;
+}
+
+class CorosPasswordLoginError extends Error {
+  constructor(readonly result: string, message: string) {
+    super(`COROS password login failed (${result || "unknown"}): ${message}`);
+    this.name = "CorosPasswordLoginError";
+  }
 }
 
 async function loginAtBase(
@@ -781,7 +817,10 @@ async function loginAtBase(
   const payload = (await response.json()) as TrainingHubApiResponse<TrainingHubLoginData>;
 
   if (!isTrainingHubSuccess(payload)) {
-    throw new Error(payload.message || "COROS login failed.");
+    throw new CorosPasswordLoginError(
+      getTrainingHubResultCode(payload),
+      payload.message || "Unknown error."
+    );
   }
 
   // Success may carry an accessToken (no 2FA) or a loginTicket (2FA required).
@@ -813,7 +852,7 @@ async function requestTwoFactorCode(
   const payload = (await response.json()) as TrainingHubApiResponse<unknown>;
   if (!isTrainingHubSuccess(payload)) {
     throw new Error(
-      payload.message || "COROS could not send a verification code."
+      `COROS could not send a verification code (${getTrainingHubResultCode(payload) || "unknown"}): ${payload.message || "Unknown error."}`
     );
   }
 }
@@ -846,7 +885,9 @@ async function verifyTwoFactorCode(
 
   const payload = (await response.json()) as TrainingHubApiResponse<TrainingHubLoginData>;
   if (!isTrainingHubSuccess(payload)) {
-    throw new Error(payload.message || "That verification code didn't work.");
+    throw new Error(
+      `COROS verification failed (${getTrainingHubResultCode(payload) || "unknown"}): ${payload.message || "That verification code didn't work."}`
+    );
   }
   if (!payload.data?.accessToken) {
     throw new Error("COROS verification did not return an access token.");
@@ -2472,40 +2513,6 @@ export async function getUpcomingWorkouts(
 }
 
 /**
- * GROUNDWORK (not yet wired to the UI): push a generated route to the user's
- * COROS account so it syncs to the watch through the COROS phone app over
- * Bluetooth — the only viable one-click path from the desktop, since COROS
- * watches do not import routes over USB.
- *
- * This reuses the existing Training Hub session via `trainingHubRequest`
- * (handles token, region base-URL failover, and re-auth), so the only missing
- * piece is the actual COROS route/course upload endpoint + payload, which is
- * undocumented.
- *
- * To finish it, capture the request the COROS web app makes:
- *   1. Log into web.coros.com and open DevTools → Network.
- *   2. Import a GPX route (or create one) and watch for the upload request.
- *   3. Note the path (likely under `/route` / `/course` / `/nav`), HTTP method,
- *      and body shape (JSON vs. multipart form-data with the GPX/`.kml`).
- * Then replace the placeholder below with that path/body and remove the throw.
- */
-export async function uploadRouteToCorosAccount(
-  _name: string,
-  _gpx: string
-): Promise<void> {
-  // Example of the intended call once the endpoint is known:
-  //
-  //   await trainingHubRequest<{ result: string }>("/route/import", {
-  //     method: "POST",
-  //     body: JSON.stringify({ name: _name, fileType: "gpx", content: _gpx })
-  //   });
-  //
-  throw new Error(
-    "Uploading routes to your COROS account is not available yet. Export the GPX and import it in the COROS phone app for now."
-  );
-}
-
-/**
  * Upload a local .fit or .tcx activity file to the signed-in COROS account.
  * Reuses the stored Training Hub session (no separate COROS login).
  * Flow: STS credentials → zip the file → S3 PUT → POST /activity/fit/import.
@@ -2754,12 +2761,6 @@ export async function deleteWorkoutProgram(programId: string): Promise<void> {
   }
   await trainingHubPostVoid("/training/program/delete", [id]);
   invalidateLibraryWorkoutPrograms();
-}
-
-export async function listWorkoutPrograms(): Promise<Record<string, unknown>[]> {
-  // Handed out whole, so it is copied: the list is cached now, and a caller
-  // that edited a row in place would be editing every later read of it.
-  return structuredClone(await listLibraryWorkoutPrograms());
 }
 
 export async function listLibraryWorkouts(): Promise<TrainingHubLibraryWorkout[]> {
@@ -8188,11 +8189,10 @@ async function resolveTrainingHubBaseUrl(
     }
   }
 
-  return (
-    REGION_BASE_URLS["1"] ??
-    loginBaseUrl ??
-    GLOBAL_BASE_URL
-  );
+  // No region answered — COROS or the network being unwell for a moment. The
+  // account's own region is still the best answer; falling back to the US one
+  // moved an EU or Singapore session to a host that holds none of its data.
+  return loginBaseUrl;
 }
 
 /**
@@ -8371,16 +8371,21 @@ async function fetchJson<T>(
   options: RequestInit,
   fetchOptions?: { allowEmptyData?: boolean; contextPath?: string }
 ): Promise<T> {
-  const response = await fetch(url, options);
-  if (!response.ok) {
-    throw new Error(
-      `COROS API request failed: ${response.status} ${response.statusText}`
-    );
-  }
+  try {
+    const response = await fetch(url, options);
+    if (!response.ok) {
+      throw new Error(
+        `COROS API request failed: ${response.status} ${response.statusText}`
+      );
+    }
 
-  const payload = (await response.json()) as TrainingHubApiResponse<T>;
-  const data = parseTrainingHubApiResponse<T>(payload, fetchOptions);
-  return data as T;
+    const payload = (await response.json()) as TrainingHubApiResponse<T>;
+    const data = parseTrainingHubApiResponse<T>(payload, fetchOptions);
+    return data as T;
+  } catch (error) {
+    // Which endpoint failed, for the error log; its query is cut when written.
+    throw annotateDiagnosticRequest(error, options.method ?? "GET", url);
+  }
 }
 
 function getStoredAuth(): TrainingHubAuthState | null {

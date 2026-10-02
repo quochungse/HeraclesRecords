@@ -111,7 +111,7 @@ export function SampleDataControls({
 
   return (
     <div
-      className="app-select app-select--pill app-select--watch-smoke"
+      className="app-select app-select--pill app-select--dev-sample"
       ref={containerRef}
     >
       <button

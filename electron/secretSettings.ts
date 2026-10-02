@@ -1,9 +1,8 @@
 // Settings that hold a credential, kept encrypted at rest.
 //
-// The COROS session token, Spotify's client secret and tokens, and Apple
-// Music's captured headers were written to `app_settings` as plain text, next
+// The COROS session token was written to `app_settings` as plain text, next
 // to secrets that already went through `safeStorage`. This module is the one
-// way those are read and written now.
+// way it is read and written now.
 //
 // A stored value is `enc:v1:` followed by the `safeStorage` ciphertext in
 // base64. Anything without the prefix is a value an earlier build wrote in the

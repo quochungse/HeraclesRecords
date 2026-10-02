@@ -26,12 +26,6 @@ export function openableExternalUrl(value: string | undefined | null): URL | nul
   }
 }
 
-/** Whether a URL is a web page (http or https). */
-export function isWebUrl(value: string | undefined | null): boolean {
-  const url = openableExternalUrl(value);
-  return url !== null && url.protocol !== "mailto:";
-}
-
 /**
  * Where a link goes, as a reader would name it: the host without `www.`, or
  * the address of a `mailto:`. Null for anything that cannot be opened.

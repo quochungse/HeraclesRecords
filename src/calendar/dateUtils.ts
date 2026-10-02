@@ -12,12 +12,6 @@ export function keyFromDate(date: Date): string {
   return getLocalHappenDayKey(date);
 }
 
-export function addDaysToKey(key: string, days: number): string {
-  const date = dateFromKey(key);
-  date.setDate(date.getDate() + days);
-  return keyFromDate(date);
-}
-
 /** Monday of the week containing the given date. */
 export function mondayOf(date: Date): Date {
   const result = new Date(date.getFullYear(), date.getMonth(), date.getDate());

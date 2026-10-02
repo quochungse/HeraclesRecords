@@ -30,15 +30,12 @@ import type { TrainingSummaryMetrics } from "./training/types";
  * copy without a renderer.
  */
 export interface OverviewGreetingContext {
-  watchConnected: boolean;
   trainingConnected: boolean;
   upcomingWorkouts?: TrainingHubUpcomingWorkout[];
   activities?: TrainingHubActivity[];
   sportTypes?: TrainingHubSportType[];
   summary?: TrainingSummaryMetrics | null;
   sleep?: TrainingHubSleepSummary | null;
-  /** Local tracks in the media library — the Overview lists them too. */
-  downloadCount?: number;
   unitSystem?: UnitSystem;
   now?: Date;
 }
@@ -62,7 +59,7 @@ export const ROTATION_POOL_SIZE = 3;
 
 /**
  * Only lines within this much of the leader take turns with it. Without the
- * band a rest-day plan would lose its slot to "grab some music", which is
+ * band a rest-day plan would lose its slot to a far less useful line, which is
  * variety at the cost of saying anything useful.
  */
 export const ROTATION_PRIORITY_BAND = 25;
@@ -434,33 +431,17 @@ function activityLines(
 }
 
 function setupLines(context: OverviewGreetingContext): OverviewGreetingLine[] {
-  const lines: OverviewGreetingLine[] = [];
+  if (context.trainingConnected) {
+    return [];
+  }
 
-  if (!context.trainingConnected) {
-    lines.push({
+  return [
+    {
       id: "connect-coros",
       priority: 46,
       text: "Sign in to COROS to see your training at a glance."
-    });
-  }
-
-  const downloads = context.downloadCount ?? 0;
-
-  if (context.watchConnected && downloads > 0) {
-    lines.push({
-      id: "library-ready",
-      priority: 36,
-      text: `${downloads} ${downloads === 1 ? "track" : "tracks"} in your library, ready for the watch.`
-    });
-  } else if (context.watchConnected) {
-    lines.push({
-      id: "watch-ready",
-      priority: 34,
-      text: "Watch connected. Grab some music for your next run."
-    });
-  }
-
-  return lines;
+    }
+  ];
 }
 
 /**
@@ -524,10 +505,7 @@ export function selectOverviewGreetingLine(
   return pool[index];
 }
 
-/**
- * `fallbackText` is the watch presentation's companion line — the old fixed
- * copy, still the right thing to say when we know nothing else.
- */
+/** `fallbackText` is what to say when we know nothing else. */
 export function selectOverviewGreeting(
   context: OverviewGreetingContext,
   fallbackText: string

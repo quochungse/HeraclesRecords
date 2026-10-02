@@ -1,4 +1,5 @@
 import crypto from "node:crypto";
+import { corosDistanceTargetDisplayUnit } from "./corosWorkoutDistance";
 import type {
   RunWorkoutEditorDraft,
   RunWorkoutEditorIntensity,
@@ -441,9 +442,11 @@ function applyTarget(
     case "distance":
       exercise.targetType = 5;
       exercise.targetValue = Math.round(step.target.meters * 100);
-      exercise.targetDisplayUnit = sport === "swim"
-        ? context.distanceUnit === "imperial" ? 4 : 2
-        : context.distanceUnit === "imperial" ? 3 : 2;
+      exercise.targetDisplayUnit = corosDistanceTargetDisplayUnit(
+        step.target.meters,
+        sport,
+        context.distanceUnit
+      );
       break;
     case "load":
       exercise.targetType = 6;
@@ -502,9 +505,7 @@ function aggregateGroup(
     ? {
         targetType: 5,
         targetValue: Math.round(distance),
-        targetDisplayUnit: sport === "swim"
-          ? context.distanceUnit === "imperial" ? 4 : 2
-          : context.distanceUnit === "imperial" ? 3 : 2
+        targetDisplayUnit: corosDistanceTargetDisplayUnit(distance / 100, sport, context.distanceUnit)
       }
     : { targetType: 2, targetValue: Math.round(time), targetDisplayUnit: 0 };
 }
@@ -1016,10 +1017,6 @@ export function parseWorkoutEditorContext(
     defaultPoolLength: { value: poolLength, unit: poolLengthUnit },
     climbSystems
   };
-}
-
-export function paceSecondsForDisplay(secondsPerKm: number, unit: "km" | "mi"): number {
-  return unit === "mi" ? secondsPerKm / MILES_PER_KILOMETER : secondsPerKm;
 }
 
 export function displayPaceToSecondsPerKm(seconds: number, unit: "km" | "mi"): number {

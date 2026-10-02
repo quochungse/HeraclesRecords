@@ -27,8 +27,6 @@ import {
 import { parsePlanDay } from "../../electron/trainingPlanDomain";
 import { formatWorkoutSport } from "../../electron/workoutCapabilities";
 
-export type GeneratorStep = "goal" | "week" | "outline" | "writing" | "done";
-
 export const GOAL_KINDS: readonly { value: TrainingPlanGoalKind; label: string; hint: string }[] = [
   { value: "race", label: "A race or event", hint: "Plan ends on race day" },
   { value: "base", label: "Build a base", hint: "Steady, durable volume" },
@@ -289,16 +287,6 @@ export function addPlanDays(iso: string, days: number): string {
   if (!date) return iso;
   date.setDate(date.getDate() + days);
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
-}
-
-/**
- * What an outline was drawn for: the request as the athlete stated it, without
- * the AI that read it. An outline whose request has since changed is stale —
- * it answers a question nobody is asking any more.
- */
-export function outlineKey(request: TrainingPlanGenerationRequest): string {
-  const { runtime: _runtime, outline: _outline, ...asked } = request;
-  return JSON.stringify(asked);
 }
 
 /** Race day as the picker holds it (`yyyyMMdd`) and as the request states it (`YYYY-MM-DD`). */

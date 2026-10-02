@@ -102,11 +102,6 @@ const EXEMPT = [
     why: "Places visited, drawn from the data. Selecting one moves the globe; it does not choose a mode."
   },
   {
-    file: "src/App.tsx",
-    marker: "apple-podcast-result",
-    why: "Search results. The pressed state marks which result is open, not which option is chosen."
-  },
-  {
     file: "src/components/StartupViewMenu.tsx",
     marker: "menuitemradio",
     why: "A menu, with the menu roles and a popup of its own."

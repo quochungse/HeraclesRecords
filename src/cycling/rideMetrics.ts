@@ -64,18 +64,6 @@ export function speedKmh(
   return distance / METERS_PER_KM / (duration / SECONDS_PER_HOUR);
 }
 
-/** Climb per kilometre. Absent when COROS recorded no climb or no distance. */
-export function rideElevationPerKm(
-  activity: TrainingHubActivity
-): number | undefined {
-  const distance = positive(activity.distance);
-  if (distance === undefined || activity.elevationGain === undefined) {
-    return undefined;
-  }
-
-  return activity.elevationGain / (distance / METERS_PER_KM);
-}
-
 export interface RideTotals {
   count: number;
   /** Metres. */

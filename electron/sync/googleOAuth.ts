@@ -1,15 +1,13 @@
 // Google OAuth for the sync vault.
 //
 // Authorization Code + PKCE against a loopback redirect, the flow Google
-// specifies for desktop apps. Three details differ from the Spotify code this
-// borrows its shape from, and each is a failure if copied across unchanged:
+// specifies for desktop apps. Three details are each a failure if changed:
 //
-//   * The redirect is plain **http** on 127.0.0.1. Spotify demands https, which
-//     is why spotifyOAuthTls.ts ships a self-signed certificate; Google rejects
-//     https loopback. Take the server structure from there, not the TLS.
+//   * The redirect is plain **http** on 127.0.0.1. Google rejects https
+//     loopback.
 //   * Consent must open in the **system browser**. Google refuses embedded
-//     webviews outright (`disallowed_useragent`), so a BrowserWindow like
-//     Spotify's would fail before the user could type anything.
+//     webviews outright (`disallowed_useragent`), so a BrowserWindow would
+//     fail before the user could type anything.
 //   * The port is ephemeral. Desktop clients may use any loopback port, so
 //     nothing needs registering in the console and two apps cannot collide.
 //

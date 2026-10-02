@@ -252,8 +252,12 @@ a round trip through the codec could not see it, since both halves were wrong by
 the same factor. `test:workout-intensity-codec` now pins the scale in both
 directions against a verbatim COROS exercise.
 
-Distance-step `targetDisplayUnit` is 2 (meters); an overall metric workout uses
-`distanceDisplayUnit: 1` (kilometers). Pace targets use seconds per kilometer
+Metric land-distance steps and repeat-group targets use `targetDisplayUnit: 2`
+(meters) up to 1,000 m and `1` (kilometers) above it, because COROS's iOS app was
+reported cutting a meter target to 1,000 m (upstream CorosLink #124;
+`corosDistanceTargetDisplayUnit`). `targetValue` stays in centimeters either way.
+Swimming keeps meters/yards and imperial land targets keep miles. An overall metric
+workout uses `distanceDisplayUnit: 1` (kilometers). Pace targets use seconds per kilometer
 multiplied by 1000, `intensityMultiplier: 1000`, and an ordered low/high range.
 For example, `4:05-4:15/km` is encoded as `245000..255000` with
 `intensityDisplayUnit: 1`. Speed is stored as km/h ×100. A custom yard pool

@@ -33,7 +33,6 @@ jobs:
           HERACLES_GOOGLE_OAUTH_ID: ${{ secrets.HERACLES_GOOGLE_OAUTH_ID }}
           HERACLES_GOOGLE_OAUTH_KEY: ${{ secrets.HERACLES_GOOGLE_OAUTH_KEY }}
         run: |
-          npm run binaries:prepare:mac
           npm run build
           npx electron-builder --mac --arm64 --x64 --publish never \
             -c.mac.identity=- \

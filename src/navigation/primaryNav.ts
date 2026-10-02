@@ -4,13 +4,11 @@ import {
   BookOpen,
   CalendarDays,
   Dumbbell,
-  Gauge,
   Globe,
   LayoutGrid,
   MessageCircle,
   Moon,
   Mountain,
-  Music,
   Settings,
   User,
   type LucideIcon,
@@ -20,8 +18,6 @@ import { RunnerIcon } from "../running/runnerIcon";
 export type PrimaryView =
   | "overview"
   | "profile"
-  | "coros-overview"
-  | "media"
   | "training"
   | "running"
   | "cycling"
@@ -34,7 +30,7 @@ export type PrimaryView =
   | "places"
   | "settings";
 
-export type PrimaryNavSectionId = "today" | "plan" | "history" | "device";
+export type PrimaryNavSectionId = "today" | "plan" | "history" | "journey";
 
 export interface PrimaryNavItem {
   id: PrimaryView;
@@ -59,13 +55,14 @@ export interface PrimaryNavSection {
 }
 
 /**
- * The rail reads as an index: four standing headings, thirteen destinations,
+ * The rail reads as an index: four standing headings, eleven destinations,
  * nothing to open first.
  *
  * The sections answer *when the athlete reaches for a screen*, not where the
  * data came from. That is the one grouping the athlete already has in their
- * head — the morning check, the week being planned, the work on file, the watch
- * on the desk — and it is what lets the whole list stand open at once. The
+ * head — the morning check, the week being planned, the work on file, the
+ * ground covered over the years — and it is what lets the whole list stand
+ * open at once. The
  * disclosure groups this replaced existed only because eighteen equal rows did
  * not fit, and they cost two rows, a chevron, a remembered open/closed state and
  * a rule that reopened a group whenever the app navigated into it.
@@ -104,27 +101,22 @@ export const PRIMARY_NAV_SECTIONS: PrimaryNavSection[] = [
     label: "History",
     // What is behind. Activities holds every sport; Running, Cycling,
     // Hiking and Strength are separate destinations because they are read
-    // through different numbers, not because they are filters. The globe is
-    // the same history seen from above.
+    // through different numbers, not because they are filters.
     items: [
       { id: "training", label: "Activities", icon: Activity },
       { id: "running", label: "Running", icon: RunnerIcon },
       { id: "cycling", label: "Cycling", icon: Bike },
       { id: "hiking", label: "Hiking", icon: Mountain },
       { id: "strength", label: "Strength", icon: Dumbbell },
-      { id: "places", label: "Where you’ve been", icon: Globe },
     ],
   },
   {
-    id: "device",
-    label: "Device",
-    // The watch itself: what is on it, what goes onto it. This is the one
-    // section about a piece of hardware rather than about training, which is
-    // why the heading carries the watch's name while one is on USB.
-    items: [
-      { id: "coros-overview", label: "Coros Overview", icon: Gauge },
-      { id: "media", label: "Media", icon: Music },
-    ],
+    id: "journey",
+    label: "Your journey",
+    // The same history seen from above: not a session or a week but every
+    // place the training has taken the athlete, which is reached for at a
+    // different moment from the log above it.
+    items: [{ id: "places", label: "Where you’ve been", icon: Globe }],
   },
 ];
 
@@ -132,7 +124,7 @@ export const PRIMARY_NAV_SECTIONS: PrimaryNavSection[] = [
  * The two destinations that are about the person rather than the training.
  * They sit in the identity row at the foot of the rail, which is where an
  * account and its settings are looked for — and keeping them out of the index
- * is what brings it down to thirteen rows that fit without folding.
+ * is what brings it down to eleven rows that fit without folding.
  */
 export const PRIMARY_NAV_ACCOUNT_ITEMS: PrimaryNavItem[] = [
   { id: "profile", label: "Personal", icon: User },

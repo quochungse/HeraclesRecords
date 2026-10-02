@@ -16,18 +16,10 @@ interface StorageLocationSpec {
 // limited to this fixed allowlist.
 const STORAGE_LOCATION_SPECS: StorageLocationSpec[] = [
   {
-    id: "music-downloads",
-    label: "Music downloads",
-    description:
-      "Audio downloaded from YouTube, YouTube Music, Spotify sync, and Apple Music.",
-    kind: "directory",
-    resolvePath: () => path.join(app.getPath("userData"), "downloads")
-  },
-  {
     id: "database",
-    label: "Library database",
+    label: "Database",
     description:
-      "SQLite database holding the track library, download history, and coach sessions.",
+      "SQLite database holding your training records, plans and coach sessions.",
     kind: "file",
     resolvePath: () => path.join(app.getPath("userData"), DATABASE_FILE_NAME)
   },
@@ -54,7 +46,7 @@ async function directorySizeBytes(target: string): Promise<number> {
         total += (await fs.promises.stat(entryPath)).size;
       }
     } catch {
-      // Files can disappear mid-scan (active downloads); skip them.
+      // Files can disappear mid-scan; skip them.
     }
   }
 

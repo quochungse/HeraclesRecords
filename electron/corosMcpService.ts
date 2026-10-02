@@ -1,4 +1,5 @@
 import type { BrowserWindow } from "electron";
+import { corosMcpUrl, isCorosMcpUrl } from "./corosMcpRegions";
 import {
   callMcpTool,
   connectMcpServer,
@@ -8,8 +9,15 @@ import {
   getMcpServerStatus,
   getMcpServerTools
 } from "./mcpClientManager";
+import { getMcpServer } from "./mcpServersStore";
 import { prefixToolName } from "./mcpToolNames";
-import type { CorosMcpStatus, CorosMcpTool, McpAvailability } from "./types";
+import type {
+  CorosMcpAccount,
+  CorosMcpStatus,
+  CorosMcpTool,
+  McpAvailability,
+  McpServerStatus
+} from "./types";
 
 // Back-compat shim: COROS is now the built-in "coros" entry of the generic MCP
 // registry (electron/mcpClientManager.ts). These wrappers keep the original
@@ -17,6 +25,49 @@ import type { CorosMcpStatus, CorosMcpTool, McpAvailability } from "./types";
 // IPC handlers keep working unchanged.
 
 const COROS = "coros";
+
+// main.ts hands in the Training Hub account, so this module (which the sleep
+// and health services import) stays free of trainingHubService.
+let corosAccount: () => CorosMcpAccount = () => ({});
+
+/** Supplies the COROS account the app is signed in with. */
+export function setCorosMcpAccountSource(source: () => CorosMcpAccount): void {
+  corosAccount = source;
+}
+
+/**
+ * Connects a registered server. A COROS MCP server signs in with the account
+ * the app already knows: its email is filled in on COROS's sign-in page, and
+ * the built-in server moves to the account's regional endpoint before it is
+ * first authorized — an EU account used to need an mcpeu server added by hand.
+ * COROS's sign-in form takes the plaintext password, which is never stored
+ * here, so it is still asked for there, once.
+ */
+export async function connectMcpServerWithCorosAccount(
+  id: string,
+  interactive = true,
+  parentWindow: BrowserWindow | null = null
+): Promise<McpServerStatus> {
+  const server = getMcpServer(id);
+  if (!interactive || !server || !isCorosMcpUrl(server.url)) {
+    return connectMcpServer(id, interactive, parentWindow);
+  }
+  const account = readCorosAccount();
+  return connectMcpServer(id, interactive, parentWindow, {
+    loginHint: account.email,
+    preferredUrl:
+      server.builtin && account.region ? corosMcpUrl(account.region) : undefined
+  });
+}
+
+function readCorosAccount(): CorosMcpAccount {
+  try {
+    return corosAccount();
+  } catch {
+    // Without the account the connection still works; the athlete types it in.
+    return {};
+  }
+}
 
 /**
  * Whether COROS data can be served — an open client *or* the means to open one.
@@ -76,7 +127,7 @@ export async function connectCorosMcp(
   mainWindow?: BrowserWindow | null,
   interactive = true
 ): Promise<CorosMcpStatus> {
-  await connectMcpServer(COROS, interactive, mainWindow ?? null);
+  await connectMcpServerWithCorosAccount(COROS, interactive, mainWindow ?? null);
   return getCorosMcpStatus();
 }
 

@@ -120,12 +120,6 @@
   align-items: center;
 }
 
-/* The switches themselves are `.training-metric-toggle` from styles.css — the
-   load heatmap's chips — so nothing about their look is restated here. */
-.running-controls .training-metric-option {
-  white-space: nowrap;
-}
-
 .running-period {
   margin-left: auto;
 }

@@ -14,6 +14,7 @@ import type {
   OAuthTokens
 } from "@modelcontextprotocol/sdk/shared/auth.js";
 import { deleteSettings, getSetting, setSetting } from "./database";
+import { corosSignInEmailScript, isCorosSignInPage } from "./corosMcpRegions";
 import {
   getMcpBearer,
   getMcpServer,
@@ -155,6 +156,8 @@ interface ProviderConfig {
   scope: string;
   loopbackPort: number;
   redirectPath: string;
+  /** Account email filled in on COROS's sign-in page. */
+  loginHint?: string;
 }
 
 class McpOAuthProvider implements OAuthClientProvider {
@@ -327,8 +330,24 @@ class McpOAuthProvider implements OAuthClientProvider {
     });
     this.authWindow.webContents.on("dom-ready", () => {
       void this.injectCloseButton();
+      void this.fillLoginHint();
     });
     void this.authWindow.loadURL(authorizationUrl.toString());
+  }
+
+  private async fillLoginHint(): Promise<void> {
+    const { loginHint } = this.config;
+    const window = this.authWindow;
+    if (!loginHint || !window || window.isDestroyed()) return;
+    if (!isCorosSignInPage(window.webContents.getURL())) return;
+    try {
+      await window.webContents.executeJavaScript(
+        corosSignInEmailScript(loginHint),
+        true
+      );
+    } catch {
+      // The page may refuse the script; the email field stays editable.
+    }
   }
 
   private async injectCloseButton(): Promise<void> {
@@ -491,14 +510,18 @@ function runtime(id: string): ServerRuntime {
   return rt;
 }
 
-function providerConfig(server: McpServerConfig): ProviderConfig {
+function providerConfig(
+  server: McpServerConfig,
+  loginHint?: string
+): ProviderConfig {
   return {
     serverId: server.id,
     serverName: server.name,
     resourceUrl: server.url,
     scope: server.scope ?? "openid offline_access",
     loopbackPort: loopbackPortFor(server.id),
-    redirectPath: redirectPathFor(server.id)
+    redirectPath: redirectPathFor(server.id),
+    loginHint
   };
 }
 
@@ -532,6 +555,28 @@ function ensureCurrentResource(server: McpServerConfig): void {
     return;
   }
   clearStoredCredentials(server.id);
+}
+
+// Before its first authorization nothing ties a server to its endpoint except a
+// client registration with the old authorization server, so it can move (to the
+// COROS account's region) and register afresh. Once it holds tokens it stays.
+function moveBeforeAuthorization(
+  server: McpServerConfig,
+  url: string
+): McpServerConfig {
+  const rt = runtime(server.id);
+  if (
+    server.authType !== "oauth" ||
+    canonicalHttpUrl(url) === canonicalHttpUrl(server.url) ||
+    rt.client ||
+    rt.connectInFlight ||
+    hasStoredTokens(server.id)
+  ) {
+    return server;
+  }
+  const moved = updateMcpServer(server.id, { url });
+  clearStoredCredentials(server.id);
+  return moved;
 }
 
 async function discoverTools(client: Client): Promise<CorosMcpTool[]> {
@@ -598,7 +643,8 @@ async function connectOnce(
   server: McpServerConfig,
   parentWindow: BrowserWindow | null,
   interactive: boolean,
-  generation: number
+  generation: number,
+  loginHint?: string
 ): Promise<void> {
   const rt = runtime(server.id);
   if (rt.client) return;
@@ -617,7 +663,7 @@ async function connectOnce(
   let clearedStaleAuth = false;
   for (let attempt = 0; attempt < 2; attempt += 1) {
     const authProvider = new McpOAuthProvider(
-      providerConfig(server),
+      providerConfig(server, loginHint),
       parentWindow,
       interactive
     );
@@ -663,11 +709,19 @@ async function connectOnce(
   throw new Error(`${server.name} MCP authorization expired. Connect ${server.name} again.`);
 }
 
+export interface McpConnectOptions {
+  /** Account email filled in on COROS's sign-in page. */
+  loginHint?: string;
+  /** Endpoint to switch to while the server holds no authorization yet. */
+  preferredUrl?: string;
+}
+
 /** Connect a server (running its OAuth flow if needed). Single-flight per server. */
 export async function connectMcpServer(
   id: string,
   interactive = true,
-  parentWindow: BrowserWindow | null = null
+  parentWindow: BrowserWindow | null = null,
+  options: McpConnectOptions = {}
 ): Promise<McpServerStatus> {
   let server = getMcpServer(id);
   if (!server) throw new Error(`Unknown MCP server "${id}".`);
@@ -676,6 +730,9 @@ export async function connectMcpServer(
       throw new Error(`${server.name} MCP server is disabled.`);
     }
     server = updateMcpServer(id, { enabled: true });
+  }
+  if (options.preferredUrl) {
+    server = moveBeforeAuthorization(server, options.preferredUrl);
   }
   ensureCurrentResource(server);
   const rt = runtime(id);
@@ -699,7 +756,13 @@ export async function connectMcpServer(
     rt.connectInFlightInteractive = interactive;
     rt.lastError = undefined;
     const generation = rt.generation;
-    const flight = connectOnce(server, parentWindow, interactive, generation)
+    const flight = connectOnce(
+      server,
+      parentWindow,
+      interactive,
+      generation,
+      options.loginHint
+    )
       .then(() => {
         rt.silentRetryAfter = 0;
       })

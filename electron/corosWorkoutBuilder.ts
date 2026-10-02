@@ -35,6 +35,7 @@ import {
   workoutSportType
 } from "./workoutCapabilities";
 import { resolveStepDefaults } from "./workoutDefaults.js";
+import { corosDistanceTargetDisplayUnit } from "./corosWorkoutDistance";
 import { describePlanShape } from "./trainingPlanDomain";
 
 export type RunStepKind =
@@ -227,10 +228,6 @@ const RUN_TARGET_ALIASES: Record<string, RunTargetType> = {
 
 export function metersToCorosDistance(meters: number): number {
   return Math.round(meters * 100);
-}
-
-export function corosDistanceToMeters(value: number): number {
-  return value / 100;
 }
 
 export function parsePace(pace: string): {
@@ -441,15 +438,12 @@ function resolveRunTarget(
     return {
       targetType: 5,
       targetValue: metersToCorosDistance(Number(meters)),
-      targetDisplayUnit:
-        step.target_display_unit ??
-        (sport === "swim"
-          ? context?.distanceUnit === "imperial"
-            ? COROS_DISTANCE_UNIT_YARDS
-            : COROS_DISTANCE_UNIT_METERS
-          : context?.distanceUnit === "imperial"
-            ? COROS_DISTANCE_UNIT_MILES
-            : COROS_DISTANCE_UNIT_METERS)
+      targetDisplayUnit: corosDistanceTargetDisplayUnit(
+        Number(meters),
+        sport,
+        context?.distanceUnit,
+        step.target_display_unit
+      )
     };
   }
 
@@ -931,13 +925,7 @@ export function buildWorkoutPayload(
         targetValue: groupTargetValue,
         targetDisplayUnit:
           groupTargetType === 5
-            ? sport === "swim"
-              ? context?.distanceUnit === "imperial"
-                ? COROS_DISTANCE_UNIT_YARDS
-                : COROS_DISTANCE_UNIT_METERS
-              : context?.distanceUnit === "imperial"
-                ? COROS_DISTANCE_UNIT_MILES
-                : COROS_DISTANCE_UNIT_METERS
+            ? corosDistanceTargetDisplayUnit(groupDistance / 100, sport, context?.distanceUnit)
             : 0,
         sets: repeatCount,
         sortNo: groupSort,

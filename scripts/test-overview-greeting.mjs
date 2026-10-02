@@ -28,7 +28,7 @@ const {
 } = await import(`${moduleUrl.href}?cacheBust=${Date.now()}`);
 
 const NOW = new Date(2026, 8, 3, 9, 0, 0); // Thu 2026-09-03, 09:00 local
-const FALLBACK = "Connect your COROS watch to get started";
+const FALLBACK = "Here is where your training stands today.";
 
 function dayKey(offsetDays = 0) {
   const date = new Date(NOW);
@@ -48,7 +48,6 @@ function startTime(offsetDays = 0) {
 function context(overrides = {}) {
   return {
     now: NOW,
-    watchConnected: false,
     trainingConnected: true,
     ...overrides
   };
@@ -62,7 +61,7 @@ function ids(ctx) {
 
 assert.equal(
   selectOverviewGreeting(
-    context({ trainingConnected: true, watchConnected: false }),
+    context({ trainingConnected: true }),
     FALLBACK
   ),
   FALLBACK,
@@ -277,32 +276,11 @@ assert.ok(
   "a streak ending yesterday still counts"
 );
 
-// --- Setup and media -------------------------------------------------------
+// --- Setup ---------------------------------------------------------------
 
 assert.equal(
   selectOverviewGreeting(context({ trainingConnected: false }), FALLBACK),
   "Sign in to COROS to see your training at a glance."
-);
-
-assert.equal(
-  selectOverviewGreeting(
-    context({ watchConnected: true, downloadCount: 12 }),
-    FALLBACK
-  ),
-  "12 tracks in your library, ready for the watch."
-);
-
-assert.equal(
-  selectOverviewGreeting(
-    context({ watchConnected: true, downloadCount: 1 }),
-    FALLBACK
-  ),
-  "1 track in your library, ready for the watch."
-);
-
-assert.equal(
-  selectOverviewGreeting(context({ watchConnected: true }), FALLBACK),
-  "Watch connected. Grab some music for your next run."
 );
 
 // --- Ordering, urgency and rotation ----------------------------------------
@@ -313,9 +291,7 @@ const many = context({
     records: [],
     mcpState: "ready",
     latest: { happenDay: dayKey(0), totalMinutes: 465 }
-  },
-  watchConnected: true,
-  downloadCount: 4
+  }
 });
 
 const ranked = buildOverviewGreetingCandidates(many);
@@ -324,29 +300,6 @@ for (let index = 1; index < ranked.length; index += 1) {
     ranked[index - 1].priority >= ranked[index].priority,
     "candidates come back most important first"
   );
-}
-
-// A relevant line must not lose its slot to a far less useful one.
-for (const [label, ctx] of [
-  ["rest day", context({ watchConnected: true, upcomingWorkouts: [{ happenDay: dayKey(1), name: "Long Run" }] })],
-  ["strong recovery", context({ watchConnected: true, summary: { recoveryPct: 94 } })],
-  [
-    "long layoff",
-    context({
-      watchConnected: true,
-      activities: [{ activityId: "1", sportType: 100, sportName: "Run", startTime: startTime(-6) }]
-    })
-  ]
-]) {
-  for (const hour of [9, 14, 20]) {
-    const now = new Date(NOW);
-    now.setHours(hour, 0, 0, 0);
-    assert.notEqual(
-      selectOverviewGreetingLine({ ...ctx, now }).id,
-      "watch-ready",
-      `${label} is never rotated out for the media prompt`
-    );
-  }
 }
 
 // One day's three slots, and deliberately not a second day: the pool is built

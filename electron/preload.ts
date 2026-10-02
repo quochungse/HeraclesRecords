@@ -14,28 +14,18 @@ import type {
   RestoreResult as BackupRestoreResult
 } from "./backup/backupTypes";
 import type {
+  DiagnosticsSnapshot,
+  RendererDiagnosticError
+} from "./diagnosticsTypes";
+import type {
   ActivityDetailSummary,
   ActivityDetailSummarySync,
-  BinaryStatus,
   CoachAnalysisSessionAttention,
-  CombinedDownloadProgressEvent,
-  CombinedDownloadResult,
   CorosProfile,
   CorosProfilePatch,
   CorosProfileSnapshot,
-  DownloadAudioResult,
-  DownloadJob,
-  DownloadQueueItem,
-  LocalTrack,
   ReverseGeocodeResult,
   SaveChatSessionOptions,
-  SpotifyConfig,
-  SpotifyPlaylist,
-  SpotifyPlaylistTrack,
-  SpotifyStatus,
-  SpotifySyncResult,
-  SpotifySyncTrack,
-  SpotifySyncUpdate,
   HevySettingsInput,
   HevyStatus,
   StrengthHistory,
@@ -93,25 +83,11 @@ import type {
   WorkoutEditorDocument,
   WorkoutExerciseOption,
   WorkoutSport,
-  TransferResult,
   AppInfo,
   AppUpdateSnapshot,
-  WatchConnectionSmokeOptionId,
   SampleDataState,
-  WatchStatus,
-  WatchTransferProgress,
-  YouTubeHistoryEntry,
-  YouTubeMusicAuthCapture,
-  YouTubeMusicConfig,
-  YouTubeMusicLibrary,
-  YouTubeMusicStatus,
-  YouTubeMusicSyncResult,
   AnthropicApiConfig,
   AnthropicApiConnectionTest,
-  AppleMusicPlaylist,
-  AppleMusicStatus,
-  ApplePodcastShow,
-  ApplePodcastShowDetail,
   ChatAuthStatus,
   ChatMessage,
   ChatProvider,
@@ -144,6 +120,7 @@ import type {
   LocalChatDiscovery,
   OpenRouterConfig,
   OpenRouterConnectionTest,
+  CorosMcpAccount,
   CorosMcpStatus,
   CorosMcpTool,
   McpServerConfig,
@@ -157,8 +134,6 @@ import type {
 const api = {
   // Host OS, so the renderer can reserve space for the macOS traffic lights.
   platform: process.platform,
-  getWatchStatus: (): Promise<WatchStatus> =>
-    ipcRenderer.invoke("watch:getStatus"),
   reverseGeocodeLocation: (
     lat: number,
     lon: number
@@ -166,12 +141,6 @@ const api = {
     ipcRenderer.invoke("places:reverseGeocode", lat, lon),
   notifyRendererReady: (): Promise<void> =>
     ipcRenderer.invoke("app:rendererReady"),
-  getWatchConnectionSmokeOption: (): Promise<WatchConnectionSmokeOptionId> =>
-    ipcRenderer.invoke("watch:getConnectionSmokeOption"),
-  setWatchConnectionSmokeOption: (
-    optionId: WatchConnectionSmokeOptionId
-  ): Promise<WatchStatus> =>
-    ipcRenderer.invoke("watch:setConnectionSmokeOption", optionId),
   getSampleData: (): Promise<SampleDataState> =>
     ipcRenderer.invoke("dev:getSampleData"),
   setSampleData: (
@@ -179,188 +148,6 @@ const api = {
     enabled: boolean
   ): Promise<SampleDataState> =>
     ipcRenderer.invoke("dev:setSampleData", kind, enabled),
-  deleteWatchTrack: (relativePath: string): Promise<WatchStatus> =>
-    ipcRenderer.invoke("watch:deleteTrack", relativePath),
-  transferLocalTrack: (id: string): Promise<TransferResult> =>
-    ipcRenderer.invoke("watch:transferLocalTrack", id),
-  onWatchTransferProgress: (
-    callback: (progress: WatchTransferProgress) => void
-  ): (() => void) => {
-    const listener = (
-      _event: Electron.IpcRendererEvent,
-      progress: WatchTransferProgress
-    ) => {
-      callback(progress);
-    };
-    ipcRenderer.on("watch:transferProgress", listener);
-    return () =>
-      ipcRenderer.removeListener("watch:transferProgress", listener);
-  },
-  listDownloads: (): Promise<LocalTrack[]> =>
-    ipcRenderer.invoke("downloads:list"),
-  downloadAudio: (url: string): Promise<DownloadAudioResult> =>
-    ipcRenderer.invoke("downloads:downloadAudio", url),
-  deleteDownload: (id: string, removeFile: boolean): Promise<LocalTrack[]> =>
-    ipcRenderer.invoke("downloads:delete", id, removeFile),
-  getBinaryStatus: (): Promise<BinaryStatus> =>
-    ipcRenderer.invoke("binaries:getStatus"),
-  listYouTubeHistory: (): Promise<YouTubeHistoryEntry[]> =>
-    ipcRenderer.invoke("youtube:listHistory"),
-  recordYouTubeVisit: (
-    url: string,
-    title?: string
-  ): Promise<YouTubeHistoryEntry> =>
-    ipcRenderer.invoke("youtube:recordVisit", url, title),
-  downloadFromYouTubeBrowser: (
-    url: string,
-    title?: string
-  ): Promise<DownloadAudioResult> =>
-    ipcRenderer.invoke("youtube:download", url, title),
-  downloadMultipleFromYouTubeBrowser: (
-    items: Array<{ url: string; title?: string }>
-  ): Promise<DownloadAudioResult> =>
-    ipcRenderer.invoke("youtube:downloadMultiple", items),
-  enqueueYouTubeDownloads: (
-    items: DownloadQueueItem[]
-  ): Promise<DownloadJob[]> =>
-    ipcRenderer.invoke("youtube:enqueueDownload", items),
-  downloadCombinedPlaylist: (
-    id: string,
-    name: string,
-    items: DownloadQueueItem[]
-  ): Promise<CombinedDownloadResult> =>
-    ipcRenderer.invoke("music:downloadCombined", id, name, items),
-  onCombinedDownloadProgress: (
-    callback: (update: CombinedDownloadProgressEvent) => void
-  ): (() => void) => {
-    const listener = (
-      _event: Electron.IpcRendererEvent,
-      update: CombinedDownloadProgressEvent
-    ) => {
-      callback(update);
-    };
-    ipcRenderer.on("music:combinedProgress", listener);
-    return () =>
-      ipcRenderer.removeListener("music:combinedProgress", listener);
-  },
-  listYouTubeJobs: (): Promise<DownloadJob[]> =>
-    ipcRenderer.invoke("youtube:listJobs"),
-  clearYouTubeJob: (id: string): Promise<DownloadJob[]> =>
-    ipcRenderer.invoke("youtube:clearJob", id),
-  cancelYouTubeJob: (id: string): Promise<DownloadJob[]> =>
-    ipcRenderer.invoke("youtube:cancelJob", id),
-  clearCompletedYouTubeJobs: (): Promise<DownloadJob[]> =>
-    ipcRenderer.invoke("youtube:clearCompletedJobs"),
-  onYouTubeJobsUpdate: (
-    callback: (jobs: DownloadJob[]) => void
-  ): (() => void) => {
-    const listener = (_event: Electron.IpcRendererEvent, jobs: DownloadJob[]) => {
-      callback(jobs);
-    };
-    ipcRenderer.on("youtube:jobsUpdate", listener);
-    return () => ipcRenderer.removeListener("youtube:jobsUpdate", listener);
-  },
-  resetYouTubeBrowserSession: (): Promise<void> =>
-    ipcRenderer.invoke("youtube:resetSession"),
-  getYouTubeMusicConfig: (): Promise<YouTubeMusicConfig> =>
-    ipcRenderer.invoke("youtubeMusic:getConfig"),
-  saveYouTubeMusicConfig: (
-    config: YouTubeMusicConfig
-  ): Promise<YouTubeMusicStatus> =>
-    ipcRenderer.invoke("youtubeMusic:saveConfig", config),
-  getYouTubeMusicStatus: (): Promise<YouTubeMusicStatus> =>
-    ipcRenderer.invoke("youtubeMusic:getStatus"),
-  saveYouTubeMusicAuth: (
-    headersRaw: string
-  ): Promise<YouTubeMusicStatus> =>
-    ipcRenderer.invoke("youtubeMusic:saveAuth", headersRaw),
-  loginYouTubeMusic: (): Promise<YouTubeMusicStatus> =>
-    ipcRenderer.invoke("youtubeMusic:login"),
-  logoutYouTubeMusic: (): Promise<YouTubeMusicStatus> =>
-    ipcRenderer.invoke("youtubeMusic:logout"),
-  resetYouTubeMusicBrowserSession: (): Promise<void> =>
-    ipcRenderer.invoke("youtubeMusic:resetBrowserSession"),
-  onYouTubeMusicAuthCaptured: (
-    callback: (result: YouTubeMusicAuthCapture) => void
-  ): (() => void) => {
-    const listener = (
-      _event: Electron.IpcRendererEvent,
-      result: YouTubeMusicAuthCapture
-    ) => {
-      callback(result);
-    };
-    ipcRenderer.on("youtubeMusic:authCaptured", listener);
-    return () =>
-      ipcRenderer.removeListener("youtubeMusic:authCaptured", listener);
-  },
-  listYouTubeMusicLibrary: (): Promise<YouTubeMusicLibrary> =>
-    ipcRenderer.invoke("youtubeMusic:listLibrary"),
-  syncYouTubeMusicLibrary: (): Promise<YouTubeMusicSyncResult> =>
-    ipcRenderer.invoke("youtubeMusic:syncLibrary"),
-  getAppleMusicStatus: (): Promise<AppleMusicStatus> =>
-    ipcRenderer.invoke("appleMusic:getStatus"),
-  saveAppleMusicAuth: (headersRaw: string): Promise<AppleMusicStatus> =>
-    ipcRenderer.invoke("appleMusic:saveAuth", headersRaw),
-  logoutAppleMusic: (): Promise<AppleMusicStatus> =>
-    ipcRenderer.invoke("appleMusic:logout"),
-  resetAppleMusicBrowserSession: (): Promise<void> =>
-    ipcRenderer.invoke("appleMusic:resetBrowserSession"),
-  onAppleMusicAuthCaptured: (
-    callback: (status: AppleMusicStatus) => void
-  ): (() => void) => {
-    const listener = (
-      _event: Electron.IpcRendererEvent,
-      status: AppleMusicStatus
-    ) => {
-      callback(status);
-    };
-    ipcRenderer.on("appleMusic:authCaptured", listener);
-    return () =>
-      ipcRenderer.removeListener("appleMusic:authCaptured", listener);
-  },
-  listAppleMusicPlaylists: (): Promise<AppleMusicPlaylist[]> =>
-    ipcRenderer.invoke("appleMusic:listPlaylists"),
-  fetchAppleMusicPlaylist: (playlist: string): Promise<AppleMusicPlaylist> =>
-    ipcRenderer.invoke("appleMusic:fetchPlaylist", playlist),
-  searchApplePodcasts: (query: string): Promise<ApplePodcastShow[]> =>
-    ipcRenderer.invoke("applePodcasts:search", query),
-  loadApplePodcast: (
-    showIdOrUrl: string,
-    offset = 0
-  ): Promise<ApplePodcastShowDetail> =>
-    ipcRenderer.invoke("applePodcasts:load", showIdOrUrl, offset),
-  getSpotifyConfig: (): Promise<SpotifyConfig> =>
-    ipcRenderer.invoke("spotify:getConfig"),
-  saveSpotifyConfig: (config: SpotifyConfig): Promise<SpotifyStatus> =>
-    ipcRenderer.invoke("spotify:saveConfig", config),
-  getSpotifyStatus: (): Promise<SpotifyStatus> =>
-    ipcRenderer.invoke("spotify:getStatus"),
-  loginSpotify: (): Promise<SpotifyStatus> =>
-    ipcRenderer.invoke("spotify:login"),
-  logoutSpotify: (): Promise<SpotifyStatus> =>
-    ipcRenderer.invoke("spotify:logout"),
-  listSpotifyPlaylists: (): Promise<SpotifyPlaylist[]> =>
-    ipcRenderer.invoke("spotify:listPlaylists"),
-  listSpotifyPlaylistTracks: (
-    playlistId: string
-  ): Promise<SpotifyPlaylistTrack[]> =>
-    ipcRenderer.invoke("spotify:listPlaylistTracks", playlistId),
-  listSpotifySyncState: (playlistId: string): Promise<SpotifySyncTrack[]> =>
-    ipcRenderer.invoke("spotify:listSyncState", playlistId),
-  syncSpotifyPlaylist: (
-    playlistId: string,
-    autoTransfer: boolean
-  ): Promise<SpotifySyncResult> =>
-    ipcRenderer.invoke("spotify:syncPlaylist", playlistId, autoTransfer),
-  onSpotifySyncUpdate: (
-    callback: (update: SpotifySyncUpdate) => void
-  ): (() => void) => {
-    const listener = (_event: Electron.IpcRendererEvent, update: SpotifySyncUpdate) => {
-      callback(update);
-    };
-    ipcRenderer.on("spotify:syncUpdate", listener);
-    return () => ipcRenderer.removeListener("spotify:syncUpdate", listener);
-  },
   getTrainingHubStatus: (): Promise<TrainingHubStatus> =>
     ipcRenderer.invoke("trainingHub:getStatus"),
   loginTrainingHub: (
@@ -930,6 +717,16 @@ const api = {
     ipcRenderer.invoke("mcp:removeServer", id),
   connectMcpServer: (id: string): Promise<McpServerStatus> =>
     ipcRenderer.invoke("mcp:connect", id),
+  getCorosMcpAccount: (): Promise<CorosMcpAccount> =>
+    ipcRenderer.invoke("mcp:corosAccount"),
+  getDiagnostics: (): Promise<DiagnosticsSnapshot> =>
+    ipcRenderer.invoke("diagnostics:get"),
+  copyDiagnostics: (): Promise<DiagnosticsSnapshot> =>
+    ipcRenderer.invoke("diagnostics:copy"),
+  clearDiagnostics: (): Promise<DiagnosticsSnapshot> =>
+    ipcRenderer.invoke("diagnostics:clear"),
+  reportRendererError: (error: RendererDiagnosticError): void =>
+    ipcRenderer.send("diagnostics:rendererError", error),
   disconnectMcpServer: (id: string): Promise<void> =>
     ipcRenderer.invoke("mcp:disconnect", id),
   getMcpStatuses: (): Promise<McpServerStatus[]> =>

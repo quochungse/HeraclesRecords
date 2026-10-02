@@ -30,7 +30,7 @@ export type SyncTier =
   | "personal"
   /** Small user choices that should follow the person between machines. */
   | "preference"
-  /** Cache that can be rebuilt from COROS, Hevy, Spotify or the filesystem.
+  /** Cache that can be rebuilt from COROS, Hevy or the filesystem.
    *  Never synced — it would cost bandwidth and go stale. */
   | "derived"
   /**
@@ -151,14 +151,7 @@ export const TABLE_POLICY: Readonly<Record<string, TablePolicy>> = {
 
   // The last COROS answer for each plan, for drawing the library offline.
   // COROS is the source; another machine asks it rather than receiving this.
-  coros_plan_cache: "device",
-
-  // --- Bound to this machine's filesystem ----------------------------------
-  // Both carry absolute paths to downloaded audio that exists nowhere else.
-  downloads: "device",
-  spotify_sync_tracks: "device",
-  // A local "recently visited" convenience list, not a record worth carrying.
-  youtube_history: "device"
+  coros_plan_cache: "device"
 };
 
 export const SETTING_POLICY: Readonly<Record<string, SyncTier>> = {
@@ -185,18 +178,7 @@ export const SETTING_POLICY: Readonly<Record<string, SyncTier>> = {
   "chat.openRouter.apiKey": "device",
   "chat.local.apiKey": "device",
 
-  // Third-party accounts. clientId is not confidential on its own, but it is
-  // half of a credential pair the user created; the pair stays together.
-  "spotify.clientId": "device",
-  "spotify.clientSecret": "device",
-  "spotify.accessToken": "device",
-  "spotify.refreshToken": "device",
-  "spotify.expiresAt": "device",
-  "spotify.userId": "device",
-  "spotify.displayName": "device",
-  "youtubeMusic.clientId": "device",
-  "youtubeMusic.clientSecret": "device",
-  "appleMusic.credentialsJson": "device",
+  // Third-party accounts.
   "hevy.apiKey": "device",
   "hevy.identity": "device",
   "corosMcp.tokens": "device",
@@ -238,9 +220,6 @@ export const SETTING_POLICY: Readonly<Record<string, SyncTier>> = {
   "coachAutomation.pause": "preference",
   "coachAutomation.monthlyTokenBudget": "preference",
 
-  // --- Rebuildable cache ---------------------------------------------------
-  "youtubeMusic.libraryJson": "derived",
-
   // --- Machine-specific ----------------------------------------------------
   // An absolute path to a binary that lives at a different place on each OS.
   "chat.claudeCode.executablePath": "device",
@@ -262,8 +241,6 @@ export const SETTING_POLICY: Readonly<Record<string, SyncTier>> = {
   "chat.sidebar.open": "device",
   // Timestamps recording when *this* machine last authenticated or synced.
   "chat.authUpdatedAt": "device",
-  "appleMusic.authUpdatedAt": "device",
-  "youtubeMusic.authUpdatedAt": "device",
   "hevy.eventCursor": "device",
   "hevy.coverageSince": "device",
   "hevy.lastSyncedAt": "device",
@@ -415,8 +392,6 @@ export const LOCAL_STORAGE_POLICY: Readonly<Record<string, SyncTier>> = {
 
   // Window chrome, sized to whatever display this machine has.
   "heraclesrecords.sidebarCollapsed": "device",
-  // A transient pick in the Apple Music browser.
-  "heraclesrecords.appleMusic.selectedPlaylistId": "device",
   // "I dismissed the prompt for version X" — about this install, not the person.
   "heraclesrecords.updatePrompt.dismissedVersion": "device",
   // What was being written in each Coach conversation, and what it pointed at:

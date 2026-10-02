@@ -1,401 +1,13 @@
 import type { CoachStyle } from "./coachStyles";
 
-export type BinaryName = "yt-dlp" | "ffmpeg";
-
 /** User-selected measurement system for Heracles Records presentation and writes. */
 export type UnitSystem = "metric" | "imperial";
-
-export interface BinaryCheck {
-  name: BinaryName;
-  available: boolean;
-  command?: string;
-  source: "bundled" | "path" | "missing";
-  version?: string;
-  error?: string;
-}
-
-export interface BinaryStatus {
-  ytDlp: BinaryCheck;
-  ffmpeg: BinaryCheck;
-}
-
-export interface DriveCandidate {
-  name: string;
-  rootPath: string;
-  musicPath?: string;
-  mapPath?: string;
-  totalBytes?: number;
-  freeBytes?: number;
-  usedBytes?: number;
-  reason: string;
-}
-
-export interface WatchTrack {
-  name: string;
-  relativePath: string;
-  absolutePath: string;
-  sizeBytes: number;
-  modifiedAt: string;
-}
-
-export type WatchModelId =
-  | "pace-pro"
-  | "pace-4"
-  | "pace-3"
-  | "pace-2"
-  | "nomad"
-  | "vertix-2"
-  | "vertix-2s"
-  | "apex-4"
-  | "apex-2-pro"
-  | "apex-2"
-  | "apex-pro"
-  | "apex";
 
 /** Development builds only: which simulated activity sets are mixed into the list. */
 export interface SampleDataState {
   rides: boolean;
   hikes: boolean;
   trailRuns: boolean;
-}
-
-export type WatchConnectionSmokeOptionId =
-  | "auto"
-  | "none"
-  | "pace-pro"
-  | "pace-4"
-  | "pace-3"
-  | "pace-2"
-  | "nomad"
-  | "vertix-2"
-  | "vertix-2s"
-  | "apex-4"
-  | "apex-2-pro"
-  | "apex-2"
-  | "apex-pro"
-  | "apex"
-  | "unknown-pace"
-  | "installer";
-
-export interface WatchStatus {
-  connected: boolean;
-  checkedAt: string;
-  name?: string;
-  model?: WatchModelId;
-  rootPath?: string;
-  musicPath?: string;
-  /**
-   * COROS's offline-map folder. Nothing in the app reads or writes it any
-   * more — it is here because a watch mounted with maps but no music must
-   * still be recognised as a watch.
-   */
-  mapPath?: string;
-  totalBytes?: number;
-  freeBytes?: number;
-  usedBytes?: number;
-  tracks: WatchTrack[];
-  candidates: DriveCandidate[];
-  error?: string;
-}
-
-export interface LocalTrack {
-  id: string;
-  url: string;
-  title: string;
-  filePath: string;
-  sizeBytes: number;
-  createdAt: string;
-  transferredAt?: string;
-}
-
-export interface DownloadAudioResult {
-  tracks: LocalTrack[];
-  output: string[];
-  warnings?: string[];
-}
-
-export type DownloadJobStatus =
-  | "queued"
-  | "downloading"
-  | "completed"
-  | "failed"
-  | "cancelled";
-
-export type DownloadActivityPhase =
-  | "starting"
-  | "downloading"
-  | "converting"
-  | "between_tracks"
-  | "completed"
-  | "failed";
-
-export interface DownloadProgressUpdate {
-  trackProgress?: number;
-  trackIndex?: number;
-  trackTotal?: number;
-  currentTrackTitle?: string;
-  phase?: DownloadActivityPhase;
-  activity?: string;
-  completedTrackIncrement?: number;
-}
-
-export interface DownloadJob {
-  id: string;
-  url: string;
-  title: string;
-  status: DownloadJobStatus;
-  progress: number;
-  error?: string;
-  tracks: LocalTrack[];
-  createdAt: string;
-  updatedAt: string;
-  entryType?: "video" | "playlist" | "search" | "audio";
-  query?: string;
-  fileBaseName?: string;
-  phase?: DownloadActivityPhase;
-  trackIndex?: number;
-  trackTotal?: number;
-  currentTrackTitle?: string;
-  trackProgress?: number;
-  activity?: string;
-  completedTrackCount?: number;
-  warning?: string;
-}
-
-export type DownloadQueueItem =
-  | {
-      url: string;
-      title?: string;
-    }
-  | {
-      source: "search";
-      query: string;
-      title: string;
-      sourceUrl: string;
-      fileBaseName?: string;
-    }
-  | {
-      /** A directly downloadable public audio asset, such as a podcast RSS enclosure. */
-      source: "audio";
-      audioUrl: string;
-      title: string;
-      fileBaseName?: string;
-    };
-
-/** Live progress for a combined playlist download (many tracks → one MP3). */
-export interface CombinedDownloadProgress {
-  /** What the operation is currently doing. */
-  phase: "downloading" | "merging" | "completed";
-  /** 1-based index of the track currently downloading. */
-  index: number;
-  /** Total tracks being combined. */
-  total: number;
-  /** Display title of the track currently downloading. */
-  title: string;
-  /** 0..1 progress of the current track download. */
-  trackProgress: number;
-  /** The track was already present from an earlier interrupted attempt. */
-  reused?: boolean;
-}
-
-/**
- * A progress update tagged with the id of the combined download it belongs to,
- * so concurrent combines (e.g. one per service) stay isolated in the UI.
- */
-export interface CombinedDownloadProgressEvent extends CombinedDownloadProgress {
-  id: string;
-}
-
-export interface CombinedDownloadResult {
-  /** The merged MP3, registered in the local cache. */
-  track: LocalTrack;
-  /** Number of source tracks that were successfully downloaded and merged. */
-  downloadedCount: number;
-  /** Number of tracks restored from a previous attempt's cache. */
-  reusedCount: number;
-  /** Number of source tracks requested. */
-  totalCount: number;
-  warnings?: string[];
-}
-
-export type YouTubeHistoryEntryType =
-  | "video"
-  | "playlist"
-  | "search"
-  | "youtube";
-
-export interface YouTubeHistoryEntry {
-  url: string;
-  title: string;
-  entryType: YouTubeHistoryEntryType;
-  visits: number;
-  lastVisitedAt: string;
-  downloadedAt?: string;
-}
-
-export interface YouTubeMusicStatus {
-  configured: boolean;
-  pythonAvailable: boolean;
-  ytmusicapiAvailable: boolean;
-  authenticated: boolean;
-  authMethod?: "headers" | "oauth";
-  authUpdatedAt?: string;
-  syncedAt?: string;
-  songCount: number;
-  albumCount: number;
-  playlistCount: number;
-  dependencyError?: string;
-}
-
-export interface YouTubeMusicConfig {
-  clientId: string;
-  clientSecret: string;
-}
-
-export interface YouTubeMusicSong {
-  id: string;
-  videoId?: string;
-  songTitle: string;
-  albumTitle?: string;
-  artistName?: string;
-  videoUrl?: string;
-  thumbnailUrl?: string;
-}
-
-export interface YouTubeMusicAlbum {
-  id: string;
-  browseId?: string;
-  playlistId?: string;
-  albumTitle: string;
-  artistName?: string;
-  year?: string;
-  thumbnailUrl?: string;
-  songCount: number;
-  songs: YouTubeMusicSong[];
-}
-
-export interface YouTubeMusicPlaylist {
-  id: string;
-  playlistId?: string;
-  title: string;
-  description?: string;
-  thumbnailUrl?: string;
-  songCount: number;
-  songs: YouTubeMusicSong[];
-}
-
-export interface YouTubeMusicLibrary {
-  albums: YouTubeMusicAlbum[];
-  songs: YouTubeMusicSong[];
-  playlists: YouTubeMusicPlaylist[];
-  syncedAt?: string;
-}
-
-/**
- * Result pushed to the renderer when the embedded YouTube Music sign-in captures
- * credentials: the refreshed status on success, or a message if the ytmusicapi
- * setup failed (e.g. Python/ytmusicapi missing).
- */
-export type YouTubeMusicAuthCapture =
-  | { status: YouTubeMusicStatus; error?: undefined }
-  | { status?: undefined; error: string };
-
-export interface YouTubeMusicSyncResult extends YouTubeMusicLibrary {
-  status: YouTubeMusicStatus;
-}
-
-export interface AppleMusicStatus {
-  authenticated: boolean;
-  hasUserToken: boolean;
-  authUpdatedAt?: string;
-}
-
-export interface AppleMusicTrack {
-  id: string;
-  title: string;
-  artistName?: string;
-  albumName?: string;
-  durationMs?: number;
-  trackNumber?: number;
-  isrc?: string;
-  artworkUrl?: string;
-  catalogUrl?: string;
-}
-
-export interface AppleMusicPlaylist {
-  id: string;
-  kind: "catalog" | "library";
-  name: string;
-  description?: string;
-  curatorName?: string;
-  lastModifiedAt?: string;
-  artworkUrl?: string;
-  url?: string;
-  trackCount: number;
-  tracks: AppleMusicTrack[];
-}
-
-/** A show returned by Apple's public podcast catalogue. */
-export interface ApplePodcastShow {
-  /** Apple Podcasts collection id, serialized so it is safe across IPC. */
-  id: string;
-  /** Two-letter storefront used to resolve this show. */
-  storefront: string;
-  title: string;
-  authorName?: string;
-  description?: string;
-  artworkUrl?: string;
-  genre?: string;
-  episodeCount?: number;
-  /** Canonical Apple Podcasts show URL, when Apple supplies one. */
-  applePodcastsUrl?: string;
-  /** Public RSS feed URL. Absent for feedless or restricted shows. */
-  feedUrl?: string;
-}
-
-/** A publicly downloadable audio enclosure from a podcast RSS feed. */
-export interface ApplePodcastEpisode {
-  /** Stable RSS GUID when present, otherwise the enclosure URL. */
-  id: string;
-  title: string;
-  description?: string;
-  publishedAt?: string;
-  durationSeconds?: number;
-  episodeNumber?: number;
-  seasonNumber?: number;
-  artworkUrl?: string;
-  audioUrl: string;
-  mimeType?: string;
-  sizeBytes?: number;
-}
-
-export interface ApplePodcastShowDetail extends ApplePodcastShow {
-  episodes: ApplePodcastEpisode[];
-  /** Total valid public RSS episodes currently available from this feed. */
-  totalEpisodeCount: number;
-  /** Whether another page of older episodes can be loaded in this session. */
-  hasMoreEpisodes: boolean;
-}
-
-export interface TransferResult {
-  copiedTrack: WatchTrack;
-  watch: WatchStatus;
-}
-
-/**
- * Streamed progress for a single track being copied to the watch. Emitted from
- * the main process while `watch:transferLocalTrack` runs so the renderer can
- * show live progress instead of freezing on a synchronous copy.
- */
-export interface WatchTransferProgress {
-  /** Download id of the track currently transferring. */
-  id: string;
-  /** File name of the track currently transferring. */
-  name: string;
-  copiedBytes: number;
-  totalBytes: number;
-  /** 0..1 progress of the current file. */
-  progress: number;
 }
 
 /** A coordinate resolved to a human-readable place (Nominatim). */
@@ -405,77 +17,6 @@ export interface ReverseGeocodeResult {
   lon: number;
   city?: string;
   country?: string;
-}
-
-export interface SpotifyConfig {
-  clientId: string;
-  clientSecret: string;
-  redirectUri: string;
-}
-
-export interface SpotifyStatus {
-  configured: boolean;
-  authenticated: boolean;
-  redirectUri: string;
-  displayName?: string;
-  userId?: string;
-  tokenExpiresAt?: string;
-}
-
-export interface SpotifyPlaylist {
-  id: string;
-  name: string;
-  ownerId: string;
-  ownerName: string;
-  collaborative: boolean;
-  public: boolean | null;
-  totalTracks: number;
-  snapshotId: string;
-  syncable: boolean;
-  description?: string;
-  artworkUrl?: string;
-  url?: string;
-}
-
-export interface SpotifyPlaylistTrack {
-  spotifyTrackId: string;
-  artistName: string;
-  trackName: string;
-  albumName?: string;
-  durationMs?: number;
-  addedAt?: string;
-  filename: string;
-  query: string;
-  artworkUrl?: string;
-}
-
-export type SpotifySyncTrackStatus =
-  | "queued"
-  | "downloading"
-  | "done"
-  | "failed";
-
-export interface SpotifySyncTrack {
-  playlistId: string;
-  spotifyTrackId: string;
-  artistName: string;
-  trackName: string;
-  query: string;
-  filename: string;
-  status: SpotifySyncTrackStatus;
-  localDownloadId?: string;
-  filePath?: string;
-  error?: string;
-  updatedAt: string;
-}
-
-export interface SpotifySyncUpdate extends SpotifySyncTrack {}
-
-export interface SpotifySyncResult {
-  playlistId: string;
-  tracks: SpotifySyncTrack[];
-  completed: number;
-  failed: number;
 }
 
 export interface TrainingHubStatus {
@@ -2451,6 +1992,17 @@ export interface CorosMcpTool {
   inputSchema: Record<string, unknown>;
 }
 
+/** An account region with its own COROS MCP deployment. */
+export type CorosMcpRegion = "us" | "eu" | "cn";
+
+/** The COROS account the Training Hub session is signed in with. */
+export interface CorosMcpAccount {
+  /** Remembered login email, filled in on COROS's sign-in page. */
+  email?: string;
+  /** The session's region, which picks the built-in server's endpoint. */
+  region?: CorosMcpRegion;
+}
+
 export interface CorosMcpStatus {
   /** A live MCP client session is open. */
   connected: boolean;
@@ -2473,7 +2025,10 @@ export interface McpServerConfig {
   authType: McpAuthType;
   scope?: string;
   enabled: boolean;
-  /** Built-in (COROS): non-deletable, url/id immutable, can be disabled. */
+  /**
+   * Built-in (COROS): non-deletable, id immutable, url limited to COROS's
+   * regional endpoints, can be disabled.
+   */
   builtin: boolean;
   sortOrder: number;
 }
@@ -3700,11 +3255,7 @@ export type RunWorkoutStepInput =
   | RunWorkoutCreateStep
   | RunWorkoutCreateRepeatGroup;
 
-export type WorkoutCreateStepKind = RunWorkoutCreateStepKind;
-export type WorkoutCreateTargetType = RunWorkoutCreateTargetType;
 export type WorkoutCreateStep = RunWorkoutCreateStep;
-export type WorkoutCreateRepeatGroup = RunWorkoutCreateRepeatGroup;
-export type WorkoutStepInput = RunWorkoutStepInput;
 
 export interface CorosTrainingPlanDraftInput {
   name: string;
@@ -3879,14 +3430,6 @@ export interface RunWorkoutEditorDraft {
   sportOptions?: WorkoutSportOptions;
   nodes: RunWorkoutEditorNode[];
 }
-
-export type WorkoutEditorStepKind = RunWorkoutEditorStepKind;
-export type WorkoutEditorTarget = RunWorkoutEditorTarget;
-export type WorkoutEditorIntensity = RunWorkoutEditorIntensity;
-export type WorkoutEditorStep = RunWorkoutEditorStep;
-export type WorkoutEditorRepeatGroup = RunWorkoutEditorRepeatGroup;
-export type WorkoutEditorNode = RunWorkoutEditorNode;
-export type WorkoutEditorDraft = RunWorkoutEditorDraft;
 
 export interface WorkoutZone {
   index: number;

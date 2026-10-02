@@ -25,7 +25,7 @@ import {
   classifyWorkoutExerciseName,
   type ExerciseSearchEquipment
 } from "../../electron/exerciseCatalogSearch";
-import { MUSCLE_BY_ID, MUSCLES, resolveExerciseTargets, type MuscleId } from "../strength/muscles";
+import { MUSCLE_BY_ID, resolveExerciseTargets, type MuscleId } from "../strength/muscles";
 
 export type ExerciseFacetKind = "all" | "bodyPart" | "muscle" | "equipment";
 
@@ -168,5 +168,3 @@ export function muscleLabel(muscle: MuscleId): string {
 export function muscleAnatomy(muscle: MuscleId): string {
   return MUSCLE_BY_ID[muscle].anatomy;
 }
-
-export const ALL_MUSCLE_IDS: readonly MuscleId[] = MUSCLES.map((muscle) => muscle.id);

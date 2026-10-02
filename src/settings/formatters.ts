@@ -2,10 +2,7 @@
 //
 // Kept together because the panels are siblings that describe the same kind of
 // thing — a destination and a file — and they carried byte-identical copies of
-// both functions. `src/media/libraryUtils.ts` has its own `formatBytes` and is
-// deliberately left alone: it reports track sizes to one decimal from a kilobyte
-// up, which is the right precision for a 4 MB song and the wrong one for a
-// 15 GB Drive quota.
+// both functions. Settings' storage locations read sizes through here too.
 
 /** A stored ISO timestamp as the local machine writes dates. Falls back to the
  *  raw string rather than "Invalid Date", so a file from a future version still

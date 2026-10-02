@@ -3861,15 +3861,6 @@
   }
 }
 
-@keyframes tl-grow {
-  from {
-    transform: scaleY(0);
-  }
-  to {
-    transform: scaleY(1);
-  }
-}
-
 @keyframes tl-reader-dock-in {
   from {
     opacity: 0;
