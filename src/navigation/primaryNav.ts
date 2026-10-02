@@ -30,7 +30,7 @@ export type PrimaryView =
   | "places"
   | "settings";
 
-export type PrimaryNavSectionId = "today" | "plan" | "history";
+export type PrimaryNavSectionId = "today" | "plan" | "history" | "journey";
 
 export interface PrimaryNavItem {
   id: PrimaryView;
@@ -55,13 +55,14 @@ export interface PrimaryNavSection {
 }
 
 /**
- * The rail reads as an index: three standing headings, eleven destinations,
+ * The rail reads as an index: four standing headings, eleven destinations,
  * nothing to open first.
  *
  * The sections answer *when the athlete reaches for a screen*, not where the
  * data came from. That is the one grouping the athlete already has in their
- * head — the morning check, the week being planned, the work on file — and it
- * is what lets the whole list stand open at once. The
+ * head — the morning check, the week being planned, the work on file, the
+ * ground covered over the years — and it is what lets the whole list stand
+ * open at once. The
  * disclosure groups this replaced existed only because eighteen equal rows did
  * not fit, and they cost two rows, a chevron, a remembered open/closed state and
  * a rule that reopened a group whenever the app navigated into it.
@@ -100,16 +101,22 @@ export const PRIMARY_NAV_SECTIONS: PrimaryNavSection[] = [
     label: "History",
     // What is behind. Activities holds every sport; Running, Cycling,
     // Hiking and Strength are separate destinations because they are read
-    // through different numbers, not because they are filters. The globe is
-    // the same history seen from above.
+    // through different numbers, not because they are filters.
     items: [
       { id: "training", label: "Activities", icon: Activity },
       { id: "running", label: "Running", icon: RunnerIcon },
       { id: "cycling", label: "Cycling", icon: Bike },
       { id: "hiking", label: "Hiking", icon: Mountain },
       { id: "strength", label: "Strength", icon: Dumbbell },
-      { id: "places", label: "Where you’ve been", icon: Globe },
     ],
+  },
+  {
+    id: "journey",
+    label: "Your journey",
+    // The same history seen from above: not a session or a week but every
+    // place the training has taken the athlete, which is reached for at a
+    // different moment from the log above it.
+    items: [{ id: "places", label: "Where you’ve been", icon: Globe }],
   },
 ];
 

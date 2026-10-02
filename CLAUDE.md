@@ -2466,8 +2466,8 @@ neutralised, so the concept has to be reintroduced deliberately. A hardcoded `#8
 `var(--success-text)` and follows the theme.
 
 **The primary rail is an index, not a control panel.** `PRIMARY_NAV_SECTIONS`
-(`primaryNav.ts`) is three standing headings — Today, Plan, History — over eleven
-destinations, and a heading is a label: it does not open, close or remember anything. The
+(`primaryNav.ts`) is four standing headings — Today, Plan, History, Your journey — over
+eleven destinations, and a heading is a label: it does not open, close or remember anything. The
 disclosure groups this replaced existed only because eighteen equal rows did not fit, and
 they cost two rows, a chevron, a stored open/closed state, a rule that reopened a group
 whenever the app navigated into it, and a second indicator key for a collapsed group's

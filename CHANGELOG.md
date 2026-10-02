@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **Where you've been** has a section of its own at the foot of the rail, Your journey.
+
 ### Removed
 
 - **Coros Overview and Media**, and the USB connection to the watch they were built on. Heracles Records reads your watch only through your COROS account now; Overview keeps its training panels.
