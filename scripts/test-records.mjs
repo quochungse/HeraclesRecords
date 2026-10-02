@@ -211,13 +211,32 @@ const corosOnly = computeRecords({
     { type: 4, label: "All", records: [{ type: 5, label: "5K", duration: 1430, happenDay: "20250614", activityId: r2.activityId }] }
   ]
 });
-const current = find(corosOnly, `record:5000:${r2.activityId}`);
+const current = find(corosOnly, `pr:${r2.activityId}`);
 assert.equal(
   current.title,
   "Your 5K record — 23:50",
   "before any backfill, COROS's current record is still on the timeline"
 );
 assert.equal(current.labour, undefined, "but it improved nothing, so it is no labour stage");
+
+// Once the backfill reads what came before, it is the same milestone: the same
+// id, so it is not news twice — and, set in the first weeks at the distance,
+// it stays on the timeline as the record standing rather than leaving it.
+const early = activity(at(2025, 6, 1), 100);
+const backfilled = computeRecords({
+  ...base,
+  activities: [early, r2],
+  summaries: new Map([[early.activityId, { recordsVersion: 2, bestEfforts: [{ distance: 5000, seconds: 1500 }] }]]),
+  personalRecords: [
+    { type: 4, label: "All", records: [{ type: 5, label: "5K", duration: 1430, happenDay: "20250614", activityId: r2.activityId }] }
+  ]
+});
+assert.deepEqual(
+  ids(backfilled).filter((id) => id.startsWith("pr:") || id.startsWith("record:")),
+  [`pr:${r2.activityId}`],
+  "one record milestone, under the id it had before the backfill"
+);
+assert.equal(find(backfilled, `pr:${r2.activityId}`).title, "Your 5K record — 23:50");
 
 // A beginner breaks a record every other run. The first four weeks at a
 // distance set the bar; a gain under 1% is noise; one run's records are one
@@ -380,6 +399,26 @@ const named = computeRecords({
 });
 assert.deepEqual(find(named, "place:country:thailand").labour, { id: "cattle", stage: 2 });
 assert.ok(!find(named, "place:country:việt-nam"), "home is no new country");
+
+// The two geocoders name one country in two languages. Home named by
+// Nominatim ("Việt Nam", from before codes were kept) and a trip inside the
+// country named by Photon ("Vietnam", VN) are one country, not two.
+const twoLanguages = computeRecords({
+  ...base,
+  activities: [...homeRuns, ...away],
+  summaries: placeSummaries,
+  placeLabels: {
+    [homeKey]: { city: "Hà Nội", country: "Việt Nam" },
+    [placesFirst.places.find((cell) => cell.lat === 22.34).key]: { city: "Sa Pa", country: "Vietnam", countryCode: "VN" },
+    [placesFirst.places.find((cell) => cell.lat === 18.79).key]: { city: "Chiang Mai", country: "ประเทศไทย", countryCode: "TH" }
+  }
+});
+assert.deepEqual(
+  ids(twoLanguages).filter((id) => id.startsWith("place:country:")),
+  ["place:country:ประเทศไทย"],
+  "Sa Pa is no new country; Chiang Mai is, in whatever language it was named"
+);
+assert.deepEqual(find(twoLanguages, "place:country:ประเทศไทย").labour, { id: "cattle", stage: 2 });
 assert.deepEqual(find(named, "place:pillars").labour, { id: "cattle", stage: 3 }, "Paris is past the Pillars from Hà Nội");
 
 // --- The labours ------------------------------------------------------------------------------------

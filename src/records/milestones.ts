@@ -40,6 +40,7 @@ import { formatDurationSeconds, getLocalHappenDayKey } from "../training/formatt
 import { isStrengthSportType, isSwimSportType } from "../training/sportTypes";
 import { RECORDS_SUMMARY_VERSION } from "../../electron/activityMetrics";
 import { isIndoorSportType } from "../../electron/corosSportTypes";
+import { geoHeatBucketKey } from "../trainingMap/activityVisitHeatmap";
 import type { LabourId, LabourStage, StageProgress } from "./labours";
 import { STAGE_NUMERALS, labourDefinition, labourStageKey } from "./labours";
 
@@ -127,6 +128,8 @@ export interface PlaceCell {
 export interface PlaceLabelLookup {
   city: string;
   country: string;
+  /** ISO alpha-2 where the geocoder gave one: what says two names are one country. */
+  countryCode?: string;
 }
 
 export interface WithinReach {
@@ -530,9 +533,19 @@ function haversineKm(a: { lat: number; lon: number }, b: { lat: number; lon: num
   return 6371 * 2 * Math.asin(Math.min(1, Math.sqrt(h)));
 }
 
-/** The globe's 0.5° cell (`geoHeatBucketKey`), so a name it has already found is reused. */
+/** The globe's own 0.5° cell, so a name it has already found is reused. */
 export function placeCellKey(point: { lat: number; lon: number }): string {
-  return `${Math.round(point.lat / 0.5)}:${Math.round(point.lon / 0.5)}`;
+  return geoHeatBucketKey(point);
+}
+
+/** A country's name with its accents and spacing folded: "Việt Nam" and "Vietnam" meet. */
+function foldCountryName(name: string): string {
+  return name
+    .normalize("NFD")
+    .replace(/\p{M}/gu, "")
+    .replace(/đ/giu, "d")
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}]+/gu, "");
 }
 
 function ratioOf(value: number, target: number): number {
@@ -1213,51 +1226,78 @@ function recordMilestones(
   entries.sort((left, right) => left.day.localeCompare(right.day) || left.at - right.at);
 
   // Improvements, gathered per run: one run that sets three records is one
-  // milestone, not three.
+  // milestone, not three. COROS's own current records gather there too, under
+  // the same id whether or not the backfill has yet read what came before —
+  // it used to be `record:` until then and `pr:` after, so the athlete was
+  // told twice, or the record left the hall once its history showed it was
+  // set in the first weeks.
   type Gain = { distance: number; seconds: number; previous: { seconds: number; day: string }; source: Entry["source"] };
-  const gains = new Map<string, { entry: Entry; gains: Gain[] }>();
+  const runs = new Map<string, { entry: Entry; gains: Gain[]; standing: Entry[] }>();
+  const runOf = (entry: Entry) => {
+    const key = entry.activity.activityId;
+    const group = runs.get(key) ?? { entry, gains: [], standing: [] };
+    runs.set(key, group);
+    return group;
+  };
   for (const entry of entries) {
     const previous = best.get(entry.distance);
-    if (previous && entry.seconds >= previous.seconds) continue;
-    best.set(entry.distance, { seconds: entry.seconds, day: entry.day });
-    if (!firstEffort.has(entry.distance)) firstEffort.set(entry.distance, entry.day);
-
-    if (!previous) {
-      // The first effort at a distance beats nothing, so it is no record — but
-      // COROS's own current record is shown however little history the
-      // backfill has reached, since it is the one the athlete has seen.
-      if (entry.source === "coros") {
-        milestones.push({
-          id: `record:${entry.distance}:${entry.activity.activityId}`,
-          category: "record",
-          day: entry.day,
-          at: entry.at,
-          kind: "Record · Running",
-          title: `Your ${labelOf(entry.distance)} record — ${formatDurationSeconds(entry.seconds)}`,
-          detail: "COROS's current record",
-          sport: "run",
-          major: false,
-          activity: activityRef(entry.activity)
-        });
-      }
+    if (previous && entry.seconds >= previous.seconds) {
+      // Our own read of an earlier run came in a breath under COROS's figure:
+      // COROS's is still the record the athlete has seen.
+      if (entry.source === "coros") runOf(entry).standing.push(entry);
       continue;
     }
-    // A record a beginner breaks every other run is no milestone: the first
-    // four weeks at a distance set the bar, and a sliver under it is noise.
-    const settled = daysBetween(firstEffort.get(entry.distance) as string, entry.day) >= RECORD_SETTLE_DAYS;
-    const meaningful = (previous.seconds - entry.seconds) / previous.seconds >= RECORD_MIN_GAIN;
-    if (!settled || !meaningful) continue;
-    const key = entry.activity.activityId;
-    const group = gains.get(key) ?? { entry, gains: [] };
-    group.gains.push({ distance: entry.distance, seconds: entry.seconds, previous, source: entry.source });
-    gains.set(key, group);
+    best.set(entry.distance, { seconds: entry.seconds, day: entry.day });
+    if (!firstEffort.has(entry.distance)) firstEffort.set(entry.distance, entry.day);
+    // The first effort at a distance beats nothing, so it is no improvement.
+    // A record a beginner breaks every other run is no milestone either: the
+    // first four weeks at a distance set the bar, and a sliver under it is
+    // noise. COROS's current record is shown whichever, as the one standing.
+    const settled =
+      previous !== undefined &&
+      daysBetween(firstEffort.get(entry.distance) as string, entry.day) >= RECORD_SETTLE_DAYS;
+    const meaningful =
+      previous !== undefined && (previous.seconds - entry.seconds) / previous.seconds >= RECORD_MIN_GAIN;
+    if (previous && settled && meaningful) {
+      runOf(entry).gains.push({ distance: entry.distance, seconds: entry.seconds, previous, source: entry.source });
+    } else if (entry.source === "coros") {
+      runOf(entry).standing.push(entry);
+    }
   }
 
-  const groups = [...gains.values()].sort(
+  const groups = [...runs.values()].sort(
     (left, right) => left.entry.day.localeCompare(right.entry.day) || left.entry.at - right.entry.at
   );
-  for (const { entry, gains: list } of groups) {
+  for (const { entry, gains: list, standing } of groups) {
     list.sort((left, right) => left.distance - right.distance);
+    standing.sort((left, right) => left.distance - right.distance);
+    const joined = (labels: string[]) =>
+      labels.length === 1
+        ? labels[0]
+        : `${labels.slice(0, -1).join(", ")} and ${labels[labels.length - 1]}`;
+    const standingLine = standing
+      .map((record) => `${labelOf(record.distance)} ${formatDurationSeconds(record.seconds)}`)
+      .join(" · ");
+
+    if (list.length === 0) {
+      milestones.push({
+        id: `pr:${entry.activity.activityId}`,
+        category: "record",
+        day: entry.day,
+        at: entry.at,
+        kind: "Record · Running",
+        title:
+          standing.length === 1
+            ? `Your ${labelOf(standing[0].distance)} record — ${formatDurationSeconds(standing[0].seconds)}`
+            : `Your ${joined(standing.map((record) => labelOf(record.distance)))} records`,
+        detail: standing.length === 1 ? "COROS's current record" : `${standingLine} · COROS's current records`,
+        sport: "run",
+        major: false,
+        activity: activityRef(entry.activity)
+      });
+      continue;
+    }
+
     let labour: MilestoneLabour | undefined;
     for (const gain of list) {
       improved.add(gain.distance);
@@ -1274,13 +1314,13 @@ function recordMilestones(
       maresSet = true;
       labour = withStage(labour, "mares", 2);
     }
-    const labels = list.map((gain) => labelOf(gain.distance));
-    const named =
-      labels.length === 1
-        ? labels[0]
-        : `${labels.slice(0, -1).join(", ")} and ${labels[labels.length - 1]}`;
+    const named = joined(list.map((gain) => labelOf(gain.distance)));
     const describe = (gain: Gain) =>
       `${formatGap(gain.previous.seconds - gain.seconds)} faster than the record from ${formatDayShort(gain.previous.day)}`;
+    const contextLines = [
+      ...(list.length > 1 ? list.map((gain) => `${labelOf(gain.distance)}: ${describe(gain)}.`) : []),
+      ...(standing.length > 0 ? [`Also COROS's current record: ${standingLine}.`] : [])
+    ];
     milestones.push({
       id: `pr:${entry.activity.activityId}`,
       category: "record",
@@ -1297,9 +1337,7 @@ function recordMilestones(
           : list
               .map((gain) => `${labelOf(gain.distance)} ${formatDurationSeconds(gain.seconds)}`)
               .join(" · "),
-      ...(list.length > 1
-        ? { context: list.map((gain) => `${labelOf(gain.distance)}: ${describe(gain)}.`).join(" ") }
-        : {}),
+      ...(contextLines.length > 0 ? { context: contextLines.join(" ") } : {}),
       sport: "run",
       major: list.some((gain) => gain.distance >= 21097.5),
       activity: activityRef(entry.activity),
@@ -1622,9 +1660,22 @@ function placeMilestones(
   if (!home) return { milestones, cells: ranked, progress };
 
   const labels = input.placeLabels ?? {};
-  const homeCountry = labels[home.key]?.country;
+  // One country, however it was named. The two geocoders write it in two
+  // languages — Nominatim the local name, Photon English — so the name alone
+  // made "Vietnam" a new country for an athlete at home in "Việt Nam". The
+  // code decides where the geocoder gave one; a name cached before codes
+  // existed borrows the code another place under that name carries.
+  const codeOfName = new Map<string, string>();
+  for (const label of Object.values(labels)) {
+    if (label.countryCode) codeOfName.set(foldCountryName(label.country), label.countryCode.toUpperCase());
+  }
+  const countryOf = (label: PlaceLabelLookup): string => {
+    const folded = foldCountryName(label.country);
+    return label.countryCode?.toUpperCase() ?? codeOfName.get(folded) ?? folded;
+  };
+  const homeLabel = labels[home.key];
   const visited = new Set<string>();
-  const countries = new Set<string>(homeCountry ? [homeCountry] : []);
+  const countries = new Set<string>(homeLabel?.country ? [countryOf(homeLabel)] : []);
   let furthest = 0;
   let pillars = false;
   let secondCountry = false;
@@ -1655,9 +1706,9 @@ function placeMilestones(
       }
       if (label?.country && countries.size === 0) {
         // The first country named is home, not a new one.
-        countries.add(label.country);
-      } else if (label?.country && !countries.has(label.country)) {
-        countries.add(label.country);
+        countries.add(countryOf(label));
+      } else if (label?.country && !countries.has(countryOf(label))) {
+        countries.add(countryOf(label));
         const labour = !secondCountry && countries.size >= 2 ? { id: "cattle" as const, stage: 2 as const } : undefined;
         if (labour) secondCountry = true;
         milestones.push({

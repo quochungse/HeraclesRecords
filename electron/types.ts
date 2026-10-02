@@ -17,6 +17,11 @@ export interface ReverseGeocodeResult {
   lon: number;
   city?: string;
   country?: string;
+  /**
+   * ISO 3166-1 alpha-2, upper case. The two providers name one country in two
+   * languages ("Việt Nam", "Vietnam"); the code is what says they are one.
+   */
+  countryCode?: string;
 }
 
 export interface TrainingHubStatus {

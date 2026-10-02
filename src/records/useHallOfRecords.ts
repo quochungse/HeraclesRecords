@@ -64,7 +64,11 @@ function namedPlaceLabels(): Record<string, PlaceLabelLookup> {
   for (const [key, label] of Object.entries(known)) {
     // "Location" is `coordinateLabel`'s country: nobody answered for that cell.
     if (label.country && label.country !== "Location") {
-      named[key] = { city: label.city, country: label.country };
+      named[key] = {
+        city: label.city,
+        country: label.country,
+        ...(typeof label.countryCode === "string" ? { countryCode: label.countryCode } : {})
+      };
     }
   }
   return named;
