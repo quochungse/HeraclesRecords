@@ -78,8 +78,14 @@ watch switch and chip), the rail's Device heading, every music source (`youtube*
 `yt-dlp`, FFmpeg, Python runtime and `ytmusicapi` (`prepare-binaries`, `bin/`,
 `binaries:prepare*`, the `extraResources` entry), the `<webview>` tag and its guards, 46 IPC
 channels and six pushes, six suites, and the `spotify-web-api-node`, `fast-xml-parser` and
-`ffmpeg-static` packages. Overview keeps its training panels, and its greeting no longer
-speaks of a watch or a library. A "Your device" banner, if one comes, reads COROS's API —
+`ffmpeg-static` packages. What Media kept is deleted on open: `dropRetiredMediaData` drops
+`downloads`, `spotify_sync_tracks` and `youtube_history` and every `spotify.*`,
+`youtubeMusic.*` and `appleMusic.*` setting (a client secret, tokens and captured headers
+among them; `test:media-legacy-drop`), and `removeRetiredFeatureStorage` sweeps
+`<userData>/downloads` — the downloaded MP3s with it — `combined-download-cache`,
+`ytmusicapi-browser.json` and the three `Partitions/heraclesrecords-*` browser sessions.
+Overview keeps its training panels, and its greeting no longer speaks of a watch or a
+library. A "Your device" banner, if one comes, reads COROS's API —
 `queryDevices` on COROS MCP (firmware, battery), or the `deviceList` every activity detail
 carries (name, model `type`, icon) — never a drive.
 

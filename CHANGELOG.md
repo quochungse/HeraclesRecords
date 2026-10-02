@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Removed
 
 - **Coros Overview and Media**, and the USB connection to the watch they were built on. Heracles Records reads your watch only through your COROS account now; Overview keeps its training panels.
+- What Media kept on this computer is deleted on the first launch: downloaded MP3s, the music sign-ins (Spotify, YouTube Music, Apple Music) and their browser sessions.
 
 ## [1.0.0] - 2026-10-01
 

@@ -665,15 +665,18 @@ function createWindow(): void {
 }
 
 /**
- * Deletes what the Maps, Watch Faces and Gear screens left on disk.
+ * Deletes what the Maps, Watch Faces, Gear and Media screens left on disk.
  *
  * Their SQLite tables are dropped when the database opens, and these are the
  * files those rows described — downloaded COROS map packages (often a gigabyte
  * of them), route GPX, saved watchface projects and the archives built from
- * them. Nothing reads any of it, and an install that had used those screens
- * would otherwise carry the whole of it forever with nothing in the app even
- * naming the folders. Best effort: a folder that will not delete is not worth
- * a failed launch, and the next one tries again.
+ * them, downloaded music and its combine cache — plus Media's sign-ins: the
+ * ytmusicapi auth file and the YouTube, YouTube Music and Apple Music browser
+ * sessions (cookies and caches, a hundred megabytes or more). Nothing reads any
+ * of it, and an install that had used those screens would otherwise carry the
+ * whole of it forever with nothing in the app even naming the folders. Best
+ * effort: a folder that will not delete is not worth a failed launch, and the
+ * next one tries again.
  */
 async function removeRetiredFeatureStorage(): Promise<void> {
   const retired = [
@@ -682,7 +685,13 @@ async function removeRetiredFeatureStorage(): Promise<void> {
     "watchface-projects",
     "watchface-archives",
     "watchface-share-imports",
-    "community-watchface-imports"
+    "community-watchface-imports",
+    "downloads",
+    "combined-download-cache",
+    "ytmusicapi-browser.json",
+    path.join("Partitions", "heraclesrecords-youtube"),
+    path.join("Partitions", "heraclesrecords-ytmusic"),
+    path.join("Partitions", "heraclesrecords-apple")
   ];
   for (const name of retired) {
     const target = path.join(app.getPath("userData"), name);

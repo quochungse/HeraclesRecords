@@ -466,6 +466,7 @@ export function initializeDatabase(userDataPath: string): Database.Database {
   dropRetiredMapTables(db);
   dropRetiredCollectionTable(db);
   dropRetiredIntervalsSettings(db);
+  dropRetiredMediaData(db);
   dropLocalTrainingPlans(db);
   migrateChatTranscriptsToSessions(db);
 
@@ -743,6 +744,33 @@ function dropRetiredIntervalsSettings(database: Database.Database): void {
     .run().changes;
   if (removed > 0) {
     console.log(`[db] removed ${removed} retired intervals.icu setting(s)`);
+  }
+}
+
+/**
+ * Deletes what the Media screen kept in the database: the downloads it
+ * listed, Spotify's per-playlist sync state, the YouTube browser's history,
+ * and every `spotify.*`, `youtubeMusic.*` and `appleMusic.*` setting — a client
+ * secret, OAuth tokens and captured Apple Music headers among them, which
+ * nothing would use or offer to remove any more. All of it was `device` tier
+ * and never left the machine, so there is nothing to do anywhere else; the
+ * files the rows described are swept by `removeRetiredFeatureStorage` in
+ * main.ts.
+ */
+function dropRetiredMediaData(database: Database.Database): void {
+  for (const table of ["downloads", "spotify_sync_tracks", "youtube_history"]) {
+    if (!tableExists(database, table)) continue;
+    console.log(`[db] dropping retired media table: ${table}`);
+    database.exec(`DROP TABLE ${table}`);
+  }
+  const removed = database
+    .prepare(
+      `DELETE FROM app_settings
+       WHERE key LIKE 'spotify.%' OR key LIKE 'youtubeMusic.%' OR key LIKE 'appleMusic.%'`
+    )
+    .run().changes;
+  if (removed > 0) {
+    console.log(`[db] removed ${removed} retired media setting(s)`);
   }
 }
 
