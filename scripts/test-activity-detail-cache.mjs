@@ -383,6 +383,21 @@ const jumped = metrics.bestEfforts(
 );
 assert.deepEqual(jumped, [], "an effort faster than 2:12/km is refused");
 
+// A jump inside an honest kilometre is no faster on average than 2:12/km, so
+// the stretch test alone let it through. The step itself is refused, and the
+// best stretch that does not cross it is the 1K.
+const steady = [];
+for (let second = 0; second <= 1500; second += 5) {
+  // 5:00/km, with a 300 m jump at the tenth minute.
+  steady.push({ elapsed: second, distance: (second * 1000) / 300 + (second >= 600 ? 300 : 0) });
+}
+const throughJump = metrics.bestEfforts(steady, [1000]);
+assert.equal(throughJump.length, 1, "the run still has a 1K");
+assert.ok(
+  Math.abs(throughJump[0].seconds - 300) < 1,
+  `a jump inside the stretch is no 3:30 1K, got ${throughJump[0]?.seconds}`
+);
+
 // Activity time, not the wall clock: a wait at a crossing is not in the stretch.
 const paused = metrics.withPausesRemoved(
   [

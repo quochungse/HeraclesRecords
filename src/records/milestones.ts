@@ -38,6 +38,7 @@ import { isHikeSportType } from "../hiking/hikeType";
 import { isRunSportType } from "../running/runSurface";
 import { formatDurationSeconds, getLocalHappenDayKey } from "../training/formatters";
 import { isStrengthSportType, isSwimSportType } from "../training/sportTypes";
+import { RECORDS_SUMMARY_VERSION } from "../../electron/activityMetrics";
 import { isIndoorSportType } from "../../electron/corosSportTypes";
 import type { LabourId, LabourStage, StageProgress } from "./labours";
 import { STAGE_NUMERALS, labourDefinition, labourStageKey } from "./labours";
@@ -443,7 +444,7 @@ export function needsRecordsSummary(
   activity: Pick<TrainingHubActivity, "sportType" | "distance">,
   summary: Pick<ActivityDetailSummary, "recordsVersion"> | undefined
 ): boolean {
-  if (summary?.recordsVersion !== undefined) return false;
+  if (summary?.recordsVersion === RECORDS_SUMMARY_VERSION) return false;
   if (isIndoorSportType(activity.sportType) || isStrengthSportType(activity.sportType)) return false;
   return (activity.distance ?? 0) > 0;
 }

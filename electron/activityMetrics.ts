@@ -40,7 +40,8 @@ export const ACTIVITY_SUMMARY_VERSION = 2;
  * Running, Cycling and Activities until each run was fetched again; this way a
  * row keeps serving those while the records backfill fills in the rest.
  */
-export const RECORDS_SUMMARY_VERSION = 1;
+// 2: a stretch no longer crosses a GPS jump (`MAX_PLAUSIBLE_STEP_SPEED`).
+export const RECORDS_SUMMARY_VERSION = 2;
 
 /** 1K, 5K, 10K, half and full marathon, in metres. */
 export const BEST_EFFORT_DISTANCES: readonly number[] = [
@@ -54,6 +55,14 @@ export const BEST_EFFORT_DISTANCES: readonly number[] = [
  * one has ever run.
  */
 const MAX_PLAUSIBLE_RUN_SPEED = 7.6;
+
+/**
+ * And faster than this from one sample to the next is a fix jumping, wherever
+ * it lands: 12 m/s is past the fastest 100 m ever run. The stretch test above
+ * only sees an average, so a 300 m jump inside an honest 5:00/km kilometre
+ * still read as a 3:30 1K; a stretch may not cross a step like this at all.
+ */
+const MAX_PLAUSIBLE_STEP_SPEED = 12;
 
 /**
  * Outdoor runs, track included. An indoor run's distance is the footpod's or
@@ -328,6 +337,17 @@ export function bestEfforts(
     return [];
   }
 
+  // A step no runner could take breaks the series: the stretches either side
+  // of it are measured on their own, so the best honest one is still found.
+  const jumpsAt = new Set<number>();
+  for (let index = 1; index < times.length; index += 1) {
+    const covered = dists[index] - dists[index - 1];
+    const took = times[index] - times[index - 1];
+    if (covered > 0 && covered > took * MAX_PLAUSIBLE_STEP_SPEED) {
+      jumpsAt.add(index);
+    }
+  }
+
   const efforts: BestEffort[] = [];
   for (const target of distances) {
     if (dists[dists.length - 1] - dists[0] < target) {
@@ -336,6 +356,10 @@ export function bestEfforts(
     let best = Number.POSITIVE_INFINITY;
     let start = 0;
     for (let end = 1; end < times.length; end += 1) {
+      if (jumpsAt.has(end)) {
+        start = end;
+        continue;
+      }
       while (start + 1 < end && dists[end] - dists[start + 1] >= target) {
         start += 1;
       }

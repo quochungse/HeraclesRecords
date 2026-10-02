@@ -414,7 +414,12 @@ assert.ok(
 // --- What still needs a detail fetch ------------------------------------------------------------------
 
 assert.equal(needsRecordsSummary({ sportType: 100, distance: 5000 }, undefined), true);
-assert.equal(needsRecordsSummary({ sportType: 100, distance: 5000 }, { recordsVersion: 1 }), false);
+assert.equal(needsRecordsSummary({ sportType: 100, distance: 5000 }, { recordsVersion: 2 }), false);
+assert.equal(
+  needsRecordsSummary({ sportType: 100, distance: 5000 }, { recordsVersion: 1 }),
+  true,
+  "a summary from before the jump guard is read again"
+);
 assert.equal(needsRecordsSummary({ sportType: 101, distance: 5000 }, undefined), false, "a treadmill has no start and no record");
 assert.equal(needsRecordsSummary({ sportType: 402, distance: 0 }, undefined), false);
 assert.equal(needsRecordsSummary({ sportType: 200, distance: 30000 }, {}), true, "a ride's start is a place");
