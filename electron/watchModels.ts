@@ -1,4 +1,5 @@
 export type WatchModelId =
+  | "pace-4-pro"
   | "pace-pro"
   | "pace-4"
   | "pace-3"
@@ -40,6 +41,11 @@ export function normalizeVolumeName(name?: string): string {
 function matchWatchModelFromName(
   normalized: string
 ): WatchModelId | undefined {
+  // Before PACE 4, which would claim this label too.
+  if (/\bPACE\s*4\s*PRO\b/.test(normalized)) {
+    return "pace-4-pro";
+  }
+
   if (/\bPACE\s*PRO\b/.test(normalized)) {
     return "pace-pro";
   }
@@ -100,6 +106,7 @@ export function resolveWatchModel(
 
 export function fallbackBytesForModel(model?: WatchModelId): number {
   if (
+    model === "pace-4-pro" ||
     model === "pace-pro" ||
     model === "nomad" ||
     model === "vertix-2" ||

@@ -1917,6 +1917,10 @@ lives at module level for the same visit-to-visit reason — see `useCalendarDat
   strength sessions merged with Hevy imports.
 - **Watch USB** (`watchService.ts`) — model fixture table drives detection; renderer polls
   status, so results are cached (`invalidateWatchStatusCache`).
+  **A drive is the watch only when its whole label names one** (`WATCH_VOLUME_PATTERN`):
+  Media writes to it and deletes MP3s from it, and a Music folder is no proof — any backup
+  drive has one. A recognised watch counts with neither folder yet; `COROS_WATCH_PATH`
+  skips the label but still needs a `Music` or `map` folder. `npm run test:watch-detection`.
 - **Sync** (`electron/sync/`) — continuous two-way sync through Google Drive, so two
   machines hold the same user data. **Drive is the only destination**: a local folder was
   offered beside it until 2026-10-01 and was removed because a folder kept by Dropbox,

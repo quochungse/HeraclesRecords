@@ -29,6 +29,7 @@
     "clean:electron": "node -e \"require('node:fs').rmSync('dist-electron', { recursive: true, force: true })\"",
     "build:renderer": "tsc -p tsconfig.json --noEmit && vite build && node scripts/collect-licenses.mjs",
     "smoke:watch": "npm run build:electron && node scripts/smoke-watch-service.mjs",
+    "test:watch-detection": "npm run build:electron && node scripts/test-watch-detection.mjs",
     "test:watch-models": "npm run build:electron && node scripts/test-watch-models.mjs",
     "test:base-layers": "cross-env ELECTRON_RUN_AS_NODE=1 electron --experimental-strip-types --import ./scripts/register-ts-ext.mjs scripts/test-base-layers.mjs",
     "test:route-coloring": "cross-env ELECTRON_RUN_AS_NODE=1 electron --experimental-strip-types scripts/test-route-coloring.mjs",

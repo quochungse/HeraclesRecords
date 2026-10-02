@@ -11,6 +11,7 @@ const FOUR_GB = 4 * 1024 * 1024 * 1024;
 const THIRTY_TWO_GB = 32 * 1024 * 1024 * 1024;
 
 const {
+  fallbackBytesForModel,
   normalizeVolumeName,
   resolveWatchModel
 } = await import(
@@ -18,6 +19,11 @@ const {
 );
 
 const nameCases = [
+  ["COROS PACE 4 PRO", "pace-4-pro"],
+  ["Pace 4 Pro", "pace-4-pro"],
+  ["PACE4PRO", "pace-4-pro"],
+  ["PACE-4-PRO", "pace-4-pro"],
+  ["COROS_PACE_4_PRO", "pace-4-pro"],
   ["COROS PACE PRO", "pace-pro"],
   ["PACE PRO", "pace-pro"],
   ["COROS PACE 4", "pace-4"],
@@ -80,5 +86,6 @@ assert.equal(normalizeVolumeName("  coros apex-2  "), "APEX 2");
 assert.equal(resolveWatchModel("COROS PACE", FOUR_GB), undefined);
 assert.equal(resolveWatchModel("UNKNOWN", FOUR_GB), undefined);
 assert.equal(resolveWatchModel("UNKNOWN", THIRTY_TWO_GB), undefined);
+assert.equal(fallbackBytesForModel("pace-4-pro"), THIRTY_TWO_GB);
 
 console.log("Watch model resolution tests passed.");

@@ -39,6 +39,7 @@ export interface WatchTrack {
 }
 
 export type WatchModelId =
+  | "pace-4-pro"
   | "pace-pro"
   | "pace-4"
   | "pace-3"
@@ -62,6 +63,7 @@ export interface SampleDataState {
 export type WatchConnectionSmokeOptionId =
   | "auto"
   | "none"
+  | "pace-4-pro"
   | "pace-pro"
   | "pace-4"
   | "pace-3"
