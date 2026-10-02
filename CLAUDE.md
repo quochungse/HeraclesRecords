@@ -85,9 +85,13 @@ among them; `test:media-legacy-drop`), and `removeRetiredFeatureStorage` sweeps
 `<userData>/downloads` — the downloaded MP3s with it — `combined-download-cache`,
 `ytmusicapi-browser.json` and the three `Partitions/heraclesrecords-*` browser sessions.
 Overview keeps its training panels, and its greeting no longer speaks of a watch or a
-library. A "Your device" banner, if one comes, reads COROS's API —
-`queryDevices` on COROS MCP (firmware, battery), or the `deviceList` every activity detail
-carries (name, model `type`, icon) — never a drive.
+library. A "Your device" banner, if one comes, reads COROS's API, never a drive — and what
+the API knows is little. `queryDevices` on COROS MCP (probed 2026-10-02) is prose listing each
+bound watch's name ("COROS PACE 4"), Bluetooth ID, hardware model ("COROS W336"), serial number
+and warranty end; its description promises a firmware type the answer does not carry. No
+firmware version, battery, storage or last sync exists on any endpoint: Training Hub has no
+device route at all, and the `deviceList` every activity detail carries adds only the model
+`type` and an icon URL (`s3.coros.com/static/device_icon/…`), its `version` empty.
 
 **Every link in the app points at this fork** (since 2026-10-01). Settings → About holds
 "Website" (`heraclesrecords.github.io`) and "Report an issue" under the tagline, and a

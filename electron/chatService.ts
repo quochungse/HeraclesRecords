@@ -2949,7 +2949,8 @@ function getAllChatTools(): CorosMcpTool[] {
  * COROS MCP tools no chat model can act on, hidden unconditionally.
  *
  * The two FIT tools answer with a binary resource or an S3 URL, neither of
- * which a text turn can read. `queryDevices` is firmware and battery.
+ * which a text turn can read. `queryDevices` is the watch's name, serial and
+ * warranty.
  * `analyzeActivityDetail` is COROS's own coach-style write-up: it fetches the
  * same activity detail underneath, then adds an opinion — and the opinion is
  * the one thing this app is not short of.
