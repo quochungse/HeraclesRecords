@@ -472,9 +472,7 @@ export function AppSidebar({
                 aria-labelledby={headingId}
               >
                 <p className="app-sidebar-section-label" id={headingId}>
-                  <span className="app-sidebar-section-name">
-                    {section.label}
-                  </span>
+                  {section.label}
                 </p>
                 {section.items.map(renderNavItem)}
               </div>

@@ -86,15 +86,15 @@ export function RecoveryRing({
 
       <div className="training-ring-content">
         <div
-          className={`storage-ring training-recovery-ring${
+          className={`ring-gauge training-recovery-ring${
             isReady ? " is-ready" : ""
           }`}
           aria-label={`${Math.round(percent)}% recovery`}
         >
           <svg viewBox="0 0 128 128" aria-hidden="true">
-            <circle className="storage-ring-track" cx="64" cy="64" r={radius} />
+            <circle className="ring-gauge-track" cx="64" cy="64" r={radius} />
             <circle
-              className="storage-ring-progress training-recovery-ring-progress"
+              className="ring-gauge-progress training-recovery-ring-progress"
               cx="64"
               cy="64"
               r={radius}
@@ -103,7 +103,7 @@ export function RecoveryRing({
               transform="rotate(-90 64 64)"
             />
           </svg>
-          <div className="storage-ring-label">
+          <div className="ring-gauge-label">
             <strong>{hasData ? `${Math.round(percent)}%` : "–"}</strong>
             <span>{label}</span>
           </div>

@@ -17,7 +17,7 @@ interface StorageLocationSpec {
 const STORAGE_LOCATION_SPECS: StorageLocationSpec[] = [
   {
     id: "database",
-    label: "Library database",
+    label: "Database",
     description:
       "SQLite database holding your training records, plans and coach sessions.",
     kind: "file",

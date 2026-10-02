@@ -142,7 +142,7 @@ const DESIGNED_LENGTHS = [
   ["src/strength/strength.css", ".muscle-recovery-fill", "transform"],
   ["src/strength/strength.css", ".muscle-trend-bar-fill", "height"],
   ["src/strength/strength.css", ".strength-mix-bar > span", "flex-grow"],
-  ["src/styles.css", ".storage-ring-progress", "stroke-dashoffset"],
+  ["src/styles.css", ".ring-gauge-progress", "stroke-dashoffset"],
   ["src/styles.css", ".training-fitness-bar", "height"],
   ["src/styles.css", ".training-fitness-bar", "background"],
   // Staged reveals on load, most of them behind a 220ms delay.

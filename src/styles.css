@@ -1015,9 +1015,6 @@ input::placeholder {
  * needs no chevrons and no stored state.
  */
 .app-sidebar-section-label {
-  display: flex;
-  align-items: center;
-  gap: 8px;
   margin: 0 0 6px;
   padding: 0 10px;
   color: var(--text-secondary);
@@ -1028,10 +1025,6 @@ input::placeholder {
   text-transform: uppercase;
   white-space: nowrap;
   overflow: hidden;
-}
-
-.app-sidebar-section-name {
-  flex: 0 0 auto;
 }
 
 .app-sidebar-nav-item {
@@ -3054,25 +3047,25 @@ input::placeholder {
   }
 }
 
-.storage-ring {
+.ring-gauge {
   position: relative;
   width: 160px;
   height: 160px;
   margin: 0 auto;
 }
 
-.storage-ring svg {
+.ring-gauge svg {
   width: 100%;
   height: 100%;
 }
 
-.storage-ring-track {
+.ring-gauge-track {
   fill: none;
   stroke: rgba(255, 255, 255, 0.08);
   stroke-width: 8;
 }
 
-.storage-ring-progress {
+.ring-gauge-progress {
   fill: none;
   stroke: var(--accent);
   stroke-width: 8;
@@ -3081,7 +3074,7 @@ input::placeholder {
   transition: stroke-dashoffset 0.8s cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 
-.storage-ring-label {
+.ring-gauge-label {
   position: absolute;
   inset: 0;
   display: grid;
@@ -3090,14 +3083,14 @@ input::placeholder {
   gap: 2px;
 }
 
-.storage-ring-label strong {
+.ring-gauge-label strong {
   font-size: 36px;
   font-weight: 400;
   letter-spacing: -0.02em;
   line-height: 1;
 }
 
-.storage-ring-label span {
+.ring-gauge-label span {
   color: var(--text-muted);
   font-size: 12px;
   font-weight: 500;
@@ -4283,18 +4276,18 @@ td span {
   background: var(--glass-bg-hover);
 }
 
-.app-select--watch-smoke .app-select-trigger {
+.app-select--dev-sample .app-select-trigger {
   border-color: rgba(255, 180, 80, 0.35);
   background: rgba(255, 180, 80, 0.08);
 }
 
-.app-select--watch-smoke .app-select-trigger:hover,
-.app-select--watch-smoke .app-select-trigger[aria-expanded="true"] {
+.app-select--dev-sample .app-select-trigger:hover,
+.app-select--dev-sample .app-select-trigger[aria-expanded="true"] {
   border-color: rgba(255, 180, 80, 0.55);
   background: rgba(255, 180, 80, 0.12);
 }
 
-.app-select--watch-smoke .app-select-menu {
+.app-select--dev-sample .app-select-menu {
   min-width: 180px;
 }
 
@@ -7602,7 +7595,7 @@ td span {
   overflow: visible;
 }
 
-.training-recovery-ring .storage-ring-track {
+.training-recovery-ring .ring-gauge-track {
   stroke: rgba(255, 255, 255, 0.06);
 }
 
@@ -7611,13 +7604,13 @@ td span {
   transition-delay: 0.22s;
 }
 
-.training-recovery-ring .storage-ring-label strong {
+.training-recovery-ring .ring-gauge-label strong {
   font-size: clamp(36px, 4vw, 36px);
   font-weight: 700;
   letter-spacing: -0.02em;
 }
 
-.training-recovery-ring .storage-ring-label span {
+.training-recovery-ring .ring-gauge-label span {
   margin-top: 4px;
   color: var(--ring-color);
   font-size: 14px;
@@ -10254,7 +10247,7 @@ td span {
     animation: none;
   }
 
-  .storage-ring-progress {
+  .ring-gauge-progress {
     transition: none;
   }
 
@@ -17773,7 +17766,7 @@ td span {
 }
 
 /* --- Recovery ring -------------------------------------------------------- */
-:root[data-theme="paper"] .storage-ring-track {
+:root[data-theme="paper"] .ring-gauge-track {
   stroke: rgba(19, 26, 40, 0.1);
   stroke-width: 10;
 }
@@ -17811,7 +17804,7 @@ td span {
   --ring-glow: rgba(168, 162, 158, 0.2);
 }
 
-:root[data-theme="paper"] .training-recovery-ring .storage-ring-track {
+:root[data-theme="paper"] .training-recovery-ring .ring-gauge-track {
   stroke: color-mix(in srgb, var(--ring-color) 18%, rgba(19, 26, 40, 0.06));
 }
 
