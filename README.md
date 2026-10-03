@@ -36,8 +36,8 @@
 | Platform | Installer | Size |
 | --- | --- | --- |
 | **macOS** · Apple Silicon (M1 and later) | [HeraclesRecords-1.0.0-arm64.dmg](https://github.com/quochungse/HeraclesRecords/releases/download/v1.0.0/HeraclesRecords-1.0.0-arm64.dmg) | 176 MB |
-| **macOS** · Intel | [HeraclesRecords-1.0.0-x64.dmg](https://github.com/quochungse/HeraclesRecords/releases/download/v1.0.0/HeraclesRecords-1.0.0-x64.dmg) | 180 MB |
-| **Windows** 10 / 11 · 64-bit | [HeraclesRecords-Setup-1.0.0.exe](https://github.com/quochungse/HeraclesRecords/releases/download/v1.0.0/HeraclesRecords-Setup-1.0.0.exe) | 158 MB |
+| **macOS** · Intel | [HeraclesRecords-1.0.0-x64.dmg](https://github.com/quochungse/HeraclesRecords/releases/download/v1.0.0/HeraclesRecords-1.0.0-x64.dmg) | 181 MB |
+| **Windows** 10 / 11 · 64-bit | [HeraclesRecords-Setup-1.0.0.exe](https://github.com/quochungse/HeraclesRecords/releases/download/v1.0.0/HeraclesRecords-Setup-1.0.0.exe) | 162 MB |
 | **Linux** · x86-64 | [HeraclesRecords-1.0.0.AppImage](https://github.com/quochungse/HeraclesRecords/releases/download/v1.0.0/HeraclesRecords-1.0.0.AppImage) | 184 MB |
 
 Version 1.0.0 · [What's new](https://github.com/quochungse/HeraclesRecords/releases/tag/v1.0.0) · [All releases](https://github.com/quochungse/HeraclesRecords/releases). The app tells you when a new version is out.
