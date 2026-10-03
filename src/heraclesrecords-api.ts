@@ -379,7 +379,6 @@ export interface HeraclesRecordsApi {
     input: ManualActivityInput
   ) => Promise<{ importId: string }>;
   getAppInfo: () => Promise<AppInfo>;
-  openAppStorageLocation: (id: string) => Promise<void>;
   getAppUpdateStatus: () => Promise<AppUpdateSnapshot>;
   checkForAppUpdates: () => Promise<AppUpdateSnapshot>;
   downloadAppUpdate: () => Promise<AppUpdateSnapshot>;

@@ -1,30 +1,25 @@
 import {
-  ArrowLeft,
   Bike,
   BrainCircuit,
   Bug,
   Check,
-  ChevronRight,
   Coffee,
   Compass,
   Dumbbell,
   Ellipsis,
   ExternalLink,
-  FolderOpen,
   Globe2,
-  HardDrive,
   Link2,
-  Loader2,
+  LogIn,
   Moon,
   Mountain,
   Palette,
   RefreshCw,
   Server,
   Sun,
-  Watch,
   type LucideIcon,
 } from "lucide-react";
-import { useCallback, useEffect, useState, type CSSProperties } from "react";
+import { useEffect, useState, type CSSProperties, type ReactNode } from "react";
 import type {
   AppInfo,
   AppUpdateSnapshot,
@@ -32,8 +27,11 @@ import type {
 } from "../../electron/types";
 import { AppUpdateControl } from "../components/AppUpdateControls";
 import { OptionChips, OptionGroup } from "../components/OptionGroup";
-import { StartupViewMenu } from "../components/StartupViewMenu";
-import { PRIMARY_NAV_ITEMS, type PrimaryView } from "../navigation/primaryNav";
+import {
+  PRIMARY_NAV_ITEMS,
+  visiblePrimaryNavItems,
+  type PrimaryView
+} from "../navigation/primaryNav";
 import { getPrimaryViewLabel } from "../navigation/startupView";
 import { SPORT_SCREENS, type SportScreen } from "../navigation/sportScreens";
 import { RunnerIcon } from "../running/runnerIcon";
@@ -45,7 +43,6 @@ import {
 import { summarizeMcpStatuses } from "../chat/McpServersPanel";
 import type { HeraclesRecordsApi } from "../heraclesrecords-api";
 import { CoachModelsModal } from "./CoachModelsModal";
-import { formatBytes } from "./formatters";
 import { McpServersModal } from "./McpServersModal";
 import { ReportIssueDialog } from "./ReportIssueDialog";
 import { useTheme } from "../theme/ThemeProvider";
@@ -56,7 +53,6 @@ import {
 import { CorosConnectionRow } from "../training/components/CorosConnectionRow";
 import {
   DEFAULT_SPORT_COLORS,
-  SPORT_COLOR_CATEGORIES,
   SPORT_COLOR_LABELS,
   applySportColors,
   readStoredSportColors,
@@ -64,6 +60,7 @@ import {
   type SportColorCategory,
 } from "../training/sportColors";
 import appLogo from "../../build/icon.png";
+import { SettingsPrefRow } from "./SettingsPrefRow";
 import { SyncPanel } from "./SyncPanel";
 import { BackupPanel } from "./BackupPanel";
 
@@ -77,7 +74,10 @@ interface McpSummary {
   tools: number;
 }
 
-function mcpSummaryLine(summary: McpSummary | null): string {
+/* The MCP and Coach Models rows state the count on one line and what it
+   amounts to on the next, the part worth reading at a glance in bold — joined
+   by a dot on one line, the second half wrapped wherever the column ended. */
+function mcpSummaryDetail(summary: McpSummary | null): ReactNode {
   if (!summary) {
     return "Checking connections…";
   }
@@ -85,10 +85,36 @@ function mcpSummaryLine(summary: McpSummary | null): string {
     return "No servers added. Connect one to give the coach more tools.";
   }
 
-  const servers = `${summary.connected} of ${summary.total} connected`;
-  return summary.tools > 0
-    ? `${servers} · ${summary.tools} ${summary.tools === 1 ? "tool" : "tools"} ready for the coach`
-    : servers;
+  const servers = `${summary.connected} of ${summary.total} connected.`;
+  if (summary.tools === 0) {
+    return servers;
+  }
+  return (
+    <>
+      {servers}
+      <span className="settings-pref-line">
+        <strong>
+          {summary.tools} {summary.tools === 1 ? "tool" : "tools"}
+        </strong>{" "}
+        ready for the coach.
+      </span>
+    </>
+  );
+}
+
+function coachModelsDetail(summary: CoachModelsSummary | null): ReactNode {
+  if (!summary || summary.connected === 0) {
+    return coachModelsSummaryLine(summary);
+  }
+  return (
+    <>
+      {summary.connected} of {summary.total} providers connected.
+      <span className="settings-pref-line">
+        <strong>{summary.activeLabel}</strong>{" "}
+        {summary.activeReady ? "in use." : "selected but not connected."}
+      </span>
+    </>
+  );
 }
 
 /** The mark each sport wears elsewhere in the app, so the colour is picked
@@ -103,6 +129,17 @@ const SPORT_COLOR_ICONS: Record<SportColorCategory, LucideIcon> = {
   other: Ellipsis,
 };
 
+/** The colour tiles in the sport screens' order — Running, Cycling, Hiking,
+    Strength — so each colour sits under its sport's screen in the card above,
+    the two grids sharing their columns. Other, which has no screen, ends it. */
+const SPORT_COLOR_ORDER: SportColorCategory[] = [
+  "run",
+  "bike",
+  "hiking",
+  "strength",
+  "other",
+];
+
 /** The sport screens as tiles, each wearing the icon it has on the sidebar. */
 const SPORT_SCREEN_OPTIONS = SPORT_SCREENS.map((screen) => {
   const Icon = PRIMARY_NAV_ITEMS.find((item) => item.id === screen)?.icon;
@@ -112,41 +149,6 @@ const SPORT_SCREEN_OPTIONS = SPORT_SCREENS.map((screen) => {
     icon: Icon ? <Icon size={18} aria-hidden="true" /> : undefined,
   };
 });
-
-/**
- * A row in the Connections list that opens something: an icon, what it is, what
- * state it is in, and a chevron. Three copies of this markup sat inline, which
- * is how two of them ended up a size apart from the third.
- */
-function SettingsNavRow({
-  icon: Icon,
-  title,
-  detail,
-  onClick
-}: {
-  icon: LucideIcon;
-  title: string;
-  detail: string;
-  onClick: () => void;
-}) {
-  return (
-    <button className="settings-nav-row" type="button" onClick={onClick}>
-      <span className="settings-nav-row-icon" aria-hidden="true">
-        <Icon size={20} strokeWidth={1.9} />
-      </span>
-      <span className="settings-nav-row-copy">
-        <strong>{title}</strong>
-        <span>{detail}</span>
-      </span>
-      <ChevronRight
-        className="settings-row-chevron"
-        size={20}
-        strokeWidth={2}
-        aria-hidden="true"
-      />
-    </button>
-  );
-}
 
 interface SettingsViewProps {
   api: HeraclesRecordsApi;
@@ -206,11 +208,6 @@ export function SettingsView({
   onTrainingSignIn,
 }: SettingsViewProps) {
   const [appInfo, setAppInfo] = useState<AppInfo | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [openingLocationId, setOpeningLocationId] = useState<string | null>(
-    null,
-  );
-  const [settingsPage, setSettingsPage] = useState<"main" | "storage">("main");
   const [reportIssueOpen, setReportIssueOpen] = useState(false);
   const [mcpModalOpen, setMcpModalOpen] = useState(false);
   const [mcpSummary, setMcpSummary] = useState<McpSummary | null>(null);
@@ -317,37 +314,26 @@ export function SettingsView({
     };
   }, [api, coachRefreshVersion]);
 
-  const loadAppInfo = useCallback(async () => {
-    setLoading(true);
-    try {
-      setAppInfo(await api.getAppInfo());
-    } catch (caught) {
-      onError(
-        caught instanceof Error ? caught.message : "Could not load app info.",
-      );
-    } finally {
-      setLoading(false);
-    }
-  }, [api, onError]);
-
   useEffect(() => {
-    void loadAppInfo();
-  }, [loadAppInfo]);
+    let cancelled = false;
 
-  async function handleOpenLocation(id: string) {
-    setOpeningLocationId(id);
-    try {
-      await api.openAppStorageLocation(id);
-    } catch (caught) {
-      onError(
-        caught instanceof Error
-          ? caught.message
-          : "Could not open that folder.",
-      );
-    } finally {
-      setOpeningLocationId(null);
-    }
-  }
+    void (async () => {
+      try {
+        const info = await api.getAppInfo();
+        if (!cancelled) {
+          setAppInfo(info);
+        }
+      } catch (caught) {
+        onError(
+          caught instanceof Error ? caught.message : "Could not load app info.",
+        );
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [api, onError]);
 
   function toggleSportScreen(screen: SportScreen) {
     onHiddenSportScreensChange(
@@ -369,92 +355,18 @@ export function SettingsView({
 
   const appVersion = appInfo?.version ?? updateSnapshot.currentVersion;
 
-  if (settingsPage === "storage") {
-    return (
-      <section className="settings-view settings-subpage">
-        <button
-          className="settings-subpage-back"
-          type="button"
-          onClick={() => setSettingsPage("main")}
-        >
-          <ArrowLeft size={16} strokeWidth={2} aria-hidden="true" />
-          Settings
-        </button>
-
-        <div className="panel settings-storage-detail-panel">
-          <div className="section-heading settings-storage-detail-heading">
-            <div>
-              <p className="eyebrow">Storage</p>
-              <h2>On this computer</h2>
-              <p className="settings-subpage-description">
-                Review storage use or open an app location on your computer.
-              </p>
-            </div>
-            <button
-              className="icon-button"
-              type="button"
-              title="Refresh storage sizes"
-              aria-label="Refresh storage sizes"
-              onClick={() => void loadAppInfo()}
-              disabled={loading}
-            >
-              <RefreshCw
-                size={16}
-                aria-hidden="true"
-                className={loading ? "spin" : ""}
-              />
-            </button>
-          </div>
-
-          {appInfo ? (
-            <ul className="settings-storage-list">
-              {appInfo.storageLocations.map((location) => (
-                <li className="settings-storage-row" key={location.id}>
-                  <div className="settings-storage-info">
-                    <div className="settings-storage-title">
-                      <strong>{location.label}</strong>
-                      <span className="settings-storage-size">
-                        {location.exists
-                          ? location.sizeBytes !== null
-                            ? formatBytes(location.sizeBytes)
-                            : "Size unavailable"
-                          : "Not created yet"}
-                      </span>
-                    </div>
-                    <p>{location.description}</p>
-                    <code className="settings-storage-path">
-                      {location.path}
-                    </code>
-                  </div>
-                  <button
-                    className="secondary-button"
-                    type="button"
-                    onClick={() => void handleOpenLocation(location.id)}
-                    disabled={
-                      openingLocationId === location.id ||
-                      (location.kind === "file" && !location.exists)
-                    }
-                  >
-                    {openingLocationId === location.id ? (
-                      <Loader2 size={15} aria-hidden="true" className="spin" />
-                    ) : (
-                      <FolderOpen size={15} aria-hidden="true" />
-                    )}
-                    Open in Folder
-                  </button>
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <p className="settings-storage-loading">
-              <Loader2 size={16} aria-hidden="true" className="spin" />
-              Loading storage locations…
-            </p>
-          )}
-        </div>
-      </section>
-    );
-  }
+  // Every destination the rail offers, less the sport screens taken off it and
+  // the ones that cannot be a start, each wearing its rail icon.
+  const startupOptions = visiblePrimaryNavItems(
+    showDevelopmentTools,
+    hiddenSportScreens
+  )
+    .filter((item) => !item.excludeFromStartup)
+    .map(({ id, label, icon: Icon }) => ({
+      value: id,
+      label,
+      icon: <Icon size={15} aria-hidden="true" />
+    }));
 
   return (
     <section className="settings-view">
@@ -528,213 +440,230 @@ export function SettingsView({
             </span>
           </a>
         </div>
+      </div>
 
-        {/* Where the app opens and which sport screens the rail lists: both
-            are how the app is arranged, so they share one heading. The sport
-            screens are not a facet of Activity colors below — a sport keeps
-            its colour in Activities and the Calendar when its screen is off
-            the rail, and Other has a colour but no screen. For the same
-            reason the chips wear the accent, not the sports' hues: this is
-            chrome, and the colours are spent on the row just below. */}
-        <div className="settings-navigation">
-          <div className="settings-section-head">
-            <span className="settings-section-icon" aria-hidden="true">
-              <Compass size={18} strokeWidth={1.9} />
-            </span>
-            <div>
-              <h2>Navigation</h2>
-              <p>Where the app opens, and which sport screens the sidebar lists.</p>
-            </div>
-          </div>
-          <div className="settings-navigation-rows">
-            <span className="settings-navigation-label">Opens on</span>
-            <StartupViewMenu
-              labeled
-              value={startupView}
-              onChange={onStartupViewChange}
-              showDevelopmentItems={showDevelopmentTools}
-              hiddenViews={hiddenSportScreens}
-            />
-            <span className="settings-navigation-label">Sport screens</span>
-            <div>
-              <OptionChips
-                label="Sport screens"
-                size="md"
-                appearance="tiles"
-                options={SPORT_SCREEN_OPTIONS}
-                values={SPORT_SCREENS.filter(
-                  (screen) => !hiddenSportScreens.includes(screen)
-                )}
-                onToggle={toggleSportScreen}
-              />
-              {/* Toned as a warning only once it has happened: Strength hidden
-                  with Hevy connected takes Hevy's workouts off the screen. */}
-              <p
-                className={`settings-navigation-note${
-                  hevyConnected && hiddenSportScreens.includes("strength")
-                    ? " is-warning"
-                    : ""
-                }`}
-              >
-                {hevyConnected
-                  ? "Every COROS session stays in Activities. Hevy workouts are only on Strength."
-                  : "Every session stays in Activities."}
-              </p>
-            </div>
+      {/* Where the app opens and which sport screens the rail lists: both are
+          how the app is arranged, so they share a card. The sport screens are
+          not a facet of Activity colors in Appearance — a sport keeps its
+          colour in Activities and the Calendar when its screen is off the
+          rail, and Other has a colour but no screen. For the same reason the
+          tiles wear the accent, not the sports' hues: this is chrome. */}
+      <div className="panel settings-pref-panel">
+        <div className="settings-section-head">
+          <span className="settings-section-icon" aria-hidden="true">
+            <Compass size={18} strokeWidth={1.9} />
+          </span>
+          <div>
+            <h2>Navigation</h2>
+            <p>Where the app opens, and which sport screens the sidebar lists.</p>
           </div>
         </div>
+        <div className="settings-pref-list">
+          <SettingsPrefRow
+            title="Opens on"
+            detail="The screen shown each time the app starts."
+          >
+            <OptionGroup
+              label="Opens on"
+              mode="dropdown"
+              size="md"
+              value={startupView}
+              options={startupOptions}
+              onChange={onStartupViewChange}
+            />
+          </SettingsPrefRow>
+          {/* The Hevy half is toned as a warning only once it has happened:
+              Strength hidden with Hevy connected takes Hevy's workouts off the
+              screen. */}
+          <SettingsPrefRow
+            title="Sport screens"
+            detail={
+              <>
+                Turn one off to take it off the sidebar.
+                {hevyConnected ? (
+                  <span
+                    className={
+                      hiddenSportScreens.includes("strength")
+                        ? "settings-pref-warning"
+                        : undefined
+                    }
+                  >
+                    {" "}
+                    Hevy workouts are only on Strength.
+                  </span>
+                ) : null}
+              </>
+            }
+            align="start"
+          >
+            <OptionChips
+              label="Sport screens"
+              size="md"
+              appearance="tiles"
+              options={SPORT_SCREEN_OPTIONS}
+              values={SPORT_SCREENS.filter(
+                (screen) => !hiddenSportScreens.includes(screen)
+              )}
+              onToggle={toggleSportScreen}
+            />
+          </SettingsPrefRow>
+        </div>
+      </div>
 
-        {/* Appearance lives inside the About card rather than a card of its
-            own. The mode switch sits on its own row under the heading;
-            the five palettes sit under it as swatches, with the selected one
-            named beside them. The palettes were five 220px cards carrying a
-            sentence apiece — "Night-run blue, easy on the eyes after dark" — which is
-            read once and never again, and which cost the section four hundred
-            pixels for a choice made by looking at the colour. The sentence is
-            not lost: the active one is shown under the row, and each swatch
-            carries its own as a title. */}
-        <div className="settings-appearance">
-          <div className="settings-section-head">
-            <span className="settings-section-icon" aria-hidden="true">
-              <Palette size={18} strokeWidth={1.9} />
-            </span>
-            <div>
-              <h2>Appearance</h2>
-              <p>Colour mode, accent palette and the colours sports wear.</p>
-            </div>
+      {/* The palettes were five 220px cards carrying a sentence apiece —
+          "Night-run blue, easy on the eyes after dark" — which is read once
+          and never again, for a choice made by looking at the colour. The
+          sentence is not lost: the active one is shown beside the swatches,
+          and each swatch carries its own as a title. */}
+      <div className="panel settings-pref-panel">
+        <div className="settings-section-head">
+          <span className="settings-section-icon" aria-hidden="true">
+            <Palette size={18} strokeWidth={1.9} />
+          </span>
+          <div>
+            <h2>Appearance</h2>
+            <p>Colour mode, accent palette and the colours sports wear.</p>
           </div>
-          {/* The swap animates out of the point that was pressed, so the chip
-              that produced the change comes back with it. */}
-          <OptionGroup
-            label="Color mode"
-            size="md"
-            value={theme}
-            options={THEME_MODES.map((mode) => ({
-              value: mode.id,
-              label: mode.label,
-              icon: <mode.icon size={15} aria-hidden="true" />
-            }))}
-            onChange={(next, from) => {
-              const rect = from?.getBoundingClientRect();
-              setTheme(
-                next,
-                rect
-                  ? { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 }
-                  : undefined
-              );
-            }}
-          />
+        </div>
+        <div className="settings-pref-list">
+          <SettingsPrefRow
+            title="Color mode"
+            detail="Dark or light, across the whole app."
+          >
+            {/* The swap animates out of the point that was pressed, so the
+                chip that produced the change comes back with it. */}
+            <OptionGroup
+              label="Color mode"
+              size="md"
+              value={theme}
+              options={THEME_MODES.map((mode) => ({
+                value: mode.id,
+                label: mode.label,
+                icon: <mode.icon size={15} aria-hidden="true" />
+              }))}
+              onChange={(next, from) => {
+                const rect = from?.getBoundingClientRect();
+                setTheme(
+                  next,
+                  rect
+                    ? { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 }
+                    : undefined
+                );
+              }}
+            />
+          </SettingsPrefRow>
 
-          <div className="settings-palette-row">
-            <ul className="settings-palette-swatches">
-              {ACCENT_PALETTES.map((palette) => {
-                const detail = ACCENT_PALETTE_DETAILS[palette];
-                const active = accent === palette;
-                const swatchStyle = {
-                  "--swatch-from": detail.swatch[0],
-                  "--swatch-to": detail.swatch[1]
+          <SettingsPrefRow
+            title="Accent"
+            detail="Buttons, highlights and what is selected."
+          >
+            <div className="settings-palette-row">
+              {/* The one sentence still worth showing, and it belongs to
+                  whichever swatch is selected — on a line of its own above
+                  them, so the row of swatches keeps its width as it changes. */}
+              <p className="settings-palette-caption">
+                <strong>{ACCENT_PALETTE_DETAILS[accent].label}</strong>
+                <span>{ACCENT_PALETTE_DETAILS[accent].description}</span>
+              </p>
+              <ul className="settings-palette-swatches">
+                {ACCENT_PALETTES.map((palette) => {
+                  const detail = ACCENT_PALETTE_DETAILS[palette];
+                  const active = accent === palette;
+                  const swatchStyle = {
+                    "--swatch-from": detail.swatch[0],
+                    "--swatch-to": detail.swatch[1]
+                  } as CSSProperties;
+
+                  return (
+                    <li key={palette}>
+                      <button
+                        className={`settings-palette-option${active ? " is-active" : ""}`}
+                        type="button"
+                        aria-pressed={active}
+                        title={`${detail.label} — ${detail.description}`}
+                        aria-label={detail.label}
+                        onClick={(event) => {
+                          const rect = event.currentTarget.getBoundingClientRect();
+                          setAccent(palette, {
+                            x: rect.left + rect.width / 2,
+                            y: rect.top + rect.height / 2
+                          });
+                        }}
+                      >
+                        <span
+                          className="settings-theme-swatch"
+                          style={swatchStyle}
+                          aria-hidden="true"
+                        />
+                        {active ? (
+                          <Check size={15} strokeWidth={3} aria-hidden="true" />
+                        ) : null}
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
+          </SettingsPrefRow>
+
+          {/* A chip carries the two facts — which sport, which colour — in a
+              fifth of the height that five rows with a picker apiece took. */}
+          <SettingsPrefRow
+            title="Activity colors"
+            detail="The colour each sport wears across the app."
+            align="start"
+            action={
+              <button
+                className="settings-sport-reset"
+                type="button"
+                onClick={resetSportColors}
+              >
+                <RefreshCw size={13} strokeWidth={2} aria-hidden="true" />
+                Reset
+              </button>
+            }
+          >
+            <ul className="settings-sport-tiles">
+              {SPORT_COLOR_ORDER.map((cat) => {
+                const colorStyle = {
+                  "--sport-color": sportColors[cat],
                 } as CSSProperties;
 
+                const SportIcon = SPORT_COLOR_ICONS[cat];
+
                 return (
-                  <li key={palette}>
-                    <button
-                      className={`settings-palette-option${active ? " is-active" : ""}`}
-                      type="button"
-                      aria-pressed={active}
-                      title={`${detail.label} — ${detail.description}`}
-                      aria-label={detail.label}
-                      onClick={(event) => {
-                        const rect = event.currentTarget.getBoundingClientRect();
-                        setAccent(palette, {
-                          x: rect.left + rect.width / 2,
-                          y: rect.top + rect.height / 2
-                        });
-                      }}
-                    >
-                      <span
-                        className="settings-theme-swatch"
-                        style={swatchStyle}
-                        aria-hidden="true"
+                  <li key={cat} style={colorStyle}>
+                    <label className="settings-sport-tile">
+                      <input
+                        type="color"
+                        className="settings-sport-input"
+                        value={sportColors[cat]}
+                        onChange={(event) =>
+                          updateSportColor(cat, event.target.value)
+                        }
+                        aria-label={`${SPORT_COLOR_LABELS[cat]} color`}
                       />
-                      {active ? (
-                        <Check size={15} strokeWidth={3} aria-hidden="true" />
-                      ) : null}
-                    </button>
+                      <span className="settings-sport-swatch" aria-hidden="true">
+                        <SportIcon size={14} strokeWidth={2.2} />
+                      </span>
+                      <span className="settings-sport-tile-copy">
+                        <span className="settings-sport-tile-label">
+                          {SPORT_COLOR_LABELS[cat]}
+                        </span>
+                        <span className="settings-sport-hex">
+                          {sportColors[cat].toUpperCase()}
+                        </span>
+                      </span>
+                    </label>
                   </li>
                 );
               })}
             </ul>
-            {/* The one sentence still worth showing, and it belongs to whichever
-                swatch is selected — so the row stays readable without five
-                copies of it. */}
-            <p className="settings-palette-caption">
-              <strong>{ACCENT_PALETTE_DETAILS[accent].label}</strong>
-              <span>{ACCENT_PALETTE_DETAILS[accent].description}</span>
-            </p>
-          </div>
-
-          {/* A secondary control, and sized like one. Five full rows with an
-              icon tile, a sentence of description and a 164px picker apiece ran
-              to roughly four hundred pixels for a preference most people set
-              once; the chips carry the same two facts — which sport, which
-              colour — in a fifth of the height. The per-sport descriptions went
-              with them: the label already names the sport, and the sentence
-              under it only listed examples of the thing it had just named. */}
-          <div className="settings-sport-subheading">
-            <div className="settings-sport-subheading-copy">
-              <strong>Activity colors</strong>
-              <span>
-                Used by the training load heatmap and the calendar. A day with one
-                sport is solid; several sports split into a wheel.
-              </span>
-            </div>
-            <button
-              className="settings-sport-reset"
-              type="button"
-              onClick={resetSportColors}
-            >
-              <RefreshCw size={13} strokeWidth={2} aria-hidden="true" />
-              Reset
-            </button>
-          </div>
-          <ul className="settings-sport-chips">
-            {SPORT_COLOR_CATEGORIES.map((cat) => {
-              const colorStyle = {
-                "--sport-color": sportColors[cat],
-              } as CSSProperties;
-
-              const SportIcon = SPORT_COLOR_ICONS[cat];
-
-              return (
-                <li key={cat} style={colorStyle}>
-                  <label className="settings-sport-chip">
-                    <input
-                      type="color"
-                      className="settings-sport-input"
-                      value={sportColors[cat]}
-                      onChange={(event) =>
-                        updateSportColor(cat, event.target.value)
-                      }
-                      aria-label={`${SPORT_COLOR_LABELS[cat]} color`}
-                    />
-                    <span className="settings-sport-swatch" aria-hidden="true">
-                      <SportIcon size={14} strokeWidth={2.2} />
-                    </span>
-                    <span className="settings-sport-chip-label">
-                      {SPORT_COLOR_LABELS[cat]}
-                    </span>
-                    <span className="settings-sport-hex">
-                      {sportColors[cat].toUpperCase()}
-                    </span>
-                  </label>
-                </li>
-              );
-            })}
-          </ul>
+          </SettingsPrefRow>
         </div>
       </div>
 
-      <div className="panel settings-connections-panel">
+      <div className="panel settings-pref-panel">
         <div className="settings-section-head">
           <span className="settings-section-icon" aria-hidden="true">
             <Link2 size={18} strokeWidth={1.9} />
@@ -745,7 +674,7 @@ export function SettingsView({
           </div>
         </div>
 
-        <div className="settings-connections-list">
+        <div className="settings-pref-list">
           {trainingStatus?.authenticated ? (
             <CorosConnectionRow
               status={trainingStatus}
@@ -754,66 +683,66 @@ export function SettingsView({
               onLogout={onTrainingLogout}
             />
           ) : (
-            <SettingsNavRow
-              icon={Watch}
+            <SettingsPrefRow
               title="COROS account"
               detail={
                 trainingStatus?.rememberCredentials && trainingStatus?.email
                   ? `Not connected. Sign in as ${trainingStatus.email} to sync activities and workouts.`
                   : "Not connected. Sign in to sync activities and workouts."
               }
-              onClick={onTrainingSignIn}
-            />
+            >
+              <button
+                className="settings-row-button is-primary"
+                type="button"
+                onClick={onTrainingSignIn}
+              >
+                <LogIn size={15} aria-hidden="true" />
+                Sign in
+              </button>
+            </SettingsPrefRow>
           )}
 
-          <SettingsNavRow
-            icon={Server}
+          <SettingsPrefRow
             title="MCP Servers"
-            detail={mcpSummaryLine(mcpSummary)}
-            onClick={() => setMcpModalOpen(true)}
-          />
+            detail={mcpSummaryDetail(mcpSummary)}
+            tone={mcpSummary && mcpSummary.connected > 0 ? "success" : undefined}
+          >
+            <button
+              className="settings-row-button"
+              type="button"
+              onClick={() => setMcpModalOpen(true)}
+            >
+              <Server size={15} aria-hidden="true" />
+              Manage
+            </button>
+          </SettingsPrefRow>
 
-          <SettingsNavRow
-            icon={BrainCircuit}
+          <SettingsPrefRow
             title="Coach Models"
-            detail={coachModelsSummaryLine(coachModels)}
-            onClick={() => setCoachModelsOpen(true)}
-          />
+            detail={coachModelsDetail(coachModels)}
+            tone={
+              !coachModels || coachModels.connected === 0
+                ? undefined
+                : coachModels.activeReady
+                  ? "success"
+                  : "warning"
+            }
+          >
+            <button
+              className="settings-row-button"
+              type="button"
+              onClick={() => setCoachModelsOpen(true)}
+            >
+              <BrainCircuit size={15} aria-hidden="true" />
+              Manage
+            </button>
+          </SettingsPrefRow>
         </div>
       </div>
 
       <SyncPanel api={api} />
 
       <BackupPanel api={api} />
-
-      {/* The same compact row, with the whole head as the control: this panel
-          is one link to a subpage, so an eyebrow above a 46px row spent a card
-          saying what a row already said. */}
-      <div className="panel settings-compact-panel">
-        <button
-          className="settings-compact-head is-link"
-          type="button"
-          onClick={() => setSettingsPage("storage")}
-        >
-          <span className="settings-compact-icon" aria-hidden="true">
-            <HardDrive size={18} strokeWidth={1.9} />
-          </span>
-          <span className="settings-compact-copy">
-            <strong>Storage on this computer</strong>
-            <span>
-              {appInfo
-                ? `The database and the app's data folder — ${appInfo.storageLocations.length} locations.`
-                : "The database and the app's data folder."}
-            </span>
-          </span>
-          <ChevronRight
-            className="settings-row-chevron"
-            size={18}
-            strokeWidth={2}
-            aria-hidden="true"
-          />
-        </button>
-      </div>
 
       <McpServersModal
         api={api}

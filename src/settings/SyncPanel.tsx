@@ -3,15 +3,15 @@ import {
   AlertTriangle,
   Check,
   Cloud,
-  CloudOff,
   CloudUpload,
   Loader2,
   RefreshCw,
-  UserRound
+  Unplug
 } from "lucide-react";
 import type { HeraclesRecordsApi } from "../heraclesrecords-api";
 import type { GoogleAccountInfo, SyncStatus } from "../../electron/sync/syncTypes";
 import { formatBytes, formatWhen } from "./formatters";
+import { SettingsPrefRow } from "./SettingsPrefRow";
 
 interface SyncPanelProps {
   api: HeraclesRecordsApi;
@@ -38,9 +38,8 @@ let cachedAccount: GoogleAccountInfo | null = null;
 const REFRESH_NOTICE_DELAY_MS = 400;
 
 const SYNC_DESCRIPTION =
-  "Keeps your conversations, plans and preferences the same on every computer " +
-  "signed in to the same COROS account, through your Google Drive. Sign-ins " +
-  "never leave this machine.";
+  "Your data on every computer with this COROS account, through Google Drive. " +
+  "Sign-ins stay on this one.";
 
 /**
  * Where this machine's data meets the other one's.
@@ -268,7 +267,7 @@ export function SyncPanel({ api }: SyncPanelProps) {
     // and returning only a spinner would leave the panel saying "loading"
     // forever with the reason invisible.
     return (
-      <div className="panel settings-connections-panel settings-sync-panel">
+      <div className="panel settings-pref-panel settings-sync-panel">
         {head}
         <p className="sync-panel-loading">
           {error ?? (
@@ -287,21 +286,13 @@ export function SyncPanel({ api }: SyncPanelProps) {
   // rather than drawing a Connect button that cannot work.
   if (!status.googleClientConfigured) {
     return (
-      <div className="panel settings-connections-panel settings-sync-panel">
+      <div className="panel settings-pref-panel settings-sync-panel">
         {head}
-        <div className="settings-connections-list">
-          <div className="settings-nav-row is-static">
-            <span className="settings-nav-row-icon" aria-hidden="true">
-              <CloudOff size={20} strokeWidth={1.9} />
-            </span>
-            <span className="settings-nav-row-copy">
-              <strong>Sync is not available in this build</strong>
-              <span>
-                This copy of the app was built without a Google sign-in, and
-                Google Drive is where sync keeps your data.
-              </span>
-            </span>
-          </div>
+        <div className="settings-pref-list">
+          <SettingsPrefRow
+            title="Sync is not available in this build"
+            detail="This copy of the app was built without a Google sign-in, and Google Drive is where sync keeps your data."
+          />
         </div>
       </div>
     );
@@ -316,9 +307,22 @@ export function SyncPanel({ api }: SyncPanelProps) {
       ? `${formatBytes(account.quota.used)} used`
       : `${formatBytes(account.quota.used)} of ${formatBytes(account.quota.limit)} used`
     : null;
-  const googleDetail = status.googleConnected
-    ? [account?.email, googleQuota].filter(Boolean).join(" · ") || "Connected"
-    : "Not connected. Connecting opens your browser to Google; the app can only see the folder it creates there.";
+  // The account and its usage on two lines: joined by a dot, the usage wrapped
+  // on its own whenever the address was long, leaving the dot at a line's end.
+  const googleDetail = status.googleConnected ? (
+    account?.email || googleQuota ? (
+      <>
+        {account?.email ?? "Connected"}
+        {googleQuota ? (
+          <span className="settings-pref-line">{googleQuota}</span>
+        ) : null}
+      </>
+    ) : (
+      "Connected"
+    )
+  ) : (
+    "Not connected. Connecting opens your browser to Google; the app can only see the folder it creates there."
+  );
 
   // What the loop has actually been doing, rather than a promise about what it
   // will do. The row used to say "changes go out within a minute or so", which
@@ -333,17 +337,17 @@ export function SyncPanel({ api }: SyncPanelProps) {
   const activityDetail = !status.loop
     ? "Sync now starts it."
     : status.loop.lastPulledAt
-      ? `Last received from another computer ${formatWhen(status.loop.lastPulledAt)}`
-      : "Nothing received from another computer yet";
+      ? `Last received from another computer ${formatWhen(status.loop.lastPulledAt)}.`
+      : "Nothing received from another computer yet.";
 
   return (
     <div
-      className="panel settings-connections-panel settings-sync-panel"
+      className="panel settings-pref-panel settings-sync-panel"
       aria-busy={busy !== null}
     >
       {head}
 
-      <div className="settings-connections-list">
+      <div className="settings-pref-list">
         {/* Before anything about the destination. Sync merges two machines'
             records into one log, and the tables have no owner column — so
             whose data it is has to be settled first, and connecting Drive
@@ -351,42 +355,25 @@ export function SyncPanel({ api }: SyncPanelProps) {
             still to take, not a fault, so it is drawn in the neutral tone: in
             the error tone it greeted every new install as something broken. */}
         {status.state === "signed-out" ? (
-          <div className="settings-nav-row is-static">
-            <span className="settings-nav-row-icon" aria-hidden="true">
-              <UserRound size={20} strokeWidth={1.9} />
-            </span>
-            <span className="settings-nav-row-copy">
-              <strong>Sign in to COROS to sync</strong>
-              <span>
-                Syncing needs to know whose records it is merging. Sign in under
-                Connections — sync starts on its own.
-              </span>
-            </span>
-          </div>
+          <SettingsPrefRow
+            title="Sign in to COROS to sync"
+            detail="Syncing needs to know whose records it is merging. Sign in under Connections — sync starts on its own."
+          />
         ) : null}
 
         {/* The one destination: the account, and the button that connects or
-            lets it go. Tinted like the COROS row when connected — the tint is
-            what says so without spending a line on it. */}
-        <div className="settings-nav-row is-static">
-          <span
-            className={`settings-nav-row-icon${
-              status.googleConnected ? " is-connected" : ""
-            }`}
-            aria-hidden="true"
-          >
-            <Cloud size={20} strokeWidth={1.9} />
-          </span>
-          <span className="settings-nav-row-copy">
-            <strong>Google Drive</strong>
-            <span>{googleDetail}</span>
-          </span>
+            lets it go. Its dot says connected, as the COROS row's does. */}
+        <SettingsPrefRow
+          title="Google Drive"
+          detail={googleDetail}
+          tone={status.googleConnected ? "success" : undefined}
+        >
           <button
             type="button"
             className={
               status.googleConnected
-                ? "secondary-button danger-button"
-                : "primary-button"
+                ? "settings-row-button is-danger"
+                : "settings-row-button is-primary"
             }
             disabled={busy === "google"}
             onClick={() =>
@@ -399,70 +386,61 @@ export function SyncPanel({ api }: SyncPanelProps) {
           >
             {busy === "google" ? (
               <Loader2 size={15} strokeWidth={2} className="spin" />
-            ) : null}
+            ) : status.googleConnected ? (
+              <Unplug size={15} aria-hidden="true" />
+            ) : (
+              <Cloud size={15} aria-hidden="true" />
+            )}
             {status.googleConnected ? "Disconnect" : "Connect"}
           </button>
-        </div>
+        </SettingsPrefRow>
 
         {status.state === "wrong-owner" ? (
-          <div className="settings-nav-row is-static sync-row-alert sync-row-stacked">
-            <span className="settings-nav-row-icon" aria-hidden="true">
-              <UserRound size={20} strokeWidth={1.9} />
-            </span>
-            <span className="settings-nav-row-copy">
-              <strong>This vault holds another account's data</strong>
-              <span>
-                Nothing is being sent or received. Two accounts' records merged
-                into one log cannot be separated again — there is no owner on
-                each record to sort them by — so this is left alone until you
-                say what it is.
-              </span>
-            </span>
-            <span className="sync-row-footer">
-              <span className="sync-destination-detail">
-                If this is your own second COROS account, or a vault you made
-                before switching accounts, you can take it over. Everything on
-                this computer is then published into it.
-              </span>
-              <button
-                type="button"
-                className="secondary-button danger-button"
-                onClick={claimVault}
-                disabled={busy === "claim"}
-              >
-                {busy === "claim" ? (
-                  <Loader2 size={15} strokeWidth={2} className="spin" />
-                ) : null}
-                Use this vault
-              </button>
-            </span>
-          </div>
+          <SettingsPrefRow
+            title="This vault holds another account's data"
+            tone="error"
+            align="start"
+            detail="Nothing is being sent or received. Two accounts' records merged into one log cannot be separated again — there is no owner on each record to sort them by — so this is left alone until you say what it is."
+          >
+            <p className="settings-pref-control-note">
+              If this is your own second COROS account, or a vault you made
+              before switching accounts, you can take it over. Everything on
+              this computer is then published into it.
+            </p>
+            <button
+              type="button"
+              className="settings-row-button is-danger"
+              onClick={claimVault}
+              disabled={busy === "claim"}
+            >
+              {busy === "claim" ? (
+                <Loader2 size={15} strokeWidth={2} className="spin" />
+              ) : null}
+              Use this vault
+            </button>
+          </SettingsPrefRow>
         ) : null}
 
         {status.state === "unreachable" ? (
-          <div className="settings-nav-row is-static sync-row-alert">
-            <span className="settings-nav-row-icon" aria-hidden="true">
-              <AlertTriangle size={20} strokeWidth={1.9} />
-            </span>
-            <span className="settings-nav-row-copy">
-              <strong>Google Drive did not answer</strong>
-              <span>
-                Check that this computer is online. If it is, disconnecting and
-                connecting the account again is the usual fix.
-              </span>
-            </span>
+          <SettingsPrefRow
+            title="Google Drive did not answer"
+            tone="error"
+            detail="Check that this computer is online. If it is, disconnecting and connecting the account again is the usual fix."
+          >
             <button
               type="button"
-              className="secondary-button"
+              className="settings-row-button"
               onClick={retryPrepare}
               disabled={busy === "prepare"}
             >
               {busy === "prepare" ? (
                 <Loader2 size={15} strokeWidth={2} className="spin" />
-              ) : null}
+              ) : (
+                <RefreshCw size={15} aria-hidden="true" />
+              )}
               Try again
             </button>
-          </div>
+          </SettingsPrefRow>
         ) : null}
 
         {/* The one-off publish of everything this machine already had. Only
@@ -471,49 +449,31 @@ export function SyncPanel({ api }: SyncPanelProps) {
             the quiet one — the vault is reachable, the loop is running, and
             months of history simply never left. */}
         {seed && seed.state !== "done" ? (
-          <div
-            className={`settings-nav-row is-static${
-              seed.state === "failed" ? " sync-row-alert" : ""
-            }`}
-          >
-            <span className="settings-nav-row-icon" aria-hidden="true">
-              {seed.state === "failed" ? (
-                <AlertTriangle size={20} strokeWidth={1.9} />
-              ) : (
-                <Loader2 size={20} strokeWidth={1.9} className="spin" />
-              )}
-            </span>
-            <span className="settings-nav-row-copy">
-              <strong>
-                {seed.state === "failed"
-                  ? "This computer's existing data has not been sent"
-                  : "Sending this computer's existing data…"}
-              </strong>
-              <span>
-                {seed.state === "failed"
-                  ? `${seed.error ?? "The publish did not finish."} Until it succeeds, anything created before sync was switched on stays on this computer. "Sync now" tries again.`
-                  : "Everything from before sync was switched on is going up once. New changes go out as you make them."}
-              </span>
-            </span>
-          </div>
+          <SettingsPrefRow
+            title={
+              seed.state === "failed"
+                ? "This computer's existing data has not been sent"
+                : "Sending this computer's existing data…"
+            }
+            tone={seed.state === "failed" ? "error" : "busy"}
+            detail={
+              seed.state === "failed"
+                ? `${seed.error ?? "The publish did not finish."} Until it succeeds, anything created before sync was switched on stays on this computer. "Sync now" tries again.`
+                : "Everything from before sync was switched on is going up once. New changes go out as you make them."
+            }
+          />
         ) : null}
 
+        {/* A fixed title over what the loop has been doing, like every other
+            row's: the state is the detail, not the name of the row. */}
         {status.state === "ready" ? (
-          <div className="settings-nav-row is-static">
-            <span className="settings-nav-row-icon" aria-hidden="true">
-              {busy === "syncnow" ? (
-                <Loader2 size={20} strokeWidth={1.9} className="spin" />
-              ) : (
-                <CloudUpload size={20} strokeWidth={1.9} />
-              )}
-            </span>
-            <span className="settings-nav-row-copy">
-              <strong>{activityTitle}</strong>
-              <span>{activityDetail}</span>
-            </span>
+          <SettingsPrefRow
+            title="Changes"
+            detail={`${activityTitle}. ${activityDetail}`}
+          >
             <button
               type="button"
-              className="secondary-button"
+              className="settings-row-button"
               onClick={() =>
                 void run("syncnow", async () => {
                   const result = await api.syncNow();
@@ -526,25 +486,27 @@ export function SyncPanel({ api }: SyncPanelProps) {
             >
               {busy === "syncnow" ? (
                 <Loader2 size={15} strokeWidth={2} className="spin" />
-              ) : null}
+              ) : (
+                <CloudUpload size={15} aria-hidden="true" />
+              )}
               Sync now
             </button>
-          </div>
-        ) : null}
-
-        {error ? (
-          <p className="sync-panel-note is-error">
-            <AlertTriangle size={14} strokeWidth={2} />
-            {error}
-          </p>
-        ) : null}
-        {message && !error ? (
-          <p className="sync-panel-note">
-            <Check size={14} strokeWidth={2} />
-            {message}
-          </p>
+          </SettingsPrefRow>
         ) : null}
       </div>
+
+      {error ? (
+        <p className="sync-panel-note is-error">
+          <AlertTriangle size={14} strokeWidth={2} />
+          {error}
+        </p>
+      ) : null}
+      {message && !error ? (
+        <p className="sync-panel-note">
+          <Check size={14} strokeWidth={2} />
+          {message}
+        </p>
+      ) : null}
     </div>
   );
 }
