@@ -17,6 +17,7 @@ import {
   initializeDiagnostics,
   observeDiagnosticWindow
 } from "./diagnosticsService";
+import { listRememberedMilestones, rememberMilestones } from "./recordsLedger";
 import type { OpenDialogOptions } from "electron";
 import fs from "node:fs";
 import os from "node:os";
@@ -91,6 +92,7 @@ import {
   getTrainingHubActivityDetailRaw,
   readActivityDetailSummaries,
   syncActivityDetailSummaries,
+  type ActivityDetailSummarySyncOptions,
   getCorosProfileSnapshot,
   getTrainingHubStatus,
   getUpcomingWorkouts,
@@ -2159,8 +2161,12 @@ function registerIpcHandlers(): void {
 
   ipcMain.handle(
     "trainingHub:syncActivityDetailSummaries",
-    (_event, activityIds: string[], limit?: number) =>
-      syncActivityDetailSummaries(activityIds, limit)
+    (
+      _event,
+      activityIds: string[],
+      limit?: number,
+      options?: ActivityDetailSummarySyncOptions
+    ) => syncActivityDetailSummaries(activityIds, limit, options)
   );
 
   ipcMain.handle(
@@ -2242,7 +2248,7 @@ function registerIpcHandlers(): void {
 
   ipcMain.handle(
     "sleep:getHistory",
-    (_event, request?: { days?: number; refresh?: boolean }) =>
+    (_event, request?: { days?: number; refresh?: boolean; cacheOnly?: boolean }) =>
       getSleepHistory(request ?? {})
   );
 
@@ -2303,6 +2309,15 @@ function registerIpcHandlers(): void {
   // about somewhere the athlete has actually trained.
   ipcMain.handle("places:reverseGeocode", (_event, lat: number, lon: number) =>
     reverseGeocodeLocation(lat, lon)
+  );
+
+  // The Hall of Records' memory — milestones whose source forgets them. Not
+  // behind the sample switches: nothing a sample activity produces is a kind
+  // this keeps (recordsLedger.ts takes VO2max and sleep from the renderer, and
+  // works plan runs out from the plan cache itself).
+  ipcMain.handle("records:list", () => listRememberedMilestones());
+  ipcMain.handle("records:remember", (_event, entries: unknown) =>
+    rememberMilestones(entries)
   );
 
   ipcMain.handle("app:getUpdateStatus", () => getAppUpdateSnapshot());

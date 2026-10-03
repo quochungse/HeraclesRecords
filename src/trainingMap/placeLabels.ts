@@ -9,6 +9,8 @@ export interface PlaceLabel {
   city: string;
   country: string;
   full: string;
+  /** ISO alpha-2, where the geocoder said; a name cached before it has none. */
+  countryCode?: string;
 }
 
 const PLACE_LABEL_CACHE = new Map<string, PlaceLabel>();
@@ -91,6 +93,7 @@ export function toPlaceLabel(
       city: result.city,
       country: result.country ?? "Location",
       full: result.label,
+      ...(result.countryCode ? { countryCode: result.countryCode } : {}),
     };
   }
   const parsed = parsePlaceLabel(result.label, point);

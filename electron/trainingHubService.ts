@@ -25,6 +25,7 @@ import {
 } from "./activityDetailCache";
 import {
   ACTIVITY_SUMMARY_VERSION,
+  RECORDS_SUMMARY_VERSION,
   summarizeActivityDetail
 } from "./activityMetrics";
 import {
@@ -1804,7 +1805,8 @@ function cacheActivityDetailSummary(
   activityId: string,
   fingerprint: string | null,
   detail: TrainingHubActivityDetail,
-  raw: Record<string, unknown>
+  raw: Record<string, unknown>,
+  sportType?: number
 ): ActivityDetailSummary | null {
   if (fingerprint === null || !isUsableActivityDetail(raw)) {
     return null;
@@ -1814,7 +1816,9 @@ function cacheActivityDetailSummary(
     const summary = summarizeActivityDetail({
       activityId,
       fingerprint,
-      detail,
+      // The list row's sport is the one every screen sorts by; a payload that
+      // names none still has one, and best efforts are counted for runs only.
+      detail: { ...detail, sportType: detail.sportType ?? sportType },
       raw
     });
     upsertActivityDetailSummary(summary);
@@ -1839,7 +1843,7 @@ export async function getTrainingHubActivityDetail(
   // Opportunistically cache the end-of-activity feeling while we have the detail.
   cacheFeelTypeFromDetail(activityId, raw);
   // And the list-level figures, so opening a run is also what fills its row.
-  cacheActivityDetailSummary(activityId, fingerprint, detail, raw);
+  cacheActivityDetailSummary(activityId, fingerprint, detail, raw, sportType);
   if (listActivity) {
     detail = mergeActivityDetailWithList(detail, listActivity);
   }
@@ -2003,13 +2007,29 @@ const summaryBackfillFailedIds = new Set<string>();
  * athlete has not asked for, and it should cost disk in proportion to what it
  * keeps, which is 130 bytes. Opening the run is what earns it a file.
  */
+export interface ActivityDetailSummarySyncOptions {
+  /**
+   * Count a summary as missing until it carries the Hall of Records' figures
+   * too (`RECORDS_SUMMARY_VERSION`). The run screens leave this off: a row
+   * from before those figures existed still answers everything they ask.
+   */
+  requireRecords?: boolean;
+}
+
 export async function syncActivityDetailSummaries(
   activityIds: readonly string[],
-  limit = 6
+  limit = 6,
+  options: ActivityDetailSummarySyncOptions = {}
 ): Promise<ActivityDetailSummarySync> {
   const stored = storedActivityIndex(activityIds);
   const valid = new Set(
-    validSummaries(activityIds, stored).map((summary) => summary.activityId)
+    validSummaries(activityIds, stored)
+      .filter(
+        (summary) =>
+          !options.requireRecords ||
+          summary.recordsVersion === RECORDS_SUMMARY_VERSION
+      )
+      .map((summary) => summary.activityId)
   );
 
   // Both brakes count **attempts**, not successes. Counting successes lets a
@@ -2065,7 +2085,8 @@ export async function syncActivityDetailSummaries(
         activityId,
         fingerprint,
         parseActivityDetail(raw),
-        raw
+        raw,
+        activity.sportType
       );
       if (summary) {
         written.push(summary);

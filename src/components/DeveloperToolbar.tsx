@@ -1,5 +1,6 @@
 import { Sparkles } from "lucide-react";
 import type { HeraclesRecordsApi } from "../heraclesrecords-api";
+import type { RecordsSamplePreset } from "../records/sampleRecords";
 import { SampleDataControls } from "./SampleDataControls";
 
 interface DeveloperToolbarProps {
@@ -13,6 +14,9 @@ interface DeveloperToolbarProps {
   /** The Strength screen's generated sample history. */
   strengthSampleActive: boolean;
   onStrengthSampleChange: (active: boolean) => void;
+  /** The Hall of Records' sample history, one preset at a time. */
+  recordsSample: RecordsSamplePreset | null;
+  onRecordsSampleChange: (preset: RecordsSamplePreset | null) => void;
   onError: (message: string) => void;
 }
 
@@ -30,6 +34,8 @@ export function DeveloperToolbar({
   onToggleUpdateSimulation,
   strengthSampleActive,
   onStrengthSampleChange,
+  recordsSample,
+  onRecordsSampleChange,
   onError,
 }: DeveloperToolbarProps) {
   return (
@@ -70,6 +76,8 @@ export function DeveloperToolbar({
               api={api}
               strengthSampleActive={strengthSampleActive}
               onStrengthSampleChange={onStrengthSampleChange}
+              recordsSample={recordsSample}
+              onRecordsSampleChange={onRecordsSampleChange}
               onError={onError}
             />
           </>

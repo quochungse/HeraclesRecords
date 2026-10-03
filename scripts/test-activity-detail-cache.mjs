@@ -322,6 +322,155 @@ assert.deepEqual(
 database.upsertActivityDetailSummary(summary);
 
 // ---------------------------------------------------------------------------
+// 3a. The Hall of Records' share: best efforts and a start point
+//
+// Versioned on its own, so adding it withheld none of the zone splits and drift
+// figures already stored — and a row without it is what the records backfill
+// asks for, while the run screens' backfill leaves it alone.
+// ---------------------------------------------------------------------------
+
+assert.equal(
+  summary.recordsVersion,
+  metrics.RECORDS_SUMMARY_VERSION,
+  "every summary written now carries the records figures' version"
+);
+assert.equal(summary.bestEfforts, undefined, "a payload with no sport and no distance has no efforts");
+
+// 12 km a sample every 5 s at 5:00/km, with kilometre 7 run at 4:00/km.
+const effortSeries = [];
+{
+  let elapsed = 0;
+  let distance = 0;
+  effortSeries.push({ elapsed, distance });
+  while (distance < 12000) {
+    const fast = distance >= 6000 && distance < 7000;
+    elapsed += 5;
+    distance += fast ? 1000 / 48 : 1000 / 60;
+    effortSeries.push({ elapsed, distance: Math.min(distance, 12000) });
+  }
+}
+const efforts = metrics.bestEfforts(effortSeries);
+const effortAt = (list, distance) => list.find((effort) => effort.distance === distance)?.seconds;
+assert.ok(Math.abs(effortAt(efforts, 1000) - 240) <= 5, `the fast kilometre is the 1K, got ${effortAt(efforts, 1000)}`);
+assert.ok(
+  Math.abs(effortAt(efforts, 5000) - 1440) <= 5,
+  `the best 5K holds the fast kilometre: 4×300 + 240 = 1440 s, got ${effortAt(efforts, 5000)}`
+);
+assert.ok(Math.abs(effortAt(efforts, 10000) - 2940) <= 5, "and so does the 10K");
+assert.equal(effortAt(efforts, 21097.5), undefined, "a distance never covered has no effort");
+
+// The start of a stretch is interpolated, so a sparse series is not a whole
+// sample interval slow.
+const sparse = metrics.bestEfforts(
+  [
+    { elapsed: 0, distance: 0 },
+    { elapsed: 200, distance: 700 },
+    { elapsed: 400, distance: 1400 }
+  ],
+  [1000]
+);
+assert.ok(Math.abs(sparse[0].seconds - 285.7) < 0.2, `1000 m at 3.5 m/s, got ${sparse[0]?.seconds}`);
+
+// A GPS jump is not a record: 400 m in two seconds would be a 1K nobody has run.
+const jumped = metrics.bestEfforts(
+  [
+    { elapsed: 0, distance: 0 },
+    { elapsed: 60, distance: 200 },
+    { elapsed: 62, distance: 1150 },
+    { elapsed: 120, distance: 1300 }
+  ],
+  [1000]
+);
+assert.deepEqual(jumped, [], "an effort faster than 2:12/km is refused");
+
+// A jump inside an honest kilometre is no faster on average than 2:12/km, so
+// the stretch test alone let it through. The step itself is refused, and the
+// best stretch that does not cross it is the 1K.
+const steady = [];
+for (let second = 0; second <= 1500; second += 5) {
+  // 5:00/km, with a 300 m jump at the tenth minute.
+  steady.push({ elapsed: second, distance: (second * 1000) / 300 + (second >= 600 ? 300 : 0) });
+}
+const throughJump = metrics.bestEfforts(steady, [1000]);
+assert.equal(throughJump.length, 1, "the run still has a 1K");
+assert.ok(
+  Math.abs(throughJump[0].seconds - 300) < 1,
+  `a jump inside the stretch is no 3:30 1K, got ${throughJump[0]?.seconds}`
+);
+
+// Activity time, not the wall clock: a wait at a crossing is not in the stretch.
+const paused = metrics.withPausesRemoved(
+  [
+    { elapsed: 0, distance: 0 },
+    { elapsed: 150, distance: 500 },
+    { elapsed: 450, distance: 500 },
+    { elapsed: 600, distance: 1000 }
+  ],
+  [{ start: 150, duration: 300 }]
+);
+assert.equal(metrics.bestEfforts(paused, [1000])[0].seconds, 300);
+
+const located = metrics.summarizeActivityDetail({
+  activityId: "run-efforts",
+  fingerprint: base,
+  detail: {
+    sportType: 100,
+    hrZones: [],
+    series: effortSeries,
+    track: { points: [{ lat: 0, lon: 0 }, { lat: 21.028511, lon: 105.804817 }] }
+  }
+});
+assert.equal(located.bestEfforts.length, 3, "an outdoor run has its 1K, 5K and 10K");
+assert.deepEqual(
+  located.startPoint,
+  { lat: 21.03, lon: 105.8 },
+  "the start is the first real fix, rounded to about a kilometre"
+);
+assert.equal(
+  metrics.summarizeActivityDetail({
+    activityId: "treadmill",
+    fingerprint: base,
+    detail: { sportType: 101, hrZones: [], series: effortSeries }
+  }).bestEfforts,
+  undefined,
+  "an indoor run's distance is an estimate, so it sets no record"
+);
+assert.equal(
+  metrics.summarizeActivityDetail({
+    activityId: "ride",
+    fingerprint: base,
+    detail: { sportType: 200, hrZones: [], series: effortSeries }
+  }).bestEfforts,
+  undefined,
+  "best efforts are a runner's"
+);
+
+// Through JSON, so a figure the summariser left `undefined` and a column read
+// back as absent compare equal.
+const effortsRow = JSON.parse(JSON.stringify({ ...located, activityId: run.activityId }));
+database.upsertActivityDetailSummary(effortsRow);
+assert.deepEqual(
+  database.getActivityDetailSummaries([run.activityId])[0],
+  effortsRow,
+  "efforts and the start point round-trip through the row"
+);
+
+// A row from before the records figures existed still serves the run screens.
+const { recordsVersion: _dropped, bestEfforts: _none, startPoint: _nowhere, ...olderRow } = summary;
+database.upsertActivityDetailSummary(olderRow);
+assert.equal(
+  service.readActivityDetailSummaries([run.activityId]).length,
+  1,
+  "a row without the records figures is still a valid summary"
+);
+assert.equal(
+  database.getActivityDetailSummaries([run.activityId])[0].recordsVersion,
+  undefined,
+  "and reads back as one the records backfill has still to fill"
+);
+database.upsertActivityDetailSummary(summary);
+
+// ---------------------------------------------------------------------------
 // 3b. A cached open asks COROS for nothing
 //
 // The payload coming off disk is only half of it: an outdoor activity with no
@@ -561,6 +710,22 @@ assert.equal(scoredPass.computed, 1);
 assert.deepEqual(
   scoredPass.summaries.map((summary) => summary.activityId),
   [summable.activityId]
+);
+
+// A summary from before the records figures is complete for the run screens
+// and missing for the Hall of Records — the two sweeps ask different questions
+// of the same row.
+const { recordsVersion: _v, ...beforeRecords } = scoredPass.summaries[0];
+database.upsertActivityDetailSummary(beforeRecords);
+const screenPass = await service.syncActivityDetailSummaries([summable.activityId], 2);
+assert.equal(screenPass.computed, 0, "the run screens' sweep leaves an older row alone");
+const recordsPass = await service.syncActivityDetailSummaries([summable.activityId], 2, {
+  requireRecords: true
+});
+assert.equal(recordsPass.computed, 1, "the records sweep fills it in");
+assert.equal(
+  recordsPass.summaries[0].recordsVersion,
+  metrics.RECORDS_SUMMARY_VERSION
 );
 
 globalThis.fetch = realFetch;

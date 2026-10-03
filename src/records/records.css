@@ -1,0 +1,875 @@
+/*
+ * The Hall of Records. Chrome is the app's: neutral surfaces, the accent, the
+ * `.panel` card. Colour is data — a sport's own hue on its dot, and gold (the
+ * accent) only where a labour stage was reached. Imported by the view, so it
+ * arrives with the screen's chunk.
+ */
+
+.records-view {
+  display: grid;
+  gap: 24px;
+  max-width: 1080px;
+  padding-bottom: 72px;
+}
+
+.records-page-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px 24px;
+}
+
+.records-page-header h1 {
+  margin: 0;
+  color: var(--text-primary);
+  font-size: 32px;
+}
+
+.records-page-header p {
+  margin: 8px 0 0;
+  color: var(--text-secondary);
+  font-size: 14px;
+  line-height: 1.45;
+}
+
+.records-backfill {
+  margin: -12px 0 0;
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.records-section-label {
+  margin: 0 0 12px;
+  color: var(--text-secondary);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+.records-section-label.is-accent {
+  margin: 0;
+  color: var(--accent);
+}
+
+.records-eyebrow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+.records-eyebrow.is-start {
+  color: var(--accent);
+  letter-spacing: 0.1em;
+}
+
+.records-new {
+  padding: 2px 6px;
+  border-radius: var(--radius-pill);
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  line-height: 1;
+}
+
+.records-empty h2 {
+  margin: 0;
+  color: var(--text-primary);
+  font-size: 18px;
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+.records-empty p {
+  margin: 6px 0 0;
+  color: var(--text-secondary);
+  font-size: 14px;
+  line-height: 1.45;
+}
+
+.records-skeleton {
+  display: grid;
+  gap: 16px;
+}
+
+.records-skeleton span {
+  display: block;
+  height: 120px;
+  border-radius: var(--radius-md);
+  background: var(--glass-bg);
+}
+
+/* --- Within reach ----------------------------------------------------------- */
+
+.records-reach-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.records-reach-card {
+  display: grid;
+  gap: 12px;
+  padding: 16px 18px;
+}
+
+.records-reach-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.records-reach-head h3 {
+  margin: 6px 0 0;
+  color: var(--text-primary);
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+.records-reach-foot {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1;
+}
+
+.records-reach-foot .figure {
+  color: var(--text-primary);
+  font-size: 13px;
+  line-height: 1;
+}
+
+.records-progress {
+  display: block;
+  height: 6px;
+  overflow: hidden;
+  border-radius: var(--radius-pill);
+  background: var(--glass-bg);
+}
+
+.records-progress.is-thin {
+  flex: 1 1 auto;
+  height: 4px;
+}
+
+.records-progress > span {
+  display: block;
+  height: 100%;
+  border-radius: var(--radius-pill);
+  background: var(--accent);
+}
+
+.records-filters {
+  justify-self: start;
+}
+
+/* --- The timeline --------------------------------------------------------------- */
+
+.records-year {
+  display: grid;
+}
+
+.records-year-head {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  padding-bottom: 4px;
+}
+
+.records-year-head h2 {
+  margin: 0;
+  color: var(--text-primary);
+  font-family: var(--font-display);
+  font-size: 28px;
+  font-weight: 500;
+  letter-spacing: -0.02em;
+  line-height: 1.2;
+}
+
+.records-year-head span {
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+/* Three columns: the date, the line with its node, and the milestone. The line
+   is one hairline down the whole year, drawn behind the nodes. */
+.records-line {
+  position: relative;
+  display: grid;
+}
+
+.records-line::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 75.5px;
+  width: 1px;
+  background: var(--glass-border);
+}
+
+.records-slot {
+  position: relative;
+  display: grid;
+  grid-template-columns: 56px 40px minmax(0, 1fr);
+  align-items: start;
+  padding: 9px 0;
+}
+
+.records-month-slot {
+  align-items: center;
+  padding: 20px 0 6px;
+}
+
+.records-gap-slot {
+  align-items: center;
+  padding: 20px 0 8px;
+}
+
+.records-more-slot {
+  padding: 2px 0 10px;
+}
+
+.records-month {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+.records-date {
+  display: grid;
+  justify-items: end;
+  gap: 4px;
+}
+
+.records-date .figure {
+  color: var(--text-primary);
+  font-size: 18px;
+  line-height: 1;
+}
+
+.records-date span:last-child {
+  color: var(--text-muted);
+  font-size: 11px;
+  line-height: 1;
+}
+
+.records-milestone.is-card .records-date {
+  padding-top: 20px;
+}
+
+/* The node sits on the line; its ring is the page colour, so the line seems
+   to pass behind it. */
+.records-node {
+  justify-self: center;
+  display: block;
+  width: 8px;
+  height: 8px;
+  margin-top: 5px;
+  border-radius: var(--radius-pill);
+  background: var(--text-muted);
+  box-shadow: 0 0 0 3px var(--bg-base);
+}
+
+.records-node.is-month {
+  width: 9px;
+  height: 9px;
+  margin-top: 0;
+  border: 1.5px solid var(--text-muted);
+  background: var(--bg-base);
+  box-shadow: none;
+}
+
+.records-node.is-gap {
+  width: 9px;
+  height: 9px;
+  margin-top: 0;
+  border: 1.5px dashed var(--text-muted);
+  background: var(--bg-base);
+  box-shadow: none;
+}
+
+.records-node.is-card {
+  width: 12px;
+  height: 12px;
+  margin-top: 23px;
+  box-shadow: 0 0 0 3px var(--bg-base), 0 0 0 5px var(--node-colour, var(--text-muted));
+}
+
+.records-node.is-start {
+  width: 11px;
+  height: 11px;
+  margin-top: 4px;
+  border-radius: var(--radius-xs);
+  background: var(--accent);
+  transform: rotate(45deg);
+}
+
+.records-node.is-run { --node-colour: var(--sport-run); background: var(--sport-run); }
+.records-node.is-ride { --node-colour: var(--sport-bike); background: var(--sport-bike); }
+.records-node.is-hike { --node-colour: var(--sport-hiking); background: var(--sport-hiking); }
+.records-node.is-strength { --node-colour: var(--sport-strength); background: var(--sport-strength); }
+.records-node.is-swim,
+.records-node.is-other { --node-colour: var(--sport-other); background: var(--sport-other); }
+.records-node.is-accent { --node-colour: var(--accent); background: var(--accent); }
+.records-node.is-none { --node-colour: var(--text-muted); background: var(--text-muted); }
+
+.records-dot {
+  flex: 0 0 auto;
+  width: 10px;
+  height: 10px;
+  margin: 0 11px;
+  border-radius: var(--radius-pill);
+  background: var(--text-muted);
+}
+
+.records-dot.is-run { background: var(--sport-run); }
+.records-dot.is-ride { background: var(--sport-bike); }
+.records-dot.is-hike { background: var(--sport-hiking); }
+.records-dot.is-strength { background: var(--sport-strength); }
+.records-dot.is-swim { background: var(--sport-other); }
+
+.records-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  min-width: 0;
+}
+
+.records-row > div {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+
+/* A title opens its session, so it is a button that reads as a heading — no
+   "Open" beside it. */
+.records-row-title,
+.records-card-title {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.3;
+  text-align: left;
+}
+
+.records-card-title {
+  margin-top: 10px;
+  font-size: 18px;
+}
+
+.records-title-link {
+  cursor: pointer;
+  text-decoration: underline;
+  text-decoration-color: transparent;
+  text-underline-offset: 4px;
+  transition: text-decoration-color var(--dur-fast) var(--ease);
+}
+
+.records-title-link:hover {
+  text-decoration-color: var(--accent);
+}
+
+.records-title-link:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: 2px;
+}
+
+.records-detail {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 13px;
+  line-height: 1.45;
+  font-variant-numeric: tabular-nums;
+}
+
+.records-card {
+  padding: 20px 22px;
+}
+
+.records-card.is-gilded {
+  border-color: color-mix(in srgb, var(--accent) 45%, transparent);
+}
+
+.records-card-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.records-figures {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 36px;
+  margin: 18px 0 0;
+}
+
+.records-figures div {
+  display: flex;
+  flex-direction: column-reverse;
+  gap: 6px;
+}
+
+.records-figures dt {
+  color: var(--text-muted);
+  font-size: 11px;
+  line-height: 1;
+}
+
+.records-figures dd {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+  margin: 0;
+}
+
+.records-figures .figure {
+  color: var(--text-primary);
+  font-size: 22px;
+  line-height: 1;
+}
+
+.records-figure-unit {
+  color: var(--text-secondary);
+  font-size: 13px;
+  line-height: 1;
+}
+
+.records-context {
+  margin: 16px 0 0;
+  color: var(--text-secondary);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.records-gap,
+.records-more {
+  justify-self: start;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 32px;
+  padding: 0 14px;
+  border: 1px dashed var(--glass-border);
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: 13px;
+  line-height: 1;
+  cursor: pointer;
+  transition:
+    border-color var(--dur-fast) var(--ease),
+    color var(--dur-fast) var(--ease);
+}
+
+.records-more {
+  min-height: 28px;
+  padding: 0 12px;
+  border-style: solid;
+  font-size: 12px;
+}
+
+.records-gap strong,
+.records-more strong {
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+.records-gap em,
+.records-more span {
+  color: var(--text-muted);
+  font-style: normal;
+}
+
+.records-gap:hover,
+.records-more:hover {
+  border-color: var(--accent);
+  color: var(--text-primary);
+}
+
+.records-gap:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: 2px;
+}
+
+.records-more:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: 2px;
+}
+
+/* --- Labour badges ---------------------------------------------------------------- */
+
+.records-badge {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 32px;
+  padding: 0 12px 0 5px;
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-pill);
+  background: var(--glass-bg);
+}
+
+.records-badge.is-large {
+  height: auto;
+  gap: 10px;
+  padding: 5px 16px 5px 5px;
+  border-radius: var(--radius-md);
+}
+
+.records-badge.is-complete {
+  border-color: color-mix(in srgb, var(--accent) 45%, transparent);
+  background: var(--accent-soft);
+}
+
+.records-badge-text {
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.records-badge-text strong {
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.records-badge.is-large .records-badge-text {
+  display: grid;
+  gap: 5px;
+}
+
+.records-badge.is-large .records-badge-text strong {
+  color: var(--text-primary);
+  font-size: 13px;
+}
+
+.records-badge.is-large .records-badge-text span {
+  color: var(--accent);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+/* --- The Twelve Labours -------------------------------------------------------------- */
+
+.records-apotheosis {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  padding: 22px 24px;
+}
+
+.records-laurel {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 64px;
+  height: 64px;
+  border-radius: var(--radius-pill);
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.records-apotheosis-copy {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.records-apotheosis-count {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin: 10px 0 0;
+  color: var(--text-secondary);
+  font-size: 14px;
+  line-height: 1.3;
+}
+
+.records-apotheosis-count .figure {
+  color: var(--text-primary);
+  font-size: 28px;
+  line-height: 1;
+}
+
+.records-apotheosis-note {
+  margin: 8px 0 0;
+  color: var(--text-muted);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.records-pips {
+  display: flex;
+  align-items: flex-end;
+  gap: 6px;
+}
+
+.records-pip-column {
+  display: flex;
+  flex-direction: column-reverse;
+  gap: 3px;
+}
+
+.records-pip-column span {
+  display: block;
+  width: 14px;
+  height: 9px;
+  border-radius: var(--radius-xs);
+  background: var(--glass-border);
+}
+
+.records-pip-column span.is-reached {
+  background: var(--accent);
+}
+
+.records-labours {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.records-labour {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 18px;
+}
+
+.records-labour.is-complete {
+  border-color: color-mix(in srgb, var(--accent) 45%, transparent);
+}
+
+.records-labour-head {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.records-labour-head > div {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.records-labour-head h3 {
+  margin: 6px 0 0;
+  color: var(--text-primary);
+  font-size: 18px;
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+.records-labour-status {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 8px;
+}
+
+.records-labour-pips {
+  display: flex;
+  gap: 3px;
+}
+
+.records-labour-pips span {
+  display: block;
+  width: 14px;
+  height: 4px;
+  border-radius: var(--radius-pill);
+  background: var(--glass-border);
+}
+
+.records-labour-pips span.is-reached {
+  background: var(--accent);
+}
+
+.records-complete {
+  flex: 0 0 auto;
+  padding: 5px 9px;
+  border-radius: var(--radius-pill);
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1;
+}
+
+.records-stage-count {
+  flex: 0 0 auto;
+  color: var(--text-secondary);
+  font-size: 13px;
+  line-height: 1;
+}
+
+.records-myth {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.records-stages {
+  display: grid;
+  gap: 12px;
+  margin: 0;
+  padding: 14px 0 0;
+  border-top: 1px solid var(--glass-border);
+  list-style: none;
+}
+
+.records-stage {
+  display: grid;
+  grid-template-columns: 22px minmax(0, 1fr);
+  align-items: start;
+  gap: 10px;
+}
+
+.records-stage-pip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  width: 22px;
+  height: 22px;
+  border: 1.5px dashed var(--glass-border);
+  border-radius: var(--radius-pill);
+  color: var(--text-muted);
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.records-stage.is-reached .records-stage-pip {
+  border: 1.5px solid var(--accent);
+  background: var(--accent);
+  color: var(--bg-base);
+}
+
+.records-stage.is-current .records-stage-pip {
+  border: 1.5px solid color-mix(in srgb, var(--accent) 45%, transparent);
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.records-stage > div {
+  display: grid;
+  gap: 7px;
+  min-width: 0;
+  padding-top: 3px;
+}
+
+.records-stage-line {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.records-stage-title {
+  color: var(--text-muted);
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.3;
+}
+
+.records-stage.is-reached .records-stage-title {
+  color: var(--text-primary);
+}
+
+.records-stage.is-current .records-stage-title {
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+.records-stage-date {
+  flex: 0 0 auto;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--text-muted);
+  font: inherit;
+  font-size: 12px;
+  line-height: 1;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+  text-decoration: underline;
+  text-decoration-color: transparent;
+  text-underline-offset: 3px;
+  transition: text-decoration-color var(--dur-fast) var(--ease);
+}
+
+.records-stage-date:hover {
+  color: var(--text-secondary);
+  text-decoration-color: var(--accent);
+}
+
+.records-stage-date:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: 2px;
+}
+
+.records-stage-progress {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--text-secondary);
+  font-size: 12px;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+/* --- Narrow windows --------------------------------------------------------------------- */
+
+@media (max-width: 1100px) {
+  .records-labours,
+  .records-reach-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 760px) {
+  .records-labours,
+  .records-reach-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .records-apotheosis {
+    flex-wrap: wrap;
+  }
+
+  .records-row {
+    flex-direction: column;
+  }
+}

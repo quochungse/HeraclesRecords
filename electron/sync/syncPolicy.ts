@@ -126,6 +126,12 @@ export const TABLE_POLICY: Readonly<Record<string, TablePolicy>> = {
   // classified would let a row from a machine still on the old build recreate
   // the table on the merge path.
   training_workout_metadata: "personal",
+  // The Hall of Records' memory: a milestone whose source forgets it — a
+  // VO2max reading past COROS's year, a night past what this machine kept, a
+  // plan run gone from COROS's list. Not rebuildable once forgotten, which is
+  // the whole reason it exists, and it is what lets the other machine show the
+  // same labours.
+  athlete_milestones: "personal",
   // Server config only. The bearer tokens and OAuth client info live in
   // app_settings under `mcp.<id>.*`, and stay on the machine that authorised
   // them — so a restored machine lists its servers and signs in to them again.
@@ -389,6 +395,14 @@ export const LOCAL_STORAGE_POLICY: Readonly<Record<string, SyncTier>> = {
   "heraclesrecords.hiddenSportScreens": "preference",
   // Which muscle layers the strength body map draws.
   "heraclesrecords-strength-muscle-layers-v2": "preference",
+
+  // What the Hall of Records has told the athlete: the milestones they have
+  // seen and the labour stages already announced. It follows them, so a stage
+  // celebrated on one machine is not celebrated again on the other.
+  "heraclesrecords.records.notices.v1": "personal",
+  // This machine's own copy of it, never synced: what it reads is the union of
+  // the two, so the other machine's copy cannot wipe what this one was told.
+  "heraclesrecords.records.notices.local.v1": "device",
 
   // Window chrome, sized to whatever display this machine has.
   "heraclesrecords.sidebarCollapsed": "device",

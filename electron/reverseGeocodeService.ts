@@ -118,6 +118,13 @@ function joinParts(parts: Array<string | undefined>): string {
   return kept.join(", ");
 }
 
+/** Two letters, upper case — Nominatim writes `vn`, Photon `VN`. */
+function countryCodeOf(value: unknown): string | undefined {
+  return typeof value === "string" && /^[a-z]{2}$/i.test(value.trim())
+    ? value.trim().toUpperCase()
+    : undefined;
+}
+
 interface NominatimPlace {
   display_name?: string;
   name?: string;
@@ -132,6 +139,7 @@ interface NominatimPlace {
     hamlet?: string;
     suburb?: string;
     country?: string;
+    country_code?: string;
   };
   error?: unknown;
 }
@@ -158,6 +166,7 @@ export function parseNominatimPlace(
     address.state
   );
   const country = firstString(address.country);
+  const countryCode = countryCodeOf(address.country_code);
   const label = firstString(place.display_name, place.name);
   if (!label && !city) {
     return undefined;
@@ -167,7 +176,8 @@ export function parseNominatimPlace(
     lat,
     lon,
     city,
-    country
+    country,
+    ...(countryCode ? { countryCode } : {})
   };
 }
 
@@ -182,6 +192,7 @@ interface PhotonFeature {
     county?: string;
     state?: string;
     country?: string;
+    countrycode?: string;
   };
 }
 
@@ -207,6 +218,7 @@ export function parsePhotonPlace(
     properties.state
   );
   const country = firstString(properties.country);
+  const countryCode = countryCodeOf(properties.countrycode);
   const street = properties.housenumber
     ? `${properties.housenumber} ${properties.street ?? ""}`.trim()
     : properties.street;
@@ -229,7 +241,8 @@ export function parsePhotonPlace(
     lat,
     lon,
     city,
-    country
+    country,
+    ...(countryCode ? { countryCode } : {})
   };
 }
 

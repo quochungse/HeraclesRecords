@@ -106,6 +106,12 @@ export interface AppSidebarProps {
   activeView: PrimaryView;
   onChange: (view: PrimaryView) => void;
   coachBusy?: boolean;
+  /**
+   * A count of something new behind a destination — the Hall of Records'
+   * unseen milestones. Drawn as "N new" beside the label, and as a dot on the
+   * icon while the rail is collapsed.
+   */
+  newCounts?: Partial<Record<PrimaryView, number>>;
   showDevelopmentItems?: boolean;
   /** Destinations taken off the rail in Settings → Navigation. */
   hiddenViews?: readonly PrimaryView[];
@@ -124,6 +130,7 @@ export function AppSidebar({
   activeView,
   onChange,
   coachBusy = false,
+  newCounts,
   showDevelopmentItems = false,
   hiddenViews = NO_HIDDEN_VIEWS,
   athleteName = null,
@@ -324,7 +331,13 @@ export function AppSidebar({
   const renderNavItem = (item: PrimaryNavItem) => {
     const Icon = item.icon;
     const isActive = activeView === item.id;
-    const tooltip = item.beta ? `${item.label} (Beta)` : item.label;
+    const fresh = newCounts?.[item.id] ?? 0;
+    const tooltip = [
+      item.beta ? `${item.label} (Beta)` : item.label,
+      fresh > 0 ? `${fresh} new` : ""
+    ]
+      .filter(Boolean)
+      .join(" · ");
 
     return (
       <button
@@ -349,11 +362,19 @@ export function AppSidebar({
               aria-label="Coach is responding"
             />
           ) : null}
+          {fresh > 0 && !showLabels ? (
+            <span className="app-sidebar-nav-dot" aria-label={`${fresh} new`} />
+          ) : null}
         </span>
         {rowCopy(
           rowIndex++,
           item.label,
-          item.beta ? <span className="primary-tab-beta">Beta</span> : null,
+          <>
+            {item.beta ? <span className="primary-tab-beta">Beta</span> : null}
+            {fresh > 0 ? (
+              <span className="app-sidebar-nav-count">{fresh} new</span>
+            ) : null}
+          </>,
         )}
       </button>
     );

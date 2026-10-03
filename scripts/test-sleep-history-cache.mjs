@@ -766,4 +766,16 @@ clearSleepHistoryCache();
   assert.ok(cached.records.length > 0, "and still serves the nights it holds");
 }
 
+clearSleepHistoryCache();
+{
+  // A cache-only read asks COROS nothing, however stale the window: the Hall of
+  // Records reads 400 days on every launch and must not cost a fetch of them.
+  const { state, deps } = harness({ records: [night(0)] });
+  const empty = await getSleepHistory({ days: 400, cacheOnly: true }, deps);
+  assert.equal(state.fetches, 0, "an empty cache read cache-only is not filled");
+  assert.equal(state.heartRateFetches, 0);
+  assert.equal(empty.records.length, 0);
+  assert.equal(empty.source, "cache");
+}
+
 console.log("sleep history cache: all assertions passed");

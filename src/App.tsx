@@ -1,5 +1,6 @@
 import { AlertCircle, CheckCircle2, Loader2, RefreshCw, X } from "lucide-react";
 import {
+  Children,
   Component,
   type ComponentProps,
   type ComponentType,
@@ -72,6 +73,13 @@ import { SettingsView } from "./settings/SettingsView";
 import { useTimeOfDayGreeting } from "./hooks/useTimeOfDayGreeting";
 import { selectOverviewGreeting } from "./overviewGreeting";
 import { useUnitSystem } from "./units/UnitSystemProvider";
+import { useHallOfRecords } from "./records/useHallOfRecords";
+import { useRecordsNotices } from "./records/useRecordsNotices";
+import {
+  isSampleRecordsActivity,
+  type RecordsSamplePreset,
+} from "./records/sampleRecords";
+import { LabourCelebration, LabourToastCard } from "./records/LabourNotices";
 import appLogo from "../build/icon.png";
 import changelogMarkdown from "../CHANGELOG.md?raw";
 
@@ -174,6 +182,11 @@ const LazyProfileView = lazy(() =>
 const LazyTrainingMapView = lazy(() =>
   import("./trainingMap/TrainingMapView").then(({ TrainingMapView }) => ({
     default: TrainingMapView,
+  })),
+);
+const LazyHallOfRecordsView = lazy(() =>
+  import("./records/HallOfRecordsView").then(({ HallOfRecordsView }) => ({
+    default: HallOfRecordsView,
   })),
 );
 
@@ -317,6 +330,8 @@ export default function App() {
     useState<AppUpdateSnapshot | null>(null);
   /** The Strength screen's generated sample history, switched from the toolbar. */
   const [strengthSampleMode, setStrengthSampleMode] = useState(false);
+  /** The Hall of Records' sample history, switched from the toolbar. */
+  const [recordsSample, setRecordsSample] = useState<RecordsSamplePreset | null>(null);
   const [sidebarOverlayOpen, setSidebarOverlayOpen] = useState(() => {
     if (typeof window === "undefined") {
       return false;
@@ -1516,6 +1531,90 @@ export default function App() {
     trainingHubDailyHealthData,
   ]);
 
+  const { unitSystem } = useUnitSystem();
+  // The rail's identity row, and the birthday and sex the Hall of Records
+  // grades speed and VO2max for. The snapshot is served from the main
+  // process's hour-long cache, so asking for it here costs no COROS request; a
+  // failure just leaves the row on the account's email, which is already to
+  // hand, and the hall on its default athlete.
+  const [athleteIdentity, setAthleteIdentity] = useState<{
+    name: string | null;
+    avatarUrl: string | null;
+    birthday?: number;
+    sex?: number;
+    /** The profile has answered, or failed to: the hall may reckon now. */
+    loaded: boolean;
+  }>({ name: null, avatarUrl: null, loaded: false });
+
+  useEffect(() => {
+    if (!api || !trainingHubStatus?.authenticated) {
+      setAthleteIdentity({ name: null, avatarUrl: null, loaded: false });
+      return;
+    }
+
+    let cancelled = false;
+    void api
+      .getCorosProfileSnapshot()
+      .then((snapshot) => {
+        if (cancelled) {
+          return;
+        }
+        setAthleteIdentity({
+          name: snapshot.profile.nickname?.trim() || null,
+          avatarUrl: snapshot.profile.avatarUrl ?? null,
+          birthday: snapshot.profile.birthday,
+          sex: snapshot.profile.sex,
+          loaded: true,
+        });
+      })
+      .catch(() => {
+        // The rail falls back to the email; nothing here is worth a toast.
+        if (!cancelled) {
+          setAthleteIdentity((current) => ({ ...current, loaded: true }));
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [api, trainingHubStatus?.authenticated]);
+
+  const recordsAthlete = useMemo(
+    () =>
+      athleteIdentity.loaded
+        ? { birthday: athleteIdentity.birthday, sex: athleteIdentity.sex }
+        : undefined,
+    [athleteIdentity.loaded, athleteIdentity.birthday, athleteIdentity.sex],
+  );
+
+  /*
+   * The Hall of Records is worked out here rather than in its screen: the
+   * rail's "new" count and the labour notifications have to know what was
+   * reached while the athlete is somewhere else. It is all local reads; what
+   * costs a request runs only while the screen is open.
+   */
+  const hallOfRecords = useHallOfRecords({
+    api,
+    activities: trainingHubActivities,
+    activitiesStatus: trainingHubActivitiesStatus,
+    snapshot: trainingHubSnapshot,
+    snapshotStatus: trainingHubSnapshotStatus,
+    connected: Boolean(trainingHubStatus?.authenticated),
+    visible: activeView === "records",
+    unitSystem,
+    athlete: recordsAthlete,
+    sample: recordsSample,
+  });
+  const recordsNotices = useRecordsNotices({
+    records: hallOfRecords,
+    onRecordsScreen: activeView === "records",
+  });
+  /* The tab the hall opens on when something sent the athlete to a part of
+     it — the celebration's "See the Twelve Labours". Taken once, on mount. */
+  const [recordsTabRequest, setRecordsTabRequest] = useState<
+    "timeline" | "labours" | null
+  >(null);
+
   // Kick the RPE backfill and poll until the window is fully fetched, merging
   // freshly-cached sRPE into the daily metrics so the trend chart's RPE series
   // fills in live.
@@ -1612,6 +1711,34 @@ export default function App() {
     return true;
   }
 
+  /*
+   * An activity opened from another screen — a session the Library's plan
+   * was trained as, a milestone in the Hall of Records: on the screen built for
+   * its sport, the way Activities hands one over, and in Activities itself for
+   * a swim, anything else with no screen of its own, or a sport whose screen
+   * the athlete took off the rail.
+   */
+  function openActivityFrom(activityId: string, from: PrimaryView) {
+    const activity = trainingHubActivities.find(
+      (candidate) => candidate.activityId === activityId
+    );
+    const view = activity ? sportScreenFor(activity.sportType) : null;
+    if (
+      activity &&
+      view &&
+      openSportScreen({ view, activityId, startTime: activity.startTime, from })
+    ) {
+      return;
+    }
+    if (activity) {
+      void handleTrainingHubActivityDetail(activity);
+      setActiveView("training");
+    } else {
+      setMessage("That activity is not in the loaded history yet. Opening Activities.");
+      setActiveView("training");
+    }
+  }
+
   function handleDevelopmentViewToggle() {
     const nextVisible = !showDevelopmentTools;
     setShowDevelopmentTools(nextVisible);
@@ -1619,6 +1746,7 @@ export default function App() {
       // Leaving dev view drops the preview, so generated data can never
       // linger in the production view.
       setStrengthSampleMode(false);
+      setRecordsSample(null);
       const developmentOnlyViews = new Set(
         PRIMARY_NAV_ITEMS.filter((item) => item.developmentOnly).map(
           (item) => item.id,
@@ -1636,41 +1764,6 @@ export default function App() {
 
   const { toasts, dismissToast } = useToaster(message, error);
 
-  // The rail's identity row. The snapshot is served from the main process's
-  // hour-long cache, so asking for it here costs no COROS request; a failure
-  // just leaves the row on the account's email, which is already to hand.
-  const [athleteIdentity, setAthleteIdentity] = useState<{
-    name: string | null;
-    avatarUrl: string | null;
-  }>({ name: null, avatarUrl: null });
-
-  useEffect(() => {
-    if (!api || !trainingHubStatus?.authenticated) {
-      setAthleteIdentity({ name: null, avatarUrl: null });
-      return;
-    }
-
-    let cancelled = false;
-    void api
-      .getCorosProfileSnapshot()
-      .then((snapshot) => {
-        if (cancelled) {
-          return;
-        }
-        setAthleteIdentity({
-          name: snapshot.profile.nickname?.trim() || null,
-          avatarUrl: snapshot.profile.avatarUrl ?? null,
-        });
-      })
-      .catch(() => {
-        // The rail falls back to the email; nothing here is worth a toast.
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [api, trainingHubStatus?.authenticated]);
-
   const athleteName =
     athleteIdentity.name ??
     trainingHubStatus?.email?.split("@")[0]?.trim() ??
@@ -1687,6 +1780,8 @@ export default function App() {
           onToggleUpdateSimulation={toggleDevUpdateSimulation}
           strengthSampleActive={strengthSampleMode}
           onStrengthSampleChange={setStrengthSampleMode}
+          recordsSample={recordsSample}
+          onRecordsSampleChange={setRecordsSample}
           onError={setError}
         />
       ) : (
@@ -1702,6 +1797,7 @@ export default function App() {
           activeView={activeView}
           onChange={setActiveView}
           coachBusy={coachBusy}
+          newCounts={{ records: recordsNotices.freshCount }}
           showDevelopmentItems={showDevelopmentTools}
           hiddenViews={hiddenSportScreens}
           athleteName={athleteName}
@@ -1817,35 +1913,9 @@ export default function App() {
                     onMessage={setMessage}
                     onError={setError}
                     onScheduleChanged={handleExternalScheduleChange}
-                    /*
-                     * A planned session that was trained, opened as the activity
-                     * it became — on the screen built for its sport, the way
-                     * Activities hands one over, and in Activities itself for a
-                     * swim, anything else with no screen of its own, or a sport
-                     * whose screen the athlete took off the rail.
-                     */
-                    onOpenActivity={(activityId) => {
-                      const activity = trainingHubActivities.find(
-                        (candidate) => candidate.activityId === activityId
-                      );
-                      const view = activity
-                        ? sportScreenFor(activity.sportType)
-                        : null;
-                      if (
-                        activity &&
-                        view &&
-                        openSportScreen({ view, activityId, startTime: activity.startTime, from: "library" })
-                      ) {
-                        return;
-                      }
-                      if (activity) {
-                        void handleTrainingHubActivityDetail(activity);
-                        setActiveView("training");
-                      } else {
-                        setMessage("That activity is not in the loaded history yet. Opening Activities.");
-                        setActiveView("training");
-                      }
-                    }}
+                    /* A planned session that was trained, opened as the
+                       activity it became. */
+                    onOpenActivity={(activityId) => openActivityFrom(activityId, "library")}
                   />
                 </Suspense>
               </TrainingLibraryErrorBoundary>
@@ -1990,6 +2060,31 @@ export default function App() {
                 />
               </Suspense>
             ) : null}
+            {activeView === "records" ? (
+              <Suspense
+                fallback={<DeferredSurfaceFallback label="Hall of Records" />}
+              >
+                <LazyHallOfRecordsView
+                  api={api}
+                  records={hallOfRecords}
+                  activities={trainingHubActivities}
+                  connected={Boolean(trainingHubStatus?.authenticated)}
+                  newIds={recordsNotices.visitNew}
+                  requestedTab={recordsTabRequest}
+                  onTabRequestHandled={() => setRecordsTabRequest(null)}
+                  onOpenActivity={(activity) =>
+                    isSampleRecordsActivity(activity.activityId)
+                      ? setMessage(
+                          "A sample milestone: its activity exists only in the sample, so there is no page to open.",
+                        )
+                      : openActivityFrom(activity.activityId, "records")
+                  }
+                  onOpenOverview={() => setActiveView("overview")}
+                  retrying={busy === "training-refresh"}
+                  onRetryActivities={() => void handleRunningActivitiesRetry()}
+                />
+              </Suspense>
+            ) : null}
             {activeView === "settings" ? (
               <SettingsView
                 api={api}
@@ -2080,7 +2175,32 @@ export default function App() {
         }
         previewKey={devUpdatePreviewKey}
       />
-      <Toaster toasts={toasts} onDismiss={dismissToast} />
+      <Toaster toasts={toasts} onDismiss={dismissToast}>
+        {recordsNotices.toasts.map(({ announcement, labour }) => (
+          <LabourToastCard
+            key={announcement.key}
+            announcement={announcement}
+            labour={labour}
+            onOpen={() => {
+              recordsNotices.dismissToast(announcement.key);
+              setActiveView("records");
+            }}
+            onDismiss={() => recordsNotices.dismissToast(announcement.key)}
+          />
+        ))}
+      </Toaster>
+      {recordsNotices.celebration ? (
+        <LabourCelebration
+          labour={recordsNotices.celebration.labour}
+          completed={recordsNotices.celebration.completed}
+          onSeeLabours={() => {
+            recordsNotices.closeCelebration();
+            setRecordsTabRequest("labours");
+            setActiveView("records");
+          }}
+          onClose={recordsNotices.closeCelebration}
+        />
+      ) : null}
     </div>
   );
 }
@@ -2256,16 +2376,21 @@ function useToaster(message: string | null, error: string | null) {
 function Toaster({
   toasts,
   onDismiss,
+  children,
 }: {
   toasts: ToastItem[];
   onDismiss: (id: number) => void;
+  /** Toasts of another shape that share the stack: the labour notices. */
+  children?: ReactNode;
 }) {
-  if (toasts.length === 0) {
+  const hasExtra = Children.toArray(children).length > 0;
+  if (toasts.length === 0 && !hasExtra) {
     return null;
   }
 
   return (
     <div className="toast-stack" role="region" aria-label="Notifications">
+      {children}
       {toasts.map((toast) => (
         <ToastCard key={toast.id} toast={toast} onDismiss={onDismiss} />
       ))}

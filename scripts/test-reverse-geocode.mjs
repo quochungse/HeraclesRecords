@@ -37,7 +37,8 @@ const NOMINATIM_PAYLOAD = {
     road: "Cat Linh Street",
     suburb: "Van Mieu - Quoc Tu Giam Ward",
     city: "Hanoi",
-    country: "Vietnam"
+    country: "Vietnam",
+    country_code: "vn"
   }
 };
 
@@ -81,11 +82,13 @@ const fromNominatim = parseNominatimPlace(
 );
 assert.equal(fromNominatim.city, "Hanoi", "Nominatim city");
 assert.equal(fromNominatim.country, "Vietnam", "Nominatim country");
+assert.equal(fromNominatim.countryCode, "VN", "Nominatim's code, upper case like Photon's");
 assert.match(fromNominatim.label, /Cat Linh Street/, "Nominatim display name");
 
 const fromPhoton = parsePhotonPlace(PHOTON_PAYLOAD, HANOI.lat, HANOI.lon);
 assert.equal(fromPhoton.city, "Hanoi", "Photon city");
 assert.equal(fromPhoton.country, "Vietnam", "Photon country");
+assert.equal(fromPhoton.countryCode, "VN", "Photon code: what says two languages' names are one country");
 // Photon has no display_name, so the label is built most-specific first.
 assert.equal(
   fromPhoton.label,

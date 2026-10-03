@@ -2224,6 +2224,7 @@ input::placeholder {
 .strength-title h2,
 .activities-head h2,
 .training-map-page-header h1,
+.records-page-header h1,
 .tl-masthead h1,
 .calendar-headline {
   font-family: var(--font-title);
@@ -3979,6 +3980,10 @@ td span {
 
 .app-select--dev-sample .app-select-menu {
   min-width: 180px;
+  /* The trigger is the toolbar's last control, at the window's right edge:
+     the menu opens leftward from there, or the longer labels (the Hall of
+     Records' presets) run off the window. */
+  left: auto;
 }
 
 .app-select--pill .app-select-menu {

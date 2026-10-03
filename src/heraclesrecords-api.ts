@@ -21,6 +21,7 @@ import type {
   CorosProfile,
   CorosProfilePatch,
   CorosProfileSnapshot,
+  RememberedMilestone,
   ReverseGeocodeResult,
   SaveChatSessionOptions,
   HevySettingsInput,
@@ -137,6 +138,13 @@ export interface HeraclesRecordsApi {
     lat: number,
     lon: number
   ) => Promise<ReverseGeocodeResult>;
+  /**
+   * The Hall of Records' memory: milestones whose source forgets them, with
+   * the finished plan runs the plan cache can vouch for added first.
+   */
+  listRememberedMilestones: () => Promise<RememberedMilestone[]>;
+  /** Keep VO2max and sleep milestones; answers how many rows moved. */
+  rememberMilestones: (entries: RememberedMilestone[]) => Promise<number>;
   /**
    * Tell the main process this window has its IPC listeners attached.
    *
@@ -313,10 +321,12 @@ export interface HeraclesRecordsApi {
     activityIds: string[]
   ) => Promise<ActivityDetailSummary[]>;
   /** Compute the missing ones, a few per call. Call again while `remaining`
-   *  is above zero. */
+   *  is above zero. `requireRecords` also counts a summary as missing until it
+   *  carries the Hall of Records' best efforts and start point. */
   syncActivityDetailSummaries: (
     activityIds: string[],
-    limit?: number
+    limit?: number,
+    options?: { requireRecords?: boolean }
   ) => Promise<ActivityDetailSummarySync>;
   exportTrainingHubActivityFile: (
     activityId: string,
@@ -352,6 +362,7 @@ export interface HeraclesRecordsApi {
   getSleepHistory: (request?: {
     days?: number;
     refresh?: boolean;
+    cacheOnly?: boolean;
   }) => Promise<SleepHistorySnapshot>;
   getSleepNightSeries: (request: {
     happenDay: string;

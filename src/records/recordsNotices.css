@@ -1,0 +1,385 @@
+/*
+ * What the Hall of Records shows outside its own screen: the labour emblem
+ * (also drawn by the hall), the labour toast in the app's stack, the
+ * celebration when a labour is complete, and the rail's "new" count. In the
+ * main bundle because any screen can raise them; `records.css` is the hall's
+ * own and arrives with its chunk.
+ */
+
+/* --- The emblem ------------------------------------------------------------ */
+
+/*
+ * The artwork's frame, drawn here rather than baked into the picture so it can
+ * follow the size and the state. The plate is the relief's own black in both
+ * themes — the gold was cast for it, and on a light ground its shadows read as
+ * holes — and the rim is a metal gradient on the border box under the plate's
+ * padding box. The golds are the artwork's, not the accent: a rim in the
+ * athlete's blue would sit round a gold figure it does not match.
+ */
+.labour-emblem {
+  --emblem-size: 40px;
+  --emblem-gold-light: #f7d98c;
+  --emblem-gold: #e3b049;
+  --emblem-gold-deep: #8f5f12;
+  --emblem-plate-top: #1d1a14;
+  --emblem-plate: #070706;
+  flex: 0 0 auto;
+  display: inline-grid;
+  place-items: center;
+  box-sizing: border-box;
+  width: var(--emblem-size);
+  height: var(--emblem-size);
+  border: 1px solid transparent;
+  border-radius: 24%;
+  background:
+    radial-gradient(circle at 50% 30%, var(--emblem-plate-top), var(--emblem-plate) 72%) padding-box,
+    linear-gradient(var(--glass-border), var(--glass-border)) border-box;
+}
+
+.labour-emblem img {
+  display: block;
+  width: 88%;
+  height: 88%;
+  object-fit: contain;
+  user-select: none;
+}
+
+.labour-emblem.is-card,
+.labour-emblem.is-hero {
+  border-width: 2px;
+}
+
+/*
+ * Four steps of light, one per stage reached. The figure brightens and takes
+ * its colour back (`brightness` and `saturate`, so a dim gold is still gold
+ * rather than brown), and the rim warms with it, until the third stage lights
+ * it whole and sets it glowing.
+ */
+.labour-emblem.is-stage-0 img {
+  filter: grayscale(1) brightness(0.8);
+  opacity: 0.4;
+}
+
+.labour-emblem.is-stage-1 img {
+  filter: saturate(0.55) brightness(0.55);
+}
+
+.labour-emblem.is-stage-2 img {
+  filter: saturate(0.8) brightness(0.8);
+}
+
+.labour-emblem.is-stage-1 {
+  background:
+    radial-gradient(circle at 50% 30%, var(--emblem-plate-top), var(--emblem-plate) 72%) padding-box,
+    linear-gradient(160deg, color-mix(in srgb, var(--emblem-gold) 40%, transparent), color-mix(in srgb, var(--emblem-gold-deep) 30%, transparent)) border-box;
+}
+
+.labour-emblem.is-stage-2 {
+  background:
+    radial-gradient(circle at 50% 30%, var(--emblem-plate-top), var(--emblem-plate) 72%) padding-box,
+    linear-gradient(160deg, color-mix(in srgb, var(--emblem-gold) 75%, transparent), color-mix(in srgb, var(--emblem-gold-deep) 60%, transparent)) border-box;
+}
+
+.labour-emblem.is-stage-3 {
+  --emblem-glow: color-mix(in srgb, var(--emblem-gold) 28%, transparent);
+  background:
+    radial-gradient(circle at 50% 30%, var(--emblem-plate-top), var(--emblem-plate) 72%) padding-box,
+    linear-gradient(160deg, var(--emblem-gold-light), var(--emblem-gold) 45%, var(--emblem-gold-deep)) border-box;
+  box-shadow: 0 0 calc(var(--emblem-size) / 4) var(--emblem-glow);
+}
+
+/* The timeline's inline badge: the figure alone, in the badge's own pill. */
+.labour-emblem.is-badge {
+  border: 0;
+  background: none;
+  box-shadow: none;
+}
+
+.labour-emblem.is-badge img {
+  width: 100%;
+  height: 100%;
+}
+
+/* --- The toast ------------------------------------------------------------ */
+
+.labour-toast {
+  position: relative;
+  display: grid;
+  justify-items: start;
+  gap: 8px;
+  pointer-events: auto;
+  padding: 16px;
+  border-radius: var(--radius-md);
+  background: var(--menu-surface);
+  box-shadow: var(--shadow-elevated);
+}
+
+.labour-toast-close {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.labour-toast-close:hover {
+  color: var(--text-primary);
+}
+
+.labour-toast-close:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: -2px;
+}
+
+.labour-toast-eyebrow {
+  margin: 4px 0 0;
+  color: var(--accent);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+.labour-toast-title {
+  margin: 0;
+  padding-right: 24px;
+  color: var(--text-primary);
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+.labour-toast-text {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.labour-toast-pips {
+  display: flex;
+  gap: 4px;
+}
+
+.labour-toast-pips span {
+  display: block;
+  width: 22px;
+  height: 4px;
+  border-radius: var(--radius-pill);
+  background: var(--glass-border);
+}
+
+.labour-toast-pips span.is-reached {
+  background: var(--accent);
+}
+
+.labour-toast-link {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--accent);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1;
+  cursor: pointer;
+  text-decoration: underline;
+  text-decoration-color: transparent;
+  text-underline-offset: 3px;
+}
+
+.labour-toast-link:hover {
+  text-decoration-color: currentColor;
+}
+
+.labour-toast-link:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: 2px;
+}
+
+/* --- The celebration ------------------------------------------------------- */
+
+.labour-celebration-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1300;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px 16px;
+  background: color-mix(in srgb, var(--bg-base) 72%, transparent);
+}
+
+.labour-celebration {
+  position: relative;
+  width: min(520px, 100%);
+  max-height: 100%;
+  overflow-y: auto;
+  box-sizing: border-box;
+  padding: 24px 36px 30px;
+  border-radius: var(--radius-xl);
+  background: var(--menu-surface);
+  box-shadow: var(--shadow-elevated);
+  text-align: center;
+}
+
+.labour-celebration-close {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.labour-celebration-close:hover {
+  color: var(--text-primary);
+}
+
+.labour-celebration-close:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: -2px;
+}
+
+.labour-celebration-art {
+  display: flex;
+  justify-content: center;
+  margin: 0 auto 4px;
+  color: var(--accent);
+}
+
+.labour-celebration-eyebrow {
+  margin: 0;
+  color: var(--accent);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+/* The labour itself: its emblem beside its name and its myth, read left to
+   right like a labour card, under the wreath that celebrates it. */
+.labour-celebration-labour {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  margin-top: 18px;
+  text-align: left;
+}
+
+.labour-celebration-labour > div {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.labour-celebration h2 {
+  margin: 0;
+  color: var(--text-primary);
+  font-size: 22px;
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+.labour-celebration-myth {
+  margin: 6px 0 0;
+  color: var(--text-secondary);
+  font-size: 14px;
+  line-height: 1.45;
+}
+
+.labour-celebration-stages {
+  display: grid;
+  gap: 10px;
+  margin: 22px 0 0;
+  padding: 14px 16px;
+  border-radius: var(--radius-md);
+  background: var(--glass-bg);
+  list-style: none;
+  text-align: left;
+}
+
+.labour-celebration-stages li {
+  display: grid;
+  grid-template-columns: 22px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  color: var(--text-primary);
+  font-size: 13px;
+  line-height: 1.3;
+}
+
+.labour-celebration-pip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: var(--radius-pill);
+  background: var(--accent);
+  color: var(--bg-base);
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.labour-celebration-date {
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+.labour-celebration-actions {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  margin-top: 24px;
+}
+
+/* --- The rail ---------------------------------------------------------------- */
+
+/* The row's copy grows to the rail's edge so the count sits at it. */
+.app-sidebar-nav-copy:has(> .app-sidebar-nav-count) {
+  flex: 1 1 auto;
+}
+
+.app-sidebar-nav-count {
+  margin-left: auto;
+  padding: 3px 6px;
+  border-radius: var(--radius-pill);
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.app-sidebar-nav-dot {
+  position: absolute;
+  top: -1px;
+  right: 0;
+  width: 6px;
+  height: 6px;
+  border-radius: var(--radius-pill);
+  background: var(--accent);
+}
