@@ -21,7 +21,7 @@ export const DEFAULT_SPORT_COLORS: Record<SportColorCategory, string> = {
 };
 
 export const SPORT_COLOR_LABELS: Record<SportColorCategory, string> = {
-  strength: "Strength / Gym",
+  strength: "Strength",
   hiking: "Hiking",
   run: "Running",
   bike: "Cycling",

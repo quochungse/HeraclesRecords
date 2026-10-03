@@ -102,11 +102,6 @@ const EXEMPT = [
     why: "Places visited, drawn from the data. Selecting one moves the globe; it does not choose a mode."
   },
   {
-    file: "src/components/StartupViewMenu.tsx",
-    marker: "menuitemradio",
-    why: "A menu, with the menu roles and a popup of its own."
-  },
-  {
     file: "src/components/SampleDataControls.tsx",
     marker: "menuitemcheckbox",
     why: "The developer toolbar's sample switches: a menu of independent checkboxes, with the menu roles and a popup of its own."

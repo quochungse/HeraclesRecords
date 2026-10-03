@@ -77,7 +77,7 @@ import {
   readTrainingActivityFeelTypes,
   setSetting
 } from "./database";
-import { getAppInfo, openAppStorageLocation } from "./appInfoService";
+import { getAppInfo } from "./appInfoService";
 import {
   backfillFeelTypes,
   getDailyMetrics,
@@ -2356,10 +2356,6 @@ function registerIpcHandlers(): void {
   });
 
   ipcMain.handle("app:getInfo", () => getAppInfo());
-
-  ipcMain.handle("app:openStorageLocation", (_event, id: string) =>
-    openAppStorageLocation(id)
-  );
 
   // ----- Sync -----
   //

@@ -161,7 +161,7 @@ async function main() {
     const label = await harness("attr", ".activities-mix-bar", "aria-label");
     for (const phrase of [
       "Running 67%, 30 sessions",
-      "Strength / Gym 30%, 25 sessions",
+      "Strength 30%, 25 sessions",
       "Cycling 2%, 1 session",
       "Other 1%, 1 session"
     ]) {
@@ -176,7 +176,7 @@ async function main() {
     await hoverBand(1);
 
     assert.equal(await harness("count", ".activities-mix-tip"), 1, "one tooltip");
-    assert.equal(await harness("text", ".activities-mix-tip-name"), "Strength / Gym");
+    assert.equal(await harness("text", ".activities-mix-tip-name"), "Strength");
     const figures = await harness("text", ".activities-mix-tip-figures");
     assert.match(figures, /30%/, "the band's share");
     assert.match(figures, /25 sessions/, "the band's sessions");
@@ -336,7 +336,7 @@ async function main() {
 
     await harness("keyDown", ".activities-mix-bar", "ArrowRight");
     await settle();
-    assert.equal(await harness("text", ".activities-mix-tip-name"), "Strength / Gym");
+    assert.equal(await harness("text", ".activities-mix-tip-name"), "Strength");
 
     await harness("keyDown", ".activities-mix-bar", "ArrowLeft");
     await settle();

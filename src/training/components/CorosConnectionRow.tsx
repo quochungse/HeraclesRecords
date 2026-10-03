@@ -7,10 +7,10 @@ import {
   Loader2,
   LogOut,
   RefreshCw,
-  User,
-  Watch
+  User
 } from "lucide-react";
 import type { TrainingHubStatus } from "../../../electron/types";
+import { SettingsPrefRow } from "../../settings/SettingsPrefRow";
 
 export interface CorosConnectionRowProps {
   status: TrainingHubStatus | null;
@@ -41,28 +41,21 @@ export function CorosConnectionRow({
     return null;
   }
 
-  // The connected account, in the same shape as the two rows below it.
-  //
-  // It used to be a bar of its own — a status dot, a "COROS account connected"
-  // sentence, an "Authenticated" badge and three buttons, on its own glass
-  // frame — sitting first in a list of otherwise identical nav rows, so the one
-  // row that matters most was the one that looked like it belonged to another
-  // screen. The state it was spending three elements on is binary and this
-  // component only renders at all when it is true, so the tinted icon says it
-  // and the line underneath spends its room on the account instead. Region and
-  // host are not on it: Details already carries both, and the address is the
-  // part worth reading at a glance.
+  // The connected account, in the same shape as the two rows below it: a row
+  // of the Connections card like every other, the dot before its title the
+  // only thing saying it is connected, the line under it spent on the account.
+  // Region and host are not on it: Details carries both, and the address is
+  // the part worth reading at a glance. Details opens under the buttons, in the
+  // control column, so the buttons do not move when it appears.
   const identity = status.email ?? "Connected";
 
   return (
-    <div className="settings-nav-row is-static">
-      <span className="settings-nav-row-icon is-connected" aria-hidden="true">
-        <Watch size={20} strokeWidth={1.9} />
-      </span>
-      <span className="settings-nav-row-copy">
-        <strong>COROS account</strong>
-        <span>{identity}</span>
-      </span>
+    <SettingsPrefRow
+      title="COROS account"
+      detail={identity}
+      tone="success"
+      align={showConnectionDetails ? "start" : "center"}
+    >
       <span className="settings-connection-actions">
         <button
           className="settings-row-button"
@@ -72,9 +65,9 @@ export function CorosConnectionRow({
           onClick={() => setShowConnectionDetails((current) => !current)}
         >
           {showConnectionDetails ? (
-            <EyeOff size={14} aria-hidden="true" />
+            <EyeOff size={15} aria-hidden="true" />
           ) : (
-            <Eye size={14} aria-hidden="true" />
+            <Eye size={15} aria-hidden="true" />
           )}
           {showConnectionDetails ? "Hide" : "Details"}
         </button>
@@ -85,9 +78,9 @@ export function CorosConnectionRow({
           onClick={onRefresh}
         >
           {busy === "training-refresh" ? (
-            <Loader2 className="spin" size={14} aria-hidden="true" />
+            <Loader2 className="spin" size={15} aria-hidden="true" />
           ) : (
-            <RefreshCw size={14} aria-hidden="true" />
+            <RefreshCw size={15} aria-hidden="true" />
           )}
           Refresh
         </button>
@@ -97,13 +90,11 @@ export function CorosConnectionRow({
           disabled={busy === "training-logout"}
           onClick={onLogout}
         >
-          <LogOut size={14} aria-hidden="true" />
+          <LogOut size={15} aria-hidden="true" />
           Disconnect
         </button>
       </span>
       {showConnectionDetails ? (
-        // Same second-line slot the Sync panel's destination row uses, so an
-        // expanded row grows downward instead of pushing its controls around.
         <span className="settings-connection-meta" id={detailsId}>
           <span>
             <User size={13} aria-hidden="true" />
@@ -122,6 +113,6 @@ export function CorosConnectionRow({
           </span>
         </span>
       ) : null}
-    </div>
+    </SettingsPrefRow>
   );
 }
