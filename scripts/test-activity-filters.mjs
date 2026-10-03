@@ -486,6 +486,86 @@ assert.deepEqual(
   ["duration", "distance", "pace", "avgHr", "drift"]
 );
 
+// Drift is pace against heart rate, which on a ride the road and the wind
+// decide and on a hike or a trail run the gradient does — Cycling, Hiking and
+// a trail run's page leave it out, so the row does too. A summary is stored
+// for every sport all the same; a Tam Đảo climb's came back −172.1%.
+const driftSummary = {
+  activityId: "a1",
+  fingerprint: "f",
+  summaryVersion: 1,
+  decouplingPercent: -172.1,
+  computedAt: 0
+};
+const hillyRow = (sportType) =>
+  activity({
+    sportType,
+    duration: 9000,
+    distance: 40_000,
+    avgHr: 150,
+    elevationGain: 1100,
+    trainingLoad: 260
+  });
+
+assert.deepEqual(
+  activityRowFacts(hillyRow(204), "metric", driftSummary).map((fact) => fact.key),
+  ["duration", "distance", "speed", "avgHr", "climb"],
+  "a ride gets no drift, and climb takes its place"
+);
+assert.ok(
+  !activityRowFacts(hillyRow(200), "metric", driftSummary).some(
+    (fact) => fact.key === "drift"
+  ),
+  "nor does a road ride"
+);
+assert.ok(
+  !activityRowFacts(hillyRow(104), "metric", driftSummary).some(
+    (fact) => fact.key === "drift"
+  ),
+  "a hike gets no drift"
+);
+assert.ok(
+  !activityRowFacts(hillyRow(105), "metric", driftSummary).some(
+    (fact) => fact.key === "drift"
+  ),
+  "nor does a mountain climb"
+);
+assert.ok(
+  !activityRowFacts(hillyRow(102), "metric", driftSummary).some(
+    (fact) => fact.key === "drift"
+  ),
+  "a trail run gets no drift — its run page drops decoupling too"
+);
+assert.ok(
+  !activityRowFacts(
+    activity({ sportType: 300, duration: 2400, distance: 2000 }),
+    "metric",
+    driftSummary
+  ).some((fact) => fact.key === "drift"),
+  "a swim gets no drift"
+);
+assert.ok(
+  !activityRowFacts(
+    activity({ sportType: 402, duration: 3600, avgHr: 118 }),
+    "metric",
+    driftSummary
+  ).some((fact) => fact.key === "drift"),
+  "a strength session gets no drift"
+);
+
+for (const sportType of [100, 101, 103]) {
+  const facts = activityRowFacts(
+    activity({ sportType, duration: 3600, distance: 10_000, avgHr: 148 }),
+    "metric",
+    driftSummary
+  );
+  assert.equal(
+    facts.find((fact) => fact.key === "drift")?.value,
+    "-172.1% drift",
+    `a run off the trail (${sportType}) still reads its drift`
+  );
+}
+
 // ---------------------------------------------------------------------------
 // 11. A detail belongs to exactly one selection
 // ---------------------------------------------------------------------------

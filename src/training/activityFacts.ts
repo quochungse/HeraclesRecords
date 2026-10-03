@@ -20,6 +20,7 @@ import {
   formatPaceSecondsPerKm
 } from "./formatters";
 import { isSpeedSport, isSwimSportType } from "./sportTypes";
+import { classifyRunSurface, isRunSportType } from "../running/runSurface";
 import { formatSpeedValue } from "../units/units";
 
 export interface ActivityFact {
@@ -35,6 +36,17 @@ export interface ActivityFact {
  */
 function isPacedSport(sportType: number | undefined): boolean {
   return !isSpeedSport(sportType) && !isSwimSportType(sportType);
+}
+
+/**
+ * Whether aerobic decoupling says anything about this sport: a run off the
+ * trail — road, track or treadmill — which is where Running reads it. Drift is
+ * pace against heart rate, and on a ride the road and the wind move the speed,
+ * on a hike and a trail run the gradient does; Cycling, Hiking and a trail
+ * run's page all leave it out, so a row for one of those leaves it out too.
+ */
+function readsDecoupling(sportType: number | undefined): boolean {
+  return isRunSportType(sportType) && classifyRunSurface(sportType) !== "trail";
 }
 
 /**
@@ -106,8 +118,12 @@ export function activityRowFacts(
 
   // Decoupling before climb and load: it says something about the session that
   // none of the session's own figures do, and it is the reason the stored
-  // summaries exist at all.
-  if (facts.length < MAX_FACTS && summary?.decouplingPercent !== undefined) {
+  // summaries exist at all — on a run, where it measures the runner.
+  if (
+    facts.length < MAX_FACTS &&
+    readsDecoupling(sportType) &&
+    summary?.decouplingPercent !== undefined
+  ) {
     const drift = summary.decouplingPercent;
     facts.push({
       key: "drift",
