@@ -5,8 +5,16 @@
 // that reaches a stage with `{ labour, stage }` and reports how far along the
 // next stage is; this module only names the labours and folds those tags into
 // a state per labour. A stage is reached by its own milestone, so the stages
-// of one labour may come in any order — a month that climbs an Everest can
+// of one labour may come in any order — thirty days that climb an Everest can
 // come before a single 1,500 m day — and a labour reads as so many of three.
+//
+// **Every stage is a standard, not a first and not a gain.** Stage I asks what
+// an ordinary beginner reaches with a few weeks of effort, II a few months, III
+// a year. A first session is a milestone on the timeline but no stage; and a
+// stage is never measured against the athlete's own past — a beginner beats
+// that every week and an athlete at the top never does — so speed is age
+// graded and VO2max rated for age and sex (`fitnessStandards.ts`). Lifetime
+// counts are kept: years of training are the athlete's, whenever they arrive.
 
 export type LabourId =
   | "lion"
@@ -46,7 +54,7 @@ export const LABOURS: readonly LabourDefinition[] = [
     short: "Nemean Lion",
     category: "Strength",
     myth: "Its hide turned every blade, so Heracles fought it bare-handed.",
-    stages: ["First strength session", "50 strength sessions", "100 strength sessions"]
+    stages: ["20 days of strength training", "100 days of strength training", "200 days of strength training"]
   },
   {
     id: "hydra",
@@ -54,7 +62,7 @@ export const LABOURS: readonly LabourDefinition[] = [
     short: "Hydra",
     category: "Swimming",
     myth: "The many-headed serpent of the Lerna marshes.",
-    stages: ["First swim", "1.5 km in one swim", "3.8 km in one swim"]
+    stages: ["500 m in one swim", "1.5 km in one swim", "3.8 km in one swim"]
   },
   {
     id: "hind",
@@ -62,7 +70,7 @@ export const LABOURS: readonly LabourDefinition[] = [
     short: "Ceryneian Hind",
     category: "Consistency",
     myth: "So swift it took a whole year of pursuit to catch.",
-    stages: ["4 weeks in a row", "26 weeks in a row", "52 weeks in a row"]
+    stages: ["8 weeks in a row", "26 weeks in a row", "52 weeks in a row"]
   },
   {
     id: "boar",
@@ -71,9 +79,9 @@ export const LABOURS: readonly LabourDefinition[] = [
     category: "Mountains",
     myth: "Driven up Mount Erymanthos into deep snow and taken alive.",
     stages: [
-      "500 m climbed in one activity",
+      "750 m climbed in one activity",
       "1,500 m climbed in one activity",
-      "8,849 m — one Everest — in a month"
+      "8,849 m — one Everest — in 30 days"
     ]
   },
   {
@@ -82,7 +90,7 @@ export const LABOURS: readonly LabourDefinition[] = [
     short: "Augean Stables",
     category: "Volume",
     myth: "Thirty years of muck, cleared in one day by turning two rivers.",
-    stages: ["100 hours of training", "500 hours of training", "1,000 hours of training"]
+    stages: ["50 hours of training", "250 hours of training", "500 hours of training"]
   },
   {
     id: "birds",
@@ -90,7 +98,7 @@ export const LABOURS: readonly LabourDefinition[] = [
     short: "Stymphalian Birds",
     category: "Cycling",
     myth: "Bronze-beaked birds, rattled into the air and brought down.",
-    stages: ["First ride", "100 km in one ride", "160 km in one ride"]
+    stages: ["50 km of riding", "100 km in one ride", "160 km in one ride"]
   },
   {
     id: "bull",
@@ -107,9 +115,9 @@ export const LABOURS: readonly LabourDefinition[] = [
     category: "Speed",
     myth: "The man-eating horses of Thrace, tamed and driven home.",
     stages: [
-      "Beat one of your records",
-      "Beat your 5K, 10K and half marathon records",
-      "Beat a record that had stood a year"
+      "A 45% age grade, 5K or longer",
+      "A 60% age grade",
+      "A 70% age grade"
     ]
   },
   {
@@ -120,8 +128,8 @@ export const LABOURS: readonly LabourDefinition[] = [
     myth: "The Amazon queen’s war belt, won at the end of a long campaign.",
     stages: [
       "Finish a plan of 4+ weeks at 80%",
-      "Finish a plan of 8+ weeks at 85%",
-      "Finish a plan of 12+ weeks at 90%"
+      "Finish a plan of 12+ weeks at 85%",
+      "Finish a plan of 16+ weeks at 90%"
     ]
   },
   {
@@ -130,7 +138,7 @@ export const LABOURS: readonly LabourDefinition[] = [
     short: "Geryon",
     category: "Exploration",
     myth: "Fetched from the edge of the western world, where he set up his Pillars.",
-    stages: ["Train in 5 different places", "Train in a second country", "Train 2,700 km from home"]
+    stages: ["Train in 5 different places", "Train in 10 different places", "Train in 25 different places"]
   },
   {
     id: "apples",
@@ -138,7 +146,7 @@ export const LABOURS: readonly LabourDefinition[] = [
     short: "Hesperides",
     category: "Aerobic fitness",
     myth: "The golden apples of youth, taken while Heracles held up the sky.",
-    stages: ["First VO2max reading", "2 above your first reading", "5 above your first reading"]
+    stages: ["VO2max rated Good for your age", "VO2max rated Excellent", "VO2max rated Superior"]
   },
   {
     id: "cerberus",
@@ -146,7 +154,7 @@ export const LABOURS: readonly LabourDefinition[] = [
     short: "Cerberus",
     category: "Sleep",
     myth: "The three-headed hound of the underworld, dragged into daylight.",
-    stages: ["First night recorded", "7 nights in a row of 7 h+", "30 nights in a row of 7 h+"]
+    stages: ["7 nights in a row of 7 h+", "26 of 30 nights at 7 h+", "300 of 365 nights at 7 h+"]
   }
 ];
 

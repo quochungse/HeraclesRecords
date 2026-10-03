@@ -703,9 +703,12 @@ function StageRow({
             </button>
           ) : null}
         </div>
-        {!reached && stage.progress ? (
+        {/* Only the stage being worked on says how far along it is: the same
+            count under every open stage ("73 / 250 h", "73 / 500 h") reads as
+            noise, and the next one is there to be read once this one is done. */}
+        {current && stage.progress ? (
           <div className="records-stage-progress">
-            {current && stage.progress.ratio !== undefined ? (
+            {stage.progress.ratio !== undefined ? (
               <span className="records-progress is-thin" aria-hidden="true">
                 <span style={{ width: `${Math.round(stage.progress.ratio * 100)}%` }} />
               </span>

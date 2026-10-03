@@ -1532,6 +1532,61 @@ export default function App() {
   ]);
 
   const { unitSystem } = useUnitSystem();
+  // The rail's identity row, and the birthday and sex the Hall of Records
+  // grades speed and VO2max for. The snapshot is served from the main
+  // process's hour-long cache, so asking for it here costs no COROS request; a
+  // failure just leaves the row on the account's email, which is already to
+  // hand, and the hall on its default athlete.
+  const [athleteIdentity, setAthleteIdentity] = useState<{
+    name: string | null;
+    avatarUrl: string | null;
+    birthday?: number;
+    sex?: number;
+    /** The profile has answered, or failed to: the hall may reckon now. */
+    loaded: boolean;
+  }>({ name: null, avatarUrl: null, loaded: false });
+
+  useEffect(() => {
+    if (!api || !trainingHubStatus?.authenticated) {
+      setAthleteIdentity({ name: null, avatarUrl: null, loaded: false });
+      return;
+    }
+
+    let cancelled = false;
+    void api
+      .getCorosProfileSnapshot()
+      .then((snapshot) => {
+        if (cancelled) {
+          return;
+        }
+        setAthleteIdentity({
+          name: snapshot.profile.nickname?.trim() || null,
+          avatarUrl: snapshot.profile.avatarUrl ?? null,
+          birthday: snapshot.profile.birthday,
+          sex: snapshot.profile.sex,
+          loaded: true,
+        });
+      })
+      .catch(() => {
+        // The rail falls back to the email; nothing here is worth a toast.
+        if (!cancelled) {
+          setAthleteIdentity((current) => ({ ...current, loaded: true }));
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [api, trainingHubStatus?.authenticated]);
+
+  const recordsAthlete = useMemo(
+    () =>
+      athleteIdentity.loaded
+        ? { birthday: athleteIdentity.birthday, sex: athleteIdentity.sex }
+        : undefined,
+    [athleteIdentity.loaded, athleteIdentity.birthday, athleteIdentity.sex],
+  );
+
   /*
    * The Hall of Records is worked out here rather than in its screen: the
    * rail's "new" count and the labour notifications have to know what was
@@ -1547,6 +1602,7 @@ export default function App() {
     connected: Boolean(trainingHubStatus?.authenticated),
     visible: activeView === "records",
     unitSystem,
+    athlete: recordsAthlete,
     sample: recordsSample,
   });
   const recordsNotices = useRecordsNotices({
@@ -1707,41 +1763,6 @@ export default function App() {
   }
 
   const { toasts, dismissToast } = useToaster(message, error);
-
-  // The rail's identity row. The snapshot is served from the main process's
-  // hour-long cache, so asking for it here costs no COROS request; a failure
-  // just leaves the row on the account's email, which is already to hand.
-  const [athleteIdentity, setAthleteIdentity] = useState<{
-    name: string | null;
-    avatarUrl: string | null;
-  }>({ name: null, avatarUrl: null });
-
-  useEffect(() => {
-    if (!api || !trainingHubStatus?.authenticated) {
-      setAthleteIdentity({ name: null, avatarUrl: null });
-      return;
-    }
-
-    let cancelled = false;
-    void api
-      .getCorosProfileSnapshot()
-      .then((snapshot) => {
-        if (cancelled) {
-          return;
-        }
-        setAthleteIdentity({
-          name: snapshot.profile.nickname?.trim() || null,
-          avatarUrl: snapshot.profile.avatarUrl ?? null,
-        });
-      })
-      .catch(() => {
-        // The rail falls back to the email; nothing here is worth a toast.
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [api, trainingHubStatus?.authenticated]);
 
   const athleteName =
     athleteIdentity.name ??

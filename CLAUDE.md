@@ -1953,9 +1953,28 @@ lives at module level for the same visit-to-visit reason — see `useCalendarDat
   note `hall-of-records-decisions`) — every milestone the athlete has reached, newest first by
   year and month, and **the Twelve Labours**: twelve kinds of achievement (Nemean Lion =
   strength, Hydra = swimming, Hind = week streaks, Boar = climbing, Stables = hours, Birds =
-  cycling, Bull = long runs, Mares = records, Hippolyta = plans, Geryon = places, Hesperides =
+  cycling, Bull = long runs, Mares = speed, Hippolyta = plans, Geryon = places, Hesperides =
   VO2max, Cerberus = sleep), three stages each, all twelve being Apotheosis. Under Your journey,
   with a laurel drawn through `createLucideIcon` like `RunnerIcon`.
+  **Every stage is a standard, never a first and never a gain on the athlete's own past**
+  (reworked 2026-10-03): I is what an ordinary beginner reaches in a few weeks, II a few
+  months, III a year. A first swim, ride or night is a timeline milestone and no stage. Speed
+  and VO2max are measured against **absolute yardsticks for age and sex**
+  (`fitnessStandards.ts`), because a record broken or a VO2max risen is something a beginner
+  does every week and an athlete at the top never does: the Mares are a **WMA 2025 road age
+  grade** (45 / 60 / 70%, on a best effort of 5K or longer — CC0 tables, the four distances
+  only), the Hesperides **The Cooper Institute's VO2max ratings** (Good / Excellent /
+  Superior, the 60th/80th/95th percentile), each graded for the age on its own day. Birthday
+  and sex come from the COROS profile App already reads for the rail; missing, the athlete is
+  a man of 30, and the hall's `settled` waits for that read so a default the profile then
+  overturns is not reckoned. **Lifetime counts are kept** — years of training are the
+  athlete's whenever they install — but the Lion counts **days**, not sessions (a workout
+  split into a session per muscle group is one day; 20 / 100 / 200), the Stables 50 / 250 /
+  500 h and the Birds' first stage 50 km ridden all told. A stretch is **any days running**,
+  never a calendar month: the Boar's Everest in 30 days, the Cerberus' 26 of 30 and 300 of 365
+  nights at 7 h+ (naps count; a night not recorded is a miss). The Geryon counts **places
+  only** (5 / 10 / 25 cells): a second country and 2,700 km from home are milestones, not
+  stages, since one flight reached the last stage before the first.
   **A labour's emblem is the athlete's gold artwork, not a glyph** (`LabourEmblem`,
   `src/assets/labours/<LabourId>.webp`: 256px, black ground keyed to transparency, frame
   removed). The frame is CSS — a plate in the artwork's own black in both themes and a metal
@@ -1970,13 +1989,15 @@ lives at module level for the same visit-to-visit reason — see `useCalendarDat
   `pr:<activityId>`): computing twice gives the same ids, which is what the "New" badge and
   the notifications are keyed on. `labours.ts` only names the labours and folds the stage tags
   the milestones carry (`labour`, with `also` when one milestone reaches several stages at
-  once — a 12-week plan at 91% is all three of the Girdle's) into a state per labour; stages
+  once — a 16-week plan at 91% is all three of the Girdle's) into a state per labour; stages
   may be reached in any order. `timelineModel.ts` folds it: the newest four months and the
   month the beginning sits in open, the rest of each year one line, a month's rows past four
   behind "+ N more" **where the first of them would have been** (never after the beginning,
   which closes the timeline). `test:records` holds all three.
   **Records are improvements, and they were noise until three rules**: on real data a beginner
-  broke the 1K, 5K and 10K on most runs. One run's records are one milestone; nothing counts
+  broke the 1K, 5K and 10K on most runs. A record is a milestone and never a stage (the
+  Mares grade speed, above); a run that reaches a Mares stage carries it on its record's row
+  when it has one, and on a `speed:<activityId>` row of its own when it does not. One run's records are one milestone; nothing counts
   in the first four weeks at a distance or under a 1% gain; COROS's own all-time record stands
   in for our figure on the same run, is shown on its own before any backfill (`record:<d>:<id>`),
   and an effort under 97% of it is a GPS fault. Best efforts come from the summary: an outdoor
@@ -1993,7 +2014,7 @@ lives at module level for the same visit-to-visit reason — see `useCalendarDat
   and the matches — `finished`, never `stopped`, 4+ weeks, 80%+ — dated at the last session).
   The earliest day ever seen wins, a sighting that moves nothing is not a sync change, and the
   window may write only VO2max and sleep. Remembered VO2max rows are fed back as readings, so
-  "five above your first" keeps its first. `test:records-ledger`.
+  a rating reached past COROS's year still stands. `test:records-ledger`.
   **Computed in App, not in the screen** (`useHallOfRecords`): the rail's count and the
   notifications need it on every screen. It is local reads only; the backfill and the place
   names (through the globe's own `placeLabels` cache, busiest cells first, 40 a visit) run
@@ -2007,7 +2028,7 @@ lives at module level for the same visit-to-visit reason — see `useCalendarDat
   new; a milestone older than 30 days is seen without a badge, a stage older than 14 days
   announced without a toast. A title opens its session (no Open button) through
   `openActivityFrom` in App, which the Library's trained sessions use too.
-  **Left out on purpose**: a strength 1RM stage (Lion III is 100 sessions — Hevy's sets are not
+  **Left out on purpose**: a strength 1RM stage (Lion III is 200 days — Hevy's sets are not
   read here) and a sport other than the five families for firsts. Dev sample activities reach
   the hall through the window's door like every other screen, so a run with them on marks
   their milestones seen.

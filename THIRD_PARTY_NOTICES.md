@@ -50,6 +50,14 @@ from [OpenStreetMap](https://www.openstreetmap.org/copyright)
 [BRouter](https://brouter.de/), with ground heights from SRTM (NASA/USGS,
 public domain).
 
+### Age grading and VO2max ratings
+
+The Hall of Records grades running speed against the WMA/USATF 2025 road
+age-grading standards by Alan Jones with Tom Bernhard
+([Age-Grade-Tables](https://github.com/AlanLyttonJones/Age-Grade-Tables)),
+dedicated to the public domain under CC0 1.0, and rates VO2max against
+The Cooper Institute's normative values by age and sex.
+
 ### Maps
 
 Base maps are drawn from OpenFreeMap (OpenMapTiles schema, data © OpenStreetMap

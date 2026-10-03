@@ -10,6 +10,11 @@
 // reach several labour stages at once; a remembered fact outranks a source
 // that has forgotten it.
 //
+// And a labour stage is a standard, never a first and never a gain on the
+// athlete's own past: a beginner beats their own records every week and an
+// athlete at the top hardly ever does, so speed is age graded and VO2max rated
+// for age and sex — the same bar for everyone of that age.
+//
 // Runs under Electron for the reason test-hike-metrics does: this repo's Node
 // is built without Amaro, and the module graph has extensionless imports.
 import assert from "node:assert/strict";
@@ -66,9 +71,18 @@ const ladder = computeRecords({
 assert.equal(find(ladder, "start").activity.activityId, firstRun.activityId, "the beginning is the oldest activity, whatever order they arrive in");
 assert.equal(find(ladder, "first:run"), undefined, "the beginning is also the first run — one milestone, not two");
 assert.equal(find(ladder, "start").sport, "run");
-assert.equal(find(ladder, "first:ride").labour.id, "birds", "a first ride is the Birds' first stage");
-assert.deepEqual(find(ladder, "first:swim").labour, { id: "hydra", stage: 1 });
+assert.equal(find(ladder, "first:ride").labour, undefined, "a first is a milestone, never a labour stage");
+assert.equal(find(ladder, "first:swim").labour, undefined);
+const fiftyRidden = find(ladder, "lifetime:ride:50km");
+assert.equal(
+  fiftyRidden.activity.activityId,
+  longRide.activityId,
+  "the Birds' first stage is 50 km ridden all told: 32 km, then the ride that passes it"
+);
+assert.deepEqual(fiftyRidden.labour, { id: "birds", stage: 1 });
 assert.ok(find(ladder, "first:openwater"), "an open-water swim is a first of its own");
+assert.deepEqual(find(ladder, "distance:swim:500").labour, { id: "hydra", stage: 1 }, "500 m in one swim, even the first");
+assert.equal(find(ladder, "distance:swim:1k"), undefined, "a first swim past 1 km is one milestone, not another row");
 assert.deepEqual(find(ladder, "distance:swim:1500").labour, { id: "hydra", stage: 2 });
 const halfMilestone = find(ladder, "distance:run:half");
 assert.equal(
@@ -113,25 +127,40 @@ assert.equal(longestIds[0], `longest:run:${runs[runs.length - 1].activityId}`);
 // --- Streaks -------------------------------------------------------------------------------
 
 const weekly = [];
-for (let week = 0; week < 4; week += 1) weekly.push(activity(at(2026, 6, 1 + week * 7), 100));
+for (let week = 0; week < 8; week += 1) weekly.push(activity(at(2026, 4, 6 + week * 7), 100));
 // A gap, then four again: the same streak length is no new milestone.
 for (let week = 0; week < 4; week += 1) weekly.push(activity(at(2026, 7, 13 + week * 7), 100));
 const streaks = computeRecords({ ...base, activities: weekly, today: "20260808" });
 assert.equal(ids(streaks).filter((id) => id === "streak:weeks:4").length, 1);
-const four = find(streaks, "streak:weeks:4");
-assert.equal(four.day, "20260622", "reached in the fourth week, on its first session");
-assert.deepEqual(four.labour, { id: "hind", stage: 1 });
+assert.equal(find(streaks, "streak:weeks:4").labour, undefined, "four weeks is a milestone, not yet a stage");
+const eight = find(streaks, "streak:weeks:8");
+assert.equal(eight.day, "20260525", "reached in the eighth week, on its first session");
+assert.deepEqual(eight.labour, { id: "hind", stage: 1 });
 assert.equal(weekOf("20260808"), "20260803", "weeks start on a Monday");
 
 // --- Lifetime, strength and climbing --------------------------------------------------------
 
-const long = Array.from({ length: 101 }, (_, index) =>
-  activity(at(2024, 1, 1) + index * 86400, 402, { duration: 3600, distance: 0, elevationGain: 0 })
-);
+// A strength session a day for 201 days, and on the first five days a second
+// one: a workout split into a session per muscle group is still one day.
+const long = [
+  ...Array.from({ length: 201 }, (_, index) =>
+    activity(at(2024, 1, 1) + index * 86400, 402, { duration: 3600, distance: 0, elevationGain: 0 })
+  ),
+  ...Array.from({ length: 5 }, (_, index) =>
+    activity(at(2024, 1, 1, 18) + index * 86400, 402, { duration: 3600, distance: 0, elevationGain: 0 })
+  )
+];
 const volume = computeRecords({ ...base, activities: long });
-assert.deepEqual(find(volume, "lifetime:hours:100").labour, { id: "stables", stage: 1 });
-assert.deepEqual(find(volume, "lifetime:strength:50").labour, { id: "lion", stage: 2 });
-assert.deepEqual(find(volume, "lifetime:strength:100").labour, { id: "lion", stage: 3 });
+assert.deepEqual(find(volume, "lifetime:hours:50").labour, { id: "stables", stage: 1 });
+assert.equal(find(volume, "lifetime:hours:100").labour, undefined);
+assert.deepEqual(find(volume, "lifetime:strength:20").labour, { id: "lion", stage: 1 });
+assert.equal(find(volume, "lifetime:strength:50").labour, undefined);
+assert.deepEqual(find(volume, "lifetime:strength:100").labour, { id: "lion", stage: 2 });
+const lionThree = find(volume, "lifetime:strength:200");
+assert.deepEqual(lionThree.labour, { id: "lion", stage: 3 });
+assert.equal(lionThree.day, dayOfEpochSeconds(at(2024, 1, 1) + 199 * 86400), "the 200th day, not the 200th session");
+assert.equal(lionThree.title, "200 days of strength training");
+assert.equal(lionThree.detail, "205 sessions in all");
 assert.equal(find(volume, "lifetime:activities:100").category, "lifetime");
 
 const climbs = computeRecords({
@@ -143,12 +172,35 @@ const climbs = computeRecords({
     )
   ]
 });
-assert.deepEqual(find(climbs, "climb:500").labour, { id: "boar", stage: 1 });
+assert.equal(find(climbs, "climb:500").labour, undefined, "500 m is a milestone, not yet a stage");
+assert.deepEqual(find(climbs, "climb:750").labour, { id: "boar", stage: 1 });
 assert.deepEqual(find(climbs, "climb:1500").labour, { id: "boar", stage: 2 });
-assert.equal(find(climbs, "climb:500").activity.activityId, find(climbs, "climb:1500").activity.activityId, "one big day reaches both");
-const everest = find(climbs, "climb:month:everest");
-assert.deepEqual(everest.labour, { id: "boar", stage: 3 }, "8,849 m inside one month");
+assert.equal(find(climbs, "climb:750").activity.activityId, find(climbs, "climb:1500").activity.activityId, "one big day reaches both");
+const everest = find(climbs, "climb:30days:everest");
+assert.deepEqual(everest.labour, { id: "boar", stage: 3 }, "8,849 m inside thirty days");
 assert.equal(everest.day, "20260915", "reached on the session that crossed it");
+
+// Thirty days running, not a calendar month: a trek across the first of the
+// month is one Everest, and the same climbing spread wider is none.
+const acrossMonths = computeRecords({
+  ...base,
+  activities: [
+    activity(at(2026, 8, 20), 104, { elevationGain: 2500 }),
+    activity(at(2026, 8, 28), 104, { elevationGain: 2500 }),
+    activity(at(2026, 9, 3), 104, { elevationGain: 2500 }),
+    activity(at(2026, 9, 8), 104, { elevationGain: 1500 })
+  ]
+});
+assert.equal(find(acrossMonths, "climb:30days:everest").day, "20260908", "August and September together");
+const spread30 = computeRecords({
+  ...base,
+  activities: [0, 15, 30, 45].map((days) => activity(at(2026, 6, 1) + days * 86400, 104, { elevationGain: 2500 }))
+});
+assert.equal(find(spread30, "climb:30days:everest"), undefined, "never more than two of them inside thirty days");
+assert.equal(
+  buildLabours(spread30.milestones, spread30.progress).find((state) => state.definition.id === "boar").stages[2].progress.text,
+  "Best 30 days 5,000 m"
+);
 
 // --- Records -----------------------------------------------------------------------------------
 
@@ -191,17 +243,6 @@ assert.equal(
   "COROS's figure stands in for ours where it names the same run"
 );
 assert.ok(!prIds.includes(`pr:${glitch.activityId}`), "an effort far under COROS's own record is a GPS fault");
-assert.deepEqual(find(prs, `pr:${r2.activityId}`).labour, { id: "mares", stage: 1 });
-assert.deepEqual(
-  find(prs, `pr:${r3.activityId}`).labour,
-  { id: "mares", stage: 3 },
-  "the 10K record had stood over a year"
-);
-assert.deepEqual(
-  find(prs, `pr:${r4.activityId}`).labour,
-  { id: "mares", stage: 2 },
-  "the half completes the set of three"
-);
 assert.match(find(prs, `pr:${r4.activityId}`).detail, /^17:09 faster than the record from 26 Apr 2025/);
 
 const corosOnly = computeRecords({
@@ -217,7 +258,13 @@ assert.equal(
   "Your 5K record — 23:50",
   "before any backfill, COROS's current record is still on the timeline"
 );
-assert.equal(current.labour, undefined, "but it improved nothing, so it is no labour stage");
+assert.deepEqual(
+  current.labour,
+  { id: "mares", stage: 1 },
+  "it improved nothing, but the Mares grade speed rather than count gains: 23:50 is 53.7% for a man of 30"
+);
+assert.match(current.context, /5K in 23:50: a 53\.7% age grade\./, "and the record's own row says so, rather than a second one");
+assert.equal(find(corosOnly, `speed:${r2.activityId}`), undefined);
 
 // Once the backfill reads what came before, it is the same milestone: the same
 // id, so it is not news twice — and, set in the first weeks at the distance,
@@ -267,6 +314,63 @@ assert.equal(
   "New 5K record — 30:00",
   "2 s off a 5:50 kilometre is under 1%, so only the 5K counts"
 );
+assert.ok(
+  beginner.milestones.every((milestone) => milestone.labour?.id !== "mares"),
+  "a beginner's records are milestones, not the Mares: a 30:00 5K is a 42.7% age grade"
+);
+
+// --- The Mares: an age grade, the same bar for everyone of an age and sex -----------------
+
+const fitness = await import(moduleUrl("records", "fitnessStandards.ts"));
+// Spot checks against the WMA/USATF 2025 road tables.
+assert.equal(Math.round(fitness.ageStandardSeconds(5000, 30, 0)), 769, "a man of 30 is graded against the open standard");
+assert.equal(Math.round(fitness.ageStandardSeconds(5000, 50, 0)), 876, "a man of 50 against 769 s / 0.8775");
+assert.equal(Math.round(fitness.ageStandardSeconds(5000, 30, 1)), 837, "a woman of 30 against 834 s / 0.9959");
+assert.ok(fitness.ageGrade(5000, 1709, 30, 0) >= 0.45 && fitness.ageGrade(5000, 1710, 30, 0) < 0.45, "45% is a 28:29 5K at 30");
+assert.equal(fitness.ageOnDay(19900615, "20260614"), 35);
+assert.equal(fitness.ageOnDay(19900615, "20260615"), 36, "a birthday counts from its own day");
+assert.equal(fitness.ageOnDay(undefined, "20260615"), 30, "no birthday on the profile reads as 30");
+assert.equal(fitness.athleteSex(undefined), 0, "and no sex as male");
+
+const m1 = activity(at(2026, 1, 10), 100);
+const m2 = activity(at(2026, 3, 10), 100);
+const m3 = activity(at(2026, 5, 10), 100);
+const m4 = activity(at(2026, 8, 10), 100);
+const maresSummaries = new Map([
+  [m1.activityId, { recordsVersion: 2, bestEfforts: [{ distance: 1000, seconds: 300 }, { distance: 5000, seconds: 1900 }] }],
+  [m2.activityId, { recordsVersion: 2, bestEfforts: [{ distance: 5000, seconds: 1700 }] }],
+  [m3.activityId, { recordsVersion: 2, bestEfforts: [{ distance: 10000, seconds: 2630 }] }],
+  [m4.activityId, { recordsVersion: 2, bestEfforts: [{ distance: 21097.5, seconds: 4900 }] }]
+]);
+const graded = computeRecords({ ...base, activities: [m1, m2, m3, m4], summaries: maresSummaries });
+assert.ok(
+  !graded.milestones.some((milestone) => milestone.activity?.activityId === m1.activityId && milestone.labour),
+  "31:40 is 40.4%: no stage"
+);
+assert.deepEqual(find(graded, `pr:${m2.activityId}`).labour, { id: "mares", stage: 1 }, "28:20 is 45.2%, on the record's own row");
+assert.equal(find(graded, `speed:${m2.activityId}`), undefined);
+const tenK = find(graded, `speed:${m3.activityId}`);
+assert.deepEqual(tenK.labour, { id: "mares", stage: 2 }, "a first 10K is no record, so the stage has a row of its own");
+assert.equal(tenK.title, "10K in 43:50 — a 60.2% age grade");
+const halfGraded = find(graded, `speed:${m4.activityId}`);
+assert.deepEqual(halfGraded.labour, { id: "mares", stage: 3 });
+assert.equal(halfGraded.title, "Half marathon in 1:21:40 — a 70.4% age grade");
+assert.ok(halfGraded.major, "the last stage is a card");
+assert.ok(buildLabours(graded.milestones, graded.progress).find((state) => state.definition.id === "mares").complete);
+
+// The same 31:40 is no stage at 30 and the first at 60.
+const sixty = computeRecords({
+  ...base,
+  activities: [m1],
+  summaries: maresSummaries,
+  athlete: { birthday: 19660101, sex: 0 }
+});
+assert.deepEqual(find(sixty, `speed:${m1.activityId}`).labour, { id: "mares", stage: 1 });
+const thirtyOnly = computeRecords({ ...base, activities: [m1], summaries: maresSummaries });
+const maresOpen = buildLabours(thirtyOnly.milestones, thirtyOnly.progress).find((state) => state.definition.id === "mares");
+assert.equal(maresOpen.reached, 0);
+assert.equal(maresOpen.stages[0].progress.text, "Best 40.4% · 5K in 31:40", "the 1K is not graded: too short to say");
+assert.ok(Math.abs(maresOpen.stages[0].progress.ratio - fitness.ageGrade(5000, 1900, 30, 0) / 0.45) < 1e-9);
 
 // --- VO2max, and what is remembered ---------------------------------------------------------------
 
@@ -281,9 +385,13 @@ const vo2 = computeRecords({
     { day: "20260922", value: 50.4 }
   ]
 });
+// No profile: a man of 30, rated Good from 44.0, Excellent from 48.3, Superior from 54.0.
 assert.deepEqual(ids(vo2), ["vo2max:first", "vo2max:high:46", "vo2max:high:47", "vo2max:high:50"]);
-assert.deepEqual(find(vo2, "vo2max:high:47").labour, { id: "apples", stage: 2 });
-assert.deepEqual(find(vo2, "vo2max:high:50").labour, { id: "apples", stage: 3 }, "a jump of three whole points is one new high");
+assert.deepEqual(find(vo2, "vo2max:first").labour, { id: "apples", stage: 1 }, "rated Good on the first reading");
+assert.equal(find(vo2, "vo2max:first").detail, "Good for your age");
+assert.equal(find(vo2, "vo2max:high:47").labour, undefined, "a new high is no stage of itself");
+assert.deepEqual(find(vo2, "vo2max:high:50").labour, { id: "apples", stage: 2 });
+assert.match(find(vo2, "vo2max:high:50").detail, /^Excellent for your age · Up 5\.4/);
 assert.deepEqual(
   vo2.toRemember.find((row) => row.id === "vo2max:first"),
   { id: "vo2max:first", kind: "vo2max", day: "20250312", data: { value: 45 } },
@@ -308,23 +416,41 @@ const together = computeRecords({
   ...base,
   activities: [],
   vo2Readings: [
-    { day: "20250312", value: 45.5 },
-    { day: "20250601", value: 47.4 },
-    { day: "20250701", value: 47.6 }
+    { day: "20250312", value: 47.6 },
+    { day: "20250601", value: 48.0 },
+    { day: "20250701", value: 48.5 }
   ]
 });
+assert.equal(find(together, "vo2max:high:48").labour, undefined, "48.0 is under 48.3");
 assert.deepEqual(
-  find(together, "vo2max:plus:2").labour,
+  find(together, "vo2max:rating:excellent").labour,
   { id: "apples", stage: 2 },
-  "+2 reached without a new whole number still reaches the stage"
+  "a rating reached without a new whole number still reaches the stage"
 );
+
+// Rated for the age and sex on the day: 40.2 is Excellent for a woman of 55,
+// and an athlete at the top has all three from the first reading.
+const fiftyFive = computeRecords({
+  ...base,
+  activities: [],
+  athlete: { birthday: 19710301, sex: 1 },
+  vo2Readings: [
+    { day: "20260601", value: 40.2 },
+    { day: "20260901", value: 41.5 }
+  ]
+});
+assert.deepEqual(find(fiftyFive, "vo2max:first").labour, { id: "apples", stage: 2, also: [1] });
+assert.deepEqual(find(fiftyFive, "vo2max:high:41").labour, { id: "apples", stage: 3 }, "Superior from 41.1");
+const elite = computeRecords({ ...base, activities: [], vo2Readings: [{ day: "20260601", value: 71 }] });
+assert.equal(find(elite, "vo2max:first").labour.stage, 3);
+assert.deepEqual([...find(elite, "vo2max:first").labour.also].sort(), [1, 2]);
 
 // --- Sleep ----------------------------------------------------------------------------------------
 
 const nights = [];
 for (let day = 1; day <= 9; day += 1) nights.push({ day: `202608${String(day).padStart(2, "0")}`, minutes: day === 3 ? 380 : 450 });
 const sleep = computeRecords({ ...base, activities: [], sleepNights: nights, today: "20260810" });
-assert.deepEqual(find(sleep, "sleep:first").labour, { id: "cerberus", stage: 1 });
+assert.equal(find(sleep, "sleep:first").labour, undefined, "a first night is a milestone, not a stage");
 assert.equal(find(sleep, "sleep:streak:7"), undefined, "a short night breaks the run");
 const sleep2 = computeRecords({
   ...base,
@@ -333,17 +459,40 @@ const sleep2 = computeRecords({
   today: "20260810"
 });
 assert.equal(find(sleep2, "sleep:streak:7").day, "20260807");
-assert.deepEqual(find(sleep2, "sleep:streak:7").labour, { id: "cerberus", stage: 2 });
+assert.deepEqual(find(sleep2, "sleep:streak:7").labour, { id: "cerberus", stage: 1 });
+
+// 26 good nights of 30: four short ones are allowed, a fifth is not, and a
+// night with nothing recorded is a miss like a short one.
+const july = (short, missing = []) =>
+  Array.from({ length: 30 }, (_, index) => index + 1)
+    .filter((day) => !missing.includes(day))
+    .map((day) => ({ day: `202607${String(day).padStart(2, "0")}`, minutes: short.includes(day) ? 380 : 440 }));
+const month = computeRecords({ ...base, activities: [], sleepNights: july([3, 10, 17, 24]), today: "20260731" });
+assert.equal(find(month, "sleep:window:30").day, "20260730");
+assert.deepEqual(find(month, "sleep:window:30").labour, { id: "cerberus", stage: 2 });
+assert.equal(
+  find(computeRecords({ ...base, activities: [], sleepNights: july([3, 10, 17, 24, 28]), today: "20260731" }), "sleep:window:30"),
+  undefined
+);
+assert.equal(
+  find(computeRecords({ ...base, activities: [], sleepNights: july([3, 10, 17, 24], [28]), today: "20260731" }), "sleep:window:30"),
+  undefined
+);
+const monthLabours = buildLabours(month.milestones, month.progress);
+assert.equal(
+  monthLabours.find((state) => state.definition.id === "cerberus").stages[2].progress.text,
+  "26 / 300 of the last 365 nights"
+);
 const kept = computeRecords({
   ...base,
   activities: [],
   sleepNights: [],
-  remembered: [{ id: "sleep:streak:30", kind: "sleep", day: "20250430", data: { nights: 30 } }]
+  remembered: [{ id: "sleep:window:365", kind: "sleep", day: "20250430", data: { days: 365, good: 300 } }]
 });
 assert.deepEqual(
-  find(kept, "sleep:streak:30").labour,
+  find(kept, "sleep:window:365").labour,
   { id: "cerberus", stage: 3 },
-  "a run of nights this machine never saw still stands"
+  "a year of nights this machine never saw still stands"
 );
 
 // --- Plans ------------------------------------------------------------------------------------------
@@ -352,15 +501,17 @@ const plans = computeRecords({
   ...base,
   activities: [],
   remembered: [
-    { id: "plan:a", kind: "plan", day: "20251130", data: { name: "Base", weeks: 6, ratio: 0.82, done: 18, settled: 22 } },
-    { id: "plan:b", kind: "plan", day: "20260816", data: { name: "Build", weeks: 12, ratio: 0.91, done: 43, settled: 47 } }
+    { id: "plan:a", kind: "plan", day: "20251130", data: { name: "Base", weeks: 4, ratio: 0.82, done: 10, settled: 12 } },
+    { id: "plan:b", kind: "plan", day: "20260301", data: { name: "Build", weeks: 12, ratio: 0.84, done: 38, settled: 45 } },
+    { id: "plan:c", kind: "plan", day: "20260816", data: { name: "Marathon", weeks: 16, ratio: 0.91, done: 58, settled: 64 } }
   ]
 });
-assert.deepEqual(find(plans, "plan:a").labour, { id: "girdle", stage: 1 });
+assert.deepEqual(find(plans, "plan:a").labour, { id: "girdle", stage: 1 }, "four weeks at 80% is the first stage");
+assert.equal(find(plans, "plan:b").labour, undefined, "twelve weeks at 84% is short of the second");
 assert.deepEqual(
-  find(plans, "plan:b").labour,
+  find(plans, "plan:c").labour,
   { id: "girdle", stage: 3, also: [2] },
-  "a 12-week plan at 91% reaches the second and third stages at once"
+  "a 16-week plan at 91% reaches the second and third stages at once"
 );
 
 // --- Places -----------------------------------------------------------------------------------------
@@ -397,7 +548,8 @@ const named = computeRecords({
     [placesFirst.places.find((cell) => cell.lat === 18.79).key]: { city: "Chiang Mai", country: "Thailand" }
   }
 });
-assert.deepEqual(find(named, "place:country:thailand").labour, { id: "cattle", stage: 2 });
+assert.equal(find(named, "place:country:thailand").labour, undefined, "a country is a milestone; the labour counts places");
+assert.ok(find(named, "place:country:thailand").major, "the first one abroad is a card");
 assert.ok(!find(named, "place:country:việt-nam"), "home is no new country");
 
 // The two geocoders name one country in two languages. Home named by
@@ -418,8 +570,19 @@ assert.deepEqual(
   ["place:country:ประเทศไทย"],
   "Sa Pa is no new country; Chiang Mai is, in whatever language it was named"
 );
-assert.deepEqual(find(twoLanguages, "place:country:ประเทศไทย").labour, { id: "cattle", stage: 2 });
-assert.deepEqual(find(named, "place:pillars").labour, { id: "cattle", stage: 3 }, "Paris is past the Pillars from Hà Nội");
+assert.ok(find(named, "place:pillars").major, "Paris is past the Pillars from Hà Nội");
+assert.equal(find(named, "place:pillars").labour, undefined, "and one flight is no stage");
+
+// Ten places and twenty-five: one cell each, however they are spread.
+const roaming = Array.from({ length: 25 }, (_, index) => activity(at(2026, 1, 1) + index * 86400, 100));
+const roamed = computeRecords({
+  ...base,
+  activities: roaming,
+  summaries: new Map(roaming.map((run, index) => [run.activityId, { recordsVersion: 2, startPoint: { lat: 10 + index, lon: 100 } }]))
+});
+assert.deepEqual(find(roamed, "place:count:10").labour, { id: "cattle", stage: 2 });
+assert.deepEqual(find(roamed, "place:count:25").labour, { id: "cattle", stage: 3 });
+assert.ok(find(roamed, "place:count:25").major);
 
 // --- The labours ------------------------------------------------------------------------------------
 
@@ -430,12 +593,12 @@ const all = computeRecords({
 });
 const states = buildLabours(all.milestones, all.progress);
 const lion = states.find((state) => state.definition.id === "lion");
-assert.equal(lion.reached, 3, "first session, 50 and 100");
+assert.equal(lion.reached, 3, "20, 100 and 200 days");
 assert.ok(lion.complete);
 const apples = states.find((state) => state.definition.id === "apples");
 assert.equal(apples.reached, 1);
-assert.equal(apples.stages[1].progress.text, "46.6 / 47");
-assert.ok(Math.abs(apples.stages[1].progress.ratio - 0.8) < 1e-9);
+assert.equal(apples.stages[1].progress.text, "Best 46.6 / 48.3", "Excellent for a man of 30");
+assert.ok(Math.abs(apples.stages[1].progress.ratio - (46.6 / 48.3 - 0.8) / 0.2) < 1e-9, "counted from a fifth under the bar");
 assert.ok(
   all.withinReach.some((entry) => entry.id === "apples:2" && entry.label === "Hesperides · II"),
   "a stage 80% there is within reach, labelled by its labour"
@@ -614,7 +777,7 @@ const swimLabours = buildLabours(swims.milestones, swims.progress);
 const hydra = notices
   .reckonNotices({ ...empty, announced: [] }, swims.milestones, swimLabours, "20261002")
   .announce.filter((entry) => entry.labourId === "hydra");
-assert.equal(hydra.length, 3, "first swim, 1.5 km and 3.8 km on one day");
+assert.equal(hydra.length, 3, "500 m, 1.5 km and 3.8 km in one swim");
 assert.ok(hydra.every((entry) => entry.completes), "each of them completes the labour, so the screen celebrates once");
 
 // Sync carries the record whole and the last writer wins, so the other
@@ -726,7 +889,12 @@ for (const today of ["20261003", "20261005", "20261008", "20261011", "20270115"]
   );
   const complete = livedLabours.filter((state) => state.complete).map((state) => state.definition.id);
   const untouched = livedLabours.filter((state) => state.reached === 0).map((state) => state.definition.id);
-  assert.deepEqual(complete.sort(), ["bull", "hind", "mares"], `${today}: three labours complete`);
+  assert.deepEqual(complete.sort(), ["bull", "hind", "stables"], `${today}: three labours complete`);
+  assert.equal(
+    livedLabours.find((state) => state.definition.id === "mares").reached,
+    1,
+    `${today}: a 1:47 half is a club runner's — the Mares stop at their first stage`
+  );
   assert.deepEqual(untouched, ["hydra"], `${today}: no swims, so the Hydra alone is untouched`);
   const told = notices.reckonNotices({ v: 1, seen: [], announced: [] }, lived.milestones, livedLabours, today);
   assert.deepEqual(

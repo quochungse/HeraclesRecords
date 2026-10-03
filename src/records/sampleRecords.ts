@@ -14,7 +14,7 @@
 //    whatever the rules make of that. It ends on last Saturday's trail 50K,
 //    which completes the Cretan Bull and is the first climb past 1,500 m, so
 //    switching it on raises one celebration and one toast. No swims: the Hydra
-//    is untouched.
+//    is untouched. A club runner, so the Mares stop at their first stage.
 //  * **Full history** — two and a half years of runs, rides, swims, strength
 //    and hikes, a sleep log, VO2max readings, finished plans and trips: every
 //    kind of milestone, folded years and months, every labour begun and seven
@@ -117,6 +117,11 @@ function seeded(seed: number): () => number {
 
 function dayKey(date: Date): string {
   return `${date.getFullYear()}${String(date.getMonth() + 1).padStart(2, "0")}${String(date.getDate()).padStart(2, "0")}`;
+}
+
+/** A COROS birthday (`YYYYMMDD`) for someone `age` today, born on `monthDay`. */
+function birthdayAged(today: string, age: number, monthDay: string): number {
+  return Number(`${Number(today.slice(0, 4)) - age}${monthDay}`);
 }
 
 const SPORT_NAMES: Readonly<Record<number, string>> = {
@@ -361,12 +366,8 @@ function fullHistory(today: string): RecordsSampleInput {
   }
 
   // The last fortnight, the news: two labours completed at once — a 3.8 km
-  // swim and a trek that makes the month an Everest — and a new country.
-  const trekDay = 3;
-  const monthStart = history.date(trekDay);
-  const daysIntoMonth = monthStart.getDate() - 1;
-  const trekDays = [Math.min(trekDay + 6, trekDay + daysIntoMonth), Math.min(trekDay + 4, trekDay + daysIntoMonth), Math.min(trekDay + 2, trekDay + daysIntoMonth), trekDay];
-  trekDays.forEach((daysAgo, index) => {
+  // swim and a trek that makes thirty days an Everest — and a new country.
+  [9, 7, 5, 3].forEach((daysAgo, index) => {
     history.add({
       daysAgo,
       hour: 5 + index,
@@ -397,8 +398,8 @@ function fullHistory(today: string): RecordsSampleInput {
     }
   ];
 
-  // VO2max: a first reading, new highs, one step past +2 that is no new whole
-  // number (the "+2" row), and a peak just short of +5.
+  // VO2max: rated Good for a man of his age from the first reading, new
+  // highs, and Excellent nearly two years in; Superior is out of reach.
   const VO2: Array<[number, number]> = [
     [4, 44.6], [12, 45.0], [20, 45.4], [30, 46.1], [38, 46.3], [46, 46.6],
     [60, 47.2], [78, 48.0], [96, 48.9], [118, 49.4]
@@ -413,11 +414,11 @@ function fullHistory(today: string): RecordsSampleInput {
     sleepNights.push({ day: history.day(daysAgo), minutes: good ? 425 + Math.round(random() * 50) : 372 });
   }
 
-  // The first plan finished is eight weeks long, so it reaches the Girdle's
-  // first two stages at once: one milestone carrying two.
+  // The marathon block is sixteen weeks kept at 93%, so it reaches the
+  // Girdle's last two stages at once: one milestone carrying two.
   const remembered: RememberedMilestone[] = [
     { id: "plan:sample-10k", kind: "plan", day: dayOfWeek(48, 6), data: { name: "Spring 10K", weeks: 8, ratio: 0.88, done: 28, settled: 32 } },
-    { id: "plan:sample-marathon", kind: "plan", day: dayOfWeek(60, 6), data: { name: "Marathon block", weeks: 12, ratio: 0.93, done: 52, settled: 56 } },
+    { id: "plan:sample-marathon", kind: "plan", day: dayOfWeek(60, 6), data: { name: "Marathon block", weeks: 16, ratio: 0.93, done: 70, settled: 75 } },
     { id: "plan:sample-trail", kind: "plan", day: dayOfWeek(99, 6), data: { name: "Trail prep", weeks: 6, ratio: 0.81, done: 21, settled: 26 } }
   ];
 
@@ -428,7 +429,8 @@ function fullHistory(today: string): RecordsSampleInput {
     vo2Readings,
     sleepNights,
     remembered,
-    placeLabels: history.placeLabels
+    placeLabels: history.placeLabels,
+    athlete: { birthday: birthdayAged(today, 33, "0412"), sex: 0 }
   };
 }
 
@@ -705,8 +707,8 @@ function livedHistory(today: string): RecordsSampleInput {
   ];
 
   // VO2max: a whole number, as COROS states it, read every few days from the
-  // first week and climbing as the fitness does — one short of +5, which is
-  // within reach.
+  // first week and climbing as the fitness does — Good for his age from the
+  // start, Excellent once the marathon year had done its work.
   const firstVo2 = 45;
   // Their own seeds, so what the routine drew this week does not move them.
   const vo2Random = seeded(45);
@@ -755,7 +757,8 @@ function livedHistory(today: string): RecordsSampleInput {
     vo2Readings,
     sleepNights,
     remembered,
-    placeLabels: history.placeLabels
+    placeLabels: history.placeLabels,
+    athlete: { birthday: birthdayAged(today, 31, "0923"), sex: 0 }
   };
 }
 
@@ -788,21 +791,23 @@ function firstWeeks(today: string): RecordsSampleInput {
   run(4, 12000, "Long run");
   history.add({ daysAgo: 2, hour: 6, sportType: 200, name: "Ride to Sóc Sơn", distance: 35000, duration: 5000, climb: 180, place: "hanoi" });
 
+  // A first week of good nights since the watch, then one cut short.
   const sleepNights: Array<{ day: string; minutes: number }> = [];
   for (let daysAgo = 12; daysAgo >= 1; daysAgo -= 1) {
-    sleepNights.push({ day: history.day(daysAgo), minutes: daysAgo === 4 ? 360 : 410 + (daysAgo % 3) * 20 });
+    sleepNights.push({ day: history.day(daysAgo), minutes: daysAgo === 4 ? 360 : 425 + (daysAgo % 3) * 15 });
   }
   return {
     activities: history.activities,
     summaries: history.summaries,
     personalRecords: [],
     vo2Readings: [
-      { day: history.day(15), value: 46.0 },
+      { day: history.day(12), value: 46.0 },
       { day: history.day(3), value: 46.8 }
     ],
     sleepNights,
     remembered: [],
-    placeLabels: history.placeLabels
+    placeLabels: history.placeLabels,
+    athlete: { birthday: birthdayAged(today, 27, "0305"), sex: 0 }
   };
 }
 

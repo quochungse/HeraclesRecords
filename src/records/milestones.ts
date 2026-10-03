@@ -14,7 +14,7 @@
 // back out as `toRemember`.
 //
 // **An id is the fact, not the moment.** `first:run`, `streak:weeks:26`,
-// `pr:5000:<activityId>`: computing twice gives the same id, which is what the
+// `pr:<activityId>`: computing twice gives the same id, which is what the
 // "New" badge and the notifications are keyed on, and what lets a remembered
 // row and a freshly computed one be the same milestone.
 
@@ -42,6 +42,16 @@ import { isStrengthSportType, isSwimSportType } from "../training/sportTypes";
 import { RECORDS_SUMMARY_VERSION } from "../../electron/activityMetrics";
 import { isIndoorSportType } from "../../electron/corosSportTypes";
 import { geoHeatBucketKey } from "../trainingMap/activityVisitHeatmap";
+import {
+  VO2_RATINGS,
+  VO2_RATING_NAMES,
+  ageGrade,
+  ageOnDay,
+  athleteSex,
+  isAgeGradedDistance,
+  vo2RatingThreshold,
+  type AthleteSex
+} from "./fitnessStandards";
 import type { LabourId, LabourStage, StageProgress } from "./labours";
 import { STAGE_NUMERALS, labourDefinition, labourStageKey } from "./labours";
 
@@ -88,7 +98,7 @@ export interface Milestone {
   activity?: { activityId: string; sportType: number; startTime?: number };
   /**
    * The labour stage it reached, if it reached one — the highest, when one
-   * milestone reaches several at once (a 12-week plan kept at 91% is all three
+   * milestone reaches several at once (a 16-week plan kept at 91% is all three
    * of the Girdle's), with the others in `also`.
    */
   labour?: MilestoneLabour;
@@ -158,6 +168,12 @@ export interface RecordsInput {
   remembered?: readonly RememberedMilestone[];
   /** Place names by cell key, where the geocoder has answered. */
   placeLabels?: Readonly<Record<string, PlaceLabelLookup>>;
+  /**
+   * The COROS profile's birthday (`YYYYMMDD` as a number) and sex (0 male, 1
+   * female), which speed and VO2max are graded for. Either missing reads as a
+   * man of 30 (`fitnessStandards.ts`).
+   */
+  athlete?: { birthday?: number; sex?: number };
   unitSystem: UnitSystem;
   /** Local `YYYYMMDD`; defaults to the clock. */
   today?: string;
@@ -229,6 +245,13 @@ const RIDE_LADDER: readonly LadderStep[] = [
 ];
 
 const SWIM_LADDER: readonly LadderStep[] = [
+  {
+    distance: 500,
+    key: "500",
+    title: "First 500 m swim",
+    major: false,
+    labour: { id: "hydra", stage: 1 }
+  },
   { distance: 1000, key: "1k", title: "First 1 km swim", major: false },
   {
     distance: 1500,
@@ -254,38 +277,48 @@ interface ClimbStep {
 
 /** Height gained in one activity. */
 const CLIMB_LADDER: readonly ClimbStep[] = [
-  { meters: 500, labour: { id: "boar", stage: 1 }, major: false },
+  { meters: 500, major: false },
+  { meters: 750, labour: { id: "boar", stage: 1 }, major: false },
   { meters: 1000, major: false },
   { meters: 1500, labour: { id: "boar", stage: 2 }, major: true },
   { meters: 2500, major: true }
 ];
 
-/** Mount Everest, the unit a month's or a lifetime's climbing is counted in. */
+/** Mount Everest, the unit thirty days' or a lifetime's climbing is counted in. */
 export const EVEREST_METERS = 8849;
+/** The Boar's last stage: any thirty days running, not a calendar month. */
+const EVEREST_WINDOW_DAYS = 30;
 
 const LIFETIME_HOURS: ReadonlyArray<{ hours: number; labour?: LabourStage; major?: boolean }> = [
-  { hours: 50 },
-  { hours: 100, labour: 1 },
-  { hours: 250 },
-  { hours: 500, labour: 2 },
-  { hours: 1000, labour: 3, major: true },
+  { hours: 50, labour: 1 },
+  { hours: 100 },
+  { hours: 250, labour: 2 },
+  { hours: 500, labour: 3, major: true },
+  { hours: 1000, major: true },
   { hours: 2000, major: true },
   { hours: 5000, major: true }
 ];
 const LIFETIME_RUN_DISTANCE = [100, 500, 1000, 2000, 5000, 10000];
 const LIFETIME_RIDE_DISTANCE = [1000, 5000, 10000, 25000];
+/** The Birds' first stage: riding, all told, whatever the unit shown. */
+const BIRDS_FIRST_METERS = 50000;
 const LIFETIME_EVERESTS = [1, 5, 10, 25, 50];
 const LIFETIME_ACTIVITIES = [100, 250, 500, 1000, 2000];
-const STRENGTH_SESSIONS: ReadonlyArray<{ count: number; labour?: LabourStage }> = [
-  { count: 10 },
-  { count: 50, labour: 2 },
-  { count: 100, labour: 3 },
-  { count: 250 }
+/**
+ * Days with a strength session, not sessions: splitting one workout into a
+ * session per muscle group would otherwise count it several times.
+ */
+const STRENGTH_DAYS: ReadonlyArray<{ days: number; labour?: LabourStage; major?: boolean }> = [
+  { days: 20, labour: 1 },
+  { days: 50 },
+  { days: 100, labour: 2 },
+  { days: 200, labour: 3, major: true },
+  { days: 300, major: true }
 ];
 
 const STREAK_WEEKS: ReadonlyArray<{ weeks: number; labour?: LabourStage; major?: boolean }> = [
-  { weeks: 4, labour: 1 },
-  { weeks: 8 },
+  { weeks: 4 },
+  { weeks: 8, labour: 1 },
   { weeks: 12 },
   { weeks: 26, labour: 2 },
   { weeks: 52, labour: 3, major: true },
@@ -293,11 +326,15 @@ const STREAK_WEEKS: ReadonlyArray<{ weeks: number; labour?: LabourStage; major?:
   { weeks: 156, major: true }
 ];
 
-const PLACE_COUNTS: ReadonlyArray<{ count: number; labour?: LabourStage }> = [
+/**
+ * Places, one 0.5° cell each, and nothing else: a country or a distance from
+ * home would let one flight reach the last stage before the first.
+ */
+const PLACE_COUNTS: ReadonlyArray<{ count: number; labour?: LabourStage; major?: boolean }> = [
   { count: 5, labour: 1 },
-  { count: 10 },
-  { count: 25 },
-  { count: 50 }
+  { count: 10, labour: 2 },
+  { count: 25, labour: 3, major: true },
+  { count: 50, major: true }
 ];
 /** Tiryns to the Strait of Gibraltar, more or less: Heracles' western edge. */
 export const PILLARS_KM = 2700;
@@ -309,18 +346,26 @@ const CLIMB_RECORD_MIN_M = 300;
 const WEEK_RECORD_AFTER_WEEKS = 8;
 const WEEK_RECORD_MIN_SECONDS = 5 * 3600;
 
-/** Seven hours of sleep, counted against the day's whole sleep. */
+/** Seven hours of sleep, counted against the day's whole sleep, naps and all. */
 export const GOOD_NIGHT_MINUTES = 420;
 const SLEEP_STREAKS: ReadonlyArray<{ nights: number; labour?: LabourStage }> = [
-  { nights: 7, labour: 2 },
+  { nights: 7, labour: 1 },
   { nights: 14 },
-  { nights: 30, labour: 3 }
+  { nights: 30 }
+];
+/**
+ * So many good nights in any stretch of days running. A night with nothing
+ * recorded is not a good one: the watch has to be worn for it to count.
+ */
+const SLEEP_WINDOWS: ReadonlyArray<{ days: number; good: number; labour: LabourStage }> = [
+  { days: 30, good: 26, labour: 2 },
+  { days: 365, good: 300, labour: 3 }
 ];
 
 const PLAN_STAGES: ReadonlyArray<{ stage: LabourStage; weeks: number; ratio: number }> = [
   { stage: 1, weeks: 4, ratio: 0.8 },
-  { stage: 2, weeks: 8, ratio: 0.85 },
-  { stage: 3, weeks: 12, ratio: 0.9 }
+  { stage: 2, weeks: 12, ratio: 0.85 },
+  { stage: 3, weeks: 16, ratio: 0.9 }
 ];
 
 /** The best-effort distances, with COROS's record type for each. */
@@ -339,8 +384,16 @@ const COROS_ALL_TIME_GROUP = 4;
  * there has been, so nothing may beat it by much.
  */
 const EFFORT_FLOOR_OF_COROS_RECORD = 0.97;
-/** The three records the Mares' second stage asks to have improved. */
-const MARES_SET = [5000, 10000, 21097.5];
+/**
+ * The Mares' stages: an age grade on a run of 5K or longer
+ * (`fitnessStandards.ts`). 45% is a beginner a few months in, 60% a club
+ * runner, 70% the front of a city race — whatever the athlete's age.
+ */
+const MARES_GRADES: ReadonlyArray<{ stage: LabourStage; grade: number }> = [
+  { stage: 1, grade: 0.45 },
+  { stage: 2, grade: 0.6 },
+  { stage: 3, grade: 0.7 }
+];
 /** How long a distance's first efforts set the bar before beating it is news. */
 const RECORD_SETTLE_DAYS = 28;
 /** And how much it has to be beaten by: a 1% gain on a 25-minute 5K is 15 s. */
@@ -422,12 +475,6 @@ const FIRST_TITLE: Readonly<Record<Exclude<RecordsSport, "other">, string>> = {
   hike: "First hike",
   swim: "First swim",
   strength: "First strength session"
-};
-
-const FIRST_LABOUR: Partial<Record<RecordsSport, { id: LabourId; stage: LabourStage }>> = {
-  ride: { id: "birds", stage: 1 },
-  swim: { id: "hydra", stage: 1 },
-  strength: { id: "lion", stage: 1 }
 };
 
 const LONGEST_TITLE: Partial<Record<RecordsSport, string>> = {
@@ -588,8 +635,11 @@ export function computeRecords(input: RecordsInput): RecordsResult {
   const longestBySport = new Map<RecordsSport, number>();
   const ladderReached = new Set<string>();
   let longestClimb = 0;
-  const climbByMonth = new Map<string, number>();
-  let bestClimbMonth = 0;
+  // The last thirty days' climbing, oldest first, and the most any thirty held.
+  const climbWindow: Array<{ day: string; climb: number }> = [];
+  let climbWindowSum = 0;
+  let bestClimbWindow = 0;
+  const strengthDays = new Set<string>();
   let totalSeconds = 0;
   let runMeters = 0;
   let rideMeters = 0;
@@ -619,8 +669,7 @@ export function computeRecords(input: RecordsInput): RecordsResult {
 
     if (activityCount === 0) {
       // The very first activity is the beginning, and it is also the first of
-      // its sport: one milestone, not two, carrying the labour stage a first
-      // of that sport reaches.
+      // its sport: one milestone, not two.
       if (sport !== "other") firstBySport.add(sport);
       emit.push({
         id: "start",
@@ -631,8 +680,7 @@ export function computeRecords(input: RecordsInput): RecordsResult {
         title: "Your first activity on COROS",
         detail: [activity.sportName ?? SPORT_NOUN[sport], line].filter(Boolean).join(" · "),
         sport,
-        activity: ref,
-        ...(FIRST_LABOUR[sport] ? { labour: FIRST_LABOUR[sport] } : {})
+        activity: ref
       });
       firedHere = true;
     }
@@ -650,8 +698,7 @@ export function computeRecords(input: RecordsInput): RecordsResult {
         figures: activityFigures(activity, unitSystem),
         sport,
         major: true,
-        activity: ref,
-        ...(FIRST_LABOUR[sport] ? { labour: FIRST_LABOUR[sport] } : {})
+        activity: ref
       });
       firedHere = true;
     }
@@ -772,21 +819,27 @@ export function computeRecords(input: RecordsInput): RecordsResult {
     }
     longestClimb = Math.max(longestClimb, climb);
 
-    const month = day.slice(0, 6);
-    const monthBefore = climbByMonth.get(month) ?? 0;
-    const monthAfter = monthBefore + climb;
-    climbByMonth.set(month, monthAfter);
-    bestClimbMonth = Math.max(bestClimbMonth, monthAfter);
-    if (crossed(monthBefore, monthAfter, EVEREST_METERS) && !ladderReached.has("climb:month")) {
-      ladderReached.add("climb:month");
+    // Any thirty days running: a calendar month would split a trek that
+    // crossed the first of it into two months that each fell short.
+    // Only days that climbed are held, so the card's "since" names one.
+    if (climb > 0) {
+      climbWindow.push({ day, climb });
+      climbWindowSum += climb;
+    }
+    while (climbWindow.length > 0 && daysBetween(climbWindow[0].day, day) >= EVEREST_WINDOW_DAYS) {
+      climbWindowSum -= (climbWindow.shift() as { climb: number }).climb;
+    }
+    bestClimbWindow = Math.max(bestClimbWindow, climbWindowSum);
+    if (climbWindowSum >= EVEREST_METERS && !ladderReached.has("climb:30days")) {
+      ladderReached.add("climb:30days");
       emit.push({
-        id: "climb:month:everest",
+        id: "climb:30days:everest",
         category: "lifetime",
         day,
         at: startTime + 5,
         kind: "Mountains",
-        title: "An Everest climbed in a month",
-        detail: `${formatHeight(monthAfter, unitSystem)} in ${formatMonthYear(day)}`,
+        title: "An Everest climbed in 30 days",
+        detail: `${formatHeight(climbWindowSum, unitSystem)} since ${formatDayShort(climbWindow[0].day)}`,
         sport,
         major: true,
         activity: ref,
@@ -835,6 +888,20 @@ export function computeRecords(input: RecordsInput): RecordsResult {
       }
     }
     if (sport === "ride") {
+      if (crossed(rideMeters, rideMeters + distance, BIRDS_FIRST_METERS)) {
+        emit.push({
+          id: "lifetime:ride:50km",
+          category: "lifetime",
+          day,
+          at: startTime + 7,
+          kind: "Lifetime · Cycling",
+          title: "50 km of riding",
+          detail: `${groupThousands(sessions)} ${sessions === 1 ? "ride" : "rides"}`,
+          sport,
+          activity: ref,
+          labour: { id: "birds", stage: 1 }
+        });
+      }
       const before = metersToDisplayDistance(rideMeters, unitSystem);
       rideMeters += distance;
       const after = metersToDisplayDistance(rideMeters, unitSystem);
@@ -885,17 +952,20 @@ export function computeRecords(input: RecordsInput): RecordsResult {
         activity: ref
       });
     }
-    if (sport === "strength") {
-      for (const step of STRENGTH_SESSIONS) {
-        if (sessions !== step.count) continue;
+    if (sport === "strength" && !strengthDays.has(day)) {
+      strengthDays.add(day);
+      for (const step of STRENGTH_DAYS) {
+        if (strengthDays.size !== step.days) continue;
         emit.push({
-          id: `lifetime:strength:${step.count}`,
+          id: `lifetime:strength:${step.days}`,
           category: "lifetime",
           day,
           at: startTime + 9,
           kind: "Lifetime · Strength",
-          title: `${step.count} strength sessions`,
+          title: `${step.days} days of strength training`,
+          ...(sessions > step.days ? { detail: `${groupThousands(sessions)} sessions in all` } : {}),
           sport,
+          major: step.major ?? false,
           activity: ref,
           ...(step.labour ? { labour: { id: "lion", stage: step.labour } } : {})
         });
@@ -1038,29 +1108,40 @@ export function computeRecords(input: RecordsInput): RecordsResult {
     const key = labourStageKey(id, stage);
     if (!reached.has(key)) progress.set(key, value);
   };
-  const strengthCount = countBySport.get("strength") ?? 0;
-  open("lion", 2, { text: `${strengthCount} / 50 sessions`, ratio: ratioOf(strengthCount, 50) });
-  open("lion", 3, { text: `${strengthCount} / 100 sessions`, ratio: ratioOf(strengthCount, 100) });
+  const strengthDayCount = strengthDays.size;
+  for (const [stage, target] of [[1, 20], [2, 100], [3, 200]] as const) {
+    open("lion", stage, { text: `${strengthDayCount} / ${target} days`, ratio: ratioOf(strengthDayCount, target) });
+  }
   const longestSwim = longestBySport.get("swim") ?? 0;
   if (longestSwim > 0) {
-    open("hydra", 2, { text: `Best ${formatDistanceValue(longestSwim, unitSystem, { swim: true })}`, ratio: ratioOf(longestSwim, 1500) });
-    open("hydra", 3, { text: `Best ${formatDistanceValue(longestSwim, unitSystem, { swim: true })}`, ratio: ratioOf(longestSwim, 3800) });
+    for (const [stage, target] of [[1, 500], [2, 1500], [3, 3800]] as const) {
+      open("hydra", stage, {
+        text: `Best ${formatDistanceValue(longestSwim, unitSystem, { swim: true })}`,
+        ratio: ratioOf(longestSwim, target)
+      });
+    }
   }
-  for (const [stage, target] of [[1, 4], [2, 26], [3, 52]] as const) {
+  for (const [stage, target] of [[1, 8], [2, 26], [3, 52]] as const) {
     open("hind", stage, {
       text: `${currentStreak} / ${target} weeks${bestStreak > currentStreak ? ` · best ${bestStreak}` : ""}`,
       ratio: ratioOf(currentStreak, target)
     });
   }
-  open("boar", 1, { text: `Best ${formatHeight(longestClimb, unitSystem, "0 m")}`, ratio: ratioOf(longestClimb, 500) });
+  open("boar", 1, { text: `Best ${formatHeight(longestClimb, unitSystem, "0 m")}`, ratio: ratioOf(longestClimb, 750) });
   open("boar", 2, { text: `Best ${formatHeight(longestClimb, unitSystem, "0 m")}`, ratio: ratioOf(longestClimb, 1500) });
   open("boar", 3, {
-    text: `Best month ${formatHeight(bestClimbMonth, unitSystem, "0 m")}`,
-    ratio: ratioOf(bestClimbMonth, EVEREST_METERS)
+    text: `Best 30 days ${formatHeight(bestClimbWindow, unitSystem, "0 m")}`,
+    ratio: ratioOf(bestClimbWindow, EVEREST_METERS)
   });
   const hours = totalSeconds / 3600;
-  for (const [stage, target] of [[1, 100], [2, 500], [3, 1000]] as const) {
+  for (const [stage, target] of [[1, 50], [2, 250], [3, 500]] as const) {
     open("stables", stage, { text: `${groupThousands(hours)} / ${groupThousands(target)} h`, ratio: ratioOf(hours, target) });
+  }
+  if (rideMeters > 0) {
+    open("birds", 1, {
+      text: `${formatDistanceValue(rideMeters, unitSystem)} / ${formatDistanceValue(BIRDS_FIRST_METERS, unitSystem)}`,
+      ratio: ratioOf(rideMeters, BIRDS_FIRST_METERS)
+    });
   }
   const longestRide = longestBySport.get("ride") ?? 0;
   if (longestRide > 0) {
@@ -1179,10 +1260,6 @@ function recordMilestones(
   const coros = corosAllTimeRecords(input.personalRecords);
   const best = new Map<number, { seconds: number; day: string }>();
   const firstEffort = new Map<number, string>();
-  const improved = new Set<number>();
-  let maresFirst = false;
-  let maresSet = false;
-  let maresYear = false;
   const labelOf = (distance: number) =>
     RECORD_DISTANCES.find((entry) => entry.distance === distance)?.label ?? `${distance} m`;
 
@@ -1309,22 +1386,6 @@ function recordMilestones(
       continue;
     }
 
-    let labour: MilestoneLabour | undefined;
-    for (const gain of list) {
-      improved.add(gain.distance);
-      if (!maresYear && daysBetween(gain.previous.day, entry.day) >= 365) {
-        maresYear = true;
-        labour = withStage(labour, "mares", 3);
-      }
-    }
-    if (!maresFirst) {
-      maresFirst = true;
-      labour = withStage(labour, "mares", 1);
-    }
-    if (!maresSet && MARES_SET.every((distance) => improved.has(distance))) {
-      maresSet = true;
-      labour = withStage(labour, "mares", 2);
-    }
     const named = joined(list.map((gain) => labelOf(gain.distance)));
     const describe = (gain: Gain) =>
       `${formatGap(gain.previous.seconds - gain.seconds)} faster than the record from ${formatDayShort(gain.previous.day)}`;
@@ -1351,33 +1412,78 @@ function recordMilestones(
       ...(contextLines.length > 0 ? { context: contextLines.join(" ") } : {}),
       sport: "run",
       major: list.some((gain) => gain.distance >= 21097.5),
-      activity: activityRef(entry.activity),
-      ...(labour ? { labour } : {})
+      activity: activityRef(entry.activity)
     });
   }
 
-  // Progress: the Mares' open stages.
-  const missing = MARES_SET.filter((distance) => !improved.has(distance));
-  progress.set(labourStageKey("mares", 2), {
-    text: `${3 - missing.length} of 3 improved`,
-    ratio: (3 - missing.length) / 3
-  });
-  const today = input.today ?? getLocalHappenDayKey();
-  let oldest: { distance: number; day: string } | undefined;
-  for (const [distance, record] of best) {
-    if (!oldest || record.day < oldest.day) oldest = { distance, day: record.day };
+  // The Mares are not records. A record is a gain on the athlete's own past,
+  // which a beginner makes every other week and an athlete at the top hardly
+  // ever; a stage is an age grade, the same bar for everyone of that age and
+  // sex. Every effort of 5K or longer is graded on its own day, so a birthday
+  // moves the bar under the runs that come after it and not the ones before.
+  const sex: AthleteSex = athleteSex(input.athlete?.sex);
+  const birthday = input.athlete?.birthday;
+  const gradedStages = new Set<LabourStage>();
+  const reachedOn = new Map<string, { entry: Entry; grade: number; stages: LabourStage[] }>();
+  let bestGrade: { grade: number; entry: Entry } | undefined;
+  for (const entry of entries) {
+    if (!isAgeGradedDistance(entry.distance)) continue;
+    const grade = ageGrade(entry.distance, entry.seconds, ageOnDay(birthday, entry.day), sex);
+    if (!bestGrade || grade > bestGrade.grade) bestGrade = { grade, entry };
+    for (const step of MARES_GRADES) {
+      if (gradedStages.has(step.stage) || grade < step.grade) continue;
+      gradedStages.add(step.stage);
+      const held = reachedOn.get(entry.activity.activityId);
+      if (!held) {
+        reachedOn.set(entry.activity.activityId, { entry, grade, stages: [step.stage] });
+      } else {
+        held.stages.push(step.stage);
+        if (grade > held.grade) Object.assign(held, { entry, grade });
+      }
+    }
   }
-  if (oldest) {
-    const age = daysBetween(oldest.day, today);
-    progress.set(labourStageKey("mares", 3), {
-      text:
-        age >= 365
-          ? `Your ${labelOf(oldest.distance)} record has stood since ${formatDayShort(oldest.day)}`
-          : `Your ${labelOf(oldest.distance)} record turns one on ${formatDayShort(addDays(oldest.day, 365))}`,
-      ratio: Math.min(1, age / 365)
+  const effortLine = (entry: Entry) => `${labelOf(entry.distance)} in ${formatDurationSeconds(entry.seconds)}`;
+  for (const [activityId, { entry, grade, stages }] of reachedOn) {
+    let labour: MilestoneLabour | undefined;
+    for (const stage of stages) labour = withStage(labour, "mares", stage);
+    const graded = `a ${formatAgeGrade(grade)} age grade`;
+    // A run that already has its record milestone carries the stage there,
+    // rather than a second row for the same run.
+    const record = milestones.find((milestone) => milestone.id === `pr:${activityId}`);
+    if (record) {
+      record.labour = labour;
+      record.context = [record.context, `${effortLine(entry)}: ${graded}.`].filter(Boolean).join(" ");
+      continue;
+    }
+    const line = effortLine(entry);
+    milestones.push({
+      id: `speed:${activityId}`,
+      category: "record",
+      day: entry.day,
+      at: entry.at + 1,
+      kind: "Speed · Running",
+      title: `${line.charAt(0).toUpperCase()}${line.slice(1)} — ${graded}`,
+      detail: "Graded against the best time for your age and sex",
+      sport: "run",
+      major: (labour as MilestoneLabour).stage === 3,
+      activity: activityRef(entry.activity),
+      labour
     });
   }
+  if (bestGrade) {
+    for (const step of MARES_GRADES) {
+      progress.set(labourStageKey("mares", step.stage), {
+        text: `Best ${formatAgeGrade(bestGrade.grade)} · ${effortLine(bestGrade.entry)}`,
+        ratio: Math.min(1, bestGrade.grade / step.grade)
+      });
+    }
+  }
   return { milestones, progress };
+}
+
+/** "61.2%": rounded down, so a grade never reads as one it did not reach. */
+function formatAgeGrade(grade: number): string {
+  return `${(Math.floor(grade * 1000) / 10).toFixed(1)}%`;
 }
 
 // --- VO2max ----------------------------------------------------------------------------
@@ -1405,6 +1511,26 @@ function vo2Milestones(input: RecordsInput): {
   const ordered = [...readings.entries()].sort(([left], [right]) => left.localeCompare(right));
   if (ordered.length === 0) return { milestones, values, progress };
 
+  // A stage is a rating for the athlete's age and sex, not a rise on their
+  // first reading: a beginner gains five points in a season, and an athlete
+  // already near the human ceiling never would. Each reading is rated for the
+  // age on its own day.
+  const sex: AthleteSex = athleteSex(input.athlete?.sex);
+  const birthday = input.athlete?.birthday;
+  const ratedStages = new Set<LabourStage>();
+  const ratingLabour = (day: string, value: number): MilestoneLabour | undefined => {
+    let labour: MilestoneLabour | undefined;
+    VO2_RATINGS.forEach((rating, index) => {
+      const stage = (index + 1) as LabourStage;
+      if (ratedStages.has(stage) || value < vo2RatingThreshold(rating, ageOnDay(birthday, day), sex)) return;
+      ratedStages.add(stage);
+      labour = withStage(labour, "apples", stage);
+    });
+    return labour;
+  };
+  const ratingLine = (labour: MilestoneLabour | undefined) =>
+    labour ? `${VO2_RATING_NAMES[VO2_RATINGS[labour.stage - 1]]} for your age` : undefined;
+
   const [firstDay, firstValue] = ordered[0];
   const push = (milestone: Omit<Milestone, "major" | "category" | "kind" | "at">, value: number) => {
     values.set(milestone.id, Math.round(value * 10) / 10);
@@ -1416,31 +1542,22 @@ function vo2Milestones(input: RecordsInput): {
       ...milestone
     });
   };
+  const firstLabour = ratingLabour(firstDay, firstValue);
   push(
     {
       id: "vo2max:first",
       day: firstDay,
       title: `First VO2max reading — ${Math.round(firstValue)}`,
-      labour: { id: "apples", stage: 1 }
+      ...(firstLabour ? { detail: ratingLine(firstLabour), labour: firstLabour } : {})
     },
     firstValue
   );
 
   let highest = Math.floor(firstValue);
-  let plusTwo = false;
-  let plusFive = false;
   let peak = firstValue;
   for (const [day, value] of ordered.slice(1)) {
     peak = Math.max(peak, value);
-    let labour: MilestoneLabour | undefined;
-    if (!plusTwo && value - firstValue >= 2) {
-      plusTwo = true;
-      labour = withStage(labour, "apples", 2);
-    }
-    if (!plusFive && value - firstValue >= 5) {
-      plusFive = true;
-      labour = withStage(labour, "apples", 3);
-    }
+    const labour = ratingLabour(day, value);
     const whole = Math.floor(value);
     if (whole > highest) {
       highest = whole;
@@ -1449,18 +1566,23 @@ function vo2Milestones(input: RecordsInput): {
           id: `vo2max:high:${whole}`,
           day,
           title: `VO2max ${whole} — a new high`,
-          detail: `Up ${(value - firstValue).toFixed(1)} since your first reading in ${formatMonthYear(firstDay)}`,
+          detail: [
+            ratingLine(labour),
+            `Up ${(value - firstValue).toFixed(1)} since your first reading in ${formatMonthYear(firstDay)}`
+          ]
+            .filter(Boolean)
+            .join(" · "),
           ...(labour ? { labour } : {})
         },
         value
       );
     } else if (labour) {
+      const rating = VO2_RATINGS[labour.stage - 1];
       push(
         {
-          id: `vo2max:plus:${labour.stage === 2 ? 2 : 5}`,
+          id: `vo2max:rating:${rating}`,
           day,
-          title: `VO2max ${labour.stage === 2 ? 2 : 5} above your first reading`,
-          detail: `${value.toFixed(1)} against ${firstValue.toFixed(1)}`,
+          title: `VO2max ${value.toFixed(1)} — ${VO2_RATING_NAMES[rating]} for your age`,
           labour
         },
         value
@@ -1468,14 +1590,15 @@ function vo2Milestones(input: RecordsInput): {
     }
   }
 
-  const peakText = `${Math.round(peak * 10) / 10} / ${Math.round((firstValue + 2) * 10) / 10}`;
-  progress.set(labourStageKey("apples", 2), {
-    text: peakText,
-    ratio: ratioOf(peak - firstValue, 2)
-  });
-  progress.set(labourStageKey("apples", 3), {
-    text: `${Math.round(peak * 10) / 10} / ${Math.round((firstValue + 5) * 10) / 10}`,
-    ratio: ratioOf(peak - firstValue, 5)
+  // Counted from a fifth under the bar: VO2max moves a point or two a season,
+  // so the whole scale from zero would read every rating as nearly there.
+  const today = input.today ?? getLocalHappenDayKey();
+  VO2_RATINGS.forEach((rating, index) => {
+    const threshold = vo2RatingThreshold(rating, ageOnDay(birthday, today), sex);
+    progress.set(labourStageKey("apples", (index + 1) as LabourStage), {
+      text: `Best ${Math.round(peak * 10) / 10} / ${threshold}`,
+      ratio: Math.max(0, Math.min(1, (peak / threshold - 0.8) / 0.2))
+    });
   });
   return { milestones, values, progress };
 }
@@ -1527,24 +1650,29 @@ function sleepMilestones(input: RecordsInput): {
       first.day,
       "First night recorded",
       `${Math.floor(first.minutes / 60)} h ${Math.round(first.minutes % 60)} min`,
-      { minutes: Math.round(first.minutes) },
-      { id: "cerberus", stage: 1 }
+      { minutes: Math.round(first.minutes) }
     );
   }
+
+  const good = new Set(nights.filter((night) => night.minutes >= GOOD_NIGHT_MINUTES).map((night) => night.day));
+  const streakTitle = (count: number) => `${count} nights in a row of 7 h+`;
+  const windowTitle = (step: (typeof SLEEP_WINDOWS)[number]) => `${step.good} of ${step.days} nights at 7 h+`;
+  const windowDetail = (step: (typeof SLEEP_WINDOWS)[number], day: string) =>
+    `The ${step.days} nights to ${formatDayShort(day)}`;
 
   let streak = 0;
   let previous: string | undefined;
   for (const night of nights) {
-    const good = night.minutes >= GOOD_NIGHT_MINUTES;
+    const isGood = good.has(night.day);
     const consecutive = previous !== undefined && addDays(previous, 1) === night.day;
-    streak = good ? (consecutive ? streak + 1 : 1) : 0;
+    streak = isGood ? (consecutive ? streak + 1 : 1) : 0;
     previous = night.day;
     for (const step of SLEEP_STREAKS) {
       if (streak !== step.nights) continue;
       push(
         `sleep:streak:${step.nights}`,
         night.day,
-        `${step.nights} nights in a row of 7 h+`,
+        streakTitle(step.nights),
         `Every night since ${formatDayShort(addDays(night.day, -(step.nights - 1)))}`,
         { nights: step.nights },
         step.labour ? { id: "cerberus", stage: step.labour } : undefined
@@ -1552,23 +1680,52 @@ function sleepMilestones(input: RecordsInput): {
     }
   }
 
+  // So many good nights in any run of days, walked a day at a time from the
+  // first night: a day with no night recorded stays in the count as a miss.
+  if (nights.length > 0) {
+    const lastDay = nights[nights.length - 1].day;
+    for (const step of SLEEP_WINDOWS) {
+      let count = 0;
+      for (let day = nights[0].day; day <= lastDay; day = addDays(day, 1)) {
+        if (good.has(day)) count += 1;
+        if (good.has(addDays(day, -step.days))) count -= 1;
+        if (count < step.good) continue;
+        push(
+          `sleep:window:${step.days}`,
+          day,
+          windowTitle(step),
+          windowDetail(step, day),
+          { days: step.days, good: step.good },
+          { id: "cerberus", stage: step.labour }
+        );
+        break;
+      }
+    }
+  }
+
   // A remembered milestone this machine's nights no longer show still stands,
   // at the day it was first reached.
   for (const [id, row] of remembered) {
     if (milestones.some((milestone) => milestone.id === id)) continue;
-    const nightsValue = typeof row.data.nights === "number" ? row.data.nights : undefined;
-    const step = SLEEP_STREAKS.find((entry) => entry.nights === nightsValue);
+    const [, kind, size] = id.split(":");
+    const streakStep = kind === "streak" ? SLEEP_STREAKS.find((entry) => entry.nights === Number(size)) : undefined;
+    const windowStep = kind === "window" ? SLEEP_WINDOWS.find((entry) => entry.days === Number(size)) : undefined;
     if (id === "sleep:first") {
-      push(id, row.day, "First night recorded", "", row.data, { id: "cerberus", stage: 1 });
-    } else if (step) {
+      push(id, row.day, "First night recorded", "", row.data);
+    } else if (streakStep) {
       push(
         id,
         row.day,
-        `${step.nights} nights in a row of 7 h+`,
-        `Every night since ${formatDayShort(addDays(row.day, -(step.nights - 1)))}`,
+        streakTitle(streakStep.nights),
+        `Every night since ${formatDayShort(addDays(row.day, -(streakStep.nights - 1)))}`,
         row.data,
-        step.labour ? { id: "cerberus", stage: step.labour } : undefined
+        streakStep.labour ? { id: "cerberus", stage: streakStep.labour } : undefined
       );
+    } else if (windowStep) {
+      push(id, row.day, windowTitle(windowStep), windowDetail(windowStep, row.day), row.data, {
+        id: "cerberus",
+        stage: windowStep.labour
+      });
     }
   }
   for (const milestone of milestones) {
@@ -1579,27 +1736,28 @@ function sleepMilestones(input: RecordsInput): {
   const today = input.today ?? getLocalHappenDayKey();
   // The run still alive, through last night.
   let alive = 0;
-  const byDay = new Map(nights.map((night) => [night.day, night.minutes]));
-  for (let cursor = today; (byDay.get(cursor) ?? 0) >= GOOD_NIGHT_MINUTES; cursor = addDays(cursor, -1)) {
+  for (let cursor = today; good.has(cursor); cursor = addDays(cursor, -1)) {
     alive += 1;
   }
   if (alive === 0) {
-    for (
-      let cursor = addDays(today, -1);
-      (byDay.get(cursor) ?? 0) >= GOOD_NIGHT_MINUTES;
-      cursor = addDays(cursor, -1)
-    ) {
+    for (let cursor = addDays(today, -1); good.has(cursor); cursor = addDays(cursor, -1)) {
       alive += 1;
     }
   }
-  progress.set(labourStageKey("cerberus", 2), {
+  progress.set(labourStageKey("cerberus", 1), {
     text: `${alive} / 7 nights`,
     ratio: ratioOf(alive, 7)
   });
-  progress.set(labourStageKey("cerberus", 3), {
-    text: `${alive} / 30 nights`,
-    ratio: ratioOf(alive, 30)
-  });
+  for (const step of SLEEP_WINDOWS) {
+    let count = 0;
+    for (let back = 0; back < step.days; back += 1) {
+      if (good.has(addDays(today, -back))) count += 1;
+    }
+    progress.set(labourStageKey("cerberus", step.labour), {
+      text: `${count} / ${step.good} of the last ${step.days} nights`,
+      ratio: ratioOf(count, step.good)
+    });
+  }
   return { milestones, data, progress };
 }
 
@@ -1689,7 +1847,7 @@ function placeMilestones(
   const countries = new Set<string>(homeLabel?.country ? [countryOf(homeLabel)] : []);
   let furthest = 0;
   let pillars = false;
-  let secondCountry = false;
+  let abroad = false;
   for (const { activity, point } of located) {
     const startTime = activity.startTime as number;
     const day = dayOfEpochSeconds(startTime);
@@ -1710,7 +1868,7 @@ function placeMilestones(
           title: `${step.count} different places`,
           detail: label ? `The ${step.count}th: ${label.city}` : undefined,
           sport,
-          major: false,
+          major: step.major ?? false,
           activity: ref,
           ...(step.labour ? { labour: { id: "cattle" as const, stage: step.labour } } : {})
         });
@@ -1720,8 +1878,9 @@ function placeMilestones(
         countries.add(countryOf(label));
       } else if (label?.country && !countries.has(countryOf(label))) {
         countries.add(countryOf(label));
-        const labour = !secondCountry && countries.size >= 2 ? { id: "cattle" as const, stage: 2 as const } : undefined;
-        if (labour) secondCountry = true;
+        // The first country abroad is a card; the ones after it are rows.
+        const firstAbroad = !abroad;
+        abroad = true;
         milestones.push({
           id: `place:country:${label.country.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, "-")}`,
           category: "place",
@@ -1731,9 +1890,8 @@ function placeMilestones(
           title: `A new country: ${label.country}`,
           detail: [label.city, activity.name].filter(Boolean).join(" · "),
           sport,
-          major: Boolean(labour),
-          activity: ref,
-          ...(labour ? { labour } : {})
+          major: firstAbroad,
+          activity: ref
         });
       }
     }
@@ -1750,8 +1908,7 @@ function placeMilestones(
         detail: [label?.city, activity.name].filter(Boolean).join(" · ") || undefined,
         sport,
         major: true,
-        activity: ref,
-        labour: { id: "cattle", stage: 3 }
+        activity: ref
       });
     } else if (away >= 100 && away > furthest * 1.25 && furthest > 0) {
       milestones.push({
@@ -1770,16 +1927,12 @@ function placeMilestones(
     furthest = Math.max(furthest, away);
   }
 
-  progress.set(labourStageKey("cattle", 1), {
-    text: `${visited.size} / 5 places`,
-    ratio: ratioOf(visited.size, 5)
-  });
-  progress.set(labourStageKey("cattle", 2), {
-    text: countries.size > 0 ? `${countries.size} ${countries.size === 1 ? "country" : "countries"} so far` : "Countries named as places resolve"
-  });
-  progress.set(labourStageKey("cattle", 3), {
-    text: `Furthest ${groupThousands(Math.round(furthest))} km`,
-    ratio: ratioOf(furthest, PILLARS_KM)
-  });
+  for (const step of PLACE_COUNTS) {
+    if (!step.labour) continue;
+    progress.set(labourStageKey("cattle", step.labour), {
+      text: `${visited.size} / ${step.count} places`,
+      ratio: ratioOf(visited.size, step.count)
+    });
+  }
   return { milestones, cells: ranked, progress };
 }

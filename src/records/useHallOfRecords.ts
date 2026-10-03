@@ -106,6 +106,7 @@ export function useHallOfRecords({
   connected,
   visible,
   unitSystem,
+  athlete,
   sample = null
 }: {
   api: HeraclesRecordsApi | undefined;
@@ -117,6 +118,12 @@ export function useHallOfRecords({
   /** The hall is the screen on show. */
   visible: boolean;
   unitSystem: UnitSystem;
+  /**
+   * The COROS profile's birthday and sex, which speed and VO2max are graded
+   * for; `undefined` until the profile has answered (or failed to), so the
+   * notifications do not reckon on a default the profile then overturns.
+   */
+  athlete: { birthday?: number; sex?: number } | undefined;
   sample?: RecordsSamplePreset | null;
 }): HallOfRecordsState {
   const [summaries, setSummaries] = useState<ReadonlyMap<string, ActivityDetailSummary>>(
@@ -248,9 +255,10 @@ export function useHallOfRecords({
             sleepNights,
             remembered,
             placeLabels,
+            ...(athlete ? { athlete } : {}),
             unitSystem
           }),
-    [sampleInput, activities, summaries, snapshot, vo2Readings, sleepNights, remembered, placeLabels, unitSystem]
+    [sampleInput, activities, summaries, snapshot, vo2Readings, sleepNights, remembered, placeLabels, athlete, unitSystem]
   );
 
   const labours = useMemo(
@@ -313,6 +321,7 @@ export function useHallOfRecords({
       (summariesLoaded || activityIds.length === 0) &&
       rememberedLoaded &&
       sleepLoaded &&
+      athlete !== undefined &&
       snapshotStatus !== "pending",
     mergeSummaries,
     refreshPlaceLabels
