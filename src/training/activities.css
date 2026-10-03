@@ -406,8 +406,7 @@
   align-items: center;
   gap: 12px;
   width: 100%;
-  /* Room on the right for the actions, which sit outside this button. */
-  padding: 8px 46px 8px 8px;
+  padding: 8px;
   border: 1px solid transparent;
   border-radius: var(--radius-sm);
   background: transparent;
@@ -509,27 +508,6 @@
   border-left: 1px solid var(--ax-edge);
 }
 
-.activity-row-actions {
-  position: absolute;
-  top: 50%;
-  right: 6px;
-  z-index: 1;
-  transform: translateY(-50%);
-  /*
-   * Present for the keyboard and for screen readers, but out of the way of the
-   * eye until the row is wanted: a column of download icons used to be the
-   * loudest thing on the screen and the rarest action on it.
-   */
-  opacity: 0;
-  transition: opacity var(--dur-fast) var(--ease);
-}
-
-.activity-row:hover .activity-row-actions,
-.activity-row:focus-within .activity-row-actions,
-.activity-row.is-selected .activity-row-actions {
-  opacity: 1;
-}
-
 .activity-journal-more {
   display: flex;
   align-items: center;
@@ -623,6 +601,11 @@
   font-size: 12px;
 }
 
+.activity-meta-action + .activity-meta-action,
+.training-export-menu + .activity-meta-action {
+  margin-left: -6px;
+}
+
 .activity-detail-pane-actions {
   display: flex;
   align-items: center;
@@ -630,11 +613,32 @@
   flex: 0 0 auto;
 }
 
-.activity-detail-pane-actions .secondary-button {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  font-size: 12px;
+/* Export and raw JSON: bare icons at the end of the subtitle, sized to its
+   line — the rarest actions in the pane, drawn as such. The negative margin
+   keeps the hit area from making the line taller than its 12px text. */
+.activity-meta-action {
+  display: inline-grid;
+  width: 22px;
+  height: 22px;
+  margin: -4px 0;
+  place-items: center;
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: color var(--dur-fast) var(--ease), background var(--dur-fast) var(--ease);
+}
+
+.activity-meta-action:hover:not(:disabled),
+.activity-meta-action[aria-expanded="true"] {
+  background: var(--glass-bg-hover);
+  color: var(--text-primary);
+}
+
+.activity-meta-action:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: 2px;
 }
 
 /* --- Figures -------------------------------------------------------------- */

@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import {
-  ArrowUpRight,
   Braces,
   CloudOff,
   Loader2,
+  Maximize2,
   MessageCircle,
   RefreshCw,
   X
@@ -13,6 +13,7 @@ import type {
   CoachOpenRequest,
   TrainingHubActivity,
   TrainingHubActivityDetail,
+  TrainingHubActivityFileType,
   TrainingHubSportType
 } from "../../../electron/types";
 import type { HeraclesRecordsApi } from "../../heraclesrecords-api";
@@ -40,6 +41,7 @@ import { useUnitSystem } from "../../units/UnitSystemProvider";
 import { formatTemperatureValue } from "../../units/units";
 import { formatSpeedValue } from "../../units/units";
 import { ActivityElevationChart } from "./ActivityElevationChart";
+import { ActivityExportMenu } from "./ActivityExportMenu";
 import { ActivityRouteMap } from "./ActivityRouteMap";
 import { ActivitySeriesChart } from "./ActivitySeriesChart";
 import { ActivityZoneBar } from "./ActivityZoneBar";
@@ -52,7 +54,14 @@ interface ActivityDetailPaneProps {
   sportTypes: TrainingHubSportType[];
   detailRequest: TrainingHubDetailRequest | null;
   api?: HeraclesRecordsApi | null;
+  /** The app's busy key; an export in flight is read off it. */
+  busy?: string | null;
   onRetry: (activity: TrainingHubActivity) => void;
+  /** Saves this session's file. Offered quietly, beside the other actions. */
+  onExportFile?: (
+    activity: TrainingHubActivity,
+    fileType: TrainingHubActivityFileType
+  ) => void;
   /** Hands a run or a lifting session to the screen built for that sport. */
   onOpenSportScreen?: (request: SportScreenRequest) => void;
   /** Sport screens taken off the rail; their door is not offered. */
@@ -81,7 +90,10 @@ const ELEVATION_PROFILE_MIN_GAIN_M = 30;
 /** Paused time worth reporting, in seconds. Below this it is a traffic light. */
 const PAUSE_NOTICE_S = 60;
 
-/** What the "Open in …" button names, per screen built for a sport. */
+/**
+ * The screen the Open button leads to, per sport. The button itself says only
+ * "Open" — the screen is in its tooltip and its accessible name.
+ */
 const SPORT_SCREEN_LABELS: Record<SportScreen, string> = {
   running: "Running",
   cycling: "Cycling",
@@ -95,7 +107,9 @@ export function ActivityDetailPane({
   sportTypes,
   detailRequest,
   api = null,
+  busy = null,
   onRetry,
+  onExportFile,
   onOpenSportScreen,
   hiddenSportScreens,
   onAskCoach
@@ -427,7 +441,7 @@ export function ActivityDetailPane({
       <header className="activity-detail-pane-head">
         <div className="activity-detail-pane-title">
           <h2>{detail.name ?? listActivity.name ?? "Selected activity"}</h2>
-          <p className="activity-detail-pane-meta">
+          <div className="activity-detail-pane-meta">
             {sportName ? (
               <span className="sport-chip" data-sport={sportColorCategory(sportType)}>
                 {sportName}
@@ -453,7 +467,26 @@ export function ActivityDetailPane({
                   : ""}
               </span>
             ) : null}
-          </p>
+            {onExportFile ? (
+              <ActivityExportMenu
+                activity={listActivity}
+                activityName={detail.name ?? listActivity.name ?? sportName ?? "activity"}
+                busy={busy}
+                onExportFile={onExportFile}
+              />
+            ) : null}
+            {rawAvailable ? (
+              <button
+                type="button"
+                className="activity-meta-action"
+                aria-label="Show raw JSON"
+                title="Show raw JSON"
+                onClick={() => void openRaw()}
+              >
+                <Braces size={13} aria-hidden="true" />
+              </button>
+            ) : null}
+          </div>
         </div>
 
         <div className="activity-detail-pane-actions">
@@ -472,7 +505,9 @@ export function ActivityDetailPane({
           {sportScreen && onOpenSportScreen && activityId !== undefined ? (
             <button
               type="button"
-              className="secondary-button"
+              className="activity-open-screen"
+              aria-label={`Open in ${SPORT_SCREEN_LABELS[sportScreen]}`}
+              title={`Open in ${SPORT_SCREEN_LABELS[sportScreen]}`}
               onClick={() =>
                 onOpenSportScreen({
                   view: sportScreen,
@@ -481,19 +516,8 @@ export function ActivityDetailPane({
                 })
               }
             >
-              Open in {SPORT_SCREEN_LABELS[sportScreen]}
-              <ArrowUpRight size={14} aria-hidden="true" />
-            </button>
-          ) : null}
-          {rawAvailable ? (
-            <button
-              type="button"
-              className="icon-button"
-              aria-label="Show raw JSON"
-              title="Show raw JSON"
-              onClick={() => void openRaw()}
-            >
-              <Braces size={16} aria-hidden="true" />
+              <Maximize2 size={14} aria-hidden="true" />
+              Open
             </button>
           ) : null}
         </div>

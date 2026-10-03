@@ -8765,11 +8765,6 @@ td span {
   --sport-chip-color: var(--sport-other);
 }
 
-.icon-button.training-action-button {
-  width: 34px;
-  height: 34px;
-}
-
 .activity-detail-grid {
   display: flex;
   flex-wrap: wrap;
@@ -18096,8 +18091,10 @@ td span {
 }
 
 /* Ask Coach on a session's own screen (Activities, Running, Strength): the
-   Calendar's ghost button, which is scoped to the calendar's surfaces. */
-.activity-ask-coach {
+   Calendar's ghost button, which is scoped to the calendar's surfaces.
+   Activities' Open wears the same pill beside it. */
+.activity-ask-coach,
+.activity-open-screen {
   display: inline-flex;
   flex: none;
   align-items: center;
@@ -18115,12 +18112,14 @@ td span {
   transition: color var(--dur-fast) var(--ease), background var(--dur-fast) var(--ease);
 }
 
-.activity-ask-coach:hover {
+.activity-ask-coach:hover,
+.activity-open-screen:hover {
   background: var(--glass-bg-hover);
   color: var(--text-primary);
 }
 
-.activity-ask-coach:focus-visible {
+.activity-ask-coach:focus-visible,
+.activity-open-screen:focus-visible {
   outline: var(--focus-ring);
   outline-offset: 2px;
 }

@@ -3,7 +3,6 @@ import { Angry, Frown, Laugh, Meh, Smile } from "lucide-react";
 import type {
   ActivityDetailSummary,
   TrainingHubActivity,
-  TrainingHubActivityFileType,
   TrainingHubSportType
 } from "../../../electron/types";
 import {
@@ -17,7 +16,6 @@ import { sportColorCategory } from "../sportColors";
 import { resolveSportName } from "../sportTypes";
 import { FEEL_LABELS, type ActivityFeelMap } from "../useActivityFeelTypes";
 import { useUnitSystem } from "../../units/UnitSystemProvider";
-import { ActivityExportMenu } from "./ActivityExportMenu";
 
 interface ActivityJournalListProps {
   activities: TrainingHubActivity[];
@@ -35,10 +33,6 @@ interface ActivityJournalListProps {
    */
   summaries: ReadonlyMap<string, ActivityDetailSummary>;
   onLoadDetail: (activity: TrainingHubActivity) => void;
-  onExportFile: (
-    activity: TrainingHubActivity,
-    fileType: TrainingHubActivityFileType
-  ) => void;
 }
 
 /**
@@ -111,9 +105,9 @@ function DateBlock({ startTime }: { startTime?: number }) {
  * the figures its own sport is read by — all of them already on the list
  * payload, none of them costing a request.
  *
- * The row is one button with the actions beside it rather than inside it: a
- * button nested in a button is invalid, and the old table put the export menu
- * inside a `<tr role="button">`.
+ * The row is one button and nothing else. Export used to hang off every row,
+ * a column of download icons for the rarest action on the screen; it lives in
+ * the detail pane's header now, beside the session it exports.
  */
 export function ActivityJournalList({
   activities,
@@ -123,8 +117,7 @@ export function ActivityJournalList({
   nowMs,
   feel,
   summaries,
-  onLoadDetail,
-  onExportFile
+  onLoadDetail
 }: ActivityJournalListProps) {
   const { unitSystem } = useUnitSystem();
   const listRef = useRef<HTMLDivElement>(null);
@@ -253,15 +246,6 @@ export function ActivityJournalList({
                       </span>
                     </span>
                   </button>
-
-                  <div className="activity-row-actions">
-                    <ActivityExportMenu
-                      activity={activity}
-                      activityName={activityName}
-                      busy={busy}
-                      onExportFile={onExportFile}
-                    />
-                  </div>
                 </li>
               );
             })}

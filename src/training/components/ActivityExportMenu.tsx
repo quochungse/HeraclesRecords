@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { ChevronDown, FileDown, Loader2 } from "lucide-react";
+import { FileDown, Loader2 } from "lucide-react";
 import {
   TRAINING_HUB_EXPORT_FORMATS,
   type TrainingHubActivity,
@@ -8,11 +8,11 @@ import {
 } from "../../../electron/types";
 
 /**
- * The per-activity export menu, lifted out of the table it used to live in.
+ * The export menu in an activity's detail pane.
  *
- * It renders one of these per row, so it stays as small as it can be: a
- * closed menu is a button and nothing else, and the listeners below are
- * attached only while one is open.
+ * Deliberately quiet — a bare icon that takes colour only under the pointer —
+ * because saving a file is the rarest thing done here. A closed menu is a
+ * button and nothing else; the listeners below are attached only while open.
  */
 interface ActivityExportMenuProps {
   activity: TrainingHubActivity;
@@ -103,10 +103,10 @@ export function ActivityExportMenu({
     <div className="training-export-menu" ref={containerRef}>
       <button
         ref={buttonRef}
-        className="icon-button training-action-button"
+        className="activity-meta-action"
         type="button"
         aria-label={`Export ${activityName}`}
-        title="Export activity file"
+        title="Export file"
         aria-haspopup="menu"
         aria-expanded={open}
         disabled={isExporting}
@@ -116,12 +116,9 @@ export function ActivityExportMenu({
         }}
       >
         {isExporting ? (
-          <Loader2 className="spin" size={17} aria-hidden="true" />
+          <Loader2 className="spin" size={13} aria-hidden="true" />
         ) : (
-          <>
-            <FileDown size={17} aria-hidden="true" />
-            <ChevronDown size={13} aria-hidden="true" />
-          </>
+          <FileDown size={13} aria-hidden="true" />
         )}
       </button>
 

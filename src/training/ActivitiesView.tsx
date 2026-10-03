@@ -68,7 +68,7 @@ export function ActivitiesView({
    *
    * There is no windowing here and no virtual-list dependency to reach for, so
    * the cap is the thing standing between a six-year history on "All" and
-   * several thousand rows with an export menu each. The period filter is the
+   * several thousand rows built at once. The period filter is the
    * real answer; this is what stops the screen locking up before the athlete
    * reaches for it.
    */
@@ -186,7 +186,6 @@ export function ActivitiesView({
             feel={feel}
             summaries={summaries}
             onLoadDetail={openActivity}
-            onExportFile={onExportFile}
           />
           {hidden > 0 ? (
             <div className="activity-journal-more">
@@ -259,7 +258,9 @@ export function ActivitiesView({
       listActivity={selectedActivity}
       sportTypes={sportTypes}
       detailRequest={detailRequest}
+      busy={busy}
       onRetry={onLoadDetail}
+      onExportFile={onExportFile}
       onOpenSportScreen={onOpenSportScreen}
       hiddenSportScreens={hiddenSportScreens}
       onAskCoach={onAskCoach}
