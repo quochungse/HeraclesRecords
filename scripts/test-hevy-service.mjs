@@ -45,9 +45,23 @@ const workout = (id, title, daysAgo) => ({
 let phase = "connect";
 let activeUser = { id: "user-1", name: "Ada", url: "https://hevy.com/user/ada" };
 const requests = [];
+// A list whose order Hevy does not promise: an old workout among recent ones on
+// page 1, a recent one on page 2, a page that is all old, then one never asked for.
+const interleavedPages = [
+  [workout("c1", "Recent 1", 2), workout("dated-back", "Imported", 500), workout("c2", "Recent 2", 10)],
+  [workout("c3", "Recent 3", 20)],
+  [workout("old2", "Old 2", 600), workout("old3", "Old 3", 700)],
+  [workout("never", "Past the old page", 30)]
+];
+
 globalThis.fetch = async (input, init = {}) => {
   const url = new URL(String(input));
-  requests.push({ url, headers: init.headers });
+  requests.push({ url, headers: init.headers, signal: init.signal });
+  if (phase === "hang") {
+    return new Promise((_, reject) => {
+      init.signal?.addEventListener("abort", () => reject(init.signal.reason));
+    });
+  }
   if (url.pathname.endsWith("/user/info")) {
     if (phase === "bad-auth") {
       return new Response(JSON.stringify({ error: "forbidden" }), {
@@ -88,6 +102,13 @@ globalThis.fetch = async (input, init = {}) => {
   }
   if (url.pathname.endsWith("/workouts")) {
     const page = Number(url.searchParams.get("page"));
+    if (phase === "interleaved") {
+      return Response.json({
+        page,
+        page_count: interleavedPages.length,
+        workouts: interleavedPages[page - 1] ?? []
+      });
+    }
     return Response.json(
       page === 1
         ? {
@@ -133,11 +154,27 @@ assert.ok(
   )
 );
 
+assert.ok(
+  requests.every(({ signal }) => signal instanceof AbortSignal),
+  "every Hevy request is bounded in time"
+);
+
 phase = "events";
+const storedCursor = database.getSetting("hevy.eventCursor");
 const incremental = await hevy.syncHevyStrengthHistory(90, false);
 assert.equal(incremental.fetched, 1);
 assert.equal(incremental.sessions.length, 1);
 assert.equal(incremental.sessions[0].name, "Push Updated");
+const eventsRead = requests.findLast(({ url }) => url.pathname.endsWith("/workouts/events"));
+assert.equal(
+  eventsRead.url.searchParams.get("since"),
+  new Date(Date.parse(storedCursor) - 86_400_000).toISOString(),
+  "events are read from a day before the cursor, so a late upload or a fast clock misses nothing"
+);
+assert.ok(
+  Date.parse(database.getSetting("hevy.eventCursor")) > Date.parse(storedCursor),
+  "the stored cursor itself still moves forward"
+);
 
 const cursorBeforeFailure = database.getSetting("hevy.eventCursor");
 phase = "event-failure";
@@ -159,6 +196,43 @@ const switched = await hevy.connectHevy("second-key");
 assert.equal(switched.userId, "user-2");
 assert.equal(hevy.getStoredHevyStrengthSessions(90).length, 0, "account switching purges workouts");
 assert.equal(database.getSetting("hevy.eventCursor"), undefined);
+
+database.setSetting("hevy.coverageSince", "0");
+database.setSetting("hevy.eventCursor", "not a date");
+requests.length = 0;
+await hevy.syncHevyStrengthHistory(90, false);
+assert.ok(
+  requests.some(({ url }) => url.pathname.endsWith("/workouts")) &&
+    !requests.some(({ url }) => url.pathname.endsWith("/workouts/events")),
+  "a cursor that does not parse reads the whole window again"
+);
+
+phase = "interleaved";
+requests.length = 0;
+const interleaved = await hevy.syncHevyStrengthHistory(90, true);
+assert.deepEqual(
+  interleaved.sessions.map((session) => session.sourceIds.hevy).sort(),
+  ["c1", "c2", "c3"],
+  "an old workout among recent ones does not end the read"
+);
+const workoutPages = requests
+  .filter(({ url }) => url.pathname.endsWith("/workouts"))
+  .map(({ url }) => Number(url.searchParams.get("page")));
+assert.deepEqual(workoutPages, [1, 2, 3], "the read ends at a page that is all older than the window");
+
+phase = "hang";
+hevy.setHevyRequestTimeoutForTests(50);
+// `AbortSignal.timeout` does not hold the event loop open; the app's does.
+const keepAlive = setInterval(() => undefined, 1_000);
+await assert.rejects(
+  () => hevy.syncHevyStrengthHistory(90, true),
+  /Hevy did not answer within/,
+  "a stalled request fails instead of holding the refresh"
+);
+clearInterval(keepAlive);
+hevy.setHevyRequestTimeoutForTests(20_000);
+assert.equal(hevy.getStoredHevyStrengthSessions(90).length, 3, "a timeout keeps the cache");
+phase = "connect";
 
 encryptionAvailable = false;
 await assert.rejects(() => hevy.connectHevy("cannot-save"), /Secure credential storage/);

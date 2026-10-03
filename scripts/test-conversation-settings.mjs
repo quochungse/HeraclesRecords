@@ -76,6 +76,12 @@ assert.equal(reach.allow("get_sleep_summary"), false, "sleep's tool is not offer
 assert.equal(reach.allow("list_recent_activities"), false, "nor the activity list");
 assert.equal(reach.allow("get_training_zones"), true, "zones are shared");
 assert.equal(reach.allow("draft_workout"), true, "and writing is not reading");
+assert.equal(reach.allow("strava__get_activities"), false, "another MCP server goes with anything withheld");
+assert.equal(
+  chat.conversationReach({ ...everything, zones: false }).allow("strava__get_activities"),
+  false,
+  "even a switch its tools have nothing to do with, since nothing says what they read"
+);
 assert.deepEqual(reach.context, { activities: false, zones: true, sleep: false, announce: true });
 
 console.log("conversation settings tests passed");

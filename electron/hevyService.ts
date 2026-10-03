@@ -26,6 +26,20 @@ type JsonRecord = Record<string, unknown>;
 
 const BASE_URL = "https://api.hevyapp.com/v1";
 const INITIAL_HISTORY_DAYS = 365;
+/**
+ * A Hevy request that has not answered by then has failed. Without it a stalled
+ * connection held the whole Strength refresh — COROS and Hevy run one after the
+ * other — for as long as Node's own five-minute timeouts.
+ */
+const DEFAULT_REQUEST_TIMEOUT_MS = 20_000;
+/**
+ * How far back of the stored cursor each events read starts. The cursor is this
+ * machine's clock, and a workout the phone logged offline can reach Hevy with
+ * an `updated_at` from before the last read; either would otherwise be missed
+ * until a forced refresh. Replaying an event is harmless: it is an upsert or a
+ * delete of the same id.
+ */
+const EVENT_CURSOR_OVERLAP_MS = 24 * 60 * 60 * 1000;
 const SETTINGS = {
   apiKey: "hevy.apiKey",
   identity: "hevy.identity",
@@ -42,10 +56,16 @@ interface CredentialStorage {
 }
 
 let credentialStorage: CredentialStorage = safeStorage;
+let requestTimeoutMs = DEFAULT_REQUEST_TIMEOUT_MS;
 
 /** Test seam; production always uses Electron safeStorage. */
 export function setHevyCredentialStorageForTests(storage: CredentialStorage): void {
   credentialStorage = storage;
+}
+
+/** Test seam; production always waits `DEFAULT_REQUEST_TIMEOUT_MS`. */
+export function setHevyRequestTimeoutForTests(milliseconds: number): void {
+  requestTimeoutMs = milliseconds;
 }
 
 interface HevyIdentity {
@@ -132,8 +152,24 @@ async function hevyRequest(
   for (const [key, value] of Object.entries(search ?? {})) {
     url.searchParams.set(key, String(value));
   }
-  const response = await fetch(url, { headers: { "api-key": apiKey } });
-  const payload = await response.json().catch(() => undefined);
+  // One signal covers the body as well as the headers.
+  const signal = AbortSignal.timeout(requestTimeoutMs);
+  let response: Response;
+  let payload: unknown;
+  try {
+    response = await fetch(url, { headers: { "api-key": apiKey }, signal });
+    payload = await response.json().catch((error: unknown) => {
+      if (signal.aborted) throw error;
+      return undefined;
+    });
+  } catch (error) {
+    if (signal.aborted) {
+      throw new Error(
+        `Hevy did not answer within ${Math.round(requestTimeoutMs / 1000)} seconds. Try again later.`
+      );
+    }
+    throw error;
+  }
   if (!response.ok) {
     if (response.status === 401 || response.status === 403) {
       throw new Error("Hevy rejected the API key. Reconnect Hevy with a current Pro API key.");
@@ -257,13 +293,15 @@ async function fullSync(apiKey: string): Promise<number> {
     const workouts = Array.isArray(response.workouts)
       ? response.workouts.map(record).filter((item): item is JsonRecord => Boolean(item))
       : [];
-    let reachedBoundary = false;
+    let dated = 0;
+    let older = 0;
     for (const workout of workouts) {
       const id = hevyWorkoutId(workout);
       const startTime = hevyWorkoutStartTime(workout);
       if (!id || startTime === undefined) continue;
+      dated += 1;
       if (startTime < since) {
-        reachedBoundary = true;
+        older += 1;
         continue;
       }
       retainedIds.add(id);
@@ -271,7 +309,13 @@ async function fullSync(apiKey: string): Promise<number> {
       fetched += 1;
     }
     const pageCount = Math.max(1, numberValue(response.page_count) ?? page);
-    if (reachedBoundary || page >= pageCount || workouts.length === 0) break;
+    // Stop at a page that is all older than the window, never at the first
+    // older workout. Hevy does not document the order of this list, and a
+    // workout dated back (an import, a corrected date) sitting among recent
+    // ones used to end the read there — after which `reconcileHevyWorkoutIds`
+    // deleted every workout in the window that the short read had not reached.
+    const pastWindow = dated > 0 && older === dated;
+    if (pastWindow || page >= pageCount || workouts.length === 0) break;
   }
 
   reconcileHevyWorkoutIds(since, retainedIds);
@@ -279,6 +323,11 @@ async function fullSync(apiKey: string): Promise<number> {
   setSetting(SETTINGS.eventCursor, startedAt);
   setSetting(SETTINGS.lastSyncedAt, new Date().toISOString());
   return fetched;
+}
+
+/** Where an events read starts: the stored cursor, less the overlap. */
+function eventsSince(cursor: string): string {
+  return new Date(Date.parse(cursor) - EVENT_CURSOR_OVERLAP_MS).toISOString();
 }
 
 async function incrementalSync(apiKey: string, cursor: string): Promise<number> {
@@ -291,7 +340,7 @@ async function incrementalSync(apiKey: string, cursor: string): Promise<number> 
     const response = await hevyRequest("/workouts/events", apiKey, {
       page,
       pageSize: 10,
-      since: cursor
+      since: eventsSince(cursor)
     });
     const events = Array.isArray(response.events)
       ? response.events.map(record).filter((item): item is JsonRecord => Boolean(item))
@@ -342,7 +391,11 @@ export async function syncHevyStrengthHistory(
   const coverageSince = Number(getSetting(SETTINGS.coverageSince));
   const cursor = getSetting(SETTINGS.eventCursor);
   const needsFullSync =
-    force || !cursor || !Number.isFinite(coverageSince) || coverageSince > requestedSince;
+    force ||
+    !cursor ||
+    !Number.isFinite(Date.parse(cursor)) ||
+    !Number.isFinite(coverageSince) ||
+    coverageSince > requestedSince;
   const fetched = needsFullSync
     ? await fullSync(apiKey)
     : await incrementalSync(apiKey, cursor);

@@ -42,6 +42,7 @@ import {
   parsePlanDay
 } from "./trainingPlanDomain";
 import { WORKOUT_SPORTS, formatWorkoutSport } from "./workoutCapabilities";
+import { splitToolName } from "./mcpToolNames";
 
 export const TRAINING_PLAN_GENERATION_LIMITS = {
   maxWeeks: 24,
@@ -229,15 +230,27 @@ const REMOTE_TOOL_SOURCES: readonly [RegExp, PlanDataSource][] = [
   [/activit|lap|record|load|fitness|metric|trend|vo2|recovery|workout/i, "activities"]
 ];
 
-/** Whether a tool reads a source the athlete withheld from this plan. */
+/**
+ * Whether a tool reads a source the athlete withheld from this plan.
+ *
+ * **Another MCP server's tool is withheld whenever anything is.** Only COROS's
+ * names are known, so only COROS's can be sorted by what they read; Strava's
+ * activities, heart-rate streams and GPS (or whatever a custom server serves)
+ * used to stay on offer with "activities" switched off, which made the switch a
+ * promise the tool list did not keep. The read-only policy draws the same line
+ * for the same reason (`isToolAllowedUnderPolicy`).
+ */
 export function toolReadsWithheldSource(name: string, sources: TrainingPlanDataSources | undefined): boolean {
   if (!sources) return false;
   const withheld = (source: PlanDataSource) => sources[source] === false;
   const local = LOCAL_TOOL_SOURCES[name];
   if (local) return local.some(withheld);
-  const remote = name.startsWith("coros__") ? name.slice("coros__".length) : undefined;
+  const remote = splitToolName(name);
   if (!remote) return false;
-  return REMOTE_TOOL_SOURCES.some(([pattern, source]) => pattern.test(remote) && withheld(source));
+  if (remote.serverId !== "coros") {
+    return (Object.keys(ALL_TRAINING_PLAN_SOURCES) as PlanDataSource[]).some(withheld);
+  }
+  return REMOTE_TOOL_SOURCES.some(([pattern, source]) => pattern.test(remote.toolName) && withheld(source));
 }
 
 const SOURCE_WITHHELD_LINES: Record<PlanDataSource, string> = {

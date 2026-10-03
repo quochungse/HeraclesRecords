@@ -99,6 +99,18 @@ export const SOURCES: readonly { value: keyof TrainingPlanDataSources; label: st
   { value: "zones", label: "Training zones", detail: "Your COROS thresholds and zones" }
 ];
 
+/**
+ * Said under the switches once one is off: `toolReadsWithheldSource` then
+ * takes every MCP server but COROS out of the turn, and a Strava connection
+ * that vanished with no word would read as broken.
+ */
+export const OTHER_SERVERS_WITHHELD_NOTE =
+  "While anything here is not shared, Coach also leaves out MCP servers other than COROS, such as Strava: what they read is not known.";
+
+export function anySourceWithheld(sources: TrainingPlanDataSources): boolean {
+  return SOURCES.some((source) => sources[source.value] === false);
+}
+
 export const DEFAULT_GENERATOR_FORM: GeneratorForm = {
   goalKind: "race",
   goal: "",

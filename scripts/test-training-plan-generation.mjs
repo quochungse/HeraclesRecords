@@ -460,6 +460,20 @@ await test("a withheld source is behind no tool, local or COROS's own", () => {
   assert.equal(withheld("draft_training_plan", off({ activities: false })), false);
 });
 
+await test("another MCP server's tools go whenever anything is withheld, since what they read is unknown", () => {
+  const off = (patch) => ({ activities: true, sleep: true, zones: true, ...patch });
+  const withheld = (name, sources) => generation.toolReadsWithheldSource(name, sources);
+  // Strava's own names say nothing this app can sort by, so each switch takes them all.
+  for (const source of ["activities", "sleep", "zones"]) {
+    assert.equal(withheld("strava__get_activity_streams", off({ [source]: false })), true, `${source} off withholds Strava`);
+    assert.equal(withheld("freddy__daily_readiness", off({ [source]: false })), true, `${source} off withholds a custom server`);
+  }
+  assert.equal(withheld("strava__get_activity_streams", off({})), false, "everything shared keeps them");
+  assert.equal(withheld("strava__get_activity_streams", undefined), false);
+  // COROS's stay sorted by name: a zones switch leaves its sleep reads alone.
+  assert.equal(withheld("coros__querySleepData", off({ zones: false })), false);
+});
+
 await test("the prompt names only what was shared, and says what was not", () => {
   const prompt = generation.trainingPlanGenerationPrompt({ ...request, sources: { activities: true, sleep: false, zones: false } });
   assert.match(prompt, /Use my Training Coach context — recent training and personal records — and read/);

@@ -69,7 +69,10 @@ export async function syncStrengthHistory(
   return {
     sessions: selectStrengthSessions(source, corosSessions, hevySessions),
     pending: corosPending,
-    fetched: corosFetched + hevyFetched,
+    // COROS's alone, as the type says: the renderer keeps draining `pending`
+    // while this is above zero, and Hevy re-reads a day of events on every
+    // call, so its count would hold that loop open against a COROS refusing.
+    fetched: corosFetched,
     days,
     source,
     pendingBySource: { coros: corosPending, hevy: 0 },

@@ -8,7 +8,11 @@ import type {
   ConversationSettings
 } from "../../electron/types";
 import { GeneratorProviderPanel } from "../training-library/GeneratorProviderPanel";
-import { SOURCES } from "../training-library/planGeneratorModel";
+import {
+  OTHER_SERVERS_WITHHELD_NOTE,
+  SOURCES,
+  anySourceWithheld
+} from "../training-library/planGeneratorModel";
 import {
   requestRuntime,
   runtimeFromSettings,
@@ -181,6 +185,9 @@ function ConversationSettingsSheet({
               );
             })}
           </ul>
+          {anySourceWithheld(conversation.sources) ? (
+            <p className="plan-generator-sheet-note">{OTHER_SERVERS_WITHHELD_NOTE}</p>
+          ) : null}
           <p className="tl-eyebrow">AI</p>
           <div className="coach-conversation-ai">
             <span>

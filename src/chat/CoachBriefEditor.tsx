@@ -6,8 +6,10 @@ import { generationRequestProblems, type TrainingPlanGenerationField } from "../
 import { GeneratorGoalStep } from "../training-library/GeneratorGoalStep";
 import { GeneratorWeekStep } from "../training-library/GeneratorWeekStep";
 import {
+  OTHER_SERVERS_WITHHELD_NOTE,
   SOURCES,
   STEP_FIELDS,
+  anySourceWithheld,
   planSnapshot,
   requestFromForm,
   spanSentence,
@@ -153,6 +155,9 @@ export default function CoachBriefEditor({
                   );
                 })}
               </ul>
+              {anySourceWithheld(sources) ? (
+                <p className="plan-generator-sheet-note">{OTHER_SERVERS_WITHHELD_NOTE}</p>
+              ) : null}
               <p className="tl-eyebrow plan-generator-aside-eyebrow">Plan</p>
               <dl className="plan-generator-snapshot">
                 {planSnapshot(current, request).map((row) => (

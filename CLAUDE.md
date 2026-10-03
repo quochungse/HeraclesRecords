@@ -737,6 +737,10 @@ lives at module level for the same visit-to-visit reason — see `useCalendarDat
   from every tool that reads it (local, and COROS MCP's by what its name says,
   `toolReadsWithheldSource`) and from the snapshot the turn starts from (`buildTrainingContext`'s
   scope); a switch that only edited the prompt would be a lie. "From my data" needs the activities.
+  **Every other MCP server (Strava, a custom one) is withheld whenever any source is**: only
+  COROS's tool names are known, so only COROS's can be sorted by what they read — Strava stayed on
+  offer with activities switched off until 2026-10-03. The source switches say so under the list
+  once one is off (`OTHER_SERVERS_WITHHELD_NOTE`).
   **`npm run dev:simulate-plan-ai` runs both steps without a provider** (`HERACLES_SIMULATE_PLAN_AI=1`,
   `trainingPlanSimulation.ts`): a script in the model's place streams thinking and announced reads,
   then hands its outline and plan to the *real* tools, so the checks, the store and COROS all run as
@@ -2045,7 +2049,18 @@ lives at module level for the same visit-to-visit reason — see `useCalendarDat
   says so only on the toolbar's trigger, as Strength's does. `test:records` holds what each
   is for, the realistic one on any weekday.
 - **Strength** (`strengthHistoryService`, `hevyService`, `strengthSessionMerge`) — COROS
-  strength sessions merged with Hevy imports.
+  strength sessions merged with Hevy imports. **Hevy is its REST API, not MCP**, and no one
+  here has had a real Hevy account: the shapes were checked against Hevy's own OpenAPI
+  (`https://api.hevyapp.com/docs.json`) on 2026-10-03, and `test:hevy-service` fakes them. Three
+  rules it rests on. **The full read stops at a page that is all older than the window**, never
+  at the first older workout — Hevy documents no order for `/v1/workouts`, and a short read
+  hands `reconcileHevyWorkoutIds` a short list, which deletes what it was not handed. **Every
+  request is bounded** (20 s): COROS and Hevy refresh one after the other, so a stalled Hevy
+  held the whole Strength screen. **Events are read from a day before the stored cursor**
+  (`EVENT_CURSOR_OVERLAP_MS`): the cursor is this machine's clock, and a workout uploaded late
+  from the phone could carry an `updated_at` before it. Replays are upserts and deletes of the
+  same id, so they cost nothing — but they are why `StrengthHistory.fetched` counts COROS
+  alone, or the renderer's drain loop would never see COROS refusing.
 - **Sync** (`electron/sync/`) — continuous two-way sync through Google Drive, so two
   machines hold the same user data. **Drive is the only destination**: a local folder was
   offered beside it until 2026-10-01 and was removed because a folder kept by Dropbox,
