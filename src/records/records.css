@@ -526,15 +526,15 @@
   outline-offset: 2px;
 }
 
-/* --- Labour medals and badges -------------------------------------------------- */
+/* --- Labour badges ---------------------------------------------------------------- */
 
 .records-badge {
   flex: 0 0 auto;
   display: inline-flex;
   align-items: center;
-  gap: 8px;
-  height: 28px;
-  padding: 0 10px 0 4px;
+  gap: 6px;
+  height: 32px;
+  padding: 0 12px 0 5px;
   border: 1px solid var(--glass-border);
   border-radius: var(--radius-pill);
   background: var(--glass-bg);
@@ -543,7 +543,8 @@
 .records-badge.is-large {
   height: auto;
   gap: 10px;
-  padding: 5px 14px 5px 5px;
+  padding: 5px 16px 5px 5px;
+  border-radius: var(--radius-md);
 }
 
 .records-badge.is-complete {
@@ -673,7 +674,7 @@
 .records-labour-head {
   display: flex;
   align-items: center;
-  gap: 14px;
+  gap: 16px;
 }
 
 .records-labour-head > div {
@@ -684,9 +685,33 @@
 .records-labour-head h3 {
   margin: 6px 0 0;
   color: var(--text-primary);
-  font-size: 14px;
+  font-size: 18px;
   font-weight: 600;
   line-height: 1.3;
+}
+
+.records-labour-status {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 8px;
+}
+
+.records-labour-pips {
+  display: flex;
+  gap: 3px;
+}
+
+.records-labour-pips span {
+  display: block;
+  width: 14px;
+  height: 4px;
+  border-radius: var(--radius-pill);
+  background: var(--glass-border);
+}
+
+.records-labour-pips span.is-reached {
+  background: var(--accent);
 }
 
 .records-complete {

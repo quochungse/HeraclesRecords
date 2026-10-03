@@ -2,7 +2,7 @@ import { useEffect, useRef } from "react";
 import { X } from "lucide-react";
 import { STAGE_NUMERALS, type LabourState } from "./labours";
 import { formatDayShort } from "./milestones";
-import { LabourGlyph, LabourMedal, LaurelWreath } from "./recordsIcons";
+import { LabourEmblem, LaurelWreath } from "./recordsIcons";
 import type { Announcement } from "./recordsNotices";
 import "./recordsNotices.css";
 
@@ -29,7 +29,7 @@ export function LabourToastCard({
       <button type="button" className="labour-toast-close" aria-label="Dismiss" onClick={onDismiss}>
         <X size={14} aria-hidden="true" />
       </button>
-      <LabourMedal id={labour.definition.id} reached={1} size="chip" />
+      <LabourEmblem id={labour.definition.id} reached={labour.reached} size="toast" />
       <p className="labour-toast-eyebrow">Labour advanced</p>
       <p className="labour-toast-title">
         {labour.definition.name} — {STAGE_NUMERALS[announcement.stage]} of III
@@ -94,18 +94,20 @@ export function LabourCelebration({
           <X size={18} aria-hidden="true" />
         </button>
         <div className="labour-celebration-art" aria-hidden="true">
-          <LaurelWreath size={200} />
-          <span className="labour-celebration-medal">
-            <LabourGlyph id={definition.id} size={42} />
-          </span>
+          <LaurelWreath size={168} />
         </div>
         <p className="labour-celebration-eyebrow">
           Labour complete · {completed} of 12
         </p>
-        <h2 id="labour-celebration-title">{definition.name}</h2>
-        <p id="labour-celebration-myth" className="labour-celebration-myth">
-          {definition.myth}
-        </p>
+        <div className="labour-celebration-labour">
+          <LabourEmblem id={definition.id} reached={3} size="hero" />
+          <div>
+            <h2 id="labour-celebration-title">{definition.name}</h2>
+            <p id="labour-celebration-myth" className="labour-celebration-myth">
+              {definition.myth}
+            </p>
+          </div>
+        </div>
         <ol className="labour-celebration-stages">
           {labour.stages.map((stage) => (
             <li key={stage.stage}>

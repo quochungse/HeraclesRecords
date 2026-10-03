@@ -14,7 +14,7 @@ import {
   type Milestone,
   type WithinReach
 } from "./milestones";
-import { LabourMedal, LaurelWreath } from "./recordsIcons";
+import { LabourEmblem, LaurelWreath } from "./recordsIcons";
 import {
   FILTER_LABELS,
   filtersInUse,
@@ -336,7 +336,7 @@ function WithinReachRow({
           <article key={item.id} className="panel records-reach-card">
             <div className="records-reach-head">
               {item.labour ? (
-                <LabourMedal
+                <LabourEmblem
                   id={item.labour.id}
                   reached={labourOf.get(item.labour.id)?.reached ?? 0}
                   size="chip"
@@ -473,7 +473,7 @@ function LabourBadge({
       className={`records-badge ${large ? "is-large" : ""} ${completing ? "is-complete" : ""}`}
       title={`${labour.definition.name} — ${stageText}`}
     >
-      <LabourMedal id={tag.id} reached={completing ? 3 : Math.min(tag.stage, 2)} size={large ? "chip" : "badge"} />
+      <LabourEmblem id={tag.id} reached={completing ? 3 : Math.min(tag.stage, 2)} size={large ? "tag" : "badge"} />
       {large ? (
         <span className="records-badge-text">
           <strong>{labour.definition.name}</strong>
@@ -638,18 +638,27 @@ function LabourCard({
       aria-labelledby={`labour-${definition.id}`}
     >
       <div className="records-labour-head">
-        <LabourMedal id={definition.id} reached={labour.reached} size="card" />
+        <LabourEmblem id={definition.id} reached={labour.reached} size="card" />
         <div>
           <p className="records-eyebrow">{definition.category}</p>
           <h3 id={`labour-${definition.id}`}>{definition.name}</h3>
+          <div className="records-labour-status">
+            {labour.complete ? (
+              <span className="records-complete">Complete</span>
+            ) : (
+              <>
+                <span className="records-stage-count figure">
+                  {labour.reached > 0 ? STAGE_NUMERALS[labour.reached as 1 | 2] : "0"} / III
+                </span>
+                <span className="records-labour-pips" aria-hidden="true">
+                  {[1, 2, 3].map((index) => (
+                    <span key={index} className={index <= labour.reached ? "is-reached" : ""} />
+                  ))}
+                </span>
+              </>
+            )}
+          </div>
         </div>
-        {labour.complete ? (
-          <span className="records-complete">Complete</span>
-        ) : (
-          <span className="records-stage-count figure">
-            {labour.reached > 0 ? STAGE_NUMERALS[labour.reached as 1 | 2] : "0"} / III
-          </span>
-        )}
       </div>
       <p className="records-myth">{definition.myth}</p>
       <ol className="records-stages">

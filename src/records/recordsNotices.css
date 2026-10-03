@@ -1,39 +1,103 @@
 /*
- * What the Hall of Records shows outside its own screen: the labour medal
+ * What the Hall of Records shows outside its own screen: the labour emblem
  * (also drawn by the hall), the labour toast in the app's stack, the
  * celebration when a labour is complete, and the rail's "new" count. In the
  * main bundle because any screen can raise them; `records.css` is the hall's
  * own and arrives with its chunk.
  */
 
-.records-medal {
+/* --- The emblem ------------------------------------------------------------ */
+
+/*
+ * The artwork's frame, drawn here rather than baked into the picture so it can
+ * follow the size and the state. The plate is the relief's own black in both
+ * themes — the gold was cast for it, and on a light ground its shadows read as
+ * holes — and the rim is a metal gradient on the border box under the plate's
+ * padding box. The golds are the artwork's, not the accent: a rim in the
+ * athlete's blue would sit round a gold figure it does not match.
+ */
+.labour-emblem {
+  --emblem-size: 40px;
+  --emblem-gold-light: #f7d98c;
+  --emblem-gold: #e3b049;
+  --emblem-gold-deep: #8f5f12;
+  --emblem-plate-top: #1d1a14;
+  --emblem-plate: #070706;
   flex: 0 0 auto;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
+  display: inline-grid;
+  place-items: center;
   box-sizing: border-box;
-  border-radius: var(--radius-pill);
-  border: 1.5px dashed var(--glass-border);
-  color: var(--text-muted);
+  width: var(--emblem-size);
+  height: var(--emblem-size);
+  border: 1px solid transparent;
+  border-radius: 24%;
+  background:
+    radial-gradient(circle at 50% 30%, var(--emblem-plate-top), var(--emblem-plate) 72%) padding-box,
+    linear-gradient(var(--glass-border), var(--glass-border)) border-box;
 }
 
-.records-medal.is-badge { width: 20px; height: 20px; border-width: 1px; }
-.records-medal.is-chip { width: 34px; height: 34px; }
-.records-medal.is-card { width: 52px; height: 52px; }
-.records-medal.is-hero { width: 88px; height: 88px; }
-
-.records-medal.is-begun {
-  border-style: solid;
-  border-color: color-mix(in srgb, var(--accent) 45%, transparent);
-  background: var(--accent-soft);
-  color: var(--accent);
+.labour-emblem img {
+  display: block;
+  width: 88%;
+  height: 88%;
+  object-fit: contain;
+  user-select: none;
 }
 
-.records-medal.is-complete {
-  border-style: solid;
-  border-color: var(--accent);
-  background: var(--accent);
-  color: var(--bg-base);
+.labour-emblem.is-card,
+.labour-emblem.is-hero {
+  border-width: 2px;
+}
+
+/*
+ * Four steps of light, one per stage reached. The figure brightens and takes
+ * its colour back (`brightness` and `saturate`, so a dim gold is still gold
+ * rather than brown), and the rim warms with it, until the third stage lights
+ * it whole and sets it glowing.
+ */
+.labour-emblem.is-stage-0 img {
+  filter: grayscale(1) brightness(0.8);
+  opacity: 0.4;
+}
+
+.labour-emblem.is-stage-1 img {
+  filter: saturate(0.55) brightness(0.55);
+}
+
+.labour-emblem.is-stage-2 img {
+  filter: saturate(0.8) brightness(0.8);
+}
+
+.labour-emblem.is-stage-1 {
+  background:
+    radial-gradient(circle at 50% 30%, var(--emblem-plate-top), var(--emblem-plate) 72%) padding-box,
+    linear-gradient(160deg, color-mix(in srgb, var(--emblem-gold) 40%, transparent), color-mix(in srgb, var(--emblem-gold-deep) 30%, transparent)) border-box;
+}
+
+.labour-emblem.is-stage-2 {
+  background:
+    radial-gradient(circle at 50% 30%, var(--emblem-plate-top), var(--emblem-plate) 72%) padding-box,
+    linear-gradient(160deg, color-mix(in srgb, var(--emblem-gold) 75%, transparent), color-mix(in srgb, var(--emblem-gold-deep) 60%, transparent)) border-box;
+}
+
+.labour-emblem.is-stage-3 {
+  --emblem-glow: color-mix(in srgb, var(--emblem-gold) 28%, transparent);
+  background:
+    radial-gradient(circle at 50% 30%, var(--emblem-plate-top), var(--emblem-plate) 72%) padding-box,
+    linear-gradient(160deg, var(--emblem-gold-light), var(--emblem-gold) 45%, var(--emblem-gold-deep)) border-box;
+  box-shadow: 0 0 calc(var(--emblem-size) / 4) var(--emblem-glow);
+}
+
+/* The timeline's inline badge: the figure alone, in the badge's own pill. */
+.labour-emblem.is-badge {
+  border: 0;
+  background: none;
+  box-shadow: none;
+}
+
+.labour-emblem.is-badge img {
+  width: 100%;
+  height: 100%;
 }
 
 /* --- The toast ------------------------------------------------------------ */
@@ -196,33 +260,10 @@
 }
 
 .labour-celebration-art {
-  position: relative;
-  width: 200px;
-  height: 200px;
-  margin: 0 auto;
-  color: var(--accent);
-}
-
-/* The wreath only: the glyph inside the medal is an svg too, and must stay
-   centred in its own box. */
-.labour-celebration-art > svg {
-  position: absolute;
-  inset: 0;
-}
-
-.labour-celebration-medal {
-  position: absolute;
-  left: 60px;
-  top: 50px;
   display: flex;
-  align-items: center;
   justify-content: center;
-  width: 80px;
-  height: 80px;
-  border-radius: var(--radius-pill);
-  background: var(--accent);
-  color: var(--bg-base);
-  box-shadow: 0 0 0 6px var(--accent-soft);
+  margin: 0 auto 4px;
+  color: var(--accent);
 }
 
 .labour-celebration-eyebrow {
@@ -235,8 +276,23 @@
   text-transform: uppercase;
 }
 
+/* The labour itself: its emblem beside its name and its myth, read left to
+   right like a labour card, under the wreath that celebrates it. */
+.labour-celebration-labour {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  margin-top: 18px;
+  text-align: left;
+}
+
+.labour-celebration-labour > div {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
 .labour-celebration h2 {
-  margin: 12px 0 0;
+  margin: 0;
   color: var(--text-primary);
   font-size: 22px;
   font-weight: 600;
@@ -244,8 +300,7 @@
 }
 
 .labour-celebration-myth {
-  max-width: 380px;
-  margin: 10px auto 0;
+  margin: 6px 0 0;
   color: var(--text-secondary);
   font-size: 14px;
   line-height: 1.45;

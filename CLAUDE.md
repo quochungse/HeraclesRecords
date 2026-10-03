@@ -1956,6 +1956,12 @@ lives at module level for the same visit-to-visit reason — see `useCalendarDat
   cycling, Bull = long runs, Mares = records, Hippolyta = plans, Geryon = places, Hesperides =
   VO2max, Cerberus = sleep), three stages each, all twelve being Apotheosis. Under Your journey,
   with a laurel drawn through `createLucideIcon` like `RunnerIcon`.
+  **A labour's emblem is the athlete's gold artwork, not a glyph** (`LabourEmblem`,
+  `src/assets/labours/<LabourId>.webp`: 256px, black ground keyed to transparency, frame
+  removed). The frame is CSS — a plate in the artwork's own black in both themes and a metal
+  rim — so it follows size and state: **four steps of light, one per stage reached** (grey,
+  dim gold, nearly full, full with a glow). Its golds are the artwork's, not `--accent`. The
+  relief is never drawn under 24px, and at 24px (the timeline's inline badge) it goes bare.
   **Worked out, not stored.** `milestones.ts` (`computeRecords`) walks every activity oldest
   first — the list is complete, COROS keeps it for good — and finds the beginning, a first per
   sport, the ladder distances (1% slack for GPS), a longest or biggest climb once there is a
