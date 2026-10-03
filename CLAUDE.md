@@ -2005,6 +2005,16 @@ lives at module level for the same visit-to-visit reason — see `useCalendarDat
   read here) and a sport other than the five families for firsts. Dev sample activities reach
   the hall through the window's door like every other screen, so a run with them on marks
   their milestones seen.
+  **The developer toolbar's Sample menu has four hall presets** (`sampleRecords.ts`, renderer
+  state like Strength's sample, one at a time): **realistic** — one Hà Nội runner's two
+  years, built to be believed rather than to cover cases, for PR screenshots; last
+  Saturday's trail 50K completes the Cretan Bull and is the first 1,500 m climb, so it raises
+  one celebration and one toast — **full history** (every milestone kind, two labours
+  completing at once), **first weeks** and **empty**. A preset stands in for the whole
+  history, is built back from today, is told against a notices record held in memory (the
+  athlete's own is neither read nor written), asks COROS and the geocoder for nothing, and
+  says so only on the toolbar's trigger, as Strength's does. `test:records` holds what each
+  is for, the realistic one on any weekday.
 - **Strength** (`strengthHistoryService`, `hevyService`, `strengthSessionMerge`) — COROS
   strength sessions merged with Hevy imports.
 - **Sync** (`electron/sync/`) — continuous two-way sync through Google Drive, so two
@@ -2396,12 +2406,13 @@ reads as chrome under a panel and as a tint under a sheet hanging over the page.
 shorthand resets it, so the declared size sat there doing nothing and every trigger in the app
 drew at the page's 16px, a size that is not on the scale and two steps above the chips a pill
 trigger stands in a row with.
-**Thirteen controls are exempt**, each named in the test by file *and* by a string from the
+**Fourteen controls are exempt**, each named in the test by file *and* by a string from the
 element, so an exemption covers one control rather than a whole file. They are four kinds and
 none is a row of options: a grid whose arrangement carries meaning (sports, a month of days),
 cards that need a sentence (plan difficulty, analysis starters), a list of
 records (places, exercise facets, muscle layers) and a menu (the base-map
-popup, the start-up view, the developer toolbar's sample switches).
+popup, the start-up view, the developer toolbar's sample switches and the Hall of Records'
+sample presets beside them).
 
 **A feature stylesheet must not restate type for whole element types.** The Training Library
 had `.training-library-view :is(button, input, select, textarea) { font: inherit }` — one class

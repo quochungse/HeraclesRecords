@@ -110,11 +110,14 @@ export function useRecordsNotices({
     const completingIds = new Set(
       reckoning.announce.filter((entry) => entry.completes).map((entry) => entry.labourId)
     );
-    const completed = labours.filter((candidate) => candidate.complete).length;
+    // Counted in turn — "7 of 12", then "8 of 12" — rather than each saying
+    // the total both make together.
+    const completedBefore =
+      labours.filter((candidate) => candidate.complete).length - completingIds.size;
     const celebrated = [...completingIds].flatMap((labourId) => {
       const labour = labourOf.get(labourId);
-      return labour ? [{ labour, completed }] : [];
-    });
+      return labour ? [{ labour }] : [];
+    }).map((entry, index) => ({ ...entry, completed: completedBefore + index + 1 }));
     if (celebrated.length > 0) {
       setCelebrations((current) => [...current, ...celebrated]);
     }

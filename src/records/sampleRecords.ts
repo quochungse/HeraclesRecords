@@ -7,8 +7,14 @@
 // `computeRecords` is not told — so what is on screen is what the rules make of
 // such a history, not a picture of one.
 //
-// Three presets, each built back from today so the dates stay current:
+// Four presets, each built back from today so the dates stay current:
 //
+//  * **Realistic** — one runner's two years in Hà Nội, for screenshots: a
+//    routine with gaps, fitness that comes slowly, real races and trips, and
+//    whatever the rules make of that. It ends on last Saturday's trail 50K,
+//    which completes the Cretan Bull and is the first climb past 1,500 m, so
+//    switching it on raises one celebration and one toast. No swims: the Hydra
+//    is untouched.
 //  * **Full history** — two and a half years of runs, rides, swims, strength
 //    and hikes, a sleep log, VO2max readings, finished plans and trips: every
 //    kind of milestone, folded years and months, every labour begun and seven
@@ -32,13 +38,18 @@ import type {
 } from "../../electron/types";
 import { placeCellKey, type PlaceLabelLookup, type RecordsInput } from "./milestones";
 
-export type RecordsSamplePreset = "full" | "beginner" | "empty";
+export type RecordsSamplePreset = "realistic" | "full" | "beginner" | "empty";
 
 export const RECORDS_SAMPLE_PRESETS: ReadonlyArray<{
   value: RecordsSamplePreset;
   label: string;
   title: string;
 }> = [
+  {
+    value: "realistic",
+    label: "Records · realistic",
+    title: "Hall of Records: one runner's two years, built to be believed — for screenshots. Last Saturday's 50K completes a labour"
+  },
   {
     value: "full",
     label: "Records · full history",
@@ -82,7 +93,10 @@ const PLACES = {
   danang: { lat: 16.05, lon: 108.2, label: { city: "Đà Nẵng", country: "Vietnam", countryCode: "VN" } },
   dalat: { lat: 11.94, lon: 108.44, label: { city: "Đà Lạt", country: "Vietnam", countryCode: "VN" } },
   saigon: { lat: 10.78, lon: 106.7, label: { city: "Hồ Chí Minh City", country: "Vietnam", countryCode: "VN" } },
-  chiangmai: { lat: 18.79, lon: 98.98, label: { city: "Chiang Mai", country: "Thailand", countryCode: "TH" } }
+  chiangmai: { lat: 18.79, lon: 98.98, label: { city: "Chiang Mai", country: "Thailand", countryCode: "TH" } },
+  bangkok: { lat: 13.73, lon: 100.54, label: { city: "Bangkok", country: "Thailand", countryCode: "TH" } },
+  yty: { lat: 22.62, lon: 103.62, label: { city: "Bát Xát", country: "Vietnam", countryCode: "VN" } },
+  mocchauTea: { lat: 20.92, lon: 104.68, label: { city: "Mộc Châu", country: "Vietnam", countryCode: "VN" } }
 } satisfies Record<string, SamplePlace>;
 
 type PlaceId = keyof typeof PLACES;
@@ -438,6 +452,313 @@ const HIKES = new Map<number, { name: string; distance: number; duration: number
   [110, { name: "Fansipan via Trạm Tôn", distance: 22000, duration: 11 * 3600, climb: 2600, place: "sapa" }]
 ]);
 
+// --- Realistic ------------------------------------------------------------------------------
+//
+// One runner's two years and two months, for screenshots: what the other
+// presets are built to cover, this one is built to be believed. Nothing in it
+// is arranged per milestone — a routine week with the gaps a life puts in it,
+// fitness that comes slowly, the races a Hà Nội runner enters, a few trips —
+// and the hall makes of it what it makes. Only the end is chosen: the trail 50K
+// last Saturday completes the Cretan Bull (one celebration) and is the first
+// climb past 1,500 m (one toast). No swims, so one labour is still untouched.
+
+/** Weeks back to the first, so the second anniversary falls in the open months. */
+const LIVED_WEEKS = 113;
+/** Weeks with no session at all: a fever the first autumn, Tết the winter after. */
+const LIVED_BREAKS = new Set([8, 26]);
+
+/** A share of the way from the first week to the fittest, eased: early weeks gain most. */
+function fitnessAt(week: number): number {
+  return Math.min(1, week / 105) ** 0.8;
+}
+
+interface LivedKeySession {
+  week: number;
+  weekday: number;
+  hour?: number;
+  sportType: number;
+  name: string;
+  distance?: number;
+  duration: number;
+  climb?: number;
+  place?: PlaceId;
+  efforts?: BestEffort[];
+}
+
+// The weeks the routine gives way: races, trips, the mountains. Week 111 is
+// last week, whatever day today is.
+const LIVED_KEY_SESSIONS: readonly LivedKeySession[] = [
+  // The first race, three months in.
+  { week: 13, weekday: 6, sportType: 100, name: "Hồ Tây 10K", distance: 10080, duration: 3521, climb: 18, efforts: raceEfforts({ 1000: 328, 5000: 1730, 10000: 3492 }) },
+  { week: 23, weekday: 5, sportType: 100, name: "Tam Cốc easy run", distance: 8100, duration: 3290, climb: 35, place: "ninhbinh", efforts: effortsAt(8100, 400) },
+  { week: 29, weekday: 6, sportType: 100, name: "Sông Hồng dyke long run", distance: 21240, duration: 8720, climb: 40, efforts: effortsAt(21240, 410) },
+  // The first half, at the end of the first plan.
+  { week: 34, weekday: 6, sportType: 100, name: "Ecopark Half Marathon", distance: 21180, duration: 7145, climb: 22, efforts: raceEfforts({ 1000: 326, 5000: 1640, 10000: 3320, 21097.5: 7112 }) },
+  { week: 38, weekday: 6, hour: 5, sportType: 104, name: "Ba Vì to Đền Thượng", distance: 9600, duration: 4.2 * 3600, climb: 720, place: "bavi" },
+  { week: 45, weekday: 5, sportType: 100, name: "5K time trial", distance: 5060, duration: 1540, climb: 8, efforts: raceEfforts({ 1000: 292, 5000: 1525 }) },
+  { week: 49, weekday: 5, hour: 5, sportType: 104, name: "Hàm Lợn at sunrise", distance: 8200, duration: 3 * 3600, climb: 460 },
+  { week: 54, weekday: 5, hour: 5, sportType: 200, name: "Ba Vì loop", distance: 104300, duration: 4.4 * 3600, climb: 850, place: "bavi" },
+  { week: 57, weekday: 5, hour: 6, sportType: 104, name: "Fansipan via Trạm Tôn", distance: 11400, duration: 7.5 * 3600, climb: 1250, place: "sapa" },
+  { week: 60, weekday: 6, sportType: 100, name: "Hồ Gươm 10K", distance: 10050, duration: 3135, climb: 12, efforts: raceEfforts({ 1000: 301, 5000: 1560, 10000: 3110 }) },
+  // The marathon, at the end of a plan kept less well.
+  { week: 66, weekday: 6, hour: 5, sportType: 100, name: "Hà Nội Marathon", distance: 42420, duration: 15150, climb: 45, efforts: raceEfforts({ 1000: 318, 5000: 1735, 10000: 3460, 21097.5: 7420, 42195: 15100 }) },
+  { week: 70, weekday: 3, sportType: 100, name: "Mỹ Khê beach run", distance: 8000, duration: 2950, climb: 10, place: "danang", efforts: effortsAt(8000, 368) },
+  { week: 70, weekday: 5, sportType: 100, name: "Sơn Trà easy run", distance: 11200, duration: 4280, climb: 210, place: "danang", efforts: effortsAt(11200, 382) },
+  { week: 74, weekday: 6, sportType: 100, name: "Mộc Châu tea hills run", distance: 12300, duration: 4720, climb: 260, place: "mocchauTea", efforts: effortsAt(12300, 384) },
+  { week: 76, weekday: 6, hour: 5, sportType: 104, name: "Rùng Rình peak, Tam Đảo", distance: 11000, duration: 5 * 3600, climb: 950, place: "tamdao" },
+  // Tết in Bangkok.
+  { week: 80, weekday: 3, sportType: 100, name: "Lumpini Park run", distance: 7600, duration: 2780, climb: 6, place: "bangkok", efforts: effortsAt(7600, 366) },
+  { week: 80, weekday: 5, sportType: 100, name: "Benjakitti Park run", distance: 10400, duration: 3830, climb: 9, place: "bangkok", efforts: effortsAt(10400, 368) },
+  { week: 84, weekday: 5, hour: 5, sportType: 200, name: "Tam Đảo foothills", distance: 92400, duration: 3.9 * 3600, climb: 980, place: "tamdao" },
+  // The same half a year and a week on: a record that had stood a year.
+  { week: 87, weekday: 6, sportType: 100, name: "Ecopark Half Marathon", distance: 21160, duration: 6452, climb: 22, efforts: raceEfforts({ 1000: 290, 5000: 1492, 10000: 3012, 21097.5: 6428 }) },
+  { week: 90, weekday: 5, sportType: 100, name: "Bãi Cháy seafront run", distance: 9200, duration: 3290, climb: 40, place: "halong", efforts: effortsAt(9200, 358) },
+  { week: 92, weekday: 5, hour: 5, sportType: 200, name: "Ba Vì – Hòa Bình loop", distance: 112600, duration: 4.8 * 3600, climb: 1120, place: "bavi" },
+  // The summer block for the 50K: trail long runs in the hills.
+  { week: 97, weekday: 6, hour: 5, sportType: 102, name: "Hàm Lợn trail", distance: 18200, duration: 2.7 * 3600, climb: 820, efforts: effortsAt(18200, 534) },
+  { week: 98, weekday: 5, hour: 6, sportType: 104, name: "Lảo Thẩn", distance: 14300, duration: 7.2 * 3600, climb: 1150, place: "yty" },
+  { week: 100, weekday: 6, hour: 5, sportType: 102, name: "Ba Vì long run", distance: 26100, duration: 4.4 * 3600, climb: 1240, place: "bavi", efforts: effortsAt(26100, 607) },
+  { week: 103, weekday: 6, hour: 5, sportType: 102, name: "Tam Đảo trail", distance: 24300, duration: 4.5 * 3600, climb: 1320, place: "tamdao", efforts: effortsAt(24300, 667) },
+  { week: 106, weekday: 6, hour: 5, sportType: 102, name: "Ba Vì double", distance: 32400, duration: 5.7 * 3600, climb: 1480, place: "bavi", efforts: effortsAt(32400, 633) },
+  { week: 108, weekday: 6, hour: 5, sportType: 102, name: "Hàm Lợn three loops", distance: 28100, duration: 4.8 * 3600, climb: 1090, efforts: effortsAt(28100, 615) },
+  // Last Saturday.
+  { week: 111, weekday: 5, hour: 4, sportType: 102, name: "Sa Pa 50K", distance: 50620, duration: 31450, climb: 2240, place: "sapa", efforts: effortsAt(50620, 621) }
+];
+
+function livedHistory(today: string): RecordsSampleInput {
+  const history = new SampleHistory(today);
+  const random = seeded(20240805);
+  const todayDate = history.date(0);
+  const mondayBack = (todayDate.getDay() + 6) % 7;
+  const firstMonday = mondayBack + (LIVED_WEEKS - 1) * 7;
+  const at = (week: number, weekday: number) => firstMonday - week * 7 - weekday;
+  const past = (daysAgo: number) => daysAgo >= 1;
+  /** ±share, around 1. */
+  const jitter = (share: number) => 1 + (random() * 2 - 1) * share;
+  // A race takes its day, and the days around it are rest.
+  const keyDays = new Set([
+    ...LIVED_KEY_SESSIONS.map((session) => `${session.week}:${session.weekday}`),
+    "67:1",
+    "111:6"
+  ]);
+  // A trip week is away from the routine: no gym, no Saturday ride, no long run.
+  const tripWeeks = new Set(
+    LIVED_KEY_SESSIONS.filter((session) => session.place === "danang" || session.place === "bangkok").map((session) => session.week)
+  );
+
+  /**
+   * A run at an average pace. Its best efforts are a little quicker than the
+   * average, or what a workout says: the 1K of kilometre repeats is a rep, its
+   * 5K the reps with the jogs between them.
+   */
+  const run = (
+    week: number,
+    weekday: number,
+    name: string,
+    distance: number,
+    secondsPerKm: number,
+    quick: { oneK?: number; fiveK?: number } = {}
+  ) => {
+    const daysAgo = at(week, weekday);
+    if (!past(daysAgo) || keyDays.has(`${week}:${weekday}`)) return;
+    const effortPace = (target: number) =>
+      target <= 1000 ? (quick.oneK ?? secondsPerKm * 0.96)
+      : target <= 5000 ? (quick.fiveK ?? secondsPerKm * 0.985)
+      : secondsPerKm * 0.995;
+    history.add({
+      daysAgo,
+      hour: weekday === 6 ? 5 : 6,
+      sportType: 100,
+      name,
+      distance,
+      duration: (distance / 1000) * secondsPerKm,
+      climb: 12 + random() * 45,
+      place: "hanoi",
+      efforts: EFFORT_DISTANCES.filter((target) => target <= distance).map((target) => ({
+        distance: target,
+        seconds: Math.round((target / 1000) * effortPace(target) * 10) / 10
+      }))
+    });
+  };
+
+  // Every week but this one, which is the race's aftermath and drawn below.
+  for (let week = 0; week < LIVED_WEEKS - 1; week += 1) {
+    if (LIVED_BREAKS.has(week)) continue;
+    const fitness = fitnessAt(week);
+    const easyPace = () => (412 - 52 * fitness) * jitter(0.025);
+    /** A kilometre at the effort of a 1K rep. */
+    const repPace = () => (322 - 38 * fitness) * jitter(0.012);
+    const tempoPace = () => (345 - 35 * fitness) * jitter(0.015);
+    const away = tripWeeks.has(week);
+
+    // Tuesday: easy at first, then a session that hurts.
+    if (week < 16) {
+      if (random() > 0.1) run(week, 1, "Easy run", (5 + random() * 2.5) * 1000, easyPace());
+    } else if (week % 8 === 0) {
+      const rep = repPace();
+      run(week, 1, "Kilometre repeats", 9000 + random() * 1500, rep * 1.2, { oneK: rep, fiveK: rep * 1.15 });
+    } else if (week % 2 === 0) {
+      const tempo = tempoPace();
+      run(week, 1, "Tempo", 9000 + random() * 2000, tempo * 1.08, { oneK: tempo * 0.97, fiveK: tempo });
+    } else {
+      const rep = repPace();
+      run(week, 1, "Intervals 6 × 800 m", 8500 + random() * 1000, rep * 1.25, { oneK: rep * 1.1, fiveK: rep * 1.25 });
+    }
+
+    // Wednesday evening: the gym, once it started.
+    if (week >= 40 && !away && random() > 0.15 && past(at(week, 2))) {
+      history.add({
+        daysAgo: at(week, 2),
+        hour: 18,
+        sportType: 402,
+        name: ["Upper body + core", "Legs + core", "Full body"][week % 3],
+        duration: 3000 + random() * 900
+      });
+    }
+
+    // Thursday: easy, most weeks.
+    if (random() > 0.12) {
+      run(week, 3, random() > 0.5 ? "Hồ Tây easy" : "Easy run", (6 + random() * 3) * 1000, easyPace());
+    }
+
+    // Saturday: a ride every other week once there was a bike, an easy run otherwise.
+    if (week >= 36 && week % 2 === 0 && !away) {
+      const daysAgo = at(week, 5);
+      if (past(daysAgo) && !keyDays.has(`${week}:5`) && (week === 36 || random() > 0.2)) {
+        // The dyke is flat; Sóc Sơn has hills.
+        const dyke = week !== 36 && random() > 0.5;
+        const distance = (38 + random() * 32) * 1000;
+        history.add({
+          daysAgo,
+          hour: 5,
+          sportType: 200,
+          name: week === 36 ? "First ride, Sóc Sơn" : dyke ? "Sông Hồng dyke ride" : "Sóc Sơn loop",
+          distance,
+          duration: distance / (6.6 + random() * 0.8),
+          climb: dyke ? 40 + random() * 60 : 180 + random() * 260
+        });
+      }
+    } else if (week >= 13 && random() > 0.18) {
+      run(week, 5, "Recovery run", (5 + random() * 2) * 1000, easyPace() * 1.04);
+    }
+
+    // Sunday: the long run, growing, with a cutback every fourth week.
+    const base =
+      week < 13 ? 5 + week * 0.35
+      : week < 35 ? 10 + (week - 13) * 0.45
+      : week >= 51 && week <= 62 ? 18 + (week - 51) * 1.25
+      : week > 62 && week < 66 ? 16 - (week - 62) * 2
+      : 15 + random() * 6;
+    const long = (week % 4 === 3 ? base * 0.75 : base) * jitter(0.05);
+    if (!away) {
+      run(week, 6, week >= 51 && week <= 65 ? "Marathon long run" : "Long run", long * 1000, easyPace() + 10);
+    }
+  }
+
+  for (const session of LIVED_KEY_SESSIONS) {
+    const daysAgo = at(session.week, session.weekday);
+    if (!past(daysAgo)) continue;
+    history.add({
+      daysAgo,
+      hour: session.hour ?? 6,
+      sportType: session.sportType,
+      name: session.name,
+      distance: session.distance,
+      duration: session.duration,
+      climb: session.climb,
+      place: session.place ?? "hanoi",
+      efforts: session.efforts
+    });
+  }
+  // This week, after the race: one shake-out so far.
+  if (past(at(112, 1))) {
+    run(112, 1, "Recovery run", 5200, 400);
+  }
+
+  // COROS's own all-time records are the best of what was run, as on a real account.
+  const corosBest = new Map<number, { seconds: number; day: string; activityId: string }>();
+  for (const activity of history.activities) {
+    const day = dayKey(new Date((activity.startTime as number) * 1000));
+    for (const effort of history.summaries.get(activity.activityId)?.bestEfforts ?? []) {
+      const held = corosBest.get(effort.distance);
+      if (!held || effort.seconds < held.seconds) {
+        corosBest.set(effort.distance, { seconds: effort.seconds, day, activityId: activity.activityId });
+      }
+    }
+  }
+  const corosRecord = (type: number, label: string, distance: number) => {
+    const best = corosBest.get(distance);
+    return best ? [{ type, label, duration: Math.round(best.seconds), happenDay: best.day, activityId: best.activityId }] : [];
+  };
+  const personalRecords: TrainingHubPersonalRecordGroup[] = [
+    {
+      type: 4,
+      label: "All",
+      records: [
+        ...corosRecord(7, "1K", 1000),
+        ...corosRecord(5, "5K", 5000),
+        ...corosRecord(4, "10K", 10000),
+        ...corosRecord(2, "Half Marathon", 21097.5),
+        ...corosRecord(13, "Marathon", 42195)
+      ]
+    }
+  ];
+
+  // VO2max: a whole number, as COROS states it, read every few days from the
+  // first week and climbing as the fitness does — one short of +5, which is
+  // within reach.
+  const firstVo2 = 45;
+  // Their own seeds, so what the routine drew this week does not move them.
+  const vo2Random = seeded(45);
+  const vo2Readings: Array<{ day: string; value: number }> = [];
+  for (let daysAgo = at(0, 4); daysAgo >= 1; daysAgo -= 3) {
+    const week = Math.floor((firstMonday - daysAgo) / 7);
+    const value =
+      daysAgo === at(0, 4)
+        ? firstVo2
+        : Math.min(firstVo2 + 4, Math.round(firstVo2 + 4.2 * fitnessAt(week) ** 1.6 + (vo2Random() - 0.5) * 0.8));
+    vo2Readings.push({ day: history.day(daysAgo), value });
+  }
+
+  // Sleep, every night since the watch: around seven hours, more at the
+  // weekend and in the weeks a race is tapered for, and short on a race
+  // morning's early start.
+  const raceMornings = new Set(
+    LIVED_KEY_SESSIONS.filter((session) => /Marathon|10K|50K/.test(session.name)).map((session) =>
+      history.day(at(session.week, session.weekday))
+    )
+  );
+  const tapers = new Set([63, 64, 65, 66, 109, 110, 111, 112]);
+  const sleepRandom = seeded(420);
+  const sleepNights: Array<{ day: string; minutes: number }> = [];
+  // The first night is the one after the first run.
+  for (let daysAgo = at(0, 2); daysAgo >= 1; daysAgo -= 1) {
+    const day = history.day(daysAgo);
+    const weekday = history.date(daysAgo).getDay();
+    const week = Math.floor((firstMonday - daysAgo) / 7);
+    const minutes = raceMornings.has(day)
+      ? 290 + sleepRandom() * 40
+      : 428 + (weekday === 0 || weekday === 6 ? 22 : 0) + (tapers.has(week) ? 28 : 0) + (sleepRandom() + sleepRandom() + sleepRandom() - 1.5) * 52;
+    sleepNights.push({ day, minutes: Math.round(minutes) });
+  }
+
+  const planDay = (week: number, weekday: number) => history.day(at(week, weekday));
+  const remembered: RememberedMilestone[] = [
+    { id: "plan:sample-lived-half", kind: "plan", day: planDay(34, 6), data: { name: "Half marathon plan", weeks: 10, ratio: 0.88, done: 35, settled: 40 } },
+    { id: "plan:sample-lived-marathon", kind: "plan", day: planDay(66, 6), data: { name: "Marathon plan", weeks: 16, ratio: 0.84, done: 54, settled: 64 } }
+  ];
+
+  return {
+    activities: history.activities,
+    summaries: history.summaries,
+    personalRecords,
+    vo2Readings,
+    sleepNights,
+    remembered,
+    placeLabels: history.placeLabels
+  };
+}
+
 // --- First weeks ------------------------------------------------------------------------
 
 function firstWeeks(today: string): RecordsSampleInput {
@@ -487,6 +808,7 @@ function firstWeeks(today: string): RecordsSampleInput {
 
 /** The history a preset stands for, built back from `today` (`YYYYMMDD`). */
 export function sampleRecordsInput(preset: RecordsSamplePreset, today: string): RecordsSampleInput {
+  if (preset === "realistic") return livedHistory(today);
   if (preset === "full") return fullHistory(today);
   if (preset === "beginner") return firstWeeks(today);
   return { activities: [], summaries: new Map(), personalRecords: [], vo2Readings: [], sleepNights: [], remembered: [], placeLabels: {} };

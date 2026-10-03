@@ -112,6 +112,11 @@ const EXEMPT = [
     why: "The developer toolbar's sample switches: a menu of independent checkboxes, with the menu roles and a popup of its own."
   },
   {
+    file: "src/components/SampleDataControls.tsx",
+    marker: "menuitemradio",
+    why: "The Hall of Records' sample presets, in the same menu: one at a time, so radio items rather than checkboxes, under the menu's roles and popup."
+  },
+  {
     file: "src/training-library/MonthDayPicker.tsx",
     marker: "tl-daypick-day",
     why: "A month of days: the grid's arrangement is the control — a day is found by the week it sits in, which a row of chips cannot say."

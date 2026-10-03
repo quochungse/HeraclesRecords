@@ -28,10 +28,11 @@ import type {
 } from "../../electron/types";
 import {
   distanceUnit,
+  elevationUnit,
   formatDistanceValue,
-  formatElevationValue,
   formatPaceValue,
-  metersToDisplayDistance
+  metersToDisplayDistance,
+  metersToElevation
 } from "../../electron/unitSystem";
 import { isRideSportType } from "../cycling/rideType";
 import { isHikeSportType } from "../hiking/hikeType";
@@ -467,6 +468,16 @@ function groupThousands(value: number): string {
   return Math.round(value).toLocaleString("en-US");
 }
 
+/**
+ * A height in the athlete's units, its thousands grouped the way the labours'
+ * own stages write them: "1,500 m climbed" on a card under a badge reading
+ * "1,500 m climbed in one activity", not "1500 m".
+ */
+function formatHeight(meters: number | undefined, unitSystem: UnitSystem, empty = "-"): string {
+  if (!Number.isFinite(meters) || !meters) return empty;
+  return `${groupThousands(metersToElevation(meters as number, unitSystem))} ${elevationUnit(unitSystem)}`;
+}
+
 function activityLine(activity: TrainingHubActivity, unitSystem: UnitSystem): string {
   const sport = recordsSportOf(activity.sportType);
   const parts: string[] = [];
@@ -497,7 +508,7 @@ function activityFigures(activity: TrainingHubActivity, unitSystem: UnitSystem):
     figures.push({ value, unit: unit ?? "", label: "Pace" });
   } else if (activity.elevationGain && activity.elevationGain > 0) {
     figures.push({
-      ...splitValue(formatElevationValue(activity.elevationGain, unitSystem)),
+      ...splitValue(formatHeight(activity.elevationGain, unitSystem)),
       label: "Climbed"
     });
   }
@@ -724,14 +735,14 @@ export function computeRecords(input: RecordsInput): RecordsResult {
         day,
         at: startTime + 4,
         kind: `First · ${SPORT_NOUN[sport]}`,
-        title: `${formatElevationValue(step.meters, unitSystem)} climbed in one activity`,
-        detail: [activity.name, `${formatElevationValue(climb, unitSystem)} climbed`].filter(Boolean).join(" · "),
+        title: `${formatHeight(step.meters, unitSystem)} climbed in one activity`,
+        detail: [activity.name, `${formatHeight(climb, unitSystem)} climbed`].filter(Boolean).join(" · "),
         figures: [
-          { ...splitValue(formatElevationValue(climb, unitSystem)), label: "Climbed" },
+          { ...splitValue(formatHeight(climb, unitSystem)), label: "Climbed" },
           ...activityFigures(activity, unitSystem).filter((figure) => figure.label !== "Climbed")
         ],
         ...(longestClimb > 0
-          ? { context: `${formatElevationValue(climb - longestClimb, unitSystem)} more than your previous biggest climb.` }
+          ? { context: `${formatHeight(climb - longestClimb, unitSystem)} more than your previous biggest climb.` }
           : {}),
         sport,
         major: step.major,
@@ -754,7 +765,7 @@ export function computeRecords(input: RecordsInput): RecordsResult {
         at: startTime + 4,
         kind: `Biggest climb · ${SPORT_NOUN[sport]}`,
         title: activity.name ? `Biggest climb yet: ${activity.name}` : "Biggest climb yet",
-        detail: `${formatElevationValue(climb, unitSystem)} · ${formatElevationValue(climb - longestClimb, unitSystem)} more than before`,
+        detail: `${formatHeight(climb, unitSystem)} · ${formatHeight(climb - longestClimb, unitSystem)} more than before`,
         sport,
         activity: ref
       });
@@ -775,7 +786,7 @@ export function computeRecords(input: RecordsInput): RecordsResult {
         at: startTime + 5,
         kind: "Mountains",
         title: "An Everest climbed in a month",
-        detail: `${formatElevationValue(monthAfter, unitSystem)} in ${formatMonthYear(day)}`,
+        detail: `${formatHeight(monthAfter, unitSystem)} in ${formatMonthYear(day)}`,
         sport,
         major: true,
         activity: ref,
@@ -854,7 +865,7 @@ export function computeRecords(input: RecordsInput): RecordsResult {
         at: startTime + 8,
         kind: "Lifetime · Climbing",
         title: count === 1 ? "An Everest climbed, all told" : `${count} Everests climbed, all told`,
-        detail: `${formatElevationValue(climbMeters, unitSystem)} gained since you started`,
+        detail: `${formatHeight(climbMeters, unitSystem)} gained since you started`,
         major: count >= 10,
         activity: ref
       });
@@ -1041,10 +1052,10 @@ export function computeRecords(input: RecordsInput): RecordsResult {
       ratio: ratioOf(currentStreak, target)
     });
   }
-  open("boar", 1, { text: `Best ${formatElevationValue(longestClimb, unitSystem, "0 m")}`, ratio: ratioOf(longestClimb, 500) });
-  open("boar", 2, { text: `Best ${formatElevationValue(longestClimb, unitSystem, "0 m")}`, ratio: ratioOf(longestClimb, 1500) });
+  open("boar", 1, { text: `Best ${formatHeight(longestClimb, unitSystem, "0 m")}`, ratio: ratioOf(longestClimb, 500) });
+  open("boar", 2, { text: `Best ${formatHeight(longestClimb, unitSystem, "0 m")}`, ratio: ratioOf(longestClimb, 1500) });
   open("boar", 3, {
-    text: `Best month ${formatElevationValue(bestClimbMonth, unitSystem, "0 m")}`,
+    text: `Best month ${formatHeight(bestClimbMonth, unitSystem, "0 m")}`,
     ratio: ratioOf(bestClimbMonth, EVEREST_METERS)
   });
   const hours = totalSeconds / 3600;

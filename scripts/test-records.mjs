@@ -706,6 +706,56 @@ for (const today of ["20261002", "20261001", "20261004", "20260301", "20270115"]
   assert.ok(full.withinReach.length >= 2, "something within reach");
 }
 
+// The realistic preset is for screenshots, so what is held is that it reads as
+// one athlete's history rather than a catalogue: whichever day it is switched
+// on, last Saturday's 50K completes one labour (one celebration) and reaches
+// one other stage (one toast); some labours are complete, most are under way,
+// one is untouched; nothing is dated before the beginning; the year's open
+// months are not empty; and what is drawn does not depend on the weekday.
+let realisticShape;
+for (const today of ["20261003", "20261005", "20261008", "20261011", "20270115"]) {
+  const input = samples.sampleRecordsInput("realistic", today);
+  const lived = computeRecords({ ...input, unitSystem: "metric", today });
+  const livedLabours = buildLabours(lived.milestones, lived.progress);
+  assert.ok(input.activities.every((entry) => samples.isSampleRecordsActivity(entry.activityId)));
+  const start = lived.milestones.find((milestone) => milestone.id === "start");
+  assert.ok(start, `${today}: the realistic history has a beginning`);
+  assert.ok(
+    lived.milestones.every((milestone) => milestone.day >= start.day),
+    `${today}: nothing before the beginning`
+  );
+  const complete = livedLabours.filter((state) => state.complete).map((state) => state.definition.id);
+  const untouched = livedLabours.filter((state) => state.reached === 0).map((state) => state.definition.id);
+  assert.deepEqual(complete.sort(), ["bull", "hind", "mares"], `${today}: three labours complete`);
+  assert.deepEqual(untouched, ["hydra"], `${today}: no swims, so the Hydra alone is untouched`);
+  const told = notices.reckonNotices({ v: 1, seen: [], announced: [] }, lived.milestones, livedLabours, today);
+  assert.deepEqual(
+    told.announce.map((entry) => `${entry.key}${entry.completes ? " completes" : ""}`).sort(),
+    ["boar:2", "bull:3 completes"],
+    `${today}: the 50K is one celebration and one toast`
+  );
+  assert.ok(lived.withinReach.length === 3, `${today}: Within reach is full`);
+  const open = timeline
+    .foldTimeline(timeline.groupTimeline(lived.milestones), new Set())
+    .flatMap(({ blocks }) => blocks)
+    .filter((block) => block.kind === "month")
+    .slice(0, timeline.OPEN_MONTHS);
+  assert.ok(
+    open.every((block) => block.month.milestones.length >= 1) &&
+      open.reduce((total, block) => total + block.month.milestones.length, 0) >= 7,
+    `${today}: the open months carry the screenshot`
+  );
+  const shape = {
+    milestones: lived.milestones.length,
+    stages: livedLabours.reduce((total, state) => total + state.reached, 0),
+    kinds: [...new Set(lived.milestones.map((milestone) => milestone.id.split(":")[0]))].sort()
+  };
+  realisticShape ??= shape;
+  if (!today.startsWith("2027")) {
+    assert.deepEqual(shape, realisticShape, `${today}: the same history whatever the weekday`);
+  }
+}
+
 const firstWeeksToday = "20261002";
 const firstWeeks = computeRecords({ ...samples.sampleRecordsInput("beginner", firstWeeksToday), unitSystem: "metric", today: firstWeeksToday });
 const firstLabours = buildLabours(firstWeeks.milestones, firstWeeks.progress);

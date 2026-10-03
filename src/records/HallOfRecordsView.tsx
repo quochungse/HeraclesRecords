@@ -194,12 +194,9 @@ export function HallOfRecordsView({
         />
       </header>
 
-      {records.sample ? (
-        <p className="records-backfill" role="status">
-          A sample history from the developer toolbar — not yours, and nothing in it is kept.
-        </p>
-      ) : null}
-
+      {/* A sample says so on the toolbar's trigger ("Sample · 1"), as the
+          Strength screen's does, and not here: the realistic preset is for
+          screenshots of the hall as an athlete sees it. */}
       {backfill.remaining !== undefined && backfill.remaining > 0 ? (
         <p className="records-backfill" role="status">
           {backfill.paused
