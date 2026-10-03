@@ -1,213 +1,203 @@
 <p align="center">
-  <img src="build/icon.png" alt="Heracles Records" width="96" />
+  <img src="build/icon.png" alt="Heracles Records" width="112" />
 </p>
 
 <h1 align="center">Heracles Records</h1>
 
 <p align="center">
-  <em>Your training log and your AI coach, on your own machine.</em>
+  <strong>Training records, analytics &amp; AI - alongside your COROS data.</strong><br />
+  <em>Every session a record. Every record a labour.</em>
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/platform-macOS%20%7C%20Windows%20%7C%20Linux-c8952f?style=flat-square" alt="Platform" />
-  <img src="https://img.shields.io/badge/Electron-42-47848F?style=flat-square&logo=electron&logoColor=white" alt="Electron" />
-  <img src="https://img.shields.io/badge/React-19-61DAFB?style=flat-square&logo=react&logoColor=black" alt="React" />
-  <img src="https://img.shields.io/badge/data-local--first-6e6e73?style=flat-square" alt="Local-first" />
+  An unofficial desktop app for COROS athletes: every session read in depth,<br />
+  an AI coach that has read all of it, and a hall for every record you set along the way.
 </p>
 
 <p align="center">
-  <img src="docs/screenshots/overview.png" alt="Overview dashboard" width="900" />
+  <a href="https://github.com/quochungse/HeraclesRecords/releases/latest"><img src="https://img.shields.io/github/v/release/quochungse/HeraclesRecords?style=flat-square&label=release&color=c8952f" alt="Latest release" /></a>
+  <a href="https://github.com/quochungse/HeraclesRecords/releases"><img src="https://img.shields.io/github/downloads/quochungse/HeraclesRecords/total?style=flat-square&color=c8952f" alt="Downloads" /></a>
+  <img src="https://img.shields.io/badge/macOS%20%7C%20Windows%20%7C%20Linux-desktop-555?style=flat-square" alt="macOS, Windows and Linux" />
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-555?style=flat-square" alt="MIT license" /></a>
 </p>
-
----
-
-## What it is
-
-A desktop app that keeps one honest record of your training — every session, every plan,
-every night of sleep — and puts a coach next to it that has actually read all of it.
-
-Everything lives in a SQLite file on your machine. The only thing that leaves is what you
-send to your chosen AI provider, and what a COROS sign-in needs.
-
-> Unofficial. Not affiliated with or endorsed by COROS.
-
----
-
-## Features
-
-### Coach — an AI that has read your whole log
-
-Chat with Claude, an OpenRouter model, or a local model. The coach reads your activities,
-analytics, plans and calendar through built-in tools, so "why did that long run fall apart?"
-gets an answer from your data instead of a guess.
-
-- **Four providers** — Claude subscription, Anthropic API, OpenRouter, or a local model
-- **A built-in COROS toolset** — activities, analytics, workouts, calendar — plus any MCP server you add
-- **Automations** — scheduled, headless coach runs that leave drafts as approval cards;
-  auto runs are read-only by design
-- **Effort and model switches** per conversation, with pinned and searchable history
 
 <p align="center">
-  <img src="docs/screenshots/coach.png" alt="Training Coach" width="900" />
+  <a href="https://github.com/quochungse/HeraclesRecords/releases/download/v1.0.0/HeraclesRecords-1.0.0-arm64.dmg"><img src="https://img.shields.io/badge/macOS-Apple%20Silicon-1f2328?style=for-the-badge&logo=apple&logoColor=white" alt="Download for macOS, Apple Silicon" /></a>
+  <a href="https://github.com/quochungse/HeraclesRecords/releases/download/v1.0.0/HeraclesRecords-1.0.0-x64.dmg"><img src="https://img.shields.io/badge/macOS-Intel-1f2328?style=for-the-badge&logo=apple&logoColor=white" alt="Download for macOS, Intel" /></a>
+  <a href="https://github.com/quochungse/HeraclesRecords/releases/download/v1.0.0/HeraclesRecords-Setup-1.0.0.exe"><img src="https://img.shields.io/badge/Windows-10%20%2F%2011-1f2328?style=for-the-badge&logo=data%3Aimage%2Fsvg%2Bxml%3Bbase64%2CPHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCI%2BPHBhdGggZmlsbD0iI2ZmZiIgZD0iTTMgNS42bDcuNi0xLjF2N0gzek0xMS42IDQuNEwyMSAzdjguNWgtOS40ek0zIDEyLjVoNy42djdMMyAxOC40ek0xMS42IDEyLjVIMjFWMjFsLTkuNC0xLjN6Ii8%2BPC9zdmc%2B" alt="Download for Windows" /></a>
+  <a href="https://github.com/quochungse/HeraclesRecords/releases/download/v1.0.0/HeraclesRecords-1.0.0.AppImage"><img src="https://img.shields.io/badge/Linux-AppImage-1f2328?style=for-the-badge&logo=linux&logoColor=white" alt="Download for Linux" /></a>
 </p>
 
-### Overview — where you stand today
+> [!NOTE]
+> Heracles Records is an independent project. It is **not made, endorsed or supported by COROS**. It reads your training through your own COROS account, so it works with any COROS watch that syncs there: PACE, APEX, VERTIX, NOMAD and the rest.
 
-Recovery, load, resting HR, sleep and VO₂ max on one screen, with a greeting that reads the
-numbers before you do.
+## Download
 
-### Calendar — plan against what happened
+| Platform | Installer | Size |
+| --- | --- | --- |
+| **macOS** · Apple Silicon (M1 and later) | [HeraclesRecords-1.0.0-arm64.dmg](https://github.com/quochungse/HeraclesRecords/releases/download/v1.0.0/HeraclesRecords-1.0.0-arm64.dmg) | 176 MB |
+| **macOS** · Intel | [HeraclesRecords-1.0.0-x64.dmg](https://github.com/quochungse/HeraclesRecords/releases/download/v1.0.0/HeraclesRecords-1.0.0-x64.dmg) | 180 MB |
+| **Windows** 10 / 11 · 64-bit | [HeraclesRecords-Setup-1.0.0.exe](https://github.com/quochungse/HeraclesRecords/releases/download/v1.0.0/HeraclesRecords-Setup-1.0.0.exe) | 158 MB |
+| **Linux** · x86-64 | [HeraclesRecords-1.0.0.AppImage](https://github.com/quochungse/HeraclesRecords/releases/download/v1.0.0/HeraclesRecords-1.0.0.AppImage) | 184 MB |
 
-Planned workouts and completed activities side by side, with weekly base fitness, load ratio
-and target range. Drag to reschedule; ask the coach about any week without leaving the grid.
+Version 1.0.0 · [What's new](https://github.com/quochungse/HeraclesRecords/releases/tag/v1.0.0) · [All releases](https://github.com/quochungse/HeraclesRecords/releases). The app tells you when a new version is out.
 
-<p align="center">
-  <img src="docs/screenshots/calendar.png" alt="Training calendar" width="900" />
-</p>
+<details>
+<summary><strong>First launch</strong></summary>
 
-### Activities — every session in detail
+- **macOS**: this build is not notarized yet. If macOS says it cannot check the app, open **System Settings → Privacy &amp; Security** and click **Open Anyway**. If it says the app is damaged, run `xattr -dr com.apple.quarantine "/Applications/Heracles Records.app"` in Terminal, then open it again.
+- **Windows**: SmartScreen may warn about an unrecognised app. Click **More info → Run anyway**.
+- **Linux**: make the file executable (`chmod +x HeraclesRecords-1.0.0.AppImage`) and run it.
 
-Route, elevation, laps, HR and training load per activity, over your full history — with the
-raw record one click away.
+You sign in with your COROS account. Coach also needs an AI: your ChatGPT account, a Claude subscription, a Claude or OpenRouter API key, or a model running on your own computer.
 
-<p align="center">
-  <img src="docs/screenshots/activities.png" alt="Activity detail" width="900" />
-</p>
+</details>
 
-### Strength — what you actually trained
+## What's inside
 
-COROS strength sessions merged with Hevy imports, mapped onto a 3D model so a neglected
-muscle group is impossible to miss.
+### Today at a glance
 
-<p align="center">
-  <img src="docs/screenshots/strength.png" alt="Strength analytics" width="900" />
-</p>
+Recovery, the week's load, last night's sleep and the next session on your plan. The screen to open in the morning.
 
-### Training Library — workouts, plans, adherence
+<img src="docs/readme/01-overview.webp" alt="Overview: recovery, the week's training, last night's sleep and what is planned next" />
 
-Build workouts and plans, schedule them to your COROS calendar, and see how closely each
-completed session matched what was planned.
+### Sleep
 
-<p align="center">
-  <img src="docs/screenshots/training-library.png" alt="Training Library" width="900" />
-</p>
+Nights and naps, stages, HRV and stress across the night, kept long after the nine weeks COROS holds.
 
-### Personal
+<img src="docs/readme/08-sleep.webp" alt="Sleep: stages, HRV and stress across the night" />
 
-The identity, body metrics and training thresholds your COROS account holds — max HR, LTHR,
-threshold pace, FTP — and the zones derived from them.
+### Every session, read in depth
 
-### Sync and backup
+**Activities.** Every session COROS holds, across every sport, in one list. Pick one to see its heart-rate zones, running dynamics, power and every channel the watch recorded.
 
-Two machines, one COROS account, the same data. Sync runs continuously to a local folder or
-Google Drive; backup is a single file you save where you like and restore when you want it.
+<img src="docs/readme/02-activities.webp" alt="Activities: every session in one list with a detail pane" />
 
-**No credential ever leaves the machine, on either path.**
+**A page for every run, ride and hike.** A run shows pace, grade-adjusted pace, form and decoupling on a map of the route.
 
----
+<img src="docs/readme/04-run.webp" alt="A run: map, pace, heart rate, running form and every channel" />
 
-## Install
+<table>
+  <tr>
+    <td width="50%" valign="top">
+      <img src="docs/readme/03-running.webp" alt="Running: weekly volume, load ratio, VO2max and threshold" />
+      <p><strong>Running</strong>: weekly volume, load ratio, VO₂max and threshold pace. Switch to Trail and the screen reads climb instead of pace.</p>
+    </td>
+    <td width="50%" valign="top">
+      <img src="docs/readme/05-ride.webp" alt="A ride: normalised power, intensity, TSS and peak power" />
+      <p><strong>Rides</strong>: normalised power, IF and TSS against your FTP, peak power from 5 seconds to an hour, power zones and the climbs.</p>
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" valign="top">
+      <img src="docs/readme/06-hike.webp" alt="A hike: moving time, ascent, terrain and climbing rate" />
+      <p><strong>Hikes</strong>: the moving time inside a long day, your rests, the terrain you covered and your climbing rate.</p>
+    </td>
+    <td width="50%" valign="top">
+      <img src="docs/readme/07-strength.webp" alt="Strength: sessions and a 3D muscle map" />
+      <p><strong>Strength</strong>: COROS strength sessions and Hevy workouts in one place, on a 3D map of the muscles you trained.</p>
+    </td>
+  </tr>
+</table>
 
-Grab an installer from [Releases](https://github.com/quochungse/HeraclesRecords/releases):
+**Every route, replayed.** Open the map full size and colour the line by pace, heart rate or elevation, then watch the route draw itself the way you covered it.
 
-| Platform | File |
-|---|---|
-| macOS (Apple Silicon) | `HeraclesRecords-*-arm64.dmg` |
-| macOS (Intel) | `HeraclesRecords-*-x64.dmg` |
-| Windows | `HeraclesRecords-Setup-*.exe` |
-| Linux (x64) | `HeraclesRecords-*.AppImage` |
+<img src="docs/readme/16-route.webp" alt="A hike around Hàm Lợn replayed on a satellite map, coloured by elevation" />
 
-Packaged builds check for updates on launch and install them in place.
+### Plan your training
 
-**macOS**, if Gatekeeper blocks an unsigned local build:
+**Calendar**: planned and done side by side, by week or month, with a plan's compliance on every session. Drag a session to another day and it moves on your COROS calendar too.
+
+<img src="docs/readme/09-calendar.webp" alt="Calendar: planned and completed sessions by month" />
+
+**Training Library**: your COROS workouts and plans. Read them, build new ones, edit, duplicate and put a plan on the calendar. Everything saves straight to your COROS account, so your watch has it.
+
+<img src="docs/readme/10-library.webp" alt="Training Library: a 12-week marathon plan, week by week" />
+
+### A coach that has read your training
+
+Ask about a session, a week or how well you are recovering. Coach reads your COROS data and answers with the numbers and the charts behind them.
+
+<img src="docs/readme/11-coach.webp" alt="Coach: an interval session analysed, with heart-rate and pace charts" />
+
+Ask for a plan and Coach drafts it with you: the brief, the outline, then every session. Read it in the Workbench beside the conversation, change what you like, and save it to COROS and your calendar. Changes Coach suggests to your week arrive as a list you apply one line at a time.
+
+<img src="docs/readme/12-coach-plan.webp" alt="Coach: a marathon plan in the Workbench beside the conversation" />
+
+Coach runs on your ChatGPT account, your Claude subscription, a Claude or OpenRouter API key, or a local model. Each conversation reads only the data you allow. Scheduled analyses can debrief every new activity on their own, and never change anything without you.
+
+### Hall of Records
+
+Every milestone you reach is kept: firsts, records, streaks, totals and new places, month by month.
+
+<table>
+  <tr>
+    <td width="50%" valign="top">
+      <img src="docs/readme/14-timeline.webp" alt="Hall of Records: the timeline of milestones" />
+      <p><strong>Timeline</strong>: every first, record and streak, and the labour stage it reached.</p>
+    </td>
+    <td width="50%" valign="top">
+      <img src="docs/readme/13-labours.webp" alt="Hall of Records: the Twelve Labours" />
+      <p><strong>The Twelve Labours</strong>: twelve kinds of achievement in three stages each, from your first weeks to your first year. Speed and VO₂max are graded for your age and sex, so a stage means the same for everyone.</p>
+    </td>
+  </tr>
+</table>
+
+### Where you've been
+
+Every place your training has taken you, on a globe.
+
+<img src="docs/readme/15-places.webp" alt="Where you've been: every place you trained, on a globe" />
+
+### Settings
+
+- **Appearance.** Light or dark, your own accent and sport colours, metric or imperial.
+- **Your sports.** Running, Cycling, Hiking and Strength each have a screen; keep the ones you train.
+- **Cloud sync.** Use two computers? Sync them through your own Google Drive. Passwords and sign-ins never leave the machine they were made on.
+
+<table>
+  <tr>
+    <td width="50%" valign="top">
+      <img src="docs/readme/17-settings.webp" alt="Settings: sport screens and appearance" />
+      <p><strong>Sport screens and appearance</strong></p>
+    </td>
+    <td width="50%" valign="top">
+      <img src="docs/readme/18-sync.webp" alt="Settings: sync through Google Drive" />
+      <p><strong>Google Drive sync</strong></p>
+    </td>
+  </tr>
+</table>
+
+### Your data stays yours
+
+- Your training comes from your COROS account and stays on your computer.
+- Back up everything to one file you keep, and restore it whenever you like.
+
+## From CorosLink to Heracles Records
+
+Heracles Records began as a fork of CorosLink, a desktop companion for COROS watches. As my own training grew, what I wanted from it changed: a full record of everything I had done, analytics deeper than a summary screen, and an AI coach that reads all of it. A complete training system rather than a set of tools. So I rebuilt the app around that: training records, deep analytics and AI.
+
+If you are looking for music and media on your watch, offline maps and routes, watch faces or gear tracking, **CorosLink** does those well and is the app to use. They are not part of Heracles Records.
+
+## Support
+
+- Found a bug or have an idea? [Open an issue](https://github.com/quochungse/HeraclesRecords/issues/new), or use **Settings → About → Report an issue** in the app.
+- Website: [heraclesrecords.github.io](https://heraclesrecords.github.io)
+- If the app helps your training, you can [buy me a coffee](https://buymeacoffee.com/quochungse).
+
+<details>
+<summary><strong>Build from source</strong></summary>
 
 ```sh
-xattr -cr "/Applications/Heracles Records.app"
-```
-
-**Linux**: `chmod +x HeraclesRecords-*.AppImage`, then run it.
-
-### Build from source
-
-```sh
-git clone https://github.com/quochungse/HeraclesRecords.git
-cd HeraclesRecords
 npm install
-npm run rebuild            # native SQLite bindings for Electron's ABI
-npm run dev                # Vite on 127.0.0.1:5173 + Electron
+npm run rebuild   # rebuilds the SQLite module for Electron
+npm run dev
 ```
-
-`npm run dist:mac` / `dist:win` / `dist:linux` write installers to `release/`. Build each
-platform on that platform — `better-sqlite3` is native.
-
-### What you need
-
-Nothing but the app to start. Everything else is optional and only for the feature it serves:
-
-- **COROS account** — activities, analytics, plans, calendar
-- **An AI provider** — Claude subscription, Anthropic key, OpenRouter key, or a local model
-
----
-
-## Privacy
-
-- **Your training data stays on this machine** — SQLite in the Electron user data directory
-- **Coach prompts** go only to the provider you pick, with the tool data that answers them
-- **COROS credentials** are sent to COROS to sign in, and nowhere else
-- **Sync and backup carry user data only** — no token, key or account sign-in travels, down any path
-- **No backend.** The app uploads nothing to us; there is no us
-
----
-
-## Development
-
-<details>
-<summary><strong>Commands and layout</strong></summary>
-
-```sh
-npm run build        # tsc electron + tsc --noEmit renderer + vite build  (the only typecheck)
-npm start            # build, then run the packaged-style app
-```
-
-There is no linter and no test runner. Tests are ~165 standalone `scripts/test-*.mjs` files,
-each wired to its own npm script — `npm run test:chat-service`, `npm run test:ipc-surface`,
-and so on. `npm run | grep test:` lists them.
-
-Three layers: `src/` is a React 19 + Vite renderer, `electron/preload.ts` bridges ~184 IPC
-channels, and `electron/*Service.ts` does the work with `electron/database.ts` owning SQLite.
-Adding a channel means editing `main.ts`, `preload.ts` and `src/heraclesrecords-api.ts` together,
-then running `npm run test:ipc-surface`.
-
-See [CLAUDE.md](CLAUDE.md) for the architecture in full, and [docs/](docs/) for the
-feature-level notes.
 
 </details>
 
-<details>
-<summary><strong>Optional integrations</strong></summary>
+## License
 
-**Google Drive sync** — a packaged build needs `HERACLES_GOOGLE_OAUTH_ID` and
-`HERACLES_GOOGLE_OAUTH_KEY` at build time, or the Drive option stays disabled.
+[MIT](LICENSE). Heracles Records is based on CorosLink by AtoZ, also MIT. Third-party software and fonts are credited in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
 
-</details>
-
-<details>
-<summary><strong>Releasing</strong></summary>
-
-```sh
-npm run release:prepare -- v1.0.1   # syncs package.json + lockfile, prints the commands
-git commit -am "chore: release v1.0.1"
-git tag v1.0.1
-git push origin main v1.0.1
-```
-
-The tag push triggers `release.yml`, which re-checks that the tag and `package.json` agree,
-builds every platform, and gates on `verify-release-artifacts.mjs` for updater metadata.
-
-</details>
-
----
-
-<p align="center">
-  Built with Electron, React and Vite · <a href="LICENSE">MIT</a>
-</p>
+COROS is a trademark of COROS Wearables, Inc. It appears here only to say which watches and accounts the app works with.
