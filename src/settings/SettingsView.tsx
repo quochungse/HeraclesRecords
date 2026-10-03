@@ -45,9 +45,9 @@ import {
 import { summarizeMcpStatuses } from "../chat/McpServersPanel";
 import type { HeraclesRecordsApi } from "../heraclesrecords-api";
 import { CoachModelsModal } from "./CoachModelsModal";
-import { DiagnosticsSettings } from "./DiagnosticsSettings";
 import { formatBytes } from "./formatters";
 import { McpServersModal } from "./McpServersModal";
+import { ReportIssueDialog } from "./ReportIssueDialog";
 import { useTheme } from "../theme/ThemeProvider";
 import {
   ACCENT_PALETTES,
@@ -69,18 +69,7 @@ import { BackupPanel } from "./BackupPanel";
 
 const BUY_ME_A_COFFEE_URL = "https://buymeacoffee.com/quochungse";
 
-const ABOUT_LINKS = [
-  {
-    label: "Website",
-    href: "https://heraclesrecords.github.io",
-    icon: Globe2,
-  },
-  {
-    label: "Report an issue",
-    href: "https://github.com/quochungse/HeraclesRecords/issues",
-    icon: Bug,
-  },
-];
+const WEBSITE_URL = "https://heraclesrecords.github.io";
 
 interface McpSummary {
   total: number;
@@ -221,7 +210,8 @@ export function SettingsView({
   const [openingLocationId, setOpeningLocationId] = useState<string | null>(
     null,
   );
-  const [settingsPage, setSettingsPage] = useState<"main" | "storage" | "errors">("main");
+  const [settingsPage, setSettingsPage] = useState<"main" | "storage">("main");
+  const [reportIssueOpen, setReportIssueOpen] = useState(false);
   const [mcpModalOpen, setMcpModalOpen] = useState(false);
   const [mcpSummary, setMcpSummary] = useState<McpSummary | null>(null);
   const [mcpRefreshVersion, setMcpRefreshVersion] = useState(0);
@@ -379,22 +369,6 @@ export function SettingsView({
 
   const appVersion = appInfo?.version ?? updateSnapshot.currentVersion;
 
-  if (settingsPage === "errors" && api) {
-    return (
-      <section className="settings-view settings-subpage">
-        <button
-          className="settings-subpage-back"
-          type="button"
-          onClick={() => setSettingsPage("main")}
-        >
-          <ArrowLeft size={16} strokeWidth={2} aria-hidden="true" />
-          Settings
-        </button>
-        <DiagnosticsSettings api={api} />
-      </section>
-    );
-  }
-
   if (settingsPage === "storage") {
     return (
       <section className="settings-view settings-subpage">
@@ -518,19 +492,26 @@ export function SettingsView({
             </div>
             <p>Unofficial COROS companion for training analytics.</p>
             <div className="settings-about-links">
-              {ABOUT_LINKS.map(({ label, href, icon: Icon }) => (
-                <a
-                  key={href}
-                  className="settings-about-link"
-                  href={href}
-                  target="_blank"
-                  rel="noreferrer"
-                >
-                  <Icon size={15} aria-hidden="true" />
-                  <span>{label}</span>
-                  <ExternalLink size={12} aria-hidden="true" />
-                </a>
-              ))}
+              <a
+                className="settings-about-link"
+                href={WEBSITE_URL}
+                target="_blank"
+                rel="noreferrer"
+              >
+                <Globe2 size={15} aria-hidden="true" />
+                <span>Website</span>
+                <ExternalLink size={12} aria-hidden="true" />
+              </a>
+              {/* A dialog, not a link: it offers the error log to copy before
+                  sending the athlete to GitHub. */}
+              <button
+                className="settings-about-link"
+                type="button"
+                onClick={() => setReportIssueOpen(true)}
+              >
+                <Bug size={15} aria-hidden="true" />
+                <span>Report an issue</span>
+              </button>
             </div>
           </div>
           {/* The header's far end, apart from the app's own controls. Drawn as
@@ -834,38 +815,18 @@ export function SettingsView({
         </button>
       </div>
 
-      {api ? (
-        <div className="panel settings-compact-panel">
-          <button
-            className="settings-compact-head is-link"
-            type="button"
-            onClick={() => setSettingsPage("errors")}
-          >
-            <span className="settings-compact-icon" aria-hidden="true">
-              <Bug size={18} strokeWidth={1.9} />
-            </span>
-            <span className="settings-compact-copy">
-              <strong>Error logs</strong>
-              <span>
-                Recent errors, kept on this computer, to copy into an issue.
-              </span>
-            </span>
-            <ChevronRight
-              className="settings-row-chevron"
-              size={18}
-              strokeWidth={2}
-              aria-hidden="true"
-            />
-          </button>
-        </div>
-      ) : null}
-
       <McpServersModal
         api={api}
         open={mcpModalOpen}
         refreshVersion={mcpRefreshVersion}
         onClose={() => setMcpModalOpen(false)}
         onChange={() => setMcpRefreshVersion((version) => version + 1)}
+      />
+
+      <ReportIssueDialog
+        api={api}
+        open={reportIssueOpen}
+        onClose={() => setReportIssueOpen(false)}
       />
 
       <CoachModelsModal

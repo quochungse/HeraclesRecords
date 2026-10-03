@@ -7,7 +7,7 @@ import type {
   RendererDiagnosticError
 } from "./diagnosticsTypes";
 
-// The error log behind Settings → Error logs (from upstream CorosLink 0.1.34).
+// The error log behind Settings → Report an issue (from upstream CorosLink 0.1.34).
 // It stays on this machine — `<userData>/diagnostics/errors.json`, no setting
 // and no localStorage key, so sync never sees it — and is redacted before it is
 // written, not only before it is copied.

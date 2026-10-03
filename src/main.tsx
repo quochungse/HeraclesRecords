@@ -11,7 +11,7 @@ import "./styles.css";
 // App's Suspense fallback and is drawn before the library's chunk has loaded.
 import "./training-library/trainingLibrary.css";
 
-// Uncaught errors go to Settings → Error logs; installed before React renders.
+// Uncaught errors go to the error log (Settings → Report an issue); installed before React renders.
 installRendererDiagnostics(window.heraclesRecords);
 
 // Apply the persisted theme before the first paint to avoid a dark→light flash.

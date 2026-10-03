@@ -94,7 +94,9 @@ device route at all, and the `deviceList` every activity detail carries adds onl
 `type` and an icon URL (`s3.coros.com/static/device_icon/…`), its `version` empty.
 
 **Every link in the app points at this fork** (since 2026-10-01). Settings → About holds
-"Website" (`heraclesrecords.github.io`) and "Report an issue" under the tagline, and a
+"Website" (`heraclesrecords.github.io`) and "Report an issue" under the tagline — a dialog
+(`ReportIssueDialog`) offering the error log to copy and a button that opens a new GitHub
+issue; the Error logs subpage it replaced was removed on 2026-10-03 — and a
 **Buy me a coffee** button (`buymeacoffee.com/quochungse`, drawn as the Color mode switch's
 chosen chip, at the About header's far end; the Updates button sits beside the version). The
 platform and runtime versions are not shown; the screen ends on a one-line footer. "Source on GitHub", the COROS Help menu (`ResourcesMenu`) and a
