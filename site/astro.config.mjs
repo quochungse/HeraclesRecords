@@ -4,7 +4,7 @@ import { defineConfig } from "astro/config";
 // by .github/workflows/site.yml: an organisation's root Pages site can only be
 // served from a repository of that name. See docs/website-plan.md.
 export default defineConfig({
-  site: "https://heraclesrecords.github.io",
+  site: "https://heraclesrecords.com",
   build: {
     // `preserve` writes src/pages/privacy.astro to privacy.html. That exact URL
     // is the privacy policy Google's OAuth consent screen links to, so it must

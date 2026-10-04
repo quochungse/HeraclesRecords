@@ -94,7 +94,7 @@ device route at all, and the `deviceList` every activity detail carries adds onl
 `type` and an icon URL (`s3.coros.com/static/device_icon/…`), its `version` empty.
 
 **Every link in the app points at this fork** (since 2026-10-01). Settings → About holds
-"Website" (`heraclesrecords.github.io`) and "Report an issue" under the tagline — a dialog
+"Website" (`heraclesrecords.com`) and "Report an issue" under the tagline — a dialog
 (`ReportIssueDialog`) offering the error log to copy and a button that opens a new GitHub
 issue; the Error logs subpage it replaced was removed on 2026-10-03 — and a
 **Buy me a coffee** button (`buymeacoffee.com/quochungse`, drawn as the Color mode switch's
@@ -164,8 +164,17 @@ untouched (`isAnimated`): resized, it would lose every frame but the first.
 Electron, one per entry in its `PAGES`, and a page names its card with `<Base og="…">`. Change
 a card's words or its screenshot and run it again; the build never runs Electron.
 `test:site` also holds the cards, `sitemap.xml` (every page but 404, at the address Pages
-serves it from) and the JSON-LD on the home and download pages. **`robots.txt` and the
-`site` in `astro.config.mjs` name the domain**: both change with a custom domain. `.github/workflows/site.yml` builds it, runs `scripts/test-site.mjs`
+serves it from) and the JSON-LD on the home and download pages.
+**The site is served at `heraclesrecords.com`** (since 2026-10-04; registered and DNS at
+Cloudflare). `site/public/CNAME` is what tells GitHub Pages so — deployed with the build — and
+GitHub then redirects every `heraclesrecords.github.io` address there, `/privacy.html`
+included. The DNS records are **DNS only** (grey cloud): the apex has GitHub's four A and four
+AAAA records, `www` a CNAME to `heraclesrecords.github.io`, and GitHub issues the HTTPS
+certificate itself, which a Cloudflare proxy in front would break. The domain is written in
+four places that must agree — `CNAME`, `site` in `astro.config.mjs`, `robots.txt`, and the
+footer of `scripts/site-og/og.html` (re-render with `npm run site:og`) — and `test:site`
+holds the first three together. The app's Settings → About link (`WEBSITE_URL`) and the
+README point there too. `.github/workflows/site.yml` builds it, runs `scripts/test-site.mjs`
 and pushes `site/dist` to **`heraclesrecords/heraclesrecords.github.io`**, because an
 organisation's root Pages site can only be served from a repository of that name; that
 repository is a deploy target, edited by nothing but the workflow. The push needs the

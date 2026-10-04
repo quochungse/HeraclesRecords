@@ -186,7 +186,7 @@ If you are looking for music and media on your watch, offline maps and routes, w
 ## Support
 
 - Found a bug or have an idea? [Open an issue](https://github.com/quochungse/HeraclesRecords/issues/new), or use **Settings → About → Report an issue** in the app.
-- Website: [heraclesrecords.github.io](https://heraclesrecords.github.io)
+- Website: [heraclesrecords.com](https://heraclesrecords.com)
 - If the app helps your training, you can [buy me a coffee](https://buymeacoffee.com/quochungse).
 
 <details>

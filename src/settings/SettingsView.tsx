@@ -66,7 +66,7 @@ import { BackupPanel } from "./BackupPanel";
 
 const BUY_ME_A_COFFEE_URL = "https://buymeacoffee.com/quochungse";
 
-const WEBSITE_URL = "https://heraclesrecords.github.io";
+const WEBSITE_URL = "https://heraclesrecords.com";
 
 interface McpSummary {
   total: number;

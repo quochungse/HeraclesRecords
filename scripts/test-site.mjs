@@ -11,7 +11,7 @@
 // 3. Every page links its assets from _astro/ and each one is in the build.
 // 4. No em dash in the site's own copy: the README's rule, kept for the site.
 // 5-10. Installers, the version, em dashes in the build, internal links,
-//    link-preview cards, the sitemap and the structured data:
+//    link-preview cards, the sitemap, the structured data and the domain:
 //    see each check below.
 
 import assert from "node:assert/strict";
@@ -114,6 +114,14 @@ for (const page of pages.filter((page) => !page.endsWith("404.html"))) {
   assert.ok(listed.includes(servedAs(page)), `sitemap.xml leaves out ${servedAs(page)}`);
 }
 assert.match(readFileSync(join(dist, "robots.txt"), "utf8"), /Sitemap: https:\/\/.+\/sitemap\.xml/);
+
+// 11. The custom domain is stated once each in three places and they agree:
+//     CNAME (what GitHub Pages serves the site at; github.io redirects there),
+//     the canonical and card addresses, and the sitemap line in robots.txt.
+const cname = readFileSync(join(dist, "CNAME"), "utf8").trim();
+const homeCanonical = home.match(/<link rel="canonical" href="https:\/\/([^/"]+)/)?.[1];
+assert.equal(homeCanonical, cname, `CNAME says ${cname}, the pages' canonical address says ${homeCanonical}`);
+assert.match(readFileSync(join(dist, "robots.txt"), "utf8"), new RegExp(`Sitemap: https://${cname.replace(/\./g, "\\.")}/sitemap\\.xml`));
 
 // 10. The home and download pages describe the app as structured data, with
 //     the version the page offers.
