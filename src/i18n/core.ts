@@ -6,6 +6,7 @@ import {
   type Locale,
 } from "./locales.ts";
 import en from "./messages/en/index.ts";
+import { setDecimalFormatter } from "../../electron/unitSystem.ts";
 
 /**
  * The runtime behind every translated word. React-free, so a pure module (a
@@ -95,12 +96,54 @@ function apply(locale: Locale, messages: Dictionary): void {
   intl = resolveIntlLocale(locale, systemLanguages());
   pluralRules = new Intl.PluralRules(intl);
   numberFormat = new Intl.NumberFormat(intl);
+  setDecimalFormatter(decimalFormatterFor(intl));
   if (typeof document !== "undefined") {
     document.documentElement.lang = LOCALE_DETAILS[locale].htmlLang;
   }
   for (const listener of listeners) {
     listener();
   }
+}
+
+/** `toFixed` in a language's digits: 5,2 in German, 5.2 in English; no grouping. */
+function decimalFormatterFor(locale: string): (value: number, digits: number) => string {
+  const formats = new Map<number, Intl.NumberFormat>();
+  return (value, digits) => {
+    let format = formats.get(digits);
+    if (!format) {
+      format = new Intl.NumberFormat(locale, {
+        minimumFractionDigits: digits,
+        maximumFractionDigits: digits,
+        useGrouping: false,
+      });
+      formats.set(digits, format);
+    }
+    return format.format(value);
+  };
+}
+
+export { formatDecimal } from "../../electron/unitSystem.ts";
+
+/**
+ * Weekday names in the language on screen, Monday first, as the app's weeks
+ * run. From Intl rather than from messages: every language already has them,
+ * spelled the way its calendars spell them.
+ */
+export function weekdayNames(style: "narrow" | "short" | "long" = "short"): string[] {
+  const format = new Intl.DateTimeFormat(intl, { weekday: style, timeZone: "UTC" });
+  // 2024-01-01 was a Monday.
+  return Array.from({ length: 7 }, (_, day) => format.format(new Date(Date.UTC(2024, 0, 1 + day))));
+}
+
+/** Month names in the language on screen, January first. */
+export function monthNames(style: "narrow" | "short" | "long" = "short"): string[] {
+  const format = new Intl.DateTimeFormat(intl, { month: style, timeZone: "UTC" });
+  return Array.from({ length: 12 }, (_, month) => format.format(new Date(Date.UTC(2024, month, 15))));
+}
+
+/** A count in the language's digits, grouped: 12.345 in German. */
+export function formatCount(value: number): string {
+  return numberFormat.format(value);
 }
 
 export function readStoredLocale(): Locale {

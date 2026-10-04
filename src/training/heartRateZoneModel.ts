@@ -4,6 +4,7 @@ import type {
   TrainingHubThresholdZone
 } from "../../electron/types";
 
+import { t } from "../i18n/core";
 /**
  * COROS `hrZoneType`, labelled as its own web client labels the picker.
  * `title` is the same name in the heading case the panels use.
@@ -18,20 +19,32 @@ export interface HeartRateZoneModelDefinition {
 export const HR_ZONE_MODELS: ReadonlyArray<HeartRateZoneModelDefinition> = [
   {
     value: 1,
-    label: "Max heart rate",
-    title: "Max Heart Rate",
+    get label() {
+      return t("overview.zones.maxHr.label");
+    },
+    get title() {
+      return t("overview.zones.maxHr.title");
+    },
     family: "maxHr"
   },
   {
     value: 2,
-    label: "Heart rate reserve",
-    title: "Heart Rate Reserve",
+    get label() {
+      return t("overview.zones.reserve.label");
+    },
+    get title() {
+      return t("overview.zones.reserve.title");
+    },
     family: "restingHr"
   },
   {
     value: 3,
-    label: "Lactate threshold",
-    title: "Threshold Heart Rate",
+    get label() {
+      return t("overview.zones.lthr.label");
+    },
+    get title() {
+      return t("overview.zones.lthr.title");
+    },
     family: "lthr"
   }
 ];
@@ -58,16 +71,16 @@ function anchorNote(
   thresholds: CorosProfile["thresholds"]
 ): string | undefined {
   if (family === "maxHr") {
-    return thresholds.maxHr ? `Max HR ${thresholds.maxHr} bpm` : undefined;
+    return thresholds.maxHr ? t("overview.zones.anchor.maxHr", { maxHr: thresholds.maxHr }) : undefined;
   }
 
   if (family === "restingHr") {
     return thresholds.maxHr && thresholds.restingHr
-      ? `Max HR ${thresholds.maxHr} bpm · resting ${thresholds.restingHr} bpm`
+      ? t("overview.zones.anchor.reserve", { maxHr: thresholds.maxHr, restingHr: thresholds.restingHr })
       : undefined;
   }
 
-  return thresholds.lthr ? `LTHR ${thresholds.lthr} bpm` : undefined;
+  return thresholds.lthr ? t("overview.zones.anchor.lthr", { lthr: thresholds.lthr }) : undefined;
 }
 
 /**

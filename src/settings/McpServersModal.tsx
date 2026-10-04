@@ -3,6 +3,7 @@ import { Server, X } from "lucide-react";
 import type { HeraclesRecordsApi } from "../heraclesrecords-api";
 import { McpServersPanel } from "../chat/McpServersPanel";
 
+import { t } from "../i18n/core";
 export interface McpServersModalProps {
   api: HeraclesRecordsApi | undefined;
   open: boolean;
@@ -59,12 +60,12 @@ export function McpServersModal({
         <header className="app-modal-header">
           <div className="app-modal-title">
             <Server size={16} aria-hidden="true" />
-            <h2 id="mcp-servers-title">MCP servers</h2>
+            <h2 id="mcp-servers-title">{t("app.mcpServers.title")}</h2>
           </div>
           <button
             type="button"
             className="icon-button"
-            aria-label="Close MCP servers"
+            aria-label={t("app.mcpServers.close")}
             onClick={onClose}
           >
             <X size={18} aria-hidden="true" />
@@ -72,10 +73,7 @@ export function McpServersModal({
         </header>
         <div className="app-modal-body">
           <p className="app-modal-copy">
-            Connect additional Model Context Protocol servers so the coach can
-            call their tools. Their tools appear alongside COROS, namespaced per
-            server. Only add servers you trust, because tool descriptions and
-            returned data are shared with the selected coach provider.
+            {t("app.mcpServers.intro")}
           </p>
           <McpServersPanel
             api={api}

@@ -2,6 +2,10 @@ import common from "./common.ts";
 import nav from "./nav.ts";
 import settings from "./settings.ts";
 import sync from "./sync.ts";
+import app from "./app.ts";
+import overview from "./overview.ts";
+import units from "./units.ts";
+import sports from "./sports.ts";
 
 /**
  * English, the source every other language is translated from. A key added
@@ -14,6 +18,10 @@ const en = {
   ...nav,
   ...settings,
   ...sync,
+  ...app,
+  ...overview,
+  ...units,
+  ...sports,
 };
 
 export default en;

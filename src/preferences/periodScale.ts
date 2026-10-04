@@ -1,3 +1,4 @@
+import { t } from "../i18n/core";
 /**
  * One scale for "how far back am I looking", and the words that go with it.
  *
@@ -33,12 +34,60 @@ export interface PeriodOption {
  * accident — only by editing this file, which is the point.
  */
 export const PERIOD_SCALE: readonly PeriodOption[] = [
-  { days: 7, label: "7 days", phrase: "the last 7 days" },
-  { days: 28, label: "4 weeks", phrase: "the last 4 weeks" },
-  { days: 90, label: "3 months", phrase: "the last 3 months" },
-  { days: 180, label: "6 months", phrase: "the last 6 months" },
-  { days: 365, label: "1 year", phrase: "the last year" },
-  { days: null, label: "All", phrase: "all time" }
+  {
+    days: 7,
+    get label() {
+      return t("app.period.d7");
+    },
+    get phrase() {
+      return t("app.period.d7.phrase");
+    }
+  },
+  {
+    days: 28,
+    get label() {
+      return t("app.period.d28");
+    },
+    get phrase() {
+      return t("app.period.d28.phrase");
+    }
+  },
+  {
+    days: 90,
+    get label() {
+      return t("app.period.d90");
+    },
+    get phrase() {
+      return t("app.period.d90.phrase");
+    }
+  },
+  {
+    days: 180,
+    get label() {
+      return t("app.period.d180");
+    },
+    get phrase() {
+      return t("app.period.d180.phrase");
+    }
+  },
+  {
+    days: 365,
+    get label() {
+      return t("app.period.d365");
+    },
+    get phrase() {
+      return t("app.period.d365.phrase");
+    }
+  },
+  {
+    days: null,
+    get label() {
+      return t("app.period.all");
+    },
+    get phrase() {
+      return t("app.period.all.phrase");
+    }
+  }
 ];
 
 /** The options for the days a screen supports, in scale order. */
@@ -50,7 +99,7 @@ export function periodOptions(
 
 /** The label for a window, for a heading or a sentence that names it. */
 export function periodLabel(days: PeriodDays): string {
-  return PERIOD_SCALE.find((option) => option.days === days)?.label ?? "All";
+  return PERIOD_SCALE.find((option) => option.days === days)?.label ?? t("app.period.all");
 }
 
 /**

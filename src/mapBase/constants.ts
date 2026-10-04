@@ -1,3 +1,4 @@
+import { t } from "../i18n/core";
 /** A selectable base map style. */
 export type BaseLayerId =
   | "street"
@@ -38,7 +39,7 @@ export type BaseLayerConfig = RasterBaseLayerConfig | VectorBaseLayerConfig;
 const OPENFREEMAP_ATTRIBUTION =
   '&copy; <a href="https://openfreemap.org">OpenFreeMap</a> ' +
   '&copy; <a href="https://www.openmaptiles.org/">OpenMapTiles</a> ' +
-  'Data from <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>';
+  'Data from <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'; // i18n-ignore: the credit OpenFreeMap asks for, verbatim
 
 /**
  * Base map styles. All are free and keyless — no style here may need an API
@@ -57,8 +58,12 @@ export const BASE_LAYERS: Record<BaseLayerId, BaseLayerConfig> = {
     kind: "raster",
     url: "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
     maxZoom: 19,
-    label: "Street",
-    description: "Standard OpenStreetMap",
+    get label() {
+      return t("app.map.street.label");
+    },
+    get description() {
+      return t("app.map.street.description");
+    },
     attribution:
       '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
   },
@@ -67,8 +72,12 @@ export const BASE_LAYERS: Record<BaseLayerId, BaseLayerConfig> = {
     url: "https://{s}.tile-cyclosm.openstreetmap.fr/cyclosm/{z}/{x}/{y}.png",
     maxZoom: 20,
     subdomains: "abc",
-    label: "Outdoors",
-    description: "CyclOSM — cycling & trails",
+    get label() {
+      return t("app.map.outdoors.label");
+    },
+    get description() {
+      return t("app.map.outdoors.description");
+    },
     attribution:
       '&copy; <a href="https://www.cyclosm.org">CyclOSM</a>, &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
   },
@@ -76,16 +85,24 @@ export const BASE_LAYERS: Record<BaseLayerId, BaseLayerConfig> = {
     kind: "vector",
     styleUrl: "https://tiles.openfreemap.org/styles/positron",
     maxZoom: 20,
-    label: "Light",
-    description: "Clean minimal map",
+    get label() {
+      return t("app.map.light.label");
+    },
+    get description() {
+      return t("app.map.light.description");
+    },
     attribution: OPENFREEMAP_ATTRIBUTION
   },
   dark: {
     kind: "vector",
     styleUrl: "https://tiles.openfreemap.org/styles/dark",
     maxZoom: 20,
-    label: "Dark",
-    description: "Low-glare night map",
+    get label() {
+      return t("app.map.dark.label");
+    },
+    get description() {
+      return t("app.map.dark.description");
+    },
     attribution: OPENFREEMAP_ATTRIBUTION
   },
   topo: {
@@ -93,8 +110,12 @@ export const BASE_LAYERS: Record<BaseLayerId, BaseLayerConfig> = {
     url: "https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png",
     maxZoom: 17,
     subdomains: "abc",
-    label: "Topo",
-    description: "Contours & terrain",
+    get label() {
+      return t("app.map.topo.label");
+    },
+    get description() {
+      return t("app.map.topo.description");
+    },
     attribution:
       '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>, SRTM, &copy; <a href="https://opentopomap.org">OpenTopoMap</a>'
   },
@@ -102,10 +123,14 @@ export const BASE_LAYERS: Record<BaseLayerId, BaseLayerConfig> = {
     kind: "raster",
     url: "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
     maxZoom: 19,
-    label: "Satellite",
-    description: "Aerial imagery",
+    get label() {
+      return t("app.map.satellite.label");
+    },
+    get description() {
+      return t("app.map.satellite.description");
+    },
     attribution:
-      'Imagery &copy; <a href="https://www.esri.com">Esri</a>, Maxar, Earthstar Geographics'
+      'Imagery &copy; <a href="https://www.esri.com">Esri</a>, Maxar, Earthstar Geographics' // i18n-ignore: a credit, verbatim
   }
 };
 

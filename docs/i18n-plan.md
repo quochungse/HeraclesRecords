@@ -14,7 +14,7 @@ code, and `npm run test:i18n` holds both.
 | Phase | Scope | State |
 |---|---|---|
 | P1 | Runtime, Language setting with flags, CJK fonts, the rail, Settings (About, Navigation, Appearance, Connections, Sync, Backup & Restore, Report an issue, Updates, the COROS account row), sport and palette names | **Done** (2026-10-04) |
-| P2 | Overview (`TrainingOverview`, `overviewGreeting.ts`, `greetings.ts`), the COROS sign-in, `App.tsx`'s toasts and messages, shared components (`ConfirmDialog`, `periodScale.ts` labels), **numbers and units** (see below) | Next |
+| P2 | Overview and its panels, the greeting, the COROS sign-in, `App.tsx`'s toasts and loading states, the update prompt, map styles, periods, MCP notices, COROS's sport names (`sports.*`), and **numbers**: the unit formatters' digits and every count follow the language | **Done** |
 | P3 | Activities, Running, Cycling, Hiking, Strength, and what they share (`ActivitySeriesChart`, `activityChannels.ts`, `sportTypes.ts`, the heatmap) | |
 | P4 | Calendar and Training Library (`WorkoutBuilder`, step kinds, zones, the plan reader and editor) | |
 | P5 | Sleep, Hall of Records, Where you've been, Personal | |
@@ -106,13 +106,20 @@ line in the website's guide (`site/src/content/guide/customise.md`, under Appear
   file in every other language, and `npm run i18n:index`, which writes the other languages'
   `index.ts` and fails on a file missing.
 
-## Numbers and units (P2)
+## Numbers and units
 
-`formatBytes` and every count on a translated screen go through the Intl locale, so German
-reads `6,0 GB` and `1.234`. The unit formatters (`unitSystem.ts`, `training/formatters.ts`)
-still write `toFixed`, so `5.2 km` stays `5.2 km` in German, French, Spanish and
-Vietnamese, which all write `5,2 km`. Moving them is P2's first job, because every later
-screen reads them. Unit symbols (km, mi, bpm, W, m) are not translated.
+**`electron/unitSystem.ts` writes its decimals through a formatter the renderer swaps for the
+language's** (`setDecimalFormatter`, set by `core.ts` on every switch), so German reads
+`5,2 km` while the main process, which writes for the coach, keeps `5.2 km`. In a component,
+`formatDecimal(value, digits)` stands for `toFixed` and `formatCount` for a grouped count;
+dates and `Intl` take `getIntlLocale()`. The scanner flags a `toFixed` on a displayed figure
+and a `toLocale*String` or `Intl` without the app's locale; a `toFixed` that feeds a style or
+a parser carries `i18n-ignore`.
+
+Durations are messages (`units.duration.hm`, `.h`, `.m`), short enough for a tile in every
+language. A tile draws any letter of any script in a figure as a small unit
+(`withUnitSuffixes`). Weekday and month names come from `Intl` (`weekdayNames`,
+`monthNames`), never from messages. Unit symbols (km, mi, bpm, W, m) are not translated.
 
 ## Style, per language
 

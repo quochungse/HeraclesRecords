@@ -1,88 +1,103 @@
 import type { TrainingHubSportType } from "../../electron/types";
 import { isHikeSportType } from "../hiking/hikeType";
+import { t, type MessageKey } from "../i18n/core";
 
 // Keep in sync with electron/corosSportTypes.ts for renderer-side fallbacks.
-const KNOWN_SPORT_NAMES: Record<number, string> = {
-  98: "Custom Sport",
-  100: "Run",
-  101: "Indoor Run",
-  102: "Trail Run",
-  103: "Track Run",
-  104: "Hike",
-  105: "Mountain Climb",
-  106: "Climb",
-  200: "Bike",
-  201: "Indoor Bike",
-  202: "Road E-Bike",
-  203: "Gravel Road Bike",
-  204: "Mountain Bike",
-  205: "Mountain E-Bike",
-  299: "Helmet Bike",
-  300: "Pool Swim",
-  301: "Open Water Swim",
-  400: "Gym Cardio",
-  401: "GPS Cardio",
-  402: "Strength",
-  500: "Ski",
-  501: "Snowboard",
-  502: "XC Ski",
-  503: "Ski Touring",
-  600: "Fighter",
-  700: "Rowing",
-  701: "Indoor Rowing",
-  702: "Whitewater",
-  704: "Flatwater",
-  705: "Windsurfing",
-  706: "Speedsurfing",
-  707: "Boat Fishing Lure",
-  708: "Shore Fishing Lure",
-  709: "Pond Fishing Lure",
-  710: "Kayak Fishing Lure",
-  711: "Inshore Fishing",
-  712: "Offshore Fishing",
-  713: "Boat Fly Fishing",
-  714: "Shore Fly Fishing",
-  715: "Surf Fishing",
-  800: "Indoor Climb",
-  801: "Bouldering",
-  802: "Outdoor Climb",
-  900: "Walk",
-  901: "Jump Rope",
-  902: "Climb Stairs",
-  903: "Elliptical",
-  904: "Yoga",
-  905: "Pilates",
-  906: "Boxing",
-  1000: "Badminton",
-  1001: "Ping Pong",
-  1002: "Basketball",
-  1003: "Soccer",
-  1004: "Pickleball",
-  1005: "Tennis",
-  1006: "Padel",
-  1100: "Frisbee",
-  1101: "Skateboard",
-  1200: "Hybrid Fitness",
-  9800: "Custom Outdoor Ball",
-  9801: "Custom Outdoor Leisure",
-  9802: "Custom Outdoor Mountain",
-  9803: "Custom Outdoor High Altitude",
-  9804: "Custom Outdoor Motor Vehicle",
-  9805: "Custom Outdoor Aquatics",
-  9806: "Custom Outdoor Adventure",
-  9807: "Custom Outdoor Other",
-  9900: "Custom Indoor Ball",
-  9901: "Custom Indoor Strength",
-  9902: "Custom Indoor Shape",
-  9903: "Custom Indoor Dance",
-  9904: "Custom Indoor Other",
-  9999: "Custom Activity",
-  10000: "Triathlon",
-  10001: "Multi Sport",
-  10002: "Ski Touring",
-  10003: "Multi-Pitch Climb",
-  65535: "All Sports"
-};
+/** Every code COROS names, read from the messages (sports.code.<code>). */
+const KNOWN_SPORT_CODES: ReadonlySet<number> = new Set([
+  98,
+  100,
+  101,
+  102,
+  103,
+  104,
+  105,
+  106,
+  200,
+  201,
+  202,
+  203,
+  204,
+  205,
+  299,
+  300,
+  301,
+  400,
+  401,
+  402,
+  500,
+  501,
+  502,
+  503,
+  600,
+  700,
+  701,
+  702,
+  704,
+  705,
+  706,
+  707,
+  708,
+  709,
+  710,
+  711,
+  712,
+  713,
+  714,
+  715,
+  800,
+  801,
+  802,
+  900,
+  901,
+  902,
+  903,
+  904,
+  905,
+  906,
+  1000,
+  1001,
+  1002,
+  1003,
+  1004,
+  1005,
+  1006,
+  1100,
+  1101,
+  1200,
+  9800,
+  9801,
+  9802,
+  9803,
+  9804,
+  9805,
+  9806,
+  9807,
+  9900,
+  9901,
+  9902,
+  9903,
+  9904,
+  9999,
+  10000,
+  10001,
+  10002,
+  10003,
+  65535
+]);
+
+/**
+ * Codes whose name is the athlete's own: a custom sport carries the name they
+ * gave it, which no table here can know.
+ */
+function isCustomSportCode(code: number): boolean {
+  return code === 98 || (code >= 9800 && code <= 9999);
+}
+
+/** A known code's name in the language on screen. */
+export function knownSportName(code: number): string | undefined {
+  return KNOWN_SPORT_CODES.has(code) ? t(`sports.code.${code}` as MessageKey) : undefined;
+}
 
 export function isSwimSportType(sportType?: number): boolean {
   return sportType === 300 || sportType === 301;
@@ -123,6 +138,16 @@ export function resolveSportName(
   },
   sportTypes: TrainingHubSportType[] | Map<number, string> = []
 ): string | undefined {
+  // A code COROS names is written in the language on screen: the main process
+  // fills `sportName` in English, and a custom sport's own name is kept.
+  if (
+    activity.sportType !== undefined &&
+    !isCustomSportCode(activity.sportType) &&
+    KNOWN_SPORT_CODES.has(activity.sportType)
+  ) {
+    return knownSportName(activity.sportType);
+  }
+
   if (activity.sportName?.trim()) {
     return activity.sportName.trim();
   }
@@ -142,5 +167,5 @@ export function resolveSportName(
     return fromMap;
   }
 
-  return KNOWN_SPORT_NAMES[sportType];
+  return knownSportName(sportType);
 }

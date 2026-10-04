@@ -3,7 +3,7 @@ import {
   WORKOUT_SPORT_CAPABILITIES,
   workoutSportFromType
 } from "../../electron/workoutCapabilities";
-import { inferUpcomingWorkoutCategory } from "./formatters";
+import { inferUpcomingWorkoutCategory, workoutCategoryLabel } from "./formatters";
 import type { SportColorCategory } from "./sportColors";
 
 /**
@@ -193,7 +193,7 @@ export function planTag(workout: {
 
   const category = inferUpcomingWorkoutCategory(workout.name ?? "");
   if (category !== "Run") {
-    return category;
+    return workoutCategoryLabel(category);
   }
   // "Run" is the classifier's default as well as a real answer, so it only
   // stands when COROS said the sport really is running.

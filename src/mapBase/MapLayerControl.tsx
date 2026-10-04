@@ -2,6 +2,7 @@ import { Layers, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { BASE_LAYERS, BASE_LAYER_ORDER, type BaseLayerId } from "./constants";
 
+import { t } from "../i18n/core";
 /**
  * A choice a map adds to its layer menu below the base maps — how a route is
  * coloured, say. The menu is where everything about how the map is drawn
@@ -79,12 +80,12 @@ export function MapLayerControl<T extends string = never>({
       {open ? (
         <div className="basemap-menu">
           <div className="basemap-head">
-            <span>{onChange ? "Base map" : section?.title}</span>
+            <span>{onChange ? t("app.map.baseMap") : section?.title}</span>
             <button
               type="button"
               className="icon-button"
               onClick={() => setOpen(false)}
-              aria-label="Close"
+              aria-label={t("common.close")}
             >
               <X size={15} aria-hidden="true" />
             </button>
@@ -142,8 +143,8 @@ export function MapLayerControl<T extends string = never>({
           type="button"
           className="basemap-toggle"
           onClick={() => setOpen(true)}
-          title="Change map layers"
-          aria-label="Change map layers"
+          title={t("app.map.changeLayers")}
+          aria-label={t("app.map.changeLayers")}
         >
           <Layers size={18} aria-hidden="true" />
         </button>

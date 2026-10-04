@@ -26,6 +26,7 @@ import type { TrainingHubSleepRecord, TrainingHubSleepSummary } from "../../../e
 import type { TrainingTrendPoint } from "../types";
 import { buildSleepWeekTotals } from "../sleepWeekTotals";
 import { SleepWeekTotals } from "./SleepWeekTotals";
+import { t } from "../../i18n/core";
 
 interface SleepSummaryPanelProps {
   sleep?: TrainingHubSleepSummary | null;
@@ -55,7 +56,7 @@ function formatSleepWindow(
 
 function formatSleepMetricDuration(minutes?: number): string {
   const duration = formatSleepDurationMinutes(minutes);
-  return duration === "–" ? "No data" : duration;
+  return duration === "–" ? t("overview.noData") : duration;
 }
 
 function SleepMetric({
@@ -83,7 +84,7 @@ const NO_POINTS: TrainingTrendPoint[] = [];
 function formatWholeFigure(value: number | undefined, unit: string): string {
   return value !== undefined && Number.isFinite(value) && value > 0
     ? `${Math.round(value)} ${unit}`
-    : "No data";
+    : t("overview.noData");
 }
 
 function SleepWindowMetric({ record }: { record: TrainingHubSleepRecord }) {
@@ -91,10 +92,10 @@ function SleepWindowMetric({ record }: { record: TrainingHubSleepRecord }) {
 
   return (
     <div className="sleep-metric is-window">
-      <dt>Sleep window</dt>
+      <dt>{t("overview.sleep.window")}</dt>
       <dd
         className="sleep-window-value"
-        title={window ? `${window.start} to ${window.end}` : "No data"}
+        title={window ? t("overview.sleep.windowRange", { start: window.start, end: window.end }) : t("overview.noData")}
       >
         {window ? (
           <>
@@ -107,7 +108,7 @@ function SleepWindowMetric({ record }: { record: TrainingHubSleepRecord }) {
             </span>
           </>
         ) : (
-          "No data"
+          t("overview.noData")
         )}
       </dd>
     </div>
@@ -140,14 +141,14 @@ function SleepStageBar({ record }: { record: TrainingHubSleepRecord }) {
   });
 
   if (segments.length === 0) {
-    return <p className="sleep-panel-empty-stages">Stage breakdown unavailable.</p>;
+    return <p className="sleep-panel-empty-stages">{t("overview.sleep.noStages")}</p>;
   }
 
   return (
     <div className="sleep-stage-stack">
       <div
         className="sleep-stage-bar"
-        aria-label="Sleep stage breakdown"
+        aria-label={t("overview.sleep.stageBreakdown")}
         role="list"
       >
         {segments.map((segment) => (
@@ -184,7 +185,7 @@ function formatStaleNightSummary(record: TrainingHubSleepRecord): string {
   }
 
   if (record.score !== undefined && Number.isFinite(record.score)) {
-    parts.push(`score ${Math.round(record.score)}`);
+    parts.push(t("overview.sleep.score", { score: Math.round(record.score) }));
   }
 
   return parts.join(" · ");
@@ -218,7 +219,10 @@ export function SleepSummaryPanel({
   // A day the athlete only napped has no score and never will, so "Waiting"
   // would have the card waiting on something COROS is not sending.
   const napOnly = night !== undefined && isNapOnlyRecord(night);
-  const label = sleepScoreLabel(night?.score, napOnly ? "Naps only" : "Waiting");
+  const label = sleepScoreLabel(
+    night?.score,
+    napOnly ? t("overview.sleep.napsOnly") : t("overview.recovery.waiting.label")
+  );
   const isLoading = connecting || refreshing;
   const nightPoint = night
     ? points.find((point) => point.date === night.happenDay)
@@ -242,7 +246,7 @@ export function SleepSummaryPanel({
       <div className="sleep-panel-header">
         {/* Which night it is sits over the score it belongs to, not up here:
             the column of seven days beside the score is not about that night. */}
-        <p className="eyebrow">Sleep</p>
+        <p className="eyebrow">{t("nav.sleep")}</p>
         {onOpenDetails ? (
           <button
             type="button"
@@ -251,7 +255,7 @@ export function SleepSummaryPanel({
               event.stopPropagation();
               onOpenDetails();
             }}
-            aria-label="Open sleep details"
+            aria-label={t("overview.sleep.openDetails")}
           >
             {isLoading ? (
               <Loader2 className="spin" size={16} aria-hidden="true" />
@@ -271,11 +275,11 @@ export function SleepSummaryPanel({
         <SleepWeekTotals totals={weekTotals} />
         <div className="sleep-panel-main">
           {connecting ? (
-            <p className="sleep-panel-message">Connecting COROS data access…</p>
+            <p className="sleep-panel-message">{t("overview.sleep.connecting")}</p>
           ) : null}
 
           {!connecting && isLoading ? (
-            <p className="sleep-panel-message">Syncing sleep data…</p>
+            <p className="sleep-panel-message">{t("overview.sleep.syncing")}</p>
           ) : null}
 
           {!isLoading && night ? (
@@ -289,15 +293,14 @@ export function SleepSummaryPanel({
                 <div className="sleep-panel-duration">
                   {/* The whole day's sleep. The stage bar under it is the main
                       sleep's split, which is why the naps get a row of their own. */}
-                  <span>Total sleep</span>
+                  <span>{t("overview.sleep.total")}</span>
                   <strong>{formatSleepDurationMinutes(totalSleepMinutes(night))}</strong>
                 </div>
               </div>
 
               {napOnly ? (
                 <p className="sleep-panel-empty-stages">
-                  Naps only — COROS reports no score or stages for a day without a
-                  main sleep.
+                  {t("overview.sleep.napsOnlyNote")}
                 </p>
               ) : (
                 <SleepStageBar record={night} />
@@ -305,42 +308,42 @@ export function SleepSummaryPanel({
 
               {night.completeness === "partial" ? (
                 <p className="sleep-panel-partial">
-                  Partial data: {night.partialReason ?? "COROS is still syncing this sleep."}
+                  {t("overview.sleep.partial", { reason: night.partialReason ?? t("overview.sleep.stillSyncing") })}
                 </p>
               ) : null}
 
-              <dl className="sleep-panel-metrics" aria-label="Sleep details">
+              <dl className="sleep-panel-metrics" aria-label={t("overview.sleep.details")}>
                 <SleepWindowMetric record={night} />
                 <SleepMetric
-                  label="Awake"
+                  label={t("overview.sleep.awake")}
                   area="awake"
                   value={formatSleepMetricDuration(night.awakeMinutes)}
                 />
                 <SleepMetric
-                  label="Wake-ups > 5m"
+                  label={t("overview.sleep.wakeUps")}
                   area="wakeups"
-                  value={night.awakeCountOverFiveMinutes ?? "No data"}
+                  value={night.awakeCountOverFiveMinutes ?? t("overview.noData")}
                 />
                 <SleepMetric
-                  label="Naps"
+                  label={t("overview.sleep.naps")}
                   area="naps"
                   value={formatNapValue(night)}
                   hover={napHover(night)}
                 />
                 <SleepMetric
-                  label="HRV"
+                  label={t("overview.sleep.hrv")}
                   area="hrv"
                   value={formatWholeFigure(nightPoint?.avgSleepHrv, "ms")}
                   hover={
                     nightPoint?.avgSleepHrv !== undefined &&
                     nightPoint.sleepHrvBase !== undefined &&
                     nightPoint.sleepHrvBase > 0
-                      ? `Overnight average · baseline ${Math.round(nightPoint.sleepHrvBase)} ms`
+                      ? t("overview.sleep.hrvHover", { baseline: Math.round(nightPoint.sleepHrvBase) })
                       : undefined
                   }
                 />
                 <SleepMetric
-                  label="RHR"
+                  label={t("overview.sleep.rhr")}
                   area="rhr"
                   value={formatWholeFigure(nightPoint?.rhr, "bpm")}
                 />
@@ -357,12 +360,12 @@ export function SleepSummaryPanel({
                 {mcpTextOr(
                   sleep?.mcpState,
                   MCP_SLEEP_SUBJECT,
-                  "No sleep recorded for last night yet. Sync your watch to see it here."
+                  t("overview.sleep.noneYet")
                 )}
               </p>
               {staleNight ? (
                 <p className="sleep-panel-stale">
-                  Most recent night on record: {formatStaleNightSummary(staleNight)}
+                  {t("overview.sleep.mostRecent", { summary: formatStaleNightSummary(staleNight) })}
                 </p>
               ) : null}
             </div>

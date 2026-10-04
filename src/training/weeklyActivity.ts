@@ -3,6 +3,7 @@ import type {
   TrainingHubDailyHealthRecord,
   TrainingHubDailyMetric
 } from "../../electron/types";
+import type { MessageKey } from "../i18n/core";
 import type { UnitSystem } from "../../electron/types";
 import {
   SPORT_COLOR_CATEGORIES,
@@ -12,11 +13,12 @@ import {
 import type { SportColorCategory } from "./sportColors";
 import { distanceUnit, metersToDisplayDistance } from "../units/units";
 
+import { formatDecimal, getIntlLocale, t, weekdayNames } from "../i18n/core";
 export type WeeklyActivityMetric = "distance" | "duration" | "trainingLoad";
 
 /** Key and label of the block standing for a day's value no activity claims. */
 export const WEEKLY_ACTIVITY_RESIDUAL_KEY = "residual";
-const WEEKLY_ACTIVITY_RESIDUAL_LABEL = "Unattributed";
+const residualLabel = () => t("units.weekly.unattributed");
 
 /**
  * One block of a day's column — an activity, coloured by its sport, so a day
@@ -63,12 +65,10 @@ export interface WeeklyActivityLegendEntry {
   category: SportColorCategory | null;
 }
 
-const WEEKDAY_LABELS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"] as const;
-
-const METRIC_LABELS: Record<WeeklyActivityMetric, string> = {
-  distance: "Distance",
-  duration: "Duration",
-  trainingLoad: "Training Load"
+const METRIC_LABELS: Record<WeeklyActivityMetric, MessageKey> = {
+  distance: "overview.tiles.distance",
+  duration: "overview.tiles.duration",
+  trainingLoad: "overview.trainingLoad"
 };
 
 function dateToHappenDay(date: Date): string {
@@ -203,7 +203,7 @@ function formatDayDisplayValue(
 ): string {
   switch (metric) {
     case "distance":
-      return `${metersToDisplayDistance(raw, unitSystem).toFixed(2)} ${distanceUnit(unitSystem)}`;
+      return `${formatDecimal(metersToDisplayDistance(raw, unitSystem), 2)} ${distanceUnit(unitSystem)}`;
     case "duration":
       return formatDurationTotal(raw);
     case "trainingLoad":
@@ -220,10 +220,12 @@ export function formatDurationTotal(seconds: number): string {
   const minutes = totalMinutes % 60;
 
   if (hours > 0) {
-    return minutes > 0 ? `${hours}h ${minutes}m` : `${hours}h`;
+    return minutes > 0
+      ? t("units.duration.hm", { h: hours, m: minutes })
+      : t("units.duration.h", { h: hours });
   }
 
-  return `${minutes}m`;
+  return t("units.duration.m", { m: minutes });
 }
 
 function formatWeeklyTotal(
@@ -233,7 +235,7 @@ function formatWeeklyTotal(
 ): string {
   switch (metric) {
     case "distance":
-      return `${metersToDisplayDistance(totalRaw, unitSystem).toFixed(2)} ${distanceUnit(unitSystem)}`;
+      return `${formatDecimal(metersToDisplayDistance(totalRaw, unitSystem), 2)} ${distanceUnit(unitSystem)}`;
     case "duration":
       return formatDurationTotal(totalRaw);
     case "trainingLoad":
@@ -276,7 +278,7 @@ function yAxisUnitForMetric(
 
 function formatAxisTick(value: number, metric: WeeklyActivityMetric, useMinutes: boolean): string {
   if (metric === "distance") {
-    return value.toFixed(value >= 10 ? 0 : 1);
+    return formatDecimal(value, value >= 10 ? 0 : 1);
   }
 
   if (metric === "trainingLoad") {
@@ -287,7 +289,7 @@ function formatAxisTick(value: number, metric: WeeklyActivityMetric, useMinutes:
     return String(Math.round(value * 60));
   }
 
-  return value >= 1 ? value.toFixed(1) : value.toFixed(2);
+  return formatDecimal(value, value >= 1 ? 1 : 2);
 }
 
 /**
@@ -414,7 +416,7 @@ export function buildWeeklyActivitySeries(
       const residualRaw = dayRaw - attributedRaw;
       segments.push({
         key: WEEKLY_ACTIVITY_RESIDUAL_KEY,
-        label: WEEKLY_ACTIVITY_RESIDUAL_LABEL,
+        label: residualLabel(),
         category: null,
         value: toChartValue(residualRaw, metric, unitSystem),
         displayValue: formatDayDisplayValue(residualRaw, metric, unitSystem)
@@ -429,7 +431,7 @@ export function buildWeeklyActivitySeries(
 
     return {
       happenDay,
-      weekdayLabel: WEEKDAY_LABELS[index],
+      weekdayLabel: weekdayNames("short")[index],
       value: chartValue,
       displayValue: hasValue
         ? formatDayDisplayValue(dayRaw, metric, unitSystem)
@@ -487,7 +489,7 @@ export function weeklyActivitySportLegend(
   if (hasResidual) {
     entries.push({
       key: WEEKLY_ACTIVITY_RESIDUAL_KEY,
-      label: WEEKLY_ACTIVITY_RESIDUAL_LABEL,
+      label: residualLabel(),
       category: null
     });
   }
@@ -522,7 +524,7 @@ export function getWeeklyActivityYAxisUnitLabel(
   yAxisUnit: string
 ): string {
   if (metric === "trainingLoad") {
-    return "Load";
+    return t("overview.tiles.load");
   }
 
   return yAxisUnit;
@@ -579,27 +581,18 @@ export function buildWeekToDateTotals(
   };
 }
 
-const MONTH_LABELS = [
-  "Jan",
-  "Feb",
-  "Mar",
-  "Apr",
-  "May",
-  "Jun",
-  "Jul",
-  "Aug",
-  "Sep",
-  "Oct",
-  "Nov",
-  "Dec"
-] as const;
-
-function describeWeekDay(happenDay: string, weekdayIndex: number, withMonth: boolean): string {
-  const month = MONTH_LABELS[Number(happenDay.slice(4, 6)) - 1];
-  const day = Number(happenDay.slice(6, 8));
-  const weekday = WEEKDAY_LABELS[weekdayIndex];
-
-  return withMonth ? `${weekday} ${month} ${day}` : `${weekday} ${day}`;
+/** "Mon 4" or "Mon, Oct 4", in the language on screen's own order. */
+function describeWeekDay(happenDay: string, _weekdayIndex: number, withMonth: boolean): string {
+  const date = new Date(
+    Number(happenDay.slice(0, 4)),
+    Number(happenDay.slice(4, 6)) - 1,
+    Number(happenDay.slice(6, 8))
+  );
+  return new Intl.DateTimeFormat(getIntlLocale(), {
+    weekday: "short",
+    day: "numeric",
+    ...(withMonth ? { month: "short" as const } : {})
+  }).format(date);
 }
 
 /**
@@ -644,6 +637,6 @@ export function getWeeklyActivityMetricLabel(
   unitSystem: UnitSystem
 ): string {
   return metric === "distance"
-    ? `Distance (${distanceUnit(unitSystem)})`
-    : METRIC_LABELS[metric];
+    ? t("units.weekly.distanceUnit", { unit: distanceUnit(unitSystem) })
+    : t(METRIC_LABELS[metric]);
 }

@@ -23,6 +23,9 @@ export const SKIPPED_PATHS = [
   // switches between. A packaged build never draws them.
   /[\\/]src[\\/]components[\\/]DeveloperToolbar\.tsx$/,
   /[\\/]src[\\/]records[\\/]sampleRecords\.ts$/,
+  /[\\/]src[\\/]components[\\/]SampleDataControls\.tsx$/,
+  // Each language's own name, the same in every language.
+  /[\\/]src[\\/]i18n[\\/]locales\.ts$/,
   /[\\/]src[\\/]vite-env\.d\.ts$/,
   /[\\/]src[\\/]heraclesrecords-api\.ts$/,
   /\.d\.ts$/,
@@ -30,6 +33,14 @@ export const SKIPPED_PATHS = [
 
 // Words that are the same in every language: names, not text.
 export const NAMES = new Set([
+  "OpenFreeMap",
+  "OpenMapTiles",
+  "OpenStreetMap",
+  "OpenTopoMap",
+  "CyclOSM",
+  "Esri",
+  "Training Hub",
+  "COROS Training Hub",
   "Heracles Records",
   "COROS",
   "Google Drive",
@@ -91,13 +102,16 @@ function looksLikeText(value) {
 }
 
 const PROP = /\b(title|label|detail|placeholder|aria-label|aria-description|alt|description|emptyLabel|helper|hint|caption|heading|tooltip|summary|message)(=|:\s*)"([^"\n]*)"/g;
-const JSX_TEXT = /(?<![=-])>([^<>{}]*[A-Za-z]{2,}[^<>{}]*)</g;
+// Text between a tag or an expression and the next: `>Sign in<`, and the
+// `)}\n  Verify and sign in\n</button>` that follows a conditional icon.
+const JSX_TEXT = /(?:(?<![=-])>|\})([^<>{}]*[A-Za-z]{2,}[^<>{}]*)(?=<|\{)/g;
 const LITERAL = /(["'`])((?:\\.|(?!\1)[^\\\n])*)\1/g;
 
 const IGNORED_LINE = /i18n-ignore|console\.(log|warn|error|info|debug)|import\s|from\s+["']|require\(|querySelector|className|data-[\w-]+=|new RegExp|\.test\(|\.match\(|localStorage|addEventListener|dispatchEvent|matchMedia|setAttribute|getPropertyValue|setProperty|style=|\bkey=|typeof |case "|=== "|!== "|\.startsWith\(|\.endsWith\(|\.includes\(|\.replace\(|invoke\(|ipcRenderer|defineSelectionPreference|type:\s*"|kind:\s*"|status:\s*"|mode:\s*"|tone:\s*"|variant:\s*"|role="|id="|htmlFor=|name="|href=|src=|rel="|target="|lang=|fill="|stroke|viewBox|transform|d="|font-|grid-template|cubic-bezier|@keyframes/;
 
 /** Every untranslated string in one file, as { line, text }. */
-export function scanSource(source) {
+export function scanSource(source, file = "x.tsx") {
+  const jsx = file.endsWith(".tsx");
   const clean = stripComments(source);
   const lines = clean.split("\n");
   const original = source.split("\n");
@@ -109,10 +123,16 @@ export function scanSource(source) {
     if (!found.has(key)) found.set(key, { line, text });
   };
 
-  for (const match of clean.matchAll(JSX_TEXT)) {
-    const text = match[1].replace(/\s+/g, " ").trim();
+  for (const match of jsx ? clean.matchAll(JSX_TEXT) : []) {
+    const text = match[1]
+      .replace(/&(amp|apos|quot|lt|gt|nbsp);/g, " ")
+      .replace(/\s+/g, " ")
+      .trim();
     if (!text || NAMES.has(text)) continue;
-    if (/[;=()[\]]|=>|\b(const|return|function|if|else)\b/.test(text)) continue;
+    if (/^[:,.|&?(\-$]|\w\(|\b(if|while|for|switch)\s*\(|\b(class|extends|implements)\b|\w:\s*[A-Z]\w*$/.test(text)) continue;
+    if (/\$$|^[\w-]+\)$/.test(text)) continue; // a template's head, a call's tail
+    if (/[;=[\]`]|=>|&&|\|\||\?\s|^\)|\($|\b(const|let|return|function|else|catch|finally|import|export|interface|await|async)\b/.test(text)) continue;
+    if (/^[\w.$]+(\s*[,:]\s*[\w.$]+)*,?$/.test(text) && !/\s/.test(text.replace(/,\s*/g, ","))) continue; // a list of identifiers
     if (!/[A-Za-z]{2,}/.test(text)) continue;
     add(match.index, text);
   }
@@ -122,6 +142,23 @@ export function scanSource(source) {
     if (NAMES.has(value) || !/[A-Za-z]{2,}/.test(value)) continue;
     if (/^[a-z][\w.-]*$/.test(value)) continue;
     add(match.index, `${match[1]}="${value}"`);
+  }
+
+  // Numbers: a figure written with `toFixed` keeps English digits ("5.2" where
+  // German writes "5,2"), and `toLocale*String()` with no locale, or with
+  // "en-US", writes the system's language rather than the app's. Display
+  // figures go through formatDecimal / getIntlLocale; a toFixed that feeds a
+  // style, a key or a parser carries i18n-ignore.
+  for (const match of clean.matchAll(/\.toFixed\(/g)) {
+    const line = lines[lineOf(clean, match.index) - 1] ?? "";
+    if (/\b(style|transform|translate|width|height|left|top|right|bottom|x|y|cx|cy|r|d|key|points|viewBox|opacity)\b\s*[:=]|px`|%`|\bkey\b|parseFloat|Number\(/.test(line)) continue;
+    add(match.index, "toFixed (digits in the app's language: formatDecimal)");
+  }
+  for (const match of clean.matchAll(/\.toLocale(?:Date|Time)?String\(\s*(?:\)|undefined|\[\]|"en-[A-Z]{2}")/g)) {
+    add(match.index, "toLocale*String without the app's locale (getIntlLocale)");
+  }
+  for (const match of clean.matchAll(/new Intl\.(?:DateTimeFormat|NumberFormat|RelativeTimeFormat|ListFormat|PluralRules)\(\s*(?:\)|undefined|\[\]|"en-[A-Z]{2}")/g)) {
+    add(match.index, "Intl without the app's locale (getIntlLocale)");
   }
 
   for (const match of clean.matchAll(LITERAL)) {
@@ -153,7 +190,7 @@ export function scanRenderer(root) {
   return rendererFiles(root)
     .map((file) => ({
       file: path.relative(root, file).split(path.sep).join("/"),
-      hits: scanSource(fs.readFileSync(file, "utf8")),
+      hits: scanSource(fs.readFileSync(file, "utf8"), file),
     }))
     .filter((entry) => entry.hits.length > 0);
 }

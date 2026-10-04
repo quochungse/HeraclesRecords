@@ -23,10 +23,12 @@ import { TrainingTrendCharts } from "./components/TrainingTrendChart";
 import { TrainingZoneDistributionCharts } from "./components/TrainingZoneDistributionCharts";
 import { UpcomingWorkoutsPanel } from "./components/UpcomingWorkoutsPanel";
 import { snapshotVo2Readings } from "./parsers";
+import { renderRich } from "../i18n/useI18n";
 import type { TrainingOverviewProps } from "./types";
 import { useHeartRateZoneModel } from "./useHeartRateZoneModel";
 import loginPageBackground from "../assets/training-hub/login-bg.webp";
 
+import { t } from "../i18n/core";
 // The body map drags in three.js and a GLTF mannequin. Overview is the default
 // startup view, so that weight stays out of its first chunk.
 const LazyStrengthDistributionSection = lazy(() =>
@@ -132,8 +134,7 @@ export function TrainingOverview({
                 </span>
               </h2>
               <p className="training-signin-lead">
-                Desktop access to training load, recovery, activity detail, and
-                race readiness.
+                {t("overview.signin.lead")}
               </p>
 
               <div className="training-signin-feature-list">
@@ -142,10 +143,9 @@ export function TrainingOverview({
                     <ChartNoAxesColumnIncreasing size={24} aria-hidden="true" />
                   </span>
                   <div>
-                    <strong>Deep Insights</strong>
+                    <strong>{t("overview.signin.insights")}</strong>
                     <p>
-                      Track recovery, training load, VO2 max, and more with
-                      advanced analytics.
+                      {t("overview.signin.insightsBody")}
                     </p>
                   </div>
                 </div>
@@ -154,10 +154,9 @@ export function TrainingOverview({
                     <Trophy size={24} aria-hidden="true" />
                   </span>
                   <div>
-                    <strong>All Your Data</strong>
+                    <strong>{t("overview.signin.allData")}</strong>
                     <p>
-                      Sync activities, view PRs, and analyze performance over
-                      time.
+                      {t("overview.signin.allDataBody")}
                     </p>
                   </div>
                 </div>
@@ -166,10 +165,9 @@ export function TrainingOverview({
                     <ShieldCheck size={24} aria-hidden="true" />
                   </span>
                   <div>
-                    <strong>Secure &amp; Private</strong>
+                    <strong>{t("overview.signin.secure")}</strong>
                     <p>
-                      Remembered credentials are encrypted and stored locally
-                      on this device.
+                      {t("overview.signin.secureBody")}
                     </p>
                   </div>
                 </div>
@@ -183,19 +181,18 @@ export function TrainingOverview({
               <div className="training-login-panel-header">
                 <strong>
                   <Loader2 className="spin" size={18} aria-hidden="true" />
-                  Restoring your session
+                  {t("overview.signin.restoring")}
                 </strong>
                 <p>
                   {status?.email
-                    ? `Signing ${status.email} back in to COROS.`
-                    : "Signing back in to COROS."}
+                    ? t("overview.signin.signingAs", { email: status.email })
+                    : t("overview.signin.signingBack")}
                 </p>
               </div>
 
               <p className="training-login-footer">
                 <ShieldCheck size={16} aria-hidden="true" />
-                Signing in on another device ends this one&apos;s session, so
-                this happens once each time the app starts. Nothing to do.
+                {t("overview.signin.onceNote")}
               </p>
             </div>
           ) : awaitingTwoFactor ? (
@@ -204,16 +201,17 @@ export function TrainingOverview({
               onSubmit={onVerifyTwoFactor}
             >
               <div className="training-login-panel-header">
-                <strong>Verify it's you</strong>
+                <strong>{t("overview.signin.verify")}</strong>
                 <p>
-                  Enter the 6-digit code we emailed to{" "}
-                  <strong>{twoFactorEmail}</strong>.
+                  {renderRich(t("overview.signin.enterCode", { email: twoFactorEmail ?? "" }), {
+                    b: (chunk) => <strong>{chunk}</strong>
+                  })}
                 </p>
               </div>
 
               <div className="training-login-fields">
                 <label className="field training-login-field">
-                  <span>Verification code</span>
+                  <span>{t("overview.signin.code")}</span>
                   <div className="training-login-input">
                     <KeyRound size={18} aria-hidden="true" />
                     <input
@@ -244,7 +242,7 @@ export function TrainingOverview({
                   ) : (
                     <ArrowRightFromLine size={17} aria-hidden="true" />
                   )}
-                  Verify and sign in
+                  {t("overview.signin.verifyAndSignIn")}
                 </button>
               </div>
 
@@ -260,7 +258,7 @@ export function TrainingOverview({
                   ) : (
                     <RefreshCw size={15} aria-hidden="true" />
                   )}
-                  Resend code
+                  {t("overview.signin.resend")}
                 </button>
                 <button
                   className="training-login-text-button"
@@ -269,13 +267,13 @@ export function TrainingOverview({
                   disabled={verifying}
                 >
                   <ArrowLeft size={15} aria-hidden="true" />
-                  Use a different account
+                  {t("overview.signin.differentAccount")}
                 </button>
               </div>
 
               <p className="training-login-footer">
                 <ShieldCheck size={16} aria-hidden="true" />
-                Your credentials are encrypted and never shared.
+                {t("overview.signin.neverShared")}
               </p>
             </form>
           ) : (
@@ -283,18 +281,19 @@ export function TrainingOverview({
             <div className="training-login-panel-header">
               {/* "Welcome back" only to someone this machine has seen sign in. */}
               <strong>
-                {canReconnect || status?.email ? "Welcome back" : "Connect your COROS account"}
+                {canReconnect || status?.email
+                  ? t("overview.signin.welcomeBack")
+                  : t("overview.signin.connectAccount")}
               </strong>
-              <p>Sign in to access your COROS Training Hub data</p>
+              <p>{t("overview.signin.subtitle")}</p>
             </div>
 
             {canReconnect ? (
               <div className="training-login-reconnect">
                 <div className="training-login-reconnect-text">
-                  <strong>Saved COROS account: {status?.email}</strong>
+                  <strong>{t("overview.signin.savedAccount", { email: status?.email ?? "" })}</strong>
                   <small>
-                    Create a Training Hub session using your saved COROS
-                    credentials — no password needed.
+                    {t("overview.signin.reconnectBody")}
                   </small>
                 </div>
                 <button
@@ -308,20 +307,20 @@ export function TrainingOverview({
                   ) : (
                     <RefreshCw size={17} aria-hidden="true" />
                   )}
-                  Sign in
+                  {t("common.signIn")}
                 </button>
               </div>
             ) : null}
 
             <div className="training-login-fields">
               <label className="field training-login-field">
-                <span>Email</span>
+                <span>{t("overview.signin.email")}</span>
                 <div className="training-login-input">
                   <Mail size={18} aria-hidden="true" />
                   <input
                     value={email}
                     onChange={(event) => onEmailChange(event.target.value)}
-                    placeholder="you@example.com"
+                    placeholder="you@example.com" // i18n-ignore: an address
                     type="email"
                     autoComplete="username"
                     disabled={busy === "training-login"}
@@ -329,13 +328,13 @@ export function TrainingOverview({
                 </div>
               </label>
               <label className="field training-login-field">
-                <span>Password</span>
+                <span>{t("overview.signin.password")}</span>
                 <div className="training-login-input">
                   <LockKeyhole size={18} aria-hidden="true" />
                   <input
                     value={password}
                     onChange={(event) => onPasswordChange(event.target.value)}
-                    placeholder="COROS password"
+                    placeholder={t("overview.signin.passwordPlaceholder")}
                     type={showPassword ? "text" : "password"}
                     autoComplete="current-password"
                     disabled={busy === "training-login"}
@@ -343,7 +342,7 @@ export function TrainingOverview({
                   <button
                     className="training-login-visibility"
                     type="button"
-                    aria-label={showPassword ? "Hide password" : "Show password"}
+                    aria-label={showPassword ? t("overview.signin.hidePassword") : t("overview.signin.showPassword")}
                     onClick={() => setShowPassword((current) => !current)}
                     disabled={busy === "training-login"}
                   >
@@ -365,10 +364,9 @@ export function TrainingOverview({
                 disabled={busy === "training-login"}
               />
               <span>
-                Save this COROS account
+                {t("overview.signin.remember")}
                 <small>
-                  Securely stores an encrypted password digest so Training Hub
-                  can sign back in on its own after a session expires.
+                  {t("overview.signin.rememberBody")}
                 </small>
               </span>
             </label>
@@ -384,12 +382,12 @@ export function TrainingOverview({
                 ) : (
                   <ArrowRightFromLine size={17} aria-hidden="true" />
                 )}
-                Sign in to COROS
+                {t("overview.signin.submit")}
               </button>
             </div>
 
             <div className="training-login-divider">
-              <span>or</span>
+              <span>{t("overview.signin.or")}</span>
             </div>
 
             <a
@@ -399,12 +397,12 @@ export function TrainingOverview({
               rel="noreferrer"
             >
               <ExternalLink size={16} aria-hidden="true" />
-              Open COROS Training Hub in Browser
+              {t("overview.signin.openBrowser")}
             </a>
 
             <p className="training-login-footer">
               <ShieldCheck size={16} aria-hidden="true" />
-              Your credentials are encrypted and never shared.
+              {t("overview.signin.neverShared")}
             </p>
           </form>
           )}
@@ -415,11 +413,11 @@ export function TrainingOverview({
         <>
           <section className="training-intelligence">
             <div className="training-intelligence-header">
-              <p className="eyebrow">Training Intelligence</p>
+              <p className="eyebrow">{t("overview.intelligence")}</p>
               {busy === "training-refresh" ? (
                 <span className="training-sync-pill is-syncing">
                   <span className="training-sync-dot" aria-hidden="true" />
-                  Syncing data
+                  {t("overview.syncing")}
                 </span>
               ) : null}
             </div>

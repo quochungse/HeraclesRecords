@@ -19,15 +19,15 @@ import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 
 import {
-  MCP_CONNECT_HINT,
-  MCP_CONNECT_LOCATION,
   MCP_DAILY_HEALTH_SUBJECT,
-  MCP_RETRY_HINT,
   MCP_SLEEP_SUBJECT,
   MCP_SLEEP_TREND_SUBJECT,
-  MCP_UNAVAILABLE_SHORT,
-  MCP_UNREACHABLE_SHORT,
   isMcpFailure,
+  mcpConnectHint,
+  mcpConnectLocation,
+  mcpRetryHint,
+  mcpUnavailableShort,
+  mcpUnreachableShort,
   mcpNotice,
   mcpShortTextOr,
   mcpTextOr,
@@ -35,6 +35,13 @@ import {
 } from "../src/mcp/mcpNotice.ts";
 
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), "..");
+
+// The copy is read in English, the language the app opens in.
+const MCP_CONNECT_LOCATION = mcpConnectLocation();
+const MCP_CONNECT_HINT = mcpConnectHint();
+const MCP_RETRY_HINT = mcpRetryHint();
+const MCP_UNAVAILABLE_SHORT = mcpUnavailableShort();
+const MCP_UNREACHABLE_SHORT = mcpUnreachableShort();
 const read = (relative) => readFileSync(join(repoRoot, relative), "utf8");
 
 const SUBJECTS = [

@@ -20,6 +20,7 @@ import { isNapOnlyRecord, totalSleepMinutes } from "../electron/sleepMetrics";
 import { resolveSportName } from "./training/sportTypes";
 import { scheduledWorkoutSport } from "./training/workoutSport";
 import type { TrainingSummaryMetrics } from "./training/types";
+import { formatCount, getIntlLocale, getLocale, t, type MessageKey } from "./i18n/core";
 
 /**
  * The Overview subtitle used to be one frozen sentence. It now reads the
@@ -73,10 +74,10 @@ function formatSleepLength(minutes: number): string {
   const remainder = Math.round(minutes % MINUTES_PER_HOUR);
 
   if (hours <= 0) {
-    return `${remainder}m`;
+    return t("units.duration.m", { m: remainder });
   }
 
-  return `${hours}h ${String(remainder).padStart(2, "0")}m`;
+  return t("units.duration.hm", { h: hours, m: String(remainder).padStart(2, "0") });
 }
 
 function dayKeyOffset(now: Date, days: number): string {
@@ -116,12 +117,12 @@ function findLastNight(
   return pickLastNightSleep(sleep, { now, excludePartial: true });
 }
 
-const TODAY_WORKOUT_COPY: Record<string, string> = {
-  Race: "Race day. Trust the training and go get it.",
-  Long: "Long run on the plan today — settle in and enjoy it.",
-  Easy: "An easy run today. Keep it conversational.",
-  Intervals: "Intervals today. Warm up properly before the hard reps.",
-  Speed: "A tempo session today. Find the rhythm and hold it."
+const TODAY_WORKOUT_COPY: Record<string, MessageKey> = {
+  Race: "overview.greeting.today.race",
+  Long: "overview.greeting.today.long",
+  Easy: "overview.greeting.today.easy",
+  Intervals: "overview.greeting.today.intervals",
+  Speed: "overview.greeting.today.speed"
 };
 
 function todayWorkoutText(workout: TrainingHubUpcomingWorkout): string {
@@ -135,11 +136,13 @@ function todayWorkoutText(workout: TrainingHubUpcomingWorkout): string {
   const copy = runFlavoured ? TODAY_WORKOUT_COPY[category] : undefined;
 
   if (copy) {
-    return copy;
+    return t(copy);
   }
 
   const name = workout.name?.trim();
-  return name ? `${name} is on the plan today.` : "You have a session on the plan today.";
+  return name
+    ? t("overview.greeting.namedToday", { name })
+    : t("overview.greeting.sessionToday");
 }
 
 function sleepLines(
@@ -166,9 +169,9 @@ function sleepLines(
           {
             id: "sleep-naps-only",
             priority: 86,
-            text: `No main sleep last night — ${formatSleepLength(
-              totalMinutes
-            )} of naps instead. Go gentle today.`
+            text: t("overview.greeting.napsOnly", {
+              length: formatSleepLength(totalMinutes)
+            })
           }
         ]
       : [];
@@ -178,7 +181,7 @@ function sleepLines(
     lines.push({
       id: "sleep-poor",
       priority: 90,
-      text: `Last night's sleep scored ${Math.round(score)}. Looks rough — keep today easy.`
+      text: t("overview.greeting.sleepPoor", { score: Math.round(score) })
     });
   } else if (
     totalMinutes !== undefined &&
@@ -189,13 +192,13 @@ function sleepLines(
     lines.push({
       id: "sleep-short",
       priority: 84,
-      text: `Only ${formatSleepLength(totalMinutes)} of sleep last night. Go gentle today.`
+      text: t("overview.greeting.sleepShort", { length: formatSleepLength(totalMinutes) })
     });
   } else if (score !== undefined && Number.isFinite(score) && score >= 90) {
     lines.push({
       id: "sleep-excellent",
       priority: 62,
-      text: `You slept well — ${Math.round(score)} sleep score last night.`
+      text: t("overview.greeting.sleepExcellent", { score: Math.round(score) })
     });
   } else if (
     totalMinutes !== undefined &&
@@ -205,7 +208,7 @@ function sleepLines(
     lines.push({
       id: "sleep-solid",
       priority: 52,
-      text: `${formatSleepLength(totalMinutes)} of sleep last night. That's a solid base.`
+      text: t("overview.greeting.sleepSolid", { length: formatSleepLength(totalMinutes) })
     });
   }
 
@@ -223,25 +226,25 @@ function recoveryLines(summary: TrainingSummaryMetrics): OverviewGreetingLine[] 
       lines.push({
         id: "recovery-low",
         priority: 92,
-        text: `Recovery is at ${percent}%. Rest is training too.`
+        text: t("overview.greeting.recoveryLow", { percent })
       });
     } else if (percent >= 90) {
       lines.push({
         id: "recovery-peak",
         priority: 72,
-        text: `${percent}% recovered. Your body is ready for a hard one.`
+        text: t("overview.greeting.recoveryPeak", { percent })
       });
     } else if (percent >= 70) {
       lines.push({
         id: "recovery-ready",
         priority: 66,
-        text: `You're ${percent}% recovered and good to go.`
+        text: t("overview.greeting.recoveryReady", { percent })
       });
     } else {
       lines.push({
         id: "recovery-moderate",
         priority: 58,
-        text: `Recovery is at ${percent}% — easy to moderate suits today.`
+        text: t("overview.greeting.recoveryModerate", { percent })
       });
     }
   }
@@ -251,13 +254,13 @@ function recoveryLines(summary: TrainingSummaryMetrics): OverviewGreetingLine[] 
       lines.push({
         id: "rhr-elevated",
         priority: 86,
-        text: `Resting heart rate is ${Math.round(rhrDelta)} bpm above your week's average. Worth an easy day.`
+        text: t("overview.greeting.rhrElevated", { bpm: Math.round(rhrDelta) })
       });
     } else if (rhrDelta <= -3) {
       lines.push({
         id: "rhr-falling",
         priority: 50,
-        text: "Your resting heart rate is trending down. Good sign."
+        text: t("overview.greeting.rhrFalling")
       });
     }
   }
@@ -270,7 +273,7 @@ function recoveryLines(summary: TrainingSummaryMetrics): OverviewGreetingLine[] 
     lines.push({
       id: "week-load",
       priority: 42,
-      text: `${Math.round(summary.weekLoadTotal)} training load over the last 7 days.`
+      text: t("overview.greeting.weekLoad", { load: formatCount(Math.round(summary.weekLoadTotal)) })
     });
   }
 
@@ -282,7 +285,7 @@ function recoveryLines(summary: TrainingSummaryMetrics): OverviewGreetingLine[] 
     lines.push({
       id: "steps",
       priority: 44,
-      text: `${summary.steps.toLocaleString()} steps today. Nice moving.`
+      text: t("overview.greeting.steps", { steps: formatCount(summary.steps) })
     });
   }
 
@@ -310,7 +313,7 @@ function planLines(
       {
         id: "plan-today-multi",
         priority: 84,
-        text: `${today.length} sessions on the plan today.`
+        text: t("overview.greeting.multiToday", { count: today.length })
       }
     ];
   }
@@ -330,8 +333,8 @@ function planLines(
   const gap = daysBetweenDayKeys(getLocalHappenDayKey(now), next.happenDay);
   const when =
     gap === 1
-      ? "tomorrow"
-      : `on ${formatUpcomingWorkoutDate(next.happenDay, now)}`;
+      ? t("overview.greeting.tomorrow")
+      : t("overview.greeting.onDate", { date: formatUpcomingWorkoutDate(next.happenDay, now) });
   const name = next.name?.trim();
 
   return [
@@ -339,8 +342,8 @@ function planLines(
       id: "plan-rest",
       priority: 60,
       text: name
-        ? `Rest day today. Next up: ${name} ${when}.`
-        : `Nothing scheduled today. Your next session is ${when}.`
+        ? t("overview.greeting.restNext", { name, when })
+        : t("overview.greeting.nothingToday", { when })
     }
   ];
 }
@@ -376,8 +379,10 @@ function activityLines(
   const lines: OverviewGreetingLine[] = [];
   const todayKey = getLocalHappenDayKey(now);
   const latestKey = happenDayFromTimestamp(latest.startTime);
-  const sport = (resolveSportName(latest, context.sportTypes ?? []) ?? "session")
-    .toLowerCase();
+  // Lower case mid-sentence where the language writes it so; German keeps a
+  // noun's capital, and most scripts have no case at all.
+  const sportName = resolveSportName(latest, context.sportTypes ?? []) ?? t("overview.greeting.session");
+  const sport = getLocale() === "de" ? sportName : sportName.toLocaleLowerCase(getIntlLocale());
   const gap = latestKey ? daysBetweenDayKeys(latestKey, todayKey) : null;
 
   if (gap === 0) {
@@ -390,20 +395,20 @@ function activityLines(
       id: "logged-today",
       priority: 86,
       text: distance
-        ? `Today's ${sport} is logged — ${distance} in the bank.`
-        : `Today's ${sport} is logged. Nice work.`
+        ? t("overview.greeting.loggedTodayDistance", { sport, distance })
+        : t("overview.greeting.loggedToday", { sport })
     });
   } else if (gap === 1) {
     lines.push({
       id: "logged-yesterday",
       priority: 48,
-      text: `Yesterday's ${sport} is in the books.`
+      text: t("overview.greeting.loggedYesterday", { sport })
     });
   } else if (gap !== null && gap >= 4) {
     lines.push({
       id: "training-gap",
       priority: 64,
-      text: `It's been ${gap} days since your last session. Ready when you are.`
+      text: t("overview.greeting.gap", { days: gap })
     });
   }
 
@@ -422,7 +427,7 @@ function activityLines(
       lines.push({
         id: "streak",
         priority: 56,
-        text: `${streak} days in a row. Nice streak.`
+        text: t("overview.greeting.streak", { days: streak })
       });
     }
   }
@@ -439,7 +444,7 @@ function setupLines(context: OverviewGreetingContext): OverviewGreetingLine[] {
     {
       id: "connect-coros",
       priority: 46,
-      text: "Sign in to COROS to see your training at a glance."
+      text: t("overview.greeting.connect")
     }
   ];
 }

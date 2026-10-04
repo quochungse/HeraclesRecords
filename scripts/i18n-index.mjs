@@ -27,11 +27,15 @@ for (const locale of Object.keys(names)) {
       missing += 1;
     }
   }
+  // `satisfies` is what makes a namespace missing from this index a build
+  // error: each file is typed against English's, but an index that forgot one
+  // would otherwise typecheck and fall back to English at run time.
   const body =
+    'import type en from "../en/index.ts";\n' +
     namespaces.map((ns) => `import ${ns} from "./${ns}.ts";`).join("\n") +
     `\n\n/** ${names[locale]}. Written by scripts/i18n-index.mjs. */\nexport default {\n` +
     namespaces.map((ns) => `  ...${ns},`).join("\n") +
-    "\n};\n";
+    "\n} satisfies Record<keyof typeof en, string>;\n";
   fs.writeFileSync(path.join(dir, "index.ts"), body);
 }
 console.log(`${namespaces.length} namespaces × ${Object.keys(names).length - 1} languages${missing ? `, ${missing} files missing` : ""}`);

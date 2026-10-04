@@ -1,4 +1,5 @@
 import type { McpAvailability } from "../../electron/types";
+import { t } from "../i18n/core.ts";
 
 /**
  * What a surface says when the COROS MCP server cannot serve it.
@@ -21,41 +22,59 @@ import type { McpAvailability } from "../../electron/types";
  * having answered yet — must say neither.
  */
 
-/** Keep in step with SettingsView; `test:mcp-notice` checks that it is. */
-export const MCP_CONNECT_LOCATION = "Settings → Connections → MCP Servers";
+/**
+ * Where the server is connected, in the screens' own words: the rail's
+ * Settings, then the Connections card, then its MCP Servers row. Built from
+ * those labels, so it cannot drift from them in any language;
+ * `test:mcp-notice` checks the English route against the screens.
+ */
+export function mcpConnectLocation(): string {
+  return `${t("nav.settings")} → ${t("settings.connections.title")} → ${t("settings.mcp.title")}`;
+}
 
-export const MCP_CONNECT_HINT = `Please connect it in ${MCP_CONNECT_LOCATION}.`;
+export function mcpConnectHint(): string {
+  return t("app.mcp.hint.connect", { location: mcpConnectLocation() });
+}
 
 /** For a server that *is* connected here — nothing to add, something to renew. */
-export const MCP_RETRY_HINT =
-  `It may be offline, or its connection may need renewing in ${MCP_CONNECT_LOCATION}.`;
+export function mcpRetryHint(): string {
+  return t("app.mcp.hint.retry", { location: mcpConnectLocation() });
+}
 
 /**
- * What a surface's data comes from, as the opening of a sentence. The rest of
- * the sentence depends on which way the server failed, so it is built rather
- * than written out.
+ * What a surface's data is. The sentence is whole per subject and per way the
+ * server failed: built from an opening and an ending, it read in English only.
  */
-export const MCP_SLEEP_SUBJECT = "Sleep data comes from";
-export const MCP_SLEEP_TREND_SUBJECT = "A sleep trend needs";
-export const MCP_DAILY_HEALTH_SUBJECT = "Steps and calories come from";
+export type McpSubject = "sleep" | "sleepTrend" | "dailyHealth";
+export const MCP_SLEEP_SUBJECT: McpSubject = "sleep";
+export const MCP_SLEEP_TREND_SUBJECT: McpSubject = "sleepTrend";
+export const MCP_DAILY_HEALTH_SUBJECT: McpSubject = "dailyHealth";
 
 /**
  * For empties *inside* a screen whose banner already gave the directions — the
  * Sleep screen has four, and repeating the full sentence in each turned one
  * problem into four paragraphs of the same advice.
  */
-export const MCP_UNAVAILABLE_SHORT = "The COROS MCP server is not connected.";
-export const MCP_UNREACHABLE_SHORT = "The COROS MCP server could not be reached.";
+export function mcpUnavailableShort(): string {
+  return t("app.mcp.short.disconnected");
+}
+export function mcpUnreachableShort(): string {
+  return t("app.mcp.short.unreachable");
+}
 
 /** A stat tile's one short line. The sentence it abbreviates sits below it. */
-export const MCP_DAILY_HEALTH_TILE_DETAIL = "needs COROS MCP";
+export function mcpDailyHealthTileDetail(): string {
+  return t("app.mcp.tileDetail");
+}
 
 /**
  * The same room, for a server that is there and did not answer: a stat tile's
- * line and a panel heading. One constant because it is one piece of news —
+ * line and a panel heading. One message because it is one piece of news —
  * "connect it" is what differs per surface, not this.
  */
-export const MCP_UNREACHABLE_LABEL = "COROS MCP unreachable";
+export function mcpUnreachableLabel(): string {
+  return t("app.mcp.unreachableLabel");
+}
 
 /**
  * `"ready"` is a server that answered (the data may still be empty);
@@ -74,14 +93,14 @@ export function isMcpFailure(state: McpConnectionState): boolean {
  * anyone to connect a server they already have.
  */
 export function mcpNotice(
-  subject: string,
+  subject: McpSubject,
   state: McpConnectionState
 ): string | null {
   if (state === "disconnected") {
-    return `${subject} the COROS MCP server, which is not connected. ${MCP_CONNECT_HINT}`;
+    return t(`app.mcp.${subject}.disconnected` as const, { hint: mcpConnectHint() });
   }
   if (state === "unreachable") {
-    return `${subject} the COROS MCP server, which could not be reached. ${MCP_RETRY_HINT}`;
+    return t(`app.mcp.${subject}.unreachable` as const, { hint: mcpRetryHint() });
   }
   return null;
 }
@@ -89,7 +108,7 @@ export function mcpNotice(
 /** The notice, or the copy that was there before it. */
 export function mcpTextOr(
   state: McpConnectionState,
-  subject: string,
+  subject: McpSubject,
   fallback: string
 ): string {
   return mcpNotice(subject, state) ?? fallback;
@@ -104,8 +123,8 @@ export function mcpShortTextOr(
   lead: string,
   fallback: string
 ): string {
-  if (state === "disconnected") return `${lead} ${MCP_UNAVAILABLE_SHORT}`;
-  if (state === "unreachable") return `${lead} ${MCP_UNREACHABLE_SHORT}`;
+  if (state === "disconnected") return `${lead} ${mcpUnavailableShort()}`;
+  if (state === "unreachable") return `${lead} ${mcpUnreachableShort()}`;
   return fallback;
 }
 
@@ -122,6 +141,6 @@ export function mcpTitleOr(
   fallback: string
 ): string {
   if (state === "disconnected") return disconnected;
-  if (state === "unreachable") return MCP_UNREACHABLE_LABEL;
+  if (state === "unreachable") return mcpUnreachableLabel();
   return fallback;
 }

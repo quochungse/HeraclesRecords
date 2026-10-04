@@ -84,6 +84,7 @@ import { LabourCelebration, LabourToastCard } from "./records/LabourNotices";
 // bundling the 1024px, 840 KB source.
 import appLogo from "../build/icons/128x128.png";
 import { t } from "./i18n/core";
+import { useI18n } from "./i18n/useI18n";
 import changelogMarkdown from "../CHANGELOG.md?raw";
 
 type View = PrimaryView;
@@ -197,7 +198,7 @@ function DeferredSurfaceFallback({ label }: { label: string }) {
   return (
     <div className="empty-state" role="status" aria-live="polite">
       <Loader2 className="spin" size={24} aria-hidden="true" />
-      <span>Loading {label}…</span>
+      <span>{t("app.loadingView", { view: label })}</span>
     </div>
   );
 }
@@ -223,14 +224,14 @@ class TrainingLibraryErrorBoundary extends Component<
     return (
       <section className="empty-state" role="alert">
         <AlertCircle size={28} aria-hidden="true" />
-        <strong>Training Library could not render</strong>
+        <strong>{t("app.libraryFailed")}</strong>
         <span>{this.state.error.message}</span>
         <button
           type="button"
           className="primary-button"
           onClick={() => this.setState({ error: null })}
         >
-          Try again
+          {t("common.tryAgain")}
         </button>
       </section>
     );
@@ -263,7 +264,7 @@ function getLatestReleasePreview(changelog: string): {
     return {
       version: "0.0.0-dev-preview",
       previousVersion: "0.0.0",
-      releaseNotes: "No released changelog entries found.",
+      releaseNotes: "No released changelog entries found.", // i18n-ignore: development preview only
     };
   }
 
@@ -296,6 +297,9 @@ async function listAllTrainingHubActivities(
 }
 
 export default function App() {
+  // Subscribed here so a language switch redraws the whole tree; a memoised
+  // screen below that shows words subscribes on its own as well.
+  useI18n();
   const api: HeraclesRecordsApi | undefined = window.heraclesRecords;
   const [activeView, setActiveView] = useState<View>(readStartupView);
   /**
@@ -535,7 +539,7 @@ export default function App() {
     if (appUpdateSnapshot.status === "error") {
       installAcceptedVersionRef.current = null;
       setError(
-        appUpdateSnapshot.error ?? "Could not download the update.",
+        appUpdateSnapshot.error ?? t("app.update.downloadFailed"),
       );
     }
   }, [
@@ -745,7 +749,7 @@ export default function App() {
       .map((result) => toErrorMessage(result.reason));
 
     if (results.every((result) => result.status === "rejected")) {
-      throw new Error(failures[0] ?? "Training Hub data could not be loaded.");
+      throw new Error(failures[0] ?? t("app.trainingHubLoadFailed"));
     }
   }, [api]);
 
@@ -1091,7 +1095,7 @@ export default function App() {
 
     if (devUpdateSimulation) {
       setMessage(
-        `Test update ${devUpdateSimulation.availableVersion} is available.`,
+        `Test update ${devUpdateSimulation.availableVersion} is available.`, // i18n-ignore: development build only
       );
       return;
     }
@@ -1106,11 +1110,11 @@ export default function App() {
         // checkForAppUpdates() returns the snapshot untouched when the updater
         // is disabled, so nothing below would fire and the click would look
         // broken.
-        setMessage("Updates are only available in installed builds.");
+        setMessage(t("app.update.notInstalled"));
       } else if (snapshot.status === "not-available") {
-        setMessage("You're on the latest version.");
+        setMessage(t("app.update.latest"));
       } else if (snapshot.status === "error") {
-        setError(snapshot.error ?? "Could not check for updates.");
+        setError(snapshot.error ?? t("app.update.checkFailed"));
       }
     } catch (caught) {
       setError(toErrorMessage(caught));
@@ -1122,7 +1126,7 @@ export default function App() {
   function handleInstallUpdate() {
     if (devUpdateSimulation) {
       setMessage(
-        "Test update install skipped — the development build has no updater.",
+        "Test update install skipped — the development build has no updater.", // i18n-ignore: development build only
       );
       return;
     }
@@ -1132,7 +1136,7 @@ export default function App() {
       .then((result) => {
         if (result?.installMethod === "manual") {
           setMessage(
-            "Opened the GitHub download page. Install the new build over Heracles Records in Applications.",
+            t("app.update.openedDownload"),
           );
         }
       })
@@ -1147,7 +1151,7 @@ export default function App() {
       // reachable; nothing is fetched.
       setDevUpdateSimulation({ ...devUpdateSimulation, status: "downloaded" });
       setMessage(
-        `Test update ${devUpdateSimulation.availableVersion} is ready to install. Nothing was downloaded.`,
+        `Test update ${devUpdateSimulation.availableVersion} is ready to install. Nothing was downloaded.`, // i18n-ignore: development build only
       );
       return;
     }
@@ -1163,7 +1167,7 @@ export default function App() {
       setAppUpdateSnapshot(snapshot);
 
       if (snapshot.status === "error") {
-        setError(snapshot.error ?? "Could not download the update.");
+        setError(snapshot.error ?? t("app.update.downloadFailed"));
       }
     } catch (caught) {
       setError(toErrorMessage(caught));
@@ -1176,7 +1180,7 @@ export default function App() {
     if (devUpdateSimulation) {
       setDevUpdatePreviewKey(undefined);
       setMessage(
-        `Test update ${version} accepted. No files were downloaded in the development build.`,
+        `Test update ${version} accepted. No files were downloaded in the development build.`, // i18n-ignore: development build only
       );
       return;
     }
@@ -1218,7 +1222,7 @@ export default function App() {
     if (devUpdateSimulation) {
       setDevUpdateSimulation(null);
       setDevUpdatePreviewKey(undefined);
-      setMessage("Test update cleared. Showing the real update status again.");
+      setMessage("Test update cleared. Showing the real update status again."); // i18n-ignore: development build only
       return;
     }
 
@@ -1299,11 +1303,11 @@ export default function App() {
       if (result.twoFactorRequired) {
         setTrainingHub2faEmail(result.email ?? trainingHubEmail);
         setTrainingHub2faCode("");
-        setMessage("Enter the verification code we emailed you.");
+        setMessage(t("app.coros.enterCode"));
       } else {
         await finishTrainingHubConnect(
           result.status,
-          "COROS Training Hub connected.",
+          t("app.coros.connected"),
         );
       }
     } catch (caught) {
@@ -1326,7 +1330,7 @@ export default function App() {
 
     try {
       const status = await api.verifyTrainingHubTwoFactor(trainingHub2faCode);
-      await finishTrainingHubConnect(status, "COROS Training Hub connected.");
+      await finishTrainingHubConnect(status, t("app.coros.connected"));
     } catch (caught) {
       setError(toErrorMessage(caught));
     } finally {
@@ -1344,7 +1348,7 @@ export default function App() {
 
     try {
       await api.resendTrainingHubTwoFactorCode();
-      setMessage("We sent a new verification code to your email.");
+      setMessage(t("app.coros.codeResent"));
     } catch (caught) {
       setError(toErrorMessage(caught));
     } finally {
@@ -1376,11 +1380,11 @@ export default function App() {
       if (result.twoFactorRequired) {
         setTrainingHub2faEmail(result.email ?? trainingHubStatus?.email ?? null);
         setTrainingHub2faCode("");
-        setMessage("Enter the verification code we emailed you.");
+        setMessage(t("app.coros.enterCode"));
       } else {
         await finishTrainingHubConnect(
           result.status,
-          "COROS Training Hub connected with your saved account.",
+          t("app.coros.connectedSaved"),
         );
       }
     } catch (caught) {
@@ -1402,7 +1406,7 @@ export default function App() {
     try {
       setTrainingHubStatus(await api.logoutTrainingHub());
       clearTrainingHubData();
-      setMessage("COROS Training Hub disconnected.");
+      setMessage(t("app.coros.disconnected"));
     } catch (caught) {
       setError(toErrorMessage(caught));
     } finally {
@@ -1440,7 +1444,7 @@ export default function App() {
 
     try {
       await refreshTrainingHub();
-      setMessage("COROS Training Hub analytics refreshed.");
+      setMessage(t("app.coros.refreshed"));
     } catch (caught) {
       setError(toErrorMessage(caught));
     } finally {
@@ -1465,7 +1469,7 @@ export default function App() {
 
     try {
       await refreshTrainingHub();
-      setMessage("Refreshed.");
+      setMessage(t("app.refreshed"));
     } catch (caught) {
       await reportTrainingHubError(caught);
     } finally {
@@ -1499,7 +1503,7 @@ export default function App() {
 
       if (result.saved) {
         setMessage(
-          `Saved ${format?.label ?? "activity"} file to ${result.filePath}.`,
+          t("app.savedFile", { format: format?.label ?? t("app.activityFile"), path: result.filePath ?? "" }),
         );
       }
     } catch (caught) {
@@ -1740,7 +1744,7 @@ export default function App() {
       void handleTrainingHubActivityDetail(activity);
       setActiveView("training");
     } else {
-      setMessage("That activity is not in the loaded history yet. Opening Activities.");
+      setMessage(t("app.activityNotLoaded"));
       setActiveView("training");
     }
   }
@@ -1836,7 +1840,7 @@ export default function App() {
                 trainingOverview={
                   <div className="dashboard-block">
                     <Suspense
-                      fallback={<DeferredSurfaceFallback label="training" />}
+                      fallback={<DeferredSurfaceFallback label={t("nav.overview")} />}
                     >
                       <LazyTrainingOverview
                         api={api}
@@ -1877,7 +1881,7 @@ export default function App() {
               />
             ) : null}
             {activeView === "training" ? (
-              <Suspense fallback={<DeferredSurfaceFallback label="activities" />}>
+              <Suspense fallback={<DeferredSurfaceFallback label={t("nav.training")} />}>
                 <LazyActivitiesView
                   api={api}
                   status={trainingHubStatus}
@@ -1907,7 +1911,7 @@ export default function App() {
                     trainingHubStatus?.authenticated ? (
                       <TrainingLibrarySkeleton />
                     ) : (
-                      <DeferredSurfaceFallback label="Training Library" />
+                      <DeferredSurfaceFallback label={t("nav.library")} />
                     )
                   }
                 >
@@ -1927,7 +1931,7 @@ export default function App() {
               </TrainingLibraryErrorBoundary>
             ) : null}
             {activeView === "running" ? (
-              <Suspense fallback={<DeferredSurfaceFallback label="running" />}>
+              <Suspense fallback={<DeferredSurfaceFallback label={t("nav.running")} />}>
                 <LazyRunningView
                   api={api}
                   activities={trainingHubActivities}
@@ -1953,7 +1957,7 @@ export default function App() {
               </Suspense>
             ) : null}
             {activeView === "cycling" ? (
-              <Suspense fallback={<DeferredSurfaceFallback label="cycling" />}>
+              <Suspense fallback={<DeferredSurfaceFallback label={t("nav.cycling")} />}>
                 <LazyCyclingView
                   api={api}
                   activities={trainingHubActivities}
@@ -1979,7 +1983,7 @@ export default function App() {
               </Suspense>
             ) : null}
             {activeView === "hiking" ? (
-              <Suspense fallback={<DeferredSurfaceFallback label="hiking" />}>
+              <Suspense fallback={<DeferredSurfaceFallback label={t("nav.hiking")} />}>
                 <LazyHikingView
                   api={api}
                   activities={trainingHubActivities}
@@ -2005,7 +2009,7 @@ export default function App() {
               </Suspense>
             ) : null}
             {activeView === "strength" ? (
-              <Suspense fallback={<DeferredSurfaceFallback label="strength" />}>
+              <Suspense fallback={<DeferredSurfaceFallback label={t("nav.strength")} />}>
                 <LazyStrengthView
                   api={api}
                   status={trainingHubStatus}
@@ -2029,7 +2033,7 @@ export default function App() {
               </Suspense>
             ) : null}
             {activeView === "sleep" ? (
-              <Suspense fallback={<DeferredSurfaceFallback label="sleep" />}>
+              <Suspense fallback={<DeferredSurfaceFallback label={t("nav.sleep")} />}>
                 <LazySleepDetailsView
                   api={api}
                   connected={Boolean(trainingHubStatus?.authenticated)}
@@ -2042,7 +2046,7 @@ export default function App() {
               </Suspense>
             ) : null}
             {activeView === "profile" ? (
-              <Suspense fallback={<DeferredSurfaceFallback label="Personal" />}>
+              <Suspense fallback={<DeferredSurfaceFallback label={t("nav.profile")} />}>
                 <LazyProfileView
                   api={api}
                   status={trainingHubStatus}
@@ -2055,7 +2059,7 @@ export default function App() {
             ) : null}
             {activeView === "places" ? (
               <Suspense
-                fallback={<DeferredSurfaceFallback label="training map" />}
+                fallback={<DeferredSurfaceFallback label={t("nav.places")} />}
               >
                 <LazyTrainingMapView
                   activities={trainingHubActivities}
@@ -2082,7 +2086,7 @@ export default function App() {
             ) : null}
             {activeView === "records" ? (
               <Suspense
-                fallback={<DeferredSurfaceFallback label="Hall of Records" />}
+                fallback={<DeferredSurfaceFallback label={t("nav.records")} />}
               >
                 <LazyHallOfRecordsView
                   api={api}
@@ -2095,7 +2099,7 @@ export default function App() {
                   onOpenActivity={(activity) =>
                     isSampleRecordsActivity(activity.activityId)
                       ? setMessage(
-                          "A sample milestone: its activity exists only in the sample, so there is no page to open.",
+                          "A sample milestone: its activity exists only in the sample, so there is no page to open.", // i18n-ignore: development samples only
                         )
                       : openActivityFrom(activity.activityId, "records")
                   }
@@ -2134,7 +2138,7 @@ export default function App() {
                   trainingHubStatus?.authenticated ? (
                     <CalendarSkeleton />
                   ) : (
-                    <DeferredSurfaceFallback label="calendar" />
+                    <DeferredSurfaceFallback label={t("nav.calendar")} />
                   )
                 }
               >
@@ -2162,7 +2166,7 @@ export default function App() {
                 aria-hidden={activeView !== "coach"}
               >
                 <Suspense
-                  fallback={<DeferredSurfaceFallback label="Coach" />}
+                  fallback={<DeferredSurfaceFallback label={t("nav.coach")} />}
                 >
                   <LazyChatView
                     api={api}
@@ -2248,8 +2252,6 @@ interface OverviewTabProps {
   trainingSportTypes: TrainingHubSportType[];
 }
 
-/** What the subtitle says when nothing else is known yet. */
-const OVERVIEW_FALLBACK_SUBTITLE = "Here is where your training stands today.";
 
 function OverviewTab({
   trainingOverview,
@@ -2262,6 +2264,7 @@ function OverviewTab({
   trainingSportTypes,
 }: OverviewTabProps) {
   const greeting = useTimeOfDayGreeting();
+  const { locale } = useI18n();
   const { unitSystem } = useUnitSystem();
   // `greeting` is a dependency on purpose: it flips at the morning/afternoon/
   // evening boundaries, which is exactly when the subtitle should turn over.
@@ -2277,10 +2280,12 @@ function OverviewTab({
           sleep: trainingSnapshot?.sleep ?? null,
           unitSystem,
         },
-        OVERVIEW_FALLBACK_SUBTITLE,
+        // What the subtitle says when nothing else is known yet.
+        t("app.overview.fallbackSubtitle"),
       ),
     [
       greeting,
+      locale,
       trainingConnected,
       trainingUpcomingWorkouts,
       trainingActivities,
@@ -2302,8 +2307,8 @@ function OverviewTab({
           type="button"
           onClick={onRefresh}
           disabled={refreshing}
-          title={refreshing ? "Refreshing…" : "Refresh COROS data"}
-          aria-label={refreshing ? "Refreshing" : "Refresh"}
+          title={refreshing ? t("app.refreshing") : t("app.refreshCoros")}
+          aria-label={refreshing ? t("app.refreshing") : t("common.refresh")}
           aria-busy={refreshing}
         >
           <RefreshCw
@@ -2409,7 +2414,7 @@ function Toaster({
   }
 
   return (
-    <div className="toast-stack" role="region" aria-label="Notifications">
+    <div className="toast-stack" role="region" aria-label={t("app.notifications")}>
       {children}
       {toasts.map((toast) => (
         <ToastCard key={toast.id} toast={toast} onDismiss={onDismiss} />
@@ -2441,7 +2446,7 @@ function ToastCard({
       <button
         className="toast-close"
         type="button"
-        aria-label="Dismiss notification"
+        aria-label={t("app.dismissNotification")}
         onClick={() => onDismiss(toast.id)}
       >
         <X size={15} aria-hidden="true" />
@@ -2460,8 +2465,9 @@ function BridgeMissing() {
     <section className="panel">
       <div className="empty-state">
         <AlertCircle size={26} aria-hidden="true" />
+        {/* i18n-ignore: a developer's error, never seen in a build */}
         <strong>Electron bridge unavailable</strong>
-        <span>Run the app with npm run dev or npm start.</span>
+        <span>Run the app with npm run dev or npm start.</span>{/* i18n-ignore */}
       </div>
     </section>
   );
