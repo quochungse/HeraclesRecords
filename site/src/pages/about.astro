@@ -1,0 +1,66 @@
+---
+import Base from "../layouts/Base.astro";
+
+const repo = "https://github.com/quochungse/HeraclesRecords";
+---
+
+<Base
+  title="About"
+  description="Why Heracles Records exists, where its name comes from, and how it is made."
+>
+  <article class="prose">
+    <h1>About Heracles Records</h1>
+    <p class="meta">Training records, analytics and AI, alongside your COROS data.</p>
+
+    <h2>Why it exists</h2>
+    <p>
+      Heracles Records began as a fork of CorosLink, a desktop companion for COROS watches. As
+      my own training grew, what I wanted from it changed: a full record of everything I had
+      done, analytics deeper than a summary screen, and an AI coach that reads all of it. A
+      complete training system rather than a set of tools. So I rebuilt the app around that.
+    </p>
+    <p>
+      If you are looking for music and media on your watch, offline maps and routes, watch faces
+      or gear tracking, CorosLink does those well and is the app to use. They are not part of
+      Heracles Records.
+    </p>
+
+    <h2>The name</h2>
+    <p>
+      Heracles was given twelve labours, each one impossible until it was done. Training is the
+      same kind of work: a long run that once looked out of reach becomes an ordinary Sunday. The
+      app keeps every session as a record of that work, and its Hall of Records names twelve
+      kinds of achievement after the labours. <a href="/labours">Meet the Twelve Labours</a>.
+    </p>
+
+    <h2>How it is made</h2>
+    <ul>
+      <li>
+        <strong>Open source.</strong> The whole app is on <a href={repo}>GitHub</a> under the MIT
+        license. Heracles Records is based on CorosLink by AtoZ, also MIT, and credits every
+        other piece of software and font it ships in its third-party notices.
+      </li>
+      <li>
+        <strong>Local first.</strong> No account, no server. Your training stays on your computer,
+        and the services you connect are the only places it goes.
+      </li>
+      <li>
+        <strong>Independent.</strong> Heracles Records is not made, endorsed or supported by COROS.
+        COROS is a trademark of COROS Wearables, Inc., and appears here only to say which watches
+        and accounts the app works with.
+      </li>
+    </ul>
+
+    <h2>Get in touch</h2>
+    <ul>
+      <li>
+        Found a bug or have an idea? <a href={`${repo}/issues/new`}>Open an issue</a>, or use
+        <strong>Settings → About → Report an issue</strong> in the app.
+      </li>
+      <li>
+        If the app helps your training, you can
+        <a href="https://buymeacoffee.com/quochungse">buy me a coffee</a>.
+      </li>
+    </ul>
+  </article>
+</Base>

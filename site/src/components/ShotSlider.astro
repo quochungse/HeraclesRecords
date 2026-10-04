@@ -1,0 +1,233 @@
+---
+// A few screenshots in one frame, crossfading on their own. The slides share
+// one grid cell, so the frame keeps the first shot's size and nothing below it
+// moves. Autoplay stops for good once the visitor picks a slide and pauses while
+// the pointer or focus is inside or the tab is hidden. With reduced motion asked
+// for, slides still advance (the page is about what they show) but swap at once,
+// with no fade.
+import { shot } from "../assets";
+
+interface Slide {
+  name: string;
+  alt: string;
+  label: string;
+  caption: string;
+}
+
+interface Props {
+  slides: Slide[];
+  label: string;
+  /** Milliseconds each slide stays. */
+  interval?: number;
+}
+
+const { slides, label, interval = 6000 } = Astro.props;
+const images = slides.map((slide) => ({ ...slide, image: shot(slide.name) }));
+---
+
+<div class="slider" role="region" aria-roledescription="carousel" aria-label={label} style={`--interval: ${interval}ms`} data-interval={interval}>
+  <div class="slider-frame">
+    {
+      images.map((slide, index) => (
+        <figure
+          class="slider-slide"
+          role="group"
+          aria-roledescription="slide"
+          aria-label={`${index + 1} of ${images.length}: ${slide.label}`}
+          aria-hidden={index === 0 ? undefined : "true"}
+          data-active={index === 0 ? "true" : undefined}
+        >
+          <img
+            class="shot"
+            src={slide.image.src}
+            width={slide.image.width}
+            height={slide.image.height}
+            alt={slide.alt}
+            loading={index === 0 ? "eager" : "lazy"}
+            decoding="async"
+          />
+        </figure>
+      ))
+    }
+  </div>
+  <div class="slider-tabs">
+    {
+      images.map((slide, index) => (
+        <button type="button" class="slider-tab" aria-pressed={index === 0 ? "true" : "false"} data-index={index}>
+          <span class="slider-progress" aria-hidden="true" />
+          <strong>{slide.label}</strong>
+          <span class="slider-caption">{slide.caption}</span>
+        </button>
+      ))
+    }
+  </div>
+</div>
+
+<script>
+  for (const slider of document.querySelectorAll<HTMLElement>(".slider")) {
+    const slides = [...slider.querySelectorAll<HTMLElement>(".slider-slide")];
+    const tabs = [...slider.querySelectorAll<HTMLButtonElement>(".slider-tab")];
+    const interval = Number(slider.dataset.interval) || 6000;
+    let current = 0;
+    let timer: number | undefined;
+    let stopped = false;
+
+    const show = (index: number) => {
+      current = (index + slides.length) % slides.length;
+      slides.forEach((slide, i) => {
+        slide.toggleAttribute("data-active", i === current);
+        if (i === current) slide.removeAttribute("aria-hidden");
+        else slide.setAttribute("aria-hidden", "true");
+        // The next slide's image may still be lazy; ask for it now.
+        if (i === current) slide.querySelector("img")?.setAttribute("loading", "eager");
+      });
+      tabs.forEach((tab, i) => tab.setAttribute("aria-pressed", String(i === current)));
+      // Restart the progress bar's animation on the tab that is now active.
+      const bar = tabs[current]?.querySelector<HTMLElement>(".slider-progress");
+      if (bar) {
+        bar.style.animation = "none";
+        void bar.offsetWidth;
+        bar.style.animation = "";
+      }
+    };
+
+    const schedule = () => {
+      window.clearTimeout(timer);
+      if (stopped || slider.dataset.paused === "true" || document.hidden) return;
+      timer = window.setTimeout(() => {
+        show(current + 1);
+        schedule();
+      }, interval);
+    };
+
+    const pause = (paused: boolean) => {
+      slider.dataset.paused = String(paused);
+      schedule();
+    };
+
+    tabs.forEach((tab, index) =>
+      tab.addEventListener("click", () => {
+        stopped = true;
+        slider.dataset.stopped = "true";
+        show(index);
+        schedule();
+      }),
+    );
+    slider.addEventListener("pointerenter", () => pause(true));
+    slider.addEventListener("pointerleave", () => pause(false));
+    slider.addEventListener("focusin", () => pause(true));
+    slider.addEventListener("focusout", () => pause(false));
+    document.addEventListener("visibilitychange", schedule);
+
+    schedule();
+  }
+</script>
+
+<style>
+  .slider-frame {
+    display: grid;
+  }
+
+  .slider-slide {
+    grid-area: 1 / 1;
+    margin: 0;
+    opacity: 0;
+    visibility: hidden;
+    transition:
+      opacity 600ms ease,
+      visibility 0s linear 600ms;
+  }
+
+  .slider-slide[data-active] {
+    opacity: 1;
+    visibility: visible;
+    transition: opacity 600ms ease;
+  }
+
+  .slider-tabs {
+    display: grid;
+    grid-auto-columns: minmax(0, 1fr);
+    grid-auto-flow: column;
+    gap: 20px;
+    margin-top: 24px;
+  }
+
+  @media (max-width: 640px) {
+    .slider-tabs {
+      grid-auto-flow: row;
+      gap: 12px;
+    }
+  }
+
+  .slider-tab {
+    position: relative;
+    display: grid;
+    gap: 4px;
+    padding: 14px 0 0;
+    border: 0;
+    border-top: 2px solid var(--line);
+    background: none;
+    color: var(--ink-3);
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+  }
+
+  .slider-tab strong {
+    color: var(--ink-2);
+    font-size: 15px;
+  }
+
+  .slider-caption {
+    font-size: 14px;
+    line-height: 1.5;
+  }
+
+  .slider-tab[aria-pressed="true"] strong {
+    color: var(--ink);
+  }
+
+  .slider-tab[aria-pressed="true"] .slider-caption {
+    color: var(--ink-2);
+  }
+
+  /* The bar along the top of the active tab fills over the slide's interval:
+     it is how the visitor sees that the frame will change on its own. */
+  .slider-progress {
+    position: absolute;
+    top: -2px;
+    left: 0;
+    height: 2px;
+    width: 0;
+    background: var(--accent);
+  }
+
+  .slider-tab[aria-pressed="true"] .slider-progress {
+    width: 100%;
+    animation: slider-fill var(--interval) linear;
+  }
+
+  .slider[data-paused="true"] .slider-tab[aria-pressed="true"] .slider-progress {
+    animation-play-state: paused;
+  }
+
+  .slider[data-stopped="true"] .slider-tab[aria-pressed="true"] .slider-progress {
+    animation: none;
+  }
+
+  @keyframes slider-fill {
+    from {
+      width: 0;
+    }
+    to {
+      width: 100%;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .slider-slide,
+    .slider-slide[data-active] {
+      transition: none;
+    }
+  }
+</style>

@@ -1,31 +1,108 @@
 ---
 import Base from "../layouts/Base.astro";
 import DownloadButton from "../components/DownloadButton.astro";
+import LabourEmblem from "../components/LabourEmblem.astro";
+import Shot from "../components/Shot.astro";
+import ShotSlider from "../components/ShotSlider.astro";
 import icon from "../../../build/icon-256.png";
-import overview from "../../../docs/readme/01-overview.webp";
+import { LABOURS } from "../../../src/records/labours";
 
-const repo = "https://github.com/quochungse/HeraclesRecords";
+const today = [
+  {
+    name: "01-overview",
+    alt: "Overview: recovery, the week's training, last night's sleep and what is planned next",
+    label: "Overview",
+    caption: "Recovery, the week's load, last night's sleep and the next session on your plan.",
+  },
+  {
+    name: "08-sleep",
+    alt: "Sleep: stages, HRV and stress across the night",
+    label: "Sleep",
+    caption: "Every night and nap, its stages, HRV and stress across the night.",
+  },
+];
 
-const features = [
+// The four starting points the app offers when an analysis is created
+// (electron/coachAnalysisPresets.ts), in the words a visitor needs.
+const analyses = [
   {
-    name: "Training",
-    text: "Every session COROS holds, with a screen each for running, cycling, hiking and strength, plus sleep, recovery and every place you have trained.",
+    when: "After each activity",
+    title: "Post-activity debrief",
+    text: "How the session went against your recent training, and anything worth acting on.",
   },
   {
-    name: "Planning",
-    text: "Your COROS workouts, plans and calendar. Build, edit and schedule them here, and they are saved straight to your COROS account, so your watch has them.",
+    when: "Every morning",
+    title: "Morning briefing",
+    text: "What today should look like, given the last few days and what is on the calendar.",
   },
   {
-    name: "Coach",
-    text: "An AI coach that has read your training. It answers with the numbers and charts behind them, drafts workouts and plans, and changes nothing without you.",
+    when: "Every Sunday",
+    title: "Weekly review",
+    text: "The week as a whole: what held, what slipped and what it means for the next one.",
   },
   {
-    name: "Hall of Records",
-    text: "Every first, record and streak, month by month, and the Twelve Labours: twelve kinds of achievement in three stages each.",
+    when: "Every Monday",
+    title: "Next week's plan",
+    text: "The week's sessions drafted from recent training, waiting for your approval.",
+  },
+];
+
+const trust = [
+  { title: "Free and open source", text: "MIT licensed, with the source on GitHub." },
+  { title: "Any COROS watch", text: "PACE, APEX, VERTIX, NOMAD and the rest, through your COROS account." },
+  { title: "No account, no server", text: "Your training stays on your computer." },
+  { title: "macOS, Windows, Linux", text: "One app on every computer you train from." },
+];
+
+const sports = [
+  {
+    shot: "03-running",
+    alt: "Running: weekly volume, load ratio, VO2max and threshold",
+    title: "Running",
+    text: "Weekly volume, load ratio, VO₂max and threshold pace. Switch to Trail and the screen reads climb instead of pace.",
   },
   {
-    name: "Your data",
-    text: "Kept on your computer. Sync two computers through your own Google Drive, or back everything up to one file you keep.",
+    shot: "05-ride",
+    alt: "A ride: normalised power, intensity, TSS and peak power",
+    title: "Rides",
+    text: "Normalised power, IF and TSS against your FTP, peak power from 5 seconds to an hour, power zones and the climbs.",
+  },
+  {
+    shot: "06-hike",
+    alt: "A hike: moving time, ascent, terrain and climbing rate",
+    title: "Hikes",
+    text: "The moving time inside a long day, your rests, the terrain you covered and your climbing rate.",
+  },
+  {
+    shot: "07-strength",
+    alt: "Strength: sessions and a 3D muscle map",
+    title: "Strength",
+    text: "COROS strength sessions and Hevy workouts in one place, on a 3D map of the muscles you trained.",
+  },
+];
+
+const steps = [
+  { title: "Download", text: "Install Heracles Records on macOS, Windows or Linux." },
+  { title: "Sign in with COROS", text: "Your activities, sleep, workouts and plans arrive from your COROS account." },
+  { title: "Pick an AI for Coach", text: "Optional. Your ChatGPT account, a Claude subscription, an API key or a model on your own computer." },
+];
+
+const faq = [
+  {
+    q: "Is it made by COROS?",
+    a: "No. Heracles Records is an independent app. It reads your training through your own COROS account, the same way the COROS Training Hub website does.",
+  },
+  {
+    q: "Does it cost anything?",
+    a: "The app is free. Coach runs on an AI you choose: your own ChatGPT or Claude plan, a pay-as-you-go API key, or a free model on your own computer.",
+  },
+  {
+    q: "Can I use it without the AI coach?",
+    a: "Yes. Every screen but Coach works without one.",
+  },
+  {
+    q: "Where is my data?",
+    a: "On your computer. Nothing goes to the developer. If you sync two computers, it goes through your own Google Drive.",
   },
 ];
 ---
@@ -40,42 +117,258 @@ const features = [
       has read all of it, and a hall for every record you set along the way.
     </p>
     <div class="hero-download">
-      <DownloadButton>
-        <a class="button" href={repo}>Source on GitHub</a>
-      </DownloadButton>
+      <DownloadButton />
     </div>
-    <p class="hero-meta">Free and open source (MIT)</p>
   </section>
 
-  <section class="wrap shot">
-    <img
-      src={overview.src}
-      width={overview.width}
-      height={overview.height}
-      alt="Overview: recovery, the week's training, last night's sleep and what is planned next"
-    />
-  </section>
-
-  <section class="wrap features" aria-labelledby="features-title">
-    <h2 id="features-title" class="visually-hidden">What it does</h2>
+  <section class="wrap trust" aria-label="At a glance">
     <ul>
       {
-        features.map((feature) => (
+        trust.map((item) => (
           <li>
-            <h3>{feature.name}</h3>
-            <p>{feature.text}</p>
+            <strong>{item.title}</strong>
+            <span>{item.text}</span>
           </li>
         ))
       }
     </ul>
   </section>
 
-  <section class="wrap note">
-    <p>
-      Heracles Records reads your training through your own COROS account, so it works with
-      any COROS watch that syncs there. It has no account of its own and its developer runs no
-      servers. <a href="/privacy.html">Privacy policy</a>
-    </p>
+  <section class="wrap section split">
+    <div>
+      <p class="eyebrow">Today</p>
+      <h2 class="section-title">Start the day knowing where you stand.</h2>
+      <p class="lede">
+        Recovery, the week's load, last night's sleep and the next session on your plan, on
+        one screen. Sleep keeps every night and nap, its stages, HRV and stress, long after
+        the nine weeks COROS holds.
+      </p>
+    </div>
+    <ShotSlider label="Today and Sleep" slides={today} />
+  </section>
+
+  <section class="wrap section">
+    <div class="section-head">
+      <p class="eyebrow">Every session</p>
+      <h2 class="section-title">Every session, read in depth.</h2>
+      <p class="lede">
+        Every session COROS holds, across every sport, in one list. Pick one to see its
+        heart-rate zones, running dynamics, power and every channel the watch recorded. A
+        run, a ride and a hike each get a page that reads what that sport is about.
+      </p>
+    </div>
+    <Shot name="04-run" alt="A run: map, pace, heart rate, running form and every channel" />
+    <div class="grid-2 sports">
+      {
+        sports.map((sport) => (
+          <figure class="figure">
+            <Shot name={sport.shot} alt={sport.alt} />
+            <figcaption>
+              <strong>{sport.title}</strong>: {sport.text}
+            </figcaption>
+          </figure>
+        ))
+      }
+    </div>
+    <figure class="figure route">
+      <Shot name="16-route" alt="A hike around Hàm Lợn replayed on a satellite map, coloured by elevation" />
+      <figcaption>
+        <strong>Every route, replayed.</strong> Open the map full size, colour the line by pace,
+        heart rate or elevation, and watch the route draw itself the way you covered it.
+      </figcaption>
+    </figure>
+  </section>
+
+  <section class="wrap section">
+    <div class="section-head">
+      <p class="eyebrow">Plan</p>
+      <h2 class="section-title">Plan it here, and your watch has it.</h2>
+      <p class="lede">
+        Your COROS workouts, plans and calendar. Everything you build, edit or schedule is
+        saved straight to your COROS account, so it is on your watch the next time it syncs.
+      </p>
+    </div>
+    <div class="grid-2">
+      <figure class="figure">
+        <Shot name="09-calendar" alt="Calendar: planned and completed sessions by month" />
+        <figcaption>
+          <strong>Calendar</strong>: planned and done side by side, by week or month. Drag a
+          session to another day and it moves on your COROS calendar too.
+        </figcaption>
+      </figure>
+      <figure class="figure">
+        <Shot name="10-library" alt="Training Library: a 12-week marathon plan, week by week" />
+        <figcaption>
+          <strong>Training Library</strong>: read, build, edit and duplicate workouts and plans,
+          and put a plan on the calendar with its compliance on every session.
+        </figcaption>
+      </figure>
+    </div>
+  </section>
+
+  <section class="wrap section">
+    <div class="section-head">
+      <p class="eyebrow">Coach</p>
+      <h2 class="section-title">A coach that has read your training.</h2>
+      <p class="lede">
+        Ask about a session, a week or how well you are recovering. Coach reads your COROS
+        data and answers with the numbers and the charts behind them.
+      </p>
+    </div>
+    <div class="grid-2">
+      <Shot name="11-coach" alt="Coach: an interval session analysed, with heart-rate and pace charts" />
+      <Shot name="12-coach-plan" alt="Coach: a marathon plan in the Workbench beside the conversation" />
+    </div>
+    <ul class="ticks columns">
+      <li><strong>Plans with you.</strong> The brief, the outline, then every session, saved to COROS and your calendar when you are happy with it.</li>
+      <li><strong>Proposes, never decides.</strong> Changes to your week arrive as a list you apply one line at a time.</li>
+      <li><strong>Your AI, your choice.</strong> ChatGPT, Claude, OpenRouter or a model on your own computer.</li>
+      <li><strong>Reads only what you allow.</strong> Each conversation has its own sources, and Coach sees nothing it is not given.</li>
+    </ul>
+
+    <div class="auto">
+      <div class="auto-intro">
+        <h3>Auto analysis: Coach checks in on its own.</h3>
+        <p>
+          Give a conversation a standing job and Coach does it without being asked: after a new
+          activity, on a schedule, or when something in your data turns. The answer lands in the
+          same conversation, ready when you open it.
+        </p>
+      </div>
+      <ul class="auto-list">
+        {
+          analyses.map((item) => (
+            <li>
+              <span class="auto-when">{item.when}</span>
+              <strong>{item.title}</strong>
+              <span>{item.text}</span>
+            </li>
+          ))
+        }
+      </ul>
+      <p class="auto-note">
+        Read-only by design: an analysis can read and suggest, never write. Anything it drafts
+        waits for you, and a monthly budget caps what it may spend.
+      </p>
+    </div>
+    <a class="more" href="/coach">How Coach works</a>
+  </section>
+
+  <section class="wrap section">
+    <div class="section-head center">
+      <p class="eyebrow">Hall of Records</p>
+      <h2 class="section-title">Twelve labours. Three stages each.</h2>
+      <p class="lede">
+        Every first, record and streak is kept, month by month. The Twelve Labours turn them
+        into standards: what a beginner reaches in a few weeks, a few months, a year. Speed and
+        VO₂max are graded for your age and sex, so a stage means the same for everyone.
+      </p>
+    </div>
+    <ul class="labours">
+      {
+        LABOURS.map((labour) => (
+          <li>
+            <LabourEmblem id={labour.id} size={88} />
+            <strong>{labour.short}</strong>
+            <span>{labour.category}</span>
+          </li>
+        ))
+      }
+    </ul>
+    <p class="center-link"><a class="more" href="/labours">See every labour and its stages</a></p>
+    <div class="grid-2 records">
+      <figure class="figure">
+        <Shot name="14-timeline" alt="Hall of Records: the timeline of milestones" />
+        <figcaption>
+          <strong>Timeline</strong>: every first, record and streak, and the labour stage it reached.
+        </figcaption>
+      </figure>
+      <figure class="figure">
+        <Shot name="15-places" alt="Where you've been: every place you trained, on a globe" />
+        <figcaption>
+          <strong>Where you've been</strong>: every place your training has taken you, on a globe.
+        </figcaption>
+      </figure>
+    </div>
+  </section>
+
+  <section class="wrap section">
+    <div class="section-head">
+      <p class="eyebrow">Appearance</p>
+      <h2 class="section-title">Light or dark, and your own colours.</h2>
+      <p class="lede">
+        Pick a colour mode and an accent, give each sport its own colour, choose metric or
+        imperial, and keep only the sport screens you train.
+      </p>
+    </div>
+    <div class="grid-2">
+      <figure class="figure">
+        <Shot name="19-appearance-dark" alt="Overview in the dark colour mode" />
+        <figcaption><strong>Dark</strong></figcaption>
+      </figure>
+      <figure class="figure">
+        <Shot name="20-appearance-light" alt="Overview in the light colour mode" />
+        <figcaption><strong>Light</strong></figcaption>
+      </figure>
+    </div>
+  </section>
+
+  <section class="wrap section split">
+    <div>
+      <p class="eyebrow">Your data</p>
+      <h2 class="section-title">Your training stays yours.</h2>
+      <ul class="ticks">
+        <li><strong>On your computer.</strong> The app has no account of its own and the developer runs no servers.</li>
+        <li><strong>Two computers, one record.</strong> Sync them through your own Google Drive. Passwords and sign-ins never leave the machine they were made on.</li>
+        <li><strong>One file to keep.</strong> Back everything up to a file and restore it whenever you like.</li>
+      </ul>
+      <a class="more" href="/privacy.html">Privacy policy</a>
+    </div>
+    <Shot name="18-sync" alt="Settings: sync through Google Drive" />
+  </section>
+
+  <section class="wrap section">
+    <div class="section-head center">
+      <p class="eyebrow">Get started</p>
+      <h2 class="section-title">Three steps to your first session.</h2>
+    </div>
+    <ol class="steps">
+      {
+        steps.map((step, index) => (
+          <li>
+            <span class="step-number">{index + 1}</span>
+            <h3>{step.title}</h3>
+            <p>{step.text}</p>
+          </li>
+        ))
+      }
+    </ol>
+    <p class="center-link"><a class="more" href="/guide/getting-started">Read the getting started guide</a></p>
+  </section>
+
+  <section class="wrap section faq">
+    <div class="section-head">
+      <p class="eyebrow">Questions</p>
+      <h2 class="section-title">Before you download.</h2>
+    </div>
+    <dl>
+      {
+        faq.map((item) => (
+          <div>
+            <dt>{item.q}</dt>
+            <dd>{item.a}</dd>
+          </div>
+        ))
+      }
+    </dl>
+    <a class="more" href="/guide/faq">Every question</a>
+  </section>
+
+  <section class="wrap section closing">
+    <h2 class="section-title">Every session a record.</h2>
+    <div class="closing-download">
+      <DownloadButton />
+    </div>
   </section>
 </Base>
 
@@ -91,7 +384,6 @@ const features = [
   .hero-icon {
     width: 88px;
     height: 88px;
-    border-radius: 22px;
     margin-bottom: 28px;
   }
 
@@ -121,64 +413,258 @@ const features = [
     margin-top: 32px;
   }
 
-  .hero-meta {
-    margin: 18px 0 0;
-    color: var(--ink-3);
-    font-size: 14px;
-  }
-
-  .shot img {
-    display: block;
-    width: 100%;
-    border: 1px solid var(--line);
-    border-radius: var(--radius-lg);
-    box-shadow: var(--shot-shadow);
-  }
-
-  .features ul {
+  .trust ul {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-    gap: 20px;
-    margin: 72px 0 0;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 24px;
+    margin: 56px 0 0;
     padding: 0;
     list-style: none;
   }
 
-  .features li {
-    padding: 22px 22px 24px;
+  .trust li {
+    display: grid;
+    gap: 4px;
+    padding-top: 16px;
+    border-top: 1px solid var(--line);
+  }
+
+  .trust strong {
+    font-size: 15px;
+  }
+
+  .trust span {
+    color: var(--ink-2);
+    font-size: 14px;
+    line-height: 1.5;
+  }
+
+  @media (max-width: 860px) {
+    .trust ul {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+  }
+
+  .split {
+    display: grid;
+    grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
+    gap: 48px;
+    align-items: center;
+  }
+
+  @media (max-width: 860px) {
+    .split {
+      grid-template-columns: 1fr;
+      gap: 32px;
+    }
+  }
+
+  .sports,
+  .records {
+    margin-top: 40px;
+  }
+
+  .route {
+    margin-top: 40px;
+  }
+
+  .columns {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0 32px;
+    margin-top: 32px;
+  }
+
+  @media (max-width: 760px) {
+    .columns {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  .auto {
+    margin-top: 48px;
+    padding: 28px;
+    border: 1px solid var(--line);
+    border-radius: var(--radius-lg);
+    background: linear-gradient(180deg, var(--accent-soft), transparent 70%), var(--surface);
+  }
+
+  .auto-intro h3 {
+    margin: 0;
+    font: 600 22px/1.3 var(--font-title);
+  }
+
+  .auto-intro p {
+    max-width: 720px;
+    margin: 10px 0 0;
+    color: var(--ink-2);
+  }
+
+  .auto-list {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 16px;
+    margin: 24px 0 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  @media (max-width: 960px) {
+    .auto-list {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+  }
+
+  @media (max-width: 560px) {
+    .auto-list {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  .auto-list li {
+    display: grid;
+    align-content: start;
+    gap: 6px;
+    padding-top: 14px;
+    border-top: 1px solid var(--line);
+  }
+
+  .auto-when {
+    color: var(--accent);
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+  }
+
+  .auto-list strong {
+    font-size: 15px;
+  }
+
+  .auto-list li > span:last-child {
+    color: var(--ink-2);
+    font-size: 14px;
+    line-height: 1.5;
+  }
+
+  .auto-note {
+    margin: 24px 0 0;
+    color: var(--ink-3);
+    font-size: 14px;
+  }
+
+  .labours {
+    display: grid;
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+    gap: 32px 16px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    text-align: center;
+  }
+
+  .labours li {
+    display: grid;
+    justify-items: center;
+    gap: 4px;
+  }
+
+  .labours strong {
+    margin-top: 10px;
+    font-size: 14px;
+    line-height: 1.3;
+  }
+
+  .labours span {
+    color: var(--ink-3);
+    font-size: 13px;
+  }
+
+  @media (max-width: 860px) {
+    .labours {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+  }
+
+  .center-link {
+    margin: 24px 0 0;
+    text-align: center;
+  }
+
+  .steps {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 20px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  @media (max-width: 760px) {
+    .steps {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  .steps li {
+    padding: 24px;
     border: 1px solid var(--line);
     border-radius: var(--radius-lg);
     background: var(--surface);
   }
 
-  .features h3 {
-    margin: 0 0 8px;
-    font-size: 17px;
-    line-height: 1.3;
-    font-weight: 600;
+  .step-number {
+    display: inline-grid;
+    place-items: center;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: var(--accent-soft);
+    color: var(--accent);
+    font-weight: 700;
   }
 
-  .features p {
+  .steps h3 {
+    margin: 16px 0 6px;
+    font-size: 17px;
+    line-height: 1.3;
+  }
+
+  .steps p {
     margin: 0;
     color: var(--ink-2);
     font-size: 15px;
-    line-height: 1.6;
   }
 
-  .note p {
-    max-width: 680px;
-    margin: 56px auto 0;
-    color: var(--ink-3);
-    font-size: 15px;
+  .faq dl {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 28px 40px;
+    margin: 0;
+  }
+
+  @media (max-width: 760px) {
+    .faq dl {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  .faq dt {
+    font-weight: 600;
+  }
+
+  .faq dd {
+    margin: 6px 0 0;
+    color: var(--ink-2);
+  }
+
+  .closing {
+    display: grid;
+    justify-items: center;
     text-align: center;
   }
 
-  .visually-hidden {
-    position: absolute;
-    width: 1px;
-    height: 1px;
-    overflow: hidden;
-    clip-path: inset(50%);
-    white-space: nowrap;
+  .closing-download {
+    margin-top: 28px;
   }
 </style>

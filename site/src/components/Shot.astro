@@ -1,0 +1,25 @@
+---
+// A screenshot of the app, framed like the README's. Every shot but the first
+// one on a page loads lazily.
+import { shot } from "../assets";
+
+interface Props {
+  name: string;
+  alt: string;
+  eager?: boolean;
+  class?: string;
+}
+
+const { name, alt, eager = false, class: className } = Astro.props;
+const image = shot(name);
+---
+
+<img
+  class:list={["shot", className]}
+  src={image.src}
+  width={image.width}
+  height={image.height}
+  alt={alt}
+  loading={eager ? "eager" : "lazy"}
+  decoding="async"
+/>

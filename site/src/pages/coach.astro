@@ -1,0 +1,270 @@
+---
+import Base from "../layouts/Base.astro";
+import Shot from "../components/Shot.astro";
+
+const reads = [
+  { title: "Activities", text: "Every session, its laps, zones and every channel, down to one stretch of it: the last 5 km, the third interval." },
+  { title: "Trends", text: "Training load and where it is heading, steps, exercise minutes and stress, week by week." },
+  { title: "Sleep", text: "Nights, naps, stages, HRV across the night and stress by the hour." },
+  { title: "Plans and workouts", text: "Your COROS workout library, your plans and how well you are keeping to them." },
+  { title: "Zones and profile", text: "Your own heart-rate, pace and power zones, thresholds and personal records." },
+  { title: "The conversation", text: "Earlier turns of a long conversation, searched when they matter again." },
+];
+
+const does = [
+  { title: "Answers with charts", text: "Heart rate against pace, a week's load, time in zones: the figures behind the answer, drawn where they belong in it." },
+  { title: "Drafts workouts", text: "One session, built to your zones, saved to your COROS library or straight onto your calendar." },
+  { title: "Writes plans with you", text: "A plan longer than two weeks starts as a brief you can edit, then an outline, then every session. Read it in the Workbench beside the conversation, change what you like, and save it to COROS." },
+  { title: "Rearranges your week", text: "Moves, swaps, removals and additions arrive as a list. Apply them one line at a time, or all at once." },
+  { title: "Checks in on its own", text: "An auto analysis debriefs each new activity, briefs you in the morning or reviews the week, without being asked. More below." },
+  { title: "Speaks your way", text: "Friendly, Motivating, Neutral, Straight talk or No filter. Your own instructions go on top." },
+];
+
+const providers = [
+  { name: "ChatGPT", need: "Your ChatGPT account. You sign in through your browser." },
+  { name: "Claude subscription", need: "A paid Claude plan, and Claude Code installed on the computer. The app signs in with a Claude login of its own." },
+  { name: "Claude API key", need: "An Anthropic API key. Pay as you go." },
+  { name: "OpenRouter", need: "An OpenRouter API key, and any model it offers." },
+  { name: "Local model", need: "Ollama or LM Studio running on your computer. Free, and your questions never leave it." },
+];
+---
+
+<Base
+  title="Coach"
+  description="An AI coach that has read your COROS training: answers with charts, drafts workouts and plans, and proposes changes you apply one line at a time."
+>
+  <section class="wrap page-hero">
+    <p class="eyebrow">Coach</p>
+    <h1>A coach that has read your training.</h1>
+    <p class="lede">
+      Ask about a session, a week or how well you are recovering. Coach reads your COROS data
+      and answers with the numbers and the charts behind them. It drafts what you ask for, and
+      changes nothing until you say so.
+    </p>
+  </section>
+
+  <section class="wrap section-tight">
+    <Shot name="11-coach" alt="Coach: an interval session analysed, with heart-rate and pace charts" eager />
+  </section>
+
+  <section class="wrap section">
+    <div class="section-head">
+      <h2 class="section-title">What Coach reads</h2>
+      <p class="lede">
+        Coach fetches what a question is about, not everything at once, and every figure it
+        quotes comes from your COROS account.
+      </p>
+    </div>
+    <ul class="cards">
+      {
+        reads.map((item) => (
+          <li class="card">
+            <h3>{item.title}</h3>
+            <p>{item.text}</p>
+          </li>
+        ))
+      }
+    </ul>
+  </section>
+
+  <section class="wrap section">
+    <div class="section-head">
+      <h2 class="section-title">What Coach does</h2>
+    </div>
+    <ul class="cards">
+      {
+        does.map((item) => (
+          <li class="card">
+            <h3>{item.title}</h3>
+            <p>{item.text}</p>
+          </li>
+        ))
+      }
+    </ul>
+    <div class="workbench">
+      <Shot name="12-coach-plan" alt="Coach: a marathon plan in the Workbench beside the conversation" />
+    </div>
+  </section>
+
+  <section class="wrap section" id="auto-analysis">
+    <div class="section-head">
+      <p class="eyebrow">Auto analysis</p>
+      <h2 class="section-title">Coach checks in on its own.</h2>
+      <p class="lede">
+        Give a conversation a standing job and Coach does it without being asked. Open
+        <strong>Analyses</strong> at the top of a conversation, start from one of four starting
+        points or write your own playbook, and choose when it runs. Each answer lands in that
+        conversation, marked as an analysis, ready when you open it.
+      </p>
+    </div>
+
+    <div class="auto-grid">
+      <div class="card">
+        <h3>Start from</h3>
+        <ul class="plain">
+          <li><strong>Post-activity debrief</strong>: after every activity over 20 minutes, how it went against recent training.</li>
+          <li><strong>Morning briefing</strong>: at 07:00, what today should look like.</li>
+          <li><strong>Weekly review</strong>: on Sunday evening, what held and what slipped.</li>
+          <li><strong>Next week's plan</strong>: on Monday morning, the week's sessions drafted for your approval.</li>
+          <li><strong>Write my own</strong>: what to look at and what to say, in your words.</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>When it runs</h3>
+        <ul class="plain">
+          <li><strong>After a new activity</strong>: for the sports you pick, over a length or a distance. A debrief also reads the 72 hours before, so yesterday's leg day is part of today's run.</li>
+          <li><strong>On a schedule</strong>: every day or every week, at the time you set.</li>
+          <li><strong>When a metric turns</strong>: training load ramping, resting heart rate drifting up, a planned workout missed, or sleep debt building.</li>
+          <li><strong>Only when you ask</strong>: a playbook you run by hand.</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>Kept in bounds</h3>
+        <ul class="plain">
+          <li><strong>Read-only.</strong> An analysis reads and suggests. Workouts and changes it proposes wait for you to apply them.</li>
+          <li><strong>Guard rails.</strong> A cooldown, a cap on runs per day and quiet hours.</li>
+          <li><strong>A monthly budget</strong> for everything analyses spend, and one switch that pauses them all.</li>
+          <li><strong>One computer or any.</strong> With Sync, an analysis runs on whichever of your computers is awake, once. Or keep it to this one.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section class="wrap section">
+    <div class="section-head">
+      <h2 class="section-title">Ask from anywhere</h2>
+      <p class="lede">
+        Ask Coach sits on every session's page, on a calendar day or week, and on a plan in the
+        Training Library. The question arrives in Coach already pointing at what it is about.
+      </p>
+    </div>
+  </section>
+
+  <section class="wrap section">
+    <div class="section-head">
+      <h2 class="section-title">Pick the AI</h2>
+      <p class="lede">
+        Coach runs on an AI you choose, set up under <strong>Settings → Connections → Coach Models</strong>.
+        Each conversation can use a different one.
+      </p>
+    </div>
+    <div class="table-wrap">
+      <table class="providers">
+        <thead>
+          <tr>
+            <th>Provider</th>
+            <th>What you need</th>
+          </tr>
+        </thead>
+        <tbody>
+          {
+            providers.map((provider) => (
+              <tr>
+                <th scope="row">{provider.name}</th>
+                <td>{provider.need}</td>
+              </tr>
+            ))
+          }
+        </tbody>
+      </table>
+    </div>
+    <a class="more" href="/guide/set-up-coach">Set up Coach, step by step</a>
+  </section>
+
+  <section class="wrap section">
+    <div class="section-head">
+      <h2 class="section-title">You decide what it sees</h2>
+    </div>
+    <ul class="ticks">
+      <li>
+        <strong>Sources per conversation.</strong> Switch off activities, sleep or anything else a
+        conversation should not read. It is withheld from Coach's tools and from what it is told,
+        not only from the prompt.
+      </li>
+      <li>
+        <strong>Straight to your provider.</strong> Your questions and the data they need go from
+        your computer to the AI you picked, and nowhere else. A local model keeps them on your
+        computer.
+      </li>
+      <li>
+        <strong>Nothing saved behind your back.</strong> Drafts, plans and changes to your calendar
+        wait on a button you press. Automatic analyses can only read.
+      </li>
+      <li>
+        <strong>What each answer cost.</strong> The model and the tokens it used are under every
+        answer, and automatic analyses have a monthly budget you set.
+      </li>
+    </ul>
+  </section>
+</Base>
+
+<style>
+  .section-tight {
+    padding-top: 40px;
+  }
+
+  .workbench {
+    margin-top: 40px;
+  }
+
+  .auto-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 20px;
+  }
+
+  @media (max-width: 960px) {
+    .auto-grid {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  .plain {
+    display: grid;
+    gap: 10px;
+    margin: 12px 0 0;
+    padding: 0;
+    list-style: none;
+    color: var(--ink-2);
+    font-size: 15px;
+    line-height: 1.55;
+  }
+
+  .plain strong {
+    color: var(--ink);
+  }
+
+  .table-wrap {
+    overflow-x: auto;
+  }
+
+  .providers {
+    width: 100%;
+    border-collapse: collapse;
+  }
+
+  .providers th,
+  .providers td {
+    padding: 14px 16px 14px 0;
+    border-bottom: 1px solid var(--line);
+    text-align: left;
+    vertical-align: top;
+  }
+
+  .providers thead th {
+    color: var(--ink-3);
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+  }
+
+  .providers tbody th {
+    white-space: nowrap;
+    font-weight: 600;
+  }
+
+  .providers td {
+    color: var(--ink-2);
+  }
+</style>

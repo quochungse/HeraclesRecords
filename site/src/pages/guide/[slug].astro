@@ -1,0 +1,53 @@
+---
+import { getCollection, render } from "astro:content";
+import Base from "../../layouts/Base.astro";
+
+export async function getStaticPaths() {
+  const guides = (await getCollection("guide")).sort((a, b) => a.data.order - b.data.order);
+  return guides.map((guide, index) => ({
+    params: { slug: guide.id },
+    props: { guide, previous: guides[index - 1], next: guides[index + 1] },
+  }));
+}
+
+const { guide, previous, next } = Astro.props;
+const { Content } = await render(guide);
+---
+
+<Base title={guide.data.title} description={guide.data.description}>
+  <article class="prose guide">
+    <p class="crumb"><a href="/guide/">Guide</a></p>
+    <h1>{guide.data.title}</h1>
+    <p class="meta">{guide.data.description}</p>
+    <Content />
+    <nav class="pager" aria-label="More guides">
+      {previous ? <a href={`/guide/${previous.id}`}>← {previous.data.title}</a> : <span />}
+      {next && <a href={`/guide/${next.id}`}>{next.data.title} →</a>}
+    </nav>
+  </article>
+</Base>
+
+<style>
+  .crumb {
+    margin: 0 0 12px;
+    font-size: 14px;
+  }
+
+  .crumb a {
+    text-decoration: none;
+  }
+
+  .pager {
+    display: flex;
+    justify-content: space-between;
+    gap: 16px;
+    margin-top: 56px;
+    padding-top: 20px;
+    border-top: 1px solid var(--line);
+    font-size: 15px;
+  }
+
+  .pager a {
+    text-decoration: none;
+  }
+</style>

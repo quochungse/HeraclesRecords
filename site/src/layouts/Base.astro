@@ -11,10 +11,20 @@ interface Props {
 
 const { title, description } = Astro.props;
 const fullTitle = title ? `${title} · Heracles Records` : "Heracles Records";
-const canonical = new URL(Astro.url.pathname, Astro.site);
+// GitHub Pages serves coach.html at /coach, so that is the address to share.
+const path = Astro.url.pathname.replace(/\.html$/, "").replace(/\/index$/, "/");
+const canonical = new URL(path, Astro.site);
 const repo = "https://github.com/quochungse/HeraclesRecords";
-const path = Astro.url.pathname;
 const release = await latestRelease();
+
+const nav = [
+  { href: "/coach", label: "Coach" },
+  { href: "/labours", label: "Labours" },
+  { href: "/guide/", label: "Guide" },
+  { href: "/changelog/", label: "Changelog" },
+];
+const current = (href: string) =>
+  path === href || (href.endsWith("/") && path.startsWith(href)) ? "page" : undefined;
 ---
 
 <!doctype html>
@@ -26,6 +36,7 @@ const release = await latestRelease();
     <meta name="description" content={description} />
     <link rel="canonical" href={canonical} />
     <link rel="icon" type="image/png" href={icon.src} />
+    <link rel="alternate" type="application/rss+xml" title="Heracles Records releases" href="/changelog.xml" />
     <meta property="og:type" content="website" />
     <meta property="og:site_name" content="Heracles Records" />
     <meta property="og:title" content={fullTitle} />
@@ -40,10 +51,11 @@ const release = await latestRelease();
           Heracles Records
         </a>
         <nav class="site-nav" aria-label="Site">
-          <a href={`${repo}/releases/latest`}>Download</a>
-          <a href="/privacy.html" aria-current={path.startsWith("/privacy") ? "page" : undefined}>Privacy</a>
-          <a href={repo}>GitHub</a>
+          {nav.map((item) => <a href={item.href} aria-current={current(item.href)}>{item.label}</a>)}
         </nav>
+        <a class="button primary header-download" href="/download" aria-current={current("/download")}>
+          Download
+        </a>
       </div>
     </header>
 
@@ -54,7 +66,12 @@ const release = await latestRelease();
     <footer class="site-footer">
       <div class="wrap">
         <nav aria-label="Footer">
-          <a href={`${repo}/releases`}>Releases</a>
+          <a href="/download">Download</a>
+          <a href="/guide/">Guide</a>
+          <a href="/guide/faq">FAQ</a>
+          <a href="/changelog/">Changelog</a>
+          <a href="/about">About</a>
+          <a href={repo}>GitHub</a>
           <a href={`${repo}/issues/new`}>Report an issue</a>
           <a href="/privacy.html">Privacy policy</a>
           <a href="https://buymeacoffee.com/quochungse">Buy me a coffee</a>
@@ -63,7 +80,7 @@ const release = await latestRelease();
           release && (
             <p>
               Version {release.version} · {formatReleaseDate(release.publishedAt)} ·{" "}
-              <a href={release.notesUrl}>What's new</a>
+              <a href="/changelog/">What's new</a>
             </p>
           )
         }

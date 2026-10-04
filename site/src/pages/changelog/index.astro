@@ -1,0 +1,64 @@
+---
+// Every released section of CHANGELOG.md, newest first. A section written
+// ahead of its tag (main carries the next version before it is released) is
+// left out until the release is published.
+import { getCollection, render } from "astro:content";
+import Base from "../../layouts/Base.astro";
+import { compareVersions } from "../../assets";
+import { formatReleaseDate, latestRelease } from "../../release.mjs";
+
+const release = await latestRelease();
+const repo = "https://github.com/quochungse/HeraclesRecords";
+const entries = (await getCollection("changelog"))
+  .filter((entry) => !release || compareVersions(entry.data.version, release.version) <= 0)
+  .sort((a, b) => compareVersions(b.data.version, a.data.version));
+const rendered = await Promise.all(entries.map(async (entry) => ({ entry, ...(await render(entry)) })));
+---
+
+<Base title="Changelog" description="What changed in each release of Heracles Records.">
+  <section class="wrap page-hero">
+    <p class="eyebrow">Changelog</p>
+    <h1>What's new</h1>
+    <p class="lede">
+      Every release of Heracles Records. Follow along with the <a href="/changelog.xml">RSS feed</a>,
+      or watch the repository's releases on <a href={`${repo}/releases`}>GitHub</a>.
+    </p>
+  </section>
+
+  <div class="wrap">
+  {
+    rendered.map(({ entry, Content }) => (
+      <article class="prose release" id={entry.data.version}>
+        <h2>
+          <a href={`#${entry.data.version}`}>{entry.data.version}</a>
+        </h2>
+        <p class="meta">
+          {entry.data.date ? formatReleaseDate(entry.data.date) : "Unreleased"} ·{" "}
+          <a href={`${repo}/releases/tag/v${entry.data.version}`}>Release on GitHub</a>
+        </p>
+        <Content />
+      </article>
+    ))
+  }
+  </div>
+</Base>
+
+<style>
+  .release {
+    padding-top: 48px;
+  }
+
+  .release > h2 {
+    margin: 0;
+    font: 600 30px/1.3 var(--font-title);
+  }
+
+  .release > h2 a {
+    color: var(--ink);
+    text-decoration: none;
+  }
+
+  .release .meta {
+    margin: 4px 0 8px;
+  }
+</style>

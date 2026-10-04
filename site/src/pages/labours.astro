@@ -1,0 +1,193 @@
+---
+// Every labour as the app defines it (src/records/labours.ts): the site reads
+// the same names, myths and stages, so the two cannot disagree.
+import Base from "../layouts/Base.astro";
+import LabourEmblem from "../components/LabourEmblem.astro";
+import Shot from "../components/Shot.astro";
+import { plain } from "../assets";
+import { LABOURS, STAGE_NUMERALS } from "../../../src/records/labours";
+---
+
+<Base
+  title="The Twelve Labours"
+  description="Twelve kinds of achievement in three stages each, from your first weeks to your first year. Speed and VO2max graded for your age and sex."
+>
+  <section class="wrap page-hero">
+    <p class="eyebrow">Hall of Records</p>
+    <h1>The Twelve Labours</h1>
+    <p class="lede">
+      Twelve kinds of achievement, named for the labours of Heracles, three stages each. Stage I
+      is what an ordinary beginner reaches in a few weeks of effort, II in a few months, III in a
+      year. Complete all twelve and you reach the Apotheosis.
+    </p>
+  </section>
+
+  <section class="wrap rules">
+    <ul class="cards">
+      <li class="card">
+        <h3>A standard, not a first</h3>
+        <p>A first swim or a first ride is a milestone on your timeline. A stage asks for more than turning up once.</p>
+      </li>
+      <li class="card">
+        <h3>The same for everyone</h3>
+        <p>Speed is a road age grade and VO₂max is rated for your age and sex, so a stage means the same at 25 and at 60.</p>
+      </li>
+      <li class="card">
+        <h3>Every year counts</h3>
+        <p>Your whole COROS history is read, so years of training before you installed the app count from the first day.</p>
+      </li>
+    </ul>
+  </section>
+
+  <section class="wrap labour-list">
+    {
+      LABOURS.map((labour, index) => (
+        <article class="labour" id={labour.id}>
+          <LabourEmblem id={labour.id} size={120} />
+          <div>
+            <p class="labour-number">
+              Labour {index + 1} · {labour.category}
+            </p>
+            <h2>{labour.name}</h2>
+            <p class="labour-myth">{labour.myth}</p>
+            <ol class="labour-stages">
+              {labour.stages.map((stage, stageIndex) => (
+                <li>
+                  <span>{STAGE_NUMERALS[(stageIndex + 1) as 1 | 2 | 3]}</span>
+                  {plain(stage)}
+                </li>
+              ))}
+            </ol>
+          </div>
+        </article>
+      ))
+    }
+  </section>
+
+  <section class="wrap section">
+    <div class="section-head">
+      <h2 class="section-title">Where your stages show up</h2>
+      <p class="lede">
+        The Hall of Records keeps every milestone month by month, and the labours beside it fill
+        in as you reach each stage. A new stage arrives as a notice in the app; completing a labour
+        is a celebration.
+      </p>
+    </div>
+    <div class="grid-2">
+      <Shot name="13-labours" alt="Hall of Records: the Twelve Labours" />
+      <Shot name="14-timeline" alt="Hall of Records: the timeline of milestones" />
+    </div>
+  </section>
+
+  <div class="wrap">
+  <article class="prose notes">
+    <h2>How the yardsticks work</h2>
+    <ul>
+      <li>
+        <strong>The Mares of Diomedes</strong> grade your best effort of 5K or longer as a road age
+        grade: your time against the standard for your age and sex in the WMA tables, as a
+        percentage.
+      </li>
+      <li>
+        <strong>The Apples of the Hesperides</strong> rate your COROS VO₂max with The Cooper
+        Institute's norms for your age and sex: Good, Excellent and Superior.
+      </li>
+      <li>
+        Both read your birthday and sex from your COROS profile, each graded for your age on the
+        day it happened. Without them, the app grades you as a man of 30.
+      </li>
+      <li>
+        <strong>The Girdle of Hippolyta</strong> counts plans you put on your calendar and finished,
+        by the share of their sessions you completed.
+      </li>
+      <li>
+        <strong>Cerberus</strong> counts naps toward the night. A night your watch did not record
+        counts as a miss.
+      </li>
+    </ul>
+  </article>
+  </div>
+</Base>
+
+<style>
+  .rules {
+    padding-top: 40px;
+  }
+
+  .labour-list {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 20px;
+    padding-top: 56px;
+  }
+
+  @media (max-width: 860px) {
+    .labour-list {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  .labour {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    gap: 24px;
+    align-items: start;
+    padding: 24px;
+    border: 1px solid var(--line);
+    border-radius: var(--radius-lg);
+    background: var(--surface);
+    scroll-margin-top: 24px;
+  }
+
+  @media (max-width: 480px) {
+    .labour {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  .labour-number {
+    margin: 0;
+    color: var(--accent);
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+  }
+
+  .labour h2 {
+    margin: 6px 0 0;
+    font: 600 22px/1.3 var(--font-title);
+  }
+
+  .labour-myth {
+    margin: 6px 0 0;
+    color: var(--ink-3);
+    font-style: italic;
+    font-size: 15px;
+  }
+
+  .labour-stages {
+    display: grid;
+    gap: 8px;
+    margin: 16px 0 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .labour-stages li {
+    display: grid;
+    grid-template-columns: 32px minmax(0, 1fr);
+    align-items: baseline;
+    color: var(--ink-2);
+    font-size: 15px;
+  }
+
+  .labour-stages span {
+    color: var(--accent);
+    font: 600 15px/1 var(--font-title);
+  }
+
+  .notes {
+    padding-top: 72px;
+  }
+</style>

@@ -1,0 +1,212 @@
+---
+import Base from "../layouts/Base.astro";
+import DownloadButton from "../components/DownloadButton.astro";
+import { formatReleaseDate, latestRelease } from "../release.mjs";
+
+const release = await latestRelease();
+const repo = "https://github.com/quochungse/HeraclesRecords";
+
+const requirements: Record<string, string> = {
+  "mac-arm64": "A Mac with an M1 chip or later.",
+  "mac-x64": "A Mac with an Intel processor.",
+  linux: "64-bit Linux (x86-64). Runs as an AppImage, no install needed.",
+};
+---
+
+<Base
+  title="Download"
+  description="Download Heracles Records for macOS (Apple Silicon or Intel), Windows or Linux. Free and open source."
+>
+  <section class="wrap page-hero">
+    <p class="eyebrow">Download</p>
+    <h1>Heracles Records{release ? ` ${release.version}` : ""}</h1>
+    <p class="lede">
+      Free and open source, for macOS, Windows and Linux.
+      {release && <> Released {formatReleaseDate(release.publishedAt)}. <a href="/changelog/">What's new</a></>}
+    </p>
+    <div class="download-main">
+      <DownloadButton list={false} />
+    </div>
+  </section>
+
+  {
+    release ? (
+      <section class="wrap section-tight">
+        <ul class="installers">
+          {release.installers.map((entry) => (
+            <li class="card">
+              <div class="installer-head">
+                <h2>
+                  {entry.os} <span>{entry.variant}</span>
+                </h2>
+                <a class="button" href={entry.url}>
+                  Download · {entry.sizeLabel}
+                </a>
+              </div>
+              {requirements[entry.id] && <p>{requirements[entry.id]}</p>}
+              <p class="installer-file">
+                <code>{entry.name}</code>
+              </p>
+              {entry.sha256 && (
+                <p class="installer-sum">
+                  SHA-256 <code>{entry.sha256}</code>
+                </p>
+              )}
+            </li>
+          ))}
+        </ul>
+        <p class="older">
+          Looking for an earlier version? Every release is on <a href={`${repo}/releases`}>GitHub</a>.
+        </p>
+      </section>
+    ) : (
+      <section class="wrap section-tight">
+        <p class="lede">
+          Every installer is on <a href={`${repo}/releases/latest`}>the latest GitHub release</a>.
+        </p>
+      </section>
+    )
+  }
+
+  <div class="wrap">
+  <article class="prose">
+    <h2>First launch</h2>
+    <p>
+      Heracles Records is not yet signed with an Apple or Microsoft developer certificate, so
+      your system asks once before it opens the app.
+    </p>
+    <h3>macOS</h3>
+    <ol>
+      <li>Open the <code>.dmg</code> and drag Heracles Records into Applications.</li>
+      <li>
+        If macOS says it cannot check the app, open <strong>System Settings → Privacy &amp; Security</strong>
+        and click <strong>Open Anyway</strong>.
+      </li>
+      <li>
+        If it says the app is damaged, run this in Terminal, then open the app again:
+        <pre><code>xattr -dr com.apple.quarantine "/Applications/Heracles Records.app"</code></pre>
+      </li>
+    </ol>
+    <h3>Windows</h3>
+    <p>
+      Run the installer. If SmartScreen warns about an unrecognised app, click
+      <strong>More info → Run anyway</strong>.
+    </p>
+    <h3>Linux</h3>
+    <p>Make the file executable and run it:</p>
+    <pre><code>chmod +x HeraclesRecords-*.AppImage
+./HeraclesRecords-*.AppImage</code></pre>
+
+    <h2>Check a download</h2>
+    <p>
+      Each installer's SHA-256 is listed above, as GitHub computed it when the release was
+      published. To compare it with the file you downloaded:
+    </p>
+    <pre><code># macOS and Linux
+shasum -a 256 HeraclesRecords-*
+
+# Windows (PowerShell)
+Get-FileHash .\HeraclesRecords-Setup-*.exe -Algorithm SHA256</code></pre>
+
+    <h2>What you need</h2>
+    <ul>
+      <li><strong>A COROS account.</strong> Any COROS watch that syncs to it will do.</li>
+      <li>
+        <strong>For Coach, an AI</strong> (optional): your ChatGPT account, a Claude subscription,
+        a Claude or OpenRouter API key, or a model running on your own computer. See
+        <a href="/guide/set-up-coach">Set up Coach</a>.
+      </li>
+      <li>
+        <strong>For sleep and health data</strong>, the COROS MCP connection, made from inside the
+        app in a minute. See <a href="/guide/sleep-and-health">Sleep and health data</a>.
+      </li>
+    </ul>
+
+    <h2>Updates</h2>
+    <p>
+      The app checks GitHub for a new version and tells you when one is out. You can also check
+      by hand under <strong>Settings → About</strong>.
+    </p>
+  </article>
+  </div>
+</Base>
+
+<style>
+  .lede a {
+    font-weight: 600;
+  }
+
+  .download-main {
+    display: flex;
+    margin-top: 28px;
+  }
+
+  .download-main :global(.download) {
+    justify-items: start;
+  }
+
+  .download-main :global(.download-actions),
+  .download-main :global(.download-list) {
+    justify-content: flex-start;
+  }
+
+  .section-tight {
+    padding-top: 48px;
+  }
+
+  .installers {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 20px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  @media (max-width: 760px) {
+    .installers {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  .installer-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 12px;
+  }
+
+  .installer-head h2 {
+    margin: 0;
+    font-size: 20px;
+    line-height: 1.3;
+  }
+
+  .installer-head h2 span {
+    color: var(--ink-3);
+    font-weight: 400;
+  }
+
+  .installers .card p {
+    margin: 6px 0 0;
+  }
+
+  .installer-file code,
+  .installer-sum code {
+    font-size: 12px;
+    word-break: break-all;
+  }
+
+  .installer-sum {
+    color: var(--ink-3);
+    font-size: 13px;
+  }
+
+  .older {
+    margin: 24px 0 0;
+    color: var(--ink-3);
+    font-size: 15px;
+  }
+</style>

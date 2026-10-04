@@ -10,6 +10,8 @@
 //    puts every stylesheet, font and image (_astro/).
 // 3. Every page links its assets from _astro/ and each one is in the build.
 // 4. No em dash in the site's own copy: the README's rule, kept for the site.
+// 5-7. Installers, the version, em dashes in the build, and internal links:
+//    see each check below.
 
 import assert from "node:assert/strict";
 import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
@@ -47,7 +49,9 @@ for (const page of pages) {
 // 5. The home page offers the four installers of one release, and every page
 //    states that version in its footer (release data from GitHub at build).
 const home = readFileSync(join(dist, "index.html"), "utf8");
-const downloads = [...home.matchAll(/href="https:\/\/github\.com\/quochungse\/HeraclesRecords\/releases\/download\/(v[^/]+)\/([^"]+)"/g)];
+const downloads = [
+  ...new Set(home.match(/href="https:\/\/github\.com\/quochungse\/HeraclesRecords\/releases\/download\/[^"]+"/g)),
+].map((href) => href.match(/download\/(v[^/]+)\/([^"]+)"/));
 assert.equal(downloads.length, 4, `index.html links ${downloads.length} installers, not 4`);
 const tags = new Set(downloads.map((match) => match[1]));
 assert.equal(tags.size, 1, `index.html links installers of ${[...tags].join(", ")}`);
@@ -62,5 +66,30 @@ for (const file of walk(src)) {
   const line = text.split("\n").findIndex((row) => row.includes("—"));
   assert.equal(line, -1, `em dash in ${relative(root, file)}:${line + 1}`);
 }
+
+// 6. Nor in what the pages draw: text read from the app (labour stages) and
+//    from CHANGELOG.md is put in the site's style when it is rendered.
+for (const page of pages) {
+  const text = readFileSync(page, "utf8").replace(/<script[\s\S]*?<\/script>/g, "");
+  const at = text.indexOf("—");
+  assert.equal(at, -1, `em dash in ${relative(dist, page)}: …${text.slice(Math.max(0, at - 60), at + 20)}…`);
+}
+
+// 7. Every link to a page of the site lands on a page in the build, the way
+//    GitHub Pages resolves it: /coach serves coach.html, /guide/ guide/index.html.
+function resolves(path) {
+  const clean = decodeURIComponent(path.split(/[?#]/)[0]);
+  const candidates = clean.endsWith("/")
+    ? [join(dist, clean, "index.html")]
+    : [join(dist, clean), join(dist, `${clean}.html`), join(dist, clean, "index.html")];
+  return candidates.some((candidate) => existsSync(candidate) && statSync(candidate).isFile());
+}
+for (const page of pages) {
+  const html = readFileSync(page, "utf8");
+  for (const [, href] of html.matchAll(/href="(\/(?!_astro\/)[^"]*)"/g)) {
+    assert.ok(resolves(href), `${relative(dist, page)} links ${href}, which is not in the build`);
+  }
+}
+assert.ok(existsSync(join(dist, "changelog.xml")), "the release feed changelog.xml is missing");
 
 console.log(`site: ${pages.length} pages checked`);

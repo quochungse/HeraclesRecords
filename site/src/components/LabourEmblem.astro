@@ -1,0 +1,38 @@
+---
+// A labour's gold emblem on the plate the Hall of Records draws it on: the
+// artwork's own black, whatever the theme, inside a metal rim.
+import { emblem } from "../assets";
+
+interface Props {
+  id: string;
+  size?: number;
+}
+
+const { id, size = 96 } = Astro.props;
+const image = emblem(id);
+---
+
+<span class="labour-emblem" style={`--size: ${size}px`}>
+  <img src={image.src} width={size} height={size} alt="" loading="lazy" decoding="async" />
+</span>
+
+<style>
+  .labour-emblem {
+    display: inline-grid;
+    place-items: center;
+    width: var(--size);
+    height: var(--size);
+    border-radius: 50%;
+    background: radial-gradient(circle at 50% 40%, #16120b, #050403 70%);
+    box-shadow:
+      0 0 0 1px rgba(231, 176, 76, 0.55),
+      0 0 0 4px rgba(231, 176, 76, 0.08),
+      0 10px 24px rgba(0, 0, 0, 0.35);
+  }
+
+  .labour-emblem img {
+    width: 86%;
+    height: 86%;
+    object-fit: contain;
+  }
+</style>

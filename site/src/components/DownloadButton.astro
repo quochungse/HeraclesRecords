@@ -4,6 +4,12 @@
 // page; the script only swaps in the installer that matches the system.
 import { latestRelease } from "../release.mjs";
 
+interface Props {
+  /** Every installer listed under the button. Off where the page lists them itself. */
+  list?: boolean;
+}
+
+const { list = true } = Astro.props;
 const release = await latestRelease();
 const releasesUrl = "https://github.com/quochungse/HeraclesRecords/releases/latest";
 const pick = (id) => release?.installers.find((entry) => entry.id === id);
@@ -33,7 +39,7 @@ const choices =
     <slot />
   </div>
   {
-    release && (
+    release && list && (
       <ul class="download-list" aria-label={`Every installer for version ${release.version}`}>
         {release.installers.map((entry) => (
           <li>

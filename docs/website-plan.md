@@ -108,13 +108,13 @@ Giọng văn: theo README hiện tại. Tiếng Anh, câu ngắn, cụ thể, **
 | Trang | Nội dung |
 |---|---|
 | `/` | Trang chủ (chi tiết dưới) |
-| `/download` | Nút theo OS, size, sha512, yêu cầu hệ thống, hướng dẫn lần mở đầu (Gatekeeper, SmartScreen, `chmod +x`), auto-update, link các bản cũ |
-| `/features/sessions` | Activities, Running (kể cả Trail), Cycling, Hiking, Strength, route replay |
-| `/features/planning` | Calendar, Training Library, lưu thẳng lên COROS nên đồng hồ có ngay |
+| `/download` | Nút theo OS, size, sha256, yêu cầu hệ thống, hướng dẫn lần mở đầu (Gatekeeper, SmartScreen, `chmod +x`), auto-update, link các bản cũ |
+| ~~`/features/sessions`~~ | Gộp vào trang chủ (P2): mỗi môn đã có ảnh và chú thích ở đó, một trang riêng chỉ lặp lại |
+| ~~`/features/planning`~~ | Gộp vào trang chủ (P2), cùng lý do |
 | `/coach` | Coach đọc gì, AI nào dùng được, chi phí, quyền riêng tư theo từng cuộc trò chuyện, "không bao giờ đổi lịch khi bạn chưa đồng ý" |
 | `/labours` | **Trang đặc trưng**: 12 emblem vàng, mỗi labour một câu thần thoại + 3 mốc, sinh từ `labours.ts` |
-| `/features/sleep`, `/features/places` | Có thể gộp vào trang chủ ở bản đầu |
-| `/changelog`, `/changelog/1.0.0` | Sinh từ CHANGELOG.md, kèm feed Atom |
+| ~~`/features/sleep`, `/features/places`~~ | Gộp vào trang chủ (P2) |
+| `/changelog/` (+ `/changelog.xml`) | Sinh từ CHANGELOG.md, một trang với neo `#1.0.0` cho mỗi bản, kèm feed RSS. Bỏ trang riêng cho từng bản: GitHub Pages không chắc phục vụ đường dẫn có dấu chấm như `/changelog/1.0.0` |
 | `/guide/*` | Getting started, Connect COROS (vùng, 2FA), Set up Coach (từng provider), Sync qua Google Drive, Backup & restore, Hevy, Troubleshooting, FAQ |
 | `/privacy.html` | Giữ URL; rà lại danh sách dịch vụ (Hevy, OpenRouter, Nominatim/Photon, OpenFreeMap, CDN locale của COROS) |
 | `/about` | Câu chuyện "From CorosLink to Heracles Records", vì sao tên Heracles, Buy me a coffee |
@@ -147,7 +147,7 @@ Giọng văn: theo README hiện tại. Tiếng Anh, câu ngắn, cụ thể, **
 |---|---|---|
 | **P0 Nền móng** (code xong 2026-10-04, chờ deploy key) | Deploy key + secret; `site/` Astro; chuyển `index` và `privacy` hiện có sang (sửa meta description); `site.yml` deploy sang repo org | `heraclesrecords.github.io` và `/privacy.html` phục vụ từ bản build của repo này; repo org chỉ còn commit của bot |
 | **P1 Release tự động** (code xong 2026-10-04) | `lib/release-data.mjs`, `update-readme-release.mjs` + marker trong README, job `readme` và `site` trong `release.yml`, `test:site` | Chạy thử bằng `workflow_dispatch` trên v1.0.0: README không đổi gì, site hiện đúng 1.0.0 |
-| **P2 Nội dung** | Trang chủ đầy đủ, Download, Labours, Coach, Features, Changelog, Guide, FAQ | Mọi trang trong sitemap có nội dung thật |
+| **P2 Nội dung** (code xong 2026-10-04) | Trang chủ đầy đủ, Download, Labours, Coach, Features, Changelog, Guide, FAQ | Mọi trang trong sitemap có nội dung thật |
 | **P3 Hoàn thiện** | OG images, sitemap, JSON-LD, Lighthouse ≥ 95, kiểm tra a11y, đưa harness chụp ảnh vào repo, (tuỳ chọn) bản tiếng Việt `/vi/` | |
 | **P4 Domain riêng** | Xem mục 7 | |
 

@@ -136,8 +136,20 @@ tools are `mcp__heracles__*`), the manual activity's upload file name, the build
 `package.json` and lockfile on purpose**: `collect-licenses` ships the license of every
 package in the root lockfile with the app, and the installer jobs' `npm ci` should not fetch
 Astro. It reads the app's own files rather than copies — `src/fonts.css`, `build/icon*.png`,
-`docs/readme/*.webp`, and later `src/records/labours.ts` and the emblems — so a change there
-reaches the site too. `.github/workflows/site.yml` builds it, runs `scripts/test-site.mjs`
+`docs/readme/*.webp` (`site/src/assets.ts`), `src/records/labours.ts` and
+`src/assets/labours/*.webp` (the /labours page and the home page's grid), and `CHANGELOG.md`
+(a content loader in `site/src/content.config.ts`, one entry per released section, listed
+only up to the latest published release) — so a change there reaches the site too: **a
+labour renamed in the app is renamed on the site**, and the site's text is only as true as
+those files. The guides are Markdown in `site/src/content/guide/`, and they name the app's
+buttons and screens by their labels, so **a renamed button or Settings section means a guide
+to fix**. Two screenshots are the site's alone, `docs/readme/19-appearance-dark.webp` and
+`20-appearance-light.webp`, a pair shot together by the README harness (`theme: "paper"` for
+the light one) so the two show the same day. Text the site takes from the app or the
+changelog is put in its style at render time (`plain()`, the changelog loader: an em dash
+becomes a comma or a colon), and `test:site` checks the built pages as well as the source.
+A local build keeps the last release it read in `site/.astro/release-cache.json` and falls
+back to it when GitHub refuses (60 unauthenticated API requests an hour); CI never does. `.github/workflows/site.yml` builds it, runs `scripts/test-site.mjs`
 and pushes `site/dist` to **`heraclesrecords/heraclesrecords.github.io`**, because an
 organisation's root Pages site can only be served from a repository of that name; that
 repository is a deploy target, edited by nothing but the workflow. The push needs the
