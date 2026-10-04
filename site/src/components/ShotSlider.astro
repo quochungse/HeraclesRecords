@@ -1,17 +1,15 @@
 ---
-// A few screenshots in one frame, crossfading on their own. The slides share
-// one grid cell, so the frame keeps the first shot's size and nothing below it
-// moves. Autoplay stops for good once the visitor picks a slide and pauses while
-// the pointer or focus is inside or the tab is hidden. With reduced motion asked
-// for, slides still advance (the page is about what they show) but swap at once,
-// with no fade.
+// A few screenshots in one frame, sliding on their own. Left and right buttons
+// float over the picture and a dot per slide sits under it. Autoplay waits
+// while the pointer or focus is inside or the tab is hidden, and a press on a
+// button or a dot starts its clock again. With reduced motion asked for,
+// slides still advance (the page is about what they show) but swap at once.
 import { shot } from "../assets";
 
 interface Slide {
   name: string;
   alt: string;
   label: string;
-  caption: string;
 }
 
 interface Props {
@@ -21,43 +19,53 @@ interface Props {
   interval?: number;
 }
 
-const { slides, label, interval = 6000 } = Astro.props;
+const { slides, label, interval = 3000 } = Astro.props;
 const images = slides.map((slide) => ({ ...slide, image: shot(slide.name) }));
 ---
 
-<div class="slider" role="region" aria-roledescription="carousel" aria-label={label} style={`--interval: ${interval}ms`} data-interval={interval}>
+<div class="slider" role="region" aria-roledescription="carousel" aria-label={label} data-interval={interval}>
   <div class="slider-frame">
-    {
-      images.map((slide, index) => (
-        <figure
-          class="slider-slide"
-          role="group"
-          aria-roledescription="slide"
-          aria-label={`${index + 1} of ${images.length}: ${slide.label}`}
-          aria-hidden={index === 0 ? undefined : "true"}
-          data-active={index === 0 ? "true" : undefined}
-        >
-          <img
-            class="shot"
-            src={slide.image.src}
-            width={slide.image.width}
-            height={slide.image.height}
-            alt={slide.alt}
-            loading={index === 0 ? "eager" : "lazy"}
-            decoding="async"
-          />
-        </figure>
-      ))
-    }
+    <div class="slider-track">
+      {
+        images.map((slide, index) => (
+          <figure
+            class="slider-slide"
+            role="group"
+            aria-roledescription="slide"
+            aria-label={`${index + 1} of ${images.length}: ${slide.label}`}
+            aria-hidden={index === 0 ? undefined : "true"}
+          >
+            <img
+              class="shot"
+              src={slide.image.src}
+              width={slide.image.width}
+              height={slide.image.height}
+              alt={slide.alt}
+              loading={index === 0 ? "eager" : "lazy"}
+              decoding="async"
+              draggable="false"
+            />
+          </figure>
+        ))
+      }
+    </div>
+    <button type="button" class="slider-arrow is-prev" aria-label="Previous screenshot" data-step="-1">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 6l-6 6 6 6" /></svg>
+    </button>
+    <button type="button" class="slider-arrow is-next" aria-label="Next screenshot" data-step="1">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6" /></svg>
+    </button>
   </div>
-  <div class="slider-tabs">
+  <div class="slider-dots">
     {
       images.map((slide, index) => (
-        <button type="button" class="slider-tab" aria-pressed={index === 0 ? "true" : "false"} data-index={index}>
-          <span class="slider-progress" aria-hidden="true" />
-          <strong>{slide.label}</strong>
-          <span class="slider-caption">{slide.caption}</span>
-        </button>
+        <button
+          type="button"
+          class="slider-dot"
+          aria-label={`Show ${slide.label}`}
+          aria-current={index === 0 ? "true" : undefined}
+          data-index={index}
+        />
       ))
     }
   </div>
@@ -65,50 +73,53 @@ const images = slides.map((slide) => ({ ...slide, image: shot(slide.name) }));
 
 <script>
   for (const slider of document.querySelectorAll<HTMLElement>(".slider")) {
+    const track = slider.querySelector<HTMLElement>(".slider-track")!;
     const slides = [...slider.querySelectorAll<HTMLElement>(".slider-slide")];
-    const tabs = [...slider.querySelectorAll<HTMLButtonElement>(".slider-tab")];
-    const interval = Number(slider.dataset.interval) || 6000;
+    const dots = [...slider.querySelectorAll<HTMLButtonElement>(".slider-dot")];
+    const interval = Number(slider.dataset.interval) || 3000;
     let current = 0;
     let timer: number | undefined;
-    let stopped = false;
+    let paused = false;
 
     const show = (index: number) => {
       current = (index + slides.length) % slides.length;
+      track.style.transform = `translateX(-${current * 100}%)`;
       slides.forEach((slide, i) => {
-        slide.toggleAttribute("data-active", i === current);
-        if (i === current) slide.removeAttribute("aria-hidden");
-        else slide.setAttribute("aria-hidden", "true");
-        // The next slide's image may still be lazy; ask for it now.
-        if (i === current) slide.querySelector("img")?.setAttribute("loading", "eager");
+        if (i === current) {
+          slide.removeAttribute("aria-hidden");
+          slide.querySelector("img")?.setAttribute("loading", "eager");
+        } else {
+          slide.setAttribute("aria-hidden", "true");
+        }
       });
-      tabs.forEach((tab, i) => tab.setAttribute("aria-pressed", String(i === current)));
-      // Restart the progress bar's animation on the tab that is now active.
-      const bar = tabs[current]?.querySelector<HTMLElement>(".slider-progress");
-      if (bar) {
-        bar.style.animation = "none";
-        void bar.offsetWidth;
-        bar.style.animation = "";
-      }
+      dots.forEach((dot, i) => {
+        if (i === current) dot.setAttribute("aria-current", "true");
+        else dot.removeAttribute("aria-current");
+      });
     };
 
     const schedule = () => {
       window.clearTimeout(timer);
-      if (stopped || slider.dataset.paused === "true" || document.hidden) return;
+      if (paused || document.hidden) return;
       timer = window.setTimeout(() => {
         show(current + 1);
         schedule();
       }, interval);
     };
 
-    const pause = (paused: boolean) => {
-      slider.dataset.paused = String(paused);
+    const pause = (value: boolean) => {
+      paused = value;
       schedule();
     };
 
-    tabs.forEach((tab, index) =>
-      tab.addEventListener("click", () => {
-        stopped = true;
-        slider.dataset.stopped = "true";
+    for (const arrow of slider.querySelectorAll<HTMLButtonElement>(".slider-arrow")) {
+      arrow.addEventListener("click", () => {
+        show(current + Number(arrow.dataset.step));
+        schedule();
+      });
+    }
+    dots.forEach((dot, index) =>
+      dot.addEventListener("click", () => {
         show(index);
         schedule();
       }),
@@ -119,114 +130,120 @@ const images = slides.map((slide) => ({ ...slide, image: shot(slide.name) }));
     slider.addEventListener("focusout", () => pause(false));
     document.addEventListener("visibilitychange", schedule);
 
+    // Warm the next slides so the first slide-in is not a blank frame.
+    window.addEventListener("load", () =>
+      slides.forEach((slide) => slide.querySelector("img")?.setAttribute("loading", "eager")),
+    );
     schedule();
   }
 </script>
 
 <style>
   .slider-frame {
-    display: grid;
+    position: relative;
+    overflow: hidden;
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shot-shadow);
+  }
+
+  .slider-track {
+    display: flex;
+    transition: transform 600ms cubic-bezier(0.22, 0.61, 0.36, 1);
   }
 
   .slider-slide {
-    grid-area: 1 / 1;
+    flex: 0 0 100%;
     margin: 0;
-    opacity: 0;
-    visibility: hidden;
-    transition:
-      opacity 600ms ease,
-      visibility 0s linear 600ms;
   }
 
-  .slider-slide[data-active] {
-    opacity: 1;
-    visibility: visible;
-    transition: opacity 600ms ease;
+  /* The frame carries the shadow; a shadow per slide would be clipped. */
+  .slider-slide :global(.shot) {
+    box-shadow: none;
   }
 
-  .slider-tabs {
-    display: grid;
-    grid-auto-columns: minmax(0, 1fr);
-    grid-auto-flow: column;
-    gap: 20px;
-    margin-top: 24px;
-  }
-
-  @media (max-width: 640px) {
-    .slider-tabs {
-      grid-auto-flow: row;
-      gap: 12px;
-    }
-  }
-
-  .slider-tab {
-    position: relative;
-    display: grid;
-    gap: 4px;
-    padding: 14px 0 0;
-    border: 0;
-    border-top: 2px solid var(--line);
-    background: none;
-    color: var(--ink-3);
-    font: inherit;
-    text-align: left;
-    cursor: pointer;
-  }
-
-  .slider-tab strong {
-    color: var(--ink-2);
-    font-size: 15px;
-  }
-
-  .slider-caption {
-    font-size: 14px;
-    line-height: 1.5;
-  }
-
-  .slider-tab[aria-pressed="true"] strong {
-    color: var(--ink);
-  }
-
-  .slider-tab[aria-pressed="true"] .slider-caption {
-    color: var(--ink-2);
-  }
-
-  /* The bar along the top of the active tab fills over the slide's interval:
-     it is how the visitor sees that the frame will change on its own. */
-  .slider-progress {
+  .slider-arrow {
     position: absolute;
-    top: -2px;
-    left: 0;
-    height: 2px;
-    width: 0;
+    top: 50%;
+    display: grid;
+    place-items: center;
+    width: 40px;
+    height: 40px;
+    padding: 0;
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    border-radius: 50%;
+    background: rgba(5, 8, 11, 0.62);
+    color: #f5f5f7;
+    cursor: pointer;
+    opacity: 0.85;
+    transform: translateY(-50%);
+    backdrop-filter: blur(6px);
+    transition:
+      opacity 150ms ease,
+      background 150ms ease;
+  }
+
+  .slider-arrow:hover {
+    opacity: 1;
+    background: rgba(5, 8, 11, 0.85);
+  }
+
+  .slider-arrow.is-prev {
+    left: 12px;
+  }
+
+  .slider-arrow.is-next {
+    right: 12px;
+  }
+
+  .slider-arrow svg {
+    width: 20px;
+    height: 20px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+
+  .slider-dots {
+    display: flex;
+    justify-content: center;
+    gap: 8px;
+    margin-top: 16px;
+  }
+
+  .slider-dot {
+    width: 8px;
+    height: 8px;
+    padding: 0;
+    border: 0;
+    border-radius: 50%;
+    background: var(--ink-3);
+    opacity: 0.5;
+    cursor: pointer;
+    transition:
+      opacity 150ms ease,
+      background 150ms ease;
+  }
+
+  .slider-dot[aria-current="true"] {
     background: var(--accent);
+    opacity: 1;
   }
 
-  .slider-tab[aria-pressed="true"] .slider-progress {
-    width: 100%;
-    animation: slider-fill var(--interval) linear;
+  /* A bigger target than the dot it draws. */
+  .slider-dot {
+    position: relative;
   }
 
-  .slider[data-paused="true"] .slider-tab[aria-pressed="true"] .slider-progress {
-    animation-play-state: paused;
-  }
-
-  .slider[data-stopped="true"] .slider-tab[aria-pressed="true"] .slider-progress {
-    animation: none;
-  }
-
-  @keyframes slider-fill {
-    from {
-      width: 0;
-    }
-    to {
-      width: 100%;
-    }
+  .slider-dot::after {
+    content: "";
+    position: absolute;
+    inset: -8px;
   }
 
   @media (prefers-reduced-motion: reduce) {
-    .slider-slide,
-    .slider-slide[data-active] {
+    .slider-track {
       transition: none;
     }
   }
