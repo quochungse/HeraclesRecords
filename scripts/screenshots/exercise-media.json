@@ -1,0 +1,68 @@
+[
+ {
+  "id": "425827856334110721",
+  "name": "Planks",
+  "code": "T1010",
+  "coverUrls": [
+   "https://s3.coros.com/source/exercise_img/0/6b68c78df20a44f09d0f1917318cd865.png"
+  ],
+  "videoUrls": [
+   "https://s3.coros.com/source/exercise_gif/0/c519b9fce76e46d285a1bc3c5740266d.mp4"
+  ]
+ },
+ {
+  "id": "469646772906672129",
+  "name": "Walking Lunges",
+  "code": "T1225",
+  "coverUrls": [
+   "https://s3.coros.com/source/exercise_img/0/176ec68876424b39b1993459ea71f421.png"
+  ],
+  "videoUrls": [
+   "https://s3.coros.com/source/exercise_gif/0/eabd5e27554743758edf199a2d20a34d.mp4"
+  ]
+ },
+ {
+  "id": "469654960724951040",
+  "name": "Single Leg Calf Raise",
+  "code": "T1275",
+  "coverUrls": [
+   "https://s3.coros.com/source/exercise_img/0/dde15604bd31497c81051ed6f24eff23.png"
+  ],
+  "videoUrls": [
+   "https://s3.coros.com/source/exercise_gif/0/4b14c5be1b1c4217a7bf174f73b92725.mp4"
+  ]
+ },
+ {
+  "id": "469655210101489664",
+  "name": "Romanian Deadlift",
+  "code": "T1287",
+  "coverUrls": [
+   "https://s3.coros.com/source/exercise_img/0/36b2dcbfc69c4f0c83562e4aa4bc96dd.png"
+  ],
+  "videoUrls": [
+   "https://s3.coros.com/source/exercise_gif/0/8eeffa2b4c7c4ceeb25a6b97abf20632.mp4"
+  ]
+ },
+ {
+  "id": "469655241508438016",
+  "name": "Hip Thrust",
+  "code": "T1289",
+  "coverUrls": [
+   "https://s3.coros.com/source/exercise_img/0/de49ad89244947bda56c9d535d3bb8c3.png"
+  ],
+  "videoUrls": [
+   "https://s3.coros.com/source/exercise_gif/0/0a56a0362d8d4b3fa0fa5c60b7b280ec.mp4"
+  ]
+ },
+ {
+  "id": "469656067215900672",
+  "name": "Goblet Squat",
+  "code": "T1301",
+  "coverUrls": [
+   "https://s3.coros.com/source/exercise_img/0/574b6129d5654f34a969bf040be0b225.png"
+  ],
+  "videoUrls": [
+   "https://s3.coros.com/source/exercise_gif/0/970f5a992aec4896b029c4dfc40ed373.mp4"
+  ]
+ }
+]

@@ -1,0 +1,224 @@
+[
+ {
+  "out": "01-overview",
+  "view": "overview",
+  "wait": 4500,
+  "theme": "dark"
+ },
+ {
+  "out": "02-activities",
+  "view": "training",
+  "wait": 5000,
+  "theme": "dark"
+ },
+ {
+  "out": "03-running",
+  "view": "running",
+  "wait": 4500,
+  "theme": "dark"
+ },
+ {
+  "out": "04-run",
+  "view": "running",
+  "wait": 4000,
+  "steps": [
+   "demoClick('6 × 1 km intervals9/29', 'tr')",
+   3500
+  ],
+  "theme": "dark"
+ },
+ {
+  "out": "05-ride",
+  "view": "cycling",
+  "wait": 4000,
+  "steps": [
+   "demoClick('Ba Vì long ride', 'tr')",
+   3500
+  ],
+  "theme": "dark"
+ },
+ {
+  "out": "06-hike",
+  "view": "hiking",
+  "wait": 4000,
+  "steps": [
+   "demoClick('Fansipan', 'tr')",
+   3500
+  ],
+  "theme": "dark"
+ },
+ {
+  "out": "07-strength",
+  "view": "strength",
+  "wait": 7000,
+  "theme": "dark"
+ },
+ {
+  "out": "08-sleep",
+  "view": "sleep",
+  "wait": 4500,
+  "theme": "dark"
+ },
+ {
+  "out": "09-calendar",
+  "view": "calendar",
+  "wait": 4500,
+  "theme": "dark"
+ },
+ {
+  "out": "10-library",
+  "view": "library",
+  "wait": 4000,
+  "steps": [
+   "demoClick('Plans')",
+   1500,
+   "demoClick('Hanoi Marathon', 'button')",
+   2500
+  ],
+  "theme": "dark"
+ },
+ {
+  "out": "11-coach",
+  "view": "coach",
+  "wait": 5500,
+  "theme": "dark"
+ },
+ {
+  "out": "12-coach-plan",
+  "view": "coach",
+  "wait": 5500,
+  "ls": {
+   "demo.coachFirst": "c-plan"
+  },
+  "steps": [
+   "demoClick('Workbench')",
+   1500,
+   "demoClick('Hanoi Marathon · 12 weeks', 'button')",
+   2500
+  ],
+  "theme": "dark"
+ },
+ {
+  "out": "13-labours",
+  "view": "records",
+  "wait": 4500,
+  "steps": [
+   "demoClick('The Twelve Labours')",
+   1500
+  ],
+  "theme": "dark"
+ },
+ {
+  "out": "14-timeline",
+  "view": "records",
+  "wait": 4500,
+  "theme": "dark"
+ },
+ {
+  "out": "17-settings",
+  "view": "overview",
+  "wait": 3500,
+  "ls": {
+   "heraclesrecords.hiddenSportScreens": "[\"cycling\"]"
+  },
+  "steps": [
+   "document.querySelector('[data-nav-label=\"Settings\"]').click(), true",
+   2500
+  ],
+  "theme": "dark"
+ },
+ {
+  "out": "18-sync",
+  "view": "overview",
+  "wait": 3500,
+  "steps": [
+   "document.querySelector('[data-nav-label=\"Settings\"]').click(), true",
+   2500,
+   "(() => { const e = [...document.querySelectorAll('*')].find((x) => x.scrollHeight > x.clientHeight + 50 && /auto|scroll/.test(getComputedStyle(x).overflowY)); e.scrollTop = e.scrollHeight; return true; })()",
+   800
+  ],
+  "theme": "dark"
+ },
+ {
+  "out": "15-places",
+  "view": "places",
+  "wait": 9000,
+  "stepWait": 250,
+  "settle": 2500,
+  "steps": [
+   "(()=>{const c=[...document.querySelectorAll('canvas')].sort((a,b)=>b.clientWidth*b.clientHeight-a.clientWidth*a.clientHeight)[0];const r=c.getBoundingClientRect();for(let i=0;i<7;i++)c.dispatchEvent(new WheelEvent('wheel',{deltaY:-100,deltaMode:0,clientX:r.x+r.width/2,clientY:r.y+r.height*0.45,bubbles:true,cancelable:true}));return true})()",
+   1500
+  ],
+  "theme": "dark"
+ },
+ {
+  "out": "19-appearance-dark",
+  "view": "overview",
+  "wait": 4500,
+  "theme": "dark"
+ },
+ {
+  "out": "20-appearance-light",
+  "view": "overview",
+  "wait": 4500,
+  "theme": "paper"
+ },
+ {
+  "out": "21-calendar-detail",
+  "view": "calendar",
+  "wait": 4500,
+  "steps": [
+   "(()=>{const d=[...document.querySelectorAll('.calendar-day.is-openable.is-past')].filter(x=>x.querySelectorAll('button').length>=2);const el=d[d.length-2]||d[0];if(!el)return 'none';el.click();return 'days '+d.length})()",
+   2500
+  ],
+  "theme": "dark"
+ },
+ {
+  "out": "22-library-workouts",
+  "view": "library",
+  "wait": 4500,
+  "stepWait": 400,
+  "settle": 3500,
+  "steps": [
+   "demoClick(\"Runner's leg strength\")",
+   2500,
+   "(()=>{const b=document.querySelector('.sched-lift-toggle');if(!b)return 'no lift toggle';b.click();return true})()",
+   4000
+  ],
+  "theme": "dark"
+ },
+ {
+  "out": "23-workout-builder",
+  "view": "library",
+  "wait": 4500,
+  "steps": [
+   "demoClick('New workout')",
+   3000
+  ],
+  "theme": "dark"
+ },
+ {
+  "out": "24-auto-analysis",
+  "view": "coach",
+  "wait": 5500,
+  "steps": [
+   "demoClick('Analyses')",
+   1500,
+   "demoClick('Create Auto Analysis')",
+   2500
+  ],
+  "theme": "dark"
+ },
+ {
+  "out": "25-cycling",
+  "view": "cycling",
+  "wait": 5000,
+  "theme": "dark"
+ },
+ {
+  "out": "26-hiking",
+  "view": "hiking",
+  "wait": 5000,
+  "theme": "dark"
+ }
+]

@@ -9,7 +9,7 @@ Bản kế hoạch, 2026-10-04. Các quyết định đã chốt ở mục 8.
 - **`/privacy.html` là URL mà Google OAuth consent screen trỏ tới.** Nó phải tiếp tục trả 200 ở đúng đường dẫn đó, nếu không Drive sync có thể bị Google gắn cờ.
 - Trong app, `WEBSITE_URL` nằm ở [SettingsView.tsx:69](../src/settings/SettingsView.tsx) (Settings → About → Website). README cũng link tới site.
 - README có khối tải về **ghim cứng** vào v1.0.0: 4 badge, bảng 4 dòng kèm dung lượng, dòng "Version 1.0.0". Commit `e08584e` là ví dụ phải sửa tay khi build lại.
-- Ảnh chụp màn hình nằm ở `docs/readme/01..18.webp` (chỉ dark). Harness chụp ảnh ở `.work/readme-demo/` và đang bị git-ignore.
+- Ảnh chụp màn hình nằm ở `docs/readme/01..18.webp` (chỉ dark). Harness chụp ảnh lúc đó ở `.work/readme-demo/` (git-ignore); từ 2026-10-04 đã ở `scripts/screenshots/`.
 
 ## 2. Ràng buộc kỹ thuật quyết định kiến trúc
 
@@ -96,7 +96,7 @@ Các điểm phải đúng:
 
 Quy ước khi làm tính năng (đưa vào CLAUDE.md):
 - Tính năng người dùng nhìn thấy: cùng commit sửa `CHANGELOG.md [Unreleased]`, và trang tính năng tương ứng trong `site/` nếu có.
-- UI thay đổi rõ: chụp lại ảnh liên quan bằng harness. **Đề xuất đưa harness từ `.work/readme-demo/` vào repo** (`scripts/screenshots/`) để việc chụp lại tái lập được. Không chạy trong CI: cần Electron có GUI và WebGL.
+- UI thay đổi rõ: chụp lại ảnh liên quan bằng harness. **Đã đưa harness vào repo** (`scripts/screenshots/`, `npm run screenshots`) để việc chụp lại tái lập được. Không chạy trong CI: cần Electron có GUI và WebGL.
 - CLAUDE.md đang ghi "There is no website in this repository": sửa lại khi P0 xong.
 
 ## 5. Nội dung
@@ -148,7 +148,7 @@ Giọng văn: theo README hiện tại. Tiếng Anh, câu ngắn, cụ thể, **
 | **P0 Nền móng** (code xong 2026-10-04, chờ deploy key) | Deploy key + secret; `site/` Astro; chuyển `index` và `privacy` hiện có sang (sửa meta description); `site.yml` deploy sang repo org | `heraclesrecords.github.io` và `/privacy.html` phục vụ từ bản build của repo này; repo org chỉ còn commit của bot |
 | **P1 Release tự động** (code xong 2026-10-04) | `lib/release-data.mjs`, `update-readme-release.mjs` + marker trong README, job `readme` và `site` trong `release.yml`, `test:site` | Chạy thử bằng `workflow_dispatch` trên v1.0.0: README không đổi gì, site hiện đúng 1.0.0 |
 | **P2 Nội dung** (code xong 2026-10-04) | Trang chủ đầy đủ, Download, Labours, Coach, Features, Changelog, Guide, FAQ | Mọi trang trong sitemap có nội dung thật |
-| **P3 Hoàn thiện** (code xong 2026-10-04: OG, sitemap, JSON-LD, ảnh responsive, Lighthouse mobile 95–98 / desktop 100, a11y 100; harness vẫn ở .work, bản VI để sau) | OG images, sitemap, JSON-LD, Lighthouse ≥ 95, kiểm tra a11y, đưa harness chụp ảnh vào repo, (tuỳ chọn) bản tiếng Việt `/vi/` | |
+| **P3 Hoàn thiện** (code xong 2026-10-04: OG, sitemap, JSON-LD, ảnh responsive, Lighthouse mobile 95–98 / desktop 100, a11y 100; harness ở scripts/screenshots, bản VI để sau) | OG images, sitemap, JSON-LD, Lighthouse ≥ 95, kiểm tra a11y, đưa harness chụp ảnh vào repo, (tuỳ chọn) bản tiếng Việt `/vi/` | |
 | **P4 Domain riêng** | Xem mục 7 | |
 
 ## 7. Khi mua domain riêng

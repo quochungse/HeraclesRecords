@@ -1,0 +1,252 @@
+<title>Heracles Records README</title>
+<style>
+/* Layout: GitHub's repository page for the README itself, with a review rail of notes and numbered screenshots beside it. */
+:root {
+  --canvas: #f6f8fa;
+  --surface: #ffffff;
+  --fg: #1f2328;
+  --muted: #59636e;
+  --border: #d1d9e0;
+  --border-muted: #d1d9e0b3;
+  --link: #0969da;
+  --code-bg: #818b981f;
+  --row-alt: #f6f8fa;
+  --note: #0969da;
+  --gold: #9a6b12;
+  --gold-soft: #c8952f22;
+  --font: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans", Helvetica, Arial, sans-serif;
+  --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --canvas: #010409; --surface: #0d1117; --fg: #f0f6fc; --muted: #9198a1; --border: #3d444d; --border-muted: #3d444db3;
+    --link: #4493f8; --code-bg: #656c7633; --row-alt: #151b23; --note: #4493f8; --gold: #e3b341; --gold-soft: #e3b34122;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --canvas: #010409; --surface: #0d1117; --fg: #f0f6fc; --muted: #9198a1; --border: #3d444d; --border-muted: #3d444db3;
+  --link: #4493f8; --code-bg: #656c7633; --row-alt: #151b23; --note: #4493f8; --gold: #e3b341; --gold-soft: #e3b34122;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body { background: var(--canvas); color: var(--fg); font-family: var(--font); font-size: 14px; line-height: 1.5; }
+a { color: var(--link); text-decoration: none; }
+a:hover { text-decoration: underline; }
+:focus-visible { outline: 2px solid var(--link); outline-offset: 2px; border-radius: 3px; }
+
+.topbar { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5; background: var(--surface); border-bottom: 1px solid var(--border); }
+.topbar-inner { max-width: 1440px; margin: 0 auto; padding-block: 10px; padding-inline: 16px; display: flex; flex-wrap: wrap; align-items: center; gap: 12px 20px; }
+.repo { display: flex; align-items: center; gap: 8px; font-size: 16px; min-width: 0; }
+.repo svg { fill: var(--muted); flex: none; }
+.repo strong { font-weight: 600; }
+.topbar .spacer { flex: 1; }
+.theme-switch { display: inline-flex; border: 1px solid var(--border); border-radius: 6px; overflow: hidden; }
+.theme-switch button { font: inherit; font-size: 12px; padding: 5px 12px; border: 0; background: transparent; color: var(--fg); cursor: pointer; }
+.theme-switch button + button { border-left: 1px solid var(--border); }
+.theme-switch button[aria-pressed="true"] { background: var(--code-bg); font-weight: 600; }
+.hint { color: var(--muted); font-size: 12px; }
+
+.page { max-width: 1440px; margin: 0 auto; padding-block: 24px 64px; padding-inline: 16px; display: grid; grid-template-columns: minmax(0, 1fr) 360px; gap: 24px; align-items: start; }
+@media (max-width: 1100px) { .page { grid-template-columns: minmax(0, 1fr); } .rail { position: static !important; max-height: none !important; } }
+
+.readme { background: var(--surface); border: 1px solid var(--border); border-radius: 6px; min-width: 0; }
+.readme-head { display: flex; align-items: center; gap: 8px; padding: 8px 16px; border-bottom: 1px solid var(--border); font-size: 14px; font-weight: 600; }
+.readme-head svg { fill: var(--muted); }
+.readme-head .tab { border-bottom: 2px solid #fd8c73; padding-block: 6px; }
+
+/* GitHub's markdown body */
+.markdown-body { padding: 32px; font-size: 16px; line-height: 1.5; word-wrap: break-word; }
+@media (max-width: 600px) { .markdown-body { padding: 16px; } }
+.markdown-body > *:first-child { margin-top: 0 !important; }
+.markdown-body p, .markdown-body blockquote, .markdown-body ul, .markdown-body ol, .markdown-body table, .markdown-body pre, .markdown-body details { margin-top: 0; margin-bottom: 16px; }
+.markdown-body h1, .markdown-body h2, .markdown-body h3 { margin-top: 24px; margin-bottom: 16px; font-weight: 600; line-height: 1.25; text-wrap: balance; }
+.markdown-body h1 { font-size: 2em; padding-bottom: .3em; border-bottom: 1px solid var(--border-muted); }
+.markdown-body h2 { font-size: 1.5em; padding-bottom: .3em; border-bottom: 1px solid var(--border-muted); }
+.markdown-body h3 { font-size: 1.25em; }
+.markdown-body img { max-width: 100%; box-sizing: content-box; vertical-align: middle; }
+.markdown-body picture img { display: block; }
+.markdown-body p[align="center"] img { display: inline; }
+.markdown-body ul { padding-left: 2em; }
+.markdown-body li + li { margin-top: .25em; }
+.markdown-body code { font-family: var(--mono); font-size: 85%; padding: .2em .4em; background: var(--code-bg); border-radius: 6px; }
+.markdown-body pre { background: var(--row-alt); border-radius: 6px; padding: 16px; overflow-x: auto; font-size: 85%; line-height: 1.45; }
+.markdown-body pre code { background: none; padding: 0; font-size: 100%; }
+.markdown-body table { display: block; width: max-content; max-width: 100%; overflow: auto; border-spacing: 0; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+.markdown-body th, .markdown-body td { padding: 6px 13px; border: 1px solid var(--border); }
+.markdown-body th { font-weight: 600; }
+.markdown-body tr:nth-child(2n) { background: var(--row-alt); }
+.markdown-body table tr:has(> td[width]) { background: transparent; }
+.markdown-body td[width] p { margin-top: 8px; margin-bottom: 0; font-size: 15px; }
+.markdown-body blockquote { padding: 0 1em; color: var(--muted); border-left: .25em solid var(--border); }
+.markdown-body details summary { cursor: pointer; }
+.markdown-body details[open] summary { margin-bottom: 12px; }
+.markdown-body hr { height: .25em; padding: 0; margin: 24px 0; background: var(--border); border: 0; }
+.gh-alert { color: inherit !important; border-left-color: var(--note) !important; }
+.gh-alert-title { display: flex; align-items: center; gap: 8px; color: var(--note); font-weight: 500; margin-bottom: 4px !important; }
+.gh-alert-title svg { fill: currentColor; }
+
+/* Figure numbers: the preview's, not the README's. */
+.fig { position: relative; display: block; scroll-margin-top: 72px; }
+.fig-n { position: absolute; top: 10px; right: 10px; min-width: 30px; height: 30px; padding: 0 8px; border-radius: 15px; display: grid; place-items: center; font: 700 14px/1 var(--font); font-variant-numeric: tabular-nums; color: #1a1205; background: #e3b341; box-shadow: 0 1px 4px #0006; }
+
+/* Review rail */
+.rail { position: sticky; top: 64px; max-height: calc(100vh - 80px); overflow-y: auto; display: grid; gap: 16px; min-width: 0; }
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 16px; display: grid; gap: 10px; min-width: 0; }
+.card h2 { margin: 0; font-size: 13px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: var(--muted); }
+.card p, .card ul, .card ol { margin: 0; }
+.card ul, .card ol { padding-left: 18px; display: grid; gap: 4px; }
+.tagline { font-size: 15px; font-weight: 600; line-height: 1.35; padding: 10px 12px; border-radius: 6px; background: var(--gold-soft); border: 1px solid var(--gold); }
+.alts { color: var(--muted); }
+.alts li strong { color: var(--fg); font-weight: 500; }
+.card code { font-family: var(--mono); font-size: 12px; padding: .1em .35em; background: var(--code-bg); border-radius: 4px; word-break: break-word; }
+.shots { list-style: none; padding: 0 !important; gap: 6px !important; }
+.shot { display: grid; grid-template-columns: 26px 88px minmax(0, 1fr); gap: 10px; align-items: center; padding: 6px; border-radius: 6px; color: var(--fg); }
+.shot:hover { background: var(--row-alt); text-decoration: none; }
+.shot-n { font-weight: 700; font-variant-numeric: tabular-nums; color: var(--gold); text-align: right; font-size: 15px; }
+.shot-thumb { width: 88px; aspect-ratio: 3024 / 1964; object-fit: cover; border-radius: 4px; border: 1px solid var(--border); background: var(--row-alt); max-width: 100%; }
+.shot-text { display: grid; gap: 1px; min-width: 0; font-size: 12.5px; line-height: 1.35; }
+.shot-text span { color: var(--muted); }
+.shot-text code { justify-self: start; }
+@media (prefers-reduced-motion: no-preference) { html { scroll-behavior: smooth; } }
+</style>
+
+<header class="topbar">
+  <div class="topbar-inner">
+    <div class="repo">
+      <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true"><path d="M2 2.5A2.5 2.5 0 0 1 4.5 0h8.75a.75.75 0 0 1 .75.75v12.5a.75.75 0 0 1-.75.75h-2.5a.75.75 0 0 1 0-1.5h1.75v-2h-8a1 1 0 0 0-.714 1.7.75.75 0 1 1-1.072 1.05A2.495 2.495 0 0 1 2 11.5Zm10.5-1h-8a1 1 0 0 0-1 1v6.708A2.486 2.486 0 0 1 4.5 9h8ZM5 12.25a.25.25 0 0 1 .25-.25h3.5a.25.25 0 0 1 .25.25v3.25a.25.25 0 0 1-.4.2l-1.45-1.087a.249.249 0 0 0-.3 0L5.4 15.7a.25.25 0 0 1-.4-.2Z"></path></svg>
+      <span>quochungse / <strong>HeraclesRecords</strong></span>
+    </div>
+    <span class="spacer"></span>
+    <span class="hint">GitHub theme</span>
+    <div class="theme-switch" role="group" aria-label="GitHub theme">
+      <button type="button" id="theme-system" data-set="">System</button>
+      <button type="button" id="theme-light" data-set="light">Light</button>
+      <button type="button" id="theme-dark" data-set="dark">Dark</button>
+    </div>
+  </div>
+</header>
+
+<div class="page">
+  <main class="readme">
+    <div class="readme-head">
+      <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true"><path d="M0 1.75A.75.75 0 0 1 .75 1h4.253c1.227 0 2.317.59 3 1.501A3.743 3.743 0 0 1 11.006 1h4.245a.75.75 0 0 1 .75.75v10.5a.75.75 0 0 1-.75.75h-4.507a2.25 2.25 0 0 0-1.591.659l-.622.621a.75.75 0 0 1-1.06 0l-.622-.621A2.25 2.25 0 0 0 5.258 13H.75a.75.75 0 0 1-.75-.75Zm7.251 10.324.004-5.073-.002-2.253A2.25 2.25 0 0 0 5.003 2.5H1.5v9h3.757a3.75 3.75 0 0 1 1.994.574ZM8.755 4.75l-.004 7.322a3.752 3.752 0 0 1 1.992-.572H14.5v-9h-3.495a2.25 2.25 0 0 0-2.25 2.25Z"></path></svg>
+      <span class="tab">README</span>
+    </div>
+    <article class="markdown-body">
+<!--README-->
+    </article>
+  </main>
+
+  <aside class="rail" aria-label="Review notes">
+    <section class="card">
+      <h2>Slogan</h2>
+      <p class="tagline">Training records, analytics &amp; AI — alongside your COROS data.</p>
+      <p>Giữ ý của bạn, chỉ sửa cho gọn: viết thường đồng nhất, dùng “&amp;”, nối hai vế bằng gạch ngang. Dòng dưới slogan nói rõ app là gì cho người lần đầu đọc.</p>
+      <ul class="alts">
+        <li><strong>Your COROS training, recorded, analysed and coached.</strong></li>
+        <li><strong>Deep analytics and an AI coach for your COROS training.</strong></li>
+        <li><strong>Every session a record. Every record a labour.</strong> (chơi chữ với Heracles)</li>
+      </ul>
+    </section>
+
+    <section class="card">
+      <h2>Bố cục</h2>
+      <ol>
+        <li>Hero: icon, slogan, câu giới thiệu, badge (release, lượt tải), 4 nút tải trực tiếp, ảnh Overview.</li>
+        <li>Ghi chú <em>unofficial</em> ngay dưới hero, nêu tên các dòng đồng hồ COROS (giúp tìm thấy qua Google).</li>
+        <li>Download: bảng 4 bản cài, link thẳng tới file v1.0.0; hướng dẫn mở lần đầu gập lại.</li>
+        <li>Tính năng theo 5 nhóm: Today · Mọi buổi tập · Lập kế hoạch · AI Coach · Hall of Records.</li>
+        <li>Dữ liệu của bạn, câu chuyện CorosLink, hỗ trợ, license và tuyên bố thương hiệu COROS.</li>
+      </ol>
+    </section>
+
+    <section class="card">
+      <h2>Ý tưởng đã áp dụng</h2>
+      <ul>
+        <li>Mỗi ảnh có 2 bản: GitHub sáng hiện theme Paper, GitHub tối hiện theme Dark (thẻ <code>&lt;picture&gt;</code>). Dùng nút trên cùng để xem cả hai.</li>
+        <li>Ảnh 3024 × 1964, đúng độ phân giải MacBook Pro 14", bo góc và có đèn cửa sổ macOS. WebP, tổng 5,9 MB cho 30 ảnh.</li>
+        <li>Toàn bộ là dữ liệu mẫu (vận động viên giả “Alex Pham” ở Hà Nội); hội thoại Coach viết bằng tiếng Anh.</li>
+        <li>Phần kỹ thuật chỉ còn 3 lệnh build, gập lại cuối trang.</li>
+      </ul>
+    </section>
+
+    <section class="card">
+      <h2>Cần bạn làm trên GitHub</h2>
+      <ul>
+        <li>About → Description: <code>Training records, analytics &amp; AI — alongside your COROS data. Unofficial desktop app for COROS watches.</code></li>
+        <li>About → Topics: <code>coros</code> <code>coros-watch</code> <code>coros-training-hub</code> <code>running</code> <code>cycling</code> <code>training-analytics</code> <code>ai-coach</code> <code>electron</code></li>
+        <li>Link tải trỏ cố định tới v1.0.0, phải sửa mỗi lần release (có thể để <code>release:prepare</code> tự sửa).</li>
+        <li>Bản macOS chưa notarize; README đã có hướng dẫn “Open Anyway”.</li>
+      </ul>
+    </section>
+
+    <section class="card">
+      <h2>Ảnh chụp (15 × 2 theme)</h2>
+      <ol class="shots">
+<!--SHOTS-->
+      </ol>
+    </section>
+  </aside>
+</div>
+
+<script>
+(function () {
+  var root = document.documentElement;
+  var media = window.matchMedia("(prefers-color-scheme: dark)");
+
+  // Each <picture> follows the theme chosen here, not only the OS setting.
+  document.querySelectorAll(".markdown-body picture").forEach(function (picture) {
+    var source = picture.querySelector("source");
+    var img = picture.querySelector("img");
+    if (!source || !img) return;
+    img.dataset.light = img.getAttribute("src");
+    img.dataset.dark = source.getAttribute("srcset");
+    source.remove();
+    var match = /docs\/readme\/(\d\d)-/.exec(img.dataset.dark || "");
+    if (match) {
+      var wrap = document.createElement("span");
+      wrap.className = "fig";
+      wrap.id = "fig-" + match[1];
+      picture.parentNode.insertBefore(wrap, picture);
+      wrap.appendChild(picture);
+      var badge = document.createElement("span");
+      badge.className = "fig-n";
+      badge.textContent = String(Number(match[1]));
+      badge.setAttribute("aria-label", "Screenshot " + Number(match[1]));
+      wrap.appendChild(badge);
+    }
+  });
+
+  function effective() {
+    var set = root.getAttribute("data-theme");
+    if (set === "dark" || set === "light") return set;
+    return media.matches ? "dark" : "light";
+  }
+  function apply() {
+    var theme = effective();
+    document.querySelectorAll("img[data-light][data-dark]").forEach(function (img) {
+      var want = img.dataset[theme];
+      if (img.getAttribute("src") !== want) img.setAttribute("src", want);
+    });
+    var chosen = root.getAttribute("data-theme") || "";
+    document.querySelectorAll(".theme-switch button").forEach(function (button) {
+      button.setAttribute("aria-pressed", String(button.dataset.set === chosen));
+    });
+  }
+  function choose(value) {
+    if (value) root.setAttribute("data-theme", value); else root.removeAttribute("data-theme");
+    try { localStorage.setItem("readme-preview-theme", value); } catch (e) {}
+    apply();
+  }
+  document.querySelectorAll(".theme-switch button").forEach(function (button) {
+    button.addEventListener("click", function () { choose(button.dataset.set); });
+  });
+  var stored = null;
+  try { stored = localStorage.getItem("readme-preview-theme"); } catch (e) {}
+  if (stored === "light" || stored === "dark") root.setAttribute("data-theme", stored);
+  if (media.addEventListener) media.addEventListener("change", apply);
+  new MutationObserver(apply).observe(root, { attributes: true, attributeFilter: ["data-theme"] });
+  apply();
+})();
+</script>

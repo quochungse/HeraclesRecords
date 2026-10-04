@@ -144,10 +144,12 @@ labour renamed in the app is renamed on the site**, and the site's text is only 
 those files. The guides are Markdown in `site/src/content/guide/`, and they name the app's
 buttons and screens by their labels, so **a renamed button or Settings section means a guide
 to fix**. Screenshots from `19-` on are the site's alone (the README stops at 18): the appearance pair
-`19-appearance-dark`/`20-appearance-light`, shot together by the README harness
-(`theme: "paper"` for the light one) so the two show the same day, and `21-`–`26-` for the
-/plan, /activities and /coach pages. All of them are in the harness's `plan-final.json`, so a
-reshoot covers the site too. Text the site takes from the app or the
+`19-appearance-dark`/`20-appearance-light`, shot together (`theme: "paper"` for the light
+one) so the two show the same day, and `21-`–`26-` for the /plan, /activities and /coach
+pages. **Every one of them is taken by `scripts/screenshots/`** (`npm run screenshots`, or
+`-- 05-ride` for one; its README says how): the real renderer on demo data — one invented
+athlete, `example.com` emails, never a copy of a real database — driven by the plan in
+`shots.json`. A screen that changes gets reshot there, not by hand. Text the site takes from the app or the
 changelog is put in its style at render time (`plain()`, the changelog loader: an em dash
 becomes a comma or a colon), and `test:site` checks the built pages as well as the source.
 A local build keeps the last release it read in `site/.astro/release-cache.json` and falls
@@ -194,6 +196,8 @@ npm --prefix site install # the website's own dependencies (Astro), separate fro
 npm run site:dev         # the website on Astro's dev server
 npm run test:site        # build the website and check it (privacy.html, .nojekyll, assets, installers, no em dash)
 npm run readme:release   # rewrite the README's download blocks from the latest release (-- --check to only compare)
+npm run screenshots      # reshoot docs/readme from demo data (-- 05-ride for one, -- --route for the animation); scripts/screenshots/README.md
+npm run site:og          # re-render the website's link-preview cards into site/public/og
 ```
 
 There is **no linter and no test runner**. Tests are ~167 standalone `scripts/test-*.mjs`
