@@ -22,11 +22,17 @@ on:
       - "src/records/labours.ts"
       - "CHANGELOG.md"
       - "scripts/test-site.mjs"
+      - "scripts/lib/release-data.mjs"
       - ".github/workflows/site.yml"
   workflow_dispatch:
   # release.yml calls this after publishing a release. Events raised with
   # GITHUB_TOKEN start no other workflow, so `on: release` would never fire.
   workflow_call:
+    inputs:
+      ref:
+        description: "What to build. release.yml passes main: built from the tag, the site would lose every change made on main since."
+        type: string
+        default: ""
 
 permissions:
   contents: read
@@ -46,6 +52,8 @@ jobs:
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref }}
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
@@ -57,7 +65,12 @@ jobs:
       - name: Install site dependencies
         run: npm ci --prefix site
 
+      # Reads the latest published release from GitHub (version, installers,
+      # sizes); the token lifts the API's rate limit. A build that cannot read
+      # it fails rather than deploying a site with no download links.
       - name: Build site
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
         run: npm run site:build
 
       - name: Check site

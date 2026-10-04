@@ -40,7 +40,7 @@ site/                       ← Astro project riêng, package.json + lockfile ri
     styles/                 ← token màu/typography lấy theo app
   public/                   ← file tĩnh (favicon, sau này là CNAME)
 scripts/
-  release-data.mjs          ← đọc release mới nhất → JSON (version, ngày, file, size, sha512)
+  lib/release-data.mjs      ← đọc release mới nhất (version, ngày, file, size, sha256) và sinh khối README
   update-readme-release.mjs ← viết lại khối giữa <!-- release:start --> và <!-- release:end --> trong README
 .github/workflows/
   site.yml                  ← build + deploy; chạy khi push vào site/**, docs/readme/**, CHANGELOG.md; workflow_call; workflow_dispatch
@@ -57,7 +57,7 @@ Vì sao `site/` có **package.json riêng**, không thêm dependency vào app:
 
 | Thứ | Nguồn | Site đọc bằng cách |
 |---|---|---|
-| Version, file tải, size, sha512 | GitHub Release mới nhất (`latest*.yml` + API) | `scripts/release-data.mjs` lúc build |
+| Version, file tải, size, sha256 | GitHub Release mới nhất (API `releases/latest`) | `scripts/lib/release-data.mjs` lúc build |
 | Release notes | `CHANGELOG.md` | cùng parser với `scripts/release-notes.mjs` |
 | Ảnh chụp màn hình | `docs/readme/*.webp` | import thẳng, README cũng dùng chính file này |
 | 12 Labours: tên, mô tả, mốc | `src/records/labours.ts` (không có import nào, node-free) | import thẳng |
@@ -90,7 +90,7 @@ Các điểm phải đúng:
 
 1. **Dung lượng chỉ biết sau khi build xong**, nên README chỉ cập nhật được sau job `release`. Job `readme` lấy size và sha512 từ chính artifact vừa tải về (hoặc từ API), sinh lại khối giữa hai marker, commit bằng `github-actions[bot]` lên `main`.
 2. **Sự kiện do `GITHUB_TOKEN` tạo ra không kích hoạt workflow khác.** Release do `softprops/action-gh-release` tạo bằng `GITHUB_TOKEN`, nên một workflow `on: release` sẽ không bao giờ chạy; commit README của bot cũng không kích hoạt `site.yml`. Vì vậy `release.yml` phải **gọi trực tiếp** `site.yml` (`workflow_call`), không trông vào trigger.
-3. Deploy giữa hai lần release (sửa copy, thêm guide) chỉ hiển thị **release đã publish**: `release-data.mjs` đọc release mới nhất từ GitHub, không đọc `package.json`, và bỏ qua mục `[Unreleased]` của CHANGELOG. Bỏ qua cả pre-release.
+3. Deploy giữa hai lần release (sửa copy, thêm guide) chỉ hiển thị **release đã publish**: `lib/release-data.mjs` đọc release mới nhất từ GitHub, không đọc `package.json`, và bỏ qua mục `[Unreleased]` của CHANGELOG. Bỏ qua cả pre-release.
 4. Nếu sau này bật branch protection cho `main`, job `readme` đổi sang mở PR thay vì push thẳng.
 5. Thêm vào lời nhắc của `release:prepare`: CHANGELOG đã có mục version chưa, ảnh chụp có cần chụp lại không, có trang tính năng nào cần thêm không.
 
@@ -146,7 +146,7 @@ Giọng văn: theo README hiện tại. Tiếng Anh, câu ngắn, cụ thể, **
 | Phase | Nội dung | Xong khi |
 |---|---|---|
 | **P0 Nền móng** (code xong 2026-10-04, chờ deploy key) | Deploy key + secret; `site/` Astro; chuyển `index` và `privacy` hiện có sang (sửa meta description); `site.yml` deploy sang repo org | `heraclesrecords.github.io` và `/privacy.html` phục vụ từ bản build của repo này; repo org chỉ còn commit của bot |
-| **P1 Release tự động** | `release-data.mjs`, `update-readme-release.mjs` + marker trong README, job `readme` và `site` trong `release.yml`, `test:site` | Chạy thử bằng `workflow_dispatch` trên v1.0.0: README không đổi gì, site hiện đúng 1.0.0 |
+| **P1 Release tự động** (code xong 2026-10-04) | `lib/release-data.mjs`, `update-readme-release.mjs` + marker trong README, job `readme` và `site` trong `release.yml`, `test:site` | Chạy thử bằng `workflow_dispatch` trên v1.0.0: README không đổi gì, site hiện đúng 1.0.0 |
 | **P2 Nội dung** | Trang chủ đầy đủ, Download, Labours, Coach, Features, Changelog, Guide, FAQ | Mọi trang trong sitemap có nội dung thật |
 | **P3 Hoàn thiện** | OG images, sitemap, JSON-LD, Lighthouse ≥ 95, kiểm tra a11y, đưa harness chụp ảnh vào repo, (tuỳ chọn) bản tiếng Việt `/vi/` | |
 | **P4 Domain riêng** | Xem mục 7 | |

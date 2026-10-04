@@ -236,3 +236,56 @@ jobs:
             release/macos/*
             release/linux/*
             release/windows/*
+
+  # The README's download badges and table name the installers and their
+  # sizes, which exist only now. Written from the published release (as the
+  # website is, scripts/lib/release-data.mjs) and committed to main, not to the
+  # tag: the tag is history, main is what the repository's page shows.
+  readme:
+    name: Update README
+    needs: release
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Write the release into README.md
+        id: readme
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: node scripts/update-readme-release.mjs
+
+      # A push made with GITHUB_TOKEN starts no workflow, so this commit does
+      # not rebuild the installers; the website is redeployed by the job below.
+      - name: Commit README.md
+        run: |
+          if git diff --quiet README.md; then
+            echo "README.md already states ${{ steps.readme.outputs.tag }}."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "Update the README's downloads for ${{ steps.readme.outputs.tag }}" README.md
+          for attempt in 1 2 3; do
+            git push origin HEAD:main && exit 0
+            git pull --rebase origin main
+          done
+          exit 1
+
+  # Called, not triggered: a release published with GITHUB_TOKEN starts no
+  # other workflow, so `on: release` in site.yml would never fire. Built from
+  # main, so the site keeps whatever changed there after the tag.
+  site:
+    name: Website
+    needs: release
+    uses: ./.github/workflows/site.yml
+    with:
+      ref: main
+    secrets: inherit

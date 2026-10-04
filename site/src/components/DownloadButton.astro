@@ -1,0 +1,129 @@
+---
+// The download button for the visitor's own system, with every installer
+// listed under it. Without script, or on a phone, the button opens the release
+// page; the script only swaps in the installer that matches the system.
+import { latestRelease } from "../release.mjs";
+
+const release = await latestRelease();
+const releasesUrl = "https://github.com/quochungse/HeraclesRecords/releases/latest";
+const pick = (id) => release?.installers.find((entry) => entry.id === id);
+// A Mac is offered Apple Silicon: no browser says reliably which chip it runs
+// on, and Intel is one line below.
+const byOs = release && {
+  mac: pick("mac-arm64"),
+  windows: pick("windows"),
+  linux: pick("linux"),
+};
+const choices =
+  byOs &&
+  Object.fromEntries(
+    Object.entries(byOs).map(([os, entry]) => [
+      os,
+      { url: entry.url, label: `Download for ${entry.os}`, size: entry.sizeLabel },
+    ]),
+  );
+---
+
+<div class="download" data-choices={choices ? JSON.stringify(choices) : undefined}>
+  <div class="actions download-actions">
+    <a class="button primary" href={releasesUrl} data-download-primary>
+      <span data-download-label>Download</span>
+      <span class="download-size" data-download-size hidden></span>
+    </a>
+    <slot />
+  </div>
+  {
+    release && (
+      <ul class="download-list" aria-label={`Every installer for version ${release.version}`}>
+        {release.installers.map((entry) => (
+          <li>
+            <a href={entry.url}>
+              {entry.os} <span>{entry.variant}</span>
+            </a>
+            <span class="download-list-size">{entry.sizeLabel}</span>
+          </li>
+        ))}
+      </ul>
+    )
+  }
+</div>
+
+<script>
+  function detectOs(): "mac" | "windows" | "linux" | null {
+    const nav = navigator as Navigator & { userAgentData?: { platform?: string; mobile?: boolean } };
+    const ua = navigator.userAgent;
+    if (nav.userAgentData?.mobile || /Android|iPhone|iPad|iPod/i.test(ua)) return null;
+    const platform = nav.userAgentData?.platform || navigator.platform || "";
+    if (/Win/i.test(platform) || /Windows/i.test(ua)) return "windows";
+    if (/Mac/i.test(platform) || /Mac OS X/i.test(ua)) {
+      // iPadOS reports a Mac but has a touch screen.
+      return navigator.maxTouchPoints > 1 ? null : "mac";
+    }
+    if (/Linux/i.test(platform) || /Linux/i.test(ua)) return "linux";
+    return null;
+  }
+
+  for (const block of document.querySelectorAll<HTMLElement>(".download[data-choices]")) {
+    const os = detectOs();
+    if (!os) continue;
+    const choice = JSON.parse(block.dataset.choices!)[os];
+    if (!choice) continue;
+    const button = block.querySelector<HTMLAnchorElement>("[data-download-primary]")!;
+    button.href = choice.url;
+    block.querySelector("[data-download-label]")!.textContent = choice.label;
+    const size = block.querySelector<HTMLElement>("[data-download-size]")!;
+    size.textContent = choice.size;
+    size.hidden = false;
+  }
+</script>
+
+<style>
+  .download {
+    display: grid;
+    justify-items: center;
+    gap: 20px;
+  }
+
+  .download-actions {
+    justify-content: center;
+  }
+
+  .download-size {
+    font-weight: 400;
+    opacity: 0.75;
+  }
+
+  .download-size::before {
+    content: "·";
+    margin-right: 8px;
+  }
+
+  .download-list {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 6px 20px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    font-size: 14px;
+  }
+
+  .download-list a {
+    color: var(--ink-2);
+    text-decoration: none;
+  }
+
+  .download-list a:hover {
+    color: var(--ink);
+  }
+
+  .download-list a span,
+  .download-list-size {
+    color: var(--ink-3);
+  }
+
+  .download-list-size {
+    margin-left: 6px;
+  }
+</style>

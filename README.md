@@ -21,18 +21,21 @@
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-555?style=flat-square" alt="MIT license" /></a>
 </p>
 
+<!-- release:badges:start -->
 <p align="center">
   <a href="https://github.com/quochungse/HeraclesRecords/releases/download/v1.0.0/HeraclesRecords-1.0.0-arm64.dmg"><img src="https://img.shields.io/badge/macOS-Apple%20Silicon-1f2328?style=for-the-badge&logo=apple&logoColor=white" alt="Download for macOS, Apple Silicon" /></a>
   <a href="https://github.com/quochungse/HeraclesRecords/releases/download/v1.0.0/HeraclesRecords-1.0.0-x64.dmg"><img src="https://img.shields.io/badge/macOS-Intel-1f2328?style=for-the-badge&logo=apple&logoColor=white" alt="Download for macOS, Intel" /></a>
   <a href="https://github.com/quochungse/HeraclesRecords/releases/download/v1.0.0/HeraclesRecords-Setup-1.0.0.exe"><img src="https://img.shields.io/badge/Windows-10%20%2F%2011-1f2328?style=for-the-badge&logo=data%3Aimage%2Fsvg%2Bxml%3Bbase64%2CPHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCI%2BPHBhdGggZmlsbD0iI2ZmZiIgZD0iTTMgNS42bDcuNi0xLjF2N0gzek0xMS42IDQuNEwyMSAzdjguNWgtOS40ek0zIDEyLjVoNy42djdMMyAxOC40ek0xMS42IDEyLjVIMjFWMjFsLTkuNC0xLjN6Ii8%2BPC9zdmc%2B" alt="Download for Windows" /></a>
   <a href="https://github.com/quochungse/HeraclesRecords/releases/download/v1.0.0/HeraclesRecords-1.0.0.AppImage"><img src="https://img.shields.io/badge/Linux-AppImage-1f2328?style=for-the-badge&logo=linux&logoColor=white" alt="Download for Linux" /></a>
 </p>
+<!-- release:badges:end -->
 
 > [!NOTE]
 > Heracles Records is an independent project. It is **not made, endorsed or supported by COROS**. It reads your training through your own COROS account, so it works with any COROS watch that syncs there: PACE, APEX, VERTIX, NOMAD and the rest.
 
 ## Download
 
+<!-- release:downloads:start -->
 | Platform | Installer | Size |
 | --- | --- | --- |
 | **macOS** · Apple Silicon (M1 and later) | [HeraclesRecords-1.0.0-arm64.dmg](https://github.com/quochungse/HeraclesRecords/releases/download/v1.0.0/HeraclesRecords-1.0.0-arm64.dmg) | 176 MB |
@@ -41,13 +44,14 @@
 | **Linux** · x86-64 | [HeraclesRecords-1.0.0.AppImage](https://github.com/quochungse/HeraclesRecords/releases/download/v1.0.0/HeraclesRecords-1.0.0.AppImage) | 184 MB |
 
 Version 1.0.0 · [What's new](https://github.com/quochungse/HeraclesRecords/releases/tag/v1.0.0) · [All releases](https://github.com/quochungse/HeraclesRecords/releases). The app tells you when a new version is out.
+<!-- release:downloads:end -->
 
 <details>
 <summary><strong>First launch</strong></summary>
 
 - **macOS**: this build is not notarized yet. If macOS says it cannot check the app, open **System Settings → Privacy &amp; Security** and click **Open Anyway**. If it says the app is damaged, run `xattr -dr com.apple.quarantine "/Applications/Heracles Records.app"` in Terminal, then open it again.
 - **Windows**: SmartScreen may warn about an unrecognised app. Click **More info → Run anyway**.
-- **Linux**: make the file executable (`chmod +x HeraclesRecords-1.0.0.AppImage`) and run it.
+- **Linux**: make the file executable (`chmod +x HeraclesRecords-*.AppImage`) and run it.
 
 You sign in with your COROS account. Coach also needs an AI: your ChatGPT account, a Claude subscription, a Claude or OpenRouter API key, or a model running on your own computer.
 

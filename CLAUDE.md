@@ -166,7 +166,8 @@ npm run sample:coach     # app closed: writes sample Coach conversations for P0â
 npm start                # build, then run the packaged-style app
 npm --prefix site install # the website's own dependencies (Astro), separate from the app's
 npm run site:dev         # the website on Astro's dev server
-npm run test:site        # build the website and check it (privacy.html, .nojekyll, assets, no em dash)
+npm run test:site        # build the website and check it (privacy.html, .nojekyll, assets, installers, no em dash)
+npm run readme:release   # rewrite the README's download blocks from the latest release (-- --check to only compare)
 ```
 
 There is **no linter and no test runner**. Tests are ~167 standalone `scripts/test-*.mjs`
@@ -2710,7 +2711,17 @@ macOS job signs and notarizes when the Apple secrets are set and otherwise build
 the switches `build.yml` uses, so a release without an Apple account still ships Windows and
 Linux; the updater already sends an ad-hoc build to the download page (`isMacAdHocSigned`).
 The release text is the tag's `## [x.y.z]` section of `CHANGELOG.md`
-(`scripts/release-notes.mjs`), which fails the job when the section is missing. The
+(`scripts/release-notes.mjs`), which fails the job when the section is missing.
+**Nobody edits the README's download links or sizes by hand.** Once the release is
+published, the `readme` job writes them from the release itself
+(`scripts/update-readme-release.mjs`, between the `<!-- release:badges|downloads:start -->`
+markers) and commits to `main`, and the `site` job calls `site.yml` with `ref: main` â€” called,
+because a release or a push made with `GITHUB_TOKEN` triggers no other workflow, and built
+from `main`, not the tag, or the site would lose what changed there since. Both read the
+release through `scripts/lib/release-data.mjs` (`releases/latest`, so never a draft, a
+pre-release or the version `main` is heading for), which matches installers by shape and
+refuses a release missing one; `test:release-data` holds those shapes against the
+`artifactName` patterns, and fails on a versioned installer name left outside the markers. The
 changelog starts at 1.0.0; upstream's history is in `vendor-main`. `verify-release-artifacts.mjs`
 gates each platform's output before upload: every file `latest*.yml` names must be there with
 the size and sha512 it states (electron-updater refuses anything else, so a step that touches an

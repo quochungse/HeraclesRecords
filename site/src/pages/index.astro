@@ -1,5 +1,6 @@
 ---
 import Base from "../layouts/Base.astro";
+import DownloadButton from "../components/DownloadButton.astro";
 import icon from "../../../build/icon-256.png";
 import overview from "../../../docs/readme/01-overview.webp";
 
@@ -38,11 +39,12 @@ const features = [
       A free desktop app for COROS athletes: every session read in depth, an AI coach that
       has read all of it, and a hall for every record you set along the way.
     </p>
-    <div class="actions hero-actions">
-      <a class="button primary" href={`${repo}/releases/latest`}>Download</a>
-      <a class="button" href={repo}>Source on GitHub</a>
+    <div class="hero-download">
+      <DownloadButton>
+        <a class="button" href={repo}>Source on GitHub</a>
+      </DownloadButton>
     </div>
-    <p class="hero-meta">macOS · Windows · Linux · Free and open source (MIT)</p>
+    <p class="hero-meta">Free and open source (MIT)</p>
   </section>
 
   <section class="wrap shot">
@@ -115,8 +117,7 @@ const features = [
     line-height: 1.6;
   }
 
-  .hero-actions {
-    justify-content: center;
+  .hero-download {
     margin-top: 32px;
   }
 

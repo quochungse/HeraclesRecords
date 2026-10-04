@@ -201,6 +201,8 @@
     "site:dev": "npm --prefix site run dev",
     "site:build": "npm --prefix site run build",
     "test:site": "npm --prefix site run build && node scripts/test-site.mjs",
+    "test:release-data": "node scripts/test-release-data.mjs",
+    "readme:release": "node scripts/update-readme-release.mjs",
     "release:prepare": "node scripts/prepare-release.mjs",
     "release:check-version": "node scripts/sync-release-version.mjs --check",
     "migrate:legacy-names": "node scripts/run-electron-gui.mjs scripts/migrate-legacy-names.mjs",

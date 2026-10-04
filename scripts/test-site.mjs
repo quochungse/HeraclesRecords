@@ -44,6 +44,19 @@ for (const page of pages) {
   }
 }
 
+// 5. The home page offers the four installers of one release, and every page
+//    states that version in its footer (release data from GitHub at build).
+const home = readFileSync(join(dist, "index.html"), "utf8");
+const downloads = [...home.matchAll(/href="https:\/\/github\.com\/quochungse\/HeraclesRecords\/releases\/download\/(v[^/]+)\/([^"]+)"/g)];
+assert.equal(downloads.length, 4, `index.html links ${downloads.length} installers, not 4`);
+const tags = new Set(downloads.map((match) => match[1]));
+assert.equal(tags.size, 1, `index.html links installers of ${[...tags].join(", ")}`);
+const [tag] = tags;
+for (const page of pages) {
+  const html = readFileSync(page, "utf8");
+  assert.ok(html.includes(`Version ${tag.slice(1)} ·`), `${relative(dist, page)} does not state version ${tag.slice(1)}`);
+}
+
 for (const file of walk(src)) {
   const text = readFileSync(file, "utf8");
   const line = text.split("\n").findIndex((row) => row.includes("—"));
