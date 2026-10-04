@@ -1,0 +1,67 @@
+---
+import "../../../src/fonts.css";
+import "../styles/site.css";
+import icon from "../../../build/icon-256.png";
+
+interface Props {
+  title?: string;
+  description: string;
+}
+
+const { title, description } = Astro.props;
+const fullTitle = title ? `${title} · Heracles Records` : "Heracles Records";
+const canonical = new URL(Astro.url.pathname, Astro.site);
+const repo = "https://github.com/quochungse/HeraclesRecords";
+const path = Astro.url.pathname;
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{fullTitle}</title>
+    <meta name="description" content={description} />
+    <link rel="canonical" href={canonical} />
+    <link rel="icon" type="image/png" href={icon.src} />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Heracles Records" />
+    <meta property="og:title" content={fullTitle} />
+    <meta property="og:description" content={description} />
+    <meta property="og:url" content={canonical} />
+  </head>
+  <body>
+    <header class="site-header">
+      <div class="wrap">
+        <a class="brand" href="/">
+          <img src={icon.src} alt="" width="28" height="28" />
+          Heracles Records
+        </a>
+        <nav class="site-nav" aria-label="Site">
+          <a href={`${repo}/releases/latest`}>Download</a>
+          <a href="/privacy.html" aria-current={path.startsWith("/privacy") ? "page" : undefined}>Privacy</a>
+          <a href={repo}>GitHub</a>
+        </nav>
+      </div>
+    </header>
+
+    <main>
+      <slot />
+    </main>
+
+    <footer class="site-footer">
+      <div class="wrap">
+        <nav aria-label="Footer">
+          <a href={`${repo}/releases`}>Releases</a>
+          <a href={`${repo}/issues/new`}>Report an issue</a>
+          <a href="/privacy.html">Privacy policy</a>
+          <a href="https://buymeacoffee.com/quochungse">Buy me a coffee</a>
+        </nav>
+        <p>
+          Heracles Records is an independent, unofficial app. It is not made, endorsed or
+          supported by COROS. COROS is a trademark of COROS Wearables, Inc.
+        </p>
+      </div>
+    </footer>
+  </body>
+</html>

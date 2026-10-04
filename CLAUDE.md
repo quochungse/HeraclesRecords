@@ -130,9 +130,22 @@ new names are published on the next pass. Names that leave the machine were rena
 the Claude Agent SDK client app (`heracles-records-coach`), its MCP server (`heracles`, so
 tools are `mcp__heracles__*`), the manual activity's upload file name, the build's User-Agent.
 
-**There is no website in this repository.** Upstream's `website/` (its own site, branding
-included) was deleted on 2026-10-01; the homepage and privacy policy Google's OAuth consent
-screen links to are served from a separate repository, `heraclesrecords.github.io`.
+**The website is written in `site/` and deployed elsewhere** (since 2026-10-04; plan in
+[docs/website-plan.md](docs/website-plan.md)). Upstream's `website/` was deleted on
+2026-10-01 and has nothing to do with it. `site/` is an Astro project with **its own
+`package.json` and lockfile on purpose**: `collect-licenses` ships the license of every
+package in the root lockfile with the app, and the installer jobs' `npm ci` should not fetch
+Astro. It reads the app's own files rather than copies — `src/fonts.css`, `build/icon*.png`,
+`docs/readme/*.webp`, and later `src/records/labours.ts` and the emblems — so a change there
+reaches the site too. `.github/workflows/site.yml` builds it, runs `scripts/test-site.mjs`
+and pushes `site/dist` to **`heraclesrecords/heraclesrecords.github.io`**, because an
+organisation's root Pages site can only be served from a repository of that name; that
+repository is a deploy target, edited by nothing but the workflow. The push needs the
+`SITE_DEPLOY_KEY` secret (an SSH deploy key with write access on the target); without it
+the site is built and checked and the deploy skipped. **`/privacy.html` is the URL Google's
+OAuth consent screen links to**: `build.format: "preserve"` writes `src/pages/privacy.astro`
+there and `test:site` fails if it moves. The site's copy, like the README's, has no em dash
+(`test:site` holds that), and it has no analytics or cookies — the privacy policy says so.
 
 Release identity **is** renamed: `build.publish` targets `quochungse/HeraclesRecords`, and
 the `artifactName` patterns spell `HeraclesRecords` without a space on purpose — GitHub
@@ -151,6 +164,9 @@ npm run dev              # Vite on 127.0.0.1:5173 + Electron; runs build:electro
 npm run build            # tsc electron (emits dist-electron) + tsc --noEmit renderer + vite build
 npm run sample:coach     # app closed: writes sample Coach conversations for P0–P3 of docs/coach-plan-canvas.md into the app's database, no model asked (-- --only p0,p2 picks phases; -- --live adds temporary COROS data; -- --cleanup removes it all, and sweeps COROS for "Sample" names). sample:coach-p3 is --only p3.
 npm start                # build, then run the packaged-style app
+npm --prefix site install # the website's own dependencies (Astro), separate from the app's
+npm run site:dev         # the website on Astro's dev server
+npm run test:site        # build the website and check it (privacy.html, .nojekyll, assets, no em dash)
 ```
 
 There is **no linter and no test runner**. Tests are ~167 standalone `scripts/test-*.mjs`

@@ -1,0 +1,88 @@
+name: Website
+
+# The site is written in site/ and published to heraclesrecords/heraclesrecords.github.io:
+# an organisation's root Pages site can only be served from a repository of that
+# name, so that repository is a deploy target and nothing else. Never edit it by
+# hand; the next deploy replaces every file in it. See docs/website-plan.md.
+#
+# Deploying needs SITE_DEPLOY_KEY: the private half of an SSH deploy key whose
+# public half is on heraclesrecords/heraclesrecords.github.io with write access.
+# Without it the site is built and checked, and the deploy is skipped.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "site/**"
+      - "docs/readme/**"
+      - "build/icon*.png"
+      - "src/fonts.css"
+      - "src/assets/fonts/**"
+      - "src/assets/labours/**"
+      - "src/records/labours.ts"
+      - "CHANGELOG.md"
+      - "scripts/test-site.mjs"
+      - ".github/workflows/site.yml"
+  workflow_dispatch:
+  # release.yml calls this after publishing a release. Events raised with
+  # GITHUB_TOKEN start no other workflow, so `on: release` would never fire.
+  workflow_call:
+
+permissions:
+  contents: read
+
+# One deploy at a time, and a newer one waits rather than cancelling: the push
+# to the target repository is not something to stop halfway.
+concurrency:
+  group: website
+  cancel-in-progress: false
+
+jobs:
+  site:
+    name: Build and deploy
+    runs-on: ubuntu-latest
+    env:
+      ASTRO_TELEMETRY_DISABLED: "1"
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: site/package-lock.json
+
+      - name: Install site dependencies
+        run: npm ci --prefix site
+
+      - name: Build site
+        run: npm run site:build
+
+      - name: Check site
+        run: node scripts/test-site.mjs
+
+      - name: Check deploy key
+        id: key
+        env:
+          SITE_DEPLOY_KEY: ${{ secrets.SITE_DEPLOY_KEY }}
+        run: |
+          if [ -n "$SITE_DEPLOY_KEY" ]; then
+            echo "present=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "present=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::SITE_DEPLOY_KEY is not set; the site was built but not deployed."
+          fi
+
+      - name: Deploy to heraclesrecords.github.io
+        if: steps.key.outputs.present == 'true'
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          deploy_key: ${{ secrets.SITE_DEPLOY_KEY }}
+          external_repository: heraclesrecords/heraclesrecords.github.io
+          publish_branch: main
+          publish_dir: site/dist
+          user_name: github-actions[bot]
+          user_email: 41898282+github-actions[bot]@users.noreply.github.com
+          full_commit_message: "Deploy ${{ github.repository }}@${{ github.sha }}"

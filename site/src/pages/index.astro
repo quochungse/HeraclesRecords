@@ -1,0 +1,183 @@
+---
+import Base from "../layouts/Base.astro";
+import icon from "../../../build/icon-256.png";
+import overview from "../../../docs/readme/01-overview.webp";
+
+const repo = "https://github.com/quochungse/HeraclesRecords";
+
+const features = [
+  {
+    name: "Training",
+    text: "Every session COROS holds, with a screen each for running, cycling, hiking and strength, plus sleep, recovery and every place you have trained.",
+  },
+  {
+    name: "Planning",
+    text: "Your COROS workouts, plans and calendar. Build, edit and schedule them here, and they are saved straight to your COROS account, so your watch has them.",
+  },
+  {
+    name: "Coach",
+    text: "An AI coach that has read your training. It answers with the numbers and charts behind them, drafts workouts and plans, and changes nothing without you.",
+  },
+  {
+    name: "Hall of Records",
+    text: "Every first, record and streak, month by month, and the Twelve Labours: twelve kinds of achievement in three stages each.",
+  },
+  {
+    name: "Your data",
+    text: "Kept on your computer. Sync two computers through your own Google Drive, or back everything up to one file you keep.",
+  },
+];
+---
+
+<Base description="Heracles Records is a free desktop app for COROS athletes: every session read in depth, an AI coach that has read all of it, and a hall for every record you set.">
+  <section class="hero wrap">
+    <img class="hero-icon" src={icon.src} alt="" width="88" height="88" />
+    <h1>Your COROS training, read in depth.</h1>
+    <p class="hero-tagline">Every session a record. Every record a labour.</p>
+    <p class="hero-lede">
+      A free desktop app for COROS athletes: every session read in depth, an AI coach that
+      has read all of it, and a hall for every record you set along the way.
+    </p>
+    <div class="actions hero-actions">
+      <a class="button primary" href={`${repo}/releases/latest`}>Download</a>
+      <a class="button" href={repo}>Source on GitHub</a>
+    </div>
+    <p class="hero-meta">macOS · Windows · Linux · Free and open source (MIT)</p>
+  </section>
+
+  <section class="wrap shot">
+    <img
+      src={overview.src}
+      width={overview.width}
+      height={overview.height}
+      alt="Overview: recovery, the week's training, last night's sleep and what is planned next"
+    />
+  </section>
+
+  <section class="wrap features" aria-labelledby="features-title">
+    <h2 id="features-title" class="visually-hidden">What it does</h2>
+    <ul>
+      {
+        features.map((feature) => (
+          <li>
+            <h3>{feature.name}</h3>
+            <p>{feature.text}</p>
+          </li>
+        ))
+      }
+    </ul>
+  </section>
+
+  <section class="wrap note">
+    <p>
+      Heracles Records reads your training through your own COROS account, so it works with
+      any COROS watch that syncs there. It has no account of its own and its developer runs no
+      servers. <a href="/privacy.html">Privacy policy</a>
+    </p>
+  </section>
+</Base>
+
+<style>
+  .hero {
+    display: grid;
+    justify-items: center;
+    padding-top: 80px;
+    padding-bottom: 56px;
+    text-align: center;
+  }
+
+  .hero-icon {
+    width: 88px;
+    height: 88px;
+    border-radius: 22px;
+    margin-bottom: 28px;
+  }
+
+  .hero h1 {
+    max-width: 880px;
+    margin: 0;
+    font: 600 clamp(36px, 6vw, 56px) / 1.15 var(--font-title);
+    letter-spacing: -0.02em;
+    text-wrap: balance;
+  }
+
+  .hero-tagline {
+    margin: 16px 0 0;
+    color: var(--accent);
+    font: italic 400 18px/1.45 var(--font-title);
+  }
+
+  .hero-lede {
+    max-width: 600px;
+    margin: 20px 0 0;
+    color: var(--ink-2);
+    font-size: 18px;
+    line-height: 1.6;
+  }
+
+  .hero-actions {
+    justify-content: center;
+    margin-top: 32px;
+  }
+
+  .hero-meta {
+    margin: 18px 0 0;
+    color: var(--ink-3);
+    font-size: 14px;
+  }
+
+  .shot img {
+    display: block;
+    width: 100%;
+    border: 1px solid var(--line);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shot-shadow);
+  }
+
+  .features ul {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    gap: 20px;
+    margin: 72px 0 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .features li {
+    padding: 22px 22px 24px;
+    border: 1px solid var(--line);
+    border-radius: var(--radius-lg);
+    background: var(--surface);
+  }
+
+  .features h3 {
+    margin: 0 0 8px;
+    font-size: 17px;
+    line-height: 1.3;
+    font-weight: 600;
+  }
+
+  .features p {
+    margin: 0;
+    color: var(--ink-2);
+    font-size: 15px;
+    line-height: 1.6;
+  }
+
+  .note p {
+    max-width: 680px;
+    margin: 56px auto 0;
+    color: var(--ink-3);
+    font-size: 15px;
+    text-align: center;
+  }
+
+  .visually-hidden {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+</style>
