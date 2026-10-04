@@ -1,3 +1,4 @@
+import { t } from "../i18n/core.ts";
 import { PRIMARY_NAV_ITEMS, type PrimaryView } from "./primaryNav";
 import { readHiddenSportScreens, type SportScreen } from "./sportScreens";
 
@@ -20,7 +21,7 @@ function isPrimaryView(value: string | null): value is PrimaryView {
 export function getPrimaryViewLabel(view: PrimaryView): string {
   return (
     PRIMARY_NAV_ITEMS.find((item) => item.id === view)?.label ??
-    "Overview"
+    t("nav.overview")
   );
 }
 

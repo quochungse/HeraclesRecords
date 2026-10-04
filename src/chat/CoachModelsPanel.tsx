@@ -37,6 +37,7 @@ import {
 import { ClaudeCodeLoginCard } from "./ClaudeCodeLoginCard";
 import { detectAndAdoptLocalServer } from "./localModelDetection";
 import type { HeraclesRecordsApi } from "../heraclesrecords-api";
+import { t } from "../i18n/core";
 
 function claudeStatusLabel(status: ClaudeCodeStatus | null): string {
   if (!status) return "Not checked";
@@ -165,16 +166,22 @@ export function coachModelsSummaryLine(
   summary: CoachModelsSummary | null
 ): string {
   if (!summary) {
-    return "Checking connections…";
+    return t("settings.mcp.checking");
   }
   if (summary.connected === 0) {
-    return "Nothing connected yet. Add an account or key to start coaching.";
+    return t("settings.coachModels.none");
   }
 
-  const active = summary.activeReady
-    ? `${summary.activeLabel} in use`
-    : `${summary.activeLabel} selected but not connected`;
-  return `${active} · ${summary.connected} of ${summary.total} providers connected`;
+  return t(
+    summary.activeReady
+      ? "settings.coachModels.summaryInUse"
+      : "settings.coachModels.summaryNotReady",
+    {
+      model: summary.activeLabel,
+      connected: summary.connected,
+      total: summary.total,
+    },
+  );
 }
 
 /**

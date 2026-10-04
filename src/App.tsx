@@ -83,6 +83,7 @@ import { LabourCelebration, LabourToastCard } from "./records/LabourNotices";
 // Drawn at 30–42px in the rail: the 128px cut covers a 2× display without
 // bundling the 1024px, 840 KB source.
 import appLogo from "../build/icons/128x128.png";
+import { t } from "./i18n/core";
 import changelogMarkdown from "../CHANGELOG.md?raw";
 
 type View = PrimaryView;
@@ -1690,9 +1691,7 @@ export default function App() {
   function handleStartupViewChange(view: View) {
     setStartupView(view);
     saveStartupView(view);
-    setMessage(
-      `Startup view set to ${getPrimaryViewLabel(view)}. It will open on next launch.`,
-    );
+    setMessage(t("nav.startupSet", { view: getPrimaryViewLabel(view) }));
   }
 
   function handleHiddenSportScreensChange(hidden: SportScreen[]) {

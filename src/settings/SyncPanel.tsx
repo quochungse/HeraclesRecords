@@ -11,6 +11,8 @@ import {
 import type { HeraclesRecordsApi } from "../heraclesrecords-api";
 import type { GoogleAccountInfo, SyncStatus } from "../../electron/sync/syncTypes";
 import { formatBytes, formatWhen } from "./formatters";
+import { plural, t } from "../i18n/core";
+import { useI18n } from "../i18n/useI18n";
 import { SettingsPrefRow } from "./SettingsPrefRow";
 
 interface SyncPanelProps {
@@ -40,10 +42,6 @@ let cachedAccount: GoogleAccountInfo | null = null;
 /** How long a read may be out before the corner chip says so. */
 const REFRESH_NOTICE_DELAY_MS = 400;
 
-const SYNC_DESCRIPTION =
-  "Your data on every computer with this COROS account, through Google Drive. " +
-  "Sign-ins stay on this one.";
-
 /**
  * Where this machine's data meets the other one's.
  *
@@ -58,6 +56,7 @@ const SYNC_DESCRIPTION =
  * backup was a copy inside this vault. It no longer is.
  */
 export function SyncPanel({ api, onCheckForUpdates }: SyncPanelProps) {
+  useI18n();
   const [status, setStatus] = useState<SyncStatus | null>(() => cachedStatus);
   const [busy, setBusy] = useState<string | null>(null);
   // True only once a read has been out long enough to be worth mentioning. A
@@ -134,9 +133,11 @@ export function SyncPanel({ api, onCheckForUpdates }: SyncPanelProps) {
       // lands. Not every screen does yet, so the second half stays honest
       // rather than promising more than the app does.
       setMessage(
-        `Synced from another device: ${change.applied} records updated` +
-          (change.deleted > 0 ? `, ${change.deleted} removed` : "") +
-          ". Some screens catch up on their own; restart if one looks stale."
+        `${
+          change.deleted > 0
+            ? t("sync.pulledRemoved", { applied: change.applied, deleted: change.deleted })
+            : t("sync.pulled", { applied: change.applied })
+        } ${t("sync.pulledHint")}`
       );
       void refresh({ quiet: true });
     });
@@ -233,10 +234,7 @@ export function SyncPanel({ api, onCheckForUpdates }: SyncPanelProps) {
   const claimVault = () =>
     run("claim", async () => {
       await api.claimSyncVault();
-      setMessage(
-        "This vault now belongs to your account. Everything on this computer " +
-          "is being published into it."
-      );
+      setMessage(t("sync.claimed"));
     });
 
   // The same head either way, so the placeholder and the panel cannot drift
@@ -247,17 +245,17 @@ export function SyncPanel({ api, onCheckForUpdates }: SyncPanelProps) {
         <RefreshCw size={18} strokeWidth={1.9} />
       </span>
       <div>
-        <h2>Sync</h2>
-        <p>{SYNC_DESCRIPTION}</p>
+        <h2>{t("sync.title")}</h2>
+        <p>{t("sync.description")}</p>
       </div>
       {/* The corner tell. A refresh that has something to correct leaves what
           is on screen exactly where it is and says so here instead — the panel
           emptying itself is what used to make this card jump on every visit to
           Settings. */}
       {refreshing ? (
-        <span className="sync-heading-refreshing" title="Checking sync status…">
+        <span className="sync-heading-refreshing" title={t("sync.checkingTitle")}>
           <Loader2 size={14} strokeWidth={2} className="spin" />
-          Checking…
+          {t("sync.checking")}
         </span>
       ) : null}
     </div>
@@ -276,7 +274,7 @@ export function SyncPanel({ api, onCheckForUpdates }: SyncPanelProps) {
           {error ?? (
             <>
               <Loader2 size={15} strokeWidth={2} className="spin" />
-              Loading sync status…
+              {t("sync.loading")}
             </>
           )}
         </p>
@@ -293,8 +291,8 @@ export function SyncPanel({ api, onCheckForUpdates }: SyncPanelProps) {
         {head}
         <div className="settings-pref-list">
           <SettingsPrefRow
-            title="Sync is not available in this build"
-            detail="This copy of the app was built without a Google sign-in, and Google Drive is where sync keeps your data."
+            title={t("sync.unavailable.title")}
+            detail={t("sync.unavailable.detail")}
           />
         </div>
       </div>
@@ -307,24 +305,27 @@ export function SyncPanel({ api, onCheckForUpdates }: SyncPanelProps) {
   // names the account without it.
   const googleQuota = account?.quota
     ? account.quota.limit === null
-      ? `${formatBytes(account.quota.used)} used`
-      : `${formatBytes(account.quota.used)} of ${formatBytes(account.quota.limit)} used`
+      ? t("sync.drive.used", { used: formatBytes(account.quota.used) })
+      : t("sync.drive.usedOf", {
+          used: formatBytes(account.quota.used),
+          limit: formatBytes(account.quota.limit),
+        })
     : null;
   // The account and its usage on two lines: joined by a dot, the usage wrapped
   // on its own whenever the address was long, leaving the dot at a line's end.
   const googleDetail = status.googleConnected ? (
     account?.email || googleQuota ? (
       <>
-        {account?.email ?? "Connected"}
+        {account?.email ?? t("common.connected")}
         {googleQuota ? (
           <span className="settings-pref-line">{googleQuota}</span>
         ) : null}
       </>
     ) : (
-      "Connected"
+      t("common.connected")
     )
   ) : (
-    "Not connected. Connecting opens your browser to Google; the app can only see the folder it creates there."
+    t("sync.drive.notConnected")
   );
 
   // What the loop has actually been doing, rather than a promise about what it
@@ -333,15 +334,15 @@ export function SyncPanel({ api, onCheckForUpdates }: SyncPanelProps) {
   // for a week or has never once succeeded.
   const pending = status.loop?.pendingChanges ?? 0;
   const activityTitle = !status.loop
-    ? "Not running yet"
+    ? t("sync.changes.notRunning")
     : pending > 0
-      ? `${pending} change${pending === 1 ? "" : "s"} waiting to go out`
-      : "All changes sent";
+      ? plural("sync.changes.waiting", pending)
+      : t("sync.changes.allSent");
   const activityDetail = !status.loop
-    ? "Sync now starts it."
+    ? ""
     : status.loop.lastPulledAt
-      ? `Last received from another computer ${formatWhen(status.loop.lastPulledAt)}.`
-      : "Nothing received from another computer yet.";
+      ? t("sync.changes.lastReceived", { when: formatWhen(status.loop.lastPulledAt) })
+      : t("sync.changes.nothingReceived");
 
   return (
     <div
@@ -359,15 +360,15 @@ export function SyncPanel({ api, onCheckForUpdates }: SyncPanelProps) {
             the error tone it greeted every new install as something broken. */}
         {status.state === "signed-out" ? (
           <SettingsPrefRow
-            title="Sign in to COROS to sync"
-            detail="Syncing needs to know whose records it is merging. Sign in under Connections — sync starts on its own."
+            title={t("sync.signedOut.title")}
+            detail={t("sync.signedOut.detail")}
           />
         ) : null}
 
         {/* The one destination: the account, and the button that connects or
             lets it go. Its dot says connected, as the COROS row's does. */}
         <SettingsPrefRow
-          title="Google Drive"
+          title={t("sync.drive.title")}
           detail={googleDetail}
           tone={status.googleConnected ? "success" : undefined}
         >
@@ -394,21 +395,19 @@ export function SyncPanel({ api, onCheckForUpdates }: SyncPanelProps) {
             ) : (
               <Cloud size={15} aria-hidden="true" />
             )}
-            {status.googleConnected ? "Disconnect" : "Connect"}
+            {status.googleConnected ? t("common.disconnect") : t("common.connect")}
           </button>
         </SettingsPrefRow>
 
         {status.state === "wrong-owner" ? (
           <SettingsPrefRow
-            title="This vault holds another account's data"
+            title={t("sync.wrongOwner.title")}
             tone="error"
             align="start"
-            detail="Nothing is being sent or received. Two accounts' records merged into one log cannot be separated again — there is no owner on each record to sort them by — so this is left alone until you say what it is."
+            detail={t("sync.wrongOwner.detail")}
           >
             <p className="settings-pref-control-note">
-              If this is your own second COROS account, or a vault you made
-              before switching accounts, you can take it over. Everything on
-              this computer is then published into it.
+              {t("sync.wrongOwner.note")}
             </p>
             <button
               type="button"
@@ -419,7 +418,7 @@ export function SyncPanel({ api, onCheckForUpdates }: SyncPanelProps) {
               {busy === "claim" ? (
                 <Loader2 size={15} strokeWidth={2} className="spin" />
               ) : null}
-              Use this vault
+              {t("sync.wrongOwner.claim")}
             </button>
           </SettingsPrefRow>
         ) : null}
@@ -464,9 +463,9 @@ export function SyncPanel({ api, onCheckForUpdates }: SyncPanelProps) {
 
         {status.state === "unreachable" ? (
           <SettingsPrefRow
-            title="Google Drive did not answer"
+            title={t("sync.unreachable.title")}
             tone="error"
-            detail="Check that this computer is online. If it is, disconnecting and connecting the account again is the usual fix."
+            detail={t("sync.unreachable.detail")}
           >
             <button
               type="button"
@@ -479,7 +478,7 @@ export function SyncPanel({ api, onCheckForUpdates }: SyncPanelProps) {
               ) : (
                 <RefreshCw size={15} aria-hidden="true" />
               )}
-              Try again
+              {t("common.tryAgain")}
             </button>
           </SettingsPrefRow>
         ) : null}
@@ -493,14 +492,16 @@ export function SyncPanel({ api, onCheckForUpdates }: SyncPanelProps) {
           <SettingsPrefRow
             title={
               seed.state === "failed"
-                ? "This computer's existing data has not been sent"
-                : "Sending this computer's existing data…"
+                ? t("sync.seed.failedTitle")
+                : t("sync.seed.sendingTitle")
             }
             tone={seed.state === "failed" ? "error" : "busy"}
             detail={
               seed.state === "failed"
-                ? `${seed.error ?? "The publish did not finish."} Until it succeeds, anything created before sync was switched on stays on this computer. "Sync now" tries again.`
-                : "Everything from before sync was switched on is going up once. New changes go out as you make them."
+                ? t("sync.seed.failedDetail", {
+                    reason: seed.error ?? t("sync.seed.failedFallback"),
+                  })
+                : t("sync.seed.sendingDetail")
             }
           />
         ) : null}
@@ -509,8 +510,8 @@ export function SyncPanel({ api, onCheckForUpdates }: SyncPanelProps) {
             row's: the state is the detail, not the name of the row. */}
         {status.state === "ready" ? (
           <SettingsPrefRow
-            title="Changes"
-            detail={`${activityTitle}. ${activityDetail}`}
+            title={t("sync.changes.title")}
+            detail={activityDetail ? `${activityTitle} ${activityDetail}` : activityTitle}
           >
             <button
               type="button"
@@ -519,7 +520,7 @@ export function SyncPanel({ api, onCheckForUpdates }: SyncPanelProps) {
                 void run("syncnow", async () => {
                   const result = await api.syncNow();
                   setMessage(
-                    `Pushed ${result.pushed} changes, received ${result.applied}.`
+                    t("sync.pushed", { pushed: result.pushed, applied: result.applied })
                   );
                 })
               }
@@ -530,7 +531,7 @@ export function SyncPanel({ api, onCheckForUpdates }: SyncPanelProps) {
               ) : (
                 <CloudUpload size={15} aria-hidden="true" />
               )}
-              Sync now
+              {t("sync.now")}
             </button>
           </SettingsPrefRow>
         ) : null}

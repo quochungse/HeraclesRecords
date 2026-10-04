@@ -17,6 +17,8 @@ import {
   type PrimaryView,
 } from "../navigation/primaryNav";
 import { useMediaQuery } from "../hooks/useMediaQuery";
+import { english } from "../i18n/core";
+import { useI18n } from "../i18n/useI18n";
 
 const SIDEBAR_COLLAPSED_KEY = "heraclesrecords.sidebarCollapsed";
 
@@ -186,7 +188,8 @@ export function AppSidebar({
       ? SIDEBAR_EXPANDED_WIDTH
       : SIDEBAR_COLLAPSED_WIDTH;
 
-  const displayName = athleteName?.trim() || "Personal";
+  const { t } = useI18n();
+  const displayName = athleteName?.trim() || t("nav.profile");
   const initials = athleteName ? initialsFrom(athleteName) : "";
 
   const updateIndicator = useCallback(() => {
@@ -333,8 +336,8 @@ export function AppSidebar({
     const isActive = activeView === item.id;
     const fresh = newCounts?.[item.id] ?? 0;
     const tooltip = [
-      item.beta ? `${item.label} (Beta)` : item.label,
-      fresh > 0 ? `${fresh} new` : ""
+      item.beta ? `${item.label} (${t("common.beta")})` : item.label,
+      fresh > 0 ? t("common.newCount", { count: fresh }) : ""
     ]
       .filter(Boolean)
       .join(" · ");
@@ -359,20 +362,27 @@ export function AppSidebar({
           {item.showActivity && coachBusy ? (
             <span
               className="primary-tab-activity app-sidebar-nav-activity"
-              aria-label="Coach is responding"
+              aria-label={t("nav.coachResponding")}
             />
           ) : null}
           {fresh > 0 && !showLabels ? (
-            <span className="app-sidebar-nav-dot" aria-label={`${fresh} new`} />
+            <span
+              className="app-sidebar-nav-dot"
+              aria-label={t("common.newCount", { count: fresh })}
+            />
           ) : null}
         </span>
         {rowCopy(
           rowIndex++,
           item.label,
           <>
-            {item.beta ? <span className="primary-tab-beta">Beta</span> : null}
+            {item.beta ? (
+              <span className="primary-tab-beta">{t("common.beta")}</span>
+            ) : null}
             {fresh > 0 ? (
-              <span className="app-sidebar-nav-count">{fresh} new</span>
+              <span className="app-sidebar-nav-count">
+                {t("common.newCount", { count: fresh })}
+              </span>
             ) : null}
           </>,
         )}
@@ -447,8 +457,8 @@ export function AppSidebar({
               type="button"
               className="app-sidebar-brand-toggle"
               aria-expanded={railExpanded}
-              aria-label={railExpanded ? "Collapse sidebar" : "Expand sidebar"}
-              title={railExpanded ? "Collapse sidebar" : "Expand sidebar"}
+              aria-label={railExpanded ? t("nav.collapse") : t("nav.expand")}
+              title={railExpanded ? t("nav.collapse") : t("nav.expand")}
               onClick={handleToggleExpanded}
             >
               {railExpanded ? (
@@ -468,7 +478,7 @@ export function AppSidebar({
           ]
             .filter(Boolean)
             .join(" ")}
-          aria-label="Primary"
+          aria-label={t("nav.primary")}
           ref={navRef}
           onScroll={updateNavFade}
         >
@@ -519,7 +529,7 @@ export function AppSidebar({
             /* The row shows the athlete's name, so its destination is not
                readable from its text. The probe and anything else driving the
                rail navigate by this. */
-            data-nav-label={ACCOUNT_ITEM.label}
+            data-nav-label={english(ACCOUNT_ITEM.labelKey)}
             title={!showLabels ? displayName : undefined}
             onClick={() => handleSelect(ACCOUNT_ITEM.id)}
           >
@@ -561,7 +571,7 @@ export function AppSidebar({
               .join(" ")}
             aria-current={activeView === SETTINGS_ITEM.id ? "page" : undefined}
             aria-label={SETTINGS_ITEM.label}
-            data-nav-label={SETTINGS_ITEM.label}
+            data-nav-label={english(SETTINGS_ITEM.labelKey)}
             title={SETTINGS_ITEM.label}
             onClick={() => handleSelect(SETTINGS_ITEM.id)}
           >
@@ -580,7 +590,7 @@ export function AppSidebar({
           className={["app-sidebar-overlay", overlayOpen ? "is-visible" : ""]
             .filter(Boolean)
             .join(" ")}
-          aria-label="Close navigation"
+          aria-label={t("nav.closeNavigation")}
           aria-hidden={!overlayOpen}
           tabIndex={overlayOpen ? 0 : -1}
           onClick={() => onOverlayOpenChange(false)}

@@ -103,6 +103,7 @@
     "test:analysis-startup-order": "node scripts/test-analysis-startup-order.mjs",
     "test:ipc-surface": "node scripts/test-ipc-surface.mjs",
     "test:sync-policy": "node scripts/test-sync-policy.mjs",
+    "test:i18n": "cross-env ELECTRON_RUN_AS_NODE=1 electron --experimental-strip-types scripts/test-i18n.mjs",
     "test:sync-obfuscation": "npm run build:electron && node scripts/test-sync-obfuscation.mjs",
     "test:sync-storage": "npm run build:electron && node scripts/test-sync-storage.mjs",
     "test:sync-drive": "npm run build:electron && node scripts/test-sync-drive.mjs",

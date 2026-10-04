@@ -2655,6 +2655,22 @@ are still honoured by the rail and the start-up picker, but no destination sets
 either since Watch Faces and Gear were removed — the first one to need them again just sets
 the flag.
 
+**The app is translated, screen by screen, through `src/i18n/`** (since 2026-10-04; plan,
+phases, rules and a per-language glossary in [docs/i18n-plan.md](docs/i18n-plan.md)). English
+is the default and the fallback; Tiếng Việt, 日本語, 한국어, 简体中文, Español, Français and
+Deutsch are chunks of their own, picked in Settings → Appearance → Language (flags from
+flag-icons, committed in `src/assets/flags` like the fonts). Messages are flat keys in
+`src/i18n/messages/<locale>/<namespace>.ts`, each language typed against English's, so
+**`npm run build` fails on a missing key**; `npm run test:i18n` holds placeholders, tags,
+plurals and the files already translated (`TRANSLATED_FILES`), which fail on English written
+straight into them. Four rules that are easy to break: **a component showing translated words
+calls `useI18n()`** (subscribing is what redraws it on a switch); **a module-level label is a
+getter over its message, never a copy** (`PRIMARY_NAV_*`, `SPORT_COLOR_LABELS`,
+`ACCENT_PALETTE_DETAILS`); **dates and numbers take `getIntlLocale()`**, never `undefined`,
+which is the OS language; and **no translated string is ever stored** — not in SQLite,
+localStorage or anything sync carries. Coach's prompt is not translated, and
+`data-nav-label` stays English for the probe and the screenshot harness.
+
 Styling is plain CSS with custom properties — no Tailwind, no CSS modules.
 `src/styles.css` (~28k lines) holds the design tokens and most rules; fourteen feature
 stylesheets sit beside their components (strength ×3, training ×2, records ×2, profile, running,

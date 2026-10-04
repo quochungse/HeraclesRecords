@@ -39,6 +39,14 @@ for (const file of fs.readdirSync(fontLicenses).sort()) {
   );
 }
 
+// --- Flags -------------------------------------------------------------------
+// Committed SVGs, not a package, so the lockfile below never sees them.
+
+sections.push(
+  `${rule}\nflag-icons 7.5.0 (language flags) — MIT\n${rule}\n\n` +
+    fs.readFileSync(path.join(repoRoot, "src", "assets", "flags", "LICENSE-flag-icons.txt"), "utf8").trim()
+);
+
 // --- npm packages ------------------------------------------------------------
 
 const lock = JSON.parse(fs.readFileSync(path.join(repoRoot, "package-lock.json"), "utf8"));
@@ -85,7 +93,7 @@ for (const { id, license, texts } of packages) {
 const header = [
   "Heracles Records — third-party licenses",
   "",
-  "The license texts of the fonts and npm packages that ship inside this build,",
+  "The license texts of the fonts, flags and npm packages that ship inside this build,",
   "generated from package-lock.json at build time. See THIRD_PARTY_NOTICES.md in",
   "this folder for artwork and data.",
   ""

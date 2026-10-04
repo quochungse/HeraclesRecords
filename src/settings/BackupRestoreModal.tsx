@@ -5,6 +5,12 @@ import type {
   BackupImportCandidate,
   RestoreMode
 } from "../../electron/backup/backupTypes";
+import { getIntlLocale, t } from "../i18n/core";
+import { useI18n } from "../i18n/useI18n";
+
+function count(value: number): string {
+  return value.toLocaleString(getIntlLocale());
+}
 
 export interface BackupRestoreModalProps {
   /** The file that was chosen, or null when no question is being asked. */
@@ -47,6 +53,7 @@ export function BackupRestoreModal({
   // warning on it: "this is someone else's data" and "what should happen to
   // yours" are different decisions, and answering the second by reflex is
   // exactly what the first is there to prevent.
+  useI18n();
   const [acknowledgedOwner, setAcknowledgedOwner] = useState(false);
   useEffect(() => {
     setAcknowledgedOwner(false);
@@ -79,20 +86,20 @@ export function BackupRestoreModal({
           className="panel app-modal backup-restore-modal"
           role="dialog"
           aria-modal="true"
-          aria-label="This backup belongs to another account"
+          aria-label={t("backup.foreign.label")}
           onClick={(event) => event.stopPropagation()}
         >
           <header className="app-modal-header">
             <div className="app-modal-title">
               <p className="eyebrow">
-                Backup from {formatWhen(candidate.createdAt)}
+                {t("backup.from", { when: formatWhen(candidate.createdAt) })}
               </p>
-              <h2>This backup is another account's</h2>
+              <h2>{t("backup.foreign.title")}</h2>
             </div>
             <button
               type="button"
               className="icon-button"
-              aria-label="Close"
+              aria-label={t("common.close")}
               onClick={onClose}
               disabled={busy}
             >
@@ -102,14 +109,10 @@ export function BackupRestoreModal({
 
           <div className="app-modal-body">
             <p className="app-modal-copy backup-restore-lede">
-              It was saved from a different COROS account than the one signed in
-              here. Restoring it would put two people's records in one place,
-              and nothing can separate them again — records carry no owner of
-              their own.
+              {t("backup.foreign.lede")}
             </p>
             <p className="app-modal-copy backup-restore-note">
-              Continue only if this is your own other account, or a backup you
-              made before switching accounts.
+              {t("backup.foreign.note")}
             </p>
           </div>
 
@@ -117,7 +120,7 @@ export function BackupRestoreModal({
             {busy ? (
               <span className="backup-restore-busy">
                 <Loader2 size={15} strokeWidth={2} className="spin" />
-                Restoring…
+                {t("backup.restoring")}
               </span>
             ) : null}
             <button
@@ -126,7 +129,7 @@ export function BackupRestoreModal({
               onClick={onClose}
               disabled={busy}
             >
-              Cancel
+              {t("common.cancel")}
             </button>
             <button
               type="button"
@@ -140,7 +143,9 @@ export function BackupRestoreModal({
               }}
             >
               <UserRound size={15} strokeWidth={2} />
-              {candidate.machineHasData ? "Continue anyway" : "Restore anyway"}
+              {candidate.machineHasData
+                ? t("backup.foreign.continue")
+                : t("backup.foreign.restore")}
             </button>
           </footer>
         </div>
@@ -161,18 +166,20 @@ export function BackupRestoreModal({
         className="panel app-modal backup-restore-modal"
         role="dialog"
         aria-modal="true"
-        aria-label="Restore this backup"
+        aria-label={t("backup.choose.label")}
         onClick={(event) => event.stopPropagation()}
       >
         <header className="app-modal-header">
           <div className="app-modal-title">
-            <p className="eyebrow">Backup from {formatWhen(candidate.createdAt)}</p>
-            <h2>This computer already has data</h2>
+            <p className="eyebrow">
+              {t("backup.from", { when: formatWhen(candidate.createdAt) })}
+            </p>
+            <h2>{t("backup.choose.title")}</h2>
           </div>
           <button
             type="button"
             className="icon-button"
-            aria-label="Close"
+            aria-label={t("common.close")}
             onClick={onClose}
             disabled={busy}
           >
@@ -182,8 +189,7 @@ export function BackupRestoreModal({
 
         <div className="app-modal-body">
           <p className="app-modal-copy backup-restore-lede">
-            Choose what happens to the {replace.totalExistingRows.toLocaleString()}{" "}
-            records already on this computer.
+            {t("backup.choose.lede", { count: count(replace.totalExistingRows) })}
           </p>
 
           <div className="backup-restore-options">
@@ -197,18 +203,22 @@ export function BackupRestoreModal({
                 <Replace size={20} strokeWidth={1.9} />
               </span>
               <span className="backup-restore-option-copy">
-                <strong>Override</strong>
+                <strong>{t("backup.override.title")}</strong>
                 <span>
-                  This computer ends up exactly as the backup describes it.
-                  Writes {replace.rowsWriting.toLocaleString()} records
-                  {replace.rowsRemoved > 0 || replace.settingsRemoved.length > 0
-                    ? ` and permanently deletes ${replace.rowsRemoved.toLocaleString()} records${
-                        replace.settingsRemoved.length > 0
-                          ? ` and ${replace.settingsRemoved.length} settings`
-                          : ""
-                      } the backup does not have`
-                    : ", and deletes nothing — the backup covers everything here"}
-                  .
+                  {replace.settingsRemoved.length > 0
+                    ? t("backup.override.detailDeletesSettings", {
+                        count: count(replace.rowsWriting),
+                        removed: count(replace.rowsRemoved),
+                        settings: count(replace.settingsRemoved.length),
+                      })
+                    : replace.rowsRemoved > 0
+                      ? t("backup.override.detailDeletes", {
+                          count: count(replace.rowsWriting),
+                          removed: count(replace.rowsRemoved),
+                        })
+                      : t("backup.override.detail", {
+                          count: count(replace.rowsWriting),
+                        })}
                 </span>
               </span>
             </button>
@@ -223,12 +233,9 @@ export function BackupRestoreModal({
                 <Layers size={20} strokeWidth={1.9} />
               </span>
               <span className="backup-restore-option-copy">
-                <strong>Merge</strong>
+                <strong>{t("backup.merge.title")}</strong>
                 <span>
-                  Keeps everything on this computer and adds what is missing.
-                  Writes {merge.rowsWriting.toLocaleString()} new records;
-                  anything already here keeps the copy it has, and nothing is
-                  deleted.
+                  {t("backup.merge.detail", { count: count(merge.rowsWriting) })}
                 </span>
               </span>
             </button>
@@ -239,8 +246,7 @@ export function BackupRestoreModal({
               restore look partial for no visible reason. */}
           {replace.refused.length > 0 ? (
             <p className="app-modal-copy backup-restore-note">
-              {replace.refused.length} entries in this file are not restored —
-              sign-ins stay on the machine that made them, either way.
+              {t("backup.refused", { count: count(replace.refused.length) })}
             </p>
           ) : null}
         </div>
@@ -249,7 +255,7 @@ export function BackupRestoreModal({
           {busy ? (
             <span className="backup-restore-busy">
               <Loader2 size={15} strokeWidth={2} className="spin" />
-              Restoring…
+              {t("backup.restoring")}
             </span>
           ) : null}
           <button
@@ -258,7 +264,7 @@ export function BackupRestoreModal({
             onClick={onClose}
             disabled={busy}
           >
-            Cancel
+            {t("common.cancel")}
           </button>
         </footer>
       </div>

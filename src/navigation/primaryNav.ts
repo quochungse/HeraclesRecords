@@ -13,6 +13,7 @@ import {
   User,
   type LucideIcon,
 } from "lucide-react";
+import { t, type MessageKey } from "../i18n/core.ts";
 import { LaurelIcon } from "../records/recordsIcons";
 import { RunnerIcon } from "../running/runnerIcon";
 
@@ -36,7 +37,10 @@ export type PrimaryNavSectionId = "today" | "plan" | "history" | "journey";
 
 export interface PrimaryNavItem {
   id: PrimaryView;
-  label: string;
+  /** In the language on screen: read it while rendering, never keep it. */
+  readonly label: string;
+  /** The message `label` is read from, for what must not change with the language. */
+  labelKey: MessageKey;
   icon: LucideIcon;
   beta?: boolean;
   showActivity?: boolean;
@@ -52,8 +56,26 @@ export interface PrimaryNavItem {
  */
 export interface PrimaryNavSection {
   id: PrimaryNavSectionId;
-  label: string;
+  readonly label: string;
   items: PrimaryNavItem[];
+}
+
+/** A destination whose label is read in the language on screen each time it is asked for. */
+function navItem(
+  id: PrimaryView,
+  labelKey: MessageKey,
+  icon: LucideIcon,
+  extra: Omit<PrimaryNavItem, "id" | "label" | "labelKey" | "icon"> = {},
+): PrimaryNavItem {
+  return {
+    id,
+    labelKey,
+    get label() {
+      return t(labelKey);
+    },
+    icon,
+    ...extra,
+  };
 }
 
 /**
@@ -72,55 +94,58 @@ export interface PrimaryNavSection {
 export const PRIMARY_NAV_SECTIONS: PrimaryNavSection[] = [
   {
     id: "today",
-    label: "Today",
+    get label() {
+      return t("nav.section.today");
+    },
     // What the morning is read from: the app's own account of it, and the
     // night it is all judged against.
     items: [
-      { id: "overview", label: "Overview", icon: LayoutGrid },
-      { id: "sleep", label: "Sleep", icon: Moon },
+      navItem("overview", "nav.overview", LayoutGrid),
+      navItem("sleep", "nav.sleep", Moon),
     ],
   },
   {
     id: "plan",
-    label: "Plan",
+    get label() {
+      return t("nav.section.plan");
+    },
     // What is ahead, in the order it is decided: the coach settles what the
     // next session should be, the calendar is where it lands, and the library
     // is reached for while filling that calendar — a peer of it rather than a
     // drawer inside it.
     items: [
-      {
-        id: "coach",
-        label: "Coach",
-        icon: MessageCircle,
-        showActivity: true,
-      },
-      { id: "calendar", label: "Calendar", icon: CalendarDays },
-      { id: "library", label: "Training Library", icon: BookOpen },
+      navItem("coach", "nav.coach", MessageCircle, { showActivity: true }),
+      navItem("calendar", "nav.calendar", CalendarDays),
+      navItem("library", "nav.library", BookOpen),
     ],
   },
   {
     id: "history",
-    label: "History",
+    get label() {
+      return t("nav.section.history");
+    },
     // What is behind. Activities holds every sport; Running, Cycling,
     // Hiking and Strength are separate destinations because they are read
     // through different numbers, not because they are filters.
     items: [
-      { id: "training", label: "Activities", icon: Activity },
-      { id: "running", label: "Running", icon: RunnerIcon },
-      { id: "cycling", label: "Cycling", icon: Bike },
-      { id: "hiking", label: "Hiking", icon: Mountain },
-      { id: "strength", label: "Strength", icon: Dumbbell },
+      navItem("training", "nav.training", Activity),
+      navItem("running", "nav.running", RunnerIcon),
+      navItem("cycling", "nav.cycling", Bike),
+      navItem("hiking", "nav.hiking", Mountain),
+      navItem("strength", "nav.strength", Dumbbell),
     ],
   },
   {
     id: "journey",
-    label: "Your journey",
+    get label() {
+      return t("nav.section.journey");
+    },
     // The same history seen from above: not a session or a week but every
     // milestone the training has reached, and every place it has taken the
     // athlete — reached for at a different moment from the log above it.
     items: [
-      { id: "records", label: "Hall of Records", icon: LaurelIcon },
-      { id: "places", label: "Where you’ve been", icon: Globe },
+      navItem("records", "nav.records", LaurelIcon),
+      navItem("places", "nav.places", Globe),
     ],
   },
 ];
@@ -132,13 +157,8 @@ export const PRIMARY_NAV_SECTIONS: PrimaryNavSection[] = [
  * is what brings it down to twelve rows that fit without folding.
  */
 export const PRIMARY_NAV_ACCOUNT_ITEMS: PrimaryNavItem[] = [
-  { id: "profile", label: "Personal", icon: User },
-  {
-    id: "settings",
-    label: "Settings",
-    icon: Settings,
-    excludeFromStartup: true,
-  },
+  navItem("profile", "nav.profile", User),
+  navItem("settings", "nav.settings", Settings, { excludeFromStartup: true }),
 ];
 
 /** Every destination, flattened in rail order. */

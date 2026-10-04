@@ -61,6 +61,10 @@ import {
 } from "../training/sportColors";
 // Drawn at 64px: the 128px cut is its 2× size.
 import appLogo from "../../build/icons/128x128.png";
+import { t, plural, setLocale } from "../i18n/core";
+import { LanguageFlag } from "../i18n/LanguageFlag";
+import { LOCALES, LOCALE_DETAILS, type Locale } from "../i18n/locales";
+import { renderRich, useI18n } from "../i18n/useI18n";
 import { SettingsPrefRow } from "./SettingsPrefRow";
 import { SyncPanel } from "./SyncPanel";
 import { BackupPanel } from "./BackupPanel";
@@ -78,15 +82,20 @@ interface McpSummary {
 /* The MCP and Coach Models rows state the count on one line and what it
    amounts to on the next, the part worth reading at a glance in bold — joined
    by a dot on one line, the second half wrapped wherever the column ended. */
+const BOLD = { b: (chunk: ReactNode) => <strong>{chunk}</strong> };
+
 function mcpSummaryDetail(summary: McpSummary | null): ReactNode {
   if (!summary) {
-    return "Checking connections…";
+    return t("settings.mcp.checking");
   }
   if (summary.total === 0) {
-    return "No servers added. Connect one to give the coach more tools.";
+    return t("settings.mcp.none");
   }
 
-  const servers = `${summary.connected} of ${summary.total} connected.`;
+  const servers = t("settings.mcp.connected", {
+    connected: summary.connected,
+    total: summary.total,
+  });
   if (summary.tools === 0) {
     return servers;
   }
@@ -94,10 +103,7 @@ function mcpSummaryDetail(summary: McpSummary | null): ReactNode {
     <>
       {servers}
       <span className="settings-pref-line">
-        <strong>
-          {summary.tools} {summary.tools === 1 ? "tool" : "tools"}
-        </strong>{" "}
-        ready for the coach.
+        {renderRich(plural("settings.mcp.tools", summary.tools), BOLD)}
       </span>
     </>
   );
@@ -109,10 +115,20 @@ function coachModelsDetail(summary: CoachModelsSummary | null): ReactNode {
   }
   return (
     <>
-      {summary.connected} of {summary.total} providers connected.
+      {t("settings.coachModels.providers", {
+        connected: summary.connected,
+        total: summary.total,
+      })}
       <span className="settings-pref-line">
-        <strong>{summary.activeLabel}</strong>{" "}
-        {summary.activeReady ? "in use." : "selected but not connected."}
+        {renderRich(
+          t(
+            summary.activeReady
+              ? "settings.coachModels.inUse"
+              : "settings.coachModels.notReady",
+            { model: summary.activeLabel },
+          ),
+          BOLD,
+        )}
       </span>
       {summary.claudeCodeUpdate ? (
         <span className="settings-pref-line settings-pref-warning">
@@ -148,15 +164,27 @@ const SPORT_COLOR_ORDER: SportColorCategory[] = [
   "other",
 ];
 
-/** The sport screens as tiles, each wearing the icon it has on the sidebar. */
-const SPORT_SCREEN_OPTIONS = SPORT_SCREENS.map((screen) => {
-  const Icon = PRIMARY_NAV_ITEMS.find((item) => item.id === screen)?.icon;
-  return {
-    value: screen,
-    label: getPrimaryViewLabel(screen),
-    icon: Icon ? <Icon size={18} aria-hidden="true" /> : undefined,
-  };
-});
+/** The sport screens as tiles, each wearing the icon it has on the sidebar.
+    Built while rendering, so the labels are in the language on screen. */
+function sportScreenOptions() {
+  return SPORT_SCREENS.map((screen) => {
+    const Icon = PRIMARY_NAV_ITEMS.find((item) => item.id === screen)?.icon;
+    return {
+      value: screen,
+      label: getPrimaryViewLabel(screen),
+      icon: Icon ? <Icon size={18} aria-hidden="true" /> : undefined,
+    };
+  });
+}
+
+/** Each language in its own name and with its flag, so it can be found by
+    someone who cannot read the language on screen. */
+const LANGUAGE_OPTIONS = LOCALES.map((locale) => ({
+  value: locale,
+  label: LOCALE_DETAILS[locale].nativeName,
+  title: locale === "en" ? undefined : LOCALE_DETAILS[locale].englishName,
+  icon: <LanguageFlag locale={locale} />,
+}));
 
 interface SettingsViewProps {
   api: HeraclesRecordsApi;
@@ -190,8 +218,8 @@ interface SettingsViewProps {
 }
 
 const THEME_MODES = [
-  { id: "dark" as const, label: "Dark", icon: Moon },
-  { id: "paper" as const, label: "Light", icon: Sun }
+  { id: "dark" as const, labelKey: "settings.colorMode.dark" as const, icon: Moon },
+  { id: "paper" as const, labelKey: "settings.colorMode.light" as const, icon: Sun }
 ];
 
 export function SettingsView({
@@ -226,6 +254,7 @@ export function SettingsView({
   const { theme, setTheme, accent, setAccent } = useTheme();
   const [sportColors, setSportColors] = useState(() => readStoredSportColors());
   const [hevyConnected, setHevyConnected] = useState(false);
+  const { locale } = useI18n();
 
   function updateSportColor(cat: SportColorCategory, value: string) {
     const next = { ...sportColors, [cat]: value };
@@ -333,7 +362,7 @@ export function SettingsView({
         }
       } catch (caught) {
         onError(
-          caught instanceof Error ? caught.message : "Could not load app info.",
+          caught instanceof Error ? caught.message : t("settings.about.loadFailed"),
         );
       }
     })();
@@ -356,9 +385,9 @@ export function SettingsView({
   // "Update 1.2.0" or "Downloading 40%".
   const updateStatus =
     updateSnapshot.status === "not-available"
-      ? { tone: "success", label: "Up to date" }
+      ? { tone: "success", label: t("settings.about.upToDate") }
       : updateSnapshot.status === "downloaded"
-        ? { tone: "accent", label: "Ready to install" }
+        ? { tone: "accent", label: t("settings.about.readyToInstall") }
         : null;
 
   const appVersion = appInfo?.version ?? updateSnapshot.currentVersion;
@@ -410,7 +439,7 @@ export function SettingsView({
                 onPreferencesChange={onUpdatePreferencesChange}
               />
             </div>
-            <p>Unofficial COROS companion for training analytics.</p>
+            <p>{t("settings.about.tagline")}</p>
             <div className="settings-about-links">
               <a
                 className="settings-about-link"
@@ -419,7 +448,7 @@ export function SettingsView({
                 rel="noreferrer"
               >
                 <Globe2 size={15} aria-hidden="true" />
-                <span>Website</span>
+                <span>{t("settings.about.website")}</span>
                 <ExternalLink size={12} aria-hidden="true" />
               </a>
               {/* A dialog, not a link: it offers the error log to copy before
@@ -430,7 +459,7 @@ export function SettingsView({
                 onClick={() => setReportIssueOpen(true)}
               >
                 <Bug size={15} aria-hidden="true" />
-                <span>Report an issue</span>
+                <span>{t("settings.about.reportIssue")}</span>
               </button>
             </div>
           </div>
@@ -444,7 +473,7 @@ export function SettingsView({
           >
             <span className="settings-about-coffee-chip">
               <Coffee size={15} aria-hidden="true" />
-              <span>Buy me a coffee</span>
+              <span>{t("settings.about.coffee")}</span>
             </span>
           </a>
         </div>
@@ -462,17 +491,17 @@ export function SettingsView({
             <Compass size={18} strokeWidth={1.9} />
           </span>
           <div>
-            <h2>Navigation</h2>
-            <p>Where the app opens, and which sport screens the sidebar lists.</p>
+            <h2>{t("settings.navigation.title")}</h2>
+            <p>{t("settings.navigation.description")}</p>
           </div>
         </div>
         <div className="settings-pref-list">
           <SettingsPrefRow
-            title="Opens on"
-            detail="The screen shown each time the app starts."
+            title={t("settings.opensOn.title")}
+            detail={t("settings.opensOn.detail")}
           >
             <OptionGroup
-              label="Opens on"
+              label={t("settings.opensOn.title")}
               mode="dropdown"
               size="md"
               value={startupView}
@@ -484,10 +513,10 @@ export function SettingsView({
               Strength hidden with Hevy connected takes Hevy's workouts off the
               screen. */}
           <SettingsPrefRow
-            title="Sport screens"
+            title={t("settings.sportScreens.title")}
             detail={
               <>
-                Turn one off to take it off the sidebar.
+                {t("settings.sportScreens.detail")}
                 {hevyConnected ? (
                   <span
                     className={
@@ -497,7 +526,7 @@ export function SettingsView({
                     }
                   >
                     {" "}
-                    Hevy workouts are only on Strength.
+                    {t("settings.sportScreens.hevy")}
                   </span>
                 ) : null}
               </>
@@ -505,10 +534,10 @@ export function SettingsView({
             align="start"
           >
             <OptionChips
-              label="Sport screens"
+              label={t("settings.sportScreens.title")}
               size="md"
               appearance="tiles"
-              options={SPORT_SCREEN_OPTIONS}
+              options={sportScreenOptions()}
               values={SPORT_SCREENS.filter(
                 (screen) => !hiddenSportScreens.includes(screen)
               )}
@@ -529,24 +558,44 @@ export function SettingsView({
             <Palette size={18} strokeWidth={1.9} />
           </span>
           <div>
-            <h2>Appearance</h2>
-            <p>Colour mode, accent palette and the colours sports wear.</p>
+            <h2>{t("settings.appearance.title")}</h2>
+            <p>{t("settings.appearance.description")}</p>
           </div>
         </div>
         <div className="settings-pref-list">
+          {/* The switch waits for the language's own chunk, then every screen
+              that subscribes redraws in it; nothing reloads. */}
           <SettingsPrefRow
-            title="Color mode"
-            detail="Dark or light, across the whole app."
+            title={t("settings.language.title")}
+            detail={t("settings.language.detail")}
+          >
+            <OptionGroup
+              label={t("settings.language.title")}
+              mode="dropdown"
+              size="md"
+              value={locale}
+              options={LANGUAGE_OPTIONS}
+              onChange={(next: Locale) => {
+                void setLocale(next).catch((caught: unknown) =>
+                  onError(caught instanceof Error ? caught.message : String(caught)),
+                );
+              }}
+            />
+          </SettingsPrefRow>
+
+          <SettingsPrefRow
+            title={t("settings.colorMode.title")}
+            detail={t("settings.colorMode.detail")}
           >
             {/* The swap animates out of the point that was pressed, so the
                 chip that produced the change comes back with it. */}
             <OptionGroup
-              label="Color mode"
+              label={t("settings.colorMode.title")}
               size="md"
               value={theme}
               options={THEME_MODES.map((mode) => ({
                 value: mode.id,
-                label: mode.label,
+                label: t(mode.labelKey),
                 icon: <mode.icon size={15} aria-hidden="true" />
               }))}
               onChange={(next, from) => {
@@ -562,8 +611,8 @@ export function SettingsView({
           </SettingsPrefRow>
 
           <SettingsPrefRow
-            title="Accent"
-            detail="Buttons, highlights and what is selected."
+            title={t("settings.accent.title")}
+            detail={t("settings.accent.detail")}
           >
             <div className="settings-palette-row">
               {/* The one sentence still worth showing, and it belongs to
@@ -617,8 +666,8 @@ export function SettingsView({
           {/* A chip carries the two facts — which sport, which colour — in a
               fifth of the height that five rows with a picker apiece took. */}
           <SettingsPrefRow
-            title="Activity colors"
-            detail="The colour each sport wears across the app."
+            title={t("settings.activityColors.title")}
+            detail={t("settings.activityColors.detail")}
             align="start"
             action={
               <button
@@ -627,7 +676,7 @@ export function SettingsView({
                 onClick={resetSportColors}
               >
                 <RefreshCw size={13} strokeWidth={2} aria-hidden="true" />
-                Reset
+                {t("common.reset")}
               </button>
             }
           >
@@ -649,7 +698,9 @@ export function SettingsView({
                         onChange={(event) =>
                           updateSportColor(cat, event.target.value)
                         }
-                        aria-label={`${SPORT_COLOR_LABELS[cat]} color`}
+                        aria-label={t("settings.activityColors.colorFor", {
+                          sport: SPORT_COLOR_LABELS[cat],
+                        })}
                       />
                       <span className="settings-sport-swatch" aria-hidden="true">
                         <SportIcon size={14} strokeWidth={2.2} />
@@ -677,8 +728,8 @@ export function SettingsView({
             <Link2 size={18} strokeWidth={1.9} />
           </span>
           <div>
-            <h2>Connections</h2>
-            <p>Accounts and services Heracles Records talks to on your behalf.</p>
+            <h2>{t("settings.connections.title")}</h2>
+            <p>{t("settings.connections.description")}</p>
           </div>
         </div>
 
@@ -692,11 +743,11 @@ export function SettingsView({
             />
           ) : (
             <SettingsPrefRow
-              title="COROS account"
+              title={t("settings.coros.title")}
               detail={
                 trainingStatus?.rememberCredentials && trainingStatus?.email
-                  ? `Not connected. Sign in as ${trainingStatus.email} to sync activities and workouts.`
-                  : "Not connected. Sign in to sync activities and workouts."
+                  ? t("settings.coros.notConnectedAs", { email: trainingStatus.email })
+                  : t("settings.coros.notConnected")
               }
             >
               <button
@@ -705,13 +756,13 @@ export function SettingsView({
                 onClick={onTrainingSignIn}
               >
                 <LogIn size={15} aria-hidden="true" />
-                Sign in
+                {t("common.signIn")}
               </button>
             </SettingsPrefRow>
           )}
 
           <SettingsPrefRow
-            title="MCP Servers"
+            title={t("settings.mcp.title")}
             detail={mcpSummaryDetail(mcpSummary)}
             tone={mcpSummary && mcpSummary.connected > 0 ? "success" : undefined}
           >
@@ -721,12 +772,12 @@ export function SettingsView({
               onClick={() => setMcpModalOpen(true)}
             >
               <Server size={15} aria-hidden="true" />
-              Manage
+              {t("common.manage")}
             </button>
           </SettingsPrefRow>
 
           <SettingsPrefRow
-            title="Coach Models"
+            title={t("settings.coachModels.title")}
             detail={coachModelsDetail(coachModels)}
             tone={
               !coachModels || coachModels.connected === 0
@@ -742,7 +793,7 @@ export function SettingsView({
               onClick={() => setCoachModelsOpen(true)}
             >
               <BrainCircuit size={15} aria-hidden="true" />
-              Manage
+              {t("common.manage")}
             </button>
           </SettingsPrefRow>
         </div>
@@ -774,7 +825,7 @@ export function SettingsView({
       />
 
       <footer className="settings-footer">
-        Heracles Records {appVersion} · Made by quochungse
+        {t("settings.footer", { version: appVersion })}
       </footer>
     </section>
   );
