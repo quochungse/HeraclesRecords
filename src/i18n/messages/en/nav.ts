@@ -1,3 +1,5 @@
+import type { Translation } from "../../types.ts";
+
 /** The rail: its four headings, every destination, and its own controls. */
 const nav = {
   "nav.section.today": "Today",
@@ -29,4 +31,4 @@ const nav = {
 };
 
 export default nav;
-export type NavMessages = Record<keyof typeof nav, string>;
+export type NavMessages = Translation<typeof nav>;

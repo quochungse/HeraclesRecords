@@ -169,8 +169,8 @@
 }
 
 /*
- * Japanese, Korean and Chinese. The three shipped faces carry Latin and
- * Vietnamese only, so a CJK character falls through the stack — and with
+ * Japanese, Korean, Chinese and Thai. The three shipped faces carry Latin,
+ * Vietnamese and Cyrillic only, so a CJK or Thai character falls through the stack — and with
  * nothing named for it, Windows lands on a full-width Gothic that sets
  * katakana a space apart. Each language names its own system UI faces, keyed
  * on <html lang> (src/i18n/locales.ts), Latin still drawn in Inter ahead of
@@ -190,6 +190,13 @@
   --font-title: "Source Serif 4", "Batang", "AppleMyungjo", "Noto Serif KR", serif;
 
   font-family: Inter, "Malgun Gothic", "Apple SD Gothic Neo", "Noto Sans KR", sans-serif;
+}
+
+:root:lang(th) {
+  --font-display: "Space Grotesk", Inter, "Leelawadee UI", "Thonburi", "Noto Sans Thai", sans-serif;
+  --font-title: "Source Serif 4", "Leelawadee UI", "Thonburi", "Noto Serif Thai", serif;
+
+  font-family: Inter, "Leelawadee UI", "Thonburi", "Noto Sans Thai", sans-serif;
 }
 
 :root:lang(zh) {

@@ -7,6 +7,11 @@ import cn from "../assets/flags/cn.svg";
 import es from "../assets/flags/es.svg";
 import fr from "../assets/flags/fr.svg";
 import de from "../assets/flags/de.svg";
+import br from "../assets/flags/br.svg";
+import it from "../assets/flags/it.svg";
+import ru from "../assets/flags/ru.svg";
+import id from "../assets/flags/id.svg";
+import th from "../assets/flags/th.svg";
 
 /**
  * The flag beside each language in Settings. SVG files from flag-icons (MIT,
@@ -22,8 +27,13 @@ const FLAGS: Record<Locale, string> = {
   ko: kr,
   zh: cn,
   es,
+  pt: br,
   fr,
   de,
+  it,
+  ru,
+  id,
+  th,
 };
 
 export function LanguageFlag({ locale }: { locale: Locale }) {

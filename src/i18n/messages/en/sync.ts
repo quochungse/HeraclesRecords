@@ -1,3 +1,5 @@
+import type { Translation } from "../../types.ts";
+
 /** Settings: the Sync card and Backup & Restore. */
 const sync = {
   "sync.title": "Sync",
@@ -67,4 +69,4 @@ const sync = {
 };
 
 export default sync;
-export type SyncMessages = Record<keyof typeof sync, string>;
+export type SyncMessages = Translation<typeof sync>;

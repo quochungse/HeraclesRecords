@@ -26,6 +26,19 @@ jobs:
         if: startsWith(github.ref, 'refs/tags/v')
         run: node scripts/sync-release-version.mjs --from-tag "${{ github.ref_name }}" --check
 
+      # Every language finished, or no release: a screen left in English, a
+      # message missing from a language or a plural form a language needs
+      # stops the release here (docs/i18n-plan.md). Plain Node 22 from
+      # setup-node carries the TypeScript stripping the check loads the
+      # translations with.
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Require every language to be complete
+        run: node --experimental-strip-types scripts/check-i18n-release.mjs
+
       # Google Drive is the only sync destination, so a build without the
       # OAuth client ships with no sync at all — and builds without a word.
       - name: Require the Google OAuth client

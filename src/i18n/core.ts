@@ -43,8 +43,13 @@ const LOADERS: Record<Exclude<Locale, "en">, () => Promise<{ default: Dictionary
   ko: () => import("./messages/ko/index.ts"),
   zh: () => import("./messages/zh/index.ts"),
   es: () => import("./messages/es/index.ts"),
+  pt: () => import("./messages/pt/index.ts"),
   fr: () => import("./messages/fr/index.ts"),
   de: () => import("./messages/de/index.ts"),
+  it: () => import("./messages/it/index.ts"),
+  ru: () => import("./messages/ru/index.ts"),
+  id: () => import("./messages/id/index.ts"),
+  th: () => import("./messages/th/index.ts"),
 };
 
 const loaded = new Map<Locale, Dictionary>([["en", en]]);

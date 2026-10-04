@@ -1,3 +1,5 @@
+import type { Translation } from "../../types.ts";
+
 /** Words every screen reaches for. */
 const common = {
   "common.close": "Close",
@@ -24,4 +26,4 @@ const common = {
 };
 
 export default common;
-export type CommonMessages = Record<keyof typeof common, string>;
+export type CommonMessages = Translation<typeof common>;

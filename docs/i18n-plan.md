@@ -1,9 +1,10 @@
 # Languages (i18n)
 
-Heracles Records is written in English and translated into seven languages: Tiếng Việt,
-日本語, 한국어, 简体中文 (Simplified), Español, Français and Deutsch. English is the default
-whatever the operating system says, and the athlete switches in **Settings → Appearance →
-Language**, where each language is listed in its own name beside its flag.
+Heracles Records is written in English and translated into twelve languages: Tiếng Việt,
+日本語, 한국어, 简体中文 (Simplified), Español, Português (Brasil), Français, Deutsch,
+Italiano, Русский, Bahasa Indonesia and ไทย. English is the default whatever the operating
+system says, and the athlete switches in **Settings → Appearance → Language**, where each
+language is listed in its own name beside its flag.
 
 The work is phased, screen by screen. This file is the plan and the rules; `src/i18n/` is the
 code, and `npm run test:i18n` holds both.
@@ -20,10 +21,25 @@ code, and `npm run test:i18n` holds both.
 | P6 | Coach's screen: `ChatView`, Coach Models, MCP servers, the Workbench, analyses. **Not the prompt** (below) | |
 | P7 | Text the main process puts on screen: errors thrown over IPC, native dialog titles | |
 
-Until P7 lands, a non-English screen still shows some English. That is expected mid-way.
-Releasing before every phase is done means shipping that mix, so two things wait until the
-end: the changelog entry for languages, and a **Language** line in the website's guide
-(`site/src/content/guide/customise.md`, under Appearance).
+## A release ships every language finished
+
+**`npm run check:i18n-release` refuses a release while anything is left in English**, and it
+runs twice: in `npm run release:prepare`, before the version is written, and in
+`release.yml`'s preflight job, before any installer is built. It refuses when:
+
+- `scripts/lib/i18n-pending.json` lists a file, or the scanner finds English anywhere in
+  `src/` (`scripts/lib/i18n-coverage.mjs`);
+- a language is missing a message English has, or a plural form its own rules use.
+
+The pending list is a ratchet that `npm run test:i18n` holds. A file not on it must stay
+clean, and a file on it that has become clean must come off it. `npm run i18n:coverage`
+(`-- <path> -v` for one file, line by line) is the to-do list. The scanner passes over the
+developer toolbar and the sample presets, which no packaged build draws. A line that looks
+like text and is not (a log line, a selector, a COROS field value) carries `i18n-ignore` and
+the reason.
+
+Two things wait for the gate to pass: the changelog entry for languages, and a **Language**
+line in the website's guide (`site/src/content/guide/customise.md`, under Appearance).
 
 ## How it works
 
@@ -51,9 +67,10 @@ end: the changelog entry for languages, and a **Language** line in the website's
 - **The choice is `heraclesrecords.language`**, a `preference`, so it follows the athlete to
   their other machine, which reads it at its next launch.
 - **`<html lang>` follows the language.** Chromium picks fallback fonts from it, and
-  `styles.css` names each CJK language's own system faces under `:root:lang(ja|ko|zh)`;
+  `styles.css` names each language's own system faces under `:root:lang(ja|ko|zh|th)`;
   without them Windows set Japanese in a full-width Gothic. Chinese is `zh-CN`, so Han
-  characters take Simplified shapes.
+  characters take Simplified shapes. Russian is drawn in the shipped faces: `fonts:fetch`
+  brings their Cyrillic cuts (Space Grotesk has none and falls to Inter).
 - **Dates and numbers follow the language, not the system.** `getIntlLocale()` (or `intl`
   from the hook) is the system's own regional variant of the chosen language when it has
   one, the language's usual region otherwise. Pass it to every `toLocale*String` and
@@ -79,6 +96,15 @@ end: the changelog entry for languages, and a **Language** line in the website's
   word order differs, so the whole sentence is the key, with its variants as keys of their
   own when a part comes and goes (`backup.override.detail`, `…detailDeletes`,
   `…detailDeletesSettings`).
+- **A count in front of a noun is a plural message**, even where English would get away with
+  one form. Russian declines the noun by the number (1 изменение, 3 изменения, 5 изменений)
+  and states `_one`, `_few` and `_many`; `Translation<T>` (`src/i18n/types.ts`) leaves room
+  for them and `test:i18n` requires every form a language's rules use. Where a sentence
+  cannot take a plural, a language writes the count as a label instead
+  ("записей: {count}"), never "1 записей".
+- **A new namespace** is a file in `messages/en/`, a line in `messages/en/index.ts`, the same
+  file in every other language, and `npm run i18n:index`, which writes the other languages'
+  `index.ts` and fails on a file missing.
 
 ## Numbers and units (P2)
 
@@ -99,8 +125,13 @@ The voice of each language, chosen to match the sports apps its readers already 
 | 한국어 | 합니다 in sentences, nouns for labels | 러닝, 사이클링 as Korean apps write them |
 | 简体中文 | **你** | Short labels; full-width punctuation |
 | Español | **tú** | Peninsular vocabulary (*ordenador*), as Strava and Garmin write in Spain |
+| Português (Brasil) | **você** | Brazilian vocabulary (*tela*, *arquivo*, *salvar*) |
 | Français | **vous** | Typographic apostrophe (’), a space before `:` |
 | Deutsch | **du** | As Strava and Garmin Connect write; compounds kept whole |
+| Italiano | **tu** | As Strava Italia writes; typographic apostrophe (’) |
+| Русский | **вы** (lower case) | Counts as plural messages or as "label: {count}"; ё written |
+| Bahasa Indonesia | **Anda** | Standard (baku) forms; English kept for terms runners use (Beta, API) |
+| ไทย | **คุณ** | No full stop at the end of a sentence; English kept for brand and tech terms |
 
 ### Glossary
 
@@ -126,3 +157,26 @@ Terms later phases must reuse rather than reinvent.
 | Vault (sync storage) | Kho | 保管庫 | 보관소 | 存储库 | Almacén | Espace | Speicher |
 | Sign in | Đăng nhập | サインイン | 로그인 | 登录 | Iniciar sesión | Se connecter | Anmelden |
 | Settings | Cài đặt | 設定 | 설정 | 设置 | Ajustes | Paramètres | Einstellungen |
+
+The same terms in the five languages added after P1:
+
+| English | pt | it | ru | id | th |
+|---|---|---|---|---|---|
+| Overview | Visão geral | Panoramica | Обзор | Ringkasan | ภาพรวม |
+| Coach | Treinador | Coach | Тренер | Pelatih | โค้ช |
+| Activity | Atividade | Attività | Активность | Aktivitas | กิจกรรม |
+| Workout | Treino | Allenamento | Тренировка | Latihan | การฝึก |
+| Training plan | Plano de treino | Piano di allenamento | План тренировок | Rencana latihan | แผนการฝึก |
+| Training Library | Biblioteca de treinos | Libreria allenamenti | Библиотека тренировок | Pustaka latihan | คลังการฝึก |
+| Running | Corrida | Corsa | Бег | Lari | วิ่ง |
+| Cycling | Ciclismo | Ciclismo | Велоспорт | Bersepeda | ปั่นจักรยาน |
+| Hiking | Trilha | Escursionismo | Хайкинг | Mendaki | เดินป่า |
+| Strength | Força | Forza | Силовые | Latihan beban | เวทเทรนนิ่ง |
+| Sleep | Sono | Sonno | Сон | Tidur | การนอน |
+| Hall of Records | Galeria de recordes | Albo dei record | Зал рекордов | Galeri rekor | หอเกียรติยศ |
+| Labour (of Heracles) | Trabalho | Fatica | Подвиг | Tugas | ภารกิจ |
+| Record (a row of data) | Registro | Elemento | Запись | Data | รายการ |
+| Sync | Sincronização | Sincronizzazione | Синхронизация | Sinkronisasi | ซิงค์ |
+| Vault (sync storage) | Cofre | Archivio | Хранилище | Brankas | พื้นที่เก็บ |
+| Sign in | Entrar | Accedi | Войти | Masuk | ลงชื่อเข้าใช้ |
+| Settings | Configurações | Impostazioni | Настройки | Pengaturan | การตั้งค่า |

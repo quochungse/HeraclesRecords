@@ -7,7 +7,21 @@
  * the app opens in until the athlete picks another — whatever the operating
  * system is set to. A missing translation falls back to it, string by string.
  */
-export const LOCALES = ["en", "vi", "ja", "ko", "zh", "es", "fr", "de"] as const;
+export const LOCALES = [
+  "en",
+  "vi",
+  "ja",
+  "ko",
+  "zh",
+  "es",
+  "pt",
+  "fr",
+  "de",
+  "it",
+  "ru",
+  "id",
+  "th",
+] as const;
 
 export type Locale = (typeof LOCALES)[number];
 
@@ -39,8 +53,13 @@ export const LOCALE_DETAILS: Record<Locale, LocaleDetail> = {
   ko: { nativeName: "한국어", englishName: "Korean", htmlLang: "ko", defaultIntl: "ko-KR" },
   zh: { nativeName: "简体中文", englishName: "Chinese (Simplified)", htmlLang: "zh-CN", defaultIntl: "zh-CN" },
   es: { nativeName: "Español", englishName: "Spanish", htmlLang: "es", defaultIntl: "es-ES" },
+  pt: { nativeName: "Português (Brasil)", englishName: "Portuguese (Brazil)", htmlLang: "pt-BR", defaultIntl: "pt-BR" },
   fr: { nativeName: "Français", englishName: "French", htmlLang: "fr", defaultIntl: "fr-FR" },
   de: { nativeName: "Deutsch", englishName: "German", htmlLang: "de", defaultIntl: "de-DE" },
+  it: { nativeName: "Italiano", englishName: "Italian", htmlLang: "it", defaultIntl: "it-IT" },
+  ru: { nativeName: "Русский", englishName: "Russian", htmlLang: "ru", defaultIntl: "ru-RU" },
+  id: { nativeName: "Bahasa Indonesia", englishName: "Indonesian", htmlLang: "id", defaultIntl: "id-ID" },
+  th: { nativeName: "ไทย", englishName: "Thai", htmlLang: "th", defaultIntl: "th-TH" },
 };
 
 export function isLocale(value: unknown): value is Locale {
@@ -64,6 +83,9 @@ export function resolveIntlLocale(
       continue;
     }
     if (locale === "zh" && !/^(CN|SG|Hans)/i.test(rest.join("-"))) {
+      continue;
+    }
+    if (locale === "pt" && !/^BR/i.test(rest.join("-"))) {
       continue;
     }
     try {

@@ -1,3 +1,4 @@
+import { spawnSync } from "node:child_process";
 import { syncReleaseVersion } from "./sync-release-version.mjs";
 
 const tag = process.argv[2];
@@ -7,6 +8,15 @@ if (!tag) {
 }
 
 const version = tag.replace(/^v/i, "");
+
+// Every language finished, or no release (docs/i18n-plan.md). Asked before the
+// version is written, so a refusal leaves nothing to undo; release.yml asks
+// again before it builds.
+const i18n = spawnSync("npm", ["run", "--silent", "check:i18n-release"], { stdio: "inherit", shell: true });
+if (i18n.status !== 0) {
+  process.exit(i18n.status ?? 1);
+}
+
 syncReleaseVersion({ fromTag: tag, sync: true });
 
 console.log(`Prepared ${version} in package.json and package-lock.json.`);

@@ -1,3 +1,5 @@
+import type { Translation } from "../../types.ts";
+
 /** Settings: the About header, its two dialogs, and the Navigation, Appearance and Connections cards. */
 const settings = {
   "settings.about.tagline": "Unofficial COROS companion for training analytics.",
@@ -92,4 +94,4 @@ const settings = {
 };
 
 export default settings;
-export type SettingsMessages = Record<keyof typeof settings, string>;
+export type SettingsMessages = Translation<typeof settings>;
