@@ -1,25 +1,55 @@
 ---
-// A screenshot of the app, framed like the README's. Every shot but the first
-// one on a page loads lazily.
-import { shot } from "../assets";
+// A screenshot of the app, framed like the README's. The shots are 3024px
+// wide, so the page offers a set of widths and lets the browser pick by the
+// space the shot takes (`sizes`). Every shot but the first one on a page
+// loads lazily.
+import { Image } from "astro:assets";
+import { isAnimated, shot, SHOT_WIDTHS } from "../assets";
 
 interface Props {
   name: string;
   alt: string;
   eager?: boolean;
   class?: string;
+  /** How wide the shot is drawn, for the browser's pick of a width. */
+  sizes?: string;
 }
 
-const { name, alt, eager = false, class: className } = Astro.props;
+const {
+  name,
+  alt,
+  eager = false,
+  class: className,
+  sizes = "(max-width: 1120px) calc(100vw - 40px), 1080px",
+} = Astro.props;
 const image = shot(name);
+const loading = eager ? "eager" : "lazy";
 ---
 
-<img
-  class:list={["shot", className]}
-  src={image.src}
-  width={image.width}
-  height={image.height}
-  alt={alt}
-  loading={eager ? "eager" : "lazy"}
-  decoding="async"
-/>
+{
+  isAnimated(name) ? (
+    <img
+      class:list={["shot", className]}
+      src={image.src}
+      width={image.width}
+      height={image.height}
+      alt={alt}
+      loading={loading}
+      fetchpriority={eager ? "high" : undefined}
+      decoding="async"
+    />
+  ) : (
+    <Image
+      class:list={["shot", className]}
+      src={image}
+      widths={SHOT_WIDTHS.filter((width) => width < image.width).concat(image.width)}
+      sizes={sizes}
+      alt={alt}
+      loading={loading}
+      fetchpriority={eager ? "high" : undefined}
+      decoding="async"
+      format="webp"
+      quality={82}
+    />
+  )
+}

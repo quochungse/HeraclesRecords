@@ -1,11 +1,17 @@
 ---
+import { Image } from "astro:assets";
 import Base from "../layouts/Base.astro";
 import DownloadButton from "../components/DownloadButton.astro";
 import LabourEmblem from "../components/LabourEmblem.astro";
 import Shot from "../components/Shot.astro";
 import ShotSlider from "../components/ShotSlider.astro";
+import { SIZES_HALF, SIZES_SIDE } from "../assets";
 import icon from "../../../build/icon-256.png";
 import { LABOURS } from "../../../src/records/labours";
+import { latestRelease } from "../release.mjs";
+import { softwareApplication } from "../structuredData.mjs";
+
+const release = await latestRelease();
 
 const today = [
   {
@@ -105,9 +111,9 @@ const faq = [
 ];
 ---
 
-<Base description="Heracles Records is a free desktop app for COROS athletes: every session read in depth, an AI coach that has read all of it, and a hall for every record you set.">
+<Base jsonLd={softwareApplication(release, Astro.site)} description="Heracles Records is a free desktop app for COROS athletes: every session read in depth, an AI coach that has read all of it, and a hall for every record you set.">
   <section class="hero wrap">
-    <img class="hero-icon" src={icon.src} alt="" width="88" height="88" />
+    <Image class="hero-icon" src={icon} alt="" width={88} height={88} densities={[1, 2]} format="webp" loading="eager" />
     <h1>Your COROS training, read in depth.</h1>
     <p class="hero-tagline">Every session a record. Every record a labour.</p>
     <p class="hero-lede">
@@ -160,7 +166,7 @@ const faq = [
       {
         sports.map((sport) => (
           <figure class="figure">
-            <Shot name={sport.shot} alt={sport.alt} />
+            <Shot name={sport.shot} alt={sport.alt} sizes={SIZES_HALF} />
             <figcaption>
               <strong>{sport.title}</strong>: {sport.text}
             </figcaption>
@@ -189,14 +195,14 @@ const faq = [
     </div>
     <div class="grid-2">
       <figure class="figure">
-        <Shot name="09-calendar" alt="Calendar: planned and completed sessions by month" />
+        <Shot name="09-calendar" alt="Calendar: planned and completed sessions by month" sizes={SIZES_HALF} />
         <figcaption>
           <strong>Calendar</strong>: planned and done side by side, by week or month. Drag a
           session to another day and it moves on your COROS calendar too.
         </figcaption>
       </figure>
       <figure class="figure">
-        <Shot name="10-library" alt="Training Library: a 12-week marathon plan, week by week" />
+        <Shot name="10-library" alt="Training Library: a 12-week marathon plan, week by week" sizes={SIZES_HALF} />
         <figcaption>
           <strong>Training Library</strong>: read, build, edit and duplicate workouts and plans,
           and put a plan on the calendar with its compliance on every session.
@@ -216,8 +222,8 @@ const faq = [
       </p>
     </div>
     <div class="grid-2">
-      <Shot name="11-coach" alt="Coach: an interval session analysed, with heart-rate and pace charts" />
-      <Shot name="12-coach-plan" alt="Coach: a marathon plan in the Workbench beside the conversation" />
+      <Shot name="11-coach" alt="Coach: an interval session analysed, with heart-rate and pace charts" sizes={SIZES_HALF} />
+      <Shot name="12-coach-plan" alt="Coach: a marathon plan in the Workbench beside the conversation" sizes={SIZES_HALF} />
     </div>
     <ul class="ticks columns">
       <li><strong>Plans with you.</strong> The brief, the outline, then every session, saved to COROS and your calendar when you are happy with it.</li>
@@ -278,13 +284,13 @@ const faq = [
     <p class="center-link"><a class="more" href="/labours">See every labour and its stages</a></p>
     <div class="grid-2 records">
       <figure class="figure">
-        <Shot name="14-timeline" alt="Hall of Records: the timeline of milestones" />
+        <Shot name="14-timeline" alt="Hall of Records: the timeline of milestones" sizes={SIZES_HALF} />
         <figcaption>
           <strong>Timeline</strong>: every first, record and streak, and the labour stage it reached.
         </figcaption>
       </figure>
       <figure class="figure">
-        <Shot name="15-places" alt="Where you've been: every place you trained, on a globe" />
+        <Shot name="15-places" alt="Where you've been: every place you trained, on a globe" sizes={SIZES_HALF} />
         <figcaption>
           <strong>Where you've been</strong>: every place your training has taken you, on a globe.
         </figcaption>
@@ -303,11 +309,11 @@ const faq = [
     </div>
     <div class="grid-2">
       <figure class="figure">
-        <Shot name="19-appearance-dark" alt="Overview in the dark colour mode" />
+        <Shot name="19-appearance-dark" alt="Overview in the dark colour mode" sizes={SIZES_HALF} />
         <figcaption><strong>Dark</strong></figcaption>
       </figure>
       <figure class="figure">
-        <Shot name="20-appearance-light" alt="Overview in the light colour mode" />
+        <Shot name="20-appearance-light" alt="Overview in the light colour mode" sizes={SIZES_HALF} />
         <figcaption><strong>Light</strong></figcaption>
       </figure>
     </div>
@@ -324,7 +330,7 @@ const faq = [
       </ul>
       <a class="more" href="/privacy.html">Privacy policy</a>
     </div>
-    <Shot name="18-sync" alt="Settings: sync through Google Drive" />
+    <Shot name="18-sync" alt="Settings: sync through Google Drive" sizes={SIZES_SIDE} />
   </section>
 
   <section class="wrap section">

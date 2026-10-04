@@ -200,6 +200,7 @@
     "dist:linux": "npm run clean:electron && npm run build && electron-builder --linux AppImage --x64 --publish never",
     "site:dev": "npm --prefix site run dev",
     "site:build": "npm --prefix site run build",
+    "site:og": "node scripts/run-electron-gui.mjs scripts/site-og/render.cjs",
     "test:site": "npm --prefix site run build && node scripts/test-site.mjs",
     "test:release-data": "node scripts/test-release-data.mjs",
     "readme:release": "node scripts/update-readme-release.mjs",

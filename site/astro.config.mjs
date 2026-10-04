@@ -5,10 +5,14 @@ import { defineConfig } from "astro/config";
 // served from a repository of that name. See docs/website-plan.md.
 export default defineConfig({
   site: "https://heraclesrecords.github.io",
-  // `preserve` writes src/pages/privacy.astro to privacy.html. That exact URL is
-  // the privacy policy Google's OAuth consent screen links to, so it must not
-  // become privacy/index.html.
-  build: { format: "preserve" },
+  build: {
+    // `preserve` writes src/pages/privacy.astro to privacy.html. That exact URL
+    // is the privacy policy Google's OAuth consent screen links to, so it must
+    // not become privacy/index.html.
+    format: "preserve",
+    // The stylesheet is small; inlined, it costs the first paint no request.
+    inlineStylesheets: "always",
+  },
   // Compression drops the line break before an inline element ("the<code>…"),
   // which runs words together in prose wrapped across lines.
   compressHTML: false,

@@ -16,6 +16,21 @@ function pick(files: Record<string, { default: ImageMetadata }>, name: string, w
 /** A screenshot by its file name without the extension: shot("04-run"). */
 export const shot = (name: string) => pick(shots, name, "docs/readme");
 
+/** `sizes` for a shot in half the measure (.grid-2). */
+export const SIZES_HALF = "(max-width: 760px) calc(100vw - 40px), 530px";
+
+/** `sizes` for a shot beside its words (.split, FeatureRow: seven twelfths). */
+export const SIZES_SIDE = "(max-width: 860px) calc(100vw - 40px), 630px";
+
+/** Widths a screenshot is offered at (plus its own, 3024px). */
+export const SHOT_WIDTHS = [640, 960, 1280, 1920, 2560];
+
+/**
+ * Shots that move. The image service would flatten one to its first frame, so
+ * these are served as they are.
+ */
+export const isAnimated = (name: string) => name === "16-route";
+
 /** A labour's emblem by its id: emblem("lion"). */
 export const emblem = (id: string) => pick(emblems, id, "src/assets/labours");
 

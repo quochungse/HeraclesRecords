@@ -5,7 +5,7 @@ import Base from "../../layouts/Base.astro";
 const guides = (await getCollection("guide")).sort((a, b) => a.data.order - b.data.order);
 ---
 
-<Base title="Guide" description="How to install Heracles Records, connect COROS, set up Coach, sync two computers and fix what goes wrong.">
+<Base og="guide" title="Guide" description="How to install Heracles Records, connect COROS, set up Coach, sync two computers and fix what goes wrong.">
   <section class="wrap page-hero">
     <p class="eyebrow">Guide</p>
     <h1>Getting the most out of Heracles Records</h1>

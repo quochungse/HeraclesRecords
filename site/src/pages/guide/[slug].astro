@@ -14,7 +14,7 @@ const { guide, previous, next } = Astro.props;
 const { Content } = await render(guide);
 ---
 
-<Base title={guide.data.title} description={guide.data.description}>
+<Base og="guide" title={guide.data.title} description={guide.data.description}>
   <article class="prose guide">
     <p class="crumb"><a href="/guide/">Guide</a></p>
     <h1>{guide.data.title}</h1>

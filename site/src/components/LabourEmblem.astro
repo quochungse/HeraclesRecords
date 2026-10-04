@@ -1,6 +1,7 @@
 ---
 // A labour's gold emblem on the plate the Hall of Records draws it on: the
 // artwork's own black, whatever the theme, inside a metal rim.
+import { Image } from "astro:assets";
 import { emblem } from "../assets";
 
 interface Props {
@@ -13,7 +14,7 @@ const image = emblem(id);
 ---
 
 <span class="labour-emblem" style={`--size: ${size}px`}>
-  <img src={image.src} width={size} height={size} alt="" loading="lazy" decoding="async" />
+  <Image src={image} width={size} height={size} densities={[1, 2]} format="webp" alt="" loading="lazy" decoding="async" />
 </span>
 
 <style>

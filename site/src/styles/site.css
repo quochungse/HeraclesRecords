@@ -418,6 +418,7 @@ code {
   background: var(--surface);
 }
 
+.card h2,
 .card h3 {
   margin: 0 0 8px;
   font-size: 17px;
@@ -547,4 +548,28 @@ code {
   margin: 20px 0;
   padding: 2px 0 2px 16px;
   border-left: 3px solid var(--accent);
+}
+
+/* Skip link: off screen until a keyboard user tabs to it. */
+
+.skip-link {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  z-index: 10;
+  padding: 10px 14px;
+  border-radius: var(--radius);
+  background: var(--accent);
+  color: var(--on-accent);
+  font-weight: 600;
+  text-decoration: none;
+  transform: translateY(-160%);
+}
+
+.skip-link:focus {
+  transform: none;
+}
+
+main:focus {
+  outline: none;
 }

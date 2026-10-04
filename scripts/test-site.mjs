@@ -10,7 +10,8 @@
 //    puts every stylesheet, font and image (_astro/).
 // 3. Every page links its assets from _astro/ and each one is in the build.
 // 4. No em dash in the site's own copy: the README's rule, kept for the site.
-// 5-7. Installers, the version, em dashes in the build, and internal links:
+// 5-10. Installers, the version, em dashes in the build, internal links,
+//    link-preview cards, the sitemap and the structured data:
 //    see each check below.
 
 import assert from "node:assert/strict";
@@ -91,5 +92,37 @@ for (const page of pages) {
   }
 }
 assert.ok(existsSync(join(dist, "changelog.xml")), "the release feed changelog.xml is missing");
+
+// 8. Every page names a link-preview card that is in the build (site/public/og,
+//    rendered by `npm run site:og`).
+for (const page of pages) {
+  const html = readFileSync(page, "utf8");
+  const card = html.match(/<meta property="og:image" content="https:\/\/[^/]+(\/og\/[^"]+\.jpg)"/)?.[1];
+  assert.ok(card, `${relative(dist, page)} has no og:image`);
+  assert.ok(existsSync(join(dist, card)), `${relative(dist, page)} names ${card}, which is not in the build`);
+}
+
+// 9. The sitemap lists every page but 404, and nothing that is not a page.
+const sitemap = readFileSync(join(dist, "sitemap.xml"), "utf8");
+const listed = [...sitemap.matchAll(/<loc>https:\/\/[^/]+(\/[^<]*)<\/loc>/g)].map((match) => match[1]);
+for (const path of listed) assert.ok(resolves(path), `sitemap.xml lists ${path}, which is not in the build`);
+const servedAs = (page) => {
+  const path = `/${relative(dist, page).replace(/\\/g, "/")}`;
+  return path === "/privacy.html" ? path : path.replace(/index\.html$/, "").replace(/\.html$/, "");
+};
+for (const page of pages.filter((page) => !page.endsWith("404.html"))) {
+  assert.ok(listed.includes(servedAs(page)), `sitemap.xml leaves out ${servedAs(page)}`);
+}
+assert.match(readFileSync(join(dist, "robots.txt"), "utf8"), /Sitemap: https:\/\/.+\/sitemap\.xml/);
+
+// 10. The home and download pages describe the app as structured data, with
+//     the version the page offers.
+for (const file of ["index.html", "download.html"]) {
+  const block = readFileSync(join(dist, file), "utf8").match(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/)?.[1];
+  assert.ok(block, `${file} has no JSON-LD`);
+  const data = JSON.parse(block);
+  assert.equal(data["@type"], "SoftwareApplication");
+  assert.equal(data.softwareVersion, tag.slice(1), `${file}'s JSON-LD states ${data.softwareVersion}`);
+}
 
 console.log(`site: ${pages.length} pages checked`);

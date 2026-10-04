@@ -2,6 +2,7 @@
 // Words on one side, a screenshot on the other, tops aligned. `flip` puts the
 // screenshot first on wide screens; on a narrow one the words always lead.
 import Shot from "./Shot.astro";
+import { SIZES_SIDE } from "../assets";
 
 interface Props {
   shot: string;
@@ -18,7 +19,7 @@ const { shot, alt, flip = false, id } = Astro.props;
     <slot />
   </div>
   <div class="feature-row-shot">
-    <Shot name={shot} alt={alt} />
+    <Shot name={shot} alt={alt} sizes={SIZES_SIDE} />
   </div>
 </section>
 

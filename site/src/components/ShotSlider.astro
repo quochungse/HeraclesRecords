@@ -4,7 +4,8 @@
 // while the pointer or focus is inside or the tab is hidden, and a press on a
 // button or a dot starts its clock again. With reduced motion asked for,
 // slides still advance (the page is about what they show) but swap at once.
-import { shot } from "../assets";
+import { getImage } from "astro:assets";
+import { shot, SHOT_WIDTHS, SIZES_SIDE } from "../assets";
 
 interface Slide {
   name: string;
@@ -20,7 +21,19 @@ interface Props {
 }
 
 const { slides, label, interval = 3000 } = Astro.props;
-const images = slides.map((slide) => ({ ...slide, image: shot(slide.name) }));
+const images = await Promise.all(
+  slides.map(async (slide) => {
+    const image = shot(slide.name);
+    const sized = await getImage({
+      src: image,
+      widths: SHOT_WIDTHS.filter((width) => width < image.width).concat(image.width),
+      sizes: SIZES_SIDE,
+      format: "webp",
+      quality: 82,
+    });
+    return { ...slide, image, sized };
+  }),
+);
 ---
 
 <div class="slider" role="region" aria-roledescription="carousel" aria-label={label} data-interval={interval}>
@@ -37,7 +50,9 @@ const images = slides.map((slide) => ({ ...slide, image: shot(slide.name) }));
           >
             <img
               class="shot"
-              src={slide.image.src}
+              src={slide.sized.src}
+              srcset={slide.sized.srcSet.attribute}
+              sizes={SIZES_SIDE}
               width={slide.image.width}
               height={slide.image.height}
               alt={slide.alt}
@@ -208,38 +223,38 @@ const images = slides.map((slide) => ({ ...slide, image: shot(slide.name) }));
   .slider-dots {
     display: flex;
     justify-content: center;
-    gap: 8px;
-    margin-top: 16px;
+    gap: 0;
+    margin-top: 8px;
   }
 
+  /* A 24px target (WCAG 2.5.8) drawing an 8px dot. */
   .slider-dot {
-    width: 8px;
-    height: 8px;
+    display: grid;
+    place-items: center;
+    width: 24px;
+    height: 24px;
     padding: 0;
     border: 0;
     border-radius: 50%;
+    background: none;
+    cursor: pointer;
+  }
+
+  .slider-dot::before {
+    content: "";
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
     background: var(--ink-3);
     opacity: 0.5;
-    cursor: pointer;
     transition:
       opacity 150ms ease,
       background 150ms ease;
   }
 
-  .slider-dot[aria-current="true"] {
+  .slider-dot[aria-current="true"]::before {
     background: var(--accent);
     opacity: 1;
-  }
-
-  /* A bigger target than the dot it draws. */
-  .slider-dot {
-    position: relative;
-  }
-
-  .slider-dot::after {
-    content: "";
-    position: absolute;
-    inset: -8px;
   }
 
   @media (prefers-reduced-motion: reduce) {

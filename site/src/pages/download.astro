@@ -2,6 +2,7 @@
 import Base from "../layouts/Base.astro";
 import DownloadButton from "../components/DownloadButton.astro";
 import { formatReleaseDate, latestRelease } from "../release.mjs";
+import { softwareApplication } from "../structuredData.mjs";
 
 const release = await latestRelease();
 const repo = "https://github.com/quochungse/HeraclesRecords";
@@ -13,7 +14,7 @@ const requirements: Record<string, string> = {
 };
 ---
 
-<Base
+<Base og="download" jsonLd={softwareApplication(release, Astro.site)}
   title="Download"
   description="Download Heracles Records for macOS (Apple Silicon or Intel), Windows or Linux. Free and open source."
 >

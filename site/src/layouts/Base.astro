@@ -1,15 +1,32 @@
 ---
 import "../../../src/fonts.css";
 import "../styles/site.css";
+import { getImage, Image } from "astro:assets";
 import icon from "../../../build/icon-256.png";
+// The face of every page's text, asked for ahead of the stylesheet that names
+// it: arriving late, it swaps under the text and moves the page. The serif is
+// not preloaded: it sets only the headings, and at 120 KB it would hold back
+// the first paint on a slow connection.
+import interLatin from "../../../src/assets/fonts/inter-latin.woff2?url";
 import { formatReleaseDate, latestRelease } from "../release.mjs";
 
 interface Props {
   title?: string;
   description: string;
+  /**
+   * The link-preview card, one of scripts/site-og/og.html's PAGES, rendered to
+   * public/og/<og>.jpg by `npm run site:og`. Pages without their own use home.
+   */
+  og?: string;
+  /** Structured data for search engines, written as JSON-LD. */
+  jsonLd?: Record<string, unknown>;
 }
 
-const { title, description } = Astro.props;
+const { title, description, og = "home", jsonLd } = Astro.props;
+const ogImage = new URL(`/og/${og}.jpg`, Astro.site);
+// The icon is 256px and 88 KB; a tab and a home screen need far less.
+const favicon = await getImage({ src: icon, width: 64, height: 64, format: "png" });
+const touchIcon = await getImage({ src: icon, width: 180, height: 180, format: "png" });
 const fullTitle = title ? `${title} · Heracles Records` : "Heracles Records";
 // GitHub Pages serves coach.html at /coach, so that is the address to share.
 const path = Astro.url.pathname.replace(/\.html$/, "").replace(/\/index$/, "/");
@@ -34,22 +51,36 @@ const current = (href: string) =>
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="preload" href={interLatin} as="font" type="font/woff2" crossorigin />
     <title>{fullTitle}</title>
     <meta name="description" content={description} />
     <link rel="canonical" href={canonical} />
-    <link rel="icon" type="image/png" href={icon.src} />
+    <link rel="icon" type="image/png" sizes="64x64" href={favicon.src} />
+    <link rel="apple-touch-icon" href={touchIcon.src} />
     <link rel="alternate" type="application/rss+xml" title="Heracles Records releases" href="/changelog.xml" />
     <meta property="og:type" content="website" />
     <meta property="og:site_name" content="Heracles Records" />
     <meta property="og:title" content={fullTitle} />
     <meta property="og:description" content={description} />
     <meta property="og:url" content={canonical} />
+    <meta property="og:image" content={ogImage} />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content={fullTitle} />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content={fullTitle} />
+    <meta name="twitter:description" content={description} />
+    <meta name="twitter:image" content={ogImage} />
+    <meta name="theme-color" content="#05080b" media="(prefers-color-scheme: dark)" />
+    <meta name="theme-color" content="#e9ecf2" media="(prefers-color-scheme: light)" />
+    {jsonLd && <script type="application/ld+json" set:html={JSON.stringify(jsonLd)} />}
   </head>
   <body>
+    <a class="skip-link" href="#main">Skip to content</a>
     <header class="site-header">
       <div class="wrap">
         <a class="brand" href="/">
-          <img src={icon.src} alt="" width="28" height="28" />
+          <Image src={icon} alt="" width={28} height={28} densities={[1, 2]} format="webp" loading="eager" />
           Heracles Records
         </a>
         <nav class="site-nav" aria-label="Site">
@@ -61,7 +92,7 @@ const current = (href: string) =>
       </div>
     </header>
 
-    <main>
+    <main id="main" tabindex="-1">
       <slot />
     </main>
 

@@ -151,7 +151,19 @@ reshoot covers the site too. Text the site takes from the app or the
 changelog is put in its style at render time (`plain()`, the changelog loader: an em dash
 becomes a comma or a colon), and `test:site` checks the built pages as well as the source.
 A local build keeps the last release it read in `site/.astro/release-cache.json` and falls
-back to it when GitHub refuses (60 unauthenticated API requests an hour); CI never does. `.github/workflows/site.yml` builds it, runs `scripts/test-site.mjs`
+back to it when GitHub refuses (60 unauthenticated API requests an hour); CI never does.
+**Screenshots go through `Shot`/`ShotSlider`, never a bare `<img>`**: they are 3024px, and
+Astro's image service (`sharp`, a site dependency) writes each at 640–3024px for a `srcset`
+— a phone used to download the full shot. Pass `sizes` (`SIZES_HALF`/`SIZES_SIDE` in
+`site/src/assets.ts`) when a shot is not full width. `16-route` is animated and is served
+untouched (`isAnimated`): resized, it would lose every frame but the first.
+**Link-preview cards are committed images**: `npm run site:og` renders
+`scripts/site-og/og.html` (the app's fonts and screenshots) into `site/public/og/*.jpg` with
+Electron, one per entry in its `PAGES`, and a page names its card with `<Base og="…">`. Change
+a card's words or its screenshot and run it again; the build never runs Electron.
+`test:site` also holds the cards, `sitemap.xml` (every page but 404, at the address Pages
+serves it from) and the JSON-LD on the home and download pages. **`robots.txt` and the
+`site` in `astro.config.mjs` name the domain**: both change with a custom domain. `.github/workflows/site.yml` builds it, runs `scripts/test-site.mjs`
 and pushes `site/dist` to **`heraclesrecords/heraclesrecords.github.io`**, because an
 organisation's root Pages site can only be served from a repository of that name; that
 repository is a deploy target, edited by nothing but the workflow. The push needs the

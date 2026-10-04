@@ -148,7 +148,7 @@ Giọng văn: theo README hiện tại. Tiếng Anh, câu ngắn, cụ thể, **
 | **P0 Nền móng** (code xong 2026-10-04, chờ deploy key) | Deploy key + secret; `site/` Astro; chuyển `index` và `privacy` hiện có sang (sửa meta description); `site.yml` deploy sang repo org | `heraclesrecords.github.io` và `/privacy.html` phục vụ từ bản build của repo này; repo org chỉ còn commit của bot |
 | **P1 Release tự động** (code xong 2026-10-04) | `lib/release-data.mjs`, `update-readme-release.mjs` + marker trong README, job `readme` và `site` trong `release.yml`, `test:site` | Chạy thử bằng `workflow_dispatch` trên v1.0.0: README không đổi gì, site hiện đúng 1.0.0 |
 | **P2 Nội dung** (code xong 2026-10-04) | Trang chủ đầy đủ, Download, Labours, Coach, Features, Changelog, Guide, FAQ | Mọi trang trong sitemap có nội dung thật |
-| **P3 Hoàn thiện** | OG images, sitemap, JSON-LD, Lighthouse ≥ 95, kiểm tra a11y, đưa harness chụp ảnh vào repo, (tuỳ chọn) bản tiếng Việt `/vi/` | |
+| **P3 Hoàn thiện** (code xong 2026-10-04: OG, sitemap, JSON-LD, ảnh responsive, Lighthouse mobile 95–98 / desktop 100, a11y 100; harness vẫn ở .work, bản VI để sau) | OG images, sitemap, JSON-LD, Lighthouse ≥ 95, kiểm tra a11y, đưa harness chụp ảnh vào repo, (tuỳ chọn) bản tiếng Việt `/vi/` | |
 | **P4 Domain riêng** | Xem mục 7 | |
 
 ## 7. Khi mua domain riêng
@@ -160,7 +160,7 @@ Giữ nguyên pipeline, chỉ thêm:
 3. Repo org → Pages → Custom domain, bật **Enforce HTTPS**. Nên verify domain ở cấp org (Settings → Pages → Verified domains) để tránh bị chiếm.
 4. GitHub tự redirect `heraclesrecords.github.io/*` sang domain mới, kể cả `/privacy.html`, nên link cũ không gãy.
 5. Google Cloud Console → OAuth consent screen: đổi homepage, privacy URL, thêm authorized domain, verify domain trong Search Console.
-6. Đổi `WEBSITE_URL` trong `SettingsView.tsx`, link trong README, `site` trong `astro.config.mjs`, và mục trong CLAUDE.md. Lần release tiếp theo mang link mới vào app.
+6. Đổi `WEBSITE_URL` trong `SettingsView.tsx`, link trong README, `site` trong `astro.config.mjs`, dòng `Sitemap:` trong `site/public/robots.txt`, dòng chân thẻ trong `scripts/site-og/og.html` (rồi chạy lại `npm run site:og`), và mục trong CLAUDE.md. Lần release tiếp theo mang link mới vào app.
 
 ## 8. Đã chốt (2026-10-04)
 

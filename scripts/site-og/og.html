@@ -1,0 +1,73 @@
+<!doctype html>
+<!--
+  The website's link-preview cards (1200 × 630), one per page in PAGES below.
+  Rendered by render.cjs (`npm run site:og`) into site/public/og/<id>.jpg; it
+  reads the app's own fonts and the README's screenshots, so a card follows them.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<style>
+  @font-face { font-family: "Source Serif 4"; font-weight: 300 700; src: url("../../src/assets/fonts/source-serif-4-latin.woff2") format("woff2"); }
+  @font-face { font-family: "Inter"; font-weight: 300 700; src: url("../../src/assets/fonts/inter-latin.woff2") format("woff2"); }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; width: 1200px; height: 630px; overflow: hidden; }
+  body {
+    position: relative;
+    background:
+      radial-gradient(ellipse 70% 80% at 85% 10%, rgba(231, 176, 76, 0.16), transparent 60%),
+      radial-gradient(ellipse 60% 70% at 0% 100%, rgba(231, 176, 76, 0.07), transparent 60%),
+      #05080b;
+    color: #f5f5f7;
+    font-family: Inter, system-ui, sans-serif;
+  }
+  .words { position: absolute; left: 64px; top: 64px; width: 500px; }
+  .brand { display: flex; align-items: center; gap: 14px; font-size: 22px; font-weight: 600; }
+  .brand img { width: 52px; height: 52px; }
+  h1 {
+    margin: 64px 0 0;
+    font: 600 56px/1.12 "Source Serif 4", Georgia, serif;
+    letter-spacing: -0.02em;
+  }
+  p { margin: 22px 0 0; color: #a1a1a6; font-size: 24px; line-height: 1.45; }
+  .eyebrow { margin: 0; color: #e7b04c; font-size: 18px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; }
+  .foot { position: absolute; left: 64px; bottom: 52px; color: #6e6e73; font-size: 19px; }
+  .shot {
+    position: absolute;
+    left: 620px;
+    top: 96px;
+    width: 860px;
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    border-radius: 18px;
+    box-shadow: 0 40px 90px rgba(0, 0, 0, 0.65);
+  }
+</style>
+</head>
+<body>
+  <div class="words">
+    <div class="brand"><img src="../../build/icon-256.png" alt="" />Heracles Records</div>
+    <h1 id="title"></h1>
+    <p id="text"></p>
+  </div>
+  <div class="foot">heraclesrecords.github.io</div>
+  <img class="shot" id="shot" alt="" />
+<script>
+  // id: [title, text, screenshot]. Base.astro's `og` prop names one of these.
+  const PAGES = {
+    home: ["Your COROS training, read in depth.", "An AI coach that has read all of it, and a hall for every record you set.", "01-overview"],
+    download: ["Download Heracles Records", "A free desktop app for COROS athletes.", "19-appearance-dark"],
+    activities: ["Every session, read in depth.", "Running, cycling, hiking and strength, each read as its own sport.", "04-run"],
+    plan: ["Plan it here, and your watch has it.", "Your COROS calendar, workouts and plans.", "10-library"],
+    coach: ["A coach that has read your training.", "Answers with charts, drafts plans, and changes nothing without you.", "11-coach"],
+    labours: ["The Twelve Labours", "Twelve kinds of achievement, three stages each.", "13-labours"],
+    guide: ["The Heracles Records guide", "From the first launch to a second computer.", "17-settings"],
+  };
+  const id = new URLSearchParams(location.search).get("page") ?? "home";
+  const [title, text, shot] = PAGES[id];
+  document.getElementById("title").textContent = title;
+  document.getElementById("text").textContent = text;
+  document.getElementById("shot").src = `../../docs/readme/${shot}.webp`;
+  window.OG_PAGES = Object.keys(PAGES);
+</script>
+</body>
+</html>

@@ -4,11 +4,11 @@
 import Base from "../layouts/Base.astro";
 import LabourEmblem from "../components/LabourEmblem.astro";
 import Shot from "../components/Shot.astro";
-import { plain } from "../assets";
+import { plain, SIZES_HALF } from "../assets";
 import { LABOURS, STAGE_NUMERALS } from "../../../src/records/labours";
 ---
 
-<Base
+<Base og="labours"
   title="The Twelve Labours"
   description="Twelve kinds of achievement in three stages each, from your first weeks to your first year. Speed and VO2max graded for your age and sex."
 >
@@ -25,15 +25,15 @@ import { LABOURS, STAGE_NUMERALS } from "../../../src/records/labours";
   <section class="wrap rules">
     <ul class="cards">
       <li class="card">
-        <h3>A standard, not a first</h3>
+        <h2>A standard, not a first</h2>
         <p>A first swim or a first ride is a milestone on your timeline. A stage asks for more than turning up once.</p>
       </li>
       <li class="card">
-        <h3>The same for everyone</h3>
+        <h2>The same for everyone</h2>
         <p>Speed is a road age grade and VO₂max is rated for your age and sex, so a stage means the same at 25 and at 60.</p>
       </li>
       <li class="card">
-        <h3>Every year counts</h3>
+        <h2>Every year counts</h2>
         <p>Your whole COROS history is read, so years of training before you installed the app count from the first day.</p>
       </li>
     </ul>
@@ -74,8 +74,8 @@ import { LABOURS, STAGE_NUMERALS } from "../../../src/records/labours";
       </p>
     </div>
     <div class="grid-2">
-      <Shot name="13-labours" alt="Hall of Records: the Twelve Labours" />
-      <Shot name="14-timeline" alt="Hall of Records: the timeline of milestones" />
+      <Shot name="13-labours" alt="Hall of Records: the Twelve Labours" sizes={SIZES_HALF} />
+      <Shot name="14-timeline" alt="Hall of Records: the timeline of milestones" sizes={SIZES_HALF} />
     </div>
   </section>
 
