@@ -15,6 +15,13 @@
 </p>
 
 <p align="center">
+  <a href="https://heraclesrecords.com"><strong>heraclesrecords.com</strong></a>
+  &nbsp;·&nbsp; <a href="https://heraclesrecords.com/guide/">Guide</a>
+  &nbsp;·&nbsp; <a href="https://heraclesrecords.com/changelog/">Changelog</a>
+  &nbsp;·&nbsp; <a href="https://heraclesrecords.com/privacy.html">Privacy</a>
+</p>
+
+<p align="center">
   <a href="https://github.com/quochungse/HeraclesRecords/releases/latest"><img src="https://img.shields.io/github/v/release/quochungse/HeraclesRecords?style=flat-square&label=release&color=c8952f" alt="Latest release" /></a>
   <a href="https://github.com/quochungse/HeraclesRecords/releases"><img src="https://img.shields.io/github/downloads/quochungse/HeraclesRecords/total?style=flat-square&color=c8952f" alt="Downloads" /></a>
   <img src="https://img.shields.io/badge/macOS%20%7C%20Windows%20%7C%20Linux-desktop-555?style=flat-square" alt="macOS, Windows and Linux" />
@@ -58,6 +65,8 @@ You sign in with your COROS account. Coach also needs an AI: your ChatGPT accoun
 </details>
 
 ## What's inside
+
+A tour of the main screens. [heraclesrecords.com](https://heraclesrecords.com) goes further into activities, plans, Coach and the Twelve Labours, and the [guide](https://heraclesrecords.com/guide/) walks through setting up COROS, Coach, sync and backups.
 
 ### Today at a glance
 
@@ -186,6 +195,7 @@ If you are looking for music and media on your watch, offline maps and routes, w
 ## Support
 
 - Found a bug or have an idea? [Open an issue](https://github.com/quochungse/HeraclesRecords/issues/new), or use **Settings → About → Report an issue** in the app.
+- Questions about setup? The [guide](https://heraclesrecords.com/guide/) and its [FAQ](https://heraclesrecords.com/guide/faq) may already answer them.
 - Website: [heraclesrecords.com](https://heraclesrecords.com)
 - If the app helps your training, you can [buy me a coffee](https://buymeacoffee.com/quochungse).
 
