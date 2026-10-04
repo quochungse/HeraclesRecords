@@ -1,0 +1,77 @@
+---
+// Words on one side, a screenshot on the other, tops aligned. `flip` puts the
+// screenshot first on wide screens; on a narrow one the words always lead.
+import Shot from "./Shot.astro";
+
+interface Props {
+  shot: string;
+  alt: string;
+  flip?: boolean;
+  id?: string;
+}
+
+const { shot, alt, flip = false, id } = Astro.props;
+---
+
+<section class:list={["feature-row", { "is-flipped": flip }]} id={id}>
+  <div class="feature-row-text">
+    <slot />
+  </div>
+  <div class="feature-row-shot">
+    <Shot name={shot} alt={alt} />
+  </div>
+</section>
+
+<style>
+  .feature-row {
+    display: grid;
+    grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
+    gap: 48px;
+    align-items: start;
+    padding-top: 96px;
+    scroll-margin-top: 24px;
+  }
+
+  .feature-row.is-flipped {
+    grid-template-columns: minmax(0, 7fr) minmax(0, 5fr);
+  }
+
+  .feature-row.is-flipped .feature-row-shot {
+    order: -1;
+  }
+
+  @media (max-width: 860px) {
+    .feature-row,
+    .feature-row.is-flipped {
+      grid-template-columns: 1fr;
+      gap: 28px;
+      padding-top: 72px;
+    }
+
+    .feature-row.is-flipped .feature-row-shot {
+      order: 0;
+    }
+  }
+
+  .feature-row-text :global(h2) {
+    margin: 0;
+    font: 600 clamp(26px, 3.4vw, 32px) / 1.2 var(--font-title);
+    letter-spacing: -0.02em;
+    text-wrap: balance;
+  }
+
+  .feature-row-text :global(p) {
+    margin: 14px 0 0;
+    color: var(--ink-2);
+    font-size: 17px;
+    line-height: 1.6;
+  }
+
+  .feature-row-text :global(.ticks) {
+    margin-top: 16px;
+  }
+
+  .feature-row-text :global(.ticks li) {
+    font-size: 15px;
+  }
+</style>

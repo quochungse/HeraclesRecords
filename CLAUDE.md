@@ -143,9 +143,11 @@ only up to the latest published release) — so a change there reaches the site 
 labour renamed in the app is renamed on the site**, and the site's text is only as true as
 those files. The guides are Markdown in `site/src/content/guide/`, and they name the app's
 buttons and screens by their labels, so **a renamed button or Settings section means a guide
-to fix**. Two screenshots are the site's alone, `docs/readme/19-appearance-dark.webp` and
-`20-appearance-light.webp`, a pair shot together by the README harness (`theme: "paper"` for
-the light one) so the two show the same day. Text the site takes from the app or the
+to fix**. Screenshots from `19-` on are the site's alone (the README stops at 18): the appearance pair
+`19-appearance-dark`/`20-appearance-light`, shot together by the README harness
+(`theme: "paper"` for the light one) so the two show the same day, and `21-`–`26-` for the
+/plan, /activities and /coach pages. All of them are in the harness's `plan-final.json`, so a
+reshoot covers the site too. Text the site takes from the app or the
 changelog is put in its style at render time (`plain()`, the changelog loader: an em dash
 becomes a comma or a colon), and `test:site` checks the built pages as well as the source.
 A local build keeps the last release it read in `site/.astro/release-cache.json` and falls

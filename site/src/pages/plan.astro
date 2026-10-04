@@ -1,0 +1,102 @@
+---
+import Base from "../layouts/Base.astro";
+import FeatureRow from "../components/FeatureRow.astro";
+import Shot from "../components/Shot.astro";
+---
+
+<Base
+  title="Calendar and Training Library"
+  description="Plan your training in Heracles Records: a calendar of planned and done, your COROS workouts and plans, and one builder for every sport. Everything saves to your COROS account."
+>
+  <section class="wrap page-hero">
+    <p class="eyebrow">Plan</p>
+    <h1>Plan it here, and your watch has it.</h1>
+    <p class="lede">
+      Your COROS calendar, workouts and plans, with room to read and build them. Everything you
+      save goes straight to your COROS account, so it is on your watch the next time it syncs.
+    </p>
+  </section>
+
+  <section class="wrap section-tight">
+    <Shot name="09-calendar" alt="Calendar: planned and completed sessions by month" eager />
+  </section>
+
+  <div class="wrap">
+    <FeatureRow shot="21-calendar-detail" alt="Calendar with a session's detail open beside the month">
+      <p class="eyebrow">Calendar</p>
+      <h2>Planned and done, side by side.</h2>
+      <p>
+        Every scheduled workout and every completed activity, by month or by week, matched to
+        each other so a session shows how much of its plan you did.
+      </p>
+      <ul class="ticks">
+        <li><strong>Open any day.</strong> A session opens beside the month with its route, elevation and laps; a busy day opens as a whole.</li>
+        <li><strong>Drag to move.</strong> Drop a session on another day and it moves on your COROS calendar too. A session from a plan stays part of that plan.</li>
+        <li><strong>Week by week.</strong> The week view adds its load, load ratio, time, distance and climb.</li>
+        <li><strong>From the library.</strong> Put any workout on a day, or select several upcoming ones at once.</li>
+        <li><strong>Ask Coach</strong> about a day, a week or a single session.</li>
+      </ul>
+    </FeatureRow>
+
+    <FeatureRow shot="22-library-workouts" alt="Training Library: the workout list and a workout's step structure" flip>
+      <p class="eyebrow">Training Library</p>
+      <h2>Every workout you keep on COROS.</h2>
+      <p>
+        Your COROS workout library in one list, each workout read step by step: warm-up, the
+        repeats, recoveries and cool-down, with the targets in your own zones.
+      </p>
+      <ul class="ticks">
+        <li><strong>Schedule</strong> a workout on a day from a month view that shows the week it lands in.</li>
+        <li><strong>Edit, duplicate, tag</strong> and favourite, all saved to COROS.</li>
+        <li><strong>Search and filter</strong> the list to find a workout fast.</li>
+      </ul>
+    </FeatureRow>
+
+    <FeatureRow shot="23-workout-builder" alt="The workout builder: warm-up, training and cool-down steps with zone targets">
+      <p class="eyebrow">Builder</p>
+      <h2>One builder for every sport.</h2>
+      <p>
+        Run, ride, swim, strength and the rest are built in the same place, step by step, with
+        repeat groups for intervals.
+      </p>
+      <ul class="ticks">
+        <li><strong>Targets in your zones.</strong> Pick a heart-rate, pace or power zone and the builder shows what it means for you, from the thresholds on your COROS account.</li>
+        <li><strong>Sensible from the first step.</strong> A new step starts with a length and an intensity that suit its sport and its place in the workout.</li>
+        <li><strong>Strength from COROS's own catalogue</strong> of exercises, with sets, reps and weight.</li>
+      </ul>
+    </FeatureRow>
+
+    <FeatureRow shot="10-library" alt="A 12-week marathon plan in the Training Library, week by week" flip>
+      <p class="eyebrow">Plans</p>
+      <h2>Multi-week plans, read and run.</h2>
+      <p>
+        Your COROS training plans, read week by week: the load of each week, the stages from
+        base to taper, and every session in its day.
+      </p>
+      <ul class="ticks">
+        <li><strong>Edit</strong> sessions, weeks and stages, and keep a draft until you are ready to save it.</li>
+        <li><strong>Add to calendar</strong> from a start date, with a preview of exactly which sessions land where.</li>
+        <li><strong>See how it is going.</strong> Once a plan is running, each session shows whether it was done, and the plan its overall compliance.</li>
+        <li><strong>Change a running plan</strong> and choose whether your calendar follows.</li>
+      </ul>
+    </FeatureRow>
+  </div>
+
+  <section class="wrap section">
+    <div class="section-head">
+      <h2 class="section-title">Want a plan written for you?</h2>
+      <p class="lede">
+        Ask Coach. It starts from a brief you can edit, draws an outline of the weeks, then writes
+        every session to your zones. Read it in the Workbench, change what you like, and save it to
+        COROS and your calendar like any other plan.
+      </p>
+      <a class="more" href="/coach">How Coach works</a>
+    </div>
+  </section>
+</Base>
+
+<style>
+  .section-tight {
+    padding-top: 40px;
+  }
+</style>

@@ -132,7 +132,7 @@ const faq = [
     </ul>
   </section>
 
-  <section class="wrap section split">
+  <section class="wrap section split split-top">
     <div>
       <p class="eyebrow">Today</p>
       <h2 class="section-title">Start the day knowing where you stand.</h2>
@@ -175,6 +175,7 @@ const faq = [
         heart rate or elevation, and watch the route draw itself the way you covered it.
       </figcaption>
     </figure>
+    <a class="more" href="/activities">Every sport, in depth</a>
   </section>
 
   <section class="wrap section">
@@ -202,6 +203,7 @@ const faq = [
         </figcaption>
       </figure>
     </div>
+    <a class="more" href="/plan">The calendar and library in depth</a>
   </section>
 
   <section class="wrap section">
@@ -448,6 +450,11 @@ const faq = [
     grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
     gap: 48px;
     align-items: center;
+  }
+
+  /* Today: the slider's top sits level with the eyebrow beside it. */
+  .split-top {
+    align-items: start;
   }
 
   @media (max-width: 860px) {

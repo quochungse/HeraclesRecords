@@ -1,0 +1,166 @@
+---
+import Base from "../layouts/Base.astro";
+import FeatureRow from "../components/FeatureRow.astro";
+import Shot from "../components/Shot.astro";
+---
+
+<Base
+  title="Activities and sports"
+  description="Every COROS session in one list, and a screen each for running, cycling, hiking and strength that reads what that sport is about."
+>
+  <section class="wrap page-hero">
+    <p class="eyebrow">Every session</p>
+    <h1>Every session, read in depth.</h1>
+    <p class="lede">
+      One list holds everything your watch has recorded. Running, Cycling, Hiking and Strength
+      each get a screen of their own that reads what that sport is about, and every session a
+      page with every channel the watch recorded.
+    </p>
+  </section>
+
+  <section class="wrap section-tight">
+    <Shot name="02-activities" alt="Activities: every session in one list with a detail pane" eager />
+  </section>
+
+  <div class="wrap">
+    <section class="feature-text">
+      <p class="eyebrow">Activities</p>
+      <h2>Every sport in one list.</h2>
+      <ul class="ticks columns">
+        <li><strong>Everything COROS holds</strong>, swims and hybrid sessions included, grouped by week with the week's totals.</li>
+        <li><strong>Filter</strong> by period, by sport or by name.</li>
+        <li><strong>Compare sports</strong> on one bar: how your time splits between them.</li>
+        <li><strong>A detail pane</strong> beside the list: zones, laps, running dynamics, power and every channel, and a link to the session's own sport page.</li>
+      </ul>
+    </section>
+
+    <FeatureRow id="running" shot="03-running" alt="Running: weekly volume, load ratio, VO2max and threshold pace">
+      <p class="eyebrow">Running</p>
+      <h2>Pace, load and form.</h2>
+      <p>
+        Weekly volume against its four-week average, your load ratio, VO₂max and threshold pace,
+        how much of your running is easy, and a split by surface.
+      </p>
+      <ul class="ticks">
+        <li><strong>Trail runs read as trail runs.</strong> Switch to Trail and the screen counts hours and climb instead of pace, with climb per hour as the measure of progress.</li>
+        <li><strong>Efficiency and drift</strong> for every run: pace against heart rate, and how much it slipped in the second half.</li>
+      </ul>
+    </FeatureRow>
+
+    <FeatureRow shot="04-run" alt="A run: map, pace, heart rate, running form and every channel" flip>
+      <p class="eyebrow">A run's page</p>
+      <h2>Every channel the watch recorded.</h2>
+      <p>
+        The route on a map, then pace, grade-adjusted pace, heart rate, cadence, power, stride,
+        ground contact and vertical oscillation on one chart you can read a stretch at a time.
+      </p>
+      <ul class="ticks">
+        <li><strong>Running form</strong> and the session's effect, weather and conditions.</li>
+        <li><strong>Laps and zones</strong>, numbered as COROS numbers them.</li>
+        <li><strong>Decoupling</strong>: how far heart rate drifted from pace.</li>
+      </ul>
+    </FeatureRow>
+
+    <FeatureRow id="cycling" shot="25-cycling" alt="Cycling: hours this week, load ratio, FTP and climb">
+      <p class="eyebrow">Cycling</p>
+      <h2>Hours, power and climb.</h2>
+      <p>
+        A week of riding is read in hours, because an indoor ride may record no distance and an
+        hour off-road covers half the road's. FTP and watts per kilo, the week's climb, and a
+        split by road, gravel, mountain, indoor and e-bike.
+      </p>
+    </FeatureRow>
+
+    <FeatureRow shot="05-ride" alt="A ride: normalised power, intensity, TSS and peak power" flip>
+      <p class="eyebrow">A ride's page</p>
+      <h2>The power behind a ride.</h2>
+      <ul class="ticks">
+        <li><strong>Normalised power, IF and TSS</strong> against your FTP, variability and work.</li>
+        <li><strong>Peak power</strong> from 5 seconds to an hour.</li>
+        <li><strong>Time in your COROS power zones</strong>, with coasting set apart.</li>
+        <li><strong>The climbs</strong>, found in the elevation and categorised by length and grade.</li>
+        <li><strong>Speed</strong> over the time you were moving, and a top speed held for five seconds, so one GPS jump does not count.</li>
+      </ul>
+    </FeatureRow>
+
+    <FeatureRow id="hiking" shot="26-hiking" alt="Hiking: time, ascent, biggest day and ascent per hour">
+      <p class="eyebrow">Hiking</p>
+      <h2>Height and hours before distance.</h2>
+      <p>
+        Hikes and mountain climbs, read the way a walker thinks about them: this week's ascent,
+        your biggest day, and ascent per hour as the measure of how fit you are on a hill.
+      </p>
+    </FeatureRow>
+
+    <FeatureRow shot="06-hike" alt="A hike: moving time, ascent, terrain and climbing rate" flip>
+      <p class="eyebrow">A hike's page</p>
+      <h2>A long day, taken apart.</h2>
+      <ul class="ticks">
+        <li><strong>Moving time</strong> worked out from the samples, because a watch records the lunch stop too.</li>
+        <li><strong>Every rest</strong> of two minutes or more, with the time, the kilometre and the altitude.</li>
+        <li><strong>Terrain</strong>: time climbing, on the flat and descending, and your speed on each.</li>
+        <li><strong>Ascents and descents</strong>, the highest point, and your time against Naismith's rule.</li>
+      </ul>
+    </FeatureRow>
+
+    <FeatureRow id="strength" shot="07-strength" alt="Strength: sessions and a 3D muscle map">
+      <p class="eyebrow">Strength</p>
+      <h2>Every set, on the muscles it worked.</h2>
+      <p>
+        COROS strength sessions and your Hevy workouts in one place, on a 3D map of the muscles
+        you trained, with the weight you moved, the time you spent lifting and your coverage of
+        each muscle group.
+      </p>
+      <a class="more" href="/guide/hevy">Connect Hevy</a>
+    </FeatureRow>
+
+    <FeatureRow shot="16-route" alt="A hike replayed on a satellite map, coloured by elevation" flip>
+      <p class="eyebrow">Every route</p>
+      <h2>Replayed on the map.</h2>
+      <p>
+        Open any route full size on a street, satellite or topographic map. Colour the line by
+        pace, heart rate or elevation, then watch it draw itself the way you covered it.
+      </p>
+    </FeatureRow>
+  </div>
+
+  <section class="wrap section">
+    <div class="section-head">
+      <h2 class="section-title">Ask about any session.</h2>
+      <p class="lede">
+        Every session's page has <strong>Ask Coach</strong>. The question arrives in Coach
+        already pointing at that session, and the answer comes with the figures and charts
+        behind it.
+      </p>
+      <a class="more" href="/coach">How Coach works</a>
+    </div>
+  </section>
+</Base>
+
+<style>
+  .section-tight {
+    padding-top: 40px;
+  }
+
+  .feature-text {
+    padding-top: 56px;
+  }
+
+  .feature-text h2 {
+    margin: 0;
+    font: 600 clamp(26px, 3.4vw, 32px) / 1.2 var(--font-title);
+    letter-spacing: -0.02em;
+  }
+
+  .columns {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0 32px;
+  }
+
+  @media (max-width: 760px) {
+    .columns {
+      grid-template-columns: 1fr;
+    }
+  }
+</style>
