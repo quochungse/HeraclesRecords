@@ -1980,6 +1980,27 @@ lives at module level for the same visit-to-visit reason — see `useCalendarDat
   untouched `points`.
 - **Where you've been** (`reverseGeocodeService.ts`, `src/trainingMap/`) — the globe clusters
   visit coordinates and names each cluster through `places:reverseGeocode`.
+  **Laid out like Running and the Hall** (redesigned 2026-10-06): the serif title on the page
+  and a line under it about the places (activities, places, countries, the first day for all
+  time, the farthest from home), then the globe filling the height the header leaves
+  (`.training-map` grows in `.content`'s column; the stage's `flex-basis: 0` is what makes a
+  long list scroll inside its column rather than grow the page) and a column of places beside
+  it: every place, Recent or Most visited, which opens one in its place — figures, the sports
+  as a bar, visits by month with empty months kept, Street view, and its activities, whose
+  titles open them through `openActivityFrom(…, "places")`. The open place is module state
+  (`rememberedPlaceKey`) so Back from an activity lands on it again; a new period lets it go.
+  The arithmetic is node-free `placeSummaries.ts` (`test:place-summaries`): "home" is the place
+  with most visits, "farthest" counts from 100 km — the Hall's line for its own "furthest"
+  milestones — and **no country count is given while any place is unnamed**, or the named ones
+  would read as the answer. A row and its pin share one hovered key (`hoveredKey` into the
+  renderer, `onHoverChange(key)` out). **Picking a place never opens the street map on its
+  own**; Street view and zooming past `STREET_VIEW_ALTITUDE` (wheel or the + button) do.
+  **Reset shows only once the athlete has moved the camera** (`userAdjustedRef`) — the idle
+  spin used to raise it — and returns to the picked place when there is one (`homeView`). The
+  mouse's back button steps out a layer at a time: street map, place, list. Under the list,
+  the **Cattle of Geryon** card is the Hall's own `LabourState` — a place there is an
+  activity's starting cell over all time — handed down by App only once the Hall has
+  `settled`, and it opens the Hall on The Twelve Labours.
   **It asks more than one geocoder, because one host is a single point of failure the app
   cannot route around.** A resolver that answers `*.openstreetmap.org` with loopback — which
   a number of ISPs do, and which `nslookup` against `8.8.8.8` is what proves — took Nominatim
@@ -2000,8 +2021,10 @@ lives at module level for the same visit-to-visit reason — see `useCalendarDat
   (`PLACE_LABEL_FAILURES`). Caching the fallback is what made a single blocked request
   permanent for the life of the window.
   **Names are fetched for what is on the screen, which is not the same as the first few.**
-  Recent places is paged five at a time, so a fixed head of eight left every page but the
-  first reading coordinates for good, and Most visited can sit anywhere in the list.
+  The list is named as far as it has been scrolled, 40 rows at a time in the order it is
+  sorted (`labelReach`), plus the home, the farthest and the open place; it used to be a
+  carousel paged five at a time, and a fixed head of eight left every page but the first
+  reading coordinates for good.
   `npm run test:reverse-geocode` drives the chain, both parsers against verbatim live
   payloads, and the throw-vs-return split.
   **A name is kept across launches, and only a name.** `src/trainingMap/placeLabels.ts`
