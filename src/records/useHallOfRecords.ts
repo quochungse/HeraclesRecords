@@ -9,9 +9,9 @@ import { RECORDS_SUMMARY_VERSION } from "../../electron/activityMetrics";
 import { isSleepDayRecord, totalSleepMinutes } from "../../electron/sleepMetrics";
 import type { HeraclesRecordsApi } from "../heraclesrecords-api";
 import { getLocalHappenDayKey } from "../training/formatters";
-import { loadRegionIndex, type RegionIndex } from "../trainingMap/adminRegions";
 import { placeLabelKey } from "../trainingMap/placeClusters";
 import { coordinateLabel, knownPlaceLabels, loadPlaceLabel } from "../trainingMap/placeLabels";
+import { useRegionIndex } from "../trainingMap/useRegionIndex";
 import { mergeTrainingDayLists } from "../training/parsers";
 import type { TrainingHubLoadStatus, TrainingHubSnapshot } from "../training/types";
 import { buildLabours, type LabourState } from "./labours";
@@ -130,19 +130,10 @@ export function useHallOfRecords({
   const [remembered, setRemembered] = useState<RememberedMilestone[]>([]);
   const [sleepNights, setSleepNights] = useState<Array<{ day: string; minutes: number }>>([]);
   const [labelVersion, setLabelVersion] = useState(0);
-  // What tells places apart (`adminRegions.ts`), read once per window. The
-  // hall is not settled without it: places counted by distance alone and then
-  // again by region would announce a stage that was never reached.
-  const [regions, setRegions] = useState<RegionIndex | null>(null);
-  useEffect(() => {
-    let cancelled = false;
-    void loadRegionIndex().then((index) => {
-      if (!cancelled) setRegions(index);
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+  // What tells places apart (`adminRegions.ts`). The hall is not settled
+  // without it: places counted by distance alone and then again by region
+  // would announce a stage that was never reached.
+  const regions = useRegionIndex();
   const [summariesLoaded, setSummariesLoaded] = useState(false);
   const [rememberedLoaded, setRememberedLoaded] = useState(false);
   const [sleepLoaded, setSleepLoaded] = useState(false);
@@ -456,11 +447,11 @@ export function useRecordsBackfill({
  * and the reverse.
  */
 export function usePlaceNames({
-  cells,
+  places,
   enabled,
   onNamed
 }: {
-  cells: RecordsResult["places"];
+  places: RecordsResult["places"];
   enabled: boolean;
   onNamed: () => void;
 }): void {
@@ -468,17 +459,17 @@ export function usePlaceNames({
   // Counted for the visit (the screen's mount), not per run of the effect: a
   // name landing recomputes the places, and a cap per run would be no cap.
   const askedThisVisit = useRef(0);
-  const cellsRef = useRef(cells);
-  cellsRef.current = cells;
-  // The cells as a set of places, so a recompute that names one does not start
-  // the queue again.
-  const cellKeys = cells.map((cell) => cell.key).join(",");
+  const placesRef = useRef(places);
+  placesRef.current = places;
+  // The places as a set, so a recompute that names one does not start the
+  // queue again.
+  const placeKeys = places.map((place) => place.key).join(",");
   useEffect(() => {
     if (!enabled) return;
     let cancelled = false;
     const known = knownPlaceLabels();
-    const queue = cellsRef.current
-      .map((cell) => ({ key: placeLabelKey(cell), point: { lat: cell.lat, lon: cell.lon } }))
+    const queue = placesRef.current
+      .map((place) => ({ key: placeLabelKey(place), point: { lat: place.lat, lon: place.lon } }))
       .filter(({ key }) => !known[key] && !asked.current.has(key))
       .slice(0, Math.max(0, PLACE_NAMES_PER_VISIT - askedThisVisit.current));
     void (async () => {
@@ -497,5 +488,5 @@ export function usePlaceNames({
     return () => {
       cancelled = true;
     };
-  }, [cellKeys, enabled, onNamed]);
+  }, [placeKeys, enabled, onNamed]);
 }

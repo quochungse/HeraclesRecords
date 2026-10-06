@@ -2043,7 +2043,8 @@ lives at module level for the same visit-to-visit reason — see `useCalendarDat
   2025 merger — written by `npm run admin-regions:fetch` and committed like the fonts. A start
   outside every outline goes to the nearest region within 25 km (a beach, a pier); further out
   it is in none and grouped by distance alone. Neither screen draws places until the index is
-  read, and the Hall is not `settled` before it. **A place is named by the geocoder's town,
+  read, and the Hall is not `settled` before it; a file that cannot be read gives an index of
+  no regions (places by distance alone) rather than a screen left loading for good. **A place is named by the geocoder's town,
   and by its region until then** (`placeLabelFor`): the region needs no request, so a place
   never reads as coordinates while it has one, and the line under a town names its region when
   the two differ (Ba Vì · Hà Nội, Vietnam).

@@ -198,16 +198,33 @@ export function buildRegionIndex(data: AdminRegionData): RegionIndex {
   };
 }
 
+/** No outlines at all: every start is in no region, told apart by distance. */
+const NO_REGIONS: RegionIndex = { regionOf: () => undefined };
+
 let loading: Promise<RegionIndex> | undefined;
+let loaded: RegionIndex | undefined;
 
 /**
  * The index, built once per window. The outlines are a chunk of their own
  * (2.6 MB), read the first time a screen asks, never with the main bundle. They
  * come in as text and are parsed here so the typechecker never reads the file.
+ *
+ * It never rejects. Both screens wait on it before drawing a place, so a file
+ * that could not be read would leave the map loading and the Hall unsettled
+ * for good; places told apart by distance alone are the better answer.
  */
 export function loadRegionIndex(): Promise<RegionIndex> {
-  loading ??= import("./adminRegions.json?raw").then((module) =>
-    buildRegionIndex(JSON.parse(module.default) as AdminRegionData)
-  );
+  loading ??= import("./adminRegions.json?raw")
+    .then((module) => buildRegionIndex(JSON.parse(module.default) as AdminRegionData))
+    .catch((error: unknown) => {
+      console.error("Region outlines could not be read; places are told apart by distance alone.", error);
+      return NO_REGIONS;
+    })
+    .then((index) => (loaded = index));
   return loading;
+}
+
+/** The index if it has been read already, so a screen opened again draws at once. */
+export function loadedRegionIndex(): RegionIndex | undefined {
+  return loaded;
 }
