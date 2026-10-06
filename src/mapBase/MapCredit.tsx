@@ -1,47 +1,16 @@
 import { Info } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useState } from "react";
 
 /**
- * How long the tile credit stays spelled out before folding into its (i)
- * button. The OSM Foundation's attribution guidelines allow a credit to
- * collapse after five seconds provided it can still be found from an (i) in
- * the corner — which is what this does. It cannot be left out altogether:
- * OpenStreetMap, OpenMapTiles and OpenFreeMap all require it.
- */
-const CREDIT_VISIBLE_MS = 5000;
-
-/**
- * When the credit folds for the whole session. The five seconds are counted
- * once, from the first map the app draws — not per map — so a map opened later
- * starts folded rather than spelling the credit out again, and maps on screen
- * together in those first seconds fold at the same moment.
- */
-let creditFoldsAt: number | undefined;
-
-function creditStillShowing(): boolean {
-  creditFoldsAt ??= Date.now() + CREDIT_VISIBLE_MS;
-  return Date.now() < creditFoldsAt;
-}
-
-/**
- * Whether the credit is spelled out, and the (i)'s toggle. The caller puts
- * `is-credit-open` on the map's `.map-frame` while it is; the frame's CSS folds
- * Leaflet's attribution bar the rest of the time.
+ * Whether the tile credit is spelled out, and the (i)'s toggle. It starts
+ * folded into the (i), as other map apps show it: OpenStreetMap, OpenMapTiles
+ * and OpenFreeMap all require the credit, and the OSM Foundation's attribution
+ * guidelines accept one that can be found from an (i) in the corner. The caller
+ * puts `is-credit-open` on the map's `.map-frame` while it is open; the frame's
+ * CSS folds Leaflet's attribution bar the rest of the time.
  */
 export function useFoldingCredit(): [boolean, () => void] {
-  const [open, setOpen] = useState(creditStillShowing);
-
-  useEffect(() => {
-    if (creditFoldsAt === undefined || Date.now() >= creditFoldsAt) {
-      return;
-    }
-    const timer = window.setTimeout(
-      () => setOpen(false),
-      creditFoldsAt - Date.now()
-    );
-    return () => window.clearTimeout(timer);
-  }, []);
-
+  const [open, setOpen] = useState(false);
   const toggle = useCallback(() => setOpen((current) => !current), []);
   return [open, toggle];
 }
