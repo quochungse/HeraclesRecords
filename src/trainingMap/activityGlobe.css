@@ -120,6 +120,12 @@
   border-color: color-mix(in srgb, var(--accent) 45%, var(--glass-border));
 }
 
+/* The box is what reads as the field, so the ring goes on it. */
+.training-map-date-range label:has(input:focus-visible) {
+  outline: var(--focus-ring);
+  outline-offset: 2px;
+}
+
 .training-map-date-range label > span {
   color: var(--text-muted);
   font-size: 10px;
@@ -960,7 +966,7 @@
 
 .training-map-place-activities li {
   display: flex;
-  align-items: flex-start;
+  align-items: baseline;
   justify-content: space-between;
   gap: 12px;
   border-radius: var(--radius-sm);
@@ -1027,7 +1033,7 @@
   flex: 0 0 auto;
   color: var(--text-secondary);
   font-size: 12px;
-  line-height: 1.6;
+  line-height: 1.3;
   white-space: nowrap;
 }
 
