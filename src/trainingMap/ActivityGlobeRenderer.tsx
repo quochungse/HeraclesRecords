@@ -66,12 +66,11 @@ interface ActivityGlobeRendererProps {
   onError: (error: boolean) => void;
   /** The place under the pointer on the globe, or null when it leaves them. */
   onHoverChange: (key: string | null) => void;
-  /** `placeKey` when it opens on a place, `exact` when on the point itself. */
+  /** Zooming in handed over: where to open, and where the pointer was. */
   onRequestStreet: (focus: {
     lat: number;
     lon: number;
-    exact?: boolean;
-    placeKey?: string;
+    zoomedIn: { anchor: { x: number; y: number } | null };
   }) => void;
   onSelectLocation: (bucket: GeoHeatBucket) => void;
   onViewChange: (changed: boolean) => void;
@@ -622,7 +621,7 @@ const ActivityGlobeRendererComponent = forwardRef<
   /**
    * Where the street map opens when zooming in hands over to it: on a place of
    * the athlete's near the pointer — near the middle, for the + button — when
-   * one is within `STREET_SNAP_PX` on screen, framed by its routes. With none
+   * one is within `STREET_SNAP_PX` on screen, put under the pointer. With none
    * that near, on the very point under the pointer (the middle, for the
    * button), and nothing else: the street map used to pull itself to any route
    * within 130 km of the globe's centre, so zooming at the sea off Đà Nẵng
@@ -630,7 +629,8 @@ const ActivityGlobeRendererComponent = forwardRef<
    */
   const streetFocusFrom = useCallback(
     (view: GlobeView, anchor: { x: number; y: number } | null) => {
-      const fallback = { lat: view.lat, lon: view.lng, exact: true };
+      const zoomedIn = { anchor };
+      const fallback = { lat: view.lat, lon: view.lng, zoomedIn };
       const globe = globeRef.current;
       if (!globe) {
         return fallback;
@@ -647,11 +647,11 @@ const ActivityGlobeRendererComponent = forwardRef<
           })),
       );
       if (place) {
-        return { lat: place.lat, lon: place.lon, placeKey: place.key };
+        return { lat: place.lat, lon: place.lon, zoomedIn };
       }
       const pointed = anchor ? globe.toGlobeCoords(anchor.x, anchor.y) : null;
       return pointed
-        ? { lat: pointed.lat, lon: pointed.lng, exact: true }
+        ? { lat: pointed.lat, lon: pointed.lng, zoomedIn }
         : fallback;
     },
     [locations],

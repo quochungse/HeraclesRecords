@@ -774,13 +774,7 @@ export function ActivityGlobeCard({
               streetMode={streetMode}
               onError={setGlobeError}
               onHoverChange={setHoveredKey}
-              onRequestStreet={({ placeKey, ...focus }) =>
-                enterStreetFocus({
-                  ...focus,
-                  activityIds: places.find((place) => place.key === placeKey)
-                    ?.cluster.activityIds,
-                })
-              }
+              onRequestStreet={enterStreetFocus}
               onSelectLocation={selectLocation}
               onViewChange={setCanResetView}
             />

@@ -19,10 +19,13 @@ export interface StreetMapFocus {
   lat: number;
   lon: number;
   /**
-   * Open on this very point rather than framing the routes near it: zooming in
-   * where no place of the athlete's is, the map opens where they pointed.
+   * Set when zooming in on the globe handed over. The map opens a step past
+   * where the globe stopped (`ZOOMED_IN_OPEN_ZOOM`) with the focus under the
+   * pointer — `anchor`, in the map's own pixels, or the middle for the +
+   * button — so the zoom carries on. Framing the routes instead jumped
+   * straight in to street level.
    */
-  exact?: boolean;
+  zoomedIn?: { anchor: { x: number; y: number } | null };
   /**
    * The place it opens on, by its activities: the map frames their routes
    * rather than every route within `NEAR_FOCUS_DEG`, which pulled in the
@@ -76,8 +79,8 @@ const MIN_OPEN_ZOOM = 9;
 const EXIT_ZOOM = 8;
 /** Prefer fitting polylines within this deg-ish window of focus. */
 const NEAR_FOCUS_DEG = 1.2;
-/** An exact focus opens a region around the point, close to the globe's last view. */
-const EXACT_FOCUS_ZOOM = 10;
+/** Where a zoom in from the globe lands: a region, a step past the globe's closest view. */
+const ZOOMED_IN_OPEN_ZOOM = 9;
 
 /** Neon cyan route stack — soft bloom under a bright core (Strava-style lines). */
 const ROUTE_GLOW_DARK = {
@@ -302,18 +305,24 @@ export function ActivityGlobeStreetMap({
     const placeRoutePoints = routes
       .filter((route) => placeIds.has(route.activityId))
       .flatMap((route) => route.points);
-    const fitPoints = focus.exact
-      ? [focus]
-      : placeRoutePoints.length >= 2
+    const fitPoints =
+      placeRoutePoints.length >= 2
         ? placeRoutePoints
         : collectFitPoints(focus, visits, routes);
 
-    if (fitPoints.length === 1) {
-      map.setView(
-        [focus.lat, focus.lon],
-        focus.exact ? EXACT_FOCUS_ZOOM : 12,
-        { animate: false },
-      );
+    if (focus.zoomedIn) {
+      map.setView([focus.lat, focus.lon], ZOOMED_IN_OPEN_ZOOM, {
+        animate: false,
+      });
+      const anchor = focus.zoomedIn.anchor;
+      if (anchor) {
+        const size = map.getSize();
+        map.panBy([size.x / 2 - anchor.x, size.y / 2 - anchor.y], {
+          animate: false,
+        });
+      }
+    } else if (fitPoints.length === 1) {
+      map.setView([focus.lat, focus.lon], 12, { animate: false });
     } else {
       map.fitBounds(
         L.latLngBounds(fitPoints.map((point) => [point.lat, point.lon])),
@@ -352,7 +361,7 @@ export function ActivityGlobeStreetMap({
     };
     // Intentionally omit visits/routes — updated via the effect below.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [focus.lat, focus.lon, focus.exact]);
+  }, [focus.lat, focus.lon, focus.zoomedIn]);
 
   // Swap the base map in place, and recolour what is drawn over it for the new
   // ground — the glow is tuned per light or dark map.
