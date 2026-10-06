@@ -20,6 +20,9 @@ const byOs = release && {
   windows: pick("windows"),
   linux: pick("linux"),
 };
+// A Linux visitor on a Debian family system is offered the deb, which installs
+// into the app menu; everyone else the AppImage, which runs anywhere.
+const deb = pick("linux-deb");
 const choices =
   byOs &&
   Object.fromEntries(
@@ -28,6 +31,9 @@ const choices =
       { url: entry.url, label: `Download for ${entry.os}`, size: entry.sizeLabel },
     ]),
   );
+if (choices && deb) {
+  choices.linuxDeb = { url: deb.url, label: "Download for Debian / Ubuntu", size: deb.sizeLabel };
+}
 ---
 
 <div class="download" data-choices={choices ? JSON.stringify(choices) : undefined}>
@@ -69,10 +75,16 @@ const choices =
     return null;
   }
 
+  // Browsers do not report the distribution, but Firefox on a Debian family
+  // system names it in the user agent; where it is not named, the AppImage
+  // is the one that works on every system.
+  const takesDeb = /Ubuntu|Debian|Linux Mint|Pop!_OS|elementary|Zorin|Kali/i.test(navigator.userAgent);
+
   for (const block of document.querySelectorAll<HTMLElement>(".download[data-choices]")) {
     const os = detectOs();
     if (!os) continue;
-    const choice = JSON.parse(block.dataset.choices!)[os];
+    const choices = JSON.parse(block.dataset.choices!);
+    const choice = os === "linux" && takesDeb && choices.linuxDeb ? choices.linuxDeb : choices[os];
     if (!choice) continue;
     const button = block.querySelector<HTMLAnchorElement>("[data-download-primary]")!;
     button.href = choice.url;
