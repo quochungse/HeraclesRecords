@@ -393,7 +393,12 @@ function MonthBlock({
       <div className="records-slot records-month-slot">
         <span aria-hidden="true" />
         <span className="records-node is-month" aria-hidden="true" />
-        <h3 className="records-month">{month.label}</h3>
+        <div className="records-month-head">
+          <h3 className="records-month">{month.label}</h3>
+          <span>
+            {month.milestones.length} {month.milestones.length === 1 ? "milestone" : "milestones"}
+          </span>
+        </div>
       </div>
       {entries.map((entry) =>
         entry.kind === "milestone" ? (

@@ -2053,8 +2053,9 @@ lives at module level for the same visit-to-visit reason — see `useCalendarDat
   the milestones carry (`labour`, with `also` when one milestone reaches several stages at
   once — a 16-week plan at 91% is all three of the Girdle's) into a state per labour; stages
   may be reached in any order. `timelineModel.ts` folds it: the newest four months and the
-  month the beginning sits in open, the rest of each year one line, a month's rows past four
-  behind "+ N more" **where the first of them would have been** (never after the beginning,
+  month the beginning sits in open, the rest of each year one line, and a month shows every card
+  and minor rows up to ten in all, the rest behind "N more" — unless under three would fold —
+  **where the first of them would have been** (never after the beginning,
   which closes the timeline). `test:records` holds all three.
   **Records are improvements, and they were noise until three rules**: on real data a beginner
   broke the 1K, 5K and 10K on most runs. A record is a milestone and never a stage (the

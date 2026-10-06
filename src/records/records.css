@@ -235,7 +235,7 @@
 
 .records-month-slot {
   align-items: center;
-  padding: 20px 0 6px;
+  padding: 28px 0 8px;
 }
 
 .records-gap-slot {
@@ -247,14 +247,35 @@
   padding: 2px 0 10px;
 }
 
+/* A month heads its own section: the name in the ink, its count beside it,
+   and a hairline running on to the edge so the rows under it read as one
+   group. */
+.records-month-head {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  min-width: 0;
+}
+
+.records-month-head::after {
+  content: "";
+  flex: 1;
+  align-self: center;
+  height: 1px;
+  background: var(--glass-border);
+}
+
 .records-month {
   margin: 0;
-  color: var(--text-secondary);
-  font-size: 11px;
+  color: var(--text-primary);
+  font-size: 18px;
   font-weight: 600;
-  letter-spacing: 0.1em;
-  line-height: 1;
-  text-transform: uppercase;
+  line-height: 1.2;
+}
+
+.records-month-head span {
+  color: var(--text-muted);
+  font-size: 12px;
 }
 
 .records-date {
@@ -293,10 +314,10 @@
 }
 
 .records-node.is-month {
-  width: 9px;
-  height: 9px;
+  width: 11px;
+  height: 11px;
   margin-top: 0;
-  border: 1.5px solid var(--text-muted);
+  border: 2px solid var(--text-secondary);
   background: var(--bg-base);
   box-shadow: none;
 }
