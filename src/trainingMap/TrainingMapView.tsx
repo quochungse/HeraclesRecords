@@ -3,6 +3,7 @@ import type {
   TrainingHubActivity,
   TrainingHubActivityDetail,
 } from "../../electron/types";
+import type { LabourState } from "../records/labours";
 import { ActivityGlobeCard } from "./ActivityGlobeCard";
 
 interface TrainingMapViewProps {
@@ -11,6 +12,8 @@ interface TrainingMapViewProps {
   detail: TrainingHubActivityDetail | null;
   onSelectActivity: (activity: TrainingHubActivity) => void;
   onOpenActivity: (activityId: string) => void;
+  labour?: LabourState;
+  onOpenLabours: () => void;
   onOpenOverview: () => void;
 }
 
@@ -35,6 +38,8 @@ export function TrainingMapView({
   detail,
   onSelectActivity,
   onOpenActivity,
+  labour,
+  onOpenLabours,
   onOpenOverview,
 }: TrainingMapViewProps) {
   if (!connected) {
@@ -74,6 +79,8 @@ export function TrainingMapView({
       detail={detail}
       onSelectActivity={onSelectActivity}
       onOpenActivity={onOpenActivity}
+      labour={labour}
+      onOpenLabours={onOpenLabours}
     />
   );
 }

@@ -42,7 +42,13 @@ import {
   type PlaceSort,
   type PlaceSummary,
 } from "./placeSummaries";
-import { PlaceDetail, PlaceList, placeLabelOf } from "./PlacePanels";
+import {
+  PlaceDetail,
+  PlaceLabourCard,
+  PlaceList,
+  placeLabelOf,
+} from "./PlacePanels";
+import type { LabourState } from "../records/labours";
 import {
   ActivityGlobeStreetMap,
   type StreetMapFocus,
@@ -67,6 +73,9 @@ interface ActivityGlobeCardProps {
   onSelectActivity: (activity: TrainingHubActivity) => void;
   /** Opens an activity on its own screen, from a place's list of them. */
   onOpenActivity: (activityId: string) => void;
+  /** The Cattle of Geryon, once the Hall of Records has reckoned it. */
+  labour?: LabourState;
+  onOpenLabours: () => void;
 }
 
 type ActivityPeriod = "all" | "year" | "90-days" | "custom";
@@ -200,6 +209,8 @@ export function ActivityGlobeCard({
   detail,
   onSelectActivity,
   onOpenActivity,
+  labour,
+  onOpenLabours,
 }: ActivityGlobeCardProps) {
   const globeRendererRef = useRef<ActivityGlobeRendererHandle>(null);
   const streetEnterTimerRef = useRef<number | null>(null);
@@ -857,20 +868,25 @@ export function ActivityGlobeCard({
               <p>Outdoor activities with location data will appear here.</p>
             </div>
           ) : (
-            <PlaceList
-              places={sortedPlaces}
-              labels={placeLabels}
-              sort={placeSort}
-              hoveredKey={hoveredKey}
-              onHover={setHoveredKey}
-              onSortChange={setPlaceSort}
-              onSelect={(place) => selectLocation(place.bucket)}
-              onNearEnd={() =>
-                setLabelReach((reach) =>
-                  reach < sortedPlaces.length ? reach + LABEL_BATCH : reach,
-                )
-              }
-            />
+            <>
+              <PlaceList
+                places={sortedPlaces}
+                labels={placeLabels}
+                sort={placeSort}
+                hoveredKey={hoveredKey}
+                onHover={setHoveredKey}
+                onSortChange={setPlaceSort}
+                onSelect={(place) => selectLocation(place.bucket)}
+                onNearEnd={() =>
+                  setLabelReach((reach) =>
+                    reach < sortedPlaces.length ? reach + LABEL_BATCH : reach,
+                  )
+                }
+              />
+              {labour ? (
+                <PlaceLabourCard labour={labour} onOpen={onOpenLabours} />
+              ) : null}
+            </>
           )}
         </aside>
       </div>

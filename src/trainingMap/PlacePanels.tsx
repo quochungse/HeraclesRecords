@@ -2,6 +2,12 @@ import { ChevronDown, ChevronLeft, Map as MapIcon } from "lucide-react";
 import { useState, type UIEvent } from "react";
 import { OptionGroup } from "../components/OptionGroup";
 import {
+  STAGE_NUMERALS,
+  nextOpenStage,
+  type LabourState,
+} from "../records/labours";
+import { LabourEmblem } from "../records/recordsIcons";
+import {
   SPORT_COLOR_LABELS,
   sportColorCategory,
 } from "../training/sportColors";
@@ -130,6 +136,46 @@ export function PlaceList({
         })}
       </ol>
     </>
+  );
+}
+
+/**
+ * The labour this screen is the record of: places trained in, as the Hall of
+ * Records counts them (all time, whatever period the map shows), written the
+ * way its Within reach cards write a stage being worked on.
+ */
+export function PlaceLabourCard({
+  labour,
+  onOpen,
+}: {
+  labour: LabourState;
+  onOpen: () => void;
+}) {
+  const next = nextOpenStage(labour);
+  const ratio = next?.progress?.ratio;
+  return (
+    <button type="button" className="training-map-labour" onClick={onOpen}>
+      <LabourEmblem id={labour.definition.id} reached={labour.reached} size="chip" />
+      <span className="training-map-labour-text">
+        <span className="training-map-labour-eyebrow">
+          {next
+            ? `${labour.definition.short} · ${STAGE_NUMERALS[next.stage]}`
+            : labour.definition.short}
+        </span>
+        <strong>{next ? next.title : "All three stages reached"}</strong>
+        {ratio !== undefined ? (
+          <span className="training-map-labour-bar" aria-hidden="true">
+            <span style={{ width: `${Math.round(ratio * 100)}%` }} />
+          </span>
+        ) : null}
+        {next?.progress ? (
+          <span className="training-map-labour-foot">
+            <span>{next.progress.text}</span>
+            {ratio !== undefined ? <span>{Math.round(ratio * 100)}% there</span> : null}
+          </span>
+        ) : null}
+      </span>
+    </button>
   );
 }
 
