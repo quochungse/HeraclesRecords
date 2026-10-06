@@ -753,13 +753,13 @@ export function ActivityGlobeCard({
     {
       label: "Activities",
       value: overall.count.toLocaleString(),
-      unit: overall.count === 1 ? "activity" : "activities",
+      unit: "",
       icon: Activity,
     },
     {
       label: "Places visited",
       value: mapPlaceCount.toLocaleString(),
-      unit: mapPlaceCount === 1 ? "place" : "places",
+      unit: "",
       icon: MapPin,
     },
   ];
@@ -894,9 +894,9 @@ export function ActivityGlobeCard({
                       <Icon size={17} aria-hidden="true" />
                       <span>{stat.label}</span>
                     </dt>
-                    <dd aria-label={`${stat.value} ${stat.unit}`}>
+                    <dd aria-label={stat.unit ? `${stat.value} ${stat.unit}` : stat.value}>
                       <strong>{stat.value}</strong>
-                      <span>{stat.unit}</span>
+                      {stat.unit ? <span>{stat.unit}</span> : null}
                     </dd>
                   </div>
                 );
