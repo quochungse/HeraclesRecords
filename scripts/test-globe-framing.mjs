@@ -14,6 +14,8 @@ import {
   labelSeparationDegrees,
   landDetailLevels,
   landDetailOpacity,
+  nearestOnScreen,
+  STREET_SNAP_PX,
   surfacePixelsPerDegree,
   pickSpacedPlaces,
   sphericalCenter
@@ -288,6 +290,23 @@ function place(lat, lon, key = `${lat}:${lon}`) {
   assert.equal(clampLatitude(89), 78, "north pole clamps");
   assert.equal(clampLatitude(-89), -78, "south pole clamps");
   assert.equal(clampLatitude(12.5), 12.5, "everything else passes through");
+}
+
+// --- zooming into the street map: a place near the pointer takes it ------------------
+{
+  const pointer = { x: 400, y: 300 };
+  const places = [
+    { item: "far", x: 400 + STREET_SNAP_PX + 1, y: 300 },
+    { item: "near", x: 430, y: 340 },
+    { item: "nearer", x: 410, y: 290 }
+  ];
+  assert.equal(nearestOnScreen(pointer, places), "nearer", "the nearest place within reach");
+  assert.equal(
+    nearestOnScreen(pointer, [places[0]]),
+    undefined,
+    "a place further than the reach leaves the street map where the pointer is"
+  );
+  assert.equal(nearestOnScreen(pointer, []), undefined);
 }
 
 console.log("globe framing: ok");

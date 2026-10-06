@@ -18,6 +18,17 @@ import type {
 export interface StreetMapFocus {
   lat: number;
   lon: number;
+  /**
+   * Open on this very point rather than framing the routes near it: zooming in
+   * where no place of the athlete's is, the map opens where they pointed.
+   */
+  exact?: boolean;
+  /**
+   * The place it opens on, by its activities: the map frames their routes
+   * rather than every route within `NEAR_FOCUS_DEG`, which pulled in the
+   * places around it.
+   */
+  activityIds?: readonly string[];
 }
 
 interface ActivityGlobeStreetMapProps {
@@ -67,6 +78,8 @@ const HEAT_FADE_START_ZOOM = 11.5;
 const HEAT_HIDE_ZOOM = 13.25;
 /** Prefer fitting polylines within this deg-ish window of focus. */
 const NEAR_FOCUS_DEG = 1.2;
+/** An exact focus opens a region around the point, close to the globe's last view. */
+const EXACT_FOCUS_ZOOM = 10;
 
 /** Neon cyan route stack — soft bloom under a bright core (Strava-style lines). */
 const ROUTE_GLOW_DARK = {
@@ -453,10 +466,22 @@ export function ActivityGlobeStreetMap({
     routeLayersRef.current = syncRouteGroup(routeGroup, routes, lightBasemap);
     applyHighlight(highlightRef.current);
 
-    const fitPoints = collectFitPoints(focus, visits, routes);
+    const placeIds = new Set(focus.activityIds ?? []);
+    const placeRoutePoints = routes
+      .filter((route) => placeIds.has(route.activityId))
+      .flatMap((route) => route.points);
+    const fitPoints = focus.exact
+      ? [focus]
+      : placeRoutePoints.length >= 2
+        ? placeRoutePoints
+        : collectFitPoints(focus, visits, routes);
 
     if (fitPoints.length === 1) {
-      map.setView([focus.lat, focus.lon], 12, { animate: false });
+      map.setView(
+        [focus.lat, focus.lon],
+        focus.exact ? EXACT_FOCUS_ZOOM : 12,
+        { animate: false },
+      );
     } else {
       map.fitBounds(
         L.latLngBounds(fitPoints.map((point) => [point.lat, point.lon])),
@@ -496,7 +521,7 @@ export function ActivityGlobeStreetMap({
     };
     // Intentionally omit visits/routes — updated via the effect below.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [focus.lat, focus.lon]);
+  }, [focus.lat, focus.lon, focus.exact]);
 
   // Swap the base map in place, and recolour what is drawn over it for the new
   // ground — the glow is tuned per light or dark map.

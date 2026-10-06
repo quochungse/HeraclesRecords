@@ -485,6 +485,7 @@ export function ActivityGlobeCard({
     const focus = {
       lat: selectedPlace.cluster.lat,
       lon: selectedPlace.cluster.lon,
+      activityIds: selectedPlace.cluster.activityIds,
     };
     const duration =
       globeRendererRef.current?.zoomToLocation(
@@ -773,7 +774,13 @@ export function ActivityGlobeCard({
               streetMode={streetMode}
               onError={setGlobeError}
               onHoverChange={setHoveredKey}
-              onRequestStreet={enterStreetFocus}
+              onRequestStreet={({ placeKey, ...focus }) =>
+                enterStreetFocus({
+                  ...focus,
+                  activityIds: places.find((place) => place.key === placeKey)
+                    ?.cluster.activityIds,
+                })
+              }
               onSelectLocation={selectLocation}
               onViewChange={setCanResetView}
             />

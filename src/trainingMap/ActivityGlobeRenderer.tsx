@@ -32,11 +32,13 @@ import type { GeoHeatBucket, GlobePoint } from "./activityVisitHeatmap";
 import {
   FIT_MIN_ALTITUDE,
   SINGLE_PLACE_ALTITUDE,
+  angularDistanceDegrees,
   clampLatitude,
   computeFitView,
   focusLatitudeOffset,
   labelSeparationDegrees,
   landDetailLevels,
+  nearestOnScreen,
   pickSpacedPlaces,
   type GlobeCameraView,
 } from "./globeFraming";
@@ -64,7 +66,13 @@ interface ActivityGlobeRendererProps {
   onError: (error: boolean) => void;
   /** The place under the pointer on the globe, or null when it leaves them. */
   onHoverChange: (key: string | null) => void;
-  onRequestStreet: (focus: { lat: number; lon: number }) => void;
+  /** `placeKey` when it opens on a place, `exact` when on the point itself. */
+  onRequestStreet: (focus: {
+    lat: number;
+    lon: number;
+    exact?: boolean;
+    placeKey?: string;
+  }) => void;
   onSelectLocation: (bucket: GeoHeatBucket) => void;
   onViewChange: (changed: boolean) => void;
 }
@@ -342,6 +350,8 @@ const ActivityGlobeRendererComponent = forwardRef<
   const interactionRef = useRef(false);
   const userAdjustedRef = useRef(false);
   const streetRequestedRef = useRef(false);
+  // Where the pointer last was over the globe, in the canvas's own pixels.
+  const pointerRef = useRef<{ x: number; y: number } | null>(null);
   const idleTimerRef = useRef<number | null>(null);
   const hadSelectionRef = useRef(false);
   const selectedRef = useRef(selectedLocation);
@@ -609,6 +619,44 @@ const ActivityGlobeRendererComponent = forwardRef<
     [onViewChange, reducedMotion, stopIdleRotation],
   );
 
+  /**
+   * Where the street map opens when zooming in hands over to it: on a place of
+   * the athlete's near the pointer — near the middle, for the + button — when
+   * one is within `STREET_SNAP_PX` on screen, framed by its routes. With none
+   * that near, on the very point under the pointer (the middle, for the
+   * button), and nothing else: the street map used to pull itself to any route
+   * within 130 km of the globe's centre, so zooming at the sea off Đà Nẵng
+   * opened on Đà Nẵng.
+   */
+  const streetFocusFrom = useCallback(
+    (view: GlobeView, anchor: { x: number; y: number } | null) => {
+      const fallback = { lat: view.lat, lon: view.lng, exact: true };
+      const globe = globeRef.current;
+      if (!globe) {
+        return fallback;
+      }
+      const centre = { lat: view.lat, lon: view.lng };
+      const place = nearestOnScreen(
+        anchor ?? globe.getScreenCoords(view.lat, view.lng),
+        locations
+          // A place behind the globe projects onto the screen too.
+          .filter((location) => angularDistanceDegrees(centre, location) < 75)
+          .map((location) => ({
+            item: location,
+            ...globe.getScreenCoords(location.lat, location.lon),
+          })),
+      );
+      if (place) {
+        return { lat: place.lat, lon: place.lon, placeKey: place.key };
+      }
+      const pointed = anchor ? globe.toGlobeCoords(anchor.x, anchor.y) : null;
+      return pointed
+        ? { lat: pointed.lat, lon: pointed.lng, exact: true }
+        : fallback;
+    },
+    [locations],
+  );
+
   // A step of the buttons goes where a few turns of the wheel would, street
   // view included: closing in past its altitude hands over to the street map
   // the way scrolling does, or a button would stop where the wheel goes on.
@@ -631,7 +679,7 @@ const ActivityGlobeRendererComponent = forwardRef<
         (locations.length > 0 || routePoints.length > 0)
       ) {
         streetRequestedRef.current = true;
-        onRequestStreet({ lat: view.lat, lon: view.lng });
+        onRequestStreet(streetFocusFrom(view, null));
         return;
       }
       globe.pointOfView(
@@ -649,6 +697,7 @@ const ActivityGlobeRendererComponent = forwardRef<
       routePoints.length,
       scheduleIdleRotation,
       stopIdleRotation,
+      streetFocusFrom,
       streetMode,
     ],
   );
@@ -922,7 +971,7 @@ const ActivityGlobeRendererComponent = forwardRef<
       ) {
         streetRequestedRef.current = true;
         stopIdleRotation();
-        onRequestStreet({ lat: view.lat, lon: view.lng });
+        onRequestStreet(streetFocusFrom(view, pointerRef.current));
       }
     },
     [
@@ -933,6 +982,7 @@ const ActivityGlobeRendererComponent = forwardRef<
       onViewChange,
       routePoints.length,
       stopIdleRotation,
+      streetFocusFrom,
       streetMode,
     ],
   );
@@ -991,7 +1041,17 @@ const ActivityGlobeRendererComponent = forwardRef<
       ref={containerRef}
       className={`activity-globe-webgl${streetMode ? " is-street-hidden" : ""}`}
       onPointerEnter={stopIdleRotation}
-      onPointerLeave={scheduleIdleRotation}
+      onPointerMove={(event) => {
+        const bounds = event.currentTarget.getBoundingClientRect();
+        pointerRef.current = {
+          x: event.clientX - bounds.left,
+          y: event.clientY - bounds.top,
+        };
+      }}
+      onPointerLeave={() => {
+        pointerRef.current = null;
+        scheduleIdleRotation();
+      }}
     >
       <Globe
         ref={globeRef}
