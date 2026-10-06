@@ -191,11 +191,20 @@ function applyRouteHighlight(
   }
 }
 
+/** What the map opens framed on: the place's own routes, else what is near it. */
 function collectFitPoints(
   focus: StreetMapFocus,
   visits: ActivityVisitPoint[],
   routes: ActivityRoutePolyline[],
 ): GlobePoint[] {
+  const placeIds = new Set(focus.activityIds ?? []);
+  const placeRoutePoints = routes
+    .filter((route) => placeIds.has(route.activityId))
+    .flatMap((route) => route.points);
+  if (placeRoutePoints.length >= 2) {
+    return placeRoutePoints;
+  }
+
   const nearbyRoutePoints = routes
     .filter((route) => routeNearFocus(route, focus))
     .flatMap((route) => route.points);
@@ -241,6 +250,9 @@ export function ActivityGlobeStreetMap({
   const onExitRef = useRef(onRequestExit);
   const routeGroupRef = useRef<L.LayerGroup | null>(null);
   const routeLayersRef = useRef<RouteLayers>(new Map());
+  // The routes array the group was last drawn from, so the mount and the
+  // routes effect after it in the same commit do not both draw every route.
+  const drawnRoutesRef = useRef<ActivityRoutePolyline[] | null>(null);
   const routeFocusGroupRef = useRef<L.LayerGroup | null>(null);
   const highlightRef = useRef(highlightActivityId);
   highlightRef.current = highlightActivityId;
@@ -268,6 +280,12 @@ export function ActivityGlobeStreetMap({
     }
   };
 
+  const drawRoutes = (group: L.LayerGroup, next: ActivityRoutePolyline[]) => {
+    routeLayersRef.current = syncRouteGroup(group, next, lightBasemapRef.current);
+    drawnRoutesRef.current = next;
+    applyHighlight(highlightRef.current);
+  };
+
   // Mount the map once per focus.
   useEffect(() => {
     const container = containerRef.current;
@@ -276,8 +294,7 @@ export function ActivityGlobeStreetMap({
     }
 
     const layer = baseLayerRef.current;
-    const lightBasemap = isLightBaseLayer(layer);
-    lightBasemapRef.current = lightBasemap;
+    lightBasemapRef.current = isLightBaseLayer(layer);
     appliedBaseLayerRef.current = layer;
     const map = L.map(container, {
       zoomControl: true,
@@ -298,17 +315,7 @@ export function ActivityGlobeStreetMap({
     const routeGroup = L.layerGroup().addTo(map);
     routeGroupRef.current = routeGroup;
     routeFocusGroupRef.current = L.layerGroup().addTo(map);
-    routeLayersRef.current = syncRouteGroup(routeGroup, routes, lightBasemap);
-    applyHighlight(highlightRef.current);
-
-    const placeIds = new Set(focus.activityIds ?? []);
-    const placeRoutePoints = routes
-      .filter((route) => placeIds.has(route.activityId))
-      .flatMap((route) => route.points);
-    const fitPoints =
-      placeRoutePoints.length >= 2
-        ? placeRoutePoints
-        : collectFitPoints(focus, visits, routes);
+    drawRoutes(routeGroup, routes);
 
     if (focus.zoomedIn) {
       map.setView([focus.lat, focus.lon], ZOOMED_IN_OPEN_ZOOM, {
@@ -321,13 +328,16 @@ export function ActivityGlobeStreetMap({
           animate: false,
         });
       }
-    } else if (fitPoints.length === 1) {
-      map.setView([focus.lat, focus.lon], 12, { animate: false });
     } else {
-      map.fitBounds(
-        L.latLngBounds(fitPoints.map((point) => [point.lat, point.lon])),
-        { padding: [36, 36], maxZoom: 14, animate: false },
-      );
+      const fitPoints = collectFitPoints(focus, visits, routes);
+      if (fitPoints.length === 1) {
+        map.setView([focus.lat, focus.lon], 12, { animate: false });
+      } else {
+        map.fitBounds(
+          L.latLngBounds(fitPoints.map((point) => [point.lat, point.lon])),
+          { padding: [36, 36], maxZoom: 14, animate: false },
+        );
+      }
     }
 
     if (map.getZoom() < MIN_OPEN_ZOOM) {
@@ -355,11 +365,13 @@ export function ActivityGlobeStreetMap({
       routeGroupRef.current = null;
       routeFocusGroupRef.current = null;
       routeLayersRef.current = new Map();
+      drawnRoutesRef.current = null;
       tileLayerRef.current = null;
       mapRef.current = null;
       map.remove();
     };
-    // Intentionally omit visits/routes — updated via the effect below.
+    // Visits and routes frame the opening view only; later routes are the
+    // effect below's. A place's activity ids arrive with its own focus.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [focus.lat, focus.lon, focus.zoomedIn]);
 
@@ -381,12 +393,7 @@ export function ActivityGlobeStreetMap({
     if (lightBasemap !== lightBasemapRef.current) {
       lightBasemapRef.current = lightBasemap;
       if (routeGroupRef.current) {
-        routeLayersRef.current = syncRouteGroup(
-          routeGroupRef.current,
-          routes,
-          lightBasemap,
-        );
-        applyHighlight(highlightRef.current);
+        drawRoutes(routeGroupRef.current, routes);
       }
     }
     // Routes are read, not watched — the effect below owns their changes.
@@ -395,14 +402,10 @@ export function ActivityGlobeStreetMap({
 
   useEffect(() => {
     const group = routeGroupRef.current;
-    if (group) {
-      routeLayersRef.current = syncRouteGroup(
-        group,
-        routes,
-        lightBasemapRef.current,
-      );
-      applyHighlight(highlightRef.current);
+    if (group && drawnRoutesRef.current !== routes) {
+      drawRoutes(group, routes);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [routes]);
 
   useEffect(() => {
