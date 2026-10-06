@@ -287,7 +287,9 @@
 
 .training-map-primary-stat {
   display: grid;
-  align-content: start;
+  /* The figure sits on the cell's floor, so a label that wraps to two lines
+     ("Total distance") does not push its figure below the one beside it. */
+  grid-template-rows: 1fr auto;
   gap: 10px;
   min-width: 0;
   padding: 0 14px;
@@ -301,6 +303,7 @@
 
 .training-map-primary-stat dt {
   display: grid;
+  align-content: start;
   justify-items: start;
   gap: 9px;
   min-width: 0;
