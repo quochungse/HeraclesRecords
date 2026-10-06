@@ -50,6 +50,16 @@ from [OpenStreetMap](https://www.openstreetmap.org/copyright)
 [BRouter](https://brouter.de/), with ground heights from SRTM (NASA/USGS,
 public domain).
 
+### Administrative regions
+
+Places on "Where you've been" and in the Hall of Records are told apart by the
+first-level administrative region they lie in. The outlines are
+[Natural Earth](https://www.naturalearthdata.com/) admin-1 states and provinces
+1:10m (public domain), simplified, and, for Việt Nam, the provinces from
+[OpenStreetMap](https://www.openstreetmap.org/copyright)
+(© OpenStreetMap contributors, Open Database License 1.0). The derived file,
+`src/trainingMap/adminRegions.json`, is available under the same licence.
+
 ### Age grading and VO2max ratings
 
 The Hall of Records grades running speed against the WMA/USATF 2025 road
