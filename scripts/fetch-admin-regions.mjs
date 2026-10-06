@@ -157,6 +157,11 @@ async function vietnam() {
   url.searchParams.set("polygon_threshold", "0.002");
   url.searchParams.set("osm_ids", relations.map((relation) => `R${relation.id}`).join(","));
   const features = (await (await download(url)).json()).features;
+  // A short answer would write Việt Nam with provinces missing, and starts in
+  // them would quietly fall into a neighbour.
+  if (features.length !== relations.length) {
+    throw new Error(`Nominatim outlined ${features.length} of ${relations.length} provinces of Việt Nam`);
+  }
   const tagsById = new Map(relations.map((relation) => [relation.id, relation.tags]));
   return features.map((feature) => {
     const tags = tagsById.get(feature.properties.osm_id) ?? {};
