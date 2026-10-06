@@ -336,9 +336,10 @@ export async function loadActivityVisits(
           });
         }
       } catch {
-        // Skip failed lookups; never block the globe on one activity.
-        VISIT_CACHE.set(activity.activityId, null);
-        ROUTE_CACHE.set(activity.activityId, null);
+        // Skip failed lookups; never block the globe on one activity. A
+        // failure is not an answer, so nothing is cached for it: written down
+        // as "no GPS" it went to storage with the next write, and the place
+        // the Hall of Records counts never came back to the globe.
       }
     }
   }
