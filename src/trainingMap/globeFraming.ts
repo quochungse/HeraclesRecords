@@ -18,7 +18,7 @@ const GLOBE_FOV_DEGREES = 50;
 /** Keeps the outermost place off the panel edge and clear of `globeOffset`. */
 const FIT_PADDING = 0.78;
 /**
- * Never frame closer than this. Below ~0.42 the card hands over to the street
+ * Never frame closer than this. Below ~0.24 the card hands over to the street
  * map, so the framing has to leave room for a person to zoom in themselves —
  * and a closer view stops reading as a globe at all.
  */

@@ -1,15 +1,19 @@
 import { geoEquirectangular, geoPath, type GeoPermissibleObjects } from "d3-geo";
 import type { GeometryCollection, Topology } from "topojson-specification";
-import { feature } from "topojson-client";
+import { feature, mesh } from "topojson-client";
+import countriesAtlas from "world-atlas/countries-50m.json";
 import landAtlas from "world-atlas/land-110m.json";
 
 interface LandGeometryMessage {
   positions: ArrayBuffer;
   strengths: ArrayBuffer;
   tiers: ArrayBuffer;
+  /** Country borders as line-segment pairs, three floats a point. */
+  borders: ArrayBuffer;
 }
 
 type LandTopology = Topology<{ land: GeometryCollection }>;
+type CountriesTopology = Topology<{ countries: GeometryCollection }>;
 
 /** Spacing of the coarse lattice — what the globe shows at full-planet zoom. */
 const LAND_DOT_STEP_DEGREES = 1;
@@ -33,6 +37,8 @@ const LAND_DOT_TIER_SPAN = 2 ** (LAND_DOT_TIERS - 1);
 const LAND_DOT_FINE_STEP_DEGREES = LAND_DOT_STEP_DEGREES / LAND_DOT_TIER_SPAN;
 const GLOBE_RADIUS = 100;
 const SURFACE_ALTITUDE = 0.0025;
+/** Just above the dots, so a border is never hidden under the land it divides. */
+const BORDER_ALTITUDE = 0.003;
 const MASK_WIDTH = 1440;
 const MASK_HEIGHT = 720;
 
@@ -156,7 +162,32 @@ function buildLandGeometry(): LandGeometryMessage {
     positions: positions.buffer,
     strengths: strengths.buffer,
     tiers: tiers.buffer,
+    borders: buildBorders(),
   };
+}
+
+/**
+ * The lines between countries, and only those: `mesh` with `a !== b` keeps an
+ * arc two countries share and drops the coast, which the dots already draw.
+ * Natural Earth's 1:50m is the scale that still reads as a border at the
+ * closest the globe goes before the street map; 1:110m was visibly a polygon
+ * there. Its vertices are a few km apart, so the straight chords between them
+ * stay on the surface.
+ */
+function buildBorders(): ArrayBuffer {
+  const topology = countriesAtlas as unknown as CountriesTopology;
+  const borders = mesh(topology, topology.objects.countries, (a, b) => a !== b);
+  const radius = GLOBE_RADIUS * (1 + BORDER_ALTITUDE);
+  const values: number[] = [];
+  for (const line of borders.coordinates) {
+    for (let index = 1; index < line.length; index += 1) {
+      const [fromLon, fromLat] = line[index - 1]!;
+      const [toLon, toLat] = line[index]!;
+      values.push(...coordinateToVector(fromLat!, fromLon!, radius));
+      values.push(...coordinateToVector(toLat!, toLon!, radius));
+    }
+  }
+  return Float32Array.from(values).buffer;
 }
 
 const message = buildLandGeometry();
@@ -167,5 +198,6 @@ workerScope.postMessage(message, [
   message.positions,
   message.strengths,
   message.tiers,
+  message.borders,
 ]);
 

@@ -21,6 +21,7 @@ import {
   HemisphereLight,
   MeshStandardMaterial,
   type Light,
+  LineSegments,
   NormalBlending,
   Points,
   ShaderMaterial,
@@ -89,17 +90,25 @@ interface LandLayerData {
   object: Points<BufferGeometry, ShaderMaterial>;
 }
 
+interface BorderLayerData {
+  kind: "borders";
+  object: LineSegments<BufferGeometry, ShaderMaterial>;
+}
+
 interface LandGeometryData {
   positions: Float32Array;
   strengths: Float32Array;
   /** 0 = coarse lattice, 1 = half spacing, 2 = quarter spacing. */
   tiers: Float32Array;
+  /** Country borders as segment pairs. */
+  borders: Float32Array;
 }
 
 interface LandGeometryMessage {
   positions: ArrayBuffer;
   strengths: ArrayBuffer;
   tiers: ArrayBuffer;
+  borders: ArrayBuffer;
 }
 
 interface RouteLayerData {
@@ -110,10 +119,16 @@ const GLOBE_RADIUS = 100;
 const DEFAULT_VIEW: GlobeView = { lat: 18, lng: -20, altitude: 2.2 };
 const FRAMING_VERSION = "fit-all-places-v1";
 const CAMERA_FOCUS_MS = 600;
-const STREET_VIEW_ALTITUDE = 0.42;
-const STREET_TRANSITION_ALTITUDE = 0.36;
+/**
+ * Closing in past this hands over to the street map: about 1,500 km up, three
+ * steps of the + button from the closest framing. It was 0.42, two steps, which
+ * left too little of the globe — a country and its neighbours — to zoom
+ * through before the street map took over.
+ */
+const STREET_VIEW_ALTITUDE = 0.24;
+const STREET_TRANSITION_ALTITUDE = 0.2;
 /** How close and how far the camera goes, in globe radii above the surface. */
-const MIN_CAMERA_ALTITUDE = 0.32;
+const MIN_CAMERA_ALTITUDE = 0.18;
 const MAX_CAMERA_ALTITUDE = 4.2;
 const ZOOM_BUTTON_MS = 320;
 const IDLE_DELAY_MS = 4_200;
@@ -147,6 +162,7 @@ function loadLandGeometry(): Promise<LandGeometryData> {
         positions: new Float32Array(event.data.positions),
         strengths: new Float32Array(event.data.strengths),
         tiers: new Float32Array(event.data.tiers),
+        borders: new Float32Array(event.data.borders),
       };
       worker.terminate();
       resolve(landGeometryCache);
@@ -239,6 +255,51 @@ function createGeographyPoints(
   object.frustumCulled = false;
   object.renderOrder = 2;
   return { kind: "geography", object };
+}
+
+/**
+ * The lines between countries: a hairline in the dots' own ink, quieter than
+ * the dots, and faded towards the rim the same way so the far side of the
+ * globe never shows through.
+ */
+function createBorderLines(
+  paperTheme: boolean,
+  borders: Float32Array,
+): BorderLayerData {
+  const geometry = new BufferGeometry();
+  geometry.setAttribute("position", new BufferAttribute(borders, 3));
+  const material = new ShaderMaterial({
+    transparent: true,
+    depthTest: true,
+    depthWrite: false,
+    blending: NormalBlending,
+    uniforms: {
+      uColor: { value: new Color(paperTheme ? "#5f6b74" : "#c4d5e1") },
+      uOpacity: { value: paperTheme ? 0.42 : 0.26 },
+    },
+    vertexShader: `
+      varying float vFacing;
+
+      void main() {
+        vec3 viewNormal = normalize(normalMatrix * normalize(position));
+        vFacing = smoothstep(0.03, 0.72, clamp(viewNormal.z, 0.0, 1.0));
+        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+      }
+    `,
+    fragmentShader: `
+      uniform vec3 uColor;
+      uniform float uOpacity;
+      varying float vFacing;
+
+      void main() {
+        gl_FragColor = vec4(uColor, uOpacity * vFacing);
+      }
+    `,
+  });
+  const object = new LineSegments(geometry, material);
+  object.frustumCulled = false;
+  object.renderOrder = 3;
+  return { kind: "borders", object };
 }
 
 function viewChanged(current: GlobeView, baseline: GlobeView): boolean {
@@ -338,9 +399,16 @@ const ActivityGlobeRendererComponent = forwardRef<
         : null,
     [landGeometry, paperTheme],
   );
-  const landLayerData = useMemo(
-    () => (landLayer ? [landLayer] : []),
-    [landLayer],
+  const borderLayer = useMemo(
+    () =>
+      landGeometry && landGeometry.borders.length > 0
+        ? createBorderLines(paperTheme, landGeometry.borders)
+        : null,
+    [landGeometry, paperTheme],
+  );
+  const landLayerData = useMemo<Array<LandLayerData | BorderLayerData>>(
+    () => [landLayer, borderLayer].filter((layer) => layer !== null),
+    [borderLayer, landLayer],
   );
 
   /**
@@ -908,7 +976,7 @@ const ActivityGlobeRendererComponent = forwardRef<
   );
 
   const customThreeObject = useCallback(
-    (datum: object) => (datum as LandLayerData).object,
+    (datum: object) => (datum as LandLayerData | BorderLayerData).object,
     [],
   );
 
