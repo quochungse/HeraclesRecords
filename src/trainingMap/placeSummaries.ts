@@ -3,6 +3,10 @@
 // test can reach. No `node:` imports and no React.
 import type { TrainingHubActivity } from "../../electron/types";
 import {
+  sportColorCategory,
+  type SportColorCategory,
+} from "../training/sportColors";
+import {
   geoHeatBucketKey,
   type ActivityVisitPoint,
   type GeoHeatBucket,
@@ -201,6 +205,12 @@ export function formatDayLong(ms: number): string {
   return `${date.getDate()} ${MONTHS[date.getMonth()]} ${date.getFullYear()}`;
 }
 
+/** "Mar 2025". */
+export function formatMonthYear(ms: number): string {
+  const date = new Date(ms);
+  return `${MONTHS[date.getMonth()]} ${date.getFullYear()}`;
+}
+
 /** "4 Oct" within the current year, "14 Dec 2025" before it. */
 export function formatDayNear(ms: number, nowMs = Date.now()): string {
   if (!ms) {
@@ -261,4 +271,68 @@ export function placesSummaryLine({
     line += ` · Farthest: ${where ? `${where}, ` : ""}${km} km from ${from}`;
   }
   return line;
+}
+
+export interface SportShare {
+  category: SportColorCategory;
+  count: number;
+}
+
+/** The sports trained at a place, most sessions first. */
+export function sportMix(
+  activities: readonly TrainingHubActivity[],
+): SportShare[] {
+  const counts = new Map<SportColorCategory, number>();
+  for (const activity of activities) {
+    const category = sportColorCategory(activity.sportType);
+    counts.set(category, (counts.get(category) ?? 0) + 1);
+  }
+  return [...counts.entries()]
+    .map(([category, count]) => ({ category, count }))
+    .sort((left, right) => right.count - left.count);
+}
+
+export interface MonthVisits {
+  /** Epoch ms of the month's first day, local time. */
+  monthMs: number;
+  count: number;
+}
+
+/**
+ * Visits per calendar month, from the first visit to the month `endMs` falls
+ * in, the most recent `maxMonths` of them. Empty months are kept: the gaps are
+ * what the bars are for.
+ */
+export function visitsByMonth(
+  activities: readonly TrainingHubActivity[],
+  endMs: number,
+  maxMonths = 36,
+): MonthVisits[] {
+  const stamps = activities
+    .map((activity) => activityTimestampMs(activity.startTime))
+    .filter((ms) => ms > 0);
+  if (stamps.length === 0) {
+    return [];
+  }
+  const monthIndex = (ms: number) => {
+    const date = new Date(ms);
+    return date.getFullYear() * 12 + date.getMonth();
+  };
+  const last = Math.max(monthIndex(endMs), ...stamps.map(monthIndex));
+  const first = Math.max(Math.min(...stamps.map(monthIndex)), last - maxMonths + 1);
+  const counts = new Map<number, number>();
+  for (const ms of stamps) {
+    const index = monthIndex(ms);
+    if (index >= first) {
+      counts.set(index, (counts.get(index) ?? 0) + 1);
+    }
+  }
+  const months: MonthVisits[] = [];
+  for (let index = first; index <= last; index += 1) {
+    months.push({
+      monthMs: new Date(Math.floor(index / 12), index % 12, 1).getTime(),
+      count: counts.get(index) ?? 0,
+    });
+  }
+  return months;
 }

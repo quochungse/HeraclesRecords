@@ -25,8 +25,16 @@ interface ActivityGlobeStreetMapProps {
   visits: ActivityVisitPoint[];
   /** All GPS tracks available for the drilled region (latest + cached visits). */
   routes: ActivityRoutePolyline[];
+  /** One activity's route to bring forward, the rest dimmed: the row pointed at beside the map. */
+  highlightActivityId?: string | null;
   onRequestExit: () => void;
 }
+
+/** Each line a route is drawn with, and the opacity it was drawn at. */
+type RouteLayers = Map<string, Array<{ line: L.Polyline; opacity: number }>>;
+
+/** How much of its own opacity a route keeps while another is brought forward. */
+const DIMMED_ROUTE_SHARE = 0.3;
 
 const HEAT_MIN_ZOOM = 9;
 const EXIT_ZOOM = 8;
@@ -218,31 +226,31 @@ const VisitHeatLayer = L.Layer.extend({
 }) as new (points: GlobePoint[], lightBasemap: boolean) => HeatLayerInstance;
 
 function addGlowingRoute(
-  _map: L.Map,
   latLngs: [number, number][],
   lightBasemap: boolean,
   group: L.LayerGroup,
-): void {
+): Array<{ line: L.Polyline; opacity: number }> {
   const styles = lightBasemap ? ROUTE_GLOW_LIGHT : ROUTE_GLOW_DARK;
-  for (const style of [styles.outer, styles.mid, styles.core]) {
-    L.polyline(latLngs, {
+  return [styles.outer, styles.mid, styles.core].map((style) => ({
+    line: L.polyline(latLngs, {
       color: style.color,
       weight: style.weight,
       opacity: style.opacity,
       lineCap: "round",
       lineJoin: "round",
       interactive: false,
-    }).addTo(group);
-  }
+    }).addTo(group),
+    opacity: style.opacity,
+  }));
 }
 
 function syncRouteGroup(
-  map: L.Map,
   group: L.LayerGroup,
   routes: ActivityRoutePolyline[],
   lightBasemap: boolean,
-): void {
+): RouteLayers {
   group.clearLayers();
+  const layers: RouteLayers = new Map();
   for (const route of routes) {
     if (route.points.length < 2) {
       continue;
@@ -250,7 +258,28 @@ function syncRouteGroup(
     const latLngs = route.points.map(
       (point) => [point.lat, point.lon] as [number, number],
     );
-    addGlowingRoute(map, latLngs, lightBasemap, group);
+    layers.set(route.activityId, addGlowingRoute(latLngs, lightBasemap, group));
+  }
+  return layers;
+}
+
+/**
+ * Brings one route forward and dims the rest, or puts every route back as it
+ * was drawn. Styles change in place: redrawing a few hundred glowing routes
+ * on every row the pointer crosses would be a frame each.
+ */
+function applyRouteHighlight(layers: RouteLayers, activityId: string | null): void {
+  const highlighted = activityId !== null && layers.has(activityId);
+  for (const [id, lines] of layers) {
+    const share = highlighted && id !== activityId ? DIMMED_ROUTE_SHARE : 1;
+    for (const { line, opacity } of lines) {
+      line.setStyle({ opacity: opacity * share });
+    }
+  }
+  if (highlighted) {
+    for (const { line } of layers.get(activityId) ?? []) {
+      line.bringToFront();
+    }
   }
 }
 
@@ -293,6 +322,7 @@ export function ActivityGlobeStreetMap({
   focus,
   visits,
   routes,
+  highlightActivityId = null,
   onRequestExit,
 }: ActivityGlobeStreetMapProps) {
   const [baseLayer, setBaseLayer] = useBaseLayerPreference(
@@ -303,6 +333,9 @@ export function ActivityGlobeStreetMap({
   const onExitRef = useRef(onRequestExit);
   const heatLayerRef = useRef<HeatLayerInstance | null>(null);
   const routeGroupRef = useRef<L.LayerGroup | null>(null);
+  const routeLayersRef = useRef<RouteLayers>(new Map());
+  const highlightRef = useRef(highlightActivityId);
+  highlightRef.current = highlightActivityId;
   const mapRef = useRef<L.Map | null>(null);
   const tileLayerRef = useRef<L.Layer | null>(null);
   const lightBasemapRef = useRef(false);
@@ -353,7 +386,8 @@ export function ActivityGlobeStreetMap({
 
     const routeGroup = L.layerGroup().addTo(map);
     routeGroupRef.current = routeGroup;
-    syncRouteGroup(map, routeGroup, routes, lightBasemap);
+    routeLayersRef.current = syncRouteGroup(routeGroup, routes, lightBasemap);
+    applyRouteHighlight(routeLayersRef.current, highlightRef.current);
 
     const fitPoints = collectFitPoints(focus, visits, routes);
 
@@ -390,6 +424,7 @@ export function ActivityGlobeStreetMap({
       resizeObserver.disconnect();
       heatLayerRef.current = null;
       routeGroupRef.current = null;
+      routeLayersRef.current = new Map();
       tileLayerRef.current = null;
       mapRef.current = null;
       map.remove();
@@ -417,7 +452,12 @@ export function ActivityGlobeStreetMap({
       lightBasemapRef.current = lightBasemap;
       heatLayerRef.current?.setLightBasemap(lightBasemap);
       if (routeGroupRef.current) {
-        syncRouteGroup(map, routeGroupRef.current, routes, lightBasemap);
+        routeLayersRef.current = syncRouteGroup(
+          routeGroupRef.current,
+          routes,
+          lightBasemap,
+        );
+        applyRouteHighlight(routeLayersRef.current, highlightRef.current);
       }
     }
     // Routes are read, not watched — the effect below owns their changes.
@@ -435,12 +475,20 @@ export function ActivityGlobeStreetMap({
           : [focus];
     heatLayerRef.current?.setPoints(heatPoints);
 
-    const map = mapRef.current;
     const group = routeGroupRef.current;
-    if (map && group) {
-      syncRouteGroup(map, group, routes, lightBasemapRef.current);
+    if (group) {
+      routeLayersRef.current = syncRouteGroup(
+        group,
+        routes,
+        lightBasemapRef.current,
+      );
+      applyRouteHighlight(routeLayersRef.current, highlightRef.current);
     }
   }, [visits, routes, focus]);
+
+  useEffect(() => {
+    applyRouteHighlight(routeLayersRef.current, highlightActivityId);
+  }, [highlightActivityId]);
 
   return (
     <div

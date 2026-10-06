@@ -12,6 +12,8 @@
 //   two geocoders name it in two languages.
 // - **Days are written "6 Aug 2024", never "Sept"**, the way the Hall of
 //   Records writes the same days.
+// - **A place's months run unbroken to now**: a month with no visit is a bar
+//   of nothing, because the gaps are what the bars are for.
 //
 // Mode: renderer TypeScript with extensionless imports in the graph, so the
 // resolver hook comes along. Run through Electron because a distro Node built
@@ -34,8 +36,11 @@ const {
   formatDayLong,
   formatDayNear,
   homePlace,
+  formatMonthYear,
   placesSummaryLine,
   sortPlaces,
+  sportMix,
+  visitsByMonth,
 } = await load("src/trainingMap/placeSummaries.ts");
 const { bucketVisitsGeographically } = await load(
   "src/trainingMap/activityVisitHeatmap.ts",
@@ -201,6 +206,37 @@ function world(entries) {
   assert.equal(formatDayNear(new Date("2026-09-28T08:00:00").getTime(), now), "28 Sep");
   assert.equal(formatDayNear(new Date("2025-12-14T08:00:00").getTime(), now), "14 Dec 2025");
   assert.equal(formatDayNear(0, now), "");
+}
+
+// --- a place's sports and months -------------------------------------------
+{
+  const mixed = [
+    activity("2026-09-01", { sportType: 104 }),
+    activity("2026-08-01", { sportType: 200 }),
+    activity("2026-07-01", { sportType: 104 }),
+    activity("2026-06-01", { sportType: 102 }),
+    activity("2026-05-01", { sportType: 104 }),
+  ];
+  assert.deepEqual(sportMix(mixed), [
+    { category: "hiking", count: 3 },
+    { category: "bike", count: 1 },
+    { category: "run", count: 1 },
+  ], "most sessions first; a trail run is a run");
+
+  const now = new Date("2026-10-06T12:00:00").getTime();
+  const months = visitsByMonth(
+    [activity("2026-07-02"), activity("2026-07-20"), activity("2026-09-03")],
+    now,
+  );
+  assert.deepEqual(
+    months.map((month) => `${formatMonthYear(month.monthMs)}:${month.count}`),
+    ["Jul 2026:2", "Aug 2026:0", "Sep 2026:1", "Oct 2026:0"],
+    "from the first visit to this month, empty months kept",
+  );
+  const long = visitsByMonth([activity("2020-01-05"), activity("2026-10-01")], now, 12);
+  assert.equal(long.length, 12, "the most recent twelve months, no more");
+  assert.equal(formatMonthYear(long[0].monthMs), "Nov 2025");
+  assert.deepEqual(visitsByMonth([], now), []);
 }
 
 console.log("place summaries: all assertions passed");

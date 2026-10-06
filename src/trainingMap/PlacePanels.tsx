@@ -1,7 +1,11 @@
-import { ChevronLeft, MapPin, ZoomIn } from "lucide-react";
-import { Area, AreaChart, ResponsiveContainer } from "recharts";
-import type { UIEvent } from "react";
+import { ChevronDown, ChevronLeft, Map as MapIcon } from "lucide-react";
+import { useState, type UIEvent } from "react";
 import { OptionGroup } from "../components/OptionGroup";
+import {
+  SPORT_COLOR_LABELS,
+  sportColorCategory,
+} from "../training/sportColors";
+import { resolveSportName } from "../training/sportTypes";
 import { useUnitSystem } from "../units/UnitSystemProvider";
 import {
   distanceUnit,
@@ -11,7 +15,11 @@ import {
 } from "../units/units";
 import { coordinateLabel, type PlaceLabel } from "./placeLabels";
 import {
+  activityTimestampMs,
   formatDayNear,
+  formatMonthYear,
+  sportMix,
+  visitsByMonth,
   type PlaceSort,
   type PlaceSummary,
 } from "./placeSummaries";
@@ -135,14 +143,20 @@ function formatPlaceDuration(seconds: number): string {
   return minutes > 0 ? `${hours} h ${minutes} m` : `${hours} h`;
 }
 
+/** Rows shown before "Show all": a place's latest few are what is asked for. */
+const ACTIVITIES_SHOWN = 5;
+
 interface PlaceDetailProps {
   place: PlaceSummary;
   label: PlaceLabel;
   zooming: boolean;
-  /** The street map is already open: there is nothing closer to zoom to. */
+  /** The street map is already open: there is nothing closer to go to. */
   streetMode: boolean;
   onBack: () => void;
-  onZoomIn: () => void;
+  onStreetView: () => void;
+  onOpenActivity: (activityId: string) => void;
+  /** The row pointed at, so the street map can bring its route forward. */
+  onHoverActivity: (activityId: string | null) => void;
 }
 
 export function PlaceDetail({
@@ -151,45 +165,57 @@ export function PlaceDetail({
   zooming,
   streetMode,
   onBack,
-  onZoomIn,
+  onStreetView,
+  onOpenActivity,
+  onHoverActivity,
 }: PlaceDetailProps) {
   const { unitSystem } = useUnitSystem();
-  const hasClimb = place.elevationMeters > 0;
-  const trend = [...place.activities].reverse().map((activity, order) => ({
-    order,
-    value: hasClimb
-      ? metersToElevation(Math.max(0, activity.elevationGain ?? 0), unitSystem)
-      : metersToDisplayDistance(Math.max(0, activity.distance ?? 0), unitSystem),
-  }));
-  const distance = metersToDisplayDistance(
-    place.distanceMeters,
-    unitSystem,
-  ).toLocaleString(undefined, { maximumFractionDigits: 1 });
+  const [showAll, setShowAll] = useState(false);
+
+  const count = place.activities.length;
+  const mix = sportMix(place.activities);
+  const months = count >= 3 ? visitsByMonth(place.activities, Date.now()) : [];
+  const busiest = months.reduce((max, month) => Math.max(max, month.count), 0);
+  const lastLit = months.reduce(
+    (last, month, index) => (month.count > 0 ? index : last),
+    -1,
+  );
+  const shown = showAll
+    ? place.activities
+    : place.activities.slice(0, ACTIVITIES_SHOWN);
+  const distance = (meters: number) =>
+    metersToDisplayDistance(meters, unitSystem).toLocaleString(undefined, {
+      maximumFractionDigits: 1,
+    });
+  const climb = (meters: number) =>
+    Math.round(metersToElevation(meters, unitSystem)).toLocaleString();
+  const when =
+    count === 1
+      ? formatDayNear(place.lastVisitedMs)
+      : `since ${formatMonthYear(place.firstVisitedMs)} · last ${formatDayNear(place.lastVisitedMs)}`;
+
   return (
-    <div className="training-map-place" key={place.key}>
+    <div className="training-map-place">
       <button type="button" className="training-map-place-back" onClick={onBack}>
         <ChevronLeft size={16} aria-hidden="true" />
         All places
       </button>
       <header className="training-map-place-header">
-        <span className="training-map-place-icon" aria-hidden="true">
-          <MapPin size={18} />
-        </span>
-        <div>
-          <h2>{label.city}</h2>
-          <p>{label.country}</p>
-        </div>
+        <h2>{label.city}</h2>
+        <p>
+          {label.country} · {when}
+        </p>
       </header>
 
       <dl className="training-map-place-metrics">
         <div>
           <dt>Activities</dt>
-          <dd>{place.activities.length.toLocaleString()}</dd>
+          <dd>{count.toLocaleString()}</dd>
         </div>
         <div>
           <dt>Distance</dt>
           <dd>
-            {distance} <small>{distanceUnit(unitSystem)}</small>
+            {distance(place.distanceMeters)} <small>{distanceUnit(unitSystem)}</small>
           </dd>
         </div>
         <div>
@@ -197,64 +223,142 @@ export function PlaceDetail({
           <dd>{formatPlaceDuration(place.durationSeconds)}</dd>
         </div>
         <div>
-          <dt>Last visited</dt>
-          <dd>{formatDayNear(place.lastVisitedMs)}</dd>
+          <dt>Climb</dt>
+          <dd>
+            {climb(place.elevationMeters)} <small>{elevationUnit(unitSystem)}</small>
+          </dd>
         </div>
       </dl>
 
-      <div className="training-map-location-trend">
-        <div>
-          <span>{hasClimb ? "Elevation gained" : "Distance trend"}</span>
-          <strong>
-            {hasClimb
-              ? `${Math.round(metersToElevation(place.elevationMeters, unitSystem)).toLocaleString()} ${elevationUnit(unitSystem)}`
-              : `${distance} ${distanceUnit(unitSystem)}`}
-          </strong>
+      <div className="training-map-place-mix">
+        <div className="training-map-place-mix-bar" aria-hidden="true">
+          {mix.map((share) => (
+            <span
+              key={share.category}
+              style={{
+                width: `${(share.count / count) * 100}%`,
+                background: `var(--sport-${share.category})`,
+              }}
+            />
+          ))}
         </div>
-        {trend.length > 1 ? (
-          <div className="training-map-location-chart" aria-hidden="true">
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={trend}>
-                <defs>
-                  <linearGradient
-                    id="trainingMapLocationFill"
-                    x1="0"
-                    y1="0"
-                    x2="0"
-                    y2="1"
-                  >
-                    <stop offset="0%" stopColor="var(--map-accent)" stopOpacity={0.3} />
-                    <stop offset="100%" stopColor="var(--map-accent)" stopOpacity={0} />
-                  </linearGradient>
-                </defs>
-                <Area
-                  type="monotone"
-                  dataKey="value"
-                  stroke="var(--map-accent)"
-                  strokeWidth={1.8}
-                  fill="url(#trainingMapLocationFill)"
-                  isAnimationActive={false}
-                />
-              </AreaChart>
-            </ResponsiveContainer>
+        <ul aria-label="Sports trained here">
+          {mix.map((share) => (
+            <li key={share.category}>
+              <i
+                aria-hidden="true"
+                style={{ background: `var(--sport-${share.category})` }}
+              />
+              {SPORT_COLOR_LABELS[share.category]} <strong>{share.count.toLocaleString()}</strong>
+            </li>
+          ))}
+        </ul>
+      </div>
+
+      {months.length > 1 ? (
+        <div className="training-map-place-visits">
+          <span className="training-map-place-label">Visits by month</span>
+          <div
+            className="training-map-place-visit-bars"
+            role="img"
+            aria-label={`Visits by month from ${formatMonthYear(months[0].monthMs)} to ${formatMonthYear(months[months.length - 1].monthMs)}, at most ${busiest} in a month`}
+          >
+            {months.map((month, index) => (
+              <span
+                key={month.monthMs}
+                className={
+                  month.count === 0
+                    ? "is-empty"
+                    : index === lastLit
+                      ? "is-latest"
+                      : undefined
+                }
+                style={{
+                  height:
+                    month.count === 0
+                      ? undefined
+                      : `${Math.round(6 + (month.count / busiest) * 30)}px`,
+                }}
+                title={`${formatMonthYear(month.monthMs)}: ${month.count}`}
+              />
+            ))}
           </div>
-        ) : (
-          <p className="training-map-trend-empty">
-            More activities will build a location trend.
-          </p>
-        )}
-        {streetMode ? null : (
+          <div className="training-map-place-visit-axis" aria-hidden="true">
+            <span>{formatMonthYear(months[0].monthMs)}</span>
+            <span>{formatMonthYear(months[months.length - 1].monthMs)}</span>
+          </div>
+        </div>
+      ) : null}
+
+      {streetMode ? null : (
+        <button
+          type="button"
+          className={`training-map-view-action${zooming ? " is-zooming" : ""}`}
+          onClick={onStreetView}
+          disabled={zooming}
+        >
+          <MapIcon size={16} aria-hidden="true" />
+          {zooming ? "Opening street view" : "Street view"}
+        </button>
+      )}
+
+      <section className="training-map-place-activities" aria-label="Activities here">
+        <span className="training-map-place-label">Activities here</span>
+        <ul>
+          {shown.map((activity) => {
+            const category = sportColorCategory(activity.sportType);
+            const sport =
+              resolveSportName(activity) ?? SPORT_COLOR_LABELS[category];
+            const facts = [
+              sport,
+              activity.distance ? `${distance(activity.distance)} ${distanceUnit(unitSystem)}` : null,
+              activity.elevationGain
+                ? `${climb(activity.elevationGain)} ${elevationUnit(unitSystem)}`
+                : null,
+            ].filter(Boolean);
+            return (
+              <li
+                key={activity.activityId}
+                onPointerEnter={() => onHoverActivity(activity.activityId)}
+                onPointerLeave={() => onHoverActivity(null)}
+              >
+                <div>
+                  <button
+                    type="button"
+                    className="training-map-place-activity-title"
+                    onClick={() => onOpenActivity(activity.activityId)}
+                    onFocus={() => onHoverActivity(activity.activityId)}
+                    onBlur={() => onHoverActivity(null)}
+                  >
+                    {activity.name?.trim() || sport}
+                  </button>
+                  <span>
+                    <i
+                      aria-hidden="true"
+                      style={{ background: `var(--sport-${category})` }}
+                    />
+                    {facts.join(" · ")}
+                  </span>
+                </div>
+                <time>
+                  {formatDayNear(activityTimestampMs(activity.startTime))}
+                </time>
+              </li>
+            );
+          })}
+        </ul>
+        {count > ACTIVITIES_SHOWN ? (
           <button
             type="button"
-            className={`training-map-view-action${zooming ? " is-zooming" : ""}`}
-            onClick={onZoomIn}
-            disabled={zooming}
+            className="training-map-place-more"
+            onClick={() => setShowAll((current) => !current)}
+            aria-expanded={showAll}
           >
-            {zooming ? "Zooming in" : "Zoom in"}
-            <ZoomIn size={15} aria-hidden="true" />
+            {showAll ? "Show fewer" : `Show all ${count.toLocaleString()}`}
+            <ChevronDown size={14} aria-hidden="true" />
           </button>
-        )}
-      </div>
+        ) : null}
+      </section>
     </div>
   );
 }

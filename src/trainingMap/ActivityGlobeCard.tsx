@@ -52,6 +52,7 @@ import {
   type ActivityGlobeRendererHandle,
 } from "./ActivityGlobeRenderer";
 import { OptionGroup } from "../components/OptionGroup";
+import { useBackGesture } from "../running/sportPage";
 import { periodLabel } from "../preferences/periodScale";
 import {
   defineSelectionPreference,
@@ -64,6 +65,8 @@ interface ActivityGlobeCardProps {
   connected: boolean;
   detail: TrainingHubActivityDetail | null;
   onSelectActivity: (activity: TrainingHubActivity) => void;
+  /** Opens an activity on its own screen, from a place's list of them. */
+  onOpenActivity: (activityId: string) => void;
 }
 
 type ActivityPeriod = "all" | "year" | "90-days" | "custom";
@@ -121,6 +124,13 @@ const PLACE_SORT_PREFERENCE = defineSelectionPreference<PlaceSort>({
   validate: (value): value is PlaceSort =>
     value === "recent" || value === "visits",
 });
+
+/**
+ * The place open beside the globe, kept for the session rather than the mount:
+ * an activity opened from a place leaves this screen, and Back from it should
+ * land on the place it was opened from, not on the list.
+ */
+let rememberedPlaceKey: string | null = null;
 
 const MAX_RENDERED_POINTS = 900;
 
@@ -189,6 +199,7 @@ export function ActivityGlobeCard({
   connected,
   detail,
   onSelectActivity,
+  onOpenActivity,
 }: ActivityGlobeCardProps) {
   const globeRendererRef = useRef<ActivityGlobeRendererHandle>(null);
   const streetEnterTimerRef = useRef<number | null>(null);
@@ -200,9 +211,13 @@ export function ActivityGlobeCard({
   const [placeSort, setPlaceSort] = useSelectionPreference(
     PLACE_SORT_PREFERENCE,
   );
-  const [selectedLocationKey, setSelectedLocationKey] = useState<string | null>(
-    null,
-  );
+  const [selectedLocationKey, setSelectedLocationKeyState] = useState<
+    string | null
+  >(rememberedPlaceKey);
+  const setSelectedLocationKey = (key: string | null) => {
+    rememberedPlaceKey = key;
+    setSelectedLocationKeyState(key);
+  };
   const [labelReach, setLabelReach] = useState(LABEL_BATCH);
   // Seeded from storage, so the names a previous launch resolved are on the
   // screen in the first paint instead of arriving one request later.
@@ -262,6 +277,11 @@ export function ActivityGlobeCard({
   // One place pointed at, from either side: a row in the list lights its pin,
   // and a pin under the pointer lights its row.
   const [hoveredKey, setHoveredKey] = useState<string | null>(null);
+  // The activity row pointed at in an open place: its route comes forward on
+  // the street map.
+  const [hoveredActivityId, setHoveredActivityId] = useState<string | null>(
+    null,
+  );
   const [streetFocus, setStreetFocus] = useState<StreetMapFocus | null>(null);
   const [zoomingToStreet, setZoomingToStreet] = useState(false);
   const streetMode = streetFocus !== null;
@@ -320,9 +340,12 @@ export function ActivityGlobeCard({
     return entries;
   }, [hoveredKey, places, placeLabels, selectedLocationKey]);
 
+  // A place that is no longer on the map is let go — but not while the map is
+  // still empty, which is every mount before the visits are read back.
   useEffect(() => {
     if (
       selectedLocationKey &&
+      places.length > 0 &&
       !places.some((place) => place.key === selectedLocationKey)
     ) {
       setSelectedLocationKey(null);
@@ -368,7 +391,15 @@ export function ActivityGlobeCard({
     };
   }, [labelReach, places, selectedPlace, sortedPlaces]);
 
+  // A new period is a new map: whatever was open belongs to the old one. The
+  // first run is the mount, which must keep a place remembered from before.
+  const periodKey = `${period}|${customStart}|${customEnd}`;
+  const periodKeyRef = useRef(periodKey);
   useEffect(() => {
+    if (periodKeyRef.current === periodKey) {
+      return;
+    }
+    periodKeyRef.current = periodKey;
     if (streetEnterTimerRef.current !== null) {
       window.clearTimeout(streetEnterTimerRef.current);
       streetEnterTimerRef.current = null;
@@ -378,7 +409,7 @@ export function ActivityGlobeCard({
     setZoomingToStreet(false);
     setCanResetView(false);
     setLabelReach(LABEL_BATCH);
-  }, [period, customStart, customEnd]);
+  }, [periodKey]);
 
   const enterStreetFocus = (focus: StreetMapFocus) => {
     if (streetEnterTimerRef.current !== null) {
@@ -471,8 +502,19 @@ export function ActivityGlobeCard({
     }
     setZoomingToStreet(false);
     setStreetFocus(null);
+    setHoveredActivityId(null);
     setSelectedLocationKey(null);
   };
+
+  // The mouse's back button steps back one layer, as it does from a run's
+  // page: out of the street map to the globe, then from a place to the list.
+  useBackGesture(() => {
+    if (streetFocus) {
+      exitStreetMode();
+    } else if (selectedLocationKey) {
+      showAllPlaces();
+    }
+  });
 
   useEffect(
     () => () => {
@@ -715,6 +757,7 @@ export function ActivityGlobeCard({
                 focus={streetFocus}
                 visits={visits}
                 routes={streetRoutes}
+                highlightActivityId={hoveredActivityId}
                 onRequestExit={exitStreetMode}
               />
             ) : null}
@@ -781,12 +824,15 @@ export function ActivityGlobeCard({
         <aside className="training-map-side panel" aria-label="Places">
           {selectedPlace ? (
             <PlaceDetail
+              key={selectedPlace.key}
               place={selectedPlace}
               label={placeLabelOf(selectedPlace, placeLabels)}
               zooming={zoomingToStreet}
               streetMode={streetMode}
               onBack={showAllPlaces}
-              onZoomIn={zoomIntoSelectedLocation}
+              onStreetView={zoomIntoSelectedLocation}
+              onOpenActivity={onOpenActivity}
+              onHoverActivity={setHoveredActivityId}
             />
           ) : mapLoading ? (
             <div className="training-map-side-loading" role="status" aria-label="Mapping GPS activities">

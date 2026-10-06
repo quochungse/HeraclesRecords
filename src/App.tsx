@@ -2056,6 +2056,9 @@ export default function App() {
                   connected={Boolean(trainingHubStatus?.authenticated)}
                   detail={trainingHubActivityDetail}
                   onSelectActivity={handleTrainingHubActivityDetail}
+                  onOpenActivity={(activityId) =>
+                    openActivityFrom(activityId, "places")
+                  }
                   onOpenOverview={() => setActiveView("overview")}
                 />
               </Suspense>

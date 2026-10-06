@@ -10,6 +10,7 @@ interface TrainingMapViewProps {
   connected: boolean;
   detail: TrainingHubActivityDetail | null;
   onSelectActivity: (activity: TrainingHubActivity) => void;
+  onOpenActivity: (activityId: string) => void;
   onOpenOverview: () => void;
 }
 
@@ -33,6 +34,7 @@ export function TrainingMapView({
   connected,
   detail,
   onSelectActivity,
+  onOpenActivity,
   onOpenOverview,
 }: TrainingMapViewProps) {
   if (!connected) {
@@ -71,6 +73,7 @@ export function TrainingMapView({
       connected={connected}
       detail={detail}
       onSelectActivity={onSelectActivity}
+      onOpenActivity={onOpenActivity}
     />
   );
 }
