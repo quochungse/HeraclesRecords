@@ -21,21 +21,24 @@ import {
   HemisphereLight,
   MeshStandardMaterial,
   type Light,
+  LineSegments,
   NormalBlending,
   Points,
   ShaderMaterial,
   SRGBColorSpace,
   Vector2,
 } from "three";
-import type { GeoHeatBucket, GlobePoint } from "./activityVisitHeatmap";
+import type { GlobePlace, GlobePoint } from "./activityVisitHeatmap";
 import {
   FIT_MIN_ALTITUDE,
   SINGLE_PLACE_ALTITUDE,
+  angularDistanceDegrees,
   clampLatitude,
   computeFitView,
   focusLatitudeOffset,
   labelSeparationDegrees,
   landDetailLevels,
+  nearestOnScreen,
   pickSpacedPlaces,
   type GlobeCameraView,
 } from "./globeFraming";
@@ -52,21 +55,31 @@ function withAlpha(hex: string, alpha: number): string {
 
 interface ActivityGlobeRendererProps {
   frameKey: string;
-  locations: GeoHeatBucket[];
+  locations: GlobePlace[];
   routePoints: GlobePoint[];
-  selectedLocation: GeoHeatBucket | null;
+  selectedLocation: GlobePlace | null;
+  /** A place pointed at — in the list beside the globe, or on the globe itself. */
+  hoveredKey: string | null;
   /** City name per location key, for the labels pinned on the globe. */
   labels: Record<string, string>;
   streetMode: boolean;
   onError: (error: boolean) => void;
-  onHoverChange: (hovering: boolean) => void;
-  onRequestStreet: (focus: { lat: number; lon: number }) => void;
-  onSelectLocation: (bucket: GeoHeatBucket) => void;
+  /** The place under the pointer on the globe, or null when it leaves them. */
+  onHoverChange: (key: string | null) => void;
+  /** Zooming in handed over: where to open, and where the pointer was. */
+  onRequestStreet: (focus: {
+    lat: number;
+    lon: number;
+    zoomedIn: { anchor: { x: number; y: number } | null };
+  }) => void;
+  onSelectLocation: (place: GlobePlace) => void;
   onViewChange: (changed: boolean) => void;
 }
 
 export interface ActivityGlobeRendererHandle {
   resetView: (duration?: number) => void;
+  /** Closer under 1, further over it — the panel's + and − buttons. */
+  zoomBy: (factor: number) => void;
   zoomToLocation: (
     focus: { lat: number; lon: number },
     duration?: number,
@@ -75,7 +88,7 @@ export interface ActivityGlobeRendererHandle {
 
 type GlobeView = GlobeCameraView;
 
-interface ActivityPoint extends GeoHeatBucket {
+interface ActivityPoint extends GlobePlace {
   intensity: number;
 }
 
@@ -84,17 +97,25 @@ interface LandLayerData {
   object: Points<BufferGeometry, ShaderMaterial>;
 }
 
+interface BorderLayerData {
+  kind: "borders";
+  object: LineSegments<BufferGeometry, ShaderMaterial>;
+}
+
 interface LandGeometryData {
   positions: Float32Array;
   strengths: Float32Array;
   /** 0 = coarse lattice, 1 = half spacing, 2 = quarter spacing. */
   tiers: Float32Array;
+  /** Country borders and the coast, as segment pairs. */
+  borders: Float32Array;
 }
 
 interface LandGeometryMessage {
   positions: ArrayBuffer;
   strengths: ArrayBuffer;
   tiers: ArrayBuffer;
+  borders: ArrayBuffer;
 }
 
 interface RouteLayerData {
@@ -105,8 +126,18 @@ const GLOBE_RADIUS = 100;
 const DEFAULT_VIEW: GlobeView = { lat: 18, lng: -20, altitude: 2.2 };
 const FRAMING_VERSION = "fit-all-places-v1";
 const CAMERA_FOCUS_MS = 600;
-const STREET_VIEW_ALTITUDE = 0.42;
-const STREET_TRANSITION_ALTITUDE = 0.36;
+/**
+ * Closing in past this hands over to the street map: about 1,500 km up, three
+ * steps of the + button from the closest framing. It was 0.42, two steps, which
+ * left too little of the globe — a country and its neighbours — to zoom
+ * through before the street map took over.
+ */
+const STREET_VIEW_ALTITUDE = 0.24;
+const STREET_TRANSITION_ALTITUDE = 0.2;
+/** How close and how far the camera goes, in globe radii above the surface. */
+const MIN_CAMERA_ALTITUDE = 0.18;
+const MAX_CAMERA_ALTITUDE = 4.2;
+const ZOOM_BUTTON_MS = 320;
 const IDLE_DELAY_MS = 4_200;
 const IDLE_ROTATION_SPEED = 0.08;
 /** Above this the globe reads as a globe and an idle spin is decorative;
@@ -138,6 +169,7 @@ function loadLandGeometry(): Promise<LandGeometryData> {
         positions: new Float32Array(event.data.positions),
         strengths: new Float32Array(event.data.strengths),
         tiers: new Float32Array(event.data.tiers),
+        borders: new Float32Array(event.data.borders),
       };
       worker.terminate();
       resolve(landGeometryCache);
@@ -150,6 +182,13 @@ function loadLandGeometry(): Promise<LandGeometryData> {
   });
   return landGeometryPromise;
 }
+
+/**
+ * The land dots and the borders are scenery. globe.gl casts a ray at the
+ * pointer twenty times a second, idle or not, and through these that was
+ * ~190,000 dots and ~79,000 segments a time, for objects nothing picks.
+ */
+function skipRaycast(): void {}
 
 /** Dot size at the coarse lattice; finer tiers divide it by √density. */
 function basePointSize(paperTheme: boolean): number {
@@ -229,8 +268,68 @@ function createGeographyPoints(
   const object = new Points(geometry, material);
   object.frustumCulled = false;
   object.renderOrder = 2;
+  object.raycast = skipRaycast;
   return { kind: "geography", object };
 }
+
+/**
+ * The lines between countries and along the coast: a hairline in the dots' own
+ * ink, quieter than the dots, and faded towards the rim the same way so the far
+ * side of the globe never shows through.
+ */
+function createBorderLines(
+  paperTheme: boolean,
+  borders: Float32Array,
+): BorderLayerData {
+  const geometry = new BufferGeometry();
+  geometry.setAttribute("position", new BufferAttribute(borders, 3));
+  const material = new ShaderMaterial({
+    transparent: true,
+    depthTest: true,
+    depthWrite: false,
+    blending: NormalBlending,
+    uniforms: {
+      uColor: { value: new Color(paperTheme ? "#5f6b74" : "#c4d5e1") },
+      uOpacity: { value: paperTheme ? 0.42 : 0.26 },
+    },
+    vertexShader: `
+      varying float vFacing;
+
+      void main() {
+        vec3 viewNormal = normalize(normalMatrix * normalize(position));
+        vFacing = smoothstep(0.03, 0.72, clamp(viewNormal.z, 0.0, 1.0));
+        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+      }
+    `,
+    fragmentShader: `
+      uniform vec3 uColor;
+      uniform float uOpacity;
+      varying float vFacing;
+
+      void main() {
+        gl_FragColor = vec4(uColor, uOpacity * vFacing);
+      }
+    `,
+  });
+  const object = new LineSegments(geometry, material);
+  object.frustumCulled = false;
+  object.renderOrder = 3;
+  object.raycast = skipRaycast;
+  return { kind: "borders", object };
+}
+
+// Accessors handed to globe.gl. A new function is a changed prop, and a changed
+// accessor makes three-globe digest its whole layer again, so the ones that
+// read nothing but their datum are made once here, and the rest are memoised:
+// a hover re-renders the globe, and it used to rebuild the route and every
+// ring with it.
+const placeLat = (datum: object) => (datum as GlobePlace).lat;
+const placeLng = (datum: object) => (datum as GlobePlace).lon;
+const routePathPoints = (path: object) => (path as RouteLayerData).points;
+const routePointLat = (point: object) => (point as GlobePoint).lat;
+const routePointLng = (point: object) => (point as GlobePoint).lon;
+const noTooltip = () => "";
+const pointerOnPoints = (type: string) => type === "point";
 
 function viewChanged(current: GlobeView, baseline: GlobeView): boolean {
   const longitudeDelta = Math.abs(
@@ -252,6 +351,7 @@ const ActivityGlobeRendererComponent = forwardRef<
     locations,
     routePoints,
     selectedLocation,
+    hoveredKey,
     labels,
     streetMode,
     onError,
@@ -271,7 +371,12 @@ const ActivityGlobeRendererComponent = forwardRef<
   const interactionRef = useRef(false);
   const userAdjustedRef = useRef(false);
   const streetRequestedRef = useRef(false);
+  // Where the pointer last was over the globe, in the canvas's own pixels.
+  const pointerRef = useRef<{ x: number; y: number } | null>(null);
   const idleTimerRef = useRef<number | null>(null);
+  const hadSelectionRef = useRef(false);
+  const selectedRef = useRef(selectedLocation);
+  selectedRef.current = selectedLocation;
   const [ready, setReady] = useState(false);
   const [size, setSize] = useState({ width: 1, height: 1 });
   const [paperTheme, setPaperTheme] = useState(
@@ -325,9 +430,16 @@ const ActivityGlobeRendererComponent = forwardRef<
         : null,
     [landGeometry, paperTheme],
   );
-  const landLayerData = useMemo(
-    () => (landLayer ? [landLayer] : []),
-    [landLayer],
+  const borderLayer = useMemo(
+    () =>
+      landGeometry && landGeometry.borders.length > 0
+        ? createBorderLines(paperTheme, landGeometry.borders)
+        : null,
+    [landGeometry, paperTheme],
+  );
+  const landLayerData = useMemo<Array<LandLayerData | BorderLayerData>>(
+    () => [landLayer, borderLayer].filter((layer) => layer !== null),
+    [borderLayer, landLayer],
   );
 
   /**
@@ -375,8 +487,8 @@ const ActivityGlobeRendererComponent = forwardRef<
 
   /**
    * The view that holds every place at once. Falls back to the latest GPS track
-   * before visit centroids have been bucketed, and to the whole globe when
-   * there is nothing to frame at all.
+   * before the places are found, and to the whole globe when there is nothing
+   * to frame at all.
    */
   const baselineView = useMemo<GlobeView>(
     () =>
@@ -411,18 +523,31 @@ const ActivityGlobeRendererComponent = forwardRef<
   const markerScale = frameAltitude / FIT_MIN_ALTITUDE;
 
   const labelData = useMemo(() => {
-    if (selectedLocation) {
-      return [selectedLocation];
-    }
-    if (!highlightAll) {
-      return [];
-    }
-    return pickSpacedPlaces(
-      locations.filter((location) => Boolean(labels[location.key])),
-      MAX_HIGHLIGHT_LABELS,
-      labelSeparationDegrees(baselineView.altitude),
-    );
-  }, [baselineView.altitude, highlightAll, labels, locations, selectedLocation]);
+    const picked = selectedLocation
+      ? [selectedLocation]
+      : highlightAll
+        ? pickSpacedPlaces(
+            locations.filter((location) => Boolean(labels[location.key])),
+            MAX_HIGHLIGHT_LABELS,
+            labelSeparationDegrees(baselineView.altitude),
+          )
+        : [];
+    // The place pointed at always says its name, wherever the spacing rule
+    // left it out.
+    const hovered = hoveredKey
+      ? locations.find((location) => location.key === hoveredKey)
+      : undefined;
+    return hovered && !picked.some((location) => location.key === hovered.key)
+      ? [...picked, hovered]
+      : picked;
+  }, [
+    baselineView.altitude,
+    highlightAll,
+    hoveredKey,
+    labels,
+    locations,
+    selectedLocation,
+  ]);
 
   const stopIdleRotation = useCallback(() => {
     if (idleTimerRef.current !== null) {
@@ -435,11 +560,15 @@ const ActivityGlobeRendererComponent = forwardRef<
     }
   }, []);
 
+  // The pick is read through its ref: the place is a new object whenever the
+  // places are worked out again (every batch of visits while they load), and
+  // a new callback here re-ran the selection effect, which flew the camera
+  // back to the place under the athlete's hands.
   const scheduleIdleRotation = useCallback(() => {
     stopIdleRotation();
     if (
       reducedMotion ||
-      selectedLocation ||
+      selectedRef.current ||
       streetMode ||
       baselineRef.current.altitude < IDLE_ROTATION_MIN_ALTITUDE
     ) {
@@ -452,7 +581,30 @@ const ActivityGlobeRendererComponent = forwardRef<
         controls.autoRotateSpeed = IDLE_ROTATION_SPEED;
       }
     }, IDLE_DELAY_MS);
-  }, [reducedMotion, selectedLocation, stopIdleRotation, streetMode]);
+  }, [reducedMotion, stopIdleRotation, streetMode]);
+
+  /**
+   * Where the screen put the camera: on the picked place, or framing them all.
+   * Reset returns here, and the camera only counts as moved — the Reset button
+   * only shows — once the athlete has taken it somewhere else themselves.
+   */
+  const homeView = useCallback((): GlobeView => {
+    const selected = selectedRef.current;
+    if (!selected) {
+      return baselineRef.current;
+    }
+    // Never further out than the overview: picking a place should close in on
+    // it, and the fitted overview can already be closer than globe scale.
+    const altitude = Math.min(
+      baselineRef.current.altitude,
+      SINGLE_PLACE_ALTITUDE,
+    );
+    return {
+      lat: clampLatitude(selected.lat + focusLatitudeOffset(altitude)),
+      lng: selected.lon,
+      altitude,
+    };
+  }, []);
 
   const resetView = useCallback(
     (duration = 600) => {
@@ -460,13 +612,13 @@ const ActivityGlobeRendererComponent = forwardRef<
       userAdjustedRef.current = false;
       stopIdleRotation();
       globeRef.current?.pointOfView(
-        baselineRef.current,
+        homeView(),
         reducedMotion ? 0 : duration,
       );
       onViewChange(false);
       scheduleIdleRotation();
     },
-    [onViewChange, reducedMotion, scheduleIdleRotation, stopIdleRotation],
+    [homeView, onViewChange, reducedMotion, scheduleIdleRotation, stopIdleRotation],
   );
 
   const zoomToLocation = useCallback(
@@ -492,10 +644,123 @@ const ActivityGlobeRendererComponent = forwardRef<
     [onViewChange, reducedMotion, stopIdleRotation],
   );
 
+  /**
+   * Where the street map opens when zooming in hands over to it: on a place of
+   * the athlete's near the pointer — near the middle, for the + button — when
+   * one is within `STREET_SNAP_PX` on screen, put under the pointer. With none
+   * that near, on the very point under the pointer (the middle, for the
+   * button), and nothing else: the street map used to pull itself to any route
+   * within 130 km of the globe's centre, so zooming at the sea off Đà Nẵng
+   * opened on Đà Nẵng.
+   */
+  const streetFocusFrom = useCallback(
+    (view: GlobeView, anchor: { x: number; y: number } | null) => {
+      const zoomedIn = { anchor };
+      const fallback = { lat: view.lat, lon: view.lng, zoomedIn };
+      const globe = globeRef.current;
+      if (!globe) {
+        return fallback;
+      }
+      const centre = { lat: view.lat, lon: view.lng };
+      const place = nearestOnScreen(
+        anchor ?? globe.getScreenCoords(view.lat, view.lng),
+        locations
+          // A place behind the globe projects onto the screen too.
+          .filter((location) => angularDistanceDegrees(centre, location) < 75)
+          .map((location) => ({
+            item: location,
+            ...globe.getScreenCoords(location.lat, location.lon),
+          })),
+      );
+      if (place) {
+        return { lat: place.lat, lon: place.lon, zoomedIn };
+      }
+      const pointed = anchor ? globe.toGlobeCoords(anchor.x, anchor.y) : null;
+      return pointed
+        ? { lat: pointed.lat, lon: pointed.lng, zoomedIn }
+        : fallback;
+    },
+    [locations],
+  );
+
+  // A step of the buttons goes where a few turns of the wheel would, street
+  // view included: closing in past its altitude hands over to the street map
+  // the way scrolling does, or a button would stop where the wheel goes on.
+  const zoomBy = useCallback(
+    (factor: number) => {
+      const globe = globeRef.current;
+      if (!globe) {
+        return;
+      }
+      const view = globe.pointOfView();
+      const altitude = Math.min(
+        MAX_CAMERA_ALTITUDE,
+        Math.max(MIN_CAMERA_ALTITUDE, view.altitude * factor),
+      );
+      // With the camera on a picked place, the place sits below centre by an
+      // offset that scales with altitude. Held in degrees it slid further down
+      // the frame at every step, and the street map opened on whatever was
+      // nearest the middle: 200 km north of it, or the next place up.
+      const selected = selectedRef.current;
+      const picked =
+        selected &&
+        angularDistanceDegrees(
+          { lat: view.lat, lon: view.lng },
+          {
+            lat: clampLatitude(selected.lat + focusLatitudeOffset(view.altitude)),
+            lon: selected.lon,
+          },
+        ) < 0.5
+          ? selected
+          : null;
+      userAdjustedRef.current = true;
+      stopIdleRotation();
+      if (
+        !streetMode &&
+        altitude <= STREET_VIEW_ALTITUDE &&
+        (locations.length > 0 || routePoints.length > 0)
+      ) {
+        streetRequestedRef.current = true;
+        // On a picked place, the place is what is being zoomed at, though the
+        // pick sits it below centre: a place nearer the middle would win.
+        onRequestStreet(
+          streetFocusFrom(
+            view,
+            picked ? globe.getScreenCoords(picked.lat, picked.lon) : null,
+          ),
+        );
+        return;
+      }
+      globe.pointOfView(
+        picked
+          ? {
+              lat: clampLatitude(picked.lat + focusLatitudeOffset(altitude)),
+              lng: picked.lon,
+              altitude,
+            }
+          : { lat: view.lat, lng: view.lng, altitude },
+        reducedMotion ? 0 : ZOOM_BUTTON_MS,
+      );
+      onViewChange(true);
+      scheduleIdleRotation();
+    },
+    [
+      locations.length,
+      onRequestStreet,
+      onViewChange,
+      reducedMotion,
+      routePoints.length,
+      scheduleIdleRotation,
+      stopIdleRotation,
+      streetFocusFrom,
+      streetMode,
+    ],
+  );
+
   useImperativeHandle(
     forwardedRef,
-    () => ({ resetView, zoomToLocation }),
-    [resetView, zoomToLocation],
+    () => ({ resetView, zoomBy, zoomToLocation }),
+    [resetView, zoomBy, zoomToLocation],
   );
 
   useEffect(() => {
@@ -598,7 +863,7 @@ const ActivityGlobeRendererComponent = forwardRef<
     globeRef.current.lights(lights);
   }, [lights, ready]);
 
-  // Frames every place at once. Visit centroids stream in after mount, so this
+  // Frames every place at once. Places stream in after mount, so this
   // re-frames as they land — until the person moves the camera themselves.
   useEffect(() => {
     if (!ready) {
@@ -638,35 +903,38 @@ const ActivityGlobeRendererComponent = forwardRef<
     streetMode,
   ]);
 
+  // The camera follows the pick: onto a place when one is picked, and back to
+  // every place when it is let go. Either move is the screen's, not the
+  // athlete's, so it leaves nothing to reset.
   useEffect(() => {
     if (!ready) {
       return;
     }
     if (!selectedLocation) {
+      if (hadSelectionRef.current) {
+        hadSelectionRef.current = false;
+        userAdjustedRef.current = false;
+        globeRef.current?.pointOfView(
+          baselineRef.current,
+          reducedMotion ? 0 : CAMERA_FOCUS_MS,
+        );
+        onViewChange(false);
+      }
       scheduleIdleRotation();
       return;
     }
 
+    hadSelectionRef.current = true;
+    userAdjustedRef.current = false;
     stopIdleRotation();
-    // Never further out than the overview: picking a place should close in on
-    // it, and the fitted overview can already be closer than globe scale.
     // `baselineRef` is current here — the framing effect above runs first.
-    const altitude = Math.min(
-      baselineRef.current.altitude,
-      SINGLE_PLACE_ALTITUDE,
-    );
     globeRef.current?.pointOfView(
-      {
-        lat: clampLatitude(
-          selectedLocation.lat + focusLatitudeOffset(altitude),
-        ),
-        lng: selectedLocation.lon,
-        altitude,
-      },
+      homeView(),
       reducedMotion ? 0 : CAMERA_FOCUS_MS,
     );
-    onViewChange(true);
+    onViewChange(false);
   }, [
+    homeView,
     onViewChange,
     ready,
     reducedMotion,
@@ -687,8 +955,8 @@ const ActivityGlobeRendererComponent = forwardRef<
     controls.enableZoom = true;
     controls.rotateSpeed = 0.42;
     controls.zoomSpeed = 0.72;
-    controls.minDistance = GLOBE_RADIUS * 1.32;
-    controls.maxDistance = GLOBE_RADIUS * 5.2;
+    controls.minDistance = GLOBE_RADIUS * (1 + MIN_CAMERA_ALTITUDE);
+    controls.maxDistance = GLOBE_RADIUS * (1 + MAX_CAMERA_ALTITUDE);
     controls.autoRotate = false;
     controls.autoRotateSpeed = IDLE_ROTATION_SPEED;
 
@@ -748,7 +1016,7 @@ const ActivityGlobeRendererComponent = forwardRef<
   const handleZoom = useCallback(
     (view: GlobeView) => {
       applyLandDetail(view.altitude);
-      onViewChange(viewChanged(view, baselineRef.current));
+      onViewChange(userAdjustedRef.current && viewChanged(view, homeView()));
       if (
         interactionRef.current &&
         !streetMode &&
@@ -758,46 +1026,56 @@ const ActivityGlobeRendererComponent = forwardRef<
       ) {
         streetRequestedRef.current = true;
         stopIdleRotation();
-        onRequestStreet({ lat: view.lat, lon: view.lng });
+        onRequestStreet(streetFocusFrom(view, pointerRef.current));
       }
     },
     [
       applyLandDetail,
+      homeView,
       locations.length,
       onRequestStreet,
       onViewChange,
       routePoints.length,
       stopIdleRotation,
+      streetFocusFrom,
       streetMode,
     ],
   );
 
   const handlePointClick = useCallback(
-    (point: object) => onSelectLocation(point as GeoHeatBucket),
+    (point: object) => onSelectLocation(point as GlobePlace),
     [onSelectLocation],
   );
 
+  // globe.gl keeps casting at the pointer's last spot once it has left, so a
+  // moving camera would light pins under a pointer that is somewhere else —
+  // and the row beside them. The hover ends when the pointer leaves.
   const handlePointHover = useCallback(
-    (point: object | null) => onHoverChange(Boolean(point)),
+    (point: object | null) => {
+      if (pointerRef.current) {
+        onHoverChange(point ? (point as GlobePlace).key : null);
+      }
+    },
     [onHoverChange],
   );
 
   const makeHtmlLabel = useCallback(
     (datum: object) => {
-      const location = datum as GeoHeatBucket;
+      const location = datum as GlobePlace;
       const anchor = document.createElement("div");
       anchor.className = "training-map-globe-label-anchor";
       anchor.dataset.locationKey = location.key;
       const label = document.createElement("span");
-      const selected = location.key === selectedLocation?.key;
-      label.className = selected
+      const lit =
+        location.key === selectedLocation?.key || location.key === hoveredKey;
+      label.className = lit
         ? "training-map-globe-label"
         : "training-map-globe-label is-secondary";
       label.textContent = labels[location.key] ?? "";
       anchor.append(label);
       return anchor;
     },
-    [labels, selectedLocation?.key],
+    [hoveredKey, labels, selectedLocation?.key],
   );
 
   const modifyHtmlLabelVisibility = useCallback(
@@ -809,12 +1087,78 @@ const ActivityGlobeRendererComponent = forwardRef<
   );
 
   const customThreeObject = useCallback(
-    (datum: object) => (datum as LandLayerData).object,
+    (datum: object) => (datum as LandLayerData | BorderLayerData).object,
     [],
   );
 
+  // Places, and the globe itself: let through, the globe stands in front of
+  // the pins on its far side, which were otherwise hovered and picked through it.
+  const tone = ACCENT_PALETTE_DETAILS[accent][paperTheme ? "paper" : "dark"];
+  const selectedKey = selectedLocation?.key;
+
+  const pointAltitude = useCallback(
+    (point: object) => {
+      const activity = point as ActivityPoint;
+      const base =
+        activity.key === selectedKey ? 0.008 : highlightAll ? 0.006 : 0.0035;
+      // Scaled like the radius, but never below the land dots (0.0025) —
+      // a pin that sinks under the geography stops reading as a marker.
+      return Math.max(0.003, base * markerScale);
+    },
+    [highlightAll, markerScale, selectedKey],
+  );
+
+  const pointRadius = useCallback(
+    (point: object) => {
+      const activity = point as ActivityPoint;
+      if (activity.key === selectedKey) {
+        return 0.28 * markerScale;
+      }
+      const radius = highlightAll
+        ? 0.17 + activity.intensity * 0.11
+        : 0.1 + activity.intensity * 0.1;
+      // Pointed at, a pin grows; the busiest are already larger than 0.24.
+      return (
+        (activity.key === hoveredKey ? Math.max(0.24, radius * 1.15) : radius) *
+        markerScale
+      );
+    },
+    [highlightAll, hoveredKey, markerScale, selectedKey],
+  );
+
+  const pointColor = useCallback(
+    (point: object) => {
+      const activity = point as ActivityPoint;
+      if (activity.key === selectedKey || activity.key === hoveredKey) {
+        return tone.strong;
+      }
+      if (highlightAll) {
+        return withAlpha(tone.strong, paperTheme ? 0.94 : 0.88);
+      }
+      return withAlpha(tone.accent, paperTheme ? 0.76 : 0.55);
+    },
+    [highlightAll, hoveredKey, paperTheme, selectedKey, tone],
+  );
+
+  const ringColor = useCallback(
+    () =>
+      paperTheme
+        ? [
+            "rgba(8, 123, 91, 0.62)",
+            "rgba(8, 123, 91, 0.22)",
+            "rgba(8, 123, 91, 0)",
+          ]
+        : [
+            "rgba(131, 243, 206, 0.7)",
+            "rgba(73, 207, 163, 0.24)",
+            "rgba(73, 207, 163, 0)",
+          ],
+    [paperTheme],
+  );
+
   const pointerEventsFilter = useCallback(
-    (_object: unknown, data?: object) =>
+    (object: unknown, data?: object) =>
+      (object as { __globeObjType?: string }).__globeObjType === "globe" ||
       Boolean(data && "key" in data && "count" in data),
     [],
   );
@@ -824,7 +1168,18 @@ const ActivityGlobeRendererComponent = forwardRef<
       ref={containerRef}
       className={`activity-globe-webgl${streetMode ? " is-street-hidden" : ""}`}
       onPointerEnter={stopIdleRotation}
-      onPointerLeave={scheduleIdleRotation}
+      onPointerMove={(event) => {
+        const bounds = event.currentTarget.getBoundingClientRect();
+        pointerRef.current = {
+          x: event.clientX - bounds.left,
+          y: event.clientY - bounds.top,
+        };
+      }}
+      onPointerLeave={() => {
+        pointerRef.current = null;
+        onHoverChange(null);
+        scheduleIdleRotation();
+      }}
     >
       <Globe
         ref={globeRef}
@@ -843,92 +1198,45 @@ const ActivityGlobeRendererComponent = forwardRef<
         customLayerData={landLayerData}
         customThreeObject={customThreeObject}
         pointsData={activityPoints}
-        pointLat={(point) => (point as ActivityPoint).lat}
-        pointLng={(point) => (point as ActivityPoint).lon}
-        pointAltitude={(point) => {
-          const activity = point as ActivityPoint;
-          const base =
-            activity.key === selectedLocation?.key
-              ? 0.008
-              : highlightAll
-                ? 0.006
-                : 0.0035;
-          // Scaled like the radius, but never below the land dots (0.0025) —
-          // a pin that sinks under the geography stops reading as a marker.
-          return Math.max(0.003, base * markerScale);
-        }}
-        pointRadius={(point) => {
-          const activity = point as ActivityPoint;
-          if (activity.key === selectedLocation?.key) {
-            return 0.28 * markerScale;
-          }
-          return (
-            (highlightAll
-              ? 0.17 + activity.intensity * 0.11
-              : 0.1 + activity.intensity * 0.1) * markerScale
-          );
-        }}
-        pointColor={(point) => {
-          const activity = point as ActivityPoint;
-          const tone = ACCENT_PALETTE_DETAILS[accent][
-            paperTheme ? "paper" : "dark"
-          ];
-          if (activity.key === selectedLocation?.key) {
-            return tone.strong;
-          }
-          if (highlightAll) {
-            return withAlpha(tone.strong, paperTheme ? 0.94 : 0.88);
-          }
-          return withAlpha(tone.accent, paperTheme ? 0.76 : 0.55);
-        }}
+        pointLat={placeLat}
+        pointLng={placeLng}
+        pointAltitude={pointAltitude}
+        pointRadius={pointRadius}
+        pointColor={pointColor}
         pointResolution={12}
         pointsMerge={false}
         pointsTransitionDuration={0}
-        pointLabel={() => ""}
+        pointLabel={noTooltip}
         onPointClick={handlePointClick}
         onPointHover={handlePointHover}
         pathsData={pathsData}
-        pathPoints={(path) => (path as RouteLayerData).points}
-        pathPointLat={(point) => (point as GlobePoint).lat}
-        pathPointLng={(point) => (point as GlobePoint).lon}
+        pathPoints={routePathPoints}
+        pathPointLat={routePointLat}
+        pathPointLng={routePointLng}
         pathPointAlt={0.006}
         pathResolution={0.7}
-        pathColor={() =>
-          ACCENT_PALETTE_DETAILS[accent][paperTheme ? "paper" : "dark"].strong
-        }
+        pathColor={tone.strong}
         pathStroke={0.13}
         pathTransitionDuration={0}
         ringsData={ringData}
-        ringLat={(point) => (point as GeoHeatBucket).lat}
-        ringLng={(point) => (point as GeoHeatBucket).lon}
+        ringLat={placeLat}
+        ringLng={placeLng}
         ringAltitude={0.007}
-        ringColor={() =>
-          paperTheme
-            ? [
-                "rgba(8, 123, 91, 0.62)",
-                "rgba(8, 123, 91, 0.22)",
-                "rgba(8, 123, 91, 0)",
-              ]
-            : [
-                "rgba(131, 243, 206, 0.7)",
-                "rgba(73, 207, 163, 0.24)",
-                "rgba(73, 207, 163, 0)",
-              ]
-        }
+        ringColor={ringColor}
         ringMaxRadius={frameAltitude * (selectedLocation ? 4 : 2.4)}
         ringPropagationSpeed={frameAltitude * (selectedLocation ? 3.3 : 1.9)}
         ringRepeatPeriod={selectedLocation ? 820 : 1_500}
         ringResolution={selectedLocation ? 64 : 48}
         htmlElementsData={labelData}
-        htmlLat={(point) => (point as GeoHeatBucket).lat}
-        htmlLng={(point) => (point as GeoHeatBucket).lon}
+        htmlLat={placeLat}
+        htmlLng={placeLng}
         htmlAltitude={0.012}
         htmlElement={makeHtmlLabel}
         htmlElementVisibilityModifier={modifyHtmlLabelVisibility}
         htmlTransitionDuration={0}
         enablePointerInteraction
         pointerEventsFilter={pointerEventsFilter}
-        showPointerCursor={(type) => type === "point"}
+        showPointerCursor={pointerOnPoints}
         onZoom={handleZoom}
       />
     </div>

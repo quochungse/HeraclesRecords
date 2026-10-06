@@ -101,7 +101,7 @@ export function HallOfRecordsView({
     onSummaries: records.mergeSummaries
   });
   usePlaceNames({
-    cells: result.places,
+    places: result.places,
     enabled: live,
     onNamed: records.refreshPlaceLabels
   });

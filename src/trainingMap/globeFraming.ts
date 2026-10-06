@@ -18,7 +18,7 @@ const GLOBE_FOV_DEGREES = 50;
 /** Keeps the outermost place off the panel edge and clear of `globeOffset`. */
 const FIT_PADDING = 0.78;
 /**
- * Never frame closer than this. Below ~0.42 the card hands over to the street
+ * Never frame closer than this. Below ~0.24 the card hands over to the street
  * map, so the framing has to leave room for a person to zoom in themselves —
  * and a closer view stops reading as a globe at all.
  */
@@ -271,4 +271,36 @@ export function landDetailLevels(
   const tier2 =
     tier1 >= 1 ? landDetailOpacity(perDegree * coarseStepDegrees * 0.5) : 0;
   return { tier1, tier2, density: 1 + 3 * tier1 + 12 * tier2 };
+}
+
+/**
+ * How near the pointer, on screen, a place has to be to take the street map to
+ * itself when zooming in hands over. Near enough that the athlete was plainly
+ * zooming at it; further than that they were zooming at the map, and the
+ * street map opens where they pointed. At the hand-off a pixel is about 2 km,
+ * so this is some 120 km on the ground; at 96 px a pointer over empty hills
+ * 150 km from every place still opened on one.
+ */
+export const STREET_SNAP_PX = 64;
+
+/**
+ * The place nearest `anchor` on screen, if one is within `maxPx`. Candidates
+ * are what the camera can see: a place behind the globe projects onto the
+ * screen too, and must be left out before it gets here.
+ */
+export function nearestOnScreen<T>(
+  anchor: { x: number; y: number },
+  candidates: ReadonlyArray<{ item: T; x: number; y: number }>,
+  maxPx: number = STREET_SNAP_PX,
+): T | undefined {
+  let best: T | undefined;
+  let bestDistance = maxPx;
+  for (const candidate of candidates) {
+    const distance = Math.hypot(candidate.x - anchor.x, candidate.y - anchor.y);
+    if (distance <= bestDistance) {
+      best = candidate.item;
+      bestDistance = distance;
+    }
+  }
+  return best;
 }

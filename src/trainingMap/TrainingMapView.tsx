@@ -3,6 +3,7 @@ import type {
   TrainingHubActivity,
   TrainingHubActivityDetail,
 } from "../../electron/types";
+import type { LabourState } from "../records/labours";
 import { ActivityGlobeCard } from "./ActivityGlobeCard";
 
 interface TrainingMapViewProps {
@@ -10,6 +11,9 @@ interface TrainingMapViewProps {
   connected: boolean;
   detail: TrainingHubActivityDetail | null;
   onSelectActivity: (activity: TrainingHubActivity) => void;
+  onOpenActivity: (activityId: string) => void;
+  labour?: LabourState;
+  onOpenLabours: () => void;
   onOpenOverview: () => void;
 }
 
@@ -33,15 +37,19 @@ export function TrainingMapView({
   connected,
   detail,
   onSelectActivity,
+  onOpenActivity,
+  labour,
+  onOpenLabours,
   onOpenOverview,
 }: TrainingMapViewProps) {
   if (!connected) {
     return (
       <section className="training-map-disconnected">
         <header className="training-map-page-header">
-          <p className="training-map-eyebrow">Training map</p>
-          <h1>Where you’ve been</h1>
-          <p>Explore every place your training has taken you.</p>
+          <div>
+            <h1>Where you’ve been</h1>
+            <p>Explore every place your training has taken you.</p>
+          </div>
         </header>
 
         <section className="panel data-connect-panel">
@@ -70,6 +78,9 @@ export function TrainingMapView({
       connected={connected}
       detail={detail}
       onSelectActivity={onSelectActivity}
+      onOpenActivity={onOpenActivity}
+      labour={labour}
+      onOpenLabours={onOpenLabours}
     />
   );
 }

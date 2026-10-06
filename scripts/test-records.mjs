@@ -534,46 +534,72 @@ const placeSummaries = new Map([
   [away[4].activityId, { recordsVersion: 1, startPoint: { lat: 18.79, lon: 98.98 } }],
   [away[5].activityId, { recordsVersion: 1, startPoint: { lat: 48.86, lon: 2.35 } }]
 ]);
+// A place is what "Where you've been" draws (placeClusters.ts): one region,
+// at most 25 km across. Without the region index, distance alone.
 const placesFirst = computeRecords({ ...base, activities: [...homeRuns, ...away], summaries: placeSummaries });
-const homeKey = placesFirst.places[0].key;
-assert.equal(placesFirst.places[0].count, 6, "home is the busiest cell");
+assert.equal(placesFirst.places[0].count, 6, "home is the busiest place");
+assert.equal(placesFirst.places.length, 7);
 assert.deepEqual(find(placesFirst, "place:count:5").labour, { id: "cattle", stage: 1 });
-assert.ok(!ids(placesFirst).some((id) => id.startsWith("place:country:")), "no country is named until the geocoder has answered");
-const named = computeRecords({
-  ...base,
-  activities: [...homeRuns, ...away],
-  summaries: placeSummaries,
-  placeLabels: {
-    [homeKey]: { city: "Hà Nội", country: "Việt Nam" },
-    [placesFirst.places.find((cell) => cell.lat === 18.79).key]: { city: "Chiang Mai", country: "Thailand" }
-  }
-});
-assert.equal(find(named, "place:country:thailand").labour, undefined, "a country is a milestone; the labour counts places");
-assert.ok(find(named, "place:country:thailand").major, "the first one abroad is a card");
-assert.ok(!find(named, "place:country:việt-nam"), "home is no new country");
+assert.ok(!ids(placesFirst).some((id) => id.startsWith("place:country:")), "no country is named without the regions");
 
-// The two geocoders name one country in two languages. Home named by
-// Nominatim ("Việt Nam", from before codes were kept) and a trip inside the
-// country named by Photon ("Vietnam", VN) are one country, not two.
-const twoLanguages = computeRecords({
+const { readFileSync } = await import("node:fs");
+const { buildRegionIndex } = await import(moduleUrl("trainingMap", "adminRegions.ts"));
+const { placeLabelKey } = await import(moduleUrl("trainingMap", "placeClusters.ts"));
+const regions = buildRegionIndex(
+  JSON.parse(readFileSync(path.join(repoRoot, "src", "trainingMap", "adminRegions.json"), "utf8"))
+);
+const named = computeRecords({ ...base, activities: [...homeRuns, ...away], summaries: placeSummaries, regions });
+assert.deepEqual(
+  ids(named).filter((id) => id.startsWith("place:country:")),
+  ["place:country:th", "place:country:fr"],
+  "a country is the region's, known on the machine: Sa Pa is no new country, Chiang Mai and Paris are"
+);
+assert.equal(find(named, "place:country:th").title, "A new country: Thailand");
+assert.equal(find(named, "place:country:th").labour, undefined, "a country is a milestone; the labour counts places");
+assert.ok(find(named, "place:country:th").major, "the first one abroad is a card");
+assert.ok(!find(named, "place:country:fr").major, "the ones after it are rows");
+assert.equal(
+  find(named, "place:count:5").detail,
+  "The 5th: Phú Thọ",
+  "a place the geocoder has not named is called by its region: Tam Đảo is in Phú Thọ since 2025"
+);
+const tamDao = named.places.find((place) => place.lat === 21.45);
+const townNamed = computeRecords({
   ...base,
   activities: [...homeRuns, ...away],
   summaries: placeSummaries,
-  placeLabels: {
-    [homeKey]: { city: "Hà Nội", country: "Việt Nam" },
-    [placesFirst.places.find((cell) => cell.lat === 22.34).key]: { city: "Sa Pa", country: "Vietnam", countryCode: "VN" },
-    [placesFirst.places.find((cell) => cell.lat === 18.79).key]: { city: "Chiang Mai", country: "ประเทศไทย", countryCode: "TH" }
-  }
+  regions,
+  placeLabels: { [placeLabelKey(tamDao)]: { city: "Tam Đảo" } }
 });
-assert.deepEqual(
-  ids(twoLanguages).filter((id) => id.startsWith("place:country:")),
-  ["place:country:ประเทศไทย"],
-  "Sa Pa is no new country; Chiang Mai is, in whatever language it was named"
-);
+assert.equal(find(townNamed, "place:count:5").detail, "The 5th: Tam Đảo", "and by its town once named");
 assert.ok(find(named, "place:pillars").major, "Paris is past the Pillars from Hà Nội");
 assert.equal(find(named, "place:pillars").labour, undefined, "and one flight is no stage");
 
-// Ten places and twenty-five: one cell each, however they are spread.
+// Two regions are two places however close; one region holds starts up to 25 km apart.
+{
+  const near = [activity(at(2026, 1, 5), 100), activity(at(2026, 1, 6), 100)];
+  const summariesOf = (points) =>
+    new Map(near.map((run, index) => [run.activityId, { recordsVersion: 2, startPoint: points[index] }]));
+  const border = computeRecords({
+    ...base,
+    activities: near,
+    summaries: summariesOf([{ lat: 21.0, lon: 105.5 }, { lat: 20.99, lon: 105.5 }]),
+    regions: {
+      regionOf: (point) => ({ id: point.lat >= 21 ? "N" : "S", name: "", country: "XX", countryName: "" })
+    }
+  });
+  assert.equal(border.places.length, 2, "a kilometre apart across a border: two places");
+  const westHanoi = computeRecords({
+    ...base,
+    activities: near,
+    // Hồ Tây and Hoài Đức, either side of the 105.75° line the old grid cut along.
+    summaries: summariesOf([{ lat: 21.06, lon: 105.82 }, { lat: 21.03, lon: 105.7 }]),
+    regions
+  });
+  assert.equal(westHanoi.places.length, 1, "12 km apart in one province: one place");
+}
+
+// Ten places and twenty-five, however they are spread.
 const roaming = Array.from({ length: 25 }, (_, index) => activity(at(2026, 1, 1) + index * 86400, 100));
 const roamed = computeRecords({
   ...base,

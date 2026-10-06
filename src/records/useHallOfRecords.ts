@@ -9,7 +9,9 @@ import { RECORDS_SUMMARY_VERSION } from "../../electron/activityMetrics";
 import { isSleepDayRecord, totalSleepMinutes } from "../../electron/sleepMetrics";
 import type { HeraclesRecordsApi } from "../heraclesrecords-api";
 import { getLocalHappenDayKey } from "../training/formatters";
-import { knownPlaceLabels, loadPlaceLabel } from "../trainingMap/placeLabels";
+import { placeLabelKey } from "../trainingMap/placeClusters";
+import { coordinateLabel, knownPlaceLabels, loadPlaceLabel } from "../trainingMap/placeLabels";
+import { useRegionIndex } from "../trainingMap/useRegionIndex";
 import { mergeTrainingDayLists } from "../training/parsers";
 import type { TrainingHubLoadStatus, TrainingHubSnapshot } from "../training/types";
 import { buildLabours, type LabourState } from "./labours";
@@ -69,13 +71,9 @@ function namedPlaceLabels(): Record<string, PlaceLabelLookup> {
   const known = knownPlaceLabels();
   const named: Record<string, PlaceLabelLookup> = {};
   for (const [key, label] of Object.entries(known)) {
-    // "Location" is `coordinateLabel`'s country: nobody answered for that cell.
+    // "Location" is `coordinateLabel`'s country: nobody answered for that place.
     if (label.country && label.country !== "Location") {
-      named[key] = {
-        city: label.city,
-        country: label.country,
-        ...(typeof label.countryCode === "string" ? { countryCode: label.countryCode } : {})
-      };
+      named[key] = { city: label.city };
     }
   }
   return named;
@@ -132,6 +130,10 @@ export function useHallOfRecords({
   const [remembered, setRemembered] = useState<RememberedMilestone[]>([]);
   const [sleepNights, setSleepNights] = useState<Array<{ day: string; minutes: number }>>([]);
   const [labelVersion, setLabelVersion] = useState(0);
+  // What tells places apart (`adminRegions.ts`). The hall is not settled
+  // without it: places counted by distance alone and then again by region
+  // would announce a stage that was never reached.
+  const regions = useRegionIndex();
   const [summariesLoaded, setSummariesLoaded] = useState(false);
   const [rememberedLoaded, setRememberedLoaded] = useState(false);
   const [sleepLoaded, setSleepLoaded] = useState(false);
@@ -246,7 +248,7 @@ export function useHallOfRecords({
   const result = useMemo(
     () =>
       sampleInput
-        ? computeRecords({ ...sampleInput, unitSystem })
+        ? computeRecords({ ...sampleInput, ...(regions ? { regions } : {}), unitSystem })
         : computeRecords({
             activities,
             summaries,
@@ -255,10 +257,23 @@ export function useHallOfRecords({
             sleepNights,
             remembered,
             placeLabels,
+            ...(regions ? { regions } : {}),
             ...(athlete ? { athlete } : {}),
             unitSystem
           }),
-    [sampleInput, activities, summaries, snapshot, vo2Readings, sleepNights, remembered, placeLabels, athlete, unitSystem]
+    [
+      sampleInput,
+      activities,
+      summaries,
+      snapshot,
+      vo2Readings,
+      sleepNights,
+      remembered,
+      placeLabels,
+      regions,
+      athlete,
+      unitSystem
+    ]
   );
 
   const labours = useMemo(
@@ -303,7 +318,7 @@ export function useHallOfRecords({
       labours,
       ready: true,
       failed: false,
-      settled: true,
+      settled: regions !== null,
       mergeSummaries,
       refreshPlaceLabels
     };
@@ -321,6 +336,7 @@ export function useHallOfRecords({
       (summariesLoaded || activityIds.length === 0) &&
       rememberedLoaded &&
       sleepLoaded &&
+      regions !== null &&
       athlete !== undefined &&
       snapshotStatus !== "pending",
     mergeSummaries,
@@ -426,15 +442,16 @@ export function useRecordsBackfill({
 
 /**
  * Name the places trained in, busiest first, a few per visit. The names land in
- * the globe's own cache (`placeLabels.ts`), so a cell "Where you've been" has
- * named is never asked about again here, and the reverse.
+ * the globe's own cache (`placeLabels.ts`), under the same key (`placeLabelKey`),
+ * so a place "Where you've been" has named is never asked about again here,
+ * and the reverse.
  */
 export function usePlaceNames({
-  cells,
+  places,
   enabled,
   onNamed
 }: {
-  cells: RecordsResult["places"];
+  places: RecordsResult["places"];
   enabled: boolean;
   onNamed: () => void;
 }): void {
@@ -442,25 +459,26 @@ export function usePlaceNames({
   // Counted for the visit (the screen's mount), not per run of the effect: a
   // name landing recomputes the places, and a cap per run would be no cap.
   const askedThisVisit = useRef(0);
-  const cellsRef = useRef(cells);
-  cellsRef.current = cells;
-  // The cells as a set of places, so a recompute that names one does not start
-  // the queue again.
-  const cellKeys = cells.map((cell) => cell.key).join(",");
+  const placesRef = useRef(places);
+  placesRef.current = places;
+  // The places as a set, so a recompute that names one does not start the
+  // queue again.
+  const placeKeys = places.map((place) => place.key).join(",");
   useEffect(() => {
     if (!enabled) return;
     let cancelled = false;
     const known = knownPlaceLabels();
-    const queue = cellsRef.current
-      .filter((cell) => !known[cell.key] && !asked.current.has(cell.key))
+    const queue = placesRef.current
+      .map((place) => ({ key: placeLabelKey(place), point: { lat: place.lat, lon: place.lon } }))
+      .filter(({ key }) => !known[key] && !asked.current.has(key))
       .slice(0, Math.max(0, PLACE_NAMES_PER_VISIT - askedThisVisit.current));
     void (async () => {
-      for (const cell of queue) {
+      for (const { key, point } of queue) {
         if (cancelled) return;
-        asked.current.add(cell.key);
+        asked.current.add(key);
         askedThisVisit.current += 1;
-        const named = await loadPlaceLabel(cell.key, { lat: cell.lat, lon: cell.lon }).then(
-          () => true,
+        const named = await loadPlaceLabel(key, point).then(
+          (label) => label.full !== coordinateLabel(point).full,
           () => false
         );
         // Told even when superseded: the name is in the cache either way.
@@ -470,5 +488,5 @@ export function usePlaceNames({
     return () => {
       cancelled = true;
     };
-  }, [cellKeys, enabled, onNamed]);
+  }, [placeKeys, enabled, onNamed]);
 }

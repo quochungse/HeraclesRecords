@@ -36,7 +36,8 @@ import type {
   TrainingHubActivity,
   TrainingHubPersonalRecordGroup
 } from "../../electron/types";
-import { placeCellKey, type PlaceLabelLookup, type RecordsInput } from "./milestones";
+import { placeLabelKey } from "../trainingMap/placeClusters";
+import type { PlaceLabelLookup, RecordsInput } from "./milestones";
 
 export type RecordsSamplePreset = "realistic" | "full" | "beginner" | "empty";
 
@@ -79,24 +80,23 @@ interface SamplePlace {
   label: PlaceLabelLookup;
 }
 
-// Home is named the way Nominatim names it, with no code — a label cached
-// before codes were kept — and the rest the way Photon does, so the sample
-// also shows that one country in two languages is still one country.
+// Towns as the geocoder names them. A name is kept under a place's centre
+// (`placeLabelKey`), so each sample place is one point: its activities all
+// start there, and the centre is the point.
 const PLACES = {
-  hanoi: { lat: 21.03, lon: 105.85, label: { city: "Hà Nội", country: "Việt Nam" } },
-  bavi: { lat: 21.08, lon: 105.37, label: { city: "Ba Vì", country: "Vietnam", countryCode: "VN" } },
-  tamdao: { lat: 21.46, lon: 105.64, label: { city: "Tam Đảo", country: "Vietnam", countryCode: "VN" } },
-  ninhbinh: { lat: 20.25, lon: 105.97, label: { city: "Ninh Bình", country: "Vietnam", countryCode: "VN" } },
-  halong: { lat: 20.95, lon: 107.08, label: { city: "Hạ Long", country: "Vietnam", countryCode: "VN" } },
-  sapa: { lat: 22.34, lon: 103.84, label: { city: "Sa Pa", country: "Vietnam", countryCode: "VN" } },
-  mocchau: { lat: 20.85, lon: 104.63, label: { city: "Mộc Châu", country: "Vietnam", countryCode: "VN" } },
-  danang: { lat: 16.05, lon: 108.2, label: { city: "Đà Nẵng", country: "Vietnam", countryCode: "VN" } },
-  dalat: { lat: 11.94, lon: 108.44, label: { city: "Đà Lạt", country: "Vietnam", countryCode: "VN" } },
-  saigon: { lat: 10.78, lon: 106.7, label: { city: "Hồ Chí Minh City", country: "Vietnam", countryCode: "VN" } },
-  chiangmai: { lat: 18.79, lon: 98.98, label: { city: "Chiang Mai", country: "Thailand", countryCode: "TH" } },
-  bangkok: { lat: 13.73, lon: 100.54, label: { city: "Bangkok", country: "Thailand", countryCode: "TH" } },
-  yty: { lat: 22.62, lon: 103.62, label: { city: "Bát Xát", country: "Vietnam", countryCode: "VN" } },
-  mocchauTea: { lat: 20.92, lon: 104.68, label: { city: "Mộc Châu", country: "Vietnam", countryCode: "VN" } }
+  hanoi: { lat: 21.03, lon: 105.85, label: { city: "Hà Nội" } },
+  bavi: { lat: 21.08, lon: 105.37, label: { city: "Ba Vì" } },
+  tamdao: { lat: 21.46, lon: 105.64, label: { city: "Tam Đảo" } },
+  ninhbinh: { lat: 20.25, lon: 105.97, label: { city: "Ninh Bình" } },
+  halong: { lat: 20.95, lon: 107.08, label: { city: "Hạ Long" } },
+  sapa: { lat: 22.34, lon: 103.84, label: { city: "Sa Pa" } },
+  mocchau: { lat: 20.85, lon: 104.63, label: { city: "Mộc Châu" } },
+  danang: { lat: 16.05, lon: 108.2, label: { city: "Đà Nẵng" } },
+  dalat: { lat: 11.94, lon: 108.44, label: { city: "Đà Lạt" } },
+  saigon: { lat: 10.78, lon: 106.7, label: { city: "Hồ Chí Minh City" } },
+  chiangmai: { lat: 18.79, lon: 98.98, label: { city: "Chiang Mai" } },
+  bangkok: { lat: 13.73, lon: 100.54, label: { city: "Bangkok" } },
+  yty: { lat: 22.62, lon: 103.62, label: { city: "Bát Xát" } }
 } satisfies Record<string, SamplePlace>;
 
 type PlaceId = keyof typeof PLACES;
@@ -187,7 +187,7 @@ class SampleHistory {
     };
     this.activities.push(activity);
     const place = session.place ? PLACES[session.place] : undefined;
-    if (place) this.placeLabels[placeCellKey(place)] = place.label;
+    if (place) this.placeLabels[placeLabelKey(place)] = place.label;
     this.summaries.set(activityId, {
       activityId,
       fingerprint: "sample",
@@ -506,7 +506,7 @@ const LIVED_KEY_SESSIONS: readonly LivedKeySession[] = [
   { week: 66, weekday: 6, hour: 5, sportType: 100, name: "Hà Nội Marathon", distance: 42420, duration: 15150, climb: 45, efforts: raceEfforts({ 1000: 318, 5000: 1735, 10000: 3460, 21097.5: 7420, 42195: 15100 }) },
   { week: 70, weekday: 3, sportType: 100, name: "Mỹ Khê beach run", distance: 8000, duration: 2950, climb: 10, place: "danang", efforts: effortsAt(8000, 368) },
   { week: 70, weekday: 5, sportType: 100, name: "Sơn Trà easy run", distance: 11200, duration: 4280, climb: 210, place: "danang", efforts: effortsAt(11200, 382) },
-  { week: 74, weekday: 6, sportType: 100, name: "Mộc Châu tea hills run", distance: 12300, duration: 4720, climb: 260, place: "mocchauTea", efforts: effortsAt(12300, 384) },
+  { week: 74, weekday: 6, sportType: 100, name: "Mộc Châu tea hills run", distance: 12300, duration: 4720, climb: 260, place: "mocchau", efforts: effortsAt(12300, 384) },
   { week: 76, weekday: 6, hour: 5, sportType: 104, name: "Rùng Rình peak, Tam Đảo", distance: 11000, duration: 5 * 3600, climb: 950, place: "tamdao" },
   // Tết in Bangkok.
   { week: 80, weekday: 3, sportType: 100, name: "Lumpini Park run", distance: 7600, duration: 2780, climb: 6, place: "bangkok", efforts: effortsAt(7600, 366) },

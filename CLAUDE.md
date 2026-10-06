@@ -196,6 +196,7 @@ Those URLs and these patterns must change together.
 npm install
 npm run rebuild          # electron-builder install-app-deps — rebuilds better-sqlite3 against Electron's ABI. Required after install.
 npm run fonts:fetch      # re-downloads the three faces into src/assets/fonts + rewrites src/fonts.css. Not part of a build: the files are committed so a build never needs the network.
+npm run admin-regions:fetch # regenerates src/trainingMap/adminRegions.json (Natural Earth + OSM for Việt Nam) for telling places apart. Committed, never run by a build.
 npm run body-shapes:fetch # regenerates src/calendar/bodyShapes.ts from react-native-body-highlighter (MIT). Same rule as fonts: the output is committed, the package is not a dependency, and a build never runs this.
 npm run dev              # Vite on 127.0.0.1:5173 + Electron; runs build:electron first
 npm run build            # tsc electron (emits dist-electron) + tsc --noEmit renderer + vite build
@@ -1980,6 +1981,26 @@ lives at module level for the same visit-to-visit reason — see `useCalendarDat
   untouched `points`.
 - **Where you've been** (`reverseGeocodeService.ts`, `src/trainingMap/`) — the globe clusters
   visit coordinates and names each cluster through `places:reverseGeocode`.
+  **Laid out like Running and the Hall** (redesigned 2026-10-06): the serif title on the page
+  and a line under it about the places (activities, places, countries, the first day for all
+  time, the farthest from home), then the globe filling the height the header leaves
+  (`.training-map` grows in `.content`'s column; the stage's `flex-basis: 0` is what makes a
+  long list scroll inside its column rather than grow the page) and a column of places beside
+  it: every place, Recent or Most visited, which opens one in its place — figures, the sports
+  as a bar, visits by month with empty months kept, Street view, and its activities, whose
+  titles open them through `openActivityFrom(…, "places")`. The open place is module state
+  (`rememberedPlaceKey`) so Back from an activity lands on it again; a new period lets it go.
+  The arithmetic is node-free `placeSummaries.ts` (`test:place-summaries`): "home" is the place
+  with most visits, "farthest" counts from 100 km — the Hall's line for its own "furthest"
+  milestones — and countries are the regions' (below), so they need no name. A row and its
+  pin share one hovered key (`hoveredKey` into the renderer, `onHoverChange(key)` out). **Picking a place never opens the street map on its
+  own**; Street view and zooming past `STREET_VIEW_ALTITUDE` (wheel or the + button) do.
+  **Reset shows only once the athlete has moved the camera** (`userAdjustedRef`) — the idle
+  spin used to raise it — and returns to the picked place when there is one (`homeView`). The
+  mouse's back button steps out a layer at a time: street map, place, list. Under the list,
+  the **Cattle of Geryon** card is the Hall's own `LabourState` — the same places, counted
+  over all time whatever period the map shows — handed down by App only once the Hall has
+  `settled`, and it opens the Hall on The Twelve Labours.
   **It asks more than one geocoder, because one host is a single point of failure the app
   cannot route around.** A resolver that answers `*.openstreetmap.org` with loopback — which
   a number of ISPs do, and which `nslookup` against `8.8.8.8` is what proves — took Nominatim
@@ -2000,17 +2021,41 @@ lives at module level for the same visit-to-visit reason — see `useCalendarDat
   (`PLACE_LABEL_FAILURES`). Caching the fallback is what made a single blocked request
   permanent for the life of the window.
   **Names are fetched for what is on the screen, which is not the same as the first few.**
-  Recent places is paged five at a time, so a fixed head of eight left every page but the
-  first reading coordinates for good, and Most visited can sit anywhere in the list.
+  The list is named as far as it has been scrolled, 40 rows at a time in the order it is
+  sorted (`labelReach`), plus the home, the farthest and the open place; it used to be a
+  carousel paged five at a time, and a fixed head of eight left every page but the first
+  reading coordinates for good.
   `npm run test:reverse-geocode` drives the chain, both parsers against verbatim live
   payloads, and the throw-vs-return split.
+  **A place is one administrative region and at most 25 km across** (redefined 2026-10-06,
+  `placeClusters.ts`, `test:place-clusters`), and the Hall counts the same places. It was a
+  0.5° grid cell, which cut cities along fixed lines (Hà Nội's west along 105.75°) and held
+  starts 76 km apart corner to corner. Now starts in two first-level regions are two places
+  however close, and inside one region **complete-linkage** clustering keeps every pair of a
+  place's starts within `PLACE_DIAMETER_KM` — a diameter, never a radius around a centre: a
+  centre moves as starts join, and a chain 24 km apart walked it until one place was 36 km
+  wide. The result does not depend on order; a place's key is its oldest activity
+  (`place:<id>`). Each activity counts **where it started** (`activityStartPoint`, the Hall's
+  own reading off the summary), not the middle of its route. **The regions are on the
+  machine**: `adminRegions.json` (2.6 MB, its own chunk, read through `?raw` so the typechecker
+  never parses it; `loadRegionIndex`) is Natural Earth admin-1 simplified to ~1 km plus Việt
+  Nam's 34 provinces from OpenStreetMap — Natural Earth still has the 63 from before the 1 July
+  2025 merger — written by `npm run admin-regions:fetch` and committed like the fonts. A start
+  outside every outline goes to the nearest region within 25 km (a beach, a pier); further out
+  it is in none and grouped by distance alone. Neither screen draws places until the index is
+  read, and the Hall is not `settled` before it; a file that cannot be read gives an index of
+  no regions (places by distance alone) rather than a screen left loading for good. **A place is named by the geocoder's town,
+  and by its region until then** (`placeLabelFor`): the region needs no request, so a place
+  never reads as coordinates while it has one, and the line under a town names its region when
+  the two differ (Ba Vì · Hà Nội, Vietnam).
   **A name is kept across launches, and only a name.** `src/trainingMap/placeLabels.ts`
   holds the caches out of the view for the reason `activityFilters.ts` sits outside
-  `ActivitiesView` — it is the only part of naming a place a test can reach. A cluster key is
-  a ~55 km grid cell (`GEO_HEAT_STEP`) and the name of the city in it does not change, so a
-  resolved name is written to localStorage (`heraclesrecords.activity-globe.place-labels.v1`,
-  `derived`) and is on the screen in the first paint of the next launch. Held only in memory,
-  every launch re-asked about every place on the screen, serialised behind the provider
+  `ActivitiesView` — it is the only part of naming a place a test can reach. A name is kept
+  under the place's centre to two decimals (`placeLabelKey`, which is all the geocoder is told)
+  and the town at a point does not change, so a resolved name is written to localStorage
+  (`heraclesrecords.activity-globe.place-labels.v1`, `derived`; payload version 2 — version 1
+  was keyed by grid cell and is not read) and is on the screen in the first paint of the next
+  launch. Held only in memory, every launch re-asked about every place on the screen, serialised behind the provider
   throttle, and the screen read coordinates for the ten-odd seconds that took.
   **A coordinate fallback is never written there**, and neither is a cluster in open water —
   read back, the two are indistinguishable from a failure, and storing either would turn one
@@ -2043,8 +2088,9 @@ lives at module level for the same visit-to-visit reason — see `useCalendarDat
   500 h and the Birds' first stage 50 km ridden all told. A stretch is **any days running**,
   never a calendar month: the Boar's Everest in 30 days, the Cerberus' 26 of 30 and 300 of 365
   nights at 7 h+ (naps count; a night not recorded is a miss). The Geryon counts **places
-  only** (5 / 10 / 25 cells): a second country and 2,700 km from home are milestones, not
-  stages, since one flight reached the last stage before the first.
+  only** (5 / 10 / 25 places, as Where you've been draws them): a second country and 2,700 km
+  from home are milestones, not stages, since one flight reached the last stage before the
+  first.
   **A labour's emblem is the athlete's gold artwork, not a glyph** (`LabourEmblem`,
   `src/assets/labours/<LabourId>.webp`: 256px, black ground keyed to transparency, frame
   removed). The frame is CSS — a plate in the artwork's own black in both themes and a metal
@@ -2088,7 +2134,7 @@ lives at module level for the same visit-to-visit reason — see `useCalendarDat
   a rating reached past COROS's year still stands. `test:records-ledger`.
   **Computed in App, not in the screen** (`useHallOfRecords`): the rail's count and the
   notifications need it on every screen. It is local reads only; the backfill and the place
-  names (through the globe's own `placeLabels` cache, busiest cells first, 40 a visit) run
+  names (through the globe's own `placeLabels` cache, busiest places first, 40 a visit) run
   only while the hall is open. **Notifications** (`recordsNotices.ts`, `useRecordsNotices`,
   `LabourNotices.tsx` in the main bundle with `recordsNotices.css`): "N new" on the rail,
   cleared by a visit that keeps them marked "New" while it lasts; a stage reached is a toast in

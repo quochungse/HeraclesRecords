@@ -2056,6 +2056,20 @@ export default function App() {
                   connected={Boolean(trainingHubStatus?.authenticated)}
                   detail={trainingHubActivityDetail}
                   onSelectActivity={handleTrainingHubActivityDetail}
+                  onOpenActivity={(activityId) =>
+                    openActivityFrom(activityId, "places")
+                  }
+                  labour={
+                    hallOfRecords.settled
+                      ? hallOfRecords.labours.find(
+                          (labour) => labour.definition.id === "cattle",
+                        )
+                      : undefined
+                  }
+                  onOpenLabours={() => {
+                    setRecordsTabRequest("labours");
+                    setActiveView("records");
+                  }}
                   onOpenOverview={() => setActiveView("overview")}
                 />
               </Suspense>

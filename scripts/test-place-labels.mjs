@@ -1,6 +1,6 @@
 // Names for the globe's visit clusters, and the three rules that decide what is
-// remembered. A cluster key is a ~55 km grid cell and the name of the city in it
-// does not change, so a resolved name is kept across launches — but a coordinate
+// remembered. A name is kept under a place's centre to two decimals, and the name
+// of the town at a point does not change, so a resolved name is kept across launches — but a coordinate
 // fallback never is, or one blocked launch would be baked in permanently.
 //
 // Mode: renderer TypeScript with extensionless imports in the graph, so the
@@ -92,13 +92,13 @@ answer = async () => ({
   country: "Vietnam"
 });
 
-const first = await loadPlaceLabel("42:211", HANOI);
+const first = await loadPlaceLabel("21.03,105.85", HANOI);
 assert.equal(first.city, "Hanoi", "the name is resolved");
 assert.equal(asked.length, 1, "one request");
 flushPlaceLabelWrites();
 assert.deepEqual(
   storedEntries().map(([key, label]) => [key, label.city]),
-  [["42:211", "Hanoi"]],
+  [["21.03,105.85", "Hanoi"]],
   "the name reached storage"
 );
 
@@ -106,11 +106,11 @@ assert.deepEqual(
 resetPlaceLabels();
 asked.length = 0;
 assert.equal(
-  knownPlaceLabels()["42:211"].city,
+  knownPlaceLabels()["21.03,105.85"].city,
   "Hanoi",
   "the name is known before any request"
 );
-const again = await loadPlaceLabel("42:211", HANOI);
+const again = await loadPlaceLabel("21.03,105.85", HANOI);
 assert.equal(again.city, "Hanoi", "still named");
 assert.equal(asked.length, 0, "nobody was asked on the second launch");
 
@@ -123,7 +123,7 @@ answer = async () => {
   throw new Error("Place lookup failed (nominatim: fetch failed)");
 };
 
-const failed = await loadPlaceLabel("42:211", HANOI);
+const failed = await loadPlaceLabel("21.03,105.85", HANOI);
 assert.deepEqual(failed, coordinateLabel(HANOI), "falls back to coordinates");
 flushPlaceLabelWrites();
 assert.deepEqual(storedEntries(), [], "a failure is not written to storage");
@@ -138,7 +138,7 @@ answer = async () => ({
   city: "Hanoi",
   country: "Vietnam"
 });
-const recovered = await loadPlaceLabel("42:211", HANOI);
+const recovered = await loadPlaceLabel("21.03,105.85", HANOI);
 assert.equal(recovered.city, "Hanoi", "the next launch recovers the name");
 assert.equal(asked.length, 1, "it asked again");
 
@@ -203,7 +203,7 @@ assert.deepEqual(knownPlaceLabels(), {}, "unparseable storage reads as empty");
 reset();
 storage.setItem(
   STORAGE_KEY,
-  JSON.stringify({ version: 2, entries: [["42:211", { city: "Hanoi" }]] })
+  JSON.stringify({ version: 3, entries: [["21.03,105.85", { city: "Hanoi" }]] })
 );
 assert.deepEqual(knownPlaceLabels(), {}, "a future version is ignored");
 
@@ -212,8 +212,18 @@ storage.setItem(
   STORAGE_KEY,
   JSON.stringify({
     version: 1,
+    entries: [["42:211", { city: "Hanoi", country: "Vietnam", full: "Hanoi, Vietnam" }]]
+  })
+);
+assert.deepEqual(knownPlaceLabels(), {}, "version 1, keyed by the old 0.5° grid cell, is not read");
+
+reset();
+storage.setItem(
+  STORAGE_KEY,
+  JSON.stringify({
+    version: 2,
     entries: [
-      ["42:211", { city: "Hanoi", country: "Vietnam", full: "Hanoi, Vietnam" }],
+      ["21.03,105.85", { city: "Hanoi", country: "Vietnam", full: "Hanoi, Vietnam" }],
       ["bad", { city: "" }],
       ["worse", null],
       "not-an-entry"
@@ -222,7 +232,7 @@ storage.setItem(
 );
 assert.deepEqual(
   Object.keys(knownPlaceLabels()),
-  ["42:211"],
+  ["21.03,105.85"],
   "malformed entries are dropped and the good one survives"
 );
 

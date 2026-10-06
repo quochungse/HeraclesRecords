@@ -41,7 +41,6 @@ import { formatDurationSeconds, getLocalHappenDayKey } from "../training/formatt
 import { isStrengthSportType, isSwimSportType } from "../training/sportTypes";
 import { RECORDS_SUMMARY_VERSION } from "../../electron/activityMetrics";
 import { isIndoorSportType } from "../../electron/corosSportTypes";
-import { geoHeatBucketKey } from "../trainingMap/activityVisitHeatmap";
 import {
   VO2_RATINGS,
   VO2_RATING_NAMES,
@@ -54,6 +53,13 @@ import {
 } from "./fitnessStandards";
 import type { LabourId, LabourStage, StageProgress } from "./labours";
 import { STAGE_NUMERALS, labourDefinition, labourStageKey } from "./labours";
+import type { AdminRegion } from "../trainingMap/adminRegions";
+import {
+  clusterPlaces,
+  haversineKm,
+  placeLabelKey,
+  type PlaceCluster
+} from "../trainingMap/placeClusters";
 
 export type MilestoneCategory =
   | "first"
@@ -128,19 +134,9 @@ function withStage(
   return { id, stage: top, ...(rest.length > 0 ? { also: rest } : {}) };
 }
 
-/** A ~55 km cell of the 0.5° grid the globe clusters on, and a point in it. */
-export interface PlaceCell {
-  key: string;
-  lat: number;
-  lon: number;
-  count: number;
-}
-
+/** A town's name for a place, where the geocoder has answered. */
 export interface PlaceLabelLookup {
   city: string;
-  country: string;
-  /** ISO alpha-2 where the geocoder gave one: what says two names are one country. */
-  countryCode?: string;
 }
 
 export interface WithinReach {
@@ -166,8 +162,14 @@ export interface RecordsInput {
   /** One per night: the day's whole sleep in minutes (`totalSleepMinutes`). */
   sleepNights?: ReadonlyArray<{ day: string; minutes: number }>;
   remembered?: readonly RememberedMilestone[];
-  /** Place names by cell key, where the geocoder has answered. */
+  /** Town names by `placeLabelKey`, where the geocoder has answered. */
   placeLabels?: Readonly<Record<string, PlaceLabelLookup>>;
+  /**
+   * The region index (`adminRegions.ts`): what tells places apart, and the
+   * country each is in. Without it places are told apart by distance alone and
+   * no country is named.
+   */
+  regions?: { regionOf(point: { lat: number; lon: number }): AdminRegion | undefined };
   /**
    * The COROS profile's birthday (`YYYYMMDD` as a number) and sex (0 male, 1
    * female), which speed and VO2max are graded for. Either missing reads as a
@@ -188,8 +190,8 @@ export interface RecordsResult {
   withinReach: WithinReach[];
   /** VO2max and sleep milestones, for `athlete_milestones`. */
   toRemember: RememberedMilestone[];
-  /** Every cell trained in, busiest first, so the screen can name them. */
-  places: PlaceCell[];
+  /** Every place trained in, busiest first, so the screen can name them. */
+  places: PlaceCluster[];
 }
 
 // --- Thresholds -------------------------------------------------------------
@@ -327,8 +329,9 @@ const STREAK_WEEKS: ReadonlyArray<{ weeks: number; labour?: LabourStage; major?:
 ];
 
 /**
- * Places, one 0.5° cell each, and nothing else: a country or a distance from
- * home would let one flight reach the last stage before the first.
+ * Places (`placeClusters.ts`: one region, at most 25 km across), and nothing
+ * else: a country or a distance from home would let one flight reach the last
+ * stage before the first.
  */
 const PLACE_COUNTS: ReadonlyArray<{ count: number; labour?: LabourStage; major?: boolean }> = [
   { count: 5, labour: 1 },
@@ -579,31 +582,6 @@ function formatGap(seconds: number): string {
 
 interface Emitter {
   push(milestone: Omit<Milestone, "major"> & { major?: boolean }): void;
-}
-
-function haversineKm(a: { lat: number; lon: number }, b: { lat: number; lon: number }): number {
-  const toRad = (deg: number) => (deg * Math.PI) / 180;
-  const dLat = toRad(b.lat - a.lat);
-  const dLon = toRad(b.lon - a.lon);
-  const h =
-    Math.sin(dLat / 2) ** 2 +
-    Math.cos(toRad(a.lat)) * Math.cos(toRad(b.lat)) * Math.sin(dLon / 2) ** 2;
-  return 6371 * 2 * Math.asin(Math.min(1, Math.sqrt(h)));
-}
-
-/** The globe's own 0.5° cell, so a name it has already found is reused. */
-export function placeCellKey(point: { lat: number; lon: number }): string {
-  return geoHeatBucketKey(point);
-}
-
-/** A country's name with its accents and spacing folded: "Việt Nam" and "Vietnam" meet. */
-function foldCountryName(name: string): string {
-  return name
-    .normalize("NFD")
-    .replace(/\p{M}/gu, "")
-    .replace(/đ/giu, "d")
-    .toLowerCase()
-    .replace(/[^\p{L}\p{N}]+/gu, "");
 }
 
 function ratioOf(value: number, target: number): number {
@@ -1215,7 +1193,7 @@ export function computeRecords(input: RecordsInput): RecordsResult {
     progress,
     withinReach,
     toRemember,
-    places: places.cells
+    places: places.places
   };
 }
 
@@ -1809,7 +1787,7 @@ function planMilestones(input: RecordsInput): Milestone[] {
 function placeMilestones(
   activities: readonly TrainingHubActivity[],
   input: RecordsInput
-): { milestones: Milestone[]; cells: PlaceCell[]; progress: Map<string, StageProgress> } {
+): { milestones: Milestone[]; places: PlaceCluster[]; progress: Map<string, StageProgress> } {
   const milestones: Milestone[] = [];
   const progress = new Map<string, StageProgress>();
   const located: Array<{ activity: TrainingHubActivity; point: { lat: number; lon: number } }> = [];
@@ -1817,34 +1795,31 @@ function placeMilestones(
     const point = input.summaries.get(activity.activityId)?.startPoint;
     if (point) located.push({ activity, point });
   }
-  const cells = new Map<string, PlaceCell>();
-  for (const { point } of located) {
-    const key = placeCellKey(point);
-    const cell = cells.get(key);
-    if (cell) cell.count += 1;
-    else cells.set(key, { key, lat: point.lat, lon: point.lon, count: 1 });
+  // The places "Where you've been" draws for all time, found the same way.
+  const places = clusterPlaces(
+    located.map(({ activity, point }) => ({
+      activityId: activity.activityId,
+      lat: point.lat,
+      lon: point.lon,
+      startTime: activity.startTime as number
+    })),
+    input.regions ? (point) => input.regions?.regionOf(point) : undefined
+  );
+  const home = places[0];
+  if (!home) return { milestones, places, progress };
+  const placeOf = new Map<string, PlaceCluster>();
+  for (const place of places) {
+    for (const activityId of place.activityIds) placeOf.set(activityId, place);
   }
-  const ranked = [...cells.values()].sort((left, right) => right.count - left.count);
-  const home = ranked[0];
-  if (!home) return { milestones, cells: ranked, progress };
 
   const labels = input.placeLabels ?? {};
-  // One country, however it was named. The two geocoders write it in two
-  // languages — Nominatim the local name, Photon English — so the name alone
-  // made "Vietnam" a new country for an athlete at home in "Việt Nam". The
-  // code decides where the geocoder gave one; a name cached before codes
-  // existed borrows the code another place under that name carries.
-  const codeOfName = new Map<string, string>();
-  for (const label of Object.values(labels)) {
-    if (label.countryCode) codeOfName.set(foldCountryName(label.country), label.countryCode.toUpperCase());
-  }
-  const countryOf = (label: PlaceLabelLookup): string => {
-    const folded = foldCountryName(label.country);
-    return label.countryCode?.toUpperCase() ?? codeOfName.get(folded) ?? folded;
-  };
-  const homeLabel = labels[home.key];
+  // The town once the geocoder has named it, its region until then.
+  const nameOf = (place: PlaceCluster | undefined): string | undefined =>
+    place ? labels[placeLabelKey(place)]?.city ?? place.region?.name : undefined;
+  // A country is the region's, known on the machine, so it is the same answer
+  // whichever geocoder named the town and in whatever language.
+  const countries = new Set<string>(home.region ? [home.region.country] : []);
   const visited = new Set<string>();
-  const countries = new Set<string>(homeLabel?.country ? [countryOf(homeLabel)] : []);
   let furthest = 0;
   let pillars = false;
   let abroad = false;
@@ -1852,11 +1827,11 @@ function placeMilestones(
     const startTime = activity.startTime as number;
     const day = dayOfEpochSeconds(startTime);
     const sport = recordsSportOf(activity.sportType);
-    const key = placeCellKey(point);
+    const place = placeOf.get(activity.activityId);
     const ref = activityRef(activity);
-    const label = labels[key];
-    if (!visited.has(key)) {
-      visited.add(key);
+    const name = nameOf(place);
+    if (place && !visited.has(place.key)) {
+      visited.add(place.key);
       for (const step of PLACE_COUNTS) {
         if (visited.size !== step.count) continue;
         milestones.push({
@@ -1866,29 +1841,27 @@ function placeMilestones(
           at: startTime + 30,
           kind: "Places",
           title: `${step.count} different places`,
-          detail: label ? `The ${step.count}th: ${label.city}` : undefined,
+          detail: name ? `The ${step.count}th: ${name}` : undefined,
           sport,
           major: step.major ?? false,
           activity: ref,
           ...(step.labour ? { labour: { id: "cattle" as const, stage: step.labour } } : {})
         });
       }
-      if (label?.country && countries.size === 0) {
-        // The first country named is home, not a new one.
-        countries.add(countryOf(label));
-      } else if (label?.country && !countries.has(countryOf(label))) {
-        countries.add(countryOf(label));
+      const region = place.region;
+      if (region && !countries.has(region.country)) {
+        countries.add(region.country);
         // The first country abroad is a card; the ones after it are rows.
         const firstAbroad = !abroad;
         abroad = true;
         milestones.push({
-          id: `place:country:${label.country.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, "-")}`,
+          id: `place:country:${region.country.toLowerCase()}`,
           category: "place",
           day,
           at: startTime + 31,
           kind: "Places",
-          title: `A new country: ${label.country}`,
-          detail: [label.city, activity.name].filter(Boolean).join(" · "),
+          title: `A new country: ${region.countryName}`,
+          detail: [name, activity.name].filter(Boolean).join(" · "),
           sport,
           major: firstAbroad,
           activity: ref
@@ -1905,7 +1878,7 @@ function placeMilestones(
         at: startTime + 32,
         kind: "Places",
         title: `Trained ${groupThousands(away)} km from home`,
-        detail: [label?.city, activity.name].filter(Boolean).join(" · ") || undefined,
+        detail: [name, activity.name].filter(Boolean).join(" · ") || undefined,
         sport,
         major: true,
         activity: ref
@@ -1918,7 +1891,7 @@ function placeMilestones(
         at: startTime + 32,
         kind: "Places",
         title: `Furthest from home yet — ${groupThousands(Math.round(away))} km`,
-        detail: [label?.city, activity.name].filter(Boolean).join(" · ") || undefined,
+        detail: [name, activity.name].filter(Boolean).join(" · ") || undefined,
         sport,
         major: false,
         activity: ref
@@ -1934,5 +1907,5 @@ function placeMilestones(
       ratio: ratioOf(visited.size, step.count)
     });
   }
-  return { milestones, cells: ranked, progress };
+  return { milestones, places, progress };
 }
