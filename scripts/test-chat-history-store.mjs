@@ -638,6 +638,27 @@ deleteChatSession(unbound.id, db);
   assert.deepEqual(priced[0].usage, { inputTokens: 18_200, outputTokens: 900 });
   assert.equal(priced[0].model, "claude-opus-5");
 
+  // The cache counts are parts of the input: kept when they fit inside it,
+  // dropped when they do not, which counts the turn in full rather than less.
+  const cacheCase = (usage) =>
+    parseChatTranscriptJson(
+      JSON.stringify([{ kind: "message", role: "assistant", content: "hi", usage }])
+    )[0].usage;
+  assert.deepEqual(
+    cacheCase({ inputTokens: 92_509, outputTokens: 3_787, cacheReadTokens: 85_021, cacheWriteTokens: 7_482 }),
+    { inputTokens: 92_509, outputTokens: 3_787, cacheReadTokens: 85_021, cacheWriteTokens: 7_482 }
+  );
+  assert.deepEqual(
+    cacheCase({ inputTokens: 1_000, outputTokens: 10, cacheReadTokens: 5_000 }),
+    { inputTokens: 1_000, outputTokens: 10 },
+    "a cache read larger than the input it is part of"
+  );
+  assert.deepEqual(
+    cacheCase({ inputTokens: 1_000, outputTokens: 10, cacheReadTokens: -1 }),
+    { inputTokens: 1_000, outputTokens: 10 },
+    "a negative cache read"
+  );
+
   // A half-reported pair is dropped rather than half-restored: the footer adds
   // the two, so one missing number would print a total that is simply wrong.
   // Zero is not half-reported — a turn someone counted as free stays free.

@@ -1595,8 +1595,16 @@ export interface ChatSessionSummary {
  * budget that treats the second as the first undercounts silently.
  */
 export interface ChatTokenUsage {
+  /** Every input token, cached or not. */
   inputTokens: number;
   outputTokens: number;
+  /**
+   * The parts of `inputTokens` read from and written to the provider's prompt
+   * cache. Absent when the provider said nothing about a cache, which counts
+   * the input in full. `countedTokens` (`tokenUsage.ts`) is what a turn adds up to.
+   */
+  cacheReadTokens?: number;
+  cacheWriteTokens?: number;
 }
 
 /**
@@ -1847,6 +1855,8 @@ export interface CoachAnalysisRun {
   /** What this run cost, when the provider said (13). */
   inputTokens?: number;
   outputTokens?: number;
+  /** The part of `inputTokens` read from the prompt cache. */
+  cacheReadTokens?: number;
   error?: string;
   /**
    * disabled | missing-session | cooldown | quiet-hours | no-auth | offline |
@@ -1933,6 +1943,10 @@ export interface CoachAnalysisSpend {
   monthStart: string;
   inputTokens: number;
   outputTokens: number;
+  /** The part of `inputTokens` read from the prompt cache. */
+  cacheReadTokens: number;
+  /** What the budget is held to: `countedTokens` of the three above. */
+  countedTokens: number;
   /** Null when no ceiling is set, which is the default. */
   budget: number | null;
   /**

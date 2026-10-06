@@ -1025,6 +1025,10 @@ function toRun(row: CoachAnalysisRunRow): CoachAnalysisRun {
   if (outputTokens !== undefined) {
     run.outputTokens = outputTokens;
   }
+  const cacheReadTokens = cost(row.cache_read_tokens);
+  if (cacheReadTokens) {
+    run.cacheReadTokens = cacheReadTokens;
+  }
   return run;
 }
 
@@ -1046,6 +1050,7 @@ function toRunRow(run: CoachAnalysisRun): CoachAnalysisRunRow {
     seen_at: run.seenAt ?? null,
     input_tokens: run.inputTokens ?? null,
     output_tokens: run.outputTokens ?? null,
+    cache_read_tokens: run.cacheReadTokens ?? null,
     started_at: run.startedAt,
     finished_at: run.finishedAt ?? null
   };

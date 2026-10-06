@@ -43,6 +43,7 @@ import type {
 import { migrateActivityHrTrendPreview } from "./chatActivityTools";
 import { deviceId } from "./sync/deviceIdentity";
 import { contentKey, transcriptEntryId } from "./sync/rowMergers";
+import { countableUsage } from "./tokenUsage";
 
 export interface ChatSessionRow {
   id: string;
@@ -1070,9 +1071,18 @@ function parseTokenUsage(value: unknown): ChatTokenUsage | undefined {
   };
   const inputTokens = count("inputTokens");
   const outputTokens = count("outputTokens");
-  return inputTokens === null || outputTokens === null
-    ? undefined
-    : keepUnknownKeys({ inputTokens, outputTokens }, value, ["inputTokens", "outputTokens"]);
+  if (inputTokens === null || outputTokens === null) return undefined;
+  // The cache counts are optional parts of the input: one that does not fit
+  // inside it is dropped, which counts the turn in full rather than less.
+  const usage = countableUsage({
+    inputTokens,
+    outputTokens,
+    cacheReadTokens: value.cacheReadTokens as number | undefined,
+    cacheWriteTokens: value.cacheWriteTokens as number | undefined
+  });
+  return usage
+    ? keepUnknownKeys(usage, value, ["inputTokens", "outputTokens", "cacheReadTokens", "cacheWriteTokens"])
+    : undefined;
 }
 
 function parseMessageEntry(value: unknown): PersistedChatMessageEntry | null {

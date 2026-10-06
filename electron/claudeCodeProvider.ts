@@ -6,6 +6,7 @@ import { promisify } from "node:util";
 import { constants as fsConstants, mkdirSync } from "node:fs";
 import { z } from "zod";
 import { formatClaudeModelName } from "./chatModels";
+import { tokenUsage } from "./tokenUsage";
 import type { ChatModelOption } from "./chatModels";
 import type {
   AnthropicEffort,
@@ -865,8 +866,7 @@ export async function streamClaudeCodeCompletion(
   // Undefined rather than zero when the SDK says nothing: "this run cost
   // nothing" and "nobody told us" are different facts, and a budget that
   // conflates them undercounts in silence.
-  let counted = false;
-  const usage: ChatTokenUsage = { inputTokens: 0, outputTokens: 0 };
+  let usage: ChatTokenUsage | undefined;
   const onAbort = () => {
     externallyCancelled = true;
     controller.abort();
@@ -1006,12 +1006,12 @@ export async function streamClaudeCodeCompletion(
             const value = reported[key];
             return typeof value === "number" && Number.isFinite(value) ? value : 0;
           };
-          counted = true;
-          usage.inputTokens =
-            count("input_tokens") +
-            count("cache_creation_input_tokens") +
-            count("cache_read_input_tokens");
-          usage.outputTokens = count("output_tokens");
+          usage = tokenUsage({
+            uncachedInput: count("input_tokens"),
+            cacheRead: count("cache_read_input_tokens"),
+            cacheWrite: count("cache_creation_input_tokens"),
+            output: count("output_tokens")
+          });
         }
         if (message.subtype === "success") {
           resultText = message.result;
@@ -1031,7 +1031,7 @@ export async function streamClaudeCodeCompletion(
       fullText = resultText;
       options.onToken(resultText);
     }
-    return { fullText, ...(counted ? { usage } : {}) };
+    return { fullText, ...(usage ? { usage } : {}) };
   } catch (caught) {
     if (timedOut) {
       throw new ClaudeCodeProviderError(

@@ -13,6 +13,9 @@ const srcUrl = (...parts) =>
 
 const { formatTokenCount, formatTurnCost, formatTurnCostDetail, totalTokens } =
   await import(srcUrl("src", "chat", "turnCost.ts"));
+const { CACHE_READ_WEIGHT, addTokenUsage, countableUsage, countedTokens, tokenUsage } =
+  await import(srcUrl("electron", "tokenUsage.ts"));
+const { extractResponseUsage } = await import(srcUrl("electron", "chatResponsesProtocol.ts"));
 const { describeChatModel } = await import(
   srcUrl("electron", "chatModels.ts")
 );
@@ -60,6 +63,78 @@ assert.equal(
   "1.5k Tokens"
 );
 
+// --- a cache read counts as a tenth ----------------------------------------
+// Measured 2026-10-06 on Claude Code: three tool rounds, 92,509 input tokens of
+// which 85,021 were the same prefix read back from the cache. Counted whole it
+// read as 96.3k; it cost less than a one-round turn whose prefix was new.
+{
+  assert.equal(CACHE_READ_WEIGHT, 0.1);
+  const threeRounds = tokenUsage({ uncachedInput: 6, cacheRead: 85_021, cacheWrite: 7_482, output: 3_787 });
+  assert.deepEqual(threeRounds, {
+    inputTokens: 92_509,
+    outputTokens: 3_787,
+    cacheReadTokens: 85_021,
+    cacheWriteTokens: 7_482
+  });
+  assert.equal(countedTokens(threeRounds), 6 + 7_482 + 8_502 + 3_787);
+  assert.equal(totalTokens(threeRounds), countedTokens(threeRounds), "the footer states the same number as the budget");
+  assert.equal(formatTurnCost(threeRounds, "claude-opus-5-5"), "Opus 5.5 - 19.8k Tokens");
+  assert.equal(
+    formatTurnCostDetail(threeRounds),
+    "Input 6 · Cache write 7,482 · Cache read 85,021 (counted as 8,502) · Output 3,787"
+  );
+  // A cache write is counted whole: it is input the provider processed this turn.
+  const coldPrefix = tokenUsage({ uncachedInput: 2, cacheWrite: 27_494, output: 1_006 });
+  assert.equal(countedTokens(coldPrefix), 28_502);
+  assert.equal(formatTurnCostDetail(coldPrefix), "Input 2 · Cache write 27,494 · Output 1,006");
+
+  // A provider with no cache produces the same object as one with an empty one.
+  assert.deepEqual(tokenUsage({ uncachedInput: 500, cacheRead: 0, cacheWrite: 0, output: 20 }), {
+    inputTokens: 500,
+    outputTokens: 20
+  });
+
+  // Summing rounds keeps the cache parts; unknown stays unknown.
+  assert.deepEqual(addTokenUsage(threeRounds, { inputTokens: 100, outputTokens: 5 }), {
+    inputTokens: 92_609,
+    outputTokens: 3_792,
+    cacheReadTokens: 85_021,
+    cacheWriteTokens: 7_482
+  });
+  assert.equal(addTokenUsage(undefined, undefined), undefined);
+  assert.equal(addTokenUsage(undefined, coldPrefix), coldPrefix);
+
+  // A cache count that cannot be part of the input is dropped, which counts the
+  // turn in full: a budget must never read under what was spent.
+  assert.deepEqual(countableUsage({ inputTokens: 100, outputTokens: 1, cacheReadTokens: 900 }), {
+    inputTokens: 100,
+    outputTokens: 1
+  });
+  assert.deepEqual(
+    countableUsage({ inputTokens: 100, outputTokens: 1, cacheReadTokens: 60, cacheWriteTokens: 60 }),
+    { inputTokens: 100, outputTokens: 1, cacheReadTokens: 60 },
+    "a write that does not fit beside the read"
+  );
+  assert.equal(countableUsage({ inputTokens: -1, outputTokens: 1 }), undefined);
+}
+
+// The Responses API states the cached part inside `input_tokens`, which
+// already includes it — so it is the read, and nothing is added to the input.
+{
+  const completed = (usage) => ({ type: "response.completed", response: { usage } });
+  assert.deepEqual(
+    extractResponseUsage(
+      completed({ input_tokens: 30_000, output_tokens: 900, input_tokens_details: { cached_tokens: 24_000 } })
+    ),
+    { inputTokens: 30_000, outputTokens: 900, cacheReadTokens: 24_000 }
+  );
+  assert.deepEqual(
+    extractResponseUsage(completed({ input_tokens: 30_000, output_tokens: 900, input_tokens_details: { cached_tokens: 0 } })),
+    { inputTokens: 30_000, outputTokens: 900 }
+  );
+  assert.equal(extractResponseUsage(completed({ input_tokens: 0, output_tokens: 0 })), undefined);
+}
+
 // --- naming a model id ------------------------------------------------------
 // Claude ids are formatted rather than looked up, so a dated id or one added
 // after this build still reads as a name instead of falling through raw.
@@ -99,6 +174,15 @@ assert.equal(describeChatModel("   "), "");
   assert.deepEqual(persisted[0].usage, { inputTokens: 18_200, outputTokens: 900 });
   assert.equal(persisted[0].model, "claude-opus-5");
   assert.deepEqual(fromPersistedEntries(persisted), answered);
+
+  // The cache counts ride inside `usage`, so they travel with it both ways.
+  const cachedAnswer = [
+    {
+      ...answered[0],
+      usage: { inputTokens: 92_509, outputTokens: 3_787, cacheReadTokens: 85_021, cacheWriteTokens: 7_482 }
+    }
+  ];
+  assert.deepEqual(fromPersistedEntries(toPersistedEntries(cachedAnswer)), cachedAnswer);
 
   // An answer nobody priced carries neither field, so the footer is absent
   // rather than reading zero — every answer written before this shipped is one

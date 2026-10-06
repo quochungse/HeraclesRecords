@@ -92,6 +92,7 @@ import type {
   StrengthDetail,
   StrengthExercise
 } from "./types";
+import { addTokenUsage, countedTokens } from "./tokenUsage";
 
 // ---------------------------------------------------------------------------
 // Output contract (5.5)
@@ -453,26 +454,6 @@ export function startOfLocalMonth(now: Date): string {
  */
 export function isOverBudget(spent: number, budget: number | null): boolean {
   return budget !== null && budget > 0 && spent >= budget;
-}
-
-/**
- * 13: what a run cost is the sum of every provider turn it took, and the
- * rolling summariser (5.7) is one of those turns. Undefined stays undefined —
- * "nobody reported" is a different fact from "it was free", and adding a
- * reported number to an unreported one must not quietly invent the missing
- * half as zero. Two unknowns are still one unknown; one known and one unknown
- * is the known part, which is the best the run log can honestly claim.
- */
-function addTokenUsage(
-  left: ChatTokenUsage | undefined,
-  right: ChatTokenUsage | undefined
-): ChatTokenUsage | undefined {
-  if (!left) return right;
-  if (!right) return left;
-  return {
-    inputTokens: left.inputTokens + right.inputTokens,
-    outputTokens: left.outputTokens + right.outputTokens
-  };
 }
 
 /**
@@ -869,10 +850,8 @@ function createDefaultDeps(): CoachAnalysisRunnerDeps {
     },
     corosAuthenticated: () => getTrainingHubStatus().authenticated,
     getBudget: () => getCoachAnalysisBudget(),
-    getMonthToDateTokens: () => {
-      const totals = sumCoachAnalysisTokensSince(startOfLocalMonth(new Date()));
-      return totals.inputTokens + totals.outputTokens;
-    },
+    getMonthToDateTokens: () =>
+      countedTokens(sumCoachAnalysisTokensSince(startOfLocalMonth(new Date()))),
     getPause: () => getCoachAnalysisPause(),
     setPause: (pause) => {
       setCoachAnalysisPause(pause);
@@ -1698,7 +1677,11 @@ async function runInConversation(
   const costOf = (streamUsage: ChatTokenUsage | undefined) => {
     const total = addTokenUsage(rollUsage, streamUsage);
     return total
-      ? { inputTokens: total.inputTokens, outputTokens: total.outputTokens }
+      ? {
+          inputTokens: total.inputTokens,
+          outputTokens: total.outputTokens,
+          ...(total.cacheReadTokens ? { cacheReadTokens: total.cacheReadTokens } : {})
+        }
       : {};
   };
 
@@ -2267,6 +2250,8 @@ export function getAnalysisSpend(): CoachAnalysisSpend {
     monthStart,
     inputTokens: totals.inputTokens,
     outputTokens: totals.outputTokens,
+    cacheReadTokens: totals.cacheReadTokens,
+    countedTokens: countedTokens(totals),
     budget: getCoachAnalysisBudget(),
     countedRuns: totals.countedRuns,
     providerRuns: totals.providerRuns

@@ -1,4 +1,5 @@
 import type { ChatTokenUsage } from "./types";
+import { countableUsage } from "./tokenUsage";
 
 /** Build the ChatGPT Responses request with safe reasoning summaries enabled. */
 export function buildResponsesRequest(
@@ -65,5 +66,13 @@ export function extractResponseUsage(event: unknown): ChatTokenUsage | undefined
   };
   const inputTokens = count("input_tokens");
   const outputTokens = count("output_tokens");
-  return inputTokens || outputTokens ? { inputTokens, outputTokens } : undefined;
+  if (!inputTokens && !outputTokens) return undefined;
+  // The cached part of the input, which `input_tokens` already includes.
+  const details = reported.input_tokens_details as Record<string, unknown> | undefined;
+  const cached = details?.cached_tokens;
+  return countableUsage({
+    inputTokens,
+    outputTokens,
+    ...(typeof cached === "number" ? { cacheReadTokens: cached } : {})
+  });
 }

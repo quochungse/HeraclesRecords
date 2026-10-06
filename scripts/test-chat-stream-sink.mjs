@@ -629,7 +629,7 @@ assert.deepEqual(persisted[1].automation, marker);
   // added up, and that is inside `streamChat`.
   assert.match(
     source,
-    /const addUsage = \([^)]*\) => \{\s*\n\s*const counted = countableUsage\(round\);/,
+    /const addUsage = \([^)]*\) => \{\s*\n\s*usage = addTokenUsage\(usage, countableUsage\(round\)\);/,
     "every tool round's report must go through the same rule"
   );
 }
