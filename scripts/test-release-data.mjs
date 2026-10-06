@@ -41,6 +41,8 @@ function apiRelease(version, { drop = [], extra = [], ...rest } = {}) {
 }
 
 // 1. The release's four installers, in order, with the README's size labels.
+//    v1.0.0 shipped no deb, and an optional installer that is absent is left
+//    out rather than refused.
 const v100 = releaseFromApi(apiRelease("1.0.0"));
 assert.equal(v100.version, "1.0.0");
 assert.deepEqual(
@@ -58,11 +60,29 @@ assert.equal(
 );
 assert.equal(v100.installers[0].sha256, "5c0829f6");
 
+// 1b. A release with a deb lists it after the AppImage, in both README blocks.
+const withDeb = releaseFromApi(apiRelease("1.1.0", { extra: [["HeraclesRecords-1.1.0.deb", 121000000]] }));
+assert.deepEqual(
+  withDeb.installers.map((entry) => entry.id),
+  ["mac-arm64", "mac-x64", "windows", "linux", "linux-deb"],
+);
+{
+  const text = updateReadme(readme, withDeb);
+  assert.ok(text.includes("| **Linux** · Debian / Ubuntu (.deb) | [HeraclesRecords-1.1.0.deb]("));
+  assert.ok(text.includes('<a href="https://github.com/quochungse/HeraclesRecords/releases/download/v1.1.0/HeraclesRecords-1.1.0.deb">'));
+  const blocksOf = (text) => text.match(/<!-- release:(\w+):start -->[\s\S]*?<!-- release:\1:end -->/g).join("\n");
+  assert.ok(!blocksOf(updateReadme(readme, v100)).includes(".deb"), "a release without a deb still names one");
+}
+
 // 2. A release missing an installer, holding two, or not yet public is refused.
 assert.throws(() => releaseFromApi(apiRelease("1.0.0", { drop: [/\.AppImage$/] })), /linux installer, found 0/);
 assert.throws(
   () => releaseFromApi(apiRelease("1.0.0", { extra: [["HeraclesRecords-1.0.0-copy.AppImage", 1]] })),
   /linux installer, found 2/,
+);
+assert.throws(
+  () => releaseFromApi(apiRelease("1.0.0", { extra: [["HeraclesRecords-1.0.0.deb", 1], ["HeraclesRecords-1.0.0-copy.deb", 1]] })),
+  /linux-deb installer, found 2/,
 );
 assert.throws(() => releaseFromApi(apiRelease("1.0.0", { prerelease: true })), /pre-release/);
 assert.throws(() => releaseFromApi({ message: "Not Found" }), /Not a GitHub release/);
@@ -75,6 +95,7 @@ const expected = {
   "mac-x64": named(pkg.build.mac.artifactName, "x64", "dmg"),
   windows: named(pkg.build.nsis?.artifactName ?? pkg.build.win.artifactName, "x64", "exe"),
   linux: named(pkg.build.linux.artifactName, "x64", "AppImage"),
+  "linux-deb": named(pkg.build.deb?.artifactName ?? pkg.build.linux.artifactName, "x64", "deb"),
 };
 for (const platform of PLATFORMS) {
   assert.ok(platform.match.test(expected[platform.id]), `${platform.id} does not match ${expected[platform.id]}`);

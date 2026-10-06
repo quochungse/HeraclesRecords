@@ -10,7 +10,8 @@ const repo = "https://github.com/quochungse/HeraclesRecords";
 const requirements: Record<string, string> = {
   "mac-arm64": "A Mac with an M1 chip or later.",
   "mac-x64": "A Mac with an Intel processor.",
-  linux: "64-bit Linux (x86-64). Runs as an AppImage, no install needed.",
+  linux: "Any 64-bit Linux (x86-64). Runs as an AppImage, no install needed.",
+  "linux-deb": "Debian, Ubuntu, Mint and their relatives (x86-64). Installs into the app menu like any other package.",
 };
 ---
 
@@ -94,9 +95,14 @@ const requirements: Record<string, string> = {
       <strong>More info → Run anyway</strong>.
     </p>
     <h3>Linux</h3>
-    <p>Make the file executable and run it:</p>
+    <p>For the AppImage, make the file executable and run it:</p>
     <pre><code>chmod +x HeraclesRecords-*.AppImage
 ./HeraclesRecords-*.AppImage</code></pre>
+    <p>
+      For the deb, install it with apt, then open Heracles Records from the app menu. Updates
+      ask for your password, as any system package does.
+    </p>
+    <pre><code>sudo apt install ./HeraclesRecords-*.deb</code></pre>
 
     <h2>Check a download</h2>
     <p>

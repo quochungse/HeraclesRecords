@@ -30,8 +30,10 @@ const PLATFORM_CHECKS = {
     metadataFile: "latest-mac.yml",
     arches: ["arm64", "x64"],
     exts: ["dmg", "zip"],
-    updateExt: "zip",
-    blockmaps: true
+    updateExts: ["zip"],
+    // Only the zip the updater downloads carries one: a dmg blockmap is read
+    // by nothing (dmg.writeUpdateInfo is off), so it is not published.
+    blockmapExts: ["zip"]
   },
   windows: {
     label: "Windows",
@@ -39,18 +41,25 @@ const PLATFORM_CHECKS = {
     metadataFile: "latest.yml",
     arches: ["x64"],
     exts: ["exe"],
-    updateExt: "exe",
-    blockmaps: true
+    updateExts: ["exe"],
+    blockmapExts: ["exe"]
   },
   linux: {
     label: "Linux",
     builderKey: "linux",
     metadataFile: "latest-linux.yml",
     arches: ["x64"],
-    exts: ["AppImage"],
-    updateExt: "AppImage",
-    // AppImage blockmaps are embedded in the file, not written as *.AppImage.blockmap.
-    blockmaps: false
+    exts: ["AppImage", "deb"],
+    // electron-updater picks by how the app was installed: a deb install
+    // (resources/package-type) downloads the deb, anything else the AppImage.
+    // The deb target writes package-type into linux-unpacked, which the
+    // AppImage is packed from, so the AppImage must stay the first target
+    // (package.json's linux.target and dist:linux) or it ships the file too
+    // and updates itself with the deb.
+    updateExts: ["AppImage", "deb"],
+    // AppImage blockmaps are embedded in the file, not written as
+    // *.AppImage.blockmap, and a deb has none.
+    blockmapExts: []
   }
 };
 
@@ -232,7 +241,7 @@ function verifyMetadata(check, metadata, installers, releaseDir, files, errors) 
 
   const listed = new Set(metadata.files.map((entry) => entry.url));
   for (const installer of installers) {
-    if (installer.ext === check.updateExt && !listed.has(installer.name)) {
+    if (check.updateExts.includes(installer.ext) && !listed.has(installer.name)) {
       errors.push(
         `${metadataFile} does not list ${installer.name}, the file the updater downloads`
       );
@@ -253,7 +262,10 @@ export function verifyPlatform(platform, options = {}) {
     if (!files.includes(installer.name)) {
       errors.push(`missing installer ${installer.name}`);
     }
-    if (check.blockmaps && !files.includes(`${installer.name}.blockmap`)) {
+    if (
+      check.blockmapExts.includes(installer.ext) &&
+      !files.includes(`${installer.name}.blockmap`)
+    ) {
       errors.push(`missing blockmap ${installer.name}.blockmap`);
     }
   }

@@ -75,7 +75,7 @@ assert.deepEqual(
 );
 assert.deepEqual(
   expectedInstallers("linux", version).map((installer) => installer.name),
-  ["HeraclesRecords-1.2.3.AppImage"]
+  ["HeraclesRecords-1.2.3.AppImage", "HeraclesRecords-1.2.3.deb"]
 );
 
 // ---------------------------------------------------------------------------
@@ -167,14 +167,15 @@ withReleaseDir((releaseDir) => {
 });
 
 // ---------------------------------------------------------------------------
-// 4. macOS: both architectures, dmg and zip, every one hashed.
+// 4. macOS: both architectures, dmg and zip, every one hashed. Only the zips
+//    carry a blockmap: the dmg's is read by nothing and is not published.
 
 const MAC_INSTALLERS = expectedInstallers("macos", version).map((installer) => installer.name);
 
 withReleaseDir((releaseDir) => {
   for (const file of MAC_INSTALLERS) {
     writeReleaseFile(releaseDir, file);
-    writeReleaseFile(releaseDir, `${file}.blockmap`);
+    if (file.endsWith(".zip")) writeReleaseFile(releaseDir, `${file}.blockmap`);
   }
   writeMetadata(
     releaseDir,
@@ -182,6 +183,25 @@ withReleaseDir((releaseDir) => {
     MAC_INSTALLERS.map((file) => describe(releaseDir, file))
   );
   verify("macos", releaseDir);
+});
+
+// 4a. A zip without its blockmap is refused: the updater's differential
+//     download reads it.
+withReleaseDir((releaseDir) => {
+  for (const file of MAC_INSTALLERS) {
+    writeReleaseFile(releaseDir, file);
+  }
+  writeMetadata(
+    releaseDir,
+    "latest-mac.yml",
+    MAC_INSTALLERS.map((file) => describe(releaseDir, file))
+  );
+  assert.throws(
+    () => verify("macos", releaseDir),
+    (error) =>
+      /missing blockmap HeraclesRecords-1\.2\.3-arm64\.zip\.blockmap/.test(error.message) &&
+      !/dmg\.blockmap/.test(error.message)
+  );
 });
 
 // 4b. A dmg named other than the updater's link spells it fails, though a dmg
@@ -220,13 +240,30 @@ withReleaseDir((releaseDir) => {
 });
 
 // ---------------------------------------------------------------------------
-// 5. Linux: one AppImage, no blockmap file.
+// 5. Linux: an AppImage and a deb, both in latest-linux.yml, no blockmap file.
+
+const APP_IMAGE = `HeraclesRecords-${version}.AppImage`;
+const DEB = `HeraclesRecords-${version}.deb`;
 
 withReleaseDir((releaseDir) => {
-  const appImage = `HeraclesRecords-${version}.AppImage`;
-  writeReleaseFile(releaseDir, appImage);
-  writeMetadata(releaseDir, "latest-linux.yml", [describe(releaseDir, appImage)]);
+  writeReleaseFile(releaseDir, APP_IMAGE);
+  writeReleaseFile(releaseDir, DEB);
+  writeMetadata(releaseDir, "latest-linux.yml", [
+    describe(releaseDir, APP_IMAGE),
+    describe(releaseDir, DEB)
+  ]);
   verify("linux", releaseDir);
+});
+
+// 5b. A deb the metadata leaves out cannot update a deb install.
+withReleaseDir((releaseDir) => {
+  writeReleaseFile(releaseDir, APP_IMAGE);
+  writeReleaseFile(releaseDir, DEB);
+  writeMetadata(releaseDir, "latest-linux.yml", [describe(releaseDir, APP_IMAGE)]);
+  assert.throws(
+    () => verify("linux", releaseDir),
+    /does not list HeraclesRecords-1\.2\.3\.deb, the file the updater downloads/
+  );
 });
 
 console.log("release artifact verifier tests passed");

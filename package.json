@@ -7,6 +7,7 @@
   "license": "MIT",
   "homepage": "https://github.com/quochungse/HeraclesRecords",
   "main": "dist-electron/main.js",
+  "desktopName": "heracles-records.desktop",
   "scripts": {
     "dev": "concurrently -k \"npm:dev:renderer\" \"npm:dev:electron\"",
     "dev:simulate-plan-ai": "cross-env HERACLES_SIMULATE_PLAN_AI=1 npm run dev",
@@ -200,7 +201,7 @@
     "dist": "npm run clean:electron && npm run build && electron-builder --publish never",
     "dist:mac": "npm run clean:electron && npm run build && electron-builder --mac --arm64 --x64 --publish never",
     "dist:win": "npm run clean:electron && npm run build && electron-builder --win nsis --x64 --publish never",
-    "dist:linux": "npm run clean:electron && npm run build && electron-builder --linux AppImage --x64 --publish never",
+    "dist:linux": "npm run clean:electron && npm run build && electron-builder --linux AppImage deb --x64 --publish never",
     "site:dev": "npm --prefix site run dev",
     "site:build": "npm --prefix site run build",
     "site:og": "node scripts/run-electron-gui.mjs scripts/site-og/render.cjs",
@@ -246,6 +247,7 @@
       "node_modules/better-sqlite3/**/*"
     ],
     "dmg": {
+      "writeUpdateInfo": false,
       "background": "dmg-background.png",
       "iconSize": 100,
       "window": {
@@ -294,11 +296,14 @@
     },
     "linux": {
       "target": [
-        "AppImage"
+        "AppImage",
+        "deb"
       ],
+      "maintainer": "quochungse <quochungse@gmail.com>",
+      "syncDesktopName": true,
       "artifactName": "HeraclesRecords-${version}.${ext}",
       "category": "Utility",
-      "icon": "build/icon.png"
+      "icon": "build/icons"
     }
   },
   "dependencies": {

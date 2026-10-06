@@ -48,7 +48,7 @@
 | **macOS** · Apple Silicon (M1 and later) | [HeraclesRecords-1.0.0-arm64.dmg](https://github.com/quochungse/HeraclesRecords/releases/download/v1.0.0/HeraclesRecords-1.0.0-arm64.dmg) | 176 MB |
 | **macOS** · Intel | [HeraclesRecords-1.0.0-x64.dmg](https://github.com/quochungse/HeraclesRecords/releases/download/v1.0.0/HeraclesRecords-1.0.0-x64.dmg) | 181 MB |
 | **Windows** 10 / 11 · 64-bit | [HeraclesRecords-Setup-1.0.0.exe](https://github.com/quochungse/HeraclesRecords/releases/download/v1.0.0/HeraclesRecords-Setup-1.0.0.exe) | 162 MB |
-| **Linux** · x86-64 | [HeraclesRecords-1.0.0.AppImage](https://github.com/quochungse/HeraclesRecords/releases/download/v1.0.0/HeraclesRecords-1.0.0.AppImage) | 184 MB |
+| **Linux** · AppImage, any distribution | [HeraclesRecords-1.0.0.AppImage](https://github.com/quochungse/HeraclesRecords/releases/download/v1.0.0/HeraclesRecords-1.0.0.AppImage) | 184 MB |
 
 Version 1.0.0 · [What's new](https://github.com/quochungse/HeraclesRecords/releases/tag/v1.0.0) · [All releases](https://github.com/quochungse/HeraclesRecords/releases). The app tells you when a new version is out.
 <!-- release:downloads:end -->
@@ -58,7 +58,7 @@ Version 1.0.0 · [What's new](https://github.com/quochungse/HeraclesRecords/rele
 
 - **macOS**: this build is not notarized yet. If macOS says it cannot check the app, open **System Settings → Privacy &amp; Security** and click **Open Anyway**. If it says the app is damaged, run `xattr -dr com.apple.quarantine "/Applications/Heracles Records.app"` in Terminal, then open it again.
 - **Windows**: SmartScreen may warn about an unrecognised app. Click **More info → Run anyway**.
-- **Linux**: make the file executable (`chmod +x HeraclesRecords-*.AppImage`) and run it.
+- **Linux**: make the AppImage executable (`chmod +x HeraclesRecords-*.AppImage`) and run it, or install the deb on Debian / Ubuntu (`sudo apt install ./HeraclesRecords-*.deb`).
 
 You sign in with your COROS account. Coach also needs an AI: your ChatGPT account, a Claude subscription, a Claude or OpenRouter API key, or a model running on your own computer.
 

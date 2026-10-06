@@ -47,13 +47,14 @@ for (const page of pages) {
   }
 }
 
-// 5. The home page offers the four installers of one release, and every page
-//    states that version in its footer (release data from GitHub at build).
+// 5. The home page offers the installers of one release (four, or five once a
+//    release ships the deb), and every page states that version in its footer
+//    (release data from GitHub at build).
 const home = readFileSync(join(dist, "index.html"), "utf8");
 const downloads = [
   ...new Set(home.match(/href="https:\/\/github\.com\/quochungse\/HeraclesRecords\/releases\/download\/[^"]+"/g)),
 ].map((href) => href.match(/download\/(v[^/]+)\/([^"]+)"/));
-assert.equal(downloads.length, 4, `index.html links ${downloads.length} installers, not 4`);
+assert.ok([4, 5].includes(downloads.length), `index.html links ${downloads.length} installers, not 4 or 5`);
 const tags = new Set(downloads.map((match) => match[1]));
 assert.equal(tags.size, 1, `index.html links installers of ${[...tags].join(", ")}`);
 const [tag] = tags;

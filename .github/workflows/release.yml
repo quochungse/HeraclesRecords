@@ -111,13 +111,12 @@ jobs:
           name: heracles-macos
           path: |
             release/*.dmg
-            release/*.dmg.blockmap
             release/*.zip
             release/*.zip.blockmap
             release/latest-mac.yml
 
   linux:
-    name: Linux AppImage
+    name: Linux AppImage and deb
     needs: preflight
     runs-on: ubuntu-latest
     steps:
@@ -136,7 +135,7 @@ jobs:
       - name: Rebuild native modules
         run: npm run rebuild
 
-      - name: Build AppImage
+      - name: Build AppImage and deb
         env:
           GITHUB_TOKEN: ${{ github.token }}
           HERACLES_GOOGLE_OAUTH_ID: ${{ secrets.HERACLES_GOOGLE_OAUTH_ID }}
@@ -152,6 +151,7 @@ jobs:
           name: heracles-linux
           path: |
             release/*.AppImage
+            release/*.deb
             release/latest-linux.yml
 
   windows:

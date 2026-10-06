@@ -2823,3 +2823,18 @@ installer after electron-builder — a signing service, say — must rewrite the
 installers must carry the names the `artifactName` patterns give, which `test:release-artifacts`
 also holds `updaterService.ts`'s hand-built download links to. The `dist*` scripts clean `dist-electron/` first —
 `tsc` never deletes the output of a removed module, and a local package would ship it.
+**What a release publishes is what something reads** (since 1.0.1): per Mac architecture a dmg
+(people) and a zip with its blockmap (the updater, differentially), the Windows exe with its
+blockmap, the three `latest*.yml`, and **both a Linux AppImage and a deb**. The dmg's blockmap
+is not written (`dmg.writeUpdateInfo: false`): nothing reads it. The AppImage stays because it
+runs on any distribution without root and is what every 1.0.0 Linux install updates from; the
+deb installs into the app menu and updates through electron-updater's `DebUpdater`, which asks
+for the password (`pkexec`). Which one an install takes is `resources/package-type`, which the
+deb target writes into `linux-unpacked` — **the AppImage must stay the first Linux target** or
+it is packed with that file and updates itself with the deb. The deb is `optional` in
+`release-data.mjs` because 1.0.0 shipped none; `desktopName` + `linux.syncDesktopName` make the
+deb's `.desktop` entry, its `StartupWMClass` and Electron's app_id agree.
+**Linux icons are a set, `build/icons/<n>x<n>.png` (16–512), and `linux.icon` names the
+directory.** Handed the lone 1024px `icon.png`, the deb installed
+`hicolor/1024x1024/apps/…` only — a size the icon theme never looks up — so the app menu and dock
+drew the generic placeholder. `npm run icons:generate` writes the set beside `icon.icns`.

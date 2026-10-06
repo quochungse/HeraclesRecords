@@ -1,9 +1,14 @@
-"""Build build/icon.icns from a square PNG source.
+"""Build build/icon.icns and build/icons/ from a square PNG source.
 
 The macOS path (scripts/generate-icons.mjs) shells out to sips and iconutil.
 Neither exists off macOS, so this writes the ICNS container directly: it emits
 the same nine chunks iconutil does (TOC plus ic07-ic14), each holding an
 optimised PNG.
+
+build/icons/<n>x<n>.png is the set Linux packages install under
+usr/share/icons/hicolor. A lone 1024px icon is not enough there: the icon
+theme looks sizes up from 16 to 512 and never finds a 1024x1024 directory, so
+the app menu and dock drew the generic placeholder.
 """
 from __future__ import annotations
 
@@ -51,6 +56,16 @@ def build_icns(source_path: Path, target_path: Path) -> None:
     target_path.write_bytes(b"icns" + struct.pack(">I", len(body) + 8) + body)
 
 
+LINUX_SIZES = [16, 24, 32, 48, 64, 128, 256, 512]
+
+
+def build_linux_icons(source_path: Path, target_dir: Path) -> None:
+    source = Image.open(source_path).convert("RGBA")
+    target_dir.mkdir(exist_ok=True)
+    for size in LINUX_SIZES:
+        (target_dir / f"{size}x{size}.png").write_bytes(_png(source, size))
+
+
 def main() -> None:
     build_dir = Path(__file__).resolve().parent.parent / "build"
     source_path = Path(sys.argv[1]).resolve() if len(sys.argv) > 1 else build_dir / "icon.png"
@@ -60,6 +75,8 @@ def main() -> None:
     icns_path = build_dir / "icon.icns"
     build_icns(source_path, icns_path)
     print(f"Generated {icns_path} ({icns_path.stat().st_size // 1024} KB)")
+    build_linux_icons(source_path, build_dir / "icons")
+    print(f"Generated {build_dir / 'icons'}")
 
 
 if __name__ == "__main__":

@@ -63,6 +63,18 @@ for (const size of [16, 32, 128, 256, 512]) {
   );
 }
 
+// The set Linux packages install under hicolor: a lone 1024px icon is never
+// found by the icon theme, which looks sizes up from 16 to 512.
+const linuxIconsDir = path.join(buildDir, "icons");
+fs.mkdirSync(linuxIconsDir, { recursive: true });
+for (const size of [16, 24, 32, 48, 64, 128, 256, 512]) {
+  execFileSync(
+    "sips",
+    ["-z", String(size), String(size), iconPngPath, "--out", path.join(linuxIconsDir, `${size}x${size}.png`)],
+    { stdio: "ignore" }
+  );
+}
+
 execFileSync("iconutil", ["-c", "icns", iconsetDir, "-o", path.join(buildDir, "icon.icns")], {
   stdio: "inherit"
 });

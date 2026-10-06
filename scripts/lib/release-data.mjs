@@ -27,7 +27,11 @@ const windowsLogo = encodeURIComponent(
 const badge = (message, logo, logoColor = "white") =>
   `https://img.shields.io/badge/${message}-1f2328?style=for-the-badge&logo=${logo}${logoColor ? `&logoColor=${logoColor}` : ""}`;
 
-/** The four installers, in the order every list shows them. */
+/**
+ * The installers, in the order every list shows them. An `optional` one may be
+ * absent from a release (the deb first shipped after 1.0.0) and is then left
+ * out of every list; the others must be there.
+ */
 export const PLATFORMS = [
   {
     id: "mac-arm64",
@@ -61,9 +65,19 @@ export const PLATFORMS = [
     os: "Linux",
     variant: "AppImage, x86-64",
     match: /\.AppImage$/,
-    readmeLabel: "**Linux** · x86-64",
+    readmeLabel: "**Linux** · AppImage, any distribution",
     badgeSrc: badge("Linux-AppImage", "linux"),
     badgeAlt: "Download for Linux",
+  },
+  {
+    id: "linux-deb",
+    os: "Linux",
+    variant: "Debian / Ubuntu, x86-64",
+    match: /\.deb$/,
+    optional: true,
+    readmeLabel: "**Linux** · Debian / Ubuntu (.deb)",
+    badgeSrc: badge("Linux-.deb", "debian"),
+    badgeAlt: "Download for Debian or Ubuntu",
   },
 ];
 
@@ -86,8 +100,9 @@ export function releaseFromApi(json) {
   }
   const tag = json.tag_name;
   const assets = Array.isArray(json.assets) ? json.assets : [];
-  const installers = PLATFORMS.map((platform) => {
+  const installers = PLATFORMS.flatMap((platform) => {
     const found = assets.filter((asset) => platform.match.test(asset.name));
+    if (found.length === 0 && platform.optional) return [];
     if (found.length !== 1) {
       throw new Error(`${tag}: expected one ${platform.id} installer, found ${found.length}`);
     }
@@ -150,16 +165,18 @@ export async function fetchLatestRelease({ token = process.env.GITHUB_TOKEN, fet
 // them is ever rewritten.
 
 export function renderReadmeBadges(release) {
-  const lines = PLATFORMS.map((platform) => {
+  const lines = PLATFORMS.flatMap((platform) => {
     const installer = release.installers.find((entry) => entry.id === platform.id);
+    if (!installer) return [];
     return `  <a href="${installer.url}"><img src="${platform.badgeSrc}" alt="${platform.badgeAlt}" /></a>`;
   });
   return ['<p align="center">', ...lines, "</p>"].join("\n");
 }
 
 export function renderReadmeDownloads(release) {
-  const rows = PLATFORMS.map((platform) => {
+  const rows = PLATFORMS.flatMap((platform) => {
     const installer = release.installers.find((entry) => entry.id === platform.id);
+    if (!installer) return [];
     return `| ${platform.readmeLabel} | [${installer.name}](${installer.url}) | ${installer.sizeLabel} |`;
   });
   return [
