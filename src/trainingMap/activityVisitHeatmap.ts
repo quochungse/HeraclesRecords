@@ -21,7 +21,7 @@ export interface ActivityRoutePolyline {
 }
 
 /** A place as the globe draws it: a pin, sized by its activities. */
-export interface GeoHeatBucket {
+export interface GlobePlace {
   key: string;
   lat: number;
   lon: number;

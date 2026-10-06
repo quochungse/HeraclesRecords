@@ -8,7 +8,7 @@ import {
   RotateCcw,
   Route,
 } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type {
   TrainingHubActivity,
   TrainingHubActivityDetail,
@@ -22,10 +22,9 @@ import {
   sampleGlobePoints,
   type ActivityRoutePolyline,
   type ActivityVisitPoint,
-  type GeoHeatBucket,
+  type GlobePlace,
   type GlobePoint,
 } from "./activityVisitHeatmap";
-import { loadRegionIndex, type RegionIndex } from "./adminRegions";
 import { placeLabelKey } from "./placeClusters";
 import {
   coordinateLabel,
@@ -45,6 +44,7 @@ import {
   type PlaceSummary,
 } from "./placeSummaries";
 import { PlaceDetail, PlaceLabourCard, PlaceList } from "./PlacePanels";
+import { useRegionIndex } from "./useRegionIndex";
 import type { LabourState } from "../records/labours";
 import {
   ActivityGlobeStreetMap,
@@ -222,10 +222,10 @@ export function ActivityGlobeCard({
   const [selectedLocationKey, setSelectedLocationKeyState] = useState<
     string | null
   >(rememberedPlaceKey);
-  const setSelectedLocationKey = (key: string | null) => {
+  const setSelectedLocationKey = useCallback((key: string | null) => {
     rememberedPlaceKey = key;
     setSelectedLocationKeyState(key);
-  };
+  }, []);
   const [labelReach, setLabelReach] = useState(LABEL_BATCH);
   // Seeded from storage, so the names a previous launch resolved are on the
   // screen in the first paint instead of arriving one request later.
@@ -233,21 +233,10 @@ export function ActivityGlobeCard({
     knownPlaceLabels,
   );
   const [globeError, setGlobeError] = useState(false);
-  // The outlines that tell places apart, read once per window. Until they are
-  // here there are no places to draw: grouping without them would draw a
-  // different map a moment later.
-  const [regionIndex, setRegionIndex] = useState<RegionIndex | null>(null);
-  useEffect(() => {
-    let cancelled = false;
-    void loadRegionIndex().then((index) => {
-      if (!cancelled) {
-        setRegionIndex(index);
-      }
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+  // The outlines that tell places apart. Until they are here there are no
+  // places to draw: grouping without them would draw a different map a moment
+  // later.
+  const regionIndex = useRegionIndex();
 
   const filteredActivities = useMemo(() => {
     if (period === "all") {
@@ -416,6 +405,14 @@ export function ActivityGlobeCard({
     };
   }, [labelReach, places, selectedPlace, sortedPlaces]);
 
+  // A street map scheduled to open once the globe has flown in.
+  const cancelStreetEnter = useCallback(() => {
+    if (streetEnterTimerRef.current !== null) {
+      window.clearTimeout(streetEnterTimerRef.current);
+      streetEnterTimerRef.current = null;
+    }
+  }, []);
+
   // A new period is a new map: whatever was open belongs to the old one. The
   // first run is the mount, which must keep a place remembered from before.
   const periodKey = `${period}|${customStart}|${customEnd}`;
@@ -425,10 +422,7 @@ export function ActivityGlobeCard({
       return;
     }
     periodKeyRef.current = periodKey;
-    if (streetEnterTimerRef.current !== null) {
-      window.clearTimeout(streetEnterTimerRef.current);
-      streetEnterTimerRef.current = null;
-    }
+    cancelStreetEnter();
     setSelectedLocationKey(null);
     setStreetFocus(null);
     setZoomingToStreet(false);
@@ -436,21 +430,21 @@ export function ActivityGlobeCard({
     setLabelReach(LABEL_BATCH);
   }, [periodKey]);
 
-  const enterStreetFocus = (focus: StreetMapFocus) => {
-    if (streetEnterTimerRef.current !== null) {
-      window.clearTimeout(streetEnterTimerRef.current);
-      streetEnterTimerRef.current = null;
-    }
-    setZoomingToStreet(false);
-    setStreetFocus(focus);
-    setCanResetView(true);
-    setHoveredKey(null);
-  };
+  // Stable, like `selectLocation`, so the memoised globe is not drawn again
+  // whenever something beside it changes.
+  const enterStreetFocus = useCallback(
+    (focus: StreetMapFocus) => {
+      cancelStreetEnter();
+      setZoomingToStreet(false);
+      setStreetFocus(focus);
+      setCanResetView(true);
+      setHoveredKey(null);
+    },
+    [cancelStreetEnter],
+  );
 
   const scheduleStreetFocus = (focus: StreetMapFocus, delayMs: number) => {
-    if (streetEnterTimerRef.current !== null) {
-      window.clearTimeout(streetEnterTimerRef.current);
-    }
+    cancelStreetEnter();
     streetEnterTimerRef.current = window.setTimeout(() => {
       streetEnterTimerRef.current = null;
       enterStreetFocus(focus);
@@ -460,23 +454,23 @@ export function ActivityGlobeCard({
   // Picking a place, on the globe or in the list, flies the globe to it and
   // opens it beside the map. The street map is a step further, taken from
   // there: it used to open on its own the moment a pin was clicked.
-  const selectLocation = (location: GeoHeatBucket) => {
-    if (streetEnterTimerRef.current !== null) {
-      window.clearTimeout(streetEnterTimerRef.current);
-      streetEnterTimerRef.current = null;
-    }
-    setZoomingToStreet(false);
-    setStreetFocus(null);
-    // The row that was clicked unmounts under the pointer, so it never hears
-    // the pointer leave.
-    setHoveredKey(null);
-    const place = places.find((candidate) => candidate.key === location.key);
-    setSelectedLocationKey(location.key);
-    const latestActivity = place?.activities[0];
-    if (latestActivity) {
-      onSelectActivity(latestActivity);
-    }
-  };
+  const selectLocation = useCallback(
+    (location: GlobePlace) => {
+      cancelStreetEnter();
+      setZoomingToStreet(false);
+      setStreetFocus(null);
+      // The row that was clicked unmounts under the pointer, so it never hears
+      // the pointer leave.
+      setHoveredKey(null);
+      const place = places.find((candidate) => candidate.key === location.key);
+      setSelectedLocationKey(location.key);
+      const latestActivity = place?.activities[0];
+      if (latestActivity) {
+        onSelectActivity(latestActivity);
+      }
+    },
+    [cancelStreetEnter, onSelectActivity, places, setSelectedLocationKey],
+  );
 
   const zoomIntoSelectedLocation = () => {
     if (!selectedPlace || zoomingToStreet) {
@@ -500,32 +494,22 @@ export function ActivityGlobeCard({
     scheduleStreetFocus(focus, duration);
   };
 
-  const restoreBaselineCamera = (duration = 900) => {
-    if (streetEnterTimerRef.current !== null) {
-      window.clearTimeout(streetEnterTimerRef.current);
-      streetEnterTimerRef.current = null;
-    }
+  const restoreBaselineCamera = () => {
+    cancelStreetEnter();
     setZoomingToStreet(false);
-    globeRendererRef.current?.resetView(duration);
+    globeRendererRef.current?.resetView(900);
     setCanResetView(false);
   };
 
   const exitStreetMode = () => {
-    if (streetEnterTimerRef.current !== null) {
-      window.clearTimeout(streetEnterTimerRef.current);
-      streetEnterTimerRef.current = null;
-    }
     setStreetFocus(null);
-    restoreBaselineCamera(900);
+    restoreBaselineCamera();
   };
 
   // Letting the place go is enough: the globe flies back to every place on
   // its own when nothing is picked.
   const showAllPlaces = () => {
-    if (streetEnterTimerRef.current !== null) {
-      window.clearTimeout(streetEnterTimerRef.current);
-      streetEnterTimerRef.current = null;
-    }
+    cancelStreetEnter();
     setZoomingToStreet(false);
     setStreetFocus(null);
     setHoveredActivityId(null);
@@ -542,14 +526,7 @@ export function ActivityGlobeCard({
     }
   });
 
-  useEffect(
-    () => () => {
-      if (streetEnterTimerRef.current !== null) {
-        window.clearTimeout(streetEnterTimerRef.current);
-      }
-    },
-    [],
-  );
+  useEffect(() => cancelStreetEnter, [cancelStreetEnter]);
 
   // Seed / refresh latest activity geo into the visit + route caches.
   useEffect(() => {
@@ -660,7 +637,7 @@ export function ActivityGlobeCard({
       exitStreetMode();
       return;
     }
-    restoreBaselineCamera(900);
+    restoreBaselineCamera();
   };
 
   const mapHasRoute = routePoints.length > 0;
@@ -892,9 +869,13 @@ export function ActivityGlobeCard({
                 onHover={setHoveredKey}
                 onSortChange={setPlaceSort}
                 onSelect={(place) => selectLocation(place.cluster)}
-                onNearEnd={() =>
+                onScrolledTo={(rows) =>
+                  // Whole batches, half a batch ahead of the rows in view.
                   setLabelReach((reach) =>
-                    reach < sortedPlaces.length ? reach + LABEL_BATCH : reach,
+                    Math.max(
+                      reach,
+                      Math.ceil((rows + LABEL_BATCH / 2) / LABEL_BATCH) * LABEL_BATCH,
+                    ),
                   )
                 }
               />

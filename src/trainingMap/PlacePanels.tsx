@@ -46,8 +46,8 @@ interface PlaceListProps {
   onHover: (key: string | null) => void;
   onSortChange: (sort: PlaceSort) => void;
   onSelect: (place: PlaceSummary) => void;
-  /** The list scrolled close to its end: name the next rows. */
-  onNearEnd: () => void;
+  /** How many rows the list has been scrolled down to: name as far as that. */
+  onScrolledTo: (rows: number) => void;
 }
 
 export function PlaceList({
@@ -58,17 +58,17 @@ export function PlaceList({
   onHover,
   onSortChange,
   onSelect,
-  onNearEnd,
+  onScrolledTo,
 }: PlaceListProps) {
   const maxCount = places.reduce(
     (max, place) => Math.max(max, place.activities.length),
     0,
   );
+  // The rows are one height, so the bottom of the view is that share of them.
   const handleScroll = (event: UIEvent<HTMLOListElement>) => {
     const list = event.currentTarget;
-    if (list.scrollTop + list.clientHeight > list.scrollHeight - 160) {
-      onNearEnd();
-    }
+    const bottom = list.scrollTop + list.clientHeight;
+    onScrolledTo(Math.ceil((bottom / list.scrollHeight) * places.length));
   };
   return (
     <>
