@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.1] - 2026-10-06
+
+### What's new
+
+- **Where you've been, redesigned** — the globe sits beside a list of places. Point at one in the list or on the globe and both follow; open it to see its figures, the sports trained there, visits by month and its activities. A place is now one province or state, no more than 25 km across, named by its region until the town is found. Country borders and coasts are drawn on the globe, and zooming in opens a street map of your routes.
+- **Hall of Records** — each month has a clear heading and a long month folds behind "N more". The Cattle of Geryon counts the same places Where you've been draws.
+- **Linux** — a `.deb` for Debian and Ubuntu beside the AppImage. The AppImage still updates itself.
+- **Coach** — tokens read from the prompt cache count as a tenth, so a turn's total and the monthly budget match what was spent. Settings tell you when a newer Claude Code is available.
+
+### Fixed
+
+- Sleep shows up as soon as COROS MCP is connected, without pressing Refresh.
+- Improve app performance and stability.
+
 ## [1.0.0] - 2026-10-03
 
 The first release of Heracles Records: a desktop companion for COROS athletes,

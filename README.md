@@ -158,7 +158,7 @@ Every milestone you reach is kept: firsts, records, streaks, totals and new plac
 
 ### Where you've been
 
-Every place your training has taken you, on a globe.
+Every place your training has taken you, on a globe beside a list of places. Open one to see what you trained there.
 
 <img src="docs/readme/15-places.webp" alt="Where you've been: every place you trained, on a globe" />
 
