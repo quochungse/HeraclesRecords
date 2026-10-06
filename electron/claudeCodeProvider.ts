@@ -3,7 +3,7 @@ import { access, stat } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { promisify } from "node:util";
-import { constants as fsConstants } from "node:fs";
+import { constants as fsConstants, mkdirSync } from "node:fs";
 import { z } from "zod";
 import { formatClaudeModelName } from "./chatModels";
 import type { ChatModelOption } from "./chatModels";
@@ -325,6 +325,21 @@ export function createClaudeSubscriptionEnvironment(
   return env;
 }
 
+/**
+ * The directory every Claude Code process starts in: an empty one of the
+ * app's own, never the app's working directory. A Mac app opened from the
+ * Finder runs in `/`, and the CLI reads the tree it starts in, so it walked
+ * into Documents, Desktop and Downloads — and macOS asks the person about each
+ * of those in the name of Heracles Records, the process that spawned it.
+ */
+export function claudeWorkingDirectory(configDir?: string): string {
+  const base = configDir?.trim();
+  if (!base) return os.tmpdir();
+  const dir = path.join(base, "cwd");
+  mkdirSync(dir, { recursive: true, mode: 0o700 });
+  return dir;
+}
+
 /** Strips terminal control sequences so CLI output can be pattern-matched. */
 export function stripAnsi(value: string): string {
   return value
@@ -503,6 +518,7 @@ export async function startClaudeCodeLogin(options: {
     // prints anything, and without stdout we never see the authorize URL.
     stdio: ["pipe", "pipe", "pipe"],
     windowsHide: true,
+    cwd: claudeWorkingDirectory(options.configDir),
     env: createClaudeSubscriptionEnvironment(options.configDir)
   });
 
@@ -696,6 +712,7 @@ export async function listClaudeCodeModels(options: {
         allowedTools: [],
         settingSources: [],
         persistSession: false,
+        cwd: claudeWorkingDirectory(options.configDir),
         env: createClaudeSubscriptionEnvironment(options.configDir)
       }
     });
@@ -933,6 +950,7 @@ export async function streamClaudeCodeCompletion(
         includePartialMessages: true,
         maxTurns: 10,
         persistSession: false,
+        cwd: claudeWorkingDirectory(options.configDir),
         env: createClaudeSubscriptionEnvironment(options.configDir)
       }
     });
@@ -1111,6 +1129,7 @@ async function execClaude(
   const result = await execFileAsync(executablePath, args, {
     timeout: options.timeout,
     windowsHide: true,
+    cwd: claudeWorkingDirectory(options.configDir),
     env: createClaudeSubscriptionEnvironment(options.configDir),
     maxBuffer: 1024 * 1024
   });
