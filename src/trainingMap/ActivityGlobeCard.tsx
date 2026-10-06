@@ -1,50 +1,21 @@
 import {
-  Activity,
   CalendarDays,
   ChevronLeft,
-  ChevronRight,
   CircleAlert,
-  Flame,
-  Gauge,
-  Hand,
-  LockKeyhole,
   MapPin,
-  Mountain,
-  Route,
+  Minus,
+  Plus,
   RotateCcw,
-  Timer,
-  ZoomIn,
+  Route,
 } from "lucide-react";
-import {
-  Area,
-  AreaChart,
-  ResponsiveContainer,
-} from "recharts";
-import {
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-  type CSSProperties,
-} from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type {
   TrainingHubActivity,
   TrainingHubActivityDetail,
 } from "../../electron/types";
-import { useUnitSystem } from "../units/UnitSystemProvider";
 import {
-  distanceUnit,
-  elevationUnit,
-  metersToDisplayDistance,
-  metersToElevation,
-} from "../units/units";
-import {
-  aggregateActivityStats,
   bucketVisitsGeographically,
   extractTrackPoints,
-  formatOverallDistance,
-  formatOverallDuration,
-  geoHeatBucketKey,
   getCachedRoutePolylines,
   getCachedVisitPoints,
   loadActivityVisitCentroids,
@@ -61,6 +32,17 @@ import {
   loadPlaceLabel,
   type PlaceLabel,
 } from "./placeLabels";
+import {
+  activityTimestampMs,
+  buildPlaceSummaries,
+  farthestFromHome,
+  homePlace,
+  placesSummaryLine,
+  sortPlaces,
+  type PlaceSort,
+  type PlaceSummary,
+} from "./placeSummaries";
+import { PlaceDetail, PlaceList, placeLabelOf } from "./PlacePanels";
 import {
   ActivityGlobeStreetMap,
   type StreetMapFocus,
@@ -94,6 +76,10 @@ interface ActivityPeriodPreference {
 
 const ISO_DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 const LOCATION_ZOOM_DURATION_MS = 1_100;
+/** One press of + or −: the camera's altitude times this, or divided by it. */
+const ZOOM_STEP = 0.7;
+/** Places named per batch, as the list scrolls: the geocoder is throttled. */
+const LABEL_BATCH = 40;
 
 function isIsoDateOrEmpty(value: unknown): value is string {
   if (value === "") return true;
@@ -129,47 +115,12 @@ const ACTIVITY_PERIOD_PREFERENCE =
     },
   });
 
-interface LocationSummary {
-  key: string;
-  bucket: GeoHeatBucket;
-  activities: TrainingHubActivity[];
-  activityIds: Set<string>;
-  distanceMeters: number;
-  durationSeconds: number;
-  elevationMeters: number;
-  lastVisited?: number;
-  routeCount: number;
-  trend: Array<{ order: number; elevation: number; distance: number }>;
-}
-
-function activityTimestampMs(value?: number): number {
-  if (!value || !Number.isFinite(value)) {
-    return 0;
-  }
-  return value < 10_000_000_000 ? value * 1000 : value;
-}
-
-function formatVisitDate(value?: number): string {
-  const timestamp = activityTimestampMs(value);
-  if (!timestamp) {
-    return "Date unavailable";
-  }
-  return new Intl.DateTimeFormat(undefined, {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  }).format(new Date(timestamp));
-}
-
-function formatLocationDuration(seconds: number): string {
-  const totalMinutes = Math.max(0, Math.round(seconds / 60));
-  const hours = Math.floor(totalMinutes / 60);
-  const minutes = totalMinutes % 60;
-  if (hours === 0) {
-    return `${minutes} min`;
-  }
-  return minutes > 0 ? `${hours} h ${minutes} m` : `${hours} h`;
-}
+const PLACE_SORT_PREFERENCE = defineSelectionPreference<PlaceSort>({
+  key: "trainingMap.placeSort",
+  defaultValue: "recent",
+  validate: (value): value is PlaceSort =>
+    value === "recent" || value === "visits",
+});
 
 const MAX_RENDERED_POINTS = 900;
 
@@ -239,7 +190,6 @@ export function ActivityGlobeCard({
   detail,
   onSelectActivity,
 }: ActivityGlobeCardProps) {
-  const { unitSystem } = useUnitSystem();
   const globeRendererRef = useRef<ActivityGlobeRendererHandle>(null);
   const streetEnterTimerRef = useRef<number | null>(null);
 
@@ -247,10 +197,13 @@ export function ActivityGlobeCard({
     ACTIVITY_PERIOD_PREFERENCE,
   );
   const { period, customStart, customEnd } = periodPreference;
+  const [placeSort, setPlaceSort] = useSelectionPreference(
+    PLACE_SORT_PREFERENCE,
+  );
   const [selectedLocationKey, setSelectedLocationKey] = useState<string | null>(
     null,
   );
-  const [recentStart, setRecentStart] = useState(0);
+  const [labelReach, setLabelReach] = useState(LABEL_BATCH);
   // Seeded from storage, so the names a previous launch resolved are on the
   // screen in the first paint instead of arriving one request later.
   const [placeLabels, setPlaceLabels] = useState<Record<string, PlaceLabel>>(
@@ -332,182 +285,87 @@ export function ActivityGlobeCard({
     [visits],
   );
 
-  const overall = useMemo(
-    () => aggregateActivityStats(filteredActivities),
-    [filteredActivities],
+  const places = useMemo(
+    () => buildPlaceSummaries(filteredActivities, visits, heatBuckets),
+    [filteredActivities, heatBuckets, visits],
+  );
+  const sortedPlaces = useMemo(
+    () => sortPlaces(places, placeSort),
+    [places, placeSort],
   );
 
-  const locationSummaries = useMemo<LocationSummary[]>(() => {
-    const activitiesById = new Map(
-      filteredActivities.map((activity) => [activity.activityId, activity]),
-    );
-    const routesByActivityId = new Set(
-      routes.map((route) => route.activityId),
-    );
-    const visitIdsByBucket = new Map<string, Set<string>>();
-    for (const visit of visits) {
-      const key = geoHeatBucketKey(visit);
-      const activityIds = visitIdsByBucket.get(key);
-      if (activityIds) {
-        activityIds.add(visit.activityId);
-      } else {
-        visitIdsByBucket.set(key, new Set([visit.activityId]));
-      }
-    }
-    return heatBuckets
-      .map((bucket) => {
-        const activityIds =
-          visitIdsByBucket.get(bucket.key) ?? new Set<string>();
-        const placeActivities = [...activityIds]
-          .map((activityId) => activitiesById.get(activityId))
-          .filter(
-            (activity): activity is TrainingHubActivity => Boolean(activity),
-          )
-          .sort(
-            (left, right) =>
-              activityTimestampMs(right.startTime) -
-              activityTimestampMs(left.startTime),
-          );
-        const distanceMeters = placeActivities.reduce(
-          (sum, activity) => sum + (activity.distance ?? 0),
-          0,
-        );
-        const durationSeconds = placeActivities.reduce(
-          (sum, activity) => sum + (activity.duration ?? 0),
-          0,
-        );
-        const elevationMeters = placeActivities.reduce(
-          (sum, activity) => sum + (activity.elevationGain ?? 0),
-          0,
-        );
-        const trend = [...placeActivities]
-          .reverse()
-          .map((activity, order) => ({
-            order,
-            elevation: Math.max(0, activity.elevationGain ?? 0),
-            distance: Math.max(0, activity.distance ?? 0),
-          }));
-        return {
-          key: bucket.key,
-          bucket,
-          activities: placeActivities,
-          activityIds,
-          distanceMeters,
-          durationSeconds,
-          elevationMeters,
-          lastVisited: placeActivities[0]?.startTime,
-          routeCount: [...activityIds].filter((activityId) =>
-            routesByActivityId.has(activityId),
-          ).length,
-          trend,
-        };
-      })
-      .filter((summary) => summary.activities.length > 0)
-      .sort(
-        (left, right) =>
-          activityTimestampMs(right.lastVisited) -
-          activityTimestampMs(left.lastVisited),
-      );
-  }, [filteredActivities, heatBuckets, routes, visits]);
-
-  const selectedLocation = useMemo(
-    () =>
-      locationSummaries.find(
-        (summary) => summary.key === selectedLocationKey,
-      ) ?? null,
-    [locationSummaries, selectedLocationKey],
+  const selectedPlace = useMemo(
+    () => places.find((place) => place.key === selectedLocationKey) ?? null,
+    [places, selectedLocationKey],
   );
   const globeLocations = useMemo(
-    () => locationSummaries.map((summary) => summary.bucket),
-    [locationSummaries],
+    () => places.map((place) => place.bucket),
+    [places],
   );
   // Names for the places pinned on the globe. Only resolved labels go in, so an
   // unnamed place stays a dot rather than becoming a pair of coordinates —
   // except the selected one, which always says something.
   const globeLabels = useMemo(() => {
     const entries: Record<string, string> = {};
-    for (const summary of locationSummaries) {
-      const label = placeLabels[summary.key];
+    for (const place of places) {
+      const label = placeLabels[place.key];
       if (label) {
-        entries[summary.key] = label.city;
+        entries[place.key] = label.city;
       }
     }
-    if (selectedLocation && !entries[selectedLocation.key]) {
-      entries[selectedLocation.key] = coordinateLabel(
-        selectedLocation.bucket,
-      ).city;
+    if (selectedPlace && !entries[selectedPlace.key]) {
+      entries[selectedPlace.key] = coordinateLabel(selectedPlace.bucket).city;
     }
     return entries;
-  }, [locationSummaries, placeLabels, selectedLocation]);
-
-  const mostVisited = useMemo(
-    () =>
-      [...locationSummaries].sort(
-        (left, right) => right.activities.length - left.activities.length,
-      )[0],
-    [locationSummaries],
-  );
-
-  useEffect(() => {
-    setRecentStart((current) =>
-      Math.min(current, Math.max(0, locationSummaries.length - 5)),
-    );
-  }, [locationSummaries.length]);
+  }, [places, placeLabels, selectedPlace]);
 
   useEffect(() => {
     if (
       selectedLocationKey &&
-      !locationSummaries.some((summary) => summary.key === selectedLocationKey)
+      !places.some((place) => place.key === selectedLocationKey)
     ) {
       setSelectedLocationKey(null);
     }
-  }, [locationSummaries, selectedLocationKey]);
+  }, [places, selectedLocationKey]);
 
-  // Names are fetched for every place whose name is on the screen, which is not
-  // the same as the first few. Recent places is paged, and its second page
-  // starts at index 5, so a fixed head of eight left every page but the first
-  // showing coordinates for good; Most visited can sit anywhere in the list and
-  // was as often outside that head as in it.
+  // Names are fetched for the places whose names are on the screen: the list's
+  // rows as far as it has been scrolled, in the order it is sorted, and the
+  // places the line under the title names. A list can hold hundreds, and the
+  // geocoder is throttled, so naming them all up front would put the rows the
+  // athlete is looking at behind ones they may never scroll to.
   useEffect(() => {
     let cancelled = false;
-    const summaries: LocationSummary[] = [];
+    const wanted: PlaceSummary[] = [];
     const seen = new Set<string>();
-    const want = (summary: LocationSummary | undefined) => {
-      if (!summary || seen.has(summary.key)) {
+    const want = (place: PlaceSummary | null | undefined) => {
+      if (!place || seen.has(place.key)) {
         return;
       }
-      seen.add(summary.key);
-      summaries.push(summary);
+      seen.add(place.key);
+      wanted.push(place);
     };
-    // The globe's own pins, then the panels beside it.
-    for (const summary of locationSummaries.slice(0, 8)) {
-      want(summary);
+    want(selectedPlace);
+    want(homePlace(places));
+    want(farthestFromHome(places)?.place);
+    for (const place of sortedPlaces.slice(0, labelReach)) {
+      want(place);
     }
-    for (const summary of locationSummaries.slice(
-      recentStart,
-      recentStart + 5,
-    )) {
-      want(summary);
-    }
-    want(mostVisited);
-    want(locationSummaries[0]);
-    want(selectedLocation ?? undefined);
-    for (const summary of summaries) {
-      void loadPlaceLabel(summary.key, summary.bucket).then((label) => {
+    for (const place of wanted) {
+      void loadPlaceLabel(place.key, place.bucket).then((label) => {
         if (cancelled) {
           return;
         }
         setPlaceLabels((current) =>
-          current[summary.key]?.full === label.full
+          current[place.key]?.full === label.full
             ? current
-            : { ...current, [summary.key]: label },
+            : { ...current, [place.key]: label },
         );
       });
     }
     return () => {
       cancelled = true;
     };
-  }, [locationSummaries, mostVisited, recentStart, selectedLocation]);
+  }, [labelReach, places, selectedPlace, sortedPlaces]);
 
   useEffect(() => {
     if (streetEnterTimerRef.current !== null) {
@@ -518,6 +376,7 @@ export function ActivityGlobeCard({
     setStreetFocus(null);
     setZoomingToStreet(false);
     setCanResetView(false);
+    setLabelReach(LABEL_BATCH);
   }, [period, customStart, customEnd]);
 
   const enterStreetFocus = (focus: StreetMapFocus) => {
@@ -541,36 +400,31 @@ export function ActivityGlobeCard({
     }, delayMs);
   };
 
-  const selectLocation = (
-    bucket: GeoHeatBucket,
-    options?: { openStreet?: boolean },
-  ) => {
+  // Picking a place, on the globe or in the list, flies the globe to it and
+  // opens it beside the map. The street map is a step further, taken from
+  // there: it used to open on its own the moment a pin was clicked.
+  const selectLocation = (bucket: GeoHeatBucket) => {
     if (streetEnterTimerRef.current !== null) {
       window.clearTimeout(streetEnterTimerRef.current);
       streetEnterTimerRef.current = null;
     }
     setZoomingToStreet(false);
-    const summary = locationSummaries.find(
-      (candidate) => candidate.key === bucket.key,
-    );
+    setStreetFocus(null);
+    const place = places.find((candidate) => candidate.key === bucket.key);
     setSelectedLocationKey(bucket.key);
-    const latestActivity = summary?.activities[0];
+    const latestActivity = place?.activities[0];
     if (latestActivity) {
       onSelectActivity(latestActivity);
     }
-    if (options?.openStreet) {
-      scheduleStreetFocus({ lat: bucket.lat, lon: bucket.lon }, 620);
-    }
-    setCanResetView(true);
   };
 
   const zoomIntoSelectedLocation = () => {
-    if (!selectedLocation || zoomingToStreet) {
+    if (!selectedPlace || zoomingToStreet) {
       return;
     }
     const focus = {
-      lat: selectedLocation.bucket.lat,
-      lon: selectedLocation.bucket.lon,
+      lat: selectedPlace.bucket.lat,
+      lon: selectedPlace.bucket.lon,
     };
     const duration =
       globeRendererRef.current?.zoomToLocation(
@@ -602,6 +456,18 @@ export function ActivityGlobeCard({
     }
     setStreetFocus(null);
     restoreBaselineCamera(900);
+  };
+
+  // Letting the place go is enough: the globe flies back to every place on
+  // its own when nothing is picked.
+  const showAllPlaces = () => {
+    if (streetEnterTimerRef.current !== null) {
+      window.clearTimeout(streetEnterTimerRef.current);
+      streetEnterTimerRef.current = null;
+    }
+    setZoomingToStreet(false);
+    setStreetFocus(null);
+    setSelectedLocationKey(null);
   };
 
   useEffect(
@@ -717,7 +583,6 @@ export function ActivityGlobeCard({
     };
   }, [activityKey, connected]);
 
-
   const handleResetView = () => {
     if (streetFocus) {
       exitStreetMode();
@@ -726,413 +591,101 @@ export function ActivityGlobeCard({
     restoreBaselineCamera(900);
   };
 
-  const mapDistance = formatOverallDistance(overall.totalDistanceMeters, unitSystem);
-  const mapDuration = formatOverallDuration(overall.totalDurationSeconds);
   const mapHasRoute = routePoints.length > 0;
   const mapHasVisits = visits.length > 0;
-  const mapPlaceCount = locationSummaries.length;
-  const recentPlaces = locationSummaries.slice(recentStart, recentStart + 5);
-  const latestPlace = locationSummaries[0];
-  const selectedPlaceLabel = selectedLocation
-    ? (placeLabels[selectedLocation.key] ??
-      coordinateLabel(selectedLocation.bucket))
-    : null;
-  const primaryStats = [
-    {
-      label: "Total distance",
-      value: mapDistance.value,
-      unit: mapDistance.unit,
-      icon: Route,
-    },
-    {
-      label: "Training time",
-      value: mapDuration.value,
-      unit: mapDuration.unit,
-      icon: Timer,
-    },
-    {
-      label: "Activities",
-      value: overall.count.toLocaleString(),
-      unit: "",
-      icon: Activity,
-    },
-    {
-      label: "Places visited",
-      value: mapPlaceCount.toLocaleString(),
-      unit: "",
-      icon: MapPin,
-    },
-  ];
-  const secondaryStats = [
-    routes.length > 0
-      ? {
-          label: "GPS routes",
-          value: routes.length.toLocaleString(),
-          unit: "",
-          icon: Route,
-        }
-      : null,
-    overall.totalElevationMeters > 0
-      ? {
-          label: "Elevation gained",
-          value: Math.round(
-            metersToElevation(overall.totalElevationMeters, unitSystem),
-          ).toLocaleString(),
-          unit: elevationUnit(unitSystem),
-          icon: Mountain,
-        }
-      : null,
-    overall.totalTrainingLoad > 0
-      ? {
-          label: "Training load",
-          value: Math.round(overall.totalTrainingLoad).toLocaleString(),
-          unit: "TL",
-          icon: Gauge,
-        }
-      : null,
-    overall.totalCalories > 0
-      ? {
-          label: "Calories",
-          value: Math.round(overall.totalCalories).toLocaleString(),
-          unit: "kcal",
-          icon: Flame,
-        }
-      : null,
-  ].filter(
-    (
-      stat,
-    ): stat is {
-      label: string;
-      value: string;
-      unit: string;
-      icon: typeof Route;
-    } => Boolean(stat),
-  );
+  const mapLoading = visitsLoading && !mapHasVisits;
+  const summary = mapLoading
+    ? "Mapping your GPS activities…"
+    : filteredActivities.length === 0
+      ? connected
+        ? "No activities in this period."
+        : "Training Hub is offline."
+      : places.length === 0
+        ? "No activities with GPS in this period."
+        : placesSummaryLine({ places, labels: placeLabels, allTime: period === "all" });
 
   return (
     <section className="training-map" aria-labelledby="training-map-title">
-      <div className="training-map-main">
-        <div className="training-map-information">
-          <header className="training-map-header">
-            <p className="training-map-eyebrow">Training map</p>
-            <h2 id="training-map-title">Where you’ve been</h2>
-            <p>Explore every place your training has taken you.</p>
-          </header>
-
-          <div className="training-map-period-wrap">
-            {/* Folded: four options with labels this long were the widest
-                thing on the card, and the period is chosen once and then
-                looked at. "Custom" keeps its icon — it is the one option that
-                opens something rather than answering. */}
-            <OptionGroup
-              label="Training period"
-              mode="collapsible"
-              className="training-map-periods"
-              value={period}
-              options={[
-                { value: "all", label: "All time" },
-                { value: "year", label: "This year" },
-                { value: "90-days", label: periodLabel(90) },
-                {
-                  value: "custom",
-                  label: "Custom",
-                  icon: <CalendarDays size={14} aria-hidden="true" />
-                }
-              ]}
-              onChange={(next) =>
-                setPeriodPreference((current) => ({
-                  ...current,
-                  period: next as ActivityPeriod
-                }))
-              }
-            />
-            {period === "custom" ? (
-              <div className="training-map-date-range">
-                <label>
-                  <span>From</span>
-                  <input
-                    type="date"
-                    value={customStart}
-                    max={customEnd || undefined}
-                    onChange={(event) =>
-                      setPeriodPreference((current) => ({
-                        ...current,
-                        customStart: event.target.value,
-                      }))
-                    }
-                  />
-                </label>
-                <label>
-                  <span>To</span>
-                  <input
-                    type="date"
-                    value={customEnd}
-                    min={customStart || undefined}
-                    onChange={(event) =>
-                      setPeriodPreference((current) => ({
-                        ...current,
-                        customEnd: event.target.value,
-                      }))
-                    }
-                  />
-                </label>
-              </div>
-            ) : null}
-          </div>
-
-          <section className="training-map-stats" aria-label="Training summary">
-            <dl className="training-map-primary-stats">
-              {primaryStats.map((stat, index) => {
-                const Icon = stat.icon;
-                return (
-                  <div
-                    key={stat.label}
-                    className="training-map-primary-stat"
-                    style={{ "--stat-delay": `${index * 45}ms` } as CSSProperties}
-                  >
-                    <dt>
-                      <Icon size={17} aria-hidden="true" />
-                      <span>{stat.label}</span>
-                    </dt>
-                    <dd aria-label={stat.unit ? `${stat.value} ${stat.unit}` : stat.value}>
-                      <strong>{stat.value}</strong>
-                      {stat.unit ? <span>{stat.unit}</span> : null}
-                    </dd>
-                  </div>
-                );
-              })}
-            </dl>
-            {secondaryStats.length > 0 ? (
-              <dl className="training-map-secondary-stats">
-                {secondaryStats.map((stat) => {
-                  const Icon = stat.icon;
-                  return (
-                    <div key={stat.label}>
-                      <Icon size={16} aria-hidden="true" />
-                      <span>
-                        <dt>{stat.label}</dt>
-                        <dd aria-label={`${stat.value} ${stat.unit}`}>
-                          <strong>{stat.value}</strong>
-                          {stat.unit ? <small>{stat.unit}</small> : null}
-                        </dd>
-                      </span>
-                    </div>
-                  );
-                })}
-              </dl>
-            ) : null}
-          </section>
-
-          <section
-            className="training-map-location"
-            aria-label="Selected location"
-            aria-live="polite"
-          >
-            {selectedLocation && selectedPlaceLabel ? (
-              <div
-                key={selectedLocation.key}
-                className="training-map-location-content is-selected"
-              >
-                <header className="training-map-location-header">
-                  <span className="training-map-location-icon" aria-hidden="true">
-                    <MapPin size={19} />
-                  </span>
-                  <div>
-                    <h3>{selectedPlaceLabel.city}</h3>
-                    <p>{selectedPlaceLabel.country}</p>
-                  </div>
-                  <span className="training-map-selected-label">Selected</span>
-                </header>
-
-                <dl className="training-map-location-metrics">
-                  <div>
-                    <dt>Activities</dt>
-                    <dd>{selectedLocation.activities.length.toLocaleString()}</dd>
-                  </div>
-                  <div>
-                    <dt>Distance</dt>
-                    <dd>
-                      {metersToDisplayDistance(selectedLocation.distanceMeters, unitSystem).toLocaleString(
-                        undefined,
-                        { maximumFractionDigits: 1 },
-                      )} <small>{distanceUnit(unitSystem)}</small>
-                    </dd>
-                  </div>
-                  <div>
-                    <dt>Time</dt>
-                    <dd>{formatLocationDuration(selectedLocation.durationSeconds)}</dd>
-                  </div>
-                  <div>
-                    <dt>Last visited</dt>
-                    <dd>{formatVisitDate(selectedLocation.lastVisited)}</dd>
-                  </div>
-                </dl>
-
-                <div className="training-map-location-trend">
-                  <div>
-                    <span>
-                      {selectedLocation.elevationMeters > 0
-                        ? "Elevation gained"
-                        : "Distance trend"}
-                    </span>
-                    <strong>
-                      {selectedLocation.elevationMeters > 0
-                        ? `${Math.round(metersToElevation(selectedLocation.elevationMeters, unitSystem)).toLocaleString()} ${elevationUnit(unitSystem)}`
-                        : `${metersToDisplayDistance(selectedLocation.distanceMeters, unitSystem).toLocaleString(undefined, { maximumFractionDigits: 1 })} ${distanceUnit(unitSystem)}`}
-                    </strong>
-                  </div>
-                  {selectedLocation.trend.length > 1 ? (
-                    <div className="training-map-location-chart" aria-hidden="true">
-                      <ResponsiveContainer width="100%" height="100%">
-                        <AreaChart
-                          data={selectedLocation.trend.map((point) => ({
-                            ...point,
-                            elevation: metersToElevation(point.elevation, unitSystem),
-                            distance: metersToDisplayDistance(point.distance, unitSystem),
-                          }))}
-                        >
-                          <defs>
-                            <linearGradient
-                              id="trainingMapLocationFill"
-                              x1="0"
-                              y1="0"
-                              x2="0"
-                              y2="1"
-                            >
-                              <stop
-                                offset="0%"
-                                stopColor="var(--map-accent)"
-                                stopOpacity={0.3}
-                              />
-                              <stop
-                                offset="100%"
-                                stopColor="var(--map-accent)"
-                                stopOpacity={0}
-                              />
-                            </linearGradient>
-                          </defs>
-                          <Area
-                            type="monotone"
-                            dataKey={
-                              selectedLocation.elevationMeters > 0
-                                ? "elevation"
-                                : "distance"
-                            }
-                            stroke="var(--map-accent)"
-                            strokeWidth={1.8}
-                            fill="url(#trainingMapLocationFill)"
-                            isAnimationActive={false}
-                          />
-                        </AreaChart>
-                      </ResponsiveContainer>
-                    </div>
-                  ) : (
-                    <p className="training-map-trend-empty">
-                      More activities will build a location trend.
-                    </p>
-                  )}
-                  <button
-                    type="button"
-                    className={`training-map-view-action${zoomingToStreet ? " is-zooming" : ""}`}
-                    onClick={zoomIntoSelectedLocation}
-                    disabled={zoomingToStreet}
-                  >
-                    {zoomingToStreet ? "Zooming in" : "Zoom in"}
-                    <ZoomIn size={15} aria-hidden="true" />
-                  </button>
-                </div>
-              </div>
-            ) : (
-              <div className="training-map-location-content training-map-overview">
-                {visitsLoading && !mapHasVisits ? (
-                  <div className="training-map-location-loading" aria-label="Mapping GPS activities">
-                    <span />
-                    <span />
-                    <span />
-                  </div>
-                ) : overall.count === 0 ? (
-                  <div className="training-map-location-empty">
-                    <MapPin size={22} aria-hidden="true" />
-                    <h3>{connected ? "No activities in this period" : "Training Hub is offline"}</h3>
-                    <p>
-                      {connected
-                        ? "Choose another period when more activity history is available."
-                        : "Connect Training Hub to map your routes and training history."}
-                    </p>
-                  </div>
-                ) : !mapHasVisits ? (
-                  <div className="training-map-location-empty">
-                    <Route size={22} aria-hidden="true" />
-                    <h3>No GPS routes found</h3>
-                    <p>Outdoor activities with location data will appear here.</p>
-                  </div>
-                ) : (
-                  <>
-                    <header>
-                      <h3>Your training world</h3>
-                      <p>
-                        Every place you’ve trained is pinned on the globe.
-                        Select one to explore its history.
-                      </p>
-                    </header>
-                    <dl className="training-map-overview-values">
-                      {mostVisited ? (
-                        <div>
-                          <dt>Most visited</dt>
-                          <dd>
-                            {(placeLabels[mostVisited.key] ??
-                              coordinateLabel(mostVisited.bucket)).city}
-                          </dd>
-                        </div>
-                      ) : null}
-                      {latestPlace ? (
-                        <div>
-                          <dt>Most recent</dt>
-                          <dd>
-                            {(placeLabels[latestPlace.key] ??
-                              coordinateLabel(latestPlace.bucket)).city}
-                          </dd>
-                        </div>
-                      ) : null}
-                      <div>
-                        <dt>Places explored</dt>
-                        <dd>{mapPlaceCount.toLocaleString()}</dd>
-                      </div>
-                    </dl>
-                  </>
-                )}
-              </div>
-            )}
-          </section>
+      <header className="training-map-page-header">
+        <div>
+          <h1 id="training-map-title">Where you’ve been</h1>
+          <p>{summary}</p>
         </div>
+        <div className="training-map-period-wrap">
+          {/* Folded: four options with labels this long were the widest
+              thing in the header, and the period is chosen once and then
+              looked at. "Custom" keeps its icon — it is the one option that
+              opens something rather than answering. */}
+          <OptionGroup
+            label="Training period"
+            mode="collapsible"
+            className="training-map-periods"
+            value={period}
+            options={[
+              { value: "all", label: "All time" },
+              { value: "year", label: "This year" },
+              { value: "90-days", label: periodLabel(90) },
+              {
+                value: "custom",
+                label: "Custom",
+                icon: <CalendarDays size={14} aria-hidden="true" />
+              }
+            ]}
+            onChange={(next) =>
+              setPeriodPreference((current) => ({
+                ...current,
+                period: next as ActivityPeriod
+              }))
+            }
+          />
+          {period === "custom" ? (
+            <div className="training-map-date-range">
+              <label>
+                <span>From</span>
+                <input
+                  type="date"
+                  value={customStart}
+                  max={customEnd || undefined}
+                  onChange={(event) =>
+                    setPeriodPreference((current) => ({
+                      ...current,
+                      customStart: event.target.value,
+                    }))
+                  }
+                />
+              </label>
+              <label>
+                <span>To</span>
+                <input
+                  type="date"
+                  value={customEnd}
+                  min={customStart || undefined}
+                  onChange={(event) =>
+                    setPeriodPreference((current) => ({
+                      ...current,
+                      customEnd: event.target.value,
+                    }))
+                  }
+                />
+              </label>
+            </div>
+          ) : null}
+        </div>
+      </header>
 
+      <div className="training-map-stage">
         <section
           className={`training-map-globe-panel${streetMode ? " is-street-mode" : ""}`}
           aria-label="Interactive training globe"
         >
-          <div className="training-map-globe-helper">
-            <Hand size={18} aria-hidden="true" />
-            <span>Drag to explore · Scroll to zoom</span>
-          </div>
-          <button
-            type="button"
-            className="training-map-reset"
-            onClick={handleResetView}
-            disabled={!canResetView}
-            aria-label={streetMode ? "Back to globe" : "Reset globe view"}
-          >
-            <RotateCcw size={14} aria-hidden="true" />
-            {streetMode ? "Back to globe" : "Reset view"}
-          </button>
-
           <div
             className={`training-map-globe-stage${hoveringCluster ? " is-hovering-cluster" : ""}`}
             role="img"
             aria-label={
               streetMode
-                ? "Street map heatmap near the selected location. Zoom out or reset to return to the globe."
+                ? "Street map heatmap near the selected location. Zoom out or go back to return to the globe."
                 : mapHasVisits
-                  ? `Interactive globe showing ${mapPlaceCount} training locations. Drag to rotate, scroll to zoom, and select a location for details.`
+                  ? `Interactive globe showing ${places.length} training locations. Drag to rotate, scroll to zoom, and select a location for details.`
                   : mapHasRoute
                     ? "Interactive globe showing the latest GPS route."
                     : "Interactive globe waiting for GPS activity data."
@@ -1143,15 +696,13 @@ export function ActivityGlobeCard({
               frameKey={activityKey}
               locations={globeLocations}
               routePoints={routePoints}
-              selectedLocation={selectedLocation?.bucket ?? null}
+              selectedLocation={selectedPlace?.bucket ?? null}
               labels={globeLabels}
               streetMode={streetMode}
               onError={setGlobeError}
               onHoverChange={setHoveringCluster}
               onRequestStreet={enterStreetFocus}
-              onSelectLocation={(bucket) =>
-                selectLocation(bucket, { openStreet: true })
-              }
+              onSelectLocation={selectLocation}
               onViewChange={setCanResetView}
             />
             {streetFocus ? (
@@ -1170,104 +721,106 @@ export function ActivityGlobeCard({
             ) : null}
           </div>
 
-          <div className="training-map-globe-meta">
-            <div>
-              <Route size={14} aria-hidden="true" />
-              <span>
-                {visitsLoading
-                  ? "Mapping GPS activity"
-                  : `${routes.length.toLocaleString()} GPS ${routes.length === 1 ? "route" : "routes"}`}
-              </span>
+          {streetMode ? (
+            <button
+              type="button"
+              className="training-map-globe-back"
+              onClick={exitStreetMode}
+            >
+              <ChevronLeft size={16} aria-hidden="true" />
+              Back to globe
+            </button>
+          ) : globeError ? null : (
+            <div className="training-map-zoom" role="group" aria-label="Globe view">
+              <button
+                type="button"
+                aria-label="Zoom in"
+                title="Zoom in"
+                onClick={() => globeRendererRef.current?.zoomBy(ZOOM_STEP)}
+              >
+                <Plus size={16} aria-hidden="true" />
+              </button>
+              <button
+                type="button"
+                aria-label="Zoom out"
+                title="Zoom out"
+                onClick={() => globeRendererRef.current?.zoomBy(1 / ZOOM_STEP)}
+              >
+                <Minus size={16} aria-hidden="true" />
+              </button>
+              {canResetView ? (
+                <button
+                  type="button"
+                  className="training-map-zoom-reset"
+                  aria-label="Reset view"
+                  title="Reset view"
+                  onClick={handleResetView}
+                >
+                  <RotateCcw size={15} aria-hidden="true" />
+                </button>
+              ) : null}
             </div>
-            <div>
-              <LockKeyhole size={14} aria-hidden="true" />
-              <span>Rendered locally</span>
-            </div>
-          </div>
+          )}
 
-          {(mapHasVisits || mapHasRoute) ? (
-            <div className="training-map-legend" aria-label="Activity intensity from low to high">
-              <span>Low</span>
+          {!streetMode && (mapHasVisits || mapHasRoute) ? (
+            <div className="training-map-legend" aria-label="Visits, from fewer to more">
+              <span>Fewer</span>
               <i className="is-low" aria-hidden="true" />
               <i className="is-medium" aria-hidden="true" />
               <i className="is-high" aria-hidden="true" />
-              <span>High</span>
+              <span>More visits</span>
             </div>
           ) : null}
         </section>
-      </div>
 
-      {recentPlaces.length > 0 ? (
-        <section className="training-map-recent" aria-labelledby="recent-places-title">
-          <header>
-            <h3 id="recent-places-title">Recent places</h3>
-            {locationSummaries.length > 5 ? (
-              <div className="training-map-recent-controls">
-                <button
-                  type="button"
-                  aria-label="Previous recent places"
-                  title="Previous places"
-                  disabled={recentStart === 0}
-                  onClick={() => setRecentStart((current) => Math.max(0, current - 1))}
-                >
-                  <ChevronLeft size={16} aria-hidden="true" />
-                </button>
-                <button
-                  type="button"
-                  aria-label="Next recent places"
-                  title="Next places"
-                  disabled={recentStart + 5 >= locationSummaries.length}
-                  onClick={() =>
-                    setRecentStart((current) =>
-                      Math.min(locationSummaries.length - 5, current + 1),
-                    )
-                  }
-                >
-                  <ChevronRight size={16} aria-hidden="true" />
-                </button>
-              </div>
-            ) : null}
-          </header>
-          <div className="training-map-recent-list">
-            {recentPlaces.map((summary, index) => {
-              const label = placeLabels[summary.key] ?? coordinateLabel(summary.bucket);
-              const selected = selectedLocationKey === summary.key;
-              return (
-                <button
-                  key={summary.key}
-                  type="button"
-                  className={selected ? "is-selected" : undefined}
-                  style={{ "--recent-delay": `${index * 45}ms` } as CSSProperties}
-                  aria-pressed={selected}
-                  onClick={() => selectLocation(summary.bucket)}
-                >
-                  <span className="training-map-recent-pin" aria-hidden="true">
-                    <MapPin size={17} />
-                  </span>
-                  <span className="training-map-recent-place">
-                    <strong>{label.city}</strong>
-                    <small>{label.country}</small>
-                  </span>
-                  <span className="training-map-recent-value">
-                    <strong>{summary.activities.length}</strong>
-                    <small>{summary.activities.length === 1 ? "activity" : "activities"}</small>
-                  </span>
-                  <span className="training-map-recent-value">
-                    <strong>
-                      {metersToDisplayDistance(summary.distanceMeters, unitSystem).toLocaleString(undefined, {
-                        maximumFractionDigits: 0,
-                      })} <small>{distanceUnit(unitSystem)}</small>
-                    </strong>
-                    <small>{formatVisitDate(summary.lastVisited)}</small>
-                  </span>
-                  <ChevronRight className="training-map-recent-chevron" size={16} aria-hidden="true" />
-                </button>
-              );
-            })}
-          </div>
-        </section>
-      ) : null}
+        <aside className="training-map-side panel" aria-label="Places">
+          {selectedPlace ? (
+            <PlaceDetail
+              place={selectedPlace}
+              label={placeLabelOf(selectedPlace, placeLabels)}
+              zooming={zoomingToStreet}
+              streetMode={streetMode}
+              onBack={showAllPlaces}
+              onZoomIn={zoomIntoSelectedLocation}
+            />
+          ) : mapLoading ? (
+            <div className="training-map-side-loading" role="status" aria-label="Mapping GPS activities">
+              <span />
+              <span />
+              <span />
+            </div>
+          ) : filteredActivities.length === 0 ? (
+            <div className="training-map-side-empty">
+              <MapPin size={22} aria-hidden="true" />
+              <h2>{connected ? "No activities in this period" : "Training Hub is offline"}</h2>
+              <p>
+                {connected
+                  ? "Choose another period when more activity history is available."
+                  : "Connect Training Hub to map your routes and training history."}
+              </p>
+            </div>
+          ) : places.length === 0 ? (
+            <div className="training-map-side-empty">
+              <Route size={22} aria-hidden="true" />
+              <h2>No GPS routes found</h2>
+              <p>Outdoor activities with location data will appear here.</p>
+            </div>
+          ) : (
+            <PlaceList
+              places={sortedPlaces}
+              labels={placeLabels}
+              sort={placeSort}
+              onSortChange={setPlaceSort}
+              onSelect={(place) => selectLocation(place.bucket)}
+              onNearEnd={() =>
+                setLabelReach((reach) =>
+                  reach < sortedPlaces.length ? reach + LABEL_BATCH : reach,
+                )
+              }
+            />
+          )}
+        </aside>
+      </div>
     </section>
   );
-
 }

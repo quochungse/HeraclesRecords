@@ -67,6 +67,8 @@ interface ActivityGlobeRendererProps {
 
 export interface ActivityGlobeRendererHandle {
   resetView: (duration?: number) => void;
+  /** Closer under 1, further over it — the panel's + and − buttons. */
+  zoomBy: (factor: number) => void;
   zoomToLocation: (
     focus: { lat: number; lon: number },
     duration?: number,
@@ -107,6 +109,10 @@ const FRAMING_VERSION = "fit-all-places-v1";
 const CAMERA_FOCUS_MS = 600;
 const STREET_VIEW_ALTITUDE = 0.42;
 const STREET_TRANSITION_ALTITUDE = 0.36;
+/** How close and how far the camera goes, in globe radii above the surface. */
+const MIN_CAMERA_ALTITUDE = 0.32;
+const MAX_CAMERA_ALTITUDE = 4.2;
+const ZOOM_BUTTON_MS = 320;
 const IDLE_DELAY_MS = 4_200;
 const IDLE_ROTATION_SPEED = 0.08;
 /** Above this the globe reads as a globe and an idle spin is decorative;
@@ -272,6 +278,9 @@ const ActivityGlobeRendererComponent = forwardRef<
   const userAdjustedRef = useRef(false);
   const streetRequestedRef = useRef(false);
   const idleTimerRef = useRef<number | null>(null);
+  const hadSelectionRef = useRef(false);
+  const selectedRef = useRef(selectedLocation);
+  selectedRef.current = selectedLocation;
   const [ready, setReady] = useState(false);
   const [size, setSize] = useState({ width: 1, height: 1 });
   const [paperTheme, setPaperTheme] = useState(
@@ -454,19 +463,42 @@ const ActivityGlobeRendererComponent = forwardRef<
     }, IDLE_DELAY_MS);
   }, [reducedMotion, selectedLocation, stopIdleRotation, streetMode]);
 
+  /**
+   * Where the screen put the camera: on the picked place, or framing them all.
+   * Reset returns here, and the camera only counts as moved — the Reset button
+   * only shows — once the athlete has taken it somewhere else themselves.
+   */
+  const homeView = useCallback((): GlobeView => {
+    const selected = selectedRef.current;
+    if (!selected) {
+      return baselineRef.current;
+    }
+    // Never further out than the overview: picking a place should close in on
+    // it, and the fitted overview can already be closer than globe scale.
+    const altitude = Math.min(
+      baselineRef.current.altitude,
+      SINGLE_PLACE_ALTITUDE,
+    );
+    return {
+      lat: clampLatitude(selected.lat + focusLatitudeOffset(altitude)),
+      lng: selected.lon,
+      altitude,
+    };
+  }, []);
+
   const resetView = useCallback(
     (duration = 600) => {
       streetRequestedRef.current = false;
       userAdjustedRef.current = false;
       stopIdleRotation();
       globeRef.current?.pointOfView(
-        baselineRef.current,
+        homeView(),
         reducedMotion ? 0 : duration,
       );
       onViewChange(false);
       scheduleIdleRotation();
     },
-    [onViewChange, reducedMotion, scheduleIdleRotation, stopIdleRotation],
+    [homeView, onViewChange, reducedMotion, scheduleIdleRotation, stopIdleRotation],
   );
 
   const zoomToLocation = useCallback(
@@ -492,10 +524,54 @@ const ActivityGlobeRendererComponent = forwardRef<
     [onViewChange, reducedMotion, stopIdleRotation],
   );
 
+  // A step of the buttons goes where a few turns of the wheel would, street
+  // view included: closing in past its altitude hands over to the street map
+  // the way scrolling does, or a button would stop where the wheel goes on.
+  const zoomBy = useCallback(
+    (factor: number) => {
+      const globe = globeRef.current;
+      if (!globe) {
+        return;
+      }
+      const view = globe.pointOfView();
+      const altitude = Math.min(
+        MAX_CAMERA_ALTITUDE,
+        Math.max(MIN_CAMERA_ALTITUDE, view.altitude * factor),
+      );
+      userAdjustedRef.current = true;
+      stopIdleRotation();
+      if (
+        !streetMode &&
+        altitude <= STREET_VIEW_ALTITUDE &&
+        (locations.length > 0 || routePoints.length > 0)
+      ) {
+        streetRequestedRef.current = true;
+        onRequestStreet({ lat: view.lat, lon: view.lng });
+        return;
+      }
+      globe.pointOfView(
+        { lat: view.lat, lng: view.lng, altitude },
+        reducedMotion ? 0 : ZOOM_BUTTON_MS,
+      );
+      onViewChange(true);
+      scheduleIdleRotation();
+    },
+    [
+      locations.length,
+      onRequestStreet,
+      onViewChange,
+      reducedMotion,
+      routePoints.length,
+      scheduleIdleRotation,
+      stopIdleRotation,
+      streetMode,
+    ],
+  );
+
   useImperativeHandle(
     forwardedRef,
-    () => ({ resetView, zoomToLocation }),
-    [resetView, zoomToLocation],
+    () => ({ resetView, zoomBy, zoomToLocation }),
+    [resetView, zoomBy, zoomToLocation],
   );
 
   useEffect(() => {
@@ -638,35 +714,38 @@ const ActivityGlobeRendererComponent = forwardRef<
     streetMode,
   ]);
 
+  // The camera follows the pick: onto a place when one is picked, and back to
+  // every place when it is let go. Either move is the screen's, not the
+  // athlete's, so it leaves nothing to reset.
   useEffect(() => {
     if (!ready) {
       return;
     }
     if (!selectedLocation) {
+      if (hadSelectionRef.current) {
+        hadSelectionRef.current = false;
+        userAdjustedRef.current = false;
+        globeRef.current?.pointOfView(
+          baselineRef.current,
+          reducedMotion ? 0 : CAMERA_FOCUS_MS,
+        );
+        onViewChange(false);
+      }
       scheduleIdleRotation();
       return;
     }
 
+    hadSelectionRef.current = true;
+    userAdjustedRef.current = false;
     stopIdleRotation();
-    // Never further out than the overview: picking a place should close in on
-    // it, and the fitted overview can already be closer than globe scale.
     // `baselineRef` is current here — the framing effect above runs first.
-    const altitude = Math.min(
-      baselineRef.current.altitude,
-      SINGLE_PLACE_ALTITUDE,
-    );
     globeRef.current?.pointOfView(
-      {
-        lat: clampLatitude(
-          selectedLocation.lat + focusLatitudeOffset(altitude),
-        ),
-        lng: selectedLocation.lon,
-        altitude,
-      },
+      homeView(),
       reducedMotion ? 0 : CAMERA_FOCUS_MS,
     );
-    onViewChange(true);
+    onViewChange(false);
   }, [
+    homeView,
     onViewChange,
     ready,
     reducedMotion,
@@ -687,8 +766,8 @@ const ActivityGlobeRendererComponent = forwardRef<
     controls.enableZoom = true;
     controls.rotateSpeed = 0.42;
     controls.zoomSpeed = 0.72;
-    controls.minDistance = GLOBE_RADIUS * 1.32;
-    controls.maxDistance = GLOBE_RADIUS * 5.2;
+    controls.minDistance = GLOBE_RADIUS * (1 + MIN_CAMERA_ALTITUDE);
+    controls.maxDistance = GLOBE_RADIUS * (1 + MAX_CAMERA_ALTITUDE);
     controls.autoRotate = false;
     controls.autoRotateSpeed = IDLE_ROTATION_SPEED;
 
@@ -748,7 +827,7 @@ const ActivityGlobeRendererComponent = forwardRef<
   const handleZoom = useCallback(
     (view: GlobeView) => {
       applyLandDetail(view.altitude);
-      onViewChange(viewChanged(view, baselineRef.current));
+      onViewChange(userAdjustedRef.current && viewChanged(view, homeView()));
       if (
         interactionRef.current &&
         !streetMode &&
@@ -763,6 +842,7 @@ const ActivityGlobeRendererComponent = forwardRef<
     },
     [
       applyLandDetail,
+      homeView,
       locations.length,
       onRequestStreet,
       onViewChange,

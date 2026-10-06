@@ -39,9 +39,10 @@ export function TrainingMapView({
     return (
       <section className="training-map-disconnected">
         <header className="training-map-page-header">
-          <p className="training-map-eyebrow">Training map</p>
-          <h1>Where you’ve been</h1>
-          <p>Explore every place your training has taken you.</p>
+          <div>
+            <h1>Where you’ve been</h1>
+            <p>Explore every place your training has taken you.</p>
+          </div>
         </header>
 
         <section className="panel data-connect-panel">

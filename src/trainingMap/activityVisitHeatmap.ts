@@ -3,8 +3,6 @@ import type {
   TrainingHubActivityDetail,
   TrainingHubTrackPoint,
 } from "../../electron/types";
-import type { UnitSystem } from "../../electron/types";
-import { distanceUnit, metersToDisplayDistance } from "../units/units";
 
 export interface GlobePoint {
   lat: number;
@@ -19,15 +17,6 @@ export interface ActivityVisitPoint extends GlobePoint {
 export interface ActivityRoutePolyline {
   activityId: string;
   points: GlobePoint[];
-}
-
-export interface OverallActivityStats {
-  count: number;
-  totalDistanceMeters: number;
-  totalDurationSeconds: number;
-  totalElevationMeters: number;
-  totalTrainingLoad: number;
-  totalCalories: number;
 }
 
 export interface GeoHeatBucket {
@@ -261,49 +250,6 @@ export function getCachedRoutePolylines(
   return routes;
 }
 
-export function aggregateActivityStats(
-  activities: TrainingHubActivity[],
-): OverallActivityStats {
-  let totalDistanceMeters = 0;
-  let totalDurationSeconds = 0;
-  let totalElevationMeters = 0;
-  let totalTrainingLoad = 0;
-  let totalCalories = 0;
-
-  for (const activity of activities) {
-    if (typeof activity.distance === "number" && Number.isFinite(activity.distance)) {
-      totalDistanceMeters += activity.distance;
-    }
-    if (typeof activity.duration === "number" && Number.isFinite(activity.duration)) {
-      totalDurationSeconds += activity.duration;
-    }
-    if (
-      typeof activity.elevationGain === "number" &&
-      Number.isFinite(activity.elevationGain)
-    ) {
-      totalElevationMeters += activity.elevationGain;
-    }
-    if (
-      typeof activity.trainingLoad === "number" &&
-      Number.isFinite(activity.trainingLoad)
-    ) {
-      totalTrainingLoad += activity.trainingLoad;
-    }
-    if (typeof activity.calories === "number" && Number.isFinite(activity.calories)) {
-      totalCalories += activity.calories;
-    }
-  }
-
-  return {
-    count: activities.length,
-    totalDistanceMeters,
-    totalDurationSeconds,
-    totalElevationMeters,
-    totalTrainingLoad,
-    totalCalories,
-  };
-}
-
 export function bucketVisitsGeographically(
   visits: GlobePoint[],
 ): GeoHeatBucket[] {
@@ -330,42 +276,6 @@ export function bucketVisitsGeographically(
   }
 
   return Array.from(buckets.values());
-}
-
-export function formatOverallDuration(totalSeconds: number): {
-  value: string;
-  unit: string;
-} {
-  const seconds = Math.max(0, Math.round(totalSeconds));
-  if (seconds < 3600) {
-    const minutes = Math.floor(seconds / 60);
-    return { value: String(minutes), unit: "min" };
-  }
-
-  const hours = seconds / 3600;
-  if (hours < 10) {
-    return { value: hours.toFixed(1), unit: "h" };
-  }
-
-  return { value: String(Math.round(hours)), unit: "h" };
-}
-
-export function formatOverallDistance(
-  meters: number,
-  unitSystem: UnitSystem,
-): {
-  value: string;
-  unit: string;
-} {
-  const distance = metersToDisplayDistance(meters, unitSystem);
-  const unit = distanceUnit(unitSystem);
-  if (distance >= 100) {
-    return { value: String(Math.round(distance)), unit };
-  }
-  if (distance >= 10) {
-    return { value: distance.toFixed(1), unit };
-  }
-  return { value: distance.toFixed(2), unit };
 }
 
 type DetailFetcher = (
