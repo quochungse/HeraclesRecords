@@ -33,6 +33,8 @@ const choices =
   );
 if (choices && deb) {
   choices.linuxDeb = { url: deb.url, label: "Download for Debian / Ubuntu", size: deb.sizeLabel };
+  choices.linuxAppImage = { ...choices.linux, label: "AppImage (any distribution)" };
+  choices.linuxDebAlt = { ...choices.linuxDeb, label: "Debian / Ubuntu (.deb)" };
 }
 ---
 
@@ -42,6 +44,7 @@ if (choices && deb) {
       <span data-download-label>Download</span>
       <span class="download-size" data-download-size hidden></span>
     </a>
+    <a class="button" href={releasesUrl} data-download-alt hidden></a>
     <slot />
   </div>
   {
@@ -75,20 +78,31 @@ if (choices && deb) {
     return null;
   }
 
-  // Browsers do not report the distribution, but Firefox on a Debian family
-  // system names it in the user agent; where it is not named, the AppImage
-  // is the one that works on every system.
+  // Browsers do not report the distribution: Firefox on a Debian family system
+  // names it in the user agent, Chrome does not (it sends "X11; Linux x86_64").
+  // So a Linux visitor always gets both installers as two buttons, and the
+  // main one is the deb only where the system is named; unnamed, it is the
+  // AppImage, the one that works on every distribution.
   const takesDeb = /Ubuntu|Debian|Linux Mint|Pop!_OS|elementary|Zorin|Kali/i.test(navigator.userAgent);
 
   for (const block of document.querySelectorAll<HTMLElement>(".download[data-choices]")) {
     const os = detectOs();
     if (!os) continue;
     const choices = JSON.parse(block.dataset.choices!);
-    const choice = os === "linux" && takesDeb && choices.linuxDeb ? choices.linuxDeb : choices[os];
+    const both = os === "linux" && choices.linuxDeb;
+    const choice = both && takesDeb ? choices.linuxDeb : choices[os];
     if (!choice) continue;
+    if (both) {
+      const alt = block.querySelector<HTMLAnchorElement>("[data-download-alt]")!;
+      const other = takesDeb ? choices.linuxAppImage : choices.linuxDebAlt;
+      alt.href = other.url;
+      alt.textContent = `${other.label} · ${other.size}`;
+      alt.hidden = false;
+    }
     const button = block.querySelector<HTMLAnchorElement>("[data-download-primary]")!;
     button.href = choice.url;
-    block.querySelector("[data-download-label]")!.textContent = choice.label;
+    block.querySelector("[data-download-label]")!.textContent =
+      both && !takesDeb ? "Download AppImage" : choice.label;
     const size = block.querySelector<HTMLElement>("[data-download-size]")!;
     size.textContent = choice.size;
     size.hidden = false;
@@ -104,6 +118,10 @@ if (choices && deb) {
 
   .download-actions {
     justify-content: center;
+  }
+
+  .download-actions [data-download-alt][hidden] {
+    display: none;
   }
 
   .download-size {
