@@ -193,32 +193,37 @@ export function foldTimeline(
   });
 }
 
-/** Minor rows a month shows before the rest wait behind "+ N more". */
-export const MINOR_ROWS = 4;
+/** The most rows a month shows before its minor rows wait behind "N more". */
+export const MONTH_ROWS = 10;
+/** A fold never hides fewer than this: "1 more" costs a row to save a row. */
+export const MIN_FOLDED = 3;
 
 export type MonthEntry =
   | { kind: "milestone"; milestone: Milestone }
   | { kind: "more"; hidden: Milestone[] };
 
 /**
- * A month's milestones as drawn: every card, and the newest minor rows up to
- * `MINOR_ROWS`, in time order. What is left waits behind one "+ N more" line,
- * drawn where the first of it would have been — so it never lands after the
- * beginning, which is the last thing on the timeline.
+ * A month's milestones as drawn. Every card and the beginning always show;
+ * minor rows fill what is left of `MONTH_ROWS`, newest first, and the rest
+ * wait behind one "N more" line — unless fewer than `MIN_FOLDED` would, when
+ * the month simply shows them all. Everything stays in time order, and the
+ * fold is drawn where the first of it would have been, so it never lands
+ * after the beginning, which is the last thing on the timeline.
  */
 export function visibleInMonth(month: TimelineMonth, expanded: boolean): MonthEntry[] {
-  if (expanded) {
-    return month.milestones.map((milestone) => ({ kind: "milestone", milestone }));
+  const all = month.milestones;
+  const isMinor = (milestone: Milestone) => !milestone.major && milestone.id !== "start";
+  const minors = all.filter(isMinor);
+  const room = Math.max(0, MONTH_ROWS - (all.length - minors.length));
+  if (expanded || minors.length - room < MIN_FOLDED) {
+    return all.map((milestone) => ({ kind: "milestone", milestone }));
   }
+  const kept = new Set(minors.slice(0, room));
   const entries: MonthEntry[] = [];
   let more: { kind: "more"; hidden: Milestone[] } | undefined;
-  let minors = 0;
-  for (const milestone of month.milestones) {
-    if (milestone.major || milestone.id === "start") {
+  for (const milestone of all) {
+    if (!isMinor(milestone) || kept.has(milestone)) {
       entries.push({ kind: "milestone", milestone });
-    } else if (minors < MINOR_ROWS) {
-      entries.push({ kind: "milestone", milestone });
-      minors += 1;
     } else {
       if (!more) {
         more = { kind: "more", hidden: [] };

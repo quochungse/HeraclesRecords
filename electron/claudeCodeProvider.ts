@@ -3,7 +3,7 @@ import { access, stat } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { promisify } from "node:util";
-import { constants as fsConstants } from "node:fs";
+import { constants as fsConstants, mkdirSync } from "node:fs";
 import { z } from "zod";
 import { formatClaudeModelName } from "./chatModels";
 import type { ChatModelOption } from "./chatModels";
@@ -26,7 +26,7 @@ const LOGIN_POLL_INTERVAL_MS = 2_000;
 
 // `claude --version` costs a process spawn per status read, and the answer only
 // changes when the CLI is upgraded — which rewrites the file, so the answer is
-// kept per path *and* modification time. Keyed by path alone, an upgrade in
+// kept per path *and* the file's identity (inode, size, mtime, ctime). Keyed by path alone, an upgrade in
 // place (npm, `claude update`) went on reporting the old version, and choosing
 // the newest install compared against it, until the app was restarted.
 // Failures are not cached: a binary that could not launch may launch later.
@@ -244,14 +244,19 @@ export function compareClaudeVersions(a: string | undefined, b: string | undefin
   return 0;
 }
 
-/** `claude --version` for one install, cached per path and modification time. */
+/** `claude --version` for one install, cached per path and the file it resolves to. */
 async function readClaudeVersion(
   executablePath: string,
   configDir?: string
 ): Promise<string | undefined> {
   let key = executablePath;
   try {
-    key = `${executablePath}@${(await stat(executablePath)).mtimeMs}`;
+    // The file the path resolves to, not only its mtime: an install can be
+    // replaced with the mtime its archive carried, and a symlink swapped to
+    // another version. ctime cannot be set back, and inode and size move with
+    // a replaced file.
+    const file = await stat(executablePath);
+    key = `${executablePath}@${file.ino}:${file.size}:${file.mtimeMs}:${file.ctimeMs}`;
   } catch {
     // Unstattable yet executable: fall back to the path alone.
   }
@@ -323,6 +328,21 @@ export function createClaudeSubscriptionEnvironment(
     env.CLAUDE_CONFIG_DIR = configDir.trim();
   }
   return env;
+}
+
+/**
+ * The directory every Claude Code process starts in: an empty one of the
+ * app's own, never the app's working directory. A Mac app opened from the
+ * Finder runs in `/`, and the CLI reads the tree it starts in, so it walked
+ * into Documents, Desktop and Downloads — and macOS asks the person about each
+ * of those in the name of Heracles Records, the process that spawned it.
+ */
+export function claudeWorkingDirectory(configDir?: string): string {
+  const base = configDir?.trim();
+  if (!base) return os.tmpdir();
+  const dir = path.join(base, "cwd");
+  mkdirSync(dir, { recursive: true, mode: 0o700 });
+  return dir;
 }
 
 /** Strips terminal control sequences so CLI output can be pattern-matched. */
@@ -503,6 +523,7 @@ export async function startClaudeCodeLogin(options: {
     // prints anything, and without stdout we never see the authorize URL.
     stdio: ["pipe", "pipe", "pipe"],
     windowsHide: true,
+    cwd: claudeWorkingDirectory(options.configDir),
     env: createClaudeSubscriptionEnvironment(options.configDir)
   });
 
@@ -696,6 +717,7 @@ export async function listClaudeCodeModels(options: {
         allowedTools: [],
         settingSources: [],
         persistSession: false,
+        cwd: claudeWorkingDirectory(options.configDir),
         env: createClaudeSubscriptionEnvironment(options.configDir)
       }
     });
@@ -933,6 +955,7 @@ export async function streamClaudeCodeCompletion(
         includePartialMessages: true,
         maxTurns: 10,
         persistSession: false,
+        cwd: claudeWorkingDirectory(options.configDir),
         env: createClaudeSubscriptionEnvironment(options.configDir)
       }
     });
@@ -1111,6 +1134,7 @@ async function execClaude(
   const result = await execFileAsync(executablePath, args, {
     timeout: options.timeout,
     windowsHide: true,
+    cwd: claudeWorkingDirectory(options.configDir),
     env: createClaudeSubscriptionEnvironment(options.configDir),
     maxBuffer: 1024 * 1024
   });

@@ -680,38 +680,51 @@ assert.equal(
   "an opened gap draws its months"
 );
 
-const crowded = {
+const monthOf = (length, major = () => false) => ({
   key: "202609",
   label: "September",
-  milestones: Array.from({ length: 7 }, (_, index) => ({
+  milestones: Array.from({ length }, (_, index) => ({
     id: `r${index}`,
     category: "lifetime",
     day: "20260910",
     at: 100 - index,
     kind: "Lifetime",
     title: `Row ${index}`,
-    major: index === 5
+    major: major(index)
   }))
-};
+});
+assert.ok(
+  timeline.visibleInMonth(monthOf(12), false).every((entry) => entry.kind === "milestone"),
+  "two rows past ten are not worth a fold"
+);
+const crowded = monthOf(14, (index) => index === 9 || index === 11);
 const entries = timeline.visibleInMonth(crowded, false);
 const drawn = entries.filter((entry) => entry.kind === "milestone").map((entry) => entry.milestone.id);
-assert.deepEqual(drawn, ["r0", "r1", "r2", "r3", "r5"], "every card and four rows");
+assert.deepEqual(
+  drawn,
+  ["r0", "r1", "r2", "r3", "r4", "r5", "r6", "r7", "r9", "r11"],
+  "every card, and minor rows up to ten"
+);
 const more = entries.find((entry) => entry.kind === "more");
-assert.deepEqual(more.hidden.map((milestone) => milestone.id), ["r4", "r6"]);
-assert.equal(entries.indexOf(more), 4, "the fold sits where its first row would have been");
+assert.deepEqual(more.hidden.map((milestone) => milestone.id), ["r8", "r10", "r12", "r13"]);
+assert.equal(entries.indexOf(more), 8, "the fold sits where its first row would have been");
+const cards = timeline.visibleInMonth(monthOf(15, (index) => index < 12), false);
+assert.equal(cards.filter((entry) => entry.kind === "milestone").length, 12, "every card shows, past ten too");
+assert.equal(cards.find((entry) => entry.kind === "more").hidden.length, 3, "and the minor rows fold");
 assert.ok(timeline.visibleInMonth(crowded, true).every((entry) => entry.kind === "milestone"));
 
 // The beginning closes its month, whatever else that day held — and a fold
 // never lands after it.
 const opening = timeline.groupTimeline([
   { id: "start", category: "first", day: "20250709", at: 100, kind: "The beginning", title: "Start", major: false },
-  ...Array.from({ length: 6 }, (_, index) => ({
+  ...Array.from({ length: 12 }, (_, index) => ({
     id: `x${index}`, category: "record", day: "20250709", at: 50 + index, kind: "Record", title: `X${index}`, major: false
   }))
 ])[0].months[0];
 assert.equal(opening.milestones[opening.milestones.length - 1].id, "start");
 const openingEntries = timeline.visibleInMonth(opening, false);
 assert.equal(openingEntries[openingEntries.length - 1].milestone?.id, "start");
+assert.equal(openingEntries[openingEntries.length - 2].kind, "more", "the fold lands before the beginning");
 
 assert.deepEqual(
   timeline.filtersInUse(monthly),

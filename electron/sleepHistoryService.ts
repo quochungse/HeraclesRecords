@@ -555,8 +555,13 @@ export async function getSleepHistory(
       const answer = await deps.fetchFromCoros(days);
       mcpState = answer.mcpState;
       // Stamped on every answer COROS gives, including an empty one: the point
-      // of the stamp is "we asked", not "we got something".
-      cache.lastNetworkAt = now;
+      // of the stamp is "we asked", not "we got something". A server that was
+      // not connected gave no answer, so it stamps nothing — or connecting it
+      // in Settings left the Sleep screen and Overview on an empty cache for
+      // the rest of the TTL, mended only by Refresh.
+      if (answer.mcpState === "ready") {
+        cache.lastNetworkAt = now;
+      }
       if (answer.records.length > 0) {
         store(deps, withDailyHealth(answer.records, await readDailyHealth(deps, days)), now);
         filled = true;

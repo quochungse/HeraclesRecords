@@ -19,7 +19,11 @@ import {
   normalizeContextDetail
 } from "../../electron/chatContextCompaction";
 import { compressionModelFor, providerModelOptions } from "../../electron/chatModels";
-import { COACH_PROVIDER_LABELS } from "./CoachModelsPanel";
+import {
+  COACH_PROVIDER_LABELS,
+  ClaudeCodeUpdateNote,
+  type ClaudeCodeUpdate
+} from "./CoachModelsPanel";
 import type { HeraclesRecordsApi } from "../heraclesrecords-api";
 import { formatTokens } from "./analyses/analysisLabels";
 import { OptionGroup } from "../components/OptionGroup";
@@ -38,6 +42,7 @@ export function ChatSettingsPanel({
   api,
   chatSettings,
   coachModelsSummary,
+  claudeCodeUpdate,
   onOpenCoachModels,
   onUpdateChatSettings,
   pendingBudget,
@@ -47,6 +52,8 @@ export function ChatSettingsPanel({
   chatSettings: ChatSettings;
   /** One line describing what is connected, or null while it is being read. */
   coachModelsSummary: string | null;
+  /** A newer Claude Code than the one installed, while Coach runs on it. */
+  claudeCodeUpdate?: ClaudeCodeUpdate;
   onOpenCoachModels: () => void;
   onUpdateChatSettings: (patch: Partial<ChatSettings>) => void;
   /** The analyses' monthly budget as edited, or `undefined` while it is the saved one. */
@@ -103,6 +110,8 @@ export function ChatSettingsPanel({
           aria-hidden="true"
         />
       </button>
+
+      {claudeCodeUpdate ? <ClaudeCodeUpdateNote update={claudeCodeUpdate} /> : null}
 
       <section className="chat-settings-section">
         <h3>Coach style</h3>

@@ -681,7 +681,7 @@ async function main() {
     );
 
     // The tile credit: required, so never left out, but folded into an (i)
-    // after five seconds as the OSM attribution guidelines allow.
+    // from the start, as the OSM attribution guidelines allow.
     const credit = () =>
       win.webContents.executeJavaScript(
         // Read off the state class, not computed visibility: the fade is a
@@ -690,10 +690,9 @@ async function main() {
         true
       );
     const first = await credit();
-    assert.equal(first.shown, true, "the credit is spelled out at first");
+    assert.equal(first.shown, false, "the credit starts folded");
     assert.ok(first.text.includes("OpenStreetMap"), `the credit names OpenStreetMap: ${first.text}`);
     assert.equal(first.text.includes("Leaflet"), false, "no Leaflet prefix");
-    await waitFor(async () => !(await credit()).shown, "the credit folds away", 7_000);
     await harness("click", ".activity-route-cover-credit");
     await waitFor(async () => (await credit()).shown, "the (i) brings it back");
     assert.equal(await harness("exists", ".activity-route-modal"), false, "the (i) does not open the map");
@@ -797,8 +796,7 @@ async function main() {
     assert.equal(hit, true, "the top of the cover is not covered by the heading");
     await waitFor(() => harness("exists", ".activity-route-modal"), "the full map opens");
 
-    // The five seconds are the session's, not each map's: the full map opens
-    // after the cover's credit folded, so it opens folded too, with its (i).
+    // The full map opens folded too, with its (i).
     await waitFor(
       () => harness("exists", ".activity-route-modal .leaflet-control-attribution"),
       "the full map credits its tiles"
@@ -811,7 +809,7 @@ async function main() {
     assert.equal(
       await harness("exists", ".activity-route-modal-map.is-credit-open"),
       false,
-      "a map opened after the first five seconds of the session starts folded"
+      "the full map starts folded"
     );
     await harness("click", ".activity-route-modal .map-credit-toggle");
     assert.equal(await harness("exists", ".activity-route-modal-map.is-credit-open"), true, "its (i) brings it back");

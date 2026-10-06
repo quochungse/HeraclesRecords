@@ -1491,11 +1491,11 @@ input::placeholder {
   color: var(--text-primary);
 }
 
+/* Portalled to <body>; `top` and `left` come from the trigger, measured by
+   AppUpdateControl. */
 .update-settings-popover {
-  position: absolute;
-  top: calc(100% + 8px);
-  right: 0;
-  z-index: 20;
+  position: fixed;
+  z-index: 420;
   display: grid;
   gap: 12px;
   width: 260px;
@@ -24174,16 +24174,16 @@ td span {
   cursor: pointer;
 }
 
-/* `.panel` carries a backdrop-filter, which makes every panel its own stacking
-   context — so the Updates popover cannot escape this one on z-index alone,
-   and the panels below would paint over it in DOM order.
-   Lifting the whole panel above its siblings is what actually frees it. The
-   panels never overlap geometrically, so nothing else changes. */
+/* No z-index here. The card was once lifted above its siblings so the Updates
+   popover could escape it, and that made the seam under it shimmer: a 24px
+   backdrop blur reads across the 18px gap, so a card painted last re-samples
+   the blurred Navigation card below on every repaint there. The popover is
+   portalled to <body> instead (AppUpdateControl), and the cards keep their
+   DOM order. */
 .settings-about-panel {
   display: flex;
   flex-direction: column;
   gap: 18px;
-  z-index: 3;
 }
 
 .settings-about-header {
@@ -24264,22 +24264,12 @@ td span {
   padding: 0 10px;
 }
 
-/* The Update button is a popover trigger, so it anchors its own menu. It sits
-   beside the version, near the header's left, so the popover opens rightward
-   from the button's own edge. `white-space` stays off this wrapper on purpose:
-   the chip inside sets its own nowrap, and inheriting it here would reach the
-   popover and stop the preference hints from wrapping, overflowing the 260px
-   menu. */
+/* The Update button is a popover trigger. It sits beside the version, near
+   the header's left, so the popover opens rightward from the button's own
+   edge. */
 .settings-update-menu {
-  position: relative;
   display: inline-flex;
   flex-shrink: 0;
-}
-
-.settings-update-menu .update-settings-popover {
-  right: auto;
-  left: 0;
-  white-space: normal;
 }
 
 .settings-update-menu > button[aria-expanded="true"] {
@@ -24695,25 +24685,6 @@ button.settings-about-link {
   font-size: 12px;
   font-weight: 600;
   overflow-wrap: anywhere;
-}
-
-/*
- * The Sync panel deliberately opts out of the glass blur.
- *
- * Settings already stacks five `.panel` elements, each with its own
- * `backdrop-filter`, inside one scrolling column. Every one of those is a
- * separate render surface that Chromium has to re-sample as the column moves,
- * and adding a sixth pushed it past the point where it keeps up: scrolling made
- * the seam under the first card shimmer continuously. Dropping the blur here
- * takes the chain back to five and costs nothing visually — a panel this far
- * down the page has app chrome behind it, not content worth blurring.
- *
- * `contain: paint` keeps the panel's own repaints from escaping into that seam.
- */
-.settings-sync-panel {
-  -webkit-backdrop-filter: none;
-  backdrop-filter: none;
-  contain: paint;
 }
 
 /* The heading's corner tell. A refresh no longer empties the card, so the only

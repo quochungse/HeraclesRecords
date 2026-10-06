@@ -223,6 +223,7 @@ export function ChatSettingsModal({
             api={api}
             chatSettings={shownSettings}
             coachModelsSummary={coachModelsSummaryLine(coachModels)}
+            claudeCodeUpdate={coachModels?.claudeCodeUpdate}
             onOpenCoachModels={() => setCoachModelsOpen(true)}
             onUpdateChatSettings={(patch) => setDraft((current) => ({ ...current, ...patch }))}
             pendingBudget={pendingBudget}

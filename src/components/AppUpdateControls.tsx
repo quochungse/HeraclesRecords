@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import {
   Download,
   Loader2,
@@ -74,7 +75,48 @@ export function AppUpdateControl({
   onPreferencesChange,
 }: AppUpdateControlProps) {
   const [open, setOpen] = useState(false);
+  const [position, setPosition] = useState<{ top: number; left: number } | null>(
+    null
+  );
   const containerRef = useRef<HTMLDivElement>(null);
+  const popoverRef = useRef<HTMLDivElement>(null);
+
+  /*
+   * The popover is portalled to <body> and placed in viewport coordinates,
+   * under the trigger and opening rightward from its left edge.
+   *
+   * It used to be a child of the About card, and `.panel` carries a
+   * `backdrop-filter`, so the card is its own stacking context and the cards
+   * below painted over the menu. The card was lifted above its siblings with
+   * `z-index: 3` to free it — and that is what made the seam under it shimmer:
+   * a 24px blur reads past the card's edge, across the 18px gap, so once the
+   * card painted last its backdrop held the Navigation card, itself a blurred
+   * layer. Every repaint below re-rendered the About card's bottom edge, and
+   * Chromium redrew it short for a second or two at a time. Out of the card,
+   * the menu needs nothing lifted and the cards keep their DOM order.
+   */
+  useLayoutEffect(() => {
+    if (!open) {
+      setPosition(null);
+      return;
+    }
+
+    const place = () => {
+      const trigger = containerRef.current?.getBoundingClientRect();
+      if (trigger) {
+        setPosition({ top: trigger.bottom + 8, left: trigger.left });
+      }
+    };
+
+    place();
+    window.addEventListener("resize", place);
+    // `capture` reaches the scroll of `.content`, which does not bubble.
+    window.addEventListener("scroll", place, true);
+    return () => {
+      window.removeEventListener("resize", place);
+      window.removeEventListener("scroll", place, true);
+    };
+  }, [open]);
 
   useEffect(() => {
     if (!open) {
@@ -82,7 +124,11 @@ export function AppUpdateControl({
     }
 
     const handlePointerDown = (event: MouseEvent) => {
-      if (!containerRef.current?.contains(event.target as Node)) {
+      const target = event.target as Node;
+      if (
+        !containerRef.current?.contains(target) &&
+        !popoverRef.current?.contains(target)
+      ) {
         setOpen(false);
       }
     };
@@ -131,111 +177,119 @@ export function AppUpdateControl({
         <span className="update-settings-trigger-label">{label}</span>
       </button>
 
-      {open ? (
-        <div className="update-settings-popover" role="menu">
-          <p className="update-settings-heading">Updates</p>
+      {open && position
+        ? createPortal(
+            <div
+              ref={popoverRef}
+              className="update-settings-popover"
+              role="menu"
+              style={{ top: position.top, left: position.left }}
+            >
+              <p className="update-settings-heading">Updates</p>
 
-          {snapshot.supported ? null : (
-            <p className="update-settings-note">
-              Auto-updates run in installed builds. Preferences below apply
-              when you install Heracles Records.
-            </p>
-          )}
+              {snapshot.supported ? null : (
+                <p className="update-settings-note">
+                  Auto-updates run in installed builds. Preferences below apply
+                  when you install Heracles Records.
+                </p>
+              )}
 
-          {pendingAction ? (
-            <div className="update-settings-actions">
-              {pendingAction === "install" ? (
+              {pendingAction ? (
+                <div className="update-settings-actions">
+                  {pendingAction === "install" ? (
+                    <button
+                      className="update-settings-action"
+                      type="button"
+                      onClick={() => {
+                        onInstall();
+                        setOpen(false);
+                      }}
+                    >
+                      <Sparkles size={14} aria-hidden="true" />
+                      {snapshot.installMethod === "manual"
+                        ? `Download ${snapshot.availableVersion}`
+                        : "Restart to update"}
+                    </button>
+                  ) : (
+                    <button
+                      className="update-settings-action"
+                      type="button"
+                      disabled={downloading}
+                      onClick={() => {
+                        onDownload();
+                        setOpen(false);
+                      }}
+                    >
+                      {downloading ? (
+                        <Loader2 className="spin" size={14} aria-hidden="true" />
+                      ) : (
+                        <Download size={14} aria-hidden="true" />
+                      )}
+                      {downloading
+                        ? "Starting…"
+                        : `Download ${snapshot.availableVersion}`}
+                    </button>
+                  )}
+                </div>
+              ) : null}
+
+              <label className="update-settings-option">
+                <input
+                  type="checkbox"
+                  checked={snapshot.autoCheck}
+                  onChange={(event) =>
+                    onPreferencesChange({ autoCheck: event.target.checked })
+                  }
+                />
+                <span>
+                  <span className="update-settings-option-label">
+                    Check automatically
+                  </span>
+                  <span className="update-settings-option-hint">
+                    Look for updates on startup.
+                  </span>
+                </span>
+              </label>
+              <label className="update-settings-option">
+                <input
+                  type="checkbox"
+                  checked={snapshot.autoDownload}
+                  onChange={(event) =>
+                    onPreferencesChange({ autoDownload: event.target.checked })
+                  }
+                />
+                <span>
+                  <span className="update-settings-option-label">
+                    Download automatically
+                  </span>
+                  <span className="update-settings-option-hint">
+                    Otherwise, download only when you ask.
+                  </span>
+                </span>
+              </label>
+
+              <div className="update-settings-actions">
                 <button
                   className="update-settings-action"
                   type="button"
+                  disabled={busy || snapshot.status === "checking"}
                   onClick={() => {
-                    onInstall();
+                    onCheck();
                     setOpen(false);
                   }}
                 >
-                  <Sparkles size={14} aria-hidden="true" />
-                  {snapshot.installMethod === "manual"
-                    ? `Download ${snapshot.availableVersion}`
-                    : "Restart to update"}
-                </button>
-              ) : (
-                <button
-                  className="update-settings-action"
-                  type="button"
-                  disabled={downloading}
-                  onClick={() => {
-                    onDownload();
-                    setOpen(false);
-                  }}
-                >
-                  {downloading ? (
+                  {busy || snapshot.status === "checking" ? (
                     <Loader2 className="spin" size={14} aria-hidden="true" />
                   ) : (
-                    <Download size={14} aria-hidden="true" />
+                    <RefreshCw size={14} aria-hidden="true" />
                   )}
-                  {downloading
-                    ? "Starting…"
-                    : `Download ${snapshot.availableVersion}`}
+                  Check for updates
                 </button>
-              )}
-            </div>
-          ) : null}
-
-          <label className="update-settings-option">
-            <input
-              type="checkbox"
-              checked={snapshot.autoCheck}
-              onChange={(event) =>
-                onPreferencesChange({ autoCheck: event.target.checked })
-              }
-            />
-            <span>
-              <span className="update-settings-option-label">
-                Check automatically
-              </span>
-              <span className="update-settings-option-hint">
-                Look for updates on startup.
-              </span>
-            </span>
-          </label>
-          <label className="update-settings-option">
-            <input
-              type="checkbox"
-              checked={snapshot.autoDownload}
-              onChange={(event) =>
-                onPreferencesChange({ autoDownload: event.target.checked })
-              }
-            />
-            <span>
-              <span className="update-settings-option-label">
-                Download automatically
-              </span>
-              <span className="update-settings-option-hint">
-                Otherwise, download only when you ask.
-              </span>
-            </span>
-          </label>
-
-          <div className="update-settings-actions">
-            <button
-              className="update-settings-action"
-              type="button"
-              disabled={busy || snapshot.status === "checking"}
-              onClick={() => {
-                onCheck();
-                setOpen(false);
-              }}
-            >
-              {busy || snapshot.status === "checking" ? (
-                <Loader2 className="spin" size={14} aria-hidden="true" />
-              ) : (
-                <RefreshCw size={14} aria-hidden="true" />
-              )}
-              Check for updates
-            </button>
-          </div>
-        </div>
-      ) : null}
+              </div>
+            </div>,
+            document.body
+          )
+        : null}
     </div>
   );
 }
