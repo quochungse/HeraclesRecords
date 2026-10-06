@@ -8,7 +8,7 @@ interface LandGeometryMessage {
   positions: ArrayBuffer;
   strengths: ArrayBuffer;
   tiers: ArrayBuffer;
-  /** Country borders as line-segment pairs, three floats a point. */
+  /** Borders and coast as line-segment pairs, three floats a point. */
   borders: ArrayBuffer;
 }
 
@@ -37,7 +37,7 @@ const LAND_DOT_TIER_SPAN = 2 ** (LAND_DOT_TIERS - 1);
 const LAND_DOT_FINE_STEP_DEGREES = LAND_DOT_STEP_DEGREES / LAND_DOT_TIER_SPAN;
 const GLOBE_RADIUS = 100;
 const SURFACE_ALTITUDE = 0.0025;
-/** Just above the dots, so a border is never hidden under the land it divides. */
+/** Just above the dots, so a line is never hidden under the land it outlines. */
 const BORDER_ALTITUDE = 0.003;
 const MASK_WIDTH = 1440;
 const MASK_HEIGHT = 720;
@@ -167,16 +167,16 @@ function buildLandGeometry(): LandGeometryMessage {
 }
 
 /**
- * The lines between countries, and only those: `mesh` with `a !== b` keeps an
- * arc two countries share and drops the coast, which the dots already draw.
- * Natural Earth's 1:50m is the scale that still reads as a border at the
- * closest the globe goes before the street map; 1:110m was visibly a polygon
- * there. Its vertices are a few km apart, so the straight chords between them
- * stay on the surface.
+ * Every country's outline: the borders between countries and the coast, each
+ * arc once (`mesh` with no filter). The coast is drawn as a line as well as by
+ * the dots, which at the closest zoom are a quarter of a degree apart and leave
+ * a shore to be guessed. Natural Earth's 1:50m is the scale that still reads
+ * as a line there; 1:110m was visibly a polygon. Its vertices are a few km
+ * apart, so the straight chords between them stay on the surface.
  */
 function buildBorders(): ArrayBuffer {
   const topology = countriesAtlas as unknown as CountriesTopology;
-  const borders = mesh(topology, topology.objects.countries, (a, b) => a !== b);
+  const borders = mesh(topology, topology.objects.countries);
   const radius = GLOBE_RADIUS * (1 + BORDER_ALTITUDE);
   const values: number[] = [];
   for (const line of borders.coordinates) {
