@@ -26,7 +26,7 @@ const LOGIN_POLL_INTERVAL_MS = 2_000;
 
 // `claude --version` costs a process spawn per status read, and the answer only
 // changes when the CLI is upgraded — which rewrites the file, so the answer is
-// kept per path *and* modification time. Keyed by path alone, an upgrade in
+// kept per path *and* the file's identity (inode, size, mtime, ctime). Keyed by path alone, an upgrade in
 // place (npm, `claude update`) went on reporting the old version, and choosing
 // the newest install compared against it, until the app was restarted.
 // Failures are not cached: a binary that could not launch may launch later.
@@ -244,14 +244,19 @@ export function compareClaudeVersions(a: string | undefined, b: string | undefin
   return 0;
 }
 
-/** `claude --version` for one install, cached per path and modification time. */
+/** `claude --version` for one install, cached per path and the file it resolves to. */
 async function readClaudeVersion(
   executablePath: string,
   configDir?: string
 ): Promise<string | undefined> {
   let key = executablePath;
   try {
-    key = `${executablePath}@${(await stat(executablePath)).mtimeMs}`;
+    // The file the path resolves to, not only its mtime: an install can be
+    // replaced with the mtime its archive carried, and a symlink swapped to
+    // another version. ctime cannot be set back, and inode and size move with
+    // a replaced file.
+    const file = await stat(executablePath);
+    key = `${executablePath}@${file.ino}:${file.size}:${file.mtimeMs}:${file.ctimeMs}`;
   } catch {
     // Unstattable yet executable: fall back to the path alone.
   }
