@@ -147,12 +147,15 @@ import {
   MODEL_CATALOG_KEYS,
   createCatalogRefresher,
   isStale,
+  knownLatestClaudeCodeVersion,
+  latestClaudeCodeVersion,
   listChatGptModels,
   openRouterEntries,
   serializeCatalog
 } from "./modelCatalog";
 import {
   ClaudeCodeProviderError,
+  compareClaudeVersions,
   getClaudeCodeStatus as inspectClaudeCodeStatus,
   isStandardClaudeLocation,
   listClaudeCodeModels,
@@ -375,6 +378,26 @@ function getClaudeCodeConfigDir(): string {
  * `forceModels` reads the account's model list again even when the one held
  * is fresh — the way in for Coach Models' Check; everything else waits for the day.
  */
+/**
+ * The status the settings screens read: npm is asked for the latest Claude Code
+ * first (at most once a day), so the status that follows can say whether a
+ * newer one is out. A turn's own status read never waits on npm — it takes
+ * whatever was last read, through `withNewerVersion`.
+ */
+export async function getClaudeCodeStatusWithUpdate(): Promise<ClaudeCodeStatus> {
+  await latestClaudeCodeVersion();
+  return getClaudeCodeConnectionStatus();
+}
+
+/** `newerVersion` when the release last read from npm is newer than the CLI in use. */
+function withNewerVersion(status: ClaudeCodeStatus): ClaudeCodeStatus {
+  const latest = knownLatestClaudeCodeVersion();
+  return status.installed && status.version && latest &&
+    compareClaudeVersions(latest, status.version) > 0
+    ? { ...status, newerVersion: latest }
+    : status;
+}
+
 export async function getClaudeCodeConnectionStatus(
   options: { forceModels?: boolean } = {}
 ): Promise<ClaudeCodeStatus> {
@@ -415,7 +438,7 @@ export async function getClaudeCodeConnectionStatus(
       merged.availableModels;
   }
   recordClaudeCodeStatus(merged);
-  return merged;
+  return withNewerVersion(merged);
 }
 
 // listClaudeCodeModels spawns the CLI and takes over a second, so it must never
@@ -576,7 +599,7 @@ export async function testClaudeCodeConnection(): Promise<ClaudeCodeConnectionTe
       : settings.claudeCode.availableModels
   };
   recordClaudeCodeStatus(status);
-  return { ...result, status };
+  return { ...result, status: withNewerVersion(status) };
 }
 
 /**

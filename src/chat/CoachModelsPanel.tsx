@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import {
   AlertCircle,
   Bot,
+  CircleArrowUp,
   CircleCheck,
   ExternalLink,
   KeyRound,
@@ -77,6 +78,41 @@ export interface CoachModelsSummary {
   activeReady: boolean;
   connected: number;
   total: number;
+  /** A newer Claude Code than the one installed, while Coach runs on Claude Code. */
+  claudeCodeUpdate?: ClaudeCodeUpdate;
+}
+
+export interface ClaudeCodeUpdate {
+  installed: string;
+  latest: string;
+}
+
+/**
+ * A newer Claude Code to tell the athlete about — only while `provider` (Coach's,
+ * or a conversation's) is Claude Code, since nothing else runs the CLI.
+ */
+export function claudeCodeUpdateFor(
+  provider: ChatProvider,
+  claudeStatus: ClaudeCodeStatus | null
+): ClaudeCodeUpdate | undefined {
+  if (provider !== "claude-code") return undefined;
+  const installed = claudeStatus?.version?.match(/\d+\.\d+\.\d+/)?.[0];
+  const latest = claudeStatus?.newerVersion;
+  return installed && latest ? { installed, latest } : undefined;
+}
+
+/** The notice itself, worded once for every screen that shows it. */
+export function ClaudeCodeUpdateNote({ update }: { update: ClaudeCodeUpdate }) {
+  return (
+    <p className="coach-analysis-banner" role="status">
+      <CircleArrowUp size={15} aria-hidden="true" />
+      <span>
+        <strong>Claude Code {update.latest} is available.</strong> This
+        computer has {update.installed}. Run <code>claude update</code> in a
+        terminal to get the newest models and fixes.
+      </span>
+    </p>
+  );
 }
 
 /**
@@ -116,7 +152,8 @@ export function summarizeCoachModels(
     activeLabel: COACH_PROVIDER_LABELS[chatSettings.provider],
     activeReady: ready[chatSettings.provider],
     connected: providers.filter((provider) => ready[provider]).length,
-    total: providers.length
+    total: providers.length,
+    claudeCodeUpdate: claudeCodeUpdateFor(chatSettings.provider, claudeStatus)
   };
 }
 
@@ -793,6 +830,7 @@ export function CoachModelsPanel({ api, onChange }: CoachModelsPanelProps) {
     claudeStatus?.state === "not-installed" ||
     Boolean(chatSettings.claudeCode.executablePath) ||
     claudeExecutableEdited;
+  const claudeCodeUpdate = claudeCodeUpdateFor(chatSettings.provider, claudeStatus);
   const availableLocalServers =
     localDiscovery?.servers.filter(
       (server) => server.ok && server.models.length > 0
@@ -897,6 +935,8 @@ export function CoachModelsPanel({ api, onChange }: CoachModelsPanelProps) {
             ) : null}
           </div>
         </div>
+
+        {claudeCodeUpdate ? <ClaudeCodeUpdateNote update={claudeCodeUpdate} /> : null}
 
         {showClaudeExecutable ? (
           <label className="chat-local-field">

@@ -8,7 +8,11 @@ import {
   withCurrentModel
 } from "../../electron/chatModels";
 import { OptionGroup } from "../components/OptionGroup";
-import { COACH_PROVIDER_LABELS } from "../chat/CoachModelsPanel";
+import {
+  COACH_PROVIDER_LABELS,
+  ClaudeCodeUpdateNote,
+  claudeCodeUpdateFor
+} from "../chat/CoachModelsPanel";
 import {
   GENERATOR_PROVIDERS,
   modelChipLabel,
@@ -69,6 +73,7 @@ export function GeneratorProviderPanel({
   }, []);
 
   const ready = readiness[runtime.provider];
+  const claudeCodeUpdate = claudeCodeUpdateFor(runtime.provider, claudeStatus);
   const models = withCurrentModel(
     runtimeModelOptions(runtime.provider, settings, claudeStatus),
     runtime.model
@@ -139,6 +144,8 @@ export function GeneratorProviderPanel({
               <button type="button" className="ghost-button" onClick={onOpenCoach}>Coach settings <ArrowRight size={13} /></button>
             </div>
           ) : null}
+
+          {claudeCodeUpdate ? <ClaudeCodeUpdateNote update={claudeCodeUpdate} /> : null}
 
           <p className="tl-eyebrow">Model</p>
           {runtime.provider === "local" ? (

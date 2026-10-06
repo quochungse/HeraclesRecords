@@ -287,6 +287,38 @@ export async function listChatGptModels(request: CodexModelListRequest): Promise
   return models;
 }
 
+const CLAUDE_CODE_DIST_TAGS_URL = "https://registry.npmjs.org/-/package/@anthropic-ai/claude-code/dist-tags";
+/** How long a failed read stands before it is tried again, so an offline Settings does not wait on every open. */
+const CLAUDE_CODE_VERSION_RETRY_MS = 60 * 60 * 1000;
+
+let claudeCodeVersion: { value: string | undefined; at: number; ttl: number } | undefined;
+
+/**
+ * The latest Claude Code release, from npm's `latest` tag — the channel both the
+ * npm package and `claude update` follow. Read at most once a day; undefined when
+ * npm does not answer, and that answer is kept for an hour.
+ */
+export async function latestClaudeCodeVersion(fetchImpl: FetchLike = fetch): Promise<string | undefined> {
+  if (claudeCodeVersion && Date.now() - claudeCodeVersion.at < claudeCodeVersion.ttl) return claudeCodeVersion.value;
+  let value: string | undefined;
+  try {
+    const response = await fetchImpl(CLAUDE_CODE_DIST_TAGS_URL, {
+      headers: { Accept: "application/json" },
+      signal: AbortSignal.timeout(5_000)
+    });
+    value = response.ok ? codexVersionFromTag(((await response.json()) as { latest?: unknown }).latest) : undefined;
+  } catch {
+    value = undefined;
+  }
+  claudeCodeVersion = { value, at: Date.now(), ttl: value ? MODEL_CATALOG_TTL_MS : CLAUDE_CODE_VERSION_RETRY_MS };
+  return value;
+}
+
+/** The latest Claude Code release as last read, without asking npm. */
+export function knownLatestClaudeCodeVersion(): string | undefined {
+  return claudeCodeVersion?.value;
+}
+
 /** For tests: forget the cached Codex version. */
 export function resetCodexVersionForTests(): void {
   codexVersion = undefined;

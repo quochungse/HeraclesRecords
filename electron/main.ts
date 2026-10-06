@@ -225,7 +225,7 @@ import {
   submitClaudeCodeLoginCode,
   openClaudeCodeLoginUrl,
   revokeClaudeCodeLogin,
-  getClaudeCodeConnectionStatus,
+  getClaudeCodeStatusWithUpdate,
   getChatAuthStatus,
   getChatSessionEntries,
   getChatSettings,
@@ -1469,7 +1469,7 @@ function registerIpcHandlers(): void {
   );
 
   ipcMain.handle("chat:getClaudeCodeStatus", () =>
-    getClaudeCodeConnectionStatus()
+    getClaudeCodeStatusWithUpdate()
   );
 
   ipcMain.handle("chat:startClaudeCodeLogin", () => beginClaudeCodeLogin());

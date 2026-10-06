@@ -1257,6 +1257,11 @@ export interface ClaudeCodeStatus {
   authenticated: boolean;
   executablePath?: string;
   version?: string;
+  /**
+   * The latest Claude Code release, set only when it is newer than `version`.
+   * Read for Coach settings alone (`chat:getClaudeCodeStatus`), never on a turn.
+   */
+  newerVersion?: string;
   authMethod?: string;
   subscriptionType?: string;
   /** Model Claude Code picks when none is requested, as reported by the CLI. */

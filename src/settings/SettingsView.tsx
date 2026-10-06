@@ -113,6 +113,13 @@ function coachModelsDetail(summary: CoachModelsSummary | null): ReactNode {
         <strong>{summary.activeLabel}</strong>{" "}
         {summary.activeReady ? "in use." : "selected but not connected."}
       </span>
+      {summary.claudeCodeUpdate ? (
+        <span className="settings-pref-line settings-pref-warning">
+          Claude Code {summary.claudeCodeUpdate.latest} is available (this
+          computer has {summary.claudeCodeUpdate.installed}). Run{" "}
+          <code>claude update</code> in a terminal.
+        </span>
+      ) : null}
     </>
   );
 }
