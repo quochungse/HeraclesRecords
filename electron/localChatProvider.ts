@@ -6,6 +6,7 @@ import type {
   LocalChatDiscovery,
   LocalChatServerCandidate
 } from "./types";
+import { addTokenUsage, countableUsage } from "./tokenUsage";
 
 export const DEFAULT_LOCAL_CHAT_BASE_URL = "http://localhost:11434/v1";
 
@@ -369,13 +370,12 @@ export async function streamOpenAiCompatibleChatCompletion(
   }
 
   let fullText = "";
-  let counted = false;
   // Starts as the model asked for and is replaced by whatever the server names,
   // so a router reports what it routed to rather than "openrouter/auto". The
   // last round wins: routing is decided per request, and the round that wrote
   // the answer is the one worth naming.
   let resolvedModel = model;
-  const usage: ChatTokenUsage = { inputTokens: 0, outputTokens: 0 };
+  let usage: ChatTokenUsage | undefined;
   let input = buildLocalInputMessages(options.instructions, options.messages);
   let tools = options.toolsEnabled
     ? buildLocalFunctionTools(options.tools)
@@ -414,11 +414,7 @@ export async function streamOpenAiCompatibleChatCompletion(
     if (roundModel) {
       resolvedModel = roundModel;
     }
-    if (roundUsage) {
-      counted = true;
-      usage.inputTokens += roundUsage.inputTokens;
-      usage.outputTokens += roundUsage.outputTokens;
-    }
+    usage = addTokenUsage(usage, roundUsage);
     const functionCalls = normalizeLocalToolCalls(rawFunctionCalls, options.tools);
     fullText += delta;
 
@@ -460,7 +456,7 @@ export async function streamOpenAiCompatibleChatCompletion(
 
   // A no-tool retry that still emits nothing returns the empty text as it is;
   // the caller decides what an empty answer means.
-  return { fullText, model: resolvedModel, ...(counted ? { usage } : {}) };
+  return { fullText, model: resolvedModel, ...(usage ? { usage } : {}) };
 }
 
 async function fetchLocalModels(
@@ -610,7 +606,16 @@ function parseLocalChatUsage(event: unknown): ChatTokenUsage | undefined {
   };
   const inputTokens = count("prompt_tokens");
   const outputTokens = count("completion_tokens");
-  return inputTokens || outputTokens ? { inputTokens, outputTokens } : undefined;
+  if (!inputTokens && !outputTokens) return undefined;
+  // OpenAI and OpenRouter state the cached part of the prompt here; a local
+  // server usually says nothing, which counts the prompt in full.
+  const details = reported.prompt_tokens_details as Record<string, unknown> | undefined;
+  const cached = details?.cached_tokens;
+  return countableUsage({
+    inputTokens,
+    outputTokens,
+    ...(typeof cached === "number" ? { cacheReadTokens: cached } : {})
+  });
 }
 
 /**

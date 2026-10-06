@@ -455,6 +455,10 @@ export function initializeDatabase(userDataPath: string): Database.Database {
   ensureColumn(db, "training_activity_summaries", "best_efforts", "TEXT");
   ensureColumn(db, "training_activity_summaries", "start_lat", "REAL");
   ensureColumn(db, "training_activity_summaries", "start_lon", "REAL");
+  // The part of input_tokens a run read from the prompt cache, which the
+  // budget counts at a tenth (tokenUsage.ts). NULL on a run from before it was
+  // kept, and on one whose provider said nothing about a cache: both count in full.
+  ensureColumn(db, "coach_analysis_runs", "cache_read_tokens", "INTEGER");
   migrateChatSessionProviderConstraint(db);
   // pinned_at holds the ISO timestamp a conversation was pinned; NULL = unpinned.
   ensureColumn(db, "chat_sessions", "pinned_at", "TEXT");
@@ -1553,6 +1557,7 @@ export interface CoachAnalysisRunRow {
   seen_at: string | null;
   input_tokens: number | null;
   output_tokens: number | null;
+  cache_read_tokens: number | null;
   started_at: string;
   finished_at: string | null;
 }
@@ -1560,6 +1565,7 @@ export interface CoachAnalysisRunRow {
 export interface CoachAnalysisTokenTotals {
   inputTokens: number;
   outputTokens: number;
+  cacheReadTokens: number;
   /** Runs that reported a cost, and runs that reached the provider at all. */
   countedRuns: number;
   providerRuns: number;
@@ -1581,6 +1587,7 @@ export function sumCoachAnalysisTokensSince(
       `SELECT
          COALESCE(SUM(input_tokens), 0) AS inputTokens,
          COALESCE(SUM(output_tokens), 0) AS outputTokens,
+         COALESCE(SUM(cache_read_tokens), 0) AS cacheReadTokens,
          SUM(CASE WHEN input_tokens IS NOT NULL
                     OR output_tokens IS NOT NULL THEN 1 ELSE 0 END) AS countedRuns,
          COUNT(*) AS providerRuns
@@ -1592,6 +1599,7 @@ export function sumCoachAnalysisTokensSince(
   return {
     inputTokens: row.inputTokens ?? 0,
     outputTokens: row.outputTokens ?? 0,
+    cacheReadTokens: row.cacheReadTokens ?? 0,
     countedRuns: row.countedRuns ?? 0,
     providerRuns: row.providerRuns ?? 0
   };
@@ -1600,7 +1608,7 @@ export function sumCoachAnalysisTokensSince(
 const COACH_ANALYSIS_RUN_COLUMNS = `id, analysis_id, status, trigger_kind,
          trigger_payload_json, session_id, summary, model, effort, error,
          skip_reason, seen_at, input_tokens, output_tokens,
-         started_at, finished_at`;
+         cache_read_tokens, started_at, finished_at`;
 
 export function listCoachAnalysisRunRows(
   filter: CoachAnalysisRunQuery = {}
@@ -1659,12 +1667,12 @@ export function insertCoachAnalysisRunRow(row: CoachAnalysisRunRow): void {
          (id, analysis_id, status, trigger_kind,
           trigger_payload_json, session_id, summary, model, effort, error,
           skip_reason, seen_at, input_tokens, output_tokens,
-          started_at, finished_at)
+          cache_read_tokens, started_at, finished_at)
        VALUES
          (@id, @analysis_id, @status, @trigger_kind,
           @trigger_payload_json, @session_id, @summary, @model, @effort, @error,
           @skip_reason, @seen_at, @input_tokens, @output_tokens,
-          @started_at, @finished_at)`
+          @cache_read_tokens, @started_at, @finished_at)`
     )
     .run(row);
 }
@@ -1791,7 +1799,8 @@ export function updateCoachAnalysisRunRow(row: CoachAnalysisRunRow): void {
            session_id = @session_id, summary = @summary, model = @model,
            effort = @effort, error = @error, skip_reason = @skip_reason,
            seen_at = @seen_at, input_tokens = @input_tokens,
-           output_tokens = @output_tokens, finished_at = @finished_at
+           output_tokens = @output_tokens,
+           cache_read_tokens = @cache_read_tokens, finished_at = @finished_at
        WHERE id = @id`
     )
     .run(row);

@@ -175,6 +175,7 @@ import {
   type ChatSettingsStore
 } from "./chatSettingsStore";
 import { getChatGptModelCandidates } from "./chatModels";
+import { addTokenUsage, countableUsage } from "./tokenUsage";
 import { inlineSuggestionsSection } from "./chatCoachContext";
 import { chartHandle, chartHandleNote, isChartKind, orderTurn } from "./chartPlacement";
 import {
@@ -1318,27 +1319,8 @@ export interface ChatStreamSink {
   bindAbort?(controller: AbortController): () => void;
 }
 
-/**
- * A usage report that can be counted, or nothing.
- *
- * "Nobody reported" and "it was free" are different facts (13), and a number
- * that is negative, NaN or infinite is neither — it is a third thing, and the
- * only honest reading of it is the first. Guarded here rather than only where
- * the run row is read, because this is where the number *enters*: a `local`
- * provider is whatever OpenAI-compatible server the athlete pointed the app at,
- * and a negative round would quietly reduce a total the month's budget trusts.
- */
-export function countableUsage(
-  value: ChatTokenUsage | undefined
-): ChatTokenUsage | undefined {
-  if (!value) return undefined;
-  const { inputTokens, outputTokens } = value;
-  const usable = (count: unknown): count is number =>
-    typeof count === "number" && Number.isFinite(count) && count >= 0;
-  return usable(inputTokens) && usable(outputTokens)
-    ? { inputTokens, outputTokens }
-    : undefined;
-}
+/** Kept exported from here for the suites that read it beside the sinks. */
+export { countableUsage };
 
 /**
  * A stream that has gone quiet, as opposed to one that is legitimately slow.
@@ -1862,12 +1844,7 @@ async function streamChatTurn(
   // reads the second as the first undercounts in silence (13).
   let usage: ChatTokenUsage | undefined;
   const addUsage = (round: ChatTokenUsage | undefined) => {
-    const counted = countableUsage(round);
-    if (!counted) return;
-    usage = {
-      inputTokens: (usage?.inputTokens ?? 0) + counted.inputTokens,
-      outputTokens: (usage?.outputTokens ?? 0) + counted.outputTokens
-    };
+    usage = addTokenUsage(usage, countableUsage(round));
   };
   /**
    * Which model actually answered, which none of the four providers can be read

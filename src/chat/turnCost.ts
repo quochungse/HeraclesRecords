@@ -1,4 +1,5 @@
 import { describeChatModel } from "../../electron/chatModels";
+import { CACHE_READ_WEIGHT, countedTokens } from "../../electron/tokenUsage";
 import type { ChatTokenUsage } from "../../electron/types";
 
 /**
@@ -9,9 +10,14 @@ import type { ChatTokenUsage } from "../../electron/types";
  * answers is "was that turn expensive?", and two numbers make that a subtraction
  * the reader has to do. The whole point of the footer is that the athlete can
  * see a 40k answer without opening anything.
+ *
+ * A token read from the prompt cache counts as a tenth (`tokenUsage.ts`), as it
+ * does for the analysis budget, so the footer, the run log and the month's
+ * spend state one number. Counted whole, a turn of three tool rounds read as
+ * 92k when 85k of it was the same prefix answered from the cache.
  */
 export function totalTokens(usage: ChatTokenUsage): number {
-  return usage.inputTokens + usage.outputTokens;
+  return countedTokens(usage);
 }
 
 /**
@@ -55,11 +61,23 @@ export function formatTurnCost(usage: ChatTokenUsage, model?: string): string {
   return name ? `${name} - ${tokens}` : tokens;
 }
 
-/** The breakdown, for the footer's tooltip. */
+/**
+ * The breakdown, for the footer's tooltip. With a cache, the input is split
+ * into what was new, what was written to the cache and what was read from it,
+ * and the read says what it counted for — the one part of the line the footer's
+ * number does not take at face value.
+ */
 export function formatTurnCostDetail(usage: ChatTokenUsage): string {
-  const round = (value: number) => Math.max(0, Math.round(value));
+  const round = (value: number) => Math.max(0, Math.round(value)).toLocaleString("en-US");
+  const read = usage.cacheReadTokens ?? 0;
+  const write = usage.cacheWriteTokens ?? 0;
+  if (!read && !write) {
+    return [`Input ${round(usage.inputTokens)}`, `Output ${round(usage.outputTokens)}`].join(" · ");
+  }
   return [
-    `Input ${round(usage.inputTokens).toLocaleString("en-US")}`,
-    `Output ${round(usage.outputTokens).toLocaleString("en-US")}`
+    `Input ${round(usage.inputTokens - read - write)}`,
+    ...(write ? [`Cache write ${round(write)}`] : []),
+    ...(read ? [`Cache read ${round(read)} (counted as ${round(read * CACHE_READ_WEIGHT)})`] : []),
+    `Output ${round(usage.outputTokens)}`
   ].join(" · ");
 }

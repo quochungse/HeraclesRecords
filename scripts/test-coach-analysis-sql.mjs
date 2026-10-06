@@ -32,6 +32,7 @@ const run = (patch) => ({
   seen_at: patch.seen_at ?? null,
   input_tokens: patch.input_tokens ?? null,
   output_tokens: patch.output_tokens ?? null,
+  cache_read_tokens: patch.cache_read_tokens ?? null,
   started_at: patch.started_at ?? "2026-08-25T07:00:00.000Z",
   finished_at: patch.finished_at ?? "2026-08-25T07:00:04.000Z"
 });
@@ -375,12 +376,13 @@ assert.match(
         skip_reason: patch.skip_reason ?? null,
         input_tokens: patch.input_tokens ?? null,
         output_tokens: patch.output_tokens ?? null,
+        cache_read_tokens: patch.cache_read_tokens ?? null,
         id: patch.id
       })
     );
 
   spent({ id: "t-1", started_at: "2026-09-01T00:00:00.000Z", input_tokens: 100, output_tokens: 20 });
-  spent({ id: "t-2", started_at: "2026-09-14T09:00:00.000Z", input_tokens: 300, output_tokens: 40 });
+  spent({ id: "t-2", started_at: "2026-09-14T09:00:00.000Z", input_tokens: 300, output_tokens: 40, cache_read_tokens: 200 });
   // Before the window: last month is somebody else's problem.
   spent({ id: "t-old", started_at: "2026-08-31T23:59:59.000Z", input_tokens: 9_000, output_tokens: 9_000 });
   // Reached the provider and cost something, whatever it turned into.
@@ -394,6 +396,7 @@ assert.match(
   const totals = database.sumCoachAnalysisTokensSince("2026-09-01T00:00:00.000Z");
   assert.equal(totals.inputTokens, 100 + 300 + 50 + 10);
   assert.equal(totals.outputTokens, 20 + 40 + 5 + 1);
+  assert.equal(totals.cacheReadTokens, 200, "a run from before the column counts no cache reads");
   assert.equal(totals.providerRuns, 5, "the cooldown skip is not a run that spent anything");
   assert.equal(
     totals.countedRuns,
@@ -405,6 +408,7 @@ assert.match(
   assert.deepEqual(empty, {
     inputTokens: 0,
     outputTokens: 0,
+    cacheReadTokens: 0,
     countedRuns: 0,
     providerRuns: 0
   });
@@ -596,6 +600,16 @@ corruptAnalysis(corruptAnalysisId, {});
   );
   assert.equal(free.inputTokens, 0, "zero is a cost, not an absence");
   assert.equal(free.outputTokens, 0);
+
+  // The cache count survives the round trip, and is left off when there was none.
+  database.insertCoachAnalysisRunRow(
+    run({ id: "r-cached", input_tokens: 90_000, output_tokens: 3_000, cache_read_tokens: 85_000 })
+  );
+  const cached = store.listCoachAnalysisRuns({ analysisId: "auto-1" }).find(
+    (entry) => entry.id === "r-cached"
+  );
+  assert.equal(cached.cacheReadTokens, 85_000);
+  assert.equal("cacheReadTokens" in free, false);
 }
 
 // Windows will not unlink a file that is still open, so the handle has to

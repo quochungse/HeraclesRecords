@@ -1,4 +1,5 @@
 import { COROS_KNOWN_SPORT_TYPES } from "../../../electron/corosSportTypes";
+import { countedTokens } from "../../../electron/tokenUsage";
 import { formatDistanceValue, type UnitSystem } from "../../units/units";
 import type {
   AnalysisThresholdMetric,
@@ -192,7 +193,13 @@ export function formatRunTokens(run: CoachAnalysisRun): string | null {
   if (run.inputTokens === undefined && run.outputTokens === undefined) {
     return null;
   }
-  return formatTokens((run.inputTokens ?? 0) + (run.outputTokens ?? 0));
+  return formatTokens(
+    countedTokens({
+      inputTokens: run.inputTokens ?? 0,
+      outputTokens: run.outputTokens ?? 0,
+      cacheReadTokens: run.cacheReadTokens
+    })
+  );
 }
 
 export function formatDuration(run: CoachAnalysisRun): string {

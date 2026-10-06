@@ -678,16 +678,24 @@ async function main() {
       getCoachAnalysisPause: null,
       getCoachAnalysisSpend: {
         monthStart: "2026-09-01T00:00:00.000Z",
-        inputTokens: 412_000,
+        // 1M of the input came from the cache and counts as 100k, so the
+        // month stands at 312k + 100k + 71k (tokenUsage.ts).
+        inputTokens: 1_312_000,
         outputTokens: 71_000,
+        cacheReadTokens: 1_000_000,
+        countedTokens: 483_000,
         budget: 500_000,
         countedRuns: 12,
         providerRuns: 12
       },
       setCoachAnalysisBudget: {
         monthStart: "2026-09-01T00:00:00.000Z",
-        inputTokens: 412_000,
+        // 1M of the input came from the cache and counts as 100k, so the
+        // month stands at 312k + 100k + 71k (tokenUsage.ts).
+        inputTokens: 1_312_000,
         outputTokens: 71_000,
+        cacheReadTokens: 1_000_000,
+        countedTokens: 483_000,
         budget: 900_000,
         countedRuns: 12,
         providerRuns: 12
@@ -700,6 +708,7 @@ async function main() {
     );
     assert.match(spend, /483k/, "rounded, because nobody budgets to the token");
     assert.match(spend, /tokens this month/);
+    assert.match(spend, /cache reads count as 10%/, "a month that read from the cache says how it was counted");
     assert.doesNotMatch(
       spend,
       /not counted/,
@@ -810,6 +819,8 @@ async function main() {
         monthStart: "2026-09-01T00:00:00.000Z",
         inputTokens: 1_000,
         outputTokens: 200,
+        cacheReadTokens: 0,
+        countedTokens: 1_200,
         budget: null,
         countedRuns: 3,
         providerRuns: 7
@@ -821,6 +832,7 @@ async function main() {
       "Settings renders its spend line"
     );
     assert.match(spend, /4 runs not counted/, "and names how many it cannot see");
+    assert.doesNotMatch(spend, /cache reads/, "a month with no cache reads says nothing about them");
     assert.equal(
       await harness("value", ".coach-analysis-budget input"),
       "",

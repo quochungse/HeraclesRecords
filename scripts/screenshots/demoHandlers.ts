@@ -228,7 +228,7 @@ export function demoHandlers(): Record<string, unknown> {
     getPlanDraftDocument: async () => planDraftDocument(),
     getPlanCalendarState: async (ids: string[]) => ids.includes("artifact-marathon") || ids.length ? [{ artifactId: "artifact-marathon", remotePlanId: "demo-run-plan", running: planDraftDocument(), matches: librarySnapshot().matches }] : [],
     syncPlanFromCoros: async () => ({ kind: "current" }),
-    getCoachAnalysisSpend: async () => ({ monthStart: new Date().toISOString(), inputTokens: 0, outputTokens: 0, budget: null, countedRuns: 0, providerRuns: 0 }),
+    getCoachAnalysisSpend: async () => ({ monthStart: new Date().toISOString(), inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, countedTokens: 0, budget: null, countedRuns: 0, providerRuns: 0 }),
     getCoachAnalysisPause: async () => null,
     getBaseCoachInstructions: async () => "",
     compactChatContext: async () => ({ tailStart: 0, through: 0, rolled: false, failed: false, tailLength: 0, entryCount: 0 }),

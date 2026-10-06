@@ -1401,6 +1401,14 @@ lives at module level for the same visit-to-visit reason — see `useCalendarDat
   the field, so the renderer could not read what it was being handed. Both leave the turn
   unpriced rather than reading zero when a provider reports nothing — see `ChatTokenUsage`.
   `test:chat-turn-cost` drives the round trip and the formatting.
+  **A token read from the prompt cache counts as a tenth** (`electron/tokenUsage.ts`,
+  `CACHE_READ_WEIGHT`): the footer, an analysis's run-log row, the month's spend and the budget
+  all state `countedTokens`. Every tool round re-sends the whole prefix, so counted whole a
+  three-round Claude Code turn read 96.3k when 85k of it was cache reads (measured 2026-10-06),
+  and the budget drained about four times faster than what was spent. Providers report the
+  cache as parts of `inputTokens` (`cacheReadTokens`, `cacheWriteTokens`, inside the existing
+  `usage` object, so an older build keeps them through `keepUnknownKeys`); a write counts whole,
+  and a run row keeps its reads in `coach_analysis_runs.cache_read_tokens`.
 
   **What this build does not know, it carries; what an older build does not know, it can
   lose.** Since P0.1 of [docs/coach-plan-canvas.md](docs/coach-plan-canvas.md), every parser

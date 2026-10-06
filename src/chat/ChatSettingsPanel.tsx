@@ -537,9 +537,19 @@ function AnalysesSettingsSection({
         <p className="coach-analysis-spend">
           <span>
             <strong>
-              {formatTokens(spend.inputTokens + spend.outputTokens)}
+              {formatTokens(spend.countedTokens)}
             </strong>{" "}
             tokens this month
+            {spend.cacheReadTokens > 0 ? (
+              <>
+                {" · "}
+                <span
+                  title={`${formatTokens(spend.cacheReadTokens)} tokens were read from the provider's cache, which costs a tenth of new input, so they count as a tenth.`}
+                >
+                  cache reads count as 10%
+                </span>
+              </>
+            ) : null}
             {/* A total that is short of the truth has to say so, or a budget
                 reads as comfortably under when nobody actually knows. */}
             {spend.providerRuns > spend.countedRuns ? (
