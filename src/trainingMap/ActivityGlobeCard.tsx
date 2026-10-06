@@ -259,7 +259,9 @@ export function ActivityGlobeCard({
   );
   const [visitsLoading, setVisitsLoading] = useState(false);
   const [canResetView, setCanResetView] = useState(false);
-  const [hoveringCluster, setHoveringCluster] = useState(false);
+  // One place pointed at, from either side: a row in the list lights its pin,
+  // and a pin under the pointer lights its row.
+  const [hoveredKey, setHoveredKey] = useState<string | null>(null);
   const [streetFocus, setStreetFocus] = useState<StreetMapFocus | null>(null);
   const [zoomingToStreet, setZoomingToStreet] = useState(false);
   const streetMode = streetFocus !== null;
@@ -304,20 +306,19 @@ export function ActivityGlobeCard({
   );
   // Names for the places pinned on the globe. Only resolved labels go in, so an
   // unnamed place stays a dot rather than becoming a pair of coordinates —
-  // except the selected one, which always says something.
+  // except the selected one and the one pointed at, which always say something.
   const globeLabels = useMemo(() => {
     const entries: Record<string, string> = {};
     for (const place of places) {
       const label = placeLabels[place.key];
       if (label) {
         entries[place.key] = label.city;
+      } else if (place.key === selectedLocationKey || place.key === hoveredKey) {
+        entries[place.key] = coordinateLabel(place.bucket).city;
       }
     }
-    if (selectedPlace && !entries[selectedPlace.key]) {
-      entries[selectedPlace.key] = coordinateLabel(selectedPlace.bucket).city;
-    }
     return entries;
-  }, [places, placeLabels, selectedPlace]);
+  }, [hoveredKey, places, placeLabels, selectedLocationKey]);
 
   useEffect(() => {
     if (
@@ -387,7 +388,7 @@ export function ActivityGlobeCard({
     setZoomingToStreet(false);
     setStreetFocus(focus);
     setCanResetView(true);
-    setHoveringCluster(false);
+    setHoveredKey(null);
   };
 
   const scheduleStreetFocus = (focus: StreetMapFocus, delayMs: number) => {
@@ -410,6 +411,9 @@ export function ActivityGlobeCard({
     }
     setZoomingToStreet(false);
     setStreetFocus(null);
+    // The row that was clicked unmounts under the pointer, so it never hears
+    // the pointer leave.
+    setHoveredKey(null);
     const place = places.find((candidate) => candidate.key === bucket.key);
     setSelectedLocationKey(bucket.key);
     const latestActivity = place?.activities[0];
@@ -679,7 +683,7 @@ export function ActivityGlobeCard({
           aria-label="Interactive training globe"
         >
           <div
-            className={`training-map-globe-stage${hoveringCluster ? " is-hovering-cluster" : ""}`}
+            className={`training-map-globe-stage${hoveredKey ? " is-hovering-cluster" : ""}`}
             role="img"
             aria-label={
               streetMode
@@ -697,10 +701,11 @@ export function ActivityGlobeCard({
               locations={globeLocations}
               routePoints={routePoints}
               selectedLocation={selectedPlace?.bucket ?? null}
+              hoveredKey={hoveredKey}
               labels={globeLabels}
               streetMode={streetMode}
               onError={setGlobeError}
-              onHoverChange={setHoveringCluster}
+              onHoverChange={setHoveredKey}
               onRequestStreet={enterStreetFocus}
               onSelectLocation={selectLocation}
               onViewChange={setCanResetView}
@@ -810,6 +815,8 @@ export function ActivityGlobeCard({
               places={sortedPlaces}
               labels={placeLabels}
               sort={placeSort}
+              hoveredKey={hoveredKey}
+              onHover={setHoveredKey}
               onSortChange={setPlaceSort}
               onSelect={(place) => selectLocation(place.bucket)}
               onNearEnd={() =>

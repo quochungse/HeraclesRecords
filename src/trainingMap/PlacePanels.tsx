@@ -33,6 +33,9 @@ interface PlaceListProps {
   places: readonly PlaceSummary[];
   labels: Readonly<Record<string, PlaceLabel>>;
   sort: PlaceSort;
+  /** The place pointed at, here or on the globe: its row lights up. */
+  hoveredKey: string | null;
+  onHover: (key: string | null) => void;
   onSortChange: (sort: PlaceSort) => void;
   onSelect: (place: PlaceSummary) => void;
   /** The list scrolled close to its end: name the next rows. */
@@ -43,6 +46,8 @@ export function PlaceList({
   places,
   labels,
   sort,
+  hoveredKey,
+  onHover,
   onSortChange,
   onSelect,
   onNearEnd,
@@ -87,8 +92,12 @@ export function PlaceList({
             <li key={place.key}>
               <button
                 type="button"
-                className="training-map-place-row"
+                className={`training-map-place-row${place.key === hoveredKey ? " is-hovered" : ""}`}
                 onClick={() => onSelect(place)}
+                onPointerEnter={() => onHover(place.key)}
+                onPointerLeave={() => onHover(null)}
+                onFocus={() => onHover(place.key)}
+                onBlur={() => onHover(null)}
               >
                 <i
                   className={`training-map-place-dot is-${intensityTier(count, maxCount)}`}

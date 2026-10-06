@@ -55,11 +55,14 @@ interface ActivityGlobeRendererProps {
   locations: GeoHeatBucket[];
   routePoints: GlobePoint[];
   selectedLocation: GeoHeatBucket | null;
+  /** A place pointed at — in the list beside the globe, or on the globe itself. */
+  hoveredKey: string | null;
   /** City name per location key, for the labels pinned on the globe. */
   labels: Record<string, string>;
   streetMode: boolean;
   onError: (error: boolean) => void;
-  onHoverChange: (hovering: boolean) => void;
+  /** The place under the pointer on the globe, or null when it leaves them. */
+  onHoverChange: (key: string | null) => void;
   onRequestStreet: (focus: { lat: number; lon: number }) => void;
   onSelectLocation: (bucket: GeoHeatBucket) => void;
   onViewChange: (changed: boolean) => void;
@@ -258,6 +261,7 @@ const ActivityGlobeRendererComponent = forwardRef<
     locations,
     routePoints,
     selectedLocation,
+    hoveredKey,
     labels,
     streetMode,
     onError,
@@ -420,18 +424,31 @@ const ActivityGlobeRendererComponent = forwardRef<
   const markerScale = frameAltitude / FIT_MIN_ALTITUDE;
 
   const labelData = useMemo(() => {
-    if (selectedLocation) {
-      return [selectedLocation];
-    }
-    if (!highlightAll) {
-      return [];
-    }
-    return pickSpacedPlaces(
-      locations.filter((location) => Boolean(labels[location.key])),
-      MAX_HIGHLIGHT_LABELS,
-      labelSeparationDegrees(baselineView.altitude),
-    );
-  }, [baselineView.altitude, highlightAll, labels, locations, selectedLocation]);
+    const picked = selectedLocation
+      ? [selectedLocation]
+      : highlightAll
+        ? pickSpacedPlaces(
+            locations.filter((location) => Boolean(labels[location.key])),
+            MAX_HIGHLIGHT_LABELS,
+            labelSeparationDegrees(baselineView.altitude),
+          )
+        : [];
+    // The place pointed at always says its name, wherever the spacing rule
+    // left it out.
+    const hovered = hoveredKey
+      ? locations.find((location) => location.key === hoveredKey)
+      : undefined;
+    return hovered && !picked.some((location) => location.key === hovered.key)
+      ? [...picked, hovered]
+      : picked;
+  }, [
+    baselineView.altitude,
+    highlightAll,
+    hoveredKey,
+    labels,
+    locations,
+    selectedLocation,
+  ]);
 
   const stopIdleRotation = useCallback(() => {
     if (idleTimerRef.current !== null) {
@@ -858,7 +875,8 @@ const ActivityGlobeRendererComponent = forwardRef<
   );
 
   const handlePointHover = useCallback(
-    (point: object | null) => onHoverChange(Boolean(point)),
+    (point: object | null) =>
+      onHoverChange(point ? (point as GeoHeatBucket).key : null),
     [onHoverChange],
   );
 
@@ -869,15 +887,16 @@ const ActivityGlobeRendererComponent = forwardRef<
       anchor.className = "training-map-globe-label-anchor";
       anchor.dataset.locationKey = location.key;
       const label = document.createElement("span");
-      const selected = location.key === selectedLocation?.key;
-      label.className = selected
+      const lit =
+        location.key === selectedLocation?.key || location.key === hoveredKey;
+      label.className = lit
         ? "training-map-globe-label"
         : "training-map-globe-label is-secondary";
       label.textContent = labels[location.key] ?? "";
       anchor.append(label);
       return anchor;
     },
-    [labels, selectedLocation?.key],
+    [hoveredKey, labels, selectedLocation?.key],
   );
 
   const modifyHtmlLabelVisibility = useCallback(
@@ -942,6 +961,9 @@ const ActivityGlobeRendererComponent = forwardRef<
           if (activity.key === selectedLocation?.key) {
             return 0.28 * markerScale;
           }
+          if (activity.key === hoveredKey) {
+            return 0.24 * markerScale;
+          }
           return (
             (highlightAll
               ? 0.17 + activity.intensity * 0.11
@@ -953,7 +975,10 @@ const ActivityGlobeRendererComponent = forwardRef<
           const tone = ACCENT_PALETTE_DETAILS[accent][
             paperTheme ? "paper" : "dark"
           ];
-          if (activity.key === selectedLocation?.key) {
+          if (
+            activity.key === selectedLocation?.key ||
+            activity.key === hoveredKey
+          ) {
             return tone.strong;
           }
           if (highlightAll) {

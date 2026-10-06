@@ -516,7 +516,8 @@
   transition: background var(--dur-fast) var(--ease);
 }
 
-.training-map-place-row:hover {
+.training-map-place-row:hover,
+.training-map-place-row.is-hovered {
   background: var(--glass-bg);
 }
 
