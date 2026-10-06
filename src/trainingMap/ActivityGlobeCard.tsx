@@ -755,7 +755,7 @@ export function ActivityGlobeCard({
             role="img"
             aria-label={
               streetMode
-                ? "Street map heatmap near the selected location. Zoom out or go back to return to the globe."
+                ? "Street map of your routes near the selected location. Zoom out or go back to return to the globe."
                 : mapHasVisits
                   ? `Interactive globe showing ${places.length} training locations. Drag to rotate, scroll to zoom, and select a location for details.`
                   : mapHasRoute

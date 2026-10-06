@@ -2514,10 +2514,6 @@ input::placeholder {
   font: inherit;
 }
 
-.activity-globe-heat-canvas {
-  pointer-events: none;
-}
-
 @keyframes activity-globe-street-in {
   from {
     opacity: 0;
