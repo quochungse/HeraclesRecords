@@ -9,7 +9,9 @@ import { RECORDS_SUMMARY_VERSION } from "../../electron/activityMetrics";
 import { isSleepDayRecord, totalSleepMinutes } from "../../electron/sleepMetrics";
 import type { HeraclesRecordsApi } from "../heraclesrecords-api";
 import { getLocalHappenDayKey } from "../training/formatters";
-import { knownPlaceLabels, loadPlaceLabel } from "../trainingMap/placeLabels";
+import { loadRegionIndex, type RegionIndex } from "../trainingMap/adminRegions";
+import { placeLabelKey } from "../trainingMap/placeClusters";
+import { coordinateLabel, knownPlaceLabels, loadPlaceLabel } from "../trainingMap/placeLabels";
 import { mergeTrainingDayLists } from "../training/parsers";
 import type { TrainingHubLoadStatus, TrainingHubSnapshot } from "../training/types";
 import { buildLabours, type LabourState } from "./labours";
@@ -69,13 +71,9 @@ function namedPlaceLabels(): Record<string, PlaceLabelLookup> {
   const known = knownPlaceLabels();
   const named: Record<string, PlaceLabelLookup> = {};
   for (const [key, label] of Object.entries(known)) {
-    // "Location" is `coordinateLabel`'s country: nobody answered for that cell.
+    // "Location" is `coordinateLabel`'s country: nobody answered for that place.
     if (label.country && label.country !== "Location") {
-      named[key] = {
-        city: label.city,
-        country: label.country,
-        ...(typeof label.countryCode === "string" ? { countryCode: label.countryCode } : {})
-      };
+      named[key] = { city: label.city };
     }
   }
   return named;
@@ -132,6 +130,19 @@ export function useHallOfRecords({
   const [remembered, setRemembered] = useState<RememberedMilestone[]>([]);
   const [sleepNights, setSleepNights] = useState<Array<{ day: string; minutes: number }>>([]);
   const [labelVersion, setLabelVersion] = useState(0);
+  // What tells places apart (`adminRegions.ts`), read once per window. The
+  // hall is not settled without it: places counted by distance alone and then
+  // again by region would announce a stage that was never reached.
+  const [regions, setRegions] = useState<RegionIndex | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    void loadRegionIndex().then((index) => {
+      if (!cancelled) setRegions(index);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
   const [summariesLoaded, setSummariesLoaded] = useState(false);
   const [rememberedLoaded, setRememberedLoaded] = useState(false);
   const [sleepLoaded, setSleepLoaded] = useState(false);
@@ -246,7 +257,7 @@ export function useHallOfRecords({
   const result = useMemo(
     () =>
       sampleInput
-        ? computeRecords({ ...sampleInput, unitSystem })
+        ? computeRecords({ ...sampleInput, ...(regions ? { regions } : {}), unitSystem })
         : computeRecords({
             activities,
             summaries,
@@ -255,10 +266,23 @@ export function useHallOfRecords({
             sleepNights,
             remembered,
             placeLabels,
+            ...(regions ? { regions } : {}),
             ...(athlete ? { athlete } : {}),
             unitSystem
           }),
-    [sampleInput, activities, summaries, snapshot, vo2Readings, sleepNights, remembered, placeLabels, athlete, unitSystem]
+    [
+      sampleInput,
+      activities,
+      summaries,
+      snapshot,
+      vo2Readings,
+      sleepNights,
+      remembered,
+      placeLabels,
+      regions,
+      athlete,
+      unitSystem
+    ]
   );
 
   const labours = useMemo(
@@ -303,7 +327,7 @@ export function useHallOfRecords({
       labours,
       ready: true,
       failed: false,
-      settled: true,
+      settled: regions !== null,
       mergeSummaries,
       refreshPlaceLabels
     };
@@ -321,6 +345,7 @@ export function useHallOfRecords({
       (summariesLoaded || activityIds.length === 0) &&
       rememberedLoaded &&
       sleepLoaded &&
+      regions !== null &&
       athlete !== undefined &&
       snapshotStatus !== "pending",
     mergeSummaries,
@@ -426,8 +451,9 @@ export function useRecordsBackfill({
 
 /**
  * Name the places trained in, busiest first, a few per visit. The names land in
- * the globe's own cache (`placeLabels.ts`), so a cell "Where you've been" has
- * named is never asked about again here, and the reverse.
+ * the globe's own cache (`placeLabels.ts`), under the same key (`placeLabelKey`),
+ * so a place "Where you've been" has named is never asked about again here,
+ * and the reverse.
  */
 export function usePlaceNames({
   cells,
@@ -452,15 +478,16 @@ export function usePlaceNames({
     let cancelled = false;
     const known = knownPlaceLabels();
     const queue = cellsRef.current
-      .filter((cell) => !known[cell.key] && !asked.current.has(cell.key))
+      .map((cell) => ({ key: placeLabelKey(cell), point: { lat: cell.lat, lon: cell.lon } }))
+      .filter(({ key }) => !known[key] && !asked.current.has(key))
       .slice(0, Math.max(0, PLACE_NAMES_PER_VISIT - askedThisVisit.current));
     void (async () => {
-      for (const cell of queue) {
+      for (const { key, point } of queue) {
         if (cancelled) return;
-        asked.current.add(cell.key);
+        asked.current.add(key);
         askedThisVisit.current += 1;
-        const named = await loadPlaceLabel(cell.key, { lat: cell.lat, lon: cell.lon }).then(
-          () => true,
+        const named = await loadPlaceLabel(key, point).then(
+          (label) => label.full !== coordinateLabel(point).full,
           () => false
         );
         // Told even when superseded: the name is in the cache either way.
