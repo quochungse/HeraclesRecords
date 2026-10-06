@@ -41,7 +41,6 @@ import { formatDurationSeconds, getLocalHappenDayKey } from "../training/formatt
 import { isStrengthSportType, isSwimSportType } from "../training/sportTypes";
 import { RECORDS_SUMMARY_VERSION } from "../../electron/activityMetrics";
 import { isIndoorSportType } from "../../electron/corosSportTypes";
-import { geoHeatBucketKey } from "../trainingMap/activityVisitHeatmap";
 import {
   VO2_RATINGS,
   VO2_RATING_NAMES,
@@ -593,7 +592,7 @@ function haversineKm(a: { lat: number; lon: number }, b: { lat: number; lon: num
 
 /** The globe's own 0.5° cell, so a name it has already found is reused. */
 export function placeCellKey(point: { lat: number; lon: number }): string {
-  return geoHeatBucketKey(point);
+  return `${Math.round(point.lat / 0.5)}:${Math.round(point.lon / 0.5)}`;
 }
 
 /** A country's name with its accents and spacing folded: "Việt Nam" and "Vietnam" meet. */

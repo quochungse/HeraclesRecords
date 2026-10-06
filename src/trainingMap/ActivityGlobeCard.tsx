@@ -14,11 +14,10 @@ import type {
   TrainingHubActivityDetail,
 } from "../../electron/types";
 import {
-  bucketVisitsGeographically,
   extractTrackPoints,
   getCachedRoutePolylines,
   getCachedVisitPoints,
-  loadActivityVisitCentroids,
+  loadActivityVisits,
   rememberActivityGeo,
   sampleGlobePoints,
   type ActivityRoutePolyline,
@@ -26,6 +25,8 @@ import {
   type GeoHeatBucket,
   type GlobePoint,
 } from "./activityVisitHeatmap";
+import { loadRegionIndex, type RegionIndex } from "./adminRegions";
+import { placeLabelKey } from "./placeClusters";
 import {
   coordinateLabel,
   knownPlaceLabels,
@@ -37,17 +38,13 @@ import {
   buildPlaceSummaries,
   farthestFromHome,
   homePlace,
+  placeLabelFor,
   placesSummaryLine,
   sortPlaces,
   type PlaceSort,
   type PlaceSummary,
 } from "./placeSummaries";
-import {
-  PlaceDetail,
-  PlaceLabourCard,
-  PlaceList,
-  placeLabelOf,
-} from "./PlacePanels";
+import { PlaceDetail, PlaceLabourCard, PlaceList } from "./PlacePanels";
 import type { LabourState } from "../records/labours";
 import {
   ActivityGlobeStreetMap,
@@ -236,6 +233,21 @@ export function ActivityGlobeCard({
     knownPlaceLabels,
   );
   const [globeError, setGlobeError] = useState(false);
+  // The outlines that tell places apart, read once per window. Until they are
+  // here there are no places to draw: grouping without them would draw a
+  // different map a moment later.
+  const [regionIndex, setRegionIndex] = useState<RegionIndex | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    void loadRegionIndex().then((index) => {
+      if (!cancelled) {
+        setRegionIndex(index);
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const filteredActivities = useMemo(() => {
     if (period === "all") {
@@ -313,14 +325,12 @@ export function ActivityGlobeCard({
     return merged;
   }, [routes, detail?.activityId, routePoints]);
 
-  const heatBuckets = useMemo(
-    () => bucketVisitsGeographically(visits),
-    [visits],
-  );
-
   const places = useMemo(
-    () => buildPlaceSummaries(filteredActivities, visits, heatBuckets),
-    [filteredActivities, heatBuckets, visits],
+    () =>
+      regionIndex
+        ? buildPlaceSummaries(filteredActivities, visits, regionIndex.regionOf)
+        : [],
+    [filteredActivities, regionIndex, visits],
   );
   const sortedPlaces = useMemo(
     () => sortPlaces(places, placeSort),
@@ -332,20 +342,22 @@ export function ActivityGlobeCard({
     [places, selectedLocationKey],
   );
   const globeLocations = useMemo(
-    () => places.map((place) => place.bucket),
+    () => places.map((place) => place.cluster),
     [places],
   );
-  // Names for the places pinned on the globe. Only resolved labels go in, so an
-  // unnamed place stays a dot rather than becoming a pair of coordinates —
-  // except the selected one and the one pointed at, which always say something.
+  // Names for the places pinned on the globe. Only the geocoder's go in, so a
+  // place it has not named yet stays a dot rather than a province's name that
+  // a town's will replace — except the selected one and the one pointed at,
+  // which always say something.
   const globeLabels = useMemo(() => {
     const entries: Record<string, string> = {};
     for (const place of places) {
-      const label = placeLabels[place.key];
-      if (label) {
-        entries[place.key] = label.city;
-      } else if (place.key === selectedLocationKey || place.key === hoveredKey) {
-        entries[place.key] = coordinateLabel(place.bucket).city;
+      if (
+        placeLabels[placeLabelKey(place.cluster)] ||
+        place.key === selectedLocationKey ||
+        place.key === hoveredKey
+      ) {
+        entries[place.key] = placeLabelFor(place.cluster, placeLabels).city;
       }
     }
     return entries;
@@ -386,14 +398,16 @@ export function ActivityGlobeCard({
       want(place);
     }
     for (const place of wanted) {
-      void loadPlaceLabel(place.key, place.bucket).then((label) => {
-        if (cancelled) {
+      const key = placeLabelKey(place.cluster);
+      void loadPlaceLabel(key, place.cluster).then((label) => {
+        // Only a name: a coordinate fallback would hide the region's name.
+        if (cancelled || label.full === coordinateLabel(place.cluster).full) {
           return;
         }
         setPlaceLabels((current) =>
-          current[place.key]?.full === label.full
+          current[key]?.full === label.full
             ? current
-            : { ...current, [place.key]: label },
+            : { ...current, [key]: label },
         );
       });
     }
@@ -446,7 +460,7 @@ export function ActivityGlobeCard({
   // Picking a place, on the globe or in the list, flies the globe to it and
   // opens it beside the map. The street map is a step further, taken from
   // there: it used to open on its own the moment a pin was clicked.
-  const selectLocation = (bucket: GeoHeatBucket) => {
+  const selectLocation = (location: GeoHeatBucket) => {
     if (streetEnterTimerRef.current !== null) {
       window.clearTimeout(streetEnterTimerRef.current);
       streetEnterTimerRef.current = null;
@@ -456,8 +470,8 @@ export function ActivityGlobeCard({
     // The row that was clicked unmounts under the pointer, so it never hears
     // the pointer leave.
     setHoveredKey(null);
-    const place = places.find((candidate) => candidate.key === bucket.key);
-    setSelectedLocationKey(bucket.key);
+    const place = places.find((candidate) => candidate.key === location.key);
+    setSelectedLocationKey(location.key);
     const latestActivity = place?.activities[0];
     if (latestActivity) {
       onSelectActivity(latestActivity);
@@ -469,8 +483,8 @@ export function ActivityGlobeCard({
       return;
     }
     const focus = {
-      lat: selectedPlace.bucket.lat,
-      lon: selectedPlace.bucket.lon,
+      lat: selectedPlace.cluster.lat,
+      lon: selectedPlace.cluster.lon,
     };
     const duration =
       globeRendererRef.current?.zoomToLocation(
@@ -542,12 +556,12 @@ export function ActivityGlobeCard({
       return;
     }
 
-    const { centroid, route } = rememberActivityGeo(detail.activityId, detail);
-    if (centroid) {
+    const { start, route } = rememberActivityGeo(detail.activityId, detail);
+    if (start) {
       setVisits((current) =>
         mergeVisits(current, {
           activityId: detail.activityId!,
-          ...centroid,
+          ...start,
         }),
       );
     }
@@ -603,7 +617,7 @@ export function ActivityGlobeCard({
     setRoutes(getCachedRoutePolylines(list));
     setVisitsLoading(true);
 
-    void loadActivityVisitCentroids(
+    void loadActivityVisits(
       list,
       (activityId, sportType, listActivity) =>
         api.getTrainingHubActivityDetail(activityId, sportType, listActivity),
@@ -650,7 +664,7 @@ export function ActivityGlobeCard({
 
   const mapHasRoute = routePoints.length > 0;
   const mapHasVisits = visits.length > 0;
-  const mapLoading = visitsLoading && !mapHasVisits;
+  const mapLoading = (visitsLoading && !mapHasVisits) || (mapHasVisits && !regionIndex);
   const summary = mapLoading
     ? "Mapping your GPS activities…"
     : filteredActivities.length === 0
@@ -753,7 +767,7 @@ export function ActivityGlobeCard({
               frameKey={activityKey}
               locations={globeLocations}
               routePoints={routePoints}
-              selectedLocation={selectedPlace?.bucket ?? null}
+              selectedLocation={selectedPlace?.cluster ?? null}
               hoveredKey={hoveredKey}
               labels={globeLabels}
               streetMode={streetMode}
@@ -837,7 +851,7 @@ export function ActivityGlobeCard({
             <PlaceDetail
               key={selectedPlace.key}
               place={selectedPlace}
-              label={placeLabelOf(selectedPlace, placeLabels)}
+              label={placeLabelFor(selectedPlace.cluster, placeLabels)}
               zooming={zoomingToStreet}
               streetMode={streetMode}
               onBack={showAllPlaces}
@@ -876,7 +890,7 @@ export function ActivityGlobeCard({
                 hoveredKey={hoveredKey}
                 onHover={setHoveredKey}
                 onSortChange={setPlaceSort}
-                onSelect={(place) => selectLocation(place.bucket)}
+                onSelect={(place) => selectLocation(place.cluster)}
                 onNearEnd={() =>
                   setLabelReach((reach) =>
                     reach < sortedPlaces.length ? reach + LABEL_BATCH : reach,

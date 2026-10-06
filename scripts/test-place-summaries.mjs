@@ -7,9 +7,9 @@
 // - **Home is where most of the training is, and "farthest" is measured from
 //   it** — and only from 100 km, where the Hall of Records starts counting a
 //   trip too: Tam Đảo, 53 km out, is a day out from Hà Nội.
-// - **No country count while any place is unnamed**: the named ones would read
-//   as the answer and be short. "Việt Nam" and "Vietnam" are one country — the
-//   two geocoders name it in two languages.
+// - **Countries come from the regions places lie in**, known on the machine,
+//   so a place the geocoder has not named still counts — and is called by its
+//   region until it is named.
 // - **Days are written "6 Aug 2024", never "Sept"**, the way the Hall of
 //   Records writes the same days.
 // - **A place's months run unbroken to now**: a month with no visit is a bar
@@ -37,14 +37,13 @@ const {
   formatDayNear,
   homePlace,
   formatMonthYear,
+  placeLabelFor,
   placesSummaryLine,
   sortPlaces,
   sportMix,
   visitsByMonth,
 } = await load("src/trainingMap/placeSummaries.ts");
-const { bucketVisitsGeographically } = await load(
-  "src/trainingMap/activityVisitHeatmap.ts",
-);
+const { placeLabelKey } = await load("src/trainingMap/placeClusters.ts");
 
 const HANOI = { lat: 21.03, lon: 105.85 };
 const TAM_DAO = { lat: 21.46, lon: 105.64 };
@@ -75,17 +74,26 @@ function world(entries) {
       visits.push({ activityId: item.activityId, ...point });
     }
   }
-  return { activities, visits, buckets: bucketVisitsGeographically(visits) };
+  return { activities, visits };
 }
+
+// Regions by hand: what the shipped outlines say about these four points.
+const region = (id, name, country, countryName) => ({ id, name, country, countryName });
+const HA_NOI = region("VN-HN", "Hà Nội", "VN", "Vietnam");
+const PHU_THO = region("VN-68", "Phú Thọ", "VN", "Vietnam");
+const LAM_DONG = region("VN-35", "Lâm Đồng", "VN", "Vietnam");
+const BANGKOK_REGION = region("TH-10", "Bangkok Metropolis", "TH", "Thailand");
+const regionOf = (point) =>
+  point.lat === HANOI.lat ? HA_NOI : point.lat === TAM_DAO.lat ? PHU_THO : point.lat === DA_LAT.lat ? LAM_DONG : BANGKOK_REGION;
 
 // --- a place is the activities still in the list -------------------------
 {
-  const { activities, visits, buckets } = world([
+  const { activities, visits } = world([
     [HANOI, ["2026-10-01", "2026-09-20", "2025-03-02"]],
     [TAM_DAO, ["2026-10-04"]],
     [DA_LAT, ["2026-04-12"]],
   ]);
-  const places = buildPlaceSummaries(activities, visits, buckets);
+  const places = buildPlaceSummaries(activities, visits, regionOf);
   assert.equal(places.length, 3);
   assert.deepEqual(
     places.map((place) => place.activities.length),
@@ -108,8 +116,8 @@ function world(entries) {
   const kept = activities.filter(
     (item) => item.startTime !== day("2026-04-12") && item.startTime !== day("2025-03-02"),
   );
-  const narrowed = buildPlaceSummaries(kept, visits, buckets);
-  assert.equal(narrowed.length, 2, "a bucket whose activities all left is no place");
+  const narrowed = buildPlaceSummaries(kept, visits, regionOf);
+  assert.equal(narrowed.length, 2, "a place whose activities all left is no place");
   assert.equal(narrowed.find((place) => place.activities.length === 2)?.firstVisitedMs, day("2026-09-20") * 1000);
 
   // Two orders.
@@ -127,17 +135,17 @@ function world(entries) {
 
 // --- farthest from home ----------------------------------------------------
 {
-  const { activities, visits, buckets } = world([
+  const { activities, visits } = world([
     [HANOI, ["2026-10-01", "2026-09-20"]],
     [TAM_DAO, ["2026-10-04"]],
     [DA_LAT, ["2026-04-12"]],
     [BANGKOK, ["2025-12-14"]],
   ]);
-  const places = buildPlaceSummaries(activities, visits, buckets);
+  const places = buildPlaceSummaries(activities, visits, regionOf);
   const farthest = farthestFromHome(places);
   assert.ok(farthest);
   assert.equal(farthest.home.activities.length, 2);
-  assert.equal(farthest.place.bucket.lat, DA_LAT.lat, "Đà Lạt is further from Hà Nội than Bangkok");
+  assert.equal(farthest.place.cluster.lat, DA_LAT.lat, "Đà Lạt is further from Hà Nội than Bangkok");
   assert.ok(Math.abs(farthest.km - 1048) < 1, `Hà Nội to Đà Lạt is ~1,048 km, got ${farthest.km}`);
 
   const near = world([
@@ -145,58 +153,73 @@ function world(entries) {
     [TAM_DAO, ["2026-10-04"]],
   ]);
   assert.equal(
-    farthestFromHome(buildPlaceSummaries(near.activities, near.visits, near.buckets)),
+    farthestFromHome(buildPlaceSummaries(near.activities, near.visits, regionOf)),
     undefined,
     "Tam Đảo is 53 km out: a day out from home, not a trip",
   );
 }
 
-// --- countries --------------------------------------------------------------
+// --- countries and names ------------------------------------------------------
 {
-  const { activities, visits, buckets } = world([
+  const { activities, visits } = world([
     [HANOI, ["2026-10-01"]],
     [DA_LAT, ["2026-04-12"]],
     [BANGKOK, ["2025-12-14"]],
   ]);
-  const places = buildPlaceSummaries(activities, visits, buckets);
-  const key = (point) => places.find((place) => place.bucket.lat === point.lat).key;
-  const labels = {
-    [key(HANOI)]: { city: "Hà Nội", country: "Việt Nam", full: "Hà Nội, Việt Nam" },
-    [key(DA_LAT)]: { city: "Đà Lạt", country: "Vietnam", full: "Đà Lạt, Vietnam", countryCode: "vn" },
-  };
-  assert.equal(countriesVisited(places, labels), undefined, "Bangkok is unnamed yet: no count");
-  labels[key(BANGKOK)] = { city: "Bangkok", country: "Thailand", full: "Bangkok, Thailand", countryCode: "TH" };
-  assert.equal(countriesVisited(places, labels), 2, "Việt Nam and Vietnam are one country");
-
+  const places = buildPlaceSummaries(activities, visits, regionOf);
+  const at = (point) => places.find((place) => place.cluster.lat === point.lat).cluster;
+  assert.equal(countriesVisited(places), 2, "by region, with no name asked of anyone");
   assert.equal(
-    placesSummaryLine({ places, labels, allTime: true }),
-    "3 activities in 3 places and 2 countries since 14 Dec 2025 · Farthest: Đà Lạt, 1,048 km from Hà Nội",
+    countriesVisited(buildPlaceSummaries(activities, visits)),
+    0,
+    "a place in no region counts toward no country",
+  );
+
+  // Before the geocoder answers, a place is called by its region.
+  assert.deepEqual(placeLabelFor(at(DA_LAT), {}), {
+    city: "Lâm Đồng",
+    country: "Vietnam",
+    full: "Lâm Đồng, Vietnam",
+    countryCode: "VN",
+  });
+  assert.equal(
+    placesSummaryLine({ places, labels: {}, allTime: true }),
+    "3 activities in 3 places and 2 countries since 14 Dec 2025 · Farthest: Lâm Đồng, 1,048 km from Hà Nội",
+  );
+
+  const labels = {
+    [placeLabelKey(at(HANOI))]: { city: "Hà Nội", country: "Việt Nam", full: "Hà Nội, Việt Nam" },
+    [placeLabelKey(at(DA_LAT))]: { city: "Đà Lạt", country: "Việt Nam", full: "Đà Lạt, Lâm Đồng, Việt Nam" },
+  };
+  // A town in a region says which region; a town that is its region does not.
+  assert.equal(placeLabelFor(at(DA_LAT), labels).country, "Lâm Đồng, Vietnam");
+  assert.equal(placeLabelFor(at(HANOI), labels).country, "Vietnam");
+  assert.equal(
+    placeLabelFor(at(HANOI), { [placeLabelKey(at(HANOI))]: { city: "Thành phố Hà Nội", country: "Việt Nam", full: "" } }).country,
+    "Vietnam",
+    "a town named with its title is still its region",
+  );
+  assert.equal(
+    placeLabelFor(at(BANGKOK), { [placeLabelKey(at(BANGKOK))]: { city: "Bangkok", country: "Thailand", full: "" } }).country,
+    "Thailand",
+    "and so is a region named at length: Bangkok is \"Bangkok Metropolis\"",
   );
   assert.equal(
     placesSummaryLine({ places, labels, allTime: false }),
     "3 activities in 3 places and 2 countries · Farthest: Đà Lạt, 1,048 km from Hà Nội",
     "a shorter period is named by its picker, not by a date",
   );
-  delete labels[key(DA_LAT)];
-  assert.equal(
-    placesSummaryLine({ places, labels, allTime: false }),
-    "3 activities in 3 places · Farthest: 1,048 km from Hà Nội",
-    "an unnamed place leaves the country count out, and the farthest unnamed",
-  );
 }
 
 {
-  const { activities, visits, buckets } = world([[HANOI, ["2026-10-01"]]]);
-  const places = buildPlaceSummaries(activities, visits, buckets);
-  const labels = {
-    [places[0].key]: { city: "Hà Nội", country: "Vietnam", full: "Hà Nội, Vietnam" },
-  };
+  const { activities, visits } = world([[HANOI, ["2026-10-01"]]]);
+  const places = buildPlaceSummaries(activities, visits, regionOf);
   assert.equal(
-    placesSummaryLine({ places, labels, allTime: true }),
+    placesSummaryLine({ places, labels: {}, allTime: true }),
     "1 activity in 1 place since 1 Oct 2026",
     "one country is not worth saying, and one place has no farthest",
   );
-  assert.equal(placesSummaryLine({ places: [], labels, allTime: true }), "");
+  assert.equal(placesSummaryLine({ places: [], labels: {}, allTime: true }), "");
 }
 
 // --- days -------------------------------------------------------------------

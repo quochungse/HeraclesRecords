@@ -25,9 +25,10 @@ const PLACE_LABEL_REQUESTS = new Map<string, Promise<PlaceLabel>>();
 const PLACE_LABEL_RETRY_MS = 60_000;
 const PLACE_LABEL_FAILURES = new Map<string, number>();
 
-// A cluster key is a ~55 km grid cell (`GEO_HEAT_STEP`), and neither the cell
-// nor the name of the city in it changes — so the answer is worth keeping past
-// the window that asked for it. Held only in memory, every launch re-asked a
+// A name is kept under the place's centre to two decimals (`placeLabelKey`),
+// which is also all the geocoder is told, and the name of the town at a point
+// does not change — so the answer is worth keeping past the window that asked
+// for it. Held only in memory, every launch re-asked a
 // public geocoder about every place on the screen, serialised behind its
 // throttle, and the screen read coordinates for the ten-odd seconds that took.
 //
@@ -36,11 +37,14 @@ const PLACE_LABEL_FAILURES = new Map<string, number>();
 // would bake one blocked launch in permanently — the same bug as caching a
 // failure, made to survive a restart.
 const PLACE_LABEL_STORAGE_KEY = "heraclesrecords.activity-globe.place-labels.v1";
+// Version 2: keyed by a place's centre. Version 1 was keyed by a 0.5° grid
+// cell, which names nothing now, and is not read.
+const PLACE_LABEL_VERSION = 2;
 const MAX_PERSISTED_PLACE_LABELS = 200;
 const PLACE_LABEL_NAMED = new Set<string>();
 
 interface PersistedPlaceLabels {
-  version: 1;
+  version: typeof PLACE_LABEL_VERSION;
   entries: Array<[string, PlaceLabel]>;
 }
 
@@ -127,7 +131,7 @@ export function hydratePlaceLabels(): void {
       return;
     }
     const parsed = JSON.parse(stored) as Partial<PersistedPlaceLabels>;
-    if (parsed.version !== 1 || !Array.isArray(parsed.entries)) {
+    if (parsed.version !== PLACE_LABEL_VERSION || !Array.isArray(parsed.entries)) {
       return;
     }
     for (const entry of parsed.entries.slice(-MAX_PERSISTED_PLACE_LABELS)) {
@@ -156,7 +160,7 @@ function persistPlaceLabels(): void {
       }
     }
     const payload: PersistedPlaceLabels = {
-      version: 1,
+      version: PLACE_LABEL_VERSION,
       entries: entries.slice(-MAX_PERSISTED_PLACE_LABELS),
     };
     window.localStorage.setItem(

@@ -1,3 +1,4 @@
+import { activityStartPoint } from "../../electron/activityMetrics";
 import type {
   TrainingHubActivity,
   TrainingHubActivityDetail,
@@ -19,6 +20,7 @@ export interface ActivityRoutePolyline {
   points: GlobePoint[];
 }
 
+/** A place as the globe draws it: a pin, sized by its activities. */
 export interface GeoHeatBucket {
   key: string;
   lat: number;
@@ -35,8 +37,10 @@ const MAX_CACHED_ROUTE_POINTS = 280;
 /** Keep only recent, downsampled coordinates in the renderer's local storage. */
 const MAX_PERSISTED_GEO_ACTIVITIES = 80;
 const GEO_CACHE_STORAGE_KEY = "heraclesrecords.activity-globe.geo-cache.v1";
-/** ~0.5° geographic grid for visit density (~55 km). */
-const GEO_HEAT_STEP = 0.5;
+// Version 2: a visit is where the activity started. Version 1 held the middle
+// of its route, which put a ride from home to the hills in neither, and is not
+// read; the next write replaces it.
+const GEO_CACHE_VERSION = 2;
 
 interface PersistedGeoRecord {
   activityId: string;
@@ -45,7 +49,7 @@ interface PersistedGeoRecord {
 }
 
 interface PersistedGeoCache {
-  version: 1;
+  version: typeof GEO_CACHE_VERSION;
   records: PersistedGeoRecord[];
 }
 
@@ -82,7 +86,7 @@ function hydrateGeoCache(): void {
       return;
     }
     const parsed = JSON.parse(stored) as Partial<PersistedGeoCache>;
-    if (parsed.version !== 1 || !Array.isArray(parsed.records)) {
+    if (parsed.version !== GEO_CACHE_VERSION || !Array.isArray(parsed.records)) {
       return;
     }
     for (const record of parsed.records.slice(-MAX_PERSISTED_GEO_ACTIVITIES)) {
@@ -123,7 +127,7 @@ function persistGeoCache(): void {
         ? { route: ROUTE_CACHE.get(activityId) ?? null }
         : {}),
     }));
-    const payload: PersistedGeoCache = { version: 1, records };
+    const payload: PersistedGeoCache = { version: GEO_CACHE_VERSION, records };
     window.localStorage.setItem(GEO_CACHE_STORAGE_KEY, JSON.stringify(payload));
   } catch {
     // Quota and privacy settings can disable storage; memory cache still works.
@@ -153,12 +157,6 @@ function rememberCacheEntry<T>(
 ): void {
   cache.delete(activityId);
   cache.set(activityId, value);
-}
-
-export function geoHeatBucketKey(point: GlobePoint): string {
-  const latKey = Math.round(point.lat / GEO_HEAT_STEP);
-  const lonKey = Math.round(point.lon / GEO_HEAT_STEP);
-  return `${latKey}:${lonKey}`;
 }
 
 export function isGlobePoint(
@@ -198,21 +196,18 @@ export function extractTrackPoints(
 export function rememberActivityGeo(
   activityId: string,
   detail: TrainingHubActivityDetail | null | undefined,
-): { centroid: GlobePoint | null; route: GlobePoint[] | null } {
+): { start: GlobePoint | null; route: GlobePoint[] | null } {
   hydrateGeoCache();
   const track = extractTrackPoints(detail);
-  const centroid =
-    track.length >= 2
-      ? {
-          lat: track.reduce((sum, point) => sum + point.lat, 0) / track.length,
-          lon: track.reduce((sum, point) => sum + point.lon, 0) / track.length,
-        }
-      : null;
+  // Where it started, read exactly as the Hall of Records reads it off the
+  // stored summary — the same point, rounded the same way — so the two count
+  // the same places.
+  const start = activityStartPoint(detail?.track?.points) ?? null;
   const route = track.length >= 2 ? sampleGlobePoints(track) : null;
-  rememberCacheEntry(VISIT_CACHE, activityId, centroid);
+  rememberCacheEntry(VISIT_CACHE, activityId, start);
   rememberCacheEntry(ROUTE_CACHE, activityId, route);
   scheduleGeoCacheWrite();
-  return { centroid, route };
+  return { start, route };
 }
 
 export function getCachedVisitPoints(
@@ -250,34 +245,6 @@ export function getCachedRoutePolylines(
   return routes;
 }
 
-export function bucketVisitsGeographically(
-  visits: GlobePoint[],
-): GeoHeatBucket[] {
-  if (visits.length === 0) {
-    return [];
-  }
-
-  const buckets = new Map<string, GeoHeatBucket>();
-  for (const visit of visits) {
-    const key = geoHeatBucketKey(visit);
-    const existing = buckets.get(key);
-    if (existing) {
-      existing.count += 1;
-      existing.lat = (existing.lat * (existing.count - 1) + visit.lat) / existing.count;
-      existing.lon = (existing.lon * (existing.count - 1) + visit.lon) / existing.count;
-    } else {
-      buckets.set(key, {
-        key,
-        lat: visit.lat,
-        lon: visit.lon,
-        count: 1,
-      });
-    }
-  }
-
-  return Array.from(buckets.values());
-}
-
 type DetailFetcher = (
   activityId: string,
   sportType: number,
@@ -294,7 +261,7 @@ function emitCachedRoute(
   }
 }
 
-export async function loadActivityVisitCentroids(
+export async function loadActivityVisits(
   activities: TrainingHubActivity[],
   fetchDetail: DetailFetcher,
   options?: {
@@ -350,14 +317,14 @@ export async function loadActivityVisitCentroids(
           return;
         }
 
-        const { centroid, route } = rememberActivityGeo(
+        const { start, route } = rememberActivityGeo(
           activity.activityId,
           detail,
         );
-        if (centroid) {
+        if (start) {
           const visit = {
             activityId: activity.activityId,
-            ...centroid,
+            ...start,
           };
           visits.push(visit);
           options?.onVisit?.(visit);

@@ -6,17 +6,21 @@ import {
   sportColorCategory,
   type SportColorCategory,
 } from "../training/sportColors";
+import type { ActivityVisitPoint, GlobePoint } from "./activityVisitHeatmap";
+import type { AdminRegion } from "./adminRegions";
 import {
-  geoHeatBucketKey,
-  type ActivityVisitPoint,
-  type GeoHeatBucket,
-  type GlobePoint,
-} from "./activityVisitHeatmap";
-import type { PlaceLabel } from "./placeLabels";
+  clusterPlaces,
+  haversineKm,
+  placeLabelKey,
+  type PlaceCluster,
+} from "./placeClusters";
+import { coordinateLabel, type PlaceLabel } from "./placeLabels";
+
+export { haversineKm };
 
 export interface PlaceSummary {
   key: string;
-  bucket: GeoHeatBucket;
+  cluster: PlaceCluster;
   /** Newest first. */
   activities: TrainingHubActivity[];
   distanceMeters: number;
@@ -38,31 +42,27 @@ export function activityTimestampMs(value?: number): number {
 }
 
 /**
- * One summary per bucket that holds an activity still in the list, newest
- * visit first. A visit whose activity has left the list (another period) does
- * not count, so a bucket can come out empty and be dropped.
+ * One summary per place, newest visit first. Places are found among the
+ * activities still in the list (`placeClusters.ts`), so a period draws its own
+ * places: a visit whose activity another period holds takes no part.
  */
 export function buildPlaceSummaries(
   activities: readonly TrainingHubActivity[],
   visits: readonly ActivityVisitPoint[],
-  buckets: readonly GeoHeatBucket[],
+  regionOf?: (point: GlobePoint) => AdminRegion | undefined,
 ): PlaceSummary[] {
   const activitiesById = new Map(
     activities.map((activity) => [activity.activityId, activity]),
   );
-  const idsByBucket = new Map<string, Set<string>>();
-  for (const visit of visits) {
-    const key = geoHeatBucketKey(visit);
-    const ids = idsByBucket.get(key);
-    if (ids) {
-      ids.add(visit.activityId);
-    } else {
-      idsByBucket.set(key, new Set([visit.activityId]));
-    }
-  }
-  return buckets
-    .map((bucket) => {
-      const placeActivities = [...(idsByBucket.get(bucket.key) ?? [])]
+  const points = visits.flatMap((visit) => {
+    const activity = activitiesById.get(visit.activityId);
+    return activity
+      ? [{ ...visit, startTime: activityTimestampMs(activity.startTime) }]
+      : [];
+  });
+  return clusterPlaces(points, regionOf)
+    .map((cluster) => {
+      const placeActivities = cluster.activityIds
         .map((activityId) => activitiesById.get(activityId))
         .filter(
           (activity): activity is TrainingHubActivity => Boolean(activity),
@@ -81,8 +81,8 @@ export function buildPlaceSummaries(
         elevationMeters += activity.elevationGain ?? 0;
       }
       return {
-        key: bucket.key,
-        bucket,
+        key: cluster.key,
+        cluster,
         activities: placeActivities,
         distanceMeters,
         durationSeconds,
@@ -115,18 +115,7 @@ export function homePlace(
   return sortPlaces(places, "visits")[0];
 }
 
-const EARTH_RADIUS_KM = 6371;
 const FARTHEST_MIN_KM = 100;
-
-export function haversineKm(a: GlobePoint, b: GlobePoint): number {
-  const toRad = Math.PI / 180;
-  const dLat = (b.lat - a.lat) * toRad;
-  const dLon = (b.lon - a.lon) * toRad;
-  const h =
-    Math.sin(dLat / 2) ** 2 +
-    Math.cos(a.lat * toRad) * Math.cos(b.lat * toRad) * Math.sin(dLon / 2) ** 2;
-  return 2 * EARTH_RADIUS_KM * Math.asin(Math.min(1, Math.sqrt(h)));
-}
 
 /**
  * The place furthest from home, once it is 100 km away: nearer than that it is
@@ -142,7 +131,7 @@ export function farthestFromHome(
   }
   let best: { place: PlaceSummary; km: number } | undefined;
   for (const place of places) {
-    const km = haversineKm(home.bucket, place.bucket);
+    const km = haversineKm(home.cluster, place.cluster);
     if (!best || km > best.km) {
       best = { place, km };
     }
@@ -150,46 +139,53 @@ export function farthestFromHome(
   return best && best.km >= FARTHEST_MIN_KM ? { home, ...best } : undefined;
 }
 
-/** "Việt Nam" and "Vietnam" meet: the two geocoders name a country in two languages. */
-function foldCountryName(name: string): string {
+/** Accents, case and spacing folded, so "Thành phố Hà Nội" holds "Hà Nội". */
+function foldName(name: string): string {
   return name
     .normalize("NFD")
     .replace(/\p{Diacritic}/gu, "")
+    .replace(/đ/giu, "d")
     .replace(/[^\p{L}\p{N}]+/gu, "")
     .toLowerCase();
 }
 
 /**
- * How many countries the places are in — or nothing, while any place is still
- * unnamed: a count of the named ones would read as the answer and be short.
+ * What a place is called. The town is the geocoder's, once it has answered;
+ * until then, and when it cannot be reached, the region it lies in, which is
+ * known on the machine. The second line says where the town is — "Lâm Đồng,
+ * Vietnam" under Đà Lạt — or only the country, when the town is the region
+ * (Hà Nội, Bangkok). A place in no region at all (out at sea) is its coordinates.
  */
-export function countriesVisited(
-  places: readonly PlaceSummary[],
+export function placeLabelFor(
+  cluster: PlaceCluster,
   labels: Readonly<Record<string, PlaceLabel>>,
-): number | undefined {
+): PlaceLabel {
+  const named = labels[placeLabelKey(cluster)];
+  const region = cluster.region;
+  if (!region) {
+    return named ?? coordinateLabel(cluster);
+  }
+  const city = named?.city ?? region.name;
+  // Either way round: "Thành phố Hà Nội" is Hà Nội, and Bangkok is Natural
+  // Earth's "Bangkok Metropolis".
+  const town = foldName(city);
+  const regionName = foldName(region.name);
+  const country =
+    town.includes(regionName) || regionName.includes(town)
+      ? region.countryName
+      : `${region.name}, ${region.countryName}`;
+  return { city, country, full: `${city}, ${country}`, countryCode: region.country };
+}
+
+/** How many countries the places are in, by the region each lies in. */
+export function countriesVisited(places: readonly PlaceSummary[]): number {
   const countries = new Set<string>();
   for (const place of places) {
-    const label = labels[place.key];
-    if (!label?.country) {
-      return undefined;
-    }
-    countries.add(
-      label.countryCode?.toUpperCase() ?? foldCountryName(label.country),
-    );
-  }
-  // A name cached before country codes existed counts once with its coded twin.
-  const codes = new Map<string, string>();
-  for (const place of places) {
-    const label = labels[place.key];
-    if (label?.countryCode) {
-      codes.set(foldCountryName(label.country), label.countryCode.toUpperCase());
+    if (place.cluster.region) {
+      countries.add(place.cluster.region.country);
     }
   }
-  const merged = new Set<string>();
-  for (const country of countries) {
-    merged.add(codes.get(country) ?? country);
-  }
-  return merged.size;
+  return countries.size;
 }
 
 // Written out rather than asked of Intl: en-GB spells September "Sept", and
@@ -248,9 +244,9 @@ export function placesSummaryLine({
     (sum, place) => sum + place.activities.length,
     0,
   );
-  const countries = countriesVisited(places, labels);
+  const countries = countriesVisited(places);
   let line = `${plural(activityCount, "activity", "activities")} in ${plural(places.length, "place", "places")}`;
-  if (countries !== undefined && countries > 1) {
+  if (countries > 1) {
     line += ` and ${plural(countries, "country", "countries")}`;
   }
   if (allTime) {
@@ -265,10 +261,10 @@ export function placesSummaryLine({
   }
   const farthest = farthestFromHome(places);
   if (farthest) {
-    const where = labels[farthest.place.key]?.city;
-    const from = labels[farthest.home.key]?.city ?? "home";
+    const where = placeLabelFor(farthest.place.cluster, labels).city;
+    const from = placeLabelFor(farthest.home.cluster, labels).city;
     const km = Math.round(farthest.km).toLocaleString("en-US");
-    line += ` · Farthest: ${where ? `${where}, ` : ""}${km} km from ${from}`;
+    line += ` · Farthest: ${where}, ${km} km from ${from}`;
   }
   return line;
 }

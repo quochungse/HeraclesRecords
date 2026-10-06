@@ -412,8 +412,8 @@ export const LOCAL_STORAGE_POLICY: Readonly<Record<string, SyncTier>> = {
   // an unsent question on this machine, not the athlete's record.
   "heraclesrecords.coach.composerDrafts.v1": "device",
 
-  // Visit centroids and route polylines for the activity globe, read back out
-  // of the activity details; refetched on demand.
+  // Where each activity started and its route, for the activity globe, read
+  // back out of the activity details; refetched on demand.
   "heraclesrecords.activity-globe.geo-cache.v1": "derived",
   // Place names for the globe's visit clusters, as a public geocoder answered
   // them. Refetched on demand, and about the map rather than the athlete.

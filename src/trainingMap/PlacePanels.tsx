@@ -19,11 +19,12 @@ import {
   metersToDisplayDistance,
   metersToElevation,
 } from "../units/units";
-import { coordinateLabel, type PlaceLabel } from "./placeLabels";
+import type { PlaceLabel } from "./placeLabels";
 import {
   activityTimestampMs,
   formatDayNear,
   formatMonthYear,
+  placeLabelFor,
   sportMix,
   visitsByMonth,
   type PlaceSort,
@@ -34,13 +35,6 @@ import {
 function intensityTier(count: number, maxCount: number): "low" | "medium" | "high" {
   const intensity = Math.sqrt(count / Math.max(1, maxCount));
   return intensity >= 0.7 ? "high" : intensity >= 0.35 ? "medium" : "low";
-}
-
-export function placeLabelOf(
-  place: PlaceSummary,
-  labels: Readonly<Record<string, PlaceLabel>>,
-): PlaceLabel {
-  return labels[place.key] ?? coordinateLabel(place.bucket);
 }
 
 interface PlaceListProps {
@@ -100,7 +94,7 @@ export function PlaceList({
       </div>
       <ol className="training-map-places" onScroll={handleScroll}>
         {places.map((place) => {
-          const label = placeLabelOf(place, labels);
+          const label = placeLabelFor(place.cluster, labels);
           const count = place.activities.length;
           return (
             <li key={place.key}>
