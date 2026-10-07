@@ -1860,7 +1860,10 @@ lives at module level for the same visit-to-visit reason — see `useCalendarDat
   by arithmetic). The week's four totals left the panel for Weekly Activity: `WeekTotals`, a
   list in a column left of the chart, a row above it when the panel is under 600px
   (`@container weekly-activity`); the days they cover are the panel's title, beside "Weekly
-  Activity". `npm run test:body-figure`.
+  Activity". **That chart is drawn whenever COROS has answered**, an empty week included — a
+  Monday morning is seven empty columns on a 0–6 axis, and the totals beside them read 0 (steps
+  keep their dash: the daily-health feed runs a day behind) — and its "could not be read" line
+  is for no answer at all. `npm run test:body-figure`, `test:weekly-activity`.
 - **Sleep** (`sleepDataService`, `sleepHistoryService`, `sleepSeriesService`, `src/sleep/`) —
   nights from the COROS MCP server, cached in `sleep_nights` because COROS keeps only ~9
   weeks. **`totalMinutes` is the main sleep and nothing else** — the stage percentages, the

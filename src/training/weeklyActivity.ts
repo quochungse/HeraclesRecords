@@ -241,9 +241,16 @@ function formatWeeklyTotal(
   }
 }
 
+/**
+ * An empty week still draws its axis — a Monday morning is seven empty
+ * columns, not a missing chart — at one whole unit a division, where 4 split
+ * six ways repeated itself as rounded load ticks (0, 1, 1, 2, 3, 3, 4).
+ */
+const EMPTY_AXIS_MAX = 6;
+
 function roundAxisMax(max: number): number {
   if (max <= 0) {
-    return 4;
+    return EMPTY_AXIS_MAX;
   }
 
   const padded = max * 1.25;
@@ -441,7 +448,7 @@ export function buildWeeklyActivitySeries(
   return {
     days,
     weeklyTotal: hasData ? formatWeeklyTotal(totalRaw, metric, unitSystem) : "—",
-    yMax: yMax > 0 ? yMax : 4,
+    yMax: yMax > 0 ? yMax : EMPTY_AXIS_MAX,
     hasData,
     metricLabel: getWeeklyActivityMetricLabel(metric, unitSystem),
     yAxisUnit: yAxisUnitForMetric(metric, maxChartValue, unitSystem)

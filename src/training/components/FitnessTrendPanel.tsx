@@ -129,13 +129,26 @@ export function FitnessTrendPanel({
       ),
     [activities, dayList, selectedMetric, unitSystem]
   );
+  // COROS has answered. An empty week is then a real one: zeros on the chart
+  // and beside it, where "no data" read as the app having failed.
+  const answered = !loading && snapshot !== null;
   // Read from the same enriched day list the columns are drawn from, so a total
   // and the columns beside it are one set of days — the chart shows Monday to
-  // Sunday, the totals stop at today.
-  const weekTotals = useMemo(
-    () => buildWeekToDateTotals(dayList, snapshot?.dailyHealth?.records ?? []),
-    [dayList, snapshot]
-  );
+  // Sunday, the totals stop at today. An answer with no days in it at all (no
+  // training in the window COROS sends) is a week of zeros too. Steps keep
+  // their dash: the daily-health feed runs a day behind, so on a Monday it has
+  // nothing for this week yet, which is not the same as no steps.
+  const weekTotals = useMemo(() => {
+    const totals = buildWeekToDateTotals(dayList, snapshot?.dailyHealth?.records ?? []);
+    return answered
+      ? {
+          ...totals,
+          trainingLoad: totals.trainingLoad ?? 0,
+          distance: totals.distance ?? 0,
+          duration: totals.duration ?? 0
+        }
+      : totals;
+  }, [answered, dayList, snapshot]);
   // Columns are coloured by sport, so the week needs a key naming them.
   const sportLegend = useMemo(
     () => weeklyActivitySportLegend(series.days),
@@ -152,6 +165,9 @@ export function FitnessTrendPanel({
     series.yAxisUnit
   );
   const hasData = series.hasData;
+  // Drawn once COROS has answered, an empty week included: a Monday morning
+  // with nothing recorded yet is seven empty columns. The line is for no answer.
+  const showChart = hasData || answered;
 
   useEffect(() => {
     setBarsVisible(false);
@@ -203,7 +219,7 @@ export function FitnessTrendPanel({
 
       <div className="training-fitness-body">
         <WeekTotals totals={weekTotals} mcpState={snapshot?.summary.mcpState} />
-        {hasData ? (
+        {showChart ? (
           <div
             className="training-fitness-chart"
             role="img"
@@ -374,7 +390,7 @@ export function FitnessTrendPanel({
           <p className="training-empty-state" aria-busy={loading || undefined}>
             {loading
               ? "Reading your weeks from COROS…"
-              : "No weekly activity data yet."}
+              : "Your weeks could not be read from COROS."}
           </p>
         )}
       </div>
