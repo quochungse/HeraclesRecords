@@ -16,19 +16,14 @@ import {
   RefreshCw
 } from "lucide-react";
 import { FitnessTrendPanel } from "./components/FitnessTrendPanel";
-import { RecoveryRing } from "./components/RecoveryRing";
+import { RecoveryPanel } from "./components/RecoveryPanel";
 import { SleepSummaryPanel } from "./components/SleepSummaryPanel";
 import { TrainingHeatmapPanel } from "./components/TrainingHeatmapPanel";
 import { TrainingTrendCharts } from "./components/TrainingTrendChart";
 import { TrainingZoneDistributionCharts } from "./components/TrainingZoneDistributionCharts";
 import { UpcomingWorkoutsPanel } from "./components/UpcomingWorkoutsPanel";
-import { mergeTrainingDayLists } from "./parsers";
 import type { TrainingOverviewProps } from "./types";
 import { useHeartRateZoneModel } from "./useHeartRateZoneModel";
-import {
-  buildWeekToDateTotals,
-  enrichDayListWithActivityTotals
-} from "./weeklyActivity";
 import loginPageBackground from "../assets/training-hub/login-bg.webp";
 
 // The body map drags in three.js and a GLTF mannequin. Overview is the default
@@ -77,7 +72,12 @@ export function TrainingOverview({
   const activitiesPending = activitiesStatus === "pending" && activities.length === 0;
   // The zone distribution is labelled with whichever heart-rate model the
   // Personal screen has selected, not LTHR by default.
-  const { model: hrZoneModel } = useHeartRateZoneModel({ api, corosConnected: connected });
+  // The same answer carries the profile the recovery figure is shaped from.
+  const {
+    model: hrZoneModel,
+    profile: corosProfile,
+    settled: corosProfileSettled
+  } = useHeartRateZoneModel({ api, corosConnected: connected });
   // Signed out because a start-up re-login is still in the air, which is a very
   // different thing to say than "sign in": nobody has to do anything, and it
   // resolves on its own in a second or two.
@@ -107,23 +107,6 @@ export function TrainingOverview({
         mcpState: undefined
       },
     [snapshot]
-  );
-  // Built from the same enriched day list the Weekly Activity chart draws, so a
-  // tile and the columns beside it are reading one set of days — the chart shows
-  // Monday to Sunday, the tiles stop at today.
-  const weekTotals = useMemo(
-    () =>
-      buildWeekToDateTotals(
-        enrichDayListWithActivityTotals(
-          mergeTrainingDayLists(
-            snapshot?.dailyMetrics ?? null,
-            snapshot?.analytics ?? null
-          ),
-          activities
-        ),
-        snapshot?.dailyHealth?.records ?? []
-      ),
-    [snapshot, activities]
   );
 
   return (
@@ -439,10 +422,11 @@ export function TrainingOverview({
             </div>
             <div className="training-intelligence-grid">
               <div className="training-intelligence-column">
-                <RecoveryRing
+                <RecoveryPanel
                   summary={summary}
-                  weekTotals={weekTotals}
                   loading={snapshotPending}
+                  profile={corosProfile}
+                  profileSettled={corosProfileSettled}
                 />
               </div>
               <div className="training-intelligence-column">

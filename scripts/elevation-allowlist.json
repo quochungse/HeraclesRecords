@@ -1,8 +1,6 @@
 {
   "about": "Both rules of the elevation ladder are held across the app as of 2026-09-17 (phase 7c of docs/ui-system-refinement.md), so the two lists below are empty and a new violation fails the test outright. `exempt` is the other thing: a rule that breaks a rule and is right to, with the reason written out. An exempt entry is counted nowhere and must still apply — one matching no violating rule fails, so a converted rule cannot leave its reason behind. If a list has to grow again, say why in the change that grows it.",
-  "exempt": {
-    "src/styles.css|.training-recovery-ring::before": "The recovery ring itself. The ring is the datum and the glow is its colour; neither is elevation."
-  },
+  "exempt": {},
   "borderAndShadow": {},
   "shadowOutsideTokens": {}
 }

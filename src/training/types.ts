@@ -34,7 +34,7 @@ export interface TrainingTrendPoint {
 
 /**
  * What Overview's recovery panel and the greeting read. Only those two consume
- * it, so a figure with no reader on either is not carried: the weekly tiles are
+ * it, so a figure with no reader on either is not carried: the week totals are
  * built from {@link WeekToDateTotals} instead, and the profile reads the COROS
  * dashboard directly.
  */
