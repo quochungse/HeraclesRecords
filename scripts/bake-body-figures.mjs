@@ -37,6 +37,17 @@ const RACE = { african: 1 / 3, asian: 1 / 3, caucasian: 1 / 3 };
 
 const LR = (name, k) => [[`l-${name}`, k], [`r-${name}`, k]];
 
+/** Halfway from one preset to another: the macros, the gain and every extra. */
+function between(a, b) {
+  const extras = new Map();
+  for (const [name, k] of [...a.extras, ...b.extras]) extras.set(name, (extras.get(name) ?? 0) + k / 2);
+  const mid = (key) => (a[key] + b[key]) / 2;
+  return {
+    gender: a.gender, muscle: mid("muscle"), weight: mid("weight"), proportions: mid("proportions"), gain: mid("gain"),
+    extras: [...extras]
+  };
+}
+
 // `gender` is MakeHuman's macro: 0 female, 1 male. MakeHuman's weight and
 // muscle range is narrow (its heaviest waist is ~5 cm wider than its average),
 // so `gain` scales the muscle/weight targets up to read at the size the figure
@@ -67,17 +78,17 @@ const PRESETS = {
       extras: [
         ["measure-waist-circ-decr", 0.3], ["measure-bust-circ-incr", 0.1], ["measure-shoulder-dist-decr", 0.2],
         ["measure-neck-circ-decr", 0.35], ["measure-upperarm-circ-decr", 0.4], ["measure-thigh-circ-incr", 0.06],
-        ["measure-calf-circ-decr", 0.08], ["measure-hips-circ-decr", 0.05], ["buttocks-volume-decr", 0.12],
+        ["measure-calf-circ-decr", 0.08], ["measure-hips-circ-incr", 0.12], ["buttocks-volume-incr", 0.25],
         ...LR("upperleg-fat-decr", 0.1), ...LR("upperarm-fat-decr", 0.4)
       ]
     },
     medium: {
-      gender: 0, muscle: 0.4, weight: 0.45, proportions: 1, gain: 1.4,
+      gender: 0, muscle: 0.4, weight: 0.36, proportions: 1, gain: 1.4,
       extras: [
-        ["measure-waist-circ-incr", 0.1], ["measure-hips-circ-incr", 0.22], ["measure-bust-circ-incr", 0.3],
-        ["measure-shoulder-dist-decr", 0.25], ["measure-neck-circ-decr", 0.25], ["stomach-tone-decr", 0.4],
+        ["measure-waist-circ-incr", 0.04], ["measure-hips-circ-incr", 0.18], ["measure-bust-circ-incr", 0.3],
+        ["measure-shoulder-dist-decr", 0.25], ["measure-neck-circ-decr", 0.25], ["stomach-tone-decr", 0.3],
         ["buttocks-volume-incr", 0.08], ["measure-thigh-circ-incr", 0.05],
-        ...LR("upperarm-fat-incr", 0.1), ...LR("upperleg-fat-incr", 0.1)
+        ...LR("upperarm-fat-incr", 0.04), ...LR("upperleg-fat-incr", 0.05)
       ]
     },
     heavy: {
@@ -90,6 +101,13 @@ const PRESETS = {
     }
   }
 };
+
+// Sturdy is the upper half of what was one Medium: halfway to Heavy.
+for (const presets of Object.values(PRESETS)) {
+  const { lean, medium, heavy } = presets;
+  for (const key of Object.keys(presets)) delete presets[key];
+  Object.assign(presets, { lean, medium, sturdy: between(medium, heavy), heavy });
+}
 
 // ---------- MakeHuman files ----------
 

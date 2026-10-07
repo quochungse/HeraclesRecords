@@ -6177,10 +6177,10 @@ td span {
   overflow: visible;
 }
 
-/* The figure's stage: dark here, where the figure is light added onto it
-   (`plus-lighter`); paper's is grey and drawn in ink (below). The figure's
-   colours and strengths (BodyFigure.tsx) live here; `--figure-tone` is the
-   recovery's colour, set per tone. */
+/* The figure's stage is dark in both themes: the figure is light added onto
+   it (`plus-lighter`), and paper's own grey stage, drawn in ink, read as
+   washed out. The figure's colours and strengths (BodyFigure.tsx) live here;
+   `--figure-tone` is the recovery's colour, set per tone. */
 .recovery-figure {
   --figure-rim: 0.1;
   --figure-skin-alpha: 1;
@@ -16076,65 +16076,10 @@ td span {
 }
 
 /* --- Recovery panel ------------------------------------------------------- */
-/* Paper draws the figure in ink: a light grey stage, lines in deeper tones
-   laid on it (light added onto a light ground could only be lighter than
-   it), a faint tint for the body that lets the far side's lines through, and
-   a soft halo in the tone in place of the glow. */
+/* The figure is the dark theme's on paper too; its stage is a step lighter,
+   so the black does not sit as a hole in a white page. */
 :root[data-theme="paper"] .recovery-figure {
-  --figure-rim: 0.55;
-  --figure-skin: #ffffff;
-  --figure-skin-alpha: 0.18;
-  --figure-line: 0.85;
-  --figure-back-line: 0.07;
-  --figure-dim: #8d98a6;
-  --figure-idle: #2f7cb8;
-  --figure-low: #d0453a;
-  --figure-mid: #d37422;
-  --figure-high: #8a9a0c;
-  --figure-full: #129c68;
-  background: #b3bac3;
-}
-
-@media (min-resolution: 1.5dppx) {
-  :root[data-theme="paper"] .recovery-figure {
-    --figure-line: 0.8;
-    --figure-back-line: 0.08;
-  }
-}
-
-:root[data-theme="paper"] .body-figure {
-  filter: drop-shadow(0 0 3px color-mix(in srgb, var(--figure-tone) 35%, transparent));
-  mix-blend-mode: normal;
-}
-
-/* No bloom on paper; the rim is the tone itself, laid on as colour. */
-:root[data-theme="paper"] .body-figure-lines {
-  filter: none;
-}
-
-:root[data-theme="paper"] .body-figure-halo {
-  display: none;
-}
-
-:root[data-theme="paper"] .body-figure-rim {
-  fill: var(--figure-tone);
-}
-
-
-:root[data-theme="paper"] .training-recovery-panel.tone-full {
-  border-color: rgba(18, 156, 104, 0.28);
-}
-
-:root[data-theme="paper"] .training-recovery-panel.tone-high {
-  border-color: rgba(138, 154, 12, 0.3);
-}
-
-:root[data-theme="paper"] .training-recovery-panel.tone-mid {
-  border-color: rgba(211, 116, 34, 0.28);
-}
-
-:root[data-theme="paper"] .training-recovery-panel.tone-low {
-  border-color: rgba(208, 69, 58, 0.26);
+  background: #222222;
 }
 
 /* --- Training Hub: export dropdown ----------------------------------------- */

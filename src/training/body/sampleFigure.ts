@@ -6,7 +6,7 @@
 // A preset stands in for the COROS profile and the recovery % the panel reads;
 // the panel reckons the build from it as it does from COROS (`readPhysique`),
 // so what is drawn is what the rules make of those numbers. Between them the
-// presets draw all six bodies, each of the four recovery colours (100% green
+// presets draw all eight bodies, each of the four recovery colours (100% green
 // apart from 70–99 yellow), and a profile with no height or weight.
 
 import { useSyncExternalStore } from "react";
@@ -14,9 +14,11 @@ import { useSyncExternalStore } from "react";
 export type FigureSamplePreset =
   | "male-lean"
   | "male-medium"
+  | "male-sturdy"
   | "male-heavy"
   | "female-lean"
   | "female-medium"
+  | "female-sturdy"
   | "female-heavy"
   | "no-body";
 
@@ -46,6 +48,12 @@ export const FIGURE_SAMPLE_PRESETS: ReadonlyArray<{
     sample: { profile: { sex: 0, statureCm: 174, weightKg: 68 }, recoveryPct: 58 }
   },
   {
+    value: "male-sturdy",
+    label: "Physique · man, sturdy, 72%",
+    title: "Your physique: 175 cm, 76 kg (adjusted BMI 24.4), recovery 72% — Ready, in yellow: not full",
+    sample: { profile: { sex: 0, statureCm: 175, weightKg: 76 }, recoveryPct: 72 }
+  },
+  {
     value: "male-heavy",
     label: "Physique · man, heavy, 34%",
     title: "Your physique: 172 cm, 82 kg (adjusted BMI 27.5), recovery 34% — Recover",
@@ -62,6 +70,12 @@ export const FIGURE_SAMPLE_PRESETS: ReadonlyArray<{
     label: "Physique · woman, medium, 88%",
     title: "Your physique: 160 cm, 56 kg (adjusted BMI 22.5), recovery 88% — Ready, in yellow: not full",
     sample: { profile: { sex: 1, statureCm: 160, weightKg: 56 }, recoveryPct: 88 }
+  },
+  {
+    value: "female-sturdy",
+    label: "Physique · woman, sturdy, 100%",
+    title: "Your physique: 160 cm, 60 kg (adjusted BMI 24.1), recovery 100% — Ready, the full-recovery green",
+    sample: { profile: { sex: 1, statureCm: 160, weightKg: 60 }, recoveryPct: 100 }
   },
   {
     value: "female-heavy",

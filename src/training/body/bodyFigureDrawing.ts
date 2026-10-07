@@ -17,6 +17,10 @@ const BRIGHTNESS_STEPS = 6;
 const RIM_STEPS = 8;
 /** A rim this faint is not drawn at all. */
 const RIM_FLOOR = 0.04;
+/** The depth buffer's cell, in the drawing's units (about 2 mm of body). */
+const DEPTH_CELL = 2;
+/** How far behind the nearest surface a line may sit and still show, in the mesh's units (dm). */
+const DEPTH_SLACK = 0.04;
 
 export interface FigureLayer {
   d: string;
@@ -75,6 +79,7 @@ export function drawFigure({ positions, triangles, edges }: FigureGeometry): Fig
   // Projected, y up, in camera units; scaled to the drawing below.
   const px = new Float64Array(n);
   const py = new Float64Array(n);
+  const pz = new Float64Array(n);
   for (let i = 0; i < n; i++) {
     const x = positions[i * 3] - midX;
     const y = positions[i * 3 + 1] - minY;
@@ -82,6 +87,7 @@ export function drawFigure({ positions, triangles, edges }: FigureGeometry): Fig
     const depth = cameraZ - z;
     px[i] = x / depth;
     py[i] = (y - cameraY) / depth;
+    pz[i] = depth;
   }
   let left = Infinity, right = -Infinity, top = -Infinity, bottom = Infinity;
   for (let i = 0; i < n; i++) {
@@ -124,6 +130,42 @@ export function drawFigure({ positions, triangles, edges }: FigureGeometry): Fig
     turn[i] = Math.pow(1 - dot, 2.4);
   }
 
+  // Facing the camera is not being seen: inside the mouth, the eye sockets
+  // and the ears, triangles face it behind the lips and lids. A depth buffer
+  // of the facing triangles, the way WebGL tests a line, sorts those out.
+  const cols = Math.ceil(((right - left) * scale) / DEPTH_CELL) + 1;
+  const rows = Math.ceil(DRAWING_HEIGHT / DEPTH_CELL) + 1;
+  const nearest = new Float64Array(cols * rows).fill(Infinity);
+  const cx = (i: number) => ((px[i] - left) * scale) / DEPTH_CELL;
+  const cy = (i: number) => ((top - py[i]) * scale) / DEPTH_CELL;
+  for (let t = 0; t < triangleCount; t++) {
+    if (!facing[t]) continue;
+    const a = triangles[t * 3], b = triangles[t * 3 + 1], c = triangles[t * 3 + 2];
+    const ax = cx(a), ay = cy(a), bx = cx(b), by = cy(b), qx = cx(c), qy = cy(c);
+    const area = (bx - ax) * (qy - ay) - (by - ay) * (qx - ax);
+    if (area === 0) continue;
+    const x0 = Math.max(0, Math.floor(Math.min(ax, bx, qx))), x1 = Math.min(cols - 1, Math.ceil(Math.max(ax, bx, qx)));
+    const y0 = Math.max(0, Math.floor(Math.min(ay, by, qy))), y1 = Math.min(rows - 1, Math.ceil(Math.max(ay, by, qy)));
+    for (let y = y0; y <= y1; y++) {
+      for (let x = x0; x <= x1; x++) {
+        const wa = ((bx - x) * (qy - y) - (by - y) * (qx - x)) / area;
+        const wb = ((qx - x) * (ay - y) - (qy - y) * (ax - x)) / area;
+        const wc = 1 - wa - wb;
+        if (wa < 0 || wb < 0 || wc < 0) continue;
+        const depth = wa * pz[a] + wb * pz[b] + wc * pz[c];
+        const cell = y * cols + x;
+        if (depth < nearest[cell]) nearest[cell] = depth;
+      }
+    }
+  }
+  /** Whether the point `t` of the way from vertex a to b is in sight. */
+  const seen = (a: number, b: number, t: number) => {
+    const x = Math.round(cx(a) + (cx(b) - cx(a)) * t);
+    const y = Math.round(cy(a) + (cy(b) - cy(a)) * t);
+    if (x < 0 || y < 0 || x >= cols || y >= rows) return true;
+    return pz[a] + (pz[b] - pz[a]) * t <= nearest[y * cols + x] + DEPTH_SLACK;
+  };
+
   const skin: string[] = [];
   const rimPaths: string[][] = Array.from({ length: RIM_STEPS }, () => []);
   const corner = (i: number) => `${sx(i)} ${sy(i)}`;
@@ -133,10 +175,13 @@ export function drawFigure({ positions, triangles, edges }: FigureGeometry): Fig
     const shape = `M${corner(a)}L${corner(b)}L${corner(c)}Z`;
     skin.push(shape);
     const rim = (turn[a] + turn[b] + turn[c]) / 3;
-    if (rim >= RIM_FLOOR) rimPaths[bucket(rim, 0, 1, RIM_STEPS)].push(shape);
+    if (rim >= RIM_FLOOR && seen(a, b, 0.5) && seen(b, c, 0.5) && seen(c, a, 0.5)) rimPaths[bucket(rim, 0, 1, RIM_STEPS)].push(shape);
   }
 
-  // An edge is in front when either triangle beside it faces the camera.
+  // An edge is in front when either triangle beside it faces the camera and
+  // most of it is in sight. One that faces it but is hidden — inside the
+  // mouth, under a lid — is not drawn at all: as a faint far-side line it
+  // still crowded the face.
   const front = new Set<number>();
   for (let t = 0; t < triangleCount; t++) {
     if (!facing[t]) continue;
@@ -152,7 +197,9 @@ export function drawFigure({ positions, triangles, edges }: FigureGeometry): Fig
     const a = edges[e], b = edges[e + 1];
     const key = a < b ? a * 65536 + b : b * 65536 + a;
     const step = bucket((brightness[a] + brightness[b]) / 2, 0.3, 1, BRIGHTNESS_STEPS);
-    (front.has(key) ? frontPaths : backPaths)[step].push(`M${corner(a)}L${corner(b)}`);
+    const line = `M${corner(a)}L${corner(b)}`;
+    if (!front.has(key)) backPaths[step].push(line);
+    else if ([0.2, 0.5, 0.8].filter((t) => seen(a, b, t)).length >= 2) frontPaths[step].push(line);
   }
 
   // The fill line is measured up the body; its height on the drawing is where

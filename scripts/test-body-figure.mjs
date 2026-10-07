@@ -2,19 +2,20 @@
 // from. Rules a typecheck cannot hold:
 //
 // - **The physique is height and weight, and nothing else**, read on
-//   Trefethen's height-adjusted BMI (1.3 kg / m^2.5): under 20 is Lean, 26 and
-//   over Heavy, Medium between, so the same build reads the same at 1.55 m and
+//   Trefethen's height-adjusted BMI (1.3 kg / m^2.5): under 20 is Lean, 20–23
+//   Medium, 23–26 Sturdy, 26 and over Heavy, so the same build reads the same at 1.55 m and
 //   at 1.90 m. A profile without a usable height or weight has no physique —
 //   the panel draws the Medium figure — never a guess.
 // - **COROS's `sex` is 0 male, 1 female**; anything else draws the male figure.
-// - **The baked file is whole**: six bodies, one topology, every index in
+// - **The baked file is whole**: eight bodies, one topology, every index in
 //   range, every body standing on the same ground with its crown at a person's
 //   height — a stale or half-written bake fails here, not as a blank stage.
-// - **The bodies are in order**: Heavy is wider at the waist than Medium, and
-//   Medium than Lean, for both sexes; a woman's figure is not a man's.
-// - **The drawing is whole**: front and far-side lines split the edges between
-//   them, the skin is the triangles facing the camera, and the fill line runs
-//   from the soles to the crown.
+// - **The bodies are in order**: each is wider at the waist than the one
+//   before it, Lean to Heavy, for both sexes; a woman's figure is not a man's.
+// - **The drawing is whole**: front and far-side lines, less what the face
+//   hides from the front (a depth buffer, as WebGL tested a line); the skin
+//   is the triangles facing the camera; the fill line runs from the soles to
+//   the crown.
 // - **The level and the frame agree**: the words stand where the stylesheet
 //   puts the fill line.
 // - **100% is its own colour**: green for full recovery only, 70–99 yellow.
@@ -47,21 +48,25 @@ const at = (cm, weightKg, sex = 0) => physique.readPhysique({ sex, statureCm: cm
 
 assert.equal(at(170, 55).physique, "lean", "170 cm, 55 kg (19.4)");
 assert.equal(at(170, 65).physique, "medium", "170 cm, 65 kg (22.4)");
-assert.equal(at(170, 75).physique, "medium", "170 cm, 75 kg (25.9)");
+assert.equal(at(170, 70).physique, "sturdy", "170 cm, 70 kg (24.2)");
+assert.equal(at(170, 75).physique, "sturdy", "170 cm, 75 kg (25.9)");
 assert.equal(at(170, 80).physique, "heavy", "170 cm, 80 kg (27.6)");
 assert.equal(at(158, 45, 1).physique, "lean");
 assert.equal(at(158, 52, 1).physique, "medium");
+assert.equal(at(158, 58, 1).physique, "sturdy");
 assert.equal(at(158, 63, 1).physique, "heavy");
 
 // The lines themselves: the lower bound of a class belongs to it.
 assert.equal(at(175, kg(19.99, 175)).physique, "lean");
 assert.equal(at(175, kg(20, 175)).physique, "medium");
-assert.equal(at(175, kg(25.99, 175)).physique, "medium");
+assert.equal(at(175, kg(22.99, 175)).physique, "medium");
+assert.equal(at(175, kg(23, 175)).physique, "sturdy");
+assert.equal(at(175, kg(25.99, 175)).physique, "sturdy");
 assert.equal(at(175, kg(26, 175)).physique, "heavy");
 
 // The point of the height adjustment: one build reads alike at any height.
 // A tall athlete at BMI 26.5 is not Heavy; a short one at BMI 25.5 is.
-assert.equal(at(190, 26.5 * 1.9 ** 2).physique, "medium", "190 cm at BMI 26.5");
+assert.equal(at(190, 26.5 * 1.9 ** 2).physique, "sturdy", "190 cm at BMI 26.5");
 assert.equal(at(155, 25.5 * 1.55 ** 2).physique, "heavy", "155 cm at BMI 25.5");
 // At 1.69 m the two scales agree.
 {
@@ -95,7 +100,7 @@ assert.equal(physique.readPhysique({ sex: 1 }).sex, "female", "the sex is read w
 // --- the baked file ----------------------------------------------------------
 
 const SEXES = ["male", "female"];
-const PHYSIQUES = ["lean", "medium", "heavy"];
+const PHYSIQUES = ["lean", "medium", "sturdy", "heavy"];
 assert.deepEqual(Object.keys(file.bodies).sort(), [...SEXES].sort());
 for (const sex of SEXES) assert.deepEqual(Object.keys(file.bodies[sex]).sort(), [...PHYSIQUES].sort());
 assert.match(file.source, /MakeHuman/);
@@ -163,7 +168,10 @@ for (const sex of SEXES) {
   assert.ok(Math.max(...heights) - Math.min(...heights) < 0.6, `${sex}: bodies stand at one height`);
 
   const waist = PHYSIQUES.map((p) => torsoWidth(figures[sex][p].positions, 0.6, 0.64));
-  assert.ok(waist[0] < waist[1] && waist[1] < waist[2], `${sex}: waist Lean < Medium < Heavy (${waist.map((w) => w.toFixed(2))})`);
+  assert.ok(
+    waist.every((w, i) => i === 0 || waist[i - 1] < w),
+    `${sex}: waist Lean < Medium < Sturdy < Heavy (${waist.map((w) => w.toFixed(2))})`
+  );
 }
 
 {
@@ -180,8 +188,13 @@ for (const sex of SEXES) {
   assert.equal(d.height, 2000);
   assert.ok(d.width > d.height * 0.3 && d.width < d.height * 0.6, `a person's width (${d.width})`);
   const count = (layers) => layers.reduce((n, layer) => n + (layer.d.match(/M/g) ?? []).length, 0);
-  assert.equal(count(d.front) + count(d.back), geometry.edges.length / 2, "every edge is drawn once, in front or behind");
-  assert.ok(count(d.front) > count(d.back), "more of the mesh faces the camera than not, from the front");
+  // About half the mesh faces the camera. Of that, what the lips, lids and
+  // ears hide is not drawn: a few hundred lines, never a share of the body.
+  const total = geometry.edges.length / 2;
+  const hidden = total - count(d.front) - count(d.back);
+  const shown = count(d.front) / total;
+  assert.ok(shown > 0.4 && shown < 0.6, `about half the lines in front (${shown.toFixed(2)})`);
+  assert.ok(hidden > 100 && hidden < total * 0.12, `the hidden lines left out (${hidden} of ${total})`);
   const skin = (d.skin.match(/M/g) ?? []).length;
   const triangles = geometry.triangles.length / 3;
   assert.ok(skin > triangles * 0.4 && skin < triangles * 0.6, `about half the triangles face the camera (${skin} of ${triangles})`);
@@ -239,5 +252,5 @@ assert.ok(NARROW_FRAME.feet > WIDE_FRAME.feet + 0.05, "a narrow stage leaves roo
 }
 
 console.log(
-  `body figure OK — ${file.vertexCount} vertices, ${figures.male.medium.triangles.length / 3} triangles, six bodies, adjusted BMI lines at ${physique.LEAN_BELOW_BMI} and ${physique.HEAVY_FROM_BMI}`
+  `body figure OK — ${file.vertexCount} vertices, ${figures.male.medium.triangles.length / 3} triangles, eight bodies, adjusted BMI lines at ${physique.LEAN_BELOW_BMI}, ${physique.STURDY_FROM_BMI} and ${physique.HEAVY_FROM_BMI}`
 );

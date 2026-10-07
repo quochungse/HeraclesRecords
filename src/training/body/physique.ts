@@ -1,4 +1,4 @@
-// Which body the Overview draws: a sex and one of three physiques.
+// Which body the Overview draws: a sex and one of four physiques.
 //
 // Read from the COROS profile's height and weight and nothing else. Telling a
 // muscular athlete from a heavy one needs measures COROS does not have — a
@@ -8,10 +8,12 @@
 // guessed. Node-free: `test:body-figure` reads it directly.
 
 export type FigureSex = "male" | "female";
-export type Physique = "lean" | "medium" | "heavy";
+export type Physique = "lean" | "medium" | "sturdy" | "heavy";
 
 /**
- * The lines, on the height-adjusted scale below. Heavy from 26: a step past
+ * The lines, on the height-adjusted scale below. Sturdy from 23, where Asian
+ * populations are counted overweight: 20–26 was one Medium, too wide a span
+ * for one figure. Heavy from 26: a step past
  * the 25 at which Asian populations are counted obese (WHO's 2004 expert
  * consultation; Việt Nam uses it), because an athlete carries more of their
  * weight as muscle than the people that line was drawn on. 20 is the figure's
@@ -19,11 +21,13 @@ export type Physique = "lean" | "medium" | "heavy";
  * medical 18.5.
  */
 export const LEAN_BELOW_BMI = 20;
+export const STURDY_FROM_BMI = 23;
 export const HEAVY_FROM_BMI = 26;
 
 export const PHYSIQUE_LABEL: Record<Physique, string> = {
   lean: "Lean",
   medium: "Medium",
+  sturdy: "Sturdy",
   heavy: "Heavy"
 };
 
@@ -51,7 +55,8 @@ export function heightAdjustedBmi(statureCm: number | undefined, weightKg: numbe
 
 export function physiqueForBmi(bmi: number): Physique {
   if (bmi < LEAN_BELOW_BMI) return "lean";
-  if (bmi < HEAVY_FROM_BMI) return "medium";
+  if (bmi < STURDY_FROM_BMI) return "medium";
+  if (bmi < HEAVY_FROM_BMI) return "sturdy";
   return "heavy";
 }
 

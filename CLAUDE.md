@@ -1827,16 +1827,20 @@ lives at module level for the same visit-to-visit reason — see `useCalendarDat
   from the COROS profile and nothing else** (`physique.ts`), read on **Trefethen's
   height-adjusted BMI**, 1.3 kg / m^2.5, not kg / m²: BMI reads the same build heavier on a
   tall athlete, and the 2.5 power moves the lines with height instead (Heavy from 24.9 BMI at
-  1.55 m, 26 at 1.69 m where the scales agree, 27.6 at 1.90 m). Under 20 Lean, 26 and over
-  Heavy — a step past the Asian cut-off of 25, for an athlete's muscle — Medium between; no
-  usable height or weight draws Medium, silently. Telling muscle from fat would need measures
+  1.55 m, 26 at 1.69 m where the scales agree, 27.6 at 1.90 m). Under 20 Lean, 20–23 Medium,
+  23–26 Sturdy (split from Medium, which was too wide; 23 is the Asian overweight line, and the
+  bake makes Sturdy halfway between the Medium and Heavy presets), 26 and over Heavy — a step
+  past the Asian cut-off of 25, for an athlete's muscle; no usable height or weight draws
+  Medium, silently. Telling muscle from fat would need measures
   COROS does not have — a training-history heuristic was designed and dropped as guesswork —
-  so Strong/Fit and Bodybuilder are left for the athlete to choose, later. The six bodies are
+  so Strong/Fit and Bodybuilder are left for the athlete to choose, later. The eight bodies are
   baked (`npm run body-figures:bake`, MakeHuman CC0) through one decimated topology, so the
   file holds one triangle list and per-body positions.
   **It is SVG** (`BodyFigure.tsx`, paths from `bodyFigureDrawing.ts`, worked out once per body
   and kept): the mesh projected through a fixed camera, the hidden lines left out by which way
-  each triangle faces (the mesh is closed and wound outward), lines grouped by brightness into
+  each triangle faces (the mesh is closed and wound outward) and then by a depth buffer of the
+  facing triangles — inside the mouth, the eye sockets and the ears, triangles face the
+  camera behind the lips and lids, and drawn they made a tangle of the face, lines grouped by brightness into
   a few paths, the fill line a vertical gradient. It was three.js with a bloom pass, and was
   replaced the same day because the two draw the same picture (measured against it: paper
   practically identical, dark within ~1% after blurring) and SVG costs no GPU context, no
@@ -1849,11 +1853,11 @@ lives at module level for the same visit-to-visit reason — see `useCalendarDat
   things**: a tight blur of the lines, and a halo — the outline blurred wide *under* the
   opaque skin, so only what spills past the edge shows; glowing the lines wide lights the
   whole body as a haze. Every colour and strength is a custom property on the stage
-  (`--figure-*`), per theme and stepped at 2x (`min-resolution: 1.5dppx`), where a line is one
-  device pixel. **Paper draws in ink, not light**: light added onto a light ground can only be
-  lighter than it, so on paper's grey stage the lines are deeper tones, the skin a faint tint,
-  no glow or halo but a CSS drop-shadow. Several rounds of turning the glow down on a
-  dark-grey paper stage read as washed out and flat, which is what led there. "88% Ready" sits on the stage: under the feet on a narrow
+  (`--figure-*`), stepped at 2x (`min-resolution: 1.5dppx`), where a line is one device pixel.
+  **Both themes draw the same figure on a black stage** (paper's a step lighter, `#222222`). Paper had its own — first a
+  dark-grey stage with the glow turned down (washed out and flat), then a light grey one with
+  the lines in ink, deeper tones in normal blending — and the athlete judged both uglier than
+  the dark one on a white page. "88% Ready" sits on the stage: under the feet on a narrow
   stage, on the fill line beside the figure from 560px (`WIDE_STAGE_MIN_PX`, the same width as
   the CSS container query; the stylesheet places the drawing at `NARROW_FRAME`/`WIDE_FRAME`
   of `bodyFigureMath.ts` — `test:body-figure` holds the two together — and the line is found
