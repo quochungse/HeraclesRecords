@@ -198,6 +198,7 @@ npm run rebuild          # electron-builder install-app-deps — rebuilds better
 npm run fonts:fetch      # re-downloads the three faces into src/assets/fonts + rewrites src/fonts.css. Not part of a build: the files are committed so a build never needs the network.
 npm run admin-regions:fetch # regenerates src/trainingMap/adminRegions.json (Natural Earth + OSM for Việt Nam) for telling places apart. Committed, never run by a build.
 npm run body-shapes:fetch # regenerates src/calendar/bodyShapes.ts from react-native-body-highlighter (MIT). Same rule as fonts: the output is committed, the package is not a dependency, and a build never runs this.
+npm run body-figures:bake # regenerates src/training/body/bodyFigures.json (the Overview figure) from MakeHuman (CC0, pinned commit). Committed; a build never runs it.
 npm run dev              # Vite on 127.0.0.1:5173 + Electron; runs build:electron first
 npm run build            # tsc electron (emits dist-electron) + tsc --noEmit renderer + vite build
 npm run sample:coach     # app closed: writes sample Coach conversations for P0–P3 of docs/coach-plan-canvas.md into the app's database, no model asked (-- --only p0,p2 picks phases; -- --live adds temporary COROS data; -- --cleanup removes it all, and sweeps COROS for "Sample" names). sample:coach-p3 is --only p3.
@@ -1818,6 +1819,51 @@ lives at module level for the same visit-to-visit reason — see `useCalendarDat
   it says outright that it changes tone only and never what goes onto a card — names and
   descriptions are saved to COROS and shown on the watch.
 
+- **Overview's body figure** (`src/training/body/`, built 2026-10-07) — the panel titled
+  "Your physique" (`RecoveryPanel`, which replaced the recovery ring) draws a low-poly
+  wireframe of the athlete, lit from the feet up to COROS's recovery %, in four colours
+  (`figureToneFor`, the stage's `--figure-tone`): green for 100% alone, yellow 70–99, orange
+  40–69, red below — the words keep COROS's three bands. **The physique is height and weight
+  from the COROS profile and nothing else** (`physique.ts`), read on **Trefethen's
+  height-adjusted BMI**, 1.3 kg / m^2.5, not kg / m²: BMI reads the same build heavier on a
+  tall athlete, and the 2.5 power moves the lines with height instead (Heavy from 24.9 BMI at
+  1.55 m, 26 at 1.69 m where the scales agree, 27.6 at 1.90 m). Under 20 Lean, 26 and over
+  Heavy — a step past the Asian cut-off of 25, for an athlete's muscle — Medium between; no
+  usable height or weight draws Medium, silently. Telling muscle from fat would need measures
+  COROS does not have — a training-history heuristic was designed and dropped as guesswork —
+  so Strong/Fit and Bodybuilder are left for the athlete to choose, later. The six bodies are
+  baked (`npm run body-figures:bake`, MakeHuman CC0) through one decimated topology, so the
+  file holds one triangle list and per-body positions.
+  **It is SVG** (`BodyFigure.tsx`, paths from `bodyFigureDrawing.ts`, worked out once per body
+  and kept): the mesh projected through a fixed camera, the hidden lines left out by which way
+  each triangle faces (the mesh is closed and wound outward), lines grouped by brightness into
+  a few paths, the fill line a vertical gradient. It was three.js with a bloom pass, and was
+  replaced the same day because the two draw the same picture (measured against it: paper
+  practically identical, dark within ~1% after blurring) and SVG costs no GPU context, no
+  three.js on the start-up screen, and nothing on a resize — the drawing scales with its box,
+  where the canvas showed the old frame stretched on every step of a window zoom. Three
+  things carry the look over. **The far side's lines are drawn over the opaque skin**, faint:
+  three.js drew the opaque skin before every transparent line, so they showed. **The
+  strengths are as WebGL showed them, not as it stated them**: it blended in linear light and
+  encoded at the end, so a far-side line at a nominal 0.04 read as ~0.25. **The glow is two
+  things**: a tight blur of the lines, and a halo — the outline blurred wide *under* the
+  opaque skin, so only what spills past the edge shows; glowing the lines wide lights the
+  whole body as a haze. Every colour and strength is a custom property on the stage
+  (`--figure-*`), per theme and stepped at 2x (`min-resolution: 1.5dppx`), where a line is one
+  device pixel. **Paper draws in ink, not light**: light added onto a light ground can only be
+  lighter than it, so on paper's grey stage the lines are deeper tones, the skin a faint tint,
+  no glow or halo but a CSS drop-shadow. Several rounds of turning the glow down on a
+  dark-grey paper stage read as washed out and flat, which is what led there. "88% Ready" sits on the stage: under the feet on a narrow
+  stage, on the fill line beside the figure from 560px (`WIDE_STAGE_MIN_PX`, the same width as
+  the CSS container query; the stylesheet places the drawing at `NARROW_FRAME`/`WIDE_FRAME`
+  of `bodyFigureMath.ts` — `test:body-figure` holds the two together — and the line is found
+  by arithmetic). The week's four totals left the panel for Weekly Activity: `WeekTotals`, a
+  list in a column left of the chart, a row above it when the panel is under 600px
+  (`@container weekly-activity`); the days they cover are the panel's title, beside "Weekly
+  Activity". **That chart is drawn whenever COROS has answered**, an empty week included — a
+  Monday morning is seven empty columns on a 0–6 axis, and the totals beside them read 0 (steps
+  keep their dash: the daily-health feed runs a day behind) — and its "could not be read" line
+  is for no answer at all. `npm run test:body-figure`, `test:weekly-activity`.
 - **Sleep** (`sleepDataService`, `sleepHistoryService`, `sleepSeriesService`, `src/sleep/`) —
   nights from the COROS MCP server, cached in `sleep_nights` because COROS keeps only ~9
   weeks. **`totalMinutes` is the main sleep and nothing else** — the stage percentages, the
@@ -2648,8 +2694,8 @@ time, so neither the build nor a render says anything. (`\bease\b` also matches 
 outer shadow; a well sits in a hairline; no rule draws a visible border *and* an outer shadow
 (an inset is a highlight, and a border spelled `var(--surface-line, …)` is the card recipe),
 and every layer that **lifts** spends `--shadow-soft|card|elevated|inset`. Both rules hold
-across the app as of 2026-09-17, so `scripts/elevation-allowlist.json` is empty but for one
-`exempt` decision and a new violation fails outright. A `box-shadow` draws four other things
+across the app as of 2026-09-17, so `scripts/elevation-allowlist.json` is empty and a new
+violation fails outright. A `box-shadow` draws four other things
 and those are not elevation: a hairline (an inset with no blur — a highlight, a gridline, a
 marker bar), a ring (`0 0 0 Npx`, up to 8px), a glow (no offset), a tint (a lift painted in a
 named signal colour — accent, sport, sleep stage, tone) and the 1–2px edge under a control.

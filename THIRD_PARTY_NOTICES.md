@@ -42,6 +42,14 @@ from paths taken from
 [react-native-body-highlighter](https://github.com/HichamELBSI/react-native-body-highlighter)
 3.2.0, Copyright (c) 2022 ELABBASSI Hicham, MIT License.
 
+### Overview body figure
+
+The human figure on Overview is built from [MakeHuman](http://www.makehumancommunity.org/)'s
+base mesh, body-shape targets and default skeleton
+([makehumancommunity/makehuman](https://github.com/makehumancommunity/makehuman)),
+released under CC0 1.0. `npm run body-figures:bake` shapes, poses and decimates
+them into `src/training/body/bodyFigures.json`.
+
 ### Sample routes
 
 The simulated activities used in development builds follow roads and trails

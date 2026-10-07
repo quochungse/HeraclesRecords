@@ -241,9 +241,16 @@ function formatWeeklyTotal(
   }
 }
 
+/**
+ * An empty week still draws its axis — a Monday morning is seven empty
+ * columns, not a missing chart — at one whole unit a division, where 4 split
+ * six ways repeated itself as rounded load ticks (0, 1, 1, 2, 3, 3, 4).
+ */
+const EMPTY_AXIS_MAX = 6;
+
 function roundAxisMax(max: number): number {
   if (max <= 0) {
-    return 4;
+    return EMPTY_AXIS_MAX;
   }
 
   const padded = max * 1.25;
@@ -441,7 +448,7 @@ export function buildWeeklyActivitySeries(
   return {
     days,
     weeklyTotal: hasData ? formatWeeklyTotal(totalRaw, metric, unitSystem) : "—",
-    yMax: yMax > 0 ? yMax : 4,
+    yMax: yMax > 0 ? yMax : EMPTY_AXIS_MAX,
     hasData,
     metricLabel: getWeeklyActivityMetricLabel(metric, unitSystem),
     yAxisUnit: yAxisUnitForMetric(metric, maxChartValue, unitSystem)
@@ -598,7 +605,7 @@ function describeWeekDay(happenDay: string, weekdayIndex: number, withMonth: boo
 /**
  * The days the week-to-date totals actually add up: Monday through the
  * reference day, the window `buildWeekToDateTotals` sums. It is said once above
- * the four tiles, which is what lets each of them drop its own "this week"
+ * the four week totals, which is what lets each of them drop its own "this week"
  * line — and it says more than that line did, because "this week" never told
  * anyone the totals stop at today rather than Sunday.
  *

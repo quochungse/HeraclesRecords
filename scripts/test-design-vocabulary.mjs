@@ -136,7 +136,6 @@ const DESIGNED_LENGTHS = [
   ["src/strength/strength.css", ".muscle-recovery-fill", "transform"],
   ["src/strength/strength.css", ".muscle-trend-bar-fill", "height"],
   ["src/strength/strength.css", ".strength-mix-bar > span", "flex-grow"],
-  ["src/styles.css", ".ring-gauge-progress", "stroke-dashoffset"],
   ["src/styles.css", ".training-fitness-bar", "height"],
   ["src/styles.css", ".training-fitness-bar", "background"],
   // Staged reveals on load, most of them behind a 220ms delay.
@@ -147,8 +146,6 @@ const DESIGNED_LENGTHS = [
   ["src/styles.css", ".vo2-gauge::before", "transform"],
   ["src/styles.css", ".vo2-gauge-needle", "opacity"],
   ["src/styles.css", ".vo2-gauge-needle", "transform"],
-  ["src/styles.css", ".training-recovery-ring::before", "opacity"],
-  ["src/styles.css", ".training-recovery-ring::before", "transform"],
 ];
 
 function cssFiles(dir) {

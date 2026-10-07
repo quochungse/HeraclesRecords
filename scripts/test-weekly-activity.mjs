@@ -73,6 +73,9 @@ const emptySeries = buildWeeklyActivitySeries([], "distance", referenceDate, "me
 assert.equal(emptySeries.hasData, false);
 assert.equal(emptySeries.weeklyTotal, "—");
 assert.equal(emptySeries.days.every((day) => day.value === 0), true);
+// An empty week still has an axis to draw, one whole unit a division.
+assert.equal(emptySeries.yMax, 6);
+assert.deepEqual(buildWeeklyActivityYAxisTicks(emptySeries.yMax), [0, 1, 2, 3, 4, 5, 6]);
 
 const activityEnriched = buildWeeklyActivitySeries(
   enrichDayListWithActivityTotals(
