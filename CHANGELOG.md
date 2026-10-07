@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.2] - 2026-10-07
+
+### What's new
+
+- **Overview** — "Your physique" replaces the recovery ring: a wireframe of your body, drawn from your COROS height and weight and lit up to today's recovery. Weekly Activity shows the week's totals beside its chart.
+
+### Fixed
+
+- Improve app performance and stability.
+
 ## [1.0.1] - 2026-10-06
 
 ### What's new

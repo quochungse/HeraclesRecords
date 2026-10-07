@@ -111,7 +111,7 @@ function dashboard(): TrainingHubDashboard {
   return {
     racePredictor: {
       staminaLevel: 72,
-      recoveryPct: 88,
+      recoveryPct: 58,
       aerobicEnduranceScore: 78,
       lactateThresholdCapacityScore: 71,
       anaerobicEnduranceScore: 64,
@@ -126,7 +126,7 @@ function dashboard(): TrainingHubDashboard {
       ]
     },
     rhr: 50,
-    recoveryPct: 88,
+    recoveryPct: 58,
     recoveryState: 3,
     fullRecoveryHours: 6,
     fitnessMaxHr: 188,
