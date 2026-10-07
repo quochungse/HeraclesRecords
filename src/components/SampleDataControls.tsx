@@ -3,6 +3,11 @@ import { Check, ChevronDown } from "lucide-react";
 import type { SampleDataState } from "../../electron/types";
 import type { HeraclesRecordsApi } from "../heraclesrecords-api";
 import { RECORDS_SAMPLE_PRESETS, type RecordsSamplePreset } from "../records/sampleRecords";
+import {
+  FIGURE_SAMPLE_PRESETS,
+  setFigureSample,
+  useFigureSamplePreset
+} from "../training/body/sampleFigure";
 
 type MainSampleKind = keyof SampleDataState;
 type SampleKind = MainSampleKind | "strength";
@@ -40,7 +45,9 @@ interface SampleDataControlsProps {
  * again. Strength's is renderer state and switches in place, and so is the
  * Hall of Records' — one preset at a time (`sampleRecords.ts`), standing in for
  * the athlete's whole history there, so a second press on the chosen one
- * switches it off.
+ * switches it off. Overview's "Your physique" presets work the same way
+ * (`sampleFigure.ts`): one body and recovery at a time, in place of the
+ * profile's.
  */
 export function SampleDataControls({
   api,
@@ -54,6 +61,7 @@ export function SampleDataControls({
   const [busy, setBusy] = useState(false);
   const [open, setOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
+  const figureSample = useFigureSamplePreset();
 
   useEffect(() => {
     if (!api || !import.meta.env.DEV) {
@@ -115,7 +123,9 @@ export function SampleDataControls({
   }
 
   const activeCount =
-    SAMPLE_OPTIONS.filter((option) => isOn(option.value)).length + (recordsSample ? 1 : 0);
+    SAMPLE_OPTIONS.filter((option) => isOn(option.value)).length +
+    (recordsSample ? 1 : 0) +
+    (figureSample ? 1 : 0);
   const triggerLabel = activeCount > 0 ? `Sample · ${activeCount}` : "Sample";
 
   return (
@@ -183,6 +193,32 @@ export function SampleDataControls({
                   aria-checked={checked}
                   title={preset.title}
                   onClick={() => onRecordsSampleChange(checked ? null : preset.value)}
+                >
+                  <span className="app-select-option-content">
+                    <span className="app-select-option-label">{preset.label}</span>
+                  </span>
+                  {checked ? (
+                    <Check
+                      className="app-select-option-check"
+                      size={15}
+                      strokeWidth={2.6}
+                      aria-hidden="true"
+                    />
+                  ) : null}
+                </button>
+              );
+            })}
+            {FIGURE_SAMPLE_PRESETS.map((preset) => {
+              const checked = figureSample === preset.value;
+              return (
+                <button
+                  key={preset.value}
+                  className={`app-select-option${checked ? " is-selected" : ""}`}
+                  type="button"
+                  role="menuitemradio"
+                  aria-checked={checked}
+                  title={preset.title}
+                  onClick={() => setFigureSample(checked ? null : preset.value)}
                 >
                   <span className="app-select-option-content">
                     <span className="app-select-option-label">{preset.label}</span>

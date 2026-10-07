@@ -2,6 +2,7 @@ import { Suspense, lazy, type CSSProperties } from "react";
 import { recoveryTone } from "../parsers";
 import { figureToneFor, levelInFrame } from "../body/bodyFigureMath";
 import { PHYSIQUE_LABEL, readPhysique } from "../body/physique";
+import { useFigureSample } from "../body/sampleFigure";
 import type { CorosProfile } from "../../../electron/types";
 import type { TrainingSummaryMetrics } from "../types";
 
@@ -58,12 +59,14 @@ function readinessCopy(
   }
 }
 
-export function RecoveryPanel({
-  summary,
-  loading = false,
-  profile,
-  profileSettled
-}: RecoveryPanelProps) {
+export function RecoveryPanel(props: RecoveryPanelProps) {
+  // A development build's Sample menu can stand in for the profile and the
+  // recovery % (sampleFigure.ts); otherwise this is COROS's answer as given.
+  const sample = useFigureSample();
+  const summary = sample ? { ...props.summary, recoveryPct: sample.recoveryPct } : props.summary;
+  const loading = sample ? false : (props.loading ?? false);
+  const profile = sample ? sample.profile : props.profile;
+  const profileSettled = sample ? true : props.profileSettled;
   // Rounded once, so the figure, its colour and its words read one number.
   const percent = Math.round(Math.max(0, Math.min(100, summary.recoveryPct ?? 0)));
   const hasData = percent > 0;
