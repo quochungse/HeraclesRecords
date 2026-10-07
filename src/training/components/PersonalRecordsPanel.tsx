@@ -18,6 +18,9 @@ import {
   defineSelectionPreference,
   useSelectionPreference
 } from "../../preferences/selectionPreferences";
+// Cut to twice the size they are drawn at (52px badge, ~200px banner wheat).
+import prLaurel from "../../assets/training-hub/pr-laurel.webp";
+import prWheat from "../../assets/training-hub/pr-wheat.webp";
 
 interface PersonalRecordsPanelProps {
   dashboard: TrainingHubDashboard | null;
@@ -153,13 +156,12 @@ function RecordEmptyGraphic() {
   );
 }
 
-const PR_ASSET_BASE = "./assets/training-hub/PR";
 
 function LaurelBadge() {
   return (
     <img
       className="training-record-pr"
-      src={`${PR_ASSET_BASE}/pr-logo_no_bg.png`}
+      src={prLaurel}
       alt="Personal record"
     />
   );
@@ -195,7 +197,7 @@ export function PersonalRecordsPanel({ dashboard }: PersonalRecordsPanelProps) {
         <span className="training-records-embers" aria-hidden="true" />
         <img
           className="training-records-banner-wheat is-left"
-          src={`${PR_ASSET_BASE}/left-wheat_no_bg.png`}
+          src={prWheat}
           alt=""
           aria-hidden="true"
         />
@@ -204,7 +206,7 @@ export function PersonalRecordsPanel({ dashboard }: PersonalRecordsPanelProps) {
         </div>
         <img
           className="training-records-banner-wheat is-right"
-          src={`${PR_ASSET_BASE}/left-wheat_no_bg.png`}
+          src={prWheat}
           alt=""
           aria-hidden="true"
         />

@@ -80,7 +80,9 @@ import {
   type RecordsSamplePreset,
 } from "./records/sampleRecords";
 import { LabourCelebration, LabourToastCard } from "./records/LabourNotices";
-import appLogo from "../build/icon.png";
+// Drawn at 30–42px in the rail: the 128px cut covers a 2× display without
+// bundling the 1024px, 840 KB source.
+import appLogo from "../build/icons/128x128.png";
 import changelogMarkdown from "../CHANGELOG.md?raw";
 
 type View = PrimaryView;

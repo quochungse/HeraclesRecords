@@ -1,7 +1,7 @@
 ---
 import "../../../src/fonts.css";
 import "../styles/site.css";
-import { getImage, Image } from "astro:assets";
+import { Image } from "astro:assets";
 import icon from "../../../build/icon-256.png";
 // The face of every page's text, asked for ahead of the stylesheet that names
 // it: arriving late, it swaps under the text and moves the page. The serif is
@@ -24,9 +24,6 @@ interface Props {
 
 const { title, description, og = "home", jsonLd } = Astro.props;
 const ogImage = new URL(`/og/${og}.jpg`, Astro.site);
-// The icon is 256px and 88 KB; a tab and a home screen need far less.
-const favicon = await getImage({ src: icon, width: 64, height: 64, format: "png" });
-const touchIcon = await getImage({ src: icon, width: 180, height: 180, format: "png" });
 const fullTitle = title ? `${title} · Heracles Records` : "Heracles Records";
 // GitHub Pages serves coach.html at /coach, so that is the address to share.
 const path = Astro.url.pathname.replace(/\.html$/, "").replace(/\/index$/, "/");
@@ -55,8 +52,11 @@ const current = (href: string) =>
     <title>{fullTitle}</title>
     <meta name="description" content={description} />
     <link rel="canonical" href={canonical} />
-    <link rel="icon" type="image/png" sizes="64x64" href={favicon.src} />
-    <link rel="apple-touch-icon" href={touchIcon.src} />
+    <!-- Fixed addresses cut from the app's icon (src/siteIcon.ts): Google shows a
+         favicon only from a stable URL, square and a multiple of 48px. -->
+    <link rel="icon" href="/favicon.ico" sizes="16x16 32x32 48x48" />
+    <link rel="icon" type="image/png" sizes="192x192" href="/favicon-192.png" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
     <link rel="alternate" type="application/rss+xml" title="Heracles Records releases" href="/changelog.xml" />
     <meta property="og:type" content="website" />
     <meta property="og:site_name" content="Heracles Records" />

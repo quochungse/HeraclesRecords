@@ -59,7 +59,8 @@ import {
   storeSportColors,
   type SportColorCategory,
 } from "../training/sportColors";
-import appLogo from "../../build/icon.png";
+// Drawn at 64px: the 128px cut is its 2× size.
+import appLogo from "../../build/icons/128x128.png";
 import { SettingsPrefRow } from "./SettingsPrefRow";
 import { SyncPanel } from "./SyncPanel";
 import { BackupPanel } from "./BackupPanel";

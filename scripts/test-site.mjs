@@ -30,6 +30,13 @@ for (const file of ["index.html", "privacy.html", "404.html", ".nojekyll"]) {
 }
 assert.ok(!existsSync(join(dist, "privacy", "index.html")), "privacy must be privacy.html, not privacy/index.html");
 
+// Google shows a favicon only from a stable address, square and a multiple of
+// 48px, and falls back to /favicon.ico: a hashed _astro/ file at 64px got none.
+for (const file of ["favicon.ico", "favicon-192.png", "apple-touch-icon.png"]) {
+  assert.ok(existsSync(join(dist, file)), `site/dist/${file} is missing`);
+}
+assert.match(readFileSync(join(dist, "index.html"), "utf8"), /<link rel="icon" href="\/favicon\.ico"/);
+
 function walk(dir) {
   return readdirSync(dir).flatMap((name) => {
     const path = join(dir, name);
