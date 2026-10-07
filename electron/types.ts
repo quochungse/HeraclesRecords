@@ -1896,6 +1896,17 @@ export interface CoachAnalysisUpdate {
 }
 
 /**
+ * An analysis step being worked on before its run row exists — the lease,
+ * COROS, a summary roll — and its end. The conversation list reads it so a
+ * row says Coach is answering from the start rather than seconds in.
+ */
+export interface CoachAnalysisPreparing {
+  analysisId: string;
+  sessionId: string;
+  preparing: boolean;
+}
+
+/**
  * What the conversation list has to say about one conversation (9.3). An auto
  * run changes the transcript and so bumps the row to the top; without this the
  * row reorders for no visible reason.

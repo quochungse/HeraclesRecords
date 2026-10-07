@@ -2065,6 +2065,68 @@ export function ChatView({
     });
   }, [api, markSessionRead, refreshSessionAttention]);
 
+  /**
+   * An analysis answering in a conversation says so on its row, as a turn of
+   * the athlete's does: the run is in the main process, so this window learns
+   * of it from the run updates, and from the list for one already running
+   * when Coach mounted. Keyed by run, since one conversation can hold two.
+   * A run has no row for its first seconds (the lease, COROS, a summary
+   * roll), so the step's own preparing push, keyed by analysis, covers those.
+   */
+  const [analysisRuns, setAnalysisRuns] = useState<ReadonlyMap<string, string>>(
+    () => new Map()
+  );
+  const [preparingAnalyses, setPreparingAnalyses] = useState<
+    ReadonlyMap<string, string>
+  >(() => new Map());
+  useEffect(
+    () =>
+      api?.onCoachAnalysisRunPreparing?.(({ analysisId, sessionId, preparing }) => {
+        setPreparingAnalyses((current) => {
+          if (preparing === current.has(analysisId)) return current;
+          const next = new Map(current);
+          if (preparing) next.set(analysisId, sessionId);
+          else next.delete(analysisId);
+          return next;
+        });
+      }),
+    [api]
+  );
+  useEffect(() => {
+    if (!api) return;
+    let cancelled = false;
+    void api
+      .listCoachAnalysisRuns({ statuses: ["running"] })
+      .then((runs) => {
+        const running = (runs ?? []).filter((run) => run.sessionId);
+        if (cancelled || !running.length) return;
+        setAnalysisRuns((current) => {
+          const next = new Map(current);
+          for (const run of running) next.set(run.id, run.sessionId!);
+          return next;
+        });
+      })
+      .catch(() => undefined);
+    const unsubscribe = api.onCoachAnalysisRunUpdate?.((run) => {
+      setAnalysisRuns((current) => {
+        const running = run.status === "running" && Boolean(run.sessionId);
+        if (running === current.has(run.id)) return current;
+        const next = new Map(current);
+        if (running && run.sessionId) next.set(run.id, run.sessionId);
+        else next.delete(run.id);
+        return next;
+      });
+    });
+    return () => {
+      cancelled = true;
+      unsubscribe?.();
+    };
+  }, [api]);
+  const analysingSessionIds = useMemo(
+    () => new Set([...analysisRuns.values(), ...preparingAnalyses.values()]),
+    [analysisRuns, preparingAnalyses]
+  );
+
   useEffect(() => {
     liveAnalysisRef.current = liveAnalysis;
   }, [liveAnalysis]);
@@ -4176,6 +4238,7 @@ export function ChatView({
     // The list stays open while Coach answers (UAT); the answering row says so.
     busy: exportingLatestActivity,
     answeringSessionId: streaming ? turnSessionId : null,
+    analysingSessionIds,
     attention: sessionAttention,
     compactingSessionId,
     onClose: () => void handleUpdateChatSettings({ sidebarOpen: false }),

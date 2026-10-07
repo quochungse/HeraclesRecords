@@ -98,6 +98,7 @@ import type {
   CoachAnalysisInput,
   CoachAnalysisPatch,
   CoachAnalysisRun,
+  CoachAnalysisPreparing,
   CoachAnalysisPause,
   CoachAnalysisSpend,
   CoachAnalysisRunQuery,
@@ -640,6 +641,16 @@ const api = {
     ) => callback(run);
     ipcRenderer.on("analysis:runUpdate", listener);
     return () => ipcRenderer.removeListener("analysis:runUpdate", listener);
+  },
+  onCoachAnalysisRunPreparing: (
+    callback: (preparing: CoachAnalysisPreparing) => void
+  ): (() => void) => {
+    const listener = (
+      _event: Electron.IpcRendererEvent,
+      preparing: CoachAnalysisPreparing
+    ) => callback(preparing);
+    ipcRenderer.on("analysis:runPreparing", listener);
+    return () => ipcRenderer.removeListener("analysis:runPreparing", listener);
   },
   onCoachAnalysisUpdate: (
     callback: (update: CoachAnalysisUpdate) => void

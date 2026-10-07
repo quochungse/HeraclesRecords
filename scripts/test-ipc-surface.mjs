@@ -208,6 +208,7 @@ for (const method of [
   "cancelCoachAnalysisRun",
   "markCoachAnalysisRunsSeen",
   "onCoachAnalysisRunUpdate",
+  "onCoachAnalysisRunPreparing",
   "onCoachAnalysisUpdate",
   "getCoachAnalysisPause",
   "resumeCoachAnalyses",

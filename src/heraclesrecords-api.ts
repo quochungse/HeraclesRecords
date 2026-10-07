@@ -96,6 +96,7 @@ import type {
   CoachAnalysisPatch,
   CoachAnalysisRun,
   CoachAnalysisPause,
+  CoachAnalysisPreparing,
   CoachAnalysisSpend,
   CoachAnalysisRunQuery,
   CoachAnalysisSummary,
@@ -522,6 +523,9 @@ export interface HeraclesRecordsApi {
   markCoachAnalysisSessionSeen: (sessionId: string) => Promise<number>;
   onCoachAnalysisRunUpdate: (
     callback: (run: CoachAnalysisRun) => void
+  ) => () => void;
+  onCoachAnalysisRunPreparing: (
+    callback: (preparing: CoachAnalysisPreparing) => void
   ) => () => void;
   onCoachAnalysisUpdate: (
     callback: (update: CoachAnalysisUpdate) => void

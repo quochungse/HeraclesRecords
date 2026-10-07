@@ -79,6 +79,7 @@ import type {
   CoachAnalysis,
   AnalysisTrigger,
   CoachAnalysisPause,
+  CoachAnalysisPreparing,
   CoachAnalysisRun,
   CoachAnalysisRunQuery,
   CoachAnalysisSpend,
@@ -667,6 +668,12 @@ export interface CoachAnalysisRunnerDeps {
     }
   ): Promise<void>;
   emitRunUpdate(run: CoachAnalysisRun): void;
+  /**
+   * A step has reached the front of the queue and is being prepared — the
+   * lease, COROS, a summary roll — before its run row exists. Raised again
+   * with `false` once the step is over, whatever became of it.
+   */
+  emitRunPreparing(preparing: CoachAnalysisPreparing): void;
   /** Aborts an in-flight stream by run id; the same seam "Cancel" uses. */
   cancelRun(runId: string): void;
   /** How long a run may emit nothing before it is given up on. */
@@ -679,6 +686,14 @@ export interface CoachAnalysisRunnerDeps {
  */
 export function emitAnalysisRunUpdate(run: CoachAnalysisRun): void {
   emitToAnyWindow("analysis:runUpdate", run);
+}
+
+/**
+ * The seconds before a run has a row: the conversation list says Coach is
+ * answering from the moment a step starts, not from the moment it is recorded.
+ */
+function emitAnalysisRunPreparing(preparing: CoachAnalysisPreparing): void {
+  emitToAnyWindow("analysis:runPreparing", preparing);
 }
 
 /**
@@ -861,6 +876,7 @@ function createDefaultDeps(): CoachAnalysisRunnerDeps {
     streamChat: (sink, runId, messages, options) =>
       streamChat(sink, runId, messages, options),
     emitRunUpdate: (run) => emitAnalysisRunUpdate(run),
+    emitRunPreparing: (preparing) => emitAnalysisRunPreparing(preparing),
     cancelRun: (runId) => cancelChat(runId),
     idleTimeoutMs: ANALYSIS_IDLE_TIMEOUT_MS
   };
@@ -2158,11 +2174,20 @@ export async function runAnalysisTrigger(
           // The lease is taken inside `enqueue`, not around it: acquiring it
           // before the step reaches the front of the queue would hold the lock
           // across the wait and keep the other machines idle for no reason.
-          const outcome = await enqueue(() =>
-            runExclusively(step.analysis.id, () =>
-              runOneBinding(step, deps, cancellation)
-            )
-          );
+          const outcome = await enqueue(async () => {
+            const preparing = {
+              analysisId: step.analysis.id,
+              sessionId: step.analysis.sessionId
+            };
+            resolved.emitRunPreparing({ ...preparing, preparing: true });
+            try {
+              return await runExclusively(step.analysis.id, () =>
+                runOneBinding(step, deps, cancellation)
+              );
+            } finally {
+              resolved.emitRunPreparing({ ...preparing, preparing: false });
+            }
+          });
           if (!outcome.ran) {
             // Another machine is running it. Recorded so the log says where the
             // work went rather than showing an unexplained gap.

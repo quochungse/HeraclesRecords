@@ -16,6 +16,7 @@ export function ChatSidebar({
   attention,
   compactingSessionId,
   answeringSessionId,
+  analysingSessionIds,
   onClose,
   onOpen,
   onNewChat,
@@ -39,6 +40,8 @@ export function ChatSidebar({
   compactingSessionId?: string | null;
   /** The conversation Coach is answering in, if any (UAT). */
   answeringSessionId?: string | null;
+  /** Conversations an analysis is answering in right now. */
+  analysingSessionIds?: ReadonlySet<string>;
   onClose: () => void;
   onOpen: () => void;
   onNewChat: () => void;
@@ -111,6 +114,7 @@ export function ChatSidebar({
               attention={attention}
               compactingSessionId={compactingSessionId}
               answeringSessionId={answeringSessionId}
+              analysingSessionIds={analysingSessionIds}
               onCollapse={onClose}
               onNewChat={onNewChat}
               onSelectSession={onSelectSession}

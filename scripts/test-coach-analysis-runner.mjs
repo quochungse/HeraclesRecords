@@ -283,6 +283,7 @@ function createWorld(overrides = {}) {
     runs: [],
     sessions: new Map(), // id -> { title, entries }
     updates: [],
+    preparing: [],
     streamCalls: [],
     corosResult: { ok: true },
     /**
@@ -470,6 +471,9 @@ function createWorld(overrides = {}) {
     },
     emitRunUpdate: (run) => {
       state.updates.push({ id: run.id, status: run.status });
+    },
+    emitRunPreparing: ({ analysisId, preparing }) => {
+      state.preparing.push({ analysisId, preparing });
     },
     cancelRun: (runId) => {
       state.cancelledRunIds.push(runId);
@@ -830,6 +834,11 @@ function addSession(world, id, entries = []) {
   assert.deepEqual(world.updates, [
     { id: run.id, status: "running" },
     { id: run.id, status: "success" }
+  ]);
+  // And heard the step begin before the run had a row, and end after it.
+  assert.deepEqual(world.preparing, [
+    { analysisId: "a1", preparing: true },
+    { analysisId: "a1", preparing: false }
   ]);
 }
 

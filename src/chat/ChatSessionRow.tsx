@@ -277,6 +277,7 @@ export function ChatSessionRow({
   disabled,
   compacting,
   answering,
+  analyzing,
   attention,
   onSelect,
   onTogglePin,
@@ -292,6 +293,8 @@ export function ChatSessionRow({
   compacting?: boolean;
   /** Coach is answering in this conversation (UAT): the row says so in place of its time. */
   answering?: boolean;
+  /** An analysis is running in this conversation: said the same way, in its own word. */
+  analyzing?: boolean;
   /** 9.3: whether a coach speaks here, and whether it has said something new. */
   attention?: CoachAnalysisSessionAttention;
   onSelect: () => void;
@@ -428,10 +431,10 @@ export function ChatSessionRow({
               aria-label={`${unread} unread coach ${unread === 1 ? "run" : "runs"}`}
             />
           ) : null}
-          {answering ? (
+          {answering || analyzing ? (
             <span className="chat-session-row-answering" role="status">
               <Loader2 className="chat-spinner" size={11} aria-hidden="true" />
-              Answering
+              {answering ? "Answering" : "Analyzing"}
             </span>
           ) : (
             <span className="chat-session-row-time">

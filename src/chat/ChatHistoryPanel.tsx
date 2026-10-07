@@ -14,6 +14,7 @@ export function ChatHistoryPanel({
   attention,
   compactingSessionId,
   answeringSessionId,
+  analysingSessionIds,
   onCollapse,
   onNewChat,
   onSelectSession,
@@ -32,6 +33,8 @@ export function ChatHistoryPanel({
   compactingSessionId?: string | null;
   /** The conversation Coach is answering in: its row says so, the list stays open (UAT). */
   answeringSessionId?: string | null;
+  /** Conversations an analysis is running in right now: their rows say Analyzing. */
+  analysingSessionIds?: ReadonlySet<string>;
   onCollapse: () => void;
   onNewChat: () => void;
   onSelectSession: (sessionId: string) => void;
@@ -176,6 +179,7 @@ export function ChatHistoryPanel({
                     attention={attention?.get(session.id)}
                     compacting={compactingSessionId === session.id}
                     answering={answeringSessionId === session.id}
+                    analyzing={Boolean(analysingSessionIds?.has(session.id))}
                     onSelect={() => onSelectSession(session.id)}
                     onTogglePin={() =>
                       onTogglePinSession(session.id, !session.pinnedAt)
