@@ -24,6 +24,7 @@ export const SKIPPED_PATHS = [
   /[\\/]src[\\/]components[\\/]DeveloperToolbar\.tsx$/,
   /[\\/]src[\\/]records[\\/]sampleRecords\.ts$/,
   /[\\/]src[\\/]components[\\/]SampleDataControls\.tsx$/,
+  /[\\/]src[\\/]strength[\\/]sampleSessions\.ts$/,
   // Each language's own name, the same in every language.
   /[\\/]src[\\/]i18n[\\/]locales\.ts$/,
   /[\\/]src[\\/]vite-env\.d\.ts$/,
@@ -54,6 +55,17 @@ export const NAMES = new Set([
   "Ollama",
   "LM Studio",
   "MCP",
+  "VO₂max",
+  "VO2max",
+  "VO2 Max",
+  "HRV",
+  "FTP",
+  "W/kg",
+  "IF",
+  "TSS",
+  "NP",
+  "RHR",
+  "LTHR",
 ]);
 
 function stripComments(source) {
@@ -69,7 +81,7 @@ const lineOf = (source, index) => source.slice(0, index).split("\n").length;
 
 /** A literal that reads as a sentence or a label someone would read. */
 // A unit symbol is the same in every language (km, bpm, W, GB).
-const UNITS = /^(px|em|rem|%|ms|s|min|h|B|KB|MB|GB|km|mi|m|ft|yd|kg|lb|bpm|rpm|spm|W|kJ|kcal|cal|°C|°F|m\/h|km\/h|mph|ft\/h|\/km|\/mi|x|×)$/;
+const UNITS = /^(px|em|rem|%|ms|s|min|h|B|KB|MB|GB|km|mi|m|cm|mm|ft|yd|in|kg|lb|bpm|rpm|spm|W|kJ|kcal|cal|°C|°F|m\/h|km\/h|mph|ft\/h|\/km|\/mi|W\/kg|x|×|TSS|IF|NP|VAM|HRV|RHR|LTHR|FTP|VO₂max|VO2max)$/;
 
 function looksLikeText(value) {
   // What is left once the values and the names are taken out.
@@ -128,11 +140,16 @@ export function scanSource(source, file = "x.tsx") {
       .replace(/&(amp|apos|quot|lt|gt|nbsp);/g, " ")
       .replace(/\s+/g, " ")
       .trim();
-    if (!text || NAMES.has(text)) continue;
+    if (!text || NAMES.has(text) || UNITS.test(text)) continue;
     if (/^[:,.|&?(\-$]|\w\(|\b(if|while|for|switch)\s*\(|\b(class|extends|implements)\b|\w:\s*[A-Z]\w*$/.test(text)) continue;
-    if (/\$$|^[\w-]+\)$/.test(text)) continue; // a template's head, a call's tail
+    if (/\$$|^[\w-]+\)$|\bthis\./.test(text)) continue; // a template's head, a call's tail, code
     if (/[;=[\]`]|=>|&&|\|\||\?\s|^\)|\($|\b(const|let|return|function|else|catch|finally|import|export|interface|await|async)\b/.test(text)) continue;
-    if (/^[\w.$]+(\s*[,:]\s*[\w.$]+)*,?$/.test(text) && !/\s/.test(text.replace(/,\s*/g, ","))) continue; // a list of identifiers
+    // A list of identifiers or one camelCase name; a single plain word ("Route",
+    // "or") is text.
+    if (/[,.$]/.test(text) && /^[\w.$]+(\s*,\s*[\w.$]+)*,?$/.test(text)) continue;
+    if (/^[a-z]+[A-Z]\w*$/.test(text)) continue;
+    if (/^(try|do|else|finally|default|return|break|continue|case|async|await)$/.test(text)) continue;
+    if (/^(as|satisfies)\s+[A-Z]\w*$/.test(text)) continue; // a type assertion: `{} as Record<…>`
     if (!/[A-Za-z]{2,}/.test(text)) continue;
     add(match.index, text);
   }
@@ -142,6 +159,14 @@ export function scanSource(source, file = "x.tsx") {
     if (NAMES.has(value) || !/[A-Za-z]{2,}/.test(value)) continue;
     if (/^[a-z][\w.-]*$/.test(value)) continue;
     add(match.index, `${match[1]}="${value}"`);
+  }
+
+  // English plurals: `count === 1 ? "session" : "sessions"` and `"" : "s"`.
+  // Each word alone is lowercase, so the literal rule above lets it through;
+  // the shape is what gives it away. A count goes through plural().
+  for (const match of clean.matchAll(/[!=]==\s*1\s*\?\s*(["'`])([^"'`\n]*)\1\s*:\s*(["'`])([^"'`\n]*)\3/g)) {
+    if (!/[A-Za-z]/.test(match[2] + match[4])) continue;
+    add(match.index, `English plural "${match[2]}"/"${match[4]}" (use plural())`);
   }
 
   // Numbers: a figure written with `toFixed` keeps English digits ("5.2" where

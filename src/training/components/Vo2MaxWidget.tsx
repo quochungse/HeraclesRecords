@@ -16,6 +16,7 @@ import {
 } from "../vo2Trend";
 import type { TrainingHubSnapshot } from "../types";
 
+import { t } from "../../i18n/core";
 interface Vo2MaxWidgetProps {
   snapshot: TrainingHubSnapshot | null;
 }
@@ -81,29 +82,29 @@ function describeArc(min: number, max: number): string {
   const end = pointOnArc(max);
 
   return [
-    `M ${start.x.toFixed(2)} ${start.y.toFixed(2)}`,
-    `A ${VO2_RADIUS} ${VO2_RADIUS} 0 0 1 ${end.x.toFixed(2)} ${end.y.toFixed(2)}`
+    `M ${start.x.toFixed(2)} ${start.y.toFixed(2)}`, // i18n-ignore: an SVG path
+    `A ${VO2_RADIUS} ${VO2_RADIUS} 0 0 1 ${end.x.toFixed(2)} ${end.y.toFixed(2)}` // i18n-ignore: an SVG path
   ].join(" ");
 }
 
 function vo2Status(value?: number): { label: string; tone: string } {
   if (value === undefined) {
-    return { label: "Waiting", tone: "neutral" };
+    return { label: t("activity.vo2.waiting"), tone: "neutral" };
   }
 
   if (value < 30) {
-    return { label: "Base", tone: "low" };
+    return { label: t("activity.vo2.base"), tone: "low" };
   }
 
   if (value < 35) {
-    return { label: "Building", tone: "mid" };
+    return { label: t("activity.vo2.building"), tone: "mid" };
   }
 
   if (value < 45) {
-    return { label: "Strong", tone: "good" };
+    return { label: t("activity.vo2.strong"), tone: "good" };
   }
 
-  return { label: "Peak", tone: "high" };
+  return { label: t("activity.vo2.peak"), tone: "high" };
 }
 
 function isFocusedBand(value: number | undefined, band: Vo2Band): boolean {
@@ -148,7 +149,7 @@ function Vo2PlateauBar({ trend }: { trend: Vo2Trend }) {
   return (
     <div className="vo2-plateaus">
       <div className="vo2-plateaus-head">
-        <span>Last {formatTrendSpan(trend.spanDays)}</span>
+        <span>{t("activity.vo2.last", { span: formatTrendSpan(trend.spanDays) })}</span>
         <strong
           className={`vo2-plateaus-delta${trend.delta > 0 ? " is-up" : trend.delta < 0 ? " is-down" : ""}`}
         >
@@ -187,7 +188,7 @@ function Vo2PlateauBar({ trend }: { trend: Vo2Trend }) {
               }
               tabIndex={0}
               role="img"
-              aria-label={`VO2 Max ${plateau.value}, ${plateau.days} days, ${range}`}
+              aria-label={t("activity.vo2.plateau", { value: plateau.value, days: plateau.days, range })}
             >
               <span className="vo2-plateau-tip" role="tooltip">
                 VO2 Max <strong>{plateau.value}</strong> · {range}
@@ -236,14 +237,14 @@ export function Vo2MaxWidget({ snapshot }: Vo2MaxWidgetProps) {
       <div className="vo2-widget-header">
         <div>
           <p className="eyebrow">VO2 Max</p>
-          <h2>Running engine</h2>
+          <h2>{t("activity.vo2.title")}</h2>
         </div>
         <span className="vo2-widget-icon" aria-hidden="true">
           <Activity size={16} />
         </span>
       </div>
 
-      <div className="vo2-gauge" aria-label="VO2 max gauge">
+      <div className="vo2-gauge" aria-label={t("activity.vo2.gauge")}>
         <svg viewBox="0 0 240 144" aria-hidden="true">
           <path
             className="vo2-gauge-track"
@@ -284,19 +285,22 @@ export function Vo2MaxWidget({ snapshot }: Vo2MaxWidgetProps) {
 
       <div className="vo2-widget-footer">
         <div>
-          <span>Level</span>
+          <span>{t("activity.vo2.level")}</span>
           <strong>{status.label}</strong>
         </div>
         <div>
-          <span>Last step</span>
+          <span>{t("activity.vo2.lastStep")}</span>
           <strong>
             {trend?.lastStep === undefined
               ? "-"
-              : `${formatSignedDelta(trend.lastStep)} · ${formatPlateauDuration(trend.daysAtCurrent)} ago`}
+              : t("activity.vo2.ago", {
+                  delta: formatSignedDelta(trend.lastStep),
+                  duration: formatPlateauDuration(trend.daysAtCurrent)
+                })}
           </strong>
         </div>
         <div>
-          <span>Updated</span>
+          <span>{t("activity.vo2.updated")}</span>
           <strong>
             {latest ? formatHappenDayLabel(latest.happenDay) : "-"}
           </strong>

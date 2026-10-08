@@ -1,3 +1,4 @@
+import { useI18n } from "../../i18n/useI18n";
 import { useMemo, useState, type KeyboardEvent } from "react";
 import type { ActivityTotals } from "../activityFilters";
 import { SPORT_COLOR_LABELS, type SportColorCategory } from "../sportColors";
@@ -8,6 +9,7 @@ import {
 } from "../formatters";
 import { useUnitSystem } from "../../units/UnitSystemProvider";
 
+import { formatCount, plural, t } from "../../i18n/core";
 interface ActivitiesSummaryProps {
   totals: ActivityTotals;
   /** What the period selector says, e.g. "3 months" — the caption's subject. */
@@ -25,20 +27,20 @@ interface SummaryTile {
 function perWeekPhrase(
   total: number,
   weeks: number,
-  singular: string,
-  plural: string
+  kind: "sessions" | "days"
 ): string {
   if (weeks <= 0 || total <= 0) {
-    return "Nothing logged yet";
+    return t("activity.summary.nothing");
   }
 
   const perWeek = total / weeks;
   if (perWeek >= 1) {
-    const rounded = perWeek.toFixed(1).replace(/\.0$/, "");
-    return `${rounded} ${rounded === "1" ? singular : plural} a week`;
+    // One decimal at most, written in the language's digits by plural().
+    const rounded = Math.round(perWeek * 10) / 10;
+    return plural(`activity.summary.perWeek.${kind}` as const, rounded);
   }
 
-  return `One every ${Math.round(7 / perWeek)} days`;
+  return plural("activity.summary.oneEvery", Math.round(7 / perWeek));
 }
 
 /** One sport's slice of the mix bar, and where along the bar it sits. */
@@ -57,8 +59,11 @@ interface MixBand {
 
 /** "Running 68%, 30 sessions" — one band, spelled out for the bar's label. */
 function bandPhrase(band: MixBand): string {
-  const sessions = `${band.count} ${band.count === 1 ? "session" : "sessions"}`;
-  return `${band.label} ${band.percent}%, ${sessions}`;
+  return t("activity.summary.band", {
+    sport: band.label,
+    percent: band.percent,
+    sessions: plural("activity.sessions", band.count)
+  });
 }
 
 /**
@@ -86,6 +91,7 @@ export function ActivitiesSummary({
   periodLabel
 }: ActivitiesSummaryProps) {
   const { unitSystem } = useUnitSystem();
+  const { locale } = useI18n();
   const mixTotal = totals.sports.reduce((sum, sport) => sum + sport.duration, 0);
 
   const bands = useMemo<MixBand[]>(() => {
@@ -108,7 +114,8 @@ export function ActivitiesSummary({
         centre
       };
     });
-  }, [mixTotal, totals.sports]);
+    // The bands carry their sport's name, so a new language rebuilds them.
+  }, [mixTotal, totals.sports, locale]);
 
   /*
    * Held as an index rather than a category so the arrow keys have something
@@ -138,18 +145,18 @@ export function ActivitiesSummary({
   const tiles: SummaryTile[] = [
     {
       key: "sessions",
-      label: "Sessions",
-      value: String(totals.count),
-      caption: perWeekPhrase(totals.count, totals.weeks, "session", "sessions")
+      label: t("activity.summary.sessions"),
+      value: formatCount(totals.count),
+      caption: perWeekPhrase(totals.count, totals.weeks, "sessions")
     },
     {
       key: "time",
-      label: "Time",
+      label: t("activity.m.time"),
       value: formatDurationSpan(totals.duration),
       caption:
         totals.weeks > 0 && totals.duration > 0
-          ? `${formatDurationSpan(totals.duration / totals.weeks)} a week`
-          : "Nothing logged yet"
+          ? t("activity.summary.aWeek", { value: formatDurationSpan(totals.duration / totals.weeks) })
+          : t("activity.summary.nothing")
     },
     // A lifting-only history has no distance to show, and a column of "0 km"
     // is what the old table put in its place. Climb is the figure that still
@@ -157,32 +164,32 @@ export function ActivitiesSummary({
     totals.distance > 0
       ? {
           key: "distance",
-          label: "Distance",
+          label: t("activity.m.distance"),
           value: formatDistanceMeters(totals.distance, unitSystem),
           caption:
             totals.elevationGain > 0
-              ? `${formatElevationMeters(totals.elevationGain, unitSystem)} climbed`
-              : `In ${periodLabel.toLowerCase()}`
+              ? t("activity.summary.climbed", { value: formatElevationMeters(totals.elevationGain, unitSystem) })
+              : t("activity.summary.inPeriod", { period: periodLabel })
         }
       : {
           key: "days",
-          label: "Days trained",
-          value: String(totals.activeDays),
-          caption: perWeekPhrase(totals.activeDays, totals.weeks, "day", "days")
+          label: t("activity.summary.daysTrained"),
+          value: formatCount(totals.activeDays),
+          caption: perWeekPhrase(totals.activeDays, totals.weeks, "days")
         },
     {
       key: "load",
-      label: "Training load",
-      value: totals.trainingLoad > 0 ? Math.round(totals.trainingLoad).toLocaleString() : "—",
+      label: t("activity.m.trainingLoad"),
+      value: totals.trainingLoad > 0 ? formatCount(Math.round(totals.trainingLoad)) : "—",
       caption:
         totals.trainingLoad > 0 && totals.weeks > 0
-          ? `${Math.round(totals.trainingLoad / totals.weeks).toLocaleString()} a week`
-          : "COROS scores this per session"
+          ? t("activity.summary.aWeek", { value: formatCount(Math.round(totals.trainingLoad / totals.weeks)) })
+          : t("activity.summary.loadCaption")
     }
   ];
 
   return (
-    <section className="activities-summary" aria-label={`Training in ${periodLabel}`}>
+    <section className="activities-summary" aria-label={t("activity.summary.label", { period: periodLabel })}>
       <div className="activities-summary-tiles">
         {tiles.map((tile) => (
           <div className="activities-summary-tile" key={tile.key}>
@@ -203,7 +210,7 @@ export function ActivitiesSummary({
             className={`activities-mix-bar${active ? " is-probing" : ""}`}
             role="img"
             tabIndex={0}
-            aria-label={`Sport mix: ${bands.map(bandPhrase).join("; ")}`}
+            aria-label={t("activity.summary.mix", { bands: bands.map(bandPhrase).join("; ") })}
             onMouseLeave={() => setActiveIndex(null)}
             onFocus={() => setActiveIndex((current) => current ?? 0)}
             onBlur={() => setActiveIndex(null)}
@@ -257,7 +264,7 @@ export function ActivitiesSummary({
                 <p className="activities-mix-tip-figures">
                   <strong>{active.percent}%</strong>
                   <span>
-                    {active.count} {active.count === 1 ? "session" : "sessions"}
+                    {plural("activity.sessions", active.count)}
                   </span>
                   <span>{formatDurationSpan(active.duration)}</span>
                 </p>

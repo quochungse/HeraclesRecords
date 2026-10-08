@@ -1,6 +1,7 @@
 import { MUSCLES, type MuscleId } from "./muscles";
 import { nextWeekStartMs, startOfWeekMs, type StrengthAnalytics } from "./strengthAnalytics";
 
+import { getIntlLocale } from "../i18n/core";
 /**
  * The weekly working-set range most hypertrophy guidance lands on for a
  * muscle. It is counted in direct sets; the sets here are credited, so a
@@ -67,7 +68,7 @@ export function landmarkWeeks(windowDays: number, nowMs: number): LandmarkWeek[]
   for (; nextWeekStartMs(start) <= currentWeek; start = nextWeekStartMs(start)) {
     weeks.push({
       weekStart: Math.floor(start / 1000),
-      label: new Date(start).toLocaleDateString(undefined, { month: "short", day: "numeric" })
+      label: new Date(start).toLocaleDateString(getIntlLocale(), { month: "short", day: "numeric" })
     });
   }
   return weeks.slice(-LANDMARK_WEEKS);

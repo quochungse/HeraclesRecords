@@ -1,5 +1,6 @@
 import type { TrainingHubActivity } from "../../electron/types";
 
+import { t } from "../i18n/core";
 /**
  * The two kinds of hike COROS records, kept apart for the reason a run's
  * surfaces and a ride's bikes are.
@@ -23,9 +24,13 @@ const SPORT_TYPE_HIKE: Record<number, HikeType> = {
   105: "mountain" //  Mountain Climb
 };
 
-export const HIKE_TYPE_LABELS: Record<HikeType, string> = {
-  hike: "Hike",
-  mountain: "Mountain climb"
+export const HIKE_TYPE_LABELS: Readonly<Record<HikeType, string>> = {
+  get hike() {
+    return t("hike.type.hike");
+  },
+  get mountain() {
+    return t("hike.type.mountain");
+  }
 };
 
 /**

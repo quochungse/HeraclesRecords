@@ -5,6 +5,7 @@ import { useUnitSystem } from "../units/UnitSystemProvider";
 import { formatVerticalRate } from "../units/units";
 import { rideClimbs, type ClimbCategory } from "./rideAnalysis";
 
+import { t } from "../i18n/core";
 interface RideClimbsPanelProps {
   /** The ride's samples on activity time. */
   series: readonly TrainingHubActivitySeriesPoint[];
@@ -46,29 +47,29 @@ export function RideClimbsPanel({ series }: RideClimbsPanelProps) {
   return (
     <section className="panel run-detail-panel">
       <p className="running-eyebrow">
-        {climbs.length === 1 ? "Climb" : `Climbs · ${climbs.length}`}
+        {climbs.length === 1 ? t("ride.climbs.one") : t("ride.climbs.many", { count: climbs.length })}
       </p>
       <div className="run-table-scroll">
         <table className="run-list run-surface-table ride-climb-table">
           <thead>
             <tr>
-              <th scope="col">Climb</th>
-              <th scope="col" className="is-numeric">Length</th>
-              <th scope="col" className="is-numeric">Grade</th>
-              <th scope="col" className="is-numeric" title="The steepest 200 m of it">
-                Steepest
+              <th scope="col">{t("ride.climbs.one")}</th>
+              <th scope="col" className="is-numeric">{t("ride.climbs.length")}</th>
+              <th scope="col" className="is-numeric">{t("ride.climbs.grade")}</th>
+              <th scope="col" className="is-numeric" title={t("ride.climbs.steepestTitle")}>
+                {t("ride.climbs.steepest")}
               </th>
-              <th scope="col" className="is-numeric">Gain</th>
-              <th scope="col" className="is-numeric">Time</th>
+              <th scope="col" className="is-numeric">{t("ride.climbs.gain")}</th>
+              <th scope="col" className="is-numeric">{t("activity.m.time")}</th>
               <th
                 scope="col"
                 className="is-numeric"
-                title="Vertical metres climbed an hour — the climbing rate, comparable across hills"
+                title={t("ride.climbs.vamTitle")}
               >
                 VAM
               </th>
-              {withPower ? <th scope="col" className="is-numeric">Power</th> : null}
-              {withHr ? <th scope="col" className="is-numeric">Avg HR</th> : null}
+              {withPower ? <th scope="col" className="is-numeric">{t("activity.m.power")}</th> : null}
+              {withHr ? <th scope="col" className="is-numeric">{t("activity.m.avgHr")}</th> : null}
             </tr>
           </thead>
           <tbody>
@@ -78,7 +79,7 @@ export function RideClimbsPanel({ series }: RideClimbsPanelProps) {
                   <span className="ride-climb-cat" data-category={climb.category}>
                     {CATEGORY_LABELS[climb.category]}
                   </span>
-                  from {formatDistanceMeters(climb.startMeters, unitSystem)}
+                  {t("ride.climbs.from", { distance: formatDistanceMeters(climb.startMeters, unitSystem) })}
                 </td>
                 <td className="is-numeric">{formatDistanceMeters(climb.lengthMeters, unitSystem)}</td>
                 <td className="is-numeric">{percent(climb.grade)}</td>
@@ -110,9 +111,7 @@ export function RideClimbsPanel({ series }: RideClimbsPanelProps) {
         </table>
       </div>
       <p className="run-block-note">
-        Found in the elevation samples: a rise is a climb once its length times
-        its grade reaches a category, as Strava scores them — a kilometre at 8%
-        is the least that makes Cat 4.
+        {t("ride.climbs.note")}
       </p>
     </section>
   );

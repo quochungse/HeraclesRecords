@@ -7,6 +7,7 @@ import { previousWeekStartMs, startOfWeekMs } from "./strengthAnalytics";
 import { formatSpan, formatTotalWeight, sessionSourceLabel } from "./strengthFormat";
 import "./strengthSession.css";
 
+import { getIntlLocale, plural, t } from "../i18n/core";
 /** The list's first row: every session in the window at once, rather than one of them. */
 export const AGGREGATE_SELECTION = "aggregate";
 
@@ -44,18 +45,20 @@ function groupByWeek(sessions: StrengthSession[]): WeekGroup[] {
 
 function weekHeading(weekStart: number | undefined, nowMs: number): string {
   if (weekStart === undefined) {
-    return "Undated";
+    return t("activity.week.undated");
   }
   const thisWeek = startOfWeekMs(nowMs);
-  if (weekStart === thisWeek) return "This week";
-  if (weekStart === previousWeekStartMs(thisWeek)) return "Last week";
+  if (weekStart === thisWeek) return t("activity.week.this");
+  if (weekStart === previousWeekStartMs(thisWeek)) return t("activity.week.last");
   const date = new Date(weekStart);
   const sameYear = date.getFullYear() === new Date(nowMs).getFullYear();
-  return `Week of ${date.toLocaleDateString(undefined, {
-    month: "short",
-    day: "numeric",
-    ...(sameYear ? {} : { year: "numeric" })
-  })}`;
+  return t("activity.week.of", {
+    date: date.toLocaleDateString(getIntlLocale(), {
+      month: "short",
+      day: "numeric",
+      ...(sameYear ? {} : { year: "numeric" })
+    })
+  });
 }
 
 interface StrengthSessionListProps {
@@ -119,7 +122,7 @@ export function StrengthSessionList({
   return (
     <nav
       className="strength-session-nav"
-      aria-label="Strength sessions"
+      aria-label={t("strength.list.label")}
       ref={navRef}
       onKeyDown={moveSelection}
     >
@@ -134,12 +137,10 @@ export function StrengthSessionList({
           <Layers size={16} />
         </span>
         <span className="strength-session-row-main">
-          <strong>All sessions</strong>
+          <strong>{t("strength.allSessions")}</strong>
           <span className="strength-session-row-facts">
             <span>{windowLabel}</span>
-            <span>
-              {sessions.length} session{sessions.length === 1 ? "" : "s"}
-            </span>
+            <span>{plural("activity.sessions", sessions.length)}</span>
           </span>
         </span>
       </button>
@@ -172,29 +173,29 @@ export function StrengthSessionList({
                   >
                     <span className="strength-session-row-date" aria-hidden="true">
                       <em>
-                        {date?.toLocaleDateString(undefined, { weekday: "short" }) ?? "—"}
+                        {date?.toLocaleDateString(getIntlLocale(), { weekday: "short" }) ?? "—"}
                       </em>
                       <strong>{date?.getDate() ?? ""}</strong>
                     </span>
                     <span className="strength-session-row-main">
                       <span className="strength-session-row-title">
-                        <strong>{session.name?.trim() || "Strength session"}</strong>
+                        <strong>{session.name?.trim() || t("strength.untitled")}</strong>
                         {records > 0 ? (
                           <span
                             className="strength-session-record-badge"
-                            title={`${records} record${records === 1 ? "" : "s"} in this session`}
+                            title={plural("strength.list.records", records)}
                           >
                             <Trophy size={10} aria-hidden="true" />
-                            PR
+                            {t("strength.pr")}
                           </span>
                         ) : null}
                       </span>
                       <span className="strength-session-row-facts">
-                        <span>{Math.round(summary?.sets ?? 0)} sets</span>
+                        <span>{plural("strength.sets", Math.round(summary?.sets ?? 0))}</span>
                         <span>
                           {summary && summary.volumeKg > 0
                             ? formatTotalWeight(summary.volumeKg, unitSystem)
-                            : "Bodyweight"}
+                            : t("strength.bodyweight")}
                         </span>
                         <span>{formatSpan(summary?.durationSec ?? session.duration ?? 0)}</span>
                         {source ? <span className="strength-session-row-source">{source}</span> : null}

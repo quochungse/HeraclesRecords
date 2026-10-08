@@ -7,6 +7,7 @@ import {
   type TrainingHubActivityFileType
 } from "../../../electron/types";
 
+import { t } from "../../i18n/core";
 /**
  * The export menu in an activity's detail pane.
  *
@@ -105,8 +106,8 @@ export function ActivityExportMenu({
         ref={buttonRef}
         className="activity-meta-action"
         type="button"
-        aria-label={`Export ${activityName}`}
-        title="Export file"
+        aria-label={t("activity.export.named", { name: activityName })}
+        title={t("activity.export.title")}
         aria-haspopup="menu"
         aria-expanded={open}
         disabled={isExporting}
@@ -130,7 +131,7 @@ export function ActivityExportMenu({
               role="menu"
               style={{ top: menuPosition.top, right: menuPosition.right }}
             >
-              <p className="training-export-dropdown-title">Export as</p>
+              <p className="training-export-dropdown-title">{t("activity.export.as")}</p>
               {TRAINING_HUB_EXPORT_FORMATS.map((format) => (
                 <button
                   key={format.fileType}

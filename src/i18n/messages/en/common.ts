@@ -17,12 +17,18 @@ const common = {
   "common.hide": "Hide",
   "common.beta": "Beta",
   "common.newCount": "{count} new",
-
   "sport.run": "Running",
   "sport.bike": "Cycling",
   "sport.hiking": "Hiking",
   "sport.strength": "Strength",
   "sport.other": "Other",
+  "common.connectFirst.title": "Connect COROS first",
+  "common.connectFirst.body": "Signing in to COROS lives on Overview. Connect there and your activities and their detail load here.",
+  "common.openOverview": "Open Overview",
+  "common.loading": "Loading…",
+  "common.showMore": "Show more",
+  "common.all": "All",
+  "common.done": "Done",
 };
 
 export default common;

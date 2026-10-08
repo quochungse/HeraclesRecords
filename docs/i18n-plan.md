@@ -15,7 +15,7 @@ code, and `npm run test:i18n` holds both.
 |---|---|---|
 | P1 | Runtime, Language setting with flags, CJK fonts, the rail, Settings (About, Navigation, Appearance, Connections, Sync, Backup & Restore, Report an issue, Updates, the COROS account row), sport and palette names | **Done** (2026-10-04) |
 | P2 | Overview and its panels, the greeting, the COROS sign-in, `App.tsx`'s toasts and loading states, the update prompt, map styles, periods, MCP notices, COROS's sport names (`sports.*`), and **numbers**: the unit formatters' digits and every count follow the language | **Done** |
-| P3 | Activities, Running, Cycling, Hiking, Strength, and what they share (`ActivitySeriesChart`, `activityChannels.ts`, `sportTypes.ts`, the heatmap) | |
+| P3 | Activities, Running, Cycling, Hiking, Strength, and what they share (`ActivitySeriesChart`, `activityChannels.ts`, `sportTypes.ts`, the heatmap); COROS's zone names (`zoneName`, `zones.*`) | **Done** |
 | P4 | Calendar and Training Library (`WorkoutBuilder`, step kinds, zones, the plan reader and editor) | |
 | P5 | Sleep, Hall of Records, Where you've been, Personal | |
 | P6 | Coach's screen: `ChatView`, Coach Models, MCP servers, the Workbench, analyses. **Not the prompt** (below) | |
@@ -89,9 +89,15 @@ line in the website's guide (`site/src/content/guide/customise.md`, under Appear
   `src/records/labours.ts` in English, so a translation must not change that file's English.
 - **What drives the app from outside stays English.** `data-nav-label` is `english(labelKey)`,
   because the probe and the screenshot harness navigate by it.
-- **A translated file stays translated.** Add it to `TRANSLATED_FILES` in
-  `scripts/test-i18n.mjs`; the test then fails on English written straight into its JSX or
-  into a `title` / `label` / `detail` / `aria-label` / `placeholder` literal.
+- **A translated file stays translated.** Once the scanner finds nothing in it, it leaves
+  `scripts/lib/i18n-pending.json`, and `test:i18n` then fails on English written straight into
+  its JSX, into a `title` / `label` / `detail` / `aria-label` / `placeholder` literal, into a
+  sentence literal, or into an English plural (`n === 1 ? "session" : "sessions"`, which the
+  scanner catches by its shape because each word alone is lower case).
+- **A name the code keys on is not translated where it is kept, only where it is drawn.**
+  COROS's zone names stay English in the tables the coach reads and go through `zoneName()`
+  on screen; an exercise name stays the grouping key and goes through `exerciseLabel()`; a
+  peak-power window keeps its English label and the screen writes its own from the seconds.
 - **A sentence is one message.** Never build one from fragments ("Writes " + n + " records"):
   word order differs, so the whole sentence is the key, with its variants as keys of their
   own when a part comes and goes (`backup.override.detail`, `…detailDeletes`,
@@ -187,3 +193,22 @@ The same terms in the five languages added after P1:
 | Vault (sync storage) | Cofre | Archivio | Хранилище | Brankas | พื้นที่เก็บ |
 | Sign in | Entrar | Accedi | Войти | Masuk | ลงชื่อเข้าใช้ |
 | Settings | Configurações | Impostazioni | Настройки | Pengaturan | การตั้งค่า |
+
+Added in P3 (a run, a ride and a hike are the units the counts speak of; "Ask Coach" uses the
+Coach term above):
+
+| English | vi | ja | ko | zh | es | pt | fr | de | it | ru | id | th |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| a run | buổi chạy | ラン | 러닝 | 跑步 | carrera | corrida | course | Lauf | corsa | пробежка | lari | การวิ่ง |
+| a ride | buổi đạp | ライド | 라이딩 | 骑行 | salida | pedal | sortie | Fahrt | uscita | заезд | gowes | การปั่น |
+| a hike | chuyến | ハイキング | 하이킹 | 徒步 | ruta | trilha | randonnée | Wanderung | escursione | поход | pendakian | เดินป่า |
+| Climb (height gained) | Leo dốc | 獲得標高 | 상승 고도 | 爬升 | Desnivel + | Ganho de elevação | D+ | Anstieg | Dislivello + | Набор высоты | Tanjakan | ไต่ขึ้น |
+| Pace | Pace | ペース | 페이스 | 配速 | Ritmo | Pace | Allure | Pace | Passo | Темп | Pace | เพซ |
+| Set / rep | hiệp / lần | セット / レップ | 세트 / 회 | 组 / 次 | serie / repetición | série / repetição | série / répétition | Satz / Wiederholung | serie / ripetizione | подход / повторение | set / rep | เซ็ต / ครั้ง |
+| Session | buổi | セッション | 세션 | 训练 | sesión | treino | séance | Einheit | sessione | тренировка | sesi | เซสชัน |
+
+**A period phrase is spliced into sentences** (`{window}`, `{period}`: "the last 3 months"),
+so it carries its own article and every sentence around it must take that article: Italian
+and Portuguese use *durante* (not *negli* / *em*, which would contract with it), French *sur*,
+German *für*, Russian *за*. A phrase was changed where no preposition fits it
+(es *los últimos 12 meses*, fr *toute la période*, de *die gesamte Zeit*).

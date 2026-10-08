@@ -111,9 +111,13 @@ export function periodLabel(days: PeriodDays): string {
 export function periodGroupOptions(
   days: readonly PeriodDays[]
 ): Array<{ value: string; label: string }> {
+  // The label is a getter, not a copy: screens build these once at load, and a
+  // copied label would stay in the language the app opened in.
   return periodOptions(days).map((option) => ({
     value: periodValue(option.days),
-    label: option.label
+    get label() {
+      return option.label;
+    }
   }));
 }
 

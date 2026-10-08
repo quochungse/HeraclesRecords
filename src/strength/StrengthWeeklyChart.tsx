@@ -1,4 +1,5 @@
 import { useMemo } from "react";
+import { useI18n } from "../i18n/useI18n";
 import {
   Bar,
   CartesianGrid,
@@ -20,6 +21,7 @@ import { kilogramsToDisplayWeight } from "../units/units";
 import { nextWeekStartMs, startOfWeekMs, type WeekBucket } from "./strengthAnalytics";
 import { formatTotalWeight } from "./strengthFormat";
 
+import { getIntlLocale, plural, t } from "../i18n/core";
 const MS_PER_DAY = 86_400_000;
 
 /** Plot box of the weekly chart, in the same pixels the gradient is drawn in. */
@@ -78,7 +80,7 @@ function buildWeekSeries(weeks: WeekBucket[], windowDays: number): WeekPoint[] {
     const bucket = byWeekStart.get(Math.floor(at / 1000));
     points.push({
       weekStart: Math.floor(at / 1000),
-      label: new Date(at).toLocaleDateString(undefined, {
+      label: new Date(at).toLocaleDateString(getIntlLocale(), {
         month: "short",
         day: "numeric"
       }),
@@ -140,11 +142,12 @@ export function StrengthWeeklyChart({
   const { unitSystem } = useUnitSystem();
   const { colors } = useChartColors();
   const { theme } = useTheme();
+  const { locale } = useI18n();
   const ember = theme === "paper" ? EMBER.paper : EMBER.dark;
 
   const weekSeries = useMemo(
     () => buildWeekSeries(weeks, days),
-    [weeks, days]
+    [weeks, days, locale]
   );
 
   const chartData = useMemo(
@@ -196,25 +199,21 @@ export function StrengthWeeklyChart({
     }
     return value >= 1000
       ? unitSystem === "metric"
-        ? `${Math.round(value / 1000)} tonnes`
+        ? t("strength.week.tonnesAxis", { value: Math.round(value / 1000) })
         : `${Math.round(value / 1000)}k`
       : String(value);
   };
 
   const averageLabel = usesWeights
     ? formatTotalWeight(average.kg, unitSystem)
-    : `${Math.round(average.sets)} sets`;
+    : plural("strength.sets", Math.round(average.sets));
 
   return (
     <section className="panel strength-card strength-week-card">
       <div className="strength-card-head">
         <div>
-          <h3>{usesWeights ? "Weight lifted and sets each week" : "Sets each week"}</h3>
-          <p>
-            {usesWeights
-              ? "Bars show total weight lifted; the line tracks your sets."
-              : "Every bar is every set you did that week."}
-          </p>
+          <h3>{usesWeights ? t("strength.week.titleWeights") : t("strength.week.titleSets")}</h3>
+          <p>{usesWeights ? t("strength.week.subWeights") : t("strength.week.subSets")}</p>
         </div>
         {change ? (
           <span
@@ -235,10 +234,11 @@ export function StrengthWeeklyChart({
               <ArrowDownRight size={13} aria-hidden="true" />
             )}
             {Math.abs(change.percent) < 5
-              ? `About the same as the ${change.weeks} weeks before`
-              : `${Math.abs(Math.round(change.percent))}% ${
-                  change.percent > 0 ? "more" : "less"
-                } than the ${change.weeks} weeks before`}
+              ? t("strength.week.same", { weeks: change.weeks })
+              : t(change.percent > 0 ? "strength.week.more" : "strength.week.less", {
+                  percent: Math.abs(Math.round(change.percent)),
+                  weeks: change.weeks
+                })}
           </span>
         ) : null}
       </div>
@@ -310,19 +310,18 @@ export function StrengthWeeklyChart({
                 const point = props.payload[0].payload as (typeof chartData)[number];
                 return (
                   <div className="strength-tooltip">
-                    <span>Week of {props.label}</span>
+                    <span>{t("activity.week.of", { date: String(props.label ?? "") })}</span>
                     <strong>
                       {point.sessions === 0
-                        ? "No sessions"
+                        ? t("strength.week.noSessions")
                         : usesWeights
                           ? formatTotalWeight(point.volumeKg, unitSystem)
-                          : `${point.sets} sets`}
+                          : plural("strength.sets", point.sets)}
                     </strong>
                     {point.sessions > 0 ? (
                       <span>
-                        {point.sessions} session
-                        {point.sessions === 1 ? "" : "s"}
-                        {usesWeights ? ` · ${point.sets} sets` : ""}
+                        {plural("activity.sessions", point.sessions)}
+                        {usesWeights ? ` · ${plural("strength.sets", point.sets)}` : ""}
                       </span>
                     ) : null}
                   </div>
@@ -343,7 +342,7 @@ export function StrengthWeeklyChart({
             <Bar
               yAxisId="weight"
               dataKey="value"
-              name={usesWeights ? "Weight lifted" : "Sets"}
+              name={usesWeights ? t("strength.summary.lifted") : t("strength.summary.sets")}
               fill="url(#strengthWeekFill)"
               radius={[5, 5, 2, 2]}
               maxBarSize={30}
@@ -353,7 +352,7 @@ export function StrengthWeeklyChart({
                 yAxisId="sets"
                 type="monotone"
                 dataKey="sets"
-                name="Sets"
+                name={t("strength.summary.sets")}
                 stroke={ember.sets}
                 strokeWidth={2}
                 dot={false}
@@ -373,7 +372,7 @@ export function StrengthWeeklyChart({
       {averageValue > 0 ? (
         <p className="strength-chart-note">
           <span className="strength-chart-dash" aria-hidden="true" />
-          Your average week: {averageLabel}
+          {t("strength.week.average", { value: averageLabel })}
         </p>
       ) : null}
     </section>

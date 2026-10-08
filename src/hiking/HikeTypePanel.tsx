@@ -7,6 +7,7 @@ import { climbPerDistanceUnit, hikeTypeBreakdown } from "./hikeMetrics";
 import { HIKE_TYPE_LABELS } from "./hikeType";
 import { hikeTypeColors } from "./hikeTypeColors";
 
+import { t } from "../i18n/core";
 interface HikeTypePanelProps {
   /** Deliberately unfiltered by kind: this panel *is* the split by kind. */
   hikes: readonly TrainingHubActivity[];
@@ -28,7 +29,7 @@ export function HikeTypePanel({ hikes }: HikeTypePanelProps) {
 
   return (
     <section className="panel run-block">
-      <p className="running-eyebrow">Kinds</p>
+      <p className="running-eyebrow">{t("hike.kinds")}</p>
 
       {breakdown.length > 1 ? (
         <div className="run-surface-bar">
@@ -36,7 +37,7 @@ export function HikeTypePanel({ hikes }: HikeTypePanelProps) {
             <div
               key={entry.type}
               style={{ flexGrow: Math.max(entry.share, 0.02), background: palette[entry.type] }}
-              title={`${HIKE_TYPE_LABELS[entry.type]}: ${Math.round(entry.share * 100)}% of recorded time`}
+              title={t("hike.typeShare", { type: HIKE_TYPE_LABELS[entry.type], percent: Math.round(entry.share * 100) })}
             />
           ))}
         </div>
@@ -46,17 +47,17 @@ export function HikeTypePanel({ hikes }: HikeTypePanelProps) {
         <table className="run-list run-surface-table">
           <thead>
             <tr>
-              <th scope="col">Kind</th>
-              <th scope="col" className="is-numeric" title="Share of recorded time">
-                Share
+              <th scope="col">{t("hike.kind")}</th>
+              <th scope="col" className="is-numeric" title={t("hike.shareTitle")}>
+                {t("run.share")}
               </th>
-              <th scope="col" className="is-numeric">Hikes</th>
-              <th scope="col" className="is-numeric">Time</th>
+              <th scope="col" className="is-numeric">{t("hike.hikes")}</th>
+              <th scope="col" className="is-numeric">{t("activity.m.time")}</th>
               <th scope="col" className="is-numeric">
-                Ascent/{distanceUnit(unitSystem)}
+                {t("hike.ascentPer", { unit: distanceUnit(unitSystem) })}
               </th>
-              <th scope="col" className="is-numeric" title="Metres climbed an hour of recorded time">
-                Ascent/h
+              <th scope="col" className="is-numeric" title={t("hike.list.ascentRateTitle")}>
+                {t("hike.list.ascentRate")}
               </th>
             </tr>
           </thead>
@@ -86,10 +87,7 @@ export function HikeTypePanel({ hikes }: HikeTypePanelProps) {
         </table>
       </div>
       <p className="run-block-note">
-        Share is of recorded time, not distance: a mountain day covers
-        little ground and is no less of the season. Ascent an hour is over the
-        recorded time with every stop in it, as COROS records a hike with
-        auto-pause off — a hike's own page works out its moving time.
+        {t("hike.typeNote")}
       </p>
     </section>
   );

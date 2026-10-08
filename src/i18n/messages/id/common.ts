@@ -22,6 +22,13 @@ const common: CommonMessages = {
   "sport.hiking": "Mendaki",
   "sport.strength": "Latihan beban",
   "sport.other": "Lainnya",
+  "common.connectFirst.title": "Hubungkan COROS dulu",
+  "common.connectFirst.body": "Masuk ke COROS ada di Ringkasan. Hubungkan di sana, lalu aktivitas Anda beserta detailnya dimuat di sini.",
+  "common.openOverview": "Buka Ringkasan",
+  "common.loading": "Memuat…",
+  "common.showMore": "Tampilkan lebih banyak",
+  "common.all": "Semua",
+  "common.done": "Selesai",
 };
 
 export default common;

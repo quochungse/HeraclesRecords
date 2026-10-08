@@ -11,6 +11,7 @@ import { climbPerDistanceUnit, rideTypeBreakdown } from "./rideMetrics";
 import { RIDE_TYPE_LABELS } from "./rideType";
 import { rideTypeColors } from "./rideTypeColors";
 
+import { t } from "../i18n/core";
 interface RideTypePanelProps {
   /** Deliberately unfiltered by kind: this panel *is* the split by kind. */
   rides: readonly TrainingHubActivity[];
@@ -34,7 +35,7 @@ export function RideTypePanel({ rides }: RideTypePanelProps) {
 
   return (
     <section className="panel run-block">
-      <p className="running-eyebrow">Bikes</p>
+      <p className="running-eyebrow">{t("ride.bikes")}</p>
 
       {breakdown.length > 1 ? (
         <div className="run-surface-bar">
@@ -42,7 +43,7 @@ export function RideTypePanel({ rides }: RideTypePanelProps) {
             <div
               key={entry.type}
               style={{ flexGrow: Math.max(entry.share, 0.02), background: palette[entry.type] }}
-              title={`${RIDE_TYPE_LABELS[entry.type]}: ${Math.round(entry.share * 100)}% of riding time`}
+              title={t("ride.typeShare", { type: RIDE_TYPE_LABELS[entry.type], percent: Math.round(entry.share * 100) })}
             />
           ))}
         </div>
@@ -52,15 +53,15 @@ export function RideTypePanel({ rides }: RideTypePanelProps) {
         <table className="run-list run-surface-table">
           <thead>
             <tr>
-              <th scope="col">Bike</th>
-              <th scope="col" className="is-numeric" title="Share of riding time">
-                Share
+              <th scope="col">{t("ride.bike")}</th>
+              <th scope="col" className="is-numeric" title={t("ride.shareTitle")}>
+                {t("run.share")}
               </th>
-              <th scope="col" className="is-numeric">Rides</th>
-              <th scope="col" className="is-numeric">Time</th>
-              <th scope="col" className="is-numeric">Speed</th>
+              <th scope="col" className="is-numeric">{t("ride.rides")}</th>
+              <th scope="col" className="is-numeric">{t("activity.m.time")}</th>
+              <th scope="col" className="is-numeric">{t("activity.m.speed")}</th>
               <th scope="col" className="is-numeric">
-                Climb/{distanceUnit(unitSystem)}
+                {t("run.climbPer", { unit: distanceUnit(unitSystem) })}
               </th>
             </tr>
           </thead>
@@ -88,11 +89,7 @@ export function RideTypePanel({ rides }: RideTypePanelProps) {
         </table>
       </div>
       <p className="run-block-note">
-        Share is of riding time, not distance: an hour off-road covers less
-        ground than an hour on the road and is no less of the week. Speed is
-        total distance over the time that recorded one, so a trainer that
-        measured nothing does not pull it down. An indoor ride has no terrain,
-        which is why its climb is blank rather than zero.
+        {t("ride.typeNote")}
       </p>
     </section>
   );

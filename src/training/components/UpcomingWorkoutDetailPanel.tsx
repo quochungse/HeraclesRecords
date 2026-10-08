@@ -15,6 +15,7 @@ import {
   scheduledEntryFromUpcoming
 } from "../upcomingWorkoutMatch";
 
+import { t } from "../../i18n/core";
 interface UpcomingWorkoutDetailPanelProps {
   api: HeraclesRecordsApi;
   workout: TrainingHubUpcomingWorkout | null;
@@ -136,14 +137,14 @@ export function UpcomingWorkoutDetailPanel({
                     aria-live="polite"
                   >
                     <Loader2 className="spin" size={14} aria-hidden="true" />
-                    Loading
+                    {t("common.loading")}
                   </span>
                 ) : null}
                 <button
                   type="button"
                   className="ghost-button calendar-detail-action"
                   onClick={onClose}
-                  aria-label="Close details"
+                  aria-label={t("activity.closeDetails")}
                 >
                   <X size={15} aria-hidden="true" />
                 </button>

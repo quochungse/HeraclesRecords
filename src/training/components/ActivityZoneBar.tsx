@@ -2,6 +2,7 @@ import type { TrainingHubActivityZoneBucket } from "../../../electron/types";
 import { formatDurationSpan } from "../formatters";
 import { zoneLabel, zoneNumber } from "./routeColoring";
 
+import { t } from "../../i18n/core";
 interface ActivityZoneBarProps {
   zones: readonly TrainingHubActivityZoneBucket[];
 }
@@ -13,7 +14,7 @@ interface ActivityZoneBarProps {
  * the number and the bounds and nothing it would have to guess.
  */
 function zoneCaption(index: number): string {
-  return `Zone ${zoneNumber(index)}`;
+  return t("overview.zones.zone", { n: zoneNumber(index) });
 }
 
 function bounds(zone: TrainingHubActivityZoneBucket): string | undefined {
@@ -50,7 +51,7 @@ export function ActivityZoneBar({ zones }: ActivityZoneBarProps) {
 
   return (
     <section className="activity-zones">
-      <h3>Time in heart rate zones</h3>
+      <h3>{t("activity.zones.timeIn")}</h3>
       <div className="activity-zones-bar" aria-hidden="true">
         {ordered.map((zone) => (
           <i

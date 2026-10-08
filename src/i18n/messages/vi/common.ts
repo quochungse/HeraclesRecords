@@ -22,6 +22,13 @@ const common: CommonMessages = {
   "sport.hiking": "Leo núi",
   "sport.strength": "Sức mạnh",
   "sport.other": "Khác",
+  "common.connectFirst.title": "Hãy kết nối COROS trước",
+  "common.connectFirst.body": "Đăng nhập COROS nằm ở trang Tổng quan. Kết nối ở đó, rồi các hoạt động và chi tiết của chúng sẽ tải ở đây.",
+  "common.openOverview": "Mở Tổng quan",
+  "common.loading": "Đang tải…",
+  "common.showMore": "Xem thêm",
+  "common.all": "Tất cả",
+  "common.done": "Xong",
 };
 
 export default common;

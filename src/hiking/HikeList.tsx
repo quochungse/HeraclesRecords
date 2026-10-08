@@ -1,3 +1,4 @@
+import type { MessageKey } from "../i18n/core";
 import { useMemo, type KeyboardEvent } from "react";
 import { ArrowDown, ArrowUp } from "lucide-react";
 import type { TrainingHubActivity } from "../../electron/types";
@@ -12,6 +13,7 @@ import { elevationUnit, metersToElevation } from "../units/units";
 import { hikeAscentRate, hikeSeconds } from "./hikeMetrics";
 import { HIKE_TYPE_LABELS, classifyHikeType, type HikeType } from "./hikeType";
 
+import { t } from "../i18n/core";
 interface HikeListProps {
   hikes: readonly TrainingHubActivity[];
   /** Kept by the parent: this unmounts while a hike is open, as Running's list does. */
@@ -60,24 +62,37 @@ interface ColumnDefinition {
  * Running's positions (running.css) — here the climbing rate and load, then
  * time.
  */
+/** A column whose words are read in the language on screen each time. */
+function column(
+  key: HikeSortKey,
+  labelKey: MessageKey,
+  numeric: boolean,
+  titleKey?: MessageKey
+): ColumnDefinition {
+  return {
+    key,
+    get label() {
+      return t(labelKey);
+    },
+    numeric,
+    ...(titleKey
+      ? {
+          get title() {
+            return t(titleKey);
+          }
+        }
+      : {})
+  };
+}
+
 const COLUMNS: readonly ColumnDefinition[] = [
-  { key: "when", label: "When", numeric: false },
-  { key: "distance", label: "Distance", numeric: true },
-  {
-    key: "duration",
-    label: "Time",
-    numeric: true,
-    title: "Recorded time — with auto-pause off, as COROS's hike mode ships, every stop is in it"
-  },
-  { key: "ascent", label: "Ascent", numeric: true, title: "Metres climbed" },
-  {
-    key: "ascentRate",
-    label: "Ascent/h",
-    numeric: true,
-    title: "Metres climbed an hour of recorded time"
-  },
-  { key: "avgHr", label: "Avg HR", numeric: true },
-  { key: "load", label: "Load", numeric: true, title: "COROS training load for the hike" }
+  column("when", "run.list.when", false),
+  column("distance", "activity.m.distance", true),
+  column("duration", "activity.m.time", true, "hike.list.timeTitle"),
+  column("ascent", "hike.ascent", true, "hike.list.ascentTitle"),
+  column("ascentRate", "hike.list.ascentRate", true, "hike.list.ascentRateTitle"),
+  column("avgHr", "activity.m.avgHr", true),
+  column("load", "overview.tiles.load", true, "hike.list.loadTitle")
 ];
 
 const FIRST_DIRECTION: Record<HikeSortKey, "asc" | "desc"> = {
@@ -168,7 +183,7 @@ export function HikeList({ hikes, sort, onSortChange, onOpenHike }: HikeListProp
                 <button
                   type="button"
                   onClick={() => toggleSort(column.key)}
-                  title={column.title ?? `Sort by ${column.label.toLowerCase()}`}
+                  title={column.title ?? t("run.list.sortBy", { column: column.label })}
                 >
                   <span>{column.label}</span>
                   {active ? (

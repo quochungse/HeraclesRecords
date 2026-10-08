@@ -49,6 +49,7 @@ import {
   type ActivityMotion
 } from "../activityChannels";
 
+import { formatDecimal, t } from "../../i18n/core";
 /**
  * How many points reach recharts.
  *
@@ -94,7 +95,8 @@ type ChartRow = ActivityChannelPoint & {
 };
 
 /** What one whole activity is called, by how it moves. */
-const ACTIVITY_NOUN: Record<ActivityMotion, string> = {
+/** Which activity the chart is about, for its two sentences that name it. */
+const ACTIVITY_NOUN: Record<ActivityMotion, "run" | "ride" | "hike"> = {
   pace: "run",
   speed: "ride",
   hike: "hike",
@@ -129,19 +131,19 @@ function formatChannelValue(
     return `${formatPaceTick(value, unitSystem)} /${distanceUnit(unitSystem)}`;
   }
   if (key === "speed") {
-    return `${kmhToDisplaySpeed(value, unitSystem).toFixed(1)} ${speedUnit(unitSystem)}`;
+    return `${formatDecimal(kmhToDisplaySpeed(value, unitSystem), 1)} ${speedUnit(unitSystem)}`;
   }
   if (key === "verticalSpeed") {
     return formatVerticalRate(value, unitSystem);
   }
   if (key === "cadence") {
-    return `${value.toFixed(definition.decimals)} ${cadenceUnit(motion)}`;
+    return `${formatDecimal(value, definition.decimals)} ${cadenceUnit(motion)}`;
   }
   if (key === "altitude") {
     return `${Math.round(metersToElevation(value, unitSystem))} ${elevationUnit(unitSystem)}`;
   }
 
-  return `${value.toFixed(definition.decimals)} ${definition.unit}`.trim();
+  return `${formatDecimal(value, definition.decimals)} ${definition.unit}`.trim();
 }
 
 function formatAxisTick(
@@ -153,12 +155,12 @@ function formatAxisTick(
     return formatPaceTick(value, unitSystem);
   }
   if (key === "speed") {
-    return kmhToDisplaySpeed(value, unitSystem).toFixed(0);
+    return formatDecimal(kmhToDisplaySpeed(value, unitSystem), 0);
   }
   if (key === "altitude" || key === "verticalSpeed") {
     return String(Math.round(metersToElevation(value, unitSystem)));
   }
-  return value.toFixed(activityChannel(key).decimals);
+  return formatDecimal(value, activityChannel(key).decimals);
 }
 
 /**
@@ -191,7 +193,7 @@ function formatXTick(
   if (axis === "elapsed") {
     return formatDurationSeconds(value);
   }
-  return metersToDisplayDistance(value, unitSystem).toFixed(1);
+  return formatDecimal(metersToDisplayDistance(value, unitSystem), 1);
 }
 
 /** The tooltip's heading: the same position as a tick, with its unit. */
@@ -203,7 +205,7 @@ function formatXLabel(
   if (axis === "elapsed") {
     return formatDurationSeconds(value);
   }
-  return `${metersToDisplayDistance(value, unitSystem).toFixed(2)} ${distanceUnit(unitSystem)}`;
+  return `${formatDecimal(metersToDisplayDistance(value, unitSystem), 2)} ${distanceUnit(unitSystem)}`;
 }
 
 /**
@@ -442,9 +444,9 @@ export function ActivitySeriesChart({
     ? "activity-chart-panel is-embedded"
     : "panel run-detail-panel activity-chart-panel";
   const heading = embedded ? (
-    <h3>Channels</h3>
+    <h3>{t("activity.chart.channels")}</h3>
   ) : (
-    <p className="running-eyebrow">Channels</p>
+    <p className="running-eyebrow">{t("activity.chart.channels")}</p>
   );
 
   if (rows.length < 2) {
@@ -452,8 +454,7 @@ export function ActivitySeriesChart({
       <section className={surfaceClass}>
         {heading}
         <p className="activity-chart-empty">
-          COROS returned no per-sample readings for this {ACTIVITY_NOUN[motion]},
-          so there is nothing to plot. The summary above is everything it sent.
+          {t(`activity.chart.empty.${ACTIVITY_NOUN[motion]}` as const)}
         </p>
       </section>
     );
@@ -466,12 +467,12 @@ export function ActivitySeriesChart({
       <div className="activity-chart-head">
         {heading}
         <OptionGroup
-          label="X axis"
+          label={t("activity.chart.xAxis")}
           className="activity-chart-axis"
           value={axis}
           options={[
-            { value: "elapsed", label: "Time", disabled: !hasElapsed },
-            { value: "distance", label: "Distance", disabled: !hasDistance }
+            { value: "elapsed", label: t("activity.m.time"), disabled: !hasElapsed },
+            { value: "distance", label: t("activity.m.distance"), disabled: !hasDistance }
           ]}
           onChange={(next) =>
             setAxis(next === "distance" ? "distance" : "elapsed")
@@ -482,7 +483,7 @@ export function ActivitySeriesChart({
       {/* The chip wears its own series colour, because that colour is how the
           line is found in the plot — it is data, not decoration. */}
       <OptionChips
-        label="Series"
+        label={t("activity.chart.series")}
         className="activity-chart-chips"
         options={available.map((channel) => ({
           value: channel.key,
@@ -657,11 +658,13 @@ export function ActivitySeriesChart({
       {segment ? (
         <div className="activity-chart-segment">
           <span className="activity-chart-segment-label">
-            {range === null ? `Whole ${ACTIVITY_NOUN[motion]}` : "Selection"}
+            {range === null
+              ? t(`activity.chart.whole.${ACTIVITY_NOUN[motion]}` as const)
+              : t("activity.chart.selection")}
           </span>
           {segment.distance !== undefined ? (
             <span>
-              {metersToDisplayDistance(segment.distance, unitSystem).toFixed(2)}{" "}
+              {formatDecimal(metersToDisplayDistance(segment.distance, unitSystem), 2)}{" "}
               {distanceUnit(unitSystem)}
             </span>
           ) : null}

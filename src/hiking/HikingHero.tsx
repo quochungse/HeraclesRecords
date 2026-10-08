@@ -16,6 +16,7 @@ import {
   hikeSeconds
 } from "./hikeMetrics";
 
+import { plural, t } from "../i18n/core";
 interface HikingHeroProps {
   /**
    * Hikes matching the kind filter, over the whole history — "this week", its
@@ -77,13 +78,13 @@ export function HikingHero({ hikes, nowMs }: HikingHeroProps) {
   return (
     <section className="run-hero">
       <div className="run-hero-card">
-        <span className="run-hero-label">This week</span>
+        <span className="run-hero-label">{t("activity.hero.thisWeek")}</span>
         <strong className="run-hero-value">
           {count > 0 ? formatDurationSpan(thisWeek?.current.duration) : "—"}
         </strong>
         <div className="run-hero-foot">
           <span>
-            {count} {count === 1 ? "hike" : "hikes"}
+            {plural("activity.hike.count", count)}
             {(thisWeek?.current.distance ?? 0) > 0
               ? ` · ${formatDistanceMeters(thisWeek?.current.distance, unitSystem)}`
               : ""}
@@ -93,7 +94,7 @@ export function HikingHero({ hikes, nowMs }: HikingHeroProps) {
       </div>
 
       <div className="run-hero-card">
-        <span className="run-hero-label">Ascent this week</span>
+        <span className="run-hero-label">{t("hike.hero.ascentThisWeek")}</span>
         <strong className="run-hero-value">
           {(thisWeek?.current.elevationGain ?? 0) > 0
             ? formatElevationMeters(thisWeek?.current.elevationGain, unitSystem)
@@ -102,43 +103,43 @@ export function HikingHero({ hikes, nowMs }: HikingHeroProps) {
         <div className="run-hero-foot">
           <span>
             {thisWeek && thisWeek.ascentBaseline > 0
-              ? `4-week average ${formatElevationMeters(thisWeek.ascentBaseline, unitSystem)}`
-              : "No climbing in the last four weeks"}
+              ? t("activity.hero.avg4w", { value: formatElevationMeters(thisWeek.ascentBaseline, unitSystem) })
+              : t("activity.trail.noClimb")}
           </span>
         </div>
       </div>
 
       <div className="run-hero-card">
-        <span className="run-hero-label">Biggest day · 12 weeks</span>
+        <span className="run-hero-label">{t("hike.hero.biggest")}</span>
         <strong className="run-hero-value">
           {biggest ? formatDurationSpan(hikeSeconds(biggest)) : "—"}
         </strong>
         <div className="run-hero-foot">
           <span className="hike-hero-name" title={biggest?.name}>
             {biggest
-              ? `${biggest.name?.trim() || "Hike"}${
+              ? `${biggest.name?.trim() || t("hike.type.hike")}${
                   (biggest.elevationGain ?? 0) > 0
                     ? ` · +${formatElevationMeters(biggest.elevationGain, unitSystem)}`
                     : ""
                 }`
-              : "No hikes in the last twelve weeks"}
+              : t("hike.hero.noRecent")}
           </span>
         </div>
       </div>
 
       <div
         className="run-hero-card"
-        title={`Median metres climbed an hour over the hikes of the last twelve weeks that climbed ${CLIMBING_RATE_MIN_GAIN_M} m or more — over the recorded time, stops included.`}
+        title={t("hike.hero.rateTitle", { floor: CLIMBING_RATE_MIN_GAIN_M })}
       >
-        <span className="run-hero-label">Ascent per hour · 12 weeks</span>
+        <span className="run-hero-label">{t("hike.hero.rate")}</span>
         <strong className="run-hero-value">
           {rate.rate === undefined ? "—" : formatVerticalRate(rate.rate, unitSystem)}
         </strong>
         <div className="run-hero-foot">
           <span>
             {rate.rate === undefined
-              ? `No hike over ${CLIMBING_RATE_MIN_GAIN_M} m of ascent yet`
-              : `${rate.count} ${rate.count === 1 ? "hike" : "hikes"} over ${CLIMBING_RATE_MIN_GAIN_M} m`}
+              ? t("hike.hero.noRate", { floor: CLIMBING_RATE_MIN_GAIN_M })
+              : plural("hike.hero.over", rate.count, { floor: CLIMBING_RATE_MIN_GAIN_M })}
           </span>
           {rate.rate !== undefined && rate.previousRate !== undefined && rate.previousRate > 0 ? (
             <DeltaChip ratio={(rate.rate - rate.previousRate) / rate.previousRate} />

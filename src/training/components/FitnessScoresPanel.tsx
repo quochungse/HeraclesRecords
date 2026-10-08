@@ -10,6 +10,7 @@ import {
 } from "../formatters";
 import { useUnitSystem } from "../../units/UnitSystemProvider";
 
+import { t } from "../../i18n/core";
 interface FitnessScoresPanelProps {
   dashboard: TrainingHubDashboard | null;
   racePredictor: TrainingHubRacePredictor | null;
@@ -70,12 +71,12 @@ export function FitnessScoresPanel({
       <section className="panel training-scores-panel">
         <header className="training-scores-header">
           <div className="training-scores-heading">
-            <p className="eyebrow">Fitness Scores</p>
-            <h2>Not loaded</h2>
+            <p className="eyebrow">{t("activity.scores.eyebrow")}</p>
+            <h2>{t("activity.scores.notLoaded")}</h2>
           </div>
           <BarChart3 size={22} aria-hidden="true" />
         </header>
-        <p className="training-empty-chart">Fitness scores could not be loaded.</p>
+        <p className="training-empty-chart">{t("activity.scores.failed")}</p>
       </section>
     );
   }
@@ -86,22 +87,22 @@ export function FitnessScoresPanel({
   );
   const scores: ScoreItem[] = [
     {
-      label: "Endurance",
+      label: t("activity.scores.endurance"),
       value: predictor?.aerobicEnduranceScore,
       paceLabel: paceLabels.Endurance
     },
     {
-      label: "Threshold",
+      label: t("activity.scores.threshold"),
       value: predictor?.lactateThresholdCapacityScore,
       paceLabel: paceLabels.Threshold
     },
     {
-      label: "Speed",
+      label: t("activity.scores.speed"),
       value: predictor?.anaerobicEnduranceScore,
       paceLabel: paceLabels.Speed
     },
     {
-      label: "Sprint",
+      label: t("activity.scores.sprint"),
       value: predictor?.anaerobicCapacityScore,
       paceLabel: paceLabels.Sprint
     }
@@ -110,20 +111,20 @@ export function FitnessScoresPanel({
   const metrics: MetricItem[] = [
     { label: "LTHR", value: predictor?.lthr, format: formatBpm },
     {
-      label: "LT Pace",
+      label: t("activity.scores.ltPace"),
       value: predictor?.ltsp,
       format: (value) => formatPaceSecondsPerKm(value, unitSystem)
     },
-    { label: "Max HR", value: dashboard?.fitnessMaxHr, format: formatBpm },
-    { label: "Run Level HR", value: dashboard?.runningLevelHr, format: formatBpm }
+    { label: t("activity.m.maxHr"), value: dashboard?.fitnessMaxHr, format: formatBpm },
+    { label: t("activity.scores.runLevelHr"), value: dashboard?.runningLevelHr, format: formatBpm }
   ];
 
   return (
     <section className="panel training-scores-panel">
       <header className="training-scores-header">
         <div className="training-scores-heading">
-          <p className="eyebrow">Fitness Scores</p>
-          <h2>{scores.length > 0 ? "Running fitness" : "Threshold profile"}</h2>
+          <p className="eyebrow">{t("activity.scores.eyebrow")}</p>
+          <h2>{scores.length > 0 ? t("activity.scores.running") : t("activity.scores.threshold.title")}</h2>
         </div>
         <BarChart3 size={22} aria-hidden="true" />
       </header>

@@ -15,6 +15,7 @@ import { buildVo2Trend, formatPlateauDuration, type Vo2Reading } from "../traini
 import { useUnitSystem } from "../units/UnitSystemProvider";
 import { buildRunWeeks, runLoadBalance, type LoadBalance } from "./runMetrics";
 
+import { formatDecimal, plural, t } from "../i18n/core";
 interface RunningHeroProps {
   /**
    * Runs matching the surface filter, over the whole history — "this week" and
@@ -47,10 +48,10 @@ interface LoadBand {
  * is rather than what the athlete should do about it.
  */
 function loadBand(ratio: number): LoadBand {
-  if (ratio < 0.8) return { label: "Backing off", tone: "low" };
-  if (ratio <= 1.3) return { label: "Steady", tone: "steady" };
-  if (ratio <= 1.5) return { label: "Ramping up", tone: "high" };
-  return { label: "Sharp jump", tone: "spike" };
+  if (ratio < 0.8) return { label: t("activity.load.backingOff"), tone: "low" };
+  if (ratio <= 1.3) return { label: t("activity.load.steady"), tone: "steady" };
+  if (ratio <= 1.5) return { label: t("activity.load.rampingUp"), tone: "high" };
+  return { label: t("activity.load.sharpJump"), tone: "spike" };
 }
 
 function thresholdPace(
@@ -126,22 +127,19 @@ export function RunningHero({ runs, allRuns, snapshot, filtered, nowMs }: Runnin
   return (
     <section className="run-hero">
       <div className="run-hero-card">
-        <span className="run-hero-label">This week</span>
+        <span className="run-hero-label">{t("activity.hero.thisWeek")}</span>
         <strong className="run-hero-value">
           {formatDistanceMeters(thisWeek?.current.distance ?? 0, unitSystem)}
         </strong>
         <div className="run-hero-foot">
-          <span>
-            {thisWeek?.current.count ?? 0}{" "}
-            {thisWeek?.current.count === 1 ? "run" : "runs"}
-          </span>
+          <span>{plural("activity.run.count", thisWeek?.current.count ?? 0)}</span>
           {thisWeek?.deltaRatio !== undefined ? (
             <DeltaChip ratio={thisWeek.deltaRatio} />
           ) : null}
         </div>
       </div>
 
-      <LoadRatioCard balance={balance} filtered={filtered} sessions="runs" doing="running" />
+      <LoadRatioCard balance={balance} filtered={filtered} sport="run" />
 
       <div className="run-hero-card">
         <span className="run-hero-label">VO₂max</span>
@@ -149,19 +147,19 @@ export function RunningHero({ runs, allRuns, snapshot, filtered, nowMs }: Runnin
         <div className="run-hero-foot">
           <span>
             {vo2
-              ? `Held ${formatPlateauDuration(vo2.daysAtCurrent)}`
-              : "No readings yet"}
+              ? t("activity.hero.held", { duration: formatPlateauDuration(vo2.daysAtCurrent) })
+              : t("activity.hero.noReadings")}
           </span>
         </div>
       </div>
 
       <div className="run-hero-card">
-        <span className="run-hero-label">Threshold</span>
+        <span className="run-hero-label">{t("activity.scores.threshold")}</span>
         <strong className="run-hero-value">
           {ltsp === undefined ? "—" : formatPaceSecondsPerKm(ltsp, unitSystem)}
         </strong>
         <div className="run-hero-foot">
-          <span>{lthr === undefined ? "No threshold HR" : `${lthr} bpm`}</span>
+          <span>{lthr === undefined ? t("activity.hero.noThresholdHr") : `${lthr} bpm`}</span>
         </div>
       </div>
     </section>
@@ -175,7 +173,7 @@ export function DeltaChip({ ratio }: { ratio: number }) {
   if (Math.abs(percent) < 2) {
     return (
       <span className="run-delta tone-flat">
-        <Minus size={12} aria-hidden="true" /> level
+        <Minus size={12} aria-hidden="true" /> {t("activity.delta.level")}
       </span>
     );
   }
@@ -200,13 +198,12 @@ interface LoadRatioCardProps {
   balance: LoadBalance;
   /** Whether a filter narrows the figures beside it — the ratio is always the whole sport's. */
   filtered: boolean;
-  /** The sport's sessions and the doing of it, as the card words them: "rides", "riding". */
-  sessions: string;
-  doing: string;
+  /** Whose load it is: the card's words are the sport's own. */
+  sport: "run" | "ride";
 }
 
 /** The acute-to-chronic card, as every sport screen's hero draws it. */
-export function LoadRatioCard({ balance, filtered, sessions, doing }: LoadRatioCardProps) {
+export function LoadRatioCard({ balance, filtered, sport }: LoadRatioCardProps) {
   const band = balance.ratio === undefined ? undefined : loadBand(balance.ratio);
   const thinHistory =
     band !== undefined &&
@@ -216,26 +213,26 @@ export function LoadRatioCard({ balance, filtered, sessions, doing }: LoadRatioC
   return (
     <div className="run-hero-card">
       <span className="run-hero-label">
-        Load ratio{filtered ? ` · all ${sessions}` : ""}
+        {filtered ? t(`activity.load.titleAll.${sport}` as const) : t("activity.load.title")}
       </span>
       {balance.ratio === undefined || band === undefined ? (
         <>
           <strong className="run-hero-value">—</strong>
           <div className="run-hero-foot">
-            <span>No {doing} load in the last four weeks</span>
+            <span>{t(`activity.load.none.${sport}` as const)}</span>
           </div>
         </>
       ) : (
         <>
-          <strong className={`run-hero-value tone-${band.tone}`}>{balance.ratio.toFixed(2)}</strong>
+          <strong className={`run-hero-value tone-${band.tone}`}>{formatDecimal(balance.ratio, 2)}</strong>
           <div className="run-hero-foot">
             <span>{band.label}</span>
             {thinHistory ? (
               <span
                 className="run-hero-note"
-                title="The four-week average is being taken over history that is not there yet, so the ratio reads high."
+                title={t("activity.load.thinTitle")}
               >
-                short history
+                {t("activity.load.thin")}
               </span>
             ) : null}
           </div>

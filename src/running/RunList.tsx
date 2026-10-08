@@ -1,3 +1,4 @@
+import type { MessageKey } from "../i18n/core";
 import { useMemo, type KeyboardEvent } from "react";
 import { ArrowDown, ArrowUp } from "lucide-react";
 import type {
@@ -32,6 +33,7 @@ import {
   type UnitSystem
 } from "../units/units";
 
+import { formatDecimal, t } from "../i18n/core";
 interface RunListProps {
   runs: readonly TrainingHubActivity[];
   /**
@@ -95,51 +97,60 @@ interface ColumnDefinition {
 /** The one column whose name carries a unit. */
 function columnLabel(column: ColumnDefinition, unitSystem: UnitSystem): string {
   return column.key === "elevationPerKm"
-    ? `${column.label}/${distanceUnit(unitSystem)}`
+    ? t("run.climbPer", { unit: distanceUnit(unitSystem) })
     : column.label;
 }
 
 function columnTitle(column: ColumnDefinition, unitSystem: UnitSystem): string {
   if (column.key === "elevationPerKm") {
     return unitSystem === "imperial"
-      ? "Feet climbed per mile"
-      : "Metres climbed per kilometre";
+      ? t("run.list.climbPerTitle.imperial")
+      : t("run.list.climbPerTitle.metric");
   }
   if (column.key === "ascentRate") {
-    return `${unitSystem === "imperial" ? "Feet" : "Metres"} climbed an hour, over the whole run`;
+    return unitSystem === "imperial"
+      ? t("run.list.rateTitle.imperial")
+      : t("run.list.rateTitle.metric");
   }
-  return column.title ?? `Sort by ${column.label.toLowerCase()}`;
+  return column.title ?? t("run.list.sortBy", { column: column.label });
+}
+
+/** A column whose words are read in the language on screen each time. */
+function column(
+  key: SortKey,
+  labelKey: MessageKey,
+  numeric: boolean,
+  titleKey?: MessageKey
+): ColumnDefinition {
+  return {
+    key,
+    get label() {
+      return t(labelKey);
+    },
+    numeric,
+    ...(titleKey
+      ? {
+          get title() {
+            return t(titleKey);
+          }
+        }
+      : {})
+  };
 }
 
 const COLUMNS: readonly ColumnDefinition[] = [
-  { key: "when", label: "When", numeric: false },
-  { key: "distance", label: "Distance", numeric: true },
-  { key: "duration", label: "Time", numeric: true },
-  { key: "pace", label: "Pace", numeric: true },
-  {
-    key: "elevationPerKm",
-    // Both halves of this ratio are units, and both follow the athlete: metres
-    // per kilometre on metric, feet per mile on imperial. Showing feet per
-    // kilometre — which is what converting only the climb gave — is a figure
-    // in no system at all, and it reads 1.6x low to anyone taking it for ft/mi.
-    label: "Climb",
-    numeric: true
-  },
-  { key: "avgHr", label: "Avg HR", numeric: true },
-  {
-    key: "efficiency",
-    label: "EF",
-    numeric: true,
-    title:
-      "Efficiency index — metres per minute per heartbeat. Higher is more ground for the same effort."
-  },
-  {
-    key: "drift",
-    label: "Drift",
-    numeric: true,
-    title:
-      "Aerobic decoupling — how much further apart pace and heart rate moved after the first ten minutes. Under 5% is a session held together; runs under 30 minutes get none."
-  }
+  column("when", "run.list.when", false),
+  column("distance", "activity.m.distance", true),
+  column("duration", "activity.m.time", true),
+  column("pace", "activity.m.pace", true),
+  // Both halves of this ratio are units, and both follow the athlete: metres
+  // per kilometre on metric, feet per mile on imperial. Showing feet per
+  // kilometre — which is what converting only the climb gave — is a figure
+  // in no system at all, and it reads 1.6x low to anyone taking it for ft/mi.
+  column("elevationPerKm", "activity.m.climb", true),
+  column("avgHr", "activity.m.avgHr", true),
+  column("efficiency", "run.list.ef", true, "run.list.efTitle"),
+  column("drift", "run.list.drift", true, "run.list.driftTitle")
 ];
 
 /**
@@ -149,14 +160,14 @@ const COLUMNS: readonly ColumnDefinition[] = [
  * breakthrough. The height takes their place, whole and by the hour.
  */
 const TRAIL_COLUMNS: readonly ColumnDefinition[] = [
-  { key: "when", label: "When", numeric: false },
-  { key: "distance", label: "Distance", numeric: true },
-  { key: "duration", label: "Time", numeric: true },
-  { key: "pace", label: "Pace", numeric: true },
-  { key: "elevationGain", label: "Climb", numeric: true, title: "Sort by the height climbed" },
-  { key: "elevationPerKm", label: "Climb", numeric: true },
-  { key: "ascentRate", label: "Climb/h", numeric: true },
-  { key: "avgHr", label: "Avg HR", numeric: true }
+  column("when", "run.list.when", false),
+  column("distance", "activity.m.distance", true),
+  column("duration", "activity.m.time", true),
+  column("pace", "activity.m.pace", true),
+  column("elevationGain", "activity.m.climb", true, "run.list.climbTitle"),
+  column("elevationPerKm", "activity.m.climb", true),
+  column("ascentRate", "run.list.climbRate", true),
+  column("avgHr", "activity.m.avgHr", true)
 ];
 
 /** Which way a column wants to sort the first time it is pressed. */
@@ -257,14 +268,14 @@ function cellText(row: RunRow, key: SortKey, unitSystem: UnitSystem): string {
       // Two decimals, not one: efficiency moves in hundredths, so a single
       // decimal rounds a block's whole progress into three values and the
       // column stops saying anything.
-      return row.efficiency === undefined ? "—" : row.efficiency.toFixed(2);
+      return row.efficiency === undefined ? "—" : formatDecimal(row.efficiency, 2);
     case "drift":
       // Signed, because a negative reading is a real result — the second half
       // cost less than the first — and an unsigned 3% would read as drift the
       // run did not have.
       return row.drift === undefined
         ? "—"
-        : `${row.drift > 0 ? "+" : ""}${row.drift.toFixed(1)}%`;
+        : `${row.drift > 0 ? "+" : ""}${formatDecimal(row.drift, 1)}%`;
   }
 }
 

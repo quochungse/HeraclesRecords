@@ -1,6 +1,8 @@
+import type { MessageKey } from "../i18n/core";
 import type { StrengthSession, StrengthSet } from "../../electron/types";
 import { estimateOneRepMax, exerciseDisplayName } from "./strengthAnalytics";
 
+import { formatDecimal, plural, t } from "../i18n/core";
 const EPSILON = 0.01;
 
 export interface ExplorerSet extends StrengthSet {
@@ -80,14 +82,29 @@ interface RepRangeDefinition {
   max?: number;
 }
 
+/** A rep range, its names read in the language on screen each time. */
+function repRange(id: string, key: string, min: number, max?: number): RepRangeDefinition {
+  return {
+    id,
+    get label() {
+      return t(`strength.range.${key}` as MessageKey);
+    },
+    get shortLabel() {
+      return t(`strength.range.${key}.short` as MessageKey);
+    },
+    min,
+    ...(max === undefined ? {} : { max })
+  };
+}
+
 const REP_RANGES: RepRangeDefinition[] = [
-  { id: "1", label: "Single", shortLabel: "1 rep", min: 1, max: 1 },
-  { id: "2-3", label: "Heavy double / triple", shortLabel: "2–3 reps", min: 2, max: 3 },
-  { id: "4-6", label: "Strength", shortLabel: "4–6 reps", min: 4, max: 6 },
-  { id: "7-9", label: "Strength / growth", shortLabel: "7–9 reps", min: 7, max: 9 },
-  { id: "10-12", label: "Muscle growth", shortLabel: "10–12 reps", min: 10, max: 12 },
-  { id: "13-15", label: "High-rep", shortLabel: "13–15 reps", min: 13, max: 15 },
-  { id: "16+", label: "Endurance", shortLabel: "16+ reps", min: 16 }
+  repRange("1", "r1", 1, 1),
+  repRange("2-3", "r2", 2, 3),
+  repRange("4-6", "r4", 4, 6),
+  repRange("7-9", "r7", 7, 9),
+  repRange("10-12", "r10", 10, 12),
+  repRange("13-15", "r13", 13, 15),
+  repRange("16+", "r16", 16)
 ];
 
 function repRangeFor(reps: number): RepRangeDefinition | undefined {
@@ -123,8 +140,8 @@ function plateauIndicator(records: ExerciseSessionRecord[]): PlateauIndicator {
   if (loaded.length < 4) {
     return {
       state: "insufficient",
-      label: "Building a baseline",
-      detail: `${4 - loaded.length} more loaded session${4 - loaded.length === 1 ? "" : "s"} needed before calling a trend.`,
+      label: t("strength.plateau.insufficient"),
+      detail: plural("strength.plateau.insufficientDetail", 4 - loaded.length),
       sessionsConsidered: loaded.length
     };
   }
@@ -143,8 +160,11 @@ function plateauIndicator(records: ExerciseSessionRecord[]): PlateauIndicator {
   if (latest < peak * 0.95 && change < -0.03) {
     return {
       state: "declining",
-      label: "Below recent peak",
-      detail: `Estimated max is ${Math.abs(changePercent).toFixed(1)}% below the first of the last ${recent.length} sessions.`,
+      label: t("strength.plateau.declining"),
+      detail: t("strength.plateau.decliningDetail", {
+        percent: formatDecimal(Math.abs(changePercent), 1),
+        count: recent.length
+      }),
       sessionsConsidered: recent.length,
       changePercent
     };
@@ -153,8 +173,11 @@ function plateauIndicator(records: ExerciseSessionRecord[]): PlateauIndicator {
   if (change > 0.025) {
     return {
       state: "progressing",
-      label: "Progressing",
-      detail: `Estimated max is up ${changePercent.toFixed(1)}% across the last ${recent.length} sessions.`,
+      label: t("strength.plateau.progressing"),
+      detail: t("strength.plateau.progressingDetail", {
+        percent: formatDecimal(changePercent, 1),
+        count: recent.length
+      }),
       sessionsConsidered: recent.length,
       changePercent
     };
@@ -163,8 +186,8 @@ function plateauIndicator(records: ExerciseSessionRecord[]): PlateauIndicator {
   if (spread <= 0.03) {
     return {
       state: "plateau",
-      label: "Plateau watch",
-      detail: `Estimated max has stayed inside a 3% band for ${recent.length} sessions.`,
+      label: t("strength.plateau.plateau"),
+      detail: t("strength.plateau.plateauDetail", { count: recent.length }),
       sessionsConsidered: recent.length,
       changePercent
     };
@@ -172,8 +195,8 @@ function plateauIndicator(records: ExerciseSessionRecord[]): PlateauIndicator {
 
   return {
     state: "steady",
-    label: "Holding steady",
-    detail: `No clear climb or plateau across the last ${recent.length} sessions yet.`,
+    label: t("strength.plateau.steady"),
+    detail: t("strength.plateau.steadyDetail", { count: recent.length }),
     sessionsConsidered: recent.length,
     changePercent
   };
@@ -223,7 +246,7 @@ export function buildExerciseExplorer(
 
     chronological.push({
       activityId: session.activityId,
-      sessionName: session.name?.trim() || "Strength session",
+      sessionName: session.name?.trim() || t("strength.untitled"),
       at: session.startTime,
       sets,
       totalReps: sets.reduce((sum, set) => sum + set.reps, 0),

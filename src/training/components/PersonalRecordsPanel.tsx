@@ -22,6 +22,7 @@ import {
 import prLaurel from "../../assets/training-hub/pr-laurel.webp";
 import prWheat from "../../assets/training-hub/pr-wheat.webp";
 
+import { t } from "../../i18n/core";
 interface PersonalRecordsPanelProps {
   dashboard: TrainingHubDashboard | null;
 }
@@ -162,7 +163,7 @@ function LaurelBadge() {
     <img
       className="training-record-pr"
       src={prLaurel}
-      alt="Personal record"
+      alt={t("activity.records.alt")}
     />
   );
 }
@@ -202,7 +203,7 @@ export function PersonalRecordsPanel({ dashboard }: PersonalRecordsPanelProps) {
           aria-hidden="true"
         />
         <div className="training-records-banner-text">
-          <p className="training-records-banner-headline">Personal Records</p>
+          <p className="training-records-banner-headline">{t("activity.records.title")}</p>
         </div>
         <img
           className="training-records-banner-wheat is-right"
@@ -213,7 +214,7 @@ export function PersonalRecordsPanel({ dashboard }: PersonalRecordsPanelProps) {
       </div>
 
       {groups.length > 0 ? (
-        <div className="training-records-tabs" role="tablist" aria-label="Record period">
+        <div className="training-records-tabs" role="tablist" aria-label={t("activity.records.period")}>
           {groups.map((group) => (
             <button
               key={group.type}
@@ -244,7 +245,7 @@ export function PersonalRecordsPanel({ dashboard }: PersonalRecordsPanelProps) {
         </div>
       ) : (
         <div className="training-empty-state">
-          <p>No personal records loaded from your COROS dashboard yet.</p>
+          <p>{t("activity.records.none")}</p>
         </div>
       )}
     </section>

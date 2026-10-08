@@ -69,7 +69,7 @@ const app: AppMessages = {
   "app.period.d180": "6 meses",
   "app.period.d180.phrase": "los últimos 6 meses",
   "app.period.d365": "1 año",
-  "app.period.d365.phrase": "el último año",
+  "app.period.d365.phrase": "los últimos 12 meses",
   "app.period.all": "Todo",
   "app.period.all.phrase": "todo el historial",
   "app.mcp.hint.connect": "Conéctalo en {location}.",

@@ -22,6 +22,13 @@ const common: CommonMessages = {
   "sport.hiking": "하이킹",
   "sport.strength": "근력 운동",
   "sport.other": "기타",
+  "common.connectFirst.title": "먼저 COROS를 연결하세요",
+  "common.connectFirst.body": "COROS 로그인은 개요 화면에서 합니다. 거기서 연결하면 활동과 상세 정보가 여기에 불러와집니다.",
+  "common.openOverview": "개요 열기",
+  "common.loading": "불러오는 중…",
+  "common.showMore": "더 보기",
+  "common.all": "전체",
+  "common.done": "완료",
 };
 
 export default common;

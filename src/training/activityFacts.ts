@@ -23,6 +23,7 @@ import { isSpeedSport, isSwimSportType } from "./sportTypes";
 import { classifyRunSurface, isRunSportType } from "../running/runSurface";
 import { formatSpeedValue } from "../units/units";
 
+import { formatDecimal, t } from "../i18n/core";
 export interface ActivityFact {
   key: string;
   value: string;
@@ -80,7 +81,7 @@ export function activityRowFacts(
     facts.push({
       key: "duration",
       value: formatDurationSpan(duration),
-      title: "Activity time, pauses taken out"
+      title: t("activity.pane.timeTitle")
     });
   }
 
@@ -88,7 +89,7 @@ export function activityRowFacts(
     facts.push({
       key: "distance",
       value: formatDistanceMeters(distance, unitSystem, swim),
-      title: "Distance"
+      title: t("activity.m.distance")
     });
 
     if (duration && duration > 0) {
@@ -96,13 +97,13 @@ export function activityRowFacts(
         facts.push({
           key: "speed",
           value: formatSpeedValue(distance / 1000 / (duration / 3600), unitSystem),
-          title: "Average speed"
+          title: t("activity.fact.avgSpeed")
         });
       } else if (isPacedSport(sportType)) {
         facts.push({
           key: "pace",
           value: formatPaceSecondsPerKm(duration / (distance / 1000), unitSystem),
-          title: "Average pace"
+          title: t("activity.fact.avgPace")
         });
       }
     }
@@ -112,7 +113,7 @@ export function activityRowFacts(
     facts.push({
       key: "avgHr",
       value: `${Math.round(avgHr)} bpm`,
-      title: "Average heart rate"
+      title: t("activity.fact.avgHr")
     });
   }
 
@@ -127,10 +128,8 @@ export function activityRowFacts(
     const drift = summary.decouplingPercent;
     facts.push({
       key: "drift",
-      value: `${drift > 0 ? "+" : ""}${drift.toFixed(1)}% drift`,
-      title:
-        "Aerobic decoupling — how far pace and heart rate moved apart after " +
-        "the first ten minutes. Under 5% is a session held together."
+      value: t("activity.fact.drift", { value: `${drift > 0 ? "+" : ""}${formatDecimal(drift, 1)}` }),
+      title: t("activity.fact.driftTitle")
     });
   }
 
@@ -141,15 +140,15 @@ export function activityRowFacts(
     facts.push({
       key: "climb",
       value: formatElevationMeters(elevationGain, unitSystem),
-      title: "Elevation gained"
+      title: t("activity.fact.climbTitle")
     });
   }
 
   if (facts.length < MAX_FACTS && trainingLoad && trainingLoad > 0) {
     facts.push({
       key: "load",
-      value: `${Math.round(trainingLoad)} TL`,
-      title: "Training load, as COROS scores it"
+      value: t("units.trainingLoadShort", { value: Math.round(trainingLoad) }),
+      title: t("activity.fact.loadTitle")
     });
   }
 

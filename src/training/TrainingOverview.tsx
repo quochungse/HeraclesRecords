@@ -130,7 +130,7 @@ export function TrainingOverview({
               <h2>
                 <span>COROS</span>
                 <span>
-                  <em>Training</em> Hub
+                  <em>Training</em> Hub{/* i18n-ignore: the product's name */}
                 </span>
               </h2>
               <p className="training-signin-lead">

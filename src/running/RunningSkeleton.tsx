@@ -1,3 +1,4 @@
+import { t } from "../i18n/core";
 /**
  * Placeholders for the two moments this screen is waiting on COROS.
  *
@@ -10,7 +11,7 @@
 const LIST_ROWS = 6;
 
 /** `label` names what is loading; Cycling draws the same page for its rides. */
-export function RunningPageSkeleton({ label = "Loading your runs" }: { label?: string }) {
+export function RunningPageSkeleton({ label = t("run.loadingRuns") }: { label?: string }) {
   return (
     <div className="running-body" aria-busy="true" aria-label={label}>
       <div className="run-hero">
@@ -59,7 +60,7 @@ export function RunBlockSkeleton({ label }: { label: string }) {
 }
 
 /** Stands in for the channel chart and the tables under it. */
-export function RunDetailSkeleton({ label = "Loading this run" }: { label?: string }) {
+export function RunDetailSkeleton({ label = t("run.loadingRun") }: { label?: string }) {
   return (
     <div className="run-detail-skeleton" aria-busy="true" aria-label={label}>
       <section className="panel run-block">

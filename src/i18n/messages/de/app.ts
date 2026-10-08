@@ -71,7 +71,7 @@ const app: AppMessages = {
   "app.period.d365": "1 Jahr",
   "app.period.d365.phrase": "das letzte Jahr",
   "app.period.all": "Alle",
-  "app.period.all.phrase": "gesamte Zeit",
+  "app.period.all.phrase": "die gesamte Zeit",
   "app.mcp.hint.connect": "Verbinde ihn unter {location}.",
   "app.mcp.hint.retry": "Er ist vielleicht offline, oder seine Verbindung muss unter {location} erneuert werden.",
   "app.mcp.sleep.disconnected": "Schlafdaten kommen vom COROS-MCP-Server, der nicht verbunden ist. {hint}",

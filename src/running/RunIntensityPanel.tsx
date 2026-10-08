@@ -1,8 +1,10 @@
+import { renderRich, useI18n } from "../i18n/useI18n";
 import { useMemo } from "react";
 import type { ActivityDetailSummary, TrainingHubActivity } from "../../electron/types";
 import { formatDurationSeconds } from "../training/formatters";
 import { intensityMix, type RunIntensityMix, type RunZoneScale } from "./runMetrics";
 
+import { plural, t } from "../i18n/core";
 /** The sports this panel is drawn for, which change its words and its target. */
 export type IntensitySport = "run" | "ride" | "hike";
 
@@ -21,11 +23,6 @@ interface RunIntensityPanelProps {
 type Band = "easy" | "moderate" | "hard";
 
 interface SportWords {
-  /** One session. */
-  one: string;
-  many: string;
-  /** The activity itself, as in "of running time". */
-  doing: string;
   /**
    * Whether the 80/20 mark is held up against it. It is an endurance-training
    * rule for runners and riders building a season; a walker is not trying to
@@ -36,15 +33,30 @@ interface SportWords {
 }
 
 const WORDS: Record<IntensitySport, SportWords> = {
-  run: { one: "run", many: "runs", doing: "running", target: true },
-  ride: { one: "ride", many: "rides", doing: "riding", target: true },
-  hike: { one: "hike", many: "hikes", doing: "hiking", target: false }
+  run: { target: true },
+  ride: { target: true },
+  hike: { target: false }
 };
 
-const BANDS: readonly { key: Band; label: string }[] = [
-  { key: "easy", label: "Easy" },
-  { key: "moderate", label: "Moderate" },
-  { key: "hard", label: "Hard" }
+const BANDS: readonly { key: Band; readonly label: string }[] = [
+  {
+    key: "easy",
+    get label() {
+      return t("activity.intensity.easy");
+    }
+  },
+  {
+    key: "moderate",
+    get label() {
+      return t("activity.intensity.moderate");
+    }
+  },
+  {
+    key: "hard",
+    get label() {
+      return t("activity.intensity.hard");
+    }
+  }
 ];
 
 /** The share the 80/20 rule is stated about: easy time, not easy sessions. */
@@ -55,7 +67,8 @@ function shares(mix: RunIntensityMix, by: "count" | "duration") {
   return {
     total,
     values: BANDS.map((band) => ({
-      ...band,
+      key: band.key,
+      label: band.label,
       value: mix[band.key][by],
       share: total > 0 ? mix[band.key][by] / total : 0
     }))
@@ -81,20 +94,21 @@ export function RunIntensityPanel({
   summaries
 }: RunIntensityPanelProps) {
   const words = WORDS[sport];
+  const { locale } = useI18n();
   const mix = useMemo(
     () => intensityMix(sessions, zoneScale, summaries),
     [sessions, summaries, zoneScale]
   );
-  const byTime = useMemo(() => shares(mix, "duration"), [mix]);
-  const byCount = useMemo(() => shares(mix, "count"), [mix]);
+  // The bands carry their names, so a new language rebuilds them.
+  const byTime = useMemo(() => shares(mix, "duration"), [mix, locale]);
+  const byCount = useMemo(() => shares(mix, "count"), [mix, locale]);
 
   if (zoneScale.zones.length < 3) {
     return (
       <section className="panel run-block">
-        <p className="running-eyebrow">Intensity mix</p>
+        <p className="running-eyebrow">{t("activity.intensity.title")}</p>
         <p className="run-block-empty">
-          This needs your threshold heart-rate zones, which COROS has not sent
-          for this account yet.
+          {t("activity.intensity.noZones")}
         </p>
       </section>
     );
@@ -103,10 +117,9 @@ export function RunIntensityPanel({
   if (byTime.total === 0) {
     return (
       <section className="panel run-block">
-        <p className="running-eyebrow">Intensity mix</p>
+        <p className="running-eyebrow">{t("activity.intensity.title")}</p>
         <p className="run-block-empty">
-          No {words.many} with a heart rate in this window, so none of them can
-          be placed in a zone.
+          {t(`activity.intensity.none.${sport}` as const)}
         </p>
       </section>
     );
@@ -121,41 +134,41 @@ export function RunIntensityPanel({
     <section className="panel run-block">
       <header className="run-block-head">
         <div>
-          <p className="running-eyebrow">Intensity mix</p>
+          <p className="running-eyebrow">{t("activity.intensity.title")}</p>
           <h3>
-            {Math.round(easyTimeShare * 100)}%
-            <span className="run-block-sub"> of {words.doing} time is easy</span>
+            {renderRich(
+              t(`activity.intensity.easyShare.${sport}` as const, { percent: Math.round(easyTimeShare * 100) }),
+              { s: (chunk) => <span className="run-block-sub"> {chunk}</span> }
+            )}
           </h3>
         </div>
         {words.target ? (
           <p className="run-block-aside">
             {Math.abs(offTarget) <= 5
-              ? "On the 80/20 mark"
+              ? t("activity.intensity.onMark")
               : offTarget > 0
-                ? `${offTarget} points above the 80/20 mark`
-                : `${Math.abs(offTarget)} points below the 80/20 mark`}
+                ? t("activity.intensity.above", { points: offTarget })
+                : t("activity.intensity.below", { points: Math.abs(offTarget) })}
           </p>
         ) : null}
       </header>
 
-      <IntensityBar title="By time" split={byTime} format={formatDurationSeconds} />
+      <IntensityBar title={t("activity.intensity.byTime")} split={byTime} format={formatDurationSeconds} />
       <IntensityBar
-        title="By session"
+        title={t("activity.intensity.bySession")}
         split={byCount}
-        format={(value) => `${value} ${value === 1 ? words.one : words.many}`}
+        format={(value) => plural(`activity.${sport}.count` as const, value)}
       />
 
       <p className="run-block-note">
-        {zoneModelLabel ? `${zoneModelLabel} zones. ` : ""}
+        {zoneModelLabel ? t("activity.intensity.zonesOf", { model: zoneModelLabel }) : ""}
         {placed === 0
-          ? `Each ${words.one} is placed by its average heart rate.`
+          ? t(`activity.intensity.byAverage.${sport}` as const)
           : placed === byCount.total
-            ? `Every ${words.one} is split by its time in each zone.`
-            : `${placed} of ${byCount.total} ${words.many} are split by their time in each zone; the rest are placed by their average heart rate.`}
+            ? t(`activity.intensity.byZone.${sport}` as const)
+            : t(`activity.intensity.mixed.${sport}` as const, { placed, total: byCount.total })}
         {mix.unrated.count > 0
-          ? ` ${mix.unrated.count} ${mix.unrated.count === 1 ? words.one : words.many} recorded no heart rate and ${
-              mix.unrated.count === 1 ? "is" : "are"
-            } left out.`
+          ? plural(`activity.intensity.unrated.${sport}` as const, mix.unrated.count)
           : ""}
       </p>
     </section>

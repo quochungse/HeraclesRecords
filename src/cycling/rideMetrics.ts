@@ -8,6 +8,7 @@ import {
 } from "./rideType";
 import { acuteChronicLoad, startOfRunWeekMs, type LoadBalance } from "../running/runMetrics";
 
+import { getIntlLocale } from "../i18n/core";
 // "The last N weeks" is one definition across the sport screens: calendar
 // weeks from a Monday, this one included. The run module owns it and nothing
 // in it is about running, so Cycling reads it from there rather than restating
@@ -157,7 +158,7 @@ export function summariseRides(
 }
 
 function weekLabel(weekStartMs: number): string {
-  return new Date(weekStartMs).toLocaleDateString(undefined, {
+  return new Date(weekStartMs).toLocaleDateString(getIntlLocale(), {
     month: "short",
     day: "numeric"
   });

@@ -8,6 +8,7 @@ import { useUnitSystem } from "../units/UnitSystemProvider";
 import { formatSpeedValue, formatVerticalRate, metersToElevation } from "../units/units";
 import type { HikeLeg, TerrainKind, TerrainShare } from "./hikeAnalysis";
 
+import { formatDecimal, plural, t } from "../i18n/core";
 /**
  * The hike page's two readings of the ground, drawn for a trail run too.
  *
@@ -20,10 +21,16 @@ import type { HikeLeg, TerrainKind, TerrainShare } from "./hikeAnalysis";
  */
 export type TerrainReading = "hike" | "trail";
 
-const TERRAIN_LABELS: Record<TerrainKind, string> = {
-  up: "Climbing",
-  flat: "Flat",
-  down: "Descending"
+const TERRAIN_LABELS: Readonly<Record<TerrainKind, string>> = {
+  get up() {
+    return t("hike.terrain.up");
+  },
+  get flat() {
+    return t("hike.terrain.flat");
+  },
+  get down() {
+    return t("hike.terrain.down");
+  }
 };
 
 /**
@@ -43,7 +50,7 @@ export function TerrainPanel({
 
   return (
     <section className="panel run-detail-panel">
-      <p className="running-eyebrow">Terrain</p>
+      <p className="running-eyebrow">{t("hike.terrain.title")}</p>
       {totalSeconds > 0 ? (
         <div className="run-surface-bar">
           {terrain.map((share) => (
@@ -51,7 +58,7 @@ export function TerrainPanel({
               key={share.kind}
               className={`terrain-${share.kind}`}
               style={{ flexGrow: Math.max(share.seconds / totalSeconds, 0.02) }}
-              title={`${TERRAIN_LABELS[share.kind]}: ${Math.round((share.seconds / totalSeconds) * 100)}% of the moving time`}
+              title={t("hike.terrain.share", { kind: TERRAIN_LABELS[share.kind], percent: Math.round((share.seconds / totalSeconds) * 100) })}
             />
           ))}
         </div>
@@ -60,19 +67,19 @@ export function TerrainPanel({
         <table className="run-list run-surface-table">
           <thead>
             <tr>
-              <th scope="col">Ground</th>
-              <th scope="col" className="is-numeric">Distance</th>
-              <th scope="col" className="is-numeric">Time</th>
-              <th scope="col" className="is-numeric">{pace ? "Pace" : "Speed"}</th>
-              <th scope="col" className="is-numeric">Height</th>
+              <th scope="col">{t("hike.terrain.ground")}</th>
+              <th scope="col" className="is-numeric">{t("activity.m.distance")}</th>
+              <th scope="col" className="is-numeric">{t("activity.m.time")}</th>
+              <th scope="col" className="is-numeric">{pace ? t("activity.m.pace") : t("activity.m.speed")}</th>
+              <th scope="col" className="is-numeric">{t("hike.terrain.height")}</th>
               <th
                 scope="col"
                 className="is-numeric"
-                title="Metres gained an hour on the climbs, lost an hour on the descents"
+                title={t("hike.terrain.verticalTitle")}
               >
-                Vertical rate
+                {t("hike.terrain.vertical")}
               </th>
-              <th scope="col" className="is-numeric">Avg HR</th>
+              <th scope="col" className="is-numeric">{t("activity.m.avgHr")}</th>
             </tr>
           </thead>
           <tbody>
@@ -109,8 +116,8 @@ export function TerrainPanel({
       </div>
       <p className="run-block-note">
         {pace
-          ? "Steeper than 4% either way is climbing or descending, timed on the moving clock. On a trail the way down is where a race is won or lost: a descending pace close to the flat one is technical ground, or legs holding back."
-          : "Steeper than 4% either way is climbing or descending. On a mountain the way down is half the day: a descending rate close to the climbing one is steep, technical ground rather than a slow walker."}
+          ? t("hike.terrain.noteTrail")
+          : t("hike.terrain.noteHike")}
       </p>
     </section>
   );
@@ -127,8 +134,8 @@ export function ClimbsPanel({ legs }: { legs: readonly HikeLeg[] }) {
     <section className="panel run-detail-panel">
       <p className="running-eyebrow">
         {[
-          ascents > 0 ? `${ascents} ${ascents === 1 ? "ascent" : "ascents"}` : null,
-          descents > 0 ? `${descents} ${descents === 1 ? "descent" : "descents"}` : null
+          ascents > 0 ? plural("hike.legs.ascents", ascents) : null,
+          descents > 0 ? plural("hike.legs.descents", descents) : null
         ]
           .filter(Boolean)
           .join(" · ")}
@@ -137,18 +144,18 @@ export function ClimbsPanel({ legs }: { legs: readonly HikeLeg[] }) {
         <table className="run-list run-surface-table">
           <thead>
             <tr>
-              <th scope="col">Leg</th>
-              <th scope="col" className="is-numeric">Altitude</th>
-              <th scope="col" className="is-numeric">Length</th>
-              <th scope="col" className="is-numeric">Height</th>
-              <th scope="col" className="is-numeric">Grade</th>
-              <th scope="col" className="is-numeric" title="Moving time on it">
-                Time
+              <th scope="col">{t("hike.legs.leg")}</th>
+              <th scope="col" className="is-numeric">{t("hike.legs.altitude")}</th>
+              <th scope="col" className="is-numeric">{t("ride.climbs.length")}</th>
+              <th scope="col" className="is-numeric">{t("hike.terrain.height")}</th>
+              <th scope="col" className="is-numeric">{t("ride.climbs.grade")}</th>
+              <th scope="col" className="is-numeric" title={t("hike.legs.timeTitle")}>
+                {t("activity.m.time")}
               </th>
-              <th scope="col" className="is-numeric" title="Metres gained or lost an hour">
-                Rate
+              <th scope="col" className="is-numeric" title={t("hike.legs.rateTitle")}>
+                {t("hike.legs.rate")}
               </th>
-              {withHr ? <th scope="col" className="is-numeric">Avg HR</th> : null}
+              {withHr ? <th scope="col" className="is-numeric">{t("activity.m.avgHr")}</th> : null}
             </tr>
           </thead>
           <tbody>
@@ -156,9 +163,9 @@ export function ClimbsPanel({ legs }: { legs: readonly HikeLeg[] }) {
               <tr key={leg.startMeters}>
                 <td>
                   <span className="terrain-leg-dir" data-direction={leg.direction}>
-                    {leg.direction === "up" ? "Up" : "Down"}
+                    {leg.direction === "up" ? t("hike.legs.up") : t("hike.legs.down")}
                   </span>
-                  from {formatDistanceMeters(leg.startMeters, unitSystem)}
+                  {t("ride.climbs.from", { distance: formatDistanceMeters(leg.startMeters, unitSystem) })}
                 </td>
                 <td className="is-numeric">
                   {Math.round(metersToElevation(leg.fromAltitude, unitSystem))}→
@@ -169,7 +176,7 @@ export function ClimbsPanel({ legs }: { legs: readonly HikeLeg[] }) {
                   {leg.direction === "up" ? "+" : "−"}
                   {formatElevationMeters(leg.height, unitSystem)}
                 </td>
-                <td className="is-numeric">{`${(leg.grade * 100).toFixed(0)}%`}</td>
+                <td className="is-numeric">{`${formatDecimal(leg.grade * 100, 0)}%`}</td>
                 <td className="is-numeric">{formatDurationSeconds(leg.seconds)}</td>
                 <td className="is-numeric">
                   {leg.verticalRate === undefined ? "—" : formatVerticalRate(leg.verticalRate, unitSystem)}

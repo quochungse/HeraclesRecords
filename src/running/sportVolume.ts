@@ -7,6 +7,7 @@ import {
 } from "../units/units";
 import { runWindowStartMs } from "./runMetrics";
 
+import { formatDecimal } from "../i18n/core";
 /**
  * What the sport screens' weekly volume charts share — Running's, Cycling's
  * and Hiking's: the three measures a week can be read in, the trailing
@@ -55,7 +56,7 @@ export function measureUnit(measure: VolumeMeasure, unitSystem: UnitSystem): str
 /** One decimal where the numbers are small enough for it to matter. */
 export function formatMeasure(value: number, measure: VolumeMeasure, unitSystem: UnitSystem): string {
   const digits = measure === "climb" ? 0 : 1;
-  return `${value.toFixed(digits)} ${measureUnit(measure, unitSystem)}`;
+  return `${formatDecimal(value, digits)} ${measureUnit(measure, unitSystem)}`;
 }
 
 /**

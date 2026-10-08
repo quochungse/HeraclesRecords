@@ -4,6 +4,7 @@ import { resolveExerciseName } from "../exerciseNames";
 import { useUnitSystem } from "../../units/UnitSystemProvider";
 import { formatVolumeKg, formatWeightKg } from "../../strength/strengthAnalytics";
 
+import { formatCount, formatDecimal, t } from "../../i18n/core";
 function StatTile({ label, value }: { label: string; value: string }) {
   return (
     <div className="activity-detail-stat">
@@ -35,25 +36,25 @@ export function StrengthDetailPanel({ strength }: { strength: StrengthDetail }) 
   return (
     <div className="strength-detail">
       <div className="activity-detail-grid">
-        <StatTile label="Sets" value={String(summary.sets)} />
-        <StatTile label="Reps" value={String(summary.totalReps)} />
-        <StatTile label="Total Weight" value={formatVolumeKg(summary.totalWeightKg, unitSystem)} />
-        <StatTile label="Calories" value={String(summary.calories)} />
-        <StatTile label="Duration" value={formatDurationSeconds(summary.durationSec)} />
+        <StatTile label={t("activity.strength.sets")} value={formatCount(summary.sets)} />
+        <StatTile label={t("activity.strength.reps")} value={formatCount(summary.totalReps)} />
+        <StatTile label={t("activity.strength.totalWeight")} value={formatVolumeKg(summary.totalWeightKg, unitSystem)} />
+        <StatTile label={t("activity.m.calories")} value={formatCount(summary.calories)} />
+        <StatTile label={t("activity.m.duration")} value={formatDurationSeconds(summary.durationSec)} />
         {summary.avgHr !== undefined ? (
-          <StatTile label="Avg HR" value={formatOptionalNumber(summary.avgHr)} />
+          <StatTile label={t("activity.m.avgHr")} value={formatOptionalNumber(summary.avgHr)} />
         ) : null}
         {summary.maxHr !== undefined ? (
-          <StatTile label="Max HR" value={formatOptionalNumber(summary.maxHr)} />
+          <StatTile label={t("activity.m.maxHr")} value={formatOptionalNumber(summary.maxHr)} />
         ) : null}
         {summary.trainingLoad !== undefined ? (
-          <StatTile label="Training Load" value={formatOptionalNumber(summary.trainingLoad)} />
+          <StatTile label={t("activity.m.trainingLoad")} value={formatOptionalNumber(summary.trainingLoad)} />
         ) : null}
         {summary.aerobicEffect !== undefined ? (
-          <StatTile label="Aerobic" value={summary.aerobicEffect.toFixed(1)} />
+          <StatTile label={t("activity.strength.aerobic")} value={formatDecimal(summary.aerobicEffect, 1)} />
         ) : null}
         {summary.anaerobicEffect !== undefined ? (
-          <StatTile label="Anaerobic" value={summary.anaerobicEffect.toFixed(1)} />
+          <StatTile label={t("activity.strength.anaerobic")} value={formatDecimal(summary.anaerobicEffect, 1)} />
         ) : null}
       </div>
 
@@ -68,19 +69,19 @@ export function StrengthDetailPanel({ strength }: { strength: StrengthDetail }) 
                 {index + 1}. {displayExerciseName(exercise.nameKey, exercise.rawName, index)}
               </span>
               <span className="strength-exercise-meta">
-                {exercise.sets} sets · {exercise.totalReps} reps
+                {t("activity.strength.setsReps", { sets: exercise.sets, reps: exercise.totalReps })}
               </span>
             </h3>
             <div className="table-shell">
               <table>
                 <thead>
                   <tr>
-                    <th>Set</th>
-                    <th>Reps</th>
-                    <th>Weight</th>
-                    <th>Time</th>
-                    <th>Rest</th>
-                    <th>Cal</th>
+                    <th>{t("activity.strength.set")}</th>
+                    <th>{t("activity.strength.reps")}</th>
+                    <th>{t("activity.strength.weight")}</th>
+                    <th>{t("activity.m.time")}</th>
+                    <th>{t("activity.strength.rest")}</th>
+                    <th>{t("activity.strength.cal")}</th>
                   </tr>
                 </thead>
                 <tbody>

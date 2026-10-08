@@ -1,3 +1,4 @@
+import { useI18n } from "../i18n/useI18n";
 import { useCallback, useMemo, useState } from "react";
 import { ArrowLeft, CloudOff, MessageCircle, RefreshCw } from "lucide-react";
 import type {
@@ -43,6 +44,7 @@ import {
   isOutdoorRunSurface
 } from "./runSurface";
 
+import { formatDecimal, t } from "../i18n/core";
 interface RunDetailViewProps {
   activity: TrainingHubActivity;
   /** Null until the fetch for *this* run lands. */
@@ -91,11 +93,12 @@ export function RunDetailView({
   detail,
   detailStatus,
   onBack,
-  backLabel = "Running",
+  backLabel = t("nav.running"),
   onRetry,
   onAskCoach
 }: RunDetailViewProps) {
   const { unitSystem, temperatureUnit } = useUnitSystem();
+  const { locale } = useI18n();
   const surface = classifyRunSurface(activity.sportType);
   const trail = surface === "trail";
 
@@ -152,13 +155,13 @@ export function RunDetailView({
     const pace = paceSecondsPerKm({ ...activity, distance, duration: active });
 
     const stats: Stat[] = [
-      { label: "Distance", value: formatDistanceMeters(distance, unitSystem) },
+      { label: t("activity.m.distance"), value: formatDistanceMeters(distance, unitSystem) },
       {
-        label: "Time",
+        label: t("activity.m.time"),
         value: formatDurationSeconds(active),
-        title: "Activity time — the pauses are not in it"
+        title: t("run.detail.timeTitle")
       },
-      { label: "Pace", value: formatPaceSecondsPerKm(pace, unitSystem) }
+      { label: t("activity.m.pace"), value: formatPaceSecondsPerKm(pace, unitSystem) }
     ];
 
     if (
@@ -167,63 +170,63 @@ export function RunDetailView({
       total - active >= MIN_PAUSED_SECONDS_SHOWN
     ) {
       stats.push({
-        label: "Total time",
+        label: t("run.detail.totalTime"),
         value: formatDurationSeconds(total),
-        title: `Start to finish, including ${formatDurationSeconds(total - active)} paused`
+        title: t("run.detail.totalTimeTitle", { paused: formatDurationSeconds(total - active) })
       });
     }
 
     if (detail?.adjustedPace !== undefined) {
       stats.push({
-        label: "GAP",
+        label: t("run.detail.gap"),
         value: formatPaceSecondsPerKm(detail.adjustedPace, unitSystem),
-        title: "Grade-adjusted pace — what this effort would have been on the flat"
+        title: t("run.detail.gapTitle")
       });
     }
 
     const avgHr = detail?.avgHr ?? activity.avgHr;
     if (avgHr !== undefined) {
-      stats.push({ label: "Avg HR", value: `${avgHr} bpm` });
+      stats.push({ label: t("activity.m.avgHr"), value: `${avgHr} bpm` });
     }
     const maxHr = detail?.maxHr ?? activity.maxHr;
     if (maxHr !== undefined) {
-      stats.push({ label: "Max HR", value: `${maxHr} bpm` });
+      stats.push({ label: t("activity.m.maxHr"), value: `${maxHr} bpm` });
     }
 
     const climb = detail?.elevationGain ?? activity.elevationGain;
     if (climb !== undefined) {
-      stats.push({ label: "Climb", value: formatElevationMeters(climb, unitSystem) });
+      stats.push({ label: t("activity.m.climb"), value: formatElevationMeters(climb, unitSystem) });
     }
 
     if (ground) {
       const descent = detail?.elevationLoss;
       if (descent !== undefined && descent > 0) {
-        stats.push({ label: "Descent", value: formatElevationMeters(descent, unitSystem) });
+        stats.push({ label: t("activity.m.descent"), value: formatElevationMeters(descent, unitSystem) });
       }
       if (ground.range) {
         stats.push({
-          label: "Highest point",
+          label: t("run.detail.highest"),
           value: formatElevationMeters(ground.range.highest, unitSystem),
-          title: `Lowest ${formatElevationMeters(ground.range.lowest, unitSystem)}`
+          title: t("run.detail.lowest", { value: formatElevationMeters(ground.range.lowest, unitSystem) })
         });
       }
       const up = ground.terrain.find((share) => share.kind === "up");
       if (up?.verticalRate !== undefined) {
         stats.push({
-          label: "Climbing rate",
+          label: t("activity.channel.verticalSpeed"),
           value: formatVerticalRate(up.verticalRate, unitSystem),
-          title: `${unitSystem === "imperial" ? "Feet" : "Metres"} gained an hour on the climbing stretches, stops out`
+          title: t(`run.detail.climbingRateTitle.${unitSystem === "imperial" ? "imperial" : "metric"}` as const)
         });
       }
     }
 
     const load = detail?.trainingLoad ?? activity.trainingLoad;
     if (load !== undefined) {
-      stats.push({ label: "Load", value: formatOptionalNumber(Math.round(load)) });
+      stats.push({ label: t("overview.tiles.load"), value: formatOptionalNumber(Math.round(load)) });
     }
 
     return stats;
-  }, [activity, detail, ground, unitSystem]);
+  }, [activity, detail, ground, unitSystem, locale]);
 
   // Decoupling compares the pace a heartbeat bought in the first half with the
   // second, and on a trail the halves differ by their gradient: a run out up a
@@ -233,12 +236,11 @@ export function RunDetailView({
       decoupling === undefined || trail
         ? null
         : {
-            label: "Decoupling",
-            value: `${decoupling.percent > 0 ? "+" : ""}${decoupling.percent.toFixed(1)}%`,
-            title:
-              "How far pace and heart rate drifted apart between the first and second half, with the first ten minutes left out as warm-up. Under 5% is a run held together."
+            label: t("run.detail.decoupling"),
+            value: `${decoupling.percent > 0 ? "+" : ""}${formatDecimal(decoupling.percent, 1)}%`,
+            title: t("run.detail.decouplingTitle")
           },
-    [decoupling, trail]
+    [decoupling, trail, locale]
   );
 
   const dynamics = useMemo<Stat[]>(() => {
@@ -249,51 +251,51 @@ export function RunDetailView({
 
     const stats: Stat[] = [];
     if (source.avgCadence !== undefined) {
-      stats.push({ label: "Cadence", value: `${Math.round(source.avgCadence)} spm` });
+      stats.push({ label: t("activity.m.cadence"), value: `${Math.round(source.avgCadence)} spm` });
     }
     if (source.strideLength !== undefined) {
-      stats.push({ label: "Stride", value: `${source.strideLength.toFixed(2)} m` });
+      stats.push({ label: t("activity.m.stride"), value: `${formatDecimal(source.strideLength, 2)} m` });
     }
     if (source.groundTime !== undefined) {
-      stats.push({ label: "Ground contact", value: `${Math.round(source.groundTime)} ms` });
+      stats.push({ label: t("activity.m.groundContact"), value: `${Math.round(source.groundTime)} ms` });
     }
     if (source.verticalOscillation !== undefined) {
       stats.push({
-        label: "Vertical osc.",
-        value: `${source.verticalOscillation.toFixed(1)} cm`
+        label: t("run.detail.vertOsc"),
+        value: `${formatDecimal(source.verticalOscillation, 1)} cm`
       });
     }
     if (source.verticalRatio !== undefined) {
-      stats.push({ label: "Vertical ratio", value: `${source.verticalRatio.toFixed(1)}%` });
+      stats.push({ label: t("activity.channel.verticalRatio"), value: `${formatDecimal(source.verticalRatio, 1)}%` });
     }
     if (source.avgPower !== undefined) {
-      stats.push({ label: "Power", value: `${Math.round(source.avgPower)} W` });
+      stats.push({ label: t("activity.m.power"), value: `${Math.round(source.avgPower)} W` });
     }
     return stats;
-  }, [detail]);
+  }, [detail, locale]);
 
   const conditions = useMemo<Stat[]>(() => {
     const stats: Stat[] = [];
     if (detail?.effect?.aerobic !== undefined) {
-      stats.push({ label: "Aerobic effect", value: detail.effect.aerobic.toFixed(1) });
+      stats.push({ label: t("run.detail.aerobic"), value: formatDecimal(detail.effect.aerobic, 1) });
     }
     if (detail?.effect?.anaerobic !== undefined) {
-      stats.push({ label: "Anaerobic effect", value: detail.effect.anaerobic.toFixed(1) });
+      stats.push({ label: t("run.detail.anaerobic"), value: formatDecimal(detail.effect.anaerobic, 1) });
     }
     if (detail?.effect?.vo2max !== undefined) {
       stats.push({ label: "VO₂max", value: formatOptionalNumber(detail.effect.vo2max) });
     }
     if (detail?.weather?.temperatureC !== undefined) {
       stats.push({
-        label: "Temperature",
+        label: t("run.detail.temperature"),
         value: formatTemperatureValue(detail.weather.temperatureC, temperatureUnit)
       });
     }
     if (detail?.weather?.humidityPct !== undefined) {
-      stats.push({ label: "Humidity", value: `${Math.round(detail.weather.humidityPct)}%` });
+      stats.push({ label: t("run.detail.humidity"), value: `${Math.round(detail.weather.humidityPct)}%` });
     }
     return stats;
-  }, [detail]);
+  }, [detail, locale]);
 
   return (
     <section className={`running-view run-detail${trail ? " is-trail" : ""}`}>
@@ -316,21 +318,21 @@ export function RunDetailView({
                 <button
                   type="button"
                   className="ghost-button activity-ask-coach"
-                  onClick={() => onAskCoach(activityCoachRequest({ ...activity, sportName: activity.sportName ?? "Run" }, unitSystem))}
+                  onClick={() => onAskCoach(activityCoachRequest({ ...activity, sportName: activity.sportName ?? t("run.run") }, unitSystem))}
                 >
                   <MessageCircle size={15} aria-hidden="true" />
-                  Ask Coach
+                  {t("activity.askCoach")}
                 </button>
               ) : null}
             </div>
             <div className="run-detail-title">
               <p className="running-eyebrow">
-                {surface ? RUN_SURFACE_LABELS[surface] : "Run"} ·{" "}
+                {surface ? RUN_SURFACE_LABELS[surface] : t("run.run")} ·{" "}
                 {formatTrainingTimestamp(activity.startTime)}
               </p>
               <h1>
                 {activity.name?.trim() ||
-                  (surface ? `${RUN_SURFACE_LABELS[surface]} run` : "Run")}
+                  (surface ? t(`run.detail.untitled.${surface}` as const) : t("run.run"))}
               </h1>
             </div>
           </header>
@@ -365,22 +367,19 @@ export function RunDetailView({
         <section className="panel running-empty running-state-panel">
           <CloudOff size={22} aria-hidden="true" />
           <div>
-            <h3>This run's detail did not load</h3>
-            <p>
-              The summary above comes from the activity list. The chart, laps and
-              route need a second request to COROS, and that one failed.
-            </p>
+            <h3>{t("run.detail.failed")}</h3>
+            <p>{t("run.detail.failedBody")}</p>
           </div>
           <button type="button" className="primary-button" onClick={onRetry}>
             <RefreshCw size={14} aria-hidden="true" />
-            Try again
+            {t("common.tryAgain")}
           </button>
         </section>
       ) : null}
 
       {dynamics.length > 0 ? (
         <section className="panel run-detail-panel">
-          <p className="running-eyebrow">Running form</p>
+          <p className="running-eyebrow">{t("run.detail.form")}</p>
           <div className="run-detail-stats">
             {dynamics.map((stat) => (
               <div className="running-stat" key={stat.label}>
@@ -394,7 +393,7 @@ export function RunDetailView({
 
       {conditions.length > 0 ? (
         <section className="panel run-detail-panel">
-          <p className="running-eyebrow">Effect and conditions</p>
+          <p className="running-eyebrow">{t("run.detail.effect")}</p>
           <div className="run-detail-stats">
             {conditions.map((stat) => (
               <div className="running-stat" key={stat.label}>
@@ -426,7 +425,7 @@ export function RunDetailView({
 
       {laps.length > 0 ? (
         <section className="panel run-detail-panel">
-          <p className="running-eyebrow">Laps</p>
+          <p className="running-eyebrow">{t("activity.m.laps")}</p>
           {/* Seven columns do not fit the narrowest column the window allows;
               a secondary table scrolls inside its panel rather than taking the
               page sideways. */}
@@ -434,13 +433,13 @@ export function RunDetailView({
           <table className="run-list run-lap-table">
             <thead>
               <tr>
-                <th scope="col">Lap</th>
-                <th scope="col" className="is-numeric">Distance</th>
-                <th scope="col" className="is-numeric">Time</th>
-                <th scope="col" className="is-numeric">Pace</th>
-                <th scope="col" className="is-numeric">Avg HR</th>
-                <th scope="col" className="is-numeric">Climb</th>
-                <th scope="col" className="is-numeric">Cadence</th>
+                <th scope="col">{t("run.detail.lap")}</th>
+                <th scope="col" className="is-numeric">{t("activity.m.distance")}</th>
+                <th scope="col" className="is-numeric">{t("activity.m.time")}</th>
+                <th scope="col" className="is-numeric">{t("activity.m.pace")}</th>
+                <th scope="col" className="is-numeric">{t("activity.m.avgHr")}</th>
+                <th scope="col" className="is-numeric">{t("activity.m.climb")}</th>
+                <th scope="col" className="is-numeric">{t("activity.m.cadence")}</th>
               </tr>
             </thead>
             <tbody>
@@ -449,7 +448,7 @@ export function RunDetailView({
                   key={lap.index}
                   tabIndex={0}
                   className="run-lap-row"
-                  title="Focus the chart on this lap"
+                  title={t("run.detail.focusLap")}
                   onClick={() => setFocusLapIndex(lap.index)}
                   onKeyDown={(event) => {
                     if (event.key === "Enter" || event.key === " ") {

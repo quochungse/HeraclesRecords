@@ -54,6 +54,7 @@ import {
 } from "./runSurface";
 import "./running.css";
 
+import { t } from "../i18n/core";
 export interface RunningViewProps {
   api: HeraclesRecordsApi | null;
   activities: TrainingHubActivity[];
@@ -142,7 +143,7 @@ export function RunningView({
     openRequest,
     onOpenRequestHandled,
     onReturn,
-    listLabel: "Running"
+    listLabel: t("nav.running")
   });
 
   // Every activity list call pushes a new array, so the clock is pinned to that
@@ -239,16 +240,12 @@ export function RunningView({
         <section className="panel data-connect-panel">
           <LockKeyhole size={24} aria-hidden="true" />
           <div>
-            <h3>{restoring ? "Reconnecting to COROS" : "Connect COROS first"}</h3>
-            <p>
-              {restoring
-                ? "Signing back in with your saved credentials. Your runs load as soon as that finishes."
-                : "This screen is drawn from your COROS activity history. Signing in lives on Overview."}
-            </p>
+            <h3>{restoring ? t("run.reconnecting") : t("common.connectFirst.title")}</h3>
+            <p>{restoring ? t("run.reconnectingBody") : t("run.connectBody")}</p>
           </div>
           {restoring ? null : (
             <button type="button" className="primary-button" onClick={onOpenOverview}>
-              Open Overview
+              {t("common.openOverview")}
             </button>
           )}
         </section>
@@ -298,11 +295,8 @@ export function RunningView({
         <section className="panel running-empty running-state-panel">
           <CloudOff size={22} aria-hidden="true" />
           <div>
-            <h3>Your activities did not load</h3>
-            <p>
-              COROS did not return the activity list. This is usually the
-              connection; nothing on this machine was lost.
-            </p>
+            <h3>{t("run.listFailed")}</h3>
+            <p>{t("run.listFailedBody")}</p>
           </div>
           <button
             type="button"
@@ -311,7 +305,7 @@ export function RunningView({
             onClick={onRetryActivities}
           >
             <RefreshCw size={14} aria-hidden="true" className={retrying ? "spin" : undefined} />
-            {retrying ? "Loading" : "Try again"}
+            {retrying ? t("common.loading") : t("common.tryAgain")}
           </button>
         </section>
       </section>
@@ -325,12 +319,8 @@ export function RunningView({
         <section className="panel running-empty running-state-panel">
           <RunnerIcon size={22} aria-hidden="true" />
           <div>
-            <h3>No runs yet</h3>
-            <p>
-              Road, trail, track and treadmill runs from your COROS watch land
-              here once they sync. Everything else you record stays under
-              Activities.
-            </p>
+            <h3>{t("run.none")}</h3>
+            <p>{t("run.noneBody")}</p>
           </div>
         </section>
       </section>
@@ -353,10 +343,10 @@ export function RunningView({
             same component now, not merely the same class, so a filter reads
             the same wherever it sits in the app. */}
         <OptionGroup
-          label="Surface"
+          label={t("run.surface")}
           value={surface ?? "all"}
           options={[
-            { value: "all", label: "All" },
+            { value: "all", label: t("common.all") },
             ...availableSurfaces.map((option) => ({
               value: option,
               label: RUN_SURFACE_LABELS[option]
@@ -371,7 +361,7 @@ export function RunningView({
             changed, and the header has a surface picker and the run count to
             fit beside it. */}
         <OptionGroup
-          label="Period"
+          label={t("activity.filter.period")}
           mode="collapsible"
           className="running-period"
           value={periodValue(periodDays as PeriodDays)}
@@ -395,15 +385,15 @@ export function RunningView({
 
         <div className="running-totals">
           <div className="running-stat">
-            <span>Runs</span>
+            <span>{t("run.runs")}</span>
             <strong>{totals.count}</strong>
           </div>
           <div className="running-stat">
-            <span>Distance</span>
+            <span>{t("activity.m.distance")}</span>
             <strong>{formatDistanceMeters(totals.distance, unitSystem)}</strong>
           </div>
           <div className="running-stat">
-            <span>Time</span>
+            <span>{t("activity.m.time")}</span>
             <strong>{formatDurationSeconds(totals.duration)}</strong>
           </div>
           {/* A trail's average pace is an average over its gradients, which
@@ -411,7 +401,7 @@ export function RunningView({
               climb per kilometre says the first thing honestly. */}
           {trail ? (
             <div className="running-stat">
-              <span>Climb/{distanceUnit(unitSystem)}</span>
+              <span>{t("run.climbPer", { unit: distanceUnit(unitSystem) })}</span>
               <strong>
                 {climbPerKm === undefined
                   ? "—"
@@ -420,12 +410,12 @@ export function RunningView({
             </div>
           ) : (
             <div className="running-stat">
-              <span>Avg pace</span>
+              <span>{t("activity.m.avgPace")}</span>
               <strong>{formatPaceSecondsPerKm(averagePace, unitSystem)}</strong>
             </div>
           )}
           <div className="running-stat">
-            <span>Climb</span>
+            <span>{t("activity.m.climb")}</span>
             <strong>{formatElevationMeters(totals.elevationGain, unitSystem)}</strong>
           </div>
         </div>
@@ -456,7 +446,7 @@ export function RunningView({
                 nowMs={nowMs}
               />
             ) : (
-              <RunBlockSkeleton label="Loading your heart-rate zones" />
+              <RunBlockSkeleton label={t("run.loadingZones")} />
             )}
             <div className="running-columns">
               {zonesSettled ? (
@@ -467,7 +457,7 @@ export function RunningView({
                   summaries={summaries}
                 />
               ) : (
-                <RunBlockSkeleton label="Loading your heart-rate zones" />
+                <RunBlockSkeleton label={t("run.loadingZones")} />
               )}
               <RunSurfacePanel runs={runsInPeriod} />
             </div>
@@ -478,11 +468,11 @@ export function RunningView({
           <section className="panel running-empty">
             <RunnerIcon size={22} aria-hidden="true" />
             <div>
-              <h3>No runs in this window</h3>
+              <h3>{t("run.noneInWindow")}</h3>
               <p>
                 {surface === null
-                  ? "Widen the period, or log a run and sync your watch."
-                  : `No ${RUN_SURFACE_LABELS[surface].toLowerCase()} runs here. Try another surface or a wider period.`}
+                  ? t("run.widen")
+                  : t(`run.noneOnSurface.${surface}` as const)}
               </p>
             </div>
           </section>
@@ -506,9 +496,9 @@ export function RunningView({
 function RunningPageHeader() {
   return (
     <header className="running-page-header">
-      <p className="running-eyebrow">Your training</p>
-      <h1>Running</h1>
-      <p>Every run you have logged, read down the time axis.</p>
+      <p className="running-eyebrow">{t("run.eyebrow")}</p>
+      <h1>{t("nav.running")}</h1>
+      <p>{t("run.lead")}</p>
     </header>
   );
 }

@@ -22,6 +22,13 @@ const common: CommonMessages = {
   "sport.hiking": "Wandern",
   "sport.strength": "Krafttraining",
   "sport.other": "Sonstiges",
+  "common.connectFirst.title": "Verbinde zuerst COROS",
+  "common.connectFirst.body": "Die Anmeldung bei COROS findest du in der Übersicht. Verbinde dich dort, dann laden deine Aktivitäten und ihre Details hier.",
+  "common.openOverview": "Übersicht öffnen",
+  "common.loading": "Wird geladen …",
+  "common.showMore": "Mehr anzeigen",
+  "common.all": "Alle",
+  "common.done": "Fertig",
 };
 
 export default common;

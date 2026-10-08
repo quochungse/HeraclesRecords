@@ -18,6 +18,7 @@ import {
   type UnitSystem
 } from "../units/units";
 
+import { getIntlLocale } from "../i18n/core";
 // The series maths is shared with the main process, which computes the same
 // figures once per run and stores them — see `electron/activityMetrics.ts`.
 // Re-exported here so this module stays the one import the run screens reach
@@ -216,7 +217,7 @@ export function summariseRuns(
 }
 
 function weekLabel(weekStartMs: number): string {
-  return new Date(weekStartMs).toLocaleDateString(undefined, {
+  return new Date(weekStartMs).toLocaleDateString(getIntlLocale(), {
     month: "short",
     day: "numeric"
   });

@@ -13,6 +13,7 @@ import { useUnitSystem } from "../units/UnitSystemProvider";
 import { DeltaChip, LoadRatioCard } from "../running/RunningHero";
 import { buildRideWeeks, rideLoadBalance } from "./rideMetrics";
 
+import { formatDecimal, plural, t } from "../i18n/core";
 interface CyclingHeroProps {
   /**
    * Rides matching the kind filter, over the whole history — "this week" and
@@ -116,13 +117,13 @@ export function CyclingHero({
   return (
     <section className="run-hero">
       <div className="run-hero-card">
-        <span className="run-hero-label">This week</span>
+        <span className="run-hero-label">{t("activity.hero.thisWeek")}</span>
         <strong className="run-hero-value">
           {count > 0 ? formatDurationSpan(thisWeek?.current.duration) : "—"}
         </strong>
         <div className="run-hero-foot">
           <span>
-            {count} {count === 1 ? "ride" : "rides"}
+            {plural("activity.ride.count", count)}
             {(thisWeek?.current.distance ?? 0) > 0
               ? ` · ${formatDistanceMeters(thisWeek?.current.distance, unitSystem)}`
               : ""}
@@ -133,7 +134,7 @@ export function CyclingHero({
         </div>
       </div>
 
-      <LoadRatioCard balance={balance} filtered={filtered} sessions="rides" doing="riding" />
+      <LoadRatioCard balance={balance} filtered={filtered} sport="ride" />
 
       <div className="run-hero-card">
         <span className="run-hero-label">FTP</span>
@@ -143,12 +144,12 @@ export function CyclingHero({
         <div className="run-hero-foot">
           <span>
             {!profileSettled
-              ? "Reading your profile"
+              ? t("ride.hero.readingProfile")
               : ftp === undefined
-                ? "No FTP on your COROS profile"
+                ? t("ride.hero.noFtp")
                 : wattsPerKilo !== undefined
-                  ? `${wattsPerKilo.toFixed(2)} W/kg`
-                  : "No weight on file for W/kg"}
+                  ? `${formatDecimal(wattsPerKilo, 2)} W/kg`
+                  : t("ride.hero.noWeight")}
           </span>
         </div>
       </div>
@@ -164,7 +165,7 @@ export function CyclingHero({
       ) : null}
 
       <div className="run-hero-card">
-        <span className="run-hero-label">Climb this week</span>
+        <span className="run-hero-label">{t("activity.trail.climbThisWeek")}</span>
         <strong className="run-hero-value">
           {(thisWeek?.current.elevationGain ?? 0) > 0
             ? formatElevationMeters(thisWeek?.current.elevationGain, unitSystem)
@@ -173,8 +174,8 @@ export function CyclingHero({
         <div className="run-hero-foot">
           <span>
             {thisWeek && thisWeek.climbBaseline > 0
-              ? `4-week average ${formatElevationMeters(thisWeek.climbBaseline, unitSystem)}`
-              : "No climbing in the last four weeks"}
+              ? t("activity.hero.avg4w", { value: formatElevationMeters(thisWeek.climbBaseline, unitSystem) })
+              : t("activity.trail.noClimb")}
           </span>
         </div>
       </div>

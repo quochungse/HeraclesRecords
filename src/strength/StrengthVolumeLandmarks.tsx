@@ -1,4 +1,5 @@
-import { useMemo, type CSSProperties } from "react";
+import { useMemo, type CSSProperties, type ReactNode } from "react";
+import { renderRich, useI18n } from "../i18n/useI18n";
 import { MUSCLE_BY_ID } from "./muscles";
 import type { StrengthAnalytics } from "./strengthAnalytics";
 import {
@@ -7,10 +8,15 @@ import {
   type LandmarkStatus
 } from "./strengthLandmarks";
 
-const STATUS_WORD: Record<LandmarkStatus, string> = {
-  below: "Under",
+import { formatDecimal, plural, t } from "../i18n/core";
+const STATUS_WORD: Readonly<Record<LandmarkStatus, string>> = {
+  get below() {
+    return t("strength.landmarks.under");
+  },
   within: "",
-  above: "Over"
+  get above() {
+    return t("strength.landmarks.over");
+  }
 };
 
 /** Never narrower than a little past the landmark, so an all-light history still shows the band. */
@@ -22,8 +28,10 @@ const MIN_SCALE_SETS = 25;
  * 20, and "20 Over" reads as a contradiction where "20.4 Over" reads as a fact.
  */
 function formatLandmarkSets(value: number): string {
-  return value.toFixed(1).replace(/\.0$/, "");
+  return Number.isInteger(Math.round(value * 10) / 10) ? String(Math.round(value)) : formatDecimal(value, 1);
 }
+
+const BOLD = { b: (chunk: ReactNode) => <strong>{chunk}</strong> };
 
 interface StrengthVolumeLandmarksProps {
   analytics: StrengthAnalytics;
@@ -36,11 +44,13 @@ interface StrengthVolumeLandmarksProps {
  * band carries the target and the words carry the verdict.
  */
 export function StrengthVolumeLandmarks({ analytics, windowDays }: StrengthVolumeLandmarksProps) {
+  const { locale } = useI18n();
   // The day only moves the result at midnight, so the window length and the
   // history are the only real inputs.
   const landmarks = useMemo(
     () => buildWeeklyVolumeLandmarks(analytics, windowDays, Date.now()),
-    [analytics, windowDays]
+    // The week labels are dates written in the language on screen.
+    [analytics, windowDays, locale]
   );
 
   if (!landmarks) {
@@ -57,23 +67,18 @@ export function StrengthVolumeLandmarks({ analytics, windowDays }: StrengthVolum
     <section className="panel strength-card strength-volume-card">
       <div className="strength-card-head">
         <div>
-          <h3>Weekly sets per muscle</h3>
+          <h3>{t("strength.landmarks.title")}</h3>
           <p>
-            Average of your last {weekCount} full
-            week{weekCount === 1 ? "" : "s"}, against the {WEEKLY_SET_LANDMARK.low}–
-            {WEEKLY_SET_LANDMARK.high} sets a week most muscles grow on.
+            {plural("strength.landmarks.sub", weekCount, {
+              low: WEEKLY_SET_LANDMARK.low,
+              high: WEEKLY_SET_LANDMARK.high
+            })}
           </p>
         </div>
         <p className="strength-volume-summary">
-          <span>
-            <strong>{landmarks.counts.within}</strong> in range
-          </span>
-          <span>
-            <strong>{landmarks.counts.below}</strong> under
-          </span>
-          <span>
-            <strong>{landmarks.counts.above}</strong> over
-          </span>
+          <span>{renderRich(t("strength.landmarks.inRange", { count: landmarks.counts.within }), BOLD)}</span>
+          <span>{renderRich(t("strength.landmarks.underCount", { count: landmarks.counts.below }), BOLD)}</span>
+          <span>{renderRich(t("strength.landmarks.overCount", { count: landmarks.counts.above }), BOLD)}</span>
         </p>
       </div>
 
@@ -149,23 +154,22 @@ export function StrengthVolumeLandmarks({ analytics, windowDays }: StrengthVolum
       </div>
 
       <p className="strength-volume-note">
-        Sets are credited, so a helper muscle counts for part of a set — a bench press gives your
-        triceps some of every set. Guidance usually counts direct sets only.
+        {t("strength.landmarks.note")}
       </p>
 
       <details className="strength-volume-table">
-        <summary>Show as a table</summary>
+        <summary>{t("strength.landmarks.table")}</summary>
         <div className="strength-volume-table-wrap">
           <table>
             <thead>
               <tr>
-                <th scope="col">Muscle</th>
+                <th scope="col">{t("strength.landmarks.muscle")}</th>
                 {landmarks.weeks.map((week) => (
                   <th scope="col" key={week.weekStart}>
                     {week.label}
                   </th>
                 ))}
-                <th scope="col">Average</th>
+                <th scope="col">{t("strength.stat.average")}</th>
               </tr>
             </thead>
             <tbody>

@@ -1,6 +1,7 @@
 import type { Theme } from "../theme/theme";
 import type { TrainingHubActivitySeriesPoint } from "../../electron/types";
 
+import { t } from "../i18n/core";
 /**
  * The channels an activity's chart can draw, and what each one is.
  *
@@ -77,30 +78,33 @@ export interface ActivityChannelDefinition {
 // `ActivitySeriesChart` from `unitSystem` and never read this field — so the
 // "/km" that used to sit on the two pace rows was a second, frozen answer to a
 // question already answered elsewhere, one edit away from being shown.
+/** A channel whose label is read in the language on screen each time it is asked for. */
+function channel(
+  key: ActivityChannelKey,
+  rest: Omit<ActivityChannelDefinition, "key" | "label">
+): ActivityChannelDefinition {
+  return {
+    key,
+    get label() {
+      return t(`activity.channel.${key}` as const);
+    },
+    ...rest
+  };
+}
+
 const ACTIVITY_CHANNELS: readonly ActivityChannelDefinition[] = [
-  { key: "pace", label: "Pace", unit: "", decimals: 0, reversed: true },
-  {
-    key: "adjustedPace",
-    label: "Grade-adjusted pace",
-    unit: "",
-    decimals: 0,
-    reversed: true
-  },
-  { key: "speed", label: "Speed", unit: "", decimals: 1 },
-  { key: "hr", label: "Heart rate", unit: "bpm", decimals: 0 },
-  { key: "cadence", label: "Cadence", unit: "spm", decimals: 0 },
-  { key: "power", label: "Power", unit: "W", decimals: 0 },
-  { key: "strideLength", label: "Stride length", unit: "m", decimals: 2 },
-  { key: "groundTime", label: "Ground contact", unit: "ms", decimals: 0 },
-  {
-    key: "verticalOscillation",
-    label: "Vertical oscillation",
-    unit: "cm",
-    decimals: 1
-  },
-  { key: "verticalRatio", label: "Vertical ratio", unit: "%", decimals: 1 },
-  { key: "verticalSpeed", label: "Climbing rate", unit: "", decimals: 0 },
-  { key: "altitude", label: "Elevation", unit: "m", decimals: 0, background: true }
+  channel("pace", { unit: "", decimals: 0, reversed: true }),
+  channel("adjustedPace", { unit: "", decimals: 0, reversed: true }),
+  channel("speed", { unit: "", decimals: 1 }),
+  channel("hr", { unit: "bpm", decimals: 0 }),
+  channel("cadence", { unit: "spm", decimals: 0 }),
+  channel("power", { unit: "W", decimals: 0 }),
+  channel("strideLength", { unit: "m", decimals: 2 }),
+  channel("groundTime", { unit: "ms", decimals: 0 }),
+  channel("verticalOscillation", { unit: "cm", decimals: 1 }),
+  channel("verticalRatio", { unit: "%", decimals: 1 }),
+  channel("verticalSpeed", { unit: "", decimals: 0 }),
+  channel("altitude", { unit: "m", decimals: 0, background: true })
 ];
 
 export function activityChannel(key: ActivityChannelKey): ActivityChannelDefinition {

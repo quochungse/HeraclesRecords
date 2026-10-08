@@ -1,3 +1,4 @@
+import { zoneName } from "../i18n/zoneNames";
 import { useMemo } from "react";
 import type {
   CorosProfileZone,
@@ -16,6 +17,7 @@ import {
 } from "./rideAnalysis";
 import { StatGrid, type Stat } from "./StatGrid";
 
+import { formatCount, formatDecimal, t } from "../i18n/core";
 interface RidePowerPanelProps {
   /** The ride's samples on activity time. */
   series: readonly TrainingHubActivitySeriesPoint[];
@@ -50,6 +52,11 @@ function zoneRange(bound: PowerZoneBound): string {
  * Without power it falls back to cadence alone, which a speed-and-cadence
  * sensor still records; without either it draws nothing.
  */
+/** A peak's window, "5 s" or "20 min", in the language on screen. */
+function peakWindowLabel(seconds: number): string {
+  return seconds < 60 ? `${seconds} s` : t("units.min", { m: Math.round(seconds / 60) });
+}
+
 export function RidePowerPanel({ series, dynamics, ftp, powerZones }: RidePowerPanelProps) {
   const watts = useMemo(() => powerSeconds(series), [series]);
   const power = useMemo(() => ridePower(watts), [watts]);
@@ -62,19 +69,19 @@ export function RidePowerPanel({ series, dynamics, ftp, powerZones }: RidePowerP
   const cadence: Stat[] = [];
   if (dynamics?.avgCadence !== undefined) {
     cadence.push({
-      label: "Cadence",
+      label: t("activity.m.cadence"),
       value: `${Math.round(dynamics.avgCadence)} rpm`,
-      title: "Averaged over the time the pedals were turning"
+      title: t("ride.power.cadenceTitle")
     });
   }
   if (dynamics?.maxCadence !== undefined) {
-    cadence.push({ label: "Max cadence", value: `${Math.round(dynamics.maxCadence)} rpm` });
+    cadence.push({ label: t("ride.power.maxCadence"), value: `${Math.round(dynamics.maxCadence)} rpm` });
   }
 
   if (!power) {
     return cadence.length > 0 ? (
       <section className="panel run-detail-panel">
-        <p className="running-eyebrow">Cadence</p>
+        <p className="running-eyebrow">{t("activity.m.cadence")}</p>
         <StatGrid stats={cadence} />
       </section>
     ) : null;
@@ -82,44 +89,44 @@ export function RidePowerPanel({ series, dynamics, ftp, powerZones }: RidePowerP
 
   const average = dynamics?.avgPower ?? power.average;
   const stats: Stat[] = [
-    { label: "Avg power", value: `${Math.round(average)} W` },
+    { label: t("activity.m.avgPower"), value: `${Math.round(average)} W` },
     ...(power.normalized !== undefined
       ? [
           {
-            label: "Normalized",
+            label: t("ride.power.normalized"),
             value: `${Math.round(power.normalized)} W`,
-            title: "Normalized power: what the ride cost, surges and freewheeling weighed in"
+            title: t("ride.power.normalizedTitle")
           }
         ]
       : []),
-    { label: "Max power", value: `${Math.round(dynamics?.maxPower ?? power.max)} W` },
+    { label: t("ride.power.max"), value: `${Math.round(dynamics?.maxPower ?? power.max)} W` },
     ...(load
       ? [
           {
-            label: "Intensity",
-            value: load.intensity.toFixed(2),
-            title: "Intensity factor: normalized power over FTP. 1.00 is an hour's all-out effort"
+            label: t("ride.power.intensity"),
+            value: formatDecimal(load.intensity, 2),
+            title: t("ride.power.intensityTitle")
           },
           {
-            label: "TSS",
+            label: t("ride.power.tss"),
             value: `${Math.round(load.stressScore)}`,
-            title: "Training stress score from power: an hour at FTP is 100"
+            title: t("ride.power.tssTitle")
           }
         ]
       : []),
     ...(power.normalized !== undefined && average > 0
       ? [
           {
-            label: "Variability",
-            value: (power.normalized / average).toFixed(2),
-            title: "Normalized over average power. Near 1.00 is a steady effort; group rides and crits run higher"
+            label: t("ride.power.variability"),
+            value: formatDecimal(power.normalized / average, 2),
+            title: t("ride.power.variabilityTitle")
           }
         ]
       : []),
     {
-      label: "Work",
-      value: `${Math.round(power.workKj).toLocaleString()} kJ`,
-      title: "Energy delivered to the pedals — close to the calories the ride burned"
+      label: t("ride.power.work"),
+      value: `${formatCount(Math.round(power.workKj))} kJ`,
+      title: t("ride.power.workTitle")
     },
     ...cadence
   ];
@@ -128,17 +135,17 @@ export function RidePowerPanel({ series, dynamics, ftp, powerZones }: RidePowerP
 
   return (
     <section className="panel run-detail-panel ride-power-panel">
-      <p className="running-eyebrow">Power</p>
+      <p className="running-eyebrow">{t("activity.m.power")}</p>
       <StatGrid stats={stats} />
 
       {power.peaks.length > 0 ? (
         <div className="ride-power-section">
-          <p className="run-intensity-title">Peak power</p>
+          <p className="run-intensity-title">{t("ride.power.peak")}</p>
           <StatGrid
             stats={power.peaks.map((peak) => ({
-              label: peak.label,
+              label: peakWindowLabel(peak.seconds),
               value: `${Math.round(peak.watts)} W`,
-              title: `Best ${peak.label} average on this ride`
+              title: t("ride.power.peakTitle", { window: peakWindowLabel(peak.seconds) })
             }))}
           />
         </div>
@@ -146,14 +153,14 @@ export function RidePowerPanel({ series, dynamics, ftp, powerZones }: RidePowerP
 
       {pedalling > 0 ? (
         <div className="ride-power-section">
-          <p className="run-intensity-title">Time in power zones</p>
+          <p className="run-intensity-title">{t("ride.power.zonesTitle")}</p>
           <div className="run-surface-bar" aria-hidden="true">
             {zones.map((zone, index) =>
               zone.seconds > 0 ? (
                 <div
                   key={zone.label}
                   style={{ flexGrow: zone.seconds / pedalling, background: zoneColor(index) }}
-                  title={`${zone.label} ${zone.name}: ${formatDurationSpan(zone.seconds)}`}
+                  title={`${zone.label} ${zoneName(zone.name)}: ${formatDurationSpan(zone.seconds)}`}
                 />
               ) : null
             )}
@@ -162,10 +169,10 @@ export function RidePowerPanel({ series, dynamics, ftp, powerZones }: RidePowerP
             <table className="run-list run-surface-table ride-zone-table">
               <thead>
                 <tr>
-                  <th scope="col">Zone</th>
-                  <th scope="col" className="is-numeric">Watts</th>
-                  <th scope="col" className="is-numeric">Time</th>
-                  <th scope="col" className="is-numeric">Share</th>
+                  <th scope="col">{t("ride.power.zone")}</th>
+                  <th scope="col" className="is-numeric">{t("ride.power.watts")}</th>
+                  <th scope="col" className="is-numeric">{t("activity.m.time")}</th>
+                  <th scope="col" className="is-numeric">{t("run.share")}</th>
                 </tr>
               </thead>
               <tbody>
@@ -173,7 +180,7 @@ export function RidePowerPanel({ series, dynamics, ftp, powerZones }: RidePowerP
                   <tr key={zone.label}>
                     <td>
                       <span className="run-surface-swatch" style={{ background: zoneColor(index) }} />
-                      {zone.label} · {zone.name}
+                      {zone.label} · {zoneName(zone.name)}
                     </td>
                     <td className="is-numeric">{zoneRange(zone)}</td>
                     <td className="is-numeric">
@@ -190,12 +197,12 @@ export function RidePowerPanel({ series, dynamics, ftp, powerZones }: RidePowerP
 
       <p className="run-block-note">
         {ftp !== undefined
-          ? `Intensity and TSS are against your FTP of ${Math.round(ftp)} W as COROS has it today, not as it was on the day. `
-          : "No FTP on your COROS profile, so there is no intensity or TSS. "}
+          ? t("ride.power.ftpNote", { ftp: Math.round(ftp) })
+          : t("ride.power.noFtpNote")}
         {power.coastingSeconds > 0
-          ? `${formatDurationSpan(power.coastingSeconds)} coasting at 0 W ${
-              pedalling > 0 ? "is left out of the zones but" : "is"
-            } counted in the average.`
+          ? t(pedalling > 0 ? "ride.power.coastingZones" : "ride.power.coasting", {
+              time: formatDurationSpan(power.coastingSeconds)
+            })
           : ""}
       </p>
     </section>

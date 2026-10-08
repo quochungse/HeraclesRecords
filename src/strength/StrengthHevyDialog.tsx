@@ -5,6 +5,7 @@ import { formatSyncTime } from "./strengthFormat";
 import { toErrorMessage } from "./useStrengthData";
 import "./strength.css";
 
+import { t } from "../i18n/core";
 interface StrengthHevyDialogProps {
   status: HevyStatus | null;
   connected: boolean;
@@ -62,7 +63,7 @@ export function StrengthHevyDialog({
   };
 
   const disconnect = () => {
-    if (!window.confirm("Disconnect Hevy and erase its cached workouts from this device?")) {
+    if (!window.confirm(t("strength.hevy.confirmDisconnect"))) {
       return;
     }
     void run(onDisconnect, () => {
@@ -86,13 +87,13 @@ export function StrengthHevyDialog({
       >
         <header>
           <div>
-            <p className="eyebrow">Strength source</p>
-            <h2 id="strength-hevy-title">{connected ? "Hevy connected" : "Connect Hevy"}</h2>
+            <p className="eyebrow">{t("strength.source")}</p>
+            <h2 id="strength-hevy-title">{connected ? t("strength.hevy.connected") : t("strength.connectHevy")}</h2>
           </div>
           <button
             type="button"
             className="strength-hevy-close"
-            aria-label="Close Hevy settings"
+            aria-label={t("strength.hevy.close")}
             disabled={busy}
             onClick={onClose}
           >
@@ -105,12 +106,12 @@ export function StrengthHevyDialog({
             <div className="strength-hevy-account">
               <span className="strength-hevy-mark" aria-hidden="true">H</span>
               <div>
-                <strong>{status?.displayName || "Hevy account"}</strong>
+                <strong>{status?.displayName || t("strength.hevy.account")}</strong>
                 <span>{formatSyncTime(status?.lastSyncedAt)}</span>
               </div>
               {status?.profileUrl ? (
                 <a href={status.profileUrl} target="_blank" rel="noreferrer">
-                  Profile <ExternalLink size={13} aria-hidden="true" />
+                  {t("strength.hevy.profile")} <ExternalLink size={13} aria-hidden="true" />
                 </a>
               ) : null}
             </div>
@@ -127,13 +128,12 @@ export function StrengthHevyDialog({
                 }}
               />
               <span>
-                <strong>Include warm-up sets</strong>
-                <small>Count warm-ups in sets, volume, and lift records.</small>
+                <strong>{t("strength.hevy.warmups")}</strong>
+                <small>{t("strength.hevy.warmupsHint")}</small>
               </span>
             </label>
             <p className="strength-hevy-privacy">
-              Heracles Records reads completed workouts only. It never writes to Hevy or
-              sends Hevy workouts to COROS.
+              {t("strength.hevy.readOnly")}
             </p>
             <footer>
               <button
@@ -142,18 +142,17 @@ export function StrengthHevyDialog({
                 disabled={busy}
                 onClick={disconnect}
               >
-                Disconnect and erase cache
+                {t("strength.hevy.disconnect")}
               </button>
               <button type="button" className="primary-button" disabled={busy} onClick={onClose}>
-                Done
+                {t("common.done")}
               </button>
             </footer>
           </>
         ) : (
           <form onSubmit={submit}>
             <p>
-              Hevy&apos;s developer API requires Hevy Pro. Create a key in your
-              Hevy web settings, then paste it below.
+              {t("strength.hevy.pro")}
             </p>
             <a
               className="strength-hevy-developer-link"
@@ -161,24 +160,23 @@ export function StrengthHevyDialog({
               target="_blank"
               rel="noreferrer"
             >
-              Open Hevy developer settings
+              {t("strength.hevy.developer")}
               <ExternalLink size={14} aria-hidden="true" />
             </a>
             <label className="field">
-              <span>Hevy API key</span>
+              <span>{t("strength.hevy.key")}</span>
               <input
                 type="password"
                 value={apiKey}
                 autoComplete="off"
                 spellCheck={false}
-                placeholder="Paste API key"
+                placeholder={t("strength.hevy.keyPlaceholder")}
                 disabled={busy}
                 onChange={(event) => setApiKey(event.target.value)}
               />
             </label>
             <p className="strength-hevy-privacy">
-              The key is encrypted with your operating system&apos;s credential
-              storage and is never exposed to the page after connection.
+              {t("strength.hevy.keyPrivacy")}
             </p>
             <button type="submit" className="primary-button" disabled={busy || !apiKey.trim()}>
               {busy ? (
@@ -186,7 +184,7 @@ export function StrengthHevyDialog({
               ) : (
                 <Link2 size={16} aria-hidden="true" />
               )}
-              Connect Hevy
+              {t("strength.connectHevy")}
             </button>
           </form>
         )}

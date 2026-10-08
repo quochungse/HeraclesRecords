@@ -48,6 +48,7 @@ import {
   type MuscleStat
 } from "./strengthAnalytics";
 
+import { t } from "../i18n/core";
 export type BodyView = "front" | "back";
 
 interface BodyMapV2Props {
@@ -550,7 +551,7 @@ function createWorld(
   canvas.setAttribute("role", "img");
   canvas.setAttribute(
     "aria-label",
-    "Interactive anatomical muscle model. Use the Front and Back controls to turn the figure, then select a highlighted muscle group."
+    t("strength.map.label")
   );
   container.appendChild(canvas);
 
@@ -1527,16 +1528,15 @@ export function BodyMapV2({
       {loading ? (
         <div className="anatomy-model-status" role="status" aria-live="polite">
           <span className="anatomy-model-skeleton" aria-hidden="true" />
-          <strong>Loading anatomical model</strong>
+          <strong>{t("strength.map.loading")}</strong>
           <span>
-            {progress === null ? "Preparing the muscle system" : `${Math.round(progress * 100)}%`}
+            {progress === null ? t("strength.map.preparing") : `${Math.round(progress * 100)}%`}
           </span>
         </div>
       ) : null}
       {failed ? (
         <p className="body-map-fallback" role="alert">
-          The Z-Anatomy model could not load. The muscle ranking beside it
-          still contains the complete workload breakdown.
+          {t("strength.map.failed")}
         </p>
       ) : null}
       <div
@@ -1557,30 +1557,30 @@ export function BodyMapV2({
             onClick={() => setLayersOpen((current) => !current)}
           >
             <Layers3 size={13} aria-hidden="true" />
-            <span>Muscle groups</span>
+            <span>{t("strength.layers.title")}</span>
           </button>
           {layersOpen ? (
             <section
               className="anatomy-layer-panel"
               id="anatomy-muscle-layers"
-              aria-label="Muscle group visibility and draw order"
+              aria-label={t("strength.layers.label")}
             >
               <header>
                 <div>
-                  <strong>Muscle groups</strong>
-                  <span>Visibility &amp; layer priority</span>
+                  <strong>{t("strength.layers.title")}</strong>
+                  <span>{t("strength.layers.sub")}</span>
                 </div>
                 <button
                   type="button"
                   className="anatomy-layer-reset"
-                  aria-label="Reset muscle group visibility and order"
-                  title="Reset groups"
+                  aria-label={t("strength.layers.reset")}
+                  title={t("strength.layers.resetTitle")}
                   onClick={resetLayers}
                 >
                   <RotateCcw size={12} aria-hidden="true" />
                 </button>
               </header>
-              <ul aria-label="Muscle group layer priority, highest first">
+              <ul aria-label={t("strength.layers.list")}>
                 {layerPreferences.order.map((muscle, index) => {
                   const hidden = layerPreferences.hidden.has(muscle);
                   const label = MUSCLE_BY_ID[muscle].label;
@@ -1589,9 +1589,9 @@ export function BodyMapV2({
                       <button
                         type="button"
                         className="anatomy-layer-visibility"
-                        aria-label={`${hidden ? "Show" : "Hide"} ${label}`}
+                        aria-label={t(hidden ? "strength.layers.show" : "strength.layers.hide", { muscle: label })}
                         aria-pressed={!hidden}
-                        title={`${hidden ? "Show" : "Hide"} ${label}`}
+                        title={t(hidden ? "strength.layers.show" : "strength.layers.hide", { muscle: label })}
                         onClick={() => toggleLayer(muscle)}
                       >
                         {hidden ? (
@@ -1604,8 +1604,8 @@ export function BodyMapV2({
                       <div className="anatomy-layer-move">
                         <button
                           type="button"
-                          aria-label={`Move ${label} up`}
-                          title="Increase layer priority"
+                          aria-label={t("strength.layers.up", { muscle: label })}
+                          title={t("strength.layers.upTitle")}
                           disabled={index === 0}
                           onClick={() => moveLayer(muscle, -1)}
                         >
@@ -1613,8 +1613,8 @@ export function BodyMapV2({
                         </button>
                         <button
                           type="button"
-                          aria-label={`Move ${label} down`}
-                          title="Decrease layer priority"
+                          aria-label={t("strength.layers.down", { muscle: label })}
+                          title={t("strength.layers.downTitle")}
                           disabled={index === layerPreferences.order.length - 1}
                           onClick={() => moveLayer(muscle, 1)}
                         >
@@ -1630,7 +1630,7 @@ export function BodyMapV2({
         </div>
       ) : null}
       <span className="sr-only" aria-live="polite">
-        {selected ? `${MUSCLE_BY_ID[selected].label} selected` : ""}
+        {selected ? t("strength.map.selected", { muscle: MUSCLE_BY_ID[selected].label }) : ""}
       </span>
     </div>
   );

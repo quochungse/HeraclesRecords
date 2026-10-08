@@ -22,6 +22,13 @@ const common: CommonMessages = {
   "sport.hiking": "Escursionismo",
   "sport.strength": "Forza",
   "sport.other": "Altro",
+  "common.connectFirst.title": "Prima collega COROS",
+  "common.connectFirst.body": "L’accesso a COROS si fa dalla Panoramica. Collegati lì e le tue attività con i loro dettagli si caricheranno qui.",
+  "common.openOverview": "Apri Panoramica",
+  "common.loading": "Caricamento…",
+  "common.showMore": "Mostra altro",
+  "common.all": "Tutti",
+  "common.done": "Fatto",
 };
 
 export default common;

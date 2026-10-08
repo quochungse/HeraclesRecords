@@ -12,6 +12,7 @@ import {
 } from "../activityFilters";
 import { SPORT_COLOR_LABELS, type SportColorCategory } from "../sportColors";
 
+import { plural, t } from "../../i18n/core";
 const ACTIVITY_PERIOD_GROUP_OPTIONS = periodGroupOptions(ACTIVITY_PERIOD_DAYS);
 
 interface ActivitiesFilterBarProps {
@@ -45,7 +46,7 @@ export function ActivitiesFilterBar({
           changed a few times a session, and the search field beside it is
           worth more room than three chips nobody is looking at. */}
       <OptionGroup
-        label="Period"
+        label={t("activity.filter.period")}
         mode="collapsible"
         className="activities-period"
         value={periodValue(filters.periodDays as PeriodDays)}
@@ -57,7 +58,7 @@ export function ActivitiesFilterBar({
 
       {available.length > 1 ? (
         <OptionChips
-          label="Sports"
+          label={t("activity.filter.sports")}
           className="activities-sports"
           options={available.map((category) => ({
             value: category,
@@ -74,8 +75,8 @@ export function ActivitiesFilterBar({
         <input
           type="search"
           value={filters.query}
-          placeholder="Search by name or sport"
-          aria-label="Search activities"
+          placeholder={t("activity.filter.search")}
+          aria-label={t("activity.filter.searchLabel")}
           onChange={(event) =>
             onChange({ ...filters, query: event.target.value })
           }
@@ -84,7 +85,7 @@ export function ActivitiesFilterBar({
           <button
             type="button"
             className="icon-button activities-search-clear"
-            aria-label="Clear search"
+            aria-label={t("activity.filter.clearSearch")}
             onClick={() => onChange({ ...filters, query: "" })}
           >
             <X size={14} aria-hidden="true" />
@@ -100,7 +101,7 @@ export function ActivitiesFilterBar({
       {narrowed ? (
         <p className="activities-filters-status" role="status">
           <span>
-            {matched} {matched === 1 ? "match" : "matches"}
+            {plural("activity.filter.matches", matched)}
           </span>
           <button
             type="button"
@@ -108,7 +109,7 @@ export function ActivitiesFilterBar({
               onChange({ ...filters, sports: [], query: "" })
             }
           >
-            Clear filters
+            {t("activity.filter.clear")}
           </button>
         </p>
       ) : null}
