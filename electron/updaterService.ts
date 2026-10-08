@@ -1,4 +1,4 @@
-import { execFileSync } from "node:child_process";
+import { spawnSync } from "node:child_process";
 import { promises as fs } from "node:fs";
 import { homedir } from "node:os";
 import path from "node:path";
@@ -39,26 +39,20 @@ function isMacAdHocSigned(): boolean {
     return false;
   }
 
-  try {
-    const output = execFileSync(
-      "codesign",
-      ["-dv", process.execPath],
-      { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }
-    );
-    const combined = output.toString();
+  // `codesign -d` writes what it displays to stderr and exits 0, so stdout is
+  // empty: reading only stdout called every ad-hoc build signed, and
+  // Squirrel.Mac then refused the update without a word, since an ad-hoc
+  // signature cannot satisfy the next build's designated requirement.
+  const result = spawnSync("codesign", ["-dv", process.execPath], {
+    encoding: "utf8"
+  });
+  const combined = `${result.stdout ?? ""}\n${result.stderr ?? ""}`;
 
-    return (
-      combined.includes("Signature=adhoc") ||
-      combined.includes("code has no resources but signature indicates they must be present")
-    );
-  } catch (error) {
-    const message =
-      error instanceof Error
-        ? `${error.message}\n${"stderr" in error ? String(error.stderr ?? "") : ""}`
-        : String(error);
-
-    return message.includes("Signature=adhoc");
-  }
+  return (
+    combined.includes("Signature=adhoc") ||
+    combined.includes("code object is not signed at all") ||
+    combined.includes("code has no resources but signature indicates they must be present")
+  );
 }
 
 // Must stay in step with the `artifactName` patterns in package.json's build
