@@ -1,6 +1,6 @@
 import { Suspense, lazy, type CSSProperties } from "react";
 import { recoveryTone } from "../parsers";
-import { figureToneFor, levelInFrame } from "../body/bodyFigureMath";
+import { figureColourFor, levelInFrame } from "../body/bodyFigureMath";
 import { DEFAULT_SHAPE, readFirmness, readPhysique, type Vo2Reading } from "../body/physique";
 import { getLocalHappenDayKey } from "../formatters";
 import { useFigureSample } from "../body/sampleFigure";
@@ -79,8 +79,8 @@ export function RecoveryPanel(props: RecoveryPanelProps) {
   // Rounded once, so the figure, its colour and its words read one number.
   const percent = Math.round(Math.max(0, Math.min(100, summary.recoveryPct ?? 0)));
   const hasData = percent > 0;
-  // The words follow COROS's three bands; the colour has a fourth for 100%.
-  const tone = figureToneFor(percent);
+  // The words follow COROS's three bands; the colour runs with the figure.
+  const colour = figureColourFor(percent);
   const waiting = loading && !hasData;
   const { label, message } = waiting
     ? { label: "Reading", message: "Reading your recovery from COROS…" }
@@ -101,7 +101,8 @@ export function RecoveryPanel(props: RecoveryPanelProps) {
 
   return (
     <section
-      className={`panel training-recovery-panel tone-${tone}`}
+      className={`panel training-recovery-panel${colour ? "" : " tone-neutral"}`}
+      style={colour ? ({ "--recovery-tone": colour } as CSSProperties) : undefined}
       aria-busy={waiting || undefined}
     >
       <div className="training-recovery-header">
@@ -117,7 +118,6 @@ export function RecoveryPanel(props: RecoveryPanelProps) {
                 shape={body.shape ?? DEFAULT_SHAPE}
                 firmness={firmness}
                 level={hasData ? percent : undefined}
-                tone={tone}
               />
             </Suspense>
           ) : null}

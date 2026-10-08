@@ -19,21 +19,31 @@ export const WIDE_FRAME = { feet: 0.05, span: 0.88 };
 export const NARROW_FRAME = { feet: 0.14, span: 0.8 };
 
 /**
- * The figure's colour for a recovery %. Full recovery has a colour of its own:
- * 99% and 100% are one step apart on COROS's scale and a different thing to an
- * athlete deciding whether to go hard, so green is kept for 100 and 70–99 is
- * yellow, apart from the orange of 40–69. The words (Ready, Moderate, Recover)
- * still follow COROS's three bands.
+ * The figure's colour for a recovery %, continuous rather than in bands: the
+ * four colours the panel declares (`--figure-low` … `--figure-full`) stand at
+ * 20, 60, 70 and 100, and a figure between two is mixed between them in
+ * OKLCH, whose lightness runs evenly — straight from red to green in RGB goes
+ * through brown. 20 and under is the red. The words (Ready, Moderate, Recover)
+ * still follow COROS's three bands. Undefined for no reading (a 0 from COROS
+ * is none), which the stage draws in its idle colour.
  */
-export type FigureTone = "full" | "high" | "mid" | "low" | "neutral";
+export const FIGURE_COLOUR_STOPS: ReadonlyArray<readonly [number, string]> = [
+  [20, "--figure-low"],
+  [60, "--figure-mid"],
+  [70, "--figure-high"],
+  [100, "--figure-full"]
+];
 
-export function figureToneFor(recoveryPct: number | undefined): FigureTone {
-  if (recoveryPct === undefined || !(recoveryPct > 0)) return "neutral";
-  const pct = Math.round(recoveryPct);
-  if (pct >= 100) return "full";
-  if (pct >= 70) return "high";
-  if (pct >= 40) return "mid";
-  return "low";
+export function figureColourFor(recoveryPct: number | undefined): string | undefined {
+  if (recoveryPct === undefined || !(recoveryPct > 0)) return undefined;
+  const pct = Math.min(100, Math.round(recoveryPct));
+  // The last stop is 100, so every percent finds one.
+  const at = FIGURE_COLOUR_STOPS.findIndex(([stop]) => pct <= stop);
+  const [high, to] = FIGURE_COLOUR_STOPS[at];
+  if (at === 0 || pct === high) return `var(${to})`;
+  const [low, from] = FIGURE_COLOUR_STOPS[at - 1];
+  const share = Math.round(((pct - low) / (high - low)) * 1000) / 10;
+  return `color-mix(in oklch, var(${from}), var(${to}) ${share}%)`;
 }
 
 /** Half the width of the soft line where the lit part meets the dim part. */

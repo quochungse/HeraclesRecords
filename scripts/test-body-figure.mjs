@@ -27,7 +27,10 @@
 //   the crown.
 // - **The level and the frame agree**: the words stand where the stylesheet
 //   puts the fill line.
-// - **100% is its own colour**: green for full recovery only, 70–99 yellow.
+// - **The colour runs with the recovery**: red at 20% and under, orange at 60,
+//   yellow at 70, green at 100, mixed in OKLCH between; no reading has none.
+//   The four colours are declared on the panel, where the mix is written —
+//   a custom property holding var() resolves where it is declared.
 //
 // Mode: renderer TypeScript, extensionless imports in the graph, so the
 // resolver hook comes along. Run through Electron because a distro Node built
@@ -325,16 +328,36 @@ for (const sex of SEXES) {
   assert.ok(k.some((v) => v === 1) && k.some((v) => v < 0.6), "dense parts are dimmed, open parts are not");
 }
 
-// Full recovery has its own colour: 100 green, 99 already yellow.
-assert.equal(math.figureToneFor(100), "full");
-assert.equal(math.figureToneFor(99.6), "full", "COROS's figure is drawn rounded");
-assert.equal(math.figureToneFor(99), "high");
-assert.equal(math.figureToneFor(70), "high");
-assert.equal(math.figureToneFor(69), "mid");
-assert.equal(math.figureToneFor(40), "mid");
-assert.equal(math.figureToneFor(39), "low");
-assert.equal(math.figureToneFor(undefined), "neutral");
-assert.equal(math.figureToneFor(0), "neutral", "a 0 from COROS is no reading");
+// The colour runs with the recovery, through the four colours at their stops.
+assert.equal(math.figureColourFor(undefined), undefined);
+assert.equal(math.figureColourFor(0), undefined, "a 0 from COROS is no reading");
+assert.equal(math.figureColourFor(5), "var(--figure-low)", "20% and under is the red");
+assert.equal(math.figureColourFor(20), "var(--figure-low)");
+assert.equal(math.figureColourFor(60), "var(--figure-mid)");
+assert.equal(math.figureColourFor(70), "var(--figure-high)");
+assert.equal(math.figureColourFor(100), "var(--figure-full)");
+assert.equal(math.figureColourFor(99.6), "var(--figure-full)", "COROS's figure is drawn rounded");
+assert.equal(math.figureColourFor(65), "color-mix(in oklch, var(--figure-mid), var(--figure-high) 50%)");
+assert.equal(math.figureColourFor(30), "color-mix(in oklch, var(--figure-low), var(--figure-mid) 25%)");
+assert.equal(math.figureColourFor(99), "color-mix(in oklch, var(--figure-high), var(--figure-full) 96.7%)");
+// Every percent from 1 to 100 has a colour, and a step of one moves the mix forward.
+{
+  const share = (pct) => {
+    const c = math.figureColourFor(pct);
+    const stop = math.FIGURE_COLOUR_STOPS.findIndex(([, name]) => c.endsWith(`var(${name})`));
+    if (stop >= 0) return stop;
+    const m = c.match(/var\((--figure-\w+)\), var\((--figure-\w+)\) ([\d.]+)%\)$/);
+    return math.FIGURE_COLOUR_STOPS.findIndex(([, name]) => name === m[1]) + Number(m[3]) / 100;
+  };
+  for (let pct = 21; pct <= 100; pct++) assert.ok(share(pct) > share(pct - 1), `${pct}% is further along than ${pct - 1}%`);
+}
+{
+  const css = readFileSync(path.join(repoRoot, "src/styles.css"), "utf8");
+  const panel = css.match(/\n\.training-recovery-panel \{([^}]*)\}/g)?.join("") ?? "";
+  for (const [, name] of math.FIGURE_COLOUR_STOPS) {
+    assert.match(panel, new RegExp(`${name}: #`), `${name} is declared on the panel, where --recovery-tone is mixed`);
+  }
+}
 
 const { WIDE_FRAME, NARROW_FRAME } = math;
 assert.equal(math.levelInFrame(0), WIDE_FRAME.feet, "an empty figure's line is at the soles");

@@ -1821,9 +1821,12 @@ lives at module level for the same visit-to-visit reason — see `useCalendarDat
 
 - **Overview's body figure** (`src/training/body/`, built 2026-10-07) — the panel titled
   "Your physique" (`RecoveryPanel`, which replaced the recovery ring) draws a low-poly
-  wireframe of the athlete, lit from the feet up to COROS's recovery %, in four colours
-  (`figureToneFor`, the stage's `--figure-tone`): green for 100% alone, yellow 70–99, orange
-  40–69, red below — the words keep COROS's three bands. **The physique is height and weight
+  wireframe of the athlete, lit from the feet up to COROS's recovery %, in a colour that runs
+  with it (`figureColourFor`, since 2026-10-08; it was four bands): red at 20% and under, orange
+  at 60, yellow at 70, green at 100, mixed in OKLCH between — the words keep COROS's three bands.
+  The mix is written on the panel as `--recovery-tone`, so the four stop colours are declared on
+  `.training-recovery-panel` and not on the stage: a custom property holding `var()` resolves
+  where it is declared, and on the stage they were out of its reach. **The physique is height and weight
   from the COROS profile and nothing else** (`physique.ts`), read on **Trefethen's
   height-adjusted BMI**, 1.3 kg / m^2.5, not kg / m²: BMI reads the same build heavier on a
   tall athlete, and the 2.5 power takes most of that out (the two agree at 1.69 m; 80 kg is a

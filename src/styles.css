@@ -6108,7 +6108,15 @@ td span {
   font-size: 14px;
 }
 
+/* The recovery's colours, 20% to 100% (`FIGURE_COLOUR_STOPS`). On the panel,
+   not the stage: the renderer's mix of them is written here as
+   `--recovery-tone`, and a custom property holding `var()` resolves where it
+   is declared, so these have to be in scope on the panel itself. */
 .training-recovery-panel {
+  --figure-low: #f87171;
+  --figure-mid: #fb923c;
+  --figure-high: #d4e34c;
+  --figure-full: #6ee7a8;
   position: relative;
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);
@@ -6116,21 +6124,13 @@ td span {
   gap: 14px;
   min-height: clamp(282px, 31vh, 392px);
   overflow: visible;
-  border-color: rgba(52, 211, 153, 0.18);
 }
 
-/* Green is full recovery alone; 70–99 is yellow, apart from 40–69's orange
-   (`figureToneFor`). */
-.training-recovery-panel.tone-high {
-  border-color: rgba(212, 227, 76, 0.18);
-}
-
-.training-recovery-panel.tone-mid {
-  border-color: rgba(251, 146, 60, 0.18);
-}
-
-.training-recovery-panel.tone-low {
-  border-color: rgba(248, 113, 113, 0.18);
+/* The edge in the recovery's colour, or the glass edge with no reading. Two
+   classes deep, both: one class loses to the matte edge
+   `.training-intelligence .training-recovery-panel` gives the card. */
+.training-recovery-panel:not(.tone-neutral) {
+  border-color: color-mix(in srgb, var(--recovery-tone) 18%, transparent);
 }
 
 .training-recovery-panel.tone-neutral {
@@ -6180,7 +6180,7 @@ td span {
 /* The figure's stage is dark in both themes: the figure is light added onto
    it (`plus-lighter`), and paper's own grey stage, drawn in ink, read as
    washed out. The figure's colours and strengths (BodyFigure.tsx) live here;
-   `--figure-tone` is the recovery's colour, set per tone. */
+   `--figure-tone` is the recovery's colour, mixed on the panel (above). */
 .recovery-figure {
   --figure-rim: 0.1;
   --figure-skin-alpha: 1;
@@ -6190,10 +6190,6 @@ td span {
   --figure-skin: #060d16;
   --figure-dim: #3b5068;
   --figure-idle: #46b8ff;
-  --figure-low: #f87171;
-  --figure-mid: #fb923c;
-  --figure-high: #d4e34c;
-  --figure-full: #6ee7a8;
   --figure-tone: var(--figure-idle);
   position: relative;
   width: 100%;
@@ -6205,20 +6201,9 @@ td span {
   container: recovery-figure / inline-size;
 }
 
-.training-recovery-panel.tone-full .recovery-figure {
-  --figure-tone: var(--figure-full);
-}
-
-.training-recovery-panel.tone-high .recovery-figure {
-  --figure-tone: var(--figure-high);
-}
-
-.training-recovery-panel.tone-mid .recovery-figure {
-  --figure-tone: var(--figure-mid);
-}
-
-.training-recovery-panel.tone-low .recovery-figure {
-  --figure-tone: var(--figure-low);
+/* The recovery's colour, mixed by the renderer (`figureColourFor`). */
+.training-recovery-panel:not(.tone-neutral) .recovery-figure {
+  --figure-tone: var(--recovery-tone);
 }
 
 /* Soles and crown at `NARROW_FRAME`, then `WIDE_FRAME` from 560px

@@ -7,8 +7,8 @@
 // the panel reckons the build from it as it does from COROS (`readPhysique`),
 // so what is drawn is what the rules make of those numbers. Between them the
 // presets draw both ends and the blends between for each sex, one weight at
-// three heights, the toning VO2max adds, each of the four recovery colours (100% green apart from
-// 70–99 yellow), and a profile with no height or weight.
+// three heights, the toning VO2max adds, recoveries from red to green, and a
+// profile with no height or weight.
 
 import { useSyncExternalStore } from "react";
 import { heightAdjustedBmi } from "./physique";
@@ -53,8 +53,8 @@ function bodyPreset(
 // From the slimmest body to the heaviest, past both ends (each held there),
 // through the blends between; then one weight at three heights, which is the
 // height adjustment at work; then one man and one woman from below Good to
-// Superior VO2max for 30-year-olds (no birthday reads as 30). Each recovery colour turns up along the way: 100%
-// the full-recovery green, 70–99 yellow, 40–69 orange, under 40 red.
+// Superior VO2max for 30-year-olds (no birthday reads as 30). The recoveries
+// spread along the colour, from the red of 8% to the green of 100%.
 export const FIGURE_SAMPLE_PRESETS: readonly FigureSampleEntry[] = [
   bodyPreset(0, 175, 52, 100),
   bodyPreset(0, 175, 62, 88),
@@ -69,7 +69,7 @@ export const FIGURE_SAMPLE_PRESETS: readonly FigureSampleEntry[] = [
   bodyPreset(1, 160, 61, 100),
   bodyPreset(1, 160, 68, 88),
   bodyPreset(1, 160, 76, 58),
-  bodyPreset(1, 160, 85, 34),
+  bodyPreset(1, 160, 85, 8),
   bodyPreset(0, 160, 80, 72),
   bodyPreset(0, 178, 80, 72),
   bodyPreset(0, 195, 80, 72),

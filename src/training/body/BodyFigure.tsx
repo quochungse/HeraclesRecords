@@ -12,7 +12,7 @@
 // stylesheet's alone.
 
 import { useId, type CSSProperties } from "react";
-import { blendFigure, type FigureTone } from "./bodyFigureMath";
+import { blendFigure } from "./bodyFigureMath";
 import { drawFigure, type FigureDrawing } from "./bodyFigureDrawing";
 import { readFigureFile } from "./figureFile";
 import type { FigureSex } from "./physique";
@@ -25,7 +25,6 @@ export interface BodyFigureProps {
   firmness: number;
   /** Recovery, 0–100. Undefined draws the whole figure in the idle colour. */
   level?: number;
-  tone: FigureTone;
 }
 
 // A shape's paths never change, so a return to Overview reuses them; the
@@ -46,11 +45,11 @@ function drawingFor(sex: FigureSex, shape: number, firmness: number): FigureDraw
   return drawing;
 }
 
-export function BodyFigure({ sex, shape, firmness, level, tone }: BodyFigureProps) {
+export function BodyFigure({ sex, shape, firmness, level }: BodyFigureProps) {
   const id = useId().replace(/[^\w-]/g, "");
   const drawing = drawingFor(sex, shape, firmness);
   // No reading lights the whole figure in the idle colour (`--figure-tone`).
-  const fill = tone === "neutral" || level === undefined ? 1 : level / 100;
+  const fill = level === undefined ? 1 : level / 100;
   const levelY = drawing.levelY(fill);
   const lines = `url(#${id}-lines)`;
 
