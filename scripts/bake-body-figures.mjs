@@ -1,5 +1,7 @@
 // Writes src/training/body/bodyFigures.json: the low-poly human figures the
-// Overview's recovery panel draws, one per sex and physique.
+// Overview's recovery panel draws, four per sex and a toned twin of each, which
+// the app blends between by the athlete's height and weight (`BODY_ANCHORS` in
+// physique.ts) and their VO2max (`vo2Firmness`).
 //
 //   npm run body-figures:bake
 //
@@ -37,24 +39,14 @@ const RACE = { african: 1 / 3, asian: 1 / 3, caucasian: 1 / 3 };
 
 const LR = (name, k) => [[`l-${name}`, k], [`r-${name}`, k]];
 
-/** Halfway from one preset to another: the macros, the gain and every extra. */
-function between(a, b) {
-  const extras = new Map();
-  for (const [name, k] of [...a.extras, ...b.extras]) extras.set(name, (extras.get(name) ?? 0) + k / 2);
-  const mid = (key) => (a[key] + b[key]) / 2;
-  return {
-    gender: a.gender, muscle: mid("muscle"), weight: mid("weight"), proportions: mid("proportions"), gain: mid("gain"),
-    extras: [...extras]
-  };
-}
-
 // `gender` is MakeHuman's macro: 0 female, 1 male. MakeHuman's weight and
 // muscle range is narrow (its heaviest waist is ~5 cm wider than its average),
 // so `gain` scales the muscle/weight targets up to read at the size the figure
 // is drawn; `extras` are its measurement targets at face value.
 const PRESETS = {
   male: {
-    lean: {
+    // The smallest figure: a slim build, not an underweight one.
+    slim: {
       gender: 1, muscle: 0.55, weight: 0, proportions: 0.8, gain: 1.6,
       extras: [["measure-thigh-circ-incr", 0.15], ["measure-calf-circ-decr", 0.2]]
     },
@@ -68,12 +60,21 @@ const PRESETS = {
         ...LR("upperarm-fat-incr", 0.2), ...LR("upperleg-fat-incr", 0.2),
         ...LR("lowerarm-fat-incr", 0.1), ...LR("lowerleg-fat-incr", 0.1)
       ]
+    },
+    // Heavy carried further, in the same places and still without a caricature.
+    veryHeavy: {
+      gender: 1, muscle: 0.35, weight: 1, proportions: 0.8, gain: 1.6,
+      extras: [
+        ["stomach-pregnant-incr", 0.22], ["measure-waist-circ-incr", 0.4], ["measure-hips-circ-incr", 0.18],
+        ...LR("upperarm-fat-incr", 0.32), ...LR("upperleg-fat-incr", 0.32),
+        ...LR("lowerarm-fat-incr", 0.18), ...LR("lowerleg-fat-incr", 0.18)
+      ]
     }
   },
   // A woman's figure is its own preset, not a man's made smaller: waist to hip,
   // a bust, narrower shoulders, a slimmer neck and upper arm.
   female: {
-    lean: {
+    slim: {
       gender: 0, muscle: 0.45, weight: 0, proportions: 1, gain: 1.6,
       extras: [
         ["measure-waist-circ-decr", 0.3], ["measure-bust-circ-incr", 0.1], ["measure-shoulder-dist-decr", 0.2],
@@ -98,15 +99,63 @@ const PRESETS = {
         ...LR("upperarm-fat-incr", 0.2), ...LR("upperleg-fat-incr", 0.25),
         ["measure-bust-circ-incr", 0.2], ["measure-shoulder-dist-decr", 0.2], ["measure-neck-circ-decr", 0.2]
       ]
+    },
+    // A step past Heavy, kept gentle: fuller hips, thighs and arms before the belly.
+    veryHeavy: {
+      gender: 0, muscle: 0.35, weight: 0.95, proportions: 1, gain: 1.45,
+      extras: [
+        ["measure-waist-circ-incr", 0.4], ["measure-hips-circ-incr", 0.22], ["stomach-pregnant-incr", 0.14],
+        ...LR("upperarm-fat-incr", 0.3), ...LR("upperleg-fat-incr", 0.35),
+        ["measure-bust-circ-incr", 0.28], ["measure-shoulder-dist-decr", 0.2], ["measure-neck-circ-decr", 0.15]
+      ]
     }
   }
 };
 
-// Sturdy is the upper half of what was one Medium: halfway to Heavy.
-for (const presets of Object.values(PRESETS)) {
-  const { lean, medium, heavy } = presets;
-  for (const key of Object.keys(presets)) delete presets[key];
-  Object.assign(presets, { lean, medium, sturdy: between(medium, heavy), heavy });
+// Each body has a toned twin, which the app moves towards as the athlete's
+// VO2max rises from the Cooper Institute's Good to Superior for their age and
+// sex (`vo2Firmness` in physique.ts). The same size of person, carrying more of
+// it as muscle: more of MakeHuman's muscle macro, a flat stomach and a smaller
+// waist, the body fat the heavier presets add taken mostly back out, and the
+// muscle a fit build shows. A man's goes to the shoulders, chest and back as
+// well as the legs; a woman's to the legs and hips, with only a little in the
+// arms — a V-shaped back read as coarse on her.
+const isAddedFat = (name) => /fat-incr|pregnant-incr|waist-circ-incr/.test(name);
+const TONE = {
+  male: [
+    ["stomach-tone-incr", 0.6], ["measure-waist-circ-decr", 0.2], ["torso-vshape-incr", 0.35],
+    ["torso-muscle-pectoral-incr", 0.3], ...LR("upperarm-muscle-incr", 0.4), ...LR("upperarm-shoulder-muscle-incr", 0.35),
+    ...LR("upperleg-muscle-incr", 0.3), ...LR("lowerleg-muscle-incr", 0.3)
+  ],
+  female: [
+    ["stomach-tone-incr", 0.6], ["measure-waist-circ-decr", 0.25], ["buttocks-volume-incr", 0.2],
+    ...LR("upperleg-muscle-incr", 0.25), ...LR("lowerleg-muscle-incr", 0.25),
+    ...LR("upperarm-shoulder-muscle-incr", 0.15), ...LR("upperarm-muscle-incr", 0.12)
+  ]
+};
+/**
+ * A toned twin weighs what its body weighs, and muscle is denser than fat, so
+ * it holds a little less: the bake searches its weight macro for this share of
+ * the body's volume. At the two ends MakeHuman's weight macro runs out before
+ * the share is reached, so the slimmest woman's twin is a few percent larger and
+ * the heaviest twins a few smaller.
+ */
+const TONED_VOLUME = 0.95;
+/**
+ * How much of that toning a twin carries. A woman's twin is drawn halfway from
+ * her body to the toned preset: shown the whole of it, the athlete judged it
+ * too much for a woman at Superior, and halfway was the step she picked.
+ */
+const TONE_REACH = { male: 1, female: 0.5 };
+for (const [sex, presets] of Object.entries(PRESETS)) {
+  for (const [name, preset] of Object.entries({ ...presets })) {
+    presets[`${name}Fit`] = {
+      ...preset,
+      muscle: Math.min(1, preset.muscle + 0.35),
+      extras: [...preset.extras.map(([target, k]) => [target, isAddedFat(target) ? k * 0.3 : k]), ...TONE[sex]],
+      toneOf: name
+    };
+  }
 }
 
 // ---------- MakeHuman files ----------
@@ -330,13 +379,50 @@ async function main() {
   const plan = lowPolyPlan(mesh);
   if (plan.original.length > 65535) throw new Error("too many vertices for 16-bit indices");
 
+  const lowOf = async (preset) => {
+    const posed = poseArms(rig, await shape(mesh, preset), ARM_DEG, ELBOW_DEG);
+    const low = new Float32Array(plan.original.length * 3);
+    plan.original.forEach((o, j) => low.set(posed.subarray(o * 3, o * 3 + 3), j * 3));
+    return low;
+  };
+  const volumeOf = (v) => {
+    const t = plan.tris;
+    let sum = 0;
+    for (let i = 0; i < t.length; i += 3) {
+      const [a, b, c] = [t[i] * 3, t[i + 1] * 3, t[i + 2] * 3];
+      sum +=
+        v[a] * (v[b + 1] * v[c + 2] - v[b + 2] * v[c + 1]) -
+        v[a + 1] * (v[b] * v[c + 2] - v[b + 2] * v[c]) +
+        v[a + 2] * (v[b] * v[c + 1] - v[b + 1] * v[c]);
+    }
+    return Math.abs(sum / 6);
+  };
+
   const bodies = {};
   for (const [sex, presets] of Object.entries(PRESETS)) {
-    for (const [physique, preset] of Object.entries(presets)) {
-      const posed = poseArms(rig, await shape(mesh, preset), ARM_DEG, ELBOW_DEG);
-      const low = new Float32Array(plan.original.length * 3);
-      plan.original.forEach((o, j) => low.set(posed.subarray(o * 3, o * 3 + 3), j * 3));
-      (bodies[sex] ??= {})[physique] = low;
+    for (const [name, preset] of Object.entries(presets)) {
+      if (!preset.toneOf) {
+        (bodies[sex] ??= {})[name] = await lowOf(preset);
+        continue;
+      }
+      // Bisect the weight macro for the toned twin's share of its body's volume.
+      const plain = bodies[sex][preset.toneOf];
+      const plainVolume = volumeOf(plain);
+      let lo = 0;
+      let hi = 1;
+      let weight;
+      let low;
+      for (let i = 0; i < 14; i++) {
+        weight = (lo + hi) / 2;
+        low = await lowOf({ ...preset, weight });
+        if (volumeOf(low) < plainVolume * TONED_VOLUME) lo = weight;
+        else hi = weight;
+      }
+      const reach = TONE_REACH[sex];
+      if (reach < 1) low = low.map((v, i) => plain[i] + (v - plain[i]) * reach);
+      bodies[sex][name] = low;
+      const share = volumeOf(low) / plainVolume;
+      console.log(`${sex} ${name}: weight ${weight.toFixed(2)}, ${(share * 100).toFixed(0)}% of ${preset.toneOf}`);
     }
   }
 
