@@ -54,6 +54,22 @@ interface RunEfficiencyChartProps {
  * builds its points, so anything reading those points back must not convert
  * again — on an imperial account that would apply the mile factor twice.
  */
+/**
+ * A point on the trend line is a week, not a day: its label is the Monday the
+ * week starts on, so a run on Wednesday the 7th sits on "Oct 5". Read bare, that
+ * says the run was on the 5th. The year is added when it is not this one, since
+ * an all-time chart holds the same "Oct 5" once a year.
+ */
+function weekOfLabel(weekStartMs: number, nowMs: number): string {
+  const start = new Date(weekStartMs);
+  const sameYear = start.getFullYear() === new Date(nowMs).getFullYear();
+  return `week of ${start.toLocaleDateString(undefined, {
+    month: "short",
+    day: "numeric",
+    ...(sameYear ? {} : { year: "numeric" })
+  })}`;
+}
+
 function formatDisplayPace(secondsPerDisplayUnit: number): string {
   const rounded = Math.round(secondsPerDisplayUnit);
   return `${Math.floor(rounded / 60)}:${String(rounded % 60).padStart(2, "0")}`;
@@ -118,6 +134,7 @@ export function RunEfficiencyChart({
       rows.map((row) => {
         const entry: Record<string, number | string | undefined> = {
           label: row.label,
+          weekStartMs: row.weekStartMs,
           overall: row.overall
         };
         for (const surface of drawn) {
@@ -184,10 +201,10 @@ export function RunEfficiencyChart({
       return null;
     }
     return {
-      since: first.label,
+      since: weekOfLabel(first.weekStartMs, nowMs),
       deltaPct: ((latest.overall! - first.overall!) / first.overall!) * 100
     };
-  }, [latest, rows]);
+  }, [latest, nowMs, rows]);
 
   return (
     <section className="panel run-block">
@@ -209,7 +226,7 @@ export function RunEfficiencyChart({
                 {trend.deltaPct >= 0 ? "+" : ""}
                 {trend.deltaPct.toFixed(1)}%
               </strong>{" "}
-              since {trend.since}
+              since the {trend.since}
             </>
           ) : null}
         </p>
@@ -258,10 +275,14 @@ export function RunEfficiencyChart({
                 ) : null}
                 <Tooltip
                   cursor={{ stroke: colors.cursor }}
-                  contentStyle={trainingChartTooltipStyle}
-                  formatter={(value) =>
-                    typeof value === "number" ? value.toFixed(2) : String(value ?? "")
-                  }
+                  content={(props: TooltipContentProps) => (
+                    <EfficiencyTooltip
+                      {...props}
+                      drawn={drawn}
+                      palette={palette}
+                      nowMs={nowMs}
+                    />
+                  )}
                 />
               </LineChart>
             </ResponsiveContainer>
@@ -322,6 +343,55 @@ export function RunEfficiencyChart({
       )}
     </section>
   );
+}
+
+function EfficiencyTooltip({
+  active,
+  payload,
+  drawn,
+  palette,
+  nowMs
+}: TooltipContentProps & {
+  drawn: readonly RunSurface[];
+  palette: Record<RunSurface, string>;
+  nowMs: number;
+}) {
+  if (!active || !payload?.length) {
+    return null;
+  }
+  const row = payload[0]?.payload as
+    | Record<string, number | string | undefined>
+    | undefined;
+  if (!row || typeof row.weekStartMs !== "number") {
+    return null;
+  }
+  const values = drawn
+    .map((surface) => ({ surface, value: row[surface] }))
+    .filter((entry): entry is { surface: RunSurface; value: number } =>
+      typeof entry.value === "number"
+    );
+
+  return (
+    <div className="training-chart-tooltip" style={trainingChartTooltipStyle}>
+      <span>{capitalise(weekOfLabel(row.weekStartMs, nowMs))}</span>
+      {typeof row.overall === "number" ? (
+        <strong>{row.overall.toFixed(2)}</strong>
+      ) : (
+        <span>No qualifying run</span>
+      )}
+      {values.length > 1
+        ? values.map(({ surface, value }) => (
+            <span key={surface} style={{ color: palette[surface] }}>
+              {RUN_SURFACE_LABELS[surface]} {value.toFixed(2)}
+            </span>
+          ))
+        : null}
+    </div>
+  );
+}
+
+function capitalise(text: string): string {
+  return text.charAt(0).toUpperCase() + text.slice(1);
 }
 
 function ScatterTooltip({
