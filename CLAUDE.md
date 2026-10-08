@@ -1821,21 +1821,49 @@ lives at module level for the same visit-to-visit reason — see `useCalendarDat
 
 - **Overview's body figure** (`src/training/body/`, built 2026-10-07) — the panel titled
   "Your physique" (`RecoveryPanel`, which replaced the recovery ring) draws a low-poly
-  wireframe of the athlete, lit from the feet up to COROS's recovery %, in four colours
-  (`figureToneFor`, the stage's `--figure-tone`): green for 100% alone, yellow 70–99, orange
-  40–69, red below — the words keep COROS's three bands. **The physique is height and weight
+  wireframe of the athlete, lit from the feet up to COROS's recovery %, in a colour that runs
+  with it (`figureColourFor`, since 2026-10-08; it was four bands): red at 20% and under, orange
+  at 60, yellow at 70, green at 100, mixed in OKLCH between — the words keep COROS's three bands.
+  The mix is written on the panel as `--recovery-tone`, so the four stop colours are declared on
+  `.training-recovery-panel` and not on the stage: a custom property holding `var()` resolves
+  where it is declared, and on the stage they were out of its reach. **The physique is height and weight
   from the COROS profile and nothing else** (`physique.ts`), read on **Trefethen's
   height-adjusted BMI**, 1.3 kg / m^2.5, not kg / m²: BMI reads the same build heavier on a
-  tall athlete, and the 2.5 power moves the lines with height instead (Heavy from 24.9 BMI at
-  1.55 m, 26 at 1.69 m where the scales agree, 27.6 at 1.90 m). Under 20 Lean, 20–23 Medium,
-  23–26 Sturdy (split from Medium, which was too wide; 23 is the Asian overweight line, and the
-  bake makes Sturdy halfway between the Medium and Heavy presets), 26 and over Heavy — a step
-  past the Asian cut-off of 25, for an athlete's muscle; no usable height or weight draws
-  Medium, silently. Telling muscle from fat would need measures
-  COROS does not have — a training-history heuristic was designed and dropped as guesswork —
-  so Strong/Fit and Bodybuilder are left for the athlete to choose, later. The eight bodies are
+  tall athlete, and the 2.5 power takes most of that out (the two agree at 1.69 m; 80 kg is a
+  32.1 at 1.60 m, 24.6 at 1.78 m and 19.6 at 1.95 m). **The shape is that number, continuously**
+  (since 2026-10-08), not a class picked from it: four bodies are baked by hand per sex — Slim,
+  Medium, Heavy, Very heavy, at 18 · 22.5 · 27 · 31.5 (`BODY_ANCHORS`) — and the figure is the two
+  either side blended vertex by vertex by how far along it is (`shapeBlend`, `blendFigure`), held
+  at Slim below 18 and Very heavy above 31.5. The athlete fixed those two ends; a change goes into
+  the middle two or the anchors. A blend of positions lands within 8.6 mm of baking the blended
+  presets (measured on a 1.7 m body, about 2 px on screen), so the file holds four bodies rather
+  than a ladder of them; it went through six named sizes and then ten numbered ones first, and
+  both read as steps where a kilogram either did nothing or jumped a size. A shape is drawn once
+  per tenth (`drawingFor`, ~15 ms). No usable height or weight draws Medium, silently.
+  **VO2max tones the figure and never softens it** (since 2026-10-08, the athlete's call): each
+  body has a toned twin (`<body>Fit`: more of MakeHuman's muscle macro, a flat stomach, a smaller
+  waist, the heavier presets' added fat mostly taken out; a man's muscle to the shoulders, chest,
+  back and legs, a woman's to the legs and hips with little in the arms, since a V-shaped back
+  read as coarse on her), and the bake **bisects its weight macro to 95% of its body's volume** —
+  the same size of person, muscle being denser than fat; MakeHuman's weight range runs out at the
+  ends, so the heaviest man's twin is ~91%. **A woman's twin carries half the toning**
+  (`TONE_REACH`): it is stored halfway from her body to the toned preset, because the whole of
+  it read as too much on her — so her Superior is that halfway figure, and the app's blend
+  knows nothing of the difference. How far the figure goes
+  toward it (`vo2Firmness`) is the athlete's VO2max against **The Cooper Institute's table for
+  their age and sex** (`fitnessStandards.ts`, the Hall's Hesperides): nothing below Good (60th
+  percentile), all of the twin at Superior (95th) and past it, evenly between. The VO2max read is
+  the median of the four weeks up to the latest reading in the snapshot's daily metrics
+  (`recentVo2max`), and a latest reading over 90 days old is none: COROS estimates VO2max from
+  runs, so an athlete who does not run is drawn by size alone. Firmness is drawn to a twentieth.
+  Telling muscle from fat would need measures
+  COROS does not have — a training-history heuristic was designed and dropped as guesswork, and
+  VO2max is the one hint taken (above) —
+  so a Bodybuilder figure is left for the athlete to choose, later. The sixteen bodies are
   baked (`npm run body-figures:bake`, MakeHuman CC0) through one decimated topology, so the
-  file holds one triangle list and per-body positions.
+  file holds one triangle list and per-body positions. `test:body-figure` holds the order by
+  the mesh's **volume**, not a width across one band: a band either missed the heavier bodies'
+  sides or took in their arms, and both broke the order — every half-step of shape included.
   **It is SVG** (`BodyFigure.tsx`, paths from `bodyFigureDrawing.ts`, worked out once per body
   and kept): the mesh projected through a fixed camera, the hidden lines left out by which way
   each triangle faces (the mesh is closed and wound outward) and then by a depth buffer of the

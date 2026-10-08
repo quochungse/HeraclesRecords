@@ -12,7 +12,7 @@ import { getLocalHappenDayKey } from "../training/formatters";
 import { placeLabelKey } from "../trainingMap/placeClusters";
 import { coordinateLabel, knownPlaceLabels, loadPlaceLabel } from "../trainingMap/placeLabels";
 import { useRegionIndex } from "../trainingMap/useRegionIndex";
-import { mergeTrainingDayLists } from "../training/parsers";
+import { snapshotVo2Readings } from "../training/parsers";
 import type { TrainingHubLoadStatus, TrainingHubSnapshot } from "../training/types";
 import { buildLabours, type LabourState } from "./labours";
 import {
@@ -222,16 +222,7 @@ export function useHallOfRecords({
     };
   }, [api, connected, visible, activityIds]);
 
-  const vo2Readings = useMemo(
-    () =>
-      mergeTrainingDayLists(snapshot?.dailyMetrics ?? null, snapshot?.analytics ?? null).flatMap(
-        (day) =>
-          typeof day.vo2max === "number" && Number.isFinite(day.vo2max) && day.vo2max > 0
-            ? [{ day: day.happenDay, value: day.vo2max }]
-            : []
-      ),
-    [snapshot]
-  );
+  const vo2Readings = useMemo(() => snapshotVo2Readings(snapshot), [snapshot]);
 
   // The labels live in a module cache; the version is what says it moved.
   const placeLabels = useMemo(() => {

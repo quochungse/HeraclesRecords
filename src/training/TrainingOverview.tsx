@@ -22,6 +22,7 @@ import { TrainingHeatmapPanel } from "./components/TrainingHeatmapPanel";
 import { TrainingTrendCharts } from "./components/TrainingTrendChart";
 import { TrainingZoneDistributionCharts } from "./components/TrainingZoneDistributionCharts";
 import { UpcomingWorkoutsPanel } from "./components/UpcomingWorkoutsPanel";
+import { snapshotVo2Readings } from "./parsers";
 import type { TrainingOverviewProps } from "./types";
 import { useHeartRateZoneModel } from "./useHeartRateZoneModel";
 import loginPageBackground from "../assets/training-hub/login-bg.webp";
@@ -108,6 +109,8 @@ export function TrainingOverview({
       },
     [snapshot]
   );
+  // Every day COROS reported a VO2max for, which tones the figure.
+  const vo2Readings = useMemo(() => snapshotVo2Readings(snapshot), [snapshot]);
 
   return (
     <div className="stack training-dashboard">
@@ -427,6 +430,7 @@ export function TrainingOverview({
                   loading={snapshotPending}
                   profile={corosProfile}
                   profileSettled={corosProfileSettled}
+                  vo2Readings={vo2Readings}
                 />
               </div>
               <div className="training-intelligence-column">

@@ -26,6 +26,15 @@ import type {
 
 export { mergeTrainingDayLists } from "../../electron/trainingTrendUtils";
 
+/** Every day the snapshot carries a VO2max for: the Hall's ratings and the Overview figure's toning. */
+export function snapshotVo2Readings(snapshot: TrainingHubSnapshot | null): Array<{ day: string; value: number }> {
+  return mergeTrainingDayLists(snapshot?.dailyMetrics ?? null, snapshot?.analytics ?? null).flatMap((day) =>
+    typeof day.vo2max === "number" && Number.isFinite(day.vo2max) && day.vo2max > 0
+      ? [{ day: day.happenDay, value: day.vo2max }]
+      : []
+  );
+}
+
 export function happenDayToDate(happenDay: string): Date | null {
   if (!/^\d{8}$/.test(happenDay)) {
     return null;

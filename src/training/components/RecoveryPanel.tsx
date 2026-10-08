@@ -1,7 +1,8 @@
 import { Suspense, lazy, type CSSProperties } from "react";
 import { recoveryTone } from "../parsers";
-import { figureToneFor, levelInFrame } from "../body/bodyFigureMath";
-import { PHYSIQUE_LABEL, readPhysique } from "../body/physique";
+import { figureColourFor, levelInFrame } from "../body/bodyFigureMath";
+import { DEFAULT_SHAPE, readFirmness, readPhysique, type Vo2Reading } from "../body/physique";
+import { getLocalHappenDayKey } from "../formatters";
 import { useFigureSample } from "../body/sampleFigure";
 import type { CorosProfile } from "../../../electron/types";
 import type { TrainingSummaryMetrics } from "../types";
@@ -28,6 +29,8 @@ interface RecoveryPanelProps {
   profile: CorosProfile | null;
   /** The profile has answered, or failed to. Until then no figure is drawn. */
   profileSettled: boolean;
+  /** COROS's VO2max by day, which tones the figure (`readFirmness`). */
+  vo2Readings: readonly Vo2Reading[];
 }
 
 function readinessCopy(
@@ -67,23 +70,30 @@ export function RecoveryPanel(props: RecoveryPanelProps) {
   const loading = sample ? false : (props.loading ?? false);
   const profile = sample ? sample.profile : props.profile;
   const profileSettled = sample ? true : props.profileSettled;
+  const today = getLocalHappenDayKey();
+  const vo2Readings = sample
+    ? sample.vo2max !== undefined
+      ? [{ day: today, value: sample.vo2max }]
+      : []
+    : props.vo2Readings;
   // Rounded once, so the figure, its colour and its words read one number.
   const percent = Math.round(Math.max(0, Math.min(100, summary.recoveryPct ?? 0)));
   const hasData = percent > 0;
-  // The words follow COROS's three bands; the colour has a fourth for 100%.
-  const tone = figureToneFor(percent);
+  // The words follow COROS's three bands; the colour runs with the figure.
+  const colour = figureColourFor(percent);
   const waiting = loading && !hasData;
   const { label, message } = waiting
     ? { label: "Reading", message: "Reading your recovery from COROS…" }
     : readinessCopy(hasData ? recoveryTone(percent) : "neutral");
   const body = readPhysique(profile);
+  const firmness = readFirmness(profile, vo2Readings, today);
   // Under the figure's feet; where the stage is wide enough to hold them
   // beside the figure, on the fill line instead (halfway up with no level).
   const labelBottom = hasData
     ? Math.min(levelInFrame(percent / 100), LEVEL_LABEL_CEILING)
     : 0.5;
   const figureDescription = [
-    body.physique ? `${PHYSIQUE_LABEL[body.physique]} build` : null,
+    body.shape !== undefined ? `Drawn from ${profile?.statureCm} cm and ${profile?.weightKg} kg` : null,
     hasData ? `${percent}% recovery` : label
   ]
     .filter(Boolean)
@@ -91,7 +101,8 @@ export function RecoveryPanel(props: RecoveryPanelProps) {
 
   return (
     <section
-      className={`panel training-recovery-panel tone-${tone}`}
+      className={`panel training-recovery-panel${colour ? "" : " tone-neutral"}`}
+      style={colour ? ({ "--recovery-tone": colour } as CSSProperties) : undefined}
       aria-busy={waiting || undefined}
     >
       <div className="training-recovery-header">
@@ -104,9 +115,9 @@ export function RecoveryPanel(props: RecoveryPanelProps) {
             <Suspense fallback={null}>
               <LazyBodyFigure
                 sex={body.sex}
-                physique={body.physique ?? "medium"}
+                shape={body.shape ?? DEFAULT_SHAPE}
+                firmness={firmness}
                 level={hasData ? percent : undefined}
-                tone={tone}
               />
             </Suspense>
           ) : null}
