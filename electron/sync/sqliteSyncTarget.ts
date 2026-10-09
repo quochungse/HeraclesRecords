@@ -352,25 +352,33 @@ export class SqliteSyncTarget implements SyncTarget {
     if (itemisedColumn(table)) this.#published.clear(table, recordId);
   }
 
-  /** See `SyncTarget.readRow`. */
-  readRow(table: string, recordId: string): Record<string, unknown> | undefined {
-    return this.#readRow(table, this.#shapeOf(table), recordId);
-  }
-
   /**
    * One element of an itemised row, put in place by its id.
    *
-   * A row that is not here is a row deleted here — a conversation's own
-   * record always travels ahead of its elements — so the element goes with
-   * it rather than bringing back a stub.
+   * A row that is not here refuses the element rather than dropping it: the
+   * row may be in a batch compacted away mid-pull, and a dropped element would
+   * be stamped as held and skipped when the snapshot brings the row. Refused,
+   * it is applied again then. A conversation deleted here refuses its elements
+   * the same way, and compaction drops them.
+   *
+   * An element this machine edited after the one arriving is kept
+   * (`outranks`), and its row is published again: the vault's newest copy is
+   * now the older one, so this machine's — recorded as published when it was
+   * first sent — is unrecorded and goes out again.
    */
   upsertItem(table: string, itemId: string, element: Record<string, unknown>): void {
     const target = this.#itemTarget(table, itemId);
-    if (!target) return;
+    if (!target) throw new Error(`${table} ${itemId} has no row here`);
     const travelling = withElementId(element, target.id);
-    const next = placeElement(target.list, target.id, travelling);
+    const placed = placeElement(target.list, target.id, travelling);
+    if (placed.kept) {
+      this.#published.remove(table, target.recordId, target.id);
+      const row = this.#readRow(table, this.#shapeOf(table), target.recordId);
+      if (row) this.#republish.push({ table, recordId: target.recordId, row });
+      return;
+    }
     this.#published.set(table, target.recordId, target.id, elementHash(travelling));
-    if (next) this.#writeList(table, target, next);
+    if (placed.list) this.#writeList(table, target, placed.list);
   }
 
   deleteItem(table: string, itemId: string): void {
@@ -434,6 +442,15 @@ export class SqliteSyncTarget implements SyncTarget {
 
   deleteLocalStorage(key: string): void {
     this.#writeInbox(key, "delete", null);
+  }
+
+  /** Forget what waits for these keys: the renderer has a newer value of its
+   *  own for each. */
+  discardPendingLocalStorage(keys: readonly string[]): void {
+    const statement = requireDatabase().prepare(
+      "DELETE FROM sync_local_storage_inbox WHERE key = ?"
+    );
+    for (const key of keys) statement.run(key);
   }
 
   #writeInbox(key: string, op: "set" | "delete", value: string | null): void {

@@ -30,7 +30,7 @@
 import crypto from "node:crypto";
 
 import { SYNC_USER_AGENT } from "./googleOAuth";
-import { isLogFilePath } from "./oplog";
+import { isWrittenOnce } from "./logFileCache";
 import {
   StorageConflictError,
   isUnderPrefix,
@@ -266,7 +266,7 @@ export class GoogleDriveProvider implements StorageProvider {
       // A raced create leaves duplicates behind; the oldest is the real one.
       if (seen.has(storagePath)) continue;
       seen.add(storagePath);
-      if (isLogFilePath(storagePath)) this.#listedLogFiles.set(storagePath, file);
+      if (isWrittenOnce(storagePath)) this.#listedLogFiles.set(storagePath, file);
       if (!isUnderPrefix(storagePath, prefix)) continue;
 
       entries.push({

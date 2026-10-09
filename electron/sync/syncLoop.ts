@@ -25,7 +25,7 @@ import {
   shouldApply,
   type RecordVersionStore
 } from "./recordVersions";
-import { isMergedTable } from "./rowMergers";
+import { foldsEntry } from "./rowMergers";
 import type { OutboxStore } from "./outbox";
 import {
   appendBatch,
@@ -34,6 +34,7 @@ import {
   listLogFiles,
   parseBatch,
   parseOplogSnapshot,
+  readAllEntries,
   type CompactOplogResult,
   type LogFile,
   type OpEntry
@@ -41,11 +42,9 @@ import {
 import { LogFileCache, withLogFileCache } from "./logFileCache";
 import { StorageConflictError } from "./storageProvider";
 import {
-  createMemoryPublishedItems,
-  elementHash,
+  applyPublishMarks,
   splitIntoItems,
-  splitItemRecordId,
-  type ListElement,
+  type PublishMark,
   type PublishedItemStore
 } from "./transcriptItems";
 import {
@@ -73,7 +72,7 @@ import {
   type ReadRecord
 } from "./readIndex";
 import { Lease } from "./lease";
-import { applyEntries, type ApplyResult, type ContentChange, type SyncTarget,
+import { applyEntries, resolve, type ApplyResult, type ContentChange, type SyncTarget,
   ChangeBuilder
 } from "./syncEngine";
 import type { StorageProvider } from "./storageProvider";
@@ -88,11 +87,17 @@ export const SYNC_LOOP_SETTINGS = {
   /** Format 2: the app version that last read the vault from its snapshot.
    *  Another version reads it again, once, so what an older build could not
    *  take — a table or column it did not know — lands now. */
-  fullReadBuild: "sync.v2.fullReadBuild"
+  fullReadBuild: "sync.v2.fullReadBuild",
+  /** The vault the format-2 bookkeeping above describes; see
+   *  `forgetVaultLogState`. */
+  vaultId: "sync.v2.vaultId"
 } as const;
 
-/** How long the format-1 log is kept, read and bridged after the newest file
- *  in it, before a format-2 machine deletes it. */
+/** How long the format-1 log is kept after the newest file in it, before a
+ *  format-2 machine deletes it: long enough for a machine still on an older
+ *  build to have stopped, and for anyone to recover from it by hand. Nothing
+ *  reads it once the vault has moved — a machine coming from format 1
+ *  publishes its own records with its first seed in format 2. */
 export const LEGACY_LOG_RETENTION_MS = 7 * 24 * 60 * 60 * 1000;
 export const FORMAT_MIGRATION_LEASE = "format-migration";
 
@@ -302,7 +307,7 @@ interface NewlyRead {
  */
 function versionKey(entry: OpEntry): string {
   const identity = entryIdentity(entry);
-  if (entry.scope !== "table" || !isMergedTable(entry.key)) return identity;
+  if (!foldsEntry(entry)) return identity;
   return `${identity}@${parseHlc(entry.hlc).device}`;
 }
 
@@ -322,6 +327,8 @@ export class SyncLoop {
   /** Format 2: whether this process has checked its own head and batches
    *  against the number it is about to use. */
   #ownSeqChecked = false;
+  /** The newest snapshot, when this process found it unreadable. */
+  #unreadableSnapshot: string | null = null;
   #flushTimer: unknown = null;
   #pollTimer: unknown = null;
   #firstPendingAt: number | null = null;
@@ -418,9 +425,27 @@ export class SyncLoop {
 
   /** Format 2: a coach conversation's row goes out without its transcript,
    *  and each message that changed goes as an item of its own. */
-  #split(entries: readonly OpEntry[]): OpEntry[] {
-    if (this.#format !== 2 || !this.#deps.publishedItems) return [...entries];
-    return splitIntoItems(entries, this.#deps.publishedItems, this.nextHlc);
+  #split(entries: readonly OpEntry[]): { entries: OpEntry[]; marks: PublishMark[] } {
+    const published = this.#deps.publishedItems;
+    if (this.#format !== 2 || !published) return { entries: [...entries], marks: [] };
+    return splitIntoItems(
+      entries,
+      (table, recordId) => published.forRecord(table, recordId),
+      this.nextHlc
+    );
+  }
+
+  /** Record as published what is now safely queued. Only after the queue took
+   *  it: a mark without the queue would be a message recorded as sent that
+   *  never left. Without the queue, the next save simply sends it again. */
+  #commitMarks(marks: readonly PublishMark[]): void {
+    const published = this.#deps.publishedItems;
+    if (!published || marks.length === 0) return;
+    try {
+      applyPublishMarks(published, marks);
+    } catch (error) {
+      this.#deps.onError?.(error);
+    }
   }
 
   /** The vault, with the log's files served from this process's cache where
@@ -448,7 +473,7 @@ export class SyncLoop {
    */
   enqueue(proposed: readonly OpEntry[]): void {
     if (proposed.length === 0) return;
-    const entries = this.#split(proposed);
+    const { entries, marks } = this.#split(proposed);
     // Stamped here, before anything is pushed or awaited, because this is the
     // moment the local database moved and a pull already in flight cannot know
     // it. The entry was built by reading the row that was just written, so its
@@ -469,6 +494,7 @@ export class SyncLoop {
     // is recoverable by the next launch.
     try {
       this.#deps.outbox.add(entries);
+      this.#commitMarks(marks);
     } catch (error) {
       // A queue that cannot be made durable is still a queue. Letting this
       // escape would take the change with it — the bridge catches and logs, and
@@ -603,15 +629,8 @@ export class SyncLoop {
     return this.#format === 2 ? this.#pullV2() : this.#pullLegacy();
   }
 
-  /**
-   * Format 1: the files of `oplog/` not read before.
-   *
-   * In format 2 this is the bridge (docs/sync-v2.md §7): a machine still on an
-   * older build may write there after the vault moved on, and what it wrote is
-   * read here and published again in format 2, for as long as the old log is
-   * kept.
-   */
-  async #pullLegacy(options: { bridge?: boolean } = {}): Promise<PullResult> {
+  /** Format 1: the files of `oplog/` not read before. */
+  async #pullLegacy(): Promise<PullResult> {
     const startedAt = this.#deps.now();
     const read = await this.#readNewFiles();
     // The vault's format moved past this build: nothing read, nothing applied,
@@ -627,8 +646,7 @@ export class SyncLoop {
         this.#readIndex.forget(
           read.gone.filter((record) => record.readAt < startedAt).map((r) => r.path)
         );
-      },
-      options
+      }
     );
   }
 
@@ -641,8 +659,7 @@ export class SyncLoop {
    */
   #merge(
     entries: OpEntry[],
-    commit: (merged: ApplyResult, incomplete: ReadonlySet<string>) => void,
-    options: { bridge?: boolean } = {}
+    commit: (merged: ApplyResult, incomplete: ReadonlySet<string>) => void
   ): PullResult {
     // Only for the clock fold below. What may be *applied* is no longer a
     // question about who wrote an entry — see the comment on `applyEntries`.
@@ -780,7 +797,6 @@ export class SyncLoop {
       }
       this.enqueue(builder.entries);
     }
-    if (options.bridge) this.#republishBridged(merged.merged, result.contentChanges);
 
     this.#deps.setSetting(
       SYNC_LOOP_SETTINGS.lastPulledAt,
@@ -812,11 +828,12 @@ export class SyncLoop {
     const next = new Map<string, VectorRecord>(held);
     const appliedOf = (device: string) => next.get(device)?.seq ?? 0;
 
-    // This machine's own head, written back if it is missing: a batch whose
-    // head write failed is invisible to the others until one is.
-    const ownSeq = held.get(self)?.seq ?? 0;
-    if (ownSeq > 0 && !listing.heads.has(self)) {
-      await writeHead(storage, self, ownSeq).catch((error) => this.#deps.onError?.(error));
+    // This machine's own head, written again when it is behind its batches or
+    // missing: a batch whose head write failed — a quit that timed out between
+    // the two, say — is invisible to the others until it is.
+    const own = held.get(self);
+    if (own && own.seq > 0 && (own.headSeq < own.seq || !listing.heads.has(self))) {
+      await this.#moveHead(storage, self, own.seq);
     }
 
     const heads = new Map<string, { seq: number; revision: string }>();
@@ -845,24 +862,42 @@ export class SyncLoop {
 
     const entries: OpEntry[] = [];
     let snapshotRead: string | null = null;
-    if (resync) {
-      // Read again from the snapshot: every other device back to what it holds.
+    const wantSnapshot =
+      latest !== undefined &&
+      (resync || (latest !== lastSnapshot && (gap || lastSnapshot === undefined)));
+    // A snapshot this build could not read is not fetched again by this
+    // process: with no other to read, every poll would download it again.
+    const snapshot =
+      wantSnapshot && latest !== this.#unreadableSnapshot
+        ? await readSnapshotAt(storage, latest)
+        : null;
+    if (wantSnapshot && !snapshot) this.#unreadableSnapshot = latest ?? null;
+    if (snapshot) {
+      entries.push(...snapshot.entries);
+      // Read again on an upgrade: every other device back to what the snapshot
+      // holds, so its batches after that are read again too. Otherwise only
+      // forward — a device this machine has read past the snapshot keeps its
+      // place.
+      if (resync) {
+        for (const [device, record] of next) {
+          if (device !== self) next.set(device, { ...record, seq: snapshot.vector[device] ?? 0 });
+        }
+      }
+      for (const [device, seq] of Object.entries(snapshot.vector)) {
+        if (device === self) continue;
+        const record = next.get(device) ?? { seq: 0, headSeq: 0, headRevision: null };
+        next.set(device, { ...record, seq: resync ? seq : Math.max(record.seq, seq) });
+      }
+      snapshotRead = latest;
+    } else if (resync && latest === undefined) {
+      // No snapshot yet: the whole log is still there to read again.
       for (const [device, record] of next) {
         if (device !== self) next.set(device, { ...record, seq: 0 });
       }
     }
-    if (latest && (resync || (latest !== lastSnapshot && (gap || lastSnapshot === undefined)))) {
-      const snapshot = await readSnapshotAt(storage, latest);
-      if (snapshot) {
-        entries.push(...snapshot.entries);
-        for (const [device, seq] of Object.entries(snapshot.vector)) {
-          if (device === self) continue;
-          const record = next.get(device) ?? { seq: 0, headSeq: 0, headRevision: null };
-          next.set(device, { ...record, seq: Math.max(record.seq, seq) });
-        }
-        snapshotRead = latest;
-      }
-    }
+    // Done only when it was: a snapshot that could not be read leaves every
+    // place where it was, and the next pull asks again.
+    const resynced = resync && (snapshot !== null || latest === undefined);
 
     for (const [device, head] of heads) {
       let seq = appliedOf(device);
@@ -882,26 +917,12 @@ export class SyncLoop {
       if (snapshotRead) {
         this.#deps.setSetting(SYNC_LOOP_SETTINGS.lastSnapshot, snapshotRead);
       }
-      if (resync && buildId !== undefined) {
+      if (resynced && buildId !== undefined) {
         this.#deps.setSetting(SYNC_LOOP_SETTINGS.fullReadBuild, buildId);
       }
     });
 
-    // The bridge, for as long as the format-1 log is there.
-    const legacy = [...listing.revisions.keys()].some(
-      (path) => path.startsWith("oplog/") || path.startsWith("oplog-snapshot/")
-    );
-    if (!legacy) return result;
-    const bridged = await this.#pullLegacy({ bridge: true });
-    return {
-      applied: result.applied + bridged.applied,
-      deleted: result.deleted + bridged.deleted,
-      superseded: result.superseded + bridged.superseded,
-      rejected: [...result.rejected, ...bridged.rejected],
-      merged: [...result.merged, ...bridged.merged],
-      contentChanges: [...result.contentChanges, ...bridged.contentChanges],
-      entriesSeen: result.entriesSeen + bridged.entriesSeen
-    };
+    return result;
   }
 
   /**
@@ -929,17 +950,31 @@ export class SyncLoop {
         seq = (await this.#ownSeqInVault(storage, self)) + 1;
         path = await writeLogBatch(storage, self, seq, batch);
       }
-      this.#vector.save(new Map([[self, { seq, headSeq: seq, headRevision: null }]]));
+      // The head as it stood, until it has moved: if moving it fails, the next
+      // pull sees it behind and writes it again.
+      const before = this.#vector.load().get(self);
+      this.#vector.save(
+        new Map([[self, { seq, headSeq: before?.headSeq ?? 0, headRevision: before?.headRevision ?? null }]])
+      );
       this.#deps.outbox.remove(batch);
-      // After the batch is safe: a head that fails to move only delays the
-      // others seeing it, and the next batch or pull writes it again.
-      await writeHead(storage, self, seq).catch((error) => this.#deps.onError?.(error));
+      await this.#moveHead(storage, self, seq);
       return { pushed: batch.length, path };
     } catch (error) {
       this.#pending = [...batch, ...this.#pending];
       this.#firstPendingAt ??= this.#deps.now();
       this.#deps.onError?.(error);
       return { pushed: 0, path: null };
+    }
+  }
+
+  /** Write this machine's head and record that it was. A failure is reported
+   *  and left for the next pull, which finds the head behind. */
+  async #moveHead(storage: StorageProvider, self: string, seq: number): Promise<void> {
+    try {
+      const revision = await writeHead(storage, self, seq);
+      this.#vector.save(new Map([[self, { seq, headSeq: seq, headRevision: revision }]]));
+    } catch (error) {
+      this.#deps.onError?.(error);
     }
   }
 
@@ -952,34 +987,6 @@ export class SyncLoop {
       head = (stored && parseHead(stored.content)) || 0;
     }
     return Math.max(head, logged[logged.length - 1] ?? 0);
-  }
-
-  /**
-   * The bridge's half on the way out: what a format-1 file brought in is
-   * published again in format 2, or the machines reading only the new log
-   * would never see it. An ordinary record goes as the entry it arrived as, its
-   * timestamp kept; a conversation goes as it now reads here, so its messages
-   * are compared against what was published and only what is new travels.
-   */
-  #republishBridged(
-    merged: readonly OpEntry[],
-    contentChanges: readonly ContentChange[]
-  ): void {
-    const plain = merged.filter(
-      (entry) => !(entry.scope === "table" && entry.key === "chat_sessions")
-    );
-    if (plain.length > 0) this.enqueue(plain);
-    const builder = new ChangeBuilder({ nextHlc: this.nextHlc });
-    for (const change of contentChanges) {
-      if (change.table !== "chat_sessions") continue;
-      if (change.removed) {
-        builder.deleteRow(change.table, change.recordId);
-        continue;
-      }
-      const row = this.#deps.target.readRow?.(change.table, change.recordId);
-      if (row) builder.row(change.table, change.recordId, row);
-    }
-    if (builder.entries.length > 0) this.enqueue(builder.entries);
   }
 
   /**
@@ -1011,26 +1018,25 @@ export class SyncLoop {
       });
       const held = await lease.withLease(async () => {
         if (!(await options.stillNeeded())) return false;
-        await this.#pullLegacy();
-        const published = this.#deps.publishedItems;
+        // The whole format-1 log, once: what it holds that this machine does
+        // not is applied (each entry against the stamps, as any pull), and its
+        // tombstones go into the snapshot. Built from this machine's data alone
+        // the snapshot would hold no deletions, and a machine that had missed
+        // one would publish the deleted record back when it joined.
+        const legacy = await readAllEntries(this.#storage());
+        this.#merge(legacy, () => undefined);
         const stamped = options.collect();
-        // Split against an empty record, so the snapshot holds every message
-        // and not only the ones this machine has not sent yet; then recorded as
+        const present = new Set(stamped.map((entry) => entryIdentity(entry)));
+        const tombstones = [...resolve(legacy).values()].filter(
+          (entry) => entry.op === "delete" && !present.has(entryIdentity(entry))
+        );
+        // Split against nothing published, so the snapshot holds every message
+        // and not only the ones this machine has not sent; then recorded as
         // published, so the next save of each conversation sends nothing again.
-        const entries = published
-          ? splitIntoItems(stamped, createMemoryPublishedItems(), this.nextHlc, {
-              itemHlc: (row) => row.hlc
-            })
-          : [...stamped];
-        if (published) {
-          for (const entry of entries) {
-            if (entry.scope !== "item" || entry.op !== "set" || !entry.recordId) continue;
-            const parts = splitItemRecordId(entry.recordId);
-            const element = entry.payload?.entry;
-            if (!parts || !element || typeof element !== "object") continue;
-            published.set(entry.key, parts[0], parts[1], elementHash(element as ListElement));
-          }
-        }
+        const split = splitIntoItems([...stamped, ...tombstones], () => new Map(), this.nextHlc, {
+          itemHlc: (row) => row.hlc
+        });
+        const entries = split.entries;
         for (const entry of entries) {
           this.#deps.recordVersions.set(entryIdentity(entry), entry.hlc);
         }
@@ -1040,11 +1046,16 @@ export class SyncLoop {
           encodeSnapshot({ version: 2, vector: {}, entries }),
           null
         );
+        await options.raiseFormat();
+        // Only once the vault has moved. Recorded first, a raise that failed
+        // would leave this machine believing it had read a snapshot nobody
+        // reads — and, when another machine then migrated, never reading that
+        // one — and its messages marked as sent in a log nobody reads either.
+        this.#commitMarks(split.marks);
         this.#deps.setSetting(SYNC_LOOP_SETTINGS.lastSnapshot, path);
         if (this.#deps.buildId !== undefined) {
           this.#deps.setSetting(SYNC_LOOP_SETTINGS.fullReadBuild, this.#deps.buildId);
         }
-        await options.raiseFormat();
         return true;
       });
       return held.ran ? held.result : false;
@@ -1053,8 +1064,7 @@ export class SyncLoop {
 
   /**
    * Format 2: the old log, deleted once nothing has been written to it for
-   * `LEGACY_LOG_RETENTION_MS` — by then every machine still on an old build
-   * has either stopped or been bridged.
+   * `LEGACY_LOG_RETENTION_MS`.
    */
   async #retireLegacyLog(): Promise<void> {
     const storage = this.#storage();
@@ -1292,10 +1302,19 @@ export class SyncLoop {
       // A queue left by a format-1 build holds whole conversations. Split as
       // they go out; the new items are queued durably as well, and the row
       // keeps its timestamp, so confirming the upload releases the original.
-      const split = this.#split(held);
+      // Its messages are stamped as held, like anything `enqueue` queues, so a
+      // pull meanwhile does not apply an older copy over them. They take fresh
+      // timestamps (the queue is keyed by timestamp); a copy that did not
+      // change and is sent again cannot beat a newer edit elsewhere, because a
+      // message keeps the copy edited last (`outranks`).
+      const { entries: split, marks } = this.#split(held);
       const original = new Set(held.map((entry) => entry.hlc));
       const added = split.filter((entry) => !original.has(entry.hlc));
+      for (const entry of added) {
+        this.#deps.recordVersions.set(entryIdentity(entry), entry.hlc);
+      }
       if (added.length > 0) this.#deps.outbox.add(added);
+      this.#commitMarks(marks);
       // Added to the queue, never substituted for it. `enqueue` treats a table
       // it cannot write to as a warning rather than a failure — the change is
       // still queued in memory — so replacing the queue with the table would

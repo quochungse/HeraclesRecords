@@ -887,6 +887,10 @@ const { deviceId, isValidDeviceId, DEVICE_ID_SETTING } = await load(
   );
   target.acknowledgeLocalStorage(target.pendingLocalStorage());
   assert.deepEqual(target.pendingLocalStorage(), []);
+  // A value the renderer changed itself outranks one still waiting for it.
+  target.setLocalStorage("coros-theme", "dark");
+  target.discardPendingLocalStorage(["coros-theme"]);
+  assert.deepEqual(target.pendingLocalStorage(), []);
 
   // Table names arrive from other machines, so they are checked, not trusted.
   assert.throws(

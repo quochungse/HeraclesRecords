@@ -24,6 +24,7 @@ import {
   type OpEntry
 } from "./oplog";
 import { normalizeStoragePath, type StorageProvider } from "./storageProvider";
+import { RECORD_ID_SEPARATOR } from "./syncPolicy";
 
 export const LOG_ROOT = "log";
 export const HEADS_ROOT = "heads";
@@ -196,16 +197,19 @@ export async function writeLogBatch(
   return path;
 }
 
+/** Returns the head's revision, for telling later whether it moved. */
 export async function writeHead(
   storage: StorageProvider,
   device: string,
   seq: number
-): Promise<void> {
-  await storage.put(headPathFor(device), encodeHead(seq));
+): Promise<string> {
+  return storage.put(headPathFor(device), encodeHead(seq));
 }
 
 /** The newest copy of each record, by HLC, with tombstones past their TTL
- *  dropped. Nothing is merged: a record is always one machine's copy. */
+ *  dropped, and every element whose row is not a live record — a deleted
+ *  conversation sends its own tombstone, not one per message, so this is where
+ *  its messages go. Nothing is merged: a record is always one machine's copy. */
 export function newestRecords(
   entries: readonly OpEntry[],
   now: number,
@@ -217,8 +221,21 @@ export function newestRecords(
     const held = winners.get(identity);
     if (!held || compareHlcStrings(entry.hlc, held.hlc) > 0) winners.set(identity, entry);
   }
+  const live = new Set(
+    [...winners.values()]
+      .filter((entry) => entry.scope === "table" && entry.op === "set")
+      .map((entry) => entryIdentity(entry))
+  );
   return [...winners.values()]
     .filter((entry) => {
+      if (entry.scope === "item") {
+        const recordId = entry.recordId ?? "";
+        const at = recordId.lastIndexOf(RECORD_ID_SEPARATOR);
+        const row = at > 0 ? recordId.slice(0, at) : "";
+        if (!live.has(entryIdentity({ scope: "table", key: entry.key, recordId: row }))) {
+          return false;
+        }
+      }
       if (entry.op !== "delete") return true;
       const separator = entry.hlc.indexOf("-");
       const millis = Number.parseInt(entry.hlc.slice(0, separator), 16);

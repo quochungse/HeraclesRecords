@@ -19,7 +19,7 @@
 
 import { compareHlcStrings } from "./hlc";
 import { entryIdentity, type OpEntry } from "./oplog";
-import { isMergedTable } from "./rowMergers";
+import { foldsEntry } from "./rowMergers";
 import {
   isDeviceEncrypted,
   policyForLocalStorage,
@@ -43,9 +43,6 @@ export interface SyncTarget {
    *  that has none refuses them, as it would an unknown table. */
   upsertItem?(table: string, recordId: string, entry: Record<string, unknown>): void;
   deleteItem?(table: string, recordId: string): void;
-  /** A row as it stands here, for what must be published again as it now
-   *  reads — the format-1 bridge's conversations. */
-  readRow?(table: string, recordId: string): Record<string, unknown> | undefined;
   setSetting(key: string, value: string): void;
   deleteSetting(key: string): void;
   setLocalStorage(key: string, value: string): void;
@@ -320,11 +317,21 @@ export function applyEntries(
   // are authoritative; see `RowMergeContext`.
   const ordered = admissible
     .filter((entry) =>
-      entry.scope === "table" && isMergedTable(entry.key)
+      foldsEntry(entry)
         ? true
         : winners.get(entryIdentity(entry)) === entry
     )
-    .sort((a, b) => compareHlcStrings(a.hlc, b.hlc));
+    // Every row before any element, then causal order. A row is applied at the
+    // timestamp of its newest copy, and its messages were written before that
+    // copy whenever the row changed since — a conversation created, written in
+    // and renamed, read in one pull — so in causal order alone they would
+    // arrive for a row not there yet. A row depends on nothing an element
+    // carries, so taking them first changes no outcome but that one.
+    .sort(
+      (a, b) =>
+        Number(a.scope === "item") - Number(b.scope === "item") ||
+        compareHlcStrings(a.hlc, b.hlc)
+    );
 
   const merged: OpEntry[] = [];
 
@@ -481,21 +488,6 @@ export class ChangeBuilder {
       recordId,
       payload: row
     });
-  }
-
-  /** One element of a row's list column; see `OpEntry.key`. */
-  item(table: string, recordId: string, element: Record<string, unknown>): this {
-    return this.#push({
-      op: "set",
-      scope: "item",
-      key: table,
-      recordId,
-      payload: { entry: element }
-    });
-  }
-
-  deleteItem(table: string, recordId: string): this {
-    return this.#push({ op: "delete", scope: "item", key: table, recordId });
   }
 
   deleteRow(table: string, recordId: string): this {

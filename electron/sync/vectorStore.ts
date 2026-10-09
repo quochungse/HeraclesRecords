@@ -18,8 +18,6 @@ export interface VectorRecord {
 export interface VectorStore {
   load(): Map<string, VectorRecord>;
   save(records: ReadonlyMap<string, VectorRecord>): void;
-  /** Forget everything: the next pull starts from the snapshot. */
-  clear(): void;
 }
 
 export function createMemoryVectorStore(): VectorStore {
@@ -27,10 +25,7 @@ export function createMemoryVectorStore(): VectorStore {
   return {
     load: () => new Map(held),
     save: (records) => {
-      held = new Map(records);
-    },
-    clear: () => {
-      held = new Map();
+      held = new Map([...held, ...records]);
     }
   };
 }
@@ -58,9 +53,22 @@ export function createSqliteVectorStore(): VectorStore {
       for (const [device, record] of records) {
         statement.run(device, record.seq, record.headSeq, record.headRevision);
       }
-    },
-    clear: () => {
-      db().prepare("DELETE FROM sync_vector").run();
     }
   };
+}
+
+/**
+ * Forget what this machine knows of a vault's format-2 log — how far it has
+ * read each device, and which messages it has published — because the vault it
+ * describes is not the one it is now pointed at (another Google account, a
+ * deleted folder). Kept, a new vault would receive this machine's batches from
+ * its old number on, a gap no reader could close, and none of its messages:
+ * they would all read as sent already.
+ */
+export function forgetVaultLogState(): void {
+  const db = requireDatabase();
+  db.transaction(() => {
+    db.prepare("DELETE FROM sync_vector").run();
+    db.prepare("DELETE FROM sync_published_items").run();
+  })();
 }

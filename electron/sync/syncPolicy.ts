@@ -297,6 +297,8 @@ export const SETTING_POLICY: Readonly<Record<string, SyncTier>> = {
   // which app version last read the vault from one. This copy's, not the data's.
   "sync.v2.lastSnapshot": "device",
   "sync.v2.fullReadBuild": "device",
+  // The vault the two above, the vector and the published messages describe.
+  "sync.v2.vaultId": "device",
   // The Google connection. Sealed by this machine's keychain and never synced:
   // the destination it unlocks is the destination it would be synced to, and a
   // refresh token that reached another machine would hand over the whole Drive

@@ -321,15 +321,7 @@ export async function listLogFiles(storage: StorageProvider): Promise<LogListing
 
 /** Whether `path` names a file of the log, which is never rewritten in place. */
 export function isLogFilePath(path: string): boolean {
-  return (
-    isUnderPrefix(path, OPLOG_ROOT) ||
-    OPLOG_SNAPSHOT_PATTERN.test(path) ||
-    // Format 2's batches and snapshots (vaultLog.ts), named the same way: written
-    // once, never rewritten. Spelled here rather than imported, since vaultLog
-    // imports this module.
-    /^log\/[^/]+\/\d{10}\.jsonl$/.test(path) ||
-    /^snap\/[0-9a-f]{12}-[0-9a-f]{4}-[^/]+\.json$/.test(path)
-  );
+  return isUnderPrefix(path, OPLOG_ROOT) || OPLOG_SNAPSHOT_PATTERN.test(path);
 }
 
 /**

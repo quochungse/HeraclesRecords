@@ -12,7 +12,7 @@
 //   * **out** — `splitIntoItems` turns a row entry into the row without the
 //     column, plus an `item` entry for each element whose content differs from
 //     what was last published (and a delete for each one no longer there),
-//     against `PublishedItemStore`;
+//     against `PublishedItemStore` — recorded only once the entries are queued;
 //   * **in** — `SqliteSyncTarget.upsertItem` / `deleteItem` put one element in
 //     place by its id, and record it as published, so the next save of the
 //     conversation does not send back what just arrived.
@@ -148,6 +148,30 @@ export function createSqlitePublishedItems(): PublishedItemStore {
 }
 
 /**
+ * A change to what is recorded as published, held back until the entries it
+ * describes are safely queued: marked first, a crash before the queue took
+ * them would leave elements recorded as sent that never left. `id: null`
+ * clears the record's elements; `hash: null` removes one.
+ */
+export interface PublishMark {
+  readonly table: string;
+  readonly recordId: string;
+  readonly id: string | null;
+  readonly hash: string | null;
+}
+
+export function applyPublishMarks(
+  store: PublishedItemStore,
+  marks: readonly PublishMark[]
+): void {
+  for (const mark of marks) {
+    if (mark.id === null) store.clear(mark.table, mark.recordId);
+    else if (mark.hash === null) store.remove(mark.table, mark.recordId, mark.id);
+    else store.set(mark.table, mark.recordId, mark.id, mark.hash);
+  }
+}
+
+/**
  * Entries as they go out in format 2: a row of an itemised table without its
  * list column, then an item for each element that changed since it was last
  * published and a delete for each that is gone. Everything else passes through.
@@ -155,11 +179,16 @@ export function createSqlitePublishedItems(): PublishedItemStore {
  * The row keeps its own timestamp and the items are stamped after it, so a
  * reader applying in causal order meets the row before its elements. A list
  * that cannot be parsed sends the row alone: the elements are not this
- * function's to guess at.
+ * function's to guess at. A row deleted sends its tombstone and nothing for
+ * its elements: a reader drops them with the row, and compaction drops the
+ * ones whose row is gone.
+ *
+ * Writes nothing: what to record as published comes back as `marks`, for the
+ * caller to apply once the entries are queued.
  */
 export function splitIntoItems(
   entries: readonly OpEntry[],
-  published: PublishedItemStore,
+  publishedOf: (table: string, recordId: string) => ReadonlyMap<string, string>,
   nextHlc: () => string,
   options: {
     /** The timestamp an element goes out under. Fresh by default; a migration
@@ -167,9 +196,23 @@ export function splitIntoItems(
      *  from. */
     readonly itemHlc?: (row: OpEntry) => string;
   } = {}
-): OpEntry[] {
+): { entries: OpEntry[]; marks: PublishMark[] } {
   const stampFor = (row: OpEntry) => (options.itemHlc ? options.itemHlc(row) : nextHlc());
   const out: OpEntry[] = [];
+  const marks: PublishMark[] = [];
+  // What this call has already decided per record, so a row saved twice in one
+  // batch is compared against its first save rather than the store.
+  const decided = new Map<string, Map<string, string>>();
+  const currentOf = (table: string, recordId: string) => {
+    const key = `${table}\u0000${recordId}`;
+    let current = decided.get(key);
+    if (!current) {
+      current = new Map(publishedOf(table, recordId));
+      decided.set(key, current);
+    }
+    return current;
+  };
+
   for (const entry of entries) {
     const column = entry.scope === "table" ? itemisedColumn(entry.key) : undefined;
     if (!column || !entry.recordId) {
@@ -178,13 +221,12 @@ export function splitIntoItems(
     }
     const table = entry.key;
     const recordId = entry.recordId;
+    const current = currentOf(table, recordId);
 
     if (entry.op === "delete") {
       out.push(entry);
-      for (const id of published.forRecord(table, recordId).keys()) {
-        out.push({ hlc: nextHlc(), op: "delete", scope: "item", key: table, recordId: itemRecordId(recordId, id) });
-      }
-      published.clear(table, recordId);
+      current.clear();
+      marks.push({ table, recordId, id: null, hash: null });
       continue;
     }
 
@@ -198,14 +240,13 @@ export function splitIntoItems(
     const list = parseList(listValue);
     if (!list) continue;
 
-    const before = published.forRecord(table, recordId);
     const present = new Set<string>();
     list.forEach((element, index) => {
       const id = elementId(element, index);
       present.add(id);
       const travelling = withElementId(element, id);
       const hash = elementHash(travelling);
-      if (before.get(id) === hash) return;
+      if (current.get(id) === hash) return;
       out.push({
         hlc: stampFor(entry),
         op: "set",
@@ -214,37 +255,60 @@ export function splitIntoItems(
         recordId: itemRecordId(recordId, id),
         payload: { entry: travelling }
       });
-      published.set(table, recordId, id, hash);
+      current.set(id, hash);
+      marks.push({ table, recordId, id, hash });
     });
-    for (const id of before.keys()) {
+    for (const id of [...current.keys()]) {
       if (present.has(id)) continue;
       out.push({ hlc: nextHlc(), op: "delete", scope: "item", key: table, recordId: itemRecordId(recordId, id) });
-      published.remove(table, recordId, id);
+      current.delete(id);
+      marks.push({ table, recordId, id, hash: null });
     }
   }
-  return out;
+  return { entries: out, marks };
 }
 
-/** Put one element in place by its id: replaced where it is, or inserted in id
- *  order, which is the order the transcript merge has always kept. Returns
- *  null when the list already holds exactly this. */
+/**
+ * Whether the element held here was edited after the one arriving.
+ *
+ * An element's `mrev` is the stamp of its last edit (`1-<millis>-<n>-<device>`,
+ * minted by the chat store), so it says which copy is newer where the item's
+ * own timestamp cannot: that one is when the row was *saved*, and a copy that
+ * did not change can be sent again — after an upgrade, or a seed — under a
+ * newer one. The copy kept is still one machine's, whole.
+ */
+export function outranks(held: ListElement, incoming: ListElement): boolean {
+  const revision = (element: ListElement) =>
+    typeof element.mrev === "string" ? element.mrev : "";
+  return revision(held) > revision(incoming);
+}
+
+/**
+ * Put one element in place by its id: replaced where it is, or inserted in id
+ * order, which is the order the transcript merge has always kept.
+ *
+ * `list` is null when nothing changes — the list holds exactly this, or holds
+ * a newer edit of it (`kept`), which the caller then leaves unrecorded as
+ * published so its own save sends it.
+ */
 export function placeElement(
   list: readonly ListElement[],
   id: string,
   element: ListElement
-): ListElement[] | null {
+): { list: ListElement[] | null; kept: boolean } {
   const ids = list.map((existing, index) => elementId(existing, index));
   const at = ids.indexOf(id);
   if (at >= 0) {
-    if (JSON.stringify(list[at]) === JSON.stringify(element)) return null;
+    if (outranks(list[at], element)) return { list: null, kept: true };
+    if (JSON.stringify(list[at]) === JSON.stringify(element)) return { list: null, kept: false };
     const next = [...list];
     next[at] = element;
-    return next;
+    return { list: next, kept: false };
   }
   const after = ids.findIndex((existing) => existing > id);
   const next = [...list];
   next.splice(after < 0 ? next.length : after, 0, element);
-  return next;
+  return { list: next, kept: false };
 }
 
 /** The list without the element of this id, or null when it is not there. */

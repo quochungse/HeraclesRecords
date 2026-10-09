@@ -12,12 +12,18 @@
 // never a wrong answer.
 
 import { isLogFilePath } from "./oplog";
+import { isImmutableVaultPath } from "./vaultLog";
 import type {
   ExpectedRevision,
   StorageContent,
   StorageEntry,
   StorageProvider
 } from "./storageProvider";
+
+/** A file of either format's log: claimed once and never rewritten in place. */
+export function isWrittenOnce(path: string): boolean {
+  return isLogFilePath(path) || isImmutableVaultPath(path);
+}
 
 /** Enough for the snapshot and a heavy hour of batches; past it the oldest go. */
 export const LOG_FILE_CACHE_BYTES = 48 * 1024 * 1024;
@@ -46,7 +52,7 @@ export class LogFileCache {
   }
 
   set(path: string, revision: string, content: Buffer): void {
-    if (!isLogFilePath(path) || content.length > this.#maxBytes) return;
+    if (!isWrittenOnce(path) || content.length > this.#maxBytes) return;
     this.delete(path);
     this.#held.set(path, { revision, content });
     this.#bytes += content.length;

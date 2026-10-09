@@ -39,9 +39,9 @@ import { tablesTouched, type ApplyResult } from "./sync/syncEngine";
 import { attachSyncSink } from "./sync/syncBridge";
 import { createSqliteRecordVersions } from "./sync/recordVersions";
 import { createSqliteOutbox } from "./sync/outbox";
-import { createSqliteReadIndex } from "./sync/readIndex";
 import { createSqlitePublishedItems } from "./sync/transcriptItems";
-import { createSqliteVectorStore } from "./sync/vectorStore";
+import { createSqliteVectorStore, forgetVaultLogState } from "./sync/vectorStore";
+import { BUILD_DATA_FORMAT } from "./sync/dataFormat";
 import { attachAnalysisLeases } from "./sync/automationLease";
 import {
   captureSyncableState,
@@ -1140,6 +1140,10 @@ function publishRendererLocalStorage(
   if (changes.entries.length === 0) return { syncing: true, published: 0 };
 
   loop.enqueue(changes.entries);
+  // A value changed here outranks one still waiting for the renderer: dropped
+  // from the inbox, so a resend after a lost acknowledgement cannot put the
+  // older one back over it.
+  syncTarget.discardPendingLocalStorage(changes.entries.map((entry) => entry.key));
   // Recorded as published as soon as it is queued, not once it is uploaded: a
   // failed flush puts the batch back on the queue rather than dropping it, so
   // the entries are not lost, and re-diffing them would only mint a second set
@@ -1224,6 +1228,7 @@ async function prepareSync(): Promise<SyncVaultState> {
   if (state === "ready") {
     // A loop held for an outdated format is not one to resume.
     if (syncLoopInstance?.isHeld) stopSyncLoop();
+    await forgetAnotherVaultsLog(service);
     // A vault still in an older format is moved to this build's before the
     // loop reads or writes anything (docs/sync-v2.md §7).
     const migrate =
@@ -1242,6 +1247,24 @@ async function prepareSync(): Promise<SyncVaultState> {
   return state;
 }
 
+/**
+ * What this machine knows of a vault's log belongs to that vault. Pointed at
+ * another — a different Google account, a folder deleted and made again — it
+ * starts over: the vector, the published messages and the snapshot it read go,
+ * and a running loop over the old vault stops first. Its seed for the new
+ * vault (keyed by vault id) then sends everything.
+ */
+async function forgetAnotherVaultsLog(
+  service: ReturnType<typeof syncService>
+): Promise<void> {
+  const vaultId = await service.vaultId();
+  if (getSetting(SYNC_LOOP_SETTINGS.vaultId) === vaultId) return;
+  if (syncLoopInstance) stopSyncLoop();
+  forgetVaultLogState();
+  deleteSettings([SYNC_LOOP_SETTINGS.lastSnapshot, SYNC_LOOP_SETTINGS.fullReadBuild]);
+  setSetting(SYNC_LOOP_SETTINGS.vaultId, vaultId);
+}
+
 /** The revision of `vault/id.json` the running loop last checked the data
  *  format against. Reset with every loop. */
 let gatedIdentityRevision: string | null = null;
@@ -1254,6 +1277,8 @@ function startSyncLoop({
   if (syncLoopInstance) return syncLoopInstance;
   if (!service.isReady) return null;
   gatedIdentityRevision = null;
+  // A new loop may be a new vault: nothing about it has been read yet.
+  caughtUpSession = null;
   const recordVersions = createSqliteRecordVersions();
 
   const loop = new SyncLoop({
@@ -1268,7 +1293,6 @@ function startSyncLoop({
     clearTimer: (handle) => clearTimeout(handle as NodeJS.Timeout),
     recordVersions,
     outbox: createSqliteOutbox(),
-    readIndex: createSqliteReadIndex(),
     // Vault format 2: a numbered log with heads, coach transcripts a message
     // at a time (docs/sync-v2.md).
     format: 2,
@@ -1382,8 +1406,8 @@ function startSyncLoop({
  * Nothing is pushed or pulled before: the loop is not started, and a pull
  * asked for meanwhile (the start-up one) waits behind the migration. When the
  * migration cannot run — another machine holds its lease, or it failed — the
- * loop is stopped and the next `prepareSync` tries again; by then the vault
- * may simply be in format 2 already.
+ * loop is held, so what changes here is still queued durably, and it is tried
+ * again in a few minutes; by then the vault may simply be in format 2 already.
  */
 async function migrateThenStart(
   loop: SyncLoop,
@@ -1403,17 +1427,43 @@ async function migrateThenStart(
     });
     if (!moved && (await service.checkDataFormat()) === "ahead") {
       console.info("[sync] another machine is moving the vault to format 2; trying later");
-      if (syncLoopInstance === loop) stopSyncLoop();
+      holdForMigrationRetry(loop);
       return;
     }
+    // This machine's data is the snapshot: there is nothing left to seed.
+    if (moved) service.markSeeded(seedMarker(await service.vaultId()));
   } catch (error) {
     console.warn("[sync] could not move the vault to format 2", error);
-    if (syncLoopInstance === loop) stopSyncLoop();
+    holdForMigrationRetry(loop);
     return;
   }
   if (syncLoopInstance !== loop) return;
   loop.start();
   void seedVaultIfNeeded(loop, service);
+}
+
+/** How long a migration that could not run waits before it is tried again. */
+const MIGRATION_RETRY_MS = 5 * 60 * 1000;
+let migrationRetry: NodeJS.Timeout | null = null;
+
+function holdForMigrationRetry(loop: SyncLoop): void {
+  if (syncLoopInstance === loop) holdSyncLoop();
+  if (migrationRetry) return;
+  migrationRetry = setTimeout(() => {
+    migrationRetry = null;
+    // Through `prepareSync`, which stops a held loop and decides afresh.
+    void prepareSync().catch((error) =>
+      console.warn("[sync] could not re-check the vault for its migration", error)
+    );
+  }, MIGRATION_RETRY_MS);
+  migrationRetry.unref?.();
+}
+
+/** The marker `hasSeeded` keeps, per vault and per data format: a machine that
+ *  seeded a vault in format 1 seeds it once more in format 2, which is how what
+ *  it wrote on an older build after the move reaches the new log. */
+function seedMarker(vaultId: string): string {
+  return `${vaultId}:v${BUILD_DATA_FORMAT.dataVersion}`;
 }
 
 /**
@@ -1435,15 +1485,27 @@ async function seedVaultIfNeeded(
 ): Promise<void> {
   try {
     const vaultId = await service.vaultId();
-    if (service.hasSeeded(vaultId)) {
+    const marker = seedMarker(vaultId);
+    if (service.hasSeeded(marker)) {
       syncSeedStatus = { state: "done", entries: 0, error: null };
       return;
     }
 
     syncSeedStatus = { state: "publishing", entries: 0, error: null };
-    const entries = collectFullStateEntries(loop.nextHlc);
+    // The vault first, then what this machine holds, each record under the
+    // timestamp of the write it came from. Published with fresh timestamps
+    // before reading anything, a machine joining a vault would have beaten
+    // every newer copy elsewhere of a record they share — a setting changed on
+    // the other computer last week, say — just by being sent now.
+    await loop.pull();
+    const versions = createSqliteRecordVersions();
+    const entries = collectStampedEntries({
+      stampOf: (identity) => versions.get(identity),
+      nextHlc: loop.nextHlc,
+      localStorage: publishedLocalStorage({ getSetting })
+    });
     const published = await publishFullState(loop, entries);
-    service.markSeeded(vaultId);
+    service.markSeeded(marker);
     syncSeedStatus = {
       state: "done",
       entries: published.entries,
@@ -1518,7 +1580,7 @@ async function republishAfterRestore(
     // A restore states the whole of this machine's data, so whatever the seed
     // would have said has just been said.
     const service = syncService();
-    service.markSeeded(await service.vaultId());
+    service.markSeeded(seedMarker(await service.vaultId()));
     console.info(
       `[sync] republished ${published.entries} records after a restore`
     );

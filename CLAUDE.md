@@ -2331,15 +2331,32 @@ lives at module level for the same visit-to-visit reason — see `useCalendarDat
     (`sync_published_items`) as an `item` entry, so a turn sends kilobytes, and
     `SqliteSyncTarget.upsertItem` puts one in place by `mid` and records it as published so
     it is not sent back. Every record — messages included — is last-writer-wins whole; the
-    transcript union in `rowMergers.ts` now serves only the bridge. **A format-1 vault is
-    migrated once** before the loop starts (`migrateThenStart` → `SyncLoop.migrateToV2`,
-    lease `format-migration`): a last v1 pull, a snapshot of this machine's data with each
-    record under its `recordVersions` stamp, then `raiseDataFormat`. While `oplog/` exists
-    every pull also reads its unread files and publishes what they brought in format 2
-    (the bridge), and compaction deletes it a week after its newest file. The `oplog`
-    layout, `readIndex` and the transcript union stay only for that, until B3 removes
-    them; the suites written before format 2 still drive `SyncLoop` in format 1, its
-    default, and `test:sync-v2` drives format 2.
+    transcript union in `rowMergers.ts` now serves only format-1 entries (`foldsEntry`: a
+    format-2 conversation row, and any delete, is chosen, never folded — folding an older
+    copy brought a deleted conversation back). **Rows are applied before items**, then in
+    causal order: a row lands at its newest copy's timestamp, and messages written before a
+    rename read in the same pull would otherwise find no row. **A message keeps the copy
+    edited last** by its own `mrev` (`outranks`), not by when its row was saved: an older
+    copy sent again (an upgrade, a seed) is not taken, and the newer one is unrecorded as
+    published and handed back through `takeRepublish`, so it goes out again. An item for a
+    row not here is refused, not dropped, so a snapshot bringing the row later brings it. A
+    publish mark is committed only once the outbox took the entries; a deleted conversation
+    sends one tombstone and compaction drops its messages. A head that failed to move
+    (`headSeq < seq`) is written again by the next pull. All of this bookkeeping — the
+    vector, the published messages, `sync.v2.*` — belongs to one vault (`sync.v2.vaultId`)
+    and is forgotten when this machine is pointed at another (`forgetAnotherVaultsLog`).
+    **A format-1 vault is migrated once** before the loop starts (`migrateThenStart` →
+    `SyncLoop.migrateToV2`, lease `format-migration`): the whole v1 log read and applied, a
+    snapshot of this machine's data with each record under its `recordVersions` stamp **plus
+    the v1 log's tombstones**, then `raiseDataFormat`; a migration that cannot run holds the
+    loop (still queueing) and retries in 5 minutes. **Nothing reads `oplog/` after that** —
+    compaction deletes it a week after its newest file. Instead **every machine seeds once
+    per format** (`seedMarker` = `<vaultId>:v2`): after a pull, every record it holds under
+    the stamp it holds (`collectStampedEntries`), so what it wrote late on an old build wins
+    and nothing it shares with the vault beats a newer copy just by being sent later. The
+    `oplog` layout, `readIndex` and the transcript union stay only for the suites written
+    before format 2, which still drive `SyncLoop` in format 1, its default; B3 removes them.
+    `test:sync-v2` drives format 2.
   - **An entry is applied only when it is newer than the row it would overwrite, and
     `sync_record_versions` is how that question can be asked at all.** The merge compares
     entries against each other and never against the database — `resolve()` picks a winner
@@ -2491,8 +2508,9 @@ lives at module level for the same visit-to-visit reason — see `useCalendarDat
     skew; an hour offline is not skew. Duplicates cost nothing — `resolve` is
     last-writer-wins over whatever it is given — and being invisible costs the write.
     `npm run test:sync-engine` fails against the old shape.
-  - **A pull fetches only the files of the log it has not read** (`readIndex.ts`,
-    `sync_read_files`, `device` tier). Batch and snapshot files are never rewritten — a
+  - **In format 1, a pull fetches only the files of the log it has not read**
+    (`readIndex.ts`, `sync_read_files`, `device` tier; format 2 counts batches against a
+    vector instead, below). Batch and snapshot files are never rewritten — a
     batch is claimed under an HLC its device never issued before, a snapshot under an
     `upTo` that only moves forward — so a pull lists the vault (metadata only), fetches
     each batch whose `path + revision` is not recorded and the newest snapshot if it is

@@ -113,6 +113,15 @@ mọi `version >= 1` và để hai con số quyết định.
     khác thì gửi `set`; `mid` đã publish mà không còn thì gửi `delete`.
   - **Nhận:** chèn hoặc thay theo `mid`, xoá theo `mid`, sắp theo `mid`.
 - Một lượt chat chỉ còn vài KB, hoặc vài chục KB nếu có card chart.
+- **Message giữ bản được sửa sau cùng** theo `mrev` của chính nó (mốc chỉnh sửa do chat store
+  sinh, `1-<millis>-<n>-<device>`), không theo HLC của item. HLC của item là lúc *lưu* row,
+  và một bản không đổi có thể bị gửi lại dưới HLC mới hơn (sau nâng cấp, khi seed). Bản giữ lại
+  vẫn là nguyên một bản của một máy. Máy giữ bản mới hơn sẽ bỏ dấu publish của nó và gửi lại.
+- Row luôn được áp dụng trước item trong một lần pull. Bản ghi row của format 2 theo luật bản
+  ghi sau thắng, không gộp (`foldsEntry`).
+- Còn một trường hợp chưa xử lý: một message bị **xoá** trên build 1.0.x sau khi vault đã lên
+  format 2 sẽ xuất hiện lại trên máy đó khi nó nâng cấp. Một lần sửa tại chỗ thì không bị mất
+  (nhờ `mrev`), nhưng một lần xoá thì không có `mrev` nào để so.
 
 ### 4.2 Log đánh số theo máy, kèm file head
 
@@ -122,8 +131,12 @@ heads/<device>.json                   { "seq": 812 }   chỉ máy đó ghi
 ```
 
 - **Đẩy:** ghi batch `seq + 1`, rồi ghi head. Nếu crash giữa hai bước thì head chậm một nhịp:
-  lần sau ghi `seq + 1` bị báo trùng, máy list thư mục của chính mình để lấy số lớn nhất rồi
-  đi tiếp.
+  lần pull sau thấy `headSeq < seq` và ghi lại head. Nếu số của chính máy bị mất (crash trước
+  khi ghi lại), lần upload đầu của mỗi tiến trình đọc head và thư mục của chính mình trên vault;
+  ghi trùng số thì báo xung đột, máy list lại rồi đi tiếp.
+- Vector, dấu publish và `sync.v2.*` gắn với một vault (`sync.v2.vaultId`). Đổi sang vault khác
+  (tài khoản Google khác, folder bị xoá rồi tạo lại) thì tất cả bị xoá: máy đánh số lại từ 1 và
+  lần seed gửi đủ mọi message.
 - **Kéo:** máy giữ version vector `sync_vector(device, seq)` (`device` tier).
   1. Hỏi xem có gì đổi không. Provider có changes feed (`pollChanges`) thì dùng nó: một
      request nhỏ, rỗng nghĩa là dừng luôn. Provider không có thì list `heads/`: không head nào
@@ -195,26 +208,34 @@ oplog/, oplog-snapshot/           v1: chỉ đọc trong thời gian chuyển ti
 
 1. Build v2 mở vault, thấy `dataVersion` 1 (`ahead`), nên migrate trước khi loop chạy
    (`migrateThenStart` trong `main.ts`, `SyncLoop.migrateToV2`).
-2. Dưới lease `format-migration`, pull v1 lần cuối (bộ đọc tăng dần của bước A).
-3. Dựng snapshot v2 **từ dữ liệu trên máy** sau lần pull đó (`collectStampedEntries`), mỗi
-   record **giữ HLC gốc** là stamp `recordVersions` của nó; record chưa từng được stamp mới
-   nhận HLC mới. Dữ liệu trên máy đã là kết quả merge v1, nên không phải resolve lại log v1.
-   Transcript được tách thành item, mỗi item mang HLC của conversation chứa nó.
+2. Dưới lease `format-migration`, đọc **toàn bộ** log v1 một lần và áp dụng như mọi lần pull
+   (so với stamp `recordVersions`).
+3. Dựng snapshot v2 **từ dữ liệu trên máy** (`collectStampedEntries`), mỗi record **giữ HLC
+   gốc** là stamp của nó; record chưa từng được stamp mới nhận HLC mới. Dữ liệu trên máy đã là
+   kết quả merge v1, nên không phải resolve lại. Transcript được tách thành item, mỗi item mang
+   HLC của conversation chứa nó. **Tombstone của log v1** (bản thắng là `delete`, record không
+   còn trên máy) được đưa vào snapshot: thiếu chúng, một máy đã lỡ một lần xoá sẽ publish lại
+   record đó khi vào vault.
 4. Ghi snapshot với vector rỗng, rồi ghi `vault/id.json` có điều kiện theo revision:
-   `version: 2, dataVersion: 2, dataVersionCompat: 2` (`SyncService.raiseDataFormat`).
-   Nếu lease đang do máy khác giữ hoặc migrate lỗi, loop dừng và lần `prepareSync` sau thử
-   lại.
+   `version: 2, dataVersion: 2, dataVersionCompat: 2` (`SyncService.raiseDataFormat`). Máy
+   migrate được đánh dấu đã seed format 2. Nếu lease đang do máy khác giữ hoặc migrate lỗi,
+   loop được **hold** (thay đổi vẫn vào outbox bền) và 5 phút sau thử lại.
 5. Outbox mà build cũ để lại vẫn được gửi: lúc loop nhận lại outbox, conversation nguyên
    khối được tách thành item.
 6. Máy kia:
    - build có cơ chế kiểm tra thì thấy `outdated` và dừng;
    - build 1.0.x thì dừng ở lỗi danh tính (§3).
-7. **Cầu chuyển tiếp:** mỗi lần pull, nếu vault còn `oplog/`, build v2 đọc thêm những file v1
-   chưa đọc (bộ đọc của bước A, theo luật merge v1) rồi **publish lại sang v2** những gì vừa
-   nhận: record thường giữ nguyên entry và HLC; conversation được đẩy lại đúng như nó đang có
-   trên máy, nên chỉ message mới mới đi.
+7. **Không có cầu đọc `oplog/`.** Bản đầu có một cầu như vậy; nó được bỏ vì nó dựa vào một máy
+   khác đọc giùm trong vòng 7 ngày, và không bao giờ publish được những gì chính máy cũ ghi.
+   Thay vào đó, **mỗi máy seed một lần cho mỗi format** (`seedMarker`: `<vaultId>:v2`): pull
+   trước, rồi publish mọi record nó đang có, mỗi record dưới HLC gốc của nó. Những gì máy ghi
+   muộn trên build cũ có stamp mới hơn bản trong vault nên thắng; những gì vault đã có thì
+   trùng HLC và bên nhận bỏ qua; record đã bị xoá thì tombstone trong snapshot đã xoá nó trên
+   máy này ở lần pull ngay trước. Seed trước đây dùng HLC mới và có thể chạy trước lần pull
+   đầu: một máy mới vào vault khi đó đè giá trị dùng chung (một setting) của máy kia.
 8. Khi file mới nhất trong `oplog/` đã cũ hơn 7 ngày, compaction v2 xoá `oplog/` và
-   `oplog-snapshot/` (`LEGACY_LOG_RETENTION_MS`).
+   `oplog-snapshot/` (`LEGACY_LOG_RETENTION_MS`). Trong 7 ngày đó không ai đọc nó; nó chỉ còn
+   đó để cứu bằng tay nếu cần.
 
 ## 8. Hợp đồng provider
 
