@@ -5,6 +5,7 @@ import type { CoachAnalysis, CoachAnalysisSummary } from "../../../electron/type
 import { describeTrigger, formatTimeAgo } from "./analysisLabels";
 import { announceRunNow } from "./runNow";
 import { useUnitSystem } from "../../units/UnitSystemProvider";
+import { plural, t } from "../../i18n/core";
 
 /** Section 2.2: the sixth analysis in one conversation is refused. */
 const MAX_PER_SESSION = 5;
@@ -197,12 +198,12 @@ export function ConversationAnalyses({
         onClick={() => setOpen((value) => !value)}
         title={
           liveCount
-            ? `${liveCount} analysis${liveCount === 1 ? "" : "es"} in this conversation`
-            : "No analyses in this conversation"
+            ? plural("chat.an.list.count", liveCount)
+            : t("chat.an.list.none")
         }
       >
         <Zap size={13} aria-hidden="true" />
-        Analyses
+        {t("chat.an.list.pill")}
         {liveCount ? (
           <span className="chat-coaches-count">{liveCount}</span>
         ) : null}
@@ -212,18 +213,16 @@ export function ConversationAnalyses({
         <div
           className="chat-coaches-panel"
           role="dialog"
-          aria-label="Analyses in this conversation"
+          aria-label={t("chat.an.list.title")}
         >
           <div className="chat-coaches-panel-head">
-            <strong>Analyses in this conversation</strong>
+            <strong>{t("chat.an.list.title")}</strong>
             {/* The count against the ceiling is what the ceiling counts: a
                 switched-off analysis still occupies one of the five, so
                 showing only the live ones read as room that the Create
                 button then refused to give. */}
             <span
-              title={`${liveCount} of these ${
-                liveCount === 1 ? "is" : "are"
-              } switched on`}
+              title={plural("chat.an.list.on", liveCount)}
             >
               {summaries.length}/{MAX_PER_SESSION}
             </span>
@@ -232,11 +231,7 @@ export function ConversationAnalyses({
           {error ? <p className="coach-analysis-error">{error}</p> : null}
 
           {summaries.length === 0 ? (
-            <p className="chat-coaches-empty">
-              Nothing runs here yet. An analysis reads your training and writes
-              what it finds into this conversation — on a schedule, after an
-              activity, or whenever you ask.
-            </p>
+            <p className="chat-coaches-empty">{t("chat.an.list.empty")}</p>
           ) : (
             <ul className="chat-coaches-list">
               {sorted.map(({ analysis, lastRun }) => {
@@ -254,14 +249,14 @@ export function ConversationAnalyses({
                     {analysis.trigger ? (
                       <label
                         className="coach-analysis-switch chat-coaches-row-switch"
-                        title={analysis.enabled ? "Running" : "Paused"}
+                        title={analysis.enabled ? t("chat.an.run.running") : t("chat.an.list.paused")}
                       >
                         <input
                           type="checkbox"
                           aria-label={
                             analysis.enabled
-                              ? `Pause ${analysis.name}`
-                              : `Resume ${analysis.name}`
+                              ? t("chat.an.list.pause", { name: analysis.name })
+                              : t("chat.an.list.resume", { name: analysis.name })
                           }
                           checked={analysis.enabled}
                           disabled={busy || !api}
@@ -283,10 +278,10 @@ export function ConversationAnalyses({
                       </span>
                       <span className="chat-coaches-row-meta">
                         {describeTrigger(analysis.trigger, unitSystem)}
-                        {analysis.deviceOnly ? " · this device only" : ""}
+                        {analysis.deviceOnly ? ` · ${t("chat.an.list.deviceOnly")}` : ""}
                         {lastRun
-                          ? ` · last run ${formatTimeAgo(lastRun.startedAt)}`
-                          : " · never run"}
+                          ? ` · ${t("chat.an.list.lastRun", { ago: formatTimeAgo(lastRun.startedAt) })}`
+                          : ` · ${t("chat.an.list.neverRun")}`}
                       </span>
                     </div>
                     <div className="chat-coaches-row-actions">
@@ -294,8 +289,8 @@ export function ConversationAnalyses({
                         <button
                           type="button"
                           className="icon-button"
-                          aria-label="Stop this run"
-                          title="Stop this run"
+                          aria-label={t("chat.an.stopRun")}
+                          title={t("chat.an.stopRun")}
                           disabled={!api}
                           onClick={() => void stopRun(inFlight)}
                         >
@@ -309,8 +304,8 @@ export function ConversationAnalyses({
                         <button
                           type="button"
                           className="icon-button"
-                          aria-label="Run now"
-                          title="Run now"
+                          aria-label={t("chat.an.runNow")}
+                          title={t("chat.an.runNow")}
                           disabled={busy || starting || !api}
                           onClick={() => void startRun(analysis.id)}
                         >
@@ -331,8 +326,8 @@ export function ConversationAnalyses({
                       <button
                         type="button"
                         className="icon-button"
-                        aria-label={`Open ${analysis.name}`}
-                        title="Details and settings"
+                        aria-label={t("chat.card.openName", { name: analysis.name })}
+                        title={t("chat.an.list.details")}
                         onClick={() => {
                           setOpen(false);
                           onOpenAnalysis(analysis.id);
@@ -354,7 +349,7 @@ export function ConversationAnalyses({
               disabled={busyId !== null || !api || full}
               title={
                 full
-                  ? `A conversation can run at most ${MAX_PER_SESSION} analyses.`
+                  ? t("chat.an.list.full", { n: MAX_PER_SESSION })
                   : undefined
               }
               onClick={() => {
@@ -362,7 +357,7 @@ export function ConversationAnalyses({
                 onCreateAnalysis();
               }}
             >
-              <Plus size={13} aria-hidden="true" /> Create Auto Analysis
+              <Plus size={13} aria-hidden="true" /> {t("chat.an.list.create")}
             </button>
           </div>
         </div>

@@ -13,6 +13,7 @@ import type {
   PlanDraftPreview,
   TrainingPlanDocument
 } from "../../electron/types";
+import { messageRecord, t } from "../i18n/core";
 
 export interface CreationVersion {
   artifactId: string;
@@ -82,17 +83,17 @@ export function isLatestVersion(index: ReadonlyMap<string, CreationVersion>, dra
   return index.get(draftId)?.latest ?? true;
 }
 
-const AUTHORS: Record<PlanArtifactVersion["author"], string> = {
-  coach: "Coach",
-  athlete: "you",
-  coros: "a change in the Library"
-};
+const AUTHORS = messageRecord<PlanArtifactVersion["author"]>({
+  coach: "chat.version.from.coach",
+  athlete: "chat.version.from.athlete",
+  coros: "chat.version.from.coros"
+});
 
-const MADE_BY: Record<PlanArtifactVersion["author"], string> = {
-  coach: "Coach",
-  athlete: "you",
-  coros: "the Library"
-};
+const MADE_BY = messageRecord<PlanArtifactVersion["author"]>({
+  coach: "chat.version.by.coach",
+  athlete: "chat.version.by.athlete",
+  coros: "chat.version.by.coros"
+});
 
 /**
  * "v1 · by Coach": the one line an older version keeps in the conversation
@@ -102,15 +103,15 @@ const MADE_BY: Record<PlanArtifactVersion["author"], string> = {
  * Versions tab.
  */
 export function versionLine(info: CreationVersion): string {
-  return `v${info.version} · by ${MADE_BY[info.author]}`;
+  return `v${info.version} · ${MADE_BY[info.author]}`;
 }
 
 /** "v1 · replaced by v2 from Coach", for a version that is no longer the newest. */
 export function supersededLine(info: CreationVersion): string {
   const newest = info.siblings[info.siblings.length - 1];
   // Two machines that each made the next version: the one written later counts.
-  const which = info.version === info.latestVersion ? "a later " : "";
-  return `v${info.version} · replaced by ${which}v${info.latestVersion} from ${AUTHORS[newest.author]}`;
+  const key = info.version === info.latestVersion ? "chat.version.replacedLater" : "chat.version.replaced";
+  return `v${info.version} · ${t(key, { version: info.latestVersion, author: AUTHORS[newest.author] })}`;
 }
 
 /**

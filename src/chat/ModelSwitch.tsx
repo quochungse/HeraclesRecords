@@ -6,6 +6,7 @@ import {
 } from "../../electron/chatModels";
 import { SelectDropdown } from "../components/SelectDropdown";
 import { useModelOptions } from "./modelOptionsContext";
+import { t } from "../i18n/core";
 
 function renderChatGptIcon() {
   return <Sparkles size={14} strokeWidth={2.1} aria-hidden="true" />;
@@ -78,8 +79,8 @@ export function ModelSwitch({
       options={options}
       onChange={onChange}
       renderIcon={renderIcon}
-      label={`${providerLabel} model`}
-      title={`${providerLabel} model: ${selectedLabel}`}
+      label={t("chat.picker.model", { provider: providerLabel })}
+      title={t("chat.picker.modelTitle", { provider: providerLabel, label: selectedLabel })}
       disabled={disabled}
       minMenuWidth={hasDetails ? 420 : undefined}
       portal

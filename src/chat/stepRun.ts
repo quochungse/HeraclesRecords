@@ -12,6 +12,7 @@ import {
   noteText,
   type RunNotes
 } from "../training-library/runTrail";
+import { messageRecord } from "../i18n/core";
 
 /**
  * A turn while it runs: what Coach has done so far (P2.3). A pipeline step's
@@ -27,11 +28,11 @@ export interface StepRun {
   attempts: number;
 }
 
-export const STEP_TITLE: Record<StepRun["step"], string> = {
-  outline: "Drawing the outline",
-  sessions: "Writing the sessions",
-  turn: "Working on it"
-};
+export const STEP_TITLE: Readonly<Record<StepRun["step"], string>> = messageRecord<StepRun["step"]>({
+  outline: "chat.stepTitle.outline",
+  sessions: "chat.stepTitle.sessions",
+  turn: "chat.stepTitle.turn"
+});
 
 const HAND_OVER_TOOL: Record<ChatPipelineStep["step"], string> = {
   outline: "propose_plan_outline",

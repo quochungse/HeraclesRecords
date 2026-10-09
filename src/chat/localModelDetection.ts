@@ -4,6 +4,7 @@ import type {
   LocalChatDiscovery
 } from "../../electron/types";
 import type { HeraclesRecordsApi } from "../heraclesrecords-api";
+import { plural, t } from "../i18n/core";
 
 export interface LocalDetectionResult {
   /** Every server probed, which is what fills the server and model pickers. */
@@ -42,8 +43,10 @@ export async function detectAndAdoptLocalServer(
         ok: false,
         message:
           runningEmpty.length > 0
-            ? `${runningEmpty.map((server) => server.label).join(" and ")} ${runningEmpty.length === 1 ? "is" : "are"} running, but no models were found. Pull an Ollama model or load a model in LM Studio, then detect again.`
-            : "No Ollama or LM Studio server found on localhost ports 11434 or 1234."
+            ? plural("chat.local.noModels", runningEmpty.length, {
+                servers: runningEmpty.map((server) => server.label).join(", ")
+              })
+            : t("chat.local.noServer")
       }
     };
   }
@@ -80,7 +83,7 @@ export async function detectAndAdoptLocalServer(
     settings,
     connection: {
       ok: true,
-      message: `Detected ${preferred.label} with ${preferred.models.length} model${preferred.models.length === 1 ? "" : "s"}.`,
+      message: plural("chat.local.detected", preferred.models.length, { server: preferred.label }),
       normalizedBaseUrl: preferred.baseUrl,
       models: preferred.models
     }

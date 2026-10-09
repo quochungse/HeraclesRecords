@@ -1,14 +1,14 @@
 import { Bot, KeyRound, Network, Sparkles, Terminal } from "lucide-react";
 import type { ChatProvider } from "../../electron/types";
 import { SelectDropdown } from "../components/SelectDropdown";
+import { t } from "../i18n/core";
+import { COACH_PROVIDER_LABELS } from "./CoachModelsPanel";
 
-const OPTIONS: Array<{ value: ChatProvider; label: string }> = [
-  { value: "chatgpt", label: "ChatGPT" },
-  { value: "claude-code", label: "Claude subscription" },
-  { value: "claude-api", label: "Claude API key" },
-  { value: "openrouter", label: "OpenRouter" },
-  { value: "local", label: "Local model" }
-];
+const PROVIDERS: ChatProvider[] = ["chatgpt", "claude-code", "claude-api", "openrouter", "local"];
+
+function providerOptions(): Array<{ value: ChatProvider; label: string }> {
+  return PROVIDERS.map((value) => ({ value, label: COACH_PROVIDER_LABELS[value] }));
+}
 
 function getProviderTone(provider: ChatProvider) {
   if (provider === "claude-code" || provider === "claude-api") return "claude";
@@ -42,8 +42,9 @@ export function ProviderSwitch({
   disabled?: boolean;
   onChange: (provider: ChatProvider) => void;
 }) {
+  const options = providerOptions();
   const selectedLabel =
-    OPTIONS.find((option) => option.value === provider)?.label ?? provider;
+    options.find((option) => option.value === provider)?.label ?? provider;
   const tone = getProviderTone(provider);
 
   return (
@@ -51,11 +52,11 @@ export function ProviderSwitch({
       className={`app-select--pill chat-provider-select chat-select--${tone}`}
       menuClassName={`chat-select-menu chat-provider-menu chat-select-menu--${tone}`}
       value={provider}
-      options={OPTIONS}
+      options={options}
       onChange={onChange}
       renderIcon={renderProviderIcon}
-      label="Coach provider"
-      title={`Coach provider: ${selectedLabel}`}
+      label={t("chat.picker.provider")}
+      title={t("chat.picker.providerTitle", { label: selectedLabel })}
       disabled={disabled}
       portal
     />

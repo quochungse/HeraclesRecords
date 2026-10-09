@@ -11,6 +11,7 @@ import { WorkoutBuilderModal } from "../calendar/WorkoutBuilderModal";
 import { ConfirmDialog } from "../training-library/ConfirmDialog";
 import { NewerVersionDialog } from "./NewerVersionDialog";
 import { useUnitSystem } from "../units/UnitSystemProvider";
+import { t } from "../i18n/core";
 import "../training-library/trainingLibrary.css";
 
 /**
@@ -53,7 +54,7 @@ export default function CoachWorkoutEditor({
         onSaved(result);
       })
       .catch((caught: unknown) =>
-        onError(caught instanceof Error ? caught.message : "Could not save the workout.")
+        onError(caught instanceof Error ? caught.message : t("chat.editor.workoutFailed"))
       );
   };
   const entry: TrainingPlanEntry = {
@@ -70,13 +71,13 @@ export default function CoachWorkoutEditor({
     <WorkoutBuilderModal
       api={api}
       source={{ kind: "plan", entry }}
-      heading={{ eyebrow: "Coach's workout", title: `Edit ${workout.name || "workout"}` }}
+      heading={{ eyebrow: t("chat.editor.workoutEyebrow"), title: workout.name ? t("library.ed.editName", { name: workout.name }) : t("chat.editor.editWorkout") }}
       confirmDiscard={({ keep, discard }) => (
         <ConfirmDialog
-          title="Discard unsaved changes?"
-          description="This workout has edits that have not been saved to the card. Closing it throws them away."
-          confirmLabel="Discard changes"
-          cancelLabel="Keep editing"
+          title={t("chat.set.discardTitle")}
+          description={t("chat.editor.discardBody")}
+          confirmLabel={t("chat.set.discardConfirm")}
+          cancelLabel={t("chat.set.keepEditing")}
           danger
           onConfirm={discard}
           onCancel={keep}

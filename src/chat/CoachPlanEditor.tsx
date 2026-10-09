@@ -11,6 +11,7 @@ import { PlanEditor } from "../training-library/PlanEditor";
 import { NewerVersionDialog } from "./NewerVersionDialog";
 import { startDraft, type PlanDraft } from "../training-library/planDraft";
 import { useUnitSystem } from "../units/UnitSystemProvider";
+import { t } from "../i18n/core";
 import "../training-library/trainingLibrary.css";
 
 interface CoachPlanEditorProps {
@@ -95,14 +96,14 @@ export default function CoachPlanEditor({ api, draftId, onSaved, onClose, onErro
 
   return createPortal(
     <div className="tl-plan-modal-backdrop" role="presentation">
-      <div className="tl-plan-modal" role="dialog" aria-modal="true" aria-label="Edit the coach's plan">
+      <div className="tl-plan-modal" role="dialog" aria-modal="true" aria-label={t("chat.editor.planAria")}>
         <PlanEditor
           api={api}
           draft={draft}
           onDraftChange={setDraft}
           workouts={workouts}
           isNew={false}
-          saveLabel="Save changes"
+          saveLabel={t("chat.editor.saveChanges")}
           onSave={(plan) => save(plan)}
           onClose={onClose}
         />

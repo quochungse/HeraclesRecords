@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { AlertTriangle, Loader2, X } from "lucide-react";
 import type { HeraclesRecordsApi } from "../../heraclesrecords-api";
+import { t } from "../../i18n/core";
 
 /**
  * Deleting an analysis. The conversation survives — it is the athlete's chat
@@ -61,11 +62,11 @@ export function DeleteAnalysisDialog({
         onClick={(event) => event.stopPropagation()}
       >
         <header className="coach-analysis-dialog-header">
-          <h3 id="delete-analysis-title">Delete “{analysisName}”?</h3>
+          <h3 id="delete-analysis-title">{t("chat.an.del.title", { name: analysisName })}</h3>
           <button
             type="button"
             className="icon-button"
-            aria-label="Close"
+            aria-label={t("common.close")}
             disabled={busy}
             onClick={onClose}
           >
@@ -78,13 +79,10 @@ export function DeleteAnalysisDialog({
         <div className="coach-analysis-dialog-body">
           <p className="coach-analysis-confirm-lead">
             <AlertTriangle size={15} aria-hidden="true" />
-            This cannot be undone.
+            {t("chat.an.del.lead")}
           </p>
 
-          <p className="chat-settings-copy">
-            The conversation is kept, along with everything {analysisName} has
-            already written in it. Only the analysis and its schedule go.
-          </p>
+          <p className="chat-settings-copy">{t("chat.an.del.body", { name: analysisName })}</p>
         </div>
 
         <div className="coach-analysis-confirm-actions">
@@ -94,7 +92,7 @@ export function DeleteAnalysisDialog({
             disabled={busy}
             onClick={onClose}
           >
-            Cancel
+            {t("common.cancel")}
           </button>
           <button
             type="button"
@@ -105,7 +103,7 @@ export function DeleteAnalysisDialog({
             {busy ? (
               <Loader2 className="chat-spinner" size={14} aria-hidden="true" />
             ) : null}
-            Delete analysis
+            {t("chat.an.del.confirm")}
           </button>
         </div>
       </section>

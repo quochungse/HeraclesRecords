@@ -1,4 +1,5 @@
 import { useEffect, useRef, type RefObject } from "react";
+import { t } from "../i18n/core";
 
 /** How far above the transcript's visible part the earlier entries are fetched in. */
 const LOOKAHEAD = "600px 0px";
@@ -50,7 +51,7 @@ export function TranscriptEarlier({
 
   return (
     <button ref={ref} type="button" className="chat-transcript-earlier" onClick={onReveal}>
-      Show earlier in this conversation
+      {t("chat.earlier")}
     </button>
   );
 }

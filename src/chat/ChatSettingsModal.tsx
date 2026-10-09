@@ -14,6 +14,7 @@ import {
   summarizeCoachModels,
   type CoachModelsSummary
 } from "./CoachModelsPanel";
+import { t } from "../i18n/core";
 
 /** The settings this dialog edits; everything else is saved elsewhere. */
 type DraftKey = "visualizationsEnabled" | "inlineSuggestions" | "coachStyle" | "customInstructions" | "compactContext";
@@ -117,7 +118,7 @@ export function ChatSettingsModal({
       setPendingBudget(undefined);
       onClose();
     } catch (caught) {
-      setSaveError(caught instanceof Error ? caught.message : "Could not save Coach settings.");
+      setSaveError(caught instanceof Error ? caught.message : t("chat.err.settings"));
     } finally {
       setSaving(false);
     }
@@ -207,12 +208,12 @@ export function ChatSettingsModal({
             <Settings2 size={16} aria-hidden="true" />
             {/* Coach's own, as the gear that opens it says: the app has a
                 Settings screen of its own, and this is not it. */}
-            <h2 id="chat-settings-title">Coach settings</h2>
+            <h2 id="chat-settings-title">{t("chat.composer.settings")}</h2>
           </div>
           <button
             type="button"
             className="icon-button"
-            aria-label="Close settings"
+            aria-label={t("chat.set.close")}
             onClick={requestClose}
           >
             <X size={18} aria-hidden="true" />
@@ -232,7 +233,7 @@ export function ChatSettingsModal({
         </div>
         <footer className="app-modal-footer chat-settings-modal-footer">
           <span className="chat-settings-footer-status" role="status">
-            {saveError ?? (dirty ? "Unsaved changes" : "All changes saved")}
+            {saveError ?? (dirty ? t("chat.set.unsaved") : t("chat.set.saved"))}
           </span>
           <button
             type="button"
@@ -240,7 +241,7 @@ export function ChatSettingsModal({
             disabled={!dirty || saving}
             onClick={() => setConfirming(true)}
           >
-            Discard
+            {t("chat.set.discard")}
           </button>
           <button
             type="button"
@@ -249,7 +250,7 @@ export function ChatSettingsModal({
             onClick={() => void save()}
           >
             {saving ? <Loader2 className="chat-spinner" size={14} aria-hidden="true" /> : null}
-            Save
+            {t("chat.set.save")}
           </button>
         </footer>
         {/* Portalled, so no ancestor's stacking or containing block holds it
@@ -258,10 +259,10 @@ export function ChatSettingsModal({
         {confirming
           ? createPortal(
               <ConfirmDialog
-                title="Discard unsaved changes?"
-                description="Your edits to Coach settings have not been saved. Discarding them closes Coach settings."
-                confirmLabel="Discard changes"
-                cancelLabel="Keep editing"
+                title={t("chat.set.discardTitle")}
+                description={t("chat.set.discardBody")}
+                confirmLabel={t("chat.set.discardConfirm")}
+                cancelLabel={t("chat.set.keepEditing")}
                 danger
                 onConfirm={confirmDiscard}
                 onCancel={() => setConfirming(false)}

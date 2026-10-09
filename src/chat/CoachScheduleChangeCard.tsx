@@ -9,6 +9,7 @@ import {
   lineStatusLabel,
   proposedLines
 } from "./scheduleChangeModel";
+import { t } from "../i18n/core";
 
 /**
  * Coach's proposal to the calendar or the workout library, under the answer
@@ -40,15 +41,15 @@ export function CoachScheduleChangeCard({
   // What is over folds under one line while anything is still open; with
   // nothing left to decide it is the whole card, so it stands open.
   const groups = [
-    { title: "To decide", lines: toDecide, folded: false },
-    { title: "Needs another try", lines: retry, folded: false },
-    { title: "Done", lines: done, folded: toDecide.length + retry.length > 0 }
+    { title: t("chat.change.group.toDecide"), lines: toDecide, folded: false },
+    { title: t("chat.change.group.retry"), lines: retry, folded: false },
+    { title: t("chat.change.group.done"), lines: done, folded: toDecide.length + retry.length > 0 }
   ];
   const doneSummary = done
     .map((line) => lineStatusLabel(line).toLowerCase())
     .reduce<Record<string, number>>((counts, label) => ({ ...counts, [label]: (counts[label] ?? 0) + 1 }), {});
   const doneText = Object.entries(doneSummary)
-    .map(([label, count]) => `${count} ${label}`)
+    .map(([label, count]) => t("chat.change.countOf", { count, label }))
     .join(" · ");
   const renderLines = (lines: ScheduleChangeLine[]) => (
     <ul className="chat-change-lines">
@@ -70,14 +71,14 @@ export function CoachScheduleChangeCard({
     <article className="chat-plan-card chat-creation-card chat-change-card" data-change-set-id={changeSet.changeSetId}>
       <header className="chat-creation-head">
         <div>
-          <span className="chat-creation-kicker">Calendar changes</span>
+          <span className="chat-creation-kicker">{t("chat.change.kicker")}</span>
           <h4>{changeSet.summary}</h4>
           <span className="chat-plan-card-summary">{changeSetHead(changeSet)}</span>
         </div>
       </header>
 
       {days.length ? (
-        <ol className="chat-change-days" aria-label="The days these changes touch">
+        <ol className="chat-change-days" aria-label={t("chat.change.daysAria")}>
           {days.map((day) => (
             <li key={day.day}>
               <b>{changeDayLabel(day.day)}</b>
@@ -117,12 +118,12 @@ export function CoachScheduleChangeCard({
           {onApply ? (
             <button type="button" className="chat-plan-upload" disabled={busy} onClick={() => onApply()}>
               {busyLine === "*" ? <Loader2 className="chat-spinner" size={14} aria-hidden="true" /> : null}
-              Apply all {open.length}
+              {t("chat.change.applyAll", { n: open.length })}
             </button>
           ) : null}
           {onDismiss ? (
             <button type="button" className="chat-plan-review" disabled={busy} onClick={() => onDismiss()}>
-              Dismiss all
+              {t("chat.change.dismissAll")}
             </button>
           ) : null}
         </div>
@@ -160,7 +161,7 @@ function ChangeLine({
         <div className="chat-change-line-actions">
           <button type="button" className="chat-change-dismiss" disabled={disabled} onClick={onApply}>
             {busy ? <Loader2 className="chat-spinner" size={12} aria-hidden="true" /> : null}
-            Try again
+            {t("chat.change.tryAgain")}
           </button>
         </div>
       ) : null}
@@ -174,12 +175,16 @@ function ChangeLine({
               onClick={onApply}
             >
               {busy ? <Loader2 className="chat-spinner" size={12} aria-hidden="true" /> : null}
-              {line.op === "remove" ? "Remove" : line.op === "deleteWorkout" ? "Delete" : "Apply"}
+              {line.op === "remove"
+                ? t("chat.canvas.remove")
+                : line.op === "deleteWorkout"
+                  ? t("chat.row.delete")
+                  : t("chat.change.apply")}
             </button>
           ) : null}
           {onDismiss ? (
             <button type="button" className="chat-change-dismiss" disabled={disabled} onClick={onDismiss}>
-              Dismiss
+              {t("chat.change.dismiss")}
             </button>
           ) : null}
         </div>

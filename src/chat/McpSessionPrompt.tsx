@@ -1,5 +1,7 @@
 import { AlertTriangle } from "lucide-react";
 import type { McpServerStatus } from "../../electron/types";
+import { plural, t } from "../i18n/core";
+import { useI18n } from "../i18n/useI18n";
 
 interface McpSessionPromptProps {
   /**
@@ -23,6 +25,7 @@ export function McpSessionPrompt({
   onLater,
   onAuthorize
 }: McpSessionPromptProps) {
+  const { rich } = useI18n();
   if (servers.length === 0) {
     return null;
   }
@@ -39,35 +42,27 @@ export function McpSessionPrompt({
           <AlertTriangle size={18} aria-hidden="true" />
           <h2 id="mcp-session-title">
             {servers.length === 1
-              ? `${servers[0].name} needs to be connected again`
-              : `${servers.length} MCP sessions need to be connected again`}
+              ? t("chat.mcpSession.titleOne", { name: servers[0].name })
+              : plural("chat.mcpSession.titleMany", servers.length)}
           </h2>
         </header>
 
         <div className="mcp-session-modal-body">
-          <p>
-            The stored session for{" "}
-            {servers.length === 1 ? "this server" : "these servers"} has stopped
-            working, so Coach cannot reach{" "}
-            {servers.length === 1 ? "its" : "their"} tools. Coach still answers
-            without them, just with less of your COROS data.
-          </p>
+          <p>{plural("chat.mcpSession.body", servers.length)}</p>
 
           <ul className="mcp-session-servers">
             {servers.map((server) => (
               <li key={server.id}>
                 <span className="mcp-session-server-name">{server.name}</span>
                 <span className="mcp-session-server-state">
-                  {server.error ?? "Stored session is no longer valid."}
+                  {server.error ?? t("chat.mcpSession.invalid")}
                 </span>
               </li>
             ))}
           </ul>
 
           <p className="mcp-session-hint">
-            <b>Skip</b> clears the stored session, so it stops being retried and
-            this stops being asked. <b>Later</b> changes nothing and asks again
-            next time you open Coach.
+            {rich("chat.mcpSession.hint", { b: (chunk) => <b>{chunk}</b> })}
           </p>
         </div>
 
@@ -78,7 +73,7 @@ export function McpSessionPrompt({
             disabled={busy}
             onClick={onSkip}
           >
-            Skip
+            {t("chat.mcpSession.skip")}
           </button>
           <button
             type="button"
@@ -86,7 +81,7 @@ export function McpSessionPrompt({
             disabled={busy}
             onClick={onLater}
           >
-            Later
+            {t("chat.mcpSession.later")}
           </button>
           <button
             type="button"
@@ -94,7 +89,7 @@ export function McpSessionPrompt({
             disabled={busy}
             onClick={onAuthorize}
           >
-            Authorize
+            {t("chat.mcpSession.authorize")}
           </button>
         </footer>
       </div>

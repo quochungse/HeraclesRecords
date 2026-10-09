@@ -10,6 +10,7 @@ import type {
   ScheduleChangeSet,
   ScheduleChangeStatus
 } from "../../electron/types";
+import { getIntlLocale, getLocale, messageRecord, plural, t } from "../i18n/core";
 
 const KNOWN_OPS: ReadonlySet<string> = new Set(["move", "replace", "remove", "add", "deleteWorkout"]);
 
@@ -22,19 +23,23 @@ export function proposedLines(set: ScheduleChangeSet): ScheduleChangeLine[] {
   return set.lines.filter((line) => line.status === "proposed" && canApply(line));
 }
 
-const STATUS_LABEL: Record<Exclude<ScheduleChangeStatus, "proposed">, string> = {
-  applied: "Applied",
-  failed: "Failed",
-  dismissed: "Dismissed",
-  stale: "Out of date"
-};
+const STATUS_LABEL = messageRecord<Exclude<ScheduleChangeStatus, "proposed">>({
+  applied: "chat.change.status.applied",
+  failed: "chat.change.status.failed",
+  dismissed: "chat.change.status.dismissed",
+  stale: "chat.change.status.stale"
+});
 
 export function lineStatusLabel(line: ScheduleChangeLine): string {
   if (line.status === "proposed") return "";
   /* A status a newer build wrote: said as it is rather than as something this build knows. */
   if (!(line.status in STATUS_LABEL)) return String(line.status);
   if (line.status === "applied") {
-    return line.op === "remove" ? "Removed" : line.op === "deleteWorkout" ? "Deleted" : STATUS_LABEL.applied;
+    return line.op === "remove"
+      ? t("chat.change.status.removed")
+      : line.op === "deleteWorkout"
+        ? t("chat.change.status.deleted")
+        : STATUS_LABEL.applied;
   }
   return STATUS_LABEL[line.status];
 }
@@ -52,14 +57,14 @@ export function changeSetHead(set: ScheduleChangeSet): string {
     else counts[line.status] += 1;
   }
   const total = set.lines.length;
-  if (counts.proposed === total) return total === 1 ? "Not applied yet" : `${total} changes, none applied yet`;
+  if (counts.proposed === total) return plural("chat.change.noneApplied", total);
   const parts: string[] = [];
-  if (counts.applied) parts.push(`${counts.applied} applied`);
-  if (counts.proposed) parts.push(`${counts.proposed} to decide`);
-  if (counts.failed) parts.push(`${counts.failed} failed`);
-  if (counts.stale) parts.push(`${counts.stale} out of date`);
-  if (counts.dismissed) parts.push(`${counts.dismissed} dismissed`);
-  if (newer) parts.push(`${newer} from a newer version of the app`);
+  if (counts.applied) parts.push(plural("chat.change.applied", counts.applied));
+  if (counts.proposed) parts.push(plural("chat.change.toDecide", counts.proposed));
+  if (counts.failed) parts.push(plural("chat.change.failed", counts.failed));
+  if (counts.stale) parts.push(plural("chat.change.stale", counts.stale));
+  if (counts.dismissed) parts.push(plural("chat.change.dismissed", counts.dismissed));
+  if (newer) parts.push(plural("chat.change.newer", newer));
   return parts.join(" · ");
 }
 
@@ -135,12 +140,15 @@ export function changeSetDays(set: ScheduleChangeSet): ChangeDay[] {
   return [...days.entries()].sort(([left], [right]) => left.localeCompare(right)).map(([day, marks]) => ({ day, marks }));
 }
 
-const DAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"] as const;
-const MONTH_NAMES = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"] as const;
+const DAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"] as const; // i18n-ignore: English's own form
+const MONTH_NAMES = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"] as const; // i18n-ignore
 
-/** `Tue 29 Sep`, as the lines name a day. */
+/** `Tue 29 Sep`, as the lines name a day; another language's own short form. */
 export function changeDayLabel(day: string): string {
   const date = new Date(Number(day.slice(0, 4)), Number(day.slice(4, 6)) - 1, Number(day.slice(6, 8)), 12);
+  if (getLocale() !== "en") {
+    return new Intl.DateTimeFormat(getIntlLocale(), { weekday: "short", day: "numeric", month: "short" }).format(date);
+  }
   return `${DAY_NAMES[date.getDay()]} ${date.getDate()} ${MONTH_NAMES[date.getMonth()]}`;
 }
 

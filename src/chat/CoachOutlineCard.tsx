@@ -1,7 +1,6 @@
 import { ArrowRight, RotateCw } from "lucide-react";
 import { useState, type CSSProperties } from "react";
 import type { PlanBrief, WorkoutSport } from "../../electron/types";
-import { PLAN_WEEKDAYS } from "../../electron/trainingPlanGeneration";
 import { addPlanDays, formatPlanDate } from "../training-library/planGeneratorModel";
 import { sportTheme } from "../training-library/sportTheme";
 import { briefTitle } from "./planBriefModel";
@@ -15,6 +14,7 @@ import {
 } from "./planOutlineModel";
 
 import { workoutSportLabel } from "../training/workoutSport";
+import { t, weekdayNames } from "../i18n/core";
 /** The tallest bar, in pixels. */
 const BAR_MAX = 64;
 
@@ -76,13 +76,13 @@ export function CoachOutlineCard({
     >
       <header className="chat-creation-head">
         <div>
-          <span className="chat-creation-kicker">Plan outline</span>
+          <span className="chat-creation-kicker">{t("chat.outline.kicker")}</span>
           <h4>{briefTitle(brief.request)}</h4>
           <span className="chat-plan-card-summary">{outlineSpan(outline)}</span>
         </div>
         <div className="chat-creation-head-aside">
           <span className="chat-creation-status">
-            {author === "athlete" ? "Adjusted by you" : "Outline"}
+            {author === "athlete" ? t("chat.outline.adjusted") : t("chat.outline")}
             {version > 1 ? ` · v${version}` : ""}
           </span>
         </div>
@@ -94,7 +94,7 @@ export function CoachOutlineCard({
         className="chat-outline-ridge"
         style={{ "--chat-outline-weeks": outline.weeks.length } as CSSProperties}
       >
-        <div className="chat-outline-bars" role="group" aria-label="Weeks">
+        <div className="chat-outline-bars" role="group" aria-label={t("chat.outline.weeksAria")}>
           {outline.weeks.map((item, weekIndex) => (
             <button
               type="button"
@@ -102,7 +102,7 @@ export function CoachOutlineCard({
               className={`chat-outline-bar${weekIndex === index ? " is-selected" : ""}${item.lighter ? " is-lighter" : ""}`}
               data-stage={outlineStageSlug(item.stage)}
               aria-pressed={weekIndex === index}
-              aria-label={`Week ${weekIndex + 1}, ${outlineStageLabel(item.stage)}${item.lighter ? ", lighter week" : ""}, ${item.hours} hours`}
+              aria-label={t(item.lighter ? "chat.outline.barLighter" : "chat.outline.bar", { n: weekIndex + 1, stage: outlineStageLabel(item.stage), hours: item.hours })}
               onClick={() => setSelected(weekIndex)}
             >
               <span style={{ height: `${Math.max(6, Math.round((item.hours / peak) * BAR_MAX))}px` }} />
@@ -124,11 +124,11 @@ export function CoachOutlineCard({
       <section className="chat-outline-week" data-stage={outlineStageSlug(week.stage)} aria-live="polite">
         <header>
           <strong>
-            Week {index + 1} · {outlineStageLabel(week.stage)}
-            {week.lighter ? " · lighter" : ""}
+            {t("chat.refs.week", { n: index + 1 })} · {outlineStageLabel(week.stage)}
+            {week.lighter ? ` · ${t("chat.outline.lighter")}` : ""}
           </strong>
           <small>
-            {formatPlanDate(monday)} – {formatPlanDate(addPlanDays(monday, 6))} · {week.sessions} sessions · {week.hours} h
+            {formatPlanDate(monday)} – {formatPlanDate(addPlanDays(monday, 6))} · {t("chat.outline.weekFigures", { sessions: week.sessions, hours: week.hours })}
           </small>
         </header>
         {week.focus ? <p>{week.focus}</p> : null}
@@ -139,11 +139,11 @@ export function CoachOutlineCard({
                 key={at}
                 style={{ "--sport-accent": sportTheme(session.sport as WorkoutSport).color } as CSSProperties}
               >
-                <span>{PLAN_WEEKDAYS[session.dayIndex]?.slice(0, 3)}</span>
+                <span>{weekdayNames("short")[session.dayIndex]}</span>
                 <strong>{session.name}</strong>
                 <small>
                   {workoutSportLabel(session.sport)}
-                  {session.minutes ? ` · ${session.minutes} min` : ""}
+                  {session.minutes ? ` · ${t("units.min", { m: session.minutes })}` : ""}
                 </small>
               </li>
             ))}
@@ -153,11 +153,11 @@ export function CoachOutlineCard({
 
       {outline.basis ? (
         <p className="chat-brief-reads">
-          <strong>What Coach read:</strong> {outline.basis}
+          <strong>{t("chat.outline.basis")}</strong> {outline.basis}
         </p>
       ) : null}
       {problems.length ? (
-        <ul className="chat-brief-open" aria-label="Does not fit the brief">
+        <ul className="chat-brief-open" aria-label={t("chat.outline.misfit")}>
           {problems.map((problem) => (
             <li key={problem}>{problem}</li>
           ))}
@@ -165,12 +165,12 @@ export function CoachOutlineCard({
       ) : null}
 
       {written ? (
-        <p className="chat-brief-reads">The sessions are written to this outline — change the plan from its card.</p>
+        <p className="chat-brief-reads">{t("chat.outline.written")}</p>
       ) : (
         <div className="chat-creation-actions">
           <div className="chat-plan-actions">
             <button type="button" className="chat-plan-review" disabled={!onAdjust} onClick={onAdjust}>
-              {editing ? "Continue adjusting" : "Adjust outline"}
+              {editing ? t("chat.outline.continueAdjusting") : t("chat.outline.adjust")}
             </button>
             <button
               type="button"
@@ -179,7 +179,7 @@ export function CoachOutlineCard({
               disabled={!onRedraw || busy}
               onClick={() => setNoteOpen((open) => !open)}
             >
-              <RotateCw size={13} aria-hidden="true" /> Redraw with a note
+              <RotateCw size={13} aria-hidden="true" /> {t("chat.outline.redrawNote")}
             </button>
             {/* The way on, at the row's end with an arrow: the outline is a
                 step, and the sessions are the next one. */}
@@ -192,12 +192,12 @@ export function CoachOutlineCard({
                   blocked
                     ? blocked
                     : problems.length
-                      ? "Adjust or redraw the outline so it fits the brief first"
+                      ? t("chat.outline.fitFirst")
                       : undefined
                 }
                 onClick={onWriteSessions}
               >
-                Write the sessions
+                {t("chat.step.writeSessions")}
                 <ArrowRight size={14} aria-hidden="true" />
               </button>
             ) : null}
@@ -214,8 +214,8 @@ export function CoachOutlineCard({
                 value={note}
                 maxLength={400}
                 autoFocus
-                placeholder="What to change — e.g. “a lighter week 5, I’m travelling”"
-                aria-label="What to change in the outline"
+                placeholder={t("chat.outline.notePh")}
+                aria-label={t("chat.outline.noteAria")}
                 onChange={(event) => setNote(event.target.value)}
                 onKeyDown={(event) => {
                   if (event.key === "Escape") {
@@ -225,7 +225,7 @@ export function CoachOutlineCard({
                 }}
               />
               <button type="submit" className="chat-plan-upload" disabled={busy || !note.trim()}>
-                Redraw
+                {t("chat.outline.redraw")}
               </button>
             </form>
           ) : null}

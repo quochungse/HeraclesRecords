@@ -18,8 +18,8 @@ code, and `npm run test:i18n` holds both.
 | P3 | Activities, Running, Cycling, Hiking, Strength, and what they share (`ActivitySeriesChart`, `activityChannels.ts`, `sportTypes.ts`, the heatmap); COROS's zone names (`zoneName`, `zones.*`) | **Done** |
 | P4 | Calendar and Training Library (`WorkoutBuilder`, step kinds, zones, the plan reader and editor, the plan brief steps Coach reuses), sport names through `workoutSportLabel` | **Done** |
 | P5 | Sleep, Hall of Records (the milestones and the Twelve Labours), Where you've been, Personal; clocks and short dates through Intl outside English | **Done** |
-| P6 | Coach's screen: `ChatView`, Coach Models, MCP servers, the Workbench, analyses. **Not the prompt** (below) | |
-| P7 | Text the main process puts on screen: errors thrown over IPC, native dialog titles | |
+| P6 | Coach's screen: `ChatView`, the conversation list, composer and refs, Coach settings and Coach Models, MCP servers, the plan brief and outline, creation cards and the Workbench, change sets, the chart cards, analyses. **Not the prompt** (below) | **Done** |
+| P7 | Text the main process puts on screen: errors thrown over IPC, native dialog titles, and what Coach's screen draws from it — `planDiff` lines, effort names (`formatEffortOption`), the brief and outline checks (`generationRequestProblems`, `planOutlineProblems`), a change line's label and reason, an activity card's start time, Claude's status message | |
 
 ## A release ships every language finished
 
@@ -132,6 +132,16 @@ line in the website's guide (`site/src/content/guide/customise.md`, under Appear
   and Thai break between any two characters, and a status pill came out one character to a
   line. A row of figures wraps rather than letting each figure shrink into the next
   (`.tl-card-figs`: Russian "ТРЕНИРОВОК" is twice "SESSIONS").
+- **A title Coach stores is mapped, never translated, where it is stored.** A conversation
+  starts as "New chat" or "New plan" and a pipeline step sends "Draw the outline" or "Write the
+  sessions" into the transcript: both are stored, so they stay English and the screen names
+  them through `displaySessionTitle` (`src/chat/sessionTitle.ts`) and `displayStepText`
+  (`planOutlineModel.ts`). What the athlete writes, and a ref's words, stay as written.
+- **An analysis preset is named in the language on screen, and stored in English.** The
+  starter card reads `chat.an.preset.*`; the analysis it creates keeps the preset's English
+  name, role and playbook — they are synced, and the role and playbook are prompt.
+- **What a label is, not what it says, decides a branch.** `creationStatus` returns a
+  `kind` beside its label, because the card used to compare the label with "On COROS".
 - **A new namespace** is a file in `messages/en/`, a line in `messages/en/index.ts`, the same
   file in every other language, and `npm run i18n:index`, which writes the other languages'
   `index.ts` and fails on a file missing.

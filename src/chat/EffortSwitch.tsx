@@ -8,6 +8,7 @@ import {
 } from "../../electron/chatModels";
 import { SelectDropdown } from "../components/SelectDropdown";
 import { useModelOptions } from "./modelOptionsContext";
+import { t } from "../i18n/core";
 
 function renderEffortIcon() {
   return <Gauge size={14} strokeWidth={2.1} aria-hidden="true" />;
@@ -59,8 +60,8 @@ export function EffortSwitch({
       options={options}
       onChange={onChange}
       renderIcon={renderEffortIcon}
-      label="Reasoning effort"
-      title={`Reasoning effort: ${selectedLabel}`}
+      label={t("chat.models.effort")}
+      title={t("chat.picker.effortTitle", { label: selectedLabel })}
       disabled={disabled}
       portal
     />

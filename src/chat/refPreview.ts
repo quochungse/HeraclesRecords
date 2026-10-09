@@ -12,6 +12,7 @@ import type { UnitSystem } from "../../electron/types";
 import { distanceUnit, metersToDisplayDistance } from "../../electron/unitSystem";
 import { datedForReading } from "./planDating";
 import { readPlan, ridgeMeasure, weekRidgeValues } from "../training-library/planReaderModel";
+import { plural, t, weekdayNames } from "../i18n/core";
 
 export interface RefPreview {
   kind: "plan" | "week" | "session" | "calendar" | "calendarWeek" | "activity";
@@ -78,10 +79,10 @@ export function planRefPreview(
     const sessions = weeks.reduce((sum, week) => sum + week.summary.workouts, 0);
     return {
       kind: "plan",
-      context: "Coach plan",
+      context: t("chat.refs.coachPlan"),
       title: ref.name,
       chip: ref.name,
-      detail: `${weeks.length} ${weeks.length === 1 ? "week" : "weeks"} · ${sessions} sessions`,
+      detail: `${plural("chat.outline.weeks", weeks.length)} · ${plural("chat.refs.sessions", sessions)}`,
       ...sportOf,
       ...(weeks.length > 1 ? { bars: { heights } } : {})
     };
@@ -90,7 +91,7 @@ export function planRefPreview(
   if (ref.scope === "week" && ref.weekIndex !== undefined) {
     const week = weeks[ref.weekIndex];
     if (!week) return bare;
-    const days = week.days.filter((day) => day.entries.length).map((day) => day.label.slice(0, 3));
+    const days = week.days.filter((day) => day.entries.length).map((day) => shortDay(day.dayIndex));
     const count = week.summary.workouts;
     const volume =
       week.timed && week.summary.durationSeconds > 0
@@ -101,9 +102,9 @@ export function planRefPreview(
     return {
       kind: "week",
       context: ref.name,
-      title: `Week ${ref.weekIndex + 1}${week.stage ? ` · ${week.stage}` : ""}`,
-      chip: `Week ${ref.weekIndex + 1}`,
-      detail: [`${count} ${count === 1 ? "session" : "sessions"}`, volume, days.join(" ")]
+      title: `${t("chat.refs.week", { n: ref.weekIndex + 1 })}${week.stage ? ` · ${week.stage}` : ""}`,
+      chip: t("chat.refs.week", { n: ref.weekIndex + 1 }),
+      detail: [plural("chat.refs.sessions", count), volume, days.join(" ")]
         .filter(Boolean)
         .join(" · "),
       ...sportOf,
@@ -120,10 +121,10 @@ export function planRefPreview(
         if (!facts) continue;
         const time =
           facts.durationComplete && facts.durationSeconds > 0 ? formatSessionTime(facts.durationSeconds) : undefined;
-        const name = `${day.label.slice(0, 3)} · ${facts.title}`;
+        const name = `${shortDay(day.dayIndex)} · ${facts.title}`;
         return {
           kind: "session",
-          context: `${ref.name} · week ${week.weekIndex + 1}`,
+          context: `${ref.name} · ${t("chat.refs.weekLower", { n: week.weekIndex + 1 })}`,
           title: time ? `${name} ${time}` : name,
           chip: name,
           ...(facts.distanceMeters > 0 ? { detail: formatDistance(facts.distanceMeters, unitSystem) } : {}),
@@ -134,6 +135,11 @@ export function planRefPreview(
     return bare;
   }
   return bare;
+}
+
+/** A plan day's short name, Monday first as the plan counts: "Mon". */
+function shortDay(dayIndex: number): string {
+  return weekdayNames("short")[dayIndex] ?? "";
 }
 
 /**
@@ -147,7 +153,11 @@ export function scheduleRefPreview(ref: ScheduleRef): RefPreview {
   const kind: RefPreview["kind"] = ref.activityId ? "activity" : ref.scope === "week" ? "calendarWeek" : "calendar";
   return {
     kind,
-    context: ref.activityId ? "your activity" : ref.planId && !ref.day ? "your COROS plan" : "your calendar",
+    context: ref.activityId
+      ? t("chat.refs.yourActivity")
+      : ref.planId && !ref.day
+        ? t("chat.refs.yourPlan")
+        : t("chat.refs.yourCalendar"),
     title: first,
     chip: first,
     ...(detail ? { detail } : {}),
@@ -157,11 +167,11 @@ export function scheduleRefPreview(ref: ScheduleRef): RefPreview {
 
 /** The composer's placeholder for what it points at. */
 export function refPlaceholder(previews: readonly RefPreview[]): string | undefined {
-  if (previews.length !== 1) return previews.length ? "Ask about these…" : undefined;
+  if (previews.length !== 1) return previews.length ? t("chat.refs.askThese") : undefined;
   const [only] = previews;
-  if (only.kind === "week" || only.kind === "calendarWeek") return "Ask about this week…";
-  if (only.kind === "session") return "Ask about this session…";
-  if (only.kind === "activity") return "Ask about this activity…";
-  if (only.kind === "plan") return "Ask about this plan…";
-  return "Ask about this…";
+  if (only.kind === "week" || only.kind === "calendarWeek") return t("chat.refs.askWeek");
+  if (only.kind === "session") return t("chat.refs.askSession");
+  if (only.kind === "activity") return t("chat.refs.askActivity");
+  if (only.kind === "plan") return t("chat.refs.askPlan");
+  return t("chat.refs.askThis");
 }

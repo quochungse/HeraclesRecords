@@ -5,6 +5,7 @@ import { remoteErrorMessage } from "./remoteError";
 import { TrainingPlanCalendarDialog } from "../training-library/TrainingPlanCalendarDialog";
 import "../training-library/trainingLibrary.css";
 import { datedForReading } from "./planDating";
+import { t } from "../i18n/core";
 
 /**
  * "Add to calendar…" for a Coach plan (docs/coach-plan-canvas.md, P1.6):
@@ -48,7 +49,7 @@ export default function CoachCalendarDialog({
       })
       .catch((cause: unknown) => {
         if (!live) return;
-        onError(remoteErrorMessage(cause, "Could not read the plan."));
+        onError(remoteErrorMessage(cause, t("chat.calendar.readFailed")));
         onClose();
       });
     return () => {
@@ -70,7 +71,7 @@ export default function CoachCalendarDialog({
           ? undefined
           : async () => {
               if (savedPlan.current) return savedPlan.current;
-              if (!(await onSave())) throw new Error("The plan was not saved to COROS, so it was not added.");
+              if (!(await onSave())) throw new Error(t("chat.calendar.notSaved"));
               savedPlan.current = await api.getPlanDraftDocument(draftId);
               return savedPlan.current;
             }

@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { ExternalLink, Loader2, Terminal, X } from "lucide-react";
 import type { ClaudeCodeStatus } from "../../electron/types";
 import type { HeraclesRecordsApi } from "../heraclesrecords-api";
+import { t } from "../i18n/core";
 
 const STATUS_POLL_INTERVAL_MS = 3_000;
 
@@ -106,7 +107,7 @@ export function ClaudeCodeLoginCard({
       setPending(true);
     } catch (caught) {
       onError(
-        caught instanceof Error ? caught.message : "Claude sign-in failed."
+        caught instanceof Error ? caught.message : t("chat.claude.failed")
       );
       return;
     } finally {
@@ -128,14 +129,14 @@ export function ClaudeCodeLoginCard({
         // The sign-in ended without credentials — leaving the spinner up here is
         // what made a failed attempt look like a hung one.
         callbacks.current.onError(
-          "Claude sign-in did not complete. Try again, or paste the code Claude showed you."
+          t("chat.claude.incomplete")
         );
       }
     } catch (caught) {
       if (!mounted.current || finished.current) return;
       reset();
       onError(
-        caught instanceof Error ? caught.message : "Claude sign-in failed."
+        caught instanceof Error ? caught.message : t("chat.claude.failed")
       );
     }
   };
@@ -150,7 +151,7 @@ export function ClaudeCodeLoginCard({
     } catch (caught) {
       if (mounted.current) setSubmitting(false);
       onError(
-        caught instanceof Error ? caught.message : "Claude sign-in failed."
+        caught instanceof Error ? caught.message : t("chat.claude.failed")
       );
     }
   };
@@ -175,7 +176,7 @@ export function ClaudeCodeLoginCard({
         ) : (
           <Terminal size={14} aria-hidden="true" />
         )}
-        Sign in with Claude
+        {t("chat.claude.signIn")}
       </button>
     );
   }
@@ -185,40 +186,35 @@ export function ClaudeCodeLoginCard({
       <div className="chat-claude-login-flow-header">
         <strong>
           <Loader2 className="chat-spinner" size={14} aria-hidden="true" />
-          {submitting ? "Signing in…" : "Finish signing in with Claude"}
+          {submitting ? t("chat.claude.signingIn") : t("chat.claude.finishTitle")}
         </strong>
         <button
           type="button"
           className="icon-button"
-          aria-label="Cancel Claude sign-in"
+          aria-label={t("chat.claude.cancelAria")}
           onClick={cancel}
         >
           <X size={15} aria-hidden="true" />
         </button>
       </div>
-      <p className="chat-settings-copy">
-        Approve on Claude&apos;s page, picking the account you want Heracles
-        Records to use — it is kept separate from any other Claude login on this
-        computer. If Claude shows you a code, paste it below. Otherwise this card closes by
-        itself once you are back.
-      </p>
+      <p className="chat-settings-copy">{t("chat.claude.approve")}</p>
       <button
         type="button"
         className="chat-local-action"
         onClick={() => void api?.openClaudeCodeLoginUrl()}
       >
         <ExternalLink size={14} aria-hidden="true" />
-        Didn&apos;t open? Open it here
+        {t("chat.claude.openHere")}
       </button>
       <label className="chat-local-field">
-        <span>Code from Claude</span>
+        <span>{t("chat.claude.code")}</span>
         <input
           value={code}
           onChange={(event) => setCode(event.target.value)}
           onKeyDown={(event) => {
             if (event.key === "Enter") void submit();
           }}
-          placeholder="Paste the code here"
+          placeholder={t("chat.claude.codePh")}
           spellCheck={false}
         />
       </label>
@@ -234,11 +230,11 @@ export function ClaudeCodeLoginCard({
           ) : (
             <Terminal size={14} aria-hidden="true" />
           )}
-          Finish sign-in
+          {t("chat.claude.finish")}
         </button>
         <button type="button" className="chat-local-action" onClick={cancel}>
           <X size={14} aria-hidden="true" />
-          Cancel
+          {t("common.cancel")}
         </button>
       </div>
     </div>

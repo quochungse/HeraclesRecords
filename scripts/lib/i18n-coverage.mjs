@@ -25,6 +25,8 @@ export const SKIPPED_PATHS = [
   /[\\/]src[\\/]records[\\/]sampleRecords\.ts$/,
   /[\\/]src[\\/]components[\\/]SampleDataControls\.tsx$/,
   /[\\/]src[\\/]strength[\\/]sampleSessions\.ts$/,
+  // Coach's "Show context history", offered in development builds only.
+  /[\\/]src[\\/]chat[\\/]ContextHistoryDialog\.tsx$/,
   // The labours in English: the website imports this file as it is, so the
   // app names a labour through src/records/labourWords.ts instead, and
   // test:i18n holds records.labour.* in English equal to it.

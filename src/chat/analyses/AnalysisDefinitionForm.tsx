@@ -6,6 +6,7 @@ import type {
 import { ModelSwitch } from "../ModelSwitch";
 import { EffortSwitch } from "../EffortSwitch";
 import { supportsReasoningEffort } from "../../../electron/chatModels";
+import { t } from "../../i18n/core";
 
 /**
  * The definition fields, shared by the create screen and the detail view's
@@ -37,7 +38,7 @@ export function AnalysisDefinitionForm({
   return (
     <>
       <label className="chat-local-field">
-        <span>Name</span>
+        <span>{t("chat.an.def.name")}</span>
         <input
           type="text"
           value={draft.name}
@@ -47,23 +48,20 @@ export function AnalysisDefinitionForm({
       </label>
 
       <label className="chat-local-field">
-        <span>Role</span>
+        <span>{t("chat.an.def.role")}</span>
         <textarea
           className="chat-custom-instructions"
           rows={3}
           value={draft.role ?? ""}
           disabled={disabled}
-          placeholder="Strict marathon coach, injury-prevention first"
+          placeholder={t("chat.an.def.rolePh")}
           onChange={(event) => onChange({ role: event.target.value })}
         />
       </label>
-      <p className="chat-settings-copy">
-        The role is preference data, not operating rules — it can never widen what
-        an analysis is allowed to do.
-      </p>
+      <p className="chat-settings-copy">{t("chat.an.def.roleNote")}</p>
 
       <label className="chat-local-field">
-        <span>Playbook</span>
+        <span>{t("chat.an.def.playbook")}</span>
         <textarea
           className="chat-custom-instructions"
           rows={8}
@@ -73,7 +71,7 @@ export function AnalysisDefinitionForm({
         />
       </label>
       <p className="coach-analysis-hint">
-        Variables: {"{{rule.name}}"}, {"{{date}}"}, {"{{activity.name}}"},{" "}
+        {t("chat.an.def.variables")} {"{{rule.name}}"}, {"{{date}}"}, {"{{activity.name}}"},{" "}
         {"{{activity.sport}}"}, {"{{week.range}}"}
       </p>
 
@@ -81,7 +79,7 @@ export function AnalysisDefinitionForm({
           leave an empty box labelled "Model" on screen. */}
       {showModel || showEffort ? (
         <fieldset className="coach-analysis-fieldset" disabled={disabled}>
-          <legend>Model</legend>
+          <legend>{t("chat.an.def.model")}</legend>
           <div className="coach-analysis-row coach-analysis-model-row">
             {showModel ? (
               <ModelSwitch
@@ -106,10 +104,7 @@ export function AnalysisDefinitionForm({
         </fieldset>
       ) : null}
 
-      <p className="chat-settings-copy">
-        Analysis runs are read-only: they can read, analyse and draft, but never
-        write to COROS. Drafts wait in the conversation for you to confirm.
-      </p>
+      <p className="chat-settings-copy">{t("chat.an.def.readOnly")}</p>
 
     </>
   );

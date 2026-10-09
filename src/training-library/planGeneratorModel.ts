@@ -340,7 +340,10 @@ export function spanSentence(request: TrainingPlanGenerationRequest): string {
 }
 
 /** The aside's summary of the plan, row by row. */
-export function planSnapshot(form: GeneratorForm, request: TrainingPlanGenerationRequest): { label: string; value: string }[] {
+export type PlanSnapshotKey = "goal" | "length" | "dates" | "week" | "sports" | "level";
+
+/** The plan in six rows; `key` names a row whatever the language its label is in. */
+export function planSnapshot(form: GeneratorForm, request: TrainingPlanGenerationRequest): { key: PlanSnapshotKey; label: string; value: string }[] {
   const span = generatedPlanSpan(request);
   const kind = GOAL_KINDS.find((option) => option.value === form.goalKind);
   const week = weekSummary(form);
@@ -350,12 +353,12 @@ export function planSnapshot(form: GeneratorForm, request: TrainingPlanGeneratio
       ? form.goal.trim() || t("library.snap.yourOwn")
       : kind?.label ?? "—";
   return [
-    { label: t("library.snap.goal"), value: goal },
-    { label: t("library.snap.length"), value: span?.weeks ? plural("library.weeks", span.weeks) : form.goalKind === "race" ? t("library.snap.toRace") : t("library.coachDecides") },
-    { label: t("library.snap.dates"), value: span?.last ? `${formatPlanDate(span.first)} – ${formatPlanDate(span.last, true)}` : t("library.snap.from", { date: formatPlanDate(span?.first) }) },
-    { label: t("library.snap.week"), value: form.weekMode === "coach" ? t("library.coachDecides") : t("library.snap.weekValue", { sessions: week.sessions, time: week.time }) },
-    { label: t("library.snap.sports"), value: form.sports.length ? form.sports.map(workoutSportLabel).join(", ") : "—" },
-    { label: t("library.snap.level"), value: LEVELS.find((level) => level.value === form.difficulty)?.label ?? "—" }
+    { key: "goal", label: t("library.snap.goal"), value: goal },
+    { key: "length", label: t("library.snap.length"), value: span?.weeks ? plural("library.weeks", span.weeks) : form.goalKind === "race" ? t("library.snap.toRace") : t("library.coachDecides") },
+    { key: "dates", label: t("library.snap.dates"), value: span?.last ? `${formatPlanDate(span.first)} – ${formatPlanDate(span.last, true)}` : t("library.snap.from", { date: formatPlanDate(span?.first) }) },
+    { key: "week", label: t("library.snap.week"), value: form.weekMode === "coach" ? t("library.coachDecides") : t("library.snap.weekValue", { sessions: week.sessions, time: week.time }) },
+    { key: "sports", label: t("library.snap.sports"), value: form.sports.length ? form.sports.map(workoutSportLabel).join(", ") : "—" },
+    { key: "level", label: t("library.snap.level"), value: LEVELS.find((level) => level.value === form.difficulty)?.label ?? "—" }
   ];
 }
 

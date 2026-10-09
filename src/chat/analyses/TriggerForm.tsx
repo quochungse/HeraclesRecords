@@ -6,7 +6,8 @@ import type {
 } from "../../../electron/types";
 import {
   SPORT_FILTER_OPTIONS,
-  THRESHOLD_METRIC_OPTIONS
+  THRESHOLD_METRIC_OPTIONS,
+  weekdayName
 } from "./analysisLabels";
 import { useUnitSystem } from "../../units/UnitSystemProvider";
 import {
@@ -14,6 +15,7 @@ import {
   distanceUnit,
   metersToDisplayDistance
 } from "../../units/units";
+import { plural, t } from "../../i18n/core";
 
 /**
  * What an analysis fires on, and how often it is allowed to.
@@ -96,17 +98,17 @@ export function TriggerForm({
   return (
     <>
       <label className="chat-local-field">
-        <span>Run it</span>
+        <span>{t("chat.an.form.runIt")}</span>
         <OptionGroup
-          label="Run it"
+          label={t("chat.an.form.runIt")}
           mode="dropdown"
           size="md"
           value={trigger?.kind ?? "manual"}
           options={[
-            { value: "manual", label: "Only when I ask" },
-            { value: "activity", label: "After a new activity" },
-            { value: "schedule", label: "On a schedule" },
-            { value: "threshold", label: "When a metric crosses a threshold" }
+            { value: "manual", label: t("chat.an.form.kind.manual") },
+            { value: "activity", label: t("chat.an.form.kind.activity") },
+            { value: "schedule", label: t("chat.an.form.kind.schedule") },
+            { value: "threshold", label: t("chat.an.form.kind.threshold") }
           ]}
           disabled={disabled}
           onChange={(kind) => setTrigger(blankTrigger(kind))}
@@ -114,21 +116,17 @@ export function TriggerForm({
       </label>
 
       {!trigger ? (
-        <p className="coach-analysis-hint">
-          It sits in this conversation and runs when you press Run now. Give it
-          a trigger whenever you want it to speak on its own — you can come back
-          to this at any time.
-        </p>
+        <p className="coach-analysis-hint">{t("chat.an.form.manualHint")}</p>
       ) : null}
 
       {thresholdTrigger ? (
         <fieldset className="coach-analysis-fieldset" disabled={disabled}>
-          <legend>Fires on a transition</legend>
+          <legend>{t("chat.an.form.transition")}</legend>
           <div className="coach-analysis-row">
             <label className="chat-local-field">
-              <span>Metric</span>
+              <span>{t("chat.an.form.metric")}</span>
               <OptionGroup
-                label="Metric"
+                label={t("chat.an.form.metric")}
                 mode="dropdown"
                 size="md"
                 value={thresholdTrigger.metric}
@@ -149,7 +147,7 @@ export function TriggerForm({
               />
             </label>
             <label className="chat-local-field">
-              <span>{thresholdOption?.unit ?? "Threshold"}</span>
+              <span>{thresholdOption?.unit ?? t("chat.an.form.threshold")}</span>
               <input
                 type="number"
                 min={0}
@@ -167,27 +165,25 @@ export function TriggerForm({
           {/* 3.3: it fires on the transition, which is the thing an athlete
               would otherwise have to discover by being surprised twice. */}
           <p className="chat-settings-copy">
-            {thresholdOption?.hint} It speaks once when this becomes true, not
-            every hour it stays true — and a trigger set today starts from where
-            things already stand rather than announcing history.
+            {thresholdOption?.hint} {t("chat.an.form.transitionHint")}
           </p>
         </fieldset>
       ) : null}
 
       {scheduleTrigger ? (
         <fieldset className="coach-analysis-fieldset" disabled={disabled}>
-          <legend>Fires on a schedule</legend>
+          <legend>{t("chat.an.form.schedule")}</legend>
           <div className="coach-analysis-row">
             <label className="chat-local-field">
-              <span>Repeats</span>
+              <span>{t("chat.an.form.repeats")}</span>
               <OptionGroup
-                label="Repeats"
+                label={t("chat.an.form.repeats")}
                 size="md"
                 fill
                 value={scheduleTrigger.cadence}
                 options={[
-                  { value: "daily", label: "Every day" },
-                  { value: "weekly", label: "Every week" }
+                  { value: "daily", label: t("chat.an.form.daily") },
+                  { value: "weekly", label: t("chat.an.form.weekly") }
                 ]}
                 onChange={(cadence) =>
                   // Rebuilt rather than merged: a daily trigger carries no
@@ -212,22 +208,22 @@ export function TriggerForm({
             </label>
             {scheduleTrigger.cadence === "weekly" ? (
               <label className="chat-local-field">
-                <span>Day</span>
+                <span>{t("chat.an.form.day")}</span>
                 <OptionGroup
-                  label="Day"
+                  label={t("chat.an.form.day")}
                   mode="dropdown"
                   size="md"
                   value={String(scheduleTrigger.dayOfWeek ?? 1)}
-                  options={WEEKDAY_OPTIONS.map((day, index) => ({
+                  options={[0, 1, 2, 3, 4, 5, 6].map((index) => ({
                     value: String(index),
-                    label: day
+                    label: weekdayName(index)
                   }))}
                   onChange={(day) => patchSchedule({ dayOfWeek: Number(day) })}
                 />
               </label>
             ) : null}
             <label className="chat-local-field">
-              <span>At</span>
+              <span>{t("chat.an.form.at")}</span>
               <input
                 type="time"
                 value={scheduleTrigger.timeOfDay}
@@ -237,18 +233,15 @@ export function TriggerForm({
               />
             </label>
           </div>
-          <p className="coach-analysis-hint">
-            Your local time, and only while Heracles Records is running. A slot
-            missed by more than a day is written off rather than delivered late.
-          </p>
+          <p className="coach-analysis-hint">{t("chat.an.form.scheduleHint")}</p>
         </fieldset>
       ) : null}
 
       {activityTrigger ? (
         <fieldset className="coach-analysis-fieldset" disabled={disabled}>
-          <legend>Fires after a new activity</legend>
+          <legend>{t("chat.an.form.activity")}</legend>
           <OptionChips
-            label="Sports that fire this analysis"
+            label={t("chat.an.form.sports")}
             values={activityTrigger.sportTypes.map(String)}
             options={SPORT_FILTER_OPTIONS.map((sport) => ({
               value: String(sport.value),
@@ -268,12 +261,12 @@ export function TriggerForm({
           />
           <p className="coach-analysis-hint">
             {activityTrigger.sportTypes.length === 0
-              ? "No sport selected means every sport."
-              : `${activityTrigger.sportTypes.length} sport(s) selected.`}
+              ? t("chat.an.form.everySport")
+              : plural("chat.an.form.sportsSelected", activityTrigger.sportTypes.length)}
           </p>
           <div className="coach-analysis-row">
             <label className="chat-local-field">
-              <span>Minimum duration (min)</span>
+              <span>{t("chat.an.form.minDuration")}</span>
               <input
                 type="number"
                 min={0}
@@ -291,7 +284,7 @@ export function TriggerForm({
                   which reads the athlete's unit — so a field fixed to km put
                   "Minimum distance (km) 5" next to "≥ 3.1 mi", one threshold
                   printed as two numbers. Stored in metres either way. */}
-              <span>Minimum distance ({distanceUnit(unitSystem)})</span>
+              <span>{t("chat.an.form.minDistance", { unit: distanceUnit(unitSystem) })}</span>
               <input
                 type="number"
                 min={0}
@@ -324,12 +317,12 @@ export function TriggerForm({
                 patchActivity({ multiActivity: event.target.checked })
               }
             />
-            <span>Analyse every new activity</span>
+            <span>{t("chat.an.form.multi")}</span>
           </label>
           <p className="coach-analysis-hint">
             {activityTrigger.multiActivity
-              ? "Every matching activity since the last analysis is analysed, one run each, oldest first."
-              : "Only the most recent matching activity is analysed, however many piled up."}
+              ? t("chat.an.form.multiOn")
+              : t("chat.an.form.multiOff")}
           </p>
         </fieldset>
       ) : null}
@@ -340,10 +333,10 @@ export function TriggerForm({
       {trigger ? (
         <>
           <fieldset className="coach-analysis-fieldset" disabled={disabled}>
-            <legend>Guard rails</legend>
+            <legend>{t("chat.an.form.guard")}</legend>
             <div className="coach-analysis-row">
               <label className="chat-local-field">
-                <span>Cooldown (min)</span>
+                <span>{t("chat.an.form.cooldown")}</span>
                 <input
                   type="number"
                   min={0}
@@ -354,7 +347,7 @@ export function TriggerForm({
                 />
               </label>
               <label className="chat-local-field">
-                <span>Max runs per day</span>
+                <span>{t("chat.an.form.maxRuns")}</span>
                 <input
                   type="number"
                   min={1}
@@ -380,12 +373,12 @@ export function TriggerForm({
                   })
                 }
               />
-              <span>Quiet hours</span>
+              <span>{t("chat.an.form.quiet")}</span>
             </label>
             {quietHours ? (
               <div className="coach-analysis-row">
                 <label className="chat-local-field">
-                  <span>From</span>
+                  <span>{t("chat.an.form.from")}</span>
                   <input
                     type="time"
                     value={quietHours.start}
@@ -400,7 +393,7 @@ export function TriggerForm({
                   />
                 </label>
                 <label className="chat-local-field">
-                  <span>Until</span>
+                  <span>{t("chat.an.form.until")}</span>
                   <input
                     type="time"
                     value={quietHours.end}
@@ -418,13 +411,13 @@ export function TriggerForm({
             ) : null}
             <p className="coach-analysis-hint">
               {quietHours
-                ? "A scheduled run inside this window waits until it closes. An activity run is skipped instead — the activity is not going anywhere, and the next poll picks it up."
-                : "Runs are allowed at any hour."}
+                ? t("chat.an.form.quietOn")
+                : t("chat.an.form.quietOff")}
             </p>
           </fieldset>
 
           <fieldset className="coach-analysis-fieldset" disabled={disabled}>
-            <legend>Sync</legend>
+            <legend>{t("chat.an.form.sync")}</legend>
             <label className="coach-analysis-switch">
               <input
                 type="checkbox"
@@ -433,12 +426,12 @@ export function TriggerForm({
                   onChange({ ...draft, deviceOnly: event.target.checked })
                 }
               />
-              <span>This device only</span>
+              <span>{t("chat.an.form.deviceOnly")}</span>
             </label>
             <p className="coach-analysis-hint">
               {draft.deviceOnly
-                ? "The trigger stays on this computer — it is not synced and not written into a backup. Your other machines still see the analysis in this conversation, as a manual one."
-                : "The trigger is synced, so this analysis runs on whichever of your machines is awake. Turn this on to keep the schedule to this computer."}
+                ? t("chat.an.form.deviceOn")
+                : t("chat.an.form.deviceOff")}
             </p>
           </fieldset>
         </>
@@ -446,16 +439,6 @@ export function TriggerForm({
     </>
   );
 }
-
-const WEEKDAY_OPTIONS = [
-  "Sunday",
-  "Monday",
-  "Tuesday",
-  "Wednesday",
-  "Thursday",
-  "Friday",
-  "Saturday"
-];
 
 /**
  * The starting point for a trigger kind the athlete just switched to. Switching

@@ -32,6 +32,7 @@ import { CreationActions } from "./CreationActions";
 import type { CreationCalendar } from "./creationCalendar";
 import { creationStatus } from "./creationChoices";
 import { isOnCoros, supersededLine, type CreationVersion } from "./creationVersions";
+import { getIntlLocale, messageRecord, plural, t } from "../i18n/core";
 
 /**
  * The Workbench (Coach Workbench review, R2; docs/coach-plan-canvas.md, P1.4):
@@ -115,7 +116,7 @@ export default function CoachCanvas({
   const artifactOf = (draftId: string) => versionIndex.get(draftId)?.artifactId ?? draftId;
   const openArtifact = open ? artifactOf(open.draftId) : null;
   return (
-    <aside id="chat-creations-panel" className="chat-plan-panel chat-canvas chat-workbench" aria-label="Workbench">
+    <aside id="chat-creations-panel" className="chat-plan-panel chat-canvas chat-workbench" aria-label={t("chat.header.workbench")}>
       {open ? (
         <ArtifactView
           key={openArtifact}
@@ -200,8 +201,8 @@ function CreationIndex({
             <BookOpen size={15} aria-hidden="true" />
           </span>
           <div>
-            <strong>Workbench</strong>
-            <span>Plans and workouts made here</span>
+            <strong>{t("chat.header.workbench")}</strong>
+            <span>{t("chat.canvas.subtitle")}</span>
           </div>
         </div>
         <div className="chat-plan-list-header-end">
@@ -209,8 +210,8 @@ function CreationIndex({
           <button
             type="button"
             className="icon-button"
-            aria-label="Close the Workbench"
-            title="Close the Workbench"
+            aria-label={t("chat.header.closeWorkbench")}
+            title={t("chat.header.closeWorkbench")}
             onClick={onClose}
           >
             <PanelRightClose size={16} aria-hidden="true" />
@@ -233,24 +234,26 @@ function CreationIndex({
                   type="button"
                   className="chat-plan-list-item"
                   onClick={() => onOpen(draft.draftId)}
-                  aria-label={`Open ${draft.name || `${isWorkout ? "workout" : "plan"} ${creations.indexOf(draft) + 1}`}`}
+                  aria-label={t("chat.card.openName", {
+                    name:
+                      draft.name ||
+                      t(isWorkout ? "chat.canvas.workoutN" : "chat.canvas.planN", { n: creations.indexOf(draft) + 1 })
+                  })}
                 >
                   <span className="chat-plan-list-sport" style={planSportStyle(primarySport)}>
                     <SportIcon size={15} strokeWidth={2} aria-hidden="true" />
                   </span>
                   <span className="chat-plan-list-copy">
                     <span className="chat-plan-list-kicker">
-                      {isWorkout ? "One-off workout" : "Training plan"}
+                      {isWorkout ? t("chat.canvas.oneOff") : t("chat.card.trainingPlan")}
                     </span>
-                    <strong>{draft.name || (isWorkout ? "Untitled workout" : "Untitled plan")}</strong>
+                    <strong>{draft.name || (isWorkout ? t("chat.canvas.untitledWorkout") : t("chat.canvas.untitledPlan"))}</strong>
                     <span className="chat-plan-list-meta">
                       {!isWorkout ? (
-                        <span>
-                          {draft.entries.length} {draft.entries.length === 1 ? "session" : "sessions"}
-                        </span>
+                        <span>{plural("chat.refs.sessions", draft.entries.length)}</span>
                       ) : null}
                       <span data-status={status.saved ? "saved" : "draft"}>
-                        {onCalendar ? "On calendar" : status.label}
+                        {onCalendar ? t("chat.status.onCalendar") : status.label}
                       </span>
                     </span>
                   </span>
@@ -267,11 +270,11 @@ function CreationIndex({
 
 type Tab = "plan" | "versions";
 
-const AUTHOR_WORDS: Record<PlanArtifactVersion["author"], string> = {
-  coach: "Coach",
-  athlete: "You",
-  coros: "Library"
-};
+const AUTHOR_WORDS = messageRecord<PlanArtifactVersion["author"]>({
+  coach: "chat.canvas.author.coach",
+  athlete: "chat.canvas.author.athlete",
+  coros: "chat.canvas.author.coros"
+});
 
 function ArtifactView({
   api,
@@ -375,7 +378,7 @@ function ArtifactView({
   // names the draft that became it.
   const onCoros = isOnCoros(info);
   const status = creationStatus(newest, onCoros);
-  const title = shown.name || (isWorkout ? "Untitled workout" : "Untitled plan");
+  const title = shown.name || (isWorkout ? t("chat.canvas.untitledWorkout") : t("chat.canvas.untitledPlan"));
 
   /**
    * What the athlete points at, as a line the coach and the chip can read:
@@ -386,14 +389,14 @@ function ArtifactView({
     const week = session ? session.weekIndex : weekIndex;
     const readWeek = week !== undefined ? reading?.weeks[week] : undefined;
     const weekText = readWeek
-      ? `Week ${readWeek.weekIndex + 1}${readWeek.stage ? ` (${readWeek.stage})` : ""}`
+      ? `${t("chat.refs.week", { n: readWeek.weekIndex + 1 })}${readWeek.stage ? ` (${readWeek.stage})` : ""}`
       : undefined;
     const sessionEntry = entryId ? planDocument?.entries.find((entry) => entry.id === entryId) : undefined;
     const label =
       scope === "plan"
-        ? "the whole plan"
+        ? t("chat.canvas.wholePlan")
         : scope === "week"
-          ? weekText ?? "a week"
+          ? weekText ?? t("chat.canvas.aWeek")
           : [weekText, session?.dayLabel, session?.entry.title].filter(Boolean).join(" · ");
     return {
       artifactId: info?.artifactId ?? newest.draftId,
@@ -422,7 +425,7 @@ function ArtifactView({
         unitSystem={unitSystem}
         api={api}
         onBack={isWorkout ? undefined : () => setOpenSession(null)}
-        backLabel="Weeks"
+        backLabel={t("chat.card.weeks")}
         onAskCoach={onAsk ? () => onAsk(refTo("session", undefined, id)) : undefined}
         onStep={(direction) => {
           const next = sessions[index + direction];
@@ -434,7 +437,7 @@ function ArtifactView({
 
   const versionOptions = [...siblings].reverse().map((item) => ({
     value: item.draftId,
-    label: `v${item.version}${item.draftId === newest.draftId ? " · newest" : ""}`
+    label: `v${item.version}${item.draftId === newest.draftId ? ` · ${t("chat.canvas.newestLower")}` : ""}`
   }));
 
   return (
@@ -450,20 +453,20 @@ function ArtifactView({
           type="button"
           className="icon-button"
           data-action="workbenchBack"
-          aria-label="All creations"
-          title="All creations"
+          aria-label={t("chat.canvas.all")}
+          title={t("chat.canvas.all")}
           onClick={onBack}
         >
           <ChevronLeft size={18} aria-hidden="true" />
         </button>
         <div className="chat-canvas-title">
           <span className="chat-creation-kicker">
-            {isWorkout ? "One-off workout" : "Training plan"}
+            {isWorkout ? t("chat.canvas.oneOff") : t("chat.card.trainingPlan")}
             {shownInfo && shownInfo.version > 1 ? ` · v${shownInfo.version}` : ""}
           </span>
           <h2 title={title}>{title}</h2>
         </div>
-        <button type="button" className="icon-button chat-canvas-close" aria-label="Close the Workbench" onClick={onClose}>
+        <button type="button" className="icon-button chat-canvas-close" aria-label={t("chat.header.closeWorkbench")} onClick={onClose}>
           <X size={18} aria-hidden="true" />
         </button>
         {/* Under the name rather than beside it: beside it, a plan's name was
@@ -474,7 +477,7 @@ function ArtifactView({
             data-saved={status.saved ? "true" : "false"}
             data-tone={status.saved ? "saved" : onCoros ? "pending" : "draft"}
           >
-            {calendar?.running && status.saved ? "On calendar" : status.label}
+            {calendar?.running && status.saved ? t("chat.status.onCalendar") : status.label}
           </span>
           {onAsk ? (
             <button
@@ -482,19 +485,19 @@ function ArtifactView({
               className="chat-plan-panel-chat-link"
               data-action="askPlan"
               onClick={() => onAsk(refTo("plan"))}
-              title="Ask Coach about this"
+              title={t("chat.canvas.askTitle")}
             >
-              Ask Coach
+              {t("chat.canvas.ask")}
             </button>
           ) : null}
           <button
             type="button"
             className="chat-plan-panel-chat-link"
             onClick={() => onViewInChat(shownId)}
-            title="Show this in the conversation"
+            title={t("chat.canvas.inChatTitle")}
           >
             <MessageCircle size={14} aria-hidden="true" />
-            In chat
+            {t("chat.canvas.inChat")}
           </button>
         </div>
       </header>
@@ -502,18 +505,18 @@ function ArtifactView({
       {siblings.length > 1 ? (
         <div className="chat-canvas-bar">
           <OptionGroup<Tab>
-            label="Show"
+            label={t("chat.canvas.show")}
             size="sm"
             value={tab}
             onChange={setTab}
             options={[
-              { value: "plan", label: isWorkout ? "Workout" : "Plan" },
-              { value: "versions", label: `Versions · ${siblings.length}` }
+              { value: "plan", label: isWorkout ? t("chat.kind.workout") : t("chat.kind.plan") },
+              { value: "versions", label: t("chat.canvas.versions", { n: siblings.length }) }
             ]}
           />
           {tab === "plan" ? (
             <OptionGroup<string>
-              label="Version"
+              label={t("chat.canvas.version")}
               size="sm"
               mode="dropdown"
               value={shownId}
@@ -547,26 +550,26 @@ function ArtifactView({
               sessions[0] ? (
                 sessionView(sessions[0].entry.id)
               ) : (
-                <p className="chat-canvas-loading">Loading the workout…</p>
+                <p className="chat-canvas-loading">{t("chat.canvas.loadingWorkout")}</p>
               )
             ) : reading ? (
               <>
                 {figures ? (
                   <dl className="chat-creation-figures">
                     <div>
-                      <dt>Weeks</dt>
+                      <dt>{t("chat.card.weeks")}</dt>
                       <dd>{figures.weeks}</dd>
                     </div>
                     <div>
-                      <dt>Sessions a week</dt>
+                      <dt>{t("chat.card.perWeek")}</dt>
                       <dd>{figures.sessionsPerWeek}</dd>
                     </div>
                     <div>
-                      <dt>Peak week</dt>
+                      <dt>{t("chat.card.peak")}</dt>
                       <dd>{figures.peakWeek}</dd>
                     </div>
                     <div>
-                      <dt>Sports</dt>
+                      <dt>{t("library.snap.sports")}</dt>
                       <dd>{figures.sports}</dd>
                     </div>
                   </dl>
@@ -596,7 +599,7 @@ function ArtifactView({
                 </ol>
               </>
             ) : (
-              <p className="chat-canvas-loading">Loading the plan…</p>
+              <p className="chat-canvas-loading">{t("chat.canvas.loadingPlan")}</p>
             )}
           </>
         )}
@@ -607,11 +610,11 @@ function ArtifactView({
           <>
             <span className="chat-creation-modal-confirm">
               {saved
-                ? "Hide this from the conversation? What was saved to COROS stays, and still links back here."
-                : "Remove this from the conversation, every version of it? It has not been saved anywhere, so it is gone."}
+                ? t("chat.canvas.hideConfirm")
+                : t("chat.canvas.removeConfirm")}
             </span>
             <button type="button" className="chat-local-action" onClick={() => setConfirming(false)}>
-              Cancel
+              {t("common.cancel")}
             </button>
             <button
               type="button"
@@ -619,7 +622,7 @@ function ArtifactView({
               onClick={() => onRemove(newest.draftId)}
             >
               <Trash2 size={14} aria-hidden="true" />
-              {saved ? "Hide" : "Remove"}
+              {saved ? t("chat.canvas.hide") : t("chat.canvas.remove")}
             </button>
           </>
         ) : (
@@ -646,7 +649,7 @@ function ArtifactView({
               onClick={() => setConfirming(true)}
             >
               <Trash2 size={14} aria-hidden="true" />
-              {saved ? "Hide" : "Remove"}
+              {saved ? t("chat.canvas.hide") : t("chat.canvas.remove")}
             </button>
           </>
         )}
@@ -685,9 +688,9 @@ function VersionList({
               <span className="chat-canvas-version-head">
                 <strong>v{item.version}</strong>
                 <span>{AUTHOR_WORDS[item.author]}</span>
-                {item.draftId === newestId ? <em>Newest</em> : null}
+                {item.draftId === newestId ? <em>{t("chat.canvas.newest")}</em> : null}
                 <time dateTime={new Date(item.createdAt).toISOString()}>
-                  {new Date(item.createdAt).toLocaleString(undefined, {
+                  {new Date(item.createdAt).toLocaleString(getIntlLocale(), {
                     month: "short",
                     day: "numeric",
                     hour: "2-digit",

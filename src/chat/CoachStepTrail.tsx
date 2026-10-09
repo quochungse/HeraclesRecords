@@ -1,6 +1,7 @@
 import { Check } from "lucide-react";
 import { thoughtTail } from "../training-library/runTrail";
 import { STEP_TITLE, type StepRun } from "./stepRun";
+import { t } from "../i18n/core";
 
 export { stepRunEvent, type StepRun } from "./stepRun";
 
@@ -45,7 +46,7 @@ export function CoachStepTrail({
           })}
         </ol>
       ) : (
-        <p className="chat-step-trail-tail">Starting…</p>
+        <p className="chat-step-trail-tail">{t("chat.stepTitle.starting")}</p>
       )}
       {tail ? <p className="chat-step-trail-tail">{tail}</p> : null}
     </section>

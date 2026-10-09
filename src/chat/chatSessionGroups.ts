@@ -1,11 +1,25 @@
 import type { ChatSessionSummary } from "../../electron/types";
+import { getIntlLocale, messageRecord, plural, t } from "../i18n/core.ts";
 
 export type ChatSessionGroupLabel =
-  | "Pinned"
-  | "Today"
-  | "Yesterday"
-  | "Previous 7 days"
-  | "Older";
+  | "Pinned" // i18n-ignore: a key
+  | "Today" // i18n-ignore: a key
+  | "Yesterday" // i18n-ignore: a key
+  | "Previous 7 days" // i18n-ignore: a key
+  | "Older"; // i18n-ignore: a key
+
+/** The group's name on screen; `ChatSessionGroupLabel` is its key. */
+const GROUP_NAMES = messageRecord<ChatSessionGroupLabel>({
+  Pinned: "chat.group.pinned",
+  Today: "chat.group.today",
+  Yesterday: "chat.group.yesterday",
+  "Previous 7 days": "chat.group.week", // i18n-ignore: a key
+  Older: "chat.group.older"
+});
+
+export function sessionGroupName(label: ChatSessionGroupLabel): string {
+  return GROUP_NAMES[label];
+}
 
 export interface ChatSessionGroup {
   label: ChatSessionGroupLabel;
@@ -19,7 +33,7 @@ function startOfLocalDay(date: Date): Date {
 function sessionGroupLabel(updatedAt: string, now = new Date()): ChatSessionGroupLabel {
   const updated = new Date(updatedAt);
   if (Number.isNaN(updated.getTime())) {
-    return "Older";
+    return "Older"; // i18n-ignore: a key
   }
 
   const todayStart = startOfLocalDay(now).getTime();
@@ -27,22 +41,22 @@ function sessionGroupLabel(updatedAt: string, now = new Date()): ChatSessionGrou
   const dayDiff = Math.floor((todayStart - updatedStart) / 86_400_000);
 
   if (dayDiff <= 0) {
-    return "Today";
+    return "Today"; // i18n-ignore: a key
   }
   if (dayDiff === 1) {
-    return "Yesterday";
+    return "Yesterday"; // i18n-ignore: a key
   }
   if (dayDiff <= 7) {
-    return "Previous 7 days";
+    return "Previous 7 days"; // i18n-ignore: a key
   }
-  return "Older";
+  return "Older"; // i18n-ignore: a key
 }
 
 const GROUP_ORDER: ChatSessionGroupLabel[] = [
-  "Today",
-  "Yesterday",
-  "Previous 7 days",
-  "Older"
+  "Today", // i18n-ignore: a key
+  "Yesterday", // i18n-ignore: a key
+  "Previous 7 days", // i18n-ignore: a key
+  "Older" // i18n-ignore: a key
 ];
 
 /** Most recently pinned first, falling back to recency when timestamps tie. */
@@ -80,7 +94,7 @@ export function groupChatSessions(
   pinned.sort(comparePinned);
 
   return [
-    { label: "Pinned" as const, sessions: pinned },
+    { label: "Pinned" as const, sessions: pinned }, // i18n-ignore: a key
     ...GROUP_ORDER.map((label) => ({
       label,
       sessions: buckets.get(label) ?? []
@@ -100,14 +114,10 @@ export function waitingLabel(session: ChatSessionSummary): string | null {
   if (!total) return null;
   const lead =
     waiting.decisions > 0
-      ? `${waiting.decisions} to decide`
+      ? t("chat.waitingRow.decide", { n: waiting.decisions })
       : waiting.questions > 0
-        ? waiting.questions === 1
-          ? "Question"
-          : `${waiting.questions} questions`
-        : waiting.briefs === 1
-          ? "Brief"
-          : `${waiting.briefs} briefs`;
+        ? plural("chat.waitingRow.questions", waiting.questions)
+        : plural("chat.waitingRow.briefs", waiting.briefs);
   const rest = total - (waiting.decisions || waiting.questions || waiting.briefs);
   return rest > 0 ? `${lead} +${rest}` : lead;
 }
@@ -118,9 +128,26 @@ export function waitingLabel(session: ChatSessionSummary): string | null {
  * Coach — a token of a streaming answer included — which measured 10–27 ms a
  * render for 32 conversations.
  */
-const SAME_DAY = new Intl.DateTimeFormat(undefined, { hour: "numeric", minute: "2-digit" });
-const THIS_WEEK = new Intl.DateTimeFormat(undefined, { weekday: "short" });
-const EARLIER = new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric" });
+let formatsFor = "";
+let formats: Record<"sameDay" | "thisWeek" | "earlier", Intl.DateTimeFormat> | null = null;
+/** Built once per language, for the reason above. */
+function rowFormat(kind: "sameDay" | "thisWeek" | "earlier"): Intl.DateTimeFormat {
+  const locale = getIntlLocale();
+  if (!formats || formatsFor !== locale) {
+    formatsFor = locale;
+    formats = {
+      sameDay: new Intl.DateTimeFormat(locale, { hour: "numeric", minute: "2-digit" }),
+      thisWeek: new Intl.DateTimeFormat(locale, { weekday: "short" }),
+      // Vietnamese abbreviates a month as "thg 9", which nobody writes in a
+      // narrow column; "28/9" is how a date that short is written there.
+      earlier: new Intl.DateTimeFormat(locale, {
+        month: locale.startsWith("vi") ? "numeric" : "short",
+        day: "numeric"
+      })
+    };
+  }
+  return formats[kind];
+}
 
 export function formatSessionRelativeTime(updatedAt: string): string {
   const updated = new Date(updatedAt);
@@ -134,13 +161,13 @@ export function formatSessionRelativeTime(updatedAt: string): string {
   const dayDiff = Math.floor((todayStart - updatedStart) / 86_400_000);
 
   if (dayDiff <= 0) {
-    return SAME_DAY.format(updated);
+    return rowFormat("sameDay").format(updated);
   }
   if (dayDiff === 1) {
-    return "Yesterday";
+    return t("chat.group.yesterday");
   }
   if (dayDiff < 7) {
-    return THIS_WEEK.format(updated);
+    return rowFormat("thisWeek").format(updated);
   }
-  return EARLIER.format(updated);
+  return rowFormat("earlier").format(updated);
 }

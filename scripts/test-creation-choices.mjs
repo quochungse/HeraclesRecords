@@ -151,12 +151,14 @@ const ids = (choices) => ({
     uploadedAt: 1,
     uploadResult: { workoutsScheduled: 0, workoutsCreated: 0, destination }
   });
-  assert.deepEqual(creationStatus(plan(entry("a"))), { label: "Proposal", saved: false });
+  assert.deepEqual(creationStatus(plan(entry("a"))), { label: "Proposal", saved: false, kind: "proposal" });
   assert.deepEqual(creationStatus({ ...plan(entry("a")), editedAt: 2 }), {
     label: "Edited by you",
-    saved: false
+    saved: false,
+    kind: "edited"
   });
   assert.equal(creationStatus(saved(plan(entry("a")), "nativePlan")).label, "On COROS");
+  assert.equal(creationStatus(saved(plan(entry("a")), "nativePlan")).kind, "onCoros");
   assert.equal(creationStatus(saved(workout(), "workoutLibrary")).label, "In library");
   assert.match(creationStatus(saved(workout("2026-10-02"), "calendar")).label, /^On calendar \S/);
   assert.equal(creationStatus(saved(plan(entry("a", "2026-10-02")), "calendar")).label, "On calendar");

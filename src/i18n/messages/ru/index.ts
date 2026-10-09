@@ -20,6 +20,7 @@ import sleep from "./sleep.ts";
 import map from "./map.ts";
 import profile from "./profile.ts";
 import records from "./records.ts";
+import chat from "./chat.ts";
 
 /** Русский. Written by scripts/i18n-index.mjs. */
 export default {
@@ -44,4 +45,5 @@ export default {
   ...map,
   ...profile,
   ...records,
+  ...chat,
 } satisfies Record<keyof typeof en, string>;

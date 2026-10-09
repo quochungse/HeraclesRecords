@@ -19,6 +19,7 @@ import sleep from "./sleep.ts";
 import map from "./map.ts";
 import profile from "./profile.ts";
 import records from "./records.ts";
+import chat from "./chat.ts";
 
 /**
  * English, the source every other language is translated from. A key added
@@ -48,6 +49,7 @@ const en = {
   ...map,
   ...profile,
   ...records,
+  ...chat,
 };
 
 export default en;

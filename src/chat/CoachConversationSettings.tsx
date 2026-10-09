@@ -14,6 +14,8 @@ import {
   anySourceWithheld
 } from "../training-library/planGeneratorModel";
 import type { GeneratorRuntime } from "../training-library/planGeneratorRuntime";
+import { messageRecord, t } from "../i18n/core";
+import { useI18n } from "../i18n/useI18n";
 import "../training-library/trainingLibrary.css";
 
 type SourceKey = keyof TrainingPlanDataSources;
@@ -21,38 +23,40 @@ type SourceKey = keyof TrainingPlanDataSources;
 type PermissionKey = SourceKey | "web";
 
 /** The chips' short names; the generator's longer label and detail are the tooltip. */
-const PERMISSION_LABELS: Record<SourceKey, string> = {
-  activities: "Activities",
-  sleep: "Sleep",
-  zones: "Zones"
-};
+const PERMISSION_LABELS = messageRecord<SourceKey>({
+  activities: "chat.source.activities",
+  sleep: "chat.source.sleep",
+  zones: "chat.source.zones"
+});
 
-const PERMISSION_OPTIONS: readonly OptionGroupOption<PermissionKey>[] = [
-  ...SOURCES.map((source) => ({
-    value: source.value,
-    label: PERMISSION_LABELS[source.value],
-    title: `${source.label}: ${source.detail}`
-  })),
-  {
-    value: "web",
-    label: "Web",
-    title: "Web: search the internet for races, events and anything else your data does not hold"
+function permissionOptions(): OptionGroupOption<PermissionKey>[] {
+    return [
+    ...SOURCES.map((source) => ({
+      value: source.value,
+      label: PERMISSION_LABELS[source.value],
+      title: `${source.label}: ${source.detail}`
+    })),
+    {
+      value: "web",
+      label: t("chat.perm.web"),
+      title: t("chat.perm.webTitle")
   }
-];
+  ];
+}
 
 /** What switching the web on means with this provider, in one sentence. */
 function webSearchNote(provider: ChatProvider): string {
   switch (provider) {
     case "local":
-      return "A local model cannot search the web, so Coach answers here without it.";
+      return t("chat.perm.web.local");
     case "claude-api":
-      return "Coach searches when a question needs it, never in an analysis; each search is billed to your Anthropic account.";
+      return t("chat.perm.web.claudeApi");
     case "openrouter":
-      return "Coach searches when a question needs it, never in an analysis; each search is billed to your OpenRouter credit.";
+      return t("chat.perm.web.openrouter");
     case "claude-code":
-      return "Coach searches through your Claude subscription when a question needs it, never in an analysis.";
+      return t("chat.perm.web.claudeCode");
     case "chatgpt":
-      return "Coach searches through your ChatGPT subscription when a question needs it, never in an analysis.";
+      return t("chat.perm.web.chatgpt");
   }
 }
 
@@ -119,15 +123,16 @@ function Permissions({
   provider: ChatProvider;
   onChange: (next: ConversationSettings) => void;
 }) {
+  useI18n();
   const { sources } = conversation;
   const web = conversation.web === true;
   return (
     <>
-      <p className="tl-eyebrow">Permissions</p>
+      <p className="tl-eyebrow">{t("chat.perm.title")}</p>
       <OptionChips<PermissionKey>
-        label="What Coach may read"
+        label={t("chat.perm.label")}
         appearance="tiles"
-        options={PERMISSION_OPTIONS}
+        options={permissionOptions()}
         values={[
           ...SOURCES.filter((source) => sources[source.value]).map((source) => source.value),
           ...(web ? ["web" as const] : [])
