@@ -1626,8 +1626,8 @@ lives at module level for the same visit-to-visit reason — see `useCalendarDat
   ~20k tokens of tools and prompt again.
 
   **The screen's frame follows the Coach Workbench review** (2026-09-26). The head is the
-  open conversation's (`ChatConversationHeader`: its name, renamed in place, a Reads chip
-  for its sources, the Analyses chip, Creations, a gear), not "Training Coach" over a
+  open conversation's (`ChatConversationHeader`: its name, renamed in place, the
+  Analyses chip, Creations, a gear), not "Training Coach" over a
   Reads · AI strip. The composer is one box (`ChatComposer.tsx`), quiet at rest — a hairline, no fill,
   `--chat-signal-border` while it is written in (the chat scope redefines `--accent` as a
   grey, so the chat's own accent is `--chat-signal`), and a send button that fills only once
@@ -1657,9 +1657,10 @@ lives at module level for the same visit-to-visit reason — see `useCalendarDat
   conversation's AI**: it states what `streamChat` will resolve (the conversation's runtime
   over Coach's settings) and opens "AI for this conversation" (`ConversationAiSheet`, the
   generator's `GeneratorProviderPanel`), where a change writes `chat_conversation_settings`.
-  Three pickers under the words read as settings to fiddle with on every turn (UAT). "This
-  conversation" states the AI as it stands too — provider, model and effort, whether it is
-  Coach's default or chosen here, and whether it is set up. The sign-in gates keep the full
+  Three pickers under the words read as settings to fiddle with on every turn (UAT). **What
+  Coach may read is that sheet's Permissions section** (Activities · Sleep · Zones as tiles,
+  since 2026-10-09): the header's Reads chip and the "This conversation" sheet it opened were
+  removed. The sign-in gates keep the full
   pickers, scoped to Coach's own settings, because a gate is about Coach's provider. There is
   no All · Needs you filter over the list; the row's badge says it. The empty box offers no follow-up
   chips. A question's `planRefs`/`scheduleRefs` anchors are

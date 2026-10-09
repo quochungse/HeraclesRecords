@@ -1009,25 +1009,28 @@ async function main() {
     getConversationSettings: { sessionId: "s1", sources: { activities: true, sleep: true, zones: true } },
     setConversationSettings: { sessionId: "s1", sources: { activities: true, sleep: false, zones: true } }
   });
-  await waitFor(() => harness("exists", ".chat-header-chip"), "the conversation's Reads chip is drawn");
-  assert.match((await harness("text", ".chat-header-chip")) ?? "", /Reads\s*Activities · Sleep · Zones/);
-  await harness("click", ".chat-header-chip");
-  await waitFor(() => harness("count", ".coach-sheet .plan-generator-source").then((n) => n === 3), "three sources to share or not");
-  // The sheet states the AI as it stands, not only a way to change it (UAT).
-  assert.match(
-    (await harness("text", ".coach-sheet .coach-conversation-ai")) ?? "",
-    /Claude subscription[\s\S]*High effort[\s\S]*Coach’s default[\s\S]*Connected[\s\S]*Change/
+  // What Coach reads is the Permissions section of the composer's AI sheet;
+  // the header no longer carries a Reads chip.
+  await waitFor(() => harness("exists", ".chat-composer .chat-ai-chip"), "the composer's AI chip is drawn");
+  assert.equal(await harness("exists", ".chat-header-chip"), false, "no Reads chip in the header");
+  await harness("click", ".chat-composer .chat-ai-chip");
+  const permissions = '.coach-sheet [aria-label="What Coach may read"] button';
+  await waitFor(() => harness("count", permissions).then((n) => n === 3), "three sources to share or not");
+  assert.equal(
+    await page(`[...document.querySelectorAll('${permissions}')].map((b) => b.textContent.trim() + ":" + b.getAttribute("aria-pressed")).join(" ")`),
+    "Activities:true Sleep:true Zones:true"
   );
-  await harness("click", ".coach-sheet li:nth-child(2) .plan-generator-source");
+  await harness("click", `${permissions}:nth-child(2)`);
   await waitFor(() => harness("callCount", "setConversationSettings"), "switching one off is kept");
   assert.deepEqual(
     (await harness("calls", "setConversationSettings"))[0].args[0],
     { sessionId: "s1", sources: { activities: true, sleep: false, zones: true } }
   );
   await waitFor(
-    async () => /Reads\s*Activities · Zones$/.test((await harness("text", ".chat-header-chip")) ?? ""),
+    async () => (await harness("attr", `${permissions}:nth-child(2)`, "aria-pressed")) === "false",
     "and the chip says so"
   );
+  assert.equal(await harness("exists", ".coach-sheet .plan-generator-sheet-note"), true, "with the note on other servers");
   await page(`[...document.querySelectorAll(".coach-sheet button")].find((b) => b.textContent.trim() === "Done").click()`);
   await harness("setValue", ".chat-composer textarea", "How am I sleeping?");
   await harness("click", ".chat-send");

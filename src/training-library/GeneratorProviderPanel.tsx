@@ -1,5 +1,5 @@
 import { AlertTriangle, ArrowRight, Check, LoaderCircle, X } from "lucide-react";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, type ReactNode } from "react";
 import type { ChatProvider, ChatSettings, ClaudeCodeStatus } from "../../electron/types";
 import {
   effortForModel,
@@ -45,6 +45,8 @@ interface GeneratorProviderPanelProps {
   onKeepForChatChange?: (keep: boolean) => void;
   /** What the AI is chosen for: a generated plan, or one conversation (P2.0). */
   subject?: "plan" | "conversation";
+  /** A section of the caller's under the AI, such as a conversation's permissions. */
+  children?: ReactNode;
   onDone: () => void;
   onOpenCoach: () => void;
 }
@@ -65,7 +67,8 @@ export function GeneratorProviderPanel({
   onKeepForChatChange,
   onDone,
   onOpenCoach,
-  subject = "plan"
+  subject = "plan",
+  children
 }: GeneratorProviderPanelProps) {
   const panelRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -190,6 +193,8 @@ export function GeneratorProviderPanel({
                 : `${COACH_PROVIDER_LABELS[runtime.provider]} has no effort setting.`}
             </p>
           )}
+
+          {children}
         </div>
 
         <footer>

@@ -13415,39 +13415,6 @@ td span {
   content: "\00a0";
 }
 
-/* What Coach reads here, as a chip beside the conversation's other controls
-   (it was a strip of grey text that did not look like a button). */
-.chat-header-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  max-width: 280px;
-  padding: 4px 9px;
-  border: 1px solid var(--glass-border);
-  border-radius: var(--radius-pill);
-  background: color-mix(in srgb, var(--glass-bg) 66%, transparent);
-  color: var(--text-secondary);
-  font: inherit;
-  font-size: 12px;
-  line-height: 1.45;
-  white-space: nowrap;
-  cursor: pointer;
-  transition:
-    border-color var(--dur-fast) var(--ease),
-    color var(--dur-fast) var(--ease);
-}
-
-.chat-header-chip b {
-  overflow: hidden;
-  color: var(--text-primary);
-  font-weight: 500;
-  text-overflow: ellipsis;
-}
-
-.chat-header-chip:hover {
-  border-color: color-mix(in srgb, var(--text-muted) 32%, var(--glass-border));
-}
-
 /* The sheet's own layer sits inside this, over the whole window. */
 .coach-sheet {
   position: fixed;
@@ -13455,52 +13422,9 @@ td span {
   z-index: 60;
 }
 
-/* A move between two sheets of one dialog swaps the sheet and keeps the
-   scrim where it is, rather than fading both in again. */
-.coach-sheet[data-swapped] .plan-generator-scrim,
-.coach-sheet[data-swapped] .plan-generator-sheet {
-  animation: none;
-}
-
 /* The generator's footer leads with its keep-for-chat box; this sheet has none. */
 .coach-sheet .plan-generator-sheet > footer {
   justify-content: flex-end;
-}
-
-/* "This conversation": the AI as it stands, one row (name, model and
-   effort, where the choice comes from), its state, and Change. */
-.coach-conversation-ai {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  margin-top: 8px;
-  padding: 10px 12px;
-  border-radius: var(--radius-sm);
-  background: var(--glass-bg);
-}
-
-.coach-conversation-ai > span:first-child {
-  display: flex;
-  min-width: 0;
-  flex: 1 1 auto;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.coach-conversation-ai strong {
-  font-size: 13px;
-  font-weight: 600;
-}
-
-.coach-conversation-ai small {
-  color: var(--text-muted);
-  font-size: 11px;
-  line-height: 1.3;
-}
-
-.coach-conversation-ai small.coach-conversation-ai-model {
-  color: var(--text-secondary);
-  font-size: 12px;
 }
 
 /* The composer's AI: one chip saying which AI answers, opening the sheet

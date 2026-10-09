@@ -189,7 +189,6 @@ const CoachWorkoutEditor = lazy(() => import("./CoachWorkoutEditor"));
 const CoachCanvas = lazy(() => import("./CoachCanvas"));
 const CorosConflictDialog = lazy(() => import("./CorosConflictDialog"));
 const CoachCalendarDialog = lazy(() => import("./CoachCalendarDialog"));
-const CoachConversationSettings = lazy(() => import("./CoachConversationSettings"));
 const ConversationAiSheet = lazy(() =>
   import("./CoachConversationSettings").then((module) => ({ default: module.ConversationAiSheet }))
 );
@@ -597,12 +596,6 @@ interface ChatViewProps {
 }
 
 /** The sources a conversation can share, in the order its strip names them. */
-const SHARED_SOURCE_LABELS: readonly ["activities" | "sleep" | "zones", string][] = [
-  ["activities", "Activities"],
-  ["sleep", "Sleep"],
-  ["zones", "Zones"]
-];
-
 /** Inline style hook that tints a row/chip with the sport's own colour. */
 function planSportStyle(sport: PlanDraftPreviewEntry["sport"]): CSSProperties {
   return { "--chat-plan-sport": sportTheme(sport).color } as CSSProperties;
@@ -1339,7 +1332,6 @@ export function ChatView({
   const [conversationSettings, setConversationSettingsState] = useState<ConversationSettings | null>(null);
   /** Raised when a pull merged another machine's settings for a conversation, to read them again. */
   const [conversationSettingsVersion, setConversationSettingsVersion] = useState(0);
-  const [conversationSettingsOpen, setConversationSettingsOpen] = useState(false);
   const [aiSheetOpen, setAiSheetOpen] = useState(false);
   useEffect(() => {
     setConversationSettingsState(null);
@@ -4714,14 +4706,6 @@ export function ChatView({
         onRename={
           activeSessionId ? (title) => void handleRenameSession(activeSessionId, title) : undefined
         }
-        reads={
-          conversationSettings
-            ? SHARED_SOURCE_LABELS.filter(([key]) => conversationSettings.sources[key])
-                .map(([, label]) => label)
-                .join(" · ")
-            : null
-        }
-        onOpenReads={() => setConversationSettingsOpen(true)}
         analyses={
           <ConversationAnalyses
             api={api}
@@ -5573,28 +5557,14 @@ export function ChatView({
             runtime={effectiveRuntime}
             readiness={aiReadiness}
             claudeStatus={claudeStatus}
+            sources={conversationSettings?.sources}
             onChange={changeConversationRuntime}
+            onSourcesChange={(sources) =>
+              conversationSettings && updateConversationSettings({ ...conversationSettings, sources })
+            }
             onClose={() => setAiSheetOpen(false)}
             onOpenCoachSettings={() => {
               setAiSheetOpen(false);
-              openSettings();
-            }}
-          />
-        </Suspense>
-      ) : null}
-      {conversationSettingsOpen && conversationSettings ? (
-        <Suspense fallback={null}>
-          <CoachConversationSettings
-            portal
-            chatSettings={chatSettings}
-            conversation={conversationSettings}
-            baseProvider={conversationProvider}
-            readiness={coachProviderReadiness(chatSettings, authStatus, claudeStatus)}
-            claudeStatus={claudeStatus}
-            onChange={updateConversationSettings}
-            onClose={() => setConversationSettingsOpen(false)}
-            onOpenCoachSettings={() => {
-              setConversationSettingsOpen(false);
               openSettings();
             }}
           />
