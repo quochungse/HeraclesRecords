@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { CircleCheck, Maximize2 } from "lucide-react";
 import type {
   PlanDraftPreview,
@@ -183,6 +184,12 @@ export function CoachCreationCard({
     onCoros
   );
   const figures = !isWorkout && document ? creationFigures(document) : undefined;
+  // A bar of the ridge picks the week the strip shows; the full view is Open's.
+  const [pickedWeek, setPickedWeek] = useState<number>();
+  const shownWeek =
+    pickedWeek !== undefined && figures?.reading[pickedWeek]
+      ? figures.reading[pickedWeek]
+      : figures?.firstWeek;
   const entry = draft.entries[0];
   // The line says what the figures below cannot: when a dated plan runs. For
   // an undated one it would repeat them, so it stands in only until they load.
@@ -245,9 +252,13 @@ export function CoachCreationCard({
       ) : null}
 
       {figures && figures.reading.length > 2 ? (
-        <PlanWeekRidge weeks={figures.reading} onJump={() => onOpen()} />
+        <PlanWeekRidge
+          weeks={figures.reading}
+          selectedWeek={shownWeek ? figures.reading.indexOf(shownWeek) : undefined}
+          onJump={setPickedWeek}
+        />
       ) : null}
-      {figures?.firstWeek ? <WeekStrip week={figures.firstWeek} span={figures.span} /> : null}
+      {figures && shownWeek ? <WeekStrip week={shownWeek} span={figures.span} /> : null}
 
       {isWorkout && entry?.stepsSummary ? (
         // Summaries written before the builder stopped printing an empty

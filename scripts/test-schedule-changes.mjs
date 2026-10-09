@@ -61,6 +61,8 @@ function fakeCoros() {
     entities: [],
     programs: [],
     library: [],
+    /** A library workout as `program/detail` answers it, by id. */
+    libraryPrograms: new Map(),
     /** Running copies of plans, as `plan/detail` answers them. */
     plans: new Map(),
     maxIdInPlan: 10,
@@ -159,6 +161,10 @@ function fakeCoros() {
           return ok({});
         case "/training/program/query":
           return ok(state.library);
+        case "/training/program/detail": {
+          const program = state.libraryPrograms.get(target.searchParams.get("id"));
+          return program ? ok(structuredClone(program)) : refuse("1001", "Service exceptions");
+        }
         case "/training/program/delete":
           state.writes.push({ path: target.pathname, body });
           state.library = state.library.filter((program) => !body.includes(program.id));
@@ -543,6 +549,33 @@ test("a proposal names every line as the card reads it, and writes nothing", asy
   assert.equal(staged.lines[3].toDay, daysFromNow(4));
   assert.match(result.message, /Nothing has changed on the calendar yet/);
   assert.equal(coros.state.writes.length, 0);
+});
+
+test("a workout from the library is named by its id, read once, and carried whole on the line", async () => {
+  const coros = fakeCoros();
+  const program = JSON.parse(
+    fs.readFileSync(path.join(repoRoot, "scripts/fixtures/coros-plan-write/plan-detail-template.json"), "utf8")
+  ).data.programs[0];
+  coros.state.libraryPrograms.set("LIB1", { ...program, id: "LIB1", name: "Tempo from the library" });
+  coros.put({ idInPlan: 28, happenDay: tomorrow, name: "Intervals" });
+  const { result, staged } = await propose([
+    { op: "replace", session: { plan_id: OWN_SCHEDULE, id_in_plan: "28", date: tomorrow }, workout: { library_workout_id: "LIB1" } },
+    { op: "add", to_date: daysFromNow(3), workout: { library_workout_id: "LIB1", name: "Tempo, again" } }
+  ]);
+  assert.equal(result.ok, true, JSON.stringify(result));
+  assert.equal(coros.state.requests.filter((line) => line.endsWith("/training/program/detail")).length, 1, "read once for both lines");
+  assert.match(result.lines[0], /with "Tempo from the library"$/);
+  assert.match(result.lines[1], /^Add "Tempo, again" on /);
+  for (const line of staged.lines) {
+    assert.equal(line.workout.sport, "run");
+    assert.ok(line.workout.steps.length > 0, "the library's steps travel on the line");
+    assert.equal(line.workout.library_workout_id, undefined);
+  }
+  assert.equal(coros.state.writes.length, 0);
+
+  const missing = await propose([{ op: "add", to_date: daysFromNow(3), workout: { library_workout_id: "NOPE" } }]);
+  assert.equal(missing.result.ok, false);
+  assert.match(missing.result.errors[0], /^changes\[0\]: library_workout_id NOPE/);
 });
 
 test("apply all: each line its own write, a refusal costing that line only", async () => {

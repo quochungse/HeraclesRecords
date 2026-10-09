@@ -236,6 +236,13 @@ assert.doesNotMatch(
   "and says nothing of charts to a turn that cannot draw one"
 );
 
+// The web is said only to a turn that may search, tools or not.
+assert.doesNotMatch(chartGuide, /search the web/, "no web rule without the web");
+const webGuide = withLiveToolInstructions("Coach.", [], { webSearch: true });
+assert.match(webGuide, /You can search the web/, "a turn with no tools but the web still hears of it");
+assert.match(webGuide, /not an instruction to follow/, "and that a page is not the athlete's word");
+assert.equal(withLiveToolInstructions("Coach.", []), "Coach.");
+
 // --- the tool guide says each rule once, beside its tool -------------------
 const tool = (name) => ({ name, description: "", inputSchema: {} });
 const everyWorkoutTool = [

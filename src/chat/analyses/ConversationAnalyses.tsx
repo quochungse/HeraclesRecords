@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Loader2, MoreHorizontal, Play, Plus, Zap } from "lucide-react";
 import type { HeraclesRecordsApi } from "../../heraclesrecords-api";
-import type { CoachAnalysisSummary } from "../../../electron/types";
+import type { CoachAnalysis, CoachAnalysisSummary } from "../../../electron/types";
 import { describeTrigger, formatTimeAgo } from "./analysisLabels";
 import { announceRunNow } from "./runNow";
 import { useUnitSystem } from "../../units/UnitSystemProvider";
@@ -177,7 +177,10 @@ export function ConversationAnalyses({
   const sorted = [...summaries].sort(
     (a, b) => a.analysis.sortOrder - b.analysis.sortOrder
   );
-  const liveCount = summaries.filter((row) => row.analysis.enabled).length;
+  // A manual analysis has no switch and runs whenever it is asked, so it is
+  // live whatever an earlier switch left `enabled` at.
+  const isLive = (analysis: CoachAnalysis) => !analysis.trigger || analysis.enabled;
+  const liveCount = summaries.filter((row) => isLive(row.analysis)).length;
   const full = summaries.length >= MAX_PER_SESSION;
 
   return (
@@ -244,31 +247,35 @@ export function ConversationAnalyses({
                   <li
                     key={analysis.id}
                     className="chat-coaches-row"
-                    data-off={analysis.enabled ? undefined : "true"}
+                    data-off={isLive(analysis) ? undefined : "true"}
                   >
-                    <label
-                      className="coach-analysis-switch chat-coaches-row-switch"
-                      title={analysis.enabled ? "Running" : "Paused"}
-                    >
-                      <input
-                        type="checkbox"
-                        aria-label={
-                          analysis.enabled
-                            ? `Pause ${analysis.name}`
-                            : `Resume ${analysis.name}`
-                        }
-                        checked={analysis.enabled}
-                        disabled={busy || !api}
-                        onChange={(event) =>
-                          void withBusy(analysis.id, () =>
-                            (api as HeraclesRecordsApi).setCoachAnalysisEnabled(
-                              analysis.id,
-                              event.target.checked
+                    {/* A manual analysis runs only from Run now, so a switch
+                        beside it pauses nothing. */}
+                    {analysis.trigger ? (
+                      <label
+                        className="coach-analysis-switch chat-coaches-row-switch"
+                        title={analysis.enabled ? "Running" : "Paused"}
+                      >
+                        <input
+                          type="checkbox"
+                          aria-label={
+                            analysis.enabled
+                              ? `Pause ${analysis.name}`
+                              : `Resume ${analysis.name}`
+                          }
+                          checked={analysis.enabled}
+                          disabled={busy || !api}
+                          onChange={(event) =>
+                            void withBusy(analysis.id, () =>
+                              (api as HeraclesRecordsApi).setCoachAnalysisEnabled(
+                                analysis.id,
+                                event.target.checked
+                              )
                             )
-                          )
-                        }
-                      />
-                    </label>
+                          }
+                        />
+                      </label>
+                    ) : null}
                     <div className="chat-coaches-row-main">
                       <span className="chat-coaches-row-name">
                         <Zap size={12} aria-hidden="true" />

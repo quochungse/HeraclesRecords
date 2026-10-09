@@ -1,5 +1,7 @@
 // Coach reading the athlete's COROS plans (P3.1 of docs/coach-plan-canvas.md):
-// `list_training_plans` and `get_training_plan`.
+// `list_training_plans` and `get_training_plan` — and putting a library
+// workout in a plan by its `library_workout_id`, read by the app rather than
+// copied by Coach.
 //
 // What is held down, each of which is easy to get wrong:
 //
@@ -35,6 +37,7 @@ const databaseModule = await import(distUrl("database.js"));
 const planTools = await import(distUrl("chatPlanTools.js"));
 const workoutTools = await import(distUrl("chatWorkoutTools.js"));
 const sources = await import(distUrl("chatToolSources.js"));
+const capabilities = await import(distUrl("workoutCapabilities.js"));
 
 databaseModule.initializeDatabase(fs.mkdtempSync(path.join(os.tmpdir(), "chat-plan-tools-")));
 databaseModule.setSetting("trainingHub.accessToken", "token-1");
@@ -339,6 +342,68 @@ test("an empty cache is filled the way the Library fills it, and says so when CO
   assert.equal(result.ok, true);
   assert.deepEqual(result.plans, []);
   assert.match(result.note, /as the app last loaded it/);
+});
+
+// --- a library workout put in a plan by its id --------------------------------
+
+const libraryProgram = fixture("plan-detail-template.json").data.programs[0];
+const libraryRoutes = (detailCalls) => ({
+  "/training/program/detail": (target) => {
+    detailCalls.push(target.searchParams.get("id"));
+    return target.searchParams.get("id") === "LIB1"
+      ? { result: "0000", data: { ...libraryProgram, id: "LIB1", name: "Tempo from the library" } }
+      : { result: "1001", message: "Service exceptions" };
+  }
+});
+const workoutCall = async (name, args, options = {}) =>
+  JSON.parse(await workoutTools.handleChatWorkoutTool(name, args, { allowUpcomingWorkouts: false, ...options }));
+
+test("a plan session that names a library workout is that workout, read once by the app", async () => {
+  const detailCalls = [];
+  stubCoros(libraryRoutes(detailCalls));
+  const drafted = await workoutCall("draft_training_plan", {
+    name: "Two tempos",
+    workouts: [
+      { key: "t1", name: "Tempo", week: 1, day: "tue", library_workout_id: "LIB1" },
+      { key: "t2", name: "", week: 2, day: "tue", library_workout_id: "LIB1" }
+    ]
+  });
+  assert.equal(drafted.ok, true, JSON.stringify(drafted));
+  assert.deepEqual(detailCalls, ["LIB1"], "one read for every session naming it");
+  const read = await workoutCall("get_plan_draft", { draft_id: drafted.draft_id, sessions: ["t1", "t2"] });
+  const [first, second] = read.workouts;
+  assert.equal(first.name, "Tempo", "Coach's name for the session stands");
+  assert.equal(second.name, "Tempo from the library", "no name takes the library's");
+  assert.equal(first.sport, "run", "the library's sport");
+  assert.equal(first.steps.length, second.steps.length);
+  assert.ok(first.steps.length > 0, "the steps are the library's");
+  assert.equal(first.library_workout_id, undefined, "the id is not kept on the session");
+
+  const revised = await workoutCall("revise_training_plan", {
+    draft_id: drafted.draft_id,
+    summary: "Added a third tempo",
+    ops: [{ op: "add_session", week: 3, day: "tue", workout: { library_workout_id: "LIB1" } }]
+  });
+  assert.equal(revised.ok, true, JSON.stringify(revised));
+  const after = await workoutCall("get_plan_draft", { draft_id: revised.draft_id });
+  assert.equal(after.sessions.length, 3);
+  assert.match(after.sessions[2], /week 3 tue · run · Tempo from the library/);
+});
+
+test("a library workout COROS does not return is handed back, and nothing is drafted", async () => {
+  stubCoros(libraryRoutes([]));
+  const refused = await workoutCall("draft_training_plan", {
+    name: "Missing",
+    workouts: [{ key: "x", name: "Gone", week: 1, day: "mon", library_workout_id: "NOPE" }]
+  });
+  assert.equal(refused.ok, false);
+  assert.equal(refused.error_code, "library_workout_unavailable");
+  assert.match(refused.errors[0], /library_workout_id NOPE/);
+});
+
+test("draft_workout does not offer library_workout_id; draft_training_plan does", () => {
+  assert.ok(capabilities.buildDraftTrainingPlanInputSchema().properties.workouts.items.properties.library_workout_id);
+  assert.equal(capabilities.buildDraftWorkoutInputSchema().properties.workout.properties.library_workout_id, undefined);
 });
 
 // --- wiring ---------------------------------------------------------------------

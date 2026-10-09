@@ -33,6 +33,9 @@ interface PlanWeekRidgeProps {
   weeks: readonly PlanReaderWeek[];
   /** 0-based week being trained today, when the plan is running. */
   currentWeek?: number;
+  /** 0-based week shown beside the ridge, when pressing a bar picks one
+      rather than scrolling to it (the Coach card's strip). */
+  selectedWeek?: number;
   onJump: (weekIndex: number) => void;
 }
 
@@ -42,7 +45,7 @@ const MINIMUM_SHARE = 0.06;
     inside a button that also holds the week's number. */
 const BAR_MAX = 80;
 
-export function PlanWeekRidge({ weeks, currentWeek, onJump }: PlanWeekRidgeProps) {
+export function PlanWeekRidge({ weeks, currentWeek, selectedWeek, onJump }: PlanWeekRidgeProps) {
   const measure = ridgeMeasure(weeks);
   const stacks = weeks.map((week) => weekRidgeSegments(week, measure));
   const values = stacks.map((segments) => segments.reduce((sum, segment) => sum + segment.value, 0));
@@ -91,6 +94,7 @@ export function PlanWeekRidge({ weeks, currentWeek, onJump }: PlanWeekRidgeProps
           const value = values[index];
           const share = peak > 0 ? value / peak : 0;
           const current = index === currentWeek;
+          const selected = selectedWeek === undefined ? undefined : index === selectedWeek;
           const breakdown =
             stacks[index].length > 1
               ? ` (${stacks[index]
@@ -104,8 +108,9 @@ export function PlanWeekRidge({ weeks, currentWeek, onJump }: PlanWeekRidgeProps
             <button
               type="button"
               key={week.weekIndex}
-              className={`plan-ridge-week${current ? " is-current" : ""}${value > 0 ? "" : " is-empty"}`}
+              className={`plan-ridge-week${current ? " is-current" : ""}${selected ? " is-selected" : ""}${value > 0 ? "" : " is-empty"}`}
               aria-label={label}
+              aria-pressed={selected}
               title={label}
               onClick={() => onJump(index)}
             >

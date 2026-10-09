@@ -224,6 +224,34 @@ export function buildAnthropicTools(
 }
 
 /**
+ * Anthropic's own web search and fetch, run on their servers inside the request
+ * (`server_tool_use` blocks, results in the same response): nothing here
+ * executes them. The 2026-02 variants filter results with code before the model
+ * reads them and run on Opus/Sonnet 4.6 and later; an older model, and Haiku,
+ * takes the basic ones. Bounded per request, because each search is billed.
+ */
+export function buildAnthropicWebTools(model: string): Anthropic.Beta.BetaToolUnion[] {
+  const basic = /haiku|claude-3|-4-[0-5](?:-|$)|-4-\d{8}/.test(model);
+  return [
+    { type: basic ? "web_search_20250305" : "web_search_20260209", name: "web_search", max_uses: 5 },
+    {
+      type: basic ? "web_fetch_20250910" : "web_fetch_20260209",
+      name: "web_fetch",
+      max_uses: 3,
+      max_content_tokens: 20_000
+    }
+  ];
+}
+
+/** The server tools a web lookup is reported under; code run to filter results is not one. */
+const ANTHROPIC_WEB_TOOL_NAMES: ReadonlySet<string> = new Set(["web_search", "web_fetch"]);
+
+/** The request named a web tool this account or model will not take (switched off in the Console, say). */
+function isWebToolRejection(caught: unknown): boolean {
+  return caught instanceof APIError && caught.status === 400 && /web[_ ]?(search|fetch)/i.test(caught.message);
+}
+
+/**
  * The Messages API requires the first message to be from the user and rejects
  * empty content, so a resumed or trimmed transcript is normalized here.
  */
@@ -270,6 +298,8 @@ export interface StreamAnthropicChatOptions {
   liveInstructions?: string;
   messages: ChatMessage[];
   tools: CorosMcpTool[];
+  /** Offer Anthropic's web search and fetch (`buildAnthropicWebTools`). */
+  webSearch?: boolean;
   maxToolRounds: number;
   signal: AbortSignal;
   onToken(delta: string): void;
@@ -308,7 +338,8 @@ export async function streamAnthropicChatCompletion(
 
   const client = createAnthropicClient(apiKey);
   const tuning = buildAnthropicRequestTuning(options.config);
-  const tools = buildAnthropicTools(options.tools);
+  const localTools = buildAnthropicTools(options.tools);
+  let webTools = options.webSearch ? buildAnthropicWebTools(model) : [];
   let fullText = "";
   // Summed across rounds: a tool-using answer is several API calls and the
   // athlete pays for every one of them. Undefined until a round actually
@@ -317,6 +348,7 @@ export async function streamAnthropicChatCompletion(
 
   try {
     for (let round = 0; round < options.maxToolRounds; round++) {
+      const tools: Anthropic.Beta.BetaToolUnion[] = [...localTools, ...webTools];
       const stream = client.beta.messages.stream(
         {
           model,
@@ -338,8 +370,32 @@ export async function streamAnthropicChatCompletion(
       if (options.onThinking) {
         stream.on("thinking", (delta) => options.onThinking?.(delta));
       }
+      if (webTools.length > 0) {
+        // A server tool runs inside the request, so the stream is the only
+        // place to see it start.
+        stream.on("streamEvent", (event) => {
+          if (
+            event.type === "content_block_start" &&
+            event.content_block.type === "server_tool_use" &&
+            ANTHROPIC_WEB_TOOL_NAMES.has(event.content_block.name)
+          ) {
+            options.onToolCallStart?.(event.content_block.name);
+          }
+        });
+      }
 
-      const message = await stream.finalMessage();
+      let message: Anthropic.Beta.BetaMessage;
+      try {
+        message = await stream.finalMessage();
+      } catch (caught) {
+        // Refused before anything was written: the turn goes on without the web.
+        if (webTools.length > 0 && isWebToolRejection(caught)) {
+          webTools = [];
+          round--;
+          continue;
+        }
+        throw caught;
+      }
 
       if (message.usage) {
         // Cache reads and writes are input the athlete is billed for, so they
@@ -361,6 +417,13 @@ export async function streamAnthropicChatCompletion(
           refusalMessage(message.stop_details),
           "refusal"
         );
+      }
+
+      // A long run of server-side searches pauses the turn; sending the
+      // response back as it is lets it pick up where it stopped.
+      if (message.stop_reason === "pause_turn") {
+        conversation.push({ role: "assistant", content: message.content });
+        continue;
       }
 
       const toolUses = message.content.filter(

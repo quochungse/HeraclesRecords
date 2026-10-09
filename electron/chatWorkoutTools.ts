@@ -43,7 +43,13 @@ import {
 } from "./trainingPlanDomain";
 import { generatedPlanProblems } from "./trainingPlanGeneration";
 import { cardDay, createScheduleChangeSet, type NewScheduleChangeLine } from "./chatScheduleChanges";
-import { CHAT_PLAN_TOOL_NAMES, getChatPlanTools, handleChatPlanTool, isChatPlanTool } from "./chatPlanTools";
+import {
+  CHAT_PLAN_TOOL_NAMES,
+  getChatPlanTools,
+  handleChatPlanTool,
+  isChatPlanTool,
+  readLibraryWorkout
+} from "./chatPlanTools";
 import { planDiff, sameWorkoutInput } from "./planDiff";
 import {
   PLAN_DAYS,
@@ -507,7 +513,8 @@ export function getChatWorkoutTools(): CorosMcpTool[] {
                 workout: {
                   type: "object",
                   description:
-                    "For replace and add: one workout in draft_workout's workout shape (name, sport, steps …). " +
+                    "For replace and add: one workout in draft_workout's workout shape (name, sport, steps …), " +
+                    "or {library_workout_id, name} for a workout from get_workout_library as it is — no steps. " +
                     "Strength and Hybrid Fitness need exact COROS exercise ids from search_coros_exercises."
                 }
               },
@@ -944,6 +951,74 @@ type PreparedDraft =
   | { ok: true; draft: CorosTrainingPlanDraft; conflicts: string[] }
   | { ok: false; response: string };
 
+type LibraryRead = { workout: PlanWorkoutEntryInput } | { error: string };
+
+/**
+ * A session that names a library workout (`library_workout_id`) is that
+ * workout, read from COROS here — so putting a saved workout in a plan or on
+ * the calendar costs Coach an id rather than the workout's steps read out and
+ * written back in full. The library's sport and steps stand; Coach's name and
+ * description, when it gives them, win. A session that brings steps of its
+ * own as well is Coach changing the workout, and its steps stand. Each
+ * workout is read once however many sessions name it — across a whole
+ * proposal too, when the caller hands in one `reads` for every line.
+ */
+async function withLibraryWorkouts(
+  args: Record<string, unknown>,
+  unitSystem: UnitSystem,
+  reads = new Map<string, Promise<LibraryRead>>()
+): Promise<{ ok: true; args: Record<string, unknown> } | { ok: false; errors: string[] }> {
+  const workouts = Array.isArray(args.workouts) ? (args.workouts as unknown[]) : [];
+  const fieldsOf = (item: unknown): Record<string, unknown> =>
+    item && typeof item === "object" ? (item as Record<string, unknown>) : {};
+  const idOf = (item: unknown) => String(fieldsOf(item).library_workout_id ?? "").trim();
+  const hasSteps = (item: unknown) => {
+    const { steps } = fieldsOf(item);
+    return Array.isArray(steps) && steps.length > 0;
+  };
+  if (!workouts.some((item) => idOf(item))) return { ok: true, args };
+
+  const needed = new Set(workouts.filter((item) => idOf(item) && !hasSteps(item)).map(idOf));
+  for (const id of needed) {
+    if (reads.has(id)) continue;
+    reads.set(
+      id,
+      readLibraryWorkout(id, unitSystem).then(
+        (workout): LibraryRead => ({ workout }),
+        (error): LibraryRead => ({ error: error instanceof Error ? error.message : String(error) })
+      )
+    );
+  }
+  const read = new Map(
+    await Promise.all([...needed].map(async (id) => [id, await reads.get(id)!] as const))
+  );
+  const errors: string[] = [];
+  const filled = workouts.map((item) => {
+    const id = idOf(item);
+    if (!id) return item;
+    const { library_workout_id: _id, ...entry } = item as Record<string, unknown>;
+    if (hasSteps(entry)) return entry;
+    const found = read.get(id);
+    if (!found || "error" in found) {
+      errors.push(
+        `library_workout_id ${id}: COROS did not return that workout (${found?.error ?? "unknown"}). ` +
+          "Check the id with get_workout_library."
+      );
+      return entry;
+    }
+    const library = found.workout;
+    return {
+      ...entry,
+      name: String(entry.name ?? "").trim() || library.name,
+      description: String(entry.description ?? "").trim() || library.description,
+      sport: library.sport,
+      sport_options: library.sport_options,
+      steps: library.steps
+    };
+  });
+  return errors.length ? { ok: false, errors } : { ok: true, args: { ...args, workouts: filled } };
+}
+
 /**
  * Every check a draft passes before it is kept — placement, the validator,
  * the generator's request, the exercise catalog — and the calendar's say on
@@ -955,11 +1030,13 @@ async function prepareDraft(
   {
     allowUpcomingWorkouts,
     planRequest,
-    retryTool
+    retryTool,
+    unitSystem
   }: {
     allowUpcomingWorkouts: boolean;
     planRequest?: TrainingPlanGenerationRequest;
     retryTool: string;
+    unitSystem: UnitSystem;
   }
 ): Promise<PreparedDraft> {
   const refuse = (body: Record<string, unknown>): PreparedDraft => ({
@@ -970,7 +1047,11 @@ async function prepareDraft(
   if (placementErrors.length > 0) {
     return refuse({ errors: placementErrors });
   }
-  const draft = toPlanDraft(args);
+  const library = await withLibraryWorkouts(args, unitSystem);
+  if (!library.ok) {
+    return refuse({ error_code: "library_workout_unavailable", errors: library.errors });
+  }
+  const draft = toPlanDraft(library.args);
   const validation = validatePlanDraft(draft, {
     todayDay: formatScheduleDay(new Date())
   });
@@ -1038,7 +1119,8 @@ async function handleDraftTrainingPlan(
   const prepared = await prepareDraft(args, {
     allowUpcomingWorkouts,
     planRequest,
-    retryTool: artifactType === "workout" ? "draft_workout" : "draft_training_plan"
+    retryTool: artifactType === "workout" ? "draft_workout" : "draft_training_plan",
+    unitSystem
   });
   if (!prepared.ok) return prepared.response;
 
@@ -1355,7 +1437,8 @@ async function handleRevisePlan(
   }
   const prepared = await prepareDraft(applied.args, {
     allowUpcomingWorkouts,
-    retryTool: "revise_training_plan"
+    retryTool: "revise_training_plan",
+    unitSystem
   });
   if (!prepared.ok) return prepared.response;
   const answer = storeRevision(
@@ -1545,7 +1628,8 @@ const REVISION_WORKOUT_FIELD = {
   type: "object",
   additionalProperties: true,
   description:
-    "The whole new workout, in exactly the shape draft_workout and draft_training_plan take one (name, sport, steps…). " +
+    "The whole new workout, in exactly the shape draft_workout and draft_training_plan take one (name, sport, steps…), " +
+    "or {library_workout_id, name} for a workout from the library as it is. " +
     "Its key is kept from the session it replaces."
 };
 
@@ -1826,6 +1910,7 @@ async function handleProposeScheduleChanges(
   }
 
   const seen = new Set<string>();
+  const libraryReads = new Map<string, Promise<LibraryRead>>();
   const lines: NewScheduleChangeLine[] = [];
   for (const [index, change] of changes.entries()) {
     const at = `changes[${index}]`;
@@ -1888,7 +1973,7 @@ async function handleProposeScheduleChanges(
 
     let workout: PlanWorkoutEntryInput | undefined;
     if (op === "replace" || op === "add") {
-      const checked = await checkedWorkout(change.workout, toDay ?? entry!.happenDay);
+      const checked = await checkedWorkout(change.workout, toDay ?? entry!.happenDay, unitSystem, libraryReads);
       if (!checked.ok) {
         errors.push(...checked.errors.map((error) => `${at}: ${error}`));
         continue;
@@ -1942,18 +2027,29 @@ async function handleProposeScheduleChanges(
   });
 }
 
-/** One workout checked as draft_workout checks it, with its exercises resolved to COROS's ids. */
+/**
+ * One workout checked as draft_workout checks it, with its exercises resolved
+ * to COROS's ids — or, named by `library_workout_id`, read from the library.
+ */
 async function checkedWorkout(
   value: unknown,
-  day: string
+  day: string,
+  unitSystem: UnitSystem,
+  reads: Map<string, Promise<LibraryRead>>
 ): Promise<{ ok: true; workout: PlanWorkoutEntryInput } | { ok: false; errors: string[] }> {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
     return { ok: false, errors: ["workout is required for replace and add."] };
   }
-  const input = value as Record<string, unknown>;
+  const library = await withLibraryWorkouts(
+    { workouts: [{ ...(value as Record<string, unknown>), key: "w1", schedule_date: day, save_to_library: false }] },
+    unitSystem,
+    reads
+  );
+  if (!library.ok) return { ok: false, errors: library.errors };
+  const input = (library.args.workouts as Record<string, unknown>[])[0];
   const draft = toPlanDraft({
     name: String(input.name ?? "").trim() || "Workout",
-    workouts: [{ ...input, key: "w1", schedule_date: day, save_to_library: false }]
+    workouts: [input]
   });
   const validation = validatePlanDraft(draft, { todayDay: formatScheduleDay(new Date()) });
   if (!validation.ok) return { ok: false, errors: validation.errors };

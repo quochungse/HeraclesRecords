@@ -1162,19 +1162,21 @@ export function listCoachAnalysisSessionAttention(
     if (existing) {
       return existing;
     }
-    const created = { sessionId, attached: false, unread: 0 };
+    const created = { sessionId, attached: false, scheduled: false, unread: 0 };
     attention.set(sessionId, created);
     return created;
   };
 
   for (const row of database.listAnalyses()) {
-    // A manual analysis still marks its conversation: the athlete can run it
-    // from there, which is exactly what the mark announces — and most
-    // analyses are manual, so a mark that required a trigger would leave the
-    // sidebar almost blank.
-    if (row.enabled === 1) {
-      entry(row.session_id).attached = true;
-    }
+    // A manual analysis attaches its conversation whatever its switch says:
+    // it has no switch any more, and runs whenever it is asked. That keeps a
+    // blank conversation from being let go; only a live trigger earns the
+    // list's mark.
+    const scheduled = readTrigger(row, database).trigger !== null;
+    if (scheduled && row.enabled !== 1) continue;
+    const mark = entry(row.session_id);
+    mark.attached = true;
+    mark.scheduled ||= scheduled;
   }
 
   for (const row of database.listRuns({

@@ -7,6 +7,7 @@ import type {
   LocalChatServerCandidate
 } from "./types";
 import { addTokenUsage, countableUsage } from "./tokenUsage";
+import { WEB_SEARCH_TOOL } from "./chatToolSources";
 
 export const DEFAULT_LOCAL_CHAT_BASE_URL = "http://localhost:11434/v1";
 
@@ -83,6 +84,14 @@ export type StreamOpenAiCompatibleChatOptions = Omit<
 > & {
   model: string;
   toolsEnabled: boolean;
+  /**
+   * Tools the server runs itself (OpenRouter's web search), sent beside the
+   * function tools. Dropped for the rest of the turn when the server refuses
+   * them, rather than failing it.
+   */
+  serverTools?: Record<string, unknown>[];
+  /** A server tool ran this round, as many times as the usage counts. */
+  onServerToolUse?: (name: string) => void;
 };
 
 export function normalizeLocalChatBaseUrl(input: string): string {
@@ -380,19 +389,29 @@ export async function streamOpenAiCompatibleChatCompletion(
   let tools = options.toolsEnabled
     ? buildLocalFunctionTools(options.tools)
     : [];
+  let serverTools = options.serverTools ?? [];
 
   for (let round = 0; round < options.maxToolRounds; round++) {
     const opened = await openLocalChatStream(
       baseUrl,
       model,
       input,
-      tools,
+      [...tools, ...serverTools],
       transport,
-      options.signal
+      options.signal,
+      serverTools.length > 0
     );
 
+    if ("serverToolsUnsupported" in opened) {
+      serverTools = [];
+      round--;
+      continue;
+    }
+
     if ("toolsUnsupported" in opened) {
+      // A server tool is a tool too: a model that takes none takes neither.
       tools = [];
+      serverTools = [];
       input = buildLocalInputMessages(
         options.fallbackInstructions ?? options.instructions,
         options.messages
@@ -405,12 +424,16 @@ export async function streamOpenAiCompatibleChatCompletion(
       delta,
       functionCalls: rawFunctionCalls,
       usage: roundUsage,
-      model: roundModel
+      model: roundModel,
+      webSearches
     } = await readLocalChatStream(
       opened.response,
       options.signal,
       options.onToken
     );
+    for (let search = 0; search < webSearches; search++) {
+      options.onServerToolUse?.(WEB_SEARCH_TOOL);
+    }
     if (roundModel) {
       resolvedModel = roundModel;
     }
@@ -543,8 +566,9 @@ async function openLocalChatStream(
   messages: LocalChatCompletionMessage[],
   tools: Record<string, unknown>[],
   transport: OpenAiCompatibleChatTransport,
-  signal: AbortSignal
-): Promise<{ response: Response } | { toolsUnsupported: true }> {
+  signal: AbortSignal,
+  hasServerTools = false
+): Promise<{ response: Response } | { toolsUnsupported: true } | { serverToolsUnsupported: true }> {
   const request: Record<string, unknown> = {
     model,
     messages,
@@ -576,6 +600,9 @@ async function openLocalChatStream(
   }
 
   const detail = await response.text().catch(() => "");
+  if (hasServerTools && response.status === 400 && /web_search|server[ _]tool/i.test(detail)) {
+    return { serverToolsUnsupported: true };
+  }
   if (
     transport.allowToolsFallback &&
     tools.length > 0 &&
@@ -638,6 +665,8 @@ async function readLocalChatStream(
   functionCalls: LocalToolCall[];
   usage?: ChatTokenUsage;
   model?: string;
+  /** Searches a server tool ran this round, from the usage OpenRouter reports. */
+  webSearches: number;
 }> {
   const reader = response.body!.getReader();
   const decoder = new TextDecoder();
@@ -646,6 +675,7 @@ async function readLocalChatStream(
   let buffer = "";
   let usage: ChatTokenUsage | undefined;
   let model: string | undefined;
+  let webSearches = 0;
 
   for (;;) {
     if (signal.aborted) break;
@@ -675,15 +705,24 @@ async function readLocalChatStream(
       accumulator.addEvent(event);
       usage = parseLocalChatUsage(event) ?? usage;
       model = parseLocalChatModel(event) ?? model;
+      webSearches = parseWebSearchRequests(event) ?? webSearches;
     }
   }
 
   return {
     delta: fullDelta,
+    webSearches,
     functionCalls: accumulator.toCalls(),
     ...(usage ? { usage } : {}),
     ...(model ? { model } : {})
   };
+}
+
+/** `usage.server_tool_use.web_search_requests`, which OpenRouter states on the usage chunk. */
+function parseWebSearchRequests(event: unknown): number | undefined {
+  const used = (event as { usage?: { server_tool_use?: { web_search_requests?: unknown } } })?.usage
+    ?.server_tool_use?.web_search_requests;
+  return typeof used === "number" && Number.isFinite(used) && used > 0 ? Math.floor(used) : undefined;
 }
 
 export function parseCompatibleChatStreamError(event: unknown): string {

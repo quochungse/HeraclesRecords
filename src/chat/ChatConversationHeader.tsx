@@ -1,22 +1,21 @@
-import { BookOpen, PanelRightClose, PanelRightOpen } from "lucide-react";
+import { PanelRightClose, PanelRightOpen } from "lucide-react";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 
 /**
  * The head of the open conversation (Coach Workbench review, R1): its name,
- * what Coach reads in it, its analyses, and the way to what it has made.
+ * its analyses, and the way to what it has made.
  *
  * It replaced a header that said "Training Coach" — the rail already names
  * the screen — over a separate strip reading "Reads: … AI: …". The open
  * conversation's name appeared nowhere outside the list, and the strip was a
- * button that did not look like one. The AI is not here, nor Coach settings:
- * both are in the composer, where the next turn is sent from.
+ * button that did not look like one. The AI is not here, nor what Coach may
+ * read, nor Coach settings: all are in the composer, where the next turn is
+ * sent from — what it reads is the Permissions section of the AI chip's sheet.
  */
 export function ChatConversationHeader({
   title,
   subtitle,
   onRename,
-  reads,
-  onOpenReads,
   analyses,
   creations,
   creationsOpen,
@@ -27,9 +26,6 @@ export function ChatConversationHeader({
   subtitle?: string;
   /** Absent while there is no conversation to rename. */
   onRename?: (title: string) => void;
-  /** "Activities · Zones", or null while the conversation's settings load. */
-  reads: string | null;
-  onOpenReads?: () => void;
   /** The conversation's analyses control, as the analyses feature draws it. */
   analyses: ReactNode;
   creations: number;
@@ -94,19 +90,6 @@ export function ChatConversationHeader({
         <span className="chat-conversation-subtitle">{subtitle}</span>
       </div>
       <div className="chat-header-end">
-        {reads !== null && onOpenReads ? (
-          <button
-            type="button"
-            className="chat-header-chip"
-            data-action="conversationSettings"
-            onClick={onOpenReads}
-            title="What Coach reads in this conversation"
-          >
-            <BookOpen size={13} aria-hidden="true" />
-            <span>Reads</span>
-            <b>{reads || "nothing of yours"}</b>
-          </button>
-        ) : null}
         {analyses}
         <button
           type="button"

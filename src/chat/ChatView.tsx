@@ -22,6 +22,7 @@ import {
   ExternalLink,
   FileDown,
   FileText,
+  Globe,
   KeyRound,
   Loader2,
   LogOut,
@@ -189,7 +190,6 @@ const CoachWorkoutEditor = lazy(() => import("./CoachWorkoutEditor"));
 const CoachCanvas = lazy(() => import("./CoachCanvas"));
 const CorosConflictDialog = lazy(() => import("./CorosConflictDialog"));
 const CoachCalendarDialog = lazy(() => import("./CoachCalendarDialog"));
-const CoachConversationSettings = lazy(() => import("./CoachConversationSettings"));
 const ConversationAiSheet = lazy(() =>
   import("./CoachConversationSettings").then((module) => ({ default: module.ConversationAiSheet }))
 );
@@ -596,13 +596,6 @@ interface ChatViewProps {
   active?: boolean;
 }
 
-/** The sources a conversation can share, in the order its strip names them. */
-const SHARED_SOURCE_LABELS: readonly ["activities" | "sleep" | "zones", string][] = [
-  ["activities", "Activities"],
-  ["sleep", "Sleep"],
-  ["zones", "Zones"]
-];
-
 /** Inline style hook that tints a row/chip with the sport's own colour. */
 function planSportStyle(sport: PlanDraftPreviewEntry["sport"]): CSSProperties {
   return { "--chat-plan-sport": sportTheme(sport).color } as CSSProperties;
@@ -744,13 +737,15 @@ function DeletePreviewCard({ preview }: { preview: WorkoutDeletePreview }) {
 const SOURCE_ICONS: Record<ChatToolSource, typeof Database> = {
   db: Database,
   coros: Cloud,
-  mcp: Plug
+  mcp: Plug,
+  web: Globe
 };
 
 /**
  * Where the answer's data came from: one pill per source — DB for this
  * machine's own store, Coros for the Training Hub API, MCP for a connected MCP
- * server — each naming the tools that read from it. `mcpUsed`/`mcpTools` are
+ * server, Web for the provider's own search — each naming the tools that read
+ * from it. `mcpUsed`/`mcpTools` are
  * the stored names from when every tool was labelled MCP; the grouping is done
  * here, by name, so old transcripts read correctly too.
  */
@@ -1339,7 +1334,6 @@ export function ChatView({
   const [conversationSettings, setConversationSettingsState] = useState<ConversationSettings | null>(null);
   /** Raised when a pull merged another machine's settings for a conversation, to read them again. */
   const [conversationSettingsVersion, setConversationSettingsVersion] = useState(0);
-  const [conversationSettingsOpen, setConversationSettingsOpen] = useState(false);
   const [aiSheetOpen, setAiSheetOpen] = useState(false);
   useEffect(() => {
     setConversationSettingsState(null);
@@ -4714,14 +4708,6 @@ export function ChatView({
         onRename={
           activeSessionId ? (title) => void handleRenameSession(activeSessionId, title) : undefined
         }
-        reads={
-          conversationSettings
-            ? SHARED_SOURCE_LABELS.filter(([key]) => conversationSettings.sources[key])
-                .map(([, label]) => label)
-                .join(" · ")
-            : null
-        }
-        onOpenReads={() => setConversationSettingsOpen(true)}
         analyses={
           <ConversationAnalyses
             api={api}
@@ -5573,28 +5559,12 @@ export function ChatView({
             runtime={effectiveRuntime}
             readiness={aiReadiness}
             claudeStatus={claudeStatus}
+            conversation={conversationSettings ?? undefined}
             onChange={changeConversationRuntime}
+            onConversationChange={updateConversationSettings}
             onClose={() => setAiSheetOpen(false)}
             onOpenCoachSettings={() => {
               setAiSheetOpen(false);
-              openSettings();
-            }}
-          />
-        </Suspense>
-      ) : null}
-      {conversationSettingsOpen && conversationSettings ? (
-        <Suspense fallback={null}>
-          <CoachConversationSettings
-            portal
-            chatSettings={chatSettings}
-            conversation={conversationSettings}
-            baseProvider={conversationProvider}
-            readiness={coachProviderReadiness(chatSettings, authStatus, claudeStatus)}
-            claudeStatus={claudeStatus}
-            onChange={updateConversationSettings}
-            onClose={() => setConversationSettingsOpen(false)}
-            onOpenCoachSettings={() => {
-              setConversationSettingsOpen(false);
               openSettings();
             }}
           />

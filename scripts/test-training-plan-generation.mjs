@@ -329,8 +329,8 @@ const outlineArgs = (patch = {}) => ({
   summary: "Two weeks: settle in, then sharpen.",
   basis: "About 30 km a week lately, long run 14 km.",
   weeks: [
-    { week: 1, stage: "base", lighter: false, hours: 1.5, sessions: 2, focus: "Settle into the routine.", key_sessions: [{ day: "Monday", name: "Easy run", sport: "run", minutes: 40 }] },
-    { week: 2, stage: "build", hours: 1.3, sessions: 2, focus: "One quality session.", key_sessions: [{ day: "Thursday", name: "Tempo", sport: "run", minutes: 45 }] }
+    { week: 1, stage: "base", lighter: false, hours: 1.5, sessions: 2, focus: "Settle into the routine.", week_sessions: [{ day: "Monday", name: "Easy run", sport: "run", minutes: 40 }] },
+    { week: 2, stage: "build", hours: 1.3, sessions: 2, focus: "One quality session.", week_sessions: [{ day: "Thursday", name: "Tempo", sport: "run", minutes: 45 }] }
   ],
   ...patch
 });
@@ -345,14 +345,14 @@ await test("the outline tool's arguments become an outline, or the reasons they 
   });
   const broken = generation.parsePlanOutline({
     summary: "x",
-    weeks: [{ week: 3, stage: "taper", hours: 2, sessions: 2, focus: "", key_sessions: [{ name: "No day", sport: "run" }] }]
+    weeks: [{ week: 3, stage: "taper", hours: 2, sessions: 2, focus: "", week_sessions: [{ name: "No day", sport: "run" }] }]
   });
   assert.equal(broken.outline, undefined);
   assert.deepEqual(broken.errors, [
     "basis is missing: say what you read of the athlete's training.",
     "Week 1 is numbered 3; number the weeks 1, 2, 3… in order.",
     "Week 1 has no stage; use one of preparation, base, build, peak, race, transition.",
-    "Week 1 has a key session without a day, a name or a sport."
+    "Week 1 has a session without a day, a name or a sport."
   ]);
 });
 
@@ -361,13 +361,13 @@ await test("an outline is held to the request: its length, each week's count and
   assert.deepEqual(generation.planOutlineProblems(outline(), request), []);
   const busy = outline({
     weeks: [
-      { week: 1, stage: "base", hours: 3, sessions: 3, focus: "Too much.", key_sessions: [
+      { week: 1, stage: "base", hours: 3, sessions: 3, focus: "Too much.", week_sessions: [
         { day: "Tuesday", name: "Intervals", sport: "run", minutes: 40 },
         { day: "Monday", name: "Swim", sport: "swim", minutes: 30 },
         { day: "Thursday", name: "Long run", sport: "run", minutes: 90 }
       ] },
-      { week: 2, stage: "build", hours: 1, sessions: 2, focus: "Fine.", key_sessions: [] },
-      { week: 3, stage: "peak", hours: 1, sessions: 2, focus: "One too many.", key_sessions: [] }
+      { week: 2, stage: "build", hours: 1, sessions: 2, focus: "Fine.", week_sessions: [] },
+      { week: 3, stage: "peak", hours: 1, sessions: 2, focus: "One too many.", week_sessions: [] }
     ]
   });
   assert.deepEqual(generation.planOutlineProblems(busy, request), [
@@ -395,7 +395,7 @@ await test("an outline asks for the shape and no sessions, and a redraw carries 
   const outline = generation.parsePlanOutline(outlineArgs()).outline;
   const redraw = generation.trainingPlanOutlinePrompt(request, { outline, note: "A lighter week 2, I'm travelling." });
   assert.match(redraw, /You proposed this outline before:/);
-  assert.match(redraw, /- Week 1 \(from 2026-08-03\): Base, 1\.5 h, 2 sessions — Settle into the routine\. Key: Monday Easy run \(Run, 40 min\)\./);
+  assert.match(redraw, /- Week 1 \(from 2026-08-03\): Base, 1\.5 h, 2 sessions — Settle into the routine\. Sessions: Monday Easy run \(Run, 40 min\)\./);
   assert.match(redraw, /keep what my request does not touch: A lighter week 2, I'm travelling\./);
 });
 

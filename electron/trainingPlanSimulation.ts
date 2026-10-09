@@ -247,7 +247,6 @@ export function simulatedOutlineArgs(request: TrainingPlanGenerationRequest, not
   const weeks = stages.map((stage, index) => {
     const sessions = weekSessions(request, index, weekCount, stage);
     const minutes = sessions.reduce((sum, session) => sum + session.minutes, 0);
-    const key = sessions.filter((session) => session.role !== "easy" && session.role !== "shakeout").slice(0, 2);
     return {
       week: index + 1,
       stage: STAGE_SLUG(stage),
@@ -255,7 +254,7 @@ export function simulatedOutlineArgs(request: TrainingPlanGenerationRequest, not
       hours: Math.round((minutes / 60) * 10) / 10,
       sessions: sessions.length,
       focus: isLighter(index, weekCount, stage) ? "A lighter week to absorb the ones before it." : FOCUS[stage] ?? "",
-      key_sessions: key.map((session) => ({
+      week_sessions: sessions.map((session) => ({
         day: PLAN_WEEKDAYS[session.dayIndex],
         name: sessionName(session, request),
         sport: session.sport,

@@ -49,6 +49,7 @@ import {
 import { formatDistanceValue } from "./unitSystem.js";
 import type {
   CorosMcpTool,
+  PlanWorkoutEntryInput,
   RunWorkoutEditorDraft,
   TrainingActivityMatch,
   TrainingPlanDocument,
@@ -117,7 +118,10 @@ export function getChatPlanTools(): CorosMcpTool[] {
       name: "get_workout_library",
       description:
         "The athlete's COROS workout library — saved workouts not tied to a day: each workout_id, name, sport, " +
-        "time, exercises and sets. Pass workout_ids for those workouts' steps. To reuse one, draft_workout from its steps.",
+        "time, exercises and sets. To put one in a plan as it is, give the session its library_workout_id " +
+        "(draft_training_plan, revise_training_plan's add_session/replace_session, or propose_schedule_changes' add/replace) " +
+        "and no steps — the app copies it. " +
+        "Pass workout_ids for steps only to read a workout or to change it before using it.",
       inputSchema: {
         type: "object",
         properties: {
@@ -183,6 +187,21 @@ async function nameExercises(draft: RunWorkoutEditorDraft): Promise<void> {
 }
 
 /**
+ * One library workout as a plan session's workout, read the way the builder
+ * reads it (`getWorkoutForEdit`), its movements named from the catalogue.
+ * Shared by `get_workout_library` and by a plan session that names its
+ * `library_workout_id`, so a workout copied by id is the one Coach would have
+ * read and copied by hand.
+ */
+export async function readLibraryWorkout(id: string, unitSystem: UnitSystem): Promise<PlanWorkoutEntryInput> {
+  await loadCorosLocale().catch(() => undefined);
+  const document = await getWorkoutForEdit({ kind: "library", programId: id }, unitSystem);
+  await nameExercises(document.draft);
+  const workout = editorDraftToPlanWorkoutInput(document.draft, { key: id, name: document.draft.name });
+  return { ...workout, name: corosText(workout.name) };
+}
+
+/**
  * The library as the Training Library reads it — `/training/program/query`,
  * cached — and each workout asked for through `getWorkoutForEdit`, the
  * builder's own read. COROS MCP's `queryWorkoutDetails` answers a strength
@@ -229,13 +248,11 @@ async function getWorkoutLibrary(args: Record<string, unknown>, options: ChatPla
   const whole = await Promise.all(
     wanted.map(async (id) => {
       try {
-        const document = await getWorkoutForEdit({ kind: "library", programId: id }, unitSystem);
-        await nameExercises(document.draft);
-        const workout = editorDraftToPlanWorkoutInput(document.draft, { key: id, name: document.draft.name });
+        const workout = await readLibraryWorkout(id, unitSystem);
         const steps = formatEntryStepsSummary(workout as PlanWorkoutEntry, unitSystem);
         return {
           workout_id: id,
-          name: corosText(workout.name),
+          name: workout.name,
           sport: workout.sport ?? "run",
           ...(workout.description ? { description: workout.description } : {}),
           ...(steps ? { steps } : {}),

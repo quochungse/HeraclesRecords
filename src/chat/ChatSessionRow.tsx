@@ -313,7 +313,7 @@ export function ChatSessionRow({
   // A run that has landed but not been read is worth marking even once the
   // binding is gone: the answer is still sitting in the conversation.
   const unread = attention?.unread ?? 0;
-  const attached = attention?.attached ?? false;
+  const scheduled = attention?.scheduled ?? false;
   const waiting = waitingLabel(session);
 
   const commitRename = () => {
@@ -395,16 +395,12 @@ export function ChatSessionRow({
                 aria-hidden="true"
               />
             ) : null}
-            {attached || unread > 0 ? (
+            {scheduled ? (
               <Zap
                 className="chat-session-row-analysis-mark"
                 size={11}
                 role="img"
-                aria-label={
-                  attached
-                    ? "An analysis coach writes into this conversation"
-                    : "An analysis coach wrote into this conversation"
-                }
+                aria-label="An analysis coach writes into this conversation on its own"
               />
             ) : null}
             {session.title}
