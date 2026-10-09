@@ -3,6 +3,14 @@
 :root {
   color-scheme: dark;
 
+  /* Sleep stages, one set for every surface that draws a night — Overview's
+     card and the Sleep screen alike. Awake is a pale yellow on dark; paper
+     takes a deeper one, or it would vanish on white. */
+  --sleep-deep: #564dc0;
+  --sleep-light: #3570ff;
+  --sleep-rem: #7fbffd;
+  --sleep-awake: #fefec7;
+
   /* Per-sport activity colors. Overridden at runtime from localStorage via
      applySportColors(); customizable in Settings → Activity colors.
      Mirrors DEFAULT_SPORT_COLORS in src/training/sportColors.ts (the source
@@ -239,6 +247,8 @@ svg:focus-visible {
  */
 :root[data-theme="paper"] {
   color-scheme: light;
+
+  --sleep-awake: #e3c94a;
 
   --bg-base: #e9ecf2; /* cool paper */
   --bg-ambient-tertiary: color-mix(in srgb, var(--accent) 8%, transparent);
@@ -4464,9 +4474,9 @@ td span {
 /* ── Sleep summary panel ───────────────────────────────────────────── */
 .sleep-panel {
   --sleep-tone: rgba(120, 146, 255, 0.72);
-  container: sleep-summary / inline-size;
+  container: totals-column / inline-size;
   display: grid;
-  grid-template-rows: auto auto minmax(0, 1fr) auto;
+  grid-template-rows: auto minmax(0, 1fr);
   align-content: start;
   gap: 14px;
   /* A floor, not a share of the window. The `clamp(282px, 31vh, 392px)` that
@@ -4513,17 +4523,9 @@ td span {
   gap: 12px;
 }
 
-.sleep-panel-title {
-  display: flex;
-  align-items: baseline;
-  gap: 8px;
-  min-width: 0;
-}
-
-/* The date is the content of this line and the eyebrow is its label, which is
-   why it is the larger of the two while staying well under the score. */
-.sleep-panel-header h2 {
-  margin: 0;
+/* Which night the score is for, over the score: a label, well under it. */
+.sleep-panel-night {
+  margin: 0 0 12px;
   overflow: hidden;
   color: var(--text-secondary);
   font-size: 12px;
@@ -4606,6 +4608,41 @@ td span {
   line-height: 1.45;
 }
 
+/* The seven days on the left, the night they end on to the right of them —
+   the arrangement Weekly Activity has, and the same rows. */
+.sleep-panel-body {
+  display: grid;
+  grid-template-columns: minmax(148px, 0.28fr) minmax(0, 1fr);
+  gap: 20px;
+  min-height: 0;
+}
+
+.sleep-panel-main {
+  container: sleep-summary / inline-size;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  align-content: start;
+  gap: 14px;
+  min-width: 0;
+}
+
+/* A caption over the rows saying which days they cover: the date in the card
+   is the night's, over the score. */
+.sleep-week-totals {
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: 4px;
+}
+
+.week-totals-caption {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  line-height: 1.2;
+  text-transform: uppercase;
+}
+
 .sleep-panel-hero {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
@@ -4649,6 +4686,9 @@ td span {
 
 .sleep-stage-stack {
   display: grid;
+  /* The bar and its key stay together when the card is taller than they are —
+     the column beside it sets the height now. */
+  align-content: start;
   gap: 10px;
 }
 
@@ -4811,19 +4851,19 @@ td span {
 }
 
 .sleep-stage-segment.is-deep {
-  --sleep-stage-color: #4a63ff;
+  --sleep-stage-color: var(--sleep-deep);
 }
 
 .sleep-stage-segment.is-light {
-  --sleep-stage-color: #6f89ff;
+  --sleep-stage-color: var(--sleep-light);
 }
 
 .sleep-stage-segment.is-rem {
-  --sleep-stage-color: #9b7bff;
+  --sleep-stage-color: var(--sleep-rem);
 }
 
 .sleep-stage-segment.is-awake {
-  --sleep-stage-color: rgba(255, 255, 255, 0.36);
+  --sleep-stage-color: var(--sleep-awake);
 }
 
 .sleep-stage-legend {
@@ -4854,19 +4894,19 @@ td span {
 }
 
 .sleep-stage-legend-dot.is-deep {
-  background: #4a63ff;
+  background: var(--sleep-deep);
 }
 
 .sleep-stage-legend-dot.is-light {
-  background: #6f89ff;
+  background: var(--sleep-light);
 }
 
 .sleep-stage-legend-dot.is-rem {
-  background: #9b7bff;
+  background: var(--sleep-rem);
 }
 
 .sleep-stage-legend-dot.is-awake {
-  background: rgba(255, 255, 255, 0.28);
+  background: var(--sleep-awake);
 }
 
 .sleep-panel-empty-stages {
@@ -4961,10 +5001,6 @@ td span {
   outline-offset: 2px;
 }
 
-.sleep-metric.is-window {
-  grid-column: 1 / -1;
-}
-
 .sleep-metric dt {
   min-width: 0;
   overflow: hidden;
@@ -5007,24 +5043,50 @@ td span {
   min-width: 0;
 }
 
-.sleep-window-time svg {
-  flex-shrink: 0;
-  color: color-mix(in srgb, var(--sleep-tone) 76%, var(--text-secondary));
-}
-
 .sleep-window-arrow {
   color: var(--text-muted);
   font-size: 11px;
 }
 
-@container sleep-summary (min-width: 680px) {
-  .sleep-panel-metrics {
-    grid-template-columns: minmax(230px, 1.5fr) repeat(3, minmax(90px, 1fr));
-    gap: 18px;
-  }
+/* Six to a card, in pairs that share a column: when (the window, the naps),
+   awake (time, then how often), and the heart (HRV, RHR). The window takes a
+   row of its own only where a third of the card is too narrow for its clocks. */
+.sleep-panel-metrics {
+  grid-template-areas:
+    "window window window"
+    "awake hrv naps"
+    "wakeups rhr .";
+}
 
-  .sleep-metric.is-window {
-    grid-column: auto;
+.sleep-panel-metrics .is-window {
+  grid-area: window;
+}
+
+.sleep-panel-metrics .is-awake {
+  grid-area: awake;
+}
+
+.sleep-panel-metrics .is-wakeups {
+  grid-area: wakeups;
+}
+
+.sleep-panel-metrics .is-naps {
+  grid-area: naps;
+}
+
+.sleep-panel-metrics .is-hrv {
+  grid-area: hrv;
+}
+
+.sleep-panel-metrics .is-rhr {
+  grid-area: rhr;
+}
+
+@container sleep-summary (min-width: 520px) {
+  .sleep-panel-metrics {
+    grid-template-areas:
+      "window awake hrv"
+      "naps wakeups rhr";
   }
 }
 
@@ -5055,7 +5117,7 @@ td span {
      this only stops the card collapsing while the week is still loading. */
   min-height: 240px;
   padding: clamp(16px, 1.55vw, 21px);
-  container: weekly-activity / inline-size;
+  container: totals-column / inline-size;
 }
 
 /* The week's totals on the left, the columns they total on the right. */
@@ -5141,9 +5203,10 @@ td span {
 }
 
 /* A narrow panel has no room for a column beside the chart: the four go in a
-   row above it. */
-@container weekly-activity (max-width: 600px) {
-  .training-fitness-body {
+   row above it. The Sleep card's column folds the same way. */
+@container totals-column (max-width: 600px) {
+  .training-fitness-body,
+  .sleep-panel-body {
     grid-template-columns: minmax(0, 1fr);
     gap: 14px;
   }
@@ -15901,14 +15964,6 @@ td span {
 :root[data-theme="paper"] .sleep-stage-bar::before {
   background: rgba(19, 26, 40, 0.1);
   box-shadow: inset 0 1px 0 rgba(19, 26, 40, 0.07);
-}
-
-:root[data-theme="paper"] .sleep-stage-segment.is-awake {
-  --sleep-stage-color: rgba(96, 104, 120, 0.46);
-}
-
-:root[data-theme="paper"] .sleep-stage-legend-dot.is-awake {
-  background: rgba(96, 104, 120, 0.52);
 }
 
 :root[data-theme="paper"] .sleep-stage-segment::after {

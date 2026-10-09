@@ -1891,11 +1891,17 @@ lives at module level for the same visit-to-visit reason — see `useCalendarDat
   of `bodyFigureMath.ts` — `test:body-figure` holds the two together — and the line is found
   by arithmetic). The week's four totals left the panel for Weekly Activity: `WeekTotals`, a
   list in a column left of the chart, a row above it when the panel is under 600px
-  (`@container weekly-activity`); the days they cover are the panel's title, beside "Weekly
+  (`@container totals-column`); the days they cover are the panel's title, beside "Weekly
   Activity". **That chart is drawn whenever COROS has answered**, an empty week included — a
   Monday morning is seven empty columns on a 0–6 axis, and the totals beside them read 0 (steps
   keep their dash: the daily-health feed runs a day behind) — and its "could not be read" line
-  is for no answer at all. `npm run test:body-figure`, `test:weekly-activity`.
+  is for no answer at all. **The Sleep card has the same column** (`SleepWeekTotals`, built of
+  `WeekTotalsRow`, folding under the same query): the seven days ending on the night shown —
+  average main sleep (naps and nap-only days left out), average score, average RHR and the HRV
+  range — each **over the days that have the figure, never over seven**, so a night with no
+  data is not a zero (`buildSleepWeekTotals`, `sleepWeekTotals.ts`). The night's own HRV and
+  RHR come from the daily metrics (`trendPoints`, keyed by the day woken up), since the sleep
+  feed carries neither. `npm run test:body-figure`, `test:weekly-activity`.
 - **Sleep** (`sleepDataService`, `sleepHistoryService`, `sleepSeriesService`, `src/sleep/`) —
   nights from the COROS MCP server, cached in `sleep_nights` because COROS keeps only ~9
   weeks. **`totalMinutes` is the main sleep and nothing else** — the stage percentages, the

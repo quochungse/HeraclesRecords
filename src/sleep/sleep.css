@@ -1,14 +1,9 @@
 /*
- * Sleep details. The stage hues match the Overview panel's stacked bar
- * (src/styles.css) so one night reads the same in both places; awake is the
- * exception, defined against the text colour rather than white so it survives
- * the paper theme.
+ * Sleep details. The stage hues (`--sleep-deep` …) are declared on `:root` in
+ * src/styles.css, beside the Overview card's, so one night reads the same in
+ * both places.
  */
 .sleep-details-view {
-  --sleep-deep: #4a63ff;
-  --sleep-light: #6f89ff;
-  --sleep-rem: #9b7bff;
-  --sleep-awake: color-mix(in srgb, var(--text-primary) 34%, transparent);
   gap: 18px;
   /* No `overflow: hidden` anywhere on this screen: the panel it was set on is
      a flex child of a fill container, so hiding overflow cut the detail pane
