@@ -748,7 +748,7 @@ export function SettingsView({
         </div>
       </div>
 
-      <SyncPanel api={api} />
+      <SyncPanel api={api} onCheckForUpdates={onCheckForUpdates} />
 
       <BackupPanel api={api} />
 

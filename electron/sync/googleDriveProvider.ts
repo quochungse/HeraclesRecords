@@ -30,6 +30,7 @@
 import crypto from "node:crypto";
 
 import { SYNC_USER_AGENT } from "./googleOAuth";
+import { isWrittenOnce } from "./logFileCache";
 import {
   StorageConflictError,
   isUnderPrefix,
@@ -79,6 +80,14 @@ export class GoogleDriveProvider implements StorageProvider {
   /** In-flight lookup, shared by concurrent callers so one provider cannot
    *  create its own folder twice while the first create is still in the air. */
   #folderLookup: Promise<string> | null = null;
+  /**
+   * The log's files as the last `list` found them. A pull lists and then
+   * fetches what is new, and `get` would otherwise look each one up by path
+   * again — a second request per file for an id the listing already returned.
+   * Only the log's files: they are never rewritten in place, so the id stays
+   * good, where a lease or the vault id must be looked up fresh every time.
+   */
+  readonly #listedLogFiles = new Map<string, DriveFile>();
 
   constructor(options: GoogleDriveProviderOptions) {
     this.#options = options;
@@ -257,6 +266,7 @@ export class GoogleDriveProvider implements StorageProvider {
       // A raced create leaves duplicates behind; the oldest is the real one.
       if (seen.has(storagePath)) continue;
       seen.add(storagePath);
+      if (isWrittenOnce(storagePath)) this.#listedLogFiles.set(storagePath, file);
       if (!isUnderPrefix(storagePath, prefix)) continue;
 
       entries.push({
@@ -271,13 +281,22 @@ export class GoogleDriveProvider implements StorageProvider {
 
   async get(storagePath: string): Promise<StorageContent | null> {
     const normalized = normalizeStoragePath(storagePath);
-    const file = await this.#fileAt(normalized);
+    const listed = this.#listedLogFiles.get(normalized);
+    const file = listed ?? (await this.#fileAt(normalized));
     if (!file) return null;
 
     const response = await this.#request(
       `${DRIVE_API}/files/${file.id}?alt=media`
     );
-    if (response.status === 404) return null;
+    if (response.status === 404) {
+      // Gone since the listing. Asked again by path, in case a copy that lost
+      // a raced create is still there.
+      if (listed) {
+        this.#listedLogFiles.delete(normalized);
+        return this.get(normalized);
+      }
+      return null;
+    }
     if (!response.ok) {
       throw new Error(
         `Google Drive download failed (${response.status}) for ${normalized}`
@@ -396,6 +415,7 @@ export class GoogleDriveProvider implements StorageProvider {
 
   async delete(storagePath: string, expected?: ExpectedRevision): Promise<void> {
     const normalized = normalizeStoragePath(storagePath);
+    this.#listedLogFiles.delete(normalized);
     const files = await this.#filesAt(normalized);
     const existing = files[0] ?? null;
 

@@ -19,7 +19,7 @@
 
 import { compareHlcStrings } from "./hlc";
 import { entryIdentity, type OpEntry } from "./oplog";
-import { isMergedTable } from "./rowMergers";
+import { foldsEntry } from "./rowMergers";
 import {
   isDeviceEncrypted,
   policyForLocalStorage,
@@ -39,6 +39,10 @@ export interface SyncTarget {
     context?: { readonly winner: boolean }
   ): void;
   deleteRow(table: string, recordId: string): void;
+  /** One element of a row's list column (an `item` entry). Optional: a target
+   *  that has none refuses them, as it would an unknown table. */
+  upsertItem?(table: string, recordId: string, entry: Record<string, unknown>): void;
+  deleteItem?(table: string, recordId: string): void;
   setSetting(key: string, value: string): void;
   deleteSetting(key: string): void;
   setLocalStorage(key: string, value: string): void;
@@ -93,8 +97,8 @@ export interface ContentChange {
   readonly removed: boolean;
 }
 
-/** A merged row on its way back out. Carries the row itself so the caller does
- *  not have to read it back and risk publishing something newer by accident. */
+/** A merged row on its way back out, as the target holds it once the merge is
+ *  over. */
 export interface RepublishRow {
   readonly table: string;
   readonly recordId: string;
@@ -145,9 +149,11 @@ export interface ApplyOptions {
   /**
    * Whether this target has already been given this exact change.
    *
-   * The log is read in full on every poll — `readAllEntries` has no cursor —
-   * so without an answer here every merged row and setting is rewritten to
-   * SQLite every few seconds and `onApplied` never stops firing. Asked after
+   * A pull still meets entries it has applied before — each new snapshot
+   * repeats the log up to its `upTo`, a launch reads again the files left for
+   * it, and a first launch reads everything — so without an answer here every
+   * merged row and setting is rewritten to SQLite and `onApplied` fires for
+   * nothing. Asked after
    * last-writer-wins rather than before it: filtering the input would let an
    * older entry win once its successor had been seen.
    */
@@ -212,6 +218,11 @@ export function tierForEntry(
       return policyForSetting(entry.key);
     case "localStorage":
       return policyForLocalStorage(entry.key);
+    case "item": {
+      // An element travels in its table's tier.
+      const policy = policyForTable(entry.key);
+      return policy === "perKey" || policy === undefined ? undefined : policy;
+    }
   }
 }
 
@@ -247,7 +258,7 @@ export function resolve(entries: readonly OpEntry[]): Map<string, OpEntry> {
 export function tablesTouched(entries: readonly OpEntry[]): string[] {
   const tables = new Set<string>();
   for (const entry of entries) {
-    if (entry.scope === "table") tables.add(entry.key);
+    if (entry.scope === "table" || entry.scope === "item") tables.add(entry.key);
   }
   return [...tables];
 }
@@ -280,7 +291,7 @@ export function applyEntries(
       rejected.push({ entry, reason: "not-syncable" });
       continue;
     }
-    if (entry.scope === "table" && !entry.recordId) {
+    if ((entry.scope === "table" || entry.scope === "item") && !entry.recordId) {
       rejected.push({ entry, reason: "malformed" });
       continue;
     }
@@ -306,11 +317,21 @@ export function applyEntries(
   // are authoritative; see `RowMergeContext`.
   const ordered = admissible
     .filter((entry) =>
-      entry.scope === "table" && isMergedTable(entry.key)
+      foldsEntry(entry)
         ? true
         : winners.get(entryIdentity(entry)) === entry
     )
-    .sort((a, b) => compareHlcStrings(a.hlc, b.hlc));
+    // Every row before any element, then causal order. A row is applied at the
+    // timestamp of its newest copy, and its messages were written before that
+    // copy whenever the row changed since — a conversation created, written in
+    // and renamed, read in one pull — so in causal order alone they would
+    // arrive for a row not there yet. A row depends on nothing an element
+    // carries, so taking them first changes no outcome but that one.
+    .sort(
+      (a, b) =>
+        Number(a.scope === "item") - Number(b.scope === "item") ||
+        compareHlcStrings(a.hlc, b.hlc)
+    );
 
   const merged: OpEntry[] = [];
 
@@ -332,6 +353,10 @@ export function applyEntries(
             break;
           case "localStorage":
             target.deleteLocalStorage(entry.key);
+            break;
+          case "item":
+            if (!target.deleteItem) throw new Error("This target takes no items");
+            target.deleteItem(entry.key, entry.recordId as string);
             break;
         }
         deleted += 1;
@@ -356,6 +381,19 @@ export function applyEntries(
           case "localStorage":
             target.setLocalStorage(entry.key, stringValue(entry.payload));
             break;
+          case "item": {
+            const element = entry.payload?.entry;
+            if (!target.upsertItem) throw new Error("This target takes no items");
+            if (!element || typeof element !== "object" || Array.isArray(element)) {
+              throw new Error("An item entry carries no element");
+            }
+            target.upsertItem(
+              entry.key,
+              entry.recordId as string,
+              element as Record<string, unknown>
+            );
+            break;
+          }
         }
         applied += 1;
       }
@@ -486,7 +524,7 @@ export class ChangeBuilder {
    * renderer hands over everything policy allows and the main process works out
    * what moved. That is the whole outbound half — theme, units, accent palette,
    * sport colours, startup view and every `heraclesrecords.selection.v1.*` — and it
-   * meets `SqliteSyncTarget.setLocalStorage` / `drainLocalStorage` /
+   * meets `SqliteSyncTarget.setLocalStorage` / `pendingLocalStorage` /
    * `applySyncedLocalStorageOps` coming the other way.
    */
   localStorage(key: string, value: string): this {

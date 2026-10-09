@@ -25,18 +25,55 @@ import {
   shouldApply,
   type RecordVersionStore
 } from "./recordVersions";
-import { isMergedTable } from "./rowMergers";
+import { foldsEntry } from "./rowMergers";
 import type { OutboxStore } from "./outbox";
 import {
   appendBatch,
   compactOplog,
   entryIdentity,
+  listLogFiles,
+  parseBatch,
+  parseOplogSnapshot,
   readAllEntries,
   type CompactOplogResult,
+  type LogFile,
   type OpEntry
 } from "./oplog";
+import { LogFileCache, withLogFileCache } from "./logFileCache";
+import { StorageConflictError } from "./storageProvider";
+import {
+  applyPublishMarks,
+  itemisedColumn,
+  splitIntoItems,
+  type PublishMark,
+  type PublishedItemStore
+} from "./transcriptItems";
+import {
+  compactVault,
+  encodeSnapshot,
+  headPathFor,
+  listVault,
+  parseHead,
+  readLogBatch,
+  readSnapshotAt,
+  snapshotPathFor,
+  writeHead,
+  writeLogBatch,
+  type CompactVaultResult
+} from "./vaultLog";
+import {
+  createMemoryVectorStore,
+  type VectorRecord,
+  type VectorStore
+} from "./vectorStore";
+import {
+  createMemoryReadIndex,
+  needsRead,
+  type ReadIndexStore,
+  type ReadRecord
+} from "./readIndex";
 import { Lease } from "./lease";
-import { applyEntries, type ApplyResult, type ContentChange, type SyncTarget,
+import { applyEntries, resolve, type ApplyResult, type ContentChange, type SyncTarget,
   ChangeBuilder
 } from "./syncEngine";
 import type { StorageProvider } from "./storageProvider";
@@ -44,8 +81,36 @@ import type { StorageProvider } from "./storageProvider";
 export const SYNC_LOOP_SETTINGS = {
   clock: "sync.clock",
   lastPulledAt: "sync.lastPulledAt",
-  lastCompactedAt: "sync.lastCompactedAt"
+  lastCompactedAt: "sync.lastCompactedAt",
+  /** Format 2: the snapshot this machine last read, or wrote when it migrated
+   *  the vault. Absent, the next pull reads the newest one. */
+  lastSnapshot: "sync.v2.lastSnapshot",
+  /** Format 2: the app version that last read the vault from its snapshot.
+   *  Another version reads it again, once, so what an older build could not
+   *  take — a table or column it did not know — lands now. */
+  fullReadBuild: "sync.v2.fullReadBuild",
+  /** The vault the format-2 bookkeeping above describes; see
+   *  `forgetVaultLogState`. */
+  vaultId: "sync.v2.vaultId"
 } as const;
+
+/** How long the format-1 log is kept after the newest file in it, before a
+ *  format-2 machine deletes it: long enough for a machine still on an older
+ *  build to have stopped, and for anyone to recover from it by hand. Nothing
+ *  reads it once the vault has moved — a machine coming from format 1
+ *  publishes its own records with its first seed in format 2. */
+export const LEGACY_LOG_RETENTION_MS = 7 * 24 * 60 * 60 * 1000;
+export const FORMAT_MIGRATION_LEASE = "format-migration";
+
+const EMPTY_PULL: PullResult = {
+  applied: 0,
+  deleted: 0,
+  superseded: 0,
+  rejected: [],
+  merged: [],
+  contentChanges: [],
+  entriesSeen: 0
+};
 
 /**
  * How rarely a device even considers compacting.
@@ -162,6 +227,35 @@ export interface SyncLoopDeps {
    * process that made it.
    */
   readonly outbox: OutboxStore;
+  /**
+   * Which files of the log this machine has read, so a pull downloads only
+   * what is new. Defaulted, unlike the two above, because the fallback is
+   * safe rather than lossy: an in-memory index forgets at every launch, and
+   * the first pull of a launch then reads the whole log — which is what every
+   * pull used to do. See `readIndex.ts`.
+   */
+  readonly readIndex?: ReadIndexStore;
+  /**
+   * Asked at every pull, after the listing and before anything is read:
+   * may this build still work with the vault? Handed every revision the
+   * listing found, so it can tell from the identity's revision whether there
+   * is anything new to ask. False stops the pull with nothing applied; the
+   * caller is expected to stop the loop. Absent, every pull proceeds.
+   */
+  readonly vaultGate?: (revisions: ReadonlyMap<string, string>) => Promise<boolean>;
+  /**
+   * The vault's data format this loop writes (docs/sync-v2.md). 1 is the
+   * `oplog/` layout, read file by file; 2 is the numbered log with heads and a
+   * vector, coach transcripts travelling a message at a time. Defaults to 1,
+   * which is what the suites written before format 2 drive; the app runs 2.
+   */
+  readonly format?: 1 | 2;
+  /** Format 2: what has been published of each transcript message. */
+  readonly publishedItems?: PublishedItemStore;
+  /** Format 2: how far each device's log has been read. */
+  readonly vector?: VectorStore;
+  /** The app's version, for the read-again-on-upgrade rule (format 2). */
+  readonly buildId?: string;
   /** Called after inbound changes land, so the renderer can reload. */
   readonly onApplied?: (result: AppliedChanges) => void;
   readonly onError?: (error: unknown) => void;
@@ -180,7 +274,23 @@ export interface AppliedChanges extends ApplyResult {
 }
 
 export interface PullResult extends AppliedChanges {
+  /** Entries read this time — from the files not read before, not the log. */
   readonly entriesSeen: number;
+}
+
+/** A file read by a pull, with what it held. */
+interface ReadFile extends LogFile {
+  readonly entries: readonly OpEntry[];
+  /** A snapshot this build could not parse. */
+  readonly unreadable: boolean;
+}
+
+interface NewlyRead {
+  readonly files: readonly ReadFile[];
+  /** Every entry from `files`, as `applyEntries` takes them. */
+  readonly entries: OpEntry[];
+  /** Recorded reads of files the vault no longer has. */
+  readonly gone: readonly ReadRecord[];
 }
 
 /**
@@ -198,7 +308,7 @@ export interface PullResult extends AppliedChanges {
  */
 function versionKey(entry: OpEntry): string {
   const identity = entryIdentity(entry);
-  if (entry.scope !== "table" || !isMergedTable(entry.key)) return identity;
+  if (!foldsEntry(entry)) return identity;
   return `${identity}@${parseHlc(entry.hlc).device}`;
 }
 
@@ -208,24 +318,24 @@ export class SyncLoop {
   /** Changes waiting to go out. Survives a failed flush: a push that could not
    *  reach the network must not lose the edit it was carrying. */
   #pending: OpEntry[] = [];
-  /**
-   * "Already merged", for the entries whose application this process must not
-   * promise on behalf of the next one.
-   *
-   * Two kinds land here, for the same reason at one remove. A `localStorage`
-   * entry queues work for the renderer rather than performing it, so a quit
-   * before it is delivered owes that work still. A row the target could take
-   * only part of — columns this build has no schema for — landed, but not as
-   * the entry describes it, and a later build has to be able to finish the job.
-   * Both are suppressed for this process, so neither churns `onApplied` every
-   * poll, and both come back on the next launch.
-   */
-  readonly #localStorageMerged = new Map<string, string>();
+  readonly #readIndex: ReadIndexStore;
+  /** Names this launch in the read index: a file left for a later reading is
+   *  read again by the next launch, and not by this one. */
+  readonly #launch: string;
+  readonly #fileCache = new LogFileCache();
+  readonly #format: 1 | 2;
+  readonly #vector: VectorStore;
+  /** Format 2: whether this process has checked its own head and batches
+   *  against the number it is about to use. */
+  #ownSeqChecked = false;
+  /** The newest snapshot, when this process found it unreadable. */
+  #unreadableSnapshot: string | null = null;
   #flushTimer: unknown = null;
   #pollTimer: unknown = null;
   #firstPendingAt: number | null = null;
   #lastActivityAt: number | null = null;
   #running = false;
+  #held = false;
   #inFlight: Promise<unknown> | null = null;
   /** Held by whichever of `pull` / `flush` / `tick` is running. See
    *  `#exclusive`. */
@@ -246,6 +356,12 @@ export class SyncLoop {
 
   constructor(deps: SyncLoopDeps) {
     this.#deps = deps;
+    this.#readIndex = deps.readIndex ?? createMemoryReadIndex();
+    this.#format = deps.format ?? 1;
+    this.#vector = deps.vector ?? createMemoryVectorStore();
+    this.#launch = `${deps.now().toString(36)}-${Math.random()
+      .toString(36)
+      .slice(2, 10)}`;
     const stored = deps.getSetting(SYNC_LOOP_SETTINGS.clock);
     this.#clock = new HlcClock({
       device: deps.deviceId(),
@@ -275,6 +391,9 @@ export class SyncLoop {
    * else until the upload returns.
    */
   get hasUnpushedChanges(): boolean {
+    // A held loop sends nothing, so quit has nothing to wait for: the queue is
+    // in `sync_outbox` for the build that may send it.
+    if (this.#held) return false;
     return this.#pending.length > 0 || this.#uploading !== null;
   }
 
@@ -290,6 +409,7 @@ export class SyncLoop {
    * this with a timeout as well, for a link that neither answers nor fails.
    */
   async flushBeforeQuit(): Promise<void> {
+    if (this.#held) return;
     // Before the queue, not after: this upload is holding entries that are no
     // longer in `#pending`, and a `flush` that raced it would push the *next*
     // batch while the older one was still unaccounted for.
@@ -302,6 +422,38 @@ export class SyncLoop {
     // existed, and it is safe: appending a batch is this device's own directory
     // and no reader is mid-write.
     await this.#flush().catch(() => undefined);
+  }
+
+  /** Format 2: a coach conversation's row goes out without its transcript,
+   *  and each message that changed goes as an item of its own. */
+  #split(entries: readonly OpEntry[]): { entries: OpEntry[]; marks: PublishMark[] } {
+    const published = this.#deps.publishedItems;
+    if (this.#format !== 2 || !published) return { entries: [...entries], marks: [] };
+    return splitIntoItems(
+      entries,
+      (table, recordId) => published.forRecord(table, recordId),
+      this.nextHlc
+    );
+  }
+
+  /** Record as published what is now safely queued. Only after the queue took
+   *  it: a mark without the queue would be a message recorded as sent that
+   *  never left. Without the queue, the next save simply sends it again. */
+  #commitMarks(marks: readonly PublishMark[]): void {
+    const published = this.#deps.publishedItems;
+    if (!published || marks.length === 0) return;
+    try {
+      applyPublishMarks(published, marks);
+    } catch (error) {
+      this.#deps.onError?.(error);
+    }
+  }
+
+  /** The vault, with the log's files served from this process's cache where
+   *  it already holds them. Every read and write of the log goes through it;
+   *  leases do not, since they are rewritten in place. */
+  #storage(): StorageProvider {
+    return withLogFileCache(this.#deps.provider(), this.#fileCache);
   }
 
   nextHlc = (): string => {
@@ -320,7 +472,13 @@ export class SyncLoop {
    * token would be correct and useless — hundreds of uploads a second, each
    * superseded by the next.
    */
-  enqueue(entries: readonly OpEntry[]): void {
+  enqueue(proposed: readonly OpEntry[]): void {
+    if (proposed.length === 0) return;
+    const { entries, marks } = this.#split(proposed);
+    this.#queue(entries, marks);
+  }
+
+  #queue(entries: readonly OpEntry[], marks: readonly PublishMark[]): void {
     if (entries.length === 0) return;
     // Stamped here, before anything is pushed or awaited, because this is the
     // moment the local database moved and a pull already in flight cannot know
@@ -330,7 +488,8 @@ export class SyncLoop {
     //
     // `enqueue` is the one door every local change comes through: the bridge's
     // hooks on settings and row writes, and `fullState`'s republish, all end up
-    // here. A second door would be a second way to lose a write.
+    // here — and so does a merge's republish, past the split. A second door
+    // would be a second way to lose a write.
     for (const entry of entries) {
       // Both marks: this machine's row holds the state, and this machine's own
       // entry for it has nothing left to fold.
@@ -342,6 +501,7 @@ export class SyncLoop {
     // is recoverable by the next launch.
     try {
       this.#deps.outbox.add(entries);
+      this.#commitMarks(marks);
     } catch (error) {
       // A queue that cannot be made durable is still a queue. Letting this
       // escape would take the change with it — the bridge catches and logs, and
@@ -383,7 +543,7 @@ export class SyncLoop {
   }
 
   async #flush(): Promise<FlushResult> {
-    if (this.#pending.length === 0) return { pushed: 0, path: null };
+    if (this.#held || this.#pending.length === 0) return { pushed: 0, path: null };
     if (!this.#deps.conditions().online) {
       // Offline: keep the queue and try again on the next flush. Nothing is
       // lost and nothing is reported — this is the normal state on a train.
@@ -408,9 +568,10 @@ export class SyncLoop {
   }
 
   async #upload(batch: OpEntry[]): Promise<FlushResult> {
+    if (this.#format === 2) return this.#uploadV2(batch);
     try {
       const written = await appendBatch(
-        this.#deps.provider(),
+        this.#storage(),
         this.#deps.deviceId(),
         batch
       );
@@ -419,6 +580,24 @@ export class SyncLoop {
       // them again — a duplicate entry costs nothing, a missing one costs the
       // change.
       this.#deps.outbox.remove(batch);
+      // Its own batch is nothing a pull needs to fetch: `enqueue` stamped every
+      // entry in it, so reading it back would change nothing. A record lost
+      // here costs one download of it, never a change.
+      if (written) {
+        try {
+          this.#readIndex.record([
+            {
+              path: written.path,
+              revision: written.revision,
+              state: "done",
+              readBy: this.#launch,
+              readAt: this.#deps.now()
+            }
+          ]);
+        } catch (error) {
+          this.#deps.onError?.(error);
+        }
+      }
       return { pushed: batch.length, path: written?.path ?? null };
     } catch (error) {
       // Put the work back. A queue that drops entries on a transient failure
@@ -453,9 +632,42 @@ export class SyncLoop {
   }
 
   async #pull(): Promise<PullResult> {
-    const provider = this.#deps.provider();
-    const entries = await readAllEntries(provider);
+    if (this.#held) return EMPTY_PULL;
+    return this.#format === 2 ? this.#pullV2() : this.#pullLegacy();
+  }
 
+  /** Format 1: the files of `oplog/` not read before. */
+  async #pullLegacy(): Promise<PullResult> {
+    const startedAt = this.#deps.now();
+    const read = await this.#readNewFiles();
+    // The vault's format moved past this build: nothing read, nothing applied,
+    // and the caller holds the loop.
+    if (!read) return EMPTY_PULL;
+    return this.#merge(
+      read.entries,
+      (merged, incomplete) => {
+        // In the same transaction as the rows: a read is recorded exactly when
+        // what it read has landed, so a crash between the two re-reads the file
+        // rather than skipping it.
+        this.#readIndex.record(this.#readRecords(read, merged, incomplete));
+        this.#readIndex.forget(
+          read.gone.filter((record) => record.readAt < startedAt).map((r) => r.path)
+        );
+      }
+    );
+  }
+
+  /**
+   * Apply what was read, and say what landed.
+   *
+   * `commit` runs inside the merge's transaction, so whatever records how far
+   * this machine has read — the read index, the vector — moves exactly when the
+   * rows do.
+   */
+  #merge(
+    entries: OpEntry[],
+    commit: (merged: ApplyResult, incomplete: ReadonlySet<string>) => void
+  ): PullResult {
     // Only for the clock fold below. What may be *applied* is no longer a
     // question about who wrote an entry — see the comment on `applyEntries`.
     const mine = this.#deps.deviceId();
@@ -466,6 +678,11 @@ export class SyncLoop {
     for (const entry of foreign) {
       this.#clock.observeString(entry.hlc);
     }
+    // Only what was read this time, which is what makes it a sign of activity.
+    // It used to be every foreign entry in the log, and a vault any other
+    // machine had ever written to has those in its snapshot for good — so the
+    // loop never left the fast interval, and pulled the whole log every five
+    // seconds for as long as a window was open.
     if (foreign.length > 0) {
       this.#deps.setSetting(
         SYNC_LOOP_SETTINGS.clock,
@@ -474,8 +691,13 @@ export class SyncLoop {
       this.#noteActivity();
     }
 
-    // Resolved over the whole log; written back only where the winner is
-    // causally later than what this machine already holds.
+    // Resolved over what was read; written back only where the winner is
+    // causally later than what this machine already holds. Reading only the
+    // files not read before changes nothing here: an entry in a file already
+    // read was applied then, found already held, or lost to one that was —
+    // so the stamps below already outrank it, and reading it again would skip
+    // it. A file that left anything for a later reading is not skipped; see
+    // `#readRecords`.
     //
     // That second half is the whole guard, and it has to be a comparison rather
     // than a rule about authorship. `applyEntries` resolves entries against each
@@ -506,18 +728,18 @@ export class SyncLoop {
     //     launch, so the whole log was re-merged on each first pull — which is
     //     precisely when the race is live.
     //
-    // `localStorage` is deliberately not stamped durably, and the asymmetry is
-    // the point. Applying one of those entries does not write anything: it
-    // queues an operation for the renderer, which performs it whenever a window
-    // is next ready. Nothing acknowledges that it did, so a durable stamp would
-    // record as held something that a quit in between simply loses. Held in
-    // memory instead, the queue is rebuilt on the next launch and the renderer
-    // writes the value again — idempotent, and the only direction in which the
-    // preference cannot be lost. Making it durable means persisting the pending
-    // operations and clearing them on an acknowledgement from the renderer,
-    // which is the honest fix and a larger one.
+    // `localStorage` is stamped like everything else. Applying one of those
+    // entries writes it to the target's inbox, in this same transaction, and
+    // it leaves the inbox only when the renderer says it wrote the value — so a
+    // quit in between owes nothing to a re-read of the log. It used to be a
+    // queue in memory, which is why these entries were once never stamped and
+    // the files holding them were read again at every launch.
+    //
+    // A row the target took only part of — columns this build has no schema
+    // for — is the one thing not stamped: it landed, but not as the entry
+    // describes it, and a later build has to be able to finish the job. Its
+    // file is left for the next launch to read again (`#readRecords`).
     const versions = this.#deps.recordVersions;
-    const durable = (entry: OpEntry): boolean => entry.scope !== "localStorage";
     const target = this.#deps.target;
     // One transaction for the rows *and* the stamps that say this machine holds
     // them. A merge used to be a few hundred separate writes with nothing
@@ -539,12 +761,7 @@ export class SyncLoop {
       target.takeContentChanges?.();
 
       const merged = applyEntries(target, entries, {
-        isApplied: (entry) => {
-          const key = versionKey(entry);
-          return durable(entry)
-            ? !shouldApply(versions, key, entry.hlc)
-            : this.#localStorageMerged.get(key) === entry.hlc;
-        },
+        isApplied: (entry) => !shouldApply(versions, versionKey(entry), entry.hlc),
         // Winning the log is not enough to overwrite a row's other columns. An
         // entry can win and still be older than what is here — a turn written
         // on a plane reaches the vault after one written since — and its
@@ -556,15 +773,13 @@ export class SyncLoop {
       const incomplete = new Set(target.takeIncomplete?.() ?? []);
       for (const entry of merged.merged) {
         const key = versionKey(entry);
-        if (!durable(entry) || incomplete.has(entryIdentity(entry))) {
-          this.#localStorageMerged.set(key, entry.hlc);
-          continue;
-        }
+        if (incomplete.has(entryIdentity(entry))) continue;
         versions.set(key, entry.hlc);
         // The record's own mark moves too, so the column guard above keeps
         // working for a merged table — `versionKey` only splits the *fold*.
         versions.set(entryIdentity(entry), entry.hlc);
       }
+      commit(merged, incomplete);
       return merged;
     };
     const merged = target.transaction ? target.transaction(runMerge) : runMerge();
@@ -587,7 +802,17 @@ export class SyncLoop {
       for (const row of republish) {
         builder.row(row.table, row.recordId, row.row);
       }
-      this.enqueue(builder.entries);
+      const { entries: split, marks } = this.#split(builder.entries);
+      // In format 2 a conversation goes back out as the messages the vault
+      // lacks, never as its row: the row is the one just merged, and sent again
+      // under a fresh timestamp it would outrank — here too, through its stamp —
+      // a rename made elsewhere and not yet read.
+      this.#queue(
+        this.#format === 2
+          ? split.filter((entry) => entry.scope !== "table" || !itemisedColumn(entry.key))
+          : split,
+        marks
+      );
     }
 
     this.#deps.setSetting(
@@ -598,6 +823,378 @@ export class SyncLoop {
       this.#deps.onApplied?.(result);
     }
     return { ...result, entriesSeen: entries.length };
+  }
+
+  /**
+   * Format 2: what the heads say is new, and the snapshot when it is needed.
+   *
+   * A head whose revision is the one last seen is not fetched, so with nothing
+   * new a pull is one listing. A device whose next batch is gone was compacted
+   * past this machine, and the snapshot covering it is read; so is the newest
+   * snapshot when this machine has never read one, and once after the app
+   * version changes (`fullReadBuild`).
+   */
+  async #pullV2(): Promise<PullResult> {
+    const storage = this.#storage();
+    const listing = await listVault(storage);
+    if (this.#deps.vaultGate && !(await this.#deps.vaultGate(listing.revisions))) {
+      return EMPTY_PULL;
+    }
+    const self = this.#deps.deviceId();
+    const held = this.#vector.load();
+    // Other devices only: this machine's own record is the upload's and the
+    // head's to move, and saving the copy loaded here would put back a head
+    // `#moveHead` has just written — then every pull would write it again.
+    const next = new Map<string, VectorRecord>(held);
+    next.delete(self);
+    const appliedOf = (device: string) => next.get(device)?.seq ?? 0;
+
+    // This machine's own head, written again when it is behind its batches or
+    // missing: a batch whose head write failed — a quit that timed out between
+    // the two, say — is invisible to the others until it is.
+    const own = held.get(self);
+    if (own && own.seq > 0 && (own.headSeq < own.seq || !listing.heads.has(self))) {
+      await this.#moveHead(storage, self, own.seq);
+    }
+
+    const heads = new Map<string, { seq: number; revision: string }>();
+    for (const [device, revision] of listing.heads) {
+      if (device === self) continue;
+      const known = held.get(device);
+      if (known && known.headRevision === revision) {
+        heads.set(device, { seq: known.headSeq, revision });
+        continue;
+      }
+      const stored = await storage.get(headPathFor(device));
+      const seq = stored ? parseHead(stored.content) : null;
+      if (seq !== null && stored) heads.set(device, { seq, revision: stored.revision });
+    }
+
+    const buildId = this.#deps.buildId;
+    const resync =
+      buildId !== undefined &&
+      this.#deps.getSetting(SYNC_LOOP_SETTINGS.fullReadBuild) !== buildId;
+    const lastSnapshot = this.#deps.getSetting(SYNC_LOOP_SETTINGS.lastSnapshot);
+    const latest = listing.snapshots[listing.snapshots.length - 1];
+    const gap = [...heads].some(([device, head]) => {
+      const applied = appliedOf(device);
+      return head.seq > applied && !(listing.logs.get(device) ?? []).includes(applied + 1);
+    });
+
+    const entries: OpEntry[] = [];
+    let snapshotRead: string | null = null;
+    const wantSnapshot =
+      latest !== undefined &&
+      (resync || (latest !== lastSnapshot && (gap || lastSnapshot === undefined)));
+    // A snapshot this build could not read is not fetched again by this
+    // process: with no other to read, every poll would download it again.
+    const snapshot =
+      wantSnapshot && latest !== this.#unreadableSnapshot
+        ? await readSnapshotAt(storage, latest)
+        : null;
+    if (wantSnapshot && !snapshot) this.#unreadableSnapshot = latest ?? null;
+    if (snapshot) {
+      entries.push(...snapshot.entries);
+      // Read again on an upgrade: every other device back to what the snapshot
+      // holds, so its batches after that are read again too. Otherwise only
+      // forward — a device this machine has read past the snapshot keeps its
+      // place.
+      if (resync) {
+        for (const [device, record] of next) {
+          next.set(device, { ...record, seq: snapshot.vector[device] ?? 0 });
+        }
+      }
+      for (const [device, seq] of Object.entries(snapshot.vector)) {
+        if (device === self) continue;
+        const record = next.get(device) ?? { seq: 0, headSeq: 0, headRevision: null };
+        next.set(device, { ...record, seq: resync ? seq : Math.max(record.seq, seq) });
+      }
+      snapshotRead = latest;
+    } else if (resync && latest === undefined) {
+      // No snapshot yet: the whole log is still there to read again.
+      for (const [device, record] of next) next.set(device, { ...record, seq: 0 });
+    }
+    // Done only when it was: a snapshot that could not be read leaves every
+    // place where it was, and the next pull asks again.
+    const resynced = resync && (snapshot !== null || latest === undefined);
+
+    for (const [device, head] of heads) {
+      let seq = appliedOf(device);
+      while (seq < head.seq) {
+        const batch = await readLogBatch(storage, device, seq + 1);
+        // Gone: compacted between the listing and now. The next pull reads the
+        // snapshot that covers it.
+        if (!batch) break;
+        entries.push(...batch);
+        seq += 1;
+      }
+      next.set(device, { seq, headSeq: head.seq, headRevision: head.revision });
+    }
+
+    const result = this.#merge(entries, () => {
+      this.#vector.save(next);
+      if (snapshotRead) {
+        this.#deps.setSetting(SYNC_LOOP_SETTINGS.lastSnapshot, snapshotRead);
+      }
+      if (resynced && buildId !== undefined) {
+        this.#deps.setSetting(SYNC_LOOP_SETTINGS.fullReadBuild, buildId);
+      }
+    });
+
+    return result;
+  }
+
+  /**
+   * Format 2: claim the next batch number, then move the head.
+   *
+   * The number is this machine's own, but a machine that lost its database —
+   * or crashed between a batch and its record — can only find it in the
+   * vault, so the first upload of a process checks the head and the batches
+   * there. A number already taken is a conflict, answered by looking again.
+   */
+  async #uploadV2(batch: OpEntry[]): Promise<FlushResult> {
+    try {
+      const storage = this.#storage();
+      const self = this.#deps.deviceId();
+      let seq = (this.#vector.load().get(self)?.seq ?? 0) + 1;
+      if (!this.#ownSeqChecked) {
+        seq = Math.max(seq, (await this.#ownSeqInVault(storage, self)) + 1);
+        this.#ownSeqChecked = true;
+      }
+      let path: string;
+      try {
+        path = await writeLogBatch(storage, self, seq, batch);
+      } catch (error) {
+        if (!(error instanceof StorageConflictError)) throw error;
+        seq = (await this.#ownSeqInVault(storage, self)) + 1;
+        path = await writeLogBatch(storage, self, seq, batch);
+      }
+      // The head as it stood, until it has moved: if moving it fails, the next
+      // pull sees it behind and writes it again.
+      const before = this.#vector.load().get(self);
+      this.#vector.save(
+        new Map([[self, { seq, headSeq: before?.headSeq ?? 0, headRevision: before?.headRevision ?? null }]])
+      );
+      this.#deps.outbox.remove(batch);
+      await this.#moveHead(storage, self, seq);
+      return { pushed: batch.length, path };
+    } catch (error) {
+      this.#pending = [...batch, ...this.#pending];
+      this.#firstPendingAt ??= this.#deps.now();
+      this.#deps.onError?.(error);
+      return { pushed: 0, path: null };
+    }
+  }
+
+  /** Write this machine's head and record that it was. A failure is reported
+   *  and left for the next pull, which finds the head behind. */
+  async #moveHead(storage: StorageProvider, self: string, seq: number): Promise<void> {
+    try {
+      const revision = await writeHead(storage, self, seq);
+      this.#vector.save(new Map([[self, { seq, headSeq: seq, headRevision: revision }]]));
+    } catch (error) {
+      this.#deps.onError?.(error);
+    }
+  }
+
+  async #ownSeqInVault(storage: StorageProvider, self: string): Promise<number> {
+    const listing = await listVault(storage);
+    const logged = listing.logs.get(self) ?? [];
+    let head = 0;
+    if (listing.heads.has(self)) {
+      const stored = await storage.get(headPathFor(self));
+      head = (stored && parseHead(stored.content)) || 0;
+    }
+    return Math.max(head, logged[logged.length - 1] ?? 0);
+  }
+
+  /**
+   * Move a format-1 vault to format 2 (docs/sync-v2.md §7), once, under a
+   * lease so two machines upgraded together do it once between them.
+   *
+   * Read the old log one last time, write a snapshot of what this machine now
+   * holds — each record under the timestamp it came from, so nothing written
+   * elsewhere loses to it for being older — and only then raise the vault's
+   * format. Until that last step every other machine still reads format 1, and
+   * a migration that stops part-way leaves a snapshot nobody reads.
+   *
+   * `collect` hands over every syncable record with the timestamp it holds;
+   * `stillNeeded` asks the vault again once the lease is held; `raiseFormat`
+   * writes the identity. False when another machine holds the lease or the
+   * vault has already moved.
+   */
+  async migrateToV2(options: {
+    readonly collect: () => readonly OpEntry[];
+    readonly stillNeeded: () => Promise<boolean>;
+    readonly raiseFormat: () => Promise<void>;
+  }): Promise<boolean> {
+    return this.#exclusive(async () => {
+      const lease = new Lease(FORMAT_MIGRATION_LEASE, {
+        provider: this.#deps.provider,
+        deviceId: this.#deps.deviceId,
+        now: this.#deps.now,
+        ttlMs: COMPACT_LEASE_TTL_MS
+      });
+      const held = await lease.withLease(async () => {
+        if (!(await options.stillNeeded())) return false;
+        // The whole format-1 log, once: what it holds that this machine does
+        // not is applied (each entry against the stamps, as any pull), and its
+        // tombstones go into the snapshot. Built from this machine's data alone
+        // the snapshot would hold no deletions, and a machine that had missed
+        // one would publish the deleted record back when it joined.
+        const legacy = await readAllEntries(this.#storage());
+        this.#merge(legacy, () => undefined);
+        const stamped = options.collect();
+        const present = new Set(stamped.map((entry) => entryIdentity(entry)));
+        const tombstones = [...resolve(legacy).values()].filter(
+          (entry) => entry.op === "delete" && !present.has(entryIdentity(entry))
+        );
+        // Split against nothing published, so the snapshot holds every message
+        // and not only the ones this machine has not sent; then recorded as
+        // published, so the next save of each conversation sends nothing again.
+        const split = splitIntoItems([...stamped, ...tombstones], () => new Map(), this.nextHlc, {
+          itemHlc: (row) => row.hlc
+        });
+        const entries = split.entries;
+        for (const entry of entries) {
+          this.#deps.recordVersions.set(entryIdentity(entry), entry.hlc);
+        }
+        const path = snapshotPathFor(this.nextHlc());
+        await this.#storage().put(
+          path,
+          encodeSnapshot({ version: 2, vector: {}, entries }),
+          null
+        );
+        await options.raiseFormat();
+        // Only once the vault has moved. Recorded first, a raise that failed
+        // would leave this machine believing it had read a snapshot nobody
+        // reads — and, when another machine then migrated, never reading that
+        // one — and its messages marked as sent in a log nobody reads either.
+        this.#commitMarks(split.marks);
+        this.#deps.setSetting(SYNC_LOOP_SETTINGS.lastSnapshot, path);
+        if (this.#deps.buildId !== undefined) {
+          this.#deps.setSetting(SYNC_LOOP_SETTINGS.fullReadBuild, this.#deps.buildId);
+        }
+        return true;
+      });
+      return held.ran ? held.result : false;
+    });
+  }
+
+  /**
+   * Format 2: the old log, deleted once nothing has been written to it for
+   * `LEGACY_LOG_RETENTION_MS`.
+   */
+  async #retireLegacyLog(): Promise<void> {
+    const storage = this.#storage();
+    const legacy = (await storage.list()).filter(
+      (entry) => entry.path.startsWith("oplog/") || entry.path.startsWith("oplog-snapshot/")
+    );
+    if (legacy.length === 0) return;
+    const newest = Math.max(...legacy.map((entry) => Date.parse(entry.modifiedAt) || 0));
+    if (this.#deps.now() - newest < LEGACY_LOG_RETENTION_MS) return;
+    for (const entry of legacy) {
+      await storage.delete(entry.path).catch(() => undefined);
+    }
+  }
+
+  /**
+   * Download the files of the log this machine has not read yet.
+   *
+   * The listing is metadata only; what is fetched is each batch not read
+   * before and the newest snapshot, if that is new. A pull with nothing new
+   * therefore costs one listing — it used to download the whole log.
+   */
+  async #readNewFiles(): Promise<NewlyRead | null> {
+    const storage = this.#storage();
+    const listing = await listLogFiles(storage);
+    if (this.#deps.vaultGate && !(await this.#deps.vaultGate(listing.revisions))) {
+      return null;
+    }
+    const known = this.#readIndex.load();
+    const fresh = (file: LogFile) =>
+      needsRead(known.get(file.path), file.revision, this.#launch);
+
+    const files: ReadFile[] = [];
+    const entries: OpEntry[] = [];
+
+    // Only the newest snapshot, as `readLog` reads it; an older one is about to
+    // be deleted by the pass that wrote its successor.
+    const snapshot = listing.snapshots[listing.snapshots.length - 1];
+    const folded = new Set<string>();
+    if (snapshot && fresh(snapshot)) {
+      const stored = await storage.get(snapshot.path);
+      if (stored) {
+        const parsed = parseOplogSnapshot(stored.content);
+        // A snapshot this build cannot read may be a newer build's: read it
+        // again next launch rather than never.
+        files.push({ ...snapshot, entries: parsed?.entries ?? [], unreadable: !parsed });
+        for (const entry of parsed?.entries ?? []) {
+          entries.push(entry);
+          folded.add(entry.hlc);
+        }
+      }
+    }
+
+    for (const batch of listing.batches) {
+      if (!fresh(batch)) continue;
+      const stored = await storage.get(batch.path);
+      // Deleted between the listing and now: compaction folded it into a
+      // snapshot, which the next listing shows as new.
+      if (!stored) continue;
+      // What the snapshot read alongside already holds, by timestamp, as
+      // `readLog` skips it — a batch straddling the horizon is in both.
+      const parsed = parseBatch(stored.content).filter((entry) => !folded.has(entry.hlc));
+      files.push({ ...batch, entries: parsed, unreadable: false });
+      entries.push(...parsed);
+    }
+
+    const listed = new Set(
+      [...listing.batches, ...listing.snapshots].map((file) => file.path)
+    );
+    const gone = [...known.values()].filter((record) => !listed.has(record.path));
+    return { files, entries, gone };
+  }
+
+  /**
+   * How each file read this time is recorded: `done` when nothing in it waits
+   * on a later reading, `retry` when something does.
+   *
+   * `retry` is everything the loop has always left for the next launch to
+   * read again, back when every pull read everything: a row the target took
+   * only part of, and an entry this build refuses but a newer one might take —
+   * unclassified, not synced by this build, or one the target threw on. Only a
+   * malformed entry and one sealed to another machine's keychain are refused
+   * for good. A `localStorage` entry is not among them: it waits in the
+   * target's inbox until the renderer acknowledges it.
+   */
+  #readRecords(
+    read: NewlyRead,
+    merged: ApplyResult,
+    incomplete: ReadonlySet<string>
+  ): ReadRecord[] {
+    const pending = new Set<OpEntry>();
+    for (const rejected of merged.rejected) {
+      if (rejected.reason !== "malformed" && rejected.reason !== "device-encrypted") {
+        pending.add(rejected.entry);
+      }
+    }
+    for (const entry of merged.merged) {
+      if (incomplete.has(entryIdentity(entry))) pending.add(entry);
+    }
+    const readAt = this.#deps.now();
+    return read.files.map((file) => {
+      const retry =
+        file.unreadable ||
+        file.entries.some((entry) => pending.has(entry));
+      return {
+        path: file.path,
+        revision: file.revision,
+        state: retry ? "retry" : "done",
+        readBy: this.#launch,
+        readAt
+      };
+    });
   }
 
   // --- Compaction ------------------------------------------------------------
@@ -614,7 +1211,8 @@ export class SyncLoop {
    * refuses it stays correct, only larger — so a failure is reported through
    * `onError` and the next window tries again.
    */
-  async compactIfDue(): Promise<CompactOplogResult | null> {
+  async compactIfDue(): Promise<CompactOplogResult | CompactVaultResult | null> {
+    if (this.#held) return null;
     const now = this.#deps.now();
     const last = Number(
       this.#deps.getSetting(SYNC_LOOP_SETTINGS.lastCompactedAt) ?? 0
@@ -635,9 +1233,17 @@ export class SyncLoop {
     });
 
     try {
-      const held = await lease.withLease(() =>
-        compactOplog(this.#deps.provider(), { now: this.#deps.now })
-      );
+      const held = await lease.withLease(async () => {
+        if (this.#format !== 2) {
+          return compactOplog(this.#storage(), { now: this.#deps.now });
+        }
+        const result = await compactVault(this.#storage(), {
+          now: this.#deps.now,
+          nextHlc: this.nextHlc
+        });
+        await this.#retireLegacyLog();
+        return result;
+      });
       return held.ran ? held.result : null;
     } catch (error) {
       this.#deps.onError?.(error);
@@ -712,11 +1318,27 @@ export class SyncLoop {
         .load()
         .filter((entry) => !known.has(entry.hlc));
       if (held.length === 0) return;
+      // A queue left by a format-1 build holds whole conversations. Split as
+      // they go out; the new items are queued durably as well, and the row
+      // keeps its timestamp, so confirming the upload releases the original.
+      // Its messages are stamped as held, like anything `enqueue` queues, so a
+      // pull meanwhile does not apply an older copy over them. They take fresh
+      // timestamps (the queue is keyed by timestamp); a copy that did not
+      // change and is sent again cannot beat a newer edit elsewhere, because a
+      // message keeps the copy edited last (`outranks`).
+      const { entries: split, marks } = this.#split(held);
+      const original = new Set(held.map((entry) => entry.hlc));
+      const added = split.filter((entry) => !original.has(entry.hlc));
+      for (const entry of added) {
+        this.#deps.recordVersions.set(entryIdentity(entry), entry.hlc);
+      }
+      if (added.length > 0) this.#deps.outbox.add(added);
+      this.#commitMarks(marks);
       // Added to the queue, never substituted for it. `enqueue` treats a table
       // it cannot write to as a warning rather than a failure — the change is
       // still queued in memory — so replacing the queue with the table would
       // throw away exactly the entries that write failed for.
-      this.#pending = [...this.#pending, ...held];
+      this.#pending = [...this.#pending, ...split];
       this.#firstPendingAt ??= this.#deps.now();
       this.#scheduleFlush();
     } catch (error) {
@@ -724,6 +1346,25 @@ export class SyncLoop {
       // still works, and the next write re-queues normally.
       this.#deps.onError?.(error);
     }
+  }
+
+  /**
+   * Stop sending and reading, and keep queueing.
+   *
+   * For a vault in a data format this build may not work with: nothing may be
+   * read from it or written to it, and a change made here meanwhile must still
+   * reach it once the app is updated. `enqueue` keeps writing to the durable
+   * outbox — which the updated build adopts and sends — while flush, pull,
+   * compaction and the flush at quit all do nothing. Final for this loop: a
+   * vault's format never moves back.
+   */
+  hold(): void {
+    this.#held = true;
+    this.stop();
+  }
+
+  get isHeld(): boolean {
+    return this.#held;
   }
 
   stop(): void {

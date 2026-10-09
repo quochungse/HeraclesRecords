@@ -30,7 +30,7 @@
 // the difference.
 
 import { requireDatabase } from "../database";
-import type { OpEntry } from "./oplog";
+import { entryIdentity, type OpEntry } from "./oplog";
 import {
   primaryKeyOf,
   readRows,
@@ -143,6 +143,52 @@ export function collectFullStateEntries(
     }
   }
 
+  return builder.entries;
+}
+
+/**
+ * Every syncable record on this machine, each under the timestamp of the
+ * write it came from — for the snapshot a format migration writes
+ * (docs/sync-v2.md §7).
+ *
+ * `collectFullStateEntries` stamps everything afresh, which is right for
+ * seeding a vault nobody else writes to and wrong here: a record stamped now
+ * would beat a change the other machine made a minute ago and has not sent
+ * yet. So each takes its `recordVersions` stamp, and only one this machine
+ * never stamped is stamped now. localStorage comes from the snapshot of it
+ * this machine last published or received, since the main process cannot
+ * read the renderer's.
+ */
+export function collectStampedEntries(options: {
+  readonly stampOf: (identity: string) => string | undefined;
+  readonly nextHlc: () => string;
+  readonly localStorage: Readonly<Record<string, string>>;
+}): readonly OpEntry[] {
+  let stamp = "";
+  const builder = new ChangeBuilder({ nextHlc: () => stamp });
+  const as = (identity: string) => {
+    stamp = options.stampOf(identity) ?? options.nextHlc();
+  };
+  for (const table of syncableTables()) {
+    const key = primaryKeyOf(table);
+    if (key.length === 0) continue;
+    for (const row of readRows(table)) {
+      const id = recordId(row, key);
+      as(entryIdentity({ scope: "table", key: table, recordId: id }));
+      builder.row(table, id, row);
+    }
+  }
+  const settings = requireDatabase()
+    .prepare("SELECT key, value FROM app_settings")
+    .all() as Array<{ key: string; value: string }>;
+  for (const { key, value } of settings) {
+    as(entryIdentity({ scope: "setting", key }));
+    builder.setting(key, value);
+  }
+  for (const [key, value] of Object.entries(options.localStorage)) {
+    as(entryIdentity({ scope: "localStorage", key }));
+    builder.localStorage(key, value);
+  }
   return builder.entries;
 }
 

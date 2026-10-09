@@ -25,27 +25,36 @@ import path from "node:path";
 import { pathToFileURL } from "node:url";
 import {
   createDefaultSyncDeps,
-  SyncService
+  SyncService,
+  VAULT_ID_PATH
 } from "./sync/syncService";
 import { GoogleOAuth } from "./sync/googleOAuth";
 import { GoogleDriveProvider } from "./sync/googleDriveProvider";
 import { SyncLoop } from "./sync/syncLoop";
-import { SqliteSyncTarget } from "./sync/sqliteSyncTarget";
+import {
+  SqliteSyncTarget,
+  type PendingLocalStorageOp
+} from "./sync/sqliteSyncTarget";
 import { tablesTouched, type ApplyResult } from "./sync/syncEngine";
 import { attachSyncSink } from "./sync/syncBridge";
 import { createSqliteRecordVersions } from "./sync/recordVersions";
 import { createSqliteOutbox } from "./sync/outbox";
+import { createSqlitePublishedItems } from "./sync/transcriptItems";
+import { createSqliteVectorStore, forgetVaultLogState } from "./sync/vectorStore";
+import { BUILD_DATA_FORMAT } from "./sync/dataFormat";
 import { attachAnalysisLeases } from "./sync/automationLease";
 import {
   captureSyncableState,
   collectFullStateEntries,
+  collectStampedEntries,
   publishFullState
 } from "./sync/fullState";
 import type { SyncableStateCapture } from "./sync/fullState";
 import {
   commitPublishedLocalStorage,
   diffLocalStorage,
-  noteAppliedLocalStorage
+  noteAppliedLocalStorage,
+  publishedLocalStorage
 } from "./sync/localStorageSync";
 import type {
   LocalStoragePublishResult,
@@ -118,6 +127,7 @@ import {
   reconnectTrainingHub,
   restoreTrainingHubSessionAtStartup,
   setTrainingHubSessionListener,
+  currentTrainingHubSessionId,
   updateCorosProfile,
   uploadActivityFitToCoros,
   uploadTrainingPlan
@@ -823,21 +833,36 @@ app.whenReady().then(() => {
 /**
  * How long the first pull may hold the analyses back.
  *
- * A pull reads the whole log, and on Drive that is a round trip per batch, so
- * a large vault on a slow link can take a while. The analyses are worth more
+ * A pull reads every file of the log this machine has not read yet — the whole
+ * log on a first launch — and on Drive that is a round trip per file, so a
+ * large vault on a slow link can take a while. The analyses are worth more
  * late than never, and a pull still in flight when they start is covered
  * anyway: a run whose conversation it changes is stopped and says so
  * (`noteConversationsChangedBySync`).
  */
 const STARTUP_SYNC_WAIT_MS = 90_000;
 
+/**
+ * The COROS session under which a pull last read the whole vault, or null.
+ *
+ * Taken when the pull *starts*: a session minted while it was in flight may
+ * have kicked out a machine that was still writing, so only a pull begun
+ * under the session counts for it.
+ */
+let caughtUpSession: string | null = null;
+
 async function firstPullAtStartup(): Promise<void> {
   const loop = syncLoopInstance;
   if (!loop || !net.isOnline()) return;
   let timer: NodeJS.Timeout | undefined;
+  const session = currentTrainingHubSessionId();
   try {
     await Promise.race([
-      loop.pull(),
+      // Still counted if it lands after the wait: the first run then finds the
+      // vault already read and does not pull again.
+      loop.pull().then(() => {
+        caughtUpSession = session;
+      }),
       new Promise<void>((resolve) => {
         timer = setTimeout(resolve, STARTUP_SYNC_WAIT_MS);
       })
@@ -1007,8 +1032,8 @@ const syncTarget = new SqliteSyncTarget();
 /**
  * What a pull merged, waiting for a renderer to tell.
  *
- * The localStorage half of a pull has always been queued — `SqliteSyncTarget`
- * holds it, because the main process cannot perform those writes itself. The
+ * The localStorage half of a pull waits in `SqliteSyncTarget`'s inbox, because
+ * the main process cannot perform those writes itself. The
  * counts and the table names had no such queue: they arrived as arguments and
  * were dropped whole when the window was not ready, and the `did-finish-load`
  * follow-up then announced `0, 0`. So a pull that landed during startup or a
@@ -1041,24 +1066,27 @@ function noteSyncApplied(result: ApplyResult): void {
 /**
  * Hand a pull's results to the renderer, localStorage writes included.
  *
- * Nothing is drained without a renderer to drain it into. `SqliteSyncTarget`
- * queues localStorage operations because the main process cannot reach
- * `window.localStorage`, and it is the only copy — so taking them while nobody
- * is listening loses them outright. That is not hypothetical: the loop is tied
- * to the app, not to a window, so a Mac with its window closed keeps pulling.
+ * Nothing is sent without a renderer to send it to. The localStorage
+ * operations wait in `SqliteSyncTarget`'s inbox because the main process cannot
+ * reach `window.localStorage`, and they leave it only on the renderer's
+ * acknowledgement — they were once a queue in memory, drained as they were
+ * sent, so a send nobody heard lost them outright. The loop is tied to the
+ * app, not to a window, so a Mac with its window closed keeps pulling.
  *
  * `rendererReady`, not merely a live `mainWindow`. A `BrowserWindow` exists from
  * `createWindow()` onward, but `webContents.send` before `did-finish-load`
  * reaches no listener — so a pull landing during startup or a reload used to
- * drain the queue into nothing and lose exactly what this guard is here to
- * protect.
+ * send its counts into nothing.
  *
  * Called again from `markRendererReady`, which is what delivers anything that
  * accumulated while there was nowhere to send it.
  */
 function sendSyncChanged(): void {
   if (!mainWindow || mainWindow.isDestroyed() || !rendererReady) return;
-  const localStorage = syncTarget.drainLocalStorage();
+  // Read, not taken: they stay in the inbox until the renderer acknowledges
+  // them (`sync:ackLocalStorage`), so a window that closes or reloads before
+  // writing them is sent them again.
+  const localStorage = syncTarget.pendingLocalStorage();
   const { applied, deleted, tables } = pendingSyncChange;
   if (localStorage.length === 0 && applied === 0 && deleted === 0) return;
   pendingSyncChange = { applied: 0, deleted: 0, tables: new Set() };
@@ -1112,6 +1140,10 @@ function publishRendererLocalStorage(
   if (changes.entries.length === 0) return { syncing: true, published: 0 };
 
   loop.enqueue(changes.entries);
+  // A value changed here outranks one still waiting for the renderer: dropped
+  // from the inbox, so a resend after a lost acknowledgement cannot put the
+  // older one back over it.
+  syncTarget.discardPendingLocalStorage(changes.entries.map((entry) => entry.key));
   // Recorded as published as soon as it is queued, not once it is uploaded: a
   // failed flush puts the batch back on the queue rather than dropping it, so
   // the entries are not lost, and re-diffing them would only mint a second set
@@ -1162,6 +1194,19 @@ function flushTrainingHubSessionChanged(): void {
   mainWindow.webContents.send("trainingHub:sessionChanged", status);
 }
 
+/**
+ * The vault is in a data format this build may not work with: read and write
+ * nothing, and keep what changes here in the outbox for the updated build to
+ * send. Stopping the loop outright would detach the bridge, and a change made
+ * meanwhile would then live only in memory and be gone at quit. Analyses run
+ * as they do with sync off — their lease is in the vault too.
+ */
+function holdSyncLoop(): void {
+  const loop = syncLoopInstance ?? startSyncLoop({ held: true });
+  loop?.hold();
+  attachAnalysisLeases(null);
+}
+
 function stopSyncLoop(): void {
   syncSeedStatus = { state: "pending", entries: 0, error: null };
   attachSyncSink(null);
@@ -1178,9 +1223,22 @@ function stopSyncLoop(): void {
  * back short of "ready" is a destination that did not answer.
  */
 async function prepareSync(): Promise<SyncVaultState> {
-  const state = await syncService().prepare();
+  const service = syncService();
+  const state = await service.prepare();
   if (state === "ready") {
-    startSyncLoop();
+    // Asked before any loop is stopped: from a loop detaching to the next one
+    // attaching, the bridge has no sink and drops what changes, so nothing may
+    // be awaited in between.
+    const vaultId = await service.vaultId();
+    const format = await service.checkDataFormat();
+    // A loop held for an outdated format is not one to resume.
+    if (syncLoopInstance?.isHeld) stopSyncLoop();
+    forgetAnotherVaultsLog(vaultId);
+    // A vault still in an older format is moved to this build's before the
+    // loop reads or writes anything (docs/sync-v2.md §7).
+    startSyncLoop({ migrate: !syncLoopInstance && format === "ahead" });
+  } else if (state === "outdated") {
+    holdSyncLoop();
   } else if (state === "signed-out" || state === "wrong-owner") {
     // The two states where carrying on is not merely unproductive but wrong:
     // nobody is signed in, or the vault holds another account's data. A loop
@@ -1192,10 +1250,36 @@ async function prepareSync(): Promise<SyncVaultState> {
   return state;
 }
 
-function startSyncLoop(): SyncLoop | null {
+/**
+ * What this machine knows of a vault's log belongs to that vault. Pointed at
+ * another — a different Google account, a folder deleted and made again — it
+ * starts over: the vector, the published messages and the snapshot it read go,
+ * and a running loop over the old vault stops first. Its seed for the new
+ * vault (keyed by vault id) then sends everything.
+ */
+function forgetAnotherVaultsLog(vaultId: string): void {
+  if (getSetting(SYNC_LOOP_SETTINGS.vaultId) === vaultId) return;
+  if (syncLoopInstance) stopSyncLoop();
+  forgetVaultLogState();
+  deleteSettings([SYNC_LOOP_SETTINGS.lastSnapshot, SYNC_LOOP_SETTINGS.fullReadBuild]);
+  setSetting(SYNC_LOOP_SETTINGS.vaultId, vaultId);
+}
+
+/** The revision of `vault/id.json` the running loop last checked the data
+ *  format against. Reset with every loop. */
+let gatedIdentityRevision: string | null = null;
+
+function startSyncLoop({
+  held = false,
+  migrate = false
+}: { held?: boolean; migrate?: boolean } = {}): SyncLoop | null {
   const service = syncService();
   if (syncLoopInstance) return syncLoopInstance;
   if (!service.isReady) return null;
+  gatedIdentityRevision = null;
+  // A new loop may be a new vault: nothing about it has been read yet.
+  caughtUpSession = null;
+  const recordVersions = createSqliteRecordVersions();
 
   const loop = new SyncLoop({
     provider: () => service.dataProvider(),
@@ -1207,8 +1291,32 @@ function startSyncLoop(): SyncLoop | null {
     now: () => Date.now(),
     setTimer: (fn, ms) => setTimeout(fn, ms),
     clearTimer: (handle) => clearTimeout(handle as NodeJS.Timeout),
-    recordVersions: createSqliteRecordVersions(),
+    recordVersions,
     outbox: createSqliteOutbox(),
+    // Vault format 2: a numbered log with heads, coach transcripts a message
+    // at a time (docs/sync-v2.md).
+    format: 2,
+    publishedItems: createSqlitePublishedItems(),
+    vector: createSqliteVectorStore(),
+    buildId: app.getVersion(),
+    // The other machine may move the vault to a newer data format while this
+    // one runs. The identity's revision is in every listing, so it is read
+    // again only when it changed — once per loop, and after a claim or an
+    // upgrade elsewhere.
+    vaultGate: async (revisions) => {
+      const revision = revisions.get(VAULT_ID_PATH) ?? null;
+      if (revision !== null && revision === gatedIdentityRevision) return true;
+      if ((await service.checkDataFormat()) === "outdated") {
+        console.warn(
+          "[sync] the vault is in a newer data format than this build; " +
+            "sync is off until the app is updated"
+        );
+        holdSyncLoop();
+        return false;
+      }
+      gatedIdentityRevision = revision;
+      return true;
+    },
     conditions: () => ({
       // A hidden window means nobody is looking, so there is nothing to poll
       // for; `resume()` picks it up again when the window comes back.
@@ -1239,6 +1347,13 @@ function startSyncLoop(): SyncLoop | null {
     nextHlc: loop.nextHlc
   });
 
+  if (held) {
+    // Queueing only: no lease, no start, no seed. See `holdSyncLoop`.
+    loop.hold();
+    syncLoopInstance = loop;
+    return loop;
+  }
+
   // Analyses sync, so the same 6am job now exists on every machine. Without
   // a lease all of them would run it.
   attachAnalysisLeases({
@@ -1252,11 +1367,30 @@ function startSyncLoop(): SyncLoop | null {
       console.warn(
         `[sync] lost the lease for analysis ${analysisId} mid-run; ` +
           `another device may have taken it over`
+      ),
+    // Only when this session has not yet read the vault in full — the
+    // start-up pull failed, ran past its wait, or a login since replaced the
+    // session. Once it has, no other machine can have run anything: COROS
+    // keeps one live session per account, and it is this one.
+    catchUp: async () => {
+      const session = currentTrainingHubSessionId();
+      if (session && session === caughtUpSession) return;
+      await loop.pull();
+      caughtUpSession = session;
+    },
+    onCatchUpFailed: (analysisId, error) =>
+      console.warn(
+        `[sync] could not pull before analysis ${analysisId}; running on what is here`,
+        error
       )
   });
 
-  loop.start();
   syncLoopInstance = loop;
+  if (migrate) {
+    void migrateThenStart(loop, service, recordVersions);
+    return loop;
+  }
+  loop.start();
 
   // The oplog only ever learned about records written while it was running, so
   // on a machine that has been in use for months it starts out describing
@@ -1264,6 +1398,72 @@ function startSyncLoop(): SyncLoop | null {
   void seedVaultIfNeeded(loop, service);
 
   return loop;
+}
+
+/**
+ * Move a format-1 vault to format 2, then run the loop over it.
+ *
+ * Nothing is pushed or pulled before: the loop is not started, and a pull
+ * asked for meanwhile (the start-up one) waits behind the migration. When the
+ * migration cannot run — another machine holds its lease, or it failed — the
+ * loop is held, so what changes here is still queued durably, and it is tried
+ * again in a few minutes; by then the vault may simply be in format 2 already.
+ */
+async function migrateThenStart(
+  loop: SyncLoop,
+  service: ReturnType<typeof syncService>,
+  recordVersions: ReturnType<typeof createSqliteRecordVersions>
+): Promise<void> {
+  try {
+    const moved = await loop.migrateToV2({
+      collect: () =>
+        collectStampedEntries({
+          stampOf: (identity) => recordVersions.get(identity),
+          nextHlc: loop.nextHlc,
+          localStorage: publishedLocalStorage({ getSetting })
+        }),
+      stillNeeded: async () => (await service.checkDataFormat()) === "ahead",
+      raiseFormat: () => service.raiseDataFormat()
+    });
+    if (!moved && (await service.checkDataFormat()) === "ahead") {
+      console.info("[sync] another machine is moving the vault to format 2; trying later");
+      holdForMigrationRetry(loop);
+      return;
+    }
+    // This machine's data is the snapshot: there is nothing left to seed.
+    if (moved) service.markSeeded(seedMarker(await service.vaultId()));
+  } catch (error) {
+    console.warn("[sync] could not move the vault to format 2", error);
+    holdForMigrationRetry(loop);
+    return;
+  }
+  if (syncLoopInstance !== loop) return;
+  loop.start();
+  void seedVaultIfNeeded(loop, service);
+}
+
+/** How long a migration that could not run waits before it is tried again. */
+const MIGRATION_RETRY_MS = 5 * 60 * 1000;
+let migrationRetry: NodeJS.Timeout | null = null;
+
+function holdForMigrationRetry(loop: SyncLoop): void {
+  if (syncLoopInstance === loop) holdSyncLoop();
+  if (migrationRetry) return;
+  migrationRetry = setTimeout(() => {
+    migrationRetry = null;
+    // Through `prepareSync`, which stops a held loop and decides afresh.
+    void prepareSync().catch((error) =>
+      console.warn("[sync] could not re-check the vault for its migration", error)
+    );
+  }, MIGRATION_RETRY_MS);
+  migrationRetry.unref?.();
+}
+
+/** The marker `hasSeeded` keeps, per vault and per data format: a machine that
+ *  seeded a vault in format 1 seeds it once more in format 2, which is how what
+ *  it wrote on an older build after the move reaches the new log. */
+function seedMarker(vaultId: string): string {
+  return `${vaultId}:v${BUILD_DATA_FORMAT.dataVersion}`;
 }
 
 /**
@@ -1285,15 +1485,27 @@ async function seedVaultIfNeeded(
 ): Promise<void> {
   try {
     const vaultId = await service.vaultId();
-    if (service.hasSeeded(vaultId)) {
+    const marker = seedMarker(vaultId);
+    if (service.hasSeeded(marker)) {
       syncSeedStatus = { state: "done", entries: 0, error: null };
       return;
     }
 
     syncSeedStatus = { state: "publishing", entries: 0, error: null };
-    const entries = collectFullStateEntries(loop.nextHlc);
+    // The vault first, then what this machine holds, each record under the
+    // timestamp of the write it came from. Published with fresh timestamps
+    // before reading anything, a machine joining a vault would have beaten
+    // every newer copy elsewhere of a record they share — a setting changed on
+    // the other computer last week, say — just by being sent now.
+    await loop.pull();
+    const versions = createSqliteRecordVersions();
+    const entries = collectStampedEntries({
+      stampOf: (identity) => versions.get(identity),
+      nextHlc: loop.nextHlc,
+      localStorage: publishedLocalStorage({ getSetting })
+    });
     const published = await publishFullState(loop, entries);
-    service.markSeeded(vaultId);
+    service.markSeeded(marker);
     syncSeedStatus = {
       state: "done",
       entries: published.entries,
@@ -1368,7 +1580,7 @@ async function republishAfterRestore(
     // A restore states the whole of this machine's data, so whatever the seed
     // would have said has just been said.
     const service = syncService();
-    service.markSeeded(await service.vaultId());
+    service.markSeeded(seedMarker(await service.vaultId()));
     console.info(
       `[sync] republished ${published.entries} records after a restore`
     );
@@ -2508,7 +2720,8 @@ function registerIpcHandlers(): void {
     // separate again.
     await prepareSync();
     const loop = syncLoopInstance;
-    if (!loop) return { pushed: 0, applied: 0 };
+    // Held for an outdated format: there is nothing it may send or read.
+    if (!loop || loop.isHeld) return { pushed: 0, applied: 0 };
 
     // A seed that failed at launch gets another go here. "Sync now" is what a
     // person reaches for when something looks wrong, and the panel points them
@@ -2532,6 +2745,24 @@ function registerIpcHandlers(): void {
     (_event, entries: Record<string, string>) =>
       publishRendererLocalStorage(entries ?? {})
   );
+
+  // The renderer wrote these localStorage values; they may leave the inbox.
+  // Checked field by field, since the payload crosses the bridge.
+  ipcMain.handle("sync:ackLocalStorage", (_event, ops: unknown) => {
+    if (!Array.isArray(ops)) return;
+    syncTarget.acknowledgeLocalStorage(
+      ops.flatMap((op): PendingLocalStorageOp[] => {
+        if (!op || typeof op !== "object") return [];
+        const { op: kind, key, value } = op as Record<string, unknown>;
+        if (typeof key !== "string") return [];
+        if (kind === "delete") return [{ op: "delete" as const, key }];
+        if (kind === "set" && typeof value === "string") {
+          return [{ op: "set" as const, key, value }];
+        }
+        return [];
+      })
+    );
+  });
 
   ipcMain.handle("sync:announcePresence", (_event, sessionId: string | null) =>
     // Whatever loop is already running. Presence must not be the thing that

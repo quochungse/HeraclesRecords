@@ -45,9 +45,15 @@ import crypto from "node:crypto";
 
 import { currentOwner, isOwnerFingerprint } from "../dataOwner";
 import { deviceId } from "./deviceIdentity";
+import {
+  BUILD_DATA_FORMAT,
+  dataFormatVerdict,
+  vaultDataFormat
+} from "./dataFormat";
 import { ObfuscatedProvider } from "./obfuscatedProvider";
 import type { StorageProvider } from "./storageProvider";
 import type {
+  DataFormatVerdict,
   SyncVaultOwnership,
   SyncVaultStatus,
   SyncVaultState
@@ -75,10 +81,17 @@ export const SYNC_SETTINGS = {
  * signed-in machine syncs, and rewritten only when someone deliberately claims
  * the vault for a different account.
  */
-const VAULT_ID_PATH = "vault/id.json";
+export const VAULT_ID_PATH = "vault/id.json";
 
 interface VaultIdentity {
-  readonly version: 1;
+  /**
+   * The identity file's own shape. Any version from 1 is read: what this build
+   * can do with the vault is decided by `dataVersion` / `dataVersionCompat`
+   * (see `dataFormat.ts`), not by this. Builds from before those numbers accept
+   * exactly 1 and refuse anything else without writing — which is how a later
+   * format stops them, by raising this to 2 (docs/sync-v2.md §3).
+   */
+  readonly version: number;
   readonly id: string;
   readonly createdAt: string;
   /**
@@ -87,13 +100,19 @@ interface VaultIdentity {
    * the next machine to sync claims it.
    */
   readonly owner: string | null;
+  /** See `dataFormat.ts`. Absent on a vault from before the numbers, which is
+   *  format 1. Kept on every rewrite: an identity is spread, never rebuilt. */
+  readonly dataVersion?: number;
+  readonly dataVersionCompat?: number;
 }
 
 function isVaultIdentity(value: unknown): value is VaultIdentity {
   if (!value || typeof value !== "object") return false;
   const identity = value as Partial<VaultIdentity>;
   return (
-    identity.version === 1 &&
+    typeof identity.version === "number" &&
+    Number.isInteger(identity.version) &&
+    identity.version >= 1 &&
     typeof identity.id === "string" &&
     /^[0-9a-f]{16}$/.test(identity.id)
   );
@@ -127,9 +146,9 @@ export interface SyncDeps {
 }
 
 export class SyncNotReadyError extends Error {
-  readonly code: "not-configured";
+  readonly code: "not-configured" | "outdated";
 
-  constructor(code: "not-configured", message: string) {
+  constructor(code: "not-configured" | "outdated", message: string) {
     super(message);
     this.name = "SyncNotReadyError";
     this.code = code;
@@ -222,6 +241,11 @@ export class SyncService {
       await this.#mintIdentity(owner);
       return "ready";
     }
+    // Before the claim below, which writes: a build that may not work with
+    // this vault's format must leave it exactly as it found it.
+    if (dataFormatVerdict(vaultDataFormat(identity)) === "outdated") {
+      return "outdated";
+    }
     const current = ownerOf(identity);
     if (!current) {
       // A vault from before ownership existed, or one whose first machine was
@@ -269,10 +293,14 @@ export class SyncService {
    */
   async #mintIdentity(owner: string): Promise<VaultIdentity> {
     const identity: VaultIdentity = {
-      version: 1,
+      // A vault born in format 2 is one no build from before the numbers may
+      // touch; they accept only identity version 1 (docs/sync-v2.md §3).
+      version: BUILD_DATA_FORMAT.dataVersion >= 2 ? 2 : 1,
       id: crypto.randomBytes(8).toString("hex"),
       createdAt: this.#deps.now().toISOString(),
-      owner
+      owner,
+      dataVersion: BUILD_DATA_FORMAT.dataVersion,
+      dataVersionCompat: BUILD_DATA_FORMAT.dataVersionCompat
     };
     try {
       await this.#provider().put(
@@ -326,6 +354,12 @@ export class SyncService {
     }
     const identity =
       (await this.#readIdentity()) ?? (await this.#mintIdentity(owner));
+    if (dataFormatVerdict(vaultDataFormat(identity)) === "outdated") {
+      throw new SyncNotReadyError(
+        "outdated",
+        "This vault is in a newer data format. Update the app first."
+      );
+    }
     await this.#writeIdentity({ ...identity, owner });
     this.#deps.setSetting(SYNC_SETTINGS.seededVaultId, "");
   }
@@ -339,6 +373,46 @@ export class SyncService {
 
   markSeeded(vaultId: string): void {
     this.#deps.setSetting(SYNC_SETTINGS.seededVaultId, vaultId);
+  }
+
+  /**
+   * Where this build stands against the vault's data format, read fresh.
+   * Null when the vault has no identity yet. Throws when it cannot be reached,
+   * like `prepare()`.
+   */
+  async checkDataFormat(): Promise<DataFormatVerdict | null> {
+    const identity = await this.#readIdentity();
+    return identity ? dataFormatVerdict(vaultDataFormat(identity)) : null;
+  }
+
+  /**
+   * Raise the vault's format to this build's, once a migration has written
+   * what the new format needs. Conditional on the revision just read, so two
+   * machines migrating together cannot both write it; never lowers either
+   * number; and raises the identity's own version to 2, which is what stops a
+   * build from before the numbers.
+   */
+  async raiseDataFormat(): Promise<void> {
+    const stored = await this.#provider().get(VAULT_ID_PATH);
+    if (!stored) throw new Error("The vault has no identity to raise.");
+    const parsed: unknown = JSON.parse(stored.content.toString("utf8"));
+    if (!isVaultIdentity(parsed)) throw new Error("The vault's identity cannot be read.");
+    const current = vaultDataFormat(parsed);
+    if (dataFormatVerdict(current) !== "ahead") return;
+    const raised: VaultIdentity = {
+      ...parsed,
+      version: Math.max(parsed.version, BUILD_DATA_FORMAT.dataVersion >= 2 ? 2 : 1),
+      dataVersion: BUILD_DATA_FORMAT.dataVersion,
+      dataVersionCompat: Math.max(
+        current.dataVersionCompat,
+        BUILD_DATA_FORMAT.dataVersionCompat
+      )
+    };
+    await this.#provider().put(
+      VAULT_ID_PATH,
+      Buffer.from(JSON.stringify(raised), "utf8"),
+      stored.revision
+    );
   }
 
   // --- Status ----------------------------------------------------------------
@@ -358,10 +432,10 @@ export class SyncService {
     // two machines' records together, so whose they are is the first question,
     // not a later one.
     if (!owner) {
-      return { ...base, state: "signed-out", ownership: null };
+      return { ...base, state: "signed-out", ownership: null, dataFormat: null };
     }
     if (!this.#isConfigured()) {
-      return { ...base, state: "not-configured", ownership: null };
+      return { ...base, state: "not-configured", ownership: null, dataFormat: null };
     }
 
     // One small object answers reachability, identity and ownership together.
@@ -374,6 +448,9 @@ export class SyncService {
     // one row less.
     try {
       const identity = await this.#readIdentity();
+      const dataFormat = identity
+        ? dataFormatVerdict(vaultDataFormat(identity))
+        : "current";
       const recorded = identity ? ownerOf(identity) : null;
       const ownership: SyncVaultOwnership = !recorded
         ? "unclaimed"
@@ -383,12 +460,20 @@ export class SyncService {
       return {
         ...base,
         // `unclaimed` is reported ready: `prepare()` claims it on the next run,
-        // and nothing about the destination is wrong.
-        state: ownership === "other" ? "wrong-owner" : "ready",
-        ownership
+        // and nothing about the destination is wrong. Another account's vault
+        // is reported as that even when its format is newer: the account is
+        // the first thing wrong with it.
+        state:
+          ownership === "other"
+            ? "wrong-owner"
+            : dataFormat === "outdated"
+              ? "outdated"
+              : "ready",
+        ownership,
+        dataFormat
       };
     } catch {
-      return { ...base, state: "unreachable", ownership: null };
+      return { ...base, state: "unreachable", ownership: null, dataFormat: null };
     }
   }
 }

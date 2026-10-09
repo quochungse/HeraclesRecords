@@ -864,18 +864,33 @@ const { deviceId, isValidDeviceId, DEVICE_ID_SETTING } = await load(
   target.deleteSetting("chat.provider");
   assert.equal(database.getSetting("chat.provider"), undefined);
 
-  // localStorage is queued for the renderer, never written here.
+  // localStorage waits in an inbox for the renderer, never written here, and
+  // leaves it only when the renderer says it wrote the value.
   target.setLocalStorage("coros-theme", "dark");
   target.deleteLocalStorage("heraclesrecords.startupView");
-  assert.deepEqual(target.drainLocalStorage(), [
+  const pending = [
     { op: "set", key: "coros-theme", value: "dark" },
     { op: "delete", key: "heraclesrecords.startupView" }
-  ]);
+  ];
+  assert.deepEqual(target.pendingLocalStorage(), pending);
   assert.deepEqual(
-    target.drainLocalStorage(),
-    [],
-    "draining takes the queue, so a second read finds nothing"
+    target.pendingLocalStorage(),
+    pending,
+    "reading does not take them: a send nobody heard is sent again"
   );
+  target.setLocalStorage("coros-theme", "paper");
+  target.acknowledgeLocalStorage(pending);
+  assert.deepEqual(
+    target.pendingLocalStorage(),
+    [{ op: "set", key: "coros-theme", value: "paper" }],
+    "an acknowledgement removes what was sent, and not a newer value for the same key"
+  );
+  target.acknowledgeLocalStorage(target.pendingLocalStorage());
+  assert.deepEqual(target.pendingLocalStorage(), []);
+  // A value the renderer changed itself outranks one still waiting for it.
+  target.setLocalStorage("coros-theme", "dark");
+  target.discardPendingLocalStorage(["coros-theme"]);
+  assert.deepEqual(target.pendingLocalStorage(), []);
 
   // Table names arrive from other machines, so they are checked, not trusted.
   assert.throws(

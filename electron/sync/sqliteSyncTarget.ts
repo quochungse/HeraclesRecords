@@ -8,8 +8,10 @@
 //     machine, so nothing is interpolated into SQL until it has been checked
 //     against the schema this build actually has.
 //   * localStorage lives in the renderer, which the main process cannot reach
-//     synchronously. Those operations are queued here and handed to the
-//     renderer over IPC by the service that owns the window.
+//     synchronously. Those operations wait in `sync_local_storage_inbox` — in
+//     the merge's transaction, so they are as durable as the rows — and are
+//     handed to the renderer over IPC by the service that owns the window,
+//     leaving the inbox only when the renderer says it applied them.
 
 import { requireDatabase } from "../database";
 import { policyForTable, RECORD_ID_SEPARATOR } from "./syncPolicy";
@@ -18,6 +20,18 @@ import { entryIdentity } from "./oplog";
 import { rowMergerFor } from "./rowMergers";
 import type { ContentChange, RepublishRow } from "./syncEngine";
 import type { SyncTarget } from "./syncEngine";
+import {
+  createSqlitePublishedItems,
+  elementHash,
+  itemisedColumn,
+  parseList,
+  placeElement,
+  removeElement,
+  splitItemRecordId,
+  withElementId,
+  type ListElement,
+  type PublishedItemStore
+} from "./transcriptItems";
 
 /** A localStorage write the renderer still has to perform. */
 export interface PendingLocalStorageOp {
@@ -37,18 +51,41 @@ interface TableShape {
 
 export class SqliteSyncTarget implements SyncTarget {
   readonly #shapes = new Map<string, TableShape>();
-  readonly #pendingLocalStorage: PendingLocalStorageOp[] = [];
   readonly #incomplete = new Set<string>();
-  readonly #republish: RepublishRow[] = [];
+  /** By identity, read only when taken: see `takeRepublish`. */
+  readonly #republish = new Map<string, { table: string; recordId: string }>();
   /** Keyed by identity, so a record folded from three entries is listed once. */
   readonly #contentChanges = new Map<string, ContentChange>();
+  readonly #published: PublishedItemStore;
+
+  /** `published` is where an element taken in is recorded as held, so the
+   *  next save of its row does not send it back out. */
+  constructor(published: PublishedItemStore = createSqlitePublishedItems()) {
+    this.#published = published;
+  }
 
   /**
    * Rows whose merge produced something the vault does not hold, taken and
    * cleared. See `SyncTarget.takeRepublish`.
+   *
+   * Read here, once the merge is over, never when the row was noted: what goes
+   * out has to be what this database now holds, and a row read partway through
+   * lacks what the rest of the merge put in it — messages that arrived after
+   * the one that noted it, which went out as deleted. A row gone by now is not
+   * published at all.
    */
   takeRepublish(): readonly RepublishRow[] {
-    return this.#republish.splice(0, this.#republish.length);
+    const taken: RepublishRow[] = [];
+    for (const { table, recordId } of this.#republish.values()) {
+      const row = this.#readRow(table, this.#shapeOf(table), recordId);
+      if (row) taken.push({ table, recordId, row });
+    }
+    this.#republish.clear();
+    return taken;
+  }
+
+  #noteRepublish(table: string, recordId: string): void {
+    this.#republish.set(entryIdentity({ scope: "table", key: table, recordId }), { table, recordId });
   }
 
   /** See `SyncTarget.takeContentChanges`. */
@@ -76,8 +113,9 @@ export class SqliteSyncTarget implements SyncTarget {
     return requireDatabase().transaction(work)();
   }
 
-  /** See `SyncTarget.takeIncomplete`. Taken and cleared in one step, for the
-   *  same reason `drainLocalStorage` is. */
+  /** See `SyncTarget.takeIncomplete`. Taken and cleared in one step: a getter
+   *  and a clearer called in turn is how a queue gets emptied before it is
+   *  read. */
   takeIncomplete(): readonly string[] {
     const taken = [...this.#incomplete];
     this.#incomplete.clear();
@@ -85,17 +123,39 @@ export class SqliteSyncTarget implements SyncTarget {
   }
 
   /**
-   * Take the queue and empty it in one step.
+   * The localStorage writes the renderer has not yet said it performed — read,
+   * not taken.
    *
-   * The only way to read it, and deliberately the only way. A separate getter
-   * and clearer used to sit here, and "read it, then clear it" was the sole way
-   * anyone called them — with the getter handing back the live array, so the
-   * clear emptied the value just read. The caller sent an empty list to the
-   * renderer every time and no synced localStorage key ever arrived. One
-   * operation cannot be got wrong that way.
+   * They used to be a queue in memory, drained as they were sent, with nothing
+   * to say a renderer had taken them: a quit in between lost them, so the loop
+   * could never record those entries as held and read the files carrying them
+   * again at every launch (the whole snapshot, in practice). Now they leave
+   * only through `acknowledgeLocalStorage`, and until then every send repeats
+   * them — writing the same value twice is harmless, losing it is not.
    */
-  drainLocalStorage(): PendingLocalStorageOp[] {
-    return this.#pendingLocalStorage.splice(0, this.#pendingLocalStorage.length);
+  pendingLocalStorage(): PendingLocalStorageOp[] {
+    const rows = requireDatabase()
+      .prepare("SELECT key, op, value FROM sync_local_storage_inbox ORDER BY key")
+      .all() as { key: string; op: string; value: string | null }[];
+    return rows.map((row) =>
+      row.op === "delete"
+        ? { op: "delete", key: row.key }
+        : { op: "set", key: row.key, value: row.value ?? "" }
+    );
+  }
+
+  /**
+   * The renderer applied these. Each leaves the inbox only if it is still what
+   * was sent: a newer value merged for the same key in the meantime is owed to
+   * the renderer still.
+   */
+  acknowledgeLocalStorage(ops: readonly PendingLocalStorageOp[]): void {
+    const statement = requireDatabase().prepare(
+      "DELETE FROM sync_local_storage_inbox WHERE key = ? AND op = ? AND value IS ?"
+    );
+    for (const op of ops) {
+      statement.run(op.key, op.op, op.op === "delete" ? null : op.value ?? "");
+    }
   }
 
   /** Read the live schema for a table, refusing anything policy does not allow
@@ -240,7 +300,7 @@ export class SqliteSyncTarget implements SyncTarget {
       // insert below still runs — and fails loudly if the payload cannot make a
       // complete row, which is the honest answer rather than a half-written one.
       if (updated > 0) {
-        this.#noteRepublish(table, shape, recordId, republish);
+        if (republish) this.#noteRepublish(table, recordId);
         if (changed) this.#noteContentChange(table, recordId, false);
         return;
       }
@@ -260,30 +320,11 @@ export class SqliteSyncTarget implements SyncTarget {
       )
       .run(columns.map(value));
 
-    this.#noteRepublish(table, shape, recordId, republish);
+    if (republish) this.#noteRepublish(table, recordId);
     // After the write, never before: an entry this schema refuses throws above,
     // and a change announced for a row that never landed would stop an
     // analysis over nothing.
     if (changed) this.#noteContentChange(table, recordId, false);
-  }
-
-  /**
-   * Queue the row for publishing, read back rather than reused.
-   *
-   * What goes out has to be what this database now holds. The merged row was
-   * built from the arriving payload — which a machine on an older schema may
-   * have sent short of a column, and which a losing entry carries only the
-   * merged columns of — so publishing it would announce a row nobody has.
-   */
-  #noteRepublish(
-    table: string,
-    shape: TableShape,
-    recordId: string,
-    republish: boolean
-  ): void {
-    if (!republish) return;
-    const written = this.#readRow(table, shape, recordId);
-    if (written) this.#republish.push({ table, recordId, row: written });
   }
 
   deleteRow(table: string, recordId: string): void {
@@ -306,6 +347,73 @@ export class SqliteSyncTarget implements SyncTarget {
     if (removed > 0 && rowMergerFor(table)) {
       this.#noteContentChange(table, recordId, true);
     }
+    if (itemisedColumn(table)) this.#published.clear(table, recordId);
+  }
+
+  /**
+   * One element of an itemised row, put in place by its id.
+   *
+   * A row that is not here refuses the element rather than dropping it: the
+   * row may be in a batch compacted away mid-pull, and a dropped element would
+   * be stamped as held and skipped when the snapshot brings the row. Refused,
+   * it is applied again then. A conversation deleted here refuses its elements
+   * the same way, and compaction drops them.
+   *
+   * An element this machine edited after the one arriving is kept
+   * (`outranks`), and its row is published again: the vault's newest copy is
+   * now the older one, so this machine's — recorded as published when it was
+   * first sent — is unrecorded and goes out again.
+   */
+  upsertItem(table: string, itemId: string, element: Record<string, unknown>): void {
+    const target = this.#itemTarget(table, itemId);
+    if (!target) throw new Error(`${table} ${itemId} has no row here`);
+    const travelling = withElementId(element, target.id);
+    const placed = placeElement(target.list, target.id, travelling);
+    if (placed.kept) {
+      this.#published.remove(table, target.recordId, target.id);
+      this.#noteRepublish(table, target.recordId);
+      return;
+    }
+    this.#published.set(table, target.recordId, target.id, elementHash(travelling));
+    if (placed.list) this.#writeList(table, target, placed.list);
+  }
+
+  deleteItem(table: string, itemId: string): void {
+    const target = this.#itemTarget(table, itemId);
+    if (!target) return;
+    const next = removeElement(target.list, target.id);
+    this.#published.remove(table, target.recordId, target.id);
+    if (next) this.#writeList(table, target, next);
+  }
+
+  #itemTarget(
+    table: string,
+    itemId: string
+  ): { recordId: string; id: string; column: string; list: ListElement[] } | null {
+    const column = itemisedColumn(table);
+    if (!column) throw new Error(`${table} has no items`);
+    const parts = splitItemRecordId(itemId);
+    if (!parts) throw new Error(`Malformed item id for ${table}`);
+    const [recordId, id] = parts;
+    const shape = this.#shapeOf(table);
+    const row = this.#readRow(table, shape, recordId);
+    if (!row) return null;
+    const list = parseList(row[column]);
+    if (!list) throw new Error(`The ${column} of ${table} ${recordId} cannot be read`);
+    return { recordId, id, column, list };
+  }
+
+  #writeList(
+    table: string,
+    target: { recordId: string; column: string },
+    list: readonly ListElement[]
+  ): void {
+    const shape = this.#shapeOf(table);
+    const keyMatch = shape.primaryKey.map((column) => `${column} = ?`).join(" AND ");
+    requireDatabase()
+      .prepare(`UPDATE ${table} SET ${target.column} = ? WHERE ${keyMatch}`)
+      .run(JSON.stringify(list), ...target.recordId.split(RECORD_ID_SEPARATOR));
+    this.#noteContentChange(table, target.recordId, false);
   }
 
   setSetting(key: string, value: string): void {
@@ -323,12 +431,32 @@ export class SqliteSyncTarget implements SyncTarget {
       .run(key);
   }
 
+  /** One row per key: entries arrive in causal order, so the last write for a
+   *  key is the one the renderer needs. */
   setLocalStorage(key: string, value: string): void {
-    this.#pendingLocalStorage.push({ op: "set", key, value });
+    this.#writeInbox(key, "set", value);
   }
 
   deleteLocalStorage(key: string): void {
-    this.#pendingLocalStorage.push({ op: "delete", key });
+    this.#writeInbox(key, "delete", null);
+  }
+
+  /** Forget what waits for these keys: the renderer has a newer value of its
+   *  own for each. */
+  discardPendingLocalStorage(keys: readonly string[]): void {
+    const statement = requireDatabase().prepare(
+      "DELETE FROM sync_local_storage_inbox WHERE key = ?"
+    );
+    for (const key of keys) statement.run(key);
+  }
+
+  #writeInbox(key: string, op: "set" | "delete", value: string | null): void {
+    requireDatabase()
+      .prepare(
+        `INSERT INTO sync_local_storage_inbox (key, op, value) VALUES (?, ?, ?)
+         ON CONFLICT(key) DO UPDATE SET op = excluded.op, value = excluded.value`
+      )
+      .run(key, op, value);
   }
 
   /** The record id for a row, matching what deleteRow expects. */

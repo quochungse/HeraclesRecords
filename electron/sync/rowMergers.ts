@@ -382,6 +382,19 @@ const mergeChatSession: RowMerger = (local, incoming, { winner }) => {
         changed: false
       };
     }
+    // A conversation's own record in vault format 2 carries no transcript at
+    // all — its messages travel as items — so a row seen here for the first
+    // time starts empty and the items fill it. Only for an absent column: one
+    // that arrived unreadable is still the entry's to answer for.
+    if (!("messages_json" in incoming) && typeof incoming.id === "string") {
+      // Only for the copy that won: a loser has nothing to insert.
+      if (!winner) return { row: { id: incoming.id }, republish: false, changed: false };
+      return {
+        row: { ...incoming, messages_json: "[]" },
+        republish: false,
+        changed: true
+      };
+    }
     return { row: incoming, republish: false, changed: false };
   }
   // A row this machine has never seen. There is no second half to union, and
@@ -466,4 +479,27 @@ export function rowMergerFor(table: string): RowMerger | undefined {
  */
 export function isMergedTable(table: string): boolean {
   return table in MERGERS;
+}
+
+/**
+ * Whether this one entry is folded rather than chosen by last-writer-wins.
+ *
+ * A merged table's `set` that carries what the merge is for. A conversation's
+ * row in vault format 2 carries no transcript — its messages travel as items —
+ * so it is an ordinary record: the newest copy wins whole, an older one is
+ * skipped, and nothing about it is folded. Folding it anyway let an older copy
+ * of a conversation deleted here insert the row again (found in review). A
+ * delete is never folded either: an older tombstone must not remove a newer
+ * row.
+ */
+export function foldsEntry(entry: {
+  readonly scope: string;
+  readonly op: string;
+  readonly key: string;
+  readonly payload?: Record<string, unknown>;
+}): boolean {
+  if (entry.scope !== "table" || entry.op !== "set" || !isMergedTable(entry.key)) {
+    return false;
+  }
+  return entry.key !== "chat_sessions" || "messages_json" in (entry.payload ?? {});
 }

@@ -2304,14 +2304,70 @@ lives at module level for the same visit-to-visit reason — see `useCalendarDat
     calls it so the loop stops. **This is a guard between machines and files, not a data
     partition**: the tables have no owner column, so switching accounts on one machine leaves
     the previous account's records in place. Closing that means giving every row an owner.
+  - **The vault declares its data format, and a build past it stops rather than guesses**
+    (`dataFormat.ts`, docs/sync-v2.md §3). `vault/id.json` carries `dataVersion` (newest
+    format written) and `dataVersionCompat` (oldest that may still work beside it); absent
+    means 1/1. Against this build's `DATA_VERSION`: equal or newer syncs; older but at least
+    the compat syncs, never lowers the numbers, and the panel says an update is out; below
+    the compat is `outdated` — `prepare()` returns it before the claim, so nothing is
+    written, and a pull whose listing shows a changed identity revision asks again
+    (`vaultGate`). An outdated loop is **held**, not stopped: `enqueue` still writes the
+    outbox, while flush, pull, compaction and the flush at quit do nothing — stopping it
+    would detach the bridge and lose changes made meanwhile. An additive format change
+    raises `DATA_VERSION` only; anything else raises both. Builds from before the numbers
+    (1.0.x) accept only identity `version: 1` and refuse anything else without writing,
+    which is how the first breaking format stops them: by raising that to 2.
+  - **This build writes format 2** (`DATA_VERSION = 2`, docs/sync-v2.md), and three things
+    differ from the `oplog/` layout the rest of this section describes. **The log is
+    numbered per device** (`vaultLog.ts`: `log/<device>/<seq>.jsonl`, claimed once, and
+    `heads/<device>.json`, written only by that device): a pull lists the vault, fetches a
+    head only when its revision moved, and asks for the next batches by name against a
+    version vector (`sync_vector`); a batch that is gone was compacted, so the snapshot
+    (`snap/<hlc>.json`, carrying the vector it covers) is read — and otherwise only when
+    this machine has never read one (`sync.v2.lastSnapshot`) or the app version changed
+    (`sync.v2.fullReadBuild`, the one rule for entries an older build could not take).
+    **A coach message is a record of its own**: a `chat_sessions` row goes out without
+    `messages_json`, each message that changed since it was last published
+    (`sync_published_items`) as an `item` entry, so a turn sends kilobytes, and
+    `SqliteSyncTarget.upsertItem` puts one in place by `mid` and records it as published so
+    it is not sent back. Every record — messages included — is last-writer-wins whole; the
+    transcript union in `rowMergers.ts` now serves only format-1 entries (`foldsEntry`: a
+    format-2 conversation row, and any delete, is chosen, never folded — folding an older
+    copy brought a deleted conversation back). **Rows are applied before items**, then in
+    causal order: a row lands at its newest copy's timestamp, and messages written before a
+    rename read in the same pull would otherwise find no row. **A message keeps the copy
+    edited last** by its own `mrev` (`outranks`), not by when its row was saved: an older
+    copy sent again (an upgrade, a seed) is not taken, and the newer one is unrecorded as
+    published and handed back through `takeRepublish`, so it goes out again — that message
+    alone: the row is read once the merge is over (read earlier, it lacked the messages
+    placed after, which then went out as deleted), and it is not sent itself, since under a
+    fresh timestamp it would outrank a rename made elsewhere. An item for a
+    row not here is refused, not dropped, so a snapshot bringing the row later brings it. A
+    publish mark is committed only once the outbox took the entries; a deleted conversation
+    sends one tombstone and compaction drops its messages. A head that failed to move
+    (`headSeq < seq`) is written again by the next pull. All of this bookkeeping — the
+    vector, the published messages, `sync.v2.*` — belongs to one vault (`sync.v2.vaultId`)
+    and is forgotten when this machine is pointed at another (`forgetAnotherVaultsLog`).
+    **A format-1 vault is migrated once** before the loop starts (`migrateThenStart` →
+    `SyncLoop.migrateToV2`, lease `format-migration`): the whole v1 log read and applied, a
+    snapshot of this machine's data with each record under its `recordVersions` stamp **plus
+    the v1 log's tombstones**, then `raiseDataFormat`; a migration that cannot run holds the
+    loop (still queueing) and retries in 5 minutes. **Nothing reads `oplog/` after that** —
+    compaction deletes it a week after its newest file. Instead **every machine seeds once
+    per format** (`seedMarker` = `<vaultId>:v2`): after a pull, every record it holds under
+    the stamp it holds (`collectStampedEntries`), so what it wrote late on an old build wins
+    and nothing it shares with the vault beats a newer copy just by being sent later. The
+    `oplog` layout, `readIndex` and the transcript union stay only for the suites written
+    before format 2, which still drive `SyncLoop` in format 1, its default; B3 removes them.
+    `test:sync-v2` drives format 2.
   - **An entry is applied only when it is newer than the row it would overwrite, and
     `sync_record_versions` is how that question can be asked at all.** The merge compares
     entries against each other and never against the database — `resolve()` picks a winner
     per `entryIdentity` and `SqliteSyncTarget.upsertRow` is an unconditional `INSERT OR
     REPLACE` — so "this entry won the log" and "this entry is newer than what is here" are
-    different questions and only the second is safe to act on. The log a pull acts on is the
-    log as it was when `readAllEntries` *began*, and that is a full fetch over the network,
-    so any local write made during it is invisible to that snapshot.
+    different questions and only the second is safe to act on. What a pull acts on is the
+    log as it was when its listing *began* — fetched over the network, file by file — so
+    any local write made during it is invisible to that read.
     `SyncLoop.enqueue` therefore stamps `entryIdentity -> hlc` at the moment of the local
     write and `pull` stamps what it merges, both through `recordVersions.ts`; a winner that
     does not beat the stamp is skipped. Own entries still take part in last-writer-wins —
@@ -2444,7 +2500,10 @@ lives at module level for the same visit-to-visit reason — see `useCalendarDat
     replays them when `attachSyncSink` speaks — or drops them when what it says is that there
     is no vault, which is what keeps the buffer to the boot window rather than the life of
     the process. Policy is asked *before* a change is held, so a credential never sits in the
-    buffer at all. `npm run test:sync-bridge` covers all three.
+    buffer at all. `npm run test:sync-bridge` covers all three. **Past the boot window a
+    detached bridge drops**, so swapping one loop for another — a held loop resumed, another
+    vault — stops and starts them with nothing awaited in between; `prepareSync` asks the
+    vault first.
   - **A compaction snapshot summarises the log; it does not shadow it.** `readLog` skips
     only entries the snapshot holds *by timestamp identity*, never everything at or below
     its `upTo` — that is a claim that nothing below the line can still arrive, and nothing
@@ -2455,6 +2514,35 @@ lives at module level for the same visit-to-visit reason — see `useCalendarDat
     skew; an hour offline is not skew. Duplicates cost nothing — `resolve` is
     last-writer-wins over whatever it is given — and being invisible costs the write.
     `npm run test:sync-engine` fails against the old shape.
+  - **In format 1, a pull fetches only the files of the log it has not read**
+    (`readIndex.ts`, `sync_read_files`, `device` tier; format 2 counts batches against a
+    vector instead, below). Batch and snapshot files are never rewritten — a
+    batch is claimed under an HLC its device never issued before, a snapshot under an
+    `upTo` that only moves forward — so a pull lists the vault (metadata only), fetches
+    each batch whose `path + revision` is not recorded and the newest snapshot if it is
+    new, and records the reads **in the merge's transaction**: a crash between the two
+    re-reads the file, never skips it. A pull with nothing new costs one listing. It used
+    to download the whole log every poll, and the "foreign entry seen" check that sets
+    the fast interval was asked of the whole log, so any vault another machine had ever
+    written to held the loop at 5 s for good — measured at a ~4 MB pull every ~45 s with
+    the app idle. Skipping a read file is safe because `recordVersions` already outranks
+    everything in it; that is also why this machine's own batch is recorded as read at
+    upload — `enqueue` stamped every entry in it, and stamps, not own entries in
+    `resolve()`, are the guard (above). **A file is `done` only when nothing in it waits
+    on a later reading**; one holding a row taken only in part, or an entry refused as
+    unclassified, not synced by this build or thrown on by the target, is `retry`, read
+    again once per launch — the promise the loop made for those entries when every pull
+    read everything, and the one an upgrade relies on. **A `localStorage` entry is stamped
+    like any other**: `SqliteSyncTarget` writes it to `sync_local_storage_inbox`
+    (`device`) in the merge's transaction, every `sync:changed` repeats what is there, and
+    a row leaves only when the renderer acknowledges it (`sync:ackLocalStorage`, and only
+    if it is still the value sent). It was a queue in memory drained as it was sent, so
+    nothing could say the renderer had taken it, and the snapshot holding one was fetched
+    again at every launch. Compaction decides
+    from the listing first — too few batches, or none named before the horizon, reads
+    nothing — and reads through `LogFileCache` (in memory, 48 MB), which holds what the
+    pull fetched and what this machine wrote. On Drive, `get` takes a log file's id from
+    the listing rather than looking it up again. `test:sync-twoway` holds all of it.
   - **The outbound queue is a table, not an array.** `sync_outbox` (`device` tier) takes
     an entry the moment it is queued and releases it only when the upload returns. What
     was lost before was never the write — that is in SQLite before an entry is built — but

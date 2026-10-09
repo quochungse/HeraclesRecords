@@ -23,6 +23,7 @@ const { createMemoryRecordVersions, createSqliteRecordVersions } = await load(
   "sync/recordVersions.js"
 );
 const { createMemoryOutbox } = await load("sync/outbox.js");
+const { createMemoryReadIndex } = await load("sync/readIndex.js");
 const { rowMergerFor } = await load("sync/rowMergers.js");
 const {
   SyncLoop,
@@ -88,7 +89,12 @@ function makeDevice(
     wallOffset = 0,
     online = true,
     recordVersions = createMemoryRecordVersions(),
-    outbox = createMemoryOutbox()
+    outbox = createMemoryOutbox(),
+    // Both for the incremental-read block: a provider that counts what it
+    // fetches, and an index shared between two launches of one machine.
+    provider = () => new LocalFolderProvider({ root }),
+    readIndex = undefined,
+    vaultGate = undefined
   } = {}
 ) {
   const settings = new Map();
@@ -98,7 +104,7 @@ function makeDevice(
   const state = { wall: 1_700_000_000_000, online, appActive: true };
 
   const loop = new SyncLoop({
-    provider: () => new LocalFolderProvider({ root }),
+    provider,
     target,
     deviceId: () => id,
     deviceName: () => `machine-${id}`,
@@ -113,7 +119,9 @@ function makeDevice(
     clearTimer: (handle) => timers.delete(handle),
     conditions: () => ({ appActive: state.appActive, online: state.online }),
     recordVersions,
-    outbox
+    outbox,
+    readIndex,
+    vaultGate
   });
 
   return {
@@ -137,6 +145,7 @@ function makeDevice(
       await loop.whenIdle();
     },
     pendingTimers: () => timers.size,
+    pendingTimersAt: () => [...timers.values()].map((timer) => timer.at),
     builder: () =>
       new ChangeBuilder({ nextHlc: loop.nextHlc }),
     /**
@@ -1448,6 +1457,242 @@ const { SqliteSyncTarget } = await load("sync/sqliteSyncTarget.js");
   );
 }
 
+
+// ===========================================================================
+// A pull reads only what it has not read
+// ===========================================================================
+//
+// It used to download the whole log — the snapshot and every batch — on every
+// poll, and a vault any other machine had ever written to kept the loop on the
+// five-second interval for good, because "a foreign entry was seen" was asked
+// of the whole log. Measured on a real vault: a pull every ~45 s, ~4 MB each,
+// with the app open and nothing happening.
+{
+  const root = tempDir("incremental");
+
+  /** The vault, counting which log files are fetched. */
+  const counted = () => {
+    const fetched = [];
+    const provider = () => {
+      const inner = new LocalFolderProvider({ root });
+      return {
+        name: inner.name,
+        list: (prefix) => inner.list(prefix),
+        get: async (path) => {
+          fetched.push(path);
+          return inner.get(path);
+        },
+        put: (path, content, expected) => inner.put(path, content, expected),
+        delete: (path, expected) => inner.delete(path, expected)
+      };
+    };
+    return { provider, fetched };
+  };
+  const logFetches = (paths) =>
+    paths.filter((path) => path.startsWith("oplog/") || path.startsWith("oplog-snapshot/"));
+
+  const a = makeDevice(root, "device-a");
+  const bVault = counted();
+  const bIndex = createMemoryReadIndex();
+  const b = makeDevice(root, "device-b", {
+    provider: bVault.provider,
+    readIndex: bIndex
+  });
+  a.loop.start();
+  b.loop.start();
+
+  a.write((builder) => builder.setting("chat.provider", "first"));
+  await a.loop.flush();
+  await b.loop.pull();
+  assert.equal(b.target.settings.get("chat.provider"), "first");
+  assert.equal(logFetches(bVault.fetched).length, 1, "the one batch there is, read");
+
+  // Nothing new: a listing and nothing else.
+  bVault.fetched.length = 0;
+  await b.loop.pull();
+  await b.loop.pull();
+  assert.deepEqual(
+    logFetches(bVault.fetched),
+    [],
+    "a pull with nothing new fetches no file of the log"
+  );
+
+  // Something new: that and only that.
+  const second = a.write((builder) => builder.setting("chat.model", "second"));
+  await a.loop.flush();
+  await b.loop.pull();
+  assert.equal(b.target.settings.get("chat.model"), "second");
+  assert.equal(
+    logFetches(bVault.fetched).length,
+    1,
+    "only the batch written since is fetched"
+  );
+  assert.ok(
+    logFetches(bVault.fetched)[0].startsWith("oplog/device-a/"),
+    "and it is the other machine's"
+  );
+  assert.equal(second.length, 1);
+
+  // Its own batch is never fetched back: every entry in it is already held.
+  bVault.fetched.length = 0;
+  b.write((builder) => builder.setting("chat.provider", "from b"));
+  await b.loop.flush();
+  await b.loop.pull();
+  assert.deepEqual(
+    logFetches(bVault.fetched),
+    [],
+    "this machine's own batch is recorded as read when it is written"
+  );
+
+  // The cadence: nothing new read is not activity. Past the window opened by
+  // b's own write above, a pull that reads nothing must leave the idle
+  // interval in place, even though the vault is full of a's entries.
+  b.state.wall += POLL_ACTIVE_WINDOW_MS + 1_000;
+  await b.loop.pull();
+  const scheduled = b.pendingTimersAt().filter((at) => at > b.state.wall);
+  assert.ok(
+    scheduled.some((at) => at - b.state.wall === POLL_IDLE_MS),
+    "with nothing new read, the next poll is the idle one"
+  );
+
+  // A localStorage entry is held like any other: the target keeps it until the
+  // renderer has written it (an inbox, in the real one), so the file that
+  // carried it is not read again — not this launch, and not the next.
+  a.write((builder) => builder.localStorage("coros-theme", "paper"));
+  await a.loop.flush();
+  bVault.fetched.length = 0;
+  await b.loop.pull();
+  assert.equal(b.target.storage.get("coros-theme"), "paper");
+  assert.equal(logFetches(bVault.fetched).length, 1);
+  bVault.fetched.length = 0;
+  await b.loop.pull();
+  assert.deepEqual(
+    logFetches(bVault.fetched),
+    [],
+    "within one launch it is read once"
+  );
+
+  // The same machine relaunched: same index, a new loop.
+  b.loop.stop();
+  const relaunchedVault = counted();
+  const relaunched = makeDevice(root, "device-b", {
+    provider: relaunchedVault.provider,
+    readIndex: bIndex,
+    recordVersions: b.recordVersions
+  });
+  relaunched.loop.start();
+  await relaunched.loop.pull();
+  assert.deepEqual(
+    logFetches(relaunchedVault.fetched),
+    [],
+    "and the next launch reads nothing it had already read"
+  );
+
+  a.loop.stop();
+  relaunched.loop.stop();
+}
+
+
+// A vault in a data format this build may not work with: the gate closes the
+// pull before anything is read, and a held loop keeps queueing — durably, for
+// the updated build — while sending, reading and the flush at quit all do
+// nothing. Stopping the loop outright would detach the bridge, and a change
+// made meanwhile would be gone at quit.
+{
+  const root = tempDir("format-gate");
+  const a = makeDevice(root, "device-a");
+  a.loop.start();
+  a.write((builder) => builder.setting("chat.provider", "before the upgrade"));
+  await a.loop.flush();
+
+  const seen = [];
+  let open = true;
+  const outbox = createMemoryOutbox();
+  const b = makeDevice(root, "device-b", {
+    outbox,
+    vaultGate: async (revisions) => {
+      seen.push(revisions);
+      return open;
+    }
+  });
+  b.loop.start();
+  await b.loop.pull();
+  assert.equal(b.target.settings.get("chat.provider"), "before the upgrade");
+  assert.ok(seen[0].size > 0, "the gate is handed the listing's revisions");
+
+  a.write((builder) => builder.setting("chat.provider", "after the upgrade"));
+  await a.loop.flush();
+  open = false;
+  const closed = await b.loop.pull();
+  assert.equal(closed.applied, 0, "a closed gate applies nothing");
+  assert.equal(
+    b.target.settings.get("chat.provider"),
+    "before the upgrade",
+    "and reads nothing past it"
+  );
+
+  b.loop.hold();
+  assert.equal(b.loop.isHeld, true);
+  b.write((builder) => builder.setting("chat.model", "made while outdated"));
+  assert.equal(
+    outbox.load().length,
+    1,
+    "a change made while held is in the durable outbox"
+  );
+  assert.equal(b.loop.hasUnpushedChanges, false, "quit does not wait on a held loop");
+  assert.deepEqual(await b.loop.flush(), { pushed: 0, path: null }, "nor does it send");
+  await b.loop.flushBeforeQuit();
+  const vaultFiles = await new LocalFolderProvider({ root }).list("oplog/device-b");
+  assert.equal(vaultFiles.length, 0, "nothing of device-b's reached the vault");
+  open = true;
+  assert.equal((await b.loop.pull()).applied, 0, "and a held loop reads nothing");
+  assert.equal(await b.loop.compactIfDue(), null);
+
+  // The updated build adopts what was queued and sends it.
+  const updated = makeDevice(root, "device-b", { outbox });
+  updated.loop.start();
+  await updated.loop.flush();
+  assert.equal(
+    (await new LocalFolderProvider({ root }).list("oplog/device-b")).length,
+    1,
+    "the next build sends what the held one queued"
+  );
+  a.loop.stop();
+  updated.loop.stop();
+}
+
+// Compaction decides from the listing whether there is anything to fold, and
+// only then reads the log. The pass that finds too few batches is the usual
+// one, and it used to download every file to learn that.
+{
+  const root = tempDir("compact-precheck");
+  const fetched = [];
+  const provider = {
+    name: "counted",
+    list: (prefix) => new LocalFolderProvider({ root }).list(prefix),
+    get: async (path) => {
+      fetched.push(path);
+      return new LocalFolderProvider({ root }).get(path);
+    },
+    put: (path, content, expected) =>
+      new LocalFolderProvider({ root }).put(path, content, expected),
+    delete: (path, expected) => new LocalFolderProvider({ root }).delete(path, expected)
+  };
+  const device = makeDevice(root, "device-c", { provider: () => provider });
+  device.loop.start();
+  device.write((builder) => builder.setting("chat.provider", "one"));
+  await device.loop.flush();
+  fetched.length = 0;
+  device.state.wall += COMPACT_INTERVAL_MS + 1;
+  await device.loop.compactIfDue();
+  assert.deepEqual(
+    fetched.filter((path) => path.startsWith("oplog")),
+    [],
+    "a log too small to compact is not read to find that out"
+  );
+  device.loop.stop();
+}
+
 // Windows will not unlink a file that is still open, so the handle has to
 // go before the tree does.
 database.closeDatabase();
@@ -1465,5 +1710,9 @@ console.log(
     "two machines appending to one conversation both keep their turn, " +
     "a third pulling both at once keeps both, an entry stamped below the " +
     "record newest is still folded, " +
-    "compaction is interval-gated and one device at a time"
+    "compaction is interval-gated and one device at a time, " +
+    "a pull fetches only the files it has not read, a relaunch reads " +
+    "nothing again, an idle vault keeps the idle " +
+    "interval, and compaction reads nothing when there is nothing to fold, " +
+    "a closed format gate reads nothing and a held loop queues without sending"
 );

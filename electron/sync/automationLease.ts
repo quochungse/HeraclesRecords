@@ -22,6 +22,12 @@ import { Lease, type LeaseDeps, type LeaseHandle } from "./lease";
  *  others. */
 export const AUTOMATION_LEASE_TTL_MS = 10 * 60 * 1000;
 
+/** How long a run waits on `catchUp` before going ahead on what this machine
+ *  has. A pull after a long time away reads the snapshot, so a large vault on
+ *  a slow link takes a while — but a vault that neither answers nor fails must
+ *  not hold the run queue behind it for good. */
+export const CATCH_UP_TIMEOUT_MS = 2 * 60 * 1000;
+
 export interface AnalysisLeaseDeps
   extends Omit<LeaseDeps, "ttlMs"> {
   /** False when sync is off, in which case there is only one machine as far as
@@ -35,6 +41,15 @@ export interface AnalysisLeaseDeps
   /** Called when a renewal finds this device has been fenced out. The run is
    *  already past the point where it can be stopped, so this is a report. */
   readonly onLeaseLost?: (analysisId: string) => void;
+  /** Brings this machine up to what the vault holds, once the lease is ours
+   *  and before the work starts. The lease says nobody else is running this
+   *  analysis *now*; it says nothing about a run another machine finished an
+   *  hour ago, whose answer and watermark may still be on their way here.
+   *  Pulled first, the run's own guards read them and stand down. The caller
+   *  decides whether a pull is owed at all, and returns at once when not. */
+  readonly catchUp?: () => Promise<void>;
+  readonly catchUpTimeoutMs?: number;
+  readonly onCatchUpFailed?: (analysisId: string, error: unknown) => void;
 }
 
 let deps: AnalysisLeaseDeps | null = null;
@@ -111,6 +126,8 @@ export async function runExclusively<T>(
   }, Math.max(Math.floor(ttlMs / 3), 1_000));
 
   try {
+    // Inside the heartbeat: a slow pull must not let the lease lapse under it.
+    await catchUp(active, analysisId);
     return { ran: true, result: await work() };
   } finally {
     clearTimer(heartbeat);
@@ -119,5 +136,28 @@ export async function runExclusively<T>(
     // until it expired.
     await renewing;
     if (held) await lease.release(held);
+  }
+}
+
+/**
+ * The pull before a run. Never a reason not to run: an unreachable vault is a
+ * sync problem, and the analysis goes ahead on what this machine has — as it
+ * does with sync off. A pull that lands later during the run is still covered,
+ * because a run whose conversation it changes is stopped.
+ */
+async function catchUp(active: AnalysisLeaseDeps, analysisId: string): Promise<void> {
+  if (!active.catchUp) return;
+  let timer: NodeJS.Timeout | undefined;
+  try {
+    await Promise.race([
+      active.catchUp(),
+      new Promise<void>((resolve) => {
+        timer = setTimeout(resolve, active.catchUpTimeoutMs ?? CATCH_UP_TIMEOUT_MS);
+      })
+    ]);
+  } catch (error) {
+    active.onCatchUpFailed?.(analysisId, error);
+  } finally {
+    clearTimeout(timer);
   }
 }

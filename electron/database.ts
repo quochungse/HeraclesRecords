@@ -353,6 +353,47 @@ export function initializeDatabase(userDataPath: string): Database.Database {
     CREATE INDEX IF NOT EXISTS idx_sync_outbox_identity
       ON sync_outbox (identity);
 
+    -- Files of the vault's log this machine has read, so a pull downloads only
+    -- what is new rather than the whole log every few seconds. See
+    -- sync/readIndex.ts. 'device' in TABLE_POLICY, and written through
+    -- requireDatabase() so recording a read cannot queue a change.
+    -- localStorage writes merged from another machine that the renderer has not
+    -- yet said it applied. Written in the merge's transaction and deleted on the
+    -- renderer's acknowledgement, so a quit in between loses nothing. See
+    -- sync/sqliteSyncTarget.ts. 'device' in TABLE_POLICY.
+    -- Vault format 2 (docs/sync-v2.md): what this machine has published or
+    -- taken of each element of an itemised list column (a coach transcript's
+    -- messages), so a save sends only the elements that changed; and how far it
+    -- has read each device's log. Both 'device' in TABLE_POLICY. See
+    -- sync/transcriptItems.ts and sync/vectorStore.ts.
+    CREATE TABLE IF NOT EXISTS sync_published_items (
+      table_name TEXT NOT NULL,
+      record_id  TEXT NOT NULL,
+      item_id    TEXT NOT NULL,
+      hash       TEXT NOT NULL,
+      PRIMARY KEY (table_name, record_id, item_id)
+    );
+    CREATE TABLE IF NOT EXISTS sync_vector (
+      device        TEXT PRIMARY KEY,
+      seq           INTEGER NOT NULL,
+      head_seq      INTEGER NOT NULL,
+      head_revision TEXT
+    );
+
+    CREATE TABLE IF NOT EXISTS sync_local_storage_inbox (
+      key   TEXT PRIMARY KEY,
+      op    TEXT NOT NULL,
+      value TEXT
+    );
+
+    CREATE TABLE IF NOT EXISTS sync_read_files (
+      path     TEXT PRIMARY KEY,
+      revision TEXT NOT NULL,
+      state    TEXT NOT NULL,
+      read_by  TEXT NOT NULL,
+      read_at  INTEGER NOT NULL
+    );
+
     -- Every activity trigger asks "what landed after this analysis's
     -- watermark", once per analysis, ordered by start_time.
     CREATE INDEX IF NOT EXISTS idx_training_activities_start_time

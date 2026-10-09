@@ -475,6 +475,11 @@ export default function App() {
     if (!api) return;
     return api.onSyncChanged((change) => {
       applySyncedLocalStorageOps(change.localStorage);
+      // Only now may they leave the main process's inbox: until this lands,
+      // every event repeats them, so a reload in between loses nothing.
+      if (change.localStorage.length > 0) {
+        void api.ackSyncedLocalStorage(change.localStorage).catch(() => undefined);
+      }
       // The rail is drawn from state, and a toggle builds on that state: left
       // stale, the next one would write back over what the other machine hid.
       const hidden = readHiddenSportScreens();
