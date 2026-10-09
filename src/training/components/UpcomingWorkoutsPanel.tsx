@@ -12,10 +12,16 @@ import {
   formatUpcomingWorkoutDetailLine,
   formatUpcomingWorkoutRowStats,
   formatUpcomingWorkoutStats,
+  getLocalHappenDayKey,
   isUpcomingWorkoutToday
 } from "../formatters";
 import { planTag } from "../workoutSport";
 import { UpcomingWorkoutDetailPanel } from "./UpcomingWorkoutDetailPanel";
+
+// Today and tomorrow show every session (COROS allows ten a day); the days
+// after tomorrow only fill the list up to three, tomorrow's included.
+const MAX_DAY_SESSIONS = 10;
+const MAX_LATER_ROWS = 3;
 
 interface UpcomingWorkoutsPanelProps {
   api: HeraclesRecordsApi;
@@ -36,13 +42,25 @@ export function UpcomingWorkoutsPanel({
     () => filterUpcomingWorkoutsFromToday(workouts),
     [workouts]
   );
-  const todayWorkouts = scheduledWorkouts.filter((workout) =>
-    isUpcomingWorkoutToday(workout.happenDay)
-  );
+  const todayWorkouts = scheduledWorkouts
+    .filter((workout) => isUpcomingWorkoutToday(workout.happenDay))
+    .slice(0, MAX_DAY_SESSIONS);
   const laterWorkouts = scheduledWorkouts.filter(
     (workout) => !isUpcomingWorkoutToday(workout.happenDay)
   );
   const nextWorkout = laterWorkouts[0];
+  const tomorrow = new Date();
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  const tomorrowKey = getLocalHappenDayKey(tomorrow);
+  const tomorrowWorkouts = laterWorkouts
+    .filter((workout) => workout.happenDay === tomorrowKey)
+    .slice(0, MAX_DAY_SESSIONS);
+  const listedWorkouts = [
+    ...tomorrowWorkouts,
+    ...laterWorkouts
+      .filter((workout) => workout.happenDay > tomorrowKey)
+      .slice(0, Math.max(0, MAX_LATER_ROWS - tomorrowWorkouts.length))
+  ];
 
   // Nothing scheduled means no panel at all, not an empty one: this sits on its
   // own row under Training Intelligence, and a card whose only content is "no
@@ -82,9 +100,9 @@ export function UpcomingWorkoutsPanel({
           <RestDayCard nextWorkout={nextWorkout} />
         )}
 
-        {laterWorkouts.length > 0 ? (
+        {listedWorkouts.length > 0 ? (
           <ul className="training-upcoming-list">
-            {laterWorkouts.map((workout, index) => {
+            {listedWorkouts.map((workout, index) => {
               const rowStats = formatUpcomingWorkoutRowStats(
                 workout.volume,
                 workout.trainingLoad,
