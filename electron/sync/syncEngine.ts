@@ -488,7 +488,7 @@ export class ChangeBuilder {
    * renderer hands over everything policy allows and the main process works out
    * what moved. That is the whole outbound half — theme, units, accent palette,
    * sport colours, startup view and every `heraclesrecords.selection.v1.*` — and it
-   * meets `SqliteSyncTarget.setLocalStorage` / `drainLocalStorage` /
+   * meets `SqliteSyncTarget.setLocalStorage` / `pendingLocalStorage` /
    * `applySyncedLocalStorageOps` coming the other way.
    */
   localStorage(key: string, value: string): this {

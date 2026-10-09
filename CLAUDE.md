@@ -2482,12 +2482,16 @@ lives at module level for the same visit-to-visit reason — see `useCalendarDat
     everything in it; that is also why this machine's own batch is recorded as read at
     upload — `enqueue` stamped every entry in it, and stamps, not own entries in
     `resolve()`, are the guard (above). **A file is `done` only when nothing in it waits
-    on a later reading**; one holding a `localStorage` entry, a row taken only in part, or
-    an entry refused as unclassified, not synced by this build or thrown on by the target
-    is `retry`, read again once per launch — the promise the loop made for those entries
-    when every pull read everything, and the one an upgrade relies on. The snapshot
-    nearly always holds a `localStorage` entry, so each launch still fetches it once;
-    dropping that needs the renderer to acknowledge what it applied. Compaction decides
+    on a later reading**; one holding a row taken only in part, or an entry refused as
+    unclassified, not synced by this build or thrown on by the target, is `retry`, read
+    again once per launch — the promise the loop made for those entries when every pull
+    read everything, and the one an upgrade relies on. **A `localStorage` entry is stamped
+    like any other**: `SqliteSyncTarget` writes it to `sync_local_storage_inbox`
+    (`device`) in the merge's transaction, every `sync:changed` repeats what is there, and
+    a row leaves only when the renderer acknowledges it (`sync:ackLocalStorage`, and only
+    if it is still the value sent). It was a queue in memory drained as it was sent, so
+    nothing could say the renderer had taken it, and the snapshot holding one was fetched
+    again at every launch. Compaction decides
     from the listing first — too few batches, or none named before the horizon, reads
     nothing — and reads through `LogFileCache` (in memory, 48 MB), which holds what the
     pull fetched and what this machine wrote. On Drive, `get` takes a log file's id from

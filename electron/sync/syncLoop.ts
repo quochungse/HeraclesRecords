@@ -250,19 +250,6 @@ export class SyncLoop {
   /** Changes waiting to go out. Survives a failed flush: a push that could not
    *  reach the network must not lose the edit it was carrying. */
   #pending: OpEntry[] = [];
-  /**
-   * "Already merged", for the entries whose application this process must not
-   * promise on behalf of the next one.
-   *
-   * Two kinds land here, for the same reason at one remove. A `localStorage`
-   * entry queues work for the renderer rather than performing it, so a quit
-   * before it is delivered owes that work still. A row the target could take
-   * only part of — columns this build has no schema for — landed, but not as
-   * the entry describes it, and a later build has to be able to finish the job.
-   * Both are suppressed for this process, so neither churns `onApplied` every
-   * poll, and both come back on the next launch.
-   */
-  readonly #localStorageMerged = new Map<string, string>();
   readonly #readIndex: ReadIndexStore;
   /** Names this launch in the read index: a file left for a later reading is
    *  read again by the next launch, and not by this one. */
@@ -611,18 +598,18 @@ export class SyncLoop {
     //     launch, so the whole log was re-merged on each first pull — which is
     //     precisely when the race is live.
     //
-    // `localStorage` is deliberately not stamped durably, and the asymmetry is
-    // the point. Applying one of those entries does not write anything: it
-    // queues an operation for the renderer, which performs it whenever a window
-    // is next ready. Nothing acknowledges that it did, so a durable stamp would
-    // record as held something that a quit in between simply loses. Held in
-    // memory instead, the queue is rebuilt on the next launch and the renderer
-    // writes the value again — idempotent, and the only direction in which the
-    // preference cannot be lost. Making it durable means persisting the pending
-    // operations and clearing them on an acknowledgement from the renderer,
-    // which is the honest fix and a larger one.
+    // `localStorage` is stamped like everything else. Applying one of those
+    // entries writes it to the target's inbox, in this same transaction, and
+    // it leaves the inbox only when the renderer says it wrote the value — so a
+    // quit in between owes nothing to a re-read of the log. It used to be a
+    // queue in memory, which is why these entries were once never stamped and
+    // the files holding them were read again at every launch.
+    //
+    // A row the target took only part of — columns this build has no schema
+    // for — is the one thing not stamped: it landed, but not as the entry
+    // describes it, and a later build has to be able to finish the job. Its
+    // file is left for the next launch to read again (`#readRecords`).
     const versions = this.#deps.recordVersions;
-    const durable = (entry: OpEntry): boolean => entry.scope !== "localStorage";
     const target = this.#deps.target;
     // One transaction for the rows *and* the stamps that say this machine holds
     // them. A merge used to be a few hundred separate writes with nothing
@@ -644,12 +631,7 @@ export class SyncLoop {
       target.takeContentChanges?.();
 
       const merged = applyEntries(target, entries, {
-        isApplied: (entry) => {
-          const key = versionKey(entry);
-          return durable(entry)
-            ? !shouldApply(versions, key, entry.hlc)
-            : this.#localStorageMerged.get(key) === entry.hlc;
-        },
+        isApplied: (entry) => !shouldApply(versions, versionKey(entry), entry.hlc),
         // Winning the log is not enough to overwrite a row's other columns. An
         // entry can win and still be older than what is here — a turn written
         // on a plane reaches the vault after one written since — and its
@@ -661,10 +643,7 @@ export class SyncLoop {
       const incomplete = new Set(target.takeIncomplete?.() ?? []);
       for (const entry of merged.merged) {
         const key = versionKey(entry);
-        if (!durable(entry) || incomplete.has(entryIdentity(entry))) {
-          this.#localStorageMerged.set(key, entry.hlc);
-          continue;
-        }
+        if (incomplete.has(entryIdentity(entry))) continue;
         versions.set(key, entry.hlc);
         // The record's own mark moves too, so the column guard above keeps
         // working for a merged table — `versionKey` only splits the *fold*.
@@ -775,12 +754,12 @@ export class SyncLoop {
    * on a later reading, `retry` when something does.
    *
    * `retry` is everything the loop has always left for the next launch to
-   * read again, back when every pull read everything: a `localStorage` entry
-   * (the renderer may not have taken it before a quit), a row the target took
-   * only part of, an entry this build refuses but a newer one might take —
+   * read again, back when every pull read everything: a row the target took
+   * only part of, and an entry this build refuses but a newer one might take —
    * unclassified, not synced by this build, or one the target threw on. Only a
    * malformed entry and one sealed to another machine's keychain are refused
-   * for good.
+   * for good. A `localStorage` entry is not among them: it waits in the
+   * target's inbox until the renderer acknowledges it.
    */
   #readRecords(
     read: NewlyRead,
@@ -800,9 +779,7 @@ export class SyncLoop {
     return read.files.map((file) => {
       const retry =
         file.unreadable ||
-        file.entries.some(
-          (entry) => entry.scope === "localStorage" || pending.has(entry)
-        );
+        file.entries.some((entry) => pending.has(entry));
       return {
         path: file.path,
         revision: file.revision,

@@ -357,6 +357,16 @@ export function initializeDatabase(userDataPath: string): Database.Database {
     -- what is new rather than the whole log every few seconds. See
     -- sync/readIndex.ts. 'device' in TABLE_POLICY, and written through
     -- requireDatabase() so recording a read cannot queue a change.
+    -- localStorage writes merged from another machine that the renderer has not
+    -- yet said it applied. Written in the merge's transaction and deleted on the
+    -- renderer's acknowledgement, so a quit in between loses nothing. See
+    -- sync/sqliteSyncTarget.ts. 'device' in TABLE_POLICY.
+    CREATE TABLE IF NOT EXISTS sync_local_storage_inbox (
+      key   TEXT PRIMARY KEY,
+      op    TEXT NOT NULL,
+      value TEXT
+    );
+
     CREATE TABLE IF NOT EXISTS sync_read_files (
       path     TEXT PRIMARY KEY,
       revision TEXT NOT NULL,

@@ -102,6 +102,12 @@ export const TABLE_POLICY: Readonly<Record<string, TablePolicy>> = {
   // machine never made, and it would skip them. See `readIndex.ts`.
   sync_read_files: "device",
 
+  // localStorage writes merged here that the renderer has not applied yet.
+  // `device`: it is this machine's delivery queue, and carried elsewhere it
+  // would be applied on a machine that already has the value. See
+  // `sqliteSyncTarget.ts`.
+  sync_local_storage_inbox: "device",
+
   // Execution records of analysis runs. Not synced: a run belongs to whichever
   // machine held the lease, and syncing them would fight that lease.
   // What a run *produces* lands in chat_sessions, which is synced.

@@ -636,6 +636,9 @@ export interface HeraclesRecordsApi {
   publishSyncedLocalStorage: (
     entries: Record<string, string>
   ) => Promise<LocalStoragePublishResult>;
+  /** The localStorage writes of a `sync:changed` event, applied: the main
+   *  process keeps sending them until it hears this. */
+  ackSyncedLocalStorage: (ops: SyncChangedEvent["localStorage"]) => Promise<void>;
   announceSyncPresence: (sessionId: string | null) => Promise<void>;
   listSyncPresence: () => Promise<SyncPresenceClaim[]>;
   onSyncChanged: (callback: (change: SyncChangedEvent) => void) => () => void;

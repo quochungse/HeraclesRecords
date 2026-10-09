@@ -8,8 +8,10 @@
 //     machine, so nothing is interpolated into SQL until it has been checked
 //     against the schema this build actually has.
 //   * localStorage lives in the renderer, which the main process cannot reach
-//     synchronously. Those operations are queued here and handed to the
-//     renderer over IPC by the service that owns the window.
+//     synchronously. Those operations wait in `sync_local_storage_inbox` — in
+//     the merge's transaction, so they are as durable as the rows — and are
+//     handed to the renderer over IPC by the service that owns the window,
+//     leaving the inbox only when the renderer says it applied them.
 
 import { requireDatabase } from "../database";
 import { policyForTable, RECORD_ID_SEPARATOR } from "./syncPolicy";
@@ -37,7 +39,6 @@ interface TableShape {
 
 export class SqliteSyncTarget implements SyncTarget {
   readonly #shapes = new Map<string, TableShape>();
-  readonly #pendingLocalStorage: PendingLocalStorageOp[] = [];
   readonly #incomplete = new Set<string>();
   readonly #republish: RepublishRow[] = [];
   /** Keyed by identity, so a record folded from three entries is listed once. */
@@ -76,8 +77,9 @@ export class SqliteSyncTarget implements SyncTarget {
     return requireDatabase().transaction(work)();
   }
 
-  /** See `SyncTarget.takeIncomplete`. Taken and cleared in one step, for the
-   *  same reason `drainLocalStorage` is. */
+  /** See `SyncTarget.takeIncomplete`. Taken and cleared in one step: a getter
+   *  and a clearer called in turn is how a queue gets emptied before it is
+   *  read. */
   takeIncomplete(): readonly string[] {
     const taken = [...this.#incomplete];
     this.#incomplete.clear();
@@ -85,17 +87,39 @@ export class SqliteSyncTarget implements SyncTarget {
   }
 
   /**
-   * Take the queue and empty it in one step.
+   * The localStorage writes the renderer has not yet said it performed — read,
+   * not taken.
    *
-   * The only way to read it, and deliberately the only way. A separate getter
-   * and clearer used to sit here, and "read it, then clear it" was the sole way
-   * anyone called them — with the getter handing back the live array, so the
-   * clear emptied the value just read. The caller sent an empty list to the
-   * renderer every time and no synced localStorage key ever arrived. One
-   * operation cannot be got wrong that way.
+   * They used to be a queue in memory, drained as they were sent, with nothing
+   * to say a renderer had taken them: a quit in between lost them, so the loop
+   * could never record those entries as held and read the files carrying them
+   * again at every launch (the whole snapshot, in practice). Now they leave
+   * only through `acknowledgeLocalStorage`, and until then every send repeats
+   * them — writing the same value twice is harmless, losing it is not.
    */
-  drainLocalStorage(): PendingLocalStorageOp[] {
-    return this.#pendingLocalStorage.splice(0, this.#pendingLocalStorage.length);
+  pendingLocalStorage(): PendingLocalStorageOp[] {
+    const rows = requireDatabase()
+      .prepare("SELECT key, op, value FROM sync_local_storage_inbox ORDER BY key")
+      .all() as { key: string; op: string; value: string | null }[];
+    return rows.map((row) =>
+      row.op === "delete"
+        ? { op: "delete", key: row.key }
+        : { op: "set", key: row.key, value: row.value ?? "" }
+    );
+  }
+
+  /**
+   * The renderer applied these. Each leaves the inbox only if it is still what
+   * was sent: a newer value merged for the same key in the meantime is owed to
+   * the renderer still.
+   */
+  acknowledgeLocalStorage(ops: readonly PendingLocalStorageOp[]): void {
+    const statement = requireDatabase().prepare(
+      "DELETE FROM sync_local_storage_inbox WHERE key = ? AND op = ? AND value IS ?"
+    );
+    for (const op of ops) {
+      statement.run(op.key, op.op, op.op === "delete" ? null : op.value ?? "");
+    }
   }
 
   /** Read the live schema for a table, refusing anything policy does not allow
@@ -323,12 +347,23 @@ export class SqliteSyncTarget implements SyncTarget {
       .run(key);
   }
 
+  /** One row per key: entries arrive in causal order, so the last write for a
+   *  key is the one the renderer needs. */
   setLocalStorage(key: string, value: string): void {
-    this.#pendingLocalStorage.push({ op: "set", key, value });
+    this.#writeInbox(key, "set", value);
   }
 
   deleteLocalStorage(key: string): void {
-    this.#pendingLocalStorage.push({ op: "delete", key });
+    this.#writeInbox(key, "delete", null);
+  }
+
+  #writeInbox(key: string, op: "set" | "delete", value: string | null): void {
+    requireDatabase()
+      .prepare(
+        `INSERT INTO sync_local_storage_inbox (key, op, value) VALUES (?, ?, ?)
+         ON CONFLICT(key) DO UPDATE SET op = excluded.op, value = excluded.value`
+      )
+      .run(key, op, value);
   }
 
   /** The record id for a row, matching what deleteRow expects. */

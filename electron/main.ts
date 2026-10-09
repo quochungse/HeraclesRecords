@@ -31,7 +31,10 @@ import {
 import { GoogleOAuth } from "./sync/googleOAuth";
 import { GoogleDriveProvider } from "./sync/googleDriveProvider";
 import { SyncLoop } from "./sync/syncLoop";
-import { SqliteSyncTarget } from "./sync/sqliteSyncTarget";
+import {
+  SqliteSyncTarget,
+  type PendingLocalStorageOp
+} from "./sync/sqliteSyncTarget";
 import { tablesTouched, type ApplyResult } from "./sync/syncEngine";
 import { attachSyncSink } from "./sync/syncBridge";
 import { createSqliteRecordVersions } from "./sync/recordVersions";
@@ -1025,8 +1028,8 @@ const syncTarget = new SqliteSyncTarget();
 /**
  * What a pull merged, waiting for a renderer to tell.
  *
- * The localStorage half of a pull has always been queued — `SqliteSyncTarget`
- * holds it, because the main process cannot perform those writes itself. The
+ * The localStorage half of a pull waits in `SqliteSyncTarget`'s inbox, because
+ * the main process cannot perform those writes itself. The
  * counts and the table names had no such queue: they arrived as arguments and
  * were dropped whole when the window was not ready, and the `did-finish-load`
  * follow-up then announced `0, 0`. So a pull that landed during startup or a
@@ -1059,24 +1062,27 @@ function noteSyncApplied(result: ApplyResult): void {
 /**
  * Hand a pull's results to the renderer, localStorage writes included.
  *
- * Nothing is drained without a renderer to drain it into. `SqliteSyncTarget`
- * queues localStorage operations because the main process cannot reach
- * `window.localStorage`, and it is the only copy — so taking them while nobody
- * is listening loses them outright. That is not hypothetical: the loop is tied
- * to the app, not to a window, so a Mac with its window closed keeps pulling.
+ * Nothing is sent without a renderer to send it to. The localStorage
+ * operations wait in `SqliteSyncTarget`'s inbox because the main process cannot
+ * reach `window.localStorage`, and they leave it only on the renderer's
+ * acknowledgement — they were once a queue in memory, drained as they were
+ * sent, so a send nobody heard lost them outright. The loop is tied to the
+ * app, not to a window, so a Mac with its window closed keeps pulling.
  *
  * `rendererReady`, not merely a live `mainWindow`. A `BrowserWindow` exists from
  * `createWindow()` onward, but `webContents.send` before `did-finish-load`
  * reaches no listener — so a pull landing during startup or a reload used to
- * drain the queue into nothing and lose exactly what this guard is here to
- * protect.
+ * send its counts into nothing.
  *
  * Called again from `markRendererReady`, which is what delivers anything that
  * accumulated while there was nowhere to send it.
  */
 function sendSyncChanged(): void {
   if (!mainWindow || mainWindow.isDestroyed() || !rendererReady) return;
-  const localStorage = syncTarget.drainLocalStorage();
+  // Read, not taken: they stay in the inbox until the renderer acknowledges
+  // them (`sync:ackLocalStorage`), so a window that closes or reloads before
+  // writing them is sent them again.
+  const localStorage = syncTarget.pendingLocalStorage();
   const { applied, deleted, tables } = pendingSyncChange;
   if (localStorage.length === 0 && applied === 0 && deleted === 0) return;
   pendingSyncChange = { applied: 0, deleted: 0, tables: new Set() };
@@ -2614,6 +2620,24 @@ function registerIpcHandlers(): void {
     (_event, entries: Record<string, string>) =>
       publishRendererLocalStorage(entries ?? {})
   );
+
+  // The renderer wrote these localStorage values; they may leave the inbox.
+  // Checked field by field, since the payload crosses the bridge.
+  ipcMain.handle("sync:ackLocalStorage", (_event, ops: unknown) => {
+    if (!Array.isArray(ops)) return;
+    syncTarget.acknowledgeLocalStorage(
+      ops.flatMap((op): PendingLocalStorageOp[] => {
+        if (!op || typeof op !== "object") return [];
+        const { op: kind, key, value } = op as Record<string, unknown>;
+        if (typeof key !== "string") return [];
+        if (kind === "delete") return [{ op: "delete" as const, key }];
+        if (kind === "set" && typeof value === "string") {
+          return [{ op: "set" as const, key, value }];
+        }
+        return [];
+      })
+    );
+  });
 
   ipcMain.handle("sync:announcePresence", (_event, sessionId: string | null) =>
     // Whatever loop is already running. Presence must not be the thing that

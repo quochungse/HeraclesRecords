@@ -11,10 +11,8 @@
 // good: applied, found already held, or refused for a reason no later build
 // could undo. Everything else this build leaves for a later reading is `retry`,
 // re-read once per launch — the behaviour the loop already promised for those
-// entries when every pull read everything (see `SyncLoop.#localStorageMerged`):
+// entries when every pull read everything:
 //
-//   * a `localStorage` entry, which only queues work for the renderer and is
-//     owed again if the app quits before a window takes it;
 //   * a row the target could take only part of — columns this build has no
 //     schema for;
 //   * an entry this build does not classify, or a table it will not sync,

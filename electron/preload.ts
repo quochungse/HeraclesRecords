@@ -838,6 +838,9 @@ const api = {
     entries: Record<string, string>
   ): Promise<LocalStoragePublishResult> =>
     ipcRenderer.invoke("sync:publishLocalStorage", entries),
+  ackSyncedLocalStorage: (
+    ops: SyncChangedEvent["localStorage"]
+  ): Promise<void> => ipcRenderer.invoke("sync:ackLocalStorage", ops),
   announceSyncPresence: (sessionId: string | null): Promise<void> =>
     ipcRenderer.invoke("sync:announcePresence", sessionId),
   listSyncPresence: (): Promise<SyncPresenceClaim[]> =>

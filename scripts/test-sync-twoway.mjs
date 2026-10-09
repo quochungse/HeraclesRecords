@@ -1555,8 +1555,9 @@ const { SqliteSyncTarget } = await load("sync/sqliteSyncTarget.js");
     "with nothing new read, the next poll is the idle one"
   );
 
-  // A localStorage entry is left for the next launch to read again — the
-  // renderer may not have taken it before a quit — and only for that.
+  // A localStorage entry is held like any other: the target keeps it until the
+  // renderer has written it (an inbox, in the real one), so the file that
+  // carried it is not read again — not this launch, and not the next.
   a.write((builder) => builder.localStorage("coros-theme", "paper"));
   await a.loop.flush();
   bVault.fetched.length = 0;
@@ -1581,15 +1582,10 @@ const { SqliteSyncTarget } = await load("sync/sqliteSyncTarget.js");
   });
   relaunched.loop.start();
   await relaunched.loop.pull();
-  assert.equal(
-    relaunched.target.storage.get("coros-theme"),
-    "paper",
-    "the next launch reads it again and hands it to the renderer"
-  );
-  assert.equal(
-    logFetches(relaunchedVault.fetched).length,
-    1,
-    "and reads nothing else it had already read"
+  assert.deepEqual(
+    logFetches(relaunchedVault.fetched),
+    [],
+    "and the next launch reads nothing it had already read"
   );
 
   a.loop.stop();
@@ -1715,8 +1711,8 @@ console.log(
     "a third pulling both at once keeps both, an entry stamped below the " +
     "record newest is still folded, " +
     "compaction is interval-gated and one device at a time, " +
-    "a pull fetches only the files it has not read and leaves a " +
-    "localStorage entry for the next launch, an idle vault keeps the idle " +
+    "a pull fetches only the files it has not read, a relaunch reads " +
+    "nothing again, an idle vault keeps the idle " +
     "interval, and compaction reads nothing when there is nothing to fold, " +
     "a closed format gate reads nothing and a held loop queues without sending"
 );
