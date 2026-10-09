@@ -1,6 +1,7 @@
 /**
  * The Overview weekly-activity chart: the calendar week it draws, the per-sport
- * blocks inside a column, its legend, and the Monday-to-today tile totals.
+ * blocks inside a column, its legend, and the Monday-to-today tile totals —
+ * and the Sleep card's column beside it, the seven days up to a night.
  *
  * Run through Electron (`ELECTRON_RUN_AS_NODE=1 electron
  * --experimental-strip-types`): this machine's Node is built without Amaro, so
@@ -348,5 +349,61 @@ assert.equal(
 );
 // Sunday is the seventh day of this app's week, not the first.
 assert.equal(formatWeekToDateRange(new Date(2026, 0, 4)), "Mon Dec 29 – Sun Jan 4");
+
+// The Sleep card's column: seven days ending on the night shown, each figure
+// over the days that have it.
+const { buildSleepWeekTotals, sleepWeekDayKeys } = await import(
+  `${pathToFileURL(path.join(repoRoot, "src", "training", "sleepWeekTotals.ts")).href}?cacheBust=${Date.now()}`
+);
+
+// Across a month's end, oldest first, the night itself last.
+assert.deepEqual(sleepWeekDayKeys("20261003"), [
+  "20260927",
+  "20260928",
+  "20260929",
+  "20260930",
+  "20261001",
+  "20261002",
+  "20261003"
+]);
+
+const sleepWeek = buildSleepWeekTotals(
+  [
+    { happenDay: "20261003", kind: "main", totalMinutes: 420, score: 80, napMinutes: 60 },
+    { happenDay: "20261002", kind: "main", totalMinutes: 360, score: 70 },
+    // Naps only: no main sleep, so neither its minutes nor a zero count.
+    { happenDay: "20261001", kind: "nap-only", napMinutes: 45 },
+    // Still syncing: its minutes are short of the night.
+    { happenDay: "20260930", kind: "main", completeness: "partial", totalMinutes: 90, score: 40 },
+    // A nap as a record of its own is part of a day, never a night.
+    { happenDay: "20260929", kind: "nap", totalMinutes: 30 },
+    // Outside the seven days.
+    { happenDay: "20260926", kind: "main", totalMinutes: 600, score: 99 }
+  ],
+  [
+    { date: "20260926", label: "", rhr: 70, avgSleepHrv: 90 },
+    { date: "20260928", label: "", rhr: 50, avgSleepHrv: 40 },
+    { date: "20261002", label: "", rhr: 0, avgSleepHrv: 0 },
+    { date: "20261003", label: "", rhr: 54, avgSleepHrv: 61 }
+  ],
+  "20261003"
+);
+
+// (420 + 360) / 2 — the naps on the 3rd are not added, the missing days not counted.
+assert.equal(sleepWeek.avgSleepMinutes, 390);
+assert.equal(sleepWeek.sleepNights, 2);
+assert.equal(sleepWeek.avgScore, 75);
+// A 0 from COROS is a figure not filled in, not a reading.
+assert.equal(sleepWeek.avgRhr, 52);
+assert.equal(sleepWeek.rhrDays, 2);
+assert.equal(sleepWeek.hrvMin, 40);
+assert.equal(sleepWeek.hrvMax, 61);
+
+// A week with nothing in it has no figures rather than zeros.
+const emptySleepWeek = buildSleepWeekTotals([], [], "20261003");
+assert.equal(emptySleepWeek.avgSleepMinutes, undefined);
+assert.equal(emptySleepWeek.avgScore, undefined);
+assert.equal(emptySleepWeek.avgRhr, undefined);
+assert.equal(emptySleepWeek.hrvMin, undefined);
 
 console.log("weekly activity tests passed");

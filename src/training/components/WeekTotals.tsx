@@ -19,8 +19,8 @@ interface WeekTotalsProps {
   mcpState?: McpConnectionState;
 }
 
-const ICON_SIZE = 13;
-const EMPTY_FIGURE = "–";
+export const WEEK_TOTALS_ICON_SIZE = 13;
+export const EMPTY_FIGURE = "–";
 
 /**
  * Unit letters inside an already-formatted figure — the `h` and `m` of
@@ -60,9 +60,12 @@ interface RowProps {
   unit?: string;
   /** What a row has to report on its own: the MCP state behind no steps. */
   notice?: string;
+  /** What the figure is over, on hover — the nights an average counts. */
+  hover?: string;
 }
 
-function Row({ icon, label, value, unit, notice }: RowProps) {
+/** One figure of a totals column. The Sleep card's column is built of these too. */
+export function WeekTotalsRow({ icon, label, value, unit, notice, hover }: RowProps) {
   const empty = value === EMPTY_FIGURE;
 
   return (
@@ -73,7 +76,10 @@ function Row({ icon, label, value, unit, notice }: RowProps) {
         </span>
         {label}
       </span>
-      <strong className={`week-totals-value${empty ? " is-empty" : ""}`}>
+      <strong
+        className={`week-totals-value${empty ? " is-empty" : ""}`}
+        title={hover}
+      >
         {withUnitSuffixes(value)}
         {/* No unit on an absent figure: "– km" reads as a measurement of
             nothing, where "–" reads as the figure not having arrived. */}
@@ -107,13 +113,13 @@ export function WeekTotals({ totals, mcpState }: WeekTotalsProps) {
   return (
     <section className="week-totals" aria-label="This week's totals">
       <ul className="week-totals-list">
-        <Row
-          icon={<Flame size={ICON_SIZE} />}
+        <WeekTotalsRow
+          icon={<Flame size={WEEK_TOTALS_ICON_SIZE} />}
           label="Load"
           value={formatWholeNumber(totals.trainingLoad)}
         />
-        <Row
-          icon={<Route size={ICON_SIZE} />}
+        <WeekTotalsRow
+          icon={<Route size={WEEK_TOTALS_ICON_SIZE} />}
           label="Distance"
           value={
             totals.distance !== undefined
@@ -122,15 +128,15 @@ export function WeekTotals({ totals, mcpState }: WeekTotalsProps) {
           }
           unit={distanceUnit(unitSystem)}
         />
-        <Row
-          icon={<Timer size={ICON_SIZE} />}
+        <WeekTotalsRow
+          icon={<Timer size={WEEK_TOTALS_ICON_SIZE} />}
           label="Duration"
           value={
             totals.duration !== undefined ? formatDurationTotal(totals.duration) : EMPTY_FIGURE
           }
         />
-        <Row
-          icon={<Footprints size={ICON_SIZE} />}
+        <WeekTotalsRow
+          icon={<Footprints size={WEEK_TOTALS_ICON_SIZE} />}
           label="Steps"
           value={formatWholeNumber(totals.steps)}
           notice={stepsNotice}

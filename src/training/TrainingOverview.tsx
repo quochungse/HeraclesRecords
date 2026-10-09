@@ -441,6 +441,7 @@ export function TrainingOverview({
                 />
                 <SleepSummaryPanel
                   sleep={snapshot?.sleep}
+                  points={snapshot?.trendPoints}
                   connecting={sleepConnecting}
                   refreshing={busy === "training-refresh"}
                   onOpenDetails={onOpenSleepDetails}
