@@ -8409,6 +8409,18 @@ async function fetchJson<T>(
   }
 }
 
+/**
+ * Which COROS session this machine holds, as a digest of its token, or null
+ * when it holds none. COROS keeps one live token per account, so the digest
+ * changes exactly when a login here (or a sign-out) changes who may be running
+ * — which is what the analyses' sync catch-up keys on.
+ */
+export function currentTrainingHubSessionId(): string | null {
+  const auth = getStoredAuth();
+  if (!auth) return null;
+  return crypto.createHash("sha256").update(auth.accessToken).digest("hex").slice(0, 16);
+}
+
 function getStoredAuth(): TrainingHubAuthState | null {
   const accessToken = getSecretSetting(SETTINGS.accessToken);
   const userId = getSetting(SETTINGS.userId);

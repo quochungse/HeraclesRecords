@@ -118,6 +118,7 @@ import {
   reconnectTrainingHub,
   restoreTrainingHubSessionAtStartup,
   setTrainingHubSessionListener,
+  currentTrainingHubSessionId,
   updateCorosProfile,
   uploadActivityFitToCoros,
   uploadTrainingPlan
@@ -831,13 +832,27 @@ app.whenReady().then(() => {
  */
 const STARTUP_SYNC_WAIT_MS = 90_000;
 
+/**
+ * The COROS session under which a pull last read the whole vault, or null.
+ *
+ * Taken when the pull *starts*: a session minted while it was in flight may
+ * have kicked out a machine that was still writing, so only a pull begun
+ * under the session counts for it.
+ */
+let caughtUpSession: string | null = null;
+
 async function firstPullAtStartup(): Promise<void> {
   const loop = syncLoopInstance;
   if (!loop || !net.isOnline()) return;
   let timer: NodeJS.Timeout | undefined;
+  const session = currentTrainingHubSessionId();
   try {
     await Promise.race([
-      loop.pull(),
+      // Still counted if it lands after the wait: the first run then finds the
+      // vault already read and does not pull again.
+      loop.pull().then(() => {
+        caughtUpSession = session;
+      }),
       new Promise<void>((resolve) => {
         timer = setTimeout(resolve, STARTUP_SYNC_WAIT_MS);
       })
@@ -1252,6 +1267,21 @@ function startSyncLoop(): SyncLoop | null {
       console.warn(
         `[sync] lost the lease for analysis ${analysisId} mid-run; ` +
           `another device may have taken it over`
+      ),
+    // Only when this session has not yet read the vault in full — the
+    // start-up pull failed, ran past its wait, or a login since replaced the
+    // session. Once it has, no other machine can have run anything: COROS
+    // keeps one live session per account, and it is this one.
+    catchUp: async () => {
+      const session = currentTrainingHubSessionId();
+      if (session && session === caughtUpSession) return;
+      await loop.pull();
+      caughtUpSession = session;
+    },
+    onCatchUpFailed: (analysisId, error) =>
+      console.warn(
+        `[sync] could not pull before analysis ${analysisId}; running on what is here`,
+        error
       )
   });
 
