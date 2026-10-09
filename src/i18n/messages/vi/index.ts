@@ -16,6 +16,10 @@ import strength from "./strength.ts";
 import calendar from "./calendar.ts";
 import workout from "./workout.ts";
 import library from "./library.ts";
+import sleep from "./sleep.ts";
+import map from "./map.ts";
+import profile from "./profile.ts";
+import records from "./records.ts";
 
 /** Tiếng Việt. Written by scripts/i18n-index.mjs. */
 export default {
@@ -36,4 +40,8 @@ export default {
   ...calendar,
   ...workout,
   ...library,
+  ...sleep,
+  ...map,
+  ...profile,
+  ...records,
 } satisfies Record<keyof typeof en, string>;

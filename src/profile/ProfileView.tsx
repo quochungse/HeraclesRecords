@@ -41,6 +41,8 @@ import {
   weightUnit,
   type UnitSystem
 } from "../units/units";
+import { getIntlLocale, messageRecord, plural, t } from "../i18n/core";
+import { useI18n } from "../i18n/useI18n";
 import "./profile.css";
 
 interface ProfileViewProps {
@@ -71,15 +73,20 @@ interface ProfileDraft {
   hrZoneType: string;
 }
 
-const ZONE_TABS: ReadonlyArray<{
-  family: CorosProfileZoneFamily;
-  label: string;
-}> = [
-  { family: "maxHr", label: "Max HR" },
-  { family: "restingHr", label: "HR reserve" },
-  { family: "lthr", label: "LTHR" },
-  { family: "thresholdPace", label: "Pace" },
-  { family: "cyclePower", label: "Power" }
+const ZONE_TAB_LABELS = messageRecord<CorosProfileZoneFamily>({
+  maxHr: "profile.zoneTab.maxHr",
+  restingHr: "profile.zoneTab.reserve",
+  lthr: "profile.zoneTab.lthr",
+  thresholdPace: "profile.zoneTab.pace",
+  cyclePower: "profile.zoneTab.power"
+});
+
+const ZONE_TABS: ReadonlyArray<{ family: CorosProfileZoneFamily }> = [
+  { family: "maxHr" },
+  { family: "restingHr" },
+  { family: "lthr" },
+  { family: "thresholdPace" },
+  { family: "cyclePower" }
 ];
 
 /** Clock time of the cached read, so a stale screen is visibly stale. */
@@ -87,7 +94,7 @@ function formatCachedAt(value: string): string {
   const parsed = new Date(value);
   return Number.isNaN(parsed.getTime())
     ? ""
-    : parsed.toLocaleTimeString(undefined, {
+    : parsed.toLocaleTimeString(getIntlLocale(), {
         hour: "2-digit",
         minute: "2-digit"
       });
@@ -118,7 +125,7 @@ function formatBirthday(value?: number): string {
     return "—";
   }
 
-  return new Date(`${iso}T00:00:00Z`).toLocaleDateString(undefined, {
+  return new Date(`${iso}T00:00:00Z`).toLocaleDateString(getIntlLocale(), {
     year: "numeric",
     month: "long",
     day: "numeric",
@@ -166,23 +173,26 @@ function displayNumber(value: number | undefined, convert: (value: number) => nu
  * tooltip. The fuller list stays as the tooltip, which is where the Settings
  * panel this replaced used to keep it.
  */
-const MEASUREMENT_OPTIONS = [
-  {
-    value: "0",
-    label: "Metric (km/kg)",
-    title: "Kilometres, metres, min/km, kilograms"
-  },
-  {
-    value: "1",
-    label: "Imperial (mi/lb)",
-    title: "Miles, feet, min/mi, pounds, yards"
-  }
-] as const;
+function measurementOptions() {
+  return [
+    {
+      value: "0",
+      label: t("profile.unit.metric"),
+      title: t("profile.unit.metricTitle")
+    },
+    {
+      value: "1",
+      label: t("profile.unit.imperial"),
+      title: t("profile.unit.imperialTitle")
+    }
+  ];
+}
 
 function measurementLabel(unit: number | undefined): string {
+  const options = measurementOptions();
   return (
-    MEASUREMENT_OPTIONS.find((option) => option.value === String(unit ?? 0))
-      ?.label ?? MEASUREMENT_OPTIONS[0].label
+    options.find((option) => option.value === String(unit ?? 0))?.label ??
+    options[0]!.label
   );
 }
 
@@ -294,6 +304,7 @@ export function ProfileView({
   onMessage,
   onError
 }: ProfileViewProps) {
+  useI18n();
   const { unitSystem, refreshUnitSystem } = useUnitSystem();
   const [profile, setProfile] = useState<CorosProfile | null>(null);
   // The fitness scores read the same dashboard Overview uses.
@@ -420,7 +431,7 @@ export function ProfileView({
       if (patch.unit !== undefined) {
         await refreshUnitSystem({ refresh: true });
       }
-      onMessage("COROS profile updated.");
+      onMessage(t("profile.updated"));
     } catch (caught) {
       onError(messageFrom(caught));
     } finally {
@@ -441,18 +452,15 @@ export function ProfileView({
     <div className="profile-view">
       <header className="profile-header">
         <div>
-          <p className="eyebrow">COROS account</p>
-          <h2>Personal</h2>
-          <p>
-            The identity, body metrics and training thresholds COROS holds for
-            your account — and the zones it derives from them.
-          </p>
+          <p className="eyebrow">{t("profile.eyebrow")}</p>
+          <h2>{t("nav.profile")}</h2>
+          <p>{t("profile.subtitle")}</p>
         </div>
         {connected ? (
           <div className="profile-header-actions">
             {cachedAt && formatCachedAt(cachedAt) ? (
               <span className="profile-cached-at">
-                Updated {formatCachedAt(cachedAt)}
+                {t("profile.updatedAt", { time: formatCachedAt(cachedAt) })}
               </span>
             ) : null}
             <button
@@ -466,7 +474,7 @@ export function ProfileView({
               ) : (
                 <RefreshCw size={16} aria-hidden="true" />
               )}
-              Refresh
+              {t("common.refresh")}
             </button>
           </div>
         ) : null}
@@ -476,21 +484,18 @@ export function ProfileView({
         <section className="panel profile-connect">
           <LockKeyhole size={24} aria-hidden="true" />
           <div>
-            <h3>Connect COROS first</h3>
-            <p>
-              Your profile is read from the Training Hub session, so sign in
-              before this screen has anything to show.
-            </p>
+            <h3>{t("common.connectFirst.title")}</h3>
+            <p>{t("profile.connectBody")}</p>
           </div>
           <button type="button" className="primary-button" onClick={onOpenOverview}>
-            Open Overview
+            {t("common.openOverview")}
           </button>
         </section>
       ) : loadError ? (
         <section className="panel profile-connect" role="alert">
           <X size={24} aria-hidden="true" />
           <div>
-            <h3>Could not load your profile</h3>
+            <h3>{t("profile.loadFailed")}</h3>
             <p>{loadError}</p>
           </div>
           <button
@@ -499,13 +504,13 @@ export function ProfileView({
             onClick={() => void handleRefresh()}
             disabled={busy !== null}
           >
-            Try again
+            {t("common.tryAgain")}
           </button>
         </section>
       ) : !profile ? (
         <section className="panel profile-loading" aria-busy="true">
           <Loader2 className="spin" size={24} aria-hidden="true" />
-          <p>Reading your COROS profile…</p>
+          <p>{t("profile.reading")}</p>
         </section>
       ) : (
         <>
@@ -523,11 +528,11 @@ export function ProfileView({
               </span>
             )}
             <div className="profile-identity-copy">
-              <h3>{profile.nickname ?? "COROS athlete"}</h3>
-              <p>{profile.email ?? "No email on file"}</p>
+              <h3>{profile.nickname ?? t("profile.athlete")}</h3>
+              <p>{profile.email ?? t("profile.noEmail")}</p>
               {profile.userId ? (
                 <p className="profile-account-id profile-mono">
-                  ID {profile.userId}
+                  {t("profile.id", { id: profile.userId })}
                 </p>
               ) : null}
               <div className="profile-badges">
@@ -539,13 +544,13 @@ export function ProfileView({
                 ) : null}
                 {profile.twoFactorRequired ? (
                   <span className="profile-badge is-strong">
-                    <ShieldCheck size={13} aria-hidden="true" /> 2FA on
+                    <ShieldCheck size={13} aria-hidden="true" /> {t("profile.twoFactor")}
                   </span>
                 ) : null}
                 {profile.activityCount !== undefined ? (
                   <span className="profile-badge">
                     <Activity size={13} aria-hidden="true" />{" "}
-                    {profile.activityCount} activities
+                    {plural("profile.activities", profile.activityCount)}
                   </span>
                 ) : null}
               </div>
@@ -558,7 +563,7 @@ export function ProfileView({
                 disabled={busy !== null}
               >
                 <Pencil size={16} aria-hidden="true" />
-                Edit
+                {t("profile.edit")}
               </button>
             ) : null}
           </section>
@@ -566,13 +571,13 @@ export function ProfileView({
           <form className="profile-grid" onSubmit={(event) => void handleSave(event)}>
             <section className="panel profile-card">
               <div className="profile-card-heading">
-                <p className="eyebrow">Body</p>
-                <h3>Metrics</h3>
+                <p className="eyebrow">{t("profile.body.eyebrow")}</p>
+                <h3>{t("profile.body.title")}</h3>
               </div>
               {editing && draft ? (
                 <div className="profile-fields">
                   <label className="field">
-                    <span>Nickname</span>
+                    <span>{t("profile.nickname")}</span>
                     <input
                       type="text"
                       maxLength={64}
@@ -583,7 +588,7 @@ export function ProfileView({
                     />
                   </label>
                   <label className="field">
-                    <span>Birthday</span>
+                    <span>{t("profile.birthday")}</span>
                     <input
                       type="date"
                       value={draft.birthday}
@@ -593,21 +598,21 @@ export function ProfileView({
                     />
                   </label>
                   <label className="field">
-                    <span>Sex</span>
+                    <span>{t("profile.sex")}</span>
                     <OptionGroup
-                      label="Sex"
+                      label={t("profile.sex")}
                       size="md"
                       fill
                       value={draft.sex}
                       options={[
-                        { value: "0", label: "Male" },
-                        { value: "1", label: "Female" }
+                        { value: "0", label: t("profile.male") },
+                        { value: "1", label: t("profile.female") }
                       ]}
                       onChange={(next) => updateDraft("sex", next)}
                     />
                   </label>
                   <label className="field">
-                    <span>Height ({heightUnit(unitSystem)})</span>
+                    <span>{t("profile.heightIn", { unit: heightUnit(unitSystem) })}</span>
                     <input
                       type="number"
                       /* COROS stores height as whole centimetres, so 175.5
@@ -628,7 +633,7 @@ export function ProfileView({
                     />
                   </label>
                   <label className="field">
-                    <span>Weight ({weightUnit(unitSystem)})</span>
+                    <span>{t("profile.weightIn", { unit: weightUnit(unitSystem) })}</span>
                     <input
                       type="number"
                       step="0.1"
@@ -649,24 +654,24 @@ export function ProfileView({
               ) : (
                 <dl className="profile-list">
                   <div>
-                    <dt>Birthday</dt>
+                    <dt>{t("profile.birthday")}</dt>
                     <dd>
                       {formatBirthday(profile.birthday)}
-                      {age !== undefined ? ` · ${age} yrs` : ""}
+                      {age !== undefined ? ` · ${plural("profile.age", age)}` : ""}
                     </dd>
                   </div>
                   <div>
-                    <dt>Sex</dt>
+                    <dt>{t("profile.sex")}</dt>
                     <dd>
                       {profile.sex === 0
-                        ? "Male"
+                        ? t("profile.male")
                         : profile.sex === 1
-                          ? "Female"
+                          ? t("profile.female")
                           : "—"}
                     </dd>
                   </div>
                   <div>
-                    <dt>Height</dt>
+                    <dt>{t("profile.height")}</dt>
                     <dd>
                       {profile.statureCm !== undefined
                         ? `${Math.round(
@@ -676,7 +681,7 @@ export function ProfileView({
                     </dd>
                   </div>
                   <div>
-                    <dt>Weight</dt>
+                    <dt>{t("profile.weight")}</dt>
                     <dd>
                       {profile.weightKg !== undefined
                         ? formatWeightValue(profile.weightKg, unitSystem, 1)
@@ -689,15 +694,15 @@ export function ProfileView({
 
             <section className="panel profile-card">
               <div className="profile-card-heading">
-                <p className="eyebrow">Training</p>
-                <h3>Thresholds</h3>
+                <p className="eyebrow">{t("profile.training.eyebrow")}</p>
+                <h3>{t("profile.training.title")}</h3>
               </div>
               {editing && draft ? (
                 <div className="profile-fields">
                   <label className="field">
-                    <span>Zone model</span>
+                    <span>{t("profile.zoneModel")}</span>
                     <OptionGroup
-                      label="Zone model"
+                      label={t("profile.zoneModel")}
                       mode="dropdown"
                       size="md"
                       value={draft.hrZoneType}
@@ -709,7 +714,7 @@ export function ProfileView({
                     />
                   </label>
                   <label className="field">
-                    <span>Max heart rate (bpm)</span>
+                    <span>{t("profile.maxHrField")}</span>
                     <input
                       type="number"
                       min={maxHrRange?.min ?? 120}
@@ -719,7 +724,7 @@ export function ProfileView({
                     />
                   </label>
                   <label className="field">
-                    <span>Resting heart rate (bpm)</span>
+                    <span>{t("profile.restingHrField")}</span>
                     <input
                       type="number"
                       min={restingHrRange?.min ?? 30}
@@ -731,15 +736,13 @@ export function ProfileView({
                     />
                   </label>
                   <p className="profile-note">
-                    Switching the zone model makes COROS rebuild your heart-rate
-                    zones around that model's anchor. LTHR, threshold pace and
-                    FTP stay COROS-calculated and are not editable here.
+                    {t("profile.zoneModelNote")}
                   </p>
                 </div>
               ) : (
                 <dl className="profile-list">
                   <div>
-                    <dt>Zone model</dt>
+                    <dt>{t("profile.zoneModel")}</dt>
                     <dd>
                       {activeModel ? (
                         <button
@@ -756,7 +759,7 @@ export function ProfileView({
                     </dd>
                   </div>
                   <div>
-                    <dt>Max HR</dt>
+                    <dt>{t("profile.maxHr")}</dt>
                     <dd>
                       {profile.thresholds.maxHr
                         ? `${profile.thresholds.maxHr} bpm`
@@ -764,7 +767,7 @@ export function ProfileView({
                     </dd>
                   </div>
                   <div>
-                    <dt>Resting HR</dt>
+                    <dt>{t("profile.restingHr")}</dt>
                     <dd>
                       {profile.thresholds.restingHr
                         ? `${profile.thresholds.restingHr} bpm`
@@ -780,7 +783,7 @@ export function ProfileView({
                     </dd>
                   </div>
                   <div>
-                    <dt>Threshold pace</dt>
+                    <dt>{t("profile.thresholdPace")}</dt>
                     <dd>
                       {profile.thresholds.thresholdPaceSecondsPerKm
                         ? formatPaceSecondsPerKm(
@@ -802,53 +805,50 @@ export function ProfileView({
 
             <section className="panel profile-card">
               <div className="profile-card-heading">
-                <p className="eyebrow">Display</p>
-                <h3>Units</h3>
+                <p className="eyebrow">{t("profile.display.eyebrow")}</p>
+                <h3>{t("profile.display.title")}</h3>
               </div>
               {editing && draft ? (
                 <div className="profile-fields">
                   <label className="field">
-                    <span>Measurement</span>
+                    <span>{t("profile.measurement")}</span>
                     <OptionGroup
-                      label="Measurement"
+                      label={t("profile.measurement")}
                       size="md"
                       fill
                       value={draft.unit}
-                      options={MEASUREMENT_OPTIONS}
+                      options={measurementOptions()}
                       onChange={(next) => updateDraft("unit", next)}
                     />
                   </label>
                   <label className="field">
-                    <span>Temperature</span>
+                    <span>{t("profile.temperature")}</span>
                     <OptionGroup
-                      label="Temperature"
+                      label={t("profile.temperature")}
                       size="md"
                       fill
                       value={draft.temperatureUnit}
                       options={[
-                        { value: "0", label: "Celsius" },
-                        { value: "1", label: "Fahrenheit" }
+                        { value: "0", label: t("profile.celsius") },
+                        { value: "1", label: t("profile.fahrenheit") }
                       ]}
                       onChange={(next) => updateDraft("temperatureUnit", next)}
                     />
                   </label>
                   <p className="profile-note">
-                    Both are your COROS account settings, and both are what
-                    Heracles Records shows too — changing them here turns over
-                    every distance, pace, elevation, weight and temperature in
-                    the app, on your watch and in the COROS apps.
+                    {t("profile.unitsNote")}
                   </p>
                 </div>
               ) : (
                 <dl className="profile-list">
                   <div>
-                    <dt>Measurement</dt>
+                    <dt>{t("profile.measurement")}</dt>
                     <dd>{measurementLabel(profile.unit)}</dd>
                   </div>
                   <div>
-                    <dt>Temperature</dt>
+                    <dt>{t("profile.temperature")}</dt>
                     <dd>
-                      {profile.temperatureUnit === 1 ? "Fahrenheit" : "Celsius"}
+                      {profile.temperatureUnit === 1 ? t("profile.fahrenheit") : t("profile.celsius")}
                     </dd>
                   </div>
                 </dl>
@@ -864,7 +864,7 @@ export function ProfileView({
                   disabled={busy === "save"}
                 >
                   <X size={16} aria-hidden="true" />
-                  Cancel
+                  {t("common.cancel")}
                 </button>
                 <button
                   type="submit"
@@ -876,7 +876,7 @@ export function ProfileView({
                   ) : (
                     <Check size={16} aria-hidden="true" />
                   )}
-                  Save to COROS
+                  {t("profile.save")}
                 </button>
               </div>
             ) : null}
@@ -896,15 +896,15 @@ export function ProfileView({
               >
                 <header className="profile-dialog-header">
                   <div className="profile-card-heading">
-                    <p className="eyebrow">Derived from your thresholds</p>
+                    <p className="eyebrow">{t("profile.zones.eyebrow")}</p>
                     <h3 id="profile-zones-title">
-                      <Gauge size={17} aria-hidden="true" /> Training zones
+                      <Gauge size={17} aria-hidden="true" /> {t("profile.zones.title")}
                     </h3>
                   </div>
                   <button
                     type="button"
                     className="icon-button"
-                    aria-label="Close"
+                    aria-label={t("common.close")}
                     onClick={() => setZonesOpen(false)}
                   >
                     <X size={18} aria-hidden="true" />
@@ -914,19 +914,19 @@ export function ProfileView({
                     the athlete came to read. A dot, not the words "in use":
                     the label has to stay one line. */}
                 <OptionGroup
-                  label="Zone family"
+                  label={t("profile.zones.family")}
                   mode="collapsible"
                   className="profile-tabs"
                   value={activeZoneTab}
                   options={zoneTabs.map((tab) => ({
                     value: tab.family,
-                    label: tab.label,
+                    label: ZONE_TAB_LABELS[tab.family],
                     ...(activeModel?.family === tab.family
                       ? {
                           icon: (
                             <span className="profile-tab-dot" aria-hidden="true" />
                           ),
-                          title: "The zones COROS is using"
+                          title: t("profile.zones.inUse")
                         }
                       : {})
                   }))}
@@ -934,7 +934,7 @@ export function ProfileView({
                 />
                 {zoneRowCount === 0 ? (
                   <p className="profile-note">
-                    COROS has no zones for this metric yet.
+                    {t("profile.zones.none")}
                   </p>
                 ) : (
                   <table className="profile-zone-table">
@@ -947,9 +947,9 @@ export function ProfileView({
                     </colgroup>
                     <thead>
                       <tr>
-                        <th scope="col">Zone</th>
-                        <th scope="col">Share</th>
-                        <th scope="col">Boundary</th>
+                        <th scope="col">{t("profile.zones.zone")}</th>
+                        <th scope="col">{t("profile.zones.share")}</th>
+                        <th scope="col">{t("profile.zones.boundary")}</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -976,8 +976,8 @@ export function ProfileView({
                 )}
                 <p className="profile-note profile-dialog-footnote">
                   {activeModel
-                    ? `Dotted tab is the model your zones are built from: ${activeModel.label}.`
-                    : "COROS has not set a heart-rate zone model for this account."}
+                    ? t("profile.zones.dotted", { model: activeModel.label })
+                    : t("profile.zones.noModel")}
                 </p>
               </section>
             </div>

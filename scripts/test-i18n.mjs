@@ -182,6 +182,24 @@ assert.equal(core.plural("sync.changes.waiting", 21), "21 изменение ж�
 
 await core.switchLocaleForTest("en");
 
+// --- 5b. The labours say in English what the website says ---------------------
+//
+// src/records/labours.ts stays English because the website imports it; the app
+// names a labour through records.labour.* (src/records/labourWords.ts). The two
+// must agree, or the app and the site describe different stages.
+
+{
+  const { LABOURS } = await import(pathToFileURL(path.join(repoRoot, "src", "records", "labours.ts")).href);
+  for (const labour of LABOURS) {
+    for (const field of ["name", "short", "category", "myth"]) {
+      assert.equal(en[`records.labour.${labour.id}.${field}`], labour[field], `records.labour.${labour.id}.${field}`);
+    }
+    labour.stages.forEach((stage, index) => {
+      assert.equal(en[`records.labour.${labour.id}.stage${index + 1}`], stage, `records.labour.${labour.id}.stage${index + 1}`);
+    });
+  }
+}
+
 // --- 6. Translated files stay translated ----------------------------------------
 //
 // A ratchet over the whole renderer (scripts/lib/i18n-coverage.mjs). Every file

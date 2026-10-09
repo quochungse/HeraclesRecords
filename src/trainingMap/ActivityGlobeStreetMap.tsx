@@ -14,6 +14,7 @@ import type {
   ActivityVisitPoint,
   GlobePoint,
 } from "./activityVisitHeatmap";
+import { t } from "../i18n/core";
 
 export interface StreetMapFocus {
   lat: number;
@@ -420,7 +421,7 @@ export function ActivityGlobeStreetMap({
         ref={containerRef}
         className="activity-globe-street-map-canvas"
         role="img"
-        aria-label="Street map with activity routes. Zoom out or reset to return to the globe."
+        aria-label={t("map.aria.streetMap")}
       />
       <MapLayerControl value={baseLayer} onChange={setBaseLayer} />
       <MapCreditButton open={creditOpen} onToggle={toggleCredit} />

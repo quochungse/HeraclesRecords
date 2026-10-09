@@ -9,6 +9,7 @@ import { HrvBaselineChart } from "../training/components/HrvBaselineChart";
 import { MCP_SLEEP_SUBJECT, mcpNotice } from "../mcp/mcpNotice";
 import type { HeraclesRecordsApi } from "../heraclesrecords-api";
 import type { TrainingTrendPoint } from "../training/types";
+import { getIntlLocale, plural, t } from "../i18n/core";
 import "./sleep.css";
 
 interface SleepDetailsViewProps {
@@ -30,7 +31,7 @@ function formatFetchedAt(fetchedAt?: number): string | null {
     return null;
   }
 
-  return new Intl.DateTimeFormat(undefined, {
+  return new Intl.DateTimeFormat(getIntlLocale(), {
     hour: "numeric",
     minute: "2-digit",
     month: "short",
@@ -93,14 +94,11 @@ export function SleepDetailsView({
       <section className="panel data-connect-panel">
         <LockKeyhole size={24} aria-hidden="true" />
         <div>
-          <h3>Connect COROS first</h3>
-          <p>
-            Sleep comes from your COROS account. Signing in lives on Overview;
-            connect there and your nights load here.
-          </p>
+          <h3>{t("common.connectFirst.title")}</h3>
+          <p>{t("sleep.connectBody")}</p>
         </div>
         <button type="button" className="primary-button" onClick={onOpenOverview}>
-          Open Overview
+          {t("common.openOverview")}
         </button>
       </section>
     );
@@ -109,9 +107,9 @@ export function SleepDetailsView({
   const countLabel =
     records.length === 0
       ? loading
-        ? "Loading nights…"
-        : "No nights on file"
-      : `${records.length} ${records.length === 1 ? "night" : "nights"} on file`;
+        ? t("sleep.loadingNights")
+        : t("sleep.noNights")
+      : plural("sleep.nightsOnFile", records.length);
 
   return (
     // Deliberately not `stack-fill`: this screen is a document that grows past
@@ -121,14 +119,15 @@ export function SleepDetailsView({
       <header className="sleep-page-header">
         <div className="sleep-page-heading">
           <p className="eyebrow">COROS</p>
-          <h1>Sleep</h1>
+          <h1>{t("sleep.title")}</h1>
           <p className="sleep-page-subtitle">
             {countLabel}
             {fetchedAtLabel ? (
               <>
                 <span aria-hidden="true"> · </span>
-                {snapshot?.source === "cache" ? "cached " : "updated "}
-                {fetchedAtLabel}
+                {snapshot?.source === "cache"
+                  ? t("sleep.cachedAt", { time: fetchedAtLabel })
+                  : t("sleep.updatedAt", { time: fetchedAtLabel })}
               </>
             ) : null}
           </p>
@@ -139,8 +138,8 @@ export function SleepDetailsView({
           className="icon-button sleep-refresh-button"
           onClick={refreshAll}
           disabled={refreshing || loading}
-          aria-label={refreshing ? "Refreshing sleep data" : "Refresh sleep data"}
-          title="Refresh"
+          aria-label={refreshing ? t("sleep.refreshing") : t("sleep.refresh")}
+          title={t("common.refresh")}
         >
           <RefreshCw
             size={16}
@@ -152,7 +151,7 @@ export function SleepDetailsView({
 
       {error ? (
         <p className="sleep-details-error">
-          COROS did not answer: {error}. Showing what is already on this machine.
+          {t("sleep.corosError", { error })}
         </p>
       ) : null}
 
@@ -165,7 +164,7 @@ export function SleepDetailsView({
       <section className="panel sleep-details-panel">
         <div className="sleep-details-split">
           <div className="sleep-details-list">
-            <h2 className="sleep-pane-title">Recent sleeps</h2>
+            <h2 className="sleep-pane-title">{t("sleep.recent")}</h2>
             <div className="sleep-night-list-scroll">
               <SleepNightList
                 records={records}
@@ -191,7 +190,7 @@ export function SleepDetailsView({
       </section>
 
       <section className="panel sleep-trend-panel">
-        <h2 className="sleep-pane-title">Sleep length and score</h2>
+        <h2 className="sleep-pane-title">{t("sleep.trendTitle")}</h2>
         <SleepTrendChart
           records={records}
           selectedDay={selectedDay ?? undefined}

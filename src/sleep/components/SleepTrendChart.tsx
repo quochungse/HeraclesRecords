@@ -18,6 +18,7 @@ import { useChartColors } from "../../training/useChartColors";
 import { mcpShortTextOr, type McpConnectionState } from "../../mcp/mcpNotice";
 import { isSleepDayRecord, totalSleepMinutes } from "../../../electron/sleepMetrics";
 import type { TrainingHubSleepRecord } from "../../../electron/types";
+import { t } from "../../i18n/core";
 
 interface SleepTrendChartProps {
   records: TrainingHubSleepRecord[];
@@ -87,11 +88,11 @@ export function SleepTrendChart({
     return (
       <p className="sleep-trend-empty">
         {loading
-          ? "Reading your nights…"
+          ? t("sleep.trend.reading")
           : mcpShortTextOr(
               mcpState,
-              "No nights to trend.",
-              "A trend needs more than one night. Keep syncing and it fills in here."
+              t("sleep.trend.noneShort"),
+              t("sleep.trend.none")
             )}
       </p>
     );
@@ -129,7 +130,8 @@ export function SleepTrendChart({
             axisLine={false}
             width={34}
             fontSize={11}
-            tickFormatter={(value: number) => `${value}h`}
+            // A unit symbol on a narrow axis, like km and bpm: the same in every language.
+            tickFormatter={(value: number) => `${value}h`} // i18n-ignore
           />
           <YAxis
             yAxisId="score"
@@ -149,7 +151,7 @@ export function SleepTrendChart({
               <TrendChartTooltip
                 {...props}
                 valueFormatter={(value, name) =>
-                  name === "Asleep"
+                  name === t("sleep.trend.asleep")
                     ? formatSleepDurationMinutes(value * 60)
                     : String(Math.round(value))
                 }
@@ -161,7 +163,7 @@ export function SleepTrendChart({
           <Bar
             yAxisId="hours"
             dataKey="hours"
-            name="Asleep"
+            name={t("sleep.trend.asleep")}
             radius={[4, 4, 0, 0]}
             fill={colors.accentSoft}
             stroke={colors.accent}
@@ -171,7 +173,7 @@ export function SleepTrendChart({
             yAxisId="score"
             type="monotone"
             dataKey="score"
-            name="Score"
+            name={t("sleep.trend.score")}
             stroke={colors.gold}
             strokeWidth={2}
             dot={false}
@@ -182,8 +184,8 @@ export function SleepTrendChart({
       </ResponsiveContainer>
       {onSelectDay ? (
         <p className="sleep-trend-caption">
-          Click a bar to open that night
-          {selectedDay ? ` · showing ${formatHappenDayLabel(selectedDay)}` : ""}
+          {t("sleep.trend.caption")}
+          {selectedDay ? ` · ${t("sleep.trend.showing", { day: formatHappenDayLabel(selectedDay) })}` : ""}
         </p>
       ) : null}
     </div>

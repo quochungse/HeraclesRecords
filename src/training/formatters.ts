@@ -10,7 +10,7 @@ import {
   secondsPerKmToDisplayPace
 } from "../units/units";
 
-import { formatDecimal, getIntlLocale, plural, t } from "../i18n/core";
+import { formatDecimal, getIntlLocale, getLocale, plural, t } from "../i18n/core";
 export function formatTrainingTimestamp(value?: number): string {
   if (!value) {
     return t("units.unknown");
@@ -299,7 +299,17 @@ function formatSleepClock(value?: string): string | undefined {
     return undefined;
   }
 
-  const period = hours >= 12 ? "PM" : "AM";
+  // Every other language writes the clock its own way (23:26, 午後11:26);
+  // English keeps its own spelling, which the suites hold to the character.
+  if (getLocale() !== "en") {
+    return new Intl.DateTimeFormat(getIntlLocale(), {
+      hour: "numeric",
+      minute: "2-digit",
+      timeZone: "UTC"
+    }).format(new Date(Date.UTC(2000, 0, 1, hours, minutes)));
+  }
+
+  const period = hours >= 12 ? "PM" : "AM"; // i18n-ignore
   const displayHour = hours % 12 || 12;
   return `${displayHour}:${String(minutes).padStart(2, "0")} ${period}`;
 }

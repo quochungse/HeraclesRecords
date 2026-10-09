@@ -17,7 +17,7 @@ code, and `npm run test:i18n` holds both.
 | P2 | Overview and its panels, the greeting, the COROS sign-in, `App.tsx`'s toasts and loading states, the update prompt, map styles, periods, MCP notices, COROS's sport names (`sports.*`), and **numbers**: the unit formatters' digits and every count follow the language | **Done** |
 | P3 | Activities, Running, Cycling, Hiking, Strength, and what they share (`ActivitySeriesChart`, `activityChannels.ts`, `sportTypes.ts`, the heatmap); COROS's zone names (`zoneName`, `zones.*`) | **Done** |
 | P4 | Calendar and Training Library (`WorkoutBuilder`, step kinds, zones, the plan reader and editor, the plan brief steps Coach reuses), sport names through `workoutSportLabel` | **Done** |
-| P5 | Sleep, Hall of Records, Where you've been, Personal | |
+| P5 | Sleep, Hall of Records (the milestones and the Twelve Labours), Where you've been, Personal; clocks and short dates through Intl outside English | **Done** |
 | P6 | Coach's screen: `ChatView`, Coach Models, MCP servers, the Workbench, analyses. **Not the prompt** (below) | |
 | P7 | Text the main process puts on screen: errors thrown over IPC, native dialog titles | |
 
@@ -85,8 +85,15 @@ line in the website's guide (`site/src/content/guide/customise.md`, under Appear
 - **Coach's prompt is not translated** (decided 2026-10-04). The model answers in the language
   the athlete writes in. Only Coach's *screen* is translated (P6).
 - **Names stay names**: Heracles Records, COROS, Google Drive, Hevy, MCP, GitHub, Claude.
-  The labour names on the Hall of Records are a P5 decision. The website reads
-  `src/records/labours.ts` in English, so a translation must not change that file's English.
+- **The labours take each language's own names for the myths** (decided in P5): Sư tử Nemea,
+  ネメアーの獅子, Немейский лев, Le Lion de Némée. The website imports
+  `src/records/labours.ts` as it is, so that file stays English and the app names a labour
+  through `src/records/labourWords.ts` (`records.labour.*`); `test:i18n` holds English's
+  messages equal to the file, and the scanner skips it.
+- **A milestone is written in the language on screen when the hall is worked out** — its
+  title, eyebrow and figures are never stored (the ledger keeps ids, days and numbers), so
+  `useHallOfRecords` works the hall out again on a switch. A title with a figure keeps
+  " — " before it in every language: the timeline cuts there to name a milestone without it.
 - **What drives the app from outside stays English.** `data-nav-label` is `english(labelKey)`,
   because the probe and the screenshot harness navigate by it.
 - **A translated file stays translated.** Once the scanner finds nothing in it, it leaves

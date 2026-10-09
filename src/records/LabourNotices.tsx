@@ -4,6 +4,8 @@ import { STAGE_NUMERALS, type LabourState } from "./labours";
 import { formatDayShort } from "./milestones";
 import { LabourEmblem, LaurelWreath } from "./recordsIcons";
 import type { Announcement } from "./recordsNotices";
+import { t } from "../i18n/core";
+import { labourMyth, labourName, labourStage } from "./labourWords";
 import "./recordsNotices.css";
 
 /**
@@ -26,26 +28,26 @@ export function LabourToastCard({
   const milestone = announcement.milestone;
   return (
     <div className="labour-toast" role="status">
-      <button type="button" className="labour-toast-close" aria-label="Dismiss" onClick={onDismiss}>
+      <button type="button" className="labour-toast-close" aria-label={t("records.toast.dismiss")} onClick={onDismiss}>
         <X size={14} aria-hidden="true" />
       </button>
       <LabourEmblem id={labour.definition.id} reached={labour.reached} size="toast" />
-      <p className="labour-toast-eyebrow">Labour advanced</p>
+      <p className="labour-toast-eyebrow">{t("records.toast.advanced")}</p>
       <p className="labour-toast-title">
-        {labour.definition.name} — {STAGE_NUMERALS[announcement.stage]} of III
+        {labourName(labour.definition.id)} — {t("records.stageOfThree", { stage: STAGE_NUMERALS[announcement.stage] })}
       </p>
       {milestone ? (
         <p className="labour-toast-text">
-          {milestone.title}, {formatDayShort(milestone.day)}.
+          {t("records.toast.text", { title: milestone.title, day: formatDayShort(milestone.day) })}
         </p>
       ) : null}
-      <div className="labour-toast-pips" aria-label={`${labour.reached} of 3 stages`}>
+      <div className="labour-toast-pips" aria-label={t("records.stagesReached", { n: labour.reached })}>
         {[1, 2, 3].map((index) => (
           <span key={index} className={index <= labour.reached ? "is-reached" : ""} />
         ))}
       </div>
       <button type="button" className="labour-toast-link" onClick={onOpen}>
-        View in Hall of Records
+        {t("records.toast.view")}
       </button>
     </div>
   );
@@ -90,21 +92,21 @@ export function LabourCelebration({
         aria-labelledby="labour-celebration-title"
         aria-describedby="labour-celebration-myth"
       >
-        <button type="button" className="labour-celebration-close" aria-label="Close" onClick={onClose}>
+        <button type="button" className="labour-celebration-close" aria-label={t("common.close")} onClick={onClose}>
           <X size={18} aria-hidden="true" />
         </button>
         <div className="labour-celebration-art" aria-hidden="true">
           <LaurelWreath size={168} />
         </div>
         <p className="labour-celebration-eyebrow">
-          Labour complete · {completed} of 12
+          {t("records.celebration.eyebrow", { n: completed })}
         </p>
         <div className="labour-celebration-labour">
           <LabourEmblem id={definition.id} reached={3} size="hero" />
           <div>
-            <h2 id="labour-celebration-title">{definition.name}</h2>
+            <h2 id="labour-celebration-title">{labourName(definition.id)}</h2>
             <p id="labour-celebration-myth" className="labour-celebration-myth">
-              {definition.myth}
+              {labourMyth(definition.id)}
             </p>
           </div>
         </div>
@@ -112,7 +114,7 @@ export function LabourCelebration({
           {labour.stages.map((stage) => (
             <li key={stage.stage}>
               <span className="labour-celebration-pip">{STAGE_NUMERALS[stage.stage]}</span>
-              <span>{stage.title}</span>
+              <span>{labourStage(definition.id, stage.stage)}</span>
               <span className="labour-celebration-date">
                 {stage.reached ? formatDayShort(stage.reached.day) : ""}
               </span>
@@ -121,10 +123,10 @@ export function LabourCelebration({
         </ol>
         <div className="labour-celebration-actions">
           <button ref={primaryRef} type="button" className="primary-button" onClick={onSeeLabours}>
-            See the Twelve Labours
+            {t("records.celebration.see")}
           </button>
           <button type="button" className="secondary-button" onClick={onClose}>
-            Close
+            {t("common.close")}
           </button>
         </div>
       </div>

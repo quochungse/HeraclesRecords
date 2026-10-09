@@ -1,6 +1,7 @@
 import { formatSleepDurationMinutes } from "../../training/formatters";
 import { drawableStages, timeInBedMinutes } from "../sleepStages";
 import type { TrainingHubSleepRecord } from "../../../electron/types";
+import { t } from "../../i18n/core";
 
 interface SleepStageDonutProps {
   record: TrainingHubSleepRecord;
@@ -24,8 +25,8 @@ export function SleepStageDonut({ record }: SleepStageDonutProps) {
 
   if (total <= 0) {
     return (
-      <div className="sleep-donut is-empty" role="img" aria-label="No stage breakdown">
-        <p>No stage breakdown for this night.</p>
+      <div className="sleep-donut is-empty" role="img" aria-label={t("sleep.donut.none")}>
+        <p>{t("sleep.donut.noneBody")}</p>
       </div>
     );
   }
@@ -34,7 +35,7 @@ export function SleepStageDonut({ record }: SleepStageDonutProps) {
 
   return (
     <div className="sleep-donut">
-      <svg viewBox="0 0 160 160" role="img" aria-label="Sleep stages by share of the night">
+      <svg viewBox="0 0 160 160" role="img" aria-label={t("sleep.donut.aria")}>
         <circle
           className="sleep-donut-track"
           cx="80"
@@ -69,7 +70,7 @@ export function SleepStageDonut({ record }: SleepStageDonutProps) {
         })}
       </svg>
       <div className="sleep-donut-centre">
-        <span>Total time</span>
+        <span>{t("sleep.donut.total")}</span>
         <strong>{formatSleepDurationMinutes(inBed)}</strong>
       </div>
     </div>

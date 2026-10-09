@@ -1,4 +1,5 @@
 import type { TrainingHubSleepRecord } from "../../electron/types";
+import { t } from "../i18n/core";
 
 export type SleepStageKey = "awake" | "rem" | "light" | "deep";
 
@@ -18,35 +19,43 @@ export interface SleepStageSlice {
  */
 const STAGE_ORDER: Array<{
   key: SleepStageKey;
-  label: string;
+  readonly label: string;
   className: string;
   minutesOf: (record: TrainingHubSleepRecord) => number | undefined;
   percentOf: (record: TrainingHubSleepRecord) => number | undefined;
 }> = [
   {
     key: "awake",
-    label: "Awake",
+    get label() {
+      return t("sleep.stage.awake");
+    },
     className: "is-awake",
     minutesOf: (record) => record.awakeMinutes,
     percentOf: (record) => record.awakePercent
   },
   {
     key: "rem",
-    label: "REM",
+    get label() {
+      return t("sleep.stage.rem");
+    },
     className: "is-rem",
     minutesOf: (record) => record.remMinutes,
     percentOf: (record) => record.remPercent
   },
   {
     key: "light",
-    label: "Light",
+    get label() {
+      return t("sleep.stage.light");
+    },
     className: "is-light",
     minutesOf: (record) => record.lightMinutes,
     percentOf: (record) => record.lightPercent
   },
   {
     key: "deep",
-    label: "Deep",
+    get label() {
+      return t("sleep.stage.deep");
+    },
     className: "is-deep",
     minutesOf: (record) => record.deepMinutes,
     percentOf: (record) => record.deepPercent

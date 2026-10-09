@@ -13,6 +13,7 @@ import {
   totalSleepMinutes
 } from "../../../electron/sleepMetrics";
 import type { TrainingHubSleepRecord } from "../../../electron/types";
+import { t } from "../../i18n/core";
 
 interface SleepNightListProps {
   records: TrainingHubSleepRecord[];
@@ -52,11 +53,11 @@ export function SleepNightList({
     return (
       <p className="sleep-night-list-empty">
         {loading
-          ? "Loading nights…"
+          ? t("sleep.loadingNights")
           : mcpShortTextOr(
               mcpState,
-              "No nights on file.",
-              "No nights on file yet. Sync your watch and refresh."
+              t("sleep.list.noNightsShort"),
+              t("sleep.list.noNights")
             )}
       </p>
     );
@@ -66,7 +67,7 @@ export function SleepNightList({
     // Plain list, plain buttons: a listbox would need its options to be the
     // listbox's own children, and `aria-current` says "this is the one on
     // screen" more accurately than a selection role does here anyway.
-    <ul className="sleep-night-list" aria-label="Recent nights">
+    <ul className="sleep-night-list" aria-label={t("sleep.list.aria")}>
       {records.map((record) => {
         const selected = record.happenDay === selectedDay;
         const stages = drawableStages(record);
@@ -96,14 +97,14 @@ export function SleepNightList({
                 {naps > 0 ? (
                   <span className="sleep-night-row-nap">
                     {isNapOnlyRecord(record)
-                      ? "naps only"
-                      : `incl. ${formatSleepDurationMinutes(naps)} nap`}
+                      ? t("sleep.list.napsOnly")
+                      : t("sleep.list.inclNap", { duration: formatSleepDurationMinutes(naps) })}
                   </span>
                 ) : null}
                 {record.completeness === "partial" ? (
                   <span className="sleep-night-row-partial">
                     <AlertCircle size={12} aria-hidden="true" />
-                    Partial
+                    {t("sleep.list.partial")}
                   </span>
                 ) : null}
               </div>

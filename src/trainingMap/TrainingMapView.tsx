@@ -5,6 +5,7 @@ import type {
 } from "../../electron/types";
 import type { LabourState } from "../records/labours";
 import { ActivityGlobeCard } from "./ActivityGlobeCard";
+import { t } from "../i18n/core";
 
 interface TrainingMapViewProps {
   activities: TrainingHubActivity[];
@@ -47,25 +48,23 @@ export function TrainingMapView({
       <section className="training-map-disconnected">
         <header className="training-map-page-header">
           <div>
-            <h1>Where you’ve been</h1>
-            <p>Explore every place your training has taken you.</p>
+            <h1>{t("map.title")}</h1>
+            <p>{t("map.subtitle")}</p>
           </div>
         </header>
 
         <section className="panel data-connect-panel">
           <LockKeyhole size={24} aria-hidden="true" />
           <div>
-            <h3>Connect COROS first</h3>
-            <p>
-              The map is drawn from the routes in your COROS activity history.
-            </p>
+            <h3>{t("common.connectFirst.title")}</h3>
+            <p>{t("map.connectBody")}</p>
           </div>
           <button
             type="button"
             className="primary-button"
             onClick={onOpenOverview}
           >
-            Open Overview
+            {t("common.openOverview")}
           </button>
         </section>
       </section>

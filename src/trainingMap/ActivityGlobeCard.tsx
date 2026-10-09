@@ -61,6 +61,8 @@ import {
   defineSelectionPreference,
   useSelectionPreference,
 } from "../preferences/selectionPreferences";
+import { plural, t } from "../i18n/core";
+import { useI18n } from "../i18n/useI18n";
 import "./activityGlobe.css";
 
 interface ActivityGlobeCardProps {
@@ -209,6 +211,7 @@ export function ActivityGlobeCard({
   labour,
   onOpenLabours,
 }: ActivityGlobeCardProps) {
+  useI18n();
   const globeRendererRef = useRef<ActivityGlobeRendererHandle>(null);
   const streetEnterTimerRef = useRef<number | null>(null);
 
@@ -644,20 +647,20 @@ export function ActivityGlobeCard({
   const mapHasVisits = visits.length > 0;
   const mapLoading = (visitsLoading && !mapHasVisits) || (mapHasVisits && !regionIndex);
   const summary = mapLoading
-    ? "Mapping your GPS activities…"
+    ? t("map.summary.mapping")
     : filteredActivities.length === 0
       ? connected
-        ? "No activities in this period."
-        : "Training Hub is offline."
+        ? t("map.summary.noActivities")
+        : t("map.summary.offline")
       : places.length === 0
-        ? "No activities with GPS in this period."
+        ? t("map.summary.noGps")
         : placesSummaryLine({ places, labels: placeLabels, allTime: period === "all" });
 
   return (
     <section className="training-map" aria-labelledby="training-map-title">
       <header className="training-map-page-header">
         <div>
-          <h1 id="training-map-title">Where you’ve been</h1>
+          <h1 id="training-map-title">{t("map.title")}</h1>
           <p>{summary}</p>
         </div>
         <div className="training-map-period-wrap">
@@ -666,17 +669,17 @@ export function ActivityGlobeCard({
               looked at. "Custom" keeps its icon — it is the one option that
               opens something rather than answering. */}
           <OptionGroup
-            label="Training period"
+            label={t("map.period")}
             mode="collapsible"
             className="training-map-periods"
             value={period}
             options={[
-              { value: "all", label: "All time" },
-              { value: "year", label: "This year" },
+              { value: "all", label: t("map.period.all") },
+              { value: "year", label: t("map.period.year") },
               { value: "90-days", label: periodLabel(90) },
               {
                 value: "custom",
-                label: "Custom",
+                label: t("map.period.custom"),
                 icon: <CalendarDays size={14} aria-hidden="true" />
               }
             ]}
@@ -690,7 +693,7 @@ export function ActivityGlobeCard({
           {period === "custom" ? (
             <div className="training-map-date-range">
               <label>
-                <span>From</span>
+                <span>{t("map.from")}</span>
                 <input
                   type="date"
                   value={customStart}
@@ -704,7 +707,7 @@ export function ActivityGlobeCard({
                 />
               </label>
               <label>
-                <span>To</span>
+                <span>{t("map.to")}</span>
                 <input
                   type="date"
                   value={customEnd}
@@ -725,19 +728,19 @@ export function ActivityGlobeCard({
       <div className="training-map-stage">
         <section
           className={`training-map-globe-panel${streetMode ? " is-street-mode" : ""}`}
-          aria-label="Interactive training globe"
+          aria-label={t("map.globeAria")}
         >
           <div
             className={`training-map-globe-stage${hoveredKey ? " is-hovering-cluster" : ""}`}
             role="img"
             aria-label={
               streetMode
-                ? "Street map of your routes near the selected location. Zoom out or go back to return to the globe."
+                ? t("map.aria.streetRoutes")
                 : mapHasVisits
-                  ? `Interactive globe showing ${places.length} training locations. Drag to rotate, scroll to zoom, and select a location for details.`
+                  ? plural("map.aria.places", places.length)
                   : mapHasRoute
-                    ? "Interactive globe showing the latest GPS route."
-                    : "Interactive globe waiting for GPS activity data."
+                    ? t("map.aria.route")
+                    : t("map.aria.waiting")
             }
           >
             <ActivityGlobeRenderer
@@ -767,7 +770,7 @@ export function ActivityGlobeCard({
             {globeError ? (
               <div className="training-map-globe-error" role="status">
                 <CircleAlert size={20} aria-hidden="true" />
-                <span>The globe could not be rendered on this device.</span>
+                <span>{t("map.globeError")}</span>
               </div>
             ) : null}
           </div>
@@ -779,22 +782,22 @@ export function ActivityGlobeCard({
               onClick={exitStreetMode}
             >
               <ChevronLeft size={16} aria-hidden="true" />
-              Back to globe
+              {t("map.backToGlobe")}
             </button>
           ) : globeError ? null : (
-            <div className="training-map-zoom" role="group" aria-label="Globe view">
+            <div className="training-map-zoom" role="group" aria-label={t("map.globeView")}>
               <button
                 type="button"
-                aria-label="Zoom in"
-                title="Zoom in"
+                aria-label={t("map.zoomIn")}
+                title={t("map.zoomIn")}
                 onClick={() => globeRendererRef.current?.zoomBy(ZOOM_STEP)}
               >
                 <Plus size={16} aria-hidden="true" />
               </button>
               <button
                 type="button"
-                aria-label="Zoom out"
-                title="Zoom out"
+                aria-label={t("map.zoomOut")}
+                title={t("map.zoomOut")}
                 onClick={() => globeRendererRef.current?.zoomBy(1 / ZOOM_STEP)}
               >
                 <Minus size={16} aria-hidden="true" />
@@ -803,8 +806,8 @@ export function ActivityGlobeCard({
                 <button
                   type="button"
                   className="training-map-zoom-reset"
-                  aria-label="Reset view"
-                  title="Reset view"
+                  aria-label={t("map.resetView")}
+                  title={t("map.resetView")}
                   onClick={handleResetView}
                 >
                   <RotateCcw size={15} aria-hidden="true" />
@@ -814,17 +817,17 @@ export function ActivityGlobeCard({
           )}
 
           {!streetMode && (mapHasVisits || mapHasRoute) ? (
-            <div className="training-map-legend" aria-label="Visits, from fewer to more">
-              <span>Fewer</span>
+            <div className="training-map-legend" aria-label={t("map.legend.aria")}>
+              <span>{t("map.legend.fewer")}</span>
               <i className="is-low" aria-hidden="true" />
               <i className="is-medium" aria-hidden="true" />
               <i className="is-high" aria-hidden="true" />
-              <span>More visits</span>
+              <span>{t("map.legend.more")}</span>
             </div>
           ) : null}
         </section>
 
-        <aside className="training-map-side panel" aria-label="Places">
+        <aside className="training-map-side panel" aria-label={t("map.places")}>
           {selectedPlace ? (
             <PlaceDetail
               key={selectedPlace.key}
@@ -838,7 +841,7 @@ export function ActivityGlobeCard({
               onHoverActivity={setHoveredActivityId}
             />
           ) : mapLoading ? (
-            <div className="training-map-side-loading" role="status" aria-label="Mapping GPS activities">
+            <div className="training-map-side-loading" role="status" aria-label={t("map.mappingAria")}>
               <span />
               <span />
               <span />
@@ -846,18 +849,18 @@ export function ActivityGlobeCard({
           ) : filteredActivities.length === 0 ? (
             <div className="training-map-side-empty">
               <MapPin size={22} aria-hidden="true" />
-              <h2>{connected ? "No activities in this period" : "Training Hub is offline"}</h2>
+              <h2>{connected ? t("map.empty.period") : t("map.empty.offline")}</h2>
               <p>
                 {connected
-                  ? "Choose another period when more activity history is available."
-                  : "Connect Training Hub to map your routes and training history."}
+                  ? t("map.empty.periodBody")
+                  : t("map.empty.offlineBody")}
               </p>
             </div>
           ) : places.length === 0 ? (
             <div className="training-map-side-empty">
               <Route size={22} aria-hidden="true" />
-              <h2>No GPS routes found</h2>
-              <p>Outdoor activities with location data will appear here.</p>
+              <h2>{t("map.empty.noRoutes")}</h2>
+              <p>{t("map.empty.noRoutesBody")}</p>
             </div>
           ) : (
             <>

@@ -25,6 +25,10 @@ export const SKIPPED_PATHS = [
   /[\\/]src[\\/]records[\\/]sampleRecords\.ts$/,
   /[\\/]src[\\/]components[\\/]SampleDataControls\.tsx$/,
   /[\\/]src[\\/]strength[\\/]sampleSessions\.ts$/,
+  // The labours in English: the website imports this file as it is, so the
+  // app names a labour through src/records/labourWords.ts instead, and
+  // test:i18n holds records.labour.* in English equal to it.
+  /[\\/]src[\\/]records[\\/]labours\.ts$/,
   // Each language's own name, the same in every language.
   /[\\/]src[\\/]i18n[\\/]locales\.ts$/,
   /[\\/]src[\\/]vite-env\.d\.ts$/,

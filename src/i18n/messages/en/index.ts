@@ -15,6 +15,10 @@ import strength from "./strength.ts";
 import calendar from "./calendar.ts";
 import workout from "./workout.ts";
 import library from "./library.ts";
+import sleep from "./sleep.ts";
+import map from "./map.ts";
+import profile from "./profile.ts";
+import records from "./records.ts";
 
 /**
  * English, the source every other language is translated from. A key added
@@ -40,6 +44,10 @@ const en = {
   ...calendar,
   ...workout,
   ...library,
+  ...sleep,
+  ...map,
+  ...profile,
+  ...records,
 };
 
 export default en;

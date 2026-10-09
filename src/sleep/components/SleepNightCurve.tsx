@@ -15,6 +15,7 @@ import { trainingChartMargin } from "../../training/chartConfig";
 import { useChartColors } from "../../training/useChartColors";
 import { mcpShortTextOr } from "../../mcp/mcpNotice";
 import type { SleepNightSeries, SleepSeriesPoint } from "../../../electron/types";
+import { t } from "../../i18n/core";
 
 interface SleepNightCurveProps {
   series: SleepNightSeries | null;
@@ -106,20 +107,22 @@ function CurveTooltip({
     return null;
   }
 
-  const rows: Array<{ key: string; color: string; value: string; taken?: string }> = [];
+  const rows: Array<{ key: string; label: string; color: string; value: string; taken?: string }> = [];
   const hrv = nearestSample(series.hrv, at, NEAREST_TOLERANCE_MS);
   const stress = nearestSample(series.stress, at, NEAREST_TOLERANCE_MS);
 
   rows.push({
-    key: "HRV",
+    key: "hrv",
+    label: "HRV",
     color: hrvColor,
-    value: hrv ? `${Math.round(hrv.point.value)} ms` : "no sample",
+    value: hrv ? `${Math.round(hrv.point.value)} ms` : t("sleep.curve.noSample"),
     taken: hrv && hrv.offsetMs >= 60_000 ? hrv.point.clock : undefined
   });
   rows.push({
-    key: "Stress",
+    key: "stress",
+    label: t("sleep.curve.stress"),
     color: stressColor,
-    value: stress ? String(Math.round(stress.point.value)) : "no sample",
+    value: stress ? String(Math.round(stress.point.value)) : t("sleep.curve.noSample"),
     taken: stress && stress.offsetMs >= 60_000 ? stress.point.clock : undefined
   });
 
@@ -135,9 +138,9 @@ function CurveTooltip({
           <li key={row.key} className="training-chart-tooltip-row">
             <span className="training-chart-tooltip-key">
               <i style={{ background: row.color }} />
-              {row.key}
+              {row.label}
               {row.taken ? (
-                <em className="sleep-curve-tooltip-taken">at {row.taken}</em>
+                <em className="sleep-curve-tooltip-taken">{t("sleep.curve.at", { time: row.taken })}</em>
               ) : null}
             </span>
             <strong>{row.value}</strong>
@@ -214,7 +217,7 @@ export function SleepNightCurve({ series, loading }: SleepNightCurveProps) {
         aria-busy="true"
       >
         <Loader2 className="spin" size={16} aria-hidden="true" />
-        <p>Loading the night…</p>
+        <p>{t("sleep.curve.loading")}</p>
       </div>
     );
   }
@@ -228,8 +231,8 @@ export function SleepNightCurve({ series, loading }: SleepNightCurveProps) {
           {series?.error ??
             mcpShortTextOr(
               series?.mcpState,
-              "No overnight samples.",
-              "No overnight HRV or stress samples for this night. COROS keeps them for about a week."
+              t("sleep.curve.noSamplesShort"),
+              t("sleep.curve.noSamples")
             )}
         </p>
       </div>
@@ -247,19 +250,20 @@ export function SleepNightCurve({ series, loading }: SleepNightCurveProps) {
     <div ref={box} className="sleep-curve">
       <div className="sleep-curve-head">
         <p className="sleep-curve-title">
-          Across the night
+          {t("sleep.curve.across")}
           <span>
             {formatClock(start)} – {formatClock(end)}
           </span>
         </p>
         {assessment?.avg !== undefined ? (
           <p className="sleep-curve-assessment">
-            HRV avg <strong>{Math.round(assessment.avg)} ms</strong>
+            {t("sleep.curve.hrvAvg")} <strong>{Math.round(assessment.avg)} ms</strong>
             {assessment.evaluation ? ` · ${assessment.evaluation}` : ""}
             {assessment.normalLow !== undefined && assessment.normalHigh !== undefined
-              ? ` · normal ${Math.round(assessment.normalLow)}–${Math.round(
-                  assessment.normalHigh
-                )} ms`
+              ? ` · ${t("sleep.curve.normal", {
+                  low: Math.round(assessment.normalLow),
+                  high: Math.round(assessment.normalHigh)
+                })}`
               : ""}
           </p>
         ) : null}
@@ -330,7 +334,7 @@ export function SleepNightCurve({ series, loading }: SleepNightCurveProps) {
               yAxisId="stress"
               type="monotone"
               dataKey="stress"
-              name="Stress"
+              name={t("sleep.curve.stress")}
               stroke={colors.gold}
               strokeWidth={1.5}
               fill={colors.gold}
@@ -356,9 +360,7 @@ export function SleepNightCurve({ series, loading }: SleepNightCurveProps) {
       </ResponsiveContainer>
 
       <p className="sleep-curve-note">
-        HRV in ms (left) and stress (right), clipped to the sleep window. COROS
-        sends no stage-by-stage timeline, so this is the night's shape rather
-        than the watch app's hypnogram.
+        {t("sleep.curve.note")}
       </p>
     </div>
   );
