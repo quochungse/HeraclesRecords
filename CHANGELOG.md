@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.3] - 2026-10-09
+
+### What's new
+
+- **Cycling** — your cycling VO₂max from COROS, on the Cycling screen and for Coach.
+- **Sync** — faster and lighter: only what changed is sent and fetched. Update every computer you sync: older versions stop syncing once one machine runs 1.0.3.
+
+### Fixed
+
+- Improve app performance and stability.
+
 ## [1.0.2] - 2026-10-08
 
 ### What's new
