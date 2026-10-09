@@ -15,6 +15,9 @@ import { SettingsPrefRow } from "./SettingsPrefRow";
 
 interface SyncPanelProps {
   api: HeraclesRecordsApi;
+  /** Settings → About's own check, so an outdated build can be updated from
+   *  here rather than sent looking for the button. */
+  onCheckForUpdates?: () => void;
 }
 
 /**
@@ -54,7 +57,7 @@ const SYNC_DESCRIPTION =
  * somewhere of their own — and the two lived here together for as long as a
  * backup was a copy inside this vault. It no longer is.
  */
-export function SyncPanel({ api }: SyncPanelProps) {
+export function SyncPanel({ api, onCheckForUpdates }: SyncPanelProps) {
   const [status, setStatus] = useState<SyncStatus | null>(() => cachedStatus);
   const [busy, setBusy] = useState<string | null>(null);
   // True only once a read has been out long enough to be worth mentioning. A
@@ -418,6 +421,44 @@ export function SyncPanel({ api }: SyncPanelProps) {
               ) : null}
               Use this vault
             </button>
+          </SettingsPrefRow>
+        ) : null}
+
+        {status.state === "outdated" ? (
+          <SettingsPrefRow
+            title="Update the app to keep syncing"
+            tone="error"
+            align="start"
+            detail="Another computer has moved your synced data to a newer format than this version can read. Nothing is being sent or received until this computer is updated. Changes you make here are kept and go out after the update."
+          >
+            {onCheckForUpdates ? (
+              <button
+                type="button"
+                className="settings-row-button"
+                onClick={onCheckForUpdates}
+              >
+                <RefreshCw size={15} aria-hidden="true" />
+                Check for updates
+              </button>
+            ) : null}
+          </SettingsPrefRow>
+        ) : null}
+
+        {status.state === "ready" && status.dataFormat === "behind" ? (
+          <SettingsPrefRow
+            title="A newer version is in use on another computer"
+            detail="Sync carries on as usual. Updating keeps every computer on the same version."
+          >
+            {onCheckForUpdates ? (
+              <button
+                type="button"
+                className="settings-row-button"
+                onClick={onCheckForUpdates}
+              >
+                <RefreshCw size={15} aria-hidden="true" />
+                Check for updates
+              </button>
+            ) : null}
           </SettingsPrefRow>
         ) : null}
 

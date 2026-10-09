@@ -93,7 +93,8 @@ function makeDevice(
     // Both for the incremental-read block: a provider that counts what it
     // fetches, and an index shared between two launches of one machine.
     provider = () => new LocalFolderProvider({ root }),
-    readIndex = undefined
+    readIndex = undefined,
+    vaultGate = undefined
   } = {}
 ) {
   const settings = new Map();
@@ -119,7 +120,8 @@ function makeDevice(
     conditions: () => ({ appActive: state.appActive, online: state.online }),
     recordVersions,
     outbox,
-    readIndex
+    readIndex,
+    vaultGate
   });
 
   return {
@@ -1594,6 +1596,75 @@ const { SqliteSyncTarget } = await load("sync/sqliteSyncTarget.js");
   relaunched.loop.stop();
 }
 
+
+// A vault in a data format this build may not work with: the gate closes the
+// pull before anything is read, and a held loop keeps queueing — durably, for
+// the updated build — while sending, reading and the flush at quit all do
+// nothing. Stopping the loop outright would detach the bridge, and a change
+// made meanwhile would be gone at quit.
+{
+  const root = tempDir("format-gate");
+  const a = makeDevice(root, "device-a");
+  a.loop.start();
+  a.write((builder) => builder.setting("chat.provider", "before the upgrade"));
+  await a.loop.flush();
+
+  const seen = [];
+  let open = true;
+  const outbox = createMemoryOutbox();
+  const b = makeDevice(root, "device-b", {
+    outbox,
+    vaultGate: async (revisions) => {
+      seen.push(revisions);
+      return open;
+    }
+  });
+  b.loop.start();
+  await b.loop.pull();
+  assert.equal(b.target.settings.get("chat.provider"), "before the upgrade");
+  assert.ok(seen[0].size > 0, "the gate is handed the listing's revisions");
+
+  a.write((builder) => builder.setting("chat.provider", "after the upgrade"));
+  await a.loop.flush();
+  open = false;
+  const closed = await b.loop.pull();
+  assert.equal(closed.applied, 0, "a closed gate applies nothing");
+  assert.equal(
+    b.target.settings.get("chat.provider"),
+    "before the upgrade",
+    "and reads nothing past it"
+  );
+
+  b.loop.hold();
+  assert.equal(b.loop.isHeld, true);
+  b.write((builder) => builder.setting("chat.model", "made while outdated"));
+  assert.equal(
+    outbox.load().length,
+    1,
+    "a change made while held is in the durable outbox"
+  );
+  assert.equal(b.loop.hasUnpushedChanges, false, "quit does not wait on a held loop");
+  assert.deepEqual(await b.loop.flush(), { pushed: 0, path: null }, "nor does it send");
+  await b.loop.flushBeforeQuit();
+  const vaultFiles = await new LocalFolderProvider({ root }).list("oplog/device-b");
+  assert.equal(vaultFiles.length, 0, "nothing of device-b's reached the vault");
+  open = true;
+  assert.equal((await b.loop.pull()).applied, 0, "and a held loop reads nothing");
+  assert.equal(await b.loop.compactIfDue(), null);
+
+  // The updated build adopts what was queued and sends it.
+  const updated = makeDevice(root, "device-b", { outbox });
+  updated.loop.start();
+  await updated.loop.flush();
+  assert.equal(
+    (await new LocalFolderProvider({ root }).list("oplog/device-b")).length,
+    1,
+    "the next build sends what the held one queued"
+  );
+  a.loop.stop();
+  updated.loop.stop();
+}
+
 // Compaction decides from the listing whether there is anything to fold, and
 // only then reads the log. The pass that finds too few batches is the usual
 // one, and it used to download every file to learn that.
@@ -1646,5 +1717,6 @@ console.log(
     "compaction is interval-gated and one device at a time, " +
     "a pull fetches only the files it has not read and leaves a " +
     "localStorage entry for the next launch, an idle vault keeps the idle " +
-    "interval, and compaction reads nothing when there is nothing to fold"
+    "interval, and compaction reads nothing when there is nothing to fold, " +
+    "a closed format gate reads nothing and a held loop queues without sending"
 );

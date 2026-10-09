@@ -11,6 +11,8 @@
 //                   first signed-in machine to prepare it takes it.
 //   * mine        — ordinary running.
 //   * wrong-owner — left completely alone until the person says what it is.
+//   * outdated    — the vault's data format is past what this build may work
+//                   with (`dataVersionCompat`), so it is left alone too.
 //
 // Runs under Electron for the SQLite ABI: `claimVault` clears the seed flag
 // through the real settings store, which is half of what makes a claim safe.
@@ -32,7 +34,10 @@ const database = await load("database.js");
 const { LocalFolderProvider } = await load("sync/localFolderProvider.js");
 const { SyncService, SYNC_SETTINGS } = await load("sync/syncService.js");
 const { fingerprintOwner } = await load("dataOwner.js");
-const { seal } = await load("sync/syncObfuscation.js");
+const { seal, unseal } = await load("sync/syncObfuscation.js");
+const { dataFormatVerdict, vaultDataFormat, BUILD_DATA_FORMAT } = await load(
+  "sync/dataFormat.js"
+);
 
 const tempRoots = [];
 const tempDir = (label) => {
@@ -236,6 +241,134 @@ console.log("ok  claiming transfers the vault and forces a republish");
   );
 }
 console.log("ok  a vault from before ownership is adopted, not rejected");
+
+
+// ---------------------------------------------------------------------------
+// The vault's data format (docs/sync-v2.md §3)
+// ---------------------------------------------------------------------------
+
+// The rule, as arithmetic: this build against what a vault declares.
+{
+  const build = { dataVersion: 2, dataVersionCompat: 1 };
+  const verdict = (dataVersion, dataVersionCompat) =>
+    dataFormatVerdict({ dataVersion, dataVersionCompat }, build);
+  assert.equal(verdict(1, 1), "ahead", "an older vault: this build is ahead");
+  assert.equal(verdict(2, 1), "current");
+  assert.equal(verdict(2, 2), "current");
+  assert.equal(verdict(3, 2), "behind", "newer, but this build is still allowed");
+  assert.equal(verdict(3, 3), "outdated", "newer, and past what this build may touch");
+
+  assert.deepEqual(
+    vaultDataFormat({ version: 1, id: "x" }),
+    { dataVersion: 1, dataVersionCompat: 1 },
+    "a vault from before the numbers is format 1"
+  );
+  assert.deepEqual(
+    vaultDataFormat({ dataVersion: 2, dataVersionCompat: 5 }),
+    { dataVersion: 2, dataVersionCompat: 2 },
+    "a compat above the version requires nothing that was never written"
+  );
+  assert.deepEqual(
+    vaultDataFormat({ dataVersion: "2", dataVersionCompat: -1 }),
+    { dataVersion: 1, dataVersionCompat: 1 },
+    "and a value that is not a positive integer reads as absent"
+  );
+}
+console.log("ok  the data-format rule: current, ahead, behind, outdated");
+
+/** A vault whose identity says what `identity` says, sealed as a real one. */
+async function vaultWithIdentity(label, identity) {
+  const folder = tempDir(label);
+  const identityPath = path.join(folder, "vault", "id.json");
+  await fsp.mkdir(path.dirname(identityPath), { recursive: true });
+  await fsp.writeFile(
+    identityPath,
+    seal(Buffer.from(JSON.stringify(identity), "utf8"), "vault/id.json")
+  );
+  const read = async () =>
+    JSON.parse(unseal(await fsp.readFile(identityPath), "vault/id.json").toString("utf8"));
+  const raw = () => fsp.readFile(identityPath);
+  return { folder, read, raw };
+}
+
+const newer = BUILD_DATA_FORMAT.dataVersion + 1;
+
+// A vault in a format this build may not touch: refused before anything is
+// written — the claim included, which is the one write `prepare()` makes.
+{
+  const { folder, raw } = await vaultWithIdentity("vault-outdated", {
+    version: 2,
+    id: "0123456789abcdef",
+    createdAt: "2026-10-09T00:00:00.000Z",
+    owner: null,
+    dataVersion: newer,
+    dataVersionCompat: newer
+  });
+  const before = await raw();
+  const { service } = makeMachine(ALICE, { folder });
+
+  assert.equal(await service.prepare(), "outdated");
+  const status = await service.status();
+  assert.equal(status.state, "outdated");
+  assert.equal(status.dataFormat, "outdated");
+  assert.equal(await service.checkDataFormat(), "outdated");
+  await assert.rejects(
+    service.claimVault(),
+    /newer data format/,
+    "and it cannot be claimed past the format either"
+  );
+  assert.deepEqual(
+    await raw(),
+    before,
+    "an unclaimed vault in a newer format is left exactly as it was"
+  );
+}
+console.log("ok  a vault past this build's format is refused, and nothing is written");
+
+// Newer, but still allowed: sync as usual, and keep the newer numbers — a
+// claim spreads the identity, so nothing this build does not know is lost.
+{
+  const { folder, read } = await vaultWithIdentity("vault-behind", {
+    version: 2,
+    id: "fedcba9876543210",
+    createdAt: "2026-10-09T00:00:00.000Z",
+    owner: null,
+    dataVersion: newer,
+    dataVersionCompat: BUILD_DATA_FORMAT.dataVersion,
+    addedByANewerBuild: { keep: true }
+  });
+  const { service } = makeMachine(ALICE, { folder });
+
+  assert.equal(await service.prepare(), "ready", "an identity of version 2 is read");
+  const status = await service.status();
+  assert.equal(status.state, "ready");
+  assert.equal(status.dataFormat, "behind", "and the panel can say an update is out");
+
+  const written = await read();
+  assert.equal(written.owner, ALICE, "the claim landed");
+  assert.equal(written.dataVersion, newer, "without lowering the version");
+  assert.equal(written.dataVersionCompat, BUILD_DATA_FORMAT.dataVersion);
+  assert.deepEqual(written.addedByANewerBuild, { keep: true });
+}
+console.log("ok  a newer but compatible vault syncs, and keeps its numbers");
+
+// A new vault declares the format it was made in.
+{
+  const folder = tempDir("vault-fresh");
+  const { service } = makeMachine(ALICE, { folder });
+  assert.equal(await service.prepare(), "ready");
+  const written = JSON.parse(
+    unseal(
+      await fsp.readFile(path.join(folder, "vault", "id.json")),
+      "vault/id.json"
+    ).toString("utf8")
+  );
+  assert.equal(written.version, 1, "readable by every build from before the numbers");
+  assert.equal(written.dataVersion, BUILD_DATA_FORMAT.dataVersion);
+  assert.equal(written.dataVersionCompat, BUILD_DATA_FORMAT.dataVersionCompat);
+  assert.equal((await service.status()).dataFormat, "current");
+}
+console.log("ok  a new vault is stamped with this build's format");
 
 // Windows will not unlink a file that is still open, so the handle has to
 // go before the tree does.

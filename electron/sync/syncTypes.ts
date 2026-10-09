@@ -19,6 +19,22 @@
 /** Nothing is encrypted and nothing is locked, so there is no locked state and
  *  no unlocked one either. What is left is whether anyone is signed in, whether
  *  a destination is chosen, whether it answers, and whose it is. */
+/**
+ * Where this build stands against the vault's data format. The rule that
+ * decides it is `dataFormatVerdict` in `dataFormat.ts`.
+ *
+ *   * `current` — the same format: read and write as usual.
+ *   * `ahead` — this build is newer. It may raise the vault's numbers once it
+ *     has migrated what is there; until a migration exists, it works as
+ *     `current`.
+ *   * `behind` — the vault has a newer format this build can still work
+ *     beside. Read and write as usual, never lower the numbers, and say an
+ *     update is available.
+ *   * `outdated` — this build is older than the vault allows. Sync stops:
+ *     nothing is read or written until the app is updated.
+ */
+export type DataFormatVerdict = "current" | "ahead" | "behind" | "outdated";
+
 export type SyncVaultState =
   /**
    * Nobody is signed in to COROS.
@@ -43,6 +59,16 @@ export type SyncVaultState =
    * carrying on regardless.
    */
   | "wrong-owner"
+  /**
+   * The vault is in a data format newer than this build may work with
+   * (`dataVersionCompat` above its `DATA_VERSION`; see `dataFormat.ts`).
+   *
+   * Nothing is pushed or pulled: a build that cannot read a format must not
+   * guess at it, and one that wrote its own beside it would write what the
+   * newer machines no longer read. Changes made here stay queued until the app
+   * is updated.
+   */
+  | "outdated"
   /** The destination answered, and it is this account's. */
   | "ready";
 
@@ -69,6 +95,10 @@ export interface SyncVaultStatus {
   readonly signedIn: boolean;
   /** Null when there is no destination to ask, or it could not be read. */
   readonly ownership: SyncVaultOwnership | null;
+  /** Where this build stands against the vault's data format, or null when
+   *  the vault could not be read. `behind` is the one the panel words on its
+   *  own: sync runs, and an update is available. */
+  readonly dataFormat: DataFormatVerdict | null;
 }
 
 /**

@@ -180,6 +180,14 @@ export interface SyncLoopDeps {
    * pull used to do. See `readIndex.ts`.
    */
   readonly readIndex?: ReadIndexStore;
+  /**
+   * Asked at every pull, after the listing and before anything is read:
+   * may this build still work with the vault? Handed every revision the
+   * listing found, so it can tell from the identity's revision whether there
+   * is anything new to ask. False stops the pull with nothing applied; the
+   * caller is expected to stop the loop. Absent, every pull proceeds.
+   */
+  readonly vaultGate?: (revisions: ReadonlyMap<string, string>) => Promise<boolean>;
   /** Called after inbound changes land, so the renderer can reload. */
   readonly onApplied?: (result: AppliedChanges) => void;
   readonly onError?: (error: unknown) => void;
@@ -265,6 +273,7 @@ export class SyncLoop {
   #firstPendingAt: number | null = null;
   #lastActivityAt: number | null = null;
   #running = false;
+  #held = false;
   #inFlight: Promise<unknown> | null = null;
   /** Held by whichever of `pull` / `flush` / `tick` is running. See
    *  `#exclusive`. */
@@ -318,6 +327,9 @@ export class SyncLoop {
    * else until the upload returns.
    */
   get hasUnpushedChanges(): boolean {
+    // A held loop sends nothing, so quit has nothing to wait for: the queue is
+    // in `sync_outbox` for the build that may send it.
+    if (this.#held) return false;
     return this.#pending.length > 0 || this.#uploading !== null;
   }
 
@@ -333,6 +345,7 @@ export class SyncLoop {
    * this with a timeout as well, for a link that neither answers nor fails.
    */
   async flushBeforeQuit(): Promise<void> {
+    if (this.#held) return;
     // Before the queue, not after: this upload is holding entries that are no
     // longer in `#pending`, and a `flush` that raced it would push the *next*
     // batch while the older one was still unaccounted for.
@@ -433,7 +446,7 @@ export class SyncLoop {
   }
 
   async #flush(): Promise<FlushResult> {
-    if (this.#pending.length === 0) return { pushed: 0, path: null };
+    if (this.#held || this.#pending.length === 0) return { pushed: 0, path: null };
     if (!this.#deps.conditions().online) {
       // Offline: keep the queue and try again on the next flush. Nothing is
       // lost and nothing is reported — this is the normal state on a train.
@@ -522,7 +535,20 @@ export class SyncLoop {
 
   async #pull(): Promise<PullResult> {
     const startedAt = this.#deps.now();
-    const read = await this.#readNewFiles();
+    const read = this.#held ? null : await this.#readNewFiles();
+    if (!read) {
+      // The vault's format moved past this build: nothing read, nothing
+      // applied, and the caller stops the loop.
+      return {
+        applied: 0,
+        deleted: 0,
+        superseded: 0,
+        rejected: [],
+        merged: [],
+        contentChanges: [],
+        entriesSeen: 0
+      };
+    }
     const entries = read.entries;
 
     // Only for the clock fold below. What may be *applied* is no longer a
@@ -693,9 +719,12 @@ export class SyncLoop {
    * before and the newest snapshot, if that is new. A pull with nothing new
    * therefore costs one listing — it used to download the whole log.
    */
-  async #readNewFiles(): Promise<NewlyRead> {
+  async #readNewFiles(): Promise<NewlyRead | null> {
     const storage = this.#storage();
     const listing = await listLogFiles(storage);
+    if (this.#deps.vaultGate && !(await this.#deps.vaultGate(listing.revisions))) {
+      return null;
+    }
     const known = this.#readIndex.load();
     const fresh = (file: LogFile) =>
       needsRead(known.get(file.path), file.revision, this.#launch);
@@ -799,6 +828,7 @@ export class SyncLoop {
    * `onError` and the next window tries again.
    */
   async compactIfDue(): Promise<CompactOplogResult | null> {
+    if (this.#held) return null;
     const now = this.#deps.now();
     const last = Number(
       this.#deps.getSetting(SYNC_LOOP_SETTINGS.lastCompactedAt) ?? 0
@@ -908,6 +938,25 @@ export class SyncLoop {
       // still works, and the next write re-queues normally.
       this.#deps.onError?.(error);
     }
+  }
+
+  /**
+   * Stop sending and reading, and keep queueing.
+   *
+   * For a vault in a data format this build may not work with: nothing may be
+   * read from it or written to it, and a change made here meanwhile must still
+   * reach it once the app is updated. `enqueue` keeps writing to the durable
+   * outbox — which the updated build adopts and sends — while flush, pull,
+   * compaction and the flush at quit all do nothing. Final for this loop: a
+   * vault's format never moves back.
+   */
+  hold(): void {
+    this.#held = true;
+    this.stop();
+  }
+
+  get isHeld(): boolean {
+    return this.#held;
   }
 
   stop(): void {

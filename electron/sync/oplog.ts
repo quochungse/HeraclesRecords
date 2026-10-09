@@ -276,6 +276,9 @@ export interface LogListing {
   readonly batches: readonly LogFile[];
   /** Compaction snapshots, oldest first; only the last one is ever read. */
   readonly snapshots: readonly LogFile[];
+  /** The revision of every object the listing found, log or not — the vault's
+   *  identity among them, which a pull checks before it reads anything. */
+  readonly revisions: ReadonlyMap<string, string>;
 }
 
 /**
@@ -300,7 +303,8 @@ export async function listLogFiles(storage: StorageProvider): Promise<LogListing
     .filter((entry) => OPLOG_SNAPSHOT_PATTERN.test(entry.path))
     .map(({ path, revision }) => ({ path, revision }))
     .sort(byPath);
-  return { batches, snapshots };
+  const revisions = new Map(listed.map((entry) => [entry.path, entry.revision]));
+  return { batches, snapshots, revisions };
 }
 
 /** Whether `path` names a file of the log, which is never rewritten in place. */

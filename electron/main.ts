@@ -25,7 +25,8 @@ import path from "node:path";
 import { pathToFileURL } from "node:url";
 import {
   createDefaultSyncDeps,
-  SyncService
+  SyncService,
+  VAULT_ID_PATH
 } from "./sync/syncService";
 import { GoogleOAuth } from "./sync/googleOAuth";
 import { GoogleDriveProvider } from "./sync/googleDriveProvider";
@@ -1179,6 +1180,19 @@ function flushTrainingHubSessionChanged(): void {
   mainWindow.webContents.send("trainingHub:sessionChanged", status);
 }
 
+/**
+ * The vault is in a data format this build may not work with: read and write
+ * nothing, and keep what changes here in the outbox for the updated build to
+ * send. Stopping the loop outright would detach the bridge, and a change made
+ * meanwhile would then live only in memory and be gone at quit. Analyses run
+ * as they do with sync off — their lease is in the vault too.
+ */
+function holdSyncLoop(): void {
+  const loop = syncLoopInstance ?? startSyncLoop({ held: true });
+  loop?.hold();
+  attachAnalysisLeases(null);
+}
+
 function stopSyncLoop(): void {
   syncSeedStatus = { state: "pending", entries: 0, error: null };
   attachSyncSink(null);
@@ -1197,7 +1211,11 @@ function stopSyncLoop(): void {
 async function prepareSync(): Promise<SyncVaultState> {
   const state = await syncService().prepare();
   if (state === "ready") {
+    // A loop held for an outdated format is not one to resume.
+    if (syncLoopInstance?.isHeld) stopSyncLoop();
     startSyncLoop();
+  } else if (state === "outdated") {
+    holdSyncLoop();
   } else if (state === "signed-out" || state === "wrong-owner") {
     // The two states where carrying on is not merely unproductive but wrong:
     // nobody is signed in, or the vault holds another account's data. A loop
@@ -1209,10 +1227,15 @@ async function prepareSync(): Promise<SyncVaultState> {
   return state;
 }
 
-function startSyncLoop(): SyncLoop | null {
+/** The revision of `vault/id.json` the running loop last checked the data
+ *  format against. Reset with every loop. */
+let gatedIdentityRevision: string | null = null;
+
+function startSyncLoop({ held = false }: { held?: boolean } = {}): SyncLoop | null {
   const service = syncService();
   if (syncLoopInstance) return syncLoopInstance;
   if (!service.isReady) return null;
+  gatedIdentityRevision = null;
 
   const loop = new SyncLoop({
     provider: () => service.dataProvider(),
@@ -1227,6 +1250,24 @@ function startSyncLoop(): SyncLoop | null {
     recordVersions: createSqliteRecordVersions(),
     outbox: createSqliteOutbox(),
     readIndex: createSqliteReadIndex(),
+    // The other machine may move the vault to a newer data format while this
+    // one runs. The identity's revision is in every listing, so it is read
+    // again only when it changed — once per loop, and after a claim or an
+    // upgrade elsewhere.
+    vaultGate: async (revisions) => {
+      const revision = revisions.get(VAULT_ID_PATH) ?? null;
+      if (revision !== null && revision === gatedIdentityRevision) return true;
+      if ((await service.checkDataFormat()) === "outdated") {
+        console.warn(
+          "[sync] the vault is in a newer data format than this build; " +
+            "sync is off until the app is updated"
+        );
+        holdSyncLoop();
+        return false;
+      }
+      gatedIdentityRevision = revision;
+      return true;
+    },
     conditions: () => ({
       // A hidden window means nobody is looking, so there is nothing to poll
       // for; `resume()` picks it up again when the window comes back.
@@ -1256,6 +1297,13 @@ function startSyncLoop(): SyncLoop | null {
     enqueue: (entries) => loop.enqueue(entries),
     nextHlc: loop.nextHlc
   });
+
+  if (held) {
+    // Queueing only: no lease, no start, no seed. See `holdSyncLoop`.
+    loop.hold();
+    syncLoopInstance = loop;
+    return loop;
+  }
 
   // Analyses sync, so the same 6am job now exists on every machine. Without
   // a lease all of them would run it.
@@ -2541,7 +2589,8 @@ function registerIpcHandlers(): void {
     // separate again.
     await prepareSync();
     const loop = syncLoopInstance;
-    if (!loop) return { pushed: 0, applied: 0 };
+    // Held for an outdated format: there is nothing it may send or read.
+    if (!loop || loop.isHeld) return { pushed: 0, applied: 0 };
 
     // A seed that failed at launch gets another go here. "Sync now" is what a
     // person reaches for when something looks wrong, and the panel points them

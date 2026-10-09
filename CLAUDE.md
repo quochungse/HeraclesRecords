@@ -2304,6 +2304,19 @@ lives at module level for the same visit-to-visit reason — see `useCalendarDat
     calls it so the loop stops. **This is a guard between machines and files, not a data
     partition**: the tables have no owner column, so switching accounts on one machine leaves
     the previous account's records in place. Closing that means giving every row an owner.
+  - **The vault declares its data format, and a build past it stops rather than guesses**
+    (`dataFormat.ts`, docs/sync-v2.md §3). `vault/id.json` carries `dataVersion` (newest
+    format written) and `dataVersionCompat` (oldest that may still work beside it); absent
+    means 1/1. Against this build's `DATA_VERSION`: equal or newer syncs; older but at least
+    the compat syncs, never lowers the numbers, and the panel says an update is out; below
+    the compat is `outdated` — `prepare()` returns it before the claim, so nothing is
+    written, and a pull whose listing shows a changed identity revision asks again
+    (`vaultGate`). An outdated loop is **held**, not stopped: `enqueue` still writes the
+    outbox, while flush, pull, compaction and the flush at quit do nothing — stopping it
+    would detach the bridge and lose changes made meanwhile. An additive format change
+    raises `DATA_VERSION` only; anything else raises both. Builds from before the numbers
+    (1.0.x) accept only identity `version: 1` and refuse anything else without writing,
+    which is how the first breaking format stops them: by raising that to 2.
   - **An entry is applied only when it is newer than the row it would overwrite, and
     `sync_record_versions` is how that question can be asked at all.** The merge compares
     entries against each other and never against the database — `resolve()` picks a winner
