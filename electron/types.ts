@@ -2458,7 +2458,7 @@ export interface TrainingPlanDataSources {
   zones: boolean;
 }
 
-/** One of an outline's key sessions: what the week is built around. */
+/** One of an outline week's sessions (stored as `keySessions`; an older outline holds only the key ones). */
 export interface TrainingPlanOutlineSession {
   /** Monday = 0 through Sunday = 6. */
   dayIndex: number;

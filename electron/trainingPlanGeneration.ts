@@ -738,7 +738,7 @@ export const PLAN_OUTLINE_TOOL_DEFINITION: CorosMcpTool = {
         description: "Every week of the plan, in order, week 1 first.",
         items: {
           type: "object",
-          required: ["week", "stage", "hours", "sessions", "focus", "key_sessions"],
+          required: ["week", "stage", "hours", "sessions", "focus", "week_sessions"],
           properties: {
             week: { type: "integer", minimum: 1 },
             stage: { type: "string", enum: STAGE_SLUGS },
@@ -746,9 +746,9 @@ export const PLAN_OUTLINE_TOOL_DEFINITION: CorosMcpTool = {
             hours: { type: "number", minimum: 0, description: "Planned training time that week, in hours." },
             sessions: { type: "integer", minimum: 0, description: "How many sessions the week holds." },
             focus: { type: "string", description: "One sentence: what the week is for." },
-            key_sessions: {
+            week_sessions: {
               type: "array",
-              description: "The one to three sessions the week is built around.",
+              description: "Every session of the week, one entry each, in day order: as many entries as `sessions`, easy and strength sessions included.",
               items: {
                 type: "object",
                 required: ["day", "name", "sport"],
@@ -793,12 +793,12 @@ export function parsePlanOutline(args: Record<string, unknown>): { outline?: Tra
     const sessions = Number.isInteger(week.sessions) && (week.sessions as number) >= 0 ? (week.sessions as number) : undefined;
     if (sessions === undefined) errors.push(`${where} has no session count.`);
     const keySessions: TrainingPlanOutlineSession[] = [];
-    for (const item of Array.isArray(week.key_sessions) ? week.key_sessions : []) {
+    for (const item of Array.isArray(week.week_sessions) ? week.week_sessions : []) {
       const key = (item ?? {}) as Record<string, unknown>;
       const dayIndex = PLAN_WEEKDAYS.indexOf(key.day as (typeof PLAN_WEEKDAYS)[number]);
       const sport = WORKOUT_SPORTS.includes(key.sport as WorkoutSport) ? (key.sport as WorkoutSport) : undefined;
       if (dayIndex < 0 || !sport || !text(key.name)) {
-        errors.push(`${where} has a key session without a day, a name or a sport.`);
+        errors.push(`${where} has a session without a day, a name or a sport.`);
         continue;
       }
       const minutes = Number.isInteger(key.minutes) && (key.minutes as number) > 0 ? (key.minutes as number) : undefined;
@@ -843,7 +843,7 @@ export function planOutlineProblems(outline: TrainingPlanOutline, request: Train
       problems.push(`${where} has ${plural(planned.sessions, "session")}; the athlete's week holds ${bandText(band)}.`);
     }
     if (planned.keySessions.length > Math.max(planned.sessions, 1)) {
-      problems.push(`${where} names more key sessions than it has sessions.`);
+      problems.push(`${where} lists more sessions than it counts.`);
     }
     const ceiling = week.mode === "coach" && week.hours?.max !== undefined
       ? week.hours.max * 1.1
@@ -883,7 +883,7 @@ export function outlineLines(outline: TrainingPlanOutline, startDate: string): s
     const keys = week.keySessions
       .map((session) => `${PLAN_WEEKDAYS[session.dayIndex]} ${session.name} (${formatWorkoutSport(session.sport)}${session.minutes ? `, ${session.minutes} min` : ""})`)
       .join("; ");
-    return `  - Week ${index + 1} (from ${monday}): ${stageName(week.stage)}${week.lighter ? ", lighter" : ""}, ${week.hours} h, ${plural(week.sessions, "session")} — ${week.focus}${keys ? ` Key: ${keys}.` : ""}`;
+    return `  - Week ${index + 1} (from ${monday}): ${stageName(week.stage)}${week.lighter ? ", lighter" : ""}, ${week.hours} h, ${plural(week.sessions, "session")} — ${week.focus}${keys ? ` Sessions: ${keys}.` : ""}`;
   });
 }
 
@@ -914,7 +914,7 @@ export function trainingPlanOutlinePrompt(request: TrainingPlanGenerationRequest
     ...requestLines(request),
     "",
     "What to propose",
-    "- Every week, in order: its stage (preparation, base, build, peak, race, transition), whether it is a lighter week, its hours, its number of sessions, one sentence on what it is for, and the one to three key sessions it is built around (day, name, sport, minutes).",
+    "- Every week, in order: its stage (preparation, base, build, peak, race, transition), whether it is a lighter week, its hours, its number of sessions, one sentence on what it is for, and every one of its sessions (day, name, sport, minutes) — easy runs and strength included, so the outline shows the whole week.",
     "- Progress the load gradually, with a lighter week every three or four weeks where the plan is long enough.",
     "- basis: one or two sentences on what you read of my current training that the plan starts from — it is shown to me.",
     "- summary: one or two sentences on how the plan is built."
