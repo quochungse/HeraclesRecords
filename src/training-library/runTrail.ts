@@ -58,7 +58,10 @@ const READS: Record<string, [doing: string, done: string]> = {
   delete_workout: ["Preparing the removal", "Prepared the removal"],
   request_plan_brief: ["Setting out the brief", "Set out the brief"],
   request_coach_input: ["Preparing a question", "Prepared a question"],
-  recall_conversation: ["Looking back through this conversation", "Looked back through this conversation"]
+  recall_conversation: ["Looking back through this conversation", "Looked back through this conversation"],
+  // The provider's own web tools, under the names every provider reports them by.
+  web_search: ["Searching the web", "Searched the web"],
+  web_fetch: ["Reading a web page", "Read a web page"]
 };
 
 /** A read, as a line. An unknown COROS MCP tool is still a read of COROS. */

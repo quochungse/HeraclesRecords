@@ -22,6 +22,7 @@ import {
   ExternalLink,
   FileDown,
   FileText,
+  Globe,
   KeyRound,
   Loader2,
   LogOut,
@@ -737,13 +738,15 @@ function DeletePreviewCard({ preview }: { preview: WorkoutDeletePreview }) {
 const SOURCE_ICONS: Record<ChatToolSource, typeof Database> = {
   db: Database,
   coros: Cloud,
-  mcp: Plug
+  mcp: Plug,
+  web: Globe
 };
 
 /**
  * Where the answer's data came from: one pill per source — DB for this
  * machine's own store, Coros for the Training Hub API, MCP for a connected MCP
- * server — each naming the tools that read from it. `mcpUsed`/`mcpTools` are
+ * server, Web for the provider's own search — each naming the tools that read
+ * from it. `mcpUsed`/`mcpTools` are
  * the stored names from when every tool was labelled MCP; the grouping is done
  * here, by name, so old transcripts read correctly too.
  */
@@ -5561,6 +5564,10 @@ export function ChatView({
             onChange={changeConversationRuntime}
             onSourcesChange={(sources) =>
               conversationSettings && updateConversationSettings({ ...conversationSettings, sources })
+            }
+            web={conversationSettings?.web !== false}
+            onWebChange={(web) =>
+              conversationSettings && updateConversationSettings({ ...conversationSettings, web })
             }
             onClose={() => setAiSheetOpen(false)}
             onOpenCoachSettings={() => {

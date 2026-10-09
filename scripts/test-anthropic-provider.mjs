@@ -15,11 +15,22 @@ const {
   buildAnthropicSystem,
   buildAnthropicRequestTuning,
   buildAnthropicTools,
+  buildAnthropicWebTools,
   getAnthropicModelCapabilities,
   normalizeAnthropicError,
   resolveAnthropicModel,
   testAnthropicApiConnectionRequest
 } = await import(`${providerUrl}?cacheBust=${Date.now()}`);
+
+// Web search and fetch: the filtering variants where the model takes them,
+// the basic ones on Haiku and before 4.6.
+const webTypes = (model) => buildAnthropicWebTools(model).map((tool) => tool.type);
+assert.deepEqual(webTypes("claude-opus-5-5"), ["web_search_20260209", "web_fetch_20260209"]);
+assert.deepEqual(webTypes("claude-sonnet-4-6"), ["web_search_20260209", "web_fetch_20260209"]);
+for (const older of ["claude-haiku-4-5", "claude-sonnet-4-5", "claude-opus-4-1-20250805", "claude-sonnet-4-20250514"]) {
+  assert.deepEqual(webTypes(older), ["web_search_20250305", "web_fetch_20250910"], older);
+}
+assert.ok(buildAnthropicWebTools("claude-opus-5-5").every((tool) => tool.max_uses > 0), "every search is bounded");
 
 assert.equal(resolveAnthropicModel(), DEFAULT_ANTHROPIC_MODEL);
 assert.equal(resolveAnthropicModel("   "), DEFAULT_ANTHROPIC_MODEL);

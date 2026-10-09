@@ -526,6 +526,10 @@ export function initializeDatabase(userDataPath: string): Database.Database {
   ensureColumn(db, "chat_plan_drafts", "refinements_json", "TEXT");
   // The units a change set's workouts were written in (P3.3).
   ensureColumn(db, "chat_schedule_changes", "unit_system", "TEXT");
+  // A conversation that may not search the web: 0. NULL is on, so a row needs
+  // to exist only once web search is switched off there. A column rather than
+  // a key in sources_json, which a build without it writes back without it.
+  ensureColumn(db, "chat_conversation_settings", "web_search", "INTEGER");
   // coach_seen_at marks a row as already considered by the analysis activity
   // watcher. NULL = not yet processed, so a re-synced activity is re-evaluated
   // only if the re-sync clears the stamp.
@@ -2715,32 +2719,37 @@ export function markChatPlanDraftUploaded(
 /** A conversation's own settings (P2.0), as stored; absent is Coach's for everything. */
 export function getChatConversationSettingsRow(
   sessionId: string
-): { sourcesJson?: string; runtimeJson?: string } | undefined {
+): { sourcesJson?: string; runtimeJson?: string; webSearch?: boolean } | undefined {
   const row = requireDatabase()
-    .prepare("SELECT sources_json, runtime_json FROM chat_conversation_settings WHERE session_id = ?")
-    .get(sessionId) as { sources_json: string | null; runtime_json: string | null } | undefined;
+    .prepare("SELECT sources_json, runtime_json, web_search FROM chat_conversation_settings WHERE session_id = ?")
+    .get(sessionId) as
+    | { sources_json: string | null; runtime_json: string | null; web_search: number | null }
+    | undefined;
   if (!row) return undefined;
   return {
     ...(row.sources_json ? { sourcesJson: row.sources_json } : {}),
-    ...(row.runtime_json ? { runtimeJson: row.runtime_json } : {})
+    ...(row.runtime_json ? { runtimeJson: row.runtime_json } : {}),
+    ...(row.web_search === 0 ? { webSearch: false } : {})
   };
 }
 
 export function saveChatConversationSettingsRow(
   sessionId: string,
   sourcesJson: string | null,
-  runtimeJson: string | null
+  runtimeJson: string | null,
+  webSearch = true
 ): void {
   requireDatabase()
     .prepare(
-      `INSERT INTO chat_conversation_settings (session_id, sources_json, runtime_json, updated_at)
-       VALUES (?, ?, ?, ?)
+      `INSERT INTO chat_conversation_settings (session_id, sources_json, runtime_json, web_search, updated_at)
+       VALUES (?, ?, ?, ?, ?)
        ON CONFLICT(session_id) DO UPDATE SET
          sources_json = excluded.sources_json,
          runtime_json = excluded.runtime_json,
+         web_search = excluded.web_search,
          updated_at = excluded.updated_at`
     )
-    .run(sessionId, sourcesJson, runtimeJson, new Date().toISOString());
+    .run(sessionId, sourcesJson, runtimeJson, webSearch ? null : 0, new Date().toISOString());
   notifySyncedRow("chat_conversation_settings", ["session_id"], [sessionId]);
 }
 

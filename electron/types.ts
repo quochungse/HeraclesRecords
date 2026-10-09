@@ -2392,6 +2392,12 @@ export interface ConversationSettings {
   sessionId: string;
   sources: TrainingPlanDataSources;
   runtime?: AnalysisRuntime;
+  /**
+   * Whether Coach may search the web in this conversation's chat turns, through
+   * the provider's own search. Absent is on; an analysis and a plan step never
+   * search, whatever this says.
+   */
+  web?: boolean;
 }
 
 /**

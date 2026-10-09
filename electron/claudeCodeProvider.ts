@@ -95,6 +95,12 @@ export interface StreamClaudeCodeOptions extends ClaudeCodeToolCallbacks {
   /** Send the last message as the prompt, without the Coach conversation's framing (a text job). */
   plainPrompt?: boolean;
   /**
+   * Let the CLI's own WebSearch and WebFetch run. They are reported through
+   * `onToolCallStart` as `web_search` / `web_fetch`, the names every provider
+   * reports a web lookup under (`chatToolSources.ts`).
+   */
+  webSearch?: boolean;
+  /**
    * Receives the model Claude Code actually ran. Only meaningful as "the
    * account default" when `model` was left unset, since otherwise it just
    * echoes the requested one.
@@ -315,6 +321,12 @@ export async function detectClaudeCodeExecutable(
  * reading or disturbing the account the user is signed into elsewhere on this
  * computer. Omit it to share the machine-wide login in ~/.claude.
  */
+/** The CLI's web tools, by the name every provider reports a web lookup under. */
+const CLAUDE_WEB_TOOLS: Readonly<Record<string, string>> = {
+  WebSearch: "web_search",
+  WebFetch: "web_fetch"
+};
+
 export function createClaudeSubscriptionEnvironment(
   configDir?: string
 ): NodeJS.ProcessEnv {
@@ -929,9 +941,13 @@ export async function streamClaudeCodeCompletion(
       tools: definitions,
       alwaysLoad: true
     });
-    const allowedTools = options.tools.map(
-      (sourceTool) => `mcp__${CLAUDE_MCP_SERVER_NAME}__${sourceTool.name}`
-    );
+    const webTools = options.webSearch ? Object.keys(CLAUDE_WEB_TOOLS) : [];
+    const allowedTools = [
+      ...options.tools.map(
+        (sourceTool) => `mcp__${CLAUDE_MCP_SERVER_NAME}__${sourceTool.name}`
+      ),
+      ...webTools
+    ];
 
     const stream = sdk.query({
       prompt: options.plainPrompt
@@ -946,7 +962,9 @@ export async function streamClaudeCodeCompletion(
         ...(options.thinkingBudget
           ? { thinking: { type: "enabled" as const, budgetTokens: options.thinkingBudget } }
           : {}),
-        tools: [],
+        // Every built-in tool stays off but the web pair, and those only when
+        // the conversation allows them: Bash, Read and Edit have no place here.
+        tools: webTools,
         allowedTools,
         permissionMode: "dontAsk",
         mcpServers: { [CLAUDE_MCP_SERVER_NAME]: mcpServer },
@@ -981,6 +999,14 @@ export async function streamClaudeCodeCompletion(
           event.delta.type === "thinking_delta"
         ) {
           options.onThinking?.(event.delta.thinking);
+        } else if (
+          event.type === "content_block_start" &&
+          event.content_block.type === "tool_use" &&
+          Object.hasOwn(CLAUDE_WEB_TOOLS, event.content_block.name)
+        ) {
+          // The app's own tools report through their handler; a built-in
+          // runs inside the CLI and is seen only here.
+          options.onToolCallStart?.(CLAUDE_WEB_TOOLS[event.content_block.name]);
         }
         continue;
       }

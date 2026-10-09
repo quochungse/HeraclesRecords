@@ -179,7 +179,18 @@ export interface StreamOpenRouterChatOptions
     "model" | "toolsEnabled" | "onToolsDisabled"
   > {
   config: Pick<OpenRouterConfig, "model"> & { apiKey: string };
+  /** Offer OpenRouter's web search server tool; the model decides when to search. */
+  webSearch?: boolean;
 }
+
+/**
+ * OpenRouter's own search, run on its side within the request and billed per
+ * search on the account's credit. Bounded, because the model decides how often.
+ */
+export const OPENROUTER_WEB_SEARCH_TOOL: Record<string, unknown> = {
+  type: "openrouter:web_search",
+  parameters: { max_results: 5, max_uses: 3 }
+};
 
 export function streamOpenRouterChatCompletion(
   options: StreamOpenRouterChatOptions
@@ -198,7 +209,9 @@ export function streamOpenRouterChatCompletion(
       onToolCallStart: options.onToolCallStart,
       onToolCallError: options.onToolCallError,
       model: options.config.model,
-      toolsEnabled: true
+      toolsEnabled: true,
+      ...(options.webSearch ? { serverTools: [OPENROUTER_WEB_SEARCH_TOOL] } : {}),
+      ...(options.onServerToolUse ? { onServerToolUse: options.onServerToolUse } : {})
     },
     {
       baseUrl: OPENROUTER_API_BASE_URL,

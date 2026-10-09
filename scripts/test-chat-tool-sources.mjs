@@ -83,4 +83,13 @@ assert.equal(chatToolSource("queryActivities"), "mcp");
 assert.equal(chatToolSource("constructor"), "mcp");
 assert.equal(chatToolSource("toString"), "mcp");
 
+// The provider's own web search and fetch, whichever provider ran them, come
+// last on the badge: the open web is the farthest from the athlete's data.
+assert.equal(chatToolSource("web_search"), "web");
+assert.equal(chatToolSource("web_fetch"), "web");
+assert.deepEqual(
+  groupChatToolsBySource(["web_search", "get_activity_detail", "web_fetch"]).map(({ label, tools }) => `${label}: ${tools.join(", ")}`),
+  ["Coros: get_activity_detail", "Web: web_search, web_fetch"]
+);
+
 console.log("chat tool source tests passed");

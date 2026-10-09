@@ -10,12 +10,19 @@
  * - `coros` — a request the app makes itself to the COROS Training Hub API.
  * - `mcp`   — a tool of a connected MCP server. Its name carries the server
  *             prefix (`coros__querySleepData`, see `mcpToolNames`).
+ * - `web`   — the provider's own web search or fetch, run on its side. Every
+ *             provider reports one under `WEB_SEARCH_TOOL` / `WEB_FETCH_TOOL`.
  *
  * Free of imports so the renderer can read it, and keyed by tool name rather
  * than carried on the stream, so transcripts saved before it existed label
  * themselves correctly too.
  */
-export type ChatToolSource = "db" | "coros" | "mcp";
+export type ChatToolSource = "db" | "coros" | "mcp" | "web";
+
+/** The names a provider's web search and page fetch are reported under, whatever the provider calls them. */
+export const WEB_SEARCH_TOOL = "web_search";
+export const WEB_FETCH_TOOL = "web_fetch";
+const WEB_TOOLS: ReadonlySet<string> = new Set([WEB_SEARCH_TOOL, WEB_FETCH_TOOL]);
 
 /**
  * Every local tool by where it reads from. `null` is a tool that reads nothing:
@@ -29,8 +36,8 @@ export type ChatToolSource = "db" | "coros" | "mcp";
  * `test:chat-tool-sources` fails on a local tool missing here, because an
  * unlisted name falls through to the MCP label.
  */
-export const LOCAL_CHAT_TOOL_SOURCES: ReadonlyMap<string, Exclude<ChatToolSource, "mcp"> | null> =
-  new Map<string, Exclude<ChatToolSource, "mcp"> | null>([
+export const LOCAL_CHAT_TOOL_SOURCES: ReadonlyMap<string, Exclude<ChatToolSource, "mcp" | "web"> | null> =
+  new Map<string, Exclude<ChatToolSource, "mcp" | "web"> | null>([
     ["list_recent_activities", "coros"],
     ["get_activity_detail", "coros"],
     ["get_fitness_trends", "coros"],
@@ -66,6 +73,7 @@ export const LOCAL_CHAT_TOOL_SOURCES: ReadonlyMap<string, Exclude<ChatToolSource
  * was labelled before, so a name from an older build keeps its old label.
  */
 export function chatToolSource(name: string): ChatToolSource | null {
+  if (WEB_TOOLS.has(name)) return "web";
   const local = LOCAL_CHAT_TOOL_SOURCES.get(name);
   return local === undefined ? "mcp" : local;
 }
@@ -79,11 +87,12 @@ export interface ChatToolSourceGroup {
 const SOURCE_LABELS: Record<ChatToolSource, string> = {
   db: "DB",
   coros: "Coros",
-  mcp: "MCP"
+  mcp: "MCP",
+  web: "Web"
 };
 
-/** Nearest first: what never left the machine, then COROS, then MCP servers. */
-const SOURCE_ORDER: readonly ChatToolSource[] = ["db", "coros", "mcp"];
+/** Nearest first: what never left the machine, then COROS, then MCP servers, then the open web. */
+const SOURCE_ORDER: readonly ChatToolSource[] = ["db", "coros", "mcp", "web"];
 
 /** The tools a turn called, grouped by source in that order, each named once. */
 export function groupChatToolsBySource(tools: readonly string[]): ChatToolSourceGroup[] {

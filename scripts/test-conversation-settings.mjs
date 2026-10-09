@@ -28,7 +28,8 @@ const session = history.createChatSession("claude-code");
 assert.deepEqual(chat.getConversationSettings(session.id), {
   sessionId: session.id,
   sources: everything,
-  runtime: { provider: "claude-code" }
+  runtime: { provider: "claude-code" },
+  web: true
 });
 assert.equal(database.getChatConversationSettingsRow(session.id), undefined);
 // Its own provider goes without saying: stating it stores nothing.
@@ -47,7 +48,8 @@ const set = chat.setConversationSettings({
 assert.deepEqual(set, {
   sessionId: session.id,
   sources: { activities: true, sleep: false, zones: true },
-  runtime: { provider: "openrouter", model: "some/model" }
+  runtime: { provider: "openrouter", model: "some/model" },
+  web: true
 });
 assert.ok(database.getChatConversationSettingsRow(session.id));
 
@@ -55,12 +57,20 @@ assert.ok(database.getChatConversationSettingsRow(session.id));
 chat.setConversationSettings({ sessionId: session.id, sources: everything });
 assert.equal(database.getChatConversationSettingsRow(session.id), undefined);
 
+// The web is on until switched off, and off is the only thing a row then holds.
+const offline = chat.setConversationSettings({ sessionId: session.id, sources: everything, web: false });
+assert.equal(offline.web, false);
+assert.deepEqual(database.getChatConversationSettingsRow(session.id), { webSearch: false });
+chat.setConversationSettings({ ...offline, web: true });
+assert.equal(database.getChatConversationSettingsRow(session.id), undefined, "back on, no row");
+
 // An unreadable row shares everything, as if there were none.
 database.saveChatConversationSettingsRow(session.id, "{not json", JSON.stringify({ provider: "nobody", effort: "high" }));
 assert.deepEqual(chat.getConversationSettings(session.id), {
   sessionId: session.id,
   sources: everything,
-  runtime: { effort: "high", provider: "claude-code" }
+  runtime: { effort: "high", provider: "claude-code" },
+  web: true
 });
 
 // Deleting the conversation takes its settings with it.

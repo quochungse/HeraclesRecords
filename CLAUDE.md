@@ -1349,6 +1349,23 @@ lives at module level for the same visit-to-visit reason — see `useCalendarDat
   provider, and a pull touching `chat_conversation_settings` or `chat_plan_artifacts` makes
   `ChatView` read the settings and the briefs again.
 
+  **Coach searches the web through the provider's own search, never a tool of ours**
+  (`ConversationSettings.web`, the `web_search` column of `chat_conversation_settings`: NULL
+  on, 0 off, so a row exists only once it is switched off — a column, because a build without
+  it would write `sources_json` back without the key). The Permissions tiles carry it as a
+  fourth, **Web**, beside the three sources but not one of them: `TrainingPlanDataSources`
+  withholds every other MCP server once anything is off, and the web off must not take Strava
+  with it. `streamChatTurn` honours it only under the interactive policy and outside a text job,
+  so an analysis or a plan step never searches. Each provider's own: Claude Code lets the CLI's
+  `WebSearch`/`WebFetch` run (the only built-ins in `tools`), the Messages API gets
+  `web_search`/`web_fetch` server tools (`buildAnthropicWebTools`, the 2026-02 variants from
+  Opus/Sonnet 4.6 on) and resumes a `pause_turn`, ChatGPT gets `{type: "web_search"}`, OpenRouter
+  `openrouter:web_search`; a local model has none. Every one reports a lookup as `web_search` /
+  `web_fetch` on `chat:streamInfo`, which the badge reads as **Web** (`chatToolSources.ts`) and
+  the trail as "Searching the web". A request refused for naming the web tool is sent again
+  without it rather than failing the turn. The rule the model reads is in
+  `withLiveToolInstructions`, said only when the turn may search.
+
   **A plan longer than two weeks starts as a brief** (P2.1): `request_plan_brief` writes the
   generator's request — less the conversation's sources and AI — to a `chat_plan_artifacts` row,
   marking each field Coach filled `chat` or `data`, and the transcript gets only an anchor,

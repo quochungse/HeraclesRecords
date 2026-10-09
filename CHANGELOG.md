@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### What's new
+
+- **Coach** — searches the web when a question needs it: a race's date, course and cut-offs, an event's weather, anything your data does not hold. It names the pages it used. Switch it off per conversation under Permissions in the AI chip's sheet. A local model cannot search.
+
 ## [1.0.3] - 2026-10-09
 
 ### What's new
