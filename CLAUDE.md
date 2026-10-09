@@ -2673,6 +2673,14 @@ getter over its message, never a copy** (`PRIMARY_NAV_*`, `SPORT_COLOR_LABELS`,
 which is the OS language; and **no translated string is ever stored** — not in SQLite,
 localStorage or anything sync carries. Coach's prompt is not translated, and
 `data-nav-label` stays English for the probe and the screenshot harness.
+**The main process's words go through `electron/screenText.ts`** (English, no value imports)
+and `electron/i18n/<locale>.ts` (the renderer's `main` namespace re-exports them). A shared
+module calls `screenText`, which stays English until the renderer installs a translator
+(`src/i18n/screenTextHooks.ts`) — so the model keeps reading English. The main process
+throws a `ScreenError` (English `message`, for the log, tools and any regex), and
+`diagnosticIpcMain` re-throws it in the language the renderer sends over `app:setLanguage`
+(`mainText.ts`). Text main *stored* (a change line, a plan event) stays English and is said
+again on screen from its fields.
 
 Styling is plain CSS with custom properties — no Tailwind, no CSS modules.
 `src/styles.css` (~28k lines) holds the design tokens and most rules; fourteen feature

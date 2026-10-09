@@ -822,6 +822,22 @@ const chat: ChatMessages = {
   "chat.an.del.lead": "Das kann nicht rückgängig gemacht werden.",
   "chat.an.del.body": "Der Chat bleibt erhalten, samt allem, was {name} schon darin geschrieben hat. Nur die Analyse und ihr Zeitplan verschwinden.",
   "chat.an.del.confirm": "Analyse löschen",
+  "chat.change.line.quoted": "„{name}“",
+  "chat.change.line.move": "{name}{plan} von {from} auf {to} verschieben",
+  "chat.change.line.replace": "{name}{plan} am {day} durch {workout} ersetzen",
+  "chat.change.line.remove": "{name}{plan} vom {day} entfernen",
+  "chat.change.line.add": "{workout} am {day} hinzufügen",
+  "chat.change.line.deleteWorkout": "{name} aus der Workout-Bibliothek löschen",
+  "chat.change.reason.unknownOp": "Diese Version kann die Änderung nicht übernehmen.",
+  "chat.change.reason.noSession": "Der Vorschlag sagt nicht, welche Einheit.",
+  "chat.change.reason.noSessionOrDay": "Der Vorschlag sagt nicht, welche Einheit oder wohin.",
+  "chat.change.reason.noSessionOrWorkout": "Der Vorschlag sagt nicht, welche Einheit oder wodurch.",
+  "chat.change.reason.noWhatOrWhere": "Der Vorschlag sagt nicht, was oder wohin.",
+  "chat.change.reason.noWorkout": "Der Vorschlag sagt nicht, welches Workout.",
+  "chat.change.reason.gone": "„{name}“ steht am {day} nicht mehr im Kalender.",
+  "chat.change.reason.replaced": "Die Einheit am {day} ist jetzt „{now}“, nicht „{name}“.",
+  "chat.change.reason.alreadyThere": "„{name}“ steht am {day} schon im Kalender.",
+  "chat.change.reason.notInLibrary": "„{name}“ ist nicht mehr in der Workout-Bibliothek.",
 };
 
 export default chat;

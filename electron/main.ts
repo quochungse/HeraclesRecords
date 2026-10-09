@@ -17,6 +17,7 @@ import {
   initializeDiagnostics,
   observeDiagnosticWindow
 } from "./diagnosticsService";
+import { localizeScreenError, mainText, setMainLocale } from "./mainText";
 import { listRememberedMilestones, rememberMilestones } from "./recordsLedger";
 import type { OpenDialogOptions } from "electron";
 import fs from "node:fs";
@@ -350,6 +351,7 @@ import type {
   RunWorkoutEditorDraft,
   WorkoutEditRef
 } from "./types";
+import { ScreenError } from "./screenText";
 
 // userData lives at <appData>/heracles-records: Electron names it after the
 // top-level `name` in package.json (`productName` sits under `build`, which
@@ -469,7 +471,7 @@ async function exportTrainingHubActivityFileToDisk(
   const saveOptions = {
     defaultPath,
     filters: [
-      { name: `${format.label} file`, extensions: [format.extension] }
+      { name: mainText("main.file.activityFilter", { format: format.label }), extensions: [format.extension] }
     ]
   };
   const result =
@@ -1845,7 +1847,8 @@ function registerIpcHandlers(): void {
         return { ok: true, analysis };
       } catch (error) {
         if (error instanceof CoachAnalysisError) {
-          return { ok: false, code: error.code, message: error.message };
+          // In the language on screen (screenText.ts); the code stays the code.
+          return { ok: false, code: error.code, message: (localizeScreenError(error) as Error).message };
         }
         throw error;
       }
@@ -1957,7 +1960,7 @@ function registerIpcHandlers(): void {
   ipcMain.handle("mcp:updateServer", async (_event, id: string, patch) => {
     const existing = getMcpServer(id);
     if (!existing) {
-      throw new Error(`Unknown MCP server "${id}".`);
+      throw new ScreenError("main.mcp.unknown");
     }
     const updated = updateMcpServer(id, patch);
     const connectionChanged =
@@ -2408,7 +2411,7 @@ function registerIpcHandlers(): void {
         await listTrainingHubActivities(1, 50)
       );
       if (!latest) {
-        throw new Error("No COROS activities were found to export.");
+        throw new ScreenError("main.coros.noActivities");
       }
       return exportTrainingHubActivityFileToDisk(latest, fileType, latest.name);
     }
@@ -2480,10 +2483,10 @@ function registerIpcHandlers(): void {
     "coros:addManualActivity",
     async (_event, input: ManualActivityInput): Promise<{ importId: string }> => {
       if (!Number.isFinite(input.durationSec) || !(input.durationSec > 0)) {
-        throw new Error("Duration must be a finite number greater than 0.");
+        throw new ScreenError("main.activity.duration");
       }
       if (Number.isNaN(Date.parse(input.startTimeIso))) {
-        throw new Error("Invalid start time.");
+        throw new ScreenError("main.activity.startTime");
       }
       const toFiniteNonNegative = (value: unknown): number => {
         const n = Number(value);
@@ -2567,6 +2570,13 @@ function registerIpcHandlers(): void {
     markRendererReady();
   });
 
+  // The language on screen, for the main process's own words (mainText.ts):
+  // an error the athlete reads, a dialog's title. The renderer sends it on
+  // start-up and on every switch.
+  ipcMain.handle("app:setLanguage", (_event, locale: unknown) => {
+    setMainLocale(locale);
+  });
+
   ipcMain.handle("app:getInfo", () => getAppInfo());
 
   // ----- Sync -----
@@ -2601,10 +2611,10 @@ function registerIpcHandlers(): void {
       requireBackupAccount("saving a backup");
 
       const saveOptions = {
-        title: "Save a backup of your data",
+        title: mainText("main.backup.saveTitle"),
         defaultPath: defaultBackupFileName(),
         filters: [
-          { name: "Heracles Records backup", extensions: [BACKUP_EXTENSION] }
+          { name: mainText("main.backup.filter"), extensions: [BACKUP_EXTENSION] }
         ]
       };
       const chosen =
@@ -2628,13 +2638,13 @@ function registerIpcHandlers(): void {
     requireBackupAccount("restoring a backup");
 
     const options: OpenDialogOptions = {
-      title: "Choose a backup to restore",
+      title: mainText("main.backup.openTitle"),
       properties: ["openFile"],
       // `.json` too: backups written before the file was sealed are plain JSON,
       // and they still restore.
       filters: [
         {
-          name: "Heracles Records backup",
+          name: mainText("main.backup.filter"),
           extensions: [...BACKUP_OPEN_EXTENSIONS]
         }
       ]

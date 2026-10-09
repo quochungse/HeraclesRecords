@@ -84,6 +84,7 @@ import type {
   TrainingPlanDataSources
 } from "../../electron/types";
 import { NOTHING_TO_REPORT } from "../../electron/types";
+import { planDiff } from "../../electron/planDiff";
 import {
   chartHandle,
   holdBackPartialPlaceholder,
@@ -5030,6 +5031,16 @@ export function ChatView({
               // only while it is still the newest: after that, undoing it
               // would also undo whatever came since.
               const eventVersion = versionIndex.get(event.draftId);
+              // The stored lines are English: a transcript is never translated.
+              // Worked out again from the two versions, they read in the
+              // language on screen; the stored ones stand in when a version
+              // is not in hand.
+              const fromDraft = event.fromVersion
+                ? eventVersion?.siblings.find((version) => version.version === event.fromVersion)?.draftId
+                : undefined;
+              const before = fromDraft ? documentForDraft(fromDraft) : undefined;
+              const after = documentForDraft(event.draftId);
+              const changes = before && after ? planDiff(before, after).map((change) => change.text) : event.changes;
               const undoTo =
                 api &&
                 event.author === "athlete" &&
@@ -5059,10 +5070,10 @@ export function ChatView({
                   {/* One line (R2): the first change and how many more, the
                       whole list on hover and in the Workbench's Versions. It
                       used to print every change, wrapping over three lines. */}
-                  <span className="chat-version-note" title={event.changes?.join("\n")}>
+                  <span className="chat-version-note" title={changes?.join("\n")}>
                     {verb}
-                    {event.changes?.length ? ` · ${event.changes[0]}` : ""}
-                    {event.changes && event.changes.length > 1 ? ` · ${t("chat.event.more", { n: event.changes.length - 1 })}` : ""}
+                    {changes?.length ? ` · ${changes[0]}` : ""}
+                    {changes && changes.length > 1 ? ` · ${t("chat.event.more", { n: changes.length - 1 })}` : ""}
                   </span>
                   <button
                     type="button"

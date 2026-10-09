@@ -299,8 +299,12 @@ async function listAllTrainingHubActivities(
 export default function App() {
   // Subscribed here so a language switch redraws the whole tree; a memoised
   // screen below that shows words subscribes on its own as well.
-  useI18n();
+  const { locale } = useI18n();
   const api: HeraclesRecordsApi | undefined = window.heraclesRecords;
+  // The main process writes some words itself (an error, a dialog's title).
+  useEffect(() => {
+    void api?.setLanguage?.(locale);
+  }, [api, locale]);
   const [activeView, setActiveView] = useState<View>(readStartupView);
   /**
    * `.content` is one scroller shared by every screen, so a screen used to open

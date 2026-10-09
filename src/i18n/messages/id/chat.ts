@@ -822,6 +822,22 @@ const chat: ChatMessages = {
   "chat.an.del.lead": "Tindakan ini tidak bisa dibatalkan.",
   "chat.an.del.body": "Obrolan tetap disimpan, beserta semua yang sudah ditulis {name} di dalamnya. Hanya analisis dan jadwalnya yang dihapus.",
   "chat.an.del.confirm": "Hapus analisis",
+  "chat.change.line.quoted": "\"{name}\"",
+  "chat.change.line.move": "Pindahkan {name}{plan} dari {from} ke {to}",
+  "chat.change.line.replace": "Ganti {name}{plan} pada {day} dengan {workout}",
+  "chat.change.line.remove": "Lepas {name}{plan} dari {day}",
+  "chat.change.line.add": "Tambahkan {workout} pada {day}",
+  "chat.change.line.deleteWorkout": "Hapus {name} dari Pustaka latihan",
+  "chat.change.reason.unknownOp": "Versi ini tidak bisa menerapkan perubahan itu.",
+  "chat.change.reason.noSession": "Usulan tidak menyebut sesi yang mana.",
+  "chat.change.reason.noSessionOrDay": "Usulan tidak menyebut sesi yang mana atau ke mana.",
+  "chat.change.reason.noSessionOrWorkout": "Usulan tidak menyebut sesi yang mana atau diganti apa.",
+  "chat.change.reason.noWhatOrWhere": "Usulan tidak menyebut apa atau di mana.",
+  "chat.change.reason.noWorkout": "Usulan tidak menyebut latihan yang mana.",
+  "chat.change.reason.gone": "\"{name}\" sudah tidak ada di kalender pada {day}.",
+  "chat.change.reason.replaced": "Sesi pada {day} sekarang \"{now}\", bukan \"{name}\".",
+  "chat.change.reason.alreadyThere": "\"{name}\" sudah ada di kalender pada {day}.",
+  "chat.change.reason.notInLibrary": "\"{name}\" sudah tidak ada di Pustaka latihan.",
 };
 
 export default chat;

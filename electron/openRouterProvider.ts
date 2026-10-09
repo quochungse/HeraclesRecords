@@ -8,6 +8,8 @@ import {
   streamOpenAiCompatibleChatCompletion,
   type StreamOpenAiCompatibleChatOptions
 } from "./localChatProvider";
+import { ScreenError } from "./screenText";
+import { mainPlural, mainText } from "./mainText";
 
 export const OPENROUTER_API_BASE_URL = "https://openrouter.ai/api/v1";
 export const OPENROUTER_KEYS_URL = "https://openrouter.ai/settings/keys";
@@ -75,7 +77,7 @@ export async function listOpenRouterModelsRequest(
 
   const payload = (await response.json()) as { data?: OpenRouterModelPayload[] };
   if (!Array.isArray(payload.data)) {
-    throw new Error("OpenRouter returned an invalid model list.");
+    throw new ScreenError("main.ai.openRouterList");
   }
   const listedModels = payload.data.flatMap((entry): OpenRouterModelOption[] => {
     if (typeof entry.id !== "string" || !entry.id.trim()) return [];
@@ -109,14 +111,14 @@ export async function testOpenRouterConnectionRequest(
   if (!apiKey) {
     return {
       ok: false,
-      message: "Add an OpenRouter API key first.",
+      message: mainText("main.ai.openRouterKey"),
       models: []
     };
   }
   if (!model) {
     return {
       ok: false,
-      message: "Choose an OpenRouter model first.",
+      message: mainText("main.ai.openRouterModel"),
       models: []
     };
   }
@@ -144,7 +146,7 @@ export async function testOpenRouterConnectionRequest(
     if (!models.some((entry) => entry.id === model)) {
       return {
         ok: false,
-        message: `OpenRouter connected, but "${model}" is not available with tool calling for this account.`,
+        message: mainText("main.ai.openRouterNoTools", { model }),
         models,
         keyLabel:
           typeof keyPayload.data?.label === "string"
@@ -154,7 +156,7 @@ export async function testOpenRouterConnectionRequest(
     }
     return {
       ok: true,
-      message: `Connected to OpenRouter with "${model}". ${models.length} tool-capable model${models.length === 1 ? " is" : "s are"} available.`,
+      message: mainPlural("main.ai.openRouterConnected", models.length, { model }),
       models,
       keyLabel:
         typeof keyPayload.data?.label === "string"

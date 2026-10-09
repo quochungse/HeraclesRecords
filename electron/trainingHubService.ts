@@ -161,6 +161,7 @@ import {
   hashCorosPassword,
   storeCorosCredentials
 } from "./corosCredentialStore";
+import { ScreenError, withScreenKey, type ScreenKey } from "./screenText";
 
 interface LoginResult {
   loginData: TrainingHubLoginData;
@@ -463,7 +464,7 @@ export async function loginTrainingHub(
 ): Promise<TrainingHubLoginResult> {
   const account = email.trim();
   if (!account || !password) {
-    throw new Error("Enter your COROS email and password.");
+    throw new ScreenError("main.coros.enterCredentials");
   }
 
   const pwdHash = hashCorosPassword(password);
@@ -490,12 +491,12 @@ export async function verifyTrainingHubTwoFactor(
 ): Promise<TrainingHubStatus> {
   const pending = pendingTwoFactor;
   if (!pending) {
-    throw new Error("No COROS verification is in progress. Start again.");
+    throw new ScreenError("main.coros.noVerification");
   }
 
   const trimmed = code.trim();
   if (!/^\d{6}$/.test(trimmed)) {
-    throw new Error("Enter the 6-digit verification code sent to your email.");
+    throw new ScreenError("main.coros.enterCode");
   }
 
   const loginData = await verifyTwoFactorCode(pending, trimmed);
@@ -520,7 +521,7 @@ export async function verifyTrainingHubTwoFactor(
 export async function resendTrainingHubTwoFactorCode(): Promise<void> {
   const pending = pendingTwoFactor;
   if (!pending) {
-    throw new Error("No COROS verification is in progress. Start again.");
+    throw new ScreenError("main.coros.noVerification");
   }
   await requestTwoFactorCode(
     pending.loginBaseUrl,
@@ -590,7 +591,7 @@ async function beginTrainingHubLogin(
   const loginTicket = String(loginData.loginTicket ?? "").trim();
   const appKey = String(loginData.appKey ?? "").trim();
   if (!loginTicket || !appKey) {
-    throw new Error("COROS returned an incomplete two-factor login challenge.");
+    throw new ScreenError("main.coros.incompleteChallenge");
   }
 
   if (!options.interactive) {
@@ -636,7 +637,7 @@ async function completeSessionFromLogin(
 ): Promise<TrainingHubAuthState> {
   const accessToken = loginData.accessToken;
   if (!accessToken) {
-    throw new Error("COROS login response did not include a usable token.");
+    throw new ScreenError("main.coros.noToken");
   }
 
   // The id first, then the region: both probes read the athlete's own data, so
@@ -646,7 +647,7 @@ async function completeSessionFromLogin(
   // than issuing requests that cannot come back with anything.
   let userId = String(loginData.userId ?? fallbackUserId).trim();
   if (!userId) {
-    throw new Error("COROS login response did not include a user ID.");
+    throw new ScreenError("main.coros.noUserId");
   }
 
   const baseUrl = await resolveTrainingHubBaseUrl(
@@ -793,6 +794,7 @@ class CorosPasswordLoginError extends Error {
   constructor(readonly result: string, message: string) {
     super(`COROS password login failed (${result || "unknown"}): ${message}`);
     this.name = "CorosPasswordLoginError";
+    withScreenKey(this, "main.coros.passwordFailed", { result: result || "unknown", message });
   }
 }
 
@@ -827,7 +829,7 @@ async function loginAtBase(
 
   // Success may carry an accessToken (no 2FA) or a loginTicket (2FA required).
   if (!payload.data?.accessToken && !payload.data?.loginTicket) {
-    throw new Error("COROS login response did not include a usable token.");
+    throw new ScreenError("main.coros.noToken");
   }
 
   return payload.data;
@@ -892,7 +894,7 @@ async function verifyTwoFactorCode(
     );
   }
   if (!payload.data?.accessToken) {
-    throw new Error("COROS verification did not return an access token.");
+    throw new ScreenError("main.coros.noAccessToken");
   }
   return payload.data;
 }
@@ -1138,7 +1140,7 @@ function appendHrZoneModelFields(
   // A value edited in the same patch wins over what the account holds today.
   const anchor = (
     field: string,
-    label: string,
+    missing: ScreenKey,
     stored: number | undefined
   ): string => {
     const patched = fields.get(field);
@@ -1146,14 +1148,14 @@ function appendHrZoneModelFields(
       return patched;
     }
     if (stored === undefined) {
-      throw new Error(`COROS needs a ${label} before it can use this zone model.`);
+      throw new ScreenError(missing);
     }
     return String(stored);
   };
-  const zoneTable = (family: CorosProfileZoneFamily, label: string): string => {
+  const zoneTable = (family: CorosProfileZoneFamily, missing: ScreenKey): string => {
     const rows = thresholds.zones[family];
     if (rows.length === 0) {
-      throw new Error(`COROS has no ${label} zones to carry into this model.`);
+      throw new ScreenError(missing);
     }
     return JSON.stringify(
       rows.map((zone) => ({ index: zone.index, ratio: zone.ratio }))
@@ -1163,18 +1165,18 @@ function appendHrZoneModelFields(
   fields.set(COROS_PROFILE_FORM_FIELDS.hrZoneType, String(model));
 
   if (model === 1) {
-    fields.set("maxHr", anchor("maxHr", "max heart rate", thresholds.maxHr));
-    fields.set("maxHrZone", zoneTable("maxHr", "max heart rate"));
+    fields.set("maxHr", anchor("maxHr", "main.coros.zoneNeedsMaxHr", thresholds.maxHr));
+    fields.set("maxHrZone", zoneTable("maxHr", "main.coros.zonesMissingMaxHr"));
   } else if (model === 2) {
-    fields.set("maxHr", anchor("maxHr", "max heart rate", thresholds.maxHr));
-    fields.set("rhr", anchor("rhr", "resting heart rate", thresholds.restingHr));
-    fields.set("rhrZone", zoneTable("restingHr", "heart-rate reserve"));
+    fields.set("maxHr", anchor("maxHr", "main.coros.zoneNeedsMaxHr", thresholds.maxHr));
+    fields.set("rhr", anchor("rhr", "main.coros.zoneNeedsRestingHr", thresholds.restingHr));
+    fields.set("rhrZone", zoneTable("restingHr", "main.coros.zonesMissingReserve"));
   } else {
     fields.set(
       "lthr",
-      anchor("lthr", "lactate threshold heart rate", thresholds.lthr)
+      anchor("lthr", "main.coros.zoneNeedsLthr", thresholds.lthr)
     );
-    fields.set("lthrZone", zoneTable("lthr", "lactate threshold"));
+    fields.set("lthrZone", zoneTable("lthr", "main.coros.zonesMissingLthr"));
   }
 
   // COROS treats a max-HR or LTHR model as a hand-calibrated one; the reserve
@@ -1199,7 +1201,7 @@ function assertCorosBirthday(value: number): number {
     date.getUTCMonth() !== month - 1 ||
     date.getUTCDate() !== day
   ) {
-    throw new Error("Enter the birthday as a real date in YYYYMMDD form.");
+    throw new ScreenError("main.coros.birthday");
   }
 
   return packed;
@@ -1247,7 +1249,7 @@ export function buildCorosProfileUpdateFields(
   if (patch.nickname !== undefined) {
     const nickname = patch.nickname.trim();
     if (!nickname || nickname.length > 64) {
-      throw new Error("Nickname must be 1-64 characters.");
+      throw new ScreenError("main.coros.nickname");
     }
     fields.set(COROS_PROFILE_FORM_FIELDS.nickname, nickname);
   }
@@ -1353,7 +1355,7 @@ export async function getCorosProfile(): Promise<CorosProfile> {
 async function readCorosAccount(): Promise<Record<string, unknown>> {
   const auth = getStoredAuth();
   if (!auth) {
-    throw new Error("Log in to COROS Training Hub first.");
+    throw new ScreenError("main.coros.signInFirst");
   }
   return trainingHubGet<Record<string, unknown>>("/account/query", {
     accountid: auth.userId
@@ -2130,7 +2132,7 @@ export async function getTrainingHubActivityFileUrl(
   );
 
   if (!data.fileUrl) {
-    throw new Error("COROS did not return a file URL for this activity.");
+    throw new ScreenError("main.coros.noFileUrl");
   }
 
   return data.fileUrl;
@@ -2544,12 +2546,12 @@ export async function uploadActivityFitToCoros(
 ): Promise<{ importId: string }> {
   const auth = getStoredAuth();
   if (!auth) {
-    throw new Error("Not signed in to COROS. Log in to the Training Hub first.");
+    throw new ScreenError("main.coros.signInFirst");
   }
 
   const ext = path.extname(fitPath).toLowerCase().replace(".", "");
   if (ext !== "fit" && ext !== "tcx") {
-    throw new Error(`Unsupported file type ".${ext}" (only .fit or .tcx).`);
+    throw new ScreenError("main.coros.fileType", { ext });
   }
 
   const fileBuf = fs.readFileSync(fitPath);
@@ -2560,13 +2562,13 @@ export async function uploadActivityFitToCoros(
   const region = regionFromBaseUrl(auth.baseUrl);
   const stsResp = await fetch(stsRequestUrl(region));
   if (!stsResp.ok) {
-    throw new Error(`COROS STS request failed: ${stsResp.status}`);
+    throw new ScreenError("main.coros.uploadFailed", { detail: `STS ${stsResp.status}` });
   }
   const stsJson = (await stsResp.json()) as {
     data?: { credentials?: string };
   };
   if (!stsJson.data?.credentials) {
-    throw new Error("COROS STS response missing credentials.");
+    throw new ScreenError("main.coros.uploadFailed");
   }
   const sts = decodeStsCredentials(stsJson.data.credentials);
 
@@ -2610,7 +2612,7 @@ export async function uploadActivityFitToCoros(
     body: zipBuf
   });
   if (!putResp.ok) {
-    throw new Error(`S3 upload failed: ${putResp.status}`);
+    throw new ScreenError("main.coros.uploadFailed", { detail: `S3 ${putResp.status}` });
   }
 
   // 3. Register the import with COROS.
@@ -2632,7 +2634,7 @@ export async function uploadActivityFitToCoros(
     body: form
   });
   if (!importResp.ok) {
-    throw new Error(`COROS import failed: ${importResp.status}`);
+    throw new ScreenError("main.coros.uploadFailed", { detail: `import ${importResp.status}` });
   }
   const importJson = (await importResp.json()) as {
     result?: string;
@@ -2640,7 +2642,7 @@ export async function uploadActivityFitToCoros(
     data?: { importId?: string | number };
   };
   if (importJson.result && importJson.result !== "0000") {
-    throw new Error(`COROS import rejected: ${importJson.message ?? "unknown"}`);
+    throw new ScreenError("main.coros.importRejected", { detail: importJson.message ?? "unknown" });
   }
   return { importId: String(importJson.data?.importId ?? "") };
 }
@@ -2695,7 +2697,7 @@ export async function calculateWorkoutProgram(
     payload
   );
   if (!calculation) {
-    throw new Error("COROS did not return calculated workout metrics.");
+    throw new ScreenError("main.coros.noMetrics");
   }
   return applyWorkoutCalculation(payload, calculation);
 }
@@ -2809,7 +2811,7 @@ export async function duplicateLibraryWorkout(
   targetSportType?: number
 ): Promise<TrainingHubLibraryWorkout> {
   const source = await getWorkoutProgramDetail(programId);
-  if (!source) throw new Error("Workout could not be loaded from COROS.");
+  if (!source) throw new ScreenError("main.coros.workoutNotLoaded");
   const sourceSport = toOptionalNumber(source.sportType);
   const targetSport = targetSportType ?? sourceSport;
   if (!sourceSport || !targetSport) throw new Error("Workout sport is unavailable.");
@@ -2891,7 +2893,7 @@ async function resolveWorkoutEditSource(ref: WorkoutEditRef): Promise<WorkoutEdi
     );
   });
   if (entityIndex < 0) {
-    throw new Error("Scheduled workout was not found on its original date.");
+    throw new ScreenError("main.coros.scheduledNotFound");
   }
   const entity = entities[entityIndex] as Record<string, unknown>;
   const maps = buildScheduledProgramMaps(programs);
@@ -2903,7 +2905,7 @@ async function resolveWorkoutEditSource(ref: WorkoutEditRef): Promise<WorkoutEdi
     programs
   );
   if (!program) {
-    throw new Error("COROS did not return the scheduled workout program.");
+    throw new ScreenError("main.coros.noProgram");
   }
   return { ref, entity, program };
 }
@@ -2983,7 +2985,7 @@ export async function calculateExistingWorkoutProgram(
     payload
   );
   if (!calculation) {
-    throw new Error("COROS did not return calculated workout metrics.");
+    throw new ScreenError("main.coros.noMetrics");
   }
   return applyWorkoutCalculation(payload, calculation);
 }
@@ -3006,7 +3008,7 @@ function workoutEditEndpointAdapter() {
         request
       );
       if (!estimate) {
-        throw new Error("COROS did not return a scheduled workout estimate.");
+        throw new ScreenError("main.coros.noEstimate");
       }
       return estimate;
     }
@@ -3085,10 +3087,10 @@ export async function previewWorkoutEdit(
   }
   const source = await resolveWorkoutEditSource(ref);
   if (ref.kind === "scheduled" && ref.happenDay < formatScheduleDay(new Date())) {
-    throw new Error("Past scheduled workouts are read-only.");
+    throw new ScreenError("main.coros.pastReadOnly");
   }
   if (workoutEditRevision(source) !== revision) {
-    throw new Error("This workout changed in COROS. Reload it before continuing.");
+    throw new ScreenError("main.coros.changedReload");
   }
   const context = parseWorkoutEditorContext(
     await loadWorkoutEditorAccount(),
@@ -3158,13 +3160,13 @@ export async function saveWorkoutEdit(
 
   const source = await resolveWorkoutEditSource(ref);
   if (ref.kind === "scheduled" && ref.happenDay < formatScheduleDay(new Date())) {
-    throw new Error("Past scheduled workouts are read-only.");
+    throw new ScreenError("main.coros.pastReadOnly");
   }
   if (!workoutSportFromType(source.program.sportType)) {
-    throw new Error(`COROS sport type ${String(source.program.sportType)} is not supported by this editor.`);
+    throw new ScreenError("main.coros.sportUnsupported", { type: String(source.program.sportType) });
   }
   if (workoutEditRevision(source) !== revision) {
-    throw new Error("This workout changed in COROS. Reload it before saving.");
+    throw new ScreenError("main.coros.changedReloadSave");
   }
 
   const context = parseWorkoutEditorContext(
@@ -3213,7 +3215,7 @@ export async function scheduleLibraryWorkout(
     (await getWorkoutProgramDetail(id)) ??
     (await findLibraryWorkoutById(id));
   if (!program) {
-    throw new Error("Library workout not found.");
+    throw new ScreenError("main.coros.libraryNotFound");
   }
   await scheduleWorkoutOnDate(program, happenDay);
 }
@@ -3317,7 +3319,7 @@ export async function rescheduleScheduledWorkout(
     return;
   }
   if (newHappenDay < formatScheduleDay(new Date())) {
-    throw new Error("COROS does not allow scheduling workouts before today.");
+    throw new ScreenError("main.coros.beforeToday");
   }
 
   const dayEntries = await listScheduledWorkoutEntries(
@@ -3330,10 +3332,10 @@ export async function rescheduleScheduledWorkout(
       candidate.idInPlan === String(entry.idInPlan)
   );
   if (!match) {
-    throw new Error("Scheduled workout not found on its original day.");
+    throw new ScreenError("main.coros.scheduledNotFound");
   }
   if (!match.rawProgram) {
-    throw new Error("Scheduled workout has no program data to reschedule.");
+    throw new ScreenError("main.coros.noProgramData");
   }
 
   await scheduleWorkoutOnDate(match.rawProgram, newHappenDay, match.sortNo ?? 1);
@@ -3403,7 +3405,7 @@ export async function deleteWorkout(options: {
     }
 
     if (!scheduleEntry) {
-      throw new Error("Scheduled workout not found on COROS calendar.");
+      throw new ScreenError("main.coros.scheduledNotOnCalendar");
     }
 
     await removeScheduledWorkout({
@@ -3430,7 +3432,7 @@ export async function deleteWorkout(options: {
 
     if (!libraryId) {
       if (target === "library") {
-        throw new Error("Library workout not found.");
+        throw new ScreenError("main.coros.libraryNotFound");
       }
     } else {
       await deleteWorkoutProgram(libraryId);
@@ -3447,7 +3449,7 @@ export async function deleteWorkout(options: {
     parts.push("removed from library");
   }
   if (parts.length === 0) {
-    throw new Error("Nothing was deleted.");
+    throw new ScreenError("main.coros.nothingDeleted");
   }
 
   return {
@@ -8068,7 +8070,7 @@ async function trainingHubRequest<T>(
 ): Promise<T> {
   const auth = getStoredAuth();
   if (!auth) {
-    throw new Error("Log in to COROS Training Hub first.");
+    throw new ScreenError("main.coros.signInFirst");
   }
 
   try {
@@ -8137,7 +8139,7 @@ async function trainingHubRequest<T>(
  * or three times eventually "worked".
  */
 function endExpiredTrainingHubSession(deadToken: string): never {
-  const expired = new Error("COROS session expired. Log in again.");
+  const expired = new ScreenError("main.coros.sessionExpired");
   const current = getStoredAuth();
 
   if (!current) {

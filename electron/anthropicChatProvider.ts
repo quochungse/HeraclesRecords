@@ -21,6 +21,7 @@ import {
   formatClaudeModelName
 } from "./chatModels";
 import { addTokenUsage, tokenUsage } from "./tokenUsage";
+import { mainText } from "./mainText";
 
 export { DEFAULT_ANTHROPIC_MODEL };
 export const DEFAULT_ANTHROPIC_EFFORT: AnthropicEffort = "high";
@@ -481,7 +482,7 @@ export async function testAnthropicApiConnectionRequest(
 ): Promise<AnthropicApiConnectionTest> {
   const apiKey = config.apiKey?.trim();
   if (!apiKey) {
-    return { ok: false, message: "Add your Anthropic API key first." };
+    return { ok: false, message: mainText("main.ai.anthropicKey") };
   }
 
   const model = resolveAnthropicModel(config.model);
@@ -492,7 +493,7 @@ export async function testAnthropicApiConnectionRequest(
     return {
       ok: true,
       model: info.id,
-      message: `Connected to ${info.display_name}.`
+      message: mainText("main.ai.connectedTo", { name: info.display_name })
     };
   } catch (caught) {
     const error = normalizeAnthropicError(caught);

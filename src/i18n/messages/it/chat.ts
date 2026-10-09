@@ -822,6 +822,22 @@ const chat: ChatMessages = {
   "chat.an.del.lead": "L’operazione non si può annullare.",
   "chat.an.del.body": "La chat resta, insieme a tutto ciò che {name} vi ha già scritto. Spariscono solo l’analisi e il suo orario.",
   "chat.an.del.confirm": "Elimina analisi",
+  "chat.change.line.quoted": "«{name}»",
+  "chat.change.line.move": "Sposta {name}{plan} da {from} a {to}",
+  "chat.change.line.replace": "Sostituisci {name}{plan} di {day} con {workout}",
+  "chat.change.line.remove": "Togli {name}{plan} da {day}",
+  "chat.change.line.add": "Aggiungi {workout} il {day}",
+  "chat.change.line.deleteWorkout": "Elimina {name} dalla libreria allenamenti",
+  "chat.change.reason.unknownOp": "Questa versione non può applicare quella modifica.",
+  "chat.change.reason.noSession": "La proposta non dice quale seduta.",
+  "chat.change.reason.noSessionOrDay": "La proposta non dice quale seduta né dove.",
+  "chat.change.reason.noSessionOrWorkout": "La proposta non dice quale seduta né con cosa.",
+  "chat.change.reason.noWhatOrWhere": "La proposta non dice cosa né dove.",
+  "chat.change.reason.noWorkout": "La proposta non dice quale allenamento.",
+  "chat.change.reason.gone": "«{name}» non è più in calendario il {day}.",
+  "chat.change.reason.replaced": "La seduta di {day} ora è «{now}», non «{name}».",
+  "chat.change.reason.alreadyThere": "«{name}» è già in calendario il {day}.",
+  "chat.change.reason.notInLibrary": "«{name}» non è più nella libreria allenamenti.",
 };
 
 export default chat;

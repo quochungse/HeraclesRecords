@@ -6,6 +6,7 @@ import { app, BrowserWindow, shell } from "electron";
 import { autoUpdater } from "electron-updater";
 import { getSetting, setSetting } from "./database";
 import type { AppUpdateSnapshot } from "./types";
+import { ScreenError } from "./screenText";
 
 const AUTO_CHECK_KEY = "updater.autoCheck";
 const AUTO_DOWNLOAD_KEY = "updater.autoDownload";
@@ -389,7 +390,7 @@ export async function quitAndInstallUpdate(): Promise<{
   installMethod: "restart" | "manual";
 }> {
   if (!isUpdaterEnabled()) {
-    throw new Error("Updates are only available in the installed app.");
+    throw new ScreenError("main.update.installedOnly");
   }
 
   if (snapshot.status !== "downloaded" || !snapshot.availableVersion) {

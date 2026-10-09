@@ -83,6 +83,7 @@ import type {
   WorkoutMetadataPatch,
   WorkoutSport
 } from "./types";
+import { ScreenError } from "./screenText";
 
 function dateKey(date: Date): string {
   return formatPlanDay(date, false);
@@ -581,7 +582,7 @@ export async function libraryWorkoutAsPlanSession(
   programId: string
 ): Promise<LibraryPlanSession> {
   const [raw] = await Promise.all([getWorkoutProgramDetail(programId), loadCorosLocale()]);
-  if (!raw) throw new Error("COROS did not return that workout.");
+  if (!raw) throw new ScreenError("main.plan.workoutNotReturned");
   const program = parseNativeCorosProgram(raw);
   const sport = workoutSportFromType(program.sportType);
   const name = corosText(program.name);
@@ -606,7 +607,7 @@ export async function libraryWorkoutAsPlanSession(
 }
 
 function remoteIdOf(planId: string): string {
-  if (!planId.startsWith("coros:")) throw new Error("That plan is not on COROS.");
+  if (!planId.startsWith("coros:")) throw new ScreenError("main.plan.notOnCoros");
   return planId.slice("coros:".length);
 }
 
@@ -787,7 +788,7 @@ export async function deletePlanFromCoros(
         ? target
         : plans.find((plan) => plan.executeStatus === 1 && plan.sourcePlanId === remoteId);
     if (running && !options.takeOffCalendar) {
-      throw new Error("This plan is on the calendar. Take it off the calendar to delete it.");
+      throw new ScreenError("main.plan.deleteOnCalendar");
     }
     if (running) await quitNativeCorosPlan(running.remoteId);
     await deleteNativeCorosPlan(remoteId);
@@ -818,7 +819,7 @@ export async function previewPlanOnCalendar(
   planId: string,
   startDay: string
 ): Promise<TrainingPlanCalendarPreview> {
-  if (!/^\d{8}$/.test(startDay)) throw new Error("Choose a start day.");
+  if (!/^\d{8}$/.test(startDay)) throw new ScreenError("main.plan.chooseStart");
   const plan = planId.startsWith("draft:")
     ? draftPlan(planId)
     : planId.startsWith("chat:")
@@ -868,7 +869,7 @@ export async function previewPlanOnCalendar(
 
 function draftPlan(draftId: string): TrainingPlanDocument {
   const draft = getTrainingPlanDraft(draftId);
-  if (!draft) throw new Error("That draft is no longer in your library.");
+  if (!draft) throw new ScreenError("main.plan.draftGone");
   return draft.plan;
 }
 
@@ -883,7 +884,7 @@ export function setChatPlanReader(reader: (draftId: string) => TrainingPlanDocum
 }
 
 function chatPlan(planId: string): TrainingPlanDocument {
-  if (!chatPlanReader) throw new Error("That Coach plan is not available here.");
+  if (!chatPlanReader) throw new ScreenError("main.plan.coachPlanGone");
   return chatPlanReader(planId.slice("chat:".length));
 }
 
@@ -906,7 +907,7 @@ export async function takePlanOffCalendar(planId: string): Promise<void> {
   const running =
     plans.find((plan) => plan.remoteId === remoteId && plan.executeStatus === 1) ??
     plans.find((plan) => plan.executeStatus === 1 && plan.sourcePlanId === remoteId);
-  if (!running) throw new Error("This plan is not on the calendar.");
+  if (!running) throw new ScreenError("main.plan.notOnCalendar");
   await quitNativeCorosPlan(running.remoteId);
 }
 
@@ -934,7 +935,7 @@ export function planOntoRunningCopy(
   const plan = nativePlanWriteInputFromRaw(templateRaw);
   const copy = nativePlanWriteInputFromRaw(copyRaw);
   const start = parsePlanDay(String(copyRaw.startDay ?? ""));
-  if (!start) throw new Error("The calendar copy of this plan has no start day.");
+  if (!start) throw new ScreenError("main.plan.noStartDay");
   const anchor = mondayOf(start);
   const dayOf = (dayNo: number) => {
     const date = new Date(anchor);
@@ -964,7 +965,7 @@ export async function syncPlanToCalendar(planId: string): Promise<TrainingPlanDo
   const running = (await listNativeCorosPlans()).find(
     (plan) => plan.executeStatus === 1 && plan.sourcePlanId === remoteId
   );
-  if (!running) throw new Error("This plan has no copy on the calendar to update.");
+  if (!running) throw new ScreenError("main.plan.noRunningCopy");
   const [templateRaw, copyRaw] = await Promise.all([
     readNativeCorosPlanRaw(remoteId),
     readNativeCorosPlanRaw(running.remoteId)
@@ -1010,7 +1011,7 @@ export async function deleteTrainingLibraryWorkouts(
 ): Promise<string[]> {
   const ids = [...new Set(request.programIds.map((id) => id.trim()).filter(Boolean))];
   if (!request.confirmed) throw new Error("Deleting workouts requires confirmation.");
-  if (ids.length === 0) throw new Error("Select at least one workout to delete.");
+  if (ids.length === 0) throw new ScreenError("main.plan.selectWorkout");
   for (const id of ids) await deleteWorkoutProgram(id);
   return ids;
 }

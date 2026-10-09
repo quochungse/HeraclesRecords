@@ -197,11 +197,11 @@ assert.throws(
 // --- create: required fields ------------------------------------------------
 assert.throws(
   () => createCoachAnalysis({ sessionId: SESSION, name: "  ", playbook: "x" }, db),
-  /name is required/
+  /needs a name/
 );
 assert.throws(
   () => createCoachAnalysis({ sessionId: SESSION, name: "x", playbook: "" }, db),
-  /playbook is required/
+  /needs a playbook/
 );
 
 // --- create: runtime overrides ----------------------------------------------
@@ -258,7 +258,7 @@ assert.equal(roleless.role, undefined);
 assert.equal(db._rows.get(manual.id).role, null);
 
 assert.equal(updateCoachAnalysis("missing", { name: "x" }, db), null);
-assert.throws(() => updateCoachAnalysis(manual.id, { name: "" }, db), /name is required/);
+assert.throws(() => updateCoachAnalysis(manual.id, { name: "" }, db), /needs a name/);
 
 // An analysis cannot change conversation. The patch type says so, and the
 // store ignores it if one arrives anyway — a move would be a new analysis

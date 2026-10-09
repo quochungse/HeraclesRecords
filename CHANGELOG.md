@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### What's new
 
 - **Coach** — searches the web when a question needs it: a race's date, course and cut-offs, an event's weather, anything your data does not hold. It names the pages it used. Off until you switch on Web for a conversation, under Permissions in the AI chip's sheet. A local model cannot search.
+- **The app in thirteen languages** — English, Vietnamese, Japanese, Korean, Simplified Chinese, Spanish, Brazilian Portuguese, French, German, Italian, Russian, Indonesian and Thai, chosen with a flag under Settings → Appearance → Language. Every screen, Coach included, and the app's own messages and dialogs are translated; dates and numbers follow the language. Coach still answers in the language you write to it, and the names the app gives what it saves to COROS (a step called Warm Up) stay in English, as your watch shows them.
 
 ## [1.0.3] - 2026-10-09
 

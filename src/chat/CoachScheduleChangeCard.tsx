@@ -3,6 +3,8 @@ import type { ScheduleChangeLine, ScheduleChangeSet } from "../../electron/types
 import {
   canApply,
   changeDayLabel,
+  changeLineLabel,
+  changeLineReason,
   changeSetDays,
   changeSetHead,
   groupChangeLines,
@@ -149,11 +151,11 @@ function ChangeLine({
   return (
     <li className="chat-change-line" data-status={line.status} data-op={line.op} data-line-id={line.lineId}>
       <div className="chat-change-line-text">
-        <span className="chat-change-line-label">{line.label}</span>
+        <span className="chat-change-line-label">{changeLineLabel(line)}</span>
         {line.status !== "proposed" ? (
           <span className="chat-change-line-status">
             {lineStatusLabel(line)}
-            {line.reason ? ` — ${line.reason}` : ""}
+            {line.reason ? ` — ${changeLineReason(line)}` : ""}
           </span>
         ) : null}
       </div>

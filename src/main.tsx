@@ -6,6 +6,7 @@ import { applyTheme, readStoredTheme } from "./theme/theme";
 import { applySportColors, readStoredSportColors } from "./training/sportColors";
 import { installRendererDiagnostics } from "./diagnostics";
 import { initLocale } from "./i18n/core";
+import "./i18n/screenTextHooks";
 import { UnitSystemProvider } from "./units/UnitSystemProvider";
 import "./styles.css";
 // In the main bundle, after the base sheet, because the library's skeleton is

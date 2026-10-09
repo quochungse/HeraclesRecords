@@ -822,6 +822,22 @@ const chat: ChatMessages = {
   "chat.an.del.lead": "되돌릴 수 없습니다.",
   "chat.an.del.body": "대화와 {name}이(가) 그곳에 이미 쓴 내용은 남습니다. 분석과 그 일정만 사라집니다.",
   "chat.an.del.confirm": "분석 삭제",
+  "chat.change.line.quoted": "\"{name}\"",
+  "chat.change.line.move": "{name}{plan}을(를) {from}에서 {to}(으)로 옮기기",
+  "chat.change.line.replace": "{day}의 {name}{plan}을(를) {workout}(으)로 바꾸기",
+  "chat.change.line.remove": "{day}에서 {name}{plan} 빼기",
+  "chat.change.line.add": "{day}에 {workout} 추가",
+  "chat.change.line.deleteWorkout": "운동 라이브러리에서 {name} 삭제",
+  "chat.change.reason.unknownOp": "이 버전에서는 그 변경을 적용할 수 없습니다.",
+  "chat.change.reason.noSession": "제안에 어떤 세션인지 나와 있지 않습니다.",
+  "chat.change.reason.noSessionOrDay": "제안에 어떤 세션을 어디로 옮길지 나와 있지 않습니다.",
+  "chat.change.reason.noSessionOrWorkout": "제안에 어떤 세션을 무엇으로 바꿀지 나와 있지 않습니다.",
+  "chat.change.reason.noWhatOrWhere": "제안에 무엇을 어디에 넣을지 나와 있지 않습니다.",
+  "chat.change.reason.noWorkout": "제안에 어떤 운동인지 나와 있지 않습니다.",
+  "chat.change.reason.gone": "\"{name}\"은(는) 더 이상 {day} 캘린더에 없습니다.",
+  "chat.change.reason.replaced": "{day}의 세션은 이제 \"{name}\"이(가) 아니라 \"{now}\"입니다.",
+  "chat.change.reason.alreadyThere": "\"{name}\"은(는) 이미 {day} 캘린더에 있습니다.",
+  "chat.change.reason.notInLibrary": "\"{name}\"은(는) 더 이상 운동 라이브러리에 없습니다.",
 };
 
 export default chat;

@@ -33,6 +33,7 @@ import type {
   McpServerConfig,
   McpServerStatus
 } from "./types";
+import { ScreenError } from "./screenText";
 
 // Generalization of the old single-server COROS MCP client into a registry of
 // connections keyed by server id. Each server gets its own OAuth provider
@@ -252,7 +253,7 @@ class McpOAuthProvider implements OAuthClientProvider {
 
   waitForCode(): Promise<string> {
     if (!this.codePromise) {
-      throw new Error(`${this.config.serverName} authorization was not started.`);
+      throw new ScreenError("main.mcp.authNotStarted", { name: this.config.serverName });
     }
     return this.codePromise;
   }
@@ -264,7 +265,7 @@ class McpOAuthProvider implements OAuthClientProvider {
   async cleanup(): Promise<void> {
     this.finishCode({
       ok: false,
-      error: new Error(`${this.config.serverName} connection cancelled.`)
+      error: new ScreenError("main.mcp.cancelled", { name: this.config.serverName })
     });
 
     const server = this.loopback;
@@ -319,7 +320,7 @@ class McpOAuthProvider implements OAuthClientProvider {
       if (this.closingWindow) return;
       this.finishCode({
         ok: false,
-        error: new Error(`${this.config.serverName} connection window was closed.`)
+        error: new ScreenError("main.mcp.windowClosed", { name: this.config.serverName })
       });
     });
     this.authWindow.webContents.setWindowOpenHandler(({ url }) => {
@@ -606,7 +607,7 @@ async function activateClient(
       if (rt.credentialsInvalidatedAtGeneration > generation) {
         clearStoredCredentials(server.id);
       }
-      throw new Error(`${server.name} connection was cancelled.`);
+      throw new ScreenError("main.mcp.cancelled", { name: server.name });
     }
     rt.client = client;
     rt.tools = tools;
@@ -706,7 +707,7 @@ async function connectOnce(
     return;
   }
 
-  throw new Error(`${server.name} MCP authorization expired. Connect ${server.name} again.`);
+  throw new ScreenError("main.mcp.authExpired", { name: server.name });
 }
 
 export interface McpConnectOptions {
@@ -724,10 +725,10 @@ export async function connectMcpServer(
   options: McpConnectOptions = {}
 ): Promise<McpServerStatus> {
   let server = getMcpServer(id);
-  if (!server) throw new Error(`Unknown MCP server "${id}".`);
+  if (!server) throw new ScreenError("main.mcp.unknown");
   if (!server.enabled) {
     if (!interactive) {
-      throw new Error(`${server.name} MCP server is disabled.`);
+      throw new ScreenError("main.mcp.disabled", { name: server.name });
     }
     server = updateMcpServer(id, { enabled: true });
   }

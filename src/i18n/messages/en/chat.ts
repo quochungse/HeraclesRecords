@@ -826,6 +826,22 @@ const chat = {
   "chat.an.del.lead": "This cannot be undone.",
   "chat.an.del.body": "The conversation is kept, along with everything {name} has already written in it. Only the analysis and its schedule go.",
   "chat.an.del.confirm": "Delete analysis",
+  "chat.change.line.quoted": "\"{name}\"",
+  "chat.change.line.move": "Move {name}{plan} from {from} to {to}",
+  "chat.change.line.replace": "Replace {name}{plan} on {day} with {workout}",
+  "chat.change.line.remove": "Remove {name}{plan} from {day}",
+  "chat.change.line.add": "Add {workout} on {day}",
+  "chat.change.line.deleteWorkout": "Delete {name} from the workout library",
+  "chat.change.reason.unknownOp": "This build cannot apply that change.",
+  "chat.change.reason.noSession": "The proposal does not say which session.",
+  "chat.change.reason.noSessionOrDay": "The proposal does not say which session or where to.",
+  "chat.change.reason.noSessionOrWorkout": "The proposal does not say which session or what with.",
+  "chat.change.reason.noWhatOrWhere": "The proposal does not say what or where.",
+  "chat.change.reason.noWorkout": "The proposal does not say which workout.",
+  "chat.change.reason.gone": "\"{name}\" is no longer on the calendar on {day}.",
+  "chat.change.reason.replaced": "The session on {day} is now \"{now}\", not \"{name}\".",
+  "chat.change.reason.alreadyThere": "\"{name}\" is already on the calendar on {day}.",
+  "chat.change.reason.notInLibrary": "\"{name}\" is no longer in the workout library.",
 };
 
 export default chat;

@@ -10,7 +10,8 @@ import type {
   ScheduleChangeSet,
   ScheduleChangeStatus
 } from "../../electron/types";
-import { getIntlLocale, getLocale, messageRecord, plural, t } from "../i18n/core";
+import { getIntlLocale, getLocale, messageRecord, plural, t, type MessageKey } from "../i18n/core";
+import { screenKeyForEnglish } from "../../electron/screenText";
 
 const KNOWN_OPS: ReadonlySet<string> = new Set(["move", "replace", "remove", "add", "deleteWorkout"]);
 
@@ -149,6 +150,97 @@ export function changeDayLabel(day: string): string {
   if (getLocale() !== "en") {
     return new Intl.DateTimeFormat(getIntlLocale(), { weekday: "short", day: "numeric", month: "short" }).format(date);
   }
+  return `${DAY_NAMES[date.getDay()]} ${date.getDate()} ${MONTH_NAMES[date.getMonth()]}`;
+}
+
+/**
+ * A line as the card states it. Its `label` is stored, and stored text stays
+ * English, so in English it is shown as written; in another language it is
+ * said again from the line itself — the session, the days and the workout —
+ * with the plan the session belongs to taken from where the label names it.
+ * A line of an op this build does not know keeps its stored label.
+ */
+export function changeLineLabel(line: ScheduleChangeLine): string {
+  if (getLocale() === "en") return line.label;
+  const session = line.session;
+  const plan = session ? planOf(line.label, session.name) : "";
+  const quoted = (name: string) => t("chat.change.line.quoted", { name });
+  switch (line.op) {
+    case "move":
+      return session && line.toDay
+        ? t("chat.change.line.move", { name: quoted(session.name), plan, from: changeDayLabel(session.happenDay), to: changeDayLabel(line.toDay) })
+        : line.label;
+    case "replace":
+      return session && line.workout
+        ? t("chat.change.line.replace", { name: quoted(session.name), plan, day: changeDayLabel(session.happenDay), workout: quoted(line.workout.name) })
+        : line.label;
+    case "remove":
+      return session
+        ? t("chat.change.line.remove", { name: quoted(session.name), plan, day: changeDayLabel(session.happenDay) })
+        : line.label;
+    case "add":
+      return line.workout && line.toDay
+        ? t("chat.change.line.add", { workout: quoted(line.workout.name), day: changeDayLabel(line.toDay) })
+        : line.label;
+    case "deleteWorkout":
+      return line.program ? t("chat.change.line.deleteWorkout", { name: quoted(line.program.name) }) : line.label;
+    default:
+      return line.label;
+  }
+}
+
+/** " (Plan name)", where the stored label names the session's plan right after it. */
+function planOf(label: string, name: string): string {
+  const at = label.indexOf(`"${name}"`);
+  if (at < 0) return "";
+  const after = /^ ((.+?)) (?:from|on) /.exec(label.slice(at + name.length + 2));
+  return after ? ` (${after[1]})` : "";
+}
+
+/** The sentences the main process stores as a reason, keyed by their English. */
+const FIXED_REASONS: Record<string, MessageKey> = {
+  "This build cannot apply that change.": "chat.change.reason.unknownOp", // i18n-ignore: the stored English it stands for
+  "The proposal does not say which session.": "chat.change.reason.noSession", // i18n-ignore: the stored English it stands for
+  "The proposal does not say which session or where to.": "chat.change.reason.noSessionOrDay", // i18n-ignore: the stored English it stands for
+  "The proposal does not say which session or what with.": "chat.change.reason.noSessionOrWorkout", // i18n-ignore: the stored English it stands for
+  "The proposal does not say what or where.": "chat.change.reason.noWhatOrWhere", // i18n-ignore: the stored English it stands for
+  "The proposal does not say which workout.": "chat.change.reason.noWorkout" // i18n-ignore: the stored English it stands for
+};
+
+/**
+ * Why a line failed or went stale. Stored in English, like its label: in
+ * another language the sentences the app writes itself are said again — the
+ * fixed ones by their words, the ones naming a session from the line, an
+ * error the main process raised by its key — and anything else (COROS's own
+ * answer) is shown as it came.
+ */
+export function changeLineReason(line: ScheduleChangeLine): string | undefined {
+  const reason = line.reason;
+  if (!reason || getLocale() === "en") return reason;
+  const fixed = FIXED_REASONS[reason];
+  if (fixed) return t(fixed);
+  const screenKey = screenKeyForEnglish(reason);
+  if (screenKey) return t(screenKey);
+  const session = line.session;
+  if (session && reason === `"${session.name}" is no longer on the calendar on ${englishCardDay(session.happenDay)}.`) { // i18n-ignore: the stored English
+    return t("chat.change.reason.gone", { name: session.name, day: changeDayLabel(session.happenDay) });
+  }
+  const now = session ? /^The session on .+ is now "(.+)", not "/.exec(reason) : null;
+  if (session && now) {
+    return t("chat.change.reason.replaced", { name: session.name, now: now[1], day: changeDayLabel(session.happenDay) });
+  }
+  if (line.workout && line.toDay && reason === `"${line.workout.name}" is already on the calendar on ${englishCardDay(line.toDay)}.`) { // i18n-ignore: the stored English
+    return t("chat.change.reason.alreadyThere", { name: line.workout.name, day: changeDayLabel(line.toDay) });
+  }
+  if (line.program && reason === `"${line.program.name}" is no longer in the workout library.`) { // i18n-ignore: the stored English
+    return t("chat.change.reason.notInLibrary", { name: line.program.name });
+  }
+  return reason;
+}
+
+/** The day as the main process wrote it into a reason (`cardDay`, English). */
+function englishCardDay(day: string): string {
+  const date = new Date(Number(day.slice(0, 4)), Number(day.slice(4, 6)) - 1, Number(day.slice(6, 8)), 12);
   return `${DAY_NAMES[date.getDay()]} ${date.getDate()} ${MONTH_NAMES[date.getMonth()]}`;
 }
 

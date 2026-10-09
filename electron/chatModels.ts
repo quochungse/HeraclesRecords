@@ -5,6 +5,7 @@ import type {
   ChatSettings,
   ClaudeCodeStatus
 } from "./types";
+import { screenText } from "./screenText";
 
 /** Every provider Coach can answer with. */
 export const CHAT_PROVIDERS: readonly ChatProvider[] = ["claude-code", "claude-api", "chatgpt", "openrouter", "local"];
@@ -70,12 +71,25 @@ export interface ChatEffortOption {
 }
 
 /** Shared by both Claude paths: the Messages API and the Agent SDK take the same levels. */
+/** Getters, so a picker reads them in the language on screen (`screenText.ts`). */
 export const REASONING_EFFORT_OPTIONS: ChatEffortOption[] = [
-  { value: "low", label: "Low", detail: "fastest and cheapest" },
-  { value: "medium", label: "Medium" },
-  { value: "high", label: "High", detail: "default" },
-  { value: "xhigh", label: "Extra high" },
-  { value: "max", label: "Max", detail: "most thorough" }
+  {
+    value: "low",
+    get label() { return screenText("screen.effort.low"); },
+    get detail() { return screenText("screen.effort.lowDetail"); }
+  },
+  { value: "medium", get label() { return screenText("screen.effort.medium"); } },
+  {
+    value: "high",
+    get label() { return screenText("screen.effort.high"); },
+    get detail() { return screenText("screen.effort.highDetail"); }
+  },
+  { value: "xhigh", get label() { return screenText("screen.effort.xhigh"); } },
+  {
+    value: "max",
+    get label() { return screenText("screen.effort.max"); },
+    get detail() { return screenText("screen.effort.maxDetail"); }
+  }
 ];
 
 /** Menu form of a model row: the pill uses `label` alone. */
@@ -103,7 +117,7 @@ export function supportsReasoningEffort(provider: string): boolean {
  */
 
 export const CHATGPT_MODEL_OPTIONS: ChatModelOption[] = [
-  { value: "", label: "Auto" },
+  { value: "", get label() { return screenText("screen.model.auto"); } },
   { value: "gpt-5.6-sol", label: "GPT-5.6 Sol" },
   { value: "gpt-5.6-terra", label: "GPT-5.6 Terra" },
   { value: "gpt-5.6-luna", label: "GPT-5.6 Luna" },

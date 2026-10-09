@@ -822,6 +822,22 @@ const chat: ChatMessages = {
   "chat.an.del.lead": "Không thể hoàn tác.",
   "chat.an.del.body": "Cuộc trò chuyện vẫn được giữ, cùng mọi thứ {name} đã ghi vào đó. Chỉ phân tích và lịch chạy của nó bị xoá.",
   "chat.an.del.confirm": "Xoá phân tích",
+  "chat.change.line.quoted": "“{name}”",
+  "chat.change.line.move": "Chuyển {name}{plan} từ {from} sang {to}",
+  "chat.change.line.replace": "Thay {name}{plan} ngày {day} bằng {workout}",
+  "chat.change.line.remove": "Bỏ {name}{plan} khỏi {day}",
+  "chat.change.line.add": "Thêm {workout} vào {day}",
+  "chat.change.line.deleteWorkout": "Xoá {name} khỏi thư viện bài tập",
+  "chat.change.reason.unknownOp": "Phiên bản này không áp dụng được thay đổi đó.",
+  "chat.change.reason.noSession": "Đề xuất không nói rõ buổi tập nào.",
+  "chat.change.reason.noSessionOrDay": "Đề xuất không nói rõ buổi tập nào hoặc chuyển đến đâu.",
+  "chat.change.reason.noSessionOrWorkout": "Đề xuất không nói rõ buổi tập nào hoặc thay bằng gì.",
+  "chat.change.reason.noWhatOrWhere": "Đề xuất không nói rõ thêm gì hoặc vào đâu.",
+  "chat.change.reason.noWorkout": "Đề xuất không nói rõ bài tập nào.",
+  "chat.change.reason.gone": "“{name}” không còn trên lịch ngày {day}.",
+  "chat.change.reason.replaced": "Buổi tập ngày {day} giờ là “{now}”, không phải “{name}”.",
+  "chat.change.reason.alreadyThere": "“{name}” đã có trên lịch ngày {day}.",
+  "chat.change.reason.notInLibrary": "“{name}” không còn trong thư viện bài tập.",
 };
 
 export default chat;

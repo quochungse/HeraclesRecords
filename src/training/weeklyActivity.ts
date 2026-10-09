@@ -13,7 +13,7 @@ import {
 import type { SportColorCategory } from "./sportColors";
 import { distanceUnit, metersToDisplayDistance } from "../units/units";
 
-import { formatDecimal, getIntlLocale, t, weekdayNames } from "../i18n/core";
+import { formatDecimal, getIntlLocale, getLocale, t, weekdayNames } from "../i18n/core";
 export type WeeklyActivityMetric = "distance" | "duration" | "trainingLoad";
 
 /** Key and label of the block standing for a day's value no activity claims. */
@@ -588,6 +588,12 @@ function describeWeekDay(happenDay: string, _weekdayIndex: number, withMonth: bo
     Number(happenDay.slice(4, 6)) - 1,
     Number(happenDay.slice(6, 8))
   );
+  /* English names the weekday first ("Mon 14", "Mon Aug 31"); Intl's en-US puts the day ahead of it. */
+  if (getLocale() === "en") {
+    const weekday = new Intl.DateTimeFormat("en-US", { weekday: "short" }).format(date); // i18n-ignore: English's own order
+    const month = withMonth ? `${new Intl.DateTimeFormat("en-US", { month: "short" }).format(date)} ` : ""; // i18n-ignore
+    return `${weekday} ${month}${date.getDate()}`;
+  }
   return new Intl.DateTimeFormat(getIntlLocale(), {
     weekday: "short",
     day: "numeric",

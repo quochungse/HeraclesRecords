@@ -822,6 +822,22 @@ const chat: ChatMessages = {
   "chat.an.del.lead": "この操作は元に戻せません。",
   "chat.an.del.body": "会話と、{name} がそこにすでに書き込んだ内容は残ります。削除されるのは分析とそのスケジュールだけです。",
   "chat.an.del.confirm": "分析を削除",
+  "chat.change.line.quoted": "「{name}」",
+  "chat.change.line.move": "{name}{plan}を {from} から {to} へ移動",
+  "chat.change.line.replace": "{day} の {name}{plan}を {workout} に置き換え",
+  "chat.change.line.remove": "{day} から {name}{plan}を外す",
+  "chat.change.line.add": "{day} に {workout} を追加",
+  "chat.change.line.deleteWorkout": "{name} をワークアウトライブラリから削除",
+  "chat.change.reason.unknownOp": "このバージョンではその変更を適用できません。",
+  "chat.change.reason.noSession": "提案にどのセッションかが書かれていません。",
+  "chat.change.reason.noSessionOrDay": "提案にどのセッションをどこへ移すかが書かれていません。",
+  "chat.change.reason.noSessionOrWorkout": "提案にどのセッションを何に置き換えるかが書かれていません。",
+  "chat.change.reason.noWhatOrWhere": "提案に何をどこへ追加するかが書かれていません。",
+  "chat.change.reason.noWorkout": "提案にどのワークアウトかが書かれていません。",
+  "chat.change.reason.gone": "「{name}」は {day} のカレンダーにもうありません。",
+  "chat.change.reason.replaced": "{day} のセッションは今は「{name}」ではなく「{now}」です。",
+  "chat.change.reason.alreadyThere": "「{name}」はすでに {day} のカレンダーにあります。",
+  "chat.change.reason.notInLibrary": "「{name}」はもうワークアウトライブラリにありません。",
 };
 
 export default chat;

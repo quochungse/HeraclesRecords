@@ -822,6 +822,22 @@ const chat: ChatMessages = {
   "chat.an.del.lead": "此操作无法撤销。",
   "chat.an.del.body": "对话会保留，{name} 已写入的所有内容也会保留。删除的只是这个分析及其计划时间。",
   "chat.an.del.confirm": "删除分析",
+  "chat.change.line.quoted": "“{name}”",
+  "chat.change.line.move": "把{name}{plan}从{from}移到{to}",
+  "chat.change.line.replace": "把{day}的{name}{plan}换成{workout}",
+  "chat.change.line.remove": "从{day}移除{name}{plan}",
+  "chat.change.line.add": "在{day}加入{workout}",
+  "chat.change.line.deleteWorkout": "从训练库删除{name}",
+  "chat.change.reason.unknownOp": "这个版本无法应用该更改。",
+  "chat.change.reason.noSession": "提案没有说明是哪节训练。",
+  "chat.change.reason.noSessionOrDay": "提案没有说明是哪节训练、移到哪里。",
+  "chat.change.reason.noSessionOrWorkout": "提案没有说明是哪节训练、换成什么。",
+  "chat.change.reason.noWhatOrWhere": "提案没有说明加什么、加在哪里。",
+  "chat.change.reason.noWorkout": "提案没有说明是哪个训练。",
+  "chat.change.reason.gone": "“{name}”已不在{day}的日历上。",
+  "chat.change.reason.replaced": "{day}的训练现在是“{now}”，不是“{name}”。",
+  "chat.change.reason.alreadyThere": "“{name}”已经在{day}的日历上。",
+  "chat.change.reason.notInLibrary": "“{name}”已不在训练库中。",
 };
 
 export default chat;

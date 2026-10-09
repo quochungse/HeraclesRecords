@@ -822,6 +822,22 @@ const chat: ChatMessages = {
   "chat.an.del.lead": "No se puede deshacer.",
   "chat.an.del.body": "La conversación se conserva, junto con todo lo que {name} ya escribió en ella. Solo se van el análisis y su horario.",
   "chat.an.del.confirm": "Eliminar análisis",
+  "chat.change.line.quoted": "«{name}»",
+  "chat.change.line.move": "Mover {name}{plan} del {from} al {to}",
+  "chat.change.line.replace": "Sustituir {name}{plan} del {day} por {workout}",
+  "chat.change.line.remove": "Quitar {name}{plan} del {day}",
+  "chat.change.line.add": "Añadir {workout} el {day}",
+  "chat.change.line.deleteWorkout": "Eliminar {name} de la biblioteca de entrenamientos",
+  "chat.change.reason.unknownOp": "Esta versión no puede aplicar ese cambio.",
+  "chat.change.reason.noSession": "La propuesta no dice qué sesión.",
+  "chat.change.reason.noSessionOrDay": "La propuesta no dice qué sesión ni adónde.",
+  "chat.change.reason.noSessionOrWorkout": "La propuesta no dice qué sesión ni por qué.",
+  "chat.change.reason.noWhatOrWhere": "La propuesta no dice qué ni dónde.",
+  "chat.change.reason.noWorkout": "La propuesta no dice qué entrenamiento.",
+  "chat.change.reason.gone": "«{name}» ya no está en el calendario el {day}.",
+  "chat.change.reason.replaced": "La sesión del {day} ahora es «{now}», no «{name}».",
+  "chat.change.reason.alreadyThere": "«{name}» ya está en el calendario el {day}.",
+  "chat.change.reason.notInLibrary": "«{name}» ya no está en la biblioteca de entrenamientos.",
 };
 
 export default chat;

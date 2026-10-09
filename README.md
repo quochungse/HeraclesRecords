@@ -166,7 +166,7 @@ Every place your training has taken you, on a globe beside a list of places. Ope
 
 ### Settings
 
-- **Appearance.** Light or dark, your own accent and sport colours, metric or imperial.
+- **Appearance.** Light or dark, your own accent and sport colours, metric or imperial, in any of thirteen languages.
 - **Your sports.** Running, Cycling, Hiking and Strength each have a screen; keep the ones you train.
 - **Cloud sync.** Use two computers? Sync them through your own Google Drive. Passwords and sign-ins never leave the machine they were made on.
 

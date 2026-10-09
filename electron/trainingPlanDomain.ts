@@ -9,6 +9,7 @@ import type {
   TrainingPlanWeekStage,
   WorkoutSport
 } from "./types";
+import { screenPlural, screenText } from "./screenText";
 
 export interface TrainingPlanValidationIssue {
   path: string;
@@ -395,34 +396,34 @@ export function validateTrainingPlan(
 ): TrainingPlanValidationIssue[] {
   const issues: TrainingPlanValidationIssue[] = [];
   if (!plan.name.trim()) {
-    issues.push({ path: "name", message: "Add a plan name.", severity: "error" });
+    issues.push({ path: "name", message: screenText("screen.planIssue.name"), severity: "error" });
   }
   if (plan.weekCount < 1 || plan.weekCount > TRAINING_PLAN_MAX_WEEKS) {
-    issues.push({ path: "weekCount", message: `Plans must contain 1 to ${TRAINING_PLAN_MAX_WEEKS} weeks.`, severity: "error" });
+    issues.push({ path: "weekCount", message: screenText("screen.planIssue.weeks", { max: TRAINING_PLAN_MAX_WEEKS }), severity: "error" });
   }
   if (plan.entries.length === 0) {
-    issues.push({ path: "entries", message: "Add a session — COROS does not keep an empty plan.", severity: "error" });
+    issues.push({ path: "entries", message: screenText("screen.planIssue.empty"), severity: "error" });
   }
   const perDay = new Map<string, number>();
   for (const entry of plan.entries) {
     if (entry.weekIndex < 0 || entry.weekIndex >= plan.weekCount) {
-      issues.push({ path: `entries.${entry.id}`, message: "A session is outside the plan's weeks.", severity: "error" });
+      issues.push({ path: `entries.${entry.id}`, message: screenText("screen.planIssue.outsideWeeks"), severity: "error" });
     }
     if (entry.dayIndex < 0 || entry.dayIndex > 6) {
-      issues.push({ path: `entries.${entry.id}.dayIndex`, message: "A session is on a day outside the week.", severity: "error" });
+      issues.push({ path: `entries.${entry.id}.dayIndex`, message: screenText("screen.planIssue.outsideDays"), severity: "error" });
     }
     const day = `${entry.weekIndex}:${entry.dayIndex}`;
     perDay.set(day, (perDay.get(day) ?? 0) + 1);
   }
   if ([...perDay.values()].some((count) => count > TRAINING_PLAN_SESSIONS_PER_DAY)) {
-    issues.push({ path: "entries", message: `COROS takes at most ${TRAINING_PLAN_SESSIONS_PER_DAY} sessions on one day.`, severity: "error" });
+    issues.push({ path: "entries", message: screenText("screen.planIssue.perDay", { max: TRAINING_PLAN_SESSIONS_PER_DAY }), severity: "error" });
   }
   const lastUsedWeek = Math.max(-1, ...plan.entries.map((entry) => entry.weekIndex));
   if (plan.entries.length && lastUsedWeek < plan.weekCount - 1) {
     const empty = plan.weekCount - 1 - lastUsedWeek;
     issues.push({
       path: "weekCount",
-      message: `COROS ends a plan at its last session, so the ${empty === 1 ? "empty last week is" : `${empty} empty weeks at the end are`} not kept.`,
+      message: screenPlural("screen.planIssue.emptyEnd", empty),
       severity: "warning"
     });
   }

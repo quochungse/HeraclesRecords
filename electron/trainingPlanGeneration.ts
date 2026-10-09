@@ -43,6 +43,7 @@ import {
 } from "./trainingPlanDomain";
 import { WORKOUT_SPORTS, formatWorkoutSport } from "./workoutCapabilities";
 import { splitToolName } from "./mcpToolNames";
+import { screenPlural, screenSport, screenText, screenWeekday } from "./screenText";
 
 export const TRAINING_PLAN_GENERATION_LIMITS = {
   maxWeeks: 24,
@@ -298,92 +299,92 @@ export function generationRequestProblems(
 
   const kind = request.goalKind;
   const goal = request.goal?.trim() ?? "";
-  if (!TRAINING_PLAN_GOAL_KINDS.includes(kind)) add("goal", "Pick what kind of goal this is.");
-  else if (kind === "other" && !goal) add("goal", "Describe what you are training for.");
-  else if (goal.length > limits.goalLength) add("goal", `Keep the goal under ${limits.goalLength} characters.`);
+  if (!TRAINING_PLAN_GOAL_KINDS.includes(kind)) add("goal", screenText("screen.gen.goalKind"));
+  else if (kind === "other" && !goal) add("goal", screenText("screen.gen.goalDescribe"));
+  else if (goal.length > limits.goalLength) add("goal", screenText("screen.gen.goalLength", { max: limits.goalLength }));
 
   const start = parsePlanDay(request.startDate);
   if (kind === "race") {
     const race = request.race?.date ? parsePlanDay(request.race.date) : undefined;
     const weeks = request.race?.date ? raceWeeks(request.startDate, request.race.date) : undefined;
-    if (!race) add("race", "Pick race day.");
-    else if (!request.race?.distance?.trim() && !goal) add("race", "Name the race or pick its distance.");
+    if (!race) add("race", screenText("screen.gen.raceDay"));
+    else if (!request.race?.distance?.trim() && !goal) add("race", screenText("screen.gen.raceName"));
     else if (start && weeks !== undefined && (race < start || weeks < limits.minRaceWeeks)) {
-      add("race", "Race day has to fall after the plan's first week — start earlier.");
+      add("race", screenText("screen.gen.raceTooSoon"));
     } else if (weeks !== undefined && weeks > limits.maxWeeks) {
-      add("race", `Race day is more than ${limits.maxWeeks} weeks after the first week — start later.`);
+      add("race", screenText("screen.gen.raceTooFar", { max: limits.maxWeeks }));
     }
   }
 
   const sports = request.sports ?? [];
   const unknownSport = sports.find((sport) => !WORKOUT_SPORTS.includes(sport));
-  if (!sports.length) add("sports", "Pick at least one sport.");
-  else if (unknownSport) add("sports", `"${unknownSport}" is not a sport a plan can hold.`);
+  if (!sports.length) add("sports", screenText("screen.gen.sports"));
+  else if (unknownSport) add("sports", screenText("screen.gen.sportUnknown", { sport: String(unknownSport) }));
 
-  if (!DIFFICULTIES.includes(request.difficulty)) add("difficulty", "Pick a level.");
+  if (!DIFFICULTIES.includes(request.difficulty)) add("difficulty", screenText("screen.gen.level"));
   else if (request.difficulty === "custom" && request.sources?.activities === false) {
-    add("difficulty", "Coach can't judge your level without your recent activities — share them, or pick a level.");
+    add("difficulty", screenText("screen.gen.levelNeedsData"));
   }
 
   if (kind !== "race" && request.weeks !== undefined) {
     if (!Number.isInteger(request.weeks) || request.weeks < 1 || request.weeks > limits.maxWeeks) {
-      add("weeks", `A generated plan runs 1 to ${limits.maxWeeks} weeks.`);
+      add("weeks", screenText("screen.gen.weeks", { max: limits.maxWeeks }));
     }
   }
 
   if (!start) {
-    add("start", "Pick the week the plan starts.");
+    add("start", screenText("screen.gen.start"));
   } else if (start.getDay() !== 1) {
-    add("start", "A plan starts on a Monday — COROS counts a plan's weeks from one.");
+    add("start", screenText("screen.gen.startMonday"));
   } else if (today) {
     const earliest = firstPlanMonday(today);
     const lead = daysFrom(parsePlanDay(earliest)!, start) / 7;
-    if (formatPlanDay(start, true) < earliest) add("start", "The first week can't be one that has already begun.");
-    else if (lead > limits.maxLeadWeeks) add("start", "Start the plan within a year.");
+    if (formatPlanDay(start, true) < earliest) add("start", screenText("screen.gen.startBegun"));
+    else if (lead > limits.maxLeadWeeks) add("start", screenText("screen.gen.startYear"));
   }
 
   const week = request.week;
   if (week?.mode === "days") {
     const days = week.days ?? [];
     if (days.length !== 7 || days.some((day) => !DAY_KINDS.includes(day?.kind))) {
-      add("days", "A usual week is seven days, Monday to Sunday.");
+      add("days", screenText("screen.gen.daysSeven"));
     } else if (!days.some((day) => day.kind !== "rest")) {
-      add("days", "Mark at least one day you can train.");
+      add("days", screenText("screen.gen.dayToTrain"));
     } else if (days.some((day) => day.kind !== "rest" && day.minutes !== undefined && !validMinutes(day.minutes))) {
-      add("days", `A day's time is a whole number of minutes, ${limits.minSessionMinutes} to ${limits.maxSessionMinutes}.`);
+      add("days", screenText("screen.gen.dayMinutes", { min: limits.minSessionMinutes, max: limits.maxSessionMinutes }));
     }
   } else if (week?.mode === "coach") {
     const blocked = week.blockedDayIndexes ?? [];
     if (blocked.some((day) => !Number.isInteger(day) || day < 0 || day > 6) || new Set(blocked).size !== blocked.length) {
-      add("days", "Days you can't train are Monday to Sunday, each once.");
+      add("days", screenText("screen.gen.blockedDays"));
     } else if (blocked.length === 7) {
-      add("days", "Leave at least one day you can train.");
+      add("days", screenText("screen.gen.leaveDay"));
     }
     const sessions = week.sessionsPerWeek;
     if (sessions !== undefined) {
       if (!Number.isInteger(sessions) || sessions < 1 || sessions > limits.maxSessionsPerWeek) {
-        add("week", `Sessions a week run 1 to ${limits.maxSessionsPerWeek}.`);
+        add("week", screenText("screen.gen.sessionsBand", { max: limits.maxSessionsPerWeek }));
       } else if (blocked.length < 7 && sessions > 7 - blocked.length) {
-        add("week", `${plural(sessions, "session")} a week need at least ${sessions} days you can train.`);
+        add("week", screenPlural("screen.gen.sessionsDays", sessions));
       }
     }
     const hours = week.hours;
     if (hours && (!(hours.min >= 0) || (hours.max !== undefined && (hours.max < hours.min || hours.max > limits.maxWeeklyHours)))) {
-      add("week", `Hours a week are a band from 0 to ${limits.maxWeeklyHours}.`);
+      add("week", screenText("screen.gen.hoursBand", { max: limits.maxWeeklyHours }));
     }
   } else {
-    add("days", "Say how your week looks, or leave it to Coach.");
+    add("days", screenText("screen.gen.week"));
   }
 
   if ((request.constraints?.trim().length ?? 0) > limits.constraintsLength) {
-    add("constraints", `Keep the constraints under ${limits.constraintsLength} characters.`);
+    add("constraints", screenText("screen.gen.constraints", { max: limits.constraintsLength }));
   }
 
   const runtime = request.runtime;
   if (runtime) {
-    if (runtime.provider !== undefined && !PROVIDERS.includes(runtime.provider)) add("runtime", "Pick a provider Coach knows.");
-    else if (runtime.effort !== undefined && !EFFORTS.includes(runtime.effort)) add("runtime", "Pick a reasoning effort.");
-    else if (runtime.model !== undefined && (typeof runtime.model !== "string" || runtime.model.length > 200)) add("runtime", "Pick a model.");
+    if (runtime.provider !== undefined && !PROVIDERS.includes(runtime.provider)) add("runtime", screenText("screen.gen.provider"));
+    else if (runtime.effort !== undefined && !EFFORTS.includes(runtime.effort)) add("runtime", screenText("screen.gen.effort"));
+    else if (runtime.model !== undefined && (typeof runtime.model !== "string" || runtime.model.length > 200)) add("runtime", screenText("screen.gen.model"));
   }
   return problems;
 }
@@ -827,23 +828,30 @@ export function planOutlineProblems(outline: TrainingPlanOutline, request: Train
   const fixed = request.goalKind === "race" ? requestedPlanWeeks(request) : request.weeks;
   const count = outline.weeks.length;
   if (fixed !== undefined && count !== fixed) {
-    problems.push(`The outline has ${plural(count, "week")}; the plan runs ${plural(fixed, "week")}${request.goalKind === "race" ? ", to race day" : ""}.`);
+    problems.push(
+      screenText(request.goalKind === "race" ? "screen.outline.weeksFixedRace" : "screen.outline.weeksFixed", { count, fixed })
+    );
   } else if (fixed === undefined && (count < limits.minCoachWeeks || count > limits.maxWeeks)) {
-    problems.push(`The outline has ${plural(count, "week")}; when you choose the length, make it ${limits.minCoachWeeks} to ${limits.maxWeeks} weeks.`);
+    problems.push(
+      screenText("screen.outline.weeksChosen", { count, min: limits.minCoachWeeks, max: limits.maxWeeks })
+    );
   }
   const race = request.goalKind === "race" && request.race?.date ? parsePlanDay(request.race.date) : undefined;
   const week = request.week;
   const minutesBand = week.mode === "days" ? weekMinutesBand(week.days) : undefined;
   outline.weeks.forEach((planned, index) => {
-    const where = `Week ${index + 1}`;
     const raceWeek = race !== undefined && index === count - 1;
-    if (raceWeek && planned.stage !== 5) problems.push(`${where} is the race week; give it the race stage.`);
+    if (raceWeek && planned.stage !== 5) problems.push(screenText("screen.outline.raceStage", { n: index + 1 }));
     const band = weekCountBand(request, raceWeek);
     if (planned.sessions < band.min || planned.sessions > band.max) {
-      problems.push(`${where} has ${plural(planned.sessions, "session")}; the athlete's week holds ${bandText(band)}.`);
+      problems.push(
+        band.min === band.max
+          ? screenText("screen.outline.sessionsExact", { n: index + 1, sessions: planned.sessions, min: band.min })
+          : screenText("screen.outline.sessionsBand", { n: index + 1, sessions: planned.sessions, min: band.min, max: band.max })
+      );
     }
     if (planned.keySessions.length > Math.max(planned.sessions, 1)) {
-      problems.push(`${where} lists more sessions than it counts.`);
+      problems.push(screenText("screen.outline.keySessions", { n: index + 1 }));
     }
     const ceiling = week.mode === "coach" && week.hours?.max !== undefined
       ? week.hours.max * 1.1
@@ -851,21 +859,25 @@ export function planOutlineProblems(outline: TrainingPlanOutline, request: Train
         ? (minutesBand.max / 60) * 1.05
         : undefined;
     if (ceiling !== undefined && planned.hours > ceiling && !raceWeek) {
-      problems.push(`${where} plans ${planned.hours} h; the athlete has at most ${Math.round(ceiling * 10) / 10} h a week.`);
+      problems.push(screenText("screen.outline.hours", { n: index + 1, hours: planned.hours, max: Math.round(ceiling * 10) / 10 }));
     }
     for (const session of planned.keySessions) {
-      const label = `${where}'s "${session.name}"`;
+      const at = { n: index + 1, name: session.name };
       const onRaceDay = raceWeek && race !== undefined && weekdayOf(race) === session.dayIndex;
-      if (!request.sports.includes(session.sport)) problems.push(`${label} is ${formatWorkoutSport(session.sport)}, which was not asked for.`);
+      if (!request.sports.includes(session.sport)) {
+        problems.push(screenText("screen.outline.sport", { ...at, sport: screenSport(session.sport, formatWorkoutSport(session.sport)) }));
+      }
       if (onRaceDay) continue;
       if (week.mode === "days") {
         const day = week.days[session.dayIndex];
-        if (day?.kind === "rest") problems.push(`${label} is on ${PLAN_WEEKDAYS[session.dayIndex]}, a rest day.`);
+        if (day?.kind === "rest") problems.push(screenText("screen.outline.restDay", { ...at, day: screenWeekday(session.dayIndex) }));
         else if (session.minutes && day?.minutes && session.minutes > day.minutes) {
-          problems.push(`${label} runs ${session.minutes} minutes; ${PLAN_WEEKDAYS[session.dayIndex]} has ${day.minutes}.`);
+          problems.push(
+            screenText("screen.outline.tooLong", { ...at, minutes: session.minutes, day: screenWeekday(session.dayIndex), available: day.minutes })
+          );
         }
       } else if (week.blockedDayIndexes.includes(session.dayIndex)) {
-        problems.push(`${label} is on ${PLAN_WEEKDAYS[session.dayIndex]}, a day the athlete can't train.`);
+        problems.push(screenText("screen.outline.blockedDay", { ...at, day: screenWeekday(session.dayIndex) }));
       }
     }
   });

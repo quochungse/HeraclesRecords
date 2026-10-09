@@ -21,6 +21,7 @@ import map from "./map.ts";
 import profile from "./profile.ts";
 import records from "./records.ts";
 import chat from "./chat.ts";
+import main from "./main.ts";
 
 /** 한국어. Written by scripts/i18n-index.mjs. */
 export default {
@@ -46,4 +47,5 @@ export default {
   ...profile,
   ...records,
   ...chat,
+  ...main,
 } satisfies Record<keyof typeof en, string>;

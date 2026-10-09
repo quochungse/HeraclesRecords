@@ -52,6 +52,7 @@ import type {
   RestoreMode,
   RestoreResult
 } from "./backupTypes";
+import { withScreenKey } from "../screenText";
 
 /** A file that is not a backup this build can read. Separate from an ordinary
  *  I/O failure because the fix is different: no permission or retry will make
@@ -111,9 +112,12 @@ function ownershipOf(
 export function requireBackupAccount(action: string): string {
   const owner = currentOwner();
   if (!owner) {
-    throw new BackupSignedOutError(
-      `Sign in to COROS before ${action}. A backup belongs to an account, so ` +
-        "there is nothing to attribute this one to."
+    throw withScreenKey(
+      new BackupSignedOutError(
+        `Sign in to COROS before ${action}. A backup belongs to an account, so ` +
+          "there is nothing to attribute this one to."
+      ),
+      action === "restoring a backup" ? "main.backup.signedOutRestore" : "main.backup.signedOutSave"
     );
   }
   return owner;
@@ -218,8 +222,10 @@ export async function readBackupFile(
     } catch {
       // The envelope is there but will not open: truncated, edited, or written
       // by a build whose key has moved on. None of those is retryable.
-      throw new BackupFormatError(
-        `${path.basename(filePath)} is damaged and cannot be opened.`
+      throw withScreenKey(
+        new BackupFormatError(`${path.basename(filePath)} is damaged and cannot be opened.`),
+        "main.backup.damaged",
+        { file: path.basename(filePath) }
       );
     }
   } else {
@@ -230,14 +236,18 @@ export async function readBackupFile(
   try {
     parsed = JSON.parse(raw);
   } catch {
-    throw new BackupFormatError(
-      `${path.basename(filePath)} is not a backup file.`
+    throw withScreenKey(
+      new BackupFormatError(`${path.basename(filePath)} is not a backup file.`),
+      "main.backup.notBackup",
+      { file: path.basename(filePath) }
     );
   }
 
   if (!isBackupDocument(parsed)) {
-    throw new BackupFormatError(
-      `${path.basename(filePath)} is not a backup this version can read.`
+    throw withScreenKey(
+      new BackupFormatError(`${path.basename(filePath)} is not a backup this version can read.`),
+      "main.backup.tooNew",
+      { file: path.basename(filePath) }
     );
   }
   return parsed;
@@ -291,9 +301,12 @@ export async function restoreBackupFile(
   // write, and it is reachable from IPC — a renderer that skipped the dialog
   // must still be refused.
   if (ownershipOf(document, owner) === "other" && !options.allowOtherOwner) {
-    throw new BackupOwnerMismatchError(
-      "This backup belongs to a different COROS account. Restoring it would " +
-        "mix two people's data together, which cannot be undone."
+    throw withScreenKey(
+      new BackupOwnerMismatchError(
+        "This backup belongs to a different COROS account. Restoring it would " +
+          "mix two people's data together, which cannot be undone."
+      ),
+      "main.backup.otherOwner"
     );
   }
 

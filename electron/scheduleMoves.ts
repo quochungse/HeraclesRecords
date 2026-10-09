@@ -29,6 +29,7 @@ import {
 } from "./trainingHubService";
 import { mondayOf, parsePlanDay } from "./trainingPlanDomain";
 import type { PlanWorkoutEntryInput, UnitSystem } from "./types";
+import { ScreenError } from "./screenText";
 
 /** What these need of a calendar session: which one, and the day it is on. */
 export interface CalendarSessionRef {
@@ -94,7 +95,7 @@ export async function isRunningCopy(planId: string, deps: ScheduleMoveDeps = def
 /** The day a running copy counts `dayNo` from: the Monday of its start day's week. */
 function copyAnchor(raw: Record<string, unknown>): Date {
   const start = parsePlanDay(String(raw.startDay ?? ""));
-  if (!start) throw new Error("The calendar copy of this plan has no start day.");
+  if (!start) throw new ScreenError("main.plan.noStartDay");
   return mondayOf(start);
 }
 
@@ -117,10 +118,10 @@ async function rewriteCopySession(
   const raw = await deps.readNativeCorosPlanRaw(ref.planId);
   const input = nativePlanWriteInputFromRaw(raw);
   const session = input.sessions.find((candidate) => candidate.idInPlan === ref.idInPlan);
-  if (!session) throw new Error("That session is no longer in the plan on the calendar.");
+  if (!session) throw new ScreenError("main.plan.sessionNotOnCalendar");
   if (change.toDay) {
     const dayNo = dayNoOn(copyAnchor(raw), change.toDay);
-    if (dayNo < 0) throw new Error("A plan's session cannot move to before the week the plan starts in.");
+    if (dayNo < 0) throw new ScreenError("main.plan.beforePlanStart");
     session.dayNo = dayNo;
   }
   if (change.program) {
@@ -142,7 +143,7 @@ export async function moveCalendarSession(
   if (!/^\d{8}$/.test(toDay)) throw new Error("The new day must be YYYYMMDD.");
   if (toDay === ref.happenDay) return;
   if (toDay < formatScheduleDay(new Date())) {
-    throw new Error("COROS does not allow scheduling workouts before today.");
+    throw new ScreenError("main.coros.beforeToday");
   }
   if (await isRunningCopy(ref.planId, deps)) {
     await rewriteCopySession(ref, { toDay }, deps);

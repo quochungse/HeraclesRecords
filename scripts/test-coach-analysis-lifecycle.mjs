@@ -841,7 +841,7 @@ assert.match(
   // "attach" affordance reappearing anywhere would mean the model came back.
   assert.match(
     popover,
-    /Create Auto Analysis/,
+    /t\("chat\.an\.list\.create"\)/,
     "the conversation is where an analysis is created"
   );
   assert.match(

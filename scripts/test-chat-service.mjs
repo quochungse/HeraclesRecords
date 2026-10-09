@@ -572,7 +572,7 @@ const missingModel = await testLocalChatConnectionRequest({
   toolsEnabled: true
 });
 assert.equal(missingModel.ok, false);
-assert.match(missingModel.message, /not found/);
+assert.match(missingModel.message, /is not on the local server/);
 
 const requests = [];
 globalThis.fetch = async (_url, init) => {

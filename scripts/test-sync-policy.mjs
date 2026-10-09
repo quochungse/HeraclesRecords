@@ -120,6 +120,8 @@ for (const source of electronSources) {
     if (FILE_EXTENSION.test(value)) continue;
     if (HOSTNAME.test(value)) continue;
     if (NOT_SETTINGS_KEYS.has(value)) continue;
+    // Keys of the screen-text catalog (electron/screenText.ts), never a setting.
+    if (/^(?:main|screen)\./.test(value)) continue;
     candidateKeys.add(value);
   }
 }

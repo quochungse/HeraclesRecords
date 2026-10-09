@@ -822,6 +822,22 @@ const chat: ChatMessages = {
   "chat.an.del.lead": "ย้อนกลับไม่ได้",
   "chat.an.del.body": "แชตยังอยู่ พร้อมทุกอย่างที่ {name} เขียนไว้แล้ว มีแค่การวิเคราะห์และตารางเวลาของมันที่ถูกลบ",
   "chat.an.del.confirm": "ลบการวิเคราะห์",
+  "chat.change.line.quoted": "\"{name}\"",
+  "chat.change.line.move": "ย้าย {name}{plan} จาก {from} ไป {to}",
+  "chat.change.line.replace": "แทน {name}{plan} วันที่ {day} ด้วย {workout}",
+  "chat.change.line.remove": "นำ {name}{plan} ออกจาก {day}",
+  "chat.change.line.add": "เพิ่ม {workout} วันที่ {day}",
+  "chat.change.line.deleteWorkout": "ลบ {name} ออกจากคลังการฝึก",
+  "chat.change.reason.unknownOp": "เวอร์ชันนี้ใช้การเปลี่ยนแปลงนั้นไม่ได้",
+  "chat.change.reason.noSession": "ข้อเสนอไม่ได้ระบุว่าเป็นการฝึกครั้งไหน",
+  "chat.change.reason.noSessionOrDay": "ข้อเสนอไม่ได้ระบุว่าเป็นการฝึกครั้งไหนหรือย้ายไปที่ใด",
+  "chat.change.reason.noSessionOrWorkout": "ข้อเสนอไม่ได้ระบุว่าเป็นการฝึกครั้งไหนหรือแทนด้วยอะไร",
+  "chat.change.reason.noWhatOrWhere": "ข้อเสนอไม่ได้ระบุว่าเพิ่มอะไรหรือที่ไหน",
+  "chat.change.reason.noWorkout": "ข้อเสนอไม่ได้ระบุว่าเป็นการฝึกใด",
+  "chat.change.reason.gone": "\"{name}\" ไม่อยู่ในปฏิทินวันที่ {day} แล้ว",
+  "chat.change.reason.replaced": "การฝึกวันที่ {day} ตอนนี้เป็น \"{now}\" ไม่ใช่ \"{name}\"",
+  "chat.change.reason.alreadyThere": "\"{name}\" อยู่ในปฏิทินวันที่ {day} แล้ว",
+  "chat.change.reason.notInLibrary": "\"{name}\" ไม่อยู่ในคลังการฝึกแล้ว",
 };
 
 export default chat;

@@ -822,6 +822,22 @@ const chat: ChatMessages = {
   "chat.an.del.lead": "Cette action est irréversible.",
   "chat.an.del.body": "La conversation est conservée, avec tout ce que {name} y a déjà écrit. Seuls l’analyse et son horaire disparaissent.",
   "chat.an.del.confirm": "Supprimer l’analyse",
+  "chat.change.line.quoted": "« {name} »",
+  "chat.change.line.move": "Déplacer {name}{plan} du {from} au {to}",
+  "chat.change.line.replace": "Remplacer {name}{plan} du {day} par {workout}",
+  "chat.change.line.remove": "Retirer {name}{plan} du {day}",
+  "chat.change.line.add": "Ajouter {workout} le {day}",
+  "chat.change.line.deleteWorkout": "Supprimer {name} de la bibliothèque d’entraînements",
+  "chat.change.reason.unknownOp": "Cette version ne peut pas appliquer cette modification.",
+  "chat.change.reason.noSession": "La proposition ne dit pas quelle séance.",
+  "chat.change.reason.noSessionOrDay": "La proposition ne dit pas quelle séance ni où.",
+  "chat.change.reason.noSessionOrWorkout": "La proposition ne dit pas quelle séance ni par quoi.",
+  "chat.change.reason.noWhatOrWhere": "La proposition ne dit pas quoi ni où.",
+  "chat.change.reason.noWorkout": "La proposition ne dit pas quel entraînement.",
+  "chat.change.reason.gone": "« {name} » n’est plus au calendrier le {day}.",
+  "chat.change.reason.replaced": "La séance du {day} est maintenant « {now} », et non « {name} ».",
+  "chat.change.reason.alreadyThere": "« {name} » est déjà au calendrier le {day}.",
+  "chat.change.reason.notInLibrary": "« {name} » n’est plus dans la bibliothèque d’entraînements.",
 };
 
 export default chat;

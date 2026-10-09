@@ -331,7 +331,7 @@ test("a stage change keeps the stage's own fields and drops the calendar's", () 
 test("a session the plan no longer holds is refused", () => {
   assert.throws(
     () => adapter.buildNativePlanUpdateBody(template, templateInput([{ idInPlan: "9", dayNo: 0, program: libraryProgram }])),
-    /not in this plan any more/
+    /no longer in this plan/
   );
 });
 

@@ -31,6 +31,7 @@ import type {
   PlanBriefRequest,
   TrainingPlanOutline
 } from "./types";
+import { ScreenError } from "./screenText";
 
 function briefOfRow(row: ChatPlanArtifactRow | undefined): PlanBrief | undefined {
   const stored = parseStoredBrief(row?.briefJson);
@@ -96,7 +97,7 @@ export function createPlanBrief(sessionId: string, request?: unknown, today = ne
     return writeBrief(crypto.randomUUID(), defaultPlanBriefRequest(firstPlanMonday(today)), {}, sessionId);
   }
   const checked = parseStoredBrief(JSON.stringify({ request }));
-  if (!checked) throw new Error("That brief could not be read.");
+  if (!checked) throw new ScreenError("main.coach.briefUnreadable");
   return writeBrief(crypto.randomUUID(), checked.request, {}, sessionId);
 }
 
@@ -107,10 +108,10 @@ export function createPlanBrief(sessionId: string, request?: unknown, today = ne
  */
 export function updatePlanBrief(artifactId: string, request: PlanBriefRequest): PlanBrief {
   const current = planBriefOf(artifactId);
-  if (!current) throw new Error("That brief is no longer in this conversation.");
-  if (hasVersions(artifactId)) throw new Error("This brief has become a plan; change the plan instead.");
+  if (!current) throw new ScreenError("main.coach.briefGone");
+  if (hasVersions(artifactId)) throw new ScreenError("main.coach.briefIsPlan");
   const checked = parseStoredBrief(JSON.stringify({ request }));
-  if (!checked) throw new Error("That brief could not be read.");
+  if (!checked) throw new ScreenError("main.coach.briefUnreadable");
   const origins = { ...current.origins };
   for (const field of briefChangedFields(current.request, checked.request)) delete origins[field];
   return writeBrief(artifactId, checked.request, origins);
@@ -129,7 +130,7 @@ export function savePlanOutline(
   replacing?: number
 ): PlanBrief {
   const row = getChatPlanArtifactRow(artifactId);
-  if (!row || !planBriefOf(artifactId)) throw new Error("That brief is no longer in this conversation.");
+  if (!row || !planBriefOf(artifactId)) throw new ScreenError("main.coach.briefGone");
   const current = row.outlineVersion ?? 0;
   const version = replacing !== undefined && replacing === current ? current : current + 1;
   const now = new Date().toISOString();
@@ -149,11 +150,11 @@ export function savePlanOutline(
  */
 export function updatePlanOutline(artifactId: string, value: unknown): PlanBrief {
   const brief = planBriefOf(artifactId);
-  if (!brief) throw new Error("That brief is no longer in this conversation.");
-  if (hasVersions(artifactId)) throw new Error("This brief has become a plan; change the plan instead.");
-  if (!brief.outline) throw new Error("This brief has no outline yet.");
+  if (!brief) throw new ScreenError("main.coach.briefGone");
+  if (hasVersions(artifactId)) throw new ScreenError("main.coach.briefIsPlan");
+  if (!brief.outline) throw new ScreenError("main.coach.noOutline");
   const outline = readOutline(value);
-  if (!outline) throw new Error("That outline could not be read.");
+  if (!outline) throw new ScreenError("main.coach.outlineUnreadable");
   const problems = planOutlineProblems(outline, brief.request);
   if (problems.length) throw new Error(problems.join(" "));
   return savePlanOutline(artifactId, outline, "athlete");
@@ -167,15 +168,15 @@ export function briefWaiting(artifactId: string): boolean {
 /** Whether a brief may still have its outline drawn: it exists and has not become a plan. */
 export function briefForOutline(artifactId: string): PlanBrief {
   const brief = planBriefOf(artifactId);
-  if (!brief) throw new Error("That brief is no longer in this conversation.");
-  if (hasVersions(artifactId)) throw new Error("This brief has become a plan; change the plan instead.");
+  if (!brief) throw new ScreenError("main.coach.briefGone");
+  if (hasVersions(artifactId)) throw new ScreenError("main.coach.briefIsPlan");
   return brief;
 }
 
 /** A brief whose sessions may be written: it has an outline and has not become a plan (P2.3). */
 export function briefForSessions(artifactId: string): PlanBrief & { outline: PlanBriefOutline } {
   const brief = briefForOutline(artifactId);
-  if (!brief.outline) throw new Error("Draw the outline first: the sessions are written to it.");
+  if (!brief.outline) throw new ScreenError("main.coach.outlineFirst");
   return brief as PlanBrief & { outline: PlanBriefOutline };
 }
 

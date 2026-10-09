@@ -58,6 +58,7 @@ import type {
   SyncVaultStatus,
   SyncVaultState
 } from "./syncTypes";
+import { withScreenKey } from "../screenText";
 
 export const SYNC_SETTINGS = {
   /** The vault this machine has already published its existing data into.
@@ -173,9 +174,9 @@ export class SyncService {
    *  engine cannot read back. */
   #rawProvider(): StorageProvider {
     if (!this.#isConfigured()) {
-      throw new SyncNotReadyError(
-        "not-configured",
-        "Connect a Google account before syncing."
+      throw withScreenKey(
+        new SyncNotReadyError("not-configured", "Connect a Google account before syncing."),
+        "main.sync.connectGoogle"
       );
     }
     return this.#deps.makeProvider();
@@ -323,9 +324,9 @@ export class SyncService {
     if (existing) return existing.id;
     const owner = this.#deps.owner();
     if (!owner) {
-      throw new SyncNotReadyError(
-        "not-configured",
-        "Sign in to COROS before syncing."
+      throw withScreenKey(
+        new SyncNotReadyError("not-configured", "Sign in to COROS before syncing."),
+        "main.sync.signInCoros"
       );
     }
     return (await this.#mintIdentity(owner)).id;
@@ -347,9 +348,9 @@ export class SyncService {
   async claimVault(): Promise<void> {
     const owner = this.#deps.owner();
     if (!owner) {
-      throw new SyncNotReadyError(
-        "not-configured",
-        "Sign in to COROS before claiming a vault."
+      throw withScreenKey(
+        new SyncNotReadyError("not-configured", "Sign in to COROS before claiming a vault."),
+        "main.sync.signInClaim"
       );
     }
     const identity =

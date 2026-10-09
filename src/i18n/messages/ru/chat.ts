@@ -880,6 +880,22 @@ const chat: ChatMessages = {
   "chat.an.del.lead": "Это нельзя отменить.",
   "chat.an.del.body": "Чат останется вместе со всем, что «{name}» уже в нём написал. Удалятся только анализ и его расписание.",
   "chat.an.del.confirm": "Удалить анализ",
+  "chat.change.line.quoted": "«{name}»",
+  "chat.change.line.move": "Перенести {name}{plan} с {from} на {to}",
+  "chat.change.line.replace": "Заменить {name}{plan} ({day}) на {workout}",
+  "chat.change.line.remove": "Убрать {name}{plan} ({day})",
+  "chat.change.line.add": "Добавить {workout} ({day})",
+  "chat.change.line.deleteWorkout": "Удалить {name} из библиотеки тренировок",
+  "chat.change.reason.unknownOp": "Эта версия не может применить такое изменение.",
+  "chat.change.reason.noSession": "В предложении не сказано, какая тренировка.",
+  "chat.change.reason.noSessionOrDay": "В предложении не сказано, какая тренировка и куда.",
+  "chat.change.reason.noSessionOrWorkout": "В предложении не сказано, какая тренировка и на что.",
+  "chat.change.reason.noWhatOrWhere": "В предложении не сказано, что и куда.",
+  "chat.change.reason.noWorkout": "В предложении не сказано, какая тренировка из библиотеки.",
+  "chat.change.reason.gone": "«{name}» больше нет в календаре ({day}).",
+  "chat.change.reason.replaced": "Тренировка {day} теперь «{now}», а не «{name}».",
+  "chat.change.reason.alreadyThere": "«{name}» уже есть в календаре ({day}).",
+  "chat.change.reason.notInLibrary": "«{name}» больше нет в библиотеке тренировок.",
 };
 
 export default chat;

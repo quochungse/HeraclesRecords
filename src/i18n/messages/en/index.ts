@@ -20,6 +20,7 @@ import map from "./map.ts";
 import profile from "./profile.ts";
 import records from "./records.ts";
 import chat from "./chat.ts";
+import main from "./main.ts";
 
 /**
  * English, the source every other language is translated from. A key added
@@ -50,6 +51,7 @@ const en = {
   ...profile,
   ...records,
   ...chat,
+  ...main,
 };
 
 export default en;

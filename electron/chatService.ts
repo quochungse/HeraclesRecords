@@ -250,6 +250,8 @@ import {
   formatRecentActivityMix,
   formatUpcomingWorkoutSport
 } from "./chatCoachContext";
+import { ScreenError } from "./screenText";
+import { mainText } from "./mainText";
 
 // =========================================================================
 // OpenAI "Sign in with ChatGPT" provider details.
@@ -922,9 +924,9 @@ function listedAnthropicModel(
   );
 }
 
-function storeEncryptedSecret(key: string, secret: string, label: string): void {
+function storeEncryptedSecret(key: string, secret: string, _label: string): void {
   if (!safeStorage.isEncryptionAvailable()) {
-    throw new Error(`Secure ${label} storage is not available on this system.`);
+    throw new ScreenError("main.coach.secureStorage");
   }
   setSetting(key, safeStorage.encryptString(secret).toString("base64"));
 }
@@ -1157,14 +1159,14 @@ function waitForAuthorizationCode(
       authWindow = new BrowserWindow({
         width: 520,
         height: 720,
-        title: "Sign in with ChatGPT",
+        title: mainText("main.coach.chatgptTitle"),
         parent: parentWindow,
         modal: Boolean(parentWindow),
         webPreferences: { nodeIntegration: false, contextIsolation: true }
       });
       authWindow.on("closed", () => {
         authWindow = undefined;
-        rejectOnce(new Error("ChatGPT sign-in window was closed."));
+        rejectOnce(new ScreenError("main.coach.chatgptWindowClosed"));
       });
       // Some OpenAI flows hop to an external verification page; keep it in-window.
       authWindow.webContents.setWindowOpenHandler(({ url }) => {
@@ -1231,7 +1233,7 @@ async function refreshAccessToken(
   };
   if (!response.ok || !payload.access_token) {
     // invalid_grant => the session is dead; force a fresh login.
-    const err = new Error("ChatGPT session expired. Please sign in again.");
+    const err = new ScreenError("main.coach.chatgptExpired");
     (err as Error & { authError?: boolean }).authError = true;
     throw err;
   }
@@ -1264,7 +1266,7 @@ function toStoredToken(
 async function getValidToken(): Promise<StoredChatToken> {
   const token = getStoredToken();
   if (!token) {
-    const err = new Error("Sign in with ChatGPT first.");
+    const err = new ScreenError("main.coach.chatgptSignIn");
     (err as Error & { authError?: boolean }).authError = true;
     throw err;
   }
@@ -2052,7 +2054,7 @@ async function streamChatTurn(
         ...status,
         state: "connected",
         checkedAt: new Date().toISOString(),
-        message: "Claude Code is connected and ready for Coach conversations."
+        message: mainText("main.ai.claudeReady")
       });
       sendStreamDone();
       return;
@@ -2061,7 +2063,7 @@ async function streamChatTurn(
     if (provider === "openrouter") {
       const apiKey = readStoredOpenRouterApiKey();
       if (!apiKey) {
-        throw new Error("Add an OpenRouter API key in Coach settings first.");
+        throw new ScreenError("main.coach.openRouterKey");
       }
       const { hasData, ...context } = await prepare(turnContext());
 
@@ -2817,7 +2819,7 @@ async function streamSessionsStep(
   if (invalid) throw new Error(invalid.message);
   const outlineProblems = planOutlineProblems(brief.outline.outline, request);
   if (outlineProblems.length) {
-    throw new Error(`The outline no longer fits the brief: ${outlineProblems[0]} Adjust or redraw it first.`);
+    throw new ScreenError("main.coach.outlineMisfit", { problem: outlineProblems[0] ?? "" });
   }
 
   planGenerations.set(requestId, { request, drafts: [], artifactId: brief.artifactId });

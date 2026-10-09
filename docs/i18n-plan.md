@@ -19,7 +19,7 @@ code, and `npm run test:i18n` holds both.
 | P4 | Calendar and Training Library (`WorkoutBuilder`, step kinds, zones, the plan reader and editor, the plan brief steps Coach reuses), sport names through `workoutSportLabel` | **Done** |
 | P5 | Sleep, Hall of Records (the milestones and the Twelve Labours), Where you've been, Personal; clocks and short dates through Intl outside English | **Done** |
 | P6 | Coach's screen: `ChatView`, the conversation list, composer and refs, Coach settings and Coach Models, MCP servers, the plan brief and outline, creation cards and the Workbench, change sets, the chart cards, analyses. **Not the prompt** (below) | **Done** |
-| P7 | Text the main process puts on screen: errors thrown over IPC, native dialog titles, and what Coach's screen draws from it — `planDiff` lines, effort names (`formatEffortOption`), the brief and outline checks (`generationRequestProblems`, `planOutlineProblems`), a change line's label and reason, an activity card's start time, Claude's status message | |
+| P7 | Text the main process puts on screen: errors over IPC, dialog titles and filters, Coach's provider statuses; and what the shared modules write: the brief's and outline's checks, the plan editor's issues, a version's changes, effort names. Change lines and plan events stored in English are said again on screen | **Done** |
 
 ## A release ships every language finished
 
@@ -142,6 +142,25 @@ line in the website's guide (`site/src/content/guide/customise.md`, under Appear
   name, role and playbook — they are synced, and the role and playbook are prompt.
 - **What a label is, not what it says, decides a branch.** `creationStatus` returns a
   `kind` beside its label, because the card used to compare the label with "On COROS".
+- **The main process writes through `electron/screenText.ts`, and stays English where it is
+  stored or read by a model.** English is written out there (no value imports, so suites
+  without the resolver hook can load it); each language is `electron/i18n/<locale>.ts`, the
+  renderer's `main` namespace re-exports it. Two routes. A **shared module** calls
+  `screenText` / `screenPlural` / `screenWeekday` / `screenSport` / `screenStage`,
+  which answer in English until a translator is installed — and only the renderer installs
+  one (`src/i18n/screenTextHooks.ts`), so the model keeps reading English. The **main
+  process** throws a `ScreenError` (or tags its own class with `withScreenKey`): its
+  `message` stays English for the log, an issue report, a tool's answer and any regex, and
+  `diagnosticIpcMain` re-throws it in the language the renderer sent over
+  `app:setLanguage` (`mainText.ts`). A status the main process returns (a provider's
+  connection test, a dialog's title) uses `mainText` directly. An error only a bug can
+  reach stays a plain English `Error`.
+- **Text the main process stored is said again, not translated where it lies.** A change
+  line's label and reason and a plan event's changes are stored in English; the screen
+  rebuilds the label from the line's own fields (`changeLineLabel`), recognises a reason
+  by its words or its catalogue key (`changeLineReason`, `screenKeyForEnglish`), and works
+  a plan event's changes out again from the two versions in hand. COROS's own words go
+  through as they came.
 - **A new namespace** is a file in `messages/en/`, a line in `messages/en/index.ts`, the same
   file in every other language, and `npm run i18n:index`, which writes the other languages'
   `index.ts` and fails on a file missing.
