@@ -39,6 +39,33 @@ import {
   type OpEntry
 } from "./oplog";
 import { LogFileCache, withLogFileCache } from "./logFileCache";
+import { StorageConflictError } from "./storageProvider";
+import {
+  createMemoryPublishedItems,
+  elementHash,
+  splitIntoItems,
+  splitItemRecordId,
+  type ListElement,
+  type PublishedItemStore
+} from "./transcriptItems";
+import {
+  compactVault,
+  encodeSnapshot,
+  headPathFor,
+  listVault,
+  parseHead,
+  readLogBatch,
+  readSnapshotAt,
+  snapshotPathFor,
+  writeHead,
+  writeLogBatch,
+  type CompactVaultResult
+} from "./vaultLog";
+import {
+  createMemoryVectorStore,
+  type VectorRecord,
+  type VectorStore
+} from "./vectorStore";
 import {
   createMemoryReadIndex,
   needsRead,
@@ -54,8 +81,30 @@ import type { StorageProvider } from "./storageProvider";
 export const SYNC_LOOP_SETTINGS = {
   clock: "sync.clock",
   lastPulledAt: "sync.lastPulledAt",
-  lastCompactedAt: "sync.lastCompactedAt"
+  lastCompactedAt: "sync.lastCompactedAt",
+  /** Format 2: the snapshot this machine last read, or wrote when it migrated
+   *  the vault. Absent, the next pull reads the newest one. */
+  lastSnapshot: "sync.v2.lastSnapshot",
+  /** Format 2: the app version that last read the vault from its snapshot.
+   *  Another version reads it again, once, so what an older build could not
+   *  take — a table or column it did not know — lands now. */
+  fullReadBuild: "sync.v2.fullReadBuild"
 } as const;
+
+/** How long the format-1 log is kept, read and bridged after the newest file
+ *  in it, before a format-2 machine deletes it. */
+export const LEGACY_LOG_RETENTION_MS = 7 * 24 * 60 * 60 * 1000;
+export const FORMAT_MIGRATION_LEASE = "format-migration";
+
+const EMPTY_PULL: PullResult = {
+  applied: 0,
+  deleted: 0,
+  superseded: 0,
+  rejected: [],
+  merged: [],
+  contentChanges: [],
+  entriesSeen: 0
+};
 
 /**
  * How rarely a device even considers compacting.
@@ -188,6 +237,19 @@ export interface SyncLoopDeps {
    * caller is expected to stop the loop. Absent, every pull proceeds.
    */
   readonly vaultGate?: (revisions: ReadonlyMap<string, string>) => Promise<boolean>;
+  /**
+   * The vault's data format this loop writes (docs/sync-v2.md). 1 is the
+   * `oplog/` layout, read file by file; 2 is the numbered log with heads and a
+   * vector, coach transcripts travelling a message at a time. Defaults to 1,
+   * which is what the suites written before format 2 drive; the app runs 2.
+   */
+  readonly format?: 1 | 2;
+  /** Format 2: what has been published of each transcript message. */
+  readonly publishedItems?: PublishedItemStore;
+  /** Format 2: how far each device's log has been read. */
+  readonly vector?: VectorStore;
+  /** The app's version, for the read-again-on-upgrade rule (format 2). */
+  readonly buildId?: string;
   /** Called after inbound changes land, so the renderer can reload. */
   readonly onApplied?: (result: AppliedChanges) => void;
   readonly onError?: (error: unknown) => void;
@@ -255,6 +317,11 @@ export class SyncLoop {
    *  read again by the next launch, and not by this one. */
   readonly #launch: string;
   readonly #fileCache = new LogFileCache();
+  readonly #format: 1 | 2;
+  readonly #vector: VectorStore;
+  /** Format 2: whether this process has checked its own head and batches
+   *  against the number it is about to use. */
+  #ownSeqChecked = false;
   #flushTimer: unknown = null;
   #pollTimer: unknown = null;
   #firstPendingAt: number | null = null;
@@ -282,6 +349,8 @@ export class SyncLoop {
   constructor(deps: SyncLoopDeps) {
     this.#deps = deps;
     this.#readIndex = deps.readIndex ?? createMemoryReadIndex();
+    this.#format = deps.format ?? 1;
+    this.#vector = deps.vector ?? createMemoryVectorStore();
     this.#launch = `${deps.now().toString(36)}-${Math.random()
       .toString(36)
       .slice(2, 10)}`;
@@ -347,10 +416,17 @@ export class SyncLoop {
     await this.#flush().catch(() => undefined);
   }
 
+  /** Format 2: a coach conversation's row goes out without its transcript,
+   *  and each message that changed goes as an item of its own. */
+  #split(entries: readonly OpEntry[]): OpEntry[] {
+    if (this.#format !== 2 || !this.#deps.publishedItems) return [...entries];
+    return splitIntoItems(entries, this.#deps.publishedItems, this.nextHlc);
+  }
+
   /** The vault, with the log's files served from this process's cache where
    *  it already holds them. Every read and write of the log goes through it;
    *  leases do not, since they are rewritten in place. */
-  #storage() {
+  #storage(): StorageProvider {
     return withLogFileCache(this.#deps.provider(), this.#fileCache);
   }
 
@@ -370,8 +446,9 @@ export class SyncLoop {
    * token would be correct and useless — hundreds of uploads a second, each
    * superseded by the next.
    */
-  enqueue(entries: readonly OpEntry[]): void {
-    if (entries.length === 0) return;
+  enqueue(proposed: readonly OpEntry[]): void {
+    if (proposed.length === 0) return;
+    const entries = this.#split(proposed);
     // Stamped here, before anything is pushed or awaited, because this is the
     // moment the local database moved and a pull already in flight cannot know
     // it. The entry was built by reading the row that was just written, so its
@@ -458,6 +535,7 @@ export class SyncLoop {
   }
 
   async #upload(batch: OpEntry[]): Promise<FlushResult> {
+    if (this.#format === 2) return this.#uploadV2(batch);
     try {
       const written = await appendBatch(
         this.#storage(),
@@ -521,23 +599,51 @@ export class SyncLoop {
   }
 
   async #pull(): Promise<PullResult> {
-    const startedAt = this.#deps.now();
-    const read = this.#held ? null : await this.#readNewFiles();
-    if (!read) {
-      // The vault's format moved past this build: nothing read, nothing
-      // applied, and the caller stops the loop.
-      return {
-        applied: 0,
-        deleted: 0,
-        superseded: 0,
-        rejected: [],
-        merged: [],
-        contentChanges: [],
-        entriesSeen: 0
-      };
-    }
-    const entries = read.entries;
+    if (this.#held) return EMPTY_PULL;
+    return this.#format === 2 ? this.#pullV2() : this.#pullLegacy();
+  }
 
+  /**
+   * Format 1: the files of `oplog/` not read before.
+   *
+   * In format 2 this is the bridge (docs/sync-v2.md §7): a machine still on an
+   * older build may write there after the vault moved on, and what it wrote is
+   * read here and published again in format 2, for as long as the old log is
+   * kept.
+   */
+  async #pullLegacy(options: { bridge?: boolean } = {}): Promise<PullResult> {
+    const startedAt = this.#deps.now();
+    const read = await this.#readNewFiles();
+    // The vault's format moved past this build: nothing read, nothing applied,
+    // and the caller holds the loop.
+    if (!read) return EMPTY_PULL;
+    return this.#merge(
+      read.entries,
+      (merged, incomplete) => {
+        // In the same transaction as the rows: a read is recorded exactly when
+        // what it read has landed, so a crash between the two re-reads the file
+        // rather than skipping it.
+        this.#readIndex.record(this.#readRecords(read, merged, incomplete));
+        this.#readIndex.forget(
+          read.gone.filter((record) => record.readAt < startedAt).map((r) => r.path)
+        );
+      },
+      options
+    );
+  }
+
+  /**
+   * Apply what was read, and say what landed.
+   *
+   * `commit` runs inside the merge's transaction, so whatever records how far
+   * this machine has read — the read index, the vector — moves exactly when the
+   * rows do.
+   */
+  #merge(
+    entries: OpEntry[],
+    commit: (merged: ApplyResult, incomplete: ReadonlySet<string>) => void,
+    options: { bridge?: boolean } = {}
+  ): PullResult {
     // Only for the clock fold below. What may be *applied* is no longer a
     // question about who wrote an entry — see the comment on `applyEntries`.
     const mine = this.#deps.deviceId();
@@ -649,13 +755,7 @@ export class SyncLoop {
         // working for a merged table — `versionKey` only splits the *fold*.
         versions.set(entryIdentity(entry), entry.hlc);
       }
-      // In the same transaction as the rows: a read is recorded exactly when
-      // what it read has landed, so a crash between the two re-reads the file
-      // rather than skipping it.
-      this.#readIndex.record(this.#readRecords(read, merged, incomplete));
-      this.#readIndex.forget(
-        read.gone.filter((record) => record.readAt < startedAt).map((r) => r.path)
-      );
+      commit(merged, incomplete);
       return merged;
     };
     const merged = target.transaction ? target.transaction(runMerge) : runMerge();
@@ -680,6 +780,7 @@ export class SyncLoop {
       }
       this.enqueue(builder.entries);
     }
+    if (options.bridge) this.#republishBridged(merged.merged, result.contentChanges);
 
     this.#deps.setSetting(
       SYNC_LOOP_SETTINGS.lastPulledAt,
@@ -689,6 +790,283 @@ export class SyncLoop {
       this.#deps.onApplied?.(result);
     }
     return { ...result, entriesSeen: entries.length };
+  }
+
+  /**
+   * Format 2: what the heads say is new, and the snapshot when it is needed.
+   *
+   * A head whose revision is the one last seen is not fetched, so with nothing
+   * new a pull is one listing. A device whose next batch is gone was compacted
+   * past this machine, and the snapshot covering it is read; so is the newest
+   * snapshot when this machine has never read one, and once after the app
+   * version changes (`fullReadBuild`).
+   */
+  async #pullV2(): Promise<PullResult> {
+    const storage = this.#storage();
+    const listing = await listVault(storage);
+    if (this.#deps.vaultGate && !(await this.#deps.vaultGate(listing.revisions))) {
+      return EMPTY_PULL;
+    }
+    const self = this.#deps.deviceId();
+    const held = this.#vector.load();
+    const next = new Map<string, VectorRecord>(held);
+    const appliedOf = (device: string) => next.get(device)?.seq ?? 0;
+
+    // This machine's own head, written back if it is missing: a batch whose
+    // head write failed is invisible to the others until one is.
+    const ownSeq = held.get(self)?.seq ?? 0;
+    if (ownSeq > 0 && !listing.heads.has(self)) {
+      await writeHead(storage, self, ownSeq).catch((error) => this.#deps.onError?.(error));
+    }
+
+    const heads = new Map<string, { seq: number; revision: string }>();
+    for (const [device, revision] of listing.heads) {
+      if (device === self) continue;
+      const known = held.get(device);
+      if (known && known.headRevision === revision) {
+        heads.set(device, { seq: known.headSeq, revision });
+        continue;
+      }
+      const stored = await storage.get(headPathFor(device));
+      const seq = stored ? parseHead(stored.content) : null;
+      if (seq !== null && stored) heads.set(device, { seq, revision: stored.revision });
+    }
+
+    const buildId = this.#deps.buildId;
+    const resync =
+      buildId !== undefined &&
+      this.#deps.getSetting(SYNC_LOOP_SETTINGS.fullReadBuild) !== buildId;
+    const lastSnapshot = this.#deps.getSetting(SYNC_LOOP_SETTINGS.lastSnapshot);
+    const latest = listing.snapshots[listing.snapshots.length - 1];
+    const gap = [...heads].some(([device, head]) => {
+      const applied = appliedOf(device);
+      return head.seq > applied && !(listing.logs.get(device) ?? []).includes(applied + 1);
+    });
+
+    const entries: OpEntry[] = [];
+    let snapshotRead: string | null = null;
+    if (resync) {
+      // Read again from the snapshot: every other device back to what it holds.
+      for (const [device, record] of next) {
+        if (device !== self) next.set(device, { ...record, seq: 0 });
+      }
+    }
+    if (latest && (resync || (latest !== lastSnapshot && (gap || lastSnapshot === undefined)))) {
+      const snapshot = await readSnapshotAt(storage, latest);
+      if (snapshot) {
+        entries.push(...snapshot.entries);
+        for (const [device, seq] of Object.entries(snapshot.vector)) {
+          if (device === self) continue;
+          const record = next.get(device) ?? { seq: 0, headSeq: 0, headRevision: null };
+          next.set(device, { ...record, seq: Math.max(record.seq, seq) });
+        }
+        snapshotRead = latest;
+      }
+    }
+
+    for (const [device, head] of heads) {
+      let seq = appliedOf(device);
+      while (seq < head.seq) {
+        const batch = await readLogBatch(storage, device, seq + 1);
+        // Gone: compacted between the listing and now. The next pull reads the
+        // snapshot that covers it.
+        if (!batch) break;
+        entries.push(...batch);
+        seq += 1;
+      }
+      next.set(device, { seq, headSeq: head.seq, headRevision: head.revision });
+    }
+
+    const result = this.#merge(entries, () => {
+      this.#vector.save(next);
+      if (snapshotRead) {
+        this.#deps.setSetting(SYNC_LOOP_SETTINGS.lastSnapshot, snapshotRead);
+      }
+      if (resync && buildId !== undefined) {
+        this.#deps.setSetting(SYNC_LOOP_SETTINGS.fullReadBuild, buildId);
+      }
+    });
+
+    // The bridge, for as long as the format-1 log is there.
+    const legacy = [...listing.revisions.keys()].some(
+      (path) => path.startsWith("oplog/") || path.startsWith("oplog-snapshot/")
+    );
+    if (!legacy) return result;
+    const bridged = await this.#pullLegacy({ bridge: true });
+    return {
+      applied: result.applied + bridged.applied,
+      deleted: result.deleted + bridged.deleted,
+      superseded: result.superseded + bridged.superseded,
+      rejected: [...result.rejected, ...bridged.rejected],
+      merged: [...result.merged, ...bridged.merged],
+      contentChanges: [...result.contentChanges, ...bridged.contentChanges],
+      entriesSeen: result.entriesSeen + bridged.entriesSeen
+    };
+  }
+
+  /**
+   * Format 2: claim the next batch number, then move the head.
+   *
+   * The number is this machine's own, but a machine that lost its database —
+   * or crashed between a batch and its record — can only find it in the
+   * vault, so the first upload of a process checks the head and the batches
+   * there. A number already taken is a conflict, answered by looking again.
+   */
+  async #uploadV2(batch: OpEntry[]): Promise<FlushResult> {
+    try {
+      const storage = this.#storage();
+      const self = this.#deps.deviceId();
+      let seq = (this.#vector.load().get(self)?.seq ?? 0) + 1;
+      if (!this.#ownSeqChecked) {
+        seq = Math.max(seq, (await this.#ownSeqInVault(storage, self)) + 1);
+        this.#ownSeqChecked = true;
+      }
+      let path: string;
+      try {
+        path = await writeLogBatch(storage, self, seq, batch);
+      } catch (error) {
+        if (!(error instanceof StorageConflictError)) throw error;
+        seq = (await this.#ownSeqInVault(storage, self)) + 1;
+        path = await writeLogBatch(storage, self, seq, batch);
+      }
+      this.#vector.save(new Map([[self, { seq, headSeq: seq, headRevision: null }]]));
+      this.#deps.outbox.remove(batch);
+      // After the batch is safe: a head that fails to move only delays the
+      // others seeing it, and the next batch or pull writes it again.
+      await writeHead(storage, self, seq).catch((error) => this.#deps.onError?.(error));
+      return { pushed: batch.length, path };
+    } catch (error) {
+      this.#pending = [...batch, ...this.#pending];
+      this.#firstPendingAt ??= this.#deps.now();
+      this.#deps.onError?.(error);
+      return { pushed: 0, path: null };
+    }
+  }
+
+  async #ownSeqInVault(storage: StorageProvider, self: string): Promise<number> {
+    const listing = await listVault(storage);
+    const logged = listing.logs.get(self) ?? [];
+    let head = 0;
+    if (listing.heads.has(self)) {
+      const stored = await storage.get(headPathFor(self));
+      head = (stored && parseHead(stored.content)) || 0;
+    }
+    return Math.max(head, logged[logged.length - 1] ?? 0);
+  }
+
+  /**
+   * The bridge's half on the way out: what a format-1 file brought in is
+   * published again in format 2, or the machines reading only the new log
+   * would never see it. An ordinary record goes as the entry it arrived as, its
+   * timestamp kept; a conversation goes as it now reads here, so its messages
+   * are compared against what was published and only what is new travels.
+   */
+  #republishBridged(
+    merged: readonly OpEntry[],
+    contentChanges: readonly ContentChange[]
+  ): void {
+    const plain = merged.filter(
+      (entry) => !(entry.scope === "table" && entry.key === "chat_sessions")
+    );
+    if (plain.length > 0) this.enqueue(plain);
+    const builder = new ChangeBuilder({ nextHlc: this.nextHlc });
+    for (const change of contentChanges) {
+      if (change.table !== "chat_sessions") continue;
+      if (change.removed) {
+        builder.deleteRow(change.table, change.recordId);
+        continue;
+      }
+      const row = this.#deps.target.readRow?.(change.table, change.recordId);
+      if (row) builder.row(change.table, change.recordId, row);
+    }
+    if (builder.entries.length > 0) this.enqueue(builder.entries);
+  }
+
+  /**
+   * Move a format-1 vault to format 2 (docs/sync-v2.md §7), once, under a
+   * lease so two machines upgraded together do it once between them.
+   *
+   * Read the old log one last time, write a snapshot of what this machine now
+   * holds — each record under the timestamp it came from, so nothing written
+   * elsewhere loses to it for being older — and only then raise the vault's
+   * format. Until that last step every other machine still reads format 1, and
+   * a migration that stops part-way leaves a snapshot nobody reads.
+   *
+   * `collect` hands over every syncable record with the timestamp it holds;
+   * `stillNeeded` asks the vault again once the lease is held; `raiseFormat`
+   * writes the identity. False when another machine holds the lease or the
+   * vault has already moved.
+   */
+  async migrateToV2(options: {
+    readonly collect: () => readonly OpEntry[];
+    readonly stillNeeded: () => Promise<boolean>;
+    readonly raiseFormat: () => Promise<void>;
+  }): Promise<boolean> {
+    return this.#exclusive(async () => {
+      const lease = new Lease(FORMAT_MIGRATION_LEASE, {
+        provider: this.#deps.provider,
+        deviceId: this.#deps.deviceId,
+        now: this.#deps.now,
+        ttlMs: COMPACT_LEASE_TTL_MS
+      });
+      const held = await lease.withLease(async () => {
+        if (!(await options.stillNeeded())) return false;
+        await this.#pullLegacy();
+        const published = this.#deps.publishedItems;
+        const stamped = options.collect();
+        // Split against an empty record, so the snapshot holds every message
+        // and not only the ones this machine has not sent yet; then recorded as
+        // published, so the next save of each conversation sends nothing again.
+        const entries = published
+          ? splitIntoItems(stamped, createMemoryPublishedItems(), this.nextHlc, {
+              itemHlc: (row) => row.hlc
+            })
+          : [...stamped];
+        if (published) {
+          for (const entry of entries) {
+            if (entry.scope !== "item" || entry.op !== "set" || !entry.recordId) continue;
+            const parts = splitItemRecordId(entry.recordId);
+            const element = entry.payload?.entry;
+            if (!parts || !element || typeof element !== "object") continue;
+            published.set(entry.key, parts[0], parts[1], elementHash(element as ListElement));
+          }
+        }
+        for (const entry of entries) {
+          this.#deps.recordVersions.set(entryIdentity(entry), entry.hlc);
+        }
+        const path = snapshotPathFor(this.nextHlc());
+        await this.#storage().put(
+          path,
+          encodeSnapshot({ version: 2, vector: {}, entries }),
+          null
+        );
+        this.#deps.setSetting(SYNC_LOOP_SETTINGS.lastSnapshot, path);
+        if (this.#deps.buildId !== undefined) {
+          this.#deps.setSetting(SYNC_LOOP_SETTINGS.fullReadBuild, this.#deps.buildId);
+        }
+        await options.raiseFormat();
+        return true;
+      });
+      return held.ran ? held.result : false;
+    });
+  }
+
+  /**
+   * Format 2: the old log, deleted once nothing has been written to it for
+   * `LEGACY_LOG_RETENTION_MS` — by then every machine still on an old build
+   * has either stopped or been bridged.
+   */
+  async #retireLegacyLog(): Promise<void> {
+    const storage = this.#storage();
+    const legacy = (await storage.list()).filter(
+      (entry) => entry.path.startsWith("oplog/") || entry.path.startsWith("oplog-snapshot/")
+    );
+    if (legacy.length === 0) return;
+    const newest = Math.max(...legacy.map((entry) => Date.parse(entry.modifiedAt) || 0));
+    if (this.#deps.now() - newest < LEGACY_LOG_RETENTION_MS) return;
+    for (const entry of legacy) {
+      await storage.delete(entry.path).catch(() => undefined);
+    }
   }
 
   /**
@@ -804,7 +1182,7 @@ export class SyncLoop {
    * refuses it stays correct, only larger — so a failure is reported through
    * `onError` and the next window tries again.
    */
-  async compactIfDue(): Promise<CompactOplogResult | null> {
+  async compactIfDue(): Promise<CompactOplogResult | CompactVaultResult | null> {
     if (this.#held) return null;
     const now = this.#deps.now();
     const last = Number(
@@ -826,9 +1204,17 @@ export class SyncLoop {
     });
 
     try {
-      const held = await lease.withLease(() =>
-        compactOplog(this.#storage(), { now: this.#deps.now })
-      );
+      const held = await lease.withLease(async () => {
+        if (this.#format !== 2) {
+          return compactOplog(this.#storage(), { now: this.#deps.now });
+        }
+        const result = await compactVault(this.#storage(), {
+          now: this.#deps.now,
+          nextHlc: this.nextHlc
+        });
+        await this.#retireLegacyLog();
+        return result;
+      });
       return held.ran ? held.result : null;
     } catch (error) {
       this.#deps.onError?.(error);
@@ -903,11 +1289,18 @@ export class SyncLoop {
         .load()
         .filter((entry) => !known.has(entry.hlc));
       if (held.length === 0) return;
+      // A queue left by a format-1 build holds whole conversations. Split as
+      // they go out; the new items are queued durably as well, and the row
+      // keeps its timestamp, so confirming the upload releases the original.
+      const split = this.#split(held);
+      const original = new Set(held.map((entry) => entry.hlc));
+      const added = split.filter((entry) => !original.has(entry.hlc));
+      if (added.length > 0) this.#deps.outbox.add(added);
       // Added to the queue, never substituted for it. `enqueue` treats a table
       // it cannot write to as a warning rather than a failure — the change is
       // still queued in memory — so replacing the queue with the table would
       // throw away exactly the entries that write failed for.
-      this.#pending = [...this.#pending, ...held];
+      this.#pending = [...this.#pending, ...split];
       this.#firstPendingAt ??= this.#deps.now();
       this.#scheduleFlush();
     } catch (error) {

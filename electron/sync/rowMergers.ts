@@ -382,6 +382,17 @@ const mergeChatSession: RowMerger = (local, incoming, { winner }) => {
         changed: false
       };
     }
+    // A conversation's own record in vault format 2 carries no transcript at
+    // all — its messages travel as items — so a row seen here for the first
+    // time starts empty and the items fill it. Only for an absent column: one
+    // that arrived unreadable is still the entry's to answer for.
+    if (!("messages_json" in incoming) && typeof incoming.id === "string") {
+      return {
+        row: { ...incoming, messages_json: "[]" },
+        republish: false,
+        changed: true
+      };
+    }
     return { row: incoming, republish: false, changed: false };
   }
   // A row this machine has never seen. There is no second half to union, and

@@ -1,6 +1,8 @@
 # Sync v2: record nguyên vẹn, log đánh số, format có version
 
-Đề xuất ngày 2026-10-09, chưa code. Bước A (pull chỉ đọc file chưa đọc) đã có ở `b1cc82d`;
+Đề xuất ngày 2026-10-09. Đã code: bước A (`b1cc82d`), B0 (`9693387`), B1 (`6fc46a5`) và B2;
+còn B3 (xoá code v1 khi mọi máy đã lên v2). Những chỗ code khác bản đề xuất ban đầu được ghi
+ngay tại mục đó.
 mô tả code hiện tại nằm trong phần Sync của `CLAUDE.md`.
 
 ## 1. Vì sao
@@ -94,9 +96,11 @@ mọi `version >= 1` và để hai con số quyết định.
 
 ### 4.1 Mỗi message là một record
 
-- Trên vault, transcript không còn là một cột. Mỗi entry là một record `chat_message`, id là
-  `<sessionId>` + `RECORD_ID_SEPARATOR` + `<mid>`, payload là chính entry đó. Record
-  `chat_sessions` chỉ còn các cột khác (tiêu đề, ghim, tóm tắt…).
+- Trên vault, transcript không còn là một cột. Mỗi message là một entry scope `item`
+  (`OpEntry.scope`), key là bảng (`chat_sessions`), record id là `<sessionId>` +
+  `RECORD_ID_SEPARATOR` + `<mid>`, payload là `{ entry }`. Record `chat_sessions` chỉ còn các
+  cột khác (tiêu đề, ghim, tóm tắt…). Code: `transcriptItems.ts`; bảng ghi những gì đã publish
+  là `sync_published_items`.
 - Mọi record, kể cả message, theo **một** luật: bản ghi sau thắng, cả record. Hai máy cùng thêm
   lượt thì đó là hai record khác nhau, cả hai đều còn. Hai máy cùng sửa một message thì một bản
   thắng, nguyên vẹn.
@@ -189,19 +193,28 @@ oplog/, oplog-snapshot/           v1: chỉ đọc trong thời gian chuyển ti
 
 ## 7. Migrate v1 → v2
 
-1. Build v2 mở vault, thấy `dataVersion` 1, nên sẽ migrate.
-2. Đẩy hết outbox, rồi pull v1 lần cuối (bộ đọc tăng dần của bước A).
-3. Dưới lease `format-migration`:
-   - Dựng snapshot v2 từ log v1 đã resolve, **giữ HLC gốc** (dùng merge transcript hiện tại
-     lần cuối, rồi tách thành message record).
-   - Ghi snapshot với vector rỗng.
-   - Ghi `vault/id.json` có điều kiện: `version: 2, dataVersion: 2, dataVersionCompat: 2`.
-4. Máy kia:
+1. Build v2 mở vault, thấy `dataVersion` 1 (`ahead`), nên migrate trước khi loop chạy
+   (`migrateThenStart` trong `main.ts`, `SyncLoop.migrateToV2`).
+2. Dưới lease `format-migration`, pull v1 lần cuối (bộ đọc tăng dần của bước A).
+3. Dựng snapshot v2 **từ dữ liệu trên máy** sau lần pull đó (`collectStampedEntries`), mỗi
+   record **giữ HLC gốc** là stamp `recordVersions` của nó; record chưa từng được stamp mới
+   nhận HLC mới. Dữ liệu trên máy đã là kết quả merge v1, nên không phải resolve lại log v1.
+   Transcript được tách thành item, mỗi item mang HLC của conversation chứa nó.
+4. Ghi snapshot với vector rỗng, rồi ghi `vault/id.json` có điều kiện theo revision:
+   `version: 2, dataVersion: 2, dataVersionCompat: 2` (`SyncService.raiseDataFormat`).
+   Nếu lease đang do máy khác giữ hoặc migrate lỗi, loop dừng và lần `prepareSync` sau thử
+   lại.
+5. Outbox mà build cũ để lại vẫn được gửi: lúc loop nhận lại outbox, conversation nguyên
+   khối được tách thành item.
+6. Máy kia:
    - build có cơ chế kiểm tra thì thấy `outdated` và dừng;
    - build 1.0.x thì dừng ở lỗi danh tính (§3).
-5. **Cầu chuyển tiếp:** trong 7 ngày, build v2 vẫn đọc file mới trong `oplog/` (do máy kia ghi
-   trước khi kịp biết), chuyển sang record v2 rồi áp dụng.
-6. Sau đó xoá `oplog/` và `oplog-snapshot/` dưới lease.
+7. **Cầu chuyển tiếp:** mỗi lần pull, nếu vault còn `oplog/`, build v2 đọc thêm những file v1
+   chưa đọc (bộ đọc của bước A, theo luật merge v1) rồi **publish lại sang v2** những gì vừa
+   nhận: record thường giữ nguyên entry và HLC; conversation được đẩy lại đúng như nó đang có
+   trên máy, nên chỉ message mới mới đi.
+8. Khi file mới nhất trong `oplog/` đã cũ hơn 7 ngày, compaction v2 xoá `oplog/` và
+   `oplog-snapshot/` (`LEGACY_LOG_RETENTION_MS`).
 
 ## 8. Hợp đồng provider
 

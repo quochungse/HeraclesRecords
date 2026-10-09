@@ -40,17 +40,21 @@ import { attachSyncSink } from "./sync/syncBridge";
 import { createSqliteRecordVersions } from "./sync/recordVersions";
 import { createSqliteOutbox } from "./sync/outbox";
 import { createSqliteReadIndex } from "./sync/readIndex";
+import { createSqlitePublishedItems } from "./sync/transcriptItems";
+import { createSqliteVectorStore } from "./sync/vectorStore";
 import { attachAnalysisLeases } from "./sync/automationLease";
 import {
   captureSyncableState,
   collectFullStateEntries,
+  collectStampedEntries,
   publishFullState
 } from "./sync/fullState";
 import type { SyncableStateCapture } from "./sync/fullState";
 import {
   commitPublishedLocalStorage,
   diffLocalStorage,
-  noteAppliedLocalStorage
+  noteAppliedLocalStorage,
+  publishedLocalStorage
 } from "./sync/localStorageSync";
 import type {
   LocalStoragePublishResult,
@@ -1215,11 +1219,16 @@ function stopSyncLoop(): void {
  * back short of "ready" is a destination that did not answer.
  */
 async function prepareSync(): Promise<SyncVaultState> {
-  const state = await syncService().prepare();
+  const service = syncService();
+  const state = await service.prepare();
   if (state === "ready") {
     // A loop held for an outdated format is not one to resume.
     if (syncLoopInstance?.isHeld) stopSyncLoop();
-    startSyncLoop();
+    // A vault still in an older format is moved to this build's before the
+    // loop reads or writes anything (docs/sync-v2.md §7).
+    const migrate =
+      !syncLoopInstance && (await service.checkDataFormat()) === "ahead";
+    startSyncLoop({ migrate });
   } else if (state === "outdated") {
     holdSyncLoop();
   } else if (state === "signed-out" || state === "wrong-owner") {
@@ -1237,11 +1246,15 @@ async function prepareSync(): Promise<SyncVaultState> {
  *  format against. Reset with every loop. */
 let gatedIdentityRevision: string | null = null;
 
-function startSyncLoop({ held = false }: { held?: boolean } = {}): SyncLoop | null {
+function startSyncLoop({
+  held = false,
+  migrate = false
+}: { held?: boolean; migrate?: boolean } = {}): SyncLoop | null {
   const service = syncService();
   if (syncLoopInstance) return syncLoopInstance;
   if (!service.isReady) return null;
   gatedIdentityRevision = null;
+  const recordVersions = createSqliteRecordVersions();
 
   const loop = new SyncLoop({
     provider: () => service.dataProvider(),
@@ -1253,9 +1266,15 @@ function startSyncLoop({ held = false }: { held?: boolean } = {}): SyncLoop | nu
     now: () => Date.now(),
     setTimer: (fn, ms) => setTimeout(fn, ms),
     clearTimer: (handle) => clearTimeout(handle as NodeJS.Timeout),
-    recordVersions: createSqliteRecordVersions(),
+    recordVersions,
     outbox: createSqliteOutbox(),
     readIndex: createSqliteReadIndex(),
+    // Vault format 2: a numbered log with heads, coach transcripts a message
+    // at a time (docs/sync-v2.md).
+    format: 2,
+    publishedItems: createSqlitePublishedItems(),
+    vector: createSqliteVectorStore(),
+    buildId: app.getVersion(),
     // The other machine may move the vault to a newer data format while this
     // one runs. The identity's revision is in every listing, so it is read
     // again only when it changed — once per loop, and after a claim or an
@@ -1342,8 +1361,12 @@ function startSyncLoop({ held = false }: { held?: boolean } = {}): SyncLoop | nu
       )
   });
 
-  loop.start();
   syncLoopInstance = loop;
+  if (migrate) {
+    void migrateThenStart(loop, service, recordVersions);
+    return loop;
+  }
+  loop.start();
 
   // The oplog only ever learned about records written while it was running, so
   // on a machine that has been in use for months it starts out describing
@@ -1351,6 +1374,46 @@ function startSyncLoop({ held = false }: { held?: boolean } = {}): SyncLoop | nu
   void seedVaultIfNeeded(loop, service);
 
   return loop;
+}
+
+/**
+ * Move a format-1 vault to format 2, then run the loop over it.
+ *
+ * Nothing is pushed or pulled before: the loop is not started, and a pull
+ * asked for meanwhile (the start-up one) waits behind the migration. When the
+ * migration cannot run — another machine holds its lease, or it failed — the
+ * loop is stopped and the next `prepareSync` tries again; by then the vault
+ * may simply be in format 2 already.
+ */
+async function migrateThenStart(
+  loop: SyncLoop,
+  service: ReturnType<typeof syncService>,
+  recordVersions: ReturnType<typeof createSqliteRecordVersions>
+): Promise<void> {
+  try {
+    const moved = await loop.migrateToV2({
+      collect: () =>
+        collectStampedEntries({
+          stampOf: (identity) => recordVersions.get(identity),
+          nextHlc: loop.nextHlc,
+          localStorage: publishedLocalStorage({ getSetting })
+        }),
+      stillNeeded: async () => (await service.checkDataFormat()) === "ahead",
+      raiseFormat: () => service.raiseDataFormat()
+    });
+    if (!moved && (await service.checkDataFormat()) === "ahead") {
+      console.info("[sync] another machine is moving the vault to format 2; trying later");
+      if (syncLoopInstance === loop) stopSyncLoop();
+      return;
+    }
+  } catch (error) {
+    console.warn("[sync] could not move the vault to format 2", error);
+    if (syncLoopInstance === loop) stopSyncLoop();
+    return;
+  }
+  if (syncLoopInstance !== loop) return;
+  loop.start();
+  void seedVaultIfNeeded(loop, service);
 }
 
 /**

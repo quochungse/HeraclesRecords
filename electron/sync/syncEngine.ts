@@ -39,6 +39,13 @@ export interface SyncTarget {
     context?: { readonly winner: boolean }
   ): void;
   deleteRow(table: string, recordId: string): void;
+  /** One element of a row's list column (an `item` entry). Optional: a target
+   *  that has none refuses them, as it would an unknown table. */
+  upsertItem?(table: string, recordId: string, entry: Record<string, unknown>): void;
+  deleteItem?(table: string, recordId: string): void;
+  /** A row as it stands here, for what must be published again as it now
+   *  reads — the format-1 bridge's conversations. */
+  readRow?(table: string, recordId: string): Record<string, unknown> | undefined;
   setSetting(key: string, value: string): void;
   deleteSetting(key: string): void;
   setLocalStorage(key: string, value: string): void;
@@ -214,6 +221,11 @@ export function tierForEntry(
       return policyForSetting(entry.key);
     case "localStorage":
       return policyForLocalStorage(entry.key);
+    case "item": {
+      // An element travels in its table's tier.
+      const policy = policyForTable(entry.key);
+      return policy === "perKey" || policy === undefined ? undefined : policy;
+    }
   }
 }
 
@@ -249,7 +261,7 @@ export function resolve(entries: readonly OpEntry[]): Map<string, OpEntry> {
 export function tablesTouched(entries: readonly OpEntry[]): string[] {
   const tables = new Set<string>();
   for (const entry of entries) {
-    if (entry.scope === "table") tables.add(entry.key);
+    if (entry.scope === "table" || entry.scope === "item") tables.add(entry.key);
   }
   return [...tables];
 }
@@ -282,7 +294,7 @@ export function applyEntries(
       rejected.push({ entry, reason: "not-syncable" });
       continue;
     }
-    if (entry.scope === "table" && !entry.recordId) {
+    if ((entry.scope === "table" || entry.scope === "item") && !entry.recordId) {
       rejected.push({ entry, reason: "malformed" });
       continue;
     }
@@ -335,6 +347,10 @@ export function applyEntries(
           case "localStorage":
             target.deleteLocalStorage(entry.key);
             break;
+          case "item":
+            if (!target.deleteItem) throw new Error("This target takes no items");
+            target.deleteItem(entry.key, entry.recordId as string);
+            break;
         }
         deleted += 1;
       } else {
@@ -358,6 +374,19 @@ export function applyEntries(
           case "localStorage":
             target.setLocalStorage(entry.key, stringValue(entry.payload));
             break;
+          case "item": {
+            const element = entry.payload?.entry;
+            if (!target.upsertItem) throw new Error("This target takes no items");
+            if (!element || typeof element !== "object" || Array.isArray(element)) {
+              throw new Error("An item entry carries no element");
+            }
+            target.upsertItem(
+              entry.key,
+              entry.recordId as string,
+              element as Record<string, unknown>
+            );
+            break;
+          }
         }
         applied += 1;
       }
@@ -452,6 +481,21 @@ export class ChangeBuilder {
       recordId,
       payload: row
     });
+  }
+
+  /** One element of a row's list column; see `OpEntry.key`. */
+  item(table: string, recordId: string, element: Record<string, unknown>): this {
+    return this.#push({
+      op: "set",
+      scope: "item",
+      key: table,
+      recordId,
+      payload: { entry: element }
+    });
+  }
+
+  deleteItem(table: string, recordId: string): this {
+    return this.#push({ op: "delete", scope: "item", key: table, recordId });
   }
 
   deleteRow(table: string, recordId: string): this {

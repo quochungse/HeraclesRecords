@@ -293,7 +293,9 @@ export class SyncService {
    */
   async #mintIdentity(owner: string): Promise<VaultIdentity> {
     const identity: VaultIdentity = {
-      version: 1,
+      // A vault born in format 2 is one no build from before the numbers may
+      // touch; they accept only identity version 1 (docs/sync-v2.md §3).
+      version: BUILD_DATA_FORMAT.dataVersion >= 2 ? 2 : 1,
       id: crypto.randomBytes(8).toString("hex"),
       createdAt: this.#deps.now().toISOString(),
       owner,
@@ -381,6 +383,36 @@ export class SyncService {
   async checkDataFormat(): Promise<DataFormatVerdict | null> {
     const identity = await this.#readIdentity();
     return identity ? dataFormatVerdict(vaultDataFormat(identity)) : null;
+  }
+
+  /**
+   * Raise the vault's format to this build's, once a migration has written
+   * what the new format needs. Conditional on the revision just read, so two
+   * machines migrating together cannot both write it; never lowers either
+   * number; and raises the identity's own version to 2, which is what stops a
+   * build from before the numbers.
+   */
+  async raiseDataFormat(): Promise<void> {
+    const stored = await this.#provider().get(VAULT_ID_PATH);
+    if (!stored) throw new Error("The vault has no identity to raise.");
+    const parsed: unknown = JSON.parse(stored.content.toString("utf8"));
+    if (!isVaultIdentity(parsed)) throw new Error("The vault's identity cannot be read.");
+    const current = vaultDataFormat(parsed);
+    if (dataFormatVerdict(current) !== "ahead") return;
+    const raised: VaultIdentity = {
+      ...parsed,
+      version: Math.max(parsed.version, BUILD_DATA_FORMAT.dataVersion >= 2 ? 2 : 1),
+      dataVersion: BUILD_DATA_FORMAT.dataVersion,
+      dataVersionCompat: Math.max(
+        current.dataVersionCompat,
+        BUILD_DATA_FORMAT.dataVersionCompat
+      )
+    };
+    await this.#provider().put(
+      VAULT_ID_PATH,
+      Buffer.from(JSON.stringify(raised), "utf8"),
+      stored.revision
+    );
   }
 
   // --- Status ----------------------------------------------------------------

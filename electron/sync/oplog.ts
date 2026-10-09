@@ -45,14 +45,22 @@ export const OPLOG_ROOT = "oplog";
 export const OPLOG_SNAPSHOT_ROOT = "oplog-snapshot";
 
 /** What a change touches. Mirrors the three stores syncPolicy classifies. */
-export type OpScope = "table" | "setting" | "localStorage";
+export type OpScope = "table" | "setting" | "localStorage" | "item";
 
 export interface OpEntry {
   /** Serialised HLC; also the total order these are applied in. */
   readonly hlc: string;
   readonly op: "set" | "delete";
   readonly scope: OpScope;
-  /** Table name for `table`, otherwise the settings / localStorage key. */
+  /**
+   * Table name for `table`, otherwise the settings / localStorage key.
+   *
+   * An `item` is one element of a table's list column — a message of a coach
+   * conversation, carried as a record of its own so that a turn sends the turn
+   * and not the transcript (vault format 2, docs/sync-v2.md §4.1). Its key is
+   * the table and its record id is the row's id and the element's, joined by
+   * `RECORD_ID_SEPARATOR`; its payload is `{ entry }`.
+   */
   readonly key: string;
   /** Primary key of the row, for `table` scope only. */
   readonly recordId?: string;
@@ -66,8 +74,8 @@ export interface OpEntry {
 export function entryIdentity(
   entry: Pick<OpEntry, "scope" | "key" | "recordId">
 ): string {
-  return entry.scope === "table"
-    ? `table:${entry.key}:${entry.recordId ?? ""}`
+  return entry.scope === "table" || entry.scope === "item"
+    ? `${entry.scope}:${entry.key}:${entry.recordId ?? ""}`
     : `${entry.scope}:${entry.key}`;
 }
 
@@ -83,12 +91,16 @@ export function isValidEntry(value: unknown): value is OpEntry {
   if (
     entry.scope !== "table" &&
     entry.scope !== "setting" &&
-    entry.scope !== "localStorage"
+    entry.scope !== "localStorage" &&
+    entry.scope !== "item"
   ) {
     return false;
   }
   if (typeof entry.key !== "string" || entry.key.length === 0) return false;
-  if (entry.scope === "table" && typeof entry.recordId !== "string") {
+  if (
+    (entry.scope === "table" || entry.scope === "item") &&
+    typeof entry.recordId !== "string"
+  ) {
     return false;
   }
   if (entry.op === "set" && (!entry.payload || typeof entry.payload !== "object")) {
@@ -309,7 +321,15 @@ export async function listLogFiles(storage: StorageProvider): Promise<LogListing
 
 /** Whether `path` names a file of the log, which is never rewritten in place. */
 export function isLogFilePath(path: string): boolean {
-  return isUnderPrefix(path, OPLOG_ROOT) || OPLOG_SNAPSHOT_PATTERN.test(path);
+  return (
+    isUnderPrefix(path, OPLOG_ROOT) ||
+    OPLOG_SNAPSHOT_PATTERN.test(path) ||
+    // Format 2's batches and snapshots (vaultLog.ts), named the same way: written
+    // once, never rewritten. Spelled here rather than imported, since vaultLog
+    // imports this module.
+    /^log\/[^/]+\/\d{10}\.jsonl$/.test(path) ||
+    /^snap\/[0-9a-f]{12}-[0-9a-f]{4}-[^/]+\.json$/.test(path)
+  );
 }
 
 /**

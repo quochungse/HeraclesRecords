@@ -363,12 +363,42 @@ console.log("ok  a newer but compatible vault syncs, and keeps its numbers");
       "vault/id.json"
     ).toString("utf8")
   );
-  assert.equal(written.version, 1, "readable by every build from before the numbers");
+  assert.equal(
+    written.version,
+    BUILD_DATA_FORMAT.dataVersion >= 2 ? 2 : 1,
+    "from format 2, an identity no build from before the numbers will touch"
+  );
   assert.equal(written.dataVersion, BUILD_DATA_FORMAT.dataVersion);
   assert.equal(written.dataVersionCompat, BUILD_DATA_FORMAT.dataVersionCompat);
   assert.equal((await service.status()).dataFormat, "current");
 }
 console.log("ok  a new vault is stamped with this build's format");
+
+// A format-1 vault raised to this build's format once it has migrated: the
+// identity's own version goes to 2 — what stops a build from before the
+// numbers — and the owner and id are kept.
+{
+  const { folder, read } = await vaultWithIdentity("vault-raise", {
+    version: 1,
+    id: "1111222233334444",
+    createdAt: "2026-01-01T00:00:00.000Z",
+    owner: ALICE
+  });
+  const { service } = makeMachine(ALICE, { folder });
+  assert.equal(await service.checkDataFormat(), "ahead", "a format-1 vault is behind this build");
+  assert.equal(await service.prepare(), "ready", "and is still prepared, for the migration");
+  await service.raiseDataFormat();
+  const raised = await read();
+  assert.equal(raised.version, 2);
+  assert.equal(raised.dataVersion, BUILD_DATA_FORMAT.dataVersion);
+  assert.equal(raised.dataVersionCompat, BUILD_DATA_FORMAT.dataVersionCompat);
+  assert.equal(raised.owner, ALICE);
+  assert.equal(raised.id, "1111222233334444");
+  assert.equal(await service.checkDataFormat(), "current");
+  await service.raiseDataFormat();
+  assert.deepEqual(await read(), raised, "raising an already current vault writes nothing");
+}
+console.log("ok  a migrated vault is raised to this build's format, once");
 
 // Windows will not unlink a file that is still open, so the handle has to
 // go before the tree does.

@@ -24,8 +24,10 @@ import type { DataFormatVerdict } from "./syncTypes";
 
 export type { DataFormatVerdict };
 
-export const DATA_VERSION = 1;
-export const DATA_VERSION_COMPAT = 1;
+// 2: a numbered log with heads and a vector, coach transcripts a message at a
+// time (docs/sync-v2.md). Not readable by format 1, so both numbers move.
+export const DATA_VERSION = 2;
+export const DATA_VERSION_COMPAT = 2;
 
 export interface DataFormat {
   readonly dataVersion: number;

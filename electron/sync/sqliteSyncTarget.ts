@@ -20,6 +20,18 @@ import { entryIdentity } from "./oplog";
 import { rowMergerFor } from "./rowMergers";
 import type { ContentChange, RepublishRow } from "./syncEngine";
 import type { SyncTarget } from "./syncEngine";
+import {
+  createSqlitePublishedItems,
+  elementHash,
+  itemisedColumn,
+  parseList,
+  placeElement,
+  removeElement,
+  splitItemRecordId,
+  withElementId,
+  type ListElement,
+  type PublishedItemStore
+} from "./transcriptItems";
 
 /** A localStorage write the renderer still has to perform. */
 export interface PendingLocalStorageOp {
@@ -43,6 +55,13 @@ export class SqliteSyncTarget implements SyncTarget {
   readonly #republish: RepublishRow[] = [];
   /** Keyed by identity, so a record folded from three entries is listed once. */
   readonly #contentChanges = new Map<string, ContentChange>();
+  readonly #published: PublishedItemStore;
+
+  /** `published` is where an element taken in is recorded as held, so the
+   *  next save of its row does not send it back out. */
+  constructor(published: PublishedItemStore = createSqlitePublishedItems()) {
+    this.#published = published;
+  }
 
   /**
    * Rows whose merge produced something the vault does not hold, taken and
@@ -330,6 +349,66 @@ export class SqliteSyncTarget implements SyncTarget {
     if (removed > 0 && rowMergerFor(table)) {
       this.#noteContentChange(table, recordId, true);
     }
+    if (itemisedColumn(table)) this.#published.clear(table, recordId);
+  }
+
+  /** See `SyncTarget.readRow`. */
+  readRow(table: string, recordId: string): Record<string, unknown> | undefined {
+    return this.#readRow(table, this.#shapeOf(table), recordId);
+  }
+
+  /**
+   * One element of an itemised row, put in place by its id.
+   *
+   * A row that is not here is a row deleted here — a conversation's own
+   * record always travels ahead of its elements — so the element goes with
+   * it rather than bringing back a stub.
+   */
+  upsertItem(table: string, itemId: string, element: Record<string, unknown>): void {
+    const target = this.#itemTarget(table, itemId);
+    if (!target) return;
+    const travelling = withElementId(element, target.id);
+    const next = placeElement(target.list, target.id, travelling);
+    this.#published.set(table, target.recordId, target.id, elementHash(travelling));
+    if (next) this.#writeList(table, target, next);
+  }
+
+  deleteItem(table: string, itemId: string): void {
+    const target = this.#itemTarget(table, itemId);
+    if (!target) return;
+    const next = removeElement(target.list, target.id);
+    this.#published.remove(table, target.recordId, target.id);
+    if (next) this.#writeList(table, target, next);
+  }
+
+  #itemTarget(
+    table: string,
+    itemId: string
+  ): { recordId: string; id: string; column: string; list: ListElement[] } | null {
+    const column = itemisedColumn(table);
+    if (!column) throw new Error(`${table} has no items`);
+    const parts = splitItemRecordId(itemId);
+    if (!parts) throw new Error(`Malformed item id for ${table}`);
+    const [recordId, id] = parts;
+    const shape = this.#shapeOf(table);
+    const row = this.#readRow(table, shape, recordId);
+    if (!row) return null;
+    const list = parseList(row[column]);
+    if (!list) throw new Error(`The ${column} of ${table} ${recordId} cannot be read`);
+    return { recordId, id, column, list };
+  }
+
+  #writeList(
+    table: string,
+    target: { recordId: string; column: string },
+    list: readonly ListElement[]
+  ): void {
+    const shape = this.#shapeOf(table);
+    const keyMatch = shape.primaryKey.map((column) => `${column} = ?`).join(" AND ");
+    requireDatabase()
+      .prepare(`UPDATE ${table} SET ${target.column} = ? WHERE ${keyMatch}`)
+      .run(JSON.stringify(list), ...target.recordId.split(RECORD_ID_SEPARATOR));
+    this.#noteContentChange(table, target.recordId, false);
   }
 
   setSetting(key: string, value: string): void {

@@ -108,6 +108,13 @@ export const TABLE_POLICY: Readonly<Record<string, TablePolicy>> = {
   // `sqliteSyncTarget.ts`.
   sync_local_storage_inbox: "device",
 
+  // Vault format 2: which elements of an itemised list this machine has sent or
+  // taken, and how far it has read each device's log. `device`: both describe
+  // this copy, and carried elsewhere would make another machine skip what it
+  // never had. See `transcriptItems.ts` and `vectorStore.ts`.
+  sync_published_items: "device",
+  sync_vector: "device",
+
   // Execution records of analysis runs. Not synced: a run belongs to whichever
   // machine held the lease, and syncing them would fight that lease.
   // What a run *produces* lands in chat_sessions, which is synced.
@@ -286,6 +293,10 @@ export const SETTING_POLICY: Readonly<Record<string, SyncTier>> = {
   // it had just compacted because one of them had.
   "sync.lastPulledAt": "device",
   "sync.lastCompactedAt": "device",
+  // Format 2's own bookkeeping: which snapshot this machine last read, and
+  // which app version last read the vault from one. This copy's, not the data's.
+  "sync.v2.lastSnapshot": "device",
+  "sync.v2.fullReadBuild": "device",
   // The Google connection. Sealed by this machine's keychain and never synced:
   // the destination it unlocks is the destination it would be synced to, and a
   // refresh token that reached another machine would hand over the whole Drive

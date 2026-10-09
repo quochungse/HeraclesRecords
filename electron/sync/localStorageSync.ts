@@ -46,6 +46,14 @@ export interface AppliedLocalStorageOp {
   readonly value?: string;
 }
 
+/** What this machine last published or received of the renderer's
+ *  localStorage — the only copy of it the main process has. */
+export function publishedLocalStorage(
+  deps: Pick<LocalStorageSyncDeps, "getSetting">
+): Record<string, string> {
+  return readPublished(deps as LocalStorageSyncDeps);
+}
+
 function readPublished(
   deps: LocalStorageSyncDeps
 ): Record<string, string> {

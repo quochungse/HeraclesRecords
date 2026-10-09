@@ -2317,6 +2317,29 @@ lives at module level for the same visit-to-visit reason — see `useCalendarDat
     raises `DATA_VERSION` only; anything else raises both. Builds from before the numbers
     (1.0.x) accept only identity `version: 1` and refuse anything else without writing,
     which is how the first breaking format stops them: by raising that to 2.
+  - **This build writes format 2** (`DATA_VERSION = 2`, docs/sync-v2.md), and three things
+    differ from the `oplog/` layout the rest of this section describes. **The log is
+    numbered per device** (`vaultLog.ts`: `log/<device>/<seq>.jsonl`, claimed once, and
+    `heads/<device>.json`, written only by that device): a pull lists the vault, fetches a
+    head only when its revision moved, and asks for the next batches by name against a
+    version vector (`sync_vector`); a batch that is gone was compacted, so the snapshot
+    (`snap/<hlc>.json`, carrying the vector it covers) is read — and otherwise only when
+    this machine has never read one (`sync.v2.lastSnapshot`) or the app version changed
+    (`sync.v2.fullReadBuild`, the one rule for entries an older build could not take).
+    **A coach message is a record of its own**: a `chat_sessions` row goes out without
+    `messages_json`, each message that changed since it was last published
+    (`sync_published_items`) as an `item` entry, so a turn sends kilobytes, and
+    `SqliteSyncTarget.upsertItem` puts one in place by `mid` and records it as published so
+    it is not sent back. Every record — messages included — is last-writer-wins whole; the
+    transcript union in `rowMergers.ts` now serves only the bridge. **A format-1 vault is
+    migrated once** before the loop starts (`migrateThenStart` → `SyncLoop.migrateToV2`,
+    lease `format-migration`): a last v1 pull, a snapshot of this machine's data with each
+    record under its `recordVersions` stamp, then `raiseDataFormat`. While `oplog/` exists
+    every pull also reads its unread files and publishes what they brought in format 2
+    (the bridge), and compaction deletes it a week after its newest file. The `oplog`
+    layout, `readIndex` and the transcript union stay only for that, until B3 removes
+    them; the suites written before format 2 still drive `SyncLoop` in format 1, its
+    default, and `test:sync-v2` drives format 2.
   - **An entry is applied only when it is newer than the row it would overwrite, and
     `sync_record_versions` is how that question can be asked at all.** The merge compares
     entries against each other and never against the database — `resolve()` picks a winner
