@@ -675,10 +675,22 @@ assert.match(
     attentionDb
   );
   const off = createCoachAnalysis(
-    { sessionId: "s-off", name: "Off", playbook: "p" },
+    {
+      sessionId: "s-off",
+      name: "Off",
+      playbook: "p",
+      trigger: { kind: "schedule", cadence: "daily", timeOfDay: "21:00" }
+    },
     attentionDb
   );
   setCoachAnalysisEnabled(off.id, false, attentionDb);
+  // A manual analysis switched off by an earlier build: it has no switch now,
+  // and still runs when asked, so it still holds its conversation.
+  const stale = createCoachAnalysis(
+    { sessionId: "s-stale", name: "Stale", playbook: "p" },
+    attentionDb
+  );
+  setCoachAnalysisEnabled(stale.id, false, attentionDb);
 
   const byId = () =>
     new Map(
@@ -701,6 +713,8 @@ assert.match(
   // from being let go), but the list's mark is for one that fires on its own.
   assert.equal(live.trigger, null);
   assert.equal(marks.get("s-live").scheduled, false, "a manual analysis earns no mark");
+  assert.equal(marks.get("s-stale").attached, true, "a manual analysis is live whatever its old switch says");
+  assert.equal(marks.get("s-stale").scheduled, false);
   createCoachAnalysis(
     {
       sessionId: "s-auto",

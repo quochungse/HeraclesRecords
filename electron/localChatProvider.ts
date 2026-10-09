@@ -7,6 +7,7 @@ import type {
   LocalChatServerCandidate
 } from "./types";
 import { addTokenUsage, countableUsage } from "./tokenUsage";
+import { WEB_SEARCH_TOOL } from "./chatToolSources";
 
 export const DEFAULT_LOCAL_CHAT_BASE_URL = "http://localhost:11434/v1";
 
@@ -408,7 +409,9 @@ export async function streamOpenAiCompatibleChatCompletion(
     }
 
     if ("toolsUnsupported" in opened) {
+      // A server tool is a tool too: a model that takes none takes neither.
       tools = [];
+      serverTools = [];
       input = buildLocalInputMessages(
         options.fallbackInstructions ?? options.instructions,
         options.messages
@@ -429,7 +432,7 @@ export async function streamOpenAiCompatibleChatCompletion(
       options.onToken
     );
     for (let search = 0; search < webSearches; search++) {
-      options.onServerToolUse?.("web_search");
+      options.onServerToolUse?.(WEB_SEARCH_TOOL);
     }
     if (roundModel) {
       resolvedModel = roundModel;

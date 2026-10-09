@@ -7,6 +7,7 @@ import { constants as fsConstants, mkdirSync } from "node:fs";
 import { z } from "zod";
 import { formatClaudeModelName } from "./chatModels";
 import { tokenUsage } from "./tokenUsage";
+import { WEB_FETCH_TOOL, WEB_SEARCH_TOOL } from "./chatToolSources";
 import type { ChatModelOption } from "./chatModels";
 import type {
   AnthropicEffort,
@@ -313,6 +314,12 @@ export async function detectClaudeCodeExecutable(
   return found[best];
 }
 
+/** The CLI's web tools, by the name every provider reports a web lookup under. */
+const CLAUDE_WEB_TOOLS: Readonly<Record<string, string>> = {
+  WebSearch: WEB_SEARCH_TOOL,
+  WebFetch: WEB_FETCH_TOOL
+};
+
 /**
  * Builds the environment every Claude Code invocation runs under.
  *
@@ -321,12 +328,6 @@ export async function detectClaudeCodeExecutable(
  * reading or disturbing the account the user is signed into elsewhere on this
  * computer. Omit it to share the machine-wide login in ~/.claude.
  */
-/** The CLI's web tools, by the name every provider reports a web lookup under. */
-const CLAUDE_WEB_TOOLS: Readonly<Record<string, string>> = {
-  WebSearch: "web_search",
-  WebFetch: "web_fetch"
-};
-
 export function createClaudeSubscriptionEnvironment(
   configDir?: string
 ): NodeJS.ProcessEnv {

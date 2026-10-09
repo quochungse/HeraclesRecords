@@ -2090,10 +2090,14 @@ async function streamChatTurn(
         fallbackInstructions: joinSystemPrompt(coachSystemPrompt(context, [])),
         messages,
         tools: chatTools,
-        ...(webSearch ? { webSearch: true } : {}),
-        onServerToolUse: (name) => {
-          send("chat:streamInfo", { requestId, kind: "mcp", tool: name, status: "call" });
-        },
+        ...(webSearch
+          ? {
+              webSearch: true,
+              onServerToolUse: (name: string) => {
+                send("chat:streamInfo", { requestId, kind: "mcp", tool: name, status: "call" });
+              }
+            }
+          : {}),
         maxToolRounds: MAX_TOOL_ROUNDS,
         signal: controller.signal,
         onToken: (delta) => {

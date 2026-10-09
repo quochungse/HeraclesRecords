@@ -24,6 +24,9 @@ export const WEB_SEARCH_TOOL = "web_search";
 export const WEB_FETCH_TOOL = "web_fetch";
 const WEB_TOOLS: ReadonlySet<string> = new Set([WEB_SEARCH_TOOL, WEB_FETCH_TOOL]);
 
+/** What a local tool reads from: never a server or the web. */
+type LocalChatToolSource = Exclude<ChatToolSource, "mcp" | "web"> | null;
+
 /**
  * Every local tool by where it reads from. `null` is a tool that reads nothing:
  * the coach's question card and the two draft previews, which the app builds
@@ -36,8 +39,8 @@ const WEB_TOOLS: ReadonlySet<string> = new Set([WEB_SEARCH_TOOL, WEB_FETCH_TOOL]
  * `test:chat-tool-sources` fails on a local tool missing here, because an
  * unlisted name falls through to the MCP label.
  */
-export const LOCAL_CHAT_TOOL_SOURCES: ReadonlyMap<string, Exclude<ChatToolSource, "mcp" | "web"> | null> =
-  new Map<string, Exclude<ChatToolSource, "mcp" | "web"> | null>([
+export const LOCAL_CHAT_TOOL_SOURCES: ReadonlyMap<string, LocalChatToolSource> =
+  new Map<string, LocalChatToolSource>([
     ["list_recent_activities", "coros"],
     ["get_activity_detail", "coros"],
     ["get_fitness_trends", "coros"],

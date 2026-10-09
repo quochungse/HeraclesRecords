@@ -969,11 +969,15 @@ async function withLibraryWorkouts(
   reads = new Map<string, Promise<LibraryRead>>()
 ): Promise<{ ok: true; args: Record<string, unknown> } | { ok: false; errors: string[] }> {
   const workouts = Array.isArray(args.workouts) ? (args.workouts as unknown[]) : [];
-  const idOf = (item: unknown) =>
-    item && typeof item === "object" ? String((item as Record<string, unknown>).library_workout_id ?? "").trim() : "";
+  const fieldsOf = (item: unknown): Record<string, unknown> =>
+    item && typeof item === "object" ? (item as Record<string, unknown>) : {};
+  const idOf = (item: unknown) => String(fieldsOf(item).library_workout_id ?? "").trim();
+  const hasSteps = (item: unknown) => {
+    const { steps } = fieldsOf(item);
+    return Array.isArray(steps) && steps.length > 0;
+  };
   if (!workouts.some((item) => idOf(item))) return { ok: true, args };
 
-  const hasSteps = (item: unknown) => Array.isArray((item as Record<string, unknown>).steps) && ((item as Record<string, unknown>).steps as unknown[]).length > 0;
   const needed = new Set(workouts.filter((item) => idOf(item) && !hasSteps(item)).map(idOf));
   for (const id of needed) {
     if (reads.has(id)) continue;

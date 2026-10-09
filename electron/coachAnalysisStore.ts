@@ -1168,15 +1168,15 @@ export function listCoachAnalysisSessionAttention(
   };
 
   for (const row of database.listAnalyses()) {
-    // A manual analysis still attaches its conversation — it keeps a blank
-    // one from being let go — but only a trigger earns the list's mark.
-    if (row.enabled === 1) {
-      const mark = entry(row.session_id);
-      mark.attached = true;
-      if (readTrigger(row, database).trigger) {
-        mark.scheduled = true;
-      }
-    }
+    // A manual analysis attaches its conversation whatever its switch says:
+    // it has no switch any more, and runs whenever it is asked. That keeps a
+    // blank conversation from being let go; only a live trigger earns the
+    // list's mark.
+    const scheduled = readTrigger(row, database).trigger !== null;
+    if (scheduled && row.enabled !== 1) continue;
+    const mark = entry(row.session_id);
+    mark.attached = true;
+    mark.scheduled ||= scheduled;
   }
 
   for (const row of database.listRuns({

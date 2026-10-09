@@ -3,9 +3,10 @@ import type {
   ChatProvider,
   ChatSettings,
   ClaudeCodeStatus,
+  ConversationSettings,
   TrainingPlanDataSources
 } from "../../electron/types";
-import { OptionChips } from "../components/OptionGroup";
+import { OptionChips, type OptionGroupOption } from "../components/OptionGroup";
 import { GeneratorProviderPanel } from "../training-library/GeneratorProviderPanel";
 import {
   OTHER_SERVERS_WITHHELD_NOTE,
@@ -26,10 +27,21 @@ const PERMISSION_LABELS: Record<SourceKey, string> = {
   zones: "Zones"
 };
 
-const WEB_TITLE = "Web: search the internet for races, events and anything else your data does not hold";
+const PERMISSION_OPTIONS: readonly OptionGroupOption<PermissionKey>[] = [
+  ...SOURCES.map((source) => ({
+    value: source.value,
+    label: PERMISSION_LABELS[source.value],
+    title: `${source.label}: ${source.detail}`
+  })),
+  {
+    value: "web",
+    label: "Web",
+    title: "Web: search the internet for races, events and anything else your data does not hold"
+  }
+];
 
 /** What switching the web on means with this provider, in one sentence. */
-export function webSearchNote(provider: ChatProvider): string {
+function webSearchNote(provider: ChatProvider): string {
   switch (provider) {
     case "local":
       return "A local model cannot search the web, so Coach answers here without it.";
@@ -59,11 +71,9 @@ export function ConversationAiSheet({
   runtime,
   readiness,
   claudeStatus,
-  sources,
-  web = false,
+  conversation,
   onChange,
-  onSourcesChange,
-  onWebChange,
+  onConversationChange,
   onClose,
   onOpenCoachSettings
 }: {
@@ -71,13 +81,10 @@ export function ConversationAiSheet({
   runtime: GeneratorRuntime;
   readiness: Partial<Record<ChatProvider, boolean>>;
   claudeStatus: ClaudeCodeStatus | null;
-  /** The open conversation's sources; absent with none open, and the section is not drawn. */
-  sources?: TrainingPlanDataSources;
-  /** Whether Coach may search the web in the open conversation. */
-  web?: boolean;
+  /** The open conversation's settings; absent with none open, and Permissions is not drawn. */
+  conversation?: ConversationSettings;
   onChange: (next: GeneratorRuntime) => void;
-  onSourcesChange?: (next: TrainingPlanDataSources) => void;
-  onWebChange?: (next: boolean) => void;
+  onConversationChange: (next: ConversationSettings) => void;
   onClose: () => void;
   onOpenCoachSettings: () => void;
 }) {
@@ -93,40 +100,52 @@ export function ConversationAiSheet({
         onDone={onClose}
         onOpenCoach={onOpenCoachSettings}
       >
-        {sources && onSourcesChange ? (
-          <>
-            <p className="tl-eyebrow">Permissions</p>
-            <OptionChips<PermissionKey>
-              label="What Coach may read"
-              appearance="tiles"
-              options={[
-                ...SOURCES.map((source) => ({
-                  value: source.value,
-                  label: PERMISSION_LABELS[source.value],
-                  title: `${source.label}: ${source.detail}`
-                })),
-                ...(onWebChange ? [{ value: "web" as const, label: "Web", title: WEB_TITLE }] : [])
-              ]}
-              values={[
-                ...SOURCES.filter((source) => sources[source.value]).map((source) => source.value),
-                ...(onWebChange && web ? ["web" as const] : [])
-              ]}
-              onToggle={(value) =>
-                value === "web"
-                  ? onWebChange?.(!web)
-                  : onSourcesChange({ ...sources, [value]: !sources[value] })
-              }
-            />
-            {anySourceWithheld(sources) ? (
-              <p className="plan-generator-sheet-note">{OTHER_SERVERS_WITHHELD_NOTE}</p>
-            ) : null}
-            {onWebChange && (web || runtime.provider === "local") ? (
-              <p className="plan-generator-sheet-note">{webSearchNote(runtime.provider)}</p>
-            ) : null}
-          </>
+        {conversation ? (
+          <Permissions conversation={conversation} provider={runtime.provider} onChange={onConversationChange} />
         ) : null}
       </GeneratorProviderPanel>
     </div>,
     document.body
+  );
+}
+
+/** What Coach may read in the conversation, and whether it may search the web. */
+function Permissions({
+  conversation,
+  provider,
+  onChange
+}: {
+  conversation: ConversationSettings;
+  provider: ChatProvider;
+  onChange: (next: ConversationSettings) => void;
+}) {
+  const { sources } = conversation;
+  const web = conversation.web === true;
+  return (
+    <>
+      <p className="tl-eyebrow">Permissions</p>
+      <OptionChips<PermissionKey>
+        label="What Coach may read"
+        appearance="tiles"
+        options={PERMISSION_OPTIONS}
+        values={[
+          ...SOURCES.filter((source) => sources[source.value]).map((source) => source.value),
+          ...(web ? ["web" as const] : [])
+        ]}
+        onToggle={(value) =>
+          onChange(
+            value === "web"
+              ? { ...conversation, web: !web }
+              : { ...conversation, sources: { ...sources, [value]: !sources[value] } }
+          )
+        }
+      />
+      {anySourceWithheld(sources) ? (
+        <p className="plan-generator-sheet-note">{OTHER_SERVERS_WITHHELD_NOTE}</p>
+      ) : null}
+      {web || provider === "local" ? (
+        <p className="plan-generator-sheet-note">{webSearchNote(provider)}</p>
+      ) : null}
+    </>
   );
 }

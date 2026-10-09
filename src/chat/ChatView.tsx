@@ -596,7 +596,6 @@ interface ChatViewProps {
   active?: boolean;
 }
 
-/** The sources a conversation can share, in the order its strip names them. */
 /** Inline style hook that tints a row/chip with the sport's own colour. */
 function planSportStyle(sport: PlanDraftPreviewEntry["sport"]): CSSProperties {
   return { "--chat-plan-sport": sportTheme(sport).color } as CSSProperties;
@@ -5560,15 +5559,9 @@ export function ChatView({
             runtime={effectiveRuntime}
             readiness={aiReadiness}
             claudeStatus={claudeStatus}
-            sources={conversationSettings?.sources}
+            conversation={conversationSettings ?? undefined}
             onChange={changeConversationRuntime}
-            onSourcesChange={(sources) =>
-              conversationSettings && updateConversationSettings({ ...conversationSettings, sources })
-            }
-            web={conversationSettings?.web === true}
-            onWebChange={(web) =>
-              conversationSettings && updateConversationSettings({ ...conversationSettings, web })
-            }
+            onConversationChange={updateConversationSettings}
             onClose={() => setAiSheetOpen(false)}
             onOpenCoachSettings={() => {
               setAiSheetOpen(false);
