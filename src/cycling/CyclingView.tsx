@@ -87,8 +87,9 @@ const DEFAULT_PERIOD_DAYS = 90;
  *
  * What changes is what a rider reads. Rides split by bike rather than surface;
  * speed stands where pace does; a week is measured in distance, hours or metres
- * climbed rather than kilometres alone; and the hero trades VO₂max and
- * threshold pace, which COROS takes from running, for FTP and the week's climb.
+ * climbed rather than kilometres alone; and the hero trades the running VO₂max
+ * and threshold pace for FTP and the week's climb, with COROS's cycling VO₂max
+ * beside them once COROS has one.
  * The aerobic-efficiency chart is not carried over: metres per heartbeat on a
  * bike is a reading of the road and the wind as much as of the rider.
  */
@@ -344,6 +345,7 @@ export function CyclingView({
           ftp={profile?.thresholds.ftp}
           weightKg={profile?.weightKg}
           profileSettled={zonesSettled}
+          snapshot={snapshot}
           filtered={rideType !== null}
           nowMs={nowMs}
         />

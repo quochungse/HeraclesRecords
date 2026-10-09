@@ -1,10 +1,14 @@
 import { useMemo } from "react";
 import type { TrainingHubActivity } from "../../electron/types";
+import type { TrainingHubSnapshot } from "../training/types";
+import { mergeTrainingDayLists } from "../training/parsers";
 import {
   formatDistanceMeters,
   formatDurationSpan,
-  formatElevationMeters
+  formatElevationMeters,
+  getLocalHappenDayKey
 } from "../training/formatters";
+import { buildVo2Trend, formatPlateauDuration, type Vo2Reading } from "../training/vo2Trend";
 import { useUnitSystem } from "../units/UnitSystemProvider";
 import { DeltaChip, LoadRatioCard } from "../running/RunningHero";
 import { buildRideWeeks, rideLoadBalance } from "./rideMetrics";
@@ -24,6 +28,8 @@ interface CyclingHeroProps {
   weightKg?: number;
   /** Whether the profile has answered — "no FTP" and "not yet" differ. */
   profileSettled: boolean;
+  /** For COROS's cycling VO₂max, read off the day list beside the running one. */
+  snapshot: TrainingHubSnapshot | null;
   /** Whether a kind filter is narrowing the figures beside the ratio. */
   filtered: boolean;
   /** The page's clock, so every block agrees on which week is "this" one. */
@@ -35,11 +41,15 @@ const BASELINE_WEEKS = 4;
 
 /**
  * The four figures a rider opens the screen for. It borrows Running's hero
- * layout and replaces the two cards that are about running: VO₂max, which
- * COROS estimates from runs, gives way to FTP, and threshold pace to the week's
- * climbing, which is the other half of a cycling week's volume. The week itself
- * is read in hours, as a rider's training is counted, with the distance under
- * it: a run's week is kilometres, a ride's is not.
+ * layout and replaces the two cards that are about running: the running
+ * VO₂max gives way to FTP, and threshold pace to the week's climbing, which is
+ * the other half of a cycling week's volume. The week itself is read in hours,
+ * as a rider's training is counted, with the distance under it: a run's week is
+ * kilometres, a ride's is not.
+ *
+ * COROS's cycling VO₂max is a fifth card beside FTP, where COROS shows it, and
+ * only once COROS has given one: it needs rides COROS can estimate from, and
+ * an athlete without them would otherwise carry a card that never fills.
  */
 export function CyclingHero({
   rides,
@@ -47,6 +57,7 @@ export function CyclingHero({
   ftp,
   weightKg,
   profileSettled,
+  snapshot,
   filtered,
   nowMs
 }: CyclingHeroProps) {
@@ -80,6 +91,20 @@ export function CyclingHero({
   }, [nowMs, rides]);
 
   const balance = useMemo(() => rideLoadBalance(allRides, nowMs), [allRides, nowMs]);
+
+  // Sparse like the running one, so it is read as plateaus carried forward.
+  const vo2 = useMemo(() => {
+    const readings = mergeTrainingDayLists(
+      snapshot?.dailyMetrics ?? null,
+      snapshot?.analytics ?? null
+    )
+      .map((day) => ({ happenDay: day.happenDay, value: day.cycleVo2max }))
+      .filter(
+        (reading): reading is Vo2Reading =>
+          reading.value !== undefined && Number.isFinite(reading.value)
+      );
+    return buildVo2Trend(readings, getLocalHappenDayKey());
+  }, [snapshot]);
 
   const wattsPerKilo =
     ftp !== undefined && weightKg !== undefined && weightKg > 0
@@ -127,6 +152,16 @@ export function CyclingHero({
           </span>
         </div>
       </div>
+
+      {vo2 ? (
+        <div className="run-hero-card">
+          <span className="run-hero-label">VO₂max</span>
+          <strong className="run-hero-value">{vo2.latest}</strong>
+          <div className="run-hero-foot">
+            <span>Held {formatPlateauDuration(vo2.daysAtCurrent)}</span>
+          </div>
+        </div>
+      ) : null}
 
       <div className="run-hero-card">
         <span className="run-hero-label">Climb this week</span>

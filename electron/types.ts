@@ -290,7 +290,14 @@ export interface TrainingHubDailyMetric {
   tiredRateStateNew?: number;
   trainingLoadRatio?: number;
   staminaLevel?: number;
+  /** COROS's running VO2max, filled in only on days with a run. */
   vo2max?: number;
+  /**
+   * COROS's cycling VO2max (from app 4.10.8, September 2026), a field of its
+   * own beside `vo2max`. COROS sends it on every day with `0` for "none", so
+   * only a reading above zero is kept.
+   */
+  cycleVo2max?: number;
   distance?: number;
   duration?: number;
 }

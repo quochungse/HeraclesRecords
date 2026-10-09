@@ -191,6 +191,19 @@ assert.match(monthText, /08-17 Mon \| 350 \| 50 \|/);
 assert.match(monthText, /09-07 Mon \(partial\) \| 250 \| 53 \|/);
 assert.match(monthText, /Daily, last 7 days \(HRV that night = [^)]+\)\):\nDay \|/);
 
+{
+  // COROS's cycling VO2max is its own field. Parsed, a day without one has
+  // none (COROS sends 0), so the column and the line stay out until a ride
+  // gives one.
+  assert.doesNotMatch(weekText, /Cycling VO2max/);
+  const rideWeek = week.map((day, index) => (index >= 4 ? { ...day, cycleVo2max: index === 6 ? 52 : 51 } : day));
+  const text = formatFitnessTrendsForChat(rideWeek, 7, today);
+  assert.match(text, /- VO2max: 47 on 09-09 Wed\n- Cycling VO2max: 52 on 09-11 Fri \(was 51 on 09-09 Wed\)\n/);
+  assert.match(text, /\| Base Fitness \| VO2max \| Cycling VO2max\n/);
+  assert.match(text, /09-11 Fri \| 50 \| 55 \| — \| 30 \| 1\.15 \| 40 \| — \| 52/);
+  assert.match(text, /09-07 Mon \| 50 \| 50 \| 60 \(62\) \| 30 \| 1\.15 \| 40 \| — \| —/);
+}
+
 assert.equal(
   formatFitnessTrendsForChat([], 7, today),
   "No fitness trend data for the last 7 days."

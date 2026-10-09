@@ -64,8 +64,9 @@ export function getChatAnalyticsTools(): CorosMcpTool[] {
         "COROS load and recovery markers per day: training load (and RPE load), " +
         "resting HR, overnight HRV vs baseline (each night listed on the day " +
         "it followed), Load Impact, load ratio " +
-        "(acute:chronic, ~1.0 = steady), Base Fitness and VO2max (recorded on run " +
-        "days only), plus daily steps, exercise minutes and average stress, led by " +
+        "(acute:chronic, ~1.0 = steady), Base Fitness, VO2max (from runs, recorded " +
+        "on run days only) and cycling VO2max (from rides, when COROS has one), " +
+        "plus daily steps, exercise minutes and average stress, led by " +
         "a summary of the latest values and 7-day totals. " +
         "Windows over 14 days are rolled up by week with the last 7 days kept " +
         "daily. Pick days to fit the question: 7 for this week, 28 for a block.",
@@ -181,7 +182,8 @@ function hasReading(day: TrainingHubDailyMetric): boolean {
     day.tiredRateNew,
     day.trainingLoadRatio,
     day.staminaLevel,
-    day.vo2max
+    day.vo2max,
+    day.cycleVo2max
   ].some((value) => value !== undefined && Number.isFinite(value));
 }
 
@@ -285,14 +287,16 @@ function hrvCell(hrv: number | undefined, base: number | undefined): string | un
 function statusColumns<Row>(
   pick: (row: Row) => Pick<
     TrainingHubDailyMetric,
-    "tiredRateNew" | "trainingLoadRatio" | "staminaLevel" | "vo2max"
+    "tiredRateNew" | "trainingLoadRatio" | "staminaLevel" | "vo2max" | "cycleVo2max"
   >
 ): Column<Row>[] {
   return [
     { header: "Load Impact", value: (row) => rounded(pick(row).tiredRateNew) },
     { header: "Load ratio", value: (row) => pick(row).trainingLoadRatio?.toFixed(2) },
     { header: "Base Fitness", value: (row) => rounded(pick(row).staminaLevel) },
-    { header: "VO2max", value: (row) => rounded(pick(row).vo2max) }
+    { header: "VO2max", value: (row) => rounded(pick(row).vo2max) },
+    // Dropped by pipeTable, like every column, while COROS has none.
+    { header: "Cycling VO2max", value: (row) => rounded(pick(row).cycleVo2max) }
   ];
 }
 
@@ -410,7 +414,8 @@ function weeklyTable(
         tiredRateNew: lastValue(week, (day) => day.tiredRateNew),
         trainingLoadRatio: lastValue(week, (day) => day.trainingLoadRatio),
         staminaLevel: lastValue(week, (day) => day.staminaLevel),
-        vo2max: lastValue(week, (day) => day.vo2max)
+        vo2max: lastValue(week, (day) => day.vo2max),
+        cycleVo2max: lastValue(week, (day) => day.cycleVo2max)
       })),
       { header: "Steps/day", value: (week) => rounded(wellnessMean(week, (record) => record.steps)) },
       { header: "Stress avg", value: (week) => rounded(wellnessMean(week, (record) => record.stressAvg)) }
@@ -487,16 +492,21 @@ function trendSummary(
     lines.push(`- Latest COROS status: ${statusParts.join(" · ")}`);
   }
 
-  const vo2 = latestOf(window, (day) => day.vo2max);
-  if (vo2) {
-    const first = firstOf(window, (day) => day.vo2max);
+  const vo2Line = (label: string, pick: (day: TrainingHubDailyMetric) => number | undefined) => {
+    const latest = latestOf(window, pick);
+    if (!latest) {
+      return;
+    }
+    const first = firstOf(window, pick);
     lines.push(
-      `- VO2max: ${Math.round(vo2.value)} on ${dayLabel(vo2.day)}` +
-        (first && first.day !== vo2.day && Math.round(first.value) !== Math.round(vo2.value)
+      `- ${label}: ${Math.round(latest.value)} on ${dayLabel(latest.day)}` +
+        (first && first.day !== latest.day && Math.round(first.value) !== Math.round(latest.value)
           ? ` (was ${Math.round(first.value)} on ${dayLabel(first.day)})`
           : "")
     );
-  }
+  };
+  vo2Line("VO2max", (day) => day.vo2max);
+  vo2Line("Cycling VO2max", (day) => day.cycleVo2max);
 
   // The feed runs to yesterday (it is a day behind), so "the last 7 days" of
   // it end on its newest day, and the line says which day that is.

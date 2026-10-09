@@ -248,7 +248,7 @@ async function main() {
     );
     assert.equal(await hasText("3.57 W/kg"), true, "and per kilo, from its weight");
     assert.equal(await hasText("Load ratio"), true);
-    assert.equal(await hasText("VO₂max"), false, "VO₂max is a running estimate and not this screen's");
+    assert.equal(await hasText("VO₂max"), false, "no cycling VO₂max from COROS, no card");
     assert.equal(await hasText("km/h"), true, "speed stands where pace does");
     assert.equal(
       await win.webContents.executeJavaScript(
@@ -303,6 +303,48 @@ async function main() {
     await settle();
     assert.match(await heading(), /^\d+ m\b/, "metres once Climb is picked");
     assert.equal(await hasText("Hilliest ride"), true, "the dashed line follows the measure");
+  }
+
+  // -------------------------------------------------------------------------
+  // COROS's cycling VO₂max is a fifth card, only once COROS has one. The
+  // running vo2max beside it is not this screen's, and a 0 is no reading.
+  // -------------------------------------------------------------------------
+  {
+    const day = (offset) => {
+      const date = new Date();
+      date.setDate(date.getDate() - offset);
+      return `${date.getFullYear()}${String(date.getMonth() + 1).padStart(2, "0")}${String(date.getDate()).padStart(2, "0")}`;
+    };
+    const snapshotWith = (dayList) => ({ dailyMetrics: { dayList, weekList: [] }, analytics: null });
+
+    await mountCycling({
+      activities: RIDES,
+      activitiesStatus: "ready",
+      height: 900,
+      snapshot: snapshotWith([{ happenDay: day(3), vo2max: 47 }])
+    });
+    assert.equal(await harness("count", ".run-hero-card"), 4, "a running VO₂max alone adds nothing");
+    assert.equal(await hasText("VO₂max"), false);
+
+    await mountCycling({
+      activities: RIDES,
+      activitiesStatus: "ready",
+      height: 900,
+      snapshot: snapshotWith([
+        { happenDay: day(20), vo2max: 47, cycleVo2max: 51 },
+        { happenDay: day(6), cycleVo2max: 53 },
+        { happenDay: day(2), vo2max: 48, cycleVo2max: 53 }
+      ])
+    });
+    assert.equal(await harness("count", ".run-hero-card"), 5, "the cycling VO₂max card");
+    const cards = await win.webContents.executeJavaScript(
+      `[...document.querySelectorAll(".run-hero-card")].map((card) => card.textContent)`,
+      true
+    );
+    const vo2Card = cards.find((text) => text.startsWith("VO₂max"));
+    assert.ok(vo2Card, `a VO₂max card among ${JSON.stringify(cards)}`);
+    assert.match(vo2Card, /^VO₂max53Held /, "the cycling reading, not the running 48");
+    assert.ok(cards.indexOf(vo2Card) === cards.findIndex((text) => text.startsWith("FTP")) + 1, "beside FTP");
   }
 
   // -------------------------------------------------------------------------

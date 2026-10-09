@@ -375,6 +375,7 @@ interface RawDailyMetric {
   trainingLoadRatio?: number;
   staminaLevel?: number;
   vo2max?: number;
+  cycleVo2max?: number;
   distance?: number;
   totalDistance?: number;
   dis?: number;
@@ -4434,6 +4435,7 @@ function parseDailyMetric(raw: RawDailyMetric): TrainingHubDailyMetric {
     trainingLoadRatio: toOptionalNumber(raw.trainingLoadRatio),
     staminaLevel: toOptionalNumber(raw.staminaLevel),
     vo2max: toOptionalNumber(raw.vo2max),
+    cycleVo2max: positiveNumber(raw.cycleVo2max),
     distance: normalizeDailyDistanceMeters(distanceRaw),
     duration: normalizeDailyDurationSeconds(durationRaw)
   };

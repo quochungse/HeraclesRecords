@@ -30,4 +30,17 @@ const listScale = parseDailyMetrics({
 assert.equal(listScale.dayList[0]?.distance, 8200);
 assert.equal(listScale.dayList[0]?.duration, 2700);
 
+// COROS's cycling VO2max rides on every day with 0 for "none" (probed
+// 2026-10-09), beside the running vo2max, which is absent on a day off.
+const cycling = parseDailyMetrics({
+  dayList: [
+    { happenDay: 20261008, vo2max: 47, cycleVo2max: 0 },
+    { happenDay: 20261009, cycleVo2max: 52 }
+  ]
+});
+assert.equal(cycling.dayList[0]?.vo2max, 47);
+assert.equal(cycling.dayList[0]?.cycleVo2max, undefined, "a 0 is no reading");
+assert.equal(cycling.dayList[1]?.cycleVo2max, 52);
+assert.equal(cycling.dayList[1]?.vo2max, undefined, "the two are not mixed");
+
 console.log("daily metrics parser tests passed");
