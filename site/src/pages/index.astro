@@ -161,7 +161,6 @@ const faq = [
         run, a ride and a hike each get a page that reads what that sport is about.
       </p>
     </div>
-    <Shot name="04-run" alt="A run: map, pace, heart rate, running form and every channel" />
     <div class="grid-2 sports">
       {
         sports.map((sport) => (
@@ -282,24 +281,10 @@ const faq = [
       }
     </ul>
     <p class="center-link"><a class="more" href="/labours">See every labour and its stages</a></p>
-    <div class="grid-2 records">
-      <figure class="figure">
-        <Shot name="14-timeline" alt="Hall of Records: the timeline of milestones" sizes={SIZES_HALF} />
-        <figcaption>
-          <strong>Timeline</strong>: every first, record and streak, and the labour stage it reached.
-        </figcaption>
-      </figure>
-      <figure class="figure">
-        <Shot name="13-labours" alt="Hall of Records: the Twelve Labours and the stage reached in each" sizes={SIZES_HALF} />
-        <figcaption>
-          <strong>The Twelve Labours</strong>: twelve kinds of achievement, three stages each.
-        </figcaption>
-      </figure>
-    </div>
   </section>
 
-  <section class="wrap section">
-    <div class="section-head">
+  <section class="wrap section split split-top">
+    <div>
       <p class="eyebrow">Where you've been</p>
       <h2 class="section-title">Every place your training has taken you.</h2>
       <p class="lede">
@@ -308,42 +293,20 @@ const faq = [
         every activity.
       </p>
     </div>
-    <Shot name="15-places" alt="Where you've been: every place you trained, on a globe beside a list of places" />
+    <Shot name="15-places" alt="Where you've been: every place you trained, on a globe beside a list of places" sizes={SIZES_SIDE} />
   </section>
 
   <section class="wrap section">
     <div class="section-head">
-      <p class="eyebrow">Appearance</p>
-      <h2 class="section-title">Light or dark, and your own colours.</h2>
-      <p class="lede">
-        Pick a colour mode and an accent, give each sport its own colour, choose metric or
-        imperial, and keep only the sport screens you train.
-      </p>
-    </div>
-    <div class="grid-2">
-      <figure class="figure">
-        <Shot name="19-appearance-dark" alt="Overview in the dark colour mode" sizes={SIZES_HALF} />
-        <figcaption><strong>Dark</strong></figcaption>
-      </figure>
-      <figure class="figure">
-        <Shot name="20-appearance-light" alt="Overview in the light colour mode" sizes={SIZES_HALF} />
-        <figcaption><strong>Light</strong></figcaption>
-      </figure>
-    </div>
-  </section>
-
-  <section class="wrap section split">
-    <div>
       <p class="eyebrow">Your data</p>
       <h2 class="section-title">Your training stays yours.</h2>
-      <ul class="ticks">
-        <li><strong>On your computer.</strong> The app has no account of its own and the developer runs no servers.</li>
-        <li><strong>Two computers, one record.</strong> Sync them through your own Google Drive. Passwords and sign-ins never leave the machine they were made on.</li>
-        <li><strong>One file to keep.</strong> Back everything up to a file and restore it whenever you like.</li>
-      </ul>
-      <a class="more" href="/privacy.html">Privacy policy</a>
     </div>
-    <Shot name="18-sync" alt="Settings: sync through Google Drive" sizes={SIZES_SIDE} />
+    <ul class="ticks data-points">
+      <li><strong>On your computer.</strong> The app has no account of its own and the developer runs no servers.</li>
+      <li><strong>Two computers, one record.</strong> Sync them through your own Google Drive. Passwords and sign-ins never leave the machine they were made on.</li>
+      <li><strong>One file to keep.</strong> Back everything up to a file and restore it whenever you like.</li>
+    </ul>
+    <a class="more" href="/privacy.html">Privacy policy</a>
   </section>
 
   <section class="wrap section">
@@ -368,7 +331,7 @@ const faq = [
   <section class="wrap section faq">
     <div class="section-head">
       <p class="eyebrow">Questions</p>
-      <h2 class="section-title">Before you download.</h2>
+      <h2 class="section-title">Good to know.</h2>
     </div>
     <dl>
       {
@@ -383,10 +346,17 @@ const faq = [
     <a class="more" href="/guide/faq">Every question</a>
   </section>
 
-  <section class="wrap section closing">
-    <h2 class="section-title">Every session a record.</h2>
-    <div class="closing-download">
-      <DownloadButton />
+  <section class="wrap section support">
+    <div class="section-head center">
+      <p class="eyebrow">Support the project</p>
+      <h2 class="section-title">Free, and made by one athlete.</h2>
+      <p class="lede">
+        Heracles Records has no ads, no subscription and no company behind it. If it helps your
+        training, a coffee says it is worth carrying on.
+      </p>
+    </div>
+    <div class="support-actions actions">
+      <a class="button primary" href="https://buymeacoffee.com/quochungse">Buy me a coffee</a>
     </div>
   </section>
 </Base>
@@ -471,7 +441,7 @@ const faq = [
     align-items: center;
   }
 
-  /* Today: the slider's top sits level with the eyebrow beside it. */
+  /* Today and Where you've been: the screenshot's top sits level with the eyebrow beside it. */
   .split-top {
     align-items: start;
   }
@@ -483,8 +453,7 @@ const faq = [
     }
   }
 
-  .sports,
-  .records {
+  .sports {
     margin-top: 40px;
   }
 
@@ -682,13 +651,20 @@ const faq = [
     color: var(--ink-2);
   }
 
-  .closing {
+  .data-points {
     display: grid;
-    justify-items: center;
-    text-align: center;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0 32px;
+    margin: 0;
   }
 
-  .closing-download {
-    margin-top: 28px;
+  @media (max-width: 860px) {
+    .data-points {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  .support-actions {
+    justify-content: center;
   }
 </style>

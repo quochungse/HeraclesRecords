@@ -1,9 +1,7 @@
 ---
-// A few screenshots in one frame, sliding on their own. Left and right buttons
-// float over the picture and a dot per slide sits under it. Autoplay waits
-// while the pointer or focus is inside or the tab is hidden, and a press on a
-// button or a dot starts its clock again. With reduced motion asked for,
-// slides still advance (the page is about what they show) but swap at once.
+// A few screenshots in one frame, turned by hand: left and right buttons float
+// over the picture and a dot per slide sits under it. Nothing moves on its own.
+// With reduced motion asked for, a slide swaps at once.
 import { getImage } from "astro:assets";
 import { shot, SHOT_WIDTHS, SIZES_SIDE } from "../assets";
 
@@ -16,11 +14,9 @@ interface Slide {
 interface Props {
   slides: Slide[];
   label: string;
-  /** Milliseconds each slide stays. */
-  interval?: number;
 }
 
-const { slides, label, interval = 3000 } = Astro.props;
+const { slides, label } = Astro.props;
 const images = await Promise.all(
   slides.map(async (slide) => {
     const image = shot(slide.name);
@@ -36,7 +32,7 @@ const images = await Promise.all(
 );
 ---
 
-<div class="slider" role="region" aria-roledescription="carousel" aria-label={label} data-interval={interval}>
+<div class="slider" role="region" aria-roledescription="carousel" aria-label={label}>
   <div class="slider-frame">
     <div class="slider-track">
       {
@@ -91,10 +87,7 @@ const images = await Promise.all(
     const track = slider.querySelector<HTMLElement>(".slider-track")!;
     const slides = [...slider.querySelectorAll<HTMLElement>(".slider-slide")];
     const dots = [...slider.querySelectorAll<HTMLButtonElement>(".slider-dot")];
-    const interval = Number(slider.dataset.interval) || 3000;
     let current = 0;
-    let timer: number | undefined;
-    let paused = false;
 
     const show = (index: number) => {
       current = (index + slides.length) % slides.length;
@@ -113,43 +106,15 @@ const images = await Promise.all(
       });
     };
 
-    const schedule = () => {
-      window.clearTimeout(timer);
-      if (paused || document.hidden) return;
-      timer = window.setTimeout(() => {
-        show(current + 1);
-        schedule();
-      }, interval);
-    };
-
-    const pause = (value: boolean) => {
-      paused = value;
-      schedule();
-    };
-
     for (const arrow of slider.querySelectorAll<HTMLButtonElement>(".slider-arrow")) {
-      arrow.addEventListener("click", () => {
-        show(current + Number(arrow.dataset.step));
-        schedule();
-      });
+      arrow.addEventListener("click", () => show(current + Number(arrow.dataset.step)));
     }
-    dots.forEach((dot, index) =>
-      dot.addEventListener("click", () => {
-        show(index);
-        schedule();
-      }),
-    );
-    slider.addEventListener("pointerenter", () => pause(true));
-    slider.addEventListener("pointerleave", () => pause(false));
-    slider.addEventListener("focusin", () => pause(true));
-    slider.addEventListener("focusout", () => pause(false));
-    document.addEventListener("visibilitychange", schedule);
+    dots.forEach((dot, index) => dot.addEventListener("click", () => show(index)));
 
     // Warm the next slides so the first slide-in is not a blank frame.
     window.addEventListener("load", () =>
       slides.forEach((slide) => slide.querySelector("img")?.setAttribute("loading", "eager")),
     );
-    schedule();
   }
 </script>
 
