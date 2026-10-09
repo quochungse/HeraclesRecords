@@ -1018,8 +1018,8 @@ async function main() {
   await waitFor(() => harness("count", permissions).then((n) => n === 4), "three sources and the web to allow or not");
   assert.equal(
     await page(`[...document.querySelectorAll('${permissions}')].map((b) => b.textContent.trim() + ":" + b.getAttribute("aria-pressed")).join(" ")`),
-    "Activities:true Sleep:true Zones:true Web:true",
-    "the web is on until switched off"
+    "Activities:true Sleep:true Zones:true Web:false",
+    "the web is off until switched on"
   );
   await harness("click", `${permissions}:nth-child(2)`);
   await waitFor(() => harness("callCount", "setConversationSettings"), "switching one off is kept");
@@ -1033,8 +1033,8 @@ async function main() {
   );
   assert.equal(await harness("exists", ".coach-sheet .plan-generator-sheet-note"), true, "with the note on other servers");
   await harness("click", `${permissions}:nth-child(4)`);
-  await waitFor(() => harness("callCount", "setConversationSettings").then((n) => n === 2), "switching the web off is kept");
-  assert.equal((await harness("calls", "setConversationSettings"))[1].args[0].web, false, "as the conversation's own");
+  await waitFor(() => harness("callCount", "setConversationSettings").then((n) => n === 2), "switching the web on is kept");
+  assert.equal((await harness("calls", "setConversationSettings"))[1].args[0].web, true, "as the conversation's own");
   await page(`[...document.querySelectorAll(".coach-sheet button")].find((b) => b.textContent.trim() === "Done").click()`);
   await harness("setValue", ".chat-composer textarea", "How am I sleeping?");
   await harness("click", ".chat-send");

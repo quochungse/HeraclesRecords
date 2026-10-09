@@ -526,9 +526,9 @@ export function initializeDatabase(userDataPath: string): Database.Database {
   ensureColumn(db, "chat_plan_drafts", "refinements_json", "TEXT");
   // The units a change set's workouts were written in (P3.3).
   ensureColumn(db, "chat_schedule_changes", "unit_system", "TEXT");
-  // A conversation that may not search the web: 0. NULL is on, so a row needs
-  // to exist only once web search is switched off there. A column rather than
-  // a key in sources_json, which a build without it writes back without it.
+  // A conversation that may search the web: 1. NULL is off, so a row needs to
+  // exist only once web search is switched on there. A column rather than a
+  // key in sources_json, which a build without it writes back without it.
   ensureColumn(db, "chat_conversation_settings", "web_search", "INTEGER");
   // coach_seen_at marks a row as already considered by the analysis activity
   // watcher. NULL = not yet processed, so a re-synced activity is re-evaluated
@@ -2729,7 +2729,7 @@ export function getChatConversationSettingsRow(
   return {
     ...(row.sources_json ? { sourcesJson: row.sources_json } : {}),
     ...(row.runtime_json ? { runtimeJson: row.runtime_json } : {}),
-    ...(row.web_search === 0 ? { webSearch: false } : {})
+    ...(row.web_search === 1 ? { webSearch: true } : {})
   };
 }
 
@@ -2737,7 +2737,7 @@ export function saveChatConversationSettingsRow(
   sessionId: string,
   sourcesJson: string | null,
   runtimeJson: string | null,
-  webSearch = true
+  webSearch = false
 ): void {
   requireDatabase()
     .prepare(
@@ -2749,7 +2749,7 @@ export function saveChatConversationSettingsRow(
          web_search = excluded.web_search,
          updated_at = excluded.updated_at`
     )
-    .run(sessionId, sourcesJson, runtimeJson, webSearch ? null : 0, new Date().toISOString());
+    .run(sessionId, sourcesJson, runtimeJson, webSearch ? 1 : null, new Date().toISOString());
   notifySyncedRow("chat_conversation_settings", ["session_id"], [sessionId]);
 }
 

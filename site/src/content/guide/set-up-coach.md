@@ -40,7 +40,7 @@ Coach's default AI is the one you pick in Coach Models. Each conversation can us
 
 The same conversation settings choose what Coach may read: switch off activities, sleep or anything else a conversation has no business seeing. What is switched off is withheld from Coach's tools and from what it is told, not only from the prompt.
 
-**Web** is there too. With it on, Coach can search the internet when a question needs something your data does not hold, such as a race's date, course or cut-offs, and it links the pages it used. The search runs through the AI you chose: on a Claude or ChatGPT subscription it is part of the plan, with an Anthropic or OpenRouter key each search is billed to that account, and a local model cannot search at all. Automatic analyses never search.
+**Web** is there too, off until you switch it on for a conversation. With it on, Coach can search the internet when a question needs something your data does not hold, such as a race's date, course or cut-offs, and it links the pages it used. The search runs through the AI you chose: on a Claude or ChatGPT subscription it is part of the plan, with an Anthropic or OpenRouter key each search is billed to that account, and a local model cannot search at all. Automatic analyses never search.
 
 ## Tone and instructions
 

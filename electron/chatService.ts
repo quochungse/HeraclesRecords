@@ -745,7 +745,7 @@ export function getConversationSettings(sessionId: string): import("./types").Co
   // changing it later moves no conversation already under way.
   const own = getChatSessionProvider(sessionId);
   if (own && !runtime?.provider) runtime = { ...(runtime ?? {}), provider: own };
-  return { sessionId, sources, ...(runtime ? { runtime } : {}), web: row?.webSearch !== false };
+  return { sessionId, sources, ...(runtime ? { runtime } : {}), web: row?.webSearch === true };
 }
 
 export function setConversationSettings(
@@ -763,8 +763,8 @@ export function setConversationSettings(
   const { provider: _own, ...rest } = settings.runtime ?? {};
   const stated = settings.runtime?.provider && settings.runtime.provider !== own ? settings.runtime : rest;
   const runtime = Object.keys(stated).length ? stated : undefined;
-  const web = settings.web !== false;
-  if (everything && !runtime && web) {
+  const web = settings.web === true;
+  if (everything && !runtime && !web) {
     // Nothing that differs from Coach's settings: no row to keep in step.
     deleteChatConversationSettingsRow(settings.sessionId);
   } else {
@@ -807,7 +807,7 @@ export async function streamConversationTurn(
     ...(sessionId ? { sessionId } : {}),
     ...(settings?.runtime ? { runtime: settings.runtime } : {}),
     ...(settings ? { sources: settings.sources } : {}),
-    webSearch: settings?.web !== false
+    webSearch: settings?.web === true
   });
 }
 

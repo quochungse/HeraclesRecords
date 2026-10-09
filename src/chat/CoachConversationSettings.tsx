@@ -60,7 +60,7 @@ export function ConversationAiSheet({
   readiness,
   claudeStatus,
   sources,
-  web = true,
+  web = false,
   onChange,
   onSourcesChange,
   onWebChange,

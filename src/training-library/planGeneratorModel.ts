@@ -105,7 +105,7 @@ export const SOURCES: readonly { value: keyof TrainingPlanDataSources; label: st
  * that vanished with no word would read as broken.
  */
 export const OTHER_SERVERS_WITHHELD_NOTE =
-  "While anything here is not shared, Coach also leaves out MCP servers other than COROS, such as Strava: what they read is not known.";
+  "While activities, sleep or zones are not shared, Coach also leaves out MCP servers other than COROS, such as Strava: what they read is not known.";
 
 export function anySourceWithheld(sources: TrainingPlanDataSources): boolean {
   return SOURCES.some((source) => sources[source.value] === false);

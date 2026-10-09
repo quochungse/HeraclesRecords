@@ -697,11 +697,21 @@ assert.match(
     "an analysis switched off is not going to speak"
   );
 
-  // A *manual* analysis still marks its conversation. It is the athlete's way
-  // of reaching it from there, which is exactly what the mark announces — and
-  // most analyses are manual, so a mark that required a trigger would leave
-  // the sidebar almost blank.
+  // A *manual* analysis still attaches its conversation (it keeps a blank one
+  // from being let go), but the list's mark is for one that fires on its own.
   assert.equal(live.trigger, null);
+  assert.equal(marks.get("s-live").scheduled, false, "a manual analysis earns no mark");
+  createCoachAnalysis(
+    {
+      sessionId: "s-auto",
+      name: "Auto",
+      playbook: "p",
+      trigger: { kind: "schedule", cadence: "daily", timeOfDay: "21:00" }
+    },
+    attentionDb
+  );
+  assert.equal(byId().get("s-auto").scheduled, true, "a triggered one does");
+  assert.equal(byId().get("s-auto").attached, true);
 
   const run = (sessionId, patch = {}) =>
     recordCoachAnalysisRun(

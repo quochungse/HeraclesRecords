@@ -244,31 +244,37 @@ export function ConversationAnalyses({
                   <li
                     key={analysis.id}
                     className="chat-coaches-row"
-                    data-off={analysis.enabled ? undefined : "true"}
+                    data-off={
+                      analysis.trigger && !analysis.enabled ? "true" : undefined
+                    }
                   >
-                    <label
-                      className="coach-analysis-switch chat-coaches-row-switch"
-                      title={analysis.enabled ? "Running" : "Paused"}
-                    >
-                      <input
-                        type="checkbox"
-                        aria-label={
-                          analysis.enabled
-                            ? `Pause ${analysis.name}`
-                            : `Resume ${analysis.name}`
-                        }
-                        checked={analysis.enabled}
-                        disabled={busy || !api}
-                        onChange={(event) =>
-                          void withBusy(analysis.id, () =>
-                            (api as HeraclesRecordsApi).setCoachAnalysisEnabled(
-                              analysis.id,
-                              event.target.checked
+                    {/* A manual analysis runs only from Run now, so a switch
+                        beside it pauses nothing. */}
+                    {analysis.trigger ? (
+                      <label
+                        className="coach-analysis-switch chat-coaches-row-switch"
+                        title={analysis.enabled ? "Running" : "Paused"}
+                      >
+                        <input
+                          type="checkbox"
+                          aria-label={
+                            analysis.enabled
+                              ? `Pause ${analysis.name}`
+                              : `Resume ${analysis.name}`
+                          }
+                          checked={analysis.enabled}
+                          disabled={busy || !api}
+                          onChange={(event) =>
+                            void withBusy(analysis.id, () =>
+                              (api as HeraclesRecordsApi).setCoachAnalysisEnabled(
+                                analysis.id,
+                                event.target.checked
+                              )
                             )
-                          )
-                        }
-                      />
-                    </label>
+                          }
+                        />
+                      </label>
+                    ) : null}
                     <div className="chat-coaches-row-main">
                       <span className="chat-coaches-row-name">
                         <Zap size={12} aria-hidden="true" />

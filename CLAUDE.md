@@ -1350,8 +1350,8 @@ lives at module level for the same visit-to-visit reason — see `useCalendarDat
   `ChatView` read the settings and the briefs again.
 
   **Coach searches the web through the provider's own search, never a tool of ours**
-  (`ConversationSettings.web`, the `web_search` column of `chat_conversation_settings`: NULL
-  on, 0 off, so a row exists only once it is switched off — a column, because a build without
+  (`ConversationSettings.web`, the `web_search` column of `chat_conversation_settings`: 1 on,
+  NULL off, so a row exists only once it is switched on — off by default — a column, because a build without
   it would write `sources_json` back without the key). The Permissions tiles carry it as a
   fourth, **Web**, beside the three sources but not one of them: `TrainingPlanDataSources`
   withholds every other MCP server once anything is off, and the web off must not take Strava

@@ -5565,7 +5565,7 @@ export function ChatView({
             onSourcesChange={(sources) =>
               conversationSettings && updateConversationSettings({ ...conversationSettings, sources })
             }
-            web={conversationSettings?.web !== false}
+            web={conversationSettings?.web === true}
             onWebChange={(web) =>
               conversationSettings && updateConversationSettings({ ...conversationSettings, web })
             }

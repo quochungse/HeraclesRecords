@@ -1922,6 +1922,12 @@ export interface CoachAnalysisSessionAttention {
   sessionId: string;
   /** A live analysis writes here, whether or not it ever has. */
   attached: boolean;
+  /**
+   * A live analysis here fires on its own (a schedule, an activity, a
+   * threshold). What the conversation list marks: a manual one runs only when
+   * asked, from this conversation, so a mark on its row announced nothing.
+   */
+  scheduled: boolean;
   /** Runs that landed in it and have not been looked at yet. */
   unread: number;
 }
@@ -2394,7 +2400,7 @@ export interface ConversationSettings {
   runtime?: AnalysisRuntime;
   /**
    * Whether Coach may search the web in this conversation's chat turns, through
-   * the provider's own search. Absent is on; an analysis and a plan step never
+   * the provider's own search. Absent is off; an analysis and a plan step never
    * search, whatever this says.
    */
   web?: boolean;
