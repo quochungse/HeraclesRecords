@@ -353,6 +353,18 @@ export function initializeDatabase(userDataPath: string): Database.Database {
     CREATE INDEX IF NOT EXISTS idx_sync_outbox_identity
       ON sync_outbox (identity);
 
+    -- Files of the vault's log this machine has read, so a pull downloads only
+    -- what is new rather than the whole log every few seconds. See
+    -- sync/readIndex.ts. 'device' in TABLE_POLICY, and written through
+    -- requireDatabase() so recording a read cannot queue a change.
+    CREATE TABLE IF NOT EXISTS sync_read_files (
+      path     TEXT PRIMARY KEY,
+      revision TEXT NOT NULL,
+      state    TEXT NOT NULL,
+      read_by  TEXT NOT NULL,
+      read_at  INTEGER NOT NULL
+    );
+
     -- Every activity trigger asks "what landed after this analysis's
     -- watermark", once per analysis, ordered by start_time.
     CREATE INDEX IF NOT EXISTS idx_training_activities_start_time

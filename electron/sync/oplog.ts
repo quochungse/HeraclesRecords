@@ -36,6 +36,7 @@
 import { compareHlcStrings, isValidHlc } from "./hlc";
 import { rowMergerFor } from "./rowMergers";
 import {
+  isUnderPrefix,
   normalizeStoragePath,
   type StorageProvider
 } from "./storageProvider";
@@ -157,6 +158,9 @@ export interface OplogSnapshot {
 export interface AppendResult {
   readonly path: string;
   readonly entries: number;
+  /** What the storage reports for the written file, as a listing will show
+   *  it — so the writer can record it as already read. */
+  readonly revision: string;
 }
 
 /** Write one batch into this device's own directory. */
@@ -171,8 +175,8 @@ export async function appendBatch(
   const path = oplogPathFor(device, ordered[0].hlc);
   // `null` — a batch name is an HLC this device has never issued before, so a
   // collision means a bug, not a race, and should surface as a conflict.
-  await storage.put(path, serializeBatch(ordered), null);
-  return { path, entries: ordered.length };
+  const revision = await storage.put(path, serializeBatch(ordered), null);
+  return { path, entries: ordered.length, revision };
 }
 
 /** One batch file as it was read, kept so compaction knows what it may delete. */
@@ -261,6 +265,60 @@ export async function readAllEntries(
   return (await readLog(storage)).entries;
 }
 
+/** One file of the log, as a listing reports it: metadata, nothing read. */
+export interface LogFile {
+  readonly path: string;
+  readonly revision: string;
+}
+
+export interface LogListing {
+  /** Every batch, oldest name first. */
+  readonly batches: readonly LogFile[];
+  /** Compaction snapshots, oldest first; only the last one is ever read. */
+  readonly snapshots: readonly LogFile[];
+}
+
+/**
+ * The log's files from one listing, without opening any of them.
+ *
+ * What an incremental reader starts from. Batch and snapshot files are written
+ * once and never changed — a batch is named by an HLC its device has never
+ * issued before and claimed with `expected: null`, a snapshot by an `upTo`
+ * that only moves forward — so a path and revision already read say
+ * everything the file would.
+ */
+export async function listLogFiles(storage: StorageProvider): Promise<LogListing> {
+  // One listing for both, where `readLog` asks twice: on Drive every `list` is
+  // a walk of the whole folder whatever the prefix.
+  const listed = await storage.list();
+  const byPath = (a: LogFile, b: LogFile) => a.path.localeCompare(b.path);
+  const batches = listed
+    .filter((entry) => isUnderPrefix(entry.path, OPLOG_ROOT))
+    .map(({ path, revision }) => ({ path, revision }))
+    .sort(byPath);
+  const snapshots = listed
+    .filter((entry) => OPLOG_SNAPSHOT_PATTERN.test(entry.path))
+    .map(({ path, revision }) => ({ path, revision }))
+    .sort(byPath);
+  return { batches, snapshots };
+}
+
+/** Whether `path` names a file of the log, which is never rewritten in place. */
+export function isLogFilePath(path: string): boolean {
+  return isUnderPrefix(path, OPLOG_ROOT) || OPLOG_SNAPSHOT_PATTERN.test(path);
+}
+
+/**
+ * The milliseconds of the first entry a batch holds, read off its name, or
+ * null for a name this module did not write. Every entry in a batch is at or
+ * after its first, so a batch named inside the horizon holds nothing
+ * compaction may fold.
+ */
+export function batchStartMillis(path: string): number | null {
+  const name = path.slice(path.lastIndexOf("/") + 1).replace(/\.jsonl$/, "");
+  return isValidHlc(name) ? hlcMillis(name) : null;
+}
+
 /**
  * The newest compaction snapshot, or null when the log has never been
  * compacted.
@@ -296,9 +354,14 @@ async function readOplogSnapshotAt(
   if (!path) return null;
   const stored = await storage.get(path);
   if (!stored) return null;
+  return parseOplogSnapshot(stored.content);
+}
 
+/** A snapshot file's content, or null for one this build cannot read — a
+ *  newer version's, or a torn write. */
+export function parseOplogSnapshot(content: Buffer): OplogSnapshot | null {
   try {
-    const parsed = JSON.parse(stored.content.toString("utf8")) as OplogSnapshot;
+    const parsed = JSON.parse(content.toString("utf8")) as OplogSnapshot;
     if (parsed?.version !== 1 || typeof parsed.upTo !== "string") return null;
     // `upTo` is compared against every batch's `maxHlc` and fed to `hlcMillis`.
     // A malformed one off disk would throw out of the same code paths a
@@ -474,11 +537,25 @@ export async function compactOplog(
   const horizonMs = options.horizonMs ?? COMPACT_HORIZON_MS;
   const now = (options.now ?? Date.now)();
 
+  // Only what is comfortably in the past. See COMPACT_HORIZON_MS.
+  const horizon = now - horizonMs;
+
+  // Decided from the listing first. Reading the log means downloading every
+  // file in it, and the pass that finds too few batches, or none old enough to
+  // fold, is the usual one — it used to cost a full read every hour to learn
+  // that. A name this module did not write is counted as foldable, so the
+  // check can only send a pass on to the read, never hold a real one back.
+  const listing = await listLogFiles(storage);
+  if (listing.batches.length < minBatches) return nothing;
+  const anyFoldable = listing.batches.some((batch) => {
+    const start = batchStartMillis(batch.path);
+    return start === null || start <= horizon;
+  });
+  if (!anyFoldable) return nothing;
+
   const log = await readLog(storage);
   if (log.batches.length < minBatches) return nothing;
 
-  // Only what is comfortably in the past. See COMPACT_HORIZON_MS.
-  const horizon = now - horizonMs;
   const foldable = log.entries.filter(
     (entry) => hlcMillis(entry.hlc) <= horizon
   );

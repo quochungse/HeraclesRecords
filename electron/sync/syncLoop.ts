@@ -31,10 +31,20 @@ import {
   appendBatch,
   compactOplog,
   entryIdentity,
-  readAllEntries,
+  listLogFiles,
+  parseBatch,
+  parseOplogSnapshot,
   type CompactOplogResult,
+  type LogFile,
   type OpEntry
 } from "./oplog";
+import { LogFileCache, withLogFileCache } from "./logFileCache";
+import {
+  createMemoryReadIndex,
+  needsRead,
+  type ReadIndexStore,
+  type ReadRecord
+} from "./readIndex";
 import { Lease } from "./lease";
 import { applyEntries, type ApplyResult, type ContentChange, type SyncTarget,
   ChangeBuilder
@@ -162,6 +172,14 @@ export interface SyncLoopDeps {
    * process that made it.
    */
   readonly outbox: OutboxStore;
+  /**
+   * Which files of the log this machine has read, so a pull downloads only
+   * what is new. Defaulted, unlike the two above, because the fallback is
+   * safe rather than lossy: an in-memory index forgets at every launch, and
+   * the first pull of a launch then reads the whole log — which is what every
+   * pull used to do. See `readIndex.ts`.
+   */
+  readonly readIndex?: ReadIndexStore;
   /** Called after inbound changes land, so the renderer can reload. */
   readonly onApplied?: (result: AppliedChanges) => void;
   readonly onError?: (error: unknown) => void;
@@ -180,7 +198,23 @@ export interface AppliedChanges extends ApplyResult {
 }
 
 export interface PullResult extends AppliedChanges {
+  /** Entries read this time — from the files not read before, not the log. */
   readonly entriesSeen: number;
+}
+
+/** A file read by a pull, with what it held. */
+interface ReadFile extends LogFile {
+  readonly entries: readonly OpEntry[];
+  /** A snapshot this build could not parse. */
+  readonly unreadable: boolean;
+}
+
+interface NewlyRead {
+  readonly files: readonly ReadFile[];
+  /** Every entry from `files`, as `applyEntries` takes them. */
+  readonly entries: OpEntry[];
+  /** Recorded reads of files the vault no longer has. */
+  readonly gone: readonly ReadRecord[];
 }
 
 /**
@@ -221,6 +255,11 @@ export class SyncLoop {
    * poll, and both come back on the next launch.
    */
   readonly #localStorageMerged = new Map<string, string>();
+  readonly #readIndex: ReadIndexStore;
+  /** Names this launch in the read index: a file left for a later reading is
+   *  read again by the next launch, and not by this one. */
+  readonly #launch: string;
+  readonly #fileCache = new LogFileCache();
   #flushTimer: unknown = null;
   #pollTimer: unknown = null;
   #firstPendingAt: number | null = null;
@@ -246,6 +285,10 @@ export class SyncLoop {
 
   constructor(deps: SyncLoopDeps) {
     this.#deps = deps;
+    this.#readIndex = deps.readIndex ?? createMemoryReadIndex();
+    this.#launch = `${deps.now().toString(36)}-${Math.random()
+      .toString(36)
+      .slice(2, 10)}`;
     const stored = deps.getSetting(SYNC_LOOP_SETTINGS.clock);
     this.#clock = new HlcClock({
       device: deps.deviceId(),
@@ -302,6 +345,13 @@ export class SyncLoop {
     // existed, and it is safe: appending a batch is this device's own directory
     // and no reader is mid-write.
     await this.#flush().catch(() => undefined);
+  }
+
+  /** The vault, with the log's files served from this process's cache where
+   *  it already holds them. Every read and write of the log goes through it;
+   *  leases do not, since they are rewritten in place. */
+  #storage() {
+    return withLogFileCache(this.#deps.provider(), this.#fileCache);
   }
 
   nextHlc = (): string => {
@@ -410,7 +460,7 @@ export class SyncLoop {
   async #upload(batch: OpEntry[]): Promise<FlushResult> {
     try {
       const written = await appendBatch(
-        this.#deps.provider(),
+        this.#storage(),
         this.#deps.deviceId(),
         batch
       );
@@ -419,6 +469,24 @@ export class SyncLoop {
       // them again — a duplicate entry costs nothing, a missing one costs the
       // change.
       this.#deps.outbox.remove(batch);
+      // Its own batch is nothing a pull needs to fetch: `enqueue` stamped every
+      // entry in it, so reading it back would change nothing. A record lost
+      // here costs one download of it, never a change.
+      if (written) {
+        try {
+          this.#readIndex.record([
+            {
+              path: written.path,
+              revision: written.revision,
+              state: "done",
+              readBy: this.#launch,
+              readAt: this.#deps.now()
+            }
+          ]);
+        } catch (error) {
+          this.#deps.onError?.(error);
+        }
+      }
       return { pushed: batch.length, path: written?.path ?? null };
     } catch (error) {
       // Put the work back. A queue that drops entries on a transient failure
@@ -453,8 +521,9 @@ export class SyncLoop {
   }
 
   async #pull(): Promise<PullResult> {
-    const provider = this.#deps.provider();
-    const entries = await readAllEntries(provider);
+    const startedAt = this.#deps.now();
+    const read = await this.#readNewFiles();
+    const entries = read.entries;
 
     // Only for the clock fold below. What may be *applied* is no longer a
     // question about who wrote an entry — see the comment on `applyEntries`.
@@ -466,6 +535,11 @@ export class SyncLoop {
     for (const entry of foreign) {
       this.#clock.observeString(entry.hlc);
     }
+    // Only what was read this time, which is what makes it a sign of activity.
+    // It used to be every foreign entry in the log, and a vault any other
+    // machine had ever written to has those in its snapshot for good — so the
+    // loop never left the fast interval, and pulled the whole log every five
+    // seconds for as long as a window was open.
     if (foreign.length > 0) {
       this.#deps.setSetting(
         SYNC_LOOP_SETTINGS.clock,
@@ -474,8 +548,13 @@ export class SyncLoop {
       this.#noteActivity();
     }
 
-    // Resolved over the whole log; written back only where the winner is
-    // causally later than what this machine already holds.
+    // Resolved over what was read; written back only where the winner is
+    // causally later than what this machine already holds. Reading only the
+    // files not read before changes nothing here: an entry in a file already
+    // read was applied then, found already held, or lost to one that was —
+    // so the stamps below already outrank it, and reading it again would skip
+    // it. A file that left anything for a later reading is not skipped; see
+    // `#readRecords`.
     //
     // That second half is the whole guard, and it has to be a comparison rather
     // than a rule about authorship. `applyEntries` resolves entries against each
@@ -565,6 +644,13 @@ export class SyncLoop {
         // working for a merged table — `versionKey` only splits the *fold*.
         versions.set(entryIdentity(entry), entry.hlc);
       }
+      // In the same transaction as the rows: a read is recorded exactly when
+      // what it read has landed, so a crash between the two re-reads the file
+      // rather than skipping it.
+      this.#readIndex.record(this.#readRecords(read, merged, incomplete));
+      this.#readIndex.forget(
+        read.gone.filter((record) => record.readAt < startedAt).map((r) => r.path)
+      );
       return merged;
     };
     const merged = target.transaction ? target.transaction(runMerge) : runMerge();
@@ -598,6 +684,104 @@ export class SyncLoop {
       this.#deps.onApplied?.(result);
     }
     return { ...result, entriesSeen: entries.length };
+  }
+
+  /**
+   * Download the files of the log this machine has not read yet.
+   *
+   * The listing is metadata only; what is fetched is each batch not read
+   * before and the newest snapshot, if that is new. A pull with nothing new
+   * therefore costs one listing — it used to download the whole log.
+   */
+  async #readNewFiles(): Promise<NewlyRead> {
+    const storage = this.#storage();
+    const listing = await listLogFiles(storage);
+    const known = this.#readIndex.load();
+    const fresh = (file: LogFile) =>
+      needsRead(known.get(file.path), file.revision, this.#launch);
+
+    const files: ReadFile[] = [];
+    const entries: OpEntry[] = [];
+
+    // Only the newest snapshot, as `readLog` reads it; an older one is about to
+    // be deleted by the pass that wrote its successor.
+    const snapshot = listing.snapshots[listing.snapshots.length - 1];
+    const folded = new Set<string>();
+    if (snapshot && fresh(snapshot)) {
+      const stored = await storage.get(snapshot.path);
+      if (stored) {
+        const parsed = parseOplogSnapshot(stored.content);
+        // A snapshot this build cannot read may be a newer build's: read it
+        // again next launch rather than never.
+        files.push({ ...snapshot, entries: parsed?.entries ?? [], unreadable: !parsed });
+        for (const entry of parsed?.entries ?? []) {
+          entries.push(entry);
+          folded.add(entry.hlc);
+        }
+      }
+    }
+
+    for (const batch of listing.batches) {
+      if (!fresh(batch)) continue;
+      const stored = await storage.get(batch.path);
+      // Deleted between the listing and now: compaction folded it into a
+      // snapshot, which the next listing shows as new.
+      if (!stored) continue;
+      // What the snapshot read alongside already holds, by timestamp, as
+      // `readLog` skips it — a batch straddling the horizon is in both.
+      const parsed = parseBatch(stored.content).filter((entry) => !folded.has(entry.hlc));
+      files.push({ ...batch, entries: parsed, unreadable: false });
+      entries.push(...parsed);
+    }
+
+    const listed = new Set(
+      [...listing.batches, ...listing.snapshots].map((file) => file.path)
+    );
+    const gone = [...known.values()].filter((record) => !listed.has(record.path));
+    return { files, entries, gone };
+  }
+
+  /**
+   * How each file read this time is recorded: `done` when nothing in it waits
+   * on a later reading, `retry` when something does.
+   *
+   * `retry` is everything the loop has always left for the next launch to
+   * read again, back when every pull read everything: a `localStorage` entry
+   * (the renderer may not have taken it before a quit), a row the target took
+   * only part of, an entry this build refuses but a newer one might take —
+   * unclassified, not synced by this build, or one the target threw on. Only a
+   * malformed entry and one sealed to another machine's keychain are refused
+   * for good.
+   */
+  #readRecords(
+    read: NewlyRead,
+    merged: ApplyResult,
+    incomplete: ReadonlySet<string>
+  ): ReadRecord[] {
+    const pending = new Set<OpEntry>();
+    for (const rejected of merged.rejected) {
+      if (rejected.reason !== "malformed" && rejected.reason !== "device-encrypted") {
+        pending.add(rejected.entry);
+      }
+    }
+    for (const entry of merged.merged) {
+      if (incomplete.has(entryIdentity(entry))) pending.add(entry);
+    }
+    const readAt = this.#deps.now();
+    return read.files.map((file) => {
+      const retry =
+        file.unreadable ||
+        file.entries.some(
+          (entry) => entry.scope === "localStorage" || pending.has(entry)
+        );
+      return {
+        path: file.path,
+        revision: file.revision,
+        state: retry ? "retry" : "done",
+        readBy: this.#launch,
+        readAt
+      };
+    });
   }
 
   // --- Compaction ------------------------------------------------------------
@@ -636,7 +820,7 @@ export class SyncLoop {
 
     try {
       const held = await lease.withLease(() =>
-        compactOplog(this.#deps.provider(), { now: this.#deps.now })
+        compactOplog(this.#storage(), { now: this.#deps.now })
       );
       return held.ran ? held.result : null;
     } catch (error) {

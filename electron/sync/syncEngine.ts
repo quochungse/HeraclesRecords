@@ -145,9 +145,11 @@ export interface ApplyOptions {
   /**
    * Whether this target has already been given this exact change.
    *
-   * The log is read in full on every poll — `readAllEntries` has no cursor —
-   * so without an answer here every merged row and setting is rewritten to
-   * SQLite every few seconds and `onApplied` never stops firing. Asked after
+   * A pull still meets entries it has applied before — each new snapshot
+   * repeats the log up to its `upTo`, a launch reads again the files left for
+   * it, and a first launch reads everything — so without an answer here every
+   * merged row and setting is rewritten to SQLite and `onApplied` fires for
+   * nothing. Asked after
    * last-writer-wins rather than before it: filtering the input would let an
    * older entry win once its successor had been seen.
    */

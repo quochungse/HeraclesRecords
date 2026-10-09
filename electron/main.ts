@@ -35,6 +35,7 @@ import { tablesTouched, type ApplyResult } from "./sync/syncEngine";
 import { attachSyncSink } from "./sync/syncBridge";
 import { createSqliteRecordVersions } from "./sync/recordVersions";
 import { createSqliteOutbox } from "./sync/outbox";
+import { createSqliteReadIndex } from "./sync/readIndex";
 import { attachAnalysisLeases } from "./sync/automationLease";
 import {
   captureSyncableState,
@@ -824,8 +825,9 @@ app.whenReady().then(() => {
 /**
  * How long the first pull may hold the analyses back.
  *
- * A pull reads the whole log, and on Drive that is a round trip per batch, so
- * a large vault on a slow link can take a while. The analyses are worth more
+ * A pull reads every file of the log this machine has not read yet — the whole
+ * log on a first launch — and on Drive that is a round trip per file, so a
+ * large vault on a slow link can take a while. The analyses are worth more
  * late than never, and a pull still in flight when they start is covered
  * anyway: a run whose conversation it changes is stopped and says so
  * (`noteConversationsChangedBySync`).
@@ -1224,6 +1226,7 @@ function startSyncLoop(): SyncLoop | null {
     clearTimer: (handle) => clearTimeout(handle as NodeJS.Timeout),
     recordVersions: createSqliteRecordVersions(),
     outbox: createSqliteOutbox(),
+    readIndex: createSqliteReadIndex(),
     conditions: () => ({
       // A hidden window means nobody is looking, so there is nothing to poll
       // for; `resume()` picks it up again when the window comes back.

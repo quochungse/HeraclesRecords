@@ -97,6 +97,11 @@ export const TABLE_POLICY: Readonly<Record<string, TablePolicy>> = {
   // another machine re-publishing entries it never made.
   sync_outbox: "device",
 
+  // Which files of the vault's log this machine has read. `device` for the
+  // same reason again: carried to another machine it would claim reads that
+  // machine never made, and it would skip them. See `readIndex.ts`.
+  sync_read_files: "device",
+
   // Execution records of analysis runs. Not synced: a run belongs to whichever
   // machine held the lease, and syncing them would fight that lease.
   // What a run *produces* lands in chat_sessions, which is synced.

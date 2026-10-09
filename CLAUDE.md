@@ -2309,9 +2309,9 @@ lives at module level for the same visit-to-visit reason — see `useCalendarDat
     entries against each other and never against the database — `resolve()` picks a winner
     per `entryIdentity` and `SqliteSyncTarget.upsertRow` is an unconditional `INSERT OR
     REPLACE` — so "this entry won the log" and "this entry is newer than what is here" are
-    different questions and only the second is safe to act on. The log a pull acts on is the
-    log as it was when `readAllEntries` *began*, and that is a full fetch over the network,
-    so any local write made during it is invisible to that snapshot.
+    different questions and only the second is safe to act on. What a pull acts on is the
+    log as it was when its listing *began* — fetched over the network, file by file — so
+    any local write made during it is invisible to that read.
     `SyncLoop.enqueue` therefore stamps `entryIdentity -> hlc` at the moment of the local
     write and `pull` stamps what it merges, both through `recordVersions.ts`; a winner that
     does not beat the stamp is skipped. Own entries still take part in last-writer-wins —
@@ -2455,6 +2455,30 @@ lives at module level for the same visit-to-visit reason — see `useCalendarDat
     skew; an hour offline is not skew. Duplicates cost nothing — `resolve` is
     last-writer-wins over whatever it is given — and being invisible costs the write.
     `npm run test:sync-engine` fails against the old shape.
+  - **A pull fetches only the files of the log it has not read** (`readIndex.ts`,
+    `sync_read_files`, `device` tier). Batch and snapshot files are never rewritten — a
+    batch is claimed under an HLC its device never issued before, a snapshot under an
+    `upTo` that only moves forward — so a pull lists the vault (metadata only), fetches
+    each batch whose `path + revision` is not recorded and the newest snapshot if it is
+    new, and records the reads **in the merge's transaction**: a crash between the two
+    re-reads the file, never skips it. A pull with nothing new costs one listing. It used
+    to download the whole log every poll, and the "foreign entry seen" check that sets
+    the fast interval was asked of the whole log, so any vault another machine had ever
+    written to held the loop at 5 s for good — measured at a ~4 MB pull every ~45 s with
+    the app idle. Skipping a read file is safe because `recordVersions` already outranks
+    everything in it; that is also why this machine's own batch is recorded as read at
+    upload — `enqueue` stamped every entry in it, and stamps, not own entries in
+    `resolve()`, are the guard (above). **A file is `done` only when nothing in it waits
+    on a later reading**; one holding a `localStorage` entry, a row taken only in part, or
+    an entry refused as unclassified, not synced by this build or thrown on by the target
+    is `retry`, read again once per launch — the promise the loop made for those entries
+    when every pull read everything, and the one an upgrade relies on. The snapshot
+    nearly always holds a `localStorage` entry, so each launch still fetches it once;
+    dropping that needs the renderer to acknowledge what it applied. Compaction decides
+    from the listing first — too few batches, or none named before the horizon, reads
+    nothing — and reads through `LogFileCache` (in memory, 48 MB), which holds what the
+    pull fetched and what this machine wrote. On Drive, `get` takes a log file's id from
+    the listing rather than looking it up again. `test:sync-twoway` holds all of it.
   - **The outbound queue is a table, not an array.** `sync_outbox` (`device` tier) takes
     an entry the moment it is queued and releases it only when the upload returns. What
     was lost before was never the write — that is in SQLite before an entry is built — but
