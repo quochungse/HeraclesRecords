@@ -1463,6 +1463,12 @@ export function buildDraftTrainingPlanInputSchema(): Record<string, unknown> {
       day: { type: "string", enum: ["mon", "tue", "wed", "thu", "fri", "sat", "sun"] },
       sort_no: { type: "integer", minimum: 1 },
       save_to_library: { type: "boolean" },
+      library_workout_id: {
+        type: "string",
+        description:
+          "A workout_id from get_workout_library: this session is that workout, copied by the app. " +
+          "Omit steps and sport; give steps only to change it."
+      },
       steps: {
         type: "array",
         minItems: 1,
@@ -1516,6 +1522,7 @@ export function buildDraftWorkoutInputSchema(): Record<string, unknown> {
     day: _day,
     sort_no: _sortNo,
     save_to_library: _saveToLibrary,
+    library_workout_id: _libraryWorkoutId,
     ...properties
   } = planSchema.properties.workouts.items.properties;
 

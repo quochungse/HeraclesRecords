@@ -129,8 +129,9 @@ export function applyPlanRevision(
 
   /** A workout as the model wrote it, without anything that places it. */
   const workoutOf = (value: unknown, label: string): Record<string, unknown> | undefined => {
-    if (!isRecord(value) || !text(value.name)) {
-      errors.push(`${label}: workout needs at least a name, and its steps.`);
+    // A library workout is named by its id; its name and steps are read later.
+    if (!isRecord(value) || !(text(value.name) || text(value.library_workout_id))) {
+      errors.push(`${label}: workout needs at least a name, and its steps or a library_workout_id.`);
       return undefined;
     }
     const {
@@ -210,7 +211,7 @@ export function applyPlanRevision(
       case "add_session": {
         const workout = workoutOf(raw.workout, label);
         if (!workout) return;
-        const where = placement(raw, `${label} (${String(workout.name)})`);
+        const where = placement(raw, `${label} (${String(workout.name ?? workout.library_workout_id)})`);
         if (!where) return;
         let newKey = text(workout.key);
         if (!newKey || find(newKey) >= 0) {
