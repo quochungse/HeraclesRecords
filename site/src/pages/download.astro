@@ -36,13 +36,13 @@ const requirements: Record<string, string> = {
       {release && <> Released {formatReleaseDate(release.publishedAt)}. <a href="/changelog/">What's new</a></>}
     </p>
     <div class="download-main">
-      <DownloadButton list={false} />
+      <DownloadButton list={false} fallback="#installers" />
     </div>
   </section>
 
   {
     release ? (
-      <section class="wrap section-tight">
+      <section class="wrap section-tight" id="installers">
         {groups.map((group) => (
           <section class="os-group" aria-labelledby={`os-${group.id}`}>
             <h2 id={`os-${group.id}`}>{group.os}</h2>
@@ -74,7 +74,7 @@ const requirements: Record<string, string> = {
         </p>
       </section>
     ) : (
-      <section class="wrap section-tight">
+      <section class="wrap section-tight" id="installers">
         <p class="lede">
           Every installer is on <a href={`${repo}/releases/latest`}>the latest GitHub release</a>.
         </p>

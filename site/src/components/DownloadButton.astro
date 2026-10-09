@@ -1,17 +1,18 @@
 ---
 // The download button for the visitor's own system, with every installer
-// listed under it. Without script, or on a phone, the button opens the release
-// page; the script only swaps in the installer that matches the system.
+// listed under it. Without script, or on a phone, the button opens the
+// download page; the script only swaps in the installer that matches the system.
 import { latestRelease } from "../release.mjs";
 
 interface Props {
   /** Every installer listed under the button. Off where the page lists them itself. */
   list?: boolean;
+  /** Where the button goes when no installer is picked for the visitor. */
+  fallback?: string;
 }
 
-const { list = true } = Astro.props;
+const { list = true, fallback = "/download" } = Astro.props;
 const release = await latestRelease();
-const releasesUrl = "https://github.com/quochungse/HeraclesRecords/releases/latest";
 const pick = (id) => release?.installers.find((entry) => entry.id === id);
 // A Mac is offered Apple Silicon: no browser says reliably which chip it runs
 // on, and Intel is one line below.
@@ -40,11 +41,11 @@ if (choices && deb) {
 
 <div class="download" data-choices={choices ? JSON.stringify(choices) : undefined}>
   <div class="actions download-actions">
-    <a class="button primary" href={releasesUrl} data-download-primary>
+    <a class="button primary" href={fallback} data-download-primary>
       <span data-download-label>Download</span>
       <span class="download-size" data-download-size hidden></span>
     </a>
-    <a class="button" href={releasesUrl} data-download-alt hidden></a>
+    <a class="button" href={fallback} data-download-alt hidden></a>
     <slot />
   </div>
   {
