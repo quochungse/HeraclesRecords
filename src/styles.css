@@ -25957,6 +25957,21 @@ body.is-backgrounded .spin {
   font-weight: 700;
 }
 
+/* The week the Coach card's strip shows: its column washed and its stack at
+   full strength, so the bar and the strip under it read as one. */
+.plan-ridge-week.is-selected {
+  background: var(--glass-bg);
+}
+
+.plan-ridge-week.is-selected .plan-ridge-seg {
+  background: var(--tl-sport, var(--text-secondary));
+}
+
+.plan-ridge-week.is-selected small {
+  color: var(--text-primary);
+  font-weight: 700;
+}
+
 .plan-ridge-legend {
   display: inline-flex;
   flex-wrap: wrap;

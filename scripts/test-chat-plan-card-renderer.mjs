@@ -256,6 +256,29 @@ async function main() {
   );
   assert.equal(await harness("count", ".chat-creation-days > li"), 7);
   assert.equal(await harness("count", ".chat-creation-days > li.is-rest"), 4);
+  assert.equal(
+    await harness("count", '.chat-creation-card .plan-ridge-week.is-selected[aria-pressed="true"]'),
+    1,
+    "the ridge marks the week the strip shows"
+  );
+
+  // A bar picks the week the strip shows; it does not open the Workbench.
+  await page(`document.querySelector('.chat-creation-card .plan-ridge-week[aria-label^="Week 2"]').click()`);
+  await waitFor(
+    async () => (await harness("text", ".chat-creation-week-label")) === "Week 2",
+    "pressing week 2 shows week 2 under the ridge"
+  );
+  await settle();
+  assert.equal(await harness("exists", ".chat-workbench"), false, "a bar does not open the Workbench");
+  assert.match(
+    await page(`document.querySelector('.chat-creation-card .plan-ridge-week.is-selected').getAttribute("aria-label")`),
+    /^Week 2/
+  );
+  await page(`document.querySelector('.chat-creation-card .plan-ridge-week[aria-label^="Week 1"]').click()`);
+  await waitFor(
+    async () => (await harness("text", ".chat-creation-week-label")) === "Week 1",
+    "and back to week 1"
+  );
 
   // An undated plan is a programme: it saves to COROS as one plan first.
   assert.equal(
