@@ -13,6 +13,9 @@ import zones from "./zones.ts";
 import ride from "./ride.ts";
 import hike from "./hike.ts";
 import strength from "./strength.ts";
+import calendar from "./calendar.ts";
+import workout from "./workout.ts";
+import library from "./library.ts";
 
 /** Русский. Written by scripts/i18n-index.mjs. */
 export default {
@@ -30,4 +33,7 @@ export default {
   ...ride,
   ...hike,
   ...strength,
+  ...calendar,
+  ...workout,
+  ...library,
 } satisfies Record<keyof typeof en, string>;

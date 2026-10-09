@@ -66,11 +66,13 @@ import {
   HEART_RATE_PRESETS,
   PACE_PRESETS,
   SWIM_STROKE_IDS,
-  formatIntensityType,
   validateWorkoutIntensity,
   workoutSportType
 } from "../../electron/workoutCapabilities";
 
+import { formatCount, formatDecimal, messageRecord, plural, t } from "../i18n/core";
+import { zoneName } from "../i18n/zoneNames";
+import { intensityTypeLabel, swimStrokeLabel } from "../i18n/workoutWords";
 /**
  * A pace as it is typed: minutes, a colon, two seconds.
  *
@@ -162,14 +164,14 @@ export interface BuilderRowOrigin {
 }
 
 /** The words for each kind, for the parts of the builder that have no icon. */
-export const BUILDER_KIND_LABELS: Readonly<Record<BuilderKind, string>> = {
-  warmup: "Warm-up",
-  training: "Training",
-  intervals: "Repeat",
-  rest: "Rest",
-  cooldown: "Cool-down",
-  sendOff: "Send-off"
-};
+export const BUILDER_KIND_LABELS: Readonly<Record<BuilderKind, string>> = messageRecord({
+  warmup: "workout.kind.warmup",
+  training: "workout.kind.training",
+  intervals: "workout.kind.intervals",
+  rest: "workout.kind.rest",
+  cooldown: "workout.kind.cooldown",
+  sendOff: "workout.kind.sendOff"
+});
 
 /** Preferred ordering for the quick-add step chips. */
 export const BUILDER_ADD_KIND_ORDER: readonly BuilderKind[] = [
@@ -548,14 +550,14 @@ export function builderRowValidationMessage(
   if (row.kind === "intervals") {
     const repeatCount = Number(row.repeats);
     if (!Number.isInteger(repeatCount) || repeatCount < 1 || repeatCount > 99) {
-      return "Enter between 1 and 99 repeats.";
+      return t("workout.invalid.repeats");
     }
     if (!row.children?.length) {
-      return "Add at least one step inside this repeat.";
+      return t("workout.invalid.repeatEmpty");
     }
     for (const [index, child] of row.children.entries()) {
       if (child.kind === "intervals") {
-        return `Sub-step ${index + 1}: nested repeats are not supported.`;
+        return t("workout.invalid.nested", { n: index + 1 });
       }
       const message = builderRowValidationMessage(
         child,
@@ -564,7 +566,7 @@ export function builderRowValidationMessage(
         exercisesLoading,
         unitSystem
       );
-      if (message) return `Sub-step ${index + 1}: ${message}`;
+      if (message) return t("workout.invalid.subStep", { n: index + 1, message });
     }
     return undefined;
   }
@@ -572,18 +574,18 @@ export function builderRowValidationMessage(
   const stepKind = row.kind;
   const targetValue = row.targetValue;
   if (row.targetType !== "open" && !(Number(targetValue) > 0)) {
-    return `Enter a valid ${builderTargetLabel(row.targetType, sport, unitSystem).toLocaleLowerCase()}.`;
+    return t("workout.invalid.target", { target: builderTargetLabel(row.targetType, sport, unitSystem) });
   }
   if (sport === "strength" && stepKind === "training") {
-    if (exercisesLoading) return "Wait for the COROS exercise catalog to finish loading.";
-    if (exerciseOptions.length === 0) return "Reconnect COROS to load the exercise catalog.";
-    if (!row.exerciseName.trim()) return "Select a COROS exercise for this Strength step.";
-    if (!row.exerciseId) return "Choose an exact exercise from the COROS library.";
+    if (exercisesLoading) return t("workout.invalid.catalogLoading");
+    if (exerciseOptions.length === 0) return t("workout.invalid.catalogMissing");
+    if (!row.exerciseName.trim()) return t("workout.invalid.strengthExercise");
+    if (!row.exerciseId) return t("workout.invalid.exactExercise");
     if (!Number.isInteger(Number(row.sets)) || Number(row.sets) < 1 || Number(row.sets) > 99) {
-      return "Enter between 1 and 99 sets.";
+      return t("workout.invalid.sets");
     }
     if (!Number.isFinite(Number(row.restSeconds)) || Number(row.restSeconds) < 0 || Number(row.restSeconds) > 3600) {
-      return "Enter rest between 0 and 3600 seconds.";
+      return t("workout.invalid.rest");
     }
   }
   // An empty added-weight field reads as 0 and would upload a 0 kg step, so
@@ -591,19 +593,19 @@ export function builderRowValidationMessage(
   if (row.intensityType === "weight"
     && row.intensityPreset === "weight"
     && !(Number(row.intensityLow) > 0)) {
-    return `Enter the added weight in ${unitSystem === "imperial" ? "lb" : "kg"}.`;
+    return t("workout.invalid.weight", { unit: unitSystem === "imperial" ? "lb" : "kg" });
   }
   if (sport === "hyrox" && row.exerciseName.trim() && !row.exerciseId) {
     return exerciseOptions.length === 0
-      ? "Reconnect COROS to load the Hybrid Fitness exercise catalog."
-      : "Choose an exact exercise from the COROS library.";
+      ? t("workout.invalid.hyroxCatalog")
+      : t("workout.invalid.exactExercise");
   }
   if (row.intensityType === "pace" || row.intensityType === "effortPace") {
     if (!isClockValue(row.paceFast) || !isClockValue(row.paceSlow)) {
-      return `Enter both paces as mm:ss, for example ${unitSystem === "imperial" ? "7:15" : "4:30"}.`;
+      return t("workout.invalid.paces", { example: unitSystem === "imperial" ? "7:15" : "4:30" });
     }
     if (clockSeconds(row.paceFast) > clockSeconds(row.paceSlow)) {
-      return "The first pace is the faster one, so it must be the smaller time.";
+      return t("workout.invalid.paceOrder");
     }
   }
   const intensityError = validateWorkoutIntensity(
@@ -622,7 +624,7 @@ export function rowToStep(
   insideRepeat = false
 ): WorkoutCreateStep {
   if (row.kind === "intervals") {
-    throw new Error("Repeat groups cannot be nested inside another repeat group.");
+    throw new Error("Repeat groups cannot be nested inside another repeat group."); // i18n-ignore: a programming error
   }
   const rawValue = Number(row.targetValue);
   const target = row.targetType === "distance"
@@ -676,7 +678,7 @@ export function rowToSteps(
     return [
       {
         repeat: Math.max(1, Math.round(Number(row.repeats) || 1)),
-        name: "Repeat",
+        name: "Repeat", // i18n-ignore: saved to COROS
         steps: (row.children ?? []).map((child) =>
           rowToStep(child, sport, unitSystem, true)
         )
@@ -708,30 +710,30 @@ export function builderTargetLabel(
   unitSystem: UnitSystem
 ): string {
   const labels: Record<BuilderRow["targetType"], string> = {
-    distance: sport === "swim"
-      ? `Distance (${swimDistanceUnit(unitSystem)})`
-      : `Distance (${distanceUnit(unitSystem)})`,
-    time: sport === "strength" ? "Duration (sec)" : "Duration (min)",
-    load: "Training Load",
-    hrRecovery: "Return to heart rate (bpm)",
-    open: "Manual end",
-    reps: "Repetitions",
-    elevationGain: `Elevation gain (${elevationUnit(unitSystem)})`,
-    routes: "Routes"
+    distance: t("workout.target.distanceIn", {
+      unit: sport === "swim" ? swimDistanceUnit(unitSystem) : distanceUnit(unitSystem)
+    }),
+    time: sport === "strength" ? t("workout.target.durationSec") : t("workout.target.durationMin"),
+    load: t("workout.target.load"),
+    hrRecovery: t("workout.target.hrRecovery"),
+    open: t("workout.target.open"),
+    reps: t("workout.target.reps"),
+    elevationGain: t("workout.target.elevationIn", { unit: elevationUnit(unitSystem) }),
+    routes: t("workout.target.routes")
   };
   return labels[target];
 }
 
 export function builderTargetTypeLabel(target: BuilderRow["targetType"]): string {
   const labels: Record<BuilderRow["targetType"], string> = {
-    distance: "Distance",
-    time: "Time",
-    load: "Training Load",
-    hrRecovery: "HR Recovery",
-    open: "Open",
-    reps: "Reps",
-    elevationGain: "Elevation Gain",
-    routes: "Routes"
+    distance: t("workout.targetType.distance"),
+    time: t("workout.targetType.time"),
+    load: t("workout.targetType.load"),
+    hrRecovery: t("workout.targetType.hrRecovery"),
+    open: t("workout.targetType.open"),
+    reps: t("workout.targetType.reps"),
+    elevationGain: t("workout.targetType.elevationGain"),
+    routes: t("workout.targetType.routes")
   };
   return labels[target];
 }
@@ -744,45 +746,45 @@ export interface BuilderRowSummaryItem {
 export function builderSummaryRange(low: string, high: string, unit: string): string {
   const start = low.trim();
   const end = high.trim();
-  if (!start) return "Not set";
+  if (!start) return t("workout.notSet");
   return `${end && end !== start ? `${start}-${end}` : start}${unit ? ` ${unit}` : ""}`;
 }
 
 export function builderIntensitySummary(row: BuilderRow): string {
   switch (row.intensityType) {
-    case "none": return "Open";
+    case "none": return t("workout.open");
     case "heartRate": return builderSummaryRange(row.intensityLow, row.intensityHigh, "bpm");
     case "heartRatePercent": {
       const preset = HEART_RATE_PRESETS[row.intensityBasis].find((zone) => zone.preset === row.intensityPreset);
-      return preset?.label ?? builderSummaryRange(row.intensityLow, row.intensityHigh, "%");
+      return preset ? zoneName(preset.label) : builderSummaryRange(row.intensityLow, row.intensityHigh, "%");
     }
     case "pace":
     case "effortPace":
       return row.paceFast.trim() && row.paceSlow.trim()
         ? `${row.paceFast.trim()}-${row.paceSlow.trim()}`
-        : "Not set";
+        : t("workout.notSet");
     case "thresholdPacePercent":
     case "effortPacePercent": {
       const preset = PACE_PRESETS.find((zone) => zone.preset === row.intensityPreset);
-      return preset?.label ?? builderSummaryRange(row.intensityLow, row.intensityHigh, "%");
+      return preset ? zoneName(preset.label) : builderSummaryRange(row.intensityLow, row.intensityHigh, "%");
     }
     case "ftpPercent": {
       const preset = FTP_PRESETS.find((zone) => zone.preset === row.intensityPreset);
-      return preset?.label ?? builderSummaryRange(row.intensityLow, row.intensityHigh, "% FTP");
+      return preset ? zoneName(preset.label) : builderSummaryRange(row.intensityLow, row.intensityHigh, "% FTP");
     }
     case "power":
       return builderSummaryRange(row.intensityLow, row.intensityHigh, "W");
     case "speed": return builderSummaryRange(row.intensityLow, row.intensityHigh, row.intensityUnit === "mph" ? "mph" : "km/h");
     case "cadence": return builderSummaryRange(row.intensityLow, row.intensityHigh, row.intensityUnit === "spm" ? "spm" : "rpm");
-    case "swimStroke": return formatBuilderToken(row.intensityPreset || "freestyle");
+    case "swimStroke": return swimStrokeLabel(row.intensityPreset || "freestyle");
     case "weight": return row.intensityPreset === "weight"
       ? builderSummaryRange(row.intensityLow, row.intensityLow, row.intensityUnit === "lb" ? "lb" : "kg")
-      : "Bodyweight";
+      : t("workout.bodyweight");
     case "rpe": return `RPE ${row.intensityLow || "5"}`;
     case "climbGrade": return row.intensityPreset.startsWith("relative:")
-      ? `${row.intensityLow || "0"} from onsight`
-      : row.intensityPreset.split(":")[1] || "Not set";
-    default: return formatIntensityType(row.intensityType);
+      ? t("workout.fromOnsight", { n: row.intensityLow || "0" })
+      : row.intensityPreset.split(":")[1] || t("workout.notSet");
+    default: return intensityTypeLabel(row.intensityType);
   }
 }
 
@@ -795,52 +797,54 @@ export function builderRowSummary(
   exerciseLabel?: string
 ): BuilderRowSummaryItem[] {
   if (row.locked) {
-    return [{ label: "Kept as is", value: row.locked }];
+    return [{ label: t("workout.summary.keptAsIs"), value: row.locked }];
   }
   if (row.kind === "intervals") {
     const children = row.children ?? [];
     return [
       {
-        label: "Sequence",
+        label: t("workout.summary.sequence"),
         value: children.length
           ? children.map((child) => BUILDER_KIND_LABELS[child.kind]).join(" + ")
-          : "No steps"
+          : t("workout.summary.noSteps")
       },
       {
-        label: "Inside",
-        value: `${children.length} ${children.length === 1 ? "step" : "steps"}`
+        label: t("workout.summary.inside"),
+        value: plural("workout.steps", children.length)
       }
     ];
   }
   const rawTarget = row.targetValue.trim();
+  const notSet = t("workout.notSet");
+  const count = Number(rawTarget);
   const target = row.targetType === "open"
-    ? "Manual"
-    : row.targetType === "time"
-      ? rawTarget ? `${rawTarget} ${sport === "strength" ? "sec" : "min"}` : "Not set"
-      : row.targetType === "distance"
-        ? rawTarget
+    ? t("workout.summary.manual")
+    : !rawTarget
+      ? notSet
+      : row.targetType === "time"
+        ? sport === "strength" ? t("workout.summary.restSec", { value: rawTarget }) : t("units.min", { m: rawTarget })
+        : row.targetType === "distance"
           ? `${rawTarget} ${sport === "swim" ? swimDistanceUnit(unitSystem) : distanceUnit(unitSystem)}`
-          : "Not set"
-        : row.targetType === "load"
-          ? rawTarget ? `${rawTarget} TL` : "Not set"
-          : row.targetType === "hrRecovery"
-            ? rawTarget ? `${rawTarget} bpm` : "Not set"
-            : row.targetType === "reps"
-              ? rawTarget ? `${rawTarget} reps` : "Not set"
-              : row.targetType === "elevationGain"
-                ? rawTarget ? `${rawTarget} ${elevationUnit(unitSystem)}` : "Not set"
-                : rawTarget ? `${rawTarget} routes` : "Not set";
+          : row.targetType === "load"
+            ? t("units.trainingLoadShort", { value: rawTarget })
+            : row.targetType === "hrRecovery"
+              ? `${rawTarget} bpm`
+              : row.targetType === "reps"
+                ? Number.isFinite(count) ? plural("workout.reps", count) : rawTarget
+                : row.targetType === "elevationGain"
+                  ? `${rawTarget} ${elevationUnit(unitSystem)}`
+                  : Number.isFinite(count) ? plural("workout.routes", count) : rawTarget;
   const details: BuilderRowSummaryItem[] = [
     { label: builderTargetTypeLabel(row.targetType), value: target },
-    { label: "Intensity", value: builderIntensitySummary(row) }
+    { label: t("workout.summary.intensity"), value: builderIntensitySummary(row) }
   ];
   const exercise = exerciseLabel?.trim() || row.exerciseName.trim();
   if (exercise) {
-    details.splice(1, 0, { label: "Exercise", value: exercise });
+    details.splice(1, 0, { label: t("workout.summary.exercise"), value: exercise });
   }
   if (sport === "strength" && row.kind === "training") {
-    details.push({ label: "Sets", value: row.sets || "Not set" });
-    details.push({ label: "Rest", value: `${row.restSeconds || "0"} sec` });
+    details.push({ label: t("workout.summary.sets"), value: row.sets || notSet });
+    details.push({ label: t("workout.summary.rest"), value: t("workout.summary.restSec", { value: row.restSeconds || "0" }) });
   }
   return details;
 }
@@ -911,11 +915,11 @@ export function builderStructureCounts(rows: BuilderRow[]): {
 export function formatBuilderMinutes(totalMinutes: number): string {
   const rounded = Math.round(totalMinutes);
   if (rounded < 60) {
-    return `${rounded} min`;
+    return t("units.min", { m: rounded });
   }
   const hours = Math.floor(rounded / 60);
   const remainder = rounded % 60;
-  return remainder > 0 ? `${hours} hr ${remainder} min` : `${hours} hr`;
+  return remainder > 0 ? t("units.duration.hm", { h: hours, m: remainder }) : t("units.duration.h", { h: hours });
 }
 
 export function formatBuilderDistance(
@@ -924,10 +928,10 @@ export function formatBuilderDistance(
   unitSystem: UnitSystem
 ): string {
   if (unit === "swim") {
-    return `${Math.round(distance).toLocaleString()} ${swimDistanceUnit(unitSystem)}`;
+    return `${formatCount(Math.round(distance))} ${swimDistanceUnit(unitSystem)}`;
   }
   const rounded = Math.round(distance * 10) / 10;
-  return `${rounded.toLocaleString()} ${distanceUnit(unitSystem)}`;
+  return `${formatDecimal(rounded, Number.isInteger(rounded) ? 0 : 1)} ${distanceUnit(unitSystem)}`;
 }
 
 export function formatBuilderToken(value: string): string {
@@ -1134,7 +1138,7 @@ function editorIntensityToRowFields(
 function withOrigin(row: BuilderRow, node: RunWorkoutEditorNode): BuilderRow {
   const read: BuilderRow = {
     ...row,
-    ...(node.editable ? {} : { locked: node.unsupportedReason ?? "This step is kept as COROS has it." })
+    ...(node.editable ? {} : { locked: node.unsupportedReason ?? t("workout.keptAsCoros") })
   };
   return { ...read, origin: { node, fingerprint: rowFingerprint(read) } };
 }
@@ -1230,14 +1234,14 @@ export function seedBuilderRows(sport: WorkoutSport, seed: RowSeed): BuilderRow[
 /** What an unnamed step is called — the words the old editor gave a new one. */
 function stepTitle(kind: RunWorkoutEditorStepKind): string {
   return kind === "warmup"
-    ? "Warm Up"
+    ? "Warm Up" // i18n-ignore: saved to COROS
     : kind === "cooldown"
-      ? "Cool Down"
+      ? "Cool Down" // i18n-ignore: saved to COROS
       : kind === "rest"
-        ? "Rest"
+        ? "Rest" // i18n-ignore: saved to COROS
         : kind === "sendOff"
-          ? "Send-off"
-          : "Training";
+          ? "Send-off" // i18n-ignore: saved to COROS
+          : "Training"; // i18n-ignore: saved to COROS
 }
 
 /**

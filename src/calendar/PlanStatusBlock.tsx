@@ -5,6 +5,7 @@ import type { HeraclesRecordsApi } from "../heraclesrecords-api";
 import { SelectDropdown } from "../components/SelectDropdown";
 import type { CalendarDay, PlannedActualPair } from "./calendarTypes";
 
+import { t } from "../i18n/core";
 interface PlanStatusBlockProps {
   api: HeraclesRecordsApi;
   day: CalendarDay;
@@ -15,8 +16,8 @@ interface PlanStatusBlockProps {
 }
 
 function activityLabel(activity: TrainingHubActivity): string {
-  const name = activity.name ?? activity.sportName ?? "Activity";
-  const minutes = activity.duration ? `${Math.round(activity.duration / 60)} min` : null;
+  const name = activity.name ?? activity.sportName ?? t("activity.untitled");
+  const minutes = activity.duration ? t("units.min", { m: Math.round(activity.duration / 60) }) : null;
   return minutes ? `${name} · ${minutes}` : name;
 }
 
@@ -80,7 +81,7 @@ export function PlanStatusBlock({
   };
 
   const options = [
-    { value: "", label: "Nothing yet" },
+    { value: "", label: t("calendar.match.nothing") },
     ...day.activities.map((activity) => ({
       value: activity.activityId,
       label: activityLabel(activity)
@@ -88,7 +89,7 @@ export function PlanStatusBlock({
   ];
 
   return (
-    <section className="calendar-plan-status" aria-label="Plan status">
+    <section className="calendar-plan-status" aria-label={t("calendar.match.label")}>
       <header>
         <span className="calendar-plan-status-icon" aria-hidden="true">
           {pair.activity ? <Check size={14} /> : <Link2 size={14} />}
@@ -96,15 +97,15 @@ export function PlanStatusBlock({
         <span>
           <strong>
             {pair.activity
-              ? "Answered by"
+              ? t("calendar.match.answered")
               : day.isPast
-                ? "Nothing matched this session"
-                : "Not done yet"}
+                ? t("calendar.match.noMatch")
+                : t("calendar.match.notYet")}
           </strong>
           <small>
             {day.activities.length
-              ? "Pick the activity that was this session, if the match is wrong."
-              : "No activity was recorded on this day."}
+              ? t("calendar.match.pick")
+              : t("calendar.match.noActivity")}
           </small>
         </span>
       </header>
@@ -112,7 +113,7 @@ export function PlanStatusBlock({
       {day.activities.length ? (
         <SelectDropdown
           className="calendar-plan-status-pick"
-          label="Activity that answered this session"
+          label={t("calendar.match.pickLabel")}
           value={pair.activity?.activityId ?? ""}
           options={options}
           portal
@@ -139,18 +140,18 @@ export function PlanStatusBlock({
           disabled={saving}
           onClick={() => void save({ status: "skipped" }, true)}
         >
-          <SkipForward size={14} aria-hidden="true" /> Mark skipped
+          <SkipForward size={14} aria-hidden="true" /> {t("calendar.match.skip")}
         </button>
         <button
           type="button"
           className="ghost-button"
           disabled={saving}
-          title="Forget what was said here and let the calendar match it again"
+          title={t("calendar.match.autoTitle")}
           onClick={() =>
             void save({ status: day.isPast ? "missed" : "upcoming" }, false)
           }
         >
-          <Undo2 size={14} aria-hidden="true" /> Match automatically
+          <Undo2 size={14} aria-hidden="true" /> {t("calendar.match.auto")}
         </button>
       </div>
     </section>

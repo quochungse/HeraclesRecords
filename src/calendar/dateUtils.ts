@@ -1,5 +1,6 @@
 import { getLocalHappenDayKey } from "../training/formatters";
 
+import { capitalizeFirst, getIntlLocale, weekdayNames } from "../i18n/core";
 export function dateFromKey(key: string): Date {
   return new Date(
     Number(key.slice(0, 4)),
@@ -52,20 +53,22 @@ export function weekRow(referenceDate: Date): string[] {
 }
 
 export function monthLabel(year: number, monthIndex: number): string {
-  return new Intl.DateTimeFormat(undefined, {
-    month: "long",
-    year: "numeric"
-  }).format(new Date(year, monthIndex, 1));
+  return capitalizeFirst(
+    new Intl.DateTimeFormat(getIntlLocale(), {
+      month: "long",
+      year: "numeric"
+    }).format(new Date(year, monthIndex, 1))
+  );
 }
 
 export function weekRangeLabel(weekKeys: string[]): string {
   const first = dateFromKey(weekKeys[0]!);
   const last = dateFromKey(weekKeys[weekKeys.length - 1]!);
-  const startLabel = new Intl.DateTimeFormat(undefined, {
+  const startLabel = new Intl.DateTimeFormat(getIntlLocale(), {
     month: "short",
     day: "numeric"
   }).format(first);
-  const endLabel = new Intl.DateTimeFormat(undefined, {
+  const endLabel = new Intl.DateTimeFormat(getIntlLocale(), {
     month: "short",
     day: "numeric",
     year: "numeric"
@@ -87,4 +90,7 @@ export function isKeyInMonth(
   );
 }
 
-export const WEEKDAY_LABELS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+/** Monday first, in the language on screen. Read while rendering, never kept. */
+export function weekdayLabels(): string[] {
+  return weekdayNames("short");
+}

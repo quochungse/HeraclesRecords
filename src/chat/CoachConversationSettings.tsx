@@ -9,7 +9,7 @@ import type {
 import { OptionChips, type OptionGroupOption } from "../components/OptionGroup";
 import { GeneratorProviderPanel } from "../training-library/GeneratorProviderPanel";
 import {
-  OTHER_SERVERS_WITHHELD_NOTE,
+  otherServersWithheldNote,
   SOURCES,
   anySourceWithheld
 } from "../training-library/planGeneratorModel";
@@ -141,7 +141,7 @@ function Permissions({
         }
       />
       {anySourceWithheld(sources) ? (
-        <p className="plan-generator-sheet-note">{OTHER_SERVERS_WITHHELD_NOTE}</p>
+        <p className="plan-generator-sheet-note">{otherServersWithheldNote()}</p>
       ) : null}
       {web || provider === "local" ? (
         <p className="plan-generator-sheet-note">{webSearchNote(provider)}</p>

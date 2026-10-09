@@ -29,7 +29,7 @@ const hike: HikeMessages = {
   "hike.list.ascentTitle": "เมตรที่ไต่ขึ้น",
   "hike.list.ascentRate": "ไต่ขึ้น/ชม.",
   "hike.list.ascentRateTitle": "เมตรที่ไต่ขึ้นต่อชั่วโมงของเวลาที่บันทึก",
-  "hike.list.loadTitle": "โหลดการฝึกของ COROS สำหรับการเดินป่านี้",
+  "hike.list.loadTitle": "ภาระการฝึกของ COROS สำหรับการเดินป่านี้",
   "hike.volume.biggestAscent": "ไต่ขึ้นมากที่สุด",
   "hike.volume.longestDay": "วันที่ยาวที่สุด",
   "hike.volume.longestHike": "การเดินป่าที่ไกลที่สุด",

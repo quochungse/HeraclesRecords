@@ -8,6 +8,7 @@
  */
 import type { PlanCompliance } from "../../electron/planCompliance";
 
+import { plural, t } from "../i18n/core";
 export { planCompliance, planScheduleKeys } from "../../electron/planCompliance";
 export type { PlanCompliance } from "../../electron/planCompliance";
 
@@ -21,13 +22,11 @@ export function formatCompliance(compliance: PlanCompliance | undefined): string
 export function describeCompliance(compliance: PlanCompliance | undefined): string | null {
   if (!compliance) return null;
   if (compliance.ratio === undefined) {
-    return compliance.upcoming === 1
-      ? "1 session ahead"
-      : `${compliance.upcoming} sessions ahead`;
+    return plural("library.compliance.ahead", compliance.upcoming);
   }
-  const parts = [`${compliance.done} done`];
-  if (compliance.missed) parts.push(`${compliance.missed} missed`);
-  if (compliance.skipped) parts.push(`${compliance.skipped} skipped`);
-  if (compliance.upcoming) parts.push(`${compliance.upcoming} ahead`);
+  const parts = [t("library.compliance.done", { n: compliance.done })];
+  if (compliance.missed) parts.push(t("library.compliance.missed", { n: compliance.missed }));
+  if (compliance.skipped) parts.push(t("library.compliance.skipped", { n: compliance.skipped }));
+  if (compliance.upcoming) parts.push(t("library.compliance.upcoming", { n: compliance.upcoming }));
   return parts.join(" · ");
 }

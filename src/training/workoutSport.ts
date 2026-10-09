@@ -1,11 +1,11 @@
 import type { WorkoutSport } from "../../electron/types";
 import {
-  WORKOUT_SPORT_CAPABILITIES,
   workoutSportFromType
 } from "../../electron/workoutCapabilities";
 import { inferUpcomingWorkoutCategory, workoutCategoryLabel } from "./formatters";
 import type { SportColorCategory } from "./sportColors";
 
+import { t } from "../i18n/core";
 /**
  * A scheduled workout carries a COROS *program* sport code (1–9), which is a
  * different numbering from the activity codes `sportColorCategory` reads — 2 is
@@ -55,7 +55,7 @@ export function scheduledSportCategory(
 
 /** COROS's own name for a program sport code, e.g. "Bike" for 2. */
 export function workoutSportLabel(sport: WorkoutSport): string {
-  return WORKOUT_SPORT_CAPABILITIES[sport].label;
+  return t(`workout.sport.${sport}`);
 }
 
 /**

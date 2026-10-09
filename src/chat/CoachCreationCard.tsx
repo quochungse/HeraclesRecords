@@ -9,7 +9,6 @@ import type {
   WorkoutSport
 } from "../../electron/types";
 import { parsePlanDay, formatPlanDay } from "../../electron/trainingPlanDomain";
-import { formatWorkoutSport } from "../../electron/workoutCapabilities";
 import {
   RIDGE_UNITS,
   formatRidgeValue,
@@ -25,6 +24,7 @@ import { datedForReading } from "./planDating";
 import type { CreationCalendar } from "./creationCalendar";
 import { creationStatus } from "./creationChoices";
 
+import { workoutSportLabel } from "../training/workoutSport";
 export interface CreationFigures {
   weeks: number;
   /** "4–5", or "4" when every week holds the same. */
@@ -84,7 +84,7 @@ export function creationFigures(document: TrainingPlanDocument): CreationFigures
     weeks: weeks.length,
     sessionsPerWeek: low === high ? `${high}` : `${low}–${high}`,
     peakWeek: `${formatRidgeValue(peak, measure)} ${RIDGE_UNITS[measure]}`,
-    sports: sports.map((sport) => formatWorkoutSport(sport)).join(", "),
+    sports: sports.map((sport) => workoutSportLabel(sport)).join(", "),
     reading: weeks,
     firstWeek: busy[0],
     span: datedSpan(document)

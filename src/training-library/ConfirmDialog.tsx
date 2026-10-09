@@ -1,6 +1,7 @@
 import { LoaderCircle } from "lucide-react";
 import { useEffect, useId, useRef } from "react";
 
+import { t } from "../i18n/core";
 export interface ConfirmDialogProps {
   title: string;
   /** What the action does, in the words of the thing it does it to. */
@@ -47,7 +48,7 @@ export function ConfirmDialog({
   description,
   warning,
   confirmLabel,
-  cancelLabel = "Cancel",
+  cancelLabel,
   danger = false,
   alternative,
   busy,
@@ -107,7 +108,7 @@ export function ConfirmDialog({
         {warning ? <p className="tl-dialog-warning" role="note">{warning}</p> : null}
         <footer>
           <button ref={cancelRef} type="button" className="ghost-button" disabled={Boolean(busy)} onClick={onCancel}>
-            {cancelLabel}
+            {cancelLabel ?? t("common.cancel")}
           </button>
           {alternative ? (
             <button

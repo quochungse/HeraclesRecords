@@ -18,6 +18,7 @@ import {
 } from "./planReaderModel";
 import { sportChipStyle, sportTheme } from "./sportTheme";
 
+import { plural, t } from "../i18n/core";
 interface PlanEntryRowProps {
   entry: PlanEntryFacts;
   unitSystem: UnitSystem;
@@ -46,8 +47,8 @@ export function PlanEntryRow({ entry, unitSystem, onOpen }: PlanEntryRowProps) {
   const figures = [
     duration,
     distance,
-    entry.trainingLoad ? `${Math.round(entry.trainingLoad)} load` : null,
-    entry.strengthSets ? `${entry.strengthSets} sets` : null
+    entry.trainingLoad ? t("library.entry.load", { n: Math.round(entry.trainingLoad) }) : null,
+    entry.strengthSets ? plural("workout.sets", entry.strengthSets) : null
   ].filter((figure): figure is string => Boolean(figure));
 
   const content = (
@@ -65,7 +66,7 @@ export function PlanEntryRow({ entry, unitSystem, onOpen }: PlanEntryRowProps) {
       ) : (
         /* No duration, no distance, no load: COROS served the session's name
            and nothing else. Saying so beats four dashes pretending to be data. */
-        <span className="plan-entry-figures is-nil">No target set</span>
+        <span className="plan-entry-figures is-nil">{t("library.entry.noTarget")}</span>
       )}
       {label && tone ? (
         <em className="plan-entry-status" data-tone={tone}>

@@ -427,7 +427,7 @@ export function formatUpcomingWorkoutLoad(value?: number): string {
     return "--";
   }
 
-  return `${Math.round(value)}TL`;
+  return t("units.trainingLoadShort", { value: String(Math.round(value)) });
 }
 
 export function parseUpcomingWorkoutDistanceKm(

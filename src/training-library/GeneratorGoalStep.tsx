@@ -4,7 +4,7 @@ import type { ReactNode } from "react";
 import type { WorkoutSport } from "../../electron/types";
 import { TRAINING_PLAN_GENERATION_LIMITS, addPlanWeeks } from "../../electron/trainingPlanGeneration";
 import { parsePlanDay } from "../../electron/trainingPlanDomain";
-import { WORKOUT_SPORTS, formatWorkoutSport } from "../../electron/workoutCapabilities";
+import { WORKOUT_SPORTS } from "../../electron/workoutCapabilities";
 import { OptionChips, OptionGroup } from "../components/OptionGroup";
 import { MonthDayPicker } from "./MonthDayPicker";
 import {
@@ -14,10 +14,13 @@ import {
   formatPlanDate,
   raceDayIso,
   raceDayKey,
+  raceDistanceLabel,
   type GeneratorForm
 } from "./planGeneratorModel";
 import { sportTheme } from "./sportTheme";
 
+import { workoutSportLabel } from "../training/workoutSport";
+import { plural, t } from "../i18n/core";
 const LIMITS = TRAINING_PLAN_GENERATION_LIMITS;
 
 export interface StepProps {
@@ -77,9 +80,9 @@ function startsIn(iso: string, today = new Date()): string {
   if (!start) return "";
   const midday = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 12);
   const days = Math.round((start.valueOf() - midday.valueOf()) / 86_400_000);
-  if (days <= 0) return "starts today";
+  if (days <= 0) return t("library.starts.today");
   const weeks = Math.ceil(days / 7);
-  return weeks === 1 ? "next week" : `in ${weeks} weeks`;
+  return plural("library.starts.weeks", weeks);
 }
 
 /**
@@ -121,12 +124,12 @@ function RaceDayPicker({ value, min, invalid, onChange }: { value: string; min: 
         onClick={() => setOpen((current) => !current)}
       >
         <CalendarDays size={14} aria-hidden="true" />
-        {value ? formatPlanDate(value, true) : "Pick race day"}
+        {value ? formatPlanDate(value, true) : t("library.raceDay.pick")}
       </button>
       {open ? (
-        <div className="plan-generator-racepop-panel" role="dialog" aria-label="Race day">
+        <div className="plan-generator-racepop-panel" role="dialog" aria-label={t("library.raceDay")}>
           <MonthDayPicker
-            label="Race day"
+            label={t("library.raceDay")}
             value={value ? raceDayKey(value) : minKey}
             min={minKey}
             onChange={(key) => {
@@ -141,51 +144,43 @@ function RaceDayPicker({ value, min, invalid, onChange }: { value: string; min: 
 }
 
 /** The goal field's words, per kind. The hints are one line each, so the field is one height whatever is picked. */
-const GOAL_FIELD: Record<GeneratorForm["goalKind"], { title: string; qualifier: string; placeholder: string; hint: string }> = {
-  race: {
-    title: "The race",
-    qualifier: "name, course, a target time",
-    placeholder: "Example: Hanoi Half, aiming for 1:45",
-    hint: "A target time is what Coach sets the paces from."
-  },
-  base: {
-    title: "In your words",
-    qualifier: "optional",
-    placeholder: "Example: Run five days a week without niggles",
-    hint: "Coach reads this beside the goal you picked."
-  },
-  return: {
-    title: "In your words",
-    qualifier: "optional",
-    placeholder: "Example: Back from a calf strain, six weeks off",
-    hint: "Coach reads this beside the goal you picked."
-  },
-  hybrid: {
-    title: "In your words",
-    qualifier: "optional",
-    placeholder: "Example: HYROX in the spring, two gym days a week",
-    hint: "Coach reads this beside the goal you picked."
-  },
-  other: {
-    title: "Describe your goal",
-    qualifier: "required",
-    placeholder: "Example: Get fit for a ski trip in February and keep two gym days a week",
-    hint: "Coach reads this as the goal — say what you want to do, and by when."
+function goalField(kind: GeneratorForm["goalKind"]): { title: string; qualifier: string; placeholder: string; hint: string } {
+  if (kind === "race") {
+    return {
+      title: t("library.field.raceTitle"),
+      qualifier: t("library.field.raceQualifier"),
+      placeholder: t("library.field.racePh"),
+      hint: t("library.field.raceHint")
+    };
   }
-};
+  if (kind === "other") {
+    return {
+      title: t("library.field.otherTitle"),
+      qualifier: t("library.field.required"),
+      placeholder: t("library.field.otherPh"),
+      hint: t("library.field.otherHint")
+    };
+  }
+  return {
+    title: t("library.field.wordsTitle"),
+    qualifier: t("library.field.optional"),
+    placeholder: t(kind === "base" ? "library.field.basePh" : kind === "return" ? "library.field.returnPh" : "library.field.hybridPh"),
+    hint: t("library.field.wordsHint")
+  };
+}
 
 /** What the plan is for: the kind of goal, its words, its length and dates, the level and the sports. */
 export function GeneratorGoalStep({ form, firstMonday, update, problemOf, spanSentence }: StepProps) {
   const startDate = addPlanWeeks(firstMonday, form.startOffset);
   const goalProblem = problemOf("goal");
-  const goalField = GOAL_FIELD[form.goalKind];
+  const goalWords = goalField(form.goalKind);
   const toggleSport = (sport: WorkoutSport) =>
     update({ sports: form.sports.includes(sport) ? form.sports.filter((item) => item !== sport) : [...form.sports, sport] }, "sports");
 
   return (
     <div className="plan-generator-step">
       <fieldset id="plan-generator-kind">
-        <legend>What kind of goal?</legend>
+        <legend>{t("library.goalStep.kind")}</legend>
         <div className="plan-generator-cards plan-generator-goal-kinds">
           {GOAL_KINDS.map((option) => (
             <button
@@ -206,34 +201,34 @@ export function GeneratorGoalStep({ form, firstMonday, update, problemOf, spanSe
           be a one-line input for four kinds and a four-line box for the fifth,
           so picking a kind jumped everything below it. */}
       <label className="plan-generator-goal">
-        <span>{goalField.title} <small>{goalField.qualifier}</small></span>
+        <span>{goalWords.title} <small>{goalWords.qualifier}</small></span>
         <textarea
           id="plan-generator-goal"
           rows={4}
           value={form.goal}
           maxLength={LIMITS.goalLength}
-          placeholder={goalField.placeholder}
+          placeholder={goalWords.placeholder}
           onChange={(event) => update({ goal: event.target.value }, "goal")}
           {...invalidProps("goal", goalProblem)}
         />
-        <small>{goalField.hint}</small>
+        <small>{goalWords.hint}</small>
       </label>
       <FieldProblem field="goal" message={goalProblem} />
 
       {form.goalKind === "race" ? (
         <div className="plan-generator-row">
           <div className="plan-generator-field" role="group" aria-labelledby="plan-generator-distance-label">
-            <span id="plan-generator-distance-label">Distance</span>
+            <span id="plan-generator-distance-label">{t("library.goalStep.distance")}</span>
             <OptionGroup
-              label="Distance"
+              label={t("library.goalStep.distance")}
               size="sm"
               value={form.raceDistance || "none"}
-              options={[...RACE_DISTANCES.map((distance) => ({ value: distance, label: distance })), { value: "none", label: "Other" }]}
+              options={[...RACE_DISTANCES.map((distance) => ({ value: distance, label: raceDistanceLabel(distance) })), { value: "none", label: t("library.goalStep.other") }]}
               onChange={(distance) => update({ raceDistance: distance === "none" ? "" : distance }, "race")}
             />
           </div>
           <div className="plan-generator-field" role="group" aria-labelledby="plan-generator-race-label">
-            <span id="plan-generator-race-label">Race day</span>
+            <span id="plan-generator-race-label">{t("library.raceDay")}</span>
             <RaceDayPicker
               value={form.raceDate}
               min={addPlanWeeks(startDate, 1)}
@@ -245,25 +240,25 @@ export function GeneratorGoalStep({ form, firstMonday, update, problemOf, spanSe
       ) : (
         <div className="plan-generator-row">
           <div className="plan-generator-field" role="group" aria-labelledby="plan-generator-length-label">
-            <span id="plan-generator-length-label">How long?</span>
+            <span id="plan-generator-length-label">{t("library.goalStep.howLong")}</span>
             <OptionGroup
-              label="How long"
+              label={t("library.goalStep.howLongLabel")}
               size="sm"
               value={form.lengthMode}
-              options={[{ value: "coach", label: "Coach decides" }, { value: "set", label: "Set the length" }]}
+              options={[{ value: "coach", label: t("library.coachDecides") }, { value: "set", label: t("library.goalStep.setLength") }]}
               onChange={(lengthMode) => update({ lengthMode }, "weeks")}
             />
           </div>
           {form.lengthMode === "set" ? (
             <div className="plan-generator-field" role="group" aria-labelledby="plan-generator-weeks-label">
-              <span id="plan-generator-weeks-label">Weeks</span>
+              <span id="plan-generator-weeks-label">{t("library.goalStep.weeks")}</span>
               <Stepper
                 id="plan-generator-weeks"
                 value={form.weeks}
                 min={1}
                 max={LIMITS.maxWeeks}
-                decreaseLabel="Fewer weeks"
-                increaseLabel="More weeks"
+                decreaseLabel={t("library.goalStep.fewer")}
+                increaseLabel={t("library.goalStep.more")}
                 onChange={(weeks) => update({ weeks }, "weeks")}
               />
             </div>
@@ -276,15 +271,15 @@ export function GeneratorGoalStep({ form, firstMonday, update, problemOf, spanSe
       {/* Groups, not labels: a label forwards a click on its text to the first
           control inside it, which here is the "earlier" button. */}
       <div className="plan-generator-field" role="group" aria-labelledby="plan-generator-start-label">
-        <span id="plan-generator-start-label">First week <small>{startsIn(startDate)}</small></span>
+        <span id="plan-generator-start-label">{t("library.goalStep.firstWeek")} <small>{startsIn(startDate)}</small></span>
         <Stepper
           id="plan-generator-start"
           value={form.startOffset}
           min={0}
           max={LIMITS.maxLeadWeeks}
           invalid={Boolean(problemOf("start"))}
-          decreaseLabel="A week earlier"
-          increaseLabel="A week later"
+          decreaseLabel={t("library.goalStep.earlier")}
+          increaseLabel={t("library.goalStep.later")}
           display={formatPlanDate(startDate)}
           onChange={(startOffset) => update({ startOffset }, "start")}
         />
@@ -293,7 +288,7 @@ export function GeneratorGoalStep({ form, firstMonday, update, problemOf, spanSe
       <FieldProblem field="start" message={problemOf("start")} />
 
       <fieldset id="plan-generator-difficulty" className={problemOf("difficulty") ? "is-invalid" : undefined}>
-        <legend>Level</legend>
+        <legend>{t("library.goalStep.level")}</legend>
         <div className="plan-generator-cards plan-generator-segmented">
           {LEVELS.map((option) => (
             <button
@@ -312,15 +307,15 @@ export function GeneratorGoalStep({ form, firstMonday, update, problemOf, spanSe
       </fieldset>
 
       <fieldset id="plan-generator-sports" className={problemOf("sports") ? "is-invalid" : undefined}>
-        <legend>Sports</legend>
+        <legend>{t("library.goalStep.sports")}</legend>
         <OptionChips
-          label="Sports"
+          label={t("library.goalStep.sports")}
           className="plan-generator-sports"
           values={form.sports}
           options={WORKOUT_SPORTS.map((sport) => {
             const theme = sportTheme(sport);
             const SportIcon = theme.icon;
-            return { value: sport, label: formatWorkoutSport(sport), icon: <SportIcon size={13} aria-hidden="true" /> };
+            return { value: sport, label: workoutSportLabel(sport), icon: <SportIcon size={13} aria-hidden="true" /> };
           })}
           colorOf={(sport) => sportTheme(sport as WorkoutSport).color}
           onToggle={(sport) => toggleSport(sport as WorkoutSport)}

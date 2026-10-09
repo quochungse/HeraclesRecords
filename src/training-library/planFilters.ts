@@ -15,12 +15,13 @@
  */
 import type { TrainingPlanDocument, TrainingPlanDraftRecord } from "../../electron/types";
 
+import { getIntlLocale, t } from "../i18n/core.ts";
 /**
  * Where a plan came from, when that is worth saying. Every plan is a COROS
  * plan now, so the one provenance left to name is the coach's.
  */
 export function planOriginLabel(plan: Pick<TrainingPlanDocument, "origin">): string | undefined {
-  return plan.origin === "coach" ? "Coach" : undefined;
+  return plan.origin === "coach" ? t("library.scope.coach") : undefined;
 }
 
 /**
@@ -269,8 +270,8 @@ export interface PlanScopeOption {
 export function planScopeOptions(
   plans: readonly TrainingPlanDocument[]
 ): PlanScopeOption[] {
-  const options: PlanScopeOption[] = [{ id: "all", label: "All" }];
-  if (plans.some((plan) => plan.origin === "coach")) options.push({ id: "coach", label: "Coach" });
+  const options: PlanScopeOption[] = [{ id: "all", label: t("library.scope.all") }];
+  if (plans.some((plan) => plan.origin === "coach")) options.push({ id: "coach", label: t("library.scope.coach") });
   return options;
 }
 
@@ -313,7 +314,7 @@ function shortDate(iso: string): string | undefined {
   const date = new Date(`${iso}T12:00:00`);
   return Number.isNaN(date.valueOf())
     ? undefined
-    : date.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+    : date.toLocaleDateString(getIntlLocale(), { month: "short", day: "numeric" });
 }
 
 /**
@@ -325,10 +326,10 @@ export function planStartLabel(plan: TrainingPlanDocument, today: Date = new Dat
   if (!plan.startDate) return undefined;
   const label = shortDate(plan.startDate);
   if (!label) return undefined;
-  if (plan.calendar === "finished") return `Ran from ${label}`;
-  if (plan.calendar === "stopped") return "Taken off the calendar";
+  if (plan.calendar === "finished") return t("library.start.ranFrom", { date: label });
+  if (plan.calendar === "stopped") return t("library.start.takenOff");
   const start = planStartDate(plan);
-  return start && start > startOfDay(today) ? `Starts ${label}` : `On calendar since ${label}`;
+  return start && start > startOfDay(today) ? t("library.start.starts", { date: label }) : t("library.start.since", { date: label });
 }
 
 /** What the reader is offered when nothing is on screen. */
@@ -356,14 +357,14 @@ export function planEmptyState(
 ): PlanEmptyState {
   if (query.trim() || scope !== "all") {
     return {
-      title: "No plans match",
-      body: "Clear the search or choose another filter.",
+      title: t("library.empty.noMatch.title"),
+      body: t("library.empty.noMatch.body"),
       action: "clear"
     };
   }
   return {
-    title: "No plans yet",
-    body: "Build a plan here, generate one with the coach, or refresh to pull plans from COROS.",
+    title: t("library.empty.none.title"),
+    body: t("library.empty.none.body"),
     action: "create"
   };
 }

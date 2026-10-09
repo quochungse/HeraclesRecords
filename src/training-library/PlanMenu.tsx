@@ -12,6 +12,7 @@
 import { MoreHorizontal, type LucideIcon } from "lucide-react";
 import { useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 
+import { t } from "../i18n/core";
 export interface PlanMenuItem {
   label: string;
   icon: LucideIcon;
@@ -37,7 +38,7 @@ interface PlanMenuProps {
 
 export function PlanMenu({
   items,
-  label = "More actions",
+  label,
   trigger,
   triggerClassName = "icon-button",
   className,
@@ -91,7 +92,7 @@ export function PlanMenu({
         ref={button}
         type="button"
         className={triggerClassName}
-        aria-label={label}
+        aria-label={label ?? t("library.menu.more")}
         aria-haspopup="menu"
         aria-expanded={open}
         onClick={() => setOpen((value) => !value)}
@@ -102,7 +103,7 @@ export function PlanMenu({
         <div
           className={`plan-more-menu${align === "start" ? " is-start" : ""}`}
           role="menu"
-          aria-label={label}
+          aria-label={label ?? t("library.menu.more")}
         >
           {items.map((item) => (
             <button

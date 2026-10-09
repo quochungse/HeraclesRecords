@@ -1,3 +1,4 @@
+import { t, type MessageKey } from "../i18n/core";
 /**
  * What a run has done so far, in the athlete's words: each read Coach makes,
  * each point its thinking turns to, and each time the check hands a draft
@@ -33,41 +34,50 @@ export interface RunNotes {
 
 export const EMPTY_NOTES: RunNotes = { trail: [], notes: "", scanned: 0 };
 
+function lineOf(key: MessageKey): { doing: string; done: string } {
+  const [doing, done] = trailLine(key);
+  return { doing, done };
+}
+
 /** The longest `notes` kept: the tail is what is shown, and headings are taken as they arrive. */
 const NOTES_LIMIT = 20_000;
 
-const READS: Record<string, [doing: string, done: string]> = {
-  list_recent_activities: ["Reading your recent activities", "Read your recent activities"],
-  get_activity_detail: ["Looking at a session in detail", "Looked at a session in detail"],
-  get_fitness_trends: ["Reading your fitness trends", "Read your fitness trends"],
-  get_training_zones: ["Reading your training zones", "Read your training zones"],
-  get_sleep_summary: ["Reading your sleep and recovery", "Read your sleep and recovery"],
-  list_scheduled_workouts: ["Checking your calendar", "Checked your calendar"],
-  search_coros_exercises: ["Finding exercises in the COROS library", "Found exercises in the COROS library"],
-  // Every local tool has a line, so an ordinary Coach turn reads as work too
-  // (R1): its trail used to be one "Using get activity detail…".
-  get_hr_zone_summary: ["Reading your heart-rate zones", "Read your heart-rate zones"],
-  list_training_plans: ["Looking through your COROS plans", "Looked through your COROS plans"],
-  get_training_plan: ["Reading a COROS plan", "Read a COROS plan"],
-  get_workout_library: ["Looking through your workout library", "Looked through your workout library"],
-  get_plan_draft: ["Reading the plan made here", "Read the plan made here"],
-  draft_workout: ["Writing the workout", "Wrote the workout"],
-  draft_training_plan: ["Writing the plan", "Wrote the plan"],
-  revise_training_plan: ["Revising the plan", "Revised the plan"],
-  propose_schedule_changes: ["Checking the changes against your calendar", "Checked the changes against your calendar"],
-  delete_workout: ["Preparing the removal", "Prepared the removal"],
-  request_plan_brief: ["Setting out the brief", "Set out the brief"],
-  request_coach_input: ["Preparing a question", "Prepared a question"],
-  recall_conversation: ["Looking back through this conversation", "Looked back through this conversation"],
+/** Each tool's two lines, as message keys: what it is doing, and what it did. */
+const READS: Record<string, MessageKey> = {
+  list_recent_activities: "library.trail.list_recent_activities",
+  get_activity_detail: "library.trail.get_activity_detail",
+  get_fitness_trends: "library.trail.get_fitness_trends",
+  get_training_zones: "library.trail.get_training_zones",
+  get_sleep_summary: "library.trail.get_sleep_summary",
+  list_scheduled_workouts: "library.trail.list_scheduled_workouts",
+  search_coros_exercises: "library.trail.search_coros_exercises",
+  get_hr_zone_summary: "library.trail.get_hr_zone_summary",
+  list_training_plans: "library.trail.list_training_plans",
+  get_training_plan: "library.trail.get_training_plan",
+  get_workout_library: "library.trail.get_workout_library",
+  get_plan_draft: "library.trail.get_plan_draft",
+  draft_workout: "library.trail.draft_workout",
+  draft_training_plan: "library.trail.draft_training_plan",
+  revise_training_plan: "library.trail.revise_training_plan",
+  propose_schedule_changes: "library.trail.propose_schedule_changes",
+  delete_workout: "library.trail.delete_workout",
+  request_plan_brief: "library.trail.request_plan_brief",
+  request_coach_input: "library.trail.request_coach_input",
+  recall_conversation: "library.trail.recall_conversation",
   // The provider's own web tools, under the names every provider reports them by.
-  web_search: ["Searching the web", "Searched the web"],
-  web_fetch: ["Reading a web page", "Read a web page"]
+  web_search: "library.trail.web_search",
+  web_fetch: "library.trail.web_fetch"
 };
+
+function trailLine(key: MessageKey): [doing: string, done: string] {
+  return [t(key), t(`${key}.done` as MessageKey)];
+}
 
 /** A read, as a line. An unknown COROS MCP tool is still a read of COROS. */
 export function readLine(tool: string | undefined): [doing: string, done: string] {
   const name = tool?.split("__").at(-1) ?? "";
-  return READS[name] ?? (tool?.startsWith("coros__") ? ["Reading COROS", "Read COROS"] : ["Reading your training", "Read your training"]);
+  const key = READS[name] ?? (tool?.startsWith("coros__") ? "library.trail.coros" : "library.trail.training");
+  return trailLine(key);
 }
 
 function push(trail: TrailItem[], item: Omit<TrailItem, "count">): TrailItem[] {
@@ -80,7 +90,7 @@ function push(trail: TrailItem[], item: Omit<TrailItem, "count">): TrailItem[] {
 
 /** The training snapshot the turn starts from, when one was sent. */
 export function noteSnapshot(notes: RunNotes): RunNotes {
-  return { ...notes, trail: push(notes.trail, { kind: "read", doing: "Reading your training snapshot", done: "Read your training snapshot" }) };
+  return { ...notes, trail: push(notes.trail, { kind: "read", ...lineOf("library.trail.snapshot") }) };
 }
 
 export function noteRead(notes: RunNotes, tool: string | undefined): RunNotes {
@@ -95,17 +105,20 @@ export function noteRead(notes: RunNotes, tool: string | undefined): RunNotes {
 export function noteHandOver(notes: RunNotes, what: "outline" | "plan", attempt: number): RunNotes {
   let trail = notes.trail;
   if (attempt > 1) {
-    trail = push(trail, { kind: "check", doing: "The check sent it back", done: "The check sent it back" });
+    const sentBack = t("library.trail.sentBack");
+    trail = push(trail, { kind: "check", doing: sentBack, done: sentBack });
   }
-  const noun = what === "outline" ? "the outline" : "the sessions";
-  trail = push(trail, attempt > 1
-    ? { kind: "read", doing: `Fixing ${noun}`, done: `Fixed ${noun}` }
-    : { kind: "read", doing: `Handing ${noun} to the check`, done: `Handed ${noun} to the check` });
+  trail = push(trail, {
+    kind: "read",
+    ...lineOf(attempt > 1
+      ? what === "outline" ? "library.trail.fixOutline" : "library.trail.fixSessions"
+      : what === "outline" ? "library.trail.handOutline" : "library.trail.handSessions")
+  });
   return { ...notes, trail };
 }
 
 export function notePassed(notes: RunNotes): RunNotes {
-  return { ...notes, trail: push(notes.trail, { kind: "passed", doing: "Every week passed the check", done: "Every week passed the check" }) };
+  return { ...notes, trail: push(notes.trail, { kind: "passed", doing: t("library.trail.passed"), done: t("library.trail.passed") }) };
 }
 
 /**

@@ -141,6 +141,16 @@ export function monthNames(style: "narrow" | "short" | "long" = "short"): string
   return Array.from({ length: 12 }, (_, month) => format.format(new Date(Date.UTC(2024, month, 15))));
 }
 
+/**
+ * A label that opens a heading, with its first letter raised. Intl writes a
+ * month in the case a sentence would ("tháng 10 năm 2026", "octobre 2026"),
+ * which reads as a mistake where it stands alone as a title.
+ */
+export function capitalizeFirst(text: string): string {
+  const [first = "", ...rest] = [...text];
+  return first.toLocaleUpperCase(intl) + rest.join("");
+}
+
 /** A count in the language's digits, grouped: 12.345 in German. */
 export function formatCount(value: number): string {
   return numberFormat.format(value);
@@ -227,6 +237,19 @@ export function plural(key: PluralKey, count: number, vars?: MessageVars): strin
 }
 
 /** The English text of a key, for what must not change with the language. */
+/**
+ * A record of labels that reads its messages each time it is read, never once:
+ * `messageRecord({ road: "run.surface.road" }).road` is the word in the
+ * language on screen, so a module-level table of labels cannot freeze English.
+ */
+export function messageRecord<K extends string>(keys: Readonly<Record<K, MessageKey>>): Readonly<Record<K, string>> {
+  const record = {} as Record<K, string>;
+  for (const key of Object.keys(keys) as K[]) {
+    Object.defineProperty(record, key, { get: () => t(keys[key]), enumerable: true });
+  }
+  return record;
+}
+
 export function english(key: MessageKey): string {
   return (en as Dictionary)[key] ?? key;
 }

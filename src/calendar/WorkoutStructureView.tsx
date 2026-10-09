@@ -24,6 +24,7 @@ import {
   type ScheduledStructureView
 } from "./scheduledStructure";
 
+import { formatDecimal, messageRecord, plural, t } from "../i18n/core";
 /*
  * How a workout's steps are drawn, wherever they are read.
  *
@@ -42,13 +43,13 @@ const KIND_ICON: Record<ScheduledStepKind, LucideIcon> = {
   sendOff: Timer
 };
 
-const KIND_LABEL: Record<ScheduledStepKind, string> = {
-  warmup: "Warm-up",
-  training: "Main",
-  rest: "Rest",
-  cooldown: "Cool-down",
-  sendOff: "Send-off"
-};
+const KIND_LABEL = messageRecord<ScheduledStepKind>({
+  warmup: "workout.kind.warmup",
+  training: "workout.view.main",
+  rest: "workout.kind.rest",
+  cooldown: "workout.kind.cooldown",
+  sendOff: "workout.kind.sendOff"
+});
 
 const KIND_ORDER: ScheduledStepKind[] = [
   "warmup",
@@ -309,10 +310,10 @@ function RepeatCard({
         <span className="sched-repeat-token" aria-hidden="true">
           <Repeat size={12} />
         </span>
-        <span className="sched-repeat-title">Repeat ×{node.repeat}</span>
+        <span className="sched-repeat-title">{t("workout.view.repeat", { n: node.repeat })}</span>
         {perRep && total ? (
           <span className="sched-repeat-total">
-            {perRep} each · {total} total
+            {t("workout.view.eachTotal", { each: perRep, total })}
           </span>
         ) : null}
       </div>
@@ -329,7 +330,7 @@ function RepeatCard({
 
 export function formatTonnage(kg: number, unitSystem: UnitSystem): string {
   if (unitSystem === "metric" && kg >= 10_000) {
-    return `${(kg / 1000).toFixed(1)} t`;
+    return `${formatDecimal(kg / 1000, 1)} t`;
   }
   return formatWeightValue(kg, unitSystem, 0);
 }
@@ -411,12 +412,12 @@ function StrengthStructure({
       {showSummary ? (
         <div className="sched-strength-summary">
           <span className="sched-strength-chip">
-            {steps.length} exercise{steps.length === 1 ? "" : "s"}
+            {plural("units.exercises", steps.length)}
           </span>
-          <span className="sched-strength-chip">{totalSets} sets</span>
+          <span className="sched-strength-chip">{plural("workout.sets", totalSets)}</span>
           {tonnage > 0 ? (
             <span className="sched-strength-chip">
-              {formatTonnage(tonnage, unitSystem)} lifted
+              {t("workout.view.lifted", { weight: formatTonnage(tonnage, unitSystem) })}
             </span>
           ) : null}
         </div>
@@ -435,7 +436,7 @@ function StrengthStructure({
             <div className="sched-circuit" key={node.id}>
               <div className="sched-circuit-head">
                 <Repeat size={12} aria-hidden="true" />
-                Circuit ×{node.repeat}
+                {t("workout.view.circuit", { n: node.repeat })}
               </div>
               {node.steps.map((step) => (
                 <LiftCard

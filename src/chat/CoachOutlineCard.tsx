@@ -2,7 +2,6 @@ import { ArrowRight, RotateCw } from "lucide-react";
 import { useState, type CSSProperties } from "react";
 import type { PlanBrief, WorkoutSport } from "../../electron/types";
 import { PLAN_WEEKDAYS } from "../../electron/trainingPlanGeneration";
-import { formatWorkoutSport } from "../../electron/workoutCapabilities";
 import { addPlanDays, formatPlanDate } from "../training-library/planGeneratorModel";
 import { sportTheme } from "../training-library/sportTheme";
 import { briefTitle } from "./planBriefModel";
@@ -15,6 +14,7 @@ import {
   outlineWeekMonday
 } from "./planOutlineModel";
 
+import { workoutSportLabel } from "../training/workoutSport";
 /** The tallest bar, in pixels. */
 const BAR_MAX = 64;
 
@@ -142,7 +142,7 @@ export function CoachOutlineCard({
                 <span>{PLAN_WEEKDAYS[session.dayIndex]?.slice(0, 3)}</span>
                 <strong>{session.name}</strong>
                 <small>
-                  {formatWorkoutSport(session.sport)}
+                  {workoutSportLabel(session.sport)}
                   {session.minutes ? ` · ${session.minutes} min` : ""}
                 </small>
               </li>

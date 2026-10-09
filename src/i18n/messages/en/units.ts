@@ -5,6 +5,7 @@ const units = {
   "units.duration.hm": "{h}h {m}m",
   "units.duration.h": "{h}h",
   "units.duration.m": "{m}m",
+  "units.duration.s": "{s}s",
   "units.min": "{m} min",
   "units.unknown": "Unknown",
   "units.today": "Today",

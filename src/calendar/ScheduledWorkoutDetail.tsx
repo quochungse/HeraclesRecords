@@ -18,7 +18,6 @@ import type { HeraclesRecordsApi } from "../heraclesrecords-api";
 import { useUnitSystem } from "../units/UnitSystemProvider";
 import { useWorkoutExerciseCatalog } from "./useWorkoutExerciseCatalog";
 import {
-  WORKOUT_SPORT_CAPABILITIES,
   workoutSportFromType
 } from "../../electron/workoutCapabilities";
 import {
@@ -30,7 +29,7 @@ import {
 import { sportColorCategory } from "../training/sportColors";
 import { resolveSportName } from "../training/sportTypes";
 import { workoutSportView } from "./workoutSportIcons";
-import { isStrengthStyleWorkout } from "../training/workoutSport";
+import { isStrengthStyleWorkout, workoutSportLabel } from "../training/workoutSport";
 import {
   buildScheduledWorkoutView,
   formatPlannedVolume,
@@ -38,6 +37,7 @@ import {
 } from "./scheduledStructure";
 import { WorkoutStructure } from "./WorkoutStructureView";
 
+import { plural, t } from "../i18n/core";
 interface ScheduledWorkoutDetailProps {
   entry: TrainingHubScheduledWorkoutEntry;
   sportTypes: TrainingHubSportType[];
@@ -58,12 +58,11 @@ function formatDetailVolume(volume: string | undefined, unitSystem: UnitSystem):
   const setCount = value.match(/^(\d+(?:\.\d+)?)\s+set\(s\)$/i);
   if (!setCount) return value;
 
-  return `${setCount[1]} ${Number(setCount[1]) === 1 ? "set" : "sets"}`;
+  return plural("workout.sets", Number(setCount[1]));
 }
 
 function formatDetailLoad(load?: number): string {
-  const value = formatUpcomingWorkoutLoad(load);
-  return value === "--" ? value : value.replace(/TL$/, " TL");
+  return formatUpcomingWorkoutLoad(load);
 }
 
 export function ScheduledWorkoutDetail({
@@ -83,9 +82,9 @@ export function ScheduledWorkoutDetail({
   const category =
     sportMeta?.category ?? sportColorCategory(entry.sportType);
   const sportName = sport
-    ? WORKOUT_SPORT_CAPABILITIES[sport].label
+    ? workoutSportLabel(sport)
     : (resolveSportName({ sportType: entry.sportType }, sportTypes) ??
-      "Workout");
+      t("workout.untitled"));
   const workoutCategory = inferUpcomingWorkoutCategory(entry.name);
   // The name classifier is run-centric — only surface its chip when it found
   // a real intent (or the sport actually is running) to avoid a bogus "Run"
@@ -107,30 +106,29 @@ export function ScheduledWorkoutDetail({
   const stats: Array<{ icon: LucideIcon; label: string; value: string }> = [
     {
       icon: Route,
-      label: "Volume",
+      label: t("workout.detail.volume"),
       value: formatPlannedVolume(view.totals, unitSystem, sport === "swim", () =>
         formatDetailVolume(entry.volume, unitSystem)
       )
     },
     {
       icon: Gauge,
-      label: "Planned load",
+      label: t("workout.detail.plannedLoad"),
       value: formatDetailLoad(entry.trainingLoad)
     }
   ];
   if (view.totals.durationSeconds) {
     stats.push({
       icon: Clock,
-      label: "Est. duration",
+      label: t("workout.detail.estDuration"),
       value: formatDurationSeconds(view.totals.durationSeconds)
     });
   }
   const structureSummary = view.totals.stepCount > 0
-    ? `${view.totals.stepCount} step${view.totals.stepCount === 1 ? "" : "s"}${
-        view.totals.repeatGroups > 0
-          ? `, ${view.totals.repeatGroups} repeat group${view.totals.repeatGroups === 1 ? "" : "s"}`
-          : ""
-      }`
+    ? [
+        plural("workout.steps", view.totals.stepCount),
+        view.totals.repeatGroups > 0 ? plural("workout.repeatGroups", view.totals.repeatGroups) : null
+      ].filter(Boolean).join(", ")
     : undefined;
 
   return (
@@ -173,15 +171,13 @@ export function ScheduledWorkoutDetail({
           <div className="sched-structure-head">
             <h4>
               <ListChecks size={14} aria-hidden="true" />
-              Workout structure
+              {t("workout.detail.structure")}
             </h4>
             {view.totals.distanceMeters ? (
               <span className="sched-structure-total">
-                {formatStepDistanceLabel(
-                  view.totals.distanceMeters,
-                  unitSystem,
-                  sport === "swim"
-                )} total
+                {t("workout.detail.total", {
+                  value: formatStepDistanceLabel(view.totals.distanceMeters, unitSystem, sport === "swim")
+                })}
               </span>
             ) : null}
           </div>
@@ -196,7 +192,7 @@ export function ScheduledWorkoutDetail({
       ) : (
         <motion.div className="sched-empty" {...rise(0.06)}>
           <ListChecks size={18} aria-hidden="true" />
-          <p>No structured steps — this workout runs by feel.</p>
+          <p>{t("workout.detail.noSteps")}</p>
         </motion.div>
       )}
     </div>

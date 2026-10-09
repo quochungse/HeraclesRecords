@@ -12,9 +12,10 @@ import {
 import type { CalendarDragPayload } from "./calendarDrag";
 import { skeletonDelay } from "./CalendarSkeleton";
 import { DayCell } from "./DayCell";
-import { WEEKDAY_LABELS } from "./dateUtils";
+import { weekdayLabels } from "./dateUtils";
 import { WeekStatsCell } from "./WeekStatsCell";
 
+import { t } from "../i18n/core";
 interface CalendarGridProps {
   weeks: CalendarWeek[];
   mode: CalendarMode;
@@ -109,13 +110,13 @@ export function CalendarGrid({
       aria-busy={busy || placeholder}
     >
       <div className="calendar-grid-header">
-        {WEEKDAY_LABELS.map((label) => (
+        {weekdayLabels().map((label) => (
           <div key={label} className="calendar-grid-header-cell">
             {label}
           </div>
         ))}
         <div className="calendar-grid-header-cell calendar-grid-header-stats">
-          Weekly Statistics
+          {t("calendar.weeklyStats")}
         </div>
       </div>
 

@@ -39,10 +39,11 @@ import {
   editorDraftToPlanWorkoutInput,
   planWorkoutInputToEditorDraft
 } from "../../electron/planWorkoutEditor";
-import { formatWorkoutSport, validateWorkoutDraftShared } from "../../electron/workoutCapabilities";
+import { WORKOUT_SPORT_CAPABILITIES, validateWorkoutDraftShared } from "../../electron/workoutCapabilities";
 import { useUnitSystem } from "../units/UnitSystemProvider";
 import { WorkoutBuilderWorkspace, useWorkoutBuilder } from "./WorkoutBuilder";
 
+import { t } from "../i18n/core";
 export type WorkoutBuilderSource =
   /** A session that does not exist yet. The sport is where the picker opens. */
   | { kind: "plan-new"; sport?: WorkoutSport }
@@ -142,13 +143,13 @@ export function WorkoutBuilderModal(props: WorkoutBuilderModalProps) {
       {loadError ? (
         <div className="calendar-modal-body workout-builder-state is-error" role="alert">
           <AlertTriangle size={20} aria-hidden="true" />
-          <strong>Workout could not be loaded</strong>
+          <strong>{t("workout.builderModal.loadFailed")}</strong>
           <span>{loadError}</span>
         </div>
       ) : (
         <div className="calendar-modal-body workout-builder-state" aria-live="polite">
           <LoaderCircle className="is-spinning" size={18} aria-hidden="true" />
-          <span>Loading workout…</span>
+          <span>{t("workout.builderModal.loading")}</span>
         </div>
       )}
     </BuilderFrame>,
@@ -216,7 +217,7 @@ function BuilderFrame({
               className="ghost-button calendar-modal-close"
               onClick={onClose}
               disabled={closeDisabled}
-              aria-label="Close"
+              aria-label={t("common.close")}
             >
               <X size={16} aria-hidden="true" />
             </button>
@@ -256,8 +257,8 @@ function LoadedWorkoutBuilder({
      Workout"; a plan session is named for its sport, which is what a new one
      was called before the builder wrote them. */
   const fallbackName = source.kind === "library"
-    ? "Structured Workout"
-    : `New ${formatWorkoutSport(builderSport).toLowerCase()} session`;
+    ? "Structured Workout" // i18n-ignore: saved to COROS as the name
+    : `New ${WORKOUT_SPORT_CAPABILITIES[builderSport].label.toLowerCase()} session`; // i18n-ignore: saved to COROS as the name
   const draft = builder.toEditorDraft(fallbackName);
   const draftKey = JSON.stringify(draft);
   /* The builder's rows have the first word; the shared validator has the
@@ -265,7 +266,7 @@ function LoadedWorkoutBuilder({
   const shared = useMemo(() => validateWorkoutDraftShared(draft), [draftKey]);
   const document = loaded.document;
   const blocked = document && !document.canEdit
-    ? document.unsupportedReason ?? "This workout cannot be edited here."
+    ? document.unsupportedReason ?? t("workout.builderModal.cannotEdit")
     : undefined;
   const problem = blocked ?? (builderValid && !shared.valid
     ? Object.values(shared.errors)[0]
@@ -338,8 +339,8 @@ function LoadedWorkoutBuilder({
 
   const trainingLoad = preview?.trainingLoad;
   const actionLabel = source.kind === "library"
-    ? saving ? "Saving and verifying…" : "Save changes"
-    : isNew ? "Add to plan" : "Apply to plan";
+    ? saving ? t("workout.builderModal.saving") : t("workout.builderModal.save")
+    : isNew ? t("workout.builderModal.addToPlan") : t("workout.builderModal.applyToPlan");
 
   return createPortal(
     <>
@@ -360,9 +361,9 @@ function LoadedWorkoutBuilder({
             </p>
           ) : null}
           totalsExtra={trainingLoad !== undefined && trainingLoad > 0 ? (
-            <span className="calendar-builder-total" title="Training load, as COROS calculates it">
+            <span className="calendar-builder-total" title={t("workout.builderModal.loadTitle")}>
               <Gauge size={11} aria-hidden="true" />
-              {Math.round(trainingLoad)} TL
+              {t("units.trainingLoadShort", { value: Math.round(trainingLoad) })}
             </span>
           ) : null}
           action={

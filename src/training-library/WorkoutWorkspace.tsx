@@ -19,7 +19,6 @@ import type { HeraclesRecordsApi } from "../heraclesrecords-api";
 import { OptionGroup } from "../components/OptionGroup";
 import { CollapsibleSearch } from "./LibrarySearch";
 import { formatHappenDayLabel } from "../training/formatters";
-import { formatWorkoutSport } from "../../electron/workoutCapabilities";
 import { workoutSportFromType } from "../../electron/trainingPlanDomain";
 import { SportBadge, sportAccentStyle } from "./sportTheme";
 import { keyFromDate } from "../calendar/dateUtils";
@@ -39,6 +38,9 @@ import {
   useSelectionPreference
 } from "../preferences/selectionPreferences";
 
+import { workoutSportLabel } from "../training/workoutSport";
+import { plural, t } from "../i18n/core";
+import { useI18n } from "../i18n/useI18n";
 interface WorkoutWorkspaceProps {
   api: HeraclesRecordsApi;
   workouts: TrainingLibraryWorkout[];
@@ -87,9 +89,9 @@ function targetLabel(
   unitSystem: UnitSystem,
   swim = false
 ): string {
-  if (node.nodeType === "repeat") return `${node.repeat} rounds`;
+  if (node.nodeType === "repeat") return plural("library.shape.rounds", node.repeat);
   const target = node.target;
-  if (target.type === "time") return `${Math.round(target.seconds / 60)} min`;
+  if (target.type === "time") return t("units.min", { m: Math.round(target.seconds / 60) });
   if (target.type === "distance") {
     if (unitSystem === "metric" && !swim && target.meters < 1000) {
       return `${Math.round(target.meters)} m`;
@@ -99,12 +101,12 @@ function targetLabel(
       ...(swim ? { digits: 0 } : {})
     });
   }
-  if (target.type === "load") return `${target.load} load`;
-  if (target.type === "reps") return `${target.count} reps`;
-  if (target.type === "routes") return `${target.count} routes`;
-  if (target.type === "elevationGain") return `${formatElevationValue(target.meters, unitSystem)} gain`;
-  if (target.type === "hrRecovery") return `${target.bpm} bpm recovery`;
-  return "Open";
+  if (target.type === "load") return t("library.entry.load", { n: target.load });
+  if (target.type === "reps") return plural("workout.reps", target.count);
+  if (target.type === "routes") return plural("workout.routes", target.count);
+  if (target.type === "elevationGain") return t("workout.gain", { value: formatElevationValue(target.meters, unitSystem) });
+  if (target.type === "hrRecovery") return t("library.shape.recovery", { bpm: target.bpm });
+  return t("workout.open");
 }
 
 interface ShapeSegment {
@@ -241,10 +243,11 @@ export function WorkoutWorkspace({
     workoutSportFromType(workouts.find((workout) => workout.id === activeId)?.sportType)
   );
 
+  const { locale } = useI18n();
   const scopes = useMemo(() => {
-    const options = [{ id: "all", label: "All" }];
+    const options = [{ id: "all", label: t("library.wscope.all") }];
     if (workouts.some((workout) => workout.favorite)) {
-      options.push({ id: "favorite", label: "Favorites" });
+      options.push({ id: "favorite", label: t("library.wscope.favorites") });
     }
     const sports = [...new Set(workouts.map((workout) => workout.sportType))]
       .filter((value): value is number => value !== undefined)
@@ -252,14 +255,14 @@ export function WorkoutWorkspace({
     for (const sportType of sports) {
       options.push({
         id: `sport:${sportType}`,
-        label: formatWorkoutSport(workoutSportFromType(sportType) ?? "run")
+        label: workoutSportLabel(workoutSportFromType(sportType) ?? "run")
       });
     }
     if (workouts.some((workout) => UNSETTLED_SYNC.has(workout.syncState))) {
-      options.push({ id: "unsettled", label: "Needs attention" });
+      options.push({ id: "unsettled", label: t("library.wscope.attention") });
     }
     return options;
-  }, [workouts]);
+  }, [workouts, locale]);
 
   const scopeAvailable = scopes.some((option) => option.id === scope);
   useEffect(() => {
@@ -510,7 +513,7 @@ export function WorkoutWorkspace({
     try {
       const happenDay = scheduleDate;
       await api.scheduleLibraryWorkout(active.id, happenDay);
-      onMessage(`Scheduled "${active.name}" on ${formatHappenDayLabel(happenDay)}.`);
+      onMessage(t("library.w.scheduled", { name: active.name, day: formatHappenDayLabel(happenDay) }));
       /* Folded again on the way out: the date has been spent, and a panel
          left standing open reads as though nothing happened. It stays open
          on a failure, where the date is still the thing being decided. */
@@ -533,7 +536,7 @@ export function WorkoutWorkspace({
         name.trim(),
         active.sportType
       );
-      onMessage(`Created "${result.name}" in the workout library.`);
+      onMessage(t("library.w.created", { name: result.name }));
       await onRefresh();
       setActiveId(result.id);
     } catch (cause) {
@@ -555,7 +558,7 @@ export function WorkoutWorkspace({
     setBusy("delete");
     try {
       await api.deleteTrainingLibraryWorkouts({ programIds: [pendingDelete.id], confirmed: true });
-      onMessage(`Deleted "${pendingDelete.name}" from COROS.`);
+      onMessage(t("library.w.deleted", { name: pendingDelete.name }));
       setPendingDelete(null);
       setActiveId(null);
       await onRefresh();
@@ -583,7 +586,7 @@ export function WorkoutWorkspace({
            */}
           <div className="tl-filters">
             <OptionGroup
-              label="Filter workouts"
+              label={t("library.w.filter")}
               className="tl-chips"
               /* The header has one line to give, and the sports in it grow
                  with the library — so the chips fold to the chosen one and
@@ -600,7 +603,7 @@ export function WorkoutWorkspace({
               <CollapsibleSearch
                 value={query}
                 onChange={setQuery}
-                label="Search workouts"
+                label={t("library.w.search")}
               />
             </div>
           </div>
@@ -614,11 +617,11 @@ export function WorkoutWorkspace({
              * standing in the corner of this column now does.
              */
             <div className="tl-empty">
-              <h3>{workouts.length ? "No workouts match" : "No workouts yet"}</h3>
+              <h3>{workouts.length ? t("library.w.noMatch") : t("library.w.none")}</h3>
               <p>
                 {workouts.length
-                  ? "Clear the search or choose another filter."
-                  : "Build your first structured workout here, or refresh to pull the ones already in your COROS library."}
+                  ? t("library.w.noMatchBody")
+                  : t("library.w.noneBody")}
               </p>
               {workouts.length ? (
                 <button
@@ -629,7 +632,7 @@ export function WorkoutWorkspace({
                     setScope("all");
                   }}
                 >
-                  Clear filters
+                  {t("library.w.clear")}
                 </button>
               ) : null}
             </div>
@@ -653,9 +656,9 @@ export function WorkoutWorkspace({
                * reserves the same gutter so the columns still line up.
                */}
               <div className="tl-index-head tl-workout-row">
-                <span className="tl-column-label">Workout</span>
-                <span className="tl-column-label is-numeric">Exercises</span>
-                <span className="tl-column-label is-numeric">Sets</span>
+                <span className="tl-column-label">{t("library.w.colWorkout")}</span>
+                <span className="tl-column-label is-numeric">{t("library.w.colExercises")}</span>
+                <span className="tl-column-label is-numeric">{t("library.w.colSets")}</span>
               </div>
 
               <div className="tl-index">
@@ -677,7 +680,7 @@ export function WorkoutWorkspace({
                         <button type="button" className="tl-row-open" onClick={() => setActiveId(workout.id)}>
                           <span className="tl-row-name">
                             {workout.favorite ? (
-                              <Heart size={12} fill="currentColor" strokeWidth={0} aria-label="Favorite" />
+                              <Heart size={12} fill="currentColor" strokeWidth={0} aria-label={t("library.w.favorite")} />
                             ) : null}
                             {/* The name is its own box so it can end in an
                                 ellipsis: `text-overflow` acts on a block's own
@@ -709,9 +712,9 @@ export function WorkoutWorkspace({
                             {...(shape?.length
                               ? {
                                   role: "img",
-                                  "aria-label": `Workout structure: ${shape
-                                    .map((segment) => segment.label)
-                                    .join(", ")}`
+                                  "aria-label": t("library.w.structure", {
+                                    steps: shape.map((segment) => segment.label).join(", ")
+                                  })
                                 }
                               : { "aria-hidden": true })}
                           >
@@ -755,7 +758,7 @@ export function WorkoutWorkspace({
                     className="tl-load-more"
                     onClick={() => setVisibleCount((value) => value + 60)}
                   >
-                    Show 60 more of {filtered.length}
+                    {t("library.w.more", { total: filtered.length })}
                   </button>
                 ) : null}
               </div>
@@ -775,22 +778,22 @@ export function WorkoutWorkspace({
             className="tl-catalog-new primary-button"
             onClick={() => setCreating(true)}
           >
-            <Plus size={15} aria-hidden="true" /> New workout
+            <Plus size={15} aria-hidden="true" /> {t("library.w.new")}
           </button>
         </section>
 
         <aside className="tl-reader" aria-live="polite">
           {!active ? (
             <div className="tl-empty">
-              <h3>Pick a workout</h3>
-              <p>Its full step structure appears here.</p>
+              <h3>{t("library.w.pick")}</h3>
+              <p>{t("library.w.pickBody")}</p>
             </div>
           ) : (
             <>
               <div className="tl-reader-scroll">
                 {previewLoading ? (
                   <p className="tl-reader-loading">
-                    <LoaderCircle className="is-spinning" size={16} /> Loading the full structure
+                    <LoaderCircle className="is-spinning" size={16} /> {t("library.w.loading")}
                   </p>
                 ) : previewDocument ? (
                   /*
@@ -816,7 +819,7 @@ export function WorkoutWorkspace({
                       <button
                         type="button"
                         className={`tl-reader-favorite${active.favorite ? " is-active" : ""}`}
-                        aria-label={active.favorite ? "Remove from favorites" : "Add to favorites"}
+                        aria-label={active.favorite ? t("library.reader.unfavorite") : t("library.reader.favorite")}
                         onClick={() => void updateMetadata([active.id], { favorite: !active.favorite })}
                       >
                         <Heart size={16} fill={active.favorite ? "currentColor" : "none"} />
@@ -825,12 +828,12 @@ export function WorkoutWorkspace({
                     {...(active.tags.length
                       ? {
                           subtitleAside: (
-                            <ul className="tl-reader-tags" aria-label="Workout tags">
+                            <ul className="tl-reader-tags" aria-label={t("library.w.tags")}>
                               {active.tags.slice(0, 8).map((tag) => (
                                 <li key={tag}>{tag}</li>
                               ))}
                               {active.tags.length > 8 ? (
-                                <li>+{active.tags.length - 8} more</li>
+                                <li>{t("library.w.moreTags", { n: active.tags.length - 8 })}</li>
                               ) : null}
                             </ul>
                           )
@@ -839,7 +842,7 @@ export function WorkoutWorkspace({
                   />
                 ) : (
                   <p className="tl-reader-loading">
-                    This workout has no structure stored on COROS.
+                    {t("library.w.noStructure")}
                   </p>
                 )}
               </div>
@@ -868,20 +871,20 @@ export function WorkoutWorkspace({
                       aria-expanded={scheduleOpen}
                       onClick={() => setScheduleOpen((open) => !open)}
                     >
-                      <CalendarPlus size={14} /> Schedule
+                      <CalendarPlus size={14} /> {t("library.w.schedule")}
                     </button>
                     {scheduleOpen ? (
                       <form
                         className="tl-schedule-pop-panel"
                         role="dialog"
-                        aria-label={`Schedule ${active.name}`}
+                        aria-label={t("library.w.scheduleName", { name: active.name })}
                         onSubmit={(event) => {
                           event.preventDefault();
                           void schedule();
                         }}
                       >
                         <MonthDayPicker
-                          label="Schedule date"
+                          label={t("library.w.scheduleDate")}
                           value={scheduleDate}
                           min={tomorrow()}
                           onChange={setScheduleDate}
@@ -894,7 +897,7 @@ export function WorkoutWorkspace({
                           className="primary-button"
                           disabled={!scheduleDate || busy === "schedule"}
                         >
-                          {busy === "schedule" ? "Scheduling" : "Schedule"}
+                          {busy === "schedule" ? t("library.w.scheduling") : t("library.w.schedule")}
                         </button>
                       </form>
                     ) : null}
@@ -905,10 +908,10 @@ export function WorkoutWorkspace({
                     disabled={!previewDocument?.canEdit}
                     onClick={() => setEditId(active.id)}
                   >
-                    <Pencil size={14} /> Edit
+                    <Pencil size={14} /> {t("library.w.edit")}
                   </button>
                   <button type="button" className="ghost-button" onClick={() => setPrompting("tags")}>
-                    <Tag size={14} /> Tags
+                    <Tag size={14} /> {t("library.w.tagsButton")}
                   </button>
                   {/* A copy of this workout, in this workout's sport. The sport
                       picker beside it offered to change that on the way
@@ -922,14 +925,14 @@ export function WorkoutWorkspace({
                     disabled={busy === "duplicate"}
                     onClick={() => setPrompting("duplicate")}
                   >
-                    <Copy size={14} /> Duplicate
+                    <Copy size={14} /> {t("library.w.duplicate")}
                   </button>
                   <button
                     type="button"
                     className="ghost-button danger"
                     onClick={() => setPendingDelete(active)}
                   >
-                    <Trash2 size={14} /> Delete
+                    <Trash2 size={14} /> {t("library.w.delete")}
                   </button>
                 </div>
               </footer>
@@ -940,11 +943,11 @@ export function WorkoutWorkspace({
 
       {pendingDelete ? (
         <ConfirmDialog
-          title={`Delete "${pendingDelete.name}" from COROS?`}
-          description="This removes the workout from your COROS library and cannot be undone. Sessions already on your calendar or in a plan are copies of their own, and stay as they are."
-          confirmLabel="Delete workout"
+          title={t("library.w.deleteTitle", { name: pendingDelete.name })}
+          description={t("library.w.deleteBody")}
+          confirmLabel={t("library.w.deleteConfirm")}
           danger
-          busy={busy === "delete" ? { target: "confirm", label: "Deleting…" } : undefined}
+          busy={busy === "delete" ? { target: "confirm", label: t("library.w.deleting") } : undefined}
           onConfirm={() => void deleteConfirmed()}
           onCancel={() => setPendingDelete(null)}
         />
@@ -956,13 +959,13 @@ export function WorkoutWorkspace({
         <WorkoutBuilderModal
           api={api}
           source={{ kind: "library", editRef }}
-          heading={{ title: "Edit library workout" }}
+          heading={{ title: t("library.w.editTitle") }}
           confirmDiscard={({ keep, discard }) => (
             <ConfirmDialog
-              title="Discard unsaved changes?"
-              description="Your edits have not been sent to COROS. Closing the workout throws them away."
-              confirmLabel="Discard changes"
-              cancelLabel="Keep editing"
+              title={t("library.w.discardTitle")}
+              description={t("library.w.discardBody")}
+              confirmLabel={t("library.w.discard")}
+              cancelLabel={t("library.w.keep")}
               danger
               onConfirm={discard}
               onCancel={keep}
@@ -972,7 +975,7 @@ export function WorkoutWorkspace({
           onSaved={(result) => {
             redrawShape(editId);
             setEditId(null);
-            onMessage(result.verified ? "Workout saved and verified." : (result.warning ?? "Workout saved."));
+            onMessage(result.verified ? t("library.w.savedVerified") : (result.warning ?? t("library.w.saved")));
             void onRefresh();
           }}
           onError={(message) => message && onError(message)}
@@ -997,11 +1000,11 @@ export function WorkoutWorkspace({
 
       {prompting === "duplicate" && active ? (
         <PromptDialog
-          title="Name the duplicate"
-          description={`A copy of "${active.name}" is created in your COROS workout library.`}
-          label="Name for the duplicate"
-          initialValue={`${active.name} Copy`}
-          confirmLabel="Duplicate"
+          title={t("library.w.dupTitle")}
+          description={t("library.w.dupBody", { name: active.name })}
+          label={t("library.w.dupLabel")}
+          initialValue={`${active.name} Copy`} // i18n-ignore: saved to COROS as the name, as COROS's own copy names it
+          confirmLabel={t("library.w.duplicate")}
           onConfirm={(name) => void duplicate(name)}
           onCancel={() => setPrompting(null)}
         />
@@ -1009,13 +1012,13 @@ export function WorkoutWorkspace({
 
       {prompting === "tags" && active ? (
         <PromptDialog
-          title="Tag this workout"
-          description={`Tags are local labels you can search and filter by. Separate them with commas; each one is held to ${TAG_MAX_LENGTH} characters.`}
-          label="Tags, separated by commas"
+          title={t("library.w.tagTitle")}
+          description={t("library.w.tagBody", { max: TAG_MAX_LENGTH })}
+          label={t("library.w.tagLabel")}
           initialValue={active.tags.join(", ")}
-          placeholder="tempo, threshold, race week"
+          placeholder={t("library.w.tagPh")}
           sanitize={clampTagInput}
-          confirmLabel="Save tags"
+          confirmLabel={t("library.w.saveTags")}
           onConfirm={saveTags}
           onCancel={() => setPrompting(null)}
         />

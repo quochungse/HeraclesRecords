@@ -30,6 +30,7 @@ import { resolveExerciseName } from "../training/exerciseNames";
 import { ExercisePreview } from "./ExercisePreview";
 import { ExercisePickerDialog, type LabeledExerciseOption } from "./ExercisePickerDialog";
 
+import { t } from "../i18n/core";
 export interface ExerciseComboboxSelection {
   name: string;
   id?: string;
@@ -88,7 +89,7 @@ export function ExerciseCombobox({
           type="button"
           className={`exercise-choice ${value ? "is-chosen" : "is-empty"}`}
           aria-haspopup="dialog"
-          aria-label={value ? `${label}: ${value}. Choose another` : `Choose ${label.toLocaleLowerCase()}`}
+          aria-label={value ? t("workout.exercise.chosen", { label, value }) : placeholder}
           disabled={disabled}
           onClick={() => setIsOpen(true)}
         >
@@ -104,7 +105,7 @@ export function ExerciseCombobox({
           </span>
           <span className="exercise-choice-name">{value || placeholder}</span>
           <span className="exercise-choice-action" aria-hidden="true">
-            {value ? "Change" : "Browse"}
+            {value ? t("workout.exercise.change") : t("workout.exercise.browse")}
             <ChevronRight size={14} />
           </span>
         </button>
@@ -121,7 +122,7 @@ export function ExerciseCombobox({
 
       {isOpen ? (
         <ExercisePickerDialog
-          title={label}
+          heading={placeholder}
           options={labeledOptions}
           selectedId={selectedId}
           loading={loading}

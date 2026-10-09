@@ -1,3 +1,4 @@
+import { t } from "../i18n/core";
 /**
  * A plan's tile draws one small picture: a ridge of its weeks, so a plan can
  * be recognised by its silhouette. It measures what `ridgeMeasure` picks, as
@@ -34,7 +35,7 @@ interface RidgeProps {
 
 export function Ridge({ values, peakWeek, unit, variant, label }: RidgeProps) {
   if (values.length === 0) {
-    return <span className="tl-ridge is-blank" aria-label="No weeks">&mdash;</span>;
+    return <span className="tl-ridge is-blank" aria-label={t("library.ridge.noWeeks")}>&mdash;</span>;
   }
 
   const peak = Math.max(...values);
@@ -58,7 +59,7 @@ export function Ridge({ values, peakWeek, unit, variant, label }: RidgeProps) {
             } as React.CSSProperties}
           >
             <span className="sr-only">
-              Week {index + 1}: {Math.round(value)} {unit}
+              {t("library.ridge.week", { n: index + 1, value: Math.round(value), unit })}
             </span>
           </span>
         );

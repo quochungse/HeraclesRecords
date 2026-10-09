@@ -16,11 +16,10 @@ import {
   speedUnit,
   weightUnit
 } from "../units/units";
-import {
-  decodeCorosIntensity,
-  formatWorkoutIntensity
-} from "../../electron/workoutCapabilities";
+import { decodeCorosIntensity } from "../../electron/workoutCapabilities";
+import { workoutIntensityText } from "../i18n/workoutWords";
 
+import { formatDecimal, messageRecord, plural, t } from "../i18n/core";
 /**
  * View-model builder for the scheduled-workout detail panel. Prefers the raw
  * COROS program payload (step kinds, repeat groups, pace/HR intensity) and
@@ -96,12 +95,21 @@ const EXERCISE_TYPE_TO_KIND: Record<number, ScheduledStepKind> = {
   5: "sendOff"
 };
 
-const FRIENDLY_KIND_NAME: Record<ScheduledStepKind, string> = {
-  warmup: "Warm Up",
-  training: "Training",
-  rest: "Rest",
-  cooldown: "Cool Down",
-  sendOff: "Send-off"
+const FRIENDLY_KIND_NAME = messageRecord<ScheduledStepKind>({
+  warmup: "workout.step.warmup",
+  training: "workout.step.training",
+  rest: "workout.step.rest",
+  cooldown: "workout.step.cooldown",
+  sendOff: "workout.step.sendOff"
+});
+
+/** The names this app writes for a step nobody named, as COROS stores them. */
+const STORED_KIND_NAME: Record<ScheduledStepKind, string> = {
+  warmup: "Warm Up", // i18n-ignore: a stored name, matched
+  training: "Training", // i18n-ignore: a stored name, matched
+  rest: "Rest", // i18n-ignore: a stored name, matched
+  cooldown: "Cool Down", // i18n-ignore: a stored name, matched
+  sendOff: "Send-off" // i18n-ignore: a stored name, matched
 };
 
 function finiteNumber(value: unknown): number | undefined {
@@ -141,7 +149,7 @@ export function formatStepDistanceLabel(
     return `${Math.round(meters)} m`;
   }
   const km = meters / 1000;
-  return `${km.toFixed(km >= 10 ? 1 : 2)} km`;
+  return `${formatDecimal(km, km >= 10 ? 1 : 2)} km`;
 }
 
 interface ParsedTarget {
@@ -162,7 +170,7 @@ function parseRawTarget(
 
   switch (targetType) {
     case 1:
-      return { label: "Open" };
+      return { label: t("workout.open") };
     case 2:
       return targetValue > 0
         ? {
@@ -170,9 +178,9 @@ function parseRawTarget(
             magnitude: targetValue,
             magnitudeType: "time"
           }
-        : { label: "Open" };
+        : { label: t("workout.open") };
     case 3:
-      return { label: `${Math.round(targetValue)} reps` };
+      return { label: plural("workout.reps", Math.round(targetValue)) };
     case 5: {
       const meters = targetValue / 100;
       return meters > 0
@@ -181,20 +189,20 @@ function parseRawTarget(
             magnitude: meters,
             magnitudeType: "distance"
           }
-        : { label: "Open" };
+        : { label: t("workout.open") };
     }
     case 6:
-      return { label: `${Math.round(targetValue)} TL` };
+      return { label: t("units.trainingLoadShort", { value: Math.round(targetValue) }) };
     case 7:
       return kind === "rest"
-        ? { label: `Until ${Math.round(targetValue)} bpm` }
+        ? { label: t("workout.untilBpm", { bpm: Math.round(targetValue) }) }
         : { label: `${Math.round(targetValue)} bpm` };
     case 8:
       return {
-        label: `${formatElevationValue(targetValue / 100, unitSystem, "0")} gain`
+        label: t("workout.gain", { value: formatElevationValue(targetValue / 100, unitSystem, "0") })
       };
     case 9:
-      return { label: `${Math.round(targetValue)} routes` };
+      return { label: plural("workout.routes", Math.round(targetValue)) };
     default:
       return {};
   }
@@ -234,22 +242,22 @@ function localizeIntensity(
     return {};
   }
   if (intensity.type === "pace" || intensity.type === "effortPace") {
-    const formatted = formatWorkoutIntensity({
+    const formatted = workoutIntensityText({
       ...intensity,
       displayUnit: unitSystem === "imperial" ? "mi" : "km"
     });
-    return { label: formatted === "Not set" ? undefined : formatted };
+    return { label: formatted };
   }
   if (intensity.type === "speed") {
     const lowKmh = intensity.unit === "mph" ? intensity.low * 1.609344 : intensity.low;
     const highKmh = intensity.unit === "mph" ? intensity.high * 1.609344 : intensity.high;
-    const formatted = formatWorkoutIntensity({
+    const formatted = workoutIntensityText({
       ...intensity,
       low: kmhToDisplaySpeed(lowKmh, unitSystem),
       high: kmhToDisplaySpeed(highKmh, unitSystem),
       unit: speedUnit(unitSystem)
     });
-    return { label: formatted === "Not set" ? undefined : formatted };
+    return { label: formatted };
   }
   if (intensity.type === "weight" && intensity.mode === "weight") {
     // COROS writes a weight of 0 for an exercise with no load prescribed —
@@ -262,26 +270,26 @@ function localizeIntensity(
       ? intensity.value / POUNDS_PER_KILOGRAM
       : intensity.value;
     const displayWeight = kilogramsToDisplayWeight(weightValue, unitSystem);
-    const formatted = formatWorkoutIntensity({
+    const formatted = workoutIntensityText({
       ...intensity,
       value: Number(displayWeight.toFixed(1)),
       unit: weightUnit(unitSystem)
     });
     return {
-      label: formatted === "Not set" ? undefined : formatted,
+      label: formatted,
       weightValue,
       weightUnit: "kg"
     };
   }
-  const formatted = formatWorkoutIntensity(intensity);
-  const label = formatted === "Not set" ? undefined : formatted;
+  const formatted = workoutIntensityText(intensity);
+  const label = formatted;
   return { label };
 }
 
 function friendlyStepName(rawName: string, kind: ScheduledStepKind): string {
   const trimmed = rawName.trim();
   // COROS template steps carry opaque names like "T3001" — swap in the kind.
-  if (!trimmed || /^T\d+$/i.test(trimmed)) {
+  if (!trimmed || /^T\d+$/i.test(trimmed) || trimmed === STORED_KIND_NAME[kind]) {
     return FRIENDLY_KIND_NAME[kind];
   }
   return trimmed;
@@ -393,7 +401,7 @@ function buildFromRawProgram(
       nodes.push({
         type: "repeat",
         id: id || `group-${index}`,
-        name: String(exercise.name ?? "Repeat"),
+        name: String(exercise.name ?? "Repeat"), // i18n-ignore: COROS's own name for a group
         repeat,
         steps,
         ...dominantMagnitude(steps)
@@ -567,9 +575,9 @@ export function buildScheduledWorkoutView(
  */
 export function liftSchemeLabel(step: ScheduledStepView): string | undefined {
   const sets = Math.max(1, Math.round(step.sets ?? 1));
-  const per = step.targetLabel ?? (step.reps ? `${step.reps} reps` : undefined);
+  const per = step.targetLabel ?? (step.reps ? plural("workout.reps", step.reps) : undefined);
   if (!per) {
-    return sets > 1 ? `${sets} sets` : undefined;
+    return sets > 1 ? plural("workout.sets", sets) : undefined;
   }
   return sets > 1 ? `${sets} × ${per}` : per;
 }
@@ -671,7 +679,7 @@ function draftTargetView(
             magnitude: target.seconds,
             magnitudeType: "time"
           }
-        : { label: "Open" };
+        : { label: t("workout.open") };
     case "distance":
       return target.meters > 0
         ? {
@@ -679,22 +687,22 @@ function draftTargetView(
             magnitude: target.meters,
             magnitudeType: "distance"
           }
-        : { label: "Open" };
+        : { label: t("workout.open") };
     case "load":
-      return { label: `${Math.round(target.load)} TL` };
+      return { label: t("units.trainingLoadShort", { value: Math.round(target.load) }) };
     case "hrRecovery":
       return kind === "rest"
-        ? { label: `Until ${Math.round(target.bpm)} bpm` }
+        ? { label: t("workout.untilBpm", { bpm: Math.round(target.bpm) }) }
         : { label: `${Math.round(target.bpm)} bpm` };
     case "reps":
-      return { label: `${Math.round(target.count)} reps` };
+      return { label: plural("workout.reps", Math.round(target.count)) };
     case "elevationGain":
-      return { label: `${formatElevationValue(target.meters, unitSystem, "0")} gain` };
+      return { label: t("workout.gain", { value: formatElevationValue(target.meters, unitSystem, "0") }) };
     case "routes":
-      return { label: `${Math.round(target.count)} routes` };
+      return { label: plural("workout.routes", Math.round(target.count)) };
     case "open":
     default:
-      return { label: "Open" };
+      return { label: t("workout.open") };
   }
 }
 

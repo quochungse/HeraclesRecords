@@ -20,6 +20,7 @@ import { PlanStatusBlock } from "./PlanStatusBlock";
 import { ScheduledWorkoutDetail } from "./ScheduledWorkoutDetail";
 import { scheduledWorkoutSport } from "../training/workoutSport";
 
+import { t } from "../i18n/core";
 interface DayDetailPanelProps {
   api: HeraclesRecordsApi;
   selection: CalendarSelection | null;
@@ -99,7 +100,7 @@ export function DayDetailPanel({
     : selection.kind === "scheduled"
       ? selection.entry.name
       : selection.kind === "activity"
-        ? (selection.activity.name ?? selection.activity.sportName ?? "Activity")
+        ? (selection.activity.name ?? selection.activity.sportName ?? t("activity.untitled"))
         : formatHappenDayLabel(selection.day.dateKey);
 
   useEffect(() => {
@@ -204,7 +205,7 @@ export function DayDetailPanel({
                       type="button"
                       className="calendar-detail-back"
                       onClick={onBackToDay}
-                      aria-label={`Back to ${formatHappenDayLabel(selection.day.dateKey)}`}
+                      aria-label={t("calendar.detail.back", { day: formatHappenDayLabel(selection.day.dateKey) })}
                     >
                       <ArrowLeft size={13} aria-hidden="true" />
                       {formatHappenDayLabel(selection.day.dateKey)}
@@ -213,8 +214,8 @@ export function DayDetailPanel({
                     <p className="eyebrow">
                       {selection.kind === "day"
                         ? selection.day.isToday
-                          ? "Today"
-                          : "Day"
+                          ? t("calendar.detail.today")
+                          : t("calendar.detail.day")
                         : formatHappenDayLabel(
                             selection.kind === "scheduled"
                               ? selection.entry.happenDay
@@ -229,10 +230,10 @@ export function DayDetailPanel({
                     type="button"
                     className="ghost-button calendar-detail-action"
                     onClick={() => onAskCoach(selection)}
-                    title="Ask Coach"
+                    title={t("activity.askCoach")}
                   >
                     <MessageCircle size={15} aria-hidden="true" />
-                    Ask Coach
+                    {t("activity.askCoach")}
                   </button>
                   {selection.kind === "scheduled" && !selection.day.isPast ? (
                     <button
@@ -242,12 +243,12 @@ export function DayDetailPanel({
                       onClick={() => onEdit(selection)}
                       title={
                         editableSport
-                          ? "Edit this scheduled occurrence"
-                          : "This COROS sport is not supported by the workout editor"
+                          ? t("calendar.detail.editTitle")
+                          : t("calendar.detail.editUnsupported")
                       }
                     >
                       <Pencil size={15} aria-hidden="true" />
-                      Edit
+                      {t("calendar.detail.edit")}
                     </button>
                   ) : null}
                   {selection.kind === "scheduled" && !selection.day.isPast ? (
@@ -259,14 +260,14 @@ export function DayDetailPanel({
                       onClick={() => setConfirmDelete(true)}
                     >
                       <Trash2 size={15} aria-hidden="true" />
-                      {deleting ? "Removing…" : "Remove"}
+                      {deleting ? t("calendar.detail.removing") : t("calendar.detail.remove")}
                     </button>
                   ) : null}
                   <button
                     type="button"
                     className="ghost-button calendar-detail-action"
                     onClick={onClose}
-                    aria-label="Close details"
+                    aria-label={t("activity.closeDetails")}
                   >
                     <X size={15} aria-hidden="true" />
                   </button>
@@ -327,11 +328,11 @@ export function DayDetailPanel({
       {removal
         ? createPortal(
             <ConfirmDialog
-              title={`Remove "${removal.entry.name}" from the calendar?`}
-              description={`It comes off ${formatHappenDayLabel(removal.entry.happenDay)} in your COROS calendar. A workout in your library stays as it is — the calendar holds a copy of its own.`}
-              confirmLabel="Remove from calendar"
+              title={t("calendar.detail.removeTitle", { name: removal.entry.name })}
+              description={t("calendar.detail.removeBody", { day: formatHappenDayLabel(removal.entry.happenDay) })}
+              confirmLabel={t("calendar.detail.removeConfirm")}
               danger
-              busy={deleting ? { target: "confirm", label: "Removing…" } : undefined}
+              busy={deleting ? { target: "confirm", label: t("calendar.detail.removing") } : undefined}
               onConfirm={() => {
                 void onDelete(removal).then(() => setConfirmDelete(false));
               }}

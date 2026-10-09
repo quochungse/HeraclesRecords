@@ -64,6 +64,8 @@ import { PlanCalendarBadge, isOnCalendar, upcomingCalendarSessions } from "./Pla
 import { PlanMenu, type PlanMenuItem } from "./PlanMenu";
 import { PlanDraftMark } from "./PlanDraftMark";
 
+import { formatCount, formatDecimal, plural, t } from "../i18n/core";
+import { useI18n } from "../i18n/useI18n";
 /** What the reader's calendar item asks for. */
 export type PlanCalendarAction = "add" | "remove";
 
@@ -146,7 +148,9 @@ export function PlanReader({
 }: PlanReaderProps) {
   const { unitSystem } = useUnitSystem();
   const summary = useMemo(() => summarizeTrainingPlan(plan), [plan]);
-  const reading = useMemo(() => readPlan(plan, matches), [plan, matches]);
+  const { locale } = useI18n();
+  // The day labels and stage names are in the language on screen.
+  const reading = useMemo(() => readPlan(plan, matches), [plan, matches, locale]);
   const compliance = useMemo(() => planCompliance(plan, matches), [plan, matches]);
 
   const onCalendar = isOnCalendar(plan);
@@ -250,6 +254,7 @@ export function PlanReader({
     if (row) {
       const box = row.getBoundingClientRect();
       const frame = node.getBoundingClientRect();
+      // i18n-ignore: geometry, not words
       if (box.top < frame.top || box.bottom > frame.bottom) {
         row.scrollIntoView({ block: "center" });
       }
@@ -324,7 +329,7 @@ export function PlanReader({
                   onAskCoachAboutSession!(
                     plan,
                     askable,
-                    [open.entry.title, `Week ${open.weekIndex + 1}`, open.dayLabel, plan.name].filter(Boolean).join(" · ")
+                    [open.entry.title, t("library.session.week", { n: open.weekIndex + 1 }), open.dayLabel, plan.name].filter(Boolean).join(" · ")
                   )
               : undefined
           }
@@ -348,16 +353,16 @@ export function PlanReader({
    */
   const hours = reading.timed ? Math.round(summary.durationSeconds / 360) / 10 : 0;
   const figures = [
-    { label: "weeks", value: String(plan.weekCount) },
-    { label: summary.workouts === 1 ? "session" : "sessions", value: String(summary.workouts) },
-    hours ? { label: "hours", value: String(hours) } : null,
+    { label: plural("library.fig.weeks", plan.weekCount), value: formatCount(plan.weekCount) },
+    { label: plural("library.fig.sessions", summary.workouts), value: formatCount(summary.workouts) },
+    hours ? { label: plural("library.fig.hours", hours), value: formatDecimal(hours, Number.isInteger(hours) ? 0 : 1) } : null,
     summary.distanceMeters
       ? {
-          label: "distance",
+          label: t("library.fig.distance"),
           value: formatDistanceValue(summary.distanceMeters, unitSystem, { digits: 0 })
         }
       : null,
-    summary.trainingLoad ? { label: "load", value: String(Math.round(summary.trainingLoad)) } : null
+    summary.trainingLoad ? { label: t("library.fig.load"), value: String(Math.round(summary.trainingLoad)) } : null
   ].filter((figure): figure is { label: string; value: string } => Boolean(figure));
 
   /* Adding is a button at the head's outer edge; what is done to a plan
@@ -368,10 +373,10 @@ export function PlanReader({
       ? []
       : [
           {
-            label: "Remove from calendar",
+            label: t("library.reader.removeCalendar"),
             icon: CalendarX,
             disabled: offline,
-            title: offline ? "Reconnect to COROS to change the calendar" : undefined,
+            title: offline ? t("library.reader.reconnectCalendar") : undefined,
             onSelect: () => onCalendarAction(plan, "remove")
           }
         ];
@@ -381,37 +386,37 @@ export function PlanReader({
     ? []
     : [
         {
-          label: "Edit",
+          label: t("library.reader.edit"),
           icon: Pencil,
           /* The reader moves to the copy when it is made, so an editor
              opened on the original meanwhile would be left behind it. */
           disabled: loadingFull || duplicating || finished || offline,
           title:
             plan.calendar === "stopped"
-              ? "This run was taken off the calendar. Duplicate it to use it again."
+              ? t("library.reader.stopped")
               : finished
-                ? "This run of the plan has finished. Duplicate it to use it again."
+                ? t("library.reader.finished")
                 : offline
-                  ? "Reconnect to COROS to edit this plan"
+                  ? t("library.reader.reconnectEdit")
                   : loadingFull
-                    ? "Reading the full plan from COROS…"
+                    ? t("library.reader.readingFull")
                     : undefined,
           onSelect: () => onEdit(plan)
         }
       ];
   const draftItems: PlanMenuItem[] = onClearDraft
-    ? [{ label: "Clear editing", icon: Eraser, danger: true, onSelect: onClearDraft }]
+    ? [{ label: t("library.reader.clearEditing"), icon: Eraser, danger: true, onSelect: onClearDraft }]
     : [];
   const planItems: PlanMenuItem[] = [
     ...editItems,
     ...(onAskCoach
-      ? [{ label: "Ask Coach about this plan", icon: MessageCircle, onSelect: () => onAskCoach(plan) }]
+      ? [{ label: t("library.reader.askPlan"), icon: MessageCircle, onSelect: () => onAskCoach(plan) }]
       : []),
     ...calendarItems,
     ...(onDuplicate
       ? [
           {
-            label: duplicating ? "Duplicating…" : "Duplicate",
+            label: duplicating ? t("library.reader.duplicating") : t("library.reader.duplicate"),
             icon: Copy,
             disabled: offline || duplicating,
             onSelect: () => onDuplicate(plan)
@@ -421,7 +426,7 @@ export function PlanReader({
     ...(onArchive
       ? [
           {
-            label: plan.archived ? "Restore" : "Archive",
+            label: plan.archived ? t("library.reader.restore") : t("library.reader.archive"),
             icon: plan.archived ? ArchiveRestore : Archive,
             onSelect: () => onArchive(plan)
           }
@@ -430,13 +435,13 @@ export function PlanReader({
     ...(onDelete
       ? [
           {
-            label: "Delete",
+            label: t("library.reader.delete"),
             icon: Trash2,
             danger: true,
             /* A plan on the calendar can be deleted too; the confirmation says it
                comes off the calendar first. */
             disabled: offline,
-            title: offline ? "Reconnect to COROS to delete this plan" : undefined,
+            title: offline ? t("library.reader.reconnectDelete") : undefined,
             onSelect: () => onDelete(plan)
           }
         ]
@@ -454,7 +459,7 @@ export function PlanReader({
       ref={scroller}
       className={scrollerClass}
       style={dominant ? sportAccentStyle(dominant) : undefined}
-      aria-label={`${plan.name}, ${plan.weekCount} weeks`}
+      aria-label={`${plan.name}, ${plural("library.weeks", plan.weekCount)}`}
       onKeyDown={onKeyDown}
       onScroll={measureEdges}
     >
@@ -473,7 +478,7 @@ export function PlanReader({
         <button
           type="button"
           className="icon-button plan-reader-close"
-          aria-label="Close plan"
+          aria-label={t("library.reader.close")}
           onClick={onBack}
         >
           <X size={16} />
@@ -482,7 +487,7 @@ export function PlanReader({
           {duplicating ? (
             <span className="plan-reader-busy" role="status">
               <LoaderCircle size={14} className="is-spinning" aria-hidden="true" />
-              Duplicating…
+              {t("library.reader.duplicating")}
             </span>
           ) : null}
           <PlanMenu items={menuItems} />
@@ -491,7 +496,7 @@ export function PlanReader({
               type="button"
               className={`icon-button plan-reader-favorite${plan.favorite ? " is-active" : ""}`}
               aria-pressed={plan.favorite}
-              aria-label={plan.favorite ? "Remove from favorites" : "Add to favorites"}
+              aria-label={plan.favorite ? t("library.reader.unfavorite") : t("library.reader.favorite")}
               onClick={() => onFavorite(plan)}
             >
               <Heart size={15} fill={plan.favorite ? "currentColor" : "none"} />
@@ -507,7 +512,7 @@ export function PlanReader({
               disabled={duplicating}
               onClick={onContinueDraft}
             >
-              <FilePen size={14} /> Continue editing
+              <FilePen size={14} /> {t("library.reader.continue")}
             </button>
           ) : null}
           {onCalendarAction && !finished ? (
@@ -517,11 +522,11 @@ export function PlanReader({
                 className="plan-reader-scheduled"
                 title={
                   plan.calendar === "running"
-                    ? `${upcomingCalendarSessions(plan)} upcoming workout${upcomingCalendarSessions(plan) === 1 ? "" : "s"} on the COROS calendar`
-                    : "On the COROS calendar"
+                    ? plural("library.badge.upcoming", upcomingCalendarSessions(plan))
+                    : t("library.badge.onCoros")
                 }
               >
-                <CalendarCheck size={14} aria-hidden="true" /> On calendar
+                <CalendarCheck size={14} aria-hidden="true" /> {t("library.badge.on")}
               </span>
             ) : (
               <button
@@ -530,14 +535,14 @@ export function PlanReader({
                 disabled={offline || !hasSessions}
                 title={
                   offline
-                    ? "Reconnect to COROS to change the calendar"
+                    ? t("library.reader.reconnectCalendar")
                     : !hasSessions
-                      ? "This plan has no sessions to put on the calendar"
+                      ? t("library.reader.noSessions")
                       : undefined
                 }
                 onClick={() => onCalendarAction(plan, "add")}
               >
-                <CalendarPlus size={14} /> Add to calendar
+                <CalendarPlus size={14} /> {t("library.reader.addCalendar")}
               </button>
             )
           ) : null}
@@ -556,7 +561,7 @@ export function PlanReader({
           {startLabel ? <span>{startLabel}</span> : null}
           {position ? (
             <span className="plan-reader-now">
-              Week {position.week} of {position.of}
+              {t("library.reader.weekOf", { n: position.week, total: position.of })}
             </span>
           ) : null}
         </p>
@@ -574,7 +579,7 @@ export function PlanReader({
         {complianceLabel ? (
           <span className="plan-reader-fig-done">
             <b>{complianceLabel}</b>
-            <small>done</small>
+            <small>{t("library.fig.done")}</small>
           </span>
         ) : null}
       </div>
@@ -616,7 +621,7 @@ export function PlanReader({
 function WeekHeading({ week }: { week: PlanReaderWeek }) {
   return (
     <>
-      Week {week.weekIndex + 1}
+      {t("library.reader.weekN", { n: week.weekIndex + 1 })}
       {/* A literal space: the flex gap separates these for the eye, but a
           screen reader reads the text nodes and JSX drops the newline between
           them, so the name was "Week 1Base". */}
@@ -643,15 +648,15 @@ function FoldedWeek({ week, onUnfold }: { week: PlanReaderWeek; onUnfold: () => 
         <span className="plan-week-fold-outcomes">
           {done ? (
             <span data-tone="done">
-              <Check size={12} aria-hidden="true" /> {done} done
+              <Check size={12} aria-hidden="true" /> {t("library.reader.doneN", { n: done })}
             </span>
           ) : null}
           {missed ? (
             <span data-tone="missed">
-              <X size={12} aria-hidden="true" /> {missed} missed
+              <X size={12} aria-hidden="true" /> {t("library.reader.missedN", { n: missed })}
             </span>
           ) : null}
-          {ahead ? <span data-tone="quiet">{ahead} open</span> : null}
+          {ahead ? <span data-tone="quiet">{t("library.reader.openN", { n: ahead })}</span> : null}
         </span>
       </button>
     </li>
@@ -693,7 +698,7 @@ export function WeekCard({
       <header>
         <h2 tabIndex={-1}>
           <WeekHeading week={week} />
-          {current ? <span className="plan-week-now">This week</span> : null}
+          {current ? <span className="plan-week-now">{t("library.reader.thisWeek")}</span> : null}
         </h2>
         <p>{formatWeekLine(week)}</p>
         {foldable ? (
@@ -703,12 +708,12 @@ export function WeekCard({
             aria-expanded={true}
             onClick={onFold}
           >
-            Fold
+            {t("library.reader.fold")}
           </button>
         ) : null}
         {onAsk ? (
           <button type="button" className="plan-week-fold-again plan-week-ask" onClick={onAsk}>
-            Ask Coach
+            {t("activity.askCoach")}
           </button>
         ) : null}
       </header>
@@ -730,7 +735,7 @@ export function WeekCard({
               >
                 <span className="plan-reader-day-label">
                   {day.label}
-                  {isToday ? <em className="plan-reader-today">Today</em> : null}
+                  {isToday ? <em className="plan-reader-today">{t("library.reader.today")}</em> : null}
                 </span>
                 <ul className="plan-reader-day-entries">
                   {day.entries.map((entry) => (
@@ -746,7 +751,7 @@ export function WeekCard({
         /* An empty week is a fact about the plan — a gap in a block, or a
            week not written yet — so it keeps its number and says so, rather
            than being dropped and renumbering everything after it. */
-        <p className="plan-reader-empty-week">Nothing planned this week.</p>
+        <p className="plan-reader-empty-week">{t("library.reader.emptyWeek")}</p>
       )}
     </li>
   );

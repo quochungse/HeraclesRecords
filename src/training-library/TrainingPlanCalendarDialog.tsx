@@ -5,6 +5,7 @@ import type { HeraclesRecordsApi } from "../heraclesrecords-api";
 import { dateFromKey, keyFromDate } from "../calendar/dateUtils";
 import { MonthDayPicker } from "./MonthDayPicker";
 
+import { formatCount, getIntlLocale, plural, t } from "../i18n/core";
 interface TrainingPlanCalendarDialogProps {
   api: HeraclesRecordsApi;
   plan: TrainingPlanDocument;
@@ -38,7 +39,7 @@ function nextMondayKey(today = new Date()): string {
 }
 
 function displayDay(key: string): string {
-  return dateFromKey(key).toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" });
+  return dateFromKey(key).toLocaleDateString(getIntlLocale(), { weekday: "short", month: "short", day: "numeric" });
 }
 
 function userFacingError(cause: unknown): string {
@@ -150,24 +151,21 @@ export function TrainingPlanCalendarDialog({
       <section className="plan-calendar-dialog" role="dialog" aria-modal="true" aria-labelledby="plan-calendar-title">
         <header>
           <div>
-            <p className="tl-eyebrow">COROS calendar</p>
+            <p className="tl-eyebrow">{t("library.cal.eyebrow")}</p>
             <h2 id="plan-calendar-title">
-              <CalendarPlus size={20} /> Add plan to calendar
+              <CalendarPlus size={20} /> {t("library.cal.title")}
             </h2>
             <p>{plan.name}</p>
           </div>
-          <button type="button" className="icon-button" aria-label="Close" disabled={Boolean(adding)} onClick={onClose}>
+          <button type="button" className="icon-button" aria-label={t("common.close")} disabled={Boolean(adding)} onClick={onClose}>
             <X size={17} />
           </button>
         </header>
 
         <div className="plan-calendar-body">
           <div className="plan-calendar-pick">
-            <MonthDayPicker label="Start day" value={startDay} min={keyFromDate(new Date())} onChange={setStartDay} />
-            <p>
-              COROS counts the plan from the Monday of the week you pick. A later day in that week leaves off the
-              sessions before it.
-            </p>
+            <MonthDayPicker label={t("library.cal.startDay")} value={startDay} min={keyFromDate(new Date())} onChange={setStartDay} />
+            <p>{t("library.cal.startBody")}</p>
           </div>
 
           <div className="plan-calendar-preview" aria-busy={loading}>
@@ -177,10 +175,10 @@ export function TrainingPlanCalendarDialog({
                 <div>
                   <strong>
                     {error.during === "save"
-                      ? "The plan wasn’t saved to COROS"
+                      ? t("library.cal.err.save")
                       : error.during === "add"
-                        ? saveFirst ? "Saved to COROS, but not added to the calendar" : "COROS didn’t add the plan"
-                        : "Couldn’t read the COROS calendar"}
+                        ? saveFirst ? t("library.cal.err.savedNotAdded") : t("library.cal.err.add")
+                        : t("library.cal.err.read")}
                   </strong>
                   <p>{error.message}</p>
                 </div>
@@ -190,7 +188,7 @@ export function TrainingPlanCalendarDialog({
                   disabled={loading || Boolean(adding)}
                   onClick={() => void (error.during === "preview" ? loadPreview(startDay) : add())}
                 >
-                  <RefreshCw size={14} /> Try again
+                  <RefreshCw size={14} /> {t("common.tryAgain")}
                 </button>
               </div>
             ) : null}
@@ -198,7 +196,7 @@ export function TrainingPlanCalendarDialog({
             {!current && loading ? (
               <div className="plan-calendar-loading">
                 <LoaderCircle className="is-spinning" size={22} />
-                <strong>Checking the COROS calendar</strong>
+                <strong>{t("library.cal.checking")}</strong>
               </div>
             ) : null}
 
@@ -206,23 +204,23 @@ export function TrainingPlanCalendarDialog({
               <>
                 <div className="plan-calendar-summary">
                   <span>
-                    <strong>{kept.length}</strong>
-                    <small>{kept.length === 1 ? "session to add" : "sessions to add"}</small>
+                    <strong>{formatCount(kept.length)}</strong>
+                    <small>{plural("library.cal.toAdd", kept.length)}</small>
                   </span>
                   <span>
                     <strong>{displayDay(current.anchorDay)}</strong>
-                    <small>Week 1 starts</small>
+                    <small>{t("library.cal.week1")}</small>
                   </span>
                   <span className={sharedDays ? "has-conflict" : ""}>
-                    <strong>{sharedDays}</strong>
-                    <small>{sharedDays === 1 ? "day already holds a workout" : "days already hold a workout"}</small>
+                    <strong>{formatCount(sharedDays)}</strong>
+                    <small>{plural("library.cal.shared", sharedDays)}</small>
                   </span>
                 </div>
 
                 {current.blockers.length ? (
                   <div className="plan-calendar-blockers" role="alert">
                     <strong>
-                      <AlertTriangle size={15} /> Can’t add from this day
+                      <AlertTriangle size={15} /> {t("library.cal.blocked")}
                     </strong>
                     {current.blockers.map((blocker) => (
                       <p key={blocker}>{blocker}</p>
@@ -232,9 +230,7 @@ export function TrainingPlanCalendarDialog({
 
                 {dropped.length && kept.length ? (
                   <p className="plan-calendar-safety">
-                    {dropped.length === 1 ? "One session falls" : `${dropped.length} sessions fall`} before{" "}
-                    {displayDay(startDay)} and {dropped.length === 1 ? "is" : "are"} left off. Start on{" "}
-                    {displayDay(current.anchorDay)} to keep {dropped.length === 1 ? "it" : "them"}.
+                    {plural("library.cal.leftOff", dropped.length, { start: displayDay(startDay), anchor: displayDay(current.anchorDay) })}
                   </p>
                 ) : null}
 
@@ -245,14 +241,14 @@ export function TrainingPlanCalendarDialog({
                       <div>
                         <strong>{entry.name}</strong>
                         {entry.dropped ? (
-                          <small>Before the start day — left off</small>
+                          <small>{t("library.cal.dropped")}</small>
                         ) : entry.existing.length ? (
                           <small className="has-conflict">
-                            <AlertTriangle size={12} /> Also on this day: {entry.existing.join(", ")}
+                            <AlertTriangle size={12} /> {t("library.cal.alsoOn", { names: entry.existing.join(", ") })}
                           </small>
                         ) : (
                           <small>
-                            <CheckCircle2 size={12} /> Nothing else that day
+                            <CheckCircle2 size={12} /> {t("library.cal.nothingElse")}
                           </small>
                         )}
                       </div>
@@ -266,7 +262,7 @@ export function TrainingPlanCalendarDialog({
 
         <footer>
           <button type="button" className="ghost-button" disabled={Boolean(adding)} onClick={onClose}>
-            Cancel
+            {t("common.cancel")}
           </button>
           <button
             type="button"
@@ -276,10 +272,12 @@ export function TrainingPlanCalendarDialog({
           >
             {adding ? <LoaderCircle className="is-spinning" size={15} /> : <CalendarPlus size={15} />}
             {adding === "saving"
-              ? "Saving to COROS…"
+              ? t("library.cal.saving")
               : adding
-                ? "Adding…"
-                : `${saveFirst ? "Save & add" : "Add"}${sharedDays ? " alongside them" : " to calendar"}`}
+                ? t("library.cal.adding")
+                : saveFirst
+                  ? sharedDays ? t("library.cal.saveAddAlongside") : t("library.cal.saveAdd")
+                  : sharedDays ? t("library.cal.addAlongside") : t("library.cal.add")}
           </button>
         </footer>
       </section>

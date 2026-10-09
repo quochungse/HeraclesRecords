@@ -1,6 +1,7 @@
 import { CalendarCheck } from "lucide-react";
 import type { TrainingPlanDocument } from "../../electron/types";
 
+import { plural, t } from "../i18n/core";
 function todayKey(now = new Date()): string {
   return `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, "0")}${String(now.getDate()).padStart(2, "0")}`;
 }
@@ -36,13 +37,13 @@ export function PlanCalendarBadge({ plan }: { plan: TrainingPlanDocument }) {
   const upcoming = upcomingCalendarSessions(plan);
   const title =
     plan.calendar === "running"
-      ? `${upcoming} upcoming workout${upcoming === 1 ? "" : "s"} on the COROS calendar`
-      : "On the COROS calendar";
+      ? plural("library.badge.upcoming", upcoming)
+      : t("library.badge.onCoros");
   return (
     <span
       className="plan-calendar-mark"
       role="img"
-      aria-label="On calendar"
+      aria-label={t("library.badge.on")}
       title={title}
     >
       <CalendarCheck size="0.8em" aria-hidden="true" />

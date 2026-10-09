@@ -32,7 +32,7 @@ const ride: RideMessages = {
   "ride.hero.noWeight": "ไม่มีน้ำหนักตัวสำหรับคำนวณ W/kg",
   "ride.list.speedTitle": "ความเร็วเฉลี่ย ไม่รวมช่วงหยุด",
   "ride.list.climbTitle": "เมตรที่ไต่ขึ้นระหว่างปั่น",
-  "ride.list.loadTitle": "โหลดการฝึกของ COROS สำหรับการปั่นนี้",
+  "ride.list.loadTitle": "ภาระการฝึกของ COROS สำหรับการปั่นนี้",
   "ride.volume.hilliest": "การปั่นที่ไต่มากที่สุด",
   "ride.volume.longest": "การปั่นที่ยาวที่สุด",
   "ride.bikes": "จักรยาน",

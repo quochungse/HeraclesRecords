@@ -6,7 +6,7 @@ import { generationRequestProblems, type TrainingPlanGenerationField } from "../
 import { GeneratorGoalStep } from "../training-library/GeneratorGoalStep";
 import { GeneratorWeekStep } from "../training-library/GeneratorWeekStep";
 import {
-  OTHER_SERVERS_WITHHELD_NOTE,
+  otherServersWithheldNote,
   SOURCES,
   STEP_FIELDS,
   anySourceWithheld,
@@ -156,7 +156,7 @@ export default function CoachBriefEditor({
                 })}
               </ul>
               {anySourceWithheld(sources) ? (
-                <p className="plan-generator-sheet-note">{OTHER_SERVERS_WITHHELD_NOTE}</p>
+                <p className="plan-generator-sheet-note">{otherServersWithheldNote()}</p>
               ) : null}
               <p className="tl-eyebrow plan-generator-aside-eyebrow">Plan</p>
               <dl className="plan-generator-snapshot">

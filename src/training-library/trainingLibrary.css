@@ -1924,9 +1924,19 @@
   white-space: nowrap;
 }
 
+/*
+ * A figure keeps the width of its label and the line wraps instead: in
+ * Russian "ТРЕНИРОВОК" is twice "SESSIONS", and a figure allowed to shrink
+ * ran its label into the next one's.
+ */
+.tl-card-figs {
+  flex-wrap: wrap;
+  row-gap: 8px;
+}
+
 .tl-card-figs span {
   display: flex;
-  min-width: 0;
+  flex: none;
   flex-direction: column;
   gap: 1px;
 }
@@ -5296,8 +5306,11 @@ button.plan-generator-provider:focus-visible {
  * everything that has not happened yet — an upcoming session drawn in the
  * same green as a kept one makes a plan look complete before it has started.
  */
+/* nowrap: CJK breaks between any two characters, so a narrow day column
+   stacked 未実施 one character to a line. */
 .plan-entry-status {
   padding: 1px 7px;
+  white-space: nowrap;
   border-radius: var(--radius-pill);
   font-size: 10px;
   font-style: normal;

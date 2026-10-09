@@ -16,7 +16,7 @@ code, and `npm run test:i18n` holds both.
 | P1 | Runtime, Language setting with flags, CJK fonts, the rail, Settings (About, Navigation, Appearance, Connections, Sync, Backup & Restore, Report an issue, Updates, the COROS account row), sport and palette names | **Done** (2026-10-04) |
 | P2 | Overview and its panels, the greeting, the COROS sign-in, `App.tsx`'s toasts and loading states, the update prompt, map styles, periods, MCP notices, COROS's sport names (`sports.*`), and **numbers**: the unit formatters' digits and every count follow the language | **Done** |
 | P3 | Activities, Running, Cycling, Hiking, Strength, and what they share (`ActivitySeriesChart`, `activityChannels.ts`, `sportTypes.ts`, the heatmap); COROS's zone names (`zoneName`, `zones.*`) | **Done** |
-| P4 | Calendar and Training Library (`WorkoutBuilder`, step kinds, zones, the plan reader and editor) | |
+| P4 | Calendar and Training Library (`WorkoutBuilder`, step kinds, zones, the plan reader and editor, the plan brief steps Coach reuses), sport names through `workoutSportLabel` | **Done** |
 | P5 | Sleep, Hall of Records, Where you've been, Personal | |
 | P6 | Coach's screen: `ChatView`, Coach Models, MCP servers, the Workbench, analyses. **Not the prompt** (below) | |
 | P7 | Text the main process puts on screen: errors thrown over IPC, native dialog titles | |
@@ -108,6 +108,23 @@ line in the website's guide (`site/src/content/guide/customise.md`, under Appear
   for them and `test:i18n` requires every form a language's rules use. Where a sentence
   cannot take a plural, a language writes the count as a label instead
   ("записей: {count}"), never "1 записей".
+- **What is saved to COROS stays English.** COROS shows it on the watch and on every other
+  device, in no language of ours: a step's stored name (Warm Up, Cool Down, Rest, Training,
+  Repeat), a default workout name (Quick Run, Structured Workout), a new plan's name
+  (`defaultPlanName`), "New {sport} session" and a duplicate's "X Copy". Only the **screen**
+  says them in the language on screen (`stepKindLabel`, `planStageLabel`, `workoutSportLabel`,
+  `swimStrokeLabel`, `workoutIntensityText` in `src/i18n/workoutWords.ts`), so a label shown is
+  never a label written. What Coach is asked about a day, a week or a plan (the ref's words in
+  the transcript) is the athlete's own question and is translated.
+- **A month standing as a title is capitalised** (`capitalizeFirst`): Intl writes it in
+  sentence case in Vietnamese, French, Spanish and others ("tháng 10 năm 2026").
+- **A short label that runs into a figure carries a no-break space**
+  (`units.trainingLoadShort`: "Tải 206"), so a narrow card never leaves the word on one line
+  and the number on the next.
+- **A chip or pill a narrow column can squeeze says `white-space: nowrap`**: Japanese, Chinese
+  and Thai break between any two characters, and a status pill came out one character to a
+  line. A row of figures wraps rather than letting each figure shrink into the next
+  (`.tl-card-figs`: Russian "ТРЕНИРОВОК" is twice "SESSIONS").
 - **A new namespace** is a file in `messages/en/`, a line in `messages/en/index.ts`, the same
   file in every other language, and `npm run i18n:index`, which writes the other languages'
   `index.ts` and fails on a file missing.
@@ -206,6 +223,25 @@ Coach term above):
 | Pace | Pace | ペース | 페이스 | 配速 | Ritmo | Pace | Allure | Pace | Passo | Темп | Pace | เพซ |
 | Set / rep | hiệp / lần | セット / レップ | 세트 / 회 | 组 / 次 | serie / repetición | série / repetição | série / répétition | Satz / Wiederholung | serie / ripetizione | подход / повторение | set / rep | เซ็ต / ครั้ง |
 | Session | buổi | セッション | 세션 | 训练 | sesión | treino | séance | Einheit | sessione | тренировка | sesi | เซสชัน |
+
+Added in P4 (the plan stages are COROS's seven, named for the screen only; "Open" is a target
+with no figure to hold):
+
+| English | vi | ja | ko | zh | es | pt | fr | de | it | ru | id | th |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| Warm-up | Khởi động | ウォームアップ | 워밍업 | 热身 | Calentamiento | Aquecimento | Échauffement | Aufwärmen | Riscaldamento | Разминка | Pemanasan | วอร์มอัพ |
+| Cool-down | Thả lỏng | クールダウン | 쿨다운 | 放松 | Vuelta a la calma | Desaquecimento | Retour au calme | Auslaufen | Defaticamento | Заминка | Pendinginan | คูลดาวน์ |
+| Rest (a step) | Nghỉ | 休息 | 휴식 | 休息 | Descanso | Descanso | Récupération | Pause | Recupero | Отдых | Istirahat | พัก |
+| Repeat | Lặp lại | リピート | 반복 | 重复 | Repetición | Repetição | Répétition | Wiederholung | Ripetizione | Повтор | Ulangi | ทำซ้ำ |
+| Open (no target) | Tự do | フリー | 자유 | 不限 | Libre | Livre | Libre | Frei | Libero | Свободно | Bebas | อิสระ |
+| Base | Nền tảng | 基礎期 | 기초기 | 基础期 | Base | Base | Foncier | Grundlage | Base | База | Dasar | พื้นฐาน |
+| Build | Tăng tiến | 強化期 | 강화기 | 提升期 | Desarrollo | Construção | Développement | Aufbau | Costruzione | Развитие | Pembentukan | เสริมสร้าง |
+| Peak | Đỉnh | ピーク期 | 정점기 | 巅峰期 | Pico | Pico | Affûtage | Spitze | Picco | Пик | Puncak | พีค |
+| Transition | Chuyển tiếp | 移行期 | 전환기 | 过渡期 | Transición | Transição | Transition | Übergang | Transizione | Переход | Transisi | ช่วงเปลี่ยนผ่าน |
+| Training load | Tải | 負荷 | 부하 | 负荷 | Carga | Carga | Charge | Last | Carico | Нагрузка | Beban | ภาระ |
+
+Thai says training load **ภาระ**, never โหลด, which also means "loading"; P4 brought P3's
+screens into line.
 
 **A period phrase is spliced into sentences** (`{window}`, `{period}`: "the last 3 months"),
 so it carries its own article and every sentence around it must take that article: Italian
