@@ -97,8 +97,8 @@ export interface ContentChange {
   readonly removed: boolean;
 }
 
-/** A merged row on its way back out. Carries the row itself so the caller does
- *  not have to read it back and risk publishing something newer by accident. */
+/** A merged row on its way back out, as the target holds it once the merge is
+ *  over. */
 export interface RepublishRow {
   readonly table: string;
   readonly recordId: string;

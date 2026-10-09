@@ -87,7 +87,7 @@ function fakeTarget(published) {
       const placed = placeElement(parseList(row.messages_json) ?? [], id, travelling);
       if (placed.kept) {
         published.remove(table, recordId, id);
-        republish.push({ table, recordId, row });
+        republish.push({ table, recordId });
         return;
       }
       published.set(table, recordId, id, elementHash(travelling));
@@ -101,7 +101,12 @@ function fakeTarget(published) {
       const next = removeElement(parseList(row.messages_json) ?? [], id);
       if (next) rows.set(key(table, recordId), { ...row, messages_json: JSON.stringify(next) });
     },
-    takeRepublish: () => republish.splice(0, republish.length),
+    // Read once the merge is over, as the real target reads them.
+    takeRepublish: () =>
+      republish
+        .splice(0, republish.length)
+        .map(({ table, recordId }) => ({ table, recordId, row: rows.get(key(table, recordId)) }))
+        .filter((taken) => taken.row),
     setSetting: (k, v) => settings.set(k, v),
     deleteSetting: (k) => settings.delete(k),
     setLocalStorage: (k, v) => storage.set(k, v),
@@ -688,9 +693,13 @@ console.log("ok  messages written before a rename land with the row read in the 
 {
   const root = tempDir("head-behind");
   let failHead = false;
+  let headWrites = 0;
   const a = makeDevice(root, "device-a", {
     put: (inner, p, c, e) => {
-      if (failHead && p.startsWith("heads/")) throw new Error("the head write timed out");
+      if (p.startsWith("heads/")) {
+        if (failHead) throw new Error("the head write timed out");
+        headWrites += 1;
+      }
       return inner.put(p, c, e);
     }
   });
@@ -706,6 +715,10 @@ console.log("ok  messages written before a rename land with the row read in the 
   await a.loop.pull();
   await b.loop.pull();
   assert.equal(b.target.settings.get("chat.provider"), "two", "until a's next pull moves the head");
+  const repaired = headWrites;
+  await a.loop.pull();
+  await a.loop.pull();
+  assert.equal(headWrites, repaired, "once moved, the head is not written again by every pull");
 }
 console.log("ok  a head that failed to move is moved again by the next pull");
 
@@ -735,6 +748,51 @@ console.log("ok  a head that failed to move is moved again by the next pull");
   assert.deepEqual(a.messages("s1"), ["card answered on b"], "and reaches the machine with the old copy");
 }
 console.log("ok  a message keeps the copy edited last, whatever was sent later");
+
+// Keeping a newer edit sends that message again — and nothing else. Not the
+// messages that arrived after it in the same pull (read back too early, the
+// row lacked them and they went out as deleted), and not the row (under a
+// fresh timestamp it outranked a rename made meanwhile elsewhere).
+{
+  const root = tempDir("kept-sends-only-the-kept");
+  const a = makeDevice(root, "device-a");
+  const b = makeDevice(root, "device-b");
+  a.saveConversation("s1", [msg("1-0001", "card unanswered", "1-0001")]);
+  await a.loop.flush();
+  await b.loop.pull();
+  b.saveConversation("s1", [msg("1-0001", "card answered on b", "1-0009")]);
+  await b.loop.flush();
+  await new Promise((resolve) => setTimeout(resolve, 5));
+  // a sends its old copy again, and a new message after it in the same batch.
+  a.published.clear("chat_sessions", "s1");
+  a.saveConversation("s1", [
+    msg("1-0001", "card unanswered", "1-0001"),
+    msg("1-0002", "a new question on a")
+  ]);
+  await a.loop.flush();
+  await new Promise((resolve) => setTimeout(resolve, 5));
+  // ...and renames the conversation, not yet sent when b pulls.
+  a.saveConversation(
+    "s1",
+    [msg("1-0001", "card unanswered", "1-0001"), msg("1-0002", "a new question on a")],
+    "renamed on a"
+  );
+  await b.loop.pull();
+  assert.deepEqual(b.messages("s1"), ["card answered on b", "a new question on a"]);
+  await b.loop.flush();
+  await a.loop.flush();
+  await a.loop.pull();
+  await b.loop.pull();
+  assert.deepEqual(
+    a.messages("s1"),
+    ["card answered on b", "a new question on a"],
+    "the message after the kept one is not sent as deleted"
+  );
+  assert.deepEqual(b.messages("s1"), ["card answered on b", "a new question on a"]);
+  assert.equal(a.target.rows.get("chat_sessions:s1").title, "renamed on a");
+  assert.equal(b.target.rows.get("chat_sessions:s1").title, "renamed on a", "the rename is not outranked");
+}
+console.log("ok  keeping a newer edit sends that message again, and nothing else");
 
 // A migration whose raise fails records nothing of having happened.
 {
@@ -849,7 +907,16 @@ console.log("ok  a message is recorded as published only once it is queued");
   target.upsertItem("chat_sessions", "s1\u001f1-0001", msg("1-0001", "an older copy", "1-0005"));
   assert.deepEqual(read(), ["first, edited"]);
   assert.equal(published.forRecord("chat_sessions", "s1").has("1-0001"), false);
-  assert.deepEqual(target.takeRepublish().map((r) => r.recordId), ["s1"]);
+  // A message placed after it in the same merge is in the row handed back:
+  // read when it is taken, not when it was noted.
+  target.upsertItem("chat_sessions", "s1\u001f1-0003", msg("1-0003", "third"));
+  const handedBack = target.takeRepublish();
+  assert.deepEqual(handedBack.map((r) => r.recordId), ["s1"]);
+  assert.deepEqual(
+    JSON.parse(handedBack[0].row.messages_json).map((m) => m.content),
+    ["first, edited", "third"]
+  );
+  target.deleteItem("chat_sessions", "s1\u001f1-0003");
   // A record with its title moved keeps its transcript.
   target.upsertRow("chat_sessions", "s1", { ...row, title: "renamed" });
   assert.deepEqual(read(), ["first, edited"]);

@@ -52,7 +52,8 @@ interface TableShape {
 export class SqliteSyncTarget implements SyncTarget {
   readonly #shapes = new Map<string, TableShape>();
   readonly #incomplete = new Set<string>();
-  readonly #republish: RepublishRow[] = [];
+  /** By identity, read only when taken: see `takeRepublish`. */
+  readonly #republish = new Map<string, { table: string; recordId: string }>();
   /** Keyed by identity, so a record folded from three entries is listed once. */
   readonly #contentChanges = new Map<string, ContentChange>();
   readonly #published: PublishedItemStore;
@@ -66,9 +67,25 @@ export class SqliteSyncTarget implements SyncTarget {
   /**
    * Rows whose merge produced something the vault does not hold, taken and
    * cleared. See `SyncTarget.takeRepublish`.
+   *
+   * Read here, once the merge is over, never when the row was noted: what goes
+   * out has to be what this database now holds, and a row read partway through
+   * lacks what the rest of the merge put in it — messages that arrived after
+   * the one that noted it, which went out as deleted. A row gone by now is not
+   * published at all.
    */
   takeRepublish(): readonly RepublishRow[] {
-    return this.#republish.splice(0, this.#republish.length);
+    const taken: RepublishRow[] = [];
+    for (const { table, recordId } of this.#republish.values()) {
+      const row = this.#readRow(table, this.#shapeOf(table), recordId);
+      if (row) taken.push({ table, recordId, row });
+    }
+    this.#republish.clear();
+    return taken;
+  }
+
+  #noteRepublish(table: string, recordId: string): void {
+    this.#republish.set(entryIdentity({ scope: "table", key: table, recordId }), { table, recordId });
   }
 
   /** See `SyncTarget.takeContentChanges`. */
@@ -283,7 +300,7 @@ export class SqliteSyncTarget implements SyncTarget {
       // insert below still runs — and fails loudly if the payload cannot make a
       // complete row, which is the honest answer rather than a half-written one.
       if (updated > 0) {
-        this.#noteRepublish(table, shape, recordId, republish);
+        if (republish) this.#noteRepublish(table, recordId);
         if (changed) this.#noteContentChange(table, recordId, false);
         return;
       }
@@ -303,30 +320,11 @@ export class SqliteSyncTarget implements SyncTarget {
       )
       .run(columns.map(value));
 
-    this.#noteRepublish(table, shape, recordId, republish);
+    if (republish) this.#noteRepublish(table, recordId);
     // After the write, never before: an entry this schema refuses throws above,
     // and a change announced for a row that never landed would stop an
     // analysis over nothing.
     if (changed) this.#noteContentChange(table, recordId, false);
-  }
-
-  /**
-   * Queue the row for publishing, read back rather than reused.
-   *
-   * What goes out has to be what this database now holds. The merged row was
-   * built from the arriving payload — which a machine on an older schema may
-   * have sent short of a column, and which a losing entry carries only the
-   * merged columns of — so publishing it would announce a row nobody has.
-   */
-  #noteRepublish(
-    table: string,
-    shape: TableShape,
-    recordId: string,
-    republish: boolean
-  ): void {
-    if (!republish) return;
-    const written = this.#readRow(table, shape, recordId);
-    if (written) this.#republish.push({ table, recordId, row: written });
   }
 
   deleteRow(table: string, recordId: string): void {
@@ -373,8 +371,7 @@ export class SqliteSyncTarget implements SyncTarget {
     const placed = placeElement(target.list, target.id, travelling);
     if (placed.kept) {
       this.#published.remove(table, target.recordId, target.id);
-      const row = this.#readRow(table, this.#shapeOf(table), target.recordId);
-      if (row) this.#republish.push({ table, recordId: target.recordId, row });
+      this.#noteRepublish(table, target.recordId);
       return;
     }
     this.#published.set(table, target.recordId, target.id, elementHash(travelling));

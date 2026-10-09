@@ -23,9 +23,9 @@ import { Lease, type LeaseDeps, type LeaseHandle } from "./lease";
 export const AUTOMATION_LEASE_TTL_MS = 10 * 60 * 1000;
 
 /** How long a run waits on `catchUp` before going ahead on what this machine
- *  has. A pull reads the whole log, so a large vault on a slow link takes a
- *  while — but a vault that neither answers nor fails must not hold the run
- *  queue behind it for good. */
+ *  has. A pull after a long time away reads the snapshot, so a large vault on
+ *  a slow link takes a while — but a vault that neither answers nor fails must
+ *  not hold the run queue behind it for good. */
 export const CATCH_UP_TIMEOUT_MS = 2 * 60 * 1000;
 
 export interface AnalysisLeaseDeps

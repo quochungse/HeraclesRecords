@@ -43,6 +43,7 @@ import { LogFileCache, withLogFileCache } from "./logFileCache";
 import { StorageConflictError } from "./storageProvider";
 import {
   applyPublishMarks,
+  itemisedColumn,
   splitIntoItems,
   type PublishMark,
   type PublishedItemStore
@@ -474,6 +475,11 @@ export class SyncLoop {
   enqueue(proposed: readonly OpEntry[]): void {
     if (proposed.length === 0) return;
     const { entries, marks } = this.#split(proposed);
+    this.#queue(entries, marks);
+  }
+
+  #queue(entries: readonly OpEntry[], marks: readonly PublishMark[]): void {
+    if (entries.length === 0) return;
     // Stamped here, before anything is pushed or awaited, because this is the
     // moment the local database moved and a pull already in flight cannot know
     // it. The entry was built by reading the row that was just written, so its
@@ -482,7 +488,8 @@ export class SyncLoop {
     //
     // `enqueue` is the one door every local change comes through: the bridge's
     // hooks on settings and row writes, and `fullState`'s republish, all end up
-    // here. A second door would be a second way to lose a write.
+    // here — and so does a merge's republish, past the split. A second door
+    // would be a second way to lose a write.
     for (const entry of entries) {
       // Both marks: this machine's row holds the state, and this machine's own
       // entry for it has nothing left to fold.
@@ -795,7 +802,17 @@ export class SyncLoop {
       for (const row of republish) {
         builder.row(row.table, row.recordId, row.row);
       }
-      this.enqueue(builder.entries);
+      const { entries: split, marks } = this.#split(builder.entries);
+      // In format 2 a conversation goes back out as the messages the vault
+      // lacks, never as its row: the row is the one just merged, and sent again
+      // under a fresh timestamp it would outrank — here too, through its stamp —
+      // a rename made elsewhere and not yet read.
+      this.#queue(
+        this.#format === 2
+          ? split.filter((entry) => entry.scope !== "table" || !itemisedColumn(entry.key))
+          : split,
+        marks
+      );
     }
 
     this.#deps.setSetting(
@@ -825,7 +842,11 @@ export class SyncLoop {
     }
     const self = this.#deps.deviceId();
     const held = this.#vector.load();
+    // Other devices only: this machine's own record is the upload's and the
+    // head's to move, and saving the copy loaded here would put back a head
+    // `#moveHead` has just written — then every pull would write it again.
     const next = new Map<string, VectorRecord>(held);
+    next.delete(self);
     const appliedOf = (device: string) => next.get(device)?.seq ?? 0;
 
     // This machine's own head, written again when it is behind its batches or
@@ -880,7 +901,7 @@ export class SyncLoop {
       // place.
       if (resync) {
         for (const [device, record] of next) {
-          if (device !== self) next.set(device, { ...record, seq: snapshot.vector[device] ?? 0 });
+          next.set(device, { ...record, seq: snapshot.vector[device] ?? 0 });
         }
       }
       for (const [device, seq] of Object.entries(snapshot.vector)) {
@@ -891,9 +912,7 @@ export class SyncLoop {
       snapshotRead = latest;
     } else if (resync && latest === undefined) {
       // No snapshot yet: the whole log is still there to read again.
-      for (const [device, record] of next) {
-        if (device !== self) next.set(device, { ...record, seq: 0 });
-      }
+      for (const [device, record] of next) next.set(device, { ...record, seq: 0 });
     }
     // Done only when it was: a snapshot that could not be read leaves every
     // place where it was, and the next pull asks again.

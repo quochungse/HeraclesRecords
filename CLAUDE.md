@@ -2338,7 +2338,10 @@ lives at module level for the same visit-to-visit reason — see `useCalendarDat
     rename read in the same pull would otherwise find no row. **A message keeps the copy
     edited last** by its own `mrev` (`outranks`), not by when its row was saved: an older
     copy sent again (an upgrade, a seed) is not taken, and the newer one is unrecorded as
-    published and handed back through `takeRepublish`, so it goes out again. An item for a
+    published and handed back through `takeRepublish`, so it goes out again — that message
+    alone: the row is read once the merge is over (read earlier, it lacked the messages
+    placed after, which then went out as deleted), and it is not sent itself, since under a
+    fresh timestamp it would outrank a rename made elsewhere. An item for a
     row not here is refused, not dropped, so a snapshot bringing the row later brings it. A
     publish mark is committed only once the outbox took the entries; a deleted conversation
     sends one tombstone and compaction drops its messages. A head that failed to move
@@ -2497,7 +2500,10 @@ lives at module level for the same visit-to-visit reason — see `useCalendarDat
     replays them when `attachSyncSink` speaks — or drops them when what it says is that there
     is no vault, which is what keeps the buffer to the boot window rather than the life of
     the process. Policy is asked *before* a change is held, so a credential never sits in the
-    buffer at all. `npm run test:sync-bridge` covers all three.
+    buffer at all. `npm run test:sync-bridge` covers all three. **Past the boot window a
+    detached bridge drops**, so swapping one loop for another — a held loop resumed, another
+    vault — stops and starts them with nothing awaited in between; `prepareSync` asks the
+    vault first.
   - **A compaction snapshot summarises the log; it does not shadow it.** `readLog` skips
     only entries the snapshot holds *by timestamp identity*, never everything at or below
     its `upTo` — that is a claim that nothing below the line can still arrive, and nothing

@@ -116,7 +116,10 @@ mọi `version >= 1` và để hai con số quyết định.
 - **Message giữ bản được sửa sau cùng** theo `mrev` của chính nó (mốc chỉnh sửa do chat store
   sinh, `1-<millis>-<n>-<device>`), không theo HLC của item. HLC của item là lúc *lưu* row,
   và một bản không đổi có thể bị gửi lại dưới HLC mới hơn (sau nâng cấp, khi seed). Bản giữ lại
-  vẫn là nguyên một bản của một máy. Máy giữ bản mới hơn sẽ bỏ dấu publish của nó và gửi lại.
+  vẫn là nguyên một bản của một máy. Máy giữ bản mới hơn sẽ bỏ dấu publish của nó và chỉ gửi
+  lại message đó. Row được đọc khi merge đã xong: nếu đọc giữa chừng, row thiếu các message đặt
+  vào sau, và chúng bị gửi đi như đã xoá. Bản thân row không được gửi lại, vì dưới một HLC mới
+  nó sẽ đè lần đổi tên vừa làm ở máy khác.
 - Row luôn được áp dụng trước item trong một lần pull. Bản ghi row của format 2 theo luật bản
   ghi sau thắng, không gộp (`foldsEntry`).
 - Còn một trường hợp chưa xử lý: một message bị **xoá** trên build 1.0.x sau khi vault đã lên

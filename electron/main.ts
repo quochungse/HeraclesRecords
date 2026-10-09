@@ -1226,14 +1226,17 @@ async function prepareSync(): Promise<SyncVaultState> {
   const service = syncService();
   const state = await service.prepare();
   if (state === "ready") {
+    // Asked before any loop is stopped: from a loop detaching to the next one
+    // attaching, the bridge has no sink and drops what changes, so nothing may
+    // be awaited in between.
+    const vaultId = await service.vaultId();
+    const format = await service.checkDataFormat();
     // A loop held for an outdated format is not one to resume.
     if (syncLoopInstance?.isHeld) stopSyncLoop();
-    await forgetAnotherVaultsLog(service);
+    forgetAnotherVaultsLog(vaultId);
     // A vault still in an older format is moved to this build's before the
     // loop reads or writes anything (docs/sync-v2.md §7).
-    const migrate =
-      !syncLoopInstance && (await service.checkDataFormat()) === "ahead";
-    startSyncLoop({ migrate });
+    startSyncLoop({ migrate: !syncLoopInstance && format === "ahead" });
   } else if (state === "outdated") {
     holdSyncLoop();
   } else if (state === "signed-out" || state === "wrong-owner") {
@@ -1254,10 +1257,7 @@ async function prepareSync(): Promise<SyncVaultState> {
  * and a running loop over the old vault stops first. Its seed for the new
  * vault (keyed by vault id) then sends everything.
  */
-async function forgetAnotherVaultsLog(
-  service: ReturnType<typeof syncService>
-): Promise<void> {
-  const vaultId = await service.vaultId();
+function forgetAnotherVaultsLog(vaultId: string): void {
   if (getSetting(SYNC_LOOP_SETTINGS.vaultId) === vaultId) return;
   if (syncLoopInstance) stopSyncLoop();
   forgetVaultLogState();
