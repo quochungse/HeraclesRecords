@@ -196,8 +196,8 @@ export function demoHandlers(): Record<string, unknown> {
       const wanted = new Set(dates);
       return { dayList: metrics().filter((m) => wanted.size === 0 || wanted.has(m.happenDay)), weekList: [] };
     },
-    getAppInfo: async () => ({ version: "1.0.0", userDataPath: "~/Library/Application Support/heracles-records" }),
-    getAppUpdateStatus: async () => ({ supported: true, currentVersion: "1.0.0", status: "idle", autoCheck: true, autoDownload: false }),
+    getAppInfo: async () => ({ version: "1.1.0", userDataPath: "~/Library/Application Support/heracles-records" }),
+    getAppUpdateStatus: async () => ({ supported: true, currentVersion: "1.1.0", status: "idle", autoCheck: true, autoDownload: false }),
     isWindowFullscreen: async () => false,
     setWindowBackground: async () => {},
     getHevyStatus: async () => ({ connected: false, includeWarmups: false }),

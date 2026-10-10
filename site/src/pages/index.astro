@@ -1,5 +1,6 @@
 ---
 import { Image } from "astro:assets";
+import type { ImageMetadata } from "astro";
 import Base from "../layouts/Base.astro";
 import DownloadButton from "../components/DownloadButton.astro";
 import LabourEmblem from "../components/LabourEmblem.astro";
@@ -8,10 +9,22 @@ import ShotSlider from "../components/ShotSlider.astro";
 import { SIZES_HALF, SIZES_SIDE } from "../assets";
 import icon from "../../../build/icon-256.png";
 import { LABOURS } from "../../../src/records/labours";
+import { LOCALES, LOCALE_DETAILS } from "../../../src/i18n/locales";
 import { latestRelease } from "../release.mjs";
 import { softwareApplication } from "../structuredData.mjs";
 
 const release = await latestRelease();
+
+// The app's own languages and the flags it draws beside them (src/i18n), so a
+// language added to the app reaches the site with a flag listed here.
+const flagFiles = import.meta.glob<{ default: ImageMetadata }>("../../../src/assets/flags/*.svg", { eager: true });
+const FLAG_CODES: Record<string, string> = {
+  en: "gb", vi: "vn", ja: "jp", ko: "kr", zh: "cn", es: "es", pt: "br", fr: "fr", de: "de", it: "it", ru: "ru", id: "id", th: "th",
+};
+const languages = LOCALES.map((locale) => {
+  const file = Object.keys(flagFiles).find((path) => path.endsWith(`/${FLAG_CODES[locale]}.svg`));
+  return { name: LOCALE_DETAILS[locale].nativeName, english: LOCALE_DETAILS[locale].englishName, flag: file ? flagFiles[file].default.src : undefined };
+});
 
 const today = [
   {
@@ -294,6 +307,29 @@ const faq = [
       </p>
     </div>
     <Shot name="15-places" alt="Where you've been: every place you trained, on a globe beside a list of places" sizes={SIZES_SIDE} />
+  </section>
+
+  <section class="wrap section">
+    <div class="section-head center">
+      <p class="eyebrow">Languages</p>
+      <h2 class="section-title">In your language, on every screen.</h2>
+      <p class="lede">
+        Heracles Records speaks {languages.length} languages. Pick one under Settings, Appearance,
+        Language and every screen, Coach included, switches at once. Dates and numbers follow it.
+        Coach answers in whatever language you write to it.
+      </p>
+    </div>
+    <ul class="languages">
+      {
+        languages.map((language) => (
+          <li title={language.english}>
+            {language.flag && <img src={language.flag} alt="" width="22" height="16" loading="lazy" />}
+            <span>{language.name}</span>
+          </li>
+        ))
+      }
+    </ul>
+    <p class="center-link"><a class="more" href="/guide/customise">How to change the language</a></p>
   </section>
 
   <section class="wrap section">
@@ -662,6 +698,34 @@ const faq = [
     .data-points {
       grid-template-columns: 1fr;
     }
+  }
+
+  .languages {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 12px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .languages li {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 16px;
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    background: var(--surface);
+    font-size: 15px;
+  }
+
+  .languages img {
+    width: 22px;
+    height: 16px;
+    border-radius: 2px;
+    object-fit: cover;
   }
 
   .support-actions {
