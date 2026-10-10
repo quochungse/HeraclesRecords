@@ -27,12 +27,12 @@ export interface DistanceZoneTotal extends DistanceZoneBucket {
  * 10.00 km session lands in "10–15 km".
  */
 export const DISTANCE_ZONE_BUCKETS: readonly DistanceZoneBucket[] = [
-  { label: "0–5 km", minMeters: 0, maxMeters: 5_000 },
-  { label: "5–10 km", minMeters: 5_000, maxMeters: 10_000 },
-  { label: "10–15 km", minMeters: 10_000, maxMeters: 15_000 },
-  { label: "15–20 km", minMeters: 15_000, maxMeters: 20_000 },
-  { label: "20–25 km", minMeters: 20_000, maxMeters: 25_000 },
-  { label: "25+ km", minMeters: 25_000 }
+  { label: "0–5 km", minMeters: 0, maxMeters: 5_000 }, // i18n-ignore: figures and a unit
+  { label: "5–10 km", minMeters: 5_000, maxMeters: 10_000 }, // i18n-ignore: figures and a unit
+  { label: "10–15 km", minMeters: 10_000, maxMeters: 15_000 }, // i18n-ignore: figures and a unit
+  { label: "15–20 km", minMeters: 15_000, maxMeters: 20_000 }, // i18n-ignore: figures and a unit
+  { label: "20–25 km", minMeters: 20_000, maxMeters: 25_000 }, // i18n-ignore: figures and a unit
+  { label: "25+ km", minMeters: 25_000 } // i18n-ignore: figures and a unit
 ];
 
 /**

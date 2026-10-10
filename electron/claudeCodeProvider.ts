@@ -17,6 +17,7 @@ import type {
   ClaudeCodeStatus,
   CorosMcpTool
 } from "./types";
+import { mainText } from "./mainText";
 
 const execFileAsync = promisify(execFile);
 const DETECTION_TIMEOUT_MS = 5_000;
@@ -451,7 +452,7 @@ export async function getClaudeCodeStatus(
       authenticated: false,
       executablePath,
       checkedAt,
-      message: `Claude Code was found but could not launch: ${safeErrorMessage(caught)}`
+      message: mainText("main.ai.claudeNoLaunch", { detail: safeErrorMessage(caught) })
     };
   }
 
@@ -502,7 +503,7 @@ export async function getClaudeCodeStatus(
       executablePath,
       version,
       checkedAt,
-      message: "Claude Code is installed, but sign-in is required."
+      message: mainText("main.ai.claudeSignIn")
     };
   }
 }
@@ -835,7 +836,7 @@ export async function testClaudeCodeConnection(
       state: "connected",
       checkedAt: new Date().toISOString(),
       defaultModel: defaultModel ?? status.defaultModel,
-      message: "Claude Code is connected and ready for Coach conversations."
+      message: mainText("main.ai.claudeReady")
     };
     return {
       ok: true,

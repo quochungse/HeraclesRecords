@@ -1,4 +1,5 @@
 import { useEffect, useId, useRef, useState } from "react";
+import { t } from "../i18n/core";
 
 export interface PromptDialogProps {
   title: string;
@@ -108,7 +109,7 @@ export function PromptDialog({
         </label>
         <footer>
           <button type="button" className="ghost-button" onClick={onCancel}>
-            Cancel
+            {t("common.cancel")}
           </button>
           <button type="submit" className="primary-button" disabled={!confirmable}>
             {confirmLabel}

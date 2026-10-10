@@ -1,5 +1,6 @@
 import { Info } from "lucide-react";
 import { useCallback, useState } from "react";
+import { t } from "../i18n/core";
 
 /**
  * Whether the tile credit is spelled out, and the (i)'s toggle. It starts
@@ -30,7 +31,7 @@ export function MapCreditButton({
     <button
       type="button"
       className={className ?? "map-credit-toggle"}
-      aria-label="Map data credits"
+      aria-label={t("app.map.credits")}
       aria-expanded={open}
       onClick={(event) => {
         event.stopPropagation();

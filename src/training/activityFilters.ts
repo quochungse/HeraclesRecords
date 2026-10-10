@@ -13,6 +13,7 @@ import {
 } from "../preferences/periodScale";
 import { activityStartTimeMs, startOfWeekMs, weekWindowStartMs } from "./activityWindow";
 import { type SportColorCategory, sportColorCategory } from "./sportColors";
+import { getIntlLocale, t } from "../i18n/core";
 
 export type ActivityPeriodOption = PeriodOption;
 
@@ -329,12 +330,12 @@ export function activityWeekHeading(
   nowMs: number
 ): string {
   if (weekStartMs === undefined) {
-    return "Undated";
+    return t("activity.week.undated");
   }
 
   const thisWeek = startOfWeekMs(nowMs);
   if (weekStartMs === thisWeek) {
-    return "This week";
+    return t("activity.week.this");
   }
 
   // Stepped through the calendar rather than by subtracting seven days, so a
@@ -342,14 +343,16 @@ export function activityWeekHeading(
   const lastWeek = new Date(thisWeek);
   lastWeek.setDate(lastWeek.getDate() - 7);
   if (weekStartMs === lastWeek.getTime()) {
-    return "Last week";
+    return t("activity.week.last");
   }
 
   const date = new Date(weekStartMs);
   const sameYear = date.getFullYear() === new Date(nowMs).getFullYear();
-  return `Week of ${date.toLocaleDateString(undefined, {
-    month: "short",
-    day: "numeric",
-    ...(sameYear ? {} : { year: "numeric" })
-  })}`;
+  return t("activity.week.of", {
+    date: date.toLocaleDateString(getIntlLocale(), {
+      month: "short",
+      day: "numeric",
+      ...(sameYear ? {} : { year: "numeric" })
+    })
+  });
 }

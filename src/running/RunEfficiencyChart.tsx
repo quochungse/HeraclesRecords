@@ -25,6 +25,7 @@ import {
 } from "./runMetrics";
 import { RUN_SURFACE_LABELS, classifyRunSurface, type RunSurface } from "./runSurface";
 import { runSurfaceColors } from "./runSurfaceColors";
+import { formatDecimal, getIntlLocale, t } from "../i18n/core";
 
 interface ScatterPoint {
   /** Seconds per display unit — already converted, see `formatDisplayPace`. */
@@ -63,11 +64,13 @@ interface RunEfficiencyChartProps {
 function weekOfLabel(weekStartMs: number, nowMs: number): string {
   const start = new Date(weekStartMs);
   const sameYear = start.getFullYear() === new Date(nowMs).getFullYear();
-  return `week of ${start.toLocaleDateString(undefined, {
-    month: "short",
-    day: "numeric",
-    ...(sameYear ? {} : { year: "numeric" })
-  })}`;
+  return t("run.ef.weekOf", {
+    date: start.toLocaleDateString(getIntlLocale(), {
+      month: "short",
+      day: "numeric",
+      ...(sameYear ? {} : { year: "numeric" })
+    })
+  });
 }
 
 function formatDisplayPace(secondsPerDisplayUnit: number): string {
@@ -210,23 +213,23 @@ export function RunEfficiencyChart({
     <section className="panel run-block">
       <header className="run-block-head">
         <div>
-          <p className="running-eyebrow">Aerobic efficiency</p>
+          <p className="running-eyebrow">{t("run.ef.title")}</p>
           <h3>
-            {latest?.overall !== undefined ? latest.overall.toFixed(2) : "—"}
-            <span className="run-block-sub"> m per minute per beat</span>
+            {latest?.overall !== undefined ? formatDecimal(latest.overall, 2) : "—"}
+            <span className="run-block-sub"> {t("run.ef.unit")}</span>
           </h3>
         </div>
         <p className="run-block-aside">
-          {easyOnly ? "Easy runs" : "All runs"} over 20 minutes
-          {hasZones && !easyOnly ? " · no easy sessions to compare" : ""}
+          {easyOnly ? t("run.ef.easy") : t("run.ef.all")}
+          {hasZones && !easyOnly ? t("run.ef.noEasy") : ""}
           {trend ? (
             <>
               {" · "}
               <strong className={trend.deltaPct >= 0 ? "tone-up" : "tone-down"}>
                 {trend.deltaPct >= 0 ? "+" : ""}
-                {trend.deltaPct.toFixed(1)}%
+                {formatDecimal(trend.deltaPct, 1)}%
               </strong>{" "}
-              since the {trend.since}
+              {t("run.ef.since", { date: trend.since })}
             </>
           ) : null}
         </p>
@@ -248,7 +251,7 @@ export function RunEfficiencyChart({
                   domain={["auto", "auto"]}
                   tick={{ fill: colors.text, fontSize: 11 }}
                   stroke={colors.grid}
-                  tickFormatter={(value: number) => value.toFixed(2)}
+                  tickFormatter={(value: number) => formatDecimal(value, 2)}
                 />
                 {drawn.map((surface) => (
                   <Line
@@ -337,8 +340,7 @@ export function RunEfficiencyChart({
         </div>
       ) : (
         <p className="run-block-empty">
-          No runs over 20 minutes with a heart rate in this window, so there is
-          nothing to compare yet.
+          {t("run.ef.none")}
         </p>
       )}
     </section>
@@ -375,14 +377,14 @@ function EfficiencyTooltip({
     <div className="training-chart-tooltip" style={trainingChartTooltipStyle}>
       <span>{capitalise(weekOfLabel(row.weekStartMs, nowMs))}</span>
       {typeof row.overall === "number" ? (
-        <strong>{row.overall.toFixed(2)}</strong>
+        <strong>{formatDecimal(row.overall, 2)}</strong>
       ) : (
-        <span>No qualifying run</span>
+        <span>{t("run.ef.noQualifying")}</span>
       )}
       {values.length > 1
         ? values.map(({ surface, value }) => (
             <span key={surface} style={{ color: palette[surface] }}>
-              {RUN_SURFACE_LABELS[surface]} {value.toFixed(2)}
+              {RUN_SURFACE_LABELS[surface]} {formatDecimal(value, 2)}
             </span>
           ))
         : null}
@@ -414,6 +416,7 @@ function ScatterTooltip({
         {formatDisplayPace(point.pace)} /{distanceUnit(unitSystem)}
       </strong>
       <span>
+        {/* i18n-ignore: a unit and a label */}
         {point.hr} bpm · {RUN_SURFACE_LABELS[point.surface]}
       </span>
     </div>

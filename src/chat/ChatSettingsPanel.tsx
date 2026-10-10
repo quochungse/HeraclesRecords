@@ -28,10 +28,10 @@ import type { HeraclesRecordsApi } from "../heraclesrecords-api";
 import { formatTokens } from "./analyses/analysisLabels";
 import { OptionGroup } from "../components/OptionGroup";
 import {
-  COACH_STYLE_CATALOG,
   COACH_STYLES,
   normalizeCoachStyle
 } from "../../electron/coachStyles";
+import { plural, t, type MessageKey } from "../i18n/core";
 
 /**
  * The body of Coach settings. It edits the draft the dialog holds
@@ -78,14 +78,14 @@ export function ChatSettingsPanel({
     setBaseInstructionsOpen(true);
     if (baseInstructions !== null) return;
     if (!api) {
-      setBaseInstructionsError("Could not load the base coach instructions.");
+      setBaseInstructionsError(t("chat.set.baseFailed"));
       return;
     }
     setBaseInstructionsError(null);
     try {
       setBaseInstructions(await api.getBaseCoachInstructions());
     } catch {
-      setBaseInstructionsError("Could not load the base coach instructions.");
+      setBaseInstructionsError(t("chat.set.baseFailed"));
     }
   };
 
@@ -100,8 +100,8 @@ export function ChatSettingsPanel({
           <BrainCircuit size={22} strokeWidth={1.9} />
         </span>
         <span className="settings-nav-row-copy">
-          <strong>Coach Models</strong>
-          <span>{coachModelsSummary ?? "Checking connections…"}</span>
+          <strong>{t("chat.models.title")}</strong>
+          <span>{coachModelsSummary ?? t("chat.set.checking")}</span>
         </span>
         <ChevronRight
           className="settings-row-chevron"
@@ -114,31 +114,28 @@ export function ChatSettingsPanel({
       {claudeCodeUpdate ? <ClaudeCodeUpdateNote update={claudeCodeUpdate} /> : null}
 
       <section className="chat-settings-section">
-        <h3>Coach style</h3>
+        <h3>{t("chat.set.style")}</h3>
         {/* Chips, warmest to harshest, so the choice reads as a scale: where
             Coach sits between the two ends is the thing being chosen. */}
         <OptionGroup<CoachStyle>
-          label="How Coach sounds"
+          label={t("chat.set.styleLabel")}
           size="md"
           fill
           value={coachStyle}
           onChange={(next) => onUpdateChatSettings({ coachStyle: next })}
           options={COACH_STYLES.map((style) => ({
             value: style,
-            label: COACH_STYLE_CATALOG[style].label,
-            title: COACH_STYLE_CATALOG[style].detail
+            label: t(`chat.style.${style}` as MessageKey),
+            title: t(`chat.style.${style}.detail` as MessageKey)
           }))}
         />
         <p className="chat-settings-copy">
-          {COACH_STYLE_CATALOG[coachStyle].detail} The style changes how Coach
-          sounds, never the figures or the advice, and it stays out of anything
-          saved to COROS — workout and plan names and descriptions are written
-          plainly in every style. Your custom instructions below can fine-tune it.
+          {t(`chat.style.${coachStyle}.detail` as MessageKey)} {t("chat.set.styleNote")}
         </p>
       </section>
 
       <section className="chat-settings-section">
-        <h3>Display</h3>
+        <h3>{t("chat.set.display")}</h3>
         <label className="chat-local-tools">
           <input
             type="checkbox"
@@ -149,67 +146,56 @@ export function ChatSettingsPanel({
               })
             }
           />
-          <span>Show charts and activity visuals in chat</span>
+          <span>{t("chat.set.charts")}</span>
         </label>
-        <p className="chat-settings-copy">
-          When off, heart rate trends, zone summaries, and activity charts are
-          hidden. The coach still responds with text.
-        </p>
+        <p className="chat-settings-copy">{t("chat.set.chartsNote")}</p>
       </section>
 
       <section className="chat-settings-section">
-        <h3>Workout suggestions</h3>
+        <h3>{t("chat.set.suggestions")}</h3>
         <OptionGroup<InlineSuggestionsMode>
-          label="Workout cards Coach offers unasked"
+          label={t("chat.set.suggestionsLabel")}
           size="md"
           fill
           value={chatSettings.inlineSuggestions ?? "auto"}
           onChange={(inlineSuggestions) => onUpdateChatSettings({ inlineSuggestions })}
           options={[
-            { value: "on", label: "On" },
-            { value: "auto", label: "Automatic" },
-            { value: "off", label: "Off" }
+            { value: "on", label: t("chat.set.on") },
+            { value: "auto", label: t("chat.set.automatic") },
+            { value: "off", label: t("chat.set.off") }
           ]}
         />
         <p className="chat-settings-copy">
-          When Coach recommends a session, it can attach it as a workout card
-          you save in one press — at most two in one answer. Automatic turns
-          this on for Claude, whose cached context keeps the extra steps cheap,
-          and off for other providers, where each one costs more. The cost of
-          every answer is shown under it.
+          {t("chat.set.suggestionsNote")}
         </p>
       </section>
 
       <section className="chat-settings-section">
-        <h3>Coach instructions</h3>
+        <h3>{t("chat.set.instructions")}</h3>
+        <p className="chat-settings-copy">{t("chat.set.instructionsNote")}</p>
         <p className="chat-settings-copy">
-          Extra preferences appended to every coaching prompt — for example your
-          goal race, training days or equipment.
-        </p>
-        <p className="chat-settings-copy">
-          Your custom instructions will be used in conjunction with the{" "}
+          {t("chat.set.withBase")}{" "}
           <button
             type="button"
             className="chat-inline-link"
             onClick={() => void openBaseInstructions()}
           >
-            Base Coach instructions
+            {t("chat.set.base")}
           </button>
-          .
         </p>
         <label className="chat-local-field">
-          <span>Custom instructions</span>
+          <span>{t("chat.set.custom")}</span>
           <textarea
             className="chat-custom-instructions"
             rows={5}
             maxLength={MAX_CUSTOM_COACH_INSTRUCTIONS}
-            placeholder="e.g. I race a marathon in October, I can only run Tue/Thu/Sat, and I have no gym access."
+            placeholder={t("chat.set.customPh")}
             value={customInstructions}
             onChange={(event) => onUpdateChatSettings({ customInstructions: event.target.value })}
           />
         </label>
         <p className="chat-settings-copy">
-          {customInstructions.length}/{MAX_CUSTOM_COACH_INSTRUCTIONS} characters.
+          {t("chat.set.characters", { n: customInstructions.length, max: MAX_CUSTOM_COACH_INSTRUCTIONS })}
         </p>
         {baseInstructionsOpen ? (
           <BaseCoachInstructionsDialog
@@ -237,19 +223,23 @@ export function ChatSettingsPanel({
   );
 }
 
-const DETAIL_OPTIONS: { value: ContextDetail; label: string }[] = [
-  { value: "lean", label: "Less" },
-  { value: "balanced", label: "Balanced" },
-  { value: "full", label: "More" }
-];
+function detailOptions(): { value: ContextDetail; label: string }[] {
+  return [
+    { value: "lean", label: t("chat.set.less") },
+    { value: "balanced", label: t("chat.set.balanced") },
+    { value: "full", label: t("chat.set.more") }
+  ];
+}
 
 type ModelChoiceKind = CompactModelChoice["kind"];
 
-const MODEL_CHOICE_OPTIONS: { value: ModelChoiceKind; label: string }[] = [
-  { value: "auto", label: "Automatic" },
-  { value: "conversation", label: "Conversation’s model" },
-  { value: "fixed", label: "Choose" }
-];
+function modelChoiceOptions(): { value: ModelChoiceKind; label: string }[] {
+  return [
+    { value: "auto", label: t("chat.set.automatic") },
+    { value: "conversation", label: t("chat.set.conversationModel") },
+    { value: "fixed", label: t("chat.set.choose") }
+  ];
+}
 
 /** Providers a model can be chosen from here: a local server lists none. */
 const CHOOSABLE_PROVIDERS: ChatProvider[] = ["claude-code", "claude-api", "chatgpt", "openrouter"];
@@ -296,66 +286,60 @@ function CompactContextSection({
 
   return (
     <section className="chat-settings-section">
-      <h3>Compact context</h3>
-      <p className="chat-settings-copy">
-        A long conversation is sent in three layers: the newest turns word for
-        word; the ones before them condensed — your messages as you wrote them,
-        each of Coach&rsquo;s answers as a short digest of its figures and
-        decisions; and everything older as a running summary. Only what is sent
-        changes. The conversation stays complete on screen, and Coach can read
-        any earlier turn word for word when it needs to.
-      </p>
+      <h3>{t("chat.row.compact")}</h3>
+      <p className="chat-settings-copy">{t("chat.set.compactNote")}</p>
       <label className="chat-local-tools">
         <input
           type="checkbox"
           checked={enabled}
           onChange={(event) => onChange({ enabled: event.target.checked })}
         />
-        <span>Compact long conversations automatically</span>
+        <span>{t("chat.set.compactAuto")}</span>
       </label>
 
       <div className="chat-local-field">
-        <span>Kept word for word</span>
+        <span>{t("chat.set.verbatim")}</span>
         <OptionGroup<ContextDetail>
-          label="How much of a conversation is sent word for word"
+          label={t("chat.set.verbatimLabel")}
           size="md"
           fill
           disabled={!enabled}
           value={detail}
           onChange={(next) => onChange({ detail: next })}
-          options={DETAIL_OPTIONS}
+          options={detailOptions()}
         />
       </div>
       <p className="chat-settings-copy">
-        About the last {thousands(budget.keep)} tokens go as written. Once the
-        recent turns pass {thousands(budget.rollAt)}, the older ones are
-        condensed; once the condensed part passes {thousands(budget.middle)}, its
-        oldest turns go into the summary.{" "}
+        {t("chat.set.budget", {
+          keep: thousands(budget.keep),
+          rollAt: thousands(budget.rollAt),
+          middle: thousands(budget.middle)
+        })}{" "}
         {detail === "lean"
-          ? "The cheapest, and Coach looks back more often."
+          ? t("chat.set.lean")
           : detail === "full"
-            ? "Costs more on every turn of a long conversation."
-            : "The default."}
+            ? t("chat.set.full")
+            : t("chat.set.default")}
       </p>
 
       <div className="chat-local-field">
-        <span>Condense with</span>
+        <span>{t("chat.set.condenseWith")}</span>
         <OptionGroup<ModelChoiceKind>
-          label="The model that makes digests and summaries"
+          label={t("chat.set.condenseLabel")}
           size="md"
           fill
           disabled={!enabled}
           value={model.kind}
           onChange={chooseKind}
-          options={MODEL_CHOICE_OPTIONS}
+          options={modelChoiceOptions()}
         />
       </div>
       {model.kind === "fixed" ? (
         <div className="chat-compact-fields">
           <div className="chat-local-field">
-            <span>Provider</span>
+            <span>{t("chat.models.provider")}</span>
             <OptionGroup<ChatProvider>
-              label="Provider of the condensing model"
+              label={t("chat.set.condenseProvider")}
               mode="dropdown"
               disabled={!enabled}
               value={model.provider}
@@ -367,16 +351,16 @@ function CompactContextSection({
             />
           </div>
           <div className="chat-local-field">
-            <span>Model</span>
+            <span>{t("chat.models.model")}</span>
             <OptionGroup<string>
-              label="Condensing model"
+              label={t("chat.set.condenseModel")}
               mode="dropdown"
               disabled={!enabled}
               value={model.model}
               onChange={(next) => onChange({ model: { kind: "fixed", provider: model.provider, model: next } })}
               options={[
                 ...fixedOptions.map((option) => ({ value: option.value, label: option.label })),
-                ...(fixedModelKnown ? [] : [{ value: model.model, label: `${model.model} (not listed)` }])
+                ...(fixedModelKnown ? [] : [{ value: model.model, label: t("chat.set.notListed", { model: model.model }) }])
               ]}
             />
           </div>
@@ -385,16 +369,15 @@ function CompactContextSection({
       <p className="chat-settings-copy">
         {model.kind === "auto"
           ? automatic
-            ? `The smallest model the conversation’s AI offers — for ${COACH_PROVIDER_LABELS[coachProvider]}, ${automatic.label}. A conversation on an AI whose models say nothing about their size uses its own model.`
-            : `The smallest model the conversation’s AI offers. ${COACH_PROVIDER_LABELS[coachProvider]} lists none by size, so its conversations use their own model.`
+            ? t("chat.set.autoModel", { provider: COACH_PROVIDER_LABELS[coachProvider], model: automatic.label })
+            : t("chat.set.autoNone", { provider: COACH_PROVIDER_LABELS[coachProvider] })
           : model.kind === "conversation"
-            ? "The model each conversation answers with. It costs more, and digests and summaries read no better for it."
-            : "Every conversation is condensed with this model, whatever AI it answers with."}{" "}
-        A digest that states a figure its answer does not is refused, and that
-        answer is sent whole.
+            ? t("chat.set.conversationNote")
+            : t("chat.set.fixedNote")}{" "}
+        {t("chat.set.digestRefused")}
       </p>
       <p className="chat-settings-copy">
-        Compact one conversation right now from its &ldquo;⋯&rdquo; menu in the sidebar.
+        {t("chat.set.compactNow")}
       </p>
     </section>
   );
@@ -491,12 +474,8 @@ function AnalysesSettingsSection({
 
   return (
     <section className="chat-settings-section">
-      <h3>Analyses</h3>
-      <p className="chat-settings-copy">
-        An analysis runs on its own inside the conversation it was written in —
-        create one from the Analyses control in a conversation&rsquo;s header.
-        What is here applies to all of them at once.
-      </p>
+      <h3>{t("chat.set.analyses")}</h3>
+      <p className="chat-settings-copy">{t("chat.set.analysesNote")}</p>
 
       {error ? <p className="coach-analysis-error">{error}</p> : null}
 
@@ -504,20 +483,8 @@ function AnalysesSettingsSection({
         <p className="coach-analysis-banner" role="status">
           <TriangleAlert size={15} aria-hidden="true" />
           <span>
-            <strong>Every analysis is paused.</strong>{" "}
-            {pause.reason === "budget" ? (
-              <>
-                This month&rsquo;s token budget ran out, so they stopped rather
-                than spending past a number you set. They start again on the
-                1st — or now, if you raise the budget below.
-              </>
-            ) : (
-              <>
-                COROS asked for a login code and no analysis can supply one, so
-                they stopped rather than filling the run log with the same skip
-                every fifteen minutes. Sign in to COROS, then resume.
-              </>
-            )}
+            <strong>{t("chat.set.paused")}</strong>{" "}
+            {pause.reason === "budget" ? t("chat.set.pausedBudget") : t("chat.set.pausedLogin")}
           </span>
           <button
             type="button"
@@ -528,7 +495,7 @@ function AnalysesSettingsSection({
             {resuming ? (
               <Loader2 className="chat-spinner" size={14} aria-hidden="true" />
             ) : null}
-            Resume
+            {t("chat.set.resume")}
           </button>
         </p>
       ) : null}
@@ -539,14 +506,14 @@ function AnalysesSettingsSection({
             <strong>
               {formatTokens(spend.countedTokens)}
             </strong>{" "}
-            tokens this month
+            {t("chat.set.tokensMonth")}
             {spend.cacheReadTokens > 0 ? (
               <>
                 {" · "}
                 <span
-                  title={`${formatTokens(spend.cacheReadTokens)} tokens were read from the provider's cache, which costs a tenth of new input, so they count as a tenth.`}
+                  title={t("chat.set.cacheReadsTitle", { count: formatTokens(spend.cacheReadTokens) })}
                 >
-                  cache reads count as 10%
+                  {t("chat.set.cacheReads")}
                 </span>
               </>
             ) : null}
@@ -555,10 +522,8 @@ function AnalysesSettingsSection({
             {spend.providerRuns > spend.countedRuns ? (
               <>
                 {" · "}
-                <span title="Some providers do not report what a turn cost.">
-                  {spend.providerRuns - spend.countedRuns} run
-                  {spend.providerRuns - spend.countedRuns === 1 ? "" : "s"} not
-                  counted
+                <span title={t("chat.set.uncountedTitle")}>
+                  {plural("chat.set.uncounted", spend.providerRuns - spend.countedRuns)}
                 </span>
               </>
             ) : null}
@@ -567,12 +532,12 @@ function AnalysesSettingsSection({
             {/* The unit is in the label rather than after the field: the
                 placeholder reads "none", and a suffix would leave the
                 unset state saying "none tokens". */}
-            <span>Monthly budget (tokens)</span>
+            <span>{t("chat.set.budgetField")}</span>
             <input
               type="number"
               min={0}
               step={1000}
-              placeholder="none"
+              placeholder={t("chat.set.none")}
               disabled={!api}
               value={budgetText ?? (shownBudget === null ? "" : String(shownBudget))}
               onChange={(event) => editBudget(event.target.value)}
@@ -619,11 +584,11 @@ function BaseCoachInstructionsDialog({
         onClick={(event) => event.stopPropagation()}
       >
         <header className="chat-base-instructions-header">
-          <h4 id="chat-base-instructions-title">Base Coach instructions</h4>
+          <h4 id="chat-base-instructions-title">{t("chat.set.base")}</h4>
           <button
             type="button"
             className="icon-button"
-            aria-label="Close base coach instructions"
+            aria-label={t("chat.set.closeBase")}
             onClick={onClose}
           >
             <X size={16} aria-hidden="true" />
@@ -635,7 +600,7 @@ function BaseCoachInstructionsDialog({
           ) : instructions === null ? (
             <p className="chat-settings-copy">
               <Loader2 className="chat-spinner" size={14} aria-hidden="true" />{" "}
-              Loading…
+              {t("common.loading")}
             </p>
           ) : (
             <pre>{instructions}</pre>

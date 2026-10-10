@@ -18,7 +18,6 @@
  * Only past two weeks: a plan of one or two weeks is on the screen whole
  * already, and a chart of two bars is a comparison, not a shape.
  */
-import { formatWorkoutSport } from "../../electron/workoutCapabilities";
 import {
   RIDGE_CAPTIONS as CAPTIONS,
   RIDGE_UNITS as UNITS,
@@ -28,6 +27,8 @@ import {
   type PlanReaderWeek
 } from "./planReaderModel";
 import { sportChipStyle } from "./sportTheme";
+import { workoutSportLabel } from "../training/workoutSport";
+import { t } from "../i18n/core";
 
 interface PlanWeekRidgeProps {
   weeks: readonly PlanReaderWeek[];
@@ -74,12 +75,12 @@ export function PlanWeekRidge({ weeks, currentWeek, selectedWeek, onJump }: Plan
       <div className="plan-ridge-caption">
         <span>{CAPTIONS[measure]}</span>
         <b>{formatValue(peak, measure)}</b>
-        <small>peak</small>
+        <small>{t("library.ridge.peak")}</small>
         {sports.length > 1 ? (
           <span className="plan-ridge-legend">
             {sports.map((sport) => (
               <span key={sport ?? "other"} style={sportChipStyle(sport)}>
-                {sport ? formatWorkoutSport(sport) : "Other"}
+                {sport ? workoutSportLabel(sport) : t("library.ridge.other")}
               </span>
             ))}
           </span>
@@ -88,7 +89,7 @@ export function PlanWeekRidge({ weeks, currentWeek, selectedWeek, onJump }: Plan
       <div
         className="plan-ridge-bars"
         role="group"
-        aria-label={`${CAPTIONS[measure]} across ${weeks.length} weeks`}
+        aria-label={t("library.ridge.across", { caption: CAPTIONS[measure], weeks: weeks.length })}
       >
         {weeks.map((week, index) => {
           const value = values[index];
@@ -98,7 +99,7 @@ export function PlanWeekRidge({ weeks, currentWeek, selectedWeek, onJump }: Plan
           const breakdown =
             stacks[index].length > 1
               ? ` (${stacks[index]
-                  .map((segment) => `${segment.sport ? formatWorkoutSport(segment.sport) : "Other"} ${formatValue(segment.value, measure)}`)
+                  .map((segment) => `${segment.sport ? workoutSportLabel(segment.sport) : t("library.ridge.other")} ${formatValue(segment.value, measure)}`)
                   .join(", ")})`
               : "";
           const label =

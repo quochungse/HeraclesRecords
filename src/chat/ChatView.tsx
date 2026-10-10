@@ -84,6 +84,7 @@ import type {
   TrainingPlanDataSources
 } from "../../electron/types";
 import { NOTHING_TO_REPORT } from "../../electron/types";
+import { planDiff } from "../../electron/planDiff";
 import {
   chartHandle,
   holdBackPartialPlaceholder,
@@ -115,7 +116,7 @@ import { EMPTY_NOTES } from "../training-library/runTrail";
 import { briefOpenProblems, briefTitle } from "./planBriefModel";
 import { CoachAskPicker } from "./CoachAskPicker";
 import { remoteErrorMessage } from "./remoteError";
-import { latestOutlineAnchors, outlineStepText } from "./planOutlineModel";
+import { displayStepText, latestOutlineAnchors, outlineStepText, WRITE_SESSIONS_TEXT } from "./planOutlineModel";
 import { ConfirmDialog } from "../training-library/ConfirmDialog";
 import { createPortal } from "react-dom";
 import { firstPlanMonday } from "../../electron/trainingPlanGeneration";
@@ -181,6 +182,10 @@ import {
   groupChatToolsBySource,
   type ChatToolSource
 } from "../../electron/chatToolSources";
+import { getIntlLocale, plural, screenSentence, t } from "../i18n/core";
+import { useI18n } from "../i18n/useI18n";
+import { displaySessionTitle, NEW_PLAN_TITLE } from "./sessionTitle";
+import { displayStoredNotice, stoppedEarlyNotice } from "./storedNotice";
 
 /* "Edit plan first": the plan editor and the library's stylesheet, loaded
    only when a coach plan is opened in it. */
@@ -196,38 +201,46 @@ const ConversationAiSheet = lazy(() =>
 const CoachBriefEditor = lazy(() => import("./CoachBriefEditor"));
 const CoachOutlineEditor = lazy(() => import("./CoachOutlineEditor"));
 
-/** What a conversation AI Plan opened is called until its brief has a goal (P2.5). */
-const NEW_PLAN_TITLE = "New plan";
-/** What an empty conversation offers (R3): three intents, each a few ways in. */
-const EMPTY_INTENTS: readonly {
+/**
+ * What an empty conversation offers (R3): three intents, each a few ways in.
+ * A function, so the words are the language on screen; a prompt pressed is the
+ * athlete's own question, in their language, like anything they type.
+ */
+function emptyIntents(): readonly {
+  key: string;
   title: string;
   prompts: readonly { text: string; detail?: string; plan?: boolean }[];
-}[] = [
-  {
-    title: "Review",
-    prompts: [
-      { text: "How did my latest session go?" },
-      { text: "How does this week compare with last week?" },
-      { text: "Am I recovered enough for a hard session?" }
-    ]
-  },
-  {
-    title: "Plan",
-    prompts: [
-      { text: "Start a training plan…", detail: "Your goal and your week, then an outline", plan: true },
-      { text: "Give me one session for today" },
-      { text: "Build a balanced week from my recent training" }
-    ]
-  },
-  {
-    title: "Adjust",
-    prompts: [
-      { text: "Rearrange this week around my schedule" },
-      { text: "I'm ill, ease the next few days" },
-      { text: "Add strength around my endurance sessions" }
-    ]
-  }
-];
+}[] {
+  return [
+    {
+      key: "review",
+      title: t("chat.intent.review"),
+      prompts: [
+        { text: t("chat.intent.review.latest") },
+        { text: t("chat.intent.review.week") },
+        { text: t("chat.intent.review.recovered") }
+      ]
+    },
+    {
+      key: "plan",
+      title: t("chat.intent.plan"),
+      prompts: [
+        { text: t("chat.intent.plan.start"), detail: t("chat.intent.plan.startDetail"), plan: true },
+        { text: t("chat.intent.plan.today") },
+        { text: t("chat.intent.plan.week") }
+      ]
+    },
+    {
+      key: "adjust",
+      title: t("chat.intent.adjust"),
+      prompts: [
+        { text: t("chat.intent.adjust.rearrange") },
+        { text: t("chat.intent.adjust.ill") },
+        { text: t("chat.intent.adjust.strength") }
+      ]
+    }
+  ];
+}
 /** Below this window width the conversation list folds while the Workbench is open. */
 const WORKBENCH_FOLD_WIDTH = 1600;
 /** Below this window width the Workbench is a sheet over the conversation. */
@@ -307,7 +320,7 @@ const CHAT_MARKDOWN_COMPONENTS: Components = {
     const destination = linkDestination(href);
     if (!href || !destination) {
       return (
-        <span className="chat-link-refused" title={href ? `Not a web link: ${href}` : undefined}>
+        <span className="chat-link-refused" title={href ? t("chat.notWebLink", { href }) : undefined}>
           {children}
         </span>
       );
@@ -327,7 +340,7 @@ const CHAT_MARKDOWN_COMPONENTS: Components = {
   img: ({ src, alt }) => {
     const source = typeof src === "string" ? src : undefined;
     const destination = linkDestination(source);
-    const label = alt?.trim() || "Image";
+    const label = alt?.trim() || t("chat.image");
     if (!source || !destination) {
       return <span className="chat-link-refused">{label}</span>;
     }
@@ -349,6 +362,7 @@ const AssistantMarkdown = memo(function AssistantMarkdown({
   content: string;
   streaming?: boolean;
 }) {
+  useI18n();
   return (
     <div className={`chat-markdown${streaming ? " chat-markdown-streaming" : ""}`}>
       <ReactMarkdown
@@ -467,7 +481,7 @@ function NextSteps({
 }) {
   if (!steps.length) return null;
   return (
-    <div className="chat-next-steps" aria-label="Next steps">
+    <div className="chat-next-steps" aria-label={t("chat.nextSteps")}>
       {steps.map((text) => (
         <button
           key={text}
@@ -491,11 +505,12 @@ const ThinkingDisclosure = memo(function ThinkingDisclosure({
   content: string;
   live?: boolean;
 }) {
+  useI18n();
   return (
     <details className={`chat-thinking${live ? " chat-thinking-live" : ""}`}>
       <summary>
-        <span>Thinking</span>
-        {live ? <small><i aria-hidden="true" />Live</small> : null}
+        <span>{t("chat.thinking")}</span>
+        {live ? <small><i aria-hidden="true" />{t("chat.live")}</small> : null}
       </summary>
       <div className="chat-thinking-text">
         <AssistantMarkdown content={content} />
@@ -524,11 +539,11 @@ function CoachInputCard({
       <header className="chat-coach-prompt-header">
         <span className="chat-coach-prompt-status">
           <MessageCircle size={14} aria-hidden="true" />
-          {answered ? "Answered" : "Waiting for your answer"}
+          {answered ? t("chat.prompt.answered") : t("chat.prompt.waiting")}
         </span>
         <h4 id={`coach-prompt-${prompt.promptId}`}>{prompt.question}</h4>
       </header>
-      <div className="chat-coach-prompt-choices" role="group" aria-label="Answer choices">
+      <div className="chat-coach-prompt-choices" role="group" aria-label={t("chat.prompt.choices")}>
         {prompt.choices.map((choice, index) => {
           const selected = prompt.selectedChoiceId === choice.id;
           return (
@@ -541,7 +556,7 @@ function CoachInputCard({
             >
               <span>
                 {choice.label}
-                {!answered && index === 0 ? <em>Recommended</em> : null}
+                {!answered && index === 0 ? <em>{t("chat.prompt.recommended")}</em> : null}
               </span>
               {choice.description ? <small>{choice.description}</small> : null}
             </button>
@@ -555,7 +570,7 @@ function CoachInputCard({
           onClick={onCustom}
           disabled={disabled}
         >
-          Type another answer
+          {t("chat.prompt.other")}
         </button>
       ) : null}
     </section>
@@ -667,7 +682,7 @@ function QuestionRefs({
     seen.add(name);
   }
   return (
-    <span className="chat-refs-row" aria-label="Asked about">
+    <span className="chat-refs-row" aria-label={t("chat.askedAbout")}>
       {sport ? (
         <SportRefIcon sport={sport} />
       ) : (
@@ -682,8 +697,8 @@ function QuestionRefs({
         <button
           type="button"
           className="chat-refs-open"
-          aria-label="Open in the Workbench"
-          title="Open in the Workbench"
+          aria-label={t("chat.openWorkbench")}
+          title={t("chat.openWorkbench")}
           onClick={() => onOpen(draftId)}
         >
           <ArrowUpRight size={12} aria-hidden="true" />
@@ -694,9 +709,9 @@ function QuestionRefs({
 }
 
 function deleteTargetLabel(target: WorkoutDeletePreview["target"]): string {
-  if (target === "scheduled") return "Calendar";
-  if (target === "library") return "Library";
-  return "Calendar and library";
+  if (target === "scheduled") return t("chat.delete.calendar");
+  if (target === "library") return t("chat.delete.library");
+  return t("chat.delete.both");
 }
 
 /**
@@ -708,28 +723,28 @@ function DeletePreviewCard({ preview }: { preview: WorkoutDeletePreview }) {
   return (
     <div className="chat-plan-card chat-delete-card">
       <div className="chat-plan-card-header">
-        <h4>Delete workout</h4>
+        <h4>{t("chat.delete.title")}</h4>
         <span className="chat-plan-card-summary">{preview.summary}</span>
       </div>
       <dl className="chat-delete-details">
         <div>
-          <dt>Target</dt>
+          <dt>{t("chat.delete.target")}</dt>
           <dd>{deleteTargetLabel(preview.target)}</dd>
         </div>
         {preview.workoutName ? (
           <div>
-            <dt>Workout</dt>
+            <dt>{t("chat.delete.workout")}</dt>
             <dd>{preview.workoutName}</dd>
           </div>
         ) : null}
         {preview.scheduleDate ? (
           <div>
-            <dt>Date</dt>
+            <dt>{t("chat.delete.date")}</dt>
             <dd>{preview.scheduleDate}</dd>
           </div>
         ) : null}
       </dl>
-      <p className="chat-delete-expired">This card is from an earlier version and can no longer delete anything. Ask Coach again.</p>
+      <p className="chat-delete-expired">{t("chat.delete.expired")}</p>
     </div>
   );
 }
@@ -764,13 +779,13 @@ function SourceBadge({ source }: { source: SourceInfo }) {
               title={group.tools.join(", ")}
             >
               <Icon size={12} aria-hidden="true" />
-              {`${group.label} · ${group.tools.length} ${group.tools.length === 1 ? "read" : "reads"}`}
+              {`${group.label} · ${plural("chat.source.reads", group.tools.length)}`}
             </div>
           );
         })}
         {failure ? (
           <div className="chat-source chat-source-error" title={failure}>
-            Tool failed
+            {t("chat.source.toolFailed")}
           </div>
         ) : null}
       </div>
@@ -780,15 +795,15 @@ function SourceBadge({ source }: { source: SourceInfo }) {
     return (
       <div className="chat-source chat-source-snapshot">
         <FileText size={12} aria-hidden="true" />
-        Training snapshot
-        {source.mcpEnabled ? " · MCP not called" : ""}
+        {t("chat.source.snapshot")}
+        {source.mcpEnabled ? ` · ${t("chat.source.mcpNotCalled")}` : ""}
       </div>
     );
   }
   return (
     <div className="chat-source chat-source-none">
       <FileText size={12} aria-hidden="true" />
-      No COROS data
+      {t("chat.source.none")}
     </div>
   );
 }
@@ -859,9 +874,9 @@ function formatLatestActivityExportMessage(
   const formatLabel = result.formatLabel ?? "FIT";
   const activityName = result.activityName ? ` "${result.activityName}"` : "";
   if (!result.saved || !result.filePath) {
-    return `No file saved. The latest activity ${formatLabel} export was cancelled.`;
+    return t("chat.export.cancelled", { format: formatLabel });
   }
-  return `Saved the latest activity ${formatLabel} file${activityName} to:\n\n\`${result.filePath}\``;
+  return `${t("chat.export.saved", { format: formatLabel, name: activityName })}\n\n\`${result.filePath}\``;
 }
 
 /**
@@ -953,26 +968,34 @@ function AnalysisPromptChip({
  * The formatters are built once — every message row asks on every render,
  * a token of a streaming answer included (see `chatSessionGroups.ts`).
  */
-const ENTRY_TIME = new Intl.DateTimeFormat(undefined, { hour: "numeric", minute: "2-digit" });
-const ENTRY_DAY = new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric" });
-const ENTRY_DAY_YEAR = new Intl.DateTimeFormat(undefined, {
-  year: "numeric",
-  month: "short",
-  day: "numeric"
-});
-const ENTRY_FULL = new Intl.DateTimeFormat(undefined, { dateStyle: "full", timeStyle: "short" });
+let entryFormatsFor = "";
+let entryFormats: Record<"time" | "day" | "dayYear" | "full", Intl.DateTimeFormat> | null = null;
+/** Built once per language, not per render. */
+function entryFormat(kind: "time" | "day" | "dayYear" | "full"): Intl.DateTimeFormat {
+  const locale = getIntlLocale();
+  if (!entryFormats || entryFormatsFor !== locale) {
+    entryFormatsFor = locale;
+    entryFormats = {
+      time: new Intl.DateTimeFormat(locale, { hour: "numeric", minute: "2-digit" }),
+      day: new Intl.DateTimeFormat(locale, { month: "short", day: "numeric" }),
+      dayYear: new Intl.DateTimeFormat(locale, { year: "numeric", month: "short", day: "numeric" }),
+      full: new Intl.DateTimeFormat(locale, { dateStyle: "full", timeStyle: "short" })
+    };
+  }
+  return entryFormats[kind];
+}
 
 function formatEntryTime(at: number): string {
   const when = new Date(at);
   if (Number.isNaN(when.getTime())) {
     return "";
   }
-  const time = ENTRY_TIME.format(when);
+  const time = entryFormat("time").format(when);
   const now = new Date();
   if (when.toDateString() === now.toDateString()) {
     return time;
   }
-  const day = (when.getFullYear() === now.getFullYear() ? ENTRY_DAY : ENTRY_DAY_YEAR).format(when);
+  const day = entryFormat(when.getFullYear() === now.getFullYear() ? "day" : "dayYear").format(when);
   return `${day}, ${time}`;
 }
 
@@ -982,7 +1005,7 @@ function MessageTime({ at }: { at?: number }) {
   const when = new Date(at);
   if (Number.isNaN(when.getTime())) return null;
   return (
-    <time className="chat-message-time" dateTime={when.toISOString()} title={ENTRY_FULL.format(when)}>
+    <time className="chat-message-time" dateTime={when.toISOString()} title={entryFormat("full").format(when)}>
       {formatEntryTime(at)}
     </time>
   );
@@ -1042,6 +1065,7 @@ export function ChatView({
   onPendingPromptConsumed,
   active = true
 }: ChatViewProps) {
+  useI18n();
   const { unitSystem } = useUnitSystem();
   const [authStatus, setAuthStatus] = useState<ChatAuthStatus | null>(null);
   const [chatSettings, setChatSettings] =
@@ -1307,7 +1331,7 @@ export function ChatView({
         setRedrawAsk(artifactId);
       }
     } catch (caught) {
-      setBriefSave({ saving: false, error: remoteErrorMessage(caught, "The brief was not saved.") });
+      setBriefSave({ saving: false, error: remoteErrorMessage(caught, t("chat.err.briefNotSaved")) });
     }
   };
   /** A brief changed under its outline: whether to have it redrawn (P2.2). */
@@ -1324,7 +1348,7 @@ export function ChatView({
       setOutlineSave({ saving: false });
       setEditingOutlineId(null);
     } catch (caught) {
-      setOutlineSave({ saving: false, error: remoteErrorMessage(caught, "The outline was not saved.") });
+      setOutlineSave({ saving: false, error: remoteErrorMessage(caught, t("chat.err.outlineNotSaved")) });
     }
   };
   /**
@@ -1621,7 +1645,7 @@ export function ChatView({
     // Pointing at something waits by the composer and sends nothing, so it
     // may land while Coach answers elsewhere; the send is what waits.
     if (exportingLatestActivity) {
-      onError("Coach is still busy. Ask again when it has finished.");
+      onError(t("chat.err.busyAsk"));
       return;
     }
     if (sessionId === null) await handleNewChat();
@@ -1632,7 +1656,7 @@ export function ChatView({
     const planHere = Boolean(request.draftId) && sessionId !== null && sessionId === suggestedId;
     if (planHere && request.refs?.length) setPendingRefs(request.refs);
     const name = request.refs?.[0]?.name;
-    const prompt = request.prompt ?? (request.draftId && !planHere && name ? `About my plan "${name}": ` : "");
+    const prompt = request.prompt ?? (request.draftId && !planHere && name ? t("chat.aboutPlan", { name }) : "");
     if (prompt) composerRef.current?.setDraft(prompt);
     requestAnimationFrame(() => composerRef.current?.focus());
   };
@@ -1640,7 +1664,7 @@ export function ChatView({
   /** What the picker says the question is about. */
   const askSubject = (request: CoachOpenRequest): string => {
     const labels = [...(request.scheduleRefs ?? []).map((ref) => ref.label), ...(request.refs ?? []).map((ref) => ref.name)];
-    return labels.length ? `About ${labels.join(", ")}` : "Pick the conversation this question goes in.";
+    return labels.length ? t("chat.askAbout", { subject: labels.join(", ") }) : t("chat.askPick");
   };
 
   /**
@@ -1654,7 +1678,7 @@ export function ChatView({
     if (!api) return;
     if (streaming || exportingLatestActivity) {
       // The request is already consumed, so dropping it would lose the click.
-      onError("Coach is still answering. Press AI Plan again when it has finished.");
+      onError(t("chat.err.busyPlan"));
       return;
     }
     onError(null);
@@ -1677,7 +1701,7 @@ export function ChatView({
       persistHistory(created.id, entries, true);
       setAutoOutline({ sessionId: created.id, artifactId: brief.artifactId });
     } catch (caught) {
-      onError(remoteErrorMessage(caught, "Could not start a plan."));
+      onError(remoteErrorMessage(caught, t("chat.err.startPlan")));
     }
   };
 
@@ -1951,7 +1975,7 @@ export function ChatView({
     if (!api) return;
     const listed = await refreshSessions();
     if (!listed.some((session) => session.id === sessionId)) {
-      onError("That conversation is no longer here — it may have been deleted.");
+      onError(t("chat.err.conversationGone"));
       return;
     }
     onError(null);
@@ -2144,7 +2168,7 @@ export function ChatView({
    */
   const showLiveAnalysis = useCallback(
     (run: CoachAnalysisRun) => {
-      setLiveAnalysis({ runId: run.id, name: "Analysis coach", text: "" });
+      setLiveAnalysis({ runId: run.id, name: t("chat.analysisCoach"), text: "" });
       void api
         ?.getCoachAnalysis(run.analysisId)
         .then((analysis) => {
@@ -2477,7 +2501,7 @@ export function ChatView({
             onError(
               caught instanceof Error
                 ? caught.message
-                : `${server.name} session could not be cleared.`
+                : t("chat.err.mcpClear", { name: server.name })
             );
           }
         })
@@ -2509,7 +2533,7 @@ export function ChatView({
           onError(
             caught instanceof Error
               ? caught.message
-              : `${server.name} connection failed.`
+              : t("chat.err.mcpConnect", { name: server.name })
           );
         }
       }
@@ -2562,7 +2586,7 @@ export function ChatView({
         // behind it; unsaved, it dropped out of the conversation on reload
         // while its draft stayed.
         turnTimeline((prev) => {
-          if (prev.length > turnStartRef.current) {
+          if (prev.length > turnStartRef.current) { // i18n-ignore
             persistTurn(prev);
           }
           return prev;
@@ -2814,7 +2838,7 @@ export function ChatView({
             }
             next.push({
               kind: "toolNotice",
-              message: `Coach stopped before finishing: ${payload.message}`
+              message: stoppedEarlyNotice(payload.message)
             });
             markSettled(prev, next);
             persistTurn(next);
@@ -2825,7 +2849,7 @@ export function ChatView({
           // card goes back to waiting for an answer they can give again.
           restoreResumedCoachPrompt();
         }
-        onError(payload.message);
+        onError(screenSentence(payload.message));
         if (payload.authError) {
           setAuthStatus({ signedIn: false });
         }
@@ -2911,7 +2935,7 @@ export function ChatView({
         await ensureActiveSession("chatgpt");
       }
     } catch (caught) {
-      onError(remoteErrorMessage(caught, "ChatGPT sign-in failed."));
+      onError(remoteErrorMessage(caught, t("chat.err.chatgptSignIn")));
     } finally {
       setSigningIn(false);
     }
@@ -2939,7 +2963,7 @@ export function ChatView({
       return status;
     } catch (caught) {
       onError(
-        remoteErrorMessage(caught, "Claude Code detection failed.")
+        remoteErrorMessage(caught, t("chat.err.claudeDetect"))
       );
       return null;
     } finally {
@@ -3020,7 +3044,7 @@ export function ChatView({
       setTimeline([]);
       resetEphemeralChatState(created.id);
     } catch (caught) {
-      onError(remoteErrorMessage(caught, "Could not start a new chat."));
+      onError(remoteErrorMessage(caught, t("chat.err.newChat")));
     }
   };
 
@@ -3051,8 +3075,8 @@ export function ChatView({
         caught instanceof Error
           ? caught.message
           : pinned
-            ? "Could not pin chat."
-            : "Could not unpin chat."
+            ? t("chat.err.pin")
+            : t("chat.err.unpin")
       );
     }
   };
@@ -3070,7 +3094,7 @@ export function ChatView({
       );
     } catch (caught) {
       onError(
-        remoteErrorMessage(caught, "Could not rename chat.")
+        remoteErrorMessage(caught, t("chat.err.rename"))
       );
     }
   };
@@ -3078,7 +3102,7 @@ export function ChatView({
   const handleDeleteSession = async (sessionId: string) => {
     if (!api || exportingLatestActivity) return;
     if (streaming && sessionId === turnSessionIdRef.current) {
-      onMessage?.("Coach is answering in that conversation. Delete it when it has finished.");
+      onMessage?.(t("chat.err.deleteBusy"));
       return;
     }
     onError(null);
@@ -3099,7 +3123,7 @@ export function ChatView({
         }
       }
     } catch (caught) {
-      onError(remoteErrorMessage(caught, "Could not delete chat."));
+      onError(remoteErrorMessage(caught, t("chat.err.delete")));
     }
   };
 
@@ -3119,7 +3143,7 @@ export function ChatView({
         setClaudeStatus(status);
       }
     } catch (caught) {
-      onError(remoteErrorMessage(caught, "Provider change failed."));
+      onError(remoteErrorMessage(caught, t("chat.err.provider")));
     }
   };
 
@@ -3137,7 +3161,7 @@ export function ChatView({
       setChatSettings(await api.saveChatSettings(nextSettings));
     } catch (caught) {
       onError(
-        remoteErrorMessage(caught, "Could not save the reasoning effort.")
+        remoteErrorMessage(caught, t("chat.err.effort"))
       );
     } finally {
       setSavingSettings(false);
@@ -3188,7 +3212,7 @@ export function ChatView({
       setChatSettings(saved);
     } catch (caught) {
       onError(
-        remoteErrorMessage(caught, "Could not save the selected model.")
+        remoteErrorMessage(caught, t("chat.err.model"))
       );
     } finally {
       setSavingSettings(false);
@@ -3201,11 +3225,11 @@ export function ChatView({
    * athlete pressed Save and is owed an answer.
    */
   const saveChatSettingsPatch = async (patch: Partial<ChatSettings>) => {
-    if (!api) throw new Error("Could not save Coach settings.");
+    if (!api) throw new Error(t("chat.err.settings"));
     try {
       setChatSettings(await api.saveChatSettings({ ...chatSettings, ...patch }));
     } catch (caught) {
-      throw new Error(remoteErrorMessage(caught, "Could not save Coach settings."));
+      throw new Error(remoteErrorMessage(caught, t("chat.err.settings")));
     }
   };
 
@@ -3299,25 +3323,23 @@ export function ChatView({
       if (result.failed) {
         showToast(
           result.failureReason
-            ? `Nothing was compacted: ${result.failureReason}. The conversation is unchanged.`
-            : "The summariser did not answer, so nothing was compacted. The conversation is unchanged.",
+            ? t("chat.compact.failedReason", { reason: result.failureReason })
+            : t("chat.compact.failed"),
           "error"
         );
       } else if (!result.rolled) {
         showToast(
-          "This conversation is already short enough — nothing to compact.",
+          t("chat.compact.short"),
           "error"
         );
       } else {
         showToast(
-          `Compacted. The next message sends a summary plus the last ${result.tailLength} ${
-            result.tailLength === 1 ? "entry" : "entries"
-          } in full.`
+          plural("chat.compact.done", result.tailLength)
         );
       }
     } catch (caught) {
       showToast(
-        remoteErrorMessage(caught, "Could not compact this conversation."),
+        remoteErrorMessage(caught, t("chat.compact.error")),
         "error"
       );
     } finally {
@@ -3337,7 +3359,7 @@ export function ChatView({
     if (!api) return;
     const title =
       sessions.find((session) => session.id === sessionId)?.title ??
-      "This conversation";
+      t("chat.thisConversation");
     setContextInspection({ sessionId, title, result: null, error: null });
     try {
       const result = await api.inspectChatContext(
@@ -3353,7 +3375,7 @@ export function ChatView({
       );
     } catch (caught) {
       const message =
-        remoteErrorMessage(caught, "Could not read the context.");
+        remoteErrorMessage(caught, t("chat.err.context"));
       setContextInspection((current) =>
         current?.sessionId === sessionId ? { ...current, error: message } : current
       );
@@ -3387,11 +3409,11 @@ export function ChatView({
       turnProvider === "openrouter" &&
       !chatSettings.openRouter.hasApiKey
     ) {
-      onError("Add an OpenRouter API key in Settings, under Connections.");
+      onError(t("chat.err.openrouterKey"));
       return false;
     }
     if (turnProvider === "local" && !localModelConfigured) {
-      onError("Enter a local model before starting the coach.");
+      onError(t("chat.err.localModel"));
       return false;
     }
     if (
@@ -3399,7 +3421,7 @@ export function ChatView({
       !chatSettings.anthropic.hasApiKey
     ) {
       onError(
-        "Save an Anthropic API key in Settings, under Connections, before starting the coach."
+        t("chat.err.anthropicKey")
       );
       return false;
     }
@@ -3542,7 +3564,7 @@ export function ChatView({
         setTimeline(timeline);
         persistHistory(activeSessionIdRef.current, timeline, true);
       }
-      onError(remoteErrorMessage(caught, "Chat request failed."));
+      onError(remoteErrorMessage(caught, t("chat.err.request")));
     }
     return true;
   };
@@ -3578,7 +3600,7 @@ export function ChatView({
 
   /** "Write the sessions" to the brief's outline, as a turn of the conversation (P2.3). */
   const writeSessions = (artifactId: string) =>
-    sendMessage("Write the sessions", undefined, [], { step: "sessions", artifactId });
+    sendMessage(WRITE_SESSIONS_TEXT, undefined, [], { step: "sessions", artifactId });
   /** Whether a brief's sessions are written: it has a version, and is a plan from then on. */
   const briefIsPlan = (artifactId: string) => artifactVersions.some((version) => version.artifactId === artifactId);
 
@@ -3724,7 +3746,7 @@ export function ChatView({
       onPlanUploaded?.();
     } catch (caught) {
       onError(
-        remoteErrorMessage(caught, "Failed to save the workout or plan to COROS.")
+        remoteErrorMessage(caught, t("chat.err.upload"))
       );
     } finally {
       setUploadingDraftId(null);
@@ -3869,7 +3891,7 @@ export function ChatView({
       setScheduleChanges((current) => ({ ...current, [changeSetId]: set }));
       if (apply) onPlanUploaded?.();
     } catch (caught) {
-      onError(remoteErrorMessage(caught, apply ? "The change was not applied." : "The change was not dismissed."));
+      onError(remoteErrorMessage(caught, apply ? t("chat.err.notApplied") : t("chat.err.notDismissed")));
       // What COROS did before the failure is in the row: read it again.
       void api
         .getScheduleChanges([changeSetId])
@@ -3911,7 +3933,7 @@ export function ChatView({
       });
     } catch (caught) {
       const message =
-        remoteErrorMessage(caught, "Latest activity FIT export failed.");
+        remoteErrorMessage(caught, t("chat.export.failed"));
       onError(message);
       setTimeline((prev) => {
         const next: ChatEntry[] = [
@@ -3919,7 +3941,7 @@ export function ChatView({
           {
             kind: "message",
             role: "assistant",
-            content: `I couldn't download the latest activity FIT file: ${message}`,
+            content: t("chat.export.failedAnswer", { message }),
             at: Date.now()
           }
         ];
@@ -3999,9 +4021,9 @@ export function ChatView({
   /** Under the conversation's name: what it has made, and when it last moved. */
   const conversationSubtitle = [
     listedCreations.length
-      ? `${listedCreations.length} creation${listedCreations.length === 1 ? "" : "s"}`
+      ? plural("chat.creations", listedCreations.length)
       : "",
-    activeSession?.messageCount ? `last reply ${formatSessionRelativeTime(activeSession.updatedAt)}` : ""
+    activeSession?.messageCount ? t("chat.lastReply", { when: formatSessionRelativeTime(activeSession.updatedAt) }) : ""
   ]
     .filter(Boolean)
     .join(" · ");
@@ -4067,7 +4089,7 @@ export function ChatView({
     try {
       appendVersion(await api.restorePlanVersion(draftId, unitSystem), "restored", sessionId);
     } catch (caught) {
-      onError(remoteErrorMessage(caught, "Could not restore that version."));
+      onError(remoteErrorMessage(caught, t("chat.err.restore")));
     }
   };
   const editingWorkoutDraft =
@@ -4211,8 +4233,8 @@ export function ChatView({
       data-action="conversationAi"
       disabled={savingSettings || isBusy}
       aria-haspopup="dialog"
-      aria-label={`AI for this conversation: ${COACH_PROVIDER_LABELS[effectiveRuntime.provider]}, ${aiSummary}${aiBlocked ? ", not set up" : ""}. Change`}
-      title={`AI for this conversation: ${COACH_PROVIDER_LABELS[effectiveRuntime.provider]}`}
+      aria-label={t(aiBlocked ? "chat.ai.ariaBlocked" : "chat.ai.aria", { provider: COACH_PROVIDER_LABELS[effectiveRuntime.provider], summary: aiSummary })}
+      title={t("chat.ai.title", { provider: COACH_PROVIDER_LABELS[effectiveRuntime.provider] })}
       onClick={() => setAiSheetOpen(true)}
     >
       {aiBlocked ? <AlertTriangle size={13} aria-hidden="true" /> : <Sparkles size={13} aria-hidden="true" />}
@@ -4312,7 +4334,7 @@ export function ChatView({
       <div className="chat-view chat-view-login">
         <div className="chat-header">
           <div className="chat-header-title">
-            <span>Training Coach</span>
+            <span>{t("chat.trainingCoach")}</span>
           </div>
           <div className="chat-header-end">
             <button
@@ -4321,7 +4343,7 @@ export function ChatView({
               onClick={() => openSettings()}
             >
               <Settings2 size={16} aria-hidden="true" />
-              Settings
+              {t("chat.settings")}
             </button>
           </div>
         </div>
@@ -4330,13 +4352,8 @@ export function ChatView({
           <div className="chat-main chat-main-login">
             <div className="panel chat-login-panel chat-claude-login-panel">
               <KeyRound size={32} aria-hidden="true" />
-              <h2>Claude API key</h2>
-              <p>
-                Coach with Claude straight from the Anthropic API using your own
-                key, billed per token to your Anthropic account. The key is
-                stored encrypted on this computer and never leaves it except to
-                call Anthropic.
-              </p>
+              <h2>{t("chat.gate.anthropic.title")}</h2>
+              <p>{t("chat.gate.anthropic.body")}</p>
               <div className="chat-login-actions">
                 <button
                   type="button"
@@ -4344,7 +4361,7 @@ export function ChatView({
                   onClick={() => openSettings()}
                 >
                   <KeyRound size={16} aria-hidden="true" />
-                  Add API key
+                  {t("chat.gate.addKey")}
                 </button>
                 <button
                   type="button"
@@ -4353,12 +4370,11 @@ export function ChatView({
                   disabled={!api}
                 >
                   <ExternalLink size={16} aria-hidden="true" />
-                  Get a key
+                  {t("chat.gate.getKey")}
                 </button>
               </div>
               <p className="chat-login-note">
-                Already have a subscription instead? Switch to Claude
-                subscription below to use Claude Code on this computer.
+                {t("chat.gate.anthropic.note")}
               </p>
             </div>
             <div className="chat-composer-toolbar chat-composer-toolbar-login">
@@ -4378,7 +4394,7 @@ export function ChatView({
       <div className="chat-view chat-view-login">
         <div className="chat-header">
           <div className="chat-header-title">
-            <span>Training Coach</span>
+            <span>{t("chat.trainingCoach")}</span>
           </div>
           <div className="chat-header-end">
             <button
@@ -4387,7 +4403,7 @@ export function ChatView({
               onClick={() => openSettings()}
             >
               <Settings2 size={16} aria-hidden="true" />
-              Settings
+              {t("chat.settings")}
             </button>
           </div>
         </div>
@@ -4397,15 +4413,8 @@ export function ChatView({
             <div className="panel chat-login-panel chat-claude-login-panel">
               <Terminal size={32} aria-hidden="true" />
               <h2>Claude Code</h2>
-              <p>
-                Coach with your Claude subscription through the Claude Code CLI
-                on this computer.
-              </p>
-              <p className="chat-login-note">
-                Signing in here creates a login that belongs to Heracles Records
-                alone. Any Claude account you use elsewhere on this computer —
-                including in a terminal — is left alone.
-              </p>
+              <p>{t("chat.gate.claude.body")}</p>
+              <p className="chat-login-note">{t("chat.gate.claude.note")}</p>
               <div className="chat-login-actions">
                 {notInstalled ? (
                   <button
@@ -4414,7 +4423,7 @@ export function ChatView({
                     onClick={() => void api?.openClaudeCodeSetupGuide()}
                   >
                     <ExternalLink size={16} aria-hidden="true" />
-                    Install Claude Code
+                    {t("chat.gate.claude.install")}
                   </button>
                 ) : (
                   <ClaudeCodeLoginCard
@@ -4438,11 +4447,11 @@ export function ChatView({
                   ) : (
                     <RefreshCw size={16} aria-hidden="true" />
                   )}
-                  Check again
+                  {t("chat.gate.checkAgain")}
                 </button>
               </div>
               <p className="chat-login-note">
-                {claudeStatus?.message ?? "Checking for Claude Code…"}
+                {claudeStatus?.message ?? t("chat.gate.claude.checking")}
               </p>
             </div>
             <div className="chat-composer-toolbar chat-composer-toolbar-login">
@@ -4461,17 +4470,17 @@ export function ChatView({
       <div className="chat-view chat-view-login">
         <div className="chat-header">
           <div className="chat-header-title">
-            <span>Training Coach</span>
+            <span>{t("chat.trainingCoach")}</span>
           </div>
           <div className="chat-header-end">
             <button
               type="button"
               className="chat-settings-button"
               onClick={() => openSettings()}
-              aria-label="Open settings"
+              aria-label={t("chat.openSettings")}
             >
               <Settings2 size={16} aria-hidden="true" />
-              Settings
+              {t("chat.settings")}
             </button>
           </div>
         </div>
@@ -4481,13 +4490,10 @@ export function ChatView({
             <div className="panel chat-login-panel chat-openrouter-login-panel">
               <Network size={32} aria-hidden="true" />
               <div className="chat-login-title-row">
-                <h2>Connect OpenRouter</h2>
-                <span className="chat-beta-badge">BYOK</span>
+                <h2>{t("chat.gate.openrouter.title")}</h2>
+                <span className="chat-beta-badge">BYOK</span>{/* i18n-ignore: OpenRouter's own term */}
               </div>
-              <p>
-                Use your OpenRouter API key and model credits for COROS-aware
-                coaching, workout drafting, and activity tools.
-              </p>
+              <p>{t("chat.gate.openrouter.body")}</p>
               <div className="chat-login-actions">
                 <button
                   type="button"
@@ -4495,7 +4501,7 @@ export function ChatView({
                   onClick={() => openSettings()}
                 >
                   <KeyRound size={16} aria-hidden="true" />
-                  Add API key
+                  {t("chat.gate.addKey")}
                 </button>
                 <button
                   type="button"
@@ -4504,12 +4510,11 @@ export function ChatView({
                   disabled={!api}
                 >
                   <ExternalLink size={16} aria-hidden="true" />
-                  Get a key from OpenRouter
+                  {t("chat.gate.openrouter.getKey")}
                 </button>
               </div>
               <p className="chat-login-note">
-                Your key is encrypted in local app storage and is never added to
-                the chat transcript.
+                {t("chat.gate.openrouter.note")}
               </p>
             </div>
             <div className="chat-composer-toolbar chat-composer-toolbar-login">
@@ -4532,17 +4537,17 @@ export function ChatView({
       >
         <div className="chat-header">
           <div className="chat-header-title">
-            <span>Training Coach</span>
+            <span>{t("chat.trainingCoach")}</span>
           </div>
           <div className="chat-header-end">
             <button
               type="button"
               className="chat-settings-button"
               onClick={() => openSettings()}
-              aria-label="Open settings"
+              aria-label={t("chat.openSettings")}
             >
               <Settings2 size={16} aria-hidden="true" />
-              Settings
+              {t("chat.settings")}
             </button>
           </div>
         </div>
@@ -4551,11 +4556,8 @@ export function ChatView({
           <div className="chat-main chat-main-login">
             <div className="panel chat-login-panel">
               <MessageCircle size={32} aria-hidden="true" />
-              <h2>Your training coach</h2>
-              <p>
-                Sign in with your ChatGPT account to chat with a coach that knows your
-                COROS activities, recovery, and upcoming workouts.
-              </p>
+              <h2>{t("chat.gate.chatgpt.title")}</h2>
+              <p>{t("chat.gate.chatgpt.body")}</p>
               <button
                 type="button"
                 className="primary-button"
@@ -4565,11 +4567,9 @@ export function ChatView({
                 {signingIn ? (
                   <Loader2 className="chat-spinner" size={16} aria-hidden="true" />
                 ) : null}
-                Sign in with ChatGPT
+                {t("chat.gate.chatgpt.signIn")}
               </button>
-              <p className="chat-login-note">
-                Or switch to Local model below to chat without signing in.
-              </p>
+              <p className="chat-login-note">{t("chat.gate.chatgpt.note")}</p>
             </div>
             <div className="chat-composer-toolbar chat-composer-toolbar-login">
               {coachProviderControls}
@@ -4607,10 +4607,10 @@ export function ChatView({
       ) : activeTool || !thinkingText ? (
         <span className="chat-stream-status">
           {compacting
-            ? "Compacting the conversation…"
+            ? t("chat.status.compacting")
             : resumedCoachPromptRef.current
-              ? "Resuming plan…"
-              : "Working on it…"}
+              ? t("chat.status.resuming")
+              : t("chat.status.working")}
         </span>
       ) : null}
       {thinkingText ? <ThinkingDisclosure content={thinkingText} live /> : null}
@@ -4703,7 +4703,7 @@ export function ChatView({
   return (
     <div className="chat-view">
       <ChatConversationHeader
-        title={activeSession?.title ?? "New chat"}
+        title={displaySessionTitle(activeSession?.title)}
         subtitle={conversationSubtitle}
         onRename={
           activeSessionId ? (title) => void handleRenameSession(activeSessionId, title) : undefined
@@ -4734,7 +4734,7 @@ export function ChatView({
               onClick={() => void handleSignOut()}
             >
               <LogOut size={14} aria-hidden="true" />
-              Sign out
+              {t("chat.signOut")}
             </button>
           ) : null
         }
@@ -4762,7 +4762,7 @@ export function ChatView({
               }}
             >
               {/* No arrow: what waits is as often above the reader as below. */}
-              {waitingCount === 1 ? "1 thing waiting on you" : `${waitingCount} things waiting on you`} · Jump
+              {plural("chat.waiting", waitingCount)} · {t("chat.waitingJump")}
             </button>
           ) : null}
           {renderFrom > 0 ? (
@@ -4777,13 +4777,13 @@ export function ChatView({
               <div className="chat-empty-icon">
                 <Sparkles size={28} aria-hidden="true" />
               </div>
-              <h3>What do you want to work on?</h3>
+              <h3>{t("chat.empty.title")}</h3>
               {/* Three things a conversation is for (R3), in place of eight
                   suggestions of equal weight — one of them a FIT download. A
                   plan starts on its brief, as AI Plan in the Library does. */}
               <div className="chat-intents">
-                {EMPTY_INTENTS.map((intent) => (
-                  <section key={intent.title} className="chat-intent" aria-label={intent.title}>
+                {emptyIntents().map((intent) => (
+                  <section key={intent.key} className="chat-intent" aria-label={intent.title}>
                     <span className="chat-creation-kicker">{intent.title}</span>
                     {intent.prompts.map((prompt) => (
                       <button
@@ -4809,7 +4809,7 @@ export function ChatView({
               {/* Said once, where a conversation starts, rather than under
                   every turn of every conversation. */}
               <p className="chat-disclaimer">
-                Coach can make mistakes. Check important training decisions.
+                {t("chat.disclaimer")}
               </p>
             </div>
           ) : null}
@@ -4838,7 +4838,7 @@ export function ChatView({
                     <Sparkles size={16} aria-hidden="true" />
                   </div>
                   <div className="chat-bubble chat-bubble-tool-notice">
-                    {entry.message}
+                    {displayStoredNotice(entry.message)}
                   </div>
                 </ChatRow>
               );
@@ -4859,7 +4859,7 @@ export function ChatView({
                     className="chat-row chat-row-assistant chat-asked-row"
                     data-chat-entry-index={index}
                   >
-                    <span className="chat-asked-kicker">Asked</span>
+                    <span className="chat-asked-kicker">{t("chat.asked")}</span>
                     <span className="chat-asked-question">{entry.prompt.question}</span>
                     <span className="chat-asked-answer">
                       {chosen?.label ?? entry.prompt.answer ?? ""}
@@ -4905,7 +4905,7 @@ export function ChatView({
                   className="chat-row chat-row-user chat-refs-row"
                   data-chat-entry-index={index}
                 >
-                  <span className="chat-asked-kicker">About</span>
+                  <span className="chat-asked-kicker">{t("chat.about")}</span>
                   {entry.refs.map((ref) => (
                     <span key={refKey(ref)} className="chat-ref-chip">
                       {ref.name}
@@ -4924,7 +4924,7 @@ export function ChatView({
                   className="chat-row chat-row-user chat-refs-row"
                   data-chat-entry-index={index}
                 >
-                  <span className="chat-asked-kicker">About</span>
+                  <span className="chat-asked-kicker">{t("chat.about")}</span>
                   {entry.refs.map((ref) => (
                     <span key={scheduleRefKey(ref)} className="chat-ref-chip">
                       {ref.label}
@@ -4987,9 +4987,9 @@ export function ChatView({
                     className="chat-row chat-row-assistant chat-asked-row chat-plan-event-row"
                     data-chat-entry-index={index}
                   >
-                    <span className="chat-asked-kicker">Outline</span>
+                    <span className="chat-asked-kicker">{t("chat.outline")}</span>
                     <span className="chat-asked-question">v{entry.outlineVersion}</span>
-                    <span className="chat-version-note">Redrawn below</span>
+                    <span className="chat-version-note">{t("chat.redrawnBelow")}</span>
                   </ChatRow>
                 );
               }
@@ -5027,11 +5027,21 @@ export function ChatView({
               // A line where it happened, as the coach reads it; the card
               // below it already shows what the creation is now.
               const event = entry.event;
-              const what = event.artifactType === "workout" ? "Workout" : "Plan";
+              const what = event.artifactType === "workout" ? t("chat.kind.workout") : t("chat.kind.plan");
               // Undo is a restore of the version this one replaced, offered
               // only while it is still the newest: after that, undoing it
               // would also undo whatever came since.
               const eventVersion = versionIndex.get(event.draftId);
+              // The stored lines are English: a transcript is never translated.
+              // Worked out again from the two versions, they read in the
+              // language on screen; the stored ones stand in when a version
+              // is not in hand.
+              const fromDraft = event.fromVersion
+                ? eventVersion?.siblings.find((version) => version.version === event.fromVersion)?.draftId
+                : undefined;
+              const before = fromDraft ? documentForDraft(fromDraft) : undefined;
+              const after = documentForDraft(event.draftId);
+              const changes = before && after ? planDiff(before, after).map((change) => change.text) : event.changes;
               const undoTo =
                 api &&
                 event.author === "athlete" &&
@@ -5043,12 +5053,12 @@ export function ChatView({
                   : undefined;
               const verb =
                 event.action === "edited"
-                  ? "Edited by you"
+                  ? t("chat.event.edited")
                   : event.action === "restored"
-                    ? "Restored by you"
+                    ? t("chat.event.restored")
                     : event.action === "imported"
-                      ? "Changed in the Library"
-                      : "Deleted on COROS";
+                      ? t("chat.event.imported")
+                      : t("chat.event.deleted");
               return (
                 <ChatRow
                   key={`${event.eventId}#${index}`}
@@ -5061,17 +5071,17 @@ export function ChatView({
                   {/* One line (R2): the first change and how many more, the
                       whole list on hover and in the Workbench's Versions. It
                       used to print every change, wrapping over three lines. */}
-                  <span className="chat-version-note" title={event.changes?.join("\n")}>
+                  <span className="chat-version-note" title={changes?.join("\n")}>
                     {verb}
-                    {event.changes?.length ? ` · ${event.changes[0]}` : ""}
-                    {event.changes && event.changes.length > 1 ? ` · +${event.changes.length - 1} more` : ""}
+                    {changes?.length ? ` · ${changes[0]}` : ""}
+                    {changes && changes.length > 1 ? ` · ${t("chat.event.more", { n: changes.length - 1 })}` : ""}
                   </span>
                   <button
                     type="button"
                     className="chat-local-action chat-plan-event-view"
                     onClick={() => openCreation(event.draftId)}
                   >
-                    View
+                    {t("chat.view")}
                   </button>
                   {undoTo ? (
                     <button
@@ -5079,7 +5089,7 @@ export function ChatView({
                       className="chat-local-action chat-plan-event-undo"
                       onClick={() => void handleRestoreVersion(undoTo)}
                     >
-                      Undo
+                      {t("chat.undo")}
                     </button>
                   ) : null}
                 </ChatRow>
@@ -5109,7 +5119,7 @@ export function ChatView({
                     data-chat-entry-index={index}
                   >
                     <span className="chat-asked-kicker">
-                      {draft.artifactType === "workout" ? "Workout" : "Plan"}
+                      {draft.artifactType === "workout" ? t("chat.kind.workout") : t("chat.kind.plan")}
                     </span>
                     <span className="chat-asked-question">{draft.name}</span>
                     <span className="chat-version-note">{versionLine(versionInfo)}</span>
@@ -5118,7 +5128,7 @@ export function ChatView({
                       className="chat-local-action chat-plan-event-view"
                       onClick={() => openCreation(draft.draftId)}
                     >
-                      View
+                      {t("chat.view")}
                     </button>
                   </ChatRow>
                 );
@@ -5319,7 +5329,7 @@ export function ChatView({
                         <ThinkingDisclosure content={entry.reasoningSummary} />
                       ) : null}
                       <AnswerBody
-                        content={answerParts.get(index)?.text ?? entry.content}
+                        content={displayStoredNotice(answerParts.get(index)?.text ?? entry.content)}
                         placement={placedAnswers.get(index)}
                       />
                       {index === lastAnswerIndex && !turnHere ? (
@@ -5351,7 +5361,7 @@ export function ChatView({
                             : undefined
                         }
                       />
-                      {entry.content}
+                      {displayStepText(entry.content)}
                     </>
                   )}
                 </div>
@@ -5372,7 +5382,7 @@ export function ChatView({
                   <Zap size={12} aria-hidden="true" />
                   {liveAnalysis.name}
                   <span className="chat-analysis-attribution-trigger">
-                    · running now
+                    · {t("chat.runningNow")}
                   </span>
                 </span>
                 {liveAnalysisText ? (
@@ -5380,7 +5390,7 @@ export function ChatView({
                 ) : (
                   <div className="chat-stream-pending">
                     <span className="chat-stream-status">
-                      Reading your training…
+                      {t("chat.readingTraining")}
                     </span>
                   </div>
                 )}
@@ -5393,7 +5403,7 @@ export function ChatView({
               <div className="chat-avatar chat-avatar-assistant">
                 <FileDown size={16} aria-hidden="true" />
               </div>
-              <div className="chat-bubble">Preparing latest activity FIT export…</div>
+              <div className="chat-bubble">{t("chat.export.preparing")}</div>
             </div>
           ) : null}
         </div>
@@ -5538,10 +5548,10 @@ export function ChatView({
       {redrawAsk && planBriefs[redrawAsk]?.outline
         ? createPortal(
             <ConfirmDialog
-              title="Redraw the outline?"
-              description="The outline was drawn from the brief as it was. Coach can draw it again from the brief as it is now; keeping it leaves the outline as it stands, with anything that no longer fits listed on its card."
-              cancelLabel="Keep the outline"
-              confirmLabel="Redraw the outline"
+              title={t("chat.redraw.title")}
+              description={t("chat.redraw.body")}
+              cancelLabel={t("chat.redraw.keep")}
+              confirmLabel={t("chat.redraw.confirm")}
               onConfirm={() => {
                 const artifactId = redrawAsk;
                 setRedrawAsk(null);

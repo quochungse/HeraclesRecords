@@ -64,6 +64,7 @@ import {
   selectionIsOneOf,
   useSelectionPreference
 } from "../../preferences/selectionPreferences";
+import { plural, t, weekdayNames } from "../../i18n/core";
 
 const HEATMAP_METRIC_PREFERENCE = defineSelectionPreference<HeatmapMetric>({
   key: "training.heatmapMetric",
@@ -88,22 +89,15 @@ interface TrainingHeatmapPanelProps {
   loading?: boolean;
 }
 
-const WEEKDAY_LABELS = ["M", "T", "W", "T", "F", "S", "S"];
+/** One letter a row in the year grid, Monday first, in the language on screen. */
+const weekdayLetters = () => weekdayNames("narrow");
 /**
  * Weekday headers for the Last-30-days calendar, Monday first so the short
  * range reads in the same direction as the year grid's rows.
  */
-const HEATMAP_WEEK_LABELS = [
-  "Mon",
-  "Tue",
-  "Wed",
-  "Thu",
-  "Fri",
-  "Sat",
-  "Sun"
-];
+const heatmapWeekLabels = () => weekdayNames("short");
 /** Columns per week row in the Last-30-days strip. Mirrored by --heatmap-strip-columns. */
-const HEATMAP_STRIP_COLUMNS = HEATMAP_WEEK_LABELS.length;
+const HEATMAP_STRIP_COLUMNS = 7;
 /** Entries a card lists before the rest collapse into a "+N more" line. */
 const HEATMAP_CARD_MAX_ENTRIES = 3;
 const HEATMAP_PROXIMITY_RADIUS = 120;
@@ -142,8 +136,8 @@ function pieBackground(
 ): string {
   const n = categories.length;
   const stops = categories.map((cat, index) => {
-    const from = ((index / n) * 360).toFixed(3);
-    const to = (((index + 1) / n) * 360).toFixed(3);
+    const from = ((index / n) * 360).toFixed(3); // i18n-ignore: a CSS angle
+    const to = (((index + 1) / n) * 360).toFixed(3); // i18n-ignore: a CSS angle
     return `${sliceColor(cat, level)} ${from}deg ${to}deg`;
   });
   return `conic-gradient(${stops.join(", ")})`;
@@ -157,7 +151,7 @@ function formatCellAriaLabel(
   const duration = formatDurationSeconds(cell.duration);
   const load = formatOptionalNumber(cell.trainingLoad);
 
-  return `${cell.label}: training load ${load}, distance ${distance}, duration ${duration}`;
+  return t("overview.heatmap.cellLabel", { date: cell.label, load, distance, duration });
 }
 
 export function TrainingHeatmapPanel({
@@ -539,11 +533,11 @@ export function TrainingHeatmapPanel({
           linearStrength * linearStrength * (3 - 2 * linearStrength);
         cell.element.style.setProperty(
           "--heatmap-brightness",
-          (1 + strength * 0.2).toFixed(3)
+          (1 + strength * 0.2).toFixed(3) // i18n-ignore: a CSS value
         );
         cell.element.style.setProperty(
           "--heatmap-glow-opacity",
-          (strength * 0.68).toFixed(3)
+          (strength * 0.68).toFixed(3) // i18n-ignore: a CSS value
         );
         nextActiveCells.add(cell.element);
       }
@@ -590,16 +584,16 @@ export function TrainingHeatmapPanel({
     <section className="panel training-heatmap-panel">
       <div className="training-heatmap-header">
         <div>
-          <p className="eyebrow">Training Activity</p>
-          <h2>{isDuration ? "Duration heatmap" : "Load heatmap"}</h2>
+          <p className="eyebrow">{t("overview.heatmap.eyebrow")}</p>
+          <h2>{isDuration ? t("overview.heatmap.durationTitle") : t("overview.heatmap.loadTitle")}</h2>
         </div>
         <div className="training-heatmap-controls">
           <OptionGroup
-            label="Heatmap metric"
+            label={t("overview.heatmap.metric")}
             value={metric}
             options={[
-              { value: "trainingLoad", label: "Training Load" },
-              { value: "duration", label: "Duration" }
+              { value: "trainingLoad", label: t("overview.trainingLoad") },
+              { value: "duration", label: t("overview.tiles.duration") }
             ]}
             onChange={(next) =>
               setMetric(next === "duration" ? "duration" : "trainingLoad")
@@ -610,7 +604,7 @@ export function TrainingHeatmapPanel({
               shared scale they are "1 year" and "4 weeks", and two chips that
               short cost less room than the fold they were hiding behind. */}
           <OptionGroup
-            label="Heatmap range"
+            label={t("overview.heatmap.range")}
             value={range}
             options={TRAINING_HEATMAP_RANGES.map((option) => ({
               value: option,
@@ -629,9 +623,10 @@ export function TrainingHeatmapPanel({
             <div
               className="training-heatmap-strip"
               role="list"
-              aria-label={`${
-                isDuration ? "Duration" : "Training load"
-              } over the last ${rangeDays} days`}
+              aria-label={t(
+                isDuration ? "overview.heatmap.rangeDuration" : "overview.heatmap.rangeLoad",
+                { days: rangeDays }
+              )}
               style={
                 {
                   "--heatmap-strip-columns": HEATMAP_STRIP_COLUMNS
@@ -639,7 +634,7 @@ export function TrainingHeatmapPanel({
               }
             >
               <div className="training-heatmap-week-titles" aria-hidden="true">
-                {HEATMAP_WEEK_LABELS.map((label, index) => (
+                {heatmapWeekLabels().map((label, index) => (
                   <span
                     key={label}
                     className={`training-heatmap-week-title${
@@ -737,25 +732,26 @@ export function TrainingHeatmapPanel({
                               ))}
                             {entries.length > HEATMAP_CARD_MAX_ENTRIES ? (
                               <li className="training-heatmap-card-more">
-                                +{entries.length - HEATMAP_CARD_MAX_ENTRIES} more
+                                {t("overview.heatmap.more", { count: entries.length - HEATMAP_CARD_MAX_ENTRIES })}
                               </li>
                             ) : null}
                           </ul>
                         ) : (
-                          <span className="training-heatmap-card-rest">Rest</span>
+                          <span className="training-heatmap-card-rest">{t("overview.heatmap.rest")}</span>
                         )}
 
                         <span className="training-heatmap-tooltip" role="tooltip">
                           <strong>{cell.label}</strong>
                           <span>
-                            Load: {formatOptionalNumber(cell.trainingLoad)}
+                            {t("overview.heatmap.load", { value: formatOptionalNumber(cell.trainingLoad) })}
                           </span>
                           <span>
-                            Distance:{" "}
-                            {formatDistanceMeters(cell.distance, unitSystem)}
+                            {t("overview.heatmap.distance", {
+                              value: formatDistanceMeters(cell.distance, unitSystem)
+                            })}
                           </span>
                           <span>
-                            Duration: {formatDurationSeconds(cell.duration)}
+                            {t("overview.heatmap.duration", { value: formatDurationSeconds(cell.duration) })}
                           </span>
                         </span>
                       </div>
@@ -787,7 +783,7 @@ export function TrainingHeatmapPanel({
               </div>
 
               <div className="training-heatmap-weekdays" aria-hidden="true">
-                {WEEKDAY_LABELS.map((label, index) => (
+                {weekdayLetters().map((label, index) => (
                   <span
                     key={`${label}-${index}`}
                     className="training-heatmap-weekday"
@@ -804,9 +800,10 @@ export function TrainingHeatmapPanel({
                 onPointerEnter={handleGridPointerEnter}
                 onPointerMove={handleGridPointerMove}
                 onPointerLeave={handleGridPointerLeave}
-                aria-label={`${
-                  isDuration ? "Duration" : "Training load"
-                } over the last ${rangeDays} days`}
+                aria-label={t(
+                  isDuration ? "overview.heatmap.rangeDuration" : "overview.heatmap.rangeLoad",
+                  { days: rangeDays }
+                )}
               >
                 {grid.cells.map((cell, index) => {
                   if (!cell) {
@@ -856,9 +853,9 @@ export function TrainingHeatmapPanel({
                     >
                       <span className="training-heatmap-tooltip" role="tooltip">
                         <strong>{cell.label}</strong>
-                        <span>Load: {loadLabel}</span>
-                        <span>Distance: {distanceLabel}</span>
-                        <span>Duration: {durationLabel}</span>
+                        <span>{t("overview.heatmap.load", { value: loadLabel })}</span>
+                        <span>{t("overview.heatmap.distance", { value: distanceLabel })}</span>
+                        <span>{t("overview.heatmap.duration", { value: durationLabel })}</span>
                       </span>
                     </span>
                   );
@@ -889,14 +886,14 @@ export function TrainingHeatmapPanel({
             ) : null}
 
             <div className="training-heatmap-summary">
-              <span>{summary.activeDays} active days</span>
+              <span>{plural("overview.heatmap.activeDays", summary.activeDays)}</span>
               <span aria-hidden="true">·</span>
-              <span>{summary.currentStreak}-day streak</span>
+              <span>{plural("overview.heatmap.streak", summary.currentStreak)}</span>
               <span aria-hidden="true">·</span>
               <span>
                 {isDuration
-                  ? `${formatDurationSpan(summary.totalLoad)} total time`
-                  : `${formatOptionalNumber(summary.totalLoad)} total load`}
+                  ? t("overview.heatmap.totalTime", { value: formatDurationSpan(summary.totalLoad) })
+                  : t("overview.heatmap.totalLoad", { value: formatOptionalNumber(summary.totalLoad) })}
               </span>
             </div>
           </div>
@@ -910,8 +907,8 @@ export function TrainingHeatmapPanel({
           )}
           <p>
             {loading
-              ? "Reading your training history from COROS…"
-              : `No training data in the last ${rangeDays} days.`}
+              ? t("overview.heatmap.reading")
+              : t("overview.heatmap.empty", { days: rangeDays })}
           </p>
         </div>
       )}

@@ -1,3 +1,5 @@
+import { t } from "../i18n/core";
+
 /**
  * Unsaved work, said where the plan is drawn.
  *
@@ -16,8 +18,8 @@ export function PlanDraftMark({ kind }: { kind: PlanDraftMarkKind }) {
       data-mark={kind}
       title={
         kind === "draft"
-          ? "A draft kept here — not on COROS yet"
-          : "Edits kept here — the plan on COROS is unchanged until they are saved"
+          ? t("library.mark.draft")
+          : t("library.mark.editing")
       }
     >
       {kind === "draft" ? "Draft" : "Editing"}

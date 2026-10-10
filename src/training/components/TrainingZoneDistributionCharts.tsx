@@ -1,3 +1,4 @@
+import { useI18n } from "../../i18n/useI18n";
 import { useMemo } from "react";
 import type { ReactNode } from "react";
 import { Footprints, Heart } from "lucide-react";
@@ -37,6 +38,7 @@ import {
   type DistanceZoneTotal
 } from "../distanceZones";
 import { usePrefersReducedMotion } from "./trendChartParts";
+import { formatDecimal, plural, t } from "../../i18n/core";
 
 interface TrainingZoneDistributionChartsProps {
   /**
@@ -113,25 +115,38 @@ const DISTANCE_ZONE_COLORS = [
   "#6f7487"
 ];
 
-const DISTANCE_METRIC_LABELS: Record<DistanceMetric, string> = {
-  frequency: "Frequency",
-  trainingLoad: "Training Load",
-  time: "Time"
+const DISTANCE_METRIC_LABELS: Readonly<Record<DistanceMetric, string>> = {
+  get frequency() {
+    return t("overview.zones.frequency");
+  },
+  get trainingLoad() {
+    return t("overview.trainingLoad");
+  },
+  get time() {
+    return t("overview.zones.time");
+  }
 };
 
-const HEART_RATE_METRIC_LABELS: Record<ActivityMetric, string> = {
-  trainingLoad: "Training Load",
-  distance: "Distance",
-  time: "Time"
+const HEART_RATE_METRIC_LABELS: Readonly<Record<ActivityMetric, string>> = {
+  get trainingLoad() {
+    return t("overview.trainingLoad");
+  },
+  get distance() {
+    return t("overview.tiles.distance");
+  },
+  get time() {
+    return t("overview.zones.time");
+  }
 };
 
-const HEART_RATE_METRIC_OPTIONS: MetricDropdownOption<ActivityMetric>[] = [
+// Functions, not arrays: a label read once at load stays in that language.
+const heartRateMetricOptions = (): MetricDropdownOption<ActivityMetric>[] => [
   { value: "trainingLoad", label: HEART_RATE_METRIC_LABELS.trainingLoad },
   { value: "distance", label: HEART_RATE_METRIC_LABELS.distance },
   { value: "time", label: HEART_RATE_METRIC_LABELS.time }
 ];
 
-const DISTANCE_METRIC_OPTIONS: MetricDropdownOption<DistanceMetric>[] = [
+const distanceMetricOptions = (): MetricDropdownOption<DistanceMetric>[] => [
   { value: "frequency", label: DISTANCE_METRIC_LABELS.frequency },
   { value: "trainingLoad", label: DISTANCE_METRIC_LABELS.trainingLoad },
   { value: "time", label: DISTANCE_METRIC_LABELS.time }
@@ -172,40 +187,40 @@ function formatDisplayLabel(label: string): string {
 function heartRateZoneCaption(zoneIndex: number): string {
   switch (zoneIndex) {
     case 1:
-      return "Recovery & warm-up";
+      return t("overview.zones.hr1");
     case 2:
-      return "Aerobic base building";
+      return t("overview.zones.hr2");
     case 3:
-      return "Steady aerobic effort";
+      return t("overview.zones.hr3");
     case 4:
-      return "Lactate threshold work";
+      return t("overview.zones.hr4");
     case 5:
-      return "High aerobic / anaerobic load";
+      return t("overview.zones.hr5");
     case 6:
-      return "Max effort intervals";
+      return t("overview.zones.hr6");
     default:
-      return "Training intensity zone";
+      return t("overview.zones.hrOther");
   }
 }
 
 function distanceZoneCaption(zoneIndex: number): string {
   if (zoneIndex === 1) {
-    return "Short & recovery sessions";
+    return t("overview.zones.dist1");
   }
   if (zoneIndex === 2) {
-    return "Easy aerobic distance";
+    return t("overview.zones.dist2");
   }
   if (zoneIndex === 3) {
-    return "Steady distance work";
+    return t("overview.zones.dist3");
   }
   if (zoneIndex === 4) {
-    return "Long session territory";
+    return t("overview.zones.dist4");
   }
   if (zoneIndex >= 5) {
-    return "Endurance & race distance";
+    return t("overview.zones.dist5");
   }
 
-  return "Distance distribution bucket";
+  return t("overview.zones.distOther");
 }
 
 function finiteNumber(value: number | undefined): number {
@@ -261,7 +276,7 @@ function buildAreaDistributionData(
           : 0;
 
     return {
-      label: labels[index] ?? `Zone ${index + 1}`,
+      label: labels[index] ?? t("overview.zones.zone", { n: index + 1 }),
       detail: formatValue(value),
       percent,
       color: colors[index % colors.length],
@@ -286,7 +301,7 @@ function buildHeartRateData(
     // straight off the account's own zone list.
     return buildAreaDistributionData(
       areaList,
-      areaList.map((_entry, index) => `Zone ${index + 1}`),
+      areaList.map((_entry, index) => t("overview.zones.zone", { n: index + 1 })),
       HEART_RATE_ZONE_COLORS,
       (value) => formatActivityMetricValue(value, metric, unitSystem),
       areaList.map((_entry, index) =>
@@ -393,7 +408,7 @@ function formatActivityMetricValue(
       return formatDurationSeconds(value);
     }
 
-    return `${Math.round(value / 60)} min`;
+    return t("units.min", { m: Math.round(value / 60) });
   }
 
   return String(Math.round(value));
@@ -416,7 +431,7 @@ function formatDistanceMetricValue(
   }
 
   const count = Math.round(value);
-  return count === 1 ? "1 session" : `${count} sessions`;
+  return plural("overview.zones.sessions", count);
 }
 
 function formatDistanceBucketLabel(
@@ -424,7 +439,7 @@ function formatDistanceBucketLabel(
   unitSystem: UnitSystem
 ): string {
   const format = (value: number) =>
-    value.toFixed(unitSystem === "imperial" ? 1 : 0);
+    formatDecimal(value, unitSystem === "imperial" ? 1 : 0);
   const lower = format(metersToDisplayDistance(bucket.minMeters, unitSystem));
   const unit = distanceUnit(unitSystem);
 
@@ -526,7 +541,7 @@ function ZoneDistributionPanel({
         <div className="training-zone-heading">
           <p className="eyebrow">{title}</p>
           <h2>
-            {subtitle} <span>(4 Weeks)</span>
+            {subtitle} <span>{t("overview.zones.fourWeeks")}</span>
           </h2>
           {coverageNote ? (
             <p className="training-zone-coverage">{coverageNote}</p>
@@ -667,6 +682,8 @@ export function TrainingZoneDistributionCharts({
   loading = false
 }: TrainingZoneDistributionChartsProps) {
   const { unitSystem } = useUnitSystem();
+  // The donuts' data carry their labels, so they are rebuilt in a new language.
+  const { locale } = useI18n();
   const [heartRateMetric, setHeartRateMetric] = useSelectionPreference(
     HEART_RATE_METRIC_PREFERENCE
   );
@@ -679,11 +696,11 @@ export function TrainingZoneDistributionCharts({
   // it rather than claiming a model it has not read.
   const heartRateZones =
     hrZoneModel && hrZoneModel.zones.length > 0 ? hrZoneModel.zones : lthrZones;
-  const heartRateTitle = hrZoneModel?.title ?? "Threshold Heart Rate";
+  const heartRateTitle = hrZoneModel?.title ?? t("overview.zones.lthr.title");
   // The title already names the model, so the note says where it is set and
   // what the percentages are taken of.
   const heartRateCoverage = hrZoneModel
-    ? ["Zone model from Personal", hrZoneModel.anchorNote]
+    ? [t("overview.zones.fromPersonal"), hrZoneModel.anchorNote]
         .filter(Boolean)
         .join(" · ")
     : undefined;
@@ -702,66 +719,66 @@ export function TrainingZoneDistributionCharts({
         analytics,
         unitSystem
       ),
-    [activities, analytics, heartRateMetric, heartRateZones, unitSystem]
+    [activities, analytics, heartRateMetric, heartRateZones, unitSystem, locale]
   );
   const distanceData = useMemo(
     () => buildDistanceData(activities, distanceMetric, unitSystem),
-    [activities, distanceMetric, unitSystem]
+    [activities, distanceMetric, unitSystem, locale]
   );
 
   return (
     <section className="training-load-profile">
       <div className="training-load-profile-header">
-        <p className="eyebrow">Load Profile</p>
-        <h2>Training Distribution</h2>
+        <p className="eyebrow">{t("overview.zones.loadProfile")}</p>
+        <h2>{t("overview.zones.distribution")}</h2>
       </div>
       <div className="training-zone-grid">
         <ZoneDistributionPanel
           title={heartRateTitle}
-          subtitle="Training Load"
+          subtitle={t("overview.trainingLoad")}
           emptyMessage={
             loading
-              ? "Reading your activities from COROS…"
-              : "No heart rate zone distribution data loaded."
+              ? t("overview.zones.reading")
+              : t("overview.zones.hrEmpty")
           }
           variant="heart"
-          heroKicker="Primary zone"
+          heroKicker={t("overview.zones.primary")}
           metricColumnLabel={HEART_RATE_METRIC_LABELS[heartRateMetric]}
           {...(heartRateCoverage ? { coverageNote: heartRateCoverage } : {})}
           data={heartRateData}
           getCaption={(datum) => heartRateZoneCaption(datum.zoneIndex)}
           metricControl={
             <MetricDropdown
-              label="Heart rate distribution metric"
+              label={t("overview.zones.hrMetric")}
               value={heartRateMetric}
-              options={HEART_RATE_METRIC_OPTIONS}
+              options={heartRateMetricOptions()}
               onChange={setHeartRateMetric}
             />
           }
         />
         <ZoneDistributionPanel
-          title="Distance Zones"
-          subtitle="Distribution"
+          title={t("overview.zones.distanceTitle")}
+          subtitle={t("overview.zones.distributionSubtitle")}
           emptyMessage={
             loading
-              ? "Reading your activities from COROS…"
-              : "No activities with a recorded distance in the last four weeks."
+              ? t("overview.zones.reading")
+              : t("overview.zones.distanceEmpty")
           }
           variant="distance"
-          heroKicker="Most sessions"
-          coverageNote="Sports that record distance — running, cycling, swimming…"
+          heroKicker={t("overview.zones.mostSessions")}
+          coverageNote={t("overview.zones.distanceCoverage")}
           metricColumnLabel={
             distanceMetric === "frequency"
-              ? "Sessions"
+              ? t("overview.zones.sessions")
               : DISTANCE_METRIC_LABELS[distanceMetric]
           }
           data={distanceData}
           getCaption={(datum) => distanceZoneCaption(datum.zoneIndex)}
           metricControl={
             <MetricDropdown
-              label="Distance distribution metric"
+              label={t("overview.zones.distanceMetric")}
               value={distanceMetric}
-              options={DISTANCE_METRIC_OPTIONS}
+              options={distanceMetricOptions()}
               onChange={setDistanceMetric}
             />
           }

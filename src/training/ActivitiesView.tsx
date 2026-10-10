@@ -1,3 +1,4 @@
+import { renderRich } from "../i18n/useI18n";
 import { useCallback, useMemo, useRef, useState } from "react";
 import {
   ArrowLeft,
@@ -26,6 +27,7 @@ import { useActivityDetailSummaries } from "./useActivityDetailSummaries";
 import { useActivityFeelTypes } from "./useActivityFeelTypes";
 import type { ActivitiesViewProps } from "./types";
 import "./activities.css";
+import { plural, t } from "../i18n/core";
 
 /** Rows built per page. See `limit` below for why there is a page at all. */
 const PAGE_SIZE = 200;
@@ -147,21 +149,18 @@ export function ActivitiesView({
 
   const periodLabel =
     ACTIVITY_PERIOD_OPTIONS.find((option) => option.days === filters.periodDays)
-      ?.label ?? "All";
+      ?.label ?? t("common.all");
 
   if (!connected) {
     return (
       <section className="panel data-connect-panel">
         <LockKeyhole size={24} aria-hidden="true" />
         <div>
-          <h3>Connect COROS first</h3>
-          <p>
-            Signing in to COROS lives on Overview. Connect there and your
-            activities and their detail load here.
-          </p>
+          <h3>{t("common.connectFirst.title")}</h3>
+          <p>{t("common.connectFirst.body")}</p>
         </div>
         <button type="button" className="primary-button" onClick={onConnect}>
-          Open Overview
+          {t("common.openOverview")}
         </button>
       </section>
     );
@@ -189,16 +188,13 @@ export function ActivitiesView({
           />
           {hidden > 0 ? (
             <div className="activity-journal-more">
-              <p>
-                {hidden.toLocaleString()} older{" "}
-                {hidden === 1 ? "session" : "sessions"} not shown
-              </p>
+              <p>{plural("activity.list.hidden", hidden)}</p>
               <button
                 type="button"
                 className="secondary-button"
                 onClick={() => setLimit((current) => current + PAGE_SIZE)}
               >
-                Show more
+                {t("common.showMore")}
               </button>
             </div>
           ) : null}
@@ -210,7 +206,7 @@ export function ActivitiesView({
       return (
         <div className="training-empty-state">
           <Loader2 className="spin" size={20} aria-hidden="true" />
-          <p>Reading your activities from COROS…</p>
+          <p>{t("activity.list.reading")}</p>
         </div>
       );
     }
@@ -219,10 +215,10 @@ export function ActivitiesView({
       return (
         <div className="training-empty-state">
           <CloudOff size={20} aria-hidden="true" />
-          <p>COROS did not answer. Nothing was lost — try again.</p>
+          <p>{t("activity.list.failed")}</p>
           <button type="button" className="secondary-button" onClick={onRetry}>
             <RefreshCw size={14} aria-hidden="true" />
-            Try again
+            {t("common.tryAgain")}
           </button>
         </div>
       );
@@ -232,13 +228,13 @@ export function ActivitiesView({
       return (
         <div className="training-empty-state">
           <SearchX size={20} aria-hidden="true" />
-          <p>Nothing in {periodLabel} matches these filters.</p>
+          <p>{t("activity.list.noMatch", { period: periodLabel })}</p>
           <button
             type="button"
             className="secondary-button"
             onClick={() => setFilters(DEFAULT_ACTIVITY_FILTERS)}
           >
-            Reset filters
+            {t("activity.list.resetFilters")}
           </button>
         </div>
       );
@@ -246,7 +242,7 @@ export function ActivitiesView({
 
     return (
       <div className="training-empty-state">
-        <p>No activities yet. They appear here once your watch syncs.</p>
+        <p>{t("activity.list.none")}</p>
       </div>
     );
   }
@@ -281,7 +277,7 @@ export function ActivitiesView({
             onClick={() => setDetailOpen(false)}
           >
             <ArrowLeft size={14} aria-hidden="true" />
-            All sessions
+            {t("activity.list.allSessions")}
           </button>
         </header>
         <section className="panel panel-flex training-activities-split-panel">
@@ -295,12 +291,13 @@ export function ActivitiesView({
     <div className="stack stack-fill training-dashboard activities-view">
       <header className="activities-head">
         <div>
-          <p className="eyebrow">Activities</p>
+          <p className="eyebrow">{t("nav.training")}</p>
           <h2>
             {activities.length === 0 && activitiesStatus === "pending"
-              ? "Loading…"
-              : `${totals.count} ${totals.count === 1 ? "session" : "sessions"}`}
-            <span> in {periodLabel}</span>
+              ? t("common.loading")
+              : renderRich(plural("activity.list.count", totals.count, { period: periodLabel }), {
+                  s: (chunk) => <span> {chunk}</span>
+                })}
           </h2>
         </div>
       </header>

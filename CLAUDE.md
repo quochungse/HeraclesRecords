@@ -2655,6 +2655,33 @@ are still honoured by the rail and the start-up picker, but no destination sets
 either since Watch Faces and Gear were removed — the first one to need them again just sets
 the flag.
 
+**The app is translated, screen by screen, through `src/i18n/`** (since 2026-10-04; plan,
+phases, rules and a per-language glossary in [docs/i18n-plan.md](docs/i18n-plan.md)). English
+is the default and the fallback; twelve other languages (vi, ja, ko, zh, es, pt-BR, fr, de,
+it, ru, id, th) are chunks of their own, picked in Settings → Appearance → Language (flags
+from flag-icons, committed in `src/assets/flags` like the fonts). Messages are flat keys in
+`src/i18n/messages/<locale>/<namespace>.ts`, each language typed against English's, so
+**`npm run build` fails on a missing key**; `npm run test:i18n` holds placeholders, tags and
+every plural form a language's rules use (Russian's `_few`/`_many`), and ratchets the whole
+renderer against `scripts/lib/i18n-pending.json`, failing on English written into a file not
+on it. **A release ships every language finished**: `npm run check:i18n-release`, run by
+`release:prepare` and by `release.yml`'s preflight, refuses while that list holds anything
+or a language lacks a message; `npm run i18n:coverage` is what is left. Four rules that are easy to break: **a component showing translated words
+calls `useI18n()`** (subscribing is what redraws it on a switch); **a module-level label is a
+getter over its message, never a copy** (`PRIMARY_NAV_*`, `SPORT_COLOR_LABELS`,
+`ACCENT_PALETTE_DETAILS`); **dates and numbers take `getIntlLocale()`**, never `undefined`,
+which is the OS language; and **no translated string is ever stored** — not in SQLite,
+localStorage or anything sync carries. Coach's prompt is not translated, and
+`data-nav-label` stays English for the probe and the screenshot harness.
+**The main process's words go through `electron/screenText.ts`** (English, no value imports)
+and `electron/i18n/<locale>.ts` (the renderer's `main` namespace re-exports them). A shared
+module calls `screenText`, which stays English until the renderer installs a translator
+(`src/i18n/screenTextHooks.ts`) — so the model keeps reading English. The main process
+throws a `ScreenError` (English `message`, for the log, tools and any regex), and
+`diagnosticIpcMain` re-throws it in the language the renderer sends over `app:setLanguage`
+(`mainText.ts`). Text main *stored* (a change line, a plan event) stays English and is said
+again on screen from its fields.
+
 Styling is plain CSS with custom properties — no Tailwind, no CSS modules.
 `src/styles.css` (~28k lines) holds the design tokens and most rules; fourteen feature
 stylesheets sit beside their components (strength ×3, training ×2, records ×2, profile, running,
@@ -2789,7 +2816,7 @@ which is the point.
 **The app carries its own typography, and one serif level.** `index.html` used to `<link>`
 Inter and Space Grotesk from `fonts.googleapis.com`, so a fresh install with no network drew
 the interface in a system fallback. The three families now ship as variable `.woff2` files in
-`src/assets/fonts` (latin, latin-ext and **vietnamese** — an athlete's activity names and the
+`src/assets/fonts` (latin, latin-ext, cyrillic for the app in Russian, and **vietnamese** — an athlete's activity names and the
 coach's answers are written in it), declared in `src/fonts.css`; `npm run fonts:fetch`
 (`scripts/fetch-fonts.mjs`) re-fetches them, and `test:design-vocabulary` skips `@font-face`, where `font-weight: 300 700`
 is a file's range rather than a choice off the scale. `--font-title` (Source Serif 4) is spent

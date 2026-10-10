@@ -9,6 +9,7 @@ import { distanceUnit, elevationUnit, formatVerticalRate } from "../units/units"
 import { climbPerDistanceUnit, runSurfaceBreakdown } from "./runMetrics";
 import { RUN_SURFACE_LABELS } from "./runSurface";
 import { runSurfaceColors } from "./runSurfaceColors";
+import { t } from "../i18n/core";
 
 interface RunSurfacePanelProps {
   /** Deliberately unfiltered by surface: this panel *is* the surface split. */
@@ -32,7 +33,7 @@ export function RunSurfacePanel({ runs }: RunSurfacePanelProps) {
 
   return (
     <section className="panel run-block">
-      <p className="running-eyebrow">Surface</p>
+      <p className="running-eyebrow">{t("run.surface")}</p>
 
       {/* A proportion bar of one thing is a full-width rectangle saying 100%,
           which the table below already says in a word. */}
@@ -52,15 +53,15 @@ export function RunSurfacePanel({ runs }: RunSurfacePanelProps) {
         <table className="run-list run-surface-table">
         <thead>
           <tr>
-            <th scope="col">Surface</th>
-            <th scope="col" className="is-numeric">Share</th>
-            <th scope="col" className="is-numeric">Distance</th>
-            <th scope="col" className="is-numeric">Runs</th>
-            <th scope="col" className="is-numeric">Pace</th>
+            <th scope="col">{t("run.surface")}</th>
+            <th scope="col" className="is-numeric">{t("run.share")}</th>
+            <th scope="col" className="is-numeric">{t("activity.m.distance")}</th>
+            <th scope="col" className="is-numeric">{t("run.runs")}</th>
+            <th scope="col" className="is-numeric">{t("activity.m.pace")}</th>
             <th scope="col" className="is-numeric">
-              Climb/{distanceUnit(unitSystem)}
+              {t("run.climbPer", { unit: distanceUnit(unitSystem) })}
             </th>
-            <th scope="col" className="is-numeric" title="Metres climbed per hour">
+            <th scope="col" className="is-numeric" title={t("run.vamTitle")}>
               VAM
             </th>
           </tr>
@@ -96,10 +97,7 @@ export function RunSurfacePanel({ runs }: RunSurfacePanelProps) {
         </table>
       </div>
       <p className="run-block-note">
-        Pace is total time over total distance, so it is the surface's own
-        average rather than the mean of its runs. A treadmill records no terrain,
-        which is why its climb columns are blank rather than zero.
-        {" "}Distances are shown in {distanceUnit(unitSystem)}.
+        {t("run.surfaceNote", { unit: distanceUnit(unitSystem) })}
       </p>
     </section>
   );

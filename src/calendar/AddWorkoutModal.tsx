@@ -43,7 +43,6 @@ import { formatHappenDayLabel, getLocalHappenDayKey } from "../training/formatte
 import { dateFromKey } from "./dateUtils";
 import {
   SWIM_STROKE_IDS,
-  WORKOUT_SPORT_CAPABILITIES
 } from "../../electron/workoutCapabilities";
 import {
   BuilderSportIcon,
@@ -53,22 +52,32 @@ import {
 import {
   builderRowValidationMessage,
   builderSummaryRange,
-  formatBuilderToken,
   rowToStep,
   rowToSteps,
   type BuilderRow
 } from "./workoutBuilderRows";
+import { workoutSportLabel } from "../training/workoutSport";
+import { formatDecimal, messageRecord, t } from "../i18n/core";
+import { swimStrokeLabel } from "../i18n/workoutWords";
+import { knownSportName } from "../training/sportTypes";
 
 type AddTab = "quick" | "library" | "builder" | "activity";
 
 type UploadSport = ManualActivityInput["sport"];
 type ActivityDistanceUnit = "km" | "m" | "none";
 
-const ADD_TAB_ITEMS: Record<AddTab, { label: string; Icon: LucideIcon }> = {
-  quick: { label: "Quick training", Icon: Zap },
-  library: { label: "From library", Icon: BookOpen },
-  builder: { label: "Structured", Icon: ListTree },
-  activity: { label: "Log activity", Icon: Activity }
+const ADD_TAB_LABELS = messageRecord<AddTab>({
+  quick: "calendar.add.tab.quick",
+  library: "calendar.add.tab.library",
+  builder: "calendar.add.tab.builder",
+  activity: "calendar.add.tab.activity"
+});
+
+const ADD_TAB_ICONS: Record<AddTab, LucideIcon> = {
+  quick: Zap,
+  library: BookOpen,
+  builder: ListTree,
+  activity: Activity
 };
 
 /**
@@ -111,15 +120,15 @@ const QUICK_TARGETS: Readonly<Record<QuickSport, readonly QuickTargetType[]>> = 
   swim: ["none", "swimStroke"]
 };
 
-const QUICK_TARGET_LABEL: Readonly<Record<QuickTargetType, string>> = {
-  none: "Open",
-  pace: "Pace",
-  heartRate: "Heart rate",
-  cadence: "Cadence",
-  power: "Power",
-  speed: "Speed",
-  swimStroke: "Stroke"
-};
+const QUICK_TARGET_LABEL = messageRecord<QuickTargetType>({
+  none: "workout.open",
+  pace: "workout.intensity.pace",
+  heartRate: "calendar.add.target.heartRate",
+  cadence: "workout.intensity.cadence",
+  power: "workout.intensity.power",
+  speed: "workout.intensity.speed",
+  swimStroke: "workout.intensity.swimStroke"
+});
 
 /** A target that is a low-to-high band of plain numbers. */
 const QUICK_RANGE_TARGETS: readonly QuickTargetType[] = [
@@ -135,10 +144,11 @@ const QUICK_DISTANCE_PRESETS: Readonly<Record<QuickSport, readonly number[]>> = 
   swim: [400, 800, 1500, 2000]
 };
 
+/** Saved to COROS as the workout's name, so in the words COROS shows. */
 const QUICK_DEFAULT_NAME: Readonly<Record<QuickSport, string>> = {
-  run: "Quick Run",
-  bike: "Quick Ride",
-  swim: "Quick Swim"
+  run: "Quick Run", // i18n-ignore: saved to COROS
+  bike: "Quick Ride", // i18n-ignore: saved to COROS
+  swim: "Quick Swim" // i18n-ignore: saved to COROS
 };
 
 function quickTargetUnit(
@@ -177,7 +187,9 @@ function quickRowPace(pace: string): { paceFast: string; paceSlow: string } {
 
 interface LogSportOption {
   id: string;
-  label: string;
+  /** COROS's English name: what the option is deduplicated, searched and classified by. */
+  key: string;
+  readonly label: string;
   uploadSport: UploadSport;
   distanceUnit: ActivityDistanceUnit;
   Icon: LucideIcon;
@@ -186,7 +198,10 @@ interface LogSportOption {
 
 const DEFAULT_LOG_SPORT_OPTION: LogSportOption = {
   id: "suggested-run",
-  label: "Run",
+  key: "Run", // i18n-ignore: a COROS sport name, matched
+  get label() {
+    return t("calendar.add.log.run");
+  },
   uploadSport: "run",
   distanceUnit: "km",
   Icon: RunnerIcon
@@ -208,12 +223,12 @@ function quickWorkoutDuration(
   const distanceKm = displayDistanceToMeters(displayDistance, unitSystem) / 1000;
   const totalMinutes = Math.round(distanceKm * secondsPerKm / 60);
   if (totalMinutes < 60) {
-    return `${totalMinutes} min`;
+    return t("units.min", { m: totalMinutes });
   }
 
   const hours = Math.floor(totalMinutes / 60);
   const minutes = totalMinutes % 60;
-  return minutes > 0 ? `${hours} hr ${minutes} min` : `${hours} hr`;
+  return minutes > 0 ? t("units.duration.hm", { h: hours, m: minutes }) : t("units.duration.h", { h: hours });
 }
 
 function isQuickPaceValid(pace: string): boolean {
@@ -230,14 +245,33 @@ function normalizeQuickPace(pace: string, unitSystem: UnitSystem): string {
 
 const SUGGESTED_LOG_SPORT_OPTIONS: LogSportOption[] = [
   DEFAULT_LOG_SPORT_OPTION,
-  { id: "suggested-ride", label: "Ride", uploadSport: "bike", distanceUnit: "km", Icon: Bike },
-  { id: "suggested-walk", label: "Walk", uploadSport: "other", distanceUnit: "km", Icon: Footprints },
-  { id: "suggested-hike", label: "Hike", uploadSport: "other", distanceUnit: "km", Icon: Mountain },
-  { id: "suggested-swim", label: "Swim", uploadSport: "other", distanceUnit: "m", Icon: Waves },
-  { id: "suggested-strength", label: "Strength", uploadSport: "other", distanceUnit: "none", Icon: Dumbbell },
-  { id: "suggested-yoga", label: "Yoga", uploadSport: "other", distanceUnit: "none", Icon: PersonStanding },
-  { id: "suggested-other", label: "Other", uploadSport: "other", distanceUnit: "none", Icon: Activity }
+  suggested("ride", "Ride", "bike", "km", Bike), // i18n-ignore: a COROS sport name, matched
+  suggested("walk", "Walk", "other", "km", Footprints), // i18n-ignore: a COROS sport name, matched
+  suggested("hike", "Hike", "other", "km", Mountain), // i18n-ignore: a COROS sport name, matched
+  suggested("swim", "Swim", "other", "m", Waves), // i18n-ignore: a COROS sport name, matched
+  suggested("strength", "Strength", "other", "none", Dumbbell), // i18n-ignore: a COROS sport name, matched
+  suggested("yoga", "Yoga", "other", "none", PersonStanding), // i18n-ignore: a COROS sport name, matched
+  suggested("other", "Other", "other", "none", Activity) // i18n-ignore: a COROS sport name, matched
 ];
+
+function suggested(
+  id: "ride" | "walk" | "hike" | "swim" | "strength" | "yoga" | "other",
+  key: string,
+  uploadSport: UploadSport,
+  distanceUnit: ActivityDistanceUnit,
+  Icon: LucideIcon
+): LogSportOption {
+  return {
+    id: `suggested-${id}`,
+    key,
+    get label() {
+      return t(`calendar.add.log.${id}`);
+    },
+    uploadSport,
+    distanceUnit,
+    Icon
+  };
+}
 
 const RUN_TERMS = ["run", "running", "treadmill", "trail run", "track"];
 const BIKE_TERMS = ["bike", "biking", "bicycle", "cycle", "cycling", "ride", "mtb", "gravel"];
@@ -332,25 +366,29 @@ function inferSportIcon(label: string): LucideIcon {
 }
 
 function createCorosLogSportOption(sportType: TrainingHubSportType): LogSportOption {
-  const label = sportType.sportName.trim() || `Sport ${sportType.sportType}`;
+  const key = sportType.sportName.trim() || `Sport ${sportType.sportType}`; // i18n-ignore: a matching key
   return {
-    id: `coros-${sportType.sportType}-${normalizeSportLabel(label).replace(/[^a-z0-9]+/g, "-")}`,
-    label,
-    uploadSport: inferUploadSport(label),
-    distanceUnit: inferDistanceUnit(label),
-    Icon: inferSportIcon(label),
+    id: `coros-${sportType.sportType}-${normalizeSportLabel(key).replace(/[^a-z0-9]+/g, "-")}`,
+    key,
+    get label() {
+      return knownSportName(sportType.sportType)
+        ?? (sportType.sportName.trim() || t("calendar.add.sportN", { code: sportType.sportType }));
+    },
+    uploadSport: inferUploadSport(key),
+    distanceUnit: inferDistanceUnit(key),
+    Icon: inferSportIcon(key),
     sportType: sportType.sportType
   };
 }
 
 function describeLogSportOption(option: LogSportOption): string {
   if (option.distanceUnit === "m") {
-    return "meters";
+    return t("calendar.add.describe.meters");
   }
   if (option.distanceUnit === "km") {
-    return "distance";
+    return t("calendar.add.describe.distance");
   }
-  return "time only";
+  return t("calendar.add.describe.time");
 }
 
 interface AddWorkoutModalProps {
@@ -495,7 +533,7 @@ export function AddWorkoutModal({
     return sportTypes
       .map(createCorosLogSportOption)
       .filter((option) => {
-        const key = normalizeSportLabel(option.label);
+        const key = normalizeSportLabel(option.key);
         if (seen.has(key)) {
           return false;
         }
@@ -510,7 +548,7 @@ export function AddWorkoutModal({
     const seen = new Set<string>();
     const combined: LogSportOption[] = [];
     for (const option of [...SUGGESTED_LOG_SPORT_OPTIONS, ...corosSportOptions]) {
-      const key = normalizeSportLabel(option.label);
+      const key = normalizeSportLabel(option.key);
       if (seen.has(key)) {
         continue;
       }
@@ -528,7 +566,8 @@ export function AddWorkoutModal({
     const query = normalizeSportLabel(activitySportSearch);
     if (query) {
       return combinedSportOptions
-        .filter((option) => normalizeSportLabel(option.label).includes(query))
+        .filter((option) =>
+          normalizeSportLabel(option.label).includes(query) || normalizeSportLabel(option.key).includes(query))
         .slice(0, 12);
     }
 
@@ -582,21 +621,21 @@ export function AddWorkoutModal({
         steps: [rowToStep(quickRow, quickSport, unitSystem)]
       };
       await api.createAndScheduleWorkout(entry, dateKey, unitSystem, quickSave);
-    }, `Scheduled "${quickName.trim() || QUICK_DEFAULT_NAME[quickSport]}" on ${formatHappenDayLabel(dateKey)}.`);
+    }, t("calendar.add.scheduled", { name: quickName.trim() || QUICK_DEFAULT_NAME[quickSport], day: formatHappenDayLabel(dateKey) }));
 
   const submitLibrary = () =>
     run(async () => {
       if (!selectedProgramId) {
-        throw new Error("Pick a workout from your library first.");
+        throw new Error(t("calendar.add.pickFirst"));
       }
       await api.scheduleLibraryWorkout(selectedProgramId, dateKey);
-    }, `Workout scheduled on ${formatHappenDayLabel(dateKey)}.`);
+    }, t("calendar.add.scheduledOn", { day: formatHappenDayLabel(dateKey) }));
 
   const submitBuilder = () =>
     run(async () => {
       const entry: PlanWorkoutEntryInput = {
         key: "calendar-builder",
-        name: builderName.trim() || "Structured Workout",
+        name: builderName.trim() || "Structured Workout", // i18n-ignore: saved to COROS
         ...(builderDescription.trim() ? { description: builderDescription.trim() } : {}),
         sport: builderSport,
         ...((builderSport === "swim")
@@ -612,8 +651,8 @@ export function AddWorkoutModal({
         await api.createAndScheduleWorkout(entry, dateKey, unitSystem, builderSave);
       }
     }, libraryOnly
-      ? `Saved "${builderName.trim() || "Structured Workout"}" to the Workout Library.`
-      : `Scheduled "${builderName.trim() || "Structured Workout"}" on ${formatHappenDayLabel(dateKey)}.`);
+      ? t("calendar.add.savedToLibrary", { name: builderName.trim() || "Structured Workout" }) // i18n-ignore: the saved name
+      : t("calendar.add.scheduled", { name: builderName.trim() || "Structured Workout", day: formatHappenDayLabel(dateKey) })); // i18n-ignore: the saved name
 
   const submitActivity = () =>
     run(async () => {
@@ -644,7 +683,7 @@ export function AddWorkoutModal({
         ...(avgHr > 0 ? { avgHr } : {})
       };
       await api.addManualActivityToCoros(input);
-    }, `Activity logged on ${formatHappenDayLabel(dateKey)}. COROS may take a moment to show it.`);
+    }, t("calendar.add.logged", { day: formatHappenDayLabel(dateKey) }));
 
   const quickDistance = Number(quickDistanceKm);
   const quickDistanceValid = Number.isFinite(quickDistance) && quickDistance > 0;
@@ -656,6 +695,7 @@ export function AddWorkoutModal({
      while a run and a ride are kilometres or miles. */
   const quickDistanceUnitLabel =
     quickSport === "swim" ? swimDistanceUnit(unitSystem) : distanceUnit(unitSystem);
+  const quickDistanceText = `${formatDecimal(quickDistance, Number.isInteger(quickDistance) ? 0 : 1)} ${quickDistanceUnitLabel}`;
   const quickTargets = QUICK_TARGETS[quickSport];
   const quickIsRangeTarget = QUICK_RANGE_TARGETS.includes(quickTargetType);
   const quickTargetUnitLabel = quickTargetUnit(
@@ -711,17 +751,17 @@ export function AddWorkoutModal({
   /** The chosen target as one phrase, for the preview and the step line. */
   const quickTargetSummary = ((): string => {
     if (quickTargetType === "none") {
-      return "Open";
+      return t("workout.open");
     }
     if (quickTargetType === "pace") {
-      return quickPace.trim() && quickPaceValid ? quickPaceLabel : "Not set";
+      return quickPace.trim() && quickPaceValid ? quickPaceLabel : t("workout.notSet");
     }
     if (quickTargetType === "swimStroke") {
-      return formatBuilderToken(quickStroke);
+      return swimStrokeLabel(quickStroke);
     }
     return Number(quickTargetLow) > 0
       ? builderSummaryRange(quickTargetLow, quickTargetHigh, quickTargetUnitLabel)
-      : "Not set";
+      : t("workout.notSet");
   })();
 
   /**
@@ -733,18 +773,18 @@ export function AddWorkoutModal({
    */
   const quickProblem = ((): string | undefined => {
     if (!quickDistanceValid) {
-      return "Enter a distance to enable scheduling.";
+      return t("calendar.add.problem.distance");
     }
     if (quickTargetType === "pace") {
       if (!quickPace.trim()) {
-        return "Enter the pace to hold, or set the target to Open.";
+        return t("calendar.add.problem.pace");
       }
       if (!quickPaceValid) {
-        return "Correct the pace format to continue.";
+        return t("calendar.add.problem.paceFormat");
       }
     }
     if (quickIsRangeTarget && !(Number(quickTargetLow) > 0)) {
-      return `Enter the ${QUICK_TARGET_LABEL[quickTargetType].toLocaleLowerCase()} to hold, or set the target to Open.`;
+      return t("calendar.add.problem.target", { target: QUICK_TARGET_LABEL[quickTargetType] });
     }
     return builderRowValidationMessage(quickRow, quickSport, [], false, unitSystem);
   })();
@@ -808,14 +848,14 @@ export function AddWorkoutModal({
                 id="add-calendar-title"
                 className={libraryOnly ? "is-library" : undefined}
               >
-                {libraryOnly ? "Create library workout" : "Add to calendar"}
+                {libraryOnly ? t("calendar.add.titleLibrary") : t("calendar.add.title")}
               </h3>
             </div>
             <button
               type="button"
               className="ghost-button calendar-modal-close"
               onClick={onClose}
-              aria-label="Close"
+              aria-label={t("common.close")}
             >
               <X size={16} aria-hidden="true" />
             </button>
@@ -824,9 +864,10 @@ export function AddWorkoutModal({
           {/* One tab is not a choice: a tablist with a single tab is a label
               that looks like a control. It comes back the moment a second
               destination is on offer. */}
-          {availableTabs.length > 1 ? <div className="calendar-modal-tabs" role="tablist" aria-label={libraryOnly ? "Workout creation method" : "Add to calendar method"}>
+          {availableTabs.length > 1 ? <div className="calendar-modal-tabs" role="tablist" aria-label={libraryOnly ? t("calendar.add.methodLibrary") : t("calendar.add.method")}>
             {availableTabs.map((id) => {
-              const { label, Icon } = ADD_TAB_ITEMS[id];
+              const label = ADD_TAB_LABELS[id];
+              const Icon = ADD_TAB_ICONS[id];
               return (
                 <button
                   key={id}
@@ -853,23 +894,23 @@ export function AddWorkoutModal({
             >
               <div className="calendar-quick-settings">
                 <div className="calendar-quick-intro">
-                  <h4>Workout settings</h4>
-                  <p>One distance, one target.</p>
+                  <h4>{t("calendar.quick.settings")}</h4>
+                  <p>{t("calendar.quick.intro")}</p>
                 </div>
 
                 <div className="calendar-quick-fields">
                   <div className="calendar-field calendar-quick-wide">
                     <span className="calendar-field-label">
-                      <span>Sport</span>
+                      <span>{t("calendar.quick.sport")}</span>
                     </span>
                     <OptionGroup
-                      label="Workout sport"
+                      label={t("calendar.quick.sportLabel")}
                       fill
                       size="md"
                       value={quickSport}
                       options={QUICK_SPORTS.map((sport) => ({
                         value: sport,
-                        label: WORKOUT_SPORT_CAPABILITIES[sport].label,
+                        label: workoutSportLabel(sport),
                         icon: (
                           <BuilderSportIcon sport={sport} />
                         )
@@ -880,8 +921,8 @@ export function AddWorkoutModal({
 
                   <label className="calendar-field calendar-quick-name calendar-quick-wide">
                     <span className="calendar-field-label">
-                      <span>Workout name</span>
-                      <small>Optional</small>
+                      <span>{t("calendar.quick.name")}</span>
+                      <small>{t("calendar.quick.optional")}</small>
                     </span>
                     <input
                       type="text"
@@ -893,8 +934,8 @@ export function AddWorkoutModal({
 
                   <label className="calendar-field calendar-quick-wide">
                     <span className="calendar-field-label">
-                      <span>Distance</span>
-                      <small>Required</small>
+                      <span>{t("calendar.quick.distance")}</span>
+                      <small>{t("calendar.quick.required")}</small>
                     </span>
                     <span className="calendar-quick-input">
                       <input
@@ -905,13 +946,13 @@ export function AddWorkoutModal({
                         value={quickDistanceKm}
                         onChange={(event) => setQuickDistanceKm(event.target.value)}
                         placeholder={quickSport === "swim" ? "1500" : "8.0"}
-                        aria-label={`Distance in ${quickDistanceUnitLabel}`}
+                        aria-label={t("calendar.quick.distanceIn", { unit: quickDistanceUnitLabel })}
                         required
                       />
                       <span aria-hidden="true">{quickDistanceUnitLabel}</span>
                     </span>
                     <OptionGroup
-                      label="Common distances"
+                      label={t("calendar.quick.common")}
                       className="calendar-quick-presets"
                       tone="quiet"
                       value={
@@ -919,7 +960,7 @@ export function AddWorkoutModal({
                       }
                       options={QUICK_DISTANCE_PRESETS[quickSport].map((distance) => ({
                         value: String(distance),
-                        label: `${distance} ${quickDistanceUnitLabel}`
+                        label: `${formatDecimal(distance, Number.isInteger(distance) ? 0 : 1)} ${quickDistanceUnitLabel}`
                       }))}
                       onChange={(next) => setQuickDistanceKm(next)}
                     />
@@ -928,8 +969,8 @@ export function AddWorkoutModal({
                   {quickSport === "swim" ? (
                     <label className="calendar-field calendar-quick-wide">
                       <span className="calendar-field-label">
-                        <span>Pool length</span>
-                        <small>From your COROS profile</small>
+                        <span>{t("calendar.quick.pool")}</span>
+                        <small>{t("calendar.quick.poolHint")}</small>
                       </span>
                       <span className="calendar-quick-input">
                         <input
@@ -945,8 +986,8 @@ export function AddWorkoutModal({
 
                   <div className="calendar-field calendar-quick-wide">
                     <span className="calendar-field-label">
-                      <span>Target</span>
-                      <small>Optional</small>
+                      <span>{t("calendar.quick.target")}</span>
+                      <small>{t("calendar.quick.optional")}</small>
                     </span>
                     {/* The kind of target and the figure to hold share a row.
                         Stacked, the two controls plus their hint came to 133px
@@ -961,7 +1002,7 @@ export function AddWorkoutModal({
                           column and reflowed every field in it. The menu
                           appearing is not a layout change. */}
                       <SelectDropdown
-                        label="Workout target"
+                        label={t("calendar.quick.targetLabel")}
                         value={quickTargetType}
                         options={quickTargets.map((target) => ({
                           value: target,
@@ -978,7 +1019,7 @@ export function AddWorkoutModal({
                             value={quickPace}
                             onChange={(event) => setQuickPace(event.target.value)}
                             placeholder="5:30"
-                            aria-label={`Target pace per ${unitSystem === "imperial" ? "mile" : "kilometre"}`}
+                            aria-label={t("calendar.quick.pacePer", { unit: distanceUnit(unitSystem) })}
                             aria-invalid={!quickPaceValid}
                           />
                           <span aria-hidden="true">/{distanceUnit(unitSystem)}</span>
@@ -994,8 +1035,8 @@ export function AddWorkoutModal({
                               inputMode="decimal"
                               value={quickTargetLow}
                               onChange={(event) => setQuickTargetLow(event.target.value)}
-                              placeholder="Low"
-                              aria-label={`${QUICK_TARGET_LABEL[quickTargetType]} low`}
+                              placeholder={t("calendar.quick.low")}
+                              aria-label={t("calendar.quick.lowOf", { target: QUICK_TARGET_LABEL[quickTargetType] })}
                             />
                             <span aria-hidden="true">{quickTargetUnitLabel}</span>
                           </span>
@@ -1006,8 +1047,8 @@ export function AddWorkoutModal({
                               inputMode="decimal"
                               value={quickTargetHigh}
                               onChange={(event) => setQuickTargetHigh(event.target.value)}
-                              placeholder="High"
-                              aria-label={`${QUICK_TARGET_LABEL[quickTargetType]} high`}
+                              placeholder={t("calendar.quick.high")}
+                              aria-label={t("calendar.quick.highOf", { target: QUICK_TARGET_LABEL[quickTargetType] })}
                             />
                             <span aria-hidden="true">{quickTargetUnitLabel}</span>
                           </span>
@@ -1016,11 +1057,11 @@ export function AddWorkoutModal({
 
                       {quickTargetType === "swimStroke" ? (
                         <SelectDropdown
-                          label="Swim stroke"
+                          label={t("calendar.quick.stroke")}
                           value={quickStroke}
                           options={Object.keys(SWIM_STROKE_IDS).map((stroke) => ({
                             value: stroke,
-                            label: formatBuilderToken(stroke)
+                            label: swimStrokeLabel(stroke)
                           }))}
                           portal
                           onChange={(next) => setQuickStroke(next as WorkoutSwimStroke)}
@@ -1031,14 +1072,14 @@ export function AddWorkoutModal({
                     {quickTargetType === "pace" ? (
                       <small className={`calendar-field-help ${quickPaceValid ? "" : "is-error"}`}>
                         {quickPaceValid
-                          ? "One pace to hold, or a range like 5:20-5:40."
-                          : "Enter pace as minutes:seconds, for example 5:30."}
+                          ? t("calendar.quick.paceHelp")
+                          : t("calendar.quick.paceError")}
                       </small>
                     ) : null}
 
                     {quickIsRangeTarget ? (
                       <small className="calendar-field-help">
-                        Leave the high value empty to hold a single figure.
+                        {t("calendar.quick.rangeHelp")}
                       </small>
                     ) : null}
                   </div>
@@ -1049,11 +1090,11 @@ export function AddWorkoutModal({
               <section className="calendar-quick-preview" aria-labelledby="calendar-quick-preview-title" aria-live="polite">
                 <header className="calendar-quick-preview-header">
                   <div>
-                    <h4 id="calendar-quick-preview-title">Workout preview</h4>
+                    <h4 id="calendar-quick-preview-title">{t("calendar.quick.preview")}</h4>
                     <p>{formatHappenDayLabel(dateKey)}</p>
                   </div>
                   <span className={quickValid ? "is-ready" : ""}>
-                    {quickValid ? "Ready" : "In progress"}
+                    {quickValid ? t("calendar.quick.ready") : t("calendar.quick.inProgress")}
                   </span>
                 </header>
 
@@ -1061,26 +1102,26 @@ export function AddWorkoutModal({
                   <span aria-hidden="true"><BuilderSportIcon sport={quickSport} size={20} /></span>
                   <div>
                     <strong>{quickName.trim() || QUICK_DEFAULT_NAME[quickSport]}</strong>
-                    <small>Distance workout</small>
+                    <small>{t("calendar.quick.distanceWorkout")}</small>
                   </div>
                 </div>
 
                 <dl className="calendar-quick-preview-metrics">
                   <div>
-                    <dt>Distance</dt>
-                    <dd>{quickDistanceValid ? `${quickDistance.toLocaleString()} ${quickDistanceUnitLabel}` : "-"}</dd>
+                    <dt>{t("calendar.quick.distance")}</dt>
+                    <dd>{quickDistanceValid ? quickDistanceText : "-"}</dd>
                   </div>
                   <div>
                     {/* "Open" is the value, so it cannot also be the label. */}
                     <dt>
                       {quickTargetType === "none"
-                        ? "Target"
+                        ? t("calendar.quick.target")
                         : QUICK_TARGET_LABEL[quickTargetType]}
                     </dt>
                     <dd>{quickTargetSummary}</dd>
                   </div>
                   <div>
-                    <dt>Estimated time</dt>
+                    <dt>{t("calendar.quick.estTime")}</dt>
                     <dd>{quickDuration ?? "-"}</dd>
                   </div>
                 </dl>
@@ -1093,20 +1134,21 @@ export function AddWorkoutModal({
                   />
                   <BookmarkPlus size={18} aria-hidden="true" />
                   <span>
-                    <strong>Save to workout library</strong>
-                    <small>Keep a reusable copy after scheduling.</small>
+                    <strong>{t("calendar.quick.save")}</strong>
+                    <small>{t("calendar.quick.saveHint")}</small>
                   </span>
                 </label>
 
                 <div className="calendar-quick-preview-step">
                   <span aria-hidden="true">1</span>
                   <div>
-                    <strong>{WORKOUT_SPORT_CAPABILITIES[quickSport].label}</strong>
+                    <strong>{workoutSportLabel(quickSport)}</strong>
                     <small>
-                      {quickDistanceValid ? `${quickDistance.toLocaleString()} ${quickDistanceUnitLabel}` : "Set a distance"}
-                      {quickTargetType === "none"
-                        ? " at open effort"
-                        : ` at ${quickTargetSummary.toLocaleLowerCase()}`}
+                      {!quickDistanceValid
+                        ? t("calendar.quick.setDistance")
+                        : quickTargetType === "none"
+                          ? t("calendar.quick.atOpen", { distance: quickDistanceText })
+                          : t("calendar.quick.at", { distance: quickDistanceText, target: quickTargetSummary })}
                     </small>
                   </div>
                 </div>
@@ -1116,10 +1158,11 @@ export function AddWorkoutModal({
                 <div className="calendar-quick-summary" aria-live="polite">
                   {quickValid ? (
                     <>
-                      <span>Workout total</span>
+                      <span>{t("calendar.quick.total")}</span>
                       <strong>
-                        {quickDistance.toLocaleString()} {quickDistanceUnitLabel}
-                        {quickDuration ? `, about ${quickDuration}` : ""}
+                        {quickDuration
+                          ? t("calendar.quick.about", { distance: quickDistanceText, time: quickDuration })
+                          : quickDistanceText}
                       </strong>
                     </>
                   ) : (
@@ -1132,7 +1175,7 @@ export function AddWorkoutModal({
                   disabled={!quickValid || submitting}
                 >
                   <CalendarPlus size={16} aria-hidden="true" />
-                  {submitting ? "Scheduling…" : "Schedule workout"}
+                  {submitting ? t("calendar.quick.scheduling") : t("calendar.quick.schedule")}
                 </button>
               </footer>
             </form>
@@ -1141,19 +1184,19 @@ export function AddWorkoutModal({
           {tab === "library" ? (
             <div className="calendar-modal-body calendar-library-body">
               <label className="calendar-field">
-                <span>Search</span>
+                <span>{t("calendar.addLibrary.search")}</span>
                 <input
                   type="text"
                   value={libraryFilter}
                   onChange={(event) => setLibraryFilter(event.target.value)}
-                  placeholder="Filter workouts…"
+                  placeholder={t("calendar.addLibrary.filter")}
                 />
               </label>
               <div className="calendar-library-list">
                 {library === null ? (
-                  <p className="calendar-detail-empty">Loading library…</p>
+                  <p className="calendar-detail-empty">{t("calendar.addLibrary.loading")}</p>
                 ) : filteredLibrary.length === 0 ? (
-                  <p className="calendar-detail-empty">No workouts in your library.</p>
+                  <p className="calendar-detail-empty">{t("calendar.addLibrary.empty")}</p>
                 ) : (
                   filteredLibrary.map((item) => (
                     <div key={item.id} className={`calendar-library-item-row ${selectedProgramId === item.id ? "is-selected" : ""}`}>
@@ -1164,17 +1207,17 @@ export function AddWorkoutModal({
                       >
                         <span className="calendar-chip-name">{item.name}</span>
                         <span className="calendar-chip-meta">
-                          {[item.volume, item.trainingLoad !== undefined ? `${Math.round(item.trainingLoad)} TL` : null]
+                          {[item.volume, item.trainingLoad !== undefined ? t("units.trainingLoadShort", { value: Math.round(item.trainingLoad) }) : null]
                             .filter(Boolean)
-                            .join(" · ") || "No calculated totals"}
+                            .join(" · ") || t("workout.libraryModal.noTotals")}
                         </span>
                       </button>
                       {onViewLibrary && item.sportType && item.sportType >= 1 && item.sportType <= 9 ? (
                         <button type="button" className="ghost-button calendar-library-edit" onClick={() => onViewLibrary(item.id)}>
-                          <Eye size={13} aria-hidden="true" /> View
+                          <Eye size={13} aria-hidden="true" /> {t("workout.libraryModal.view")}
                         </button>
                       ) : (
-                        <span className="calendar-library-readonly">No preview</span>
+                        <span className="calendar-library-readonly">{t("calendar.addLibrary.noPreview")}</span>
                       )}
                     </div>
                   ))
@@ -1187,7 +1230,7 @@ export function AddWorkoutModal({
                   disabled={!selectedProgramId || submitting}
                   onClick={() => void submitLibrary()}
                 >
-                  {submitting ? "Scheduling…" : "Schedule"}
+                  {submitting ? t("calendar.quick.scheduling") : t("workout.libraryModal.schedule")}
                 </button>
               </footer>
             </div>
@@ -1209,8 +1252,8 @@ export function AddWorkoutModal({
                     <BookmarkPlus size={17} />
                   </span>
                   <span className="calendar-builder-save-copy">
-                    <strong>Save to library</strong>
-                    <small id="calendar-builder-save-help">Keep a reusable copy after scheduling.</small>
+                    <strong>{t("calendar.addBuilder.save")}</strong>
+                    <small id="calendar-builder-save-help">{t("calendar.quick.saveHint")}</small>
                   </span>
                   <span className="calendar-builder-save-switch" aria-hidden="true">
                     <span />
@@ -1224,7 +1267,7 @@ export function AddWorkoutModal({
                     checked={builderSave}
                     onChange={(event) => setBuilderSave(event.target.checked)}
                   />
-                  Also save to workout library
+                  {t("calendar.addBuilder.alsoSave")}
                 </label>
               )}
               action={
@@ -1235,7 +1278,9 @@ export function AddWorkoutModal({
                   onClick={() => void submitBuilder()}
                 >
                   {libraryOnly ? <BookmarkPlus size={16} aria-hidden="true" /> : <CalendarPlus size={16} aria-hidden="true" />}
-                  {submitting ? (libraryOnly ? "Saving…" : "Scheduling…") : (libraryOnly ? "Save workout" : "Schedule workout")}
+                  {submitting
+                    ? (libraryOnly ? t("calendar.addBuilder.saving") : t("calendar.quick.scheduling"))
+                    : (libraryOnly ? t("calendar.addBuilder.saveWorkout") : t("calendar.quick.schedule"))}
                 </button>
               }
             />
@@ -1246,10 +1291,10 @@ export function AddWorkoutModal({
               <section
                 className="calendar-activity-section calendar-activity-sport-picker"
                 role="group"
-                aria-label="Activity type"
+                aria-label={t("calendar.log.type")}
               >
                 <div className="calendar-activity-section-head">
-                  <h4>Activity type</h4>
+                  <h4>{t("calendar.log.type")}</h4>
                   <button
                     type="button"
                     className="calendar-activity-search-toggle"
@@ -1263,7 +1308,7 @@ export function AddWorkoutModal({
                     }}
                   >
                     <Search size={12} aria-hidden="true" />
-                    {activitySportSearchOpen ? "Hide search" : "Search all types"}
+                    {activitySportSearchOpen ? t("calendar.log.hideSearch") : t("calendar.log.searchAll")}
                   </button>
                 </div>
 
@@ -1272,10 +1317,10 @@ export function AddWorkoutModal({
                     <Search size={14} aria-hidden="true" />
                     <input
                       type="text"
-                      aria-label="Search activity types"
+                      aria-label={t("calendar.log.search")}
                       value={activitySportSearch}
                       onChange={(event) => setActivitySportSearch(event.target.value)}
-                      placeholder="Rowing, pilates, indoor bike…"
+                      placeholder={t("calendar.log.searchPlaceholder")}
                       disabled={submitting}
                       autoFocus
                     />
@@ -1284,7 +1329,7 @@ export function AddWorkoutModal({
 
                 {visibleSportOptions.length === 0 ? (
                   <p className="calendar-activity-hint">
-                    No activity types match that search.
+                    {t("calendar.log.noMatch")}
                   </p>
                 ) : (
                   <div className="calendar-sport-grid">
@@ -1310,10 +1355,10 @@ export function AddWorkoutModal({
               </section>
 
               <section className="calendar-activity-section">
-                <h4>When and how long</h4>
+                <h4>{t("calendar.log.when")}</h4>
                 <div className="calendar-field-row">
                   <label className="calendar-field">
-                    <span>Started at</span>
+                    <span>{t("calendar.log.started")}</span>
                     <input
                       type="time"
                       value={activityTime}
@@ -1322,33 +1367,33 @@ export function AddWorkoutModal({
                     />
                   </label>
                   <div className="calendar-field">
-                    <span>Duration</span>
+                    <span>{t("calendar.log.duration")}</span>
                     <div className="calendar-duration-control">
                       <span className="calendar-duration-part">
                         <input
                           type="number"
                           min="0"
                           max="23"
-                          aria-label="Duration, hours"
+                          aria-label={t("calendar.log.hours")}
                           value={activityHours}
                           onChange={(event) => setActivityHours(event.target.value)}
                           placeholder="0"
                           disabled={submitting}
                         />
-                        <em>h</em>
+                        <em>{t("calendar.log.hourUnit")}</em>
                       </span>
                       <span className="calendar-duration-part">
                         <input
                           type="number"
                           min="0"
                           max="59"
-                          aria-label="Duration, minutes"
+                          aria-label={t("calendar.log.minutes")}
                           value={activityMinutes}
                           onChange={(event) => setActivityMinutes(event.target.value)}
                           placeholder="0"
                           disabled={submitting}
                         />
-                        <em>m</em>
+                        <em>{t("calendar.log.minuteUnit")}</em>
                       </span>
                     </div>
                   </div>
@@ -1358,11 +1403,11 @@ export function AddWorkoutModal({
               {/* Everything below is recalled rather than measured, so the
                   heading says so once instead of tagging each field. */}
               <section className="calendar-activity-section">
-                <h4>If you know them</h4>
+                <h4>{t("calendar.log.ifKnown")}</h4>
                 <div className="calendar-field-row">
                   {showActivityDistance ? (
                     <label className="calendar-field">
-                      <span>Distance</span>
+                      <span>{t("calendar.log.distance")}</span>
                       <span className="calendar-unit-control">
                         <input
                           type="number"
@@ -1378,7 +1423,7 @@ export function AddWorkoutModal({
                     </label>
                   ) : null}
                   <label className="calendar-field">
-                    <span>Calories</span>
+                    <span>{t("calendar.log.calories")}</span>
                     <span className="calendar-unit-control">
                       <input
                         type="number"
@@ -1392,7 +1437,7 @@ export function AddWorkoutModal({
                     </span>
                   </label>
                   <label className="calendar-field">
-                    <span>Average heart rate</span>
+                    <span>{t("calendar.log.avgHr")}</span>
                     <span className="calendar-unit-control">
                       <input
                         type="number"
@@ -1411,8 +1456,8 @@ export function AddWorkoutModal({
               <footer className="calendar-modal-footer calendar-activity-footer">
                 <p className="calendar-activity-hint">
                   {activityValid
-                    ? "Goes straight to your COROS account."
-                    : "Add a duration to log this activity."}
+                    ? t("calendar.log.ready")
+                    : t("calendar.log.needDuration")}
                 </p>
                 <button
                   type="button"
@@ -1420,7 +1465,7 @@ export function AddWorkoutModal({
                   disabled={!activityValid || submitting}
                   onClick={() => void submitActivity()}
                 >
-                  {submitting ? "Adding…" : "Add to COROS"}
+                  {submitting ? t("calendar.log.adding") : t("calendar.log.add")}
                 </button>
               </footer>
             </div>

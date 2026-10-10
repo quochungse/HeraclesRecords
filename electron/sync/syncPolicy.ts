@@ -404,6 +404,9 @@ export const LOCAL_STORAGE_POLICY: Readonly<Record<string, SyncTier>> = {
   // Appearance and units — the settings people expect to follow them.
   "coros-theme": "preference",
   "heraclesrecords.accentPalette": "preference",
+  // The language the app is written in. A preference, so it follows the
+  // athlete; another machine reads it at its next launch.
+  "heraclesrecords.language": "preference",
   // Not a preference any more: the switch is the COROS account's own
   // Measurement field, and this is the last answer it gave, cached so the next
   // launch's first paint is already in the right unit. Every machine of one

@@ -1,3 +1,5 @@
+import { t } from "../i18n/core";
+
 /**
  * COROS's sleep score, banded once.
  *
@@ -35,17 +37,17 @@ export function sleepScoreTone(score?: number): SleepScoreTone {
  */
 export function sleepScoreLabel(
   score?: number,
-  waitingLabel = "No score"
+  waitingLabel = t("sleep.score.none")
 ): string {
   switch (sleepScoreTone(score)) {
     case "low":
-      return "Poor";
+      return t("sleep.score.poor");
     case "mid":
-      return "Fair";
+      return t("sleep.score.fair");
     case "good":
-      return "Good";
+      return t("sleep.score.good");
     case "high":
-      return "Excellent";
+      return t("sleep.score.excellent");
     default:
       return waitingLabel;
   }

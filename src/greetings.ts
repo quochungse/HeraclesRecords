@@ -1,15 +1,17 @@
+import { t } from "./i18n/core";
+
 export function getTimeOfDayGreeting(
   hour: number = new Date().getHours(),
 ): string {
   if (hour < 12) {
-    return "Good morning";
+    return t("app.greeting.morning");
   }
 
   if (hour < 17) {
-    return "Good afternoon";
+    return t("app.greeting.afternoon");
   }
 
-  return "Good evening";
+  return t("app.greeting.evening");
 }
 
 export function msUntilNextGreetingChange(now: Date = new Date()): number {

@@ -12,12 +12,13 @@ import { activityWorkoutSport } from "../training/askCoachAbout";
 import { sportChipStyle, sportTheme } from "../training-library/sportTheme";
 import { dayItems, type CalendarDay, type CalendarItemSelection } from "./calendarTypes";
 import { formatPlannedVolume } from "./scheduledStructure";
+import { t } from "../i18n/core";
 
 function activityLine(activity: TrainingHubActivity, unitSystem: UnitSystem): string {
   return [
     activity.duration ? formatDurationSeconds(activity.duration) : undefined,
     activity.distance ? formatDistanceMeters(activity.distance, unitSystem, isSwimSportType(activity.sportType)) : undefined,
-    activity.trainingLoad !== undefined ? `${Math.round(activity.trainingLoad)} TL` : undefined
+    activity.trainingLoad !== undefined ? t("units.trainingLoadShort", { value: Math.round(activity.trainingLoad) }) : undefined
   ]
     .filter(Boolean)
     .join(" · ");
@@ -43,11 +44,11 @@ export function DayOverview({
   const meters = done.reduce((sum, activity) => sum + (activity.distance ?? 0), 0);
   const load = done.reduce((sum, activity) => sum + (activity.trainingLoad ?? 0), 0);
   const totals = [
-    done.length ? `${done.length} done` : undefined,
-    planned ? `${planned} planned` : undefined,
+    done.length ? t("calendar.overview.done", { count: done.length }) : undefined,
+    planned ? t("calendar.overview.planned", { count: planned }) : undefined,
     seconds ? formatDurationSeconds(seconds) : undefined,
     meters ? formatDistanceMeters(meters, unitSystem) : undefined,
-    load ? `${Math.round(load)} TL` : undefined
+    load ? t("units.trainingLoadShort", { value: Math.round(load) }) : undefined
   ].filter(Boolean);
 
   return (
@@ -65,7 +66,7 @@ export function DayOverview({
           const Icon = sport ? sportTheme(sport).icon : Activity;
           const name =
             item.kind === "activity"
-              ? item.activity.name ?? pair?.scheduled.name ?? item.activity.sportName ?? "Activity"
+              ? item.activity.name ?? pair?.scheduled.name ?? item.activity.sportName ?? t("activity.untitled")
               : item.entry.name;
           const line =
             item.kind === "activity"
@@ -74,18 +75,18 @@ export function DayOverview({
                   formatPlannedVolume(pair?.targets ?? {}, unitSystem, sport === "swim", () =>
                     formatUpcomingWorkoutVolumeDisplay(item.entry.volume, unitSystem)
                   ),
-                  item.entry.trainingLoad !== undefined ? `${Math.round(item.entry.trainingLoad)} TL` : undefined
+                  item.entry.trainingLoad !== undefined ? t("units.trainingLoadShort", { value: Math.round(item.entry.trainingLoad) }) : undefined
                 ]
                   .filter(Boolean)
                   .join(" · ");
           const status =
             item.kind === "activity"
               ? pair
-                ? { label: "Done", tone: "done" }
-                : { label: "Unplanned", tone: "extra" }
+                ? { label: t("calendar.status.done"), tone: "done" }
+                : { label: t("calendar.status.unplanned"), tone: "extra" }
               : day.isPast
-                ? { label: "Missed", tone: "missed" }
-                : { label: "Planned", tone: "planned" };
+                ? { label: t("calendar.status.missed"), tone: "missed" }
+                : { label: t("calendar.status.planned"), tone: "planned" };
           return (
             <li key={key}>
               <button type="button" className="calendar-day-overview-item" onClick={() => onOpen(item)}>

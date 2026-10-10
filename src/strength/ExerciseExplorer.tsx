@@ -25,6 +25,8 @@ import type { StrengthSession, UnitSystem } from "../../electron/types";
 import { SelectDropdown } from "../components/SelectDropdown";
 import { trainingChartTooltipStyle } from "../training/chartConfig";
 import { useChartColors } from "../training/useChartColors";
+import { useI18n } from "../i18n/useI18n";
+import { exerciseLabel } from "./strengthAnalytics";
 import { useTheme } from "../theme/ThemeProvider";
 import {
   kilogramsToDisplayWeight,
@@ -39,6 +41,7 @@ import {
   type ExplorerSet,
   type PlateauState
 } from "./exerciseExplorerData";
+import { formatCount, formatDecimal, getIntlLocale, plural, t } from "../i18n/core";
 
 interface ExerciseExplorerProps {
   exercise: ExerciseStat;
@@ -49,10 +52,16 @@ interface ExerciseExplorerProps {
   onClose: () => void;
 }
 
-const PR_LABELS: Record<ExerciseSessionPr, string> = {
-  weight: "Weight PR",
-  e1rm: "e1RM PR",
-  volume: "Volume PR"
+const PR_LABELS: Readonly<Record<ExerciseSessionPr, string>> = {
+  get weight() {
+    return t("strength.pr.weight");
+  },
+  get e1rm() {
+    return t("strength.pr.e1rm");
+  },
+  get volume() {
+    return t("strength.pr.volume");
+  }
 };
 
 const PLATEAU_ICONS = {
@@ -105,8 +114,8 @@ function recordSetNumbers(record: ExerciseSessionRecord): Set<number> {
 }
 
 function formatDate(at?: number, includeYear = false): string {
-  if (!at) return "Unknown date";
-  return new Date(at * 1000).toLocaleDateString(undefined, {
+  if (!at) return t("strength.unknownDate");
+  return new Date(at * 1000).toLocaleDateString(getIntlLocale(), {
     month: "short",
     day: "numeric",
     ...(includeYear ? { year: "numeric" } : {})
@@ -117,8 +126,8 @@ function formatWeight(kg: number, unitSystem: UnitSystem, empty = "—"): string
   if (kg <= 0) return empty;
   const display = kilogramsToDisplayWeight(kg, unitSystem);
   const value = Number.isInteger(display)
-    ? display.toLocaleString()
-    : display.toFixed(1);
+    ? formatCount(display)
+    : formatDecimal(display, 1);
   return `${value} ${weightUnit(unitSystem)}`;
 }
 
@@ -130,7 +139,7 @@ function splitWeight(
   if (kg <= 0) return { value: "—", unit: "" };
   const display = kilogramsToDisplayWeight(kg, unitSystem);
   return {
-    value: Number.isInteger(display) ? display.toLocaleString() : display.toFixed(1),
+    value: Number.isInteger(display) ? formatCount(display) : formatDecimal(display, 1),
     unit: weightUnit(unitSystem)
   };
 }
@@ -139,9 +148,9 @@ function formatVolume(kg: number, unitSystem: UnitSystem, empty = "—"): string
   if (kg <= 0) return empty;
   const display = kilogramsToDisplayWeight(kg, unitSystem);
   if (unitSystem === "metric" && display >= 1000) {
-    return `${(display / 1000).toFixed(display >= 10_000 ? 0 : 1)} tonnes`;
+    return `${formatDecimal(display / 1000, display >= 10_000 ? 0 : 1)} ${t("strength.unit.tonnes")}`;
   }
-  return `${Math.round(display).toLocaleString()} ${weightUnit(unitSystem)}`;
+  return `${formatCount(Math.round(display))} ${weightUnit(unitSystem)}`;
 }
 
 function formatDuration(seconds: number): string {
@@ -159,10 +168,10 @@ function comparisonTone(latest: number, previous: number): "up" | "down" | "flat
 }
 
 function comparisonDelta(latest: number, previous: number): string {
-  if (previous <= 0) return latest > 0 ? "New" : "Same";
+  if (previous <= 0) return latest > 0 ? t("strength.compare.new") : t("strength.compare.same");
   const percent = ((latest - previous) / previous) * 100;
-  if (Math.abs(percent) < 0.5) return "Same";
-  return `${percent > 0 ? "+" : "−"}${Math.abs(percent).toFixed(Math.abs(percent) < 10 ? 1 : 0)}%`;
+  if (Math.abs(percent) < 0.5) return t("strength.compare.same");
+  return `${percent > 0 ? "+" : "−"}${formatDecimal(Math.abs(percent), Math.abs(percent) < 10 ? 1 : 0)}%`;
 }
 
 /**
@@ -212,45 +221,45 @@ function ComparisonCard({
   const metrics = loaded
     ? [
         {
-          label: "Top weight",
+          label: t("strength.compare.topWeight"),
           latest: latest.topWeightKg,
           previous: previous.topWeightKg,
           format: (value: number) => formatWeight(value, unitSystem)
         },
         {
-          label: "Best e1RM",
+          label: t("strength.compare.bestE1rm"),
           latest: latest.bestE1rmKg,
           previous: previous.bestE1rmKg,
           format: (value: number) => formatWeight(value, unitSystem)
         },
         {
-          label: "Volume",
+          label: t("strength.metric.volume"),
           latest: latest.volumeKg,
           previous: previous.volumeKg,
           format: (value: number) => formatVolume(value, unitSystem)
         },
         {
-          label: "Reps",
+          label: t("strength.col.reps"),
           latest: latest.totalReps,
           previous: previous.totalReps,
-          format: (value: number) => Math.round(value).toLocaleString()
+          format: (value: number) => formatCount(Math.round(value))
         }
       ]
     : [
         {
-          label: "Sets",
+          label: t("strength.summary.sets"),
           latest: latest.sets.length,
           previous: previous.sets.length,
-          format: (value: number) => Math.round(value).toLocaleString()
+          format: (value: number) => formatCount(Math.round(value))
         },
         {
-          label: "Reps",
+          label: t("strength.col.reps"),
           latest: latest.totalReps,
           previous: previous.totalReps,
-          format: (value: number) => Math.round(value).toLocaleString()
+          format: (value: number) => formatCount(Math.round(value))
         },
         {
-          label: "Work time",
+          label: t("strength.compare.workTime"),
           latest: latest.workSec,
           previous: previous.workSec,
           format: formatDuration
@@ -261,9 +270,10 @@ function ComparisonCard({
     <section className="exercise-explorer-section exercise-explorer-comparison">
       <div className="exercise-explorer-section-head">
         <div>
-          <p className="eyebrow">Last vs previous</p>
+          <p className="eyebrow">{t("strength.compare.title")}</p>
           <h3>
-            {formatDate(latest.at)} <span>against {formatDate(previous.at)}</span>
+            {formatDate(latest.at)}{" "}
+            <span>{t("strength.compare.against", { date: formatDate(previous.at) })}</span>
           </h3>
         </div>
       </div>
@@ -301,11 +311,13 @@ export function ExerciseExplorer({
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const { colors } = useChartColors();
   const { theme } = useTheme();
+  const { locale } = useI18n();
   const ember = EMBER[theme === "paper" ? "paper" : "dark"];
   const emberFade = EMBER_FADE[theme === "paper" ? "paper" : "dark"];
   const data = useMemo(
     () => buildExerciseExplorer(sessions, exercise.name),
-    [exercise.name, sessions]
+    // The verdict and the rep ranges carry words, so a new language rebuilds them.
+    [exercise.name, sessions, locale]
   );
   const loaded = data.totalVolumeKg > 0;
 
@@ -313,7 +325,7 @@ export function ExerciseExplorer({
     () =>
       [...exercises]
         .sort((left, right) => left.name.localeCompare(right.name))
-        .map((item) => ({ value: item.name, label: item.name })),
+        .map((item) => ({ value: item.name, label: exerciseLabel(item.name) })),
     [exercises]
   );
 
@@ -328,7 +340,7 @@ export function ExerciseExplorer({
           value: kilogramsToDisplayWeight(record.bestE1rmKg, unitSystem),
           kg: record.bestE1rmKg
         })),
-    [data.sessions, unitSystem]
+    [data.sessions, unitSystem, locale]
   );
 
   useEffect(() => {
@@ -394,23 +406,27 @@ export function ExerciseExplorer({
   const spineReference = loaded ? (data.heaviestSet?.weightKg ?? 0) : bodyweightBest;
   const hero = loaded
     ? splitWeight(data.bestE1rmSet?.e1rmKg ?? 0, unitSystem)
-    : { value: bodyweightBest > 0 ? String(bodyweightBest) : "—", unit: "reps" };
+    : { value: bodyweightBest > 0 ? String(bodyweightBest) : "—", unit: t("strength.unit.reps") };
   const heroNote = loaded
     ? data.bestE1rmSet
-      ? `from ${formatWeight(data.bestE1rmSet.weightKg, unitSystem)} × ${data.bestE1rmSet.reps} · ${formatDate(data.bestE1rmSet.at, true)}`
-      : "Needs a loaded set of 15 reps or fewer"
-    : "Bodyweight — best single set";
+      ? t("strength.hero.from", {
+          weight: formatWeight(data.bestE1rmSet.weightKg, unitSystem),
+          reps: data.bestE1rmSet.reps,
+          date: formatDate(data.bestE1rmSet.at, true)
+        })
+      : t("strength.hero.needsLoaded")
+    : t("strength.hero.bodyweightBest");
 
   const rail = [
-    { label: "Sessions", value: String(data.sessions.length) },
-    { label: "Sets", value: String(data.totalSets) },
-    { label: "Reps", value: data.totalReps.toLocaleString() },
+    { label: t("strength.summary.sessions"), value: String(data.sessions.length) },
+    { label: t("strength.summary.sets"), value: String(data.totalSets) },
+    { label: t("strength.col.reps"), value: formatCount(data.totalReps) },
     {
-      label: "Volume",
-      value: formatVolume(data.totalVolumeKg, unitSystem, "Bodyweight")
+      label: t("strength.metric.volume"),
+      value: formatVolume(data.totalVolumeKg, unitSystem, t("strength.bodyweight"))
     },
     {
-      label: "Heaviest",
+      label: t("strength.rail.heaviest"),
       value:
         loaded && data.heaviestSet
           ? `${formatWeight(data.heaviestSet.weightKg, unitSystem)} × ${data.heaviestSet.reps}`
@@ -435,8 +451,8 @@ export function ExerciseExplorer({
         <header className="exercise-explorer-header">
           <div className="exercise-explorer-headline">
             <div className="exercise-explorer-heading">
-              <p className="eyebrow">Exercise Explorer</p>
-              <h2 id="exercise-explorer-title">{data.name}</h2>
+              <p className="eyebrow">{t("strength.explorer.title")}</p>
+              <h2 id="exercise-explorer-title">{exerciseLabel(data.name)}</h2>
               {exercise.muscles.length > 0 ? (
                 <p className="exercise-explorer-muscles">
                   {exercise.muscles.map((muscle) => MUSCLE_BY_ID[muscle].label).join(" · ")}
@@ -449,13 +465,13 @@ export function ExerciseExplorer({
                 value={exercise.name}
                 options={options}
                 onChange={onSelect}
-                label="Choose an exercise"
+                label={t("strength.explorer.choose")}
               />
               <button
                 ref={closeRef}
                 type="button"
                 className="exercise-explorer-close"
-                aria-label="Close Exercise Explorer"
+                aria-label={t("strength.explorer.close")}
                 onClick={onClose}
               >
                 <X size={18} aria-hidden="true" />
@@ -472,11 +488,11 @@ export function ExerciseExplorer({
         <div className="exercise-explorer-scroll">
           <section
             className="exercise-explorer-hero"
-            aria-label={`${data.name} summary`}
+            aria-label={t("strength.explorer.summary", { name: exerciseLabel(data.name) })}
             data-has-chart={chartData.length >= 2}
           >
             <div className="exercise-hero-figure">
-              <p className="eyebrow">{loaded ? "Best estimated 1RM" : "Best set"}</p>
+              <p className="eyebrow">{loaded ? t("strength.hero.bestE1rm") : t("strength.hero.bestSet")}</p>
               <p className="exercise-hero-value">
                 <strong>{hero.value}</strong>
                 {hero.unit ? <small>{hero.unit}</small> : null}
@@ -487,7 +503,7 @@ export function ExerciseExplorer({
             {chartData.length >= 2 ? (
               <div className="exercise-hero-chart">
                 <p className="exercise-hero-chart-label">
-                  e1RM in {weightUnit(unitSystem)} · {chartData.length} loaded sessions
+                  {plural("strength.hero.chartLabel", chartData.length, { unit: weightUnit(unitSystem) })}
                 </p>
                 <div className="exercise-progress-chart">
                   <ResponsiveContainer width="100%" height="100%">
@@ -523,7 +539,7 @@ export function ExerciseExplorer({
                             <div className="exercise-chart-tooltip">
                               <span>{point.label}</span>
                               <strong>{formatWeight(point.kg, unitSystem)}</strong>
-                              <small>estimated one-rep max</small>
+                              <small>{t("strength.hero.tooltip")}</small>
                             </div>
                           );
                         }}
@@ -564,17 +580,17 @@ export function ExerciseExplorer({
               />
             ) : (
               <section className="exercise-explorer-section exercise-explorer-comparison is-empty">
-                <p className="eyebrow">Last vs previous</p>
-                <h3>One session logged</h3>
-                <p>Log this lift again to unlock a side-by-side comparison.</p>
+                <p className="eyebrow">{t("strength.compare.title")}</p>
+                <h3>{t("strength.compare.one")}</h3>
+                <p>{t("strength.compare.oneBody")}</p>
               </section>
             )}
 
             <section className="exercise-explorer-section">
               <div className="exercise-explorer-section-head">
                 <div>
-                  <p className="eyebrow">Personal records</p>
-                  <h3>Best by rep range</h3>
+                  <p className="eyebrow">{t("strength.prs.title")}</p>
+                  <h3>{t("strength.prs.sub")}</h3>
                 </div>
               </div>
               {data.repRangeRecords.length > 0 ? (
@@ -600,8 +616,7 @@ export function ExerciseExplorer({
                 </div>
               ) : (
                 <p className="exercise-explorer-empty">
-                  Rep-range records appear once you log a loaded set. Bodyweight work still
-                  shows in the set log below.
+                  {t("strength.prs.none")}
                 </p>
               )}
             </section>
@@ -610,15 +625,15 @@ export function ExerciseExplorer({
           <section className="exercise-explorer-section exercise-explorer-log">
             <div className="exercise-explorer-section-head">
               <div>
-                <p className="eyebrow">Set log</p>
-                <h3>Every session</h3>
+                <p className="eyebrow">{t("strength.log.title")}</p>
+                <h3>{t("strength.log.sub")}</h3>
               </div>
               <span className="exercise-spine-key">
                 <i data-band="warmup" />
                 <i data-band="work" />
                 <i data-band="heavy" />
                 <i data-band="top" />
-                {loaded ? "light → heaviest" : "fewest → most reps"}
+                {loaded ? t("strength.log.keyLoaded") : t("strength.log.keyReps")}
               </span>
             </div>
             <div className="exercise-session-history">
@@ -649,12 +664,12 @@ export function ExerciseExplorer({
                         ))}
                       </span>
                       <span className="exercise-history-summary">
-                        <span>{record.sets.length} sets</span>
-                        <span>{record.totalReps} reps</span>
+                        <span>{plural("strength.sets", record.sets.length)}</span>
+                        <span>{plural("strength.reps", record.totalReps)}</span>
                         <strong>
                           {loaded
                             ? formatWeight(record.bestE1rmKg, unitSystem)
-                            : `${Math.max(...record.sets.map((set) => set.reps))} best reps`}
+                            : t("strength.log.bestReps", { count: Math.max(...record.sets.map((set) => set.reps)) })}
                         </strong>
                       </span>
                       <ChevronDown size={16} aria-hidden="true" />
@@ -664,12 +679,12 @@ export function ExerciseExplorer({
                         <table className="exercise-set-table">
                           <thead>
                             <tr>
-                              <th>Set</th>
-                              <th>Weight</th>
-                              <th>Reps</th>
-                              <th>e1RM</th>
-                              <th>Volume</th>
-                              <th>Work / rest</th>
+                              <th>{t("strength.col.set")}</th>
+                              <th>{t("strength.col.weight")}</th>
+                              <th>{t("strength.col.reps")}</th>
+                              <th>{t("strength.col.e1rmShort")}</th>
+                              <th>{t("strength.metric.volume")}</th>
+                              <th>{t("strength.col.workRest")}</th>
                             </tr>
                           </thead>
                           <tbody>
@@ -688,7 +703,7 @@ export function ExerciseExplorer({
                                   }
                                 >
                                   <td>{set.setNumber}</td>
-                                  <td>{formatWeight(set.weightKg, unitSystem, "Bodyweight")}</td>
+                                  <td>{formatWeight(set.weightKg, unitSystem, t("strength.bodyweight"))}</td>
                                   <td>{set.reps}</td>
                                   <td>{formatWeight(set.e1rmKg, unitSystem)}</td>
                                   <td>{formatVolume(set.volumeKg, unitSystem)}</td>

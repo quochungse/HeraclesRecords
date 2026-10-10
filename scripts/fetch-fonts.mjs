@@ -6,9 +6,11 @@
  * `npm run fonts:fetch`. It is not part of a build: the files are committed, so
  * a build never needs the network, which is the whole point of having them.
  * Google is asked for variable faces (one file covers a weight range) and for
- * three subsets — latin, latin-ext and vietnamese. Vietnamese is not optional:
- * an athlete's activity names and the coach's answers are written in it, and
- * without that subset every diacritic falls back to a system face mid-sentence.
+ * five subsets — latin, latin-ext, vietnamese, cyrillic and cyrillic-ext.
+ * Vietnamese is not optional: an athlete's activity names and the coach's
+ * answers are written in it, and without that subset every diacritic falls
+ * back to a system face mid-sentence. Cyrillic is the app in Russian
+ * (src/i18n); Space Grotesk has none, and its stack falls to Inter's.
  *
  * Re-run it when a family, a weight range or a subset changes, then look at the
  * diff: the URLs Google serves are versioned, so a re-run can bring a new cut
@@ -16,7 +18,7 @@
  */
 import { writeFileSync } from "node:fs";
 const UA = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0 Safari/537.36";
-const SUBSETS = new Set(["latin", "latin-ext", "vietnamese"]);
+const SUBSETS = new Set(["latin", "latin-ext", "vietnamese", "cyrillic", "cyrillic-ext"]);
 const FAMILIES = [
   ["Inter", "Inter:wght@300..700", "inter"],
   ["Space Grotesk", "Space+Grotesk:wght@500..700", "space-grotesk"],
@@ -43,8 +45,9 @@ const header = `/*
  * its whole interface in a system fallback — and that every launch asks Google
  * for a stylesheet. The files below are the same ones that link resolved to
  * (variable weights, so one file covers the range), cut to the subsets this app
- * can produce: latin, latin-ext and vietnamese, the last because an athlete's
- * own activity names and the coach's answers are written in it.
+ * can produce: latin, latin-ext and vietnamese, because an athlete's own
+ * activity names and the coach's answers are written in it, and cyrillic and
+ * cyrillic-ext for the app in Russian.
  *
  * Re-fetch with scripts/fetch-fonts.mjs if a family or a subset has to change.
  */

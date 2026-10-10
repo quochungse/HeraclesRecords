@@ -75,7 +75,6 @@ import {
   weekStageOf,
   workoutSportFromType
 } from "../../electron/trainingPlanDomain";
-import { formatWorkoutSport } from "../../electron/workoutCapabilities";
 import { replaceTrainingPlanEntryWorkout } from "../../electron/planWorkoutEditor";
 import type { HeraclesRecordsApi } from "../heraclesrecords-api";
 import { WorkoutBuilderModal } from "../calendar/WorkoutBuilderModal";
@@ -121,6 +120,10 @@ import {
   type PlanReaderWeek
 } from "./planReaderModel";
 import { PlanOriginBadge, SportMixDots, dominantSport, sportAccentStyle, sportChipStyle, sportTheme } from "./sportTheme";
+import { workoutSportLabel } from "../training/workoutSport";
+import { formatCount, formatDecimal, plural, t, weekdayNames } from "../i18n/core";
+import { planStageLabel } from "../i18n/workoutWords";
+import { useI18n } from "../i18n/useI18n";
 
 interface PlanEditorProps {
   api: HeraclesRecordsApi;
@@ -157,12 +160,13 @@ interface PlanEditorProps {
 const ENTRY_DRAG = "application/x-heracles-plan-entry";
 
 const MAX_WEEKS = TRAINING_PLAN_MAX_WEEKS;
-const DAY_NAMES = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"] as const;
-
-const STAGE_OPTIONS = COROS_WEEK_STAGES.map((stage) => ({
-  value: String(stage.value),
-  label: stage.label
-}));
+/** COROS's seven stages, named in the language on screen. */
+function stageOptions(): { value: string; label: string }[] {
+  return COROS_WEEK_STAGES.map((stage) => ({
+    value: String(stage.value),
+    label: planStageLabel(stage.slug)
+  }));
+}
 
 type Layer =
   | { kind: "workout"; entryId: string }
@@ -202,7 +206,7 @@ function slotKey(slot: PlanSlot): string {
 }
 
 function slotLabel(slot: PlanSlot, week: PlanReaderWeek | undefined): string {
-  return `Week ${slot.weekIndex + 1} · ${week?.days[slot.dayIndex]?.label ?? DAY_NAMES[slot.dayIndex]}`;
+  return t("library.ed.slot", { n: slot.weekIndex + 1, day: week?.days[slot.dayIndex]?.label ?? weekdayNames("short")[slot.dayIndex] });
 }
 
 /** Only figures the session states — the reader's rule, for the same reason. */
@@ -210,8 +214,8 @@ function entryFigures(entry: PlanEntryFacts, unitSystem: ReturnType<typeof useUn
   return [
     entry.durationComplete ? formatPlannedDuration(entry.durationSeconds) : null,
     entry.distanceMeters ? formatDistanceValue(entry.distanceMeters, unitSystem, { digits: 1 }) : null,
-    entry.trainingLoad ? `${Math.round(entry.trainingLoad)} load` : null,
-    entry.strengthSets ? `${entry.strengthSets} sets` : null
+    entry.trainingLoad ? t("library.entry.load", { n: Math.round(entry.trainingLoad) }) : null,
+    entry.strengthSets ? plural("workout.sets", entry.strengthSets) : null
   ].filter((figure): figure is string => Boolean(figure));
 }
 
@@ -235,6 +239,7 @@ export function PlanEditor({
   onClose
 }: PlanEditorProps) {
   const { unitSystem } = useUnitSystem();
+  const { rich, locale } = useI18n();
   const plan = draftPlan(draft);
   const dirty = draftIsDirty(draft);
 
@@ -277,7 +282,8 @@ export function PlanEditor({
      and is not the place to be told a session was missed. */
   const reading = useMemo(
     () => readPlan({ ...plan, ...shape, startDate: undefined, calendar: "unscheduled" }),
-    [shape]
+    // The day labels and stage names are in the language on screen.
+    [shape, locale]
   );
   const summary = useMemo(() => summarizeTrainingPlan({ ...plan, ...shape }), [shape]);
   const validation = useMemo(() => validateTrainingPlan(plan), [plan]);
@@ -312,10 +318,10 @@ export function PlanEditor({
   /* A session's unsaved edits are asked about with the dialog the plan's are. */
   const discardSession = ({ keep, discard }: { keep: () => void; discard: () => void }) => (
     <ConfirmDialog
-      title="Discard unsaved changes?"
-      description="This session has edits that have not been applied to the plan. Closing it throws them away."
-      confirmLabel="Discard changes"
-      cancelLabel="Keep editing"
+      title={t("library.w.discardTitle")}
+      description={t("library.ed.discardSessionBody")}
+      confirmLabel={t("library.w.discard")}
+      cancelLabel={t("library.w.keep")}
       danger
       onConfirm={discard}
       onCancel={keep}
@@ -537,13 +543,13 @@ export function PlanEditor({
 
   const hours = reading.timed ? Math.round(summary.durationSeconds / 360) / 10 : 0;
   const figures = [
-    { label: "weeks", value: String(plan.weekCount) },
-    { label: summary.workouts === 1 ? "session" : "sessions", value: String(summary.workouts) },
-    hours ? { label: "hours", value: String(hours) } : null,
+    { label: plural("library.fig.weeks", plan.weekCount), value: formatCount(plan.weekCount) },
+    { label: plural("library.fig.sessions", summary.workouts), value: formatCount(summary.workouts) },
+    hours ? { label: plural("library.fig.hours", hours), value: formatDecimal(hours, Number.isInteger(hours) ? 0 : 1) } : null,
     summary.distanceMeters
-      ? { label: "distance", value: formatDistanceValue(summary.distanceMeters, unitSystem, { digits: 0 }) }
+      ? { label: t("library.fig.distance"), value: formatDistanceValue(summary.distanceMeters, unitSystem, { digits: 0 }) }
       : null,
-    summary.trainingLoad ? { label: "load", value: String(Math.round(summary.trainingLoad)) } : null
+    summary.trainingLoad ? { label: t("library.fig.load"), value: String(Math.round(summary.trainingLoad)) } : null
   ].filter((figure): figure is { label: string; value: string } => Boolean(figure));
   const lastWeekHolds = plan.entries.some((entry) => entry.weekIndex === plan.weekCount - 1);
 
@@ -553,43 +559,43 @@ export function PlanEditor({
     layer?.kind === "move" ? plan.entries.find((entry) => entry.id === layer.entryId) : undefined;
 
   const title = !plan.remoteId
-    ? "New plan"
+    ? t("library.ed.titleNew")
     : plan.calendar === "running"
-      ? "Editing the plan on your calendar"
-      : "Editing plan";
+      ? t("library.ed.titleCalendar")
+      : t("library.ed.titleEditing");
   const saveTitle = errors.length
     ? errors.map((issue) => issue.message).join(" ")
     : unchanged
-      ? "Nothing has changed since this plan was opened"
+      ? t("library.ed.unchanged")
       : undefined;
 
   return (
     <section
       ref={section}
       className="plan-editor"
-      aria-label={plan.remoteId ? `Edit ${plan.name}` : "New plan"}
+      aria-label={plan.remoteId ? t("library.ed.editName", { name: plan.name }) : t("library.ed.titleNew")}
       style={dominant ? sportAccentStyle(dominant) : undefined}
     >
       <header className="plan-editor-bar">
         <button
           type="button"
           className="icon-button"
-          aria-label="Close editor"
-          title={dirty ? "Close — asks before throwing away unsaved changes" : "Close"}
+          aria-label={t("library.ed.close")}
+          title={dirty ? t("library.ed.closeDirty") : t("common.close")}
           onClick={close}
         >
           <X size={16} />
         </button>
         <span className="plan-editor-bar-title">{title}</span>
         <span className="plan-editor-state" data-state={dirty ? "dirty" : "clean"} aria-live="polite">
-          {dirty ? "Unsaved changes" : isNew ? "Not saved yet" : "No changes"}
+          {dirty ? t("library.ed.dirty") : isNew ? t("library.ed.notSaved") : t("library.ed.noChanges")}
         </span>
         <div className="plan-editor-bar-actions">
           <button
             type="button"
             className="icon-button"
-            aria-label="Undo"
-            title="Undo (Ctrl+Z)"
+            aria-label={t("library.ed.undo")}
+            title={t("library.ed.undoTitle")}
             disabled={!canUndo(draft)}
             onClick={() => onDraftChange(undoDraft(draft))}
           >
@@ -598,8 +604,8 @@ export function PlanEditor({
           <button
             type="button"
             className="icon-button"
-            aria-label="Redo"
-            title="Redo (Ctrl+Shift+Z)"
+            aria-label={t("library.ed.redo")}
+            title={t("library.ed.redoTitle")}
             disabled={!canRedo(draft)}
             onClick={() => onDraftChange(redoDraft(draft))}
           >
@@ -610,10 +616,10 @@ export function PlanEditor({
               type="button"
               className="ghost-button"
               disabled={saving !== null}
-              title="Throw this draft away"
+              title={t("library.ed.discardDraftTitle")}
               onClick={onDiscardDraft}
             >
-              <Trash2 size={14} /> Discard draft
+              <Trash2 size={14} /> {t("library.ed.discardDraft")}
             </button>
           ) : null}
           {onSaveDraft ? (
@@ -621,11 +627,11 @@ export function PlanEditor({
               type="button"
               className="ghost-button"
               disabled={saving !== null || unchanged}
-              title={unchanged ? "Nothing has changed since this plan was opened" : "Keep this edit here to finish later"}
+              title={unchanged ? t("library.ed.unchanged") : t("library.ed.keepLater")}
               onClick={() => void save("draft")}
             >
               {saving === "draft" ? <LoaderCircle size={14} className="is-spinning" /> : <FilePen size={14} />}
-              {saving === "draft" ? "Saving…" : "Save draft"}
+              {saving === "draft" ? t("library.ed.saving") : t("library.ed.saveDraft")}
             </button>
           ) : null}
           {onSave ? (
@@ -633,18 +639,18 @@ export function PlanEditor({
               type="button"
               className="primary-button"
               disabled={saveBlocked}
-              title={saveTitle ?? "Save (Ctrl+S)"}
+              title={saveTitle ?? t("library.ed.saveTitle")}
               onClick={() => void save("coros")}
             >
               {saving === "coros" ? <LoaderCircle size={14} className="is-spinning" /> : <Save size={14} />}
-              {saving === "coros" ? "Saving…" : saveLabel ?? "Save to COROS"}
+              {saving === "coros" ? t("library.ed.saving") : saveLabel ?? t("library.ed.saveCoros")}
             </button>
           ) : null}
         </div>
       </header>
 
       {listed.length ? (
-        <ul className="plan-editor-issues" aria-label="Problems with this plan">
+        <ul className="plan-editor-issues" aria-label={t("library.ed.problems")}>
           {listed.map((issue, index) => (
             <li key={`${issue.path}:${index}`} data-severity={issue.severity}>
               <AlertTriangle size={13} aria-hidden="true" />
@@ -663,9 +669,9 @@ export function PlanEditor({
           <div className="plan-editor-title">
             <input
               className="plan-editor-name"
-              aria-label="Plan name"
+              aria-label={t("library.ed.planName")}
               aria-invalid={!plan.name.trim() || undefined}
-              placeholder="Name this plan"
+              placeholder={t("library.ed.namePh")}
               ref={nameField}
               value={plan.name}
               onChange={(event) => type("name")(event.target.value)}
@@ -677,17 +683,16 @@ export function PlanEditor({
             </p>
             {plan.calendar === "running" ? (
               <p className="plan-editor-note is-warning">
-                This is the copy of the plan on your COROS calendar. Saving changes the calendar
-                straight away.
+                {t("library.ed.runningCopy")}
               </p>
             ) : null}
             <div className="plan-editor-about">
               <label className="plan-editor-field">
-                <span>Description</span>
+                <span>{t("library.ed.description")}</span>
                 <textarea
                   rows={3}
                   value={plan.description}
-                  placeholder="What the plan is for and how it works"
+                  placeholder={t("library.ed.descriptionPh")}
                   onChange={(event) => type("description")(event.target.value)}
                   onBlur={seal}
                 />
@@ -710,8 +715,7 @@ export function PlanEditor({
 
           {plan.entries.length === 0 ? (
             <p className="plan-editor-start">
-              Press a day&rsquo;s <Plus size={12} aria-label="plus" /> to put a session on it — a new
-              one, or a workout from your library.
+              {rich("library.ed.startHint", { b: () => <Plus size={12} aria-label={t("library.ed.plus")} /> })}
             </p>
           ) : null}
 
@@ -737,16 +741,16 @@ export function PlanEditor({
               disabled={plan.weekCount >= MAX_WEEKS}
               onClick={() => commit(appendWeek(plan))}
             >
-              <Plus size={14} /> Add a week
+              <Plus size={14} /> {t("library.ed.addWeek")}
             </button>
             <button
               type="button"
               className="ghost-button"
               disabled={plan.weekCount >= MAX_WEEKS || !lastWeekHolds}
-              title={lastWeekHolds ? undefined : `Week ${plan.weekCount} has nothing to repeat`}
+              title={lastWeekHolds ? undefined : t("library.ed.nothingToRepeat", { n: plan.weekCount })}
               onClick={() => commit(duplicateTrainingPlanWeek(plan, plan.weekCount - 1))}
             >
-              <Copy size={14} /> Repeat week {plan.weekCount}
+              <Copy size={14} /> {t("library.ed.repeatWeek", { n: plan.weekCount })}
             </button>
           </div>
         </div>
@@ -756,7 +760,7 @@ export function PlanEditor({
         <div className="plan-editor-workout-error" role="alert">
           <AlertTriangle size={14} />
           {workoutEditorError}
-          <button type="button" aria-label="Dismiss" onClick={() => setWorkoutEditorError(null)}>
+          <button type="button" aria-label={t("library.ed.dismiss")} onClick={() => setWorkoutEditorError(null)}>
             <X size={12} />
           </button>
         </div>
@@ -764,10 +768,10 @@ export function PlanEditor({
 
       {layer?.kind === "discard" ? (
         <ConfirmDialog
-          title="Discard unsaved changes?"
-          description={`"${plan.name || "This plan"}" has edits that have not been saved. Closing the editor throws them away.`}
-          confirmLabel="Discard changes"
-          cancelLabel="Keep editing"
+          title={t("library.w.discardTitle")}
+          description={t("library.ed.discardPlanBody", { name: plan.name || t("library.ed.thisPlan") })}
+          confirmLabel={t("library.w.discard")}
+          cancelLabel={t("library.w.keep")}
           danger
           onConfirm={() => {
             setLayer(null);
@@ -779,12 +783,12 @@ export function PlanEditor({
 
       {layer?.kind === "delete-week" ? (
         <ConfirmDialog
-          title={`Delete week ${layer.weekIndex + 1}?`}
-          description={(() => {
-            const count = plan.entries.filter((entry) => entry.weekIndex === layer.weekIndex).length;
-            return `This removes ${count} session${count === 1 ? "" : "s"}. Later weeks move up to fill the gap, and so do their stages.`;
-          })()}
-          confirmLabel="Delete week"
+          title={t("library.ed.deleteWeekTitle", { n: layer.weekIndex + 1 })}
+          description={plural(
+            "library.ed.deleteWeekBody",
+            plan.entries.filter((entry) => entry.weekIndex === layer.weekIndex).length
+          )}
+          confirmLabel={t("library.ed.deleteWeek")}
           danger
           onConfirm={() => {
             commit(removeWeek(plan, layer.weekIndex));
@@ -822,8 +826,8 @@ export function PlanEditor({
           api={api}
           source={{ kind: "plan", entry: editingEntry }}
           heading={{
-            eyebrow: `${plan.name || "New plan"} · ${slotLabel(editingEntry, reading.weeks[editingEntry.weekIndex])}`,
-            title: `Edit ${editingEntry.title || "session"}`
+            eyebrow: `${plan.name || t("library.ed.titleNew")} · ${slotLabel(editingEntry, reading.weeks[editingEntry.weekIndex])}`,
+            title: t("library.ed.editSession", { name: editingEntry.title || t("library.ed.session") })
           }}
           confirmDiscard={discardSession}
           onClose={() => setLayer(null)}
@@ -847,8 +851,8 @@ export function PlanEditor({
           api={api}
           source={{ kind: "plan-new", sport: dominant }}
           heading={{
-            eyebrow: `${plan.name || "New plan"} · ${slotLabel(layer.slot, reading.weeks[layer.slot.weekIndex])}`,
-            title: "New session"
+            eyebrow: `${plan.name || t("library.ed.titleNew")} · ${slotLabel(layer.slot, reading.weeks[layer.slot.weekIndex])}`,
+            title: t("library.ed.newSession")
           }}
           confirmDiscard={discardSession}
           onClose={() => setLayer(null)}
@@ -885,19 +889,20 @@ const EditorWeek = memo(function EditorWeek({
   unitSystem,
   actions
 }: EditorWeekProps) {
+  useI18n();
   const weekNumber = week.weekIndex + 1;
   const holds = week.days.some((day) => day.entries.length > 0);
   const menu: PlanMenuItem[] = [
-    { label: "Duplicate week", icon: Copy, disabled: weekCount >= MAX_WEEKS, onSelect: () => actions.week("duplicate", week.weekIndex) },
-    { label: "Move week earlier", icon: ArrowUp, disabled: week.weekIndex === 0, separated: true, onSelect: () => actions.week("earlier", week.weekIndex) },
-    { label: "Move week later", icon: ArrowDown, disabled: week.weekIndex >= weekCount - 1, onSelect: () => actions.week("later", week.weekIndex) },
-    { label: "Clear week", icon: Eraser, disabled: !holds, separated: true, onSelect: () => actions.week("clear", week.weekIndex) },
+    { label: t("library.wk.dupWeek"), icon: Copy, disabled: weekCount >= MAX_WEEKS, onSelect: () => actions.week("duplicate", week.weekIndex) },
+    { label: t("library.wk.earlier"), icon: ArrowUp, disabled: week.weekIndex === 0, separated: true, onSelect: () => actions.week("earlier", week.weekIndex) },
+    { label: t("library.wk.later"), icon: ArrowDown, disabled: week.weekIndex >= weekCount - 1, onSelect: () => actions.week("later", week.weekIndex) },
+    { label: t("library.wk.clearWeek"), icon: Eraser, disabled: !holds, separated: true, onSelect: () => actions.week("clear", week.weekIndex) },
     {
-      label: "Delete week",
+      label: t("library.wk.deleteWeek"),
       icon: Trash2,
       danger: true,
       disabled: weekCount <= 1,
-      title: weekCount <= 1 ? "A plan has at least one week" : undefined,
+      title: weekCount <= 1 ? t("library.wk.oneWeek") : undefined,
       onSelect: () => actions.week("delete", week.weekIndex)
     }
   ];
@@ -909,17 +914,17 @@ const EditorWeek = memo(function EditorWeek({
       data-stage={week.stageSlug}
     >
       <header>
-        <h2 tabIndex={-1}>Week {weekNumber}</h2>
+        <h2 tabIndex={-1}>{t("library.reader.weekN", { n: weekNumber })}</h2>
         <p>{formatWeekLine(week)}</p>
         <OptionGroup<string>
-          label={`Stage of week ${weekNumber}`}
+          label={t("library.wk.stageOf", { n: weekNumber })}
           className="plan-editor-week-stage"
           value={String(stage)}
-          options={STAGE_OPTIONS}
+          options={stageOptions()}
           onChange={(value) => actions.stage(week.weekIndex, Number(value) as TrainingPlanWeekStage)}
           mode="dropdown"
         />
-        <PlanMenu label={`Actions for week ${weekNumber}`} className="plan-editor-week-menu" items={menu} />
+        <PlanMenu label={t("library.wk.actionsWeek", { n: weekNumber })} className="plan-editor-week-menu" items={menu} />
       </header>
 
       <div className="plan-editor-days">
@@ -937,14 +942,14 @@ const EditorWeek = memo(function EditorWeek({
               <div className="plan-editor-day-head">
                 <span className="plan-editor-day-label">{day.label}</span>
                 <PlanMenu
-                  label={`Add to ${day.label}, week ${weekNumber}`}
+                  label={t("library.wk.addTo", { day: day.label, n: weekNumber })}
                   className="plan-editor-day-menu"
                   triggerClassName="plan-editor-day-add"
                   trigger={<Plus size={13} aria-hidden="true" />}
                   align={day.dayIndex < 4 ? "start" : "end"}
                   items={[
-                    { label: "New session", icon: PenLine, onSelect: () => actions.add("session", slot) },
-                    { label: "From workout library", icon: Library, onSelect: () => actions.add("library", slot) }
+                    { label: t("library.wk.newSession"), icon: PenLine, onSelect: () => actions.add("session", slot) },
+                    { label: t("library.wk.fromLibrary"), icon: Library, onSelect: () => actions.add("library", slot) }
                   ]}
                 />
               </div>
@@ -962,7 +967,7 @@ const EditorWeek = memo(function EditorWeek({
                 </ul>
               ) : dragging ? null : (
                 <span className="plan-editor-day-empty" aria-hidden="true">
-                  Free
+                  {t("library.wk.free")}
                 </span>
               )}
             </div>
@@ -994,17 +999,17 @@ function EditorEntry({ entry, lastWeek, unitSystem, actions }: EditorEntryProps)
   const figures = entryFigures(entry, unitSystem);
 
   const menu: PlanMenuItem[] = [
-    { label: "Edit session", icon: Pencil, onSelect: () => actions.open(entry.id) },
-    { label: "Move to…", icon: MoveRight, onSelect: () => actions.requestMove(entry.id) },
-    { label: "Duplicate", icon: Copy, onSelect: () => actions.duplicate(entry.id) },
+    { label: t("library.wk.editSession"), icon: Pencil, onSelect: () => actions.open(entry.id) },
+    { label: t("library.wk.moveTo"), icon: MoveRight, onSelect: () => actions.requestMove(entry.id) },
+    { label: t("library.wk.duplicate"), icon: Copy, onSelect: () => actions.duplicate(entry.id) },
     {
-      label: "Copy to next week",
+      label: t("library.wk.copyNext"),
       icon: CopyPlus,
       disabled: lastWeek,
-      title: lastWeek ? "This is the plan's last week" : undefined,
+      title: lastWeek ? t("library.wk.lastWeek") : undefined,
       onSelect: () => actions.copyToNextWeek(entry.id)
     },
-    { label: "Delete", icon: Trash2, danger: true, separated: true, onSelect: () => actions.remove(entry.id) }
+    { label: t("library.wk.delete"), icon: Trash2, danger: true, separated: true, onSelect: () => actions.remove(entry.id) }
   ];
 
   return (
@@ -1023,7 +1028,7 @@ function EditorEntry({ entry, lastWeek, unitSystem, actions }: EditorEntryProps)
       <button
         type="button"
         className="plan-editor-entry-main"
-        title={`Edit ${entry.title}. Alt + arrow keys move it; Delete removes it.`}
+        title={t("library.wk.entryTitle", { name: entry.title })}
         onClick={() => actions.open(entry.id)}
         onKeyDown={(event) => {
           const direction = STEP_KEYS[event.key];
@@ -1041,11 +1046,11 @@ function EditorEntry({ entry, lastWeek, unitSystem, actions }: EditorEntryProps)
         </span>
         <span className="plan-editor-entry-name">{entry.title}</span>
         <span className={`plan-editor-entry-detail${figures.length ? "" : " is-nil"}`}>
-          {figures.join(" · ") || "No target set"}
+          {figures.join(" · ") || t("library.entry.noTarget")}
         </span>
       </button>
       <PlanMenu
-        label={`Actions for ${entry.title}`}
+        label={t("library.wk.actionsFor", { name: entry.title })}
         className="plan-editor-entry-menu"
         triggerClassName="plan-editor-entry-more"
         trigger={<MoreHorizontal size={14} aria-hidden="true" />}
@@ -1071,9 +1076,9 @@ function LibraryRow({
   const sport = workoutSportFromType(workout.sportType);
   const Icon = sportTheme(sport).icon;
   const facts = [
-    formatWorkoutSport(sport ?? "run"),
+    workoutSportLabel(sport ?? "run"),
     workout.durationSeconds ? formatPlannedDuration(workout.durationSeconds) : null,
-    workout.setCount ? `${workout.setCount} sets` : null
+    workout.setCount ? plural("workout.sets", workout.setCount) : null
   ].filter(Boolean);
   return (
     <li style={sportChipStyle(sport)}>
@@ -1143,18 +1148,18 @@ function LibraryDialog({
         className="tl-dialog plan-editor-add-dialog is-library"
         role="dialog"
         aria-modal="true"
-        aria-label="Add from workout library"
+        aria-label={t("library.libdlg.addLabel")}
         onMouseDown={(event) => event.stopPropagation()}
       >
-        <h2>From workout library</h2>
-        <p>On {where}.</p>
+        <h2>{t("library.libdlg.title")}</h2>
+        <p>{t("library.libdlg.on", { where })}</p>
         <label className="plan-editor-search">
           <Search size={14} aria-hidden="true" />
           <input
             ref={field}
             value={query}
-            placeholder={`Search ${workouts.length} saved workouts`}
-            aria-label="Search saved workouts"
+            placeholder={plural("library.libdlg.searchPh", workouts.length)}
+            aria-label={t("library.libdlg.search")}
             onChange={(event) => setQuery(event.target.value)}
             onKeyDown={(event) => {
               if (event.key === "Enter" && matches.length === 1 && !loading) onPick(matches[0]!);
@@ -1176,13 +1181,13 @@ function LibraryDialog({
         ) : (
           <p className="plan-editor-hint">
             {workouts.length
-              ? "No saved workout has that in its name."
-              : "Workouts you save in the library appear here. A new session can be written for this plan alone."}
+              ? t("library.libdlg.noMatch")
+              : t("library.libdlg.empty")}
           </p>
         )}
         <footer>
           <button type="button" className="ghost-button" onClick={onCancel}>
-            Cancel
+            {t("common.cancel")}
           </button>
         </footer>
       </section>
@@ -1212,7 +1217,7 @@ function MoveDialog({
   const week = weeks[weekIndex];
   const slot: PlanSlot = { weekIndex, dayIndex: Number(day) };
   const unchanged = slot.weekIndex === entry.weekIndex && slot.dayIndex === entry.dayIndex;
-  const name = entry.title || "Session";
+  const name = entry.title || t("library.move.session");
 
   return (
     <div className="tl-dialog-backdrop" onMouseDown={onCancel}>
@@ -1220,29 +1225,31 @@ function MoveDialog({
         className="tl-dialog plan-editor-move"
         role="dialog"
         aria-modal="true"
-        aria-label={`Move ${name}`}
+        aria-label={t("library.move.label", { name })}
         onMouseDown={(event) => event.stopPropagation()}
       >
-        <h2>Move &ldquo;{name}&rdquo;</h2>
+        <h2>{t("library.move.title", { name })}</h2>
         <div className="plan-editor-field">
-          <span>Week</span>
+          <span>{t("library.move.week")}</span>
           <SelectDropdown<string>
-            label="Week"
+            label={t("library.move.week")}
             value={String(weekIndex)}
             options={weeks.map((item) => ({
               value: String(item.weekIndex),
-              label: `Week ${item.weekIndex + 1}${item.stage ? ` · ${item.stage}` : ""}`
+              label: item.stage
+                ? t("library.move.weekStage", { n: item.weekIndex + 1, stage: item.stage })
+                : t("library.move.weekOption", { n: item.weekIndex + 1 })
             }))}
             portal
             onChange={(value) => setWeekIndex(Number(value))}
           />
         </div>
         <div className="plan-editor-field">
-          <span>Day</span>
+          <span>{t("library.move.day")}</span>
           <OptionGroup<string>
-            label="Day"
+            label={t("library.move.day")}
             value={day}
-            options={DAY_NAMES.map((dayName, index) => ({
+            options={weekdayNames("short").map((dayName, index) => ({
               value: String(index),
               label: dayName,
               title: week?.days[index]?.label
@@ -1254,10 +1261,10 @@ function MoveDialog({
         </div>
         <footer>
           <button ref={cancel} type="button" className="ghost-button" onClick={onCancel}>
-            Cancel
+            {t("common.cancel")}
           </button>
           <button type="button" className="ghost-button" onClick={() => onMove(slot, true)}>
-            Copy there
+            {t("library.move.copy")}
           </button>
           <button
             type="button"
@@ -1265,7 +1272,7 @@ function MoveDialog({
             disabled={unchanged}
             onClick={() => onMove(slot, false)}
           >
-            Move
+            {t("library.move.move")}
           </button>
         </footer>
       </section>

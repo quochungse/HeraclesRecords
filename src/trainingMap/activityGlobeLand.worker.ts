@@ -85,6 +85,7 @@ function buildLandGeometry(): LandGeometryMessage {
   const raster = new OffscreenCanvas(MASK_WIDTH, MASK_HEIGHT);
   const context = raster.getContext("2d", { willReadFrequently: true });
   if (!context) {
+    // i18n-ignore: never drawn; the card shows its own sentence on any failure.
     throw new Error("Unable to create the geography mask.");
   }
 

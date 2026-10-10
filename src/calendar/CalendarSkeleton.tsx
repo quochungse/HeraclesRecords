@@ -7,7 +7,7 @@ import {
 import { getLocalHappenDayKey } from "../training/formatters";
 import type { CalendarMode } from "./calendarTypes";
 import {
-  WEEKDAY_LABELS,
+  weekdayLabels,
   dayNumber,
   isKeyInMonth,
   monthGridWeeks,
@@ -15,6 +15,7 @@ import {
   weekRangeLabel,
   weekRow
 } from "./dateUtils";
+import { t } from "../i18n/core";
 
 /*
  * The Calendar's stand-ins, in the main bundle rather than the screen's chunk.
@@ -120,7 +121,7 @@ export function CalendarSkeleton() {
     mode === "month" ? monthLabel(year, month) : weekRangeLabel(weeks[0] ?? []);
 
   return (
-    <section className="calendar-view" aria-busy="true" aria-label="Loading the calendar">
+    <section className="calendar-view" aria-busy="true" aria-label={t("calendar.loading")}>
       <header className="calendar-header">
         <div className="calendar-header-nav">
           {NAV_PILLS.map((width, index) => (
@@ -148,13 +149,13 @@ export function CalendarSkeleton() {
         aria-hidden="true"
       >
         <div className="calendar-grid-header">
-          {WEEKDAY_LABELS.map((label) => (
+          {weekdayLabels().map((label) => (
             <div key={label} className="calendar-grid-header-cell">
               {label}
             </div>
           ))}
           <div className="calendar-grid-header-cell calendar-grid-header-stats">
-            Weekly Statistics
+            {t("calendar.weeklyStats")}
           </div>
         </div>
         <div className="calendar-grid-body">
@@ -178,7 +179,7 @@ export function CalendarSkeleton() {
                     <div className="calendar-day-head">
                       <span className="calendar-day-number">
                         {isToday
-                          ? `Today ${String(dayNumber(dateKey)).padStart(2, "0")}`
+                          ? t("calendar.today", { day: String(dayNumber(dateKey)).padStart(2, "0") })
                           : dayNumber(dateKey)}
                       </span>
                     </div>

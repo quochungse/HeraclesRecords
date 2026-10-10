@@ -19,6 +19,12 @@ import {
 } from "./syncLocalStorage";
 import { BackupRestoreModal } from "./BackupRestoreModal";
 import { formatBytes, formatWhen } from "./formatters";
+import { getIntlLocale, t } from "../i18n/core";
+import { useI18n } from "../i18n/useI18n";
+
+function count(value: number): string {
+  return value.toLocaleString(getIntlLocale());
+}
 
 interface BackupPanelProps {
   api: HeraclesRecordsApi;
@@ -33,6 +39,7 @@ interface BackupPanelProps {
  * question about a shared destination, not about a file someone owns.
  */
 export function BackupPanel({ api }: BackupPanelProps) {
+  useI18n();
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
@@ -74,9 +81,13 @@ export function BackupPanel({ api }: BackupPanelProps) {
       // Null means the save dialog was dismissed, which is not worth a line.
       if (!result) return;
       setMessage(
-        `Saved ${result.rowCount.toLocaleString()} records, ` +
-          `${result.settingCount} settings and ${result.localStorageCount} view ` +
-          `preferences to ${result.path} (${formatBytes(result.bytes)}).`
+        t("backup.saved", {
+          records: count(result.rowCount),
+          settings: count(result.settingCount),
+          preferences: count(result.localStorageCount),
+          path: result.path,
+          size: formatBytes(result.bytes),
+        })
       );
     });
 
@@ -94,17 +105,22 @@ export function BackupPanel({ api }: BackupPanelProps) {
             ? replaceSyncedLocalStorage(result.localStorage).applied
             : mergeSyncedLocalStorage(result.localStorage).applied;
 
-        const wrote =
-          `Restored ${result.rowsWritten.toLocaleString()} records, ` +
-          `${result.settingsWritten} settings and ${applied} view preferences`;
-        const cleared =
+        const figures = {
+          records: count(result.rowsWritten),
+          settings: count(result.settingsWritten),
+          preferences: count(applied),
+        };
+        const restored =
           mode === "replace" &&
           (result.rowsRemoved > 0 || result.settingsRemoved > 0)
-            ? `; removed ${result.rowsRemoved.toLocaleString()} records and ` +
-              `${result.settingsRemoved} settings this backup does not have`
-            : "";
+            ? t("backup.restoredRemoved", {
+                ...figures,
+                removedRecords: count(result.rowsRemoved),
+                removedSettings: count(result.settingsRemoved),
+              })
+            : t("backup.restored", figures);
 
-        setMessage(`${wrote}${cleared}. Restart to see everything.`);
+        setMessage(`${restored} ${t("backup.restartHint")}`);
         setCandidate(null);
       }),
     [api, run]
@@ -148,12 +164,8 @@ export function BackupPanel({ api }: BackupPanelProps) {
           <Archive size={18} strokeWidth={1.9} />
         </span>
         <div className="settings-compact-copy">
-          <strong>Backup &amp; Restore</strong>
-          <span>
-            Everything you have written, in one file you keep — scrambled, not
-            encrypted. Sign-ins are never in it, and it only restores into the
-            COROS account that made it.
-          </span>
+          <strong>{t("backup.title")}</strong>
+          <span>{t("backup.description")}</span>
         </div>
         <div className="settings-compact-actions">
           <button
@@ -167,7 +179,7 @@ export function BackupPanel({ api }: BackupPanelProps) {
             ) : (
               <Download size={14} strokeWidth={2} />
             )}
-            Save backup…
+            {t("backup.save")}
           </button>
           <button
             type="button"
@@ -180,7 +192,7 @@ export function BackupPanel({ api }: BackupPanelProps) {
             ) : (
               <Upload size={14} strokeWidth={2} />
             )}
-            Restore…
+            {t("backup.restore")}
           </button>
         </div>
       </div>

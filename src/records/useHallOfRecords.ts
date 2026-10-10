@@ -22,6 +22,7 @@ import {
   type RecordsResult
 } from "./milestones";
 import { sampleRecordsInput, type RecordsSamplePreset } from "./sampleRecords";
+import { useI18n } from "../i18n/useI18n";
 
 /** The nights the sleep cache keeps (`HISTORY_RETENTION_DAYS`). */
 const SLEEP_DAYS = 400;
@@ -230,6 +231,10 @@ export function useHallOfRecords({
     return namedPlaceLabels();
   }, [labelVersion]);
 
+  // Every title and line in the result is written in the language on screen,
+  // so a switch works the hall out again; ids, days and figures do not move.
+  const { locale } = useI18n();
+
   // Built back from the day it is switched on, so its dates stay current.
   const sampleInput = useMemo(
     () => (sample ? sampleRecordsInput(sample, getLocalHappenDayKey()) : null),
@@ -263,7 +268,8 @@ export function useHallOfRecords({
       placeLabels,
       regions,
       athlete,
-      unitSystem
+      unitSystem,
+      locale
     ]
   );
 

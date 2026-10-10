@@ -5,6 +5,7 @@ import type {
   ChatSessionSummary,
   CoachAnalysisSessionAttention
 } from "../../electron/types";
+import { t } from "../i18n/core";
 
 export function ChatSidebar({
   open,
@@ -79,7 +80,7 @@ export function ChatSidebar({
           ]
             .filter(Boolean)
             .join(" ")}
-          aria-label="Close sidebar"
+          aria-label={t("chat.list.closeSidebar")}
           aria-hidden={!open}
           tabIndex={open ? 0 : -1}
           onClick={onClose}
@@ -134,8 +135,8 @@ export function ChatSidebar({
           onClick={onOpen}
           aria-expanded="false"
           aria-controls="chat-conversation-sidebar"
-          aria-label="Expand conversations"
-          title="Expand conversations"
+          aria-label={t("chat.list.expand")}
+          title={t("chat.list.expand")}
         >
           <PanelLeft size={17} aria-hidden="true" />
         </button>

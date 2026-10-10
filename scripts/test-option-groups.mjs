@@ -251,6 +251,8 @@ for (const { rel, text } of [
   }))
 ]) {
   if (rel === PERIOD_SCALE) continue;
+  // The scale's own words, in each language (periodScale.ts reads them).
+  if (rel.startsWith("src/i18n/messages/")) continue;
   // Comments explain the history and may quote the old spellings.
   const code = text.replace(/\/\*[\s\S]*?\*\//g, (c) => c.replace(/[^\n]/g, " "))
                    .replace(/\/\/[^\n]*/g, (c) => " ".repeat(c.length));

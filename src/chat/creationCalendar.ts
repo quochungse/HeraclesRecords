@@ -11,6 +11,7 @@
  */
 import type { PlanCalendarState } from "../../electron/types";
 import { describeCompliance, planCompliance } from "../training-library/planCompliance";
+import { getIntlLocale, t } from "../i18n/core";
 
 export interface CreationCalendar {
   running: boolean;
@@ -43,13 +44,15 @@ export function creationCalendar(
     if (offset < 0) {
       const [year, month, day] = running.startDate.split("-").map(Number);
       parts.push(
-        `Starts ${new Intl.DateTimeFormat(undefined, { weekday: "short", month: "short", day: "numeric" }).format(
-          new Date(year, month - 1, day)
-        )}`
+        t("chat.calendar.starts", {
+          day: new Intl.DateTimeFormat(getIntlLocale(), { weekday: "short", month: "short", day: "numeric" }).format(
+            new Date(year, month - 1, day)
+          )
+        })
       );
     } else {
       const week = Math.min(running.weekCount, Math.floor(offset / 7) + 1);
-      parts.push(`Week ${week} of ${running.weekCount}`);
+      parts.push(t("library.reader.weekOf", { n: week, total: running.weekCount }));
     }
   }
   const progress = describeCompliance(planCompliance(running, state.matches));

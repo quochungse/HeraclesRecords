@@ -3,6 +3,7 @@ import { useReducedMotion } from "motion/react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { WorkoutExerciseOption } from "../../electron/types";
 import { MUSCLE_BY_ID, resolveExerciseTargets } from "../strength/muscles";
+import { t } from "../i18n/core";
 
 interface ExercisePreviewProps {
   option?: WorkoutExerciseOption;
@@ -108,20 +109,20 @@ export function ExercisePreview({
   return (
     <section
       className={`exercise-preview ${className}`.trim()}
-      aria-label={`${name || "Exercise"} demonstration`}
+      aria-label={t("workout.preview.demo", { name: name || t("workout.preview.exercise") })}
     >
       <div className="exercise-preview-stage">
         {status === "loading" ? (
           <div className="exercise-preview-status" role="status">
             <span className="exercise-preview-spinner" aria-hidden="true" />
-            <strong>Loading demonstration</strong>
+            <strong>{t("workout.preview.loading")}</strong>
           </div>
         ) : null}
         {status === "error" ? (
           <div className="exercise-preview-status is-error" role="alert">
             <AlertCircle size={20} aria-hidden="true" />
-            <strong>Demonstration unavailable</strong>
-            {angles.length > 1 ? <span>Try another angle.</span> : null}
+            <strong>{t("workout.preview.unavailable")}</strong>
+            {angles.length > 1 ? <span>{t("workout.preview.tryAngle")}</span> : null}
           </div>
         ) : null}
         <video
@@ -139,13 +140,13 @@ export function ExercisePreview({
           onError={() => setStatus("error")}
           onPlay={() => setPaused(false)}
           onPause={() => setPaused(true)}
-          aria-label={`${name || "Exercise"} demonstration, angle ${angleIndex + 1} of ${angles.length}`}
+          aria-label={t("workout.preview.demoAngle", { name: name || t("workout.preview.exercise"), n: angleIndex + 1, total: angles.length })}
         />
         {status === "ready" ? (
           <button
             type="button"
             className={`exercise-preview-toggle ${paused ? "is-paused" : ""}`}
-            aria-label={paused ? "Play demonstration" : "Pause demonstration"}
+            aria-label={paused ? t("workout.preview.play") : t("workout.preview.pause")}
             onClick={togglePlayback}
           >
             <span className="exercise-preview-play" aria-hidden="true">
@@ -159,15 +160,15 @@ export function ExercisePreview({
         <div className="exercise-preview-angles">
           <button
             type="button"
-            aria-label="Show previous angle"
+            aria-label={t("workout.preview.prevAngle")}
             onClick={() => setAngleIndex((current) => (current - 1 + angles.length) % angles.length)}
           >
             <ChevronLeft size={15} aria-hidden="true" />
           </button>
-          <span aria-live="polite">Angle {angleIndex + 1} of {angles.length}</span>
+          <span aria-live="polite">{t("workout.preview.angle", { n: angleIndex + 1, total: angles.length })}</span>
           <button
             type="button"
-            aria-label="Show next angle"
+            aria-label={t("workout.preview.nextAngle")}
             onClick={() => setAngleIndex((current) => (current + 1) % angles.length)}
           >
             <ChevronRight size={15} aria-hidden="true" />
@@ -176,12 +177,12 @@ export function ExercisePreview({
       ) : null}
 
       {showTargets && targets?.mobility ? (
-        <p className="exercise-preview-note">Mobility work. It carries no training load.</p>
+        <p className="exercise-preview-note">{t("workout.preview.mobility")}</p>
       ) : null}
 
       {showTargets && muscles.length > 0 ? (
         <div className="exercise-preview-targets">
-          <h5>Trains</h5>
+          <h5>{t("workout.preview.trains")}</h5>
           <ul>
             {muscles.map((muscle) => (
               <li key={muscle.id} className={muscle.isPrime ? "is-prime" : ""} title={muscle.anatomy}>

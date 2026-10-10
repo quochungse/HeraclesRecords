@@ -195,8 +195,8 @@ export function setWeekStage(
  */
 export function defaultPlanName(existing: readonly string[]): string {
   const taken = new Set(existing.map((name) => name.trim().toLowerCase()));
-  if (!taken.has("new plan")) return "New plan";
+  if (!taken.has("new plan")) return "New plan"; // i18n-ignore: saved to COROS as the name
   let number = 2;
   while (taken.has(`new plan ${number}`)) number += 1;
-  return `New plan ${number}`;
+  return `New plan ${number}`; // i18n-ignore: saved to COROS as the name
 }

@@ -6,7 +6,7 @@ import { generationRequestProblems, type TrainingPlanGenerationField } from "../
 import { GeneratorGoalStep } from "../training-library/GeneratorGoalStep";
 import { GeneratorWeekStep } from "../training-library/GeneratorWeekStep";
 import {
-  OTHER_SERVERS_WITHHELD_NOTE,
+  otherServersWithheldNote,
   SOURCES,
   STEP_FIELDS,
   anySourceWithheld,
@@ -17,13 +17,16 @@ import {
 } from "../training-library/planGeneratorModel";
 import "../training-library/trainingLibrary.css";
 import { briefAsRequest, briefFromForm, formFromBrief } from "./planBriefModel";
+import { t } from "../i18n/core";
 
 type BriefStep = "goal" | "week";
 
-const STEPS: readonly { step: BriefStep; label: string }[] = [
-  { step: "goal", label: "Goal" },
-  { step: "week", label: "Your week" }
-];
+function briefSteps(): readonly { step: BriefStep; label: string }[] {
+  return [
+    { step: "goal", label: t("library.snap.goal") },
+    { step: "week", label: t("library.week.title") }
+  ];
+}
 
 /**
  * A plan brief's own screen (docs/coach-plan-canvas.md, P2.1, D10): the plan
@@ -102,11 +105,11 @@ export default function CoachBriefEditor({
           <header>
             <span className="plan-generator-title-icon"><Sparkles size={16} /></span>
             <div className="plan-generator-heading">
-              <p className="tl-eyebrow">Training Coach</p>
-              <h2 id="coach-brief-title">{mode === "new" ? "New plan" : "Plan brief"}</h2>
+              <p className="tl-eyebrow">{t("chat.trainingCoach")}</p>
+              <h2 id="coach-brief-title">{mode === "new" ? t("chat.newPlan") : t("chat.brief.kicker")}</h2>
             </div>
-            <nav className="plan-generator-steps" aria-label="Steps">
-              {STEPS.map((item, index) => {
+            <nav className="plan-generator-steps" aria-label={t("chat.brief.steps")}>
+              {briefSteps().map((item, index) => {
                 const currentStep = item.step === step;
                 const flagged = problems.some((problem) => stepOf(problem.field) === item.step);
                 return (
@@ -124,14 +127,14 @@ export default function CoachBriefEditor({
                 );
               })}
             </nav>
-            <button type="button" className="icon-button" aria-label="Close plan brief" onClick={onClose}>
+            <button type="button" className="icon-button" aria-label={t("chat.brief.close")} onClick={onClose}>
               <X size={17} />
             </button>
           </header>
 
           <div className="plan-generator-body">
             <aside className="plan-generator-status">
-              <p className="tl-eyebrow">What Coach reads</p>
+              <p className="tl-eyebrow">{t("chat.brief.whatReads")}</p>
               <ul className="plan-generator-sources">
                 {SOURCES.map((source) => {
                   const on = sources[source.value];
@@ -139,7 +142,7 @@ export default function CoachBriefEditor({
                     <li key={source.value}>
                       <span>
                         <strong id={`coach-brief-source-${source.value}`}>{source.label}</strong>
-                        <small>{on ? source.detail : mode === "new" ? "Not shared with Coach" : "Not shared in this conversation"}</small>
+                        <small>{on ? source.detail : mode === "new" ? t("chat.brief.notSharedCoach") : t("chat.brief.notShared")}</small>
                       </span>
                       <button
                         type="button"
@@ -156,9 +159,9 @@ export default function CoachBriefEditor({
                 })}
               </ul>
               {anySourceWithheld(sources) ? (
-                <p className="plan-generator-sheet-note">{OTHER_SERVERS_WITHHELD_NOTE}</p>
+                <p className="plan-generator-sheet-note">{otherServersWithheldNote()}</p>
               ) : null}
-              <p className="tl-eyebrow plan-generator-aside-eyebrow">Plan</p>
+              <p className="tl-eyebrow plan-generator-aside-eyebrow">{t("chat.kind.plan")}</p>
               <dl className="plan-generator-snapshot">
                 {planSnapshot(current, request).map((row) => (
                   <div key={row.label}>
@@ -178,15 +181,15 @@ export default function CoachBriefEditor({
               {error ??
                 problems[0]?.message ??
                 (mode === "new"
-                  ? "A conversation opens on this brief, and Coach starts drawing the outline."
-                  : "Coach draws the outline from this brief.")}
+                  ? t("chat.brief.hintNew")
+                  : t("chat.brief.hintEdit"))}
             </p>
             <button type="button" className="ghost-button" onClick={onClose}>
-              Cancel
+              {t("common.cancel")}
             </button>
             {step === "week" ? (
               <button type="button" className="ghost-button" onClick={() => setStep("goal")}>
-                Back
+                {t("chat.brief.back")}
               </button>
             ) : null}
             {step === "goal" ? (
@@ -197,7 +200,7 @@ export default function CoachBriefEditor({
                 className={mode === "new" ? "primary-button" : "ghost-button"}
                 onClick={() => setStep("week")}
               >
-                Next
+                {t("chat.brief.next")}
               </button>
             ) : null}
             {mode === "edit" || step === "week" ? (
@@ -209,7 +212,13 @@ export default function CoachBriefEditor({
                 disabled={saving || (mode === "new" && problems.length > 0)}
                 onClick={() => onSave(briefFromForm(current, firstMonday))}
               >
-                {saving ? (mode === "new" ? "Starting…" : "Saving…") : mode === "new" ? "Start plan" : "Save brief"}
+                {saving
+                  ? mode === "new"
+                    ? t("chat.brief.starting")
+                    : t("library.ed.saving")
+                  : mode === "new"
+                    ? t("chat.brief.start")
+                    : t("chat.brief.save")}
               </button>
             ) : null}
           </footer>

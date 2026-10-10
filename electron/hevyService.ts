@@ -21,6 +21,7 @@ import type {
   HevyStatus,
   StrengthSession
 } from "./types";
+import { ScreenError } from "./screenText";
 
 type JsonRecord = Record<string, unknown>;
 
@@ -172,13 +173,13 @@ async function hevyRequest(
   }
   if (!response.ok) {
     if (response.status === 401 || response.status === 403) {
-      throw new Error("Hevy rejected the API key. Reconnect Hevy with a current Pro API key.");
+      throw new ScreenError("main.hevy.keyRejected");
     }
     const message = stringValue(record(payload)?.error);
     throw new Error(message ?? `Hevy API request failed (${response.status}).`);
   }
   const parsed = record(payload);
-  if (!parsed) throw new Error("Hevy returned an invalid response.");
+  if (!parsed) throw new ScreenError("main.hevy.invalidResponse");
   return parsed;
 }
 
@@ -186,7 +187,7 @@ async function fetchIdentity(apiKey: string): Promise<HevyIdentity> {
   const response = await hevyRequest("/user/info", apiKey);
   const data = record(response.data);
   const userId = stringValue(data?.id);
-  if (!userId) throw new Error("Hevy did not return an account identity.");
+  if (!userId) throw new ScreenError("main.hevy.noIdentity");
   return {
     userId,
     displayName: stringValue(data?.name),
@@ -208,9 +209,9 @@ export function getHevyStatus(): HevyStatus {
 
 export async function connectHevy(apiKey: string): Promise<HevyStatus> {
   const key = apiKey.trim();
-  if (!key) throw new Error("Enter a Hevy API key.");
+  if (!key) throw new ScreenError("main.hevy.enterKey");
   if (!credentialStorage.isEncryptionAvailable()) {
-    throw new Error("Secure credential storage is unavailable on this system.");
+    throw new ScreenError("main.secureStorage");
   }
   const identity = await fetchIdentity(key);
   const previous = parseIdentity();
@@ -386,7 +387,7 @@ export async function syncHevyStrengthHistory(
   force = false
 ): Promise<HevySyncResult> {
   const apiKey = readApiKey();
-  if (!apiKey) throw new Error("Connect Hevy before syncing strength workouts.");
+  if (!apiKey) throw new ScreenError("main.hevy.connectFirst");
   const requestedSince = windowStartEpochSeconds(days);
   const coverageSince = Number(getSetting(SETTINGS.coverageSince));
   const cursor = getSetting(SETTINGS.eventCursor);

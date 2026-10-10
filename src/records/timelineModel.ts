@@ -5,6 +5,7 @@
 // hides the beginning the whole timeline runs down to.
 
 import type { Milestone, MilestoneCategory } from "./milestones";
+import { capitalizeFirst, messageRecord, monthNames } from "../i18n/core";
 
 export type TimelineFilter =
   | "all"
@@ -26,16 +27,16 @@ const FILTER_CATEGORIES: Readonly<Record<Exclude<TimelineFilter, "all">, readonl
   plans: ["plan"]
 };
 
-export const FILTER_LABELS: Readonly<Record<TimelineFilter, string>> = {
-  all: "All",
-  firsts: "Firsts",
-  records: "Records",
-  totals: "Totals",
-  streaks: "Streaks",
-  fitness: "Fitness",
-  places: "Places",
-  plans: "Plans"
-};
+export const FILTER_LABELS: Readonly<Record<TimelineFilter, string>> = messageRecord<TimelineFilter>({
+  all: "common.all",
+  firsts: "records.filter.firsts",
+  records: "records.filter.records",
+  totals: "records.filter.totals",
+  streaks: "records.filter.streaks",
+  fitness: "records.filter.fitness",
+  places: "records.filter.places",
+  plans: "records.filter.plans"
+});
 
 export const TIMELINE_FILTERS: readonly TimelineFilter[] = [
   "all",
@@ -74,13 +75,10 @@ export interface TimelineYear {
   months: TimelineMonth[];
 }
 
-const MONTH_NAMES = [
-  "January", "February", "March", "April", "May", "June",
-  "July", "August", "September", "October", "November", "December"
-];
-
+/** The month on its own, as a heading: "June", "Tháng 6", "Июнь". */
 export function monthLabel(key: string): string {
-  return MONTH_NAMES[Number(key.slice(4, 6)) - 1] ?? key;
+  const name = monthNames("long")[Number(key.slice(4, 6)) - 1];
+  return name ? capitalizeFirst(name) : key;
 }
 
 /** Newest first, by year and month. `milestones` arrives oldest first. */

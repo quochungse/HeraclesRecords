@@ -1,3 +1,4 @@
+import { renderRich, useI18n } from "../i18n/useI18n";
 import { useCallback, useMemo, useState } from "react";
 import { ArrowLeft, CloudOff, MessageCircle, RefreshCw } from "lucide-react";
 import type {
@@ -41,6 +42,7 @@ import {
 import { hikeSeconds } from "./hikeMetrics";
 import { HIKE_TYPE_LABELS, classifyHikeType } from "./hikeType";
 import { ClimbsPanel, TerrainPanel } from "./TerrainPanels";
+import { formatDecimal, getIntlLocale, t } from "../i18n/core";
 
 interface HikeDetailViewProps {
   activity: TrainingHubActivity;
@@ -78,7 +80,7 @@ function clockAt(startTime: number | undefined, elapsed: number): string | undef
   if (startTime === undefined) {
     return undefined;
   }
-  return new Date((startTime + elapsed) * 1000).toLocaleTimeString(undefined, {
+  return new Date((startTime + elapsed) * 1000).toLocaleTimeString(getIntlLocale(), {
     hour: "2-digit",
     minute: "2-digit"
   });
@@ -102,13 +104,14 @@ export function HikeDetailView({
   detail,
   detailStatus,
   onBack,
-  backLabel = "Hiking",
+  backLabel = t("nav.hiking"),
   onRetry,
   onAskCoach
 }: HikeDetailViewProps) {
   const { unitSystem, temperatureUnit } = useUnitSystem();
+  const { locale } = useI18n();
   const type = classifyHikeType(activity.sportType);
-  const kindLabel = type ? HIKE_TYPE_LABELS[type] : "Hike";
+  const kindLabel = type ? HIKE_TYPE_LABELS[type] : t("hike.type.hike");
 
   const laps = detail?.laps ?? [];
   const rawSeries = useMemo(() => detail?.series ?? [], [detail]);
@@ -148,111 +151,111 @@ export function HikeDetailView({
 
     const stats: Stat[] = [
       {
-        label: "Distance",
+        label: t("activity.m.distance"),
         value: distance !== undefined && distance > 0 ? formatDistanceMeters(distance, unitSystem) : "—"
       },
       {
-        label: "Moving time",
+        label: t("hike.detail.moving"),
         value: formatDurationSeconds(moving),
         title: movingSeconds !== undefined
-          ? "Time spent walking, worked out of the samples — every stop of 20 s or more is out of it"
-          : "Activity time as COROS recorded it"
+          ? t("hike.detail.movingTitle")
+          : t("hike.detail.recordedTitle")
       }
     ];
 
     if (total !== undefined && moving !== undefined && total - moving >= MIN_STOPPED_SECONDS_SHOWN) {
       stats.push({
-        label: "Total time",
+        label: t("run.detail.totalTime"),
         value: formatDurationSeconds(total),
-        title: `Start to finish, including ${formatDurationSeconds(total - moving)} stopped`
+        title: t("ride.detail.totalTimeTitle", { stopped: formatDurationSeconds(total - moving) })
       });
     }
 
     if (distance !== undefined && distance > 0 && moving !== undefined && moving > 0) {
       stats.push({
-        label: "Moving speed",
+        label: t("hike.detail.movingSpeed"),
         value: formatSpeedValue(distance / 1000 / (moving / 3600), unitSystem)
       });
     }
 
     if (ascent !== undefined && ascent > 0) {
-      stats.push({ label: "Ascent", value: formatElevationMeters(ascent, unitSystem) });
+      stats.push({ label: t("hike.ascent"), value: formatElevationMeters(ascent, unitSystem) });
     }
     const descent = detail?.elevationLoss;
     if (descent !== undefined && descent > 0) {
-      stats.push({ label: "Descent", value: formatElevationMeters(descent, unitSystem) });
+      stats.push({ label: t("activity.m.descent"), value: formatElevationMeters(descent, unitSystem) });
     }
     if (range) {
       stats.push({
-        label: "Highest point",
+        label: t("run.detail.highest"),
         value: formatElevationMeters(range.highest, unitSystem),
-        title: `Lowest ${formatElevationMeters(range.lowest, unitSystem)}`
+        title: t("run.detail.lowest", { value: formatElevationMeters(range.lowest, unitSystem) })
       });
     }
 
     const up = terrain.find((share) => share.kind === "up");
     if (up?.verticalRate !== undefined) {
       stats.push({
-        label: "Climbing rate",
+        label: t("activity.channel.verticalSpeed"),
         value: formatVerticalRate(up.verticalRate, unitSystem),
-        title: "Metres gained an hour on the climbing stretches, stops out"
+        title: t("hike.detail.climbingRateTitle")
       });
     }
 
     if (distance !== undefined && distance > 0 && moving !== undefined && moving > 0 && ascent !== undefined) {
       const book = naismithSeconds(distance, ascent);
       stats.push({
-        label: "Vs Naismith",
-        value: `${(moving / book).toFixed(2)}×`,
-        title: `Naismith's rule books ${formatDurationSeconds(book)} for this distance and ascent — an hour per 5 km and an hour per 600 m of climbing. Under 1 is faster than the book, over the moving time.`
+        label: t("hike.detail.naismith"),
+        value: `${formatDecimal(moving / book, 2)}×`,
+        title: t("hike.detail.naismithTitle", { book: formatDurationSeconds(book) })
       });
     }
 
     const avgHr = detail?.avgHr ?? activity.avgHr;
     if (avgHr !== undefined) {
-      stats.push({ label: "Avg HR", value: `${avgHr} bpm` });
+      stats.push({ label: t("activity.m.avgHr"), value: `${avgHr} bpm` });
     }
     const maxHr = detail?.maxHr ?? activity.maxHr;
     if (maxHr !== undefined) {
-      stats.push({ label: "Max HR", value: `${maxHr} bpm` });
+      stats.push({ label: t("activity.m.maxHr"), value: `${maxHr} bpm` });
     }
     const load = detail?.trainingLoad ?? activity.trainingLoad;
     if (load !== undefined) {
-      stats.push({ label: "Load", value: formatOptionalNumber(Math.round(load)) });
+      stats.push({ label: t("overview.tiles.load"), value: formatOptionalNumber(Math.round(load)) });
     }
     const calories = detail?.calories ?? activity.calories;
     if (calories !== undefined && calories > 0) {
-      stats.push({ label: "Calories", value: `${Math.round(calories)} kcal` });
+      stats.push({ label: t("activity.m.calories"), value: `${Math.round(calories)} kcal` });
     }
     return stats;
-  }, [activity, detail, movingSeconds, range, terrain, unitSystem]);
+  }, [activity, detail, movingSeconds, range, terrain, unitSystem, locale]);
 
   const conditions = useMemo<Stat[]>(() => {
     const stats: Stat[] = [];
     if (detail?.effect?.aerobic !== undefined) {
-      stats.push({ label: "Aerobic effect", value: detail.effect.aerobic.toFixed(1) });
+      stats.push({ label: t("run.detail.aerobic"), value: formatDecimal(detail.effect.aerobic, 1) });
     }
     if (detail?.effect?.anaerobic !== undefined) {
-      stats.push({ label: "Anaerobic effect", value: detail.effect.anaerobic.toFixed(1) });
+      stats.push({ label: t("run.detail.anaerobic"), value: formatDecimal(detail.effect.anaerobic, 1) });
     }
     if (detail?.weather?.temperatureC !== undefined) {
       stats.push({
-        label: "Temperature",
+        label: t("run.detail.temperature"),
         value: formatTemperatureValue(detail.weather.temperatureC, temperatureUnit)
       });
     }
     if (detail?.weather?.humidityPct !== undefined) {
-      stats.push({ label: "Humidity", value: `${Math.round(detail.weather.humidityPct)}%` });
+      stats.push({ label: t("run.detail.humidity"), value: `${Math.round(detail.weather.humidityPct)}%` });
     }
     if (detail?.dynamics?.avgCadence !== undefined && detail.dynamics.avgCadence > 0) {
       stats.push({
-        label: "Cadence",
+        label: t("activity.m.cadence"),
         value: `${Math.round(detail.dynamics.avgCadence)} spm`,
-        title: "Steps a minute, averaged over the walking"
+        title: t("hike.detail.cadenceTitle")
       });
     }
     return stats;
-  }, [detail, temperatureUnit]);
+  }, [detail, temperatureUnit, locale]);
 
   const showLaps = laps.length > 1;
 
@@ -280,7 +283,7 @@ export function HikeDetailView({
                   }
                 >
                   <MessageCircle size={15} aria-hidden="true" />
-                  Ask Coach
+                  {t("activity.askCoach")}
                 </button>
               ) : null}
             </div>
@@ -314,22 +317,18 @@ export function HikeDetailView({
         ) : null}
       </div>
 
-      {loading ? <RunDetailSkeleton label="Loading this hike" /> : null}
+      {loading ? <RunDetailSkeleton label={t("hike.loadingOne")} /> : null}
 
       {failed ? (
         <section className="panel running-empty running-state-panel">
           <CloudOff size={22} aria-hidden="true" />
           <div>
-            <h3>This hike's detail did not load</h3>
-            <p>
-              The summary above comes from the activity list. The chart, the
-              rests and the route need a second request to COROS, and that one
-              failed.
-            </p>
+            <h3>{t("hike.detail.failed")}</h3>
+            <p>{t("hike.detail.failedBody")}</p>
           </div>
           <button type="button" className="primary-button" onClick={onRetry}>
             <RefreshCw size={14} aria-hidden="true" />
-            Try again
+            {t("common.tryAgain")}
           </button>
         </section>
       ) : null}
@@ -364,7 +363,7 @@ export function HikeDetailView({
 
       {conditions.length > 0 ? (
         <section className="panel run-detail-panel">
-          <p className="running-eyebrow">Effect and conditions</p>
+          <p className="running-eyebrow">{t("run.detail.effect")}</p>
           <div className="run-detail-stats">
             {conditions.map((stat) => (
               <div className="running-stat" key={stat.label} title={stat.title}>
@@ -378,18 +377,18 @@ export function HikeDetailView({
 
       {showLaps ? (
         <section className="panel run-detail-panel">
-          <p className="running-eyebrow">Splits</p>
+          <p className="running-eyebrow">{t("hike.detail.splits")}</p>
           <div className="run-table-scroll">
             <table className="run-list run-lap-table">
               <thead>
                 <tr>
-                  <th scope="col">Split</th>
-                  <th scope="col" className="is-numeric">Distance</th>
-                  <th scope="col" className="is-numeric">Time</th>
-                  <th scope="col" className="is-numeric">Speed</th>
-                  <th scope="col" className="is-numeric">Ascent</th>
-                  <th scope="col" className="is-numeric">Avg HR</th>
-                  <th scope="col" className="is-numeric">Cadence</th>
+                  <th scope="col">{t("hike.detail.split")}</th>
+                  <th scope="col" className="is-numeric">{t("activity.m.distance")}</th>
+                  <th scope="col" className="is-numeric">{t("activity.m.time")}</th>
+                  <th scope="col" className="is-numeric">{t("activity.m.speed")}</th>
+                  <th scope="col" className="is-numeric">{t("hike.ascent")}</th>
+                  <th scope="col" className="is-numeric">{t("activity.m.avgHr")}</th>
+                  <th scope="col" className="is-numeric">{t("activity.m.cadence")}</th>
                 </tr>
               </thead>
               <tbody>
@@ -400,7 +399,7 @@ export function HikeDetailView({
                       key={lap.index}
                       tabIndex={0}
                       className="run-lap-row"
-                      title="Focus the chart on this split"
+                      title={t("hike.detail.focusSplit")}
                       onClick={() => setFocusLapIndex(lap.index)}
                       onKeyDown={(event) => {
                         if (event.key === "Enter" || event.key === " ") {
@@ -431,9 +430,7 @@ export function HikeDetailView({
             </table>
           </div>
           <p className="run-block-note">
-            A split's time is on the watch's clock, so a rest taken inside it is
-            in it — which is why the slowest split is usually the one with the
-            summit in it.
+            {t("hike.detail.splitNote")}
           </p>
         </section>
       ) : null}
@@ -457,10 +454,11 @@ function HikeRestsPanel({
     <section className="panel run-detail-panel">
       <header className="run-block-head">
         <div>
-          <p className="running-eyebrow">Rests</p>
+          <p className="running-eyebrow">{t("hike.rests.title")}</p>
           <h3>
-            {formatDurationSeconds(stoppedSeconds)}
-            <span className="run-block-sub"> stopped in all</span>
+            {renderRich(t("hike.rests.total", { time: formatDurationSeconds(stoppedSeconds) }), {
+              s: (chunk) => <span className="run-block-sub"> {chunk}</span>
+            })}
           </h3>
         </div>
       </header>
@@ -469,10 +467,10 @@ function HikeRestsPanel({
           <table className="run-list run-surface-table">
             <thead>
               <tr>
-                <th scope="col">At</th>
-                <th scope="col" className="is-numeric">Where</th>
-                <th scope="col" className="is-numeric">Altitude</th>
-                <th scope="col" className="is-numeric">Stopped</th>
+                <th scope="col">{t("hike.rests.at")}</th>
+                <th scope="col" className="is-numeric">{t("hike.rests.where")}</th>
+                <th scope="col" className="is-numeric">{t("hike.legs.altitude")}</th>
+                <th scope="col" className="is-numeric">{t("hike.rests.stopped")}</th>
               </tr>
             </thead>
             <tbody>
@@ -480,7 +478,7 @@ function HikeRestsPanel({
                 <tr key={`${rest.startElapsed}-${rest.paused ? "p" : "s"}`}>
                   <td>
                     {clockAt(startTime, rest.startElapsed) ?? formatDurationSeconds(rest.startElapsed)}
-                    {rest.paused ? <span className="hike-rest-paused">Paused</span> : null}
+                    {rest.paused ? <span className="hike-rest-paused">{t("hike.rests.paused")}</span> : null}
                   </td>
                   <td className="is-numeric">{formatDistanceMeters(rest.distance, unitSystem)}</td>
                   <td className="is-numeric">
@@ -493,13 +491,10 @@ function HikeRestsPanel({
           </table>
         </div>
       ) : (
-        <p className="run-block-empty">No stop of two minutes or more.</p>
+        <p className="run-block-empty">{t("hike.rests.none")}</p>
       )}
       <p className="run-block-note">
-        Found in the samples: the watch kept recording while the walker stood,
-        so a stop is where the position stayed put. Rests of two minutes and
-        more are listed; the breathers on the steep pitches are in the total.
-        A <em>Paused</em> rest is one the watch paused for.
+        {renderRich(t("hike.rests.note"), { em: (chunk) => <em>{chunk}</em> })}
       </p>
     </section>
   );

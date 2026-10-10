@@ -26,18 +26,26 @@ import {
   type ExerciseSearchEquipment
 } from "../../electron/exerciseCatalogSearch";
 import { MUSCLE_BY_ID, resolveExerciseTargets, type MuscleId } from "../strength/muscles";
+import { messageRecord } from "../i18n/core";
 
 export type ExerciseFacetKind = "all" | "bodyPart" | "muscle" | "equipment";
 
+const FACET_KIND_LABELS = messageRecord<ExerciseFacetKind>({
+  all: "calendar.facet.all",
+  bodyPart: "calendar.facet.bodyPart",
+  muscle: "calendar.facet.muscle",
+  equipment: "calendar.facet.equipment"
+});
+
 export const EXERCISE_FACET_KINDS: readonly {
   value: ExerciseFacetKind;
-  label: string;
-}[] = [
-  { value: "all", label: "All" },
-  { value: "bodyPart", label: "Body part" },
-  { value: "muscle", label: "Muscle" },
-  { value: "equipment", label: "Equipment" }
-];
+  readonly label: string;
+}[] = (["all", "bodyPart", "muscle", "equipment"] as const).map((value) => ({
+  value,
+  get label() {
+    return FACET_KIND_LABELS[value];
+  }
+}));
 
 export type ExerciseBodyPartId =
   | "chest"
@@ -63,15 +71,15 @@ export const BODY_PART_MUSCLES: Readonly<Record<ExerciseBodyPartId, readonly Mus
   neck: ["neck"]
 };
 
-export const BODY_PART_LABELS: Readonly<Record<ExerciseBodyPartId, string>> = {
-  chest: "Chest",
-  back: "Back",
-  shoulders: "Shoulders",
-  arms: "Arms",
-  core: "Core",
-  legs: "Legs",
-  neck: "Neck"
-};
+export const BODY_PART_LABELS: Readonly<Record<ExerciseBodyPartId, string>> = messageRecord({
+  chest: "calendar.bodyPart.chest",
+  back: "calendar.bodyPart.back",
+  shoulders: "calendar.bodyPart.shoulders",
+  arms: "calendar.bodyPart.arms",
+  core: "calendar.bodyPart.core",
+  legs: "calendar.bodyPart.legs",
+  neck: "calendar.bodyPart.neck"
+});
 
 export const EXERCISE_BODY_PARTS = Object.keys(BODY_PART_MUSCLES) as ExerciseBodyPartId[];
 
@@ -81,21 +89,21 @@ const MUSCLE_BODY_PART = new Map<MuscleId, ExerciseBodyPartId>(
   )
 );
 
-export const EQUIPMENT_LABELS: Readonly<Record<ExerciseSearchEquipment, string>> = {
-  bodyweight: "Bodyweight",
-  barbell: "Barbell",
-  dumbbell: "Dumbbell",
-  kettlebell: "Kettlebell",
-  machine: "Machine",
-  cable: "Cable",
-  resistance_band: "Resistance band",
-  medicine_ball: "Medicine ball",
-  exercise_ball: "Exercise ball",
-  suspension: "Suspension",
-  bosu: "Bosu",
-  sled: "Sled",
-  rope: "Rope"
-};
+export const EQUIPMENT_LABELS: Readonly<Record<ExerciseSearchEquipment, string>> = messageRecord({
+  bodyweight: "calendar.equipment.bodyweight",
+  barbell: "calendar.equipment.barbell",
+  dumbbell: "calendar.equipment.dumbbell",
+  kettlebell: "calendar.equipment.kettlebell",
+  machine: "calendar.equipment.machine",
+  cable: "calendar.equipment.cable",
+  resistance_band: "calendar.equipment.resistance_band",
+  medicine_ball: "calendar.equipment.medicine_ball",
+  exercise_ball: "calendar.equipment.exercise_ball",
+  suspension: "calendar.equipment.suspension",
+  bosu: "calendar.equipment.bosu",
+  sled: "calendar.equipment.sled",
+  rope: "calendar.equipment.rope"
+});
 
 /** The order the equipment column is drawn in: the common bars first. */
 export const EXERCISE_EQUIPMENT_ORDER: readonly ExerciseSearchEquipment[] = [

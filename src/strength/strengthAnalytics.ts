@@ -22,6 +22,7 @@ import {
   type MuscleId
 } from "./muscles";
 import { startOfWeekMs } from "../training/activityWindow";
+import { formatCount, formatDecimal, getIntlLocale, t } from "../i18n/core";
 
 /** What the body map shades muscles by. */
 export type HeatMetric = "sets" | "volume" | "time";
@@ -200,7 +201,7 @@ export function previousWeekStartMs(weekStartMs: number): number {
 }
 
 function weekLabel(weekStartMs: number): string {
-  return new Date(weekStartMs).toLocaleDateString(undefined, {
+  return new Date(weekStartMs).toLocaleDateString(getIntlLocale(), {
     month: "short",
     day: "numeric"
   });
@@ -243,10 +244,10 @@ export function canonicalExerciseDisplayName(name: string): string {
     ? name.replace(/\s*\((barbell|dumbbell|machine)\)\s*$/i, "").trim()
     : name.trim();
   if (suffix === "dumbbell" && !/^dumbbell\b/i.test(base)) {
-    return `Dumbbell ${base}`;
+    return `Dumbbell ${base}`; // i18n-ignore: a grouping key, named as COROS names it
   }
   if (suffix === "machine" && !/\bmachine\b/i.test(base)) {
-    return `${base} Machine`;
+    return `${base} Machine`; // i18n-ignore: a grouping key, named as COROS names it
   }
   return base || name;
 }
@@ -255,7 +256,12 @@ export function canonicalExerciseDisplayName(name: string): string {
  * The name an exercise gets when neither COROS's code nor the payload says what
  * it was. Many different movements share it, so it identifies no one lift.
  */
-export const UNNAMED_EXERCISE = "Unnamed exercise";
+export const UNNAMED_EXERCISE = "Unnamed exercise"; // i18n-ignore: a key; drawn through exerciseLabel()
+
+/** An exercise's name as drawn: the one sentinel name is put into the language on screen. */
+export function exerciseLabel(name: string): string {
+  return name === UNNAMED_EXERCISE ? t("strength.unnamedExercise") : name;
+}
 
 /** The display name an exercise is grouped under everywhere on the Strength screen. */
 export function exerciseDisplayName(nameKey: string, rawName: string | undefined): string {
@@ -557,9 +563,9 @@ export function formatVolumeKg(
   unitSystem: UnitSystem
 ): string {
   if (unitSystem === "metric" && value >= 1000) {
-    return `${(value / 1000).toFixed(value >= 10_000 ? 0 : 1)} tonnes`;
+    return `${formatDecimal(value / 1000, value >= 10_000 ? 0 : 1)} ${t("strength.unit.tonnes")}`;
   }
-  return `${Math.round(kilogramsToDisplayWeight(value, unitSystem)).toLocaleString()} ${weightUnit(unitSystem)}`;
+  return `${formatCount(Math.round(kilogramsToDisplayWeight(value, unitSystem)))} ${weightUnit(unitSystem)}`;
 }
 
 export function formatWeightKg(
@@ -567,9 +573,13 @@ export function formatWeightKg(
   unitSystem: UnitSystem
 ): string {
   const display = kilogramsToDisplayWeight(value, unitSystem);
-  return `${Number.isInteger(display) ? display : display.toFixed(1)} ${weightUnit(unitSystem)}`;
+  return `${Number.isInteger(display) ? formatCount(display) : formatDecimal(display, 1)} ${weightUnit(unitSystem)}`;
 }
 
 export function formatSets(value: number): string {
-  return value >= 10 ? String(Math.round(value)) : value.toFixed(1).replace(/\.0$/, "");
+  return value >= 10
+    ? String(Math.round(value))
+    : Number.isInteger(Math.round(value * 10) / 10)
+      ? String(Math.round(value))
+      : formatDecimal(value, 1);
 }

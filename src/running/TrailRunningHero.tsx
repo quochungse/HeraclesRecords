@@ -15,6 +15,7 @@ import {
   runLoadBalance
 } from "./runMetrics";
 import { classifyRunSurface } from "./runSurface";
+import { plural, t } from "../i18n/core";
 
 interface TrailRunningHeroProps {
   /** Trail runs over the whole history: the week, its baseline and the twelve-week rate look back past the period. */
@@ -81,13 +82,13 @@ export function TrailRunningHero({ trailRuns, allRuns, nowMs }: TrailRunningHero
   return (
     <section className="run-hero">
       <div className="run-hero-card">
-        <span className="run-hero-label">This week</span>
+        <span className="run-hero-label">{t("activity.hero.thisWeek")}</span>
         <strong className="run-hero-value">
           {count > 0 ? formatDurationSpan(thisWeek?.current.duration) : "—"}
         </strong>
         <div className="run-hero-foot">
           <span>
-            {count} {count === 1 ? "trail run" : "trail runs"}
+            {plural("activity.trail.count", count)}
             {(thisWeek?.current.distance ?? 0) > 0
               ? ` · ${formatDistanceMeters(thisWeek?.current.distance, unitSystem)}`
               : ""}
@@ -97,34 +98,34 @@ export function TrailRunningHero({ trailRuns, allRuns, nowMs }: TrailRunningHero
       </div>
 
       <div className="run-hero-card">
-        <span className="run-hero-label">Climb this week</span>
+        <span className="run-hero-label">{t("activity.trail.climbThisWeek")}</span>
         <strong className="run-hero-value">
           {climb > 0 ? formatElevationMeters(climb, unitSystem) : "—"}
         </strong>
         <div className="run-hero-foot">
           <span>
             {thisWeek && thisWeek.climbBaseline > 0
-              ? `4-week average ${formatElevationMeters(thisWeek.climbBaseline, unitSystem)}`
-              : "No climbing in the last four weeks"}
+              ? t("activity.hero.avg4w", { value: formatElevationMeters(thisWeek.climbBaseline, unitSystem) })
+              : t("activity.trail.noClimb")}
           </span>
         </div>
       </div>
 
-      <LoadRatioCard balance={balance} filtered sessions="runs" doing="running" />
+      <LoadRatioCard balance={balance} filtered sport="run" />
 
       <div
         className="run-hero-card"
-        title={`Median ${unitSystem === "imperial" ? "feet" : "metres"} climbed an hour over the trail runs of the last twelve weeks that climbed ${floor} or more, over the whole run.`}
+        title={t(`activity.trail.rateTitle.${unitSystem === "imperial" ? "imperial" : "metric"}` as const, { floor })}
       >
-        <span className="run-hero-label">Climb per hour · 12 weeks</span>
+        <span className="run-hero-label">{t("activity.trail.rate")}</span>
         <strong className="run-hero-value">
           {rate.rate === undefined ? "—" : formatVerticalRate(rate.rate, unitSystem)}
         </strong>
         <div className="run-hero-foot">
           <span>
             {rate.rate === undefined
-              ? `No trail run over ${floor} of climb yet`
-              : `${rate.count} ${rate.count === 1 ? "run" : "runs"} over ${floor}`}
+              ? t("activity.trail.noRate", { floor })
+              : plural("activity.trail.over", rate.count, { floor })}
           </span>
           {rate.rate !== undefined && rate.previousRate !== undefined && rate.previousRate > 0 ? (
             <DeltaChip ratio={(rate.rate - rate.previousRate) / rate.previousRate} />

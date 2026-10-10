@@ -1,4 +1,3 @@
-import { COROS_KNOWN_SPORT_TYPES } from "../../../electron/corosSportTypes";
 import { countedTokens } from "../../../electron/tokenUsage";
 import { formatDistanceValue, type UnitSystem } from "../../units/units";
 import type {
@@ -6,32 +5,35 @@ import type {
   AnalysisTrigger,
   CoachAnalysisRun
 } from "../../../electron/types";
+import { formatDecimal, messageRecord, plural, t, weekdayNames, type MessageKey } from "../../i18n/core";
+import { knownSportName } from "../../training/sportTypes";
 
 /** Sports offered in the trigger filter, in the order athletes think of them. */
-export const SPORT_FILTER_OPTIONS: Array<{ value: number; label: string }> = [
+export const SPORT_FILTER_OPTIONS: ReadonlyArray<{ value: number; readonly label: string }> = [
   100, 102, 101, 103, 200, 204, 201, 300, 301, 402, 104, 900
 ].map((value) => ({
   value,
-  label: COROS_KNOWN_SPORT_TYPES[value] ?? `Sport ${value}`
+  get label() {
+    return sportName(value);
+  }
 }));
+
+function sportName(code: number): string {
+  return knownSportName(code) ?? t("chat.an.sportN", { n: code });
+}
 
 function formatMinutes(seconds: number): string {
   const minutes = Math.round(seconds / 60);
-  if (minutes < 60) return `${minutes} min`;
+  if (minutes < 60) return t("units.min", { m: minutes });
   const hours = Math.floor(minutes / 60);
   const rest = minutes % 60;
-  return rest ? `${hours}h ${rest}m` : `${hours}h`;
+  return rest ? t("units.duration.hm", { h: hours, m: rest }) : t("units.duration.h", { h: hours });
 }
 
-const WEEKDAYS = [
-  "Sunday",
-  "Monday",
-  "Tuesday",
-  "Wednesday",
-  "Thursday",
-  "Friday",
-  "Saturday"
-];
+/** A COROS day of the week (0 = Sunday) by its name in the language on screen. */
+export function weekdayName(dayOfWeek: number): string {
+  return weekdayNames("long")[(dayOfWeek + 6) % 7] ?? "";
+}
 
 /**
  * The one-line "when does this fire" copy under an analysis's name.
@@ -45,23 +47,19 @@ export function describeTrigger(
   unitSystem: UnitSystem = "metric"
 ): string {
   if (!trigger) {
-    return "Manual";
+    return t("chat.an.trigger.manual");
   }
   if (trigger.kind === "schedule") {
     return trigger.cadence === "weekly"
-      ? `Every ${WEEKDAYS[trigger.dayOfWeek ?? 1]} at ${trigger.timeOfDay}`
-      : `Every day at ${trigger.timeOfDay}`;
+      ? t("chat.an.trigger.weekly", { day: weekdayName(trigger.dayOfWeek ?? 1), time: trigger.timeOfDay })
+      : t("chat.an.trigger.daily", { time: trigger.timeOfDay });
   }
 
   if (trigger.kind === "activity") {
     // No sport filter means every sport, which reads better as a bare
     // "activity" than as the literal "any activity" — especially once
     // multiActivity prefixes it with "Every new".
-    const subject = trigger.sportTypes.length
-      ? `${trigger.sportTypes
-          .map((type) => COROS_KNOWN_SPORT_TYPES[type] ?? `sport ${type}`)
-          .join(", ")} activity`
-      : "activity";
+    const sports = trigger.sportTypes.map(sportName).join(", ");
     const filters: string[] = [];
     if (trigger.minDurationSec) {
       filters.push(`≥ ${formatMinutes(trigger.minDurationSec)}`);
@@ -70,50 +68,41 @@ export function describeTrigger(
       filters.push(`≥ ${formatDistanceValue(trigger.minDistanceM, unitSystem, { digits: 1 })}`);
     }
     const suffix = filters.length ? ` ${filters.join(" · ")}` : "";
-    return trigger.multiActivity
-      ? `Every new ${subject}${suffix}`
-      : `New ${subject}${suffix}`;
+    const key = trigger.multiActivity
+      ? sports
+        ? "chat.an.trigger.everySports"
+        : "chat.an.trigger.everyAny"
+      : sports
+        ? "chat.an.trigger.newSports"
+        : "chat.an.trigger.newAny";
+    return `${t(key, { sports })}${suffix}`;
   }
 
   if (trigger.kind === "threshold") {
     return describeThresholdMetric(trigger.metric, trigger.value);
   }
-  return "Manual";
+  return t("chat.an.trigger.manual");
 }
 
 /** The four metrics of 3.3, named the way an athlete would say them. */
-export const THRESHOLD_METRIC_OPTIONS: Array<{
+export const THRESHOLD_METRIC_OPTIONS: ReadonlyArray<{
   value: AnalysisThresholdMetric;
-  label: string;
+  readonly label: string;
   /** What the number means, so the field never reads as a bare quantity. */
-  unit: string;
-  hint: string;
-}> = [
-  {
-    value: "acuteChronicRamp",
-    label: "Training load is ramping",
-    unit: "% over the 4-week average",
-    hint: "Last 7 days of load compared with the trailing 28-day average week."
+  readonly unit: string;
+  readonly hint: string;
+}> = (["acuteChronicRamp", "restingHrDrift", "planAdherence", "sleepDebt"] as const).map((value) => ({
+  value,
+  get label() {
+    return t(`chat.an.metric.${value}` as MessageKey);
   },
-  {
-    value: "restingHrDrift",
-    label: "Resting heart rate is drifting up",
-    unit: "bpm above baseline",
-    hint: "Three days running, against the 30-day baseline before them."
+  get unit() {
+    return t(`chat.an.metric.${value}.unit` as MessageKey);
   },
-  {
-    value: "planAdherence",
-    label: "A planned workout was missed",
-    unit: "hours after the day it was due",
-    hint: "Counts scheduled workouts from the last two weeks with nothing matched to them."
-  },
-  {
-    value: "sleepDebt",
-    label: "Sleep debt is building",
-    unit: "hours short over 7 nights",
-    hint: "Against 8 hours a night, counting only the nights with a reading."
+  get hint() {
+    return t(`chat.an.metric.${value}.hint` as MessageKey);
   }
-];
+}));
 
 function describeThresholdMetric(
   metric: AnalysisThresholdMetric,
@@ -122,54 +111,55 @@ function describeThresholdMetric(
   const option = THRESHOLD_METRIC_OPTIONS.find((entry) => entry.value === metric);
   return option ? `${option.label} — ${value}${
     option.unit.startsWith("%") ? "" : " "
-  }${option.unit}` : `When ${metric} crosses ${value}`;
+  }${option.unit}` : t("chat.an.metric.crosses", { metric, value });
 }
 
-const RUN_STATUS_LABELS: Record<CoachAnalysisRun["status"], string> = {
-  running: "Running",
-  success: "Reported",
-  silent: "Nothing to report",
-  skipped: "Skipped",
-  failed: "Failed",
-  cancelled: "Cancelled"
-};
+const RUN_STATUS_LABELS = messageRecord<CoachAnalysisRun["status"]>({
+  running: "chat.an.run.running",
+  success: "chat.an.run.success",
+  silent: "chat.an.run.silent",
+  skipped: "chat.an.run.skipped",
+  failed: "chat.an.run.failed",
+  cancelled: "chat.an.run.cancelled"
+});
 
 export function runStatusLabel(run: CoachAnalysisRun): string {
   return RUN_STATUS_LABELS[run.status] ?? run.status;
 }
 
-const SKIP_REASON_LABELS: Record<string, string> = {
-  disabled: "switched off",
-  "another-device": "ran on another device",
-  "missing-session": "conversation missing",
-  "no-auth": "not signed in",
-  offline: "COROS unreachable",
-  "two-factor-required": "COROS needs a login code",
-  "quiet-hours": "quiet hours",
-  cooldown: "too soon after the last run",
-  budget: "monthly token budget reached",
-  burst: "conversation busy",
-  backoff: "backing off after a failure",
-  "no-activity": "no new activity to analyse",
-  "stale-slot": "missed slot"
+const SKIP_REASON_KEYS: Record<string, MessageKey> = {
+  disabled: "chat.an.skip.disabled",
+  "another-device": "chat.an.skip.anotherDevice",
+  "missing-session": "chat.an.skip.missingSession",
+  "no-auth": "chat.an.skip.noAuth",
+  offline: "chat.an.skip.offline",
+  "two-factor-required": "chat.an.skip.twoFactor",
+  "quiet-hours": "chat.an.skip.quietHours",
+  cooldown: "chat.an.skip.cooldown",
+  budget: "chat.an.skip.budget",
+  burst: "chat.an.skip.burst",
+  backoff: "chat.an.skip.backoff",
+  "no-activity": "chat.an.skip.noActivity",
+  "stale-slot": "chat.an.skip.staleSlot"
 };
 
 export function skipReasonLabel(reason: string): string {
-  return SKIP_REASON_LABELS[reason] ?? reason;
+  const key = Object.hasOwn(SKIP_REASON_KEYS, reason) ? SKIP_REASON_KEYS[reason] : undefined;
+  return key ? t(key) : reason;
 }
 
 /** "2h ago" style, for the last-run line on a card. */
 export function formatTimeAgo(iso: string | undefined): string {
-  if (!iso) return "never";
+  if (!iso) return t("chat.an.ago.never");
   const then = new Date(iso).getTime();
-  if (Number.isNaN(then)) return "never";
+  if (Number.isNaN(then)) return t("chat.an.ago.never");
   const minutes = Math.round((Date.now() - then) / 60_000);
-  if (minutes < 1) return "just now";
-  if (minutes < 60) return `${minutes}m ago`;
+  if (minutes < 1) return t("chat.an.ago.now");
+  if (minutes < 60) return t("chat.an.ago.minutes", { n: minutes });
   const hours = Math.round(minutes / 60);
-  if (hours < 24) return `${hours}h ago`;
+  if (hours < 24) return t("chat.an.ago.hours", { n: hours });
   const days = Math.round(hours / 24);
-  return days === 1 ? "yesterday" : `${days}d ago`;
+  return days === 1 ? t("chat.an.ago.yesterday") : plural("chat.an.ago.days", days);
 }
 
 /**
@@ -182,10 +172,10 @@ export function formatTokens(count: number): string {
   if (count < 1_000) return `${Math.round(count)}`;
   if (count < 1_000_000) {
     const thousands = count / 1_000;
-    return `${thousands < 10 ? thousands.toFixed(1) : Math.round(thousands)}k`;
+    return `${thousands < 10 ? formatDecimal(thousands, 1) : Math.round(thousands)}k`;
   }
   const millions = count / 1_000_000;
-  return `${millions < 10 ? millions.toFixed(1) : Math.round(millions)}M`;
+  return `${millions < 10 ? formatDecimal(millions, 1) : Math.round(millions)}M`;
 }
 
 /** What one run cost, or null when the provider reported nothing. */
@@ -206,5 +196,5 @@ export function formatDuration(run: CoachAnalysisRun): string {
   if (!run.finishedAt) return "—";
   const ms = new Date(run.finishedAt).getTime() - new Date(run.startedAt).getTime();
   if (!Number.isFinite(ms) || ms < 0) return "—";
-  return ms < 1000 ? "<1s" : `${Math.round(ms / 1000)}s`;
+  return ms < 1000 ? `<${t("units.duration.s", { s: 1 })}` : t("units.duration.s", { s: Math.round(ms / 1000) });
 }

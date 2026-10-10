@@ -24,6 +24,7 @@ import {
   metricDot,
   usePrefersReducedMotion
 } from "./trendChartParts";
+import { t } from "../../i18n/core";
 
 /**
  * Shared by Overview and the Sleep screen, so the window the athlete picks in
@@ -45,7 +46,7 @@ function HrvChartLegend() {
       </span>
       <span className="training-chart-legend-item">
         <span className="training-chart-legend-line is-gold" />
-        Baseline
+        {t("activity.hrv.baseline")}
       </span>
     </div>
   );
@@ -90,15 +91,15 @@ export function HrvBaselineChart({
     <section className="panel training-chart-panel" data-metric="hrv">
       <div className="section-heading compact training-chart-heading">
         <div>
-          <p className="eyebrow">HRV vs Baseline · ms</p>
-          <h2>Last {trendWindow} days</h2>
+          <p className="eyebrow">{t("activity.hrv.title")}</p>
+          <h2>{t("overview.sleepTrend.lastDays", { days: trendWindow })}</h2>
         </div>
         <div className="training-chart-heading-side">
           <TrendWindowToggle
             options={TRAINING_TREND_WINDOWS}
             value={trendWindow}
             onChange={setTrendWindow}
-            label="HRV trend range"
+            label={t("activity.hrv.range")}
           />
           <HrvChartLegend />
         </div>
@@ -151,11 +152,11 @@ export function HrvBaselineChart({
           icon={loading ? Loader2 : HeartPulse}
           palette={metrics.hrv}
           busy={loading}
-          title={loading ? "Reading your HRV" : "No HRV readings"}
+          title={loading ? t("activity.hrv.reading") : t("activity.hrv.none")}
         >
           {loading
-            ? "Nightly readings are still coming back from COROS."
-            : "Wear your device during sleep to capture nightly HRV."}
+            ? t("activity.hrv.loading")
+            : t("activity.hrv.wear")}
         </EmptyChartNotice>
       )}
     </section>

@@ -1,4 +1,5 @@
 import type { TrainingHubActivity } from "../../electron/types";
+import { t } from "../i18n/core";
 
 /**
  * The five kinds of ride, kept apart for the reason a run's surfaces are.
@@ -34,13 +35,28 @@ const SPORT_TYPE_RIDE: Record<number, RideType> = {
   299: "road" //      Helmet Bike
 };
 
-export const RIDE_TYPE_LABELS: Record<RideType, string> = {
-  road: "Road",
-  gravel: "Gravel",
-  mountain: "Mountain",
-  indoor: "Indoor",
-  ebike: "E-bike"
+export const RIDE_TYPE_LABELS: Readonly<Record<RideType, string>> = {
+  get road() {
+    return t("ride.type.road");
+  },
+  get gravel() {
+    return t("ride.type.gravel");
+  },
+  get mountain() {
+    return t("ride.type.mountain");
+  },
+  get indoor() {
+    return t("ride.type.indoor");
+  },
+  get ebike() {
+    return t("ride.type.ebike");
+  }
 };
+
+/** What a ride with no name of its own is called. */
+export function untitledRide(type: RideType | null | undefined): string {
+  return type ? t(`ride.untitled.${type}` as const) : t("ride.ride");
+}
 
 /**
  * Every bike code COROS has, e-bikes included. An e-bike ride is a ride — it is

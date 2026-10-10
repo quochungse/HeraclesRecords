@@ -12,6 +12,7 @@ import {
   metersToDisplayDistance,
   metersToElevation
 } from "../units/units";
+import { formatDecimal, t } from "../i18n/core";
 
 interface WeekStatsCellProps {
   stats: WeeklyStats;
@@ -60,15 +61,15 @@ function loadRatioTone(ratio: number): {
   title: string;
 } {
   if (ratio >= 1.5) {
-    return { tone: "danger", title: "Ramping up fast — above the 1.5 load ratio COROS flags." };
+    return { tone: "danger", title: t("calendar.week.ratio.rampFast") };
   }
   if (ratio >= 1.3) {
-    return { tone: "warn", title: "Building — a load ratio above 1.3 is a sharp week." };
+    return { tone: "warn", title: t("calendar.week.ratio.building") };
   }
   if (ratio < 0.8) {
-    return { tone: "warn", title: "Easing off — below 0.8 this week is detraining territory." };
+    return { tone: "warn", title: t("calendar.week.ratio.easing") };
   }
-  return { tone: "ok", title: "Steady — a load ratio near 1.0 holds fitness." };
+  return { tone: "ok", title: t("calendar.week.ratio.steady") };
 }
 
 /** Where the week's actual load sits against COROS's own recommended band. */
@@ -81,12 +82,12 @@ function loadBandTone(
     return {};
   }
   if (actual > max) {
-    return { tone: "danger", title: `Above the ${min}–${max} TL COROS recommends for this week.` };
+    return { tone: "danger", title: t("calendar.week.band.above", { min, max }) };
   }
   if (actual < min) {
-    return { tone: "warn", title: `Below the ${min}–${max} TL COROS recommends for this week.` };
+    return { tone: "warn", title: t("calendar.week.band.below", { min, max }) };
   }
-  return { tone: "ok", title: `Inside the ${min}–${max} TL COROS recommends for this week.` };
+  return { tone: "ok", title: t("calendar.week.band.inside", { min, max }) };
 }
 
 export function WeekStatsCell({
@@ -121,7 +122,7 @@ export function WeekStatsCell({
     }
     return (
       <div className="calendar-weekstats is-empty">
-        <p className="calendar-weekstats-empty">Nothing planned or logged</p>
+        <p className="calendar-weekstats-empty">{t("calendar.week.empty")}</p>
       </div>
     );
   }
@@ -137,54 +138,54 @@ export function WeekStatsCell({
     <div className="calendar-weekstats">
       {stats.baseFitness !== undefined ? (
         <StatRow
-          label="Base Fitness"
+          label={t("calendar.week.baseFitness")}
           value={String(Math.round(stats.baseFitness))}
-          title="COROS Base Fitness at the end of this week."
+          title={t("calendar.week.baseFitnessTitle")}
         />
       ) : null}
       {stats.loadImpact !== undefined ? (
         <StatRow
-          label="Load Impact"
+          label={t("calendar.week.loadImpact")}
           value={String(Math.round(stats.loadImpact))}
-          title="How much of this week's load is still being carried."
+          title={t("calendar.week.loadImpactTitle")}
         />
       ) : null}
       {ratio !== undefined ? (
-        <StatRow label="Load Ratio" value={ratio.toFixed(2)} {...loadRatioTone(ratio)} />
+        <StatRow label={t("calendar.week.loadRatio")} value={formatDecimal(ratio, 2)} {...loadRatioTone(ratio)} />
       ) : null}
       <StatRow
-        label="Training Load"
+        label={t("calendar.week.trainingLoad")}
         value={
           stats.plannedLoad > 0
-            ? `${stats.actualLoad} / ${stats.plannedLoad} TL`
-            : `${stats.actualLoad} TL`
+            ? t("calendar.loadOf", { actual: stats.actualLoad, planned: stats.plannedLoad })
+            : t("units.trainingLoadShort", { value: stats.actualLoad })
         }
         tone={band.tone}
         title={band.title}
       />
       {stats.recommendedLoadMin !== undefined && stats.recommendedLoadMax !== undefined ? (
         <StatRow
-          label="Target Range"
-          value={`${stats.recommendedLoadMin}–${stats.recommendedLoadMax} TL`}
-          title="COROS's recommended weekly load for your current fitness."
+          label={t("calendar.week.targetRange")}
+          value={t("calendar.week.targetRangeValue", { min: stats.recommendedLoadMin, max: stats.recommendedLoadMax })}
+          title={t("calendar.week.targetRangeTitle")}
         />
       ) : null}
       <StatRow
-        label="Activity Time"
+        label={t("calendar.week.activityTime")}
         value={stats.activityTimeSeconds > 0 ? formatDurationSeconds(stats.activityTimeSeconds) : "--"}
       />
       <StatRow
-        label="Distance"
+        label={t("activity.m.distance")}
         value={
           stats.plannedDistanceKm > 0
-            ? `${metersToDisplayDistance(stats.distanceMeters, unitSystem).toFixed(1)} / ${metersToDisplayDistance(stats.plannedDistanceKm * 1_000, unitSystem).toFixed(1)} ${distanceUnit(unitSystem)}`
+            ? `${formatDecimal(metersToDisplayDistance(stats.distanceMeters, unitSystem), 1)} / ${formatDecimal(metersToDisplayDistance(stats.plannedDistanceKm * 1_000, unitSystem), 1)} ${distanceUnit(unitSystem)}`
             : stats.distanceMeters > 0
               ? formatDistanceMeters(stats.distanceMeters, unitSystem)
               : "--"
         }
       />
       <StatRow
-        label="Elev. Gain"
+        label={t("calendar.week.elevGain")}
         value={
           stats.elevationGain > 0
             ? `${Math.round(metersToElevation(stats.elevationGain, unitSystem))} ${elevationUnit(unitSystem)}`
@@ -195,10 +196,10 @@ export function WeekStatsCell({
         type="button"
         className="calendar-weekstats-coach"
         onClick={onAskCoach}
-        title="Ask Coach about this week"
+        title={t("calendar.week.askTitle")}
       >
         <MessageCircle size={13} aria-hidden="true" />
-        Ask Coach
+        {t("activity.askCoach")}
       </button>
     </div>
   );

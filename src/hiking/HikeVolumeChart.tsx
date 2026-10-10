@@ -28,6 +28,7 @@ import {
 import { buildHikeWeeks, summariseHikes, type HikeWeek } from "./hikeMetrics";
 import { HIKE_TYPE_LABELS, type HikeType } from "./hikeType";
 import { hikeTypeColors } from "./hikeTypeColors";
+import { formatDecimal, plural, t } from "../i18n/core";
 
 /**
  * What a week of hiking is measured in.
@@ -37,10 +38,10 @@ import { hikeTypeColors } from "./hikeTypeColors";
  * gained is what tells them apart. Time on the trail and distance are a switch
  * away, and the bars, the average and the heading all follow the one chosen.
  */
-const MEASURE_OPTIONS: readonly { value: VolumeMeasure; label: string }[] = [
-  { value: "climb", label: "Ascent" },
-  { value: "time", label: "Time" },
-  { value: "distance", label: "Distance" }
+const measureOptions = (): { value: VolumeMeasure; label: string }[] => [
+  { value: "climb", label: t("hike.ascent") },
+  { value: "time", label: t("activity.m.time") },
+  { value: "distance", label: t("activity.m.distance") }
 ];
 
 interface HikeVolumeChartProps {
@@ -109,32 +110,33 @@ export function HikeVolumeChart({ hikes, hikesAllTime, weeks, types, nowMs }: Hi
 
   const unit = measureUnit(measure, unitSystem);
   const biggestLabel =
-    measure === "climb" ? "Biggest ascent" : measure === "time" ? "Longest day" : "Longest hike";
+    measure === "climb"
+      ? t("hike.volume.biggestAscent")
+      : measure === "time"
+        ? t("hike.volume.longestDay")
+        : t("hike.volume.longestHike");
 
   return (
     <section className="panel run-block">
       <header className="run-block-head">
         <div>
-          <p className="running-eyebrow">Weekly volume</p>
+          <p className="running-eyebrow">{t("run.volume.title")}</p>
           <h3>
-            {total.toFixed(0)} {unit}
-            <span className="run-block-sub">
-              {" "}
-              over {weeks} {weeks === 1 ? "week" : "weeks"}
-            </span>
+            {formatDecimal(total, 0)} {unit}
+            <span className="run-block-sub"> {plural("run.volume.over", weeks)}</span>
           </h3>
         </div>
         <div className="sport-volume-aside">
           {lastYear !== undefined ? (
             <p className="run-block-aside">
-              Same span a year ago:{" "}
-              <strong>{measured(lastYear, measure, unitSystem).toFixed(0)} {unit}</strong>
+              {t("run.volume.yearAgo")}{" "}
+              <strong>{formatDecimal(measured(lastYear, measure, unitSystem), 0)} {unit}</strong>
             </p>
           ) : null}
           <OptionGroup
-            label="Measure"
+            label={t("run.volume.measure")}
             value={measure}
-            options={MEASURE_OPTIONS}
+            options={measureOptions()}
             onChange={(next) => setMeasure(next as VolumeMeasure)}
           />
         </div>
@@ -153,7 +155,7 @@ export function HikeVolumeChart({ hikes, hikesAllTime, weeks, types, nowMs }: Hi
             <YAxis
               tick={{ fill: colors.text, fontSize: 11 }}
               stroke={colors.grid}
-              tickFormatter={(value: number) => value.toFixed(0)}
+              tickFormatter={(value: number) => formatDecimal(value, 0)}
             />
             {types.map((type) => (
               <Bar
@@ -210,7 +212,8 @@ export function HikeVolumeChart({ hikes, hikesAllTime, weeks, types, nowMs }: Hi
           </span>
         ))}
         <span>
-          <i style={{ background: colors.accentBright }} />4-week average
+          <i style={{ background: colors.accentBright }} />
+          {t("run.volume.avg4w")}
         </span>
         <span>
           <i className="is-dashed" style={{ background: colors.gold }} />
@@ -248,7 +251,7 @@ function VolumeTooltip({
   }
   return (
     <div className="training-chart-tooltip" style={trainingChartTooltipStyle}>
-      <span>Week of {label}</span>
+      <span>{t("activity.week.of", { date: String(label ?? "") })}</span>
       <strong>{formatMeasure(Number(row.total), measure, unitSystem)}</strong>
       {types
         .filter((type) => Number(row[type]) > 0)

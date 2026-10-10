@@ -1,10 +1,10 @@
 import type { WorkoutSport } from "../../electron/types";
 import {
-  WORKOUT_SPORT_CAPABILITIES,
   workoutSportFromType
 } from "../../electron/workoutCapabilities";
-import { inferUpcomingWorkoutCategory } from "./formatters";
+import { inferUpcomingWorkoutCategory, workoutCategoryLabel } from "./formatters";
 import type { SportColorCategory } from "./sportColors";
+import { t } from "../i18n/core";
 
 /**
  * A scheduled workout carries a COROS *program* sport code (1–9), which is a
@@ -55,7 +55,7 @@ export function scheduledSportCategory(
 
 /** COROS's own name for a program sport code, e.g. "Bike" for 2. */
 export function workoutSportLabel(sport: WorkoutSport): string {
-  return WORKOUT_SPORT_CAPABILITIES[sport].label;
+  return t(`workout.sport.${sport}`);
 }
 
 /**
@@ -193,7 +193,7 @@ export function planTag(workout: {
 
   const category = inferUpcomingWorkoutCategory(workout.name ?? "");
   if (category !== "Run") {
-    return category;
+    return workoutCategoryLabel(category);
   }
   // "Run" is the classifier's default as well as a real answer, so it only
   // stands when COROS said the sport really is running.

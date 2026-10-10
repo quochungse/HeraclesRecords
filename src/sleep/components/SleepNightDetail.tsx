@@ -24,6 +24,7 @@ import type {
   SleepNightSeries,
   TrainingHubSleepRecord
 } from "../../../electron/types";
+import { t } from "../../i18n/core";
 
 interface SleepNightDetailProps {
   record: TrainingHubSleepRecord | null;
@@ -49,7 +50,7 @@ function formatSleepHeartRate(record: TrainingHubSleepRecord): string {
   const high = record.maxHr;
 
   if (avg === undefined && low === undefined && high === undefined) {
-    return "No data";
+    return t("sleep.noData");
   }
 
   const average = avg !== undefined ? `${Math.round(avg)} bpm` : "–";
@@ -88,17 +89,17 @@ export function SleepNightDetail({
 }: SleepNightDetailProps) {
   if (!record) {
     const empty = hasNights
-      ? "Pick a night on the left to see how it broke down."
+      ? t("sleep.detail.pick")
       : mcpShortTextOr(
           mcpState,
-          "No nights to show.",
-          "Once a night syncs from your watch it shows up here."
+          t("sleep.detail.noNightsShort"),
+          t("sleep.detail.noNights")
         );
 
     return (
       <div className="sleep-detail-empty">
         <Moon size={28} aria-hidden="true" />
-        <p>{pending ? "Loading your nights…" : empty}</p>
+        <p>{pending ? t("sleep.detail.loading") : empty}</p>
       </div>
     );
   }
@@ -143,9 +144,9 @@ export function SleepNightDetail({
               // Deliberately without the moon-and-alarm pair the window line
               // wears: those read "went to bed" and "woke up", which is not
               // what a nap is.
-              `Naps only — no main sleep${napWindowLine ? ` · ${napWindowLine}` : ""}`
+              `${t("sleep.detail.napsOnly")}${napWindowLine ? ` · ${napWindowLine}` : ""}`
             ) : (
-              "Sleep window not reported"
+              t("sleep.detail.noWindow")
             )}
           </p>
         </div>
@@ -157,14 +158,13 @@ export function SleepNightDetail({
 
       {record.completeness === "partial" ? (
         <p className="sleep-detail-partial">
-          Partial data: {record.partialReason ?? "COROS is still syncing this sleep."}
+          {t("sleep.detail.partial", { reason: record.partialReason ?? t("sleep.detail.stillSyncing") })}
         </p>
       ) : null}
 
       {napOnly ? (
         <p className="sleep-detail-naps-only">
-          COROS sends no score and no stage breakdown for a day without a main
-          sleep — only how long the naps were and when.
+          {t("sleep.detail.napsOnlyNote")}
         </p>
       ) : (
         <section className="sleep-detail-stages">
@@ -196,26 +196,26 @@ export function SleepNightDetail({
       */}
       <SleepNightCurve series={series} loading={seriesLoading} />
 
-      <dl className="sleep-detail-metrics" aria-label="Night details">
+      <dl className="sleep-detail-metrics" aria-label={t("sleep.detail.aria")}>
         <Metric
-          label="Main sleep"
+          label={t("sleep.m.main")}
           value={formatSleepDurationMinutes(record.totalMinutes)}
         />
-        <Metric label="Time in bed" value={formatSleepDurationMinutes(inBed)} />
+        <Metric label={t("sleep.m.inBed")} value={formatSleepDurationMinutes(inBed)} />
         <Metric
-          label="Efficiency"
+          label={t("sleep.m.efficiency")}
           value={efficiency !== undefined ? formatSleepPercent(efficiency) : "–"}
         />
         <Metric
-          label="Wake-ups > 5m"
+          label={t("sleep.m.wakeUps")}
           value={
             record.awakeCountOverFiveMinutes !== undefined
               ? String(record.awakeCountOverFiveMinutes)
-              : "No data"
+              : t("sleep.noData")
           }
         />
-        <Metric label="Naps" value={formatNapValue(record)} hover={napHover(record)} />
-        <Metric label="Sleep HR" value={formatSleepHeartRate(record)} />
+        <Metric label={t("sleep.m.naps")} value={formatNapValue(record)} hover={napHover(record)} />
+        <Metric label={t("sleep.m.hr")} value={formatSleepHeartRate(record)} />
       </dl>
     </div>
   );

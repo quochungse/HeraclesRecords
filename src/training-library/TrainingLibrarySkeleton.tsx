@@ -1,4 +1,5 @@
 import type { CSSProperties } from "react";
+import { t } from "../i18n/core";
 
 /*
  * The library before its snapshot lands — and, as the Suspense fallback in
@@ -17,9 +18,9 @@ export function TrainingLibrarySkeleton() {
   return (
     <section className="training-library-view">
       <header className="tl-masthead">
-        <h1>Training Library</h1>
+        <h1>{t("nav.library")}</h1>
       </header>
-      <div className="tl-skeleton" aria-label="Loading the training library">
+      <div className="tl-skeleton" aria-label={t("library.loading")}>
         {Array.from({ length: ROWS }, (_, index) => (
           <span key={index} style={{ "--tl-row-index": index } as CSSProperties} />
         ))}

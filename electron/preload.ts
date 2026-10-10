@@ -147,6 +147,8 @@ const api = {
     ipcRenderer.invoke("records:remember", entries),
   notifyRendererReady: (): Promise<void> =>
     ipcRenderer.invoke("app:rendererReady"),
+  setLanguage: (locale: string): Promise<void> =>
+    ipcRenderer.invoke("app:setLanguage", locale),
   getSampleData: (): Promise<SampleDataState> =>
     ipcRenderer.invoke("dev:getSampleData"),
   setSampleData: (

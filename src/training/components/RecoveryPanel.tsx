@@ -6,6 +6,8 @@ import { getLocalHappenDayKey } from "../formatters";
 import { useFigureSample } from "../body/sampleFigure";
 import type { CorosProfile } from "../../../electron/types";
 import type { TrainingSummaryMetrics } from "../types";
+import { t } from "../../i18n/core";
+import { useI18n } from "../../i18n/useI18n";
 
 // The baked bodies (175 KB) stay out of Overview's chunk; the panel's words do
 // not wait on them.
@@ -39,30 +41,29 @@ function readinessCopy(
   switch (tone) {
     case "high":
       return {
-        label: "Ready",
-        message:
-          "Recovery is strong. You're cleared for a hard session."
+        label: t("overview.recovery.high.label"),
+        message: t("overview.recovery.high.message")
       };
     case "mid":
       return {
-        label: "Moderate",
-        message: "Recovery is climbing back. Keep today's effort easy to moderate."
+        label: t("overview.recovery.mid.label"),
+        message: t("overview.recovery.mid.message")
       };
     case "low":
       return {
-        label: "Recover",
-        message:
-          "Recovery is low. Prioritise rest and sleep before your next hard effort."
+        label: t("overview.recovery.low.label"),
+        message: t("overview.recovery.low.message")
       };
     default:
       return {
-        label: "Waiting",
-        message: "Sync your watch to see live recovery guidance here."
+        label: t("overview.recovery.waiting.label"),
+        message: t("overview.recovery.waiting.message")
       };
   }
 }
 
 export function RecoveryPanel(props: RecoveryPanelProps) {
+  useI18n();
   // A development build's Sample menu can stand in for the profile and the
   // recovery % (sampleFigure.ts); otherwise this is COROS's answer as given.
   const sample = useFigureSample();
@@ -83,7 +84,7 @@ export function RecoveryPanel(props: RecoveryPanelProps) {
   const colour = figureColourFor(percent);
   const waiting = loading && !hasData;
   const { label, message } = waiting
-    ? { label: "Reading", message: "Reading your recovery from COROS…" }
+    ? { label: t("overview.recovery.reading.label"), message: t("overview.recovery.reading.message") }
     : readinessCopy(hasData ? recoveryTone(percent) : "neutral");
   const body = readPhysique(profile);
   const firmness = readFirmness(profile, vo2Readings, today);
@@ -93,8 +94,10 @@ export function RecoveryPanel(props: RecoveryPanelProps) {
     ? Math.min(levelInFrame(percent / 100), LEVEL_LABEL_CEILING)
     : 0.5;
   const figureDescription = [
-    body.shape !== undefined ? `Drawn from ${profile?.statureCm} cm and ${profile?.weightKg} kg` : null,
-    hasData ? `${percent}% recovery` : label
+    body.shape !== undefined
+      ? t("overview.physique.drawnFrom", { height: profile?.statureCm ?? "", weight: profile?.weightKg ?? "" })
+      : null,
+    hasData ? t("overview.recovery.percent", { percent }) : label
   ]
     .filter(Boolean)
     .join(", ");
@@ -106,7 +109,7 @@ export function RecoveryPanel(props: RecoveryPanelProps) {
       aria-busy={waiting || undefined}
     >
       <div className="training-recovery-header">
-        <p className="eyebrow">Your physique</p>
+        <p className="eyebrow">{t("overview.physique.title")}</p>
       </div>
 
       <div className="training-recovery-content">

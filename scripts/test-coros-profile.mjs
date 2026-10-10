@@ -229,19 +229,19 @@ assert.throws(
 );
 assert.throws(
   () => buildCorosProfileUpdateFields({ birthday: 19940230 }, profile),
-  /real date in YYYYMMDD form/
+  /birthday as a real date/
 );
 assert.throws(
   () => buildCorosProfileUpdateFields({ birthday: 21000101 }, profile),
-  /real date in YYYYMMDD form/
+  /birthday as a real date/
 );
 assert.throws(
   () => buildCorosProfileUpdateFields({ nickname: "   " }, profile),
-  /Nickname must be 1-64 characters/
+  /nickname is 1 to 64 characters/
 );
 assert.throws(
   () => buildCorosProfileUpdateFields({ nickname: "n".repeat(65) }, profile),
-  /Nickname must be 1-64 characters/
+  /nickname is 1 to 64 characters/
 );
 assert.throws(
   () => buildCorosProfileUpdateFields({ unit: 2 }, profile),

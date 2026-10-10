@@ -3,6 +3,7 @@ import type { CSSProperties } from "react";
 import { sportChipStyle, sportTheme } from "../training-library/sportTheme";
 import type { WorkoutSport } from "../../electron/types";
 import type { RefPreview } from "./refPreview";
+import { t } from "../i18n/core";
 
 export interface ComposerRef {
   key: string;
@@ -22,8 +23,8 @@ export function ComposerRefs({ refs }: { refs: readonly ComposerRef[] }) {
   if (!refs.length) return null;
   if (refs.length > 1) {
     return (
-      <div className="chat-ref-header is-list" aria-label="Asking about">
-        <span className="chat-ref-header-kicker">About</span>
+      <div className="chat-ref-header is-list" aria-label={t("chat.refs.asking")}>
+        <span className="chat-ref-header-kicker">{t("chat.about")}</span>
         {refs.map(({ key, preview, onRemove }) => (
           <span key={key} className="chat-ref-chip" title={`${preview.context} · ${preview.title}`}>
             <RefIcon preview={preview} size={13} />
@@ -36,7 +37,7 @@ export function ComposerRefs({ refs }: { refs: readonly ComposerRef[] }) {
   }
   const [{ preview, onRemove }] = refs;
   return (
-    <div className="chat-ref-header" aria-label="Asking about" data-kind={preview.kind}>
+    <div className="chat-ref-header" aria-label={t("chat.refs.asking")} data-kind={preview.kind}>
       {preview.bars ? <RefRidge preview={preview} /> : <RefIcon preview={preview} size={20} />}
       <div className="chat-ref-header-text" title={`${preview.context} · ${preview.title}`}>
         <strong className="chat-ref-header-title">{preview.title}</strong>

@@ -6,6 +6,23 @@ export const FEET_PER_METER = 3.280839895;
 export const POUNDS_PER_KILOGRAM = 2.2046226218;
 export const CENTIMETERS_PER_INCH = 2.54;
 
+/**
+ * How a figure's digits are written. Plain `toFixed` by default, which is what
+ * the main process keeps: the coach reads these strings, and a model is told
+ * "5.2 km". The renderer hands in its language's own (src/i18n/core.ts), so a
+ * German screen reads "5,2 km". Grouping stays off, as `toFixed` has none.
+ */
+let decimal = (value: number, digits: number): string => value.toFixed(digits);
+
+export function setDecimalFormatter(format: (value: number, digits: number) => string): void {
+  decimal = format;
+}
+
+/** `value.toFixed(digits)`, in the digits of the language on screen. */
+export function formatDecimal(value: number, digits: number): string {
+  return decimal(value, digits);
+}
+
 export function normalizeUnitSystem(value: unknown): UnitSystem {
   return value === "imperial" ? "imperial" : "metric";
 }
@@ -189,11 +206,11 @@ export function formatDistanceValue(
   if (options.swim) {
     const value = metersToSwimDistance(meters ?? 0, unitSystem);
     const digits = options.digits ?? 0;
-    return `${value.toFixed(digits)} ${swimDistanceUnit(unitSystem)}`;
+    return `${decimal(value, digits)} ${swimDistanceUnit(unitSystem)}`;
   }
   const value = metersToDisplayDistance(meters ?? 0, unitSystem);
   const digits = options.digits ?? (Math.abs(value) >= 10 ? 1 : 2);
-  return `${value.toFixed(digits)} ${distanceUnit(unitSystem)}`;
+  return `${decimal(value, digits)} ${distanceUnit(unitSystem)}`;
 }
 
 export function formatElevationValue(
@@ -239,7 +256,7 @@ export function formatSpeedValue(
   if (!Number.isFinite(kilometresPerHour) || kilometresPerHour! < 0) {
     return `- ${speedUnit(unitSystem)}`;
   }
-  return `${kmhToDisplaySpeed(kilometresPerHour ?? 0, unitSystem).toFixed(digits)} ${speedUnit(unitSystem)}`;
+  return `${decimal(kmhToDisplaySpeed(kilometresPerHour ?? 0, unitSystem), digits)} ${speedUnit(unitSystem)}`;
 }
 
 export function formatWeightValue(
@@ -247,5 +264,5 @@ export function formatWeightValue(
   unitSystem: UnitSystem,
   digits = Number.isInteger(kilograms) ? 0 : 1
 ): string {
-  return `${kilogramsToDisplayWeight(kilograms, unitSystem).toFixed(digits)} ${weightUnit(unitSystem)}`;
+  return `${decimal(kilogramsToDisplayWeight(kilograms, unitSystem), digits)} ${weightUnit(unitSystem)}`;
 }

@@ -37,15 +37,17 @@ import {
 import { ClaudeCodeLoginCard } from "./ClaudeCodeLoginCard";
 import { detectAndAdoptLocalServer } from "./localModelDetection";
 import type { HeraclesRecordsApi } from "../heraclesrecords-api";
+import { getIntlLocale, messageRecord, plural, t } from "../i18n/core";
+import { renderRich } from "../i18n/useI18n";
 
 function claudeStatusLabel(status: ClaudeCodeStatus | null): string {
-  if (!status) return "Not checked";
-  if (status.state === "not-installed") return "Not installed";
-  if (status.state === "sign-in-required") return "Installed, sign-in required";
-  if (status.state === "connecting") return "Connecting";
-  if (status.state === "connected") return "Connected";
-  if (status.state === "usage-limit-reached") return "Usage limit reached";
-  return "Connection failed";
+  if (!status) return t("chat.models.status.notChecked");
+  if (status.state === "not-installed") return t("chat.models.status.notInstalled");
+  if (status.state === "sign-in-required") return t("chat.models.status.signIn");
+  if (status.state === "connecting") return t("chat.models.status.connecting");
+  if (status.state === "connected") return t("chat.models.status.connected");
+  if (status.state === "usage-limit-reached") return t("chat.models.status.limit");
+  return t("chat.models.status.failed");
 }
 
 /** Section order in the panel, which is also the skeleton's row count. */
@@ -62,13 +64,14 @@ function chatGptPlanLabel(plan: string): string {
   return plan.charAt(0).toUpperCase() + plan.slice(1);
 }
 
-export const COACH_PROVIDER_LABELS: Record<ChatProvider, string> = {
-  chatgpt: "ChatGPT",
-  "claude-code": "Claude subscription",
-  "claude-api": "Claude API key",
-  openrouter: "OpenRouter",
-  local: "Local model"
-};
+/** Each provider's name: two brands, and three that say what they are. */
+export const COACH_PROVIDER_LABELS: Readonly<Record<ChatProvider, string>> = messageRecord<ChatProvider>({
+  chatgpt: "chat.provider.chatgpt",
+  "claude-code": "chat.provider.claude-code",
+  "claude-api": "chat.provider.claude-api",
+  openrouter: "chat.provider.openrouter",
+  local: "chat.provider.local"
+});
 
 export interface CoachModelsSummary {
   /** The provider Coach will actually use. */
@@ -107,9 +110,10 @@ export function ClaudeCodeUpdateNote({ update }: { update: ClaudeCodeUpdate }) {
     <p className="coach-analysis-banner" role="status">
       <CircleArrowUp size={15} aria-hidden="true" />
       <span>
-        <strong>Claude Code {update.latest} is available.</strong> This
-        computer has {update.installed}. Run <code>claude update</code> in a
-        terminal to get the newest models and fixes.
+        {renderRich(t("chat.models.claudeUpdate", { latest: update.latest, installed: update.installed }), {
+          b: (chunk) => <strong>{chunk}</strong>,
+          code: (chunk) => <code>{chunk}</code>
+        })}
       </span>
     </p>
   );
@@ -165,16 +169,22 @@ export function coachModelsSummaryLine(
   summary: CoachModelsSummary | null
 ): string {
   if (!summary) {
-    return "Checking connections…";
+    return t("settings.mcp.checking");
   }
   if (summary.connected === 0) {
-    return "Nothing connected yet. Add an account or key to start coaching.";
+    return t("settings.coachModels.none");
   }
 
-  const active = summary.activeReady
-    ? `${summary.activeLabel} in use`
-    : `${summary.activeLabel} selected but not connected`;
-  return `${active} · ${summary.connected} of ${summary.total} providers connected`;
+  return t(
+    summary.activeReady
+      ? "settings.coachModels.summaryInUse"
+      : "settings.coachModels.summaryNotReady",
+    {
+      model: summary.activeLabel,
+      connected: summary.connected,
+      total: summary.total,
+    },
+  );
 }
 
 /**
@@ -188,17 +198,19 @@ export function modelListLine(
   now = new Date()
 ): string {
   if (!source) {
-    return `Showing the built-in list. ${readBy} to read the models your account offers.`;
+    return t("chat.models.list.builtIn", { action: readBy });
   }
-  const models = `${source.count} model${source.count === 1 ? "" : "s"} from your account`;
+  const models = plural("chat.models.list.count", source.count);
   // A list kept by a build that did not record when it was read.
-  if (!source.fetchedAt) return `${models}.`;
+  if (!source.fetchedAt) return t("chat.models.list.plain", { models });
   const at = new Date(source.fetchedAt);
   const sameDay = at.toDateString() === now.toDateString();
-  const when = sameDay
-    ? `today at ${at.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`
-    : `on ${at.toLocaleDateString()}`;
-  return `${models}, read ${when}. Read again daily.`;
+  return sameDay
+    ? t("chat.models.list.readToday", {
+        models,
+        time: at.toLocaleTimeString(getIntlLocale(), { hour: "2-digit", minute: "2-digit" })
+      })
+    : t("chat.models.list.readOn", { models, date: at.toLocaleDateString(getIntlLocale()) });
 }
 
 type ModelListProvider = "claude-code" | "claude-api" | "openrouter";
@@ -279,7 +291,7 @@ export function CoachModelsPanel({ api, onChange }: CoachModelsPanelProps) {
       if (auth.status === "fulfilled") setAuthStatus(auth.value);
       if (claude.status === "fulfilled") setClaudeStatus(claude.value);
       if (settings.status === "rejected") {
-        setError("Could not load coach settings.");
+        setError(t("chat.models.err.load"));
         return;
       }
       // Lists a day old are read again; only the lists are taken back, so a
@@ -379,7 +391,7 @@ export function CoachModelsPanel({ api, onChange }: CoachModelsPanelProps) {
     } catch (caught) {
       setModelListErrors((current) => ({
         ...current,
-        [provider]: caught instanceof Error ? caught.message : "Could not read the model list."
+        [provider]: caught instanceof Error ? caught.message : t("chat.models.err.list")
       }));
     } finally {
       setRefreshing(provider, false);
@@ -406,7 +418,7 @@ export function CoachModelsPanel({ api, onChange }: CoachModelsPanelProps) {
       }`}
     >
       {refreshingModels[provider]
-        ? "Reading the models your account offers…"
+        ? t("chat.models.reading")
         : (modelListErrors[provider] ?? modelListLine(modelListSource(provider), readBy))}
     </p>
   );
@@ -437,7 +449,7 @@ export function CoachModelsPanel({ api, onChange }: CoachModelsPanelProps) {
       await onChange?.();
     } catch (caught) {
       setError(
-        caught instanceof Error ? caught.message : "ChatGPT sign-in failed."
+        caught instanceof Error ? caught.message : t("chat.err.chatgptSignIn")
       );
     } finally {
       setSigningIn(false);
@@ -451,7 +463,7 @@ export function CoachModelsPanel({ api, onChange }: CoachModelsPanelProps) {
       await onChange?.();
     } catch (caught) {
       setError(
-        caught instanceof Error ? caught.message : "ChatGPT sign-out failed."
+        caught instanceof Error ? caught.message : t("chat.models.err.chatgptSignOut")
       );
     }
   };
@@ -470,7 +482,7 @@ export function CoachModelsPanel({ api, onChange }: CoachModelsPanelProps) {
       await onChange?.();
     } catch (caught) {
       setError(
-        caught instanceof Error ? caught.message : "Claude Code detection failed."
+        caught instanceof Error ? caught.message : t("chat.err.claudeDetect")
       );
     } finally {
       setCheckingClaude(false);
@@ -496,7 +508,7 @@ export function CoachModelsPanel({ api, onChange }: CoachModelsPanelProps) {
       setError(
         caught instanceof Error
           ? caught.message
-          : "Could not sign Heracles Records out of Claude."
+          : t("chat.models.err.claudeSignOut")
       );
     } finally {
       setRevokingClaude(false);
@@ -518,7 +530,7 @@ export function CoachModelsPanel({ api, onChange }: CoachModelsPanelProps) {
       await onChange?.();
     } catch (caught) {
       setError(
-        caught instanceof Error ? caught.message : "Claude connection test failed."
+        caught instanceof Error ? caught.message : t("chat.models.err.claudeTest")
       );
     } finally {
       setTestingClaude(false);
@@ -554,7 +566,7 @@ export function CoachModelsPanel({ api, onChange }: CoachModelsPanelProps) {
       setOpenRouterApiKey("");
       setOpenRouterConnection((current) => ({
         ok: true,
-        message: "OpenRouter settings saved.",
+        message: t("chat.models.openrouterSaved"),
         models: current?.models ?? []
       }));
       if (apiKey) void refreshModels("openrouter");
@@ -562,7 +574,7 @@ export function CoachModelsPanel({ api, onChange }: CoachModelsPanelProps) {
       setError(
         caught instanceof Error
           ? caught.message
-          : "Could not save OpenRouter settings."
+          : t("chat.models.err.openrouterSave")
       );
     } finally {
       setSavingSettings(false);
@@ -580,14 +592,14 @@ export function CoachModelsPanel({ api, onChange }: CoachModelsPanelProps) {
       setOpenRouterApiKey("");
       setOpenRouterConnection({
         ok: true,
-        message: "OpenRouter API key cleared.",
+        message: t("chat.models.openrouterCleared"),
         models: []
       });
     } catch (caught) {
       setError(
         caught instanceof Error
           ? caught.message
-          : "Could not clear the OpenRouter API key."
+          : t("chat.models.err.openrouterClear")
       );
     } finally {
       setSavingSettings(false);
@@ -615,7 +627,7 @@ export function CoachModelsPanel({ api, onChange }: CoachModelsPanelProps) {
       setError(
         caught instanceof Error
           ? caught.message
-          : "OpenRouter connection test failed."
+          : t("chat.models.err.openrouterTest")
       );
     } finally {
       setTestingOpenRouter(false);
@@ -642,15 +654,15 @@ export function CoachModelsPanel({ api, onChange }: CoachModelsPanelProps) {
       setAnthropicConnection({
         ok: true,
         message: saved?.anthropic.hasApiKey
-          ? "Claude API settings saved."
-          : "Settings saved. Add an API key to start coaching."
+          ? t("chat.models.anthropicSaved")
+          : t("chat.models.savedNoKey")
       });
       if (apiKey && saved?.anthropic.hasApiKey) void refreshModels("claude-api");
     } catch (caught) {
       setError(
         caught instanceof Error
           ? caught.message
-          : "Could not save Claude API settings."
+          : t("chat.models.err.anthropicSave")
       );
     } finally {
       setSavingSettings(false);
@@ -666,10 +678,10 @@ export function CoachModelsPanel({ api, onChange }: CoachModelsPanelProps) {
         anthropic: { ...chatSettings.anthropic, clearApiKey: true }
       });
       setAnthropicApiKey("");
-      setAnthropicConnection({ ok: true, message: "Anthropic API key cleared." });
+      setAnthropicConnection({ ok: true, message: t("chat.models.anthropicCleared") });
     } catch (caught) {
       setError(
-        caught instanceof Error ? caught.message : "Could not clear the API key."
+        caught instanceof Error ? caught.message : t("chat.models.err.clearKey")
       );
     } finally {
       setSavingSettings(false);
@@ -701,7 +713,7 @@ export function CoachModelsPanel({ api, onChange }: CoachModelsPanelProps) {
         message:
           caught instanceof Error
             ? caught.message
-            : "Claude API connection test failed."
+            : t("chat.models.err.anthropicTest")
       });
     } finally {
       setTestingAnthropic(false);
@@ -727,12 +739,12 @@ export function CoachModelsPanel({ api, onChange }: CoachModelsPanelProps) {
       setLocalApiKey("");
       setLocalConnection({
         ok: true,
-        message: "Local model settings saved.",
+        message: t("chat.models.localSaved"),
         normalizedBaseUrl: saved?.local.baseUrl
       });
     } catch (caught) {
       setError(
-        caught instanceof Error ? caught.message : "Local settings failed."
+        caught instanceof Error ? caught.message : t("chat.models.err.localSave")
       );
     } finally {
       setSavingSettings(false);
@@ -750,12 +762,12 @@ export function CoachModelsPanel({ api, onChange }: CoachModelsPanelProps) {
       setLocalApiKey("");
       setLocalConnection({
         ok: true,
-        message: "Local API key cleared.",
+        message: t("chat.models.localCleared"),
         normalizedBaseUrl: saved?.local.baseUrl
       });
     } catch (caught) {
       setError(
-        caught instanceof Error ? caught.message : "Could not clear API key."
+        caught instanceof Error ? caught.message : t("chat.models.err.clearKey")
       );
     } finally {
       setSavingSettings(false);
@@ -784,7 +796,7 @@ export function CoachModelsPanel({ api, onChange }: CoachModelsPanelProps) {
       setError(
         caught instanceof Error
           ? caught.message
-          : "Local model detection failed."
+          : t("chat.models.err.localDetect")
       );
     } finally {
       setDetectingLocal(false);
@@ -816,7 +828,7 @@ export function CoachModelsPanel({ api, onChange }: CoachModelsPanelProps) {
       }
     } catch (caught) {
       setError(
-        caught instanceof Error ? caught.message : "Local connection test failed."
+        caught instanceof Error ? caught.message : t("chat.models.err.localTest")
       );
     } finally {
       setTestingLocal(false);
@@ -851,19 +863,19 @@ export function CoachModelsPanel({ api, onChange }: CoachModelsPanelProps) {
       ) : null}
 
       <section className="chat-settings-section">
-        <h3>ChatGPT account</h3>
+        <h3>{t("chat.models.chatgptAccount")}</h3>
         {authStatus?.signedIn ? (
           <div className="chat-settings-account">
             {/* Which account is signed in (UAT), not only that one is. */}
             <span className="chat-settings-account-who">
               <strong className="chat-settings-email">
-                {authStatus.name ?? authStatus.email ?? "Signed in"}
+                {authStatus.name ?? authStatus.email ?? t("chat.models.signedIn")}
               </strong>
               <small>
                 {[
                   authStatus.name && authStatus.email ? authStatus.email : null,
                   authStatus.plan ? `ChatGPT ${chatGptPlanLabel(authStatus.plan)}` : null,
-                  "Signed in"
+                  t("chat.models.signedIn")
                 ]
                   .filter(Boolean)
                   .join(" · ")}
@@ -876,13 +888,13 @@ export function CoachModelsPanel({ api, onChange }: CoachModelsPanelProps) {
               disabled={busy}
             >
               <LogOut size={14} aria-hidden="true" />
-              Sign out
+              {t("chat.signOut")}
             </button>
           </div>
         ) : (
           <div className="chat-settings-account">
             <p className="chat-settings-copy">
-              Sign in with your ChatGPT account to use cloud coaching.
+              {t("chat.models.chatgptHint")}
             </p>
             <button
               type="button"
@@ -893,14 +905,14 @@ export function CoachModelsPanel({ api, onChange }: CoachModelsPanelProps) {
               {signingIn ? (
                 <Loader2 className="chat-spinner" size={16} aria-hidden="true" />
               ) : null}
-              Sign in with ChatGPT
+              {t("chat.gate.chatgpt.signIn")}
             </button>
           </div>
         )}
       </section>
 
       <section className="chat-settings-section chat-claude-section">
-        <h3>Claude subscription</h3>
+        <h3>{t("chat.provider.claude-code")}</h3>
         <p className="chat-settings-copy">
           Runs the Claude Code CLI installed on this computer against your Claude
           subscription. Heracles Records signs in with a Claude login of its own,
@@ -921,7 +933,7 @@ export function CoachModelsPanel({ api, onChange }: CoachModelsPanelProps) {
             <strong>{claudeStatusLabel(claudeStatus)}</strong>
             <span>
               {claudeStatus?.message ??
-                "Check this computer for an installed Claude Code runtime."}
+                t("chat.models.checkHint")}
             </span>
             {claudeStatus?.email ? (
               <span className="chat-claude-account">
@@ -940,7 +952,7 @@ export function CoachModelsPanel({ api, onChange }: CoachModelsPanelProps) {
 
         {showClaudeExecutable ? (
           <label className="chat-local-field">
-            <span>Claude executable</span>
+            <span>{t("chat.models.executable")}</span>
             <div className="chat-claude-path-row">
               <Terminal size={15} aria-hidden="true" />
               <input
@@ -949,7 +961,7 @@ export function CoachModelsPanel({ api, onChange }: CoachModelsPanelProps) {
                   setClaudeExecutableEdited(true);
                   updateClaudeCode({ executablePath: event.target.value });
                 }}
-                placeholder="Auto-detect Claude Code"
+                placeholder={t("chat.models.autoDetect")}
                 spellCheck={false}
               />
             </div>
@@ -968,7 +980,7 @@ export function CoachModelsPanel({ api, onChange }: CoachModelsPanelProps) {
             ) : (
               <RefreshCw size={14} aria-hidden="true" />
             )}
-            Check
+            {t("chat.models.check")}
           </button>
           {claudeStatus?.state === "not-installed" ? (
             <button
@@ -977,7 +989,7 @@ export function CoachModelsPanel({ api, onChange }: CoachModelsPanelProps) {
               onClick={() => void api.openClaudeCodeSetupGuide()}
             >
               <ExternalLink size={14} aria-hidden="true" />
-              Install Claude Code
+              {t("chat.gate.claude.install")}
             </button>
           ) : null}
           {claudeStatus?.installed && claudeStatus.state !== "connected" ? (
@@ -1000,7 +1012,7 @@ export function CoachModelsPanel({ api, onChange }: CoachModelsPanelProps) {
               ) : (
                 <Bot size={14} aria-hidden="true" />
               )}
-              Test connection
+              {t("chat.models.testConnection")}
             </button>
           ) : null}
           {claudeStatus?.authenticated ? (
@@ -1010,7 +1022,7 @@ export function CoachModelsPanel({ api, onChange }: CoachModelsPanelProps) {
               onClick={() => {
                 if (
                   window.confirm(
-                    "Sign Heracles Records out of Claude? Your Claude login elsewhere on this computer is not affected."
+                    t("chat.models.signOutConfirm")
                   )
                 ) {
                   void handleRevokeClaudeCode();
@@ -1023,7 +1035,7 @@ export function CoachModelsPanel({ api, onChange }: CoachModelsPanelProps) {
               ) : (
                 <LogOut size={14} aria-hidden="true" />
               )}
-              Sign out
+              {t("chat.signOut")}
             </button>
           ) : null}
           <button
@@ -1032,7 +1044,7 @@ export function CoachModelsPanel({ api, onChange }: CoachModelsPanelProps) {
             onClick={() => void api.openClaudeCodeSetupGuide()}
           >
             <ExternalLink size={14} aria-hidden="true" />
-            Setup guide
+            {t("chat.models.setupGuide")}
           </button>
         </div>
 
@@ -1040,12 +1052,12 @@ export function CoachModelsPanel({ api, onChange }: CoachModelsPanelProps) {
           <p className="chat-local-result is-error">{claudeLoginError}</p>
         ) : null}
 
-        <strong className="chat-claude-group-title">Model</strong>
+        <strong className="chat-claude-group-title">{t("chat.models.model")}</strong>
         <div className="chat-claude-model-row">
           <label className="chat-local-field">
-            <span>Claude model</span>
+            <span>{t("chat.models.claudeModel")}</span>
             <OptionGroup
-              label="Claude model"
+              label={t("chat.models.claudeModel")}
               mode="dropdown"
               size="md"
               value={chatSettings.claudeCode.model ?? ""}
@@ -1055,9 +1067,9 @@ export function CoachModelsPanel({ api, onChange }: CoachModelsPanelProps) {
           </label>
 
           <label className="chat-local-field">
-            <span>Reasoning effort</span>
+            <span>{t("chat.models.effort")}</span>
             <OptionGroup
-              label="Reasoning effort"
+              label={t("chat.models.effort")}
               mode="dropdown"
               size="md"
               value={
@@ -1074,22 +1086,20 @@ export function CoachModelsPanel({ api, onChange }: CoachModelsPanelProps) {
         </div>
         {renderModelListStatus(
           "claude-code",
-          claudeStatus?.authenticated ? "Press Check" : "Sign in"
+          claudeStatus?.authenticated ? t("chat.models.pressCheck") : t("common.signIn")
         )}
         <p className="chat-settings-copy">
-          Higher effort means deeper reasoning per answer and more of your
-          subscription usage. Claude quietly drops to the highest level your
-          selected model supports.
+          {t("chat.models.claudeEffortNote")}
         </p>
 
         <div className="chat-claude-permissions">
-          <strong>Claude can access</strong>
+          <strong>{t("chat.models.canAccess")}</strong>
           {(
             [
-              ["recentActivities", "Recent activities"],
-              ["trainingMetrics", "Training metrics"],
-              ["upcomingWorkouts", "Upcoming workouts"],
-              ["sleepData", "Sleep data"]
+              ["recentActivities", t("chat.models.perm.activities")],
+              ["trainingMetrics", t("chat.models.perm.metrics")],
+              ["upcomingWorkouts", t("chat.models.perm.workouts")],
+              ["sleepData", t("chat.models.perm.sleep")]
             ] as const
           ).map(([permission, label]) => (
             <label key={permission} className="chat-local-tools">
@@ -1110,25 +1120,19 @@ export function CoachModelsPanel({ api, onChange }: CoachModelsPanelProps) {
           ))}
         </div>
         <p className="chat-settings-copy">
-          These selections control built-in COROS and Training Hub data.
-          Connected custom MCP servers are trusted separately and can expose
-          their tools to Claude — add and remove them in Settings, under
-          Connections. Drafts stay local until you click an upload or delete
-          button.
+          {t("chat.models.permNote")}
         </p>
       </section>
 
       <section className="chat-settings-section chat-claude-section">
-        <h3>Claude API key</h3>
+        <h3>{t("chat.provider.claude-api")}</h3>
         <p className="chat-settings-copy">
-          Talks to the Anthropic API directly with your own key, billed per
-          token to your Anthropic account. Nothing needs to be installed, and
-          the key is stored encrypted on this computer only.
+          {t("chat.models.anthropicNote")}
         </p>
 
         <div className="chat-local-settings chat-local-settings-panel">
           <label className="chat-local-field chat-local-field-key">
-            <span>API key</span>
+            <span>{t("chat.models.apiKey")}</span>
             <div className="chat-local-key-row">
               <KeyRound size={14} aria-hidden="true" />
               <input
@@ -1137,7 +1141,7 @@ export function CoachModelsPanel({ api, onChange }: CoachModelsPanelProps) {
                   setAnthropicApiKey(event.target.value)
                 }
                 placeholder={
-                  chatSettings.anthropic.hasApiKey ? "Saved key" : "sk-ant-…"
+                  chatSettings.anthropic.hasApiKey ? t("chat.models.savedKey") : "sk-ant-…"
                 }
                 type="password"
                 spellCheck={false}
@@ -1148,16 +1152,16 @@ export function CoachModelsPanel({ api, onChange }: CoachModelsPanelProps) {
                   onClick={() => void handleClearAnthropicApiKey()}
                   disabled={savingSettings}
                 >
-                  Clear
+                  {t("chat.models.clear")}
                 </button>
               ) : null}
             </div>
           </label>
 
           <label className="chat-local-field">
-            <span>Model</span>
+            <span>{t("chat.models.model")}</span>
             <OptionGroup
-              label="Model"
+              label={t("chat.models.model")}
               mode="dropdown"
               size="md"
               value={chatSettings.anthropic.model}
@@ -1167,9 +1171,9 @@ export function CoachModelsPanel({ api, onChange }: CoachModelsPanelProps) {
           </label>
 
           <label className="chat-local-field">
-            <span>Reasoning effort</span>
+            <span>{t("chat.models.effort")}</span>
             <OptionGroup
-              label="Reasoning effort"
+              label={t("chat.models.effort")}
               mode="dropdown"
               size="md"
               value={
@@ -1185,10 +1189,10 @@ export function CoachModelsPanel({ api, onChange }: CoachModelsPanelProps) {
           </label>
           <p className="chat-settings-copy">
             {anthropicModel?.efforts?.length === 0
-              ? `${anthropicModel.label} takes no effort setting; it answers the same at every level.`
-              : "Higher effort spends more tokens on reasoning before answering. Lower effort is cheaper and faster for routine questions. A level the model does not offer is sent as the nearest one below it."}
+              ? t("chat.models.noEffort", { model: anthropicModel.label })
+              : t("chat.models.effortNote")}
           </p>
-          {renderModelListStatus("claude-api", "Save or test your key")}
+          {renderModelListStatus("claude-api", t("chat.models.saveOrTest"))}
 
           <div className="chat-local-actions">
             <button
@@ -1197,7 +1201,7 @@ export function CoachModelsPanel({ api, onChange }: CoachModelsPanelProps) {
               onClick={() => void api.openAnthropicKeyGuide()}
             >
               <ExternalLink size={14} aria-hidden="true" />
-              Get a key
+              {t("chat.gate.getKey")}
             </button>
             <button
               type="button"
@@ -1210,7 +1214,7 @@ export function CoachModelsPanel({ api, onChange }: CoachModelsPanelProps) {
               ) : (
                 <Bot size={14} aria-hidden="true" />
               )}
-              Test
+              {t("chat.models.test")}
             </button>
             <button
               type="button"
@@ -1223,7 +1227,7 @@ export function CoachModelsPanel({ api, onChange }: CoachModelsPanelProps) {
               ) : (
                 <Save size={14} aria-hidden="true" />
               )}
-              Save
+              {t("chat.set.save")}
             </button>
           </div>
           {anthropicConnection ? (
@@ -1242,24 +1246,23 @@ export function CoachModelsPanel({ api, onChange }: CoachModelsPanelProps) {
 
       <section className="chat-settings-section chat-openrouter-section">
         <div className="chat-settings-section-title">
-          <h3>OpenRouter API</h3>
-          <span className="chat-beta-badge">BYOK</span>
+          <h3>{t("chat.models.openrouterApi")}</h3>
+          <span className="chat-beta-badge">BYOK</span>{/* i18n-ignore: OpenRouter's own term */}
         </div>
         <p className="chat-settings-copy">
-          Use your OpenRouter account and credits for coaching. Heracles Records stores
-          the key encrypted on this computer and only sends it to OpenRouter.
+          {t("chat.models.openrouterNote")}
         </p>
 
         <div className="chat-local-settings chat-local-settings-panel">
           <label className="chat-local-field">
-            <span>Model</span>
+            <span>{t("chat.models.model")}</span>
             <input
               value={chatSettings.openRouter.model}
               onChange={(event) =>
                 updateOpenRouterDraft({ model: event.target.value })
               }
               list="chat-openrouter-models"
-              placeholder="openrouter/auto"
+              placeholder="openrouter/auto" // i18n-ignore: a model id
               spellCheck={false}
             />
             <datalist id="chat-openrouter-models">
@@ -1270,7 +1273,7 @@ export function CoachModelsPanel({ api, onChange }: CoachModelsPanelProps) {
           </label>
           <div className="chat-local-field chat-local-field-key">
             <label htmlFor="chat-openrouter-api-key">
-              <span>API key</span>
+              <span>{t("chat.models.apiKey")}</span>
             </label>
             <div className="chat-local-key-row">
               <KeyRound size={14} aria-hidden="true" />
@@ -1282,7 +1285,7 @@ export function CoachModelsPanel({ api, onChange }: CoachModelsPanelProps) {
                 }
                 placeholder={
                   chatSettings.openRouter.hasApiKey
-                    ? "Saved key"
+                    ? t("chat.models.savedKey")
                     : "sk-or-v1-…"
                 }
                 type="password"
@@ -1295,7 +1298,7 @@ export function CoachModelsPanel({ api, onChange }: CoachModelsPanelProps) {
                   onClick={() => void handleClearOpenRouterApiKey()}
                   disabled={savingSettings}
                 >
-                  Clear
+                  {t("chat.models.clear")}
                 </button>
                 ) : null}
             </div>
@@ -1308,7 +1311,7 @@ export function CoachModelsPanel({ api, onChange }: CoachModelsPanelProps) {
               disabled={!api}
             >
               <ExternalLink size={14} aria-hidden="true" />
-              Get API key
+              {t("chat.models.getApiKey")}
             </button>
             <button
               type="button"
@@ -1317,7 +1320,7 @@ export function CoachModelsPanel({ api, onChange }: CoachModelsPanelProps) {
               disabled={!api}
             >
               <ExternalLink size={14} aria-hidden="true" />
-              Browse models
+              {t("chat.models.browse")}
             </button>
             <button
               type="button"
@@ -1335,7 +1338,7 @@ export function CoachModelsPanel({ api, onChange }: CoachModelsPanelProps) {
               ) : (
                 <Bot size={14} aria-hidden="true" />
               )}
-              Test
+              {t("chat.models.test")}
             </button>
             <button
               type="button"
@@ -1354,7 +1357,7 @@ export function CoachModelsPanel({ api, onChange }: CoachModelsPanelProps) {
               ) : (
                 <Save size={14} aria-hidden="true" />
               )}
-              Save
+              {t("chat.set.save")}
             </button>
           </div>
           {openRouterConnection ? (
@@ -1368,23 +1371,21 @@ export function CoachModelsPanel({ api, onChange }: CoachModelsPanelProps) {
               {openRouterConnection.message}
             </p>
           ) : null}
-          {renderModelListStatus("openrouter", "Save or test your key")}
+          {renderModelListStatus("openrouter", t("chat.models.saveOrTest"))}
         </div>
         <p className="chat-settings-copy">
-          Coaching prompts and requested COROS data are sent through OpenRouter
-          to the selected model provider. OpenRouter bills usage to your account.
-          Choose a model with tool calling so workout and activity tools work.
+          {t("chat.models.openrouterPrivacy")}
         </p>
       </section>
 
       <section className="chat-settings-section">
-        <h3>Local model</h3>
+        <h3>{t("chat.provider.local")}</h3>
         <div className="chat-local-settings chat-local-settings-panel">
             <label className="chat-local-field">
-              <span>Server</span>
+              <span>{t("chat.models.server")}</span>
               {availableLocalServers.length > 0 ? (
                 <OptionGroup
-                  label="Local server"
+                  label={t("chat.models.localServer")}
                   mode="dropdown"
                   size="md"
                   value={
@@ -1392,9 +1393,7 @@ export function CoachModelsPanel({ api, onChange }: CoachModelsPanelProps) {
                   }
                   options={availableLocalServers.map((server) => ({
                     value: server.baseUrl,
-                    label: `${server.label} · ${server.models.length} model${
-                      server.models.length === 1 ? "" : "s"
-                    }`
+                    label: `${server.label} · ${plural("chat.models.serverModels", server.models.length)}`
                   }))}
                   onChange={(baseUrl) => {
                     const server = availableLocalServers.find(
@@ -1415,16 +1414,16 @@ export function CoachModelsPanel({ api, onChange }: CoachModelsPanelProps) {
                   onChange={(event) =>
                     updateLocalDraft({ baseUrl: event.target.value })
                   }
-                  placeholder="http://localhost:11434/v1"
+                  placeholder="http://localhost:11434/v1" // i18n-ignore: an address
                   spellCheck={false}
                 />
               )}
             </label>
             <label className="chat-local-field">
-              <span>Model</span>
+              <span>{t("chat.models.model")}</span>
               {discoveredLocalModels.length > 0 ? (
                 <OptionGroup
-                  label="Local model"
+                  label={t("chat.provider.local")}
                   mode="dropdown"
                   size="md"
                   value={
@@ -1444,20 +1443,20 @@ export function CoachModelsPanel({ api, onChange }: CoachModelsPanelProps) {
                   onChange={(event) =>
                     updateLocalDraft({ model: event.target.value })
                   }
-                  placeholder="Detect models or enter a model id"
+                  placeholder={t("chat.models.detectPh")}
                   spellCheck={false}
                 />
               )}
             </label>
             <label className="chat-local-field chat-local-field-key">
-              <span>API key</span>
+              <span>{t("chat.models.apiKey")}</span>
               <div className="chat-local-key-row">
                 <KeyRound size={14} aria-hidden="true" />
                 <input
                   value={localApiKey}
                   onChange={(event) => setLocalApiKey(event.target.value)}
                   placeholder={
-                    chatSettings.local.hasApiKey ? "Saved key" : "Optional"
+                    chatSettings.local.hasApiKey ? t("chat.models.savedKey") : t("chat.models.optional")
                   }
                   type="password"
                   spellCheck={false}
@@ -1468,7 +1467,7 @@ export function CoachModelsPanel({ api, onChange }: CoachModelsPanelProps) {
                     onClick={() => void handleClearLocalApiKey()}
                     disabled={savingSettings}
                   >
-                    Clear
+                    {t("chat.models.clear")}
                   </button>
                 ) : null}
               </div>
@@ -1481,7 +1480,7 @@ export function CoachModelsPanel({ api, onChange }: CoachModelsPanelProps) {
                   updateLocalDraft({ toolsEnabled: event.target.checked })
                 }
               />
-              <span>Use COROS tools when supported</span>
+              <span>{t("chat.models.useTools")}</span>
             </label>
             <div className="chat-local-actions">
               <button
@@ -1495,7 +1494,7 @@ export function CoachModelsPanel({ api, onChange }: CoachModelsPanelProps) {
                 ) : (
                   <RefreshCw size={14} aria-hidden="true" />
                 )}
-                Detect
+                {t("chat.models.detect")}
               </button>
               <button
                 type="button"
@@ -1508,7 +1507,7 @@ export function CoachModelsPanel({ api, onChange }: CoachModelsPanelProps) {
                 ) : (
                   <Bot size={14} aria-hidden="true" />
                 )}
-                Test
+                {t("chat.models.test")}
               </button>
               <button
                 type="button"
@@ -1521,7 +1520,7 @@ export function CoachModelsPanel({ api, onChange }: CoachModelsPanelProps) {
                 ) : (
                   <Save size={14} aria-hidden="true" />
                 )}
-                Save
+                {t("chat.set.save")}
               </button>
             </div>
             {localConnection ? (

@@ -1,3 +1,4 @@
+import type { MessageKey } from "../i18n/core";
 import { useMemo, useState } from "react";
 import {
   Bar,
@@ -28,6 +29,7 @@ import {
   type Volume,
   type VolumeMeasure
 } from "./sportVolume";
+import { formatDecimal, plural, t } from "../i18n/core";
 
 /**
  * What a week of running is measured in.
@@ -38,10 +40,10 @@ import {
  * apart — so under the Trail filter the chart opens on time. The bars, the
  * average, the dashed line and the heading all follow the one chosen.
  */
-const MEASURE_OPTIONS: readonly { value: VolumeMeasure; label: string }[] = [
-  { value: "distance", label: "Distance" },
-  { value: "time", label: "Time" },
-  { value: "climb", label: "Climb" }
+const measureOptions = (): { value: VolumeMeasure; label: string }[] => [
+  { value: "distance", label: t("activity.m.distance") },
+  { value: "time", label: t("activity.m.time") },
+  { value: "climb", label: t("activity.m.climb") }
 ];
 
 interface RunVolumeChartProps {
@@ -82,10 +84,10 @@ function surfaceVolume(week: RunWeek, surface: RunSurface): Volume {
 }
 
 /** The dashed line: the week's longest run, or its biggest climb when height is the measure. */
-const LONGEST_LABELS: Record<VolumeMeasure, string> = {
-  distance: "Longest run",
-  time: "Longest run",
-  climb: "Biggest climb"
+const LONGEST_LABELS: Record<VolumeMeasure, MessageKey> = {
+  distance: "run.volume.longest",
+  time: "run.volume.longest",
+  climb: "run.volume.biggestClimb"
 };
 
 export function RunVolumeChart({
@@ -153,34 +155,31 @@ export function RunVolumeChart({
   );
 
   const unit = measureUnit(measure, unitSystem);
-  const longestLabel = LONGEST_LABELS[measure];
+  const longestLabel = t(LONGEST_LABELS[measure]);
 
   return (
     <section className="panel run-block">
       <header className="run-block-head">
         <div>
-          <p className="running-eyebrow">Weekly volume</p>
+          <p className="running-eyebrow">{t("run.volume.title")}</p>
           <h3>
-            {total.toFixed(0)} {unit}
-            <span className="run-block-sub">
-              {" "}
-              over {weeks} {weeks === 1 ? "week" : "weeks"}
-            </span>
+            {formatDecimal(total, 0)} {unit}
+            <span className="run-block-sub"> {plural("run.volume.over", weeks)}</span>
           </h3>
         </div>
         <div className="sport-volume-aside">
           {lastYear !== undefined ? (
             <p className="run-block-aside">
-              Same span a year ago:{" "}
+              {t("run.volume.yearAgo")}{" "}
               <strong>
-                {measured(lastYear, measure, unitSystem).toFixed(0)} {unit}
+                {formatDecimal(measured(lastYear, measure, unitSystem), 0)} {unit}
               </strong>
             </p>
           ) : null}
           <OptionGroup
-            label="Measure"
+            label={t("run.volume.measure")}
             value={measure}
-            options={MEASURE_OPTIONS}
+            options={measureOptions()}
             onChange={(next) => setMeasure(next as VolumeMeasure)}
           />
         </div>
@@ -199,7 +198,7 @@ export function RunVolumeChart({
             <YAxis
               tick={{ fill: colors.text, fontSize: 11 }}
               stroke={colors.grid}
-              tickFormatter={(value: number) => value.toFixed(0)}
+              tickFormatter={(value: number) => formatDecimal(value, 0)}
             />
 
             {/* One segment per surface in the period. Under a surface filter
@@ -265,7 +264,8 @@ export function RunVolumeChart({
           </span>
         ))}
         <span>
-          <i style={{ background: colors.accentBright }} />4-week average
+          <i style={{ background: colors.accentBright }} />
+          {t("run.volume.avg4w")}
         </span>
         <span>
           <i className="is-dashed" style={{ background: colors.gold }} />
@@ -304,7 +304,7 @@ function VolumeTooltip({
 
   return (
     <div className="training-chart-tooltip" style={trainingChartTooltipStyle}>
-      <span>Week of {label}</span>
+      <span>{t("activity.week.of", { date: String(label ?? "") })}</span>
       <strong>{formatMeasure(Number(row.total), measure, unitSystem)}</strong>
       {surfaces
         .filter((surface) => Number(row[surface]) > 0)

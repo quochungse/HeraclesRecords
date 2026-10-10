@@ -22,6 +22,7 @@ import type {
   ModelCatalogEntry,
   OpenRouterModelOption
 } from "./types";
+import { ScreenError } from "./screenText";
 
 /** How old a list may be before an ordinary refresh reads it again. */
 export const MODEL_CATALOG_TTL_MS = 24 * 60 * 60 * 1000;
@@ -142,7 +143,7 @@ export function createCatalogRefresher(deps: CatalogRefreshDeps) {
       if (named) throw new Error(NOTHING_TO_ASK_WITH[provider]);
       return;
     }
-    if (models.length === 0) throw new Error("The provider listed no models.");
+    if (models.length === 0) throw new ScreenError("main.ai.noModels");
     deps.save(provider, models);
   };
   return async (
@@ -278,11 +279,11 @@ export async function listChatGptModels(request: CodexModelListRequest): Promise
     signal: AbortSignal.timeout(15_000)
   });
   if (!response.ok) {
-    throw new Error(`ChatGPT model list failed (${response.status}).`);
+    throw new ScreenError("main.ai.chatgptListFailed", { status: response.status });
   }
   const models = parseCodexModels(await response.json());
   if (models.length === 0) {
-    throw new Error("ChatGPT returned no models.");
+    throw new ScreenError("main.ai.chatgptNoModels");
   }
   return models;
 }

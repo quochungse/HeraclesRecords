@@ -8,6 +8,7 @@ import { OptionGroup } from "../../components/OptionGroup";
 import { periodLabel, type PeriodDays } from "../../preferences/periodScale";
 import { useChartColors } from "../useChartColors";
 import type { TrainingTrendPoint } from "../types";
+import { getIntlLocale } from "../../i18n/core";
 
 /**
  * The pieces every trend panel is built from — axes, tooltip, area gradient,
@@ -26,7 +27,7 @@ export type ChartValueFormatter = (value: number) => string;
 export type ChartRowFormatter = (value: number, name: string) => string;
 
 export function formatRoundedValue(value: number): string {
-  return new Intl.NumberFormat(undefined, {
+  return new Intl.NumberFormat(getIntlLocale(), {
     maximumFractionDigits: 1
   }).format(value);
 }
@@ -88,7 +89,7 @@ function formatTooltipHeading(date: unknown, fallback: unknown): string {
     Number(raw.slice(6, 8))
   );
 
-  return parsed.toLocaleDateString(undefined, {
+  return parsed.toLocaleDateString(getIntlLocale(), {
     weekday: "short",
     month: "short",
     day: "numeric"

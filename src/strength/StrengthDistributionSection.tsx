@@ -4,6 +4,7 @@ import type { HeraclesRecordsApi } from "../heraclesrecords-api";
 import { StrengthHero } from "./StrengthHero";
 import { activeStrengthWindow, useStrengthData } from "./useStrengthData";
 import "./strength.css";
+import { t } from "../i18n/core";
 
 interface StrengthDistributionSectionProps {
   api: HeraclesRecordsApi;
@@ -28,9 +29,9 @@ export function StrengthDistributionSection({
   return (
     <section className="training-load-profile">
       <div className="training-load-profile-header">
-        <p className="eyebrow">Load Profile</p>
+        <p className="eyebrow">{t("overview.zones.loadProfile")}</p>
         <h2>
-          Strength Distribution <span>({window.label})</span>
+          {t("strength.distribution")} <span>({window.label})</span>
         </h2>
       </div>
       <div className="strength-view">
@@ -45,7 +46,7 @@ export function StrengthDistributionSection({
         {initializing ? (
           <p className="strength-notice" role="status">
             <Loader2 className="spin" size={14} aria-hidden="true" />
-            Reading your strength sessions…
+            {t("strength.readingSessions")}
           </p>
         ) : (
           <StrengthHero analytics={analytics} source={source} />

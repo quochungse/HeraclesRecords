@@ -32,6 +32,8 @@ import {
   type TrainingPlanWeekSummary
 } from "../../electron/trainingPlanDomain";
 import { WORKOUT_SPORTS } from "../../electron/workoutCapabilities";
+import { formatDecimal, getIntlLocale, messageRecord, plural, t, weekdayNames } from "../i18n/core";
+import { planStageLabel } from "../i18n/workoutWords";
 
 /** Where a planned session stands, once its plan is on the calendar. */
 export type PlanEntryStatus = TrainingActivityMatch["status"];
@@ -113,7 +115,10 @@ export interface PlanReading {
   timed: boolean;
 }
 
-const DAY_NAMES = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"] as const;
+/** Monday first, in the language on screen. */
+function dayNames(): string[] {
+  return weekdayNames("short");
+}
 
 /** Midday, not midnight: parsed as UTC, a date west of Greenwich reads as the day before. */
 function planDate(startDate: string | undefined, dayOffset: number): Date | undefined {
@@ -137,7 +142,7 @@ export function stageForWeek(
 ): { label: string; slug: CorosWeekStageSlug } | undefined {
   const stage = weekStageOf(plan, weekIndex);
   const known = COROS_WEEK_STAGES.find((item) => item.value === stage);
-  return stage && known ? { label: known.label, slug: known.slug } : undefined;
+  return stage && known ? { label: planStageLabel(known.slug), slug: known.slug } : undefined;
 }
 
 /**
@@ -189,7 +194,7 @@ function entryFacts(
   const match = onCalendar ? matchByKey.get(`${plan.remoteId}:${entry.idInPlan}`) : undefined;
   return {
     id: entry.id,
-    title: entry.title.trim() || entry.workout.name.trim() || "Untitled session",
+    title: entry.title.trim() || entry.workout.name.trim() || t("library.untitledSession"),
     sport: entry.workout.sport,
     durationSeconds: metrics.durationSeconds,
     durationComplete: durationIsComplete(entry, metrics.durationSeconds),
@@ -224,12 +229,12 @@ export function readPlan(
 
   const weeks = Array.from({ length: plan.weekCount }, (_, weekIndex): PlanReaderWeek => {
     const inWeek = ordered.filter((entry) => entry.weekIndex === weekIndex);
-    const days = DAY_NAMES.map((name, dayIndex): PlanReaderDay => {
+    const days = dayNames().map((name, dayIndex): PlanReaderDay => {
       const date = planDate(plan.startDate, weekIndex * 7 + dayIndex);
       return {
         dayIndex,
         label: date
-          ? `${name} ${date.toLocaleDateString(undefined, { day: "numeric", month: "short" })}`
+          ? `${name} ${date.toLocaleDateString(getIntlLocale(), { day: "numeric", month: "short" })}`
           : name,
         date: date ? isoDay(date) : undefined,
         entries: inWeek
@@ -288,20 +293,20 @@ export function readPlan(
  */
 export type RidgeMeasure = "load" | "hours" | "sessions";
 
-export const RIDGE_CAPTIONS: Readonly<Record<RidgeMeasure, string>> = {
-  load: "Weekly load",
-  hours: "Hours a week",
-  sessions: "Sessions a week"
-};
+export const RIDGE_CAPTIONS: Readonly<Record<RidgeMeasure, string>> = messageRecord({
+  load: "library.ridge.caption.load",
+  hours: "library.ridge.caption.hours",
+  sessions: "library.ridge.caption.sessions"
+});
 
-export const RIDGE_UNITS: Readonly<Record<RidgeMeasure, string>> = {
-  load: "load",
-  hours: "hr",
-  sessions: "sessions"
-};
+export const RIDGE_UNITS: Readonly<Record<RidgeMeasure, string>> = messageRecord({
+  load: "library.ridge.unit.load",
+  hours: "library.ridge.unit.hours",
+  sessions: "library.ridge.unit.sessions"
+});
 
 export function formatRidgeValue(value: number, measure: RidgeMeasure): string {
-  return measure === "hours" ? String(Math.round(value * 10) / 10) : String(Math.round(value));
+  return measure === "hours" ? formatDecimal(Math.round(value * 10) / 10, Number.isInteger(Math.round(value * 10) / 10) ? 0 : 1) : String(Math.round(value));
 }
 
 function weekWorkouts(week: PlanReaderWeek): PlanEntryFacts[] {
@@ -358,9 +363,9 @@ export function formatWeekLine(week: PlanReaderWeek): string {
   const hours = week.timed ? Math.round(week.summary.durationSeconds / 360) / 10 : 0;
   const count = week.summary.workouts;
   return [
-    count === 1 ? "1 session" : `${count} sessions`,
-    hours ? `${hours} hr` : "",
-    load ? `${load} load` : ""
+    plural("library.sessions", count),
+    hours ? t("library.week.hours", { n: formatDecimal(hours, Number.isInteger(hours) ? 0 : 1) }) : "",
+    load ? t("library.entry.load", { n: load }) : ""
   ]
     .filter(Boolean)
     .join(" · ");
@@ -399,18 +404,18 @@ export function planSessions(reading: PlanReading): PlanSessionRef[] {
 export function formatPlannedDuration(seconds: number): string | null {
   if (!seconds) return null;
   const minutes = Math.round(seconds / 60);
-  if (minutes < 60) return `${minutes}m`;
+  if (minutes < 60) return t("units.duration.m", { m: minutes });
   return `${Math.floor(minutes / 60)}:${`${minutes % 60}`.padStart(2, "0")}`;
 }
 
-const STATUS_LABELS: Record<PlanEntryStatus, string> = {
-  completed: "Done",
-  partial: "Partial",
-  missed: "Missed",
-  skipped: "Skipped",
-  rescheduled: "Moved",
-  upcoming: "Ahead"
-};
+const STATUS_LABELS: Record<PlanEntryStatus, string> = messageRecord({
+  completed: "library.status.completed",
+  partial: "library.status.partial",
+  missed: "library.status.missed",
+  skipped: "library.status.skipped",
+  rescheduled: "library.status.rescheduled",
+  upcoming: "library.status.upcoming"
+});
 
 /** The word on a session's badge, or nothing when the question does not apply. */
 export function statusLabel(status: PlanEntryStatus | undefined): string | null {

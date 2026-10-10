@@ -34,7 +34,6 @@ import type {
   WorkoutEditorContext
 } from "../../electron/types";
 import { planWorkoutInputToEditorDraft } from "../../electron/planWorkoutEditor";
-import { formatWorkoutSport } from "../../electron/workoutCapabilities";
 import type { HeraclesRecordsApi } from "../heraclesrecords-api";
 import { WorkoutReadOnlyBody } from "../calendar/WorkoutEditorModal";
 import { useWorkoutExerciseCatalog } from "../calendar/useWorkoutExerciseCatalog";
@@ -47,6 +46,8 @@ import {
   type PlanSessionRef
 } from "./planReaderModel";
 import { sportChipStyle, sportTheme } from "./sportTheme";
+import { workoutSportLabel } from "../training/workoutSport";
+import { t } from "../i18n/core";
 
 interface PlanSessionViewProps {
   session: PlanSessionRef;
@@ -143,7 +144,7 @@ export function PlanSessionView({
   const tone = statusTone(facts.status);
   const label = statusLabel(facts.status);
   const where = [
-    `Week ${session.weekIndex + 1}`,
+    t("library.session.week", { n: session.weekIndex + 1 }),
     session.stage,
     session.dayLabel
   ].filter(Boolean);
@@ -166,7 +167,7 @@ export function PlanSessionView({
       {facts.scheduledDate ? (
         <span className="plan-session-scheduled">
           <CalendarCheck size={12} aria-hidden="true" />
-          On the COROS calendar {dayLabel(facts.scheduledDate)}
+          {t("library.session.onCoros", { day: dayLabel(facts.scheduledDate) })}
         </span>
       ) : null}
     </p>
@@ -183,12 +184,12 @@ export function PlanSessionView({
   const comparison = outcome
     ? [
         {
-          label: "Duration",
+          label: t("library.session.duration"),
           planned: plannedDuration ? formatPlannedDuration(plannedDuration) : null,
           done: outcome.durationSeconds ? formatDurationSeconds(outcome.durationSeconds) : null
         },
         {
-          label: "Distance",
+          label: t("library.session.distance"),
           planned: facts.distanceMeters
             ? formatDistanceValue(facts.distanceMeters, unitSystem, { digits: 1 })
             : null,
@@ -197,7 +198,7 @@ export function PlanSessionView({
             : null
         },
         {
-          label: "Load",
+          label: t("library.session.load"),
           planned: facts.trainingLoad ? String(Math.round(facts.trainingLoad)) : null,
           done: outcome.trainingLoad ? String(Math.round(outcome.trainingLoad)) : null
         }
@@ -219,20 +220,20 @@ export function PlanSessionView({
           <button
             type="button"
             className="ghost-button plan-session-ask"
-            title="Ask Coach about this session"
+            title={t("library.session.askTitle")}
             onClick={onAskCoach}
           >
-            <MessageCircle size={14} aria-hidden="true" /> <span>Ask Coach</span>
+            <MessageCircle size={14} aria-hidden="true" /> <span>{t("activity.askCoach")}</span>
           </button>
         ) : null}
         <div className="plan-session-pager">
           <span aria-live="polite">
-            Session {position.index + 1} of {position.of}
+            {t("library.session.position", { n: position.index + 1, total: position.of })}
           </span>
           <button
             type="button"
             className="icon-button"
-            aria-label="Previous session"
+            aria-label={t("library.session.prev")}
             disabled={position.index === 0}
             onClick={() => onStep(-1)}
           >
@@ -241,7 +242,7 @@ export function PlanSessionView({
           <button
             type="button"
             className="icon-button"
-            aria-label="Next session"
+            aria-label={t("library.session.next")}
             disabled={position.index >= position.of - 1}
             onClick={() => onStep(1)}
           >
@@ -279,7 +280,7 @@ export function PlanSessionView({
                   <h2 className="sched-hero-name">{facts.title}</h2>
                 </div>
                 <span className="sched-hero-context">
-                  <b>{facts.sport ? formatWorkoutSport(facts.sport) : "Workout"}</b>
+                  <b>{facts.sport ? workoutSportLabel(facts.sport) : t("workout.untitled")}</b>
                   {statusChip}
                 </span>
               </div>
@@ -297,18 +298,18 @@ export function PlanSessionView({
             <ListChecks size={18} aria-hidden="true" />
             <p>
               {entry?.idInPlan
-                ? "COROS sent this session's name without its steps."
-                : "This session has no step structure — only the targets above."}
+                ? t("library.session.noSteps")
+                : t("library.session.noStructure")}
             </p>
           </div>
         </div>
       )}
 
       {comparison.length ? (
-        <section className="plan-session-outcome" aria-label="Planned and done">
+        <section className="plan-session-outcome" aria-label={t("library.session.plannedDone")}>
           <header>
             <h3>
-              Planned and done
+              {t("library.session.plannedDone")}
               {outcome ? <small>{dayLabel(outcome.happenDay)}</small> : null}
             </h3>
             {/* The figures say how it compared; the activity says how it went —
@@ -319,7 +320,7 @@ export function PlanSessionView({
                 className="ghost-button plan-session-activity"
                 onClick={() => onOpenActivity(outcome.activityId!)}
               >
-                Open activity <ArrowUpRight size={14} aria-hidden="true" />
+                {t("library.session.openActivity")} <ArrowUpRight size={14} aria-hidden="true" />
               </button>
             ) : null}
           </header>
@@ -357,12 +358,12 @@ function PlannedFigures({
   unitSystem: UnitSystem;
 }) {
   const stats = [
-    durationSeconds ? { label: "Duration", value: formatPlannedDuration(durationSeconds) } : null,
+    durationSeconds ? { label: t("library.session.duration"), value: formatPlannedDuration(durationSeconds) } : null,
     distanceMeters
-      ? { label: "Distance", value: formatDistanceValue(distanceMeters, unitSystem, { digits: 1 }) }
+      ? { label: t("library.session.distance"), value: formatDistanceValue(distanceMeters, unitSystem, { digits: 1 }) }
       : null,
-    trainingLoad ? { label: "Planned load", value: String(Math.round(trainingLoad)) } : null,
-    strengthSets ? { label: "Sets", value: String(strengthSets) } : null
+    trainingLoad ? { label: t("library.session.plannedLoad"), value: String(Math.round(trainingLoad)) } : null,
+    strengthSets ? { label: t("library.session.sets"), value: String(strengthSets) } : null
   ].filter((stat): stat is { label: string; value: string } => Boolean(stat?.value));
 
   if (!stats.length) return null;

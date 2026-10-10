@@ -1,0 +1,281 @@
+import {
+  DEFAULT_LOCALE,
+  LOCALE_DETAILS,
+  isLocale,
+  resolveIntlLocale,
+  type Locale,
+} from "./locales.ts";
+import en from "./messages/en/index.ts";
+import { setDecimalFormatter } from "../../electron/unitSystem.ts";
+import { screenKeyForEnglish } from "../../electron/screenText.ts";
+
+/**
+ * The runtime behind every translated word. React-free, so a pure module (a
+ * greeting, a formatter) can translate with `t` and a suite can drive it; the
+ * hook in `useI18n.tsx` is how a component subscribes to a change.
+ *
+ * Messages are flat: one key, one string, the key naming the screen first
+ * (`settings.language.title`). English is bundled with the app and every other
+ * language is a chunk of its own, loaded before the first paint
+ * (`initLocale`) or when the athlete switches (`setLocale`).
+ *
+ * A message may hold:
+ *   {name}          a value handed in `vars`
+ *   key_one/_other  plural forms, picked by `plural()` through Intl.PluralRules
+ *   <b>…</b>        a span the caller draws (`rich()` in useI18n.tsx); any
+ *                   lower-case tag name, never nested
+ */
+
+export type Messages = typeof en;
+export type MessageKey = keyof Messages;
+/** A key whose forms are `<key>_one`, `<key>_other`, … — what `plural` takes. */
+export type PluralKey = {
+  [K in MessageKey]: K extends `${infer Base}_other` ? Base : never;
+}[MessageKey];
+export type MessageVars = Record<string, string | number>;
+
+type Dictionary = Record<string, string>;
+
+/** A preference: it follows the athlete to their other computer through sync. */
+export const LOCALE_STORAGE_KEY = "heraclesrecords.language";
+
+const LOADERS: Record<Exclude<Locale, "en">, () => Promise<{ default: Dictionary }>> = {
+  vi: () => import("./messages/vi/index.ts"),
+  ja: () => import("./messages/ja/index.ts"),
+  ko: () => import("./messages/ko/index.ts"),
+  zh: () => import("./messages/zh/index.ts"),
+  es: () => import("./messages/es/index.ts"),
+  pt: () => import("./messages/pt/index.ts"),
+  fr: () => import("./messages/fr/index.ts"),
+  de: () => import("./messages/de/index.ts"),
+  it: () => import("./messages/it/index.ts"),
+  ru: () => import("./messages/ru/index.ts"),
+  id: () => import("./messages/id/index.ts"),
+  th: () => import("./messages/th/index.ts"),
+};
+
+const loaded = new Map<Locale, Dictionary>([["en", en]]);
+const listeners = new Set<() => void>();
+
+let current: Locale = DEFAULT_LOCALE;
+let dictionary: Dictionary = en;
+let intl = resolveIntlLocale(DEFAULT_LOCALE, systemLanguages());
+let pluralRules = new Intl.PluralRules(intl);
+let numberFormat = new Intl.NumberFormat(intl);
+const englishPluralRules = new Intl.PluralRules("en");
+
+function systemLanguages(): readonly string[] {
+  return typeof navigator === "undefined" ? [] : (navigator.languages ?? []);
+}
+
+export function getLocale(): Locale {
+  return current;
+}
+
+/** The `Intl` locale every date, number and weekday on screen is written in. */
+export function getIntlLocale(): string {
+  return intl;
+}
+
+export function subscribeLocale(listener: () => void): () => void {
+  listeners.add(listener);
+  return () => listeners.delete(listener);
+}
+
+async function loadDictionary(locale: Locale): Promise<Dictionary> {
+  const cached = loaded.get(locale);
+  if (cached) {
+    return cached;
+  }
+  const module = await LOADERS[locale as Exclude<Locale, "en">]();
+  loaded.set(locale, module.default);
+  return module.default;
+}
+
+function apply(locale: Locale, messages: Dictionary): void {
+  current = locale;
+  dictionary = messages;
+  intl = resolveIntlLocale(locale, systemLanguages());
+  pluralRules = new Intl.PluralRules(intl);
+  numberFormat = new Intl.NumberFormat(intl);
+  setDecimalFormatter(decimalFormatterFor(intl));
+  if (typeof document !== "undefined") {
+    document.documentElement.lang = LOCALE_DETAILS[locale].htmlLang;
+  }
+  for (const listener of listeners) {
+    listener();
+  }
+}
+
+/** `toFixed` in a language's digits: 5,2 in German, 5.2 in English; no grouping. */
+function decimalFormatterFor(locale: string): (value: number, digits: number) => string {
+  const formats = new Map<number, Intl.NumberFormat>();
+  return (value, digits) => {
+    let format = formats.get(digits);
+    if (!format) {
+      format = new Intl.NumberFormat(locale, {
+        minimumFractionDigits: digits,
+        maximumFractionDigits: digits,
+        useGrouping: false,
+      });
+      formats.set(digits, format);
+    }
+    return format.format(value);
+  };
+}
+
+export { formatDecimal } from "../../electron/unitSystem.ts";
+
+/**
+ * Weekday names in the language on screen, Monday first, as the app's weeks
+ * run. From Intl rather than from messages: every language already has them,
+ * spelled the way its calendars spell them.
+ */
+export function weekdayNames(style: "narrow" | "short" | "long" = "short"): string[] {
+  const format = new Intl.DateTimeFormat(intl, { weekday: style, timeZone: "UTC" });
+  // 2024-01-01 was a Monday.
+  return Array.from({ length: 7 }, (_, day) => format.format(new Date(Date.UTC(2024, 0, 1 + day))));
+}
+
+/** Month names in the language on screen, January first. */
+export function monthNames(style: "narrow" | "short" | "long" = "short"): string[] {
+  const format = new Intl.DateTimeFormat(intl, { month: style, timeZone: "UTC" });
+  return Array.from({ length: 12 }, (_, month) => format.format(new Date(Date.UTC(2024, month, 15))));
+}
+
+/**
+ * A label that opens a heading, with its first letter raised. Intl writes a
+ * month in the case a sentence would ("tháng 10 năm 2026", "octobre 2026"),
+ * which reads as a mistake where it stands alone as a title.
+ */
+export function capitalizeFirst(text: string): string {
+  const [first = "", ...rest] = [...text];
+  return first.toLocaleUpperCase(intl) + rest.join("");
+}
+
+/** A count in the language's digits, grouped: 12.345 in German. */
+export function formatCount(value: number): string {
+  return numberFormat.format(value);
+}
+
+export function readStoredLocale(): Locale {
+  try {
+    const stored = window.localStorage.getItem(LOCALE_STORAGE_KEY);
+    if (isLocale(stored)) {
+      return stored;
+    }
+  } catch {
+    // Storage unavailable: the default stands.
+  }
+  return DEFAULT_LOCALE;
+}
+
+function storeLocale(locale: Locale): void {
+  try {
+    window.localStorage.setItem(LOCALE_STORAGE_KEY, locale);
+  } catch {
+    // The choice holds for this session even when it cannot be kept.
+  }
+}
+
+/**
+ * Before the first paint: the stored language, loaded. A chunk that will not
+ * load leaves the app in English rather than not starting.
+ */
+export async function initLocale(): Promise<void> {
+  const locale = readStoredLocale();
+  try {
+    apply(locale, await loadDictionary(locale));
+  } catch {
+    apply(DEFAULT_LOCALE, en);
+  }
+}
+
+let latestPick = 0;
+
+/**
+ * The athlete's pick in Settings. Resolves once the screen can redraw in it.
+ * Two picks in quick succession load their chunks concurrently, and the one
+ * picked last wins even when the other's chunk arrives after it.
+ */
+export async function setLocale(locale: Locale): Promise<void> {
+  const pick = ++latestPick;
+  const messages = await loadDictionary(locale);
+  if (pick !== latestPick) {
+    return;
+  }
+  storeLocale(locale);
+  apply(locale, messages);
+}
+
+/** For a suite: switch without storage, with the dictionary handed in or loaded. */
+export async function switchLocaleForTest(locale: Locale): Promise<void> {
+  apply(locale, await loadDictionary(locale));
+}
+
+function lookup(key: string): string {
+  return dictionary[key] ?? (en as Dictionary)[key] ?? key;
+}
+
+export function interpolate(message: string, vars?: MessageVars): string {
+  if (!vars) {
+    return message;
+  }
+  return message.replace(/\{(\w+)\}/g, (whole, name: string) =>
+    name in vars ? String(vars[name]) : whole,
+  );
+}
+
+/** A message, with `{name}` filled from `vars`. */
+export function t(key: MessageKey, vars?: MessageVars): string {
+  return interpolate(lookup(key), vars);
+}
+
+/**
+ * The form of `key` this language uses for `count`, with `{count}` written in
+ * the language's own digits and separators. A language without a form for that
+ * category (Vietnamese, Japanese, Korean and Chinese have only `other`) takes
+ * `_other`.
+ */
+export function plural(key: PluralKey, count: number, vars?: MessageVars): string {
+  const category = pluralRules.select(count);
+  const message =
+    dictionary[`${key}_${category}`] ??
+    dictionary[`${key}_other`] ??
+    (en as Dictionary)[`${key}_${englishPluralRules.select(count)}`] ??
+    (en as Dictionary)[`${key}_other`] ??
+    key;
+  return interpolate(message, { count: numberFormat.format(count), ...vars });
+}
+
+/**
+ * A record of labels that reads its messages each time it is read, never once:
+ * `messageRecord({ road: "run.surface.road" }).road` is the word in the
+ * language on screen, so a module-level table of labels cannot freeze English.
+ * It has no prototype, so `in` and a lookup by an unknown id (a status a newer
+ * build wrote) find nothing rather than `toString`.
+ */
+export function messageRecord<K extends string>(keys: Readonly<Record<K, MessageKey>>): Readonly<Record<K, string>> {
+  const record = Object.create(null) as Record<K, string>;
+  for (const key of Object.keys(keys) as K[]) {
+    Object.defineProperty(record, key, { get: () => t(keys[key]), enumerable: true });
+  }
+  return record;
+}
+
+/**
+ * A sentence the main process wrote in English — an error that crossed as data
+ * rather than as a thrown `ScreenError`, or one stored before it was shown —
+ * in the language on screen when it is one of `screenText.ts`'s fixed
+ * sentences. Anything else (COROS's own words, a sentence with values in it)
+ * is returned as it came.
+ */
+export function screenSentence(text: string): string {
+  const key = screenKeyForEnglish(text);
+  return key ? t(key) : text;
+}
+
+/** The English text of a key, for what must not change with the language. */
+export function english(key: MessageKey): string {
+  return (en as Dictionary)[key] ?? key;
+}

@@ -13,22 +13,24 @@ import { formatHeartRateZoneRange } from "../training/heartRateZoneModel";
 import { HEART_RATE_ZONE_COLORS } from "./charts/zoneChartConfig";
 import type { UnitSystem } from "../../electron/types";
 import { useUnitSystem } from "../units/UnitSystemProvider";
+import { formatDecimal, messageRecord, t } from "../i18n/core";
+import { useI18n } from "../i18n/useI18n";
 
 interface HrZoneCardProps {
   preview: HrZonePreview;
 }
 
-const METRIC_LABELS: Record<HrZonePreview["metric"], string> = {
-  time: "Time in zones",
-  distance: "Distance in zones",
-  trainingLoad: "Training load in zones"
-};
+const METRIC_LABELS = messageRecord<HrZonePreview["metric"]>({
+  time: "chat.zones.metric.time",
+  distance: "chat.zones.metric.distance",
+  trainingLoad: "chat.zones.metric.load"
+});
 
-const METRIC_COLUMN_LABELS: Record<HrZonePreview["metric"], string> = {
-  time: "Duration",
-  distance: "Distance",
-  trainingLoad: "Load"
-};
+const METRIC_COLUMN_LABELS = messageRecord<HrZonePreview["metric"]>({
+  time: "activity.m.duration",
+  distance: "activity.m.distance",
+  trainingLoad: "library.session.load"
+});
 
 interface ZoneRow {
   index: number;
@@ -44,21 +46,21 @@ interface ZoneRow {
 function heartRateZoneCaption(zoneIndex: number): string {
   switch (zoneIndex) {
     case 0:
-      return "Below aerobic threshold";
+      return t("chat.zones.caption.0");
     case 1:
-      return "Recovery & warm-up";
+      return t("chat.zones.caption.1");
     case 2:
-      return "Aerobic base building";
+      return t("chat.zones.caption.2");
     case 3:
-      return "Steady aerobic effort";
+      return t("chat.zones.caption.3");
     case 4:
-      return "Lactate threshold work";
+      return t("chat.zones.caption.4");
     case 5:
-      return "High aerobic / anaerobic load";
+      return t("chat.zones.caption.5");
     case 6:
-      return "Max effort intervals";
+      return t("chat.zones.caption.6");
     default:
-      return "Training intensity zone";
+      return t("chat.zones.caption.other");
   }
 }
 
@@ -76,14 +78,14 @@ function formatZoneMetricValue(
       return formatDurationSeconds(value);
     }
 
-    return `${Math.round(value / 60)} min`;
+    return t("units.min", { m: Math.round(value / 60) });
   }
 
   return String(Math.round(value));
 }
 
 function formatPercent(value: number): string {
-  return `${value.toFixed(1)}%`;
+  return `${formatDecimal(value, 1)}%`;
 }
 
 function ZoneTooltip({ active, payload }: TooltipContentProps) {
@@ -108,6 +110,7 @@ function ZoneTooltip({ active, payload }: TooltipContentProps) {
 
 /** Memoised on `preview`, as `ActivityVisualCard` is and for the same reason. */
 export const HrZoneCard = memo(function HrZoneCard({ preview }: HrZoneCardProps) {
+  const { locale } = useI18n();
   const { unitSystem } = useUnitSystem();
   const rows = useMemo((): ZoneRow[] => {
     return preview.zones.map((zone, index) => ({
@@ -120,7 +123,7 @@ export const HrZoneCard = memo(function HrZoneCard({ preview }: HrZoneCardProps)
       hrRange: formatHeartRateZoneRange(preview.lthrZones, zone.index),
       color: HEART_RATE_ZONE_COLORS[index % HEART_RATE_ZONE_COLORS.length]
     }));
-  }, [preview, unitSystem]);
+  }, [locale, preview, unitSystem]);
 
   const chartData = rows.filter((row) => row.percent > 0);
   const topZone = useMemo(() => {
@@ -137,18 +140,18 @@ export const HrZoneCard = memo(function HrZoneCard({ preview }: HrZoneCardProps)
     <div className="chat-visual-card chat-zone-card">
       <div className="chat-visual-card-header">
         <div>
-          <h4>Heart rate zones</h4>
+          <h4>{t("chat.zones.title")}</h4>
           <span className="chat-visual-card-subtitle">
-            {METRIC_LABELS[preview.metric]} · last 4 weeks
+            {METRIC_LABELS[preview.metric]} · {t("chat.zones.last4")}
           </span>
         </div>
         {topZone ? (
           <div className="chat-visual-stats">
             <span className="chat-visual-stat">
-              Primary <strong>{topZone.label}</strong>
+              {t("chat.zones.primary")} <strong>{topZone.label}</strong>
             </span>
             <span className="chat-visual-stat">
-              Active zones <strong>{activeZones}</strong>
+              {t("chat.zones.active")} <strong>{activeZones}</strong>
             </span>
           </div>
         ) : null}
@@ -193,7 +196,7 @@ export const HrZoneCard = memo(function HrZoneCard({ preview }: HrZoneCardProps)
 
             {topZone ? (
               <div className="chat-zone-hero">
-                <p className="chat-zone-hero-kicker">Primary zone</p>
+                <p className="chat-zone-hero-kicker">{t("chat.zones.primaryZone")}</p>
                 <h3>{topZone.label}</h3>
                 <p className="chat-zone-hero-percent">
                   {formatPercent(topZone.percent)}
@@ -209,8 +212,8 @@ export const HrZoneCard = memo(function HrZoneCard({ preview }: HrZoneCardProps)
 
           <div className="chat-zone-table">
             <div className="chat-zone-table-head">
-              <span>Zone</span>
-              <span>HR range</span>
+              <span>{t("profile.zones.zone")}</span>
+              <span>{t("chat.zones.range")}</span>
               <span aria-hidden="true" />
               <span>%</span>
               <span>{METRIC_COLUMN_LABELS[preview.metric]}</span>
@@ -239,7 +242,7 @@ export const HrZoneCard = memo(function HrZoneCard({ preview }: HrZoneCardProps)
           </div>
         </div>
       ) : (
-        <p className="chat-visual-empty">No zone distribution data available.</p>
+        <p className="chat-visual-empty">{t("chat.zones.none")}</p>
       )}
     </div>
   );

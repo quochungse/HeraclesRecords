@@ -2,6 +2,9 @@ import { useEffect, useId, useRef } from "react";
 import { createPortal } from "react-dom";
 import { MessageCircle, Plus } from "lucide-react";
 import type { ChatSessionSummary } from "../../electron/types";
+import { getIntlLocale, t } from "../i18n/core";
+import { displaySessionTitle } from "./sessionTitle";
+
 // The dialog chrome is the library's `tl-dialog`, as ConfirmDialog's is.
 import "../training-library/trainingLibrary.css";
 
@@ -70,11 +73,11 @@ export function CoachAskPicker({
 
   const note = (session: ChatSessionSummary) =>
     session.id === suggested?.id
-      ? "Where this plan was made"
+      ? t("chat.ask.made")
       : session.id === activeId
-        ? "Open now"
+        ? t("chat.ask.openNow")
         : session.pinnedAt
-          ? "Pinned"
+          ? t("chat.group.pinned")
           : updatedLabel(session.updatedAt);
 
   return createPortal(
@@ -86,20 +89,20 @@ export function CoachAskPicker({
         aria-labelledby={titleId}
         onMouseDown={(event) => event.stopPropagation()}
       >
-        <h2 id={titleId}>Ask Coach in…</h2>
+        <h2 id={titleId}>{t("chat.ask.title")}</h2>
         <p>{subject}</p>
         <ul className="coach-ask-list">
           <li>
             <button ref={firstRef} type="button" className="coach-ask-option is-new" onClick={() => onPick(null)}>
               <Plus size={15} aria-hidden="true" />
-              <strong>New conversation</strong>
+              <strong>{t("chat.ask.new")}</strong>
             </button>
           </li>
           {listed.map((session) => (
             <li key={session.id}>
               <button type="button" className="coach-ask-option" onClick={() => onPick(session.id)}>
                 <MessageCircle size={15} aria-hidden="true" />
-                <strong>{session.title || "Untitled conversation"}</strong>
+                <strong>{session.title ? displaySessionTitle(session.title) : t("chat.ask.untitled")}</strong>
                 <span>{note(session)}</span>
               </button>
             </li>
@@ -107,7 +110,7 @@ export function CoachAskPicker({
         </ul>
         <footer>
           <button type="button" className="ghost-button" onClick={onCancel}>
-            Cancel
+            {t("common.cancel")}
           </button>
         </footer>
       </section>
@@ -119,5 +122,5 @@ export function CoachAskPicker({
 function updatedLabel(updatedAt: string): string {
   const date = new Date(updatedAt);
   if (Number.isNaN(date.valueOf())) return "";
-  return date.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+  return date.toLocaleDateString(getIntlLocale(), { month: "short", day: "numeric" });
 }

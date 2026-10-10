@@ -5,6 +5,7 @@ import rehypeRaw from "rehype-raw";
 import rehypeSanitize from "rehype-sanitize";
 import remarkGfm from "remark-gfm";
 import type { AppUpdateSnapshot } from "../../electron/types";
+import { t } from "../i18n/core";
 
 const DISMISSED_UPDATE_VERSION_KEY =
   "heraclesrecords.updatePrompt.dismissedVersion";
@@ -112,19 +113,19 @@ export function UpdateAvailablePrompt({
   const isManualInstall =
     isDownloaded && snapshot.installMethod === "manual";
   const actionLabel = isManualInstall
-    ? "Open download"
+    ? t("app.update.openDownload")
     : isDownloaded
-      ? "Restart and update"
-      : "Update now";
+      ? t("app.update.restartAndUpdate")
+      : t("app.update.now");
   const progress = Math.round(snapshot.downloadPercent ?? 0);
   const statusText =
     snapshot.status === "downloading"
-      ? `Downloading ${progress}% — Heracles Records will restart when it is ready.`
+      ? t("app.update.downloadingRestart", { percent: progress })
       : isManualInstall
-        ? "The installer will open in your browser."
+        ? t("app.update.installerInBrowser")
         : isDownloaded
-          ? "The update is downloaded and ready to install."
-          : "Heracles Records will download the update and restart to finish installing it.";
+          ? t("app.update.downloaded")
+          : t("app.update.willDownload");
 
   const decline = () => {
     if (previewKey === undefined) {
@@ -154,10 +155,10 @@ export function UpdateAvailablePrompt({
             <Sparkles size={22} />
           </span>
           <div>
-            <p className="update-prompt-eyebrow">Update available</p>
+            <p className="update-prompt-eyebrow">{t("app.update.available")}</p>
             <h2 id="update-prompt-title">Heracles Records {visibleVersion}</h2>
             <p id="update-prompt-description">
-              Everything new since Heracles Records {snapshot.currentVersion}.
+              {t("app.update.sinceVersion", { version: snapshot.currentVersion })}
             </p>
           </div>
         </header>
@@ -179,7 +180,7 @@ export function UpdateAvailablePrompt({
             </ReactMarkdown>
           ) : (
             <p>
-              This release includes the latest improvements and bug fixes.
+              {t("app.update.genericNotes")}
             </p>
           )}
         </div>
@@ -192,7 +193,7 @@ export function UpdateAvailablePrompt({
               type="button"
               onClick={decline}
             >
-              Not now
+              {t("app.update.notNow")}
             </button>
             <button
               className="primary-button"

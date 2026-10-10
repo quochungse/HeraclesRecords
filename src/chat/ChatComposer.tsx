@@ -7,6 +7,7 @@ import {
   useState,
   type ReactNode
 } from "react";
+import { t } from "../i18n/core";
 
 export function isLatestActivityFileRequest(text: string): boolean {
   const normalized = text.toLowerCase();
@@ -163,8 +164,8 @@ export const ChatComposer = forwardRef<ChatComposerHandle, ChatComposerProps>(
             }}
             placeholder={
               waitingForCoachAnswer
-                ? "Type another answer…"
-                : placeholder ?? "Ask Coach…"
+                ? t("chat.composer.anotherAnswer")
+                : placeholder ?? t("chat.composer.placeholder")
             }
             rows={1}
             disabled={exportingLatestActivity}
@@ -174,8 +175,8 @@ export const ChatComposer = forwardRef<ChatComposerHandle, ChatComposerProps>(
               type="button"
               className="chat-composer-settings"
               onClick={onOpenSettings}
-              aria-label="Open settings"
-              title="Coach settings"
+              aria-label={t("chat.openSettings")}
+              title={t("chat.composer.settings")}
             >
               <Settings2 size={14} aria-hidden="true" />
             </button>
@@ -183,7 +184,7 @@ export const ChatComposer = forwardRef<ChatComposerHandle, ChatComposerProps>(
             <span className="chat-composer-spacer" />
             {trimmedDraft && !streaming ? (
               <span className="chat-composer-hint" aria-hidden="true">
-                Enter to send · Shift+Enter for a new line
+                {t("chat.composer.hint")}
               </span>
             ) : null}
             {streaming ? (
@@ -192,8 +193,8 @@ export const ChatComposer = forwardRef<ChatComposerHandle, ChatComposerProps>(
                 className={`chat-send chat-stop${stopping ? " is-stopping" : ""}`}
                 onClick={onStop}
                 disabled={stopping}
-                title={stopping ? "Stopping…" : "Stop"}
-                aria-label={stopping ? "Stopping" : "Stop"}
+                title={stopping ? t("chat.composer.stopping") : t("chat.composer.stop")}
+                aria-label={stopping ? t("chat.composer.stopping") : t("chat.composer.stop")}
               >
                 {stopping ? (
                   <Loader2 className="chat-spinner" size={14} aria-hidden="true" />
@@ -217,10 +218,10 @@ export const ChatComposer = forwardRef<ChatComposerHandle, ChatComposerProps>(
                   blockedReason
                     ? blockedReason
                     : localProviderBlocked
-                      ? "Enter a local model first"
-                      : "Send"
+                      ? t("chat.composer.localFirst")
+                      : t("chat.composer.send")
                 }
-                aria-label="Send"
+                aria-label={t("chat.composer.send")}
               >
                 <Send size={14} aria-hidden="true" />
               </button>

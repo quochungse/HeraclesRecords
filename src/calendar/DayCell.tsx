@@ -28,6 +28,7 @@ import {
   scheduledSportCategory,
   scheduledWorkoutSport
 } from "../training/workoutSport";
+import { t } from "../i18n/core";
 
 interface DayCellProps {
   day: CalendarDay;
@@ -108,9 +109,9 @@ function loadLine(actual: number | undefined, planned: number | undefined): stri
     return null;
   }
   if (planned === undefined) {
-    return `${Math.round(actual ?? 0)} TL`;
+    return t("units.trainingLoadShort", { value: Math.round(actual ?? 0) });
   }
-  return `${Math.round(actual ?? 0)} / ${Math.round(planned)} TL`;
+  return t("calendar.loadOf", { actual: Math.round(actual ?? 0), planned: Math.round(planned) });
 }
 
 function activityStatsLine(
@@ -181,8 +182,8 @@ function PairChip({
         aria-pressed={selectable ? selected : undefined}
         title={
           selectable
-            ? `${selected ? "Deselect" : "Select"} ${scheduled.name}`
-            : `${scheduled.name} — planned vs actual`
+            ? t(selected ? "calendar.chip.deselect" : "calendar.chip.select", { name: scheduled.name })
+            : t("calendar.chip.plannedVsActual", { name: scheduled.name })
         }
       >
         {selectable ? (
@@ -195,7 +196,7 @@ function PairChip({
           {pair.completionPct !== undefined ? (
             <span
               className={`calendar-chip-badge ${completionTone(pair.completionPct)}`}
-              title={`${pair.completionPct}% of the planned session`}
+              title={t("calendar.chip.completion", { percent: pair.completionPct })}
             >
               {Math.min(pair.completionPct, 999)}%
             </span>
@@ -207,8 +208,8 @@ function PairChip({
             className="calendar-chip-meta calendar-chip-load"
             title={
               plannedLoad === undefined
-                ? "Training load"
-                : `${Math.round(actualLoad ?? 0)} TL done of ${Math.round(plannedLoad)} TL planned`
+                ? t("activity.m.trainingLoad")
+                : t("calendar.chip.loadDone", { actual: Math.round(actualLoad ?? 0), planned: Math.round(plannedLoad) })
             }
           >
             {pairedLoadLine}
@@ -254,21 +255,21 @@ function PairChip({
       aria-pressed={selectable ? selected : undefined}
       title={
         selectable
-          ? `${selected ? "Deselect" : "Select"} ${scheduled.name}`
+          ? t(selected ? "calendar.chip.deselect" : "calendar.chip.select", { name: scheduled.name })
           : missed
-            ? `${scheduled.name} — planned, nothing logged`
+            ? t("calendar.chip.missed", { name: scheduled.name })
             : canDrag
-              ? `${scheduled.name} — planned. Drag to another day.`
-              : `${scheduled.name} — planned`
+              ? t("calendar.chip.drag", { name: scheduled.name })
+              : t("calendar.chip.planned", { name: scheduled.name })
       }
       /* The dashed edge is what says "planned" on screen, and a border says
          nothing to a screen reader, so the word lives here instead. */
       aria-label={
         selectable
-          ? `${selected ? "Deselect" : "Select"} planned workout ${scheduled.name}`
+          ? t(selected ? "calendar.chip.deselectPlanned" : "calendar.chip.selectPlanned", { name: scheduled.name })
           : canDrag
-            ? `Planned: ${scheduled.name}. Drag to another day to reschedule.`
-            : `Planned: ${scheduled.name}`
+            ? t("calendar.chip.plannedDragLabel", { name: scheduled.name })
+            : t("calendar.chip.plannedLabel", { name: scheduled.name })
       }
     >
       {selectable ? (
@@ -294,7 +295,7 @@ function PairChip({
           () => formatUpcomingWorkoutVolumeDisplay(scheduled.volume, unitSystem)
         )}
         {scheduled.trainingLoad !== undefined && !missed
-          ? ` · ${Math.round(scheduled.trainingLoad)} TL`
+          ? ` · ${t("units.trainingLoadShort", { value: String(Math.round(scheduled.trainingLoad)) })}`
           : ""}
       </span>
       {missed && scheduled.trainingLoad !== undefined ? (
@@ -399,14 +400,14 @@ export function DayCell({
             type="button"
             className="calendar-day-number calendar-day-open"
             onClick={onSelectDay}
-            aria-label={`Open ${formatHappenDayLabel(day.dateKey)}`}
-            title="Open the day"
+            aria-label={t("calendar.day.open", { day: formatHappenDayLabel(day.dateKey) })}
+            title={t("calendar.day.openTitle")}
           >
-            {day.isToday ? `Today ${String(dayNumber(day.dateKey)).padStart(2, "0")}` : dayNumber(day.dateKey)}
+            {day.isToday ? t("calendar.today", { day: String(dayNumber(day.dateKey)).padStart(2, "0") }) : dayNumber(day.dateKey)}
           </button>
         ) : (
           <span className="calendar-day-number">
-            {day.isToday ? `Today ${String(dayNumber(day.dateKey)).padStart(2, "0")}` : dayNumber(day.dateKey)}
+            {day.isToday ? t("calendar.today", { day: String(dayNumber(day.dateKey)).padStart(2, "0") }) : dayNumber(day.dateKey)}
           </span>
         )}
         <button
@@ -414,8 +415,8 @@ export function DayCell({
           className="calendar-day-add"
           onClick={() => onAdd(day.dateKey)}
           disabled={busy || selectionMode}
-          title={day.isPast ? "Log activity" : "Add workout"}
-          aria-label={`${day.isPast ? "Log activity" : "Add workout"} on ${day.dateKey}`}
+          title={day.isPast ? t("calendar.day.log") : t("calendar.day.add")}
+          aria-label={t(day.isPast ? "calendar.day.logOn" : "calendar.day.addOn", { day: formatHappenDayLabel(day.dateKey) })}
         >
           <Plus size={14} aria-hidden="true" />
         </button>
@@ -456,17 +457,17 @@ export function DayCell({
               .join(" ")}
             onClick={() => onSelectActivity(activity)}
             disabled={selectionMode}
-            title={activity.name ?? activity.sportName ?? "Activity"}
+            title={activity.name ?? activity.sportName ?? t("activity.untitled")}
           >
             <span className="calendar-chip-title">
               <span className="calendar-chip-name">
-                {activity.name ?? activity.sportName ?? "Activity"}
+                {activity.name ?? activity.sportName ?? t("activity.untitled")}
               </span>
             </span>
             <span className="calendar-chip-meta">{activityStatsLine(activity, unitSystem)}</span>
             {activity.trainingLoad !== undefined ? (
               <span className="calendar-chip-meta calendar-chip-load">
-                {Math.round(activity.trainingLoad)} TL
+                {t("units.trainingLoadShort", { value: Math.round(activity.trainingLoad) })}
               </span>
             ) : null}
           </button>

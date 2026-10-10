@@ -568,7 +568,7 @@ const MOUNTS: Record<string, (options: Record<string, unknown>) => ReactElement>
     loadAppStyles();
     return (
       <ExercisePickerDialog
-        title={(options.title as string | undefined) ?? "Exercise"}
+        heading={(options.title as string | undefined) ?? "Exercise"}
         options={(options.options as never) ?? []}
         selectedId={options.selectedId as string | undefined}
         loading={(options.loading as boolean | undefined) ?? false}

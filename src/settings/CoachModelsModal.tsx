@@ -2,6 +2,7 @@ import { useEffect, type MouseEvent } from "react";
 import { BrainCircuit, X } from "lucide-react";
 import type { HeraclesRecordsApi } from "../heraclesrecords-api";
 import { CoachModelsPanel } from "../chat/CoachModelsPanel";
+import { t } from "../i18n/core";
 
 export interface CoachModelsModalProps {
   api: HeraclesRecordsApi | undefined;
@@ -64,12 +65,12 @@ export function CoachModelsModal({
         <header className="app-modal-header">
           <div className="app-modal-title">
             <BrainCircuit size={16} aria-hidden="true" />
-            <h2 id="coach-models-title">Coach models</h2>
+            <h2 id="coach-models-title">{t("app.coachModels.title")}</h2>
           </div>
           <button
             type="button"
             className="icon-button"
-            aria-label="Close coach models"
+            aria-label={t("app.coachModels.close")}
             onClick={onClose}
           >
             <X size={18} aria-hidden="true" />
@@ -77,8 +78,7 @@ export function CoachModelsModal({
         </header>
         <div className="app-modal-body">
           <p className="app-modal-copy">
-            Connect the accounts and keys the coach can run on. The provider it
-            actually uses is picked in Coach, from whatever is connected here.
+            {t("app.coachModels.intro")}
           </p>
           <CoachModelsPanel api={api} onChange={onChange} />
         </div>

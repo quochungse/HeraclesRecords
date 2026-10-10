@@ -18,6 +18,7 @@ import {
   runStatusLabel,
   skipReasonLabel
 } from "./analysisLabels";
+import { t } from "../../i18n/core";
 
 /**
  * One analysis: what it says, when it runs, and what it has done.
@@ -29,10 +30,12 @@ import {
  */
 type Tab = "settings" | "runs";
 
-const TABS: Array<{ id: Tab; label: string }> = [
-  { id: "settings", label: "Settings" },
-  { id: "runs", label: "Run log" }
-];
+function tabs(): Array<{ id: Tab; label: string }> {
+  return [
+    { id: "settings", label: t("chat.an.tab.settings") },
+    { id: "runs", label: t("chat.an.tab.runs") }
+  ];
+}
 
 type Draft = Omit<CoachAnalysisInput, "sessionId">;
 
@@ -258,13 +261,13 @@ export function AnalysisDetailView({
     }
   };
 
-  useAnalysesTitle(analysis?.name ?? "Analysis");
+  useAnalysesTitle(analysis?.name ?? t("chat.an.analysis"));
 
   if (loading || !analysis || !draft || !trigger) {
     return (
       <div className="coach-analysis-detail">
         <p className="chat-settings-copy">
-          <Loader2 className="chat-spinner" size={14} aria-hidden="true" /> Loading…
+          <Loader2 className="chat-spinner" size={14} aria-hidden="true" /> {t("common.loading")}
         </p>
       </div>
     );
@@ -277,7 +280,7 @@ export function AnalysisDetailView({
     <>
       <div className="coach-analysis-detail">
         <nav className="coach-analysis-tabs" role="tablist">
-          {TABS.map((entry) => (
+          {tabs().map((entry) => (
             <button
               key={entry.id}
               type="button"
@@ -303,11 +306,11 @@ export function AnalysisDetailView({
                 type="button"
                 className="chat-local-action"
                 disabled={!api}
-                title="Stop this run"
+                title={t("chat.an.stopRun")}
                 onClick={() => void stopRun(inFlight.id)}
               >
                 <Loader2 className="chat-spinner" size={14} aria-hidden="true" />
-                Stop
+                {t("chat.an.stop")}
               </button>
             </div>
           ) : null}
@@ -336,10 +339,7 @@ export function AnalysisDetailView({
                 one conversation it lives in, so there was nothing left to
                 filter by once "where it runs" became a single answer. */}
             {runs.length === 0 ? (
-              <p className="chat-settings-copy">
-                No runs yet. Every run is logged here, including the ones that
-                found nothing to report.
-              </p>
+              <p className="chat-settings-copy">{t("chat.an.noRuns")}</p>
             ) : (
               <ul className="coach-analysis-run-list">
                 {runs.map((run) => {
@@ -361,17 +361,17 @@ export function AnalysisDetailView({
                         <span className="coach-analysis-run-summary">
                           {run.summary ??
                             (run.skipReason
-                              ? `Skipped — ${skipReasonLabel(run.skipReason)}`
+                              ? t("chat.an.skippedBecause", { reason: skipReasonLabel(run.skipReason) })
                               : run.error ?? "—")}
                         </span>
                         <span className="coach-analysis-run-meta">
                           {formatTimeAgo(run.startedAt)} · {formatDuration(run)}
                           {run.model ? ` · ${run.model}` : ""}
-                          {run.effort ? ` · effort ${run.effort}` : ""}
+                          {run.effort ? ` · ${t("chat.an.effort", { effort: run.effort })}` : ""}
                           {/* 13. Absent rather than zero when the provider
                               reported nothing: a run whose cost nobody knows
                               must not read as a free one. */}
-                          {runTokens ? ` · ${runTokens} tokens` : ""}
+                          {runTokens ? ` · ${t("chat.an.tokens", { n: runTokens })}` : ""}
                         </span>
                       </div>
                       {opensInto ? (
@@ -390,7 +390,7 @@ export function AnalysisDetailView({
                         <button
                           type="button"
                           className="coach-analysis-run-row coach-analysis-run-open"
-                          title="Open the conversation this run wrote into"
+                          title={t("chat.an.openConversation")}
                           onClick={() => onOpenConversation?.(opensInto)}
                         >
                           {body}
@@ -415,10 +415,10 @@ export function AnalysisDetailView({
           type="button"
           className="secondary-button danger-button"
           disabled={saving || !api}
-          title="The conversation and everything it already wrote there are kept."
+          title={t("chat.an.deleteTitle")}
           onClick={() => setDeleteOpen(true)}
         >
-          <Trash2 size={14} aria-hidden="true" /> Delete
+          <Trash2 size={14} aria-hidden="true" /> {t("chat.row.delete")}
         </button>
         {/* The status and Save's enabled state answer to the same condition,
             so a greyed-out Save always has its reason beside it. */}
@@ -431,10 +431,10 @@ export function AnalysisDetailView({
           role="status"
         >
           {!complete
-            ? "A name and a playbook are required."
+            ? t("chat.an.required")
             : dirty
-              ? "Unsaved changes"
-              : "All changes saved"}
+              ? t("chat.set.unsaved")
+              : t("chat.set.saved")}
         </span>
         <button
           type="button"
@@ -442,7 +442,7 @@ export function AnalysisDetailView({
           disabled={!dirty || saving}
           onClick={discard}
         >
-          Discard
+          {t("chat.set.discard")}
         </button>
         <button
           type="button"
@@ -453,7 +453,7 @@ export function AnalysisDetailView({
           {saving ? (
             <Loader2 className="chat-spinner" size={14} aria-hidden="true" />
           ) : null}
-          Save
+          {t("chat.set.save")}
         </button>
       </footer>
 

@@ -22,6 +22,7 @@ import { formatSpeedValue } from "../../units/units";
 import { ActivityElevationChart } from "./ActivityElevationChart";
 import { ActivityRouteMap } from "./ActivityRouteMap";
 import { StrengthDetailPanel } from "./StrengthDetailPanel";
+import { t } from "../../i18n/core";
 
 interface ActivityDetailPanelProps {
   detail: TrainingHubActivityDetail | null;
@@ -147,13 +148,13 @@ export function ActivityDetailPanel({
       <div className={panelClassName}>
         <div className="section-heading compact">
           <div>
-            <p className="eyebrow">Activity Detail</p>
-            <h2>{listActivity.name ?? "Selected activity"}</h2>
+            <p className="eyebrow">{t("activity.panel.eyebrow")}</p>
+            <h2>{listActivity.name ?? t("activity.selected")}</h2>
           </div>
         </div>
         <div className="training-empty-state">
           <CloudOff size={20} aria-hidden="true" />
-          <p>This activity&apos;s detail did not arrive.</p>
+          <p>{t("activity.detailMissing")}</p>
           {onRetry ? (
             <button
               type="button"
@@ -161,7 +162,7 @@ export function ActivityDetailPanel({
               onClick={() => onRetry(listActivity)}
             >
               <RefreshCw size={14} aria-hidden="true" />
-              Try again
+              {t("common.tryAgain")}
             </button>
           ) : null}
         </div>
@@ -174,13 +175,13 @@ export function ActivityDetailPanel({
       <div className={panelClassName}>
         <div className="section-heading compact">
           <div>
-            <p className="eyebrow">Activity Detail</p>
-            <h2>{listActivity?.name ?? "Selected activity"}</h2>
+            <p className="eyebrow">{t("activity.panel.eyebrow")}</p>
+            <h2>{listActivity?.name ?? t("activity.selected")}</h2>
           </div>
         </div>
         <div className="training-detail-loading">
           <Loader2 className="spin" size={22} aria-hidden="true" />
-          <p>Loading activity…</p>
+          <p>{t("activity.panel.loading")}</p>
         </div>
       </div>
     );
@@ -191,12 +192,12 @@ export function ActivityDetailPanel({
       <div className={panelClassName}>
         <div className="section-heading compact">
           <div>
-            <p className="eyebrow">Activity Detail</p>
-            <h2>Select an activity</h2>
+            <p className="eyebrow">{t("activity.panel.eyebrow")}</p>
+            <h2>{t("activity.panel.select")}</h2>
           </div>
         </div>
         <div className="training-empty-state">
-          <p>Click a row to view route, elevation, and lap data.</p>
+          <p>{t("activity.panel.hint")}</p>
         </div>
       </div>
     );
@@ -221,8 +222,8 @@ export function ActivityDetailPanel({
     <div className={panelClassName}>
       <div className="section-heading compact">
         <div>
-          <p className="eyebrow">Activity Detail</p>
-          <h2>{detail.name ?? listActivity?.name ?? "Selected activity"}</h2>
+          <p className="eyebrow">{t("activity.panel.eyebrow")}</p>
+          <h2>{detail.name ?? listActivity?.name ?? t("activity.selected")}</h2>
           {(sportName || startTime) && (
             <div className="activity-detail-meta">
               {sportName ? (
@@ -242,28 +243,28 @@ export function ActivityDetailPanel({
         <>
           <div className="activity-detail-grid">
             <DetailStat
-              label="Duration"
+              label={t("activity.m.duration")}
               value={formatDurationSeconds(detail.duration)}
             />
             <DetailStat
-              label="Distance"
+              label={t("activity.m.distance")}
               value={formatDistanceMeters(detail.distance, unitSystem, swim)}
             />
             {performance ? (
-              <DetailStat label={readsSpeed ? "Avg Speed" : "Avg Pace"} value={performance} />
+              <DetailStat label={readsSpeed ? t("activity.m.avgSpeed") : t("activity.m.avgPace")} value={performance} />
             ) : null}
-            <DetailStat label="Avg HR" value={formatOptionalNumber(detail.avgHr)} />
-            <DetailStat label="Max HR" value={formatOptionalNumber(detail.maxHr)} />
+            <DetailStat label={t("activity.m.avgHr")} value={formatOptionalNumber(detail.avgHr)} />
+            <DetailStat label={t("activity.m.maxHr")} value={formatOptionalNumber(detail.maxHr)} />
             <DetailStat
-              label="Calories"
+              label={t("activity.m.calories")}
               value={formatOptionalNumber(detail.calories)}
             />
             <DetailStat
-              label="Elevation"
+              label={t("activity.m.elevation")}
               value={formatElevationMeters(detail.elevationGain, unitSystem)}
             />
             <DetailStat
-              label="Training Load"
+              label={t("activity.m.trainingLoad")}
               value={formatOptionalNumber(detail.trainingLoad)}
             />
           </div>
@@ -271,14 +272,14 @@ export function ActivityDetailPanel({
           <div className="activity-detail-visuals">
             <section className="activity-detail-visual-panel">
               <div className="activity-detail-visual-heading">
-                <h3>Route</h3>
+                <h3>{t("activity.m.route")}</h3>
               </div>
               <ActivityRouteMap track={detail.track} detail={detail} />
             </section>
 
             <section className="activity-detail-visual-panel">
               <div className="activity-detail-visual-heading">
-                <h3>Elevation</h3>
+                <h3>{t("activity.m.elevation")}</h3>
               </div>
               <ActivityElevationChart track={detail.track} />
             </section>
@@ -286,17 +287,17 @@ export function ActivityDetailPanel({
 
           {showLaps ? (
             <div className="training-laps-section">
-              <h3>Laps</h3>
+              <h3>{t("activity.m.laps")}</h3>
               <div className="table-shell">
                 <table>
                   <thead>
                     <tr>
                       <th>#</th>
-                      <th>Duration</th>
-                      <th>Distance</th>
-                      <th>Avg HR</th>
-                      <th>Max HR</th>
-                      <th>Elev.</th>
+                      <th>{t("activity.m.duration")}</th>
+                      <th>{t("activity.m.distance")}</th>
+                      <th>{t("activity.m.avgHr")}</th>
+                      <th>{t("activity.m.maxHr")}</th>
+                      <th>{t("activity.m.elevShort")}</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -325,7 +326,7 @@ export function ActivityDetailPanel({
             className="secondary-button"
             onClick={() => void openRaw()}
           >
-            Show raw JSON
+            {t("activity.raw.show")}
           </button>
         </div>
       ) : null}
@@ -346,12 +347,12 @@ export function ActivityDetailPanel({
               <header className="training-raw-modal-header">
                 <div className="training-raw-modal-title">
                   <Braces size={16} aria-hidden="true" />
-                  <h2 id="training-raw-modal-title">Raw JSON</h2>
+                  <h2 id="training-raw-modal-title">{t("activity.raw.title")}</h2>
                 </div>
                 <button
                   type="button"
                   className="icon-button"
-                  aria-label="Close raw JSON"
+                  aria-label={t("activity.raw.close")}
                   onClick={() => setShowRaw(false)}
                 >
                   <X size={18} aria-hidden="true" />
@@ -367,7 +368,7 @@ export function ActivityDetailPanel({
                 ) : (
                   <div className="training-detail-loading">
                     <Loader2 className="spin" size={18} aria-hidden="true" />
-                    <p>Fetching payload…</p>
+                    <p>{t("activity.raw.fetching")}</p>
                   </div>
                 )}
               </div>

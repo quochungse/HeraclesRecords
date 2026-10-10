@@ -1,7 +1,7 @@
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { useEffect, useState } from "react";
 import {
-  WEEKDAY_LABELS,
+  weekdayLabels,
   dateFromKey,
   dayNumber,
   isKeyInMonth,
@@ -9,6 +9,7 @@ import {
   monthGridWeeks,
   monthLabel
 } from "../calendar/dateUtils";
+import { getIntlLocale, t } from "../i18n/core";
 
 interface MonthDayPickerProps {
   /** The chosen day, as a COROS happen-day key (`yyyyMMdd`). */
@@ -77,7 +78,7 @@ export function MonthDayPicker({ value, min, onChange, label }: MonthDayPickerPr
           type="button"
           className="tl-daypick-step"
           disabled={!canStepBack}
-          aria-label="Previous month"
+          aria-label={t("calendar.prevMonth")}
           onClick={() => step(-1)}
         >
           <ChevronLeft size={14} />
@@ -86,7 +87,7 @@ export function MonthDayPicker({ value, min, onChange, label }: MonthDayPickerPr
         <button
           type="button"
           className="tl-daypick-step"
-          aria-label="Next month"
+          aria-label={t("calendar.nextMonth")}
           onClick={() => step(1)}
         >
           <ChevronRight size={14} />
@@ -94,7 +95,7 @@ export function MonthDayPicker({ value, min, onChange, label }: MonthDayPickerPr
       </div>
 
       <div className="tl-daypick-weekdays" aria-hidden="true">
-        {WEEKDAY_LABELS.map((day) => (
+        {weekdayLabels().map((day) => (
           <span key={day}>{day.slice(0, 2)}</span>
         ))}
       </div>
@@ -121,7 +122,7 @@ export function MonthDayPicker({ value, min, onChange, label }: MonthDayPickerPr
               data-day={key}
               disabled={disabled}
               aria-pressed={key === value}
-              aria-label={dateFromKey(key).toLocaleDateString(undefined, {
+              aria-label={dateFromKey(key).toLocaleDateString(getIntlLocale(), {
                 weekday: "long",
                 day: "numeric",
                 month: "long",

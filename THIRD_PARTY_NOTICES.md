@@ -50,6 +50,13 @@ base mesh, body-shape targets and default skeleton
 released under CC0 1.0. `npm run body-figures:bake` shapes, poses and decimates
 them into `src/training/body/bodyFigures.json`.
 
+### Flags
+
+The flags beside each language in Settings are from
+[flag-icons](https://github.com/lipis/flag-icons) 7.5.0, Copyright (c) 2013
+Panayiotis Lipiridis, MIT License; the license text is in
+`THIRD_PARTY_LICENSES.txt`.
+
 ### Sample routes
 
 The simulated activities used in development builds follow roads and trails

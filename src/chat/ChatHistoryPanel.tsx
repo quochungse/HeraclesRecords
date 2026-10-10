@@ -6,6 +6,9 @@ import type {
 } from "../../electron/types";
 import { ChatSessionRow } from "./ChatSessionRow";
 import { groupChatSessions } from "./chatSessionGroups";
+import { t } from "../i18n/core";
+import { sessionGroupName } from "./chatSessionGroups";
+import { displaySessionTitle } from "./sessionTitle";
 
 export function ChatHistoryPanel({
   sessions,
@@ -63,7 +66,7 @@ export function ChatHistoryPanel({
       (session) =>
         // A summary may come without a preview (a conversation never written
         // in); searching must not throw on it and take the whole screen down.
-        (session.title ?? "").toLowerCase().includes(normalized) ||
+        displaySessionTitle(session.title).toLowerCase().includes(normalized) ||
         (session.preview ?? "").toLowerCase().includes(normalized)
     );
   }, [query, sessions]);
@@ -77,15 +80,15 @@ export function ChatHistoryPanel({
     <div className="chat-history-panel">
       <div className="chat-history-toolbar">
         <div className="chat-history-header">
-          <h2 className="chat-history-title">Conversations</h2>
+          <h2 className="chat-history-title">{t("chat.list.title")}</h2>
           <button
             type="button"
             className="chat-history-collapse-button"
             onClick={onCollapse}
             aria-expanded="true"
             aria-controls="chat-conversation-sidebar"
-            aria-label="Collapse conversations"
-            title="Collapse conversations"
+            aria-label={t("chat.list.collapse")}
+            title={t("chat.list.collapse")}
           >
             <PanelLeftClose size={16} aria-hidden="true" />
           </button>
@@ -106,8 +109,8 @@ export function ChatHistoryPanel({
                   event.stopPropagation();
                   closeSearch();
                 }}
-                placeholder="Search chats"
-                aria-label="Search chats"
+                placeholder={t("chat.list.search")}
+                aria-label={t("chat.list.search")}
                 spellCheck={false}
               />
             </label>
@@ -115,8 +118,8 @@ export function ChatHistoryPanel({
               type="button"
               className="chat-history-actions-icon"
               onClick={closeSearch}
-              aria-label="Close search"
-              title="Close search"
+              aria-label={t("chat.list.closeSearch")}
+              title={t("chat.list.closeSearch")}
             >
               <X size={15} aria-hidden="true" />
             </button>
@@ -128,18 +131,18 @@ export function ChatHistoryPanel({
               className="chat-history-new chat-new-chat-sidebar"
               onClick={onNewChat}
               disabled={busy}
-              aria-label="New chat"
+              aria-label={t("chat.newChat")}
             >
               <Plus size={15} aria-hidden="true" />
-              New chat
+              {t("chat.newChat")}
             </button>
             <span className="chat-history-actions-divider" aria-hidden="true" />
             <button
               type="button"
               className="chat-history-actions-icon"
               onClick={() => setSearchOpen(true)}
-              aria-label="Search chats"
-              title="Search chats"
+              aria-label={t("chat.list.search")}
+              title={t("chat.list.search")}
             >
               <Search size={15} aria-hidden="true" />
             </button>
@@ -150,7 +153,7 @@ export function ChatHistoryPanel({
       <div className="chat-session-list">
         {groups.length === 0 ? (
           <p className="chat-history-empty">
-            {query.trim() ? "No chats match your search." : "No conversations yet."}
+            {query.trim() ? t("chat.list.noMatch") : t("chat.list.none")}
           </p>
         ) : (
           groups.map((group) => (
@@ -167,7 +170,7 @@ export function ChatHistoryPanel({
                 {group.label === "Pinned" ? (
                   <Pin size={11} aria-hidden="true" />
                 ) : null}
-                {group.label === "Pinned" ? "Pinned conversations" : group.label}
+                {group.label === "Pinned" ? t("chat.list.pinnedTitle") : sessionGroupName(group.label)}
               </h3>
               <div className="chat-session-group-list">
                 {group.sessions.map((session) => (

@@ -134,6 +134,6 @@ assert.deepEqual(await connect("coros"), { url: US, loginHint: undefined });
 
 // A removed COROS server stays removed.
 servers.delete("coros");
-await assert.rejects(coros.connectCorosMcp(null), /Unknown MCP server/);
+await assert.rejects(coros.connectCorosMcp(null), /MCP server is no longer here/);
 
 console.log("coros-mcp-account tests passed (region, email hint, authorized, added, silent, in-flight)");

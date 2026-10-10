@@ -48,7 +48,7 @@ export function withinPeriod(
 }
 
 /** Keys that scroll a page — the ones that mean the athlete took over. */
-const SCROLL_KEYS = new Set(["ArrowUp", "ArrowDown", "PageUp", "PageDown", "Home", "End", " "]);
+const SCROLL_KEYS = new Set(["ArrowUp", "ArrowDown", "PageUp", "PageDown", "Home", "End", " "]); // i18n-ignore: key names
 
 /** How often, and for how long, a restored scroll position is re-applied. */
 const RESTORE_INTERVAL_MS = 50;

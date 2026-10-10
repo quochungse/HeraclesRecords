@@ -1,6 +1,6 @@
 ---
 title: Make it yours
-description: Colour mode and accent, sport colours, units, the screens on your sidebar and the one the app opens on.
+description: Language, colour mode and accent, sport colours, units, the screens on your sidebar and the one the app opens on.
 order: 8
 ---
 
@@ -11,6 +11,7 @@ Under **Settings → Appearance**:
 - **Color mode**: dark or light.
 - **Accent**: the colour of buttons, links and highlights.
 - **Activity colors**: a colour for each kind of sport, used on every chart, calendar and map.
+- **Language**: the language the app is written in. English, Tiếng Việt, 日本語, 한국어, 简体中文, Español, Português (Brasil), Français, Deutsch, Italiano, Русский, Bahasa Indonesia and ไทย. Dates and numbers follow it too. Coach answers in whatever language you write to it. The names the app gives what it saves to COROS, such as a step called Warm Up, stay in English, as your watch shows them.
 
 ## Sidebar and start screen
 

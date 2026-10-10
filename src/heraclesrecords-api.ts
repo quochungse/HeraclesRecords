@@ -154,6 +154,8 @@ export interface HeraclesRecordsApi {
    * arrives, and dropped forever if it never does.
    */
   notifyRendererReady: () => Promise<void>;
+  /** The language on screen, for the text the main process writes itself. */
+  setLanguage: (locale: string) => Promise<void>;
   /** Development builds only: the simulated rides, hikes and trail runs. */
   getSampleData: () => Promise<SampleDataState>;
   setSampleData: (

@@ -1,15 +1,17 @@
-import { PLAN_WEEKDAYS, TRAINING_PLAN_GENERATION_LIMITS } from "../../electron/trainingPlanGeneration";
+import { TRAINING_PLAN_GENERATION_LIMITS } from "../../electron/trainingPlanGeneration";
 import { OptionChips, OptionGroup } from "../components/OptionGroup";
 import { FieldProblem, invalidProps, type StepProps } from "./GeneratorGoalStep";
 import {
   DAY_KIND_LABEL,
-  DAY_SHORT,
+  dayLongNames,
+  dayShortNames,
   HOURS_CHOICES,
   SESSION_CHOICES,
   cycleDay,
   dayTimeOptions,
   weekSummary
 } from "./planGeneratorModel";
+import { t } from "../i18n/core";
 
 const LIMITS = TRAINING_PLAN_GENERATION_LIMITS;
 
@@ -20,6 +22,8 @@ const LIMITS = TRAINING_PLAN_GENERATION_LIMITS;
  */
 export function GeneratorWeekStep({ form, update, problemOf }: StepProps) {
   const summary = weekSummary(form);
+  const longNames = dayLongNames();
+  const shortNames = dayShortNames();
   const setDay = (index: number, next: (typeof form.days)[number]) =>
     update({ days: form.days.map((day, at) => (at === index ? next : day)) }, "days");
 
@@ -27,28 +31,25 @@ export function GeneratorWeekStep({ form, update, problemOf }: StepProps) {
     <div className="plan-generator-step">
       <div className="plan-generator-step-head">
         <div>
-          <h3>Your usual week</h3>
+          <h3>{t("library.week.title")}</h3>
           {/* Under the heading at its own width: beside it, the row put the
               switch at the far edge and wrapped it under the sentence. */}
           <div className="plan-generator-week-mode">
             <OptionGroup
-              label="Who sets the week"
+              label={t("library.week.who")}
               size="sm"
               value={form.weekMode}
-              options={[{ value: "days", label: "I'll set my days" }, { value: "coach", label: "Let Coach decide" }]}
+              options={[{ value: "days", label: t("library.week.mine") }, { value: "coach", label: t("library.week.coach") }]}
               onChange={(weekMode) => update({ weekMode }, "days")}
             />
           </div>
           {form.weekMode === "days" ? (
             <>
-              <p>Tap a day to cycle Rest, Train, Long day and Coach picks — a day Coach may use or leave empty.</p>
-              <p>
-                The time on each day is the most you have that day, not what Coach will schedule: a session may be
-                shorter. Free means no limit.
-              </p>
+              <p>{t("library.week.tap")}</p>
+              <p>{t("library.week.ceiling")}</p>
             </>
           ) : (
-            <p>Coach sets your week from how you have trained recently. Tell it only what you are sure of.</p>
+            <p>{t("library.week.coachBody")}</p>
           )}
         </div>
       </div>
@@ -56,14 +57,14 @@ export function GeneratorWeekStep({ form, update, problemOf }: StepProps) {
       {form.weekMode === "days" ? (
         <div id="plan-generator-days" className={`plan-generator-week${problemOf("days") ? " is-invalid" : ""}`}>
           {form.days.map((day, index) => (
-            <div key={PLAN_WEEKDAYS[index]} className="plan-generator-day" data-kind={day.kind}>
+            <div key={index} className="plan-generator-day" data-kind={day.kind}>
               <button
                 type="button"
                 className="plan-generator-day-kind"
-                aria-label={`${PLAN_WEEKDAYS[index]}: ${DAY_KIND_LABEL[day.kind]}. Change`}
+                aria-label={t("library.week.dayChange", { day: longNames[index], kind: DAY_KIND_LABEL[day.kind] })}
                 onClick={() => setDay(index, cycleDay(day))}
               >
-                <span>{DAY_SHORT[index]}</span>
+                <span>{shortNames[index]}</span>
                 <strong>{DAY_KIND_LABEL[day.kind]}</strong>
               </button>
               {/* The day's time is part of the day, inside its card. */}
@@ -71,7 +72,7 @@ export function GeneratorWeekStep({ form, update, problemOf }: StepProps) {
                 <span className="plan-generator-day-time is-empty" aria-hidden="true">—</span>
               ) : (
                 <OptionGroup
-                  label={`Time on ${PLAN_WEEKDAYS[index]}`}
+                  label={t("library.week.timeOn", { day: longNames[index] })}
                   mode="dropdown"
                   size="sm"
                   className="plan-generator-day-time"
@@ -86,9 +87,9 @@ export function GeneratorWeekStep({ form, update, problemOf }: StepProps) {
       ) : (
         <div id="plan-generator-days" className="plan-generator-coach-week">
           <div className="plan-generator-field" role="group" aria-labelledby="plan-generator-hours-label">
-            <span id="plan-generator-hours-label">Time a week</span>
+            <span id="plan-generator-hours-label">{t("library.week.timeAWeek")}</span>
             <OptionGroup
-              label="Time a week"
+              label={t("library.week.timeAWeek")}
               size="sm"
               value={form.hoursChoice}
               options={HOURS_CHOICES.map((choice) => ({ value: choice.value, label: choice.label }))}
@@ -96,22 +97,22 @@ export function GeneratorWeekStep({ form, update, problemOf }: StepProps) {
             />
           </div>
           <div className="plan-generator-field" role="group" aria-labelledby="plan-generator-sessions-label">
-            <span id="plan-generator-sessions-label">Sessions a week</span>
+            <span id="plan-generator-sessions-label">{t("library.week.sessionsAWeek")}</span>
             <OptionGroup
-              label="Sessions a week"
+              label={t("library.week.sessionsAWeek")}
               size="sm"
               value={form.sessionsChoice}
-              options={SESSION_CHOICES.map((choice) => ({ value: choice, label: choice === "any" ? "Not sure" : choice }))}
+              options={SESSION_CHOICES.map((choice) => ({ value: choice, label: choice === "any" ? t("library.notSure") : choice }))}
               onChange={(sessionsChoice) => update({ sessionsChoice }, "week")}
             />
           </div>
           <div className="plan-generator-field" role="group" aria-labelledby="plan-generator-blocked-label">
-            <span id="plan-generator-blocked-label">Days you can&rsquo;t train <small>optional</small></span>
+            <span id="plan-generator-blocked-label">{t("library.week.blocked")} <small>{t("library.week.optional")}</small></span>
             <OptionChips
-              label="Days you can't train"
+              label={t("library.week.blocked")}
               size="sm"
               values={form.blockedDays.map(String)}
-              options={DAY_SHORT.map((label, index) => ({ value: String(index), label, title: PLAN_WEEKDAYS[index] }))}
+              options={shortNames.map((label, index) => ({ value: String(index), label, title: longNames[index] }))}
               onToggle={(value) => {
                 const day = Number(value);
                 update({ blockedDays: form.blockedDays.includes(day) ? form.blockedDays.filter((item) => item !== day) : [...form.blockedDays, day] }, "days");
@@ -119,7 +120,7 @@ export function GeneratorWeekStep({ form, update, problemOf }: StepProps) {
             />
           </div>
           <p className="plan-generator-note">
-            Nothing here is required. Coach picks the days, the long day and each session&rsquo;s length from how you have trained recently, and says what it chose in the plan&rsquo;s overview.
+            {t("library.week.nothingRequired")}
           </p>
         </div>
       )}
@@ -127,19 +128,19 @@ export function GeneratorWeekStep({ form, update, problemOf }: StepProps) {
       <FieldProblem field="week" message={problemOf("week")} />
 
       <dl className="plan-generator-week-summary">
-        <div><dt>Sessions a week</dt><dd>{summary.sessions}</dd></div>
-        <div><dt>Time available</dt><dd>{summary.time}</dd></div>
-        <div><dt>Long day</dt><dd>{summary.longDay}</dd></div>
+        <div><dt>{t("library.week.sessionsAWeek")}</dt><dd>{summary.sessions}</dd></div>
+        <div><dt>{t("library.week.timeAvailable")}</dt><dd>{summary.time}</dd></div>
+        <div><dt>{t("library.week.longDay")}</dt><dd>{summary.longDay}</dd></div>
       </dl>
 
       <label className="plan-generator-constraints">
-        <span>Anything Coach should know? <small>optional</small></span>
+        <span>{t("library.week.anything")} <small>{t("library.week.optional")}</small></span>
         <textarea
           id="plan-generator-constraints"
           rows={3}
           value={form.constraints}
           maxLength={LIMITS.constraintsLength}
-          placeholder="Injuries, equipment, travel, a week away…"
+          placeholder={t("library.week.anythingPh")}
           onChange={(event) => update({ constraints: event.target.value }, "constraints")}
           {...invalidProps("constraints", problemOf("constraints"))}
         />

@@ -1,3 +1,5 @@
+import { t } from "../i18n/core";
+
 /**
  * VO2max readings collapsed into the plateaus they actually form.
  *
@@ -169,10 +171,10 @@ export function buildVo2Trend(
  */
 export function formatPlateauDuration(days: number): string {
   if (days < 56) {
-    return `${days}d`;
+    return t("activity.vo2.plateau.days", { count: days });
   }
 
-  return `${Math.round(days / 7)}w`;
+  return t("activity.vo2.plateau.weeks", { count: Math.round(days / 7) });
 }
 
 /**
@@ -192,13 +194,13 @@ export function formatHappenDayNumeric(happenDay: string): string {
 /** How long the whole bar covers, for the caption above it. */
 export function formatTrendSpan(spanDays: number): string {
   if (spanDays < 60) {
-    return `${spanDays} days`;
+    return t("activity.vo2.span.days", { count: spanDays });
   }
 
   const months = Math.round(spanDays / 30.44);
   if (months < 24) {
-    return `${months} months`;
+    return t("activity.vo2.span.months", { count: months });
   }
 
-  return `${Math.round(spanDays / 365.25)} years`;
+  return t("activity.vo2.span.years", { count: Math.round(spanDays / 365.25) });
 }

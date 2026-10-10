@@ -169,6 +169,44 @@
 }
 
 /*
+ * Japanese, Korean, Chinese and Thai. The three shipped faces carry Latin,
+ * Vietnamese and Cyrillic only, so a CJK or Thai character falls through the stack — and with
+ * nothing named for it, Windows lands on a full-width Gothic that sets
+ * katakana a space apart. Each language names its own system UI faces, keyed
+ * on <html lang> (src/i18n/locales.ts), Latin still drawn in Inter ahead of
+ * them. The title serif falls to each script's Mincho/Myeongjo/Song, which is
+ * what a serif title means there. Nothing is downloaded: these are the
+ * platforms' own faces, Noto last for Linux.
+ */
+:root:lang(ja) {
+  --font-display: "Space Grotesk", Inter, "Yu Gothic UI", "Hiragino Sans", "Meiryo UI", "Noto Sans JP", sans-serif;
+  --font-title: "Source Serif 4", "Yu Mincho", "Hiragino Mincho ProN", "Noto Serif JP", serif;
+
+  font-family: Inter, "Yu Gothic UI", "Hiragino Sans", "Meiryo UI", "Noto Sans JP", sans-serif;
+}
+
+:root:lang(ko) {
+  --font-display: "Space Grotesk", Inter, "Malgun Gothic", "Apple SD Gothic Neo", "Noto Sans KR", sans-serif;
+  --font-title: "Source Serif 4", "Batang", "AppleMyungjo", "Noto Serif KR", serif;
+
+  font-family: Inter, "Malgun Gothic", "Apple SD Gothic Neo", "Noto Sans KR", sans-serif;
+}
+
+:root:lang(th) {
+  --font-display: "Space Grotesk", Inter, "Leelawadee UI", "Thonburi", "Noto Sans Thai", sans-serif;
+  --font-title: "Source Serif 4", "Leelawadee UI", "Thonburi", "Noto Serif Thai", serif;
+
+  font-family: Inter, "Leelawadee UI", "Thonburi", "Noto Sans Thai", sans-serif;
+}
+
+:root:lang(zh) {
+  --font-display: "Space Grotesk", Inter, "Microsoft YaHei UI", "PingFang SC", "Noto Sans SC", sans-serif;
+  --font-title: "Source Serif 4", "SimSun", "Songti SC", "Noto Serif SC", serif;
+
+  font-family: Inter, "Microsoft YaHei UI", "PingFang SC", "Noto Sans SC", sans-serif;
+}
+
+/*
  * The focus ring. Every `:focus-visible` rule spends it the same way —
  * `outline: var(--focus-ring)` at `outline-offset: 2px`, or `-2px` where the
  * container clips its children (a row in a scrolling list, a tab in a strip).
@@ -3189,6 +3227,19 @@ td span {
   align-items: center;
   justify-content: center;
   flex: 0 0 auto;
+}
+
+/* A language's flag, beside its own name in Settings → Language. A 4:3 card
+   with a hairline (a border: an inset shadow paints under an image), so a flag with a white field (Japan, Korea) still has an
+   edge on the paper theme's white sheet. */
+.language-flag {
+  display: block;
+  width: 20px;
+  height: 15px;
+  box-sizing: border-box;
+  border: 1px solid color-mix(in srgb, var(--text-primary) 14%, transparent);
+  border-radius: var(--radius-xs);
+  object-fit: cover;
 }
 
 .app-select-icon {

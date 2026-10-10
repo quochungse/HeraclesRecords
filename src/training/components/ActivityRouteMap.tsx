@@ -9,6 +9,7 @@ import type {
   TrainingHubTrackPoint
 } from "../../../electron/types";
 import { OptionGroup } from "../../components/OptionGroup";
+import { useI18n } from "../../i18n/useI18n";
 import {
   defineSelectionPreference,
   selectionIsOneOf,
@@ -78,6 +79,7 @@ import {
   type RouteMetric,
   type RouteZoneColoring
 } from "./routeColoring";
+import { formatDecimal, t } from "../../i18n/core";
 
 /** What the full map colours a route by: the samples, COROS's zones and the sport. */
 type RouteDetail = Partial<
@@ -195,7 +197,20 @@ const ROUTE_METRIC_PREFERENCE = defineSelectionPreference<RouteMetric>({
 
 /** A metric's name. On a ride the pace channel is read out as speed. */
 function metricLabel(metric: RouteMetric, speed: boolean): string {
-  return metric === "pace" ? (speed ? "Speed" : "Pace") : metric === "hr" ? "Heart rate" : "Elevation";
+  return t(
+    metric === "pace"
+      ? speed
+        ? "activity.m.speed"
+        : "activity.m.pace"
+      : metric === "hr"
+        ? "activity.m.heartRate"
+        : "activity.m.elevation"
+  );
+}
+
+/** The metric's own key for a sentence about it: "pace", "speed", "hr" or "elevation". */
+function metricKey(metric: RouteMetric, speed: boolean): "pace" | "speed" | "hr" | "elevation" {
+  return metric === "pace" ? (speed ? "speed" : "pace") : metric;
 }
 
 /** Shared by the side-panel map and the full map, so a pick in one is the other's. */
@@ -1018,9 +1033,9 @@ function RouteLegend() {
   return (
     <span className="activity-route-legend">
       <span className="activity-route-dot is-start" aria-hidden="true" />
-      Start
+      {t("activity.route.start")}
       <span className="activity-route-dot is-end" aria-hidden="true" />
-      Finish
+      {t("activity.route.finish")}
     </span>
   );
 }
@@ -1037,7 +1052,7 @@ function useReadout(metric: "pace" | "hr", speed: boolean) {
       return unit ? `${Math.round(value)} bpm` : `${Math.round(value)}`;
     }
     if (speed) {
-      const figure = kmhToDisplaySpeed(3600 / value, unitSystem).toFixed(1);
+      const figure = formatDecimal(kmhToDisplaySpeed(3600 / value, unitSystem), 1);
       return unit ? `${figure} ${speedUnit(unitSystem)}` : figure;
     }
     const pace = formatPaceSecondsPerKm(value, unitSystem);
@@ -1061,7 +1076,11 @@ function RouteColorLegend({
   return (
     <span
       className="activity-route-color-legend"
-      aria-label={`${metricLabel(metric, speed)} from ${read(coloring.low)} to ${read(coloring.high)}`}
+      aria-label={t("activity.route.range", {
+        metric: metricLabel(metric, speed),
+        low: read(coloring.low),
+        high: read(coloring.high)
+      })}
     >
       <span>{read(coloring.low)}</span>
       <span className="activity-route-color-ramp" aria-hidden="true">
@@ -1087,7 +1106,7 @@ function RouteElevationLegend({ lightGround }: { lightGround: boolean }) {
   return (
     <span
       className="activity-route-color-legend"
-      aria-label={`Elevation, ${heights.join(", ")} and above`}
+      aria-label={t("activity.route.elevationScale", { heights: heights.join(", ") })}
       title={heights.join(" · ")}
     >
       <span>{heights[0]}</span>
@@ -1146,7 +1165,7 @@ function RouteZoneLegend({
   return (
     <span
       className="activity-route-color-legend"
-      aria-label={`${metricLabel(metric, speed)} zones, ${first} to ${last}`}
+      aria-label={t("activity.route.zonesRange", { metric: metricLabel(metric, speed), first, last })}
     >
       <span>{first}</span>
       <span className="activity-route-color-ramp">
@@ -1244,17 +1263,18 @@ function useRouteAnalysis(
   layers: RouteMapLayers
 ): RouteAnalysis {
   const speed = isSpeedSport(detail?.sportType, detail?.sportName);
+  const { locale } = useI18n();
   const performance = useMemo((): Record<RouteMetric, PerformanceView> => {
     const series = detail?.series ?? [];
     const timed = (metric: "pace" | "hr"): PerformanceView => {
-      const label = metricLabel(metric, speed);
+      const key = metricKey(metric, speed);
       const stretches = stretchValues(route, series, metric);
       if ("missing" in stretches) {
         return stretches.missing === "unrecorded"
-          ? { kind: "none", reason: `No ${label.toLowerCase()} recorded`, recorded: false }
+          ? { kind: "none", reason: t(`activity.route.none.${key}` as const), recorded: false }
           : {
               kind: "none",
-              reason: `${label} was recorded, but the GPS track has no timing to place it along the route`,
+              reason: t(`activity.route.untimed.${key}` as const),
               recorded: true
             };
       }
@@ -1273,9 +1293,10 @@ function useRouteAnalysis(
       hr: timed("hr"),
       elevation: heights
         ? { kind: "elevation", heights }
-        : { kind: "none", reason: "No elevation recorded", recorded: false }
+        : { kind: "none", reason: t("activity.route.none.elevation"), recorded: false }
     };
-  }, [route, detail, speed]);
+    // The reasons are words, so a new language rebuilds them.
+  }, [route, detail, speed, locale]);
 
   // A choice this activity cannot show falls back rather than drawing nothing:
   // a metric it did not record to the first one it did, and Performance with
@@ -1298,25 +1319,29 @@ function useRouteAnalysis(
     return entry.kind === "none" && entry.recorded;
   });
   const layerSection: MapLayerSection<RouteColorMode> = {
-    title: "Route",
+    title: t("activity.m.route"),
     value: mode,
     onChange: layers.setColorMode,
     options: [
-      { value: "route", label: "Route", description: "One line in the route's colour" },
+      {
+        value: "route",
+        label: t("activity.m.route"),
+        description: t("activity.route.layer.route.description")
+      },
       {
         value: "performance",
-        label: "Performance",
+        label: t("activity.route.layer.performance"),
         description: !nothingShown
-          ? `${metricLabel("pace", speed)}, heart rate or elevation`
+          ? t("activity.route.layer.performance.description", { metric: metricLabel("pace", speed) })
           : somethingRecorded
-            ? "Nothing recorded can be placed along this route"
-            : "Nothing recorded along this route",
+            ? t("activity.route.layer.nothingPlaced")
+            : t("activity.route.layer.nothingRecorded"),
         disabled: nothingShown
       },
       {
         value: "heatmap",
-        label: "Heatmap",
-        description: "Hotter where it was passed more often"
+        label: t("activity.route.layer.heatmap"),
+        description: t("activity.route.layer.heatmap.description")
       }
     ]
   };
@@ -1416,8 +1441,8 @@ function RouteMapFrame({
           type="button"
           className="basemap-toggle map-expand"
           onClick={onExpand}
-          title="Expand map"
-          aria-label="Expand map"
+          title={t("activity.route.expand")}
+          aria-label={t("activity.route.expand")}
         >
           <Maximize2 size={16} aria-hidden="true" />
         </button>
@@ -1433,8 +1458,8 @@ function RouteMapFrame({
           type="button"
           className="basemap-toggle map-replay"
           onClick={onReplay}
-          title="Replay route"
-          aria-label="Replay route"
+          title={t("activity.route.replay")}
+          aria-label={t("activity.route.replay")}
         >
           <RotateCcw size={16} aria-hidden="true" />
         </button>
@@ -1502,12 +1527,12 @@ function RouteMapModal({
         <header className="activity-route-modal-header">
           <div className="activity-route-modal-title">
             <MapPin size={16} aria-hidden="true" />
-            <h2 id="activity-route-modal-title">Route</h2>
+            <h2 id="activity-route-modal-title">{t("activity.m.route")}</h2>
           </div>
           <button
             type="button"
             className="icon-button"
-            aria-label="Close expanded map"
+            aria-label={t("activity.route.closeExpanded")}
             onClick={onClose}
           >
             <X size={18} aria-hidden="true" />
@@ -1522,14 +1547,14 @@ function RouteMapModal({
             replayToken={replayToken}
             onReplay={() => setReplayToken((token) => token + 1)}
             drawing={drawing}
-            ariaLabel="Expanded activity route map"
+            ariaLabel={t("activity.route.expandedLabel")}
             layerSection={layerSection}
           />
           <div className="activity-route-footer">
             <div className="activity-route-coloring">
               {mode === "performance" ? (
                 <OptionGroup
-                  label="Performance metric"
+                  label={t("activity.route.metric")}
                   value={metric}
                   options={ROUTE_METRICS.map((candidate) => {
                     const entry = performance[candidate];
@@ -1588,7 +1613,7 @@ export function ActivityRouteMap({ track, detail }: ActivityRouteMapProps) {
     return (
       <div className="activity-route-empty">
         <MapPin size={18} aria-hidden="true" />
-        <p>No GPS track available for this activity.</p>
+        <p>{t("activity.route.noTrack")}</p>
       </div>
     );
   }
@@ -1615,7 +1640,7 @@ function RoutePreviewMap({ route, detail }: { route: RouteReplay; detail?: Route
         animate={false}
         drawing={drawing}
         layerSection={analysis.layerSection}
-        ariaLabel="Activity route map"
+        ariaLabel={t("activity.route.mapLabel")}
         onExpand={() => setExpanded(true)}
       />
       {expanded ? (
@@ -1721,14 +1746,14 @@ function RouteCover({
             visibleBand={visibleBand}
             replayCeilingMs={COVER_REPLAY_MAX_MS}
             drawing={drawing}
-            ariaLabel="Route"
+            ariaLabel={t("activity.m.route")}
           />
         </div>
         <button
           type="button"
           className="basemap-toggle map-expand"
-          title="Expand map"
-          aria-label="Expand map"
+          title={t("activity.route.expand")}
+          aria-label={t("activity.route.expand")}
           onClick={(event) => {
             event.stopPropagation();
             setExpanded(true);

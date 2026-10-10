@@ -18,6 +18,7 @@ import type {
   McpAvailability,
   McpServerStatus
 } from "./types";
+import { ScreenError } from "./screenText";
 
 // Back-compat shim: COROS is now the built-in "coros" entry of the generic MCP
 // registry (electron/mcpClientManager.ts). These wrappers keep the original
@@ -142,7 +143,7 @@ export async function disconnectCorosMcp(): Promise<CorosMcpStatus> {
 
 export async function listCorosMcpTools(): Promise<CorosMcpTool[]> {
   if (!getMcpServerStatus(COROS)?.connected) {
-    throw new Error("COROS MCP is not connected.");
+    throw new ScreenError("main.coros.mcpNotConnected");
   }
   return getMcpServerTools(COROS);
 }

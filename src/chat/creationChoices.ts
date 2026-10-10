@@ -16,6 +16,7 @@
  * Pure and outside the component for the reason `activityFilters.ts` is.
  */
 import type { PlanDraftPreview, TrainingPlanDestination } from "../../electron/types";
+import { getIntlLocale, t } from "../i18n/core";
 
 export type CreationActionId =
   | "addToCalendar"
@@ -49,17 +50,23 @@ export const ONE_SHOT_DAYS = 14;
 
 const LIBRARY: CreationAction = {
   id: "saveToLibrary",
-  label: "Save to Workout Library",
+  get label() {
+    return t("chat.save.library");
+  },
   destination: "workoutLibrary"
 };
 const PICK_DATE: CreationAction = {
   id: "pickWorkoutDate",
-  label: "Schedule…",
+  get label() {
+    return t("chat.save.pickDate");
+  },
   destination: "calendar"
 };
 const PUT_ON_CALENDAR: CreationAction = {
   id: "putOnCalendar",
-  label: "Put sessions on calendar",
+  get label() {
+    return t("chat.save.putOnCalendar");
+  },
   destination: "calendar"
 };
 
@@ -80,7 +87,7 @@ function dayNumber(date: string): number {
 
 function formatDay(date: string): string {
   const [year, month, day] = date.split("-").map(Number);
-  return new Intl.DateTimeFormat(undefined, {
+  return new Intl.DateTimeFormat(getIntlLocale(), {
     weekday: "short",
     month: "short",
     day: "numeric"
@@ -107,21 +114,30 @@ export function creationStatus(
   draft: PlanDraftPreview,
   /** Another version of it is a COROS plan, so this one is a change to that plan. */
   onCoros = false
-): { label: string; saved: boolean } {
+): { label: string; saved: boolean; kind: CreationStatusKind } {
   if (draft.uploadResult || draft.uploadedAt) {
     const destination = draft.uploadResult?.destination;
-    if (destination === "nativePlan") return { label: "On COROS", saved: true };
-    if (destination === "workoutLibrary") return { label: "In library", saved: true };
+    if (destination === "nativePlan") return { label: t("chat.status.onCoros"), saved: true, kind: "onCoros" };
+    if (destination === "workoutLibrary") return { label: t("chat.status.inLibrary"), saved: true, kind: "inLibrary" };
     if (destination === "calendar") {
       const date =
         draft.artifactType === "workout" && draft.entries[0] ? entryDate(draft.entries[0]) : undefined;
-      return { label: date ? `On calendar ${formatDay(date)}` : "On calendar", saved: true };
+      return {
+        label: date ? t("chat.status.onCalendarDay", { day: formatDay(date) }) : t("chat.status.onCalendar"),
+        saved: true,
+        kind: "onCalendar"
+      };
     }
-    return { label: "Saved", saved: true };
+    return { label: t("chat.status.saved"), saved: true, kind: "saved" };
   }
-  if (onCoros) return { label: "Changes not on COROS", saved: false };
-  return { label: draft.editedAt ? "Edited by you" : "Proposal", saved: false };
+  if (onCoros) return { label: t("chat.status.changes"), saved: false, kind: "changes" };
+  return draft.editedAt
+    ? { label: t("chat.event.edited"), saved: false, kind: "edited" }
+    : { label: t("chat.status.proposal"), saved: false, kind: "proposal" };
 }
+
+/** What `creationStatus` found, whatever the language its label is in. */
+export type CreationStatusKind = "onCoros" | "inLibrary" | "onCalendar" | "saved" | "changes" | "edited" | "proposal";
 
 /** `today` is `YYYY-MM-DD` in the athlete's own time zone. */
 export function planSaveChoices(preview: PlanDraftPreview, today: string): CreationChoices {
@@ -131,7 +147,7 @@ export function planSaveChoices(preview: PlanDraftPreview, today: string): Creat
       return {
         primary: {
           id: "scheduleWorkout",
-          label: `Schedule for ${formatDay(date)}`,
+          label: t("chat.save.scheduleFor", { day: formatDay(date) }),
           destination: "calendar",
           date
         },
@@ -146,7 +162,7 @@ export function planSaveChoices(preview: PlanDraftPreview, today: string): Creat
   if (isOneShotPlan(preview, today)) {
     return {
       primary: PUT_ON_CALENDAR,
-      secondary: [{ id: "saveAsPlan", label: "Save to COROS as a plan", destination: "nativePlan" }],
+      secondary: [{ id: "saveAsPlan", label: t("chat.save.asPlan"), destination: "nativePlan" }],
       more: [LIBRARY]
     };
   }
@@ -155,7 +171,7 @@ export function planSaveChoices(preview: PlanDraftPreview, today: string): Creat
     return date !== undefined && date < today;
   });
   return {
-    primary: { id: "saveAsPlan", label: "Save to COROS", destination: "nativePlan" },
+    primary: { id: "saveAsPlan", label: t("library.ed.saveCoros"), destination: "nativePlan" },
     secondary: [],
     more: [...(allDated && !anyPast ? [PUT_ON_CALENDAR] : []), LIBRARY]
   };
@@ -186,7 +202,9 @@ export type ArtifactActions =
  */
 const ADD_TO_CALENDAR: CreationAction = {
   id: "addToCalendar",
-  label: "Add to calendar…",
+  get label() {
+    return t("chat.save.addToCalendar");
+  },
   destination: "nativePlan"
 };
 
@@ -221,9 +239,9 @@ export function artifactActions(
     return {
       kind: "save",
       choices: {
-        primary: { id: "updatePlan", label: "Update COROS plan", destination: "nativePlan" },
+        primary: { id: "updatePlan", label: t("chat.save.update"), destination: "nativePlan" },
         secondary: [],
-        more: [{ id: "saveAsNewPlan", label: "Save as a new COROS plan", destination: "nativePlan", asNew: true }]
+        more: [{ id: "saveAsNewPlan", label: t("chat.save.asNew"), destination: "nativePlan", asNew: true }]
       }
     };
   }
@@ -248,29 +266,27 @@ export function actionOutcome(action: CreationAction, draft: PlanDraftPreview): 
   const dates = draft.entries.map(entryDate).filter((date): date is string => Boolean(date)).sort();
   const span =
     dates.length > 1
-      ? `, ${formatDay(dates[0])} → ${formatDay(dates[dates.length - 1])}`
+      ? `${formatDay(dates[0])} → ${formatDay(dates[dates.length - 1])}`
       : dates.length === 1
-        ? `, ${formatDay(dates[0])}`
+        ? formatDay(dates[0])
         : "";
   switch (action.id) {
     case "putOnCalendar":
-      return `Each session becomes a workout of its own on your COROS calendar${span}. Move or delete them one by one.`;
+      return span ? t("chat.outcome.putOnCalendarSpan", { span }) : t("chat.outcome.putOnCalendar");
     case "saveAsPlan":
-      return "The sessions stay together as one plan in your Training Library. Put it on the calendar later, from there or from here.";
+      return t("chat.outcome.saveAsPlan");
     case "addToCalendar":
-      return "Saved as one COROS plan and started on a day you pick. COROS keeps the calendar in step with the plan.";
+      return t("chat.outcome.addToCalendar");
     case "saveToLibrary":
-      return isWorkout
-        ? "Ready to schedule any day, from the Library or the Calendar."
-        : "Each session is saved to your Workout Library, ready to schedule any day.";
+      return isWorkout ? t("chat.outcome.libraryWorkout") : t("chat.outcome.libraryPlan");
     case "scheduleWorkout":
-      return `On your COROS calendar${span}.`;
+      return span ? t("chat.outcome.scheduleSpan", { span }) : t("chat.outcome.schedule");
     case "pickWorkoutDate":
-      return "On your COROS calendar, on a day you pick.";
+      return t("chat.outcome.pickDate");
     case "updatePlan":
-      return "Changes the COROS plan this was saved as.";
+      return t("chat.outcome.update");
     case "saveAsNewPlan":
-      return "A second COROS plan. The one saved before stays as it is.";
+      return t("chat.outcome.asNew");
   }
 }
 

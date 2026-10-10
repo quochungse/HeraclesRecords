@@ -22,6 +22,7 @@ import {
   metersToSwimDistance,
   swimDistanceUnit
 } from "../../units/units";
+import { formatDecimal, t } from "../../i18n/core";
 
 export interface ChartDatum {
   label: string;
@@ -153,8 +154,8 @@ export function buildDistanceSeriesData(
 
     return {
       label: useDistance
-        ? `${displayDistance.toFixed(swim ? 0 : 1)} ${swim ? swimDistanceUnit(unitSystem) : distanceUnit(unitSystem)}`
-        : `Point ${index + 1}`,
+        ? `${formatDecimal(displayDistance, swim ? 0 : 1)} ${swim ? swimDistanceUnit(unitSystem) : distanceUnit(unitSystem)}`
+        : t("chat.chart.point", { n: index + 1 }),
       value:
         valueKey === "pace" && paceAsSpeed
           ? kmhToDisplaySpeed(3600 / (point.pace as number), unitSystem)
@@ -187,8 +188,8 @@ export function buildElevationSeriesData(
 
     return {
       label: useDistance
-        ? `${displayDistance.toFixed(1)} ${distanceUnit(unitSystem)}`
-        : `Point ${index + 1}`,
+        ? `${formatDecimal(displayDistance, 1)} ${distanceUnit(unitSystem)}`
+        : t("chat.chart.point", { n: index + 1 }),
       value: metersToElevation(point.elevation!, unitSystem)
     };
   });

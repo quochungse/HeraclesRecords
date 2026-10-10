@@ -15,6 +15,7 @@ import {
   type PlaceCluster,
 } from "./placeClusters";
 import { coordinateLabel, type PlaceLabel } from "./placeLabels";
+import { formatCount, getIntlLocale, getLocale, plural, t } from "../i18n/core";
 
 export { haversineKm };
 
@@ -190,19 +191,28 @@ export function countriesVisited(places: readonly PlaceSummary[]): number {
 
 // Written out rather than asked of Intl: en-GB spells September "Sept", and
 // the Hall of Records, which names the same days, writes "Sep".
+// Another language takes its own short forms from Intl.
 const MONTHS = [
-  "Jan", "Feb", "Mar", "Apr", "May", "Jun",
-  "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+  "Jan", "Feb", "Mar", "Apr", "May", "Jun", // i18n-ignore: English's own spelling
+  "Jul", "Aug", "Sep", "Oct", "Nov", "Dec", // i18n-ignore
 ] as const;
+
+/** Intl in the app's language; Vietnamese spells the month out ("thg 8" reads as a typo). */
+function intlDate(ms: number, options: Intl.DateTimeFormatOptions): string {
+  const month = getLocale() === "vi" && options.month ? "long" : options.month;
+  return new Intl.DateTimeFormat(getIntlLocale(), { ...options, ...(month ? { month } : {}) }).format(new Date(ms));
+}
 
 /** "6 Aug 2024". */
 export function formatDayLong(ms: number): string {
+  if (getLocale() !== "en") return intlDate(ms, { day: "numeric", month: "short", year: "numeric" });
   const date = new Date(ms);
   return `${date.getDate()} ${MONTHS[date.getMonth()]} ${date.getFullYear()}`;
 }
 
 /** "Mar 2025". */
 export function formatMonthYear(ms: number): string {
+  if (getLocale() !== "en") return intlDate(ms, { month: "short", year: "numeric" });
   const date = new Date(ms);
   return `${MONTHS[date.getMonth()]} ${date.getFullYear()}`;
 }
@@ -213,14 +223,12 @@ export function formatDayNear(ms: number, nowMs = Date.now()): string {
     return "";
   }
   const date = new Date(ms);
-  return date.getFullYear() === new Date(nowMs).getFullYear()
+  if (date.getFullYear() !== new Date(nowMs).getFullYear()) return formatDayLong(ms);
+  return getLocale() === "en"
     ? `${date.getDate()} ${MONTHS[date.getMonth()]}`
-    : formatDayLong(ms);
+    : intlDate(ms, { day: "numeric", month: "short" });
 }
 
-function plural(count: number, one: string, many: string): string {
-  return `${count.toLocaleString("en-US")} ${count === 1 ? one : many}`;
-}
 
 /**
  * The line under the screen's title: what the map holds, in one sentence.
@@ -245,10 +253,13 @@ export function placesSummaryLine({
     0,
   );
   const countries = countriesVisited(places);
-  let line = `${plural(activityCount, "activity", "activities")} in ${plural(places.length, "place", "places")}`;
-  if (countries > 1) {
-    line += ` and ${plural(countries, "country", "countries")}`;
-  }
+  const counts = {
+    activities: plural("map.count.activities", activityCount),
+    places: plural("map.count.places", places.length),
+    countries: plural("map.count.countries", countries),
+  };
+  let line =
+    countries > 1 ? t("map.summary.lineCountries", counts) : t("map.summary.line", counts);
   if (allTime) {
     const first = Math.min(
       ...places
@@ -256,15 +267,15 @@ export function placesSummaryLine({
         .filter((ms) => ms > 0),
     );
     if (Number.isFinite(first)) {
-      line += ` since ${formatDayLong(first)}`;
+      line = t("map.summary.since", { line, date: formatDayLong(first) });
     }
   }
   const farthest = farthestFromHome(places);
   if (farthest) {
     const where = placeLabelFor(farthest.place.cluster, labels).city;
     const from = placeLabelFor(farthest.home.cluster, labels).city;
-    const km = Math.round(farthest.km).toLocaleString("en-US");
-    line += ` · Farthest: ${where}, ${km} km from ${from}`;
+    const km = formatCount(Math.round(farthest.km));
+    line += ` · ${t("map.summary.farthest", { where, km, from })}`;
   }
   return line;
 }

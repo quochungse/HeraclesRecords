@@ -9,7 +9,6 @@ import type {
   WorkoutSport
 } from "../../electron/types";
 import { parsePlanDay, formatPlanDay } from "../../electron/trainingPlanDomain";
-import { formatWorkoutSport } from "../../electron/workoutCapabilities";
 import {
   RIDGE_UNITS,
   formatRidgeValue,
@@ -24,6 +23,8 @@ import { CreationActions } from "./CreationActions";
 import { datedForReading } from "./planDating";
 import type { CreationCalendar } from "./creationCalendar";
 import { creationStatus } from "./creationChoices";
+import { workoutSportLabel } from "../training/workoutSport";
+import { t } from "../i18n/core";
 
 export interface CreationFigures {
   weeks: number;
@@ -84,7 +85,7 @@ export function creationFigures(document: TrainingPlanDocument): CreationFigures
     weeks: weeks.length,
     sessionsPerWeek: low === high ? `${high}` : `${low}–${high}`,
     peakWeek: `${formatRidgeValue(peak, measure)} ${RIDGE_UNITS[measure]}`,
-    sports: sports.map((sport) => formatWorkoutSport(sport)).join(", "),
+    sports: sports.map((sport) => workoutSportLabel(sport)).join(", "),
     reading: weeks,
     firstWeek: busy[0],
     span: datedSpan(document)
@@ -94,7 +95,7 @@ export function creationFigures(document: TrainingPlanDocument): CreationFigures
 function WeekStrip({ week, span }: { week: PlanReaderWeek; span?: CreationFigures["span"] }) {
   return (
     <div className="chat-creation-week">
-      <span className="chat-creation-week-label">Week {week.weekIndex + 1}</span>
+      <span className="chat-creation-week-label">{t("chat.refs.week", { n: week.weekIndex + 1 })}</span>
       <ol className="chat-creation-days">
         {week.days.map((day) => {
           const outside = !day.entries.length && outsideSpan(day.date, span);
@@ -102,7 +103,7 @@ function WeekStrip({ week, span }: { week: PlanReaderWeek; span?: CreationFigure
             <li
               key={day.dayIndex}
               className={day.entries.length ? "" : outside ? "is-outside" : "is-rest"}
-              title={outside ? "Not part of this plan" : undefined}
+              title={outside ? t("chat.card.outside") : undefined}
             >
               <b>{day.label}</b>
               {day.entries.length ? (
@@ -112,7 +113,7 @@ function WeekStrip({ week, span }: { week: PlanReaderWeek; span?: CreationFigure
                   </span>
                 ))
               ) : outside ? null : (
-                <span>Rest</span>
+                <span>{t("library.day.rest")}</span>
               )}
             </li>
           );
@@ -201,7 +202,7 @@ export function CoachCreationCard({
       <header className="chat-creation-head">
         <div>
           <span className="chat-creation-kicker">
-            {isWorkout ? "Workout" : "Training plan"}
+            {isWorkout ? t("chat.kind.workout") : t("chat.card.trainingPlan")}
             {version && version > 1 ? ` · v${version}` : ""}
           </span>
           <h4>{draft.name}</h4>
@@ -215,17 +216,17 @@ export function CoachCreationCard({
             data-saved={status.saved ? "true" : "false"}
             data-tone={status.saved ? "saved" : onCoros ? "pending" : "draft"}
           >
-            {calendar?.running && status.saved ? "On calendar" : status.label}
+            {calendar?.running && status.saved ? t("chat.status.onCalendar") : status.label}
           </span>
           <button
             type="button"
             className="chat-creation-open"
             onClick={onOpen}
-            aria-label={`Open ${draft.name}`}
-            title="Open"
+            aria-label={t("chat.card.openName", { name: draft.name })}
+            title={t("chat.card.open")}
           >
             <Maximize2 size={13} aria-hidden="true" />
-            Open
+            {t("chat.card.open")}
           </button>
         </div>
       </header>
@@ -233,19 +234,19 @@ export function CoachCreationCard({
       {figures ? (
         <dl className="chat-creation-figures">
           <div>
-            <dt>Weeks</dt>
+            <dt>{t("chat.card.weeks")}</dt>
             <dd>{figures.weeks}</dd>
           </div>
           <div>
-            <dt>Sessions a week</dt>
+            <dt>{t("chat.card.perWeek")}</dt>
             <dd>{figures.sessionsPerWeek}</dd>
           </div>
           <div>
-            <dt>Peak week</dt>
+            <dt>{t("chat.card.peak")}</dt>
             <dd>{figures.peakWeek}</dd>
           </div>
           <div>
-            <dt>Sports</dt>
+            <dt>{t("library.snap.sports")}</dt>
             <dd title={figures.sports}>{figures.sports}</dd>
           </div>
         </dl>
@@ -271,11 +272,13 @@ export function CoachCreationCard({
           <CircleCheck size={15} aria-hidden="true" />
           <span>
             {calendar?.running
-              ? `On your COROS calendar${calendar.line ? ` · ${calendar.line}` : ""}.`
-              : status.label === "On COROS"
-                ? `Saved to your COROS plans as “${draft.name}”.`
-                : status.label === "In library"
-                  ? "Saved to your COROS Workout Library."
+              ? calendar.line
+                ? t("chat.card.onCalendarLine", { line: calendar.line })
+                : t("chat.card.onCalendar")
+              : status.kind === "onCoros"
+                ? t("chat.card.savedPlan", { name: draft.name })
+                : status.kind === "inLibrary"
+                  ? t("chat.card.savedLibrary")
                   : `${status.label}.`}
           </span>
         </p>
@@ -290,7 +293,7 @@ export function CoachCreationCard({
         onUpload={onUpload}
         onEdit={onEdit}
         editing={editing}
-        onCoros={onCoros || (status.saved && status.label === "On COROS")}
+        onCoros={onCoros || (status.saved && status.kind === "onCoros")}
         onCalendar={onCalendar}
         onCalendarNow={calendar?.running ?? false}
       />

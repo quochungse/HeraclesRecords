@@ -31,6 +31,8 @@ import {
   buildElevationSeriesData,
   ChatMiniAreaChart
 } from "./charts/ChatMiniAreaChart";
+import { formatDecimal, t } from "../i18n/core";
+import { useI18n } from "../i18n/useI18n";
 
 interface ActivityVisualCardProps {
   preview: ActivityVisualPreview;
@@ -141,6 +143,9 @@ function buildLapBarData(
 export const ActivityVisualCard = memo(function ActivityVisualCard({
   preview
 }: ActivityVisualCardProps) {
+  // The series carry their labels as text (a distance's decimals, "Point 3"),
+  // so they are worked out again when the language changes.
+  const { locale } = useI18n();
   const { unitSystem } = useUnitSystem();
   const swim = preview.sportType === 300 || preview.sportType === 301;
   const cycling = isCyclingSportType(preview.sportType);
@@ -149,7 +154,7 @@ export const ActivityVisualCard = memo(function ActivityVisualCard({
       preview.sections.hr?.chartKind === "series" && preview.sections.hr.series
         ? buildDistanceSeriesData(preview.sections.hr.series, "hr", unitSystem, swim)
         : [],
-    [preview, swim, unitSystem]
+    [locale, preview, swim, unitSystem]
   );
   const hrBarData = useMemo(
     () => buildLapBarData(preview.sections.hr?.laps, (lap) => lap.avgHr),
@@ -166,7 +171,7 @@ export const ActivityVisualCard = memo(function ActivityVisualCard({
             swim
           )
         : [],
-    [preview, swim, unitSystem]
+    [locale, preview, swim, unitSystem]
   );
   const cadenceBarData = useMemo(
     () => buildLapBarData(preview.sections.cadence?.laps, (lap) => lap.avgCadence),
@@ -183,25 +188,25 @@ export const ActivityVisualCard = memo(function ActivityVisualCard({
             cycling
           )
         : [],
-    [cycling, preview, swim, unitSystem]
+    [cycling, locale, preview, swim, unitSystem]
   );
   const powerData = useMemo(
     () =>
       preview.sections.power?.series
         ? buildDistanceSeriesData(preview.sections.power.series, "power", unitSystem, swim)
         : [],
-    [preview, swim, unitSystem]
+    [locale, preview, swim, unitSystem]
   );
   const elevationData = useMemo(
     () =>
       preview.sections.elevation?.points
         ? buildElevationSeriesData(preview.sections.elevation.points, unitSystem)
         : [],
-    [preview, unitSystem]
+    [locale, preview, unitSystem]
   );
 
   const cadenceUnit = cycling ? "rpm" : "spm";
-  const title = preview.name ?? "Activity";
+  const title = preview.name ?? t("activity.untitled");
   const subtitle = preview.startTime ?? undefined;
   const laps = preview.sections.laps ?? [];
   // The column only appears where a lap actually recorded cadence, so a pool
@@ -220,12 +225,12 @@ export const ActivityVisualCard = memo(function ActivityVisualCard({
         <div className="chat-visual-stats">
           {preview.avgHr != null ? (
             <span className="chat-visual-stat">
-              Avg HR <strong>{Math.round(preview.avgHr)}</strong>
+              {t("activity.m.avgHr")} <strong>{Math.round(preview.avgHr)}</strong>
             </span>
           ) : null}
           {preview.maxHr != null ? (
             <span className="chat-visual-stat">
-              Max HR <strong>{Math.round(preview.maxHr)}</strong>
+              {t("activity.m.maxHr")} <strong>{Math.round(preview.maxHr)}</strong>
             </span>
           ) : null}
         </div>
@@ -233,123 +238,119 @@ export const ActivityVisualCard = memo(function ActivityVisualCard({
 
       {preview.sections.hr ? (
         <section className="chat-visual-section">
-          <h5>Heart rate</h5>
+          <h5>{t("activity.m.heartRate")}</h5>
           {preview.sections.hr.chartKind === "series" && hrSeriesData.length >= 2 ? (
             <ChatMiniAreaChart
               data={hrSeriesData}
               gradientId={`chatHrFill-${preview.previewId}`}
-              name="Heart rate"
+              name={t("activity.m.heartRate")}
               formatValue={(value) => `${Math.round(value)} bpm`}
             />
           ) : hrBarData.length >= 2 ? (
             <ChatLapBarChart
               data={hrBarData}
-              name="Avg HR"
+              name={t("activity.m.avgHr")}
               formatValue={(value) => `${Math.round(value)} bpm`}
             />
           ) : (
-            <p className="chat-visual-empty">
-              Heart rate samples are not available for this activity.
-            </p>
+            <p className="chat-visual-empty">{t("chat.chart.noHr")}</p>
           )}
         </section>
       ) : null}
 
       {preview.sections.pace ? (
         <section className="chat-visual-section">
-          <h5>{cycling ? "Speed" : "Pace"}</h5>
+          <h5>{cycling ? t("activity.m.speed") : t("activity.m.pace")}</h5>
           {paceData.length >= 2 ? (
             <ChatMiniAreaChart
               data={paceData}
               gradientId={`chatPaceFill-${preview.previewId}`}
-              name={cycling ? "Speed" : "Pace"}
+              name={cycling ? t("activity.m.speed") : t("activity.m.pace")}
               formatValue={(value) =>
                 cycling
-                  ? `${value.toFixed(1)} ${speedUnit(unitSystem)}`
+                  ? `${formatDecimal(value, 1)} ${speedUnit(unitSystem)}`
                   : formatPaceValue(value, unitSystem)
               }
               yAxisFormatter={(value) =>
                 cycling
-                  ? value.toFixed(1)
+                  ? formatDecimal(value, 1)
                   : formatPaceValue(value, unitSystem).replace(/\/(?:km|mi)$/, "")
               }
             />
           ) : (
-            <p className="chat-visual-empty">
-              {cycling ? "Speed" : "Pace"} samples are not available.
-            </p>
+            <p className="chat-visual-empty">{cycling ? t("chat.chart.noSpeed") : t("chat.chart.noPace")}</p>
           )}
         </section>
       ) : null}
 
       {preview.sections.power ? (
         <section className="chat-visual-section">
-          <h5>Power</h5>
+          <h5>{t("activity.m.power")}</h5>
           {powerData.length >= 2 ? (
             <ChatMiniAreaChart
               data={powerData}
               gradientId={`chatPowerFill-${preview.previewId}`}
-              name="Power"
+              name={t("activity.m.power")}
               formatValue={(value) => `${Math.round(value)} W`}
             />
           ) : (
-            <p className="chat-visual-empty">Power samples are not available.</p>
+            <p className="chat-visual-empty">{t("chat.chart.noPower")}</p>
           )}
         </section>
       ) : null}
 
       {preview.sections.cadence ? (
         <section className="chat-visual-section">
-          <h5>Cadence</h5>
+          <h5>{t("activity.m.cadence")}</h5>
           {preview.sections.cadence.chartKind === "series" &&
           cadenceSeriesData.length >= 2 ? (
             <ChatMiniAreaChart
               data={cadenceSeriesData}
               gradientId={`chatCadenceFill-${preview.previewId}`}
-              name="Cadence"
+              name={t("activity.m.cadence")}
               formatValue={(value) => `${Math.round(value)} ${cadenceUnit}`}
             />
           ) : cadenceBarData.length >= 2 ? (
             <ChatLapBarChart
               data={cadenceBarData}
-              name="Avg cadence"
+              name={t("activity.m.avgCadence")}
               formatValue={(value) => `${Math.round(value)} ${cadenceUnit}`}
             />
           ) : (
-            <p className="chat-visual-empty">Cadence samples are not available.</p>
+            <p className="chat-visual-empty">{t("chat.chart.noCadence")}</p>
           )}
         </section>
       ) : null}
 
       {preview.sections.elevation ? (
         <section className="chat-visual-section">
-          <h5>Elevation</h5>
+          <h5>{t("activity.m.elevation")}</h5>
           {elevationData.length >= 2 ? (
             <ChatMiniAreaChart
               data={elevationData}
               gradientId={`chatElevFill-${preview.previewId}`}
-              name="Elevation"
+              name={t("activity.m.elevation")}
               formatValue={(value) => `${Math.round(value)} ${elevationUnit(unitSystem)}`}
             />
           ) : (
-            <p className="chat-visual-empty">Elevation profile is not available.</p>
+            <p className="chat-visual-empty">{t("chat.chart.noElevation")}</p>
           )}
         </section>
       ) : null}
 
       {laps.length > 0 ? (
         <section className="chat-visual-section">
-          <h5>Laps</h5>
+          <h5>{t("activity.m.laps")}</h5>
           <div className="chat-plan-table-wrap">
             <table className="chat-plan-table">
               <thead>
                 <tr>
                   <th>#</th>
-                  <th>Distance</th>
-                  <th>Duration</th>
-                  <th>Avg HR</th>
-                  <th>Max HR</th>
-                  <th>{cycling ? "Speed" : "Pace"}</th>
+                  <th>{t("activity.m.distance")}</th>
+                  <th>{t("activity.m.duration")}</th>
+                  <th>{t("activity.m.avgHr")}</th>
+                  <th>{t("activity.m.maxHr")}</th>
+                  <th>{cycling ? t("activity.m.speed") : t("activity.m.pace")}</th>
                   {lapsHaveCadence ? <th>{cadenceUnit.toUpperCase()}</th> : null}
                 </tr>
               </thead>
@@ -363,7 +364,7 @@ export const ActivityVisualCard = memo(function ActivityVisualCard({
                     <td>{formatOptionalNumber(lap.maxHr)}</td>
                     <td>
                       {cycling && lap.distance && lap.duration
-                        ? `${((lap.distance / 1000) / (lap.duration / 3600) / (unitSystem === "imperial" ? 1.609344 : 1)).toFixed(1)} ${speedUnit(unitSystem)}`
+                        ? `${formatDecimal((lap.distance / 1000) / (lap.duration / 3600) / (unitSystem === "imperial" ? 1.609344 : 1), 1)} ${speedUnit(unitSystem)}`
                         : lap.pace != null
                           ? formatPaceValue(lap.pace, unitSystem)
                           : "—"}

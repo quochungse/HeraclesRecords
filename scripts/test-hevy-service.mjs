@@ -235,7 +235,7 @@ assert.equal(hevy.getStoredHevyStrengthSessions(90).length, 3, "a timeout keeps 
 phase = "connect";
 
 encryptionAvailable = false;
-await assert.rejects(() => hevy.connectHevy("cannot-save"), /Secure credential storage/);
+await assert.rejects(() => hevy.connectHevy("cannot-save"), /no secure storage for keys/);
 encryptionAvailable = true;
 hevy.disconnectHevy();
 assert.equal(hevy.getHevyStatus().connected, false);

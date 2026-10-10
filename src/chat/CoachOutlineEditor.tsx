@@ -15,8 +15,11 @@ import {
   outlineWeekMonday,
   withOutlineWeek
 } from "./planOutlineModel";
+import { t } from "../i18n/core";
 
-const STAGE_OPTIONS = OUTLINE_STAGES.map((stage) => ({ value: String(stage.value), label: stage.label }));
+function stageOptions() {
+  return OUTLINE_STAGES.map((stage) => ({ value: String(stage.value), label: stage.label }));
+}
 
 /**
  * An outline's own screen (docs/coach-plan-canvas.md, P2.2): the athlete's
@@ -72,32 +75,31 @@ export default function CoachOutlineEditor({
             <span className="plan-generator-title-icon"><Sparkles size={16} /></span>
             <div className="plan-generator-heading">
               <p className="tl-eyebrow">{briefTitle(brief.request)}</p>
-              <h2 id="coach-outline-title">Adjust outline</h2>
+              <h2 id="coach-outline-title">{t("chat.outline.adjust")}</h2>
             </div>
-            <button type="button" className="icon-button" aria-label="Close outline" onClick={onClose}>
+            <button type="button" className="icon-button" aria-label={t("chat.outline.close")} onClick={onClose}>
               <X size={17} />
             </button>
           </header>
 
           <div className="chat-outline-editor-body">
             <p className="chat-outline-editor-lede">
-              {outlineSpan(outline)}. Change a week&rsquo;s stage, time or sessions here; ask Coach to redraw it for
-              anything else.
+              {outlineSpan(outline)}. {t("chat.outline.editorLede")}
             </p>
             <ol className="chat-outline-editor-weeks">
               {outline.weeks.map((week, index) => (
                 <li key={index} data-stage={outlineStageSlug(week.stage)}>
                   <span className="chat-outline-editor-week">
-                    <strong>Week {index + 1}</strong>
+                    <strong>{t("chat.refs.week", { n: index + 1 })}</strong>
                     <small>{formatPlanDate(outlineWeekMonday(brief, index))}</small>
                   </span>
                   <OptionGroup
-                    label={`Stage of week ${index + 1}`}
+                    label={t("chat.outline.stageOf", { n: index + 1 })}
                     mode="dropdown"
                     size="sm"
                     className="chat-outline-editor-stage"
                     value={String(week.stage)}
-                    options={STAGE_OPTIONS}
+                    options={stageOptions()}
                     onChange={(value) =>
                       setOutline((current) =>
                         withOutlineWeek(current, index, { stage: Number(value) as TrainingPlanWeekStage })
@@ -110,12 +112,12 @@ export default function CoachOutlineEditor({
                       min={0}
                       step={0.5}
                       value={week.hours}
-                      aria-label={`Hours in week ${index + 1}`}
+                      aria-label={t("chat.outline.hoursIn", { n: index + 1 })}
                       onChange={(event) =>
                         setOutline((current) => withOutlineWeek(current, index, { hours: figure(event.target.value) }))
                       }
                     />
-                    <span>h</span>
+                    <span>h</span>{/* i18n-ignore: a unit symbol */}
                   </label>
                   <label className="chat-outline-editor-figure">
                     <input
@@ -123,14 +125,14 @@ export default function CoachOutlineEditor({
                       min={0}
                       step={1}
                       value={week.sessions}
-                      aria-label={`Sessions in week ${index + 1}`}
+                      aria-label={t("chat.outline.sessionsIn", { n: index + 1 })}
                       onChange={(event) =>
                         setOutline((current) =>
                           withOutlineWeek(current, index, { sessions: figure(event.target.value) })
                         )
                       }
                     />
-                    <span>sessions</span>
+                    <span>{t("chat.outline.sessionsUnit")}</span>
                   </label>
                   <label className="chat-outline-editor-lighter">
                     <input
@@ -140,7 +142,7 @@ export default function CoachOutlineEditor({
                         setOutline((current) => withOutlineWeek(current, index, { lighter: event.target.checked }))
                       }
                     />
-                    Lighter
+                    {t("chat.outline.lighterLabel")}
                   </label>
                   {week.focus ? <p className="chat-outline-editor-focus">{week.focus}</p> : null}
                 </li>
@@ -150,11 +152,11 @@ export default function CoachOutlineEditor({
 
           <footer>
             <p className="plan-generator-footer-hint" role={problems.length || error ? "alert" : undefined}>
-              {error ?? problems[0] ?? (changed ? "Saved as the outline’s next version." : "Nothing changed yet.")}
-              {!error && problems.length > 1 ? ` (+${problems.length - 1} more)` : ""}
+              {error ?? problems[0] ?? (changed ? t("chat.outline.savedNext") : t("chat.outline.nothingChanged"))}
+              {!error && problems.length > 1 ? ` (${t("chat.event.more", { n: problems.length - 1 })})` : ""}
             </p>
             <button type="button" className="ghost-button" onClick={onClose}>
-              Cancel
+              {t("common.cancel")}
             </button>
             <button
               type="button"
@@ -162,7 +164,7 @@ export default function CoachOutlineEditor({
               disabled={saving || !changed || problems.length > 0}
               onClick={() => onSave(outline)}
             >
-              {saving ? "Saving…" : "Save outline"}
+              {saving ? t("library.ed.saving") : t("chat.outline.save")}
             </button>
           </footer>
         </section>

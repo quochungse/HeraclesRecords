@@ -177,6 +177,7 @@ function loadLandGeometry(): Promise<LandGeometryData> {
     worker.onerror = (event) => {
       landGeometryPromise = null;
       worker.terminate();
+      // i18n-ignore: never drawn; the card shows its own sentence on any failure.
       reject(new Error(event.message || "Unable to prepare globe geography."));
     };
   });

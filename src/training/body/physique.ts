@@ -59,7 +59,7 @@ export function shapeBlend(shape: number): ShapeBlend {
 
 /** COROS encodes `sex` as 0 male, 1 female; anything else draws the male figure. */
 export function figureSex(sex: number | undefined): FigureSex {
-  return sex === 1 ? "female" : "male";
+  return sex === 1 ? "female" : "male"; // i18n-ignore: the baked figure's key
 }
 
 /**

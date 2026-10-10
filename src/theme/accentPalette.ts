@@ -3,6 +3,8 @@
  * styles.css (see "Accent palettes"); it is orthogonal to `Theme`, which picks
  * the dark or paper background. Both are chosen in Settings -> Appearance.
  */
+import { t } from "../i18n/core.ts";
+
 export type AccentPalette = "gold" | "teal" | "indigo" | "rose" | "sky";
 
 export const ACCENT_STORAGE_KEY = "heraclesrecords.accentPalette";
@@ -18,8 +20,9 @@ export interface AccentPaletteColors {
 }
 
 export interface AccentPaletteDetail {
-  label: string;
-  description: string;
+  /** In the language on screen. */
+  readonly label: string;
+  readonly description: string;
   /** Swatch stops, dark theme. Mirrors --accent / --accent-2 for that palette. */
   swatch: [string, string];
   dark: AccentPaletteColors;
@@ -37,36 +40,56 @@ export const ACCENT_PALETTES: AccentPalette[] = [
 export const ACCENT_PALETTE_DETAILS: Record<AccentPalette, AccentPaletteDetail> =
   {
     gold: {
-      label: "Heracles Gold",
-      description: "Burnished gold, earned one labour at a time.",
+      get label() {
+        return t("palette.gold.label");
+      },
+      get description() {
+        return t("palette.gold.description");
+      },
       swatch: ["#e7b04c", "#c78f38"],
       dark: { accent: "#e7b04c", strong: "#f3bf5c" },
       paper: { accent: "#915e13", strong: "#734a0e" }
     },
     teal: {
-      label: "Original Teal",
-      description: "Deep, calm water for the steady miles.",
+      get label() {
+        return t("palette.teal.label");
+      },
+      get description() {
+        return t("palette.teal.description");
+      },
       swatch: ["#2fbe91", "#1fb6a6"],
       dark: { accent: "#2fbe91", strong: "#4fd6a6" },
       paper: { accent: "#0f7859", strong: "#0c674d" }
     },
     indigo: {
-      label: "Indigo",
-      description: "Night-run blue, easy on the eyes after dark.",
+      get label() {
+        return t("palette.indigo.label");
+      },
+      get description() {
+        return t("palette.indigo.description");
+      },
       swatch: ["#818cf8", "#6470e2"],
       dark: { accent: "#818cf8", strong: "#96a0fa" },
       paper: { accent: "#535ec8", strong: "#3d46a6" }
     },
     rose: {
-      label: "Rose",
-      description: "The warm flush of a hard effort.",
+      get label() {
+        return t("palette.rose.label");
+      },
+      get description() {
+        return t("palette.rose.description");
+      },
       swatch: ["#fb7185", "#e2596f"],
       dark: { accent: "#fb7185", strong: "#fc8b9b" },
       paper: { accent: "#be384b", strong: "#9c2537" }
     },
     sky: {
-      label: "Sky",
-      description: "A clear morning sky, crisp in light mode.",
+      get label() {
+        return t("palette.sky.label");
+      },
+      get description() {
+        return t("palette.sky.description");
+      },
       swatch: ["#38bdf8", "#22a3e0"],
       dark: { accent: "#38bdf8", strong: "#5ecbfa" },
       paper: { accent: "#0070a2", strong: "#00587f" }

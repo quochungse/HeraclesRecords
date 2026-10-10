@@ -1,5 +1,6 @@
 import { PanelRightClose, PanelRightOpen } from "lucide-react";
 import { useEffect, useRef, useState, type ReactNode } from "react";
+import { t } from "../i18n/core";
 
 /**
  * The head of the open conversation (Coach Workbench review, R1): its name,
@@ -61,7 +62,7 @@ export function ChatConversationHeader({
             id="chat-conversation-title-input"
             className="chat-conversation-title-input"
             value={draft}
-            aria-label="Conversation name"
+            aria-label={t("chat.header.name")}
             onChange={(event) => setDraft(event.target.value)}
             onBlur={commit}
             onKeyDown={(event) => {
@@ -79,7 +80,7 @@ export function ChatConversationHeader({
             data-action="renameConversation"
             onClick={() => onRename && setEditing(true)}
             disabled={!onRename}
-            title={onRename ? "Rename this conversation" : undefined}
+            title={onRename ? t("chat.header.rename") : undefined}
           >
             {title}
           </button>
@@ -100,10 +101,10 @@ export function ChatConversationHeader({
           onClick={onToggleCreations}
           title={
             creations === 0
-              ? "Nothing made in this conversation yet"
+              ? t("chat.header.nothingMade")
               : creationsOpen
-                ? "Close the Workbench"
-                : "Open the Workbench: what Coach made here"
+                ? t("chat.header.closeWorkbench")
+                : t("chat.header.openWorkbench")
           }
         >
           {creationsOpen ? (
@@ -111,7 +112,7 @@ export function ChatConversationHeader({
           ) : (
             <PanelRightOpen size={13} aria-hidden="true" />
           )}
-          Workbench
+          {t("chat.header.workbench")}
           <span className="chat-creations-count">{creations}</span>
         </button>
         {trailing}

@@ -1,3 +1,6 @@
+import type { ReactNode } from "react";
+import { renderRich } from "../i18n/useI18n";
+import { exerciseLabel } from "./strengthAnalytics";
 import { useMemo, useState } from "react";
 import { ArrowUpRight, ChevronRight, Info, MessageCircle, Trophy } from "lucide-react";
 import type { CoachOpenRequest, StrengthSession, UnitSystem } from "../../electron/types";
@@ -18,15 +21,19 @@ import {
   formatTotalWeight,
   sessionSourceLabel
 } from "./strengthFormat";
+import { formatCount, formatDecimal, getIntlLocale, plural, t } from "../i18n/core";
 
 /** Sessions this short open with every exercise's sets showing; longer ones start folded. */
 const EXPANDED_EXERCISE_LIMIT = 3;
 
-const SET_TYPE_TAGS: Record<string, { tag: string; label: string }> = {
-  warmup: { tag: "W", label: "Warm-up" },
-  dropset: { tag: "D", label: "Drop set" },
-  failure: { tag: "F", label: "To failure" }
-};
+const SET_TYPES = new Set(["warmup", "dropset", "failure"]);
+
+/** A set's type as a one-letter tag and its name, in the language on screen. */
+function setTypeTag(type: string): { tag: string; label: string } | undefined {
+  if (!SET_TYPES.has(type)) return undefined;
+  const kind = type as "warmup" | "dropset" | "failure";
+  return { tag: t(`strength.setType.${kind}.tag` as const), label: t(`strength.setType.${kind}` as const) };
+}
 
 interface RecordGroup {
   exercise: string;
@@ -45,19 +52,34 @@ function groupRecords(records: SessionPersonalRecord[]): RecordGroup[] {
   return [...groups.values()];
 }
 
+const RECORD_TAGS = {
+  b: (chunk: ReactNode) => <strong>{chunk}</strong>,
+  em: (chunk: ReactNode) => <em>{chunk}</em>
+};
+
 function RecordFigures({ group, unitSystem }: { group: RecordGroup; unitSystem: UnitSystem }) {
   return (
     <span className="strength-session-record-figures">
       {group.weight ? (
         <span>
-          Heaviest set <strong>{formatLiftWeight(group.weight.valueKg, unitSystem)}</strong>
-          <em>was {formatLiftWeight(group.weight.previousKg, unitSystem)}</em>
+          {renderRich(
+            t("strength.record.heaviest", {
+              value: formatLiftWeight(group.weight.valueKg, unitSystem),
+              previous: formatLiftWeight(group.weight.previousKg, unitSystem)
+            }),
+            RECORD_TAGS
+          )}
         </span>
       ) : null}
       {group.e1rm ? (
         <span>
-          Est. max <strong>{formatLiftWeight(group.e1rm.valueKg, unitSystem)}</strong>
-          <em>was {formatLiftWeight(group.e1rm.previousKg, unitSystem)}</em>
+          {renderRich(
+            t("strength.record.e1rm", {
+              value: formatLiftWeight(group.e1rm.valueKg, unitSystem),
+              previous: formatLiftWeight(group.e1rm.previousKg, unitSystem)
+            }),
+            RECORD_TAGS
+          )}
         </span>
       ) : null}
     </span>
@@ -120,29 +142,29 @@ function ExerciseTable({ rows, explorable, onOpenExercise, unitSystem }: Exercis
               >
                 <ChevronRight className="strength-session-exercise-chevron" size={15} aria-hidden="true" />
                 <span className="strength-session-exercise-name">
-                  <strong>{row.name}</strong>
+                  <strong>{exerciseLabel(row.name)}</strong>
                   {row.records.length > 0 ? (
-                    <span className="strength-session-record-badge" title="Beat every earlier session in the window">
+                    <span className="strength-session-record-badge" title={t("strength.record.badgeTitle")}>
                       <Trophy size={10} aria-hidden="true" />
-                      PR
+                      {t("strength.pr")}
                     </span>
                   ) : null}
                 </span>
                 <span className="strength-session-exercise-facts">
-                  {row.sets.length} set{row.sets.length === 1 ? "" : "s"} · {row.reps} reps
+                  {plural("strength.sets", row.sets.length)} · {plural("strength.reps", row.reps)}
                 </span>
                 <span className="strength-session-exercise-top">
                   {row.topSet
                     ? `${formatLiftWeight(row.topSet.weightKg, unitSystem)} × ${row.topSet.reps}`
-                    : "Bodyweight"}
+                    : t("strength.bodyweight")}
                 </span>
               </button>
               {explorable.has(row.name) ? (
                 <button
                   type="button"
                   className="strength-session-exercise-explore"
-                  aria-label={`Explore ${row.name}`}
-                  title="Open in Exercise Explorer"
+                  aria-label={t("strength.explore", { name: exerciseLabel(row.name) })}
+                  title={t("strength.exploreTitle")}
                   onClick={() => onOpenExercise(row.name)}
                 >
                   <ArrowUpRight size={14} aria-hidden="true" />
@@ -155,17 +177,17 @@ function ExerciseTable({ rows, explorable, onOpenExercise, unitSystem }: Exercis
                 <table>
                   <thead>
                     <tr>
-                      <th scope="col">Set</th>
-                      <th scope="col">Reps</th>
-                      {hasWeight ? <th scope="col">Weight</th> : null}
-                      {hasE1rm ? <th scope="col">Est. max</th> : null}
-                      {hasRest ? <th scope="col">Rest</th> : null}
-                      {hasRpe ? <th scope="col">RPE</th> : null}
+                      <th scope="col">{t("strength.col.set")}</th>
+                      <th scope="col">{t("strength.col.reps")}</th>
+                      {hasWeight ? <th scope="col">{t("strength.col.weight")}</th> : null}
+                      {hasE1rm ? <th scope="col">{t("strength.col.e1rm")}</th> : null}
+                      {hasRest ? <th scope="col">{t("strength.col.rest")}</th> : null}
+                      {hasRpe ? <th scope="col">{t("strength.col.rpe")}</th> : null}
                     </tr>
                   </thead>
                   <tbody>
                     {row.sets.map((set, index) => {
-                      const tag = SET_TYPE_TAGS[set.type];
+                      const tag = setTypeTag(set.type);
                       return (
                         <tr key={index} data-type={set.type}>
                           <td>
@@ -230,7 +252,7 @@ export function StrengthSessionHeader({ entry, showSource, onAskCoach }: Strengt
             {formatSessionDate(session.startTime)}
             {source ? ` · ${source}` : ""}
           </p>
-          <h3>{session.name?.trim() || "Strength session"}</h3>
+          <h3>{session.name?.trim() || t("strength.untitled")}</h3>
         </div>
         {onAskCoach ? (
           <button
@@ -243,7 +265,7 @@ export function StrengthSessionHeader({ entry, showSource, onAskCoach }: Strengt
                     // A session only Hevy knows has no COROS id for Coach's tools.
                     activityId: session.sourceIds?.coros ?? (session.source === "hevy" ? undefined : session.activityId),
                     name: session.name,
-                    sportName: session.sportName ?? "Strength",
+                    sportName: session.sportName ?? t("nav.strength"),
                     sportType: session.sportType,
                     startTime: session.startTime,
                     duration: session.duration
@@ -254,60 +276,64 @@ export function StrengthSessionHeader({ entry, showSource, onAskCoach }: Strengt
             }
           >
             <MessageCircle size={15} aria-hidden="true" />
-            Ask Coach
+            {t("activity.askCoach")}
           </button>
         ) : null}
       </div>
 
       <div className="strength-session-stats">
-        <Stat label="Duration" value={formatSpan(stats.durationSec)} />
+        <Stat label={t("activity.m.duration")} value={formatSpan(stats.durationSec)} />
         <Stat
-          label="Working sets"
+          label={t("strength.stat.workingSets")}
           value={String(stats.workingSets)}
           caption={
             stats.warmupSets > 0
-              ? `+ ${stats.warmupSets} warm-up`
-              : `${stats.reps.toLocaleString()} reps`
+              ? t("strength.stat.warmups", { count: stats.warmupSets })
+              : plural("strength.reps", stats.reps)
           }
         />
         <Stat
-          label="Weight lifted"
-          value={stats.volumeKg > 0 ? formatTotalWeight(stats.volumeKg, unitSystem) : "Bodyweight"}
+          label={t("strength.summary.lifted")}
+          value={stats.volumeKg > 0 ? formatTotalWeight(stats.volumeKg, unitSystem) : t("strength.bodyweight")}
         />
         {stats.densityKgPerMin !== undefined ? (
           <Stat
-            label="Density"
+            label={t("strength.stat.density")}
             value={`${formatLiftWeight(Math.round(stats.densityKgPerMin), unitSystem)}/min`}
           />
         ) : null}
         {stats.restPerWork !== undefined ? (
           <Stat
-            label="Work : rest"
-            value={`1 : ${stats.restPerWork.toFixed(1)}`}
-            caption="Rest per second of work"
+            label={t("strength.stat.workRest")}
+            value={`1 : ${formatDecimal(stats.restPerWork, 1)}`}
+            caption={t("strength.stat.workRestCaption")}
           />
         ) : null}
         {stats.avgHr !== undefined ? (
           <Stat
-            label="Heart rate"
+            label={t("activity.m.heartRate")}
             value={`${Math.round(stats.avgHr)} bpm`}
-            caption={stats.maxHr !== undefined ? `Max ${Math.round(stats.maxHr)}` : "Average"}
+            caption={
+              stats.maxHr !== undefined
+                ? t("strength.stat.max", { value: Math.round(stats.maxHr) })
+                : t("strength.stat.average")
+            }
           />
         ) : null}
         {stats.trainingLoad !== undefined ? (
-          <Stat label="Training load" value={String(Math.round(stats.trainingLoad))} />
+          <Stat label={t("activity.m.trainingLoad")} value={String(Math.round(stats.trainingLoad))} />
         ) : null}
         {stats.calories !== undefined ? (
-          <Stat label="Calories" value={`${Math.round(stats.calories).toLocaleString()} kcal`} />
+          <Stat label={t("activity.m.calories")} value={`${formatCount(Math.round(stats.calories))} kcal`} />
         ) : null}
       </div>
 
       {recordGroups.length > 0 ? (
-        <ul className="strength-session-records" aria-label="Records set in this session">
+        <ul className="strength-session-records" aria-label={t("strength.recordsSet")}>
           {recordGroups.map((group) => (
             <li key={group.exercise}>
               <Trophy size={14} aria-hidden="true" />
-              <strong>{group.exercise}</strong>
+              <strong>{exerciseLabel(group.exercise)}</strong>
               <RecordFigures group={group} unitSystem={unitSystem} />
             </li>
           ))}
@@ -328,15 +354,18 @@ export function StrengthSessionCoverage({ entry }: { entry: SessionAnalytics }) 
     return null;
   }
   const left = [
-    generic > 0 ? `${generic} COROS recorded only as Full Body` : "",
-    unmapped > 0 ? `${unmapped} from exercises we don't recognise` : ""
+    generic > 0 ? t("strength.coverage.generic", { count: generic }) : "",
+    unmapped > 0 ? t("strength.coverage.unmapped", { count: unmapped }) : ""
   ].filter(Boolean);
   return (
     <p className="strength-notice is-attribution" role="note">
       <Info size={15} aria-hidden="true" />
       <span>
-        The map places {attributed} of {working} working sets on specific muscles. The other{" "}
-        {working - attributed} {working - attributed === 1 ? "is" : "are"} left out: {left.join(", ")}.
+        {plural("strength.coverage.note", working - attributed, {
+          attributed,
+          working,
+          reasons: new Intl.ListFormat(getIntlLocale(), { type: "conjunction" }).format(left)
+        })}
       </span>
     </p>
   );
@@ -362,14 +391,12 @@ export function StrengthSessionExercises({
     <section className="panel strength-card strength-session-exercise-card">
       <div className="strength-card-head">
         <div>
-          <h3>Exercises</h3>
-          <p>
-            {rows.length} exercise{rows.length === 1 ? "" : "s"}, in the order you did them.
-          </p>
+          <h3>{t("strength.exercises.title")}</h3>
+          <p>{plural("strength.exercises.count", rows.length)}</p>
         </div>
       </div>
       {rows.length === 0 ? (
-        <p className="strength-empty">This session has no sets recorded.</p>
+        <p className="strength-empty">{t("strength.exercises.none")}</p>
       ) : (
         <ExerciseTable
           key={entry.session.activityId}
@@ -397,10 +424,9 @@ export function StrengthAggregateHeader({
   return (
     <header className="panel strength-card strength-session-detail-head">
       <p className="eyebrow">{windowLabel}</p>
-      <h3>All sessions</h3>
+      <h3>{t("strength.allSessions")}</h3>
       <p className="strength-session-detail-sub">
-        {sessionCount} session{sessionCount === 1 ? "" : "s"} in {windowPhrase}, muscle by muscle.
-        Pick one to see what it trained.
+        {plural("strength.aggregate.sub", sessionCount, { window: windowPhrase })}
       </p>
     </header>
   );
@@ -438,13 +464,13 @@ export function StrengthAggregateRecords({
     <section className="panel strength-card strength-session-records-card">
       <div className="strength-card-head">
         <div>
-          <h3>Records</h3>
-          <p>Lifts that beat every earlier session of the same exercise in {windowPhrase}.</p>
+          <h3>{t("strength.records.title")}</h3>
+          <p>{t("strength.records.sub", { window: windowPhrase })}</p>
         </div>
       </div>
       {recordRows.length === 0 ? (
         <p className="strength-empty">
-          None yet — a record needs an earlier session of the same lift to beat.
+          {t("strength.records.none")}
         </p>
       ) : (
         <ul className="strength-session-records is-list">
@@ -452,7 +478,7 @@ export function StrengthAggregateRecords({
             <li key={`${session.activityId}-${group.exercise}`}>
               <button type="button" onClick={() => onSelectSession(session.activityId)}>
                 <Trophy size={14} aria-hidden="true" />
-                <strong>{group.exercise}</strong>
+                <strong>{exerciseLabel(group.exercise)}</strong>
                 <RecordFigures group={group} unitSystem={unitSystem} />
                 <span className="strength-session-record-date">
                   {formatSessionDate(session.startTime)}

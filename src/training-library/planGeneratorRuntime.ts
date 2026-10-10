@@ -27,6 +27,7 @@ import {
   supportsReasoningEffort,
   type ChatModelOption
 } from "../../electron/chatModels";
+import { t } from "../i18n/core";
 
 /** The order the provider list reads in: the two Claude paths first. */
 export const GENERATOR_PROVIDERS: readonly ChatProvider[] = ["claude-code", "claude-api", "chatgpt", "openrouter", "local"];
@@ -119,15 +120,15 @@ export function modelChipLabel(label: string): string {
 export function runtimeSummary(runtime: GeneratorRuntime, options: readonly ChatModelOption[]): string {
   const listed = options.find((option) => option.value === runtime.model);
   const model = runtime.provider === "local"
-    ? runtime.model.trim() || "No model chosen"
+    ? runtime.model.trim() || t("library.runtime.noModel")
     : listed
       ? modelChipLabel(listed.label)
-      : describeChatModel(runtime.model) || "Default model";
+      : describeChatModel(runtime.model) || t("library.runtime.defaultModel");
   if (!supportsReasoningEffort(runtime.provider)) return model;
   // The level a request will carry, which is not always the one chosen: a
   // model that stops at High answers a "Max" conversation at High.
   const level = effortForModel(runtime.effort, listed?.efforts);
   if (!level) return model;
   const effort = REASONING_EFFORT_OPTIONS.find((option) => option.value === level)?.label ?? level;
-  return `${model} · ${effort} effort`;
+  return t("library.runtime.effort", { model, effort });
 }

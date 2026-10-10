@@ -30,6 +30,10 @@ import {
   useRecordsBackfill,
   type HallOfRecordsState
 } from "./useHallOfRecords";
+import { plural, t, weekdayNames } from "../i18n/core";
+import { useI18n } from "../i18n/useI18n";
+import { labourCategory, labourMyth, labourName, labourShort, labourStage } from "./labourWords";
+import type { LabourId } from "./labours";
 import "./records.css";
 
 export type RecordsTab = "timeline" | "labours";
@@ -53,7 +57,11 @@ interface HallOfRecordsViewProps {
   onTabRequestHandled?: () => void;
 }
 
-const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+/** Short weekday names Sunday first, as `Date.getDay` counts. */
+function weekdayOf(date: Date): string {
+  const monday = weekdayNames("short");
+  return monday[(date.getDay() + 6) % 7] ?? "";
+}
 const TOTAL_STAGES = 36;
 
 /**
@@ -78,6 +86,7 @@ export function HallOfRecordsView({
   requestedTab,
   onTabRequestHandled
 }: HallOfRecordsViewProps) {
+  const { locale } = useI18n();
   const [tab, setTab] = useState<RecordsTab>(requestedTab ?? "timeline");
   useEffect(() => {
     if (!requestedTab) return;
@@ -113,7 +122,8 @@ export function HallOfRecordsView({
   );
   const timeline = useMemo(
     () => foldTimeline(groupTimeline(shown), openGaps, openMonths),
-    [shown, openGaps, openMonths]
+    // The month names are words: a language switch draws them again.
+    [shown, openGaps, openMonths, locale]
   );
 
   // A stage's date on the Labours tab jumps to the milestone that reached it.
@@ -152,18 +162,18 @@ export function HallOfRecordsView({
       <section className="records-view">
         <header className="records-page-header">
           <div>
-            <h1>Hall of Records</h1>
-            <p>Every milestone of your training, and the Twelve Labours.</p>
+            <h1>{t("records.title")}</h1>
+            <p>{t("records.subtitle")}</p>
           </div>
         </header>
         <section className="panel data-connect-panel">
           <LockKeyhole size={24} aria-hidden="true" />
           <div>
-            <h3>Connect COROS first</h3>
-            <p>Your milestones are worked out from your COROS activity history.</p>
+            <h3>{t("common.connectFirst.title")}</h3>
+            <p>{t("records.connectBody")}</p>
           </div>
           <button type="button" className="primary-button" onClick={onOpenOverview}>
-            Open Overview
+            {t("common.openOverview")}
           </button>
         </section>
       </section>
@@ -174,22 +184,22 @@ export function HallOfRecordsView({
     <section className="records-view">
       <header className="records-page-header">
         <div>
-          <h1>Hall of Records</h1>
+          <h1>{t("records.title")}</h1>
           <p>
             {ready && first
-              ? `${result.milestones.length} milestones since ${formatDayShort(first.day)} · ${reachedStages} of ${TOTAL_STAGES} labour stages`
+              ? `${plural("records.since", result.milestones.length, { day: formatDayShort(first.day) })} · ${t("records.stagesOf", { n: reachedStages, total: TOTAL_STAGES })}`
               : ready || records.failed
-                ? "Every milestone of your training, and the Twelve Labours."
-                : "Reading your history…"}
+                ? t("records.subtitle")
+                : t("records.reading")}
           </p>
         </div>
         <OptionGroup<RecordsTab>
-          label="Hall of Records sections"
+          label={t("records.sections")}
           value={tab}
           onChange={setTab}
           options={[
-            { value: "timeline", label: "Timeline" },
-            { value: "labours", label: "The Twelve Labours" }
+            { value: "timeline", label: t("records.tab.timeline") },
+            { value: "labours", label: t("records.tab.labours") }
           ]}
         />
       </header>
@@ -200,8 +210,8 @@ export function HallOfRecordsView({
       {backfill.remaining !== undefined && backfill.remaining > 0 ? (
         <p className="records-backfill" role="status">
           {backfill.paused
-            ? `${backfill.remaining} older activities still to read for records and places — the rest on your next visit.`
-            : `Reading ${backfill.remaining} older activities for records and places…`}
+            ? plural("records.backfill.paused", backfill.remaining)
+            : plural("records.backfill.reading", backfill.remaining)}
         </p>
       ) : null}
 
@@ -209,11 +219,8 @@ export function HallOfRecordsView({
         <section className="panel data-connect-panel">
           <CloudOff size={24} aria-hidden="true" />
           <div>
-            <h3>Your activities did not load</h3>
-            <p>
-              COROS did not return the activity list the hall is worked out from. This is
-              usually the connection; nothing on this machine was lost.
-            </p>
+            <h3>{t("records.failed.title")}</h3>
+            <p>{t("records.failed.body")}</p>
           </div>
           {onRetryActivities ? (
             <button
@@ -223,7 +230,7 @@ export function HallOfRecordsView({
               onClick={onRetryActivities}
             >
               <RefreshCw size={14} aria-hidden="true" className={retrying ? "spin" : undefined} />
-              {retrying ? "Loading" : "Try again"}
+              {retrying ? t("records.loading") : t("common.tryAgain")}
             </button>
           ) : null}
         </section>
@@ -231,8 +238,8 @@ export function HallOfRecordsView({
         <RecordsSkeleton />
       ) : result.milestones.length === 0 ? (
         <section className="panel records-empty">
-          <h2>The hall is empty, for now</h2>
-          <p>Your first activity on COROS opens it.</p>
+          <h2>{t("records.empty.title")}</h2>
+          <p>{t("records.empty.body")}</p>
         </section>
       ) : tab === "timeline" ? (
         <>
@@ -243,7 +250,7 @@ export function HallOfRecordsView({
           {filters.length > 2 ? (
             <OptionGroup<TimelineFilter>
               className="records-filters"
-              label="Show"
+              label={t("records.show")}
               value={filter}
               onChange={setFilter}
               options={filters.map((value) => ({ value, label: FILTER_LABELS[value] }))}
@@ -254,9 +261,7 @@ export function HallOfRecordsView({
             <section key={year.year} className="records-year" aria-labelledby={`records-year-${year.year}`}>
               <div className="records-year-head">
                 <h2 id={`records-year-${year.year}`}>{year.year}</h2>
-                <span>
-                  {year.count} {year.count === 1 ? "milestone" : "milestones"}
-                </span>
+                <span>{plural("records.milestones", year.count)}</span>
               </div>
               <div className="records-line">
                 {blocks.map((block) =>
@@ -270,9 +275,7 @@ export function HallOfRecordsView({
                         onClick={() => setOpenGaps((current) => new Set(current).add(block.id))}
                       >
                         <strong>{block.label}</strong>
-                        <span>
-                          {block.count} {block.count === 1 ? "milestone" : "milestones"}
-                        </span>
+                        <span>{plural("records.milestones", block.count)}</span>
                         {block.note ? <em>{block.note}</em> : null}
                         <ChevronDown size={14} aria-hidden="true" />
                       </button>
@@ -329,7 +332,7 @@ function WithinReachRow({
   return (
     <section className="records-reach" aria-labelledby="records-reach-title">
       <h2 id="records-reach-title" className="records-section-label">
-        Within reach
+        {t("records.withinReach")}
       </h2>
       <div className="records-reach-grid">
         {items.map((item) => (
@@ -396,7 +399,7 @@ function MonthBlock({
         <div className="records-month-head">
           <h3 className="records-month">{month.label}</h3>
           <span>
-            {month.milestones.length} {month.milestones.length === 1 ? "milestone" : "milestones"}
+            {plural("records.monthCount", month.milestones.length)}
           </span>
         </div>
       </div>
@@ -414,7 +417,7 @@ function MonthBlock({
             <span aria-hidden="true" />
             <span aria-hidden="true" />
             <button type="button" className="records-more" onClick={onExpand}>
-              <strong>{entry.hidden.length} more</strong>
+              <strong>{t("records.more", { n: entry.hidden.length })}</strong>
               <span>
                 {entry.hidden
                   .slice(0, 2)
@@ -448,7 +451,7 @@ function MilestoneTitle({
       type="button"
       className={`${className} records-title-link`}
       onClick={() => onOpenActivity(activity)}
-      title="Open this session"
+      title={t("records.openSession")}
     >
       {milestone.title}
     </button>
@@ -472,21 +475,23 @@ function LabourBadge({
   const completing =
     labour.complete &&
     labour.stages.every((stage) => stage.reached && stage.reached.day <= milestone.day);
-  const stageText = completing ? "Labour complete" : `Labour ${STAGE_NUMERALS[tag.stage]} of III`;
+  const stageText = completing
+    ? t("records.labourComplete")
+    : t("records.labourStage", { stage: STAGE_NUMERALS[tag.stage] });
   return (
     <span
       className={`records-badge ${large ? "is-large" : ""} ${completing ? "is-complete" : ""}`}
-      title={`${labour.definition.name} — ${stageText}`}
+      title={`${labourName(tag.id)} — ${stageText}`}
     >
       <LabourEmblem id={tag.id} reached={completing ? 3 : Math.min(tag.stage, 2)} size={large ? "tag" : "badge"} />
       {large ? (
         <span className="records-badge-text">
-          <strong>{labour.definition.name}</strong>
+          <strong>{labourName(tag.id)}</strong>
           <span>{stageText}</span>
         </span>
       ) : (
         <span className="records-badge-text">
-          {labour.definition.short} <strong>{STAGE_NUMERALS[tag.stage]}</strong>
+          {labourShort(tag.id)} <strong>{STAGE_NUMERALS[tag.stage]}</strong>
         </span>
       )}
     </span>
@@ -515,7 +520,7 @@ function MilestoneSlot({
     >
       <div className="records-date">
         <span className="figure">{date.getDate()}</span>
-        <span>{WEEKDAYS[date.getDay()]}</span>
+        <span>{weekdayOf(date)}</span>
       </div>
       <span className={`records-node is-${kind} is-${sport}`} aria-hidden="true" />
       {kind === "card" ? (
@@ -524,7 +529,7 @@ function MilestoneSlot({
             <div>
               <p className="records-eyebrow">
                 {milestone.kind}
-                {isNew ? <span className="records-new">New</span> : null}
+                {isNew ? <span className="records-new">{t("records.new")}</span> : null}
               </p>
               <MilestoneTitle
                 milestone={milestone}
@@ -556,7 +561,7 @@ function MilestoneSlot({
           <div>
             <p className={`records-eyebrow ${isStart ? "is-start" : ""}`}>
               {milestone.kind}
-              {isNew ? <span className="records-new">New</span> : null}
+              {isNew ? <span className="records-new">{t("records.new")}</span> : null}
             </p>
             <MilestoneTitle
               milestone={milestone}
@@ -593,24 +598,22 @@ function LaboursBoard({
         </span>
         <div className="records-apotheosis-copy">
           <h2 id="records-apotheosis-title" className="records-section-label is-accent">
-            Apotheosis
+            {t("records.apotheosis")}
           </h2>
           <p className="records-apotheosis-count">
             <span className="figure">{reachedStages}</span>
-            <span>
-              of {TOTAL_STAGES} stages · {completeLabours} of 12 labours complete
-            </span>
+            <span>{t("records.apotheosisCount", { total: TOTAL_STAGES, complete: completeLabours })}</span>
           </p>
           <p className="records-apotheosis-note">
-            Complete all twelve and Heracles takes his place on Olympus.
+            {t("records.apotheosisNote")}
           </p>
         </div>
-        <div className="records-pips" aria-label="Stages reached, by labour">
+        <div className="records-pips" aria-label={t("records.pipsAria")}>
           {labours.map((labour) => (
             <span
               key={labour.definition.id}
               className="records-pip-column"
-              title={`${labour.definition.name} — ${labour.reached} of 3`}
+              title={`${labourName(labour.definition.id)} — ${t("records.reachedOf", { n: labour.reached })}`}
             >
               {[1, 2, 3].map((index) => (
                 <span key={index} className={index <= labour.reached ? "is-reached" : ""} />
@@ -645,15 +648,15 @@ function LabourCard({
       <div className="records-labour-head">
         <LabourEmblem id={definition.id} reached={labour.reached} size="card" />
         <div>
-          <p className="records-eyebrow">{definition.category}</p>
-          <h3 id={`labour-${definition.id}`}>{definition.name}</h3>
+          <p className="records-eyebrow">{labourCategory(definition.id)}</p>
+          <h3 id={`labour-${definition.id}`}>{labourName(definition.id)}</h3>
           <div className="records-labour-status">
             {labour.complete ? (
-              <span className="records-complete">Complete</span>
+              <span className="records-complete">{t("records.complete")}</span>
             ) : (
               <>
                 <span className="records-stage-count figure">
-                  {labour.reached > 0 ? STAGE_NUMERALS[labour.reached as 1 | 2] : "0"} / III
+                  {labour.reached > 0 ? STAGE_NUMERALS[labour.reached as 1 | 2] : "0"} / III{/* i18n-ignore: numerals */}
                 </span>
                 <span className="records-labour-pips" aria-hidden="true">
                   {[1, 2, 3].map((index) => (
@@ -665,11 +668,12 @@ function LabourCard({
           </div>
         </div>
       </div>
-      <p className="records-myth">{definition.myth}</p>
+      <p className="records-myth">{labourMyth(definition.id)}</p>
       <ol className="records-stages">
         {labour.stages.map((stage) => (
           <StageRow
             key={stage.stage}
+            labourId={definition.id}
             stage={stage}
             current={!stage.reached && labour.stages.find((candidate) => !candidate.reached) === stage}
             onShowMilestone={onShowMilestone}
@@ -681,10 +685,12 @@ function LabourCard({
 }
 
 function StageRow({
+  labourId,
   stage,
   current,
   onShowMilestone
 }: {
+  labourId: LabourId;
   stage: LabourStageState;
   current: boolean;
   onShowMilestone: (id: string) => void;
@@ -696,13 +702,13 @@ function StageRow({
       <span className="records-stage-pip">{STAGE_NUMERALS[stage.stage]}</span>
       <div>
         <div className="records-stage-line">
-          <span className="records-stage-title">{stage.title}</span>
+          <span className="records-stage-title">{labourStage(labourId, stage.stage)}</span>
           {reached ? (
             <button
               type="button"
               className="records-stage-date"
               onClick={() => onShowMilestone(reached.milestoneId)}
-              title="Show it on the timeline"
+              title={t("records.showOnTimeline")}
             >
               {formatDayShort(reached.day)}
             </button>

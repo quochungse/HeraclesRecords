@@ -11,6 +11,7 @@ import {
   isHikeSportType,
   type HikeType
 } from "./hikeType";
+import { getIntlLocale } from "../i18n/core";
 
 // "The last N weeks" is one definition across the sport screens — calendar
 // weeks from a Monday, this one included — owned by the run module; see
@@ -158,7 +159,7 @@ export function summariseHikes(
 }
 
 function weekLabel(weekStartMs: number): string {
-  return new Date(weekStartMs).toLocaleDateString(undefined, {
+  return new Date(weekStartMs).toLocaleDateString(getIntlLocale(), {
     month: "short",
     day: "numeric"
   });

@@ -2,6 +2,8 @@ import { useEffect, useState } from "react";
 import { Bug, Check, Copy, ExternalLink, Loader2, X } from "lucide-react";
 import type { DiagnosticsSnapshot } from "../../electron/diagnosticsTypes";
 import type { HeraclesRecordsApi } from "../heraclesrecords-api";
+import { plural, t } from "../i18n/core";
+import { useI18n } from "../i18n/useI18n";
 
 const NEW_ISSUE_URL = "https://github.com/quochungse/HeraclesRecords/issues/new";
 
@@ -21,6 +23,7 @@ export function ReportIssueDialog({
   open: boolean;
   onClose: () => void;
 }) {
+  useI18n();
   const [snapshot, setSnapshot] = useState<DiagnosticsSnapshot | null>(null);
   const [copying, setCopying] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -34,7 +37,7 @@ export function ReportIssueDialog({
     void api.getDiagnostics().then((next) => {
       if (active) setSnapshot(next);
     }).catch(() => {
-      if (active) setError("Could not read the error log.");
+      if (active) setError(t("report.readFailed"));
     });
     return () => {
       active = false;
@@ -60,7 +63,7 @@ export function ReportIssueDialog({
       setCopied(true);
     } catch {
       setCopied(false);
-      setError("Could not copy the error log. Try again.");
+      setError(t("report.copyFailed"));
     } finally {
       setCopying(false);
     }
@@ -74,11 +77,11 @@ export function ReportIssueDialog({
 
   const logLine = snapshot
     ? snapshot.entryCount === 0
-      ? "No errors recorded in the last 7 days."
-      : `${snapshot.entryCount} ${snapshot.entryCount === 1 ? "error" : "errors"} recorded in the last 7 days.`
+      ? t("report.none")
+      : plural("report.count", snapshot.entryCount)
     : error
       ? ""
-      : "Reading the error log…";
+      : t("report.reading");
 
   return (
     <div
@@ -95,24 +98,19 @@ export function ReportIssueDialog({
         <header className="app-modal-header">
           <div className="app-modal-title">
             <Bug size={16} aria-hidden="true" />
-            <h2 id="report-issue-title">Report an issue</h2>
+            <h2 id="report-issue-title">{t("report.title")}</h2>
           </div>
           <button
             type="button"
             className="icon-button"
-            aria-label="Close"
+            aria-label={t("common.close")}
             onClick={onClose}
           >
             <X size={18} aria-hidden="true" />
           </button>
         </header>
         <div className="app-modal-body">
-          <p className="app-modal-copy">
-            Issues are filed on GitHub. If something failed, copy the error log
-            first and paste it into the issue. It holds recent errors and app
-            details, with credentials, email addresses and local paths taken
-            out, and it stays on this computer until you paste it.
-          </p>
+          <p className="app-modal-copy">{t("report.body")}</p>
           <div className="report-issue-log">
             <span>{logLine}</span>
             <button
@@ -128,12 +126,12 @@ export function ReportIssueDialog({
               ) : (
                 <Copy size={15} aria-hidden="true" />
               )}
-              {copied ? "Copied" : "Copy error log"}
+              {copied ? t("report.copied") : t("report.copy")}
             </button>
           </div>
           {snapshot && !snapshot.persistent ? (
             <p className="report-issue-error" role="status">
-              The log could not be saved to disk, so it holds this session only.
+              {t("report.notPersistent")}
             </p>
           ) : null}
           {error ? (
@@ -144,10 +142,10 @@ export function ReportIssueDialog({
         </div>
         <footer className="app-modal-footer">
           <button className="secondary-button" type="button" onClick={onClose}>
-            Cancel
+            {t("common.cancel")}
           </button>
           <button className="primary-button" type="button" onClick={openIssue}>
-            Open issue on GitHub
+            {t("report.open")}
             <ExternalLink size={14} aria-hidden="true" />
           </button>
         </footer>

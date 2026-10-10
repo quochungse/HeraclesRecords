@@ -7,6 +7,7 @@ import {
   briefSpan,
   briefTitle
 } from "./planBriefModel";
+import { t } from "../i18n/core";
 
 /**
  * A plan brief under the answer that set it out (docs/coach-plan-canvas.md,
@@ -48,12 +49,12 @@ export function CoachBriefCard({
     <article className="chat-plan-card chat-creation-card chat-brief-card" data-artifact-id={brief.artifactId}>
       <header className="chat-creation-head">
         <div>
-          <span className="chat-creation-kicker">Plan brief</span>
+          <span className="chat-creation-kicker">{t("chat.brief.kicker")}</span>
           <h4>{briefTitle(brief.request)}</h4>
           <span className="chat-plan-card-summary">{briefSpan(brief.request)}</span>
         </div>
         <div className="chat-creation-head-aside">
-          <span className="chat-creation-status">Brief</span>
+          <span className="chat-creation-status">{t("chat.brief.status")}</span>
         </div>
       </header>
 
@@ -75,11 +76,11 @@ export function CoachBriefCard({
 
       {reads ? (
         <p className="chat-brief-reads">
-          Coach reads {reads.length ? reads.join(" · ") : "nothing of yours"} in this conversation
+          {t("chat.brief.reads", { reads: reads.length ? reads.join(" · ") : t("chat.header.readsNothing") })}
         </p>
       ) : null}
       {open.length ? (
-        <ul className="chat-brief-open" aria-label="Still open">
+        <ul className="chat-brief-open" aria-label={t("chat.brief.stillOpen")}>
           {open.map((problem) => (
             <li key={problem}>{problem}</li>
           ))}
@@ -90,12 +91,12 @@ export function CoachBriefCard({
         <div className="chat-plan-actions">
           {onDrawOutline ? (
             <button type="button" className="chat-plan-upload" disabled={busy} onClick={onDrawOutline}>
-              Draw the outline
+              {t("chat.step.drawOutline")}
             </button>
           ) : null}
           {onEdit ? (
             <button type="button" className="chat-plan-review" onClick={onEdit}>
-              {editing ? "Continue editing" : "Edit brief"}
+              {editing ? t("library.reader.continue") : t("chat.brief.edit")}
             </button>
           ) : null}
         </div>

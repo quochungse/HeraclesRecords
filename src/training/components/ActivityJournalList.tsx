@@ -14,8 +14,9 @@ import { epochMsFromCorosTime } from "../activityWindow";
 import { formatDurationSpan } from "../formatters";
 import { sportColorCategory } from "../sportColors";
 import { resolveSportName } from "../sportTypes";
-import { FEEL_LABELS, type ActivityFeelMap } from "../useActivityFeelTypes";
+import { feltLabel, type ActivityFeelMap } from "../useActivityFeelTypes";
 import { useUnitSystem } from "../../units/UnitSystemProvider";
+import { getIntlLocale, plural, t } from "../../i18n/core";
 
 interface ActivityJournalListProps {
   activities: TrainingHubActivity[];
@@ -60,7 +61,7 @@ function FeelFace({ rating }: { rating: number }) {
     <span
       className="activity-row-feel"
       data-feel={rating}
-      title={`Felt ${FEEL_LABELS[rating]?.toLowerCase() ?? rating}`}
+      title={feltLabel(rating) ?? String(rating)}
     >
       <Face size={14} aria-hidden="true" />
     </span>
@@ -82,10 +83,10 @@ function DateBlock({ startTime }: { startTime?: number }) {
   const date = new Date(at);
   return (
     <span className="activity-row-date" aria-hidden="true">
-      <em>{date.toLocaleDateString(undefined, { weekday: "short" })}</em>
+      <em>{date.toLocaleDateString(getIntlLocale(), { weekday: "short" })}</em>
       <strong>{date.getDate()}</strong>
       <i>
-        {date.toLocaleTimeString(undefined, {
+        {date.toLocaleTimeString(getIntlLocale(), {
           hour: "numeric",
           minute: "2-digit"
         })}
@@ -181,7 +182,7 @@ export function ActivityJournalList({
             <span>{activityWeekHeading(group.weekStartMs, nowMs)}</span>
             <span className="activity-journal-week-facts">
               <span>
-                {group.count} {group.count === 1 ? "session" : "sessions"}
+                {plural("activity.sessions", group.count)}
               </span>
               {group.duration > 0 ? (
                 <span>{formatDurationSpan(group.duration)}</span>
@@ -193,7 +194,7 @@ export function ActivityJournalList({
             {group.activities.map((activity) => {
               const sportName = resolveSportName(activity, sportTypeMap);
               const activityName =
-                activity.name?.trim() || sportName || "Activity";
+                activity.name?.trim() || sportName || t("activity.untitled");
               const selected = selectedActivityId === activity.activityId;
               const loading = busy === `training-detail:${activity.activityId}`;
               const facts = activityRowFacts(

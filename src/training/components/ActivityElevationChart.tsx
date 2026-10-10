@@ -1,4 +1,5 @@
 import { useMemo } from "react";
+import { useI18n } from "../../i18n/useI18n";
 import {
   Area,
   AreaChart,
@@ -24,6 +25,7 @@ import {
   metersToElevation
 } from "../../units/units";
 import type { UnitSystem } from "../../../electron/types";
+import { formatDecimal, t } from "../../i18n/core";
 
 interface ActivityElevationChartProps {
   track?: TrainingHubActivityTrack;
@@ -56,6 +58,7 @@ function ElevationTooltip({
 
 export function ActivityElevationChart({ track }: ActivityElevationChartProps) {
   const { unitSystem } = useUnitSystem();
+  const { locale } = useI18n();
   const data = useMemo(() => {
     const points = track?.points ?? [];
     const withElevation = points.filter(
@@ -78,17 +81,17 @@ export function ActivityElevationChart({ track }: ActivityElevationChartProps) {
 
       return {
         label: useDistance
-          ? `${distance.toFixed(1)} ${distanceUnit(unitSystem)}`
-          : `Point ${index + 1}`,
+          ? `${formatDecimal(distance, 1)} ${distanceUnit(unitSystem)}`
+          : t("activity.elevation.point", { n: index + 1 }),
         elevation: metersToElevation(point.elevation!, unitSystem)
       };
     });
-  }, [track, unitSystem]);
+  }, [track, unitSystem, locale]);
 
   if (data.length < 2) {
     return (
       <div className="activity-elevation-empty">
-        <p>No elevation profile available for this activity.</p>
+        <p>{t("activity.elevation.none")}</p>
       </div>
     );
   }

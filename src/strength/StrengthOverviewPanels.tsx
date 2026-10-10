@@ -1,3 +1,4 @@
+import { exerciseLabel } from "./strengthAnalytics";
 import { useMemo } from "react";
 import { ArrowDownRight, ArrowUpRight, ChevronRight, Search } from "lucide-react";
 import { useUnitSystem } from "../units/UnitSystemProvider";
@@ -7,6 +8,7 @@ import {
   type StrengthAnalytics
 } from "./strengthAnalytics";
 import { formatLiftWeight, liftWeightParts } from "./strengthFormat";
+import { plural, t } from "../i18n/core";
 
 /**
  * Lifts shown in the main-lift list. Five keeps that card roughly level with
@@ -112,10 +114,10 @@ export function StrengthOverviewPanels({
 
   const balanceSegments = (
     [
-      ["push", "Pushing"],
-      ["pull", "Pulling"],
-      ["legs", "Legs"],
-      ["core", "Core"]
+      ["push", t("strength.balance.push")],
+      ["pull", t("strength.balance.pull")],
+      ["legs", t("strength.pattern.legs")],
+      ["core", t("strength.pattern.core")]
     ] as const
   ).map(([key, label]) => ({
     key,
@@ -128,11 +130,8 @@ export function StrengthOverviewPanels({
       <section className="panel strength-card strength-lifts-card">
         <div className="strength-card-head">
           <div>
-            <h3>Your main lifts</h3>
-            <p>
-              The most you could lift for one rep, estimated from your best
-              set.
-            </p>
+            <h3>{t("strength.lifts.title")}</h3>
+            <p>{t("strength.lifts.sub")}</p>
           </div>
           {analytics.exercises.length > 0 ? (
             <button
@@ -143,14 +142,14 @@ export function StrengthOverviewPanels({
               }
             >
               <Search size={13} aria-hidden="true" />
-              Explore all
+              {t("strength.lifts.exploreAll")}
             </button>
           ) : null}
         </div>
 
         {mainLifts.length === 0 ? (
           <p className="strength-empty">
-            Nothing to estimate yet — this needs sets with weight on them.
+            {t("strength.lifts.none")}
           </p>
         ) : (
           <ul className="strength-lift-list">
@@ -177,15 +176,14 @@ export function StrengthOverviewPanels({
                   <button
                     type="button"
                     className="strength-lift-button"
-                    aria-label={`Explore ${lift.name}`}
+                    aria-label={t("strength.explore", { name: exerciseLabel(lift.name) })}
                     onClick={() => onOpenExercise(lift.name)}
                   >
                     <div className="strength-lift-main">
-                      <span className="strength-lift-name">{lift.name}</span>
+                      <span className="strength-lift-name">{exerciseLabel(lift.name)}</span>
                       <span className="strength-lift-meta">
-                        {lift.sessions} session
-                        {lift.sessions === 1 ? "" : "s"} ·{" "}
-                        {formatSets(lift.sets)} sets
+                        {plural("activity.sessions", lift.sessions)} ·{" "}
+                        {formatSets(lift.sets)} {t("strength.unit.sets")}
                       </span>
                     </div>
                     <Sparkline
@@ -200,9 +198,9 @@ export function StrengthOverviewPanels({
                       </strong>
                       <span className="strength-lift-change" data-tone={tone}>
                         {trend === undefined ? (
-                          "One session"
+                          t("strength.lifts.oneSession")
                         ) : tone === "flat" ? (
-                          "No change"
+                          t("strength.lifts.noChange")
                         ) : (
                           <>
                             {tone === "up" ? (
@@ -231,15 +229,14 @@ export function StrengthOverviewPanels({
       <section className="panel strength-card strength-mix-card">
         <div className="strength-card-head">
           <div>
-            <h3>Where the work went</h3>
-            <p>Share of your working sets.</p>
+            <h3>{t("strength.mix.title")}</h3>
+            <p>{t("strength.mix.sub")}</p>
           </div>
         </div>
 
         {balanceTotal <= 0 ? (
           <p className="strength-empty">
-            Nothing to sort yet — sets appear here once we recognise the
-            exercise.
+            {t("strength.mix.none")}
           </p>
         ) : (
           <>
@@ -264,13 +261,10 @@ export function StrengthOverviewPanels({
               ))}
             </ul>
             <p className="strength-mix-note">
-              Helper muscles count for part of a set, so a bench press
-              mostly counts as pushing.
-              {analytics.genericSets > 0
-                ? " COROS Full Body sets are left out because they do not identify a specific muscle."
-                : ""}
+              {t("strength.mix.note")}
+              {analytics.genericSets > 0 ? t("strength.mix.noteGeneric") : ""}
               {analytics.mobilitySets > 0 || analytics.unmappedSets > 0
-                ? " Warm-ups, stretching and moves we don't recognise are left out."
+                ? t("strength.mix.noteUnmapped")
                 : ""}
             </p>
           </>

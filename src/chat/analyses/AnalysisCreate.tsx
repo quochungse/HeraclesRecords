@@ -13,6 +13,7 @@ import { COACH_ANALYSIS_PRESETS } from "../../../electron/coachAnalysisPresets";
 import { describeTrigger } from "./analysisLabels";
 import { useAnalysesTitle } from "./analysesTitle";
 import { useUnitSystem } from "../../units/UnitSystemProvider";
+import { t, type MessageKey } from "../../i18n/core";
 
 /** One the athlete writes themselves, rather than starting from a preset. */
 const BLANK: Omit<CoachAnalysisInput, "sessionId"> = {
@@ -91,7 +92,7 @@ export function AnalysisCreate({
 
   const ready = draft.name.trim().length > 0 && draft.playbook.trim().length > 0;
 
-  useAnalysesTitle("New analysis");
+  useAnalysesTitle(t("chat.an.new"));
 
   return (
     <div className="coach-analysis-create">
@@ -99,20 +100,19 @@ export function AnalysisCreate({
 
       <div className="coach-analysis-tabpanel">
         <fieldset className="coach-analysis-fieldset" disabled={saving}>
-          <legend>Start from</legend>
+          <legend>{t("chat.an.startFrom")}</legend>
           <div className="coach-analysis-starters">
             {[
               ...COACH_ANALYSIS_PRESETS.map((preset) => ({
                 id: preset.id,
-                label: preset.label,
-                description: preset.description,
+                label: presetText(preset.id, "label") ?? preset.label,
+                description: presetText(preset.id, "description") ?? preset.description,
                 trigger: describeTrigger(preset.suggestedTrigger ?? null, unitSystem)
               })),
               {
                 id: "blank",
-                label: "Write my own",
-                description:
-                  "An empty analysis you fill in yourself: what it should look at, and what to say about it.",
+                label: t("chat.an.blank"),
+                description: t("chat.an.blankDetail"),
                 trigger: describeTrigger(null, unitSystem)
               }
             ].map((starter) => (
@@ -153,19 +153,19 @@ export function AnalysisCreate({
 
         <div className="chat-local-actions coach-analysis-create-actions">
           <button type="button" className="chat-local-action" onClick={onCancel}>
-            Cancel
+            {t("common.cancel")}
           </button>
           <button
             type="button"
             className="primary-button"
             disabled={saving || !ready || !api}
-            title={ready ? undefined : "A name and a playbook are required."}
+            title={ready ? undefined : t("chat.an.required")}
             onClick={() => void create()}
           >
             {saving ? (
               <Loader2 className="chat-spinner" size={14} aria-hidden="true" />
             ) : null}
-            {trigger.trigger ? "Create auto analysis" : "Create analysis"}
+            {trigger.trigger ? t("chat.an.createAuto") : t("chat.an.create")}
           </button>
         </div>
       </div>
@@ -187,4 +187,22 @@ function triggerDraftFor(presetId: string): TriggerDraft {
     },
     deviceOnly: false
   };
+}
+
+const PRESET_KEYS: Record<string, string> = {
+  "post-activity-debrief": "debrief",
+  "morning-briefing": "morning",
+  "weekly-review": "weekly",
+  "week-ahead-plan": "weekAhead"
+};
+
+/**
+ * A preset's name and pitch in the language on screen. The analysis it creates
+ * keeps the preset's English name: that is stored and synced, and the athlete
+ * can rename it.
+ */
+function presetText(id: string, field: "label" | "description"): string | undefined {
+  const key = Object.hasOwn(PRESET_KEYS, id) ? PRESET_KEYS[id] : undefined;
+  if (!key) return undefined;
+  return t(`chat.an.preset.${key}${field === "description" ? ".detail" : ""}` as MessageKey);
 }

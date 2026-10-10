@@ -15,11 +15,12 @@ import { MUSCLE_BY_ID, type MuscleId } from "./muscles";
 import { analyticsCoverage, type SessionHeat } from "./sessionAnalytics";
 import type { HeatMetric, StrengthAnalytics } from "./strengthAnalytics";
 import "./strength.css";
+import { plural, t } from "../i18n/core";
 
-const METRIC_OPTIONS: { id: HeatMetric; label: string }[] = [
-  { id: "sets", label: "Sets" },
-  { id: "volume", label: "Volume" },
-  { id: "time", label: "Time" }
+const metricOptions = (): { id: HeatMetric; label: string }[] => [
+  { id: "sets", label: t("strength.summary.sets") },
+  { id: "volume", label: t("strength.metric.volume") },
+  { id: "time", label: t("activity.m.time") }
 ];
 
 const STRENGTH_BODY_VIEW_PREFERENCE = defineSelectionPreference<BodyView>({
@@ -127,21 +128,21 @@ export function StrengthHero({
       <section className="strength-body-panel">
         <div className="strength-body-controls">
           <OptionGroup
-            label="Body view"
+            label={t("strength.bodyView")}
             tone="quiet"
             value={view}
             options={[
-              { value: "front", label: "Front" },
-              { value: "back", label: "Back" }
+              { value: "front", label: t("strength.front") },
+              { value: "back", label: t("strength.back") }
             ]}
             onChange={(next) => requestView(next as BodyView)}
           />
           <OptionGroup
-            label="Heat metric"
+            label={t("strength.heatMetric")}
             mode="collapsible"
             tone="quiet"
             value={metric}
-            options={METRIC_OPTIONS.filter(
+            options={metricOptions().filter(
               (option) => source === "coros" || option.id !== "time"
             ).map((option) => ({ value: option.id, label: option.label }))}
             onChange={(next) => setMetric(next as HeatMetric)}
@@ -169,20 +170,16 @@ export function StrengthHero({
             <span className="muscle-panel-unattributed-icon" aria-hidden="true">
               <Info size={22} />
             </span>
-            <p className="eyebrow">Muscle attribution</p>
-            <h3>No specific muscle data</h3>
+            <p className="eyebrow">{t("strength.attribution.eyebrow")}</p>
+            <h3>{t("strength.attribution.none")}</h3>
             <p>
               {scope === "session"
                 ? genericSetCount > 0
-                  ? `COROS recorded this session only as Full Body, across ${genericSetCount.toLocaleString()} working ${
-                      genericSetCount === 1 ? "set" : "sets"
-                    }, so the whole figure is drawn at the lightest level. No specific muscle was identified.`
-                  : "None of this session's exercises could be matched to specific muscles, so the map stays neutral."
+                  ? plural("strength.attribution.sessionFullBody", genericSetCount)
+                  : t("strength.attribution.sessionUnmatched")
                 : genericSetCount > 0
-                  ? `COROS recorded ${genericSetCount.toLocaleString()} working ${
-                      genericSetCount === 1 ? "set" : "sets"
-                    } only as Full Body. Session totals remain available, but the map stays neutral because no specific muscles were identified.`
-                  : "None of the exercises in this window could be matched to specific muscles. Session totals remain available, but the map stays neutral."}
+                  ? plural("strength.attribution.windowFullBody", genericSetCount)
+                  : t("strength.attribution.windowUnmatched")}
             </p>
           </div>
         ) : (

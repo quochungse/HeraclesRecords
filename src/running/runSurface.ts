@@ -1,4 +1,5 @@
 import type { TrainingHubActivity } from "../../electron/types";
+import { t } from "../i18n/core";
 
 /**
  * The four surfaces a run happens on, kept apart because they answer different
@@ -29,11 +30,19 @@ const SPORT_TYPE_SURFACE: Record<number, RunSurface> = {
   103: "track" //      Track Run
 };
 
-export const RUN_SURFACE_LABELS: Record<RunSurface, string> = {
-  road: "Road",
-  trail: "Trail",
-  track: "Track",
-  treadmill: "Treadmill"
+export const RUN_SURFACE_LABELS: Readonly<Record<RunSurface, string>> = {
+  get road() {
+    return t("run.surface.road");
+  },
+  get trail() {
+    return t("run.surface.trail");
+  },
+  get track() {
+    return t("run.surface.track");
+  },
+  get treadmill() {
+    return t("run.surface.treadmill");
+  }
 };
 
 /**

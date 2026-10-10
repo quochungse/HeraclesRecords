@@ -39,14 +39,16 @@ import {
   type ExerciseBodyPartId,
   type ExerciseFacetKind
 } from "./exerciseFacets";
+import { plural, t } from "../i18n/core";
+import { useI18n } from "../i18n/useI18n";
 
 export interface LabeledExerciseOption extends WorkoutExerciseOption {
   label: string;
 }
 
 interface ExercisePickerDialogProps {
-  /** Names the catalog being browsed — "Exercise", "Hybrid Fitness exercise". */
-  title: string;
+  /** The dialog's heading, a whole phrase: "Choose an exercise". */
+  heading: string;
   options: readonly LabeledExerciseOption[];
   selectedId?: string;
   loading: boolean;
@@ -77,7 +79,7 @@ function thumbnailUrl(option: WorkoutExerciseOption): string | undefined {
 }
 
 export function ExercisePickerDialog({
-  title,
+  heading,
   options,
   selectedId,
   loading,
@@ -85,6 +87,7 @@ export function ExercisePickerDialog({
   onClose
 }: ExercisePickerDialogProps) {
   const reducedMotion = useReducedMotion();
+  const { locale } = useI18n();
   const [query, setQuery] = useState("");
   const [facetKind, setFacetKind] = useState<ExerciseFacetKind>("all");
   const [facetValue, setFacetValue] = useState<string | null>(null);
@@ -164,7 +167,7 @@ export function ExercisePickerDialog({
       EQUIPMENT_LABELS[item],
       <span className="exercise-picker-facet-icon"><EquipmentGlyph equipment={item} size={19} /></span>
     ));
-  }, [classified, facetKind, searched]);
+  }, [classified, facetKind, searched, locale]);
 
   /* A value the current search has emptied out stops narrowing anything, or
      the results column reads as "no exercises" for a filter nothing can match. */
@@ -196,7 +199,7 @@ export function ExercisePickerDialog({
         className="exercise-picker panel"
         role="dialog"
         aria-modal="true"
-        aria-label={`Choose ${title.toLocaleLowerCase()}`}
+        aria-label={heading}
         initial={reducedMotion ? false : { opacity: 0, y: 16, scale: 0.985 }}
         animate={{ opacity: 1, y: 0, scale: 1 }}
         transition={reducedMotion ? { duration: 0 } : { type: "spring", stiffness: 360, damping: 30 }}
@@ -204,8 +207,8 @@ export function ExercisePickerDialog({
       >
         <header className="exercise-picker-header">
           <div className="exercise-picker-heading">
-            <p>Exercise library</p>
-            <h3>Choose {title.toLocaleLowerCase()}</h3>
+            <p>{t("workout.picker.library")}</p>
+            <h3>{heading}</h3>
           </div>
           <label className="exercise-picker-search">
             <Search size={15} aria-hidden="true" />
@@ -213,15 +216,15 @@ export function ExercisePickerDialog({
               type="search"
               value={query}
               autoFocus
-              aria-label={`Search ${title.toLocaleLowerCase()}s`}
-              placeholder="Search by name"
+              aria-label={t("workout.picker.search")}
+              placeholder={t("workout.picker.searchPlaceholder")}
               onChange={(event) => setQuery(event.target.value)}
             />
           </label>
           <button
             type="button"
             className="exercise-picker-close"
-            aria-label="Close the exercise library"
+            aria-label={t("workout.picker.close")}
             onClick={onClose}
           >
             <X size={17} aria-hidden="true" />
@@ -230,7 +233,7 @@ export function ExercisePickerDialog({
 
         <div className="exercise-picker-filter-bar">
           <OptionGroup<ExerciseFacetKind>
-            label="Filter exercises by"
+            label={t("workout.picker.filterBy")}
             size="md"
             value={facetKind}
             options={EXERCISE_FACET_KINDS.map((kind) => ({ value: kind.value, label: kind.label }))}
@@ -241,16 +244,16 @@ export function ExercisePickerDialog({
           />
           <span className="exercise-picker-count" role="status">
             {loading
-              ? "Loading COROS exercises…"
-              : `${results.length} ${results.length === 1 ? "exercise" : "exercises"}`}
+              ? t("workout.picker.loadingCount")
+              : plural("units.exercises", results.length)}
           </span>
         </div>
 
         <div className={`exercise-picker-body ${facetKind === "all" ? "is-unfiltered" : ""}`}>
           {facetKind === "all" ? null : (
-            <aside className="exercise-picker-facets" aria-label={`Filter by ${facetKind === "bodyPart" ? "body part" : facetKind}`}>
+            <aside className="exercise-picker-facets" aria-label={EXERCISE_FACET_KINDS.find((kind) => kind.value === facetKind)?.label}>
               {facets.length === 0 ? (
-                <p className="exercise-picker-empty">Nothing to narrow by here.</p>
+                <p className="exercise-picker-empty">{t("workout.picker.empty")}</p>
               ) : facets.map((facet) => (
                 <button
                   key={facet.value}
@@ -272,9 +275,9 @@ export function ExercisePickerDialog({
 
           <div className="exercise-picker-results">
             {loading ? (
-              <p className="exercise-picker-empty">Loading the COROS exercise library…</p>
+              <p className="exercise-picker-empty">{t("workout.picker.loading")}</p>
             ) : results.length === 0 ? (
-              <p className="exercise-picker-empty">No exercise matches this search.</p>
+              <p className="exercise-picker-empty">{t("workout.picker.noMatch")}</p>
             ) : (
               <ul className="exercise-picker-grid">
                 {results.map((option) => {
@@ -305,7 +308,7 @@ export function ExercisePickerDialog({
                         <button
                           type="button"
                           className="exercise-picker-card-play"
-                          aria-label={`Play the ${option.label} demonstration`}
+                          aria-label={t("workout.picker.playDemo", { name: option.label })}
                           onClick={() => setPlaying(option)}
                         >
                           <Play size={15} strokeWidth={2.4} aria-hidden="true" />
@@ -339,7 +342,7 @@ export function ExercisePickerDialog({
               className="exercise-picker-clip panel"
               role="dialog"
               aria-modal="true"
-              aria-label={`${playing.label} demonstration`}
+              aria-label={t("workout.preview.demo", { name: playing.label })}
               onClick={(event) => event.stopPropagation()}
             >
               <header className="exercise-picker-clip-header">
@@ -347,7 +350,7 @@ export function ExercisePickerDialog({
                 <button
                   type="button"
                   className="ghost-button"
-                  aria-label="Close the demonstration"
+                  aria-label={t("workout.picker.closeDemo")}
                   onClick={() => setPlaying(null)}
                 >
                   <X size={16} aria-hidden="true" />
@@ -360,7 +363,7 @@ export function ExercisePickerDialog({
                   className="primary-button"
                   onClick={() => onPick(playing)}
                 >
-                  Use this exercise
+                  {t("workout.picker.use")}
                 </button>
               </footer>
             </div>

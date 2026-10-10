@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import type { TrainingHubActivity } from "../../electron/types";
 import type { HeraclesRecordsApi } from "../heraclesrecords-api";
+import { t } from "../i18n/core";
 
 /**
  * The end-of-activity feeling COROS holds for each session, read from this
@@ -79,10 +80,27 @@ export function useActivityFeelTypes(
 }
 
 /** What COROS's five smileys mean. */
-export const FEEL_LABELS: Record<number, string> = {
-  1: "Very easy",
-  2: "Easy",
-  3: "Moderate",
-  4: "Hard",
-  5: "Very hard"
+export const FEEL_LABELS: Readonly<Record<number, string>> = {
+  get 1() {
+    return t("activity.feel.1");
+  },
+  get 2() {
+    return t("activity.feel.2");
+  },
+  get 3() {
+    return t("activity.feel.3");
+  },
+  get 4() {
+    return t("activity.feel.4");
+  },
+  get 5() {
+    return t("activity.feel.5");
+  }
 };
+
+/** "Felt hard": the whole phrase, since an adjective's place differs by language. */
+export function feltLabel(rating: number): string | undefined {
+  return rating >= 1 && rating <= 5
+    ? t(`activity.feel.felt.${rating as 1 | 2 | 3 | 4 | 5}` as const)
+    : undefined;
+}

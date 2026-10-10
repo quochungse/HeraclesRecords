@@ -85,6 +85,8 @@ import {
   useSelectionPreference
 } from "../preferences/selectionPreferences";
 import "./trainingLibrary.css";
+import { messageRecord, plural, t } from "../i18n/core";
+import { useI18n } from "../i18n/useI18n";
 
 interface TrainingLibraryViewProps {
   api: HeraclesRecordsApi;
@@ -116,9 +118,14 @@ type LibrarySection = "workouts" | "plans";
 /* AI Plan's brief (P2.5), the screen Coach edits a brief on: loaded when pressed. */
 const CoachBriefEditor = lazy(() => import("../chat/CoachBriefEditor"));
 
-const SECTIONS: Array<{ id: LibrarySection; label: string; icon: typeof Zap }> = [
-  { id: "workouts", label: "Workouts", icon: Zap },
-  { id: "plans", label: "Plans", icon: CalendarRange }
+const SECTION_LABELS = messageRecord<LibrarySection>({
+  workouts: "library.section.workouts",
+  plans: "library.section.plans"
+});
+
+const SECTIONS: Array<{ id: LibrarySection; icon: typeof Zap }> = [
+  { id: "workouts", icon: Zap },
+  { id: "plans", icon: CalendarRange }
 ];
 
 const LIBRARY_SECTION_PREFERENCE =
@@ -276,10 +283,10 @@ export function TrainingLibraryView({
     return (
       <section className="training-library-gate">
         <BookOpen size={30} strokeWidth={1.5} />
-        <h1>Training Library</h1>
-        <p>Connect COROS Training Hub to load your workouts, plans, and completed activities.</p>
+        <h1>{t("nav.library")}</h1>
+        <p>{t("library.gate.body")}</p>
         <button type="button" className="primary-button" onClick={onOpenTraining}>
-          Connect in Overview
+          {t("calendar.connect.button")}
         </button>
       </section>
     );
@@ -293,10 +300,10 @@ export function TrainingLibraryView({
     return (
       <section className="training-library-gate">
         <AlertTriangle size={30} strokeWidth={1.5} />
-        <h1>The library didn&rsquo;t load</h1>
+        <h1>{t("library.gate.failed")}</h1>
         <p>{fatalError}</p>
         <button type="button" className="primary-button" onClick={() => void load()}>
-          Try again
+          {t("common.tryAgain")}
         </button>
       </section>
     );
@@ -336,8 +343,8 @@ export function TrainingLibraryView({
       closeEditor();
       onMessage(
         record.baseRemoteId
-          ? `Kept your edits to "${record.plan.name}". The plan on COROS is unchanged until you save them.`
-          : `Kept "${record.plan.name}" as a draft.`
+          ? t("library.msg.keptEdits", { name: record.plan.name })
+          : t("library.msg.keptDraft", { name: record.plan.name })
       );
       await load();
     } catch (cause) {
@@ -380,14 +387,17 @@ export function TrainingLibraryView({
         progress?.updatingCalendar?.();
         try {
           await api.syncTrainingPlanToCalendar(result.plan.id);
-          onMessage(`Saved "${result.plan.name}" and updated it on your calendar.`);
+          onMessage(t("library.msg.savedCalendar", { name: result.plan.name }));
         } catch (cause) {
           onError(
-            `Saved "${result.plan.name}", but your calendar was not updated: ${cause instanceof Error ? cause.message : String(cause)}`
+            t("library.msg.savedNoCalendar", {
+              name: result.plan.name,
+              reason: cause instanceof Error ? cause.message : String(cause)
+            })
           );
         }
       } else {
-        onMessage(`Saved "${result.plan.name}" to COROS.`);
+        onMessage(t("library.msg.saved", { name: result.plan.name }));
       }
       if (updateCalendar || result.plan.calendar === "running") onScheduleChanged();
       /* The plan is written and on screen; the library's reload is not waited on. */
@@ -425,14 +435,14 @@ export function TrainingLibraryView({
     if (!calendarSave || saveBusy) return;
     const plan = calendarSave;
     updateCalendarOnSave.current = updateCalendar;
-    setSaveBusy({ target: updateCalendar ? "confirm" : "alternative", label: "Saving…" });
+    setSaveBusy({ target: updateCalendar ? "confirm" : "alternative", label: t("library.msg.saving") });
     const done = () => {
       setSaveBusy(null);
       setCalendarSave(null);
     };
     try {
       await savePlanToCoros(plan, undefined, {
-        updatingCalendar: () => setSaveBusy({ target: "confirm", label: "Updating calendar…" }),
+        updatingCalendar: () => setSaveBusy({ target: "confirm", label: t("library.msg.updatingCalendar") }),
         written: done
       });
     } finally {
@@ -443,10 +453,10 @@ export function TrainingLibraryView({
   const answerSaveConflict = async (choice: "overwrite" | "asNew") => {
     if (!saveConflict || saveBusy) return;
     const plan = saveConflict;
-    setSaveBusy({ target: choice === "overwrite" ? "confirm" : "alternative", label: "Saving…" });
+    setSaveBusy({ target: choice === "overwrite" ? "confirm" : "alternative", label: t("library.msg.saving") });
     try {
       await savePlanToCoros(plan, choice, {
-        updatingCalendar: () => setSaveBusy({ target: "confirm", label: "Updating calendar…" }),
+        updatingCalendar: () => setSaveBusy({ target: "confirm", label: t("library.msg.updatingCalendar") }),
         written: () => setSaveBusy(null)
       });
     } finally {
@@ -460,7 +470,7 @@ export function TrainingLibraryView({
     try {
       const copy = await api.duplicateTrainingPlan(plan.id);
       setReadingPlan(copy);
-      onMessage(`Copied "${plan.name}" on COROS.`);
+      onMessage(t("library.msg.copied", { name: plan.name }));
       await load();
     } catch (cause) {
       onError(cause instanceof Error ? cause.message : String(cause));
@@ -483,8 +493,8 @@ export function TrainingLibraryView({
       );
       onMessage(
         onCalendar
-          ? `Took "${pendingPlanDelete.name}" off the calendar and deleted it from COROS.`
-          : `Deleted "${pendingPlanDelete.name}" from COROS.`
+          ? t("library.msg.tookOffDeleted", { name: pendingPlanDelete.name })
+          : t("library.msg.deleted", { name: pendingPlanDelete.name })
       );
       if (onCalendar) onScheduleChanged();
       /* Delete is reached from the reader, so the plan being read is the one
@@ -524,7 +534,7 @@ export function TrainingLibraryView({
       if (action === "remove") {
         await api.removeTrainingPlanFromCalendar(plan.id);
         setCalendarChange(null);
-        await afterCalendarChange(plan.id, `Took "${plan.name}" off the calendar.`);
+        await afterCalendarChange(plan.id, t("library.msg.tookOff", { name: plan.name }));
       }
     } catch (cause) {
       setCalendarChange(null);
@@ -559,8 +569,8 @@ export function TrainingLibraryView({
       await api.deleteTrainingPlanDraft(id);
       onMessage(
         baseRemoteId
-          ? `Cleared your edits to "${plan.name}".`
-          : `Discarded the draft "${plan.name}".`
+          ? t("library.msg.clearedEdits", { name: plan.name })
+          : t("library.msg.discardedDraft", { name: plan.name })
       );
       setPendingDraftDiscard(null);
       /* Discarded from inside the editor, the editor goes with it. */
@@ -641,7 +651,7 @@ export function TrainingLibraryView({
     }
   };
 
-  const stateLabel = current.offline ? "Offline · cached" : current.stale ? "Partial sync" : "Synced";
+  const stateLabel = current.offline ? t("library.view.offline") : current.stale ? t("library.view.partial") : t("library.view.synced");
 
   /*
    * Which of the two full screens is over the index, if either. Only the Plans
@@ -663,9 +673,9 @@ export function TrainingLibraryView({
     : undefined;
   const planScreenLabel =
     planScreen === "editor"
-      ? editing?.plan.remoteId ? `Editing ${editing.plan.name}` : "New plan"
+      ? editing?.plan.remoteId ? t("library.view.editing", { name: editing.plan.name }) : t("library.view.newPlan")
       : planScreen === "reader"
-        ? (readingPlan?.name ?? "Plan")
+        ? (readingPlan?.name ?? t("library.view.plan"))
         : "";
 
   return (
@@ -675,7 +685,7 @@ export function TrainingLibraryView({
           counts already say a few pixels below it, and cost the list the
           height of a second line. */}
       <header className="tl-masthead" inert={planScreen !== null}>
-        <h1>Training Library</h1>
+        <h1>{t("nav.library")}</h1>
         <div className="tl-masthead-actions">
           <span className={`tl-state${current.stale || current.offline ? " is-stale" : ""}`}>
             {current.offline ? <CloudOff size={13} /> : null}
@@ -687,7 +697,7 @@ export function TrainingLibraryView({
             disabled={loading}
             onClick={() => void load()}
           >
-            <RefreshCw size={14} className={loading ? "is-spinning" : ""} /> Refresh
+            <RefreshCw size={14} className={loading ? "is-spinning" : ""} /> {t("library.view.refresh")}
           </button>
         </div>
       </header>
@@ -696,7 +706,7 @@ export function TrainingLibraryView({
         <details className="tl-notice">
           <summary>
             <AlertTriangle size={14} />
-            Some COROS data didn&rsquo;t refresh. Cached items are still shown.
+            {t("library.view.notice")}
           </summary>
           {current.partialFailures.map((failure) => (
             <p key={failure}>{failure}</p>
@@ -704,8 +714,8 @@ export function TrainingLibraryView({
         </details>
       ) : null}
 
-      <nav className="tl-sections" aria-label="Library sections" inert={planScreen !== null}>
-        {SECTIONS.map(({ id, label, icon: Icon }) => (
+      <nav className="tl-sections" aria-label={t("library.view.sections")} inert={planScreen !== null}>
+        {SECTIONS.map(({ id, icon: Icon }) => (
           <button
             type="button"
             key={id}
@@ -713,7 +723,7 @@ export function TrainingLibraryView({
             onClick={() => setSection(id)}
           >
             <Icon aria-hidden="true" />
-            {label}
+            {SECTION_LABELS[id]}
             <span>{counts[id]}</span>
           </button>
         ))}
@@ -870,7 +880,7 @@ export function TrainingLibraryView({
                               name: plan.name,
                               artifactType: "plan",
                               scope: "plan",
-                              label: "the whole plan"
+                              label: t("library.view.wholePlan")
                             }
                           ]
                         });
@@ -891,11 +901,11 @@ export function TrainingLibraryView({
           view is held under it by the view's stacking context. */}
       {saveConflict ? createPortal(
         <ConfirmDialog
-          title="This plan changed on COROS"
-          description={`"${saveConflict.name}" was changed on COROS after you started editing it — on another computer, or in the COROS app. Saving now replaces those changes with yours.`}
-          cancelLabel="Keep editing"
-          alternative={{ label: "Save as a new plan", onSelect: () => void answerSaveConflict("asNew") }}
-          confirmLabel="Replace with my edit"
+          title={t("library.dlg.conflict.title")}
+          description={t("library.dlg.conflict.body", { name: saveConflict.name })}
+          cancelLabel={t("library.dlg.keepEditing")}
+          alternative={{ label: t("library.dlg.conflict.asNew"), onSelect: () => void answerSaveConflict("asNew") }}
+          confirmLabel={t("library.dlg.conflict.replace")}
           danger
           busy={saveBusy ?? undefined}
           onConfirm={() => void answerSaveConflict("overwrite")}
@@ -906,12 +916,12 @@ export function TrainingLibraryView({
 
       {calendarSave ? createPortal(
         <ConfirmDialog
-          title={`"${calendarSave.name}" is on your calendar`}
-          description="Your calendar runs its own copy of this plan, so saving won't change the sessions already scheduled unless you update them too."
-          warning="Updating makes your upcoming sessions match this plan. Anything you moved, edited or added on the calendar or in the COROS app from today on is lost; past sessions stay as they are."
-          cancelLabel="Keep editing"
-          alternative={{ label: "Save plan only", onSelect: () => void answerCalendarSave(false) }}
-          confirmLabel="Save & update calendar"
+          title={t("library.dlg.calSave.title", { name: calendarSave.name })}
+          description={t("library.dlg.calSave.body")}
+          warning={t("library.dlg.calSave.warning")}
+          cancelLabel={t("library.dlg.keepEditing")}
+          alternative={{ label: t("library.dlg.calSave.only"), onSelect: () => void answerCalendarSave(false) }}
+          confirmLabel={t("library.dlg.calSave.update")}
           busy={saveBusy ?? undefined}
           onConfirm={() => void answerCalendarSave(true)}
           onCancel={() => setCalendarSave(null)}
@@ -927,27 +937,20 @@ export function TrainingLibraryView({
           onAdded={() => {
             const { plan } = calendarChange;
             setCalendarChange(null);
-            void afterCalendarChange(plan.id, `Added "${plan.name}" to the calendar.`);
+            void afterCalendarChange(plan.id, t("library.msg.added", { name: plan.name }));
           }}
         />
       ) : null}
 
       {calendarChange?.action === "remove" ? (
         <ConfirmDialog
-          title={`Take "${calendarChange.plan.name}" off the calendar?`}
-          description={
-            "Its sessions still ahead come off your COROS calendar. Sessions already trained, and workouts you added to those days yourself, stay where they are." +
-            (removalEndsPlan ? "" : " The plan stays in your library.")
-          }
-          warning={
-            removalEndsPlan
-              ? "The plan this came from is no longer in your COROS plans, so once it is off the calendar it leaves this list, and COROS will not put it back. Duplicate it first to keep a plan you can use again."
-              : undefined
-          }
+          title={t("library.dlg.remove.title", { name: calendarChange.plan.name })}
+          description={removalEndsPlan ? t("library.dlg.remove.body") : t("library.dlg.remove.stays")}
+          warning={removalEndsPlan ? t("library.dlg.remove.warning") : undefined}
           alternative={
             removalEndsPlan
               ? {
-                  label: "Duplicate first",
+                  label: t("library.dlg.remove.duplicate"),
                   onSelect: () => {
                     const { plan } = calendarChange;
                     setCalendarChange(null);
@@ -956,9 +959,9 @@ export function TrainingLibraryView({
                 }
               : undefined
           }
-          confirmLabel="Remove from calendar"
+          confirmLabel={t("library.dlg.remove.confirm")}
           danger
-          busy={calendarBusy ? { target: "confirm", label: "Removing…" } : undefined}
+          busy={calendarBusy ? { target: "confirm", label: t("library.dlg.remove.removing") } : undefined}
           onConfirm={() => void confirmCalendarChange()}
           onCancel={() => setCalendarChange(null)}
         />
@@ -983,16 +986,12 @@ export function TrainingLibraryView({
 
       {pendingPlanDelete ? (
         <ConfirmDialog
-          title={`Delete "${pendingPlanDelete.name}"?`}
-          description={`This deletes the plan and its ${pendingPlanDelete.entries.length} session${pendingPlanDelete.entries.length === 1 ? "" : "s"} from COROS.`}
-          warning={
-            isOnCalendar(pendingPlanDelete)
-              ? "This plan is on your COROS calendar. Deleting it takes it off the calendar first: its sessions still ahead come off, while sessions already trained and workouts you added to those days yourself stay."
-              : undefined
-          }
-          confirmLabel={isOnCalendar(pendingPlanDelete) ? "Remove from calendar and delete" : "Delete plan"}
+          title={t("library.dlg.delete.title", { name: pendingPlanDelete.name })}
+          description={plural("library.dlg.delete.body", pendingPlanDelete.entries.length)}
+          warning={isOnCalendar(pendingPlanDelete) ? t("library.dlg.delete.warning") : undefined}
+          confirmLabel={isOnCalendar(pendingPlanDelete) ? t("library.dlg.delete.removeAndDelete") : t("library.dlg.delete.confirm")}
           danger
-          busy={deletingPlan ? { target: "confirm", label: "Deleting…" } : undefined}
+          busy={deletingPlan ? { target: "confirm", label: t("library.dlg.delete.deleting") } : undefined}
           onConfirm={() => void deletePlan()}
           onCancel={() => setPendingPlanDelete(null)}
         />
@@ -1002,18 +1001,18 @@ export function TrainingLibraryView({
       {pendingDraftDiscard ? createPortal(
         pendingDraftDiscard.baseRemoteId ? (
           <ConfirmDialog
-            title={`Clear your edits to "${pendingDraftDiscard.plan.name}"?`}
-            description="The edits kept here are thrown away. The plan on COROS stays as it is."
-            confirmLabel="Clear editing"
+            title={t("library.dlg.clear.title", { name: pendingDraftDiscard.plan.name })}
+            description={t("library.dlg.clear.body")}
+            confirmLabel={t("library.dlg.clear.confirm")}
             danger
             onConfirm={() => void discardDraft()}
             onCancel={() => setPendingDraftDiscard(null)}
           />
         ) : (
           <ConfirmDialog
-            title={`Discard the draft "${pendingDraftDiscard.plan.name}"?`}
-            description="This plan was never saved to COROS, so discarding the draft removes it."
-            confirmLabel="Discard draft"
+            title={t("library.dlg.discard.title", { name: pendingDraftDiscard.plan.name })}
+            description={t("library.dlg.discard.body")}
+            confirmLabel={t("library.dlg.discard.confirm")}
             danger
             onConfirm={() => void discardDraft()}
             onCancel={() => setPendingDraftDiscard(null)}
@@ -1091,7 +1090,7 @@ function planView(
       peakWeek: measure === "load" ? summary?.peakWeek : undefined,
       unit: RIDGE_UNITS[measure],
       variant: measure === "load" ? ("load" as const) : ("count" as const),
-      label: `${RIDGE_CAPTIONS[measure]} across ${weeks.length} weeks`
+      label: t("library.ridge.across", { caption: RIDGE_CAPTIONS[measure], weeks: weeks.length })
     }
   };
 }
@@ -1153,7 +1152,7 @@ function PlanTile({
             the tile beside it. */}
         {plan.favorite ? (
           <span className="tl-card-fav">
-            <Heart size={13} fill="currentColor" strokeWidth={0} aria-label="Favorite" />
+            <Heart size={13} fill="currentColor" strokeWidth={0} aria-label={t("library.w.favorite")} />
           </span>
         ) : null}
         {/* Its own line above the name, so the name stays the whole of
@@ -1199,17 +1198,17 @@ function PlanTile({
               </small>
             </>
           ) : (
-            <small className="is-empty">No sessions yet</small>
+            <small className="is-empty">{t("library.tile.noSessions")}</small>
           )}
         </span>
         <span className="tl-card-figs">
           <span>
             <b>{plan.weekCount}</b>
-            <small>weeks</small>
+            <small>{plural("library.fig.weeks", plan.weekCount)}</small>
           </span>
           <span>
             <b className={view.sessions ? "" : "is-nil"}>{view.sessions || "—"}</b>
-            <small>sessions</small>
+            <small>{plural("library.fig.sessions", view.sessions)}</small>
           </span>
           {/* Only a plan this app put on the calendar has anything to report,
               which is why this is a figure the tile grows rather than a column
@@ -1217,7 +1216,7 @@ function PlanTile({
           {view.complianceLabel ? (
             <span className="tl-card-fig-done" title={view.complianceNote ?? undefined}>
               <b>{view.complianceLabel}</b>
-              <small>done</small>
+              <small>{t("library.fig.done")}</small>
             </span>
           ) : null}
           {/* Where a plan came from, at the far end of the line that says what
@@ -1269,7 +1268,7 @@ function PlanHero({
           were shorter than the name. */}
       <span className="tl-hero-main">
         <span className="tl-hero-eyebrow">
-          <Activity size={12} aria-hidden="true" /> In progress
+          <Activity size={12} aria-hidden="true" /> {t("library.tile.inProgress")}
           {editing ? <PlanDraftMark kind="editing" /> : null}
         </span>
         <span className="tl-hero-name">
@@ -1290,17 +1289,17 @@ function PlanHero({
                 {position.week}
                 <em>/{position.of}</em>
               </b>
-              <small>week</small>
+              <small>{t("library.tile.week")}</small>
             </span>
           ) : null}
           <span>
             <b className={view.sessions ? "" : "is-nil"}>{view.sessions || "—"}</b>
-            <small>sessions</small>
+            <small>{plural("library.fig.sessions", view.sessions)}</small>
           </span>
           {view.complianceLabel ? (
             <span className="tl-hero-fig-done" title={view.complianceNote ?? undefined}>
               <b>{view.complianceLabel}</b>
-              <small>done</small>
+              <small>{t("library.fig.done")}</small>
             </span>
           ) : null}
         </span>
@@ -1354,14 +1353,15 @@ function PlanIndex({
     );
   }, [plans, matches]);
 
-  const scopes = useMemo(() => planScopeOptions(plans), [plans]);
+  const { locale } = useI18n();
+  const scopes = useMemo(() => planScopeOptions(plans), [plans, locale]);
 
   const scopeAvailable = scopes.some((option) => option.id === scope);
   useEffect(() => {
     if (!scopeAvailable) setScope("all");
   }, [scopeAvailable, setScope]);
 
-  const empty = useMemo(() => planEmptyState(query, scope), [query, scope]);
+  const empty = useMemo(() => planEmptyState(query, scope), [query, scope, locale]);
 
   /*
    * One order — favourites first, then by name (`compareFavoriteThenName`) — and
@@ -1413,7 +1413,7 @@ function PlanIndex({
           planView(draft.plan, summarizeTrainingPlan(draft.plan), undefined)
         ])
       ),
-    [drafts.loose]
+    [drafts.loose, locale]
   );
   const heroPosition = useMemo(
     () => (sections.hero ? planWeekPosition(sections.hero) : undefined),
@@ -1427,7 +1427,7 @@ function PlanIndex({
       new Map(
         plans.map((plan) => [plan.id, planView(plan, summaries.get(plan.id), compliance.get(plan.id))])
       ),
-    [plans, summaries, compliance]
+    [plans, summaries, compliance, locale]
   );
   const viewOf = (plan: TrainingPlanDocument) => views.get(plan.id)!;
 
@@ -1468,7 +1468,7 @@ function PlanIndex({
          * fold costs a press to answer "what sources have I got".
          */}
         <OptionGroup
-          label="Filter plans"
+          label={t("library.index.filter")}
           className="tl-chips"
           value={scope}
           options={scopes.map((option) => ({
@@ -1485,7 +1485,7 @@ function PlanIndex({
           <CollapsibleSearch
             value={query}
             onChange={setQuery}
-            label="Search plans"
+            label={t("library.index.search")}
           />
         </div>
       </div>
@@ -1503,12 +1503,12 @@ function PlanIndex({
                 setScope("all");
               }}
             >
-              Clear filters
+              {t("library.w.clear")}
             </button>
           ) : (
             /* An empty index is exactly where the create action is looked for. */
             <button type="button" className="primary-button" onClick={onCreate}>
-              <Plus size={14} /> New plan
+              <Plus size={14} /> {t("library.view.newPlan")}
             </button>
           )}
         </div>
@@ -1525,7 +1525,7 @@ function PlanIndex({
           ) : null}
 
           {sections.current.length || looseDrafts.length
-            ? grid(sections.current, "Plans", looseDrafts)
+            ? grid(sections.current, t("library.section.plans"), looseDrafts)
             : null}
 
           {/*
@@ -1535,9 +1535,9 @@ function PlanIndex({
           {sections.done.length ? (
             <>
               <h3 className="tl-section-head">
-                Done <span>{sections.done.length}</span>
+                {t("library.index.done")} <span>{sections.done.length}</span>
               </h3>
-              {grid(sections.done, "Plans that have finished")}
+              {grid(sections.done, t("library.index.doneLabel"))}
             </>
           ) : null}
 
@@ -1553,10 +1553,10 @@ function PlanIndex({
                   onClick={() => setArchivedOpen((open) => !open)}
                 >
                   <ChevronRight size={12} strokeWidth={2.4} aria-hidden="true" />
-                  Archived <span>{sections.archived.length}</span>
+                  {t("library.index.archived")} <span>{sections.archived.length}</span>
                 </button>
               </h3>
-              {archivedOpen ? grid(sections.archived, "Archived plans") : null}
+              {archivedOpen ? grid(sections.archived, t("library.index.archivedLabel")) : null}
             </>
           ) : null}
         </div>
@@ -1576,17 +1576,17 @@ function PlanIndex({
        */}
       <div className="tl-plans-dock">
         <button type="button" className="primary-button" onClick={onCreate}>
-          <Plus size={15} aria-hidden="true" /> New plan
+          <Plus size={15} aria-hidden="true" /> {t("library.view.newPlan")}
         </button>
         {onGenerate ? (
           <button
             type="button"
             className="primary-button"
             disabled={offline}
-            title={offline ? "Reconnect to COROS to plan with Coach" : undefined}
+            title={offline ? t("library.index.reconnectAi") : undefined}
             onClick={onGenerate}
           >
-            <Sparkles size={15} aria-hidden="true" /> AI Plan
+            <Sparkles size={15} aria-hidden="true" /> {t("library.index.aiPlan")}
           </button>
         ) : null}
       </div>

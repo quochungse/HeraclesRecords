@@ -1,3 +1,5 @@
+import { renderRich } from "../i18n/useI18n";
+import { exerciseLabel } from "./strengthAnalytics";
 import type { CSSProperties } from "react";
 import type { UnitSystem } from "../../electron/types";
 import { ChevronLeft, Minus, TrendingDown, TrendingUp } from "lucide-react";
@@ -13,6 +15,7 @@ import {
   type MuscleWeekPoint
 } from "./strengthAnalytics";
 import { formatDurationSeconds } from "../training/formatters";
+import { formatDecimal, plural, t } from "../i18n/core";
 
 interface MusclePanelProps {
   muscles: MuscleStat[];
@@ -23,12 +26,6 @@ interface MusclePanelProps {
   onSelect: (muscle: MuscleId | null) => void;
   onHover: (muscle: MuscleId | null) => void;
   unitSystem: UnitSystem;
-}
-
-function metricLabel(metric: HeatMetric): string {
-  if (metric === "volume") return "Volume";
-  if (metric === "time") return "Time under load";
-  return "Sets";
 }
 
 interface FormattedMetric {
@@ -45,13 +42,13 @@ function formatMetric(
   if (metric === "time") {
     return { value: formatDurationSeconds(Math.round(value)) };
   }
-  return { value: formatSets(value), unit: "sets" };
+  return { value: formatSets(value), unit: t("strength.unit.sets") };
 }
 
 function emptyMetricLabel(metric: HeatMetric): string {
-  if (metric === "volume") return "No load";
-  if (metric === "time") return "No time";
-  return "Not trained";
+  if (metric === "volume") return t("strength.empty.volume");
+  if (metric === "time") return t("strength.empty.time");
+  return t("strength.empty.sets");
 }
 
 /** Ranked list of every muscle, doubling as the body map's legend. */
@@ -79,14 +76,14 @@ function MuscleRanking({
         const accessibleValue =
           value > 0
             ? `${formatted.value}${formatted.unit ? ` ${formatted.unit}` : ""}`
-            : emptyLabel.toLowerCase();
+            : emptyLabel;
         return (
           <li key={stat.muscle}>
             <button
               type="button"
               className={`muscle-ranking-row${value <= 0 ? " is-empty" : ""}`}
               data-level={level}
-              aria-label={`${meta.label}, ${accessibleValue}. Show muscle details.`}
+              aria-label={t("strength.ranking.row", { muscle: meta.label, value: accessibleValue })}
               onClick={() => onSelect(stat.muscle)}
               onPointerEnter={() => onHover(stat.muscle)}
               onPointerLeave={() => onHover(null)}
@@ -119,11 +116,19 @@ function MuscleRanking({
   );
 }
 
-const PATTERN_LABEL: Record<string, string> = {
-  push: "Push",
-  pull: "Pull",
-  legs: "Legs",
-  core: "Core"
+const PATTERN_LABEL: Readonly<Record<string, string>> = {
+  get push() {
+    return t("strength.pattern.push");
+  },
+  get pull() {
+    return t("strength.pattern.pull");
+  },
+  get legs() {
+    return t("strength.pattern.legs");
+  },
+  get core() {
+    return t("strength.pattern.core");
+  }
 };
 
 interface Recovery {
@@ -153,12 +158,12 @@ function recoveryOf(stat: MuscleStat): Recovery | undefined {
   const lateAt = cadenceDays !== undefined ? cadenceDays * 1.35 : 6;
 
   if (days <= dueAt) {
-    return { days, cadenceDays, tone: "fresh", state: "Recovered" };
+    return { days, cadenceDays, tone: "fresh", state: t("strength.recovery.fresh") };
   }
   if (days <= lateAt) {
-    return { days, cadenceDays, tone: "due", state: "Due now" };
+    return { days, cadenceDays, tone: "due", state: t("strength.recovery.due") };
   }
-  return { days, cadenceDays, tone: "stale", state: "Overdue" };
+  return { days, cadenceDays, tone: "stale", state: t("strength.recovery.stale") };
 }
 
 /** Days since last set, measured against the muscle's usual turnaround. */
@@ -166,9 +171,9 @@ function MuscleRecovery({ recovery }: { recovery: Recovery | undefined }) {
   if (!recovery) {
     return (
       <section className="muscle-recovery is-empty">
-        <p className="eyebrow">Recovery</p>
+        <p className="eyebrow">{t("strength.recovery.title")}</p>
         <p className="muscle-recovery-value">
-          <span>No sets in this window</span>
+          <span>{t("strength.recovery.none")}</span>
         </p>
       </section>
     );
@@ -187,12 +192,14 @@ function MuscleRecovery({ recovery }: { recovery: Recovery | undefined }) {
   return (
     <section className="muscle-recovery" data-tone={tone}>
       <div className="muscle-section-head">
-        <p className="eyebrow">Recovery</p>
+        <p className="eyebrow">{t("strength.recovery.title")}</p>
         <span className="muscle-recovery-state">{state}</span>
       </div>
       <p className="muscle-recovery-value">
-        <strong>{days}</strong>
-        <span>{days === 1 ? "day since last set" : "days since last set"}</span>
+        {renderRich(plural("strength.recovery.days", days), {
+          b: (chunk) => <strong>{chunk}</strong>,
+          s: (chunk) => <span>{chunk}</span>
+        })}
       </p>
       <div className="muscle-recovery-track">
         <span
@@ -205,7 +212,7 @@ function MuscleRecovery({ recovery }: { recovery: Recovery | undefined }) {
             style={{ left: `${tick * 100}%` }}
           >
             <i aria-hidden="true" />
-            <em>usually {cadenceDays!.toFixed(1)}d</em>
+            <em>{t("strength.recovery.usually", { days: formatDecimal(cadenceDays!, 1) })}</em>
           </span>
         ) : null}
       </div>
@@ -225,9 +232,9 @@ interface StatCell {
 
 /** What a rep range is training for, in words that need no glossary. */
 function repRangeNote(repsPerSet: number): string {
-  if (repsPerSet <= 5) return "strength range";
-  if (repsPerSet <= 12) return "muscle growth range";
-  return "endurance range";
+  if (repsPerSet <= 5) return t("strength.repNote.strength");
+  if (repsPerSet <= 12) return t("strength.repNote.growth");
+  return t("strength.repNote.endurance");
 }
 
 /**
@@ -253,37 +260,37 @@ function statCells(
   return {
     sets: {
       id: "sets",
-      label: "Sets",
+      label: t("strength.summary.sets"),
       value: formatSets(stat.sets),
-      note: setsPerWeek > 0 ? `${formatSets(setsPerWeek)} per week` : undefined
+      note: setsPerWeek > 0 ? t("strength.cell.perWeek", { value: formatSets(setsPerWeek) }) : undefined
     },
     volume: {
       id: "volume",
-      label: "Volume",
-      value: stat.volumeKg > 0 ? formatVolumeKg(stat.volumeKg, unitSystem) : "Bodyweight",
+      label: t("strength.metric.volume"),
+      value: stat.volumeKg > 0 ? formatVolumeKg(stat.volumeKg, unitSystem) : t("strength.bodyweight"),
       note:
         stat.volumeKg > 0 && stat.sessions > 0
-          ? `${formatVolumeKg(stat.volumeKg / stat.sessions, unitSystem)} per session`
+          ? t("strength.cell.perSession", { value: formatVolumeKg(stat.volumeKg / stat.sessions, unitSystem) })
           : undefined,
       // Volume is reps × weight, so unweighted work is silently missing from
       // it. Say how much rather than letting the total read as the whole story.
       caveat:
         stat.bodyweightSets >= 0.5
-          ? `Excludes ${formatSets(stat.bodyweightSets)} unweighted sets`
+          ? t("strength.cell.excludes", { value: formatSets(stat.bodyweightSets) })
           : undefined
     },
     time: {
       id: "time",
-      label: "Time under load",
+      label: t("strength.metric.time"),
       value: formatDurationSeconds(Math.round(stat.workSec)),
       note:
         stat.workSec > 0 && stat.sessions > 0
-          ? `${formatDurationSeconds(Math.round(stat.workSec / stat.sessions))} per session`
+          ? t("strength.cell.perSession", { value: formatDurationSeconds(Math.round(stat.workSec / stat.sessions)) })
           : undefined
     },
     repRange: {
       id: "repRange",
-      label: "Reps per set",
+      label: t("strength.cell.repsPerSet"),
       value: repsPerSet > 0 ? String(repsPerSet) : "—",
       note: repsPerSet > 0 ? repRangeNote(repsPerSet) : undefined
     },
@@ -292,9 +299,9 @@ function statCells(
     // token two sets is a different problem from a genuine one.
     perSession: {
       id: "perSession",
-      label: "Sets per session",
+      label: t("strength.cell.setsPerSession"),
       value: stat.sessions > 0 ? formatSets(stat.sets / stat.sessions) : "—",
-      note: stat.sessions > 0 ? `across ${stat.sessions} sessions` : undefined
+      note: stat.sessions > 0 ? plural("strength.cell.across", stat.sessions) : undefined
     }
   };
 }
@@ -329,18 +336,21 @@ function weeklyTrend(weekly: MuscleWeekPoint[]): WeeklyTrend | undefined {
     return undefined;
   }
   if (prior <= 0) {
-    return { direction: "up", label: `New in the last ${span} wk` };
+    return { direction: "up", label: t("strength.trend.new", { weeks: span }) };
   }
   if (recent <= 0) {
-    return { direction: "down", label: `Dropped for ${span} wk` };
+    return { direction: "down", label: t("strength.trend.dropped", { weeks: span }) };
   }
   const delta = (recent - prior) / prior;
   if (Math.abs(delta) < 0.08) {
-    return { direction: "flat", label: `Steady vs prior ${span} wk` };
+    return { direction: "flat", label: t("strength.trend.steady", { weeks: span }) };
   }
   return {
     direction: delta > 0 ? "up" : "down",
-    label: `${delta > 0 ? "+" : "−"}${Math.round(Math.abs(delta) * 100)}% vs prior ${span} wk`
+    label: t("strength.trend.change", {
+      change: `${delta > 0 ? "+" : "−"}${Math.round(Math.abs(delta) * 100)}%`,
+      weeks: span
+    })
   };
 }
 
@@ -373,7 +383,7 @@ function MuscleTrend({ weekly }: { weekly: MuscleWeekPoint[] }) {
   return (
     <section className="muscle-trend">
       <div className="muscle-section-head">
-        <p className="eyebrow">Weekly sets</p>
+        <p className="eyebrow">{t("strength.trend.title")}</p>
         {trend ? (
           <span className="muscle-trend-delta" data-direction={trend.direction}>
             <TrendIcon size={12} aria-hidden="true" />
@@ -384,7 +394,7 @@ function MuscleTrend({ weekly }: { weekly: MuscleWeekPoint[] }) {
       <div
         className="muscle-trend-plot"
         role="img"
-        aria-label={`Weekly sets over ${weekly.length} weeks. Peak ${formatSets(peak)}, average ${formatSets(mean)}.`}
+        aria-label={t("strength.trend.label", { weeks: weekly.length, peak: formatSets(peak), average: formatSets(mean) })}
       >
         <span className="muscle-trend-scale" aria-hidden="true">
           <b>{formatSets(peak)}</b>
@@ -396,7 +406,7 @@ function MuscleTrend({ weekly }: { weekly: MuscleWeekPoint[] }) {
             style={{ bottom: `${(mean / peak) * 100}%` }}
             aria-hidden="true"
           >
-            <em>avg {formatSets(mean)}</em>
+            <em>{t("strength.trend.avg", { value: formatSets(mean) })}</em>
           </span>
           {weekly.map((point, index) => {
             // The last bucket is only a partial week when today still sits
@@ -451,7 +461,7 @@ function MuscleDrivers({ stat }: { stat: MuscleStat }) {
   if (stat.topExercises.length === 0) {
     return (
       <p className="muscle-panel-gap">
-        No sets landed on this muscle in the selected window.
+        {t("strength.drivers.none")}
       </p>
     );
   }
@@ -465,16 +475,16 @@ function MuscleDrivers({ stat }: { stat: MuscleStat }) {
     share: total > 0 ? exercise.sets / total : 0
   }));
   if (rest > 0.5) {
-    drivers.push({ name: "Everything else", sets: rest, share: rest / total, rest: true });
+    drivers.push({ name: t("strength.drivers.rest"), sets: rest, share: rest / total, rest: true });
   }
   const leadShare = drivers[0]?.share ?? 0;
 
   return (
     <section className="muscle-drivers">
       <div className="muscle-section-head">
-        <p className="eyebrow">Driven by</p>
+        <p className="eyebrow">{t("strength.drivers.title")}</p>
         <span className="muscle-section-note">
-          {Math.round(leadShare * 100)}% from one lift
+          {t("strength.drivers.lead", { percent: Math.round(leadShare * 100) })}
         </span>
       </div>
 
@@ -499,10 +509,10 @@ function MuscleDrivers({ stat }: { stat: MuscleStat }) {
             <span className="muscle-driver-rank" aria-hidden="true">
               {driver.rest ? "·" : index + 1}
             </span>
-            <span className="muscle-driver-name">{driver.name}</span>
+            <span className="muscle-driver-name">{driver.rest ? driver.name : exerciseLabel(driver.name)}</span>
             <span className="muscle-driver-sets">
               {formatSets(driver.sets)}
-              <em>sets</em>
+              <em>{t("strength.unit.sets")}</em>
             </span>
             <span className="muscle-driver-share">{Math.round(driver.share * 100)}%</span>
           </li>
@@ -519,7 +529,7 @@ function HeroStat({ cell, level }: { cell: StatCell; level: number }) {
         className="muscle-hero-label"
         title={
           cell.id === "sets"
-            ? "Each set is shared between the muscles that work in it, so a bench press counts as most of a set here and part of one for the triceps."
+            ? t("strength.hero.setsTitle")
             : undefined
         }
       >
@@ -554,18 +564,16 @@ export function MusclePanel({
       <div className="muscle-panel">
         <header className="muscle-panel-head">
           <div className="muscle-panel-title">
-            <p className="muscle-panel-kicker">{metricLabel(metric)} by muscle</p>
-            <h3>Muscle coverage</h3>
-            <p className="muscle-panel-lead">
-              Select a muscle to see its training detail.
-            </p>
+            <p className="muscle-panel-kicker">{t(`strength.coverage.kicker.${metric}` as const)}</p>
+            <h3>{t("strength.coverage.title")}</h3>
+            <p className="muscle-panel-lead">{t("strength.coverage.lead")}</p>
           </div>
           <p
             className="muscle-panel-summary"
-            aria-label={`${trainedCount} of ${MUSCLES.length} muscle groups trained`}
+            aria-label={t("strength.coverage.trainedLabel", { trained: trainedCount, total: MUSCLES.length })}
           >
             <strong>{trainedCount}</strong>
-            <span>of {MUSCLES.length} trained</span>
+            <span>{t("strength.coverage.trained", { total: MUSCLES.length })}</span>
           </p>
         </header>
         <MuscleRanking
@@ -602,7 +610,7 @@ export function MusclePanel({
         onClick={() => onSelect(null)}
       >
         <ChevronLeft size={14} aria-hidden="true" />
-        All muscles
+        {t("strength.allMuscles")}
       </button>
 
       <header className="muscle-detail-head">
@@ -619,10 +627,10 @@ export function MusclePanel({
           <div
             className="muscle-detail-rank"
             data-level={level}
-            aria-label={`Ranked ${rank} of ${muscles.length} by ${metricLabel(metric).toLowerCase()}`}
+            aria-label={t(`strength.rank.${metric}` as const, { rank, total: muscles.length })}
           >
             <strong>{rank}</strong>
-            <span>of {muscles.length}</span>
+            <span>{t("strength.rank.of", { total: muscles.length })}</span>
           </div>
         ) : null}
       </header>

@@ -10,7 +10,7 @@ export function installRendererDiagnostics(api: HeraclesRecordsApi | undefined):
       const error = value instanceof Error ? value : null;
       api!.reportRendererError({
         kind,
-        name: error?.name ?? "Error",
+        name: error?.name ?? "Error", // i18n-ignore: an error's class name, for the log
         message: (error?.message ?? (typeof value === "string" ? value : "Unknown renderer error")).slice(0, 32_000),
         stack: error?.stack?.slice(0, 32_000)
       });

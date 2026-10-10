@@ -1,5 +1,6 @@
 import type { ReverseGeocodeResult } from "../../electron/types";
 import type { GlobePoint } from "./activityVisitHeatmap";
+import { formatDecimal, t } from "../i18n/core";
 
 // Names for the globe's visit clusters. This is out of the view on purpose,
 // because the rules below are the only part of naming a place a test can reach
@@ -51,12 +52,25 @@ interface PersistedPlaceLabels {
 let placeLabelsHydrated = false;
 let placeLabelWriteScheduled = false;
 
+/**
+ * What a label holds where nothing named a country. It is stored with the
+ * name (the place cache keeps the whole label), so it stays this constant and
+ * the screen turns it into words through `placeCountry`.
+ */
+const UNNAMED_COUNTRY = "Location"; // i18n-ignore
+
+/** A label's second line in the language on screen. */
+export function placeCountry(label: PlaceLabel): string {
+  return label.country === UNNAMED_COUNTRY ? t("map.location") : label.country;
+}
+
 export function coordinateLabel(point: GlobePoint): PlaceLabel {
-  const lat = `${Math.abs(point.lat).toFixed(1)}° ${point.lat >= 0 ? "N" : "S"}`;
-  const lon = `${Math.abs(point.lon).toFixed(1)}° ${point.lon >= 0 ? "E" : "W"}`;
+  // The compass letters stay N/S/E/W in every language, as on a map.
+  const lat = `${formatDecimal(Math.abs(point.lat), 1)}° ${point.lat >= 0 ? "N" : "S"}`;
+  const lon = `${formatDecimal(Math.abs(point.lon), 1)}° ${point.lon >= 0 ? "E" : "W"}`;
   return {
     city: `${lat}, ${lon}`,
-    country: "Location",
+    country: UNNAMED_COUNTRY,
     full: `${lat}, ${lon}`,
   };
 }
@@ -76,7 +90,7 @@ export function parsePlaceLabel(label: string, point: GlobePoint): PlaceLabel {
   }
   return {
     city: parts[0]!,
-    country: parts.length > 1 ? parts[parts.length - 1]! : "Location",
+    country: parts.length > 1 ? parts[parts.length - 1]! : UNNAMED_COUNTRY,
     full: label,
   };
 }
@@ -95,7 +109,7 @@ export function toPlaceLabel(
   if (result.city) {
     return {
       city: result.city,
-      country: result.country ?? "Location",
+      country: result.country ?? UNNAMED_COUNTRY,
       full: result.label,
       ...(result.countryCode ? { countryCode: result.countryCode } : {}),
     };

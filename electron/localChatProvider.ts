@@ -8,6 +8,8 @@ import type {
 } from "./types";
 import { addTokenUsage, countableUsage } from "./tokenUsage";
 import { WEB_SEARCH_TOOL } from "./chatToolSources";
+import { ScreenError } from "./screenText";
+import { mainText, screenMessage } from "./mainText";
 
 export const DEFAULT_LOCAL_CHAT_BASE_URL = "http://localhost:11434/v1";
 
@@ -103,14 +105,14 @@ export function normalizeLocalChatBaseUrl(input: string): string {
   try {
     url = new URL(withProtocol);
   } catch {
-    throw new Error("Local model URL is not valid.");
+    throw new ScreenError("main.ai.localUrlInvalid");
   }
 
   if (url.protocol !== "http:" && url.protocol !== "https:") {
-    throw new Error("Local model URL must use http or https.");
+    throw new ScreenError("main.ai.localUrlScheme");
   }
   if (url.hostname !== "localhost" && url.hostname !== "127.0.0.1") {
-    throw new Error("Local model URL must point to localhost or 127.0.0.1.");
+    throw new ScreenError("main.ai.localUrlHost");
   }
 
   const pathName = url.pathname.replace(/\/+$/, "");
@@ -119,7 +121,7 @@ export function normalizeLocalChatBaseUrl(input: string): string {
   } else if (pathName === "/v1") {
     url.pathname = "/v1";
   } else {
-    throw new Error("Local model URL must end at the server root or /v1.");
+    throw new ScreenError("main.ai.localUrlPath");
   }
   url.search = "";
   url.hash = "";
@@ -306,7 +308,7 @@ export async function testLocalChatConnectionRequest(
   if (!model) {
     return {
       ok: false,
-      message: "Choose a local model name first.",
+      message: mainText("main.ai.localModelName"),
       normalizedBaseUrl: baseUrl
     };
   }
@@ -318,8 +320,8 @@ export async function testLocalChatConnectionRequest(
         ok: false,
         message:
           models.length > 0
-            ? `Model "${model}" was not found on the local server.`
-            : "The local server responded, but did not list any models.",
+            ? mainText("main.ai.localNotFound", { model })
+            : mainText("main.ai.localNoModels"),
         normalizedBaseUrl: baseUrl,
         models
       };
@@ -327,14 +329,14 @@ export async function testLocalChatConnectionRequest(
 
     return {
       ok: true,
-      message: `Connected to local model "${model}".`,
+      message: mainText("main.ai.localConnected", { model }),
       normalizedBaseUrl: baseUrl,
       models
     };
   } catch (error) {
     return {
       ok: false,
-      message: error instanceof Error ? error.message : "Local model check failed.",
+      message: screenMessage(error, "Local model check failed."),
       normalizedBaseUrl: baseUrl
     };
   }
@@ -375,7 +377,7 @@ export async function streamOpenAiCompatibleChatCompletion(
   const baseUrl = transport.baseUrl.replace(/\/+$/, "");
   const model = options.model.trim();
   if (!model) {
-    throw new Error(`Choose a ${transport.requestLabel} model first.`);
+    throw new ScreenError("main.ai.localModelName");
   }
 
   let fullText = "";

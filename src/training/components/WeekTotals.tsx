@@ -1,8 +1,8 @@
 import type { ReactNode } from "react";
 import { Flame, Footprints, Route, Timer } from "lucide-react";
 import {
-  MCP_DAILY_HEALTH_TILE_DETAIL,
-  MCP_UNREACHABLE_LABEL,
+  mcpDailyHealthTileDetail,
+  mcpUnreachableLabel,
   isMcpFailure,
   type McpConnectionState
 } from "../../mcp/mcpNotice";
@@ -12,6 +12,8 @@ import {
   formatDurationTotal,
   type WeekToDateTotals
 } from "../weeklyActivity";
+import { formatCount, formatDecimal, t } from "../../i18n/core";
+import { useI18n } from "../../i18n/useI18n";
 
 interface WeekTotalsProps {
   totals: WeekToDateTotals;
@@ -28,13 +30,14 @@ export const EMPTY_FIGURE = "–";
  * four figures read as one set rather than as two conventions side by side.
  */
 function withUnitSuffixes(value: string): ReactNode {
-  const parts = value.match(/[^A-Za-z]+|[A-Za-z]+/g);
+  // Letters in any script: a unit is "h" here and "giờ" or "時間" elsewhere.
+  const parts = value.match(/[^\p{L}]+|\p{L}+/gu);
   if (!parts || parts.length === 1) {
     return value;
   }
 
   return parts.map((part, index) =>
-    /[A-Za-z]/.test(part) ? (
+    /\p{L}/u.test(part) ? (
       <span className="week-totals-unit" key={`${index}-${part}`}>
         {part}
       </span>
@@ -49,7 +52,7 @@ function formatWholeNumber(value?: number): string {
     return EMPTY_FIGURE;
   }
 
-  return Math.round(value).toLocaleString();
+  return formatCount(Math.round(value));
 }
 
 interface RowProps {
@@ -100,6 +103,7 @@ export function WeekTotalsRow({ icon, label, value, unit, notice, hover }: RowPr
  * sport, sleep stage, heart-rate zone, load band.
  */
 export function WeekTotals({ totals, mcpState }: WeekTotalsProps) {
+  useI18n();
   const { unitSystem } = useUnitSystem();
   // Only where the figure is actually missing: a week that already has step
   // counts in it is not a row with a problem to report.
@@ -107,37 +111,37 @@ export function WeekTotals({ totals, mcpState }: WeekTotalsProps) {
   const stepsNotice = !stepsNeedMcp
     ? undefined
     : mcpState === "unreachable"
-      ? MCP_UNREACHABLE_LABEL
-      : MCP_DAILY_HEALTH_TILE_DETAIL;
+      ? mcpUnreachableLabel()
+      : mcpDailyHealthTileDetail();
 
   return (
-    <section className="week-totals" aria-label="This week's totals">
+    <section className="week-totals" aria-label={t("overview.weekTotals.aria")}>
       <ul className="week-totals-list">
         <WeekTotalsRow
           icon={<Flame size={WEEK_TOTALS_ICON_SIZE} />}
-          label="Load"
+          label={t("overview.tiles.load")}
           value={formatWholeNumber(totals.trainingLoad)}
         />
         <WeekTotalsRow
           icon={<Route size={WEEK_TOTALS_ICON_SIZE} />}
-          label="Distance"
+          label={t("overview.tiles.distance")}
           value={
             totals.distance !== undefined
-              ? metersToDisplayDistance(totals.distance, unitSystem).toFixed(1)
+              ? formatDecimal(metersToDisplayDistance(totals.distance, unitSystem), 1)
               : EMPTY_FIGURE
           }
           unit={distanceUnit(unitSystem)}
         />
         <WeekTotalsRow
           icon={<Timer size={WEEK_TOTALS_ICON_SIZE} />}
-          label="Duration"
+          label={t("overview.tiles.duration")}
           value={
             totals.duration !== undefined ? formatDurationTotal(totals.duration) : EMPTY_FIGURE
           }
         />
         <WeekTotalsRow
           icon={<Footprints size={WEEK_TOTALS_ICON_SIZE} />}
-          label="Steps"
+          label={t("overview.tiles.steps")}
           value={formatWholeNumber(totals.steps)}
           notice={stepsNotice}
         />

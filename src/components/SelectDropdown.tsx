@@ -11,6 +11,7 @@ import {
   useState
 } from "react";
 import { createPortal } from "react-dom";
+import { t } from "../i18n/core";
 
 export type SelectOption<T extends string> = {
   value: T;
@@ -101,7 +102,7 @@ export function SelectDropdown<T extends string>({
   const [menuPosition, setMenuPosition] = useState<MenuPosition | null>(null);
   const [portalTheme, setPortalTheme] = useState<PortalTheme>({});
   const selectedOption = options.find((option) => option.value === value);
-  const selectedLabel = selectedOption?.label ?? "Select";
+  const selectedLabel = selectedOption?.label ?? t("app.select");
   const selectedIcon = renderIcon?.(value);
   // A boolean rather than the array itself, because this feeds the position
   // callback: `options` is rebuilt by most callers on every render, and a

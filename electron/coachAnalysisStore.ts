@@ -44,6 +44,7 @@ import type {
   CoachAnalysisRow,
   CoachAnalysisRunRow
 } from "./database";
+import { ScreenError, withScreenKey } from "./screenText";
 
 export type { AnalysisLocalTriggerRow, CoachAnalysisRow, CoachAnalysisRunRow };
 
@@ -236,7 +237,7 @@ function parseJson(value: string | null | undefined): unknown {
 
 function requireText(value: unknown, label: string, max?: number): string {
   if (typeof value !== "string" || !value.trim()) {
-    throw new Error(`Analysis ${label} is required.`);
+    throw new ScreenError(label === "name" ? "main.coach.analysisName" : "main.coach.analysisPlaybook");
   }
   const trimmed = value.trim();
   return max ? trimmed.slice(0, max) : trimmed;
@@ -641,17 +642,21 @@ export function createCoachAnalysis(
 ): CoachAnalysis {
   const sessionId = optionalText(input.sessionId);
   if (!sessionId) {
-    throw new CoachAnalysisError(
-      "ANALYSIS_SESSION_REQUIRED",
-      "An analysis belongs to a conversation."
+    throw withScreenKey(
+      new CoachAnalysisError("ANALYSIS_SESSION_REQUIRED", "An analysis belongs to a conversation."),
+      "main.coach.analysisSession"
     );
   }
 
   const siblings = database.listAnalysesForSession(sessionId);
   if (siblings.length >= MAX_ANALYSES_PER_SESSION) {
-    throw new CoachAnalysisError(
-      "ANALYSIS_LIMIT_REACHED",
-      `A conversation can run at most ${MAX_ANALYSES_PER_SESSION} analyses.`
+    throw withScreenKey(
+      new CoachAnalysisError(
+        "ANALYSIS_LIMIT_REACHED",
+        `A conversation can run at most ${MAX_ANALYSES_PER_SESSION} analyses.`
+      ),
+      "main.coach.analysisLimit",
+      { n: MAX_ANALYSES_PER_SESSION }
     );
   }
   const sortOrder = siblings.reduce(

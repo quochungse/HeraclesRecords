@@ -26,6 +26,7 @@ import {
   selectionIsOneOf,
   useSelectionPreference
 } from "../../preferences/selectionPreferences";
+import { t } from "../../i18n/core";
 
 const FITNESS_METRIC_PREFERENCE =
   defineSelectionPreference<WeeklyActivityMetric>({
@@ -80,7 +81,7 @@ function MetricSelect({ selected, onChange }: MetricSelectProps) {
 
   return (
     <OptionGroup
-      label="Weekly metric"
+      label={t("overview.weekly.metric")}
       mode="dropdown"
       value={selected}
       options={WEEKLY_ACTIVITY_METRICS.map((metric) => ({
@@ -187,7 +188,7 @@ export function FitnessTrendPanel({
             up, which stop at today rather than on Sunday, sit on the eyebrow's
             line as the Sleep card's night does. */}
         <div className="training-fitness-title">
-          <p className="eyebrow">Weekly Activity</p>
+          <p className="eyebrow">{t("overview.weekly.title")}</p>
           <h2>{formatWeekToDateRange()}</h2>
         </div>
         <div className="training-fitness-header-keys">
@@ -223,7 +224,7 @@ export function FitnessTrendPanel({
           <div
             className="training-fitness-chart"
             role="img"
-            aria-label={`Weekly activity chart for ${series.metricLabel.toLowerCase()}, by sport.`}
+            aria-label={t("overview.weekly.chartLabel", { metric: series.metricLabel })}
           >
             <div className="training-fitness-y-axis" aria-hidden="true">
               {yAxisUnitLabel ? (
@@ -256,7 +257,7 @@ export function FitnessTrendPanel({
               <div
                 className="training-fitness-bars"
                 role="list"
-                aria-label="Weekly activity for the current calendar week"
+                aria-label={t("overview.weekly.currentWeek")}
               >
                 {series.days.map((bar, dayIndex) => {
                   const fullLabel = formatHappenDayLabel(bar.happenDay);
@@ -389,8 +390,8 @@ export function FitnessTrendPanel({
         ) : (
           <p className="training-empty-state" aria-busy={loading || undefined}>
             {loading
-              ? "Reading your weeks from COROS…"
-              : "Your weeks could not be read from COROS."}
+              ? t("overview.weekly.reading")
+              : t("overview.weekly.unreadable")}
           </p>
         )}
       </div>

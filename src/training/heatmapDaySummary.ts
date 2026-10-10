@@ -11,6 +11,7 @@ import {
   SPORT_COLOR_LABELS,
   type SportColorCategory
 } from "./sportColors";
+import { plural } from "../i18n/core";
 
 /** One activity as it reads inside a Last-30-days heatmap card. */
 export interface HeatmapDayEntry {
@@ -86,7 +87,7 @@ export function formatStrengthFocus(session?: StrengthSession): string {
   // Past the budget the count says more than a mid-word cut would; a single
   // long name is worth keeping, so it is trimmed at a word boundary instead.
   return names.length > 1
-    ? `${names.length} exercises`
+    ? plural("units.exercises", names.length)
     : truncateAtWord(names[0], MAX_FOCUS_CHARS - 2);
 }
 
@@ -291,9 +292,8 @@ export function sportStripeGradient(
     position = index === shares.length - 1 ? 1 : position + entry.share;
     const end = position * 100;
     stops.push(
-      `color-mix(in srgb, var(--sport-${entry.sport}) 75%, transparent) ${start.toFixed(
-        2
-      )}% ${end.toFixed(2)}%`
+      // i18n-ignore: CSS stops
+      `color-mix(in srgb, var(--sport-${entry.sport}) 75%, transparent) ${start.toFixed(2)}% ${end.toFixed(2)}%` // i18n-ignore: CSS stops
     );
   });
 

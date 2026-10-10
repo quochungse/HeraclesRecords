@@ -1,6 +1,7 @@
 import type { CoachAnalysisRun } from "../../../electron/types";
 import { showToast } from "../../toast";
 import { skipReasonLabel } from "./analysisLabels";
+import { t } from "../../i18n/core";
 
 /**
  * "Run now" is the one trigger the athlete watches happen, so it has to answer
@@ -13,7 +14,7 @@ export function announceRunNow(runs: CoachAnalysisRun[]): void {
     // An analysis is always in a conversation, so the only way to produce no
     // runs at all is a switched-off one — which the row already shows, but a
     // button that does nothing has to say why anyway.
-    showToast("This analysis is switched off.", "error");
+    showToast(t("chat.an.toast.off"), "error");
     return;
   }
 
@@ -22,17 +23,17 @@ export function announceRunNow(runs: CoachAnalysisRun[]): void {
   // that stopped answering looks exactly like one that was never asked.
   const failed = runs.filter((run) => run.status === "failed");
   if (failed.length === runs.length) {
-    showToast(failed[0].error ?? "The run failed.", "error");
+    showToast(failed[0].error ?? t("chat.an.toast.failed"), "error");
     return;
   }
 
   if (runs.every((run) => run.skipReason === "no-activity")) {
-    showToast("No new activity to analyse yet.", "error");
+    showToast(t("chat.an.toast.noActivity"), "error");
     return;
   }
 
   const skipped = runs.filter((run) => run.status === "skipped");
   if (skipped.length === runs.length) {
-    showToast(`Skipped — ${skipReasonLabel(skipped[0].skipReason ?? "")}.`, "error");
+    showToast(t("chat.an.toast.skipped", { reason: skipReasonLabel(skipped[0].skipReason ?? "") }), "error");
   }
 }

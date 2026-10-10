@@ -2,6 +2,7 @@ import { app, clipboard, ipcMain, type BrowserWindow } from "electron";
 import os from "node:os";
 import path from "node:path";
 import { DiagnosticsLog, withDiagnosticLogging } from "./diagnosticsLog";
+import { localizeScreenError } from "./mainText";
 import type {
   DiagnosticsSnapshot,
   RendererDiagnosticError
@@ -39,13 +40,21 @@ export function recordDiagnosticError(source: string, error: unknown): void {
  * main.ts registers every handler through this instead of Electron's
  * `ipcMain`, so a failure is logged with its `cause` chain intact — Electron
  * flattens the error to a message on its way to the renderer.
+ *
+ * The log keeps a `ScreenError` in English, which is what an issue report
+ * should hold; only what crosses to the renderer is put in the athlete's
+ * language (`screenText.ts`).
  */
 export const diagnosticIpcMain = {
   handle(channel: string, listener: Parameters<typeof ipcMain.handle>[1]): void {
-    ipcMain.handle(
-      channel,
-      withDiagnosticLogging({ record: recordDiagnosticError }, channel, listener)
-    );
+    const logged = withDiagnosticLogging({ record: recordDiagnosticError }, channel, listener);
+    ipcMain.handle(channel, async (...args: Parameters<typeof logged>) => {
+      try {
+        return await logged(...args);
+      } catch (error) {
+        throw localizeScreenError(error);
+      }
+    });
   }
 };
 

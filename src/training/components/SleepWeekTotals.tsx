@@ -2,11 +2,14 @@ import { Activity, Gauge, HeartPulse, Moon } from "lucide-react";
 import { formatSleepDurationMinutes } from "../formatters";
 import { SLEEP_WEEK_DAYS, type SleepWeekTotals as Totals } from "../sleepWeekTotals";
 import { EMPTY_FIGURE, WEEK_TOTALS_ICON_SIZE, WeekTotalsRow } from "./WeekTotals";
+import { plural, t } from "../../i18n/core";
+import { useI18n } from "../../i18n/useI18n";
 
-function overNights(count: number, noun = "night"): string | undefined {
-  return count > 0
-    ? `Average of ${count} ${noun}${count === 1 ? "" : "s"} with data`
-    : undefined;
+function overNights(count: number, unit: "night" | "day" = "night"): string | undefined {
+  if (count <= 0) return undefined;
+  return unit === "day"
+    ? plural("overview.sleepWeek.overDays", count)
+    : plural("overview.sleepWeek.overNights", count);
 }
 
 function rounded(value?: number): string {
@@ -19,6 +22,7 @@ function rounded(value?: number): string {
  * that have it (`buildSleepWeekTotals`), so a night without data is not a zero.
  */
 export function SleepWeekTotals({ totals }: { totals: Totals }) {
+  useI18n();
   const hrv =
     totals.hrvMin !== undefined && totals.hrvMax !== undefined
       ? Math.round(totals.hrvMin) === Math.round(totals.hrvMax)
@@ -29,13 +33,13 @@ export function SleepWeekTotals({ totals }: { totals: Totals }) {
   return (
     <section
       className="week-totals sleep-week-totals"
-      aria-label={`Last ${SLEEP_WEEK_DAYS} days`}
+      aria-label={t("overview.sleepTrend.lastDays", { days: SLEEP_WEEK_DAYS })}
     >
-      <p className="week-totals-caption">Last {SLEEP_WEEK_DAYS} days</p>
+      <p className="week-totals-caption">{t("overview.sleepTrend.lastDays", { days: SLEEP_WEEK_DAYS })}</p>
       <ul className="week-totals-list">
         <WeekTotalsRow
           icon={<Moon size={WEEK_TOTALS_ICON_SIZE} />}
-          label="Avg sleep"
+          label={t("overview.sleepWeek.avgSleep")}
           value={
             totals.avgSleepMinutes !== undefined
               ? formatSleepDurationMinutes(totals.avgSleepMinutes)
@@ -43,31 +47,31 @@ export function SleepWeekTotals({ totals }: { totals: Totals }) {
           }
           hover={
             totals.sleepNights > 0
-              ? `Main sleep, naps left out. ${overNights(totals.sleepNights)}`
+              ? t("overview.sleepWeek.mainSleep", { over: overNights(totals.sleepNights) ?? "" })
               : undefined
           }
         />
         <WeekTotalsRow
           icon={<Gauge size={WEEK_TOTALS_ICON_SIZE} />}
-          label="Avg score"
+          label={t("overview.sleepWeek.avgScore")}
           value={rounded(totals.avgScore)}
           hover={overNights(totals.scoreNights)}
         />
         <WeekTotalsRow
           icon={<HeartPulse size={WEEK_TOTALS_ICON_SIZE} />}
-          label="Avg RHR"
+          label={t("overview.sleepWeek.avgRhr")}
           value={rounded(totals.avgRhr)}
           unit="bpm"
           hover={overNights(totals.rhrDays, "day")}
         />
         <WeekTotalsRow
           icon={<Activity size={WEEK_TOTALS_ICON_SIZE} />}
-          label="HRV range"
+          label={t("overview.sleepWeek.hrvRange")}
           value={hrv}
           unit="ms"
           hover={
             totals.hrvNights > 0
-              ? `Lowest to highest of ${totals.hrvNights} night${totals.hrvNights === 1 ? "" : "s"}`
+              ? plural("overview.sleepWeek.hrvOver", totals.hrvNights)
               : undefined
           }
         />

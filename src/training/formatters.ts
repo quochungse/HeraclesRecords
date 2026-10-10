@@ -9,14 +9,15 @@ import {
   metersToElevation,
   secondsPerKmToDisplayPace
 } from "../units/units";
+import { formatDecimal, getIntlLocale, getLocale, plural, t } from "../i18n/core";
 
 export function formatTrainingTimestamp(value?: number): string {
   if (!value) {
-    return "Unknown";
+    return t("units.unknown");
   }
 
   const timestamp = value < 10_000_000_000 ? value * 1000 : value;
-  return new Intl.DateTimeFormat(undefined, {
+  return new Intl.DateTimeFormat(getIntlLocale(), {
     month: "short",
     day: "numeric",
     hour: "numeric",
@@ -33,7 +34,7 @@ export function formatTrainingTableWhen(value?: number): string {
   const date = new Date(timestamp);
   const sameYear = date.getFullYear() === new Date().getFullYear();
 
-  return new Intl.DateTimeFormat(undefined, {
+  return new Intl.DateTimeFormat(getIntlLocale(), {
     month: "numeric",
     day: "numeric",
     ...(sameYear ? {} : { year: "2-digit" }),
@@ -72,7 +73,7 @@ export function formatDurationSeconds(value?: number): string {
  */
 export function formatDurationSpan(value?: number): string {
   if (!Number.isFinite(value) || !value || value <= 0) {
-    return "0m";
+    return t("units.duration.m", { m: 0 });
   }
 
   const totalMinutes = Math.round(Math.max(0, value) / 60);
@@ -80,10 +81,12 @@ export function formatDurationSpan(value?: number): string {
   const minutes = totalMinutes % 60;
 
   if (hours === 0) {
-    return `${minutes}m`;
+    return t("units.duration.m", { m: minutes });
   }
 
-  return minutes === 0 ? `${hours}h` : `${hours}h ${minutes}m`;
+  return minutes === 0
+    ? t("units.duration.h", { h: hours })
+    : t("units.duration.hm", { h: hours, m: minutes });
 }
 
 export function formatDistanceMeters(
@@ -106,7 +109,7 @@ export function formatOptionalNumber(value?: number): string {
     return "-";
   }
 
-  return Number.isInteger(value) ? String(value) : value.toFixed(1);
+  return Number.isInteger(value) ? String(value) : formatDecimal(value, 1);
 }
 
 export function formatPaceSecondsPerKm(
@@ -236,7 +239,7 @@ export function formatHappenDayLabel(value: string): string {
   const year = Number(value.slice(0, 4));
   const month = Number(value.slice(4, 6)) - 1;
   const day = Number(value.slice(6, 8));
-  return new Intl.DateTimeFormat(undefined, {
+  return new Intl.DateTimeFormat(getIntlLocale(), {
     weekday: "short",
     month: "short",
     day: "numeric"
@@ -296,7 +299,17 @@ function formatSleepClock(value?: string): string | undefined {
     return undefined;
   }
 
-  const period = hours >= 12 ? "PM" : "AM";
+  // Every other language writes the clock its own way (23:26, 午後11:26);
+  // English keeps its own spelling, which the suites hold to the character.
+  if (getLocale() !== "en") {
+    return new Intl.DateTimeFormat(getIntlLocale(), {
+      hour: "numeric",
+      minute: "2-digit",
+      timeZone: "UTC"
+    }).format(new Date(Date.UTC(2000, 0, 1, hours, minutes)));
+  }
+
+  const period = hours >= 12 ? "PM" : "AM"; // i18n-ignore
   const displayHour = hours % 12 || 12;
   return `${displayHour}:${String(minutes).padStart(2, "0")} ${period}`;
 }
@@ -382,7 +395,7 @@ export function formatUpcomingWorkoutDate(
   const todayKey = getLocalHappenDayKey(referenceDate);
 
   if (happenDay === todayKey) {
-    return "Today";
+    return t("units.today");
   }
 
   const year = Number(happenDay.slice(0, 4));
@@ -397,12 +410,12 @@ export function formatUpcomingWorkoutDate(
   );
 
   if (diffDays > 0 && diffDays <= 6) {
-    return new Intl.DateTimeFormat(undefined, {
+    return new Intl.DateTimeFormat(getIntlLocale(), {
       weekday: "short"
     }).format(date);
   }
 
-  return new Intl.DateTimeFormat(undefined, {
+  return new Intl.DateTimeFormat(getIntlLocale(), {
     month: "short",
     day: "numeric"
   }).format(date);
@@ -424,7 +437,7 @@ export function formatUpcomingWorkoutLoad(value?: number): string {
     return "--";
   }
 
-  return `${Math.round(value)}TL`;
+  return t("units.trainingLoadShort", { value: String(Math.round(value)) });
 }
 
 export function parseUpcomingWorkoutDistanceKm(
@@ -466,36 +479,60 @@ export function formatUpcomingWorkoutVolumeDisplay(
   return volume;
 }
 
+/**
+ * The words for a category `inferUpcomingWorkoutCategory` answers. The
+ * categories stay English ids — the greeting and the calendar key off them —
+ * and only what is drawn is translated.
+ */
+export function workoutCategoryLabel(category: string): string {
+  switch (category) {
+    case "Race":
+      return t("units.category.race");
+    case "Long":
+      return t("units.category.long");
+    case "Easy":
+      return t("units.category.easy");
+    case "Intervals":
+      return t("units.category.intervals");
+    case "Speed":
+      return t("units.category.speed");
+    case "Run":
+      return t("units.category.run");
+    default:
+      return category;
+  }
+}
+
 export function inferUpcomingWorkoutCategory(name: string): string {
   const normalized = name.trim().toLowerCase();
 
   if (!normalized) {
-    return "Run";
+    return "Run"; // i18n-ignore: a category id (workoutCategoryLabel)
   }
 
   if (/(race|marathon|half|10k|5k|parkrun)/.test(normalized)) {
-    return "Race";
+    return "Race"; // i18n-ignore: a category id
   }
 
   if (/(long run|long\b)/.test(normalized)) {
-    return "Long";
+    return "Long"; // i18n-ignore: a category id
   }
 
   if (/(easy|recovery|filler|rest|aerobic)/.test(normalized)) {
-    return "Easy";
+    return "Easy"; // i18n-ignore: a category id
   }
 
   if (/(interval|repeat|400|800|track|fartlek|tempo|speed|taper|vo2|threshold)/.test(
     normalized
   )) {
     if (/(interval|repeat|400|800|track|fartlek|vo2)/.test(normalized)) {
-      return "Intervals";
+      return "Intervals"; // i18n-ignore: a category id
     }
 
-    return "Speed";
+    return "Speed"; // i18n-ignore: a category id
   }
 
-  return "Run";
+  return "Run"; // i18n-ignore: a category id
 }
 
 export function formatUpcomingWorkoutStats(
@@ -503,7 +540,7 @@ export function formatUpcomingWorkoutStats(
   unitSystem: UnitSystem
 ): string {
   const count = workouts.length;
-  const workoutLabel = `${count} workout${count === 1 ? "" : "s"}`;
+  const workoutLabel = plural("units.workouts", count);
 
   const totalKm = workouts.reduce((sum, workout) => {
     const km = parseUpcomingWorkoutDistanceKm(workout.volume);
@@ -525,12 +562,12 @@ export function formatUpcomingWorkoutStats(
     const displayed = metersToDisplayDistance(meters, unitSystem);
     const rounded = Math.abs(displayed - Math.round(displayed)) < 0.05
       ? Math.round(displayed)
-      : Number(displayed.toFixed(1));
-    parts.push(`${rounded} ${distanceUnit(unitSystem)}`);
+      : Number(displayed.toFixed(1)); // i18n-ignore: rounded as a number, written below
+    parts.push(`${formatDecimal(rounded, Number.isInteger(rounded) ? 0 : 1)} ${distanceUnit(unitSystem)}`);
   }
 
   if (totalLoad > 0) {
-    parts.push(`${Math.round(totalLoad)} TL`);
+    parts.push(t("units.trainingLoadShort", { value: Math.round(totalLoad) }));
   }
 
   return parts.join(" · ");
@@ -613,7 +650,7 @@ function formatRecordDistanceHero(
   distanceMeters: number,
   unitSystem: UnitSystem
 ): string {
-  return `${metersToDisplayDistance(distanceMeters, unitSystem).toFixed(2)}${distanceUnit(unitSystem)}`;
+  return `${formatDecimal(metersToDisplayDistance(distanceMeters, unitSystem), 2)}${distanceUnit(unitSystem)}`;
 }
 
 export function formatRecordDateShort(happenDay?: string): string {
@@ -625,7 +662,7 @@ export function formatRecordDateShort(happenDay?: string): string {
   const month = Number(happenDay.slice(4, 6)) - 1;
   const day = Number(happenDay.slice(6, 8));
 
-  return new Intl.DateTimeFormat(undefined, {
+  return new Intl.DateTimeFormat(getIntlLocale(), {
     month: "short",
     day: "numeric",
     year: "numeric"
@@ -652,7 +689,7 @@ export function formatPersonalRecordHero(record: {
   avgPace?: number;
 }, unitSystem: UnitSystem): string {
   if (PERSONAL_RECORD_SLOT_TYPES.has(record.type) && !isPersonalRecordPopulated(record)) {
-    return "Not recorded";
+    return t("units.notRecorded");
   }
 
   if (record.type === RECORD_TYPE_LONGEST_RUN) {

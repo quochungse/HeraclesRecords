@@ -52,7 +52,7 @@ import {
   type AthleteSex
 } from "./fitnessStandards";
 import type { LabourId, LabourStage, StageProgress } from "./labours";
-import { STAGE_NUMERALS, labourDefinition, labourStageKey } from "./labours";
+import { STAGE_NUMERALS, labourStageKey } from "./labours";
 import type { AdminRegion } from "../trainingMap/adminRegions";
 import {
   clusterPlaces,
@@ -60,6 +60,8 @@ import {
   placeLabelKey,
   type PlaceCluster
 } from "../trainingMap/placeClusters";
+import { capitalizeFirst, formatCount, formatDecimal, getIntlLocale, getLocale, messageRecord, plural, t } from "../i18n/core";
+import { labourShort, labourStage } from "./labourWords";
 
 export type MilestoneCategory =
   | "first"
@@ -208,64 +210,78 @@ interface LadderStep {
 }
 
 const RUN_LADDER: readonly LadderStep[] = [
-  { distance: 10000, key: "10k", title: "First 10K", major: false },
+  { distance: 10000, key: "10k", get title() { return t("records.ladder.run10k"); }, major: false },
   {
     distance: 21097.5,
     key: "half",
-    title: "First half marathon distance",
+    get title() {
+      return t("records.ladder.runHalf");
+    },
     major: true,
     labour: { id: "bull", stage: 1 }
   },
   {
     distance: 42195,
     key: "marathon",
-    title: "First marathon distance",
+    get title() {
+      return t("records.ladder.runMarathon");
+    },
     major: true,
     labour: { id: "bull", stage: 2 }
   },
-  { distance: 50000, key: "50k", title: "First 50K", major: true, labour: { id: "bull", stage: 3 } },
-  { distance: 100000, key: "100k", title: "First 100K", major: true }
+  { distance: 50000, key: "50k", get title() { return t("records.ladder.run50k"); }, major: true, labour: { id: "bull", stage: 3 } },
+  { distance: 100000, key: "100k", get title() { return t("records.ladder.run100k"); }, major: true }
 ];
 
 const RIDE_LADDER: readonly LadderStep[] = [
-  { distance: 50000, key: "50k", title: "First 50 km ride", major: false },
+  { distance: 50000, key: "50k", get title() { return t("records.ladder.ride50"); }, major: false },
   {
     distance: 100000,
     key: "100k",
-    title: "First 100 km ride",
+    get title() {
+      return t("records.ladder.ride100");
+    },
     major: true,
     labour: { id: "birds", stage: 2 }
   },
   {
     distance: 160934.4,
     key: "century",
-    title: "First century ride",
+    get title() {
+      return t("records.ladder.rideCentury");
+    },
     major: true,
     labour: { id: "birds", stage: 3 }
   },
-  { distance: 200000, key: "200k", title: "First 200 km ride", major: true }
+  { distance: 200000, key: "200k", get title() { return t("records.ladder.ride200"); }, major: true }
 ];
 
 const SWIM_LADDER: readonly LadderStep[] = [
   {
     distance: 500,
     key: "500",
-    title: "First 500 m swim",
+    get title() {
+      return t("records.ladder.swim500");
+    },
     major: false,
     labour: { id: "hydra", stage: 1 }
   },
-  { distance: 1000, key: "1k", title: "First 1 km swim", major: false },
+  { distance: 1000, key: "1k", get title() { return t("records.ladder.swim1k"); }, major: false },
   {
     distance: 1500,
     key: "1500",
-    title: "First 1.5 km swim",
+    get title() {
+      return t("records.ladder.swim1500");
+    },
     major: false,
     labour: { id: "hydra", stage: 2 }
   },
   {
     distance: 3800,
     key: "3800",
-    title: "First 3.8 km swim",
+    get title() {
+      return t("records.ladder.swim3800");
+    },
     major: true,
     labour: { id: "hydra", stage: 3 }
   }
@@ -376,8 +392,20 @@ export const RECORD_DISTANCES: ReadonlyArray<{ distance: number; label: string; 
   { distance: 1000, label: "1K", corosType: 7 },
   { distance: 5000, label: "5K", corosType: 5 },
   { distance: 10000, label: "10K", corosType: 4 },
-  { distance: 21097.5, label: "half marathon", corosType: 2 },
-  { distance: 42195, label: "marathon", corosType: 13 }
+  {
+    distance: 21097.5,
+    get label() {
+      return t("records.dist.half");
+    },
+    corosType: 2
+  },
+  {
+    distance: 42195,
+    get label() {
+      return t("records.dist.marathon");
+    },
+    corosType: 13
+  }
 ];
 /** COROS's "All" record group: all-time bests. */
 const COROS_ALL_TIME_GROUP = 4;
@@ -404,9 +432,11 @@ const RECORD_MIN_GAIN = 0.01;
 
 // --- Days -------------------------------------------------------------------
 
+// English's own short day, "14 Jun 2026", whatever the region; every other
+// language takes Intl's.
 const MONTHS = [
-  "Jan", "Feb", "Mar", "Apr", "May", "Jun",
-  "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"
+  "Jan", "Feb", "Mar", "Apr", "May", "Jun", // i18n-ignore
+  "Jul", "Aug", "Sep", "Oct", "Nov", "Dec" // i18n-ignore
 ];
 
 export function dayOfEpochSeconds(seconds: number): string {
@@ -444,12 +474,17 @@ function noonOf(day: string): number {
 /** "14 Jun 2026". */
 export function formatDayShort(day: string): string {
   const date = dateOfDay(day);
+  if (getLocale() !== "en") {
+    // Vietnamese abbreviates a month to "thg 8", which reads as a typo.
+    const month = getLocale() === "vi" ? "long" : "short";
+    return new Intl.DateTimeFormat(getIntlLocale(), { day: "numeric", month, year: "numeric" }).format(date);
+  }
   return `${date.getDate()} ${MONTHS[date.getMonth()]} ${date.getFullYear()}`;
 }
 
 /** "June 2025". */
 function formatMonthYear(day: string): string {
-  return dateOfDay(day).toLocaleString("en-GB", { month: "long", year: "numeric" });
+  return dateOfDay(day).toLocaleString(getLocale() === "en" ? "en-GB" : getIntlLocale(), { month: "long", year: "numeric" });
 }
 
 // --- Sports -----------------------------------------------------------------
@@ -463,29 +498,45 @@ export function recordsSportOf(sportType: number | undefined): RecordsSport {
   return "other";
 }
 
-const SPORT_NOUN: Readonly<Record<RecordsSport, string>> = {
-  run: "Running",
-  ride: "Cycling",
-  hike: "Hiking",
-  swim: "Swimming",
-  strength: "Strength",
-  other: "Training"
-};
+const SPORT_NOUN = messageRecord<RecordsSport>({
+  run: "records.sport.run",
+  ride: "records.sport.ride",
+  hike: "records.sport.hike",
+  swim: "records.sport.swim",
+  strength: "records.sport.strength",
+  other: "records.sport.other"
+});
 
-const FIRST_TITLE: Readonly<Record<Exclude<RecordsSport, "other">, string>> = {
-  run: "First run",
-  ride: "First ride",
-  hike: "First hike",
-  swim: "First swim",
-  strength: "First strength session"
-};
+/** The sport as a word inside a sentence: "The 100th was running". */
+const SPORT_IN_SENTENCE = messageRecord<RecordsSport>({
+  run: "records.sportLower.run",
+  ride: "records.sportLower.ride",
+  hike: "records.sportLower.hike",
+  swim: "records.sportLower.swim",
+  strength: "records.sportLower.strength",
+  other: "records.sportLower.other"
+});
 
-const LONGEST_TITLE: Partial<Record<RecordsSport, string>> = {
-  run: "Longest run yet",
-  ride: "Longest ride yet",
-  hike: "Longest hike yet",
-  swim: "Longest swim yet"
-};
+const FIRST_TITLE = messageRecord<Exclude<RecordsSport, "other">>({
+  run: "records.first.run",
+  ride: "records.first.ride",
+  hike: "records.first.hike",
+  swim: "records.first.swim",
+  strength: "records.first.strength"
+});
+
+const LONGEST_TITLE: Partial<Record<RecordsSport, string>> = messageRecord<"run" | "ride" | "hike" | "swim">({
+  run: "records.longest.run",
+  ride: "records.longest.ride",
+  hike: "records.longest.hike",
+  swim: "records.longest.swim"
+});
+
+const LONGEST_BEFORE = messageRecord<"run" | "ride" | "swim">({
+  run: "records.ctx.longestBefore.run",
+  ride: "records.ctx.longestBefore.ride",
+  swim: "records.ctx.longestBefore.swim"
+});
 
 /**
  * Whether an activity's summary still lacks the records figures and is worth
@@ -511,11 +562,11 @@ function splitValue(text: string): { value: string; unit: string } {
 }
 
 function distanceFigure(meters: number, unitSystem: UnitSystem, swim = false): MilestoneFigure {
-  return { ...splitValue(formatDistanceValue(meters, unitSystem, { swim })), label: "Distance" };
+  return { ...splitValue(formatDistanceValue(meters, unitSystem, { swim })), label: t("records.fig.distance") };
 }
 
 function groupThousands(value: number): string {
-  return Math.round(value).toLocaleString("en-US");
+  return formatCount(Math.round(value));
 }
 
 /**
@@ -550,19 +601,40 @@ function activityFigures(activity: TrainingHubActivity, unitSystem: UnitSystem):
     figures.push(distanceFigure(activity.distance, unitSystem, sport === "swim"));
   }
   if (activity.duration && activity.duration > 0) {
-    figures.push({ value: formatDurationSeconds(activity.duration), unit: "", label: "Time" });
+    figures.push({ value: formatDurationSeconds(activity.duration), unit: "", label: t("records.fig.time") });
   }
   if (sport === "run" && activity.distance && activity.duration && activity.distance > 0) {
     const pace = formatPaceValue(activity.duration / (activity.distance / 1000), unitSystem);
     const [value, unit] = pace.split(" ");
-    figures.push({ value, unit: unit ?? "", label: "Pace" });
+    figures.push({ value, unit: unit ?? "", label: t("records.fig.pace") });
   } else if (activity.elevationGain && activity.elevationGain > 0) {
     figures.push({
       ...splitValue(formatHeight(activity.elevationGain, unitSystem)),
-      label: "Climbed"
+      label: t("records.fig.climbed")
     });
   }
   return figures;
+}
+
+function interpolateDistance(message: string, distance: string): string {
+  return message.replace("{distance}", distance);
+}
+
+/** "1K, 5K and 10K", in the language's own way of listing. */
+function joinedList(labels: string[]): string {
+  if (labels.length === 1) return labels[0]!;
+  if (getLocale() === "en") {
+    return `${labels.slice(0, -1).join(", ")} and ${labels[labels.length - 1]}`; // i18n-ignore: English, which Intl would give an Oxford comma
+  }
+  return new Intl.ListFormat(getIntlLocale(), { type: "conjunction" }).format(labels);
+}
+
+const PLAN_ORDINALS = ["records.plan.ord1", "records.plan.ord2", "records.plan.ord3", "records.plan.ord4", "records.plan.ord5"] as const;
+
+/** "first", "second"… for the first five, "6th" after. */
+function planOrdinal(index: number): string {
+  const key = PLAN_ORDINALS[index];
+  return key ? t(key) : t("records.plan.ordN", { n: index + 1 });
 }
 
 function activityRef(activity: TrainingHubActivity): Milestone["activity"] {
@@ -654,8 +726,8 @@ export function computeRecords(input: RecordsInput): RecordsResult {
         category: "first",
         day,
         at: startTime - 1,
-        kind: "The beginning",
-        title: "Your first activity on COROS",
+        kind: t("records.kind.beginning"),
+        title: t("records.t.start"),
         detail: [activity.sportName ?? SPORT_NOUN[sport], line].filter(Boolean).join(" · "),
         sport,
         activity: ref
@@ -670,7 +742,7 @@ export function computeRecords(input: RecordsInput): RecordsResult {
         category: "first",
         day,
         at: startTime,
-        kind: `First · ${SPORT_NOUN[sport]}`,
+        kind: t("records.kind.first", { sport: SPORT_NOUN[sport] }),
         title: FIRST_TITLE[sport],
         detail: line || undefined,
         figures: activityFigures(activity, unitSystem),
@@ -687,8 +759,8 @@ export function computeRecords(input: RecordsInput): RecordsResult {
         category: "first",
         day,
         at: startTime + 1,
-        kind: "First · Swimming",
-        title: "First open-water swim",
+        kind: t("records.kind.first", { sport: SPORT_NOUN.swim }),
+        title: t("records.t.openWater"),
         detail: line || undefined,
         sport,
         activity: ref
@@ -709,13 +781,16 @@ export function computeRecords(input: RecordsInput): RecordsResult {
         category: "first",
         day,
         at: startTime + 2,
-        kind: `First · ${SPORT_NOUN[sport]}`,
+        kind: t("records.kind.first", { sport: SPORT_NOUN[sport] }),
         title: step.title,
         detail: line,
         figures: activityFigures(activity, unitSystem),
         ...(previous > 0
           ? {
-              context: `The longest ${sport === "ride" ? "ride" : sport === "swim" ? "swim" : "run"} before it was ${formatDistanceValue(previous, unitSystem, { swim: sport === "swim" })}.`
+              context: interpolateDistance(
+                LONGEST_BEFORE[sport === "ride" ? "ride" : sport === "swim" ? "swim" : "run"],
+                formatDistanceValue(previous, unitSystem, { swim: sport === "swim" })
+              )
             }
           : {}),
         sport,
@@ -739,9 +814,14 @@ export function computeRecords(input: RecordsInput): RecordsResult {
         category: "record",
         day,
         at: startTime + 3,
-        kind: `Record · ${SPORT_NOUN[sport]}`,
-        title: `${LONGEST_TITLE[sport]} — ${formatDistanceValue(distance, unitSystem, { swim: sport === "swim" })}`,
-        detail: `${formatDistanceValue(distance - longest, unitSystem, { swim: sport === "swim" })} further than the last longest`,
+        kind: t("records.kind.record", { sport: SPORT_NOUN[sport] }),
+        title: t("records.t.withFigure", {
+          title: LONGEST_TITLE[sport] ?? "",
+          value: formatDistanceValue(distance, unitSystem, { swim: sport === "swim" })
+        }),
+        detail: t("records.d.further", {
+          distance: formatDistanceValue(distance - longest, unitSystem, { swim: sport === "swim" })
+        }),
         sport,
         activity: ref
       });
@@ -759,15 +839,15 @@ export function computeRecords(input: RecordsInput): RecordsResult {
         category: "first",
         day,
         at: startTime + 4,
-        kind: `First · ${SPORT_NOUN[sport]}`,
-        title: `${formatHeight(step.meters, unitSystem)} climbed in one activity`,
-        detail: [activity.name, `${formatHeight(climb, unitSystem)} climbed`].filter(Boolean).join(" · "),
+        kind: t("records.kind.first", { sport: SPORT_NOUN[sport] }),
+        title: t("records.t.climbOne", { height: formatHeight(step.meters, unitSystem) }),
+        detail: [activity.name, t("records.d.climbed", { height: formatHeight(climb, unitSystem) })].filter(Boolean).join(" · "),
         figures: [
-          { ...splitValue(formatHeight(climb, unitSystem)), label: "Climbed" },
-          ...activityFigures(activity, unitSystem).filter((figure) => figure.label !== "Climbed")
+          { ...splitValue(formatHeight(climb, unitSystem)), label: t("records.fig.climbed") },
+          ...activityFigures(activity, unitSystem).filter((figure) => figure.label !== t("records.fig.climbed"))
         ],
         ...(longestClimb > 0
-          ? { context: `${formatHeight(climb - longestClimb, unitSystem)} more than your previous biggest climb.` }
+          ? { context: t("records.ctx.moreClimb", { height: formatHeight(climb - longestClimb, unitSystem) }) }
           : {}),
         sport,
         major: step.major,
@@ -788,9 +868,12 @@ export function computeRecords(input: RecordsInput): RecordsResult {
         category: "record",
         day,
         at: startTime + 4,
-        kind: `Biggest climb · ${SPORT_NOUN[sport]}`,
-        title: activity.name ? `Biggest climb yet: ${activity.name}` : "Biggest climb yet",
-        detail: `${formatHeight(climb, unitSystem)} · ${formatHeight(climb - longestClimb, unitSystem)} more than before`,
+        kind: t("records.kind.biggestClimb", { sport: SPORT_NOUN[sport] }),
+        title: activity.name ? t("records.t.biggestClimbNamed", { name: activity.name }) : t("records.t.biggestClimb"),
+        detail: t("records.d.biggestClimb", {
+          height: formatHeight(climb, unitSystem),
+          more: formatHeight(climb - longestClimb, unitSystem)
+        }),
         sport,
         activity: ref
       });
@@ -815,9 +898,9 @@ export function computeRecords(input: RecordsInput): RecordsResult {
         category: "lifetime",
         day,
         at: startTime + 5,
-        kind: "Mountains",
-        title: "An Everest climbed in 30 days",
-        detail: `${formatHeight(climbWindowSum, unitSystem)} since ${formatDayShort(climbWindow[0].day)}`,
+        kind: t("records.kind.mountains"),
+        title: t("records.t.everest30"),
+        detail: t("records.d.since", { value: formatHeight(climbWindowSum, unitSystem), day: formatDayShort(climbWindow[0].day) }),
         sport,
         major: true,
         activity: ref,
@@ -835,9 +918,11 @@ export function computeRecords(input: RecordsInput): RecordsResult {
         category: "lifetime",
         day,
         at: startTime + 6,
-        kind: "Lifetime",
-        title: `${groupThousands(step.hours)} hours of training`,
-        detail: `${groupThousands(activityCount + 1)} activities since ${formatMonthYear(dayOfEpochSeconds(activities[0].startTime as number))}`,
+        kind: t("records.kind.lifetime"),
+        title: plural("records.t.hours", step.hours),
+        detail: plural("records.d.activitiesSince", activityCount + 1, {
+          month: formatMonthYear(dayOfEpochSeconds(activities[0].startTime as number))
+        }),
         major: step.major ?? false,
         activity: ref,
         ...(step.labour ? { labour: { id: "stables", stage: step.labour } } : {})
@@ -856,9 +941,9 @@ export function computeRecords(input: RecordsInput): RecordsResult {
           category: "lifetime",
           day,
           at: startTime + 7,
-          kind: "Lifetime · Running",
-          title: `${groupThousands(threshold)} ${unit} of running`,
-          detail: `${groupThousands(sessions)} runs`,
+          kind: t("records.kind.lifetimeSport", { sport: SPORT_NOUN.run }),
+          title: t("records.t.runDistance", { value: groupThousands(threshold), unit }),
+          detail: plural("records.d.runs", sessions),
           sport,
           major: threshold >= 1000,
           activity: ref
@@ -872,9 +957,9 @@ export function computeRecords(input: RecordsInput): RecordsResult {
           category: "lifetime",
           day,
           at: startTime + 7,
-          kind: "Lifetime · Cycling",
-          title: "50 km of riding",
-          detail: `${groupThousands(sessions)} ${sessions === 1 ? "ride" : "rides"}`,
+          kind: t("records.kind.lifetimeSport", { sport: SPORT_NOUN.ride }),
+          title: t("records.t.ride50"),
+          detail: plural("records.d.rides", sessions),
           sport,
           activity: ref,
           labour: { id: "birds", stage: 1 }
@@ -890,9 +975,9 @@ export function computeRecords(input: RecordsInput): RecordsResult {
           category: "lifetime",
           day,
           at: startTime + 7,
-          kind: "Lifetime · Cycling",
-          title: `${groupThousands(threshold)} ${unit} of riding`,
-          detail: `${groupThousands(sessions)} rides`,
+          kind: t("records.kind.lifetimeSport", { sport: SPORT_NOUN.ride }),
+          title: t("records.t.rideDistance", { value: groupThousands(threshold), unit }),
+          detail: plural("records.d.rides", sessions),
           sport,
           major: threshold >= 10000,
           activity: ref
@@ -908,9 +993,9 @@ export function computeRecords(input: RecordsInput): RecordsResult {
         category: "lifetime",
         day,
         at: startTime + 8,
-        kind: "Lifetime · Climbing",
-        title: count === 1 ? "An Everest climbed, all told" : `${count} Everests climbed, all told`,
-        detail: `${formatHeight(climbMeters, unitSystem)} gained since you started`,
+        kind: t("records.kind.lifetimeClimbing"),
+        title: plural("records.t.everests", count),
+        detail: t("records.d.gained", { height: formatHeight(climbMeters, unitSystem) }),
         major: count >= 10,
         activity: ref
       });
@@ -923,9 +1008,9 @@ export function computeRecords(input: RecordsInput): RecordsResult {
         category: "lifetime",
         day,
         at: startTime + 9,
-        kind: "Lifetime",
-        title: `${groupThousands(count)} activities`,
-        detail: `The ${groupThousands(count)}th was ${activity.name ?? SPORT_NOUN[sport].toLowerCase()}`,
+        kind: t("records.kind.lifetime"),
+        title: plural("records.t.activities", count),
+        detail: t("records.d.nth", { n: groupThousands(count), name: activity.name ?? SPORT_IN_SENTENCE[sport] }),
         major: count >= 1000,
         activity: ref
       });
@@ -939,9 +1024,9 @@ export function computeRecords(input: RecordsInput): RecordsResult {
           category: "lifetime",
           day,
           at: startTime + 9,
-          kind: "Lifetime · Strength",
-          title: `${step.days} days of strength training`,
-          ...(sessions > step.days ? { detail: `${groupThousands(sessions)} sessions in all` } : {}),
+          kind: t("records.kind.lifetimeSport", { sport: SPORT_NOUN.strength }),
+          title: plural("records.t.strengthDays", step.days),
+          ...(sessions > step.days ? { detail: plural("records.d.sessionsInAll", sessions) } : {}),
           sport,
           major: step.major ?? false,
           activity: ref,
@@ -973,9 +1058,9 @@ export function computeRecords(input: RecordsInput): RecordsResult {
         category: "record",
         day: dayOfEpochSeconds(last.startTime as number),
         at: (last.startTime as number) + 10,
-        kind: "Record · Volume",
-        title: `Biggest week yet — ${hours.toFixed(1)} h`,
-        detail: `${(hours - biggestWeek / 3600).toFixed(1)} h more than any week before it`
+        kind: t("records.kind.recordVolume"),
+        title: t("records.t.biggestWeek", { hours: formatDecimal(hours, 1) }),
+        detail: t("records.d.biggestWeek", { hours: formatDecimal(hours - biggestWeek / 3600, 1) })
       });
     }
     biggestWeek = Math.max(biggestWeek, seconds);
@@ -996,9 +1081,9 @@ export function computeRecords(input: RecordsInput): RecordsResult {
         category: "streak",
         day: dayOfEpochSeconds(first.startTime as number),
         at: (first.startTime as number) + 11,
-        kind: "Streak",
-        title: `${step.weeks} weeks in a row`,
-        detail: `At least one session every week since ${formatDayShort(addDays(week, -7 * (step.weeks - 1)))}`,
+        kind: t("records.kind.streak"),
+        title: plural("records.t.weeksInRow", step.weeks),
+        detail: t("records.d.weeksSince", { day: formatDayShort(addDays(week, -7 * (step.weeks - 1))) }),
         major: step.major ?? false,
         activity: activityRef(first),
         ...(step.labour ? { labour: { id: "hind", stage: step.labour } } : {})
@@ -1030,9 +1115,9 @@ export function computeRecords(input: RecordsInput): RecordsResult {
         category: "anniversary",
         day,
         at: noonOf(day),
-        kind: "Anniversary",
-        title: years === 1 ? "One year since your first activity" : `${years} years since your first activity`,
-        detail: `Your first was on ${formatDayShort(firstDay)}`
+        kind: t("records.kind.anniversary"),
+        title: plural("records.t.anniversary", years),
+        detail: t("records.d.firstOn", { day: formatDayShort(firstDay) })
       });
     }
   }
@@ -1088,32 +1173,32 @@ export function computeRecords(input: RecordsInput): RecordsResult {
   };
   const strengthDayCount = strengthDays.size;
   for (const [stage, target] of [[1, 20], [2, 100], [3, 200]] as const) {
-    open("lion", stage, { text: `${strengthDayCount} / ${target} days`, ratio: ratioOf(strengthDayCount, target) });
+    open("lion", stage, { text: t("records.p.days", { n: strengthDayCount, target }), ratio: ratioOf(strengthDayCount, target) });
   }
   const longestSwim = longestBySport.get("swim") ?? 0;
   if (longestSwim > 0) {
     for (const [stage, target] of [[1, 500], [2, 1500], [3, 3800]] as const) {
       open("hydra", stage, {
-        text: `Best ${formatDistanceValue(longestSwim, unitSystem, { swim: true })}`,
+        text: t("records.p.best", { value: formatDistanceValue(longestSwim, unitSystem, { swim: true }) }),
         ratio: ratioOf(longestSwim, target)
       });
     }
   }
   for (const [stage, target] of [[1, 8], [2, 26], [3, 52]] as const) {
     open("hind", stage, {
-      text: `${currentStreak} / ${target} weeks${bestStreak > currentStreak ? ` · best ${bestStreak}` : ""}`,
+      text: `${t("records.p.weeks", { n: currentStreak, target })}${bestStreak > currentStreak ? ` · ${t("records.p.bestN", { n: bestStreak })}` : ""}`,
       ratio: ratioOf(currentStreak, target)
     });
   }
-  open("boar", 1, { text: `Best ${formatHeight(longestClimb, unitSystem, "0 m")}`, ratio: ratioOf(longestClimb, 750) });
-  open("boar", 2, { text: `Best ${formatHeight(longestClimb, unitSystem, "0 m")}`, ratio: ratioOf(longestClimb, 1500) });
+  open("boar", 1, { text: t("records.p.best", { value: formatHeight(longestClimb, unitSystem, "0 m") }), ratio: ratioOf(longestClimb, 750) });
+  open("boar", 2, { text: t("records.p.best", { value: formatHeight(longestClimb, unitSystem, "0 m") }), ratio: ratioOf(longestClimb, 1500) });
   open("boar", 3, {
-    text: `Best 30 days ${formatHeight(bestClimbWindow, unitSystem, "0 m")}`,
+    text: t("records.p.best30", { value: formatHeight(bestClimbWindow, unitSystem, "0 m") }),
     ratio: ratioOf(bestClimbWindow, EVEREST_METERS)
   });
   const hours = totalSeconds / 3600;
   for (const [stage, target] of [[1, 50], [2, 250], [3, 500]] as const) {
-    open("stables", stage, { text: `${groupThousands(hours)} / ${groupThousands(target)} h`, ratio: ratioOf(hours, target) });
+    open("stables", stage, { text: t("records.p.hours", { n: groupThousands(hours), target: groupThousands(target) }), ratio: ratioOf(hours, target) });
   }
   if (rideMeters > 0) {
     open("birds", 1, {
@@ -1123,13 +1208,13 @@ export function computeRecords(input: RecordsInput): RecordsResult {
   }
   const longestRide = longestBySport.get("ride") ?? 0;
   if (longestRide > 0) {
-    open("birds", 2, { text: `Best ${formatDistanceValue(longestRide, unitSystem)}`, ratio: ratioOf(longestRide, 100000) });
-    open("birds", 3, { text: `Best ${formatDistanceValue(longestRide, unitSystem)}`, ratio: ratioOf(longestRide, 160934.4) });
+    open("birds", 2, { text: t("records.p.best", { value: formatDistanceValue(longestRide, unitSystem) }), ratio: ratioOf(longestRide, 100000) });
+    open("birds", 3, { text: t("records.p.best", { value: formatDistanceValue(longestRide, unitSystem) }), ratio: ratioOf(longestRide, 160934.4) });
   }
   const longestRun = longestBySport.get("run") ?? 0;
   if (longestRun > 0) {
     for (const [stage, target] of [[1, 21097.5], [2, 42195], [3, 50000]] as const) {
-      open("bull", stage, { text: `Best ${formatDistanceValue(longestRun, unitSystem)}`, ratio: ratioOf(longestRun, target) });
+      open("bull", stage, { text: t("records.p.best", { value: formatDistanceValue(longestRun, unitSystem) }), ratio: ratioOf(longestRun, target) });
     }
   }
   for (const [key, value] of records.progress) {
@@ -1158,13 +1243,12 @@ export function computeRecords(input: RecordsInput): RecordsResult {
       (candidate) => candidate < stage && !reached.has(labourStageKey(id as LabourId, candidate))
     );
     if (earlier.length > 0) continue;
-    const definition = labourDefinition(id as LabourId);
     candidates.push({
       id: key,
-      label: `${definition.short} · ${STAGE_NUMERALS[stage]}`,
-      title: definition.stages[stage - 1],
+      label: `${labourShort(id as LabourId)} · ${STAGE_NUMERALS[stage]}`,
+      title: labourStage(id as LabourId, stage),
       value: value.text,
-      hint: `${Math.round(value.ratio * 100)}% there`,
+      hint: t("records.p.there", { percent: Math.round(value.ratio * 100) }),
       ratio: value.ratio,
       labour: { id: id as LabourId, stage }
     });
@@ -1175,10 +1259,10 @@ export function computeRecords(input: RecordsInput): RecordsResult {
     const unit = distanceUnit(unitSystem);
     candidates.push({
       id: "lifetime:run",
-      label: "Lifetime · Running",
-      title: `${groupThousands(nextRun)} ${unit} of running`,
+      label: t("records.kind.lifetimeSport", { sport: SPORT_NOUN.run }),
+      title: t("records.t.runDistance", { value: groupThousands(nextRun), unit }),
       value: `${groupThousands(runDisplay)} / ${groupThousands(nextRun)} ${unit}`,
-      hint: `${groupThousands(nextRun - runDisplay)} ${unit} to go`,
+      hint: t("records.p.toGo", { value: groupThousands(nextRun - runDisplay), unit }),
       ratio: runDisplay / nextRun,
       sport: "run"
     });
@@ -1337,10 +1421,7 @@ function recordMilestones(
   for (const { entry, gains: list, standing } of groups) {
     list.sort((left, right) => left.distance - right.distance);
     standing.sort((left, right) => left.distance - right.distance);
-    const joined = (labels: string[]) =>
-      labels.length === 1
-        ? labels[0]
-        : `${labels.slice(0, -1).join(", ")} and ${labels[labels.length - 1]}`;
+    const joined = joinedList;
     const standingLine = standing
       .map((record) => `${labelOf(record.distance)} ${formatDurationSeconds(record.seconds)}`)
       .join(" · ");
@@ -1351,12 +1432,15 @@ function recordMilestones(
         category: "record",
         day: entry.day,
         at: entry.at,
-        kind: "Record · Running",
+        kind: t("records.kind.record", { sport: SPORT_NOUN.run }),
         title:
           standing.length === 1
-            ? `Your ${labelOf(standing[0].distance)} record — ${formatDurationSeconds(standing[0].seconds)}`
-            : `Your ${joined(standing.map((record) => labelOf(record.distance)))} records`,
-        detail: standing.length === 1 ? "COROS's current record" : `${standingLine} · COROS's current records`,
+            ? t("records.t.yourRecord", {
+                distance: labelOf(standing[0].distance),
+                time: formatDurationSeconds(standing[0].seconds)
+              })
+            : t("records.t.yourRecords", { distances: joined(standing.map((record) => labelOf(record.distance))) }),
+        detail: standing.length === 1 ? t("records.d.corosRecord") : t("records.d.corosRecords", { line: standingLine }),
         sport: "run",
         major: false,
         activity: activityRef(entry.activity)
@@ -1366,24 +1450,24 @@ function recordMilestones(
 
     const named = joined(list.map((gain) => labelOf(gain.distance)));
     const describe = (gain: Gain) =>
-      `${formatGap(gain.previous.seconds - gain.seconds)} faster than the record from ${formatDayShort(gain.previous.day)}`;
+      t("records.d.faster", { gap: formatGap(gain.previous.seconds - gain.seconds), day: formatDayShort(gain.previous.day) });
     const contextLines = [
-      ...(list.length > 1 ? list.map((gain) => `${labelOf(gain.distance)}: ${describe(gain)}.`) : []),
-      ...(standing.length > 0 ? [`Also COROS's current record: ${standingLine}.`] : [])
+      ...(list.length > 1 ? list.map((gain) => t("records.ctx.labelled", { label: labelOf(gain.distance), text: describe(gain) })) : []),
+      ...(standing.length > 0 ? [t("records.ctx.alsoCoros", { line: standingLine })] : [])
     ];
     milestones.push({
       id: `pr:${entry.activity.activityId}`,
       category: "record",
       day: entry.day,
       at: entry.at,
-      kind: "Record · Running",
+      kind: t("records.kind.record", { sport: SPORT_NOUN.run }),
       title:
         list.length === 1
-          ? `New ${named} record — ${formatDurationSeconds(list[0].seconds)}`
-          : `New ${named} records`,
+          ? t("records.t.newRecord", { distance: named, time: formatDurationSeconds(list[0].seconds) })
+          : t("records.t.newRecords", { distances: named }),
       detail:
         list.length === 1
-          ? `${describe(list[0])}${list[0].source === "coros" ? " · COROS's own record" : ""}`
+          ? `${describe(list[0])}${list[0].source === "coros" ? ` · ${t("records.d.corosOwn")}` : ""}`
           : list
               .map((gain) => `${labelOf(gain.distance)} ${formatDurationSeconds(gain.seconds)}`)
               .join(" · "),
@@ -1420,17 +1504,18 @@ function recordMilestones(
       }
     }
   }
-  const effortLine = (entry: Entry) => `${labelOf(entry.distance)} in ${formatDurationSeconds(entry.seconds)}`;
+  const effortLine = (entry: Entry) =>
+    t("records.effort", { distance: labelOf(entry.distance), time: formatDurationSeconds(entry.seconds) });
   for (const [activityId, { entry, grade, stages }] of reachedOn) {
     let labour: MilestoneLabour | undefined;
     for (const stage of stages) labour = withStage(labour, "mares", stage);
-    const graded = `a ${formatAgeGrade(grade)} age grade`;
+    const graded = t("records.graded", { grade: formatAgeGrade(grade) });
     // A run that already has its record milestone carries the stage there,
     // rather than a second row for the same run.
     const record = milestones.find((milestone) => milestone.id === `pr:${activityId}`);
     if (record) {
       record.labour = labour;
-      record.context = [record.context, `${effortLine(entry)}: ${graded}.`].filter(Boolean).join(" ");
+      record.context = [record.context, t("records.ctx.labelled", { label: effortLine(entry), text: graded })].filter(Boolean).join(" ");
       continue;
     }
     const line = effortLine(entry);
@@ -1439,9 +1524,9 @@ function recordMilestones(
       category: "record",
       day: entry.day,
       at: entry.at + 1,
-      kind: "Speed · Running",
-      title: `${line.charAt(0).toUpperCase()}${line.slice(1)} — ${graded}`,
-      detail: "Graded against the best time for your age and sex",
+      kind: t("records.kind.speed", { sport: SPORT_NOUN.run }),
+      title: t("records.t.withFigure", { title: capitalizeFirst(line), value: graded }),
+      detail: t("records.d.graded"),
       sport: "run",
       major: (labour as MilestoneLabour).stage === 3,
       activity: activityRef(entry.activity),
@@ -1451,7 +1536,7 @@ function recordMilestones(
   if (bestGrade) {
     for (const step of MARES_GRADES) {
       progress.set(labourStageKey("mares", step.stage), {
-        text: `Best ${formatAgeGrade(bestGrade.grade)} · ${effortLine(bestGrade.entry)}`,
+        text: t("records.p.bestGrade", { grade: formatAgeGrade(bestGrade.grade), effort: effortLine(bestGrade.entry) }),
         ratio: Math.min(1, bestGrade.grade / step.grade)
       });
     }
@@ -1461,7 +1546,7 @@ function recordMilestones(
 
 /** "61.2%": rounded down, so a grade never reads as one it did not reach. */
 function formatAgeGrade(grade: number): string {
-  return `${(Math.floor(grade * 1000) / 10).toFixed(1)}%`;
+  return `${formatDecimal(Math.floor(grade * 1000) / 10, 1)}%`;
 }
 
 // --- VO2max ----------------------------------------------------------------------------
@@ -1507,14 +1592,14 @@ function vo2Milestones(input: RecordsInput): {
     return labour;
   };
   const ratingLine = (labour: MilestoneLabour | undefined) =>
-    labour ? `${VO2_RATING_NAMES[VO2_RATINGS[labour.stage - 1]]} for your age` : undefined;
+    labour ? t("records.vo2.forAge", { rating: VO2_RATING_NAMES[VO2_RATINGS[labour.stage - 1]] }) : undefined;
 
   const [firstDay, firstValue] = ordered[0];
   const push = (milestone: Omit<Milestone, "major" | "category" | "kind" | "at">, value: number) => {
     values.set(milestone.id, Math.round(value * 10) / 10);
     milestones.push({
       category: "fitness",
-      kind: "Fitness",
+      kind: t("records.kind.fitness"),
       at: noonOf(milestone.day),
       major: false,
       ...milestone
@@ -1525,7 +1610,7 @@ function vo2Milestones(input: RecordsInput): {
     {
       id: "vo2max:first",
       day: firstDay,
-      title: `First VO2max reading — ${Math.round(firstValue)}`,
+      title: t("records.t.vo2First", { value: Math.round(firstValue) }),
       ...(firstLabour ? { detail: ratingLine(firstLabour), labour: firstLabour } : {})
     },
     firstValue
@@ -1543,10 +1628,10 @@ function vo2Milestones(input: RecordsInput): {
         {
           id: `vo2max:high:${whole}`,
           day,
-          title: `VO2max ${whole} — a new high`,
+          title: t("records.t.vo2High", { value: whole }),
           detail: [
             ratingLine(labour),
-            `Up ${(value - firstValue).toFixed(1)} since your first reading in ${formatMonthYear(firstDay)}`
+            t("records.d.vo2Up", { delta: formatDecimal(value - firstValue, 1), month: formatMonthYear(firstDay) })
           ]
             .filter(Boolean)
             .join(" · "),
@@ -1560,7 +1645,7 @@ function vo2Milestones(input: RecordsInput): {
         {
           id: `vo2max:rating:${rating}`,
           day,
-          title: `VO2max ${value.toFixed(1)} — ${VO2_RATING_NAMES[rating]} for your age`,
+          title: t("records.t.vo2Rating", { value: formatDecimal(value, 1), rating: VO2_RATING_NAMES[rating] }),
           labour
         },
         value
@@ -1574,7 +1659,7 @@ function vo2Milestones(input: RecordsInput): {
   VO2_RATINGS.forEach((rating, index) => {
     const threshold = vo2RatingThreshold(rating, ageOnDay(birthday, today), sex);
     progress.set(labourStageKey("apples", (index + 1) as LabourStage), {
-      text: `Best ${Math.round(peak * 10) / 10} / ${threshold}`,
+      text: t("records.p.bestOf", { value: formatDecimal(Math.round(peak * 10) / 10, 1), target: threshold }),
       ratio: Math.max(0, Math.min(1, (peak / threshold - 0.8) / 0.2))
     });
   });
@@ -1613,7 +1698,7 @@ function sleepMilestones(input: RecordsInput): {
       category: "sleep",
       day,
       at: noonOf(day),
-      kind: "Sleep",
+      kind: t("records.kind.sleep"),
       title,
       detail,
       major: false,
@@ -1626,17 +1711,17 @@ function sleepMilestones(input: RecordsInput): {
     push(
       "sleep:first",
       first.day,
-      "First night recorded",
-      `${Math.floor(first.minutes / 60)} h ${Math.round(first.minutes % 60)} min`,
+      t("records.t.sleepFirst"),
+      t("records.d.hm", { h: Math.floor(first.minutes / 60), m: Math.round(first.minutes % 60) }),
       { minutes: Math.round(first.minutes) }
     );
   }
 
   const good = new Set(nights.filter((night) => night.minutes >= GOOD_NIGHT_MINUTES).map((night) => night.day));
-  const streakTitle = (count: number) => `${count} nights in a row of 7 h+`;
-  const windowTitle = (step: (typeof SLEEP_WINDOWS)[number]) => `${step.good} of ${step.days} nights at 7 h+`;
+  const streakTitle = (count: number) => plural("records.t.sleepStreak", count);
+  const windowTitle = (step: (typeof SLEEP_WINDOWS)[number]) => t("records.t.sleepWindow", { good: step.good, days: step.days });
   const windowDetail = (step: (typeof SLEEP_WINDOWS)[number], day: string) =>
-    `The ${step.days} nights to ${formatDayShort(day)}`;
+    t("records.d.sleepWindow", { days: step.days, day: formatDayShort(day) });
 
   let streak = 0;
   let previous: string | undefined;
@@ -1651,7 +1736,7 @@ function sleepMilestones(input: RecordsInput): {
         `sleep:streak:${step.nights}`,
         night.day,
         streakTitle(step.nights),
-        `Every night since ${formatDayShort(addDays(night.day, -(step.nights - 1)))}`,
+        t("records.d.everyNightSince", { day: formatDayShort(addDays(night.day, -(step.nights - 1))) }),
         { nights: step.nights },
         step.labour ? { id: "cerberus", stage: step.labour } : undefined
       );
@@ -1689,13 +1774,13 @@ function sleepMilestones(input: RecordsInput): {
     const streakStep = kind === "streak" ? SLEEP_STREAKS.find((entry) => entry.nights === Number(size)) : undefined;
     const windowStep = kind === "window" ? SLEEP_WINDOWS.find((entry) => entry.days === Number(size)) : undefined;
     if (id === "sleep:first") {
-      push(id, row.day, "First night recorded", "", row.data);
+      push(id, row.day, t("records.t.sleepFirst"), "", row.data);
     } else if (streakStep) {
       push(
         id,
         row.day,
         streakTitle(streakStep.nights),
-        `Every night since ${formatDayShort(addDays(row.day, -(streakStep.nights - 1)))}`,
+        t("records.d.everyNightSince", { day: formatDayShort(addDays(row.day, -(streakStep.nights - 1))) }),
         row.data,
         streakStep.labour ? { id: "cerberus", stage: streakStep.labour } : undefined
       );
@@ -1723,7 +1808,7 @@ function sleepMilestones(input: RecordsInput): {
     }
   }
   progress.set(labourStageKey("cerberus", 1), {
-    text: `${alive} / 7 nights`,
+    text: t("records.p.nights", { n: alive, target: 7 }),
     ratio: ratioOf(alive, 7)
   });
   for (const step of SLEEP_WINDOWS) {
@@ -1732,7 +1817,7 @@ function sleepMilestones(input: RecordsInput): {
       if (good.has(addDays(today, -back))) count += 1;
     }
     progress.set(labourStageKey("cerberus", step.labour), {
-      text: `${count} / ${step.good} of the last ${step.days} nights`,
+      text: t("records.p.nightsWindow", { n: count, target: step.good, days: step.days }),
       ratio: ratioOf(count, step.good)
     });
   }
@@ -1752,7 +1837,7 @@ function planMilestones(input: RecordsInput): Milestone[] {
     const ratio = typeof row.data.ratio === "number" ? row.data.ratio : 0;
     const done = typeof row.data.done === "number" ? row.data.done : undefined;
     const settled = typeof row.data.settled === "number" ? row.data.settled : undefined;
-    const name = typeof row.data.name === "string" && row.data.name ? row.data.name : "A plan";
+    const name = typeof row.data.name === "string" && row.data.name ? row.data.name : t("records.plan.unnamed");
     let labour: MilestoneLabour | undefined;
     for (const step of PLAN_STAGES) {
       if (!reached.has(step.stage) && weeks >= step.weeks && ratio >= step.ratio) {
@@ -1760,22 +1845,22 @@ function planMilestones(input: RecordsInput): Milestone[] {
         labour = withStage(labour, "girdle", step.stage);
       }
     }
-    const ordinal = ["first", "second", "third", "fourth", "fifth"][index] ?? `${index + 1}th`;
+    const ordinal = planOrdinal(index);
     return {
       id: row.id,
       category: "plan" as const,
       day: row.day,
       at: noonOf(row.day),
-      kind: "Plan finished",
-      title: `${name} · ${weeks} weeks`,
+      kind: t("records.kind.plan"),
+      title: plural("records.plan.title", weeks, { name }),
       figures: [
-        { value: String(Math.round(ratio * 100)), unit: "%", label: "Done as planned" },
+        { value: String(Math.round(ratio * 100)), unit: "%", label: t("records.plan.asPlanned") },
         ...(done !== undefined && settled !== undefined
-          ? [{ value: String(done), unit: `of ${settled}`, label: "Sessions" }]
+          ? [{ value: String(done), unit: t("records.plan.ofN", { n: settled }), label: t("records.plan.sessions") }]
           : []),
-        { value: String(weeks), unit: "weeks", label: "Length" }
+        { value: String(weeks), unit: plural("records.plan.weeksUnit", weeks), label: t("records.plan.length") }
       ],
-      context: `Your ${ordinal} finished plan.`,
+      context: t("records.plan.context", { ordinal }),
       major: true,
       ...(labour ? { labour } : {})
     };
@@ -1839,9 +1924,9 @@ function placeMilestones(
           category: "place",
           day,
           at: startTime + 30,
-          kind: "Places",
-          title: `${step.count} different places`,
-          detail: name ? `The ${step.count}th: ${name}` : undefined,
+          kind: t("records.kind.places"),
+          title: plural("records.t.places", step.count),
+          detail: name ? t("records.d.nthPlace", { n: step.count, city: name }) : undefined,
           sport,
           major: step.major ?? false,
           activity: ref,
@@ -1859,8 +1944,8 @@ function placeMilestones(
           category: "place",
           day,
           at: startTime + 31,
-          kind: "Places",
-          title: `A new country: ${region.countryName}`,
+          kind: t("records.kind.places"),
+          title: t("records.t.newCountry", { country: region.countryName }),
           detail: [name, activity.name].filter(Boolean).join(" · "),
           sport,
           major: firstAbroad,
@@ -1876,8 +1961,8 @@ function placeMilestones(
         category: "place",
         day,
         at: startTime + 32,
-        kind: "Places",
-        title: `Trained ${groupThousands(away)} km from home`,
+        kind: t("records.kind.places"),
+        title: t("records.t.pillars", { km: groupThousands(away) }),
         detail: [name, activity.name].filter(Boolean).join(" · ") || undefined,
         sport,
         major: true,
@@ -1889,8 +1974,8 @@ function placeMilestones(
         category: "place",
         day,
         at: startTime + 32,
-        kind: "Places",
-        title: `Furthest from home yet — ${groupThousands(Math.round(away))} km`,
+        kind: t("records.kind.places"),
+        title: t("records.t.furthest", { km: groupThousands(Math.round(away)) }),
         detail: [name, activity.name].filter(Boolean).join(" · ") || undefined,
         sport,
         major: false,
@@ -1903,7 +1988,7 @@ function placeMilestones(
   for (const step of PLACE_COUNTS) {
     if (!step.labour) continue;
     progress.set(labourStageKey("cattle", step.labour), {
-      text: `${visited.size} / ${step.count} places`,
+      text: t("records.p.places", { n: visited.size, target: step.count }),
       ratio: ratioOf(visited.size, step.count)
     });
   }

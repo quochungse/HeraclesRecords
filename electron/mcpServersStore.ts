@@ -8,6 +8,7 @@ import { isCorosMcpUrl } from "./corosMcpRegions";
 import { isValidServerId } from "./mcpToolNames";
 import { notifyRowChanged, notifyRowDeleted } from "./sync/syncBridge";
 import type { McpServerConfig, McpServerInput } from "./types";
+import { ScreenError } from "./screenText";
 
 const MCP_TRANSPORTS = new Set(["streamable-http"]);
 const MCP_AUTH_TYPES = new Set(["oauth", "bearer", "none"]);
@@ -56,26 +57,26 @@ function slug(name: string): string {
 
 function validateName(name: unknown): string {
   if (typeof name !== "string" || !name.trim()) {
-    throw new Error("MCP server name is required.");
+    throw new ScreenError("main.mcp.nameRequired");
   }
   return name.trim();
 }
 
 function validateUrl(url: unknown): string {
   if (typeof url !== "string" || !url.trim()) {
-    throw new Error("MCP server URL is required.");
+    throw new ScreenError("main.mcp.urlRequired");
   }
   let parsed: URL;
   try {
     parsed = new URL(url.trim());
   } catch {
-    throw new Error("MCP server URL must be a valid HTTP or HTTPS URL.");
+    throw new ScreenError("main.mcp.urlInvalid");
   }
   if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
-    throw new Error("MCP server URL must use HTTP or HTTPS.");
+    throw new ScreenError("main.mcp.urlScheme");
   }
   if (parsed.username || parsed.password) {
-    throw new Error("MCP server URL must not include credentials.");
+    throw new ScreenError("main.mcp.urlCredentials");
   }
   return parsed.toString();
 }
@@ -155,7 +156,7 @@ export function addMcpServer(
     throw new Error(`Invalid MCP server id: "${id}"`);
   }
   if (getMcpServer(id, db)) {
-    throw new Error(`MCP server "${id}" already exists.`);
+    throw new ScreenError("main.mcp.exists");
   }
   const url = validateUrl(input.url);
   const transport = validateTransport(input.transport ?? "streamable-http");
@@ -194,7 +195,7 @@ export function updateMcpServer(
   }
   const existing = getMcpServer(id, db);
   if (!existing) {
-    throw new Error(`Unknown MCP server "${id}".`);
+    throw new ScreenError("main.mcp.unknown");
   }
   if ("id" in patch) {
     throw new Error("MCP server ids cannot be changed.");
@@ -207,7 +208,7 @@ export function updateMcpServer(
     url !== existing.url &&
     !(isCorosMcpUrl(existing.url) && isCorosMcpUrl(url))
   ) {
-    throw new Error(`Built-in MCP server "${id}" URL is immutable.`);
+    throw new ScreenError("main.mcp.builtInUrl");
   }
   const transport =
     patch.transport === undefined
@@ -248,7 +249,7 @@ export function removeMcpServer(
     return;
   }
   if (existing.builtin) {
-    throw new Error(`Built-in MCP server "${id}" cannot be removed.`);
+    throw new ScreenError("main.mcp.builtInRemove");
   }
   db.prepare("DELETE FROM mcp_servers WHERE id = ?").run(id);
   notifyRowDeleted("mcp_servers", id);
@@ -275,21 +276,21 @@ export function getMcpBearer(id: string): string | undefined {
 export function setMcpBearer(id: string, token: string): void {
   const server = getMcpServer(id);
   if (!server) {
-    throw new Error(`Unknown MCP server "${id}".`);
+    throw new ScreenError("main.mcp.unknown");
   }
   if (server.authType !== "bearer") {
-    throw new Error(`${server.name} does not use API key authentication.`);
+    throw new ScreenError("main.mcp.notApiKey", { name: server.name });
   }
   if (typeof token !== "string") {
     throw new Error("API key must be a string.");
   }
   const value = token.trim();
   if (!value) {
-    throw new Error("API key cannot be empty.");
+    throw new ScreenError("main.mcp.keyEmpty");
   }
   const storage = safeStorage();
   if (!storage.isEncryptionAvailable()) {
-    throw new Error("Secure credential storage is unavailable on this system.");
+    throw new ScreenError("main.secureStorage");
   }
   setSetting(
     mcpSecretKey(id, "bearer"),

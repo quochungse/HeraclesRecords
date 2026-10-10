@@ -8,6 +8,8 @@ import {
   Sparkles,
 } from "lucide-react";
 import type { AppUpdateSnapshot } from "../../electron/types";
+import { t } from "../i18n/core";
+import { useI18n } from "../i18n/useI18n";
 
 interface AppUpdateControlProps {
   snapshot: AppUpdateSnapshot;
@@ -32,7 +34,9 @@ function triggerContent(snapshot: AppUpdateSnapshot, busy: boolean) {
     return {
       ready: true,
       icon: <Loader2 className="spin" size={15} aria-hidden="true" />,
-      label: `Downloading ${Math.round(snapshot.downloadPercent ?? 0)}%`,
+      label: t("update.downloading", {
+        percent: Math.round(snapshot.downloadPercent ?? 0),
+      }),
     };
   }
 
@@ -43,7 +47,7 @@ function triggerContent(snapshot: AppUpdateSnapshot, busy: boolean) {
     return {
       ready: true,
       icon: <Sparkles size={15} aria-hidden="true" />,
-      label: `Update ${snapshot.availableVersion}`,
+      label: t("update.version", { version: snapshot.availableVersion }),
     };
   }
 
@@ -55,7 +59,7 @@ function triggerContent(snapshot: AppUpdateSnapshot, busy: boolean) {
       ) : (
         <Settings2 size={15} aria-hidden="true" />
       ),
-    label: "Updates",
+    label: t("update.button"),
   };
 }
 
@@ -74,6 +78,7 @@ export function AppUpdateControl({
   onInstall,
   onPreferencesChange,
 }: AppUpdateControlProps) {
+  useI18n();
   const [open, setOpen] = useState(false);
   const [position, setPosition] = useState<{ top: number; left: number } | null>(
     null
@@ -185,13 +190,10 @@ export function AppUpdateControl({
               role="menu"
               style={{ top: position.top, left: position.left }}
             >
-              <p className="update-settings-heading">Updates</p>
+              <p className="update-settings-heading">{t("update.button")}</p>
 
               {snapshot.supported ? null : (
-                <p className="update-settings-note">
-                  Auto-updates run in installed builds. Preferences below apply
-                  when you install Heracles Records.
-                </p>
+                <p className="update-settings-note">{t("update.unsupported")}</p>
               )}
 
               {pendingAction ? (
@@ -207,8 +209,8 @@ export function AppUpdateControl({
                     >
                       <Sparkles size={14} aria-hidden="true" />
                       {snapshot.installMethod === "manual"
-                        ? `Download ${snapshot.availableVersion}`
-                        : "Restart to update"}
+                        ? t("update.download", { version: snapshot.availableVersion ?? "" })
+                        : t("update.restart")}
                     </button>
                   ) : (
                     <button
@@ -226,8 +228,8 @@ export function AppUpdateControl({
                         <Download size={14} aria-hidden="true" />
                       )}
                       {downloading
-                        ? "Starting…"
-                        : `Download ${snapshot.availableVersion}`}
+                        ? t("update.starting")
+                        : t("update.download", { version: snapshot.availableVersion ?? "" })}
                     </button>
                   )}
                 </div>
@@ -243,10 +245,10 @@ export function AppUpdateControl({
                 />
                 <span>
                   <span className="update-settings-option-label">
-                    Check automatically
+                    {t("update.autoCheck")}
                   </span>
                   <span className="update-settings-option-hint">
-                    Look for updates on startup.
+                    {t("update.autoCheckHint")}
                   </span>
                 </span>
               </label>
@@ -260,10 +262,10 @@ export function AppUpdateControl({
                 />
                 <span>
                   <span className="update-settings-option-label">
-                    Download automatically
+                    {t("update.autoDownload")}
                   </span>
                   <span className="update-settings-option-hint">
-                    Otherwise, download only when you ask.
+                    {t("update.autoDownloadHint")}
                   </span>
                 </span>
               </label>
@@ -283,7 +285,7 @@ export function AppUpdateControl({
                   ) : (
                     <RefreshCw size={14} aria-hidden="true" />
                   )}
-                  Check for updates
+                  {t("update.check")}
                 </button>
               </div>
             </div>,

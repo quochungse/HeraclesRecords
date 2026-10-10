@@ -10,6 +10,7 @@
  */
 import { COROS_WEEK_STAGES } from "./trainingPlanDomain";
 import type { PlanWorkoutEntryInput, TrainingPlanDocument, TrainingPlanEntry } from "./types";
+import { screenPlural, screenStage, screenText, screenWeekday } from "./screenText";
 
 export type PlanChangeKind =
   | "renamed"
@@ -27,14 +28,12 @@ export interface PlanChange {
   text: string;
 }
 
-const DAY_NAMES = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"] as const;
-
 function where(entry: TrainingPlanEntry): string {
-  return `week ${entry.weekIndex + 1} ${DAY_NAMES[entry.dayIndex] ?? ""}`.trim();
+  return screenText("screen.diff.where", { n: entry.weekIndex + 1, day: screenWeekday(entry.dayIndex, "short") }).trim();
 }
 
 function nameOf(entry: TrainingPlanEntry): string {
-  return entry.workout.name || entry.title || "a session";
+  return entry.workout.name || entry.title || screenText("screen.diff.aSession");
 }
 
 function identity(entry: TrainingPlanEntry): string {
@@ -80,7 +79,7 @@ export function sameWorkoutInput(left: PlanWorkoutEntryInput, right: PlanWorkout
 }
 
 function stageLabel(value: number | undefined): string {
-  return COROS_WEEK_STAGES.find((stage) => stage.value === (value ?? 0))?.label ?? "Not Set";
+  return screenStage(value ?? 0, COROS_WEEK_STAGES.find((stage) => stage.value === (value ?? 0))?.label ?? "Not Set");
 }
 
 /**
@@ -91,10 +90,10 @@ function stageLabel(value: number | undefined): string {
 export function planDiff(before: TrainingPlanDocument, after: TrainingPlanDocument): PlanChange[] {
   const changes: PlanChange[] = [];
   if (before.name.trim() !== after.name.trim()) {
-    changes.push({ kind: "renamed", text: `Renamed to "${after.name.trim()}"` });
+    changes.push({ kind: "renamed", text: screenText("screen.diff.renamed", { name: after.name.trim() }) });
   }
   if ((before.description ?? "").trim() !== (after.description ?? "").trim()) {
-    changes.push({ kind: "description", text: "Overview rewritten" });
+    changes.push({ kind: "description", text: screenText("screen.diff.description") });
   }
 
   const earlier = new Map(before.entries.map((entry) => [identity(entry), entry]));
@@ -107,7 +106,7 @@ export function planDiff(before: TrainingPlanDocument, after: TrainingPlanDocume
     const key = identity(entry);
     const previous = earlier.get(key);
     if (!previous) {
-      changes.push({ kind: "added", key, text: `Added ${nameOf(entry)} (${where(entry)})` });
+      changes.push({ kind: "added", key, text: screenText("screen.diff.added", { name: nameOf(entry), where: where(entry) }) });
       continue;
     }
     const moved = previous.weekIndex !== entry.weekIndex || previous.dayIndex !== entry.dayIndex;
@@ -116,7 +115,7 @@ export function planDiff(before: TrainingPlanDocument, after: TrainingPlanDocume
       changes.push({
         kind: "moved",
         key,
-        text: `Moved ${nameOf(entry)}: ${where(previous)} → ${where(entry)}`
+        text: screenText("screen.diff.moved", { name: nameOf(entry), from: where(previous), to: where(entry) })
       });
     }
     if (changed) {
@@ -124,13 +123,19 @@ export function planDiff(before: TrainingPlanDocument, after: TrainingPlanDocume
       changes.push({
         kind: "changed",
         key,
-        text: renamed ? `${nameOf(previous)} is now ${nameOf(entry)}` : `Changed ${nameOf(entry)}`
+        text: renamed
+          ? screenText("screen.diff.renamedSession", { from: nameOf(previous), to: nameOf(entry) })
+          : screenText("screen.diff.changed", { name: nameOf(entry) })
       });
     }
   }
   for (const entry of before.entries) {
     if (!later.has(identity(entry))) {
-      changes.push({ kind: "removed", key: identity(entry), text: `Removed ${nameOf(entry)} (${where(entry)})` });
+      changes.push({
+        kind: "removed",
+        key: identity(entry),
+        text: screenText("screen.diff.removed", { name: nameOf(entry), where: where(entry) })
+      });
     }
   }
 
@@ -143,7 +148,7 @@ export function planDiff(before: TrainingPlanDocument, after: TrainingPlanDocume
     const from = stagesBefore.get(week) ?? 0;
     const to = stagesAfter.get(week) ?? 0;
     if (from !== to) {
-      changes.push({ kind: "stage", text: `Week ${week + 1}: ${stageLabel(from)} → ${stageLabel(to)}` });
+      changes.push({ kind: "stage", text: screenText("screen.diff.stage", { n: week + 1, from: stageLabel(from), to: stageLabel(to) }) });
     }
   }
   return changes;
@@ -151,5 +156,5 @@ export function planDiff(before: TrainingPlanDocument, after: TrainingPlanDocume
 
 /** "3 changes", for a line that has no room for them. */
 export function changeCount(changes: readonly PlanChange[]): string {
-  return changes.length === 1 ? "1 change" : `${changes.length} changes`;
+  return screenPlural("screen.diff.count", changes.length);
 }

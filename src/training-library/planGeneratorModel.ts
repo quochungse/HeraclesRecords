@@ -17,7 +17,6 @@ import type {
   WorkoutSport
 } from "../../electron/types";
 import {
-  PLAN_WEEKDAYS,
   addPlanWeeks,
   generatedPlanSpan,
   weekMinutesBand,
@@ -25,39 +24,90 @@ import {
   type TrainingPlanGenerationField
 } from "../../electron/trainingPlanGeneration";
 import { parsePlanDay } from "../../electron/trainingPlanDomain";
-import { formatWorkoutSport } from "../../electron/workoutCapabilities";
+import { workoutSportLabel } from "../training/workoutSport";
+import { formatDecimal, getIntlLocale, messageRecord, plural, t, weekdayNames, type MessageKey } from "../i18n/core";
 
-export const GOAL_KINDS: readonly { value: TrainingPlanGoalKind; label: string; hint: string }[] = [
-  { value: "race", label: "A race or event", hint: "Plan ends on race day" },
-  { value: "base", label: "Build a base", hint: "Steady, durable volume" },
-  { value: "return", label: "Come back", hint: "After a break or injury" },
-  { value: "hybrid", label: "Strength & hybrid", hint: "HYROX, gym and engine" },
-  { value: "other", label: "Something else", hint: "Describe it yourself" }
+/** An option whose words are read in the language on screen each time. */
+function worded<V extends string>(value: V, label: MessageKey, hint: MessageKey) {
+  return {
+    value,
+    get label() {
+      return t(label);
+    },
+    get hint() {
+      return t(hint);
+    }
+  };
+}
+
+export const GOAL_KINDS: readonly { value: TrainingPlanGoalKind; readonly label: string; readonly hint: string }[] = [
+  worded("race", "library.goal.race", "library.goal.race.hint"),
+  worded("base", "library.goal.base", "library.goal.base.hint"),
+  worded("return", "library.goal.return", "library.goal.return.hint"),
+  worded("hybrid", "library.goal.hybrid", "library.goal.hybrid.hint"),
+  worded("other", "library.goal.other", "library.goal.other.hint")
 ];
 
-export const LEVELS: readonly { value: TrainingPlanDifficulty; label: string; hint: string }[] = [
-  { value: "beginner", label: "Beginner", hint: "New to structure" },
-  { value: "intermediate", label: "Intermediate", hint: "Training consistently" },
-  { value: "advanced", label: "Advanced", hint: "High-volume base" },
-  { value: "custom", label: "From my data", hint: "Coach judges it" }
+export const LEVELS: readonly { value: TrainingPlanDifficulty; readonly label: string; readonly hint: string }[] = [
+  worded("beginner", "library.level.beginner", "library.level.beginner.hint"),
+  worded("intermediate", "library.level.intermediate", "library.level.intermediate.hint"),
+  worded("advanced", "library.level.advanced", "library.level.advanced.hint"),
+  worded("custom", "library.level.custom", "library.level.custom.hint")
 ];
 
 /** A race's distance, or none: the race's own name can say it instead. */
-export const RACE_DISTANCES = ["5K", "10K", "Half", "Marathon", "Trail 50K", "Ultra 100K"] as const;
+export const RACE_DISTANCES = ["5K", "10K", "Half", "Marathon", "Trail 50K", "Ultra 100K"] as const; // i18n-ignore: values Coach reads
+
+const RACE_DISTANCE_KEYS: Readonly<Record<(typeof RACE_DISTANCES)[number], MessageKey>> = {
+  "5K": "library.race.5k",
+  "10K": "library.race.10k",
+  Half: "library.race.half",
+  Marathon: "library.race.marathon",
+  "Trail 50K": "library.race.trail50", // i18n-ignore: a lookup key
+  "Ultra 100K": "library.race.ultra100" // i18n-ignore: a lookup key
+};
+
+/** A race distance as the screen names it; the value Coach reads stays as it is. */
+export function raceDistanceLabel(distance: string): string {
+  const key = RACE_DISTANCE_KEYS[distance as (typeof RACE_DISTANCES)[number]];
+  return key ? t(key) : distance;
+}
 
 /** Hours a week the athlete may be sure of; "any" is "Not sure". */
-export const HOURS_CHOICES: readonly { value: string; label: string; hours?: { min: number; max?: number } }[] = [
-  { value: "any", label: "Not sure" },
-  { value: "3-5", label: "3–5 h", hours: { min: 3, max: 5 } },
-  { value: "5-8", label: "5–8 h", hours: { min: 5, max: 8 } },
-  { value: "8-12", label: "8–12 h", hours: { min: 8, max: 12 } },
-  { value: "12+", label: "12 h+", hours: { min: 12 } }
+function hoursChoice(value: string, hours?: { min: number; max?: number }) {
+  return {
+    value,
+    get label() {
+      return !hours
+        ? t("library.notSure")
+        : hours.max === undefined
+          ? t("library.hoursPlus", { n: hours.min })
+          : t("library.hoursRange", { low: hours.min, high: hours.max });
+    },
+    ...(hours ? { hours } : {})
+  };
+}
+
+export const HOURS_CHOICES: readonly { value: string; readonly label: string; hours?: { min: number; max?: number } }[] = [
+  hoursChoice("any"),
+  hoursChoice("3-5", { min: 3, max: 5 }),
+  hoursChoice("5-8", { min: 5, max: 8 }),
+  hoursChoice("8-12", { min: 8, max: 12 }),
+  hoursChoice("12+", { min: 12 })
 ];
 
 /** Sessions a week the athlete may be sure of; "any" is "Not sure". */
 export const SESSION_CHOICES = ["any", "2", "3", "4", "5", "6", "7"] as const;
 
-export const DAY_SHORT = PLAN_WEEKDAYS.map((day) => day.slice(0, 3));
+/** Monday first, in the language on screen. Read while drawing, never kept. */
+export function dayShortNames(): string[] {
+  return weekdayNames("short");
+}
+
+/** Monday first, the whole name, in the language on screen. */
+export function dayLongNames(): string[] {
+  return weekdayNames("long");
+}
 
 /**
  * A day of the usual week in the form. `minutes` is the most the athlete has
@@ -93,10 +143,22 @@ export interface GeneratorForm {
 }
 
 /** The athlete's data, as the switches beside the form name it. */
-export const SOURCES: readonly { value: keyof TrainingPlanDataSources; label: string; detail: string }[] = [
-  { value: "activities", label: "Recent activities", detail: "Your training history, fitness, records and race predictions" },
-  { value: "sleep", label: "Sleep & HRV", detail: "Your nights and overnight HRV" },
-  { value: "zones", label: "Training zones", detail: "Your COROS thresholds and zones" }
+function source(value: keyof TrainingPlanDataSources, label: MessageKey, detail: MessageKey) {
+  return {
+    value,
+    get label() {
+      return t(label);
+    },
+    get detail() {
+      return t(detail);
+    }
+  };
+}
+
+export const SOURCES: readonly { value: keyof TrainingPlanDataSources; readonly label: string; readonly detail: string }[] = [
+  source("activities", "library.source.activities", "library.source.activities.detail"),
+  source("sleep", "library.source.sleep", "library.source.sleep.detail"),
+  source("zones", "library.source.zones", "library.source.zones.detail")
 ];
 
 /**
@@ -104,8 +166,9 @@ export const SOURCES: readonly { value: keyof TrainingPlanDataSources; label: st
  * takes every MCP server but COROS out of the turn, and a Strava connection
  * that vanished with no word would read as broken.
  */
-export const OTHER_SERVERS_WITHHELD_NOTE =
-  "While activities, sleep or zones are not shared, Coach also leaves out MCP servers other than COROS, such as Strava: what they read is not known.";
+export function otherServersWithheldNote(): string {
+  return t("library.otherServers");
+}
 
 export function anySourceWithheld(sources: TrainingPlanDataSources): boolean {
   return SOURCES.some((source) => sources[source.value] === false);
@@ -140,12 +203,12 @@ export const DEFAULT_GENERATOR_FORM: GeneratorForm = {
 
 const NEXT_KIND: Record<TrainingPlanDayKind, TrainingPlanDayKind> = { rest: "train", train: "long", long: "flex", flex: "rest" };
 
-export const DAY_KIND_LABEL: Record<TrainingPlanDayKind, string> = {
-  rest: "Rest",
-  train: "Train",
-  long: "Long day",
-  flex: "Coach picks"
-};
+export const DAY_KIND_LABEL: Readonly<Record<TrainingPlanDayKind, string>> = messageRecord({
+  rest: "library.day.rest",
+  train: "library.day.train",
+  long: "library.day.long",
+  flex: "library.day.flex"
+});
 
 /** The time a day starts with when it becomes this kind: an hour, two for the long day. */
 export const DAY_PREFILL: Record<Exclude<TrainingPlanDayKind, "rest">, number> = { train: 60, long: 120, flex: 60 };
@@ -158,10 +221,12 @@ export function cycleDay(day: GeneratorDay): GeneratorDay {
 
 /** "45 min", "1 h", "1 h 30", or "Free" for a day with no limit. */
 export function dayTimeLabel(minutes: number | null): string {
-  if (minutes === null) return "Free";
-  if (minutes < 60) return `${minutes} min`;
+  if (minutes === null) return t("library.free");
+  if (minutes < 60) return t("units.min", { m: minutes });
   const rest = minutes % 60;
-  return rest ? `${Math.floor(minutes / 60)} h ${String(rest).padStart(2, "0")}` : `${minutes / 60} h`;
+  return rest
+    ? t("library.hm", { h: Math.floor(minutes / 60), m: String(rest).padStart(2, "0") })
+    : t("library.h", { h: minutes / 60 });
 }
 
 const DAY_TIMES = [30, 45, 60, 75, 90, 120, 150, 180, 240, 300, 360];
@@ -169,7 +234,7 @@ const DAY_TIMES = [30, 45, 60, 75, 90, 120, 150, 180, 240, 300, 360];
 /** The times a day offers, Free last; a time outside the list that the day already holds is kept in it. */
 export function dayTimeOptions(current: number | null): { value: string; label: string }[] {
   const times = current === null || DAY_TIMES.includes(current) ? DAY_TIMES : [...DAY_TIMES, current].sort((a, b) => a - b);
-  return [...times.map((minutes) => ({ value: String(minutes), label: dayTimeLabel(minutes) })), { value: "free", label: "Free" }];
+  return [...times.map((minutes) => ({ value: String(minutes), label: dayTimeLabel(minutes) })), { value: "free", label: t("library.free") }];
 }
 
 export function requestDays(days: readonly GeneratorDay[]): TrainingPlanGenerationDay[] {
@@ -214,7 +279,7 @@ export const STEP_FIELDS: Record<"goal" | "week", readonly TrainingPlanGeneratio
 
 export function formatHours(minutes: number): string {
   const hours = Math.round((minutes / 60) * 10) / 10;
-  return `${Number.isInteger(hours) ? hours : hours.toFixed(1)} h`;
+  return t("library.h", { h: Number.isInteger(hours) ? hours : formatDecimal(hours, 1) });
 }
 
 export interface WeekSummary {
@@ -228,20 +293,21 @@ export function weekSummary(form: GeneratorForm): WeekSummary {
   if (form.weekMode === "coach") {
     const hours = HOURS_CHOICES.find((choice) => choice.value === form.hoursChoice);
     return {
-      sessions: form.sessionsChoice === "any" ? "Coach decides" : form.sessionsChoice,
-      time: hours?.hours ? hours.label : "Coach decides",
-      longDay: "Coach decides"
+      sessions: form.sessionsChoice === "any" ? t("library.coachDecides") : form.sessionsChoice,
+      time: hours?.hours ? hours.label : t("library.coachDecides"),
+      longDay: t("library.coachDecides")
     };
   }
   const days = requestDays(form.days);
   const band = weekSessionBand(days);
   const minutes = weekMinutesBand(days);
-  const longDays = form.days.flatMap((day, index) => (day.kind === "long" ? [PLAN_WEEKDAYS[index]] : []));
+  const names = dayLongNames();
+  const longDays = form.days.flatMap((day, index) => (day.kind === "long" ? [names[index]] : []));
   return {
     sessions: band.min === band.max ? String(band.min) : `${band.min}–${band.max}`,
     time: minutes.max === Number.POSITIVE_INFINITY
-      ? "No limit"
-      : minutes.max === 0 ? "—" : minutes.min === minutes.max ? formatHours(minutes.max) : `up to ${formatHours(minutes.max)}`,
+      ? t("library.noLimit")
+      : minutes.max === 0 ? "—" : minutes.min === minutes.max ? formatHours(minutes.max) : t("library.upTo", { time: formatHours(minutes.max) }),
     longDay: longDays.length ? longDays.join(", ") : "—"
   };
 }
@@ -250,7 +316,7 @@ export function weekSummary(form: GeneratorForm): WeekSummary {
 export function formatPlanDate(iso: string | undefined, withYear = false): string {
   const date = iso ? parsePlanDay(iso) : undefined;
   if (!date) return "—";
-  return new Intl.DateTimeFormat(undefined, {
+  return new Intl.DateTimeFormat(getIntlLocale(), {
     weekday: "short",
     month: "short",
     day: "numeric",
@@ -265,31 +331,34 @@ export function spanSentence(request: TrainingPlanGenerationRequest): string {
   const first = formatPlanDate(span.first);
   if (request.goalKind === "race") {
     return span.last && span.weeks
-      ? `${span.weeks} weeks from ${first}, ending on race day, ${formatPlanDate(span.last, true)}.`
-      : `Starts ${first}. Pick race day and the plan runs to it.`;
+      ? t("library.span.race", { weeks: span.weeks, first, last: formatPlanDate(span.last, true) })
+      : t("library.span.raceOpen", { first });
   }
   return span.last && span.weeks
-    ? `${span.weeks} week${span.weeks === 1 ? "" : "s"}, ${first} – ${formatPlanDate(span.last, true)}.`
-    : `Starts ${first}. Coach chooses how many weeks the goal needs.`;
+    ? plural("library.span.weeks", span.weeks, { first, last: formatPlanDate(span.last, true) })
+    : t("library.span.open", { first });
 }
 
 /** The aside's summary of the plan, row by row. */
-export function planSnapshot(form: GeneratorForm, request: TrainingPlanGenerationRequest): { label: string; value: string }[] {
+export type PlanSnapshotKey = "goal" | "length" | "dates" | "week" | "sports" | "level";
+
+/** The plan in six rows; `key` names a row whatever the language its label is in. */
+export function planSnapshot(form: GeneratorForm, request: TrainingPlanGenerationRequest): { key: PlanSnapshotKey; label: string; value: string }[] {
   const span = generatedPlanSpan(request);
   const kind = GOAL_KINDS.find((option) => option.value === form.goalKind);
   const week = weekSummary(form);
   const goal = form.goalKind === "race"
-    ? form.raceDistance || form.goal.trim() || kind?.label || "—"
+    ? (form.raceDistance ? raceDistanceLabel(form.raceDistance) : "") || form.goal.trim() || kind?.label || "—"
     : form.goalKind === "other"
-      ? form.goal.trim() || "Your own"
+      ? form.goal.trim() || t("library.snap.yourOwn")
       : kind?.label ?? "—";
   return [
-    { label: "Goal", value: goal },
-    { label: "Length", value: span?.weeks ? `${span.weeks} week${span.weeks === 1 ? "" : "s"}` : form.goalKind === "race" ? "To race day" : "Coach decides" },
-    { label: "Dates", value: span?.last ? `${formatPlanDate(span.first)} – ${formatPlanDate(span.last, true)}` : `From ${formatPlanDate(span?.first)}` },
-    { label: "Week", value: form.weekMode === "coach" ? "Coach decides" : `${week.sessions} sessions · ${week.time}` },
-    { label: "Sports", value: form.sports.length ? form.sports.map(formatWorkoutSport).join(", ") : "—" },
-    { label: "Level", value: LEVELS.find((level) => level.value === form.difficulty)?.label ?? "—" }
+    { key: "goal", label: t("library.snap.goal"), value: goal },
+    { key: "length", label: t("library.snap.length"), value: span?.weeks ? plural("library.weeks", span.weeks) : form.goalKind === "race" ? t("library.snap.toRace") : t("library.coachDecides") },
+    { key: "dates", label: t("library.snap.dates"), value: span?.last ? `${formatPlanDate(span.first)} – ${formatPlanDate(span.last, true)}` : t("library.snap.from", { date: formatPlanDate(span?.first) }) },
+    { key: "week", label: t("library.snap.week"), value: form.weekMode === "coach" ? t("library.coachDecides") : t("library.snap.weekValue", { sessions: week.sessions, time: week.time }) },
+    { key: "sports", label: t("library.snap.sports"), value: form.sports.length ? form.sports.map(workoutSportLabel).join(", ") : "—" },
+    { key: "level", label: t("library.snap.level"), value: LEVELS.find((level) => level.value === form.difficulty)?.label ?? "—" }
   ];
 }
 

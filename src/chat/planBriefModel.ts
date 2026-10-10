@@ -24,10 +24,12 @@ import {
   SESSION_CHOICES,
   planSnapshot,
   requestFromForm,
+  type PlanSnapshotKey,
   spanSentence,
   type GeneratorDay,
   type GeneratorForm
 } from "../training-library/planGeneratorModel";
+import { messageRecord, t } from "../i18n/core";
 
 const EVERYTHING: TrainingPlanDataSources = { activities: true, sleep: true, zones: true };
 
@@ -123,20 +125,24 @@ export function briefOpenProblems(
 export function briefTitle(request: PlanBriefRequest): string {
   const kind = GOAL_KINDS.find((option) => option.value === request.goalKind);
   if (request.goalKind === "race") {
-    return request.goal.trim() || (request.race?.distance ? `${request.race.distance} race` : "A race");
+    return (
+      request.goal.trim() ||
+      (request.race?.distance ? t("chat.brief.race", { distance: request.race.distance }) : t("chat.brief.aRace"))
+    );
   }
-  if (request.goalKind === "other") return request.goal.trim() || "Your own goal";
-  return request.goal.trim() ? `${kind?.label ?? "Plan"} · ${request.goal.trim()}` : kind?.label ?? "Plan";
+  if (request.goalKind === "other") return request.goal.trim() || t("library.snap.yourOwn");
+  const label = kind?.label ?? t("chat.kind.plan");
+  return request.goal.trim() ? `${label} · ${request.goal.trim()}` : label;
 }
 
-/** Which of the brief's fields a snapshot row shows. */
-const ROW_FIELDS: Record<string, PlanBriefField> = {
-  Goal: "goal",
-  Length: "dates",
-  Dates: "dates",
-  Week: "week",
-  Sports: "sports",
-  Level: "level"
+/** Which of the brief's fields a snapshot row shows, by the row's key. */
+const ROW_FIELDS: Record<PlanSnapshotKey, PlanBriefField> = {
+  goal: "goal",
+  length: "dates",
+  dates: "dates",
+  week: "week",
+  sports: "sports",
+  level: "level"
 };
 
 export interface BriefRow {
@@ -152,13 +158,13 @@ export interface BriefRow {
  */
 export function briefRows(brief: Pick<PlanBrief, "request" | "origins">, firstMonday: string): BriefRow[] {
   const form = formFromBrief(brief.request, firstMonday);
-  const rows = planSnapshot(form, brief.request).map((row) => {
-    const origin = brief.origins[ROW_FIELDS[row.label]!];
+  const rows = planSnapshot(form, brief.request).map(({ key, ...row }) => {
+    const origin = brief.origins[ROW_FIELDS[key]];
     return origin ? { ...row, origin } : row;
   });
   const constraints = brief.request.constraints?.trim();
   return constraints
-    ? [...rows, { label: "Notes", value: constraints, ...(brief.origins.constraints ? { origin: brief.origins.constraints } : {}) }]
+    ? [...rows, { label: t("chat.brief.notes"), value: constraints, ...(brief.origins.constraints ? { origin: brief.origins.constraints } : {}) }]
     : rows;
 }
 
@@ -167,7 +173,7 @@ export function briefSpan(request: PlanBriefRequest): string {
   return spanSentence(request);
 }
 
-export const BRIEF_ORIGIN_LABEL: Record<PlanBriefOrigin, string> = {
-  chat: "from chat",
-  data: "from your data"
-};
+export const BRIEF_ORIGIN_LABEL: Readonly<Record<PlanBriefOrigin, string>> = messageRecord<PlanBriefOrigin>({
+  chat: "chat.brief.fromChat",
+  data: "chat.brief.fromData"
+});

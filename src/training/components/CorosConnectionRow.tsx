@@ -11,6 +11,8 @@ import {
 } from "lucide-react";
 import type { TrainingHubStatus } from "../../../electron/types";
 import { SettingsPrefRow } from "../../settings/SettingsPrefRow";
+import { t } from "../../i18n/core";
+import { useI18n } from "../../i18n/useI18n";
 
 export interface CorosConnectionRowProps {
   status: TrainingHubStatus | null;
@@ -34,6 +36,7 @@ export function CorosConnectionRow({
   onRefresh,
   onLogout
 }: CorosConnectionRowProps) {
+  useI18n();
   const [showConnectionDetails, setShowConnectionDetails] = useState(false);
   const detailsId = useId();
 
@@ -47,11 +50,11 @@ export function CorosConnectionRow({
   // Region and host are not on it: Details carries both, and the address is
   // the part worth reading at a glance. Details opens under the buttons, in the
   // control column, so the buttons do not move when it appears.
-  const identity = status.email ?? "Connected";
+  const identity = status.email ?? t("common.connected");
 
   return (
     <SettingsPrefRow
-      title="COROS account"
+      title={t("settings.coros.title")}
       detail={identity}
       tone="success"
       align={showConnectionDetails ? "start" : "center"}
@@ -69,7 +72,7 @@ export function CorosConnectionRow({
           ) : (
             <Eye size={15} aria-hidden="true" />
           )}
-          {showConnectionDetails ? "Hide" : "Details"}
+          {showConnectionDetails ? t("common.hide") : t("common.details")}
         </button>
         <button
           className="settings-row-button"
@@ -82,7 +85,7 @@ export function CorosConnectionRow({
           ) : (
             <RefreshCw size={15} aria-hidden="true" />
           )}
-          Refresh
+          {t("common.refresh")}
         </button>
         <button
           className="settings-row-button is-danger"
@@ -91,25 +94,25 @@ export function CorosConnectionRow({
           onClick={onLogout}
         >
           <LogOut size={15} aria-hidden="true" />
-          Disconnect
+          {t("common.disconnect")}
         </button>
       </span>
       {showConnectionDetails ? (
         <span className="settings-connection-meta" id={detailsId}>
           <span>
             <User size={13} aria-hidden="true" />
-            User ID
-            <strong>{status.userId ?? "Unknown"}</strong>
+            {t("settings.coros.userId")}
+            <strong>{status.userId ?? t("common.unknown")}</strong>
           </span>
           <span>
             <Globe2 size={13} aria-hidden="true" />
-            Region
-            <strong>{status.regionId ?? "Unknown"}</strong>
+            {t("settings.coros.region")}
+            <strong>{status.regionId ?? t("common.unknown")}</strong>
           </span>
           <span>
             <Database size={13} aria-hidden="true" />
-            API host
-            <strong>{status.baseUrl ?? "Unknown"}</strong>
+            {t("settings.coros.apiHost")}
+            <strong>{status.baseUrl ?? t("common.unknown")}</strong>
           </span>
         </span>
       ) : null}

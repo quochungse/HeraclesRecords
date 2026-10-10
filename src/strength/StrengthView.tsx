@@ -50,6 +50,8 @@ import {
 import "./strength.css";
 import "./exerciseExplorer.css";
 import { useUnitSystem } from "../units/UnitSystemProvider";
+import { formatCount, plural, t } from "../i18n/core";
+import { exerciseLabel } from "./strengthAnalytics";
 
 interface StrengthViewProps {
   api: HeraclesRecordsApi;
@@ -206,40 +208,40 @@ export function StrengthView({
   const summaryItems: { key: string; label: string; parts: FigurePart[]; caption: string }[] = [
     {
       key: "sessions",
-      label: "Sessions",
+      label: t("strength.summary.sessions"),
       parts: [{ value: String(summary.sessions) }],
-      caption: cadencePhrase(summary.sessionsPerWeek) || "Nothing logged yet"
+      caption: cadencePhrase(summary.sessionsPerWeek) || t("strength.summary.nothing")
     },
     usesWeights
       ? {
           key: "lifted",
-          label: "Weight lifted",
+          label: t("strength.summary.lifted"),
           parts: totalWeightParts(summary.volumeKg, unitSystem),
-          caption: `Across ${Math.round(summary.sets).toLocaleString()} sets`
+          caption: plural("strength.summary.acrossSets", Math.round(summary.sets))
         }
       : {
           key: "sets",
-          label: "Sets",
-          parts: [{ value: Math.round(summary.sets).toLocaleString() }],
-          caption: `${Math.round(summary.reps).toLocaleString()} reps`
+          label: t("strength.summary.sets"),
+          parts: [{ value: formatCount(Math.round(summary.sets)) }],
+          caption: plural("strength.reps", Math.round(summary.reps))
         },
     {
       key: "time",
-      label: "Time lifting",
+      label: t("strength.summary.time"),
       parts: durationParts(summary.durationSec),
       caption: hasSessions
-        ? `About ${formatSpan(summary.durationSec / summary.sessions)} a session`
-        : "No time logged"
+        ? t("strength.summary.perSession", { time: formatSpan(summary.durationSec / summary.sessions) })
+        : t("strength.summary.noTime")
     },
     {
       key: "heaviest",
-      label: "Heaviest lift",
+      label: t("strength.summary.heaviest"),
       parts: summary.heaviestLift
         ? liftWeightParts(summary.heaviestLift.weightKg, unitSystem)
         : [{ value: "—" }],
       caption: summary.heaviestLift
-        ? `${summary.heaviestLift.name} × ${summary.heaviestLift.reps}`
-        : "Nothing with weight on it yet"
+        ? `${exerciseLabel(summary.heaviestLift.name)} × ${summary.heaviestLift.reps}`
+        : t("strength.summary.noWeight")
     }
   ];
 
@@ -260,17 +262,15 @@ export function StrengthView({
   const renderHeader = (withControls: boolean) => (
     <header className="strength-header">
       <div className="strength-title">
-        <h2>Strength</h2>
+        <h2>{t("nav.strength")}</h2>
         <p>
           {!withControls
-            ? "Your lifting, muscle by muscle."
+            ? t("strength.lead")
             : hasSessions
-              ? `You trained ${summary.sessions} ${
-                  summary.sessions === 1 ? "time" : "times"
-                } in ${activeWindow.phrase}.`
+              ? plural("strength.trained", summary.sessions, { window: activeWindow.phrase })
               : awaitingFirstSessions
-                ? `Reading your sessions from ${activeWindow.phrase}…`
-                : `Your lifting from ${activeWindow.phrase}, muscle by muscle.`}
+                ? t("strength.readingWindow", { window: activeWindow.phrase })
+                : t("strength.leadWindow", { window: activeWindow.phrase })}
         </p>
       </div>
       <div className="strength-header-controls">
@@ -281,13 +281,13 @@ export function StrengthView({
               per athlete and the window once per session. Folded, each reads
               as what it currently is — which is what a header is for. */}
           <OptionGroup
-            label="Strength source"
+            label={t("strength.source")}
             mode="collapsible"
             value={source}
             options={[
               {
                 value: "combined",
-                label: "Combined",
+                label: t("strength.combined"),
                 disabled: !(corosConnected && hevyConnected)
               },
               { value: "hevy", label: "Hevy", disabled: !hevyConnected },
@@ -296,7 +296,7 @@ export function StrengthView({
             onChange={setSource}
           />
           <OptionGroup
-            label="Time covered"
+            label={t("strength.timeCovered")}
             mode="collapsible"
             value={periodValue(days as PeriodDays)}
             options={STRENGTH_PERIOD_OPTIONS}
@@ -317,7 +317,7 @@ export function StrengthView({
               ) : (
                 <RefreshCw size={14} aria-hidden="true" />
               )}
-              Refresh
+              {t("common.refresh")}
             </button>
           ) : null}
           <button
@@ -334,7 +334,7 @@ export function StrengthView({
             ) : (
               <>
                 <Link2 size={14} aria-hidden="true" />
-                Connect Hevy
+                {t("strength.connectHevy")}
               </>
             )}
           </button>
@@ -349,7 +349,7 @@ export function StrengthView({
         {renderHeader(false)}
         <p className="strength-notice" role="status">
           <Loader2 className="spin" size={14} aria-hidden="true" />
-          Checking strength connections…
+          {t("strength.checking")}
         </p>
         {hevyDialog}
       </section>
@@ -365,11 +365,8 @@ export function StrengthView({
           <span className="strength-connect-icon" aria-hidden="true">
             <LockKeyhole size={22} />
           </span>
-          <h3>Connect a strength source</h3>
-          <p>
-            Import completed workouts from Hevy, read sessions from COROS
-            Training Hub, or connect both for one combined history.
-          </p>
+          <h3>{t("strength.connect.title")}</h3>
+          <p>{t("strength.connect.body")}</p>
           <div className="strength-connect-actions">
             <button
               type="button"
@@ -377,10 +374,10 @@ export function StrengthView({
               onClick={() => setHevyDialogOpen(true)}
             >
               <Link2 size={16} aria-hidden="true" />
-              Connect Hevy
+              {t("strength.connectHevy")}
             </button>
             <button type="button" className="secondary-button" onClick={onOpenTraining}>
-              Open Overview
+              {t("common.openOverview")}
             </button>
           </div>
         </section>
@@ -404,7 +401,7 @@ export function StrengthView({
       {!sampleMode
         ? warnings.map((warning) => (
             <p className="strength-notice is-warning" role="status" key={warning}>
-              {warning} Showing the most recent cached workouts instead.
+              {t("strength.cachedInstead", { warning })}
             </p>
           ))
         : null}
@@ -412,8 +409,7 @@ export function StrengthView({
       {pending > 0 && !sampleMode ? (
         <p className="strength-notice" role="status">
           <Loader2 className="spin" size={14} aria-hidden="true" />
-          Reading {pending} more session{pending === 1 ? "" : "s"} from COROS.
-          The map fills in as they arrive.
+          {plural("strength.pending", pending)}
         </p>
       ) : null}
 
@@ -421,9 +417,10 @@ export function StrengthView({
         <p className="strength-notice is-attribution" role="note">
           <Info size={15} aria-hidden="true" />
           <span>
-            {`COROS recorded ${genericSetCount.toLocaleString()} working ${
-              genericSetCount === 1 ? "set" : "sets"
-            } only as Full Body, so ${genericSetCount === 1 ? "it is" : "they are"} excluded from the map. Specific attribution is available for ${attributedSetCount.toLocaleString()} of ${workingSetCount.toLocaleString()} working sets.`}
+            {plural("strength.fullBodyExcluded", genericSetCount, {
+              attributed: formatCount(attributedSetCount),
+              working: formatCount(workingSetCount)
+            })}
           </span>
         </p>
       ) : null}
@@ -432,24 +429,22 @@ export function StrengthView({
         <section className="panel strength-card strength-blank" aria-busy="true">
           <h3>
             <Loader2 className="spin" size={16} aria-hidden="true" />
-            Reading your strength sessions
+            {t("strength.reading.title")}
           </h3>
           <p>
-            Your history for {activeWindow.phrase} is being read from{" "}
-            {source === "hevy" ? "Hevy" : source === "coros" ? "COROS" : "COROS and Hevy"}.
+            {t(`strength.reading.${source === "hevy" ? "hevy" : source === "coros" ? "coros" : "combined"}` as const, {
+              window: activeWindow.phrase
+            })}
           </p>
         </section>
       ) : !hasSessions ? (
         <section className="panel strength-card strength-blank">
-          <h3>No strength sessions in {activeWindow.phrase}</h3>
-          <p>
-            Sessions appear here a few minutes after they sync from your watch.
-            Try a longer stretch of time if you know you&apos;ve been lifting.
-          </p>
+          <h3>{t("strength.none.title", { window: activeWindow.phrase })}</h3>
+          <p>{t("strength.none.body")}</p>
         </section>
       ) : (
         <>
-          <section className="strength-summary" aria-label="Your training so far">
+          <section className="strength-summary" aria-label={t("strength.summaryLabel")}>
             {summaryItems.map((item) => (
               <div key={item.key} className="strength-summary-item">
                 <p className="strength-summary-label">{item.label}</p>
@@ -478,7 +473,7 @@ export function StrengthView({
                */}
               <article
                 className="strength-session-detail"
-                aria-label={selectedEntry ? "Session detail" : "All sessions"}
+                aria-label={selectedEntry ? t("strength.sessionDetail") : t("strength.allSessions")}
               >
                 {selectedEntry ? (
                   <StrengthSessionHeader

@@ -21,6 +21,7 @@ import {
   type McpConnectionState
 } from "../../mcp/mcpNotice";
 import type { TrainingHubSleepRecord } from "../../../electron/types";
+import { t } from "../../i18n/core";
 
 const SLEEP_WINDOW_PREFERENCE = defineSelectionPreference<TrainingTrendWindow>({
   key: "training.sleepTrendWindow",
@@ -50,14 +51,14 @@ function SleepTrendLegend() {
           }
           aria-hidden="true"
         />
-        Asleep
+        {t("overview.sleepTrend.asleep")}
       </span>
       <span className="training-chart-legend-item">
         <span
           className="training-chart-legend-line is-series is-solid"
           style={{ "--swatch-color": colors.gold } as CSSProperties}
         />
-        Score
+        {t("overview.sleepTrend.score")}
       </span>
     </div>
   );
@@ -107,15 +108,15 @@ export function SleepTrendPanel({
     <section className="panel training-chart-panel" data-metric="sleep">
       <div className="section-heading compact training-chart-heading">
         <div>
-          <p className="eyebrow">Sleep Trend</p>
-          <h2>Last {trendWindow} days</h2>
+          <p className="eyebrow">{t("overview.sleepTrend.title")}</p>
+          <h2>{t("overview.sleepTrend.lastDays", { days: trendWindow })}</h2>
         </div>
         <div className="training-chart-heading-side">
           <TrendWindowToggle
             options={TRAINING_TREND_WINDOWS}
             value={trendWindow}
             onChange={setTrendWindow}
-            label="Sleep trend range"
+            label={t("overview.sleepTrend.range")}
           />
           <SleepTrendLegend />
         </div>
@@ -131,19 +132,19 @@ export function SleepTrendPanel({
           busy={loading}
           title={
             loading
-              ? "Reading your nights"
-              : mcpTitleOr(mcpState, "Sleep needs MCP", "No sleep trend yet")
+              ? t("overview.sleepTrend.reading")
+              : mcpTitleOr(mcpState, t("overview.sleepTrend.needsMcp"), t("overview.sleepTrend.none"))
           }
         >
           {/* No nights to trend: "sync your watch" sends them nowhere. A load
               still running is neither of those and must outrank both — the MCP
               state is `undefined` until something answers anyway. */}
           {loading
-            ? "Nights are still coming back from COROS."
+            ? t("overview.sleepTrend.loading")
             : mcpTextOr(
                 mcpState,
                 MCP_SLEEP_TREND_SUBJECT,
-                "A trend needs more than one night. Sync sleep from COROS and it fills in here."
+                t("overview.sleepTrend.needsNights")
               )}
         </EmptyChartNotice>
       )}

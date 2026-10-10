@@ -1,3 +1,5 @@
+import { messageRecord } from "../i18n/core";
+
 // The two absolute yardsticks the Hall of Records measures speed and aerobic
 // fitness against, so that a labour asks the same of everyone: a beginner does
 // not reach it by improving on their own first weeks, and an athlete already at
@@ -148,7 +150,7 @@ export function isAgeGradedDistance(distance: number): distance is AgeGradedDist
 
 /** The best time on the road for this age and sex, in seconds. */
 export function ageStandardSeconds(distance: AgeGradedDistance, age: number, sex: AthleteSex): number {
-  const table = ROAD_STANDARDS[sex === 1 ? "female" : "male"][distance];
+  const table = ROAD_STANDARDS[sex === 1 ? "female" : "male"][distance]; // i18n-ignore
   const index = Math.min(LAST_AGE, Math.max(FIRST_AGE, Math.round(age))) - FIRST_AGE;
   return table.standard / (table.factors[index] / 10000);
 }
@@ -163,11 +165,11 @@ export type Vo2Rating = "good" | "excellent" | "superior";
 
 export const VO2_RATINGS: readonly Vo2Rating[] = ["good", "excellent", "superior"];
 
-export const VO2_RATING_NAMES: Readonly<Record<Vo2Rating, string>> = {
-  good: "Good",
-  excellent: "Excellent",
-  superior: "Superior"
-};
+export const VO2_RATING_NAMES: Readonly<Record<Vo2Rating, string>> = messageRecord<Vo2Rating>({
+  good: "records.vo2.good",
+  excellent: "records.vo2.excellent",
+  superior: "records.vo2.superior"
+});
 
 /** By decade from 20–29 to 70–79; younger reads as 20–29, older as 70–79. */
 const VO2_NORMS: Readonly<Record<"male" | "female", Readonly<Record<Vo2Rating, readonly number[]>>>> = {
@@ -186,5 +188,5 @@ const VO2_NORMS: Readonly<Record<"male" | "female", Readonly<Record<Vo2Rating, r
 /** The VO2max a rating starts at, for this age and sex. */
 export function vo2RatingThreshold(rating: Vo2Rating, age: number, sex: AthleteSex): number {
   const decade = Math.min(5, Math.max(0, Math.floor(age / 10) - 2));
-  return VO2_NORMS[sex === 1 ? "female" : "male"][rating][decade];
+  return VO2_NORMS[sex === 1 ? "female" : "male"][rating][decade]; // i18n-ignore
 }

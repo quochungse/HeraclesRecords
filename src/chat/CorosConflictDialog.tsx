@@ -1,5 +1,6 @@
 import { createPortal } from "react-dom";
 import { ConfirmDialog } from "../training-library/ConfirmDialog";
+import { t } from "../i18n/core";
 import "../training-library/trainingLibrary.css";
 
 /**
@@ -22,11 +23,11 @@ export default function CorosConflictDialog({
 }) {
   return createPortal(
     <ConfirmDialog
-      title="This plan changed on COROS"
-      description={`"${name}" was changed on COROS after this version was made — on another computer, in the COROS app or in the Training Library. Saving now replaces those changes with this version.`}
-      cancelLabel="Keep editing"
-      alternative={{ label: "Save as a new plan", onSelect: onSaveAsNew }}
-      confirmLabel="Replace with my edit"
+      title={t("library.dlg.conflict.title")}
+      description={t("chat.conflict.body", { name })}
+      cancelLabel={t("library.dlg.keepEditing")}
+      alternative={{ label: t("library.dlg.conflict.asNew"), onSelect: onSaveAsNew }}
+      confirmLabel={t("library.dlg.conflict.replace")}
       danger
       onConfirm={onOverwrite}
       onCancel={onCancel}

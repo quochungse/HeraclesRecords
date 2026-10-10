@@ -1,3 +1,5 @@
+import { t } from "../i18n/core";
+
 /**
  * Muscle taxonomy for the Strength view.
  *
@@ -48,128 +50,192 @@ export interface MuscleMeta {
 export const MUSCLES: MuscleMeta[] = [
   {
     id: "neck",
-    label: "Neck",
-    anatomy: "Sternocleidomastoid",
+    get label() {
+      return t("strength.muscle.neck");
+    },
+    get anatomy() {
+      return t("strength.muscle.neck.anatomy");
+    },
     view: "both",
     region: "upper",
     pattern: "pull"
   },
   {
     id: "traps",
-    label: "Traps",
-    anatomy: "Trapezius",
+    get label() {
+      return t("strength.muscle.traps");
+    },
+    get anatomy() {
+      return t("strength.muscle.traps.anatomy");
+    },
     view: "both",
     region: "upper",
     pattern: "pull"
   },
   {
     id: "shoulders",
-    label: "Shoulders",
-    anatomy: "Deltoids",
+    get label() {
+      return t("strength.muscle.shoulders");
+    },
+    get anatomy() {
+      return t("strength.muscle.shoulders.anatomy");
+    },
     view: "both",
     region: "upper",
     pattern: "push"
   },
   {
     id: "chest",
-    label: "Chest",
-    anatomy: "Pectoralis major",
+    get label() {
+      return t("strength.muscle.chest");
+    },
+    get anatomy() {
+      return t("strength.muscle.chest.anatomy");
+    },
     view: "front",
     region: "upper",
     pattern: "push"
   },
   {
     id: "lats",
-    label: "Back",
-    anatomy: "Latissimus dorsi & rhomboids",
+    get label() {
+      return t("strength.muscle.lats");
+    },
+    get anatomy() {
+      return t("strength.muscle.lats.anatomy");
+    },
     view: "back",
     region: "upper",
     pattern: "pull"
   },
   {
     id: "biceps",
-    label: "Biceps",
-    anatomy: "Biceps brachii",
+    get label() {
+      return t("strength.muscle.biceps");
+    },
+    get anatomy() {
+      return t("strength.muscle.biceps.anatomy");
+    },
     view: "front",
     region: "upper",
     pattern: "pull"
   },
   {
     id: "triceps",
-    label: "Triceps",
-    anatomy: "Triceps brachii",
+    get label() {
+      return t("strength.muscle.triceps");
+    },
+    get anatomy() {
+      return t("strength.muscle.triceps.anatomy");
+    },
     view: "back",
     region: "upper",
     pattern: "push"
   },
   {
     id: "forearms",
-    label: "Forearms",
-    anatomy: "Flexors & extensors",
+    get label() {
+      return t("strength.muscle.forearms");
+    },
+    get anatomy() {
+      return t("strength.muscle.forearms.anatomy");
+    },
     view: "both",
     region: "upper",
     pattern: "pull"
   },
   {
     id: "abs",
-    label: "Abs",
-    anatomy: "Rectus abdominis",
+    get label() {
+      return t("strength.muscle.abs");
+    },
+    get anatomy() {
+      return t("strength.muscle.abs.anatomy");
+    },
     view: "front",
     region: "core",
     pattern: "core"
   },
   {
     id: "obliques",
-    label: "Obliques",
-    anatomy: "External obliques",
+    get label() {
+      return t("strength.muscle.obliques");
+    },
+    get anatomy() {
+      return t("strength.muscle.obliques.anatomy");
+    },
     view: "front",
     region: "core",
     pattern: "core"
   },
   {
     id: "lowerBack",
-    label: "Lower back",
-    anatomy: "Erector spinae",
+    get label() {
+      return t("strength.muscle.lowerBack");
+    },
+    get anatomy() {
+      return t("strength.muscle.lowerBack.anatomy");
+    },
     view: "back",
     region: "core",
     pattern: "core"
   },
   {
     id: "glutes",
-    label: "Glutes",
-    anatomy: "Gluteus maximus & medius",
+    get label() {
+      return t("strength.muscle.glutes");
+    },
+    get anatomy() {
+      return t("strength.muscle.glutes.anatomy");
+    },
     view: "back",
     region: "lower",
     pattern: "legs"
   },
   {
     id: "quads",
-    label: "Quads",
-    anatomy: "Quadriceps femoris",
+    get label() {
+      return t("strength.muscle.quads");
+    },
+    get anatomy() {
+      return t("strength.muscle.quads.anatomy");
+    },
     view: "front",
     region: "lower",
     pattern: "legs"
   },
   {
     id: "hamstrings",
-    label: "Hamstrings",
-    anatomy: "Biceps femoris",
+    get label() {
+      return t("strength.muscle.hamstrings");
+    },
+    get anatomy() {
+      return t("strength.muscle.hamstrings.anatomy");
+    },
     view: "back",
     region: "lower",
     pattern: "legs"
   },
   {
     id: "adductors",
-    label: "Adductors",
-    anatomy: "Inner thigh",
+    get label() {
+      return t("strength.muscle.adductors");
+    },
+    get anatomy() {
+      return t("strength.muscle.adductors.anatomy");
+    },
     view: "front",
     region: "lower",
     pattern: "legs"
   },
   {
     id: "calves",
-    label: "Calves",
-    anatomy: "Gastrocnemius & soleus",
+    get label() {
+      return t("strength.muscle.calves");
+    },
+    get anatomy() {
+      return t("strength.muscle.calves.anatomy");
+    },
     view: "both",
     region: "lower",
     pattern: "legs"

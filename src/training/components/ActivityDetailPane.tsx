@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
+import type { MessageKey } from "../../i18n/core";
 import {
   Braces,
   CloudOff,
@@ -47,6 +48,7 @@ import { ActivitySeriesChart } from "./ActivitySeriesChart";
 import { ActivityZoneBar } from "./ActivityZoneBar";
 import { StrengthDetailPanel } from "./StrengthDetailPanel";
 import { activityCoachRequest } from "../askCoachAbout";
+import { formatCount, formatDecimal, t } from "../../i18n/core";
 
 interface ActivityDetailPaneProps {
   detail: TrainingHubActivityDetail | null;
@@ -94,11 +96,11 @@ const PAUSE_NOTICE_S = 60;
  * The screen the Open button leads to, per sport. The button itself says only
  * "Open" — the screen is in its tooltip and its accessible name.
  */
-const SPORT_SCREEN_LABELS: Record<SportScreen, string> = {
-  running: "Running",
-  cycling: "Cycling",
-  hiking: "Hiking",
-  strength: "Strength"
+const SPORT_SCREEN_LABELS: Record<SportScreen, MessageKey> = {
+  running: "nav.running",
+  cycling: "nav.cycling",
+  hiking: "nav.hiking",
+  strength: "nav.strength"
 };
 
 export function ActivityDetailPane({
@@ -180,7 +182,7 @@ export function ActivityDetailPane({
   if (!listActivity) {
     return (
       <div className="activity-detail-pane is-blank">
-        <p>Pick a session to see its route, its zones and its splits.</p>
+        <p>{t("activity.pane.pick")}</p>
       </div>
     );
   }
@@ -189,14 +191,14 @@ export function ActivityDetailPane({
     return (
       <div className="activity-detail-pane is-blank">
         <CloudOff size={22} aria-hidden="true" />
-        <p>This activity&apos;s detail did not arrive.</p>
+        <p>{t("activity.detailMissing")}</p>
         <button
           type="button"
           className="secondary-button"
           onClick={() => onRetry(listActivity)}
         >
           <RefreshCw size={14} aria-hidden="true" />
-          Try again
+          {t("common.tryAgain")}
         </button>
       </div>
     );
@@ -206,7 +208,7 @@ export function ActivityDetailPane({
     return (
       <div className="activity-detail-pane is-blank">
         <Loader2 className="spin" size={22} aria-hidden="true" />
-        <p>Loading {listActivity.name ?? "activity"}…</p>
+        <p>{t("activity.loadingNamed", { name: listActivity.name ?? t("activity.activity") })}</p>
       </div>
     );
   }
@@ -240,26 +242,26 @@ export function ActivityDetailPane({
   if (distance && distance > 0) {
     headline.push({
       key: "distance",
-      label: "Distance",
+      label: t("activity.m.distance"),
       value: formatDistanceMeters(distance, unitSystem, swim)
     });
   }
   headline.push({
     key: "duration",
-    label: "Time",
+    label: t("activity.m.time"),
     value: formatDurationSeconds(duration),
-    title: "Activity time, pauses taken out"
+    title: t("activity.pane.timeTitle")
   });
   if (performance) {
     headline.push({
       key: "performance",
-      label: readsSpeed ? "Avg speed" : "Avg pace",
+      label: readsSpeed ? t("activity.m.avgSpeed") : t("activity.m.avgPace"),
       value: performance
     });
   } else if (detail.avgHr) {
     headline.push({
       key: "avgHr",
-      label: "Avg HR",
+      label: t("activity.m.avgHr"),
       value: `${Math.round(detail.avgHr)} bpm`
     });
   }
@@ -274,21 +276,21 @@ export function ActivityDetailPane({
 
   push(
     detail.avgHr
-      ? { key: "avgHr", label: "Avg HR", value: `${Math.round(detail.avgHr)} bpm` }
+      ? { key: "avgHr", label: t("activity.m.avgHr"), value: `${Math.round(detail.avgHr)} bpm` }
       : null
   );
   push(
     detail.maxHr
-      ? { key: "maxHr", label: "Max HR", value: `${Math.round(detail.maxHr)} bpm` }
+      ? { key: "maxHr", label: t("activity.m.maxHr"), value: `${Math.round(detail.maxHr)} bpm` }
       : null
   );
   push(
     detail.adjustedPace && !readsSpeed && !swim
       ? {
           key: "adjustedPace",
-          label: "Grade-adj. pace",
+          label: t("activity.m.gap"),
           value: formatPaceSecondsPerKm(detail.adjustedPace, unitSystem),
-          title: "What this pace would have been on the flat"
+          title: t("activity.pane.gapTitle")
         }
       : null
   );
@@ -296,8 +298,8 @@ export function ActivityDetailPane({
     detail.calories
       ? {
           key: "calories",
-          label: "Calories",
-          value: Math.round(detail.calories).toLocaleString()
+          label: t("activity.m.calories"),
+          value: formatCount(Math.round(detail.calories))
         }
       : null
   );
@@ -305,7 +307,7 @@ export function ActivityDetailPane({
     detail.elevationGain
       ? {
           key: "climb",
-          label: "Climb",
+          label: t("activity.m.climb"),
           value: formatElevationMeters(detail.elevationGain, unitSystem)
         }
       : null
@@ -314,7 +316,7 @@ export function ActivityDetailPane({
     detail.elevationLoss
       ? {
           key: "descent",
-          label: "Descent",
+          label: t("activity.m.descent"),
           value: formatElevationMeters(detail.elevationLoss, unitSystem)
         }
       : null
@@ -323,9 +325,9 @@ export function ActivityDetailPane({
     detail.trainingLoad
       ? {
           key: "load",
-          label: "Training load",
-          value: Math.round(detail.trainingLoad).toLocaleString(),
-          title: "As COROS scores this session"
+          label: t("activity.m.trainingLoad"),
+          value: formatCount(Math.round(detail.trainingLoad)),
+          title: t("activity.pane.loadTitle")
         }
       : null
   );
@@ -334,9 +336,9 @@ export function ActivityDetailPane({
     detail.effect?.aerobic !== undefined
       ? {
           key: "aerobic",
-          label: "Aerobic TE",
-          value: detail.effect.aerobic.toFixed(1),
-          title: "Aerobic training effect, 0–5"
+          label: t("activity.m.aerobicTe"),
+          value: formatDecimal(detail.effect.aerobic, 1),
+          title: t("activity.pane.aerobicTeTitle")
         }
       : null
   );
@@ -344,9 +346,9 @@ export function ActivityDetailPane({
     detail.effect?.anaerobic !== undefined
       ? {
           key: "anaerobic",
-          label: "Anaerobic TE",
-          value: detail.effect.anaerobic.toFixed(1),
-          title: "Anaerobic training effect, 0–5"
+          label: t("activity.m.anaerobicTe"),
+          value: formatDecimal(detail.effect.anaerobic, 1),
+          title: t("activity.pane.anaerobicTeTitle")
         }
       : null
   );
@@ -355,8 +357,8 @@ export function ActivityDetailPane({
       ? {
           key: "vo2max",
           label: "VO₂max",
-          value: detail.effect.vo2max.toFixed(1),
-          title: "As of this session"
+          value: formatDecimal(detail.effect.vo2max, 1),
+          title: t("activity.pane.vo2Title")
         }
       : null
   );
@@ -364,7 +366,7 @@ export function ActivityDetailPane({
     detail.dynamics?.avgCadence
       ? {
           key: "cadence",
-          label: "Avg cadence",
+          label: t("activity.m.avgCadence"),
           value: `${Math.round(detail.dynamics.avgCadence)} ${cycling ? "rpm" : "spm"}`
         }
       : null
@@ -373,7 +375,7 @@ export function ActivityDetailPane({
     detail.dynamics?.avgPower
       ? {
           key: "power",
-          label: "Avg power",
+          label: t("activity.m.avgPower"),
           value: `${Math.round(detail.dynamics.avgPower)} W`
         }
       : null
@@ -382,8 +384,8 @@ export function ActivityDetailPane({
     detail.dynamics?.strideLength
       ? {
           key: "stride",
-          label: "Stride",
-          value: `${detail.dynamics.strideLength.toFixed(2)} m`
+          label: t("activity.m.stride"),
+          value: `${formatDecimal(detail.dynamics.strideLength, 2)} m`
         }
       : null
   );
@@ -391,7 +393,7 @@ export function ActivityDetailPane({
     detail.dynamics?.groundTime
       ? {
           key: "groundTime",
-          label: "Ground contact",
+          label: t("activity.m.groundContact"),
           value: `${Math.round(detail.dynamics.groundTime)} ms`
         }
       : null
@@ -400,8 +402,8 @@ export function ActivityDetailPane({
     detail.dynamics?.verticalOscillation
       ? {
           key: "verticalOscillation",
-          label: "Vert. oscillation",
-          value: `${detail.dynamics.verticalOscillation.toFixed(1)} cm`
+          label: t("activity.m.vertOsc"),
+          value: `${formatDecimal(detail.dynamics.verticalOscillation, 1)} cm`
         }
       : null
   );
@@ -440,7 +442,7 @@ export function ActivityDetailPane({
     <div className="activity-detail-pane">
       <header className="activity-detail-pane-head">
         <div className="activity-detail-pane-title">
-          <h2>{detail.name ?? listActivity.name ?? "Selected activity"}</h2>
+          <h2>{detail.name ?? listActivity.name ?? t("activity.selected")}</h2>
           <div className="activity-detail-pane-meta">
             {sportName ? (
               <span className="sport-chip" data-sport={sportColorCategory(sportType)}>
@@ -449,28 +451,28 @@ export function ActivityDetailPane({
             ) : null}
             {startTime ? <span>{formatTrainingTimestamp(startTime)}</span> : null}
             {pausedSeconds !== undefined && pausedSeconds >= PAUSE_NOTICE_S ? (
-              <span title="Wall clock minus activity time">
-                Paused {formatDurationSpan(pausedSeconds)}
+              <span title={t("activity.pane.pausedTitle")}>
+                {t("activity.pane.paused", { time: formatDurationSpan(pausedSeconds) })}
               </span>
             ) : null}
             {weather?.temperatureC !== undefined ? (
               <span
                 title={
                   weather.feelsLikeC !== undefined
-                    ? `Felt like ${formatTemperatureValue(weather.feelsLikeC, temperatureUnit)}`
+                    ? t("activity.pane.feltLike", { temp: formatTemperatureValue(weather.feelsLikeC, temperatureUnit) })
                     : undefined
                 }
               >
                 {formatTemperatureValue(weather.temperatureC, temperatureUnit)}
                 {weather.humidityPct !== undefined
-                  ? ` · ${Math.round(weather.humidityPct)}% humidity`
+                  ? t("activity.pane.humidity", { percent: Math.round(weather.humidityPct) })
                   : ""}
               </span>
             ) : null}
             {onExportFile ? (
               <ActivityExportMenu
                 activity={listActivity}
-                activityName={detail.name ?? listActivity.name ?? sportName ?? "activity"}
+                activityName={detail.name ?? listActivity.name ?? sportName ?? t("activity.activity")}
                 busy={busy}
                 onExportFile={onExportFile}
               />
@@ -479,8 +481,8 @@ export function ActivityDetailPane({
               <button
                 type="button"
                 className="activity-meta-action"
-                aria-label="Show raw JSON"
-                title="Show raw JSON"
+                aria-label={t("activity.raw.show")}
+                title={t("activity.raw.show")}
                 onClick={() => void openRaw()}
               >
                 <Braces size={13} aria-hidden="true" />
@@ -499,15 +501,15 @@ export function ActivityDetailPane({
               }
             >
               <MessageCircle size={15} aria-hidden="true" />
-              Ask Coach
+              {t("activity.askCoach")}
             </button>
           ) : null}
           {sportScreen && onOpenSportScreen && activityId !== undefined ? (
             <button
               type="button"
               className="activity-open-screen"
-              aria-label={`Open in ${SPORT_SCREEN_LABELS[sportScreen]}`}
-              title={`Open in ${SPORT_SCREEN_LABELS[sportScreen]}`}
+              aria-label={t("activity.openIn", { screen: t(SPORT_SCREEN_LABELS[sportScreen]) })}
+              title={t("activity.openIn", { screen: t(SPORT_SCREEN_LABELS[sportScreen]) })}
               onClick={() =>
                 onOpenSportScreen({
                   view: sportScreen,
@@ -517,7 +519,7 @@ export function ActivityDetailPane({
               }
             >
               <Maximize2 size={14} aria-hidden="true" />
-              Open
+              {t("activity.open")}
             </button>
           ) : null}
         </div>
@@ -575,24 +577,24 @@ export function ActivityDetailPane({
 
           {gpsPoints > 1 ? (
             <section className="activity-detail-block">
-              <h3>Route</h3>
+              <h3>{t("activity.m.route")}</h3>
               <ActivityRouteMap track={detail.track} detail={detail} />
             </section>
           ) : null}
 
           {showElevationProfile ? (
             <section className="activity-detail-block">
-              <h3>Elevation</h3>
+              <h3>{t("activity.m.elevation")}</h3>
               <ActivityElevationChart track={detail.track} />
             </section>
           ) : null}
 
           {laps.length > 0 ? (
             <section className="activity-detail-block">
-              <h3>Laps</h3>
+              <h3>{t("activity.m.laps")}</h3>
               {hasSeries ? (
                 <p className="activity-detail-hint">
-                  Pick a lap to focus the chart on it.
+                  {t("activity.pane.pickLap")}
                 </p>
               ) : null}
               {/*
@@ -604,12 +606,14 @@ export function ActivityDetailPane({
                 <thead>
                   <tr>
                     <th scope="col">#</th>
-                    <th scope="col" className="is-numeric">Time</th>
-                    <th scope="col" className="is-numeric">Distance</th>
-                    <th scope="col" className="is-numeric">Pace</th>
-                    <th scope="col" className="is-numeric">Avg HR</th>
-                    <th scope="col" className="is-numeric">Max HR</th>
-                    <th scope="col" className="is-numeric">Climb</th>
+                    <th scope="col" className="is-numeric">{t("activity.m.time")}</th>
+                    <th scope="col" className="is-numeric">{t("activity.m.distance")}</th>
+                    <th scope="col" className="is-numeric">
+                      {readsSpeed ? t("activity.m.speed") : t("activity.m.pace")}
+                    </th>
+                    <th scope="col" className="is-numeric">{t("activity.m.avgHr")}</th>
+                    <th scope="col" className="is-numeric">{t("activity.m.maxHr")}</th>
+                    <th scope="col" className="is-numeric">{t("activity.m.climb")}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -673,12 +677,12 @@ export function ActivityDetailPane({
               <header className="training-raw-modal-header">
                 <div className="training-raw-modal-title">
                   <Braces size={16} aria-hidden="true" />
-                  <h2 id="activity-raw-modal-title">Raw JSON</h2>
+                  <h2 id="activity-raw-modal-title">{t("activity.raw.title")}</h2>
                 </div>
                 <button
                   type="button"
                   className="icon-button"
-                  aria-label="Close raw JSON"
+                  aria-label={t("activity.raw.close")}
                   onClick={() => setShowRaw(false)}
                 >
                   <X size={18} aria-hidden="true" />
@@ -694,7 +698,7 @@ export function ActivityDetailPane({
                 ) : (
                   <div className="training-detail-loading">
                     <Loader2 className="spin" size={18} aria-hidden="true" />
-                    <p>Fetching payload…</p>
+                    <p>{t("activity.raw.fetching")}</p>
                   </div>
                 )}
               </div>

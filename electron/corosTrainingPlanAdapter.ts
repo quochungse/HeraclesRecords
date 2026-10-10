@@ -12,6 +12,7 @@ import type {
   NativeCorosPlanSummary,
   TrainingHubScheduledExercise
 } from "./types";
+import { ScreenError } from "./screenText";
 
 type RawPlan = Record<string, unknown>;
 
@@ -243,14 +244,14 @@ export interface NativePlanWriteInput {
 }
 
 function validateWriteInput(input: NativePlanWriteInput): void {
-  if (!input.name.trim()) throw new Error("A COROS plan needs a name.");
+  if (!input.name.trim()) throw new ScreenError("main.plan.needsName");
   if (input.sessions.length === 0) {
-    throw new Error("A COROS plan needs at least one session.");
+    throw new ScreenError("main.plan.needsSession");
   }
   const perDay = new Map<number, number>();
   for (const session of input.sessions) {
     if (!Number.isInteger(session.dayNo) || session.dayNo < 0) {
-      throw new Error("Every session needs a day in the plan.");
+      throw new ScreenError("main.plan.needsDay");
     }
     const count = (perDay.get(session.dayNo) ?? 0) + 1;
     if (count > TRAINING_PLAN_SESSIONS_PER_DAY) {
@@ -468,7 +469,7 @@ export function buildNativePlanUpdateBody(
 
   for (const session of input.sessions) {
     if (session.idInPlan !== undefined && !entityById.has(String(session.idInPlan))) {
-      throw new Error(`Session ${session.idInPlan} is not in this plan any more. Reload it before saving.`);
+      throw new ScreenError("main.plan.sessionGone");
     }
   }
 
@@ -558,7 +559,7 @@ export function buildNativePlanUpdateBody(
 
 function requireRegion(): string {
   const region = currentTrainingHubRegionId();
-  if (!region) throw new Error("Log in to COROS Training Hub first.");
+  if (!region) throw new ScreenError("main.coros.signInFirst");
   return region;
 }
 
@@ -568,7 +569,7 @@ export async function readNativeCorosPlanRaw(remoteId: string): Promise<RawPlan>
     method: "GET",
     params: { id: remoteId, supportRestExercise: 1 }
   });
-  if (!raw || typeof raw !== "object") throw new Error("COROS did not return that plan.");
+  if (!raw || typeof raw !== "object") throw new ScreenError("main.plan.notReturned");
   return raw;
 }
 
@@ -612,7 +613,7 @@ export async function createNativeCorosPlan(input: NativePlanWriteInput): Promis
   const remoteId = stringValue(
     await writeNativeTrainingPlanEndpoint<unknown>("/training/plan/add", { body })
   );
-  if (!remoteId) throw new Error("COROS accepted the plan but returned no id for it.");
+  if (!remoteId) throw new ScreenError("main.plan.noId");
   return remoteId;
 }
 
@@ -630,7 +631,7 @@ export async function updateNativeCorosPlan(
 ): Promise<void> {
   const current = options.current ?? (await readNativeCorosPlanRaw(remoteId));
   if (isDeletedNativePlan(current)) {
-    throw new Error("This plan was deleted on COROS.");
+    throw new ScreenError("main.plan.deleted");
   }
   await writeNativeTrainingPlanEndpoint("/training/plan/update", {
     body: buildNativePlanUpdateBody(current, input)
@@ -657,7 +658,7 @@ export async function copyNativeCorosPlan(remoteId: string): Promise<NativeCoros
     body
   });
   if (!copied || typeof copied !== "object" || !stringValue(copied.id)) {
-    throw new Error("COROS accepted the copy but did not return it.");
+    throw new ScreenError("main.plan.copyMissing");
   }
   return parseNativeCorosPlan(copied);
 }
@@ -689,7 +690,7 @@ export async function executeNativeCorosPlan(
   if (!/^\d{8}$/.test(startDay)) throw new Error("startDay must be yyyyMMdd.");
   const listed = await listNativeCorosPlans();
   if (listed.some((plan) => plan.executeStatus === 1 && plan.sourcePlanId === templateId)) {
-    throw new Error("This plan is already on the calendar. Take it off before adding it again.");
+    throw new ScreenError("main.plan.alreadyOnCalendar");
   }
   const before = new Set(listed.map((plan) => plan.remoteId));
   await writeNativeTrainingPlanEndpoint("/training/schedule/executeSubPlan", {

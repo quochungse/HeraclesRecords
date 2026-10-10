@@ -43,6 +43,7 @@ import { rideTypesPresent, summariseRides, totalsSpeedKmh } from "./rideMetrics"
 import { RIDE_TYPE_LABELS, ridesOfType, type RideType } from "./rideType";
 import "../running/running.css";
 import "./cycling.css";
+import { t } from "../i18n/core";
 
 export interface CyclingViewProps {
   api: HeraclesRecordsApi | null;
@@ -128,7 +129,7 @@ export function CyclingView({
     openRequest,
     onOpenRequestHandled,
     onReturn,
-    listLabel: "Cycling"
+    listLabel: t("nav.cycling")
   });
 
   // Pinned to the list rather than read per render, so "the last 90 days"
@@ -210,16 +211,12 @@ export function CyclingView({
         <section className="panel data-connect-panel">
           <LockKeyhole size={24} aria-hidden="true" />
           <div>
-            <h3>{restoring ? "Reconnecting to COROS" : "Connect COROS first"}</h3>
-            <p>
-              {restoring
-                ? "Signing back in with your saved credentials. Your rides load as soon as that finishes."
-                : "This screen is drawn from your COROS activity history. Signing in lives on Overview."}
-            </p>
+            <h3>{restoring ? t("run.reconnecting") : t("common.connectFirst.title")}</h3>
+            <p>{restoring ? t("ride.reconnectingBody") : t("run.connectBody")}</p>
           </div>
           {restoring ? null : (
             <button type="button" className="primary-button" onClick={onOpenOverview}>
-              Open Overview
+              {t("common.openOverview")}
             </button>
           )}
         </section>
@@ -254,7 +251,7 @@ export function CyclingView({
     return (
       <section className="running-view cycling-view" ref={pageRef}>
         <CyclingPageHeader />
-        <RunningPageSkeleton label="Loading your rides" />
+        <RunningPageSkeleton label={t("ride.loading")} />
       </section>
     );
   }
@@ -267,11 +264,8 @@ export function CyclingView({
         <section className="panel running-empty running-state-panel">
           <CloudOff size={22} aria-hidden="true" />
           <div>
-            <h3>Your activities did not load</h3>
-            <p>
-              COROS did not return the activity list. This is usually the
-              connection; nothing on this machine was lost.
-            </p>
+            <h3>{t("run.listFailed")}</h3>
+            <p>{t("run.listFailedBody")}</p>
           </div>
           <button
             type="button"
@@ -280,7 +274,7 @@ export function CyclingView({
             onClick={onRetryActivities}
           >
             <RefreshCw size={14} aria-hidden="true" className={retrying ? "spin" : undefined} />
-            {retrying ? "Loading" : "Try again"}
+            {retrying ? t("common.loading") : t("common.tryAgain")}
           </button>
         </section>
       </section>
@@ -294,12 +288,8 @@ export function CyclingView({
         <section className="panel running-empty running-state-panel">
           <Bike size={22} aria-hidden="true" />
           <div>
-            <h3>No rides yet</h3>
-            <p>
-              Road, gravel, mountain, indoor and e-bike rides from your COROS
-              watch land here once they sync. Everything else you record stays
-              under Activities.
-            </p>
+            <h3>{t("ride.none")}</h3>
+            <p>{t("ride.noneBody")}</p>
           </div>
         </section>
       </section>
@@ -314,10 +304,10 @@ export function CyclingView({
 
       <div className="running-controls">
         <OptionGroup
-          label="Bike"
+          label={t("ride.bike")}
           value={rideType ?? "all"}
           options={[
-            { value: "all", label: "All" },
+            { value: "all", label: t("common.all") },
             ...availableTypes.map((option) => ({
               value: option,
               label: RIDE_TYPE_LABELS[option]
@@ -329,7 +319,7 @@ export function CyclingView({
         />
 
         <OptionGroup
-          label="Period"
+          label={t("activity.filter.period")}
           mode="collapsible"
           className="running-period"
           value={periodValue(periodDays as PeriodDays)}
@@ -352,25 +342,25 @@ export function CyclingView({
 
         <div className="running-totals">
           <div className="running-stat">
-            <span>Rides</span>
+            <span>{t("ride.rides")}</span>
             <strong>{totals.count}</strong>
           </div>
           <div className="running-stat">
-            <span>Distance</span>
+            <span>{t("activity.m.distance")}</span>
             <strong>{formatDistanceMeters(totals.distance, unitSystem)}</strong>
           </div>
           <div className="running-stat">
-            <span>Time</span>
+            <span>{t("activity.m.time")}</span>
             <strong>{formatDurationSpan(totals.duration)}</strong>
           </div>
-          <div className="running-stat" title="Total distance over the time that recorded one">
-            <span>Avg speed</span>
+          <div className="running-stat" title={t("ride.avgSpeedTitle")}>
+            <span>{t("activity.m.avgSpeed")}</span>
             <strong>
               {averageSpeed === undefined ? "—" : formatSpeedValue(averageSpeed, unitSystem)}
             </strong>
           </div>
           <div className="running-stat">
-            <span>Climb</span>
+            <span>{t("activity.m.climb")}</span>
             <strong>{formatElevationMeters(totals.elevationGain, unitSystem)}</strong>
           </div>
         </div>
@@ -394,7 +384,7 @@ export function CyclingView({
                   summaries={summaries}
                 />
               ) : (
-                <RunBlockSkeleton label="Loading your heart-rate zones" />
+                <RunBlockSkeleton label={t("run.loadingZones")} />
               )}
               <RideTypePanel rides={ridesInPeriod} />
             </div>
@@ -405,11 +395,11 @@ export function CyclingView({
           <section className="panel running-empty">
             <Bike size={22} aria-hidden="true" />
             <div>
-              <h3>No rides in this window</h3>
+              <h3>{t("ride.noneInWindow")}</h3>
               <p>
                 {rideType === null
-                  ? "Widen the period, or record a ride and sync your watch."
-                  : `No ${RIDE_TYPE_LABELS[rideType].toLowerCase()} rides here. Try another bike or a wider period.`}
+                  ? t("ride.widen")
+                  : t(`ride.noneOfType.${rideType}` as const)}
               </p>
             </div>
           </section>
@@ -431,9 +421,9 @@ export function CyclingView({
 function CyclingPageHeader() {
   return (
     <header className="running-page-header">
-      <p className="running-eyebrow">Your training</p>
-      <h1>Cycling</h1>
-      <p>Every ride you have logged, read down the time axis.</p>
+      <p className="running-eyebrow">{t("run.eyebrow")}</p>
+      <h1>{t("nav.cycling")}</h1>
+      <p>{t("ride.lead")}</p>
     </header>
   );
 }

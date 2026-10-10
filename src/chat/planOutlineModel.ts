@@ -14,11 +14,15 @@ import type {
 } from "../../electron/types";
 import { COROS_WEEK_STAGES } from "../../electron/trainingPlanDomain";
 import { addPlanWeeks, planOutlineProblems } from "../../electron/trainingPlanGeneration";
+import { formatDecimal, plural, t } from "../i18n/core";
+import { planStageLabel } from "../i18n/workoutWords";
 
 /** COROS's six stages a week of an outline may take; "Not set" is never one. */
 export const OUTLINE_STAGES = COROS_WEEK_STAGES.filter((stage) => stage.value > 0).map((stage) => ({
   value: stage.value as TrainingPlanWeekStage,
-  label: stage.label,
+  get label() {
+    return planStageLabel(stage.slug);
+  },
   slug: stage.slug
 }));
 
@@ -27,12 +31,12 @@ export function outlineStageSlug(stage: number): string | undefined {
 }
 
 export function outlineStageLabel(stage: number): string {
-  return OUTLINE_STAGES.find((candidate) => candidate.value === stage)?.label ?? "Not set";
+  return OUTLINE_STAGES.find((candidate) => candidate.value === stage)?.label ?? planStageLabel("none");
 }
 
 function hoursText(hours: number): string {
   const rounded = Math.round(hours * 10) / 10;
-  return Number.isInteger(rounded) ? String(rounded) : rounded.toFixed(1);
+  return Number.isInteger(rounded) ? String(rounded) : formatDecimal(rounded, 1);
 }
 
 function rangeText(values: readonly number[], format: (value: number) => string): string {
@@ -44,11 +48,11 @@ function rangeText(values: readonly number[], format: (value: number) => string)
 /** The outline in a line: its length, its weekly time and its weekly sessions. */
 export function outlineSpan(outline: TrainingPlanOutline): string {
   const weeks = outline.weeks;
-  if (!weeks.length) return "No weeks";
+  if (!weeks.length) return t("chat.outline.noWeeks");
   return [
-    `${weeks.length} week${weeks.length === 1 ? "" : "s"}`,
-    `${rangeText(weeks.map((week) => week.hours), hoursText)} h a week`,
-    `${rangeText(weeks.map((week) => week.sessions), String)} sessions`
+    plural("chat.outline.weeks", weeks.length),
+    t("chat.outline.hoursAWeek", { range: rangeText(weeks.map((week) => week.hours), hoursText) }),
+    t("chat.outline.sessions", { range: rangeText(weeks.map((week) => week.sessions), String) })
   ].join(" · ");
 }
 
@@ -120,8 +124,29 @@ export function outlineChanged(before: TrainingPlanOutline, after: TrainingPlanO
   return JSON.stringify(before.weeks) !== JSON.stringify(after.weeks);
 }
 
-/** What the athlete sees sent when they ask for an outline, and for a redraw. */
+/**
+ * What is sent when the athlete asks for an outline, and for a redraw. Stored
+ * in English whatever the language — `isAutomaticOutlineStep` recognises the
+ * outline AI Plan sends on its own by these words — and drawn through
+ * `displayStepText`.
+ */
 export function outlineStepText(note?: string): string {
   const said = note?.trim();
-  return said ? `Redraw the outline: ${said}` : "Draw the outline";
+  return said ? `${REDRAW_PREFIX}${said}` : DRAW_OUTLINE_TEXT;
+}
+
+const DRAW_OUTLINE_TEXT = "Draw the outline"; // i18n-ignore
+const REDRAW_PREFIX = "Redraw the outline: "; // i18n-ignore
+
+/** What is sent when the sessions are written to an outline (P2.3), stored the same way. */
+export const WRITE_SESSIONS_TEXT = "Write the sessions"; // i18n-ignore
+
+/** A pipeline step's words in the language on screen; anything else as written. */
+export function displayStepText(content: string): string {
+  if (content === DRAW_OUTLINE_TEXT) return t("chat.step.drawOutline");
+  if (content === WRITE_SESSIONS_TEXT) return t("chat.step.writeSessions");
+  if (content.startsWith(REDRAW_PREFIX)) {
+    return t("chat.step.redraw", { note: content.slice(REDRAW_PREFIX.length) });
+  }
+  return content;
 }

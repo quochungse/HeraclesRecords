@@ -1,3 +1,4 @@
+import type { MessageKey } from "../i18n/core";
 import { useMemo, type KeyboardEvent } from "react";
 import { ArrowDown, ArrowUp } from "lucide-react";
 import type { TrainingHubActivity } from "../../electron/types";
@@ -10,7 +11,8 @@ import {
 import { useUnitSystem } from "../units/UnitSystemProvider";
 import { formatSpeedValue } from "../units/units";
 import { positive, rideSeconds, speedKmh } from "./rideMetrics";
-import { RIDE_TYPE_LABELS, classifyRideType, type RideType } from "./rideType";
+import { untitledRide, RIDE_TYPE_LABELS, classifyRideType, type RideType } from "./rideType";
+import { t } from "../i18n/core";
 
 interface RideListProps {
   rides: readonly TrainingHubActivity[];
@@ -65,19 +67,37 @@ interface ColumnDefinition {
  * The columns hidden on a narrow panel are the same positions Running hides
  * (running.css), which here are climb and load, then time.
  */
+/** A column whose words are read in the language on screen each time. */
+function column(
+  key: RideSortKey,
+  labelKey: MessageKey,
+  numeric: boolean,
+  titleKey?: MessageKey
+): ColumnDefinition {
+  return {
+    key,
+    get label() {
+      return t(labelKey);
+    },
+    numeric,
+    ...(titleKey
+      ? {
+          get title() {
+            return t(titleKey);
+          }
+        }
+      : {})
+  };
+}
+
 const COLUMNS: readonly ColumnDefinition[] = [
-  { key: "when", label: "When", numeric: false },
-  { key: "distance", label: "Distance", numeric: true },
-  { key: "duration", label: "Time", numeric: true },
-  { key: "speed", label: "Speed", numeric: true, title: "Average speed, pauses out" },
-  { key: "climb", label: "Climb", numeric: true, title: "Metres climbed on the ride" },
-  { key: "avgHr", label: "Avg HR", numeric: true },
-  {
-    key: "load",
-    label: "Load",
-    numeric: true,
-    title: "COROS training load for the ride"
-  }
+  column("when", "run.list.when", false),
+  column("distance", "activity.m.distance", true),
+  column("duration", "activity.m.time", true),
+  column("speed", "activity.m.speed", true, "ride.list.speedTitle"),
+  column("climb", "activity.m.climb", true, "ride.list.climbTitle"),
+  column("avgHr", "activity.m.avgHr", true),
+  column("load", "overview.tiles.load", true, "ride.list.loadTitle")
 ];
 
 /** Which way a column wants to sort the first time it is pressed. */
@@ -184,7 +204,7 @@ export function RideList({ rides, sort, onSortChange, onOpenRide }: RideListProp
                 <button
                   type="button"
                   onClick={() => toggleSort(column.key)}
-                  title={column.title ?? `Sort by ${column.label.toLowerCase()}`}
+                  title={column.title ?? t("run.list.sortBy", { column: column.label })}
                 >
                   <span>{column.label}</span>
                   {active ? (
@@ -215,7 +235,7 @@ export function RideList({ rides, sort, onSortChange, onOpenRide }: RideListProp
                 </span>
                 <div>
                   <strong>
-                    {row.activity.name?.trim() || `${RIDE_TYPE_LABELS[row.type]} ride`}
+                    {row.activity.name?.trim() || untitledRide(row.type)}
                   </strong>
                   <span>{formatTrainingTableWhen(row.when)}</span>
                 </div>

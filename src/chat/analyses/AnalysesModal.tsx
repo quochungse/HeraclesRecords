@@ -7,6 +7,8 @@ import { AnalysisCreate } from "./AnalysisCreate";
 import { AnalysisDetailView } from "./AnalysisDetail";
 import { AnalysesTitleProvider } from "./analysesTitle";
 import { ConfirmDialog } from "../../training-library/ConfirmDialog";
+import { t } from "../../i18n/core";
+
 // The confirmation's chrome is the library's `tl-dialog`, as Coach settings'
 // is.
 import "../../training-library/trainingLibrary.css";
@@ -104,12 +106,12 @@ export function AnalysesModal({
               two ways out in one header. The X is the one that stays. */}
           <div className="chat-settings-modal-title">
             <Zap size={16} aria-hidden="true" />
-            <h2 id="coach-analyses-title">{title ?? "Analysis"}</h2>
+            <h2 id="coach-analyses-title">{title ?? t("chat.an.analysis")}</h2>
           </div>
           <button
             type="button"
             className="icon-button"
-            aria-label="Close analysis"
+            aria-label={t("chat.an.close")}
             onClick={requestClose}
           >
             <X size={18} aria-hidden="true" />
@@ -154,10 +156,10 @@ export function AnalysesModal({
         {confirming
           ? createPortal(
               <ConfirmDialog
-                title="Discard unsaved changes?"
-                description="Your edits to this analysis have not been saved. Discarding them closes the analysis."
-                confirmLabel="Discard changes"
-                cancelLabel="Keep editing"
+                title={t("chat.set.discardTitle")}
+                description={t("chat.an.discardBody")}
+                confirmLabel={t("chat.set.discardConfirm")}
+                cancelLabel={t("chat.set.keepEditing")}
                 danger
                 onConfirm={() => {
                   setConfirming(false);

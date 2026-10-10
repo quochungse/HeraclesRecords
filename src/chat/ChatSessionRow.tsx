@@ -23,6 +23,8 @@ import type {
   CoachAnalysisSessionAttention
 } from "../../electron/types";
 import { formatSessionRelativeTime, waitingLabel } from "./chatSessionGroups";
+import { plural, t } from "../i18n/core";
+import { displaySessionTitle } from "./sessionTitle";
 
 const MENU_WIDTH = 180;
 const MENU_GAP = 6;
@@ -176,7 +178,7 @@ function ChatSessionRowMenu({
       className="chat-session-row-popover"
       ref={menuRef}
       role="menu"
-      aria-label={`Actions for ${session.title}`}
+      aria-label={t("chat.row.actionsFor", { title: displaySessionTitle(session.title) })}
       style={{
         ...theme,
         ...(position ?? { left: 0, top: 0, width: MENU_WIDTH }),
@@ -193,7 +195,7 @@ function ChatSessionRowMenu({
         ) : (
           <Pin size={15} aria-hidden="true" />
         )}
-        {pinned ? "Unpin" : "Pin"}
+        {pinned ? t("chat.row.unpin") : t("chat.row.pin")}
       </button>
       <button
         type="button"
@@ -201,13 +203,13 @@ function ChatSessionRowMenu({
         onClick={(event) => runAction(event, onRename)}
       >
         <Pencil size={15} aria-hidden="true" />
-        Rename
+        {t("chat.row.rename")}
       </button>
       <button
         type="button"
         role="menuitem"
         disabled={compacting || session.messageCount === 0}
-        title="Summarise the older turns so the next message costs less"
+        title={t("chat.row.compactTitle")}
         onClick={(event) => runAction(event, onCompact)}
       >
         {compacting ? (
@@ -215,18 +217,18 @@ function ChatSessionRowMenu({
         ) : (
           <Layers size={15} aria-hidden="true" />
         )}
-        Compact context
+        {t("chat.row.compact")}
       </button>
       {IS_DEVELOPMENT_BUILD ? (
         <button
           type="button"
           role="menuitem"
-          title="What the next message would actually send"
+          title={t("chat.row.contextTitle")}
           onClick={(event) => runAction(event, onShowContext)}
         >
           <Bug size={15} aria-hidden="true" />
-          Show context history
-          <span className="chat-session-row-dev-tag">Dev</span>
+          {t("chat.row.context")}
+          <span className="chat-session-row-dev-tag">Dev</span>{/* i18n-ignore: development builds only */}
         </button>
       ) : null}
       <button
@@ -236,7 +238,7 @@ function ChatSessionRowMenu({
         onClick={(event) => runAction(event, onDelete)}
       >
         <Trash2 size={15} aria-hidden="true" />
-        Delete
+        {t("chat.row.delete")}
       </button>
     </div>
   );
@@ -252,10 +254,10 @@ function ChatSessionRowMenu({
           .filter(Boolean)
           .join(" ")}
         ref={triggerRef}
-        aria-label={`Actions for ${session.title}`}
+        aria-label={t("chat.row.actionsFor", { title: displaySessionTitle(session.title) })}
         aria-haspopup="menu"
         aria-expanded={open}
-        title="Conversation actions"
+        title={t("chat.row.actions")}
         disabled={disabled}
         onClick={(event) => {
           event.stopPropagation();
@@ -326,7 +328,7 @@ export function ChatSessionRow({
   const handleDelete = () => {
     if (
       session.messageCount === 0 ||
-      window.confirm(`Delete "${session.title}"?`)
+      window.confirm(t("chat.row.deleteConfirm", { title: displaySessionTitle(session.title) }))
     ) {
       onDelete();
     }
@@ -356,7 +358,7 @@ export function ChatSessionRow({
           onSelect();
         }
       }}
-      title={session.preview || session.title}
+      title={session.preview || displaySessionTitle(session.title)}
     >
       <span className="chat-session-row-body">
         {renaming ? (
@@ -364,7 +366,7 @@ export function ChatSessionRow({
             className="chat-session-row-title-input"
             type="text"
             value={draft ?? ""}
-            aria-label="Conversation title"
+            aria-label={t("chat.row.titleInput")}
             // The store truncates past 48 characters; stop short of that so a
             // rename never comes back with an ellipsis the user did not type.
             maxLength={48}
@@ -400,17 +402,17 @@ export function ChatSessionRow({
                 className="chat-session-row-analysis-mark"
                 size={11}
                 role="img"
-                aria-label="An analysis coach writes into this conversation on its own"
+                aria-label={t("chat.row.analysisWrites")}
               />
             ) : null}
-            {session.title}
+            {displaySessionTitle(session.title)}
           </span>
         )}
         {session.preview ? (
           <span className="chat-session-row-preview">{session.preview}</span>
         ) : null}
         {waiting ? (
-          <span className="chat-session-row-waiting" title="Waiting on you in this conversation">
+          <span className="chat-session-row-waiting" title={t("chat.row.waitingTitle")}>
             {waiting}
           </span>
         ) : null}
@@ -424,13 +426,13 @@ export function ChatSessionRow({
             <span
               className="chat-session-row-unread"
               role="img"
-              aria-label={`${unread} unread coach ${unread === 1 ? "run" : "runs"}`}
+              aria-label={plural("chat.row.unread", unread)}
             />
           ) : null}
           {answering || analyzing ? (
             <span className="chat-session-row-answering" role="status">
               <Loader2 className="chat-spinner" size={11} aria-hidden="true" />
-              {answering ? "Answering" : "Analyzing"}
+              {answering ? t("chat.row.answering") : t("chat.row.analyzing")}
             </span>
           ) : (
             <span className="chat-session-row-time">

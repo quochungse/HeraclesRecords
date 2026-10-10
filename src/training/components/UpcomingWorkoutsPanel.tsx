@@ -1,5 +1,6 @@
 import { CalendarDays, ChevronRight, Moon } from "lucide-react";
 import { useMemo, useState } from "react";
+import { renderRich } from "../../i18n/useI18n";
 import type {
   TrainingHubSportType,
   TrainingHubUpcomingWorkout
@@ -17,6 +18,7 @@ import {
 } from "../formatters";
 import { planTag } from "../workoutSport";
 import { UpcomingWorkoutDetailPanel } from "./UpcomingWorkoutDetailPanel";
+import { plural, t } from "../../i18n/core";
 
 // Today and tomorrow show every session (COROS allows ten a day); the days
 // after tomorrow only fill the list up to three, tomorrow's included.
@@ -69,17 +71,15 @@ export function UpcomingWorkoutsPanel({
     return null;
   }
 
-  const countLabel = `${scheduledWorkouts.length} upcoming ${
-    scheduledWorkouts.length === 1 ? "workout" : "workouts"
-  }`;
+  const countLabel = plural("overview.upcoming.count", scheduledWorkouts.length);
   const statsLabel = formatUpcomingWorkoutStats(scheduledWorkouts, unitSystem);
 
   return (
     <section className="panel training-upcoming-panel">
       <header className="training-upcoming-header">
         <div className="training-upcoming-heading">
-          <p className="eyebrow">Training Calendar</p>
-          <h2>Upcoming Workouts</h2>
+          <p className="eyebrow">{t("overview.upcoming.eyebrow")}</p>
+          <h2>{t("overview.upcoming.title")}</h2>
           <p className="training-upcoming-count">{countLabel}</p>
         </div>
         <p className="training-upcoming-stats">{statsLabel}</p>
@@ -192,7 +192,7 @@ function TodayWorkoutCard({
       </span>
       <span className="training-upcoming-today-copy">
         <span className="training-upcoming-today-heading">
-          <span className="training-upcoming-today-pill">Today</span>
+          <span className="training-upcoming-today-pill">{t("overview.today")}</span>
           {tag ? (
             <span className="training-upcoming-today-tag">{tag}</span>
           ) : null}
@@ -218,17 +218,20 @@ function RestDayCard({
         <Moon size={20} strokeWidth={2.2} />
       </div>
       <div className="training-upcoming-today-copy">
-        <span className="training-upcoming-today-pill">Today</span>
-        <h3 className="training-upcoming-today-title">Rest day</h3>
+        <span className="training-upcoming-today-pill">{t("overview.today")}</span>
+        <h3 className="training-upcoming-today-title">{t("overview.upcoming.restDay")}</h3>
         <p className="training-upcoming-today-meta">
-          No workout scheduled for today.
+          {t("overview.upcoming.noneToday")}
         </p>
         {nextWorkout ? (
           <p className="training-upcoming-today-next">
-            Next up{" "}
-            <strong>
-              {formatUpcomingWorkoutDate(nextWorkout.happenDay)} — {nextWorkout.name}
-            </strong>
+            {renderRich(
+              t("overview.upcoming.nextUp", {
+                date: formatUpcomingWorkoutDate(nextWorkout.happenDay),
+                name: nextWorkout.name ?? ""
+              }),
+              { b: (chunk) => <strong>{chunk}</strong> }
+            )}
           </p>
         ) : null}
       </div>

@@ -15,6 +15,7 @@ import type {
   TrainingPlanDestination
 } from "../../electron/types";
 import { actionOutcome, artifactActions, type CreationAction } from "./creationChoices";
+import { plural, t } from "../i18n/core";
 
 function todayKey(): string {
   const now = new Date();
@@ -164,13 +165,13 @@ export function CreationActions({
               disabled={uploading}
             >
               <RotateCcw size={14} aria-hidden="true" />
-              Restore this version
+              {t("chat.actions.restore")}
             </button>
           ) : (
             <p className="chat-plan-destination-summary">
               {actions.restore
-                ? "An earlier version, to read."
-                : "An earlier version, to read. The newest one is saved to COROS."}
+                ? t("chat.actions.earlier")
+                : t("chat.actions.earlierSaved")}
             </p>
           )}
         </div>
@@ -195,7 +196,7 @@ export function CreationActions({
               disabled={uploading}
             >
               <CalendarDays size={14} aria-hidden="true" />
-              Add to calendar…
+              {t("chat.save.addToCalendar")}
             </button>
           ) : null}
           {edit ? (
@@ -207,7 +208,7 @@ export function CreationActions({
               disabled={uploading}
             >
               <PencilLine size={14} aria-hidden="true" />
-              Edit
+              {t("library.reader.edit")}
             </button>
           ) : null}
         </div>
@@ -226,7 +227,7 @@ export function CreationActions({
             disabled={!onEdit}
           >
             <PencilLine size={14} aria-hidden="true" />
-            Continue editing
+            {t("library.reader.continue")}
           </button>
         </div>
       </div>
@@ -247,16 +248,13 @@ export function CreationActions({
         <p className="chat-plan-destination-summary" data-tone="alert">
           <TriangleAlert size={13} aria-hidden="true" />
           <span>
-            {draft.conflicts.length === 1
-              ? "One of these days already holds a workout."
-              : `${draft.conflicts.length} of these days already hold a workout.`}{" "}
-            Putting the sessions on the calendar adds them beside it.
+            {plural("chat.actions.conflicts", draft.conflicts.length)}
           </span>
         </p>
       ) : null}
       {pickedDate !== null ? (
         <label className="chat-workout-calendar-date">
-          <span>Calendar date</span>
+          <span>{t("chat.actions.date")}</span>
           <input
             type="date"
             value={pickedDate}
@@ -273,7 +271,7 @@ export function CreationActions({
             onChange={(event) => setKeepInLibrary(event.target.checked)}
             disabled={uploading}
           />
-          Also keep in library
+          {t("chat.actions.keep")}
         </label>
       ) : null}
       <div className="chat-plan-actions chat-save-actions">
@@ -293,7 +291,7 @@ export function CreationActions({
                 action={{ id: "pickWorkoutDate", label: "", destination: "calendar" }}
                 busy={uploading && pending === "pickWorkoutDate"}
               />
-              Schedule
+              {t("library.w.schedule")}
             </button>
             <button
               type="button"
@@ -301,7 +299,7 @@ export function CreationActions({
               onClick={() => setPickedDate(null)}
               disabled={uploading}
             >
-              Cancel
+              {t("common.cancel")}
             </button>
           </>
         ) : (
@@ -319,8 +317,8 @@ export function CreationActions({
                   data-action="saveOptions"
                   aria-haspopup="menu"
                   aria-expanded={showMore}
-                  aria-label="Other ways to save"
-                  title="Other ways to save"
+                  aria-label={t("chat.actions.otherWays")}
+                  title={t("chat.actions.otherWays")}
                   onClick={() => setShowMore((open) => !open)}
                   disabled={uploading}
                 >
@@ -337,12 +335,12 @@ export function CreationActions({
                 disabled={uploading}
               >
                 <PencilLine size={14} aria-hidden="true" />
-                Edit
+                {t("library.reader.edit")}
               </button>
             ) : null}
             {showMore ? (
-              <div className="chat-save-sheet" data-side={sheetSide} role="menu" aria-label="Ways to save">
-                <span className="chat-save-sheet-title">Save “{draft.name}”</span>
+              <div className="chat-save-sheet" data-side={sheetSide} role="menu" aria-label={t("chat.actions.ways")}>
+                <span className="chat-save-sheet-title">{t("chat.actions.saveName", { name: draft.name })}</span>
                 {[choices.primary, ...others].map((action) => (
                   <button
                     key={action.id}
@@ -359,7 +357,7 @@ export function CreationActions({
                     <span className="chat-save-option-head">
                       <ActionIcon action={action} busy={false} />
                       <strong>{action.label}</strong>
-                      {action === choices.primary ? <em>Suggested</em> : null}
+                      {action === choices.primary ? <em>{t("chat.actions.suggested")}</em> : null}
                     </span>
                     <span className="chat-save-option-outcome">{actionOutcome(action, draft)}</span>
                   </button>

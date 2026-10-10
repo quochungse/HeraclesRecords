@@ -130,13 +130,13 @@ function blendInto(a: Float32Array, b: Float32Array, t: number): Float32Array {
  */
 export function blendFigure(file: BodyFigureFile, sex: FigureSex, shape: number, firmness = 0): FigureGeometry {
   const { from, to, t } = shapeBlend(shape);
-  const sized = (suffix: "" | "Fit"): Float32Array => {
+  const sized = (suffix: "" | "Fit"): Float32Array => { // i18n-ignore: a baked figure's suffix
     if (t === 0) return decodePositions(file, sex, `${from}${suffix}`);
     const toward = decodePositions(file, sex, `${to}${suffix}`);
     return t === 1 ? toward : blendInto(decodePositions(file, sex, `${from}${suffix}`), toward, t);
   };
   const f = Math.min(1, Math.max(0, firmness));
-  const positions = f === 0 ? sized("") : f === 1 ? sized("Fit") : blendInto(sized(""), sized("Fit"), f);
+  const positions = f === 0 ? sized("") : f === 1 ? sized("Fit") : blendInto(sized(""), sized("Fit"), f); // i18n-ignore
   return { positions, ...decodeTopology(file) };
 }
 

@@ -19,15 +19,15 @@ import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 
 import {
-  MCP_CONNECT_HINT,
-  MCP_CONNECT_LOCATION,
   MCP_DAILY_HEALTH_SUBJECT,
-  MCP_RETRY_HINT,
   MCP_SLEEP_SUBJECT,
   MCP_SLEEP_TREND_SUBJECT,
-  MCP_UNAVAILABLE_SHORT,
-  MCP_UNREACHABLE_SHORT,
   isMcpFailure,
+  mcpConnectHint,
+  mcpConnectLocation,
+  mcpRetryHint,
+  mcpUnavailableShort,
+  mcpUnreachableShort,
   mcpNotice,
   mcpShortTextOr,
   mcpTextOr,
@@ -35,6 +35,13 @@ import {
 } from "../src/mcp/mcpNotice.ts";
 
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), "..");
+
+// The copy is read in English, the language the app opens in.
+const MCP_CONNECT_LOCATION = mcpConnectLocation();
+const MCP_CONNECT_HINT = mcpConnectHint();
+const MCP_RETRY_HINT = mcpRetryHint();
+const MCP_UNAVAILABLE_SHORT = mcpUnavailableShort();
+const MCP_UNREACHABLE_SHORT = mcpUnreachableShort();
 const read = (relative) => readFileSync(join(repoRoot, relative), "utf8");
 
 const SUBJECTS = [
@@ -77,10 +84,11 @@ assert.notEqual(
 );
 
 // The route the copy spells out, checked against the screens along it: the
-// sidebar's label, then Settings' own headings.
+// sidebar's label, then Settings' own headings — in English, which is where the
+// screens' words are written now (src/i18n/messages/en).
 const [view, ...rows] = MCP_CONNECT_LOCATION.split("→").map((part) => part.trim());
 assert.ok(
-  read("src/navigation/primaryNav.ts").includes(`label: "${view}"`),
+  read("src/i18n/messages/en/nav.ts").includes(`: "${view}",`),
   `no sidebar item is called "${view}" — MCP_CONNECT_LOCATION is stale`
 );
 
@@ -89,7 +97,7 @@ assert.ok(
 // were collapsed onto that component precisely so they could not drift apart.
 // What this asserts is that Settings still names the place the copy sends
 // people to — not which of the two ways it happens to say it today.
-const settings = read("src/settings/SettingsView.tsx");
+const settings = read("src/i18n/messages/en/settings.ts");
 for (const row of rows) {
   assert.ok(
     settings.includes(`>${row}<`) || settings.includes(`"${row}"`),

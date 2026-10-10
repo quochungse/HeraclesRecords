@@ -1,4 +1,5 @@
 import type { TrainingHubActivity } from "../../electron/types";
+import { t } from "../i18n/core.ts";
 
 export type SportColorCategory = "strength" | "hiking" | "run" | "bike" | "other";
 
@@ -20,12 +21,23 @@ export const DEFAULT_SPORT_COLORS: Record<SportColorCategory, string> = {
   other: "#7fd8cf"
 };
 
-export const SPORT_COLOR_LABELS: Record<SportColorCategory, string> = {
-  strength: "Strength",
-  hiking: "Hiking",
-  run: "Running",
-  bike: "Cycling",
-  other: "Other"
+/** Read in the language on screen each time, so keep the label, never a copy. */
+export const SPORT_COLOR_LABELS: Readonly<Record<SportColorCategory, string>> = {
+  get strength() {
+    return t("sport.strength");
+  },
+  get hiking() {
+    return t("sport.hiking");
+  },
+  get run() {
+    return t("sport.run");
+  },
+  get bike() {
+    return t("sport.bike");
+  },
+  get other() {
+    return t("sport.other");
+  }
 };
 
 const STORAGE_KEY = "heraclesrecords.sportColors";

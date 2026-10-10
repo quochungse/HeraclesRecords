@@ -1,13 +1,14 @@
 import type { StrengthSession, UnitSystem } from "../../electron/types";
 import { kilogramsToDisplayWeight, weightUnit } from "../units/units";
+import { formatCount, formatDecimal, getIntlLocale, t } from "../i18n/core";
 
 export function formatSessionDate(startTime?: number): string {
   if (!startTime) {
-    return "Unknown date";
+    return t("strength.unknownDate");
   }
   const date = new Date(startTime * 1000);
   const sameYear = date.getFullYear() === new Date().getFullYear();
-  return date.toLocaleDateString(undefined, {
+  return date.toLocaleDateString(getIntlLocale(), {
     weekday: "short",
     month: "short",
     day: "numeric",
@@ -16,16 +17,18 @@ export function formatSessionDate(startTime?: number): string {
 }
 
 export function formatSyncTime(value?: string): string {
-  if (!value) return "Not synced yet";
+  if (!value) return t("strength.notSynced");
   const date = new Date(value);
   return Number.isNaN(date.getTime())
-    ? "Not synced yet"
-    : `Last synced ${date.toLocaleString(undefined, {
-        month: "short",
-        day: "numeric",
-        hour: "numeric",
-        minute: "2-digit"
-      })}`;
+    ? t("strength.notSynced")
+    : t("strength.lastSynced", {
+        time: date.toLocaleString(getIntlLocale(), {
+          month: "short",
+          day: "numeric",
+          hour: "numeric",
+          minute: "2-digit"
+        })
+      });
 }
 
 export function sessionSourceLabel(session: StrengthSession): string | undefined {
@@ -49,13 +52,13 @@ export function totalWeightParts(kg: number, unitSystem: UnitSystem): FigurePart
     const tonnes = kg / 1000;
     return [
       {
-        value: tonnes >= 10 ? Math.round(tonnes).toLocaleString() : tonnes.toFixed(1),
-        unit: "tonnes"
+        value: tonnes >= 10 ? formatCount(Math.round(tonnes)) : formatDecimal(tonnes, 1),
+        unit: t("strength.unit.tonnes")
       }
     ];
   }
   const display = kilogramsToDisplayWeight(kg, unitSystem);
-  return [{ value: Math.round(display).toLocaleString(), unit: weightUnit(unitSystem) }];
+  return [{ value: formatCount(Math.round(display)), unit: weightUnit(unitSystem) }];
 }
 
 /** A single lift keeps its half-kilo; a season's tonnage does not. */
@@ -64,8 +67,8 @@ export function liftWeightParts(kg: number, unitSystem: UnitSystem): FigurePart[
   return [
     {
       value: Number.isInteger(display)
-        ? display.toLocaleString()
-        : display.toFixed(1),
+        ? formatCount(display)
+        : formatDecimal(display, 1),
       unit: weightUnit(unitSystem)
     }
   ];
@@ -92,24 +95,32 @@ export function durationParts(seconds: number): FigurePart[] {
     minutes = 0;
   }
   if (hours === 0) {
-    return [{ value: String(minutes), unit: "min" }];
+    return [{ value: String(minutes), unit: t("strength.unit.min") }];
   }
   if (minutes === 0) {
-    return [{ value: String(hours), unit: "h" }];
+    return [{ value: String(hours), unit: t("strength.unit.h") }];
   }
   return [
-    { value: String(hours), unit: "h" },
-    { value: String(minutes), unit: "min" }
+    { value: String(hours), unit: t("strength.unit.h") },
+    { value: String(minutes), unit: t("strength.unit.min") }
   ];
 }
 
 /** Compact form of the same duration, for running text: "52 min", "1h 4m". */
 export function formatSpan(seconds: number): string {
-  const parts = durationParts(seconds);
-  if (parts.length === 1 && parts[0].unit === "min") {
-    return `${parts[0].value} min`;
+  const total = Math.max(0, Math.round(seconds));
+  let hours = Math.floor(total / 3600);
+  let minutes = Math.round((total % 3600) / 60);
+  if (minutes === 60) {
+    hours += 1;
+    minutes = 0;
   }
-  return parts.map((part) => `${part.value}${part.unit?.charAt(0) ?? ""}`).join(" ");
+  if (hours === 0) {
+    return t("units.min", { m: minutes });
+  }
+  return minutes === 0
+    ? t("units.duration.h", { h: hours })
+    : t("units.duration.hm", { h: hours, m: minutes });
 }
 
 export function cadencePhrase(sessionsPerWeek: number): string {
@@ -117,7 +128,11 @@ export function cadencePhrase(sessionsPerWeek: number): string {
     return "";
   }
   if (sessionsPerWeek >= 1) {
-    return `About ${sessionsPerWeek.toFixed(1).replace(/\.0$/, "")} a week`;
+    return t("strength.cadence.perWeek", {
+      count: Number.isInteger(Math.round(sessionsPerWeek * 10) / 10)
+        ? formatCount(Math.round(sessionsPerWeek))
+        : formatDecimal(sessionsPerWeek, 1)
+    });
   }
-  return `About one every ${Math.round(7 / sessionsPerWeek)} days`;
+  return t("strength.cadence.everyDays", { days: Math.round(7 / sessionsPerWeek) });
 }

@@ -1,12 +1,13 @@
 import { createPortal } from "react-dom";
 import type { PlanVersionConflict } from "../../electron/types";
 import { ConfirmDialog } from "../training-library/ConfirmDialog";
+import { messageRecord, t } from "../i18n/core";
 
-const MADE_BY: Record<PlanVersionConflict["newest"]["author"], string> = {
-  coach: "Coach revised it",
-  athlete: "it was edited on another device",
-  coros: "it changed in the Library"
-};
+const MADE_BY = messageRecord<PlanVersionConflict["newest"]["author"]>({
+  coach: "chat.newer.coach",
+  athlete: "chat.newer.athlete",
+  coros: "chat.newer.coros"
+});
 
 /**
  * An edit saved on a version something has since replaced
@@ -29,11 +30,11 @@ export function NewerVersionDialog({
 }) {
   return createPortal(
     <ConfirmDialog
-      title={`This ${what} changed while you were editing`}
-      description={`Version ${newest.version} was written after you opened it — ${MADE_BY[newest.author]}. Saving now replaces it with your edit; it stays in the versions list either way.`}
-      cancelLabel="Keep editing"
-      alternative={{ label: "Keep the newer version", onSelect: onKeepNewer }}
-      confirmLabel="Replace with my edit"
+      title={what === "plan" ? t("chat.newer.titlePlan") : t("chat.newer.titleWorkout")}
+      description={t("chat.newer.body", { version: newest.version, who: MADE_BY[newest.author] })}
+      cancelLabel={t("library.dlg.keepEditing")}
+      alternative={{ label: t("chat.newer.keepNewer"), onSelect: onKeepNewer }}
+      confirmLabel={t("library.dlg.conflict.replace")}
       onConfirm={onReplace}
       onCancel={onKeepEditing}
     />,

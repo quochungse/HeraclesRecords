@@ -1,3 +1,4 @@
+import { useI18n } from "../i18n/useI18n";
 import { useCallback, useMemo, useState } from "react";
 import { ArrowLeft, CloudOff, MessageCircle, RefreshCw } from "lucide-react";
 import type {
@@ -32,10 +33,12 @@ import { rideSeconds, speedKmh } from "./rideMetrics";
 import { RidePowerPanel } from "./RidePowerPanel";
 import { StatGrid, type Stat } from "./StatGrid";
 import {
+  untitledRide,
   RIDE_TYPE_LABELS,
   classifyRideType,
   isOutdoorRideType
 } from "./rideType";
+import { formatDecimal, t } from "../i18n/core";
 
 interface RideDetailViewProps {
   activity: TrainingHubActivity;
@@ -91,13 +94,14 @@ export function RideDetailView({
   detail,
   detailStatus,
   onBack,
-  backLabel = "Cycling",
+  backLabel = t("nav.cycling"),
   onRetry,
   onAskCoach,
   ftp,
   powerZones
 }: RideDetailViewProps) {
   const { unitSystem, temperatureUnit } = useUnitSystem();
+  const { locale } = useI18n();
   const type = classifyRideType(activity.sportType);
 
   const laps = detail?.laps ?? [];
@@ -126,27 +130,27 @@ export function RideDetailView({
 
     const stats: Stat[] = [
       {
-        label: "Distance",
+        label: t("activity.m.distance"),
         value: distance !== undefined && distance > 0
           ? formatDistanceMeters(distance, unitSystem)
           : "—"
       },
       {
-        label: "Time",
+        label: t("activity.m.time"),
         value: formatDurationSeconds(active),
-        title: "Riding time — auto-pause and stops are not in it"
+        title: t("ride.detail.timeTitle")
       },
       {
-        label: "Speed",
+        label: t("activity.m.speed"),
         value: speed === undefined ? "—" : formatSpeedValue(speed, unitSystem)
       }
     ];
 
     if (maxSpeed !== undefined && speed !== undefined) {
       stats.push({
-        label: "Max speed",
+        label: t("ride.detail.maxSpeed"),
         value: formatSpeedValue(maxSpeed, unitSystem),
-        title: "Fastest five seconds, so one jump of the GPS is not the ride's top speed"
+        title: t("ride.detail.maxSpeedTitle")
       });
     }
 
@@ -156,62 +160,62 @@ export function RideDetailView({
       total - active >= MIN_PAUSED_SECONDS_SHOWN
     ) {
       stats.push({
-        label: "Total time",
+        label: t("run.detail.totalTime"),
         value: formatDurationSeconds(total),
-        title: `Start to finish, including ${formatDurationSeconds(total - active)} stopped`
+        title: t("ride.detail.totalTimeTitle", { stopped: formatDurationSeconds(total - active) })
       });
     }
 
     const avgHr = detail?.avgHr ?? activity.avgHr;
     if (avgHr !== undefined) {
-      stats.push({ label: "Avg HR", value: `${avgHr} bpm` });
+      stats.push({ label: t("activity.m.avgHr"), value: `${avgHr} bpm` });
     }
     const maxHr = detail?.maxHr ?? activity.maxHr;
     if (maxHr !== undefined) {
-      stats.push({ label: "Max HR", value: `${maxHr} bpm` });
+      stats.push({ label: t("activity.m.maxHr"), value: `${maxHr} bpm` });
     }
 
     const climb = detail?.elevationGain ?? activity.elevationGain;
     if (climb !== undefined && climb > 0) {
-      stats.push({ label: "Climb", value: formatElevationMeters(climb, unitSystem) });
+      stats.push({ label: t("activity.m.climb"), value: formatElevationMeters(climb, unitSystem) });
     }
     const descent = detail?.elevationLoss;
     if (descent !== undefined && descent > 0) {
-      stats.push({ label: "Descent", value: formatElevationMeters(descent, unitSystem) });
+      stats.push({ label: t("activity.m.descent"), value: formatElevationMeters(descent, unitSystem) });
     }
 
     const load = detail?.trainingLoad ?? activity.trainingLoad;
     if (load !== undefined) {
-      stats.push({ label: "Load", value: formatOptionalNumber(Math.round(load)) });
+      stats.push({ label: t("overview.tiles.load"), value: formatOptionalNumber(Math.round(load)) });
     }
 
     const calories = detail?.calories ?? activity.calories;
     if (calories !== undefined && calories > 0) {
-      stats.push({ label: "Calories", value: `${Math.round(calories)} kcal` });
+      stats.push({ label: t("activity.m.calories"), value: `${Math.round(calories)} kcal` });
     }
 
     return stats;
-  }, [activity, detail, maxSpeed, unitSystem]);
+  }, [activity, detail, maxSpeed, unitSystem, locale]);
 
   const conditions = useMemo<Stat[]>(() => {
     const stats: Stat[] = [];
     if (detail?.effect?.aerobic !== undefined) {
-      stats.push({ label: "Aerobic effect", value: detail.effect.aerobic.toFixed(1) });
+      stats.push({ label: t("run.detail.aerobic"), value: formatDecimal(detail.effect.aerobic, 1) });
     }
     if (detail?.effect?.anaerobic !== undefined) {
-      stats.push({ label: "Anaerobic effect", value: detail.effect.anaerobic.toFixed(1) });
+      stats.push({ label: t("run.detail.anaerobic"), value: formatDecimal(detail.effect.anaerobic, 1) });
     }
     if (detail?.weather?.temperatureC !== undefined) {
       stats.push({
-        label: "Temperature",
+        label: t("run.detail.temperature"),
         value: formatTemperatureValue(detail.weather.temperatureC, temperatureUnit)
       });
     }
     if (detail?.weather?.humidityPct !== undefined) {
-      stats.push({ label: "Humidity", value: `${Math.round(detail.weather.humidityPct)}%` });
+      stats.push({ label: t("run.detail.humidity"), value: `${Math.round(detail.weather.humidityPct)}%` });
     }
     return stats;
-  }, [detail, temperatureUnit]);
+  }, [detail, temperatureUnit, locale]);
 
   const lapsHavePower = laps.some((lap) => lap.avgPower !== undefined);
   // One lap is the whole ride again: a rider who turned auto-lap off, or a
@@ -239,25 +243,24 @@ export function RideDetailView({
                   onClick={() =>
                     onAskCoach(
                       activityCoachRequest(
-                        { ...activity, sportName: activity.sportName ?? "Ride" },
+                        { ...activity, sportName: activity.sportName ?? t("ride.ride") },
                         unitSystem
                       )
                     )
                   }
                 >
                   <MessageCircle size={15} aria-hidden="true" />
-                  Ask Coach
+                  {t("activity.askCoach")}
                 </button>
               ) : null}
             </div>
             <div className="run-detail-title">
               <p className="running-eyebrow">
-                {type ? RIDE_TYPE_LABELS[type] : "Ride"} ·{" "}
+                {type ? RIDE_TYPE_LABELS[type] : t("ride.ride")} ·{" "}
                 {formatTrainingTimestamp(activity.startTime)}
               </p>
               <h1>
-                {activity.name?.trim() ||
-                  (type ? `${RIDE_TYPE_LABELS[type]} ride` : "Ride")}
+                {activity.name?.trim() || untitledRide(type)}
               </h1>
             </div>
           </header>
@@ -277,21 +280,18 @@ export function RideDetailView({
         ) : null}
       </div>
 
-      {loading ? <RunDetailSkeleton label="Loading this ride" /> : null}
+      {loading ? <RunDetailSkeleton label={t("ride.loadingOne")} /> : null}
 
       {failed ? (
         <section className="panel running-empty running-state-panel">
           <CloudOff size={22} aria-hidden="true" />
           <div>
-            <h3>This ride's detail did not load</h3>
-            <p>
-              The summary above comes from the activity list. The chart, laps and
-              route need a second request to COROS, and that one failed.
-            </p>
+            <h3>{t("ride.detail.failed")}</h3>
+            <p>{t("run.detail.failedBody")}</p>
           </div>
           <button type="button" className="primary-button" onClick={onRetry}>
             <RefreshCw size={14} aria-hidden="true" />
-            Try again
+            {t("common.tryAgain")}
           </button>
         </section>
       ) : null}
@@ -307,7 +307,7 @@ export function RideDetailView({
 
       {conditions.length > 0 ? (
         <section className="panel run-detail-panel">
-          <p className="running-eyebrow">Effect and conditions</p>
+          <p className="running-eyebrow">{t("run.detail.effect")}</p>
           <StatGrid stats={conditions} />
         </section>
       ) : null}
@@ -328,20 +328,20 @@ export function RideDetailView({
 
       {showLaps ? (
         <section className="panel run-detail-panel">
-          <p className="running-eyebrow">Laps</p>
+          <p className="running-eyebrow">{t("activity.m.laps")}</p>
           <div className="run-table-scroll">
             <table className="run-list run-lap-table">
               <thead>
                 <tr>
-                  <th scope="col">Lap</th>
-                  <th scope="col" className="is-numeric">Distance</th>
-                  <th scope="col" className="is-numeric">Time</th>
-                  <th scope="col" className="is-numeric">Speed</th>
-                  <th scope="col" className="is-numeric">Avg HR</th>
-                  <th scope="col" className="is-numeric">Climb</th>
-                  <th scope="col" className="is-numeric">Cadence</th>
+                  <th scope="col">{t("run.detail.lap")}</th>
+                  <th scope="col" className="is-numeric">{t("activity.m.distance")}</th>
+                  <th scope="col" className="is-numeric">{t("activity.m.time")}</th>
+                  <th scope="col" className="is-numeric">{t("activity.m.speed")}</th>
+                  <th scope="col" className="is-numeric">{t("activity.m.avgHr")}</th>
+                  <th scope="col" className="is-numeric">{t("activity.m.climb")}</th>
+                  <th scope="col" className="is-numeric">{t("activity.m.cadence")}</th>
                   {lapsHavePower ? (
-                    <th scope="col" className="is-numeric">Power</th>
+                    <th scope="col" className="is-numeric">{t("activity.m.power")}</th>
                   ) : null}
                 </tr>
               </thead>
@@ -353,7 +353,7 @@ export function RideDetailView({
                       key={lap.index}
                       tabIndex={0}
                       className="run-lap-row"
-                      title="Focus the chart on this lap"
+                      title={t("run.detail.focusLap")}
                       onClick={() => setFocusLapIndex(lap.index)}
                       onKeyDown={(event) => {
                         if (event.key === "Enter" || event.key === " ") {

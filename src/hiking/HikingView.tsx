@@ -47,6 +47,7 @@ import {
 import { HIKE_TYPE_LABELS, hikesOfType, type HikeType } from "./hikeType";
 import "../running/running.css";
 import "./hiking.css";
+import { t } from "../i18n/core";
 
 export interface HikingViewProps {
   api: HeraclesRecordsApi | null;
@@ -131,7 +132,7 @@ export function HikingView({
     openRequest,
     onOpenRequestHandled,
     onReturn,
-    listLabel: "Hiking"
+    listLabel: t("nav.hiking")
   });
 
   // Pinned to the list, so "the last year" does not move under the filter.
@@ -190,16 +191,12 @@ export function HikingView({
         <section className="panel data-connect-panel">
           <LockKeyhole size={24} aria-hidden="true" />
           <div>
-            <h3>{restoring ? "Reconnecting to COROS" : "Connect COROS first"}</h3>
-            <p>
-              {restoring
-                ? "Signing back in with your saved credentials. Your hikes load as soon as that finishes."
-                : "This screen is drawn from your COROS activity history. Signing in lives on Overview."}
-            </p>
+            <h3>{restoring ? t("run.reconnecting") : t("common.connectFirst.title")}</h3>
+            <p>{restoring ? t("hike.reconnectingBody") : t("run.connectBody")}</p>
           </div>
           {restoring ? null : (
             <button type="button" className="primary-button" onClick={onOpenOverview}>
-              Open Overview
+              {t("common.openOverview")}
             </button>
           )}
         </section>
@@ -228,7 +225,7 @@ export function HikingView({
     return (
       <section className="running-view hiking-view" ref={pageRef}>
         <HikingPageHeader />
-        <RunningPageSkeleton label="Loading your hikes" />
+        <RunningPageSkeleton label={t("hike.loading")} />
       </section>
     );
   }
@@ -241,11 +238,8 @@ export function HikingView({
         <section className="panel running-empty running-state-panel">
           <CloudOff size={22} aria-hidden="true" />
           <div>
-            <h3>Your activities did not load</h3>
-            <p>
-              COROS did not return the activity list. This is usually the
-              connection; nothing on this machine was lost.
-            </p>
+            <h3>{t("run.listFailed")}</h3>
+            <p>{t("run.listFailedBody")}</p>
           </div>
           <button
             type="button"
@@ -254,7 +248,7 @@ export function HikingView({
             onClick={onRetryActivities}
           >
             <RefreshCw size={14} aria-hidden="true" className={retrying ? "spin" : undefined} />
-            {retrying ? "Loading" : "Try again"}
+            {retrying ? t("common.loading") : t("common.tryAgain")}
           </button>
         </section>
       </section>
@@ -268,11 +262,8 @@ export function HikingView({
         <section className="panel running-empty running-state-panel">
           <Mountain size={22} aria-hidden="true" />
           <div>
-            <h3>No hikes yet</h3>
-            <p>
-              Hikes and mountain climbs from your COROS watch land here once
-              they sync. A trail run is a run, and stays on Running.
-            </p>
+            <h3>{t("hike.none")}</h3>
+            <p>{t("hike.noneBody")}</p>
           </div>
         </section>
       </section>
@@ -287,16 +278,16 @@ export function HikingView({
 
       <div className="running-controls">
         <OptionGroup
-          label="Kind"
+          label={t("hike.kind")}
           value={hikeType ?? "all"}
           options={[
-            { value: "all", label: "All" },
+            { value: "all", label: t("common.all") },
             ...availableTypes.map((option) => ({ value: option, label: HIKE_TYPE_LABELS[option] }))
           ]}
           onChange={(next) => setHikeType(next === "all" ? null : (next as HikeType))}
         />
         <OptionGroup
-          label="Period"
+          label={t("activity.filter.period")}
           mode="collapsible"
           className="running-period"
           value={periodValue(periodDays as PeriodDays)}
@@ -310,23 +301,23 @@ export function HikingView({
 
         <div className="running-totals">
           <div className="running-stat">
-            <span>Hikes</span>
+            <span>{t("hike.hikes")}</span>
             <strong>{totals.count}</strong>
           </div>
           <div className="running-stat">
-            <span>Distance</span>
+            <span>{t("activity.m.distance")}</span>
             <strong>{formatDistanceMeters(totals.distance, unitSystem)}</strong>
           </div>
-          <div className="running-stat" title="Recorded time, stops included where the watch kept recording">
-            <span>Time</span>
+          <div className="running-stat" title={t("hike.timeTitle")}>
+            <span>{t("activity.m.time")}</span>
             <strong>{formatDurationSpan(totals.duration)}</strong>
           </div>
           <div className="running-stat">
-            <span>Ascent</span>
+            <span>{t("hike.ascent")}</span>
             <strong>{formatElevationMeters(totals.elevationGain, unitSystem)}</strong>
           </div>
-          <div className="running-stat" title="Total distance over the recorded time">
-            <span>Avg speed</span>
+          <div className="running-stat" title={t("hike.avgSpeedTitle")}>
+            <span>{t("activity.m.avgSpeed")}</span>
             <strong>
               {averageSpeed === undefined ? "—" : formatSpeedValue(averageSpeed, unitSystem)}
             </strong>
@@ -352,7 +343,7 @@ export function HikingView({
                   summaries={summaries}
                 />
               ) : (
-                <RunBlockSkeleton label="Loading your heart-rate zones" />
+                <RunBlockSkeleton label={t("run.loadingZones")} />
               )}
               <HikeTypePanel hikes={hikesInPeriod} />
             </div>
@@ -363,11 +354,11 @@ export function HikingView({
           <section className="panel running-empty">
             <Mountain size={22} aria-hidden="true" />
             <div>
-              <h3>No hikes in this window</h3>
+              <h3>{t("hike.noneInWindow")}</h3>
               <p>
                 {hikeType === null
-                  ? "Widen the period, or record a hike and sync your watch."
-                  : `No ${HIKE_TYPE_LABELS[hikeType].toLowerCase()}s here. Try the other kind or a wider period.`}
+                  ? t("hike.widen")
+                  : t(`hike.noneOfType.${hikeType}` as const)}
               </p>
             </div>
           </section>
@@ -384,9 +375,9 @@ export function HikingView({
 function HikingPageHeader() {
   return (
     <header className="running-page-header">
-      <p className="running-eyebrow">Your training</p>
-      <h1>Hiking</h1>
-      <p>Every hike and mountain climb you have logged, read down the time axis.</p>
+      <p className="running-eyebrow">{t("run.eyebrow")}</p>
+      <h1>{t("nav.hiking")}</h1>
+      <p>{t("hike.lead")}</p>
     </header>
   );
 }

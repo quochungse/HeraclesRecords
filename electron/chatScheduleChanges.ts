@@ -52,6 +52,7 @@ import type {
   TrainingHubScheduledWorkoutEntry,
   UnitSystem
 } from "./types";
+import { ScreenError } from "./screenText";
 
 const OPS: readonly ScheduleChangeOp[] = ["move", "replace", "remove", "add", "deleteWorkout"];
 
@@ -149,7 +150,7 @@ function fromRecord(record: StoredChatScheduleChange): ScheduleChangeSet {
 }
 
 function save(set: ScheduleChangeSet): ScheduleChangeSet {
-  if (unreadable.has(set.changeSetId)) throw new Error("This proposal was written by a newer version of the app; update to change it here.");
+  if (unreadable.has(set.changeSetId)) throw new ScreenError("main.coach.changeNewer");
   const next = { ...set, updatedAt: new Date().toISOString() };
   saveChatScheduleChange({
     changeSetId: next.changeSetId,
@@ -182,7 +183,7 @@ export function openLineCount(changeSetIds: readonly string[]): number {
 
 function requireSet(changeSetId: string): ScheduleChangeSet {
   const [set] = readScheduleChanges([changeSetId]);
-  if (!set) throw new Error("This proposal is gone — its conversation may have been deleted on another device.");
+  if (!set) throw new ScreenError("main.coach.changeGone");
   return set;
 }
 
@@ -252,12 +253,12 @@ export async function applyScheduleChange(
   lineId?: string,
   deps: ScheduleChangeDeps = defaultDeps
 ): Promise<ScheduleChangeSet> {
-  if (applying.has(changeSetId)) throw new Error("These changes are already being applied.");
+  if (applying.has(changeSetId)) throw new ScreenError("main.coach.changeApplying");
   applying.add(changeSetId);
   try {
     let set = requireSet(changeSetId);
     const targets = set.lines.filter((line) => (lineId ? line.lineId === lineId : true));
-    if (lineId && !targets.length) throw new Error("That change is not in this proposal any more.");
+    if (lineId && !targets.length) throw new ScreenError("main.coach.changeLineGone");
     for (const target of targets) {
       // Read again per line: another line, or another machine, may have settled it.
       set = requireSet(changeSetId);
@@ -288,7 +289,7 @@ export async function applyScheduleChange(
 
 /** Dismisses one proposed line, or every proposed line. A settled line keeps what it settled as. */
 export function dismissScheduleChange(changeSetId: string, lineId?: string): ScheduleChangeSet {
-  if (applying.has(changeSetId)) throw new Error("These changes are being applied; wait for them to finish.");
+  if (applying.has(changeSetId)) throw new ScreenError("main.coach.changeWait");
   const set = requireSet(changeSetId);
   const now = new Date().toISOString();
   return save({

@@ -18,9 +18,10 @@ import {
 } from "lucide-react";
 import type { CSSProperties } from "react";
 import type { TrainingPlanDocument, WorkoutSport } from "../../electron/types";
-import { formatWorkoutSport } from "../../electron/workoutCapabilities";
 import { planOriginLabel } from "./planFilters";
 import { RunnerIcon } from "../running/runnerIcon";
+import { workoutSportLabel } from "../training/workoutSport";
+import { t } from "../i18n/core";
 
 export interface SportTheme {
   /** CSS colour — a customizable --sport-* token where one exists. */
@@ -94,7 +95,7 @@ export function SportBadge({ sport, label, compact }: SportBadgeProps) {
   return (
     <span className={`tl-sport-badge${compact ? " is-compact" : ""}`} style={sportChipStyle(sport)}>
       <Icon size={11} strokeWidth={2.2} aria-hidden="true" />
-      <span>{label ?? (sport ? formatWorkoutSport(sport) : "Workout")}</span>
+      <span>{label ?? (sport ? workoutSportLabel(sport) : t("workout.untitled"))}</span>
     </span>
   );
 }
@@ -107,7 +108,7 @@ export function SportDot({ sport }: { sport: WorkoutSport | undefined }) {
     <span
       className="tl-sport-dot"
       style={sportChipStyle(sport)}
-      title={sport ? formatWorkoutSport(sport) : undefined}
+      title={sport ? workoutSportLabel(sport) : undefined}
     >
       <Icon size={10} strokeWidth={2.2} aria-hidden="true" />
     </span>
@@ -132,7 +133,7 @@ export function SportMixDots({ sports, counts }: SportMixDotsProps) {
     <span
       className="tl-sport-dots"
       role="img"
-      aria-label={ordered.map((sport) => formatWorkoutSport(sport)).join(", ")}
+      aria-label={ordered.map((sport) => workoutSportLabel(sport)).join(", ")}
     >
       {visible.map((sport) => <SportDot key={sport} sport={sport} />)}
       {overflow > 0 ? <b>+{overflow}</b> : null}

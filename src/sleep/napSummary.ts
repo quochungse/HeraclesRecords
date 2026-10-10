@@ -8,6 +8,7 @@ import {
   formatSleepDurationMinutes
 } from "../training/formatters";
 import type { TrainingHubSleepRecord } from "../../electron/types";
+import { plural, t } from "../i18n/core";
 
 /**
  * What the Naps and Wake-ups tiles say, and what hovering one adds.
@@ -40,7 +41,7 @@ function napLines(record: TrainingHubSleepRecord): string[] {
       // COROS's own: it sends a total for the day and a window per nap, and
       // never a length per nap.
       const minutes = windowDurationMinutes(window);
-      const label = windows.length > 1 ? `Nap ${index + 1} · ` : "";
+      const label = windows.length > 1 ? `${t("sleep.nap.n", { n: index + 1 })} · ` : "";
       return minutes !== undefined
         ? `${label}${clock} (${formatSleepDurationMinutes(minutes)})`
         : `${label}${clock}`;
@@ -55,11 +56,11 @@ function napLines(record: TrainingHubSleepRecord): string[] {
 export function formatNapValue(record: TrainingHubSleepRecord): string {
   const minutes = napMinutes(record);
   if (minutes === undefined) {
-    return "No data";
+    return t("sleep.noData");
   }
 
   if (minutes <= 0) {
-    return "None";
+    return t("sleep.nap.none");
   }
 
   const duration = formatSleepDurationMinutes(minutes);
@@ -69,7 +70,7 @@ export function formatNapValue(record: TrainingHubSleepRecord): string {
     return `${duration} · ${clocks[0]}`;
   }
 
-  return clocks.length > 1 ? `${duration} · ${clocks.length} naps` : duration;
+  return clocks.length > 1 ? plural("sleep.nap.count", clocks.length, { duration }) : duration;
 }
 
 /**

@@ -79,13 +79,16 @@ function bestAverage(values: readonly (number | undefined)[], window: number): n
 
 // ------------------------------------------------------------------- power --
 
-/** The efforts a rider compares one ride against the next by. */
+/**
+ * The efforts a rider compares one ride against the next by. The labels are
+ * the coach's and the tests'; the screen writes its own from `seconds`.
+ */
 export const PEAK_POWER_WINDOWS: readonly { seconds: number; label: string }[] = [
-  { seconds: 5, label: "5 s" },
-  { seconds: 60, label: "1 min" },
-  { seconds: 300, label: "5 min" },
-  { seconds: 1200, label: "20 min" },
-  { seconds: 3600, label: "60 min" }
+  { seconds: 5, label: "5 s" }, // i18n-ignore
+  { seconds: 60, label: "1 min" }, // i18n-ignore
+  { seconds: 300, label: "5 min" }, // i18n-ignore
+  { seconds: 1200, label: "20 min" }, // i18n-ignore
+  { seconds: 3600, label: "60 min" } // i18n-ignore
 ];
 
 /** Coggan's rolling window for normalised power. */
@@ -248,7 +251,7 @@ export function powerZoneBounds(
   const count = ceilings.length + 1;
   return Array.from({ length: count }, (_, index) => ({
     label: `Z${index + 1}`,
-    name: count === FTP_PRESETS.length ? FTP_PRESETS[index]!.label : `Zone ${index + 1}`,
+    name: count === FTP_PRESETS.length ? FTP_PRESETS[index]!.label : `Zone ${index + 1}`, // i18n-ignore: drawn through zoneName()
     ...(index > 0 ? { floor: ceilings[index - 1]! + 1 } : {}),
     ...(index < ceilings.length ? { ceiling: ceilings[index]! } : {})
   }));
