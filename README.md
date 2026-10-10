@@ -30,11 +30,11 @@
 
 <!-- release:badges:start -->
 <p align="center">
-  <a href="https://github.com/quochungse/HeraclesRecords/releases/download/v1.0.3/HeraclesRecords-1.0.3-arm64.dmg"><img src="https://img.shields.io/badge/macOS-Apple%20Silicon-1f2328?style=for-the-badge&logo=apple&logoColor=white" alt="Download for macOS, Apple Silicon" /></a>
-  <a href="https://github.com/quochungse/HeraclesRecords/releases/download/v1.0.3/HeraclesRecords-1.0.3-x64.dmg"><img src="https://img.shields.io/badge/macOS-Intel-1f2328?style=for-the-badge&logo=apple&logoColor=white" alt="Download for macOS, Intel" /></a>
-  <a href="https://github.com/quochungse/HeraclesRecords/releases/download/v1.0.3/HeraclesRecords-Setup-1.0.3.exe"><img src="https://img.shields.io/badge/Windows-10%20%2F%2011-1f2328?style=for-the-badge&logo=data%3Aimage%2Fsvg%2Bxml%3Bbase64%2CPHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCI%2BPHBhdGggZmlsbD0iI2ZmZiIgZD0iTTMgNS42bDcuNi0xLjF2N0gzek0xMS42IDQuNEwyMSAzdjguNWgtOS40ek0zIDEyLjVoNy42djdMMyAxOC40ek0xMS42IDEyLjVIMjFWMjFsLTkuNC0xLjN6Ii8%2BPC9zdmc%2B" alt="Download for Windows" /></a>
-  <a href="https://github.com/quochungse/HeraclesRecords/releases/download/v1.0.3/HeraclesRecords-1.0.3.AppImage"><img src="https://img.shields.io/badge/Linux-AppImage-1f2328?style=for-the-badge&logo=linux&logoColor=white" alt="Download for Linux" /></a>
-  <a href="https://github.com/quochungse/HeraclesRecords/releases/download/v1.0.3/HeraclesRecords-1.0.3.deb"><img src="https://img.shields.io/badge/Linux-.deb-1f2328?style=for-the-badge&logo=debian&logoColor=white" alt="Download for Debian or Ubuntu" /></a>
+  <a href="https://github.com/quochungse/HeraclesRecords/releases/download/v1.1.0/HeraclesRecords-1.1.0-arm64.dmg"><img src="https://img.shields.io/badge/macOS-Apple%20Silicon-1f2328?style=for-the-badge&logo=apple&logoColor=white" alt="Download for macOS, Apple Silicon" /></a>
+  <a href="https://github.com/quochungse/HeraclesRecords/releases/download/v1.1.0/HeraclesRecords-1.1.0-x64.dmg"><img src="https://img.shields.io/badge/macOS-Intel-1f2328?style=for-the-badge&logo=apple&logoColor=white" alt="Download for macOS, Intel" /></a>
+  <a href="https://github.com/quochungse/HeraclesRecords/releases/download/v1.1.0/HeraclesRecords-Setup-1.1.0.exe"><img src="https://img.shields.io/badge/Windows-10%20%2F%2011-1f2328?style=for-the-badge&logo=data%3Aimage%2Fsvg%2Bxml%3Bbase64%2CPHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCI%2BPHBhdGggZmlsbD0iI2ZmZiIgZD0iTTMgNS42bDcuNi0xLjF2N0gzek0xMS42IDQuNEwyMSAzdjguNWgtOS40ek0zIDEyLjVoNy42djdMMyAxOC40ek0xMS42IDEyLjVIMjFWMjFsLTkuNC0xLjN6Ii8%2BPC9zdmc%2B" alt="Download for Windows" /></a>
+  <a href="https://github.com/quochungse/HeraclesRecords/releases/download/v1.1.0/HeraclesRecords-1.1.0.AppImage"><img src="https://img.shields.io/badge/Linux-AppImage-1f2328?style=for-the-badge&logo=linux&logoColor=white" alt="Download for Linux" /></a>
+  <a href="https://github.com/quochungse/HeraclesRecords/releases/download/v1.1.0/HeraclesRecords-1.1.0.deb"><img src="https://img.shields.io/badge/Linux-.deb-1f2328?style=for-the-badge&logo=debian&logoColor=white" alt="Download for Debian or Ubuntu" /></a>
 </p>
 <!-- release:badges:end -->
 
@@ -46,13 +46,13 @@
 <!-- release:downloads:start -->
 | Platform | Installer | Size |
 | --- | --- | --- |
-| **macOS** · Apple Silicon (M1 and later) | [HeraclesRecords-1.0.3-arm64.dmg](https://github.com/quochungse/HeraclesRecords/releases/download/v1.0.3/HeraclesRecords-1.0.3-arm64.dmg) | 174 MB |
-| **macOS** · Intel | [HeraclesRecords-1.0.3-x64.dmg](https://github.com/quochungse/HeraclesRecords/releases/download/v1.0.3/HeraclesRecords-1.0.3-x64.dmg) | 178 MB |
-| **Windows** 10 / 11 · 64-bit | [HeraclesRecords-Setup-1.0.3.exe](https://github.com/quochungse/HeraclesRecords/releases/download/v1.0.3/HeraclesRecords-Setup-1.0.3.exe) | 161 MB |
-| **Linux** · AppImage, any distribution | [HeraclesRecords-1.0.3.AppImage](https://github.com/quochungse/HeraclesRecords/releases/download/v1.0.3/HeraclesRecords-1.0.3.AppImage) | 181 MB |
-| **Linux** · Debian / Ubuntu (.deb) | [HeraclesRecords-1.0.3.deb](https://github.com/quochungse/HeraclesRecords/releases/download/v1.0.3/HeraclesRecords-1.0.3.deb) | 136 MB |
+| **macOS** · Apple Silicon (M1 and later) | [HeraclesRecords-1.1.0-arm64.dmg](https://github.com/quochungse/HeraclesRecords/releases/download/v1.1.0/HeraclesRecords-1.1.0-arm64.dmg) | 175 MB |
+| **macOS** · Intel | [HeraclesRecords-1.1.0-x64.dmg](https://github.com/quochungse/HeraclesRecords/releases/download/v1.1.0/HeraclesRecords-1.1.0-x64.dmg) | 180 MB |
+| **Windows** 10 / 11 · 64-bit | [HeraclesRecords-Setup-1.1.0.exe](https://github.com/quochungse/HeraclesRecords/releases/download/v1.1.0/HeraclesRecords-Setup-1.1.0.exe) | 163 MB |
+| **Linux** · AppImage, any distribution | [HeraclesRecords-1.1.0.AppImage](https://github.com/quochungse/HeraclesRecords/releases/download/v1.1.0/HeraclesRecords-1.1.0.AppImage) | 182 MB |
+| **Linux** · Debian / Ubuntu (.deb) | [HeraclesRecords-1.1.0.deb](https://github.com/quochungse/HeraclesRecords/releases/download/v1.1.0/HeraclesRecords-1.1.0.deb) | 137 MB |
 
-Version 1.0.3 · [What's new](https://github.com/quochungse/HeraclesRecords/releases/tag/v1.0.3) · [All releases](https://github.com/quochungse/HeraclesRecords/releases). The app tells you when a new version is out.
+Version 1.1.0 · [What's new](https://github.com/quochungse/HeraclesRecords/releases/tag/v1.1.0) · [All releases](https://github.com/quochungse/HeraclesRecords/releases). The app tells you when a new version is out.
 <!-- release:downloads:end -->
 
 <details>
