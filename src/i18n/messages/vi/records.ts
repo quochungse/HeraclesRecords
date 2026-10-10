@@ -300,6 +300,8 @@ const records: RecordsMessages = {
   "records.plan.weeksUnit_other": "tuần",
   "records.plan.length": "Thời lượng",
   "records.plan.context": "Giáo án {ordinal} bạn hoàn thành.",
+  "records.monthCount_one": "{count} cột mốc",
+  "records.monthCount_other": "{count} cột mốc",
 };
 
 export default records;

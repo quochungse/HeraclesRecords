@@ -425,10 +425,10 @@ export function SyncPanel({ api, onCheckForUpdates }: SyncPanelProps) {
 
         {status.state === "outdated" ? (
           <SettingsPrefRow
-            title="Update the app to keep syncing"
+            title={t("sync.outdated.title")}
             tone="error"
             align="start"
-            detail="Another computer has moved your synced data to a newer format than this version can read. Nothing is being sent or received until this computer is updated. Changes you make here are kept and go out after the update."
+            detail={t("sync.outdated.detail")}
           >
             {onCheckForUpdates ? (
               <button
@@ -437,7 +437,7 @@ export function SyncPanel({ api, onCheckForUpdates }: SyncPanelProps) {
                 onClick={onCheckForUpdates}
               >
                 <RefreshCw size={15} aria-hidden="true" />
-                Check for updates
+                {t("update.check")}
               </button>
             ) : null}
           </SettingsPrefRow>
@@ -445,8 +445,8 @@ export function SyncPanel({ api, onCheckForUpdates }: SyncPanelProps) {
 
         {status.state === "ready" && status.dataFormat === "behind" ? (
           <SettingsPrefRow
-            title="A newer version is in use on another computer"
-            detail="Sync carries on as usual. Updating keeps every computer on the same version."
+            title={t("sync.behind.title")}
+            detail={t("sync.behind.detail")}
           >
             {onCheckForUpdates ? (
               <button
@@ -455,7 +455,7 @@ export function SyncPanel({ api, onCheckForUpdates }: SyncPanelProps) {
                 onClick={onCheckForUpdates}
               >
                 <RefreshCw size={15} aria-hidden="true" />
-                Check for updates
+                {t("update.check")}
               </button>
             ) : null}
           </SettingsPrefRow>

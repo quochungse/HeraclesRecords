@@ -182,7 +182,7 @@ import {
   groupChatToolsBySource,
   type ChatToolSource
 } from "../../electron/chatToolSources";
-import { getIntlLocale, messageRecord, plural, t } from "../i18n/core";
+import { getIntlLocale, plural, t } from "../i18n/core";
 import { useI18n } from "../i18n/useI18n";
 import { displaySessionTitle, NEW_PLAN_TITLE } from "./sessionTitle";
 

@@ -181,7 +181,7 @@ const main: ScreenMessages = {
   "screen.outline.raceStage": "สัปดาห์ที่ {n} คือสัปดาห์แข่ง ให้ตั้งเป็นช่วงแข่ง",
   "screen.outline.sessionsExact": "สัปดาห์ที่ {n} มีการฝึก {sessions} ครั้ง สัปดาห์ของคุณมีพอดี {min} ครั้ง",
   "screen.outline.sessionsBand": "สัปดาห์ที่ {n} มีการฝึก {sessions} ครั้ง สัปดาห์ของคุณมี {min} ถึง {max} ครั้ง",
-  "screen.outline.keySessions": "สัปดาห์ที่ {n} ระบุการฝึกหลักมากกว่าจำนวนการฝึกที่มี",
+  "screen.outline.keySessions": "สัปดาห์ที่ {n} ระบุเซสชันมากกว่าจำนวนที่นับไว้",
   "screen.outline.hours": "สัปดาห์ที่ {n} วางไว้ {hours} ชม. คุณมีได้มากสุด {max} ชม. ต่อสัปดาห์",
   "screen.outline.sport": "\"{name}\" ในสัปดาห์ที่ {n} เป็น{sport} ซึ่งไม่ได้ขอไว้",
   "screen.outline.restDay": "\"{name}\" ในสัปดาห์ที่ {n} ตรงกับ{day} ซึ่งเป็นวันพัก",
@@ -215,7 +215,8 @@ const main: ScreenMessages = {
   "screen.effort.xhigh": "สูงมาก",
   "screen.effort.max": "สูงสุด",
   "screen.effort.maxDetail": "ละเอียดที่สุด",
-  "screen.model.auto": "อัตโนมัติ"
+  "screen.model.auto": "อัตโนมัติ",
+  "main.sync.outdated": "พื้นที่เก็บนี้ใช้รูปแบบข้อมูลที่ใหม่กว่า โปรดอัปเดตแอปก่อน",
 };
 
 export default main;

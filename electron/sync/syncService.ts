@@ -356,9 +356,9 @@ export class SyncService {
     const identity =
       (await this.#readIdentity()) ?? (await this.#mintIdentity(owner));
     if (dataFormatVerdict(vaultDataFormat(identity)) === "outdated") {
-      throw new SyncNotReadyError(
-        "outdated",
-        "This vault is in a newer data format. Update the app first."
+      throw withScreenKey(
+        new SyncNotReadyError("outdated", "This vault is in a newer data format. Update the app first."),
+        "main.sync.outdated"
       );
     }
     await this.#writeIdentity({ ...identity, owner });

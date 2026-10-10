@@ -838,6 +838,21 @@ const chat: ChatMessages = {
   "chat.change.reason.replaced": "Buổi tập ngày {day} giờ là “{now}”, không phải “{name}”.",
   "chat.change.reason.alreadyThere": "“{name}” đã có trên lịch ngày {day}.",
   "chat.change.reason.notInLibrary": "“{name}” không còn trong thư viện bài tập.",
+  "chat.cost.cacheWrite": "Ghi cache {count}",
+  "chat.cost.cacheRead": "Đọc cache {count} (tính là {counted})",
+  "chat.row.analyzing": "Đang phân tích",
+  "chat.set.cacheReadsTitle": "{count} token được đọc từ cache của nhà cung cấp, vốn chỉ tốn một phần mười giá đầu vào mới, nên được tính bằng một phần mười.",
+  "chat.set.cacheReads": "token đọc từ cache tính 10%",
+  "chat.perm.title": "Quyền truy cập",
+  "chat.perm.label": "Huấn luyện viên được đọc gì",
+  "chat.perm.web": "Web",
+  "chat.perm.webTitle": "Web: tìm trên internet thông tin về giải chạy, sự kiện và những gì dữ liệu của bạn không có",
+  "chat.perm.web.local": "Mô hình chạy trên máy không tìm được trên web, nên ở đây Huấn luyện viên trả lời mà không có web.",
+  "chat.perm.web.claudeApi": "Huấn luyện viên chỉ tìm khi câu hỏi cần, không bao giờ trong phân tích; mỗi lượt tìm tính phí vào tài khoản Anthropic của bạn.",
+  "chat.perm.web.openrouter": "Huấn luyện viên chỉ tìm khi câu hỏi cần, không bao giờ trong phân tích; mỗi lượt tìm trừ vào tín dụng OpenRouter của bạn.",
+  "chat.perm.web.claudeCode": "Huấn luyện viên tìm qua gói Claude của bạn khi câu hỏi cần, không bao giờ trong phân tích.",
+  "chat.perm.web.chatgpt": "Huấn luyện viên tìm qua gói ChatGPT của bạn khi câu hỏi cần, không bao giờ trong phân tích.",
+  "chat.models.claudeUpdate": "<b>Đã có Claude Code {latest}.</b> Máy này đang dùng {installed}. Chạy <code>claude update</code> trong terminal để có các mô hình và bản sửa lỗi mới nhất.",
 };
 
 export default chat;

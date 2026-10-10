@@ -65,6 +65,10 @@ const sync: SyncMessages = {
   "backup.merge.title": "Gabungkan",
   "backup.merge.detail": "Menyimpan semua yang ada di komputer ini dan menambahkan yang belum ada. Menulis {count} data baru; yang sudah ada tetap seperti semula, dan tidak ada yang dihapus.",
   "backup.refused": "{count} entri dalam berkas ini tidak dipulihkan: data masuk akun selalu tetap di komputer yang membuatnya.",
+  "sync.outdated.title": "Perbarui aplikasi agar sinkronisasi berlanjut",
+  "sync.outdated.detail": "Komputer lain telah memindahkan data tersinkron Anda ke format yang lebih baru daripada yang bisa dibaca versi ini. Tidak ada yang dikirim atau diterima sampai komputer ini diperbarui. Perubahan yang Anda buat di sini tetap disimpan dan dikirim setelah pembaruan.",
+  "sync.behind.title": "Versi yang lebih baru dipakai di komputer lain",
+  "sync.behind.detail": "Sinkronisasi tetap berjalan seperti biasa. Memperbarui membuat semua komputer memakai versi yang sama.",
 };
 
 export default sync;

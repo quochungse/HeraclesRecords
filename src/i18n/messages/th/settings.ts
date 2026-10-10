@@ -90,6 +90,7 @@ const settings: SettingsMessages = {
   "update.autoDownload": "ดาวน์โหลดอัตโนมัติ",
   "update.autoDownloadHint": "ถ้าปิดไว้ จะดาวน์โหลดเมื่อคุณสั่งเท่านั้น",
   "update.check": "ตรวจหาอัปเดต",
+  "settings.coachModels.claudeUpdate": "Claude Code {latest} พร้อมใช้งานแล้ว (เครื่องนี้ใช้ {installed} อยู่) เรียก <code>claude update</code> ในเทอร์มินัล",
 };
 
 export default settings;

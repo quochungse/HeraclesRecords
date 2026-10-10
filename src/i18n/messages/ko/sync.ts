@@ -65,6 +65,10 @@ const sync: SyncMessages = {
   "backup.merge.title": "병합",
   "backup.merge.detail": "이 컴퓨터의 모든 것을 그대로 두고 빠진 것만 더합니다. 새 기록 {count}건을 씁니다. 이미 있는 항목은 지금 것을 유지하고, 아무것도 삭제하지 않습니다.",
   "backup.refused": "이 파일의 항목 {count}개는 복원되지 않습니다. 로그인 정보는 언제나 그것을 만든 컴퓨터에만 남습니다.",
+  "sync.outdated.title": "동기화를 계속하려면 앱을 업데이트하세요",
+  "sync.outdated.detail": "다른 컴퓨터가 동기화 데이터를 이 버전이 읽을 수 없는 새 형식으로 옮겼습니다. 이 컴퓨터를 업데이트할 때까지 아무것도 보내거나 받지 않습니다. 여기서 바꾼 내용은 보관되었다가 업데이트 후에 전송됩니다.",
+  "sync.behind.title": "다른 컴퓨터에서 더 새로운 버전을 쓰고 있습니다",
+  "sync.behind.detail": "동기화는 평소처럼 계속됩니다. 업데이트하면 모든 컴퓨터가 같은 버전을 쓰게 됩니다.",
 };
 
 export default sync;

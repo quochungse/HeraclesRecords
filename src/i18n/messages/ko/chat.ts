@@ -838,6 +838,21 @@ const chat: ChatMessages = {
   "chat.change.reason.replaced": "{day}의 세션은 이제 \"{name}\"이(가) 아니라 \"{now}\"입니다.",
   "chat.change.reason.alreadyThere": "\"{name}\"은(는) 이미 {day} 캘린더에 있습니다.",
   "chat.change.reason.notInLibrary": "\"{name}\"은(는) 더 이상 운동 라이브러리에 없습니다.",
+  "chat.cost.cacheWrite": "캐시 쓰기 {count}",
+  "chat.cost.cacheRead": "캐시 읽기 {count} ({counted}로 계산)",
+  "chat.row.analyzing": "분석 중",
+  "chat.set.cacheReadsTitle": "{count} 토큰은 제공업체의 캐시에서 읽었습니다. 새 입력의 10분의 1 비용이므로 10분의 1로 계산합니다.",
+  "chat.set.cacheReads": "캐시 읽기는 10%로 계산",
+  "chat.perm.title": "권한",
+  "chat.perm.label": "코치가 읽을 수 있는 것",
+  "chat.perm.web": "웹",
+  "chat.perm.webTitle": "웹: 대회, 이벤트 등 내 데이터에 없는 정보를 인터넷에서 검색",
+  "chat.perm.web.local": "로컬 모델은 웹을 검색할 수 없어서, 여기서는 코치가 웹 없이 답합니다.",
+  "chat.perm.web.claudeApi": "코치는 질문에 필요할 때만 검색하며 분석에서는 검색하지 않습니다. 검색할 때마다 Anthropic 계정에 요금이 청구됩니다.",
+  "chat.perm.web.openrouter": "코치는 질문에 필요할 때만 검색하며 분석에서는 검색하지 않습니다. 검색할 때마다 OpenRouter 크레딧이 차감됩니다.",
+  "chat.perm.web.claudeCode": "코치는 질문에 필요할 때 Claude 구독으로 검색하며, 분석에서는 검색하지 않습니다.",
+  "chat.perm.web.chatgpt": "코치는 질문에 필요할 때 ChatGPT 구독으로 검색하며, 분석에서는 검색하지 않습니다.",
+  "chat.models.claudeUpdate": "<b>Claude Code {latest}이(가) 나왔습니다.</b> 이 컴퓨터는 {installed}입니다. 터미널에서 <code>claude update</code>를 실행하면 최신 모델과 수정 사항을 받을 수 있습니다.",
 };
 
 export default chat;

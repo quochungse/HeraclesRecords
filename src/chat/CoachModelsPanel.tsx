@@ -38,6 +38,7 @@ import { ClaudeCodeLoginCard } from "./ClaudeCodeLoginCard";
 import { detectAndAdoptLocalServer } from "./localModelDetection";
 import type { HeraclesRecordsApi } from "../heraclesrecords-api";
 import { getIntlLocale, messageRecord, plural, t } from "../i18n/core";
+import { renderRich } from "../i18n/useI18n";
 
 function claudeStatusLabel(status: ClaudeCodeStatus | null): string {
   if (!status) return t("chat.models.status.notChecked");
@@ -109,9 +110,10 @@ export function ClaudeCodeUpdateNote({ update }: { update: ClaudeCodeUpdate }) {
     <p className="coach-analysis-banner" role="status">
       <CircleArrowUp size={15} aria-hidden="true" />
       <span>
-        <strong>Claude Code {update.latest} is available.</strong> This
-        computer has {update.installed}. Run <code>claude update</code> in a
-        terminal to get the newest models and fixes.
+        {renderRich(t("chat.models.claudeUpdate", { latest: update.latest, installed: update.installed }), {
+          b: (chunk) => <strong>{chunk}</strong>,
+          code: (chunk) => <code>{chunk}</code>
+        })}
       </span>
     </p>
   );

@@ -83,6 +83,8 @@ const run: RunMessages = {
   "run.detail.effect": "训练效果与环境",
   "run.detail.lap": "分段",
   "run.detail.focusLap": "让图表聚焦到这个分段",
+  "run.ef.weekOf": "{date}当周",
+  "run.ef.noQualifying": "没有符合条件的跑步",
 };
 
 export default run;

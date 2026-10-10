@@ -300,6 +300,8 @@ const records: RecordsMessages = {
   "records.plan.weeksUnit_other": "주",
   "records.plan.length": "기간",
   "records.plan.context": "{ordinal}로 완료한 계획입니다.",
+  "records.monthCount_one": "이정표 {count}개",
+  "records.monthCount_other": "이정표 {count}개",
 };
 
 export default records;

@@ -307,6 +307,8 @@ const records = {
   "records.plan.weeksUnit_other": "weeks",
   "records.plan.length": "Length",
   "records.plan.context": "Your {ordinal} finished plan.",
+  "records.monthCount_one": "{count} milestone",
+  "records.monthCount_other": "{count} milestones",
 };
 
 export default records;

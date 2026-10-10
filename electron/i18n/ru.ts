@@ -185,7 +185,7 @@ const main: ScreenMessages = {
   "screen.outline.raceStage": "Неделя {n} — неделя старта; поставьте ей этап «Старт».",
   "screen.outline.sessionsExact": "В неделе {n} тренировок: {sessions}; в вашей неделе их ровно {min}.",
   "screen.outline.sessionsBand": "В неделе {n} тренировок: {sessions}; в вашей неделе их от {min} до {max}.",
-  "screen.outline.keySessions": "В неделе {n} ключевых тренировок названо больше, чем в ней тренировок.",
+  "screen.outline.keySessions": "В неделе {n} перечислено больше тренировок, чем в ней указано.",
   "screen.outline.hours": "На неделю {n} запланировано {hours} ч; у вас не больше {max} ч в неделю.",
   "screen.outline.sport": "«{name}» в неделе {n} — это {sport}, а такой вид спорта не просили.",
   "screen.outline.restDay": "«{name}» в неделе {n} выпадает на {day}, день отдыха.",
@@ -223,7 +223,8 @@ const main: ScreenMessages = {
   "screen.effort.xhigh": "Очень высокая",
   "screen.effort.max": "Максимальная",
   "screen.effort.maxDetail": "тщательнее всего",
-  "screen.model.auto": "Авто"
+  "screen.model.auto": "Авто",
+  "main.sync.outdated": "Это хранилище в более новом формате данных. Сначала обновите приложение.",
 };
 
 export default main;

@@ -90,6 +90,7 @@ const settings: SettingsMessages = {
   "update.autoDownload": "自動でダウンロード",
   "update.autoDownloadHint": "オフの場合は、指示したときだけダウンロードします。",
   "update.check": "アップデートを確認",
+  "settings.coachModels.claudeUpdate": "Claude Code {latest} が公開されています（このコンピューターは {installed}）。ターミナルで <code>claude update</code> を実行してください。",
 };
 
 export default settings;

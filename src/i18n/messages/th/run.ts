@@ -83,6 +83,8 @@ const run: RunMessages = {
   "run.detail.effect": "ผลการฝึกและสภาพแวดล้อม",
   "run.detail.lap": "รอบ",
   "run.detail.focusLap": "โฟกัสกราฟที่รอบนี้",
+  "run.ef.weekOf": "สัปดาห์ของ {date}",
+  "run.ef.noQualifying": "ไม่มีการวิ่งที่เข้าเกณฑ์",
 };
 
 export default run;

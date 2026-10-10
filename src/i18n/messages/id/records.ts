@@ -300,6 +300,8 @@ const records: RecordsMessages = {
   "records.plan.weeksUnit_other": "minggu",
   "records.plan.length": "Durasi",
   "records.plan.context": "Rencana {ordinal} yang Anda selesaikan.",
+  "records.monthCount_one": "{count} pencapaian",
+  "records.monthCount_other": "{count} pencapaian",
 };
 
 export default records;

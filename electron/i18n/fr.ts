@@ -181,7 +181,7 @@ const main: ScreenMessages = {
   "screen.outline.raceStage": "La semaine {n} est la semaine de course ; donnez-lui la phase course.",
   "screen.outline.sessionsExact": "La semaine {n} compte {sessions} séances ; votre semaine en compte exactement {min}.",
   "screen.outline.sessionsBand": "La semaine {n} compte {sessions} séances ; votre semaine en compte de {min} à {max}.",
-  "screen.outline.keySessions": "La semaine {n} cite plus de séances clés qu’elle n’a de séances.",
+  "screen.outline.keySessions": "La semaine {n} liste plus de séances qu’elle n’en compte.",
   "screen.outline.hours": "La semaine {n} prévoit {hours} h ; vous avez au plus {max} h par semaine.",
   "screen.outline.sport": "« {name} » de la semaine {n} est en {sport}, un sport non demandé.",
   "screen.outline.restDay": "« {name} » de la semaine {n} tombe le {day}, un jour de repos.",
@@ -215,7 +215,8 @@ const main: ScreenMessages = {
   "screen.effort.xhigh": "Très élevé",
   "screen.effort.max": "Maximum",
   "screen.effort.maxDetail": "le plus approfondi",
-  "screen.model.auto": "Automatique"
+  "screen.model.auto": "Automatique",
+  "main.sync.outdated": "Cet espace est dans un format de données plus récent. Mettez d’abord l’app à jour.",
 };
 
 export default main;

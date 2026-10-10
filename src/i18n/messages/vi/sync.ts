@@ -65,6 +65,10 @@ const sync: SyncMessages = {
   "backup.merge.title": "Gộp",
   "backup.merge.detail": "Giữ nguyên mọi thứ trên máy này và bổ sung phần còn thiếu. Ghi {count} bản ghi mới; những gì đã có giữ nguyên bản hiện tại, và không xoá gì cả.",
   "backup.refused": "{count} mục trong tệp không được khôi phục: thông tin đăng nhập luôn ở lại trên máy đã tạo ra chúng.",
+  "sync.outdated.title": "Hãy cập nhật ứng dụng để tiếp tục đồng bộ",
+  "sync.outdated.detail": "Một máy khác đã chuyển dữ liệu đồng bộ sang định dạng mới hơn mức phiên bản này đọc được. Không gửi và không nhận gì cho tới khi máy này được cập nhật. Những thay đổi bạn làm ở đây vẫn được giữ và sẽ gửi đi sau khi cập nhật.",
+  "sync.behind.title": "Một máy khác đang dùng phiên bản mới hơn",
+  "sync.behind.detail": "Đồng bộ vẫn chạy bình thường. Cập nhật để mọi máy dùng cùng một phiên bản.",
 };
 
 export default sync;

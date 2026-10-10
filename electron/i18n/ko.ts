@@ -181,7 +181,7 @@ const main: ScreenMessages = {
   "screen.outline.raceStage": "{n}주차는 대회 주입니다. 대회 단계로 하세요.",
   "screen.outline.sessionsExact": "{n}주차는 세션 {sessions}회인데, 평소의 한 주는 정확히 {min}회입니다.",
   "screen.outline.sessionsBand": "{n}주차는 세션 {sessions}회인데, 평소의 한 주는 {min}~{max}회입니다.",
-  "screen.outline.keySessions": "{n}주차가 세션 수보다 많은 핵심 세션을 꼽았습니다.",
+  "screen.outline.keySessions": "{n}주차에 나열된 세션이 그 주의 세션 수보다 많습니다.",
   "screen.outline.hours": "{n}주차는 {hours}시간 계획인데, 쓸 수 있는 시간은 주 최대 {max}시간입니다.",
   "screen.outline.sport": "{n}주차의 \"{name}\"은(는) {sport}(으)로, 요청하지 않은 종목입니다.",
   "screen.outline.restDay": "{n}주차의 \"{name}\"이(가) {day}, 쉬는 날에 있습니다.",
@@ -215,7 +215,8 @@ const main: ScreenMessages = {
   "screen.effort.xhigh": "매우 높음",
   "screen.effort.max": "최대",
   "screen.effort.maxDetail": "가장 꼼꼼함",
-  "screen.model.auto": "자동"
+  "screen.model.auto": "자동",
+  "main.sync.outdated": "이 보관소는 더 새로운 데이터 형식입니다. 먼저 앱을 업데이트하세요.",
 };
 
 export default main;

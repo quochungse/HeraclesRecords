@@ -535,6 +535,10 @@ const library: LibraryMessages = {
   "library.move.day": "Día",
   "library.move.copy": "Copiar allí",
   "library.move.move": "Mover",
+  "library.trail.web_search": "Buscando en la web",
+  "library.trail.web_search.done": "Ha buscado en la web",
+  "library.trail.web_fetch": "Leyendo una página web",
+  "library.trail.web_fetch.done": "Ha leído una página web",
 };
 
 export default library;

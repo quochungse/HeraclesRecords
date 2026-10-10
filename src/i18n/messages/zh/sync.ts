@@ -65,6 +65,10 @@ const sync: SyncMessages = {
   "backup.merge.title": "合并",
   "backup.merge.detail": "保留这台电脑上的所有内容，只补充缺少的部分。写入 {count} 条新记录；已有的内容保持不变，不会删除任何东西。",
   "backup.refused": "这个文件中有 {count} 项不会被恢复：登录信息始终只保留在创建它的电脑上。",
+  "sync.outdated.title": "请更新应用以继续同步",
+  "sync.outdated.detail": "另一台电脑已把同步数据迁移到此版本无法读取的新格式。在这台电脑更新之前，不会发送或接收任何内容。你在这里所做的更改会被保留，并在更新后发出。",
+  "sync.behind.title": "另一台电脑正在使用更新的版本",
+  "sync.behind.detail": "同步照常进行。更新后所有电脑都使用同一版本。",
 };
 
 export default sync;

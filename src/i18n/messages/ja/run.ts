@@ -83,6 +83,8 @@ const run: RunMessages = {
   "run.detail.effect": "効果とコンディション",
   "run.detail.lap": "ラップ",
   "run.detail.focusLap": "グラフをこのラップに絞り込む",
+  "run.ef.weekOf": "{date}の週",
+  "run.ef.noQualifying": "対象となるランなし",
 };
 
 export default run;

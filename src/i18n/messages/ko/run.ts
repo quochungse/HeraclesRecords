@@ -83,6 +83,8 @@ const run: RunMessages = {
   "run.detail.effect": "효과와 환경",
   "run.detail.lap": "랩",
   "run.detail.focusLap": "그래프를 이 랩에 맞추기",
+  "run.ef.weekOf": "{date} 주",
+  "run.ef.noQualifying": "해당하는 러닝 없음",
 };
 
 export default run;

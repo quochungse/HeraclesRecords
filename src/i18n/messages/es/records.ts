@@ -300,6 +300,8 @@ const records: RecordsMessages = {
   "records.plan.weeksUnit_other": "semanas",
   "records.plan.length": "Duración",
   "records.plan.context": "Tu {ordinal} plan terminado.",
+  "records.monthCount_one": "{count} hito",
+  "records.monthCount_other": "{count} hitos",
 };
 
 export default records;

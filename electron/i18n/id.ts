@@ -181,7 +181,7 @@ const main: ScreenMessages = {
   "screen.outline.raceStage": "Minggu {n} adalah minggu lomba; beri fase lomba.",
   "screen.outline.sessionsExact": "Minggu {n} berisi {sessions} sesi; minggu Anda berisi tepat {min}.",
   "screen.outline.sessionsBand": "Minggu {n} berisi {sessions} sesi; minggu Anda berisi {min} sampai {max}.",
-  "screen.outline.keySessions": "Minggu {n} menyebut lebih banyak sesi utama daripada jumlah sesinya.",
+  "screen.outline.keySessions": "Minggu {n} mencantumkan lebih banyak sesi daripada yang dihitungnya.",
   "screen.outline.hours": "Minggu {n} merencanakan {hours} jam; Anda punya paling banyak {max} jam seminggu.",
   "screen.outline.sport": "\"{name}\" di minggu {n} adalah {sport}, yang tidak diminta.",
   "screen.outline.restDay": "\"{name}\" di minggu {n} jatuh pada {day}, hari istirahat.",
@@ -215,7 +215,8 @@ const main: ScreenMessages = {
   "screen.effort.xhigh": "Sangat tinggi",
   "screen.effort.max": "Maksimum",
   "screen.effort.maxDetail": "paling teliti",
-  "screen.model.auto": "Otomatis"
+  "screen.model.auto": "Otomatis",
+  "main.sync.outdated": "Brankas ini memakai format data yang lebih baru. Perbarui aplikasi terlebih dahulu.",
 };
 
 export default main;

@@ -181,7 +181,7 @@ const main: ScreenMessages = {
   "screen.outline.raceStage": "Tuần {n} là tuần thi đấu; hãy đặt giai đoạn thi đấu cho tuần đó.",
   "screen.outline.sessionsExact": "Tuần {n} có {sessions} buổi; tuần của bạn có đúng {min} buổi.",
   "screen.outline.sessionsBand": "Tuần {n} có {sessions} buổi; tuần của bạn có từ {min} đến {max} buổi.",
-  "screen.outline.keySessions": "Tuần {n} nêu nhiều buổi chính hơn số buổi của nó.",
+  "screen.outline.keySessions": "Tuần {n} liệt kê nhiều buổi hơn số buổi của tuần.",
   "screen.outline.hours": "Tuần {n} dự kiến {hours} giờ; bạn có tối đa {max} giờ mỗi tuần.",
   "screen.outline.sport": "“{name}” ở tuần {n} là {sport}, môn bạn không yêu cầu.",
   "screen.outline.restDay": "“{name}” ở tuần {n} rơi vào {day}, một ngày nghỉ.",
@@ -215,7 +215,8 @@ const main: ScreenMessages = {
   "screen.effort.xhigh": "Rất cao",
   "screen.effort.max": "Tối đa",
   "screen.effort.maxDetail": "kỹ lưỡng nhất",
-  "screen.model.auto": "Tự động"
+  "screen.model.auto": "Tự động",
+  "main.sync.outdated": "Kho này dùng định dạng dữ liệu mới hơn. Hãy cập nhật ứng dụng trước.",
 };
 
 export default main;

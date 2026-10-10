@@ -132,9 +132,13 @@ function coachModelsDetail(summary: CoachModelsSummary | null): ReactNode {
       </span>
       {summary.claudeCodeUpdate ? (
         <span className="settings-pref-line settings-pref-warning">
-          Claude Code {summary.claudeCodeUpdate.latest} is available (this
-          computer has {summary.claudeCodeUpdate.installed}). Run{" "}
-          <code>claude update</code> in a terminal.
+          {renderRich(
+            t("settings.coachModels.claudeUpdate", {
+              latest: summary.claudeCodeUpdate.latest,
+              installed: summary.claudeCodeUpdate.installed,
+            }),
+            { code: (chunk: ReactNode) => <code>{chunk}</code> },
+          )}
         </span>
       ) : null}
     </>

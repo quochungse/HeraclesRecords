@@ -30,7 +30,7 @@ const PERMISSION_LABELS = messageRecord<SourceKey>({
 });
 
 function permissionOptions(): OptionGroupOption<PermissionKey>[] {
-    return [
+  return [
     ...SOURCES.map((source) => ({
       value: source.value,
       label: PERMISSION_LABELS[source.value],
@@ -40,7 +40,7 @@ function permissionOptions(): OptionGroupOption<PermissionKey>[] {
       value: "web",
       label: t("chat.perm.web"),
       title: t("chat.perm.webTitle")
-  }
+    }
   ];
 }
 

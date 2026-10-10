@@ -896,6 +896,21 @@ const chat: ChatMessages = {
   "chat.change.reason.replaced": "Тренировка {day} теперь «{now}», а не «{name}».",
   "chat.change.reason.alreadyThere": "«{name}» уже есть в календаре ({day}).",
   "chat.change.reason.notInLibrary": "«{name}» больше нет в библиотеке тренировок.",
+  "chat.cost.cacheWrite": "Запись в кэш {count}",
+  "chat.cost.cacheRead": "Чтение из кэша {count} (засчитано как {counted})",
+  "chat.row.analyzing": "Анализирует",
+  "chat.set.cacheReadsTitle": "{count} токенов прочитано из кэша провайдера: это стоит десятую часть нового ввода, поэтому они засчитываются как десятая часть.",
+  "chat.set.cacheReads": "чтение из кэша считается за 10%",
+  "chat.perm.title": "Разрешения",
+  "chat.perm.label": "Что может читать Coach",
+  "chat.perm.web": "Интернет",
+  "chat.perm.webTitle": "Интернет: искать гонки, события и всё, чего нет в ваших данных",
+  "chat.perm.web.local": "Локальная модель не умеет искать в интернете, поэтому здесь Coach отвечает без него.",
+  "chat.perm.web.claudeApi": "Coach ищет, когда это нужно для вопроса, и никогда во время анализа; каждый поиск оплачивается с вашего аккаунта Anthropic.",
+  "chat.perm.web.openrouter": "Coach ищет, когда это нужно для вопроса, и никогда во время анализа; каждый поиск списывается с вашего баланса OpenRouter.",
+  "chat.perm.web.claudeCode": "Coach ищет через вашу подписку Claude, когда это нужно для вопроса, и никогда во время анализа.",
+  "chat.perm.web.chatgpt": "Coach ищет через вашу подписку ChatGPT, когда это нужно для вопроса, и никогда во время анализа.",
+  "chat.models.claudeUpdate": "<b>Вышел Claude Code {latest}.</b> На этом компьютере стоит {installed}. Выполните <code>claude update</code> в терминале, чтобы получить новейшие модели и исправления.",
 };
 
 export default chat;

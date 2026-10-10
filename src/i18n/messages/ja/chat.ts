@@ -838,6 +838,21 @@ const chat: ChatMessages = {
   "chat.change.reason.replaced": "{day} のセッションは今は「{name}」ではなく「{now}」です。",
   "chat.change.reason.alreadyThere": "「{name}」はすでに {day} のカレンダーにあります。",
   "chat.change.reason.notInLibrary": "「{name}」はもうワークアウトライブラリにありません。",
+  "chat.cost.cacheWrite": "キャッシュ書き込み {count}",
+  "chat.cost.cacheRead": "キャッシュ読み取り {count}（{counted} として計算）",
+  "chat.row.analyzing": "分析中",
+  "chat.set.cacheReadsTitle": "{count} トークンはプロバイダーのキャッシュから読み取られました。新しい入力の 10 分の 1 の料金なので、10 分の 1 として数えます。",
+  "chat.set.cacheReads": "キャッシュ読み取りは 10% で計算",
+  "chat.perm.title": "アクセス許可",
+  "chat.perm.label": "コーチが読めるもの",
+  "chat.perm.web": "ウェブ",
+  "chat.perm.webTitle": "ウェブ: レースやイベントなど、あなたのデータにない情報をインターネットで検索します",
+  "chat.perm.web.local": "ローカルモデルはウェブを検索できないため、ここではコーチはウェブなしで答えます。",
+  "chat.perm.web.claudeApi": "コーチは質問に必要なときだけ検索し、分析では検索しません。検索ごとに Anthropic アカウントに課金されます。",
+  "chat.perm.web.openrouter": "コーチは質問に必要なときだけ検索し、分析では検索しません。検索ごとに OpenRouter のクレジットが使われます。",
+  "chat.perm.web.claudeCode": "コーチは質問に必要なときに Claude のサブスクリプションで検索し、分析では検索しません。",
+  "chat.perm.web.chatgpt": "コーチは質問に必要なときに ChatGPT のサブスクリプションで検索し、分析では検索しません。",
+  "chat.models.claudeUpdate": "<b>Claude Code {latest} が公開されています。</b>このコンピューターは {installed} です。ターミナルで <code>claude update</code> を実行すると、最新のモデルと修正が使えます。",
 };
 
 export default chat;

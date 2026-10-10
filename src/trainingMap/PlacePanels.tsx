@@ -30,6 +30,9 @@ import {
   type PlaceSort,
   type PlaceSummary,
 } from "./placeSummaries";
+import { formatCount, getIntlLocale, plural, t } from "../i18n/core";
+import { useI18n } from "../i18n/useI18n";
+import { labourShort, labourStage } from "../records/labourWords";
 
 /** The three sizes the globe's legend draws, by a place's share of the busiest. */
 function intensityTier(count: number, maxCount: number): "low" | "medium" | "high" {
@@ -60,6 +63,7 @@ export function PlaceList({
   onSelect,
   onScrolledTo,
 }: PlaceListProps) {
+  useI18n();
   const maxCount = places.reduce(
     (max, place) => Math.max(max, place.activities.length),
     0,
@@ -74,23 +78,23 @@ export function PlaceList({
     <>
       <header className="training-map-places-head">
         <h2>
-          Places <span>{places.length.toLocaleString()}</span>
+          {t("map.places")} <span>{formatCount(places.length)}</span>
         </h2>
         <OptionGroup<PlaceSort>
-          label="Sort places"
+          label={t("map.sort.label")}
           value={sort}
           onChange={onSortChange}
           options={[
-            { value: "recent", label: "Recent" },
-            { value: "visits", label: "Most visited" },
+            { value: "recent", label: t("map.sort.recent") },
+            { value: "visits", label: t("map.mostVisited") },
           ]}
         />
       </header>
       <div className="training-map-places-columns" aria-hidden="true">
         <span />
-        <span>Place</span>
-        <span>Visits</span>
-        <span>Last</span>
+        <span>{t("map.col.place")}</span>
+        <span>{t("map.col.visits")}</span>
+        <span>{t("map.col.last")}</span>
       </div>
       <ol className="training-map-places" onScroll={handleScroll}>
         {places.map((place) => {
@@ -117,9 +121,9 @@ export function PlaceList({
                 </span>
                 <span
                   className="training-map-place-count"
-                  aria-label={`${count} ${count === 1 ? "visit" : "visits"}`}
+                  aria-label={plural("map.visits", count)}
                 >
-                  {count.toLocaleString()}
+                  {formatCount(count)}
                 </span>
                 <span className="training-map-place-last">
                   {formatDayNear(place.lastVisitedMs)}
@@ -145,6 +149,8 @@ export function PlaceLabourCard({
   labour: LabourState;
   onOpen: () => void;
 }) {
+  useI18n();
+  const id = labour.definition.id;
   const next = nextOpenStage(labour);
   const ratio = next?.progress?.ratio;
   return (
@@ -152,11 +158,9 @@ export function PlaceLabourCard({
       <LabourEmblem id={labour.definition.id} reached={labour.reached} size="chip" />
       <span className="training-map-labour-text">
         <span className="training-map-labour-eyebrow">
-          {next
-            ? `${labour.definition.short} · ${STAGE_NUMERALS[next.stage]}`
-            : labour.definition.short}
+          {next ? `${labourShort(id)} · ${STAGE_NUMERALS[next.stage]}` : labourShort(id)}
         </span>
-        <strong>{next ? next.title : "All three stages reached"}</strong>
+        <strong>{next ? labourStage(id, next.stage) : t("map.labour.allReached")}</strong>
         {ratio !== undefined ? (
           <span className="training-map-labour-bar" aria-hidden="true">
             <span style={{ width: `${Math.round(ratio * 100)}%` }} />
@@ -165,7 +169,9 @@ export function PlaceLabourCard({
         {next?.progress ? (
           <span className="training-map-labour-foot">
             <span>{next.progress.text}</span>
-            {ratio !== undefined ? <span>{Math.round(ratio * 100)}% there</span> : null}
+            {ratio !== undefined ? (
+              <span>{t("records.p.there", { percent: Math.round(ratio * 100) })}</span>
+            ) : null}
           </span>
         ) : null}
       </span>
@@ -178,9 +184,11 @@ function formatPlaceDuration(seconds: number): string {
   const hours = Math.floor(totalMinutes / 60);
   const minutes = totalMinutes % 60;
   if (hours === 0) {
-    return `${minutes} min`;
+    return t("units.min", { m: minutes });
   }
-  return minutes > 0 ? `${hours} h ${minutes} m` : `${hours} h`;
+  return minutes > 0
+    ? t("units.duration.hm", { h: hours, m: minutes })
+    : t("units.duration.h", { h: hours });
 }
 
 /** Rows shown before "Show all": a place's latest few are what is asked for. */
@@ -209,6 +217,7 @@ export function PlaceDetail({
   onOpenActivity,
   onHoverActivity,
 }: PlaceDetailProps) {
+  useI18n();
   const { unitSystem } = useUnitSystem();
   const [showAll, setShowAll] = useState(false);
 
@@ -224,21 +233,24 @@ export function PlaceDetail({
     ? place.activities
     : place.activities.slice(0, ACTIVITIES_SHOWN);
   const distance = (meters: number) =>
-    metersToDisplayDistance(meters, unitSystem).toLocaleString(undefined, {
-      maximumFractionDigits: 1,
-    });
+    new Intl.NumberFormat(getIntlLocale(), { maximumFractionDigits: 1 }).format(
+      metersToDisplayDistance(meters, unitSystem),
+    );
   const climb = (meters: number) =>
-    Math.round(metersToElevation(meters, unitSystem)).toLocaleString();
+    formatCount(Math.round(metersToElevation(meters, unitSystem)));
   const when =
     count === 1
       ? formatDayNear(place.lastVisitedMs)
-      : `since ${formatMonthYear(place.firstVisitedMs)} · last ${formatDayNear(place.lastVisitedMs)}`;
+      : t("map.place.when", {
+          first: formatMonthYear(place.firstVisitedMs),
+          last: formatDayNear(place.lastVisitedMs),
+        });
 
   return (
     <div className="training-map-place">
       <button type="button" className="training-map-place-back" onClick={onBack}>
         <ChevronLeft size={16} aria-hidden="true" />
-        All places
+        {t("map.place.all")}
       </button>
       <header className="training-map-place-header">
         <h2>{label.city}</h2>
@@ -249,21 +261,21 @@ export function PlaceDetail({
 
       <dl className="training-map-place-metrics">
         <div>
-          <dt>Activities</dt>
-          <dd>{count.toLocaleString()}</dd>
+          <dt>{t("map.loc.activities")}</dt>
+          <dd>{formatCount(count)}</dd>
         </div>
         <div>
-          <dt>Distance</dt>
+          <dt>{t("map.loc.distance")}</dt>
           <dd>
             {distance(place.distanceMeters)} <small>{distanceUnit(unitSystem)}</small>
           </dd>
         </div>
         <div>
-          <dt>Time</dt>
+          <dt>{t("map.loc.time")}</dt>
           <dd>{formatPlaceDuration(place.durationSeconds)}</dd>
         </div>
         <div>
-          <dt>Climb</dt>
+          <dt>{t("map.place.climb")}</dt>
           <dd>
             {climb(place.elevationMeters)} <small>{elevationUnit(unitSystem)}</small>
           </dd>
@@ -282,14 +294,14 @@ export function PlaceDetail({
             />
           ))}
         </div>
-        <ul aria-label="Sports trained here">
+        <ul aria-label={t("map.place.sports")}>
           {mix.map((share) => (
             <li key={share.category}>
               <i
                 aria-hidden="true"
                 style={{ background: `var(--sport-${share.category})` }}
               />
-              {SPORT_COLOR_LABELS[share.category]} <strong>{share.count.toLocaleString()}</strong>
+              {SPORT_COLOR_LABELS[share.category]} <strong>{formatCount(share.count)}</strong>
             </li>
           ))}
         </ul>
@@ -297,11 +309,15 @@ export function PlaceDetail({
 
       {months.length > 1 ? (
         <div className="training-map-place-visits">
-          <span className="training-map-place-label">Visits by month</span>
+          <span className="training-map-place-label">{t("map.place.byMonth")}</span>
           <div
             className="training-map-place-visit-bars"
             role="img"
-            aria-label={`Visits by month from ${formatMonthYear(months[0].monthMs)} to ${formatMonthYear(months[months.length - 1].monthMs)}, at most ${busiest} in a month`}
+            aria-label={t("map.place.byMonthAria", {
+              from: formatMonthYear(months[0].monthMs),
+              to: formatMonthYear(months[months.length - 1].monthMs),
+              busiest,
+            })}
           >
             {months.map((month, index) => (
               <span
@@ -338,12 +354,12 @@ export function PlaceDetail({
           disabled={zooming}
         >
           <MapIcon size={16} aria-hidden="true" />
-          {zooming ? "Opening street view" : "Street view"}
+          {zooming ? t("map.place.openingStreet") : t("map.place.street")}
         </button>
       )}
 
-      <section className="training-map-place-activities" aria-label="Activities here">
-        <span className="training-map-place-label">Activities here</span>
+      <section className="training-map-place-activities" aria-label={t("map.place.activitiesHere")}>
+        <span className="training-map-place-label">{t("map.place.activitiesHere")}</span>
         <ul>
           {shown.map((activity) => {
             const category = sportColorCategory(activity.sportType);
@@ -394,7 +410,7 @@ export function PlaceDetail({
             onClick={() => setShowAll((current) => !current)}
             aria-expanded={showAll}
           >
-            {showAll ? "Show fewer" : `Show all ${count.toLocaleString()}`}
+            {showAll ? t("map.place.showFewer") : t("map.place.showAll", { count: formatCount(count) })}
             <ChevronDown size={14} aria-hidden="true" />
           </button>
         ) : null}

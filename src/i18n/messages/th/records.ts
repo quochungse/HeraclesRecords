@@ -300,6 +300,8 @@ const records: RecordsMessages = {
   "records.plan.weeksUnit_other": "สัปดาห์",
   "records.plan.length": "ระยะเวลา",
   "records.plan.context": "แผน{ordinal}ที่คุณทำจบ",
+  "records.monthCount_one": "{count} หมุดหมาย",
+  "records.monthCount_other": "{count} หมุดหมาย",
 };
 
 export default records;

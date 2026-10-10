@@ -336,6 +336,10 @@ const records: RecordsMessages = {
   "records.plan.weeksUnit_other": "недели",
   "records.plan.length": "Длительность",
   "records.plan.context": "Ваш {ordinal} завершённый план.",
+  "records.monthCount_one": "{count} веха",
+  "records.monthCount_few": "{count} вехи",
+  "records.monthCount_many": "{count} вех",
+  "records.monthCount_other": "{count} вехи",
 };
 
 export default records;

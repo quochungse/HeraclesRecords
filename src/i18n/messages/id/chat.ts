@@ -838,6 +838,21 @@ const chat: ChatMessages = {
   "chat.change.reason.replaced": "Sesi pada {day} sekarang \"{now}\", bukan \"{name}\".",
   "chat.change.reason.alreadyThere": "\"{name}\" sudah ada di kalender pada {day}.",
   "chat.change.reason.notInLibrary": "\"{name}\" sudah tidak ada di Pustaka latihan.",
+  "chat.cost.cacheWrite": "Tulis cache {count}",
+  "chat.cost.cacheRead": "Baca cache {count} (dihitung {counted})",
+  "chat.row.analyzing": "Menganalisis",
+  "chat.set.cacheReadsTitle": "{count} token dibaca dari cache penyedia, yang biayanya sepersepuluh masukan baru, jadi dihitung sepersepuluh.",
+  "chat.set.cacheReads": "baca cache dihitung 10%",
+  "chat.perm.title": "Izin",
+  "chat.perm.label": "Yang boleh dibaca Coach",
+  "chat.perm.web": "Web",
+  "chat.perm.webTitle": "Web: cari di internet soal lomba, acara, dan apa pun yang tidak ada di data Anda",
+  "chat.perm.web.local": "Model lokal tidak bisa mencari di web, jadi di sini Coach menjawab tanpanya.",
+  "chat.perm.web.claudeApi": "Coach mencari saat pertanyaan membutuhkannya, tidak pernah dalam analisis; setiap pencarian ditagihkan ke akun Anthropic Anda.",
+  "chat.perm.web.openrouter": "Coach mencari saat pertanyaan membutuhkannya, tidak pernah dalam analisis; setiap pencarian memakai kredit OpenRouter Anda.",
+  "chat.perm.web.claudeCode": "Coach mencari lewat langganan Claude Anda saat pertanyaan membutuhkannya, tidak pernah dalam analisis.",
+  "chat.perm.web.chatgpt": "Coach mencari lewat langganan ChatGPT Anda saat pertanyaan membutuhkannya, tidak pernah dalam analisis.",
+  "chat.models.claudeUpdate": "<b>Claude Code {latest} sudah tersedia.</b> Komputer ini memakai {installed}. Jalankan <code>claude update</code> di terminal untuk mendapat model dan perbaikan terbaru.",
 };
 
 export default chat;

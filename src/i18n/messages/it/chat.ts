@@ -838,6 +838,21 @@ const chat: ChatMessages = {
   "chat.change.reason.replaced": "La seduta di {day} ora è «{now}», non «{name}».",
   "chat.change.reason.alreadyThere": "«{name}» è già in calendario il {day}.",
   "chat.change.reason.notInLibrary": "«{name}» non è più nella libreria allenamenti.",
+  "chat.cost.cacheWrite": "Scrittura in cache {count}",
+  "chat.cost.cacheRead": "Lettura dalla cache {count} (conteggiata come {counted})",
+  "chat.row.analyzing": "Sta analizzando",
+  "chat.set.cacheReadsTitle": "{count} token sono stati letti dalla cache del provider, che costa un decimo di un input nuovo, quindi contano come un decimo.",
+  "chat.set.cacheReads": "le letture dalla cache contano al 10%",
+  "chat.perm.title": "Permessi",
+  "chat.perm.label": "Cosa può leggere Coach",
+  "chat.perm.web": "Web",
+  "chat.perm.webTitle": "Web: cercare su internet gare, eventi e tutto ciò che i tuoi dati non contengono",
+  "chat.perm.web.local": "Un modello locale non può cercare sul web, quindi qui Coach risponde senza.",
+  "chat.perm.web.claudeApi": "Coach cerca quando una domanda lo richiede, mai in un’analisi; ogni ricerca viene addebitata sul tuo account Anthropic.",
+  "chat.perm.web.openrouter": "Coach cerca quando una domanda lo richiede, mai in un’analisi; ogni ricerca usa il tuo credito OpenRouter.",
+  "chat.perm.web.claudeCode": "Coach cerca tramite il tuo abbonamento Claude quando una domanda lo richiede, mai in un’analisi.",
+  "chat.perm.web.chatgpt": "Coach cerca tramite il tuo abbonamento ChatGPT quando una domanda lo richiede, mai in un’analisi.",
+  "chat.models.claudeUpdate": "<b>Claude Code {latest} è disponibile.</b> Su questo computer c’è la {installed}. Esegui <code>claude update</code> in un terminale per avere i modelli e le correzioni più recenti.",
 };
 
 export default chat;

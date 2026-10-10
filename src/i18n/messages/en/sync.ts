@@ -66,6 +66,10 @@ const sync = {
   "backup.merge.title": "Merge",
   "backup.merge.detail": "Keeps everything on this computer and adds what is missing. Writes {count} new records; anything already here keeps the copy it has, and nothing is deleted.",
   "backup.refused": "{count} entries in this file are not restored: sign-ins stay on the machine that made them, either way.",
+  "sync.outdated.title": "Update the app to keep syncing",
+  "sync.outdated.detail": "Another computer has moved your synced data to a newer format than this version can read. Nothing is being sent or received until this computer is updated. Changes you make here are kept and go out after the update.",
+  "sync.behind.title": "A newer version is in use on another computer",
+  "sync.behind.detail": "Sync carries on as usual. Updating keeps every computer on the same version.",
 };
 
 export default sync;

@@ -535,6 +535,10 @@ const library: LibraryMessages = {
   "library.move.day": "요일",
   "library.move.copy": "그곳에 복사",
   "library.move.move": "이동",
+  "library.trail.web_search": "웹 검색 중",
+  "library.trail.web_search.done": "웹을 검색했습니다",
+  "library.trail.web_fetch": "웹 페이지 읽는 중",
+  "library.trail.web_fetch.done": "웹 페이지를 읽었습니다",
 };
 
 export default library;

@@ -181,7 +181,7 @@ const main: ScreenMessages = {
   "screen.outline.raceStage": "Woche {n} ist die Wettkampfwoche; gib ihr die Wettkampfphase.",
   "screen.outline.sessionsExact": "Woche {n} hat {sessions} Einheiten; deine Woche hat genau {min}.",
   "screen.outline.sessionsBand": "Woche {n} hat {sessions} Einheiten; deine Woche hat {min} bis {max}.",
-  "screen.outline.keySessions": "Woche {n} nennt mehr Schlüsseleinheiten, als sie Einheiten hat.",
+  "screen.outline.keySessions": "Woche {n} listet mehr Einheiten auf, als sie zählt.",
   "screen.outline.hours": "Woche {n} plant {hours} Std.; du hast höchstens {max} Std. pro Woche.",
   "screen.outline.sport": "„{name}“ in Woche {n} ist {sport}, das nicht gewünscht war.",
   "screen.outline.restDay": "„{name}“ in Woche {n} liegt auf {day}, einem Ruhetag.",
@@ -215,7 +215,8 @@ const main: ScreenMessages = {
   "screen.effort.xhigh": "Sehr hoch",
   "screen.effort.max": "Maximal",
   "screen.effort.maxDetail": "am gründlichsten",
-  "screen.model.auto": "Automatisch"
+  "screen.model.auto": "Automatisch",
+  "main.sync.outdated": "Dieser Speicher hat ein neueres Datenformat. Aktualisiere zuerst die App.",
 };
 
 export default main;

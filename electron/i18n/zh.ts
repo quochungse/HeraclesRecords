@@ -181,7 +181,7 @@ const main: ScreenMessages = {
   "screen.outline.raceStage": "第 {n} 周是比赛周，请设为比赛阶段。",
   "screen.outline.sessionsExact": "第 {n} 周有 {sessions} 节训练，而你平常的一周正好 {min} 节。",
   "screen.outline.sessionsBand": "第 {n} 周有 {sessions} 节训练，而你平常的一周是 {min} 到 {max} 节。",
-  "screen.outline.keySessions": "第 {n} 周列出的重点训练多于它的训练课数。",
+  "screen.outline.keySessions": "第 {n} 周列出的训练比它统计的次数多。",
   "screen.outline.hours": "第 {n} 周计划 {hours} 小时，而你每周最多只有 {max} 小时。",
   "screen.outline.sport": "第 {n} 周的“{name}”是{sport}，不是你要求的运动。",
   "screen.outline.restDay": "第 {n} 周的“{name}”在{day}，那天是休息日。",
@@ -215,7 +215,8 @@ const main: ScreenMessages = {
   "screen.effort.xhigh": "很高",
   "screen.effort.max": "最高",
   "screen.effort.maxDetail": "最周全",
-  "screen.model.auto": "自动"
+  "screen.model.auto": "自动",
+  "main.sync.outdated": "这个存储库使用了更新的数据格式。请先更新应用。",
 };
 
 export default main;

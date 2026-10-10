@@ -258,7 +258,8 @@ export const SCREEN_TEXT_EN = {
   "screen.effort.xhigh": "Extra high",
   "screen.effort.max": "Max",
   "screen.effort.maxDetail": "most thorough",
-  "screen.model.auto": "Auto"
+  "screen.model.auto": "Auto",
+  "main.sync.outdated": "This vault is in a newer data format. Update the app first.",
 };
 
 export type ScreenMessages = Translation<typeof SCREEN_TEXT_EN>;

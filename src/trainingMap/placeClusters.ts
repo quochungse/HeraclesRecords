@@ -69,7 +69,7 @@ function roundCoordinate(value: number): number {
  * which is also all the geocoder is ever told.
  */
 export function placeLabelKey(point: GlobePoint): string {
-  return `${roundCoordinate(point.lat).toFixed(2)},${roundCoordinate(point.lon).toFixed(2)}`;
+  return `${roundCoordinate(point.lat).toFixed(2)},${roundCoordinate(point.lon).toFixed(2)}`; // i18n-ignore: a cache key, not a figure
 }
 
 interface Site extends GlobePoint {

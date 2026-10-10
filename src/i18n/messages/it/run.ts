@@ -51,7 +51,7 @@ const run: RunMessages = {
   "run.ef.easy": "Corse facili oltre i 20 minuti",
   "run.ef.all": "Tutte le corse oltre i 20 minuti",
   "run.ef.noEasy": " · nessuna sessione facile da confrontare",
-  "run.ef.since": "dal {date}",
+  "run.ef.since": "dalla {date}",
   "run.ef.none": "Nessuna corsa oltre i 20 minuti con frequenza cardiaca in questo periodo, quindi per ora non c’è niente da confrontare.",
   "run.share": "Quota",
   "run.vamTitle": "Metri saliti all’ora",
@@ -83,6 +83,8 @@ const run: RunMessages = {
   "run.detail.effect": "Effetto e condizioni",
   "run.detail.lap": "Giro",
   "run.detail.focusLap": "Centra il grafico su questo giro",
+  "run.ef.weekOf": "settimana del {date}",
+  "run.ef.noQualifying": "Nessuna corsa valida",
 };
 
 export default run;

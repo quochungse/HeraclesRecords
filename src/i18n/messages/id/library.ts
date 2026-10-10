@@ -535,6 +535,10 @@ const library: LibraryMessages = {
   "library.move.day": "Hari",
   "library.move.copy": "Salin ke sana",
   "library.move.move": "Pindahkan",
+  "library.trail.web_search": "Mencari di web",
+  "library.trail.web_search.done": "Sudah mencari di web",
+  "library.trail.web_fetch": "Membaca halaman web",
+  "library.trail.web_fetch.done": "Sudah membaca halaman web",
 };
 
 export default library;

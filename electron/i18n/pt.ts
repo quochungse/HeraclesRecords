@@ -181,7 +181,7 @@ const main: ScreenMessages = {
   "screen.outline.raceStage": "A semana {n} é a da prova; dê a ela a fase de prova.",
   "screen.outline.sessionsExact": "A semana {n} tem {sessions} sessões; sua semana tem exatamente {min}.",
   "screen.outline.sessionsBand": "A semana {n} tem {sessions} sessões; sua semana tem de {min} a {max}.",
-  "screen.outline.keySessions": "A semana {n} cita mais sessões principais do que sessões tem.",
+  "screen.outline.keySessions": "A semana {n} lista mais sessões do que conta.",
   "screen.outline.hours": "A semana {n} prevê {hours} h; você tem no máximo {max} h por semana.",
   "screen.outline.sport": "“{name}” da semana {n} é {sport}, que não foi pedido.",
   "screen.outline.restDay": "“{name}” da semana {n} cai em {day}, um dia de descanso.",
@@ -215,7 +215,8 @@ const main: ScreenMessages = {
   "screen.effort.xhigh": "Muito alto",
   "screen.effort.max": "Máximo",
   "screen.effort.maxDetail": "o mais minucioso",
-  "screen.model.auto": "Automático"
+  "screen.model.auto": "Automático",
+  "main.sync.outdated": "Este cofre está em um formato de dados mais novo. Atualize o app primeiro.",
 };
 
 export default main;

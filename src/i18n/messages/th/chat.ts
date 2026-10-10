@@ -838,6 +838,21 @@ const chat: ChatMessages = {
   "chat.change.reason.replaced": "การฝึกวันที่ {day} ตอนนี้เป็น \"{now}\" ไม่ใช่ \"{name}\"",
   "chat.change.reason.alreadyThere": "\"{name}\" อยู่ในปฏิทินวันที่ {day} แล้ว",
   "chat.change.reason.notInLibrary": "\"{name}\" ไม่อยู่ในคลังการฝึกแล้ว",
+  "chat.cost.cacheWrite": "เขียนแคช {count}",
+  "chat.cost.cacheRead": "อ่านแคช {count} (นับเป็น {counted})",
+  "chat.row.analyzing": "กำลังวิเคราะห์",
+  "chat.set.cacheReadsTitle": "อ่าน {count} โทเค็นจากแคชของผู้ให้บริการ ซึ่งมีค่าใช้จ่ายหนึ่งในสิบของอินพุตใหม่ จึงนับเป็นหนึ่งในสิบ",
+  "chat.set.cacheReads": "การอ่านแคชนับ 10%",
+  "chat.perm.title": "สิทธิ์",
+  "chat.perm.label": "สิ่งที่ Coach อ่านได้",
+  "chat.perm.web": "เว็บ",
+  "chat.perm.webTitle": "เว็บ: ค้นหาบนอินเทอร์เน็ตเรื่องรายการแข่ง อีเวนต์ และอะไรก็ตามที่ข้อมูลของคุณไม่มี",
+  "chat.perm.web.local": "โมเดลในเครื่องค้นหาเว็บไม่ได้ ที่นี่ Coach จึงตอบโดยไม่ใช้เว็บ",
+  "chat.perm.web.claudeApi": "Coach ค้นหาเมื่อคำถามจำเป็น และไม่ค้นหาในการวิเคราะห์ การค้นหาแต่ละครั้งคิดเงินกับบัญชี Anthropic ของคุณ",
+  "chat.perm.web.openrouter": "Coach ค้นหาเมื่อคำถามจำเป็น และไม่ค้นหาในการวิเคราะห์ การค้นหาแต่ละครั้งใช้เครดิต OpenRouter ของคุณ",
+  "chat.perm.web.claudeCode": "Coach ค้นหาผ่านการสมัครใช้งาน Claude ของคุณเมื่อคำถามจำเป็น และไม่ค้นหาในการวิเคราะห์",
+  "chat.perm.web.chatgpt": "Coach ค้นหาผ่านการสมัครใช้งาน ChatGPT ของคุณเมื่อคำถามจำเป็น และไม่ค้นหาในการวิเคราะห์",
+  "chat.models.claudeUpdate": "<b>Claude Code {latest} พร้อมใช้งานแล้ว</b> เครื่องนี้ใช้ {installed} อยู่ เรียก <code>claude update</code> ในเทอร์มินัลเพื่อรับโมเดลและการแก้ไขล่าสุด",
 };
 
 export default chat;

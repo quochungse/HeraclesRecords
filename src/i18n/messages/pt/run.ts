@@ -51,7 +51,7 @@ const run: RunMessages = {
   "run.ef.easy": "Corridas leves acima de 20 minutos",
   "run.ef.all": "Todas as corridas acima de 20 minutos",
   "run.ef.noEasy": " · sem treinos leves para comparar",
-  "run.ef.since": "desde {date}",
+  "run.ef.since": "desde a {date}",
   "run.ef.none": "Nenhuma corrida acima de 20 minutos com frequência cardíaca neste período, então ainda não há o que comparar.",
   "run.share": "Fatia",
   "run.vamTitle": "Metros subidos por hora",
@@ -83,6 +83,8 @@ const run: RunMessages = {
   "run.detail.effect": "Efeito e condições",
   "run.detail.lap": "Volta",
   "run.detail.focusLap": "Focar o gráfico nesta volta",
+  "run.ef.weekOf": "semana de {date}",
+  "run.ef.noQualifying": "Nenhuma corrida válida",
 };
 
 export default run;

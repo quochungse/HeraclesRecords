@@ -65,6 +65,10 @@ const sync: SyncMessages = {
   "backup.merge.title": "Combinar",
   "backup.merge.detail": "Conserva todo lo que hay en este ordenador y añade lo que falta. Escribe {count} registros nuevos; lo que ya está aquí conserva su versión y no se elimina nada.",
   "backup.refused": "{count} entradas de este archivo no se restauran: los inicios de sesión se quedan siempre en el equipo que los creó.",
+  "sync.outdated.title": "Actualiza la app para seguir sincronizando",
+  "sync.outdated.detail": "Otro ordenador ha pasado tus datos sincronizados a un formato más nuevo del que esta versión puede leer. No se envía ni se recibe nada hasta que este ordenador se actualice. Los cambios que hagas aquí se guardan y se envían después de la actualización.",
+  "sync.behind.title": "Otro ordenador usa una versión más nueva",
+  "sync.behind.detail": "La sincronización sigue como siempre. Actualizar deja todos los ordenadores en la misma versión.",
 };
 
 export default sync;

@@ -536,6 +536,10 @@ const library = {
   "library.move.day": "Day",
   "library.move.copy": "Copy there",
   "library.move.move": "Move",
+  "library.trail.web_search": "Searching the web",
+  "library.trail.web_search.done": "Searched the web",
+  "library.trail.web_fetch": "Reading a web page",
+  "library.trail.web_fetch.done": "Read a web page",
 };
 
 export default library;

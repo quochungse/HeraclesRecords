@@ -300,6 +300,8 @@ const records: RecordsMessages = {
   "records.plan.weeksUnit_other": "週",
   "records.plan.length": "期間",
   "records.plan.context": "{ordinal}の完了したプランです。",
+  "records.monthCount_one": "{count} 個のマイルストーン",
+  "records.monthCount_other": "{count} 個のマイルストーン",
 };
 
 export default records;

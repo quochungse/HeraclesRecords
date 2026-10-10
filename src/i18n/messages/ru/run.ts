@@ -85,6 +85,8 @@ const run: RunMessages = {
   "run.detail.effect": "Эффект и условия",
   "run.detail.lap": "Круг",
   "run.detail.focusLap": "Сфокусировать график на этом круге",
+  "run.ef.weekOf": "нед. {date}",
+  "run.ef.noQualifying": "Нет подходящих пробежек",
 };
 
 export default run;

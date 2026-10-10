@@ -842,6 +842,21 @@ const chat = {
   "chat.change.reason.replaced": "The session on {day} is now \"{now}\", not \"{name}\".",
   "chat.change.reason.alreadyThere": "\"{name}\" is already on the calendar on {day}.",
   "chat.change.reason.notInLibrary": "\"{name}\" is no longer in the workout library.",
+  "chat.cost.cacheWrite": "Cache write {count}",
+  "chat.cost.cacheRead": "Cache read {count} (counted as {counted})",
+  "chat.row.analyzing": "Analyzing",
+  "chat.set.cacheReadsTitle": "{count} tokens were read from the provider's cache, which costs a tenth of new input, so they count as a tenth.",
+  "chat.set.cacheReads": "cache reads count as 10%",
+  "chat.perm.title": "Permissions",
+  "chat.perm.label": "What Coach may read",
+  "chat.perm.web": "Web",
+  "chat.perm.webTitle": "Web: search the internet for races, events and anything else your data does not hold",
+  "chat.perm.web.local": "A local model cannot search the web, so Coach answers here without it.",
+  "chat.perm.web.claudeApi": "Coach searches when a question needs it, never in an analysis; each search is billed to your Anthropic account.",
+  "chat.perm.web.openrouter": "Coach searches when a question needs it, never in an analysis; each search is billed to your OpenRouter credit.",
+  "chat.perm.web.claudeCode": "Coach searches through your Claude subscription when a question needs it, never in an analysis.",
+  "chat.perm.web.chatgpt": "Coach searches through your ChatGPT subscription when a question needs it, never in an analysis.",
+  "chat.models.claudeUpdate": "<b>Claude Code {latest} is available.</b> This computer has {installed}. Run <code>claude update</code> in a terminal to get the newest models and fixes.",
 };
 
 export default chat;

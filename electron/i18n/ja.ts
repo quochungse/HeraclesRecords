@@ -181,7 +181,7 @@ const main: ScreenMessages = {
   "screen.outline.raceStage": "第 {n} 週はレース週です。レース期にしてください。",
   "screen.outline.sessionsExact": "第 {n} 週は {sessions} セッションですが、いつもの週はちょうど {min} 回です。",
   "screen.outline.sessionsBand": "第 {n} 週は {sessions} セッションですが、いつもの週は {min}〜{max} 回です。",
-  "screen.outline.keySessions": "第 {n} 週はセッション数より多くの主要セッションを挙げています。",
+  "screen.outline.keySessions": "第 {n} 週に並んでいるセッションが、その週のセッション数より多くなっています。",
   "screen.outline.hours": "第 {n} 週は {hours} 時間の予定ですが、使えるのは週 {max} 時間までです。",
   "screen.outline.sport": "第 {n} 週の「{name}」は{sport}で、依頼にないスポーツです。",
   "screen.outline.restDay": "第 {n} 週の「{name}」は{day}で、休みの日です。",
@@ -215,7 +215,8 @@ const main: ScreenMessages = {
   "screen.effort.xhigh": "最高",
   "screen.effort.max": "最大",
   "screen.effort.maxDetail": "最も丁寧",
-  "screen.model.auto": "自動"
+  "screen.model.auto": "自動",
+  "main.sync.outdated": "この保管庫は新しいデータ形式です。先にアプリを更新してください。",
 };
 
 export default main;

@@ -51,7 +51,7 @@ const run: RunMessages = {
   "run.ef.easy": "Courses faciles de plus de 20 minutes",
   "run.ef.all": "Toutes les courses de plus de 20 minutes",
   "run.ef.noEasy": " · aucune séance facile à comparer",
-  "run.ef.since": "depuis le {date}",
+  "run.ef.since": "depuis la {date}",
   "run.ef.none": "Aucune course de plus de 20 minutes avec fréquence cardiaque sur cette période, il n’y a donc rien à comparer pour l’instant.",
   "run.share": "Part",
   "run.vamTitle": "Mètres gravis par heure",
@@ -83,6 +83,8 @@ const run: RunMessages = {
   "run.detail.effect": "Effet et conditions",
   "run.detail.lap": "Tour",
   "run.detail.focusLap": "Centrer le graphique sur ce tour",
+  "run.ef.weekOf": "semaine du {date}",
+  "run.ef.noQualifying": "Aucune sortie retenue",
 };
 
 export default run;

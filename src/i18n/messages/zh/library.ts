@@ -535,6 +535,10 @@ const library: LibraryMessages = {
   "library.move.day": "星期",
   "library.move.copy": "复制到那里",
   "library.move.move": "移动",
+  "library.trail.web_search": "正在搜索网页",
+  "library.trail.web_search.done": "已搜索网页",
+  "library.trail.web_fetch": "正在阅读网页",
+  "library.trail.web_fetch.done": "已阅读网页",
 };
 
 export default library;

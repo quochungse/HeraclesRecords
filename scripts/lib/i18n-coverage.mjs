@@ -25,6 +25,7 @@ export const SKIPPED_PATHS = [
   /[\\/]src[\\/]records[\\/]sampleRecords\.ts$/,
   /[\\/]src[\\/]components[\\/]SampleDataControls\.tsx$/,
   /[\\/]src[\\/]strength[\\/]sampleSessions\.ts$/,
+  /[\\/]src[\\/]training[\\/]body[\\/]sampleFigure\.ts$/,
   // Coach's "Show context history", offered in development builds only.
   /[\\/]src[\\/]chat[\\/]ContextHistoryDialog\.tsx$/,
   // The labours in English: the website imports this file as it is, so the

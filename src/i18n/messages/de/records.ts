@@ -300,6 +300,8 @@ const records: RecordsMessages = {
   "records.plan.weeksUnit_other": "Wochen",
   "records.plan.length": "Dauer",
   "records.plan.context": "Dein {ordinal} beendeter Plan.",
+  "records.monthCount_one": "{count} Meilenstein",
+  "records.monthCount_other": "{count} Meilensteine",
 };
 
 export default records;

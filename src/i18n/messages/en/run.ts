@@ -84,6 +84,8 @@ const run = {
   "run.detail.effect": "Effect and conditions",
   "run.detail.lap": "Lap",
   "run.detail.focusLap": "Focus the chart on this lap",
+  "run.ef.weekOf": "week of {date}",
+  "run.ef.noQualifying": "No qualifying run",
 };
 
 export default run;

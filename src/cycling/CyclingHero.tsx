@@ -159,7 +159,7 @@ export function CyclingHero({
           <span className="run-hero-label">VO₂max</span>
           <strong className="run-hero-value">{vo2.latest}</strong>
           <div className="run-hero-foot">
-            <span>Held {formatPlateauDuration(vo2.daysAtCurrent)}</span>
+            <span>{t("activity.hero.held", { duration: formatPlateauDuration(vo2.daysAtCurrent) })}</span>
           </div>
         </div>
       ) : null}

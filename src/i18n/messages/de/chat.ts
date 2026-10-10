@@ -838,6 +838,21 @@ const chat: ChatMessages = {
   "chat.change.reason.replaced": "Die Einheit am {day} ist jetzt „{now}“, nicht „{name}“.",
   "chat.change.reason.alreadyThere": "„{name}“ steht am {day} schon im Kalender.",
   "chat.change.reason.notInLibrary": "„{name}“ ist nicht mehr in der Workout-Bibliothek.",
+  "chat.cost.cacheWrite": "Cache-Schreiben {count}",
+  "chat.cost.cacheRead": "Cache-Lesen {count} (gezählt als {counted})",
+  "chat.row.analyzing": "Analysiert",
+  "chat.set.cacheReadsTitle": "{count} Tokens wurden aus dem Cache des Anbieters gelesen. Das kostet ein Zehntel neuer Eingabe, deshalb zählen sie als ein Zehntel.",
+  "chat.set.cacheReads": "Cache-Lesen zählt zu 10 %",
+  "chat.perm.title": "Berechtigungen",
+  "chat.perm.label": "Was Coach lesen darf",
+  "chat.perm.web": "Web",
+  "chat.perm.webTitle": "Web: im Internet nach Rennen, Events und allem suchen, was deine Daten nicht enthalten",
+  "chat.perm.web.local": "Ein lokales Modell kann nicht im Web suchen, deshalb antwortet Coach hier ohne.",
+  "chat.perm.web.claudeApi": "Coach sucht, wenn eine Frage es braucht, nie in einer Analyse; jede Suche wird über dein Anthropic-Konto abgerechnet.",
+  "chat.perm.web.openrouter": "Coach sucht, wenn eine Frage es braucht, nie in einer Analyse; jede Suche geht von deinem OpenRouter-Guthaben ab.",
+  "chat.perm.web.claudeCode": "Coach sucht über dein Claude-Abo, wenn eine Frage es braucht, nie in einer Analyse.",
+  "chat.perm.web.chatgpt": "Coach sucht über dein ChatGPT-Abo, wenn eine Frage es braucht, nie in einer Analyse.",
+  "chat.models.claudeUpdate": "<b>Claude Code {latest} ist verfügbar.</b> Auf diesem Computer läuft {installed}. Führe <code>claude update</code> in einem Terminal aus, um die neuesten Modelle und Fehlerbehebungen zu bekommen.",
 };
 
 export default chat;

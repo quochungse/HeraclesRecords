@@ -399,7 +399,7 @@ function MonthBlock({
         <div className="records-month-head">
           <h3 className="records-month">{month.label}</h3>
           <span>
-            {month.milestones.length} {month.milestones.length === 1 ? "milestone" : "milestones"}
+            {plural("records.monthCount", month.milestones.length)}
           </span>
         </div>
       </div>

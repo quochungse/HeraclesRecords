@@ -535,6 +535,10 @@ const library: LibraryMessages = {
   "library.move.day": "曜日",
   "library.move.copy": "そこにコピー",
   "library.move.move": "移動",
+  "library.trail.web_search": "ウェブを検索中",
+  "library.trail.web_search.done": "ウェブを検索しました",
+  "library.trail.web_fetch": "ウェブページを読み込み中",
+  "library.trail.web_fetch.done": "ウェブページを読み込みました",
 };
 
 export default library;

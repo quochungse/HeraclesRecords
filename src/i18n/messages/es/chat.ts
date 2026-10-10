@@ -838,6 +838,21 @@ const chat: ChatMessages = {
   "chat.change.reason.replaced": "La sesión del {day} ahora es «{now}», no «{name}».",
   "chat.change.reason.alreadyThere": "«{name}» ya está en el calendario el {day}.",
   "chat.change.reason.notInLibrary": "«{name}» ya no está en la biblioteca de entrenamientos.",
+  "chat.cost.cacheWrite": "Escritura en caché {count}",
+  "chat.cost.cacheRead": "Lectura de caché {count} (cuenta como {counted})",
+  "chat.row.analyzing": "Analizando",
+  "chat.set.cacheReadsTitle": "{count} tokens se leyeron de la caché del proveedor, que cuesta una décima parte de la entrada nueva, así que cuentan como una décima parte.",
+  "chat.set.cacheReads": "las lecturas de caché cuentan al 10 %",
+  "chat.perm.title": "Permisos",
+  "chat.perm.label": "Lo que puede leer el entrenador",
+  "chat.perm.web": "Web",
+  "chat.perm.webTitle": "Web: buscar en internet carreras, eventos y todo lo que tus datos no tienen",
+  "chat.perm.web.local": "Un modelo local no puede buscar en la web, así que aquí el entrenador responde sin ella.",
+  "chat.perm.web.claudeApi": "El entrenador busca cuando una pregunta lo necesita, nunca en un análisis; cada búsqueda se cobra en tu cuenta de Anthropic.",
+  "chat.perm.web.openrouter": "El entrenador busca cuando una pregunta lo necesita, nunca en un análisis; cada búsqueda se descuenta de tu crédito de OpenRouter.",
+  "chat.perm.web.claudeCode": "El entrenador busca con tu suscripción de Claude cuando una pregunta lo necesita, nunca en un análisis.",
+  "chat.perm.web.chatgpt": "El entrenador busca con tu suscripción de ChatGPT cuando una pregunta lo necesita, nunca en un análisis.",
+  "chat.models.claudeUpdate": "<b>Claude Code {latest} está disponible.</b> Este ordenador tiene la {installed}. Ejecuta <code>claude update</code> en una terminal para tener los modelos y las correcciones más recientes.",
 };
 
 export default chat;

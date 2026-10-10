@@ -300,6 +300,8 @@ const records: RecordsMessages = {
   "records.plan.weeksUnit_other": "周",
   "records.plan.length": "时长",
   "records.plan.context": "你完成的{ordinal}计划。",
+  "records.monthCount_one": "{count} 个里程碑",
+  "records.monthCount_other": "{count} 个里程碑",
 };
 
 export default records;

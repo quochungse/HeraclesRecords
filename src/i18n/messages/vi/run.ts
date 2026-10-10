@@ -83,6 +83,8 @@ const run: RunMessages = {
   "run.detail.effect": "Hiệu quả và điều kiện",
   "run.detail.lap": "Vòng",
   "run.detail.focusLap": "Tập trung biểu đồ vào vòng này",
+  "run.ef.weekOf": "tuần {date}",
+  "run.ef.noQualifying": "Không có buổi chạy phù hợp",
 };
 
 export default run;

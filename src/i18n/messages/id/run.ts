@@ -83,6 +83,8 @@ const run: RunMessages = {
   "run.detail.effect": "Efek dan kondisi",
   "run.detail.lap": "Putaran",
   "run.detail.focusLap": "Fokuskan grafik ke putaran ini",
+  "run.ef.weekOf": "minggu {date}",
+  "run.ef.noQualifying": "Tidak ada lari yang memenuhi syarat",
 };
 
 export default run;

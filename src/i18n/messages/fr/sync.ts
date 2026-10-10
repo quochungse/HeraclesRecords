@@ -65,6 +65,10 @@ const sync: SyncMessages = {
   "backup.merge.title": "Fusionner",
   "backup.merge.detail": "Garde tout ce qui se trouve sur cet ordinateur et ajoute ce qui manque. {count} nouveaux éléments sont écrits ; ce qui est déjà là garde sa version, et rien n’est supprimé.",
   "backup.refused": "{count} entrées de ce fichier ne sont pas restaurées : les identifiants restent toujours sur l’appareil qui les a créés.",
+  "sync.outdated.title": "Mettez l’app à jour pour continuer la synchronisation",
+  "sync.outdated.detail": "Un autre ordinateur a passé vos données synchronisées à un format plus récent que celui que cette version sait lire. Rien n’est envoyé ni reçu tant que cet ordinateur n’est pas mis à jour. Les modifications faites ici sont conservées et partiront après la mise à jour.",
+  "sync.behind.title": "Une version plus récente est utilisée sur un autre ordinateur",
+  "sync.behind.detail": "La synchronisation continue normalement. Mettre à jour garde tous les ordinateurs sur la même version.",
 };
 
 export default sync;

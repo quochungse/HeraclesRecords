@@ -838,6 +838,21 @@ const chat: ChatMessages = {
   "chat.change.reason.replaced": "{day}的训练现在是“{now}”，不是“{name}”。",
   "chat.change.reason.alreadyThere": "“{name}”已经在{day}的日历上。",
   "chat.change.reason.notInLibrary": "“{name}”已不在训练库中。",
+  "chat.cost.cacheWrite": "缓存写入 {count}",
+  "chat.cost.cacheRead": "缓存读取 {count}（按 {counted} 计）",
+  "chat.row.analyzing": "分析中",
+  "chat.set.cacheReadsTitle": "{count} 个 Token 读取自服务商的缓存，费用只有新输入的十分之一，所以按十分之一计算。",
+  "chat.set.cacheReads": "缓存读取按 10% 计",
+  "chat.perm.title": "权限",
+  "chat.perm.label": "教练可以读取的内容",
+  "chat.perm.web": "网页",
+  "chat.perm.webTitle": "网页：在互联网上搜索比赛、活动以及你的数据里没有的信息",
+  "chat.perm.web.local": "本地模型无法搜索网页，所以这里教练不借助网页回答。",
+  "chat.perm.web.claudeApi": "教练只在问题需要时搜索，分析中从不搜索；每次搜索都会计入你的 Anthropic 账户费用。",
+  "chat.perm.web.openrouter": "教练只在问题需要时搜索，分析中从不搜索；每次搜索都会扣除你的 OpenRouter 额度。",
+  "chat.perm.web.claudeCode": "教练在问题需要时通过你的 Claude 订阅搜索，分析中从不搜索。",
+  "chat.perm.web.chatgpt": "教练在问题需要时通过你的 ChatGPT 订阅搜索，分析中从不搜索。",
+  "chat.models.claudeUpdate": "<b>Claude Code {latest} 已发布。</b>这台电脑是 {installed}。在终端运行 <code>claude update</code> 即可获得最新模型和修复。",
 };
 
 export default chat;

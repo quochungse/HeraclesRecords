@@ -51,7 +51,7 @@ const run: RunMessages = {
   "run.ef.easy": "Lockere Läufe über 20 Minuten",
   "run.ef.all": "Alle Läufe über 20 Minuten",
   "run.ef.noEasy": " · keine lockeren Einheiten zum Vergleich",
-  "run.ef.since": "seit {date}",
+  "run.ef.since": "seit der {date}",
   "run.ef.none": "Keine Läufe über 20 Minuten mit Herzfrequenz in diesem Zeitraum, es gibt also noch nichts zu vergleichen.",
   "run.share": "Anteil",
   "run.vamTitle": "Höhenmeter pro Stunde",
@@ -83,6 +83,8 @@ const run: RunMessages = {
   "run.detail.effect": "Wirkung und Bedingungen",
   "run.detail.lap": "Runde",
   "run.detail.focusLap": "Diagramm auf diese Runde fokussieren",
+  "run.ef.weekOf": "Woche vom {date}",
+  "run.ef.noQualifying": "Kein passender Lauf",
 };
 
 export default run;
