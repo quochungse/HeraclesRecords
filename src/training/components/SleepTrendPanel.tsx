@@ -21,8 +21,8 @@ import {
   type McpConnectionState
 } from "../../mcp/mcpNotice";
 import type { TrainingHubSleepRecord } from "../../../electron/types";
-
 import { t } from "../../i18n/core";
+
 const SLEEP_WINDOW_PREFERENCE = defineSelectionPreference<TrainingTrendWindow>({
   key: "training.sleepTrendWindow",
   defaultValue: TRAINING_SHORT_TREND_DAYS,

@@ -23,8 +23,8 @@ import {
   type ScheduledStepView,
   type ScheduledStructureView
 } from "./scheduledStructure";
-
 import { formatDecimal, messageRecord, plural, t } from "../i18n/core";
+
 /*
  * How a workout's steps are drawn, wherever they are read.
  *

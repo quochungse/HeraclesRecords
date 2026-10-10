@@ -1,7 +1,7 @@
 import { Info } from "lucide-react";
 import { useCallback, useState } from "react";
-
 import { t } from "../i18n/core";
+
 /**
  * Whether the tile credit is spelled out, and the (i)'s toggle. It starts
  * folded into the (i), as other map apps show it: OpenStreetMap, OpenMapTiles

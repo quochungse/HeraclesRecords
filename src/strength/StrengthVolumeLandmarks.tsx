@@ -7,8 +7,8 @@ import {
   buildWeeklyVolumeLandmarks,
   type LandmarkStatus
 } from "./strengthLandmarks";
-
 import { formatDecimal, plural, t } from "../i18n/core";
+
 const STATUS_WORD: Readonly<Record<LandmarkStatus, string>> = {
   get below() {
     return t("strength.landmarks.under");

@@ -64,8 +64,8 @@ import {
   selectionIsOneOf,
   useSelectionPreference
 } from "../../preferences/selectionPreferences";
-
 import { plural, t, weekdayNames } from "../../i18n/core";
+
 const HEATMAP_METRIC_PREFERENCE = defineSelectionPreference<HeatmapMetric>({
   key: "training.heatmapMetric",
   defaultValue: "trainingLoad",

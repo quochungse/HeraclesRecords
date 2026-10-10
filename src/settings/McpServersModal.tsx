@@ -2,8 +2,8 @@ import { useEffect } from "react";
 import { Server, X } from "lucide-react";
 import type { HeraclesRecordsApi } from "../heraclesrecords-api";
 import { McpServersPanel } from "../chat/McpServersPanel";
-
 import { t } from "../i18n/core";
+
 export interface McpServersModalProps {
   api: HeraclesRecordsApi | undefined;
   open: boolean;

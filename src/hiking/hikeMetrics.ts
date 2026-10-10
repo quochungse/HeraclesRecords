@@ -11,8 +11,8 @@ import {
   isHikeSportType,
   type HikeType
 } from "./hikeType";
-
 import { getIntlLocale } from "../i18n/core";
+
 // "The last N weeks" is one definition across the sport screens — calendar
 // weeks from a Monday, this one included — owned by the run module; see
 // rideMetrics.ts, which reads it from there for the same reason. So is the

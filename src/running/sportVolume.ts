@@ -6,8 +6,8 @@ import {
   metersToElevation
 } from "../units/units";
 import { runWindowStartMs } from "./runMetrics";
-
 import { formatDecimal } from "../i18n/core";
+
 /**
  * What the sport screens' weekly volume charts share — Running's, Cycling's
  * and Hiking's: the three measures a week can be read in, the trailing

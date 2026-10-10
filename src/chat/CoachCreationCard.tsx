@@ -23,9 +23,9 @@ import { CreationActions } from "./CreationActions";
 import { datedForReading } from "./planDating";
 import type { CreationCalendar } from "./creationCalendar";
 import { creationStatus } from "./creationChoices";
-
 import { workoutSportLabel } from "../training/workoutSport";
 import { t } from "../i18n/core";
+
 export interface CreationFigures {
   weeks: number;
   /** "4–5", or "4" when every week holds the same. */

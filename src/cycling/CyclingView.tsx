@@ -43,8 +43,8 @@ import { rideTypesPresent, summariseRides, totalsSpeedKmh } from "./rideMetrics"
 import { RIDE_TYPE_LABELS, ridesOfType, type RideType } from "./rideType";
 import "../running/running.css";
 import "./cycling.css";
-
 import { t } from "../i18n/core";
+
 export interface CyclingViewProps {
   api: HeraclesRecordsApi | null;
   activities: TrainingHubActivity[];

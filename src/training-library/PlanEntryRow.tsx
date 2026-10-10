@@ -17,8 +17,8 @@ import {
   type PlanEntryFacts
 } from "./planReaderModel";
 import { sportChipStyle, sportTheme } from "./sportTheme";
-
 import { plural, t } from "../i18n/core";
+
 interface PlanEntryRowProps {
   entry: PlanEntryFacts;
   unitSystem: UnitSystem;

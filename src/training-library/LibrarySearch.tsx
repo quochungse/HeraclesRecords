@@ -1,7 +1,7 @@
 import { Search, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-
 import { t } from "../i18n/core";
+
 /**
  * Search, folded down to its magnifier until it is reached for.
  *

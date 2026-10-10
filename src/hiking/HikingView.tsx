@@ -47,8 +47,8 @@ import {
 import { HIKE_TYPE_LABELS, hikesOfType, type HikeType } from "./hikeType";
 import "../running/running.css";
 import "./hiking.css";
-
 import { t } from "../i18n/core";
+
 export interface HikingViewProps {
   api: HeraclesRecordsApi | null;
   activities: TrainingHubActivity[];

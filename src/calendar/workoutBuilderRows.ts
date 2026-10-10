@@ -69,10 +69,10 @@ import {
   validateWorkoutIntensity,
   workoutSportType
 } from "../../electron/workoutCapabilities";
-
 import { formatCount, formatDecimal, messageRecord, plural, t } from "../i18n/core";
 import { zoneName } from "../i18n/zoneNames";
 import { intensityTypeLabel, swimStrokeLabel } from "../i18n/workoutWords";
+
 /**
  * A pace as it is typed: minutes, a colon, two seconds.
  *

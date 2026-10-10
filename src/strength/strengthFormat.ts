@@ -1,7 +1,7 @@
 import type { StrengthSession, UnitSystem } from "../../electron/types";
 import { kilogramsToDisplayWeight, weightUnit } from "../units/units";
-
 import { formatCount, formatDecimal, getIntlLocale, t } from "../i18n/core";
+
 export function formatSessionDate(startTime?: number): string {
   if (!startTime) {
     return t("strength.unknownDate");

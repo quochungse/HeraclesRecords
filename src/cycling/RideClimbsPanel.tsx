@@ -4,8 +4,8 @@ import { formatDistanceMeters, formatDurationSeconds, formatElevationMeters } fr
 import { useUnitSystem } from "../units/UnitSystemProvider";
 import { formatVerticalRate } from "../units/units";
 import { rideClimbs, type ClimbCategory } from "./rideAnalysis";
-
 import { t } from "../i18n/core";
+
 interface RideClimbsPanelProps {
   /** The ride's samples on activity time. */
   series: readonly TrainingHubActivitySeriesPoint[];

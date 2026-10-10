@@ -9,8 +9,8 @@ import { distanceUnit, elevationUnit, formatVerticalRate } from "../units/units"
 import { climbPerDistanceUnit, runSurfaceBreakdown } from "./runMetrics";
 import { RUN_SURFACE_LABELS } from "./runSurface";
 import { runSurfaceColors } from "./runSurfaceColors";
-
 import { t } from "../i18n/core";
+
 interface RunSurfacePanelProps {
   /** Deliberately unfiltered by surface: this panel *is* the surface split. */
   runs: readonly TrainingHubActivity[];

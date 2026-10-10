@@ -1,8 +1,8 @@
 import { Layers, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { BASE_LAYERS, BASE_LAYER_ORDER, type BaseLayerId } from "./constants";
-
 import { t } from "../i18n/core";
+
 /**
  * A choice a map adds to its layer menu below the base maps — how a route is
  * coloured, say. The menu is where everything about how the map is drawn

@@ -20,8 +20,8 @@ import { useUnitSystem } from "../units/UnitSystemProvider";
 import { kilogramsToDisplayWeight } from "../units/units";
 import { nextWeekStartMs, startOfWeekMs, type WeekBucket } from "./strengthAnalytics";
 import { formatTotalWeight } from "./strengthFormat";
-
 import { getIntlLocale, plural, t } from "../i18n/core";
+
 const MS_PER_DAY = 86_400_000;
 
 /** Plot box of the weekly chart, in the same pixels the gradient is drawn in. */

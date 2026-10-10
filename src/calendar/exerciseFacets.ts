@@ -26,8 +26,8 @@ import {
   type ExerciseSearchEquipment
 } from "../../electron/exerciseCatalogSearch";
 import { MUSCLE_BY_ID, resolveExerciseTargets, type MuscleId } from "../strength/muscles";
-
 import { messageRecord } from "../i18n/core";
+
 export type ExerciseFacetKind = "all" | "bodyPart" | "muscle" | "equipment";
 
 const FACET_KIND_LABELS = messageRecord<ExerciseFacetKind>({

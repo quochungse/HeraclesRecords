@@ -8,6 +8,7 @@ import { AnalysisDetailView } from "./AnalysisDetail";
 import { AnalysesTitleProvider } from "./analysesTitle";
 import { ConfirmDialog } from "../../training-library/ConfirmDialog";
 import { t } from "../../i18n/core";
+
 // The confirmation's chrome is the library's `tl-dialog`, as Coach settings'
 // is.
 import "../../training-library/trainingLibrary.css";

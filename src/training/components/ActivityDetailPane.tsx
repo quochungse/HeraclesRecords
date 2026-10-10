@@ -48,8 +48,8 @@ import { ActivitySeriesChart } from "./ActivitySeriesChart";
 import { ActivityZoneBar } from "./ActivityZoneBar";
 import { StrengthDetailPanel } from "./StrengthDetailPanel";
 import { activityCoachRequest } from "../askCoachAbout";
-
 import { formatCount, formatDecimal, t } from "../../i18n/core";
+
 interface ActivityDetailPaneProps {
   detail: TrainingHubActivityDetail | null;
   listActivity: TrainingHubActivity | null;

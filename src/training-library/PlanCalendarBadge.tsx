@@ -1,7 +1,7 @@
 import { CalendarCheck } from "lucide-react";
 import type { TrainingPlanDocument } from "../../electron/types";
-
 import { plural, t } from "../i18n/core";
+
 function todayKey(now = new Date()): string {
   return `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, "0")}${String(now.getDate()).padStart(2, "0")}`;
 }

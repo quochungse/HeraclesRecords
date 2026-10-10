@@ -36,8 +36,8 @@ import {
   formatStepDistanceLabel
 } from "./scheduledStructure";
 import { WorkoutStructure } from "./WorkoutStructureView";
-
 import { plural, t } from "../i18n/core";
+
 interface ScheduledWorkoutDetailProps {
   entry: TrainingHubScheduledWorkoutEntry;
   sportTypes: TrainingHubSportType[];

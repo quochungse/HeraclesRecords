@@ -13,8 +13,8 @@ import {
 } from "../preferences/periodScale";
 import { activityStartTimeMs, startOfWeekMs, weekWindowStartMs } from "./activityWindow";
 import { type SportColorCategory, sportColorCategory } from "./sportColors";
-
 import { getIntlLocale, t } from "../i18n/core";
+
 export type ActivityPeriodOption = PeriodOption;
 
 /**

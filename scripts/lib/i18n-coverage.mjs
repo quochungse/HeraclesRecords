@@ -150,7 +150,10 @@ export function scanSource(source, file = "x.tsx") {
     if (!text || NAMES.has(text) || UNITS.test(text)) continue;
     if (/^[:,.|&?(\-$]|\w\(|\b(if|while|for|switch)\s*\(|\b(class|extends|implements)\b|\w:\s*[A-Z]\w*$/.test(text)) continue;
     if (/\$$|^[\w-]+\)$|\bthis\./.test(text)) continue; // a template's head, a call's tail, code
-    if (/[;=[\]`]|=>|&&|\|\||\?\s|^\)|\($|\b(const|let|return|function|else|catch|finally|import|export|interface|await|async)\b/.test(text)) continue;
+    if (/[;=[\]`]|=>|&&|\|\||\?\s|^\)|\($/.test(text)) continue;
+    // A keyword opens code (`return (`, `else {`); inside a sentence it is a
+    // word ("Preparing the FIT export…"), which this used to pass over.
+    if (/^(const|let|return|function|else|catch|finally|import|export|interface|await|async)\b/.test(text)) continue;
     // A list of identifiers or one camelCase name; a single plain word ("Route",
     // "or") is text.
     if (/[,.$]/.test(text) && /^[\w.$]+(\s*,\s*[\w.$]+)*,?$/.test(text)) continue;

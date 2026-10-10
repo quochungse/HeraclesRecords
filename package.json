@@ -104,6 +104,7 @@
     "test:ipc-surface": "node scripts/test-ipc-surface.mjs",
     "test:sync-policy": "node scripts/test-sync-policy.mjs",
     "test:i18n": "cross-env ELECTRON_RUN_AS_NODE=1 electron --experimental-strip-types scripts/test-i18n.mjs",
+    "test:stored-text": "cross-env ELECTRON_RUN_AS_NODE=1 electron --experimental-strip-types --import ./scripts/register-ts-ext.mjs scripts/test-stored-text.mjs",
     "i18n:index": "node scripts/i18n-index.mjs",
     "i18n:coverage": "node scripts/lib/i18n-coverage.mjs",
     "check:i18n-release": "cross-env ELECTRON_RUN_AS_NODE=1 electron --experimental-strip-types scripts/check-i18n-release.mjs",

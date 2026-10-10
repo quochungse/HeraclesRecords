@@ -290,7 +290,7 @@ export function setMcpBearer(id: string, token: string): void {
   }
   const storage = safeStorage();
   if (!storage.isEncryptionAvailable()) {
-    throw new ScreenError("main.mcp.secureStorage");
+    throw new ScreenError("main.secureStorage");
   }
   setSetting(
     mcpSecretKey(id, "bearer"),

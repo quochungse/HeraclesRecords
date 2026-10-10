@@ -4,8 +4,8 @@ import type { TrainingPlanCalendarPreview, TrainingPlanDocument } from "../../el
 import type { HeraclesRecordsApi } from "../heraclesrecords-api";
 import { dateFromKey, keyFromDate } from "../calendar/dateUtils";
 import { MonthDayPicker } from "./MonthDayPicker";
-
 import { formatCount, getIntlLocale, plural, t } from "../i18n/core";
+
 interface TrainingPlanCalendarDialogProps {
   api: HeraclesRecordsApi;
   plan: TrainingPlanDocument;

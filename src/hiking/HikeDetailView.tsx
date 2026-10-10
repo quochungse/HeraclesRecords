@@ -42,8 +42,8 @@ import {
 import { hikeSeconds } from "./hikeMetrics";
 import { HIKE_TYPE_LABELS, classifyHikeType } from "./hikeType";
 import { ClimbsPanel, TerrainPanel } from "./TerrainPanels";
-
 import { formatDecimal, getIntlLocale, t } from "../i18n/core";
+
 interface HikeDetailViewProps {
   activity: TrainingHubActivity;
   /** Null until the fetch for *this* hike lands. */

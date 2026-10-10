@@ -47,8 +47,8 @@ import {
   type HeatMetric,
   type MuscleStat
 } from "./strengthAnalytics";
-
 import { t } from "../i18n/core";
+
 export type BodyView = "front" | "back";
 
 interface BodyMapV2Props {

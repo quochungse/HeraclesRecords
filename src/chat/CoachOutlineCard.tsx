@@ -12,9 +12,9 @@ import {
   outlineStageSlug,
   outlineWeekMonday
 } from "./planOutlineModel";
-
 import { workoutSportLabel } from "../training/workoutSport";
 import { t, weekdayNames } from "../i18n/core";
+
 /** The tallest bar, in pixels. */
 const BAR_MAX = 64;
 

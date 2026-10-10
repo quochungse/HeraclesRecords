@@ -1,4 +1,5 @@
 import { t } from "../i18n/core";
+
 /**
  * Muscle taxonomy for the Strength view.
  *

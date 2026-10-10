@@ -4,8 +4,8 @@ import type { HevyStatus } from "../../electron/types";
 import { formatSyncTime } from "./strengthFormat";
 import { toErrorMessage } from "./useStrengthData";
 import "./strength.css";
-
 import { t } from "../i18n/core";
+
 interface StrengthHevyDialogProps {
   status: HevyStatus | null;
   connected: boolean;

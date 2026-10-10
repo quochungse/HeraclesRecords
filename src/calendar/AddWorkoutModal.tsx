@@ -56,11 +56,11 @@ import {
   rowToSteps,
   type BuilderRow
 } from "./workoutBuilderRows";
-
 import { workoutSportLabel } from "../training/workoutSport";
 import { formatDecimal, messageRecord, t } from "../i18n/core";
 import { swimStrokeLabel } from "../i18n/workoutWords";
 import { knownSportName } from "../training/sportTypes";
+
 type AddTab = "quick" | "library" | "builder" | "activity";
 
 type UploadSport = ManualActivityInput["sport"];

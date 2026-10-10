@@ -1,6 +1,6 @@
 import { getLocalHappenDayKey } from "../training/formatters";
-
 import { capitalizeFirst, getIntlLocale, weekdayNames } from "../i18n/core";
+
 export function dateFromKey(key: string): Date {
   return new Date(
     Number(key.slice(0, 4)),

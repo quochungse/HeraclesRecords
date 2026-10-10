@@ -50,9 +50,9 @@ import {
 import "./strength.css";
 import "./exerciseExplorer.css";
 import { useUnitSystem } from "../units/UnitSystemProvider";
-
 import { formatCount, plural, t } from "../i18n/core";
 import { exerciseLabel } from "./strengthAnalytics";
+
 interface StrengthViewProps {
   api: HeraclesRecordsApi;
   status: TrainingHubStatus | null;

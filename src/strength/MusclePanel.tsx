@@ -15,8 +15,8 @@ import {
   type MuscleWeekPoint
 } from "./strengthAnalytics";
 import { formatDurationSeconds } from "../training/formatters";
-
 import { formatDecimal, plural, t } from "../i18n/core";
+
 interface MusclePanelProps {
   muscles: MuscleStat[];
   muscleById: Record<MuscleId, MuscleStat>;

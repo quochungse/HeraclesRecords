@@ -14,8 +14,8 @@
  * and offered a Create button.
  */
 import type { TrainingPlanDocument, TrainingPlanDraftRecord } from "../../electron/types";
-
 import { getIntlLocale, t } from "../i18n/core.ts";
+
 /**
  * Where a plan came from, when that is worth saying. Every plan is a COROS
  * plan now, so the one provenance left to name is the coach's.

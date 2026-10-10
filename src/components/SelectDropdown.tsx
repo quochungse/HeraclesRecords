@@ -11,8 +11,8 @@ import {
   useState
 } from "react";
 import { createPortal } from "react-dom";
-
 import { t } from "../i18n/core";
+
 export type SelectOption<T extends string> = {
   value: T;
   label: string;

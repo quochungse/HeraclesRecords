@@ -12,8 +12,8 @@ import { useUnitSystem } from "../units/UnitSystemProvider";
 import { elevationUnit, metersToElevation } from "../units/units";
 import { hikeAscentRate, hikeSeconds } from "./hikeMetrics";
 import { HIKE_TYPE_LABELS, classifyHikeType, type HikeType } from "./hikeType";
-
 import { t } from "../i18n/core";
+
 interface HikeListProps {
   hikes: readonly TrainingHubActivity[];
   /** Kept by the parent: this unmounts while a hike is open, as Running's list does. */

@@ -55,6 +55,7 @@ const chat = {
   "chat.export.saved": "Saved the latest activity {format} file{name} to:",
   "chat.export.failed": "Latest activity FIT export failed.",
   "chat.export.failedAnswer": "I couldn't download the latest activity FIT file: {message}",
+  "chat.export.preparing": "Preparing the latest activity's FIT export…",
   "chat.err.briefNotSaved": "The brief was not saved.",
   "chat.err.outlineNotSaved": "The outline was not saved.",
   "chat.err.busyAsk": "Coach is still busy. Ask again when it has finished.",

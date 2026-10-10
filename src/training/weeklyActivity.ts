@@ -12,8 +12,8 @@ import {
 } from "./sportColors";
 import type { SportColorCategory } from "./sportColors";
 import { distanceUnit, metersToDisplayDistance } from "../units/units";
-
 import { formatDecimal, getIntlLocale, getLocale, t, weekdayNames } from "../i18n/core";
+
 export type WeeklyActivityMetric = "distance" | "duration" | "trainingLoad";
 
 /** Key and label of the block standing for a day's value no activity claims. */

@@ -90,10 +90,10 @@ import {
   type BuilderRow,
   type RowSeed
 } from "./workoutBuilderRows";
-
 import { workoutSportLabel } from "../training/workoutSport";
 import { messageRecord, plural, t } from "../i18n/core";
 import { intensityTypeLabel, swimStrokeLabel, zoneOptionText } from "../i18n/workoutWords";
+
 /** The builder's own per-sport glyph, so Quick and Structured agree. */
 export function BuilderSportIcon({
   sport,

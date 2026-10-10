@@ -12,8 +12,8 @@ import { useUnitSystem } from "../units/UnitSystemProvider";
 import { formatSpeedValue } from "../units/units";
 import { positive, rideSeconds, speedKmh } from "./rideMetrics";
 import { untitledRide, RIDE_TYPE_LABELS, classifyRideType, type RideType } from "./rideType";
-
 import { t } from "../i18n/core";
+
 interface RideListProps {
   rides: readonly TrainingHubActivity[];
   /**

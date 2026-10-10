@@ -110,7 +110,7 @@ function ZoneTooltip({ active, payload }: TooltipContentProps) {
 
 /** Memoised on `preview`, as `ActivityVisualCard` is and for the same reason. */
 export const HrZoneCard = memo(function HrZoneCard({ preview }: HrZoneCardProps) {
-  useI18n();
+  const { locale } = useI18n();
   const { unitSystem } = useUnitSystem();
   const rows = useMemo((): ZoneRow[] => {
     return preview.zones.map((zone, index) => ({
@@ -123,7 +123,7 @@ export const HrZoneCard = memo(function HrZoneCard({ preview }: HrZoneCardProps)
       hrRange: formatHeartRateZoneRange(preview.lthrZones, zone.index),
       color: HEART_RATE_ZONE_COLORS[index % HEART_RATE_ZONE_COLORS.length]
     }));
-  }, [preview, unitSystem]);
+  }, [locale, preview, unitSystem]);
 
   const chartData = rows.filter((row) => row.percent > 0);
   const topZone = useMemo(() => {

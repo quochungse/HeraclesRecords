@@ -22,8 +22,8 @@ import { formatSpeedValue } from "../../units/units";
 import { ActivityElevationChart } from "./ActivityElevationChart";
 import { ActivityRouteMap } from "./ActivityRouteMap";
 import { StrengthDetailPanel } from "./StrengthDetailPanel";
-
 import { t } from "../../i18n/core";
+
 interface ActivityDetailPanelProps {
   detail: TrainingHubActivityDetail | null;
   listActivity: TrainingHubActivity | null;

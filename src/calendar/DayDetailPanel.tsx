@@ -19,8 +19,8 @@ import { DayOverview } from "./DayOverview";
 import { PlanStatusBlock } from "./PlanStatusBlock";
 import { ScheduledWorkoutDetail } from "./ScheduledWorkoutDetail";
 import { scheduledWorkoutSport } from "../training/workoutSport";
-
 import { t } from "../i18n/core";
+
 interface DayDetailPanelProps {
   api: HeraclesRecordsApi;
   selection: CalendarSelection | null;

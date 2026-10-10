@@ -3,8 +3,8 @@ import { formatDurationSeconds, formatOptionalNumber } from "../formatters";
 import { resolveExerciseName } from "../exerciseNames";
 import { useUnitSystem } from "../../units/UnitSystemProvider";
 import { formatVolumeKg, formatWeightKg } from "../../strength/strengthAnalytics";
-
 import { formatCount, formatDecimal, t } from "../../i18n/core";
+
 function StatTile({ label, value }: { label: string; value: string }) {
   return (
     <div className="activity-detail-stat">

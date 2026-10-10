@@ -48,8 +48,8 @@ import {
   type ActivityChannelPoint,
   type ActivityMotion
 } from "../activityChannels";
-
 import { formatDecimal, t } from "../../i18n/core";
+
 /**
  * How many points reach recharts.
  *

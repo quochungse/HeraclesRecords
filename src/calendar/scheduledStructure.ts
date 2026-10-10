@@ -18,8 +18,8 @@ import {
 } from "../units/units";
 import { decodeCorosIntensity } from "../../electron/workoutCapabilities";
 import { workoutIntensityText } from "../i18n/workoutWords";
+import { formatCount, formatDecimal, messageRecord, plural, t } from "../i18n/core";
 
-import { formatDecimal, messageRecord, plural, t } from "../i18n/core";
 /**
  * View-model builder for the scheduled-workout detail panel. Prefers the raw
  * COROS program payload (step kinds, repeat groups, pace/HR intensity) and
@@ -472,6 +472,20 @@ function magnitudeFromLabel(
   return {};
 }
 
+/**
+ * The main process writes a parsed target in English ("12 reps", "180 load",
+ * `formatScheduledExerciseTarget`); the two it words itself are said again in
+ * the language on screen. A time ("0:45") and COROS's own intensity text are
+ * drawn as they came.
+ */
+function parsedTargetLabel(label?: string): string | undefined {
+  const reps = label ? /^(\d+) reps$/.exec(label) : null;
+  if (reps) return plural("workout.reps", Number(reps[1]));
+  const load = label ? /^(\d+) load$/.exec(label) : null;
+  if (load) return t("units.trainingLoadShort", { value: formatCount(Number(load[1])) });
+  return label;
+}
+
 function buildFromParsedExercises(
   exercises: TrainingHubScheduledExercise[],
   unitSystem: UnitSystem,
@@ -488,7 +502,7 @@ function buildFromParsedExercises(
       targetLabel:
         magnitude.magnitudeType === "distance" && magnitude.magnitude
           ? formatStepDistanceLabel(magnitude.magnitude, unitSystem, swim)
-          : exercise.targetLabel,
+          : parsedTargetLabel(exercise.targetLabel),
       ...magnitude,
       sets: exercise.sets,
       reps: exercise.reps,

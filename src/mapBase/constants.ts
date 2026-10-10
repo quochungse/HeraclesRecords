@@ -1,4 +1,5 @@
 import { t } from "../i18n/core";
+
 /** A selectable base map style. */
 export type BaseLayerId =
   | "street"

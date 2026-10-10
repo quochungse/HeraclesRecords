@@ -1,6 +1,6 @@
 import { useEffect, useId, useRef, useState } from "react";
-
 import { t } from "../i18n/core";
+
 export interface PromptDialogProps {
   title: string;
   /** Sits under the title; says what the value is for, not how to type it. */

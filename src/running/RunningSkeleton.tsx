@@ -1,4 +1,5 @@
 import { t } from "../i18n/core";
+
 /**
  * Placeholders for the two moments this screen is waiting on COROS.
  *

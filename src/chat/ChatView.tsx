@@ -182,9 +182,10 @@ import {
   groupChatToolsBySource,
   type ChatToolSource
 } from "../../electron/chatToolSources";
-import { getIntlLocale, plural, t } from "../i18n/core";
+import { getIntlLocale, plural, screenSentence, t } from "../i18n/core";
 import { useI18n } from "../i18n/useI18n";
 import { displaySessionTitle, NEW_PLAN_TITLE } from "./sessionTitle";
+import { displayStoredNotice, stoppedEarlyNotice } from "./storedNotice";
 
 /* "Edit plan first": the plan editor and the library's stylesheet, loaded
    only when a coach plan is opened in it. */
@@ -2837,7 +2838,7 @@ export function ChatView({
             }
             next.push({
               kind: "toolNotice",
-              message: t("chat.stoppedEarly", { message: payload.message })
+              message: stoppedEarlyNotice(payload.message)
             });
             markSettled(prev, next);
             persistTurn(next);
@@ -2848,7 +2849,7 @@ export function ChatView({
           // card goes back to waiting for an answer they can give again.
           restoreResumedCoachPrompt();
         }
-        onError(payload.message);
+        onError(screenSentence(payload.message));
         if (payload.authError) {
           setAuthStatus({ signedIn: false });
         }
@@ -4837,7 +4838,7 @@ export function ChatView({
                     <Sparkles size={16} aria-hidden="true" />
                   </div>
                   <div className="chat-bubble chat-bubble-tool-notice">
-                    {entry.message}
+                    {displayStoredNotice(entry.message)}
                   </div>
                 </ChatRow>
               );
@@ -5328,7 +5329,7 @@ export function ChatView({
                         <ThinkingDisclosure content={entry.reasoningSummary} />
                       ) : null}
                       <AnswerBody
-                        content={answerParts.get(index)?.text ?? entry.content}
+                        content={displayStoredNotice(answerParts.get(index)?.text ?? entry.content)}
                         placement={placedAnswers.get(index)}
                       />
                       {index === lastAnswerIndex && !turnHere ? (
@@ -5402,7 +5403,7 @@ export function ChatView({
               <div className="chat-avatar chat-avatar-assistant">
                 <FileDown size={16} aria-hidden="true" />
               </div>
-              <div className="chat-bubble">Preparing latest activity FIT export…</div>
+              <div className="chat-bubble">{t("chat.export.preparing")}</div>
             </div>
           ) : null}
         </div>

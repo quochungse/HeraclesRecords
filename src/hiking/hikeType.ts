@@ -1,6 +1,6 @@
 import type { TrainingHubActivity } from "../../electron/types";
-
 import { t } from "../i18n/core";
+
 /**
  * The two kinds of hike COROS records, kept apart for the reason a run's
  * surfaces and a ride's bikes are.

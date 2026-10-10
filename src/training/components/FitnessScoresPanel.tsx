@@ -9,8 +9,8 @@ import {
   formatPaceSecondsPerKm
 } from "../formatters";
 import { useUnitSystem } from "../../units/UnitSystemProvider";
-
 import { t } from "../../i18n/core";
+
 interface FitnessScoresPanelProps {
   dashboard: TrainingHubDashboard | null;
   racePredictor: TrainingHubRacePredictor | null;

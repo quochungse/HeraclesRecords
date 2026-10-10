@@ -1,4 +1,5 @@
 import { t } from "../i18n/core";
+
 /**
  * A plan's tile draws one small picture: a ridge of its weeks, so a plan can
  * be recognised by its silhouette. It measures what `ridgeMeasure` picks, as

@@ -24,9 +24,9 @@ import {
   type TrainingPlanGenerationField
 } from "../../electron/trainingPlanGeneration";
 import { parsePlanDay } from "../../electron/trainingPlanDomain";
-
 import { workoutSportLabel } from "../training/workoutSport";
 import { formatDecimal, getIntlLocale, messageRecord, plural, t, weekdayNames, type MessageKey } from "../i18n/core";
+
 /** An option whose words are read in the language on screen each time. */
 function worded<V extends string>(value: V, label: MessageKey, hint: MessageKey) {
   return {

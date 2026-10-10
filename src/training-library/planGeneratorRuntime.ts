@@ -27,8 +27,8 @@ import {
   supportsReasoningEffort,
   type ChatModelOption
 } from "../../electron/chatModels";
-
 import { t } from "../i18n/core";
+
 /** The order the provider list reads in: the two Claude paths first. */
 export const GENERATOR_PROVIDERS: readonly ChatProvider[] = ["claude-code", "claude-api", "chatgpt", "openrouter", "local"];
 

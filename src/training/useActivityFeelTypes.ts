@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import type { TrainingHubActivity } from "../../electron/types";
 import type { HeraclesRecordsApi } from "../heraclesrecords-api";
-
 import { t } from "../i18n/core";
+
 /**
  * The end-of-activity feeling COROS holds for each session, read from this
  * machine's mirror.

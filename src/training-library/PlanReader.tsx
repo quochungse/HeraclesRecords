@@ -63,9 +63,9 @@ import { PlanOriginBadge, SportMixDots, dominantSport, sportAccentStyle } from "
 import { PlanCalendarBadge, isOnCalendar, upcomingCalendarSessions } from "./PlanCalendarBadge";
 import { PlanMenu, type PlanMenuItem } from "./PlanMenu";
 import { PlanDraftMark } from "./PlanDraftMark";
-
 import { formatCount, formatDecimal, plural, t } from "../i18n/core";
 import { useI18n } from "../i18n/useI18n";
+
 /** What the reader's calendar item asks for. */
 export type PlanCalendarAction = "add" | "remove";
 

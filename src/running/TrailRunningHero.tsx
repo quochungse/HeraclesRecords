@@ -15,8 +15,8 @@ import {
   runLoadBalance
 } from "./runMetrics";
 import { classifyRunSurface } from "./runSurface";
-
 import { plural, t } from "../i18n/core";
+
 interface TrailRunningHeroProps {
   /** Trail runs over the whole history: the week, its baseline and the twelve-week rate look back past the period. */
   trailRuns: readonly TrainingHubActivity[];

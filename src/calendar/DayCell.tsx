@@ -28,8 +28,8 @@ import {
   scheduledSportCategory,
   scheduledWorkoutSport
 } from "../training/workoutSport";
-
 import { t } from "../i18n/core";
+
 interface DayCellProps {
   day: CalendarDay;
   mode: "month" | "week";

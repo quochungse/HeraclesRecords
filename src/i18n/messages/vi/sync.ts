@@ -7,7 +7,7 @@ const sync: SyncMessages = {
   "sync.checkingTitle": "Đang kiểm tra trạng thái đồng bộ…",
   "sync.loading": "Đang tải trạng thái đồng bộ…",
   "sync.unavailable.title": "Bản này không hỗ trợ đồng bộ",
-  "sync.unavailable.detail": "Bản ứng dụng này được build mà không có đăng nhập Google, trong khi đồng bộ lưu dữ liệu của bạn trên Google Drive.",
+  "sync.unavailable.detail": "Bản ứng dụng này được đóng gói mà không có đăng nhập Google, trong khi đồng bộ lưu dữ liệu của bạn trên Google Drive.",
   "sync.signedOut.title": "Đăng nhập COROS để đồng bộ",
   "sync.signedOut.detail": "Đồng bộ cần biết đang gộp dữ liệu của ai. Hãy đăng nhập ở mục Kết nối, đồng bộ sẽ tự bắt đầu.",
   "sync.drive.title": "Google Drive",

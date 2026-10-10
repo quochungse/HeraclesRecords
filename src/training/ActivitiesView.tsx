@@ -27,8 +27,8 @@ import { useActivityDetailSummaries } from "./useActivityDetailSummaries";
 import { useActivityFeelTypes } from "./useActivityFeelTypes";
 import type { ActivitiesViewProps } from "./types";
 import "./activities.css";
-
 import { plural, t } from "../i18n/core";
+
 /** Rows built per page. See `limit` below for why there is a page at all. */
 const PAGE_SIZE = 200;
 

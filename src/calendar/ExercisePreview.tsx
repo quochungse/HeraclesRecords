@@ -3,8 +3,8 @@ import { useReducedMotion } from "motion/react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { WorkoutExerciseOption } from "../../electron/types";
 import { MUSCLE_BY_ID, resolveExerciseTargets } from "../strength/muscles";
-
 import { t } from "../i18n/core";
+
 interface ExercisePreviewProps {
   option?: WorkoutExerciseOption;
   /** Resolved display name; drives both the heading and the muscle lookup. */

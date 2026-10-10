@@ -85,9 +85,9 @@ import {
   useSelectionPreference
 } from "../preferences/selectionPreferences";
 import "./trainingLibrary.css";
-
 import { messageRecord, plural, t } from "../i18n/core";
 import { useI18n } from "../i18n/useI18n";
+
 interface TrainingLibraryViewProps {
   api: HeraclesRecordsApi;
   status: TrainingHubStatus | null;

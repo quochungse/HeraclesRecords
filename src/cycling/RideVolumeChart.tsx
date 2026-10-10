@@ -28,8 +28,8 @@ import {
 import { buildRideWeeks, summariseRides, type RideWeek } from "./rideMetrics";
 import { RIDE_TYPE_LABELS, type RideType } from "./rideType";
 import { rideTypeColors } from "./rideTypeColors";
-
 import { formatDecimal, plural, t } from "../i18n/core";
+
 /**
  * What a week of riding is measured in.
  *

@@ -32,9 +32,9 @@ import {
   type TrainingPlanWeekSummary
 } from "../../electron/trainingPlanDomain";
 import { WORKOUT_SPORTS } from "../../electron/workoutCapabilities";
-
 import { formatDecimal, getIntlLocale, messageRecord, plural, t, weekdayNames } from "../i18n/core";
 import { planStageLabel } from "../i18n/workoutWords";
+
 /** Where a planned session stands, once its plan is on the calendar. */
 export type PlanEntryStatus = TrainingActivityMatch["status"];
 

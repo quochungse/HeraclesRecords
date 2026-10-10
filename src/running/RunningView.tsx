@@ -53,8 +53,8 @@ import {
   type RunSurface
 } from "./runSurface";
 import "./running.css";
-
 import { t } from "../i18n/core";
+
 export interface RunningViewProps {
   api: HeraclesRecordsApi | null;
   activities: TrainingHubActivity[];

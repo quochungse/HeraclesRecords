@@ -1,6 +1,6 @@
 import type { CSSProperties } from "react";
-
 import { t } from "../i18n/core";
+
 /*
  * The library before its snapshot lands — and, as the Suspense fallback in
  * App, before its chunk does, so opening the screen shows one loading state

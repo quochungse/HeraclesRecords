@@ -53,8 +53,8 @@ import { WorkoutEditorModal } from "./WorkoutEditorModal";
 import { WorkoutLibraryModal } from "./WorkoutLibraryModal";
 import { useSelectionPreference } from "../preferences/selectionPreferences";
 import { CALENDAR_MODE_PREFERENCE } from "./CalendarSkeleton";
-
 import { formatCount, plural, t } from "../i18n/core";
+
 interface CalendarViewProps {
   api: HeraclesRecordsApi;
   status: TrainingHubStatus | null;

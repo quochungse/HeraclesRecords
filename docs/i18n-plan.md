@@ -158,9 +158,19 @@ line in the website's guide (`site/src/content/guide/customise.md`, under Appear
 - **Text the main process stored is said again, not translated where it lies.** A change
   line's label and reason and a plan event's changes are stored in English; the screen
   rebuilds the label from the line's own fields (`changeLineLabel`), recognises a reason
-  by its words or its catalogue key (`changeLineReason`, `screenKeyForEnglish`), and works
+  by its words or its catalogue key (`changeLineReason`, `screenSentence`), and works
   a plan event's changes out again from the two versions in hand. COROS's own words go
   through as they came.
+- **What the renderer stores is English too, even when it writes it itself.** "Coach
+  stopped before finishing: …" is saved with the transcript as an assistant message, so it
+  is written with `stoppedEarlyNotice` and drawn with `displayStoredNotice`
+  (`src/chat/storedNotice.ts`); a message that comes back as data rather than as a thrown
+  `ScreenError` (`chat:streamError`) is said with `screenSentence`. A status the main
+  process returns for the screen alone (a server's last error, a connection test) is
+  worded there with `screenMessage` (`mainText.ts`). `test:stored-text` holds all three.
+- **A sentence that names a button names it as that language labels it.** "Press AI Plan
+  again" read in English in every language while the button said "Giáo án AI" or
+  "План с ИИ".
 - **A new namespace** is a file in `messages/en/`, a line in `messages/en/index.ts`, the same
   file in every other language, and `npm run i18n:index`, which writes the other languages'
   `index.ts` and fails on a file missing.
@@ -186,7 +196,7 @@ The voice of each language, chosen to match the sports apps its readers already 
 
 | | Address | Register |
 |---|---|---|
-| Tiếng Việt | **bạn** | Friendly and plain; English terms kept where Vietnamese runners use them (Beta, API, MCP, Google Drive) |
+| Tiếng Việt | **bạn** | Friendly and plain; English terms kept where Vietnamese runners use them (Beta, API, MCP, Google Drive, pace, cadence, trail); tone marks placed the older way throughout (xoá, huỷ, hoá, khoá, tuỳ, tỷ lệ) |
 | 日本語 | です / ます in sentences, nouns for labels | Katakana for established loanwords (ランニング, アクティビティ) |
 | 한국어 | 합니다 in sentences, nouns for labels | 러닝, 사이클링 as Korean apps write them |
 | 简体中文 | **你** | Short labels; full-width punctuation |
@@ -223,6 +233,14 @@ Terms later phases must reuse rather than reinvent.
 | Vault (sync storage) | Kho | 保管庫 | 보관소 | 存储库 | Almacén | Espace | Speicher |
 | Sign in | Đăng nhập | サインイン | 로그인 | 登录 | Iniciar sesión | Se connecter | Anmelden |
 | Settings | Cài đặt | 設定 | 설정 | 设置 | Ajustes | Paramètres | Einstellungen |
+
+**Coach is a name only where the glossary keeps it** (de, fr, it). Everywhere else every
+sentence uses the language's own word, declined where the language declines it (ru
+*тренер*, *тренера*, *тренеру*): Russian, Indonesian and Thai said "Тренер", "Pelatih" and
+"โค้ช" on the rail and "Coach" in a hundred sentences of Coach's screen until they were
+brought into line. One setting is one term within a language too: "Reasoning effort" is the
+same words in Coach Models and in a plan's AI settings, and a sport COROS names is the same
+words on Activities and on its own screen (vi: *Trekking* and *Leo núi* for 104 and 105).
 
 The same terms in the five languages added after P1:
 

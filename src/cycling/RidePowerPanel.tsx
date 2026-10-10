@@ -16,8 +16,8 @@ import {
   type PowerZoneBound
 } from "./rideAnalysis";
 import { StatGrid, type Stat } from "./StatGrid";
-
 import { formatCount, formatDecimal, t } from "../i18n/core";
+
 interface RidePowerPanelProps {
   /** The ride's samples on activity time. */
   series: readonly TrainingHubActivitySeriesPoint[];

@@ -1,6 +1,6 @@
 import type { TrainingHubActivity } from "../../electron/types";
-
 import { t } from "../i18n/core";
+
 /**
  * The four surfaces a run happens on, kept apart because they answer different
  * questions.

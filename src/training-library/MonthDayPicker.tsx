@@ -9,8 +9,8 @@ import {
   monthGridWeeks,
   monthLabel
 } from "../calendar/dateUtils";
-
 import { getIntlLocale, t } from "../i18n/core";
+
 interface MonthDayPickerProps {
   /** The chosen day, as a COROS happen-day key (`yyyyMMdd`). */
   value: string;

@@ -21,8 +21,8 @@ import {
 // Cut to twice the size they are drawn at (52px badge, ~200px banner wheat).
 import prLaurel from "../../assets/training-hub/pr-laurel.webp";
 import prWheat from "../../assets/training-hub/pr-wheat.webp";
-
 import { t } from "../../i18n/core";
+
 interface PersonalRecordsPanelProps {
   dashboard: TrainingHubDashboard | null;
 }

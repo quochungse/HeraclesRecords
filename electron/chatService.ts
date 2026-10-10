@@ -926,7 +926,7 @@ function listedAnthropicModel(
 
 function storeEncryptedSecret(key: string, secret: string, _label: string): void {
   if (!safeStorage.isEncryptionAvailable()) {
-    throw new ScreenError("main.coach.secureStorage");
+    throw new ScreenError("main.secureStorage");
   }
   setSetting(key, safeStorage.encryptString(secret).toString("base64"));
 }

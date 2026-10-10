@@ -14,8 +14,8 @@ import {
 import { buildVo2Trend, formatPlateauDuration, type Vo2Reading } from "../training/vo2Trend";
 import { useUnitSystem } from "../units/UnitSystemProvider";
 import { buildRunWeeks, runLoadBalance, type LoadBalance } from "./runMetrics";
-
 import { formatDecimal, plural, t } from "../i18n/core";
+
 interface RunningHeroProps {
   /**
    * Runs matching the surface filter, over the whole history — "this week" and

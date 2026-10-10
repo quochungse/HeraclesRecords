@@ -6,8 +6,8 @@ import type { StrengthSessionIndex } from "./sessionAnalytics";
 import { previousWeekStartMs, startOfWeekMs } from "./strengthAnalytics";
 import { formatSpan, formatTotalWeight, sessionSourceLabel } from "./strengthFormat";
 import "./strengthSession.css";
-
 import { getIntlLocale, plural, t } from "../i18n/core";
+
 /** The list's first row: every session in the window at once, rather than one of them. */
 export const AGGREGATE_SELECTION = "aggregate";
 

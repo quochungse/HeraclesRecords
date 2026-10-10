@@ -28,8 +28,8 @@ import {
 import { buildHikeWeeks, summariseHikes, type HikeWeek } from "./hikeMetrics";
 import { HIKE_TYPE_LABELS, type HikeType } from "./hikeType";
 import { hikeTypeColors } from "./hikeTypeColors";
-
 import { formatDecimal, plural, t } from "../i18n/core";
+
 /**
  * What a week of hiking is measured in.
  *

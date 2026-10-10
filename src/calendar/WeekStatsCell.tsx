@@ -12,8 +12,8 @@ import {
   metersToDisplayDistance,
   metersToElevation
 } from "../units/units";
-
 import { formatDecimal, t } from "../i18n/core";
+
 interface WeekStatsCellProps {
   stats: WeeklyStats;
   /** Whether the range on screen has been read, so an empty week is known to be empty. */

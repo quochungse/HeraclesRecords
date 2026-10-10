@@ -9,7 +9,7 @@ import type {
 import { addTokenUsage, countableUsage } from "./tokenUsage";
 import { WEB_SEARCH_TOOL } from "./chatToolSources";
 import { ScreenError } from "./screenText";
-import { mainText } from "./mainText";
+import { mainText, screenMessage } from "./mainText";
 
 export const DEFAULT_LOCAL_CHAT_BASE_URL = "http://localhost:11434/v1";
 
@@ -336,7 +336,7 @@ export async function testLocalChatConnectionRequest(
   } catch (error) {
     return {
       ok: false,
-      message: error instanceof Error ? error.message : "Local model check failed.",
+      message: screenMessage(error, "Local model check failed."),
       normalizedBaseUrl: baseUrl
     };
   }

@@ -15,8 +15,8 @@ import {
   weekRangeLabel,
   weekRow
 } from "./dateUtils";
-
 import { t } from "../i18n/core";
+
 /*
  * The Calendar's stand-ins, in the main bundle rather than the screen's chunk.
  *

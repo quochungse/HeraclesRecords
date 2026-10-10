@@ -16,8 +16,8 @@ import { sportColorCategory } from "../sportColors";
 import { resolveSportName } from "../sportTypes";
 import { feltLabel, type ActivityFeelMap } from "../useActivityFeelTypes";
 import { useUnitSystem } from "../../units/UnitSystemProvider";
-
 import { getIntlLocale, plural, t } from "../../i18n/core";
+
 interface ActivityJournalListProps {
   activities: TrainingHubActivity[];
   sportTypes: TrainingHubSportType[];

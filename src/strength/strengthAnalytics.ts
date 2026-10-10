@@ -22,8 +22,8 @@ import {
   type MuscleId
 } from "./muscles";
 import { startOfWeekMs } from "../training/activityWindow";
-
 import { formatCount, formatDecimal, getIntlLocale, t } from "../i18n/core";
+
 /** What the body map shades muscles by. */
 export type HeatMetric = "sets" | "volume" | "time";
 

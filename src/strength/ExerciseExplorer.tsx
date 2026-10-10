@@ -41,8 +41,8 @@ import {
   type ExplorerSet,
   type PlateauState
 } from "./exerciseExplorerData";
-
 import { formatCount, formatDecimal, getIntlLocale, plural, t } from "../i18n/core";
+
 interface ExerciseExplorerProps {
   exercise: ExerciseStat;
   exercises: ExerciseStat[];

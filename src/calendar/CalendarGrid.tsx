@@ -14,8 +14,8 @@ import { skeletonDelay } from "./CalendarSkeleton";
 import { DayCell } from "./DayCell";
 import { weekdayLabels } from "./dateUtils";
 import { WeekStatsCell } from "./WeekStatsCell";
-
 import { t } from "../i18n/core";
+
 interface CalendarGridProps {
   weeks: CalendarWeek[];
   mode: CalendarMode;

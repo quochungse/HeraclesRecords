@@ -34,6 +34,7 @@ import type {
   McpServerStatus
 } from "./types";
 import { ScreenError } from "./screenText";
+import { screenMessage } from "./mainText";
 
 // Generalization of the old single-server COROS MCP client into a registry of
 // connections keyed by server id. Each server gets its own OAuth provider
@@ -769,7 +770,8 @@ export async function connectMcpServer(
       })
       .catch((error) => {
         if (rt.generation === generation) {
-          rt.lastError = error instanceof Error ? error.message : String(error);
+          // Drawn under the server in Settings, in the athlete's language.
+          rt.lastError = screenMessage(error, String(error));
           if (!interactive) {
             rt.silentRetryAfter = Date.now() + SILENT_RETRY_COOLDOWN_MS;
           }

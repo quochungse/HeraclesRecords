@@ -11,8 +11,8 @@ import {
   dayTimeOptions,
   weekSummary
 } from "./planGeneratorModel";
-
 import { t } from "../i18n/core";
+
 const LIMITS = TRAINING_PLAN_GENERATION_LIMITS;
 
 /**

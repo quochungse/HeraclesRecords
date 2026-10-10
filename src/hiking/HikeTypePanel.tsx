@@ -6,8 +6,8 @@ import { distanceUnit, elevationUnit, metersToElevation } from "../units/units";
 import { climbPerDistanceUnit, hikeTypeBreakdown } from "./hikeMetrics";
 import { HIKE_TYPE_LABELS } from "./hikeType";
 import { hikeTypeColors } from "./hikeTypeColors";
-
 import { t } from "../i18n/core";
+
 interface HikeTypePanelProps {
   /** Deliberately unfiltered by kind: this panel *is* the split by kind. */
   hikes: readonly TrainingHubActivity[];

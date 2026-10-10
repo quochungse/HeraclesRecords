@@ -10,8 +10,8 @@ import {
 import { climbPerDistanceUnit, rideTypeBreakdown } from "./rideMetrics";
 import { RIDE_TYPE_LABELS } from "./rideType";
 import { rideTypeColors } from "./rideTypeColors";
-
 import { t } from "../i18n/core";
+
 interface RideTypePanelProps {
   /** Deliberately unfiltered by kind: this panel *is* the split by kind. */
   rides: readonly TrainingHubActivity[];

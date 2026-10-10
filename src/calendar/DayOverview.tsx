@@ -12,8 +12,8 @@ import { activityWorkoutSport } from "../training/askCoachAbout";
 import { sportChipStyle, sportTheme } from "../training-library/sportTheme";
 import { dayItems, type CalendarDay, type CalendarItemSelection } from "./calendarTypes";
 import { formatPlannedVolume } from "./scheduledStructure";
-
 import { t } from "../i18n/core";
+
 function activityLine(activity: TrainingHubActivity, unitSystem: UnitSystem): string {
   return [
     activity.duration ? formatDurationSeconds(activity.duration) : undefined,

@@ -211,7 +211,7 @@ export async function connectHevy(apiKey: string): Promise<HevyStatus> {
   const key = apiKey.trim();
   if (!key) throw new ScreenError("main.hevy.enterKey");
   if (!credentialStorage.isEncryptionAvailable()) {
-    throw new ScreenError("main.hevy.secureStorage");
+    throw new ScreenError("main.secureStorage");
   }
   const identity = await fetchIdentity(key);
   const previous = parseIdentity();

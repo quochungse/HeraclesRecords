@@ -10,8 +10,7 @@ import type {
   ScheduleChangeSet,
   ScheduleChangeStatus
 } from "../../electron/types";
-import { getIntlLocale, getLocale, messageRecord, plural, t, type MessageKey } from "../i18n/core";
-import { screenKeyForEnglish } from "../../electron/screenText";
+import { getIntlLocale, getLocale, messageRecord, plural, screenSentence, t, type MessageKey } from "../i18n/core";
 
 const KNOWN_OPS: ReadonlySet<string> = new Set(["move", "replace", "remove", "add", "deleteWorkout"]);
 
@@ -189,11 +188,16 @@ export function changeLineLabel(line: ScheduleChangeLine): string {
   }
 }
 
-/** " (Plan name)", where the stored label names the session's plan right after it. */
-function planOf(label: string, name: string): string {
+/**
+ * " (Plan name)", where the stored label names the session's plan right after
+ * it: `Move "Easy run" (Base plan) from …`. The parentheses are the label's
+ * own, so they are matched, not captured — and a label with none (a session
+ * of no plan) names no plan even when a workout's name says "on" or "from".
+ */
+export function planOf(label: string, name: string): string {
   const at = label.indexOf(`"${name}"`);
   if (at < 0) return "";
-  const after = /^ ((.+?)) (?:from|on) /.exec(label.slice(at + name.length + 2));
+  const after = /^ \((.+?)\) (?:from|on) /.exec(label.slice(at + name.length + 2));
   return after ? ` (${after[1]})` : "";
 }
 
@@ -217,10 +221,10 @@ const FIXED_REASONS: Record<string, MessageKey> = {
 export function changeLineReason(line: ScheduleChangeLine): string | undefined {
   const reason = line.reason;
   if (!reason || getLocale() === "en") return reason;
-  const fixed = FIXED_REASONS[reason];
+  const fixed = Object.hasOwn(FIXED_REASONS, reason) ? FIXED_REASONS[reason] : undefined;
   if (fixed) return t(fixed);
-  const screenKey = screenKeyForEnglish(reason);
-  if (screenKey) return t(screenKey);
+  const said = screenSentence(reason);
+  if (said !== reason) return said;
   const session = line.session;
   if (session && reason === `"${session.name}" is no longer on the calendar on ${englishCardDay(session.happenDay)}.`) { // i18n-ignore: the stored English
     return t("chat.change.reason.gone", { name: session.name, day: changeDayLabel(session.happenDay) });

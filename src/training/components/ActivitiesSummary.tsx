@@ -8,8 +8,8 @@ import {
   formatElevationMeters
 } from "../formatters";
 import { useUnitSystem } from "../../units/UnitSystemProvider";
-
 import { formatCount, plural, t } from "../../i18n/core";
+
 interface ActivitiesSummaryProps {
   totals: ActivityTotals;
   /** What the period selector says, e.g. "3 months" — the caption's subject. */

@@ -12,8 +12,8 @@ import { buildVo2Trend, formatPlateauDuration, type Vo2Reading } from "../traini
 import { useUnitSystem } from "../units/UnitSystemProvider";
 import { DeltaChip, LoadRatioCard } from "../running/RunningHero";
 import { buildRideWeeks, rideLoadBalance } from "./rideMetrics";
-
 import { formatDecimal, plural, t } from "../i18n/core";
+
 interface CyclingHeroProps {
   /**
    * Rides matching the kind filter, over the whole history — "this week" and

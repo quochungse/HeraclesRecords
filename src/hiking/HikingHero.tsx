@@ -15,8 +15,8 @@ import {
   climbingRate,
   hikeSeconds
 } from "./hikeMetrics";
-
 import { plural, t } from "../i18n/core";
+
 interface HikingHeroProps {
   /**
    * Hikes matching the kind filter, over the whole history — "this week", its

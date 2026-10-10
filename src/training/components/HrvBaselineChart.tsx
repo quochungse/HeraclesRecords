@@ -24,8 +24,8 @@ import {
   metricDot,
   usePrefersReducedMotion
 } from "./trendChartParts";
-
 import { t } from "../../i18n/core";
+
 /**
  * Shared by Overview and the Sleep screen, so the window the athlete picks in
  * one is the window they find in the other — nightly HRV is one reading, and

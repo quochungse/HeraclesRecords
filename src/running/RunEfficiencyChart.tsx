@@ -25,8 +25,8 @@ import {
 } from "./runMetrics";
 import { RUN_SURFACE_LABELS, classifyRunSurface, type RunSurface } from "./runSurface";
 import { runSurfaceColors } from "./runSurfaceColors";
-
 import { formatDecimal, getIntlLocale, t } from "../i18n/core";
+
 interface ScatterPoint {
   /** Seconds per display unit — already converted, see `formatDisplayPace`. */
   pace: number;

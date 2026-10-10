@@ -1,4 +1,5 @@
 import { messageRecord } from "../i18n/core";
+
 // The two absolute yardsticks the Hall of Records measures speed and aerobic
 // fitness against, so that a labour asks the same of everyone: a beginner does
 // not reach it by improving on their own first weeks, and an athlete already at

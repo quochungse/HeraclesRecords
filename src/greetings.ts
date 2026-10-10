@@ -1,4 +1,5 @@
 import { t } from "./i18n/core";
+
 export function getTimeOfDayGreeting(
   hour: number = new Date().getHours(),
 ): string {

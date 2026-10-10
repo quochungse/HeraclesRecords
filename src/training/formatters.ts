@@ -9,8 +9,8 @@ import {
   metersToElevation,
   secondsPerKmToDisplayPace
 } from "../units/units";
-
 import { formatDecimal, getIntlLocale, getLocale, plural, t } from "../i18n/core";
+
 export function formatTrainingTimestamp(value?: number): string {
   if (!value) {
     return t("units.unknown");

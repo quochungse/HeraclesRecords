@@ -32,8 +32,8 @@ import {
   metersToElevation,
   type UnitSystem
 } from "../units/units";
-
 import { formatDecimal, t } from "../i18n/core";
+
 interface RunListProps {
   runs: readonly TrainingHubActivity[];
   /**

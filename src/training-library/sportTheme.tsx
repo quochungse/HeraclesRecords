@@ -20,9 +20,9 @@ import type { CSSProperties } from "react";
 import type { TrainingPlanDocument, WorkoutSport } from "../../electron/types";
 import { planOriginLabel } from "./planFilters";
 import { RunnerIcon } from "../running/runnerIcon";
-
 import { workoutSportLabel } from "../training/workoutSport";
 import { t } from "../i18n/core";
+
 export interface SportTheme {
   /** CSS colour — a customizable --sport-* token where one exists. */
   color: string;

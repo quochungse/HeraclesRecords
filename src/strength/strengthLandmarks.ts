@@ -1,7 +1,7 @@
 import { MUSCLES, type MuscleId } from "./muscles";
 import { nextWeekStartMs, startOfWeekMs, type StrengthAnalytics } from "./strengthAnalytics";
-
 import { getIntlLocale } from "../i18n/core";
+
 /**
  * The weekly working-set range most hypertrophy guidance lands on for a
  * muscle. It is counted in direct sets; the sets here are credited, so a

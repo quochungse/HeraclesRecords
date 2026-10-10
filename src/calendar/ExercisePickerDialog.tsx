@@ -39,9 +39,9 @@ import {
   type ExerciseBodyPartId,
   type ExerciseFacetKind
 } from "./exerciseFacets";
-
 import { plural, t } from "../i18n/core";
 import { useI18n } from "../i18n/useI18n";
+
 export interface LabeledExerciseOption extends WorkoutExerciseOption {
   label: string;
 }

@@ -4,8 +4,8 @@ import {
 } from "../../electron/workoutCapabilities";
 import { inferUpcomingWorkoutCategory, workoutCategoryLabel } from "./formatters";
 import type { SportColorCategory } from "./sportColors";
-
 import { t } from "../i18n/core";
+
 /**
  * A scheduled workout carries a COROS *program* sport code (1–9), which is a
  * different numbering from the activity codes `sportColorCategory` reads — 2 is

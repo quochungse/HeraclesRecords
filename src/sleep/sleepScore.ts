@@ -1,4 +1,5 @@
 import { t } from "../i18n/core";
+
 /**
  * COROS's sleep score, banded once.
  *

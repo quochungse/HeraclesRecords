@@ -1,8 +1,8 @@
 import type { MessageKey } from "../i18n/core";
 import type { StrengthSession, StrengthSet } from "../../electron/types";
 import { estimateOneRepMax, exerciseDisplayName } from "./strengthAnalytics";
-
 import { formatDecimal, plural, t } from "../i18n/core";
+
 const EPSILON = 0.01;
 
 export interface ExplorerSet extends StrengthSet {

@@ -3,8 +3,8 @@ import type {
   CorosProfileZoneFamily,
   TrainingHubThresholdZone
 } from "../../electron/types";
-
 import { t } from "../i18n/core";
+
 /**
  * COROS `hrZoneType`, labelled as its own web client labels the picker.
  * `title` is the same name in the heading case the panels use.

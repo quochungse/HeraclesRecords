@@ -22,8 +22,8 @@ import {
 import { isSpeedSport, isSwimSportType } from "./sportTypes";
 import { classifyRunSurface, isRunSportType } from "../running/runSurface";
 import { formatSpeedValue } from "../units/units";
-
 import { formatDecimal, t } from "../i18n/core";
+
 export interface ActivityFact {
   key: string;
   value: string;

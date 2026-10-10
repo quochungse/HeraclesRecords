@@ -1,7 +1,7 @@
 import type { Theme } from "../theme/theme";
 import type { TrainingHubActivitySeriesPoint } from "../../electron/types";
-
 import { t } from "../i18n/core";
+
 /**
  * The channels an activity's chart can draw, and what each one is.
  *

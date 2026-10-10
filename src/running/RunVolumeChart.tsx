@@ -29,8 +29,8 @@ import {
   type Volume,
   type VolumeMeasure
 } from "./sportVolume";
-
 import { formatDecimal, plural, t } from "../i18n/core";
+
 /**
  * What a week of running is measured in.
  *

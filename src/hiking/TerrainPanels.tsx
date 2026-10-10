@@ -7,8 +7,8 @@ import {
 import { useUnitSystem } from "../units/UnitSystemProvider";
 import { formatSpeedValue, formatVerticalRate, metersToElevation } from "../units/units";
 import type { HikeLeg, TerrainKind, TerrainShare } from "./hikeAnalysis";
-
 import { formatDecimal, plural, t } from "../i18n/core";
+
 /**
  * The hike page's two readings of the ground, drawn for a trail run too.
  *

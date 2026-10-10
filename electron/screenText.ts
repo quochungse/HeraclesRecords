@@ -31,6 +31,8 @@
 import type { Translation } from "./i18nTypes";
 
 export const SCREEN_TEXT_EN = {
+  // Any key the app keeps: an AI provider's, an MCP server's, Hevy's
+  "main.secureStorage": "This system has no secure storage for keys, so the key could not be saved.",
   // The COROS account
   "main.coros.enterCredentials": "Enter your COROS email and password.",
   "main.coros.noVerification": "No COROS verification is in progress. Start again.",
@@ -106,7 +108,6 @@ export const SCREEN_TEXT_EN = {
   "main.coach.changeLineGone": "That change is not in this proposal any more.",
   "main.coach.changeWait": "These changes are being applied; wait for them to finish.",
   "main.coach.openRouterKey": "Add an OpenRouter API key in Coach settings first.",
-  "main.coach.secureStorage": "This system has no secure storage for keys, so the key could not be saved.",
   "main.coach.chatgptExpired": "ChatGPT session expired. Sign in again.",
   "main.coach.chatgptSignIn": "Sign in with ChatGPT first.",
   "main.coach.chatgptWindowClosed": "The ChatGPT sign-in window was closed.",
@@ -150,7 +151,6 @@ export const SCREEN_TEXT_EN = {
   "main.mcp.builtInRemove": "A built-in server can't be removed.",
   "main.mcp.notApiKey": "{name} does not sign in with an API key.",
   "main.mcp.keyEmpty": "Enter the API key.",
-  "main.mcp.secureStorage": "This system has no secure storage for keys, so the key could not be saved.",
   "main.mcp.unknown": "That MCP server is no longer here.",
   "main.mcp.disabled": "{name} is switched off.",
   "main.mcp.authExpired": "{name}'s authorization expired. Connect {name} again.",
@@ -162,7 +162,6 @@ export const SCREEN_TEXT_EN = {
   "main.hevy.invalidResponse": "Hevy sent an answer this app can't read.",
   "main.hevy.noIdentity": "Hevy did not say which account the key belongs to.",
   "main.hevy.enterKey": "Enter a Hevy API key.",
-  "main.hevy.secureStorage": "This system has no secure storage for keys, so the key could not be saved.",
   "main.hevy.connectFirst": "Connect Hevy before syncing strength workouts.",
   // The calendar's manual activity
   "main.activity.duration": "Enter a duration longer than zero.",

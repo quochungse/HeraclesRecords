@@ -27,8 +27,8 @@ import { renderRich } from "../i18n/useI18n";
 import type { TrainingOverviewProps } from "./types";
 import { useHeartRateZoneModel } from "./useHeartRateZoneModel";
 import loginPageBackground from "../assets/training-hub/login-bg.webp";
-
 import { t } from "../i18n/core";
+
 // The body map drags in three.js and a GLTF mannequin. Overview is the default
 // startup view, so that weight stays out of its first chunk.
 const LazyStrengthDistributionSection = lazy(() =>

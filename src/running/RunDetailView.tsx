@@ -43,8 +43,8 @@ import {
   classifyRunSurface,
   isOutdoorRunSurface
 } from "./runSurface";
-
 import { formatDecimal, t } from "../i18n/core";
+
 interface RunDetailViewProps {
   activity: TrainingHubActivity;
   /** Null until the fetch for *this* run lands. */

@@ -1,90 +1,16 @@
 import type { TrainingHubSportType } from "../../electron/types";
 import { isHikeSportType } from "../hiking/hikeType";
 import { t, type MessageKey } from "../i18n/core";
+import englishSports from "../i18n/messages/en/sports";
 
-// Keep in sync with electron/corosSportTypes.ts for renderer-side fallbacks.
-/** Every code COROS names, read from the messages (sports.code.<code>). */
-const KNOWN_SPORT_CODES: ReadonlySet<number> = new Set([
-  98,
-  100,
-  101,
-  102,
-  103,
-  104,
-  105,
-  106,
-  200,
-  201,
-  202,
-  203,
-  204,
-  205,
-  299,
-  300,
-  301,
-  400,
-  401,
-  402,
-  500,
-  501,
-  502,
-  503,
-  600,
-  700,
-  701,
-  702,
-  704,
-  705,
-  706,
-  707,
-  708,
-  709,
-  710,
-  711,
-  712,
-  713,
-  714,
-  715,
-  800,
-  801,
-  802,
-  900,
-  901,
-  902,
-  903,
-  904,
-  905,
-  906,
-  1000,
-  1001,
-  1002,
-  1003,
-  1004,
-  1005,
-  1006,
-  1100,
-  1101,
-  1200,
-  9800,
-  9801,
-  9802,
-  9803,
-  9804,
-  9805,
-  9806,
-  9807,
-  9900,
-  9901,
-  9902,
-  9903,
-  9904,
-  9999,
-  10000,
-  10001,
-  10002,
-  10003,
-  65535
-]);
+/**
+ * Every code COROS names: the codes English has a `sports.code.<code>` message
+ * for, so a code added there is known here without a second list to keep. The
+ * messages follow electron/corosSportTypes.ts, the main process's own table.
+ */
+const KNOWN_SPORT_CODES: ReadonlySet<number> = new Set(
+  Object.keys(englishSports).map((key) => Number(key.slice("sports.code.".length)))
+);
 
 /**
  * Codes whose name is the athlete's own: a custom sport carries the name they

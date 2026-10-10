@@ -7,8 +7,8 @@
  * `ActivitiesView`: it is the only part of this a test can reach.
  */
 import type { PlanCompliance } from "../../electron/planCompliance";
-
 import { plural, t } from "../i18n/core";
+
 export { planCompliance, planScheduleKeys } from "../../electron/planCompliance";
 export type { PlanCompliance } from "../../electron/planCompliance";
 

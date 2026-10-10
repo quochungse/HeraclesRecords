@@ -8,8 +8,8 @@ import {
   type StrengthAnalytics
 } from "./strengthAnalytics";
 import { formatLiftWeight, liftWeightParts } from "./strengthFormat";
-
 import { plural, t } from "../i18n/core";
+
 /**
  * Lifts shown in the main-lift list. Five keeps that card roughly level with
  * the movement mix beside it; six left the right-hand column ending well

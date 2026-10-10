@@ -1,8 +1,8 @@
 import type { TrainingHubActivityZoneBucket } from "../../../electron/types";
 import { formatDurationSpan } from "../formatters";
 import { zoneLabel, zoneNumber } from "./routeColoring";
-
 import { t } from "../../i18n/core";
+
 interface ActivityZoneBarProps {
   zones: readonly TrainingHubActivityZoneBucket[];
 }

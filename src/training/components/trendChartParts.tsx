@@ -8,8 +8,8 @@ import { OptionGroup } from "../../components/OptionGroup";
 import { periodLabel, type PeriodDays } from "../../preferences/periodScale";
 import { useChartColors } from "../useChartColors";
 import type { TrainingTrendPoint } from "../types";
-
 import { getIntlLocale } from "../../i18n/core";
+
 /**
  * The pieces every trend panel is built from — axes, tooltip, area gradient,
  * empty notice, window chips. They live here rather than beside one chart

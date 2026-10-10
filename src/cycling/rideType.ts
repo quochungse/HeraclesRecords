@@ -1,6 +1,6 @@
 import type { TrainingHubActivity } from "../../electron/types";
-
 import { t } from "../i18n/core";
+
 /**
  * The five kinds of ride, kept apart for the reason a run's surfaces are.
  *

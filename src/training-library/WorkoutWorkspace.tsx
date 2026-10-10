@@ -37,10 +37,10 @@ import {
   defineSelectionPreference,
   useSelectionPreference
 } from "../preferences/selectionPreferences";
-
 import { workoutSportLabel } from "../training/workoutSport";
 import { plural, t } from "../i18n/core";
 import { useI18n } from "../i18n/useI18n";
+
 interface WorkoutWorkspaceProps {
   api: HeraclesRecordsApi;
   workouts: TrainingLibraryWorkout[];

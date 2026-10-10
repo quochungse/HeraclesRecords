@@ -7,6 +7,7 @@ import {
 } from "./locales.ts";
 import en from "./messages/en/index.ts";
 import { setDecimalFormatter } from "../../electron/unitSystem.ts";
+import { screenKeyForEnglish } from "../../electron/screenText.ts";
 
 /**
  * The runtime behind every translated word. React-free, so a pure module (a
@@ -61,6 +62,7 @@ let dictionary: Dictionary = en;
 let intl = resolveIntlLocale(DEFAULT_LOCALE, systemLanguages());
 let pluralRules = new Intl.PluralRules(intl);
 let numberFormat = new Intl.NumberFormat(intl);
+const englishPluralRules = new Intl.PluralRules("en");
 
 function systemLanguages(): readonly string[] {
   return typeof navigator === "undefined" ? [] : (navigator.languages ?? []);
@@ -189,9 +191,19 @@ export async function initLocale(): Promise<void> {
   }
 }
 
-/** The athlete's pick in Settings. Resolves once the screen can redraw in it. */
+let latestPick = 0;
+
+/**
+ * The athlete's pick in Settings. Resolves once the screen can redraw in it.
+ * Two picks in quick succession load their chunks concurrently, and the one
+ * picked last wins even when the other's chunk arrives after it.
+ */
 export async function setLocale(locale: Locale): Promise<void> {
+  const pick = ++latestPick;
   const messages = await loadDictionary(locale);
+  if (pick !== latestPick) {
+    return;
+  }
   storeLocale(locale);
   apply(locale, messages);
 }
@@ -230,26 +242,40 @@ export function plural(key: PluralKey, count: number, vars?: MessageVars): strin
   const message =
     dictionary[`${key}_${category}`] ??
     dictionary[`${key}_other`] ??
-    (en as Dictionary)[`${key}_${new Intl.PluralRules("en").select(count)}`] ??
+    (en as Dictionary)[`${key}_${englishPluralRules.select(count)}`] ??
     (en as Dictionary)[`${key}_other`] ??
     key;
   return interpolate(message, { count: numberFormat.format(count), ...vars });
 }
 
-/** The English text of a key, for what must not change with the language. */
 /**
  * A record of labels that reads its messages each time it is read, never once:
  * `messageRecord({ road: "run.surface.road" }).road` is the word in the
  * language on screen, so a module-level table of labels cannot freeze English.
+ * It has no prototype, so `in` and a lookup by an unknown id (a status a newer
+ * build wrote) find nothing rather than `toString`.
  */
 export function messageRecord<K extends string>(keys: Readonly<Record<K, MessageKey>>): Readonly<Record<K, string>> {
-  const record = {} as Record<K, string>;
+  const record = Object.create(null) as Record<K, string>;
   for (const key of Object.keys(keys) as K[]) {
     Object.defineProperty(record, key, { get: () => t(keys[key]), enumerable: true });
   }
   return record;
 }
 
+/**
+ * A sentence the main process wrote in English — an error that crossed as data
+ * rather than as a thrown `ScreenError`, or one stored before it was shown —
+ * in the language on screen when it is one of `screenText.ts`'s fixed
+ * sentences. Anything else (COROS's own words, a sentence with values in it)
+ * is returned as it came.
+ */
+export function screenSentence(text: string): string {
+  const key = screenKeyForEnglish(text);
+  return key ? t(key) : text;
+}
+
+/** The English text of a key, for what must not change with the language. */
 export function english(key: MessageKey): string {
   return (en as Dictionary)[key] ?? key;
 }

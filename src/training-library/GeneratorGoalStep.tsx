@@ -18,9 +18,9 @@ import {
   type GeneratorForm
 } from "./planGeneratorModel";
 import { sportTheme } from "./sportTheme";
-
 import { workoutSportLabel } from "../training/workoutSport";
 import { plural, t } from "../i18n/core";
+
 const LIMITS = TRAINING_PLAN_GENERATION_LIMITS;
 
 export interface StepProps {

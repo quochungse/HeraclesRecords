@@ -15,8 +15,8 @@ import { MUSCLE_BY_ID, type MuscleId } from "./muscles";
 import { analyticsCoverage, type SessionHeat } from "./sessionAnalytics";
 import type { HeatMetric, StrengthAnalytics } from "./strengthAnalytics";
 import "./strength.css";
-
 import { plural, t } from "../i18n/core";
+
 const metricOptions = (): { id: HeatMetric; label: string }[] => [
   { id: "sets", label: t("strength.summary.sets") },
   { id: "volume", label: t("strength.metric.volume") },

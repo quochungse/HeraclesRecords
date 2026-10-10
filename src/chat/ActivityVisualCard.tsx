@@ -143,7 +143,9 @@ function buildLapBarData(
 export const ActivityVisualCard = memo(function ActivityVisualCard({
   preview
 }: ActivityVisualCardProps) {
-  useI18n();
+  // The series carry their labels as text (a distance's decimals, "Point 3"),
+  // so they are worked out again when the language changes.
+  const { locale } = useI18n();
   const { unitSystem } = useUnitSystem();
   const swim = preview.sportType === 300 || preview.sportType === 301;
   const cycling = isCyclingSportType(preview.sportType);
@@ -152,7 +154,7 @@ export const ActivityVisualCard = memo(function ActivityVisualCard({
       preview.sections.hr?.chartKind === "series" && preview.sections.hr.series
         ? buildDistanceSeriesData(preview.sections.hr.series, "hr", unitSystem, swim)
         : [],
-    [preview, swim, unitSystem]
+    [locale, preview, swim, unitSystem]
   );
   const hrBarData = useMemo(
     () => buildLapBarData(preview.sections.hr?.laps, (lap) => lap.avgHr),
@@ -169,7 +171,7 @@ export const ActivityVisualCard = memo(function ActivityVisualCard({
             swim
           )
         : [],
-    [preview, swim, unitSystem]
+    [locale, preview, swim, unitSystem]
   );
   const cadenceBarData = useMemo(
     () => buildLapBarData(preview.sections.cadence?.laps, (lap) => lap.avgCadence),
@@ -186,21 +188,21 @@ export const ActivityVisualCard = memo(function ActivityVisualCard({
             cycling
           )
         : [],
-    [cycling, preview, swim, unitSystem]
+    [cycling, locale, preview, swim, unitSystem]
   );
   const powerData = useMemo(
     () =>
       preview.sections.power?.series
         ? buildDistanceSeriesData(preview.sections.power.series, "power", unitSystem, swim)
         : [],
-    [preview, swim, unitSystem]
+    [locale, preview, swim, unitSystem]
   );
   const elevationData = useMemo(
     () =>
       preview.sections.elevation?.points
         ? buildElevationSeriesData(preview.sections.elevation.points, unitSystem)
         : [],
-    [preview, unitSystem]
+    [locale, preview, unitSystem]
   );
 
   const cadenceUnit = cycling ? "rpm" : "spm";

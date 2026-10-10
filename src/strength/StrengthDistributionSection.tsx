@@ -4,8 +4,8 @@ import type { HeraclesRecordsApi } from "../heraclesrecords-api";
 import { StrengthHero } from "./StrengthHero";
 import { activeStrengthWindow, useStrengthData } from "./useStrengthData";
 import "./strength.css";
-
 import { t } from "../i18n/core";
+
 interface StrengthDistributionSectionProps {
   api: HeraclesRecordsApi;
   status: TrainingHubStatus | null;

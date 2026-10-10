@@ -2,8 +2,8 @@ import { useEffect, type MouseEvent } from "react";
 import { BrainCircuit, X } from "lucide-react";
 import type { HeraclesRecordsApi } from "../heraclesrecords-api";
 import { CoachModelsPanel } from "../chat/CoachModelsPanel";
-
 import { t } from "../i18n/core";
+
 export interface CoachModelsModalProps {
   api: HeraclesRecordsApi | undefined;
   open: boolean;

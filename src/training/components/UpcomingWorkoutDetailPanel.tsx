@@ -14,8 +14,8 @@ import {
   matchScheduledEntry,
   scheduledEntryFromUpcoming
 } from "../upcomingWorkoutMatch";
-
 import { t } from "../../i18n/core";
+
 interface UpcomingWorkoutDetailPanelProps {
   api: HeraclesRecordsApi;
   workout: TrainingHubUpcomingWorkout | null;

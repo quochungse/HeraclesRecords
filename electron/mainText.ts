@@ -91,3 +91,15 @@ export function localizeScreenError(error: unknown): unknown {
   if (!screen) return error;
   return new Error(translate(screen.key, screen.vars, screen.count));
 }
+
+/**
+ * An error's message for a status the renderer draws — a connection test, a
+ * server's last failure — rather than throws: a `ScreenError` in the athlete's
+ * language, anything else as it was thrown. Never for text that is stored or
+ * handed to a model, which stays English.
+ */
+export function screenMessage(error: unknown, fallback: string): string {
+  const screen = screenKeyOf(error);
+  if (screen) return translate(screen.key, screen.vars, screen.count);
+  return error instanceof Error ? error.message : fallback;
+}

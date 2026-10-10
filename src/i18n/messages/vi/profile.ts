@@ -60,7 +60,7 @@ const profile: ProfileMessages = {
   "profile.zones.inUse": "Các vùng COROS đang dùng",
   "profile.zones.none": "COROS chưa có vùng cho chỉ số này.",
   "profile.zones.zone": "Vùng",
-  "profile.zones.share": "Tỉ lệ",
+  "profile.zones.share": "Tỷ lệ",
   "profile.zones.boundary": "Mốc",
   "profile.zones.dotted": "Thẻ có chấm là mô hình dùng để dựng các vùng của bạn: {model}.",
   "profile.zones.noModel": "COROS chưa đặt mô hình vùng nhịp tim cho tài khoản này.",

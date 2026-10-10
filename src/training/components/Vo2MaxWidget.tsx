@@ -15,8 +15,8 @@ import {
   type Vo2Trend
 } from "../vo2Trend";
 import type { TrainingHubSnapshot } from "../types";
-
 import { t } from "../../i18n/core";
+
 interface Vo2MaxWidgetProps {
   snapshot: TrainingHubSnapshot | null;
 }

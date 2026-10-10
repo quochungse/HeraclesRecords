@@ -1,4 +1,5 @@
 import { t } from "../i18n/core";
+
 /**
  * One scale for "how far back am I looking", and the words that go with it.
  *

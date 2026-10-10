@@ -11,8 +11,8 @@ import {
   type ActivityFilters
 } from "../activityFilters";
 import { SPORT_COLOR_LABELS, type SportColorCategory } from "../sportColors";
-
 import { plural, t } from "../../i18n/core";
+
 const ACTIVITY_PERIOD_GROUP_OPTIONS = periodGroupOptions(ACTIVITY_PERIOD_DAYS);
 
 interface ActivitiesFilterBarProps {

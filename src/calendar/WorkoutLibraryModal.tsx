@@ -6,8 +6,8 @@ import type { HeraclesRecordsApi } from "../heraclesrecords-api";
 import { formatHappenDayLabel, getLocalHappenDayKey } from "../training/formatters";
 import { scheduledWorkoutSport, workoutSportLabel } from "../training/workoutSport";
 import { refreshWorkoutExerciseCatalogs } from "./useWorkoutExerciseCatalog";
-
 import { t } from "../i18n/core";
+
 interface WorkoutLibraryModalProps {
   api: HeraclesRecordsApi;
   onClose: () => void;

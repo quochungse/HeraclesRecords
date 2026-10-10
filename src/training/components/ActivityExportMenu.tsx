@@ -6,8 +6,8 @@ import {
   type TrainingHubActivity,
   type TrainingHubActivityFileType
 } from "../../../electron/types";
-
 import { t } from "../../i18n/core";
+
 /**
  * The export menu in an activity's detail pane.
  *

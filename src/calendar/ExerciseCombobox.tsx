@@ -29,8 +29,8 @@ import type { WorkoutExerciseOption } from "../../electron/types";
 import { resolveExerciseName } from "../training/exerciseNames";
 import { ExercisePreview } from "./ExercisePreview";
 import { ExercisePickerDialog, type LabeledExerciseOption } from "./ExercisePickerDialog";
-
 import { t } from "../i18n/core";
+
 export interface ExerciseComboboxSelection {
   name: string;
   id?: string;

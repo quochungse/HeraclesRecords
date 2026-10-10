@@ -3,8 +3,8 @@ import { useMemo } from "react";
 import type { ActivityDetailSummary, TrainingHubActivity } from "../../electron/types";
 import { formatDurationSeconds } from "../training/formatters";
 import { intensityMix, type RunIntensityMix, type RunZoneScale } from "./runMetrics";
-
 import { plural, t } from "../i18n/core";
+
 /** The sports this panel is drawn for, which change its words and its target. */
 export type IntensitySport = "run" | "ride" | "hike";
 

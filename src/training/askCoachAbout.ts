@@ -8,8 +8,8 @@
  */
 import type { CoachOpenRequest, UnitSystem, WorkoutSport } from "../../electron/types";
 import { formatDistanceMeters, formatDurationSeconds, formatHappenDayLabel } from "./formatters";
-
 import { t } from "../i18n/core";
+
 /**
  * The workout sport a finished activity's COROS code is, for its icon. An
  * activity code is not a program code (100 is a run here, 1 is there), so

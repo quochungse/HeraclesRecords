@@ -27,9 +27,9 @@ import {
   type PlanReaderWeek
 } from "./planReaderModel";
 import { sportChipStyle } from "./sportTheme";
-
 import { workoutSportLabel } from "../training/workoutSport";
 import { t } from "../i18n/core";
+
 interface PlanWeekRidgeProps {
   weeks: readonly PlanReaderWeek[];
   /** 0-based week being trained today, when the plan is running. */

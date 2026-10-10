@@ -25,8 +25,8 @@ import {
   metersToElevation
 } from "../../units/units";
 import type { UnitSystem } from "../../../electron/types";
-
 import { formatDecimal, t } from "../../i18n/core";
+
 interface ActivityElevationChartProps {
   track?: TrainingHubActivityTrack;
 }

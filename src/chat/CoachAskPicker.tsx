@@ -4,6 +4,7 @@ import { MessageCircle, Plus } from "lucide-react";
 import type { ChatSessionSummary } from "../../electron/types";
 import { getIntlLocale, t } from "../i18n/core";
 import { displaySessionTitle } from "./sessionTitle";
+
 // The dialog chrome is the library's `tl-dialog`, as ConfirmDialog's is.
 import "../training-library/trainingLibrary.css";
 

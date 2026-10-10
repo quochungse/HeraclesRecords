@@ -11,8 +11,8 @@
  */
 import { MoreHorizontal, type LucideIcon } from "lucide-react";
 import { useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
-
 import { t } from "../i18n/core";
+
 export interface PlanMenuItem {
   label: string;
   icon: LucideIcon;

@@ -5,8 +5,8 @@ import rehypeRaw from "rehype-raw";
 import rehypeSanitize from "rehype-sanitize";
 import remarkGfm from "remark-gfm";
 import type { AppUpdateSnapshot } from "../../electron/types";
-
 import { t } from "../i18n/core";
+
 const DISMISSED_UPDATE_VERSION_KEY =
   "heraclesrecords.updatePrompt.dismissedVersion";
 

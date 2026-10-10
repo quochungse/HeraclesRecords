@@ -79,8 +79,8 @@ import {
   type RouteMetric,
   type RouteZoneColoring
 } from "./routeColoring";
-
 import { formatDecimal, t } from "../../i18n/core";
+
 /** What the full map colours a route by: the samples, COROS's zones and the sport. */
 type RouteDetail = Partial<
   Pick<

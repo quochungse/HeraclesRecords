@@ -21,8 +21,8 @@ import {
   formatTotalWeight,
   sessionSourceLabel
 } from "./strengthFormat";
-
 import { formatCount, formatDecimal, getIntlLocale, plural, t } from "../i18n/core";
+
 /** Sessions this short open with every exercise's sets showing; longer ones start folded. */
 const EXPANDED_EXERCISE_LIMIT = 3;
 

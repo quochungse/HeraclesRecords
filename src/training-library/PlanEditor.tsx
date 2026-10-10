@@ -120,11 +120,11 @@ import {
   type PlanReaderWeek
 } from "./planReaderModel";
 import { PlanOriginBadge, SportMixDots, dominantSport, sportAccentStyle, sportChipStyle, sportTheme } from "./sportTheme";
-
 import { workoutSportLabel } from "../training/workoutSport";
 import { formatCount, formatDecimal, plural, t, weekdayNames } from "../i18n/core";
 import { planStageLabel } from "../i18n/workoutWords";
 import { useI18n } from "../i18n/useI18n";
+
 interface PlanEditorProps {
   api: HeraclesRecordsApi;
   /**

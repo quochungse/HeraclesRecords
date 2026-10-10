@@ -38,8 +38,8 @@ import {
   type DistanceZoneTotal
 } from "../distanceZones";
 import { usePrefersReducedMotion } from "./trendChartParts";
-
 import { formatDecimal, plural, t } from "../../i18n/core";
+
 interface TrainingZoneDistributionChartsProps {
   /**
    * The zone model picked on the Personal screen. COROS aggregates the

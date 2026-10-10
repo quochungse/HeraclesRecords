@@ -1,4 +1,5 @@
 import { t } from "../i18n/core";
+
 /**
  * VO2max readings collapsed into the plateaus they actually form.
  *

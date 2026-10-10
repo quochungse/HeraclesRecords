@@ -4,8 +4,8 @@ import type { TrainingHubActivity } from "../../electron/types";
 import type { HeraclesRecordsApi } from "../heraclesrecords-api";
 import { SelectDropdown } from "../components/SelectDropdown";
 import type { CalendarDay, PlannedActualPair } from "./calendarTypes";
-
 import { t } from "../i18n/core";
+
 interface PlanStatusBlockProps {
   api: HeraclesRecordsApi;
   day: CalendarDay;

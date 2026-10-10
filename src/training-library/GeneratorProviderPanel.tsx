@@ -20,8 +20,8 @@ import {
   runtimeModelOptions,
   type GeneratorRuntime
 } from "./planGeneratorRuntime";
-
 import { messageRecord, t } from "../i18n/core";
+
 /** More models than this are offered as a menu rather than a row of chips. */
 const MODEL_CHIP_LIMIT = 6;
 

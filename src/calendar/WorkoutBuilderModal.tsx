@@ -42,8 +42,8 @@ import {
 import { WORKOUT_SPORT_CAPABILITIES, validateWorkoutDraftShared } from "../../electron/workoutCapabilities";
 import { useUnitSystem } from "../units/UnitSystemProvider";
 import { WorkoutBuilderWorkspace, useWorkoutBuilder } from "./WorkoutBuilder";
-
 import { t } from "../i18n/core";
+
 export type WorkoutBuilderSource =
   /** A session that does not exist yet. The sport is where the picker opens. */
   | { kind: "plan-new"; sport?: WorkoutSport }

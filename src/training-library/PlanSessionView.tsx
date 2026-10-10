@@ -46,9 +46,9 @@ import {
   type PlanSessionRef
 } from "./planReaderModel";
 import { sportChipStyle, sportTheme } from "./sportTheme";
-
 import { workoutSportLabel } from "../training/workoutSport";
 import { t } from "../i18n/core";
+
 interface PlanSessionViewProps {
   session: PlanSessionRef;
   /** The stored entry, for its step list — the facts carry only the figures. */

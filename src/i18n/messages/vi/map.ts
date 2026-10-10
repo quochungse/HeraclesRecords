@@ -25,7 +25,7 @@ const map: MapMessages = {
   "map.period": "Giai đoạn tập luyện",
   "map.period.all": "Toàn bộ",
   "map.period.year": "Năm nay",
-  "map.period.custom": "Tùy chọn",
+  "map.period.custom": "Tuỳ chọn",
   "map.from": "Từ",
   "map.to": "Đến",
   "map.summaryAria": "Tóm tắt tập luyện",

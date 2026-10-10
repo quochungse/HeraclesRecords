@@ -11,8 +11,8 @@ import {
   SPORT_COLOR_LABELS,
   type SportColorCategory
 } from "./sportColors";
-
 import { plural } from "../i18n/core";
+
 /** One activity as it reads inside a Last-30-days heatmap card. */
 export interface HeatmapDayEntry {
   activityId: string;

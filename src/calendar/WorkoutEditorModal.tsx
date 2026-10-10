@@ -79,10 +79,10 @@ import {
   workoutIntensitiesForStep,
   workoutTargetsForStep
 } from "../../electron/workoutCapabilities";
-
 import { formatCount, formatDecimal, plural, t } from "../i18n/core";
 import { intensityTypeLabel, swimStrokeLabel, zoneOptionText } from "../i18n/workoutWords";
 import { builderTargetTypeLabel } from "./workoutBuilderRows";
+
 /**
  * The Calendar's editor for a scheduled occurrence, and its read-only view of
  * a library workout.

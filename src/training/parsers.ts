@@ -23,8 +23,8 @@ import type {
   TrainingHubSnapshot,
   TrainingSummaryMetrics
 } from "./types";
-
 import { getIntlLocale } from "../i18n/core";
+
 export { mergeTrainingDayLists } from "../../electron/trainingTrendUtils";
 
 /** Every day the snapshot carries a VO2max for: the Hall's ratings and the Overview figure's toning. */
@@ -168,6 +168,7 @@ export function buildHeatmapGrid(cells: HeatmapCell[]): HeatmapGrid {
   const weeks = paddedCells.length / 7;
   const monthLabels: HeatmapMonthLabel[] = [];
   const seenMonths = new Set<string>();
+  const monthFormat = new Intl.DateTimeFormat(getIntlLocale(), { month: "short" });
 
   for (let column = 0; column < weeks; column += 1) {
     for (let row = 0; row < 7; row += 1) {
@@ -189,7 +190,7 @@ export function buildHeatmapGrid(cells: HeatmapCell[]): HeatmapGrid {
       seenMonths.add(monthKey);
       monthLabels.push({
         column,
-        label: new Intl.DateTimeFormat(getIntlLocale(), { month: "short" }).format(date)
+        label: monthFormat.format(date)
       });
       break;
     }

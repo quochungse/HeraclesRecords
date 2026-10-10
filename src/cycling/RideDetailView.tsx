@@ -38,8 +38,8 @@ import {
   classifyRideType,
   isOutdoorRideType
 } from "./rideType";
-
 import { formatDecimal, t } from "../i18n/core";
+
 interface RideDetailViewProps {
   activity: TrainingHubActivity;
   /** Null until the fetch for *this* ride lands. */

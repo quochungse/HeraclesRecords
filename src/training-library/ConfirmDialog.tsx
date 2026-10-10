@@ -1,7 +1,7 @@
 import { LoaderCircle } from "lucide-react";
 import { useEffect, useId, useRef } from "react";
-
 import { t } from "../i18n/core";
+
 export interface ConfirmDialogProps {
   title: string;
   /** What the action does, in the words of the thing it does it to. */
