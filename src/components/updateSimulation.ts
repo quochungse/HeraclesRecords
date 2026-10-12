@@ -148,7 +148,11 @@ export function useUpdateSimulation({ onMessage, onFinished }: UpdateSimulationC
 
   const download = useCallback(() => {
     const current = stateRef.current;
-    if (!current || current.snapshot.status !== "available") {
+    // From a failed download too, as the real Download button allows.
+    if (
+      !current ||
+      (current.snapshot.status !== "available" && current.snapshot.status !== "error")
+    ) {
       return;
     }
 

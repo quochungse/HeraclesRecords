@@ -13,7 +13,9 @@ interface UpdateGlyphProps {
  * bottom, clipped to the ring so it never draws over the stroke.
  */
 export function UpdateGlyph({ size = 16, active = false }: UpdateGlyphProps) {
-  const clipId = `update-glyph-clip-${useId().replace(/:/g, "")}`;
+  // useId's spelling has changed between React versions (`:r0:`, `«r0»`,
+  // `_r_0_`); only word characters are safe inside `url(#…)`.
+  const clipId = `update-glyph-clip-${useId().replace(/[^\w-]/g, "")}`;
 
   return (
     <svg

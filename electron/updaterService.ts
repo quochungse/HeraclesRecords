@@ -488,9 +488,13 @@ async function installOnLinux(
   setSnapshot({ status: "installing", error: undefined, installFailure: undefined });
 
   try {
-    const relaunchPath =
-      route === "deb" ? await installDebPackage(file) : await installAppImage(file);
-    app.relaunch({ execPath: relaunchPath, args: process.argv.slice(1) });
+    if (route === "deb") {
+      await installDebPackage(file);
+      // dpkg replaced the files in place, so the same path is the new build.
+      app.relaunch({ args: process.argv.slice(1) });
+    } else {
+      relaunchAppImageAfterExit(await installAppImage(file));
+    }
     app.quit();
   } catch (error) {
     console.warn("[updater] could not install the update", error);
@@ -512,7 +516,7 @@ async function installOnLinux(
  * the same two steps electron-updater runs, which there cost two prompts. The
  * path travels as `$1`, never inside the script, so no quoting can break it.
  */
-function installDebPackage(file: string): Promise<string> {
+function installDebPackage(file: string): Promise<void> {
   return new Promise((resolve, reject) => {
     const child = spawn(
       "pkexec",
@@ -539,8 +543,7 @@ function installDebPackage(file: string): Promise<string> {
     });
     child.on("close", (code) => {
       if (code === 0) {
-        // dpkg replaced the files in place, so the same path is the new build.
-        resolve(process.execPath);
+        resolve();
       } else if (code === 126 || code === 127) {
         // pkexec: the dialog was dismissed (126) or the password refused (127).
         reject(new LinuxInstallCancelled("pkexec authorisation was not given"));
@@ -591,6 +594,33 @@ async function installAppImage(file: string): Promise<string> {
   }
 
   return destination;
+}
+
+/**
+ * Starts the new AppImage once this process has gone.
+ *
+ * Not `app.relaunch()`: Electron's relauncher is this executable, which in an
+ * AppImage lives inside the FUSE mount the AppImage runtime takes down as soon
+ * as the app exits — the helper that is meant to outlive the app would be
+ * running from a filesystem that is no longer there. Nor a spawn of the new
+ * AppImage right now, as electron-updater does: it would start while this one
+ * still holds the single-instance lock, find it taken and quit. So a shell
+ * from outside the mount waits for this pid to end, then runs the new file.
+ */
+function relaunchAppImageAfterExit(appImage: string): void {
+  const child = spawn(
+    "/bin/sh",
+    [
+      "-c",
+      'while kill -0 "$1" 2>/dev/null; do sleep 0.2; done; shift; exec "$@"',
+      "sh",
+      String(process.pid),
+      appImage,
+      ...process.argv.slice(1)
+    ],
+    { detached: true, stdio: "ignore" }
+  );
+  child.unref();
 }
 
 function formatReleaseNotes(
