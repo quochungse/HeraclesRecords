@@ -27,6 +27,9 @@ const nav: NavMessages = {
   "nav.expand": "Seitenleiste ausklappen",
   "nav.closeNavigation": "Navigation schließen",
   "nav.startupSet": "Beim nächsten Start öffnet sich {view}.",
+  "nav.update.downloading": "Update wird geladen: {percent} %",
+  "nav.update.installing": "Update wird installiert",
+  "nav.update.ready": "Update bereit – zum Installieren neu starten",
 };
 
 export default nav;

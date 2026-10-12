@@ -18,6 +18,7 @@ import {
 } from "../navigation/primaryNav";
 import { useMediaQuery } from "../hooks/useMediaQuery";
 import { english } from "../i18n/core";
+import { UpdateGlyph } from "./UpdateGlyph";
 import { useI18n } from "../i18n/useI18n";
 
 const SIDEBAR_COLLAPSED_KEY = "heraclesrecords.sidebarCollapsed";
@@ -126,7 +127,18 @@ export interface AppSidebarProps {
   onExpandedChange: (expanded: boolean) => void;
   overlayOpen: boolean;
   onOverlayOpenChange: (open: boolean) => void;
+  /**
+   * An app update in flight, worn by the Settings button: the glyph animates
+   * while it downloads or installs and stays, still, while it waits on a
+   * restart. Null when there is nothing to show.
+   */
+  appUpdate?: AppSidebarUpdate | null;
 }
+
+export type AppSidebarUpdate =
+  | { phase: "downloading"; percent: number }
+  | { phase: "installing" }
+  | { phase: "ready" };
 
 export function AppSidebar({
   activeView,
@@ -138,6 +150,7 @@ export function AppSidebar({
   athleteName = null,
   athleteAvatarUrl = null,
   appLogo,
+  appUpdate = null,
   expanded,
   onExpandedChange,
   overlayOpen,
@@ -189,6 +202,14 @@ export function AppSidebar({
       : SIDEBAR_COLLAPSED_WIDTH;
 
   const { t } = useI18n();
+  const updateNote =
+    appUpdate?.phase === "downloading"
+      ? t("nav.update.downloading", { percent: Math.round(appUpdate.percent) })
+      : appUpdate?.phase === "installing"
+        ? t("nav.update.installing")
+        : appUpdate?.phase === "ready"
+          ? t("nav.update.ready")
+          : null;
   const displayName = athleteName?.trim() || t("nav.profile");
   const initials = athleteName ? initialsFrom(athleteName) : "";
 
@@ -566,16 +587,23 @@ export function AppSidebar({
             className={[
               "app-sidebar-identity-settings",
               activeView === SETTINGS_ITEM.id ? "active" : "",
+              appUpdate ? "has-update" : "",
             ]
               .filter(Boolean)
               .join(" ")}
             aria-current={activeView === SETTINGS_ITEM.id ? "page" : undefined}
-            aria-label={SETTINGS_ITEM.label}
+            aria-label={
+              updateNote ? `${SETTINGS_ITEM.label} · ${updateNote}` : SETTINGS_ITEM.label
+            }
             data-nav-label={english(SETTINGS_ITEM.labelKey)}
-            title={SETTINGS_ITEM.label}
+            title={updateNote ?? SETTINGS_ITEM.label}
             onClick={() => handleSelect(SETTINGS_ITEM.id)}
           >
-            <SettingsIcon size={16} aria-hidden="true" />
+            {appUpdate ? (
+              <UpdateGlyph size={16} active={appUpdate.phase !== "ready"} />
+            ) : (
+              <SettingsIcon size={16} aria-hidden="true" />
+            )}
           </button>
         </div>
       </div>

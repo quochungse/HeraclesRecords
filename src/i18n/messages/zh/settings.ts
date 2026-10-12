@@ -91,6 +91,7 @@ const settings: SettingsMessages = {
   "update.autoDownloadHint": "关闭后，只在你需要时下载。",
   "update.check": "检查更新",
   "settings.coachModels.claudeUpdate": "Claude Code {latest} 已发布（这台电脑是 {installed}）。在终端运行 <code>claude update</code>。",
+  "update.installing": "正在安装…",
 };
 
 export default settings;

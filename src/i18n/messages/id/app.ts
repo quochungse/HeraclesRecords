@@ -31,10 +31,10 @@ const app: AppMessages = {
   "app.update.openDownload": "Buka unduhan",
   "app.update.restartAndUpdate": "Mulai ulang dan perbarui",
   "app.update.now": "Perbarui sekarang",
-  "app.update.downloadingRestart": "Mengunduh {percent}%. Heracles Records akan dimulai ulang saat siap.",
+  "app.update.downloadingRestart": "Mengunduh {percent}%. Silakan lanjutkan — Heracles Records akan bertanya sebelum memulai ulang.",
   "app.update.installerInBrowser": "Penginstal akan terbuka di browser Anda.",
   "app.update.downloaded": "Pembaruan sudah diunduh dan siap dipasang.",
-  "app.update.willDownload": "Heracles Records akan mengunduh pembaruan lalu memulai ulang untuk menyelesaikan pemasangan.",
+  "app.update.willDownload": "Heracles Records mengunduh pembaruan di latar belakang dan bertanya sebelum memulai ulang untuk memasangnya.",
   "app.update.available": "Pembaruan tersedia",
   "app.update.sinceVersion": "Semua yang baru sejak Heracles Records {version}.",
   "app.update.genericNotes": "Rilis ini berisi peningkatan dan perbaikan bug terbaru.",
@@ -84,6 +84,15 @@ const app: AppMessages = {
   "app.mcp.short.unreachable": "Server COROS MCP tidak dapat dihubungi.",
   "app.mcp.tileDetail": "perlu COROS MCP",
   "app.mcp.unreachableLabel": "COROS MCP tidak terjangkau",
+  "app.update.readyTitle": "Pembaruan siap",
+  "app.update.installingTitle": "Memasang pembaruan",
+  "app.update.readyBody": "Heracles Records {version} sudah diunduh. Mulai ulang untuk menyelesaikan pemasangan — aplikasi akan terbuka lagi dengan sendirinya.",
+  "app.update.windowsNote": "Pembaruan dipasang di latar belakang, tanpa perlu melewati penginstal.",
+  "app.update.passwordNote": "Sistem akan meminta kata sandi administrator untuk memasangnya.",
+  "app.update.installingBody": "Memasang Heracles Records {version}. Aplikasi akan dimulai ulang begitu selesai.",
+  "app.update.installCancelled": "Belum terpasang: permintaan kata sandi dibatalkan. Mulai ulang untuk mencoba lagi.",
+  "app.update.installFailed": "Pembaruan tidak bisa dipasang dari sini. Unduh dari GitHub saja.",
+  "app.update.restartNow": "Mulai ulang sekarang",
 };
 
 export default app;

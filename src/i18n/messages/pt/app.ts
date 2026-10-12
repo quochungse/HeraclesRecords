@@ -31,10 +31,10 @@ const app: AppMessages = {
   "app.update.openDownload": "Abrir download",
   "app.update.restartAndUpdate": "Reiniciar e atualizar",
   "app.update.now": "Atualizar agora",
-  "app.update.downloadingRestart": "Baixando {percent}%. O Heracles Records vai reiniciar quando estiver pronto.",
+  "app.update.downloadingRestart": "Baixando {percent}%. Pode continuar usando — o Heracles Records pergunta antes de reiniciar.",
   "app.update.installerInBrowser": "O instalador vai abrir no seu navegador.",
   "app.update.downloaded": "A atualização foi baixada e está pronta para instalar.",
-  "app.update.willDownload": "O Heracles Records vai baixar a atualização e reiniciar para concluir a instalação.",
+  "app.update.willDownload": "O Heracles Records baixa a atualização em segundo plano e pergunta antes de reiniciar para instalá-la.",
   "app.update.available": "Atualização disponível",
   "app.update.sinceVersion": "Todas as novidades desde o Heracles Records {version}.",
   "app.update.genericNotes": "Esta versão traz as últimas melhorias e correções de bugs.",
@@ -84,6 +84,15 @@ const app: AppMessages = {
   "app.mcp.short.unreachable": "O servidor COROS MCP não respondeu.",
   "app.mcp.tileDetail": "precisa do COROS MCP",
   "app.mcp.unreachableLabel": "COROS MCP fora do ar",
+  "app.update.readyTitle": "Atualização pronta",
+  "app.update.installingTitle": "Instalando a atualização",
+  "app.update.readyBody": "O Heracles Records {version} foi baixado. Reinicie para concluir a instalação — o app abre de novo sozinho.",
+  "app.update.windowsNote": "A instalação acontece em segundo plano, sem passar pelo instalador.",
+  "app.update.passwordNote": "O sistema vai pedir uma senha de administrador para instalar.",
+  "app.update.installingBody": "Instalando o Heracles Records {version}. O app reinicia assim que terminar.",
+  "app.update.installCancelled": "Não instalada: o pedido de senha foi cancelado. Reinicie para tentar de novo.",
+  "app.update.installFailed": "Não foi possível instalar a atualização por aqui. Baixe-a pelo GitHub.",
+  "app.update.restartNow": "Reiniciar agora",
 };
 
 export default app;

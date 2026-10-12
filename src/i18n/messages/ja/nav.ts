@@ -27,6 +27,9 @@ const nav: NavMessages = {
   "nav.expand": "サイドバーを展開",
   "nav.closeNavigation": "ナビゲーションを閉じる",
   "nav.startupSet": "次回の起動時から「{view}」が開きます。",
+  "nav.update.downloading": "アップデートをダウンロード中 {percent}%",
+  "nav.update.installing": "アップデートをインストール中",
+  "nav.update.ready": "アップデートの準備完了 — 再起動してインストール",
 };
 
 export default nav;

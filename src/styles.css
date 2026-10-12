@@ -767,19 +767,6 @@ input::placeholder {
   color: var(--text-secondary);
 }
 
-.app-dev-update-test {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  border-color: color-mix(in srgb, var(--accent-gold) 48%, var(--glass-border));
-  background: color-mix(in srgb, var(--accent-gold) 13%, var(--glass-bg));
-}
-
-.app-dev-update-test:hover {
-  border-color: color-mix(in srgb, var(--accent-gold) 72%, var(--glass-border));
-  background: color-mix(in srgb, var(--accent-gold) 20%, var(--glass-bg));
-}
-
 .app-body {
   display: flex;
   flex: 1;
@@ -1305,6 +1292,45 @@ input::placeholder {
   outline-offset: 2px;
 }
 
+/* An update on its way: Settings wears the update glyph in the accent while
+   it downloads or installs (the arrow climbing) and once it waits on a
+   restart (still). Settings is where the update lives, so the mark sits on
+   the way to it rather than in a badge of its own. */
+.app-sidebar-identity-settings.has-update {
+  color: var(--accent-strong);
+}
+
+.update-glyph-arrow {
+  transform-box: view-box;
+}
+
+.update-glyph.is-active .update-glyph-arrow {
+  animation: update-glyph-rise 1.6s var(--ease) infinite;
+}
+
+/* Out of the top of the ring, back in at the bottom: the jump between the two
+   happens while the arrow is clipped away, so only the climb is ever seen. */
+@keyframes update-glyph-rise {
+  0% {
+    transform: translateY(0);
+  }
+  45% {
+    transform: translateY(-14px);
+  }
+  45.01% {
+    transform: translateY(14px);
+  }
+  100% {
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .update-glyph.is-active .update-glyph-arrow {
+    animation: none;
+  }
+}
+
 /* --- The collapsed rail ------------------------------------------------- */
 
 .app-sidebar.is-collapsed .app-sidebar-inner {
@@ -1809,6 +1835,43 @@ input::placeholder {
 .update-prompt-actions .primary-button,
 .update-prompt-actions .secondary-button {
   min-height: 40px;
+}
+
+/* The restart question: no changelog, so a narrower sheet whose body is a
+   sentence or two. */
+.update-prompt--compact {
+  width: min(480px, 100%);
+}
+
+.update-prompt-body {
+  display: grid;
+  gap: 10px;
+  padding: 18px 28px 22px;
+}
+
+.update-prompt-body > p {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.update-prompt-body > .update-prompt-note {
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.update-prompt-body > .update-prompt-failure {
+  padding: 8px 12px;
+  border: 1px solid var(--warning-border);
+  border-radius: var(--radius-sm);
+  background: var(--warning-bg);
+  color: var(--warning-text);
+  font-size: 12px;
+}
+
+.update-prompt-actions a.primary-button {
+  text-decoration: none;
 }
 
 @media (max-width: 600px) {

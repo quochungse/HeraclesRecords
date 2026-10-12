@@ -31,10 +31,10 @@ const app: AppMessages = {
   "app.update.openDownload": "Download öffnen",
   "app.update.restartAndUpdate": "Neu starten und aktualisieren",
   "app.update.now": "Jetzt aktualisieren",
-  "app.update.downloadingRestart": "Wird geladen: {percent} %. Heracles Records startet neu, sobald es fertig ist.",
+  "app.update.downloadingRestart": "Wird geladen: {percent} %. Arbeite ruhig weiter – Heracles Records fragt, bevor es neu startet.",
   "app.update.installerInBrowser": "Das Installationsprogramm öffnet sich in deinem Browser.",
   "app.update.downloaded": "Das Update ist heruntergeladen und bereit zur Installation.",
-  "app.update.willDownload": "Heracles Records lädt das Update herunter und startet neu, um die Installation abzuschließen.",
+  "app.update.willDownload": "Heracles Records lädt das Update im Hintergrund und fragt, bevor es zur Installation neu startet.",
   "app.update.available": "Update verfügbar",
   "app.update.sinceVersion": "Alles Neue seit Heracles Records {version}.",
   "app.update.genericNotes": "Diese Version bringt die neuesten Verbesserungen und Fehlerbehebungen.",
@@ -84,6 +84,15 @@ const app: AppMessages = {
   "app.mcp.short.unreachable": "Der COROS-MCP-Server war nicht erreichbar.",
   "app.mcp.tileDetail": "braucht COROS MCP",
   "app.mcp.unreachableLabel": "COROS MCP nicht erreichbar",
+  "app.update.readyTitle": "Update bereit",
+  "app.update.installingTitle": "Update wird installiert",
+  "app.update.readyBody": "Heracles Records {version} ist geladen. Starte neu, um die Installation abzuschließen – die App öffnet sich danach von selbst.",
+  "app.update.windowsNote": "Die Installation läuft im Hintergrund, ohne Installationsassistenten.",
+  "app.update.passwordNote": "Dein System fragt zur Installation nach einem Administratorpasswort.",
+  "app.update.installingBody": "Heracles Records {version} wird installiert. Die App startet neu, sobald es fertig ist.",
+  "app.update.installCancelled": "Nicht installiert: Die Passwortabfrage wurde abgebrochen. Starte neu, um es noch einmal zu versuchen.",
+  "app.update.installFailed": "Das Update ließ sich hier nicht installieren. Lade es stattdessen von GitHub herunter.",
+  "app.update.restartNow": "Jetzt neu starten",
 };
 
 export default app;

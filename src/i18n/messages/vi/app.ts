@@ -31,10 +31,10 @@ const app: AppMessages = {
   "app.update.openDownload": "Mở trang tải về",
   "app.update.restartAndUpdate": "Khởi động lại và cập nhật",
   "app.update.now": "Cập nhật ngay",
-  "app.update.downloadingRestart": "Đang tải {percent}%. Heracles Records sẽ khởi động lại khi tải xong.",
+  "app.update.downloadingRestart": "Đang tải {percent}%. Bạn cứ tiếp tục dùng — Heracles Records sẽ hỏi trước khi khởi động lại.",
   "app.update.installerInBrowser": "Trình cài đặt sẽ mở trong trình duyệt.",
   "app.update.downloaded": "Bản cập nhật đã tải xong và sẵn sàng cài đặt.",
-  "app.update.willDownload": "Heracles Records sẽ tải bản cập nhật rồi khởi động lại để cài đặt.",
+  "app.update.willDownload": "Heracles Records sẽ tải bản cập nhật trong nền và hỏi trước khi khởi động lại để cài đặt.",
   "app.update.available": "Có bản cập nhật",
   "app.update.sinceVersion": "Mọi điểm mới kể từ Heracles Records {version}.",
   "app.update.genericNotes": "Bản này có các cải tiến và sửa lỗi mới nhất.",
@@ -84,6 +84,15 @@ const app: AppMessages = {
   "app.mcp.short.unreachable": "Không liên lạc được với máy chủ COROS MCP.",
   "app.mcp.tileDetail": "cần COROS MCP",
   "app.mcp.unreachableLabel": "Không liên lạc được COROS MCP",
+  "app.update.readyTitle": "Bản cập nhật đã sẵn sàng",
+  "app.update.installingTitle": "Đang cài đặt bản cập nhật",
+  "app.update.readyBody": "Đã tải xong Heracles Records {version}. Khởi động lại để hoàn tất cài đặt — ứng dụng sẽ tự mở lại.",
+  "app.update.windowsNote": "Bản cập nhật được cài trong nền, không cần bấm qua trình cài đặt.",
+  "app.update.passwordNote": "Hệ thống sẽ hỏi mật khẩu quản trị để cài đặt.",
+  "app.update.installingBody": "Đang cài đặt Heracles Records {version}. Ứng dụng sẽ khởi động lại ngay khi xong.",
+  "app.update.installCancelled": "Chưa cài đặt vì yêu cầu mật khẩu đã bị huỷ. Khởi động lại để thử lại.",
+  "app.update.installFailed": "Không cài được bản cập nhật từ đây. Hãy tải về từ GitHub.",
+  "app.update.restartNow": "Khởi động lại",
 };
 
 export default app;

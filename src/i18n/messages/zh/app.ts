@@ -31,10 +31,10 @@ const app: AppMessages = {
   "app.update.openDownload": "打开下载页面",
   "app.update.restartAndUpdate": "重启并更新",
   "app.update.now": "立即更新",
-  "app.update.downloadingRestart": "正在下载 {percent}%，完成后 Heracles Records 将自动重启。",
+  "app.update.downloadingRestart": "正在下载 {percent}%。可以继续使用，Heracles Records 重启前会先询问你。",
   "app.update.installerInBrowser": "安装程序将在浏览器中打开。",
   "app.update.downloaded": "更新已下载，可以安装。",
-  "app.update.willDownload": "Heracles Records 将下载更新，并重启以完成安装。",
+  "app.update.willDownload": "Heracles Records 会在后台下载更新，并在重启安装前先询问你。",
   "app.update.available": "有可用更新",
   "app.update.sinceVersion": "自 Heracles Records {version} 以来的全部更新。",
   "app.update.genericNotes": "此版本包含最新的改进和错误修复。",
@@ -84,6 +84,15 @@ const app: AppMessages = {
   "app.mcp.short.unreachable": "无法连接到 COROS MCP 服务器。",
   "app.mcp.tileDetail": "需要 COROS MCP",
   "app.mcp.unreachableLabel": "无法连接 COROS MCP",
+  "app.update.readyTitle": "更新已就绪",
+  "app.update.installingTitle": "正在安装更新",
+  "app.update.readyBody": "Heracles Records {version} 已下载。重启即可完成安装，应用会自动重新打开。",
+  "app.update.windowsNote": "更新在后台安装，无需逐步点击安装程序。",
+  "app.update.passwordNote": "系统会要求输入管理员密码以完成安装。",
+  "app.update.installingBody": "正在安装 Heracles Records {version}，完成后应用会立即重启。",
+  "app.update.installCancelled": "未安装：密码请求已取消。重启即可重试。",
+  "app.update.installFailed": "无法在此安装更新，请改从 GitHub 下载。",
+  "app.update.restartNow": "立即重启",
 };
 
 export default app;

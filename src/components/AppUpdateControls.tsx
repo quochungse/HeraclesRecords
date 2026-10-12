@@ -10,6 +10,7 @@ import {
 import type { AppUpdateSnapshot } from "../../electron/types";
 import { t } from "../i18n/core";
 import { useI18n } from "../i18n/useI18n";
+import { UpdateGlyph } from "./UpdateGlyph";
 
 interface AppUpdateControlProps {
   snapshot: AppUpdateSnapshot;
@@ -30,13 +31,16 @@ interface AppUpdateControlProps {
  * turns green and names the version, so the state is readable at a glance.
  */
 function triggerContent(snapshot: AppUpdateSnapshot, busy: boolean) {
-  if (snapshot.status === "downloading") {
+  if (snapshot.status === "downloading" || snapshot.status === "installing") {
     return {
       ready: true,
-      icon: <Loader2 className="spin" size={15} aria-hidden="true" />,
-      label: t("update.downloading", {
-        percent: Math.round(snapshot.downloadPercent ?? 0),
-      }),
+      icon: <UpdateGlyph size={15} active />,
+      label:
+        snapshot.status === "installing"
+          ? t("update.installing")
+          : t("update.downloading", {
+              percent: Math.round(snapshot.downloadPercent ?? 0),
+            }),
     };
   }
 

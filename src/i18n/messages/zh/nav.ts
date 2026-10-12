@@ -27,6 +27,9 @@ const nav: NavMessages = {
   "nav.expand": "展开侧边栏",
   "nav.closeNavigation": "关闭导航",
   "nav.startupSet": "下次启动时将打开「{view}」。",
+  "nav.update.downloading": "正在下载更新 {percent}%",
+  "nav.update.installing": "正在安装更新",
+  "nav.update.ready": "更新已就绪，重启即可安装",
 };
 
 export default nav;

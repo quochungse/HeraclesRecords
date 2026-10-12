@@ -71,32 +71,53 @@ jobs:
       - name: Rebuild native modules
         run: npm run rebuild
 
-      # Signed and notarized when the Apple Developer secrets are set; ad-hoc
-      # signed otherwise, so a release without an Apple account still ships the
-      # other two platforms instead of failing here. An ad-hoc build opens only
-      # after the user allows it in System Settings → Privacy & Security, and
-      # the updater sends it to the download page rather than installing
-      # (`isMacAdHocSigned` in updaterService.ts).
-      - name: Check Apple signing secrets
+      # Three ways to sign, best first:
+      #   developer-id — the Apple Developer secrets are set: signed and
+      #     notarized. Nothing asks anything, ever.
+      #   self-signed — the project's own certificate (MAC_SELF_SIGN_P12_*,
+      #     made once by scripts/create-mac-signing-cert.sh). Not notarized, so
+      #     the first install from the DMG still needs "Open Anyway"; after that
+      #     every update installs in place through Squirrel, never through a
+      #     browser, and the keychain's "Always Allow" survives it. Why, in
+      #     scripts/mac-sign.cjs.
+      #   ad-hoc — neither: the build is its own identity, so every update is
+      #     a DMG from the browser, Gatekeeper asks again and so does the
+      #     keychain (`isMacAdHocSigned` in updaterService.ts).
+      # A release without an Apple account still ships the other two platforms
+      # instead of failing here.
+      - name: Choose macOS signing
         id: apple
         env:
           APPLE_CERTIFICATE_BASE64: ${{ secrets.APPLE_CERTIFICATE_BASE64 }}
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          MAC_SELF_SIGN_P12_BASE64: ${{ secrets.MAC_SELF_SIGN_P12_BASE64 }}
         run: |
           if [ -n "$APPLE_CERTIFICATE_BASE64" ] && [ -n "$APPLE_ID" ] && [ -n "$APPLE_TEAM_ID" ]; then
-            echo "signed=true" >> "$GITHUB_OUTPUT"
+            echo "mode=developer-id" >> "$GITHUB_OUTPUT"
+          elif [ -n "$MAC_SELF_SIGN_P12_BASE64" ]; then
+            echo "mode=self-signed" >> "$GITHUB_OUTPUT"
+            echo "::notice::Signing macOS with the project's self-signed certificate; not notarized."
           else
-            echo "signed=false" >> "$GITHUB_OUTPUT"
-            echo "::warning::Apple Developer secrets are not set; the macOS build is ad-hoc signed and not notarized."
+            echo "mode=ad-hoc" >> "$GITHUB_OUTPUT"
+            echo "::warning::No macOS signing secrets are set; the build is ad-hoc signed and cannot update itself in place."
           fi
 
       - name: Import Apple Developer certificate
-        if: steps.apple.outputs.signed == 'true'
+        if: steps.apple.outputs.mode == 'developer-id'
         uses: apple-actions/import-codesign-certs@v3
         with:
           p12-file-base64: ${{ secrets.APPLE_CERTIFICATE_BASE64 }}
           p12-password: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+
+      # Into a keychain on the search list, which is where codesign looks for
+      # the certificate behind an identity given by hash.
+      - name: Import self-signed certificate
+        if: steps.apple.outputs.mode == 'self-signed'
+        uses: apple-actions/import-codesign-certs@v3
+        with:
+          p12-file-base64: ${{ secrets.MAC_SELF_SIGN_P12_BASE64 }}
+          p12-password: ${{ secrets.MAC_SELF_SIGN_P12_PASSWORD }}
 
       - name: Build DMG
         env:
@@ -107,13 +128,38 @@ jobs:
           HERACLES_GOOGLE_OAUTH_ID: ${{ secrets.HERACLES_GOOGLE_OAUTH_ID }}
           HERACLES_GOOGLE_OAUTH_KEY: ${{ secrets.HERACLES_GOOGLE_OAUTH_KEY }}
         run: |
-          if [ "${{ steps.apple.outputs.signed }}" = "true" ]; then
-            npm run dist:mac
-          else
-            # The same switches build.yml uses for its unsigned macOS check.
-            CSC_IDENTITY_AUTO_DISCOVERY=false npm run dist:mac -- \
-              -c.mac.identity=- -c.mac.notarize=false -c.mac.hardenedRuntime=false
-          fi
+          case "${{ steps.apple.outputs.mode }}" in
+            developer-id)
+              npm run dist:mac
+              ;;
+            self-signed)
+              # The certificate's SHA-1, read from the keychain it was just put
+              # in; it is listed as CSSMERR_TP_NOT_TRUSTED, which is expected.
+              HERACLES_MAC_SIGN_IDENTITY="$(security find-identity -p codesigning \
+                | awk '/"Heracles Records Self-Signed"/ { print $2; exit }')"
+              if [ -z "$HERACLES_MAC_SIGN_IDENTITY" ]; then
+                echo "::error::The self-signed certificate is not in the keychain."
+                exit 1
+              fi
+              export HERACLES_MAC_SIGN_IDENTITY
+              CSC_IDENTITY_AUTO_DISCOVERY=false npm run dist:mac -- \
+                -c.mac.identity=- -c.mac.notarize=false -c.mac.sign=scripts/mac-sign.cjs
+              # The requirement every later build must satisfy, in the log:
+              # it has to name the certificate, never a cdhash.
+              for app in release/mac*/"Heracles Records.app"; do
+                codesign -d -r- "$app" 2>&1 | tail -1
+                codesign -d -r- "$app" 2>&1 | grep -q "certificate leaf" || {
+                  echo "::error::$app was not signed with the certificate."
+                  exit 1
+                }
+              done
+              ;;
+            *)
+              # The same switches build.yml uses for its unsigned macOS check.
+              CSC_IDENTITY_AUTO_DISCOVERY=false npm run dist:mac -- \
+                -c.mac.identity=- -c.mac.notarize=false -c.mac.hardenedRuntime=false
+              ;;
+          esac
 
       - name: Verify macOS update artifacts
         run: node scripts/verify-release-artifacts.mjs macos

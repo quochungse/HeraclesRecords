@@ -31,10 +31,10 @@ const app: AppMessages = {
   "app.update.openDownload": "เปิดหน้าดาวน์โหลด",
   "app.update.restartAndUpdate": "รีสตาร์ทและอัปเดต",
   "app.update.now": "อัปเดตเลย",
-  "app.update.downloadingRestart": "กำลังดาวน์โหลด {percent}% Heracles Records จะรีสตาร์ทเมื่อพร้อม",
+  "app.update.downloadingRestart": "กำลังดาวน์โหลด {percent}% ใช้งานต่อได้เลย Heracles Records จะถามก่อนรีสตาร์ท",
   "app.update.installerInBrowser": "ตัวติดตั้งจะเปิดในเบราว์เซอร์",
   "app.update.downloaded": "ดาวน์โหลดอัปเดตแล้ว พร้อมติดตั้ง",
-  "app.update.willDownload": "Heracles Records จะดาวน์โหลดอัปเดตแล้วรีสตาร์ทเพื่อติดตั้งให้เสร็จ",
+  "app.update.willDownload": "Heracles Records จะดาวน์โหลดอัปเดตเบื้องหลัง และถามก่อนรีสตาร์ทเพื่อติดตั้ง",
   "app.update.available": "มีอัปเดตใหม่",
   "app.update.sinceVersion": "ทุกอย่างที่ใหม่ตั้งแต่ Heracles Records {version}",
   "app.update.genericNotes": "รุ่นนี้มีการปรับปรุงและแก้ไขข้อผิดพลาดล่าสุด",
@@ -84,6 +84,15 @@ const app: AppMessages = {
   "app.mcp.short.unreachable": "ติดต่อเซิร์ฟเวอร์ COROS MCP ไม่ได้",
   "app.mcp.tileDetail": "ต้องใช้ COROS MCP",
   "app.mcp.unreachableLabel": "ติดต่อ COROS MCP ไม่ได้",
+  "app.update.readyTitle": "อัปเดตพร้อมแล้ว",
+  "app.update.installingTitle": "กำลังติดตั้งอัปเดต",
+  "app.update.readyBody": "ดาวน์โหลด Heracles Records {version} เสร็จแล้ว รีสตาร์ทเพื่อติดตั้งให้เสร็จ แอปจะเปิดขึ้นมาใหม่เอง",
+  "app.update.windowsNote": "ติดตั้งเบื้องหลัง โดยไม่ต้องกดผ่านตัวติดตั้ง",
+  "app.update.passwordNote": "ระบบจะขอรหัสผ่านผู้ดูแลระบบเพื่อติดตั้ง",
+  "app.update.installingBody": "กำลังติดตั้ง Heracles Records {version} แอปจะรีสตาร์ททันทีที่เสร็จ",
+  "app.update.installCancelled": "ยังไม่ได้ติดตั้ง เพราะคำขอรหัสผ่านถูกยกเลิก รีสตาร์ทเพื่อลองอีกครั้ง",
+  "app.update.installFailed": "ติดตั้งอัปเดตจากตรงนี้ไม่ได้ โปรดดาวน์โหลดจาก GitHub แทน",
+  "app.update.restartNow": "รีสตาร์ทเลย",
 };
 
 export default app;

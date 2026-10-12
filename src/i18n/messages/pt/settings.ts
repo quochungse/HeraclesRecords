@@ -91,6 +91,7 @@ const settings: SettingsMessages = {
   "update.autoDownloadHint": "Caso contrário, só baixa quando você pedir.",
   "update.check": "Verificar atualizações",
   "settings.coachModels.claudeUpdate": "O Claude Code {latest} está disponível (este computador tem a {installed}). Execute <code>claude update</code> em um terminal.",
+  "update.installing": "Instalando…",
 };
 
 export default settings;

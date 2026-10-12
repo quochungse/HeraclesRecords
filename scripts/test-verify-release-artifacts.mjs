@@ -86,11 +86,12 @@ assert.deepEqual(
   const templates = [...source.matchAll(/\/download\/v\$\{version\}\/([^`]+)`/g)].map(
     (match) => match[1]
   );
-  const platformFor = { dmg: "macos", exe: "windows", AppImage: "linux" };
+  // Linux has two: a deb install is sent to the deb, an AppImage to the AppImage.
+  const platformFor = { dmg: "macos", exe: "windows", AppImage: "linux", deb: "linux" };
   assert.deepEqual(
     templates.map((template) => platformFor[template.split(".").pop()]).sort(),
-    ["linux", "macos", "windows"],
-    "updaterService.ts builds one manual download link per platform"
+    ["linux", "linux", "macos", "windows"],
+    "updaterService.ts builds one manual download link per installer kind"
   );
   for (const template of templates) {
     const platform = platformFor[template.split(".").pop()];

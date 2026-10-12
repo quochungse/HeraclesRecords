@@ -49,12 +49,20 @@ import { applySyncedLocalStorageOps } from "./settings/syncLocalStorage";
 import { startLocalStoragePublisher } from "./settings/localStoragePublisher";
 import { subscribeToToasts } from "./toast";
 import { isMcpFailure } from "./mcp/mcpNotice";
-import { UpdateAvailablePrompt } from "./components/UpdateAvailablePrompt";
+import {
+  UpdateAvailablePrompt,
+  UpdateRestartPrompt,
+} from "./components/UpdateAvailablePrompt";
 import {
   AppSidebar,
   createInitialSidebarExpanded,
+  type AppSidebarUpdate,
 } from "./components/AppSidebar";
 import { DeveloperToolbar } from "./components/DeveloperToolbar";
+import {
+  useUpdateSimulation,
+  type UpdateScenario,
+} from "./components/updateSimulation";
 import { PRIMARY_NAV_ITEMS, type PrimaryView } from "./navigation/primaryNav";
 import {
   getPrimaryViewLabel,
@@ -331,14 +339,6 @@ export default function App() {
     number | undefined
   >(undefined);
   const devUpdatePreviewSequenceRef = useRef(0);
-  /**
-   * A fake "update available" snapshot for the dev-only Test update button.
-   * It shadows the real snapshot rather than overwriting it, so main can keep
-   * pushing real status underneath and clearing the simulation needs no
-   * refetch. Renderer state only — a restart drops it.
-   */
-  const [devUpdateSimulation, setDevUpdateSimulation] =
-    useState<AppUpdateSnapshot | null>(null);
   /** The Strength screen's generated sample history, switched from the toolbar. */
   const [strengthSampleMode, setStrengthSampleMode] = useState(false);
   /** The Hall of Records' sample history, switched from the toolbar. */
@@ -447,7 +447,37 @@ export default function App() {
     },
   );
   const installAcceptedVersionRef = useRef<string | null>(null);
+  const [restartPromptOpen, setRestartPromptOpen] = useState(false);
+  /**
+   * The dev-only Test update: a scripted update that shadows the real snapshot
+   * rather than overwriting it, so main can keep pushing real status underneath
+   * and clearing the simulation needs no refetch. It goes through the same
+   * handlers below as a real one. Renderer state only — a restart drops it.
+   */
+  const updateSimulation = useUpdateSimulation({
+    onMessage: setMessage,
+    onFinished: () => {
+      installAcceptedVersionRef.current = null;
+      setRestartPromptOpen(false);
+      setDevUpdatePreviewKey(undefined);
+    },
+  });
+  const devUpdateSimulation = updateSimulation.snapshot;
   const effectiveUpdateSnapshot = devUpdateSimulation ?? appUpdateSnapshot;
+  // What the Settings button wears while an update is on its way.
+  const sidebarUpdate: AppSidebarUpdate | null = !effectiveUpdateSnapshot.supported
+    ? null
+    : effectiveUpdateSnapshot.status === "downloading"
+      ? {
+          phase: "downloading",
+          percent: effectiveUpdateSnapshot.downloadPercent ?? 0,
+        }
+      : effectiveUpdateSnapshot.status === "installing"
+        ? { phase: "installing" }
+        : effectiveUpdateSnapshot.status === "downloaded" &&
+            effectiveUpdateSnapshot.installMethod !== "manual"
+          ? { phase: "ready" }
+          : null;
 
 
   /* The two screens most opened from a cold start are fetched once the first
@@ -531,25 +561,27 @@ export default function App() {
       return;
     }
 
+    // Downloaded in the background: ask, never restart unasked. This used to
+    // quit the app the moment the file landed, whatever was on screen.
     if (
-      appUpdateSnapshot.status === "downloaded" &&
-      appUpdateSnapshot.availableVersion === acceptedVersion
+      effectiveUpdateSnapshot.status === "downloaded" &&
+      effectiveUpdateSnapshot.availableVersion === acceptedVersion
     ) {
       installAcceptedVersionRef.current = null;
-      handleInstallUpdate();
+      setRestartPromptOpen(true);
       return;
     }
 
-    if (appUpdateSnapshot.status === "error") {
+    if (effectiveUpdateSnapshot.status === "error") {
       installAcceptedVersionRef.current = null;
       setError(
-        appUpdateSnapshot.error ?? t("app.update.downloadFailed"),
+        effectiveUpdateSnapshot.error ?? t("app.update.downloadFailed"),
       );
     }
   }, [
-    appUpdateSnapshot.availableVersion,
-    appUpdateSnapshot.error,
-    appUpdateSnapshot.status,
+    effectiveUpdateSnapshot.availableVersion,
+    effectiveUpdateSnapshot.error,
+    effectiveUpdateSnapshot.status,
   ]);
 
   // Tag the document with the host OS so the header can clear the macOS
@@ -1129,34 +1161,33 @@ export default function App() {
 
   function handleInstallUpdate() {
     if (devUpdateSimulation) {
-      setMessage(
-        "Test update install skipped — the development build has no updater.", // i18n-ignore: development build only
-      );
+      setRestartPromptOpen(devUpdateSimulation.installMethod !== "manual");
+      updateSimulation.install();
       return;
     }
 
+    // Up while it works: on Linux the install runs in this app and the prompt
+    // is where it is seen; elsewhere the app is gone a moment later.
+    setRestartPromptOpen(effectiveUpdateSnapshot.installMethod !== "manual");
     void api
       ?.quitAndInstallUpdate()
       .then((result) => {
         if (result?.installMethod === "manual") {
+          setRestartPromptOpen(false);
           setMessage(
             t("app.update.openedDownload"),
           );
         }
       })
       .catch((caught) => {
+        setRestartPromptOpen(false);
         setError(toErrorMessage(caught));
       });
   }
 
   async function handleDownloadUpdate() {
     if (devUpdateSimulation) {
-      // Jump straight to "ready to install" so the downloaded-state UI is
-      // reachable; nothing is fetched.
-      setDevUpdateSimulation({ ...devUpdateSimulation, status: "downloaded" });
-      setMessage(
-        `Test update ${devUpdateSimulation.availableVersion} is ready to install. Nothing was downloaded.`, // i18n-ignore: development build only
-      );
+      updateSimulation.download();
       return;
     }
 
@@ -1181,19 +1212,13 @@ export default function App() {
   }
 
   function handleAcceptAvailableUpdate(version: string) {
-    if (devUpdateSimulation) {
-      setDevUpdatePreviewKey(undefined);
-      setMessage(
-        `Test update ${version} accepted. No files were downloaded in the development build.`, // i18n-ignore: development build only
-      );
-      return;
-    }
-
+    // The simulation takes this same path, so Test update exercises it.
+    const snapshot = effectiveUpdateSnapshot;
     installAcceptedVersionRef.current = version;
 
     if (
-      appUpdateSnapshot.status === "downloaded" &&
-      appUpdateSnapshot.availableVersion === version
+      snapshot.status === "downloaded" &&
+      snapshot.availableVersion === version
     ) {
       installAcceptedVersionRef.current = null;
       handleInstallUpdate();
@@ -1203,28 +1228,28 @@ export default function App() {
     // electron-updater starts this itself when auto-download is enabled.
     // Otherwise the explicit acceptance starts the download here.
     if (
-      appUpdateSnapshot.status !== "downloading" &&
-      !(
-        appUpdateSnapshot.status === "available" &&
-        appUpdateSnapshot.autoDownload
-      )
+      snapshot.status !== "downloading" &&
+      !(snapshot.status === "available" && snapshot.autoDownload)
     ) {
       void handleDownloadUpdate();
     }
   }
 
   /**
-   * Turns the simulated update on and off. It holds for the session so the
-   * Settings update button, its popover and the prompt can all be exercised
-   * in a dev build; a restart clears it because nothing is persisted.
+   * Starts a Test update scenario, or with `null` clears it. It holds for the
+   * session so the Settings button, its popover and both prompts can all be
+   * exercised in a dev build; a restart clears it because nothing is persisted.
    */
-  function toggleDevUpdateSimulation() {
+  function handleUpdateScenarioChange(scenario: UpdateScenario | null) {
     if (!IS_DEVELOPMENT_BUILD) {
       return;
     }
 
-    if (devUpdateSimulation) {
-      setDevUpdateSimulation(null);
+    installAcceptedVersionRef.current = null;
+    setRestartPromptOpen(false);
+
+    if (!scenario) {
+      updateSimulation.clear();
       setDevUpdatePreviewKey(undefined);
       setMessage("Test update cleared. Showing the real update status again."); // i18n-ignore: development build only
       return;
@@ -1232,21 +1257,17 @@ export default function App() {
 
     devUpdatePreviewSequenceRef.current += 1;
     setDevUpdatePreviewKey(devUpdatePreviewSequenceRef.current);
-    setDevUpdateSimulation({
-      supported: true,
-      currentVersion:
+    updateSimulation.start(scenario, {
+      base: appUpdateSnapshot,
+      version: DEV_UPDATE_PREVIEW.version,
+      previousVersion:
         appUpdateSnapshot.currentVersion === "0.0.0"
           ? DEV_UPDATE_PREVIEW.previousVersion
           : appUpdateSnapshot.currentVersion,
-      status: "available",
-      availableVersion: DEV_UPDATE_PREVIEW.version,
       releaseNotes: DEV_UPDATE_PREVIEW.releaseNotes,
-      autoCheck: appUpdateSnapshot.autoCheck,
-      autoDownload: false,
     });
   }
 
-  /** Dismissing the prompt closes it but leaves the simulation running. */
   function dismissDevUpdatePreview() {
     setDevUpdatePreviewKey(undefined);
   }
@@ -1262,15 +1283,10 @@ export default function App() {
     try {
       const snapshot = await api.setUpdatePreferences(prefs);
       setAppUpdateSnapshot(snapshot);
-      setDevUpdateSimulation((current) =>
-        current
-          ? {
-              ...current,
-              autoCheck: snapshot.autoCheck,
-              autoDownload: snapshot.autoDownload,
-            }
-          : current,
-      );
+      updateSimulation.setPreferences({
+        autoCheck: snapshot.autoCheck,
+        autoDownload: snapshot.autoDownload,
+      });
     } catch (caught) {
       setError(toErrorMessage(caught));
     }
@@ -1790,8 +1806,8 @@ export default function App() {
           api={api}
           developmentViewActive={showDevelopmentTools}
           onDevelopmentViewToggle={handleDevelopmentViewToggle}
-          updateSimulationActive={devUpdateSimulation !== null}
-          onToggleUpdateSimulation={toggleDevUpdateSimulation}
+          updateScenario={updateSimulation.scenario}
+          onUpdateScenarioChange={handleUpdateScenarioChange}
           strengthSampleActive={strengthSampleMode}
           onStrengthSampleChange={setStrengthSampleMode}
           recordsSample={recordsSample}
@@ -1821,6 +1837,7 @@ export default function App() {
           onExpandedChange={setSidebarExpanded}
           overlayOpen={sidebarOverlayOpen}
           onOverlayOpenChange={setSidebarOverlayOpen}
+          appUpdate={sidebarUpdate}
         />
 
         <main
@@ -2203,6 +2220,16 @@ export default function App() {
         }
         previewKey={devUpdatePreviewKey}
       />
+      {restartPromptOpen &&
+      (effectiveUpdateSnapshot.status === "downloaded" ||
+        effectiveUpdateSnapshot.status === "installing") ? (
+        <UpdateRestartPrompt
+          snapshot={effectiveUpdateSnapshot}
+          platform={updateSimulation.platform ?? api?.platform}
+          onRestart={handleInstallUpdate}
+          onLater={() => setRestartPromptOpen(false)}
+        />
+      ) : null}
       <Toaster toasts={toasts} onDismiss={dismissToast}>
         {recordsNotices.toasts.map(({ announcement, labour }) => (
           <LabourToastCard

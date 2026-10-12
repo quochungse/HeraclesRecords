@@ -27,6 +27,9 @@ const nav: NavMessages = {
   "nav.expand": "Bentangkan bilah samping",
   "nav.closeNavigation": "Tutup navigasi",
   "nav.startupSet": "Saat dibuka berikutnya, aplikasi akan langsung ke {view}.",
+  "nav.update.downloading": "Mengunduh pembaruan {percent}%",
+  "nav.update.installing": "Memasang pembaruan",
+  "nav.update.ready": "Pembaruan siap — mulai ulang untuk memasang",
 };
 
 export default nav;
