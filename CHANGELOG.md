@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.1.1] - 2026-10-12
+
+### What's new
+
+- **Updates** - an update downloads in the background and no longer closes the app the moment it lands. The Settings button on the rail shows its progress, and once it is ready you choose Restart now or Later. On Windows it installs without the setup wizard; on Linux the window no longer freezes while the update installs.
+- **Overview** - the panels sit side by side on narrower windows, and a full 100% recovery draws your physique in sky blue.
+
+### Fixed
+
+- Coach's analysis presets fill the role and playbook in the language on screen.
+- Improve app performance and stability.
+
 ## [1.1.0] - 2026-10-10
 
 ### What's new
