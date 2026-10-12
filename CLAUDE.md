@@ -1841,7 +1841,7 @@ lives at module level for the same visit-to-visit reason — see `useCalendarDat
   "Your physique" (`RecoveryPanel`, which replaced the recovery ring) draws a low-poly
   wireframe of the athlete, lit from the feet up to COROS's recovery %, in a colour that runs
   with it (`figureColourFor`, since 2026-10-08; it was four bands): red at 20% and under, orange
-  at 60, yellow at 70, green at 100, mixed in OKLCH between — the words keep COROS's three bands.
+  at 60, yellow at 70, green toward 100, mixed in OKLCH between, and a full 100 sky blue (`--figure-peak`, the stage's idle colour) — the words keep COROS's three bands.
   The mix is written on the panel as `--recovery-tone`, so the four stop colours are declared on
   `.training-recovery-panel` and not on the stage: a custom property holding `var()` resolves
   where it is declared, and on the stage they were out of its reach. **The physique is height and weight

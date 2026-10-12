@@ -23,8 +23,10 @@ export const NARROW_FRAME = { feet: 0.14, span: 0.8 };
  * four colours the panel declares (`--figure-low` … `--figure-full`) stand at
  * 20, 60, 70 and 100, and a figure between two is mixed between them in
  * OKLCH, whose lightness runs evenly — straight from red to green in RGB goes
- * through brown. 20 and under is the red. The words (Ready, Moderate, Recover)
- * still follow COROS's three bands. Undefined for no reading (a 0 from COROS
+ * through brown. 20 and under is the red. A full 100 is not the green the mix
+ * runs toward but `--figure-peak`, the stage's idle sky blue, so 99 and 100
+ * read apart. The words (Ready, Moderate, Recover) still follow COROS's three
+ * bands. Undefined for no reading (a 0 from COROS
  * is none), which the stage draws in its idle colour.
  */
 export const FIGURE_COLOUR_STOPS: ReadonlyArray<readonly [number, string]> = [
@@ -37,6 +39,7 @@ export const FIGURE_COLOUR_STOPS: ReadonlyArray<readonly [number, string]> = [
 export function figureColourFor(recoveryPct: number | undefined): string | undefined {
   if (recoveryPct === undefined || !(recoveryPct > 0)) return undefined;
   const pct = Math.min(100, Math.round(recoveryPct));
+  if (pct === 100) return "var(--figure-peak)";
   // The last stop is 100, so every percent finds one.
   const at = FIGURE_COLOUR_STOPS.findIndex(([stop]) => pct <= stop);
   const [high, to] = FIGURE_COLOUR_STOPS[at];

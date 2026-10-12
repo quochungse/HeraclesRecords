@@ -6265,6 +6265,7 @@ td span {
   --figure-mid: #fb923c;
   --figure-high: #d4e34c;
   --figure-full: #6ee7a8;
+  --figure-peak: #46b8ff; /* 100% alone: the stage's idle sky blue (`--figure-idle`) */
   position: relative;
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);

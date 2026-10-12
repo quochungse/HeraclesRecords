@@ -28,7 +28,7 @@
 // - **The level and the frame agree**: the words stand where the stylesheet
 //   puts the fill line.
 // - **The colour runs with the recovery**: red at 20% and under, orange at 60,
-//   yellow at 70, green at 100, mixed in OKLCH between; no reading has none.
+//   yellow at 70, green toward 100 (mixed in OKLCH between), and sky blue at 100 itself; no reading has none.
 //   The four colours are declared on the panel, where the mix is written —
 //   a custom property holding var() resolves where it is declared.
 //
@@ -335,12 +335,12 @@ assert.equal(math.figureColourFor(5), "var(--figure-low)", "20% and under is the
 assert.equal(math.figureColourFor(20), "var(--figure-low)");
 assert.equal(math.figureColourFor(60), "var(--figure-mid)");
 assert.equal(math.figureColourFor(70), "var(--figure-high)");
-assert.equal(math.figureColourFor(100), "var(--figure-full)");
-assert.equal(math.figureColourFor(99.6), "var(--figure-full)", "COROS's figure is drawn rounded");
+assert.equal(math.figureColourFor(100), "var(--figure-peak)", "a full 100 is the sky blue");
+assert.equal(math.figureColourFor(99.6), "var(--figure-peak)", "COROS's figure is drawn rounded");
 assert.equal(math.figureColourFor(65), "color-mix(in oklch, var(--figure-mid), var(--figure-high) 50%)");
 assert.equal(math.figureColourFor(30), "color-mix(in oklch, var(--figure-low), var(--figure-mid) 25%)");
-assert.equal(math.figureColourFor(99), "color-mix(in oklch, var(--figure-high), var(--figure-full) 96.7%)");
-// Every percent from 1 to 100 has a colour, and a step of one moves the mix forward.
+assert.equal(math.figureColourFor(99), "color-mix(in oklch, var(--figure-high), var(--figure-full) 96.7%)", "99 still runs toward the green");
+// Every percent from 1 to 99 has a colour, and a step of one moves the mix forward (100 is the peak, above).
 {
   const share = (pct) => {
     const c = math.figureColourFor(pct);
@@ -349,12 +349,12 @@ assert.equal(math.figureColourFor(99), "color-mix(in oklch, var(--figure-high), 
     const m = c.match(/var\((--figure-\w+)\), var\((--figure-\w+)\) ([\d.]+)%\)$/);
     return math.FIGURE_COLOUR_STOPS.findIndex(([, name]) => name === m[1]) + Number(m[3]) / 100;
   };
-  for (let pct = 21; pct <= 100; pct++) assert.ok(share(pct) > share(pct - 1), `${pct}% is further along than ${pct - 1}%`);
+  for (let pct = 21; pct <= 99; pct++) assert.ok(share(pct) > share(pct - 1), `${pct}% is further along than ${pct - 1}%`);
 }
 {
   const css = readFileSync(path.join(repoRoot, "src/styles.css"), "utf8");
   const panel = css.match(/\n\.training-recovery-panel \{([^}]*)\}/g)?.join("") ?? "";
-  for (const [, name] of math.FIGURE_COLOUR_STOPS) {
+  for (const name of [...math.FIGURE_COLOUR_STOPS.map(([, stop]) => stop), "--figure-peak"]) {
     assert.match(panel, new RegExp(`${name}: #`), `${name} is declared on the panel, where --recovery-tone is mixed`);
   }
 }
