@@ -412,15 +412,6 @@ export function TrainingOverview({
       {connected ? (
         <>
           <section className="training-intelligence">
-            <div className="training-intelligence-header">
-              <p className="eyebrow">{t("overview.intelligence")}</p>
-              {busy === "training-refresh" ? (
-                <span className="training-sync-pill is-syncing">
-                  <span className="training-sync-dot" aria-hidden="true" />
-                  {t("overview.syncing")}
-                </span>
-              ) : null}
-            </div>
             <div className="training-intelligence-grid">
               <div className="training-intelligence-column">
                 <RecoveryPanel

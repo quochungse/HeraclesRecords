@@ -192,8 +192,6 @@ const overview: OverviewMessages = {
   "overview.signin.submit": "COROS 로그인",
   "overview.signin.or": "또는",
   "overview.signin.openBrowser": "브라우저에서 COROS Training Hub 열기",
-  "overview.intelligence": "훈련 분석",
-  "overview.syncing": "데이터 동기화 중",
   "overview.weekly.unreadable": "COROS에서 주간 데이터를 읽지 못했습니다.",
   "overview.sleep.hrv": "HRV",
   "overview.sleep.rhr": "안정 시 심박",

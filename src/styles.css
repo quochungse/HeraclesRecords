@@ -4014,57 +4014,28 @@ td span {
 }
 
 /* ── Training Intelligence (Recovery + Fitness Trend) ───────────────── */
-/* A heading over a grid, not a frame. It was a card around three cards, which
-   put the tiles inside them a third layer deep; now the three are the cards,
-   sitting on the page like every other panel on the screen. */
+/* No heading and no frame: the three panels are the cards, sitting on the
+   page like every other panel on the screen. A container, because whether the
+   two columns fit is a question about this section's width, not the window's —
+   a viewport query folded them at 1200px, where the section still had ~900px. */
 .training-intelligence {
   position: relative;
-  display: grid;
-  gap: 14px;
   animation: training-card-enter 0.55s cubic-bezier(0.2, 0.8, 0.2, 1) both;
-}
-
-.training-intelligence-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-}
-
-.training-intelligence-header .eyebrow {
-  margin: 0;
-}
-
-.training-sync-pill {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  border: 1px solid var(--success-border);
-  border-radius: var(--radius-pill);
-  background: color-mix(in srgb, var(--accent-muted) 10%, transparent);
-  padding: 7px 15px;
-  color: var(--success-text);
-  font-size: 13px;
-  font-weight: 700;
-}
-
-.training-sync-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: var(--success-dot);
-  box-shadow: 0 0 10px rgba(52, 211, 153, 0.6);
-}
-
-.training-sync-pill.is-syncing .training-sync-dot {
-  animation: training-live-pulse 1.4s ease-in-out infinite;
+  container: training-intelligence / inline-size;
 }
 
 .training-intelligence-grid {
   display: grid;
-  grid-template-columns: minmax(330px, 0.82fr) minmax(360px, 1.76fr);
+  grid-template-columns: minmax(270px, 0.82fr) minmax(420px, 1.76fr);
   align-items: stretch;
   gap: 14px;
+}
+
+/* Under 760px the two minimums no longer fit side by side. */
+@container training-intelligence (max-width: 760px) {
+  .training-intelligence-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 
 /* Two stacks side by side: recovery on its own, weekly activity over sleep.
@@ -5318,7 +5289,7 @@ td span {
 
 /* A narrow panel has no room for a column beside the chart: the four go in a
    row above it. The Sleep card's column folds the same way. */
-@container totals-column (max-width: 600px) {
+@container totals-column (max-width: 480px) {
   .training-fitness-body,
   .sleep-panel-body {
     grid-template-columns: minmax(0, 1fr);
@@ -6328,18 +6299,6 @@ td span {
 
 .training-recovery-header .eyebrow {
   margin: 0;
-}
-
-@keyframes training-live-pulse {
-  0%,
-  100% {
-    opacity: 1;
-    transform: scale(1);
-  }
-  50% {
-    opacity: 0.5;
-    transform: scale(0.82);
-  }
 }
 
 /* Its column holds this one card against two stacked ones, so the row runs
@@ -9158,7 +9117,6 @@ td span {
   }
 
   .training-chart-grid,
-  .training-intelligence-grid,
   .training-activities-split,
   .activity-detail-visuals {
     grid-template-columns: 1fr;
@@ -9252,8 +9210,7 @@ td span {
 
   .training-command-center,
 .training-login-fields,
-.training-chart-grid,
-.training-intelligence-grid {
+.training-chart-grid {
     grid-template-columns: 1fr;
   }
 
@@ -16216,11 +16173,6 @@ td span {
 :root[data-theme="paper"] .training-heatmap-summary > span:not([aria-hidden="true"]) {
   background: rgba(19, 26, 40, 0.06);
   border-color: var(--glass-border);
-}
-
-/* --- Training Hub: connected command bar ----------------------------------- */
-:root[data-theme="paper"] .training-sync-dot {
-  box-shadow: 0 0 0 5px color-mix(in srgb, var(--accent) 12%, transparent);
 }
 
 /* --- Training Hub: charts -------------------------------------------------- */

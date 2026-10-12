@@ -192,8 +192,6 @@ const overview: OverviewMessages = {
   "overview.signin.submit": "COROS にサインイン",
   "overview.signin.or": "または",
   "overview.signin.openBrowser": "ブラウザーで COROS Training Hub を開く",
-  "overview.intelligence": "トレーニング分析",
-  "overview.syncing": "データを同期中",
   "overview.weekly.unreadable": "COROS から週のデータを読み込めませんでした。",
   "overview.sleep.hrv": "HRV",
   "overview.sleep.rhr": "安静時心拍",

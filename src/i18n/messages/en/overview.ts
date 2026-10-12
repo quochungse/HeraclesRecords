@@ -193,8 +193,6 @@ const overview = {
   "overview.signin.submit": "Sign in to COROS",
   "overview.signin.or": "or",
   "overview.signin.openBrowser": "Open COROS Training Hub in Browser",
-  "overview.intelligence": "Training Intelligence",
-  "overview.syncing": "Syncing data",
   "overview.weekly.unreadable": "Your weeks could not be read from COROS.",
   "overview.sleep.hrv": "HRV",
   "overview.sleep.rhr": "RHR",

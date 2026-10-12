@@ -1908,7 +1908,7 @@ lives at module level for the same visit-to-visit reason — see `useCalendarDat
   the CSS container query; the stylesheet places the drawing at `NARROW_FRAME`/`WIDE_FRAME`
   of `bodyFigureMath.ts` — `test:body-figure` holds the two together — and the line is found
   by arithmetic). The week's four totals left the panel for Weekly Activity: `WeekTotals`, a
-  list in a column left of the chart, a row above it when the panel is under 600px
+  list in a column left of the chart, a row above it when the panel is under 480px
   (`@container totals-column`); the days they cover are the panel's title, beside "Weekly
   Activity". **That chart is drawn whenever COROS has answered**, an empty week included — a
   Monday morning is seven empty columns on a 0–6 axis, and the totals beside them read 0 (steps

@@ -192,8 +192,6 @@ const overview: OverviewMessages = {
   "overview.signin.submit": "Accedi a COROS",
   "overview.signin.or": "oppure",
   "overview.signin.openBrowser": "Apri COROS Training Hub nel browser",
-  "overview.intelligence": "Analisi dell’allenamento",
-  "overview.syncing": "Sincronizzazione dati",
   "overview.weekly.unreadable": "Impossibile leggere le tue settimane da COROS.",
   "overview.sleep.hrv": "HRV",
   "overview.sleep.rhr": "FC a riposo",

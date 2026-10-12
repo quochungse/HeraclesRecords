@@ -192,8 +192,6 @@ const overview: OverviewMessages = {
   "overview.signin.submit": "Đăng nhập COROS",
   "overview.signin.or": "hoặc",
   "overview.signin.openBrowser": "Mở COROS Training Hub trên trình duyệt",
-  "overview.intelligence": "Phân tích tập luyện",
-  "overview.syncing": "Đang đồng bộ dữ liệu",
   "overview.weekly.unreadable": "Không đọc được các tuần của bạn từ COROS.",
   "overview.sleep.hrv": "HRV",
   "overview.sleep.rhr": "Nhịp tim nghỉ",
