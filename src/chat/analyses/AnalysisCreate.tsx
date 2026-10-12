@@ -9,7 +9,10 @@ import type {
 import { DEFAULT_ANALYSIS_CONDITIONS } from "../../../electron/types";
 import { AnalysisDefinitionForm } from "./AnalysisDefinitionForm";
 import { TriggerForm, type TriggerDraft } from "./TriggerForm";
-import { COACH_ANALYSIS_PRESETS } from "../../../electron/coachAnalysisPresets";
+import {
+  COACH_ANALYSIS_PRESETS,
+  type CoachAnalysisPreset
+} from "../../../electron/coachAnalysisPresets";
 import { describeTrigger } from "./analysisLabels";
 import { useAnalysesTitle } from "./analysesTitle";
 import { useUnitSystem } from "../../units/UnitSystemProvider";
@@ -47,8 +50,8 @@ export function AnalysisCreate({
   const [presetId, setPresetId] = useState<string>(
     COACH_ANALYSIS_PRESETS[0]?.id ?? "blank"
   );
-  const [draft, setDraft] = useState<Omit<CoachAnalysisInput, "sessionId">>(
-    COACH_ANALYSIS_PRESETS[0]?.definition ?? BLANK
+  const [draft, setDraft] = useState<Omit<CoachAnalysisInput, "sessionId">>(() =>
+    COACH_ANALYSIS_PRESETS[0] ? presetDefinition(COACH_ANALYSIS_PRESETS[0]) : BLANK
   );
   const [trigger, setTrigger] = useState<TriggerDraft>(() =>
     triggerDraftFor(COACH_ANALYSIS_PRESETS[0]?.id ?? "blank")
@@ -62,7 +65,7 @@ export function AnalysisCreate({
     const preset = COACH_ANALYSIS_PRESETS.find((entry) => entry.id === id);
     // Switching the starting point replaces the draft wholesale — a preset is
     // a complete analysis, not a set of fields to merge into what is there.
-    setDraft(preset ? { ...preset.definition } : { ...BLANK });
+    setDraft(preset ? presetDefinition(preset) : { ...BLANK });
     setTrigger(triggerDraftFor(id));
   };
 
@@ -196,13 +199,30 @@ const PRESET_KEYS: Record<string, string> = {
   "week-ahead-plan": "weekAhead"
 };
 
-/**
- * A preset's name and pitch in the language on screen. The analysis it creates
- * keeps the preset's English name: that is stored and synced, and the athlete
- * can rename it.
- */
+function presetKey(id: string): string | undefined {
+  return Object.hasOwn(PRESET_KEYS, id) ? PRESET_KEYS[id] : undefined;
+}
+
+/** A preset's name and pitch in the language on screen. */
 function presetText(id: string, field: "label" | "description"): string | undefined {
-  const key = Object.hasOwn(PRESET_KEYS, id) ? PRESET_KEYS[id] : undefined;
+  const key = presetKey(id);
   if (!key) return undefined;
   return t(`chat.an.preset.${key}${field === "description" ? ".detail" : ""}` as MessageKey);
+}
+
+/**
+ * What a preset fills the form with, written in the language on screen: the
+ * name, the role and the playbook. Whatever language it is saved in is what
+ * the analysis keeps — stored, synced and editable like anything typed there.
+ * The `{{…}}` variables and the tool names stay as they are in every language.
+ */
+function presetDefinition(preset: CoachAnalysisPreset): Omit<CoachAnalysisInput, "sessionId"> {
+  const key = presetKey(preset.id);
+  if (!key) return { ...preset.definition };
+  return {
+    ...preset.definition,
+    name: t(`chat.an.preset.${key}` as MessageKey),
+    role: t(`chat.an.preset.${key}.role` as MessageKey),
+    playbook: t(`chat.an.preset.${key}.playbook` as MessageKey)
+  };
 }
