@@ -1039,6 +1039,8 @@ export type AppUpdateStatus =
   | "not-available"
   | "downloading"
   | "downloaded"
+  /** Linux only: the package is being put in place while the app runs. */
+  | "installing"
   | "error";
 
 export interface AppUpdateSnapshot {
@@ -1052,6 +1054,13 @@ export interface AppUpdateSnapshot {
   /** macOS ad-hoc builds cannot self-install; user must open the release asset. */
   installMethod?: "restart" | "manual";
   manualInstallUrl?: string;
+  /** Linux .deb: installing asks for an administrator password (pkexec). */
+  installNeedsPassword?: boolean;
+  /**
+   * Linux: why the last in-app install did not finish. The update stays
+   * "downloaded", so Restart can be pressed again.
+   */
+  installFailure?: "cancelled" | "failed";
   /** When false, the app does not check for updates automatically on startup. */
   autoCheck: boolean;
   /** When false, available updates are not downloaded until the user asks. */

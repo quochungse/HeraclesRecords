@@ -27,6 +27,9 @@ const nav: NavMessages = {
   "nav.expand": "Expandir barra lateral",
   "nav.closeNavigation": "Fechar navegação",
   "nav.startupSet": "Na próxima vez, o app vai abrir em {view}.",
+  "nav.update.downloading": "Baixando atualização {percent}%",
+  "nav.update.installing": "Instalando atualização",
+  "nav.update.ready": "Atualização pronta — reinicie para instalar",
 };
 
 export default nav;

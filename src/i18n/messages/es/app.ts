@@ -31,10 +31,10 @@ const app: AppMessages = {
   "app.update.openDownload": "Abrir descarga",
   "app.update.restartAndUpdate": "Reiniciar y actualizar",
   "app.update.now": "Actualizar ahora",
-  "app.update.downloadingRestart": "Descargando {percent} %. Heracles Records se reiniciará cuando esté lista.",
+  "app.update.downloadingRestart": "Descargando {percent} %. Sigue trabajando: Heracles Records preguntará antes de reiniciarse.",
   "app.update.installerInBrowser": "El instalador se abrirá en tu navegador.",
   "app.update.downloaded": "La actualización está descargada y lista para instalar.",
-  "app.update.willDownload": "Heracles Records descargará la actualización y se reiniciará para terminar de instalarla.",
+  "app.update.willDownload": "Heracles Records descarga la actualización en segundo plano y pregunta antes de reiniciarse para instalarla.",
   "app.update.available": "Actualización disponible",
   "app.update.sinceVersion": "Todo lo nuevo desde Heracles Records {version}.",
   "app.update.genericNotes": "Esta versión incluye las últimas mejoras y correcciones de errores.",
@@ -84,6 +84,15 @@ const app: AppMessages = {
   "app.mcp.short.unreachable": "El servidor COROS MCP no responde.",
   "app.mcp.tileDetail": "necesita COROS MCP",
   "app.mcp.unreachableLabel": "COROS MCP no responde",
+  "app.update.readyTitle": "Actualización lista",
+  "app.update.installingTitle": "Instalando la actualización",
+  "app.update.readyBody": "Heracles Records {version} ya está descargada. Reinicia para terminar de instalarla; la app se abrirá sola.",
+  "app.update.windowsNote": "Se instala en segundo plano, sin pasar por el instalador.",
+  "app.update.passwordNote": "El sistema pedirá una contraseña de administrador para instalarla.",
+  "app.update.installingBody": "Instalando Heracles Records {version}. La app se reiniciará en cuanto termine.",
+  "app.update.installCancelled": "No se instaló: se canceló la solicitud de contraseña. Reinicia para volver a intentarlo.",
+  "app.update.installFailed": "No se pudo instalar la actualización desde aquí. Descárgala de GitHub.",
+  "app.update.restartNow": "Reiniciar ahora",
 };
 
 export default app;

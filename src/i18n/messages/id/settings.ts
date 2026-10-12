@@ -91,6 +91,7 @@ const settings: SettingsMessages = {
   "update.autoDownloadHint": "Jika tidak, unduh hanya saat Anda minta.",
   "update.check": "Periksa pembaruan",
   "settings.coachModels.claudeUpdate": "Claude Code {latest} sudah tersedia (komputer ini memakai {installed}). Jalankan <code>claude update</code> di terminal.",
+  "update.installing": "Memasang…",
 };
 
 export default settings;

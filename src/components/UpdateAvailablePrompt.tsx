@@ -1,11 +1,12 @@
 import { useEffect, useRef, useState } from "react";
-import { Download, Sparkles } from "lucide-react";
+import { Download, Loader2, RotateCw, Sparkles } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import rehypeRaw from "rehype-raw";
 import rehypeSanitize from "rehype-sanitize";
 import remarkGfm from "remark-gfm";
 import type { AppUpdateSnapshot } from "../../electron/types";
 import { t } from "../i18n/core";
+import { UpdateGlyph } from "./UpdateGlyph";
 
 const DISMISSED_UPDATE_VERSION_KEY =
   "heraclesrecords.updatePrompt.dismissedVersion";
@@ -208,6 +209,144 @@ export function UpdateAvailablePrompt({
               )}
               {actionLabel}
             </button>
+          </div>
+        </footer>
+      </section>
+    </div>
+  );
+}
+
+interface UpdateRestartPromptProps {
+  snapshot: AppUpdateSnapshot;
+  /** `process.platform` from the bridge, for the one sentence that differs. */
+  platform: string | undefined;
+  onRestart: () => void;
+  onLater: () => void;
+}
+
+/**
+ * Asked once an accepted update is on disk. The app used to quit the moment
+ * the download finished — mid-sentence, with an unsaved edit on screen — and on
+ * Windows the NSIS wizard then opened over a closed app. Now the download runs
+ * in the background and this asks; Restart is the only thing that closes the
+ * app. On Linux it also stays up through the install, which runs in the
+ * running app and ends in the relaunch.
+ */
+export function UpdateRestartPrompt({
+  snapshot,
+  platform,
+  onRestart,
+  onLater,
+}: UpdateRestartPromptProps) {
+  const installing = snapshot.status === "installing";
+
+  useEffect(() => {
+    if (installing) {
+      return;
+    }
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        onLater();
+      }
+    };
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [installing, onLater]);
+
+  const version = snapshot.availableVersion ?? "";
+  const manual = snapshot.installMethod === "manual";
+  const failed = snapshot.installFailure === "failed";
+  const body = installing
+    ? t("app.update.installingBody", { version })
+    : manual
+      ? t("app.update.installerInBrowser")
+      : t("app.update.readyBody", { version });
+  const note =
+    installing || manual || failed
+      ? null
+      : snapshot.installNeedsPassword
+        ? t("app.update.passwordNote")
+        : platform === "win32"
+          ? t("app.update.windowsNote")
+          : null;
+  const failure =
+    !installing && snapshot.installFailure === "cancelled"
+      ? t("app.update.installCancelled")
+      : !installing && failed
+        ? t("app.update.installFailed")
+        : null;
+
+  return (
+    <div className="update-prompt-backdrop" role="presentation">
+      <section
+        className="update-prompt update-prompt--compact"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="update-restart-title"
+        aria-describedby="update-restart-description"
+        aria-busy={installing}
+      >
+        <header className="update-prompt-header">
+          <span className="update-prompt-icon" aria-hidden="true">
+            <UpdateGlyph size={22} active={installing} />
+          </span>
+          <div>
+            <p className="update-prompt-eyebrow">
+              {installing ? t("app.update.installingTitle") : t("app.update.readyTitle")}
+            </p>
+            <h2 id="update-restart-title">Heracles Records {version}</h2>
+          </div>
+        </header>
+
+        <div className="update-prompt-body" id="update-restart-description">
+          <p>{body}</p>
+          {note ? <p className="update-prompt-note">{note}</p> : null}
+          {failure ? (
+            <p className="update-prompt-failure" role="alert">
+              {failure}
+            </p>
+          ) : null}
+        </div>
+
+        <footer className="update-prompt-footer">
+          <div className="update-prompt-actions">
+            <button
+              className="secondary-button"
+              type="button"
+              disabled={installing}
+              onClick={onLater}
+            >
+              {t("app.update.notNow")}
+            </button>
+            {failed && snapshot.manualInstallUrl ? (
+              <a
+                className="primary-button"
+                href={snapshot.manualInstallUrl}
+                target="_blank"
+                rel="noreferrer"
+                onClick={onLater}
+              >
+                <Download size={16} aria-hidden="true" />
+                {t("app.update.openDownload")}
+              </a>
+            ) : (
+              <button
+                className="primary-button"
+                type="button"
+                autoFocus
+                disabled={installing}
+                onClick={onRestart}
+              >
+                {installing ? (
+                  <Loader2 className="spin" size={16} aria-hidden="true" />
+                ) : manual ? (
+                  <Download size={16} aria-hidden="true" />
+                ) : (
+                  <RotateCw size={16} aria-hidden="true" />
+                )}
+                {manual ? t("app.update.openDownload") : t("app.update.restartNow")}
+              </button>
+            )}
           </div>
         </footer>
       </section>

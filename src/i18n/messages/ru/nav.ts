@@ -27,6 +27,9 @@ const nav: NavMessages = {
   "nav.expand": "Развернуть боковую панель",
   "nav.closeNavigation": "Закрыть меню",
   "nav.startupSet": "При следующем запуске откроется раздел «{view}».",
+  "nav.update.downloading": "Загрузка обновления {percent}%",
+  "nav.update.installing": "Установка обновления",
+  "nav.update.ready": "Обновление готово — перезапустите для установки",
 };
 
 export default nav;

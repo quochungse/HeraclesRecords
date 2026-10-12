@@ -31,10 +31,10 @@ const app: AppMessages = {
   "app.update.openDownload": "ダウンロードを開く",
   "app.update.restartAndUpdate": "再起動してアップデート",
   "app.update.now": "今すぐアップデート",
-  "app.update.downloadingRestart": "ダウンロード中 {percent}%。完了すると Heracles Records が再起動します。",
+  "app.update.downloadingRestart": "ダウンロード中 {percent}%。作業はそのまま続けられます。再起動の前に確認します。",
   "app.update.installerInBrowser": "インストーラーはブラウザーで開きます。",
   "app.update.downloaded": "アップデートのダウンロードが完了し、インストールの準備ができました。",
-  "app.update.willDownload": "Heracles Records がアップデートをダウンロードし、再起動してインストールを完了します。",
+  "app.update.willDownload": "Heracles Records はアップデートをバックグラウンドでダウンロードし、インストールのために再起動する前に確認します。",
   "app.update.available": "アップデートがあります",
   "app.update.sinceVersion": "Heracles Records {version} からの変更点です。",
   "app.update.genericNotes": "このリリースには最新の改善とバグ修正が含まれています。",
@@ -84,6 +84,15 @@ const app: AppMessages = {
   "app.mcp.short.unreachable": "COROS MCP サーバーに接続できませんでした。",
   "app.mcp.tileDetail": "COROS MCP が必要",
   "app.mcp.unreachableLabel": "COROS MCP に接続できません",
+  "app.update.readyTitle": "アップデートの準備ができました",
+  "app.update.installingTitle": "アップデートをインストール中",
+  "app.update.readyBody": "Heracles Records {version} のダウンロードが完了しました。再起動するとインストールが完了し、アプリは自動で再び開きます。",
+  "app.update.windowsNote": "インストールはバックグラウンドで行われ、インストーラーを操作する必要はありません。",
+  "app.update.passwordNote": "インストールには管理者パスワードの入力を求められます。",
+  "app.update.installingBody": "Heracles Records {version} をインストールしています。完了するとアプリが再起動します。",
+  "app.update.installCancelled": "パスワードの要求がキャンセルされたため、インストールされていません。再起動してもう一度お試しください。",
+  "app.update.installFailed": "ここからはアップデートをインストールできませんでした。GitHub からダウンロードしてください。",
+  "app.update.restartNow": "今すぐ再起動",
 };
 
 export default app;

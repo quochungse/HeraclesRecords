@@ -31,10 +31,10 @@ const app: AppMessages = {
   "app.update.openDownload": "Открыть загрузку",
   "app.update.restartAndUpdate": "Перезапустить и обновить",
   "app.update.now": "Обновить сейчас",
-  "app.update.downloadingRestart": "Загрузка {percent}%. Heracles Records перезапустится, когда всё будет готово.",
+  "app.update.downloadingRestart": "Загрузка {percent}%. Можно продолжать работу — Heracles Records спросит перед перезапуском.",
   "app.update.installerInBrowser": "Установщик откроется в браузере.",
   "app.update.downloaded": "Обновление скачано и готово к установке.",
-  "app.update.willDownload": "Heracles Records скачает обновление и перезапустится, чтобы завершить установку.",
+  "app.update.willDownload": "Heracles Records скачивает обновление в фоне и спрашивает, прежде чем перезапуститься для установки.",
   "app.update.available": "Доступно обновление",
   "app.update.sinceVersion": "Всё новое с версии Heracles Records {version}.",
   "app.update.genericNotes": "В этой версии последние улучшения и исправления ошибок.",
@@ -84,6 +84,15 @@ const app: AppMessages = {
   "app.mcp.short.unreachable": "Сервер COROS MCP не ответил.",
   "app.mcp.tileDetail": "нужен COROS MCP",
   "app.mcp.unreachableLabel": "COROS MCP недоступен",
+  "app.update.readyTitle": "Обновление готово",
+  "app.update.installingTitle": "Установка обновления",
+  "app.update.readyBody": "Heracles Records {version} скачан. Перезапустите, чтобы завершить установку, — приложение откроется само.",
+  "app.update.windowsNote": "Установка идёт в фоне, без окон установщика.",
+  "app.update.passwordNote": "Для установки система запросит пароль администратора.",
+  "app.update.installingBody": "Устанавливается Heracles Records {version}. Приложение перезапустится, как только всё будет готово.",
+  "app.update.installCancelled": "Не установлено: запрос пароля был отменён. Перезапустите, чтобы попробовать снова.",
+  "app.update.installFailed": "Не удалось установить обновление отсюда. Скачайте его с GitHub.",
+  "app.update.restartNow": "Перезапустить",
 };
 
 export default app;

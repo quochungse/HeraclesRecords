@@ -91,6 +91,7 @@ const settings: SettingsMessages = {
   "update.autoDownloadHint": "Nếu tắt, chỉ tải khi bạn yêu cầu.",
   "update.check": "Kiểm tra cập nhật",
   "settings.coachModels.claudeUpdate": "Đã có Claude Code {latest} (máy này đang dùng {installed}). Chạy <code>claude update</code> trong terminal.",
+  "update.installing": "Đang cài đặt…",
 };
 
 export default settings;

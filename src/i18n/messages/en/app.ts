@@ -32,10 +32,10 @@ const app = {
   "app.update.openDownload": "Open download",
   "app.update.restartAndUpdate": "Restart and update",
   "app.update.now": "Update now",
-  "app.update.downloadingRestart": "Downloading {percent}%. Heracles Records will restart when it is ready.",
+  "app.update.downloadingRestart": "Downloading {percent}%. Keep working — Heracles Records asks before it restarts.",
   "app.update.installerInBrowser": "The installer will open in your browser.",
   "app.update.downloaded": "The update is downloaded and ready to install.",
-  "app.update.willDownload": "Heracles Records will download the update and restart to finish installing it.",
+  "app.update.willDownload": "Heracles Records downloads the update in the background and asks before it restarts to install it.",
   "app.update.available": "Update available",
   "app.update.sinceVersion": "Everything new since Heracles Records {version}.",
   "app.update.genericNotes": "This release includes the latest improvements and bug fixes.",
@@ -85,6 +85,15 @@ const app = {
   "app.mcp.short.unreachable": "The COROS MCP server could not be reached.",
   "app.mcp.tileDetail": "needs COROS MCP",
   "app.mcp.unreachableLabel": "COROS MCP unreachable",
+  "app.update.readyTitle": "Update ready",
+  "app.update.installingTitle": "Installing update",
+  "app.update.readyBody": "Heracles Records {version} is downloaded. Restart to finish installing it — the app opens again on its own.",
+  "app.update.windowsNote": "It installs in the background, with no installer to click through.",
+  "app.update.passwordNote": "Your system will ask for an administrator password to install it.",
+  "app.update.installingBody": "Installing Heracles Records {version}. The app restarts as soon as it is done.",
+  "app.update.installCancelled": "Not installed: the password request was cancelled. Restart to try again.",
+  "app.update.installFailed": "The update could not be installed from here. Download it from GitHub instead.",
+  "app.update.restartNow": "Restart now",
 };
 
 export default app;

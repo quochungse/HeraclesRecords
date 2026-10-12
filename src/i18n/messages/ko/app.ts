@@ -31,10 +31,10 @@ const app: AppMessages = {
   "app.update.openDownload": "다운로드 열기",
   "app.update.restartAndUpdate": "다시 시작하고 업데이트",
   "app.update.now": "지금 업데이트",
-  "app.update.downloadingRestart": "다운로드 중 {percent}%. 준비되면 Heracles Records가 다시 시작됩니다.",
+  "app.update.downloadingRestart": "다운로드 중 {percent}%. 계속 사용하셔도 됩니다. 다시 시작하기 전에 물어봅니다.",
   "app.update.installerInBrowser": "설치 프로그램이 브라우저에서 열립니다.",
   "app.update.downloaded": "업데이트를 다운로드했으며 설치할 준비가 되었습니다.",
-  "app.update.willDownload": "Heracles Records가 업데이트를 다운로드한 뒤 다시 시작해 설치를 마칩니다.",
+  "app.update.willDownload": "Heracles Records가 업데이트를 백그라운드에서 다운로드하고, 설치를 위해 다시 시작하기 전에 물어봅니다.",
   "app.update.available": "업데이트 가능",
   "app.update.sinceVersion": "Heracles Records {version} 이후 새로워진 점입니다.",
   "app.update.genericNotes": "이번 릴리스에는 최신 개선 사항과 버그 수정이 포함되어 있습니다.",
@@ -84,6 +84,15 @@ const app: AppMessages = {
   "app.mcp.short.unreachable": "COROS MCP 서버에 연결할 수 없었습니다.",
   "app.mcp.tileDetail": "COROS MCP 필요",
   "app.mcp.unreachableLabel": "COROS MCP 연결 불가",
+  "app.update.readyTitle": "업데이트 준비 완료",
+  "app.update.installingTitle": "업데이트 설치 중",
+  "app.update.readyBody": "Heracles Records {version} 다운로드를 마쳤습니다. 다시 시작하면 설치가 끝나고 앱이 자동으로 다시 열립니다.",
+  "app.update.windowsNote": "설치 프로그램을 거치지 않고 백그라운드에서 설치됩니다.",
+  "app.update.passwordNote": "설치하려면 시스템에서 관리자 비밀번호를 묻습니다.",
+  "app.update.installingBody": "Heracles Records {version}을(를) 설치하는 중입니다. 끝나는 대로 앱이 다시 시작됩니다.",
+  "app.update.installCancelled": "비밀번호 요청이 취소되어 설치되지 않았습니다. 다시 시작해 다시 시도하세요.",
+  "app.update.installFailed": "여기서 업데이트를 설치하지 못했습니다. GitHub에서 다운로드하세요.",
+  "app.update.restartNow": "지금 다시 시작",
 };
 
 export default app;

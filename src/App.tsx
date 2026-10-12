@@ -49,10 +49,14 @@ import { applySyncedLocalStorageOps } from "./settings/syncLocalStorage";
 import { startLocalStoragePublisher } from "./settings/localStoragePublisher";
 import { subscribeToToasts } from "./toast";
 import { isMcpFailure } from "./mcp/mcpNotice";
-import { UpdateAvailablePrompt } from "./components/UpdateAvailablePrompt";
+import {
+  UpdateAvailablePrompt,
+  UpdateRestartPrompt,
+} from "./components/UpdateAvailablePrompt";
 import {
   AppSidebar,
   createInitialSidebarExpanded,
+  type AppSidebarUpdate,
 } from "./components/AppSidebar";
 import { DeveloperToolbar } from "./components/DeveloperToolbar";
 import { PRIMARY_NAV_ITEMS, type PrimaryView } from "./navigation/primaryNav";
@@ -447,7 +451,22 @@ export default function App() {
     },
   );
   const installAcceptedVersionRef = useRef<string | null>(null);
+  const [restartPromptOpen, setRestartPromptOpen] = useState(false);
   const effectiveUpdateSnapshot = devUpdateSimulation ?? appUpdateSnapshot;
+  // What the Settings button wears while an update is on its way.
+  const sidebarUpdate: AppSidebarUpdate | null = !effectiveUpdateSnapshot.supported
+    ? null
+    : effectiveUpdateSnapshot.status === "downloading"
+      ? {
+          phase: "downloading",
+          percent: effectiveUpdateSnapshot.downloadPercent ?? 0,
+        }
+      : effectiveUpdateSnapshot.status === "installing"
+        ? { phase: "installing" }
+        : effectiveUpdateSnapshot.status === "downloaded" &&
+            effectiveUpdateSnapshot.installMethod !== "manual"
+          ? { phase: "ready" }
+          : null;
 
 
   /* The two screens most opened from a cold start are fetched once the first
@@ -531,12 +550,14 @@ export default function App() {
       return;
     }
 
+    // Downloaded in the background: ask, never restart unasked. This used to
+    // quit the app the moment the file landed, whatever was on screen.
     if (
       appUpdateSnapshot.status === "downloaded" &&
       appUpdateSnapshot.availableVersion === acceptedVersion
     ) {
       installAcceptedVersionRef.current = null;
-      handleInstallUpdate();
+      setRestartPromptOpen(true);
       return;
     }
 
@@ -1135,16 +1156,21 @@ export default function App() {
       return;
     }
 
+    // Up while it works: on Linux the install runs in this app and the prompt
+    // is where it is seen; elsewhere the app is gone a moment later.
+    setRestartPromptOpen(effectiveUpdateSnapshot.installMethod !== "manual");
     void api
       ?.quitAndInstallUpdate()
       .then((result) => {
         if (result?.installMethod === "manual") {
+          setRestartPromptOpen(false);
           setMessage(
             t("app.update.openedDownload"),
           );
         }
       })
       .catch((caught) => {
+        setRestartPromptOpen(false);
         setError(toErrorMessage(caught));
       });
   }
@@ -1821,6 +1847,7 @@ export default function App() {
           onExpandedChange={setSidebarExpanded}
           overlayOpen={sidebarOverlayOpen}
           onOverlayOpenChange={setSidebarOverlayOpen}
+          appUpdate={sidebarUpdate}
         />
 
         <main
@@ -2203,6 +2230,16 @@ export default function App() {
         }
         previewKey={devUpdatePreviewKey}
       />
+      {restartPromptOpen &&
+      (effectiveUpdateSnapshot.status === "downloaded" ||
+        effectiveUpdateSnapshot.status === "installing") ? (
+        <UpdateRestartPrompt
+          snapshot={effectiveUpdateSnapshot}
+          platform={api?.platform}
+          onRestart={handleInstallUpdate}
+          onLater={() => setRestartPromptOpen(false)}
+        />
+      ) : null}
       <Toaster toasts={toasts} onDismiss={dismissToast}>
         {recordsNotices.toasts.map(({ announcement, labour }) => (
           <LabourToastCard

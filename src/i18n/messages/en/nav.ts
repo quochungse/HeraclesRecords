@@ -28,6 +28,9 @@ const nav = {
   "nav.expand": "Expand sidebar",
   "nav.closeNavigation": "Close navigation",
   "nav.startupSet": "Startup view set to {view}. It will open on next launch.",
+  "nav.update.downloading": "Downloading update {percent}%",
+  "nav.update.installing": "Installing update",
+  "nav.update.ready": "Update ready — restart to install",
 };
 
 export default nav;

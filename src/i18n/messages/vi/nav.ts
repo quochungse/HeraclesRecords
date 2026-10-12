@@ -27,6 +27,9 @@ const nav: NavMessages = {
   "nav.expand": "Mở rộng thanh bên",
   "nav.closeNavigation": "Đóng thanh điều hướng",
   "nav.startupSet": "Từ lần mở sau, ứng dụng sẽ khởi động ở {view}.",
+  "nav.update.downloading": "Đang tải bản cập nhật {percent}%",
+  "nav.update.installing": "Đang cài đặt bản cập nhật",
+  "nav.update.ready": "Bản cập nhật đã sẵn sàng — khởi động lại để cài",
 };
 
 export default nav;

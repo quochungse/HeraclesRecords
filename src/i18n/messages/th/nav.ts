@@ -27,6 +27,9 @@ const nav: NavMessages = {
   "nav.expand": "ขยายแถบด้านข้าง",
   "nav.closeNavigation": "ปิดเมนู",
   "nav.startupSet": "ครั้งต่อไปแอปจะเปิดที่หน้า {view}",
+  "nav.update.downloading": "กำลังดาวน์โหลดอัปเดต {percent}%",
+  "nav.update.installing": "กำลังติดตั้งอัปเดต",
+  "nav.update.ready": "อัปเดตพร้อมแล้ว รีสตาร์ทเพื่อติดตั้ง",
 };
 
 export default nav;

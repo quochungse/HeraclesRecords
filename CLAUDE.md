@@ -3045,8 +3045,8 @@ also holds `updaterService.ts`'s hand-built download links to. The `dist*` scrip
 blockmap, the three `latest*.yml`, and **both a Linux AppImage and a deb**. The dmg's blockmap
 is not written (`dmg.writeUpdateInfo: false`): nothing reads it. The AppImage stays because it
 runs on any distribution without root and is what every 1.0.0 Linux install updates from; the
-deb installs into the app menu and updates through electron-updater's `DebUpdater`, which asks
-for the password (`pkexec`). Which one an install takes is `resources/package-type`, which the
+deb installs into the app menu and updates with one `pkexec` password prompt (the install
+itself is the app's, not `DebUpdater`'s — see below). Which one an install takes is `resources/package-type`, which the
 deb target writes into `linux-unpacked` — **the AppImage must stay the first Linux target** or
 it is packed with that file and updates itself with the deb. The deb is `optional` in
 `release-data.mjs` because 1.0.0 shipped none; `desktopName` + `linux.syncDesktopName` make the
@@ -3055,3 +3055,26 @@ deb's `.desktop` entry, its `StartupWMClass` and Electron's app_id agree.
 directory.** Handed the lone 1024px `icon.png`, the deb installed
 `hicolor/1024x1024/apps/…` only — a size the icon theme never looks up — so the app menu and dock
 drew the generic placeholder. `npm run icons:generate` writes the set beside `icon.icns`.
+**An update downloads in the background and never restarts the app unasked.** Accepting it
+closes the prompt; while it downloads (and, on Linux, installs) the rail's Settings button
+wears `UpdateGlyph` with its arrow climbing, and once it is on disk `UpdateRestartPrompt` asks
+— Restart now or Later. It used to quit the moment the file landed, whatever was on screen.
+Per platform (`quitAndInstallUpdate` in `updaterService.ts`): **Windows** runs NSIS silently
+(`quitAndInstall(true, true)` → `--updated /S --force-run`); NSIS cannot replace a running
+app's files, so "install first, then ask to restart" is not possible there, but the wizard no
+longer opens. **Linux** installs inside the running app, asynchronously, then relaunches — a
+deb through one `pkexec` (`dpkg -i || apt-get install -f`), an AppImage by renaming the new
+file over the old one. electron-updater does both with `spawnSync` inside `quitAndInstall`,
+which froze the window through the password dialog and the whole of dpkg. A dismissed
+password dialog leaves the update `downloaded` with `installFailure: "cancelled"`.
+**macOS depends on the signature.** An ad-hoc designated requirement is the build's cdhash,
+which no later build satisfies — so Squirrel refuses the update and the app sends the athlete
+to the DMG (`isMacAdHocSigned`), and that same fact is why Gatekeeper ("Open Anyway") and the
+keychain password are asked again after every update. release.yml has three modes: Developer
+ID + notarization when the Apple secrets are set; **the project's own self-signed
+certificate** when `MAC_SELF_SIGN_P12_BASE64`/`_PASSWORD` are (`scripts/mac-sign.cjs`, the
+certificate made once by `scripts/create-mac-signing-cert.sh` — never make a second one, it
+*is* the app's identity), which makes the requirement name the certificate, so Squirrel
+installs in place with no browser download and "Always Allow" survives; ad-hoc otherwise. The
+first install from a self-signed DMG still needs "Open Anyway" once, and an install on an
+ad-hoc build needs one last manual DMG to cross over.

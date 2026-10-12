@@ -31,10 +31,10 @@ const app: AppMessages = {
   "app.update.openDownload": "Ouvrir le téléchargement",
   "app.update.restartAndUpdate": "Redémarrer et mettre à jour",
   "app.update.now": "Mettre à jour",
-  "app.update.downloadingRestart": "Téléchargement {percent} %. Heracles Records redémarrera une fois prêt.",
+  "app.update.downloadingRestart": "Téléchargement {percent} %. Continuez à travailler : Heracles Records demandera avant de redémarrer.",
   "app.update.installerInBrowser": "Le programme d’installation s’ouvrira dans votre navigateur.",
   "app.update.downloaded": "La mise à jour est téléchargée et prête à être installée.",
-  "app.update.willDownload": "Heracles Records va télécharger la mise à jour, puis redémarrer pour terminer l’installation.",
+  "app.update.willDownload": "Heracles Records télécharge la mise à jour en arrière-plan et demande avant de redémarrer pour l’installer.",
   "app.update.available": "Mise à jour disponible",
   "app.update.sinceVersion": "Toutes les nouveautés depuis Heracles Records {version}.",
   "app.update.genericNotes": "Cette version apporte les dernières améliorations et corrections.",
@@ -84,6 +84,15 @@ const app: AppMessages = {
   "app.mcp.short.unreachable": "Le serveur COROS MCP n’a pas répondu.",
   "app.mcp.tileDetail": "nécessite COROS MCP",
   "app.mcp.unreachableLabel": "COROS MCP injoignable",
+  "app.update.readyTitle": "Mise à jour prête",
+  "app.update.installingTitle": "Installation de la mise à jour",
+  "app.update.readyBody": "Heracles Records {version} est téléchargé. Redémarrez pour terminer l’installation : l’app se rouvrira toute seule.",
+  "app.update.windowsNote": "L’installation se fait en arrière-plan, sans assistant à parcourir.",
+  "app.update.passwordNote": "Votre système demandera un mot de passe administrateur pour l’installer.",
+  "app.update.installingBody": "Installation de Heracles Records {version}. L’app redémarrera dès que ce sera fait.",
+  "app.update.installCancelled": "Non installée : la demande de mot de passe a été annulée. Redémarrez pour réessayer.",
+  "app.update.installFailed": "La mise à jour n’a pas pu être installée d’ici. Téléchargez-la plutôt depuis GitHub.",
+  "app.update.restartNow": "Redémarrer maintenant",
 };
 
 export default app;

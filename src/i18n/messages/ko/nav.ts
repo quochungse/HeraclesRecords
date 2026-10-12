@@ -27,6 +27,9 @@ const nav: NavMessages = {
   "nav.expand": "사이드바 펼치기",
   "nav.closeNavigation": "메뉴 닫기",
   "nav.startupSet": "다음 실행부터 {view} 화면으로 시작합니다.",
+  "nav.update.downloading": "업데이트 다운로드 중 {percent}%",
+  "nav.update.installing": "업데이트 설치 중",
+  "nav.update.ready": "업데이트 준비 완료 — 다시 시작해 설치",
 };
 
 export default nav;

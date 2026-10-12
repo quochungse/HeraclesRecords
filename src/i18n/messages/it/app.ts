@@ -31,10 +31,10 @@ const app: AppMessages = {
   "app.update.openDownload": "Apri il download",
   "app.update.restartAndUpdate": "Riavvia e aggiorna",
   "app.update.now": "Aggiorna ora",
-  "app.update.downloadingRestart": "Download {percent}%. Heracles Records si riavvierà quando sarà pronto.",
+  "app.update.downloadingRestart": "Download {percent}%. Continua pure a lavorare: Heracles Records chiederà prima di riavviarsi.",
   "app.update.installerInBrowser": "Il programma di installazione si aprirà nel browser.",
   "app.update.downloaded": "L’aggiornamento è scaricato e pronto da installare.",
-  "app.update.willDownload": "Heracles Records scaricherà l’aggiornamento e si riavvierà per completare l’installazione.",
+  "app.update.willDownload": "Heracles Records scarica l’aggiornamento in background e chiede prima di riavviarsi per installarlo.",
   "app.update.available": "Aggiornamento disponibile",
   "app.update.sinceVersion": "Tutte le novità da Heracles Records {version}.",
   "app.update.genericNotes": "Questa versione include gli ultimi miglioramenti e correzioni.",
@@ -84,6 +84,15 @@ const app: AppMessages = {
   "app.mcp.short.unreachable": "Il server COROS MCP non ha risposto.",
   "app.mcp.tileDetail": "serve COROS MCP",
   "app.mcp.unreachableLabel": "COROS MCP non raggiungibile",
+  "app.update.readyTitle": "Aggiornamento pronto",
+  "app.update.installingTitle": "Installazione dell’aggiornamento",
+  "app.update.readyBody": "Heracles Records {version} è stato scaricato. Riavvia per completare l’installazione: l’app si riaprirà da sola.",
+  "app.update.windowsNote": "Si installa in background, senza passare dal programma di installazione.",
+  "app.update.passwordNote": "Il sistema chiederà una password di amministratore per installarlo.",
+  "app.update.installingBody": "Installazione di Heracles Records {version}. L’app si riavvierà appena finito.",
+  "app.update.installCancelled": "Non installato: la richiesta della password è stata annullata. Riavvia per riprovare.",
+  "app.update.installFailed": "Non è stato possibile installare l’aggiornamento da qui. Scaricalo invece da GitHub.",
+  "app.update.restartNow": "Riavvia ora",
 };
 
 export default app;
