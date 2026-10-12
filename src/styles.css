@@ -767,19 +767,6 @@ input::placeholder {
   color: var(--text-secondary);
 }
 
-.app-dev-update-test {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  border-color: color-mix(in srgb, var(--accent-gold) 48%, var(--glass-border));
-  background: color-mix(in srgb, var(--accent-gold) 13%, var(--glass-bg));
-}
-
-.app-dev-update-test:hover {
-  border-color: color-mix(in srgb, var(--accent-gold) 72%, var(--glass-border));
-  background: color-mix(in srgb, var(--accent-gold) 20%, var(--glass-bg));
-}
-
 .app-body {
   display: flex;
   flex: 1;

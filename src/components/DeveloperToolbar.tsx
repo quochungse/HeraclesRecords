@@ -1,16 +1,35 @@
-import { Sparkles } from "lucide-react";
 import type { HeraclesRecordsApi } from "../heraclesrecords-api";
 import type { RecordsSamplePreset } from "../records/sampleRecords";
+import { OptionGroup, type OptionGroupOption } from "./OptionGroup";
 import { SampleDataControls } from "./SampleDataControls";
+import {
+  UPDATE_SCENARIO_ORDER,
+  UPDATE_SCENARIOS,
+  type UpdateScenario,
+} from "./updateSimulation";
+
+type UpdateScenarioChoice = UpdateScenario | "off";
+
+const UPDATE_SCENARIO_OPTIONS: readonly OptionGroupOption<UpdateScenarioChoice>[] = [
+  { value: "off", label: "Test update", detail: "Show the real update status." },
+  ...UPDATE_SCENARIO_ORDER.map((value) => ({
+    value,
+    label: `Test: ${UPDATE_SCENARIOS[value].label}`,
+    detail: UPDATE_SCENARIOS[value].detail,
+  })),
+];
 
 interface DeveloperToolbarProps {
   api: HeraclesRecordsApi | undefined;
   /** Dev view exposes development-only destinations and the tools below. */
   developmentViewActive: boolean;
   onDevelopmentViewToggle: () => void;
-  /** Non-null while a fake "update available" state is being simulated. */
-  updateSimulationActive: boolean;
-  onToggleUpdateSimulation: () => void;
+  /**
+   * The Test update scenario running, or null. Picking one starts it from the
+   * available prompt; picking it again restarts it; "Test update" clears it.
+   */
+  updateScenario: UpdateScenario | null;
+  onUpdateScenarioChange: (scenario: UpdateScenario | null) => void;
   /** The Strength screen's generated sample history. */
   strengthSampleActive: boolean;
   onStrengthSampleChange: (active: boolean) => void;
@@ -30,8 +49,8 @@ export function DeveloperToolbar({
   api,
   developmentViewActive,
   onDevelopmentViewToggle,
-  updateSimulationActive,
-  onToggleUpdateSimulation,
+  updateScenario,
+  onUpdateScenarioChange,
   strengthSampleActive,
   onStrengthSampleChange,
   recordsSample,
@@ -57,20 +76,16 @@ export function DeveloperToolbar({
 
         {developmentViewActive ? (
           <>
-            <button
-              className="app-dev-view-toggle app-dev-update-test"
-              type="button"
-              aria-pressed={updateSimulationActive}
-              title={
-                updateSimulationActive
-                  ? "Clear the simulated update"
-                  : "Simulate an available update for this session"
+            <OptionGroup
+              mode="dropdown"
+              label="Simulate an app update"
+              options={UPDATE_SCENARIO_OPTIONS}
+              value={updateScenario ?? "off"}
+              minMenuWidth={320}
+              onChange={(next) =>
+                onUpdateScenarioChange(next === "off" ? null : next)
               }
-              onClick={onToggleUpdateSimulation}
-            >
-              <Sparkles size={13} aria-hidden="true" />
-              {updateSimulationActive ? "Clear test" : "Test update"}
-            </button>
+            />
 
             <SampleDataControls
               api={api}
