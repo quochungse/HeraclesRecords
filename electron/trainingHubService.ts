@@ -132,12 +132,15 @@ import {
   workoutEditRevision,
   type WorkoutEditSource
 } from "./corosWorkoutEditor";
+import { corosText, hasCorosLocaleTable, loadCorosLocale } from "./corosLocale";
 import {
   WORKOUT_SPORT_CAPABILITIES,
   decodeCorosIntensity,
   resolveWorkoutExerciseName,
   workoutExerciseId,
   workoutExerciseMedia,
+  workoutExerciseLoading,
+  workoutExerciseMuscles,
   workoutExerciseName,
   workoutSportFromType
 } from "./workoutCapabilities";
@@ -155,6 +158,12 @@ import {
   decodeStsCredentials
 } from "./corosUploadConfig";
 import { parseStrengthDetail } from "./strengthDetail";
+import {
+  formatSwimPace,
+  readsMovement,
+  readsSpeed,
+  type ActivityReading
+} from "./activityReading";
 import {
   clearStoredCorosCredentials,
   getStoredCorosCredentials,
@@ -3565,6 +3574,25 @@ const workoutExerciseCatalogCache = new Map<
   { expiresAt: number; rows: Record<string, unknown>[] }
 >();
 
+/**
+ * A catalog row whose name `workoutExerciseName` can only give as a bare code.
+ *
+ * The name is read off `overview`, which is a `sid_…` key for nearly every
+ * movement. T1016's is Chinese text, so the name came out as `T1016` — in the
+ * picker, and in every workout that uses the movement, where a step with only
+ * a code is drawn as its kind ("Training") and edited as the code. COROS's
+ * locale table does name it, so the words are put on the row as `displayName`,
+ * which `workoutExerciseName` reads first and which every reader of the
+ * catalog (picker, search, name resolution) therefore shares.
+ */
+export function nameFromCorosLocale(row: Record<string, unknown>): Record<string, unknown> {
+  const codePattern = /^[TS]\d+$/i;
+  if (!codePattern.test(workoutExerciseName(row))) return row;
+  const key = typeof row.name === "string" ? row.name.trim() : "";
+  const words = key ? corosText(key) : "";
+  return words && !codePattern.test(words) ? { ...row, displayName: words } : row;
+}
+
 async function loadWorkoutExerciseCatalog(sport: WorkoutSport): Promise<Record<string, unknown>[]> {
   if (sport !== "strength" && sport !== "hyrox") return [];
   const auth = getStoredAuth();
@@ -3579,7 +3607,12 @@ async function loadWorkoutExerciseCatalog(sport: WorkoutSport): Promise<Record<s
     ...(auth?.userId ? { userId: auth.userId } : {}),
     keyword: ""
   });
-  const rows = exerciseCatalogRows(raw);
+  // The load puts a copy on disk in memory before it awaits anything, so only a
+  // machine that has never had the table waits for the CDN — a stale copy is
+  // refreshed behind the picker rather than holding it up to 15 s.
+  const locale = loadCorosLocale().catch(() => undefined);
+  if (!hasCorosLocaleTable()) await locale;
+  const rows = exerciseCatalogRows(raw).map(nameFromCorosLocale);
   workoutExerciseCatalogCache.set(cacheKey, {
     expiresAt: Date.now() + WORKOUT_CACHE_MS,
     rows
@@ -3598,12 +3631,23 @@ export async function listWorkoutExercises(
     const exerciseKind = toOptionalNumber(row.exerciseKind);
     const media = workoutExerciseMedia(row);
     const thumbnailUrl = media.find((entry) => entry.coverUrl)?.coverUrl;
+    const muscles = workoutExerciseMuscles(row);
+    const loading = workoutExerciseLoading(row);
+    const corosKey = typeof row.name === "string" && /^[TS]\d+$/i.test(row.name.trim())
+      ? row.name.trim()
+      : undefined;
     const option: WorkoutExerciseOption = {
       id,
       name,
       ...(exerciseKind !== undefined ? { exerciseKind } : {}),
       ...(thumbnailUrl ? { thumbnailUrl } : {}),
-      ...(media.length ? { media } : {})
+      ...(media.length ? { media } : {}),
+      ...(corosKey ? { corosKey } : {}),
+      ...(muscles.primary.length ? { primaryMuscles: muscles.primary } : {}),
+      ...(muscles.involved.length ? { involvedMuscles: muscles.involved } : {}),
+      ...(loading.equipment.length ? { equipmentCodes: loading.equipment } : {}),
+      ...(loading.targetType !== undefined ? { targetType: loading.targetType } : {}),
+      ...(loading.defaultLoad !== undefined ? { defaultLoad: loading.defaultLoad } : {})
     };
     return [[id, option] as const];
   })).values()].sort((left, right) => left.name.localeCompare(right.name));
@@ -6997,8 +7041,10 @@ function formatElapsedClock(seconds: number): string {
  * Columns added only when some sample carries them, so a wrist-only run keeps
  * the four-column table it had before and a Pace Pro run with a pod gains the
  * altitude and running-form columns. Distance, HR, pace and power stay
- * unconditional: they are what a coach reads first, and a dash reads better
- * than a table whose shape moves between activities.
+ * unconditional on anything that moves: they are what a coach reads first, and
+ * a dash reads better than a table whose shape moves between activities. A gym
+ * session has HR alone, and a sport that may or may not cover ground
+ * (`effort`) has a distance and a speed only where it did, as its laps do.
  */
 function optionalSeriesColumns(unitSystem: UnitSystem): SeriesColumn[] {
   return [
@@ -7020,24 +7066,33 @@ function optionalSeriesColumns(unitSystem: UnitSystem): SeriesColumn[] {
 export function formatActivitySeriesForChat(
   points: TrainingHubActivitySeriesPoint[],
   unitSystem: UnitSystem = "metric",
-  swim = false,
-  cycling = false
+  /** How the sport is read (`activityReading`), which decides the columns. */
+  reading: ActivityReading = "pace"
 ): string {
   if (points.length === 0) {
     return "Time series: no HR/pace/power samples available.";
   }
 
+  const swim = reading === "swim";
+  const speed = readsSpeed(reading);
+  const moves = readsMovement(reading);
+  const coversGround =
+    moves && (reading !== "effort" || points.some((point) => (point.distance ?? 0) > 0));
   const hasElapsed = points.some((point) => point.elapsed !== undefined);
-  const optional = optionalSeriesColumns(unitSystem).filter((column) =>
-    points.some((point) => column.value(point) !== undefined)
-  );
+  // A gym session carried Distance, Pace and Power on every row, all dashes,
+  // which the model read as figures to talk about.
+  const optional = moves
+    ? optionalSeriesColumns(unitSystem).filter((column) =>
+        points.some((point) => column.value(point) !== undefined)
+      )
+    : [];
 
   const header = [
     hasElapsed ? "Time" : undefined,
-    "Distance",
+    coversGround ? "Distance" : undefined,
     "HR",
-    cycling ? "Speed" : "Pace",
-    "Power",
+    coversGround ? (speed ? "Speed" : swim ? "Pace /100" : "Pace") : undefined,
+    moves ? "Power" : undefined,
     ...optional.map((column) => column.header)
   ]
     .filter(Boolean)
@@ -7050,16 +7105,22 @@ export function formatActivitySeriesForChat(
           ? formatElapsedClock(point.elapsed)
           : "—"
         : undefined,
-      point.distance !== undefined
-        ? formatDistanceValue(point.distance, unitSystem, { swim })
-        : "—",
+      coversGround
+        ? point.distance !== undefined
+          ? formatDistanceValue(point.distance, unitSystem, { swim })
+          : "—"
+        : undefined,
       point.hr !== undefined ? `${point.hr}` : "—",
-      point.pace !== undefined
-        ? cycling
-          ? formatSpeedValue(3600 / point.pace, unitSystem)
-          : formatPaceValue(point.pace, unitSystem).replace(" /", "/")
-        : "—",
-      point.power !== undefined ? `${point.power} W` : "—",
+      coversGround
+        ? point.pace !== undefined
+          ? speed
+            ? formatSpeedValue(3600 / point.pace, unitSystem)
+            : swim
+              ? formatSwimPace(point.pace, unitSystem).replace(" /", "/")
+              : formatPaceValue(point.pace, unitSystem).replace(" /", "/")
+          : "—"
+        : undefined,
+      moves ? (point.power !== undefined ? `${point.power} W` : "—") : undefined,
       ...optional.map((column) => column.value(point) ?? "—")
     ]
       .filter((cell) => cell !== undefined)

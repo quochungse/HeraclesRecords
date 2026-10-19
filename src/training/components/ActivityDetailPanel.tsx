@@ -15,6 +15,7 @@ import {
   formatTrainingTimestamp
 } from "../formatters";
 import { isSpeedSport, isSwimSportType, resolveSportName } from "../sportTypes";
+import { formatSwimPace } from "../../../electron/activityReading";
 import type { HeraclesRecordsApi } from "../../heraclesrecords-api";
 import type { TrainingHubDetailRequest } from "../types";
 import { useUnitSystem } from "../../units/UnitSystemProvider";
@@ -205,17 +206,18 @@ export function ActivityDetailPanel({
 
   const startTime = detail.startTime ?? listActivity?.startTime;
   const showLaps = hasPopulatedLaps(detail);
-  const swim = isSwimSportType(detail.sportType ?? listActivity?.sportType);
+  const sportType = detail.sportType ?? listActivity?.sportType;
+  const swim = isSwimSportType(sportType);
   // A ride and a hike are read in km/h; see `isSpeedSport`.
-  const readsSpeed = isSpeedSport(detail.sportType ?? listActivity?.sportType, sportName);
+  const readsSpeed = isSpeedSport(sportType, sportName);
   const distance = detail.distance ?? listActivity?.distance;
   const duration = detail.duration ?? listActivity?.duration;
   const performance = distance && duration
     ? readsSpeed
       ? formatSpeedValue((distance / 1000) / (duration / 3600), unitSystem)
-      : !swim
-        ? formatPaceSecondsPerKm(duration / (distance / 1000), unitSystem)
-        : undefined
+      : swim
+        ? formatSwimPace(duration / (distance / 1000), unitSystem)
+        : formatPaceSecondsPerKm(duration / (distance / 1000), unitSystem)
     : undefined;
 
   return (

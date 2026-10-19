@@ -168,30 +168,162 @@ export function computeFitView(
   };
 }
 
+/** A place as a label sees it: where it is, and which first-level region holds it. */
+export interface LabelPlace extends GlobePoint {
+  key: string;
+  region?: { id: string };
+}
+
+/** One label on the globe: the place it stands on, and the places it speaks for. */
+export interface PlaceLabelGroup<T extends LabelPlace> {
+  lead: T;
+  /** The lead first. */
+  members: T[];
+  /**
+   * Pixels this name is raised over its pin — just enough to clear a name in
+   * another region that would cover it, and 0 when it has room.
+   */
+  lift: number;
+}
+
 /**
- * Thins a recency-ordered list down to labels that will not sit on top of each
- * other. Nothing in globe.gl does label collision, so separation is decided
- * here in globe degrees.
+ * A label's box as `.training-map-globe-label.is-secondary` draws it: 10px
+ * type, 8px padding a side, 132px at most, 21px tall, its foot `LABEL_FOOT_PX`
+ * over the pin. Measuring the DOM would need the labels drawn first; an
+ * estimate a little generous is what keeps two names from touching.
  */
-export function pickSpacedPlaces<T extends GlobePoint>(
+export const LABEL_HEIGHT_PX = 21;
+export const LABEL_FOOT_PX = 10;
+const LABEL_MAX_WIDTH_PX = 132;
+const LABEL_CHAR_PX = 6;
+const LABEL_PADDING_PX = 16;
+const LABEL_GAP_PX = 4;
+
+export function estimateLabelWidth(text: string): number {
+  return Math.min(
+    LABEL_MAX_WIDTH_PX,
+    LABEL_PADDING_PX + text.length * LABEL_CHAR_PX,
+  );
+}
+
+/** "Hà Nội +1": the lead's name, and how many more places it speaks for. */
+export function mergedLabelText(leadText: string, others: number): string {
+  return others > 0 ? `${leadText} +${others}` : leadText;
+}
+
+interface LabelBox {
+  left: number;
+  right: number;
+  top: number;
+  bottom: number;
+}
+
+function labelBox(
+  x: number,
+  y: number,
+  width: number,
+  lift: number,
+): LabelBox {
+  const bottom = y - LABEL_FOOT_PX - lift;
+  return {
+    left: x - width / 2,
+    right: x + width / 2,
+    top: bottom - LABEL_HEIGHT_PX,
+    bottom,
+  };
+}
+
+function boxesTouch(a: LabelBox, b: LabelBox): boolean {
+  return (
+    a.left < b.right + LABEL_GAP_PX &&
+    b.left < a.right + LABEL_GAP_PX &&
+    a.top < b.bottom + LABEL_GAP_PX &&
+    b.top < a.bottom + LABEL_GAP_PX
+  );
+}
+
+/**
+ * Every place gets a label, and the labels' boxes on screen decide how they
+ * share the globe. A name that would touch another's in the same first-level
+ * region joins it ("Hà Nội +1"); in a different region — or in none — names
+ * are never merged, and one that would touch is lifted just over the name in
+ * its way, and again over the next, until it is clear. A name with room keeps its place at the pin. Nothing in
+ * globe.gl does label collision, so it is decided here, on a flat projection
+ * around the frame's centre at `pixelsPerDegree` (`surfacePixelsPerDegree`).
+ * `places` is newest first, which is the order a group takes its lead from.
+ */
+export function groupPlaceLabels<T extends LabelPlace>(
   places: T[],
-  maxCount: number,
-  minSeparationDegrees: number,
-): T[] {
-  const picked: T[] = [];
+  textOf: (place: T) => string,
+  pixelsPerDegree: number,
+): PlaceLabelGroup<T>[] {
+  const centre = sphericalCenter(places);
+  const cosLat = Math.cos((centre?.lat ?? 0) * DEG_TO_RAD);
+  const screen = (place: T) => {
+    let dLon = place.lon - (centre?.lon ?? 0);
+    dLon = ((((dLon + 180) % 360) + 360) % 360) - 180;
+    return {
+      x: dLon * cosLat * pixelsPerDegree,
+      y: -(place.lat - (centre?.lat ?? 0)) * pixelsPerDegree,
+    };
+  };
+  const placed: Array<{
+    group: PlaceLabelGroup<T>;
+    x: number;
+    y: number;
+    /** Where the lead's name would sit unlifted: what a neighbour merges against. */
+    home: LabelBox;
+    box: LabelBox;
+  }> = [];
   for (const place of places) {
-    if (picked.length >= maxCount) {
-      break;
+    const { x, y } = screen(place);
+    const width = estimateLabelWidth(textOf(place));
+    const home = labelBox(x, y, width, 0);
+    const regionId = place.region?.id;
+    const joined = regionId
+      ? placed.find(
+          (entry) =>
+            entry.group.lead.region?.id === regionId &&
+            boxesTouch(entry.home, home),
+        )
+      : undefined;
+    if (joined) {
+      const { group } = joined;
+      group.members.push(place);
+      // "+N" widens the name; later names are kept clear of the wider box.
+      const wider = estimateLabelWidth(
+        mergedLabelText(textOf(group.lead), group.members.length - 1),
+      );
+      joined.home = labelBox(joined.x, joined.y, wider, 0);
+      joined.box = labelBox(joined.x, joined.y, wider, group.lift);
+      continue;
     }
-    const clear = picked.every(
-      (other) =>
-        angularDistanceDegrees(other, place) >= minSeparationDegrees,
-    );
-    if (clear) {
-      picked.push(place);
+    let lift = 0;
+    let box = home;
+    for (;;) {
+      const inTheWay = placed.filter((entry) => boxesTouch(entry.box, box));
+      if (inTheWay.length === 0) {
+        break;
+      }
+      // Its foot just over the highest top in the way; each step only rises,
+      // so this ends.
+      lift = Math.max(
+        lift + 1,
+        ...inTheWay.map(
+          (entry) => y - LABEL_FOOT_PX - entry.box.top + LABEL_GAP_PX,
+        ),
+      );
+      box = labelBox(x, y, width, lift);
     }
+    placed.push({
+      group: { lead: place, members: [place], lift },
+      x,
+      y,
+      home,
+      box,
+    });
   }
-  return picked;
+  return placed.map((entry) => entry.group);
 }
 
 /**
@@ -201,14 +333,6 @@ export function pickSpacedPlaces<T extends GlobePoint>(
  */
 export function focusLatitudeOffset(altitude: number): number {
   return altitude * 3;
-}
-
-/**
- * Rough on-screen radius of the framed area, used to space labels relative to
- * how much of the globe is visible rather than by a fixed number of degrees.
- */
-export function labelSeparationDegrees(altitude: number): number {
-  return Math.max(0.5, altitude * 3.5);
 }
 
 /**

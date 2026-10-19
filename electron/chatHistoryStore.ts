@@ -10,10 +10,12 @@ import {
   updateChatSessionRow
 } from "./database";
 import { stripChartPlaceholders } from "./chartPlacement";
+import { ACTIVITY_READINGS } from "./activityReading";
 import type {
   ActivityHrTrendPreview,
   ActivityVisualChannelSection,
   ActivityVisualLapPoint,
+  ActivityVisualStrengthExercise,
   ActivityVisualPreview,
   ChatEntryAnalysisMarker,
   ChatProvider,
@@ -687,6 +689,31 @@ function parseVisualLapPoint(value: unknown): ActivityVisualLapPoint | null {
   );
 }
 
+function parseVisualStrengthExercise(value: unknown): ActivityVisualStrengthExercise | null {
+  if (
+    !isRecord(value) ||
+    typeof value.nameKey !== "string" ||
+    typeof value.sets !== "number" ||
+    typeof value.reps !== "number"
+  ) {
+    return null;
+  }
+  const optionalNumber = (field: unknown) => (typeof field === "number" ? field : undefined);
+  return keepUnknownKeys(
+    {
+      nameKey: value.nameKey,
+      rawName: typeof value.rawName === "string" ? value.rawName : undefined,
+      sets: value.sets,
+      reps: value.reps,
+      minWeightKg: optionalNumber(value.minWeightKg),
+      maxWeightKg: optionalNumber(value.maxWeightKg),
+      volumeKg: optionalNumber(value.volumeKg)
+    },
+    value,
+    ["nameKey", "rawName", "sets", "reps", "minWeightKg", "maxWeightKg", "volumeKg"]
+  );
+}
+
 function parseChannelSection(value: unknown): ActivityVisualChannelSection | null {
   if (!isRecord(value)) {
     return null;
@@ -810,11 +837,30 @@ function parseActivityVisualPreview(value: unknown): ActivityVisualPreview | nul
     sections.laps = laps;
   }
 
+  if (value.sections.strength !== undefined) {
+    if (
+      !isRecord(value.sections.strength) ||
+      !Array.isArray(value.sections.strength.exercises)
+    ) {
+      return null;
+    }
+    const exercises = value.sections.strength.exercises
+      .map((exercise) => parseVisualStrengthExercise(exercise))
+      .filter((exercise): exercise is ActivityVisualStrengthExercise => exercise !== null);
+    if (exercises.length !== value.sections.strength.exercises.length) {
+      return null;
+    }
+    sections.strength = keepUnknownKeys({ exercises }, value.sections.strength, ["exercises"]);
+  }
+
+  // A reading this build does not know is carried as it came, not read.
+  const reading = ACTIVITY_READINGS.find((known) => known === value.reading);
   return keepUnknownKeys(
     {
       previewId: value.previewId,
       activityId: value.activityId,
       sportType: typeof value.sportType === "number" ? value.sportType : undefined,
+      reading,
       name: typeof value.name === "string" ? value.name : undefined,
       startTime: typeof value.startTime === "string" ? value.startTime : undefined,
       avgHr: typeof value.avgHr === "number" ? value.avgHr : undefined,
@@ -825,11 +871,22 @@ function parseActivityVisualPreview(value: unknown): ActivityVisualPreview | nul
         "pace",
         "power",
         "elevation",
-        "laps"
+        "laps",
+        "strength"
       ])
     },
     value,
-    ["previewId", "activityId", "sportType", "name", "startTime", "avgHr", "maxHr", "sections"]
+    [
+      "previewId",
+      "activityId",
+      "sportType",
+      ...(reading ? ["reading"] : []),
+      "name",
+      "startTime",
+      "avgHr",
+      "maxHr",
+      "sections"
+    ]
   );
 }
 

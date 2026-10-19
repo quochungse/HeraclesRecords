@@ -36,10 +36,11 @@ import {
   clampLatitude,
   computeFitView,
   focusLatitudeOffset,
-  labelSeparationDegrees,
+  groupPlaceLabels,
   landDetailLevels,
+  mergedLabelText,
   nearestOnScreen,
-  pickSpacedPlaces,
+  surfacePixelsPerDegree,
   type GlobeCameraView,
 } from "./globeFraming";
 
@@ -145,8 +146,12 @@ const IDLE_ROTATION_SPEED = 0.08;
 const IDLE_ROTATION_MIN_ALTITUDE = 1.6;
 /** Rings animate per datum, so the pulsing highlight is capped. */
 const MAX_HIGHLIGHT_RINGS = 18;
-/** More than a handful of pinned names turns the globe into a word cloud. */
-const MAX_HIGHLIGHT_LABELS = 6;
+/** A name pinned on the globe, standing for one place or several close ones. */
+interface GlobeLabel extends GlobePlace {
+  text: string;
+  /** Pixels raised over the pin, clear of a neighbour's name. */
+  lift: number;
+}
 
 let landGeometryCache: LandGeometryData | null = null;
 let landGeometryPromise: Promise<LandGeometryData> | null = null;
@@ -523,26 +528,40 @@ const ActivityGlobeRendererComponent = forwardRef<
     : baselineView.altitude;
   const markerScale = frameAltitude / FIT_MIN_ALTITUDE;
 
-  const labelData = useMemo(() => {
-    const picked = selectedLocation
-      ? [selectedLocation]
-      : highlightAll
-        ? pickSpacedPlaces(
-            locations.filter((location) => Boolean(labels[location.key])),
-            MAX_HIGHLIGHT_LABELS,
-            labelSeparationDegrees(baselineView.altitude),
-          )
-        : [];
-    // The place pointed at always says its name, wherever the spacing rule
-    // left it out.
-    const hovered = hoveredKey
-      ? locations.find((location) => location.key === hoveredKey)
-      : undefined;
-    return hovered && !picked.some((location) => location.key === hovered.key)
-      ? [...picked, hovered]
-      : picked;
+  const labelData = useMemo<GlobeLabel[]>(() => {
+    const own = (location: GlobePlace, lift = 0): GlobeLabel => ({
+      ...location,
+      text: labels[location.key] ?? "",
+      lift,
+    });
+    if (selectedLocation) {
+      return [own(selectedLocation)];
+    }
+    if (!highlightAll) {
+      const hovered = hoveredKey
+        ? locations.find((location) => location.key === hoveredKey)
+        : undefined;
+      return hovered ? [own(hovered)] : [];
+    }
+    // Every named place says its name; close places in one region share it.
+    // The place pointed at always says its own, so a shared label gives way to it.
+    return groupPlaceLabels(
+      locations.filter((location) => Boolean(labels[location.key])),
+      (location) => labels[location.key] ?? "",
+      surfacePixelsPerDegree(size.height, baselineView.altitude),
+    ).map(({ lead, members, lift }) => {
+      const hovered = members.find((member) => member.key === hoveredKey);
+      if (hovered) {
+        return own(hovered, lift);
+      }
+      return {
+        ...own(lead, lift),
+        text: mergedLabelText(labels[lead.key] ?? "", members.length - 1),
+      };
+    });
   }, [
     baselineView.altitude,
+    size.height,
     highlightAll,
     hoveredKey,
     labels,
@@ -1062,21 +1081,22 @@ const ActivityGlobeRendererComponent = forwardRef<
 
   const makeHtmlLabel = useCallback(
     (datum: object) => {
-      const location = datum as GlobePlace;
+      const location = datum as GlobeLabel;
       const anchor = document.createElement("div");
       anchor.className = "training-map-globe-label-anchor";
       anchor.dataset.locationKey = location.key;
+      anchor.style.setProperty("--label-lift", `${location.lift}px`);
       const label = document.createElement("span");
       const lit =
         location.key === selectedLocation?.key || location.key === hoveredKey;
       label.className = lit
         ? "training-map-globe-label"
         : "training-map-globe-label is-secondary";
-      label.textContent = labels[location.key] ?? "";
+      label.textContent = location.text;
       anchor.append(label);
       return anchor;
     },
-    [hoveredKey, labels, selectedLocation?.key],
+    [hoveredKey, selectedLocation?.key],
   );
 
   const modifyHtmlLabelVisibility = useCallback(

@@ -1145,6 +1145,39 @@ assert.equal(restoredVisual[0].preview.sections.laps[0].avgCadence, 172);
 // dropped here, every reopened ride charted its speed as a running pace.
 assert.equal(restoredVisual[0].preview.sportType, 100);
 
+// A gym session's card carries its reading and its exercises, and both are
+// read back — kept only as unknown keys, the card would fall back to the code
+// and lose the exercise table's types on the next build that reads it.
+const gymVisualEntry = {
+  kind: "activityVisual",
+  preview: {
+    previewId: "gym-1:req-1",
+    activityId: "gym-1",
+    sportType: 402,
+    reading: "sets",
+    name: "Full vai tay",
+    sections: {
+      hr: { chartKind: "series", series: [{ elapsed: 0, hr: 100 }, { elapsed: 60, hr: 120 }] },
+      strength: {
+        exercises: [
+          { nameKey: "T1041", sets: 3, reps: 30, minWeightKg: 20, maxWeightKg: 25, volumeKg: 675 },
+          { nameKey: "S9999", rawName: "Plank", sets: 2, reps: 2 }
+        ]
+      }
+    }
+  }
+};
+const restoredGym = parseChatTranscriptJson(JSON.stringify([gymVisualEntry]))[0];
+assert.equal(restoredGym.preview.reading, "sets");
+assert.equal(JSON.stringify(restoredGym), JSON.stringify(gymVisualEntry), "the round trip rewrites nothing");
+assert.equal(
+  parseChatTranscriptJson(
+    JSON.stringify([{ ...gymVisualEntry, preview: { ...gymVisualEntry.preview, reading: "jog" } }])
+  )[0].preview.reading,
+  "jog",
+  "a reading this build does not know is carried, for the build that wrote it"
+);
+
 // Removing a creation is a mark on the draft that survives a round trip, and
 // a save that keeps the array's length so `foreignTail` has no tail to put
 // back. Both halves matter: `parsePlanDraft` rebuilds the draft field by

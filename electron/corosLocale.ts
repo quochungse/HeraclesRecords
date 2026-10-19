@@ -99,6 +99,11 @@ async function fetchTable(): Promise<Record<string, string>> {
   }
 }
 
+/** Whether any table — the copy on disk or a fresh one — is in memory. */
+export function hasCorosLocaleTable(): boolean {
+  return strings !== null;
+}
+
 /** Replaces the table in memory — for suites, and for the loader below. */
 export function useCorosLocaleTable(table: Record<string, string> | null): void {
   strings = table ? new Map(Object.entries(table)) : null;

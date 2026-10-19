@@ -1,4 +1,12 @@
 import { summarizeActivityWindow, type ActivityWindow } from "./activityMetrics";
+import {
+  activityReading,
+  formatSwimPace,
+  readsMovement,
+  readsSpeed,
+  swimPacePer100,
+  type ActivityReading
+} from "./activityReading";
 import { dayKey, isoDay, isoFromDayKey, padTwo } from "./chatDayKeys";
 import { getStoredTrainingActivity } from "./database";
 import {
@@ -12,6 +20,7 @@ import type {
   ActivityHrTrendPreview,
   ActivityVisualLapPoint,
   ActivityVisualPreview,
+  ActivityVisualStrengthExercise,
   CorosMcpTool,
   StrengthDetail,
   StrengthExercise,
@@ -34,8 +43,11 @@ import {
   formatPaceValue,
   formatSpeedValue,
   formatWeightValue,
+  kmhToDisplaySpeed,
   metersToElevation,
-  secondsPerKmToDisplayPace
+  secondsPerKmToDisplayPace,
+  speedUnit,
+  swimDistanceUnit
 } from "./unitSystem.js";
 
 export const CHAT_ACTIVITY_TOOL_NAMES = [
@@ -687,8 +699,8 @@ export function formatActivityWindowForChat(
       window.unit === "km" ? " — this activity has no distance channel" : ""
     }. Use the laps instead.`;
   }
-  const swim = isSwimActivity(detail.sportType, detail.sportName);
-  const cycling = isCyclingActivity(detail.sportType, detail.sportName);
+  const reading = activityReading(detail.sportType, detail.sportName);
+  const swim = reading === "swim";
   const where = [
     stretch.startMeters !== undefined && stretch.endMeters !== undefined
       ? `${formatDistanceValue(stretch.startMeters, unitSystem, { swim })}–${formatDistanceValue(stretch.endMeters, unitSystem, { swim })}`
@@ -699,13 +711,10 @@ export function formatActivityWindowForChat(
     stretch.distanceMeters !== undefined
       ? `${formatDistanceValue(stretch.distanceMeters, unitSystem, { swim })} in ${formatDurationSeconds(stretch.durationSeconds)}`
       : formatDurationSeconds(stretch.durationSeconds),
-    // No per-km pace for a swim, as the summary below leaves it out.
-    stretch.paceSecondsPerKm !== undefined && !swim
-      ? cycling
-        ? `speed ${formatSpeedValue(3600 / stretch.paceSecondsPerKm, unitSystem)}`
-        : `pace ${formatPaceSeconds(stretch.paceSecondsPerKm, unitSystem)}`
+    stretch.paceSecondsPerKm !== undefined
+      ? formatPerformance(stretch.paceSecondsPerKm, reading, unitSystem)
       : undefined,
-    stretch.adjustedPaceSecondsPerKm !== undefined && !cycling && !swim
+    stretch.adjustedPaceSecondsPerKm !== undefined && reading === "pace"
       ? `GAP ${formatPaceSeconds(stretch.adjustedPaceSecondsPerKm, unitSystem)}`
       : undefined,
     stretch.avgHr !== undefined ? `HR ${Math.round(stretch.avgHr)} avg / ${stretch.maxHr} max` : undefined,
@@ -716,6 +725,34 @@ export function formatActivityWindowForChat(
       : undefined
   ].filter(Boolean);
   return `Stretch (${asked}: ${where.join(", ")}; ${stretch.samples} samples): ${figures.join(" · ")}`;
+}
+
+function strengthVisualExercises(
+  strength: StrengthDetail | undefined
+): ActivityVisualStrengthExercise[] {
+  // Every exercise: a row is a few numbers, and the coach's text names the
+  // ones past its own cap, so a card that stopped at 20 would disagree with it.
+  return (strength?.exercises ?? []).map((exercise) => {
+    const loads = exercise.entries
+      .map((entry) => entry.weightKg)
+      .filter((weight) => weight > 0);
+    const volumeKg = exercise.entries.reduce(
+      (sum, entry) => sum + (entry.weightKg > 0 ? entry.weightKg * entry.reps : 0),
+      0
+    );
+    // Counted from the work sets, as the Strength screen counts them: COROS's
+    // aggregate lap can claim a set with no reps, which no entry stands for.
+    return {
+      nameKey: exercise.nameKey,
+      ...(exercise.rawName ? { rawName: exercise.rawName } : {}),
+      sets: exercise.entries.length,
+      reps: exercise.entries.reduce((sum, entry) => sum + entry.reps, 0),
+      ...(loads.length > 0
+        ? { minWeightKg: Math.min(...loads), maxWeightKg: Math.max(...loads) }
+        : {}),
+      ...(volumeKg > 0 ? { volumeKg: Math.round(volumeKg * 10) / 10 } : {})
+    };
+  });
 }
 
 function mapLapPoints(laps: TrainingHubActivityLap[]): ActivityVisualLapPoint[] {
@@ -733,22 +770,27 @@ function mapLapPoints(laps: TrainingHubActivityLap[]): ActivityVisualLapPoint[] 
 type VisualChannel = "hr" | "pace" | "power" | "cadence";
 
 /**
- * One chart's points: distance and the channel it draws, nothing else. The
- * card stores every section separately in the transcript, so handing four
- * sections one array of every recorded channel stored that array four times.
+ * One chart's points: where along the activity, and the channel it draws,
+ * nothing else. The card stores every section separately in the transcript,
+ * so handing four sections one array of every recorded channel stored that
+ * array four times. "Where" is the distance, or the activity time when there
+ * is none — a gym session's heart rate drew against "Point 1, Point 2…".
  */
 function channelSeries(
   series: TrainingHubActivitySeriesPoint[],
   channel: VisualChannel
 ): TrainingHubActivitySeriesPoint[] {
+  const byDistance = series.some((point) => (point.distance ?? 0) > 0);
   return series.flatMap((point) => {
     const value = point[channel];
     if (value === undefined || !Number.isFinite(value)) {
       return [];
     }
     const trimmed: TrainingHubActivitySeriesPoint = {};
-    if (point.distance !== undefined) {
+    if (byDistance && point.distance !== undefined) {
       trimmed.distance = point.distance;
+    } else if (!byDistance && point.elapsed !== undefined) {
+      trimmed.elapsed = point.elapsed;
     }
     trimmed[channel] = value;
     return [trimmed];
@@ -859,6 +901,12 @@ export function buildActivityVisualPreview(
       : [];
 
   const sections: ActivityVisualPreview["sections"] = {};
+  // A gym session is heart rate over time: what COROS sends beside it there —
+  // a cadence, a pace off the wrist — describes no movement anyone made.
+  const reading = activityReading(detail.sportType, detail.sportName);
+  const moves = readsMovement(reading);
+  // Any other sport is read in speed, and only where it covered ground.
+  const coveredGround = reading !== "effort" || (detail.distance ?? 0) > 0;
 
   const hrSeriesPoints = downsampled.filter(
     (point) => point.hr !== undefined && Number.isFinite(point.hr)
@@ -879,14 +927,14 @@ export function buildActivityVisualPreview(
   const pacePoints = downsampled.filter(
     (point) => point.pace !== undefined && Number.isFinite(point.pace)
   );
-  if (pacePoints.length >= 2) {
+  if (moves && coveredGround && pacePoints.length >= 2) {
     sections.pace = { series: channelSeries(downsampled, "pace") };
   }
 
   const powerPoints = downsampled.filter(
     (point) => point.power !== undefined && Number.isFinite(point.power)
   );
-  if (powerPoints.length >= 2) {
+  if (moves && powerPoints.length >= 2) {
     sections.power = { series: channelSeries(downsampled, "power") };
   }
 
@@ -900,7 +948,9 @@ export function buildActivityVisualPreview(
   const cadenceLaps = detail.laps.filter(
     (lap) => lap.avgCadence !== undefined && Number.isFinite(lap.avgCadence)
   );
-  if (cadencePoints.length >= 2) {
+  if (!moves) {
+    // No cadence for a gym session.
+  } else if (cadencePoints.length >= 2) {
     sections.cadence = { chartKind: "series", series: channelSeries(downsampled, "cadence") };
   } else if (cadenceLaps.length >= 2) {
     sections.cadence = { chartKind: "laps", laps: mapLapPoints(cadenceLaps) };
@@ -909,11 +959,16 @@ export function buildActivityVisualPreview(
   const elevationPoints = (detail.track?.points ?? []).filter(
     (point) => point.elevation !== undefined && Number.isFinite(point.elevation)
   );
-  if (elevationPoints.length >= 2) {
+  if (moves && reading !== "swim" && elevationPoints.length >= 2) {
     sections.elevation = { points: elevationProfile(elevationPoints) };
   }
 
-  if (detail.laps.length > 0) {
+  // A gym session lists its exercises in place of its laps, which are its sets
+  // and rests with nothing to say which is which.
+  const exercises = moves ? [] : strengthVisualExercises(detail.strength);
+  if (exercises.length > 0) {
+    sections.strength = { exercises };
+  } else if (detail.laps.length > 0) {
     sections.laps = mapLapPoints(detail.laps);
   }
 
@@ -925,6 +980,7 @@ export function buildActivityVisualPreview(
     previewId: `${activityId}:${requestId}`,
     activityId,
     sportType: detail.sportType,
+    reading,
     name: detail.name,
     startTime: detail.startTime ? formatIsoDate(detail.startTime) : undefined,
     avgHr: detail.avgHr,
@@ -1070,14 +1126,11 @@ export function formatActivityDetailForChat(
 ): string {
   const wants = (section: ActivityDetailSection): boolean =>
     section === "series" ? includeSeries || include.has("series") : include.has(section);
-  const swim = isSwimActivity(detail.sportType, detail.sportName);
-  const cycling = isCyclingActivity(detail.sportType, detail.sportName);
+  const reading = activityReading(detail.sportType, detail.sportName);
+  const swim = reading === "swim";
+  const cycling = reading === "speed";
   const performance = detail.distance && detail.duration
-    ? cycling
-      ? `Avg speed: ${formatSpeedValue((detail.distance / 1000) / (detail.duration / 3600), unitSystem)}`
-      : !swim
-        ? `Avg pace: ${formatPaceSeconds(detail.duration / (detail.distance / 1000), unitSystem)}`
-        : undefined
+    ? formatPerformance(detail.duration / (detail.distance / 1000), reading, unitSystem, "Avg ")
     : undefined;
   const summaryParts = [
     detail.name ? `Name: ${detail.name}` : undefined,
@@ -1096,7 +1149,7 @@ export function formatActivityDetailForChat(
       ? `Elapsed (pauses included): ${formatDurationSeconds(detail.elapsedDuration)}`
       : undefined,
     performance,
-    detail.adjustedPace
+    detail.adjustedPace && reading === "pace"
       ? `Adjusted pace (grade-adjusted): ${formatPaceSeconds(detail.adjustedPace, unitSystem)}`
       : undefined,
     detail.avgHr ? `Avg HR: ${detail.avgHr} bpm` : undefined,
@@ -1109,7 +1162,7 @@ export function formatActivityDetailForChat(
   const sections = ["Activity detail", summaryParts.join("\n")];
 
   const context = [
-    formatActivityDynamics(detail.dynamics, cycling),
+    readsMovement(reading) ? formatActivityDynamics(detail.dynamics, cycling) : undefined,
     formatActivityEffect(detail.effect),
     formatActivityWeather(detail.weather)
   ].filter(Boolean);
@@ -1118,7 +1171,7 @@ export function formatActivityDetailForChat(
   }
 
   const formTrend = wants("trend")
-    ? formatFormTrend(detail, unitSystem, cycling)
+    ? formatFormTrend(detail, unitSystem, reading)
     : undefined;
   if (formTrend) {
     sections.push("", formTrend);
@@ -1138,7 +1191,7 @@ export function formatActivityDetailForChat(
 
   if (wants("laps")) {
     if (detail.laps.length > 0) {
-      sections.push("", formatLapTable(detail.laps, unitSystem, swim, cycling));
+      sections.push("", formatLapTable(detail.laps, unitSystem, reading));
     } else {
       sections.push("", "Laps: none recorded for this activity.");
     }
@@ -1167,8 +1220,7 @@ export function formatActivityDetailForChat(
         formatActivitySeriesForChat(
           downsampleActivitySeries(detail.series),
           unitSystem,
-          swim,
-          cycling
+          reading
         )
       );
     } else {
@@ -1440,20 +1492,50 @@ function paceTrend(first: number, last: number, unitSystem: UnitSystem): string 
   );
 }
 
-function formTrendMetrics(cadenceUnit: string): FormTrendMetric[] {
+/** Speed both sides, its change in the same unit, as `paceTrend` does for a pace. */
+function speedTrend(first: number, last: number, unitSystem: UnitSystem): string {
+  const change =
+    kmhToDisplaySpeed(3600 / last, unitSystem) - kmhToDisplaySpeed(3600 / first, unitSystem);
+  return (
+    `${formatSpeedValue(3600 / first, unitSystem)} → ${formatSpeedValue(3600 / last, unitSystem)} ` +
+    `(${signedNumber(change, 1)} ${speedUnit(unitSystem)})`
+  );
+}
+
+/** A pace per 100 both sides, its change in seconds per 100 of the pool's unit. */
+function swimPaceTrend(first: number, last: number, unitSystem: UnitSystem): string {
+  const change = swimPacePer100(last, unitSystem) - swimPacePer100(first, unitSystem);
+  return (
+    `${formatSwimPace(first, unitSystem)} → ${formatSwimPace(last, unitSystem)} ` +
+    `(${signedNumber(change, 0)} s/100${swimDistanceUnit(unitSystem)})`
+  );
+}
+
+/**
+ * The rows a sport's trend is read in: a gym session has heart rate and
+ * nothing that moved, a ride and a hike gain speed where a run loses pace, and
+ * a swim reads its pace per 100.
+ */
+function formTrendMetrics(reading: ActivityReading): FormTrendMetric[] {
+  const cadenceUnit = reading === "speed" ? "rpm" : "spm";
+  const pace: FormTrendMetric = {
+    label: readsSpeed(reading) ? "speed" : "pace",
+    fromPoint: (point) => point.pace,
+    fromLap: (lap) => lap.pace,
+    render: readsSpeed(reading) ? speedTrend : reading === "swim" ? swimPaceTrend : paceTrend
+  };
+  const heartRate: FormTrendMetric = {
+    label: "HR",
+    fromPoint: (point) => point.hr,
+    fromLap: (lap) => lap.avgHr,
+    render: numericTrend("bpm", 0)
+  };
+  if (!readsMovement(reading)) {
+    return [heartRate];
+  }
   return [
-    {
-      label: "pace",
-      fromPoint: (point) => point.pace,
-      fromLap: (lap) => lap.pace,
-      render: paceTrend
-    },
-    {
-      label: "HR",
-      fromPoint: (point) => point.hr,
-      fromLap: (lap) => lap.avgHr,
-      render: numericTrend("bpm", 0)
-    },
+    pace,
+    heartRate,
     {
       label: "cadence",
       fromPoint: (point) => point.cadence,
@@ -1550,9 +1632,9 @@ function formTrendLaps(laps: TrainingHubActivityLap[]): {
 function formatFormTrend(
   detail: TrainingHubActivityDetail,
   unitSystem: UnitSystem,
-  cycling: boolean
+  reading: ActivityReading
 ): string | undefined {
-  const metrics = formTrendMetrics(cycling ? "rpm" : "spm");
+  const metrics = formTrendMetrics(reading);
   const series = detail.series ?? [];
 
   const fromSeries = (metric: FormTrendMetric): FormTrendSample[] =>
@@ -1662,10 +1744,12 @@ function formatStrengthDetailForChat(
         sets.push(`… ${exercise.entries.length - MAX_STRENGTH_SETS} more`);
       }
 
+      // The work sets listed beside it, as the card and the Strength screen
+      // count them: COROS's aggregate lap can claim a set no entry stands for.
       const heading = [
         strengthExerciseLabel(exercise),
-        `${exercise.sets} sets`,
-        `${exercise.totalReps} reps`
+        `${exercise.entries.length} sets`,
+        `${exercise.entries.reduce((sum, entry) => sum + entry.reps, 0)} reps`
       ].join(" — ");
       return `- ${heading}: ${sets.join(", ")}`;
     });
@@ -1756,38 +1840,53 @@ const LAP_PHASE_LABELS: Record<string, string> = {
   rest: "rest"
 };
 
+/**
+ * The laps in the columns the sport is read in. A gym session's laps are its
+ * sets and rests, so it has no Distance or Pace column — it had both, empty on
+ * every row, which the coach then read back as figures to talk about. A sport
+ * that may or may not cover ground (`effort`) shows them only when a lap did.
+ */
 function formatLapTable(
   laps: TrainingHubActivityLap[],
   unitSystem: UnitSystem,
-  swim: boolean,
-  cycling: boolean
+  reading: ActivityReading
 ): string {
   const capped = laps.slice(0, MAX_LAPS);
-  const dynamicsColumns = lapDynamicsColumns(unitSystem).filter((column) =>
-    capped.some((lap) => column.value(lap) !== undefined)
-  );
+  const swim = reading === "swim";
+  const moves = readsMovement(reading);
+  const dynamicsColumns = moves
+    ? lapDynamicsColumns(unitSystem).filter((column) =>
+        capped.some((lap) => column.value(lap) !== undefined)
+      )
+    : [];
   const hasPhases = capped.some((lap) => lap.phase !== undefined);
+  const hasDistance =
+    moves && (reading !== "effort" || capped.some((lap) => (lap.distance ?? 0) > 0));
   const header = [
     "Lap",
     ...(hasPhases ? ["Phase"] : []),
-    "Distance",
+    ...(hasDistance ? ["Distance"] : []),
     "Duration",
     "Avg HR",
     "Max HR",
-    cycling ? "Speed" : "Pace",
+    ...(hasDistance ? [readsSpeed(reading) ? "Speed" : "Pace"] : []),
     ...dynamicsColumns.map((column) => column.header)
   ].join(" | ");
   const rows = capped.map((lap) => {
+    const lapPace =
+      lap.distance && lap.duration ? lap.duration / (lap.distance / 1000) : lap.pace;
     const cols = [
       String(lap.index),
       ...(hasPhases ? [lap.phase ? LAP_PHASE_LABELS[lap.phase] ?? lap.phase : "—"] : []),
-      lap.distance ? formatDistanceValue(lap.distance, unitSystem, { swim }) : "—",
+      ...(hasDistance
+        ? [lap.distance ? formatDistanceValue(lap.distance, unitSystem, { swim }) : "—"]
+        : []),
       lap.duration ? formatDurationSeconds(lap.duration) : "—",
       lap.avgHr ? `${lap.avgHr}` : "—",
       lap.maxHr ? `${lap.maxHr}` : "—",
-      cycling && lap.distance && lap.duration
-        ? formatSpeedValue((lap.distance / 1000) / (lap.duration / 3600), unitSystem)
-        : lap.pace ? formatPaceSeconds(lap.pace, unitSystem) : "—",
+      ...(hasDistance
+        ? [lapPace ? formatPerformance(lapPace, reading, unitSystem, "", false) ?? "—" : "—"]
+        : []),
       ...dynamicsColumns.map((column) => column.value(lap) ?? "—")
     ];
     return cols.join(" | ");
@@ -1803,7 +1902,9 @@ function formatLapTable(
     // left to confirm it.
     lines.push(
       "Phase is the structured-workout role COROS recorded for each lap; " +
-        "read it against the HR and pace columns."
+        (moves
+          ? "read it against the HR and pace columns."
+          : "read it against the HR columns.")
     );
   }
   return lines.join("\n");
@@ -1843,6 +1944,34 @@ function formatDurationSeconds(value: number): string {
     return `${hours}:${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
   }
   return `${minutes}:${String(seconds).padStart(2, "0")}`;
+}
+
+/**
+ * A pace in seconds per km as the sport reads it: `pace 5:10/km`, `speed
+ * 24.1 km/h`, `pace 1:52 /100m` — and nothing for a gym session. `prefix`
+ * leads the label ("Avg "), and `labelled: false` gives the bare figure for a
+ * table cell.
+ */
+function formatPerformance(
+  secondsPerKm: number,
+  reading: ActivityReading,
+  unitSystem: UnitSystem,
+  prefix = "",
+  labelled = true
+): string | undefined {
+  if (!readsMovement(reading) || !Number.isFinite(secondsPerKm) || secondsPerKm <= 0) {
+    return undefined;
+  }
+  const [label, value] = readsSpeed(reading)
+    ? ["speed", formatSpeedValue(3600 / secondsPerKm, unitSystem)]
+    : reading === "swim"
+      ? ["pace", formatSwimPace(secondsPerKm, unitSystem)]
+      : ["pace", formatPaceSeconds(secondsPerKm, unitSystem)];
+  if (!labelled) {
+    return value;
+  }
+  const named = prefix ? `${prefix}${label}` : label;
+  return prefix ? `${named}: ${value}` : `${named} ${value}`;
 }
 
 function formatPaceSeconds(

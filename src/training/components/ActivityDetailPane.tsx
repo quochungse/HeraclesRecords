@@ -29,11 +29,7 @@ import {
 } from "../formatters";
 import { detailMatchesActivity } from "../activityDetail";
 import { sportColorCategory } from "../sportColors";
-import {
-  isCyclingSportType,
-  isSwimSportType,
-  resolveSportName
-} from "../sportTypes";
+import { isSpeedSport, resolveSportName } from "../sportTypes";
 import { classifyRunSurface } from "../../running/runSurface";
 import { isRideSportType } from "../../cycling/rideType";
 import { isHikeSportType } from "../../hiking/hikeType";
@@ -41,6 +37,11 @@ import { sportScreenFor, type SportScreen } from "../../navigation/sportScreens"
 import { useUnitSystem } from "../../units/UnitSystemProvider";
 import { formatTemperatureValue } from "../../units/units";
 import { formatSpeedValue } from "../../units/units";
+import {
+  activityReading,
+  formatSwimPace,
+  readsMovement
+} from "../../../electron/activityReading";
 import { ActivityElevationChart } from "./ActivityElevationChart";
 import { ActivityExportMenu } from "./ActivityExportMenu";
 import { ActivityRouteMap } from "./ActivityRouteMap";
@@ -213,23 +214,27 @@ export function ActivityDetailPane({
     );
   }
 
-  const swim = isSwimSportType(sportType);
-  const cycling =
-    isCyclingSportType(sportType) || /bike|cycl|ride/i.test(sportName ?? "");
+  const reading = activityReading(sportType, sportName);
+  const swim = reading === "swim";
   // A hike is read in km/h as a ride is — a 19:40 /km pace says nothing to a
   // walker — but its cadence is still steps, so the two stay apart.
-  const readsSpeed = cycling || isHikeSportType(sportType);
+  const cycling = reading === "speed";
+  const readsSpeed = isSpeedSport(sportType, sportName);
   const distance = detail.distance ?? listActivity.distance;
   const duration = detail.duration ?? listActivity.duration;
   const startTime = detail.startTime ?? listActivity.startTime;
 
+  // A swim is read per 100 m (or yd), the way a swimmer reads it: a pace per
+  // kilometre put a pool session at 20:00 /km.
+  const formatPerformance = (meters: number, seconds: number): string =>
+    readsSpeed
+      ? formatSpeedValue(meters / 1000 / (seconds / 3600), unitSystem)
+      : swim
+        ? formatSwimPace(seconds / (meters / 1000), unitSystem)
+        : formatPaceSecondsPerKm(seconds / (meters / 1000), unitSystem);
   const performance =
-    distance && duration
-      ? readsSpeed
-        ? formatSpeedValue(distance / 1000 / (duration / 3600), unitSystem)
-        : !swim
-          ? formatPaceSecondsPerKm(duration / (distance / 1000), unitSystem)
-          : undefined
+    distance && duration && readsMovement(reading)
+      ? formatPerformance(distance, duration)
       : undefined;
 
   /*
@@ -634,15 +639,7 @@ export function ActivityDetailPane({
                       </td>
                       <td className="is-numeric">
                         {lap.distance && lap.duration
-                          ? readsSpeed
-                            ? formatSpeedValue(
-                                lap.distance / 1000 / (lap.duration / 3600),
-                                unitSystem
-                              )
-                            : formatPaceSecondsPerKm(
-                                lap.duration / (lap.distance / 1000),
-                                unitSystem
-                              )
+                          ? formatPerformance(lap.distance, lap.duration)
                           : "—"}
                       </td>
                       <td className="is-numeric">{lap.avgHr ?? "—"}</td>

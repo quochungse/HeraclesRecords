@@ -49,11 +49,11 @@
   font-kerning: normal;
 
   --heat-0: rgba(255, 255, 255, 0.04);
-  --heat-1: rgba(122, 107, 85, 0.4);
-  --heat-2: rgba(169, 132, 63, 0.58);
-  --heat-3: rgba(211, 154, 44, 0.68);
-  --heat-4: rgba(236, 122, 38, 0.78);
-  --heat-5: rgba(242, 80, 45, 0.88);
+  --heat-1: rgba(107, 94, 75, 0.4);
+  --heat-2: rgba(149, 116, 55, 0.58);
+  --heat-3: rgba(186, 136, 39, 0.68);
+  --heat-4: rgba(208, 107, 33, 0.78);
+  --heat-5: rgba(213, 70, 40, 0.88);
 
   /* The heat ramp is amber: one warm hue from sand to ember, so load reads as
      how hot a muscle runs rather than as a traffic light. --m3d-heat-* are its
@@ -66,16 +66,19 @@
   --m3d-head: #938e87;
   --m3d-v2-connective: #d9cfc0;
   --m3d-heat-0: var(--m3d-head);
-  --m3d-heat-1: #7a6b55;
-  --m3d-heat-2: #a9843f;
-  --m3d-heat-3: #d39a2c;
-  --m3d-heat-4: #ec7a26;
-  --m3d-heat-5: #f2502d;
+  --m3d-heat-1: #6b5e4b;
+  --m3d-heat-2: #957437;
+  --m3d-heat-3: #ba8827;
+  --m3d-heat-4: #d06b21;
+  --m3d-heat-5: #d54628;
   --m3d-rim: #7fe8c4;
   --m3d-sky: #93b8dc;
   --m3d-ground: #151a1f;
   --m3d-exposure: 1;
   --m3d-focus-glow: 0.42;
+  /* How much lighter and more vivid a hovered or selected muscle turns. None
+     here: on a dark stage the glow above is what picks it out. */
+  --m3d-focus-lift: 0;
 
   --panel-floor: rgba(0, 0, 0, 0.28);
   --muscle-focus-vignette: rgba(5, 8, 11, 0.24);
@@ -149,6 +152,10 @@
      out of the selected muscle rather than putting a rim on it. What marks
      the selection here is everything around it going grey. */
   --m3d-focus-glow: 0.06;
+  /* So the muscle under the pointer lifts instead, lighter and more vivid but
+     still its own hue: a hover dims nothing around it, and without this it read
+     exactly like its neighbours. */
+  --m3d-focus-lift: 0.1;
 
   --panel-floor: rgba(19, 26, 40, 0.09);
   --muscle-focus-vignette: rgba(19, 26, 40, 0.12);

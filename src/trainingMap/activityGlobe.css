@@ -249,7 +249,7 @@
   bottom: 2px;
   left: 0;
   width: 1px;
-  height: 16px;
+  height: calc(8px + var(--label-lift, 0px));
   background: var(--map-globe-label-border);
 }
 
@@ -258,9 +258,11 @@
   opacity: 0;
 }
 
+/* `--label-lift` (written per label) raises a name over a neighbour's in
+ * another region, its stalk growing to reach the pin. */
 .training-map-globe-label {
   position: absolute;
-  bottom: 18px;
+  bottom: calc(10px + var(--label-lift, 0px));
   left: 50%;
   display: inline-flex;
   align-items: center;

@@ -1,5 +1,5 @@
 import type { TrainingHubSportType } from "../../electron/types";
-import { isHikeSportType } from "../hiking/hikeType";
+import { activityReading, readsSpeed } from "../../electron/activityReading";
 import { t, type MessageKey } from "../i18n/core";
 import englishSports from "../i18n/messages/en/sports";
 
@@ -43,18 +43,16 @@ export function isCyclingSportType(sportType?: number): boolean {
 }
 
 /**
- * Whether an activity is read in speed rather than pace: a ride, by its COROS
- * code or, for a custom sport, its name — the rule the activity panes apply to
- * their own "Avg speed" — and a hike or a mountain climb, which a walker reads
- * in km/h. On the route map that also keeps a hike off COROS's pace zones,
- * which are the account's running zones and put a whole hike below zone 1.
+ * Whether an activity is read in speed rather than pace: a ride, a hike or a
+ * mountain climb, which a walker reads in km/h, and any sport that is neither
+ * run, swim nor gym — a ski run or a row at 4:00 /km says nothing. It is
+ * `activityReading`, the rule Coach's card and tools read too, so a session
+ * reads the same on its own screen and in a conversation. On the route map it
+ * also keeps a hike off COROS's pace zones, which are the account's running
+ * zones and put a whole hike below zone 1.
  */
 export function isSpeedSport(sportType?: number, sportName?: string): boolean {
-  return (
-    isCyclingSportType(sportType) ||
-    isHikeSportType(sportType) ||
-    /bike|cycl|ride/i.test(sportName ?? "")
-  );
+  return readsSpeed(activityReading(sportType, sportName));
 }
 
 export function resolveSportName(

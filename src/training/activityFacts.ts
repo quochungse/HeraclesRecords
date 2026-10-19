@@ -20,6 +20,7 @@ import {
   formatPaceSecondsPerKm
 } from "./formatters";
 import { isSpeedSport, isSwimSportType } from "./sportTypes";
+import { activityReading } from "../../electron/activityReading";
 import { classifyRunSurface, isRunSportType } from "../running/runSurface";
 import { formatSpeedValue } from "../units/units";
 import { formatDecimal, t } from "../i18n/core";
@@ -32,11 +33,11 @@ export interface ActivityFact {
 }
 
 /**
- * Foot sports where a seconds-per-kilometre pace is the natural reading — not
- * a ride, not a swim, and not a hike, which is read in km/h (`isSpeedSport`).
+ * Foot sports where a seconds-per-kilometre pace is the natural reading — a
+ * run or a walk; not a ride, a swim, a hike (km/h) or a gym session.
  */
 function isPacedSport(sportType: number | undefined): boolean {
-  return !isSpeedSport(sportType) && !isSwimSportType(sportType);
+  return activityReading(sportType) === "pace";
 }
 
 /**

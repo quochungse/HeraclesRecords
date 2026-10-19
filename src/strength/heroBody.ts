@@ -13,9 +13,8 @@ import type { MuscleId } from "./muscles";
  *  - the man's muscles thickened as a gym-goer's, each away from the bone under
  *    it; the woman's body reshaped to a fit woman's proportions, toned, with a
  *    bust of her own (her file alone carries it);
- *  - the skull and jaw taken out of the skeleton, a clay head of the same family
- *    for each in their place (CC BY 4.0, "Stylized Anime Female Head" by Rodesqa),
- *    its eyes in the same index list.
+ *  - the skull and jaw taken out of the skeleton, a clay head for each in their
+ *    place, its eyes (their front halves) in the same index list.
  *
  * Positions are int16 in the atlas's own frame (origin + q × step), padded to
  * four for meshopt's vertex codec, so the registration frame the old GLBs used

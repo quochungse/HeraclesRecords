@@ -60,6 +60,7 @@ import type {
   CoachPrecedingActivityRow,
   CoachUnseenActivityRow as CoachActivityRow
 } from "./database";
+import { isoDay } from "./chatDayKeys";
 import { corosText, loadCorosLocale } from "./corosLocale";
 import { EXERCISE_SEARCH_MUSCLES, classifyWorkoutExerciseName } from "./exerciseCatalogSearch";
 import { getTrainingHubStatus, reconnectTrainingHub } from "./trainingHubService";
@@ -215,13 +216,18 @@ export function renderAnalysisTemplate(
     .trim();
 }
 
-function isoDate(now: Date): string {
-  return now.toISOString().slice(0, 10);
+/**
+ * The local day, never `toISOString()`: in UTC+7 a 06:30 Monday run is still
+ * Sunday in UTC, so "the week starting {{date}}" was drafted from a Sunday.
+ */
+export function isoDate(now: Date): string {
+  return isoDay(now);
 }
 
-function weekRange(now: Date): string {
+/** The Monday-to-Sunday week `now` falls in, as the rest of the app counts it. */
+export function weekRange(now: Date): string {
   const start = new Date(now);
-  start.setDate(start.getDate() - start.getDay());
+  start.setDate(start.getDate() - ((start.getDay() + 6) % 7));
   const end = new Date(start);
   end.setDate(end.getDate() + 6);
   return `${isoDate(start)}..${isoDate(end)}`;
@@ -1311,10 +1317,17 @@ function templateVars(
   deps: CoachAnalysisRunnerDeps
 ): AnalysisTemplateVars {
   const now = deps.now();
+  // An activity run speaks of the activity's own day. "A new activity has just
+  // synced … on {{date}}" used to read the day it synced, so Sunday's long run
+  // arriving on Monday was announced as Monday's and the coach then found
+  // nothing today. The week follows the same day, so {{date}} always falls
+  // inside {{week.range}}.
+  const startTime = queued.activity?.start_time;
+  const day = startTime ? new Date(startTime * 1000) : now;
   return {
     rule: { name: queued.analysis.name },
-    date: isoDate(now),
-    week: { range: weekRange(now) },
+    date: isoDate(day),
+    week: { range: weekRange(day) },
     activity: {
       name: asText(queued.event.payload?.activityName),
       sport: asText(queued.event.payload?.activitySport)
@@ -1330,12 +1343,7 @@ function describeActivity(activity: CoachActivityRow): string {
     parts.push(sport);
   }
   if (activity.start_time) {
-    // Local, not `toISOString()`: a 06:00 run in UTC+7 is the UTC day before.
-    const start = new Date(activity.start_time * 1000);
-    parts.push(
-      `${start.getFullYear()}-${String(start.getMonth() + 1).padStart(2, "0")}-` +
-        `${String(start.getDate()).padStart(2, "0")}`
-    );
+    parts.push(isoDate(new Date(activity.start_time * 1000)));
   }
   return parts.join(" · ");
 }

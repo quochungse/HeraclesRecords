@@ -12,8 +12,10 @@
  * right with their own thumbnail and a play button. **All** drops the value
  * column, because there is nothing to narrow by.
  *
- * Every facet is derived from the movement's name — see `exerciseFacets.ts`
- * for why, and for what a movement no rule recognises does.
+ * Muscles are COROS's own where the catalog row lists them, and derived from
+ * the movement's name where it does not — see `exerciseFacets.ts` for why, and
+ * for what a movement nothing recognises does. A chosen muscle or body part
+ * puts the movements that load it hardest first.
  */
 import { Play, Search, X } from "lucide-react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
@@ -33,9 +35,10 @@ import {
   EXERCISE_EQUIPMENT_ORDER,
   EXERCISE_FACET_KINDS,
   EXERCISE_MUSCLE_ORDER,
-  exerciseFacets,
+  facetRank,
   muscleAnatomy,
   muscleLabel,
+  optionFacets,
   type ExerciseBodyPartId,
   type ExerciseFacetKind
 } from "./exerciseFacets";
@@ -114,7 +117,7 @@ export function ExercisePickerDialog({
   /* Classified once per catalog, not once per keystroke: the facet counts and
      the results both read it for every option. */
   const classified = useMemo(
-    () => new Map(options.map((option) => [option, exerciseFacets(option.label)])),
+    () => new Map(options.map((option) => [option, optionFacets(option, option.label)])),
     [options]
   );
 
@@ -179,7 +182,7 @@ export function ExercisePickerDialog({
 
   const results = useMemo(() => {
     if (facetKind === "all" || !facetValue) return searched;
-    return searched.filter((option) => {
+    const matching = searched.filter((option) => {
       const facetsOf = classified.get(option)!;
       if (facetKind === "bodyPart") {
         return facetsOf.bodyParts.includes(facetValue as ExerciseBodyPartId);
@@ -187,6 +190,15 @@ export function ExercisePickerDialog({
       if (facetKind === "muscle") return facetsOf.muscles.includes(facetValue as MuscleId);
       return facetsOf.equipment.includes(facetValue as ExerciseSearchEquipment);
     });
+    // A chosen muscle or body part puts the movements that load it hardest
+    // first: its share of the work, loaded lifts a step ahead of bodyweight
+    // ones, and stretches last. The sort is stable, so equal ranks keep the catalog's order.
+    if (facetKind === "equipment") return matching;
+    const kind = facetKind;
+    const loadOf = new Map(
+      matching.map((option) => [option, facetRank(classified.get(option)!, kind, facetValue)])
+    );
+    return matching.sort((a, b) => loadOf.get(b)! - loadOf.get(a)!);
   }, [classified, facetKind, facetValue, searched]);
 
   return createPortal(

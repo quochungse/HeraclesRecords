@@ -1317,6 +1317,7 @@
 .tl-row {
   align-items: center;
   border-bottom: 1px solid var(--tl-rule-soft);
+  cursor: pointer;
   transition: background var(--dur-fast) var(--ease);
 }
 
@@ -4669,6 +4670,12 @@ button.plan-generator-provider:focus-visible {
   padding: 16px 20px 18px;
   overflow-y: auto;
 }
+
+/* The body scrolls, so nothing in it may give up height to fit. `.option-group`
+   clips (`overflow: hidden`), which takes its automatic minimum height to 0:
+   in a column that was too tall it was squeezed to a 14px strip, its labels cut
+   in half (Reasoning effort on a short window). */
+.plan-generator-sheet-body > * { flex-shrink: 0; }
 
 .plan-generator-sheet-body > .tl-eyebrow:not(:first-child) { margin-top: 10px; }
 

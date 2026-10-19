@@ -24,15 +24,46 @@ import {
 } from "../training/chartConfig";
 import { useChartColors } from "../training/useChartColors";
 import { useUnitSystem } from "../units/UnitSystemProvider";
-import { elevationUnit, speedUnit } from "../units/units";
-import { isCyclingSportType } from "../training/sportTypes";
+import {
+  elevationUnit,
+  kilogramsToDisplayWeight,
+  kmhToDisplaySpeed,
+  speedUnit,
+  swimDistanceUnit
+} from "../units/units";
+import {
+  ACTIVITY_READINGS,
+  activityReading,
+  formatSwimPace,
+  formatSwimPaceClock,
+  readsMovement,
+  readsSpeed
+} from "../../electron/activityReading";
 import {
   buildDistanceSeriesData,
   buildElevationSeriesData,
   ChatMiniAreaChart
 } from "./charts/ChatMiniAreaChart";
-import { formatDecimal, t } from "../i18n/core";
+import { formatCount, formatDecimal, t } from "../i18n/core";
+import { resolveExerciseName } from "../training/exerciseNames";
+import { formatVolumeKg, formatWeightKg } from "../strength/strengthAnalytics";
 import { useI18n } from "../i18n/useI18n";
+
+/** `40 kg`, or `20–40 kg` when the sets were lifted at different loads. */
+function formatLoadRange(
+  minKg: number | undefined,
+  maxKg: number | undefined,
+  unitSystem: "metric" | "imperial"
+): string {
+  if (!maxKg) {
+    return "—";
+  }
+  if (!minKg || minKg === maxKg) {
+    return formatWeightKg(maxKg, unitSystem);
+  }
+  const low = kilogramsToDisplayWeight(minKg, unitSystem);
+  return `${Number.isInteger(low) ? formatCount(low) : formatDecimal(low, 1)}–${formatWeightKg(maxKg, unitSystem)}`;
+}
 
 interface ActivityVisualCardProps {
   preview: ActivityVisualPreview;
@@ -147,8 +178,21 @@ export const ActivityVisualCard = memo(function ActivityVisualCard({
   // so they are worked out again when the language changes.
   const { locale } = useI18n();
   const { unitSystem } = useUnitSystem();
-  const swim = preview.sportType === 300 || preview.sportType === 301;
-  const cycling = isCyclingSportType(preview.sportType);
+  // What a sport is read in decides every section below: a gym session is
+  // heart rate over time, a hike and a ride read km/h, a swim a pace per 100.
+  // A card stored before this was decided may still hold a pace or a cadence
+  // for a gym session, which is not drawn, and carries no `reading` (nor one
+  // this build knows, from a newer one): its code stands in, which misreads
+  // only a custom sport. A card from before the code was stored has neither,
+  // and reads as a pace, as every such card was drawn.
+  const reading =
+    preview.reading && ACTIVITY_READINGS.includes(preview.reading)
+      ? preview.reading
+      : activityReading(preview.sportType);
+  const swim = reading === "swim";
+  const cycling = reading === "speed";
+  const asSpeed = readsSpeed(reading);
+  const moves = readsMovement(reading);
   const hrSeriesData = useMemo(
     () =>
       preview.sections.hr?.chartKind === "series" && preview.sections.hr.series
@@ -185,10 +229,10 @@ export const ActivityVisualCard = memo(function ActivityVisualCard({
             "pace",
             unitSystem,
             swim,
-            cycling
+            asSpeed
           )
         : [],
-    [cycling, locale, preview, swim, unitSystem]
+    [asSpeed, locale, preview, swim, unitSystem]
   );
   const powerData = useMemo(
     () =>
@@ -209,9 +253,21 @@ export const ActivityVisualCard = memo(function ActivityVisualCard({
   const title = preview.name ?? t("activity.untitled");
   const subtitle = preview.startTime ?? undefined;
   const laps = preview.sections.laps ?? [];
+  const strengthExercises = preview.sections.strength?.exercises ?? [];
   // The column only appears where a lap actually recorded cadence, so a pool
-  // swim keeps the narrow table it has now.
-  const lapsHaveCadence = laps.some((lap) => lap.avgCadence !== undefined);
+  // swim keeps the narrow table it has now. A gym session's laps are its sets
+  // and rests: time and heart rate, no distance, pace or cadence.
+  const lapsHaveCadence = moves && laps.some((lap) => lap.avgCadence !== undefined);
+  const lapsHaveDistance =
+    moves && (reading !== "effort" || laps.some((lap) => (lap.distance ?? 0) > 0));
+  const paceLabel = asSpeed ? t("activity.m.speed") : t("activity.m.pace");
+  const formatPerformance = (secondsPerKm: number): string =>
+    asSpeed
+      ? `${formatDecimal(kmhToDisplaySpeed(3600 / secondsPerKm, unitSystem), 1)} ${speedUnit(unitSystem)}`
+      : swim
+        ? formatSwimPace(secondsPerKm, unitSystem)
+        : formatPaceValue(secondsPerKm, unitSystem);
+  const cadence = moves ? preview.sections.cadence : undefined;
 
   return (
     <div className="chat-visual-card">
@@ -258,32 +314,38 @@ export const ActivityVisualCard = memo(function ActivityVisualCard({
         </section>
       ) : null}
 
-      {preview.sections.pace ? (
+      {moves && preview.sections.pace ? (
         <section className="chat-visual-section">
-          <h5>{cycling ? t("activity.m.speed") : t("activity.m.pace")}</h5>
+          <h5>{paceLabel}</h5>
           {paceData.length >= 2 ? (
             <ChatMiniAreaChart
               data={paceData}
               gradientId={`chatPaceFill-${preview.previewId}`}
-              name={cycling ? t("activity.m.speed") : t("activity.m.pace")}
+              name={paceLabel}
+              // A swim's values are already seconds per 100 (the series data
+              // converts them), a ride's and a hike's km/h.
               formatValue={(value) =>
-                cycling
+                asSpeed
                   ? `${formatDecimal(value, 1)} ${speedUnit(unitSystem)}`
-                  : formatPaceValue(value, unitSystem)
+                  : swim
+                    ? `${formatSwimPaceClock(value)} /100${swimDistanceUnit(unitSystem)}`
+                    : formatPaceValue(value, unitSystem)
               }
               yAxisFormatter={(value) =>
-                cycling
+                asSpeed
                   ? formatDecimal(value, 1)
-                  : formatPaceValue(value, unitSystem).replace(/\/(?:km|mi)$/, "")
+                  : swim
+                    ? formatSwimPaceClock(value)
+                    : formatPaceValue(value, unitSystem).replace(/\/(?:km|mi)$/, "")
               }
             />
           ) : (
-            <p className="chat-visual-empty">{cycling ? t("chat.chart.noSpeed") : t("chat.chart.noPace")}</p>
+            <p className="chat-visual-empty">{asSpeed ? t("chat.chart.noSpeed") : t("chat.chart.noPace")}</p>
           )}
         </section>
       ) : null}
 
-      {preview.sections.power ? (
+      {moves && preview.sections.power ? (
         <section className="chat-visual-section">
           <h5>{t("activity.m.power")}</h5>
           {powerData.length >= 2 ? (
@@ -299,10 +361,10 @@ export const ActivityVisualCard = memo(function ActivityVisualCard({
         </section>
       ) : null}
 
-      {preview.sections.cadence ? (
+      {cadence ? (
         <section className="chat-visual-section">
           <h5>{t("activity.m.cadence")}</h5>
-          {preview.sections.cadence.chartKind === "series" &&
+          {cadence.chartKind === "series" &&
           cadenceSeriesData.length >= 2 ? (
             <ChatMiniAreaChart
               data={cadenceSeriesData}
@@ -322,7 +384,7 @@ export const ActivityVisualCard = memo(function ActivityVisualCard({
         </section>
       ) : null}
 
-      {preview.sections.elevation ? (
+      {moves && !swim && preview.sections.elevation ? (
         <section className="chat-visual-section">
           <h5>{t("activity.m.elevation")}</h5>
           {elevationData.length >= 2 ? (
@@ -338,6 +400,40 @@ export const ActivityVisualCard = memo(function ActivityVisualCard({
         </section>
       ) : null}
 
+      {strengthExercises.length > 0 ? (
+        <section className="chat-visual-section">
+          <h5>{t("strength.exercises.title")}</h5>
+          <div className="chat-plan-table-wrap">
+            <table className="chat-plan-table">
+              <thead>
+                <tr>
+                  <th>#</th>
+                  <th>{t("workout.summary.exercise")}</th>
+                  <th>{t("activity.strength.sets")}</th>
+                  <th>{t("activity.strength.reps")}</th>
+                  <th>{t("activity.strength.weight")}</th>
+                  <th>{t("strength.metric.volume")}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {strengthExercises.map((exercise, index) => (
+                  <tr key={`${exercise.nameKey}-${index}`}>
+                    <td>{index + 1}</td>
+                    <td>{resolveExerciseName(exercise.nameKey, exercise.rawName)}</td>
+                    <td>{formatCount(exercise.sets)}</td>
+                    <td>{formatCount(exercise.reps)}</td>
+                    <td>{formatLoadRange(exercise.minWeightKg, exercise.maxWeightKg, unitSystem)}</td>
+                    <td>
+                      {exercise.volumeKg ? formatVolumeKg(exercise.volumeKg, unitSystem) : "—"}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      ) : null}
+
       {laps.length > 0 ? (
         <section className="chat-visual-section">
           <h5>{t("activity.m.laps")}</h5>
@@ -346,11 +442,11 @@ export const ActivityVisualCard = memo(function ActivityVisualCard({
               <thead>
                 <tr>
                   <th>#</th>
-                  <th>{t("activity.m.distance")}</th>
+                  {lapsHaveDistance ? <th>{t("activity.m.distance")}</th> : null}
                   <th>{t("activity.m.duration")}</th>
                   <th>{t("activity.m.avgHr")}</th>
                   <th>{t("activity.m.maxHr")}</th>
-                  <th>{cycling ? t("activity.m.speed") : t("activity.m.pace")}</th>
+                  {lapsHaveDistance ? <th>{paceLabel}</th> : null}
                   {lapsHaveCadence ? <th>{cadenceUnit.toUpperCase()}</th> : null}
                 </tr>
               </thead>
@@ -358,17 +454,21 @@ export const ActivityVisualCard = memo(function ActivityVisualCard({
                 {laps.map((lap) => (
                   <tr key={lap.index}>
                     <td>{lap.index}</td>
-                    <td>{formatDistanceMeters(lap.distance, unitSystem, swim)}</td>
+                    {lapsHaveDistance ? (
+                      <td>{formatDistanceMeters(lap.distance, unitSystem, swim)}</td>
+                    ) : null}
                     <td>{formatDurationSeconds(lap.duration)}</td>
                     <td>{formatOptionalNumber(lap.avgHr)}</td>
                     <td>{formatOptionalNumber(lap.maxHr)}</td>
-                    <td>
-                      {cycling && lap.distance && lap.duration
-                        ? `${formatDecimal((lap.distance / 1000) / (lap.duration / 3600) / (unitSystem === "imperial" ? 1.609344 : 1), 1)} ${speedUnit(unitSystem)}`
-                        : lap.pace != null
-                          ? formatPaceValue(lap.pace, unitSystem)
-                          : "—"}
-                    </td>
+                    {lapsHaveDistance ? (
+                      <td>
+                        {lap.distance && lap.duration
+                          ? formatPerformance(lap.duration / (lap.distance / 1000))
+                          : lap.pace
+                            ? formatPerformance(lap.pace)
+                            : "—"}
+                      </td>
+                    ) : null}
                     {lapsHaveCadence ? (
                       <td>{formatOptionalNumber(lap.avgCadence)}</td>
                     ) : null}
