@@ -11,13 +11,14 @@ import {
   angularDistanceDegrees,
   clampLatitude,
   computeFitView,
-  labelSeparationDegrees,
   landDetailLevels,
   landDetailOpacity,
   nearestOnScreen,
   STREET_SNAP_PX,
   surfacePixelsPerDegree,
-  pickSpacedPlaces,
+  groupPlaceLabels,
+  LABEL_HEIGHT_PX,
+  mergedLabelText,
   sphericalCenter
 } from "../src/trainingMap/globeFraming.ts";
 
@@ -197,26 +198,70 @@ function place(lat, lon, key = `${lat}:${lon}`) {
   );
 }
 
-// --- labels thin out instead of stacking on top of each other ---
+// --- every place keeps a label; only touching names in one region share one ---
 {
-  const crowded = [
-    place(21.03, 105.85, "hanoi"),
-    place(21.05, 105.83, "hanoi-west"),
-    place(16.05, 108.2, "danang"),
-    place(10.78, 106.7, "hcmc")
-  ];
-  const picked = pickSpacedPlaces(crowded, 6, labelSeparationDegrees(1));
+  const inRegion = (lat, lon, key, id) => ({ ...place(lat, lon, key), region: { id } });
+  const name = (location) => location.key;
+  const PX_PER_DEGREE = 20;
+  const groups = groupPlaceLabels(
+    [
+      inRegion(21.03, 105.85, "hanoi", "VN-HN"),
+      inRegion(21.05, 105.83, "hanoi-west", "VN-HN"),
+      inRegion(21.4, 105.62, "tamdao", "VN-VP"),
+      inRegion(21.03, 110.0, "east", "CN-GX"),
+      inRegion(16.05, 108.2, "danang", "VN-DN"),
+      place(21.06, 105.86, "offshore")
+    ],
+    name,
+    PX_PER_DEGREE
+  );
   assert.deepEqual(
-    picked.map((point) => point.key),
-    ["hanoi", "danang", "hcmc"],
-    "the neighbouring pin is dropped, the distant ones kept"
+    groups.map((group) => [group.lead.key, group.members.map((m) => m.key)]),
+    [
+      ["hanoi", ["hanoi", "hanoi-west"]],
+      ["tamdao", ["tamdao"]],
+      ["east", ["east"]],
+      ["danang", ["danang"]],
+      ["offshore", ["offshore"]]
+    ],
+    "a touching name in the same region is merged; in another region, or in none, it keeps its own"
+  );
+  const lift = Object.fromEntries(groups.map((group) => [group.lead.key, group.lift]));
+  assert.equal(lift.hanoi, 0, "the first name stays at its pin");
+  assert.equal(lift.east, 0, "a name with room stays at its pin");
+  assert.equal(lift.danang, 0, "a distant name stays at its pin");
+  // Tam Đảo's pin sits 7.4px over Hà Nội's, so a 21px name and a 4px gap
+  // leave 17.6px to rise — not a whole label height and more.
+  assert.ok(
+    Math.abs(lift.tamdao - (LABEL_HEIGHT_PX + 4 - 0.37 * PX_PER_DEGREE)) < 1e-9,
+    `lifted just over the name in its way (${lift.tamdao}px)`
+  );
+  // Its pin is 6.8px under Tam Đảo's: its foot lands 4px over Tam Đảo's top.
+  assert.ok(
+    Math.abs(lift.offshore - (lift.tamdao + 0.34 * PX_PER_DEGREE + LABEL_HEIGHT_PX + 4)) < 1e-9,
+    `a third name rises just over the second (${lift.offshore}px)`
+  );
+  assert.deepEqual(
+    groupPlaceLabels(
+      [inRegion(21.03, 105.85, "a", "VN-HN"), inRegion(21.03, 107.5, "b", "VN-HN")],
+      name,
+      PX_PER_DEGREE
+    ).map((group) => group.members.length),
+    [1, 1],
+    "one region is not enough: names with room between them stay apart"
   );
   assert.equal(
-    pickSpacedPlaces(crowded, 2, 0).length,
-    2,
-    "the cap is respected even when everything is far enough apart"
+    groupPlaceLabels(
+      Array.from({ length: 12 }, (_, i) => inRegion(i * 10, i * 10, `p${i}`, `R${i}`)),
+      name,
+      PX_PER_DEGREE
+    ).length,
+    12,
+    "no cap: every distant place has a label of its own"
   );
-  assert.deepEqual(pickSpacedPlaces([], 6, 3), [], "no places, no labels");
+  assert.deepEqual(groupPlaceLabels([], name, PX_PER_DEGREE), [], "no places, no labels");
+  assert.equal(mergedLabelText("Hà Nội", 1), "Hà Nội +1");
+  assert.equal(mergedLabelText("Hà Nội", 0), "Hà Nội");
 }
 
 // --- land detail: the far view keeps the single coarse lattice ---

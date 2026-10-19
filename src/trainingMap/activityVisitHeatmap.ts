@@ -26,6 +26,8 @@ export interface GlobePlace {
   lat: number;
   lon: number;
   count: number;
+  /** The first-level region it lies in; places sharing one may share a label. */
+  region?: { id: string };
 }
 
 const VISIT_CACHE = new Map<string, GlobePoint | null>();
