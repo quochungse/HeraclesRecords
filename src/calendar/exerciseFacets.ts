@@ -239,21 +239,18 @@ export function exerciseFacets(name: string): ExerciseFacets {
   if (muscles.length) {
     for (const entry of targets.activations) loads[entry.muscle] = entry.share;
   }
+  const { equipment } = classifyWorkoutExerciseName(name);
   const facets: ExerciseFacets = {
     muscles,
     loads,
-    effort: targets.mobility
-      ? "minimal"
-      : isLoadedByName(classifyWorkoutExerciseName(name).equipment)
-        ? "loaded"
-        : "light",
+    effort: targets.mobility ? "minimal" : isLoadedByName(equipment) ? "loaded" : "light",
     bodyParts: [...new Set(
       muscles.flatMap((muscle) => {
         const part = MUSCLE_BODY_PART.get(muscle);
         return part ? [part] : [];
       })
     )],
-    equipment: classifyWorkoutExerciseName(name).equipment
+    equipment
   };
   cache.set(name, facets);
   return facets;

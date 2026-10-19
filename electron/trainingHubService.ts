@@ -132,7 +132,7 @@ import {
   workoutEditRevision,
   type WorkoutEditSource
 } from "./corosWorkoutEditor";
-import { corosText, loadCorosLocale } from "./corosLocale";
+import { corosText, hasCorosLocaleTable, loadCorosLocale } from "./corosLocale";
 import {
   WORKOUT_SPORT_CAPABILITIES,
   decodeCorosIntensity,
@@ -3602,7 +3602,11 @@ async function loadWorkoutExerciseCatalog(sport: WorkoutSport): Promise<Record<s
     ...(auth?.userId ? { userId: auth.userId } : {}),
     keyword: ""
   });
-  await loadCorosLocale().catch(() => undefined);
+  // The load puts a copy on disk in memory before it awaits anything, so only a
+  // machine that has never had the table waits for the CDN — a stale copy is
+  // refreshed behind the picker rather than holding it up to 15 s.
+  const locale = loadCorosLocale().catch(() => undefined);
+  if (!hasCorosLocaleTable()) await locale;
   const rows = exerciseCatalogRows(raw).map(nameFromCorosLocale);
   workoutExerciseCatalogCache.set(cacheKey, {
     expiresAt: Date.now() + WORKOUT_CACHE_MS,

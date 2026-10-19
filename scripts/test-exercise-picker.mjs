@@ -1,10 +1,11 @@
 /**
  * The exercise library screen, mounted for real in Electron's Chromium.
  *
- * Every facet on this screen is **derived from the movement's name** — COROS's
- * `/training/exercise/query` carries an id, a name and some media and nothing
- * else — so the two things that can go wrong are wrong attribution and a
- * filter that narrows to nothing. Neither is visible from the source:
+ * Muscles come from COROS's own codes where the catalog row lists them and
+ * from the movement's name where it does not (`exerciseFacets.ts`); equipment
+ * always comes from the name. So the two things that can go wrong are wrong
+ * attribution and a filter that narrows to nothing. Neither is visible from
+ * the source:
  *
  * - **A facet nothing is filed under is not drawn.** The column is built from
  *   a fixed taxonomy, so without the count gate it would list sixteen muscles
@@ -224,7 +225,85 @@ app.whenReady().then(async () => {
   );
 
   // -------------------------------------------------------------------------
-  // 5. A chosen muscle puts the movements that load it hardest first
+  // 5. The muscle column names the muscle and its anatomy
+  // -------------------------------------------------------------------------
+  assert.equal(await chooseKind("Muscle"), true, "the Muscle chip is there");
+  await settle();
+  const muscles = await texts(".exercise-picker-facet");
+  assert.ok(
+    muscles.some((row) => row.includes("Pectoralis major")),
+    `the muscle row carries its anatomical name: ${muscles.join(" | ")}`
+  );
+
+  // -------------------------------------------------------------------------
+  // 5b. Every value row draws a figure, and lights something on it
+  //
+  // The artwork is copied in from a package and grouped by hand, so the way it
+  // breaks is a slug that quietly stops matching: the row then draws a bare
+  // silhouette with nothing lit, which looks like a design choice rather than
+  // a fault. `bodyShapes.ts` also names the *view* a muscle is drawn on, and a
+  // wrong one puts the lats on a chest.
+  // -------------------------------------------------------------------------
+  const facetArt = () =>
+    evaluate(
+      `Array.from(document.querySelectorAll(".exercise-picker-facet")).map((row) => ({
+         label: row.querySelector("strong").textContent.trim(),
+         view: row.querySelector("svg").getAttribute("viewBox").startsWith("0 ") ? "front" : "back",
+         figures: row.querySelectorAll(".exercise-body-glyph-figure").length,
+         lit: row.querySelectorAll(".exercise-body-glyph-lit").length
+       }))`
+    );
+
+  const muscleArt = await facetArt();
+  for (const row of muscleArt) {
+    assert.equal(row.figures, 1, `${row.label} draws one silhouette`);
+    assert.ok(row.lit > 0, `${row.label} lights something on it`);
+  }
+  const byLabel = Object.fromEntries(muscleArt.map((row) => [row.label, row]));
+  assert.equal(byLabel.Back?.view, "back", "the lats are drawn on the back figure");
+  assert.equal(byLabel.Chest?.view, "front", "the chest is drawn on the front one");
+
+  assert.equal(await chooseKind("Body part"), true, "back to Body part");
+  await settle();
+  const partArt = await facetArt();
+  for (const row of partArt) {
+    assert.ok(row.lit > 0, `the ${row.label} row lights something`);
+  }
+  const partByLabel = Object.fromEntries(partArt.map((row) => [row.label, row]));
+  assert.equal(partByLabel.Back?.view, "back", "Body part > Back is the back view");
+  assert.equal(
+    partByLabel.Arms?.view,
+    "front",
+    "Arms is the front view: biceps and forearms outnumber the triceps there"
+  );
+
+  assert.equal(await chooseKind("Muscle"), true, "and back to Muscle for the search");
+  await settle();
+
+  // -------------------------------------------------------------------------
+  // 6. The search narrows the values, not only the results
+  // -------------------------------------------------------------------------
+  await evaluate(
+    `(() => {
+       const input = document.querySelector(".exercise-picker-search input");
+       const setter = Object.getOwnPropertyDescriptor(
+         window.HTMLInputElement.prototype, "value"
+       ).set;
+       setter.call(input, "squat");
+       input.dispatchEvent(new Event("input", { bubbles: true }));
+       return true;
+     })()`
+  );
+  await settle();
+  assert.equal(await count(".exercise-picker-card"), 1, "one movement matches 'squat'");
+  const narrowed = await texts(".exercise-picker-facet");
+  assert.ok(
+    narrowed.length > 0 && narrowed.length < muscles.length,
+    `a value the search has emptied stops being offered: ${narrowed.length} of ${muscles.length}`
+  );
+
+  // -------------------------------------------------------------------------
+  // 7. A chosen muscle puts the movements that load it hardest first
   // -------------------------------------------------------------------------
   const pickMuscle = async (label) => {
     assert.equal(await chooseKind("Muscle"), true, "the Muscle chip is there");
