@@ -15,6 +15,7 @@ import {
   formatTrainingTimestamp
 } from "../formatters";
 import { isSpeedSport, isSwimSportType, resolveSportName } from "../sportTypes";
+import { formatSwimPace } from "../../../electron/activityReading";
 import type { HeraclesRecordsApi } from "../../heraclesrecords-api";
 import type { TrainingHubDetailRequest } from "../types";
 import { useUnitSystem } from "../../units/UnitSystemProvider";
@@ -213,9 +214,9 @@ export function ActivityDetailPanel({
   const performance = distance && duration
     ? readsSpeed
       ? formatSpeedValue((distance / 1000) / (duration / 3600), unitSystem)
-      : !swim
-        ? formatPaceSecondsPerKm(duration / (distance / 1000), unitSystem)
-        : undefined
+      : swim
+        ? formatSwimPace(duration / (distance / 1000), unitSystem)
+        : formatPaceSecondsPerKm(duration / (distance / 1000), unitSystem)
     : undefined;
 
   return (

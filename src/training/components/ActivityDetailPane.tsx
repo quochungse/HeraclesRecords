@@ -41,6 +41,7 @@ import { sportScreenFor, type SportScreen } from "../../navigation/sportScreens"
 import { useUnitSystem } from "../../units/UnitSystemProvider";
 import { formatTemperatureValue } from "../../units/units";
 import { formatSpeedValue } from "../../units/units";
+import { formatSwimPace } from "../../../electron/activityReading";
 import { ActivityElevationChart } from "./ActivityElevationChart";
 import { ActivityExportMenu } from "./ActivityExportMenu";
 import { ActivityRouteMap } from "./ActivityRouteMap";
@@ -223,14 +224,16 @@ export function ActivityDetailPane({
   const duration = detail.duration ?? listActivity.duration;
   const startTime = detail.startTime ?? listActivity.startTime;
 
+  // A swim is read per 100 m (or yd), the way a swimmer reads it: a pace per
+  // kilometre put a pool session at 20:00 /km.
+  const formatPerformance = (meters: number, seconds: number): string =>
+    readsSpeed
+      ? formatSpeedValue(meters / 1000 / (seconds / 3600), unitSystem)
+      : swim
+        ? formatSwimPace(seconds / (meters / 1000), unitSystem)
+        : formatPaceSecondsPerKm(seconds / (meters / 1000), unitSystem);
   const performance =
-    distance && duration
-      ? readsSpeed
-        ? formatSpeedValue(distance / 1000 / (duration / 3600), unitSystem)
-        : !swim
-          ? formatPaceSecondsPerKm(duration / (distance / 1000), unitSystem)
-          : undefined
-      : undefined;
+    distance && duration ? formatPerformance(distance, duration) : undefined;
 
   /*
    * Three figures at the top, then everything else at half the size.
@@ -634,15 +637,7 @@ export function ActivityDetailPane({
                       </td>
                       <td className="is-numeric">
                         {lap.distance && lap.duration
-                          ? readsSpeed
-                            ? formatSpeedValue(
-                                lap.distance / 1000 / (lap.duration / 3600),
-                                unitSystem
-                              )
-                            : formatPaceSecondsPerKm(
-                                lap.duration / (lap.distance / 1000),
-                                unitSystem
-                              )
+                          ? formatPerformance(lap.distance, lap.duration)
                           : "—"}
                       </td>
                       <td className="is-numeric">{lap.avgHr ?? "—"}</td>
