@@ -49,6 +49,8 @@ const {
   MULTI_ACTIVITY_MAX_PER_TRIGGER,
   parseAnalysisOutput,
   renderAnalysisTemplate,
+  isoDate,
+  weekRange,
   resetAnalysisQueueForTests,
   runAnalysisNow,
   runAnalysisTrigger,
@@ -261,6 +263,23 @@ assert.equal(
   "an unknown variable collapses to nothing"
 );
 assert.equal(renderAnalysisTemplate("{{nope}}", {}), "");
+
+// {{date}} and {{week.range}} are the athlete's local days, not UTC's: the Monday
+// 06:30 plan used to be drafted for "the week starting" Sunday, and a week was
+// counted Sunday to Saturday where the app counts Monday to Sunday.
+{
+  const previousTz = process.env.TZ;
+  process.env.TZ = "Asia/Ho_Chi_Minh";
+  try {
+    const mondayEarly = new Date("2026-10-19T06:30:00+07:00");
+    assert.equal(isoDate(mondayEarly), "2026-10-19");
+    assert.equal(weekRange(mondayEarly), "2026-10-19..2026-10-25");
+    assert.equal(weekRange(new Date("2026-10-18T18:00:00+07:00")), "2026-10-12..2026-10-18");
+  } finally {
+    if (previousTz === undefined) delete process.env.TZ;
+    else process.env.TZ = previousTz;
+  }
+}
 
 // --- quiet hours (4) --------------------------------------------------------
 const at = (hh, mm) => new Date(2026, 7, 21, hh, mm, 0);

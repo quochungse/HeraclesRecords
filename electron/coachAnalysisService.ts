@@ -60,6 +60,7 @@ import type {
   CoachPrecedingActivityRow,
   CoachUnseenActivityRow as CoachActivityRow
 } from "./database";
+import { isoDay } from "./chatDayKeys";
 import { corosText, loadCorosLocale } from "./corosLocale";
 import { EXERCISE_SEARCH_MUSCLES, classifyWorkoutExerciseName } from "./exerciseCatalogSearch";
 import { getTrainingHubStatus, reconnectTrainingHub } from "./trainingHubService";
@@ -215,13 +216,18 @@ export function renderAnalysisTemplate(
     .trim();
 }
 
-function isoDate(now: Date): string {
-  return now.toISOString().slice(0, 10);
+/**
+ * The local day, never `toISOString()`: in UTC+7 a 06:30 Monday run is still
+ * Sunday in UTC, so "the week starting {{date}}" was drafted from a Sunday.
+ */
+export function isoDate(now: Date): string {
+  return isoDay(now);
 }
 
-function weekRange(now: Date): string {
+/** The Monday-to-Sunday week `now` falls in, as the rest of the app counts it. */
+export function weekRange(now: Date): string {
   const start = new Date(now);
-  start.setDate(start.getDate() - start.getDay());
+  start.setDate(start.getDate() - ((start.getDay() + 6) % 7));
   const end = new Date(start);
   end.setDate(end.getDate() + 6);
   return `${isoDate(start)}..${isoDate(end)}`;
@@ -1311,9 +1317,14 @@ function templateVars(
   deps: CoachAnalysisRunnerDeps
 ): AnalysisTemplateVars {
   const now = deps.now();
+  // An activity run speaks of the activity's own day. "A new activity has just
+  // synced … on {{date}}" used to read the day it synced, so Sunday's long run
+  // arriving on Monday was announced as Monday's and the coach then found
+  // nothing today.
+  const startTime = queued.activity?.start_time;
   return {
     rule: { name: queued.analysis.name },
-    date: isoDate(now),
+    date: isoDate(startTime ? new Date(startTime * 1000) : now),
     week: { range: weekRange(now) },
     activity: {
       name: asText(queued.event.payload?.activityName),
