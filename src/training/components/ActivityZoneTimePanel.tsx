@@ -16,6 +16,8 @@ import {
   type ZoneTimeRow
 } from "../zoneTime";
 import { zoneColor } from "./routeColoring";
+import type { TrainingBenefitReading } from "../trainingBenefit";
+import { TrainingBenefitReason } from "./TrainingBenefitChip";
 
 type ZoneScale = "hr" | "pace";
 
@@ -35,6 +37,8 @@ interface ActivityZoneTimePanelProps {
   /** The pace scale is grade-adjusted (a trail run's), and the switch says so. */
   paceIsGradeAdjusted?: boolean;
   frame: ZoneTimePanelFrame;
+  /** The session's training label, when it has one: why it was given is written under the zones. */
+  benefit?: TrainingBenefitReading;
 }
 
 /**
@@ -84,7 +88,8 @@ export function ActivityZoneTimePanel({
   accountFamily,
   paceZones,
   paceIsGradeAdjusted = false,
-  frame
+  frame,
+  benefit
 }: ActivityZoneTimePanelProps) {
   const { unitSystem } = useUnitSystem();
   const family = heartRateZoneFamily(hrZoneType, accountFamily);
@@ -148,6 +153,7 @@ export function ActivityZoneTimePanel({
           );
         })}
       </ul>
+      {benefit ? <TrainingBenefitReason reading={benefit} /> : null}
     </Frame>
   );
 }

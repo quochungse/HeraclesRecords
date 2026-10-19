@@ -45,7 +45,8 @@ export function heartRateZoneFamily(
   return (hrZoneType !== undefined ? ZONE_TYPE_FAMILY[hrZoneType] : undefined) ?? accountFamily;
 }
 
-function namesFor(family: CorosProfileZoneFamily | undefined): readonly string[] | undefined {
+/** COROS's English names for a family's zones, easiest first; none when the model is not known. */
+export function zoneNamesFor(family: CorosProfileZoneFamily | undefined): readonly string[] | undefined {
   if (family === "maxHr") {
     return HEART_RATE_PRESETS.maxHr.map((zone) => zone.label);
   }
@@ -114,7 +115,7 @@ export function heartRateZoneTime(
   zones: readonly TrainingHubActivityZoneBucket[],
   family: CorosProfileZoneFamily | undefined
 ): ZoneTimeRow[] {
-  return zoneRows(zones, { easy: "low", hard: "high" }, eachBucket, namesFor(family));
+  return zoneRows(zones, { easy: "low", hard: "high" }, eachBucket, zoneNamesFor(family));
 }
 
 /**
@@ -134,6 +135,6 @@ export function paceZoneTime(zones: readonly TrainingHubActivityZoneBucket[]): Z
     zones,
     { easy: "high", hard: "low" },
     coros ? () => [[0], [1], [2], [3, 4], [5], [6]] : eachBucket,
-    coros ? namesFor("thresholdPace") : undefined
+    coros ? zoneNamesFor("thresholdPace") : undefined
   );
 }

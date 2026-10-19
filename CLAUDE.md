@@ -944,6 +944,41 @@ lives at module level for the same visit-to-visit reason — see `useCalendarDat
   with Running and were moved out of `src/running/` for that — none of them ever asked what
   sport they were reading. Anything else that both screens need goes the same way rather than
   being copied.
+- **A session's training label** (`electron/sessionIntensity.ts` reads, `src/training/trainingBenefit.ts`
+  names; built 2026-10-19) — Garmin's "primary benefit" and the session's shape: a coloured chip
+  (Recovery, Aerobic, Tempo, Threshold, VO2 Max, Anaerobic) and an outlined one (Intervals 3 × 8′,
+  Strides 5 × 20″, Long run / Long ride), on the Activities pane (not its rows, by decision), a
+  Running or Cycling table row (beside the date, not a column) and the run and ride pages, whose
+  zone panel says why under the zones. **Runs and rides only** (100–103, 200, 201, 203, 204, 299):
+  an e-bike's heart rate is the motor's, a hike's climb would read Threshold, the rest has no
+  tempo. **The rules are published standards, not tuned to one athlete**: COROS's zones line up
+  with Daniels' paces (Aerobic Endurance E, Aerobic Power M → Tempo, Threshold T, Anaerobic
+  Endurance I → VO2 Max, Anaerobic Power R → Anaerobic), a repeat session is named by its work
+  bouts (Seiler & Kjerland's session-goal method) and the least work is Daniels' (R 4 min, I 8, T
+  and M 20). **A rep is read on its pace** wherever it has one — 5:45 in COROS's Threshold pace
+  zone is Threshold even under a Tempo name, chosen to agree with COROS — and on heart rate
+  elsewhere (treadmill, ride, trail); a rep under two minutes at I pace or faster is an R rep.
+  **A steady session is read after the warm-up (10 min of activity time), each second at the lower
+  of its pace zone and heart-rate zone** where both exist, so a hot easy run's drifting pulse is
+  not a tempo run — on heart rate alone the athlete's easy runs read Tempo. Tempo needs half the
+  session, VO2 Max a quarter, Recovery a session of 45 min or less 70% in Recovery; the rest is
+  Aerobic. **Reps come from the laps**: a structured workout's `phase`s (a work step beside a
+  recovery step; a lone work block is the run), or on a run laps pressed by hand (not auto-laps of
+  1 km or 1 mile, a fast set 15% quicker than the slow set, each fast lap beside a slow one); a
+  work step four times the typical one is the run the strides were added to. Under 45 s a rep and
+  under 5 min of work they are Strides; reps that decide nothing leave a long run "Long run".
+  **What is read is stored, versioned on its own** (`training_activity_summaries.intensity`,
+  `INTENSITY_SUMMARY_VERSION`): seconds by HR bucket × pace bucket, and the reps with their
+  buckets, so a list labels a session without its samples; the label is decided in the renderer
+  because only it knows the account's heart-rate model (`useHeartRateZoneModel`,
+  `benefitZoneFamily`), and nothing is labelled until it settles. Max HR's buckets map a step
+  easier. **Only the screens whose rows wear the label ask for it** (`requireIntensity`: Running
+  and Cycling): their sweep counts a run or ride without the current intensity as missing, so it
+  is read again — from the cached file where there is one — while Activities, Hiking and the Hall
+  leave such a row alone, since none of them reads it. A detail open on the pane or a page is
+  read through `detailTrainingBenefit`, cached per detail object. **The screenshot demo's profile
+  says Max HR (`hrZoneType: 1` in `demoHandlers.ts`) while its sessions are scored on reserve
+  ceilings**, so on demo data labels read a step easy. `npm run test:training-benefit`.
 - **Time in zones on every sport's own page** (`ActivityZoneTimePanel`, `src/training/zoneTime.ts`)
   — the run, ride and hike pages and an opened Strength session, **not Activities**, which keeps
   its zone bar. It draws COROS's own seconds per zone off the detail's `zoneList` (never

@@ -33,6 +33,8 @@ import {
   type UnitSystem
 } from "../units/units";
 import { formatDecimal, t } from "../i18n/core";
+import type { BenefitZoneFamily } from "../training/trainingBenefit";
+import { ActivityBenefitChips } from "../training/components/TrainingBenefitChip";
 
 interface RunListProps {
   runs: readonly TrainingHubActivity[];
@@ -50,6 +52,8 @@ interface RunListProps {
   sort: RunSort;
   onSortChange: (sort: RunSort) => void;
   onOpenRun: (activity: TrainingHubActivity) => void;
+  /** The account's heart-rate model each run's label is read on; none until it is known. */
+  benefitFamily?: BenefitZoneFamily;
   /** Under the Trail filter: the columns a trail run is read by. */
   trail?: boolean;
 }
@@ -285,6 +289,7 @@ export function RunList({
   sort,
   onSortChange,
   onOpenRun,
+  benefitFamily,
   trail = false
 }: RunListProps) {
   const { unitSystem } = useUnitSystem();
@@ -369,7 +374,14 @@ export function RunList({
                 </span>
                 <div>
                   <strong>{row.activity.name?.trim() || RUN_SURFACE_LABELS[row.surface]}</strong>
-                  <span>{formatTrainingTableWhen(row.when)}</span>
+                  <span>
+                    {formatTrainingTableWhen(row.when)}
+                    <ActivityBenefitChips
+                      sportType={row.activity.sportType}
+                      intensity={summaries?.get(row.activity.activityId)?.intensity}
+                      family={benefitFamily}
+                    />
+                  </span>
                 </div>
               </div>
             </td>

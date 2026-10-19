@@ -343,7 +343,12 @@
   white-space: nowrap;
 }
 
+/* The day, and the session's training label beside it when it has one. */
 .run-list-when > div > span {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
   color: var(--text-muted);
   font-size: 12px;
 }
@@ -430,6 +435,32 @@
   font-weight: 700;
   line-height: 1;
   letter-spacing: -0.02em;
+}
+
+/* What the session trained, under its name (src/training/trainingBenefit.ts). */
+.run-detail-benefit {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+/* Over a cover the chips take the stat cards' frosted ground, or the map shows
+   through their wash. */
+.run-detail-hero.has-cover .run-detail-benefit .benefit-chip {
+  background: color-mix(in srgb, var(--bg-base) 76%, transparent);
+  text-shadow: none;
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+}
+
+.run-detail-hero.has-cover .run-detail-benefit .benefit-chip:not(.is-format) {
+  background:
+    linear-gradient(
+      color-mix(in srgb, var(--zone-color) 16%, transparent),
+      color-mix(in srgb, var(--zone-color) 16%, transparent)
+    ),
+    color-mix(in srgb, var(--bg-base) 76%, transparent);
 }
 
 .run-detail-back {

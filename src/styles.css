@@ -8316,6 +8316,60 @@ td span {
   --sport-chip-color: var(--sport-other);
 }
 
+/*
+ * What a session trained (src/training/trainingBenefit.ts), in the colour of
+ * the zone it stands for. Sentence case and a dot, so it does not read as a
+ * second sport chip beside the uppercase one.
+ */
+.benefit-chip {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 5px;
+  width: fit-content;
+  border: 1px solid transparent;
+  border-radius: var(--radius-pill);
+  padding: 2px 8px;
+  background: color-mix(in srgb, var(--zone-color) 16%, transparent);
+  color: color-mix(in srgb, var(--zone-color) 78%, var(--text-primary));
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+.benefit-chip::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  flex: 0 0 auto;
+  border-radius: var(--radius-pill);
+  background: var(--zone-color);
+}
+
+/* The session's shape (Intervals 3 × 8′, Long run): outlined, no colour of its own. */
+.benefit-chip.is-format {
+  border-color: var(--glass-border);
+  background: transparent;
+  color: var(--text-secondary);
+}
+
+.benefit-chip.is-format::before {
+  content: none;
+}
+
+:root[data-theme="paper"] .benefit-chip:not(.is-format) {
+  color: color-mix(in srgb, var(--zone-color) 62%, var(--text-primary));
+}
+
+/* Why the label was given, under the zones it was read from. */
+.benefit-reason {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
 .activity-detail-grid {
   display: flex;
   flex-wrap: wrap;

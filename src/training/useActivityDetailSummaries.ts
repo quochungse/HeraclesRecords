@@ -42,12 +42,15 @@ export interface ActivityDetailSummariesInput {
   /** False while a session's own detail is loading: that payload wants the
    *  connection, and nothing on screen is reading these meanwhile. */
   enabled: boolean;
+  /** Also count a run or a ride as missing until it carries its intensity: a list whose rows wear the label. */
+  requireIntensity?: boolean;
 }
 
 export function useActivityDetailSummaries({
   api,
   activities,
-  enabled
+  enabled,
+  requireIntensity = false
 }: ActivityDetailSummariesInput): ReadonlyMap<string, ActivityDetailSummary> {
   const [summaries, setSummaries] =
     useState<ReadonlyMap<string, ActivityDetailSummary>>(EMPTY);
@@ -81,7 +84,11 @@ export function useActivityDetailSummaries({
         setSummaries(toMap(stored));
 
         while (!cancelled && fetchedThisSession < SESSION_FETCH_CAP) {
-          const pass = await api.syncActivityDetailSummaries(ids, SUMMARY_CHUNK);
+          const pass = await api.syncActivityDetailSummaries(
+            ids,
+            SUMMARY_CHUNK,
+            requireIntensity ? { requireIntensity } : undefined
+          );
           // Charged before anything else: the fetches happened whether or not
           // this effect is still around to see them, and a period change tears
           // it down mid-pass often enough that charging afterwards left the cap
@@ -119,7 +126,7 @@ export function useActivityDetailSummaries({
     return () => {
       cancelled = true;
     };
-  }, [api, enabled, key]);
+  }, [api, enabled, key, requireIntensity]);
 
   return summaries;
 }

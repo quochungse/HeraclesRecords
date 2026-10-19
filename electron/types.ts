@@ -681,8 +681,42 @@ export interface ActivityDetailSummary {
   bestEfforts?: BestEffort[];
   /** Where the activity began, rounded to two decimals (about a kilometre). */
   startPoint?: { lat: number; lon: number };
+  /**
+   * What a run's or ride's training label is read from, versioned on its own
+   * (`INTENSITY_SUMMARY_VERSION`) for the reason the records' figures are.
+   * Absent on another sport, and on a row computed before it existed.
+   */
+  intensityVersion?: number;
+  intensity?: SessionIntensity;
   /** Epoch milliseconds. */
   computedAt: number;
+}
+
+/**
+ * A session's effort, as `electron/sessionIntensity.ts` reads it for its
+ * training label. Buckets are COROS's: six heart-rate buckets, seven pace
+ * buckets (Threshold stored in two), 0 the easiest.
+ */
+export interface SessionIntensity {
+  version: number;
+  /** Activity time, pauses out. */
+  seconds: number;
+  /** Seconds per heart-rate bucket after the warm-up. */
+  hr: number[];
+  /** On a paced run, the same seconds by heart-rate bucket and pace bucket: `joint[hr][pace]`. */
+  joint?: number[][];
+  /** The work bouts of a repeat session. */
+  reps?: SessionRep[];
+  /** Where the reps came from: a structured workout's steps, or laps pressed by hand. */
+  repSource?: "workout" | "manual";
+}
+
+export interface SessionRep {
+  seconds: number;
+  meters: number;
+  hrBucket?: number;
+  /** Absent off a paced run, and on a trail, where a rep's pace is the hill's. */
+  paceBucket?: number;
 }
 
 /** The fastest stretch of one run over a standard distance. */

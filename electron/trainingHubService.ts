@@ -28,6 +28,7 @@ import {
   RECORDS_SUMMARY_VERSION,
   summarizeActivityDetail
 } from "./activityMetrics";
+import { INTENSITY_SUMMARY_VERSION, sportHasTrainingBenefit } from "./sessionIntensity";
 import {
   countStrengthActivitiesMissingDetail,
   countTrainingActivitiesMissingFeelType,
@@ -2014,7 +2015,10 @@ const SUMMARY_BACKFILL_MAX_CONSECUTIVE_FAILURES = 3;
 /** Activities being summarised right now, so two callers — React's development
  *  double-invoke among them — cannot fetch the same 2.5 MB payload twice. */
 const summaryBackfillInFlight = new Set<string>();
-/** Activities that failed this session. Retried on the next launch, not sooner. */
+/**
+ * Activities that failed this session, or came back short of what was asked.
+ * Retried on the next launch, not sooner.
+ */
 const summaryBackfillFailedIds = new Set<string>();
 
 /**
@@ -2032,6 +2036,14 @@ export interface ActivityDetailSummarySyncOptions {
    * from before those figures existed still answers everything they ask.
    */
   requireRecords?: boolean;
+  /**
+   * Count a run's or a ride's summary as missing until it carries the current
+   * intensity (`INTENSITY_SUMMARY_VERSION`), which its training label is read
+   * from. Asked by the screens whose rows wear the label, Running and Cycling;
+   * everywhere else a row from before it still answers what is asked, and a
+   * label on a page is read from the detail open there.
+   */
+  requireIntensity?: boolean;
 }
 
 export async function syncActivityDetailSummaries(
@@ -2040,13 +2052,20 @@ export async function syncActivityDetailSummaries(
   options: ActivityDetailSummarySyncOptions = {}
 ): Promise<ActivityDetailSummarySync> {
   const stored = storedActivityIndex(activityIds);
+  // Whether a row holds everything this sweep was asked for. A row from before
+  // a figure existed is read again — from the cached file, where there is one.
+  const answers = (summary: ActivityDetailSummary): boolean => {
+    const sportType = stored.get(summary.activityId)?.sportType;
+    return (
+      (!options.requireRecords || summary.recordsVersion === RECORDS_SUMMARY_VERSION) &&
+      (!options.requireIntensity ||
+        !sportHasTrainingBenefit(sportType) ||
+        summary.intensityVersion === INTENSITY_SUMMARY_VERSION)
+    );
+  };
   const valid = new Set(
     validSummaries(activityIds, stored)
-      .filter(
-        (summary) =>
-          !options.requireRecords ||
-          summary.recordsVersion === RECORDS_SUMMARY_VERSION
-      )
+      .filter(answers)
       .map((summary) => summary.activityId)
   );
 
@@ -2109,6 +2128,12 @@ export async function syncActivityDetailSummaries(
       if (summary) {
         written.push(summary);
         consecutiveFailures = 0;
+        // Read, and still short of what was asked — a payload naming another
+        // sport than the list row, say. Reading it again would bring the same
+        // answer, so not this session.
+        if (!answers(summary)) {
+          summaryBackfillFailedIds.add(activityId);
+        }
       } else {
         // Fetched, and nothing came of it — an unusable payload, or a write the
         // database refused. Either way this activity is not worth asking for

@@ -26,6 +26,7 @@ import {
   type PeriodDays
 } from "../preferences/periodScale";
 import { useHeartRateZoneModel } from "../training/useHeartRateZoneModel";
+import { benefitZoneFamily } from "../training/trainingBenefit";
 import { useUnitSystem } from "../units/UnitSystemProvider";
 import { distanceUnit, elevationUnit } from "../units/units";
 import type { PrimaryView } from "../navigation/primaryNav";
@@ -204,6 +205,8 @@ export function RunningView({
     api,
     corosConnected: connected
   });
+  // A run's training label waits for the same answer, and reads its family.
+  const benefitFamily = benefitZoneFamily({ settled: zonesSettled, model: zoneModel });
   // The dashboard's zones are LTHR, so that is the model they are banded by.
   const zoneScale = useMemo<RunZoneScale>(
     () => zoneModel ?? { family: "lthr", zones: runningThresholdZones(snapshot) },
@@ -229,7 +232,9 @@ export function RunningView({
   const summaries = useActivityDetailSummaries({
     api,
     activities: runs,
-    enabled: connected && selectedRunId === null
+    enabled: connected && selectedRunId === null,
+    // Each row wears its training label.
+    requireIntensity: true
   });
 
   if (!connected) {
@@ -271,6 +276,7 @@ export function RunningView({
         onRetry={() => onSelectActivity(selectedRun)}
         onAskCoach={onAskCoach}
         zoneFamily={zoneModel?.family}
+        benefitFamily={benefitFamily}
       />
     );
   }
@@ -485,6 +491,7 @@ export function RunningView({
               sort={sort}
               onSortChange={setSort}
               onOpenRun={openRun}
+              benefitFamily={benefitFamily}
               trail={trail}
             />
           </div>

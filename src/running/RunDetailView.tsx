@@ -46,6 +46,8 @@ import {
   isOutdoorRunSurface
 } from "./runSurface";
 import { formatDecimal, t } from "../i18n/core";
+import { detailTrainingBenefit, type BenefitZoneFamily } from "../training/trainingBenefit";
+import { TrainingBenefitChips } from "../training/components/TrainingBenefitChip";
 
 interface RunDetailViewProps {
   activity: TrainingHubActivity;
@@ -62,6 +64,8 @@ interface RunDetailViewProps {
   onAskCoach?: (request: CoachOpenRequest) => void;
   /** The account's heart-rate model, naming the zones of a run COROS left unlabelled. */
   zoneFamily?: CorosProfileZoneFamily;
+  /** The same model as the label's family, or none until it is known. */
+  benefitFamily?: BenefitZoneFamily;
 }
 
 /**
@@ -100,12 +104,15 @@ export function RunDetailView({
   backLabel = t("nav.running"),
   onRetry,
   onAskCoach,
-  zoneFamily
+  zoneFamily,
+  benefitFamily
 }: RunDetailViewProps) {
   const { unitSystem, temperatureUnit } = useUnitSystem();
   const { locale } = useI18n();
   const surface = classifyRunSurface(activity.sportType);
   const trail = surface === "trail";
+  // Read the way the list row's summary was, so a row and its page agree.
+  const benefit = detailTrainingBenefit(detail, activity.sportType, benefitFamily);
 
   const laps = detail?.laps ?? [];
   // On activity time, which is what the laps, the headline and every figure
@@ -339,6 +346,11 @@ export function RunDetailView({
                 {activity.name?.trim() ||
                   (surface ? t(`run.detail.untitled.${surface}` as const) : t("run.run"))}
               </h1>
+              {benefit ? (
+                <div className="run-detail-benefit">
+                  <TrainingBenefitChips reading={benefit} />
+                </div>
+              ) : null}
             </div>
           </header>
 
@@ -419,6 +431,7 @@ export function RunDetailView({
           paceZones={trail ? detail.adjustedPaceZones : detail.paceZones}
           paceIsGradeAdjusted={trail}
           frame="page"
+          benefit={benefit}
         />
       ) : null}
 

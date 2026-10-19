@@ -41,6 +41,8 @@ import {
   isOutdoorRideType
 } from "./rideType";
 import { formatDecimal, t } from "../i18n/core";
+import { detailTrainingBenefit, type BenefitZoneFamily } from "../training/trainingBenefit";
+import { TrainingBenefitChips } from "../training/components/TrainingBenefitChip";
 
 interface RideDetailViewProps {
   activity: TrainingHubActivity;
@@ -60,6 +62,8 @@ interface RideDetailViewProps {
   powerZones?: readonly CorosProfileZone[];
   /** The account's heart-rate model, naming the zones of an activity COROS left unlabelled. */
   zoneFamily?: CorosProfileZoneFamily;
+  /** The same model as the label's family, or none until it is known. */
+  benefitFamily?: BenefitZoneFamily;
 }
 
 /**
@@ -103,11 +107,14 @@ export function RideDetailView({
   onAskCoach,
   ftp,
   powerZones,
-  zoneFamily
+  zoneFamily,
+  benefitFamily
 }: RideDetailViewProps) {
   const { unitSystem, temperatureUnit } = useUnitSystem();
   const { locale } = useI18n();
   const type = classifyRideType(activity.sportType);
+  // Read the way the list row's summary was, so a row and its page agree.
+  const benefit = detailTrainingBenefit(detail, activity.sportType, benefitFamily);
 
   const laps = detail?.laps ?? [];
   const series = useMemo(
@@ -267,6 +274,11 @@ export function RideDetailView({
               <h1>
                 {activity.name?.trim() || untitledRide(type)}
               </h1>
+              {benefit ? (
+                <div className="run-detail-benefit">
+                  <TrainingBenefitChips reading={benefit} />
+                </div>
+              ) : null}
             </div>
           </header>
 
@@ -318,6 +330,7 @@ export function RideDetailView({
           hrZoneType={detail.hrZoneType}
           accountFamily={zoneFamily}
           frame="page"
+          benefit={benefit}
         />
       ) : null}
 
