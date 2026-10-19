@@ -14,6 +14,9 @@
  *
  * The renderer imports this directly, so it must stay free of `node:` imports.
  */
+import type { UnitSystem } from "./types";
+import { METERS_PER_YARD, swimDistanceUnit } from "./unitSystem";
+
 export type ActivityReading = "pace" | "speed" | "hike" | "swim" | "sets" | "effort";
 
 export const ACTIVITY_READINGS: readonly ActivityReading[] = [
@@ -35,6 +38,9 @@ const PACE_SPORT_TYPES: ReadonlySet<number> = new Set([100, 101, 102, 103, 900])
 const HIKE_SPORT_TYPES: ReadonlySet<number> = new Set([104, 105]);
 
 export function activityReading(sportType?: number, sportName?: string): ActivityReading {
+  // Nothing known at all — a card stored before it carried the sport — reads as
+  // a run, as every reader did before the sport was asked.
+  if (sportType === undefined && !sportName?.trim()) return "pace";
   if (sportType !== undefined) {
     if (sportType === 300 || sportType === 301) return "swim";
     if (sportType >= 200 && sportType <= 299) return "speed";
@@ -64,10 +70,11 @@ export function readsMovement(reading: ActivityReading): boolean {
 
 /**
  * Seconds per 100 swim units (m, or yd in imperial) from seconds per km — the
- * pace a swimmer reads. A yard is 0.9144 m, so 100 yd is 0.09144 km.
+ * pace a swimmer reads.
  */
-export function swimPacePer100(secondsPerKm: number, unitSystem: "metric" | "imperial"): number {
-  return secondsPerKm * (unitSystem === "imperial" ? 0.09144 : 0.1);
+export function swimPacePer100(secondsPerKm: number, unitSystem: UnitSystem): number {
+  const metersPer100 = 100 * (unitSystem === "imperial" ? METERS_PER_YARD : 1);
+  return (secondsPerKm * metersPer100) / 1000;
 }
 
 /** `1:52` — seconds per 100 swim units as a clock. */
@@ -79,12 +86,10 @@ export function formatSwimPaceClock(secondsPer100: number): string {
 /** `1:52 /100m` from seconds per km; `-` for a pace that is not one. */
 export function formatSwimPace(
   secondsPerKm: number | undefined,
-  unitSystem: "metric" | "imperial"
+  unitSystem: UnitSystem
 ): string {
   if (!secondsPerKm || !Number.isFinite(secondsPerKm) || secondsPerKm <= 0) {
     return "-";
   }
-  return `${formatSwimPaceClock(swimPacePer100(secondsPerKm, unitSystem))} /100${
-    unitSystem === "imperial" ? "yd" : "m"
-  }`;
+  return `${formatSwimPaceClock(swimPacePer100(secondsPerKm, unitSystem))} /100${swimDistanceUnit(unitSystem)}`;
 }

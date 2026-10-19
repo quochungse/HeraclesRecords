@@ -4,6 +4,7 @@ import {
   formatSwimPace,
   readsMovement,
   readsSpeed,
+  swimPacePer100,
   type ActivityReading
 } from "./activityReading";
 import { dayKey, isoDay, isoFromDayKey, padTwo } from "./chatDayKeys";
@@ -42,8 +43,11 @@ import {
   formatPaceValue,
   formatSpeedValue,
   formatWeightValue,
+  kmhToDisplaySpeed,
   metersToElevation,
-  secondsPerKmToDisplayPace
+  secondsPerKmToDisplayPace,
+  speedUnit,
+  swimDistanceUnit
 } from "./unitSystem.js";
 
 export const CHAT_ACTIVITY_TOOL_NAMES = [
@@ -726,7 +730,9 @@ export function formatActivityWindowForChat(
 function strengthVisualExercises(
   strength: StrengthDetail | undefined
 ): ActivityVisualStrengthExercise[] {
-  return (strength?.exercises ?? []).slice(0, MAX_STRENGTH_EXERCISES).map((exercise) => {
+  // Every exercise: a row is a few numbers, and the coach's text names the
+  // ones past its own cap, so a card that stopped at 20 would disagree with it.
+  return (strength?.exercises ?? []).map((exercise) => {
     const loads = exercise.entries
       .map((entry) => entry.weightKg)
       .filter((weight) => weight > 0);
@@ -734,11 +740,13 @@ function strengthVisualExercises(
       (sum, entry) => sum + (entry.weightKg > 0 ? entry.weightKg * entry.reps : 0),
       0
     );
+    // Counted from the work sets, as the Strength screen counts them: COROS's
+    // aggregate lap can claim a set with no reps, which no entry stands for.
     return {
       nameKey: exercise.nameKey,
       ...(exercise.rawName ? { rawName: exercise.rawName } : {}),
-      sets: exercise.sets,
-      reps: exercise.totalReps,
+      sets: exercise.entries.length,
+      reps: exercise.entries.reduce((sum, entry) => sum + entry.reps, 0),
       ...(loads.length > 0
         ? { minWeightKg: Math.min(...loads), maxWeightKg: Math.max(...loads) }
         : {}),
@@ -1212,9 +1220,7 @@ export function formatActivityDetailForChat(
         formatActivitySeriesForChat(
           downsampleActivitySeries(detail.series),
           unitSystem,
-          swim,
-          readsSpeed(reading),
-          readsMovement(reading)
+          reading
         )
       );
     } else {
@@ -1486,19 +1492,30 @@ function paceTrend(first: number, last: number, unitSystem: UnitSystem): string 
   );
 }
 
+/** Speed both sides, its change in the same unit, as `paceTrend` does for a pace. */
+function speedTrend(first: number, last: number, unitSystem: UnitSystem): string {
+  const change =
+    kmhToDisplaySpeed(3600 / last, unitSystem) - kmhToDisplaySpeed(3600 / first, unitSystem);
+  return (
+    `${formatSpeedValue(3600 / first, unitSystem)} → ${formatSpeedValue(3600 / last, unitSystem)} ` +
+    `(${signedNumber(change, 1)} ${speedUnit(unitSystem)})`
+  );
+}
+
+/** A pace per 100 both sides, its change in seconds per 100 of the pool's unit. */
+function swimPaceTrend(first: number, last: number, unitSystem: UnitSystem): string {
+  const change = swimPacePer100(last, unitSystem) - swimPacePer100(first, unitSystem);
+  return (
+    `${formatSwimPace(first, unitSystem)} → ${formatSwimPace(last, unitSystem)} ` +
+    `(${signedNumber(change, 0)} s/100${swimDistanceUnit(unitSystem)})`
+  );
+}
+
 /**
  * The rows a sport's trend is read in: a gym session has heart rate and
  * nothing that moved, a ride and a hike gain speed where a run loses pace, and
  * a swim reads its pace per 100.
  */
-function speedTrend(first: number, last: number, unitSystem: UnitSystem): string {
-  return `${formatSpeedValue(3600 / first, unitSystem)} → ${formatSpeedValue(3600 / last, unitSystem)}`;
-}
-
-function swimPaceTrend(first: number, last: number, unitSystem: UnitSystem): string {
-  return `${formatSwimPace(first, unitSystem)} → ${formatSwimPace(last, unitSystem)}`;
-}
-
 function formTrendMetrics(reading: ActivityReading): FormTrendMetric[] {
   const cadenceUnit = reading === "speed" ? "rpm" : "spm";
   const pace: FormTrendMetric = {
@@ -1727,10 +1744,12 @@ function formatStrengthDetailForChat(
         sets.push(`… ${exercise.entries.length - MAX_STRENGTH_SETS} more`);
       }
 
+      // The work sets listed beside it, as the card and the Strength screen
+      // count them: COROS's aggregate lap can claim a set no entry stands for.
       const heading = [
         strengthExerciseLabel(exercise),
-        `${exercise.sets} sets`,
-        `${exercise.totalReps} reps`
+        `${exercise.entries.length} sets`,
+        `${exercise.entries.reduce((sum, entry) => sum + entry.reps, 0)} reps`
       ].join(" — ");
       return `- ${heading}: ${sets.join(", ")}`;
     });

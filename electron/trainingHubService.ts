@@ -158,7 +158,12 @@ import {
   decodeStsCredentials
 } from "./corosUploadConfig";
 import { parseStrengthDetail } from "./strengthDetail";
-import { formatSwimPace } from "./activityReading";
+import {
+  formatSwimPace,
+  readsMovement,
+  readsSpeed,
+  type ActivityReading
+} from "./activityReading";
 import {
   clearStoredCorosCredentials,
   getStoredCorosCredentials,
@@ -7038,7 +7043,8 @@ function formatElapsedClock(seconds: number): string {
  * altitude and running-form columns. Distance, HR, pace and power stay
  * unconditional on anything that moves: they are what a coach reads first, and
  * a dash reads better than a table whose shape moves between activities. A gym
- * session has HR alone.
+ * session has HR alone, and a sport that may or may not cover ground
+ * (`effort`) has a distance and a speed only where it did, as its laps do.
  */
 function optionalSeriesColumns(unitSystem: UnitSystem): SeriesColumn[] {
   return [
@@ -7060,16 +7066,18 @@ function optionalSeriesColumns(unitSystem: UnitSystem): SeriesColumn[] {
 export function formatActivitySeriesForChat(
   points: TrainingHubActivitySeriesPoint[],
   unitSystem: UnitSystem = "metric",
-  swim = false,
-  /** A ride's, a hike's or any other non-foot sport's movement, read in km/h. */
-  speed = false,
-  /** False for a gym session: heart rate over time, no distance, pace or power. */
-  moves = true
+  /** How the sport is read (`activityReading`), which decides the columns. */
+  reading: ActivityReading = "pace"
 ): string {
   if (points.length === 0) {
     return "Time series: no HR/pace/power samples available.";
   }
 
+  const swim = reading === "swim";
+  const speed = readsSpeed(reading);
+  const moves = readsMovement(reading);
+  const coversGround =
+    moves && (reading !== "effort" || points.some((point) => (point.distance ?? 0) > 0));
   const hasElapsed = points.some((point) => point.elapsed !== undefined);
   // A gym session carried Distance, Pace and Power on every row, all dashes,
   // which the model read as figures to talk about.
@@ -7081,9 +7089,9 @@ export function formatActivitySeriesForChat(
 
   const header = [
     hasElapsed ? "Time" : undefined,
-    moves ? "Distance" : undefined,
+    coversGround ? "Distance" : undefined,
     "HR",
-    moves ? (speed ? "Speed" : swim ? "Pace /100" : "Pace") : undefined,
+    coversGround ? (speed ? "Speed" : swim ? "Pace /100" : "Pace") : undefined,
     moves ? "Power" : undefined,
     ...optional.map((column) => column.header)
   ]
@@ -7097,13 +7105,13 @@ export function formatActivitySeriesForChat(
           ? formatElapsedClock(point.elapsed)
           : "—"
         : undefined,
-      moves
+      coversGround
         ? point.distance !== undefined
           ? formatDistanceValue(point.distance, unitSystem, { swim })
           : "—"
         : undefined,
       point.hr !== undefined ? `${point.hr}` : "—",
-      moves
+      coversGround
         ? point.pace !== undefined
           ? speed
             ? formatSpeedValue(3600 / point.pace, unitSystem)

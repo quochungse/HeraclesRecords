@@ -120,7 +120,7 @@ assert.match(imperialBike, /Max HR \| Speed/);
 assert.match(imperialBike, /Distance \| HR \| Speed \| Power/);
 assert.match(imperialBike, /10\.0 mph/);
 assert.match(
-  formatActivitySeriesForChat(bikeDetail.series, "metric", false, true),
+  formatActivitySeriesForChat(bikeDetail.series, "metric", "speed"),
   /16\.1 km\/h/
 );
 
@@ -516,6 +516,17 @@ assert.match(driftText, /- ground contact: 243 → 261 ms \(\+18\)/);
 assert.match(driftText, /- vertical ratio: 9\.1 → 9\.7% \(\+0\.6\)/);
 assert.match(driftText, /- pace: 6:03\/km → 6:21\/km \(\+18 s\/km\)/);
 
+// A ride's speed and a swim's pace per 100 state their change too, so the
+// coach reads it rather than working it out.
+const asSport = (sportType) =>
+  formatActivityDetailForChat(
+    parseActivityDetail({ ...driftFixture, summary: { ...driftFixture.summary, sportType } }),
+    false,
+    "metric"
+  );
+assert.match(asSport(200), /- speed: 9\.9 km\/h → 9\.4 km\/h \(-0\.5 km\/h\)/);
+assert.match(asSport(300), /- pace: 0:36 \/100m → 0:38 \/100m \(\+2 s\/100m\)/);
+
 // A structured session compares its work reps to each other. Comparing the
 // first third to the last third of every lap would put the warm-up against the
 // cool-down and report every interval workout as a collapse.
@@ -669,8 +680,7 @@ const seriesDetailForChat = parseActivityDetail({
 const seriesTable = formatActivitySeriesForChat(
   seriesDetailForChat.series,
   "metric",
-  false,
-  false
+  "pace"
 );
 assert.match(seriesTable, /Time \| Distance \| HR \| Pace \| Power \| Alt \(m\) \| Cad \| GCT \(ms\)/);
 assert.doesNotMatch(seriesTable, /Stride \(m\)/, "an unrecorded channel gets no column");
@@ -689,11 +699,26 @@ const gymSeriesTable = formatActivitySeriesForChat(
     }))
   }).series,
   "metric",
-  false,
-  false,
-  false
+  "sets"
 );
 assert.match(gymSeriesTable, /^Time \| HR$/m);
+
+// A sport that covered no ground (an indoor climb) carries no Distance or
+// Speed column of dashes either.
+const climbSeriesTable = formatActivitySeriesForChat(
+  parseActivityDetail({
+    labelId: "act-climb-series",
+    summary: { sportType: 800, totalTime: 300000 },
+    frequencyList: Array.from({ length: 8 }, (_, index) => ({
+      time: index * 42857,
+      heartRate: 120 + index
+    }))
+  }).series,
+  "metric",
+  "effort"
+);
+assert.match(climbSeriesTable, /^Time \| HR\b/m);
+assert.doesNotMatch(climbSeriesTable, /Distance|Speed|Pace/);
 
 // And its card draws heart rate against the clock, with nothing else beside it.
 const gymPreview = buildActivityVisualPreview(

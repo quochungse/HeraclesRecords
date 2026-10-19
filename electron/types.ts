@@ -2866,6 +2866,16 @@ export interface ActivityVisualStrengthExercise {
   volumeKg?: number;
 }
 
+/**
+ * `reading` and `sections.strength` were added to this existing entry kind,
+ * which CLAUDE.md's transcript rules forbid in general because an older build
+ * drops a field it does not know and can win a merge with its copy. That does
+ * not apply here: every release from 1.0.0 on carries unknown keys in a
+ * preview and in its `sections` (`keepUnknownKeys`), and since the vault went
+ * to format 2 (`DATA_VERSION_COMPAT = 2`) no build older than 1.0.3 writes to
+ * it at all. Both fields are display-only, and a card without them falls back
+ * to the code and the laps.
+ */
 export interface ActivityVisualPreview {
   previewId: string;
   activityId: string;

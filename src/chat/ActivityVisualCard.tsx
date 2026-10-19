@@ -28,7 +28,8 @@ import {
   elevationUnit,
   kilogramsToDisplayWeight,
   kmhToDisplaySpeed,
-  speedUnit
+  speedUnit,
+  swimDistanceUnit
 } from "../units/units";
 import {
   ACTIVITY_READINGS,
@@ -182,7 +183,8 @@ export const ActivityVisualCard = memo(function ActivityVisualCard({
   // A card stored before this was decided may still hold a pace or a cadence
   // for a gym session, which is not drawn, and carries no `reading` (nor one
   // this build knows, from a newer one): its code stands in, which misreads
-  // only a custom sport.
+  // only a custom sport. A card from before the code was stored has neither,
+  // and reads as a pace, as every such card was drawn.
   const reading =
     preview.reading && ACTIVITY_READINGS.includes(preview.reading)
       ? preview.reading
@@ -326,7 +328,7 @@ export const ActivityVisualCard = memo(function ActivityVisualCard({
                 asSpeed
                   ? `${formatDecimal(value, 1)} ${speedUnit(unitSystem)}`
                   : swim
-                    ? `${formatSwimPaceClock(value)} /100${unitSystem === "imperial" ? "yd" : "m"}`
+                    ? `${formatSwimPaceClock(value)} /100${swimDistanceUnit(unitSystem)}`
                     : formatPaceValue(value, unitSystem)
               }
               yAxisFormatter={(value) =>
