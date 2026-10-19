@@ -139,6 +139,8 @@ import {
   resolveWorkoutExerciseName,
   workoutExerciseId,
   workoutExerciseMedia,
+  workoutExerciseLoading,
+  workoutExerciseMuscles,
   workoutExerciseName,
   workoutSportFromType
 } from "./workoutCapabilities";
@@ -3619,12 +3621,23 @@ export async function listWorkoutExercises(
     const exerciseKind = toOptionalNumber(row.exerciseKind);
     const media = workoutExerciseMedia(row);
     const thumbnailUrl = media.find((entry) => entry.coverUrl)?.coverUrl;
+    const muscles = workoutExerciseMuscles(row);
+    const loading = workoutExerciseLoading(row);
+    const corosKey = typeof row.name === "string" && /^[TS]\d+$/i.test(row.name.trim())
+      ? row.name.trim()
+      : undefined;
     const option: WorkoutExerciseOption = {
       id,
       name,
       ...(exerciseKind !== undefined ? { exerciseKind } : {}),
       ...(thumbnailUrl ? { thumbnailUrl } : {}),
-      ...(media.length ? { media } : {})
+      ...(media.length ? { media } : {}),
+      ...(corosKey ? { corosKey } : {}),
+      ...(muscles.primary.length ? { primaryMuscles: muscles.primary } : {}),
+      ...(muscles.involved.length ? { involvedMuscles: muscles.involved } : {}),
+      ...(loading.equipment.length ? { equipmentCodes: loading.equipment } : {}),
+      ...(loading.targetType !== undefined ? { targetType: loading.targetType } : {}),
+      ...(loading.defaultLoad !== undefined ? { defaultLoad: loading.defaultLoad } : {})
     };
     return [[id, option] as const];
   })).values()].sort((left, right) => left.name.localeCompare(right.name));

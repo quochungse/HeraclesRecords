@@ -408,6 +408,45 @@ export function workoutExerciseMedia(row: Record<string, unknown>): WorkoutExerc
   ])).values()];
 }
 
+/**
+ * The muscle codes COROS files a movement under: `muscle` is the ones it works
+ * hardest, `muscleRelevance` every one that takes part. Both arrive as arrays
+ * of small integers (the Training Hub's own muscle table); anything else — a
+ * row without them, a non-array — is an empty list rather than a guess.
+ */
+export function workoutExerciseMuscles(
+  row: Record<string, unknown>
+): { primary: number[]; involved: number[] } {
+  const codes = (value: unknown): number[] =>
+    Array.isArray(value)
+      ? [...new Set(
+        value.map(Number).filter((code) => Number.isInteger(code) && code > 0)
+      )]
+      : [];
+  return { primary: codes(row.muscle), involved: codes(row.muscleRelevance) };
+}
+
+/**
+ * What a catalog row says about how a movement is loaded: its equipment codes,
+ * whether it counts reps (`targetType` 3) or holds for time (2), and the
+ * default working weight COROS attaches to it. Each is left out when the row
+ * does not state it.
+ */
+export function workoutExerciseLoading(
+  row: Record<string, unknown>
+): { equipment: number[]; targetType?: number; defaultLoad?: number } {
+  const equipment = Array.isArray(row.equipment)
+    ? [...new Set(row.equipment.map(Number).filter((code) => Number.isInteger(code) && code > 0))]
+    : [];
+  const targetType = Number(row.targetType);
+  const defaultLoad = Number(row.intensityValue);
+  return {
+    equipment,
+    ...(Number.isInteger(targetType) && targetType > 0 ? { targetType } : {}),
+    ...(Number.isFinite(defaultLoad) && row.intensityValue != null ? { defaultLoad } : {})
+  };
+}
+
 export function resolveWorkoutExerciseName(
   catalog: readonly Record<string, unknown>[],
   requestedName: string

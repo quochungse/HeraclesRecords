@@ -3417,6 +3417,18 @@ export interface WorkoutExerciseOption {
   exerciseKind?: number;
   thumbnailUrl?: string;
   media?: WorkoutExerciseMedia[];
+  /** COROS's own muscle codes for the muscles the movement works hardest (`muscle`). */
+  primaryMuscles?: number[];
+  /** COROS's codes for every muscle that takes part (`muscleRelevance`), the primary ones included. */
+  involvedMuscles?: number[];
+  /** The key COROS files the movement under in its catalog (`T1002`), whatever name it is shown by. */
+  corosKey?: string;
+  /** COROS's equipment codes (`equipment`): 1 bodyweight, 2 dumbbells, 3 barbells, 4 plates, 5 cable, 6 gym equipment, 9 bands, 11 kettlebell… */
+  equipmentCodes?: number[];
+  /** COROS's target for the movement (`targetType`): 3 counts reps, 2 holds for time. */
+  targetType?: number;
+  /** COROS's default working weight (`intensityValue`, grams); 0 for a movement with none. */
+  defaultLoad?: number;
 }
 
 export interface WorkoutExerciseMedia {
