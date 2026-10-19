@@ -1832,9 +1832,43 @@ input::placeholder {
   flex: 0 0 auto;
 }
 
+/* The app's buttons state no size, so here they drew at the page's 16px and
+   700 with a glow under the primary, loud beside a sheet that is otherwise
+   quiet. Pills to follow the sheet's round corners; the secondary is a ghost,
+   because "Not now" is the way out, not a second offer. */
 .update-prompt-actions .primary-button,
 .update-prompt-actions .secondary-button {
-  min-height: 40px;
+  min-height: 38px;
+  padding: 0 18px;
+  border-radius: var(--radius-pill);
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1;
+}
+
+.update-prompt-actions .primary-button {
+  box-shadow: none;
+}
+
+.update-prompt-actions .primary-button:hover:not(:disabled) {
+  box-shadow: none;
+  transform: none;
+}
+
+.update-prompt-actions .secondary-button {
+  border-color: transparent;
+  background: transparent;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  color: var(--text-secondary);
+}
+
+.update-prompt-actions .secondary-button:hover:not(:disabled) {
+  border-color: transparent;
+  background: var(--glass-bg-hover);
+  color: var(--text-primary);
+  box-shadow: none;
+  transform: none;
 }
 
 /* The restart question: no changelog, so a narrower sheet whose body is a
