@@ -37,20 +37,6 @@ mirrored, the man's thickened, the woman's reshaped to a fit woman's
 proportions, the skull and jaw removed. The baked `public/assets/anatomy/hero/`
 files are distributed under CC BY-SA 4.0.
 
-### Strength figure heads
-
-The heads on the Strength figure are built from
-["Stylized Anime Female Head"](https://sketchfab.com/3d-models/stylized-anime-female-head-e8d04325a74e46a98a6494abe721a8b2)
-by [Rodesqa](https://sketchfab.com/rodesqa), licensed under
-[Creative Commons Attribution 4.0 International](https://creativecommons.org/licenses/by/4.0/).
-Changes: the head and face only (no neck), decimated, colour removed, lower
-lashes removed, the eyes smoothed and the face made somewhat less stylised; the man's head is the
-same model reshaped (squarer jaw and chin, heavier brow, no lashes, larger).
-The woman's bust is shaped from
-["female muscle human body"](https://sketchfab.com/3d-models/female-muscle-human-body-aa022f8c27e04aea89e731f66484a299)
-by [mina](https://sketchfab.com/aile6293), CC BY 4.0, rescaled and fitted to
-the figure's chest.
-
 ### Body figure
 
 The human figure in the exercise picker's Body part and Muscle filters is drawn
