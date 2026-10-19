@@ -31,9 +31,25 @@ Z-Anatomy includes material derived from BodyParts3D, copyright The Database
 Center for Life Science (DBCLS), also licensed under CC BY-SA 4.0.
 
 AtoZ exported the required structures from Z-Anatomy's upstream Blender
-atlas, attached strength-group metadata, decimated and Draco-compressed the
-geometry; the app recolors it at runtime. The resulting `muscular_lite.glb` and
-`skeletal_lite.glb` derivatives are distributed under CC BY-SA 4.0.
+atlas, attached strength-group metadata and decimated the geometry. Heracles
+Records then baked the Strength figure from that export: muscles grouped and
+mirrored, the man's thickened, the woman's reshaped to a fit woman's
+proportions, the skull and jaw removed. The baked `public/assets/anatomy/hero/`
+files are distributed under CC BY-SA 4.0.
+
+### Strength figure heads
+
+The heads on the Strength figure are built from
+["Stylized Anime Female Head"](https://sketchfab.com/3d-models/stylized-anime-female-head-e8d04325a74e46a98a6494abe721a8b2)
+by [Rodesqa](https://sketchfab.com/rodesqa), licensed under
+[Creative Commons Attribution 4.0 International](https://creativecommons.org/licenses/by/4.0/).
+Changes: the head and face only (no neck), decimated, colour removed, lower
+lashes removed, the eyes smoothed and the face made somewhat less stylised; the man's head is the
+same model reshaped (squarer jaw and chin, heavier brow, no lashes, larger).
+The woman's bust is shaped from
+["female muscle human body"](https://sketchfab.com/3d-models/female-muscle-human-body-aa022f8c27e04aea89e731f66484a299)
+by [mina](https://sketchfab.com/aile6293), CC BY 4.0, rescaled and fitted to
+the figure's chest.
 
 ### Body figure
 
@@ -92,7 +108,9 @@ its source in its corner while it is on screen.
 ## JavaScript packages
 
 Every package from npm that ships inside the app is listed, with its version,
-license and license text, in `THIRD_PARTY_LICENSES.txt`.
+license and license text, in `THIRD_PARTY_LICENSES.txt`. three.js carries
+[meshoptimizer](https://github.com/zeux/meshoptimizer)'s decoder, which reads the
+Strength figure: MIT, copyright (c) 2016-2026 Arseny Kapoulkine.
 
 ## Trademarks
 

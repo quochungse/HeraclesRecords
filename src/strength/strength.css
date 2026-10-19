@@ -49,24 +49,28 @@
   font-kerning: normal;
 
   --heat-0: rgba(255, 255, 255, 0.04);
-  --heat-1: rgba(47, 190, 145, 0.24);
-  --heat-2: rgba(47, 190, 145, 0.52);
-  --heat-3: rgba(216, 155, 34, 0.6);
-  --heat-4: rgba(229, 120, 60, 0.72);
-  --heat-5: rgba(229, 72, 77, 0.88);
+  --heat-1: rgba(122, 107, 85, 0.4);
+  --heat-2: rgba(169, 132, 63, 0.58);
+  --heat-3: rgba(211, 154, 44, 0.68);
+  --heat-4: rgba(236, 122, 38, 0.78);
+  --heat-5: rgba(242, 80, 45, 0.88);
 
-  /* Solid twins of the ramp above, for the 3D figure. WebGL materials cannot
-     use the translucent swatches the legend paints with, and the mannequin
-     needs its own charcoal so untrained bellies still read against it. */
+  /* The heat ramp is amber: one warm hue from sand to ember, so load reads as
+     how hot a muscle runs rather than as a traffic light. --m3d-heat-* are its
+     solid twins for the 3D figure, since WebGL materials cannot use the
+     translucent swatches the legend paints with. An untrained muscle wears the
+     head's clay, so the figure is one material until training colours it;
+     --m3d-base is what the muscles outside a selection fade toward. */
   --m3d-base: #39424b;
   --m3d-v2-bone: #9bcbd8;
+  --m3d-head: #938e87;
   --m3d-v2-connective: #d9cfc0;
-  --m3d-heat-0: #46505a;
-  --m3d-heat-1: #2fbe91;
-  --m3d-heat-2: #7fbe6a;
-  --m3d-heat-3: #d89b22;
-  --m3d-heat-4: #e5783c;
-  --m3d-heat-5: #e5484d;
+  --m3d-heat-0: var(--m3d-head);
+  --m3d-heat-1: #7a6b55;
+  --m3d-heat-2: #a9843f;
+  --m3d-heat-3: #d39a2c;
+  --m3d-heat-4: #ec7a26;
+  --m3d-heat-5: #f2502d;
   --m3d-rim: #7fe8c4;
   --m3d-sky: #93b8dc;
   --m3d-ground: #151a1f;
@@ -82,7 +86,7 @@
   --body-stage-middle: #10171e;
   --body-stage-bottom: #0a0f14;
   --body-stage-spotlight: rgba(190, 213, 230, 0.14);
-  --body-stage-reflection: rgba(229, 72, 77, 0.055);
+  --body-stage-reflection: rgba(236, 122, 38, 0.05);
   --body-stage-floor: rgba(0, 0, 0, 0.44);
   --body-stage-edge: rgba(167, 192, 209, 0.1);
   --body-stage-border: rgba(170, 192, 207, 0.13);
@@ -112,37 +116,34 @@
   --mix-legs: #b9791a;
   --mix-core: #3d6ecb;
 
-  /* The light ramp keeps its dark twin's hue and nearly all of its chroma,
-     and sits a few points *lighter*, not darker. Both directions were tried
-     and both were wrong: mixed toward grey at the dark twin's own lightness
-     it reads as mud on a white page, and lightened far enough to be gentle it
-     washes out and the top of the ramp stops saying "hammered". A small
-     lightness gain against a white stage is all the correction the ramp
-     needs; the glare came from the exposure, not from the swatches. */
+  /* The light ramp keeps its dark twin's hue at each step and runs only a
+     little deeper, so the hottest muscle stays the darkest thing on a
+     near-white stage, where the dark ramp's top washes out. Taken further, to
+     burnt umber, a medium load wore the red of a heavy one. */
   --heat-0: rgba(19, 26, 40, 0.06);
-  --heat-1: rgba(69, 196, 156, 0.3);
-  --heat-2: rgba(69, 196, 156, 0.62);
-  --heat-3: rgba(214, 162, 56, 0.7);
-  --heat-4: rgba(223, 125, 73, 0.8);
-  --heat-5: rgba(222, 84, 88, 0.86);
+  --heat-1: rgba(214, 183, 126, 0.55);
+  --heat-2: rgba(217, 164, 70, 0.7);
+  --heat-3: rgba(219, 138, 42, 0.78);
+  --heat-4: rgba(208, 106, 38, 0.85);
+  --heat-5: rgba(184, 67, 42, 0.9);
 
   /* On paper the mannequin stays a mid grey, not near-white: a light albedo
      under this rig clips to flat white and loses all its shading. The bone is
      lighter than its dark twin rather than darker, because here it is read
      against a white stage instead of a black one. */
-  --m3d-base: #aba59b;
+  --m3d-base: #a39d93;
   --m3d-v2-bone: #8ebfcc;
+  --m3d-head: #bdb7ad;
   --m3d-v2-connective: #cabba5;
-  --m3d-heat-0: #b1aba0;
-  --m3d-heat-1: #45c49c;
-  --m3d-heat-2: #77b762;
-  --m3d-heat-3: #d6a238;
-  --m3d-heat-4: #df7d49;
-  --m3d-heat-5: #de5458;
+  --m3d-heat-1: #d6b77e;
+  --m3d-heat-2: #d9a446;
+  --m3d-heat-3: #db8a2a;
+  --m3d-heat-4: #d06a26;
+  --m3d-heat-5: #b8432a;
   --m3d-rim: #f4efe4;
-  --m3d-sky: #fdf8ec;
+  --m3d-sky: #f4eee3;
   --m3d-ground: #8c857a;
-  --m3d-exposure: 1;
+  --m3d-exposure: 0.95;
   /* Almost none, and that is not a smaller version of the dark value: an
      emissive term adds white, so on a light stage it takes the heat colour
      out of the selected muscle rather than putting a rim on it. What marks
@@ -152,16 +153,18 @@
   --panel-floor: rgba(19, 26, 40, 0.09);
   --muscle-focus-vignette: rgba(19, 26, 40, 0.12);
 
-  /* The light theme uses a mineral-gray studio instead of warm paper behind
-     the model, preserving contrast without turning the stage stark white. */
-  --body-stage-top: #f8faf9;
-  --body-stage-middle: #e9eeed;
-  --body-stage-bottom: #d9e0e0;
-  --body-stage-spotlight: rgba(255, 255, 255, 0.9);
-  --body-stage-reflection: rgba(203, 48, 53, 0.05);
-  --body-stage-floor: rgba(60, 70, 74, 0.16);
+  /* The light stage is a bright warm grey that darkens a little toward the
+     floor, and the figure is lit a touch softer than full (sky and exposure
+     above): a stark white stage under full light washed the amber ramp out,
+     and a mid grey one read dim. */
+  --body-stage-top: #fbfaf8;
+  --body-stage-middle: #f1efeb;
+  --body-stage-bottom: #e3e0da;
+  --body-stage-spotlight: rgba(255, 252, 245, 0.9);
+  --body-stage-reflection: rgba(201, 98, 42, 0.05);
+  --body-stage-floor: rgba(74, 62, 48, 0.14);
   --body-stage-edge: rgba(255, 255, 255, 0.58);
-  --body-stage-border: rgba(46, 60, 64, 0.14);
+  --body-stage-border: rgba(64, 52, 40, 0.14);
 }
 
 /* ---------- Header ---------- */

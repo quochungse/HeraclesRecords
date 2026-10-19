@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### What's new
+
+- **Strength** - the muscle figure follows the sex on your COROS profile: a gym-trained man, or a fit woman with her own proportions. A clay head now stands where the skull was, and the heat map runs in amber, from sand to ember, on a warmer light stage.
+
 ## [1.1.1] - 2026-10-12
 
 ### What's new

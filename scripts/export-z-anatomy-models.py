@@ -1,10 +1,14 @@
-"""Export the Heracles Records anatomy assets directly from the Z-Anatomy Blender atlas.
+"""Export the Strength figure's source meshes directly from the Z-Anatomy Blender atlas.
 
 Run with Blender, not the system Python:
 
   Blender --background /path/to/Startup.blend \
     --python scripts/export-z-anatomy-models.py -- \
-    --out-dir public/assets/anatomy
+    --out-dir /path/to/bake-input
+
+The two GLBs it writes are the input of the offline bake that produced
+public/assets/anatomy/hero (see the README there); the app no longer ships them,
+so keep them out of public/.
 
 The upstream atlas is intentionally not vendored. Download Z-Anatomy.zip from
 https://github.com/Z-Anatomy/Models-of-human-anatomy and point Blender at the
