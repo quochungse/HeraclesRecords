@@ -1546,6 +1546,35 @@ const analysedIds = (world) =>
   );
 }
 
+// --- an activity run's {{date}} and {{week.range}} are the activity's --------
+// Sunday's run synced on Friday is announced on Sunday, inside Sunday's week —
+// not Friday's date beside the week it is in.
+{
+  const previousTz = process.env.TZ;
+  process.env.TZ = "UTC";
+  try {
+    resetAnalysisQueueForTests();
+    const world = createWorld();
+    addAnalysis(world, "a1", {
+      trigger: ACTIVITY_TRIGGER,
+      conditions: NO_LIMITS,
+      playbook: "Look at the run on {{date}} in the week {{week.range}}."
+    });
+    addSession(world, "s1");
+    addAttachment(world, "b1", { sessionId: "s1", lastActivityAt: RUNNER_NOW_EPOCH - 8 * 86_400 });
+    addActivity(world, "sunday", 5);
+
+    await runAnalysisTrigger({ analysisId: "a1", kind: "activity" }, world.deps);
+    assert.match(
+      JSON.stringify(world.streamCalls[0].messages),
+      /the run on 2026-08-16 in the week 2026-08-10\.\.2026-08-16/
+    );
+  } finally {
+    if (previousTz === undefined) delete process.env.TZ;
+    else process.env.TZ = previousTz;
+  }
+}
+
 // --- multiActivity on: one run per pending activity, oldest first -----------
 {
   resetAnalysisQueueForTests();

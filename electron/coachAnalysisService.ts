@@ -1320,12 +1320,14 @@ function templateVars(
   // An activity run speaks of the activity's own day. "A new activity has just
   // synced … on {{date}}" used to read the day it synced, so Sunday's long run
   // arriving on Monday was announced as Monday's and the coach then found
-  // nothing today.
+  // nothing today. The week follows the same day, so {{date}} always falls
+  // inside {{week.range}}.
   const startTime = queued.activity?.start_time;
+  const day = startTime ? new Date(startTime * 1000) : now;
   return {
     rule: { name: queued.analysis.name },
-    date: isoDate(startTime ? new Date(startTime * 1000) : now),
-    week: { range: weekRange(now) },
+    date: isoDate(day),
+    week: { range: weekRange(day) },
     activity: {
       name: asText(queued.event.payload?.activityName),
       sport: asText(queued.event.payload?.activitySport)
@@ -1341,12 +1343,7 @@ function describeActivity(activity: CoachActivityRow): string {
     parts.push(sport);
   }
   if (activity.start_time) {
-    // Local, not `toISOString()`: a 06:00 run in UTC+7 is the UTC day before.
-    const start = new Date(activity.start_time * 1000);
-    parts.push(
-      `${start.getFullYear()}-${String(start.getMonth() + 1).padStart(2, "0")}-` +
-        `${String(start.getDate()).padStart(2, "0")}`
-    );
+    parts.push(isoDate(new Date(activity.start_time * 1000)));
   }
   return parts.join(" · ");
 }
