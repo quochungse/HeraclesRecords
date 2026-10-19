@@ -270,6 +270,7 @@ export function RunningView({
         backLabel={backLabel}
         onRetry={() => onSelectActivity(selectedRun)}
         onAskCoach={onAskCoach}
+        zoneFamily={zoneModel?.family}
       />
     );
   }

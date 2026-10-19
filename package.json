@@ -28,6 +28,7 @@
     "clean:electron": "node -e \"require('node:fs').rmSync('dist-electron', { recursive: true, force: true })\"",
     "build:renderer": "tsc -p tsconfig.json --noEmit && vite build && node scripts/collect-licenses.mjs",
     "test:base-layers": "cross-env ELECTRON_RUN_AS_NODE=1 electron --experimental-strip-types --import ./scripts/register-ts-ext.mjs scripts/test-base-layers.mjs",
+    "test:zone-time": "npm run build:electron && cross-env ELECTRON_RUN_AS_NODE=1 electron --experimental-strip-types scripts/test-zone-time.mjs",
     "test:route-coloring": "cross-env ELECTRON_RUN_AS_NODE=1 electron --experimental-strip-types scripts/test-route-coloring.mjs",
     "test:oneway-arrows": "cross-env ELECTRON_RUN_AS_NODE=1 electron --experimental-strip-types scripts/test-oneway-arrows.mjs",
     "test:greetings": "node --experimental-strip-types --import ./scripts/register-ts-ext.mjs scripts/test-greetings.mjs",

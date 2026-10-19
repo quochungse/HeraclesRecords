@@ -749,12 +749,26 @@ export interface TrainingHubActivityDetail {
   /** This activity's own HR zone distribution, empty when COROS sent none. */
   hrZones: TrainingHubActivityZoneBucket[];
   /**
+   * The heart-rate model `hrZones` was scored on, COROS's `hrZoneType`: 1 Max
+   * HR, 2 HR Reserve, 3 LTHR. It names the buckets — the two families call the
+   * same bucket by different names. Absent when COROS sent 0 or nothing — and
+   * it sends 0 on some activities of an account on one model all along, so a
+   * reader falls back to the account's model rather than to none.
+   */
+  hrZoneType?: number;
+  /**
    * The pace zones COROS scored this activity against, in seconds per
    * kilometre: `low` is a bucket's fast edge and `high` its slow one. Numbered
    * bucket for bucket as `hrZones` is, so index 0 is everything slower than
    * zone 1 and carries only `low`. Empty when COROS sent none.
    */
   paceZones?: TrainingHubActivityZoneBucket[];
+  /**
+   * The same pace zones, scored on grade-adjusted pace (COROS's type 173) —
+   * what a trail run's time in zones is read from, where the raw pace is the
+   * gradient's.
+   */
+  adjustedPaceZones?: TrainingHubActivityZoneBucket[];
   effect?: TrainingHubActivityEffect;
   weather?: TrainingHubActivityWeather;
   track?: TrainingHubActivityTrack;

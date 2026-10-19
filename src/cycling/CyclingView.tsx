@@ -241,6 +241,7 @@ export function CyclingView({
         onAskCoach={onAskCoach}
         ftp={profile?.thresholds.ftp}
         powerZones={profile?.thresholds.zones.cyclePower}
+        zoneFamily={zoneModel?.family}
       />
     );
   }

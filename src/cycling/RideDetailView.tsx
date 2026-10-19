@@ -4,6 +4,7 @@ import { ArrowLeft, CloudOff, MessageCircle, RefreshCw } from "lucide-react";
 import type {
   CoachOpenRequest,
   CorosProfileZone,
+  CorosProfileZoneFamily,
   TrainingHubActivity,
   TrainingHubActivityDetail,
   TrainingHubActivityLap
@@ -31,6 +32,7 @@ import { rideMaxSpeedKmh } from "./rideAnalysis";
 import { RideClimbsPanel } from "./RideClimbsPanel";
 import { rideSeconds, speedKmh } from "./rideMetrics";
 import { RidePowerPanel } from "./RidePowerPanel";
+import { ActivityZoneTimePanel } from "../training/components/ActivityZoneTimePanel";
 import { StatGrid, type Stat } from "./StatGrid";
 import {
   untitledRide,
@@ -56,6 +58,8 @@ interface RideDetailViewProps {
   ftp?: number;
   /** The account's cycling power zones, as COROS states them. */
   powerZones?: readonly CorosProfileZone[];
+  /** The account's heart-rate model, naming the zones of an activity COROS left unlabelled. */
+  zoneFamily?: CorosProfileZoneFamily;
 }
 
 /**
@@ -98,7 +102,8 @@ export function RideDetailView({
   onRetry,
   onAskCoach,
   ftp,
-  powerZones
+  powerZones,
+  zoneFamily
 }: RideDetailViewProps) {
   const { unitSystem, temperatureUnit } = useUnitSystem();
   const { locale } = useI18n();
@@ -302,6 +307,17 @@ export function RideDetailView({
           dynamics={detail.dynamics}
           ftp={ftp}
           powerZones={powerZones}
+        />
+      ) : null}
+
+      {/* Heart rate only: the power zones are the Power panel's, and the pace
+          zones COROS scores a ride on are a runner's. */}
+      {detail ? (
+        <ActivityZoneTimePanel
+          hrZones={detail.hrZones}
+          hrZoneType={detail.hrZoneType}
+          accountFamily={zoneFamily}
+          frame="page"
         />
       ) : null}
 

@@ -3,6 +3,7 @@ import { useCallback, useMemo, useState } from "react";
 import { ArrowLeft, CloudOff, MessageCircle, RefreshCw } from "lucide-react";
 import type {
   CoachOpenRequest,
+  CorosProfileZoneFamily,
   TrainingHubActivity,
   TrainingHubActivityDetail
 } from "../../electron/types";
@@ -30,6 +31,7 @@ import {
   hikeTerrain
 } from "../hiking/hikeAnalysis";
 import { ClimbsPanel, TerrainPanel } from "../hiking/TerrainPanels";
+import { ActivityZoneTimePanel } from "../training/components/ActivityZoneTimePanel";
 import { RunDetailSkeleton } from "./RunningSkeleton";
 import { useBackGesture } from "./sportPage";
 import {
@@ -58,6 +60,8 @@ interface RunDetailViewProps {
   onRetry: () => void;
   /** Asks Coach about this run, as the Calendar's Ask Coach does. */
   onAskCoach?: (request: CoachOpenRequest) => void;
+  /** The account's heart-rate model, naming the zones of a run COROS left unlabelled. */
+  zoneFamily?: CorosProfileZoneFamily;
 }
 
 /**
@@ -95,7 +99,8 @@ export function RunDetailView({
   onBack,
   backLabel = t("nav.running"),
   onRetry,
-  onAskCoach
+  onAskCoach,
+  zoneFamily
 }: RunDetailViewProps) {
   const { unitSystem, temperatureUnit } = useUnitSystem();
   const { locale } = useI18n();
@@ -403,6 +408,18 @@ export function RunDetailView({
             ))}
           </div>
         </section>
+      ) : null}
+
+      {detail ? (
+        <ActivityZoneTimePanel
+          hrZones={detail.hrZones}
+          hrZoneType={detail.hrZoneType}
+          accountFamily={zoneFamily}
+          // A trail's pace is the gradient's, so its zones are read on GAP.
+          paceZones={trail ? detail.adjustedPaceZones : detail.paceZones}
+          paceIsGradeAdjusted={trail}
+          frame="page"
+        />
       ) : null}
 
       {ground && ground.terrain.length > 0 ? (

@@ -217,6 +217,7 @@ export function HikingView({
         backLabel={backLabel}
         onRetry={() => onSelectActivity(selectedHike)}
         onAskCoach={onAskCoach}
+        zoneFamily={zoneModel?.family}
       />
     );
   }

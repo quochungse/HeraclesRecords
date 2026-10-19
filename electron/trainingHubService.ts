@@ -7485,6 +7485,8 @@ export function mergeActivityDetailWithList(
 /** COROS's HR zone channel in `zoneList`. 130 is pace, 134 power. */
 const COROS_HR_ZONE_TYPE = 126;
 const COROS_PACE_ZONE_TYPE = 130;
+/** The same pace zones, scored on grade-adjusted pace. */
+const COROS_ADJUSTED_PACE_ZONE_TYPE = 173;
 
 // A weather temperature arrives in tenths of a degree. Anything outside this
 // band is a sentinel rather than a reading (`sweatLoss: 65535` in the same
@@ -7697,6 +7699,27 @@ export function parseActivityHrZones(
 }
 
 /**
+ * The model the HR zone split was scored on — `zoneType` beside it in
+ * `zoneList`, the same numbering as the profile's `hrZoneType`. Some
+ * activities carry 0, which names nothing.
+ */
+export function parseActivityHrZoneType(
+  raw: Record<string, unknown>
+): number | undefined {
+  for (const entry of pickArray(raw, ["zoneList"]) ?? []) {
+    if (!entry || typeof entry !== "object") {
+      continue;
+    }
+    const group = entry as Record<string, unknown>;
+    if (toOptionalNumber(group.type) === COROS_HR_ZONE_TYPE) {
+      return positiveNumber(group.zoneType);
+    }
+  }
+
+  return undefined;
+}
+
+/**
  * The pace zones of `zoneList` (type 130). Each bucket runs from `leftScope`,
  * its slow edge, to `rightScope`, its fast one, in milliseconds per kilometre
  * — a live run reads zone 1 as 468000 to 397000. Bucket 0 repeats zone 1's
@@ -7705,7 +7728,8 @@ export function parseActivityHrZones(
  * (162000, 2:42/km).
  */
 export function parseActivityPaceZones(
-  raw: Record<string, unknown>
+  raw: Record<string, unknown>,
+  type: number = COROS_PACE_ZONE_TYPE
 ): TrainingHubActivityZoneBucket[] {
   const seconds = (value: unknown) => {
     const scope = positiveNumber(value);
@@ -7716,7 +7740,7 @@ export function parseActivityPaceZones(
       continue;
     }
     const group = entry as Record<string, unknown>;
-    if (toOptionalNumber(group.type) !== COROS_PACE_ZONE_TYPE) {
+    if (toOptionalNumber(group.type) !== type) {
       continue;
     }
 
@@ -7927,7 +7951,9 @@ export function parseActivityDetail(raw: Record<string, unknown>): TrainingHubAc
     laps,
     dynamics: parseActivityDynamics(raw, summary),
     hrZones: parseActivityHrZones(raw),
+    hrZoneType: parseActivityHrZoneType(raw),
     paceZones: parseActivityPaceZones(raw),
+    adjustedPaceZones: parseActivityPaceZones(raw, COROS_ADJUSTED_PACE_ZONE_TYPE),
     effect: parseActivityEffect(summary),
     weather: parseActivityWeather(raw),
     track,

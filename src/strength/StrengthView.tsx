@@ -9,6 +9,9 @@ import {
 } from "lucide-react";
 import type { CoachOpenRequest, TrainingHubStatus } from "../../electron/types";
 import type { HeraclesRecordsApi } from "../heraclesrecords-api";
+import { ActivityZoneTimePanel } from "../training/components/ActivityZoneTimePanel";
+import { useHeartRateZoneModel } from "../training/useHeartRateZoneModel";
+import { useSessionZones } from "./useSessionZones";
 import type { SportScreenRequest } from "../training/types";
 import { epochMsFromCorosTime } from "../training/activityWindow";
 import { StrengthHero } from "./StrengthHero";
@@ -200,6 +203,9 @@ export function StrengthView({
       : AGGREGATE_SELECTION;
   const selectedEntry =
     selection === AGGREGATE_SELECTION ? undefined : sessionIndex.byId.get(selection);
+  // Read only for a session opened, and never for the toolbar's sample sessions.
+  const sessionZones = useSessionZones(api, selectedEntry?.session, corosConnected && !sampleMode);
+  const { model: zoneModel } = useHeartRateZoneModel({ api, corosConnected });
   const explorable = useMemo(
     () => new Set(analytics.exercises.map((exercise) => exercise.name)),
     [analytics.exercises]
@@ -512,6 +518,14 @@ export function StrengthView({
                     onSelectSession={setPickedSelection}
                   />
                 )}
+                {selectedEntry && sessionZones ? (
+                  <ActivityZoneTimePanel
+                    hrZones={sessionZones.hrZones}
+                    hrZoneType={sessionZones.hrZoneType}
+                    accountFamily={zoneModel?.family}
+                    frame="strength"
+                  />
+                ) : null}
               </article>
             </div>
           </div>

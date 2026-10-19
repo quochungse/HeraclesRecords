@@ -944,6 +944,23 @@ lives at module level for the same visit-to-visit reason — see `useCalendarDat
   with Running and were moved out of `src/running/` for that — none of them ever asked what
   sport they were reading. Anything else that both screens need goes the same way rather than
   being copied.
+- **Time in zones on every sport's own page** (`ActivityZoneTimePanel`, `src/training/zoneTime.ts`)
+  — the run, ride and hike pages and an opened Strength session, **not Activities**, which keeps
+  its zone bar. It draws COROS's own seconds per zone off the detail's `zoneList` (never
+  re-derived from the samples), every zone listed — one never reached reads 0, so a session is
+  read against the whole scale — with seconds stated under a minute. A run switches between
+  heart rate and pace (a trail run's pace is the GAP list, type 173, `adjustedPaceZones`); a
+  ride, a hike and a lifting session have heart rate only (a ride's power zones are the Power
+  panel's, and the pace zones COROS scores a ride or a hike on are a runner's). Three COROS
+  facts it rests on: **`zoneType` on an activity is not reliable** — runs a day apart on one
+  HR-reserve account came back 2 and 0 with identical bounds — so 0 falls back to the account's
+  model (`heartRateZoneFamily`, the screen's `useHeartRateZoneModel`); **pace has seven
+  buckets for six named zones**, because `ltspZone` splits Threshold at 100% of threshold speed
+  (69.5 / 82.7 / 91.7 / 100 / 102.2 / 112.9, probed 2026-10-19), so buckets 3 and 4 are drawn
+  as one Threshold row; and HR-reserve, LTHR and pace share the names Recovery … Anaerobic
+  Power while Max HR has its own. Strength's history carries sets only, so `useSessionZones`
+  asks for the opened session's COROS detail (a Hevy-only session has none; a failure is
+  silent). `npm run test:zone-time`.
 - **Cycling** (`src/cycling/`, built 2026-09-30) — Running's page built again for a bike: the
   same shape (a kind filter and a period, a hero, totals, a weekly chart, intensity beside a
   split by kind, a sortable list, a full-page detail that keeps the list's scroll) and **the
