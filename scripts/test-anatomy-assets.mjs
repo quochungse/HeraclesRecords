@@ -1,96 +1,65 @@
+// The Strength figure's baked body (public/assets/anatomy/hero), decoded as heroBody.ts decodes it: every block inside
+// its file and decodable by the meshopt decoder the page ships, sixteen groups that cover the muscle triangles, indices
+// inside their vertex buffers, a head for each figure, and a bust for her alone.
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
+import { gunzipSync } from "node:zlib";
+import { MeshoptDecoder } from "three/examples/jsm/libs/meshopt_decoder.module.js";
 
-const REQUIRED_STRUCTURES = [
-  "adductor_longus",
-  "adductor_magnus",
-  "adductor_brevis",
-  "anconeus",
-  "biceps_brachii",
-  "biceps_femoris",
-  "brachialis",
-  "brachioradialis",
-  "coracobrachialis",
-  "deltoid",
-  "erector_spinae_lumbar",
-  "external_oblique",
-  "forearm_extensors",
-  "forearm_flexors",
-  "gastrocnemius",
-  "gluteus_maximus",
-  "gluteus_medius",
-  "gracilis",
-  "infraspinatus",
-  "intrinsic_foot",
-  "intrinsic_hand",
-  "latissimus_dorsi",
-  "levator_scapulae",
-  "lower_leg_extensors",
-  "lower_trapezius",
-  "middle_trapezius",
-  "pectoralis_major",
-  "pectineus",
-  "peroneals",
-  "plantaris",
-  "posterior_deltoid",
-  "pronator_teres",
-  "rectus_abdominis",
-  "rectus_femoris",
-  "sartorius",
-  "semimembranosus",
-  "semitendinosus",
-  "serratus_anterior",
-  "soleus",
-  "sternocleidomastoid",
-  "supraspinatus",
-  "tensor_fasciae_latae",
-  "teres_major",
-  "teres_minor",
-  "tibialis_anterior",
-  "triceps_brachii",
-  "upper_trapezius",
-  "vastus_lateralis",
-  "vastus_medialis"
-];
+await MeshoptDecoder.ready;
+const dir = new URL("../public/assets/anatomy/hero/", import.meta.url);
+const manifest = JSON.parse(await readFile(new URL("hero.json", dir), "utf8"));
+const read = async (name) => gunzipSync(await readFile(new URL(`${name}.bin.gz`, dir)));
+const GROUPS = ["neck", "traps", "shoulders", "chest", "lats", "biceps", "triceps", "forearms", "abs", "obliques",
+  "lowerBack", "glutes", "quads", "hamstrings", "adductors", "calves"];
+assert.equal(manifest.version, 2, "meshopt-coded blocks");
+assert.deepEqual(manifest.groups, GROUPS, "group order");
+assert.equal(manifest.ranges.length, 16);
 
-async function readGlbJson(path) {
-  const bytes = await readFile(new URL(path, import.meta.url));
-  assert.equal(bytes.toString("ascii", 0, 4), "glTF", `${path} is not a GLB`);
-  const jsonLength = bytes.readUInt32LE(12);
-  return JSON.parse(bytes.toString("utf8", 20, 20 + jsonLength).trim());
+const slice = (file, name, [offset, length]) => {
+  assert(offset >= 0 && offset + length <= file.byteLength, `${name} lies inside its file`);
+  return file.subarray(offset, offset + length);
+};
+/** Vertex count, after checking the block decodes to it. */
+const vertices = (file, name, block) => {
+  const target = new Uint8Array(block[2] * 8);
+  MeshoptDecoder.decodeVertexBuffer(target, block[2], 8, slice(file, name, block));
+  return block[2];
+};
+const indices = (file, name, block) => {
+  const target = new Uint32Array(block[2]);
+  MeshoptDecoder.decodeIndexBuffer(new Uint8Array(target.buffer), block[2], 4, slice(file, name, block));
+  assert.equal(target.length % 3, 0, `${name} is whole triangles`);
+  return target;
+};
+const maxOf = (array) => array.reduce((m, v) => (v > m ? v : m), 0);
+
+const shared = await read("shared");
+const mIdx = indices(shared, "mIdx", manifest.shared.mIdx);
+const sIdx = indices(shared, "sIdx", manifest.shared.sIdx);
+const cIdx = indices(shared, "cIdx", manifest.shared.cIdx);
+let covered = 0;
+manifest.ranges.forEach(([start, end], index) => {
+  assert(end > start, `${GROUPS[index]} has triangles`);
+  assert.equal(start, covered, "ranges are contiguous");
+  covered = end;
+});
+assert.equal(covered * 3, mIdx.length, "the groups cover every muscle triangle");
+assert(maxOf(mIdx) < manifest.half, "muscle indices stay in the half");
+
+for (const sex of ["male", "female"]) {
+  const blocks = manifest[sex];
+  const own = await read(sex);
+  assert.equal(vertices(own, "mPos", blocks.mPos), manifest.half, `${sex}: one position per half vertex`);
+  assert(maxOf(sIdx) < vertices(own, "sPos", blocks.sPos), `${sex}: skeleton indices`);
+  assert(maxOf(cIdx) < vertices(own, "cPos", blocks.cPos), `${sex}: connective indices`);
+  const head = vertices(own, "hPos", blocks.hPos);
+  assert(head > 1000, `${sex}: a head`);
+  assert(maxOf(indices(own, "hIdx", blocks.hIdx)) < head, `${sex}: head indices`);
+  if (sex === "female") {
+    assert(maxOf(indices(own, "bIdx", blocks.bIdx)) < vertices(own, "bPos", blocks.bPos), "her bust's indices");
+  } else {
+    assert(!blocks.bPos && !blocks.bIdx, "his figure carries no bust");
+  }
 }
-
-const muscles = await readGlbJson("../public/assets/anatomy/muscular_lite.glb");
-const skeleton = await readGlbJson("../public/assets/anatomy/skeletal_lite.glb");
-const extras = (muscles.nodes ?? []).flatMap((node) =>
-  node.extras ? [node.extras] : []
-);
-const structures = new Set(extras.map((entry) => entry.structure_id));
-
-for (const structure of REQUIRED_STRUCTURES) {
-  assert(structures.has(structure), `missing muscle structure: ${structure}`);
-}
-assert(
-  extras
-    .filter((entry) => typeof entry.structure_id === "string")
-    .every((entry) => entry.source_side === "right"),
-  "muscle structures must come only from the atlas's intact right surface"
-);
-assert(
-  extras.some(
-    (entry) =>
-      entry.anatomy_id === "linea_alba" && entry.tissue_role === "connective"
-  ),
-  "missing connective linea alba metadata"
-);
-assert.equal(skeleton.meshes?.length, 1, "skeleton must remain one batched mesh");
-assert(
-  muscles.extensionsRequired?.includes("KHR_draco_mesh_compression"),
-  "muscle asset must remain Draco-compressed"
-);
-assert(
-  skeleton.extensionsRequired?.includes("KHR_draco_mesh_compression"),
-  "skeleton asset must remain Draco-compressed"
-);
-
-console.log("Anatomy assets preserve all required structures and linea alba metadata.");
+console.log("Strength figure assets: 16 groups, both figures and their heads, her bust alone.");

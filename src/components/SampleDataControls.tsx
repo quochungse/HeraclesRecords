@@ -8,6 +8,7 @@ import {
   setFigureSample,
   useFigureSamplePreset
 } from "../training/body/sampleFigure";
+import { HERO_SAMPLE_PRESETS, setHeroSample, useHeroSample } from "../strength/heroSample";
 
 type MainSampleKind = keyof SampleDataState;
 type SampleKind = MainSampleKind | "strength";
@@ -47,7 +48,8 @@ interface SampleDataControlsProps {
  * the athlete's whole history there, so a second press on the chosen one
  * switches it off. Overview's "Your physique" presets work the same way
  * (`sampleFigure.ts`): one body and recovery at a time, in place of the
- * profile's.
+ * profile's. The Strength figure's man and woman do the same for its sex
+ * (`heroSample.ts`).
  */
 export function SampleDataControls({
   api,
@@ -62,6 +64,7 @@ export function SampleDataControls({
   const [open, setOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const figureSample = useFigureSamplePreset();
+  const heroSample = useHeroSample();
 
   useEffect(() => {
     if (!api || !import.meta.env.DEV) {
@@ -125,7 +128,8 @@ export function SampleDataControls({
   const activeCount =
     SAMPLE_OPTIONS.filter((option) => isOn(option.value)).length +
     (recordsSample ? 1 : 0) +
-    (figureSample ? 1 : 0);
+    (figureSample ? 1 : 0) +
+    (heroSample ? 1 : 0);
   const triggerLabel = activeCount > 0 ? `Sample · ${activeCount}` : "Sample";
 
   return (
@@ -193,6 +197,32 @@ export function SampleDataControls({
                   aria-checked={checked}
                   title={preset.title}
                   onClick={() => onRecordsSampleChange(checked ? null : preset.value)}
+                >
+                  <span className="app-select-option-content">
+                    <span className="app-select-option-label">{preset.label}</span>
+                  </span>
+                  {checked ? (
+                    <Check
+                      className="app-select-option-check"
+                      size={15}
+                      strokeWidth={2.6}
+                      aria-hidden="true"
+                    />
+                  ) : null}
+                </button>
+              );
+            })}
+            {HERO_SAMPLE_PRESETS.map((preset) => {
+              const checked = heroSample === preset.value;
+              return (
+                <button
+                  key={preset.value}
+                  className={`app-select-option${checked ? " is-selected" : ""}`}
+                  type="button"
+                  role="menuitemradio"
+                  aria-checked={checked}
+                  title={preset.title}
+                  onClick={() => setHeroSample(checked ? null : preset.value)}
                 >
                   <span className="app-select-option-content">
                     <span className="app-select-option-label">{preset.label}</span>

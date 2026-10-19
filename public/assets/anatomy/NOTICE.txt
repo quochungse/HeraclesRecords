@@ -1,15 +1,21 @@
-Z-Anatomy anatomy models
-========================
+Strength figure assets
+======================
 
-These adapted 3D muscle, connective-tissue, and skeletal meshes are exported
-directly from Z-Anatomy
-(https://www.z-anatomy.com/), licensed CC BY-SA 4.0. Z-Anatomy includes
-material derived from BodyParts3D, copyright The Database Center for Life
-Science (DBCLS), also licensed CC BY-SA 4.0.
-
-The models were exported from the upstream Blender atlas at revision
-b16b4c2eb7de824722f5eef9d5f56c5569a3d640, then decimated, Draco-compressed,
-and adapted to the strength view by AtoZ. The muscular_lite.glb export retains
-Z-Anatomy's original linea alba mesh. Both GLB derivatives are distributed
-under the same CC BY-SA 4.0 license:
+The muscle, connective-tissue and skeletal geometry in hero/ is derived from
+Z-Anatomy (https://www.z-anatomy.com/), licensed CC BY-SA 4.0. Z-Anatomy
+includes material derived from BodyParts3D, copyright The Database Center for
+Life Science (DBCLS), also licensed CC BY-SA 4.0. The models were exported from
+the upstream Blender atlas at revision b16b4c2eb7de824722f5eef9d5f56c5569a3d640
+and then reshaped and baked for the Strength view. These derivatives are
+distributed under the same CC BY-SA 4.0 license:
 https://creativecommons.org/licenses/by-sa/4.0/
+
+The heads are built from "Stylized Anime Female Head" by Rodesqa
+(https://sketchfab.com/3d-models/stylized-anime-female-head-e8d04325a74e46a98a6494abe721a8b2),
+licensed CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/); the head and
+face only, decimated, uncoloured, the eyes smoothed, made less stylised, and
+reshaped for the man.
+
+The woman's bust is shaped from "female muscle human body" by mina
+(https://sketchfab.com/3d-models/female-muscle-human-body-aa022f8c27e04aea89e731f66484a299),
+licensed CC BY 4.0, rescaled and fitted to the figure.

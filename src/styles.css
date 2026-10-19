@@ -6323,7 +6323,7 @@ td span {
   --figure-skin-alpha: 1;
   --figure-line: 0.65;
   --figure-back-line: 0.3;
-  --figure-halo: 0.7;
+  --figure-halo: 0.1;
   --figure-skin: #060d16;
   --figure-dim: #3b5068;
   --figure-idle: #46b8ff;

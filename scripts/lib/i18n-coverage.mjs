@@ -27,6 +27,7 @@ export const SKIPPED_PATHS = [
   // The toolbar's Test update scenarios and the messages they leave.
   /[\\/]src[\\/]components[\\/]updateSimulation\.ts$/,
   /[\\/]src[\\/]strength[\\/]sampleSessions\.ts$/,
+  /[\\/]src[\\/]strength[\\/]heroSample\.ts$/,
   /[\\/]src[\\/]training[\\/]body[\\/]sampleFigure\.ts$/,
   // Coach's "Show context history", offered in development builds only.
   /[\\/]src[\\/]chat[\\/]ContextHistoryDialog\.tsx$/,
