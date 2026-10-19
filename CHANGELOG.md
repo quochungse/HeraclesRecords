@@ -7,9 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.1.2] - 2026-10-19
+
 ### What's new
 
-- **Strength** - the muscle figure follows the sex on your COROS profile: a gym-trained man, or a fit woman with her own proportions. A clay head now stands where the skull was, and the heat map runs in amber, from sand to ember, on a warmer light stage.
+- **Strength** - the muscle figure follows the sex on your COROS profile: a gym-trained man, or a fit woman with her own proportions, each with a face of their own. The heat map runs in amber, from sand to ember, and a muscle you point at stands out on the light theme too.
+- **Workout builder** - pick a muscle in the exercise picker and the movements that work it hardest come first, read from COROS's own catalogue.
+- **Where you've been** - every place on the globe is named, not only the six newest, and names that would overlap make room for each other.
+- **Activities** - a swim reads its pace per 100 m, and every sport reads the same on its screen as it does in Coach.
+
+### Fixed
+
+- Improve app performance and stability.
 
 ## [1.1.1] - 2026-10-12
 
