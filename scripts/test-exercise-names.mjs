@@ -10,6 +10,11 @@ const { resolveExerciseName } = await import(`${modUrl.href}?cacheBust=${Date.no
 assert.equal(resolveExerciseName("T1178"), "Two Arm Kettlebell Swings");
 assert.equal(resolveExerciseName("T1310"), "Farmers Walk");
 
+// T1016's catalogue overview is Chinese text rather than a `sid_` key, so the
+// dictionary is not generated from it; without its own entry the picker drew
+// the bare code and the movement could not be found by name.
+assert.equal(resolveExerciseName("T1016"), "Seated Dumbbell Press");
+
 // Custom exercise: rawName is human-readable and not a T#/S# code → use it.
 assert.equal(resolveExerciseName("Chaise", "Chaise"), "Chaise");
 

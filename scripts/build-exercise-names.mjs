@@ -8,10 +8,14 @@
 //   1. Obtain the catalogue JSON array once (e.g. via the coros-mcp Python
 //      package: authenticate, then call fetch_exercises(auth, 4)) and save it to
 //      a local file, e.g. /tmp/coros-catalog.json  (NOT committed — personal data).
-//   2. node scripts/build-exercise-names.mjs /tmp/coros-catalog.json
+//   2. node scripts/build-exercise-names.mjs /tmp/coros-catalog.json [en-US.json]
 //
-// Only built-in library codes (T####/S####) whose `overview` starts with `sid_`
-// are emitted. Custom exercises (personal names) are skipped.
+// Built-in library codes (T####/S####) whose `overview` starts with `sid_` are
+// emitted from it. A built-in whose overview is something else — T1016's is
+// Chinese text — is named from COROS's locale table, the app's own
+// `<userData>/coros-locale/en-US.json`, when it is passed as the second
+// argument; without it such a code is left out and the picker draws the bare
+// code. Custom exercises (personal names) are skipped.
 import fs from "node:fs";
 import path from "node:path";
 
@@ -21,6 +25,9 @@ if (!input) {
   process.exit(1);
 }
 const items = JSON.parse(fs.readFileSync(input, "utf8"));
+const localeStrings = process.argv[3]
+  ? JSON.parse(fs.readFileSync(process.argv[3], "utf8")).strings ?? {}
+  : {};
 const humanize = (s) =>
   s
     .replace(/^sid_[a-z]+_/, "")
@@ -32,8 +39,11 @@ const dict = {};
 for (const it of items) {
   const key = it.name;
   if (!key || !/^[TS]\d/.test(key)) continue;
-  if (!it.overview || !/^sid_/.test(it.overview)) continue;
-  dict[key] = humanize(it.overview);
+  if (it.overview && /^sid_/.test(it.overview)) {
+    dict[key] = humanize(it.overview);
+  } else if (localeStrings[key] && !/^[TS]\d/.test(localeStrings[key])) {
+    dict[key] = localeStrings[key];
+  }
 }
 const ordered = {};
 for (const k of Object.keys(dict).sort()) ordered[k] = dict[k];
