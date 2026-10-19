@@ -47,7 +47,8 @@ const script = `window.en_US={
   "P10300": "3x10 {'@'} tempo",
   "T1120": "Warm Up",
   "T4000": "Training",
-  "T1122": "Cool Down"
+  "T1122": "Cool Down",
+  "T1016": "Seated Dumbbell Press"
 }`;
 {
   const table = locale.parseCorosLocaleScript(script);
@@ -148,6 +149,25 @@ assert.deepEqual(plan.weekStages, [], "stage 0 is Not Set — twelve of them say
 // 6. What a save writes back is the program as COROS sent it
 assert.equal(ride.corosProgram.name, "P10281", "the raw program keeps its key, so an unedited save writes back exactly what came");
 assert.equal(ride.idInPlan, "1");
+
+// 7. A movement whose `overview` is not a `sid_` key is still named
+//    T1016 is a library strength movement whose overview is Chinese text, so the
+//    catalog name came out as the bare code: its workout step read "Training" and
+//    the editor showed "T1016". The locale table names it.
+{
+  const hub = await import(distUrl("trainingHubService.js"));
+  const capabilities = await import(distUrl("workoutCapabilities.js"));
+  const press = { id: "425828813574946816", name: "T1016", overview: "坐姿肩上哑铃推举" };
+  const named = hub.nameFromCorosLocale(press);
+  assert.equal(capabilities.workoutExerciseName(press), "T1016", "the row alone only has the code");
+  assert.equal(capabilities.workoutExerciseName(named), "Seated Dumbbell Press");
+  assert.equal(named.name, "T1016", "the key stays: a step is matched and saved by it");
+
+  const seated = { id: "1", name: "T1015", overview: "sid_strength_seated_front_press" };
+  assert.equal(hub.nameFromCorosLocale(seated), seated, "a row that already has a name is left alone");
+  const unknown = { id: "2", name: "T9998", overview: "?" };
+  assert.equal(hub.nameFromCorosLocale(unknown), unknown, "a code the table lacks stays a code");
+}
 
 // With no table at all, the keys are what shows — the state before this.
 locale.useCorosLocaleTable(null);

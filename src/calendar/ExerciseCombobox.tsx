@@ -77,6 +77,11 @@ export function ExerciseCombobox({
     () => labeledOptions.find((option) => option.id === selectedId),
     [labeledOptions, selectedId]
   );
+  /* A step read from COROS keeps its own `exerciseName`, which is a localization
+     key (`T1016`) whenever the library workout was built there. The catalog is
+     what an id means, so its name is drawn when the id is in it; the step's
+     own value stays what a save writes back. */
+  const shownValue = selectedOption?.label || value;
   const hasPreview = !hidePreview
     && Boolean(selectedOption?.media?.some((entry) => entry.videoUrl));
   const still = selectedOption?.media?.find((entry) => entry.coverUrl)?.coverUrl
@@ -87,9 +92,9 @@ export function ExerciseCombobox({
       <div className="exercise-combobox-picker">
         <button
           type="button"
-          className={`exercise-choice ${value ? "is-chosen" : "is-empty"}`}
+          className={`exercise-choice ${shownValue ? "is-chosen" : "is-empty"}`}
           aria-haspopup="dialog"
-          aria-label={value ? t("workout.exercise.chosen", { label, value }) : placeholder}
+          aria-label={shownValue ? t("workout.exercise.chosen", { label, value: shownValue }) : placeholder}
           disabled={disabled}
           onClick={() => setIsOpen(true)}
         >
@@ -103,9 +108,9 @@ export function ExerciseCombobox({
               />
             ) : <Dumbbell size={18} />}
           </span>
-          <span className="exercise-choice-name">{value || placeholder}</span>
+          <span className="exercise-choice-name">{shownValue || placeholder}</span>
           <span className="exercise-choice-action" aria-hidden="true">
-            {value ? t("workout.exercise.change") : t("workout.exercise.browse")}
+            {shownValue ? t("workout.exercise.change") : t("workout.exercise.browse")}
             <ChevronRight size={14} />
           </span>
         </button>

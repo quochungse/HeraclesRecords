@@ -132,6 +132,7 @@ import {
   workoutEditRevision,
   type WorkoutEditSource
 } from "./corosWorkoutEditor";
+import { corosText, loadCorosLocale } from "./corosLocale";
 import {
   WORKOUT_SPORT_CAPABILITIES,
   decodeCorosIntensity,
@@ -3565,6 +3566,25 @@ const workoutExerciseCatalogCache = new Map<
   { expiresAt: number; rows: Record<string, unknown>[] }
 >();
 
+/**
+ * A catalog row whose name `workoutExerciseName` can only give as a bare code.
+ *
+ * The name is read off `overview`, which is a `sid_…` key for nearly every
+ * movement. T1016's is Chinese text, so the name came out as `T1016` — in the
+ * picker, and in every workout that uses the movement, where a step with only
+ * a code is drawn as its kind ("Training") and edited as the code. COROS's
+ * locale table does name it, so the words are put on the row as `displayName`,
+ * which `workoutExerciseName` reads first and which every reader of the
+ * catalog (picker, search, name resolution) therefore shares.
+ */
+export function nameFromCorosLocale(row: Record<string, unknown>): Record<string, unknown> {
+  const codePattern = /^[TS]\d+$/i;
+  if (!codePattern.test(workoutExerciseName(row))) return row;
+  const key = typeof row.name === "string" ? row.name.trim() : "";
+  const words = key ? corosText(key) : "";
+  return words && !codePattern.test(words) ? { ...row, displayName: words } : row;
+}
+
 async function loadWorkoutExerciseCatalog(sport: WorkoutSport): Promise<Record<string, unknown>[]> {
   if (sport !== "strength" && sport !== "hyrox") return [];
   const auth = getStoredAuth();
@@ -3579,7 +3599,8 @@ async function loadWorkoutExerciseCatalog(sport: WorkoutSport): Promise<Record<s
     ...(auth?.userId ? { userId: auth.userId } : {}),
     keyword: ""
   });
-  const rows = exerciseCatalogRows(raw);
+  await loadCorosLocale().catch(() => undefined);
+  const rows = exerciseCatalogRows(raw).map(nameFromCorosLocale);
   workoutExerciseCatalogCache.set(cacheKey, {
     expiresAt: Date.now() + WORKOUT_CACHE_MS,
     rows
