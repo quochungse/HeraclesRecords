@@ -147,6 +147,12 @@ interface Palette {
    * everything around it instead, and keeps barely any glow.
    */
   focusGlow: number;
+  /**
+   * How much lighter and more saturated a hovered or selected muscle turns, as
+   * an HSL lightness step (0 keeps its colour). It does on a light stage what
+   * the glow does on a dark one, without the glow's white.
+   */
+  focusLift: number;
 }
 
 function readPalette(element: HTMLElement): Palette {
@@ -176,7 +182,8 @@ function readPalette(element: HTMLElement): Palette {
     sky: readColor("--m3d-sky", "#93b8dc"),
     ground: readColor("--m3d-ground", "#151a1f"),
     exposure: readNumber("--m3d-exposure", 1),
-    focusGlow: readNumber("--m3d-focus-glow", 0.42)
+    focusGlow: readNumber("--m3d-focus-glow", 0.42),
+    focusLift: readNumber("--m3d-focus-lift", 0)
   };
 }
 
@@ -790,9 +797,15 @@ function createWorld(
     const colorStep = reducedMotion ? 1 : 1 - Math.exp(-dt * 8);
     for (const [id, group] of groups) {
       const dimmed = selected !== null && selected !== id;
-      const target = dimmed
+      const focused = id === active || id === selected;
+      let target = dimmed
         ? group.scratch.copy(group.target).lerp(palette.base, 0.72)
         : group.target;
+      if (focused && palette.focusLift > 0) {
+        target = group.scratch
+          .copy(target)
+          .offsetHSL(0, palette.focusLift * 0.8, palette.focusLift);
+      }
       if (colorDistance(group.material.color, target) > COLOR_EPSILON) {
         group.material.color.lerp(target, colorStep);
         animating = true;
@@ -800,7 +813,6 @@ function createWorld(
         group.material.color.copy(target);
       }
       group.material.emissive.copy(group.material.color);
-      const focused = id === active || id === selected;
       const wantedGlow = focused ? palette.focusGlow : dimmed ? 0 : 0.025;
       if (Math.abs(group.material.emissiveIntensity - wantedGlow) > 0.002) {
         group.material.emissiveIntensity +=

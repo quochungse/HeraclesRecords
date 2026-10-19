@@ -68,7 +68,7 @@ export const MUSCLES: MuscleMeta[] = [
     get anatomy() {
       return t("strength.muscle.traps.anatomy");
     },
-    view: "both",
+    view: "back",
     region: "upper",
     pattern: "pull"
   },
