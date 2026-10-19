@@ -397,6 +397,20 @@ assert.deepEqual(
   "a strength session carries no distance and no pace"
 );
 
+// Any other sport that covers ground reads km/h, as Coach's card reads it — a
+// ski run at 2:00 /km says nothing — and a gym session that logged a distance
+// still has no pace.
+assert.deepEqual(
+  factValues(activity({ sportType: 500, duration: 3600, distance: 20_000 })),
+  ["1h", "20.0 km", "20.0 km/h"],
+  "a ski session is read by speed"
+);
+assert.deepEqual(
+  factValues(activity({ sportType: 402, duration: 3600, distance: 2_000 })),
+  ["1h", "2.00 km"],
+  "a strength session's distance carries no pace"
+);
+
 assert.deepEqual(
   factValues(activity({ sportType: 100, duration: 1800, distance: 5000 })),
   ["30m", "5.00 km", "6:00 /km"],

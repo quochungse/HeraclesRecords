@@ -206,9 +206,10 @@ export function ActivityDetailPanel({
 
   const startTime = detail.startTime ?? listActivity?.startTime;
   const showLaps = hasPopulatedLaps(detail);
-  const swim = isSwimSportType(detail.sportType ?? listActivity?.sportType);
+  const sportType = detail.sportType ?? listActivity?.sportType;
+  const swim = isSwimSportType(sportType);
   // A ride and a hike are read in km/h; see `isSpeedSport`.
-  const readsSpeed = isSpeedSport(detail.sportType ?? listActivity?.sportType, sportName);
+  const readsSpeed = isSpeedSport(sportType, sportName);
   const distance = detail.distance ?? listActivity?.distance;
   const duration = detail.duration ?? listActivity?.duration;
   const performance = distance && duration
