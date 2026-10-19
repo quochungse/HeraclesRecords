@@ -350,8 +350,38 @@ assert.doesNotMatch(gymText, /dynamics:/);
 assert.doesNotMatch(gymText, /Conditions:/);
 assert.doesNotMatch(gymText, /HR zones/);
 assert.match(gymText, /Training effect: aerobic 1\.6\/5/);
-assert.match(gymText, /Lap \| Distance \| Duration \| Avg HR \| Max HR \| Pace\n/);
-assert.match(gymText, /1 \| — \| 0:47 \| 104 \| 136 \| —/, "a 47 s gym lap is not 1:18:32");
+// Its laps are sets and rests: no Distance or Pace column of dashes for the
+// coach to read back as figures.
+assert.match(gymText, /Lap \| Duration \| Avg HR \| Max HR\n/);
+assert.match(gymText, /1 \| 0:47 \| 104 \| 136$/m, "a 47 s gym lap is not 1:18:32");
+assert.doesNotMatch(gymText, /Pace|Distance|Speed/);
+
+// A hike reads km/h, as Hiking does, never 19:40/km.
+const hikeText = formatActivityDetailForChat(
+  parseActivityDetail({
+    labelId: "act-hike-1",
+    summary: { name: "Hike", sportType: 104, totalTime: 1080000, distance: 1200000 },
+    lapList: [{ type: 2, lapItemList: [{ time: 120000, distance: 100000, avgHr: 120, maxHr: 130 }] }]
+  }),
+  false,
+  "metric"
+);
+assert.match(hikeText, /Avg speed: 4\.0 km\/h/);
+assert.match(hikeText, /Lap \| Distance \| Duration \| Avg HR \| Max HR \| Speed\n/);
+assert.doesNotMatch(hikeText, /\/km\b/);
+
+// A swim reads a pace per 100 m.
+const swimText = formatActivityDetailForChat(
+  parseActivityDetail({
+    labelId: "act-swim-1",
+    summary: { name: "Pool", sportType: 300, totalTime: 180000, distance: 150000 },
+    lapList: [{ type: 2, lapItemList: [{ time: 12000, distance: 10000, avgHr: 130, maxHr: 140 }] }]
+  }),
+  false,
+  "metric"
+);
+assert.match(swimText, /Avg pace: 2:00 \/100m/);
+assert.match(swimText, /1 \| 100 m \| 2:00 \| 130 \| 140 \| 2:00 \/100m/);
 
 // Cycling labels cadence as rpm.
 const bikeText = formatActivityDetailForChat(
@@ -550,8 +580,7 @@ const flatText = formatActivityDetailForChat(
 assert.match(flatText, /Elevation profile: flat — the recorded altitude varies by less than 10 m/);
 
 // --- Strength sets reach the coach ---
-const strengthText = formatActivityDetailForChat(
-  parseActivityDetail({
+const strengthDetail = parseActivityDetail({
     labelId: "act-gym-3",
     summary: {
       name: "Lower body",
@@ -578,16 +607,46 @@ const strengthText = formatActivityDetailForChat(
         ]
       }
     ]
-  }),
-  false,
-  "metric"
-);
+  });
+const strengthText = formatActivityDetailForChat(strengthDetail, false, "metric");
 assert.match(strengthText, /Strength: 2 exercises · 4 sets · 42 reps · 4,?200 kg total volume/);
 assert.match(strengthText, /- T1041 — 2 sets — 18 reps: 60 kg x10, 70 kg x8/);
 assert.match(
   strengthText,
   /- Bulgarian Split Squat — 2 sets — 24 reps: 20 kg x12, 20 kg x12/,
   "a custom exercise is named, a library code is printed as the code"
+);
+
+// The card lists the exercises in place of the laps, which are sets and rests
+// with nothing to say which is which.
+const strengthPreview = buildActivityVisualPreview(strengthDetail, "req-gym-3");
+assert.equal(strengthPreview?.reading, "sets");
+assert.equal(strengthPreview?.sections.laps, undefined);
+assert.deepEqual(strengthPreview?.sections.strength?.exercises, [
+  { nameKey: "T1041", sets: 2, reps: 18, minWeightKg: 60, maxWeightKg: 70, volumeKg: 1160 },
+  {
+    nameKey: "S9999",
+    rawName: "Bulgarian Split Squat",
+    sets: 2,
+    reps: 24,
+    minWeightKg: 20,
+    maxWeightKg: 20,
+    volumeKg: 480
+  }
+]);
+
+// A custom sport is read by its name, which only the main process has: the
+// card stores the reading so the renderer does not fall back to the code.
+assert.equal(
+  buildActivityVisualPreview(
+    parseActivityDetail({
+      labelId: "act-custom-run",
+      summary: { name: "Beach", sportType: 98, sportName: "Beach Run", totalTime: 300000, distance: 1000000 },
+      lapList: [{ type: 2, lapItemList: [{ time: 30000, distance: 100000, avgHr: 140 }] }]
+    }),
+    "req-custom"
+  )?.reading,
+  "pace"
 );
 
 // A run has no strength breakdown and gains no empty section.
@@ -616,6 +675,53 @@ const seriesTable = formatActivitySeriesForChat(
 assert.match(seriesTable, /Time \| Distance \| HR \| Pace \| Power \| Alt \(m\) \| Cad \| GCT \(ms\)/);
 assert.doesNotMatch(seriesTable, /Stride \(m\)/, "an unrecorded channel gets no column");
 assert.doesNotMatch(seriesTable, /Vert ratio/);
+
+// A gym session's series is heart rate over time: no Distance, Pace, Power
+// or altitude column of dashes.
+const gymSeriesTable = formatActivitySeriesForChat(
+  parseActivityDetail({
+    labelId: "act-gym-series",
+    summary: { sportType: 402, totalTime: 300000 },
+    frequencyList: Array.from({ length: 8 }, (_, index) => ({
+      time: index * 42857,
+      heartRate: 100 + index,
+      altitude: 1200
+    }))
+  }).series,
+  "metric",
+  false,
+  false,
+  false
+);
+assert.match(gymSeriesTable, /^Time \| HR$/m);
+
+// And its card draws heart rate against the clock, with nothing else beside it.
+const gymPreview = buildActivityVisualPreview(
+  parseActivityDetail({
+    labelId: "act-gym-card",
+    summary: { name: "Full vai tay", sportType: 402, totalTime: 300000 },
+    frequencyList: Array.from({ length: 10 }, (_, index) => ({
+      time: index * 30000,
+      heartRate: 100 + index,
+      pace: 900,
+      cadence: 20,
+      altitude: 1200 + index * 500
+    })),
+    lapList: [{ type: 2, lapItemList: [
+      { time: 4700, avgHr: 104, maxHr: 136 },
+      { time: 6100, avgHr: 110, maxHr: 127 }
+    ] }]
+  }),
+  "req-gym"
+);
+assert.deepEqual(Object.keys(gymPreview?.sections ?? {}).sort(), ["hr", "laps"]);
+assert.equal(gymPreview?.sections.hr?.chartKind, "series");
+assert.ok(
+  gymPreview?.sections.hr?.series?.every(
+    (point) => point.elapsed !== undefined && point.distance === undefined
+  ),
+  "a gym session's heart rate runs along activity time"
+);
 
 // Imperial: the bracketed change follows the unit printed either side of the
 // arrow. Computing it in metres and printing it beside feet, or in seconds per

@@ -158,6 +158,7 @@ import {
   decodeStsCredentials
 } from "./corosUploadConfig";
 import { parseStrengthDetail } from "./strengthDetail";
+import { formatSwimPace } from "./activityReading";
 import {
   clearStoredCorosCredentials,
   getStoredCorosCredentials,
@@ -7031,8 +7032,9 @@ function formatElapsedClock(seconds: number): string {
  * Columns added only when some sample carries them, so a wrist-only run keeps
  * the four-column table it had before and a Pace Pro run with a pod gains the
  * altitude and running-form columns. Distance, HR, pace and power stay
- * unconditional: they are what a coach reads first, and a dash reads better
- * than a table whose shape moves between activities.
+ * unconditional on anything that moves: they are what a coach reads first, and
+ * a dash reads better than a table whose shape moves between activities. A gym
+ * session has HR alone.
  */
 function optionalSeriesColumns(unitSystem: UnitSystem): SeriesColumn[] {
   return [
@@ -7055,23 +7057,30 @@ export function formatActivitySeriesForChat(
   points: TrainingHubActivitySeriesPoint[],
   unitSystem: UnitSystem = "metric",
   swim = false,
-  cycling = false
+  /** A ride's, a hike's or any other non-foot sport's movement, read in km/h. */
+  speed = false,
+  /** False for a gym session: heart rate over time, no distance, pace or power. */
+  moves = true
 ): string {
   if (points.length === 0) {
     return "Time series: no HR/pace/power samples available.";
   }
 
   const hasElapsed = points.some((point) => point.elapsed !== undefined);
-  const optional = optionalSeriesColumns(unitSystem).filter((column) =>
-    points.some((point) => column.value(point) !== undefined)
-  );
+  // A gym session carried Distance, Pace and Power on every row, all dashes,
+  // which the model read as figures to talk about.
+  const optional = moves
+    ? optionalSeriesColumns(unitSystem).filter((column) =>
+        points.some((point) => column.value(point) !== undefined)
+      )
+    : [];
 
   const header = [
     hasElapsed ? "Time" : undefined,
-    "Distance",
+    moves ? "Distance" : undefined,
     "HR",
-    cycling ? "Speed" : "Pace",
-    "Power",
+    moves ? (speed ? "Speed" : swim ? "Pace /100" : "Pace") : undefined,
+    moves ? "Power" : undefined,
     ...optional.map((column) => column.header)
   ]
     .filter(Boolean)
@@ -7084,16 +7093,22 @@ export function formatActivitySeriesForChat(
           ? formatElapsedClock(point.elapsed)
           : "—"
         : undefined,
-      point.distance !== undefined
-        ? formatDistanceValue(point.distance, unitSystem, { swim })
-        : "—",
+      moves
+        ? point.distance !== undefined
+          ? formatDistanceValue(point.distance, unitSystem, { swim })
+          : "—"
+        : undefined,
       point.hr !== undefined ? `${point.hr}` : "—",
-      point.pace !== undefined
-        ? cycling
-          ? formatSpeedValue(3600 / point.pace, unitSystem)
-          : formatPaceValue(point.pace, unitSystem).replace(" /", "/")
-        : "—",
-      point.power !== undefined ? `${point.power} W` : "—",
+      moves
+        ? point.pace !== undefined
+          ? speed
+            ? formatSpeedValue(3600 / point.pace, unitSystem)
+            : swim
+              ? formatSwimPace(point.pace, unitSystem).replace(" /", "/")
+              : formatPaceValue(point.pace, unitSystem).replace(" /", "/")
+          : "—"
+        : undefined,
+      moves ? (point.power !== undefined ? `${point.power} W` : "—") : undefined,
       ...optional.map((column) => column.value(point) ?? "—")
     ]
       .filter((cell) => cell !== undefined)

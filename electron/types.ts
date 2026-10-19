@@ -1,4 +1,5 @@
 import type { CoachStyle } from "./coachStyles";
+import type { ActivityReading } from "./activityReading";
 
 /** User-selected measurement system for Heracles Records presentation and writes. */
 export type UnitSystem = "metric" | "imperial";
@@ -2848,10 +2849,33 @@ export interface ActivityVisualChannelSection {
 
 export type ActivityVisualHrSection = ActivityVisualChannelSection;
 
+/**
+ * One exercise of a gym session as the card lists it: the sets, the reps, the
+ * lightest and heaviest load and the volume. A gym session's laps are its sets
+ * and rests with nothing to say which is which, so this replaces them.
+ */
+export interface ActivityVisualStrengthExercise {
+  /** "T####"/"S####" library code, or a custom name; the renderer names it. */
+  nameKey: string;
+  rawName?: string;
+  sets: number;
+  reps: number;
+  /** Kilograms, absent for a bodyweight exercise. */
+  minWeightKg?: number;
+  maxWeightKg?: number;
+  volumeKg?: number;
+}
+
 export interface ActivityVisualPreview {
   previewId: string;
   activityId: string;
   sportType?: number;
+  /**
+   * How the sport is read (`activityReading`), decided where the sport's name
+   * is known: a custom sport's code says nothing, its name does. Absent on a
+   * card stored before it, which falls back to the code.
+   */
+  reading?: ActivityReading;
   name?: string;
   startTime?: string;
   avgHr?: number;
@@ -2863,6 +2887,7 @@ export interface ActivityVisualPreview {
     cadence?: ActivityVisualChannelSection;
     elevation?: { points: TrainingHubTrackPoint[] };
     laps?: ActivityVisualLapPoint[];
+    strength?: { exercises: ActivityVisualStrengthExercise[] };
   };
 }
 
