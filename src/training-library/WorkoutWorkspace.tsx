@@ -676,8 +676,12 @@ export function WorkoutWorkspace({
                         data-workout-id={workout.id}
                         data-accent={sport ?? "other"}
                         style={sportAccentStyle(sport)}
+                        // The whole row opens the workout, not only the name: the
+                        // Exercises and Sets figures sit outside the button. The
+                        // button stays the keyboard target and its click bubbles here.
+                        onClick={() => setActiveId(workout.id)}
                       >
-                        <button type="button" className="tl-row-open" onClick={() => setActiveId(workout.id)}>
+                        <button type="button" className="tl-row-open">
                           <span className="tl-row-name">
                             {workout.favorite ? (
                               <Heart size={12} fill="currentColor" strokeWidth={0} aria-label={t("library.w.favorite")} />

@@ -1317,6 +1317,7 @@
 .tl-row {
   align-items: center;
   border-bottom: 1px solid var(--tl-rule-soft);
+  cursor: pointer;
   transition: background var(--dur-fast) var(--ease);
 }
 
