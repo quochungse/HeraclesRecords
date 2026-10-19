@@ -80,7 +80,7 @@ export function BodyFigure({ sex, shape, firmness, level }: BodyFigureProps) {
             units, so both keep their share of the figure at any size. */}
         <filter id={`${id}-bloom`} x="-10%" y="-5%" width="120%" height="110%">
           <feGaussianBlur in="SourceGraphic" stdDeviation="3" result="near" />
-          <feComposite in="SourceGraphic" in2="near" operator="arithmetic" k2="1" k3="0.6" />
+          <feComposite in="SourceGraphic" in2="near" operator="arithmetic" k2="1" k3="0.35" />
         </filter>
         <filter id={`${id}-halo`} x="-30%" y="-15%" width="160%" height="130%">
           <feGaussianBlur stdDeviation="60" />
