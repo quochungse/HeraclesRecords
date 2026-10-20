@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.2.0] - 2026-10-20
+
+### What's new
+- **Running efficiency** - how much speed a road or track run bought for the heart rate it cost, on your COROS VO₂max scale and against your usual from the six weeks before, with how well you held it to the end. It is on the Running screen and on each run's page, and replaces Aerobic efficiency.
+- **Time in zones** - the run, ride and hike pages and an opened Strength session show the time in every zone, as COROS scored it. A run switches between heart rate and pace.
+- **Performance chart** - every surge and stop is drawn rather than averaged away, and the chart can split into two plots on one clock: what you produced above, what it cost below. Grade-adjusted pace is called Effort pace, as COROS calls it.
+- **Training labels** - every run and ride is named by what it trained: Recovery, Aerobic, Tempo, Threshold, VO2 Max or Anaerobic, beside its shape, such as Intervals 6 × 1000 m, strides or a long run. The label is on Activities, on each Running and Cycling row and on the session's page, which says why it was given.
+
+
+### Fixed
+- **Workouts and plans on COROS** - written the way COROS's own web app writes them: a strength session shows its muscle map in COROS, steps are named on the watch in your language, and moving a plan's session on the calendar keeps it in its plan.
+- The weekly volume charts no longer write the same number twice on their axis.
+- Improve app performance and stability.
+
 ## [1.1.2] - 2026-10-19
 
 ### What's new
