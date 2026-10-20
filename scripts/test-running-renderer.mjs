@@ -1259,7 +1259,7 @@ async function main() {
       true
     );
     assert.ok(chips.includes("Climbing rate"), `a trail run's chart reads the climbing rate: ${chips}`);
-    assert.ok(chips.includes("Grade-adjusted pace") && chips.includes("Pace"), `and pace, as a run: ${chips}`);
+    assert.ok(chips.includes("Effort pace") && chips.includes("Pace"), `and pace, as a run: ${chips}`);
     assert.ok(!chips.includes("Speed"), `never a km/h: ${chips}`);
     for (const label of ["Terrain", "Descending", "Highest point", "Climbing rate", "1 ascent · 1 descent"]) {
       assert.equal(await hasText(label), true, `the trail page states ${label}`);

@@ -792,4 +792,109 @@ assert.equal(countsForEfficiency(run({ duration: 3600, avgHr: 140 }), scale), tr
   );
 }
 
+// The chart's rows keep every peak and trough of the samples: a surge shorter
+// than a bucket is drawn at its full height, not averaged down to a ripple.
+{
+  const { envelopeActivitySeries } = await import(
+    `${pathToFileURL(path.join(repoRoot, "electron", "activitySeries.ts")).href}${bust}`
+  );
+  const samples = Array.from({ length: 3600 }, (_, index) => ({
+    elapsed: index,
+    distance: index * 2.8,
+    altitude: 20 + Math.floor(index / 100),
+    // Steady at 150 bpm but for one three-second surge to 180 and one dip to 120.
+    hr: index >= 1000 && index < 1003 ? 180 : index >= 2000 && index < 2003 ? 120 : 150,
+    pace: 380
+  }));
+  const rows = envelopeActivitySeries(samples, 1000);
+  assert.ok(rows.length <= 1000, "no more rows than asked for");
+  assert.equal(Math.max(...rows.map((row) => row.hr)), 180, "the surge keeps its height");
+  assert.equal(Math.min(...rows.map((row) => row.hr)), 120, "and the dip its depth");
+  assert.ok(
+    rows.every((row, index) => index === 0 || row.elapsed >= rows[index - 1].elapsed),
+    "the rows run forward in time"
+  );
+  assert.ok(
+    rows.every((row) => samples.some((sample) => sample.elapsed === row.elapsed && sample.altitude === row.altitude)),
+    "a row stands where a sample was, at that sample's elevation"
+  );
+  const short = samples.slice(0, 600);
+  assert.deepEqual(envelopeActivitySeries(short, 1000), short, "a short series is drawn as recorded");
+}
+
+// Split, the chart is two plots with two axes each: the cap counts within the
+// pressed channel's group, every plot opens on something, and rejoining keeps
+// one channel of each group rather than the last two pressed.
+{
+  const { availableActivityChannels, canSplitActivityChannels, fitActivityChannels, toggleActivityChannel } =
+    await import(`${pathToFileURL(path.join(repoRoot, "src", "training", "activityChannels.ts")).href}${bust}`);
+  const available = availableActivityChannels(
+    Array.from({ length: 60 }, (_, index) => ({
+      elapsed: index,
+      distance: index * 3,
+      pace: 360,
+      hr: 150,
+      cadence: 176,
+      strideLength: 1.2,
+      power: 260
+    })),
+    "pace"
+  );
+  assert.equal(canSplitActivityChannels(available), true);
+  assert.equal(
+    canSplitActivityChannels(availableActivityChannels([{ elapsed: 0, hr: 120 }, { elapsed: 1, hr: 121 }], "pace")),
+    false,
+    "heart rate alone has nothing to split from"
+  );
+  assert.deepEqual(toggleActivityChannel(["pace", "hr"], "cadence", true), ["pace", "hr", "cadence"]);
+  assert.deepEqual(
+    toggleActivityChannel(["pace", "hr", "cadence"], "strideLength", true),
+    ["pace", "cadence", "strideLength"],
+    "a third channel below drops the oldest one below, never the pace"
+  );
+  assert.deepEqual(
+    toggleActivityChannel(["pace", "hr"], "power", true),
+    ["pace", "hr", "power"],
+    "power is output: it joins pace above, and heart rate stays"
+  );
+  assert.deepEqual(
+    fitActivityChannels(["power", "hr"], available, true),
+    ["power", "hr"],
+    "a ride's opening pair splits one above, one below"
+  );
+  assert.deepEqual(toggleActivityChannel(["pace", "hr"], "cadence"), ["hr", "cadence"], "combined, the cap is two in all");
+  assert.deepEqual(fitActivityChannels(["hr"], available, true), ["pace", "hr"], "an empty plot opens on its first channel");
+  assert.deepEqual(fitActivityChannels(["pace", "cadence", "power"], available, false), ["pace", "cadence"]);
+}
+
+// Smoothing evens out what one second of GPS or a single stride gets wrong,
+// and nothing else: heart rate stays as recorded, a stop stays a gap, a jump in
+// the clock is never averaged across, and paces average as speeds.
+{
+  const { smoothActivitySeries } = await import(
+    `${pathToFileURL(path.join(repoRoot, "electron", "activitySeries.ts")).href}${bust}`
+  );
+  // GPS jitter around 5:00 /km, a stop with no pace at 40–44 s, and a dropout:
+  // the clock jumps from 59 to 300, where the runner is suddenly at 4:00.
+  const samples = [
+    ...Array.from({ length: 60 }, (_, index) => ({
+      elapsed: index,
+      hr: 140 + (index % 7),
+      ...(index >= 40 && index < 45 ? {} : { pace: index % 2 === 0 ? 270 : 330 })
+    })),
+    ...Array.from({ length: 20 }, (_, index) => ({ elapsed: 300 + index, hr: 160, pace: 240 }))
+  ];
+  const smoothed = smoothActivitySeries(samples);
+  const harmonic = 2 / (1 / 270 + 1 / 330);
+  const steady = smoothed.slice(5, 35).map((point) => point.pace);
+  assert.ok(
+    steady.every((pace) => Math.abs(pace - harmonic) < 12),
+    "jitter of ±30 s/km is evened out to within a few seconds"
+  );
+  assert.deepEqual(smoothed.map((point) => point.hr), samples.map((point) => point.hr), "heart rate is untouched");
+  assert.ok(smoothed.slice(40, 45).every((point) => point.pace === undefined), "a stop stays a gap");
+  assert.ok(Math.abs(smoothed[60].pace - 240) < 1e-9, "nothing from before the jump bleeds across it");
+  assert.equal(samples[0].pace, 270, "the recorded samples are not written to");
+}
+
 console.log("run metrics: OK");

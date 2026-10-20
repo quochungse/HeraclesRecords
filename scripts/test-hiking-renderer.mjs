@@ -322,7 +322,7 @@ async function main() {
       true
     );
     assert.ok(chips.includes("Climbing rate") && chips.includes("Speed"), `a hike's chart reads climbing rate and speed: ${chips}`);
-    assert.ok(!chips.includes("Pace") && !chips.includes("Grade-adjusted pace"), `and no pace: ${chips}`);
+    assert.ok(!chips.includes("Pace") && !chips.includes("Effort pace"), `and no pace: ${chips}`);
     assert.equal(await noPace(), true, "no pace on the page either");
 
     for (const label of ["Moving time", "Total time", "Highest point", "Climbing rate", "Vs Naismith", "Terrain", "Rests"]) {

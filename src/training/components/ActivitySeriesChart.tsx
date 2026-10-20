@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
 import {
   Area,
   Brush,
@@ -19,7 +19,7 @@ import type {
   TrainingHubActivityZoneBucket,
   UnitSystem
 } from "../../../electron/types";
-import { downsampleActivitySeries } from "../../../electron/activitySeries";
+import { envelopeActivitySeries, smoothActivitySeries } from "../../../electron/activitySeries";
 import { OptionChips, OptionGroup } from "../../components/OptionGroup";
 import { useTheme } from "../../theme/ThemeProvider";
 import { useUnitSystem } from "../../units/UnitSystemProvider";
@@ -41,24 +41,60 @@ import {
   defaultSelectedChannels,
   activityChannel,
   activityChannelColors,
+  activityChannelGroup,
+  canSplitActivityChannels,
+  fitActivityChannels,
   toggleActivityChannel,
   withSpeed,
   withVerticalSpeed,
+  type ActivityChannelDefinition,
+  type ActivityChannelGroup,
   type ActivityChannelKey,
   type ActivityChannelPoint,
   type ActivityMotion
 } from "../activityChannels";
 import { formatDecimal, t } from "../../i18n/core";
+import {
+  defineSelectionPreference,
+  selectionIsBoolean,
+  useSelectionPreference
+} from "../../preferences/selectionPreferences";
 
 /**
- * How many points reach recharts.
+ * How many rows reach recharts.
  *
  * A real run is one sample a second — 5 149 of them on an 86-minute easy run —
  * and handing that to an SVG chart costs a second of layout per redraw for
- * detail no screen can show. Four hundred is roughly one point per two pixels
- * at full width, so the line is already smoother than the display.
+ * detail no screen can show. A thousand is about one row per pixel of a full
+ * width plot, and each bucket keeps its lowest and highest reading
+ * (`envelopeActivitySeries`), so a surge or a stop shorter than a bucket is
+ * still drawn at its full height. It was 400 bucket means: a bucket of nine
+ * seconds on an hour's run, and every peak in it averaged down to a ripple.
  */
-const CHART_POINTS = 400;
+const CHART_POINTS = 1000;
+
+const COMBINED_HEIGHT = 340;
+/**
+ * Split, the movement plot is the shorter one: it draws no time axis of its own
+ * (the body plot's, under it, is the same clock) and the brush sits under the
+ * body plot.
+ */
+const SPLIT_TOP_HEIGHT = 200;
+const SPLIT_BOTTOM_HEIGHT = 262;
+
+/** Axis ids a stacked plot draws empty, to keep its gutters as wide as its neighbour's. */
+const SPARE_LEFT_AXIS = "spare-left";
+const SPARE_RIGHT_AXIS = "spare-right";
+
+/**
+ * Whether the chart is drawn as one plot or as two — the movement above, the
+ * body below. One choice for every sport's page, a preference that syncs.
+ */
+const SPLIT_PREFERENCE = defineSelectionPreference<boolean>({
+  key: "activity.chart.split",
+  defaultValue: false,
+  validate: selectionIsBoolean
+});
 
 export type ActivitySeriesAxis = "elapsed" | "distance";
 
@@ -94,7 +130,6 @@ type ChartRow = ActivityChannelPoint & {
   x: number;
 };
 
-/** What one whole activity is called, by how it moves. */
 /** Which activity the chart is about, for its two sentences that name it. */
 const ACTIVITY_NOUN: Record<ActivityMotion, "run" | "ride" | "hike"> = {
   pace: "run",
@@ -274,7 +309,9 @@ export function ActivitySeriesChart({
   const palette = useMemo(() => activityChannelColors(theme), [theme]);
 
   const points = useMemo<ActivityChannelPoint[]>(() => {
-    const sampled = downsampleActivitySeries([...series], CHART_POINTS);
+    // Smoothed first, then reduced: the envelope keeps a bucket's extremes, and
+    // on raw GPS pace those are the noise, not the run.
+    const sampled = envelopeActivitySeries(smoothActivitySeries(series), CHART_POINTS);
     if (motion === "hike") {
       return withVerticalSpeed(withSpeed(sampled));
     }
@@ -296,6 +333,12 @@ export function ActivitySeriesChart({
   const [selected, setSelected] = useState<ActivityChannelKey[]>([]);
   const [showAltitude, setShowAltitude] = useState(true);
   const [range, setRange] = useState<{ start: number; end: number } | null>(null);
+  const [splitPreference, setSplitPreference] = useSelectionPreference(SPLIT_PREFERENCE);
+  const splittable = canSplitActivityChannels(available);
+  const split = splitPreference && splittable;
+  // One id per mounted chart: it names the elevation gradients and, split, ties
+  // the two plots' tooltip and brush together — and nothing on another screen.
+  const syncId = `activity-chart-${useId().replace(/[^\w-]/g, "")}`;
 
   // A different set of channels means different chips; re-open on their
   // defaults rather than leaving chips selected that have no readings. Keyed on
@@ -305,8 +348,16 @@ export function ActivitySeriesChart({
   const availableKey = available.map((channel) => channel.key).join(",");
   const availableRef = useRef(available);
   availableRef.current = available;
+  const splitRef = useRef(split);
+  splitRef.current = split;
   useEffect(() => {
-    setSelected(defaultSelectedChannels(availableRef.current, motion));
+    setSelected(
+      fitActivityChannels(
+        defaultSelectedChannels(availableRef.current, motion),
+        availableRef.current,
+        splitRef.current
+      )
+    );
     setRange(null);
   }, [availableKey, motion]);
 
@@ -399,9 +450,14 @@ export function ActivitySeriesChart({
         : values.reduce((sum, value) => sum + value, 0) / values.length;
     };
 
+    // From the first and last rows that carry a distance, not the stretch's
+    // ends: a watch records the clock before GPS has a fix and after it has
+    // stopped counting, and a stretch ending on such a row stated no distance.
+    const firstDistance = visible.find((row) => typeof row.distance === "number")?.distance;
+    const lastDistance = [...visible].reverse().find((row) => typeof row.distance === "number")?.distance;
     const distance =
-      typeof first.distance === "number" && typeof last.distance === "number"
-        ? last.distance - first.distance
+      firstDistance !== undefined && lastDistance !== undefined
+        ? lastDistance - firstDistance
         : undefined;
     const duration =
       range === null && activityTime !== undefined
@@ -460,73 +516,61 @@ export function ActivitySeriesChart({
     );
   }
 
-  const axisChannels = selected.map(activityChannel);
-
-  return (
-    <section className={surfaceClass}>
-      <div className="activity-chart-head">
-        {heading}
-        <OptionGroup
-          label={t("activity.chart.xAxis")}
-          className="activity-chart-axis"
-          value={axis}
-          options={[
-            { value: "elapsed", label: t("activity.m.time"), disabled: !hasElapsed },
-            { value: "distance", label: t("activity.m.distance"), disabled: !hasDistance }
-          ]}
-          onChange={(next) =>
-            setAxis(next === "distance" ? "distance" : "elapsed")
-          }
-        />
-      </div>
-
-      {/* The chip wears its own series colour, because that colour is how the
-          line is found in the plot — it is data, not decoration. */}
-      <OptionChips
-        label={t("activity.chart.series")}
-        className="activity-chart-chips"
-        options={available.map((channel) => ({
-          value: channel.key,
-          label: channel.label
-        }))}
-        values={available
-          .filter((channel) =>
-            channel.background ? showAltitude : selected.includes(channel.key)
-          )
-          .map((channel) => channel.key)}
-        colorOf={(key) => palette[key as ActivityChannelKey]?.stroke}
-        onToggle={(key) => {
-          const channel = available.find((entry) => entry.key === key);
-          if (channel?.background) {
-            setShowAltitude((previous) => !previous);
-            return;
-          }
-          setSelected((previous) =>
-            toggleActivityChannel(previous, key as ActivityChannelKey)
-          );
-        }}
-      />
-
-      <div className="activity-chart-plot">
-        <ResponsiveContainer width="100%" height={340}>
-          <ComposedChart data={rows} margin={{ top: 8, right: 8, bottom: 4, left: 0 }}>
+  const plot = ({
+    name,
+    channels,
+    height,
+    withBrush,
+    tooltipAltitude,
+    gutters,
+    showXAxis = true
+  }: {
+    /** Which plot this is, so each SVG names its own gradient. */
+    name: "combined" | ActivityChannelGroup;
+    channels: readonly ActivityChannelDefinition[];
+    height: number;
+    withBrush: boolean;
+    tooltipAltitude: boolean;
+    showXAxis?: boolean;
+    /**
+     * Stacked plots share one clock, so their x positions must line up: each
+     * keeps a left and a right gutter whether or not it has a channel for it.
+     */
+    gutters: boolean;
+  }) => {
+    const leftAxisId = channels[0]?.key ?? SPARE_LEFT_AXIS;
+    const altitudeFillId = `${syncId}-${name}-altitude-fill`;
+    return (
+      <>
+        <PlotAxisCaptions channels={channels} palette={palette} motion={motion} unitSystem={unitSystem} />
+        <ResponsiveContainer width="100%" height={height}>
+          <ComposedChart
+            data={rows}
+            margin={{ top: 8, right: 8, bottom: 4, left: 0 }}
+            {...(split ? { syncId } : {})}
+          >
             <defs>
-              <linearGradient id="run-altitude-fill" x1="0" y1="0" x2="0" y2="1">
+              <linearGradient id={altitudeFillId} x1="0" y1="0" x2="0" y2="1">
                 <stop offset="0%" stopColor={palette.altitude.stroke} stopOpacity={0.35} />
                 <stop offset="100%" stopColor={palette.altitude.stroke} stopOpacity={0.02} />
               </linearGradient>
             </defs>
 
-            <CartesianGrid stroke={colors.grid} strokeDasharray="3 3" vertical={false} />
+            {/* Hairlines, not dashes: the grid is there to be read against, and
+                a dashed one competes with the lap markers drawn the same way. */}
+            <CartesianGrid stroke={colors.grid} vertical={false} />
 
             <XAxis
               dataKey="x"
               type="number"
               domain={["dataMin", "dataMax"]}
+              hide={!showXAxis}
               tick={{ fill: colors.text, fontSize: 11 }}
-              stroke={colors.grid}
+              tickLine={false}
+              axisLine={{ stroke: colors.grid }}
+              tickMargin={6}
               tickFormatter={(value: number) => formatXTick(axis, value, unitSystem)}
-              minTickGap={40}
+              minTickGap={48}
             />
 
             {/* `hide` does not take the axis out of the layout: recharts still
@@ -541,20 +585,31 @@ export function ActivitySeriesChart({
                 its own default gutter and then draws the axis at that same
                 default, so a narrower width leaves the two disagreeing and the
                 left axis is drawn off the canvas at a negative x. */}
-            {axisChannels.map((channel, index) => (
+            {/* Ticks in the muted ink, never the series colour: which axis is
+                which is said by the caption above each, where the colour sits on
+                a mark beside the words. */}
+            {channels.map((channel, index) => (
               <YAxis
                 key={channel.key}
                 yAxisId={channel.key}
                 orientation={index === 0 ? "left" : "right"}
                 domain={["auto", "auto"]}
                 reversed={channel.reversed ?? false}
-                tick={{ fill: palette[channel.key].stroke, fontSize: 11 }}
-                stroke={colors.grid}
+                tick={{ fill: colors.text, fontSize: 11 }}
+                tickLine={false}
+                axisLine={false}
+                tickCount={5}
                 tickFormatter={(value: number) =>
                   formatAxisTick(channel.key, value, unitSystem)
                 }
               />
             ))}
+            {gutters && channels.length === 0 ? (
+              <YAxis yAxisId={SPARE_LEFT_AXIS} orientation="left" tick={false} axisLine={false} tickLine={false} />
+            ) : null}
+            {gutters && channels.length < 2 ? (
+              <YAxis yAxisId={SPARE_RIGHT_AXIS} orientation="right" tick={false} axisLine={false} tickLine={false} />
+            ) : null}
 
             {altitudeDomain && showAltitude ? (
               <Area
@@ -563,7 +618,7 @@ export function ActivitySeriesChart({
                 type="monotone"
                 stroke={palette.altitude.stroke}
                 strokeWidth={1}
-                fill="url(#run-altitude-fill)"
+                fill={`url(#${altitudeFillId})`}
                 isAnimationActive={false}
                 connectNulls
                 activeDot={false}
@@ -572,7 +627,7 @@ export function ActivitySeriesChart({
 
             {/* This run's own heart-rate bands, so a glance says which zone the
                 line was sitting in without reading the axis. */}
-            {selected.includes("hr")
+            {channels.some((channel) => channel.key === "hr")
               ? zoneBands.map((zone) => (
                   <ReferenceArea
                     key={`zone-${zone.index}`}
@@ -580,80 +635,213 @@ export function ActivitySeriesChart({
                     y1={zone.low}
                     y2={zone.high}
                     fill={palette.hr.stroke}
-                    fillOpacity={0.03 + zone.index * 0.015}
+                    fillOpacity={0.02 + zone.index * 0.012}
                     stroke="none"
                     ifOverflow="hidden"
                   />
                 ))
               : null}
 
-            {axisChannels.length > 0 && boundaries.length <= 40
+            {(channels.length > 0 || gutters) && boundaries.length <= 40
               ? boundaries.slice(0, -1).map((lap) => (
                   <ReferenceLine
                     key={`lap-${lap.index}`}
-                    yAxisId={axisChannels[0]!.key}
+                    yAxisId={leftAxisId}
                     x={lap.to}
                     // Not the grid colour: on the paper theme that is pale
                     // enough to make the lap markers disappear entirely, and a
                     // marker one theme cannot show is a feature it does not have.
                     stroke={colors.text}
-                    strokeOpacity={0.3}
-                    strokeDasharray="2 4"
+                    strokeOpacity={0.22}
+                    strokeDasharray="1 3"
                   />
                 ))
               : null}
 
-            {axisChannels.map((channel) => (
+            {/* Straight segments between recorded readings: a spline through a
+                surge rounds its corners off and draws values between samples
+                that nobody recorded. */}
+            {channels.map((channel) => (
               <Line
                 key={channel.key}
                 yAxisId={channel.key}
                 dataKey={channel.key}
-                type="monotone"
+                type="linear"
                 stroke={palette[channel.key].stroke}
-                strokeWidth={1.8}
+                strokeWidth={1.4}
+                strokeLinejoin="round"
+                strokeLinecap="round"
                 dot={false}
                 isAnimationActive={false}
                 connectNulls
-                activeDot={{ r: 3, strokeWidth: 0 }}
+                activeDot={{ r: 4, fill: palette[channel.key].stroke, stroke: colors.dotStroke, strokeWidth: 2 }}
               />
             ))}
 
             <Tooltip
-              cursor={{ stroke: colors.cursor, strokeWidth: 1 }}
+              cursor={{ stroke: colors.text, strokeOpacity: 0.35, strokeWidth: 1 }}
               content={(props: TooltipContentProps) => (
                 <RunChartTooltip
                   {...props}
                   axis={axis}
                   unitSystem={unitSystem}
                   motion={motion}
-                  showAltitude={showAltitude && altitudeDomain !== null}
+                  showAltitude={tooltipAltitude && showAltitude && altitudeDomain !== null}
                   palette={palette}
                 />
               )}
             />
 
-            <Brush
-              dataKey="x"
-              height={22}
-              travellerWidth={8}
-              stroke={colors.grid}
-              fill="transparent"
-              startIndex={range?.start}
-              endIndex={range?.end}
-              tickFormatter={(value: number) => formatXTick(axis, value, unitSystem)}
-              onChange={(next) => {
-                const start = (next as { startIndex?: number }).startIndex;
-                const end = (next as { endIndex?: number }).endIndex;
-                if (typeof start === "number" && typeof end === "number") {
-                  setRange(
-                    start === 0 && end === rows.length - 1 ? null : { start, end }
-                  );
-                }
-              }}
-            />
+            {withBrush ? (
+              <Brush
+                dataKey="x"
+                height={20}
+                travellerWidth={10}
+                stroke={colors.grid}
+                fill="transparent"
+                traveller={(props: { x: number; y: number; width: number; height: number }) => (
+                  <BrushHandle {...props} color={colors.text} fill={colors.tooltipBg} />
+                )}
+                startIndex={range?.start}
+                endIndex={range?.end}
+                tickFormatter={(value: number) => formatXTick(axis, value, unitSystem)}
+                onChange={(next) => {
+                  const start = (next as { startIndex?: number }).startIndex;
+                  const end = (next as { endIndex?: number }).endIndex;
+                  if (typeof start === "number" && typeof end === "number") {
+                    setRange(
+                      start === 0 && end === rows.length - 1 ? null : { start, end }
+                    );
+                  }
+                }}
+              />
+            ) : null}
           </ComposedChart>
         </ResponsiveContainer>
+      </>
+    );
+  };
+
+  // The chip wears its own series colour, because that colour is how the line
+  // is found in the plot — it is data, not decoration.
+  const chips = (offered: readonly ActivityChannelDefinition[], label: string) => (
+    <OptionChips
+      label={label}
+      className="activity-chart-chips"
+      options={offered.map((channel) => ({
+        value: channel.key,
+        label: channel.label
+      }))}
+      values={offered
+        .filter((channel) =>
+          channel.background ? showAltitude : selected.includes(channel.key)
+        )
+        .map((channel) => channel.key)}
+      colorOf={(key) => palette[key as ActivityChannelKey]?.stroke}
+      onToggle={(key) => {
+        const channel = offered.find((entry) => entry.key === key);
+        if (channel?.background) {
+          setShowAltitude((previous) => !previous);
+          return;
+        }
+        setSelected((previous) =>
+          toggleActivityChannel(previous, key as ActivityChannelKey, split)
+        );
+      }}
+    />
+  );
+
+  const selectedIn = (group: ActivityChannelGroup) =>
+    selected.filter((key) => activityChannelGroup(key) === group).map(activityChannel);
+  const offeredIn = (group: ActivityChannelGroup) =>
+    available.filter((channel) =>
+      group === "motion"
+        ? channel.background || activityChannelGroup(channel.key) === "motion"
+        : activityChannelGroup(channel.key) === "body"
+    );
+
+  return (
+    <section className={surfaceClass}>
+      <div className="activity-chart-head">
+        {heading}
+        <div className="activity-chart-controls">
+          {splittable ? (
+            <OptionGroup
+              label={t("activity.chart.layout")}
+              value={split ? "split" : "combined"}
+              options={[
+                { value: "combined", label: t("activity.chart.layoutCombined") },
+                { value: "split", label: t("activity.chart.layoutSplit") }
+              ]}
+              onChange={(next) => {
+                const nextSplit = next === "split";
+                setSplitPreference(nextSplit);
+                setSelected((previous) => fitActivityChannels(previous, available, nextSplit));
+              }}
+            />
+          ) : null}
+          <OptionGroup
+            label={t("activity.chart.xAxis")}
+            className="activity-chart-axis"
+            value={axis}
+            options={[
+              { value: "elapsed", label: t("activity.m.time"), disabled: !hasElapsed },
+              { value: "distance", label: t("activity.m.distance"), disabled: !hasDistance }
+            ]}
+            onChange={(next) =>
+              setAxis(next === "distance" ? "distance" : "elapsed")
+            }
+          />
+        </div>
       </div>
+
+      {split ? (
+        <>
+          <div className="activity-chart-group">
+            <span className="activity-chart-group-label">{t("activity.chart.groupMotion")}</span>
+            {chips(offeredIn("motion"), t("activity.chart.groupMotion"))}
+          </div>
+          <div className="activity-chart-plot is-split-top">
+            {plot({
+              name: "motion",
+              channels: selectedIn("motion"),
+              height: SPLIT_TOP_HEIGHT,
+              withBrush: false,
+              tooltipAltitude: true,
+              gutters: true,
+              showXAxis: false
+            })}
+          </div>
+          <div className="activity-chart-group">
+            <span className="activity-chart-group-label">{t("activity.chart.groupBody")}</span>
+            {chips(offeredIn("body"), t("activity.chart.groupBody"))}
+          </div>
+          <div className="activity-chart-plot is-split-bottom">
+            {plot({
+              name: "body",
+              channels: selectedIn("body"),
+              height: SPLIT_BOTTOM_HEIGHT,
+              withBrush: true,
+              tooltipAltitude: false,
+              gutters: true
+            })}
+          </div>
+        </>
+      ) : (
+        <>
+          {chips(available, t("activity.chart.series"))}
+          <div className="activity-chart-plot">
+            {plot({
+              name: "combined",
+              channels: selected.map(activityChannel),
+              height: COMBINED_HEIGHT,
+              withBrush: true,
+              tooltipAltitude: true,
+              gutters: false
+            })}
+          </div>
+        </>
+      )}
 
       {segment ? (
         <div className="activity-chart-segment">
@@ -696,6 +884,87 @@ export function ActivitySeriesChart({
         </div>
       ) : null}
     </section>
+  );
+}
+
+/** What a plot's axes measure: the left channel's caption at the left edge, the right's at the right. */
+function PlotAxisCaptions({
+  channels,
+  palette,
+  motion,
+  unitSystem
+}: {
+  channels: readonly ActivityChannelDefinition[];
+  palette: Record<ActivityChannelKey, { stroke: string; fill: string }>;
+  motion: ActivityMotion;
+  unitSystem: UnitSystem;
+}) {
+  if (channels.length === 0) {
+    return <div className="activity-chart-captions" aria-hidden="true" />;
+  }
+  return (
+    <div className="activity-chart-captions">
+      {channels.map((channel) => (
+        <span key={channel.key} className="activity-chart-caption">
+          <i aria-hidden="true" style={{ background: palette[channel.key].stroke }} />
+          {channel.label}
+          <span className="activity-chart-caption-unit">
+            {axisUnit(channel.key, unitSystem, motion)}
+          </span>
+        </span>
+      ))}
+    </div>
+  );
+}
+
+/** The unit a channel's axis ticks are written in, for its caption. */
+function axisUnit(key: ActivityChannelKey, unitSystem: UnitSystem, motion: ActivityMotion): string {
+  if (key === "pace" || key === "adjustedPace") return `/${distanceUnit(unitSystem)}`;
+  if (key === "speed") return speedUnit(unitSystem);
+  if (key === "verticalSpeed") return `${elevationUnit(unitSystem)}/h`;
+  if (key === "cadence") return cadenceUnit(motion);
+  return activityChannel(key).unit;
+}
+
+/** A brush handle: a rounded pill with a grip line, in place of recharts' square. */
+function BrushHandle({
+  x,
+  y,
+  width,
+  height,
+  color,
+  fill
+}: {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  color: string;
+  fill: string;
+}) {
+  const centre = x + width / 2;
+  return (
+    <g>
+      <rect
+        x={x}
+        y={y + 1}
+        width={width}
+        height={height - 2}
+        rx={3}
+        fill={fill}
+        stroke={color}
+        strokeOpacity={0.45}
+      />
+      <line
+        x1={centre}
+        x2={centre}
+        y1={y + height * 0.3}
+        y2={y + height * 0.7}
+        stroke={color}
+        strokeOpacity={0.7}
+        strokeLinecap="round"
+      />
+    </g>
   );
 }
 

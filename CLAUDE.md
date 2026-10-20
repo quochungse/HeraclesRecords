@@ -944,6 +944,26 @@ lives at module level for the same visit-to-visit reason — see `useCalendarDat
   with Running and were moved out of `src/running/` for that — none of them ever asked what
   sport they were reading. Anything else that both screens need goes the same way rather than
   being copied.
+- **The channel chart** (`ActivitySeriesChart`, `activityChannels.ts`; reworked 2026-10-20) — the
+  chart under every run, ride and hike, titled **Performance**. **Its line is drawn from what was
+  recorded**: `smoothActivitySeries` first averages the noisy channels over a few seconds on the
+  series' clock (pace and effort pace over 5 s, as speeds; power 5, cadence 3, the form figures 5;
+  heart rate never, since a smoothed peak never happened), then `envelopeActivitySeries` cuts it to
+  1 000 rows, two per bucket carrying its lowest and highest reading in the order they came, joined
+  by straight segments. It was 400 bucket means: nine seconds a bucket on an hour's run, and every
+  surge averaged to a ripple. Both are for the drawing only; every figure the page states, the
+  segment line included, comes off the recorded samples. **Split** (`activity.chart.split`, a
+  selection preference, so it syncs) draws two plots on one clock: Output above (pace,
+  effort pace, speed, power, climbing rate; `activityChannelGroup`) and Body & form below (heart
+  rate, cadence, the form figures), each with two axes of its own, so the two-channel cap counts
+  per plot (`toggleActivityChannel(…, split)`) and a change of layout keeps a channel of each group
+  (`fitActivityChannels`). The plots share a `syncId`, so the brush under the lower one and a lap
+  picked in the table move both, and a plot keeps both gutters when it has no channel for one, or
+  the two clocks would not line up. It is offered only when both groups have a channel
+  (`canSplitActivityChannels`). **Power is output, not the body**: filed with heart rate, a ride
+  opened with both in the lower plot. The colours are a set checked with a colour-vision validator
+  (`DARK_CHANNEL_COLORS` says which pairs it holds apart), and grade-adjusted pace is called
+  **Effort pace**, COROS's own name for it, in every language.
 - **A session's training label** (`electron/sessionIntensity.ts` reads, `src/training/trainingBenefit.ts`
   names; built 2026-10-19) — Garmin's "primary benefit" and the session's shape: a coloured chip
   (Recovery, Aerobic, Tempo, Threshold, VO2 Max, Anaerobic) and an outlined one (Intervals 3 × 8′,
@@ -1101,8 +1121,8 @@ lives at module level for the same visit-to-visit reason — see `useCalendarDat
   Naismith** (moving time over an hour per 5 km plus an hour per 600 m). Splits are COROS's
   1 km laps, rests inside them. The channel chart takes `motion="hike"`: Speed in km/h and a
   **Climbing rate** channel (`verticalSpeed` from `withVerticalSpeed` — metres an hour over at
-  least a minute either side, reaching to neighbouring rows so the chart's 400 downsampled
-  rows still get one, never across a gap several times the usual step), cadence in spm over
+  least a minute either side, reaching to neighbouring rows so the chart's 1 000 rows still
+  get one, never across a gap several times the usual step), cadence in spm over
   the walking, the segment line adding the stretch's ascent; it opens on climbing rate
   against heart rate. The route map reads a hike's pace as speed on the **ramp**, off
   COROS's running pace zones, through `isSpeedSport`. `npm run test:hike-metrics` holds the
