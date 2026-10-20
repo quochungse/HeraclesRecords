@@ -70,6 +70,8 @@ export interface CyclingViewProps {
   onOpenRequestHandled?: () => void;
   /** Back on a ride handed over from another screen: that screen, again. */
   onReturn?: (view: PrimaryView) => void;
+  /** Presses of this screen's rail item while it showed: back to the list. */
+  railReselect?: number;
   onAskCoach?: (request: CoachOpenRequest) => void;
 }
 
@@ -111,6 +113,7 @@ export function CyclingView({
   openRequest = null,
   onOpenRequestHandled,
   onReturn,
+  railReselect,
   onAskCoach
 }: CyclingViewProps) {
   const { unitSystem } = useUnitSystem();
@@ -130,6 +133,7 @@ export function CyclingView({
     openRequest,
     onOpenRequestHandled,
     onReturn,
+    railReselect,
     listLabel: t("nav.cycling")
   });
 

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type RefObject } from "react";
 import type { TrainingHubActivity } from "../../electron/types";
 import { PRIMARY_NAV_ITEMS, type PrimaryView } from "../navigation/primaryNav";
+import { useRailReselect } from "../navigation/useRailReselect";
 import type { SportScreenRequest } from "../training/types";
 import { runWindowStartMs } from "./runMetrics";
 
@@ -66,6 +67,8 @@ export interface SessionPageOptions {
   onReturn?: (view: PrimaryView) => void;
   /** What Back reads when it goes to this screen's own list: "Running". */
   listLabel: string;
+  /** Presses of this screen's rail item while it showed — see `useRailReselect`. */
+  railReselect?: number;
 }
 
 export interface SessionPage {
@@ -95,7 +98,8 @@ export function useSessionPage({
   openRequest = null,
   onOpenRequestHandled,
   onReturn,
-  listLabel
+  listLabel,
+  railReselect
 }: SessionPageOptions): SessionPage {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   // Where Back goes from the session open: the screen that handed it over, or,
@@ -129,6 +133,14 @@ export function useSessionPage({
       onReturn(returnTo);
     }
   }, [onReturn, returnTo]);
+
+  // The screen's own rail item lands on its list, even for a session handed
+  // over from another screen: Back goes there, the rail names this one.
+  const showList = useCallback(() => {
+    setSelectedId(null);
+    setReturnTo(null);
+  }, []);
+  useRailReselect(railReselect, showList);
 
   // The id is taken straight rather than looked up first: the screen mounts
   // with whatever `activities` the app already holds, and `selected` reads the

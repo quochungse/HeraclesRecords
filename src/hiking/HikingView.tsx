@@ -73,6 +73,8 @@ export interface HikingViewProps {
   onOpenRequestHandled?: () => void;
   /** Back on a hike handed over from another screen: that screen, again. */
   onReturn?: (view: PrimaryView) => void;
+  /** Presses of this screen's rail item while it showed: back to the list. */
+  railReselect?: number;
   onAskCoach?: (request: CoachOpenRequest) => void;
 }
 
@@ -113,6 +115,7 @@ export function HikingView({
   openRequest = null,
   onOpenRequestHandled,
   onReturn,
+  railReselect,
   onAskCoach
 }: HikingViewProps) {
   const { unitSystem } = useUnitSystem();
@@ -132,6 +135,7 @@ export function HikingView({
     openRequest,
     onOpenRequestHandled,
     onReturn,
+    railReselect,
     listLabel: t("nav.hiking")
   });
 

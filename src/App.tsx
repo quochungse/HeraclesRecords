@@ -325,6 +325,20 @@ export default function App() {
   useEffect(() => {
     contentRef.current?.scrollTo({ top: 0 });
   }, [activeView]);
+  // The rail's item for the screen already showing changes no view, so it is
+  // counted instead and handed to the screens that drill down — see
+  // `useRailReselect`.
+  const [railReselect, setRailReselect] = useState(0);
+  const handleRailSelect = useCallback(
+    (view: View) => {
+      if (view === activeView) {
+        setRailReselect((count) => count + 1);
+      } else {
+        setActiveView(view);
+      }
+    },
+    [activeView],
+  );
   const [startupView, setStartupView] = useState<View>(readStartupView);
   const [hiddenSportScreens, setHiddenSportScreens] = useState<SportScreen[]>(
     readHiddenSportScreens,
@@ -1825,7 +1839,7 @@ export default function App() {
       <div className="app-body">
         <AppSidebar
           activeView={activeView}
-          onChange={setActiveView}
+          onChange={handleRailSelect}
           coachBusy={coachBusy}
           newCounts={{ records: recordsNotices.freshCount }}
           showDevelopmentItems={showDevelopmentTools}
@@ -1973,6 +1987,7 @@ export default function App() {
                   }
                   onOpenRequestHandled={() => setSportScreenRequest(null)}
                   onReturn={setActiveView}
+                  railReselect={railReselect}
                   onAskCoach={askCoach}
                 />
               </Suspense>
@@ -1999,6 +2014,7 @@ export default function App() {
                   }
                   onOpenRequestHandled={() => setSportScreenRequest(null)}
                   onReturn={setActiveView}
+                  railReselect={railReselect}
                   onAskCoach={askCoach}
                 />
               </Suspense>
@@ -2025,6 +2041,7 @@ export default function App() {
                   }
                   onOpenRequestHandled={() => setSportScreenRequest(null)}
                   onReturn={setActiveView}
+                  railReselect={railReselect}
                   onAskCoach={askCoach}
                 />
               </Suspense>
@@ -2102,6 +2119,7 @@ export default function App() {
                     setActiveView("records");
                   }}
                   onOpenOverview={() => setActiveView("overview")}
+                  railReselect={railReselect}
                 />
               </Suspense>
             ) : null}

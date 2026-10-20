@@ -86,6 +86,8 @@ export interface RunningViewProps {
   onOpenRequestHandled?: () => void;
   /** Back on a run handed over from another screen: that screen, again. */
   onReturn?: (view: PrimaryView) => void;
+  /** Presses of this screen's rail item while it showed: back to the list. */
+  railReselect?: number;
   /** Asks Coach about the run open, as the Calendar's Ask Coach does. */
   onAskCoach?: (request: CoachOpenRequest) => void;
 }
@@ -127,6 +129,7 @@ export function RunningView({
   openRequest = null,
   onOpenRequestHandled,
   onReturn,
+  railReselect,
   onAskCoach
 }: RunningViewProps) {
   const { unitSystem } = useUnitSystem();
@@ -146,6 +149,7 @@ export function RunningView({
     openRequest,
     onOpenRequestHandled,
     onReturn,
+    railReselect,
     listLabel: t("nav.running")
   });
 

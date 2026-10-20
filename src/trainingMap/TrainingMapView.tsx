@@ -16,6 +16,7 @@ interface TrainingMapViewProps {
   labour?: LabourState;
   onOpenLabours: () => void;
   onOpenOverview: () => void;
+  railReselect?: number;
 }
 
 /**
@@ -42,6 +43,7 @@ export function TrainingMapView({
   labour,
   onOpenLabours,
   onOpenOverview,
+  railReselect,
 }: TrainingMapViewProps) {
   if (!connected) {
     return (
@@ -80,6 +82,7 @@ export function TrainingMapView({
       onOpenActivity={onOpenActivity}
       labour={labour}
       onOpenLabours={onOpenLabours}
+      railReselect={railReselect}
     />
   );
 }
