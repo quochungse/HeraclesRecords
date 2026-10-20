@@ -13,6 +13,7 @@ import type {
   TrainingHubScheduledExercise
 } from "./types";
 import { ScreenError } from "./screenText";
+import { PROGRAM_IDENTITY_KEYS, sourceThumbnailFor } from "./corosExerciseCatalog";
 
 type RawPlan = Record<string, unknown>;
 
@@ -210,16 +211,6 @@ export async function readNativeCorosPlan(
 // against the captured requests in scripts/fixtures/coros-plan-write/.
 // ---------------------------------------------------------------------------
 
-/**
- * The thumbnail a plan is filed under. The web app picks one at random from
- * COROS's default set; a plan needs one, and this is one of that set.
- */
-const DEFAULT_PLAN_THUMBNAIL = {
-  sourceId: "425846071290413056",
-  sourceUrl:
-    "https://s3.coros.com/source/source_default/0/0508c8b8638d47bead5cc384ea561ec7.jpg"
-};
-
 export interface NativePlanSessionInput {
   /** The session's `idInPlan` when it is already in the plan; absent for a new one. */
   idInPlan?: string;
@@ -294,6 +285,47 @@ function orderSessions(sessions: NativePlanSessionInput[]): OrderedSession[] {
 }
 
 /**
+ * The days whose sessions already on the plan stay in the order COROS has
+ * them and on the day they were on, each with the highest `sortNoInSchedule`
+ * it holds — a session new to such a day is numbered past it. A day missing
+ * here is numbered from one again.
+ */
+function daysKeepingTheirOrder(
+  ordered: OrderedSession[],
+  entityById: Map<string, RawPlan>
+): Map<number, number> {
+  const byDay = new Map<number, OrderedSession[]>();
+  for (const session of ordered) {
+    const list = byDay.get(session.dayNo) ?? [];
+    list.push(session);
+    byDay.set(session.dayNo, list);
+  }
+  const kept = new Map<number, number>();
+  for (const [dayNo, sessions] of byDay) {
+    let last = -Infinity;
+    let keeps = true;
+    let highest = 0;
+    let seenNew = false;
+    for (const session of sessions) {
+      const existing = session.idInPlan === undefined ? undefined : entityById.get(String(session.idInPlan));
+      if (!existing) {
+        seenNew = true;
+        continue;
+      }
+      const position = numberValue(existing.sortNoInSchedule) ?? 0;
+      if (numberValue(existing.dayNo) !== dayNo || position < last || seenNew) {
+        keeps = false;
+        break;
+      }
+      last = position;
+      highest = Math.max(highest, position);
+    }
+    if (keeps) kept.set(dayNo, highest);
+  }
+  return kept;
+}
+
+/**
  * `totalDay` is the last session's day plus one — which is why a plan cannot
  * end in an empty week — and `minWeeks`/`maxWeeks`, despite their names, are
  * the fewest and most sessions in a week that has any.
@@ -324,14 +356,21 @@ function planProgram(program: RawPlan, idInPlan: string | number): RawPlan {
 }
 
 /**
- * A session new to the plan, as the web app sends one: without the fields a
- * program holds as a session of some plan (`planId`, `star`). A session copied
- * in the editor, or out of another plan, would otherwise name the session it
- * was copied from. COROS gives a new session ids of its own.
+ * A session new to the plan, as the web app sends one. A session copied in
+ * the editor, or out of another plan, is a program row of that plan: the web
+ * app blanks its `id` and `planId` (`handleCopy`), or the write would name a
+ * row that belongs to someone else. A library workout keeps its `id`, as the
+ * web app's drag from the library does. COROS gives a new session ids of its
+ * own either way.
  */
 function newPlanProgram(program: RawPlan, idInPlan: number): RawPlan {
   const copy = planProgram(program, idInPlan);
-  delete copy.planId;
+  if (copy.planId !== undefined && String(copy.planId) !== "" && String(copy.planId) !== "0") {
+    copy.id = "";
+    copy.planId = "";
+  } else {
+    delete copy.planId;
+  }
   delete copy.star;
   return copy;
 }
@@ -405,7 +444,7 @@ export function buildNativePlanCreateBody(
     maxIdInPlan: ordered.length,
     totalDay: shape.totalDay,
     unit: input.unit ?? 0,
-    ...DEFAULT_PLAN_THUMBNAIL,
+    ...sourceThumbnailFor(input.name.trim()),
     minWeeks: shape.minWeeks,
     maxWeeks: shape.maxWeeks,
     region: Number(options.region),
@@ -442,8 +481,13 @@ function runningPlanAnchor(current: RawPlan): Date | undefined {
   return date;
 }
 
-const comparableProgram = (program: RawPlan | undefined, idInPlan: string) =>
-  program ? JSON.stringify(planProgram(program, idInPlan)) : "";
+/** What a session's program says, without the fields that only say which row it is. */
+const comparableProgram = (program: RawPlan | undefined, idInPlan: string) => {
+  if (!program) return "";
+  const copy = planProgram(program, idInPlan);
+  for (const key of PROGRAM_IDENTITY_KEYS) delete copy[key];
+  return JSON.stringify(copy);
+};
 
 /**
  * The whole plan as it should read, sent over the detail it was read from.
@@ -485,6 +529,7 @@ export function buildNativePlanUpdateBody(
     const id = String(entity.idInPlan);
     if (kept.has(id)) continue;
     versionObjects.push({
+      type: 0,
       id,
       ...(entity.labelId !== undefined ? { labelId: entity.labelId } : {}),
       planProgramId: entity.planProgramId,
@@ -494,17 +539,35 @@ export function buildNativePlanUpdateBody(
   }
 
   const ordered = orderSessions(input.sessions);
+  /* The web app sends a session back with the numbers it was read with
+     (`savePlan`): its plan-wide `sortNo`/`sortNoInPlan` always, and its place
+     in its day unless the day's order changed. Renumbering every save marked
+     untouched sessions as moved. A new session is numbered past the plan's
+     highest, so no two share a number. */
+  const keptOrder = daysKeepingTheirOrder(ordered, entityById);
+  let lastSort = Math.max(
+    0,
+    ...currentEntities.flatMap((entity) => [numberValue(entity.sortNo) ?? 0, numberValue(entity.sortNoInPlan) ?? 0])
+  );
   const entities: RawPlan[] = [];
   const programs: RawPlan[] = [];
   for (const session of ordered) {
     const happenDay = anchor ? dayKeyAfter(anchor, session.dayNo) : undefined;
+    const existing = session.idInPlan === undefined ? undefined : entityById.get(String(session.idInPlan));
+    const keepsSlot = existing !== undefined &&
+      numberValue(existing.dayNo) === session.dayNo &&
+      keptOrder.has(session.dayNo);
+    const sortNo = existing ? existing.sortNo : (lastSort += 1);
     const placement = {
       dayNo: session.dayNo,
-      sortNo: session.sortNo,
-      sortNoInPlan: session.sortNo,
-      sortNoInSchedule: session.sortNoInSchedule
+      sortNo,
+      sortNoInPlan: existing ? existing.sortNoInPlan ?? existing.sortNo : sortNo,
+      sortNoInSchedule: keepsSlot
+        ? existing!.sortNoInSchedule
+        : keptOrder.has(session.dayNo)
+          ? (keptOrder.get(session.dayNo) ?? 0) + session.sortNoInSchedule
+          : session.sortNoInSchedule
     };
-    const existing = session.idInPlan === undefined ? undefined : entityById.get(String(session.idInPlan));
     if (existing) {
       const id = String(existing.idInPlan);
       /* Only a plan on the calendar has dates to move. A plan that is not keeps
@@ -524,6 +587,7 @@ export function buildNativePlanUpdateBody(
       programs.push(planProgram(session.program, existing.idInPlan as string | number));
       if (moved || edited) {
         versionObjects.push({
+          type: 0,
           id,
           ...(existing.labelId !== undefined ? { labelId: existing.labelId } : {}),
           planProgramId: existing.planProgramId,
@@ -535,7 +599,7 @@ export function buildNativePlanUpdateBody(
       maxId += 1;
       entities.push({ happenDay: happenDay ?? "", idInPlan: maxId, ...placement });
       programs.push(newPlanProgram(session.program, maxId));
-      versionObjects.push({ id: maxId, status: 1 });
+      versionObjects.push({ type: 0, id: maxId, status: 1 });
     }
   }
 
@@ -551,7 +615,9 @@ export function buildNativePlanUpdateBody(
     totalDay: shape.totalDay,
     minWeeks: shape.minWeeks,
     maxWeeks: shape.maxWeeks,
-    ...(input.unit !== undefined ? { unit: input.unit } : {}),
+    /* A plan keeps the unit it was written in; the web app's edit screens
+       send back the detail's own. */
+    ...(current.unit === undefined && input.unit !== undefined ? { unit: input.unit } : {}),
     pbVersion: planPbVersion(programs, numberValue(current.pbVersion) ?? 0),
     versionObjects
   };
@@ -717,8 +783,8 @@ export async function executeNativeCorosPlan(
  * `executeStatus 2`, and the calendar's stage for its weeks drops to Not Set.
  */
 export async function quitNativeCorosPlan(instanceId: string): Promise<void> {
+  /* The web app sends the query alone (`api4QuitTrainingPlan`). */
   await writeNativeTrainingPlanEndpoint("/training/schedule/quitSubPlan", {
-    params: { subPlanId: instanceId },
-    body: {}
+    params: { subPlanId: instanceId }
   });
 }

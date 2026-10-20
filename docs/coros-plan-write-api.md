@@ -173,10 +173,14 @@ began from and answers a conflict before anything is priced or written.
 - `schedule/copyWeek?sourceFirstDayOfWeek=&targetFirstDayOfWeek=` copies a
   calendar week; `schedule/deleteWeek?targetFirstDayOfWeek=` empties one —
   **everything** in it, from any plan.
-- `rescheduleScheduledWorkout` in `trainingHubService.ts` says a
-  `schedule/update` with `status: 2` is refused with 17004. The move above,
-  with `type: 0` and the entity, was accepted on 2026-09-24; which part made the
-  difference has not been isolated.
+- **A move is `status: 2` with the session's full entity on its new day and
+  `type: 0`** — the web app's `sportMove`. Verified again on 2026-10-20, for a
+  session of the athlete's own (same `idInPlan` and entity id afterwards) and for
+  one of a running copy (it stays in the copy; the copy's `dayNo` moves and its
+  `version` rises). An occurrence edit (`status: 2` with a new program) on a
+  running copy's session likewise keeps it in the copy. The earlier 17004 came
+  from a probe that sent a stripped entity. `rescheduleScheduledWorkout` and
+  `replaceScheduledWorkout` send exactly these.
 
 ### Official plans
 
@@ -336,8 +340,9 @@ sport-aware editor does not understand remain on their original raw objects.
 }
 ```
 
-`status: 2` is the first-party Training Hub's occurrence-edit operation. It is
-not the move operation; Heracles Records still moves workouts by add-then-delete.
+`status: 2` is the first-party Training Hub's occurrence-edit operation, and
+with the entity on a new day it is its move as well (`sportMove`); Heracles
+Records moves and replaces workouts that way since 2026-10-20.
 Library and scheduled programs are independent copies, so neither edit flow
 propagates into the other.
 

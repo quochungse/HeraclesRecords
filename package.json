@@ -165,6 +165,7 @@
     "test:chat-workout-tools": "npm run build:electron && node scripts/test-chat-workout-tools.mjs",
     "test:coros-workout-builder": "npm run build:electron && node scripts/test-coros-workout-builder.mjs",
     "test:coros-workout-editor": "npm run build:electron && node scripts/test-coros-workout-editor.mjs",
+    "test:coros-write-parity": "npm run build:electron && node scripts/test-coros-write-parity.mjs",
     "test:workout-defaults": "cross-env ELECTRON_RUN_AS_NODE=1 electron --experimental-strip-types --import ./scripts/register-ts-ext.mjs scripts/test-workout-defaults.mjs",
     "test:workout-builder-rows": "cross-env ELECTRON_RUN_AS_NODE=1 electron --experimental-strip-types --import ./scripts/register-ts-ext.mjs scripts/test-workout-builder-rows.mjs",
     "test:workout-intensity-codec": "npm run build:electron && node scripts/test-workout-intensity-codec.mjs",

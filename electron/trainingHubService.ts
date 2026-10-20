@@ -132,6 +132,12 @@ import {
   workoutEditRevision,
   type WorkoutEditSource
 } from "./corosWorkoutEditor";
+import {
+  catalogIndex,
+  libraryProgramForCalendar,
+  withProgramIdentity,
+  type CorosExerciseCatalog
+} from "./corosExerciseCatalog";
 import { corosText, hasCorosLocaleTable, loadCorosLocale } from "./corosLocale";
 import {
   WORKOUT_SPORT_CAPABILITIES,
@@ -2714,7 +2720,7 @@ export async function calculateWorkoutProgram(
 export async function scheduleWorkoutOnDate(
   program: Record<string, unknown>,
   happenDay: string,
-  sortNo = 1
+  sortNo?: number
 ): Promise<void> {
   if (!/^\d{8}$/.test(happenDay)) {
     throw new Error("happenDay must be YYYYMMDD.");
@@ -2735,10 +2741,15 @@ export async function scheduleWorkoutOnDate(
   const programPayload = structuredClone(program);
   programPayload.idInPlan = idInPlan;
 
+  // The web app's add (`ct()`), placed after what the day already holds so
+  // two sessions on a day do not share a position.
   const entity: Record<string, unknown> = {
     happenDay,
     idInPlan,
-    sortNoInSchedule: sortNo
+    sortNo: 0,
+    dayNo: 0,
+    sortNoInPlan: 0,
+    sortNoInSchedule: sortNo ?? nextScheduleSlot(scheduleRaw, happenDay)
   };
   if (Array.isArray(programPayload.exerciseBarChart)) {
     entity.exerciseBarChart = structuredClone(programPayload.exerciseBarChart);
@@ -2748,8 +2759,51 @@ export async function scheduleWorkoutOnDate(
     entities: [entity],
     programs: [programPayload],
     versionObjects: [{ id: idInPlan, status: 1 }],
-    pbVersion: toOptionalNumber(program.pbVersion) ?? 2
+    pbVersion: toOptionalNumber(program.pbVersion) || 2
   });
+}
+
+/** One past the highest `sortNoInSchedule` on `happenDay` in a schedule read; 1 on an empty day. */
+function nextScheduleSlot(scheduleRaw: Record<string, unknown>, happenDay: string): number {
+  const entities = extractArray(scheduleRaw, ["entities"]) ?? [];
+  let highest = 0;
+  for (const item of entities) {
+    if (!item || typeof item !== "object") continue;
+    const entity = item as Record<string, unknown>;
+    if (String(entity.happenDay ?? "") !== happenDay || toOptionalNumber(entity.status) === 3) continue;
+    highest = Math.max(highest, toOptionalNumber(entity.sortNoInSchedule) ?? 0);
+  }
+  return highest + 1;
+}
+
+/**
+ * A calendar session as COROS holds it — its entity and program — read off a
+ * schedule spanning `days`, with the read itself for a caller that needs more
+ * of the range.
+ */
+async function readScheduledSession(
+  entry: { planId: string; idInPlan: string },
+  days: string[]
+): Promise<{ entity: Record<string, unknown>; program: Record<string, unknown>; raw: Record<string, unknown> }> {
+  const sorted = [...days].sort();
+  const raw = await trainingHubGet<Record<string, unknown>>(
+    "/training/schedule/query",
+    { startDate: sorted[0]!, endDate: sorted[sorted.length - 1]!, supportRestExercise: 1 }
+  );
+  const entities = extractArray(raw, ["entities"]) ?? [];
+  const programs = extractArray(raw, ["programs"]) ?? [];
+  const { programsByIdInPlan, programsById } = buildScheduledProgramMaps(programs);
+  for (const [index, item] of entities.entries()) {
+    if (!item || typeof item !== "object") continue;
+    const entity = item as Record<string, unknown>;
+    if (toOptionalNumber(entity.status) === 3) continue;
+    if (String(entity.planId ?? "") !== String(entry.planId)) continue;
+    if (String(entity.idInPlan ?? "") !== String(entry.idInPlan)) continue;
+    const program = resolveScheduledProgram(entity, index, programsByIdInPlan, programsById, programs);
+    if (!program) throw new ScreenError("main.coros.noProgramData");
+    return { entity, program, raw };
+  }
+  throw new ScreenError("main.coros.scheduledNotFound");
 }
 
 export async function listScheduledWorkoutEntries(
@@ -2771,19 +2825,23 @@ export async function removeScheduledWorkout(entry: {
   planId: string;
   idInPlan: string;
   planProgramId?: string;
-  pbVersion?: number;
+  /** Set on a session that has an activity matched to it; the web app sends it back. */
+  labelId?: string;
 }): Promise<void> {
   const idInPlan = entry.idInPlan;
+  // The web app's delete: the version object alone, at PB_VERSION 2 whatever
+  // the program's own.
   await trainingHubPostVoid("/training/schedule/update", {
     versionObjects: [
       {
         id: idInPlan,
+        ...(entry.labelId !== undefined ? { labelId: entry.labelId } : {}),
         planProgramId: entry.planProgramId ?? idInPlan,
         planId: entry.planId,
         status: 3
       }
     ],
-    pbVersion: entry.pbVersion ?? 2
+    pbVersion: 2
   });
 }
 
@@ -3105,7 +3163,12 @@ export async function previewWorkoutEdit(
     await loadWorkoutEditorAccount(),
     unitSystem
   );
-  const program = workoutDraftToCorosProgram(source.program, draft, context);
+  const program = workoutDraftToCorosProgram(
+    source.program,
+    draft,
+    context,
+    await workoutEditCatalog(draft)
+  );
 
   const result = await runWorkoutEditPreview(
     ref,
@@ -3182,7 +3245,12 @@ export async function saveWorkoutEdit(
     await loadWorkoutEditorAccount(),
     unitSystem
   );
-  const edited = workoutDraftToCorosProgram(source.program, draft, context);
+  const edited = workoutDraftToCorosProgram(
+    source.program,
+    draft,
+    context,
+    await workoutEditCatalog(draft)
+  );
   const calculated = await runWorkoutEditWrite(
     ref,
     source.entity,
@@ -3226,7 +3294,7 @@ export async function scheduleLibraryWorkout(
   if (!program) {
     throw new ScreenError("main.coros.libraryNotFound");
   }
-  await scheduleWorkoutOnDate(program, happenDay);
+  await scheduleWorkoutOnDate(libraryProgramForCalendar(program), happenDay);
 }
 
 /**
@@ -3260,7 +3328,8 @@ export async function buildCalculatedPlanProgram(
   return calculateWorkoutProgram(
     buildWorkoutPayloadFromEntry(
       resolvedEntry,
-      context ?? (await getWorkoutEditorContext(unitSystem))
+      context ?? (await getWorkoutEditorContext(unitSystem)),
+      exerciseResolution.catalog
     )
   );
 }
@@ -3288,7 +3357,7 @@ export async function createAndScheduleWorkout(
     await loadWorkoutEditorAccount(),
     unitSystem
   );
-  const payload = buildWorkoutPayloadFromEntry(resolvedEntry, context);
+  const payload = buildWorkoutPayloadFromEntry(resolvedEntry, context, exerciseResolution.catalog);
   // Schedule a calculated full payload, not the library query summary. The
   // summary omits fields needed by simple and structured workouts.
   let program: Record<string, unknown>;
@@ -3302,15 +3371,22 @@ export async function createAndScheduleWorkout(
     program = await calculateWorkoutProgram(payload);
   }
 
-  await scheduleWorkoutOnDate(program, happenDay, entryInput.sort_no ?? 1);
+  await scheduleWorkoutOnDate(program, happenDay, entryInput.sort_no);
   return { programId };
 }
 
 /**
- * Move a scheduled workout to another day. COROS's /training/schedule/update
- * has no move semantics (versionObjects status 2 is rejected with 17004), so
- * this re-adds the workout on the new day first and only then deletes the old
- * entry — a failure part-way can duplicate the workout but never lose it.
+ * Moves a calendar session to another day, in place: one `schedule/update`
+ * carrying the session's own entity on its new day, `status 2` — the web
+ * app's `sportMove`. It keeps the session's `idInPlan`, and a session of a
+ * plan on the calendar stays that plan's session: COROS moves it in the
+ * running copy too (verified on the live account 2026-10-20, the copy's
+ * `dayNo` moved and its version rose).
+ *
+ * The app used to add the session again and delete the original, because a
+ * probe of `status 2` had been refused with 17004 — that probe sent a
+ * stripped entity. The add-then-delete cost four requests, gave the session a
+ * new identity, and took a plan's session out of its plan.
  */
 export async function rescheduleScheduledWorkout(
   entry: {
@@ -3331,28 +3407,52 @@ export async function rescheduleScheduledWorkout(
     throw new ScreenError("main.coros.beforeToday");
   }
 
-  const dayEntries = await listScheduledWorkoutEntries(
-    entry.happenDay,
-    entry.happenDay
-  );
-  const match = dayEntries.find(
-    (candidate) =>
-      candidate.planId === String(entry.planId) &&
-      candidate.idInPlan === String(entry.idInPlan)
-  );
-  if (!match) {
-    throw new ScreenError("main.coros.scheduledNotFound");
-  }
-  if (!match.rawProgram) {
-    throw new ScreenError("main.coros.noProgramData");
-  }
+  const { entity, program, raw } = await readScheduledSession(entry, [entry.happenDay, newHappenDay]);
+  const moved: Record<string, unknown> = {
+    ...structuredClone(entity),
+    happenDay: typeof entity.happenDay === "number" ? Number(newHappenDay) : newHappenDay,
+    sortNoInSchedule: nextScheduleSlot(raw, newHappenDay)
+  };
+  await trainingHubPostVoid("/training/schedule/update", {
+    entities: [moved],
+    programs: [program],
+    versionObjects: [{
+      type: 0,
+      id: entity.idInPlan,
+      status: 2,
+      planId: entity.planId,
+      planProgramId: entity.planProgramId
+    }],
+    pbVersion: 2
+  });
+}
 
-  await scheduleWorkoutOnDate(match.rawProgram, newHappenDay, match.sortNo ?? 1);
-  await removeScheduledWorkout({
-    planId: match.planId,
-    idInPlan: match.idInPlan,
-    planProgramId: match.planProgramId,
-    pbVersion: toOptionalNumber(match.rawProgram.pbVersion)
+/**
+ * Puts another workout in a calendar session's place: the web app's edit of
+ * an occurrence (`status 2`), one request, so the session keeps its
+ * `idInPlan` — and, on a plan running on the calendar, its place in the plan
+ * — and nothing is left half done. `program` is a calculated program; it is
+ * written as the row it replaces (`withProgramIdentity`).
+ */
+export async function replaceScheduledWorkout(
+  entry: { planId: string; idInPlan: string; happenDay: string },
+  program: Record<string, unknown>
+): Promise<void> {
+  const { entity, program: stored } = await readScheduledSession(entry, [entry.happenDay]);
+  const replacement = withProgramIdentity(program, stored);
+  replacement.idInPlan = stored.idInPlan ?? entity.idInPlan;
+  replacement.planId = stored.planId ?? entity.planId;
+  delete replacement.happenDay;
+  await trainingHubPostVoid("/training/schedule/update", {
+    entities: [structuredClone(entity)],
+    programs: [replacement],
+    versionObjects: [{
+      id: entity.idInPlan,
+      status: 2,
+      planProgramId: entity.planProgramId,
+      planId: entity.planId
+    }],
+    pbVersion: toOptionalNumber(replacement.pbVersion) || 2
   });
 }
 
@@ -3420,8 +3520,7 @@ export async function deleteWorkout(options: {
     await removeScheduledWorkout({
       planId: scheduleEntry.planId,
       idInPlan: scheduleEntry.idInPlan,
-      planProgramId: scheduleEntry.planProgramId,
-      pbVersion: toOptionalNumber(scheduleEntry.rawProgram?.pbVersion)
+      planProgramId: scheduleEntry.planProgramId
     });
     removedFromSchedule = true;
     resolvedName = resolvedName ?? scheduleEntry.name;
@@ -3620,6 +3719,22 @@ async function loadWorkoutExerciseCatalog(sport: WorkoutSport): Promise<Record<s
   return rows;
 }
 
+/**
+ * The catalog an edited workout's movements are written from. Only a sport
+ * whose steps are movements has one; a read that fails leaves the editor to
+ * keep each movement by its id, which it does without inventing muscles.
+ */
+async function workoutEditCatalog(
+  draft: RunWorkoutEditorDraft
+): Promise<CorosExerciseCatalog | undefined> {
+  if (draft.sport !== "strength" && draft.sport !== "hyrox") return undefined;
+  try {
+    return catalogIndex(await loadWorkoutExerciseCatalog(draft.sport));
+  } catch {
+    return undefined;
+  }
+}
+
 export async function listWorkoutExercises(
   sport: WorkoutSport
 ): Promise<WorkoutExerciseOption[]> {
@@ -3675,6 +3790,12 @@ export async function resolveTrainingPlanExercises(
 ): Promise<{
   draft: CorosTrainingPlanDraft;
   issues: TrainingPlanExerciseResolutionIssue[];
+  /**
+   * The catalog rows the movements were found in. A step is written from its
+   * row (`buildWorkoutPayloadFromEntry`'s `catalog`), which is what carries the
+   * muscles COROS draws a session's muscle map from.
+   */
+  catalog: CorosExerciseCatalog;
 }> {
   const resolved = structuredClone(draft);
   const issues: TrainingPlanExerciseResolutionIssue[] = [];
@@ -3734,7 +3855,9 @@ export async function resolveTrainingPlanExercises(
     }
   }
 
-  return { draft: resolved, issues };
+  const rows: Record<string, unknown>[] = [];
+  for (const catalog of catalogs.values()) rows.push(...(await catalog));
+  return { draft: resolved, issues, catalog: catalogIndex(rows) };
 }
 
 function workoutSportTypeForService(sport: keyof typeof WORKOUT_SPORT_CAPABILITIES): number {
@@ -3817,7 +3940,7 @@ export async function uploadTrainingPlan(
   };
 
   async function uploadOneWorkout(entry: (typeof resolvedDraft.workouts)[number]): Promise<void> {
-    const payload = buildWorkoutPayloadFromEntry(entry, context);
+    const payload = buildWorkoutPayloadFromEntry(entry, context, exerciseResolution.catalog);
     const workoutSignature = JSON.stringify(payload);
     const saveToLibrary = entry.save_to_library !== false;
     // Schedule a calculated full payload, not the library query summary. The
@@ -3847,8 +3970,7 @@ export async function uploadTrainingPlan(
       if (existingByDate.get(entry.schedule_date)?.length) {
         // Still schedule — user confirmed via UI; conflict was shown in preview.
       }
-      const sortNo = entry.sort_no ?? 1;
-      await scheduleWorkoutOnDate(program, entry.schedule_date, sortNo);
+      await scheduleWorkoutOnDate(program, entry.schedule_date, entry.sort_no);
       workoutsScheduled += 1;
       entries.push({
         key: entry.key,

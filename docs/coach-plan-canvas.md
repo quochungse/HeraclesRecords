@@ -833,7 +833,8 @@ trong analysis. Mọi đề xuất sống qua restart và qua máy khác.
   (`moveCalendarSession`, `replaceCalendarSession`) chọn đường theo `isRunningCopy` (cache, không có thì
   hỏi COROS `plan/query`): buổi của plan → `plan/update` trên bản chạy, đọc `detail` lại mỗi dòng; buổi
   riêng → dời bằng thêm-rồi-xoá, thay bằng thêm-trước-xoá-sau (hỏng giữa chừng thì còn hai buổi chứ không
-  mất buổi). Dòng `add` đã có buổi cùng tên trên ngày đó thì *stale* (máy kia đã áp). Change set nhớ
+  mất buổi). *(Thay ngày 2026-10-20: mọi buổi — riêng hay của plan — dời và thay tại chỗ bằng một
+  `schedule/update` `status 2`, như web COROS; xem docs/coros-write-parity.md.)* Dòng `add` đã có buổi cùng tên trên ngày đó thì *stale* (máy kia đã áp). Change set nhớ
   `unit_system` (cột qua `ensureColumn`). Màn Calendar kéo buổi của plan giờ đi qua bản chạy (P3.0 D).
   `list_scheduled_workouts` ghi `in_plan` cho buổi của plan đang chạy. `creationIndex` mang trạng thái
   từng đề xuất (đã áp, lỗi/stale kèm lý do, bỏ, chưa quyết) đọc lại từ row mỗi lượt. Review tự làm

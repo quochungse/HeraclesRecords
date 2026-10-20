@@ -37,6 +37,13 @@ import {
 import { resolveStepDefaults } from "./workoutDefaults.js";
 import { corosDistanceTargetDisplayUnit } from "./corosWorkoutDistance";
 import { describePlanShape } from "./trainingPlanDomain";
+import {
+  HYROX_RUN_STEP_NAME,
+  poolLengthPresetId,
+  sourceThumbnailFor,
+  stepBaseRow,
+  type CorosExerciseCatalog
+} from "./corosExerciseCatalog";
 
 export type RunStepKind =
   | "warmup"
@@ -543,39 +550,41 @@ function resolveRunTarget(
   };
 }
 
-function defaultRunOverview(
-  kind: RunStepKind,
-  targetType: number,
-  sport: WorkoutSport
-): string {
-  if (sport === "swim") {
-    if (kind === "warmup" || kind === "sendOff") return "sid_poolswim_warm_up_dist";
-    if (kind === "cooldown" || kind === "rest") return "sid_poolswim_cool_down_dist";
-    return "sid_poolswim_dist_default";
+/**
+ * The name a step gives itself, when it gives one. A movement's own name is
+ * not one: the resolver writes the catalog's English words into
+ * `exercise_name`, and a coach often repeats them in `name`, but COROS's name
+ * for a movement is its localisation key (`T1041`), which the watch shows in
+ * the athlete's language.
+ */
+function stepOwnName(
+  step: RunWorkoutStep,
+  catalogRow: Record<string, unknown> | undefined
+): string | undefined {
+  const name = step.name?.trim();
+  if (!name) return undefined;
+  const lower = name.toLocaleLowerCase();
+  const same = (value: unknown) =>
+    typeof value === "string" && value.trim().toLocaleLowerCase() === lower;
+  if (same(step.exercise_name) || same(catalogRow?.name) || same(catalogRow?.displayName)) {
+    return undefined;
   }
-  if (sport === "bike") {
-    if (kind === "warmup") return "sid_bike_warm_up_dist";
-    if (kind === "cooldown" || kind === "rest") return "sid_bike_cool_down_dist";
-    return "sid_bike_dist_speed";
-  }
-  if (sport === "strength") return "sid_strength_training";
-  if (kind === "warmup") {
-    return DISTANCE_TARGET_TYPES.has(targetType)
-      ? "sid_run_warm_up_dist"
-      : "sid_run_warm_up";
-  }
-  if (kind === "cooldown") {
-    return DISTANCE_TARGET_TYPES.has(targetType)
-      ? "sid_run_cool_down_dist"
-      : "sid_run_cool_down";
-  }
-  if (kind === "rest") {
-    return DISTANCE_TARGET_TYPES.has(targetType)
-      ? "sid_run_rest_dist"
-      : "sid_run_rest";
-  }
-  return "sid_run_training";
+  // A step read off COROS comes back named in words its key stands for
+  // (`T1120` → "Warm Up"), and the builder labels an unnamed step the same
+  // way; written back, those words would replace the key the watch shows in
+  // the athlete's own language.
+  if (DEFAULT_STEP_LABELS.has(lower) || /^[TS]\d+$/i.test(name)) return undefined;
+  return name;
 }
+
+/** What COROS's own step keys read as in English, and the builder's labels for an unnamed step. */
+const DEFAULT_STEP_LABELS = new Set([
+  "warm up", "warm-up", "warmup",
+  "training", "train", "interval", "run training", "functional training",
+  "cool down", "cool-down", "cooldown",
+  "rest",
+  "send-off", "send off", "sendoff"
+]);
 
 function buildRunExercise(
   step: RunWorkoutStep,
@@ -583,7 +592,8 @@ function buildRunExercise(
   sortNo: number,
   groupId = "0",
   sport: WorkoutSport = "run",
-  context?: WorkoutEditorContext
+  context?: WorkoutEditorContext,
+  catalog?: CorosExerciseCatalog
 ): { exercise: Record<string, unknown>; distance: number; time: number } {
   const parsed = normalizeRunStep(step);
   const kind = parsed.kind ?? "training";
@@ -651,53 +661,61 @@ function buildRunExercise(
         intensityPercent: normalized.intensity_percent ?? 0,
         intensityPercentExtend: normalized.intensity_percent_extend ?? 0
       };
-  const functionalExercise = sport === "strength" ||
-    (sport === "hyrox" && kind === "training" && Boolean(normalized.exercise_kind));
+  // A movement: a strength training step, or a HYROX station. Warm-up,
+  // cool-down and rest are COROS's own rows even on a strength day.
+  const functionalExercise = kind === "training" && (sport === "strength" ||
+    (sport === "hyrox" && Boolean(normalized.exercise_kind)));
+  const exerciseType = RUN_STEP_KIND_TO_EXERCISE_TYPE[kind];
+  const catalogRow = functionalExercise && normalized.exercise_id
+    ? catalog?.get(normalized.exercise_id)
+    : undefined;
+  // The web app's way (corosExerciseCatalog.ts): the row first, then what the
+  // step says. A HYROX station is a row of the strength catalog.
+  const base = stepBaseRow(
+    functionalExercise ? 4 : capability.sportType,
+    exerciseType,
+    catalogRow
+  );
+  const climbing = sport === "indoorClimb" || sport === "bouldering";
+  const hyroxRun = sport === "hyrox" && kind === "training" && !functionalExercise;
+  const ownName = stepOwnName(normalized, catalogRow);
 
   const exercise: Record<string, unknown> = {
+    ...base,
     id: exId,
-    access: 0,
-    createTimestamp: 0,
-    defaultOrder: sortNo,
-    deleted: 0,
-    equipment: [1],
-    isDefaultAdd: kind === "training" || kind === "interval" ? 1 : 0,
-    part: [0],
-    sourceId: "0",
-    sourceUrl: "",
+    sourceId: base.sourceId ?? "0",
+    sourceUrl: base.sourceUrl ?? "",
+    videoUrl: base.videoUrl ?? "",
     status: 1,
-    userId: 0,
-    videoUrl: "",
-    name:
-      normalized.name ??
-      normalized.exercise_name ??
-      kind.replace("warmup", "Warm-up").replace("cooldown", "Cool-down"),
-    exerciseType: RUN_STEP_KIND_TO_EXERCISE_TYPE[kind],
+    name: hyroxRun
+      ? HYROX_RUN_STEP_NAME
+      : ownName ??
+        // A movement the catalog was not read for keeps the name it was
+        // resolved by rather than the template's generic "Training".
+        (functionalExercise && !catalogRow ? normalized.exercise_name : undefined) ??
+        base.name,
+    exerciseType,
     sportType: capability.sportType,
-    subType: kind === "sendOff"
-      ? 1
-      : sport === "hyrox" && kind === "training" && normalized.exercise_kind
-        ? 2
-        : 0,
+    subType: kind === "sendOff" ? 1 : functionalExercise && sport === "hyrox" ? 2 : 0,
+    ...(climbing ? { gradeSystem: 0, onsightGradeOffset: 0 } : {}),
     ...rawIntensity,
     targetType,
     targetValue,
     targetDisplayUnit,
     sets: normalized.sets ?? 1,
     sortNo,
-    restType: normalized.rest_type ?? (functionalExercise ? 1 : 3),
+    restType: normalized.rest_type ?? (functionalExercise ? 1 : climbing ? 0 : 3),
     restValue: normalized.rest_value ?? (functionalExercise ? 60 : 0),
     groupId,
     isGroup: false,
-    originId: "0",
-    overview: normalized.overview ?? (functionalExercise
-      ? "sid_strength_training"
-      : defaultRunOverview(kind, targetType, sport)),
-    ...(normalized.exercise_id ? { originId: normalized.exercise_id } : {}),
-    ...(normalized.exercise_kind !== undefined
-      ? { exerciseKind: normalized.exercise_kind }
-      : {}),
-    ...(sport === "hyrox" && kind === "training" && normalized.exercise_kind
+    overview: normalized.overview ?? base.overview ?? "",
+    ...(functionalExercise && normalized.exercise_id ? { originId: normalized.exercise_id } : {}),
+    ...(sport === "hyrox"
+      ? { exerciseKind: functionalExercise ? normalized.exercise_kind ?? 0 : 0 }
+      : normalized.exercise_kind !== undefined
+        ? { exerciseKind: normalized.exercise_kind }
+        : {}),
+    ...(functionalExercise && sport === "hyrox"
       ? { hyroxTrainingMode: "strength" }
       : {}),
     ...(kind === "sendOff" || normalized.send_off_seconds !== undefined
@@ -837,7 +855,7 @@ export function buildEasyRun(options: {
     originEssence: 0,
     overview: "",
     type: 0,
-    unit: 0,
+    unit: options.context?.distanceUnit === "imperial" ? 1 : 0,
     pbVersion: 2,
     sourceId: RUN_TRAINING_EXERCISE_SOURCE_ID,
     sourceUrl: RUN_TRAINING_EXERCISE_SOURCE_URL,
@@ -857,13 +875,29 @@ export function buildEasyRun(options: {
   };
 }
 
+/**
+ * A swim's pool, with the preset COROS names it by (1 = 25 m, 2 = 50 m, …);
+ * 0 is a custom length, which every swim written here used to claim.
+ */
+function swimPoolLength(
+  sportOptions: WorkoutSportOptions | undefined,
+  context: WorkoutEditorContext | undefined
+): { poolLengthId: number; poolLength: number; poolLengthUnit: number } {
+  const value = sportOptions?.poolLength?.value ?? context?.defaultPoolLength.value ?? 25;
+  const unit = sportOptions?.poolLength?.unit ?? context?.defaultPoolLength.unit ?? "m";
+  const poolLength = Math.round(value * (unit === "yd" ? 0.9144 : 1) * 100);
+  const poolLengthUnit = unit === "yd" ? 4 : 2;
+  return { poolLengthId: poolLengthPresetId(poolLength, poolLengthUnit), poolLength, poolLengthUnit };
+}
+
 export function buildWorkoutPayload(
   name: string,
   steps: RunWorkoutStepInput[],
   sport: WorkoutSport = "run",
   sportOptions?: WorkoutSportOptions,
   context?: WorkoutEditorContext,
-  description = ""
+  description = "",
+  catalog?: CorosExerciseCatalog
 ): Record<string, unknown> {
   const capability = WORKOUT_SPORT_CAPABILITIES[sport];
   if (!capability) throw new Error(`Unsupported workout sport "${String(sport)}".`);
@@ -904,7 +938,8 @@ export function buildWorkoutPayload(
           groupSort + 65536 * (j + 1),
           String(groupId),
           sport,
-          context
+          context,
+          catalog
         );
         builtSubSteps.push(built.exercise);
         groupDistance += built.distance;
@@ -914,13 +949,28 @@ export function buildWorkoutPayload(
       const groupTargetType = groupDistance > 0 ? 5 : 2;
       const groupTargetValue = groupDistance > 0 ? groupDistance : groupTime;
 
+      // The web app's repeat group (`ts()`): no sport, no overview, and the
+      // 0 / 30 rest every native group carries. A coach's name for the set
+      // is kept; COROS stores one when the group was read with one.
       exercises.push({
+        access: 0,
+        defaultOrder: 0,
         id: groupId,
-        name: step.name ?? "Interval Group",
+        name: step.name ?? "",
         exerciseType: 0,
-        sportType: capability.sportType,
+        sportType: 0,
+        subType: 0,
+        hrType: 0,
+        intensityCustom: 0,
+        intensityDisplayUnit: 0,
+        intensityMultiplier: 0,
+        intensityPercent: 0,
+        intensityPercentExtend: 0,
         intensityType: 0,
         intensityValue: 0,
+        intensityValueExtend: 0,
+        isDefaultAdd: 0,
+        isIntensityPercent: false,
         targetType: groupTargetType,
         targetValue: groupTargetValue,
         targetDisplayUnit:
@@ -929,12 +979,15 @@ export function buildWorkoutPayload(
             : 0,
         sets: repeatCount,
         sortNo: groupSort,
-        restType: step.rest_type ?? 3,
-        restValue: step.rest_value ?? 0,
+        restType: step.rest_type ?? 0,
+        restValue: step.rest_value ?? 30,
         groupId: "0",
         isGroup: true,
         originId: "0",
-        overview: step.overview ?? defaultRunOverview("training", groupTargetType, sport)
+        overview: step.overview ?? "",
+        sourceId: "0",
+        sourceUrl: "",
+        videoUrl: ""
       });
       exercises.push(...builtSubSteps);
       totalDistance += groupDistance * repeatCount;
@@ -948,7 +1001,8 @@ export function buildWorkoutPayload(
         16777216 * topIndex,
         "0",
         sport,
-        context
+        context,
+        catalog
       );
       exercises.push(built.exercise);
       totalDistance += built.distance;
@@ -976,16 +1030,8 @@ export function buildWorkoutPayload(
         : {})
     },
     ...(sport === "swim"
-      ? {
-          poolLengthId: 0,
-          poolLength: Math.round(
-            (sportOptions?.poolLength?.value ?? context?.defaultPoolLength.value ?? 25) *
-            ((sportOptions?.poolLength?.unit ?? context?.defaultPoolLength.unit ?? "m") === "yd" ? 0.9144 : 1) *
-            100
-          ),
-          poolLengthUnit: (sportOptions?.poolLength?.unit ?? context?.defaultPoolLength.unit ?? "m") === "yd" ? 4 : 2
-        }
-      : {}),
+      ? swimPoolLength(sportOptions, context)
+      : { poolLengthId: 0, poolLength: 0, poolLengthUnit: 0 }),
     ...((sport === "indoorClimb" || sport === "bouldering")
       ? { gradeSystemVersion: 1 }
       : {}),
@@ -1007,7 +1053,12 @@ export function buildWorkoutPayload(
     originEssence: 0,
     overview: description.trim().slice(0, 300),
     type: 0,
-    unit: 0,
+    unit: context?.distanceUnit === "imperial" ? 1 : 0,
+    // A cover, as the web app gives every program it writes.
+    ...sourceThumbnailFor(name),
+    profile: "",
+    videoUrl: "",
+    videoCoverUrl: "",
     exerciseNum: exercises.length,
     totalSets: exercises.length,
     exercises
@@ -1050,11 +1101,12 @@ export function buildIntervalWorkout(options: {
 
 export function buildWorkoutPayloadFromEntry(
   entry: PlanWorkoutEntry,
-  context?: WorkoutEditorContext
+  context?: WorkoutEditorContext,
+  catalog?: CorosExerciseCatalog
 ): Record<string, unknown> {
   const sport = entry.sport ?? "run";
   if (entry.steps && entry.steps.length > 0) {
-    return buildWorkoutPayload(entry.name, entry.steps, sport, entry.sport_options, context, entry.description);
+    return buildWorkoutPayload(entry.name, entry.steps, sport, entry.sport_options, context, entry.description, catalog);
   }
   if (entry.distance_km !== undefined && entry.distance_km > 0) {
     if (sport !== "run" && sport !== "trailRun") {
