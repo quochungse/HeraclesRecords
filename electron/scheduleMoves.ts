@@ -1,33 +1,31 @@
 /**
- * Moving and replacing a session on the calendar, the way COROS keeps it a
- * session of its plan (P3.0 of docs/coach-plan-canvas.md, measured on the
- * live account on 2026-09-26).
+ * Moving and replacing a session on the calendar, the way COROS's own web app
+ * does both: in place, one `schedule/update` each.
  *
- * COROS has no "move". The app's own `rescheduleScheduledWorkout` adds the
- * session to the athlete's own schedule and deletes the original — right for
- * a session of the athlete's own, and wrong for one of a running plan: the
- * copy drops it and the new one belongs to no plan, so the plan's compliance
- * loses it for good (P3.0 D). A plan session is moved, and its workout
- * replaced, through `plan/update` on the **running copy** instead, which keeps
- * its `idInPlan` and leaves the plan it came from alone (P3.0 B, C).
+ * A move sends the session's own entity on its new day with `status 2`
+ * (`rescheduleScheduledWorkout`); a replacement sends its entity with the new
+ * program, `status 2` again (`replaceScheduledWorkout`). Both keep the
+ * session's `idInPlan`, and COROS carries either into the running copy of a
+ * plan on the calendar, so a plan's session stays that plan's — verified on
+ * the live account on 2026-10-20 (the copy's `dayNo` moved, its version rose,
+ * and a replaced program read back in the copy).
+ *
+ * This replaced a split measured on 2026-09-26 (P3.0 of
+ * docs/coach-plan-canvas.md): a plan's session was rewritten through
+ * `plan/update` on its running copy, and one of the athlete's own was added
+ * again and the original deleted. The add-then-delete is what took a plan's
+ * session out of its plan; it rested on a probe of `status 2` that sent a
+ * stripped entity and was refused.
  *
  * The Calendar screen's drag and Coach's change sets both come through here.
  */
-import {
-  listNativeCorosPlans,
-  nativePlanWriteInputFromRaw,
-  readNativeCorosPlanRaw,
-  updateNativeCorosPlan
-} from "./corosTrainingPlanAdapter";
 import { formatScheduleDay } from "./corosWorkoutBuilder";
-import { getCorosPlanCache } from "./database";
 import {
   buildCalculatedPlanProgram,
   createAndScheduleWorkout,
-  removeScheduledWorkout,
+  replaceScheduledWorkout,
   rescheduleScheduledWorkout
 } from "./trainingHubService";
-import { mondayOf, parsePlanDay } from "./trainingPlanDomain";
 import type { PlanWorkoutEntryInput, UnitSystem } from "./types";
 import { ScreenError } from "./screenText";
 
@@ -37,104 +35,24 @@ export interface CalendarSessionRef {
   idInPlan: string;
   planProgramId?: string;
   happenDay: string;
-  /** For a removal: the program's `pbVersion`, as `removeScheduledWorkout` sends it. */
-  pbVersion?: number;
 }
 
 export interface ScheduleMoveDeps {
-  listNativeCorosPlans: typeof listNativeCorosPlans;
-  readNativeCorosPlanRaw: typeof readNativeCorosPlanRaw;
-  updateNativeCorosPlan: typeof updateNativeCorosPlan;
   rescheduleScheduledWorkout: typeof rescheduleScheduledWorkout;
-  createAndScheduleWorkout: typeof createAndScheduleWorkout;
-  removeScheduledWorkout: typeof removeScheduledWorkout;
+  replaceScheduledWorkout: typeof replaceScheduledWorkout;
   buildCalculatedPlanProgram: typeof buildCalculatedPlanProgram;
+  /** A new session of the athlete's own — Coach's "add" line. */
+  createAndScheduleWorkout: typeof createAndScheduleWorkout;
 }
 
 export const defaultScheduleMoveDeps: ScheduleMoveDeps = {
-  listNativeCorosPlans,
-  readNativeCorosPlanRaw,
-  updateNativeCorosPlan,
   rescheduleScheduledWorkout,
-  createAndScheduleWorkout,
-  removeScheduledWorkout,
-  buildCalculatedPlanProgram
+  replaceScheduledWorkout,
+  buildCalculatedPlanProgram,
+  createAndScheduleWorkout
 };
 
-/**
- * Calendar `planId`s COROS has said are not a running plan — in practice the
- * athlete's own schedule, whose id never changes. `plan/query` is the heaviest
- * thing COROS serves, and without this every drag of one of the athlete's own
- * sessions paid for it. The answer is held for minutes, not for the process:
- * a plan put on the calendar from the COROS app can show on the calendar
- * before the plan list carries it, and a "no" held for good would detach every
- * session of it dragged for the rest of the launch.
- */
-const notRunning = new Map<string, number>();
-const NOT_RUNNING_TTL_MS = 10 * 60_000;
-
-/**
- * Whether a calendar `planId` is a plan running on the calendar, rather than
- * the athlete's own schedule. The Library's cache answers for a plan it has
- * seen; anything else is asked of COROS, because a plan put on the calendar
- * from the other machine or the COROS app is not in the cache yet, and
- * guessing "own schedule" there is exactly what would detach its session.
- */
-export async function isRunningCopy(planId: string, deps: ScheduleMoveDeps = defaultScheduleMoveDeps): Promise<boolean> {
-  const cached = getCorosPlanCache(planId);
-  if (cached) return cached.calendar === "running";
-  const until = notRunning.get(planId);
-  if (until !== undefined && until > Date.now()) return false;
-  const listed = await deps.listNativeCorosPlans();
-  const running = listed.some((plan) => plan.remoteId === planId && plan.executeStatus === 1);
-  if (running) notRunning.delete(planId);
-  else notRunning.set(planId, Date.now() + NOT_RUNNING_TTL_MS);
-  return running;
-}
-
-/** The day a running copy counts `dayNo` from: the Monday of its start day's week. */
-function copyAnchor(raw: Record<string, unknown>): Date {
-  const start = parsePlanDay(String(raw.startDay ?? ""));
-  if (!start) throw new ScreenError("main.plan.noStartDay");
-  return mondayOf(start);
-}
-
-function dayNoOn(anchor: Date, day: string): number {
-  const date = parsePlanDay(day);
-  if (!date) throw new Error(`${day} is not a day.`);
-  return Math.round((date.valueOf() - anchor.valueOf()) / 86_400_000);
-}
-
-/**
- * Rewrites one session of a running copy through `plan/update`, the rest
- * written back exactly as the copy holds them. The copy is read first, so a
- * session gone from it since is said, not recreated.
- */
-async function rewriteCopySession(
-  ref: CalendarSessionRef,
-  change: { toDay?: string; program?: Record<string, unknown> },
-  deps: ScheduleMoveDeps
-): Promise<void> {
-  const raw = await deps.readNativeCorosPlanRaw(ref.planId);
-  const input = nativePlanWriteInputFromRaw(raw);
-  const session = input.sessions.find((candidate) => candidate.idInPlan === ref.idInPlan);
-  if (!session) throw new ScreenError("main.plan.sessionNotOnCalendar");
-  if (change.toDay) {
-    const dayNo = dayNoOn(copyAnchor(raw), change.toDay);
-    if (dayNo < 0) throw new ScreenError("main.plan.beforePlanStart");
-    session.dayNo = dayNo;
-  }
-  if (change.program) {
-    session.program = { ...change.program, idInPlan: session.idInPlan };
-  }
-  await deps.updateNativeCorosPlan(ref.planId, input, { current: raw });
-}
-
-/**
- * Moves a session to another day: through its running copy when it belongs
- * to a plan on the calendar, so it stays that plan's session; otherwise the
- * app's add-then-delete.
- */
+/** Moves a session to another day, in place, whoever's session it is. */
 export async function moveCalendarSession(
   ref: CalendarSessionRef,
   toDay: string,
@@ -145,47 +63,22 @@ export async function moveCalendarSession(
   if (toDay < formatScheduleDay(new Date())) {
     throw new ScreenError("main.coros.beforeToday");
   }
-  if (await isRunningCopy(ref.planId, deps)) {
-    await rewriteCopySession(ref, { toDay }, deps);
-    return;
-  }
   await deps.rescheduleScheduledWorkout(
     { planId: ref.planId, idInPlan: ref.idInPlan, planProgramId: ref.planProgramId, happenDay: ref.happenDay },
     toDay
   );
 }
 
-/**
- * Puts another workout in a session's place on its day. A plan's session is
- * rewritten in its running copy, keeping its `idInPlan` and so its place in
- * the plan. One of the athlete's own is added first and removed after, so a
- * failure leaves two sessions on the day rather than none.
- */
+/** Puts another workout in a session's place on its day, in one request. */
 export async function replaceCalendarSession(
   ref: CalendarSessionRef,
   workout: PlanWorkoutEntryInput,
   unitSystem: UnitSystem,
   deps: ScheduleMoveDeps = defaultScheduleMoveDeps
 ): Promise<void> {
-  if (await isRunningCopy(ref.planId, deps)) {
-    const program = await deps.buildCalculatedPlanProgram(workout, unitSystem);
-    await rewriteCopySession(ref, { program }, deps);
-    return;
-  }
-  await deps.createAndScheduleWorkout({ ...workout, save_to_library: false }, ref.happenDay, unitSystem, false);
-  try {
-    await deps.removeScheduledWorkout({
-      planId: ref.planId,
-      idInPlan: ref.idInPlan,
-      planProgramId: ref.planProgramId,
-      ...(ref.pbVersion ? { pbVersion: ref.pbVersion } : {})
-    });
-  } catch (error) {
-    throw new PartialReplaceError(
-      `The new workout was added, but the old one could not be removed (${error instanceof Error ? error.message : String(error)}).`
-    );
-  }
+  const program = await deps.buildCalculatedPlanProgram({ ...workout, save_to_library: false }, unitSystem);
+  await deps.replaceScheduledWorkout(
+    { planId: ref.planId, idInPlan: ref.idInPlan, happenDay: ref.happenDay },
+    program
+  );
 }
-
-/** A replacement that added its workout and could not take the old one off: trying again would add it twice. */
-export class PartialReplaceError extends Error {}

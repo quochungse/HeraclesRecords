@@ -1,5 +1,12 @@
 import crypto from "node:crypto";
 import { corosDistanceTargetDisplayUnit } from "./corosWorkoutDistance";
+import {
+  HYROX_RUN_STEP_NAME,
+  poolLengthPresetId,
+  sourceThumbnailFor,
+  stepBaseRow,
+  type CorosExerciseCatalog
+} from "./corosExerciseCatalog";
 import type {
   RunWorkoutEditorDraft,
   RunWorkoutEditorIntensity,
@@ -254,7 +261,8 @@ function parseStep(
     ...(numberValue(exercise.exerciseKind) !== undefined
       ? { exerciseKind: numberValue(exercise.exerciseKind) }
       : {}),
-    ...(sport === "strength" && kind === "training"
+    ...(kind === "training" &&
+      (sport === "strength" || (sport === "hyrox" && Boolean(numberValue(exercise.exerciseKind))))
       ? {
           sets: Math.max(1, Math.min(99, Math.round(numberValue(exercise.sets) ?? 1))),
           restType: Math.round(numberValue(exercise.restType) ?? 1),
@@ -377,54 +385,112 @@ function nextExerciseIdFactory(exercises: Record<string, unknown>[]): () => stri
   return () => String(++maximum);
 }
 
-function newExercise(id: string, sport: WorkoutSport): Record<string, unknown> {
+/** The fields of a movement COROS reads to draw a session's muscle map. */
+const CATALOG_MUSCLE_FIELDS = ["muscle", "muscleRelevance", "part", "equipment"] as const;
+
+/** The web app's repeat group, for one the workout did not have. */
+function newRepeatGroup(): Record<string, unknown> {
   return {
-    id,
     access: 0,
-    createTimestamp: 0,
-    deleted: 0,
-    equipment: [1],
+    defaultOrder: 0,
+    exerciseType: 0,
+    hrType: 0,
+    intensityCustom: 0,
+    intensityDisplayUnit: 0,
+    intensityMultiplier: 0,
+    intensityPercent: 0,
+    intensityPercentExtend: 0,
+    intensityType: 0,
+    intensityValue: 0,
+    intensityValueExtend: 0,
+    isDefaultAdd: 0,
+    isGroup: true,
+    isIntensityPercent: false,
+    name: "",
     originId: "0",
+    overview: "",
+    restType: 0,
+    restValue: 30,
     sourceId: "0",
     sourceUrl: "",
-    videoUrl: "",
-    sportType: workoutSportType(sport),
+    sportType: 0,
     subType: 0,
-    userId: 0,
-    status: 1,
-    isDefaultAdd: 0,
-    part: [0]
+    targetDisplayUnit: 0,
+    videoUrl: ""
   };
 }
 
-function defaultOverview(
-  sport: WorkoutSport,
-  kind: RunWorkoutEditorStepKind,
-  target: RunWorkoutEditorTarget
-): string {
-  if (sport === "swim") {
-    if (kind === "warmup" || kind === "sendOff") return "sid_poolswim_warm_up_dist";
-    if (kind === "cooldown") return "sid_poolswim_cool_down_dist";
-    if (kind === "rest") return "sid_poolswim_cool_down_dist";
-    return "sid_poolswim_dist_default";
+function isLocalizationKey(value: unknown): boolean {
+  return typeof value === "string" && /^[TS]\d+$/i.test(value.trim());
+}
+
+/**
+ * The name a step was given, when it was given one. The builder labels a
+ * step it was not told the name of — "Warm Up", "Training", a movement's
+ * English name — and `parseStep` reads COROS's key (`T1120`) back as the same
+ * words; none of those is a name of the athlete's, and writing one over the
+ * key loses the watch's own language.
+ */
+function ownStepName(
+  step: RunWorkoutEditorStep,
+  base: Record<string, unknown>,
+  catalogRow: Record<string, unknown> | undefined,
+  functional: boolean
+): string | undefined {
+  const name = step.name.trim();
+  if (!name) return undefined;
+  const implied = [
+    friendlyStepName(step.kind),
+    typeof base.name === "string" && !isLocalizationKey(base.name) && functional ? base.name : undefined,
+    typeof catalogRow?.displayName === "string" ? catalogRow.displayName : undefined,
+    typeof catalogRow?.name === "string" ? catalogRow.name : undefined,
+    functional ? step.exerciseName : undefined
+  ];
+  const lower = name.toLocaleLowerCase();
+  if (implied.some((value) => typeof value === "string" && value.trim().toLocaleLowerCase() === lower)) {
+    return undefined;
   }
-  if (sport === "bike") {
-    if (kind === "warmup") return "sid_bike_warm_up_dist";
-    if (kind === "cooldown") return "sid_bike_cool_down_dist";
-    if (kind === "rest") return "sid_bike_cool_down_dist";
-    return "sid_bike_dist_speed";
+  if (isLocalizationKey(name)) return undefined;
+  return name;
+}
+
+/**
+ * The name a step is written with. A HYROX run is always `T1398`; a name
+ * unchanged since it was read is the source's own, a key included; a name
+ * the athlete gave it is theirs; anything else is COROS's key for the step —
+ * or, for a movement the catalog was not read for, the name it was picked by.
+ */
+function stepName(
+  step: RunWorkoutEditorStep,
+  {
+    source,
+    exercise,
+    row,
+    catalogRow,
+    functional,
+    sport
+  }: {
+    /** The node the step was read from, when the step still fits it. */
+    source: Record<string, unknown> | undefined;
+    exercise: Record<string, unknown>;
+    row: Record<string, unknown>;
+    catalogRow: Record<string, unknown> | undefined;
+    functional: boolean;
+    sport: WorkoutSport;
   }
-  if (sport === "strength") return "sid_strength_training";
-  if (kind === "warmup") {
-    return target.type === "distance" ? "sid_run_warm_up_dist" : "sid_run_warm_up";
+): unknown {
+  if (sport === "hyrox" && step.kind === "training" && !functional) return HYROX_RUN_STEP_NAME;
+  if (source) {
+    const readName = isLocalizationKey(source.name)
+      ? friendlyStepName(step.kind)
+      : String(source.name ?? "").trim();
+    if (step.name.trim() === readName) return source.name;
   }
-  if (kind === "cooldown") {
-    return target.type === "distance" ? "sid_run_cool_down_dist" : "sid_run_cool_down";
-  }
-  if (kind === "rest") {
-    return target.type === "distance" ? "sid_run_rest_dist" : "sid_run_rest";
-  }
-  return "sid_run_training";
+  const own = ownStepName(step, exercise, catalogRow, functional);
+  if (own) return own;
+  if (isLocalizationKey(exercise.name)) return exercise.name;
+  if (functional && !catalogRow && step.exerciseName) return step.exerciseName;
+  return row.name;
 }
 
 function applyTarget(
@@ -513,7 +579,9 @@ function aggregateGroup(
 export function workoutDraftToCorosProgram(
   sourceProgram: Record<string, unknown>,
   draft: RunWorkoutEditorDraft,
-  context: WorkoutEditorContext
+  context: WorkoutEditorContext,
+  /** The strength catalog, for a movement new to the workout. */
+  catalog?: CorosExerciseCatalog
 ): Record<string, unknown> {
   const validation = validateWorkoutDraft(draft);
   if (!validation.valid) {
@@ -535,6 +603,9 @@ export function workoutDraftToCorosProgram(
   const allocateId = nextExerciseIdFactory(sourceExercises);
   const flattened: Record<string, unknown>[] = [];
 
+  const sportType = draft.sportType;
+  const climbing = draft.sport === "indoorClimb" || draft.sport === "bouldering";
+
   const buildStep = (
     step: RunWorkoutEditorStep,
     sortNo: number,
@@ -542,44 +613,80 @@ export function workoutDraftToCorosProgram(
   ): Record<string, unknown> => {
     const id = step.sourceExerciseId ?? allocateId();
     const source = step.sourceExerciseId ? byId.get(step.sourceExerciseId) : undefined;
-    const exercise = source ? structuredClone(source) : newExercise(id, draft.sport);
+
+    if (!step.editable && source) {
+      const kept = structuredClone(source);
+      Object.assign(kept, { id, sortNo, groupId, isGroup: false });
+      return kept;
+    }
+
+    const exerciseType = KIND_TO_EXERCISE_TYPE[step.kind];
+    const functional = step.kind === "training" &&
+      (draft.sport === "strength" || (draft.sport === "hyrox" && Boolean(step.exerciseKind)));
+    const catalogRow = functional && step.exerciseId ? catalog?.get(step.exerciseId) : undefined;
+    // The row this step would start from on the web app (corosExerciseCatalog.ts).
+    const row = stepBaseRow(functional ? 4 : sportType, exerciseType, catalogRow);
+    // A step that is still the movement and the kind it was read as keeps its
+    // node: whatever COROS stored on it, muscles included, goes back as it
+    // came. One whose movement or kind changed starts again from the row —
+    // keeping the old node would carry the old movement's muscles onto the
+    // new one, which is how "Straight Arm Pulldown" came to be filed under
+    // the chest.
+    const fits = Boolean(source) &&
+      numberValue(source!.exerciseType) === exerciseType &&
+      (!functional || (step.exerciseId ?? "") === (originExerciseId(source!) ?? ""));
+    let exercise: Record<string, unknown>;
+    if (fits) {
+      exercise = structuredClone(source!);
+      // What COROS draws the muscle map from is the catalog's, always: a
+      // workout an earlier build saved carries the muscles of the movement it
+      // swapped out, and this is where it heals.
+      if (catalogRow) {
+        for (const key of CATALOG_MUSCLE_FIELDS) {
+          if (catalogRow[key] !== undefined) exercise[key] = structuredClone(catalogRow[key]);
+        }
+      }
+    } else {
+      exercise = row;
+      if (functional && step.exerciseId && !catalogRow) {
+        // The catalog was not read: the movement is known by id only, and
+        // a muscle map from the template's [0] parts is no map at all.
+        exercise.originId = step.exerciseId;
+        delete exercise.muscle;
+        delete exercise.muscleRelevance;
+      }
+    }
     exercise.id = id;
     exercise.sortNo = sortNo;
     exercise.groupId = groupId;
     exercise.isGroup = false;
 
-    if (!step.editable && source) {
-      return exercise;
-    }
-
-    exercise.name = step.name.trim() || friendlyStepName(step.kind);
-    exercise.exerciseType = KIND_TO_EXERCISE_TYPE[step.kind];
-    exercise.subType = step.kind === "sendOff"
-      ? 1
-      : draft.sport === "hyrox" && step.kind === "training" && step.exerciseKind
-        ? 2
-        : 0;
-    exercise.sportType = draft.sportType;
-    if (step.exerciseId) exercise.originId = step.exerciseId;
-    if (step.exerciseKind !== undefined) exercise.exerciseKind = step.exerciseKind;
-    if (draft.sport === "hyrox" && step.kind === "training" && step.exerciseKind) {
-      exercise.hyroxTrainingMode = "strength";
-    } else if (draft.sport === "hyrox") {
-      delete exercise.hyroxTrainingMode;
-      exercise.exerciseKind = 0;
+    exercise.name = stepName(step, { source: fits ? source : undefined, exercise, row, catalogRow, functional, sport: draft.sport });
+    exercise.exerciseType = exerciseType;
+    exercise.subType = step.kind === "sendOff" ? 1 : functional && draft.sport === "hyrox" ? 2 : 0;
+    exercise.sportType = sportType;
+    if (draft.sport === "hyrox") {
+      exercise.exerciseKind = functional ? step.exerciseKind ?? 0 : 0;
+      if (functional) exercise.hyroxTrainingMode = "strength";
+      else delete exercise.hyroxTrainingMode;
+    } else if (step.exerciseKind !== undefined) {
+      exercise.exerciseKind = step.exerciseKind;
     }
     if (step.sendOffSeconds !== undefined) exercise.packageTime = Math.round(step.sendOffSeconds);
-    const strengthExercise = draft.sport === "strength" && step.kind === "training";
-    exercise.sets = strengthExercise ? step.sets ?? 1 : 1;
-    exercise.restType = step.kind === "rest"
-      ? 3
-      : strengthExercise
-        ? step.restType ?? 1
-        : numberValue(exercise.restType) ?? 3;
-    exercise.restValue = strengthExercise
-      ? step.restValue ?? 60
-      : numberValue(exercise.restValue) ?? 0;
-    exercise.overview = step.overview?.trim() || defaultOverview(draft.sport, step.kind, step.target);
+    exercise.sets = functional ? step.sets ?? 1 : 1;
+    // The web app: a movement's rest is the athlete's; climbing has none;
+    // every other step ends without one.
+    exercise.restType = functional ? step.restType ?? 1 : climbing ? 0 : 3;
+    exercise.restValue = functional ? step.restValue ?? 60 : 0;
+    // A description the athlete wrote, else COROS's key for one — the
+    // source's while it has one, the row's when its own text was cleared.
+    exercise.overview = step.overview?.trim() ||
+      (/^sid_/i.test(String(exercise.overview ?? "")) ? exercise.overview : row.overview) ||
+      "";
+    if (climbing) {
+      exercise.gradeSystem = 0;
+      exercise.onsightGradeOffset = 0;
+    }
     applyTarget(exercise, step, context, draft.sport);
     applyIntensity(exercise, step.intensity, context);
     return exercise;
@@ -594,13 +701,14 @@ export function workoutDraftToCorosProgram(
 
     const id = node.sourceExerciseId ?? allocateId();
     const source = node.sourceExerciseId ? byId.get(node.sourceExerciseId) : undefined;
-    const group = source ? structuredClone(source) : newExercise(id, draft.sport);
+    const group = source ? structuredClone(source) : newRepeatGroup();
     const aggregate = aggregateGroup(node, context, draft.sport);
+    // "Repeat" is the builder's label for a group with no name of its own.
+    const name = node.name.trim();
     Object.assign(group, aggregate, {
       id,
-      name: node.name.trim() || "Repeat",
+      name: name && name !== "Repeat" ? name : String(source?.name ?? ""),
       exerciseType: 0,
-      sportType: draft.sportType,
       intensityType: 0,
       intensityValue: 0,
       intensityValueExtend: 0,
@@ -608,10 +716,7 @@ export function workoutDraftToCorosProgram(
       groupId: "0",
       isGroup: true,
       sets: node.repeat,
-      sortNo: topSort,
-      restType: numberValue(group.restType) ?? 3,
-      restValue: numberValue(group.restValue) ?? 0,
-      overview: String(group.overview ?? defaultOverview(draft.sport, "training", { type: "open" }))
+      sortNo: topSort
     });
     flattened.push(group);
     node.steps.forEach((step, childIndex) => {
@@ -645,7 +750,18 @@ export function workoutDraftToCorosProgram(
   if (poolLength) {
     program.poolLength = Math.round(poolLength.value * (poolLength.unit === "yd" ? 0.9144 : 1) * 100);
     program.poolLengthUnit = poolLength.unit === "yd" ? 4 : 2;
-    program.poolLengthId = 0;
+    program.poolLengthId = poolLengthPresetId(
+      program.poolLength as number,
+      program.poolLengthUnit as number
+    );
+  }
+  // What the web app gives every program it writes, filled in only where the
+  // source has none: a cover, and the three blank media fields.
+  if (!program.sourceId || String(program.sourceId) === "0") {
+    Object.assign(program, sourceThumbnailFor(String(program.name ?? "")));
+  }
+  for (const key of ["profile", "videoUrl", "videoCoverUrl"]) {
+    if (typeof program[key] !== "string") program[key] = "";
   }
   if (gradingSystem) program.gradeSystemVersion = numberValue(program.gradeSystemVersion) ?? 1;
   program.simple = false;

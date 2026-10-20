@@ -636,16 +636,17 @@ lives at module level for the same visit-to-visit reason — see `useCalendarDat
   else).
   **The calendar is COROS's running copy of a plan** (`executeSubPlan`), which COROS keeps in step
   with the calendar both ways: moving a session on the calendar moves it in the copy, and editing
-  the copy moves the calendar. **The app's own move is not COROS's**: `rescheduleScheduledWorkout` adds the
-  session to the athlete's own calendar and deletes the original, so a plan session moved that way
-  leaves the copy and its compliance with it (measured on the live account, 2026-09-26).
-  So **every move goes through `moveCalendarSession` (`electron/scheduleMoves.ts`)** — the Calendar's
-  drag (`trainingHub:rescheduleWorkout`) and Coach's change sets alike: a plan session moves, and has
-  its workout replaced (`replaceCalendarSession`), through `plan/update` on the running copy, which
-  keeps its `idInPlan`; only the athlete's own sessions take the add-then-delete. Whether a `planId`
-  is a running copy is asked of the cache and, when the cache has never seen it, of COROS — never
-  guessed. Removing a plan session with `schedule/update` status 3 takes it out of the copy too, so
-  a delete stays in step. One `schedule/update` is all or nothing (`17004` for the whole request). Two things COROS does without a word, which
+  the copy moves the calendar. **A move is the web app's move, in place** (since 2026-10-20):
+  `rescheduleScheduledWorkout` sends the session's own entity on its new day with `status 2` and
+  `type 0` (`sportMove`), one request, keeping its `idInPlan`, and COROS moves it in the running copy
+  too — verified live, the copy's `dayNo` moved and its version rose. A replacement is the web app's
+  occurrence edit (`replaceScheduledWorkout`, `status 2` with the new program written as the row it
+  replaces). **Every move and replacement goes through `electron/scheduleMoves.ts`** — the Calendar's
+  drag (`trainingHub:rescheduleWorkout`) and Coach's change sets alike — and neither asks whose
+  session it is. Until then the app's own sessions were added again and the original deleted (four
+  requests, a new identity) and a plan's went through `plan/update` on the copy, all on the strength
+  of a `status 2` probe that had sent a stripped entity and been refused. Removing a plan session
+  with `schedule/update` status 3 takes it out of the copy too, so a delete stays in step. One `schedule/update` is all or nothing (`17004` for the whole request). Two things COROS does without a word, which
   `TrainingPlanCalendarDialog` states before anything is written: **it counts the plan from the
   Monday of the week the start day is in, and leaves off every session before the start** (a
   Wednesday start loses week 1's Monday and Tuesday), and **it never checks the calendar** (a day
@@ -1125,6 +1126,24 @@ lives at module level for the same visit-to-visit reason — see `useCalendarDat
   from the Monday of last week back, plus the last weekday before today, so the hero's
   "This week" holds a run on every day but a Monday (the suite skips that check then).
   `npm run test:sample-trail-runs`.
+- **What is written to COROS is what COROS's own web app writes** (`electron/corosExerciseCatalog.ts`,
+  [docs/coros-write-parity.md](docs/coros-write-parity.md), 2026-10-20). The Training Hub web app
+  never hand-builds a step: its serializer starts every step from a clone of a row of
+  `/training/exercise/query` — the movement for a strength step, the sport's warm-up / training /
+  cool-down / rest row for any other — and writes only id, group, sets, target, intensity and rest
+  over it. **COROS draws a session's muscle map from the program's `muscle` / `muscleRelevance` /
+  `part`, not from `originId`**: every strength session of a plan written here before this had
+  `muscleList: []`, and a movement swapped in the app's editor kept the old one's muscles.
+  `stepBaseRow` is that rule (run, bike and swim rows kept in the file; the ~380 strength movements
+  read from COROS and handed to the builder by `resolveTrainingPlanExercises`'s `catalog`; trail,
+  climbing, XC ski and HYROX from the web template). A step's name is COROS's key (`T1120`, `T1041`)
+  unless the coach or the athlete gave it one of their own — the words a key reads as ("Warm Up",
+  a movement's English name) are not one. The editor keeps a step's node while its movement and
+  kind are unchanged and rebuilds it from the row otherwise. Plan writes blank a copied session's
+  `id`/`planId`, never renumber a session nobody moved, keep a catalog plan's `P…` keys, and write a
+  rebuilt session as the row it replaces (`withProgramIdentity`). A library workout goes onto the
+  calendar or into a plan with its intensity figures reduced to the half that states the step
+  (`libraryProgramForCalendar`). `npm run test:coros-write-parity` holds it.
 - **Workout defaults** (`electron/workoutDefaults.ts`) — what a step holds before
   anyone types. `workoutCapabilities.ts` says what a step *may* hold; this says where
   it starts, and the two are different questions. `emptyRow` used to answer the second

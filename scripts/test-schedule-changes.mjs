@@ -127,6 +127,35 @@ function fakeCoros() {
               const copy = state.plans.get(String(version.planId));
               if (copy) copy.entities = copy.entities.filter((entity) => String(entity.idInPlan) !== String(version.id));
             }
+            if (version.status === 2) {
+              /* The web app's move and occurrence edit: the session's own entity,
+                 on its new day, with the program it should hold. COROS carries
+                 it into a running copy (verified 2026-10-20). */
+              const entity = body.entities.find((candidate) => String(candidate.idInPlan) === String(version.id));
+              const program = body.programs.find((candidate) => String(candidate.idInPlan) === String(version.id));
+              const copy = state.plans.get(String(version.planId));
+              if (copy && copy.executeStatus === 1) {
+                const held = copy.entities.find((candidate) => String(candidate.idInPlan) === String(version.id));
+                if (!held) return refuse("17004", "Plan data is illegal.");
+                held.dayNo = dayNoFrom(copy.startDay, String(entity.happenDay));
+                copy.programs = copy.programs.map((candidate) =>
+                  String(candidate.idInPlan) === String(version.id) ? { ...program, idInPlan: String(version.id) } : candidate
+                );
+                copy.version += 1;
+              } else {
+                const held = state.entities.find(
+                  (candidate) => candidate.planId === version.planId && String(candidate.idInPlan) === String(version.id)
+                );
+                if (!held) return refuse("17004", "Plan data is illegal.");
+                held.happenDay = String(entity.happenDay);
+                held.sortNoInSchedule = entity.sortNoInSchedule;
+                state.programs = state.programs.map((candidate) =>
+                  candidate.planId === held.planId && String(candidate.idInPlan) === String(version.id)
+                    ? { ...program, planId: held.planId, idInPlan: String(version.id) }
+                    : candidate
+                );
+              }
+            }
             if (version.status === 1) {
               const entity = body.entities.find((candidate) => String(candidate.idInPlan) === String(version.id));
               const program = body.programs.find((candidate) => String(candidate.idInPlan) === String(version.id));
@@ -224,6 +253,12 @@ const daysFromNow = (days) => {
 };
 const tomorrow = daysFromNow(1);
 /** The day `dayNo` lands on for a plan started on `startDay`: counted from that week's Monday. */
+/** The inverse of `dayOf`: how many days `day` is past the Monday of `startDay`'s week. */
+function dayNoFrom(startDay, day) {
+  const monday = dayOf(startDay, 0);
+  const at = (key) => new Date(Number(key.slice(0, 4)), Number(key.slice(4, 6)) - 1, Number(key.slice(6, 8)), 12);
+  return Math.round((at(day) - at(monday)) / 86_400_000);
+}
 function dayOf(startDay, dayNo) {
   const date = new Date(Number(startDay.slice(0, 4)), Number(startDay.slice(4, 6)) - 1, Number(startDay.slice(6, 8)), 12);
   date.setDate(date.getDate() - ((date.getDay() + 6) % 7) + dayNo);
@@ -340,28 +375,25 @@ test("a refusal fails the line and says why; it is tried again only when named",
   assert.equal(coros.removals().length, 2);
 });
 
-test("a replacement that landed half-way is never tried again", async () => {
+test("a replacement is one write, in place: the session keeps its id and a refusal leaves the day as it was", async () => {
   const coros = fakeCoros();
   coros.put({ idInPlan: 51, happenDay: tomorrow, name: "Tempo" });
   const { staged } = await propose([
     { op: "replace", session: { plan_id: OWN_SCHEDULE, id_in_plan: "51", date: tomorrow }, workout: easyRun() }
   ]);
-  // The add goes through; the removal after it is refused.
-  let writes = 0;
-  const realFetch = globalThis.fetch;
-  globalThis.fetch = async (url, init) => {
-    if (String(url).includes("/training/schedule/update") && ++writes === 2) {
-      coros.state.failNextWrite = { code: "5000", message: "Busy." };
-    }
-    return realFetch(url, init);
-  };
+  coros.state.failNextWrite = { code: "5000", message: "Busy." };
   const set = await changes.applyScheduleChange(staged.changeSetId);
   assert.equal(set.lines[0].status, "failed");
-  assert.match(set.lines[0].reason, /The new workout was added, but the old one could not be removed/);
-  assert.equal(set.lines[0].retry, false);
+  assert.equal(set.lines[0].retry, undefined, "nothing landed, so it may be tried again");
+  assert.deepEqual(coros.state.programs.map((program) => program.name), ["Tempo"]);
   const again = await changes.applyScheduleChange(staged.changeSetId, "l1");
-  assert.equal(again.lines[0].status, "failed");
-  assert.equal(coros.state.entities.length, 2, "the day holds both, and no third");
+  assert.equal(again.lines[0].status, "applied", again.lines[0].reason);
+  assert.equal(coros.state.entities.length, 1, "one session on the day, never two");
+  assert.equal(coros.state.entities[0].idInPlan, "51", "the same session, its id kept");
+  assert.equal(coros.state.programs[0].name, "Easy 45");
+  const [write] = coros.writesTo("/training/schedule/update").slice(-1);
+  assert.deepEqual(write.body.versionObjects.map((version) => version.status), [2], "the web app's occurrence edit");
+  assert.equal(write.body.programs[0].id, `p-${OWN_SCHEDULE}-51`, "written as the row it replaces");
 });
 
 test("calendar and library: two lines, each applied and recorded on its own", async () => {
@@ -587,11 +619,11 @@ test("apply all: each line its own write, a refusal costing that line only", asy
     { op: "remove", session: { plan_id: OWN_SCHEDULE, id_in_plan: "27", date: tomorrow } },
     { op: "add", to_date: daysFromNow(4), workout: easyRun("Shakeout") }
   ]);
-  // The move is two writes (add, then remove); the removal's is the third.
+  // The move is one write, in place; the removal's is the second.
   let writes = 0;
   const realFetch = globalThis.fetch;
   globalThis.fetch = async (url, init) => {
-    if (String(url).includes("/training/schedule/update") && ++writes === 3) {
+    if (String(url).includes("/training/schedule/update") && ++writes === 2) {
       coros.state.failNextWrite = { code: "17004", message: "Plan data is illegal." };
     }
     return realFetch(url, init);
@@ -600,7 +632,7 @@ test("apply all: each line its own write, a refusal costing that line only", asy
   assert.deepEqual(set.lines.map((line) => line.status), ["applied", "failed", "applied"]);
   assert.match(set.lines[1].reason, /Plan data is illegal/);
   const onDay = (day) => coros.state.entities.filter((entity) => entity.happenDay === day).map((entity) => coros.state.programs.find((program) => program.idInPlan === entity.idInPlan && program.planId === entity.planId).name);
-  assert.deepEqual(onDay(daysFromNow(3)), ["Long run"], "the athlete's own session moved by add-then-remove");
+  assert.deepEqual(onDay(daysFromNow(3)), ["Long run"], "the athlete's own session moved in place");
   assert.deepEqual(onDay(tomorrow), ["Strides"], "the refused removal left its session where it was");
   assert.deepEqual(onDay(daysFromNow(4)), ["Shakeout"]);
   const again = await changes.applyScheduleChange(staged.changeSetId);
@@ -616,8 +648,10 @@ test("a plan's session is moved through its running copy and stays in its plan (
   assert.match(staged.lines[0].label, /^Move "Long run" from Sat/);
   const set = await changes.applyScheduleChange(staged.changeSetId);
   assert.equal(set.lines[0].status, "applied");
-  assert.equal(coros.writesTo("/training/schedule/update").length, 0, "never the add-then-delete that detaches it");
-  assert.equal(coros.writesTo("/training/plan/update").length, 1);
+  const writes = coros.writesTo("/training/schedule/update");
+  assert.equal(writes.length, 1, "one write, never the add-then-delete that detached it");
+  assert.deepEqual(writes[0].body.versionObjects, [{ type: 0, id: "3", status: 2, planId: "R1", planProgramId: "3" }], "the web app's sportMove");
+  assert.equal(coros.writesTo("/training/plan/update").length, 0);
   assert.deepEqual(
     coros.copy("R1").entities.map((entity) => [entity.idInPlan, entity.dayNo]),
     [["1", 0], ["2", 3], ["3", 6]],
@@ -665,8 +699,9 @@ test("a plan's session replaced keeps its place in the plan (P3.0 B)", async () 
   const copy = coros.copy("R2");
   assert.deepEqual(copy.entities.map((entity) => [entity.idInPlan, entity.dayNo]), [["1", 0], ["2", 3]]);
   assert.equal(copy.programs.find((program) => program.idInPlan === "2").name, "Easy 45");
-  assert.equal(copy.programs.find((program) => program.idInPlan === "1").name, "Easy", "the other session is written back as it was");
-  assert.equal(coros.writesTo("/training/schedule/update").length, 0);
+  assert.equal(copy.programs.find((program) => program.idInPlan === "1").name, "Easy", "the other session is untouched");
+  assert.equal(coros.writesTo("/training/schedule/update").length, 1, "one occurrence edit");
+  assert.equal(coros.writesTo("/training/plan/update").length, 0);
 });
 
 test("a plan's session removed goes from the copy with status 3 (P3.0 A)", async () => {
@@ -715,24 +750,17 @@ test("an addition to a day that already holds a session of the same name is a do
   assert.equal(coros.state.entities.length, 2, "the second Shakeout is added beside the first");
 });
 
-test("the Calendar's drag moves a plan's session through its copy, and the athlete's own by add-then-remove", async () => {
+test("the Calendar's drag moves any session in place, asking nothing about whose it is", async () => {
   const coros = fakeCoros();
   coros.runningCopy("R5", planMonday, [["1", 0, "Easy"]]);
   coros.put({ idInPlan: 31, happenDay: tomorrow, name: "Own run" });
-  // The Library has never seen the plan on this machine: COROS is asked whose it is.
   await moves.moveCalendarSession({ planId: "R5", idInPlan: "1", happenDay: planMonday }, dayOf(planMonday, 1));
-  assert.ok(coros.state.requests.includes("POST /training/plan/query"), "an unknown planId is looked up, not guessed");
   assert.deepEqual(coros.copy("R5").entities.map((entity) => [entity.idInPlan, entity.dayNo]), [["1", 1]]);
   await moves.moveCalendarSession({ planId: OWN_SCHEDULE, idInPlan: "31", happenDay: tomorrow }, daysFromNow(2));
-  assert.deepEqual(coros.state.entities.map((entity) => entity.happenDay), [daysFromNow(2)]);
-  const listed = coros.state.requests.filter((line) => line === "POST /training/plan/query").length;
-  const own = coros.state.entities[0];
-  await moves.moveCalendarSession({ planId: OWN_SCHEDULE, idInPlan: own.idInPlan, happenDay: own.happenDay }, daysFromNow(3));
-  assert.equal(
-    coros.state.requests.filter((line) => line === "POST /training/plan/query").length,
-    listed,
-    "the athlete's own schedule is asked about once, not on every drag"
-  );
+  assert.deepEqual(coros.state.entities.map((entity) => [entity.idInPlan, entity.happenDay]), [["31", daysFromNow(2)]], "the same session, a day later");
+  assert.equal(coros.state.requests.includes("POST /training/plan/query"), false, "no plan list is read to decide how to move");
+  assert.equal(coros.writesTo("/training/plan/update").length, 0);
+  assert.equal(coros.removals().length, 0, "nothing is deleted to move it");
   await assert.rejects(
     moves.moveCalendarSession({ planId: "R5", idInPlan: "1", happenDay: dayOf(planMonday, 1) }, daysFromNow(-1)),
     /before today/

@@ -38,7 +38,6 @@ import { formatScheduleDay } from "./corosWorkoutBuilder";
 import {
   defaultScheduleMoveDeps,
   moveCalendarSession,
-  PartialReplaceError,
   replaceCalendarSession,
   type ScheduleMoveDeps
 } from "./scheduleMoves";
@@ -325,8 +324,7 @@ async function applyLine(
   } catch (error) {
     return {
       status: "failed",
-      reason: error instanceof Error ? error.message : String(error),
-      ...(error instanceof PartialReplaceError ? { retry: false as const } : {})
+      reason: error instanceof Error ? error.message : String(error)
     };
   }
 }
@@ -357,12 +355,10 @@ async function applyRemove(line: ScheduleChangeLine, deps: ScheduleChangeDeps): 
   if (!line.session) return { status: "failed", reason: "The proposal does not say which session." };
   const found = await currentSession(line.session, deps);
   if ("stale" in found) return { status: "stale", reason: found.stale };
-  const pbVersion = Number(found.entry.rawProgram?.pbVersion);
   await deps.removeScheduledWorkout({
     planId: found.entry.planId,
     idInPlan: found.entry.idInPlan,
-    planProgramId: found.entry.planProgramId,
-    ...(Number.isFinite(pbVersion) && pbVersion > 0 ? { pbVersion } : {})
+    planProgramId: found.entry.planProgramId
   });
   return { status: "applied" };
 }
@@ -392,14 +388,12 @@ async function applyReplace(line: ScheduleChangeLine, deps: ScheduleChangeDeps, 
   if (passed) return { status: "stale", reason: passed };
   const found = await currentSession(line.session, deps);
   if ("stale" in found) return { status: "stale", reason: found.stale };
-  const pbVersion = Number(found.entry.rawProgram?.pbVersion);
   await replaceCalendarSession(
     {
       planId: found.entry.planId,
       idInPlan: found.entry.idInPlan,
       planProgramId: found.entry.planProgramId,
-      happenDay: found.entry.happenDay,
-      ...(Number.isFinite(pbVersion) && pbVersion > 0 ? { pbVersion } : {})
+      happenDay: found.entry.happenDay
     },
     line.workout,
     unitSystem,

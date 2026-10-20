@@ -2296,7 +2296,7 @@ function registerIpcHandlers(): void {
       },
       newHappenDay: string
     ) =>
-      // A plan's session moves through its running copy, or it leaves the plan (P3.0 D).
+      // In place, so a plan's session stays in its plan.
       moveCalendarSession(entry, newHappenDay)
   );
 
@@ -2308,9 +2308,14 @@ function registerIpcHandlers(): void {
         planId: string;
         idInPlan: string;
         planProgramId?: string;
+        /** Sent by the renderer and not used: a delete is always PB_VERSION 2, as the web app sends it. */
         pbVersion?: number;
       }
-    ) => removeScheduledWorkout(entry)
+    ) => removeScheduledWorkout({
+      planId: entry.planId,
+      idInPlan: entry.idInPlan,
+      planProgramId: entry.planProgramId
+    })
   );
 
   ipcMain.handle(

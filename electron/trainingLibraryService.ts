@@ -35,6 +35,7 @@ import {
   updateNativeCorosPlan,
   type NativePlanWriteInput
 } from "./corosTrainingPlanAdapter";
+import { libraryProgramForCalendar, withProgramIdentity } from "./corosExerciseCatalog";
 import { corosText, loadCorosLocale } from "./corosLocale";
 import { corosProgramToWorkoutDraft } from "./corosWorkoutEditor";
 import { editorDraftToPlanWorkoutInput } from "./planWorkoutEditor";
@@ -593,7 +594,7 @@ export async function libraryWorkoutAsPlanSession(
     sport,
     save_to_library: false
   };
-  const { happenDay: _happenDay, idInPlan: _idInPlan, ...corosProgram } = raw;
+  const { happenDay: _happenDay, idInPlan: _idInPlan, ...corosProgram } = libraryProgramForCalendar(raw);
   return {
     title: name,
     workout: { ...base, ...nativeProgramSteps(program, base) },
@@ -609,6 +610,16 @@ export async function libraryWorkoutAsPlanSession(
 function remoteIdOf(planId: string): string {
   if (!planId.startsWith("coros:")) throw new ScreenError("main.plan.notOnCoros");
   return planId.slice("coros:".length);
+}
+
+/**
+ * A plan's text as COROS should keep it. A catalog plan's name and overview
+ * are localisation keys (`P10035`) that the reader shows resolved; written
+ * back resolved, the plan would read in English everywhere, the COROS app
+ * included. Text the athlete changed is theirs.
+ */
+function keyedText(text: string, raw: unknown): string {
+  return typeof raw === "string" && raw && corosText(raw) === text ? raw : text;
 }
 
 /**
@@ -649,16 +660,21 @@ async function planWriteInput(
     const program =
       entry.corosProgram ??
       (kept && !entry.workout.steps?.length ? held.get(kept) : undefined) ??
-      (await buildCalculatedPlanProgram(
-        entry.workout,
-        unitSystem,
-        (context ??= await getWorkoutEditorContext(unitSystem))
-      ));
+      /* An edited session is the row it was, saying something new. */
+      withProgramIdentity(
+        await buildCalculatedPlanProgram(
+          entry.workout,
+          unitSystem,
+          (context ??= await getWorkoutEditorContext(unitSystem))
+        ),
+        kept ? held.get(kept) : undefined
+      );
     sessions.push({ idInPlan: kept, dayNo: entry.weekIndex * 7 + entry.dayIndex, program });
   }
   return {
-    name: plan.name,
-    overview: plan.description,
+    name: keyedText(plan.name, current?.name),
+    overview: keyedText(plan.description, current?.overview),
+    unit: unitSystem === "imperial" ? 1 : 0,
     sessions,
     weekStages: Array.from({ length: plan.weekCount }, (_, weekIndex) => ({
       weekNo: weekIndex + 1,
@@ -745,7 +761,11 @@ export async function duplicatePlanOnCoros(planId: string): Promise<TrainingPlan
   const remoteId = remoteIdOf(planId);
   const copy = await copyNativeCorosPlan(remoteId);
   const name = `${corosText(copy.name) ?? copy.name} Copy`;
-  await updateNativeCorosPlan(copy.remoteId, nativePlanWriteInputFromRaw(copy.rawPayload, { name, overview: corosText(copy.overview) ?? "" }), {
+  const rawOverview = copy.rawPayload.overview;
+  await updateNativeCorosPlan(copy.remoteId, nativePlanWriteInputFromRaw(copy.rawPayload, {
+    name,
+    overview: typeof rawOverview === "string" ? rawOverview : corosText(copy.overview) ?? ""
+  }), {
     current: copy.rawPayload
   });
   const source = getTrainingPlanMetadata(planId);
@@ -946,12 +966,18 @@ export function planOntoRunningCopy(
   const from = today > startKey ? today : startKey;
   const past = copy.sessions.filter((session) => dayOf(session.dayNo) < from);
   const pastIds = new Set(past.map((session) => session.idInPlan));
-  const onCopy = new Set(copy.sessions.map((session) => session.idInPlan));
+  const onCopy = new Map(copy.sessions.map((session) => [session.idInPlan, session]));
+  /* The template's session, as the copy's row: a template program's id and
+     plan written over the copy's would name the template's row, and read as
+     an edit of every session on every sync. */
   const ahead = plan.sessions
     .filter((session) => dayOf(session.dayNo) >= from && !pastIds.has(session.idInPlan))
-    .map((session) =>
-      onCopy.has(session.idInPlan) ? session : { dayNo: session.dayNo, program: session.program }
-    );
+    .map((session) => {
+      const row = onCopy.get(session.idInPlan);
+      return row
+        ? { ...session, program: withProgramIdentity(session.program, row.program) }
+        : { dayNo: session.dayNo, program: session.program };
+    });
   return {
     name: plan.name,
     overview: plan.overview,

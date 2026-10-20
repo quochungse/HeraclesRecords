@@ -199,11 +199,12 @@ test("an unchanged session says nothing; an added one takes the next id", () => 
     keepTemplateSession,
     { dayNo: 2, program: libraryProgram }
   ]));
-  assert.deepEqual(body.versionObjects, [{ id: 2, status: 1 }]);
+  // `type: 0` on every entry of an update, as the web app's edit screens send it.
+  assert.deepEqual(body.versionObjects, [{ type: 0, id: 2, status: 1 }]);
   assert.deepEqual(
     body.versionObjects,
-    fixture("plan-update-add-session-request.json").versionObjects,
-    "the same change the live probe sent and COROS accepted"
+    fixture("plan-update-add-session-request.json").versionObjects.map((entry) => ({ type: 0, ...entry })),
+    "the change the live probe sent and COROS accepted, plus the web app's type"
   );
   assert.equal(body.maxIdInPlan, 2);
   assert.equal(body.entities[0].id, template.entities[0].id, "a kept session keeps every field COROS gave it");
@@ -219,16 +220,19 @@ test("a session new to the plan is sent as the web app sends one, whatever plan 
   const [kept, fresh] = body.programs;
   assert.equal(kept.planId, template.id, "a kept session keeps what COROS gave it");
   assert.equal(fresh.idInPlan, 2);
-  const sent = fixture("plan-update-add-session-request.json").programs[1];
-  for (const field of ["planId", "star"]) {
-    assert.equal(field in sent, false, `the web app sends a new session without ${field}`);
-    assert.equal(field in fresh, false, `and so does the app, for a session copied in the plan (${field})`);
-  }
+  // The web app's copy of a session (`handleCopy`): `id` and `planId` blanked,
+  // so the write names no row of the plan it came from.
+  assert.equal(fresh.planId, "", "a session copied in the plan names no plan");
+  assert.equal(fresh.id, "", "nor the program row it was copied from");
+  assert.equal("star" in fresh, false);
   assert.deepEqual(fresh.exercises, copied.exercises, "with the steps it was copied from");
-  assert.deepEqual(body.versionObjects, [{ id: 2, status: 1 }]);
+  assert.deepEqual(body.versionObjects, [{ type: 0, id: 2, status: 1 }]);
 
   const created = adapter.buildNativePlanCreateBody(templateInput([{ dayNo: 0, program: copied }]), { region: 1 });
-  assert.equal("planId" in created.programs[0], false, "and a session saved into a new plan names no old one");
+  assert.equal(created.programs[0].planId, "", "and a session saved into a new plan names no old one");
+  const fromLibrary = adapter.buildNativePlanCreateBody(templateInput([{ dayNo: 0, program: libraryProgram }]), { region: 1 });
+  assert.equal(fromLibrary.programs[0].id, libraryProgram.id, "a library workout keeps its id, as the web app's drag does");
+  assert.equal("planId" in fromLibrary.programs[0], false);
 });
 
 test("a rename alone is a plan-level change, not a session edit", () => {
@@ -250,15 +254,54 @@ const instanceInput = (sessions, extra = {}) => ({
   ...extra
 });
 
+test("an update renumbers no session it did not move, as the web app never does", () => {
+  /* COROS's own numbering, which is not the app's 1…n: a catalog plan arrives
+     with sortNoInSchedule 0 on every session. */
+  const numbered = structuredClone(instance);
+  numbered.entities.forEach((entity, index) => {
+    entity.sortNo = 40 + index;
+    entity.sortNoInPlan = 40 + index;
+    entity.sortNoInSchedule = 0;
+  });
+  const sessions = numbered.entities.map((entity) => ({
+    idInPlan: entity.idInPlan,
+    dayNo: entity.dayNo,
+    program: numbered.programs.find((program) => program.idInPlan === entity.idInPlan)
+  }));
+  const body = adapter.buildNativePlanUpdateBody(numbered, { name: numbered.name, overview: numbered.overview ?? "", sessions, weekStages: [] });
+  assert.deepEqual(body.versionObjects, [], "nothing changed, nothing is named");
+  assert.deepEqual(
+    body.entities.map((entity) => [entity.sortNo, entity.sortNoInSchedule]),
+    numbered.entities.map((entity) => [entity.sortNo, entity.sortNoInSchedule]),
+    "every session keeps COROS's numbers"
+  );
+
+  const added = adapter.buildNativePlanUpdateBody(numbered, {
+    name: numbered.name,
+    overview: numbered.overview ?? "",
+    sessions: [...sessions, { dayNo: sessions[0].dayNo, program: libraryProgram }],
+    weekStages: []
+  });
+  const fresh = added.entities.find((entity) => entity.id === undefined);
+  const highest = 40 + numbered.entities.length - 1;
+  assert.equal(fresh.sortNo, highest + 1, "a new session is numbered past the plan's highest");
+  assert.equal(new Set(added.entities.map((entity) => entity.sortNo)).size, added.entities.length, "no two sessions share a number");
+  assert.equal(
+    added.versionObjects.filter((version) => version.status === 2).length,
+    0,
+    "adding a session after the others on a day moves none of them"
+  );
+});
+
 test("a removed session is named with its plan ids and status 3", () => {
   const body = adapter.buildNativePlanUpdateBody(instance, instanceInput([keepInstance("2"), keepInstance("3")]));
   assert.deepEqual(body.versionObjects, [
-    { id: "1", planProgramId: "1", planId: instance.id, status: 3 }
+    { type: 0, id: "1", planProgramId: "1", planId: instance.id, status: 3 }
   ]);
   assert.deepEqual(
     Object.keys(body.versionObjects[0]).sort(),
-    Object.keys(fixture("plan-update-remove-session-request.json").versionObjects[0]).sort(),
-    "named the way the web app names a removal"
+    [...Object.keys(fixture("plan-update-remove-session-request.json").versionObjects[0]), "type"].sort(),
+    "named the way the web app names a removal, type included"
   );
   assert.deepEqual(body.entities.map((entity) => entity.idInPlan), ["2", "3"]);
   assert.deepEqual(body.programs.map((program) => program.idInPlan), ["2", "3"]);
@@ -274,7 +317,7 @@ test("moving a session on a running plan re-dates it from the start week's Monda
   assert.equal(moved.dayNo, 10);
   assert.equal(moved.happenDay, 20270121, "Monday 11 Jan + 10 days");
   assert.deepEqual(body.versionObjects, [
-    { id: "2", planProgramId: "2", planId: instance.id, status: 2 }
+    { type: 0, id: "2", planProgramId: "2", planId: instance.id, status: 2 }
   ]);
 });
 
@@ -285,7 +328,7 @@ test("a session added to a running plan is dated; one started mid-week counts fr
   ]));
   const fresh = added.entities.find((entity) => entity.idInPlan === 4);
   assert.equal(fresh.happenDay, 20270115, "Friday of week 1");
-  assert.deepEqual(added.versionObjects, [{ id: 4, status: 1 }]);
+  assert.deepEqual(added.versionObjects, [{ type: 0, id: 4, status: 1 }]);
 
   const midWeek = { ...clone(instance), startDay: 20270113 };
   const fromWednesday = adapter.buildNativePlanUpdateBody(midWeek, instanceInput([
@@ -304,7 +347,7 @@ test("an edited program is a session edit", () => {
   const body = adapter.buildNativePlanUpdateBody(instance, instanceInput([
     keepInstance("1"), keepInstance("2"), keepInstance("3", { program: renamed })
   ]));
-  assert.deepEqual(body.versionObjects, [{ id: "3", planProgramId: "3", planId: instance.id, status: 2 }]);
+  assert.deepEqual(body.versionObjects, [{ type: 0, id: "3", planProgramId: "3", planId: instance.id, status: 2 }]);
   assert.equal(body.programs.find((program) => program.idInPlan === "3").name, "Tempo instead");
 });
 
@@ -595,10 +638,10 @@ test("a session copied in the editor is saved as a new session", async () => {
   });
   assert.equal(result.ok, true);
   const [update] = coros.to("/training/plan/update");
-  assert.deepEqual(update.body.versionObjects, [{ id: 2, status: 1 }], "COROS is told of one new session");
+  assert.deepEqual(update.body.versionObjects, [{ type: 0, id: 2, status: 1 }], "COROS is told of one new session");
   const [kept, fresh] = update.body.programs;
   assert.equal(kept.planId, template.id);
-  assert.equal("planId" in fresh || "star" in fresh, false, "and it names no session it was copied from");
+  assert.equal(fresh.planId || fresh.id || "star" in fresh, false, "and it names no session it was copied from");
   assert.deepEqual(fresh.exercises, kept.exercises, "it has the steps it was copied from");
   assert.equal(coros.to("/training/program/calculate").length, 0, "an untouched copy is not recalculated");
   assert.equal(result.plan.entries.length, 2);
