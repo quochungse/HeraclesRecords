@@ -198,6 +198,8 @@ export function RunVolumeChart({
             <YAxis
               tick={{ fill: colors.text, fontSize: 11 }}
               stroke={colors.grid}
+              // Whole numbers, as the labels are written: a 3.5 h week drew 3 twice.
+              allowDecimals={false}
               tickFormatter={(value: number) => formatDecimal(value, 0)}
             />
 
