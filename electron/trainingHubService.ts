@@ -29,6 +29,7 @@ import {
   summarizeActivityDetail
 } from "./activityMetrics";
 import { INTENSITY_SUMMARY_VERSION, sportHasTrainingBenefit } from "./sessionIntensity";
+import { PERFORMANCE_SUMMARY_VERSION, sportHasRunPerformance } from "./runPerformance";
 import {
   countStrengthActivitiesMissingDetail,
   countTrainingActivitiesMissingFeelType,
@@ -2044,6 +2045,13 @@ export interface ActivityDetailSummarySyncOptions {
    * label on a page is read from the detail open there.
    */
   requireIntensity?: boolean;
+  /**
+   * Count a road or track run's summary as missing until it carries the
+   * current performance curve (`PERFORMANCE_SUMMARY_VERSION`). Only the Running
+   * screen asks: the curve is read for the runs it shows and the six weeks
+   * before them, not swept across the whole history.
+   */
+  requirePerformance?: boolean;
 }
 
 export async function syncActivityDetailSummaries(
@@ -2060,7 +2068,10 @@ export async function syncActivityDetailSummaries(
       (!options.requireRecords || summary.recordsVersion === RECORDS_SUMMARY_VERSION) &&
       (!options.requireIntensity ||
         !sportHasTrainingBenefit(sportType) ||
-        summary.intensityVersion === INTENSITY_SUMMARY_VERSION)
+        summary.intensityVersion === INTENSITY_SUMMARY_VERSION) &&
+      (!options.requirePerformance ||
+        !sportHasRunPerformance(sportType) ||
+        summary.performanceVersion === PERFORMANCE_SUMMARY_VERSION)
     );
   };
   const valid = new Set(

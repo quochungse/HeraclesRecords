@@ -2,6 +2,7 @@ import { useI18n } from "../i18n/useI18n";
 import { useCallback, useMemo, useState } from "react";
 import { ArrowLeft, CloudOff, MessageCircle, RefreshCw } from "lucide-react";
 import type {
+  ActivityDetailSummary,
   CoachOpenRequest,
   CorosProfileZoneFamily,
   TrainingHubActivity,
@@ -48,6 +49,8 @@ import {
 import { formatDecimal, t } from "../i18n/core";
 import { detailTrainingBenefit, type BenefitZoneFamily } from "../training/trainingBenefit";
 import { TrainingBenefitChips } from "../training/components/TrainingBenefitChip";
+import { sportHasRunPerformance, type PerformanceProfile } from "../../electron/runPerformance";
+import { RunPerformanceChart } from "./RunPerformanceChart";
 
 interface RunDetailViewProps {
   activity: TrainingHubActivity;
@@ -66,7 +69,14 @@ interface RunDetailViewProps {
   zoneFamily?: CorosProfileZoneFamily;
   /** The same model as the label's family, or none until it is known. */
   benefitFamily?: BenefitZoneFamily;
+  /** Maximum and resting heart rate, which performance is read on. None until the profile answers. */
+  performanceProfile?: PerformanceProfile;
+  /** Every run, and their stored summaries, for the usual this run is read against. */
+  allRuns?: readonly TrainingHubActivity[];
+  summaries?: ReadonlyMap<string, ActivityDetailSummary>;
 }
+
+const NO_SUMMARIES: ReadonlyMap<string, ActivityDetailSummary> = new Map();
 
 /**
  * How much longer start-to-finish has to be than the running itself before it
@@ -105,7 +115,10 @@ export function RunDetailView({
   onRetry,
   onAskCoach,
   zoneFamily,
-  benefitFamily
+  benefitFamily,
+  performanceProfile,
+  allRuns = [],
+  summaries = NO_SUMMARIES
 }: RunDetailViewProps) {
   const { unitSystem, temperatureUnit } = useUnitSystem();
   const { locale } = useI18n();
@@ -437,6 +450,18 @@ export function RunDetailView({
 
       {ground && ground.terrain.length > 0 ? (
         <TerrainPanel terrain={ground.terrain} reading="trail" />
+      ) : null}
+
+      {series.length > 0 && performanceProfile && sportHasRunPerformance(activity.sportType) ? (
+        <RunPerformanceChart
+          activity={activity}
+          series={series}
+          corosVo2max={detail?.effect?.vo2max}
+          durationSeconds={detail?.duration ?? activity.duration ?? 0}
+          profile={performanceProfile}
+          allRuns={allRuns}
+          summaries={summaries}
+        />
       ) : null}
 
       {series.length > 0 ? (

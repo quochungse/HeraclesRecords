@@ -34,6 +34,12 @@ import {
   speedUnit
 } from "../../units/units";
 import { formatDurationSeconds } from "../formatters";
+import {
+  activityAxisTicks,
+  formatXLabel,
+  formatXTick,
+  type ActivitySeriesAxis
+} from "../activityAxis";
 import { useChartColors } from "../useChartColors";
 import "../activityChart.css";
 import {
@@ -82,7 +88,7 @@ const COMBINED_HEIGHT = 340;
 const SPLIT_TOP_HEIGHT = 200;
 const SPLIT_BOTTOM_HEIGHT = 262;
 
-/** Axis ids a stacked plot draws empty, to keep its gutters as wide as its neighbour's. */
+/** Axis ids a plot draws empty, so it keeps both gutters whatever channels it holds. */
 const SPARE_LEFT_AXIS = "spare-left";
 const SPARE_RIGHT_AXIS = "spare-right";
 
@@ -95,8 +101,6 @@ const SPLIT_PREFERENCE = defineSelectionPreference<boolean>({
   defaultValue: false,
   validate: selectionIsBoolean
 });
-
-export type ActivitySeriesAxis = "elapsed" | "distance";
 
 interface ActivitySeriesChartProps {
   series: readonly TrainingHubActivitySeriesPoint[];
@@ -218,29 +222,6 @@ function stretchGain(points: readonly ActivityChannelPoint[]): number | undefine
     }
   }
   return anchor === undefined ? undefined : gain;
-}
-
-function formatXTick(
-  axis: ActivitySeriesAxis,
-  value: number,
-  unitSystem: UnitSystem
-): string {
-  if (axis === "elapsed") {
-    return formatDurationSeconds(value);
-  }
-  return formatDecimal(metersToDisplayDistance(value, unitSystem), 1);
-}
-
-/** The tooltip's heading: the same position as a tick, with its unit. */
-function formatXLabel(
-  axis: ActivitySeriesAxis,
-  value: number,
-  unitSystem: UnitSystem
-): string {
-  if (axis === "elapsed") {
-    return formatDurationSeconds(value);
-  }
-  return `${formatDecimal(metersToDisplayDistance(value, unitSystem), 2)} ${distanceUnit(unitSystem)}`;
 }
 
 /**
@@ -422,6 +403,16 @@ export function ActivitySeriesChart({
     return rows.slice(range.start, range.end + 1);
   }, [range, rows]);
 
+  // Round marks over the stretch on screen, the same ones the efficiency chart
+  // above a run's page draws, so a minute reads at one x in both.
+  const xTicks = useMemo(
+    () =>
+      visible.length > 0
+        ? activityAxisTicks(visible[0]!.x, visible[visible.length - 1]!.x, axis, unitSystem)
+        : undefined,
+    [axis, unitSystem, visible]
+  );
+
   const segment = useMemo(() => {
     if (visible.length < 2) {
       return null;
@@ -522,7 +513,6 @@ export function ActivitySeriesChart({
     height,
     withBrush,
     tooltipAltitude,
-    gutters,
     showXAxis = true
   }: {
     /** Which plot this is, so each SVG names its own gradient. */
@@ -532,11 +522,6 @@ export function ActivitySeriesChart({
     withBrush: boolean;
     tooltipAltitude: boolean;
     showXAxis?: boolean;
-    /**
-     * Stacked plots share one clock, so their x positions must line up: each
-     * keeps a left and a right gutter whether or not it has a channel for it.
-     */
-    gutters: boolean;
   }) => {
     const leftAxisId = channels[0]?.key ?? SPARE_LEFT_AXIS;
     const altitudeFillId = `${syncId}-${name}-altitude-fill`;
@@ -565,6 +550,7 @@ export function ActivitySeriesChart({
               type="number"
               domain={["dataMin", "dataMax"]}
               hide={!showXAxis}
+              ticks={xTicks}
               tick={{ fill: colors.text, fontSize: 11 }}
               tickLine={false}
               axisLine={{ stroke: colors.grid }}
@@ -604,10 +590,14 @@ export function ActivitySeriesChart({
                 }
               />
             ))}
-            {gutters && channels.length === 0 ? (
+            {/* A left and a right gutter whether or not there is a channel for
+                each, so x positions line up with whatever is drawn on the same
+                clock — the other plot of a split, the efficiency chart above a
+                run's page — and the plot does not widen as a channel is let go. */}
+            {channels.length === 0 ? (
               <YAxis yAxisId={SPARE_LEFT_AXIS} orientation="left" tick={false} axisLine={false} tickLine={false} />
             ) : null}
-            {gutters && channels.length < 2 ? (
+            {channels.length < 2 ? (
               <YAxis yAxisId={SPARE_RIGHT_AXIS} orientation="right" tick={false} axisLine={false} tickLine={false} />
             ) : null}
 
@@ -642,7 +632,7 @@ export function ActivitySeriesChart({
                 ))
               : null}
 
-            {(channels.length > 0 || gutters) && boundaries.length <= 40
+            {boundaries.length <= 40
               ? boundaries.slice(0, -1).map((lap) => (
                   <ReferenceLine
                     key={`lap-${lap.index}`}
@@ -808,7 +798,6 @@ export function ActivitySeriesChart({
               height: SPLIT_TOP_HEIGHT,
               withBrush: false,
               tooltipAltitude: true,
-              gutters: true,
               showXAxis: false
             })}
           </div>
@@ -822,8 +811,7 @@ export function ActivitySeriesChart({
               channels: selectedIn("body"),
               height: SPLIT_BOTTOM_HEIGHT,
               withBrush: true,
-              tooltipAltitude: false,
-              gutters: true
+              tooltipAltitude: false
             })}
           </div>
         </>
@@ -836,8 +824,7 @@ export function ActivitySeriesChart({
               channels: selected.map(activityChannel),
               height: COMBINED_HEIGHT,
               withBrush: true,
-              tooltipAltitude: true,
-              gutters: false
+              tooltipAltitude: true
             })}
           </div>
         </>

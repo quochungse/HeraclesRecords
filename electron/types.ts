@@ -688,8 +688,33 @@ export interface ActivityDetailSummary {
    */
   intensityVersion?: number;
   intensity?: SessionIntensity;
+  /**
+   * A road or track run's raw performance curve (`electron/runPerformance.ts`),
+   * versioned on its own for the reason the intensity is. Present, perhaps with
+   * no points, once read; absent on another sport and on an older row.
+   */
+  performanceVersion?: number;
+  performance?: RunPerformanceCurve;
   /** Epoch milliseconds. */
   computedAt: number;
+}
+
+/**
+ * What a run's performance is read from: per step of activity time, the
+ * grade-adjusted speed over 90 seconds and the heart rate over the same 90
+ * seconds `lag` later. Only steps that can be trusted are kept. No profile is
+ * in it, so a change of maximum or resting heart rate needs no recompute.
+ */
+export interface RunPerformanceCurve {
+  version: number;
+  /** Seconds between readings. */
+  step: number;
+  /** Seconds heart rate was read behind the pace. */
+  lag: number;
+  /** COROS's VO2max as of the run, which the figure is scaled onto. */
+  corosVo2max?: number;
+  /** `[seconds of activity time, metres a minute, bpm]`. */
+  points: [number, number, number][];
 }
 
 /**

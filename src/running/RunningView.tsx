@@ -31,7 +31,9 @@ import { useUnitSystem } from "../units/UnitSystemProvider";
 import { distanceUnit, elevationUnit } from "../units/units";
 import type { PrimaryView } from "../navigation/primaryNav";
 import { RunDetailView } from "./RunDetailView";
-import { RunEfficiencyChart } from "./RunEfficiencyChart";
+import { RunPerformancePanel } from "./RunPerformancePanel";
+import { performanceHistory, performanceRunsNeeded } from "./runPerformanceModel";
+import { performanceProfile, sportHasRunPerformance } from "../../electron/runPerformance";
 import { RunIntensityPanel } from "./RunIntensityPanel";
 import { RunningHero, runningThresholdZones } from "./RunningHero";
 import { RunSurfacePanel } from "./RunSurfacePanel";
@@ -201,7 +203,11 @@ export function RunningView({
   // zone wait rather than draw from LTHR: this view remounts on every visit, and
   // on such an account the fallback found no easy runs, so the efficiency
   // headline switched to "All runs" and back each time.
-  const { model: zoneModel, settled: zonesSettled } = useHeartRateZoneModel({
+  const {
+    model: zoneModel,
+    settled: zonesSettled,
+    profile: corosProfile
+  } = useHeartRateZoneModel({
     api,
     corosConnected: connected
   });
@@ -211,6 +217,12 @@ export function RunningView({
   const zoneScale = useMemo<RunZoneScale>(
     () => zoneModel ?? { family: "lthr", zones: runningThresholdZones(snapshot) },
     [snapshot, zoneModel]
+  );
+  // Performance reads the account's maximum and resting heart rate, off the
+  // same profile answer as the zones.
+  const perfProfile = useMemo(
+    () => performanceProfile(corosProfile?.thresholds.maxHr, corosProfile?.thresholds.restingHr),
+    [corosProfile]
   );
   const stackedSurfaces = useMemo(
     () => (surface === null ? availableSurfaces : [surface]),
@@ -229,12 +241,33 @@ export function RunningView({
   // are kept as a row per run so a whole list can show them. Read for the runs
   // on screen; missing ones are computed in the background and appear as they
   // land.
+  //
+  // Performance needs more than the runs on screen: each is read against the
+  // six weeks before it, so those runs' curves are asked for too — on the list,
+  // the weeks before the oldest run shown; on a run's page, the weeks before
+  // that run, once its own detail is in. Nothing outside those windows is read.
+  // Only where a performance block is drawn: the list off the Trail filter, or
+  // a road or track run's page.
+  const ownDetailLoaded = selectedRunId !== null && detail?.activityId === selectedRunId;
+  const readsPerformance = selectedRun ? sportHasRunPerformance(selectedRun.sportType) : !trail;
+  const summaryRuns = useMemo(() => {
+    if (!readsPerformance) {
+      return selectedRun ? [selectedRun] : runs;
+    }
+    if (selectedRun) {
+      return [selectedRun, ...performanceHistory(allRuns, (selectedRun.startTime ?? 0) * 1000)];
+    }
+    const needed = performanceRunsNeeded(allRuns, runs);
+    const shown = new Set(runs.map((activity) => activity.activityId));
+    return [...runs, ...needed.filter((activity) => !shown.has(activity.activityId))];
+  }, [allRuns, readsPerformance, runs, selectedRun]);
   const summaries = useActivityDetailSummaries({
     api,
-    activities: runs,
-    enabled: connected && selectedRunId === null,
-    // Each row wears its training label.
-    requireIntensity: true
+    activities: summaryRuns,
+    enabled: connected && (selectedRunId === null || ownDetailLoaded),
+    // The list's rows wear their training label; a page reads its own off the detail.
+    requireIntensity: selectedRun === null,
+    requirePerformance: readsPerformance
   });
 
   if (!connected) {
@@ -277,6 +310,9 @@ export function RunningView({
         onAskCoach={onAskCoach}
         zoneFamily={zoneModel?.family}
         benefitFamily={benefitFamily}
+        performanceProfile={perfProfile}
+        allRuns={allRuns}
+        summaries={summaries}
       />
     );
   }
@@ -440,16 +476,18 @@ export function RunningView({
               nowMs={nowMs}
               defaultMeasure={trail ? "time" : "distance"}
             />
-            {/* Efficiency is ground covered per heartbeat, and on a trail the
-                gradient decides the ground covered: the chart would rank the
-                hilly weeks as unfit ones. So the trail view leaves it out
-                rather than draw it with a caveat. */}
+            {/* Performance is read on road and track runs only: on a trail the
+                ground decides the pace as much as the legs, so the trail view
+                leaves it out rather than draw it with a caveat. It waits for
+                the profile, whose maximum and resting heart rate it reads. */}
             {trail ? null : zonesSettled ? (
-              <RunEfficiencyChart
+              <RunPerformancePanel
                 runs={runs}
+                allRuns={allRuns}
+                summaries={summaries}
+                profile={perfProfile}
                 weeks={chartWeeks}
-                surfaces={stackedSurfaces}
-                zoneScale={zoneScale}
+                periodDays={periodDays as PeriodDays}
                 nowMs={nowMs}
               />
             ) : (

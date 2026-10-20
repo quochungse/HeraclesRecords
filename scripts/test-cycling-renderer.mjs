@@ -259,7 +259,7 @@ async function main() {
       "and no pace anywhere"
     );
     assert.equal(await hasText("Bikes"), true, "the split by bike");
-    assert.equal(await hasText("Aerobic efficiency"), false, "no efficiency chart for a bike");
+    assert.equal(await hasText("Running efficiency"), false, "no running efficiency chart for a bike");
 
     // The bike chips are the kinds present and nothing else.
     for (const label of ["Road", "Gravel", "Indoor"]) {

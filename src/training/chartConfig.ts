@@ -59,6 +59,9 @@ export interface TrainingChartColors {
   tooltipBorder: string;
   /** Hue-free color for a bar block that stands for no sport in particular. */
   neutralFill: string;
+  /** Above and below the athlete's usual, on the performance charts. */
+  better: string;
+  worse: string;
 }
 
 export type TrainingMetricKey = "load" | "rpe" | "hrv" | "sleep";
@@ -89,7 +92,9 @@ const DARK_CHART_COLORS: TrainingChartColors = {
   dotStroke: "rgba(12, 14, 13, 0.85)",
   tooltipBg: "rgba(18, 18, 20, 0.96)",
   tooltipBorder: "rgba(255, 255, 255, 0.12)",
-  neutralFill: "#5c6167"
+  neutralFill: "#5c6167",
+  better: "#26a37c",
+  worse: "#d9772a"
 };
 
 const PAPER_CHART_COLORS: TrainingChartColors = {
@@ -105,7 +110,9 @@ const PAPER_CHART_COLORS: TrainingChartColors = {
   dotStroke: "rgba(255, 255, 255, 0.9)",
   tooltipBg: "rgba(255, 255, 255, 0.98)",
   tooltipBorder: "rgba(19, 26, 40, 0.15)",
-  neutralFill: "#98a0ae"
+  neutralFill: "#98a0ae",
+  better: "#0f7859",
+  worse: "#c2570c"
 };
 
 export function getTrainingChartColors(theme: Theme): TrainingChartColors {

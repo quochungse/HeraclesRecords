@@ -949,6 +949,131 @@
   font-size: 12px;
 }
 
+/* ---------------------------------------------------------- performance -- */
+
+.run-performance-change {
+  color: var(--text-primary);
+}
+
+/* How the figure is read, and along what: two switches at the head's end. */
+.run-performance-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.run-performance-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.run-performance-tags:empty {
+  display: none;
+}
+
+.run-performance-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 10px;
+  border-radius: var(--radius-pill);
+  background: var(--run-raised);
+  color: var(--text-primary);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+.run-performance-pill i {
+  width: 8px;
+  height: 8px;
+  border-radius: var(--radius-pill);
+  background: var(--text-muted);
+}
+
+.run-performance-pill.is-better i {
+  background: var(--success-text);
+}
+
+.run-performance-pill.is-worse i {
+  background: var(--warning-text);
+}
+
+.run-performance-plot-title {
+  margin: 0 0 6px;
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+/* The two kinds of stretch the run page reads nothing on, as the chart draws
+   them: hatched where the data was not steady, dotted where there was none. */
+.run-legend i.run-performance-swatch,
+.training-chart-tooltip-key i.run-performance-swatch {
+  width: 14px;
+  height: 10px;
+  border-radius: var(--radius-xs);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--text-muted) 35%, transparent);
+}
+
+.run-performance-swatch.is-unsteady {
+  background: repeating-linear-gradient(
+    45deg,
+    color-mix(in srgb, var(--text-muted) 55%, transparent) 0 1.5px,
+    transparent 1.5px 4px
+  );
+}
+
+.run-performance-swatch.is-no-data {
+  background: radial-gradient(color-mix(in srgb, var(--text-muted) 70%, transparent) 1px, transparent 1.2px) 0 0 / 4px 4px;
+}
+
+/* The four corners are words, laid over the plot rather than drawn in it, so
+   they wrap and translate like any other text. */
+.run-performance-quadrant-plot {
+  position: relative;
+}
+
+.run-performance-corner {
+  position: absolute;
+  display: grid;
+  max-width: 42%;
+  color: var(--text-muted);
+  font-size: 11px;
+  line-height: 1.3;
+  pointer-events: none;
+}
+
+.run-performance-corner strong {
+  color: var(--text-secondary);
+  font-weight: 600;
+}
+
+.run-performance-corner.is-top-left {
+  top: 12px;
+  left: 54px;
+}
+
+.run-performance-corner.is-top-right {
+  top: 12px;
+  right: 14px;
+  text-align: right;
+}
+
+.run-performance-corner.is-bottom-left {
+  bottom: 30px;
+  left: 54px;
+}
+
+.run-performance-corner.is-bottom-right {
+  bottom: 30px;
+  right: 14px;
+  text-align: right;
+}
+
 .run-legend {
   display: flex;
   flex-wrap: wrap;

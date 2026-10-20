@@ -326,11 +326,12 @@ export interface HeraclesRecordsApi {
   /** Compute the missing ones, a few per call. Call again while `remaining`
    *  is above zero. `requireRecords` also counts a summary as missing until it
    *  carries the Hall of Records' best efforts and start point;
-   *  `requireIntensity` until a run or a ride carries what its label is read from. */
+   *  `requireIntensity` until a run or a ride carries what its label is read from;
+   *  `requirePerformance` until a road or track run carries its performance curve. */
   syncActivityDetailSummaries: (
     activityIds: string[],
     limit?: number,
-    options?: { requireRecords?: boolean; requireIntensity?: boolean }
+    options?: { requireRecords?: boolean; requireIntensity?: boolean; requirePerformance?: boolean }
   ) => Promise<ActivityDetailSummarySync>;
   exportTrainingHubActivityFile: (
     activityId: string,

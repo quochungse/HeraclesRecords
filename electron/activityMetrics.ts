@@ -19,6 +19,11 @@ import type {
   TrainingHubTrackPoint
 } from "./types";
 import { INTENSITY_SUMMARY_VERSION, summarizeSessionIntensity } from "./sessionIntensity";
+import {
+  PERFORMANCE_SUMMARY_VERSION,
+  runPerformanceCurve,
+  sportHasRunPerformance
+} from "./runPerformance";
 
 const METERS_PER_KM = 1000;
 const SECONDS_PER_MINUTE = 60;
@@ -456,6 +461,16 @@ export function summarizeActivityDetail(
       : [];
   const startPoint = activityStartPoint(detail.track?.points);
   const intensity = summarizeSessionIntensity(detail);
+  const corosSummary = raw?.summary as Record<string, unknown> | undefined;
+  const performance = sportHasRunPerformance(detail.sportType)
+    ? runPerformanceCurve(
+        active,
+        // As `parseActivityEffect` reads it, so the stored anchor is the page's.
+        [corosSummary?.currentVo2Max, corosSummary?.hrmVo2Max].find(
+          (value): value is number => typeof value === "number" && value > 0
+        )
+      )
+    : undefined;
 
   return {
     activityId,
@@ -471,6 +486,7 @@ export function summarizeActivityDetail(
     ...(efforts.length > 0 ? { bestEfforts: efforts } : {}),
     ...(startPoint ? { startPoint } : {}),
     ...(intensity ? { intensityVersion: INTENSITY_SUMMARY_VERSION, intensity } : {}),
+    ...(performance ? { performanceVersion: PERFORMANCE_SUMMARY_VERSION, performance } : {}),
     computedAt: now ?? Date.now()
   };
 }

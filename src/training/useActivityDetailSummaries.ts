@@ -30,10 +30,24 @@ let fetchedThisSession = 0;
 
 const EMPTY: ReadonlyMap<string, ActivityDetailSummary> = new Map();
 
-function toMap(
+/**
+ * What is held, with these laid over it. Never what is held thrown away: a
+ * screen that reads another set for a while — Running's run page, with the six
+ * weeks before it — came back to a list whose columns and charts drew from the
+ * page's few runs until the list's own read landed, a frame later.
+ */
+function withSummaries(
+  current: ReadonlyMap<string, ActivityDetailSummary>,
   summaries: readonly ActivityDetailSummary[]
 ): ReadonlyMap<string, ActivityDetailSummary> {
-  return new Map(summaries.map((summary) => [summary.activityId, summary]));
+  if (summaries.length === 0) {
+    return current;
+  }
+  const next = new Map(current);
+  for (const summary of summaries) {
+    next.set(summary.activityId, summary);
+  }
+  return next;
 }
 
 export interface ActivityDetailSummariesInput {
@@ -44,13 +58,16 @@ export interface ActivityDetailSummariesInput {
   enabled: boolean;
   /** Also count a run or a ride as missing until it carries its intensity: a list whose rows wear the label. */
   requireIntensity?: boolean;
+  /** Also count a road or track run as missing until it carries its performance curve. */
+  requirePerformance?: boolean;
 }
 
 export function useActivityDetailSummaries({
   api,
   activities,
   enabled,
-  requireIntensity = false
+  requireIntensity = false,
+  requirePerformance = false
 }: ActivityDetailSummariesInput): ReadonlyMap<string, ActivityDetailSummary> {
   const [summaries, setSummaries] =
     useState<ReadonlyMap<string, ActivityDetailSummary>>(EMPTY);
@@ -77,17 +94,19 @@ export function useActivityDetailSummaries({
 
     void (async () => {
       try {
-        const stored = await api.getActivityDetailSummaries(ids);
+        // Taken as a list here, inside the `try`: React runs the updater later,
+        // outside it, where a reply that is no list would take the screen down.
+        const stored = [...(await api.getActivityDetailSummaries(ids))];
         if (cancelled) {
           return;
         }
-        setSummaries(toMap(stored));
+        setSummaries((current) => withSummaries(current, stored));
 
         while (!cancelled && fetchedThisSession < SESSION_FETCH_CAP) {
           const pass = await api.syncActivityDetailSummaries(
             ids,
             SUMMARY_CHUNK,
-            requireIntensity ? { requireIntensity } : undefined
+            { requireIntensity, requirePerformance }
           );
           // Charged before anything else: the fetches happened whether or not
           // this effect is still around to see them, and a period change tears
@@ -98,18 +117,10 @@ export function useActivityDetailSummaries({
             return;
           }
 
-          const written = pass.summaries ?? [];
-          if (written.length > 0) {
-            // Merged, not re-read: a fresh read of every id after every few
-            // would send the whole summary table over IPC once per pass.
-            setSummaries((current) => {
-              const next = new Map(current);
-              for (const summary of written) {
-                next.set(summary.activityId, summary);
-              }
-              return next;
-            });
-          }
+          // Merged, not re-read: a fresh read of every id after every few
+          // would send the whole summary table over IPC once per pass.
+          const written = [...(pass.summaries ?? [])];
+          setSummaries((current) => withSummaries(current, written));
 
           // Nothing left, or nothing moving — a pass that computes none is
           // either done or failing, and retrying it in a loop helps neither.
@@ -126,7 +137,7 @@ export function useActivityDetailSummaries({
     return () => {
       cancelled = true;
     };
-  }, [api, enabled, key, requireIntensity]);
+  }, [api, enabled, key, requireIntensity, requirePerformance]);
 
   return summaries;
 }

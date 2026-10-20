@@ -98,6 +98,11 @@ export function periodOptions(
   return PERIOD_SCALE.filter((option) => days.includes(option.days));
 }
 
+/** The phrase for a window inside a sentence: "the last 3 months", "all time". */
+export function periodPhrase(days: PeriodDays): string {
+  return PERIOD_SCALE.find((option) => option.days === days)?.phrase ?? t("app.period.all.phrase");
+}
+
 /** The label for a window, for a heading or a sentence that names it. */
 export function periodLabel(days: PeriodDays): string {
   return PERIOD_SCALE.find((option) => option.days === days)?.label ?? t("app.period.all");
