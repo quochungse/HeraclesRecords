@@ -76,6 +76,11 @@ const PACE_TIERS: readonly number[] = [0, 1, 2, 3, 3, 4, 5];
 
 /** Less activity time than this is a warm-up or a commute, not a session to label. */
 export const MIN_BENEFIT_SECONDS = 10 * 60;
+/**
+ * Less than this read after the warm-up — no heart rate recorded, or a run
+ * that barely outlasted the warm-up — says nothing about a steady session.
+ */
+const MIN_STEADY_READ_SECONDS = 5 * 60;
 
 /**
  * Daniels' sessions, and the least work each takes to be one: R repetitions
@@ -210,10 +215,14 @@ function rankedSeconds(intensity: SessionIntensity, tiers: readonly number[]): n
   return ranked;
 }
 
-/** A session without reps that decide it: hardest first, as each standard defines it. */
-function steady(intensity: SessionIntensity, tiers: readonly number[]): Reading {
+/**
+ * A session without reps that decide it: hardest first, as each standard
+ * defines it. Nothing when too little of it was read to say.
+ */
+function steady(intensity: SessionIntensity, tiers: readonly number[]): Reading | undefined {
   const ranked = rankedSeconds(intensity, tiers);
   const total = ranked.reduce((sum, value) => sum + value, 0);
+  if (total < MIN_STEADY_READ_SECONDS) return undefined;
   const measure = intensity.joint ? "both" : "hr";
   const atOrAbove = (benefit: TrainingBenefit) =>
     ranked.slice(RANK[benefit]).reduce((sum, value) => sum + value, 0);
@@ -245,7 +254,8 @@ function steady(intensity: SessionIntensity, tiers: readonly number[]): Reading 
 
 /**
  * The session's label and shape, or nothing: the wrong sport, no intensity
- * read yet, under ten minutes, or the account's model not known yet.
+ * read yet, under ten minutes, too little read after the warm-up, or the
+ * account's model not known yet.
  */
 export function trainingBenefit(
   sportType: number | undefined,
@@ -258,6 +268,7 @@ export function trainingBenefit(
   const tiers = family === "maxHr" ? MAX_HR_TIERS : RESERVE_TIERS;
   const repeats = intensity.reps?.length ? fromReps(intensity.reps, tiers) : undefined;
   const reading = repeats?.reading ?? steady(intensity, tiers);
+  if (!reading) return undefined;
   const ride = (sportType ?? 0) >= 200;
   const long = intensity.seconds >= (ride ? LONG_RIDE_SECONDS : LONG_RUN_SECONDS);
   // Pick-ups that decide nothing say less about a long run than its length does; strides stay strides.

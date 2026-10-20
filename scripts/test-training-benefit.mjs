@@ -240,6 +240,8 @@ assert.equal(
 );
 assert.equal(label(steady(MIN_BENEFIT_SECONDS - 1, [[1, 1, 60]])), undefined, "under ten minutes");
 assert.equal(label(undefined), undefined, "no intensity read yet");
+assert.equal(label(steady(min(40), [])), undefined, "no heart rate recorded is not an aerobic run");
+assert.equal(label(steady(min(12), [[3, 4, min(1)]])), undefined, "a minute read after the warm-up says nothing");
 assert.equal(label(steady(min(60), [[1, 1, min(50)]]), 104), undefined, "a hike");
 
 {
