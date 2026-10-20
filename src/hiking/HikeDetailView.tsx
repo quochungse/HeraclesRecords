@@ -3,6 +3,7 @@ import { useCallback, useMemo, useState } from "react";
 import { ArrowLeft, CloudOff, MessageCircle, RefreshCw } from "lucide-react";
 import type {
   CoachOpenRequest,
+  CorosProfileZoneFamily,
   TrainingHubActivity,
   TrainingHubActivityDetail,
   TrainingHubActivityLap
@@ -42,6 +43,7 @@ import {
 import { hikeSeconds } from "./hikeMetrics";
 import { HIKE_TYPE_LABELS, classifyHikeType } from "./hikeType";
 import { ClimbsPanel, TerrainPanel } from "./TerrainPanels";
+import { ActivityZoneTimePanel } from "../training/components/ActivityZoneTimePanel";
 import { formatDecimal, getIntlLocale, t } from "../i18n/core";
 
 interface HikeDetailViewProps {
@@ -55,6 +57,8 @@ interface HikeDetailViewProps {
   backLabel?: string;
   onRetry: () => void;
   onAskCoach?: (request: CoachOpenRequest) => void;
+  /** The account's heart-rate model, naming the zones of an activity COROS left unlabelled. */
+  zoneFamily?: CorosProfileZoneFamily;
 }
 
 /** Stopped time worth a stat of its own. Below it the day had no rest in it to speak of. */
@@ -106,7 +110,8 @@ export function HikeDetailView({
   onBack,
   backLabel = t("nav.hiking"),
   onRetry,
-  onAskCoach
+  onAskCoach,
+  zoneFamily
 }: HikeDetailViewProps) {
   const { unitSystem, temperatureUnit } = useUnitSystem();
   const { locale } = useI18n();
@@ -331,6 +336,16 @@ export function HikeDetailView({
             {t("common.tryAgain")}
           </button>
         </section>
+      ) : null}
+
+      {/* Heart rate only: the pace zones COROS scores a hike on are a runner's. */}
+      {detail ? (
+        <ActivityZoneTimePanel
+          hrZones={detail.hrZones}
+          hrZoneType={detail.hrZoneType}
+          accountFamily={zoneFamily}
+          frame="page"
+        />
       ) : null}
 
       {terrain.length > 0 ? <TerrainPanel terrain={terrain} reading="hike" /> : null}

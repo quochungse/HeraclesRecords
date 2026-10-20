@@ -25,6 +25,8 @@ import {
 import { resolveSportName } from "./sportTypes";
 import { useActivityDetailSummaries } from "./useActivityDetailSummaries";
 import { useActivityFeelTypes } from "./useActivityFeelTypes";
+import { useHeartRateZoneModel } from "./useHeartRateZoneModel";
+import { benefitZoneFamily } from "./trainingBenefit";
 import type { ActivitiesViewProps } from "./types";
 import "./activities.css";
 import { plural, t } from "../i18n/core";
@@ -119,6 +121,9 @@ export function ActivitiesView({
     // connection first.
     enabled: detailRequest?.status !== "pending"
   });
+  // The open session's label is read on the account's heart-rate model, and waits for it.
+  const zoneModel = useHeartRateZoneModel({ api, corosConnected: connected });
+  const benefitFamily = benefitZoneFamily(zoneModel);
 
   const visible = useMemo(
     () =>
@@ -260,6 +265,7 @@ export function ActivitiesView({
       onOpenSportScreen={onOpenSportScreen}
       hiddenSportScreens={hiddenSportScreens}
       onAskCoach={onAskCoach}
+      benefitFamily={benefitFamily}
     />
   );
 

@@ -681,8 +681,67 @@ export interface ActivityDetailSummary {
   bestEfforts?: BestEffort[];
   /** Where the activity began, rounded to two decimals (about a kilometre). */
   startPoint?: { lat: number; lon: number };
+  /**
+   * What a run's or ride's training label is read from, versioned on its own
+   * (`INTENSITY_SUMMARY_VERSION`) for the reason the records' figures are.
+   * Absent on another sport, and on a row computed before it existed.
+   */
+  intensityVersion?: number;
+  intensity?: SessionIntensity;
+  /**
+   * A road or track run's raw performance curve (`electron/runPerformance.ts`),
+   * versioned on its own for the reason the intensity is. Present, perhaps with
+   * no points, once read; absent on another sport and on an older row.
+   */
+  performanceVersion?: number;
+  performance?: RunPerformanceCurve;
   /** Epoch milliseconds. */
   computedAt: number;
+}
+
+/**
+ * What a run's performance is read from: per step of activity time, the
+ * grade-adjusted speed over 90 seconds and the heart rate over the same 90
+ * seconds `lag` later. Only steps that can be trusted are kept. No profile is
+ * in it, so a change of maximum or resting heart rate needs no recompute.
+ */
+export interface RunPerformanceCurve {
+  version: number;
+  /** Seconds between readings. */
+  step: number;
+  /** Seconds heart rate was read behind the pace. */
+  lag: number;
+  /** COROS's VO2max as of the run, which the figure is scaled onto. */
+  corosVo2max?: number;
+  /** `[seconds of activity time, metres a minute, bpm]`. */
+  points: [number, number, number][];
+}
+
+/**
+ * A session's effort, as `electron/sessionIntensity.ts` reads it for its
+ * training label. Buckets are COROS's: six heart-rate buckets, seven pace
+ * buckets (Threshold stored in two), 0 the easiest.
+ */
+export interface SessionIntensity {
+  version: number;
+  /** Activity time, pauses out. */
+  seconds: number;
+  /** Seconds per heart-rate bucket after the warm-up. */
+  hr: number[];
+  /** On a paced run, the same seconds by heart-rate bucket and pace bucket: `joint[hr][pace]`. */
+  joint?: number[][];
+  /** The work bouts of a repeat session. */
+  reps?: SessionRep[];
+  /** Where the reps came from: a structured workout's steps, or laps pressed by hand. */
+  repSource?: "workout" | "manual";
+}
+
+export interface SessionRep {
+  seconds: number;
+  meters: number;
+  hrBucket?: number;
+  /** Absent off a paced run, and on a trail, where a rep's pace is the hill's. */
+  paceBucket?: number;
 }
 
 /** The fastest stretch of one run over a standard distance. */
@@ -749,12 +808,26 @@ export interface TrainingHubActivityDetail {
   /** This activity's own HR zone distribution, empty when COROS sent none. */
   hrZones: TrainingHubActivityZoneBucket[];
   /**
+   * The heart-rate model `hrZones` was scored on, COROS's `hrZoneType`: 1 Max
+   * HR, 2 HR Reserve, 3 LTHR. It names the buckets — the two families call the
+   * same bucket by different names. Absent when COROS sent 0 or nothing — and
+   * it sends 0 on some activities of an account on one model all along, so a
+   * reader falls back to the account's model rather than to none.
+   */
+  hrZoneType?: number;
+  /**
    * The pace zones COROS scored this activity against, in seconds per
    * kilometre: `low` is a bucket's fast edge and `high` its slow one. Numbered
    * bucket for bucket as `hrZones` is, so index 0 is everything slower than
    * zone 1 and carries only `low`. Empty when COROS sent none.
    */
   paceZones?: TrainingHubActivityZoneBucket[];
+  /**
+   * The same pace zones, scored on grade-adjusted pace (COROS's type 173) —
+   * what a trail run's time in zones is read from, where the raw pace is the
+   * gradient's.
+   */
+  adjustedPaceZones?: TrainingHubActivityZoneBucket[];
   effect?: TrainingHubActivityEffect;
   weather?: TrainingHubActivityWeather;
   track?: TrainingHubActivityTrack;

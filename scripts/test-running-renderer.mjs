@@ -989,6 +989,11 @@ async function main() {
       RUNS.length,
       "the sweep covers the list on screen"
     );
+    assert.deepEqual(
+      sweeps[0].args[2],
+      { requireIntensity: true, requirePerformance: true },
+      "and asks for the labels its rows wear and the performance curves the road and track runs need"
+    );
 
     assert.equal(
       await hasText("2 of 30 runs are split by their time in each zone"),
@@ -1070,7 +1075,9 @@ async function main() {
   // view remounts on every visit, and the dashboard's LTHR zones it drew from
   // in the meantime are a different population: on a heart-rate-reserve account
   // with no run under the LTHR easy ceiling, the efficiency headline read "All
-  // runs" and then switched to "Easy runs" once the profile answered.
+  // runs" and then switched to "Easy runs" once the profile answered. The
+  // performance block that replaced it waits on the same answer, for the
+  // maximum and resting heart rate it is read on.
   // -------------------------------------------------------------------------
   {
     // Every fixture run averages 150 bpm: moderate on these, easy on the next.
@@ -1083,6 +1090,8 @@ async function main() {
       profile: {
         hrZoneType: 2,
         thresholds: {
+          maxHr: 190,
+          restingHr: 52,
           zones: {
             maxHr: [],
             restingHr: [133, 154, 168, 173, 183, 404].map((bpm, index) => ({ index, bpm })),
@@ -1104,9 +1113,9 @@ async function main() {
       { ...noSummaries, getCorosProfileSnapshot: "__pending" }
     );
     assert.equal(
-      await hasText("Aerobic efficiency"),
+      await hasText("Running efficiency"),
       false,
-      "no efficiency figure while the account's zones are on their way"
+      "no performance figure while the account's profile is on its way"
     );
     assert.equal(await hasText("Intensity mix"), false, "nor an intensity split");
     assert.equal(
@@ -1116,13 +1125,13 @@ async function main() {
     );
 
     assert.equal(await harness("resolvePending", "getCorosProfileSnapshot", reserveProfile), true);
-    await waitFor(() => hasText("Aerobic efficiency"), "the efficiency block draws once the zones land");
+    await waitFor(() => hasText("Running efficiency"), "the performance block draws once the profile lands");
     assert.equal(
-      await hasText("Easy runs over 20 minutes"),
-      true,
-      "scored on the account's own zones, never first on the dashboard's"
+      await hasText("Set your maximum and resting heart rate"),
+      false,
+      "read on the profile's own maximum and resting heart rate"
     );
-    assert.equal(await hasText("no easy sessions to compare"), false);
+    assert.equal(await hasText("Road and track runs"), true);
     assert.equal(await hasText("Heart Rate Reserve zones."), true);
 
     // A profile that cannot be read settles too — onto the dashboard's zones,
@@ -1131,8 +1140,12 @@ async function main() {
       { activities: RUNS, activitiesStatus: "ready", snapshot: lthrOnly },
       noSummaries
     );
-    await waitFor(() => hasText("Aerobic efficiency"), "a failed profile read still draws the block");
-    assert.equal(await hasText("no easy sessions to compare"), true, "from the LTHR fallback");
+    await waitFor(() => hasText("Running efficiency"), "a failed profile read still draws the block");
+    assert.equal(
+      await hasText("Set your maximum and resting heart rate on COROS to read your running efficiency."),
+      true,
+      "and says what it needs rather than guessing a maximum"
+    );
   }
 
   const errors = await harness("consoleErrors");
@@ -1230,7 +1243,7 @@ async function main() {
     }
     assert.equal(await hasText("VO₂max"), false, "VO₂max and threshold pace are the road's");
     assert.equal(await hasText("Threshold"), false);
-    assert.equal(await hasText("Aerobic efficiency"), false, "ground per heartbeat is the gradient's on a trail");
+    assert.equal(await hasText("Running efficiency"), false, "on a trail the ground decides the pace");
     assert.equal(await hasText("Avg pace"), false, "an average pace over gradients says how hilly, not how run");
     assert.deepEqual(await pressedIn(".sport-volume-aside"), ["Time"], "a trail week opens in hours");
     assert.match(await volumeHeading(), /^\d+ h/, "and the heading counts them");
@@ -1259,7 +1272,7 @@ async function main() {
       true
     );
     assert.ok(chips.includes("Climbing rate"), `a trail run's chart reads the climbing rate: ${chips}`);
-    assert.ok(chips.includes("Grade-adjusted pace") && chips.includes("Pace"), `and pace, as a run: ${chips}`);
+    assert.ok(chips.includes("Effort pace") && chips.includes("Pace"), `and pace, as a run: ${chips}`);
     assert.ok(!chips.includes("Speed"), `never a km/h: ${chips}`);
     for (const label of ["Terrain", "Descending", "Highest point", "Climbing rate", "1 ascent · 1 descent"]) {
       assert.equal(await hasText(label), true, `the trail page states ${label}`);

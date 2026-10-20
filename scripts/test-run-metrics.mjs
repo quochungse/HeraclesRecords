@@ -22,10 +22,8 @@ const {
 const {
   CLIMBING_RATE_MIN_GAIN_M,
   ascentPerHour,
-  buildRunEfficiencyWeeks,
   buildRunWeeks,
   climbingRateOf,
-  countsForEfficiency,
   runIntensityMix,
   runSurfaceBreakdown,
   efficiencyIndex,
@@ -151,14 +149,6 @@ assert.equal(
     zones: [{ index: 0, hr: 140 }, { index: 1, hr: 155 }, { index: 2, hr: 170 }]
   }).easy.duration,
   4190
-);
-assert.equal(
-  buildRunEfficiencyWeeks(
-    [run({ startTime: secondsAgo(1), duration: 1100, elapsedDuration: 1800 })],
-    { weeks: 1, nowMs: NOW }
-  )[0].count,
-  0,
-  "18 minutes of running is too short for efficiency, however long the stops were"
 );
 
 // Pauses sit on the wall clock; the samples go quiet through them.
@@ -452,73 +442,6 @@ assert.deepEqual(
 );
 
 // ---------------------------------------------------------------------------
-// Efficiency by week. Only steady running counts: a ten-minute shakeout spends
-// most of its length with the pulse still climbing, and would read as a jump in
-// fitness that never happened.
-// ---------------------------------------------------------------------------
-
-const efficiencyFixtures = [
-  // Easy, long enough, last week: 10 km in 50 min at 140 bpm -> 200/140.
-  run({
-    activityId: "ef-easy",
-    startTime: secondsAt(2026, 8, 9),
-    distance: 10_000,
-    duration: 3000,
-    avgHr: 140
-  }),
-  // Same week, same numbers, but a hard effort — excluded once zones are known.
-  run({
-    activityId: "ef-hard",
-    startTime: secondsAt(2026, 8, 10),
-    distance: 10_000,
-    duration: 3000,
-    avgHr: 170
-  }),
-  // Easy but only 15 minutes: too short for an average to mean anything.
-  run({
-    activityId: "ef-short",
-    startTime: secondsAt(2026, 8, 11),
-    distance: 3_000,
-    duration: 900,
-    avgHr: 120
-  }),
-  // Trail, easy, long enough — its own surface line.
-  run({
-    activityId: "ef-trail",
-    startTime: secondsAt(2026, 8, 12),
-    sportType: 102,
-    distance: 8_000,
-    duration: 3200,
-    avgHr: 140
-  })
-];
-
-const efficiencyWeeks = buildRunEfficiencyWeeks(efficiencyFixtures, {
-  weeks: 3,
-  nowMs: NOW,
-  zoneScale: scale
-});
-assert.equal(efficiencyWeeks.length, 3);
-
-const efLastWeek = efficiencyWeeks[1];
-assert.equal(efLastWeek.count, 2, "the hard run and the short run are both out");
-assert.ok(Math.abs(efLastWeek.bySurface.road - 200 / 140) < 1e-9);
-assert.ok(Math.abs(efLastWeek.bySurface.trail - (8000 / (3200 / 60)) / 140) < 1e-9);
-assert.equal(
-  efLastWeek.bySurface.track,
-  undefined,
-  "a surface with no run that week has no figure, not a zero"
-);
-
-// Without zones there is no way to tell easy from hard, so every long enough
-// run counts — the caller is expected to say which of the two it is showing.
-const efficiencyNoZones = buildRunEfficiencyWeeks(efficiencyFixtures, {
-  weeks: 3,
-  nowMs: NOW
-});
-assert.equal(efficiencyNoZones[1].count, 3, "hard running is counted, the shakeout is not");
-
-// ---------------------------------------------------------------------------
 // Intensity mix. Counted both ways because they disagree, and the disagreement
 // is the point: the 80/20 rule is stated about time, not about sessions.
 // ---------------------------------------------------------------------------
@@ -545,16 +468,6 @@ assert.equal(
   mix.easy.count + mix.moderate.count + mix.hard.count + mix.unrated.count,
   6,
   "the bike ride is not a run"
-);
-// A run long enough to count, placed by its average: zones decide easy from
-// hard, and this week's Monday keeps it inside the single week asked for.
-assert.equal(
-  buildRunEfficiencyWeeks(
-    [run({ activityId: "grey", startTime: secondsAt(2026, 8, 14, 7), avgHr: 165, duration: 3600 })],
-    { weeks: 1, nowMs: NOW, zoneScale: scale }
-  )[0].count,
-  0,
-  "hard running is not efficiency data"
 );
 
 // ---------------------------------------------------------------------------
@@ -702,15 +615,6 @@ assert.equal(
 );
 
 // ---------------------------------------------------------------------------
-// The efficiency line and its scatter draw one population.
-// ---------------------------------------------------------------------------
-
-assert.equal(countsForEfficiency(run({ duration: 600 })), false, "a shakeout is too short to mean anything");
-assert.equal(countsForEfficiency(run({ duration: 3600, avgHr: 150 })), true, "no zones: every long run");
-assert.equal(countsForEfficiency(run({ duration: 3600, avgHr: 150 }), scale), false, "zone 3 is not easy");
-assert.equal(countsForEfficiency(run({ duration: 3600, avgHr: 140 }), scale), true);
-
-// ---------------------------------------------------------------------------
 // The trail view reads a week in hours and height, per surface, and the
 // climbing rate is Hiking's rule read over trail runs.
 // ---------------------------------------------------------------------------
@@ -790,6 +694,146 @@ assert.equal(countsForEfficiency(run({ duration: 3600, avgHr: 140 }), scale), tr
     ["pace", "hr"],
     "no GAP: raw pace takes its slot, still ahead of heart rate"
   );
+}
+
+// The chart's rows keep every peak and trough of the samples: a surge shorter
+// than a bucket is drawn at its full height, not averaged down to a ripple.
+{
+  const { envelopeActivitySeries } = await import(
+    `${pathToFileURL(path.join(repoRoot, "electron", "activitySeries.ts")).href}${bust}`
+  );
+  const samples = Array.from({ length: 3600 }, (_, index) => ({
+    elapsed: index,
+    distance: index * 2.8,
+    altitude: 20 + Math.floor(index / 100),
+    // Steady at 150 bpm but for one three-second surge to 180 and one dip to 120.
+    hr: index >= 1000 && index < 1003 ? 180 : index >= 2000 && index < 2003 ? 120 : 150,
+    pace: 380
+  }));
+  const rows = envelopeActivitySeries(samples, 1000);
+  assert.ok(rows.length <= 1000, "no more rows than asked for");
+  assert.equal(Math.max(...rows.map((row) => row.hr)), 180, "the surge keeps its height");
+  assert.equal(Math.min(...rows.map((row) => row.hr)), 120, "and the dip its depth");
+  assert.ok(
+    rows.every((row, index) => index === 0 || row.elapsed >= rows[index - 1].elapsed),
+    "the rows run forward in time"
+  );
+  assert.ok(
+    rows.every((row) => samples.some((sample) => sample.elapsed === row.elapsed && sample.altitude === row.altitude)),
+    "a row stands where a sample was, at that sample's elevation"
+  );
+  const short = samples.slice(0, 600);
+  assert.deepEqual(envelopeActivitySeries(short, 1000), short, "a short series is drawn as recorded");
+}
+
+// Split, the chart is two plots with two axes each: the cap counts within the
+// pressed channel's group, every plot opens on something, and rejoining keeps
+// one channel of each group rather than the last two pressed.
+{
+  const { availableActivityChannels, canSplitActivityChannels, fitActivityChannels, toggleActivityChannel } =
+    await import(`${pathToFileURL(path.join(repoRoot, "src", "training", "activityChannels.ts")).href}${bust}`);
+  const available = availableActivityChannels(
+    Array.from({ length: 60 }, (_, index) => ({
+      elapsed: index,
+      distance: index * 3,
+      pace: 360,
+      hr: 150,
+      cadence: 176,
+      strideLength: 1.2,
+      power: 260
+    })),
+    "pace"
+  );
+  assert.equal(canSplitActivityChannels(available), true);
+  assert.equal(
+    canSplitActivityChannels(availableActivityChannels([{ elapsed: 0, hr: 120 }, { elapsed: 1, hr: 121 }], "pace")),
+    false,
+    "heart rate alone has nothing to split from"
+  );
+  assert.deepEqual(toggleActivityChannel(["pace", "hr"], "cadence", true), ["pace", "hr", "cadence"]);
+  assert.deepEqual(
+    toggleActivityChannel(["pace", "hr", "cadence"], "strideLength", true),
+    ["pace", "cadence", "strideLength"],
+    "a third channel below drops the oldest one below, never the pace"
+  );
+  assert.deepEqual(
+    toggleActivityChannel(["pace", "hr"], "power", true),
+    ["pace", "hr", "power"],
+    "power is output: it joins pace above, and heart rate stays"
+  );
+  assert.deepEqual(
+    fitActivityChannels(["power", "hr"], available, true),
+    ["power", "hr"],
+    "a ride's opening pair splits one above, one below"
+  );
+  assert.deepEqual(toggleActivityChannel(["pace", "hr"], "cadence"), ["hr", "cadence"], "combined, the cap is two in all");
+  assert.deepEqual(fitActivityChannels(["hr"], available, true), ["pace", "hr"], "an empty plot opens on its first channel");
+  assert.deepEqual(fitActivityChannels(["pace", "cadence", "power"], available, false), ["pace", "cadence"]);
+}
+
+// Smoothing evens out what one second of GPS or a single stride gets wrong,
+// and nothing else: heart rate stays as recorded, a stop stays a gap, a jump in
+// the clock is never averaged across, and paces average as speeds.
+{
+  const { smoothActivitySeries } = await import(
+    `${pathToFileURL(path.join(repoRoot, "electron", "activitySeries.ts")).href}${bust}`
+  );
+  // GPS jitter around 5:00 /km, a stop with no pace at 40–44 s, and a dropout:
+  // the clock jumps from 59 to 300, where the runner is suddenly at 4:00.
+  const samples = [
+    ...Array.from({ length: 60 }, (_, index) => ({
+      elapsed: index,
+      hr: 140 + (index % 7),
+      ...(index >= 40 && index < 45 ? {} : { pace: index % 2 === 0 ? 270 : 330 })
+    })),
+    ...Array.from({ length: 20 }, (_, index) => ({ elapsed: 300 + index, hr: 160, pace: 240 }))
+  ];
+  const smoothed = smoothActivitySeries(samples);
+  const harmonic = 2 / (1 / 270 + 1 / 330);
+  const steady = smoothed.slice(5, 35).map((point) => point.pace);
+  assert.ok(
+    steady.every((pace) => Math.abs(pace - harmonic) < 12),
+    "jitter of ±30 s/km is evened out to within a few seconds"
+  );
+  assert.deepEqual(smoothed.map((point) => point.hr), samples.map((point) => point.hr), "heart rate is untouched");
+  assert.ok(smoothed.slice(40, 45).every((point) => point.pace === undefined), "a stop stays a gap");
+  assert.ok(Math.abs(smoothed[60].pace - 240) < 1e-9, "nothing from before the jump bleeds across it");
+  assert.equal(samples[0].pace, 270, "the recorded samples are not written to");
+}
+
+// The axis an activity's charts are read along: round marks, and a moment of
+// activity time placed on the distance axis where the runner was by then.
+{
+  const axisModule = await import(
+    `${pathToFileURL(path.join(repoRoot, "src", "training", "activityAxis.ts")).href}${bust}`
+  );
+  const { activityAxisTicks, axisPositionOf, seriesAxisExtent } = axisModule;
+  assert.deepEqual(
+    activityAxisTicks(0, 4193, "elapsed", "metric"),
+    [0, 600, 1200, 1800, 2400, 3000, 3600],
+    "a 70-minute run is marked every ten minutes, never at 16:40"
+  );
+  assert.deepEqual(activityAxisTicks(0, 12_400, "distance", "metric"), [0, 2000, 4000, 6000, 8000, 10000, 12000]);
+  assert.ok(Object.is(activityAxisTicks(0, 5000, "distance", "metric")[0], 0), "the first mark is 0, not -0");
+  assert.deepEqual(
+    activityAxisTicks(0, 16_093.44, "distance", "imperial"),
+    [0, 3218.688, 6437.376, 9656.064, 12874.752, 16093.44],
+    "in miles, every two"
+  );
+  assert.deepEqual(activityAxisTicks(130, 1310, "elapsed", "metric"), [300, 600, 900, 1200], "a zoomed stretch keeps round marks");
+  const samples = [
+    { elapsed: 0, distance: 0 },
+    { elapsed: 10, distance: 30 },
+    { elapsed: 20 },
+    { elapsed: 30, distance: 100 }
+  ];
+  const at = axisPositionOf(samples, "distance");
+  assert.equal(at(5), 15, "read between the samples either side");
+  assert.equal(at(20), 65, "across a sample with no distance");
+  assert.equal(at(99), 100, "and held at the last one past the end");
+  assert.equal(axisPositionOf(samples, "elapsed")(42), 42);
+  assert.deepEqual(seriesAxisExtent(samples, "distance"), [0, 100]);
+  assert.equal(seriesAxisExtent([{ elapsed: 1 }], "distance"), undefined);
 }
 
 console.log("run metrics: OK");

@@ -4,6 +4,7 @@ import { ArrowLeft, CloudOff, MessageCircle, RefreshCw } from "lucide-react";
 import type {
   CoachOpenRequest,
   CorosProfileZone,
+  CorosProfileZoneFamily,
   TrainingHubActivity,
   TrainingHubActivityDetail,
   TrainingHubActivityLap
@@ -31,6 +32,7 @@ import { rideMaxSpeedKmh } from "./rideAnalysis";
 import { RideClimbsPanel } from "./RideClimbsPanel";
 import { rideSeconds, speedKmh } from "./rideMetrics";
 import { RidePowerPanel } from "./RidePowerPanel";
+import { ActivityZoneTimePanel } from "../training/components/ActivityZoneTimePanel";
 import { StatGrid, type Stat } from "./StatGrid";
 import {
   untitledRide,
@@ -39,6 +41,8 @@ import {
   isOutdoorRideType
 } from "./rideType";
 import { formatDecimal, t } from "../i18n/core";
+import { detailTrainingBenefit, type BenefitZoneFamily } from "../training/trainingBenefit";
+import { TrainingBenefitChips } from "../training/components/TrainingBenefitChip";
 
 interface RideDetailViewProps {
   activity: TrainingHubActivity;
@@ -56,6 +60,10 @@ interface RideDetailViewProps {
   ftp?: number;
   /** The account's cycling power zones, as COROS states them. */
   powerZones?: readonly CorosProfileZone[];
+  /** The account's heart-rate model, naming the zones of an activity COROS left unlabelled. */
+  zoneFamily?: CorosProfileZoneFamily;
+  /** The same model as the label's family, or none until it is known. */
+  benefitFamily?: BenefitZoneFamily;
 }
 
 /**
@@ -98,11 +106,15 @@ export function RideDetailView({
   onRetry,
   onAskCoach,
   ftp,
-  powerZones
+  powerZones,
+  zoneFamily,
+  benefitFamily
 }: RideDetailViewProps) {
   const { unitSystem, temperatureUnit } = useUnitSystem();
   const { locale } = useI18n();
   const type = classifyRideType(activity.sportType);
+  // Read the way the list row's summary was, so a row and its page agree.
+  const benefit = detailTrainingBenefit(detail, activity.sportType, benefitFamily);
 
   const laps = detail?.laps ?? [];
   const series = useMemo(
@@ -262,6 +274,11 @@ export function RideDetailView({
               <h1>
                 {activity.name?.trim() || untitledRide(type)}
               </h1>
+              {benefit ? (
+                <div className="run-detail-benefit">
+                  <TrainingBenefitChips reading={benefit} />
+                </div>
+              ) : null}
             </div>
           </header>
 
@@ -302,6 +319,18 @@ export function RideDetailView({
           dynamics={detail.dynamics}
           ftp={ftp}
           powerZones={powerZones}
+        />
+      ) : null}
+
+      {/* Heart rate only: the power zones are the Power panel's, and the pace
+          zones COROS scores a ride on are a runner's. */}
+      {detail ? (
+        <ActivityZoneTimePanel
+          hrZones={detail.hrZones}
+          hrZoneType={detail.hrZoneType}
+          accountFamily={zoneFamily}
+          frame="page"
+          benefit={benefit}
         />
       ) : null}
 

@@ -1,7 +1,7 @@
 import type { MessageKey } from "../i18n/core";
 import { useMemo, type KeyboardEvent } from "react";
 import { ArrowDown, ArrowUp } from "lucide-react";
-import type { TrainingHubActivity } from "../../electron/types";
+import type { ActivityDetailSummary, TrainingHubActivity } from "../../electron/types";
 import {
   formatDistanceMeters,
   formatDurationSeconds,
@@ -13,6 +13,8 @@ import { formatSpeedValue } from "../units/units";
 import { positive, rideSeconds, speedKmh } from "./rideMetrics";
 import { untitledRide, RIDE_TYPE_LABELS, classifyRideType, type RideType } from "./rideType";
 import { t } from "../i18n/core";
+import type { BenefitZoneFamily } from "../training/trainingBenefit";
+import { ActivityBenefitChips } from "../training/components/TrainingBenefitChip";
 
 interface RideListProps {
   rides: readonly TrainingHubActivity[];
@@ -24,6 +26,10 @@ interface RideListProps {
   sort: RideSort;
   onSortChange: (sort: RideSort) => void;
   onOpenRide: (activity: TrainingHubActivity) => void;
+  /** Per-ride figures out of the detail payload, by activity id; a ride's label reads its intensity. */
+  summaries?: ReadonlyMap<string, ActivityDetailSummary>;
+  /** The account's heart-rate model each ride's label is read on; none until it is known. */
+  benefitFamily?: BenefitZoneFamily;
 }
 
 export interface RideSort {
@@ -157,7 +163,14 @@ function compareRows(
 
 export const DEFAULT_RIDE_SORT: RideSort = { key: "when", descending: true };
 
-export function RideList({ rides, sort, onSortChange, onOpenRide }: RideListProps) {
+export function RideList({
+  rides,
+  sort,
+  onSortChange,
+  onOpenRide,
+  summaries,
+  benefitFamily
+}: RideListProps) {
   const { unitSystem } = useUnitSystem();
   const { key: sortKey, descending } = sort;
 
@@ -237,7 +250,14 @@ export function RideList({ rides, sort, onSortChange, onOpenRide }: RideListProp
                   <strong>
                     {row.activity.name?.trim() || untitledRide(row.type)}
                   </strong>
-                  <span>{formatTrainingTableWhen(row.when)}</span>
+                  <span>
+                    {formatTrainingTableWhen(row.when)}
+                    <ActivityBenefitChips
+                      sportType={row.activity.sportType}
+                      intensity={summaries?.get(row.activity.activityId)?.intensity}
+                      family={benefitFamily}
+                    />
+                  </span>
                 </div>
               </div>
             </td>

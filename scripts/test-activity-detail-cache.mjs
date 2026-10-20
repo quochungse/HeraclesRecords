@@ -728,6 +728,38 @@ assert.equal(
   metrics.RECORDS_SUMMARY_VERSION
 );
 
+// The same for a training label: a run's row from before its intensity was kept
+// answers every sweep but the one from a screen whose rows wear the label.
+const { intensityVersion: _iv, intensity: _i, ...beforeIntensity } = recordsPass.summaries[0];
+database.upsertActivityDetailSummary(beforeIntensity);
+const unlabelledPass = await service.syncActivityDetailSummaries([summable.activityId], 2);
+assert.equal(unlabelledPass.computed, 0, "a sweep that shows no label leaves the row alone");
+const labelPass = await service.syncActivityDetailSummaries([summable.activityId], 2, {
+  requireIntensity: true
+});
+assert.equal(labelPass.computed, 1, "the labelled list's sweep reads it again");
+assert.ok(labelPass.summaries[0].intensity, "and the row now carries the intensity");
+
+// A payload that names a sport with no label, under a list row that has one,
+// gives a row without an intensity. Read once, it is not read again each pass.
+const otherSport = { ...run, activityId: "run-other-sport", name: "E-bike, says COROS" };
+database.upsertTrainingActivities([otherSport]);
+cache.writeCachedActivityDetail(
+  otherSport.activityId,
+  cache.activityDetailFingerprint(otherSport),
+  { ...detailPayload, sportType: 202 }
+);
+const mismatchPass = await service.syncActivityDetailSummaries([otherSport.activityId], 2, {
+  requireIntensity: true
+});
+assert.equal(mismatchPass.computed, 1);
+assert.equal(mismatchPass.summaries[0].intensity, undefined);
+const againPass = await service.syncActivityDetailSummaries([otherSport.activityId], 2, {
+  requireIntensity: true
+});
+assert.equal(againPass.computed, 0, "the same answer is not fetched again");
+assert.equal(againPass.remaining, 0, "and the sweep does not wait on it");
+
 globalThis.fetch = realFetch;
 database.deleteSettings(["trainingHub.accessToken", "trainingHub.baseUrl"]);
 

@@ -56,6 +56,7 @@ import {
 } from "./ActivityGlobeRenderer";
 import { OptionGroup } from "../components/OptionGroup";
 import { useBackGesture } from "../running/sportPage";
+import { useRailReselect } from "../navigation/useRailReselect";
 import { periodLabel } from "../preferences/periodScale";
 import {
   defineSelectionPreference,
@@ -75,6 +76,8 @@ interface ActivityGlobeCardProps {
   /** The Cattle of Geryon, once the Hall of Records has reckoned it. */
   labour?: LabourState;
   onOpenLabours: () => void;
+  /** Presses of this screen's rail item while it showed: back to every place. */
+  railReselect?: number;
 }
 
 type ActivityPeriod = "all" | "year" | "90-days" | "custom";
@@ -210,6 +213,7 @@ export function ActivityGlobeCard({
   onOpenActivity,
   labour,
   onOpenLabours,
+  railReselect,
 }: ActivityGlobeCardProps) {
   useI18n();
   const globeRendererRef = useRef<ActivityGlobeRendererHandle>(null);
@@ -525,6 +529,17 @@ export function ActivityGlobeCard({
     if (streetFocus) {
       exitStreetMode();
     } else if (selectedLocationKey) {
+      showAllPlaces();
+    }
+  });
+
+  // The rail's own item takes both steps at once. With a place open, letting
+  // it go flies the globe back on its own; a street map entered with nothing
+  // picked has no place to let go, so the camera is put back by hand.
+  useRailReselect(railReselect, () => {
+    if (streetFocus && !selectedLocationKey) {
+      exitStreetMode();
+    } else {
       showAllPlaces();
     }
   });

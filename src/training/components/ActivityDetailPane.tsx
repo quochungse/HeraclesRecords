@@ -49,6 +49,8 @@ import { ActivitySeriesChart } from "./ActivitySeriesChart";
 import { ActivityZoneBar } from "./ActivityZoneBar";
 import { StrengthDetailPanel } from "./StrengthDetailPanel";
 import { activityCoachRequest } from "../askCoachAbout";
+import { detailTrainingBenefit, type BenefitZoneFamily } from "../trainingBenefit";
+import { TrainingBenefitChips, TrainingBenefitReason } from "./TrainingBenefitChip";
 import { formatCount, formatDecimal, t } from "../../i18n/core";
 
 interface ActivityDetailPaneProps {
@@ -71,6 +73,8 @@ interface ActivityDetailPaneProps {
   hiddenSportScreens?: readonly SportScreen[];
   /** Asks Coach about this session, as the Calendar's Ask Coach does. */
   onAskCoach?: (request: CoachOpenRequest) => void;
+  /** The account's heart-rate model the session's label is read on; none until it is known. */
+  benefitFamily?: BenefitZoneFamily;
 }
 
 interface Figure {
@@ -115,7 +119,8 @@ export function ActivityDetailPane({
   onExportFile,
   onOpenSportScreen,
   hiddenSportScreens,
-  onAskCoach
+  onAskCoach,
+  benefitFamily
 }: ActivityDetailPaneProps) {
   const { unitSystem, temperatureUnit } = useUnitSystem();
   // A detail belonging to some other session is no detail at all — see
@@ -435,6 +440,9 @@ export function ActivityDetailPane({
     gpsPoints > 1 &&
     (detail.elevationGain ?? 0) >= ELEVATION_PROFILE_MIN_GAIN_M;
 
+  // Read the way a list row's summary is, so the pane and a row agree.
+  const benefit = detailTrainingBenefit(detail, sportType, benefitFamily);
+
   // Which screen, if any, is built for this sport — and none when the athlete
   // took it off the rail.
   const builtScreen = sportScreenFor(sportType);
@@ -454,6 +462,7 @@ export function ActivityDetailPane({
                 {sportName}
               </span>
             ) : null}
+            {benefit ? <TrainingBenefitChips reading={benefit} /> : null}
             {startTime ? <span>{formatTrainingTimestamp(startTime)}</span> : null}
             {pausedSeconds !== undefined && pausedSeconds >= PAUSE_NOTICE_S ? (
               <span title={t("activity.pane.pausedTitle")}>
@@ -555,6 +564,7 @@ export function ActivityDetailPane({
           ) : null}
 
           <ActivityZoneBar zones={detail.hrZones} />
+          {benefit ? <TrainingBenefitReason reading={benefit} /> : null}
 
           {hasSeries ? (
             <ActivitySeriesChart

@@ -26,6 +26,7 @@ import {
 } from "../preferences/periodScale";
 import { useHeartRateZoneModel } from "../training/useHeartRateZoneModel";
 import { useActivityDetailSummaries } from "../training/useActivityDetailSummaries";
+import { benefitZoneFamily } from "../training/trainingBenefit";
 import { useUnitSystem } from "../units/UnitSystemProvider";
 import { formatSpeedValue } from "../units/units";
 import type { PrimaryView } from "../navigation/primaryNav";
@@ -69,6 +70,8 @@ export interface CyclingViewProps {
   onOpenRequestHandled?: () => void;
   /** Back on a ride handed over from another screen: that screen, again. */
   onReturn?: (view: PrimaryView) => void;
+  /** Presses of this screen's rail item while it showed: back to the list. */
+  railReselect?: number;
   onAskCoach?: (request: CoachOpenRequest) => void;
 }
 
@@ -110,6 +113,7 @@ export function CyclingView({
   openRequest = null,
   onOpenRequestHandled,
   onReturn,
+  railReselect,
   onAskCoach
 }: CyclingViewProps) {
   const { unitSystem } = useUnitSystem();
@@ -129,6 +133,7 @@ export function CyclingView({
     openRequest,
     onOpenRequestHandled,
     onReturn,
+    railReselect,
     listLabel: t("nav.cycling")
   });
 
@@ -178,6 +183,7 @@ export function CyclingView({
     settled: zonesSettled,
     profile
   } = useHeartRateZoneModel({ api, corosConnected: connected });
+  const benefitFamily = benefitZoneFamily({ settled: zonesSettled, model: zoneModel });
   const zoneScale = useMemo<RunZoneScale>(
     () => zoneModel ?? { family: "lthr", zones: runningThresholdZones(snapshot) },
     [snapshot, zoneModel]
@@ -200,7 +206,9 @@ export function CyclingView({
   const summaries = useActivityDetailSummaries({
     api,
     activities: rides,
-    enabled: connected && selectedRideId === null
+    enabled: connected && selectedRideId === null,
+    // Each row wears its training label.
+    requireIntensity: true
   });
 
   if (!connected) {
@@ -241,6 +249,8 @@ export function CyclingView({
         onAskCoach={onAskCoach}
         ftp={profile?.thresholds.ftp}
         powerZones={profile?.thresholds.zones.cyclePower}
+        zoneFamily={zoneModel?.family}
+        benefitFamily={benefitFamily}
       />
     );
   }
@@ -410,6 +420,8 @@ export function CyclingView({
               sort={sort}
               onSortChange={setSort}
               onOpenRide={openRide}
+              summaries={summaries}
+              benefitFamily={benefitFamily}
             />
           </div>
         )}

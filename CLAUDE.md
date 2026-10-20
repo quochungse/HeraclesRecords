@@ -944,6 +944,133 @@ lives at module level for the same visit-to-visit reason — see `useCalendarDat
   with Running and were moved out of `src/running/` for that — none of them ever asked what
   sport they were reading. Anything else that both screens need goes the same way rather than
   being copied.
+- **The channel chart** (`ActivitySeriesChart`, `activityChannels.ts`; reworked 2026-10-20) — the
+  chart under every run, ride and hike, titled **Performance**. **Its line is drawn from what was
+  recorded**: `smoothActivitySeries` first averages the noisy channels over a few seconds on the
+  series' clock (pace and effort pace over 5 s, as speeds; power 5, cadence 3, the form figures 5;
+  heart rate never, since a smoothed peak never happened), then `envelopeActivitySeries` cuts it to
+  1 000 rows, two per bucket carrying its lowest and highest reading in the order they came, joined
+  by straight segments. It was 400 bucket means: nine seconds a bucket on an hour's run, and every
+  surge averaged to a ripple. Both are for the drawing only; every figure the page states, the
+  segment line included, comes off the recorded samples. **Split** (`activity.chart.split`, a
+  selection preference, so it syncs) draws two plots on one clock: Output above (pace,
+  effort pace, speed, power, climbing rate; `activityChannelGroup`) and Body & form below (heart
+  rate, cadence, the form figures), each with two axes of its own, so the two-channel cap counts
+  per plot (`toggleActivityChannel(…, split)`) and a change of layout keeps a channel of each group
+  (`fitActivityChannels`). The plots share a `syncId`, so the brush under the lower one and a lap
+  picked in the table move both. **Every plot keeps both gutters** whatever channels it holds, and
+  is marked in round minutes or kilometres over the stretch on screen (`activityAxis.ts`), so two
+  plots on one clock line up, and a plot does not widen as a channel is let go. It is offered only
+  when both groups have a channel
+  (`canSplitActivityChannels`). **Power is output, not the body**: filed with heart rate, a ride
+  opened with both in the lower plot. The colours are a set checked with a colour-vision validator
+  (`DARK_CHANNEL_COLORS` says which pairs it holds apart), and grade-adjusted pace is called
+  **Effort pace**, COROS's own name for it, in every language.
+- **A session's training label** (`electron/sessionIntensity.ts` reads, `src/training/trainingBenefit.ts`
+  names; built 2026-10-19) — Garmin's "primary benefit" and the session's shape: a coloured chip
+  (Recovery, Aerobic, Tempo, Threshold, VO2 Max, Anaerobic) and an outlined one (Intervals 3 × 8′,
+  Strides 5 × 20″, Long run / Long ride), on the Activities pane (not its rows, by decision), a
+  Running or Cycling table row (beside the date, not a column) and the run and ride pages, whose
+  zone panel says why under the zones. **Runs and rides only** (100–103, 200, 201, 203, 204, 299):
+  an e-bike's heart rate is the motor's, a hike's climb would read Threshold, the rest has no
+  tempo. **The rules are published standards, not tuned to one athlete**: COROS's zones line up
+  with Daniels' paces (Aerobic Endurance E, Aerobic Power M → Tempo, Threshold T, Anaerobic
+  Endurance I → VO2 Max, Anaerobic Power R → Anaerobic), a repeat session is named by its work
+  bouts (Seiler & Kjerland's session-goal method) and the least work is Daniels' (R 4 min, I 8, T
+  and M 20). **A rep is read on its pace** wherever it has one — 5:45 in COROS's Threshold pace
+  zone is Threshold even under a Tempo name, chosen to agree with COROS — and on heart rate
+  elsewhere (treadmill, ride, trail); a rep under two minutes at I pace or faster is an R rep.
+  **A steady session is read after the warm-up (10 min of activity time), each second at the lower
+  of its pace zone and heart-rate zone** where both exist, so a hot easy run's drifting pulse is
+  not a tempo run — on heart rate alone the athlete's easy runs read Tempo. Tempo needs half the
+  session, VO2 Max a quarter, Recovery a session of 45 min or less 70% in Recovery; the rest is
+  Aerobic. **Reps come from the laps**: a structured workout's `phase`s (a work step beside a
+  recovery step; a lone work block is the run), or on a run laps pressed by hand (not auto-laps of
+  1 km or 1 mile, a fast set 15% quicker than the slow set, each fast lap beside a slow one); a
+  work step four times the typical one is the run the strides were added to. Under 45 s a rep and
+  under 5 min of work they are Strides; reps that decide nothing leave a long run "Long run".
+  **What is read is stored, versioned on its own** (`training_activity_summaries.intensity`,
+  `INTENSITY_SUMMARY_VERSION`): seconds by HR bucket × pace bucket, and the reps with their
+  buckets, so a list labels a session without its samples; the label is decided in the renderer
+  because only it knows the account's heart-rate model (`useHeartRateZoneModel`,
+  `benefitZoneFamily`), and nothing is labelled until it settles. Max HR's buckets map a step
+  easier. **Only the screens whose rows wear the label ask for it** (`requireIntensity`: Running
+  and Cycling): their sweep counts a run or ride without the current intensity as missing, so it
+  is read again — from the cached file where there is one — while Activities, Hiking and the Hall
+  leave such a row alone, since none of them reads it. A detail open on the pane or a page is
+  read through `detailTrainingBenefit`, cached per detail object. **The screenshot demo's profile
+  says Max HR (`hrZoneType: 1` in `demoHandlers.ts`) while its sessions are scored on reserve
+  ceilings**, so on demo data labels read a step easy. `npm run test:training-benefit`.
+- **Running efficiency** (the chart's title; the code says performance — `electron/runPerformance.ts` reads, `src/running/runPerformanceModel.ts`
+  arranges; built 2026-10-20, replacing the Aerobic efficiency chart) — speed bought for the
+  heart rate it cost, on the VO2max scale: Daniels & Gilbert's oxygen cost of the **GAP** over
+  Swain's share of the heart-rate reserve (HR − resting ÷ max − resting, both off the COROS
+  profile), so the beats a resting heart already makes buy nothing. Metres per beat, which it
+  replaced, made a faster run at the same fitness read as a more efficient one. **Road and track
+  runs only** (100, 103): a treadmill's pace is the watch's, a trail's is the ground's.
+  **The summary keeps a raw curve, not a figure** (`performance` on `training_activity_summaries`,
+  `PERFORMANCE_SUMMARY_VERSION`): every 30 s of activity time, 90 s of GAP and 90 s of heart rate
+  **40 s later** — measured on the athlete's own interval sessions, mean delay 43 s up and 39 s
+  down — kept only past the 10-minute warm-up, with pace steady (±7% from 100 s before to
+  60 s after — the minute either side plus the heart's lag, so a reading a minute into a rep
+  is not taken while the heart still climbs), the heart settled (±8 bpm across a minute; real
+  heart rate wanders ~7 bpm a minute at a steady pace, and ±4 cut steady running into pieces)
+  and cadence a run's (140+, so a cool-down walk is not a collapse). Version 2 of the curve:
+  on 43 real runs that reads 83% of the running where 5% / 4 bpm read 71%, for 0.2% more
+  noise. **Every step not read says why** (`runPerformanceSteps`), in two kinds the run page
+  draws apart and names on hover: *no data to compare* (stopped or lost signal, walking, no
+  heart rate, too easy to read, above the profile's maximum, the end of the run — dotted) and
+  *not steady enough* (warm-up, pace changing, heart rate catching up — hatched). Above the
+  maximum is told apart from too easy (`readingGapReason`): it means the maximum on COROS is out
+  of date, and it lands on the hardest stretches, which "too easy" would misname. Recharts hides
+  a tooltip whose payload is empty, so every row carries an invisible `hover` value or a gap
+  would never answer. An
+  interval session read in 1-minute reps has no stretch to read and says so.
+  No profile is in the curve, so changing a maximum or resting heart rate needs no recompute.
+  **Each minute is read against the athlete's usual at the same minute**: the usual curve is the
+  median, minute by minute, of the six weeks of runs before, each brought to its own level over
+  minutes 10–40, flat until fatigue and then falling; a minute fewer than three runs reached holds
+  the last one's level, and the chart marks where. A run's figure is the median of its readings
+  brought back along that curve, so a long run is marked down only for more fatigue than usual,
+  and Durability (last 20 min against 10–40) is stated beside the usual fall. **Scaled onto COROS's
+  VO2max** (decided 2026-10-20): the raw figure reads 28 against COROS's 47 on easy running in
+  Hà Nội's heat, so it is multiplied by COROS's median VO2max (`currentVo2Max`, kept on the curve)
+  over its median: the usual reads as the COROS VO2max and percentages are untouched. Heat is
+  not taken out of the usual, on purpose: the athlete should see what the weather costs.
+  **Read on demand, bounded**: the Running screen asks the summary sweep with
+  `requirePerformance` for the runs it shows and the six weeks before the oldest, a road or track
+  run's page for the six weeks before it once its own detail is in, and neither under the Trail
+  filter or on a trail run's page, where no block is drawn; nothing sweeps the whole history.
+  Only Running asks, so Activities and the Hall do not backfill curves. The run page draws its own
+  curve live from the series it holds (`RunPerformanceChart`, % of usual or ml/kg/min), on time
+  or distance by **a switch of its own** — the two charts are switched apart, by decision — with
+  each step placed by `axisPositionOf` (activity time, or the distance run by then) and the
+  Performance chart's extent, marks, formatter and gutters, so on the same axis a stretch is read
+  straight down from one to the other. Switching moves the line sideways and that is right: time
+  and distance are proportional only at an even pace, so on distance a fast rep widens and a
+  slow warm-up kilometre narrows, every value staying where it was. The Running block (`RunPerformancePanel`) reads the
+  period chosen on the screen: its median, each run and the line through them, and a pace ×
+  performance quadrant; the usual stays the six weeks to today. Its time axis starts on the Monday the period is cut at, and the line is a rolling median
+  (`performanceRollingMedian`: at each run, the median of the seven days up to it), so it runs from
+  the first run to the last; a calendar week's median drawn mid-week started days late and ended
+  days early, this week's in the future. `npm run test:run-performance`.
+- **Time in zones on every sport's own page** (`ActivityZoneTimePanel`, `src/training/zoneTime.ts`)
+  — the run, ride and hike pages and an opened Strength session, **not Activities**, which keeps
+  its zone bar. It draws COROS's own seconds per zone off the detail's `zoneList` (never
+  re-derived from the samples), every zone listed — one never reached reads 0, so a session is
+  read against the whole scale — with seconds stated under a minute. A run switches between
+  heart rate and pace (a trail run's pace is the GAP list, type 173, `adjustedPaceZones`); a
+  ride, a hike and a lifting session have heart rate only (a ride's power zones are the Power
+  panel's, and the pace zones COROS scores a ride or a hike on are a runner's). Three COROS
+  facts it rests on: **`zoneType` on an activity is not reliable** — runs a day apart on one
+  HR-reserve account came back 2 and 0 with identical bounds — so 0 falls back to the account's
+  model (`heartRateZoneFamily`, the screen's `useHeartRateZoneModel`); **pace has seven
+  buckets for six named zones**, because `ltspZone` splits Threshold at 100% of threshold speed
+  (69.5 / 82.7 / 91.7 / 100 / 102.2 / 112.9, probed 2026-10-19), so buckets 3 and 4 are drawn
+  as one Threshold row; and HR-reserve, LTHR and pace share the names Recovery … Anaerobic
+  Power while Max HR has its own. Strength's history carries sets only, so `useSessionZones`
+  asks for the opened session's COROS detail (a Hevy-only session has none; a failure is
+  silent). `npm run test:zone-time`.
 - **Cycling** (`src/cycling/`, built 2026-09-30) — Running's page built again for a bike: the
   same shape (a kind filter and a period, a hero, totals, a weekly chart, intensity beside a
   split by kind, a sortable list, a full-page detail that keeps the list's scroll) and **the
@@ -1049,8 +1176,8 @@ lives at module level for the same visit-to-visit reason — see `useCalendarDat
   Naismith** (moving time over an hour per 5 km plus an hour per 600 m). Splits are COROS's
   1 km laps, rests inside them. The channel chart takes `motion="hike"`: Speed in km/h and a
   **Climbing rate** channel (`verticalSpeed` from `withVerticalSpeed` — metres an hour over at
-  least a minute either side, reaching to neighbouring rows so the chart's 400 downsampled
-  rows still get one, never across a gap several times the usual step), cadence in spm over
+  least a minute either side, reaching to neighbouring rows so the chart's 1 000 rows still
+  get one, never across a gap several times the usual step), cadence in spm over
   the walking, the segment line adding the stretch's ascent; it opens on climbing rate
   against heart rate. The route map reads a hike's pace as speed on the **ramp**, off
   COROS's running pace zones, through `isSpeedSport`. `npm run test:hike-metrics` holds the

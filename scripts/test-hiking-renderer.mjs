@@ -243,7 +243,7 @@ async function main() {
       assert.equal(await hasText(label), true, `the page states ${label}`);
     }
     assert.equal(await hasText("Summit day"), true, "the biggest day is named");
-    for (const absent of ["Load ratio", "VO₂max", "Threshold pace", "80/20", "Aerobic efficiency"]) {
+    for (const absent of ["Load ratio", "VO₂max", "Threshold pace", "80/20", "Running efficiency"]) {
       assert.equal(await hasText(absent), false, `${absent} is a runner's figure and not this screen's`);
     }
     assert.equal(await noPace(), true, "no pace anywhere: a walker reads km/h");
@@ -322,7 +322,7 @@ async function main() {
       true
     );
     assert.ok(chips.includes("Climbing rate") && chips.includes("Speed"), `a hike's chart reads climbing rate and speed: ${chips}`);
-    assert.ok(!chips.includes("Pace") && !chips.includes("Grade-adjusted pace"), `and no pace: ${chips}`);
+    assert.ok(!chips.includes("Pace") && !chips.includes("Effort pace"), `and no pace: ${chips}`);
     assert.equal(await noPace(), true, "no pace on the page either");
 
     for (const label of ["Moving time", "Total time", "Highest point", "Climbing rate", "Vs Naismith", "Terrain", "Rests"]) {

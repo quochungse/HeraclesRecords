@@ -334,22 +334,107 @@ export function defaultSelectedChannels(
 }
 
 /**
+ * Which plot a channel belongs to when the chart is split: what the athlete
+ * produced (pace, effort pace, speed, power, climbing rate) above, and what it
+ * cost and how it was done (heart rate, cadence and the form figures) below.
+ * Read top to bottom it is the question the chart is for — how the effort went,
+ * and what the heart paid for it. Power is output, not the body: it was filed
+ * with heart rate at first, so a ride opened with power and heart rate both in
+ * the lower plot and speed made up to fill the upper one. Elevation is neither
+ * — it is the ground both are read against.
+ */
+export type ActivityChannelGroup = "body" | "motion";
+
+const MOTION_GROUP: ReadonlySet<ActivityChannelKey> = new Set([
+  "pace",
+  "adjustedPace",
+  "speed",
+  "power",
+  "verticalSpeed"
+]);
+
+export function activityChannelGroup(key: ActivityChannelKey): ActivityChannelGroup | undefined {
+  if (activityChannel(key).background) {
+    return undefined;
+  }
+  return MOTION_GROUP.has(key) ? "motion" : "body";
+}
+
+/** A split needs something to draw in both plots, or one of them is an empty frame. */
+export function canSplitActivityChannels(
+  available: readonly ActivityChannelDefinition[]
+): boolean {
+  const groups = new Set(available.map((channel) => activityChannelGroup(channel.key)));
+  return groups.has("body") && groups.has("motion");
+}
+
+/**
  * Toggling a channel, with the two-axis cap applied by **dropping the oldest**
  * rather than refusing the press. A chip that does nothing when clicked reads
  * as broken; one that quietly replaces what it has to is understood at once.
+ *
+ * Split, each plot has two axes of its own, so the cap — and the oldest that
+ * gives way — is counted within the pressed channel's group.
  */
 export function toggleActivityChannel(
   selected: readonly ActivityChannelKey[],
-  key: ActivityChannelKey
+  key: ActivityChannelKey,
+  split = false
 ): ActivityChannelKey[] {
   if (selected.includes(key)) {
     return selected.filter((entry) => entry !== key);
   }
 
   const next = [...selected, key];
-  return next.length > MAX_SELECTED_CHANNELS
-    ? next.slice(next.length - MAX_SELECTED_CHANNELS)
-    : next;
+  if (!split) {
+    return next.length > MAX_SELECTED_CHANNELS
+      ? next.slice(next.length - MAX_SELECTED_CHANNELS)
+      : next;
+  }
+  const group = activityChannelGroup(key);
+  const sameGroup = next.filter((entry) => activityChannelGroup(entry) === group);
+  const dropped = new Set(sameGroup.slice(0, Math.max(0, sameGroup.length - MAX_SELECTED_CHANNELS)));
+  return next.filter((entry) => !dropped.has(entry));
+}
+
+/**
+ * The selection carried across a change of layout. Split, every plot opens on
+ * something — a group with nothing chosen takes its first channel — and each
+ * keeps at most two. Combined, the first channel of each group is kept ahead of
+ * the rest, so pace and heart rate split and rejoined come back as pace and
+ * heart rate rather than as whichever two were pressed last.
+ */
+export function fitActivityChannels(
+  selected: readonly ActivityChannelKey[],
+  available: readonly ActivityChannelDefinition[],
+  split: boolean
+): ActivityChannelKey[] {
+  const offered = new Set(
+    available.filter((channel) => !channel.background).map((channel) => channel.key)
+  );
+  const kept = selected.filter((key) => offered.has(key));
+
+  if (split) {
+    return (["motion", "body"] as const).flatMap((group) => {
+      const inGroup = kept.filter((key) => activityChannelGroup(key) === group);
+      if (inGroup.length > 0) {
+        return inGroup.slice(-MAX_SELECTED_CHANNELS);
+      }
+      const first = available.find((channel) => activityChannelGroup(channel.key) === group);
+      return first ? [first.key] : [];
+    });
+  }
+
+  const leads = (["motion", "body"] as const).flatMap((group) => {
+    const lead = kept.find((key) => activityChannelGroup(key) === group);
+    return lead === undefined ? [] : [lead];
+  });
+  const ordered = kept.filter((key) => leads.includes(key));
+  for (const key of kept) {
+    if (ordered.length >= MAX_SELECTED_CHANNELS) break;
+    if (!ordered.includes(key)) ordered.push(key);
+  }
+  return ordered.slice(0, MAX_SELECTED_CHANNELS);
 }
 
 export interface ActivityChannelColors {
@@ -358,39 +443,57 @@ export interface ActivityChannelColors {
   fill: string;
 }
 
+/**
+ * The channels' colours, chosen as a set and checked with a colour-vision
+ * validator rather than by eye (OKLab ΔE: at least 15 with normal vision and 8
+ * under protan and deutan simulation for every pair below).
+ *
+ * Eleven channels cannot all be told apart from each other on any palette, so
+ * the pairs that are actually drawn together come first. Heart rate is told
+ * from every other channel, because it is beside all of them in one plot or
+ * the other. The output channels — pace, effort pace, power and the climbing
+ * rate, which share the upper plot when split — are told apart pair by pair,
+ * and pace and power from cadence. Heart rate keeps red and pace blue, the
+ * colours every watch and training app has taught an athlete to read them by.
+ * What gives way is pairs nobody draws together: the form figures among each
+ * other (they are read one at a time against heart rate), and an output
+ * channel beside a form figure, which only a combined chart could hold. Paper's
+ * steps are the same hues, darkened to hold 3:1 on white.
+ */
 const DARK_CHANNEL_COLORS: Record<ActivityChannelKey, ActivityChannelColors> = {
-  pace: { stroke: "#74c08f", fill: "rgba(116, 192, 143, 0.18)" },
-  adjustedPace: { stroke: "#4fd1c5", fill: "rgba(79, 209, 197, 0.18)" },
+  pace: { stroke: "#3987e5", fill: "rgba(57, 135, 229, 0.18)" },
+  adjustedPace: { stroke: "#1fa58c", fill: "rgba(31, 165, 140, 0.18)" },
   // Speed takes pace's colour: the two are one channel read two ways, and are
   // never offered together.
-  speed: { stroke: "#74c08f", fill: "rgba(116, 192, 143, 0.18)" },
-  hr: { stroke: "#f87171", fill: "rgba(248, 113, 113, 0.18)" },
-  cadence: { stroke: "#b79bff", fill: "rgba(183, 155, 255, 0.18)" },
-  power: { stroke: "#f3bf5c", fill: "rgba(243, 191, 92, 0.18)" },
-  strideLength: { stroke: "#7ab8ff", fill: "rgba(122, 184, 255, 0.18)" },
-  groundTime: { stroke: "#fb923c", fill: "rgba(251, 146, 60, 0.18)" },
-  verticalOscillation: { stroke: "#f472b6", fill: "rgba(244, 114, 182, 0.18)" },
-  verticalRatio: { stroke: "#a3e635", fill: "rgba(163, 230, 53, 0.18)" },
-  verticalSpeed: { stroke: "#38bdf8", fill: "rgba(56, 189, 248, 0.18)" },
+  speed: { stroke: "#3987e5", fill: "rgba(57, 135, 229, 0.18)" },
+  hr: { stroke: "#e66767", fill: "rgba(230, 103, 103, 0.18)" },
+  cadence: { stroke: "#33b5c4", fill: "rgba(51, 181, 196, 0.18)" },
+  power: { stroke: "#e6ab45", fill: "rgba(230, 171, 69, 0.18)" },
+  strideLength: { stroke: "#8a84f2", fill: "rgba(138, 132, 242, 0.18)" },
+  groundTime: { stroke: "#d4a2e6", fill: "rgba(212, 162, 230, 0.18)" },
+  verticalOscillation: { stroke: "#bf4da8", fill: "rgba(191, 77, 168, 0.18)" },
+  verticalRatio: { stroke: "#6aa7f0", fill: "rgba(106, 167, 240, 0.18)" },
+  verticalSpeed: { stroke: "#b751b5", fill: "rgba(183, 81, 181, 0.18)" },
   altitude: { stroke: "rgba(255, 255, 255, 0.22)", fill: "rgba(255, 255, 255, 0.07)" }
 };
 
 const PAPER_CHANNEL_COLORS: Record<ActivityChannelKey, ActivityChannelColors> = {
-  pace: { stroke: "#1f7a55", fill: "rgba(31, 122, 85, 0.16)" },
-  adjustedPace: { stroke: "#0f766e", fill: "rgba(15, 118, 110, 0.16)" },
-  speed: { stroke: "#1f7a55", fill: "rgba(31, 122, 85, 0.16)" },
-  hr: { stroke: "#c2410c", fill: "rgba(194, 65, 12, 0.16)" },
-  cadence: { stroke: "#6d28d9", fill: "rgba(109, 40, 217, 0.16)" },
-  power: { stroke: "#a16207", fill: "rgba(161, 98, 7, 0.16)" },
-  strideLength: { stroke: "#1d4ed8", fill: "rgba(29, 78, 216, 0.16)" },
-  groundTime: { stroke: "#b45309", fill: "rgba(180, 83, 9, 0.16)" },
-  verticalOscillation: { stroke: "#be185d", fill: "rgba(190, 24, 93, 0.16)" },
-  verticalRatio: { stroke: "#4d7c0f", fill: "rgba(77, 124, 15, 0.16)" },
-  verticalSpeed: { stroke: "#0369a1", fill: "rgba(3, 105, 161, 0.16)" },
+  pace: { stroke: "#2a6fc9", fill: "rgba(42, 111, 201, 0.16)" },
+  adjustedPace: { stroke: "#0f8a73", fill: "rgba(15, 138, 115, 0.16)" },
+  // Speed takes pace's colour: the two are one channel read two ways, and are
+  // never offered together.
+  speed: { stroke: "#2a6fc9", fill: "rgba(42, 111, 201, 0.16)" },
+  hr: { stroke: "#d4473f", fill: "rgba(212, 71, 63, 0.16)" },
+  cadence: { stroke: "#139aa0", fill: "rgba(19, 154, 160, 0.16)" },
+  power: { stroke: "#c48a12", fill: "rgba(196, 138, 18, 0.16)" },
+  strideLength: { stroke: "#675ed8", fill: "rgba(103, 94, 216, 0.16)" },
+  groundTime: { stroke: "#b06bc8", fill: "rgba(176, 107, 200, 0.16)" },
+  verticalOscillation: { stroke: "#a4287c", fill: "rgba(164, 40, 124, 0.16)" },
+  verticalRatio: { stroke: "#4c86de", fill: "rgba(76, 134, 222, 0.16)" },
+  verticalSpeed: { stroke: "#963096", fill: "rgba(150, 48, 150, 0.16)" },
   // The one channel that is a backdrop rather than a series, so it takes the
   // theme's ink the way every border and well does — rgb(19, 26, 40) here,
-  // white-alpha in the dark table. It was the cream theme's warm ink and got
-  // missed when that was swept out of the stylesheets, because it lives in TS.
+  // white-alpha in the dark table.
   altitude: { stroke: "rgba(19, 26, 40, 0.2)", fill: "rgba(19, 26, 40, 0.08)" }
 };
 

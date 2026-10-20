@@ -2,7 +2,9 @@ import { useI18n } from "../i18n/useI18n";
 import { useCallback, useMemo, useState } from "react";
 import { ArrowLeft, CloudOff, MessageCircle, RefreshCw } from "lucide-react";
 import type {
+  ActivityDetailSummary,
   CoachOpenRequest,
+  CorosProfileZoneFamily,
   TrainingHubActivity,
   TrainingHubActivityDetail
 } from "../../electron/types";
@@ -30,6 +32,7 @@ import {
   hikeTerrain
 } from "../hiking/hikeAnalysis";
 import { ClimbsPanel, TerrainPanel } from "../hiking/TerrainPanels";
+import { ActivityZoneTimePanel } from "../training/components/ActivityZoneTimePanel";
 import { RunDetailSkeleton } from "./RunningSkeleton";
 import { useBackGesture } from "./sportPage";
 import {
@@ -44,6 +47,10 @@ import {
   isOutdoorRunSurface
 } from "./runSurface";
 import { formatDecimal, t } from "../i18n/core";
+import { detailTrainingBenefit, type BenefitZoneFamily } from "../training/trainingBenefit";
+import { TrainingBenefitChips } from "../training/components/TrainingBenefitChip";
+import { sportHasRunPerformance, type PerformanceProfile } from "../../electron/runPerformance";
+import { RunPerformanceChart } from "./RunPerformanceChart";
 
 interface RunDetailViewProps {
   activity: TrainingHubActivity;
@@ -58,7 +65,18 @@ interface RunDetailViewProps {
   onRetry: () => void;
   /** Asks Coach about this run, as the Calendar's Ask Coach does. */
   onAskCoach?: (request: CoachOpenRequest) => void;
+  /** The account's heart-rate model, naming the zones of a run COROS left unlabelled. */
+  zoneFamily?: CorosProfileZoneFamily;
+  /** The same model as the label's family, or none until it is known. */
+  benefitFamily?: BenefitZoneFamily;
+  /** Maximum and resting heart rate, which performance is read on. None until the profile answers. */
+  performanceProfile?: PerformanceProfile;
+  /** Every run, and their stored summaries, for the usual this run is read against. */
+  allRuns?: readonly TrainingHubActivity[];
+  summaries?: ReadonlyMap<string, ActivityDetailSummary>;
 }
+
+const NO_SUMMARIES: ReadonlyMap<string, ActivityDetailSummary> = new Map();
 
 /**
  * How much longer start-to-finish has to be than the running itself before it
@@ -95,12 +113,19 @@ export function RunDetailView({
   onBack,
   backLabel = t("nav.running"),
   onRetry,
-  onAskCoach
+  onAskCoach,
+  zoneFamily,
+  benefitFamily,
+  performanceProfile,
+  allRuns = [],
+  summaries = NO_SUMMARIES
 }: RunDetailViewProps) {
   const { unitSystem, temperatureUnit } = useUnitSystem();
   const { locale } = useI18n();
   const surface = classifyRunSurface(activity.sportType);
   const trail = surface === "trail";
+  // Read the way the list row's summary was, so a row and its page agree.
+  const benefit = detailTrainingBenefit(detail, activity.sportType, benefitFamily);
 
   const laps = detail?.laps ?? [];
   // On activity time, which is what the laps, the headline and every figure
@@ -334,6 +359,11 @@ export function RunDetailView({
                 {activity.name?.trim() ||
                   (surface ? t(`run.detail.untitled.${surface}` as const) : t("run.run"))}
               </h1>
+              {benefit ? (
+                <div className="run-detail-benefit">
+                  <TrainingBenefitChips reading={benefit} />
+                </div>
+              ) : null}
             </div>
           </header>
 
@@ -405,8 +435,33 @@ export function RunDetailView({
         </section>
       ) : null}
 
+      {detail ? (
+        <ActivityZoneTimePanel
+          hrZones={detail.hrZones}
+          hrZoneType={detail.hrZoneType}
+          accountFamily={zoneFamily}
+          // A trail's pace is the gradient's, so its zones are read on GAP.
+          paceZones={trail ? detail.adjustedPaceZones : detail.paceZones}
+          paceIsGradeAdjusted={trail}
+          frame="page"
+          benefit={benefit}
+        />
+      ) : null}
+
       {ground && ground.terrain.length > 0 ? (
         <TerrainPanel terrain={ground.terrain} reading="trail" />
+      ) : null}
+
+      {series.length > 0 && performanceProfile && sportHasRunPerformance(activity.sportType) ? (
+        <RunPerformanceChart
+          activity={activity}
+          series={series}
+          corosVo2max={detail?.effect?.vo2max}
+          durationSeconds={detail?.duration ?? activity.duration ?? 0}
+          profile={performanceProfile}
+          allRuns={allRuns}
+          summaries={summaries}
+        />
       ) : null}
 
       {series.length > 0 ? (

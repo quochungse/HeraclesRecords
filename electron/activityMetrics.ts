@@ -18,6 +18,12 @@ import type {
   TrainingHubActivitySeriesPoint,
   TrainingHubTrackPoint
 } from "./types";
+import { INTENSITY_SUMMARY_VERSION, summarizeSessionIntensity } from "./sessionIntensity";
+import {
+  PERFORMANCE_SUMMARY_VERSION,
+  runPerformanceCurve,
+  sportHasRunPerformance
+} from "./runPerformance";
 
 const METERS_PER_KM = 1000;
 const SECONDS_PER_MINUTE = 60;
@@ -423,7 +429,12 @@ export interface ActivityDetailSummaryInput {
   activityId: string;
   fingerprint: string;
   detail: Pick<TrainingHubActivityDetail, "hrZones" | "series" | "pauses"> &
-    Partial<Pick<TrainingHubActivityDetail, "sportType" | "track">>;
+    Partial<
+      Pick<
+        TrainingHubActivityDetail,
+        "sportType" | "track" | "laps" | "paceZones" | "adjustedPaceZones" | "duration"
+      >
+    >;
   /** The payload as COROS sent it, for the fields the parser has no use for. */
   raw?: Record<string, unknown>;
   now?: number;
@@ -449,6 +460,17 @@ export function summarizeActivityDetail(
       ? bestEfforts(active)
       : [];
   const startPoint = activityStartPoint(detail.track?.points);
+  const intensity = summarizeSessionIntensity(detail);
+  const corosSummary = raw?.summary as Record<string, unknown> | undefined;
+  const performance = sportHasRunPerformance(detail.sportType)
+    ? runPerformanceCurve(
+        active,
+        // As `parseActivityEffect` reads it, so the stored anchor is the page's.
+        [corosSummary?.currentVo2Max, corosSummary?.hrmVo2Max].find(
+          (value): value is number => typeof value === "number" && value > 0
+        )
+      )
+    : undefined;
 
   return {
     activityId,
@@ -463,6 +485,8 @@ export function summarizeActivityDetail(
     recordsVersion: RECORDS_SUMMARY_VERSION,
     ...(efforts.length > 0 ? { bestEfforts: efforts } : {}),
     ...(startPoint ? { startPoint } : {}),
+    ...(intensity ? { intensityVersion: INTENSITY_SUMMARY_VERSION, intensity } : {}),
+    ...(performance ? { performanceVersion: PERFORMANCE_SUMMARY_VERSION, performance } : {}),
     computedAt: now ?? Date.now()
   };
 }

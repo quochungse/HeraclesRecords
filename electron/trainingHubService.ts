@@ -28,6 +28,8 @@ import {
   RECORDS_SUMMARY_VERSION,
   summarizeActivityDetail
 } from "./activityMetrics";
+import { INTENSITY_SUMMARY_VERSION, sportHasTrainingBenefit } from "./sessionIntensity";
+import { PERFORMANCE_SUMMARY_VERSION, sportHasRunPerformance } from "./runPerformance";
 import {
   countStrengthActivitiesMissingDetail,
   countTrainingActivitiesMissingFeelType,
@@ -2014,7 +2016,10 @@ const SUMMARY_BACKFILL_MAX_CONSECUTIVE_FAILURES = 3;
 /** Activities being summarised right now, so two callers — React's development
  *  double-invoke among them — cannot fetch the same 2.5 MB payload twice. */
 const summaryBackfillInFlight = new Set<string>();
-/** Activities that failed this session. Retried on the next launch, not sooner. */
+/**
+ * Activities that failed this session, or came back short of what was asked.
+ * Retried on the next launch, not sooner.
+ */
 const summaryBackfillFailedIds = new Set<string>();
 
 /**
@@ -2032,6 +2037,21 @@ export interface ActivityDetailSummarySyncOptions {
    * from before those figures existed still answers everything they ask.
    */
   requireRecords?: boolean;
+  /**
+   * Count a run's or a ride's summary as missing until it carries the current
+   * intensity (`INTENSITY_SUMMARY_VERSION`), which its training label is read
+   * from. Asked by the screens whose rows wear the label, Running and Cycling;
+   * everywhere else a row from before it still answers what is asked, and a
+   * label on a page is read from the detail open there.
+   */
+  requireIntensity?: boolean;
+  /**
+   * Count a road or track run's summary as missing until it carries the
+   * current performance curve (`PERFORMANCE_SUMMARY_VERSION`). Only the Running
+   * screen asks: the curve is read for the runs it shows and the six weeks
+   * before them, not swept across the whole history.
+   */
+  requirePerformance?: boolean;
 }
 
 export async function syncActivityDetailSummaries(
@@ -2040,13 +2060,23 @@ export async function syncActivityDetailSummaries(
   options: ActivityDetailSummarySyncOptions = {}
 ): Promise<ActivityDetailSummarySync> {
   const stored = storedActivityIndex(activityIds);
+  // Whether a row holds everything this sweep was asked for. A row from before
+  // a figure existed is read again — from the cached file, where there is one.
+  const answers = (summary: ActivityDetailSummary): boolean => {
+    const sportType = stored.get(summary.activityId)?.sportType;
+    return (
+      (!options.requireRecords || summary.recordsVersion === RECORDS_SUMMARY_VERSION) &&
+      (!options.requireIntensity ||
+        !sportHasTrainingBenefit(sportType) ||
+        summary.intensityVersion === INTENSITY_SUMMARY_VERSION) &&
+      (!options.requirePerformance ||
+        !sportHasRunPerformance(sportType) ||
+        summary.performanceVersion === PERFORMANCE_SUMMARY_VERSION)
+    );
+  };
   const valid = new Set(
     validSummaries(activityIds, stored)
-      .filter(
-        (summary) =>
-          !options.requireRecords ||
-          summary.recordsVersion === RECORDS_SUMMARY_VERSION
-      )
+      .filter(answers)
       .map((summary) => summary.activityId)
   );
 
@@ -2109,6 +2139,12 @@ export async function syncActivityDetailSummaries(
       if (summary) {
         written.push(summary);
         consecutiveFailures = 0;
+        // Read, and still short of what was asked — a payload naming another
+        // sport than the list row, say. Reading it again would bring the same
+        // answer, so not this session.
+        if (!answers(summary)) {
+          summaryBackfillFailedIds.add(activityId);
+        }
       } else {
         // Fetched, and nothing came of it — an unusable payload, or a write the
         // database refused. Either way this activity is not worth asking for
@@ -7485,6 +7521,8 @@ export function mergeActivityDetailWithList(
 /** COROS's HR zone channel in `zoneList`. 130 is pace, 134 power. */
 const COROS_HR_ZONE_TYPE = 126;
 const COROS_PACE_ZONE_TYPE = 130;
+/** The same pace zones, scored on grade-adjusted pace. */
+const COROS_ADJUSTED_PACE_ZONE_TYPE = 173;
 
 // A weather temperature arrives in tenths of a degree. Anything outside this
 // band is a sentinel rather than a reading (`sweatLoss: 65535` in the same
@@ -7697,6 +7735,27 @@ export function parseActivityHrZones(
 }
 
 /**
+ * The model the HR zone split was scored on — `zoneType` beside it in
+ * `zoneList`, the same numbering as the profile's `hrZoneType`. Some
+ * activities carry 0, which names nothing.
+ */
+export function parseActivityHrZoneType(
+  raw: Record<string, unknown>
+): number | undefined {
+  for (const entry of pickArray(raw, ["zoneList"]) ?? []) {
+    if (!entry || typeof entry !== "object") {
+      continue;
+    }
+    const group = entry as Record<string, unknown>;
+    if (toOptionalNumber(group.type) === COROS_HR_ZONE_TYPE) {
+      return positiveNumber(group.zoneType);
+    }
+  }
+
+  return undefined;
+}
+
+/**
  * The pace zones of `zoneList` (type 130). Each bucket runs from `leftScope`,
  * its slow edge, to `rightScope`, its fast one, in milliseconds per kilometre
  * — a live run reads zone 1 as 468000 to 397000. Bucket 0 repeats zone 1's
@@ -7705,7 +7764,8 @@ export function parseActivityHrZones(
  * (162000, 2:42/km).
  */
 export function parseActivityPaceZones(
-  raw: Record<string, unknown>
+  raw: Record<string, unknown>,
+  type: number = COROS_PACE_ZONE_TYPE
 ): TrainingHubActivityZoneBucket[] {
   const seconds = (value: unknown) => {
     const scope = positiveNumber(value);
@@ -7716,7 +7776,7 @@ export function parseActivityPaceZones(
       continue;
     }
     const group = entry as Record<string, unknown>;
-    if (toOptionalNumber(group.type) !== COROS_PACE_ZONE_TYPE) {
+    if (toOptionalNumber(group.type) !== type) {
       continue;
     }
 
@@ -7927,7 +7987,9 @@ export function parseActivityDetail(raw: Record<string, unknown>): TrainingHubAc
     laps,
     dynamics: parseActivityDynamics(raw, summary),
     hrZones: parseActivityHrZones(raw),
+    hrZoneType: parseActivityHrZoneType(raw),
     paceZones: parseActivityPaceZones(raw),
+    adjustedPaceZones: parseActivityPaceZones(raw, COROS_ADJUSTED_PACE_ZONE_TYPE),
     effect: parseActivityEffect(summary),
     weather: parseActivityWeather(raw),
     track,
