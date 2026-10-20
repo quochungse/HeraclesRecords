@@ -34,6 +34,7 @@ import type {
   TrainingHubActivityDetail,
   TrainingHubActivityLap,
   TrainingHubActivityPause,
+  TrainingHubLapPhase,
   TrainingHubActivitySeriesPoint,
   TrainingHubTrackPoint
 } from "../../electron/types";
@@ -143,6 +144,17 @@ interface TrailRunPlan {
   autoPause: boolean;
   temperatureC: number;
   humidityPct: number;
+  /**
+   * A structured workout's steps, in metres: the watch laps it at each step,
+   * with the step's phase, rather than every kilometre.
+   */
+  steps?: readonly WorkoutStep[];
+}
+
+interface WorkoutStep {
+  meters: number;
+  effort: number;
+  phase: TrainingHubLapPhase;
 }
 
 const lap = (effort: number, summitStop?: number): Leg[] => [
@@ -484,9 +496,21 @@ function rounded(value: number | undefined, digits = 0): number | undefined {
   return Math.round(value * scale) / scale;
 }
 
-function lapsOf(series: readonly TrainingHubActivitySeriesPoint[]): TrainingHubActivityLap[] {
+function lapsOf(
+  series: readonly TrainingHubActivitySeriesPoint[],
+  steps?: readonly WorkoutStep[]
+): TrainingHubActivityLap[] {
   const laps: TrainingHubActivityLap[] = [];
   let bucket: TrainingHubActivitySeriesPoint[] = [];
+  // Where each lap ends, in metres, and the phase it ran: a workout's steps, or every kilometre.
+  const ends: number[] = [];
+  let total = 0;
+  for (const step of steps ?? []) ends.push((total += step.meters));
+  const lapAt = (distance: number) => {
+    if (!steps) return Math.floor(distance / LAP_METERS);
+    const at = ends.findIndex((end) => distance < end);
+    return at < 0 ? ends.length - 1 : at;
+  };
   const close = () => {
     if (bucket.length < 2) return;
     const first = bucket[0]!;
@@ -494,8 +518,10 @@ function lapsOf(series: readonly TrainingHubActivitySeriesPoint[]): TrainingHubA
     const lapDistance = (last.distance ?? 0) - (first.distance ?? 0);
     const duration = bucket.length;
     const cadences = bucket.map((point) => point.cadence ?? 0).filter((value) => value > 0);
+    const phase = steps?.[lapAt(first.distance ?? 0)]?.phase;
     laps.push({
       index: laps.length + 1,
+      ...(phase ? { phase } : {}),
       distance: Math.round(lapDistance),
       duration,
       avgHr: Math.round(mean(bucket.map((point) => point.hr ?? 0)) ?? 0),
@@ -512,8 +538,8 @@ function lapsOf(series: readonly TrainingHubActivitySeriesPoint[]): TrainingHubA
     });
   };
   for (const point of series) {
-    const index = Math.floor((point.distance ?? 0) / LAP_METERS);
-    if (bucket.length > 0 && index !== Math.floor((bucket[0]!.distance ?? 0) / LAP_METERS)) {
+    const index = lapAt(point.distance ?? 0);
+    if (bucket.length > 0 && index !== lapAt(bucket[0]!.distance ?? 0)) {
       close();
       bucket = [];
     }
@@ -570,7 +596,7 @@ function summarise(
       ? { adjustedPace: Math.round(duration / (totals.flatEquivalent / 1000)) }
       : {}),
     pauses,
-    laps: lapsOf(series),
+    laps: lapsOf(series, plan.steps),
     dynamics: {
       avgCadence: Math.round(mean(cadences) ?? 0),
       maxCadence: Math.max(0, ...cadences),
@@ -716,11 +742,12 @@ function roadPlans(): TrailRunPlan[] {
     const fitness = 1 - week * 0.0065;
     const off = week * 7;
     const recovery = week % 4 === 3;
+    const step = (meters: number, effort: number, phase: TrainingHubLapPhase): WorkoutStep => ({ meters, effort, phase });
     const workout = week % 2 === 0
-      ? { name: "6 × 1 km intervals", legs: stretches([[2400, 0.56], ...Array.from({ length: 6 }, (_, i): [number, number][] => [[1000, 0.885], ...(i < 5 ? [[400, 0.47] as [number, number]] : [])]).flat(), [2000, 0.52]]) }
-      : { name: "Tempo run", legs: stretches([[2000, 0.56], [7000, 0.8], [1500, 0.52]]) };
+      ? { name: "6 × 1 km intervals", steps: [step(2400, 0.56, "warmup"), ...Array.from({ length: 6 }, (_, i) => [step(1000, 0.885, "work"), ...(i < 5 ? [step(400, 0.47, "recovery")] : [])]).flat(), step(2000, 0.52, "cooldown")] }
+      : { name: "Tempo run", steps: [step(2000, 0.56, "warmup"), step(7000, 0.8, "work"), step(1500, 0.52, "cooldown")] };
     if (!recovery) {
-      plans.push({ ...base, key: "w" + week + "-workout", name: workout.name, daysAgo: off + 4, startHour: 5.3 + random() * 0.4, legs: workout.legs, fitness, autoPause: false, temperatureC: 24, humidityPct: 80 });
+      plans.push({ ...base, key: "w" + week + "-workout", name: workout.name, daysAgo: off + 4, startHour: 5.3 + random() * 0.4, legs: stretches(workout.steps.map((s): [number, number] => [s.meters, s.effort])), steps: workout.steps, fitness, autoPause: false, temperatureC: 24, humidityPct: 80 });
     }
     plans.push({ ...base, key: "w" + week + "-easy", name: week === 0 ? "Easy run" : random() < 0.5 ? "Easy run" : "Recovery run", daysAgo: off + 2, startHour: 5.4 + random() * 0.5, legs: stretches([[7000 + Math.round(random() * 3) * 1000, 0.58]]), fitness, autoPause: true, temperatureC: 28, humidityPct: 80 });
     if (week === 3) {

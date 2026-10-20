@@ -37,7 +37,8 @@ export const PROFILE: CorosProfile = {
   statureCm: 174,
   weightKg: 68,
   unit: 0,
-  hrZoneType: 1,
+  // HR reserve: the sessions' zones are scored on its ceilings (restingHr below).
+  hrZoneType: 2,
   activityCount: 0,
   thresholds: {
     maxHr: 188,

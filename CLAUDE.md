@@ -999,8 +999,10 @@ lives at module level for the same visit-to-visit reason — see `useCalendarDat
   is read again — from the cached file where there is one — while Activities, Hiking and the Hall
   leave such a row alone, since none of them reads it. A detail open on the pane or a page is
   read through `detailTrainingBenefit`, cached per detail object. **The screenshot demo's profile
-  says Max HR (`hrZoneType: 1` in `demoHandlers.ts`) while its sessions are scored on reserve
-  ceilings**, so on demo data labels read a step easy. `npm run test:training-benefit`.
+  is HR reserve (`hrZoneType: 2` in `demoHandlers.ts`) because its sessions are scored on reserve
+  ceilings**: it said Max HR until 1.2.0, and every label and zone name on demo data read a step
+  easy. A session under five minutes read after the warm-up — no heart rate recorded, or a run
+  that barely outlasts it — has no label. `npm run test:training-benefit`.
 - **Running efficiency** (the chart's title; the code says performance — `electron/runPerformance.ts` reads, `src/running/runPerformanceModel.ts`
   arranges; built 2026-10-20, replacing the Aerobic efficiency chart) — speed bought for the
   heart rate it cost, on the VO2max scale: Daniels & Gilbert's oxygen cost of the **GAP** over
