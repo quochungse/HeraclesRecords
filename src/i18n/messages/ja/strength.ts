@@ -115,6 +115,7 @@ const strength: StrengthMessages = {
   "strength.exploreTitle": "種目エクスプローラーで開く",
   "strength.col.set": "セット",
   "strength.col.reps": "レップ",
+  "strength.col.time": "時間",
   "strength.col.weight": "重量",
   "strength.col.e1rm": "推定最大",
   "strength.col.rest": "休息",

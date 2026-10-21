@@ -302,6 +302,8 @@ export function buildSessionStats(session: StrengthSession): SessionStats {
 export interface ExerciseSetRow {
   type: StrengthSetType;
   reps: number;
+  /** Held for a time, so `workSec` is its figure: a plank, a stretch. */
+  timed: boolean;
   weightKg: number;
   /** 0 when the set is outside the range an estimate means anything in. */
   e1rmKg: number;
@@ -316,6 +318,8 @@ export interface SessionExerciseRow {
   name: string;
   sets: ExerciseSetRow[];
   reps: number;
+  /** Seconds over the timed sets. */
+  timedSec: number;
   volumeKg: number;
   /** The heaviest set, the one with more reps on a tie; absent for bodyweight work. */
   topSet?: { weightKg: number; reps: number };
@@ -330,6 +334,8 @@ export function buildExerciseRows(entry: SessionAnalytics): SessionExerciseRow[]
     const sets = exercise.entries.map((set) => ({
       type: set.type ?? "normal",
       reps: set.reps,
+      // COROS says so; a Hevy duration set says it by its zero reps.
+      timed: set.timed === true || (set.reps === 0 && set.workSec > 0),
       weightKg: set.weightKg,
       e1rmKg: estimateOneRepMax(set.weightKg, set.reps),
       workSec: set.workSec,
@@ -349,6 +355,7 @@ export function buildExerciseRows(entry: SessionAnalytics): SessionExerciseRow[]
       name: exerciseDisplayName(exercise.nameKey, exercise.rawName),
       sets,
       reps: sets.reduce((total, set) => total + set.reps, 0),
+      timedSec: sets.reduce((total, set) => total + (set.timed ? set.workSec : 0), 0),
       volumeKg: sets.reduce((total, set) => total + set.reps * set.weightKg, 0),
       topSet: top ? { weightKg: top.weightKg, reps: top.reps } : undefined,
       bestE1rmKg: Math.max(0, ...sets.map((set) => set.e1rmKg)),

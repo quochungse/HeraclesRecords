@@ -1750,6 +1750,16 @@ function formatSessionSet(set: SessionSet, unitSystem: UnitSystem): string {
   return `${load ? `${load} for ${time}` : time}${counted}`;
 }
 
+/** The reps of the sets that were counted: a timed set's watch count is no rep. */
+function countedReps(sets: readonly SessionSet[]): number {
+  return sets.reduce((sum, set) => sum + (set.timed ? 0 : (set.reps ?? 0)), 0);
+}
+
+/** `1 set`, `4 sets`. */
+function countOf(count: number, noun: string): string {
+  return `${count} ${noun}${count === 1 ? "" : "s"}`;
+}
+
 /**
  * The set-by-set breakdown of a session recorded exercise by exercise — a
  * strength session, a Hybrid Fitness one — as the card lists it, timed sets
@@ -1768,19 +1778,17 @@ function formatStrengthDetailForChat(
     return undefined;
   }
 
-  // COROS's own totals where it sent them; the sets' where it did not (a
-  // Hybrid Fitness session counts no exercises).
+  // Counted from the sets listed below, so the headline and the rows agree:
+  // COROS's own totals count the reps the watch counted through a timed set
+  // (451 reps over rows adding up to 156), and a set no entry stands for. The
+  // volume is COROS's, which no row states.
   const summary = detail.strength?.summary;
   const setCount = exercises.reduce((sum, exercise) => sum + exercise.sets.length, 0);
-  const repCount = exercises.reduce(
-    (sum, exercise) =>
-      sum + exercise.sets.reduce((total, set) => total + (set.timed ? 0 : (set.reps ?? 0)), 0),
-    0
-  );
+  const repCount = exercises.reduce((sum, exercise) => sum + countedReps(exercise.sets), 0);
   const headline = [
-    `${summary?.exercises || exercises.length} exercises`,
-    `${summary?.sets || setCount} sets`,
-    (summary?.totalReps || repCount) ? `${summary?.totalReps || repCount} reps` : undefined,
+    countOf(exercises.length, "exercise"),
+    countOf(setCount, "set"),
+    repCount > 0 ? countOf(repCount, "rep") : undefined,
     summary?.totalWeightKg
       ? `${formatWeightValue(summary.totalWeightKg, unitSystem)} total volume`
       : undefined
@@ -1798,11 +1806,11 @@ function formatStrengthDetailForChat(
 
       // The work sets listed beside it, as the card counts them: COROS's
       // aggregate lap can claim a set no entry stands for.
-      const reps = exercise.sets.reduce((sum, set) => sum + (set.timed ? 0 : (set.reps ?? 0)), 0);
+      const reps = countedReps(exercise.sets);
       const heading = [
         strengthExerciseLabel(exercise),
-        `${exercise.sets.length} sets`,
-        reps > 0 ? `${reps} reps` : undefined
+        countOf(exercise.sets.length, "set"),
+        reps > 0 ? countOf(reps, "rep") : undefined
       ]
         .filter(Boolean)
         .join(" — ");

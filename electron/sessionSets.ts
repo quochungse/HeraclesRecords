@@ -5,32 +5,22 @@ import type {
   TrainingHubActivitySeriesPoint
 } from "./types";
 import { downsampleActivitySeries } from "./activitySeries";
+import { exerciseGroupKey, isTimedSet, lapItemKind, REST_MARKER_KEY } from "./strengthDetail";
 
 /**
  * The sets of a session COROS records exercise by exercise — a strength
  * session, a Hybrid Fitness one — read for the Coach's card and the text its
  * tools hand the model.
  *
- * `parseStrengthDetail` reads the same lap items for the Strength screen and
- * is left as it is. It tells a set from a rest by its reps, which loses every
- * timed set (a plank records none) and, on Hybrid Fitness, where a rest
- * carries its set's rep count, would count each rest as a set. COROS marks
- * every item with a `mode` — 14 a set, 15 the rest after it, 16 the exercise's
- * roll-up, 17 the rest between exercises — and that is what is read here; the
- * reps decide only on an item that carries no mode at all. A run's and a
- * ride's laps carry exercise keys too (`S4208`), under modes 0–2, and are no
- * sets.
+ * `parseStrengthDetail` reads the same lap items for the Strength screen, and
+ * both tell a set from a rest by `lapItemKind`. This one keeps what a card and
+ * the coach need beside it: where each set sits on the session's clock, its
+ * heart rate, and the reps the watch counted through a timed set.
  *
  * The renderer imports this directly — it redraws a card stored before the
  * sets were kept — so it must stay free of `node:` imports.
  */
 
-/** COROS's marker for the rest between two exercises. */
-const SECTION_REST_KEY = "S3618";
-const MODE_SET = 14;
-const MODE_REST = 15;
-/** A set's target type when it is held for a time rather than counted. */
-const TARGET_TIME = 2;
 /** Heart-rate points a card draws under its sets: one every ~15 s of an hour. */
 export const SETS_HR_POINTS = 240;
 
@@ -60,16 +50,6 @@ function exerciseItems(raw: Record<string, unknown>): LapItem[] {
   return [];
 }
 
-function itemKind(item: LapItem): "set" | "rest" | undefined {
-  if (item.exerciseNameKey === SECTION_REST_KEY) return undefined;
-  const mode = num(item.mode);
-  if (mode !== undefined) {
-    return mode === MODE_SET ? "set" : mode === MODE_REST ? "rest" : undefined;
-  }
-  if ((num(item.sets) ?? 0) > 0) return undefined;
-  return (num(item.reps) ?? 0) > 0 ? "set" : "rest";
-}
-
 export function parseSessionSets(raw: Record<string, unknown>): SessionSetExercise[] | undefined {
   const items = exerciseItems(raw);
   if (items.length === 0) return undefined;
@@ -86,8 +66,11 @@ export function parseSessionSets(raw: Record<string, unknown>): SessionSetExerci
   let last: SessionSet | undefined;
 
   for (const item of items) {
-    const kind = itemKind(item);
-    if (!kind) {
+    const kind = lapItemKind(item);
+    // The rest between two exercises is no set, but it is time on the clock
+    // the sets are placed on where COROS stamped none; a roll-up is not.
+    const between = !kind && item.exerciseNameKey === REST_MARKER_KEY;
+    if (!kind && !between) {
       last = undefined;
       continue;
     }
@@ -96,17 +79,14 @@ export function parseSessionSets(raw: Record<string, unknown>): SessionSetExerci
     const start = stamp !== undefined && base !== undefined ? Math.max(0, Math.round((stamp - base) / 100)) : cursor;
     cursor = start + seconds;
 
-    if (kind === "rest") {
-      if (last && seconds > 0) last.restSeconds = seconds;
+    if (kind !== "set") {
+      if (kind === "rest" && last && seconds > 0) last.restSeconds = seconds;
       last = undefined;
       continue;
     }
 
-    // By index and name: COROS gives two exercises one index now and then
-    // (Squat Jumps and the minute after them), and grouped by index alone the
-    // second read as another set of the first.
     const nameKey = typeof item.exerciseNameKey === "string" ? item.exerciseNameKey : "";
-    const key = `${num(item.exerciseIndex) ?? -1}:${nameKey}`;
+    const key = exerciseGroupKey(item);
     let exercise = groups.get(key);
     if (!exercise) {
       const rawName = typeof item.name === "string" && item.name.trim() ? item.name : undefined;
@@ -115,10 +95,10 @@ export function parseSessionSets(raw: Record<string, unknown>): SessionSetExerci
       order.push(key);
     }
 
-    // A set held for a time is read in time, whatever the watch counted
-    // through it: a minute of high knees is 74 reps, a five-minute stretch 53.
+    // A timed set keeps the reps the watch counted through it — a minute of
+    // high knees is 74 — which the coach is told beside its time.
     const reps = positive(item.reps);
-    const timed = num(item.targetType) === TARGET_TIME || reps === undefined;
+    const timed = isTimedSet(item);
     const weight = positive(item.weight);
     const avgHr = positive(item.avgHr);
     const maxHr = positive(item.maxHr);

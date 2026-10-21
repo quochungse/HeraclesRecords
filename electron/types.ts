@@ -546,6 +546,11 @@ export interface StrengthSet {
   type?: StrengthSetType;
   /** Rating of perceived exertion, on Hevy's 1–10 scale. */
   rpe?: number;
+  /**
+   * Held for a time — a plank, a stretch — so `workSec` is its figure and
+   * `reps` is 0, whatever the watch counted through it.
+   */
+  timed?: boolean;
 }
 
 export type StrengthSetType = "normal" | "warmup" | "dropset" | "failure";

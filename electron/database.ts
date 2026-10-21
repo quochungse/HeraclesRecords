@@ -11,6 +11,7 @@ import {
 } from "./sync/syncBridge";
 import { compareMilestoneCopies } from "./milestoneOrder";
 import { RECORD_ID_SEPARATOR } from "./sync/syncPolicy";
+import { STRENGTH_DETAIL_VERSION } from "./strengthDetail";
 import type {
   ActivityDetailSummary,
   BestEffort,
@@ -499,6 +500,9 @@ export function initializeDatabase(userDataPath: string): Database.Database {
   // feel_type caches the COROS end-of-activity feeling (sportFeelInfo.feelType,
   // 1..5; 0 = unrated). NULL = never fetched from the detail endpoint yet.
   ensureColumn(db, "training_activities", "feel_type", "INTEGER");
+  // The parse a strength breakdown was cached with (STRENGTH_DETAIL_VERSION in
+  // strengthDetail.ts); an older one, NULL included, is parsed again. `derived`.
+  ensureColumn(db, "strength_sessions", "parse_version", "INTEGER");
   // The Hall of Records' share of a summary, versioned apart from the zone
   // split and the drift (RECORDS_SUMMARY_VERSION in activityMetrics.ts): a row
   // written before these existed keeps serving the run screens, and NULL here
@@ -2379,18 +2383,20 @@ export function upsertStrengthSessionDetail(
   }
   requireDatabase()
     .prepare(
-      `INSERT INTO strength_sessions (activity_id, sport_type, detail_json, fetched_at)
-       VALUES (?, ?, ?, ?)
+      `INSERT INTO strength_sessions (activity_id, sport_type, detail_json, fetched_at, parse_version)
+       VALUES (?, ?, ?, ?, ?)
        ON CONFLICT(activity_id) DO UPDATE SET
          sport_type = excluded.sport_type,
          detail_json = excluded.detail_json,
-         fetched_at = excluded.fetched_at`
+         fetched_at = excluded.fetched_at,
+         parse_version = excluded.parse_version`
     )
     .run(
       activityId,
       sportType,
       detail ? JSON.stringify(detail) : null,
-      new Date().toISOString()
+      new Date().toISOString(),
+      STRENGTH_DETAIL_VERSION
     );
 }
 
@@ -2399,8 +2405,10 @@ function sportTypePlaceholders(sportTypes: number[]): string {
 }
 
 /**
- * Strength activities on/after `sinceEpochSeconds` that have never had their
- * breakdown fetched, NEWEST first so the most relevant sessions land first.
+ * Strength activities on/after `sinceEpochSeconds` whose breakdown was never
+ * fetched, or was parsed by an older `parseStrengthDetail` — a cached row is
+ * the parse, not the payload, so it is read again — NEWEST first so the most
+ * relevant sessions land first.
  */
 export function listStrengthActivitiesMissingDetail(
   sinceEpochSeconds: number,
@@ -2415,13 +2423,13 @@ export function listStrengthActivitiesMissingDetail(
       `SELECT a.activity_id, a.sport_type
        FROM training_activities a
        LEFT JOIN strength_sessions s ON s.activity_id = a.activity_id
-       WHERE s.activity_id IS NULL
+       WHERE (s.activity_id IS NULL OR s.parse_version IS NULL OR s.parse_version < ?)
          AND a.start_time >= ?
          AND a.sport_type IN (${sportTypePlaceholders(sportTypes)})
        ORDER BY a.start_time DESC
        LIMIT ?`
     )
-    .all(sinceEpochSeconds, ...sportTypes, limit) as {
+    .all(STRENGTH_DETAIL_VERSION, sinceEpochSeconds, ...sportTypes, limit) as {
     activity_id: string;
     sport_type: number;
   }[];
@@ -2444,11 +2452,11 @@ export function countStrengthActivitiesMissingDetail(
       `SELECT count(*) AS n
        FROM training_activities a
        LEFT JOIN strength_sessions s ON s.activity_id = a.activity_id
-       WHERE s.activity_id IS NULL
+       WHERE (s.activity_id IS NULL OR s.parse_version IS NULL OR s.parse_version < ?)
          AND a.start_time >= ?
          AND a.sport_type IN (${sportTypePlaceholders(sportTypes)})`
     )
-    .get(sinceEpochSeconds, ...sportTypes) as { n: number };
+    .get(STRENGTH_DETAIL_VERSION, sinceEpochSeconds, ...sportTypes) as { n: number };
   return row.n;
 }
 

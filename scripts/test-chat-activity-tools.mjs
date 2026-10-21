@@ -639,6 +639,8 @@ const strengthDetail = parseActivityDetail({
           { mode: 14, exerciseIndex: 0, exerciseNameKey: "T1041", time: 4000, reps: 10, weight: 60000 },
           { mode: 14, exerciseIndex: 0, exerciseNameKey: "T1041", time: 4000, reps: 8, weight: 70000 },
           { mode: 16, exerciseIndex: 0, exerciseNameKey: "T1041", time: 8000, sets: 2, reps: 18 },
+          // The rest between exercises, a minute on the clock.
+          { mode: 17, exerciseIndex: 0, exerciseNameKey: "S3618", time: 6000 },
           { mode: 14, exerciseIndex: 1, exerciseNameKey: "S9999", name: "Bulgarian Split Squat", time: 4000, reps: 12, weight: 20000 },
           { mode: 14, exerciseIndex: 1, exerciseNameKey: "S9999", name: "Bulgarian Split Squat", time: 4000, reps: 12, weight: 20000 },
           { mode: 16, exerciseIndex: 1, exerciseNameKey: "S9999", name: "Bulgarian Split Squat", time: 8000, sets: 2, reps: 24 }
@@ -668,6 +670,11 @@ assert.deepEqual(
   ],
   "each exercise carries its sets, placed one after another where COROS stamped no time"
 );
+assert.equal(
+  strengthPreview?.sections.strength?.exercises[1]?.setList?.[0]?.start,
+  140,
+  "and the rest between exercises takes its time on that clock, where the roll-up takes none"
+);
 assert.deepEqual(strengthPreview?.sections.strength?.exercises.map(({ setList: _sets, ...row }) => row), [
   { nameKey: "T1041", sets: 2, reps: 18, minWeightKg: 60, maxWeightKg: 70, volumeKg: 1160 },
   {
@@ -689,7 +696,9 @@ assert.deepEqual(strengthPreview?.sections.strength?.exercises.map(({ setList: _
 const hybridStart = 178421631874;
 const hybridDetail = parseActivityDetail({
   labelId: "act-hybrid-1",
-  summary: { name: "Core & Breath", sportType: 1200, totalTime: 60000, startTimestamp: hybridStart },
+  // COROS's `totalReps` counts the 74 the watch counted through the timed set,
+  // which no row lists.
+  summary: { name: "Core & Breath", sportType: 1200, totalTime: 60000, startTimestamp: hybridStart, totalReps: 104 },
   frequencyList: Array.from({ length: 61 }, (_, index) => ({
     timestamp: hybridStart + index * 1000,
     heart: 90 + (index % 7)
@@ -735,10 +744,14 @@ assert.ok(
   "the heart rate under the sets runs on their clock"
 );
 const hybridText = formatActivityDetailForChat(hybridDetail, false, "metric");
-assert.match(hybridText, /Strength: 3 exercises · 4 sets · 30 reps/);
+assert.match(
+  hybridText,
+  /Strength: 3 exercises · 4 sets · 30 reps\n/,
+  "the headline counts the reps the rows list, not the watch's count through a timed set"
+);
 assert.match(hybridText, /- T1132 — 2 sets — 30 reps: 15 reps, 15 reps/);
-assert.match(hybridText, /- T1010 — 1 sets: 0:45/);
-assert.match(hybridText, /- T1013 — 1 sets: 1:00 \(74 reps\)/);
+assert.match(hybridText, /- T1010 — 1 set: 0:45/);
+assert.match(hybridText, /- T1013 — 1 set: 1:00 \(74 reps\)/);
 
 // A run's laps carry an exercise key too, under a mode no set has.
 assert.equal(

@@ -115,6 +115,7 @@ const strength: StrengthMessages = {
   "strength.exploreTitle": "Buka di Penjelajah Latihan",
   "strength.col.set": "Set",
   "strength.col.reps": "Rep",
+  "strength.col.time": "Waktu",
   "strength.col.weight": "Beban",
   "strength.col.e1rm": "Estimasi maks",
   "strength.col.rest": "Istirahat",

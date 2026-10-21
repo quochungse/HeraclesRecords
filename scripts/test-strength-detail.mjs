@@ -71,6 +71,49 @@ assert.equal(ex8.sets, 1);
 assert.equal(ex8.entries.length, 1);
 assert.equal(ex8.entries[0].weightKg, 16);
 
+// Read by mode where COROS gives one (14 set, 15 rest, 16 roll-up, 17 rest
+// between exercises): a Hybrid Fitness rest carries its set's reps and is no
+// set, a plank records no reps and is one, a set held for a time (targetType
+// 2) is read in time whatever the watch counted, and two exercises sharing an
+// index stay two.
+const byMode = parseStrengthDetail({
+  summary: { sets: 5, totalReps: 30 },
+  lapList: [
+    {
+      lapItemList: [
+        { mode: 14, exerciseIndex: 1, exerciseNameKey: "T1132", reps: 15, time: 3000, targetType: 3 },
+        { mode: 15, exerciseIndex: 1, exerciseNameKey: "T1132", reps: 15, time: 2000, targetType: 1 },
+        { mode: 14, exerciseIndex: 1, exerciseNameKey: "T1132", reps: 15, time: 3000, targetType: 3 },
+        { mode: 16, exerciseIndex: 1, exerciseNameKey: "T1132", sets: 2, reps: 30, time: 6000 },
+        { mode: 17, exerciseIndex: 1, exerciseNameKey: "S3618", sets: 2, time: 2000 },
+        { mode: 14, exerciseIndex: 2, exerciseNameKey: "T1010", reps: 0, time: 4500, targetType: 2 },
+        { mode: 15, exerciseIndex: 2, exerciseNameKey: "T1010", reps: 0, time: 3000, targetType: 2 },
+        { mode: 14, exerciseIndex: 2, exerciseNameKey: "T1010", reps: 0, time: 4500, targetType: 2 },
+        { mode: 16, exerciseIndex: 2, exerciseNameKey: "T1010", sets: 2, reps: 0, time: 9000 },
+        { mode: 14, exerciseIndex: 3, exerciseNameKey: "T1078", reps: 7, time: 2061, targetType: 3 },
+        { mode: 16, exerciseIndex: 3, exerciseNameKey: "T1078", sets: 1, reps: 7, time: 2061 },
+        { mode: 14, exerciseIndex: 3, exerciseNameKey: "T1013", reps: 74, time: 6000, targetType: 2 },
+        { mode: 16, exerciseIndex: 3, exerciseNameKey: "T1013", sets: 1, reps: 74, time: 6000 }
+      ]
+    }
+  ]
+});
+assert.deepEqual(
+  byMode.exercises.map((exercise) => [exercise.nameKey, exercise.sets, exercise.totalReps]),
+  [["T1132", 2, 30], ["T1010", 2, 0], ["T1078", 1, 7], ["T1013", 1, 0]]
+);
+assert.deepEqual(byMode.exercises[0].entries.map((entry) => [entry.reps, entry.restSec]), [[15, 20], [15, 0]]);
+assert.deepEqual(byMode.exercises[1].entries[0], {
+  reps: 0, weightKg: 0, workSec: 45, restSec: 30, calories: 0, timed: true
+});
+assert.equal(byMode.exercises[3].entries[0].timed, true, "a minute of high knees is read in time");
+
+// A run's laps carry exercise keys too, under modes that are no set.
+assert.equal(
+  parseStrengthDetail({ summary: {}, lapList: [{ lapItemList: [{ mode: 0, exerciseNameKey: "S4208", reps: 0, time: 60000 }] }] }),
+  undefined
+);
+
 // non-strength payload → undefined
 assert.equal(parseStrengthDetail({ summary: {}, laps: [] }), undefined);
 

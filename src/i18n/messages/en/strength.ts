@@ -116,6 +116,7 @@ const strength = {
   "strength.exploreTitle": "Open in Exercise Explorer",
   "strength.col.set": "Set",
   "strength.col.reps": "Reps",
+  "strength.col.time": "Time",
   "strength.col.weight": "Weight",
   "strength.col.e1rm": "Est. max",
   "strength.col.rest": "Rest",

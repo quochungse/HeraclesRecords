@@ -5,7 +5,18 @@ import type {
   StrengthSummary
 } from "./types";
 
-const REST_MARKER_KEY = "S3618";
+export const REST_MARKER_KEY = "S3618";
+const MODE_SET = 14;
+const MODE_REST = 15;
+/** A set's target type when it is held for a time rather than counted. */
+const TARGET_TIME = 2;
+
+/**
+ * Bumped when the parse changes what it keeps, so `strength_sessions` rows
+ * written by an older one are parsed again. 2: sets read by `mode`, timed
+ * sets kept, exercises told apart by name as well as index.
+ */
+export const STRENGTH_DETAIL_VERSION = 2;
 
 function num(value: unknown): number | undefined {
   return typeof value === "number" && Number.isFinite(value) ? value : undefined;
@@ -31,21 +42,58 @@ function getLapItems(raw: Record<string, unknown>): Record<string, unknown>[] {
     : [];
 }
 
-/** Group lap items by exerciseIndex, in first-seen order. */
-function groupByExerciseIndex(
+/**
+ * What a lap item is. COROS marks each with a `mode` — 14 a set, 15 the rest
+ * after it, 16 the exercise's roll-up, 17 the rest between exercises — and
+ * that decides wherever it is present: on Hybrid Fitness a rest carries its
+ * set's reps, and a plank carries none. A run's laps carry exercise keys too
+ * (`S4208`) under modes 0–2, and are neither. Only an item with no mode at all
+ * is told by its reps, as every item was before the mode was read.
+ */
+export function lapItemKind(item: Record<string, unknown>): "set" | "rest" | undefined {
+  if (item.exerciseNameKey === REST_MARKER_KEY) return undefined;
+  const mode = num(item.mode);
+  if (mode !== undefined) {
+    return mode === MODE_SET ? "set" : mode === MODE_REST ? "rest" : undefined;
+  }
+  if ((num(item.sets) ?? 0) > 0) return undefined;
+  return (num(item.reps) ?? 0) > 0 ? "set" : "rest";
+}
+
+/**
+ * Which exercise a lap item belongs to: its index and its name, since COROS
+ * gives two exercises one index now and then (Squat Jumps and the minute after
+ * them), and by index alone the second read as a set of the first.
+ */
+export function exerciseGroupKey(item: Record<string, unknown>): string {
+  return `${num(item.exerciseIndex) ?? -1}:${
+    item.exerciseNameKey === REST_MARKER_KEY ? "" : String(item.exerciseNameKey ?? "")
+  }`;
+}
+
+/**
+ * A set held for a time — a plank, a stretch, a minute of high knees — is read
+ * in time, whatever the watch counted through it.
+ */
+export function isTimedSet(item: Record<string, unknown>): boolean {
+  return num(item.targetType) === TARGET_TIME || (num(item.reps) ?? 0) <= 0;
+}
+
+/** Group lap items by exercise (`exerciseGroupKey`), in first-seen order. */
+function groupByExercise(
   items: Record<string, unknown>[]
 ): Record<string, unknown>[][] {
-  const order: number[] = [];
-  const groups = new Map<number, Record<string, unknown>[]>();
+  const order: string[] = [];
+  const groups = new Map<string, Record<string, unknown>[]>();
   for (const item of items) {
-    const idx = num(item.exerciseIndex) ?? -1;
-    if (!groups.has(idx)) {
-      groups.set(idx, []);
-      order.push(idx);
+    const key = exerciseGroupKey(item);
+    if (!groups.has(key)) {
+      groups.set(key, []);
+      order.push(key);
     }
-    groups.get(idx)!.push(item);
+    groups.get(key)!.push(item);
   }
-  return order.map((idx) => groups.get(idx)!);
+  return order.map((key) => groups.get(key)!);
 }
 
 function buildExercise(
@@ -68,27 +116,29 @@ function buildExercise(
   const entries: StrengthSet[] = [];
   for (let i = 0; i < laps.length; i++) {
     const lap = laps[i];
-    const reps = num(lap.reps) ?? 0;
-    const sets = num(lap.sets) ?? 0;
-    if (reps <= 0 || sets > 0) {
-      continue; // rest laps (reps 0) and the aggregate lap (sets > 0) are not work sets
+    if (lapItemKind(lap) !== "set") {
+      continue; // rests and the aggregate lap are not work sets
     }
+    const timed = isTimedSet(lap);
     const next = laps[i + 1];
-    const nextIsRest =
-      next && (num(next.reps) ?? 0) === 0 && (num(next.sets) ?? 0) === 0;
+    const nextIsRest = next !== undefined && lapItemKind(next) === "rest";
     entries.push({
-      reps,
+      reps: timed ? 0 : (num(lap.reps) ?? 0),
       weightKg: round((num(lap.weight) ?? 0) / 1000, 2),
       workSec: round((num(lap.time) ?? 0) / 100, 2),
       restSec: nextIsRest ? round((num(next!.time) ?? 0) / 100, 2) : 0,
-      calories: Math.round((num(lap.calories) ?? 0) / 1000)
+      calories: Math.round((num(lap.calories) ?? 0) / 1000),
+      ...(timed ? { timed } : {})
     });
   }
 
-  const sets = aggregate
+  // COROS's roll-up counts what the watch counted, timed sets included; the
+  // entries are what is shown, so they decide once a set is read in time.
+  const anyTimed = entries.some((entry) => entry.timed);
+  const sets = aggregate && !anyTimed
     ? num(aggregate.sets) ?? entries.length
     : entries.length;
-  const totalReps = aggregate
+  const totalReps = aggregate && !anyTimed
     ? num(aggregate.reps) ?? entries.reduce((s, e) => s + e.reps, 0)
     : entries.reduce((s, e) => s + e.reps, 0);
 
@@ -132,7 +182,7 @@ export function parseStrengthDetail(
   if (!hasExerciseData) {
     return undefined;
   }
-  const exercises = groupByExerciseIndex(items)
+  const exercises = groupByExercise(items)
     .map(buildExercise)
     .filter((e): e is StrengthExercise => e !== undefined && e.entries.length > 0);
   if (exercises.length === 0) {

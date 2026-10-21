@@ -96,7 +96,8 @@ function Stat({ label, value, caption }: { label: string; value: string; caption
   );
 }
 
-function formatRest(seconds: number): string {
+/** `45 s`, or `1:30` from a minute up: a rest, or a timed set's hold. */
+function formatSeconds(seconds: number): string {
   const total = Math.round(seconds);
   if (total < 60) return `${total} s`;
   return `${Math.floor(total / 60)}:${String(total % 60).padStart(2, "0")}`;
@@ -128,6 +129,8 @@ function ExerciseTable({ rows, explorable, onOpenExercise, unitSystem }: Exercis
         const hasWeight = row.sets.some((set) => set.weightKg > 0);
         const hasE1rm = row.sets.some((set) => set.e1rmKg > 0);
         const hasRest = row.sets.some((set) => set.restSec > 0);
+        const hasReps = row.sets.some((set) => !set.timed);
+        const hasTime = row.sets.some((set) => set.timed);
         const hasRpe = row.sets.some((set) => set.rpe !== undefined);
         const panelId = `strength-session-exercise-${row.key}`;
         return (
@@ -151,7 +154,9 @@ function ExerciseTable({ rows, explorable, onOpenExercise, unitSystem }: Exercis
                   ) : null}
                 </span>
                 <span className="strength-session-exercise-facts">
-                  {plural("strength.sets", row.sets.length)} · {plural("strength.reps", row.reps)}
+                  {plural("strength.sets", row.sets.length)}
+                  {row.reps > 0 || !hasTime ? ` · ${plural("strength.reps", row.reps)}` : null}
+                  {hasTime && !hasReps ? ` · ${formatSeconds(row.timedSec)}` : null}
                 </span>
                 <span className="strength-session-exercise-top">
                   {row.topSet
@@ -178,7 +183,8 @@ function ExerciseTable({ rows, explorable, onOpenExercise, unitSystem }: Exercis
                   <thead>
                     <tr>
                       <th scope="col">{t("strength.col.set")}</th>
-                      <th scope="col">{t("strength.col.reps")}</th>
+                      {hasReps ? <th scope="col">{t("strength.col.reps")}</th> : null}
+                      {hasTime ? <th scope="col">{t("strength.col.time")}</th> : null}
                       {hasWeight ? <th scope="col">{t("strength.col.weight")}</th> : null}
                       {hasE1rm ? <th scope="col">{t("strength.col.e1rm")}</th> : null}
                       {hasRest ? <th scope="col">{t("strength.col.rest")}</th> : null}
@@ -199,14 +205,15 @@ function ExerciseTable({ rows, explorable, onOpenExercise, unitSystem }: Exercis
                               index + 1
                             )}
                           </td>
-                          <td>{set.reps}</td>
+                          {hasReps ? <td>{set.timed ? "—" : set.reps}</td> : null}
+                          {hasTime ? <td>{set.timed ? formatSeconds(set.workSec) : "—"}</td> : null}
                           {hasWeight ? (
                             <td>{set.weightKg > 0 ? formatLiftWeight(set.weightKg, unitSystem) : "—"}</td>
                           ) : null}
                           {hasE1rm ? (
                             <td>{set.e1rmKg > 0 ? formatLiftWeight(Math.round(set.e1rmKg * 10) / 10, unitSystem) : "—"}</td>
                           ) : null}
-                          {hasRest ? <td>{set.restSec > 0 ? formatRest(set.restSec) : "—"}</td> : null}
+                          {hasRest ? <td>{set.restSec > 0 ? formatSeconds(set.restSec) : "—"}</td> : null}
                           {hasRpe ? <td>{set.rpe ?? "—"}</td> : null}
                         </tr>
                       );
