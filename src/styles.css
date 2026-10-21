@@ -11964,6 +11964,15 @@ td span {
 }
 
 /* Scroll area + centered reading column */
+/* The transcript and the rail of questions beside it. */
+.chat-transcript-frame {
+  position: relative;
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+}
+
 .chat-transcript {
   flex: 1;
   min-height: 0;
@@ -13894,7 +13903,8 @@ td span {
   font-size: 12px;
 }
 
-.chat-hidden-turn-label button {
+.chat-hidden-turn-label button,
+.chat-branched-from button {
   padding: 0;
   border: 0;
   background: none;
@@ -13903,6 +13913,91 @@ td span {
   cursor: pointer;
   text-decoration: underline;
   text-underline-offset: 3px;
+}
+
+/* The head of a conversation branched from another, and the way back. */
+.chat-branched-from {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  color: var(--text-muted);
+  font-size: 12px;
+  text-align: center;
+}
+
+/* The athlete's questions as marks down the transcript's edge (QuestionRail).
+   The marks give way to a long conversation rather than scroll: each shrinks
+   toward a hairline, so every question keeps a place. */
+.chat-question-rail {
+  position: absolute;
+  top: 50%;
+  right: 6px;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  max-height: calc(100% - 32px);
+  transform: translateY(-50%);
+}
+
+.chat-question-tick {
+  position: relative;
+  display: grid;
+  flex: 0 1 16px;
+  place-items: center;
+  width: 22px;
+  min-height: 3px;
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+}
+
+.chat-question-tick i {
+  display: block;
+  width: 10px;
+  height: 3px;
+  border-radius: var(--radius-xs);
+  background: var(--glass-border);
+  transition: width var(--dur-base) var(--ease), background var(--dur-fast) var(--ease);
+}
+
+.chat-question-tick:hover i {
+  background: var(--text-secondary);
+}
+
+.chat-question-tick.is-active i {
+  width: 16px;
+  background: var(--chat-signal);
+}
+
+.chat-question-tick.is-hidden i {
+  border: 1px dashed var(--text-muted);
+  background: none;
+}
+
+.chat-question-tick.is-active.is-hidden i {
+  border-color: var(--chat-signal);
+}
+
+.chat-question-tick:hover::after {
+  position: absolute;
+  top: 50%;
+  right: calc(100% + 6px);
+  width: max-content;
+  max-width: 280px;
+  padding: 6px 10px;
+  border-radius: var(--radius-sm);
+  background: var(--menu-surface);
+  box-shadow: var(--shadow-elevated);
+  color: var(--text-primary);
+  content: attr(data-question);
+  font-size: 12px;
+  line-height: 1.45;
+  text-align: left;
+  pointer-events: none;
+  transform: translateY(-50%);
 }
 
 /* The last question, being written again in place of its bubble. */

@@ -931,6 +931,13 @@ const chat: ChatMessages = {
   "chat.turn.summaryRewritten": "Ringkasan sudah ditulis ulang.",
   "chat.turn.summaryNotRewritten": "Ringkasan tidak bisa ditulis ulang; akan berubah pada penulisan ulang berikutnya.",
   "chat.turn.hideFailed": "Tidak bisa mengubah apa yang dibaca pelatih.",
+  "chat.turn.branch": "Cabangkan dari sini",
+  "chat.turn.branched": "Dicabangkan ke percakapan baru.",
+  "chat.turn.branchFailed": "Tidak bisa mencabangkan percakapan ini.",
+  "chat.branch.from": "Dicabangkan dari “{title}”. Yang dibuat pelatih di sana tetap di sana.",
+  "chat.branch.open": "Buka",
+  "chat.rail.label": "Pertanyaan Anda",
+  "chat.rail.question": "Pertanyaan {n}: {text}",
 };
 
 export default chat;

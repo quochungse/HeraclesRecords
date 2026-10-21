@@ -931,6 +931,13 @@ const chat: ChatMessages = {
   "chat.turn.summaryRewritten": "Bản tóm tắt đã được viết lại.",
   "chat.turn.summaryNotRewritten": "Không viết lại được bản tóm tắt; nó sẽ thay đổi ở lần viết lại sau.",
   "chat.turn.hideFailed": "Không thay đổi được phần huấn luyện viên đọc.",
+  "chat.turn.branch": "Tách hội thoại từ đây",
+  "chat.turn.branched": "Đã tách thành một cuộc trò chuyện mới.",
+  "chat.turn.branchFailed": "Không tách được cuộc trò chuyện này.",
+  "chat.branch.from": "Tách từ “{title}”. Những gì huấn luyện viên đã tạo vẫn ở đó.",
+  "chat.branch.open": "Mở",
+  "chat.rail.label": "Các câu hỏi của bạn",
+  "chat.rail.question": "Câu hỏi {n}: {text}",
 };
 
 export default chat;

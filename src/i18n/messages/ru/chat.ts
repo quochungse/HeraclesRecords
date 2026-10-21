@@ -989,6 +989,13 @@ const chat: ChatMessages = {
   "chat.turn.summaryRewritten": "Сводка переписана.",
   "chat.turn.summaryNotRewritten": "Сводку переписать не удалось; она изменится при следующей переписке.",
   "chat.turn.hideFailed": "Не удалось изменить то, что учитывает тренер.",
+  "chat.turn.branch": "Ответвить отсюда",
+  "chat.turn.branched": "Ответвлено в новый разговор.",
+  "chat.turn.branchFailed": "Не удалось ответвить этот разговор.",
+  "chat.branch.from": "Ответвлено от «{title}». Созданное там тренером осталось там.",
+  "chat.branch.open": "Открыть",
+  "chat.rail.label": "Ваши вопросы",
+  "chat.rail.question": "Вопрос {n}: {text}",
 };
 
 export default chat;

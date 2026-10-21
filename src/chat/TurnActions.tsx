@@ -1,4 +1,4 @@
-import { Check, Copy, Eye, EyeOff, Pencil, Trash2, type LucideIcon } from "lucide-react";
+import { Check, Copy, Eye, EyeOff, GitBranch, Pencil, Trash2, type LucideIcon } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { t } from "../i18n/core";
 import { useI18n } from "../i18n/useI18n";
@@ -32,8 +32,8 @@ function Action({
 
 /**
  * What can be done to a message, beside it: copy it, ask the last question
- * again in other words, keep its turn out of what Coach reads, delete the
- * turn. Drawn quiet and shown on hover or focus, so a conversation reads as
+ * again in other words, keep its turn out of what Coach reads, carry the
+ * conversation up to it into a new one, delete the turn. Drawn quiet and shown on hover or focus, so a conversation reads as
  * a conversation until the athlete reaches for one of them. An action left
  * out is one that does not apply here, or not now.
  */
@@ -42,6 +42,7 @@ export function TurnActions({
   onEdit,
   hidden,
   onToggleHidden,
+  onBranch,
   onDelete
 }: {
   /** The text a copy puts on the clipboard, worked out when it is pressed. */
@@ -50,6 +51,7 @@ export function TurnActions({
   /** Whether the turn is hidden from Coach, for the toggle's words. */
   hidden?: boolean;
   onToggleHidden?: () => void;
+  onBranch?: () => void;
   onDelete?: () => void;
 }) {
   useI18n();
@@ -79,6 +81,7 @@ export function TurnActions({
           onClick={onToggleHidden}
         />
       ) : null}
+      {onBranch ? <Action icon={GitBranch} label={t("chat.turn.branch")} onClick={onBranch} /> : null}
       {onDelete ? <Action icon={Trash2} label={t("chat.turn.delete")} danger onClick={onDelete} /> : null}
     </span>
   );

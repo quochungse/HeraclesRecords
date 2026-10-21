@@ -931,6 +931,13 @@ const chat: ChatMessages = {
   "chat.turn.summaryRewritten": "Il riepilogo è stato riscritto.",
   "chat.turn.summaryNotRewritten": "Non è stato possibile riscrivere il riepilogo; cambierà alla prossima riscrittura.",
   "chat.turn.hideFailed": "Impossibile cambiare ciò che legge Coach.",
+  "chat.turn.branch": "Dirama da qui",
+  "chat.turn.branched": "Diramato in una nuova conversazione.",
+  "chat.turn.branchFailed": "Impossibile diramare questa conversazione.",
+  "chat.branch.from": "Diramato da “{title}”. Ciò che Coach ha creato lì resta lì.",
+  "chat.branch.open": "Apri",
+  "chat.rail.label": "Le tue domande",
+  "chat.rail.question": "Domanda {n}: {text}",
 };
 
 export default chat;

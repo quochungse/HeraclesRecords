@@ -935,6 +935,13 @@ const chat = {
   "chat.turn.summaryRewritten": "The summary was rewritten.",
   "chat.turn.summaryNotRewritten": "The summary could not be rewritten; it changes at its next rewrite.",
   "chat.turn.hideFailed": "Could not change what Coach reads.",
+  "chat.turn.branch": "Branch from here",
+  "chat.turn.branched": "Branched into a new conversation.",
+  "chat.turn.branchFailed": "Could not branch this conversation.",
+  "chat.branch.from": "Branched from “{title}”. What Coach made there stays there.",
+  "chat.branch.open": "Open",
+  "chat.rail.label": "Your questions",
+  "chat.rail.question": "Question {n}: {text}",
 };
 
 export default chat;

@@ -590,6 +590,8 @@ const api = {
     ipcRenderer.invoke("chat:deleteTurn", sessionId, ref, options),
   editChatTurn: (sessionId: string, ref: TurnRef, text: string): Promise<TurnChange> =>
     ipcRenderer.invoke("chat:editTurn", sessionId, ref, text),
+  branchChatConversation: (sessionId: string, ref: TurnRef): Promise<ChatSessionSummary> =>
+    ipcRenderer.invoke("chat:branchConversation", sessionId, ref),
   getHiddenChatTurns: (sessionId: string): Promise<string[]> => ipcRenderer.invoke("chat:hiddenTurns", sessionId),
   setChatTurnHidden: (sessionId: string, ref: TurnRef, options: HideTurnOptions): Promise<TurnChange> =>
     ipcRenderer.invoke("chat:setTurnHidden", sessionId, ref, options),

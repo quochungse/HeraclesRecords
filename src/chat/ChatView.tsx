@@ -24,6 +24,7 @@ import {
   EyeOff,
   FileDown,
   FileText,
+  GitBranch,
   Globe,
   KeyRound,
   Loader2,
@@ -205,6 +206,7 @@ import { TurnFailureRow } from "./TurnFailureRow";
 import { classifyTurnFailure, unansweredKind, type TurnFailureRowKind } from "./turnFailure";
 import { HIDDEN_TURN_PLACEHOLDER, maskHiddenTurns, turnRanges, type TurnRange } from "../../electron/chatTurns";
 import { QuestionEditor } from "./QuestionEditor";
+import { QuestionRail, questionAtScroll, type RailQuestion } from "./QuestionRail";
 
 const NO_HIDDEN_TURNS: ReadonlySet<string> = new Set();
 
@@ -1442,6 +1444,16 @@ export function ChatView({
   const [hiddenTurnsVersion, setHiddenTurnsVersion] = useState(0);
   /** The question being written again, by its index; only ever the last one. */
   const [editingQuestion, setEditingQuestion] = useState<number | null>(null);
+  /** The question whose turn is being read, for the rail's mark. */
+  const [railActive, setRailActive] = useState<number | null>(null);
+  /**
+   * The next timeline change keeps the reader where they are: a turn deleted
+   * or hidden further up is not a new entry to be read from the end.
+   */
+  const keepScrollRef = useRef(false);
+  /** The rail's questions and the latest way to jump to one, for the keyboard's listener. */
+  const railQuestionsRef = useRef<RailQuestion[]>([]);
+  const railStepRef = useRef<(direction: -1 | 1) => void>(() => undefined);
   /** A turn the summary covers, while the athlete is asked about hiding or showing it. */
   const [turnHiding, setTurnHiding] = useState<{
     sessionId: string;
@@ -2394,6 +2406,19 @@ export function ChatView({
     };
   }, [api, activeSessionId, hiddenTurnsVersion]);
 
+  // Alt + ↑ / ↓ step through the athlete's questions, as the rail does.
+  useEffect(() => {
+    if (!active) return;
+    const step = (event: KeyboardEvent) => {
+      if (!event.altKey || event.ctrlKey || event.metaKey) return;
+      if (event.key !== "ArrowUp" && event.key !== "ArrowDown") return;
+      event.preventDefault();
+      railStepRef.current(event.key === "ArrowUp" ? -1 : 1);
+    };
+    document.addEventListener("keydown", step);
+    return () => document.removeEventListener("keydown", step);
+  }, [active]);
+
   // Load sign-in/provider state on mount.
   useEffect(() => {
     let cancelled = false;
@@ -3007,8 +3032,27 @@ export function ChatView({
     if (thread.parentElement) observer.observe(thread.parentElement);
     threadObserverRef.current = observer;
   }, []);
+  /** Which question's turn is at the top of the transcript, for the rail's mark. */
+  const railFrameRef = useRef(0);
+  const readRailPosition = (transcript: HTMLDivElement) => {
+    cancelAnimationFrame(railFrameRef.current);
+    railFrameRef.current = requestAnimationFrame(() => {
+      const frameTop = transcript.getBoundingClientRect().top;
+      setRailActive(
+        questionAtScroll(
+          railQuestionsRef.current,
+          (index) =>
+            transcript
+              .querySelector<HTMLElement>(`[data-chat-entry-index="${index}"]`)
+              ?.getBoundingClientRect().top,
+          frameTop + 80
+        )
+      );
+    });
+  };
   const handleTranscriptScroll = (event: { currentTarget: HTMLDivElement }) => {
     const transcript = event.currentTarget;
+    readRailPosition(transcript);
     if (transcript.scrollHeight - transcript.scrollTop - transcript.clientHeight < 40) {
       stickToEndRef.current = true;
     } else if (transcript.scrollTop < lastScrollTopRef.current) {
@@ -3017,8 +3061,17 @@ export function ChatView({
     lastScrollTopRef.current = transcript.scrollTop;
   };
 
+  // The rail's mark follows whatever moved the transcript.
+  useEffect(() => {
+    if (scrollRef.current) readRailPosition(scrollRef.current);
+  }, [timeline, renderFrom]);
+
   // A new entry, or another conversation, is read from its end.
   useEffect(() => {
+    if (keepScrollRef.current) {
+      keepScrollRef.current = false;
+      return;
+    }
     const transcript = scrollRef.current;
     stickToEndRef.current = true;
     if (!transcript) return;
@@ -3716,7 +3769,8 @@ export function ChatView({
    * turns. Drawn in place, never faded in (see `ChatRow`), and counted as the
    * row's whole length so the next save is not read as missing a tail.
    */
-  const applyTurnChange = (change: TurnChange): ChatEntry[] => {
+  const applyTurnChange = (change: TurnChange, { keepScroll = true }: { keepScroll?: boolean } = {}): ChatEntry[] => {
+    keepScrollRef.current = keepScroll;
     persistedBaseRef.current = change.entries.length;
     const next = fromPersistedEntries(change.entries);
     for (const entry of next) settledEntriesRef.current.add(entry);
@@ -3785,7 +3839,7 @@ export function ChatView({
       await flushPendingSave();
       const change = await api.editChatTurn(sessionId, ref, text ?? ref.content);
       if (activeSessionIdRef.current !== sessionId) return;
-      const entries = applyTurnChange(change);
+      const entries = applyTurnChange(change, { keepScroll: false });
       if (condense) {
         const asked = turnRanges(entries).at(-1);
         await api
@@ -3846,6 +3900,39 @@ export function ChatView({
     } finally {
       setTurnHiding(null);
     }
+  };
+
+  /** A new conversation holding this one up to and including the turn at `question`, opened. */
+  const branchFromTurn = async (question: number) => {
+    const sessionId = activeSessionIdRef.current;
+    const ref = turnRefAt(question);
+    if (!api || !sessionId || !ref) return;
+    try {
+      await flushPendingSave();
+      const branch = await api.branchChatConversation(sessionId, ref);
+      await refreshSessions();
+      await loadSession(branch.id);
+      showToast(t("chat.turn.branched"));
+    } catch (caught) {
+      showToast(remoteErrorMessage(caught, t("chat.turn.branchFailed")), "error");
+    }
+  };
+
+  /** The transcript taken to a question, which is marked for a moment. */
+  const jumpToQuestion = (index: number) => {
+    setRailActive(index);
+    withEntryRow(index, (row) => {
+      const transcript = scrollRef.current;
+      if (!transcript) return;
+      const top = transcript.scrollTop + row.getBoundingClientRect().top - transcript.getBoundingClientRect().top - 16;
+      transcript.scrollTo({ top: Math.max(0, top), behavior: "smooth" });
+      setHighlightedChatEntryIndex(index);
+      if (chatHighlightTimeoutRef.current) clearTimeout(chatHighlightTimeoutRef.current);
+      chatHighlightTimeoutRef.current = setTimeout(() => {
+        setHighlightedChatEntryIndex(null);
+        chatHighlightTimeoutRef.current = null;
+      }, 1800);
+    });
   };
 
   /** "Draw the outline", or a redraw with the athlete's note, as a turn of the conversation (P2.2). */
@@ -4932,6 +5019,24 @@ export function ChatView({
     const turn = turnByEntry.get(index);
     return turnActionsLive && turn ? () => void toggleTurnHidden(turn.question, !hiddenAt(index)) : undefined;
   };
+  const branchAt = (index: number) => {
+    const turn = turnByEntry.get(index);
+    return turnActionsLive && turn ? () => void branchFromTurn(turn.question) : undefined;
+  };
+  const railQuestions: RailQuestion[] = turns.flatMap((range) => {
+    const entry = timeline[range.question];
+    return entry?.kind === "message" && !entry.automation
+      ? [{ index: range.question, text: displayStepText(entry.content), hidden: hiddenAt(range.question) }]
+      : [];
+  });
+  railQuestionsRef.current = railQuestions;
+  railStepRef.current = (direction) => {
+    if (!railQuestions.length) return;
+    const at = railQuestions.findIndex((question) => question.index === railActive);
+    const from = at < 0 ? (direction < 0 ? railQuestions.length : -1) : at;
+    const next = railQuestions[Math.max(0, Math.min(railQuestions.length - 1, from + direction))];
+    if (next) jumpToQuestion(next.index);
+  };
   /** Only the last question is written again: one further up would leave every later turn answering something never asked. */
   const editAt = (index: number) => {
     const entry = timeline[index];
@@ -5107,6 +5212,7 @@ export function ChatView({
       >
         <ChatSidebar {...sidebarProps} />
         <div className="chat-main">
+          <div className="chat-transcript-frame">
           <div className="chat-transcript" ref={scrollRef} onScroll={handleTranscriptScroll}>
         <div className="chat-thread" ref={observeThread}>
           {/* What waits on the athlete here (R3), as a bar that jumps to each
@@ -5644,6 +5750,22 @@ export function ChatView({
               return null;
             }
 
+            if (entry.kind === "branchedFrom") {
+              // A conversation deleted since has nothing to open.
+              const original = sessions.some((session) => session.id === entry.sessionId);
+              return (
+                <div key={`branched-from-${index}`} className="chat-branched-from" data-chat-entry-index={index}>
+                  <GitBranch size={13} aria-hidden="true" />
+                  <span>{t("chat.branch.from", { title: displaySessionTitle(entry.title) })}</span>
+                  {original ? (
+                    <button type="button" onClick={() => void loadSession(entry.sessionId)}>
+                      {t("chat.branch.open")}
+                    </button>
+                  ) : null}
+                </div>
+              );
+            }
+
             // 5.6: the synthetic user turn an analysis sends is stored with
             // role "user", but it was never typed by the athlete — showing it as
             // their bubble would misattribute the playbook to them.
@@ -5734,6 +5856,7 @@ export function ChatView({
                           }
                           hidden={hiddenAt(index)}
                           onToggleHidden={toggleHiddenAt(index)}
+                          onBranch={branchAt(index)}
                           onDelete={deleteTurnAt(index)}
                         />
                         <TurnCostFooter usage={entry.usage} model={entry.model} />
@@ -5823,6 +5946,8 @@ export function ChatView({
           ) : null}
         </div>
       </div>
+          <QuestionRail questions={railQuestions} active={railActive} onJump={jumpToQuestion} />
+          </div>
 
           <ChatComposer
             ref={composerRef}

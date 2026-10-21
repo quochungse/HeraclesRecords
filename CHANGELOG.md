@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### What's new
 - **Coach** - delete a question together with Coach's answer, and what Coach made in it if you choose. When the conversation's summary still mentions it, the summary can be rewritten on the spot. A question that got no answer says why right under it and offers Retry, and every message can be copied.
 - **Coach** - edit your last question and send it again; Coach answers afresh. Hide a turn from Coach to keep it on screen without Coach reading it, and show it again whenever you like.
+- **Coach** - branch a new conversation from any answer: it carries everything up to that point, with the same AI and sources, while what Coach made stays where it was made. In a long conversation, a column of marks at the edge lists your questions; press one, or use Alt with the up and down arrows, to go back to it.
 
 ## [1.2.0] - 2026-10-20
 

@@ -931,6 +931,13 @@ const chat: ChatMessages = {
   "chat.turn.summaryRewritten": "Le résumé a été réécrit.",
   "chat.turn.summaryNotRewritten": "Le résumé n’a pas pu être réécrit ; il changera à la prochaine réécriture.",
   "chat.turn.hideFailed": "Impossible de changer ce que lit Coach.",
+  "chat.turn.branch": "Créer une branche ici",
+  "chat.turn.branched": "Branche créée dans une nouvelle conversation.",
+  "chat.turn.branchFailed": "Impossible de créer une branche de cette conversation.",
+  "chat.branch.from": "Branche de « {title} ». Ce que Coach y a créé y reste.",
+  "chat.branch.open": "Ouvrir",
+  "chat.rail.label": "Vos questions",
+  "chat.rail.question": "Question {n} : {text}",
 };
 
 export default chat;

@@ -931,6 +931,13 @@ const chat: ChatMessages = {
   "chat.turn.summaryRewritten": "O resumo foi reescrito.",
   "chat.turn.summaryNotRewritten": "Não foi possível reescrever o resumo; ele muda na próxima reescrita.",
   "chat.turn.hideFailed": "Não foi possível mudar o que o treinador lê.",
+  "chat.turn.branch": "Ramificar a partir daqui",
+  "chat.turn.branched": "Ramificado em uma nova conversa.",
+  "chat.turn.branchFailed": "Não foi possível ramificar esta conversa.",
+  "chat.branch.from": "Ramificado de “{title}”. O que o treinador criou lá continua lá.",
+  "chat.branch.open": "Abrir",
+  "chat.rail.label": "Suas perguntas",
+  "chat.rail.question": "Pergunta {n}: {text}",
 };
 
 export default chat;

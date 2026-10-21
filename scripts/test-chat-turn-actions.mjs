@@ -21,6 +21,10 @@
 //   * A hidden turn stays in the row and out of what Coach reads — an
 //     analysis, the summariser, recall — with every position kept; asking it
 //     again shows it, and deleting it or its conversation forgets it.
+//   * A branch is a conversation of its own holding this one up to a turn:
+//     its entries minted afresh, what Coach made left where it was made, the
+//     same AI and sources, the summary when it covers nothing past the branch
+//     point, and the same turns hidden.
 //   * A failed turn's row is sorted by what the athlete can do about it, and
 //     a recent question with no answer may still be answered elsewhere.
 //
@@ -344,6 +348,53 @@ test("asking a hidden turn again shows it, and deleting one forgets it", async (
   await service.setTurnHidden(sessionId, { index: 0, content: "Q2" }, { hidden: true, rewriteSummary: false }, noRoll);
   chatService.deleteChatSessionById(sessionId);
   assert.deepEqual(service.hiddenTurns(sessionId), [], "and the conversation's go with it");
+});
+
+// --- branching ----------------------------------------------------------------------
+
+test("a branch holds the conversation up to its turn, and leaves what Coach made behind", async () => {
+  saveDraft("b-1", "art-B", 1);
+  const sessionId = conversation([
+    user("Q1"),
+    coach("A1"),
+    user("Q2"),
+    draftCard("b-1"),
+    coach("A2"),
+    user("Q3"),
+    coach("A3")
+  ]);
+  history.setChatSessionTitle(sessionId, "Tuần trước 10K");
+  chatService.setConversationSettings({ sessionId, sources: { activities: true, sleep: false, zones: true }, web: true });
+  context.writeSessionSummary(sessionId, "About Q1", 2);
+  await service.setTurnHidden(sessionId, { index: 0, content: "Q1" }, { hidden: true, rewriteSummary: false }, noRoll);
+
+  const branch = service.branchConversation(sessionId, { index: 2, content: "Q2" });
+  assert.equal(branch.title, "↳ Tuần trước 10K");
+  const entries = history.getChatSession(branch.id);
+  assert.deepEqual(entries[0], { ...entries[0], kind: "branchedFrom", sessionId, title: "Tuần trước 10K" });
+  assert.deepEqual(contents(branch.id), ["branchedFrom:", "Q1", "A1", "Q2", "A2"], "the plan card stays in the original");
+  const original = history.getChatSession(sessionId);
+  assert.ok(
+    entries.every((entry) => entry.mid && !original.some((kept) => kept.mid === entry.mid)),
+    "a branch's entries are its own"
+  );
+  assert.deepEqual(context.readSessionSummary(branch.id), { summary: "About Q1", through: 3 }, "one place later for the head");
+  assert.deepEqual(service.hiddenTurns(branch.id), [entries[1].mid], "the same turn hidden, under its new identity");
+  const settings = chatService.getConversationSettings(branch.id);
+  assert.equal(settings.sources.sleep, false);
+  assert.equal(settings.web, true);
+
+  chatService.deleteChatSessionById(branch.id);
+  assert.ok(databaseModule.getChatPlanDraft("b-1"), "deleting the branch takes nothing of the original's");
+});
+
+test("a summary reaching past the branch point is not carried", () => {
+  const sessionId = conversation([user("Q1"), coach("A1"), user("Q2"), coach("A2"), user("Q3"), coach("A3")]);
+  context.writeSessionSummary(sessionId, "About Q1 and Q2", 4);
+  const branch = service.branchConversation(sessionId, { index: 0, content: "Q1" });
+  assert.equal(context.readSessionSummary(branch.id).summary, undefined);
+  const again = service.branchConversation(branch.id, { index: 1, content: "Q1" });
+  assert.equal(again.title.startsWith("↳ ↳"), false, "a branch of a branch is marked once");
 });
 
 // --- a failed turn ---------------------------------------------------------------

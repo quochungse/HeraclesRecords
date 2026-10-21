@@ -1,4 +1,11 @@
-import { getChatSession, saveChatSession } from "./chatHistoryStore";
+import {
+  createChatSession,
+  getChatSession,
+  getChatSessionProvider,
+  getChatSessionTitle,
+  saveChatSession,
+  setChatSessionTitle
+} from "./chatHistoryStore";
 import {
   readSessionSummary,
   rollTranscriptSummary,
@@ -7,7 +14,7 @@ import {
 } from "./chatContextService";
 import { resolveCompressionRuntime, transcriptDigests } from "./chatCompression";
 import { providerModelOptions } from "./chatModels";
-import { getChatSettings } from "./chatService";
+import { getChatSettings, getConversationSettings, setConversationSettings } from "./chatService";
 import { coachTranscript } from "./chatHiddenTurns";
 import {
   shiftBoundary,
@@ -21,6 +28,7 @@ import { readScheduleChanges } from "./chatScheduleChanges";
 import { deleteChatScheduleChanges, listChatHiddenTurns, setChatHiddenTurn } from "./database";
 import { ScreenError } from "./screenText";
 import type {
+  ChatSessionSummary,
   ChatTokenUsage,
   DeleteTurnOptions,
   HideTurnOptions,
@@ -32,7 +40,8 @@ import type {
 } from "./types";
 
 /**
- * Deleting, editing and hiding a turn of a conversation.
+ * Deleting, editing and hiding a turn of a conversation, and branching a new
+ * conversation from one.
  *
  * Done here rather than by the window saving a shorter transcript: a save
  * that shortens the row is exactly what `foreignTail` refuses — it reads as
@@ -334,4 +343,67 @@ export async function setTurnHidden(
       ? await rewriteSummary(sessionId, entries, readSessionSummary(sessionId).through, deps)
       : {};
   return { entries, hidden: listChatHiddenTurns(sessionId), ...rewritten };
+}
+
+/**
+ * What a branch leaves behind: anchors and cards naming rows of the original
+ * conversation. Two conversations naming one draft or one proposal would
+ * have deleting either take the other's with it (`deleteChatSessionById`
+ * deletes what its transcript names), so what Coach made stays where it was
+ * made, and the branch's head says where that is.
+ */
+const LEFT_BEHIND = new Set([
+  "planDraft",
+  "planBrief",
+  "planOutline",
+  "planEvent",
+  "planRefs",
+  "scheduleChange",
+  "workoutDelete"
+]);
+
+/** Marks the title of a branch in every language: a sign, not a word. */
+const BRANCH_MARK = "↳ ";
+
+/**
+ * A new conversation holding this one up to and including the turn at
+ * `ref`: same AI, same sources, same summary when it covers no more than
+ * what was carried over, and the same turns hidden. Its entries are minted
+ * afresh — a branch is a conversation of its own, not a copy that merges.
+ */
+export function branchConversation(sessionId: string, ref: TurnRef): ChatSessionSummary {
+  const entries = identified(sessionId);
+  const range = resolveTurn(entries, ref);
+  const carried = entries.slice(0, range.end);
+  const dropped = carried.flatMap((entry, index) => (LEFT_BEHIND.has(entry.kind) ? [index] : []));
+  const kept = withoutIndices(carried, dropped).map(({ mid: _mid, mrev: _mrev, ...entry }) => entry as PersistedChatEntry);
+  const keptMids = withoutIndices(carried, dropped).map((entry) => entry.mid);
+
+  const provider = getChatSessionProvider(sessionId) ?? getChatSettings().provider;
+  const title = getChatSessionTitle(sessionId) ?? "";
+  const branch = createChatSession(provider);
+  const head: PersistedChatEntry = { kind: "branchedFrom", sessionId, title };
+
+  // The summary first, so the row the save announces to sync carries it. Kept
+  // only when it covers nothing past the branch point; one place later for
+  // the head at the top.
+  const stored = readSessionSummary(sessionId);
+  if (stored.summary && stored.through > 0 && stored.through <= range.end) {
+    writeSessionSummary(branch.id, stored.summary, shiftBoundary(stored.through, dropped) + 1);
+    if (stored.condensedThrough !== undefined && stored.condensedThrough <= range.end) {
+      writeCondensedThrough(branch.id, shiftBoundary(stored.condensedThrough, dropped) + 1);
+    }
+  }
+  saveChatSession(branch.id, [head, ...kept]);
+
+  const minted = getChatSession(branch.id).slice(1);
+  const hidden = new Set(listChatHiddenTurns(sessionId));
+  keptMids.forEach((mid, index) => {
+    const copy = minted[index]?.mid;
+    if (mid && copy && hidden.has(mid)) setChatHiddenTurn(branch.id, copy, true);
+  });
+  const settings = getConversationSettings(sessionId);
+  setConversationSettings({ ...settings, sessionId: branch.id });
+
+  return setChatSessionTitle(branch.id, `${BRANCH_MARK}${title.replace(/^(↳ )+/, "")}`) ?? branch;
 }

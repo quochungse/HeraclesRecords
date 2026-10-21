@@ -1200,7 +1200,8 @@ const KNOWN_ENTRY_KINDS = new Set([
   "fitnessTrend",
   "hrZoneSummary",
   "automationSilent",
-  "automationStopped"
+  "automationStopped",
+  "branchedFrom"
 ]);
 
 function opaqueEntry(
@@ -1273,6 +1274,12 @@ function cardEntry<T extends PersistedChatEntry>(
 }
 
 function parseEntryShape(value: Record<string, unknown>): PersistedChatEntry | null {
+
+  if (value.kind === "branchedFrom") {
+    return typeof value.sessionId === "string" && value.sessionId && typeof value.title === "string"
+      ? cardEntry({ kind: "branchedFrom", sessionId: value.sessionId, title: value.title }, value, "sessionId", "title")
+      : null;
+  }
 
   if (value.kind === "planDraft") {
     const draft = parsePlanDraft(value.draft);
@@ -1661,6 +1668,14 @@ export function getChatSessionProvider(
 ): ChatProvider | undefined {
   const row = database.getSession(id);
   return row ? normalizeProvider(row.provider) : undefined;
+}
+
+/** A conversation's title as stored, or undefined when it is gone. */
+export function getChatSessionTitle(
+  id: string,
+  database: ChatSessionDatabase = defaultDatabase
+): string | undefined {
+  return database.getSession(id)?.title;
 }
 
 export function getChatSession(

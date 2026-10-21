@@ -154,6 +154,13 @@ export interface ChatPlanOutlineEntry {
   outlineVersion: number;
 }
 
+/** The head of a conversation branched from another (`branchConversation`); an anchor. */
+export interface ChatBranchedFromEntry {
+  kind: "branchedFrom";
+  sessionId: string;
+  title: string;
+}
+
 /**
  * An entry a newer build wrote, of a kind this one cannot draw. It keeps its
  * place in the timeline and goes back to the store untouched, so this window's
@@ -181,6 +188,7 @@ export type ChatEntry = (
   | ChatAnalysisSilentEntry
   | ChatAnalysisStoppedEntry
   | ChatToolNoticeEntry
+  | ChatBranchedFromEntry
   | ChatOpaqueEntry
 ) & {
   /**
@@ -342,6 +350,7 @@ const HANDLED_KEYS: Record<string, readonly string[]> = {
   hrZoneSummary: ["preview"],
   automationSilent: ["automation", "at"],
   automationStopped: ["automation", "at", "reason"],
+  branchedFrom: ["sessionId", "title"],
   opaque: ["raw"]
 };
 
@@ -364,6 +373,9 @@ function persistVisualEntry(entry: ChatEntry): PersistedChatEntry | null {
 function persistKnownEntry(entry: ChatEntry): PersistedChatEntry | null {
   if (entry.kind === "opaque") {
     return { kind: "opaque", raw: entry.raw };
+  }
+  if (entry.kind === "branchedFrom") {
+    return { kind: "branchedFrom", sessionId: entry.sessionId, title: entry.title };
   }
   if (entry.kind === "coachPrompt") {
     return { kind: "coachPrompt", prompt: entry.prompt };
@@ -457,6 +469,9 @@ export function fromPersistedEntries(entries: PersistedChatEntry[]): ChatEntry[]
 function fromPersistedEntry(entry: PersistedChatEntry): ChatEntry {
   if (entry.kind === "opaque") {
     return { kind: "opaque", raw: entry.raw };
+  }
+  if (entry.kind === "branchedFrom") {
+    return { kind: "branchedFrom", sessionId: entry.sessionId, title: entry.title };
   }
   if (entry.kind === "coachPrompt") {
     return { kind: "coachPrompt", prompt: entry.prompt };

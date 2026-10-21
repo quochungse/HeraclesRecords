@@ -931,6 +931,13 @@ const chat: ChatMessages = {
   "chat.turn.summaryRewritten": "Die Zusammenfassung wurde neu geschrieben.",
   "chat.turn.summaryNotRewritten": "Die Zusammenfassung ließ sich nicht neu schreiben; sie ändert sich beim nächsten Mal.",
   "chat.turn.hideFailed": "Was Coach liest, ließ sich nicht ändern.",
+  "chat.turn.branch": "Ab hier abzweigen",
+  "chat.turn.branched": "In ein neues Gespräch abgezweigt.",
+  "chat.turn.branchFailed": "Dieses Gespräch ließ sich nicht abzweigen.",
+  "chat.branch.from": "Abgezweigt von „{title}“. Was Coach dort erstellt hat, bleibt dort.",
+  "chat.branch.open": "Öffnen",
+  "chat.rail.label": "Deine Fragen",
+  "chat.rail.question": "Frage {n}: {text}",
 };
 
 export default chat;

@@ -931,6 +931,13 @@ const chat: ChatMessages = {
   "chat.turn.summaryRewritten": "摘要已重写。",
   "chat.turn.summaryNotRewritten": "摘要未能重写，会在下次重写时更新。",
   "chat.turn.hideFailed": "无法更改教练读取的内容。",
+  "chat.turn.branch": "从这里分出新对话",
+  "chat.turn.branched": "已分出一个新对话。",
+  "chat.turn.branchFailed": "无法从这段对话分出新对话。",
+  "chat.branch.from": "从“{title}”分出。教练在那里生成的内容仍留在那里。",
+  "chat.branch.open": "打开",
+  "chat.rail.label": "你的问题",
+  "chat.rail.question": "问题 {n}：{text}",
 };
 
 export default chat;

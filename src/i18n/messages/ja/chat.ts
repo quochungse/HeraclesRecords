@@ -931,6 +931,13 @@ const chat: ChatMessages = {
   "chat.turn.summaryRewritten": "要約を書き直しました。",
   "chat.turn.summaryNotRewritten": "要約を書き直せませんでした。次に書き直すときに反映されます。",
   "chat.turn.hideFailed": "コーチが読む内容を変更できませんでした。",
+  "chat.turn.branch": "ここから分岐",
+  "chat.turn.branched": "新しい会話に分岐しました。",
+  "chat.turn.branchFailed": "この会話を分岐できませんでした。",
+  "chat.branch.from": "「{title}」から分岐。そこでコーチが作ったものはそちらに残ります。",
+  "chat.branch.open": "開く",
+  "chat.rail.label": "あなたの質問",
+  "chat.rail.question": "質問 {n}：{text}",
 };
 
 export default chat;

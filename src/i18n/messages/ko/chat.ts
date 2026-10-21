@@ -931,6 +931,13 @@ const chat: ChatMessages = {
   "chat.turn.summaryRewritten": "요약을 다시 썼습니다.",
   "chat.turn.summaryNotRewritten": "요약을 다시 쓰지 못했습니다. 다음에 다시 쓸 때 바뀝니다.",
   "chat.turn.hideFailed": "코치가 읽는 내용을 바꾸지 못했습니다.",
+  "chat.turn.branch": "여기서 분기",
+  "chat.turn.branched": "새 대화로 분기했습니다.",
+  "chat.turn.branchFailed": "이 대화를 분기하지 못했습니다.",
+  "chat.branch.from": "“{title}”에서 분기. 거기서 코치가 만든 것은 그곳에 남습니다.",
+  "chat.branch.open": "열기",
+  "chat.rail.label": "내 질문",
+  "chat.rail.question": "질문 {n}: {text}",
 };
 
 export default chat;

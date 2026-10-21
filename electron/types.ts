@@ -3891,6 +3891,8 @@ export type PersistedChatEntry = ChatEntryMergeMeta &
   | { kind: "workoutDelete"; preview: WorkoutDeletePreview }
   /** An anchor (Q3): the change set itself is `chat_schedule_changes`' (P3.2). */
   | { kind: "scheduleChange"; changeSetId: string }
+  /** An anchor at the head of a conversation branched from another, naming it (`branchConversation`). */
+  | { kind: "branchedFrom"; sessionId: string; title: string }
   | { kind: "activityVisual"; preview: ActivityVisualPreview }
   | { kind: "activityHrTrend"; preview: ActivityHrTrendPreview }
   | { kind: "fitnessTrend"; preview: FitnessTrendPreview }

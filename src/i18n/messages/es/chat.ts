@@ -931,6 +931,13 @@ const chat: ChatMessages = {
   "chat.turn.summaryRewritten": "El resumen se reescribió.",
   "chat.turn.summaryNotRewritten": "No se pudo reescribir el resumen; cambiará en la próxima reescritura.",
   "chat.turn.hideFailed": "No se pudo cambiar lo que lee el entrenador.",
+  "chat.turn.branch": "Bifurcar desde aquí",
+  "chat.turn.branched": "Bifurcado en una conversación nueva.",
+  "chat.turn.branchFailed": "No se pudo bifurcar esta conversación.",
+  "chat.branch.from": "Bifurcado de «{title}». Lo que creó el entrenador allí se queda allí.",
+  "chat.branch.open": "Abrir",
+  "chat.rail.label": "Tus preguntas",
+  "chat.rail.question": "Pregunta {n}: {text}",
 };
 
 export default chat;

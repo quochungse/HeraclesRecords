@@ -931,6 +931,13 @@ const chat: ChatMessages = {
   "chat.turn.summaryRewritten": "เขียนสรุปใหม่แล้ว",
   "chat.turn.summaryNotRewritten": "เขียนสรุปใหม่ไม่ได้ จะเปลี่ยนในการเขียนใหม่ครั้งถัดไป",
   "chat.turn.hideFailed": "เปลี่ยนสิ่งที่โค้ชอ่านไม่ได้",
+  "chat.turn.branch": "แยกบทสนทนาจากตรงนี้",
+  "chat.turn.branched": "แยกเป็นบทสนทนาใหม่แล้ว",
+  "chat.turn.branchFailed": "แยกบทสนทนานี้ไม่ได้",
+  "chat.branch.from": "แยกมาจาก “{title}” สิ่งที่โค้ชสร้างไว้ที่นั่นยังอยู่ที่นั่น",
+  "chat.branch.open": "เปิด",
+  "chat.rail.label": "คำถามของคุณ",
+  "chat.rail.question": "คำถามที่ {n}: {text}",
 };
 
 export default chat;
