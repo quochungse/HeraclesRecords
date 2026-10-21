@@ -11,7 +11,10 @@ import { ChartWhenNear } from "./charts/ChartWhenNear";
 import type { TooltipContentProps } from "recharts";
 import type {
   ActivityVisualLapPoint,
-  ActivityVisualPreview
+  ActivityVisualPreview,
+  ActivityVisualStrengthExercise,
+  CorosProfileZoneFamily,
+  SessionSet
 } from "../../electron/types";
 import {
   formatDistanceMeters,
@@ -52,6 +55,7 @@ import { formatVolumeKg, formatWeightKg } from "../strength/strengthAnalytics";
 import { useI18n } from "../i18n/useI18n";
 import { zoneName } from "../i18n/zoneNames";
 import { heartRateZoneFamily, heartRateZoneTime } from "../training/zoneTime";
+import { heartRateZoneModelFromProfile } from "../training/heartRateZoneModel";
 import { zoneColor } from "../training/components/routeColoring";
 import { sessionSetsCardExercises, sessionSetsHeartRate } from "../../electron/sessionSets";
 import { SessionSetsChart } from "./charts/SessionSetsChart";
@@ -62,6 +66,39 @@ import { LapRecoveryMark, LapSectionRow } from "../training/components/LapSectio
 const HYBRID_FITNESS = 1200;
 
 type CardSections = ActivityVisualPreview["sections"];
+
+/**
+ * Each session's redraw, asked once a window. A session with no sets — a gym
+ * session the watch recorded no exercises for — and a detail that cannot be
+ * read (signed out, the session gone from COROS) are remembered as none: the
+ * card would otherwise ask again on every mount, and each ask opens a ~2.5 MB
+ * file, or costs a COROS request, and each failure writes to the error log.
+ */
+const storedSetsRedraws = new Map<string, Promise<Partial<CardSections> | null>>();
+
+function readStoredSetsRedraw(activityId: string, sportType: number): Promise<Partial<CardSections> | null> {
+  const key = `${activityId}:${sportType}`;
+  const known = storedSetsRedraws.get(key);
+  if (known) return known;
+  const api = window.heraclesRecords;
+  if (!api?.getTrainingHubActivityDetail) return Promise.resolve(null);
+  const read = api.getTrainingHubActivityDetail(activityId, sportType).then(
+    (detail): Partial<CardSections> | null => {
+      const exercises = sessionSetsCardExercises(detail.exerciseSets);
+      if (exercises.length === 0) return null;
+      const series = sessionSetsHeartRate(detail.series);
+      return {
+        strength: { exercises },
+        laps: undefined,
+        cadence: undefined,
+        ...(series.length >= 2 ? { hr: { chartKind: "series" as const, series } } : {})
+      };
+    },
+    () => null
+  );
+  storedSetsRedraws.set(key, read);
+  return read;
+}
 
 /**
  * A set-by-set session's card stored before its sets were kept — heart rate
@@ -83,29 +120,86 @@ function useStoredSetsRedraw(
     !preview.sections.strength?.exercises.some((exercise) => exercise.setList?.length);
 
   useEffect(() => {
-    const api = window.heraclesRecords;
-    if (!stale || sportType === undefined || !api?.getTrainingHubActivityDetail) return;
+    if (!stale || sportType === undefined) return;
     let live = true;
-    api
-      .getTrainingHubActivityDetail(activityId, sportType)
-      .then((detail) => {
-        const exercises = sessionSetsCardExercises(detail.exerciseSets);
-        if (!live || exercises.length === 0) return;
-        const series = sessionSetsHeartRate(detail.series);
-        setRedrawn({
-          strength: { exercises },
-          laps: undefined,
-          cadence: undefined,
-          ...(series.length >= 2 ? { hr: { chartKind: "series" as const, series } } : {})
-        });
-      })
-      .catch(() => undefined);
+    void readStoredSetsRedraw(activityId, sportType).then((sections) => {
+      if (live && sections) setRedrawn(sections);
+    });
     return () => {
       live = false;
     };
   }, [activityId, sportType, stale]);
 
   return stale ? redrawn : undefined;
+}
+
+function finite(value: unknown): value is number {
+  return typeof value === "number" && Number.isFinite(value);
+}
+
+/** A set the card can place: a start and a length on the clock, and a rest after it if any. */
+function readableSet(set: unknown): set is SessionSet {
+  if (!set || typeof set !== "object") return false;
+  const { start, seconds, restSeconds } = set as Record<string, unknown>;
+  return finite(start) && finite(seconds) && (restSeconds === undefined || finite(restSeconds));
+}
+
+/**
+ * The exercises with every set list in a shape the card can draw. The sets
+ * reach it through the stored entry's unknown keys, unparsed, so a list
+ * another build wrote in a shape this one does not know loses the sets it
+ * cannot read rather than taking the card down.
+ */
+function readableExercises(
+  exercises: ActivityVisualStrengthExercise[] | undefined
+): ActivityVisualStrengthExercise[] {
+  return (exercises ?? []).map((exercise) => {
+    const sets: unknown = exercise.setList;
+    if (sets === undefined || (Array.isArray(sets) && sets.every(readableSet))) return exercise;
+    const { setList: _unreadable, ...rest } = exercise;
+    const setList = Array.isArray(sets) ? sets.filter(readableSet) : [];
+    return setList.length > 0 ? { ...rest, setList } : rest;
+  });
+}
+
+/** How long the account's zone model read for a card is trusted before it is read again. */
+const ACCOUNT_FAMILY_TTL_MS = 10 * 60_000;
+let accountFamilyRead: { at: number; family: Promise<CorosProfileZoneFamily | undefined> } | undefined;
+
+/**
+ * The heart-rate model the account is scored against, for a zone split whose
+ * activity names none — COROS sends `zoneType` 0 on some sessions of an
+ * account it scores on reserve. Read from the main process's profile cache,
+ * which costs no COROS request, and shared by every card on screen.
+ */
+function readAccountZoneFamily(): Promise<CorosProfileZoneFamily | undefined> {
+  const api = window.heraclesRecords;
+  if (!api?.getCorosProfileSnapshot) return Promise.resolve(undefined);
+  if (!accountFamilyRead || Date.now() - accountFamilyRead.at > ACCOUNT_FAMILY_TTL_MS) {
+    accountFamilyRead = {
+      at: Date.now(),
+      family: api.getCorosProfileSnapshot().then(
+        (snapshot) => heartRateZoneModelFromProfile(snapshot.profile)?.family,
+        () => undefined
+      )
+    };
+  }
+  return accountFamilyRead.family;
+}
+
+function useAccountZoneFamily(needed: boolean): CorosProfileZoneFamily | undefined {
+  const [family, setFamily] = useState<CorosProfileZoneFamily>();
+  useEffect(() => {
+    if (!needed) return;
+    let live = true;
+    void readAccountZoneFamily().then((read) => {
+      if (live) setFamily(read);
+    });
+    return () => {
+      live = false;
+    };
+  }, [needed]);
+  return needed ? family : undefined;
 }
 
 /** `40 kg`, or `20–40 kg` when the sets were lifted at different loads. */
@@ -226,11 +320,6 @@ function buildLapBarData(
 }
 
 /**
- * Memoised on `preview`, which is the transcript entry's own object: Coach
- * re-renders on every token, keystroke and settings change, and a card whose
- * entry did not change has nothing to redraw.
- */
-/**
  * Where the session's heart rate sat, as COROS scored it: one bar of the
  * zones reached, each in the colour the route map and the session's own page
  * give it, named in the account's model. The zones never reached are left
@@ -238,12 +327,13 @@ function buildLapBarData(
  * what the session was.
  */
 function ZoneShare({ zones }: { zones: NonNullable<ActivityVisualPreview["sections"]["zones"]> }) {
+  useI18n();
+  const stated = zones.zoneType || undefined;
+  const account = useAccountZoneFamily(heartRateZoneFamily(stated, undefined) === undefined);
+  const family = heartRateZoneFamily(stated, account);
   const reached = useMemo(
-    () =>
-      heartRateZoneTime(zones.buckets, heartRateZoneFamily(zones.zoneType || undefined, undefined)).filter(
-        (row) => row.seconds > 0
-      ),
-    [zones]
+    () => heartRateZoneTime(zones.buckets, family).filter((row) => row.seconds > 0),
+    [family, zones]
   );
   if (!reached.length) return null;
   const rows = reached.map((row) => ({
@@ -283,6 +373,11 @@ function ZoneShare({ zones }: { zones: NonNullable<ActivityVisualPreview["sectio
  */
 const LAPS_FOLDED_FROM = 5;
 
+/**
+ * Memoised on `preview`, which is the transcript entry's own object: Coach
+ * re-renders on every token, keystroke and settings change, and a card whose
+ * entry did not change has nothing to redraw.
+ */
 export const ActivityVisualCard = memo(function ActivityVisualCard({
   preview
 }: ActivityVisualCardProps) {
@@ -332,7 +427,7 @@ export const ActivityVisualCard = memo(function ActivityVisualCard({
   const laps = sections.laps ?? [];
   const [lapsOpen, setLapsOpen] = useState(laps.length < LAPS_FOLDED_FROM);
   const lapsTableId = useId();
-  const strengthExercises = sections.strength?.exercises ?? [];
+  const strengthExercises = useMemo(() => readableExercises(sections.strength?.exercises), [sections]);
   // A session recorded set by set draws its heart rate under its sets, on
   // the clock they were placed on; a card with no clock or no sets cannot.
   const setsSeries =

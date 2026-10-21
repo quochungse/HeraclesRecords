@@ -2500,7 +2500,9 @@ lives at module level for the same visit-to-visit reason — see `useCalendarDat
   rate under the sets (`SessionSetsChart`: a band per set, the exercise's number over it, the
   set in the tooltip), writes a set scheme as `4 × 11–14` / `3 × 0:45`, and a card stored
   before `setList` is redrawn from the detail on render (`useStoredSetsRedraw`), never written
-  back.
+  back, and asked once a window per session: the answer is remembered with or without sets, or
+  a gym session the watch recorded no exercises for would read its ~2.5 MB detail, and log a
+  failure when signed out, on every mount.
 - **Sync** (`electron/sync/`) — continuous two-way sync through Google Drive, so two
   machines hold the same user data. **Drive is the only destination**: a local folder was
   offered beside it until 2026-10-01 and was removed because a folder kept by Dropbox,
