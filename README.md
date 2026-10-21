@@ -88,9 +88,24 @@ Nights and naps, stages, HRV and stress across the night, kept long after the ni
 
 <img src="docs/readme/02-activities.webp" alt="Activities: every session in one list with a detail pane" />
 
-**A page for every run, ride and hike.** A run shows pace, grade-adjusted pace, form and decoupling on a map of the route.
+**A page for every run, ride and hike.** The route on a map, then running form, the session's effect and conditions, time in every zone as COROS scored it, and a label for what the session trained: Tempo, Threshold, VO2 Max, Intervals 6 × 1000 m.
 
 <img src="docs/readme/04-run.webp" alt="A run: map, pace, heart rate, running form and every channel" />
+
+**Charts that answer a question.** Scroll down a run and the analysis begins.
+
+<table>
+  <tr>
+    <td width="50%" valign="top">
+      <img src="docs/readme/27-run-efficiency.webp" alt="Running efficiency: a long run against the athlete's usual, minute by minute" />
+      <p><strong>Running efficiency</strong>: how much speed each minute bought for the heart rate it cost, on your COROS VO₂max scale and against your usual from the six weeks before. It shows how well you held it to the end, and marks every stretch it could not read fairly.</p>
+    </td>
+    <td width="50%" valign="top">
+      <img src="docs/readme/28-run-performance.webp" alt="Performance chart split in two: pace and running power above, heart rate below" />
+      <p><strong>Performance</strong>: every surge and stop drawn rather than averaged away, in COROS's own colours. Split it and what you produced sits above what it cost, on one clock, with the laps headed by the workout's parts underneath.</p>
+    </td>
+  </tr>
+</table>
 
 <table>
   <tr>
@@ -131,13 +146,15 @@ Nights and naps, stages, HRV and stress across the night, kept long after the ni
 
 ### A coach that has read your training
 
-Ask about a session, a week or how well you are recovering. Coach reads your COROS data and answers with the numbers and the charts behind them.
+Ask about a session, a week or how well you are recovering. Coach reads your COROS data and answers with the numbers and the charts behind them: a session's card carries the same Performance chart, zones and laps as its own page.
 
 <img src="docs/readme/11-coach.webp" alt="Coach: an interval session analysed, with heart-rate and pace charts" />
 
 Ask for a plan and Coach drafts it with you: the brief, the outline, then every session. Read it in the Workbench beside the conversation, change what you like, and save it to COROS and your calendar. Changes Coach suggests to your week arrive as a list you apply one line at a time.
 
 <img src="docs/readme/12-coach-plan.webp" alt="Coach: a marathon plan in the Workbench beside the conversation" />
+
+A conversation is yours to shape. Delete a question you regret, edit the last one and ask again, hide a turn from Coach without losing it, or branch a new conversation from any answer to try another idea. In a long thread, a rail of your questions takes you straight back to any of them.
 
 Coach runs on your ChatGPT account, your Claude subscription, a Claude or OpenRouter API key, or a local model. Each conversation reads only the data you allow. Scheduled analyses can debrief every new activity on their own, and never change anything without you.
 
@@ -191,6 +208,8 @@ Every place your training has taken you, on a globe beside a list of places. Ope
 ## From CorosLink to Heracles Records
 
 Heracles Records began as a fork of CorosLink, a desktop companion for COROS watches. As my own training grew, what I wanted from it changed: a full record of everything I had done, analytics deeper than a summary screen, and an AI coach that reads all of it. A complete training system rather than a set of tools. So I rebuilt the app around that: training records, deep analytics and AI.
+
+I also want it to be an app you enjoy opening every day: clear screens, charts that are easy to read, and as few clicks as possible between a question about your training and what to do next.
 
 If you are looking for music and media on your watch, offline maps and routes, watch faces or gear tracking, **CorosLink** does those well and is the app to use. They are not part of Heracles Records.
 

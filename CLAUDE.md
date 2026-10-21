@@ -143,7 +143,7 @@ only up to the latest published release) — so a change there reaches the site 
 labour renamed in the app is renamed on the site**, and the site's text is only as true as
 those files. The guides are Markdown in `site/src/content/guide/`, and they name the app's
 buttons and screens by their labels, so **a renamed button or Settings section means a guide
-to fix**. Screenshots from `19-` on are the site's alone (the README stops at 18): the appearance pair
+to fix**. Screenshots `19-`–`26-` are the site's alone (the README shows `01-`–`18-` and the run page's analysis pair `27-run-efficiency`/`28-run-performance`, which the site may use too): the appearance pair
 `19-appearance-dark`/`20-appearance-light`, shot together (`theme: "paper"` for the light
 one) so the two show the same day, and `21-`–`26-` for the /plan, /activities and /coach
 pages. **Every one of them is taken by `scripts/screenshots/`** (`npm run screenshots`, or

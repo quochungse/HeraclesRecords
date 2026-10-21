@@ -1,3 +1,4 @@
+import "./clock";
 import { installDemoApi } from "./demoApi";
 
 const params = new URLSearchParams(location.search);

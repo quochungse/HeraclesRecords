@@ -7,19 +7,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### What's new
-- **Coach** - delete a question together with Coach's answer, and what Coach made in it if you choose. When the conversation's summary still mentions it, the summary can be rewritten on the spot. A question that got no answer says why right under it and offers Retry, and every message can be copied.
-- **Coach** - edit your last question and send it again; Coach answers afresh. Hide a turn from Coach to keep it on screen without Coach reading it, and show it again whenever you like.
-- **Coach** - branch a new conversation from any answer: it carries everything up to that point, with the same AI and sources, while what Coach made stays where it was made. In a long conversation, a column of marks at the edge lists your questions; press one, or use Alt with the up and down arrows, to go back to it.
-- **Coach** - a session's card shows its time in each heart-rate zone, as COROS scored it and named in your zone model. A lap table of five laps or more starts folded, one click from open.
-- **Coach** - a session's card draws its channels on one Performance chart, two at a time with a chip each, as the session's own page does. A strength or Hybrid Fitness card draws heart rate under its sets, numbered by exercise, and writes a set scheme as "4 × 11–14" or "3 × 0:45". The trend card is now Recovery trends: HRV and resting heart rate.
-- **Coach** - Coach Models is now AI Model Providers. "AI for this conversation" lists the providers that can answer, and Manage providers opens the rest.
+## [1.2.1] - 2026-10-21
+
+The biggest Coach update since 1.0. A conversation is now something you work in rather than scroll through: take a question back, rewrite it, keep a turn out of Coach's reading or branch off to try another idea, and every session Coach shows you reads the way its own page does. Fewer clicks between asking, reading and deciding.
+
+### Coach: a conversation you can shape
+- **Take it back** - delete a question together with Coach's answer, and what Coach made in it if you choose. When the conversation's summary still mentions it, the summary can be rewritten on the spot.
+- **Ask it again** - edit your last question and send it; Coach answers afresh. A question that got no answer says why right under it and offers Retry, and every message can be copied.
+- **Keep it off the record** - hide a turn and it stays on screen while Coach no longer reads it. Show it again whenever you like.
+- **Branch off** - start a new conversation from any answer, carrying everything up to that point with the same AI and sources, while what Coach made stays where it was made.
+- **Find your way back** - in a long conversation a column of marks at the edge lists your questions. Press one, or use Alt with the up and down arrows, to jump straight to it.
+
+### Coach: sessions read in depth
+- **Every channel on one chart** - a session's card draws its Performance chart as the session's own page does, two channels at a time with a chip each.
+- **Time in zones** - a card shows the time in each heart-rate zone, as COROS scored it and named in your zone model. A lap table of five laps or more starts folded, one click from open.
+- **Strength and Hybrid Fitness** - heart rate is drawn under the sets, numbered by exercise, and a set scheme reads "4 × 11–14" or "3 × 0:45".
+- **Recovery trends** - the trend card now follows HRV and resting heart rate.
+- **AI Model Providers** - Coach Models has a clearer name. "AI for this conversation" lists the providers that can answer, and Manage providers opens the rest.
+
+### Across the app
 - **Lap tables** - a structured workout's laps are headed by its parts (Warm Up, Training, Cool Down) and a recovery between repeats is marked Rest, on the run, ride and hike pages and on Activities.
 - **Performance chart** - each channel but stride ratio wears the colour it has in the COROS app, toned so lines drawn together stay apart for colour-blind eyes too, and the form figures take COROS's names: Ground time, Stride height, Stride ratio. Power on a run is Running power.
+- **Calendar** - a scheduled session is edited in the same workout builder as Create workout.
 - **Notices** - a quiet card centred over the screen: at the bottom for what you just did, at the top when the app speaks unasked. It waits while the pointer is on it, and the same notice again restarts it instead of stacking a copy.
 
 ### Fixed
 - **Strength** - a plank or any set held for a time is no longer dropped, a Hybrid Fitness rest is no longer counted as a set, and two exercises COROS numbered alike stay apart. Sessions are read again once after the update.
+- Improve app performance and stability.
 
 ## [1.2.0] - 2026-10-20
 

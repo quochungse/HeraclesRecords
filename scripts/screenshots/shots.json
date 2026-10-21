@@ -22,7 +22,7 @@
   "view": "running",
   "wait": 4000,
   "steps": [
-   "demoClick('6 × 1 km intervals9/29', 'tr')",
+   "[...document.querySelectorAll(\"tr\")].find((t) => t.textContent.startsWith(\"Road6 × 1 km intervals\")).click(), true",
    3500
   ],
   "theme": "dark"
@@ -219,6 +219,34 @@
   "out": "26-hiking",
   "view": "hiking",
   "wait": 5000,
+  "theme": "dark"
+ },
+ {
+  "out": "27-run-efficiency",
+  "view": "running",
+  "wait": 4000,
+  "steps": [
+   "[...document.querySelectorAll(\"tr\")].find((t) => t.textContent.startsWith(\"RoadLong run\")).click(), true",
+   3500,
+   "(() => { const page = document.querySelector(\".run-detail\"); const panel = [...page.querySelectorAll(\".panel\")].find((p) => p.textContent.startsWith(\"Running efficiency\")); if (!panel) return \"no panel\"; page.scrollTop += panel.getBoundingClientRect().top - 70; return true; })()",
+   1500
+  ],
+  "theme": "dark"
+ },
+ {
+  "out": "28-run-performance",
+  "view": "running",
+  "wait": 4000,
+  "steps": [
+   "[...document.querySelectorAll(\"tr\")].find((t) => t.textContent.startsWith(\"Road6 × 1 km intervals\")).click(), true",
+   3500,
+   "demoClick(\"Split\"), true",
+   1000,
+   "demoClick(\"Running power\"), true",
+   1000,
+   "(() => { const page = document.querySelector(\".run-detail\"); const panel = [...page.querySelectorAll(\".panel\")].find((p) => p.textContent.startsWith(\"Performance\")); if (!panel) return \"no panel\"; page.scrollTop += panel.getBoundingClientRect().top - 70; return true; })()",
+   1500
+  ],
   "theme": "dark"
  }
 ]

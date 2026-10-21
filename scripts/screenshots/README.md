@@ -1,7 +1,7 @@
 # Screenshots
 
-Every screenshot in `docs/readme/` comes from here: the README uses `01`–`18`, the website
-`01`–`26`. They are taken of the real renderer (`src/main.tsx`) running on demo data, so no
+Every screenshot in `docs/readme/` comes from here: the README uses `01`–`18` and
+`27`–`28`, the website `01`–`28`. They are taken of the real renderer (`src/main.tsx`) running on demo data, so no
 athlete's own training ever appears in them.
 
 ```sh
@@ -24,7 +24,9 @@ Shots are 1512 × 982 at 2×, with the macOS window corners, written as WebP int
   and the rides, hikes and trail runs of `electron/sample*.ts`; sleep (`demoSleep.ts`); a
   12-week marathon plan and a workout library (`demoPlan.ts`, `demoLibrary.ts`); Coach
   conversations in English (`demoCoach.ts`); and the Hall of Records' realistic history.
-  Emails are `example.com`.
+  Emails are `example.com`. Its today is always the last Saturday (`clock.ts`, imported first):
+  the sample sets are each dated back from today and the demo keeps one outdoor session a day, so
+  on other weekdays they land on each other's days and a shot's hike or ride is dropped.
 - **`shots.json`** is the plan: per shot, the screen (`view`), the theme (`dark` or `paper`),
   how long to wait, localStorage to seed (`ls`), and `steps`, JavaScript run in the page in
   order (`demoClick(text, selector)` clicks the shortest element holding that text) with
