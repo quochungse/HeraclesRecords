@@ -37,6 +37,7 @@ import type {
   PlanWorkoutEntryInput,
   SaveChatSessionOptions,
   TrainingHubActivitySeriesPoint,
+  TrainingHubActivityZoneBucket,
   TrainingHubThresholdZone,
   TrainingHubTrackPoint,
   TrainingTrendPoint,
@@ -755,6 +756,24 @@ function parseChannelSection(value: unknown): ActivityVisualChannelSection | nul
   );
 }
 
+function parseZoneBucket(value: unknown): TrainingHubActivityZoneBucket | null {
+  if (!isRecord(value) || typeof value.index !== "number") return null;
+  const number = (field: unknown) => (typeof field === "number" && Number.isFinite(field) ? field : undefined);
+  const low = number(value.low);
+  const high = number(value.high);
+  const seconds = number(value.seconds);
+  return keepUnknownKeys(
+    {
+      index: value.index,
+      ...(low !== undefined ? { low } : {}),
+      ...(high !== undefined ? { high } : {}),
+      ...(seconds !== undefined ? { seconds } : {})
+    },
+    value,
+    ["index", "low", "high", "seconds"]
+  );
+}
+
 function parseActivityVisualPreview(value: unknown): ActivityVisualPreview | null {
   if (!isRecord(value)) {
     return null;
@@ -853,6 +872,22 @@ function parseActivityVisualPreview(value: unknown): ActivityVisualPreview | nul
     sections.strength = keepUnknownKeys({ exercises }, value.sections.strength, ["exercises"]);
   }
 
+  if (value.sections.zones !== undefined) {
+    const zones = value.sections.zones;
+    if (!isRecord(zones) || !Array.isArray(zones.buckets)) {
+      return null;
+    }
+    const buckets = zones.buckets.map(parseZoneBucket).filter((bucket): bucket is TrainingHubActivityZoneBucket => bucket !== null);
+    if (buckets.length !== zones.buckets.length) {
+      return null;
+    }
+    sections.zones = keepUnknownKeys(
+      { ...(typeof zones.zoneType === "number" ? { zoneType: zones.zoneType } : {}), buckets },
+      zones,
+      ["zoneType", "buckets"]
+    );
+  }
+
   // A reading this build does not know is carried as it came, not read.
   const reading = ACTIVITY_READINGS.find((known) => known === value.reading);
   return keepUnknownKeys(
@@ -872,7 +907,8 @@ function parseActivityVisualPreview(value: unknown): ActivityVisualPreview | nul
         "power",
         "elevation",
         "laps",
-        "strength"
+        "strength",
+        "zones"
       ])
     },
     value,
@@ -1200,7 +1236,8 @@ const KNOWN_ENTRY_KINDS = new Set([
   "fitnessTrend",
   "hrZoneSummary",
   "automationSilent",
-  "automationStopped"
+  "automationStopped",
+  "branchedFrom"
 ]);
 
 function opaqueEntry(
@@ -1273,6 +1310,12 @@ function cardEntry<T extends PersistedChatEntry>(
 }
 
 function parseEntryShape(value: Record<string, unknown>): PersistedChatEntry | null {
+
+  if (value.kind === "branchedFrom") {
+    return typeof value.sessionId === "string" && value.sessionId && typeof value.title === "string"
+      ? cardEntry({ kind: "branchedFrom", sessionId: value.sessionId, title: value.title }, value, "sessionId", "title")
+      : null;
+  }
 
   if (value.kind === "planDraft") {
     const draft = parsePlanDraft(value.draft);
@@ -1661,6 +1704,14 @@ export function getChatSessionProvider(
 ): ChatProvider | undefined {
   const row = database.getSession(id);
   return row ? normalizeProvider(row.provider) : undefined;
+}
+
+/** A conversation's title as stored, or undefined when it is gone. */
+export function getChatSessionTitle(
+  id: string,
+  database: ChatSessionDatabase = defaultDatabase
+): string | undefined {
+  return database.getSession(id)?.title;
 }
 
 export function getChatSession(

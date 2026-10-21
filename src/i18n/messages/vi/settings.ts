@@ -46,7 +46,7 @@ const settings: SettingsMessages = {
   "settings.mcp.connected": "Đã kết nối {connected}/{total}.",
   "settings.mcp.tools_one": "<b>{count} công cụ</b> sẵn sàng cho huấn luyện viên.",
   "settings.mcp.tools_other": "<b>{count} công cụ</b> sẵn sàng cho huấn luyện viên.",
-  "settings.coachModels.title": "Mô hình AI",
+  "settings.coachModels.title": "Nhà cung cấp mô hình AI",
   "settings.coachModels.none": "Chưa kết nối gì. Thêm tài khoản hoặc khoá API để bắt đầu.",
   "settings.coachModels.providers": "Đã kết nối {connected}/{total} nhà cung cấp.",
   "settings.coachModels.inUse": "Đang dùng <b>{model}</b>.",

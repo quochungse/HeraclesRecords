@@ -215,6 +215,9 @@ const main: ScreenMessages = {
   "screen.effort.maxDetail": "kỹ lưỡng nhất",
   "screen.model.auto": "Tự động",
   "main.sync.outdated": "Kho này dùng định dạng dữ liệu mới hơn. Hãy cập nhật ứng dụng trước.",
+  "main.coach.turnChanged": "Cuộc trò chuyện này đã thay đổi từ lúc mở. Hãy xem lại rồi thử thêm lần nữa.",
+  "main.coach.turnNotLast": "Chỉ câu hỏi cuối cùng mới sửa hoặc hỏi lại được.",
+  "main.coach.questionEmpty": "Câu hỏi cần có nội dung.",
 };
 
 export default main;

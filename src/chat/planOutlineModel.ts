@@ -141,6 +141,14 @@ const REDRAW_PREFIX = "Redraw the outline: "; // i18n-ignore
 /** What is sent when the sessions are written to an outline (P2.3), stored the same way. */
 export const WRITE_SESSIONS_TEXT = "Write the sessions"; // i18n-ignore
 
+/**
+ * Whether a message is a pipeline step's: driven by the brief's and the
+ * outline's own buttons, so it is never edited or retried as a question.
+ */
+export function isPipelineStepText(content: string): boolean {
+  return content === DRAW_OUTLINE_TEXT || content === WRITE_SESSIONS_TEXT || content.startsWith(REDRAW_PREFIX);
+}
+
 /** A pipeline step's words in the language on screen; anything else as written. */
 export function displayStepText(content: string): string {
   if (content === DRAW_OUTLINE_TEXT) return t("chat.step.drawOutline");

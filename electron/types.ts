@@ -394,6 +394,12 @@ export interface TrainingHubActivityLap {
   mode?: number;
   /** Structured-workout phase, when `mode` names one. */
   phase?: TrainingHubLapPhase;
+  /**
+   * Run past the structured workout's last step — COROS files such a lap as
+   * `mode` 2 with `programExerciseIndex` 255, so its phase alone reads it as
+   * part of the work.
+   */
+  afterWorkout?: boolean;
   /** Steps per minute for foot sports, rpm for cycling. */
   avgCadence?: number;
   maxCadence?: number;
@@ -540,6 +546,11 @@ export interface StrengthSet {
   type?: StrengthSetType;
   /** Rating of perceived exertion, on Hevy's 1–10 scale. */
   rpe?: number;
+  /**
+   * Held for a time — a plank, a stretch — so `workSec` is its figure and
+   * `reps` is 0, whatever the watch counted through it.
+   */
+  timed?: boolean;
 }
 
 export type StrengthSetType = "normal" | "warmup" | "dropset" | "failure";
@@ -833,6 +844,13 @@ export interface TrainingHubActivityDetail {
   track?: TrainingHubActivityTrack;
   series?: TrainingHubActivitySeriesPoint[];
   strength?: StrengthDetail;
+  /**
+   * Every set of a session COROS records exercise by exercise — a strength
+   * session, a Hybrid Fitness one — timed sets included, each placed on the
+   * session's clock (`sessionSets.ts`). `strength` is the Strength screen's
+   * reading of the same laps and leaves the timed sets out.
+   */
+  exerciseSets?: SessionSetExercise[];
 }
 
 export interface TrainingHubScheduledExercise {
@@ -1254,6 +1272,61 @@ export interface PersistedChatAnalysisStoppedEntry {
   /** Epoch milliseconds: when it stopped. */
   at: number;
   reason: AnalysisStopReason;
+}
+
+/**
+ * A turn of a conversation, as the window names it: its question's position
+ * in the transcript the window holds and its words, and the question's `mid`
+ * where the window has one. The main process checks them against the row
+ * before it changes anything (`chatTurnService.ts`).
+ */
+export interface TurnRef {
+  index: number;
+  content: string;
+  mid?: string;
+}
+
+/** Something a turn made that lives in a table of its own: a plan, a workout, a proposed change. */
+export interface TurnCreation {
+  kind: "plan" | "workout" | "changes";
+  name: string;
+  /** Whether it can be deleted with the turn. */
+  deletable: boolean;
+  /** Why it cannot: saved to COROS, or versions of it in other turns. */
+  keptBecause?: "saved" | "versions";
+}
+
+/** What deleting a turn would touch, for the question the window asks first. */
+export interface TurnDescription {
+  creations: TurnCreation[];
+  /** The conversation's summary speaks for this turn. */
+  summarised: boolean;
+  /** The model a rewritten summary would run on. */
+  summaryModel?: string;
+}
+
+export interface DeleteTurnOptions {
+  /** Delete what the turn made too, where it can be; otherwise its cards stay. */
+  deleteCreations: boolean;
+  /** Write the summary again without the turn, now. */
+  rewriteSummary: boolean;
+}
+
+export interface HideTurnOptions {
+  /** Out of what Coach reads, or back in. */
+  hidden: boolean;
+  /** Write the summary again now, with the turn left out or put back. */
+  rewriteSummary: boolean;
+}
+
+/** A conversation after one of its turns changed. */
+export interface TurnChange {
+  entries: PersistedChatEntry[];
+  /** The question mids of its turns hidden from Coach, as they now stand. */
+  hidden: string[];
+  /** How the summary rewrite went, when one was asked for. */
+  summary?: "rewritten" | "failed";
+  summaryError?: string;
 }
 
 /**
@@ -2906,7 +2979,16 @@ export interface ActivityVisualLapPoint {
   pace?: number;
   /** Steps per minute for foot sports, rpm for cycling. */
   avgCadence?: number;
+  /**
+   * The part of a structured workout the lap fell in (`lapSections`), on a
+   * session with more than one. Absent on a card stored before it.
+   */
+  section?: ActivityLapSection;
+  /** A recovery between repeats, inside the workout's main part. */
+  recovery?: boolean;
 }
+
+export type ActivityLapSection = "warmup" | "training" | "cooldown" | "after";
 
 /**
  * A channel the card can draw either way. `series` is the per-sample recording
@@ -2922,6 +3004,33 @@ export interface ActivityVisualChannelSection {
 
 export type ActivityVisualHrSection = ActivityVisualChannelSection;
 
+/** One set of an exercise as COROS recorded it (`sessionSets.ts`). */
+export interface SessionSet {
+  /** Seconds from the session's start, on the clock its heart-rate samples run on. */
+  start: number;
+  /** Seconds the set took. */
+  seconds: number;
+  /** The reps counted; on a timed set, what the watch counted through it, if anything. */
+  reps?: number;
+  /**
+   * Held for a time — a plank, a stretch, a minute of high knees — and read in
+   * `seconds` rather than reps.
+   */
+  timed?: boolean;
+  weightKg?: number;
+  /** The rest taken after it, in seconds. */
+  restSeconds?: number;
+  avgHr?: number;
+  maxHr?: number;
+}
+
+export interface SessionSetExercise {
+  /** "T####"/"S####" library code, or a custom name; the renderer names it. */
+  nameKey: string;
+  rawName?: string;
+  sets: SessionSet[];
+}
+
 /**
  * One exercise of a gym session as the card lists it: the sets, the reps, the
  * lightest and heaviest load and the volume. A gym session's laps are its sets
@@ -2932,11 +3041,18 @@ export interface ActivityVisualStrengthExercise {
   nameKey: string;
   rawName?: string;
   sets: number;
+  /** Reps over the sets counted in reps; a timed set adds none. */
   reps: number;
   /** Kilograms, absent for a bodyweight exercise. */
   minWeightKg?: number;
   maxWeightKg?: number;
   volumeKg?: number;
+  /**
+   * The sets themselves, which place the exercise on the heart-rate chart.
+   * Absent on a card stored before them, which the renderer redraws from the
+   * session's detail.
+   */
+  setList?: SessionSet[];
 }
 
 /**
@@ -2971,6 +3087,13 @@ export interface ActivityVisualPreview {
     elevation?: { points: TrainingHubTrackPoint[] };
     laps?: ActivityVisualLapPoint[];
     strength?: { exercises: ActivityVisualStrengthExercise[] };
+    /**
+     * The time in each heart-rate zone as COROS scored the session (its
+     * `zoneList`), and the model it was scored on — the activity's own
+     * `hrZoneType`, or the account's where the activity says 0 — so the card
+     * names the bands as COROS does. Absent on a card stored before it.
+     */
+    zones?: { zoneType?: number; buckets: TrainingHubActivityZoneBucket[] };
   };
 }
 
@@ -3838,6 +3961,8 @@ export type PersistedChatEntry = ChatEntryMergeMeta &
   | { kind: "workoutDelete"; preview: WorkoutDeletePreview }
   /** An anchor (Q3): the change set itself is `chat_schedule_changes`' (P3.2). */
   | { kind: "scheduleChange"; changeSetId: string }
+  /** An anchor at the head of a conversation branched from another, naming it (`branchConversation`). */
+  | { kind: "branchedFrom"; sessionId: string; title: string }
   | { kind: "activityVisual"; preview: ActivityVisualPreview }
   | { kind: "activityHrTrend"; preview: ActivityHrTrendPreview }
   | { kind: "fitnessTrend"; preview: FitnessTrendPreview }

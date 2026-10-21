@@ -115,6 +115,7 @@ const strength: StrengthMessages = {
   "strength.exploreTitle": "在动作浏览器中打开",
   "strength.col.set": "组",
   "strength.col.reps": "次数",
+  "strength.col.time": "时长",
   "strength.col.weight": "重量",
   "strength.col.e1rm": "预估极限",
   "strength.col.rest": "休息",

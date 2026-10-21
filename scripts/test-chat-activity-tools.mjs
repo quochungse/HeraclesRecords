@@ -304,6 +304,33 @@ const dynamicsText = formatActivityDetailForChat(
   "metric"
 );
 
+// The card carries the session's time in each heart-rate zone, as COROS
+// scored it, and the model to name the bands by: the activity's own, or the
+// account's where the activity says 0.
+{
+  const scored = parseActivityDetail(dynamicsChatFixture);
+  const card = buildActivityVisualPreview(scored, "req-zones", 2);
+  assert.deepEqual(
+    card?.sections.zones?.buckets.map((bucket) => bucket.seconds),
+    scored.hrZones.map((zone) => zone.seconds),
+    "every bucket, reached or not"
+  );
+  assert.equal(card?.sections.zones?.zoneType, scored.hrZoneType || 2);
+  assert.equal(
+    buildActivityVisualPreview({ ...scored, hrZoneType: 1 }, "req-own", 2)?.sections.zones?.zoneType,
+    1,
+    "the activity's own model first"
+  );
+  assert.equal(
+    buildActivityVisualPreview({ ...scored, hrZones: [] }, "req-none")?.sections.zones,
+    undefined,
+    "no zones without a score"
+  );
+  const { parseChatTranscriptJson } = await import(`${distUrl("chatHistoryStore.js")}?cacheBust=${Date.now()}`);
+  const [stored] = parseChatTranscriptJson(JSON.stringify([{ kind: "activityVisual", preview: card }]));
+  assert.deepEqual(stored.preview.sections.zones, card.sections.zones, "and it survives the store");
+}
+
 assert.match(dynamicsText, /Adjusted pace \(grade-adjusted\): 7:10\/km/);
 assert.match(dynamicsText, /Running dynamics: cadence 163 spm \(max 170\)/);
 assert.match(dynamicsText, /stride length 0\.84 m/);
@@ -612,6 +639,8 @@ const strengthDetail = parseActivityDetail({
           { mode: 14, exerciseIndex: 0, exerciseNameKey: "T1041", time: 4000, reps: 10, weight: 60000 },
           { mode: 14, exerciseIndex: 0, exerciseNameKey: "T1041", time: 4000, reps: 8, weight: 70000 },
           { mode: 16, exerciseIndex: 0, exerciseNameKey: "T1041", time: 8000, sets: 2, reps: 18 },
+          // The rest between exercises, a minute on the clock.
+          { mode: 17, exerciseIndex: 0, exerciseNameKey: "S3618", time: 6000 },
           { mode: 14, exerciseIndex: 1, exerciseNameKey: "S9999", name: "Bulgarian Split Squat", time: 4000, reps: 12, weight: 20000 },
           { mode: 14, exerciseIndex: 1, exerciseNameKey: "S9999", name: "Bulgarian Split Squat", time: 4000, reps: 12, weight: 20000 },
           { mode: 16, exerciseIndex: 1, exerciseNameKey: "S9999", name: "Bulgarian Split Squat", time: 8000, sets: 2, reps: 24 }
@@ -633,7 +662,20 @@ assert.match(
 const strengthPreview = buildActivityVisualPreview(strengthDetail, "req-gym-3");
 assert.equal(strengthPreview?.reading, "sets");
 assert.equal(strengthPreview?.sections.laps, undefined);
-assert.deepEqual(strengthPreview?.sections.strength?.exercises, [
+assert.deepEqual(
+  strengthPreview?.sections.strength?.exercises[0]?.setList,
+  [
+    { start: 0, seconds: 40, reps: 10, weightKg: 60 },
+    { start: 40, seconds: 40, reps: 8, weightKg: 70 }
+  ],
+  "each exercise carries its sets, placed one after another where COROS stamped no time"
+);
+assert.equal(
+  strengthPreview?.sections.strength?.exercises[1]?.setList?.[0]?.start,
+  140,
+  "and the rest between exercises takes its time on that clock, where the roll-up takes none"
+);
+assert.deepEqual(strengthPreview?.sections.strength?.exercises.map(({ setList: _sets, ...row }) => row), [
   { nameKey: "T1041", sets: 2, reps: 18, minWeightKg: 60, maxWeightKg: 70, volumeKg: 1160 },
   {
     nameKey: "S9999",
@@ -645,6 +687,125 @@ assert.deepEqual(strengthPreview?.sections.strength?.exercises, [
     volumeKg: 480
   }
 ]);
+
+// --- A session recorded set by set, read by the mode COROS gives each item ---
+// Hybrid Fitness carries its set's reps on the rest after it, which read by
+// reps alone was a second set; a plank records no reps, and a minute of high
+// knees counts them while being held for a time. Two exercises may share an
+// index. Stamps are hundredths of a second, like the samples'.
+const hybridStart = 178421631874;
+const hybridDetail = parseActivityDetail({
+  labelId: "act-hybrid-1",
+  // COROS's `totalReps` counts the 74 the watch counted through the timed set,
+  // which no row lists.
+  summary: { name: "Core & Breath", sportType: 1200, totalTime: 60000, startTimestamp: hybridStart, totalReps: 104 },
+  frequencyList: Array.from({ length: 61 }, (_, index) => ({
+    timestamp: hybridStart + index * 1000,
+    heart: 90 + (index % 7)
+  })),
+  lapList: [
+    {
+      type: 2,
+      lapItemList: [
+        { mode: 14, exerciseIndex: 1, exerciseNameKey: "T1132", reps: 15, time: 3000, targetType: 3, startTimestamp: hybridStart, avgHr: 92, avgCadence: 110 },
+        { mode: 15, exerciseIndex: 1, exerciseNameKey: "T1132", reps: 15, time: 2000, targetType: 1, startTimestamp: hybridStart + 3000, avgCadence: 104 },
+        { mode: 14, exerciseIndex: 1, exerciseNameKey: "T1132", reps: 15, time: 3000, targetType: 3, startTimestamp: hybridStart + 5000 },
+        { mode: 16, exerciseIndex: 1, exerciseNameKey: "T1132", sets: 2, reps: 30, time: 6000 },
+        { mode: 17, exerciseIndex: 1, exerciseNameKey: "S3618", sets: 2, time: 2000 },
+        { mode: 14, exerciseIndex: 2, exerciseNameKey: "T1010", reps: 0, time: 4500, targetType: 1, startTimestamp: hybridStart + 10000 },
+        { mode: 14, exerciseIndex: 2, exerciseNameKey: "T1013", reps: 74, time: 6000, targetType: 2, startTimestamp: hybridStart + 16000 }
+      ]
+    }
+  ]
+});
+assert.deepEqual(
+  hybridDetail.exerciseSets?.map((exercise) => [exercise.nameKey, exercise.sets]),
+  [
+    ["T1132", [
+      { start: 0, seconds: 30, reps: 15, avgHr: 92, restSeconds: 20 },
+      { start: 50, seconds: 30, reps: 15 }
+    ]],
+    ["T1010", [{ start: 100, seconds: 45, timed: true }]],
+    ["T1013", [{ start: 160, seconds: 60, reps: 74, timed: true }]]
+  ]
+);
+const hybridPreview = buildActivityVisualPreview(hybridDetail, "req-hybrid");
+assert.equal(hybridPreview?.reading, "effort", "Hybrid Fitness is still read as any other sport");
+assert.equal(hybridPreview?.sections.laps, undefined, "its laps give way to its exercises");
+assert.equal(hybridDetail.laps.filter((lap) => lap.avgCadence).length, 2);
+assert.equal(hybridPreview?.sections.cadence, undefined, "a set's cadence describes no movement");
+assert.deepEqual(
+  hybridPreview?.sections.strength?.exercises.map(({ nameKey, sets, reps }) => [nameKey, sets, reps]),
+  [["T1132", 2, 30], ["T1010", 1, 0], ["T1013", 1, 0]],
+  "a timed set adds no reps to its exercise"
+);
+assert.ok(
+  hybridPreview?.sections.hr?.series?.every((point) => Object.keys(point).sort().join() === "elapsed,hr"),
+  "the heart rate under the sets runs on their clock"
+);
+const hybridText = formatActivityDetailForChat(hybridDetail, false, "metric");
+assert.match(
+  hybridText,
+  /Strength: 3 exercises · 4 sets · 30 reps\n/,
+  "the headline counts the reps the rows list, not the watch's count through a timed set"
+);
+assert.match(hybridText, /- T1132 — 2 sets — 30 reps: 15 reps, 15 reps/);
+assert.match(hybridText, /- T1010 — 1 set: 0:45/);
+assert.match(hybridText, /- T1013 — 1 set: 1:00 \(74 reps\)/);
+
+// A run's laps carry an exercise key too, under a mode no set has.
+assert.equal(
+  parseActivityDetail({
+    labelId: "act-run-keys",
+    summary: { sportType: 100, totalTime: 60000 },
+    lapList: [{ type: 2, lapItemList: [{ mode: 0, exerciseNameKey: "S4208", time: 60000, reps: 0 }] }]
+  }).exerciseSets,
+  undefined
+);
+
+// --- A structured run's laps are headed by the part of the workout they fell in ---
+// COROS names no step on a lap, only its mode (4 warm-up, 2 work, 3 recovery,
+// 5 cool-down); a lap run after the last step is mode 2 with step index 255.
+const tempoPreview = buildActivityVisualPreview(
+  parseActivityDetail({
+    labelId: "act-tempo",
+    summary: { name: "Tempo 3 × 8'", sportType: 100, totalTime: 300000, distance: 600000 },
+    lapList: [{ type: 10, lapItemList: [
+      { mode: 4, programExerciseIndex: 0, time: 30000, distance: 100000, avgHr: 130 },
+      { mode: 2, programExerciseIndex: 1, time: 30000, distance: 100000, avgHr: 160 },
+      { mode: 3, programExerciseIndex: 2, time: 18000, distance: 40000, avgHr: 140 },
+      { mode: 2, programExerciseIndex: 1, time: 30000, distance: 100000, avgHr: 162 },
+      { mode: 5, programExerciseIndex: 3, time: 30000, distance: 100000, avgHr: 135 },
+      { mode: 2, programExerciseIndex: 255, time: 30000, distance: 100000, avgHr: 138 }
+    ] }]
+  }),
+  "req-tempo"
+);
+assert.deepEqual(
+  tempoPreview?.sections.laps?.map((lap) => [lap.section, lap.recovery ?? false]),
+  [
+    ["warmup", false],
+    ["training", false],
+    ["training", true],
+    ["training", false],
+    ["cooldown", false],
+    ["after", false]
+  ]
+);
+// A run of one step has nothing to tell apart.
+assert.ok(
+  buildActivityVisualPreview(
+    parseActivityDetail({
+      labelId: "act-easy",
+      summary: { name: "Easy", sportType: 100, totalTime: 120000, distance: 400000 },
+      lapList: [{ type: 10, lapItemList: [
+        { mode: 2, programExerciseIndex: 0, time: 60000, distance: 200000, avgHr: 130 },
+        { mode: 2, programExerciseIndex: 0, time: 60000, distance: 200000, avgHr: 132 }
+      ] }]
+    }),
+    "req-easy"
+  )?.sections.laps?.every((lap) => lap.section === undefined && lap.recovery === undefined)
+);
 
 // A custom sport is read by its name, which only the main process has: the
 // card stores the reading so the renderer does not fall back to the code.

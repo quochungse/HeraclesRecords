@@ -258,6 +258,7 @@ const library: LibraryMessages = {
   "library.ai.connected": "接続済み",
   "library.ai.notSetUp": "未設定",
   "library.ai.coachSettings": "コーチの設定",
+  "library.ai.manageProviders": "プロバイダーを管理",
   "library.ai.model": "モデル",
   "library.ai.runsLocal": "コーチの設定で選んだローカルモデル {model} で動きます。",
   "library.ai.effort": "推論レベル",

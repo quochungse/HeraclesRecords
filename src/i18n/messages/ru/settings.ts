@@ -48,7 +48,7 @@ const settings: SettingsMessages = {
   "settings.mcp.tools_few": "Тренеру доступно <b>{count} инструмента</b>.",
   "settings.mcp.tools_many": "Тренеру доступно <b>{count} инструментов</b>.",
   "settings.mcp.tools_other": "Тренеру доступно <b>{count} инструмента</b>.",
-  "settings.coachModels.title": "Модели тренера",
+  "settings.coachModels.title": "Поставщики моделей ИИ",
   "settings.coachModels.none": "Пока ничего не подключено. Добавьте аккаунт или ключ, чтобы начать.",
   "settings.coachModels.providers": "Подключено провайдеров: {connected} из {total}.",
   "settings.coachModels.inUse": "Используется <b>{model}</b>.",

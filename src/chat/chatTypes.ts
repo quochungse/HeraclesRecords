@@ -154,6 +154,13 @@ export interface ChatPlanOutlineEntry {
   outlineVersion: number;
 }
 
+/** The head of a conversation branched from another (`branchConversation`); an anchor. */
+export interface ChatBranchedFromEntry {
+  kind: "branchedFrom";
+  sessionId: string;
+  title: string;
+}
+
 /**
  * An entry a newer build wrote, of a kind this one cannot draw. It keeps its
  * place in the timeline and goes back to the store untouched, so this window's
@@ -181,6 +188,7 @@ export type ChatEntry = (
   | ChatAnalysisSilentEntry
   | ChatAnalysisStoppedEntry
   | ChatToolNoticeEntry
+  | ChatBranchedFromEntry
   | ChatOpaqueEntry
 ) & {
   /**
@@ -189,6 +197,14 @@ export type ChatEntry = (
    * this they would be dropped on the first save.
    */
   extra?: Record<string, unknown>;
+  /**
+   * The store's identity for an entry read back from it, for naming a turn
+   * the athlete hid (`maskHiddenTurns`). Never stored from here: the store
+   * recovers identities on every save (`stampEntries`), so a copy held in a
+   * window is never trusted with one. Absent on an entry written in this
+   * window until the conversation is next read.
+   */
+  mid?: string;
 };
 
 export function isChatVisualEntry(
@@ -334,6 +350,7 @@ const HANDLED_KEYS: Record<string, readonly string[]> = {
   hrZoneSummary: ["preview"],
   automationSilent: ["automation", "at"],
   automationStopped: ["automation", "at", "reason"],
+  branchedFrom: ["sessionId", "title"],
   opaque: ["raw"]
 };
 
@@ -356,6 +373,9 @@ function persistVisualEntry(entry: ChatEntry): PersistedChatEntry | null {
 function persistKnownEntry(entry: ChatEntry): PersistedChatEntry | null {
   if (entry.kind === "opaque") {
     return { kind: "opaque", raw: entry.raw };
+  }
+  if (entry.kind === "branchedFrom") {
+    return { kind: "branchedFrom", sessionId: entry.sessionId, title: entry.title };
   }
   if (entry.kind === "coachPrompt") {
     return { kind: "coachPrompt", prompt: entry.prompt };
@@ -439,12 +459,19 @@ export function toPersistedEntries(entries: ChatEntry[]): PersistedChatEntry[] {
 }
 
 export function fromPersistedEntries(entries: PersistedChatEntry[]): ChatEntry[] {
-  return entries.map((entry) => ({ ...fromPersistedEntry(entry), ...extraOf(entry) }));
+  return entries.map((entry) => ({
+    ...fromPersistedEntry(entry),
+    ...extraOf(entry),
+    ...(entry.mid ? { mid: entry.mid } : {})
+  }));
 }
 
 function fromPersistedEntry(entry: PersistedChatEntry): ChatEntry {
   if (entry.kind === "opaque") {
     return { kind: "opaque", raw: entry.raw };
+  }
+  if (entry.kind === "branchedFrom") {
+    return { kind: "branchedFrom", sessionId: entry.sessionId, title: entry.title };
   }
   if (entry.kind === "coachPrompt") {
     return { kind: "coachPrompt", prompt: entry.prompt };

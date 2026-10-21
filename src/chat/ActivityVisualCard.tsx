@@ -1,4 +1,5 @@
-import { memo, useMemo } from "react";
+import { Fragment, memo, useEffect, useId, useMemo, useState, type CSSProperties } from "react";
+import { ChevronDown } from "lucide-react";
 import {
   Bar,
   BarChart,
@@ -10,11 +11,15 @@ import { ChartWhenNear } from "./charts/ChartWhenNear";
 import type { TooltipContentProps } from "recharts";
 import type {
   ActivityVisualLapPoint,
-  ActivityVisualPreview
+  ActivityVisualPreview,
+  ActivityVisualStrengthExercise,
+  CorosProfileZoneFamily,
+  SessionSet
 } from "../../electron/types";
 import {
   formatDistanceMeters,
   formatDurationSeconds,
+  formatDurationSpan,
   formatOptionalNumber,
   formatPaceSecondsPerKm
 } from "../training/formatters";
@@ -28,26 +33,174 @@ import {
   elevationUnit,
   kilogramsToDisplayWeight,
   kmhToDisplaySpeed,
-  speedUnit,
-  swimDistanceUnit
+  speedUnit
 } from "../units/units";
 import {
   ACTIVITY_READINGS,
   activityReading,
   formatSwimPace,
-  formatSwimPaceClock,
   readsMovement,
-  readsSpeed
+  readsSpeed,
+  type ActivityReading
 } from "../../electron/activityReading";
 import {
-  buildDistanceSeriesData,
   buildElevationSeriesData,
   ChatMiniAreaChart
 } from "./charts/ChatMiniAreaChart";
+import { ChatChannelChart } from "./charts/ChatChannelChart";
+import { joinChannelRows } from "./charts/channelRows";
 import { formatCount, formatDecimal, t } from "../i18n/core";
 import { resolveExerciseName } from "../training/exerciseNames";
 import { formatVolumeKg, formatWeightKg } from "../strength/strengthAnalytics";
 import { useI18n } from "../i18n/useI18n";
+import { zoneName } from "../i18n/zoneNames";
+import { heartRateZoneFamily, heartRateZoneTime } from "../training/zoneTime";
+import { heartRateZoneModelFromProfile } from "../training/heartRateZoneModel";
+import { zoneColor } from "../training/components/routeColoring";
+import { sessionSetsCardExercises, sessionSetsHeartRate } from "../../electron/sessionSets";
+import { SessionSetsChart } from "./charts/SessionSetsChart";
+import { formatSessionSet, formatSetScheme } from "./sessionSetsFormat";
+import { LapRecoveryMark, LapSectionRow } from "../training/components/LapSections";
+
+/** COROS's Hybrid Fitness, recorded set by set though it is read as any other sport. */
+const HYBRID_FITNESS = 1200;
+
+type CardSections = ActivityVisualPreview["sections"];
+
+/**
+ * Each session's redraw, asked once a window. A session with no sets — a gym
+ * session the watch recorded no exercises for — and a detail that cannot be
+ * read (signed out, the session gone from COROS) are remembered as none: the
+ * card would otherwise ask again on every mount, and each ask opens a ~2.5 MB
+ * file, or costs a COROS request, and each failure writes to the error log.
+ */
+const storedSetsRedraws = new Map<string, Promise<Partial<CardSections> | null>>();
+
+function readStoredSetsRedraw(activityId: string, sportType: number): Promise<Partial<CardSections> | null> {
+  const key = `${activityId}:${sportType}`;
+  const known = storedSetsRedraws.get(key);
+  if (known) return known;
+  const api = window.heraclesRecords;
+  if (!api?.getTrainingHubActivityDetail) return Promise.resolve(null);
+  const read = api.getTrainingHubActivityDetail(activityId, sportType).then(
+    (detail): Partial<CardSections> | null => {
+      const exercises = sessionSetsCardExercises(detail.exerciseSets);
+      if (exercises.length === 0) return null;
+      const series = sessionSetsHeartRate(detail.series);
+      return {
+        strength: { exercises },
+        laps: undefined,
+        cadence: undefined,
+        ...(series.length >= 2 ? { hr: { chartKind: "series" as const, series } } : {})
+      };
+    },
+    () => null
+  );
+  storedSetsRedraws.set(key, read);
+  return read;
+}
+
+/**
+ * A set-by-set session's card stored before its sets were kept — heart rate
+ * with no clock, drawn as "Point 1, Point 2…", and a lap table of sets and
+ * rests with nothing to say which is which — drawn again from the session's
+ * detail, which is on disk from when the card was made. Nothing is written
+ * back: the stored card stays as it was, and a detail that cannot be read
+ * leaves it drawn as before.
+ */
+function useStoredSetsRedraw(
+  preview: ActivityVisualPreview,
+  reading: ActivityReading
+): Partial<CardSections> | undefined {
+  const [redrawn, setRedrawn] = useState<Partial<CardSections>>();
+  const { activityId, sportType } = preview;
+  const stale =
+    (reading === "sets" || sportType === HYBRID_FITNESS) &&
+    sportType !== undefined &&
+    !preview.sections.strength?.exercises.some((exercise) => exercise.setList?.length);
+
+  useEffect(() => {
+    if (!stale || sportType === undefined) return;
+    let live = true;
+    void readStoredSetsRedraw(activityId, sportType).then((sections) => {
+      if (live && sections) setRedrawn(sections);
+    });
+    return () => {
+      live = false;
+    };
+  }, [activityId, sportType, stale]);
+
+  return stale ? redrawn : undefined;
+}
+
+function finite(value: unknown): value is number {
+  return typeof value === "number" && Number.isFinite(value);
+}
+
+/** A set the card can place: a start and a length on the clock, and a rest after it if any. */
+function readableSet(set: unknown): set is SessionSet {
+  if (!set || typeof set !== "object") return false;
+  const { start, seconds, restSeconds } = set as Record<string, unknown>;
+  return finite(start) && finite(seconds) && (restSeconds === undefined || finite(restSeconds));
+}
+
+/**
+ * The exercises with every set list in a shape the card can draw. The sets
+ * reach it through the stored entry's unknown keys, unparsed, so a list
+ * another build wrote in a shape this one does not know loses the sets it
+ * cannot read rather than taking the card down.
+ */
+function readableExercises(
+  exercises: ActivityVisualStrengthExercise[] | undefined
+): ActivityVisualStrengthExercise[] {
+  return (exercises ?? []).map((exercise) => {
+    const sets: unknown = exercise.setList;
+    if (sets === undefined || (Array.isArray(sets) && sets.every(readableSet))) return exercise;
+    const { setList: _unreadable, ...rest } = exercise;
+    const setList = Array.isArray(sets) ? sets.filter(readableSet) : [];
+    return setList.length > 0 ? { ...rest, setList } : rest;
+  });
+}
+
+/** How long the account's zone model read for a card is trusted before it is read again. */
+const ACCOUNT_FAMILY_TTL_MS = 10 * 60_000;
+let accountFamilyRead: { at: number; family: Promise<CorosProfileZoneFamily | undefined> } | undefined;
+
+/**
+ * The heart-rate model the account is scored against, for a zone split whose
+ * activity names none — COROS sends `zoneType` 0 on some sessions of an
+ * account it scores on reserve. Read from the main process's profile cache,
+ * which costs no COROS request, and shared by every card on screen.
+ */
+function readAccountZoneFamily(): Promise<CorosProfileZoneFamily | undefined> {
+  const api = window.heraclesRecords;
+  if (!api?.getCorosProfileSnapshot) return Promise.resolve(undefined);
+  if (!accountFamilyRead || Date.now() - accountFamilyRead.at > ACCOUNT_FAMILY_TTL_MS) {
+    accountFamilyRead = {
+      at: Date.now(),
+      family: api.getCorosProfileSnapshot().then(
+        (snapshot) => heartRateZoneModelFromProfile(snapshot.profile)?.family,
+        () => undefined
+      )
+    };
+  }
+  return accountFamilyRead.family;
+}
+
+function useAccountZoneFamily(needed: boolean): CorosProfileZoneFamily | undefined {
+  const [family, setFamily] = useState<CorosProfileZoneFamily>();
+  useEffect(() => {
+    if (!needed) return;
+    let live = true;
+    void readAccountZoneFamily().then((read) => {
+      if (live) setFamily(read);
+    });
+    return () => {
+      live = false;
+    };
+  }, [needed]);
+  return needed ? family : undefined;
+}
 
 /** `40 kg`, or `20–40 kg` when the sets were lifted at different loads. */
 function formatLoadRange(
@@ -167,6 +320,60 @@ function buildLapBarData(
 }
 
 /**
+ * Where the session's heart rate sat, as COROS scored it: one bar of the
+ * zones reached, each in the colour the route map and the session's own page
+ * give it, named in the account's model. The zones never reached are left
+ * out here — the page lists the whole scale; a card in a conversation says
+ * what the session was.
+ */
+function ZoneShare({ zones }: { zones: NonNullable<ActivityVisualPreview["sections"]["zones"]> }) {
+  useI18n();
+  const stated = zones.zoneType || undefined;
+  const account = useAccountZoneFamily(heartRateZoneFamily(stated, undefined) === undefined);
+  const family = heartRateZoneFamily(stated, account);
+  const reached = useMemo(
+    () => heartRateZoneTime(zones.buckets, family).filter((row) => row.seconds > 0),
+    [family, zones]
+  );
+  if (!reached.length) return null;
+  const rows = reached.map((row) => ({
+    ...row,
+    name: row.label ? zoneName(row.label) : t("overview.zones.zone", { n: row.position + 1 }),
+    style: { "--zone-color": zoneColor(row.position) } as CSSProperties
+  }));
+  return (
+    <section className="chat-visual-section">
+      <h5>{t("activity.zoneTime.title")}</h5>
+      <div className="chat-visual-zones-bar" aria-hidden="true">
+        {rows.map((row) => (
+          <i
+            key={row.position}
+            style={{ ...row.style, flexGrow: row.share }}
+            title={`${row.name} · ${formatDurationSpan(row.seconds)}`}
+          />
+        ))}
+      </div>
+      <ul className="chat-visual-zones-legend">
+        {rows.map((row) => (
+          <li key={row.position} style={row.style} title={formatDurationSpan(row.seconds)}>
+            <i aria-hidden="true" />
+            {row.name}
+            <strong>{`${Math.round(row.share * 100)}%`}</strong>
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
+/**
+ * A lap table this long or longer starts folded: an interval session's twenty
+ * rows ran the card a screen down the conversation, past the answer that
+ * reads them. A shorter one is open, being no taller than a chart.
+ */
+const LAPS_FOLDED_FROM = 5;
+
+/**
  * Memoised on `preview`, which is the transcript entry's own object: Coach
  * re-renders on every token, keystroke and settings change, and a card whose
  * entry did not change has nothing to redraw.
@@ -174,7 +381,7 @@ function buildLapBarData(
 export const ActivityVisualCard = memo(function ActivityVisualCard({
   preview
 }: ActivityVisualCardProps) {
-  // The series carry their labels as text (a distance's decimals, "Point 3"),
+  // The series carry their labels as text (a distance's decimals, a clock),
   // so they are worked out again when the language changes.
   const { locale } = useI18n();
   const { unitSystem } = useUnitSystem();
@@ -193,73 +400,53 @@ export const ActivityVisualCard = memo(function ActivityVisualCard({
   const cycling = reading === "speed";
   const asSpeed = readsSpeed(reading);
   const moves = readsMovement(reading);
-  const hrSeriesData = useMemo(
-    () =>
-      preview.sections.hr?.chartKind === "series" && preview.sections.hr.series
-        ? buildDistanceSeriesData(preview.sections.hr.series, "hr", unitSystem, swim)
-        : [],
-    [locale, preview, swim, unitSystem]
+  const redrawn = useStoredSetsRedraw(preview, reading);
+  const sections = useMemo<CardSections>(
+    () => (redrawn ? { ...preview.sections, ...redrawn } : preview.sections),
+    [preview, redrawn]
   );
   const hrBarData = useMemo(
-    () => buildLapBarData(preview.sections.hr?.laps, (lap) => lap.avgHr),
-    [preview]
-  );
-  const cadenceSeriesData = useMemo(
-    () =>
-      preview.sections.cadence?.chartKind === "series" &&
-      preview.sections.cadence.series
-        ? buildDistanceSeriesData(
-            preview.sections.cadence.series,
-            "cadence",
-            unitSystem,
-            swim
-          )
-        : [],
-    [locale, preview, swim, unitSystem]
+    () => buildLapBarData(sections.hr?.laps, (lap) => lap.avgHr),
+    [sections]
   );
   const cadenceBarData = useMemo(
-    () => buildLapBarData(preview.sections.cadence?.laps, (lap) => lap.avgCadence),
-    [preview]
-  );
-  const paceData = useMemo(
-    () =>
-      preview.sections.pace?.series
-        ? buildDistanceSeriesData(
-            preview.sections.pace.series,
-            "pace",
-            unitSystem,
-            swim,
-            asSpeed
-          )
-        : [],
-    [asSpeed, locale, preview, swim, unitSystem]
-  );
-  const powerData = useMemo(
-    () =>
-      preview.sections.power?.series
-        ? buildDistanceSeriesData(preview.sections.power.series, "power", unitSystem, swim)
-        : [],
-    [locale, preview, swim, unitSystem]
+    () => buildLapBarData(sections.cadence?.laps, (lap) => lap.avgCadence),
+    [sections]
   );
   const elevationData = useMemo(
     () =>
-      preview.sections.elevation?.points
-        ? buildElevationSeriesData(preview.sections.elevation.points, unitSystem)
+      sections.elevation?.points
+        ? buildElevationSeriesData(sections.elevation.points, unitSystem)
         : [],
-    [locale, preview, unitSystem]
+    [locale, sections, unitSystem]
   );
 
   const cadenceUnit = cycling ? "rpm" : "spm";
   const title = preview.name ?? t("activity.untitled");
   const subtitle = preview.startTime ?? undefined;
-  const laps = preview.sections.laps ?? [];
-  const strengthExercises = preview.sections.strength?.exercises ?? [];
+  const laps = sections.laps ?? [];
+  const [lapsOpen, setLapsOpen] = useState(laps.length < LAPS_FOLDED_FROM);
+  const lapsTableId = useId();
+  const strengthExercises = useMemo(() => readableExercises(sections.strength?.exercises), [sections]);
+  // A session recorded set by set draws its heart rate under its sets, on
+  // the clock they were placed on; a card with no clock or no sets cannot.
+  const setsSeries =
+    sections.hr?.chartKind === "series" &&
+    strengthExercises.some((exercise) => exercise.setList?.length) &&
+    (sections.hr.series ?? []).filter((point) => point.elapsed !== undefined && point.hr !== undefined)
+      .length >= 2
+      ? sections.hr.series
+      : undefined;
+  const exercisesHaveLoad = strengthExercises.some((exercise) => exercise.maxWeightKg);
+  const exercisesHaveVolume = strengthExercises.some((exercise) => exercise.volumeKg);
   // The column only appears where a lap actually recorded cadence, so a pool
   // swim keeps the narrow table it has now. A gym session's laps are its sets
   // and rests: time and heart rate, no distance, pace or cadence.
   const lapsHaveCadence = moves && laps.some((lap) => lap.avgCadence !== undefined);
   const lapsHaveDistance =
     moves && (reading !== "effort" || laps.some((lap) => (lap.distance ?? 0) > 0));
+  const lapColumns = 4 + (lapsHaveDistance ? 2 : 0) + (lapsHaveCadence ? 1 : 0);
+  const lapSectionList = laps.map((lap) => lap.section);
   const paceLabel = asSpeed ? t("activity.m.speed") : t("activity.m.pace");
   const formatPerformance = (secondsPerKm: number): string =>
     asSpeed
@@ -267,7 +454,32 @@ export const ActivityVisualCard = memo(function ActivityVisualCard({
       : swim
         ? formatSwimPace(secondsPerKm, unitSystem)
         : formatPaceValue(secondsPerKm, unitSystem);
-  const cadence = moves ? preview.sections.cadence : undefined;
+  const cadence = moves ? sections.cadence : undefined;
+  const { colors } = useChartColors();
+  // Every channel recorded sample by sample shares one chart, a chip each; a
+  // channel COROS gave only per-lap averages for keeps its own bars, which run
+  // along the laps rather than the distance, and a session of sets keeps its
+  // heart rate under its sets.
+  const { rows: channelRows, joinsElevation } = useMemo(
+    () =>
+      joinChannelRows(
+        {
+          hr: sections.hr?.chartKind === "series" && !setsSeries ? sections.hr.series : undefined,
+          pace: moves ? sections.pace?.series : undefined,
+          power: moves ? sections.power?.series : undefined,
+          cadence: cadence?.chartKind === "series" ? cadence.series : undefined,
+          elevation: moves && !swim ? sections.elevation?.points : undefined
+        },
+        reading,
+        unitSystem
+      ),
+    // The labels are text in the language on screen.
+    [cadence, locale, moves, reading, sections, setsSeries, swim, unitSystem]
+  );
+  const charted = (key: "hr" | "pace" | "speed" | "power" | "cadence"): boolean =>
+    channelRows.filter((row) => row[key] !== undefined).length >= 2;
+  const hrCharted = charted("hr");
+  const paceCharted = charted(asSpeed ? "speed" : "pace");
 
   return (
     <div className="chat-visual-card">
@@ -292,15 +504,38 @@ export const ActivityVisualCard = memo(function ActivityVisualCard({
         </div>
       </div>
 
-      {preview.sections.hr ? (
+      {sections.zones ? <ZoneShare zones={sections.zones} /> : null}
+
+      {channelRows.length >= 2 && (hrCharted || paceCharted || charted("power") || charted("cadence")) ? (
+        <ChatChannelChart
+          previewId={preview.previewId}
+          reading={reading}
+          sportType={preview.sportType}
+          rows={channelRows}
+          unitSystem={unitSystem}
+          cadenceUnit={cadenceUnit}
+        />
+      ) : null}
+
+      {sections.hr && !hrCharted ? (
         <section className="chat-visual-section">
-          <h5>{t("activity.m.heartRate")}</h5>
-          {preview.sections.hr.chartKind === "series" && hrSeriesData.length >= 2 ? (
-            <ChatMiniAreaChart
-              data={hrSeriesData}
+          {setsSeries ? (
+            <div className="chat-visual-section-head">
+              <h5>{t("activity.m.heartRate")}</h5>
+              <span className="chat-visual-key" style={{ "--set-band": colors.accent } as CSSProperties}>
+                <i aria-hidden="true" />
+                {t("activity.strength.set")}
+              </span>
+            </div>
+          ) : (
+            <h5>{t("activity.m.heartRate")}</h5>
+          )}
+          {setsSeries ? (
+            <SessionSetsChart
+              series={setsSeries}
+              exercises={strengthExercises}
               gradientId={`chatHrFill-${preview.previewId}`}
-              name={t("activity.m.heartRate")}
-              formatValue={(value) => `${Math.round(value)} bpm`}
+              unitSystem={unitSystem}
             />
           ) : hrBarData.length >= 2 ? (
             <ChatLapBarChart
@@ -314,65 +549,24 @@ export const ActivityVisualCard = memo(function ActivityVisualCard({
         </section>
       ) : null}
 
-      {moves && preview.sections.pace ? (
+      {moves && sections.pace && !paceCharted ? (
         <section className="chat-visual-section">
           <h5>{paceLabel}</h5>
-          {paceData.length >= 2 ? (
-            <ChatMiniAreaChart
-              data={paceData}
-              gradientId={`chatPaceFill-${preview.previewId}`}
-              name={paceLabel}
-              // A swim's values are already seconds per 100 (the series data
-              // converts them), a ride's and a hike's km/h.
-              formatValue={(value) =>
-                asSpeed
-                  ? `${formatDecimal(value, 1)} ${speedUnit(unitSystem)}`
-                  : swim
-                    ? `${formatSwimPaceClock(value)} /100${swimDistanceUnit(unitSystem)}`
-                    : formatPaceValue(value, unitSystem)
-              }
-              yAxisFormatter={(value) =>
-                asSpeed
-                  ? formatDecimal(value, 1)
-                  : swim
-                    ? formatSwimPaceClock(value)
-                    : formatPaceValue(value, unitSystem).replace(/\/(?:km|mi)$/, "")
-              }
-            />
-          ) : (
-            <p className="chat-visual-empty">{asSpeed ? t("chat.chart.noSpeed") : t("chat.chart.noPace")}</p>
-          )}
+          <p className="chat-visual-empty">{asSpeed ? t("chat.chart.noSpeed") : t("chat.chart.noPace")}</p>
         </section>
       ) : null}
 
-      {moves && preview.sections.power ? (
+      {moves && sections.power && !charted("power") ? (
         <section className="chat-visual-section">
           <h5>{t("activity.m.power")}</h5>
-          {powerData.length >= 2 ? (
-            <ChatMiniAreaChart
-              data={powerData}
-              gradientId={`chatPowerFill-${preview.previewId}`}
-              name={t("activity.m.power")}
-              formatValue={(value) => `${Math.round(value)} W`}
-            />
-          ) : (
-            <p className="chat-visual-empty">{t("chat.chart.noPower")}</p>
-          )}
+          <p className="chat-visual-empty">{t("chat.chart.noPower")}</p>
         </section>
       ) : null}
 
-      {cadence ? (
+      {cadence && !charted("cadence") ? (
         <section className="chat-visual-section">
           <h5>{t("activity.m.cadence")}</h5>
-          {cadence.chartKind === "series" &&
-          cadenceSeriesData.length >= 2 ? (
-            <ChatMiniAreaChart
-              data={cadenceSeriesData}
-              gradientId={`chatCadenceFill-${preview.previewId}`}
-              name={t("activity.m.cadence")}
-              formatValue={(value) => `${Math.round(value)} ${cadenceUnit}`}
-            />
-          ) : cadenceBarData.length >= 2 ? (
+          {cadenceBarData.length >= 2 ? (
             <ChatLapBarChart
               data={cadenceBarData}
               name={t("activity.m.avgCadence")}
@@ -384,7 +578,7 @@ export const ActivityVisualCard = memo(function ActivityVisualCard({
         </section>
       ) : null}
 
-      {moves && !swim && preview.sections.elevation ? (
+      {moves && !swim && sections.elevation && !joinsElevation ? (
         <section className="chat-visual-section">
           <h5>{t("activity.m.elevation")}</h5>
           {elevationData.length >= 2 ? (
@@ -402,17 +596,18 @@ export const ActivityVisualCard = memo(function ActivityVisualCard({
 
       {strengthExercises.length > 0 ? (
         <section className="chat-visual-section">
-          <h5>{t("strength.exercises.title")}</h5>
+          <h5>
+            {t("strength.exercises.title")} <span>{formatCount(strengthExercises.length)}</span>
+          </h5>
           <div className="chat-plan-table-wrap">
-            <table className="chat-plan-table">
+            <table className="chat-plan-table chat-sets-table">
               <thead>
                 <tr>
                   <th>#</th>
                   <th>{t("workout.summary.exercise")}</th>
                   <th>{t("activity.strength.sets")}</th>
-                  <th>{t("activity.strength.reps")}</th>
-                  <th>{t("activity.strength.weight")}</th>
-                  <th>{t("strength.metric.volume")}</th>
+                  {exercisesHaveLoad ? <th>{t("activity.strength.weight")}</th> : null}
+                  {exercisesHaveVolume ? <th>{t("strength.metric.volume")}</th> : null}
                 </tr>
               </thead>
               <tbody>
@@ -420,12 +615,21 @@ export const ActivityVisualCard = memo(function ActivityVisualCard({
                   <tr key={`${exercise.nameKey}-${index}`}>
                     <td>{index + 1}</td>
                     <td>{resolveExerciseName(exercise.nameKey, exercise.rawName)}</td>
-                    <td>{formatCount(exercise.sets)}</td>
-                    <td>{formatCount(exercise.reps)}</td>
-                    <td>{formatLoadRange(exercise.minWeightKg, exercise.maxWeightKg, unitSystem)}</td>
-                    <td>
-                      {exercise.volumeKg ? formatVolumeKg(exercise.volumeKg, unitSystem) : "—"}
+                    <td
+                      title={exercise.setList
+                        ?.map((set) => formatSessionSet(set, unitSystem))
+                        .join(" · ")}
+                    >
+                      {formatSetScheme(exercise)}
                     </td>
+                    {exercisesHaveLoad ? (
+                      <td>{formatLoadRange(exercise.minWeightKg, exercise.maxWeightKg, unitSystem)}</td>
+                    ) : null}
+                    {exercisesHaveVolume ? (
+                      <td>
+                        {exercise.volumeKg ? formatVolumeKg(exercise.volumeKg, unitSystem) : "—"}
+                      </td>
+                    ) : null}
                   </tr>
                 ))}
               </tbody>
@@ -436,8 +640,22 @@ export const ActivityVisualCard = memo(function ActivityVisualCard({
 
       {laps.length > 0 ? (
         <section className="chat-visual-section">
-          <h5>{t("activity.m.laps")}</h5>
-          <div className="chat-plan-table-wrap">
+          <div className="chat-visual-section-head">
+            <h5>
+              {t("activity.m.laps")} <span>{formatCount(laps.length)}</span>
+            </h5>
+            <button
+              type="button"
+              className="chat-plan-review chat-visual-toggle"
+              aria-expanded={lapsOpen}
+              aria-controls={lapsTableId}
+              onClick={() => setLapsOpen((open) => !open)}
+            >
+              {lapsOpen ? t("chat.chart.hideLaps") : t("chat.chart.showLaps")}
+              <ChevronDown size={14} aria-hidden="true" />
+            </button>
+          </div>
+          <div className="chat-plan-table-wrap" id={lapsTableId} hidden={!lapsOpen}>
             <table className="chat-plan-table">
               <thead>
                 <tr>
@@ -451,28 +669,34 @@ export const ActivityVisualCard = memo(function ActivityVisualCard({
                 </tr>
               </thead>
               <tbody>
-                {laps.map((lap) => (
-                  <tr key={lap.index}>
-                    <td>{lap.index}</td>
-                    {lapsHaveDistance ? (
-                      <td>{formatDistanceMeters(lap.distance, unitSystem, swim)}</td>
-                    ) : null}
-                    <td>{formatDurationSeconds(lap.duration)}</td>
-                    <td>{formatOptionalNumber(lap.avgHr)}</td>
-                    <td>{formatOptionalNumber(lap.maxHr)}</td>
-                    {lapsHaveDistance ? (
+                {laps.map((lap, position) => (
+                  <Fragment key={lap.index}>
+                    <LapSectionRow sections={lapSectionList} index={position} colSpan={lapColumns} />
+                    <tr className={lap.recovery ? "is-lap-recovery" : undefined}>
                       <td>
-                        {lap.distance && lap.duration
-                          ? formatPerformance(lap.duration / (lap.distance / 1000))
-                          : lap.pace
-                            ? formatPerformance(lap.pace)
-                            : "—"}
+                        {lap.index}
+                        {lap.recovery ? <LapRecoveryMark /> : null}
                       </td>
-                    ) : null}
-                    {lapsHaveCadence ? (
-                      <td>{formatOptionalNumber(lap.avgCadence)}</td>
-                    ) : null}
-                  </tr>
+                      {lapsHaveDistance ? (
+                        <td>{formatDistanceMeters(lap.distance, unitSystem, swim)}</td>
+                      ) : null}
+                      <td>{formatDurationSeconds(lap.duration)}</td>
+                      <td>{formatOptionalNumber(lap.avgHr)}</td>
+                      <td>{formatOptionalNumber(lap.maxHr)}</td>
+                      {lapsHaveDistance ? (
+                        <td>
+                          {lap.distance && lap.duration
+                            ? formatPerformance(lap.duration / (lap.distance / 1000))
+                            : lap.pace
+                              ? formatPerformance(lap.pace)
+                              : "—"}
+                        </td>
+                      ) : null}
+                      {lapsHaveCadence ? (
+                        <td>{formatOptionalNumber(lap.avgCadence)}</td>
+                      ) : null}
+                    </tr>
+                  </Fragment>
                 ))}
               </tbody>
             </table>

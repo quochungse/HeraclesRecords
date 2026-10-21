@@ -360,7 +360,12 @@ async function main() {
       name: "Post-activity debrief",
       triggerLabel: "New activity"
     };
-    const history = [{ kind: "message", role: "user", content: "Tuần trước thế nào?" }];
+    // Answered: a question with no answer under it gets a row of its own
+    // (`TurnFailureRow`), which would leave with the run and skew the count.
+    const history = [
+      { kind: "message", role: "user", content: "Tuần trước thế nào?" },
+      { kind: "message", role: "assistant", content: "Ổn định." }
+    ];
     await harness("mount", "ChatView", {}, {
       ...BASE_SCRIPT,
       __persistChatSessions: false,
@@ -788,6 +793,46 @@ async function main() {
       "the answer is in its conversation"
     );
     // The profile's localStorage outlives this run; leave no draft behind.
+    await win.webContents.executeJavaScript(`localStorage.removeItem("heraclesrecords.coach.composerDrafts.v1")`, true);
+  }
+
+  // -------------------------------------------------------------------------
+  // A turn hidden from another machine keeps its question's row, and an
+  // editor whose question is no longer the last one is not drawn
+  // -------------------------------------------------------------------------
+  {
+    const row = [
+      { kind: "message", role: "user", content: "Tuần này thế nào?", mid: "q1", mrev: 1 },
+      { kind: "message", role: "assistant", content: "Tuần này ổn.", mid: "a1", mrev: 1 }
+    ];
+    await harness("mount", "ChatView", {}, { ...BASE_SCRIPT, getChatSession: row, getHiddenChatTurns: [] });
+    await waitFor(() => harness("exists", ".chat-row-user"), "the question is drawn");
+    await settle();
+    await win.webContents.executeJavaScript(`document.querySelector(".chat-row-user").__kept = true`, true);
+    await harness("setScript", { getHiddenChatTurns: ["q1"] });
+    await harness("emit", "onSyncChanged", { tables: ["chat_hidden_turns"], pulled: 1, applied: 1 });
+    await waitFor(() => harness("exists", ".chat-hidden-turn-label"), "the turn reads as hidden");
+    assert.equal(
+      await win.webContents.executeJavaScript(`document.querySelector(".chat-row-user").__kept === true`, true),
+      true,
+      "the question's row is the one already drawn: a row mounted again fades in from nothing"
+    );
+
+    assert.equal(await harness("click", '.chat-row-user .chat-turn-action[aria-label="Edit & resend"]'), true);
+    await waitFor(() => harness("exists", ".chat-question-edit"), "the editor opens on the last question");
+    await harness("setValue", ".chat-composer textarea", "Còn tuần sau?");
+    await harness("click", ".chat-send");
+    const turn = await waitFor(async () => (await harness("calls", "sendChat"))[0], "a question goes from the composer");
+    assert.equal(
+      await harness("exists", ".chat-question-edit"),
+      false,
+      "the editor goes: its question is no longer the last, and a save would rewrite the turn after it"
+    );
+    await harness("emit", "onChatStreamStart", { requestId: turn.args[0] });
+    await harness("emit", "onChatStreamDone", { requestId: turn.args[0], fullText: "Tuần sau nhẹ hơn." });
+    await settle();
+    assert.equal(await harness("exists", ".chat-question-edit"), false, "and does not come back once it is answered");
+    assert.equal(await harness("callCount", "editChatTurn"), 0, "nothing was edited");
     await win.webContents.executeJavaScript(`localStorage.removeItem("heraclesrecords.coach.composerDrafts.v1")`, true);
   }
 

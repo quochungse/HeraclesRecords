@@ -166,6 +166,7 @@ import {
   decodeStsCredentials
 } from "./corosUploadConfig";
 import { parseStrengthDetail } from "./strengthDetail";
+import { parseSessionSets } from "./sessionSets";
 import {
   formatSwimPace,
   readsMovement,
@@ -1402,6 +1403,16 @@ function cachedCorosProfile(): CorosProfile | null {
  */
 export function lastKnownCorosProfileSex(): number | undefined {
   return corosProfileCache?.snapshot.profile.sex ?? coachProfileCache?.profile.sex;
+}
+
+/**
+ * The account's heart-rate model as last read (`hrZoneType`: 1 Max HR, 2 HR
+ * Reserve, 3 LTHR), for an activity that says 0 — COROS writes 0 on some
+ * activities of an account that has been on one model all along. Undefined
+ * until a profile has been read since sign-in, like the sex above.
+ */
+export function lastKnownCorosHrZoneType(): number | undefined {
+  return corosProfileCache?.snapshot.profile.hrZoneType ?? coachProfileCache?.profile.hrZoneType;
 }
 
 function storeCorosProfileSnapshot(
@@ -6085,6 +6096,9 @@ const COROS_LAP_PHASES: Record<number, TrainingHubLapPhase> = {
   15: "rest"
 };
 
+/** `programExerciseIndex` on a lap run after a structured workout's last step. */
+const COROS_PAST_PROGRAM_STEP = 255;
+
 function isRollupLapItem(item: Record<string, unknown>): boolean {
   const mode = toOptionalNumber(item.mode);
   return mode !== undefined && COROS_LAP_MODE_ROLLUP.has(mode);
@@ -7994,7 +8008,8 @@ export function parseActivityDetail(raw: Record<string, unknown>): TrainingHubAc
     weather: parseActivityWeather(raw),
     track,
     series: parseActivitySeries(raw, wallClock),
-    strength: parseStrengthDetail(raw)
+    strength: parseStrengthDetail(raw),
+    exerciseSets: parseSessionSets(raw)
   };
 }
 
@@ -8041,6 +8056,7 @@ function parseActivityLap(raw: unknown, index: number): TrainingHubActivityLap {
     maxHr: toOptionalNumber(lap.maxHr),
     mode,
     phase: mode !== undefined ? COROS_LAP_PHASES[mode] : undefined,
+    ...(toOptionalNumber(lap.programExerciseIndex) === COROS_PAST_PROGRAM_STEP ? { afterWorkout: true } : {}),
     pace:
       (avgPace !== undefined &&
       isPlausiblePaceSecondsPerKm(normalizeActivityDuration(avgPace) ?? avgPace)

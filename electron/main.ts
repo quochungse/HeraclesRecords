@@ -144,6 +144,9 @@ import type {
   CorosProfilePatch,
   HevySettingsInput,
   SaveChatSessionOptions,
+  DeleteTurnOptions,
+  HideTurnOptions,
+  TurnRef,
   StrengthHistoryRequest,
   TrainingHubStatus,
   UnitSystem,
@@ -272,6 +275,14 @@ import {
   dismissScheduleChangeLine,
   getScheduleChanges
 } from "./chatService";
+import {
+  branchConversation,
+  deleteTurn,
+  describeTurn,
+  editTurn,
+  hiddenTurns,
+  setTurnHidden
+} from "./chatTurnService";
 import {
   compactChatSessionContext,
   inspectChatSessionContext
@@ -1811,6 +1822,30 @@ function registerIpcHandlers(): void {
   ipcMain.handle("chat:deleteSession", (_event, sessionId: string) => {
     deleteChatSessionById(sessionId);
   });
+
+  // A turn — the athlete's question and everything Coach answered it with —
+  // is deleted here rather than by the window saving a shorter transcript,
+  // which the save's guard would refuse (`chatTurnService.ts`).
+  ipcMain.handle("chat:describeTurn", (_event, sessionId: string, ref: TurnRef) => describeTurn(sessionId, ref));
+  ipcMain.handle("chat:deleteTurn", (_event, sessionId: string, ref: TurnRef, options: DeleteTurnOptions) =>
+    deleteTurn(sessionId, ref, {
+      deleteCreations: options?.deleteCreations === true,
+      rewriteSummary: options?.rewriteSummary === true
+    })
+  );
+  ipcMain.handle("chat:editTurn", (_event, sessionId: string, ref: TurnRef, text: string) =>
+    editTurn(sessionId, ref, typeof text === "string" ? text : "")
+  );
+  ipcMain.handle("chat:branchConversation", (_event, sessionId: string, ref: TurnRef) =>
+    branchConversation(sessionId, ref)
+  );
+  ipcMain.handle("chat:hiddenTurns", (_event, sessionId: string) => hiddenTurns(sessionId));
+  ipcMain.handle("chat:setTurnHidden", (_event, sessionId: string, ref: TurnRef, options: HideTurnOptions) =>
+    setTurnHidden(sessionId, ref, {
+      hidden: options?.hidden === true,
+      rewriteSummary: options?.rewriteSummary === true
+    })
+  );
 
   // Renaming leaves updatedAt alone. Nothing in the analysis feature calls
   // this any more — nothing in the analysis feature creates or titles a

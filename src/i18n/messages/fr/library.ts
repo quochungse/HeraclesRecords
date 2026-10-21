@@ -258,6 +258,7 @@ const library: LibraryMessages = {
   "library.ai.connected": "Connecté",
   "library.ai.notSetUp": "Non configuré",
   "library.ai.coachSettings": "Réglages de Coach",
+  "library.ai.manageProviders": "Gérer les fournisseurs",
   "library.ai.model": "Modèle",
   "library.ai.runsLocal": "Utilise {model}, le modèle local choisi dans les réglages de Coach.",
   "library.ai.effort": "Niveau de raisonnement",

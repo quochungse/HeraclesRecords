@@ -61,7 +61,7 @@ const run = {
   "run.detail.climbingRateTitle.imperial": "Feet gained an hour on the climbing stretches, stops out",
   "run.detail.decoupling": "Decoupling",
   "run.detail.decouplingTitle": "How far pace and heart rate drifted apart between the first and second half, with the first ten minutes left out as warm-up. Under 5% is a run held together.",
-  "run.detail.vertOsc": "Vertical osc.",
+  "run.detail.vertOsc": "Stride height",
   "run.detail.aerobic": "Aerobic effect",
   "run.detail.anaerobic": "Anaerobic effect",
   "run.detail.temperature": "Temperature",

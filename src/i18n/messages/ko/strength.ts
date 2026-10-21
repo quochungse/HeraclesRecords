@@ -115,6 +115,7 @@ const strength: StrengthMessages = {
   "strength.exploreTitle": "운동 탐색기에서 열기",
   "strength.col.set": "세트",
   "strength.col.reps": "횟수",
+  "strength.col.time": "시간",
   "strength.col.weight": "중량",
   "strength.col.e1rm": "추정 최대",
   "strength.col.rest": "휴식",

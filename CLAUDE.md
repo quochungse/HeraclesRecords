@@ -566,10 +566,12 @@ lives at module level for the same visit-to-visit reason — see `useCalendarDat
   **Every workout is written in one builder** (`src/calendar/WorkoutBuilder.tsx`, rows in
   `workoutBuilderRows.ts`): Create workout (Calendar and Library), a plan session new or edited
   (`WorkoutBuilderModal`, applied through `editorDraftToPlanWorkoutInput` as before) and **Edit
-  workout** in the Library (read by `getWorkoutForEdit`, saved and verified by `saveWorkoutEdit`, with
-  COROS's `previewWorkoutEdit` load beside the totals). A session and a library workout had a second
-  editor, `WorkoutEditorModal`, with its own defaults, validator and layout; that modal is now only
-  the Calendar's (a scheduled occurrence, and its read-only view of a library workout). An existing
+  workout** in the Library and **Edit** on a scheduled session in the Calendar (both read by
+  `getWorkoutForEdit`, saved and verified by `saveWorkoutEdit`, with COROS's `previewWorkoutEdit` load
+  beside the totals; the source is `library` or `scheduled`). Every one of them had a second editor,
+  `WorkoutEditorModal`, with its own defaults, validator and layout; the Calendar's occurrence was the
+  last to leave it (2026-10-21), and what is left is `WorkoutViewModal`, the Calendar's read-only view
+  of a library workout, plus `WorkoutReadOnlyBody`, which the Library and the plan reader draw. An existing
   workout keeps its sport — stated where the picker would be, never a locked dropdown. **A row read
   from a workout remembers its node (`BuilderRow.origin`) and an untouched row writes that node back
   byte for byte**: a row holds display strings (km to three places, pace as `m:ss`), so re-encoding
@@ -963,9 +965,20 @@ lives at module level for the same visit-to-visit reason — see `useCalendarDat
   plots on one clock line up, and a plot does not widen as a channel is let go. It is offered only
   when both groups have a channel
   (`canSplitActivityChannels`). **Power is output, not the body**: filed with heart rate, a ride
-  opened with both in the lower plot. The colours are a set checked with a colour-vision validator
-  (`DARK_CHANNEL_COLORS` says which pairs it holds apart), and grade-adjusted pace is called
-  **Effort pace**, COROS's own name for it, in every language.
+  opened with both in the lower plot. **The colours are COROS's hues at this app's lightness**:
+  COROS's set crowds the warm half of the wheel, so lightness holds apart every pair a chart can
+  draw together (OKLab ΔE 15, 8 under protan and deutan simulation, every stroke 3:1 on its
+  panel), and `test:activity-channel-colors` holds the pairs the comment over
+  `DARK_CHANNEL_COLORS` names — its first cut claimed that and had pace and heart rate at a
+  deutan ΔE of 4.6. Paper has only the band between ink and 3:1 on white, so pace, effort pace
+  and power, which colour vision cannot tell apart by hue, are three steps of lightness there
+  (light olive-lime, mid green, dark burnt orange); hue matters too, since at the lime of
+  `#526b11` effort pace had to go near-black to clear both pace and power. Stride ratio is the one
+  channel off COROS's hue — a sky blue, not yellow-green, which sat on effort pace and had no
+  lightness left to move to. COROS's names go with them: grade-adjusted pace is **Effort pace**,
+  the form figures Ground time, Stride height and Stride ratio, and power on a run (100–103,
+  `isRunSportType`, never the `motion` alone, which Activities gives a HYROX session too) is
+  **Running power**.
 - **A session's training label** (`electron/sessionIntensity.ts` reads, `src/training/trainingBenefit.ts`
   names; built 2026-10-19) — Garmin's "primary benefit" and the session's shape: a coloured chip
   (Recovery, Aerobic, Tempo, Threshold, VO2 Max, Anaerobic) and an outlined one (Intervals 3 × 8′,
@@ -1459,7 +1472,7 @@ lives at module level for the same visit-to-visit reason — see `useCalendarDat
   how a native 2.1.266 kept an npm 2.1.283 and its Opus 5.5 out of the picker. So nothing
   detected is stored any more, and a stored path at a standard location
   (`isStandardClaudeLocation`) is read as that leftover and let go; only a path detection would
-  not find is the athlete's choice — which is why Coach Models shows the path field only when
+  not find is the athlete's choice — which is why AI Model Providers shows the path field only when
   detection finds nothing or a path is already set. The list remembers the CLI it was read from
   (`availableModelsFrom`, `<path>@<version>`) and is read again as soon as that changes.
   **Claude Code always runs against the app's own login** (`<userData>/claude-code` as
@@ -1646,6 +1659,55 @@ lives at module level for the same visit-to-visit reason — see `useCalendarDat
   before finishing" notice are kept and saved, and the answered card stays answered;
   only a turn that produced nothing is undone. `streamedTextRef` exists for this —
   `streamingText` is state, stale inside the subscription.
+
+  **A turn is the unit the athlete deletes, edits, hides and branches from**
+  (`electron/chatTurns.ts`, node-free, shared): a user message and everything after it up
+  to the next one, with the `planRefs`/`scheduleRefs` in front of it. Every change is made
+  in the main process (`chatTurnService.ts`, `chat:describeTurn`/`deleteTurn`/`editTurn`/
+  `setTurnHidden`/`branchConversation`), read, cut and written with nothing awaited
+  between, after the window flushes its own save: the window saving a shorter transcript is
+  what `foreignTail` refuses, and an analysis appends to the same row from main. The turn
+  is named by its question's `mid`, index and words (`TurnRef`): by the `mid` wherever the
+  window has one and the row is stamped, because a turn deleted on another machine leaves its
+  place, and often its words ("ok"), to another; otherwise checked at the index, and found by
+  the words alone only when they are unique. **No change is made while anything writes into
+  the conversation** — its own turn or an analysis (`turnsBusyIn`) — or the row, which holds
+  only the running turn's question, would land on screen and the turn's save would write back
+  what the change took out; an editor saves on the `TurnRef` it opened with, so a question
+  that has stopped being the last is refused (`turnNotLast`). **Every position-held boundary
+  moves with the entries** (`shiftBoundary`): the summary's `through` and the condensed
+  layer's start; a summary left covering nothing Coach may read (`speaksBefore`, after the
+  mask) is dropped, a rewrite is announced to sync on its own (`announceChatSessionRow`, no
+  save follows it), and when the summary covers the turn the athlete
+  is asked whether to rewrite it now, on the compression model (`rewriteSummary`, only over
+  the summary it replaces). A removal leaves a brief, an outline, a plan event, an analysis
+  trace and an opaque entry; **what the turn made stays, cards included, unless the athlete
+  deletes it too**, and only what can go goes: nothing saved to COROS, no proposal with a line
+  applied, no creation with a version in another turn. A creation that goes takes the plan
+  events and refs naming it, wherever they are; a card the athlete removed stays while its
+  drafts do, since it is what deleting the conversation reads to delete them. **Edit and retry are `editTurn`, last turn only**, by decision:
+  the question keeps its `mid` (`mrev` bumped), Coach's answer and what it made go, with no
+  versions kept and no second question asked. **A failed turn is a row under its question**
+  (`TurnFailureRow`, kinds from `classifyTurnFailure`), never stored: reopened, a question
+  with no answer is enough, and one asked in the last ten minutes "may still be answering on
+  another device" (`unansweredKind`), since the question is saved at send and the answer at
+  the end. The stopped-early notice was already stored and becomes that row when it closes
+  the last turn. A pipeline step and an analysis's playbook get no row. **A hidden turn is a
+  row of `chat_hidden_turns` (`personal`) by its question's `mid`**, not a field on the entry
+  (an older build would drop the field and win the merge). What Coach reads is the transcript
+  masked by `maskHiddenTurns` — every spoken entry replaced by an empty opaque one, positions
+  kept, so `through` still counts the stored transcript. The window masks before a turn
+  (never the turn being asked; `ChatEntry.mid` is carried for this and never stored from the
+  window, which reads the hidden set again at send rather than trusting the one on screen) and
+  main masks for analyses, recall, the summariser and the menu's compaction through
+  `coachTranscript` — an analysis whose transcript cannot be masked **fails** rather than
+  reading the turns the athlete hid, so that dep is not `optional`. **A branch is a conversation of its own** — entries minted
+  afresh, a `branchedFrom` anchor at its head, the same AI, sources and hidden turns, the
+  summary only when it covers nothing past the branch point — and it **leaves behind every
+  anchor that names a row** (drafts, briefs, outlines, proposals, plan events, plan refs):
+  two conversations naming one draft would have deleting either take the other's with it.
+  A branch of a branch leaves its parent's `branchedFrom` too, so it opens on one head.
+  `npm run test:chat-turn-actions`.
 
   **A turn reads chart, answer, then creations.** Cards arrive while a turn runs and the
   answer last, so where the answer goes is decided at the end: under the turn's charts
@@ -1958,7 +2020,7 @@ lives at module level for the same visit-to-visit reason — see `useCalendarDat
   gets none of it; a failed read leaves the line out rather than saying there was nothing.
 
   The pause and the monthly budget live in **Coach's settings dialog** (`ChatSettingsModal`
-  over `ChatSettingsPanel`, with Coach Models, display, suggestions, instructions and
+  over `ChatSettingsPanel`, with AI Model Providers, display, suggestions, instructions and
   compaction — how much is kept word for word and which model condenses, `CompactContextSection`), which the composer's gear and the sign-in gates open: they are feature-wide and
   the screen that used to host them is gone, so without a home a paused world would have no
   Resume button. R3 moved the panel into the app's Settings as a section; UAT moved it back,
@@ -1968,7 +2030,7 @@ lives at module level for the same visit-to-visit reason — see `useCalendarDat
   budget included (written through `setCoachAnalysisBudget` on Save, which closes the dialog);
   Discard drops it, and closing with a draft held asks first. Every control used to
   save on change and the instructions box on blur, so a half-written instruction reached the
-  next turn and went out through sync with no way back. The Coach Models row and Resume are not
+  next turn and went out through sync with no way back. The AI Model Providers row and Resume are not
   part of the draft — one is its own dialog, the other an action. `test:coach-analysis-renderer`.
   **The dialog wears the app's colours, not Coach's.** It is mounted inside `.chat-view`, whose
   grey `--accent` and own `--surface` it inherited unseen, so every chip and the Save button drew
@@ -2422,6 +2484,25 @@ lives at module level for the same visit-to-visit reason — see `useCalendarDat
   from the phone could carry an `updated_at` before it. Replays are upserts and deletes of the
   same id, so they cost nothing — but they are why `StrengthHistory.fetched` counts COROS
   alone, or the renderer's drain loop would never see COROS refusing.
+  **COROS's set-by-set laps are read by their `mode`** (2026-10-21): 14 set, 15 rest, 16
+  roll-up, 17 rest between exercises (`lapItemKind` in `strengthDetail.ts`). Read by reps
+  instead, as they were, a plank (no reps) vanished, a Hybrid Fitness (1200) rest — which
+  carries its set's reps — was a second set, and two exercises COROS gave one index merged;
+  so exercises are grouped by index *and* name, and a set whose `targetType` is 2 is read in
+  time (`timed`, reps 0) whatever the watch counted. A run's laps carry exercise keys too
+  (`S4208`), under modes 0–2, and are no sets. Two parsers read them for two readers:
+  `parseStrengthDetail` (this screen, cached in `strength_sessions`) and `parseSessionSets`
+  (`sessionSets.ts`, node-free, `detail.exerciseSets`: Coach's card and text, which keep each
+  set's place on the clock and its heart rate); on 43 real sessions they agree set for set.
+  **A cached breakdown is a parse, not the payload**: `strength_sessions.parse_version` below
+  `STRENGTH_DETAIL_VERSION` counts as missing, so a change to the parser is read again by the
+  ordinary backfill — bump it with any change to what the parse keeps. The card draws heart
+  rate under the sets (`SessionSetsChart`: a band per set, the exercise's number over it, the
+  set in the tooltip), writes a set scheme as `4 × 11–14` / `3 × 0:45`, and a card stored
+  before `setList` is redrawn from the detail on render (`useStoredSetsRedraw`), never written
+  back, and asked once a window per session: the answer is remembered with or without sets, or
+  a gym session the watch recorded no exercises for would read its ~2.5 MB detail, and log a
+  failure when signed out, on every mount.
 - **Sync** (`electron/sync/`) — continuous two-way sync through Google Drive, so two
   machines hold the same user data. **Drive is the only destination**: a local folder was
   offered beside it until 2026-10-01 and was removed because a folder kept by Dropbox,
@@ -2838,6 +2919,16 @@ the four CSS suites report. Themes are `dark` | `paper` via `src/theme/`, persis
 and `THEME_WINDOW_BACKGROUND` must stay in sync with `--bg-base`. Sport colors live in both
 `src/styles.css` and `src/training/sportColors.ts` (the source of truth) —
 `npm run test:sport-colors` asserts they match.
+
+**A toast says who spoke by where it appears** (`src/toast.ts`, drawn by `Toaster`). The bottom
+stack, the default, answers what the athlete just did; the top one is the app speaking unasked —
+a labour reached, a load that failed at start-up, an update that would not download. Both centre
+on the content column, measured, and a screen with something typed into at its foot marks it
+`data-toast-floor` so the bottom stack waits above it (Coach's composer). There are three kinds:
+`info` (a thing done, no colour), `warning` (done, with a consequence) and `error` (not done); a
+`success` kind existed and was removed with no caller left. The clock stops under the pointer,
+with focus inside and while the window is in the background, and the same sentence again
+restarts its toast rather than stacking a copy.
 
 **An empty result and an unfinished load are different screens.** An array that has not
 arrived reads exactly like one that came back empty, so a view that branches on `length`

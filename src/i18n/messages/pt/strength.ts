@@ -115,6 +115,7 @@ const strength: StrengthMessages = {
   "strength.exploreTitle": "Abrir no Explorador de exercícios",
   "strength.col.set": "Série",
   "strength.col.reps": "Reps",
+  "strength.col.time": "Tempo",
   "strength.col.weight": "Carga",
   "strength.col.e1rm": "Máx. estimado",
   "strength.col.rest": "Descanso",

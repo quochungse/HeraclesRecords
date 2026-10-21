@@ -115,6 +115,7 @@ const strength: StrengthMessages = {
   "strength.exploreTitle": "Mở trong Khám phá bài tập",
   "strength.col.set": "Hiệp",
   "strength.col.reps": "Số lần",
+  "strength.col.time": "Thời gian",
   "strength.col.weight": "Mức tạ",
   "strength.col.e1rm": "1RM ước tính",
   "strength.col.rest": "Nghỉ",

@@ -9,9 +9,11 @@
  *   session editor wrote through before;
  * - **Edit workout** in the Training Library — read from COROS, saved back
  *   through `saveWorkoutEdit`, verified, with COROS's training load for the
- *   draft beside the builder's own totals.
+ *   draft beside the builder's own totals;
+ * - **a scheduled session** on the Calendar — the same read and save, against
+ *   the occurrence rather than the library program.
  *
- * It replaced `WorkoutEditorModal` in all three, which was a second editor
+ * It replaced `WorkoutEditorModal` in all four, which was a second editor
  * for the same workouts with its own defaults, its own validator and its own
  * layout. The builder is Create workout's, moved rather than copied, so what
  * differs here is the frame: the heading, the button, and a question before
@@ -50,7 +52,16 @@ export type WorkoutBuilderSource =
   /** A session already in a plan. */
   | { kind: "plan"; entry: TrainingPlanEntry }
   /** A workout in the COROS library. */
-  | { kind: "library"; editRef: WorkoutEditRef };
+  | { kind: "library"; editRef: Extract<WorkoutEditRef, { kind: "library" }> }
+  /** A session on the COROS calendar. */
+  | { kind: "scheduled"; editRef: Extract<WorkoutEditRef, { kind: "scheduled" }> };
+
+/** Read from COROS and saved back to it, rather than written into a plan. */
+type CorosSource = Extract<WorkoutBuilderSource, { kind: "library" | "scheduled" }>;
+
+function isCorosSource(source: WorkoutBuilderSource): source is CorosSource {
+  return source.kind === "library" || source.kind === "scheduled";
+}
 
 export interface WorkoutBuilderModalProps {
   api: HeraclesRecordsApi;
@@ -65,7 +76,7 @@ export interface WorkoutBuilderModalProps {
   onClose: () => void;
   /** A plan session, as the plan stores it. */
   onSavedToPlan?: (workout: PlanWorkoutEntryInput) => void;
-  /** A library workout, as COROS saved it. */
+  /** A library workout or a scheduled session, as COROS saved it. */
   onSaved?: (result: WorkoutEditSaveResult) => void;
   onError: (message: string | null) => void;
 }
@@ -109,7 +120,7 @@ export function WorkoutBuilderModal(props: WorkoutBuilderModalProps) {
     if (immediate) return;
     let cancelled = false;
     const load = async (): Promise<LoadedWorkout> => {
-      if (source.kind === "library") {
+      if (isCorosSource(source)) {
         const document = await api.getWorkoutForEdit(source.editRef, unitSystem);
         return { seed: document.draft, document };
       }
@@ -256,7 +267,7 @@ function LoadedWorkoutBuilder({
   /* What an unnamed workout is saved as. Create workout says "Structured
      Workout"; a plan session is named for its sport, which is what a new one
      was called before the builder wrote them. */
-  const fallbackName = source.kind === "library"
+  const fallbackName = isCorosSource(source)
     ? "Structured Workout" // i18n-ignore: saved to COROS as the name
     : `New ${WORKOUT_SPORT_CAPABILITIES[builderSport].label.toLowerCase()} session`; // i18n-ignore: saved to COROS as the name
   const draft = builder.toEditorDraft(fallbackName);
@@ -290,17 +301,17 @@ function LoadedWorkoutBuilder({
     return () => window.removeEventListener("keydown", handleKeyDown);
   });
 
-  /* COROS's own figures for a library workout, which the editor this
+  /* COROS's own figures for a workout read from COROS, which the editor this
      replaced showed along its foot. Only COROS can price a step, and only a
      timed or distance step with an intensity target gets a load. */
-  const canPreview = source.kind === "library"
+  const canPreview = isCorosSource(source)
     && Boolean(document?.canEdit)
     && builderValid
     && shared.valid
     && builderSport !== "strength";
   useEffect(() => {
     const sequence = ++previewSequence.current;
-    if (source.kind !== "library" || !document || !canPreview) {
+    if (!isCorosSource(source) || !document || !canPreview) {
       setPreview(null);
       return;
     }
@@ -315,7 +326,7 @@ function LoadedWorkoutBuilder({
 
   const save = async () => {
     if (!canSave) return;
-    if (source.kind !== "library") {
+    if (!isCorosSource(source)) {
       if (!onSavedToPlan) return;
       const previous = loaded.previous ?? {
         key: `local:${Date.now()}`,
@@ -338,7 +349,7 @@ function LoadedWorkoutBuilder({
   };
 
   const trainingLoad = preview?.trainingLoad;
-  const actionLabel = source.kind === "library"
+  const actionLabel = isCorosSource(source)
     ? saving ? t("workout.builderModal.saving") : t("workout.builderModal.save")
     : isNew ? t("workout.builderModal.addToPlan") : t("workout.builderModal.applyToPlan");
 

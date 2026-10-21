@@ -4719,6 +4719,42 @@ button.plan-generator-provider:focus-visible {
   outline-offset: 2px;
 }
 
+/* An eyebrow with a quiet link at its far end, on the eyebrow's own line. */
+.plan-generator-sheet-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.plan-generator-sheet-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0;
+  border: 0;
+  color: var(--text-secondary);
+  background: none;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1;
+  cursor: pointer;
+  transition: color var(--dur-fast) var(--ease);
+}
+
+.plan-generator-sheet-link:hover { color: var(--accent-strong); }
+
+.plan-generator-sheet-link:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: 2px;
+}
+
+/* Four permissions as two even rows; three across left the fourth alone. */
+.plan-generator-sheet-body .option-chips.option-chips--tiles {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
 .plan-generator-provider-option-name { display: flex; align-items: baseline; gap: 6px; }
 .plan-generator-provider-option-name small { color: var(--text-muted); font-size: 10px; font-weight: 500; }
 

@@ -668,7 +668,7 @@ change on the screens you touched unless you intended it to.
   `sleep.css` into `styles.css`, beside the paper `.panel` rule, on
   `:is(.sleep-details-view, .training-dashboard, .settings-view:not(.settings-subpage))`.
   `.training-dashboard` is the root of both Overview and Activities and of
-  nothing else. Settings' subpages (MCP servers, Coach models, Storage) stay
+  nothing else. Settings' subpages (MCP servers, AI Model Providers, Storage) stay
   out: their rows are still drawn at 12px, and a borderless card round them is
   a half-converted screen.
 - **Overview.** `.training-intelligence` is a heading over a grid: no border,

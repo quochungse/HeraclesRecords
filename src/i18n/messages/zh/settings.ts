@@ -46,7 +46,7 @@ const settings: SettingsMessages = {
   "settings.mcp.connected": "已连接 {connected}/{total} 个。",
   "settings.mcp.tools_one": "教练可用 <b>{count} 个工具</b>。",
   "settings.mcp.tools_other": "教练可用 <b>{count} 个工具</b>。",
-  "settings.coachModels.title": "教练模型",
+  "settings.coachModels.title": "AI 模型提供商",
   "settings.coachModels.none": "尚未连接任何服务。添加账号或 API 密钥即可开始使用教练。",
   "settings.coachModels.providers": "已连接 {connected}/{total} 个服务商。",
   "settings.coachModels.inUse": "正在使用 <b>{model}</b>。",

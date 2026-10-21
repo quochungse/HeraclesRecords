@@ -133,6 +133,7 @@ const strength: StrengthMessages = {
   "strength.exploreTitle": "Открыть в обозревателе упражнений",
   "strength.col.set": "Подход",
   "strength.col.reps": "Повт.",
+  "strength.col.time": "Время",
   "strength.col.weight": "Вес",
   "strength.col.e1rm": "Оценка макс.",
   "strength.col.rest": "Отдых",

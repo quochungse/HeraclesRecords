@@ -571,12 +571,20 @@ export function formatFitnessTrendsForChat(
   return lines.join("\n");
 }
 
+/**
+ * The card is recovery only — HRV and resting heart rate — so a window with
+ * neither draws none, rather than a card that says so. Training load stays in
+ * the points: the card no longer draws it, but an older build's does.
+ */
 export function buildFitnessTrendPreview(
   trendPoints: FitnessTrendPreview["trendPoints"],
   requestId?: string,
   windowDays?: number
 ): FitnessTrendPreview | null {
-  if (trendPoints.length === 0) {
+  const recovery = trendPoints.some(
+    (point) => point.avgSleepHrv !== undefined || point.sleepHrvBase !== undefined || point.rhr !== undefined
+  );
+  if (!recovery) {
     return null;
   }
 

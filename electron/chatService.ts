@@ -6,6 +6,7 @@ import path from "node:path";
 import type { AddressInfo } from "node:net";
 import {
   deleteChatAnswerDigestsOf,
+  deleteChatHiddenTurnsOf,
   deleteChatConversationSettingsRow,
   deleteChatScheduleChangesOf,
   deleteSettings,
@@ -380,7 +381,7 @@ function getClaudeCodeConfigDir(): string {
 
 /**
  * `forceModels` reads the account's model list again even when the one held
- * is fresh — the way in for Coach Models' Check; everything else waits for the day.
+ * is fresh — the way in for AI Model Providers' Check; everything else waits for the day.
  */
 /**
  * The status the settings screens read: npm is asked for the latest Claude Code
@@ -833,6 +834,7 @@ export function deleteChatSessionById(id: string): void {
   deleteChatConversationSettingsRow(id);
   deleteChatScheduleChangesOf(id);
   deleteChatAnswerDigestsOf(id);
+  deleteChatHiddenTurnsOf(id);
   // Section 2.4: the analyses inside this conversation go with it. An analysis
   // lives in exactly one conversation and cannot be moved, so there is nothing
   // to re-point and nothing left for one to be about.

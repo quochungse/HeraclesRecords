@@ -24,6 +24,9 @@
 //   App draws the same stand-ins as the Suspense fallback while the screen's
 //   chunk loads, and the grid must sit where the screen's own will, or the
 //   chunk landing moves the whole month.
+// - **A scheduled session is edited in Create workout's builder.** It had an
+//   editor of its own; now Edit opens the builder every other workout is
+//   written in, saves against the occurrence and asks in the screen's dialog.
 //
 // Nothing here removes anything anywhere: `removeScheduledWorkout` is a stub
 // that records its arguments.
@@ -402,10 +405,135 @@ async function main() {
     await settle();
   }
 
+  // -------------------------------------------------------------------------
+  // 5. Editing a scheduled session opens Create workout's builder
+  // -------------------------------------------------------------------------
+  //
+  // It had an editor of its own (`WorkoutEditorModal`): card-per-step, its own
+  // header, footer and discard strip, beside a builder every other workout is
+  // written in. Now it is that builder, read from the occurrence, saved back
+  // against it, and its discard question is the screen's ConfirmDialog.
+  {
+    const context = {
+      distanceUnit: "metric",
+      paceUnit: "km",
+      heartRateBasis: "maxHr",
+      maxHr: 190,
+      restingHr: 52,
+      lthrBpm: 168,
+      thresholdPaceSecondsPerKm: 322,
+      ftp: 180,
+      zones: {},
+      lthrZones: [],
+      defaultPoolLength: { value: 25, unit: "m" },
+      climbSystems: {}
+    };
+    const ref = {
+      kind: "scheduled",
+      happenDay: todayKey,
+      planId: "plan-1",
+      idInPlan: "7",
+      planProgramId: "program-1"
+    };
+    const occurrence = {
+      ref,
+      revision: "rev-1",
+      canEdit: true,
+      context,
+      draft: {
+        name: "Easy run",
+        overview: "",
+        sportType: 1,
+        sport: "run",
+        nodes: [
+          {
+            id: "step-1",
+            sourceExerciseId: "1",
+            nodeType: "step",
+            kind: "training",
+            name: "Easy",
+            target: { type: "distance", meters: 5000 },
+            intensity: { type: "none" },
+            editable: true
+          }
+        ]
+      }
+    };
+    // A scheduled session's sport is a COROS program code (1 is a run), not
+    // the activity code the entries above carry, and only those are editable.
+    await mountCalendar({
+      listScheduledWorkouts: [{ ...entry, sportType: 1 }],
+      getWorkoutForEdit: occurrence,
+      getWorkoutEditorContext: context,
+      listWorkoutExercises: [],
+      previewWorkoutEdit: { trainingLoad: 40 },
+      saveWorkoutEdit: { verified: true, document: occurrence }
+    });
+    assert.equal(await harness("click", ".calendar-chip-planned"), true);
+    await settle();
+    assert.equal(await harness("clickText", ".calendar-detail-action", "Edit"), true);
+    await settle();
+    await settle();
+
+    assert.equal(await harness("exists", ".workout-editor-modal"), false, "not the old editor");
+    assert.ok(await harness("exists", ".calendar-modal-builder"), "the builder opens");
+    assert.equal(
+      await harness("text", ".calendar-modal-builder .calendar-modal-header h3"),
+      "Edit workout"
+    );
+    assert.ok(
+      await harness("exists", ".calendar-modal-builder .calendar-modal-date"),
+      "the day it is on heads the sheet, as Create workout's does"
+    );
+    assert.equal(
+      await evaluate(`document.querySelector(".calendar-builder-sport-value")?.textContent`),
+      "Run",
+      "it keeps its sport, stated where the picker would be"
+    );
+    const saveButton = `Array.from(document.querySelectorAll(".calendar-builder-footer .primary-button")).find((node) => node.textContent.includes("Save changes"))`;
+    assert.equal(await evaluate(`${saveButton}.disabled`), true, "nothing changed, nothing to save");
+
+    await evaluate(
+      `(() => {
+         const input = document.querySelector('.calendar-builder-settings input[type="text"]');
+         const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value").set;
+         setter.call(input, "Easy run, relaxed");
+         input.dispatchEvent(new Event("input", { bubbles: true }));
+         return true;
+       })()`
+    );
+    await settle();
+    await evaluate(`window.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true })), true`);
+    await settle();
+    assert.equal(
+      await harness("text", `${DIALOG} h2`),
+      "Discard unsaved changes?",
+      "an edit is asked about in the screen's own dialog before it is thrown away"
+    );
+    assert.equal(await harness("click", CANCEL), true);
+    await settle();
+    assert.ok(await harness("exists", ".calendar-modal-builder"), "Keep editing keeps it");
+
+    await evaluate(`${saveButton}.click()`);
+    await settle();
+    const saves = await harness("calls", "saveWorkoutEdit");
+    assert.equal(saves.length, 1, "Save goes to COROS once");
+    const [savedRef, revision, draft] = saves[0].args;
+    assert.deepEqual(savedRef, ref, "against the occurrence on screen");
+    assert.equal(revision, "rev-1");
+    assert.equal(draft.name, "Easy run, relaxed");
+    assert.deepEqual(draft.nodes, occurrence.draft.nodes, "the untouched step goes back as it was read");
+    assert.ok(
+      (await harness("calls", "prop:onMessage")).some((call) => call.args[0] === "Updated scheduled occurrence in COROS."),
+      "the update is reported"
+    );
+    assert.equal(await harness("exists", ".calendar-modal-builder"), false, "and the builder closes");
+  }
+
   assert.deepEqual(await harness("consoleErrors"), [], "the screen logged no errors");
 
   console.log(
-    "calendar renderer OK — an unread range shimmers and a read one is drawn from cache at once, an empty week waits for its range before saying so, both removals ask first in a portalled dialog, and its Escape leaves the panel open"
+    "calendar renderer OK — an unread range shimmers and a read one is drawn from cache at once, an empty week waits for its range before saying so, both removals ask first in a portalled dialog, its Escape leaves the panel open, and a scheduled session is edited in Create workout's builder"
   );
 }
 

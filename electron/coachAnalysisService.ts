@@ -30,6 +30,7 @@ import {
   writeCondensedThrough,
   writeSessionSummary
 } from "./chatContextService";
+import { coachTranscript } from "./chatHiddenTurns";
 import { requestDigests, transcriptDigests } from "./chatCompression";
 import { runtimeOver } from "./chatModels";
 import {
@@ -606,6 +607,12 @@ export interface CoachAnalysisRunnerDeps {
   getConversationSettings?(sessionId: string): ConversationSettings | undefined;
   /** 5.7: the conversation's rolling summary and what it covers. */
   getSessionSummary(sessionId: string): StoredTranscriptSummary;
+  /**
+   * The transcript as Coach may read it: the turns the athlete hid put out of
+   * sight, positions kept. Optional so a suite with no database can leave it
+   * out; the run then reads every turn. One that throws fails the run.
+   */
+  coachTranscript?(sessionId: string, entries: PersistedChatEntry[]): PersistedChatEntry[];
   setSessionSummary(sessionId: string, summary: string, through: number): void;
   /**
    * 5.7: the window the athlete configured, shared with the interactive chat.
@@ -782,6 +789,7 @@ function createDefaultDeps(): CoachAnalysisRunnerDeps {
       return getChatSession(sessionId);
     },
     getSessionSummary: (sessionId) => readSessionSummary(sessionId),
+    coachTranscript: (sessionId, entries) => coachTranscript(sessionId, entries),
     // A conversation whose settings cannot be read runs on the analysis's own.
     getConversationSettings: (sessionId) => {
       try {
@@ -1660,7 +1668,12 @@ async function runInConversation(
     }
   };
   const budget = optional(() => resolved.getContextBudget?.());
-  const digestOf = optional(() => resolved.getDigests?.(session.entries));
+  // Not an optimisation, so not `optional`: a transcript that cannot be masked
+  // would send the turns the athlete hid, and the run fails rather than that.
+  const readable = resolved.coachTranscript
+    ? resolved.coachTranscript(session.sessionId, session.entries)
+    : session.entries;
+  const digestOf = optional(() => resolved.getDigests?.(readable));
   // Section 7's default is resolved once, here, so the run log records what the
   // run actually used rather than what the definition happened to leave blank —
   // and so the roll and the digests run on the AI the run itself answers with,
@@ -1672,7 +1685,7 @@ async function runInConversation(
     runtime: analysisRuntimeOver(analysis.runtime, conversation?.runtime)
   });
   const context = await applyTranscriptContext({
-    entries: session.entries,
+    entries: readable,
     stored: resolved.getSessionSummary(session.sessionId),
     window: resolved.getContextWindow(),
     ...(budget ? { budget } : {}),

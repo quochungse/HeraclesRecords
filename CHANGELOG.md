@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### What's new
+- **Coach** - delete a question together with Coach's answer, and what Coach made in it if you choose. When the conversation's summary still mentions it, the summary can be rewritten on the spot. A question that got no answer says why right under it and offers Retry, and every message can be copied.
+- **Coach** - edit your last question and send it again; Coach answers afresh. Hide a turn from Coach to keep it on screen without Coach reading it, and show it again whenever you like.
+- **Coach** - branch a new conversation from any answer: it carries everything up to that point, with the same AI and sources, while what Coach made stays where it was made. In a long conversation, a column of marks at the edge lists your questions; press one, or use Alt with the up and down arrows, to go back to it.
+- **Coach** - a session's card shows its time in each heart-rate zone, as COROS scored it and named in your zone model. A lap table of five laps or more starts folded, one click from open.
+- **Coach** - a session's card draws its channels on one Performance chart, two at a time with a chip each, as the session's own page does. A strength or Hybrid Fitness card draws heart rate under its sets, numbered by exercise, and writes a set scheme as "4 × 11–14" or "3 × 0:45". The trend card is now Recovery trends: HRV and resting heart rate.
+- **Coach** - Coach Models is now AI Model Providers. "AI for this conversation" lists the providers that can answer, and Manage providers opens the rest.
+- **Lap tables** - a structured workout's laps are headed by its parts (Warm Up, Training, Cool Down) and a recovery between repeats is marked Rest, on the run, ride and hike pages and on Activities.
+- **Performance chart** - each channel but stride ratio wears the colour it has in the COROS app, toned so lines drawn together stay apart for colour-blind eyes too, and the form figures take COROS's names: Ground time, Stride height, Stride ratio. Power on a run is Running power.
+- **Notices** - a quiet card centred over the screen: at the bottom for what you just did, at the top when the app speaks unasked. It waits while the pointer is on it, and the same notice again restarts it instead of stacking a copy.
+
+### Fixed
+- **Strength** - a plank or any set held for a time is no longer dropped, a Hybrid Fitness rest is no longer counted as a set, and two exercises COROS numbered alike stay apart. Sessions are read again once after the update.
+
 ## [1.2.0] - 2026-10-20
 
 ### What's new

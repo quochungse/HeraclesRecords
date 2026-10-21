@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import type { MessageKey } from "../../i18n/core";
 import {
@@ -52,6 +52,8 @@ import { activityCoachRequest } from "../askCoachAbout";
 import { detailTrainingBenefit, type BenefitZoneFamily } from "../trainingBenefit";
 import { TrainingBenefitChips, TrainingBenefitReason } from "./TrainingBenefitChip";
 import { formatCount, formatDecimal, t } from "../../i18n/core";
+import { isRecoveryLap, lapSections } from "../../../electron/lapSections";
+import { LapRecoveryMark, LapSectionRow } from "./LapSections";
 
 interface ActivityDetailPaneProps {
   detail: TrainingHubActivityDetail | null;
@@ -429,6 +431,7 @@ export function ActivityDetailPane({
       (lap.distance !== undefined && lap.distance > 0) ||
       (lap.duration !== undefined && lap.duration > 0)
   );
+  const lapSectionList = lapSections(laps);
   const series = detail.series ?? [];
   const hasSeries = series.length > 1;
   const gpsPoints =
@@ -575,6 +578,7 @@ export function ActivityDetailPane({
               onFocusLapHandled={() => setFocusLapIndex(null)}
               activityTime={duration}
               embedded
+              sportType={sportType}
               // A ride reads in km/h and rpm here as it does on Cycling, a
               // hike in km/h and metres an hour as it does on Hiking, and a
               // trail run in pace and metres an hour as it does on Running.
@@ -632,35 +636,50 @@ export function ActivityDetailPane({
                   </tr>
                 </thead>
                 <tbody>
-                  {laps.map((lap) => (
-                    <tr
-                      key={lap.index}
-                      className={hasSeries ? "is-pickable" : undefined}
-                      onClick={
-                        hasSeries ? () => setFocusLapIndex(lap.index) : undefined
-                      }
-                    >
-                      <td>{lap.index}</td>
-                      <td className="is-numeric">
-                        {formatDurationSeconds(lap.duration)}
-                      </td>
-                      <td className="is-numeric">
-                        {formatDistanceMeters(lap.distance, unitSystem, swim)}
-                      </td>
-                      <td className="is-numeric">
-                        {lap.distance && lap.duration
-                          ? formatPerformance(lap.distance, lap.duration)
-                          : "—"}
-                      </td>
-                      <td className="is-numeric">{lap.avgHr ?? "—"}</td>
-                      <td className="is-numeric">{lap.maxHr ?? "—"}</td>
-                      <td className="is-numeric">
-                        {lap.elevationGain
-                          ? formatElevationMeters(lap.elevationGain, unitSystem)
-                          : "—"}
-                      </td>
-                    </tr>
-                  ))}
+                  {laps.map((lap, position) => {
+                    const recovery = isRecoveryLap(lap, lapSectionList[position]);
+                    return (
+                      <Fragment key={lap.index}>
+                        <LapSectionRow sections={lapSectionList} index={position} colSpan={7} />
+                        <tr
+                          className={
+                            [
+                              hasSeries ? "is-pickable" : "",
+                              recovery ? "is-lap-recovery" : ""
+                            ]
+                              .filter(Boolean)
+                              .join(" ") || undefined
+                          }
+                          onClick={
+                            hasSeries ? () => setFocusLapIndex(lap.index) : undefined
+                          }
+                        >
+                          <td>
+                            {lap.index}
+                            {recovery ? <LapRecoveryMark /> : null}
+                          </td>
+                          <td className="is-numeric">
+                            {formatDurationSeconds(lap.duration)}
+                          </td>
+                          <td className="is-numeric">
+                            {formatDistanceMeters(lap.distance, unitSystem, swim)}
+                          </td>
+                          <td className="is-numeric">
+                            {lap.distance && lap.duration
+                              ? formatPerformance(lap.distance, lap.duration)
+                              : "—"}
+                          </td>
+                          <td className="is-numeric">{lap.avgHr ?? "—"}</td>
+                          <td className="is-numeric">{lap.maxHr ?? "—"}</td>
+                          <td className="is-numeric">
+                            {lap.elevationGain
+                              ? formatElevationMeters(lap.elevationGain, unitSystem)
+                              : "—"}
+                          </td>
+                        </tr>
+                      </Fragment>
+                    );
+                  })}
                 </tbody>
               </table>
             </section>

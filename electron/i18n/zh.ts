@@ -215,6 +215,9 @@ const main: ScreenMessages = {
   "screen.effort.maxDetail": "最周全",
   "screen.model.auto": "自动",
   "main.sync.outdated": "这个存储库使用了更新的数据格式。请先更新应用。",
+  "main.coach.turnChanged": "这段对话在打开后已有变动。请重新查看后再试一次。",
+  "main.coach.turnNotLast": "只有最后一个问题可以修改或重新提问。",
+  "main.coach.questionEmpty": "问题需要有内容。",
 };
 
 export default main;

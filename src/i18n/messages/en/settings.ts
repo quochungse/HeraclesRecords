@@ -47,7 +47,7 @@ const settings = {
   "settings.mcp.connected": "{connected} of {total} connected.",
   "settings.mcp.tools_one": "<b>{count} tool</b> ready for the coach.",
   "settings.mcp.tools_other": "<b>{count} tools</b> ready for the coach.",
-  "settings.coachModels.title": "Coach Models",
+  "settings.coachModels.title": "AI Model Providers",
   "settings.coachModels.none": "Nothing connected yet. Add an account or key to start coaching.",
   "settings.coachModels.providers": "{connected} of {total} providers connected.",
   "settings.coachModels.inUse": "<b>{model}</b> in use.",

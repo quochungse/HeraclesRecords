@@ -270,6 +270,7 @@ const library: LibraryMessages = {
   "library.ai.connected": "Подключено",
   "library.ai.notSetUp": "Не настроено",
   "library.ai.coachSettings": "Настройки тренера",
+  "library.ai.manageProviders": "Управлять поставщиками",
   "library.ai.model": "Модель",
   "library.ai.runsLocal": "Работает на {model} — локальной модели из настроек тренера.",
   "library.ai.effort": "Глубина рассуждений",

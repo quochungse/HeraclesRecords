@@ -51,7 +51,7 @@ function settingsDraftChanges(saved: ChatSettings, draft: SettingsDraft): Settin
  * yes closes Coach settings too; a press outside the dialog with edits held
  * does nothing, since a stray click is not a decision. The footer keeps
  * Discard and Save throughout.
- * The Coach Models row opens a dialog that saves on its own, and Resume is an
+ * The AI Model Providers row opens a dialog that saves on its own, and Resume is an
  * action, not a setting; neither waits for Save.
  */
 export function ChatSettingsModal({

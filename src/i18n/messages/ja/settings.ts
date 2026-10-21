@@ -46,7 +46,7 @@ const settings: SettingsMessages = {
   "settings.mcp.connected": "{total} 件中 {connected} 件が接続済み。",
   "settings.mcp.tools_one": "コーチが使える<b>ツールは {count} 個</b>です。",
   "settings.mcp.tools_other": "コーチが使える<b>ツールは {count} 個</b>です。",
-  "settings.coachModels.title": "コーチのモデル",
+  "settings.coachModels.title": "AIモデルプロバイダー",
   "settings.coachModels.none": "まだ何も接続されていません。アカウントか API キーを追加すると、コーチを使い始められます。",
   "settings.coachModels.providers": "{total} 件中 {connected} 件のプロバイダーが接続済み。",
   "settings.coachModels.inUse": "<b>{model}</b> を使用中。",

@@ -215,6 +215,9 @@ const main: ScreenMessages = {
   "screen.effort.maxDetail": "le plus approfondi",
   "screen.model.auto": "Automatique",
   "main.sync.outdated": "Cet espace est dans un format de données plus récent. Mettez d’abord l’app à jour.",
+  "main.coach.turnChanged": "Cette conversation a changé depuis son ouverture. Relisez-la, puis réessayez.",
+  "main.coach.turnNotLast": "Seule votre dernière question peut être modifiée ou reposée.",
+  "main.coach.questionEmpty": "Une question a besoin de mots.",
 };
 
 export default main;

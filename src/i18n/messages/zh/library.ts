@@ -258,6 +258,7 @@ const library: LibraryMessages = {
   "library.ai.connected": "已连接",
   "library.ai.notSetUp": "未设置",
   "library.ai.coachSettings": "教练设置",
+  "library.ai.manageProviders": "管理提供商",
   "library.ai.model": "模型",
   "library.ai.runsLocal": "使用在教练设置中选择的本地模型 {model}。",
   "library.ai.effort": "推理强度",

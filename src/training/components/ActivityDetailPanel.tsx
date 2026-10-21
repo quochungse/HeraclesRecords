@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import { Braces, CloudOff, Loader2, RefreshCw, X } from "lucide-react";
 import type {
@@ -24,6 +24,8 @@ import { ActivityElevationChart } from "./ActivityElevationChart";
 import { ActivityRouteMap } from "./ActivityRouteMap";
 import { StrengthDetailPanel } from "./StrengthDetailPanel";
 import { t } from "../../i18n/core";
+import { isRecoveryLap, lapSections } from "../../../electron/lapSections";
+import { LapRecoveryMark, LapSectionRow } from "./LapSections";
 
 interface ActivityDetailPanelProps {
   detail: TrainingHubActivityDetail | null;
@@ -206,6 +208,7 @@ export function ActivityDetailPanel({
 
   const startTime = detail.startTime ?? listActivity?.startTime;
   const showLaps = hasPopulatedLaps(detail);
+  const lapSectionList = lapSections(detail.laps);
   const sportType = detail.sportType ?? listActivity?.sportType;
   const swim = isSwimSportType(sportType);
   // A ride and a hike are read in km/h; see `isSpeedSport`.
@@ -303,16 +306,25 @@ export function ActivityDetailPanel({
                     </tr>
                   </thead>
                   <tbody>
-                    {detail.laps.map((lap) => (
-                      <tr key={lap.index}>
-                        <td>{lap.index}</td>
-                        <td>{formatDurationSeconds(lap.duration)}</td>
-                        <td>{formatDistanceMeters(lap.distance, unitSystem, swim)}</td>
-                        <td>{formatOptionalNumber(lap.avgHr)}</td>
-                        <td>{formatOptionalNumber(lap.maxHr)}</td>
-                        <td>{formatElevationMeters(lap.elevationGain, unitSystem)}</td>
-                      </tr>
-                    ))}
+                    {detail.laps.map((lap, position) => {
+                      const recovery = isRecoveryLap(lap, lapSectionList[position]);
+                      return (
+                        <Fragment key={lap.index}>
+                          <LapSectionRow sections={lapSectionList} index={position} colSpan={6} />
+                          <tr className={recovery ? "is-lap-recovery" : undefined}>
+                            <td>
+                              {lap.index}
+                              {recovery ? <LapRecoveryMark /> : null}
+                            </td>
+                            <td>{formatDurationSeconds(lap.duration)}</td>
+                            <td>{formatDistanceMeters(lap.distance, unitSystem, swim)}</td>
+                            <td>{formatOptionalNumber(lap.avgHr)}</td>
+                            <td>{formatOptionalNumber(lap.maxHr)}</td>
+                            <td>{formatElevationMeters(lap.elevationGain, unitSystem)}</td>
+                          </tr>
+                        </Fragment>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>

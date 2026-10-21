@@ -46,7 +46,7 @@ const settings: SettingsMessages = {
   "settings.mcp.connected": "{connected} dari {total} terhubung.",
   "settings.mcp.tools_one": "<b>{count} alat</b> siap dipakai pelatih.",
   "settings.mcp.tools_other": "<b>{count} alat</b> siap dipakai pelatih.",
-  "settings.coachModels.title": "Model pelatih",
+  "settings.coachModels.title": "Penyedia model AI",
   "settings.coachModels.none": "Belum ada yang terhubung. Tambahkan akun atau kunci untuk mulai.",
   "settings.coachModels.providers": "{connected} dari {total} penyedia terhubung.",
   "settings.coachModels.inUse": "Memakai <b>{model}</b>.",

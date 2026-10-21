@@ -102,16 +102,27 @@
 
 /* --- The toast ------------------------------------------------------------ */
 
+/* The same card as the app's toasts (styles.css), wider for the medal; it sits
+   in the top stack, so it comes in from above. */
 .labour-toast {
   position: relative;
   display: grid;
   justify-items: start;
   gap: 8px;
+  width: min(360px, 100%);
+  box-sizing: border-box;
   pointer-events: auto;
   padding: 16px;
   border-radius: var(--radius-md);
   background: var(--menu-surface);
-  box-shadow: var(--shadow-elevated);
+  box-shadow: var(--toast-edge), var(--shadow-elevated);
+  animation: toast-in var(--dur-base) var(--ease) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .labour-toast {
+    animation: none;
+  }
 }
 
 .labour-toast-close {

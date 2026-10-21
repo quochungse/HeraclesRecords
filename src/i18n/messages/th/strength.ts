@@ -115,6 +115,7 @@ const strength: StrengthMessages = {
   "strength.exploreTitle": "เปิดในตัวสำรวจท่า",
   "strength.col.set": "เซ็ต",
   "strength.col.reps": "ครั้ง",
+  "strength.col.time": "เวลา",
   "strength.col.weight": "น้ำหนัก",
   "strength.col.e1rm": "สูงสุดโดยประมาณ",
   "strength.col.rest": "พัก",

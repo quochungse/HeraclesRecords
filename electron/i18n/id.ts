@@ -215,6 +215,9 @@ const main: ScreenMessages = {
   "screen.effort.maxDetail": "paling teliti",
   "screen.model.auto": "Otomatis",
   "main.sync.outdated": "Brankas ini memakai format data yang lebih baru. Perbarui aplikasi terlebih dahulu.",
+  "main.coach.turnChanged": "Percakapan ini berubah sejak dibuka. Lihat lagi, lalu coba sekali lagi.",
+  "main.coach.turnNotLast": "Hanya pertanyaan terakhir yang bisa diedit atau ditanyakan lagi.",
+  "main.coach.questionEmpty": "Pertanyaan perlu berisi kata-kata.",
 };
 
 export default main;

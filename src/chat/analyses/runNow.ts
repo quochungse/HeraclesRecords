@@ -14,7 +14,7 @@ export function announceRunNow(runs: CoachAnalysisRun[]): void {
     // An analysis is always in a conversation, so the only way to produce no
     // runs at all is a switched-off one — which the row already shows, but a
     // button that does nothing has to say why anyway.
-    showToast(t("chat.an.toast.off"), "error");
+    showToast(t("chat.an.toast.off"), "warning");
     return;
   }
 
@@ -28,12 +28,12 @@ export function announceRunNow(runs: CoachAnalysisRun[]): void {
   }
 
   if (runs.every((run) => run.skipReason === "no-activity")) {
-    showToast(t("chat.an.toast.noActivity"), "error");
+    showToast(t("chat.an.toast.noActivity"), "warning");
     return;
   }
 
   const skipped = runs.filter((run) => run.status === "skipped");
   if (skipped.length === runs.length) {
-    showToast(t("chat.an.toast.skipped", { reason: skipReasonLabel(skipped[0].skipReason ?? "") }), "error");
+    showToast(t("chat.an.toast.skipped", { reason: skipReasonLabel(skipped[0].skipReason ?? "") }), "warning");
   }
 }

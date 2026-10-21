@@ -68,6 +68,7 @@ import { renderRich, useI18n } from "../i18n/useI18n";
 import { SettingsPrefRow } from "./SettingsPrefRow";
 import { SyncPanel } from "./SyncPanel";
 import { BackupPanel } from "./BackupPanel";
+import { showToast } from "../toast";
 
 const BUY_ME_A_COFFEE_URL = "https://buymeacoffee.com/quochungse";
 
@@ -79,7 +80,7 @@ interface McpSummary {
   tools: number;
 }
 
-/* The MCP and Coach Models rows state the count on one line and what it
+/* The MCP and AI Model Providers rows state the count on one line and what it
    amounts to on the next, the part worth reading at a glance in bold — joined
    by a dot on one line, the second half wrapped wherever the column ended. */
 const BOLD = { b: (chunk: ReactNode) => <strong>{chunk}</strong> };
@@ -365,8 +366,11 @@ export function SettingsView({
           setAppInfo(info);
         }
       } catch (caught) {
-        onError(
+        // Read on its own as the screen opens: nothing the athlete pressed.
+        showToast(
           caught instanceof Error ? caught.message : t("settings.about.loadFailed"),
+          "error",
+          { placement: "top" },
         );
       }
     })();
@@ -374,7 +378,7 @@ export function SettingsView({
     return () => {
       cancelled = true;
     };
-  }, [api, onError]);
+  }, [api]);
 
   function toggleSportScreen(screen: SportScreen) {
     onHiddenSportScreensChange(

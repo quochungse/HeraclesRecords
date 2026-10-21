@@ -1,5 +1,5 @@
 import { useI18n } from "../i18n/useI18n";
-import { useCallback, useMemo, useState } from "react";
+import { Fragment, useCallback, useMemo, useState } from "react";
 import { ArrowLeft, CloudOff, MessageCircle, RefreshCw } from "lucide-react";
 import type {
   ActivityDetailSummary,
@@ -51,6 +51,8 @@ import { detailTrainingBenefit, type BenefitZoneFamily } from "../training/train
 import { TrainingBenefitChips } from "../training/components/TrainingBenefitChip";
 import { sportHasRunPerformance, type PerformanceProfile } from "../../electron/runPerformance";
 import { RunPerformanceChart } from "./RunPerformanceChart";
+import { isRecoveryLap, lapSections } from "../../electron/lapSections";
+import { LapRecoveryMark, LapSectionRow } from "../training/components/LapSections";
 
 interface RunDetailViewProps {
   activity: TrainingHubActivity;
@@ -128,6 +130,7 @@ export function RunDetailView({
   const benefit = detailTrainingBenefit(detail, activity.sportType, benefitFamily);
 
   const laps = detail?.laps ?? [];
+  const lapSectionList = lapSections(laps);
   // On activity time, which is what the laps, the headline and every figure
   // read off the chart are stated in. See `withPausesRemoved`.
   const series = useMemo(
@@ -498,40 +501,48 @@ export function RunDetailView({
               </tr>
             </thead>
             <tbody>
-              {laps.map((lap) => (
-                <tr
-                  key={lap.index}
-                  tabIndex={0}
-                  className="run-lap-row"
-                  title={t("run.detail.focusLap")}
-                  onClick={() => setFocusLapIndex(lap.index)}
-                  onKeyDown={(event) => {
-                    if (event.key === "Enter" || event.key === " ") {
-                      event.preventDefault();
-                      setFocusLapIndex(lap.index);
-                    }
-                  }}
-                >
-                  {/* Already counted from one by the parser. */}
-                  <td>{lap.index}</td>
-                  <td className="is-numeric">
-                    {formatDistanceMeters(lap.distance, unitSystem)}
-                  </td>
-                  <td className="is-numeric">{formatDurationSeconds(lap.duration)}</td>
-                  <td className="is-numeric">
-                    {formatPaceSecondsPerKm(lap.pace, unitSystem)}
-                  </td>
-                  <td className="is-numeric">{lap.avgHr ?? "—"}</td>
-                  <td className="is-numeric">
-                    {lap.elevationGain === undefined
-                      ? "—"
-                      : formatElevationMeters(lap.elevationGain, unitSystem)}
-                  </td>
-                  <td className="is-numeric">
-                    {lap.avgCadence === undefined ? "—" : Math.round(lap.avgCadence)}
-                  </td>
-                </tr>
-              ))}
+              {laps.map((lap, position) => {
+                const recovery = isRecoveryLap(lap, lapSectionList[position]);
+                return (
+                  <Fragment key={lap.index}>
+                    <LapSectionRow sections={lapSectionList} index={position} colSpan={7} />
+                    <tr
+                      tabIndex={0}
+                      className={recovery ? "run-lap-row is-lap-recovery" : "run-lap-row"}
+                      title={t("run.detail.focusLap")}
+                      onClick={() => setFocusLapIndex(lap.index)}
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter" || event.key === " ") {
+                          event.preventDefault();
+                          setFocusLapIndex(lap.index);
+                        }
+                      }}
+                    >
+                      {/* Already counted from one by the parser. */}
+                      <td>
+                        {lap.index}
+                        {recovery ? <LapRecoveryMark /> : null}
+                      </td>
+                      <td className="is-numeric">
+                        {formatDistanceMeters(lap.distance, unitSystem)}
+                      </td>
+                      <td className="is-numeric">{formatDurationSeconds(lap.duration)}</td>
+                      <td className="is-numeric">
+                        {formatPaceSecondsPerKm(lap.pace, unitSystem)}
+                      </td>
+                      <td className="is-numeric">{lap.avgHr ?? "—"}</td>
+                      <td className="is-numeric">
+                        {lap.elevationGain === undefined
+                          ? "—"
+                          : formatElevationMeters(lap.elevationGain, unitSystem)}
+                      </td>
+                      <td className="is-numeric">
+                        {lap.avgCadence === undefined ? "—" : Math.round(lap.avgCadence)}
+                      </td>
+                    </tr>
+                  </Fragment>
+                );
+              })}
             </tbody>
           </table>
           </div>

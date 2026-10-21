@@ -144,7 +144,7 @@ export const ChatComposer = forwardRef<ChatComposerHandle, ChatComposerProps>(
     };
 
     return (
-      <div className="chat-composer">
+      <div className="chat-composer" data-toast-floor>
         <div className={`chat-composer-inner${attachments ? " has-refs" : ""}`}>
           {attachments}
           <textarea
