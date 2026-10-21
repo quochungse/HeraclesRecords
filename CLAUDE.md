@@ -566,10 +566,12 @@ lives at module level for the same visit-to-visit reason — see `useCalendarDat
   **Every workout is written in one builder** (`src/calendar/WorkoutBuilder.tsx`, rows in
   `workoutBuilderRows.ts`): Create workout (Calendar and Library), a plan session new or edited
   (`WorkoutBuilderModal`, applied through `editorDraftToPlanWorkoutInput` as before) and **Edit
-  workout** in the Library (read by `getWorkoutForEdit`, saved and verified by `saveWorkoutEdit`, with
-  COROS's `previewWorkoutEdit` load beside the totals). A session and a library workout had a second
-  editor, `WorkoutEditorModal`, with its own defaults, validator and layout; that modal is now only
-  the Calendar's (a scheduled occurrence, and its read-only view of a library workout). An existing
+  workout** in the Library and **Edit** on a scheduled session in the Calendar (both read by
+  `getWorkoutForEdit`, saved and verified by `saveWorkoutEdit`, with COROS's `previewWorkoutEdit` load
+  beside the totals; the source is `library` or `scheduled`). Every one of them had a second editor,
+  `WorkoutEditorModal`, with its own defaults, validator and layout; the Calendar's occurrence was the
+  last to leave it (2026-10-21), and what is left is `WorkoutViewModal`, the Calendar's read-only view
+  of a library workout, plus `WorkoutReadOnlyBody`, which the Library and the plan reader draw. An existing
   workout keeps its sport — stated where the picker would be, never a locked dropdown. **A row read
   from a workout remembers its node (`BuilderRow.origin`) and an untouched row writes that node back
   byte for byte**: a row holds display strings (km to three places, pace as `m:ss`), so re-encoding

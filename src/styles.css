@@ -18162,8 +18162,7 @@ td span {
 
 .calendar-view .ghost-button:disabled,
 .calendar-detail-panel .ghost-button:disabled,
-.calendar-modal .ghost-button:disabled,
-.workout-editor-modal .ghost-button:disabled {
+.calendar-modal .ghost-button:disabled {
   opacity: 0.5;
   cursor: default;
 }
@@ -21643,13 +21642,6 @@ td span {
   }
 }
 
-@media (min-width: 1380px) and (min-height: 760px) {
-  .workout-editor-modal:not(.is-view) {
-    width: min(1400px, 100%);
-    height: min(1040px, calc(100dvh - 36px));
-  }
-}
-
 .exercise-combobox {
   position: relative;
   min-width: 0;
@@ -22723,17 +22715,6 @@ td span {
   font-size: 13px;
 }
 
-/* Stands where an input would be, so it takes that input's height and centres
-   in it — which a 2.1 leading used to do by inflating the line box. */
-.set-line-open {
-  display: inline-flex;
-  min-height: 27px;
-  align-items: center;
-  color: var(--text-secondary);
-  font-size: 13px;
-  line-height: 1.45;
-}
-
 .set-line-weight {
   display: flex;
   align-items: baseline;
@@ -22959,7 +22940,7 @@ td span {
   white-space: nowrap;
 }
 
-/* --- shared COROS run workout editor --- */
+/* --- a library workout, read from the Calendar --- */
 
 .workout-editor-backdrop {
   position: fixed;
@@ -22972,11 +22953,15 @@ td span {
   padding: 18px;
 }
 
+/* A workout being read is a document, not a workbench: a name, a bar and a
+   list of steps, at a width where the list stays near its own headings. It
+   stops at the height of what it holds, so a three-step workout is not a
+   mostly empty sheet. */
 .workout-editor-modal {
   position: relative;
   display: flex;
-  width: min(1180px, 100%);
-  height: min(860px, calc(100dvh - 36px));
+  width: min(620px, 100%);
+  max-height: min(820px, calc(100dvh - 36px));
   flex-direction: column;
   overflow: hidden;
   border: 1px solid var(--surface-line, var(--glass-border));
@@ -22993,26 +22978,6 @@ td span {
   gap: 16px;
   border-bottom: 1px solid var(--glass-border);
   padding: 16px 20px 14px;
-}
-
-/* A workout being read is a document, not a workbench. The editor needs the
-   1180px because a step card carries five controls across; the view carries a
-   name, a bar and a list of steps, and at that width the list runs half a
-   metre from its own headings. It also stops at the height of what it holds,
-   so a three-step workout is not a mostly empty sheet. */
-.workout-editor-modal.is-view {
-  width: min(620px, 100%);
-  height: auto;
-  max-height: min(820px, calc(100dvh - 36px));
-}
-
-.workout-editor-modal.is-view .workout-editor-scroll {
-  padding: 18px 20px 20px;
-}
-
-.workout-editor-modal.is-view .workout-editor-footer {
-  min-height: 0;
-  justify-content: flex-end;
 }
 
 /*
@@ -23112,483 +23077,7 @@ td span {
   min-height: 0;
   overflow-y: auto;
   overscroll-behavior: contain;
-  padding: 18px 20px 30px;
-}
-
-.workout-editor-notice,
-.workout-step-warning {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  border: 1px solid color-mix(in srgb, var(--warning-text) 40%, transparent);
-  border-radius: var(--radius-sm);
-  background: color-mix(in srgb, var(--warning-text) 8%, transparent);
-  padding: 9px 11px;
-  color: var(--warning-text);
-  font-size: 12px;
-}
-
-.workout-editor-notice { margin-bottom: 14px; }
-
-.workout-editor-basics {
-  display: grid;
-  grid-template-columns: minmax(260px, 0.8fr) minmax(360px, 1.2fr);
-  gap: 14px;
-  border-bottom: 1px solid var(--glass-border);
-  padding-bottom: 18px;
-}
-
-.workout-editor-basics .calendar-field {
-  position: relative;
-}
-
-.workout-editor-basics input,
-.workout-editor-basics textarea,
-.workout-step-card input,
-.workout-step-card select,
-.workout-repeat-card input,
-.workout-repeat-card select {
-  min-width: 0;
-  border: 1px solid var(--glass-border);
-  border-radius: var(--radius-sm);
-  background: var(--glass-bg);
-  padding: 8px 10px;
-  color: var(--text-primary);
-  font: inherit;
-}
-
-.workout-editor-basics textarea {
-  resize: vertical;
-  min-height: 66px;
-}
-
-.workout-editor-basics small {
-  position: absolute;
-  right: 7px;
-  bottom: 6px;
-  color: var(--text-muted);
-  font-size: 10px;
-  pointer-events: none;
-}
-
-.workout-editor-basics em,
-.workout-field-error {
-  margin: 0;
-  color: #f28b8b;
-  font-size: 11px;
-  font-style: normal;
-}
-
-.workout-editor-structure-header {
-  display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: 20px;
-  padding: 18px 0 8px;
-}
-
-.workout-editor-structure-header h3 {
-  margin: 0;
-  color: var(--text-primary);
-  font-size: 14px;
-}
-
-.workout-editor-structure-header p {
-  margin: 4px 0 0;
-  color: var(--text-muted);
-  font-size: 11px;
-}
-
-.workout-editor-structure-header .ghost-button,
-.workout-repeat-add,
-.workout-editor-confirm .ghost-button {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  border: 1px solid var(--glass-border);
-  border-radius: var(--radius-pill);
-  background: transparent;
-  padding: 6px 11px;
-  color: var(--text-secondary);
-  font-size: 12px;
-  cursor: pointer;
-}
-
-.workout-editor-add-actions {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: flex-end;
-  gap: 6px;
-}
-
-.workout-editor-add-actions .ghost-button {
-  padding-inline: 9px;
-}
-
-.workout-editor-nodes {
-  display: flex;
-  flex-direction: column;
-}
-
-.workout-drop-zone {
-  height: 10px;
-  border-radius: var(--radius-pill);
-  transition: background var(--dur-fast) var(--ease), height var(--dur-base) var(--ease);
-}
-
-.workout-drop-zone:has(+ [draggable="true"]:active),
-.workout-drop-zone:hover {
-  height: 16px;
-  background: color-mix(in srgb, var(--accent) 26%, transparent);
-}
-
-.workout-step-card {
-  --step-color: #35c76f;
-  position: relative;
-  overflow: hidden;
-  border: 1px solid var(--glass-border);
-  border-left: 4px solid var(--step-color);
-  border-radius: var(--radius-sm);
-  background: color-mix(in srgb, var(--glass-bg) 92%, var(--step-color) 8%);
-}
-
-.workout-step-card.is-warmup { --step-color: #f0a72e; }
-.workout-step-card.is-rest { --step-color: #9099aa; }
-.workout-step-card.is-cooldown { --step-color: #27c2e5; }
-.workout-step-card.is-locked { opacity: 0.86; }
-
-.workout-step-card[draggable="true"] .workout-drag-handle,
-.workout-repeat-card[draggable="true"] > .workout-repeat-header > svg {
-  cursor: grab;
-}
-
-.workout-step-header,
-.workout-repeat-header {
-  display: flex;
-  min-height: 48px;
-  align-items: center;
-  gap: 9px;
-  border-bottom: 1px solid var(--glass-border);
-  padding: 7px 10px;
-}
-
-.workout-drag-handle,
-.workout-repeat-header > svg {
-  flex: 0 0 auto;
-  color: var(--text-muted);
-}
-
-.workout-step-header select {
-  width: 126px;
-  border: 0;
-  background: transparent;
-  padding-left: 2px;
-  color: var(--text-primary);
-  font-weight: 600;
-}
-
-.workout-step-header .workout-step-kind-select {
-  width: 126px;
-  flex: 0 0 auto;
-}
-
-.workout-step-header .workout-step-kind-select .app-select-trigger {
-  min-height: 34px;
-  border-color: transparent;
-  background: transparent;
-  padding: 0 4px 0 2px;
-  font-weight: 600;
-}
-
-.workout-step-header .workout-step-kind-select .app-select-trigger:hover,
-.workout-step-header .workout-step-kind-select .app-select-trigger[aria-expanded="true"] {
-  border-color: var(--glass-border);
-  background: var(--glass-bg-hover);
-}
-
-.workout-step-header > input {
-  flex: 1;
-  border-color: transparent;
-  background: transparent;
-}
-
-.workout-step-header > input:hover,
-.workout-step-header > input:focus {
-  border-color: var(--glass-border);
-  background: var(--glass-bg);
-}
-
-.workout-strength-step-heading {
-  display: grid;
-  min-width: 0;
-  flex: 1;
-  gap: 2px;
-}
-
-.workout-strength-step-heading strong,
-.workout-strength-step-heading span {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.workout-strength-step-heading strong {
-  color: var(--text-primary);
-  font-size: 13px;
-  font-weight: 600;
-}
-
-.workout-strength-step-heading span {
-  color: var(--text-muted);
-  font-size: 11px;
-  font-variant-numeric: tabular-nums;
-}
-
-.workout-step-actions {
-  display: flex;
-  flex: 0 0 auto;
-  align-items: center;
-  gap: 2px;
-}
-
-.workout-icon-action {
-  display: grid;
-  width: 28px;
-  height: 28px;
-  place-items: center;
-  border: 0;
-  border-radius: var(--radius-sm);
-  background: transparent;
-  color: var(--text-muted);
-  cursor: pointer;
-}
-
-.workout-icon-action svg { width: 14px; height: 14px; }
-
-.workout-icon-action:hover:not(:disabled) {
-  background: var(--glass-bg-hover);
-  color: var(--text-primary);
-}
-
-.workout-icon-action:disabled { opacity: 0.34; cursor: default; }
-
-.workout-step-warning {
-  margin: 8px 10px 0;
-}
-
-.workout-step-fields {
-  display: grid;
-  grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.25fr);
-  gap: 18px;
-  padding: 11px 13px 13px;
-}
-
-.workout-control-group {
-  display: flex;
-  min-width: 0;
-  align-items: flex-end;
-  gap: 8px;
-}
-
-.workout-exercise-control {
-  display: grid;
-  align-items: stretch;
-  gap: 5px;
-}
-
-.workout-exercise-control > span {
-  color: var(--text-muted);
-  font-size: 10px;
-}
-
-.workout-exercise-control > small {
-  color: var(--text-muted);
-  font-size: 10px;
-}
-
-.workout-exercise-control .exercise-combobox {
-  width: 100%;
-}
-
-.workout-strength-fields {
-  display: grid;
-  min-width: 0;
-  gap: 18px;
-  padding: 14px;
-  container: workout-strength-fields / inline-size;
-}
-
-.workout-strength-form {
-  display: grid;
-  min-width: 0;
-  align-content: start;
-  gap: 15px;
-}
-
-.workout-strength-fields.has-preview {
-  grid-template-columns: minmax(0, 1fr) minmax(210px, 270px);
-}
-
-.workout-strength-preview {
-  min-width: 0;
-}
-
-.workout-strength-preview .exercise-preview {
-  position: sticky;
-  top: 0;
-}
-
-.workout-strength-instructions {
-  position: relative;
-  display: grid;
-  min-width: 0;
-  gap: 6px;
-}
-
-.workout-strength-instructions > span {
-  color: var(--text-secondary);
-  font-size: 12px;
-  font-weight: 600;
-}
-
-.workout-strength-instructions textarea {
-  min-height: 62px;
-  resize: vertical;
-}
-
-.workout-strength-instructions small {
-  position: absolute;
-  right: 8px;
-  bottom: 6px;
-  color: var(--text-muted);
-  font-size: 10px;
-}
-
-.workout-step-card .set-line input {
-  width: auto;
-  min-height: 0;
-  border: 0;
-  border-radius: var(--radius-xs);
-  background: transparent;
-  box-shadow: none;
-  color: var(--text-primary);
-  padding: 0;
-  font-size: 28px;
-  font-weight: 700;
-  font-variant-numeric: tabular-nums;
-  letter-spacing: -0.02em;
-  line-height: 1.2;
-  appearance: textfield;
-}
-
-.workout-step-card .set-line input::-webkit-inner-spin-button,
-.workout-step-card .set-line input::-webkit-outer-spin-button {
-  appearance: none;
-  margin: 0;
-}
-
-.workout-step-card .set-line input:focus {
-  border: 0;
-  box-shadow: none;
-  outline: none;
-}
-
-.workout-step-card .set-line input:focus-visible,
-.workout-step-card .rest-picker input:focus-visible,
-.workout-step-card .rest-picker button:focus-visible {
-  --focus-ring-color: var(--step-color, var(--accent));
-  outline: var(--focus-ring);
-  outline-offset: 2px;
-}
-
-.workout-step-card .set-line-cell > input {
-  width: 2.6em;
-}
-
-.workout-step-card .set-line-compound > input {
-  width: 3.2em;
-}
-
-.workout-step-card .set-line .set-line-select {
-  min-width: 108px;
-  flex: 0 1 auto;
-}
-
-.workout-step-card .set-line .set-line-select .app-select-trigger {
-  min-height: 0;
-  padding: 5px 8px;
-  border: 1px solid var(--glass-border);
-  border-radius: var(--radius-sm);
-  background: var(--glass-bg);
-  color: var(--text-secondary);
-  font-size: 12px;
-  font-weight: 600;
-}
-
-.workout-step-card .set-line-weight input {
-  width: 3.4em;
-  font-size: 22px;
-}
-
-.workout-step-card .rest-picker-custom input {
-  width: 66px;
-  min-height: 32px;
-  border-radius: var(--radius-pill);
-  padding: 0 10px;
-  font-size: 13px;
-  font-variant-numeric: tabular-nums;
-  text-align: center;
-}
-
-.workout-step-card .rest-picker-custom input:focus {
-  border-color: color-mix(in srgb, var(--step-color, var(--accent)) 70%, var(--glass-border));
-  box-shadow: none;
-}
-
-.workout-control-group > label,
-.workout-range-inputs label {
-  display: grid;
-  min-width: 0;
-  flex: 1;
-  gap: 5px;
-}
-
-.workout-control-group label > span,
-.workout-range-inputs label > span {
-  color: var(--text-muted);
-  font-size: 10px;
-  white-space: nowrap;
-}
-
-.workout-control-group input,
-.workout-control-group select {
-  width: 100%;
-  min-height: 34px;
-}
-
-.workout-control-group .app-select {
-  width: 100%;
-  flex: 1;
-}
-
-.workout-control-group .app-select-trigger {
-  min-height: 34px;
-  padding: 7px 9px;
-  font-weight: 500;
-}
-
-.workout-range-inputs {
-  display: flex;
-  min-width: 0;
-  flex: 1.2;
-  align-items: flex-end;
-  gap: 7px;
-}
-
-.workout-range-inputs > span {
-  padding-bottom: 9px;
-  color: var(--text-muted);
-  font-size: 10px;
+  padding: 18px 20px 20px;
 }
 
 .workout-control-hint {
@@ -23599,62 +23088,6 @@ td span {
   line-height: 1.3;
 }
 
-.workout-field-error { padding: 0 13px 10px; }
-
-.workout-repeat-card {
-  overflow: hidden;
-  border: 1px solid color-mix(in srgb, var(--accent) 26%, var(--glass-border));
-  border-radius: var(--radius-md);
-  background: color-mix(in srgb, var(--accent) 3%, var(--glass-bg));
-  padding-bottom: 10px;
-}
-
-.workout-repeat-header > input {
-  min-width: 120px;
-  max-width: 210px;
-  border-color: transparent;
-  background: transparent;
-  font-weight: 600;
-}
-
-.workout-repeat-count {
-  display: flex;
-  align-items: center;
-  gap: 0;
-  margin-left: auto;
-}
-
-.workout-repeat-count > span {
-  margin-right: 8px;
-  color: var(--text-muted);
-  font-size: 11px;
-}
-
-.workout-repeat-count button,
-.workout-repeat-count input {
-  width: 34px;
-  height: 30px;
-  border: 1px solid var(--glass-border);
-  border-radius: 0;
-  background: var(--glass-bg);
-  color: var(--text-primary);
-  text-align: center;
-}
-
-.workout-repeat-count button:first-of-type { border-radius: var(--radius-sm) 0 0 var(--radius-sm); }
-.workout-repeat-count button:last-of-type { border-radius: 0 var(--radius-sm) var(--radius-sm) 0; }
-.workout-repeat-count input { border-inline: 0; padding: 0; }
-
-.workout-repeat-steps {
-  display: flex;
-  flex-direction: column;
-  gap: 9px;
-  padding: 11px;
-}
-
-.workout-repeat-add { margin-left: 11px; }
-
-.workout-editor-empty,
 .workout-editor-state {
   display: grid;
   min-height: 260px;
@@ -23665,7 +23098,6 @@ td span {
   text-align: center;
 }
 
-.workout-editor-empty p,
 .workout-editor-state h3,
 .workout-editor-state p { margin: 0; }
 .workout-editor-state h3 { color: var(--text-primary); }
@@ -23674,33 +23106,13 @@ td span {
 .workout-editor-footer {
   display: flex;
   flex: 0 0 auto;
-  min-height: 70px;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-end;
   gap: 18px;
   border-top: 1px solid var(--glass-border);
   background: color-mix(in srgb, var(--bg-base) 94%, white 6%);
   padding: 11px 18px;
 }
-
-.workout-estimate {
-  display: flex;
-  min-width: 0;
-  align-items: center;
-  gap: 18px;
-  overflow-x: auto;
-}
-
-.workout-estimate > span {
-  display: grid;
-  flex: 0 0 auto;
-  gap: 2px;
-}
-
-.workout-estimate small { color: var(--text-muted); font-size: 10px; text-transform: uppercase; letter-spacing: 0.06em; }
-.workout-estimate strong { color: var(--text-primary); font-size: 12px; font-variant-numeric: tabular-nums; }
-.workout-estimate > span:first-child:not(:only-child) strong { color: var(--accent-strong); }
-.workout-estimate .is-error { display: flex; align-items: center; color: #f28b8b; font-size: 11px; }
 
 .workout-editor-footer-actions {
   display: flex;
@@ -23709,52 +23121,10 @@ td span {
   gap: 8px;
 }
 
-.workout-editor-footer-actions .ghost-button,
 .workout-editor-footer-actions .primary-button {
   display: inline-flex;
   align-items: center;
   gap: 7px;
-}
-
-.workout-editor-confirm {
-  position: absolute;
-  inset: auto 12px 12px;
-  z-index: 3;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  border: 1px solid var(--surface-line, color-mix(in srgb, #f28b8b 42%, var(--glass-border)));
-  border-radius: var(--radius-md);
-  background: color-mix(in srgb, var(--bg-base) 95%, #f28b8b 5%);
-  box-shadow: var(--shadow-card);
-  padding: 11px 12px;
-}
-
-.workout-editor-confirm > div {
-  display: grid;
-  flex: 1;
-  gap: 2px;
-}
-
-.workout-editor-confirm strong { color: var(--text-primary); font-size: 12px; }
-.workout-editor-confirm span { color: var(--text-muted); font-size: 11px; }
-/* Discard is the delete confirmation's recipe at the size of the Keep editing
-   beside it. It was a bare `.danger-button` — a colour modifier with no size,
-   padding or radius of its own — so it drew as the platform's button. */
-.workout-editor-confirm .primary-button.danger {
-  min-height: 0;
-  padding: 7px 14px;
-  border-radius: var(--radius-pill);
-  color: #fff;
-  background: linear-gradient(135deg, #f87171 0%, #ef4444 100%);
-  font-size: 12px;
-  font-weight: 600;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.22), var(--shadow-soft);
-}
-
-.workout-editor-confirm .primary-button.danger:hover:not(:disabled) {
-  background: linear-gradient(135deg, #f87171 0%, #ef4444 100%);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.26), var(--shadow-card);
 }
 
 .workout-editor-skeleton {
@@ -23780,33 +23150,15 @@ td span {
 .is-spinning { animation: workout-spin 0.8s linear infinite; }
 @keyframes workout-spin { to { transform: rotate(360deg); } }
 
-.workout-editor-modal input:focus,
-.workout-editor-modal select:focus,
-.workout-editor-modal textarea:focus {
-  outline: 2px solid var(--accent);
-  outline-offset: 2px;
-}
-
 .workout-library-select:focus-visible,
-.workout-icon-action:focus-visible,
 .workout-editor-header button:focus-visible,
 .calendar-library-modal button:focus-visible {
   outline: var(--focus-ring);
   outline-offset: 2px;
 }
 
-.workout-editor-modal :disabled { cursor: not-allowed; opacity: 0.58; }
-
 @media (max-width: 900px) {
   .workout-editor-backdrop { align-items: stretch; padding: 8px; }
-  .workout-editor-modal { height: calc(100dvh - 16px); }
-  .workout-editor-basics,
-  .workout-step-fields { grid-template-columns: 1fr; }
-  .workout-strength-fields.has-preview { grid-template-columns: 1fr; }
-  .workout-control-group { align-items: stretch; flex-wrap: wrap; }
-  .workout-step-header { flex-wrap: wrap; }
-  .workout-step-header > input { order: 2; flex-basis: calc(100% - 40px); }
-  .workout-step-actions { margin-left: auto; }
   .workout-editor-footer { align-items: stretch; flex-direction: column; }
   .workout-editor-footer-actions { justify-content: flex-end; }
 }
@@ -23820,14 +23172,6 @@ td span {
   .workout-library-footer .calendar-field { max-width: none; }
   .workout-editor-scroll { padding-inline: 10px; }
   .workout-editor-header { padding-inline: 12px; }
-  .workout-editor-structure-header { align-items: stretch; flex-direction: column; }
-  .workout-editor-add-actions { justify-content: flex-start; }
-  .workout-repeat-header { flex-wrap: wrap; }
-  .workout-repeat-count { margin-left: 0; }
-  .workout-repeat-header .workout-step-actions { margin-left: auto; }
-  .workout-range-inputs { flex-basis: 100%; }
-  .workout-editor-confirm { align-items: stretch; flex-wrap: wrap; }
-  .workout-editor-confirm > div { flex-basis: 100%; }
 }
 
 @media (prefers-reduced-motion: reduce) {

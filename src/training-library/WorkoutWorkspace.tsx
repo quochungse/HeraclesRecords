@@ -26,7 +26,7 @@ import { MonthDayPicker } from "./MonthDayPicker";
 import { PromptDialog } from "./PromptDialog";
 import { compareFavoriteThenName } from "./libraryOrder";
 import { TAG_MAX_LENGTH, clampTagInput, parseTagInput } from "./tagInput";
-import { WorkoutReadOnlyBody } from "../calendar/WorkoutEditorModal";
+import { WorkoutReadOnlyBody } from "../calendar/WorkoutViewModal";
 import { WorkoutBuilderModal } from "../calendar/WorkoutBuilderModal";
 import { ConfirmDialog } from "./ConfirmDialog";
 import { useWorkoutExerciseCatalog } from "../calendar/useWorkoutExerciseCatalog";

@@ -49,7 +49,8 @@ import {
   weekRow
 } from "./dateUtils";
 import { useCalendarData } from "./useCalendarData";
-import { WorkoutEditorModal } from "./WorkoutEditorModal";
+import { WorkoutViewModal } from "./WorkoutViewModal";
+import { WorkoutBuilderModal } from "./WorkoutBuilderModal";
 import { WorkoutLibraryModal } from "./WorkoutLibraryModal";
 import { useSelectionPreference } from "../preferences/selectionPreferences";
 import { CALENDAR_MODE_PREFERENCE } from "./CalendarSkeleton";
@@ -130,16 +131,19 @@ export function CalendarView({
   const [mutating, setMutating] = useState(false);
   const [libraryOpen, setLibraryOpen] = useState(false);
   /*
-   * A workout opened from this screen, and whether it opens to be read or to
-   * be changed. Only a scheduled occurrence is editable here: a library
-   * workout is a template every future use of it shares, so changing one from
-   * a day cell would rewrite sessions the athlete is not looking at. Training
-   * Library owns that decision.
+   * A library workout opened from this screen, to be read. Only a scheduled
+   * occurrence is editable here: a library workout is a template every future
+   * use of it shares, so changing one from a day cell would rewrite sessions
+   * the athlete is not looking at. Training Library owns that decision.
    */
-  const [workoutRef, setWorkoutRef] = useState<{
-    ref: WorkoutEditRef;
-    readOnly: boolean;
-  } | null>(null);
+  const [viewedProgramId, setViewedProgramId] = useState<string | null>(null);
+  /*
+   * A scheduled occurrence being edited, in Create workout's builder — the
+   * form every other workout is written in — rather than an editor of its own.
+   */
+  const [editedOccurrence, setEditedOccurrence] = useState<
+    Extract<WorkoutEditRef, { kind: "scheduled" }> | null
+  >(null);
   const [selectionMode, setSelectionMode] = useState(false);
   const [selectedWorkoutKeys, setSelectedWorkoutKeys] = useState<Set<string>>(
     () => new Set()
@@ -730,15 +734,12 @@ export function CalendarView({
         }
         onEdit={(target) => {
           setSelection(null);
-          setWorkoutRef({
-            readOnly: false,
-            ref: {
-              kind: "scheduled",
-              happenDay: target.entry.happenDay,
-              planId: target.entry.planId,
-              idInPlan: target.entry.idInPlan,
-              planProgramId: target.entry.planProgramId
-            }
+          setEditedOccurrence({
+            kind: "scheduled",
+            happenDay: target.entry.happenDay,
+            planId: target.entry.planId,
+            idInPlan: target.entry.idInPlan,
+            planProgramId: target.entry.planProgramId
           });
         }}
         onError={onError}
@@ -756,13 +757,8 @@ export function CalendarView({
             reload();
           }}
           onError={onError}
-          covered={workoutRef !== null}
-          onViewLibrary={(programId) => {
-            setWorkoutRef({
-              readOnly: true,
-              ref: { kind: "library", programId }
-            });
-          }}
+          covered={viewedProgramId !== null}
+          onViewLibrary={setViewedProgramId}
         />
       ) : null}
 
@@ -770,13 +766,8 @@ export function CalendarView({
         <WorkoutLibraryModal
           api={api}
           onClose={() => setLibraryOpen(false)}
-          covered={workoutRef !== null}
-          onView={(programId) => {
-            setWorkoutRef({
-              readOnly: true,
-              ref: { kind: "library", programId }
-            });
-          }}
+          covered={viewedProgramId !== null}
+          onView={setViewedProgramId}
           onScheduled={(message) => {
             onMessage(message);
             setLibraryOpen(false);
@@ -786,21 +777,41 @@ export function CalendarView({
         />
       ) : null}
 
-      {workoutRef ? (
-        <WorkoutEditorModal
+      {viewedProgramId ? (
+        <WorkoutViewModal
           api={api}
-          editRef={workoutRef.ref}
-          readOnly={workoutRef.readOnly}
-          onClose={() => setWorkoutRef(null)}
+          programId={viewedProgramId}
+          onClose={() => setViewedProgramId(null)}
+        />
+      ) : null}
+
+      {editedOccurrence ? (
+        <WorkoutBuilderModal
+          api={api}
+          source={{ kind: "scheduled", editRef: editedOccurrence }}
+          heading={{
+            eyebrow: formatHappenDayLabel(editedOccurrence.happenDay),
+            title: t("workout.e.editWorkout")
+          }}
+          confirmDiscard={({ keep, discard }) => (
+            <ConfirmDialog
+              title={t("workout.e.discardTitle")}
+              description={t("workout.e.discardBody")}
+              confirmLabel={t("workout.e.discard")}
+              cancelLabel={t("workout.e.keepEditing")}
+              danger
+              onConfirm={discard}
+              onCancel={keep}
+            />
+          )}
+          onClose={() => setEditedOccurrence(null)}
           onSaved={(result) => {
-            // Only a scheduled occurrence can reach this: a library workout
-            // opens read-only from here and has no Save.
             onMessage(
               result.verified
                 ? t("calendar.updated")
                 : (result.warning ?? t("calendar.updatedPending"))
             );
-            setWorkoutRef(null);
+            setEditedOccurrence(null);
             reload();
           }}
           onError={onError}

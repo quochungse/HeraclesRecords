@@ -35,7 +35,7 @@ import type {
 } from "../../electron/types";
 import { planWorkoutInputToEditorDraft } from "../../electron/planWorkoutEditor";
 import type { HeraclesRecordsApi } from "../heraclesrecords-api";
-import { WorkoutReadOnlyBody } from "../calendar/WorkoutEditorModal";
+import { WorkoutReadOnlyBody } from "../calendar/WorkoutViewModal";
 import { useWorkoutExerciseCatalog } from "../calendar/useWorkoutExerciseCatalog";
 import { formatDurationSeconds, formatHappenDayLabel } from "../training/formatters";
 import { formatDistanceValue } from "../units/units";
