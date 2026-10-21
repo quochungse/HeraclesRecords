@@ -1,4 +1,5 @@
-import { memo, useMemo, type CSSProperties } from "react";
+import { memo, useId, useMemo, useState, type CSSProperties } from "react";
+import { ChevronRight } from "lucide-react";
 import {
   Bar,
   BarChart,
@@ -221,6 +222,13 @@ function ZoneShare({ zones }: { zones: NonNullable<ActivityVisualPreview["sectio
   );
 }
 
+/**
+ * A lap table this long or longer starts folded: an interval session's twenty
+ * rows ran the card a screen down the conversation, past the answer that
+ * reads them. A shorter one is open, being no taller than a chart.
+ */
+const LAPS_FOLDED_FROM = 5;
+
 export const ActivityVisualCard = memo(function ActivityVisualCard({
   preview
 }: ActivityVisualCardProps) {
@@ -303,6 +311,8 @@ export const ActivityVisualCard = memo(function ActivityVisualCard({
   const title = preview.name ?? t("activity.untitled");
   const subtitle = preview.startTime ?? undefined;
   const laps = preview.sections.laps ?? [];
+  const [lapsOpen, setLapsOpen] = useState(laps.length < LAPS_FOLDED_FROM);
+  const lapsTableId = useId();
   const strengthExercises = preview.sections.strength?.exercises ?? [];
   // The column only appears where a lap actually recorded cadence, so a pool
   // swim keeps the narrow table it has now. A gym session's laps are its sets
@@ -488,8 +498,20 @@ export const ActivityVisualCard = memo(function ActivityVisualCard({
 
       {laps.length > 0 ? (
         <section className="chat-visual-section">
-          <h5>{t("activity.m.laps")}</h5>
-          <div className="chat-plan-table-wrap">
+          <h5>
+            <button
+              type="button"
+              className="chat-visual-toggle"
+              aria-expanded={lapsOpen}
+              aria-controls={lapsTableId}
+              onClick={() => setLapsOpen((open) => !open)}
+            >
+              <ChevronRight size={14} aria-hidden="true" />
+              {t("activity.m.laps")}
+              <span>{formatCount(laps.length)}</span>
+            </button>
+          </h5>
+          <div className="chat-plan-table-wrap" id={lapsTableId} hidden={!lapsOpen}>
             <table className="chat-plan-table">
               <thead>
                 <tr>

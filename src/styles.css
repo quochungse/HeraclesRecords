@@ -15643,6 +15643,37 @@ td span {
   color: var(--text-secondary);
 }
 
+/* A section that folds (the lap table): its heading is the switch. */
+.chat-visual-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.chat-visual-toggle svg {
+  transition: transform var(--dur-base) var(--ease);
+}
+
+.chat-visual-toggle[aria-expanded="true"] svg {
+  transform: rotate(90deg);
+}
+
+.chat-visual-toggle span {
+  color: var(--text-muted);
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+
+.chat-visual-toggle:hover {
+  color: var(--text-primary);
+}
+
 /* The session's time in each heart-rate zone it reached (`ZoneShare`), in
    the colours its route map and its own page give the zones. */
 .chat-visual-zones-bar {
