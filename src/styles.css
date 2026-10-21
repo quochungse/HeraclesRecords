@@ -15644,6 +15644,17 @@ td span {
   height: 140px;
 }
 
+/* A channel not drawn says so in its dot too: it takes the chip's grey ink,
+   and only a channel on the chart wears its line's colour. */
+.chat-visual-chips button[aria-pressed="false"] .option-chip-dot {
+  background: currentColor;
+}
+
+/* One chart in place of a stack of them, so it may take a little more height. */
+.chat-visual-chart-shell--channels {
+  height: 180px;
+}
+
 /* Holds a chart's place until it comes near the screen (ChartWhenNear), at
    the size of the shell it stands in. */
 .chat-chart-when-near {

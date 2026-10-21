@@ -30,23 +30,22 @@ import {
   elevationUnit,
   kilogramsToDisplayWeight,
   kmhToDisplaySpeed,
-  speedUnit,
-  swimDistanceUnit
+  speedUnit
 } from "../units/units";
 import {
   ACTIVITY_READINGS,
   activityReading,
   formatSwimPace,
-  formatSwimPaceClock,
   readsMovement,
   readsSpeed,
   type ActivityReading
 } from "../../electron/activityReading";
 import {
-  buildDistanceSeriesData,
   buildElevationSeriesData,
   ChatMiniAreaChart
 } from "./charts/ChatMiniAreaChart";
+import { ChatChannelChart } from "./charts/ChatChannelChart";
+import { joinChannelRows } from "./charts/channelRows";
 import { formatCount, formatDecimal, t } from "../i18n/core";
 import { resolveExerciseName } from "../training/exerciseNames";
 import { formatVolumeKg, formatWeightKg } from "../strength/strengthAnalytics";
@@ -311,53 +310,13 @@ export const ActivityVisualCard = memo(function ActivityVisualCard({
     () => (redrawn ? { ...preview.sections, ...redrawn } : preview.sections),
     [preview, redrawn]
   );
-  const hrSeriesData = useMemo(
-    () =>
-      sections.hr?.chartKind === "series" && sections.hr.series
-        ? buildDistanceSeriesData(sections.hr.series, "hr", unitSystem, swim)
-        : [],
-    [locale, sections, swim, unitSystem]
-  );
   const hrBarData = useMemo(
     () => buildLapBarData(sections.hr?.laps, (lap) => lap.avgHr),
     [sections]
   );
-  const cadenceSeriesData = useMemo(
-    () =>
-      sections.cadence?.chartKind === "series" &&
-      sections.cadence.series
-        ? buildDistanceSeriesData(
-            sections.cadence.series,
-            "cadence",
-            unitSystem,
-            swim
-          )
-        : [],
-    [locale, sections, swim, unitSystem]
-  );
   const cadenceBarData = useMemo(
     () => buildLapBarData(sections.cadence?.laps, (lap) => lap.avgCadence),
     [sections]
-  );
-  const paceData = useMemo(
-    () =>
-      sections.pace?.series
-        ? buildDistanceSeriesData(
-            sections.pace.series,
-            "pace",
-            unitSystem,
-            swim,
-            asSpeed
-          )
-        : [],
-    [asSpeed, locale, sections, swim, unitSystem]
-  );
-  const powerData = useMemo(
-    () =>
-      sections.power?.series
-        ? buildDistanceSeriesData(sections.power.series, "power", unitSystem, swim)
-        : [],
-    [locale, sections, swim, unitSystem]
   );
   const elevationData = useMemo(
     () =>
@@ -402,6 +361,30 @@ export const ActivityVisualCard = memo(function ActivityVisualCard({
         : formatPaceValue(secondsPerKm, unitSystem);
   const cadence = moves ? sections.cadence : undefined;
   const { colors } = useChartColors();
+  // Every channel recorded sample by sample shares one chart, a chip each; a
+  // channel COROS gave only per-lap averages for keeps its own bars, which run
+  // along the laps rather than the distance, and a session of sets keeps its
+  // heart rate under its sets.
+  const { rows: channelRows, joinsElevation } = useMemo(
+    () =>
+      joinChannelRows(
+        {
+          hr: sections.hr?.chartKind === "series" && !setsSeries ? sections.hr.series : undefined,
+          pace: moves ? sections.pace?.series : undefined,
+          power: moves ? sections.power?.series : undefined,
+          cadence: cadence?.chartKind === "series" ? cadence.series : undefined,
+          elevation: moves && !swim ? sections.elevation?.points : undefined
+        },
+        reading,
+        unitSystem
+      ),
+    // The labels are text in the language on screen.
+    [cadence, locale, moves, reading, sections, setsSeries, swim, unitSystem]
+  );
+  const charted = (key: "hr" | "pace" | "speed" | "power" | "cadence"): boolean =>
+    channelRows.filter((row) => row[key] !== undefined).length >= 2;
+  const hrCharted = charted("hr");
+  const paceCharted = charted(asSpeed ? "speed" : "pace");
 
   return (
     <div className="chat-visual-card">
@@ -428,7 +411,18 @@ export const ActivityVisualCard = memo(function ActivityVisualCard({
 
       {sections.zones ? <ZoneShare zones={sections.zones} /> : null}
 
-      {sections.hr ? (
+      {channelRows.length >= 2 && (hrCharted || paceCharted || charted("power") || charted("cadence")) ? (
+        <ChatChannelChart
+          previewId={preview.previewId}
+          reading={reading}
+          sportType={preview.sportType}
+          rows={channelRows}
+          unitSystem={unitSystem}
+          cadenceUnit={cadenceUnit}
+        />
+      ) : null}
+
+      {sections.hr && !hrCharted ? (
         <section className="chat-visual-section">
           {setsSeries ? (
             <div className="chat-visual-section-head">
@@ -448,13 +442,6 @@ export const ActivityVisualCard = memo(function ActivityVisualCard({
               gradientId={`chatHrFill-${preview.previewId}`}
               unitSystem={unitSystem}
             />
-          ) : sections.hr.chartKind === "series" && hrSeriesData.length >= 2 ? (
-            <ChatMiniAreaChart
-              data={hrSeriesData}
-              gradientId={`chatHrFill-${preview.previewId}`}
-              name={t("activity.m.heartRate")}
-              formatValue={(value) => `${Math.round(value)} bpm`}
-            />
           ) : hrBarData.length >= 2 ? (
             <ChatLapBarChart
               data={hrBarData}
@@ -467,65 +454,24 @@ export const ActivityVisualCard = memo(function ActivityVisualCard({
         </section>
       ) : null}
 
-      {moves && sections.pace ? (
+      {moves && sections.pace && !paceCharted ? (
         <section className="chat-visual-section">
           <h5>{paceLabel}</h5>
-          {paceData.length >= 2 ? (
-            <ChatMiniAreaChart
-              data={paceData}
-              gradientId={`chatPaceFill-${preview.previewId}`}
-              name={paceLabel}
-              // A swim's values are already seconds per 100 (the series data
-              // converts them), a ride's and a hike's km/h.
-              formatValue={(value) =>
-                asSpeed
-                  ? `${formatDecimal(value, 1)} ${speedUnit(unitSystem)}`
-                  : swim
-                    ? `${formatSwimPaceClock(value)} /100${swimDistanceUnit(unitSystem)}`
-                    : formatPaceValue(value, unitSystem)
-              }
-              yAxisFormatter={(value) =>
-                asSpeed
-                  ? formatDecimal(value, 1)
-                  : swim
-                    ? formatSwimPaceClock(value)
-                    : formatPaceValue(value, unitSystem).replace(/\/(?:km|mi)$/, "")
-              }
-            />
-          ) : (
-            <p className="chat-visual-empty">{asSpeed ? t("chat.chart.noSpeed") : t("chat.chart.noPace")}</p>
-          )}
+          <p className="chat-visual-empty">{asSpeed ? t("chat.chart.noSpeed") : t("chat.chart.noPace")}</p>
         </section>
       ) : null}
 
-      {moves && sections.power ? (
+      {moves && sections.power && !charted("power") ? (
         <section className="chat-visual-section">
           <h5>{t("activity.m.power")}</h5>
-          {powerData.length >= 2 ? (
-            <ChatMiniAreaChart
-              data={powerData}
-              gradientId={`chatPowerFill-${preview.previewId}`}
-              name={t("activity.m.power")}
-              formatValue={(value) => `${Math.round(value)} W`}
-            />
-          ) : (
-            <p className="chat-visual-empty">{t("chat.chart.noPower")}</p>
-          )}
+          <p className="chat-visual-empty">{t("chat.chart.noPower")}</p>
         </section>
       ) : null}
 
-      {cadence ? (
+      {cadence && !charted("cadence") ? (
         <section className="chat-visual-section">
           <h5>{t("activity.m.cadence")}</h5>
-          {cadence.chartKind === "series" &&
-          cadenceSeriesData.length >= 2 ? (
-            <ChatMiniAreaChart
-              data={cadenceSeriesData}
-              gradientId={`chatCadenceFill-${preview.previewId}`}
-              name={t("activity.m.cadence")}
-              formatValue={(value) => `${Math.round(value)} ${cadenceUnit}`}
-            />
-          ) : cadenceBarData.length >= 2 ? (
+          {cadenceBarData.length >= 2 ? (
             <ChatLapBarChart
               data={cadenceBarData}
               name={t("activity.m.avgCadence")}
@@ -537,7 +483,7 @@ export const ActivityVisualCard = memo(function ActivityVisualCard({
         </section>
       ) : null}
 
-      {moves && !swim && sections.elevation ? (
+      {moves && !swim && sections.elevation && !joinsElevation ? (
         <section className="chat-visual-section">
           <h5>{t("activity.m.elevation")}</h5>
           {elevationData.length >= 2 ? (

@@ -16,14 +16,10 @@ import { ChartAreaGradient } from "../../training/components/trendChartParts";
 import type { UnitSystem } from "../../../electron/types";
 import {
   distanceUnit,
-  kmhToDisplaySpeed,
   metersToDisplayDistance,
-  metersToElevation,
-  metersToSwimDistance,
-  swimDistanceUnit
+  metersToElevation
 } from "../../units/units";
 import { formatDecimal } from "../../i18n/core";
-import { swimPacePer100 } from "../../../electron/activityReading";
 
 export interface ChartDatum {
   label: string;
@@ -119,76 +115,6 @@ export function ChatMiniAreaChart({
       </ChartWhenNear>
     </div>
   );
-}
-
-/** Activity time as `m:ss` or `h:mm:ss`, for a chart with no distance to run along. */
-function formatElapsedLabel(seconds: number): string {
-  const total = Math.max(0, Math.round(seconds));
-  const hours = Math.floor(total / 3600);
-  const minutes = Math.floor((total % 3600) / 60);
-  const secs = String(total % 60).padStart(2, "0");
-  return hours > 0 ? `${hours}:${String(minutes).padStart(2, "0")}:${secs}` : `${minutes}:${secs}`;
-}
-
-/**
- * A channel's points labelled by distance, by activity time where the activity
- * covered none (a gym session, a trainer that measured nothing), and not at all
- * on a card stored before it carried the time — "Point 1, Point 2…" named
- * nothing anyone could read.
- */
-export function buildDistanceSeriesData(
-  series: {
-    elapsed?: number;
-    distance?: number;
-    hr?: number;
-    pace?: number;
-    power?: number;
-    cadence?: number;
-  }[],
-  valueKey: "hr" | "pace" | "power" | "cadence",
-  unitSystem: UnitSystem,
-  swim = false,
-  paceAsSpeed = false
-): ChartDatum[] {
-  const pickValue = (point: (typeof series)[number]): number =>
-    valueKey === "pace" && paceAsSpeed
-      ? kmhToDisplaySpeed(3600 / (point.pace as number), unitSystem)
-      : valueKey === "pace" && swim
-        ? swimPacePer100(point.pace as number, unitSystem)
-        : (point[valueKey] as number);
-
-  const withValue = series.filter(
-    (point) =>
-      point[valueKey] !== undefined && Number.isFinite(point[valueKey] as number)
-  );
-
-  if (withValue.length < 2) {
-    return [];
-  }
-
-  const useDistance = withValue.some(
-    (point) => point.distance !== undefined && point.distance > 0
-  );
-  const useElapsed =
-    !useDistance && withValue.some((point) => point.elapsed !== undefined);
-
-  return withValue.map((point, index): ChartDatum => {
-    const displayDistance =
-      useDistance && point.distance !== undefined
-        ? swim
-          ? metersToSwimDistance(point.distance, unitSystem)
-          : metersToDisplayDistance(point.distance, unitSystem)
-        : index;
-
-    return {
-      label: useDistance
-        ? `${formatDecimal(displayDistance, swim ? 0 : 1)} ${swim ? swimDistanceUnit(unitSystem) : distanceUnit(unitSystem)}`
-        : useElapsed && point.elapsed !== undefined
-          ? formatElapsedLabel(point.elapsed)
-          : "",
-      value: pickValue(point)
-    };
-  });
 }
 
 export function buildElevationSeriesData(
