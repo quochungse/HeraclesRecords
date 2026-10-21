@@ -55,16 +55,25 @@ export function QuestionRail({
   );
 }
 
-/** The question a reader at `scrollTop` is in: the last one whose row starts above the reading line. */
+/**
+ * The question whose turn is being read: the last one whose row starts above
+ * the reading line. At the end of the transcript, where the last questions
+ * can never scroll up to that line, it is the last one on screen — or the
+ * mark would sit on an earlier question while the reader is at the end, and
+ * stepping down would land on a question the mark then left again.
+ */
 export function questionAtScroll(
   questions: readonly RailQuestion[],
   rowTop: (index: number) => number | undefined,
-  readingLine: number
+  readingLine: number,
+  /** The transcript's bottom edge, when it is scrolled to its end. */
+  endLine?: number
 ): number | null {
   let active: number | null = questions[0]?.index ?? null;
+  const line = endLine ?? readingLine;
   for (const question of questions) {
     const top = rowTop(question.index);
-    if (top !== undefined && top <= readingLine) active = question.index;
+    if (top !== undefined && top <= line) active = question.index;
   }
   return active;
 }

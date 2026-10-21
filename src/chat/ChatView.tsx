@@ -1462,6 +1462,12 @@ export function ChatView({
   /** The rail's questions and the latest way to jump to one, for the keyboard's listener. */
   const railQuestionsRef = useRef<RailQuestion[]>([]);
   const railStepRef = useRef<(direction: -1 | 1) => void>(() => undefined);
+  /**
+   * The question a jump is going to, while the transcript scrolls there: it
+   * holds the mark, which read from the scroll would pass back through the
+   * questions in between and land a step short at the end.
+   */
+  const railJumpRef = useRef<number | null>(null);
   // An analysis run writing into the conversation that is open right now.
   const [liveAnalysis, setLiveAnalysis] = useState<LiveAnalysisRun | null>(
     null
@@ -3047,7 +3053,9 @@ export function ChatView({
   const readRailPosition = (transcript: HTMLDivElement) => {
     cancelAnimationFrame(railFrameRef.current);
     railFrameRef.current = requestAnimationFrame(() => {
-      const frameTop = transcript.getBoundingClientRect().top;
+      if (railJumpRef.current !== null) return;
+      const frame = transcript.getBoundingClientRect();
+      const atEnd = transcript.scrollHeight - transcript.scrollTop - transcript.clientHeight < 4;
       setRailActive(
         questionAtScroll(
           railQuestionsRef.current,
@@ -3055,7 +3063,8 @@ export function ChatView({
             transcript
               .querySelector<HTMLElement>(`[data-chat-entry-index="${index}"]`)
               ?.getBoundingClientRect().top,
-          frameTop + 80
+          frame.top + 80,
+          atEnd ? frame.bottom : undefined
         )
       );
     });
@@ -3931,10 +3940,18 @@ export function ChatView({
   /** The transcript taken to a question, which is marked for a moment. */
   const jumpToQuestion = (index: number) => {
     setRailActive(index);
+    railJumpRef.current = index;
     withEntryRow(index, (row) => {
       const transcript = scrollRef.current;
       if (!transcript) return;
       const top = transcript.scrollTop + row.getBoundingClientRect().top - transcript.getBoundingClientRect().top - 16;
+      // Let go once the scroll settles; a jump already in place scrolls not
+      // at all, so a timer lets go of it too. A newer jump owns the mark.
+      const release = () => {
+        if (railJumpRef.current === index) railJumpRef.current = null;
+      };
+      transcript.addEventListener("scrollend", release, { once: true });
+      setTimeout(release, 1000);
       transcript.scrollTo({ top: Math.max(0, top), behavior: "smooth" });
       setHighlightedChatEntryIndex(index);
       if (chatHighlightTimeoutRef.current) clearTimeout(chatHighlightTimeoutRef.current);
