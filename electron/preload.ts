@@ -28,6 +28,7 @@ import type {
   ReverseGeocodeResult,
   SaveChatSessionOptions,
   DeleteTurnOptions,
+  HideTurnOptions,
   TurnChange,
   TurnDescription,
   TurnRef,
@@ -589,6 +590,9 @@ const api = {
     ipcRenderer.invoke("chat:deleteTurn", sessionId, ref, options),
   editChatTurn: (sessionId: string, ref: TurnRef, text: string): Promise<TurnChange> =>
     ipcRenderer.invoke("chat:editTurn", sessionId, ref, text),
+  getHiddenChatTurns: (sessionId: string): Promise<string[]> => ipcRenderer.invoke("chat:hiddenTurns", sessionId),
+  setChatTurnHidden: (sessionId: string, ref: TurnRef, options: HideTurnOptions): Promise<TurnChange> =>
+    ipcRenderer.invoke("chat:setTurnHidden", sessionId, ref, options),
   renameChatSession: (
     sessionId: string,
     title: string

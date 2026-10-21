@@ -5,6 +5,7 @@ import {
   setChatSessionCondensedThroughRow
 } from "./database";
 import { chatSessionExists, getChatSession } from "./chatHistoryStore";
+import { coachTranscript } from "./chatHiddenTurns";
 import {
   applyTranscriptContext,
   buildRollingSummaryTurn,
@@ -232,7 +233,7 @@ export function createDefaultCompactDeps(): CompactChatSessionDeps {
     // there is nothing to compact — but the existence check keeps this honest
     // for a caller that ever wants to tell the two apart.
     loadEntries: (sessionId) =>
-      chatSessionExists(sessionId) ? getChatSession(sessionId) : [],
+      chatSessionExists(sessionId) ? coachTranscript(sessionId, getChatSession(sessionId)) : [],
     compact: compactSessionContext
   };
 }
@@ -305,7 +306,7 @@ export function createDefaultInspectDeps(): InspectChatSessionDeps {
     window: getContextWindow,
     stored: readSessionSummary,
     loadEntries: (sessionId) =>
-      chatSessionExists(sessionId) ? getChatSession(sessionId) : [],
+      chatSessionExists(sessionId) ? coachTranscript(sessionId, getChatSession(sessionId)) : [],
     budget: getContextBudget,
     digests: transcriptDigests
   };

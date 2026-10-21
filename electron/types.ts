@@ -1297,9 +1297,18 @@ export interface DeleteTurnOptions {
   rewriteSummary: boolean;
 }
 
+export interface HideTurnOptions {
+  /** Out of what Coach reads, or back in. */
+  hidden: boolean;
+  /** Write the summary again now, with the turn left out or put back. */
+  rewriteSummary: boolean;
+}
+
 /** A conversation after one of its turns changed. */
 export interface TurnChange {
   entries: PersistedChatEntry[];
+  /** The question mids of its turns hidden from Coach, as they now stand. */
+  hidden: string[];
   /** How the summary rewrite went, when one was asked for. */
   summary?: "rewritten" | "failed";
   summaryError?: string;

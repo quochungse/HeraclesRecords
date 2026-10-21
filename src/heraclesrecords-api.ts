@@ -25,6 +25,7 @@ import type {
   ReverseGeocodeResult,
   SaveChatSessionOptions,
   DeleteTurnOptions,
+  HideTurnOptions,
   TurnChange,
   TurnDescription,
   TurnRef,
@@ -495,6 +496,10 @@ export interface HeraclesRecordsApi {
   deleteChatTurn: (sessionId: string, ref: TurnRef, options: DeleteTurnOptions) => Promise<TurnChange>;
   /** Asks the last turn again with `text` (the same words for a retry): Coach's answer and what it made go. */
   editChatTurn: (sessionId: string, ref: TurnRef, text: string) => Promise<TurnChange>;
+  /** The question mids of a conversation's turns hidden from Coach. */
+  getHiddenChatTurns: (sessionId: string) => Promise<string[]>;
+  /** Keeps a turn on screen but out of what Coach reads, or puts it back. */
+  setChatTurnHidden: (sessionId: string, ref: TurnRef, options: HideTurnOptions) => Promise<TurnChange>;
   renameChatSession: (
     sessionId: string,
     title: string

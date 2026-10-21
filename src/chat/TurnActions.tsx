@@ -1,4 +1,4 @@
-import { Check, Copy, Trash2 } from "lucide-react";
+import { Check, Copy, Eye, EyeOff, Pencil, Trash2, type LucideIcon } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { t } from "../i18n/core";
 import { useI18n } from "../i18n/useI18n";
@@ -6,18 +6,50 @@ import { useI18n } from "../i18n/useI18n";
 /** How long a copied message says so before its icon goes back. */
 const COPIED_MS = 1500;
 
+function Action({
+  icon: Icon,
+  label,
+  danger = false,
+  onClick
+}: {
+  icon: LucideIcon;
+  label: string;
+  danger?: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      className={danger ? "chat-turn-action is-danger" : "chat-turn-action"}
+      onClick={onClick}
+      aria-label={label}
+      title={label}
+    >
+      <Icon size={14} aria-hidden="true" />
+    </button>
+  );
+}
+
 /**
- * What can be done to a message, beside it: copy it, delete the turn it
- * belongs to. Drawn quiet and shown
- * on hover or focus, so a conversation reads as a conversation until the
- * athlete reaches for one of them.
+ * What can be done to a message, beside it: copy it, ask the last question
+ * again in other words, keep its turn out of what Coach reads, delete the
+ * turn. Drawn quiet and shown on hover or focus, so a conversation reads as
+ * a conversation until the athlete reaches for one of them. An action left
+ * out is one that does not apply here, or not now.
  */
 export function TurnActions({
   copyText,
+  onEdit,
+  hidden,
+  onToggleHidden,
   onDelete
 }: {
   /** The text a copy puts on the clipboard, worked out when it is pressed. */
   copyText: () => string;
+  onEdit?: () => void;
+  /** Whether the turn is hidden from Coach, for the toggle's words. */
+  hidden?: boolean;
+  onToggleHidden?: () => void;
   onDelete?: () => void;
 }) {
   useI18n();
@@ -38,26 +70,16 @@ export function TurnActions({
 
   return (
     <span className="chat-turn-actions">
-      <button
-        type="button"
-        className="chat-turn-action"
-        onClick={copy}
-        aria-label={copied ? t("chat.turn.copied") : t("chat.turn.copy")}
-        title={copied ? t("chat.turn.copied") : t("chat.turn.copy")}
-      >
-        {copied ? <Check size={14} aria-hidden="true" /> : <Copy size={14} aria-hidden="true" />}
-      </button>
-      {onDelete ? (
-        <button
-          type="button"
-          className="chat-turn-action is-danger"
-          onClick={onDelete}
-          aria-label={t("chat.turn.delete")}
-          title={t("chat.turn.delete")}
-        >
-          <Trash2 size={14} aria-hidden="true" />
-        </button>
+      <Action icon={copied ? Check : Copy} label={copied ? t("chat.turn.copied") : t("chat.turn.copy")} onClick={copy} />
+      {onEdit ? <Action icon={Pencil} label={t("chat.turn.edit")} onClick={onEdit} /> : null}
+      {onToggleHidden ? (
+        <Action
+          icon={hidden ? Eye : EyeOff}
+          label={hidden ? t("chat.turn.show") : t("chat.turn.hide")}
+          onClick={onToggleHidden}
+        />
       ) : null}
+      {onDelete ? <Action icon={Trash2} label={t("chat.turn.delete")} danger onClick={onDelete} /> : null}
     </span>
   );
 }

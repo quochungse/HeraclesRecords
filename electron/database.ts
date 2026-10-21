@@ -179,6 +179,15 @@ export function initializeDatabase(userDataPath: string): Database.Database {
       updated_at TEXT NOT NULL
     );
 
+    -- A turn of a conversation the athlete keeps on screen but out of what
+    -- Coach reads, by its question's mid (chatTurns.ts maskHiddenTurns).
+    CREATE TABLE IF NOT EXISTS chat_hidden_turns (
+      session_id TEXT NOT NULL,
+      question_mid TEXT NOT NULL,
+      hidden_at TEXT NOT NULL,
+      PRIMARY KEY (session_id, question_mid)
+    );
+
     CREATE TABLE IF NOT EXISTS chat_plan_drafts (
       draft_id TEXT PRIMARY KEY,
       plan_json TEXT NOT NULL,
@@ -2904,6 +2913,36 @@ export function deleteChatScheduleChangesOf(sessionId: string): void {
     .prepare("SELECT change_set_id FROM chat_schedule_changes WHERE session_id = ?")
     .all(sessionId) as Array<{ change_set_id: string }>;
   deleteChatScheduleChanges(ids.map((row) => row.change_set_id));
+}
+
+/** The question mids of a conversation's turns hidden from Coach. */
+export function listChatHiddenTurns(sessionId: string): string[] {
+  const rows = requireDatabase()
+    .prepare("SELECT question_mid FROM chat_hidden_turns WHERE session_id = ? ORDER BY hidden_at")
+    .all(sessionId) as Array<{ question_mid: string }>;
+  return rows.map((row) => row.question_mid);
+}
+
+export function setChatHiddenTurn(sessionId: string, questionMid: string, hidden: boolean): void {
+  const database = requireDatabase();
+  if (hidden) {
+    const inserted = database
+      .prepare(
+        `INSERT INTO chat_hidden_turns (session_id, question_mid, hidden_at) VALUES (?, ?, ?)
+         ON CONFLICT(session_id, question_mid) DO NOTHING`
+      )
+      .run(sessionId, questionMid, new Date().toISOString());
+    if (inserted.changes > 0) notifySyncedRow("chat_hidden_turns", ["session_id", "question_mid"], [sessionId, questionMid]);
+    return;
+  }
+  const removed = database
+    .prepare("DELETE FROM chat_hidden_turns WHERE session_id = ? AND question_mid = ?")
+    .run(sessionId, questionMid);
+  if (removed.changes > 0) notifySyncedDelete("chat_hidden_turns", sessionId, questionMid);
+}
+
+export function deleteChatHiddenTurnsOf(sessionId: string): void {
+  for (const mid of listChatHiddenTurns(sessionId)) setChatHiddenTurn(sessionId, mid, false);
 }
 
 /** Change sets deleted with the turn that proposed them; lines already applied stay on COROS. */

@@ -8,6 +8,7 @@ import {
 import { resolveCompressionRuntime, transcriptDigests } from "./chatCompression";
 import { providerModelOptions } from "./chatModels";
 import { getChatSettings } from "./chatService";
+import { coachTranscript } from "./chatHiddenTurns";
 import {
   shiftBoundary,
   turnRanges,
@@ -17,11 +18,12 @@ import {
 } from "./chatTurns";
 import { creationOfDraft, deletePlanDraftsOf } from "./chatWorkoutTools";
 import { readScheduleChanges } from "./chatScheduleChanges";
-import { deleteChatScheduleChanges } from "./database";
+import { deleteChatScheduleChanges, listChatHiddenTurns, setChatHiddenTurn } from "./database";
 import { ScreenError } from "./screenText";
 import type {
   ChatTokenUsage,
   DeleteTurnOptions,
+  HideTurnOptions,
   PersistedChatEntry,
   TurnChange,
   TurnCreation,
@@ -30,7 +32,7 @@ import type {
 } from "./types";
 
 /**
- * Deleting a turn of a conversation (and, later, editing and hiding one).
+ * Deleting, editing and hiding a turn of a conversation.
  *
  * Done here rather than by the window saving a shorter transcript: a save
  * that shortens the row is exactly what `foreignTail` refuses — it reads as
@@ -230,7 +232,7 @@ async function rewriteSummary(
 ): Promise<Pick<TurnChange, "summary" | "summaryError">> {
   if (through <= 0) return {};
   try {
-    const result = await deps.rollSummary(sessionId, entries.slice(0, through));
+    const result = await deps.rollSummary(sessionId, coachTranscript(sessionId, entries).slice(0, through));
     if (!result.summary) return { summary: "failed", ...(result.reason ? { summaryError: result.reason } : {}) };
     // Only over the summary it replaces: a turn sent while this ran may have
     // rolled the summary further, and that one covers more.
@@ -255,12 +257,13 @@ export async function deleteTurn(
 
   const { through } = removeEntries(sessionId, entries, removed);
   deleteCreations(deleting);
+  forgetHidden(sessionId, entries[range.question]);
 
   const rewritten =
     summarised && options.rewriteSummary
       ? await rewriteSummary(sessionId, getChatSession(sessionId), through, deps)
       : {};
-  return { entries: getChatSession(sessionId), ...rewritten };
+  return { entries: getChatSession(sessionId), hidden: listChatHiddenTurns(sessionId), ...rewritten };
 }
 
 /**
@@ -284,5 +287,51 @@ export function editTurn(sessionId: string, ref: TurnRef, text: string): TurnCha
   );
   removeEntries(sessionId, edited, removed);
   deleteCreations(deleting);
-  return { entries: getChatSession(sessionId) };
+  // A question asked again is one Coach is meant to read.
+  forgetHidden(sessionId, entries[range.question]);
+  return { entries: getChatSession(sessionId), hidden: listChatHiddenTurns(sessionId) };
+}
+
+function forgetHidden(sessionId: string, question: PersistedChatEntry | undefined): void {
+  if (question?.mid) setChatHiddenTurn(sessionId, question.mid, false);
+}
+
+/**
+ * Every entry with its `mid`. A conversation not saved since identities were
+ * minted has none, and a turn is hidden by its question's; saving it once
+ * stamps them, as any save would.
+ */
+function identified(sessionId: string): PersistedChatEntry[] {
+  const entries = getChatSession(sessionId);
+  if (entries.every((entry) => entry.mid)) return entries;
+  saveChatSession(sessionId, entries);
+  return getChatSession(sessionId);
+}
+
+export function hiddenTurns(sessionId: string): string[] {
+  return listChatHiddenTurns(sessionId);
+}
+
+/**
+ * A turn kept on screen but out of what Coach reads, or put back. The summary
+ * is a summary of what Coach could read, so a turn it covers asks the same
+ * question deleting one does: leave it, or write it again now.
+ */
+export async function setTurnHidden(
+  sessionId: string,
+  ref: TurnRef,
+  options: HideTurnOptions,
+  deps: TurnServiceDeps = createDefaultTurnDeps()
+): Promise<TurnChange> {
+  const entries = identified(sessionId);
+  const range = resolveTurn(entries, ref);
+  const mid = entries[range.question]!.mid;
+  if (!mid) throw new ScreenError("main.coach.turnChanged");
+  setChatHiddenTurn(sessionId, mid, options.hidden);
+  const covered = turnRemoval(entries, range, { keepCreations: true });
+  const rewritten =
+    options.rewriteSummary && summarises(sessionId, covered)
+      ? await rewriteSummary(sessionId, entries, readSessionSummary(sessionId).through, deps)
+      : {};
+  return { entries, hidden: listChatHiddenTurns(sessionId), ...rewritten };
 }

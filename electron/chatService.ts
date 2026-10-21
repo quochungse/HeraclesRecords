@@ -6,6 +6,7 @@ import path from "node:path";
 import type { AddressInfo } from "node:net";
 import {
   deleteChatAnswerDigestsOf,
+  deleteChatHiddenTurnsOf,
   deleteChatConversationSettingsRow,
   deleteChatScheduleChangesOf,
   deleteSettings,
@@ -833,6 +834,7 @@ export function deleteChatSessionById(id: string): void {
   deleteChatConversationSettingsRow(id);
   deleteChatScheduleChangesOf(id);
   deleteChatAnswerDigestsOf(id);
+  deleteChatHiddenTurnsOf(id);
   // Section 2.4: the analyses inside this conversation go with it. An analysis
   // lives in exactly one conversation and cannot be moved, so there is nothing
   // to re-point and nothing left for one to be about.

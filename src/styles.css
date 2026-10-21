@@ -13875,6 +13875,81 @@ td span {
   color: var(--error-text);
 }
 
+/* A turn hidden from Coach: still readable, set back, and said so once above
+   its question. Only the words are set back — not the actions under them,
+   one of which puts it back, and not the cards: what the turn made is still
+   Coach's to read. */
+.chat-row-user.is-hidden-turn > .chat-bubble,
+.chat-row-assistant.is-hidden-turn > .chat-bubble > :not(.chat-answer-foot) {
+  opacity: 0.5;
+}
+
+.chat-hidden-turn-label {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+  margin-bottom: -12px;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.chat-hidden-turn-label button {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--chat-signal-strong);
+  font: inherit;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+/* The last question, being written again in place of its bubble. */
+.chat-question-edit {
+  display: grid;
+  gap: 8px;
+  width: min(100%, 640px);
+  padding: 10px 12px;
+  border: 1px solid var(--chat-signal-border);
+  border-radius: var(--radius-lg) var(--radius-lg) var(--radius-sm) var(--radius-lg);
+  background: var(--glass-bg);
+}
+
+.chat-question-edit:focus-within {
+  border-color: var(--chat-signal);
+}
+
+.chat-question-edit textarea {
+  width: 100%;
+  min-height: 3lh;
+  max-height: 12lh;
+  padding: 0;
+  border: 0;
+  outline: none;
+  resize: none;
+  background: none;
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 14px;
+  line-height: 1.6;
+  field-sizing: content;
+}
+
+.chat-question-edit-foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.chat-question-edit-foot span {
+  margin-right: auto;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
 /* Where a turn's answer would be when none came, or in place of the notice a
    turn that stopped part-way left: what happened and what to do about it. A
    passing trouble wears the warning tone, one to act on the error tone, and

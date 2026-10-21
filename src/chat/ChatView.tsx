@@ -1,4 +1,5 @@
 import {
+  Fragment,
   Suspense,
   isValidElement,
   lazy,
@@ -20,6 +21,7 @@ import {
   CornerDownRight,
   Database,
   ExternalLink,
+  EyeOff,
   FileDown,
   FileText,
   Globe,
@@ -77,6 +79,7 @@ import type {
   TrainingPlanDestination,
   TrainingPlanDocument,
   DeleteTurnOptions,
+  TurnChange,
   TurnDescription,
   TurnRef,
   TrainingHubExportResult,
@@ -196,11 +199,14 @@ import { getIntlLocale, plural, screenSentence, t } from "../i18n/core";
 import { useI18n } from "../i18n/useI18n";
 import { displaySessionTitle, NEW_PLAN_TITLE } from "./sessionTitle";
 import { displayStoredNotice, stoppedEarlyNotice, stoppedEarlyReason } from "./storedNotice";
-import { DeleteTurnDialog } from "./DeleteTurnDialog";
+import { DeleteTurnDialog, HideTurnDialog } from "./TurnDialogs";
 import { TurnActions } from "./TurnActions";
 import { TurnFailureRow } from "./TurnFailureRow";
 import { classifyTurnFailure, unansweredKind, type TurnFailureRowKind } from "./turnFailure";
-import { turnRanges, type TurnRange } from "../../electron/chatTurns";
+import { HIDDEN_TURN_PLACEHOLDER, maskHiddenTurns, turnRanges, type TurnRange } from "../../electron/chatTurns";
+import { QuestionEditor } from "./QuestionEditor";
+
+const NO_HIDDEN_TURNS: ReadonlySet<string> = new Set();
 
 /* "Edit plan first": the plan editor and the library's stylesheet, loaded
    only when a coach plan is opened in it. */
@@ -1430,6 +1436,20 @@ export function ChatView({
   } | null>(null);
   /** A retry on its way: the failure row's buttons wait. */
   const [retrying, setRetrying] = useState(false);
+  /** The open conversation's turns hidden from Coach, by their question's mid. */
+  const [hiddenTurns, setHiddenTurns] = useState<ReadonlySet<string>>(NO_HIDDEN_TURNS);
+  /** Bumped when another machine hid or showed a turn, so the set is read again. */
+  const [hiddenTurnsVersion, setHiddenTurnsVersion] = useState(0);
+  /** The question being written again, by its index; only ever the last one. */
+  const [editingQuestion, setEditingQuestion] = useState<number | null>(null);
+  /** A turn the summary covers, while the athlete is asked about hiding or showing it. */
+  const [turnHiding, setTurnHiding] = useState<{
+    sessionId: string;
+    ref: TurnRef;
+    hidden: boolean;
+    summaryModel?: string;
+    busy: boolean;
+  } | null>(null);
   // An analysis run writing into the conversation that is open right now.
   const [liveAnalysis, setLiveAnalysis] = useState<LiveAnalysisRun | null>(
     null
@@ -2333,6 +2353,7 @@ export function ChatView({
       if (change.tables.includes("chat_conversation_settings")) {
         setConversationSettingsVersion((value) => value + 1);
       }
+      if (change.tables.includes("chat_hidden_turns")) setHiddenTurnsVersion((value) => value + 1);
 
       if (!change.tables.includes("chat_sessions")) return;
       void refreshSessions().catch(() => undefined);
@@ -2351,6 +2372,27 @@ export function ChatView({
       void reloadTranscript(sessionId);
     });
   }, [api, refreshSessions]);
+
+  // A question being written again belongs to the conversation it is in.
+  useEffect(() => setEditingQuestion(null), [activeSessionId]);
+
+  // The open conversation's hidden turns, read whenever it changes.
+  useEffect(() => {
+    if (!api || !activeSessionId) {
+      setHiddenTurns(NO_HIDDEN_TURNS);
+      return;
+    }
+    let current = true;
+    void api
+      .getHiddenChatTurns(activeSessionId)
+      .then((mids) => {
+        if (current) setHiddenTurns(new Set(mids));
+      })
+      .catch(() => undefined);
+    return () => {
+      current = false;
+    };
+  }, [api, activeSessionId, hiddenTurnsVersion]);
 
   // Load sign-in/provider state on mount.
   useEffect(() => {
@@ -3371,7 +3413,7 @@ export function ChatView({
         // The open conversation's live timeline may hold turns the debounced
         // save has not written yet; any other one is only on disk.
         sessionId === activeSessionIdRef.current
-          ? toPersistedEntries(timeline)
+          ? coachEntries(timeline)
           : undefined,
         { force: true }
       );
@@ -3427,7 +3469,7 @@ export function ChatView({
         // Same reasoning as the compact action: the open conversation may hold
         // turns the debounced save has not written yet.
         sessionId === activeSessionIdRef.current
-          ? toPersistedEntries(timeline)
+          ? coachEntries(timeline)
           : undefined
       );
       setContextInspection((current) =>
@@ -3440,6 +3482,19 @@ export function ChatView({
         current?.sessionId === sessionId ? { ...current, error: message } : current
       );
     }
+  };
+
+  /**
+   * The transcript as Coach may read it, in the form the main process counts:
+   * every turn the athlete hid put out of sight, positions kept
+   * (`maskHiddenTurns`). The turn being asked, named by `asking`, is never
+   * hidden — a question is asked to be read.
+   */
+  const coachEntries = (entries: ChatEntry[], asking?: string): PersistedChatEntry[] => {
+    const hidden = asking && hiddenTurns.has(asking) ? new Set([...hiddenTurns].filter((mid) => mid !== asking)) : hiddenTurns;
+    return toPersistedEntries(
+      maskHiddenTurns(entries, hidden, (): ChatEntry => ({ kind: "opaque", raw: { ...HIDDEN_TURN_PLACEHOLDER.raw } }))
+    );
   };
 
   /**
@@ -3591,7 +3646,8 @@ export function ChatView({
     // transcript is built from that array rather than from the timeline: a
     // `tailStart` measured in one and sliced from the other would cut the
     // conversation at a boundary that does not exist in it.
-    const persisted = toPersistedEntries(nextEntries);
+    const asked = turnRanges(nextEntries).at(-1);
+    const persisted = coachEntries(nextEntries, asked ? nextEntries[asked.question]?.mid : undefined);
     // A pipeline step carries only its recent messages (P2.4), so compacting
     // before it would pay a summariser call for a summary it never sends.
     const context = pipeline
@@ -3660,11 +3716,12 @@ export function ChatView({
    * turns. Drawn in place, never faded in (see `ChatRow`), and counted as the
    * row's whole length so the next save is not read as missing a tail.
    */
-  const applyTurnChange = (entries: PersistedChatEntry[]): ChatEntry[] => {
-    persistedBaseRef.current = entries.length;
-    const next = fromPersistedEntries(entries);
+  const applyTurnChange = (change: TurnChange): ChatEntry[] => {
+    persistedBaseRef.current = change.entries.length;
+    const next = fromPersistedEntries(change.entries);
     for (const entry of next) settledEntriesRef.current.add(entry);
     setTimeline(next);
+    setHiddenTurns(new Set(change.hidden));
     void refreshSessions().catch(() => undefined);
     return next;
   };
@@ -3701,7 +3758,7 @@ export function ChatView({
     try {
       await flushPendingSave();
       const change = await api.deleteChatTurn(pending.sessionId, pending.ref, options);
-      if (activeSessionIdRef.current === pending.sessionId) applyTurnChange(change.entries);
+      if (activeSessionIdRef.current === pending.sessionId) applyTurnChange(change);
       if (change.summary === "failed") showToast(t("chat.turn.summaryFailed"), "error");
       else showToast(change.summary === "rewritten" ? t("chat.turn.deletedRewritten") : t("chat.turn.deleted"));
     } catch (caught) {
@@ -3712,35 +3769,82 @@ export function ChatView({
   };
 
   /**
-   * The last question asked again. Whatever stands under it — a part of an
-   * answer, a card — is taken out by the main process first, which keeps the
-   * question where it is; then it goes out as a new turn.
+   * The last question asked again — in its own words for a retry, in new ones
+   * after an edit. The main process takes out whatever stands under it (a
+   * part of an answer, a card, what an answer made) and puts it back in what
+   * Coach reads if it was hidden; then it goes out as a new turn.
    */
-  const retryLastTurn = async ({ condense = false }: { condense?: boolean } = {}) => {
+  const askLastTurnAgain = async ({ text, condense = false }: { text?: string; condense?: boolean } = {}) => {
     const sessionId = activeSessionIdRef.current;
     const last = turnRanges(timeline).at(-1);
     const ref = last ? turnRefAt(last.question) : null;
-    if (!api || !sessionId || !last || !ref || streaming || retrying) return;
+    if (!api || !sessionId || !ref || streaming || retrying) return;
     if (!providerReady()) return;
     setRetrying(true);
     try {
       await flushPendingSave();
-      let entries = timeline;
-      // Something stands under the question: a part of an answer, a card.
-      if (last.end !== last.question + 1) {
-        const change = await api.editChatTurn(sessionId, ref, ref.content);
-        if (activeSessionIdRef.current !== sessionId) return;
-        entries = applyTurnChange(change.entries);
-      }
-      if (condense) {
-        await api.compactChatContext(sessionId, toPersistedEntries(entries), { force: true }).catch(() => undefined);
-      }
+      const change = await api.editChatTurn(sessionId, ref, text ?? ref.content);
       if (activeSessionIdRef.current !== sessionId) return;
+      const entries = applyTurnChange(change);
+      if (condense) {
+        const asked = turnRanges(entries).at(-1);
+        await api
+          .compactChatContext(sessionId, coachEntries(entries, asked ? entries[asked.question]?.mid : undefined), {
+            force: true
+          })
+          .catch(() => undefined);
+        if (activeSessionIdRef.current !== sessionId) return;
+      }
       await startTurn(entries, { previous: entries, persist: false });
     } catch (caught) {
       showToast(remoteErrorMessage(caught, t("chat.fail.retryFailed")), "error");
     } finally {
       setRetrying(false);
+    }
+  };
+
+  /**
+   * Hides a turn from Coach or shows it again. A turn the summary covers asks
+   * first whether to write the summary again; any other changes at once.
+   */
+  const toggleTurnHidden = async (question: number, hidden: boolean) => {
+    const sessionId = activeSessionIdRef.current;
+    const ref = turnRefAt(question);
+    if (!api || !sessionId || !ref) return;
+    try {
+      await flushPendingSave();
+      const description = await api.describeChatTurn(sessionId, ref);
+      if (description.summarised) {
+        setTurnHiding({ sessionId, ref, hidden, summaryModel: description.summaryModel, busy: false });
+        return;
+      }
+      await applyHidden(sessionId, ref, hidden, false);
+    } catch (caught) {
+      showToast(remoteErrorMessage(caught, t("chat.turn.hideFailed")), "error");
+    }
+  };
+
+  const applyHidden = async (sessionId: string, ref: TurnRef, hidden: boolean, rewriteSummary: boolean) => {
+    if (!api) return;
+    const change = await api.setChatTurnHidden(sessionId, ref, { hidden, rewriteSummary });
+    // The row as main read it: a turn answered in this window has no `mid`
+    // on screen until the conversation is read again.
+    if (activeSessionIdRef.current === sessionId) applyTurnChange(change);
+    const done = hidden ? t("chat.turn.hiddenDone") : t("chat.turn.shownDone");
+    if (change.summary === "failed") showToast(`${done} ${t("chat.turn.summaryNotRewritten")}`, "error");
+    else showToast(change.summary === "rewritten" ? `${done} ${t("chat.turn.summaryRewritten")}` : done);
+  };
+
+  const confirmTurnHiding = async (rewriteSummary: boolean) => {
+    const pending = turnHiding;
+    if (!pending || pending.busy) return;
+    setTurnHiding({ ...pending, busy: true });
+    try {
+      await applyHidden(pending.sessionId, pending.ref, pending.hidden, rewriteSummary);
+    } catch (caught) {
+      showToast(remoteErrorMessage(caught, t("chat.turn.hideFailed")), "error");
+    } finally {
+      setTurnHiding(null);
     }
   };
 
@@ -4812,10 +4916,32 @@ export function ChatView({
   for (const range of turns) {
     for (let at = range.start; at < range.end; at += 1) turnByEntry.set(at, range);
   }
-  const turnActionsLive = Boolean(api && activeSessionId) && !turnHere && !turnDeletion && !retrying && !liveAnalysis;
+  const turnActionsLive =
+    Boolean(api && activeSessionId) && !turnHere && !turnDeletion && !turnHiding && !retrying && !liveAnalysis;
   const deleteTurnAt = (index: number) => {
     const turn = turnByEntry.get(index);
     return turnActionsLive && turn ? () => void askDeleteTurn(turn.question) : undefined;
+  };
+  /** Whether the turn holding this entry is hidden from Coach. */
+  const hiddenAt = (index: number) => {
+    const turn = turnByEntry.get(index);
+    const mid = turn ? timeline[turn.question]?.mid : undefined;
+    return Boolean(mid && hiddenTurns.has(mid));
+  };
+  const toggleHiddenAt = (index: number) => {
+    const turn = turnByEntry.get(index);
+    return turnActionsLive && turn ? () => void toggleTurnHidden(turn.question, !hiddenAt(index)) : undefined;
+  };
+  /** Only the last question is written again: one further up would leave every later turn answering something never asked. */
+  const editAt = (index: number) => {
+    const entry = timeline[index];
+    const editable =
+      turnActionsLive &&
+      turns.at(-1)?.question === index &&
+      entry?.kind === "message" &&
+      !entry.automation &&
+      !isPipelineStepText(entry.content);
+    return editable ? () => setEditingQuestion(index) : undefined;
   };
   /*
    * The row under a last question that got no answer, or in place of the
@@ -4856,8 +4982,8 @@ export function ChatView({
           detail={failure.detail}
           busy={retrying || streaming}
           actions={{
-            onRetry: () => void retryLastTurn(),
-            onCondense: () => void retryLastTurn({ condense: true }),
+            onRetry: () => void askLastTurnAgain(),
+            onCondense: () => void askLastTurnAgain({ condense: true }),
             onOtherAi: () => setAiSheetOpen(true),
             onSettings: openSettings,
             onDelete: turns.length ? deleteTurnAt(turns[turns.length - 1]!.question) : undefined
@@ -5534,7 +5660,27 @@ export function ChatView({
               );
             }
 
-            return (
+            const hiddenTurn = hiddenAt(index);
+            if (entry.role === "user" && editingQuestion === index) {
+              return (
+                <ChatRow
+                  key={`message-${index}`}
+                  settled={settled}
+                  className="chat-row chat-row-user"
+                  data-chat-entry-index={index}
+                >
+                  <QuestionEditor
+                    initial={entry.content}
+                    onCancel={() => setEditingQuestion(null)}
+                    onSave={(text) => {
+                      setEditingQuestion(null);
+                      void askLastTurnAgain({ text });
+                    }}
+                  />
+                </ChatRow>
+              );
+            }
+            const row = (
               <ChatRow
                 key={`message-${index}`}
                 settled={settled}
@@ -5542,7 +5688,7 @@ export function ChatView({
                   highlightedChatEntryIndex === index
                     ? " is-chat-jump-target"
                     : ""
-                }`}
+                }${hiddenTurn ? " is-hidden-turn" : ""}`}
                 data-chat-entry-index={index}
               >
                 <div className={`chat-avatar chat-avatar-${entry.role}`}>
@@ -5586,6 +5732,8 @@ export function ChatView({
                           copyText={() =>
                             displayStoredNotice(stripChartPlaceholders(answerParts.get(index)?.text ?? entry.content))
                           }
+                          hidden={hiddenAt(index)}
+                          onToggleHidden={toggleHiddenAt(index)}
                           onDelete={deleteTurnAt(index)}
                         />
                         <TurnCostFooter usage={entry.usage} model={entry.model} />
@@ -5610,9 +5758,30 @@ export function ChatView({
                 {entry.role === "user" ? <MessageTime at={entry.at} /> : null}
                 {/* Last in the row, which runs right to left: beside the time. */}
                 {entry.role === "user" ? (
-                  <TurnActions copyText={() => displayStepText(entry.content)} onDelete={deleteTurnAt(index)} />
+                  <TurnActions
+                    copyText={() => displayStepText(entry.content)}
+                    onEdit={editAt(index)}
+                    onDelete={deleteTurnAt(index)}
+                  />
                 ) : null}
               </ChatRow>
+            );
+            // Said once, above the question, rather than on every row of the turn.
+            if (!hiddenTurn || entry.role !== "user") return row;
+            const show = toggleHiddenAt(index);
+            return (
+              <Fragment key={`message-${index}`}>
+                <div className="chat-hidden-turn-label">
+                  <EyeOff size={13} aria-hidden="true" />
+                  {t("chat.turn.hidden")}
+                  {show ? (
+                    <button type="button" onClick={show}>
+                      {t("chat.turn.show")}
+                    </button>
+                  ) : null}
+                </div>
+                {row}
+              </Fragment>
             );
           }))}
 
@@ -5727,6 +5896,15 @@ export function ChatView({
       </div>
       {settingsModal}
       {contextHistoryDialog}
+      {turnHiding && turnHiding.sessionId === activeSessionId ? (
+        <HideTurnDialog
+          hidden={turnHiding.hidden}
+          summaryModel={turnHiding.summaryModel}
+          busy={turnHiding.busy}
+          onConfirm={(rewriteSummary) => void confirmTurnHiding(rewriteSummary)}
+          onCancel={() => setTurnHiding(null)}
+        />
+      ) : null}
       {turnDeletion && turnDeletion.sessionId === activeSessionId ? (
         <DeleteTurnDialog
           description={turnDeletion.description}

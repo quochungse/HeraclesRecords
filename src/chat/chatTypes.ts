@@ -189,6 +189,14 @@ export type ChatEntry = (
    * this they would be dropped on the first save.
    */
   extra?: Record<string, unknown>;
+  /**
+   * The store's identity for an entry read back from it, for naming a turn
+   * the athlete hid (`maskHiddenTurns`). Never stored from here: the store
+   * recovers identities on every save (`stampEntries`), so a copy held in a
+   * window is never trusted with one. Absent on an entry written in this
+   * window until the conversation is next read.
+   */
+  mid?: string;
 };
 
 export function isChatVisualEntry(
@@ -439,7 +447,11 @@ export function toPersistedEntries(entries: ChatEntry[]): PersistedChatEntry[] {
 }
 
 export function fromPersistedEntries(entries: PersistedChatEntry[]): ChatEntry[] {
-  return entries.map((entry) => ({ ...fromPersistedEntry(entry), ...extraOf(entry) }));
+  return entries.map((entry) => ({
+    ...fromPersistedEntry(entry),
+    ...extraOf(entry),
+    ...(entry.mid ? { mid: entry.mid } : {})
+  }));
 }
 
 function fromPersistedEntry(entry: PersistedChatEntry): ChatEntry {

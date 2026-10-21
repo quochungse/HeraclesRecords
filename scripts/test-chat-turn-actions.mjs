@@ -18,6 +18,9 @@
 //     unique, refused when they are not.
 //   * Asking again is the last turn only; the question keeps its identity,
 //     its answer and what the answer made go.
+//   * A hidden turn stays in the row and out of what Coach reads — an
+//     analysis, the summariser, recall — with every position kept; asking it
+//     again shows it, and deleting it or its conversation forgets it.
 //   * A failed turn's row is sorted by what the athlete can do about it, and
 //     a recent question with no answer may still be answered elsewhere.
 //
@@ -42,6 +45,8 @@ const history = await import(distUrl("chatHistoryStore.js"));
 const context = await import(distUrl("chatContextService.js"));
 const turns = await import(distUrl("chatTurns.js"));
 const service = await import(distUrl("chatTurnService.js"));
+const hiddenModule = await import(distUrl("chatHiddenTurns.js"));
+const chatService = await import(distUrl("chatService.js"));
 const failure = await import(pathToFileURL(path.join(repoRoot, "src/chat/turnFailure.ts")).href);
 
 databaseModule.initializeDatabase(fs.mkdtempSync(path.join(os.tmpdir(), "chat-turn-actions-")));
@@ -285,6 +290,60 @@ test("asking again deletes what the answer made, where it can", () => {
   service.editTurn(sessionId, { index: 6, content: "Q3" }, "Q3");
   assert.deepEqual(contents(sessionId).slice(6), ["Q3", "planDraft:a-2"], "a-2 has a version in Q2's turn");
   assert.deepEqual(databaseModule.getChatScheduleChanges(["cs-1"]), []);
+});
+
+// --- hiding -------------------------------------------------------------------------
+
+const spoken = (sessionId) =>
+  hiddenModule
+    .coachTranscript(sessionId, history.getChatSession(sessionId))
+    .map((entry) => (entry.kind === "message" ? entry.content : entry.kind));
+
+test("a hidden turn stays in the row and out of what Coach reads", async () => {
+  const sessionId = conversation([user("Q1"), coach("A1"), user("Off topic"), coach("Shoes"), user("Q3"), coach("A3")]);
+  const change = await service.setTurnHidden(sessionId, { index: 2, content: "Off topic" }, { hidden: true, rewriteSummary: false }, noRoll);
+  assert.equal(change.hidden.length, 1);
+  assert.equal(change.hidden[0], history.getChatSession(sessionId)[2].mid, "named by its question's identity");
+  assert.deepEqual(contents(sessionId), ["Q1", "A1", "Off topic", "Shoes", "Q3", "A3"], "the athlete still reads it");
+  assert.deepEqual(spoken(sessionId), ["Q1", "A1", "opaque", "opaque", "Q3", "A3"], "Coach does not, and nothing moved");
+
+  await service.setTurnHidden(sessionId, { index: 2, content: "Off topic" }, { hidden: false, rewriteSummary: false }, noRoll);
+  assert.deepEqual(service.hiddenTurns(sessionId), []);
+});
+
+test("a hidden turn the summary covers can have the summary written without it", async () => {
+  const sessionId = conversation([user("Q1"), coach("A1"), user("Q2"), coach("A2"), user("Q3"), coach("A3")]);
+  context.writeSessionSummary(sessionId, "About Q1 and Q2", 4);
+  let handed;
+  const change = await service.setTurnHidden(
+    sessionId,
+    { index: 0, content: "Q1" },
+    { hidden: true, rewriteSummary: true },
+    {
+      rollSummary: async (_id, entries) => {
+        handed = entries.map((entry) => (entry.kind === "message" ? entry.content : entry.kind));
+        return { summary: "About Q2" };
+      }
+    }
+  );
+  assert.deepEqual(handed, ["opaque", "opaque", "Q2", "A2"], "the summariser reads what Coach may");
+  assert.equal(change.summary, "rewritten");
+  assert.deepEqual(context.readSessionSummary(sessionId), { summary: "About Q2", through: 4 });
+});
+
+test("asking a hidden turn again shows it, and deleting one forgets it", async () => {
+  const sessionId = conversation([user("Q1"), coach("A1"), user("Q2"), coach("A2")]);
+  await service.setTurnHidden(sessionId, { index: 2, content: "Q2" }, { hidden: true, rewriteSummary: false }, noRoll);
+  const asked = service.editTurn(sessionId, { index: 2, content: "Q2" }, "Q2");
+  assert.deepEqual(asked.hidden, [], "a question asked again is meant to be read");
+
+  await service.setTurnHidden(sessionId, { index: 0, content: "Q1" }, { hidden: true, rewriteSummary: false }, noRoll);
+  const deleted = await service.deleteTurn(sessionId, { index: 0, content: "Q1" }, { deleteCreations: false, rewriteSummary: false }, noRoll);
+  assert.deepEqual(deleted.hidden, []);
+
+  await service.setTurnHidden(sessionId, { index: 0, content: "Q2" }, { hidden: true, rewriteSummary: false }, noRoll);
+  chatService.deleteChatSessionById(sessionId);
+  assert.deepEqual(service.hiddenTurns(sessionId), [], "and the conversation's go with it");
 });
 
 // --- a failed turn ---------------------------------------------------------------

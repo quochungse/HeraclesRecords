@@ -145,6 +145,7 @@ import type {
   HevySettingsInput,
   SaveChatSessionOptions,
   DeleteTurnOptions,
+  HideTurnOptions,
   TurnRef,
   StrengthHistoryRequest,
   TrainingHubStatus,
@@ -274,7 +275,7 @@ import {
   dismissScheduleChangeLine,
   getScheduleChanges
 } from "./chatService";
-import { deleteTurn, describeTurn, editTurn } from "./chatTurnService";
+import { deleteTurn, describeTurn, editTurn, hiddenTurns, setTurnHidden } from "./chatTurnService";
 import {
   compactChatSessionContext,
   inspectChatSessionContext
@@ -1827,6 +1828,13 @@ function registerIpcHandlers(): void {
   );
   ipcMain.handle("chat:editTurn", (_event, sessionId: string, ref: TurnRef, text: string) =>
     editTurn(sessionId, ref, typeof text === "string" ? text : "")
+  );
+  ipcMain.handle("chat:hiddenTurns", (_event, sessionId: string) => hiddenTurns(sessionId));
+  ipcMain.handle("chat:setTurnHidden", (_event, sessionId: string, ref: TurnRef, options: HideTurnOptions) =>
+    setTurnHidden(sessionId, ref, {
+      hidden: options?.hidden === true,
+      rewriteSummary: options?.rewriteSummary === true
+    })
   );
 
   // Renaming leaves updatedAt alone. Nothing in the analysis feature calls

@@ -1,5 +1,6 @@
 import { getChatSessionCoachSummaryRow } from "./database";
 import { getChatSession } from "./chatHistoryStore";
+import { coachTranscript } from "./chatHiddenTurns";
 import { DEFAULT_RECALLED, MAX_RECALLED, recallEarlierTurns } from "./chatRecall";
 import type { CorosMcpTool } from "./types";
 
@@ -84,6 +85,7 @@ export function handleChatConversationTool(
   const query = typeof args.query === "string" ? args.query.trim() : "";
   const limit = typeof args.limit === "number" && Number.isFinite(args.limit) ? args.limit : DEFAULT_RECALLED;
   // Only the part not sent word for word: the tail is on the wire already.
-  const earlier = getChatSession(sessionId).slice(0, recallableThrough(sessionId));
+  // What the athlete hid from Coach stays hidden from a search of it too.
+  const earlier = coachTranscript(sessionId, getChatSession(sessionId)).slice(0, recallableThrough(sessionId));
   return recallEarlierTurns(earlier, query, limit);
 }

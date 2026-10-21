@@ -17,11 +17,44 @@ function keptNote(creation: TurnCreation): string | undefined {
 }
 
 /**
+ * The summary's part of either question: what the summary still says, and
+ * whether to write it again now — on the model that condenses the
+ * conversation — or leave it until it next rolls.
+ */
+function SummaryChoice({
+  note,
+  model,
+  checked,
+  disabled,
+  onChange
+}: {
+  note: string;
+  model?: string;
+  checked: boolean;
+  disabled: boolean;
+  onChange: (checked: boolean) => void;
+}) {
+  return (
+    <section className="chat-turn-dialog-section">
+      <h3>{t("chat.turn.summary")}</h3>
+      <p className="tl-dialog-warning" role="note">{note}</p>
+      <label className="chat-turn-dialog-choice">
+        <input type="checkbox" checked={checked} disabled={disabled} onChange={(event) => onChange(event.target.checked)} />
+        <span>
+          <b>{t("chat.turn.rewrite")}</b>
+          <small>{model ? t("chat.turn.rewriteOn", { model }) : t("chat.turn.rewriteAny")}</small>
+        </span>
+      </label>
+    </section>
+  );
+}
+
+/**
  * The question before a turn is deleted. It says what goes, and asks the two
  * things only the athlete can answer: whether what Coach made in the turn
  * goes with it (left alone, its cards stay where they are), and — when the
  * conversation's summary speaks for the turn — whether to write the summary
- * again now or leave it until it next rolls.
+ * again now.
  *
  * `description` is null while the main process is still finding out; the
  * delete waits for it, since the answer may add a question.
@@ -84,27 +117,62 @@ export function DeleteTurnDialog({
         </section>
       ) : null}
       {description?.summarised ? (
-        <section className="chat-turn-dialog-section">
-          <h3>{t("chat.turn.summary")}</h3>
-          <p className="tl-dialog-warning" role="note">{t("chat.turn.summaryNote")}</p>
-          <label className="chat-turn-dialog-choice">
-            <input
-              type="checkbox"
-              checked={rewriteSummary}
-              disabled={busy}
-              onChange={(event) => setRewriteSummary(event.target.checked)}
-            />
-            <span>
-              <b>{t("chat.turn.rewrite")}</b>
-              <small>
-                {description.summaryModel
-                  ? t("chat.turn.rewriteOn", { model: description.summaryModel })
-                  : t("chat.turn.rewriteAny")}
-              </small>
-            </span>
-          </label>
-        </section>
+        <SummaryChoice
+          note={t("chat.turn.summaryNote")}
+          model={description.summaryModel}
+          checked={rewriteSummary}
+          disabled={busy}
+          onChange={setRewriteSummary}
+        />
       ) : null}
+    </ConfirmDialog>
+  );
+}
+
+/**
+ * The question before a turn the summary covers is hidden from Coach, or
+ * shown to it again: the summary is a summary of what Coach could read, so it
+ * is out of step with the change until it is written again.
+ */
+export function HideTurnDialog({
+  hidden,
+  summaryModel,
+  busy,
+  onConfirm,
+  onCancel
+}: {
+  /** What the turn becomes: hidden, or shown again. */
+  hidden: boolean;
+  summaryModel?: string;
+  busy: boolean;
+  onConfirm: (rewriteSummary: boolean) => void;
+  onCancel: () => void;
+}) {
+  useI18n();
+  const [rewriteSummary, setRewriteSummary] = useState(false);
+  const confirmLabel = hidden
+    ? rewriteSummary
+      ? t("chat.turn.hideRewrite")
+      : t("chat.turn.hide")
+    : rewriteSummary
+      ? t("chat.turn.showRewrite")
+      : t("chat.turn.show");
+  return (
+    <ConfirmDialog
+      title={hidden ? t("chat.turn.hideTitle") : t("chat.turn.showTitle")}
+      description={hidden ? t("chat.turn.hideBody") : t("chat.turn.showBody")}
+      confirmLabel={confirmLabel}
+      busy={busy ? { target: "confirm", label: t("chat.turn.saving") } : undefined}
+      onConfirm={() => onConfirm(rewriteSummary)}
+      onCancel={onCancel}
+    >
+      <SummaryChoice
+        note={hidden ? t("chat.turn.summaryNote") : t("chat.turn.summaryLeavesOut")}
+        model={summaryModel}
+        checked={rewriteSummary}
+        disabled={busy}
+        onChange={setRewriteSummary}
+      />
     </ConfirmDialog>
   );
 }
