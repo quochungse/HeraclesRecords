@@ -394,13 +394,13 @@ function createWorld(
   });
   sharedMaterials.add(connectiveMaterial);
 
-  // The head is neutral clay, matte and opaque: it gives the figure a face
-  // without competing with the heat colours below it.
+  // The head is neutral clay with a soft sheen, opaque: it gives the figure a
+  // face without competing with the heat colours below it.
   const headMaterial = new MeshStandardMaterial({
     color: 0x938e87,
     emissive: 0x938e87,
-    emissiveIntensity: 0.02,
-    roughness: 0.6,
+    emissiveIntensity: 0.1,
+    roughness: 0.3,
     metalness: 0
   });
   sharedMaterials.add(headMaterial);
