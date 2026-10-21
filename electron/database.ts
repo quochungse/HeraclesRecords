@@ -2900,12 +2900,16 @@ export function saveChatScheduleChange(record: StoredChatScheduleChange): void {
 
 /** A conversation's change sets go with it. */
 export function deleteChatScheduleChangesOf(sessionId: string): void {
-  const database = requireDatabase();
-  const ids = database
+  const ids = requireDatabase()
     .prepare("SELECT change_set_id FROM chat_schedule_changes WHERE session_id = ?")
     .all(sessionId) as Array<{ change_set_id: string }>;
-  const drop = database.prepare("DELETE FROM chat_schedule_changes WHERE change_set_id = ?");
-  for (const { change_set_id: id } of ids) {
+  deleteChatScheduleChanges(ids.map((row) => row.change_set_id));
+}
+
+/** Change sets deleted with the turn that proposed them; lines already applied stay on COROS. */
+export function deleteChatScheduleChanges(changeSetIds: readonly string[]): void {
+  const drop = requireDatabase().prepare("DELETE FROM chat_schedule_changes WHERE change_set_id = ?");
+  for (const id of changeSetIds) {
     if (drop.run(id).changes > 0) notifySyncedDelete("chat_schedule_changes", id);
   }
 }

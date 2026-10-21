@@ -29,3 +29,8 @@ export function displayStoredNotice(content: string): string {
   }
   return screenSentence(content);
 }
+
+/** The reason a stored stopped-early notice gives, or undefined for any other text. */
+export function stoppedEarlyReason(content: string): string | undefined {
+  return content.startsWith(STOPPED_EARLY_PREFIX) ? content.slice(STOPPED_EARLY_PREFIX.length) : undefined;
+}

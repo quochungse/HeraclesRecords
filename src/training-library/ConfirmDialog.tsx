@@ -1,5 +1,5 @@
 import { LoaderCircle } from "lucide-react";
-import { useEffect, useId, useRef } from "react";
+import { useEffect, useId, useRef, type ReactNode } from "react";
 import { t } from "../i18n/core";
 
 export interface ConfirmDialogProps {
@@ -20,6 +20,10 @@ export interface ConfirmDialogProps {
    * done — closing it first left a slow save with nothing on screen.
    */
   busy?: { target: "confirm" | "alternative"; label: string };
+  /** What the athlete may decide alongside the answer — a choice the action takes with it. */
+  children?: ReactNode;
+  /** Holds the confirm button back while the dialog is still finding out what it is asking. */
+  confirmDisabled?: boolean;
   onConfirm: () => void;
   onCancel: () => void;
 }
@@ -52,6 +56,8 @@ export function ConfirmDialog({
   danger = false,
   alternative,
   busy,
+  children,
+  confirmDisabled,
   onConfirm,
   onCancel
 }: ConfirmDialogProps) {
@@ -106,6 +112,7 @@ export function ConfirmDialog({
         <h2 id={titleId}>{title}</h2>
         {description ? <p id={descriptionId}>{description}</p> : null}
         {warning ? <p className="tl-dialog-warning" role="note">{warning}</p> : null}
+        {children}
         <footer>
           <button ref={cancelRef} type="button" className="ghost-button" disabled={Boolean(busy)} onClick={onCancel}>
             {cancelLabel ?? t("common.cancel")}
@@ -123,7 +130,7 @@ export function ConfirmDialog({
           <button
             type="button"
             className={`primary-button${danger ? " danger" : ""}${busy?.target === "confirm" ? " is-busy" : ""}`}
-            disabled={Boolean(busy)}
+            disabled={Boolean(busy) || confirmDisabled}
             onClick={onConfirm}
           >
             {working("confirm", confirmLabel)}

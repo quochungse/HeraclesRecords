@@ -223,6 +223,8 @@ const main: ScreenMessages = {
   "screen.effort.maxDetail": "тщательнее всего",
   "screen.model.auto": "Авто",
   "main.sync.outdated": "Это хранилище в более новом формате данных. Сначала обновите приложение.",
+  "main.coach.turnChanged": "С момента открытия этот разговор изменился. Просмотрите его снова и повторите попытку.",
+  "main.coach.turnNotLast": "Изменить или задать заново можно только последний вопрос.",
 };
 
 export default main;

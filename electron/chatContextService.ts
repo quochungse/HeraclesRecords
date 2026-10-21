@@ -78,10 +78,11 @@ export function readSessionSummary(sessionId: string): StoredTranscriptSummary {
   };
 }
 
+/** A null pair drops the summary: what it covered is gone. */
 export function writeSessionSummary(
   sessionId: string,
-  summary: string,
-  through: number
+  summary: string | null,
+  through: number | null
 ): void {
   setChatSessionCoachSummaryRow(sessionId, summary, through);
 }

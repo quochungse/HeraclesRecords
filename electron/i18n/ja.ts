@@ -215,6 +215,8 @@ const main: ScreenMessages = {
   "screen.effort.maxDetail": "最も丁寧",
   "screen.model.auto": "自動",
   "main.sync.outdated": "この保管庫は新しいデータ形式です。先にアプリを更新してください。",
+  "main.coach.turnChanged": "開いた後にこの会話が変更されました。もう一度確認してから、やり直してください。",
+  "main.coach.turnNotLast": "編集や再送信ができるのは最後の質問だけです。",
 };
 
 export default main;

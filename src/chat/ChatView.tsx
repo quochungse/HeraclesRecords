@@ -76,6 +76,9 @@ import type {
   PlanDraftPreviewEntry,
   TrainingPlanDestination,
   TrainingPlanDocument,
+  DeleteTurnOptions,
+  TurnDescription,
+  TurnRef,
   TrainingHubExportResult,
   UploadPlanResult,
   WorkoutDeletePreview,
@@ -117,7 +120,13 @@ import { EMPTY_NOTES } from "../training-library/runTrail";
 import { briefOpenProblems, briefTitle } from "./planBriefModel";
 import { CoachAskPicker } from "./CoachAskPicker";
 import { remoteErrorMessage } from "./remoteError";
-import { displayStepText, latestOutlineAnchors, outlineStepText, WRITE_SESSIONS_TEXT } from "./planOutlineModel";
+import {
+  displayStepText,
+  isPipelineStepText,
+  latestOutlineAnchors,
+  outlineStepText,
+  WRITE_SESSIONS_TEXT
+} from "./planOutlineModel";
 import { ConfirmDialog } from "../training-library/ConfirmDialog";
 import { createPortal } from "react-dom";
 import { firstPlanMonday } from "../../electron/trainingPlanGeneration";
@@ -186,7 +195,12 @@ import {
 import { getIntlLocale, plural, screenSentence, t } from "../i18n/core";
 import { useI18n } from "../i18n/useI18n";
 import { displaySessionTitle, NEW_PLAN_TITLE } from "./sessionTitle";
-import { displayStoredNotice, stoppedEarlyNotice } from "./storedNotice";
+import { displayStoredNotice, stoppedEarlyNotice, stoppedEarlyReason } from "./storedNotice";
+import { DeleteTurnDialog } from "./DeleteTurnDialog";
+import { TurnActions } from "./TurnActions";
+import { TurnFailureRow } from "./TurnFailureRow";
+import { classifyTurnFailure, unansweredKind, type TurnFailureRowKind } from "./turnFailure";
+import { turnRanges, type TurnRange } from "../../electron/chatTurns";
 
 /* "Edit plan first": the plan editor and the library's stylesheet, loaded
    only when a coach plan is opened in it. */
@@ -1397,6 +1411,25 @@ export function ChatView({
   const [uploadedPlans, setUploadedPlans] = useState<
     Record<string, UploadPlanResult>
   >({});
+  /**
+   * The last failure a turn in this window ended in, for the row drawn where
+   * its answer would be. Kept per conversation and never stored: reopened, a
+   * question with no answer under it is enough to offer it again.
+   */
+  const [turnFailure, setTurnFailure] = useState<{
+    sessionId: string;
+    kind: TurnFailureRowKind;
+    detail?: string;
+  } | null>(null);
+  /** The turn the athlete asked to delete, while the question is up. */
+  const [turnDeletion, setTurnDeletion] = useState<{
+    sessionId: string;
+    ref: TurnRef;
+    description: TurnDescription | null;
+    busy: boolean;
+  } | null>(null);
+  /** A retry on its way: the failure row's buttons wait. */
+  const [retrying, setRetrying] = useState(false);
   // An analysis run writing into the conversation that is open right now.
   const [liveAnalysis, setLiveAnalysis] = useState<LiveAnalysisRun | null>(
     null
@@ -1417,6 +1450,8 @@ export function ChatView({
   const activeRequestIdRef = useRef<string | null>(null);
   /** The timeline's length when the running turn was sent: what comes after is the turn's. */
   const turnStartRef = useRef(0);
+  /** The running turn is a step of the plan pipeline, whose failure the step's own card answers. */
+  const turnPipelineRef = useRef(false);
   const activeSessionIdRef = useRef<string | null>(null);
   /**
    * A turn of the athlete's own is in the air, so the timeline on screen is
@@ -2583,7 +2618,14 @@ export function ChatView({
       pendingCoachPromptsRef.current = [];
       setCurrentSource(null);
       sourceRef.current = null;
+      // A turn that ends with nothing to show is told apart, from here, from
+      // one still being answered on another device (`unansweredKind`).
+      const endedEmpty = () => {
+        const sessionId = turnSessionIdRef.current;
+        if (sessionId) setTurnFailure({ sessionId, kind: "noAnswer" });
+      };
       if (finishReason === "cancelled") {
+        endedEmpty();
         restoreResumedCoachPrompt();
         // A card the turn produced before Stop is on screen and has a draft
         // behind it; unsaved, it dropped out of the conversation on reload
@@ -2627,6 +2669,8 @@ export function ChatView({
           persistTurn(next);
           return next;
         });
+      } else {
+        endedEmpty();
       }
     };
 
@@ -2847,12 +2891,25 @@ export function ChatView({
             persistTurn(next);
             return next;
           });
-        } else {
+        } else if (resumedCoachPromptRef.current || turnPipelineRef.current) {
           // Nothing reached the athlete, so the turn is simply undone: the
-          // card goes back to waiting for an answer they can give again.
+          // card goes back to waiting for an answer they can give again, and
+          // a pipeline step's own card offers it again.
           restoreResumedCoachPrompt();
+          onError(screenSentence(payload.message));
+        } else {
+          // The question stays, and the row under it says what happened and
+          // offers it again (`TurnFailureRow`); a banner went with the next
+          // click and left the question with nothing under it.
+          const sessionId = turnSessionIdRef.current;
+          if (sessionId) {
+            setTurnFailure({
+              sessionId,
+              kind: classifyTurnFailure(payload.message, payload.authError === true),
+              detail: screenSentence(payload.message)
+            });
+          }
         }
-        onError(screenSentence(payload.message));
         if (payload.authError) {
           setAuthStatus({ signedIn: false });
         }
@@ -3385,6 +3442,29 @@ export function ChatView({
     }
   };
 
+  /**
+   * Whether the AI this conversation answers with (P2.0) can be asked, which
+   * may not be Coach's: a key missing for Coach's provider must not block a
+   * conversation that uses another, and one missing for the conversation's
+   * must. Says why when it cannot.
+   */
+  const providerReady = (): boolean => {
+    const turnProvider = effectiveRuntime.provider;
+    if (turnProvider === "openrouter" && !chatSettings.openRouter.hasApiKey) {
+      onError(t("chat.err.openrouterKey"));
+      return false;
+    }
+    if (turnProvider === "local" && !localModelConfigured) {
+      onError(t("chat.err.localModel"));
+      return false;
+    }
+    if (turnProvider === "claude-api" && !chatSettings.anthropic.hasApiKey) {
+      onError(t("chat.err.anthropicKey"));
+      return false;
+    }
+    return true;
+  };
+
   const sendMessage = async (
     trimmed: string,
     answeredPrompt?: { promptId: string; choiceId: string },
@@ -3404,30 +3484,7 @@ export function ChatView({
       await handleLatestActivityFileRequest(trimmed);
       return true;
     }
-    // The AI this conversation answers with (P2.0), which may not be Coach's:
-    // a key missing for Coach's provider must not block a conversation that
-    // uses another, and one missing for the conversation's must.
-    const turnProvider = effectiveRuntime.provider;
-    if (
-      turnProvider === "openrouter" &&
-      !chatSettings.openRouter.hasApiKey
-    ) {
-      onError(t("chat.err.openrouterKey"));
-      return false;
-    }
-    if (turnProvider === "local" && !localModelConfigured) {
-      onError(t("chat.err.localModel"));
-      return false;
-    }
-    if (
-      turnProvider === "claude-api" &&
-      !chatSettings.anthropic.hasApiKey
-    ) {
-      onError(
-        t("chat.err.anthropicKey")
-      );
-      return false;
-    }
+    if (!providerReady()) return false;
     let answeredPromptIndex = pipeline
       ? -1
       : answeredPrompt
@@ -3482,6 +3539,32 @@ export function ChatView({
         ];
     if (refs.length && !aboutRefs) setPendingRefs([]);
     if (scheduleRefs.length) setPendingScheduleRefs([]);
+    await startTurn(nextEntries, { previous: timeline, originalPrompt, pipeline });
+    return true;
+  };
+
+  /**
+   * Sends a turn whose question is already in `nextEntries` — one just
+   * written by `sendMessage`, or the last question asked again by a retry,
+   * which is in the row already (`persist: false`).
+   */
+  const startTurn = async (
+    nextEntries: ChatEntry[],
+    {
+      previous,
+      originalPrompt = null,
+      pipeline,
+      persist = true
+    }: {
+      /** The timeline before this turn, put back when a step is refused. */
+      previous: ChatEntry[];
+      originalPrompt?: CoachInputPrompt | null;
+      pipeline?: ChatPipelineStep;
+      persist?: boolean;
+    }
+  ): Promise<void> => {
+    if (!api) return;
+    setTurnFailure(null);
     const requestId = crypto.randomUUID();
 
     activeRequestIdRef.current = requestId;
@@ -3489,6 +3572,7 @@ export function ChatView({
     setTurnSessionId(activeSessionIdRef.current);
     setStepRun({ requestId, step: pipeline?.step ?? "turn", notes: EMPTY_NOTES, attempts: 0 });
     turnStartRef.current = nextEntries.length;
+    turnPipelineRef.current = Boolean(pipeline);
     resumedCoachPromptRef.current = originalPrompt;
     sourceRef.current = null;
     setCurrentSource(null);
@@ -3496,7 +3580,7 @@ export function ChatView({
     // Keep the unanswered card durable until the resumed turn completes. If
     // the app closes mid-request, reloading the session can safely offer it
     // again instead of leaving an answered-but-incomplete invisible entry.
-    if (!originalPrompt) {
+    if (!originalPrompt && persist) {
       persistHistory(activeSessionIdRef.current, nextEntries, true);
     }
     setStreaming(true);
@@ -3515,7 +3599,7 @@ export function ChatView({
       : await compactBeforeSend(activeSessionIdRef.current, persisted);
     // Stop landed while the summariser was running. Nothing has reached a
     // provider, and the athlete's turn is already in the transcript.
-    if (activeRequestIdRef.current !== requestId) return true;
+    if (activeRequestIdRef.current !== requestId) return;
     // Every version the conversation's cards belong to, read now rather than
     // from state: the list on screen may still be on its way, and the index is
     // what tells the coach which draft_id is the newest.
@@ -3532,7 +3616,7 @@ export function ChatView({
     // Read now, not from state: a line applied on the other machine is what the coach should hear (P3.3).
     const changeSetIds = scheduleChangeIds(persisted);
     const changeSets = changeSetIds.length ? await api.getScheduleChanges(changeSetIds).catch(() => []) : [];
-    if (activeRequestIdRef.current !== requestId) return true;
+    if (activeRequestIdRef.current !== requestId) return;
     const wireMessages = withCreationIndex(
       [
         ...(context?.summary ? [summaryContextMessage(context.summary)] : []),
@@ -3552,7 +3636,7 @@ export function ChatView({
       setStreaming(false);
       if (originalPrompt) {
         resumedCoachPromptRef.current = null;
-        const restoredEntries = timeline.map((entry): ChatEntry =>
+        const restoredEntries = previous.map((entry): ChatEntry =>
           entry.kind === "coachPrompt" &&
           entry.prompt.promptId === originalPrompt.promptId
             ? { ...entry, prompt: originalPrompt }
@@ -3564,12 +3648,100 @@ export function ChatView({
         // A step the main process refused before anything streamed (P2.2):
         // its words would sit in the conversation unanswered, and go to the
         // model on every later turn, so the step is taken back.
-        setTimeline(timeline);
-        persistHistory(activeSessionIdRef.current, timeline, true);
+        setTimeline(previous);
+        persistHistory(activeSessionIdRef.current, previous, true);
       }
       onError(remoteErrorMessage(caught, t("chat.err.request")));
     }
-    return true;
+  };
+
+  /**
+   * The conversation as the main process left it after changing one of its
+   * turns. Drawn in place, never faded in (see `ChatRow`), and counted as the
+   * row's whole length so the next save is not read as missing a tail.
+   */
+  const applyTurnChange = (entries: PersistedChatEntry[]): ChatEntry[] => {
+    persistedBaseRef.current = entries.length;
+    const next = fromPersistedEntries(entries);
+    for (const entry of next) settledEntriesRef.current.add(entry);
+    setTimeline(next);
+    void refreshSessions().catch(() => undefined);
+    return next;
+  };
+
+  /** The turn at `question`, as the main process is told which one is meant. */
+  const turnRefAt = (question: number): TurnRef | null => {
+    const entry = timeline[question];
+    return entry?.kind === "message" && entry.role === "user" ? { index: question, content: entry.content } : null;
+  };
+
+  /**
+   * Asks before a turn is deleted. The window's own pending save goes first,
+   * so the row the main process reads is the transcript on screen.
+   */
+  const askDeleteTurn = async (question: number) => {
+    const sessionId = activeSessionIdRef.current;
+    const ref = turnRefAt(question);
+    if (!api || !sessionId || !ref) return;
+    setTurnDeletion({ sessionId, ref, description: null, busy: false });
+    try {
+      await flushPendingSave();
+      const description = await api.describeChatTurn(sessionId, ref);
+      setTurnDeletion((current) => (current?.ref === ref ? { ...current, description } : current));
+    } catch (caught) {
+      setTurnDeletion(null);
+      showToast(remoteErrorMessage(caught, t("chat.turn.deleteFailed")), "error");
+    }
+  };
+
+  const confirmDeleteTurn = async (options: DeleteTurnOptions) => {
+    const pending = turnDeletion;
+    if (!api || !pending || pending.busy) return;
+    setTurnDeletion({ ...pending, busy: true });
+    try {
+      await flushPendingSave();
+      const change = await api.deleteChatTurn(pending.sessionId, pending.ref, options);
+      if (activeSessionIdRef.current === pending.sessionId) applyTurnChange(change.entries);
+      if (change.summary === "failed") showToast(t("chat.turn.summaryFailed"), "error");
+      else showToast(change.summary === "rewritten" ? t("chat.turn.deletedRewritten") : t("chat.turn.deleted"));
+    } catch (caught) {
+      showToast(remoteErrorMessage(caught, t("chat.turn.deleteFailed")), "error");
+    } finally {
+      setTurnDeletion(null);
+    }
+  };
+
+  /**
+   * The last question asked again. Whatever stands under it — a part of an
+   * answer, a card — is taken out by the main process first, which keeps the
+   * question where it is; then it goes out as a new turn.
+   */
+  const retryLastTurn = async ({ condense = false }: { condense?: boolean } = {}) => {
+    const sessionId = activeSessionIdRef.current;
+    const last = turnRanges(timeline).at(-1);
+    const ref = last ? turnRefAt(last.question) : null;
+    if (!api || !sessionId || !last || !ref || streaming || retrying) return;
+    if (!providerReady()) return;
+    setRetrying(true);
+    try {
+      await flushPendingSave();
+      let entries = timeline;
+      // Something stands under the question: a part of an answer, a card.
+      if (last.end !== last.question + 1) {
+        const change = await api.editChatTurn(sessionId, ref, ref.content);
+        if (activeSessionIdRef.current !== sessionId) return;
+        entries = applyTurnChange(change.entries);
+      }
+      if (condense) {
+        await api.compactChatContext(sessionId, toPersistedEntries(entries), { force: true }).catch(() => undefined);
+      }
+      if (activeSessionIdRef.current !== sessionId) return;
+      await startTurn(entries, { previous: entries, persist: false });
+    } catch (caught) {
+      showToast(remoteErrorMessage(caught, t("chat.fail.retryFailed")), "error");
+    } finally {
+      setRetrying(false);
+    }
   };
 
   /** "Draw the outline", or a redraw with the athlete's note, as a turn of the conversation (P2.2). */
@@ -4634,6 +4806,66 @@ export function ChatView({
     }
     return -1;
   })();
+  // Which turn each entry belongs to, for the actions beside a message.
+  const turnByEntry = new Map<number, TurnRange>();
+  const turns = turnRanges(timeline);
+  for (const range of turns) {
+    for (let at = range.start; at < range.end; at += 1) turnByEntry.set(at, range);
+  }
+  const turnActionsLive = Boolean(api && activeSessionId) && !turnHere && !turnDeletion && !retrying && !liveAnalysis;
+  const deleteTurnAt = (index: number) => {
+    const turn = turnByEntry.get(index);
+    return turnActionsLive && turn ? () => void askDeleteTurn(turn.question) : undefined;
+  };
+  /*
+   * The row under a last question that got no answer, or in place of the
+   * notice a turn that stopped part-way left. Nothing for a step of the plan
+   * pipeline (its card offers it again) or an analysis's playbook (its run
+   * log says what happened), nor while anything still writes here.
+   */
+  const failure = ((): { kind: TurnFailureRowKind; detail?: string; replaces?: number } | null => {
+    const last = turns.at(-1);
+    if (!last || turnHere || liveAnalysis || !activeSessionId) return null;
+    const question = timeline[last.question];
+    if (question?.kind !== "message" || question.automation || isPipelineStepText(question.content)) return null;
+    const closing = last.end === timeline.length ? timeline[last.end - 1] : undefined;
+    const stopped =
+      closing?.kind === "toolNotice"
+        ? stoppedEarlyReason(closing.message)
+        : closing?.kind === "message" && closing.role === "assistant"
+          ? stoppedEarlyReason(closing.content)
+          : undefined;
+    if (stopped !== undefined) return { kind: "partial", detail: screenSentence(stopped), replaces: last.end - 1 };
+    const answered = timeline
+      .slice(last.question + 1, last.end)
+      .some((entry) => entry.kind === "coachPrompt" || entry.kind === "toolNotice" || entry.kind === "message");
+    if (answered) return null;
+    const known = turnFailure?.sessionId === activeSessionId ? turnFailure : null;
+    return known
+      ? { kind: known.kind, ...(known.detail ? { detail: known.detail } : {}) }
+      : { kind: unansweredKind(question.at, Date.now()) };
+  })();
+  const failureRow = failure ? (
+    <ChatRow key="turn-failure" settled className="chat-row chat-row-assistant">
+      <div className="chat-avatar chat-avatar-assistant">
+        <Sparkles size={16} aria-hidden="true" />
+      </div>
+      <div className="chat-bubble chat-bubble-plan">
+        <TurnFailureRow
+          kind={failure.kind}
+          detail={failure.detail}
+          busy={retrying || streaming}
+          actions={{
+            onRetry: () => void retryLastTurn(),
+            onCondense: () => void retryLastTurn({ condense: true }),
+            onOtherAi: () => setAiSheetOpen(true),
+            onSettings: openSettings,
+            onDelete: turns.length ? deleteTurnAt(turns[turns.length - 1]!.question) : undefined
+          }}
+        />
+      </div>
+    </ChatRow>
+  ) : null;
   const turnCharts: TurnChart[] = [];
   if (turnHere && chatSettings.visualizationsEnabled) {
     timeline.forEach((entry, index) => {
@@ -4700,7 +4932,8 @@ export function ChatView({
           ).map((item) => item.row)
         ]
       : rows;
-    return stepTrailRow ? [...placed, stepTrailRow] : placed;
+    const closed = failureRow && failure?.replaces === undefined ? [...placed, failureRow] : placed;
+    return stepTrailRow ? [...closed, stepTrailRow] : closed;
   };
 
   return (
@@ -4830,6 +5063,7 @@ export function ChatView({
             // See `ChatRow`: every row a settle or a reload mounts is drawn as it is.
             const settled = settledEntriesRef.current.has(entry);
 
+            if (index === failure?.replaces) return failureRow;
             if (entry.kind === "toolNotice") {
               return (
                 <ChatRow
@@ -5343,14 +5577,19 @@ export function ChatView({
                         />
                       ) : null}
                       {/* Where the answer came from and what it cost, as one
-                          quiet line under it rather than two rows of pills. */}
-                      {entry.source || entry.usage || entry.at !== undefined ? (
-                        <div className="chat-answer-foot">
-                          <MessageTime at={entry.at} />
-                          {entry.source ? <SourceBadge source={entry.source} /> : null}
-                          <TurnCostFooter usage={entry.usage} model={entry.model} />
-                        </div>
-                      ) : null}
+                          quiet line under it rather than two rows of pills,
+                          and what can be done to it. */}
+                      <div className="chat-answer-foot">
+                        <MessageTime at={entry.at} />
+                        {entry.source ? <SourceBadge source={entry.source} /> : null}
+                        <TurnActions
+                          copyText={() =>
+                            displayStoredNotice(stripChartPlaceholders(answerParts.get(index)?.text ?? entry.content))
+                          }
+                          onDelete={deleteTurnAt(index)}
+                        />
+                        <TurnCostFooter usage={entry.usage} model={entry.model} />
+                      </div>
                     </>
                   ) : (
                     <>
@@ -5369,6 +5608,10 @@ export function ChatView({
                   )}
                 </div>
                 {entry.role === "user" ? <MessageTime at={entry.at} /> : null}
+                {/* Last in the row, which runs right to left: beside the time. */}
+                {entry.role === "user" ? (
+                  <TurnActions copyText={() => displayStepText(entry.content)} onDelete={deleteTurnAt(index)} />
+                ) : null}
               </ChatRow>
             );
           }))}
@@ -5484,6 +5727,14 @@ export function ChatView({
       </div>
       {settingsModal}
       {contextHistoryDialog}
+      {turnDeletion && turnDeletion.sessionId === activeSessionId ? (
+        <DeleteTurnDialog
+          description={turnDeletion.description}
+          busy={turnDeletion.busy}
+          onConfirm={(options) => void confirmDeleteTurn(options)}
+          onCancel={() => setTurnDeletion(null)}
+        />
+      ) : null}
       {/* Held until a conversation is open: Coach mounting for the first time
           from the Calendar opens its newest one, and a pick made before that
           landed would be switched away from under the athlete. */}

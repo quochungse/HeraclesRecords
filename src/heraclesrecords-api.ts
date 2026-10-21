@@ -24,6 +24,10 @@ import type {
   RememberedMilestone,
   ReverseGeocodeResult,
   SaveChatSessionOptions,
+  DeleteTurnOptions,
+  TurnChange,
+  TurnDescription,
+  TurnRef,
   HevySettingsInput,
   HevyStatus,
   StrengthHistory,
@@ -485,6 +489,12 @@ export interface HeraclesRecordsApi {
     pinned: boolean
   ) => Promise<ChatSessionSummary | null>;
   deleteChatSession: (sessionId: string) => Promise<void>;
+  /** What deleting a turn would touch: the creations it made, and whether the summary speaks for it. */
+  describeChatTurn: (sessionId: string, ref: TurnRef) => Promise<TurnDescription>;
+  /** Deletes a turn — its question and Coach's answer — and returns the conversation as it now stands. */
+  deleteChatTurn: (sessionId: string, ref: TurnRef, options: DeleteTurnOptions) => Promise<TurnChange>;
+  /** Asks the last turn again with `text` (the same words for a retry): Coach's answer and what it made go. */
+  editChatTurn: (sessionId: string, ref: TurnRef, text: string) => Promise<TurnChange>;
   renameChatSession: (
     sessionId: string,
     title: string

@@ -13825,6 +13825,194 @@ td span {
   padding-bottom: 4px;
 }
 
+/* What can be done to a message — copy it, delete its turn — kept out of
+   sight until its row is hovered or one of the buttons takes focus, so a
+   conversation reads as one. A touch screen has no hover, so it shows them. */
+.chat-turn-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  opacity: 0;
+  transition: opacity var(--dur-fast) var(--ease);
+}
+
+.chat-row:hover .chat-turn-actions,
+.chat-turn-actions:focus-within {
+  opacity: 1;
+}
+
+@media (hover: none) {
+  .chat-turn-actions {
+    opacity: 1;
+  }
+}
+
+.chat-row-user > .chat-turn-actions {
+  align-self: center;
+}
+
+.chat-turn-action {
+  display: inline-grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: background var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease);
+}
+
+.chat-turn-action:hover {
+  background: var(--glass-bg-hover);
+  color: var(--text-primary);
+}
+
+.chat-turn-action.is-danger:hover {
+  background: var(--error-bg);
+  color: var(--error-text);
+}
+
+/* Where a turn's answer would be when none came, or in place of the notice a
+   turn that stopped part-way left: what happened and what to do about it. A
+   passing trouble wears the warning tone, one to act on the error tone, and
+   an answer that simply never arrived neither. */
+.chat-failure {
+  display: grid;
+  gap: 10px;
+  padding: 12px 14px;
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-md);
+  background: var(--glass-bg);
+}
+
+.chat-failure.is-warning {
+  border-color: var(--warning-border);
+  background: var(--warning-bg);
+}
+
+.chat-failure.is-error {
+  border-color: var(--error-border);
+  background: var(--error-bg);
+}
+
+.chat-failure-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.chat-failure-head > svg {
+  flex: none;
+  margin-top: 2px;
+  color: var(--text-muted);
+}
+
+.chat-failure.is-warning .chat-failure-head > svg {
+  color: var(--warning-text);
+}
+
+.chat-failure.is-error .chat-failure-head > svg {
+  color: var(--error-text);
+}
+
+.chat-failure-head strong {
+  display: block;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+.chat-failure-head p {
+  margin: 2px 0 0;
+  color: var(--text-secondary);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.chat-failure-details {
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.chat-failure-details summary {
+  width: fit-content;
+  cursor: pointer;
+}
+
+.chat-failure-details pre {
+  margin: 6px 0 0;
+  padding: 8px 10px;
+  border-radius: var(--radius-sm);
+  background: var(--glass-bg);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+/* The choices the delete question carries (`DeleteTurnDialog`), inside the
+   library's dialog. */
+.chat-turn-dialog-section {
+  display: grid;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.tl-dialog .chat-turn-dialog-section h3 {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.tl-dialog .chat-turn-dialog-section ul,
+.tl-dialog .chat-turn-dialog-section .tl-dialog-warning {
+  margin: 0;
+}
+
+.tl-dialog .chat-turn-dialog-pending {
+  color: var(--text-muted);
+}
+
+.chat-turn-dialog-choice {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: background var(--dur-fast) var(--ease);
+}
+
+.chat-turn-dialog-choice:has(input:checked) {
+  background: var(--glass-bg);
+}
+
+.chat-turn-dialog-choice input {
+  flex: none;
+  margin: 3px 0 0;
+}
+
+.chat-turn-dialog-choice b {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.chat-turn-dialog-choice small {
+  display: block;
+  margin-top: 2px;
+  color: var(--text-secondary);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
 /* ---------------------------------------------------------------------------
    The composer as one box (R1): the words, and under them what the question
    is about and which AI answers it.

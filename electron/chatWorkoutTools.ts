@@ -2823,6 +2823,24 @@ export function discardPlanDraft(draftId: string): void {
 }
 
 /**
+ * A creation as deleting a turn sees it: every version's draft id, and
+ * whether any of them is saved — a saved one is never deleted from a turn,
+ * for the reason `discardPlanDraft` refuses it.
+ */
+export function creationOfDraft(
+  draftId: string
+): { artifactId: string; draftIds: string[]; saved: boolean } | undefined {
+  const stored = loadStoredPlanDraft(draftId);
+  if (!stored) return undefined;
+  const versions = versionsOf(stored.artifactId);
+  return {
+    artifactId: stored.artifactId,
+    draftIds: [...new Set([draftId, ...versions.map((version) => version.draftId)])],
+    saved: Boolean(stored.uploadedAt || versions.some((version) => version.uploadedAt))
+  };
+}
+
+/**
  * A conversation's drafts go with it. They used to be pruned a day after they
  * were written, which left a card in the transcript whose Save could only
  * answer "draft not found"; now a draft lives exactly as long as the card.

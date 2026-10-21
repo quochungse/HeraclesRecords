@@ -116,6 +116,8 @@ export const SCREEN_TEXT_EN = {
   "main.coach.analysisPlaybook": "An analysis needs a playbook.",
   "main.coach.analysisSession": "An analysis belongs to a conversation.",
   "main.coach.analysisLimit": "A conversation can run at most {n} analyses.",
+  "main.coach.turnNotLast": "Only your last question can be edited or asked again.",
+  "main.coach.turnChanged": "This conversation changed since it was opened. Look at it again, then try once more.",
   // Coach's AI providers
   "main.ai.anthropicKey": "Add your Anthropic API key first.",
   "main.ai.connectedTo": "Connected to {name}.",

@@ -360,7 +360,12 @@ async function main() {
       name: "Post-activity debrief",
       triggerLabel: "New activity"
     };
-    const history = [{ kind: "message", role: "user", content: "Tuần trước thế nào?" }];
+    // Answered: a question with no answer under it gets a row of its own
+    // (`TurnFailureRow`), which would leave with the run and skew the count.
+    const history = [
+      { kind: "message", role: "user", content: "Tuần trước thế nào?" },
+      { kind: "message", role: "assistant", content: "Ổn định." }
+    ];
     await harness("mount", "ChatView", {}, {
       ...BASE_SCRIPT,
       __persistChatSessions: false,

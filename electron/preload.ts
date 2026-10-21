@@ -27,6 +27,10 @@ import type {
   RememberedMilestone,
   ReverseGeocodeResult,
   SaveChatSessionOptions,
+  DeleteTurnOptions,
+  TurnChange,
+  TurnDescription,
+  TurnRef,
   HevySettingsInput,
   HevyStatus,
   StrengthHistory,
@@ -579,6 +583,12 @@ const api = {
     ipcRenderer.invoke("chat:setSessionPinned", sessionId, pinned),
   deleteChatSession: (sessionId: string): Promise<void> =>
     ipcRenderer.invoke("chat:deleteSession", sessionId),
+  describeChatTurn: (sessionId: string, ref: TurnRef): Promise<TurnDescription> =>
+    ipcRenderer.invoke("chat:describeTurn", sessionId, ref),
+  deleteChatTurn: (sessionId: string, ref: TurnRef, options: DeleteTurnOptions): Promise<TurnChange> =>
+    ipcRenderer.invoke("chat:deleteTurn", sessionId, ref, options),
+  editChatTurn: (sessionId: string, ref: TurnRef, text: string): Promise<TurnChange> =>
+    ipcRenderer.invoke("chat:editTurn", sessionId, ref, text),
   renameChatSession: (
     sessionId: string,
     title: string

@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### What's new
+- **Coach** - delete a question together with Coach's answer, and what Coach made in it if you choose. When the conversation's summary still mentions it, the summary can be rewritten on the spot. A question that got no answer says why right under it and offers Retry, and every message can be copied.
+
 ## [1.2.0] - 2026-10-20
 
 ### What's new

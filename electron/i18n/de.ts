@@ -215,6 +215,8 @@ const main: ScreenMessages = {
   "screen.effort.maxDetail": "am gründlichsten",
   "screen.model.auto": "Automatisch",
   "main.sync.outdated": "Dieser Speicher hat ein neueres Datenformat. Aktualisiere zuerst die App.",
+  "main.coach.turnChanged": "Dieses Gespräch hat sich seit dem Öffnen geändert. Sieh es dir erneut an und versuche es noch einmal.",
+  "main.coach.turnNotLast": "Nur deine letzte Frage kann bearbeitet oder erneut gestellt werden.",
 };
 
 export default main;

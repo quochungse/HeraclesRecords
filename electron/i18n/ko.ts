@@ -215,6 +215,8 @@ const main: ScreenMessages = {
   "screen.effort.maxDetail": "가장 꼼꼼함",
   "screen.model.auto": "자동",
   "main.sync.outdated": "이 보관소는 더 새로운 데이터 형식입니다. 먼저 앱을 업데이트하세요.",
+  "main.coach.turnChanged": "연 뒤에 이 대화가 바뀌었습니다. 다시 확인한 뒤 한 번 더 시도하세요.",
+  "main.coach.turnNotLast": "마지막 질문만 수정하거나 다시 물을 수 있습니다.",
 };
 
 export default main;

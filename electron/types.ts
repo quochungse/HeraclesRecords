@@ -1261,6 +1261,50 @@ export interface PersistedChatAnalysisStoppedEntry {
  * here rather than beside the store because the renderer declares the same
  * call and must not import a main-process module to do it.
  */
+/**
+ * A turn of a conversation, as the window names it: its question's position
+ * in the transcript the window holds and its words. The main process checks
+ * both against the row before it changes anything (`chatTurnService.ts`).
+ */
+export interface TurnRef {
+  index: number;
+  content: string;
+}
+
+/** Something a turn made that lives in a table of its own: a plan, a workout, a proposed change. */
+export interface TurnCreation {
+  kind: "plan" | "workout" | "changes";
+  name: string;
+  /** Whether it can be deleted with the turn. */
+  deletable: boolean;
+  /** Why it cannot: saved to COROS, or versions of it in other turns. */
+  keptBecause?: "saved" | "versions";
+}
+
+/** What deleting a turn would touch, for the question the window asks first. */
+export interface TurnDescription {
+  creations: TurnCreation[];
+  /** The conversation's summary speaks for this turn. */
+  summarised: boolean;
+  /** The model a rewritten summary would run on. */
+  summaryModel?: string;
+}
+
+export interface DeleteTurnOptions {
+  /** Delete what the turn made too, where it can be; otherwise its cards stay. */
+  deleteCreations: boolean;
+  /** Write the summary again without the turn, now. */
+  rewriteSummary: boolean;
+}
+
+/** A conversation after one of its turns changed. */
+export interface TurnChange {
+  entries: PersistedChatEntry[];
+  /** How the summary rewrite went, when one was asked for. */
+  summary?: "rewritten" | "failed";
+  summaryError?: string;
+}
+
 export interface SaveChatSessionOptions {
   /**
    * How many of the stored entries the caller's array accounts for. Anything
