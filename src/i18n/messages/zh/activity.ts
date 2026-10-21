@@ -105,6 +105,7 @@ const activity: ActivityMessages = {
   "activity.channel.hr": "心率",
   "activity.channel.cadence": "步频",
   "activity.channel.power": "功率",
+  "activity.channel.runningPower": "跑步功率",
   "activity.channel.strideLength": "步幅",
   "activity.channel.groundTime": "触地时间",
   "activity.channel.verticalOscillation": "垂直振幅",

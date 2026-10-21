@@ -36,6 +36,7 @@
     "test:overview-greeting": "cross-env ELECTRON_RUN_AS_NODE=1 electron --experimental-strip-types --import ./scripts/register-ts-ext.mjs scripts/test-overview-greeting.mjs",
     "test:distance-zones": "cross-env ELECTRON_RUN_AS_NODE=1 electron --experimental-strip-types --import ./scripts/register-ts-ext.mjs scripts/test-distance-zones.mjs",
     "test:run-metrics": "cross-env ELECTRON_RUN_AS_NODE=1 electron --experimental-strip-types --import ./scripts/register-ts-ext.mjs scripts/test-run-metrics.mjs",
+    "test:activity-channel-colors": "cross-env ELECTRON_RUN_AS_NODE=1 electron --experimental-strip-types --import ./scripts/register-ts-ext.mjs scripts/test-activity-channel-colors.mjs",
     "test:run-performance": "cross-env ELECTRON_RUN_AS_NODE=1 electron --experimental-strip-types --import ./scripts/register-ts-ext.mjs scripts/test-run-performance.mjs",
     "test:sample-rides": "npm run build:electron && node scripts/test-sample-rides.mjs",
     "test:sample-hikes": "npm run build:electron && node scripts/test-sample-hikes.mjs",

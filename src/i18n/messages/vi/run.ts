@@ -60,7 +60,7 @@ const run: RunMessages = {
   "run.detail.climbingRateTitle.imperial": "Số feet leo mỗi giờ trên các đoạn lên dốc, không tính lúc dừng",
   "run.detail.decoupling": "Độ lệch hiếu khí",
   "run.detail.decouplingTitle": "Pace và nhịp tim tách nhau bao xa giữa nửa đầu và nửa sau, bỏ qua mười phút đầu khởi động. Dưới 5% là buổi chạy giữ được nhịp.",
-  "run.detail.vertOsc": "Dao động dọc",
+  "run.detail.vertOsc": "Chiều cao sải chân",
   "run.detail.aerobic": "Hiệu quả hiếu khí",
   "run.detail.anaerobic": "Hiệu quả kỵ khí",
   "run.detail.temperature": "Nhiệt độ",

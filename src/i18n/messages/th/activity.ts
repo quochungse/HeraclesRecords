@@ -105,6 +105,7 @@ const activity: ActivityMessages = {
   "activity.channel.hr": "อัตราการเต้นของหัวใจ",
   "activity.channel.cadence": "รอบก้าว",
   "activity.channel.power": "พาวเวอร์",
+  "activity.channel.runningPower": "พาวเวอร์การวิ่ง",
   "activity.channel.strideLength": "ความยาวก้าว",
   "activity.channel.groundTime": "เวลาเท้าแตะพื้น",
   "activity.channel.verticalOscillation": "การกระเด้งขึ้นลง",

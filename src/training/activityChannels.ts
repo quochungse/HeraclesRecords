@@ -1,6 +1,7 @@
 import type { Theme } from "../theme/theme";
 import type { TrainingHubActivitySeriesPoint } from "../../electron/types";
 import { t } from "../i18n/core";
+import { isRunSportType } from "../running/runSurface";
 
 /**
  * The channels an activity's chart can draw, and what each one is.
@@ -81,16 +82,19 @@ export interface ActivityChannelDefinition {
 /** A channel whose label is read in the language on screen each time it is asked for. */
 function channel(
   key: ActivityChannelKey,
-  rest: Omit<ActivityChannelDefinition, "key" | "label">
+  rest: Omit<ActivityChannelDefinition, "key" | "label">,
+  name: ActivityChannelKey | "runningPower" = key
 ): ActivityChannelDefinition {
   return {
     key,
     get label() {
-      return t(`activity.channel.${key}` as const);
+      return t(`activity.channel.${name}` as const);
     },
     ...rest
   };
 }
+
+const POWER = { unit: "W", decimals: 0 } as const;
 
 const ACTIVITY_CHANNELS: readonly ActivityChannelDefinition[] = [
   channel("pace", { unit: "", decimals: 0, reversed: true }),
@@ -98,7 +102,7 @@ const ACTIVITY_CHANNELS: readonly ActivityChannelDefinition[] = [
   channel("speed", { unit: "", decimals: 1 }),
   channel("hr", { unit: "bpm", decimals: 0 }),
   channel("cadence", { unit: "spm", decimals: 0 }),
-  channel("power", { unit: "W", decimals: 0 }),
+  channel("power", POWER),
   channel("strideLength", { unit: "m", decimals: 2 }),
   channel("groundTime", { unit: "ms", decimals: 0 }),
   channel("verticalOscillation", { unit: "cm", decimals: 1 }),
@@ -107,8 +111,30 @@ const ACTIVITY_CHANNELS: readonly ActivityChannelDefinition[] = [
   channel("altitude", { unit: "m", decimals: 0, background: true })
 ];
 
-export function activityChannel(key: ActivityChannelKey): ActivityChannelDefinition {
-  return ACTIVITY_CHANNELS.find((channel) => channel.key === key) ?? ACTIVITY_CHANNELS[0]!;
+/**
+ * Power on a run is COROS's Running Power, and is called that; on a ride it is
+ * the meter's power, and keeps the plain word. So does power on anything else
+ * read as a pace — a HYROX session, a row — which is not a run: the Activities
+ * pane reads every such sport as a pace, so the motion alone cannot say. A
+ * caller that names no sport is a run's own page, or a card read as one.
+ */
+const RUNNING_POWER = channel("power", POWER, "runningPower");
+
+function forMotion(
+  channel: ActivityChannelDefinition,
+  motion: ActivityMotion | undefined,
+  sportType: number | undefined
+): ActivityChannelDefinition {
+  const run = (motion === "pace" || motion === "trail") && (sportType === undefined || isRunSportType(sportType));
+  return channel.key === "power" && run ? RUNNING_POWER : channel;
+}
+
+export function activityChannel(
+  key: ActivityChannelKey,
+  motion?: ActivityMotion,
+  sportType?: number
+): ActivityChannelDefinition {
+  return forMotion(ACTIVITY_CHANNELS.find((channel) => channel.key === key) ?? ACTIVITY_CHANNELS[0]!, motion, sportType);
 }
 
 /**
@@ -260,7 +286,8 @@ function countChannelSamples(
 /** The channels this run can actually draw, in the order they are offered. */
 export function availableActivityChannels(
   series: readonly ActivityChannelPoint[],
-  motion: ActivityMotion = "pace"
+  motion: ActivityMotion = "pace",
+  sportType?: number
 ): ActivityChannelDefinition[] {
   return ACTIVITY_CHANNELS.filter((channel) => {
     if (isOtherMotion(channel.key, motion)) {
@@ -273,7 +300,7 @@ export function availableActivityChannels(
       channel.key !== "altitude" ||
       channelRange(series, "altitude") >= MIN_ALTITUDE_RANGE_METERS
     );
-  });
+  }).map((channel) => forMotion(channel, motion, sportType));
 }
 
 /**
@@ -444,57 +471,72 @@ export interface ActivityChannelColors {
 }
 
 /**
- * The channels' colours, chosen as a set and checked with a colour-vision
- * validator rather than by eye (OKLab ΔE: at least 15 with normal vision and 8
- * under protan and deutan simulation for every pair below).
+ * The channels' colours are COROS's: the hue each one wears in the COROS app
+ * (pace green, effort pace lime, heart rate red, cadence amber, running power
+ * orange, stride length violet, ground time yellow, stride height coral,
+ * elevation teal), so a chart here reads like the one the athlete already
+ * knows. Two are this app's own. The climbing rate is not a COROS channel and
+ * keeps a magenta. Stride ratio is a sky blue where COROS draws it
+ * yellow-green: at that hue it sat on effort pace (ΔE under 3), and held apart
+ * from it, from pace and from heart rate it had nowhere to go but near-black
+ * on paper or orange on dark. The blue half of the wheel is empty, and blue
+ * against yellow is the axis protan and deutan vision keeps.
  *
- * Eleven channels cannot all be told apart from each other on any palette, so
- * the pairs that are actually drawn together come first. Heart rate is told
- * from every other channel, because it is beside all of them in one plot or
- * the other. The output channels — pace, effort pace, power and the climbing
- * rate, which share the upper plot when split — are told apart pair by pair,
- * and pace and power from cadence. Heart rate keeps red and pace blue, the
- * colours every watch and training app has taught an athlete to read them by.
- * What gives way is pairs nobody draws together: the form figures among each
- * other (they are read one at a time against heart rate), and an output
- * channel beside a form figure, which only a combined chart could hold. Paper's
- * steps are the same hues, darkened to hold 3:1 on white.
+ * The hues are COROS's and the lightness and chroma this app's. COROS's set
+ * crowds the warm half of the wheel — red, orange, amber, lime and green — so
+ * lightness carries what hue cannot, and the pairs that can be drawn together
+ * are held apart by OKLab ΔE (×100) of at least 15 to normal vision and 8
+ * under protan and deutan simulation (Machado 2009, full severity), in both
+ * themes: heart rate against every channel, since it sits beside all of them;
+ * pace (and speed, its colour) against effort pace, power, cadence and the
+ * climbing rate; effort pace against power and the climbing rate; power
+ * against cadence and the climbing rate; cadence against the climbing rate;
+ * stride ratio against pace, effort pace, power, cadence, stride length and
+ * the climbing rate.
+ * What gives way is pairs nobody reads together — the form figures among
+ * each other, and effort pace against cadence. `test:activity-channel-colors`
+ * holds every one of those pairs, and every stroke at 3:1 against the panel.
+ *
+ * Holding them costs some tone. On dark, heart rate is a deeper red, the low
+ * point the bright greens and ambers are read off, and cadence a pale amber
+ * above the orange of power. Paper has only the band between ink and 3:1 on
+ * white to spend, so the three tones it holds apart are three steps of
+ * lightness: effort pace a light olive-lime at the top of the band, pace a
+ * mid-tone green and power a dark burnt orange, beside the red of heart rate.
+ * Elevation is a backdrop, so it is the teal washed thin.
  */
 const DARK_CHANNEL_COLORS: Record<ActivityChannelKey, ActivityChannelColors> = {
-  pace: { stroke: "#3987e5", fill: "rgba(57, 135, 229, 0.18)" },
-  adjustedPace: { stroke: "#1fa58c", fill: "rgba(31, 165, 140, 0.18)" },
+  pace: { stroke: "#5cbc7d", fill: "rgba(92, 188, 125, 0.18)" },
+  adjustedPace: { stroke: "#c5db70", fill: "rgba(197, 219, 112, 0.18)" },
   // Speed takes pace's colour: the two are one channel read two ways, and are
   // never offered together.
-  speed: { stroke: "#3987e5", fill: "rgba(57, 135, 229, 0.18)" },
-  hr: { stroke: "#e66767", fill: "rgba(230, 103, 103, 0.18)" },
-  cadence: { stroke: "#33b5c4", fill: "rgba(51, 181, 196, 0.18)" },
-  power: { stroke: "#e6ab45", fill: "rgba(230, 171, 69, 0.18)" },
-  strideLength: { stroke: "#8a84f2", fill: "rgba(138, 132, 242, 0.18)" },
-  groundTime: { stroke: "#d4a2e6", fill: "rgba(212, 162, 230, 0.18)" },
-  verticalOscillation: { stroke: "#bf4da8", fill: "rgba(191, 77, 168, 0.18)" },
-  verticalRatio: { stroke: "#6aa7f0", fill: "rgba(106, 167, 240, 0.18)" },
-  verticalSpeed: { stroke: "#b751b5", fill: "rgba(183, 81, 181, 0.18)" },
-  altitude: { stroke: "rgba(255, 255, 255, 0.22)", fill: "rgba(255, 255, 255, 0.07)" }
+  speed: { stroke: "#5cbc7d", fill: "rgba(92, 188, 125, 0.18)" },
+  hr: { stroke: "#d75154", fill: "rgba(215, 81, 84, 0.18)" },
+  cadence: { stroke: "#f1ce99", fill: "rgba(241, 206, 153, 0.18)" },
+  power: { stroke: "#f58c38", fill: "rgba(245, 140, 56, 0.18)" },
+  strideLength: { stroke: "#8f78df", fill: "rgba(143, 120, 223, 0.18)" },
+  groundTime: { stroke: "#dcc86c", fill: "rgba(220, 200, 108, 0.18)" },
+  verticalOscillation: { stroke: "#ed987d", fill: "rgba(237, 152, 125, 0.18)" },
+  verticalRatio: { stroke: "#64bced", fill: "rgba(100, 188, 237, 0.18)" },
+  verticalSpeed: { stroke: "#ae64bc", fill: "rgba(174, 100, 188, 0.18)" },
+  altitude: { stroke: "rgba(61, 187, 174, 0.4)", fill: "rgba(61, 187, 174, 0.1)" }
 };
 
 const PAPER_CHANNEL_COLORS: Record<ActivityChannelKey, ActivityChannelColors> = {
-  pace: { stroke: "#2a6fc9", fill: "rgba(42, 111, 201, 0.16)" },
-  adjustedPace: { stroke: "#0f8a73", fill: "rgba(15, 138, 115, 0.16)" },
+  pace: { stroke: "#357a4e", fill: "rgba(53, 122, 78, 0.16)" },
+  adjustedPace: { stroke: "#7e9d1d", fill: "rgba(126, 157, 29, 0.16)" },
   // Speed takes pace's colour: the two are one channel read two ways, and are
   // never offered together.
-  speed: { stroke: "#2a6fc9", fill: "rgba(42, 111, 201, 0.16)" },
-  hr: { stroke: "#d4473f", fill: "rgba(212, 71, 63, 0.16)" },
-  cadence: { stroke: "#139aa0", fill: "rgba(19, 154, 160, 0.16)" },
-  power: { stroke: "#c48a12", fill: "rgba(196, 138, 18, 0.16)" },
-  strideLength: { stroke: "#675ed8", fill: "rgba(103, 94, 216, 0.16)" },
-  groundTime: { stroke: "#b06bc8", fill: "rgba(176, 107, 200, 0.16)" },
-  verticalOscillation: { stroke: "#a4287c", fill: "rgba(164, 40, 124, 0.16)" },
-  verticalRatio: { stroke: "#4c86de", fill: "rgba(76, 134, 222, 0.16)" },
-  verticalSpeed: { stroke: "#963096", fill: "rgba(150, 48, 150, 0.16)" },
-  // The one channel that is a backdrop rather than a series, so it takes the
-  // theme's ink the way every border and well does — rgb(19, 26, 40) here,
-  // white-alpha in the dark table.
-  altitude: { stroke: "rgba(19, 26, 40, 0.2)", fill: "rgba(19, 26, 40, 0.08)" }
+  speed: { stroke: "#357a4e", fill: "rgba(53, 122, 78, 0.16)" },
+  hr: { stroke: "#cc342f", fill: "rgba(204, 52, 47, 0.16)" },
+  cadence: { stroke: "#c48225", fill: "rgba(196, 130, 37, 0.16)" },
+  power: { stroke: "#753a05", fill: "rgba(117, 58, 5, 0.16)" },
+  strideLength: { stroke: "#6a4ec8", fill: "rgba(106, 78, 200, 0.16)" },
+  groundTime: { stroke: "#ac8b00", fill: "rgba(172, 139, 0, 0.16)" },
+  verticalOscillation: { stroke: "#c8846d", fill: "rgba(200, 132, 109, 0.16)" },
+  verticalRatio: { stroke: "#4093bb", fill: "rgba(64, 147, 187, 0.16)" },
+  verticalSpeed: { stroke: "#9945a9", fill: "rgba(153, 69, 169, 0.16)" },
+  altitude: { stroke: "rgba(38, 153, 142, 0.4)", fill: "rgba(38, 153, 142, 0.1)" }
 };
 
 export function activityChannelColors(theme: Theme): Record<ActivityChannelKey, ActivityChannelColors> {

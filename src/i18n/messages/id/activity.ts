@@ -105,6 +105,7 @@ const activity: ActivityMessages = {
   "activity.channel.hr": "Detak jantung",
   "activity.channel.cadence": "Kadens",
   "activity.channel.power": "Daya",
+  "activity.channel.runningPower": "Daya lari",
   "activity.channel.strideLength": "Panjang langkah",
   "activity.channel.groundTime": "Kontak tanah",
   "activity.channel.verticalOscillation": "Osilasi vertikal",

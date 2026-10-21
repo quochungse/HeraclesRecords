@@ -578,6 +578,7 @@ export function ActivityDetailPane({
               onFocusLapHandled={() => setFocusLapIndex(null)}
               activityTime={duration}
               embedded
+              sportType={sportType}
               // A ride reads in km/h and rpm here as it does on Cycling, a
               // hike in km/h and metres an hour as it does on Hiking, and a
               // trail run in pace and metres an hour as it does on Running.

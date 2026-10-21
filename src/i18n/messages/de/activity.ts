@@ -105,6 +105,7 @@ const activity: ActivityMessages = {
   "activity.channel.hr": "Herzfrequenz",
   "activity.channel.cadence": "Kadenz",
   "activity.channel.power": "Leistung",
+  "activity.channel.runningPower": "Laufleistung",
   "activity.channel.strideLength": "Schrittlänge",
   "activity.channel.groundTime": "Bodenkontaktzeit",
   "activity.channel.verticalOscillation": "Vertikale Oszillation",

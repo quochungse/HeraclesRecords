@@ -963,9 +963,20 @@ lives at module level for the same visit-to-visit reason — see `useCalendarDat
   plots on one clock line up, and a plot does not widen as a channel is let go. It is offered only
   when both groups have a channel
   (`canSplitActivityChannels`). **Power is output, not the body**: filed with heart rate, a ride
-  opened with both in the lower plot. The colours are a set checked with a colour-vision validator
-  (`DARK_CHANNEL_COLORS` says which pairs it holds apart), and grade-adjusted pace is called
-  **Effort pace**, COROS's own name for it, in every language.
+  opened with both in the lower plot. **The colours are COROS's hues at this app's lightness**:
+  COROS's set crowds the warm half of the wheel, so lightness holds apart every pair a chart can
+  draw together (OKLab ΔE 15, 8 under protan and deutan simulation, every stroke 3:1 on its
+  panel), and `test:activity-channel-colors` holds the pairs the comment over
+  `DARK_CHANNEL_COLORS` names — its first cut claimed that and had pace and heart rate at a
+  deutan ΔE of 4.6. Paper has only the band between ink and 3:1 on white, so pace, effort pace
+  and power, which colour vision cannot tell apart by hue, are three steps of lightness there
+  (light olive-lime, mid green, dark burnt orange); hue matters too, since at the lime of
+  `#526b11` effort pace had to go near-black to clear both pace and power. Stride ratio is the one
+  channel off COROS's hue — a sky blue, not yellow-green, which sat on effort pace and had no
+  lightness left to move to. COROS's names go with them: grade-adjusted pace is **Effort pace**,
+  the form figures Ground time, Stride height and Stride ratio, and power on a run (100–103,
+  `isRunSportType`, never the `motion` alone, which Activities gives a HYROX session too) is
+  **Running power**.
 - **A session's training label** (`electron/sessionIntensity.ts` reads, `src/training/trainingBenefit.ts`
   names; built 2026-10-19) — Garmin's "primary benefit" and the session's shape: a coloured chip
   (Recovery, Aerobic, Tempo, Threshold, VO2 Max, Anaerobic) and an outlined one (Intervals 3 × 8′,

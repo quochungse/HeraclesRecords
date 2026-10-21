@@ -128,6 +128,11 @@ interface ActivitySeriesChartProps {
    * minute on foot, revolutions on a bike — and what the whole of it is called.
    */
   motion?: ActivityMotion;
+  /**
+   * The activity's COROS sport, where the caller reads more than one: power
+   * read as a pace is Running power only on a run (`activityChannel`).
+   */
+  sportType?: number;
 }
 
 type ChartRow = ActivityChannelPoint & {
@@ -282,7 +287,8 @@ export function ActivitySeriesChart({
   onFocusLapHandled,
   activityTime,
   embedded = false,
-  motion = "pace"
+  motion = "pace",
+  sportType
 }: ActivitySeriesChartProps) {
   const { unitSystem } = useUnitSystem();
   const { theme } = useTheme();
@@ -303,8 +309,8 @@ export function ActivitySeriesChart({
   }, [motion, series]);
 
   const available = useMemo(
-    () => availableActivityChannels(points, motion),
-    [motion, points]
+    () => availableActivityChannels(points, motion, sportType),
+    [motion, points, sportType]
   );
   const hasAltitude = available.some((channel) => channel.key === "altitude");
   const hasDistance = points.some((point) => typeof point.distance === "number");
@@ -676,6 +682,7 @@ export function ActivitySeriesChart({
                   axis={axis}
                   unitSystem={unitSystem}
                   motion={motion}
+                  sportType={sportType}
                   showAltitude={tooltipAltitude && showAltitude && altitudeDomain !== null}
                   palette={palette}
                 />
@@ -742,7 +749,7 @@ export function ActivitySeriesChart({
   );
 
   const selectedIn = (group: ActivityChannelGroup) =>
-    selected.filter((key) => activityChannelGroup(key) === group).map(activityChannel);
+    selected.filter((key) => activityChannelGroup(key) === group).map((key) => activityChannel(key, motion, sportType));
   const offeredIn = (group: ActivityChannelGroup) =>
     available.filter((channel) =>
       group === "motion"
@@ -821,7 +828,7 @@ export function ActivitySeriesChart({
           <div className="activity-chart-plot">
             {plot({
               name: "combined",
-              channels: selected.map(activityChannel),
+              channels: selected.map((key) => activityChannel(key, motion, sportType)),
               height: COMBINED_HEIGHT,
               withBrush: true,
               tooltipAltitude: true
@@ -959,6 +966,7 @@ interface RunChartTooltipProps extends TooltipContentProps {
   axis: ActivitySeriesAxis;
   unitSystem: UnitSystem;
   motion: ActivityMotion;
+  sportType: number | undefined;
   showAltitude: boolean;
   palette: Record<ActivityChannelKey, { stroke: string; fill: string }>;
 }
@@ -970,6 +978,7 @@ function RunChartTooltip({
   axis,
   unitSystem,
   motion,
+  sportType,
   showAltitude,
   palette
 }: RunChartTooltipProps) {
@@ -1013,7 +1022,7 @@ function RunChartTooltip({
           <li key={reading.key} className="training-chart-tooltip-row">
             <span className="training-chart-tooltip-key">
               <i aria-hidden="true" style={{ background: reading.color }} />
-              {activityChannel(reading.key).label}
+              {activityChannel(reading.key, motion, sportType).label}
             </span>
             <strong>
               {formatChannelValue(reading.key, reading.value, unitSystem, motion)}

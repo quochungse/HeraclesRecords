@@ -105,6 +105,7 @@ const activity: ActivityMessages = {
   "activity.channel.hr": "심박수",
   "activity.channel.cadence": "케이던스",
   "activity.channel.power": "파워",
+  "activity.channel.runningPower": "러닝 파워",
   "activity.channel.strideLength": "보폭",
   "activity.channel.groundTime": "지면 접촉 시간",
   "activity.channel.verticalOscillation": "수직 진폭",
