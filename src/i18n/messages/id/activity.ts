@@ -20,6 +20,7 @@ const activity: ActivityMessages = {
   "activity.m.heartRate": "Detak jantung",
   "activity.m.route": "Rute",
   "activity.m.laps": "Putaran",
+  "activity.lap.afterWorkout": "Setelah latihan",
   "activity.pane.pick": "Pilih sesi untuk melihat rute, zona, dan split-nya.",
   "activity.detailMissing": "Detail aktivitas ini tidak diterima.",
   "activity.loadingNamed": "Memuat {name}…",

@@ -4,6 +4,7 @@ import {
   mergeActivityDetailWithList,
   parseActivityDetail
 } from "../dist-electron/trainingHubService.js";
+import { isRecoveryLap, lapSections } from "../dist-electron/lapSections.js";
 
 const trailDetailFixture = {
   summary: {
@@ -542,6 +543,30 @@ assert.deepEqual(
   ["set", "rest", undefined]
 );
 assert.equal(gymPhaseDetail.laps[2]?.mode, 99, "an unmapped mode is still readable");
+
+// --- The parts a lap table heads its rows by, and the recoveries in them ---
+const structuredSections = lapSections(structuredRunDetail.laps);
+assert.deepEqual(structuredSections, ["warmup", "training", "training", "cooldown"]);
+assert.deepEqual(
+  structuredRunDetail.laps.map((lap, index) => isRecoveryLap(lap, structuredSections[index])),
+  [false, false, true, false]
+);
+// Repeats with no warm-up or cool-down have one part and no headings, and
+// their recoveries are still recoveries.
+const repeatsOnly = [{ phase: "work" }, { phase: "recovery" }, { phase: "work" }, { phase: "recovery" }];
+const repeatSections = lapSections(repeatsOnly);
+assert.deepEqual(repeatSections, [undefined, undefined, undefined, undefined]);
+assert.deepEqual(
+  repeatsOnly.map((lap, index) => isRecoveryLap(lap, repeatSections[index])),
+  [false, true, false, true]
+);
+// A lap run past the last step is "after", and a free run has nothing to tell apart.
+assert.deepEqual(
+  lapSections([{ phase: "work" }, { phase: "recovery" }, { afterWorkout: true, phase: "recovery" }]),
+  ["training", "training", "after"]
+);
+assert.equal(isRecoveryLap({ afterWorkout: true, phase: "recovery" }, "after"), false);
+assert.deepEqual(lapSections([{}, {}]), [undefined, undefined]);
 
 // --- Peak running-form values, and the maximum COROS reports below its average ---
 assert.equal(dynamicsDetail.dynamics?.maxStrideLength, 0.97);

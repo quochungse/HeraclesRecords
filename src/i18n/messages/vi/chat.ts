@@ -651,7 +651,6 @@ const chat: ChatMessages = {
   "chat.chart.setOf": "Hiệp {n}/{total}",
   "chat.chart.restAfter": "Nghỉ sau hiệp {n}",
   "chat.chart.between": "Chuyển bài",
-  "chat.chart.afterWorkout": "Sau bài tập",
   "chat.chart.showLaps": "Xem các vòng",
   "chat.chart.hideLaps": "Ẩn các vòng",
   "chat.zones.metric.time": "Thời gian theo vùng",

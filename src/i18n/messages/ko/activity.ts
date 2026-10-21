@@ -20,6 +20,7 @@ const activity: ActivityMessages = {
   "activity.m.heartRate": "심박수",
   "activity.m.route": "경로",
   "activity.m.laps": "랩",
+  "activity.lap.afterWorkout": "운동 후",
   "activity.pane.pick": "세션을 선택하면 경로, 심박 구간, 스플릿을 볼 수 있습니다.",
   "activity.detailMissing": "이 활동의 상세 정보를 받지 못했습니다.",
   "activity.loadingNamed": "{name} 불러오는 중…",

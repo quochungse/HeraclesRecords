@@ -21,6 +21,7 @@ const activity = {
   "activity.m.heartRate": "Heart rate",
   "activity.m.route": "Route",
   "activity.m.laps": "Laps",
+  "activity.lap.afterWorkout": "After the workout",
   "activity.pane.pick": "Pick a session to see its route, its zones and its splits.",
   "activity.detailMissing": "This activity’s detail did not arrive.",
   "activity.loadingNamed": "Loading {name}…",

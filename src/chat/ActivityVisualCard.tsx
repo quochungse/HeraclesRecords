@@ -10,7 +10,6 @@ import {
 import { ChartWhenNear } from "./charts/ChartWhenNear";
 import type { TooltipContentProps } from "recharts";
 import type {
-  ActivityLapSection,
   ActivityVisualLapPoint,
   ActivityVisualPreview
 } from "../../electron/types";
@@ -58,6 +57,7 @@ import { zoneColor } from "../training/components/routeColoring";
 import { sessionSetsCardExercises, sessionSetsHeartRate } from "../../electron/sessionSets";
 import { SessionSetsChart } from "./charts/SessionSetsChart";
 import { formatSessionSet, formatSetScheme } from "./sessionSetsFormat";
+import { LapRecoveryMark, LapSectionRow } from "../training/components/LapSections";
 
 /** COROS's Hybrid Fitness, recorded set by set though it is read as any other sport. */
 const HYBRID_FITNESS = 1200;
@@ -277,20 +277,6 @@ function ZoneShare({ zones }: { zones: NonNullable<ActivityVisualPreview["sectio
   );
 }
 
-/** A structured workout's part, as its builder names the step kind. */
-function lapSectionLabel(section: ActivityLapSection): string {
-  switch (section) {
-    case "warmup":
-      return t("workout.step.warmup");
-    case "cooldown":
-      return t("workout.step.cooldown");
-    case "after":
-      return t("chat.chart.afterWorkout");
-    default:
-      return t("workout.step.training");
-  }
-}
-
 /**
  * A lap table this long or longer starts folded: an interval session's twenty
  * rows ran the card a screen down the conversation, past the answer that
@@ -406,6 +392,7 @@ export const ActivityVisualCard = memo(function ActivityVisualCard({
   const lapsHaveDistance =
     moves && (reading !== "effort" || laps.some((lap) => (lap.distance ?? 0) > 0));
   const lapColumns = 4 + (lapsHaveDistance ? 2 : 0) + (lapsHaveCadence ? 1 : 0);
+  const lapSectionList = laps.map((lap) => lap.section);
   const paceLabel = asSpeed ? t("activity.m.speed") : t("activity.m.pace");
   const formatPerformance = (secondsPerKm: number): string =>
     asSpeed
@@ -643,17 +630,11 @@ export const ActivityVisualCard = memo(function ActivityVisualCard({
               <tbody>
                 {laps.map((lap, position) => (
                   <Fragment key={lap.index}>
-                    {lap.section && lap.section !== laps[position - 1]?.section ? (
-                      <tr className="chat-lap-section">
-                        <th scope="colgroup" colSpan={lapColumns}>
-                          {lapSectionLabel(lap.section)}
-                        </th>
-                      </tr>
-                    ) : null}
-                    <tr className={lap.recovery ? "is-recovery" : undefined}>
+                    <LapSectionRow sections={lapSectionList} index={position} colSpan={lapColumns} />
+                    <tr className={lap.recovery ? "is-lap-recovery" : undefined}>
                       <td>
                         {lap.index}
-                        {lap.recovery ? <span className="chat-lap-step">{t("workout.step.rest")}</span> : null}
+                        {lap.recovery ? <LapRecoveryMark /> : null}
                       </td>
                       {lapsHaveDistance ? (
                         <td>{formatDistanceMeters(lap.distance, unitSystem, swim)}</td>

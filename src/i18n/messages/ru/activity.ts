@@ -20,6 +20,7 @@ const activity: ActivityMessages = {
   "activity.m.heartRate": "Пульс",
   "activity.m.route": "Маршрут",
   "activity.m.laps": "Круги",
+  "activity.lap.afterWorkout": "После тренировки",
   "activity.pane.pick": "Выберите тренировку, чтобы увидеть маршрут, зоны и отрезки.",
   "activity.detailMissing": "Подробности этой активности не загрузились.",
   "activity.loadingNamed": "Загружается {name}…",

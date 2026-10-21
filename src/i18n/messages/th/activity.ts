@@ -20,6 +20,7 @@ const activity: ActivityMessages = {
   "activity.m.heartRate": "อัตราการเต้นของหัวใจ",
   "activity.m.route": "เส้นทาง",
   "activity.m.laps": "รอบ",
+  "activity.lap.afterWorkout": "หลังจบการฝึก",
   "activity.pane.pick": "เลือกเซสชันเพื่อดูเส้นทาง โซน และสปลิต",
   "activity.detailMissing": "ไม่ได้รับรายละเอียดของกิจกรรมนี้",
   "activity.loadingNamed": "กำลังโหลด {name}…",

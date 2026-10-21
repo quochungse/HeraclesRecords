@@ -20,6 +20,7 @@ const activity: ActivityMessages = {
   "activity.m.heartRate": "Herzfrequenz",
   "activity.m.route": "Strecke",
   "activity.m.laps": "Runden",
+  "activity.lap.afterWorkout": "Nach dem Training",
   "activity.pane.pick": "Wähl eine Einheit, um ihre Strecke, ihre Zonen und ihre Splits zu sehen.",
   "activity.detailMissing": "Die Details zu dieser Aktivität sind nicht angekommen.",
   "activity.loadingNamed": "{name} wird geladen …",

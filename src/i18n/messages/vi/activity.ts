@@ -20,6 +20,7 @@ const activity: ActivityMessages = {
   "activity.m.heartRate": "Nhịp tim",
   "activity.m.route": "Lộ trình",
   "activity.m.laps": "Vòng",
+  "activity.lap.afterWorkout": "Sau bài tập",
   "activity.pane.pick": "Chọn một buổi tập để xem lộ trình, vùng nhịp tim và các split.",
   "activity.detailMissing": "Chưa nhận được dữ liệu chi tiết của hoạt động này.",
   "activity.loadingNamed": "Đang tải {name}…",

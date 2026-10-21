@@ -20,6 +20,7 @@ const activity: ActivityMessages = {
   "activity.m.heartRate": "Fréquence cardiaque",
   "activity.m.route": "Parcours",
   "activity.m.laps": "Tours",
+  "activity.lap.afterWorkout": "Après la séance",
   "activity.pane.pick": "Choisissez une séance pour voir son parcours, ses zones et ses temps intermédiaires.",
   "activity.detailMissing": "Le détail de cette activité n’est pas arrivé.",
   "activity.loadingNamed": "Chargement de {name}…",

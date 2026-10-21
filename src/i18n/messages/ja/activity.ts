@@ -20,6 +20,7 @@ const activity: ActivityMessages = {
   "activity.m.heartRate": "心拍数",
   "activity.m.route": "ルート",
   "activity.m.laps": "ラップ",
+  "activity.lap.afterWorkout": "ワークアウト後",
   "activity.pane.pick": "セッションを選ぶと、ルート・ゾーン・スプリットが表示されます。",
   "activity.detailMissing": "このアクティビティの詳細を取得できませんでした。",
   "activity.loadingNamed": "{name}を読み込んでいます…",

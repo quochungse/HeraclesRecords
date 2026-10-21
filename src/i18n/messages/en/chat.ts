@@ -655,7 +655,6 @@ const chat = {
   "chat.chart.setOf": "Set {n} of {total}",
   "chat.chart.restAfter": "Rest after set {n}",
   "chat.chart.between": "Between exercises",
-  "chat.chart.afterWorkout": "After the workout",
   "chat.chart.showLaps": "Show laps",
   "chat.chart.hideLaps": "Hide laps",
   "chat.zones.metric.time": "Time in zones",

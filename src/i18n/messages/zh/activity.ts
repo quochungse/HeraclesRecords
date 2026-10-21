@@ -20,6 +20,7 @@ const activity: ActivityMessages = {
   "activity.m.heartRate": "心率",
   "activity.m.route": "路线",
   "activity.m.laps": "分段",
+  "activity.lap.afterWorkout": "训练结束后",
   "activity.pane.pick": "选择一次训练，查看它的路线、心率区间和分段。",
   "activity.detailMissing": "这次活动的详情没有加载到。",
   "activity.loadingNamed": "正在加载{name}…",

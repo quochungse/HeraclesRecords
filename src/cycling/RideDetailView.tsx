@@ -1,5 +1,5 @@
 import { useI18n } from "../i18n/useI18n";
-import { useCallback, useMemo, useState } from "react";
+import { Fragment, useCallback, useMemo, useState } from "react";
 import { ArrowLeft, CloudOff, MessageCircle, RefreshCw } from "lucide-react";
 import type {
   CoachOpenRequest,
@@ -43,6 +43,8 @@ import {
 import { formatDecimal, t } from "../i18n/core";
 import { detailTrainingBenefit, type BenefitZoneFamily } from "../training/trainingBenefit";
 import { TrainingBenefitChips } from "../training/components/TrainingBenefitChip";
+import { isRecoveryLap, lapSections } from "../../electron/lapSections";
+import { LapRecoveryMark, LapSectionRow } from "../training/components/LapSections";
 
 interface RideDetailViewProps {
   activity: TrainingHubActivity;
@@ -117,6 +119,7 @@ export function RideDetailView({
   const benefit = detailTrainingBenefit(detail, activity.sportType, benefitFamily);
 
   const laps = detail?.laps ?? [];
+  const lapSectionList = lapSections(laps);
   const series = useMemo(
     () => withPausesRemoved(detail?.series ?? [], detail?.pauses),
     [detail]
@@ -375,45 +378,51 @@ export function RideDetailView({
                 </tr>
               </thead>
               <tbody>
-                {laps.map((lap) => {
+                {laps.map((lap, position) => {
                   const speed = lapSpeedKmh(lap);
+                  const recovery = isRecoveryLap(lap, lapSectionList[position]);
                   return (
-                    <tr
-                      key={lap.index}
-                      tabIndex={0}
-                      className="run-lap-row"
-                      title={t("run.detail.focusLap")}
-                      onClick={() => setFocusLapIndex(lap.index)}
-                      onKeyDown={(event) => {
-                        if (event.key === "Enter" || event.key === " ") {
-                          event.preventDefault();
-                          setFocusLapIndex(lap.index);
-                        }
-                      }}
-                    >
-                      <td>{lap.index}</td>
-                      <td className="is-numeric">
-                        {formatDistanceMeters(lap.distance, unitSystem)}
-                      </td>
-                      <td className="is-numeric">{formatDurationSeconds(lap.duration)}</td>
-                      <td className="is-numeric">
-                        {speed === undefined ? "—" : formatSpeedValue(speed, unitSystem)}
-                      </td>
-                      <td className="is-numeric">{lap.avgHr ?? "—"}</td>
-                      <td className="is-numeric">
-                        {lap.elevationGain === undefined
-                          ? "—"
-                          : formatElevationMeters(lap.elevationGain, unitSystem)}
-                      </td>
-                      <td className="is-numeric">
-                        {lap.avgCadence === undefined ? "—" : Math.round(lap.avgCadence)}
-                      </td>
-                      {lapsHavePower ? (
-                        <td className="is-numeric">
-                          {lap.avgPower === undefined ? "—" : `${Math.round(lap.avgPower)} W`}
+                    <Fragment key={lap.index}>
+                      <LapSectionRow sections={lapSectionList} index={position} colSpan={lapsHavePower ? 8 : 7} />
+                      <tr
+                        tabIndex={0}
+                        className={recovery ? "run-lap-row is-lap-recovery" : "run-lap-row"}
+                        title={t("run.detail.focusLap")}
+                        onClick={() => setFocusLapIndex(lap.index)}
+                        onKeyDown={(event) => {
+                          if (event.key === "Enter" || event.key === " ") {
+                            event.preventDefault();
+                            setFocusLapIndex(lap.index);
+                          }
+                        }}
+                      >
+                        <td>
+                          {lap.index}
+                          {recovery ? <LapRecoveryMark /> : null}
                         </td>
-                      ) : null}
-                    </tr>
+                        <td className="is-numeric">
+                          {formatDistanceMeters(lap.distance, unitSystem)}
+                        </td>
+                        <td className="is-numeric">{formatDurationSeconds(lap.duration)}</td>
+                        <td className="is-numeric">
+                          {speed === undefined ? "—" : formatSpeedValue(speed, unitSystem)}
+                        </td>
+                        <td className="is-numeric">{lap.avgHr ?? "—"}</td>
+                        <td className="is-numeric">
+                          {lap.elevationGain === undefined
+                            ? "—"
+                            : formatElevationMeters(lap.elevationGain, unitSystem)}
+                        </td>
+                        <td className="is-numeric">
+                          {lap.avgCadence === undefined ? "—" : Math.round(lap.avgCadence)}
+                        </td>
+                        {lapsHavePower ? (
+                          <td className="is-numeric">
+                            {lap.avgPower === undefined ? "—" : `${Math.round(lap.avgPower)} W`}
+                          </td>
+                        ) : null}
+                      </tr>
+                    </Fragment>
                   );
                 })}
               </tbody>
