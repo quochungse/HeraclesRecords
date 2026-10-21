@@ -53,7 +53,7 @@ const CREATION_KINDS = new Set(["planDraft", "scheduleChange"]);
  */
 const SPOKEN_KINDS = new Set(["message", "toolNotice", "coachPrompt", "planRefs", "scheduleRefs"]);
 
-export function isQuestionEntry(entry: TurnEntryLike): boolean {
+function isQuestionEntry(entry: TurnEntryLike): boolean {
   return entry.kind === "message" && entry.role === "user";
 }
 
@@ -69,22 +69,6 @@ export function turnRanges(entries: readonly TurnEntryLike[]): TurnRange[] {
     ranges.push({ start, question: index, end: entries.length });
   });
   return ranges;
-}
-
-/** The turn whose question is at `question`. */
-export function turnOfQuestion(
-  entries: readonly TurnEntryLike[],
-  question: number
-): TurnRange | undefined {
-  return turnRanges(entries).find((range) => range.question === question);
-}
-
-/** The turn holding the entry at `index`, when one does. */
-export function turnContaining(
-  entries: readonly TurnEntryLike[],
-  index: number
-): TurnRange | undefined {
-  return turnRanges(entries).find((range) => index >= range.start && index < range.end);
 }
 
 export interface TurnRemovalOptions {

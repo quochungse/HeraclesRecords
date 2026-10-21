@@ -125,7 +125,7 @@ test("a turn starts at the references in front of its question and ends at the n
     { start: 1, question: 1, end: 3 },
     { start: 3, question: 5, end: 8 }
   ]);
-  assert.equal(turns.turnContaining(entries, 0), undefined, "an entry before the first question is in no turn");
+  assert.equal(turns.turnRanges(entries)[0].start, 1, "an entry before the first question is in no turn");
   assert.deepEqual(
     turns.turnRemoval(entries, turns.turnRanges(entries)[1], { keepCreations: false }),
     [3, 4, 5, 6],

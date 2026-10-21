@@ -264,13 +264,13 @@ export async function deleteTurn(
   const { deleting, removed } = turnCut(entries, range, { deleteCreations: options.deleteCreations });
   const summarised = summarises(sessionId, removed);
 
-  const { through } = removeEntries(sessionId, entries, removed);
+  const remaining = removeEntries(sessionId, entries, removed);
   deleteCreations(deleting);
   forgetHidden(sessionId, entries[range.question]);
 
   const rewritten =
     summarised && options.rewriteSummary
-      ? await rewriteSummary(sessionId, getChatSession(sessionId), through, deps)
+      ? await rewriteSummary(sessionId, remaining.entries, remaining.through, deps)
       : {};
   return { entries: getChatSession(sessionId), hidden: listChatHiddenTurns(sessionId), ...rewritten };
 }
@@ -376,8 +376,7 @@ export function branchConversation(sessionId: string, ref: TurnRef): ChatSession
   const range = resolveTurn(entries, ref);
   const carried = entries.slice(0, range.end);
   const dropped = carried.flatMap((entry, index) => (LEFT_BEHIND.has(entry.kind) ? [index] : []));
-  const kept = withoutIndices(carried, dropped).map(({ mid: _mid, mrev: _mrev, ...entry }) => entry as PersistedChatEntry);
-  const keptMids = withoutIndices(carried, dropped).map((entry) => entry.mid);
+  const kept = withoutIndices(carried, dropped);
 
   const provider = getChatSessionProvider(sessionId) ?? getChatSettings().provider;
   const title = getChatSessionTitle(sessionId) ?? "";
@@ -394,13 +393,14 @@ export function branchConversation(sessionId: string, ref: TurnRef): ChatSession
       writeCondensedThrough(branch.id, shiftBoundary(stored.condensedThrough, dropped) + 1);
     }
   }
-  saveChatSession(branch.id, [head, ...kept]);
+  // Without their identities, so the store mints the branch's own.
+  saveChatSession(branch.id, [head, ...kept.map(({ mid: _mid, mrev: _mrev, ...entry }) => entry as PersistedChatEntry)]);
 
   const minted = getChatSession(branch.id).slice(1);
   const hidden = new Set(listChatHiddenTurns(sessionId));
-  keptMids.forEach((mid, index) => {
+  kept.forEach((entry, index) => {
     const copy = minted[index]?.mid;
-    if (mid && copy && hidden.has(mid)) setChatHiddenTurn(branch.id, copy, true);
+    if (entry.mid && copy && hidden.has(entry.mid)) setChatHiddenTurn(branch.id, copy, true);
   });
   const settings = getConversationSettings(sessionId);
   setConversationSettings({ ...settings, sessionId: branch.id });

@@ -1436,6 +1436,14 @@ export function ChatView({
     description: TurnDescription | null;
     busy: boolean;
   } | null>(null);
+  /** A turn the summary covers, while the athlete is asked about hiding or showing it. */
+  const [turnHiding, setTurnHiding] = useState<{
+    sessionId: string;
+    ref: TurnRef;
+    hidden: boolean;
+    summaryModel?: string;
+    busy: boolean;
+  } | null>(null);
   /** A retry on its way: the failure row's buttons wait. */
   const [retrying, setRetrying] = useState(false);
   /** The open conversation's turns hidden from Coach, by their question's mid. */
@@ -1454,14 +1462,6 @@ export function ChatView({
   /** The rail's questions and the latest way to jump to one, for the keyboard's listener. */
   const railQuestionsRef = useRef<RailQuestion[]>([]);
   const railStepRef = useRef<(direction: -1 | 1) => void>(() => undefined);
-  /** A turn the summary covers, while the athlete is asked about hiding or showing it. */
-  const [turnHiding, setTurnHiding] = useState<{
-    sessionId: string;
-    ref: TurnRef;
-    hidden: boolean;
-    summaryModel?: string;
-    busy: boolean;
-  } | null>(null);
   // An analysis run writing into the conversation that is open right now.
   const [liveAnalysis, setLiveAnalysis] = useState<LiveAnalysisRun | null>(
     null
@@ -2386,7 +2386,9 @@ export function ChatView({
   }, [api, refreshSessions]);
 
   // A question being written again belongs to the conversation it is in.
-  useEffect(() => setEditingQuestion(null), [activeSessionId]);
+  useEffect(() => {
+    setEditingQuestion(null);
+  }, [activeSessionId]);
 
   // The open conversation's hidden turns, read whenever it changes.
   useEffect(() => {
@@ -2412,6 +2414,14 @@ export function ChatView({
     const step = (event: KeyboardEvent) => {
       if (!event.altKey || event.ctrlKey || event.metaKey) return;
       if (event.key !== "ArrowUp" && event.key !== "ArrowDown") return;
+      // Words being written keep the keys: Option + ↑ moves the caret on a Mac.
+      const target = event.target;
+      if (
+        (target instanceof HTMLElement && target.isContentEditable) ||
+        ((target instanceof HTMLTextAreaElement || target instanceof HTMLInputElement) && target.value !== "")
+      ) {
+        return;
+      }
       event.preventDefault();
       railStepRef.current(event.key === "ArrowUp" ? -1 : 1);
     };
@@ -4687,6 +4697,18 @@ export function ChatView({
     return { placedCharts, placedAnswers, answerParts };
   }, [timeline, chatSettings.visualizationsEnabled]);
 
+  // The conversation as turns, and which turn each entry belongs to, for the
+  // actions beside a message. Worked out when the timeline changes, not on
+  // every streamed token.
+  const { turns, turnByEntry } = useMemo(() => {
+    const ranges = turnRanges(timeline);
+    const byEntry = new Map<number, TurnRange>();
+    for (const range of ranges) {
+      for (let at = range.start; at < range.end; at += 1) byEntry.set(at, range);
+    }
+    return { turns: ranges, turnByEntry: byEntry };
+  }, [timeline]);
+
   if (checkingAuth) {
     return (
       <div className="chat-view chat-view-centered">
@@ -4997,12 +5019,6 @@ export function ChatView({
     }
     return -1;
   })();
-  // Which turn each entry belongs to, for the actions beside a message.
-  const turnByEntry = new Map<number, TurnRange>();
-  const turns = turnRanges(timeline);
-  for (const range of turns) {
-    for (let at = range.start; at < range.end; at += 1) turnByEntry.set(at, range);
-  }
   const turnActionsLive =
     Boolean(api && activeSessionId) && !turnHere && !turnDeletion && !turnHiding && !retrying && !liveAnalysis;
   const deleteTurnAt = (index: number) => {

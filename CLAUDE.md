@@ -1647,6 +1647,42 @@ lives at module level for the same visit-to-visit reason — see `useCalendarDat
   only a turn that produced nothing is undone. `streamedTextRef` exists for this —
   `streamingText` is state, stale inside the subscription.
 
+  **A turn is the unit the athlete deletes, edits, hides and branches from**
+  (`electron/chatTurns.ts`, node-free, shared): a user message and everything after it up
+  to the next one, with the `planRefs`/`scheduleRefs` in front of it. Every change is made
+  in the main process (`chatTurnService.ts`, `chat:describeTurn`/`deleteTurn`/`editTurn`/
+  `setTurnHidden`/`branchConversation`), read, cut and written with nothing awaited
+  between, after the window flushes its own save: the window saving a shorter transcript is
+  what `foreignTail` refuses, and an analysis appends to the same row from main. The turn
+  is named by its question's index and words (`TurnRef`), checked against the row, found by
+  the words alone only when they are unique. **Every position-held boundary moves with the
+  entries** (`shiftBoundary`): the summary's `through` and the condensed layer's start; a
+  summary left covering nothing is dropped, and when the summary covers the turn the athlete
+  is asked whether to rewrite it now, on the compression model (`rewriteSummary`, only over
+  the summary it replaces). A removal leaves a brief, an outline, a plan event, an analysis
+  trace and an opaque entry; **what the turn made stays, cards included, unless the athlete
+  deletes it too**, and only what can go goes: nothing saved to COROS, no creation with a
+  version in another turn. **Edit and retry are `editTurn`, last turn only**, by decision:
+  the question keeps its `mid` (`mrev` bumped), Coach's answer and what it made go, with no
+  versions kept and no second question asked. **A failed turn is a row under its question**
+  (`TurnFailureRow`, kinds from `classifyTurnFailure`), never stored: reopened, a question
+  with no answer is enough, and one asked in the last ten minutes "may still be answering on
+  another device" (`unansweredKind`), since the question is saved at send and the answer at
+  the end. The stopped-early notice was already stored and becomes that row when it closes
+  the last turn. A pipeline step and an analysis's playbook get no row. **A hidden turn is a
+  row of `chat_hidden_turns` (`personal`) by its question's `mid`**, not a field on the entry
+  (an older build would drop the field and win the merge). What Coach reads is the transcript
+  masked by `maskHiddenTurns` — every spoken entry replaced by an empty opaque one, positions
+  kept, so `through` still counts the stored transcript. The window masks before a turn
+  (never the turn being asked; `ChatEntry.mid` is carried for this and never stored from the
+  window) and main masks for analyses, recall, the summariser and the menu's compaction
+  through `coachTranscript`. **A branch is a conversation of its own** — entries minted
+  afresh, a `branchedFrom` anchor at its head, the same AI, sources and hidden turns, the
+  summary only when it covers nothing past the branch point — and it **leaves behind every
+  anchor that names a row** (drafts, briefs, outlines, proposals, plan events, plan refs):
+  two conversations naming one draft would have deleting either take the other's with it.
+  `npm run test:chat-turn-actions`.
+
   **A turn reads chart, answer, then creations.** Cards arrive while a turn runs and the
   answer last, so where the answer goes is decided at the end: under the turn's charts
   (`activityVisual`, `fitnessTrend`, `hrZoneSummary` — what it reads from) and above its

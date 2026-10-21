@@ -9,7 +9,7 @@ export interface RailQuestion {
 }
 
 /** Below this many questions a conversation is short enough to scroll by eye. */
-export const RAIL_MIN_QUESTIONS = 3;
+const RAIL_MIN_QUESTIONS = 3;
 
 /**
  * The athlete's questions as a column of marks beside the transcript: hovered,
