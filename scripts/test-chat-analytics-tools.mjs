@@ -45,6 +45,11 @@ assert.ok(fitnessPreview);
 assert.equal(fitnessPreview.trendPoints.length, 2);
 assert.equal(fitnessPreview.previewId, "fitness-trends:req-1");
 assert.equal(buildFitnessTrendPreview([], "req-2"), null);
+assert.equal(
+  buildFitnessTrendPreview(buildTrendPoints([{ happenDay: "20260701", trainingLoad: 120 }]), "req-6"),
+  null,
+  "a window with load and no recovery reading draws no recovery card"
+);
 
 const zonePreview = buildHrZonePreview(
   {

@@ -41,15 +41,18 @@ function TrendTooltip({ active, payload, label }: TooltipContentProps) {
   );
 }
 
-/** Memoised on `preview`, as `ActivityVisualCard` is and for the same reason. */
+/**
+ * Memoised on `preview`, as `ActivityVisualCard` is and for the same reason.
+ *
+ * Recovery only: HRV against its baseline and the resting heart rate. A card
+ * stored with training load keeps it in its points, undrawn — it is a
+ * training figure, and the coach's words carry it.
+ */
 export const FitnessTrendCard = memo(function FitnessTrendCard({
   preview
 }: FitnessTrendCardProps) {
   useI18n();
   const { colors, activeDot } = useChartColors();
-  const loadPoints = preview.trendPoints.filter(
-    (point) => point.trainingLoad !== undefined
-  );
   const hrvPoints = preview.trendPoints.filter(
     (point) => point.avgSleepHrv !== undefined || point.sleepHrvBase !== undefined
   );
@@ -65,48 +68,6 @@ export const FitnessTrendCard = memo(function FitnessTrendCard({
           </span>
         </div>
       </div>
-
-      {loadPoints.length > 0 ? (
-        <section className="chat-visual-section">
-          <h5>{t("activity.m.trainingLoad")}</h5>
-          <div className="chat-visual-chart-shell">
-            <ChartWhenNear>
-              <AreaChart data={loadPoints} margin={trainingChartMargin}>
-                <defs>
-                  <ChartAreaGradient id={`chatLoadFill-${preview.previewId}`} />
-                </defs>
-                <XAxis
-                  dataKey="label"
-                  tick={{ fill: colors.text, fontSize: 11 }}
-                  axisLine={false}
-                  tickLine={false}
-                />
-                <YAxis
-                  tick={{ fill: colors.text, fontSize: 11 }}
-                  axisLine={false}
-                  tickLine={false}
-                  width={36}
-                />
-                <Tooltip
-                  content={(props) => <TrendTooltip {...props} />}
-                  contentStyle={trainingChartTooltipStyle}
-                />
-                <Area
-                  type="monotone"
-                  dataKey="trainingLoad"
-                  name={t("library.session.load")}
-                  stroke={colors.accentBright}
-                  fill={`url(#chatLoadFill-${preview.previewId})`}
-                  strokeWidth={2}
-                  dot={false}
-                  activeDot={activeDot}
-                  isAnimationActive={false}
-                />
-              </AreaChart>
-            </ChartWhenNear>
-          </div>
-        </section>
-      ) : null}
 
       {hrvPoints.length > 0 ? (
         <section className="chat-visual-section">
@@ -205,9 +166,7 @@ export const FitnessTrendCard = memo(function FitnessTrendCard({
         </section>
       ) : null}
 
-      {loadPoints.length === 0 &&
-      hrvPoints.length === 0 &&
-      rhrPoints.length === 0 ? (
+      {hrvPoints.length === 0 && rhrPoints.length === 0 ? (
         <p className="chat-visual-empty">{t("chat.trend.none")}</p>
       ) : null}
     </div>
