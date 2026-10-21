@@ -2471,6 +2471,18 @@ lives at module level for the same visit-to-visit reason — see `useCalendarDat
   from the phone could carry an `updated_at` before it. Replays are upserts and deletes of the
   same id, so they cost nothing — but they are why `StrengthHistory.fetched` counts COROS
   alone, or the renderer's drain loop would never see COROS refusing.
+  **COROS's set-by-set laps are read twice, on purpose** (2026-10-21). `parseStrengthDetail`
+  (this screen) tells a set from a rest by its reps; `parseSessionSets` (`sessionSets.ts`,
+  node-free, `detail.exerciseSets`: Coach's card and text) reads each item's `mode` — 14 set,
+  15 rest, 16 roll-up, 17 rest between exercises — so it keeps timed sets (a plank records no
+  reps; `targetType` 2 is read in time whatever the watch counted), Hybrid Fitness (1200),
+  whose rests carry their set's reps, and two exercises COROS gave one index. A run's laps
+  carry exercise keys too (`S4208`), under modes 0–2, and are no sets. On 43 real sessions
+  every rep set agrees between the two; this screen was left as it is. The card draws heart
+  rate under the sets (`SessionSetsChart`: a band per set, the exercise's number over it, the
+  set in the tooltip), writes a set scheme as `4 × 11–14` / `3 × 0:45`, and a card stored
+  before `setList` is redrawn from the detail on render (`useStoredSetsRedraw`), never written
+  back.
 - **Sync** (`electron/sync/`) — continuous two-way sync through Google Drive, so two
   machines hold the same user data. **Drive is the only destination**: a local folder was
   offered beside it until 2026-10-01 and was removed because a folder kept by Dropbox,

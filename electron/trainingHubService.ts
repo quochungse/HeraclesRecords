@@ -166,6 +166,7 @@ import {
   decodeStsCredentials
 } from "./corosUploadConfig";
 import { parseStrengthDetail } from "./strengthDetail";
+import { parseSessionSets } from "./sessionSets";
 import {
   formatSwimPace,
   readsMovement,
@@ -8004,7 +8005,8 @@ export function parseActivityDetail(raw: Record<string, unknown>): TrainingHubAc
     weather: parseActivityWeather(raw),
     track,
     series: parseActivitySeries(raw, wallClock),
-    strength: parseStrengthDetail(raw)
+    strength: parseStrengthDetail(raw),
+    exerciseSets: parseSessionSets(raw)
   };
 }
 

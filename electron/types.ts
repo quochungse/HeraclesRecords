@@ -833,6 +833,13 @@ export interface TrainingHubActivityDetail {
   track?: TrainingHubActivityTrack;
   series?: TrainingHubActivitySeriesPoint[];
   strength?: StrengthDetail;
+  /**
+   * Every set of a session COROS records exercise by exercise — a strength
+   * session, a Hybrid Fitness one — timed sets included, each placed on the
+   * session's clock (`sessionSets.ts`). `strength` is the Strength screen's
+   * reading of the same laps and leaves the timed sets out.
+   */
+  exerciseSets?: SessionSetExercise[];
 }
 
 export interface TrainingHubScheduledExercise {
@@ -2977,6 +2984,33 @@ export interface ActivityVisualChannelSection {
 
 export type ActivityVisualHrSection = ActivityVisualChannelSection;
 
+/** One set of an exercise as COROS recorded it (`sessionSets.ts`). */
+export interface SessionSet {
+  /** Seconds from the session's start, on the clock its heart-rate samples run on. */
+  start: number;
+  /** Seconds the set took. */
+  seconds: number;
+  /** The reps counted; on a timed set, what the watch counted through it, if anything. */
+  reps?: number;
+  /**
+   * Held for a time — a plank, a stretch, a minute of high knees — and read in
+   * `seconds` rather than reps.
+   */
+  timed?: boolean;
+  weightKg?: number;
+  /** The rest taken after it, in seconds. */
+  restSeconds?: number;
+  avgHr?: number;
+  maxHr?: number;
+}
+
+export interface SessionSetExercise {
+  /** "T####"/"S####" library code, or a custom name; the renderer names it. */
+  nameKey: string;
+  rawName?: string;
+  sets: SessionSet[];
+}
+
 /**
  * One exercise of a gym session as the card lists it: the sets, the reps, the
  * lightest and heaviest load and the volume. A gym session's laps are its sets
@@ -2987,11 +3021,18 @@ export interface ActivityVisualStrengthExercise {
   nameKey: string;
   rawName?: string;
   sets: number;
+  /** Reps over the sets counted in reps; a timed set adds none. */
   reps: number;
   /** Kilograms, absent for a bodyweight exercise. */
   minWeightKg?: number;
   maxWeightKg?: number;
   volumeKg?: number;
+  /**
+   * The sets themselves, which place the exercise on the heart-rate chart.
+   * Absent on a card stored before them, which the renderer redraws from the
+   * session's detail.
+   */
+  setList?: SessionSet[];
 }
 
 /**

@@ -22,7 +22,7 @@ import {
   metersToSwimDistance,
   swimDistanceUnit
 } from "../../units/units";
-import { formatDecimal, t } from "../../i18n/core";
+import { formatDecimal } from "../../i18n/core";
 import { swimPacePer100 } from "../../../electron/activityReading";
 
 export interface ChartDatum {
@@ -52,7 +52,7 @@ function MiniAreaTooltip({
 
   return (
     <div className="training-chart-tooltip">
-      <span>{label}</span>
+      {label ? <span>{label}</span> : null}
       <strong>
         {typeof value === "number" ? formatValue(value) : "-"}
       </strong>
@@ -72,6 +72,8 @@ export function ChatMiniAreaChart({
   if (data.length < 2) {
     return null;
   }
+  // A card stored before its samples carried a clock has no axis to mark.
+  const placed = data.some((datum) => datum.label);
 
   return (
     <div className="chat-visual-chart-shell">
@@ -82,7 +84,7 @@ export function ChatMiniAreaChart({
           </defs>
           <XAxis
             dataKey="label"
-            tick={{ fill: colors.text, fontSize: 11 }}
+            tick={placed ? { fill: colors.text, fontSize: 11 } : false}
             axisLine={false}
             tickLine={false}
             minTickGap={24}
@@ -130,8 +132,9 @@ function formatElapsedLabel(seconds: number): string {
 
 /**
  * A channel's points labelled by distance, by activity time where the activity
- * covered none (a gym session, a trainer that measured nothing), and by their
- * order only on a card stored before it carried the time.
+ * covered none (a gym session, a trainer that measured nothing), and not at all
+ * on a card stored before it carried the time — "Point 1, Point 2…" named
+ * nothing anyone could read.
  */
 export function buildDistanceSeriesData(
   series: {
@@ -182,7 +185,7 @@ export function buildDistanceSeriesData(
         ? `${formatDecimal(displayDistance, swim ? 0 : 1)} ${swim ? swimDistanceUnit(unitSystem) : distanceUnit(unitSystem)}`
         : useElapsed && point.elapsed !== undefined
           ? formatElapsedLabel(point.elapsed)
-          : t("chat.chart.point", { n: index + 1 }),
+          : "",
       value: pickValue(point)
     };
   });
@@ -213,7 +216,7 @@ export function buildElevationSeriesData(
     return {
       label: useDistance
         ? `${formatDecimal(displayDistance, 1)} ${distanceUnit(unitSystem)}`
-        : t("chat.chart.point", { n: index + 1 }),
+        : "",
       value: metersToElevation(point.elevation!, unitSystem)
     };
   });

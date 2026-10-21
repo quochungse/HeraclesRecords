@@ -8,6 +8,7 @@ import {
   type ActivityReading
 } from "./activityReading";
 import { dayKey, isoDay, isoFromDayKey, padTwo } from "./chatDayKeys";
+import { sessionSetsCardExercises, sessionSetsHeartRate } from "./sessionSets";
 import { getStoredTrainingActivity } from "./database";
 import {
   getTrainingHubStatus,
@@ -21,10 +22,8 @@ import type {
   ActivityHrTrendPreview,
   ActivityVisualLapPoint,
   ActivityVisualPreview,
-  ActivityVisualStrengthExercise,
   CorosMcpTool,
-  StrengthDetail,
-  StrengthExercise,
+  SessionSet,
   TrainingHubActivity,
   TrainingHubActivityDetail,
   TrainingHubActivityDynamics,
@@ -728,34 +727,6 @@ export function formatActivityWindowForChat(
   return `Stretch (${asked}: ${where.join(", ")}; ${stretch.samples} samples): ${figures.join(" · ")}`;
 }
 
-function strengthVisualExercises(
-  strength: StrengthDetail | undefined
-): ActivityVisualStrengthExercise[] {
-  // Every exercise: a row is a few numbers, and the coach's text names the
-  // ones past its own cap, so a card that stopped at 20 would disagree with it.
-  return (strength?.exercises ?? []).map((exercise) => {
-    const loads = exercise.entries
-      .map((entry) => entry.weightKg)
-      .filter((weight) => weight > 0);
-    const volumeKg = exercise.entries.reduce(
-      (sum, entry) => sum + (entry.weightKg > 0 ? entry.weightKg * entry.reps : 0),
-      0
-    );
-    // Counted from the work sets, as the Strength screen counts them: COROS's
-    // aggregate lap can claim a set with no reps, which no entry stands for.
-    return {
-      nameKey: exercise.nameKey,
-      ...(exercise.rawName ? { rawName: exercise.rawName } : {}),
-      sets: exercise.entries.length,
-      reps: exercise.entries.reduce((sum, entry) => sum + entry.reps, 0),
-      ...(loads.length > 0
-        ? { minWeightKg: Math.min(...loads), maxWeightKg: Math.max(...loads) }
-        : {}),
-      ...(volumeKg > 0 ? { volumeKg: Math.round(volumeKg * 10) / 10 } : {})
-    };
-  });
-}
-
 function mapLapPoints(laps: TrainingHubActivityLap[]): ActivityVisualLapPoint[] {
   return laps.slice(0, MAX_LAPS).map((lap) => ({
     index: lap.index,
@@ -918,7 +889,16 @@ export function buildActivityVisualPreview(
     (lap) => lap.avgHr !== undefined && Number.isFinite(lap.avgHr)
   );
 
-  if (hrSeriesPoints.length >= 2) {
+  // A session recorded set by set: its exercises in place of its laps, which
+  // are its sets and rests with nothing to say which is which, and its heart
+  // rate on the clock the sets are placed on. A Hybrid Fitness session is one
+  // too, though it is read as any other sport.
+  const exercises = sessionSetsCardExercises(detail.exerciseSets);
+  const setsHeartRate = exercises.length > 0 ? sessionSetsHeartRate(detail.series) : [];
+
+  if (setsHeartRate.length >= 2) {
+    sections.hr = { chartKind: "series", series: setsHeartRate };
+  } else if (hrSeriesPoints.length >= 2) {
     sections.hr = { chartKind: "series", series: channelSeries(downsampled, "hr") };
   } else if (hrLaps.length >= 2) {
     sections.hr = {
@@ -951,8 +931,8 @@ export function buildActivityVisualPreview(
   const cadenceLaps = detail.laps.filter(
     (lap) => lap.avgCadence !== undefined && Number.isFinite(lap.avgCadence)
   );
-  if (!moves) {
-    // No cadence for a gym session.
+  if (!moves || exercises.length > 0) {
+    // No cadence for a session of sets: a lap's is a set's, of a glute bridge.
   } else if (cadencePoints.length >= 2) {
     sections.cadence = { chartKind: "series", series: channelSeries(downsampled, "cadence") };
   } else if (cadenceLaps.length >= 2) {
@@ -966,9 +946,6 @@ export function buildActivityVisualPreview(
     sections.elevation = { points: elevationProfile(elevationPoints) };
   }
 
-  // A gym session lists its exercises in place of its laps, which are its sets
-  // and rests with nothing to say which is which.
-  const exercises = moves ? [] : strengthVisualExercises(detail.strength);
   if (exercises.length > 0) {
     sections.strength = { exercises };
   } else if (detail.laps.length > 0) {
@@ -1131,7 +1108,7 @@ function sectionHasData(
           .length >= ELEVATION_PROFILE_SEGMENTS
       );
     case "strength":
-      return (detail.strength?.exercises.length ?? 0) > 0;
+      return (detail.exerciseSets?.length ?? 0) > 0;
     default:
       return false;
   }
@@ -1217,7 +1194,7 @@ export function formatActivityDetailForChat(
   }
 
   const strength = wants("strength")
-    ? formatStrengthDetailForChat(detail.strength, unitSystem)
+    ? formatStrengthDetailForChat(detail, unitSystem)
     : undefined;
   if (strength) {
     sections.push("", strength);
@@ -1719,70 +1696,91 @@ const EXERCISE_CODE_RE = /^[TS]\d/;
  * printed verbatim when that is all there is. The coach can still read the
  * sets, reps and load, which is what the numbers are for.
  */
-function strengthExerciseLabel(exercise: StrengthExercise): string {
+function strengthExerciseLabel(exercise: { nameKey: string; rawName?: string }): string {
   const raw = exercise.rawName?.trim();
   return raw && !EXERCISE_CODE_RE.test(raw) ? raw : exercise.nameKey;
 }
 
 /**
- * The set-by-set breakdown of a gym session.
+ * `60 kg x10`, `13 reps`, or a timed set's `0:45` — `1:00 (74 reps)` where the
+ * watch counted through it, `24 kg for 2:00` with a load.
+ */
+function formatSessionSet(set: SessionSet, unitSystem: UnitSystem): string {
+  const load = set.weightKg ? formatWeightValue(set.weightKg, unitSystem) : undefined;
+  if (!set.timed && set.reps !== undefined) {
+    return load ? `${load} x${set.reps}` : `${set.reps} reps`;
+  }
+  const time = formatDurationSeconds(set.seconds);
+  const counted = set.reps !== undefined ? ` (${set.reps} reps)` : "";
+  return `${load ? `${load} for ${time}` : time}${counted}`;
+}
+
+/**
+ * The set-by-set breakdown of a session recorded exercise by exercise — a
+ * strength session, a Hybrid Fitness one — as the card lists it, timed sets
+ * included.
  *
  * `parseStrengthDetail` has always populated this and the chat formatter never
  * printed it, so asking the coach about a strength activity returned its
  * duration and average HR and nothing about what was lifted.
  */
 function formatStrengthDetailForChat(
-  strength: StrengthDetail | undefined,
+  detail: TrainingHubActivityDetail,
   unitSystem: UnitSystem
 ): string | undefined {
-  if (!strength || strength.exercises.length === 0) {
+  const exercises = detail.exerciseSets ?? [];
+  if (exercises.length === 0) {
     return undefined;
   }
 
-  const { summary } = strength;
+  // COROS's own totals where it sent them; the sets' where it did not (a
+  // Hybrid Fitness session counts no exercises).
+  const summary = detail.strength?.summary;
+  const setCount = exercises.reduce((sum, exercise) => sum + exercise.sets.length, 0);
+  const repCount = exercises.reduce(
+    (sum, exercise) =>
+      sum + exercise.sets.reduce((total, set) => total + (set.timed ? 0 : (set.reps ?? 0)), 0),
+    0
+  );
   const headline = [
-    summary.exercises ? `${summary.exercises} exercises` : undefined,
-    summary.sets ? `${summary.sets} sets` : undefined,
-    summary.totalReps ? `${summary.totalReps} reps` : undefined,
-    summary.totalWeightKg
+    `${summary?.exercises || exercises.length} exercises`,
+    `${summary?.sets || setCount} sets`,
+    (summary?.totalReps || repCount) ? `${summary?.totalReps || repCount} reps` : undefined,
+    summary?.totalWeightKg
       ? `${formatWeightValue(summary.totalWeightKg, unitSystem)} total volume`
       : undefined
   ].filter(Boolean);
 
-  const rows = strength.exercises
+  const rows = exercises
     .slice(0, MAX_STRENGTH_EXERCISES)
     .map((exercise) => {
-      const sets = exercise.entries
+      const sets = exercise.sets
         .slice(0, MAX_STRENGTH_SETS)
-        .map((entry) =>
-          entry.weightKg > 0
-            ? `${formatWeightValue(entry.weightKg, unitSystem)} x${entry.reps}`
-            : `${entry.reps} reps`
-        );
-      if (exercise.entries.length > MAX_STRENGTH_SETS) {
-        sets.push(`… ${exercise.entries.length - MAX_STRENGTH_SETS} more`);
+        .map((set) => formatSessionSet(set, unitSystem));
+      if (exercise.sets.length > MAX_STRENGTH_SETS) {
+        sets.push(`… ${exercise.sets.length - MAX_STRENGTH_SETS} more`);
       }
 
-      // The work sets listed beside it, as the card and the Strength screen
-      // count them: COROS's aggregate lap can claim a set no entry stands for.
+      // The work sets listed beside it, as the card counts them: COROS's
+      // aggregate lap can claim a set no entry stands for.
+      const reps = exercise.sets.reduce((sum, set) => sum + (set.timed ? 0 : (set.reps ?? 0)), 0);
       const heading = [
         strengthExerciseLabel(exercise),
-        `${exercise.entries.length} sets`,
-        `${exercise.entries.reduce((sum, entry) => sum + entry.reps, 0)} reps`
-      ].join(" — ");
+        `${exercise.sets.length} sets`,
+        reps > 0 ? `${reps} reps` : undefined
+      ]
+        .filter(Boolean)
+        .join(" — ");
       return `- ${heading}: ${sets.join(", ")}`;
     });
 
-  if (strength.exercises.length > MAX_STRENGTH_EXERCISES) {
+  if (exercises.length > MAX_STRENGTH_EXERCISES) {
     rows.push(
-      `… ${strength.exercises.length - MAX_STRENGTH_EXERCISES} more exercises omitted`
+      `… ${exercises.length - MAX_STRENGTH_EXERCISES} more exercises omitted`
     );
   }
 
-  return [
-    headline.length > 0 ? `Strength: ${headline.join(" · ")}` : "Strength:",
-    ...rows
-  ].join("\n");
+  return [`Strength: ${headline.join(" · ")}`, ...rows].join("\n");
 }
 
 /**

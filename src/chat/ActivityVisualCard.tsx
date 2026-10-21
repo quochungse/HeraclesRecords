@@ -1,4 +1,4 @@
-import { memo, useId, useMemo, useState, type CSSProperties } from "react";
+import { memo, useEffect, useId, useMemo, useState, type CSSProperties } from "react";
 import { ChevronDown } from "lucide-react";
 import {
   Bar,
@@ -39,7 +39,8 @@ import {
   formatSwimPace,
   formatSwimPaceClock,
   readsMovement,
-  readsSpeed
+  readsSpeed,
+  type ActivityReading
 } from "../../electron/activityReading";
 import {
   buildDistanceSeriesData,
@@ -53,6 +54,59 @@ import { useI18n } from "../i18n/useI18n";
 import { zoneName } from "../i18n/zoneNames";
 import { heartRateZoneFamily, heartRateZoneTime } from "../training/zoneTime";
 import { zoneColor } from "../training/components/routeColoring";
+import { sessionSetsCardExercises, sessionSetsHeartRate } from "../../electron/sessionSets";
+import { SessionSetsChart } from "./charts/SessionSetsChart";
+import { formatSessionSet, formatSetScheme } from "./sessionSetsFormat";
+
+/** COROS's Hybrid Fitness, recorded set by set though it is read as any other sport. */
+const HYBRID_FITNESS = 1200;
+
+type CardSections = ActivityVisualPreview["sections"];
+
+/**
+ * A set-by-set session's card stored before its sets were kept — heart rate
+ * with no clock, drawn as "Point 1, Point 2…", and a lap table of sets and
+ * rests with nothing to say which is which — drawn again from the session's
+ * detail, which is on disk from when the card was made. Nothing is written
+ * back: the stored card stays as it was, and a detail that cannot be read
+ * leaves it drawn as before.
+ */
+function useStoredSetsRedraw(
+  preview: ActivityVisualPreview,
+  reading: ActivityReading
+): Partial<CardSections> | undefined {
+  const [redrawn, setRedrawn] = useState<Partial<CardSections>>();
+  const { activityId, sportType } = preview;
+  const stale =
+    (reading === "sets" || sportType === HYBRID_FITNESS) &&
+    sportType !== undefined &&
+    !preview.sections.strength?.exercises.some((exercise) => exercise.setList?.length);
+
+  useEffect(() => {
+    const api = window.heraclesRecords;
+    if (!stale || sportType === undefined || !api?.getTrainingHubActivityDetail) return;
+    let live = true;
+    api
+      .getTrainingHubActivityDetail(activityId, sportType)
+      .then((detail) => {
+        const exercises = sessionSetsCardExercises(detail.exerciseSets);
+        if (!live || exercises.length === 0) return;
+        const series = sessionSetsHeartRate(detail.series);
+        setRedrawn({
+          strength: { exercises },
+          laps: undefined,
+          cadence: undefined,
+          ...(series.length >= 2 ? { hr: { chartKind: "series" as const, series } } : {})
+        });
+      })
+      .catch(() => undefined);
+    return () => {
+      live = false;
+    };
+  }, [activityId, sportType, stale]);
+
+  return stale ? redrawn : undefined;
+}
 
 /** `40 kg`, or `20–40 kg` when the sets were lifted at different loads. */
 function formatLoadRange(
@@ -232,7 +286,7 @@ const LAPS_FOLDED_FROM = 5;
 export const ActivityVisualCard = memo(function ActivityVisualCard({
   preview
 }: ActivityVisualCardProps) {
-  // The series carry their labels as text (a distance's decimals, "Point 3"),
+  // The series carry their labels as text (a distance's decimals, a clock),
   // so they are worked out again when the language changes.
   const { locale } = useI18n();
   const { unitSystem } = useUnitSystem();
@@ -251,69 +305,85 @@ export const ActivityVisualCard = memo(function ActivityVisualCard({
   const cycling = reading === "speed";
   const asSpeed = readsSpeed(reading);
   const moves = readsMovement(reading);
+  const redrawn = useStoredSetsRedraw(preview, reading);
+  const sections = useMemo<CardSections>(
+    () => (redrawn ? { ...preview.sections, ...redrawn } : preview.sections),
+    [preview, redrawn]
+  );
   const hrSeriesData = useMemo(
     () =>
-      preview.sections.hr?.chartKind === "series" && preview.sections.hr.series
-        ? buildDistanceSeriesData(preview.sections.hr.series, "hr", unitSystem, swim)
+      sections.hr?.chartKind === "series" && sections.hr.series
+        ? buildDistanceSeriesData(sections.hr.series, "hr", unitSystem, swim)
         : [],
-    [locale, preview, swim, unitSystem]
+    [locale, sections, swim, unitSystem]
   );
   const hrBarData = useMemo(
-    () => buildLapBarData(preview.sections.hr?.laps, (lap) => lap.avgHr),
-    [preview]
+    () => buildLapBarData(sections.hr?.laps, (lap) => lap.avgHr),
+    [sections]
   );
   const cadenceSeriesData = useMemo(
     () =>
-      preview.sections.cadence?.chartKind === "series" &&
-      preview.sections.cadence.series
+      sections.cadence?.chartKind === "series" &&
+      sections.cadence.series
         ? buildDistanceSeriesData(
-            preview.sections.cadence.series,
+            sections.cadence.series,
             "cadence",
             unitSystem,
             swim
           )
         : [],
-    [locale, preview, swim, unitSystem]
+    [locale, sections, swim, unitSystem]
   );
   const cadenceBarData = useMemo(
-    () => buildLapBarData(preview.sections.cadence?.laps, (lap) => lap.avgCadence),
-    [preview]
+    () => buildLapBarData(sections.cadence?.laps, (lap) => lap.avgCadence),
+    [sections]
   );
   const paceData = useMemo(
     () =>
-      preview.sections.pace?.series
+      sections.pace?.series
         ? buildDistanceSeriesData(
-            preview.sections.pace.series,
+            sections.pace.series,
             "pace",
             unitSystem,
             swim,
             asSpeed
           )
         : [],
-    [asSpeed, locale, preview, swim, unitSystem]
+    [asSpeed, locale, sections, swim, unitSystem]
   );
   const powerData = useMemo(
     () =>
-      preview.sections.power?.series
-        ? buildDistanceSeriesData(preview.sections.power.series, "power", unitSystem, swim)
+      sections.power?.series
+        ? buildDistanceSeriesData(sections.power.series, "power", unitSystem, swim)
         : [],
-    [locale, preview, swim, unitSystem]
+    [locale, sections, swim, unitSystem]
   );
   const elevationData = useMemo(
     () =>
-      preview.sections.elevation?.points
-        ? buildElevationSeriesData(preview.sections.elevation.points, unitSystem)
+      sections.elevation?.points
+        ? buildElevationSeriesData(sections.elevation.points, unitSystem)
         : [],
-    [locale, preview, unitSystem]
+    [locale, sections, unitSystem]
   );
 
   const cadenceUnit = cycling ? "rpm" : "spm";
   const title = preview.name ?? t("activity.untitled");
   const subtitle = preview.startTime ?? undefined;
-  const laps = preview.sections.laps ?? [];
+  const laps = sections.laps ?? [];
   const [lapsOpen, setLapsOpen] = useState(laps.length < LAPS_FOLDED_FROM);
   const lapsTableId = useId();
-  const strengthExercises = preview.sections.strength?.exercises ?? [];
+  const strengthExercises = sections.strength?.exercises ?? [];
+  // A session recorded set by set draws its heart rate under its sets, on
+  // the clock they were placed on; a card with no clock or no sets cannot.
+  const setsSeries =
+    sections.hr?.chartKind === "series" &&
+    strengthExercises.some((exercise) => exercise.setList?.length) &&
+    (sections.hr.series ?? []).filter((point) => point.elapsed !== undefined && point.hr !== undefined)
+      .length >= 2
+      ? sections.hr.series
+      : undefined;
+  const exercisesHaveLoad = strengthExercises.some((exercise) => exercise.maxWeightKg);
+  const exercisesHaveVolume = strengthExercises.some((exercise) => exercise.volumeKg);
   // The column only appears where a lap actually recorded cadence, so a pool
   // swim keeps the narrow table it has now. A gym session's laps are its sets
   // and rests: time and heart rate, no distance, pace or cadence.
@@ -327,7 +397,8 @@ export const ActivityVisualCard = memo(function ActivityVisualCard({
       : swim
         ? formatSwimPace(secondsPerKm, unitSystem)
         : formatPaceValue(secondsPerKm, unitSystem);
-  const cadence = moves ? preview.sections.cadence : undefined;
+  const cadence = moves ? sections.cadence : undefined;
+  const { colors } = useChartColors();
 
   return (
     <div className="chat-visual-card">
@@ -352,12 +423,29 @@ export const ActivityVisualCard = memo(function ActivityVisualCard({
         </div>
       </div>
 
-      {preview.sections.zones ? <ZoneShare zones={preview.sections.zones} /> : null}
+      {sections.zones ? <ZoneShare zones={sections.zones} /> : null}
 
-      {preview.sections.hr ? (
+      {sections.hr ? (
         <section className="chat-visual-section">
-          <h5>{t("activity.m.heartRate")}</h5>
-          {preview.sections.hr.chartKind === "series" && hrSeriesData.length >= 2 ? (
+          {setsSeries ? (
+            <div className="chat-visual-section-head">
+              <h5>{t("activity.m.heartRate")}</h5>
+              <span className="chat-visual-key" style={{ "--set-band": colors.accent } as CSSProperties}>
+                <i aria-hidden="true" />
+                {t("activity.strength.set")}
+              </span>
+            </div>
+          ) : (
+            <h5>{t("activity.m.heartRate")}</h5>
+          )}
+          {setsSeries ? (
+            <SessionSetsChart
+              series={setsSeries}
+              exercises={strengthExercises}
+              gradientId={`chatHrFill-${preview.previewId}`}
+              unitSystem={unitSystem}
+            />
+          ) : sections.hr.chartKind === "series" && hrSeriesData.length >= 2 ? (
             <ChatMiniAreaChart
               data={hrSeriesData}
               gradientId={`chatHrFill-${preview.previewId}`}
@@ -376,7 +464,7 @@ export const ActivityVisualCard = memo(function ActivityVisualCard({
         </section>
       ) : null}
 
-      {moves && preview.sections.pace ? (
+      {moves && sections.pace ? (
         <section className="chat-visual-section">
           <h5>{paceLabel}</h5>
           {paceData.length >= 2 ? (
@@ -407,7 +495,7 @@ export const ActivityVisualCard = memo(function ActivityVisualCard({
         </section>
       ) : null}
 
-      {moves && preview.sections.power ? (
+      {moves && sections.power ? (
         <section className="chat-visual-section">
           <h5>{t("activity.m.power")}</h5>
           {powerData.length >= 2 ? (
@@ -446,7 +534,7 @@ export const ActivityVisualCard = memo(function ActivityVisualCard({
         </section>
       ) : null}
 
-      {moves && !swim && preview.sections.elevation ? (
+      {moves && !swim && sections.elevation ? (
         <section className="chat-visual-section">
           <h5>{t("activity.m.elevation")}</h5>
           {elevationData.length >= 2 ? (
@@ -464,17 +552,18 @@ export const ActivityVisualCard = memo(function ActivityVisualCard({
 
       {strengthExercises.length > 0 ? (
         <section className="chat-visual-section">
-          <h5>{t("strength.exercises.title")}</h5>
+          <h5>
+            {t("strength.exercises.title")} <span>{formatCount(strengthExercises.length)}</span>
+          </h5>
           <div className="chat-plan-table-wrap">
-            <table className="chat-plan-table">
+            <table className="chat-plan-table chat-sets-table">
               <thead>
                 <tr>
                   <th>#</th>
                   <th>{t("workout.summary.exercise")}</th>
                   <th>{t("activity.strength.sets")}</th>
-                  <th>{t("activity.strength.reps")}</th>
-                  <th>{t("activity.strength.weight")}</th>
-                  <th>{t("strength.metric.volume")}</th>
+                  {exercisesHaveLoad ? <th>{t("activity.strength.weight")}</th> : null}
+                  {exercisesHaveVolume ? <th>{t("strength.metric.volume")}</th> : null}
                 </tr>
               </thead>
               <tbody>
@@ -482,12 +571,21 @@ export const ActivityVisualCard = memo(function ActivityVisualCard({
                   <tr key={`${exercise.nameKey}-${index}`}>
                     <td>{index + 1}</td>
                     <td>{resolveExerciseName(exercise.nameKey, exercise.rawName)}</td>
-                    <td>{formatCount(exercise.sets)}</td>
-                    <td>{formatCount(exercise.reps)}</td>
-                    <td>{formatLoadRange(exercise.minWeightKg, exercise.maxWeightKg, unitSystem)}</td>
-                    <td>
-                      {exercise.volumeKg ? formatVolumeKg(exercise.volumeKg, unitSystem) : "—"}
+                    <td
+                      title={exercise.setList
+                        ?.map((set) => formatSessionSet(set, unitSystem))
+                        .join(" · ")}
+                    >
+                      {formatSetScheme(exercise)}
                     </td>
+                    {exercisesHaveLoad ? (
+                      <td>{formatLoadRange(exercise.minWeightKg, exercise.maxWeightKg, unitSystem)}</td>
+                    ) : null}
+                    {exercisesHaveVolume ? (
+                      <td>
+                        {exercise.volumeKg ? formatVolumeKg(exercise.volumeKg, unitSystem) : "—"}
+                      </td>
+                    ) : null}
                   </tr>
                 ))}
               </tbody>
