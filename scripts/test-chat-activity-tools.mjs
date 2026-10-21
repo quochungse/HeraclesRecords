@@ -304,6 +304,33 @@ const dynamicsText = formatActivityDetailForChat(
   "metric"
 );
 
+// The card carries the session's time in each heart-rate zone, as COROS
+// scored it, and the model to name the bands by: the activity's own, or the
+// account's where the activity says 0.
+{
+  const scored = parseActivityDetail(dynamicsChatFixture);
+  const card = buildActivityVisualPreview(scored, "req-zones", 2);
+  assert.deepEqual(
+    card?.sections.zones?.buckets.map((bucket) => bucket.seconds),
+    scored.hrZones.map((zone) => zone.seconds),
+    "every bucket, reached or not"
+  );
+  assert.equal(card?.sections.zones?.zoneType, scored.hrZoneType || 2);
+  assert.equal(
+    buildActivityVisualPreview({ ...scored, hrZoneType: 1 }, "req-own", 2)?.sections.zones?.zoneType,
+    1,
+    "the activity's own model first"
+  );
+  assert.equal(
+    buildActivityVisualPreview({ ...scored, hrZones: [] }, "req-none")?.sections.zones,
+    undefined,
+    "no zones without a score"
+  );
+  const { parseChatTranscriptJson } = await import(`${distUrl("chatHistoryStore.js")}?cacheBust=${Date.now()}`);
+  const [stored] = parseChatTranscriptJson(JSON.stringify([{ kind: "activityVisual", preview: card }]));
+  assert.deepEqual(stored.preview.sections.zones, card.sections.zones, "and it survives the store");
+}
+
 assert.match(dynamicsText, /Adjusted pace \(grade-adjusted\): 7:10\/km/);
 assert.match(dynamicsText, /Running dynamics: cadence 163 spm \(max 170\)/);
 assert.match(dynamicsText, /stride length 0\.84 m/);

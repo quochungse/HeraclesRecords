@@ -1404,6 +1404,16 @@ export function lastKnownCorosProfileSex(): number | undefined {
   return corosProfileCache?.snapshot.profile.sex ?? coachProfileCache?.profile.sex;
 }
 
+/**
+ * The account's heart-rate model as last read (`hrZoneType`: 1 Max HR, 2 HR
+ * Reserve, 3 LTHR), for an activity that says 0 — COROS writes 0 on some
+ * activities of an account that has been on one model all along. Undefined
+ * until a profile has been read since sign-in, like the sex above.
+ */
+export function lastKnownCorosHrZoneType(): number | undefined {
+  return corosProfileCache?.snapshot.profile.hrZoneType ?? coachProfileCache?.profile.hrZoneType;
+}
+
 function storeCorosProfileSnapshot(
   profile: CorosProfile,
   dashboard: TrainingHubDashboard | null

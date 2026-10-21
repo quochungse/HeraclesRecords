@@ -15643,6 +15643,51 @@ td span {
   color: var(--text-secondary);
 }
 
+/* The session's time in each heart-rate zone it reached (`ZoneShare`), in
+   the colours its route map and its own page give the zones. */
+.chat-visual-zones-bar {
+  display: flex;
+  gap: 2px;
+  height: 10px;
+  overflow: hidden;
+  border-radius: var(--radius-pill);
+}
+
+.chat-visual-zones-bar i {
+  min-width: 2px;
+  background: var(--zone-color);
+}
+
+.chat-visual-zones-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  margin: 0;
+  padding: 0;
+  color: var(--text-secondary);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  list-style: none;
+}
+
+.chat-visual-zones-legend li {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.chat-visual-zones-legend i {
+  width: 8px;
+  height: 8px;
+  border-radius: var(--radius-xs);
+  background: var(--zone-color);
+}
+
+.chat-visual-zones-legend strong {
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
 /* The lap table scrolls sideways inside the card rather than widening it. The
    global `table` rule sets min-width: 720px, which every other table in the app
    cancels from its own shell; this one had no shell at all. */

@@ -3026,6 +3026,13 @@ export interface ActivityVisualPreview {
     elevation?: { points: TrainingHubTrackPoint[] };
     laps?: ActivityVisualLapPoint[];
     strength?: { exercises: ActivityVisualStrengthExercise[] };
+    /**
+     * The time in each heart-rate zone as COROS scored the session (its
+     * `zoneList`), and the model it was scored on — the activity's own
+     * `hrZoneType`, or the account's where the activity says 0 — so the card
+     * names the bands as COROS does. Absent on a card stored before it.
+     */
+    zones?: { zoneType?: number; buckets: TrainingHubActivityZoneBucket[] };
   };
 }
 

@@ -14,7 +14,8 @@ import {
   getTrainingHubActivityDetail,
   listTrainingHubActivities,
   downsampleActivitySeries,
-  formatActivitySeriesForChat
+  formatActivitySeriesForChat,
+  lastKnownCorosHrZoneType
 } from "./trainingHubService";
 import type {
   ActivityHrTrendPreview,
@@ -646,7 +647,7 @@ async function handleGetActivityDetail(
     }
 
     if (callbacks?.onActivityVisual && callbacks.requestId) {
-      const preview = buildActivityVisualPreview(detail, callbacks.requestId);
+      const preview = buildActivityVisualPreview(detail, callbacks.requestId, lastKnownCorosHrZoneType());
       if (preview) {
         callbacks.onActivityVisual(preview);
       }
@@ -888,7 +889,9 @@ export function migrateActivityHrTrendPreview(
 
 export function buildActivityVisualPreview(
   detail: TrainingHubActivityDetail,
-  requestId: string
+  requestId: string,
+  /** The account's heart-rate model, for an activity that names none. */
+  accountZoneType?: number
 ): ActivityVisualPreview | null {
   const activityId = detail.activityId?.trim();
   if (!activityId) {
@@ -970,6 +973,22 @@ export function buildActivityVisualPreview(
     sections.strength = { exercises };
   } else if (detail.laps.length > 0) {
     sections.laps = mapLapPoints(detail.laps);
+  }
+
+  // Where the session's heart rate sat, as COROS scored it — read off the
+  // detail already in hand, never worked out again from the samples.
+  const zones = detail.hrZones ?? [];
+  if (zones.some((zone) => (zone.seconds ?? 0) > 0)) {
+    const zoneType = detail.hrZoneType || accountZoneType;
+    sections.zones = {
+      ...(zoneType ? { zoneType } : {}),
+      buckets: zones.map(({ index, low, high, seconds }) => ({
+        index,
+        ...(low !== undefined ? { low } : {}),
+        ...(high !== undefined ? { high } : {}),
+        ...(seconds !== undefined ? { seconds } : {})
+      }))
+    };
   }
 
   if (Object.keys(sections).length === 0) {

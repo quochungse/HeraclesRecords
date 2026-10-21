@@ -1,4 +1,4 @@
-import { memo, useMemo } from "react";
+import { memo, useMemo, type CSSProperties } from "react";
 import {
   Bar,
   BarChart,
@@ -15,6 +15,7 @@ import type {
 import {
   formatDistanceMeters,
   formatDurationSeconds,
+  formatDurationSpan,
   formatOptionalNumber,
   formatPaceSecondsPerKm
 } from "../training/formatters";
@@ -48,6 +49,9 @@ import { formatCount, formatDecimal, t } from "../i18n/core";
 import { resolveExerciseName } from "../training/exerciseNames";
 import { formatVolumeKg, formatWeightKg } from "../strength/strengthAnalytics";
 import { useI18n } from "../i18n/useI18n";
+import { zoneName } from "../i18n/zoneNames";
+import { heartRateZoneFamily, heartRateZoneTime } from "../training/zoneTime";
+import { zoneColor } from "../training/components/routeColoring";
 
 /** `40 kg`, or `20–40 kg` when the sets were lifted at different loads. */
 function formatLoadRange(
@@ -171,6 +175,52 @@ function buildLapBarData(
  * re-renders on every token, keystroke and settings change, and a card whose
  * entry did not change has nothing to redraw.
  */
+/**
+ * Where the session's heart rate sat, as COROS scored it: one bar of the
+ * zones reached, each in the colour the route map and the session's own page
+ * give it, named in the account's model. The zones never reached are left
+ * out here — the page lists the whole scale; a card in a conversation says
+ * what the session was.
+ */
+function ZoneShare({ zones }: { zones: NonNullable<ActivityVisualPreview["sections"]["zones"]> }) {
+  const reached = useMemo(
+    () =>
+      heartRateZoneTime(zones.buckets, heartRateZoneFamily(zones.zoneType || undefined, undefined)).filter(
+        (row) => row.seconds > 0
+      ),
+    [zones]
+  );
+  if (!reached.length) return null;
+  const rows = reached.map((row) => ({
+    ...row,
+    name: row.label ? zoneName(row.label) : t("overview.zones.zone", { n: row.position + 1 }),
+    style: { "--zone-color": zoneColor(row.position) } as CSSProperties
+  }));
+  return (
+    <section className="chat-visual-section">
+      <h5>{t("activity.zoneTime.title")}</h5>
+      <div className="chat-visual-zones-bar" aria-hidden="true">
+        {rows.map((row) => (
+          <i
+            key={row.position}
+            style={{ ...row.style, flexGrow: row.share }}
+            title={`${row.name} · ${formatDurationSpan(row.seconds)}`}
+          />
+        ))}
+      </div>
+      <ul className="chat-visual-zones-legend">
+        {rows.map((row) => (
+          <li key={row.position} style={row.style} title={formatDurationSpan(row.seconds)}>
+            <i aria-hidden="true" />
+            {row.name}
+            <strong>{`${Math.round(row.share * 100)}%`}</strong>
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
 export const ActivityVisualCard = memo(function ActivityVisualCard({
   preview
 }: ActivityVisualCardProps) {
@@ -291,6 +341,8 @@ export const ActivityVisualCard = memo(function ActivityVisualCard({
           ) : null}
         </div>
       </div>
+
+      {preview.sections.zones ? <ZoneShare zones={preview.sections.zones} /> : null}
 
       {preview.sections.hr ? (
         <section className="chat-visual-section">
