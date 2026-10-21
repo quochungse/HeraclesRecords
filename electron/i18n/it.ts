@@ -217,6 +217,7 @@ const main: ScreenMessages = {
   "main.sync.outdated": "Questo archivio usa un formato dati più recente. Aggiorna prima l’app.",
   "main.coach.turnChanged": "Questa conversazione è cambiata da quando è stata aperta. Ricontrollala, poi riprova.",
   "main.coach.turnNotLast": "Solo l’ultima domanda si può modificare o porre di nuovo.",
+  "main.coach.questionEmpty": "Una domanda ha bisogno di parole.",
 };
 
 export default main;

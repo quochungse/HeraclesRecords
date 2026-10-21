@@ -10,10 +10,13 @@ import { useI18n } from "../i18n/useI18n";
  */
 export function QuestionEditor({
   initial,
+  busy = false,
   onSave,
   onCancel
 }: {
   initial: string;
+  /** The edit is on its way: the words stay, and the buttons wait. */
+  busy?: boolean;
   onSave: (text: string) => void;
   onCancel: () => void;
 }) {
@@ -21,7 +24,7 @@ export function QuestionEditor({
   const field = useRef<HTMLTextAreaElement>(null);
   const save = () => {
     const text = field.current?.value.trim() ?? "";
-    if (text) onSave(text);
+    if (text && !busy) onSave(text);
   };
   return (
     <div className="chat-question-edit">
@@ -34,7 +37,7 @@ export function QuestionEditor({
         onKeyDown={(event) => {
           if (event.key === "Escape") {
             event.preventDefault();
-            onCancel();
+            if (!busy) onCancel();
           } else if (event.key === "Enter" && (event.ctrlKey || event.metaKey)) {
             event.preventDefault();
             save();
@@ -43,10 +46,10 @@ export function QuestionEditor({
       />
       <div className="chat-question-edit-foot">
         <span>{t("chat.turn.editNote")}</span>
-        <button type="button" className="chat-plan-review" onClick={onCancel}>
+        <button type="button" className="chat-plan-review" disabled={busy} onClick={onCancel}>
           {t("common.cancel")}
         </button>
-        <button type="button" className="chat-plan-upload" onClick={save}>
+        <button type="button" className="chat-plan-upload" disabled={busy} onClick={save}>
           {t("chat.turn.editSave")}
         </button>
       </div>

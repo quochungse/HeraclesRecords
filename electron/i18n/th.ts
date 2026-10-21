@@ -217,6 +217,7 @@ const main: ScreenMessages = {
   "main.sync.outdated": "พื้นที่เก็บนี้ใช้รูปแบบข้อมูลที่ใหม่กว่า โปรดอัปเดตแอปก่อน",
   "main.coach.turnChanged": "บทสนทนานี้เปลี่ยนไปหลังจากเปิดขึ้นมา ดูอีกครั้งแล้วลองใหม่",
   "main.coach.turnNotLast": "แก้ไขหรือถามซ้ำได้เฉพาะคำถามล่าสุดเท่านั้น",
+  "main.coach.questionEmpty": "คำถามต้องมีข้อความ",
 };
 
 export default main;

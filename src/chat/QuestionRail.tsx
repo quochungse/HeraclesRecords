@@ -1,3 +1,4 @@
+import { memo } from "react";
 import { t } from "../i18n/core";
 import { useI18n } from "../i18n/useI18n";
 
@@ -16,9 +17,11 @@ const RAIL_MIN_QUESTIONS = 3;
  * a mark says its question; pressed, the transcript goes to it. Answers and
  * cards take most of a long conversation's height, so the questions are what
  * a reader looks for when going back. A turn hidden from Coach is a hollow
- * mark. Alt + ↑ and ↓ step through the same list.
+ * mark. Alt + ↑ and ↓ step through the same list. Memoised: the view
+ * renders on every token of a streaming answer, and the marks move only with
+ * the turns.
  */
-export function QuestionRail({
+export const QuestionRail = memo(function QuestionRail({
   questions,
   active,
   onJump
@@ -53,7 +56,7 @@ export function QuestionRail({
       ))}
     </nav>
   );
-}
+});
 
 /**
  * The question whose turn is being read: the last one whose row starts above
@@ -61,6 +64,11 @@ export function QuestionRail({
  * can never scroll up to that line, it is the last one on screen — or the
  * mark would sit on an earlier question while the reader is at the end, and
  * stepping down would land on a question the mark then left again.
+ *
+ * A question with no row ahead of the first drawn one is above the window a
+ * long conversation opens on (`TRANSCRIPT_TAIL`), so above the line too: read
+ * at the window's top, the mark is the last question before it, not the first
+ * of the conversation.
  */
 export function questionAtScroll(
   questions: readonly RailQuestion[],
@@ -71,9 +79,15 @@ export function questionAtScroll(
 ): number | null {
   let active: number | null = questions[0]?.index ?? null;
   const line = endLine ?? readingLine;
+  let drawn = false;
   for (const question of questions) {
     const top = rowTop(question.index);
-    if (top !== undefined && top <= line) active = question.index;
+    if (top === undefined) {
+      if (!drawn) active = question.index;
+      continue;
+    }
+    drawn = true;
+    if (top <= line) active = question.index;
   }
   return active;
 }

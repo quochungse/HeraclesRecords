@@ -225,6 +225,7 @@ const main: ScreenMessages = {
   "main.sync.outdated": "Это хранилище в более новом формате данных. Сначала обновите приложение.",
   "main.coach.turnChanged": "С момента открытия этот разговор изменился. Просмотрите его снова и повторите попытку.",
   "main.coach.turnNotLast": "Изменить или задать заново можно только последний вопрос.",
+  "main.coach.questionEmpty": "В вопросе должны быть слова.",
 };
 
 export default main;

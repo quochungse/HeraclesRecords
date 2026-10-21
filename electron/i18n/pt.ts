@@ -217,6 +217,7 @@ const main: ScreenMessages = {
   "main.sync.outdated": "Este cofre está em um formato de dados mais novo. Atualize o app primeiro.",
   "main.coach.turnChanged": "Esta conversa mudou desde que foi aberta. Veja-a de novo e tente mais uma vez.",
   "main.coach.turnNotLast": "Só a sua última pergunta pode ser editada ou enviada de novo.",
+  "main.coach.questionEmpty": "Uma pergunta precisa de palavras.",
 };
 
 export default main;

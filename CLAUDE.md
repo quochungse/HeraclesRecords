@@ -1654,15 +1654,25 @@ lives at module level for the same visit-to-visit reason — see `useCalendarDat
   `setTurnHidden`/`branchConversation`), read, cut and written with nothing awaited
   between, after the window flushes its own save: the window saving a shorter transcript is
   what `foreignTail` refuses, and an analysis appends to the same row from main. The turn
-  is named by its question's index and words (`TurnRef`), checked against the row, found by
-  the words alone only when they are unique. **Every position-held boundary moves with the
-  entries** (`shiftBoundary`): the summary's `through` and the condensed layer's start; a
-  summary left covering nothing is dropped, and when the summary covers the turn the athlete
+  is named by its question's `mid`, index and words (`TurnRef`): by the `mid` wherever the
+  window has one and the row is stamped, because a turn deleted on another machine leaves its
+  place, and often its words ("ok"), to another; otherwise checked at the index, and found by
+  the words alone only when they are unique. **No change is made while anything writes into
+  the conversation** — its own turn or an analysis (`turnsBusyIn`) — or the row, which holds
+  only the running turn's question, would land on screen and the turn's save would write back
+  what the change took out; an editor saves on the `TurnRef` it opened with, so a question
+  that has stopped being the last is refused (`turnNotLast`). **Every position-held boundary
+  moves with the entries** (`shiftBoundary`): the summary's `through` and the condensed
+  layer's start; a summary left covering nothing Coach may read (`speaksBefore`, after the
+  mask) is dropped, a rewrite is announced to sync on its own (`announceChatSessionRow`, no
+  save follows it), and when the summary covers the turn the athlete
   is asked whether to rewrite it now, on the compression model (`rewriteSummary`, only over
   the summary it replaces). A removal leaves a brief, an outline, a plan event, an analysis
   trace and an opaque entry; **what the turn made stays, cards included, unless the athlete
-  deletes it too**, and only what can go goes: nothing saved to COROS, no creation with a
-  version in another turn. **Edit and retry are `editTurn`, last turn only**, by decision:
+  deletes it too**, and only what can go goes: nothing saved to COROS, no proposal with a line
+  applied, no creation with a version in another turn. A creation that goes takes the plan
+  events and refs naming it, wherever they are; a card the athlete removed stays while its
+  drafts do, since it is what deleting the conversation reads to delete them. **Edit and retry are `editTurn`, last turn only**, by decision:
   the question keeps its `mid` (`mrev` bumped), Coach's answer and what it made go, with no
   versions kept and no second question asked. **A failed turn is a row under its question**
   (`TurnFailureRow`, kinds from `classifyTurnFailure`), never stored: reopened, a question
@@ -1675,12 +1685,15 @@ lives at module level for the same visit-to-visit reason — see `useCalendarDat
   masked by `maskHiddenTurns` — every spoken entry replaced by an empty opaque one, positions
   kept, so `through` still counts the stored transcript. The window masks before a turn
   (never the turn being asked; `ChatEntry.mid` is carried for this and never stored from the
-  window) and main masks for analyses, recall, the summariser and the menu's compaction
-  through `coachTranscript`. **A branch is a conversation of its own** — entries minted
+  window, which reads the hidden set again at send rather than trusting the one on screen) and
+  main masks for analyses, recall, the summariser and the menu's compaction through
+  `coachTranscript` — an analysis whose transcript cannot be masked **fails** rather than
+  reading the turns the athlete hid, so that dep is not `optional`. **A branch is a conversation of its own** — entries minted
   afresh, a `branchedFrom` anchor at its head, the same AI, sources and hidden turns, the
   summary only when it covers nothing past the branch point — and it **leaves behind every
   anchor that names a row** (drafts, briefs, outlines, proposals, plan events, plan refs):
   two conversations naming one draft would have deleting either take the other's with it.
+  A branch of a branch leaves its parent's `branchedFrom` too, so it opens on one head.
   `npm run test:chat-turn-actions`.
 
   **A turn reads chart, answer, then creations.** Cards arrive while a turn runs and the

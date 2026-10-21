@@ -1167,6 +1167,16 @@ function notifyChatSessionRow(id: string): void {
   notifySyncedRow("chat_sessions", ["id"], [id]);
 }
 
+/**
+ * For a write that changed a conversation's row and is followed by no save:
+ * the summary is written on its own (`setChatSessionCoachSummaryRow`) because
+ * a save normally comes right after and carries it, and a rewrite done once a
+ * turn is deleted or hidden has no save after it.
+ */
+export function announceChatSessionRow(id: string): void {
+  notifyChatSessionRow(id);
+}
+
 export function insertChatSessionRow(
   id: string,
   provider: string,

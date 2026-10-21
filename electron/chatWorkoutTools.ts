@@ -2813,13 +2813,12 @@ function writeVersion(
  * plan on COROS names its draft (`coach.draftId`).
  */
 export function discardPlanDraft(draftId: string): void {
-  const stored = loadStoredPlanDraft(draftId);
-  if (!stored) return;
-  const versions = versionsOf(stored.artifactId);
-  if (stored.uploadedAt || versions.some((version) => version.uploadedAt)) {
+  const creation = creationOfDraft(draftId);
+  if (!creation) return;
+  if (creation.saved) {
     throw new Error("A saved creation is hidden, not removed.");
   }
-  deletePlanDraftsOf([...new Set([draftId, ...versions.map((version) => version.draftId)])]);
+  deletePlanDraftsOf(creation.draftIds);
 }
 
 /**

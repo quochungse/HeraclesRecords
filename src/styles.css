@@ -13947,6 +13947,11 @@ td span {
   color: var(--error-text);
 }
 
+.chat-turn-action:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: 2px;
+}
+
 /* A turn hidden from Coach: still readable, set back, and said so once above
    its question. Only the words are set back — not the actions under them,
    one of which puts it back, and not the cards: what the turn made is still
@@ -13976,6 +13981,12 @@ td span {
   cursor: pointer;
   text-decoration: underline;
   text-underline-offset: 3px;
+}
+
+.chat-hidden-turn-label button:focus-visible,
+.chat-branched-from button:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: 2px;
 }
 
 /* The head of a conversation branched from another, and the way back. */
@@ -14044,7 +14055,15 @@ td span {
   border-color: var(--chat-signal);
 }
 
-.chat-question-tick:hover::after {
+.chat-question-tick:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: 2px;
+}
+
+/* The question a mark stands for, beside it — under the pointer, and on the
+   mark the keyboard is on. */
+.chat-question-tick:hover::after,
+.chat-question-tick:focus-visible::after {
   position: absolute;
   top: 50%;
   right: calc(100% + 6px);

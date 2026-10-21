@@ -1257,18 +1257,15 @@ export interface PersistedChatAnalysisStoppedEntry {
 }
 
 /**
- * How a `chat:saveSession` call describes what it is based on (5.6b). Lives
- * here rather than beside the store because the renderer declares the same
- * call and must not import a main-process module to do it.
- */
-/**
  * A turn of a conversation, as the window names it: its question's position
- * in the transcript the window holds and its words. The main process checks
- * both against the row before it changes anything (`chatTurnService.ts`).
+ * in the transcript the window holds and its words, and the question's `mid`
+ * where the window has one. The main process checks them against the row
+ * before it changes anything (`chatTurnService.ts`).
  */
 export interface TurnRef {
   index: number;
   content: string;
+  mid?: string;
 }
 
 /** Something a turn made that lives in a table of its own: a plan, a workout, a proposed change. */
@@ -1314,6 +1311,11 @@ export interface TurnChange {
   summaryError?: string;
 }
 
+/**
+ * How a `chat:saveSession` call describes what it is based on (5.6b). Lives
+ * here rather than beside the store because the renderer declares the same
+ * call and must not import a main-process module to do it.
+ */
 export interface SaveChatSessionOptions {
   /**
    * How many of the stored entries the caller's array accounts for. Anything

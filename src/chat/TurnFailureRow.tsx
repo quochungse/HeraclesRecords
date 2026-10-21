@@ -78,7 +78,9 @@ export function TurnFailureRow({
   };
 
   return (
-    <div className={`chat-failure is-${row.tone}`} role="alert">
+    // Only trouble interrupts a screen reader: a question still unanswered is
+    // read out every time its conversation opens, so it is a status.
+    <div className={`chat-failure is-${row.tone}`} role={row.tone === "neutral" ? "status" : "alert"}>
       <div className="chat-failure-head">
         <Icon size={16} aria-hidden="true" />
         <div>

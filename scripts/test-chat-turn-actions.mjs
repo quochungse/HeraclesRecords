@@ -7,15 +7,18 @@
 //     question; deleting it takes its words and charts and leaves a plan
 //     event, a brief, an outline and an entry a newer build wrote.
 //   * What the turn made stays (its cards with it) unless the athlete deletes
-//     it too, and then only what can go: nothing saved to COROS, and no
-//     creation with a version in another turn.
+//     it too, and then only what can go: nothing saved to COROS — a proposal
+//     with a line applied included — and no creation with a version in
+//     another turn. A creation deleted takes the events and references that
+//     name it; a card the athlete removed stays while its drafts do.
 //   * Every position-held boundary moves with the entries: the summary's
 //     `through` and the condensed layer's start. A summary left covering
-//     nothing is dropped; one asked to be rewritten is written from the turns
-//     it now covers.
-//   * The window names the turn by position and words, and the row is checked
-//     against both: a turn found only by its words is used when they are
-//     unique, refused when they are not.
+//     nothing Coach may read is dropped; one asked to be rewritten is written
+//     from the turns it now covers, and announced to sync.
+//   * The window names the turn by its question's identity where it has one,
+//     and otherwise by position and words: a turn found only by its words is
+//     used when they are unique, refused when they are not; one whose identity
+//     is gone is refused whatever its words.
 //   * Asking again is the last turn only; the question keeps its identity,
 //     its answer and what the answer made go.
 //   * A hidden turn stays in the row and out of what Coach reads — an
@@ -51,6 +54,8 @@ const turns = await import(distUrl("chatTurns.js"));
 const service = await import(distUrl("chatTurnService.js"));
 const hiddenModule = await import(distUrl("chatHiddenTurns.js"));
 const chatService = await import(distUrl("chatService.js"));
+const syncBridge = await import(distUrl("sync/syncBridge.js"));
+const { HlcClock, formatHlc } = await import(distUrl("sync/hlc.js"));
 const failure = await import(pathToFileURL(path.join(repoRoot, "src/chat/turnFailure.ts")).href);
 
 databaseModule.initializeDatabase(fs.mkdtempSync(path.join(os.tmpdir(), "chat-turn-actions-")));
@@ -79,13 +84,13 @@ function saveDraft(draftId, artifactId, version, uploadedAt) {
   });
 }
 
-function saveChanges(changeSetId, sessionId) {
+function saveChanges(changeSetId, sessionId, lines = []) {
   const now = new Date().toISOString();
   databaseModule.saveChatScheduleChange({
     changeSetId,
     sessionId,
     summary: "Move Thursday",
-    linesJson: "[]",
+    linesJson: JSON.stringify(lines),
     createdAt: now,
     updatedAt: now
   });
@@ -127,7 +132,7 @@ test("a turn starts at the references in front of its question and ends at the n
   ]);
   assert.equal(turns.turnRanges(entries)[0].start, 1, "an entry before the first question is in no turn");
   assert.deepEqual(
-    turns.turnRemoval(entries, turns.turnRanges(entries)[1], { keepCreations: false }),
+    turns.turnRemoval(entries, turns.turnRanges(entries)[1]),
     [3, 4, 5, 6],
     "the plan event stays"
   );
@@ -209,6 +214,64 @@ test("deleting what a turn made takes only what can go", async () => {
   const changes = richConversation();
   await service.deleteTurn(changes, { index: 6, content: "Q3" }, { deleteCreations: true, rewriteSummary: false }, noRoll);
   assert.deepEqual(databaseModule.getChatScheduleChanges(["cs-1"]), [], "a proposal goes with its turn");
+
+  const applied = conversation([user("Move my week"), changesCard("cs-applied"), coach("Moved")]);
+  saveChanges("cs-applied", applied, [{ lineId: "l1", status: "applied" }, { lineId: "l2", status: "proposed" }]);
+  const described = service.describeTurn(applied, { index: 0, content: "Move my week" });
+  assert.deepEqual(
+    described.creations.map(({ deletable, keptBecause }) => ({ deletable, keptBecause })),
+    [{ deletable: false, keptBecause: "saved" }],
+    "a line of it is on COROS"
+  );
+  await service.deleteTurn(applied, { index: 0, content: "Move my week" }, { deleteCreations: true, rewriteSummary: false }, noRoll);
+  assert.deepEqual(contents(applied), ["scheduleChange:cs-applied"]);
+  assert.equal(databaseModule.getChatScheduleChanges(["cs-applied"]).length, 1, "and the proposal stays to say so");
+});
+
+test("a creation deleted with its turn takes the events and references that name it", async () => {
+  saveDraft("e-1", "art-E", 1);
+  saveDraft("e-2", "art-E", 2);
+  saveDraft("k-1", "art-K", 1);
+  const ref = (artifactId, draftId) => ({ artifactId, draftId, name: "Plan", artifactType: "plan", scope: "plan", label: "Plan" });
+  const sessionId = conversation([
+    user("Make a plan"),
+    draftCard("e-1"),
+    draftCard("e-2"),
+    {
+      kind: "planEvent",
+      event: { eventId: "ev-1", artifactId: "art-E", draftId: "e-2", action: "edited", author: "athlete", name: "Plan", artifactType: "plan", at: 1 }
+    },
+    coach("Here it is"),
+    { kind: "planRefs", refs: [ref("art-E", "e-2")] },
+    user("Is week 2 too much?"),
+    coach("No"),
+    { kind: "planRefs", refs: [ref("art-E", "e-2"), ref("art-K", "k-1")] },
+    user("Compare them"),
+    coach("Done")
+  ]);
+  await service.deleteTurn(sessionId, { index: 0, content: "Make a plan" }, { deleteCreations: true, rewriteSummary: false }, noRoll);
+  assert.deepEqual(contents(sessionId), ["Is week 2 too much?", "No", "planRefs:", "Compare them", "Done"]);
+  assert.deepEqual(
+    history.getChatSession(sessionId)[2].refs.map((kept) => kept.artifactId),
+    ["art-K"],
+    "a question about two creations keeps the one that is left"
+  );
+});
+
+test("a card the athlete removed stays with the drafts it records", async () => {
+  saveDraft("r-1", "art-R", 1, Date.now());
+  const removed = { ...draftCard("r-1"), draft: { ...draftCard("r-1").draft, removedAt: Date.now() } };
+  const sessionId = conversation([user("Make a plan"), removed, coach("Here it is"), user("Q2"), coach("A2")]);
+  await service.deleteTurn(sessionId, { index: 0, content: "Make a plan" }, { deleteCreations: true, rewriteSummary: false }, noRoll);
+  assert.deepEqual(contents(sessionId), ["planDraft:r-1", "Q2", "A2"]);
+  chatService.deleteChatSessionById(sessionId);
+  assert.equal(databaseModule.getChatPlanDraft("r-1"), undefined, "deleting the conversation still finds them");
+
+  // Unsaved, removing it deleted the drafts already, and the card has nothing to record.
+  const gone = { ...draftCard("r-2"), draft: { ...draftCard("r-2").draft, removedAt: Date.now() } };
+  const unsaved = conversation([user("Make a plan"), gone, coach("Here it is")]);
+  await service.deleteTurn(unsaved, { index: 0, content: "Make a plan" }, { deleteCreations: false, rewriteSummary: false }, noRoll);
+  assert.deepEqual(contents(unsaved), []);
 });
 
 test("the summary's boundaries move with the entries, and a summary left covering nothing goes", async () => {
@@ -228,6 +291,13 @@ test("the summary's boundaries move with the entries, and a summary left coverin
   const dropped = context.readSessionSummary(short);
   assert.equal(dropped.summary, undefined);
   assert.equal(dropped.through, 0);
+
+  // An AI Plan conversation opens on its brief, which is no turn: deleting the
+  // one turn the summary covered leaves it covering the brief alone.
+  const briefed = conversation([{ kind: "planBrief", artifactId: "brief-1" }, user("Q1"), coach("A1"), user("Q2"), coach("A2")]);
+  context.writeSessionSummary(briefed, "About Q1", 3);
+  await service.deleteTurn(briefed, { index: 1, content: "Q1" }, { deleteCreations: false, rewriteSummary: true }, noRoll);
+  assert.equal(context.readSessionSummary(briefed).summary, undefined, "nothing Coach may read is left under it");
 });
 
 test("a summary asked to be rewritten is written from the turns it now covers", async () => {
@@ -261,6 +331,29 @@ test("a summary asked to be rewritten is written from the turns it now covers", 
   assert.equal(context.readSessionSummary(failing).summary, "About Q1 and Q2", "the old summary stays");
 });
 
+test("a rewritten summary reaches sync, though no save follows it", async () => {
+  const sessionId = conversation([user("Q1"), coach("A1"), user("Q2"), coach("A2"), user("Q3"), coach("A3")]);
+  context.writeSessionSummary(sessionId, "About Q1 and Q2", 4);
+  const captured = [];
+  const clock = new HlcClock({ device: "turnactionstest00" });
+  syncBridge.attachSyncSink({
+    enqueue: (entries) => captured.push(...entries),
+    nextHlc: () => formatHlc(clock.tick())
+  });
+  try {
+    await service.setTurnHidden(
+      sessionId,
+      { index: 0, content: "Q1" },
+      { hidden: true, rewriteSummary: true },
+      { rollSummary: async () => ({ summary: "About Q2" }) }
+    );
+  } finally {
+    syncBridge.attachSyncSink(null);
+  }
+  const rows = captured.filter((entry) => entry.key === "chat_sessions" && entry.recordId === sessionId);
+  assert.equal(rows.at(-1)?.payload.coach_summary, "About Q2");
+});
+
 test("a turn is found by its words when its position moved, and refused when they are not unique", async () => {
   const sessionId = conversation([user("Q1"), coach("A1"), user("Q2"), coach("A2")]);
   await service.deleteTurn(sessionId, { index: 9, content: "Q2" }, { deleteCreations: false, rewriteSummary: false }, noRoll);
@@ -272,6 +365,21 @@ test("a turn is found by its words when its position moved, and refused when the
     /changed since it was opened/
   );
   assert.equal(contents(twice).length, 4, "nothing was touched");
+});
+
+test("a turn is found by its question's identity, and refused once that is gone", async () => {
+  const sessionId = conversation([user("ok"), coach("A1"), user("Q2"), coach("A2"), user("ok"), coach("A3")]);
+  const [first, , , , second] = history.getChatSession(sessionId);
+  // Another machine deleted the first "ok"; this window still shows it where it was.
+  await service.deleteTurn(sessionId, { index: 0, content: "ok", mid: first.mid }, { deleteCreations: false, rewriteSummary: false }, noRoll);
+  assert.deepEqual(contents(sessionId), ["Q2", "A2", "ok", "A3"]);
+  await assert.rejects(
+    service.deleteTurn(sessionId, { index: 0, content: "ok", mid: first.mid }, { deleteCreations: false, rewriteSummary: false }, noRoll),
+    /changed since it was opened/,
+    "its words are unique now, and still not this turn"
+  );
+  await service.deleteTurn(sessionId, { index: 4, content: "ok", mid: second.mid }, { deleteCreations: false, rewriteSummary: false }, noRoll);
+  assert.deepEqual(contents(sessionId), ["Q2", "A2"], "found where it moved to");
 });
 
 // --- asking again ---------------------------------------------------------------
@@ -395,6 +503,8 @@ test("a summary reaching past the branch point is not carried", () => {
   assert.equal(context.readSessionSummary(branch.id).summary, undefined);
   const again = service.branchConversation(branch.id, { index: 1, content: "Q1" });
   assert.equal(again.title.startsWith("↳ ↳"), false, "a branch of a branch is marked once");
+  assert.deepEqual(contents(again.id), ["branchedFrom:", "Q1", "A1"], "and opens on one head, its own");
+  assert.equal(history.getChatSession(again.id)[0].sessionId, branch.id);
 });
 
 // --- a failed turn ---------------------------------------------------------------

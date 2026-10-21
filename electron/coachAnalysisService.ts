@@ -610,7 +610,7 @@ export interface CoachAnalysisRunnerDeps {
   /**
    * The transcript as Coach may read it: the turns the athlete hid put out of
    * sight, positions kept. Optional so a suite with no database can leave it
-   * out; the run then reads every turn.
+   * out; the run then reads every turn. One that throws fails the run.
    */
   coachTranscript?(sessionId: string, entries: PersistedChatEntry[]): PersistedChatEntry[];
   setSessionSummary(sessionId: string, summary: string, through: number): void;
@@ -1668,7 +1668,11 @@ async function runInConversation(
     }
   };
   const budget = optional(() => resolved.getContextBudget?.());
-  const readable = optional(() => resolved.coachTranscript?.(session.sessionId, session.entries)) ?? session.entries;
+  // Not an optimisation, so not `optional`: a transcript that cannot be masked
+  // would send the turns the athlete hid, and the run fails rather than that.
+  const readable = resolved.coachTranscript
+    ? resolved.coachTranscript(session.sessionId, session.entries)
+    : session.entries;
   const digestOf = optional(() => resolved.getDigests?.(readable));
   // Section 7's default is resolved once, here, so the run log records what the
   // run actually used rather than what the definition happened to leave blank —

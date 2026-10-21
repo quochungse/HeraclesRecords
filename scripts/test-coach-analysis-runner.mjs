@@ -413,6 +413,9 @@ function createWorld(overrides = {}) {
     },
     getSessionSummary: (sessionId) =>
       state.summaries.get(sessionId) ?? { through: 0 },
+    // No turn is hidden in this world. The default dep reads the hidden turns
+    // out of SQLite, and one that cannot fails the run.
+    coachTranscript: (_sessionId, entries) => entries,
     // The window is a chat setting now, shared with the interactive coach, and
     // the default dep reads it out of SQLite. Injected here for the same reason
     // getChatProvider is: this suite has no database.
@@ -4079,6 +4082,42 @@ const laptopTurn = { kind: "message", role: "user", content: "Written on the lap
     "there is nowhere to write the line, so the run log is where it says so"
   );
   assert.equal(world.sessions.has("s1"), false, "and nothing brings the conversation back");
+}
+
+// --- a turn the athlete hid ------------------------------------------------------
+// The run reads the conversation as Coach may: the hidden turn out of what the
+// model is sent. A transcript that cannot be masked is not sent unmasked — the
+// run fails rather than hand the model what the athlete took out of its sight.
+{
+  resetAnalysisQueueForTests();
+  const world = createWorld();
+  addAnalysis(world, "a1", { conditions: NO_LIMITS });
+  addSession(world, "s1", [
+    { kind: "message", role: "user", content: "Private aside" },
+    { kind: "message", role: "assistant", content: "Noted" },
+    { kind: "message", role: "user", content: "How was my week?" }
+  ]);
+  addAttachment(world, "b1", { sessionId: "s1" });
+  world.deps.coachTranscript = (_sessionId, entries) =>
+    entries.map((entry, index) => (index < 2 ? { kind: "opaque", raw: { kind: "hiddenTurn" } } : entry));
+
+  const [run] = await runAnalysisNow("a1", world.deps);
+  assert.equal(run.status, "success");
+  const sent = JSON.stringify(world.streamCalls[0].messages);
+  assert.ok(!sent.includes("Private aside") && !sent.includes("Noted"), "the hidden turn is not sent");
+  assert.ok(sent.includes("How was my week?"));
+
+  resetAnalysisQueueForTests();
+  const broken = createWorld();
+  addAnalysis(broken, "a1", { conditions: NO_LIMITS });
+  addSession(broken, "s1", [{ kind: "message", role: "user", content: "Private aside" }]);
+  addAttachment(broken, "b1", { sessionId: "s1" });
+  broken.deps.coachTranscript = () => {
+    throw new Error("database is locked");
+  };
+  const [failed] = await runAnalysisNow("a1", broken.deps);
+  assert.equal(failed.status, "failed");
+  assert.equal(broken.streamCalls.length, 0, "no model is asked");
 }
 
 console.log("coach analysis runner tests passed");

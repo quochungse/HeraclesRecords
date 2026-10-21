@@ -217,6 +217,7 @@ const main: ScreenMessages = {
   "main.sync.outdated": "Este almacén está en un formato de datos más nuevo. Actualiza la app primero.",
   "main.coach.turnChanged": "Esta conversación cambió desde que se abrió. Revísala y vuelve a intentarlo.",
   "main.coach.turnNotLast": "Solo se puede editar o volver a enviar tu última pregunta.",
+  "main.coach.questionEmpty": "Una pregunta necesita palabras.",
 };
 
 export default main;

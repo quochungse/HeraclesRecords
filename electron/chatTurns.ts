@@ -43,9 +43,6 @@ const KEPT_KINDS = new Set([
   "automationStopped"
 ]);
 
-/** Cards whose rows outlive the transcript: kept unless the athlete deletes them too. */
-const CREATION_KINDS = new Set(["planDraft", "scheduleChange"]);
-
 /**
  * What goes on the wire, and so what hiding a turn masks: the words of it.
  * Cards are not sent anyway, and a plan event speaks for a creation rather
@@ -72,25 +69,24 @@ export function turnRanges(entries: readonly TurnEntryLike[]): TurnRange[] {
 }
 
 export interface TurnRemovalOptions {
-  /** Leave the turn's creation cards where they are. */
-  keepCreations: boolean;
   /** Only what came after the question (an edit or a retry): the question stays. */
   answerOnly?: boolean;
 }
 
-/** The indices a turn's removal takes out of the transcript, ascending. */
+/**
+ * The indices a turn's removal takes out of the transcript, ascending. Its
+ * creation cards are among them; the caller keeps the ones whose creation
+ * stays (`turnCut`).
+ */
 export function turnRemoval(
   entries: readonly TurnEntryLike[],
   range: TurnRange,
-  options: TurnRemovalOptions
+  options: TurnRemovalOptions = {}
 ): number[] {
   const from = options.answerOnly ? range.question + 1 : range.start;
   const removed: number[] = [];
   for (let index = from; index < range.end; index += 1) {
-    const kind = entries[index]!.kind;
-    if (KEPT_KINDS.has(kind)) continue;
-    if (options.keepCreations && CREATION_KINDS.has(kind)) continue;
-    removed.push(index);
+    if (!KEPT_KINDS.has(entries[index]!.kind)) removed.push(index);
   }
   return removed;
 }
