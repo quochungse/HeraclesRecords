@@ -1,5 +1,5 @@
 import { memo, useId, useMemo, useState, type CSSProperties } from "react";
-import { ChevronRight } from "lucide-react";
+import { ChevronDown } from "lucide-react";
 import {
   Bar,
   BarChart,
@@ -498,19 +498,21 @@ export const ActivityVisualCard = memo(function ActivityVisualCard({
 
       {laps.length > 0 ? (
         <section className="chat-visual-section">
-          <h5>
+          <div className="chat-visual-section-head">
+            <h5>
+              {t("activity.m.laps")} <span>{formatCount(laps.length)}</span>
+            </h5>
             <button
               type="button"
-              className="chat-visual-toggle"
+              className="chat-plan-review chat-visual-toggle"
               aria-expanded={lapsOpen}
               aria-controls={lapsTableId}
               onClick={() => setLapsOpen((open) => !open)}
             >
-              <ChevronRight size={14} aria-hidden="true" />
-              {t("activity.m.laps")}
-              <span>{formatCount(laps.length)}</span>
+              {lapsOpen ? t("chat.chart.hideLaps") : t("chat.chart.showLaps")}
+              <ChevronDown size={14} aria-hidden="true" />
             </button>
-          </h5>
+          </div>
           <div className="chat-plan-table-wrap" id={lapsTableId} hidden={!lapsOpen}>
             <table className="chat-plan-table">
               <thead>

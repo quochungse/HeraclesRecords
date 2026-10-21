@@ -649,6 +649,8 @@ const chat: ChatMessages = {
   "chat.chart.noCadence": "ケイデンスのサンプルがありません。",
   "chat.chart.noElevation": "標高プロフィールがありません。",
   "chat.chart.point": "ポイント {n}",
+  "chat.chart.showLaps": "ラップを表示",
+  "chat.chart.hideLaps": "ラップを隠す",
   "chat.zones.metric.time": "ゾーン別の時間",
   "chat.zones.metric.distance": "ゾーン別の距離",
   "chat.zones.metric.load": "ゾーン別のトレーニング負荷",

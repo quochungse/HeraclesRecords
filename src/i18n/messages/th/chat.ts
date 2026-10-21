@@ -649,6 +649,8 @@ const chat: ChatMessages = {
   "chat.chart.noCadence": "ไม่มีข้อมูลรอบขา",
   "chat.chart.noElevation": "ไม่มีโปรไฟล์ความสูง",
   "chat.chart.point": "จุดที่ {n}",
+  "chat.chart.showLaps": "แสดงรอบ",
+  "chat.chart.hideLaps": "ซ่อนรอบ",
   "chat.zones.metric.time": "เวลาในแต่ละโซน",
   "chat.zones.metric.distance": "ระยะทางในแต่ละโซน",
   "chat.zones.metric.load": "ภาระการฝึกในแต่ละโซน",

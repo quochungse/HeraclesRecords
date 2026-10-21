@@ -649,6 +649,8 @@ const chat: ChatMessages = {
   "chat.chart.noCadence": "没有步频样本。",
   "chat.chart.noElevation": "没有海拔剖面。",
   "chat.chart.point": "点 {n}",
+  "chat.chart.showLaps": "显示分段",
+  "chat.chart.hideLaps": "隐藏分段",
   "chat.zones.metric.time": "各区间时间",
   "chat.zones.metric.distance": "各区间距离",
   "chat.zones.metric.load": "各区间训练负荷",

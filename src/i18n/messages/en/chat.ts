@@ -653,6 +653,8 @@ const chat = {
   "chat.chart.noCadence": "Cadence samples are not available.",
   "chat.chart.noElevation": "Elevation profile is not available.",
   "chat.chart.point": "Point {n}",
+  "chat.chart.showLaps": "Show laps",
+  "chat.chart.hideLaps": "Hide laps",
   "chat.zones.metric.time": "Time in zones",
   "chat.zones.metric.distance": "Distance in zones",
   "chat.zones.metric.load": "Training load in zones",

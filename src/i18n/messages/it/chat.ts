@@ -649,6 +649,8 @@ const chat: ChatMessages = {
   "chat.chart.noCadence": "Nessun campione di cadenza.",
   "chat.chart.noElevation": "Nessun profilo altimetrico.",
   "chat.chart.point": "Punto {n}",
+  "chat.chart.showLaps": "Mostra giri",
+  "chat.chart.hideLaps": "Nascondi giri",
   "chat.zones.metric.time": "Tempo per zona",
   "chat.zones.metric.distance": "Distanza per zona",
   "chat.zones.metric.load": "Carico di allenamento per zona",

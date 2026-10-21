@@ -15643,17 +15643,26 @@ td span {
   color: var(--text-secondary);
 }
 
-/* A section that folds (the lap table): its heading is the switch. */
-.chat-visual-toggle {
-  display: inline-flex;
+/* A section that folds (the lap table): its heading, and beside it a pill
+   that says what pressing it does — a bare heading with a chevron read as a
+   label, not a control. The pill is the card's own `.chat-plan-review`
+   (hover, press and focus ring with it), made compact for a heading row. */
+.chat-visual-section-head {
+  display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 0;
-  border: 0;
-  background: none;
-  color: inherit;
-  font: inherit;
-  cursor: pointer;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.chat-visual-section-head h5 span {
+  color: var(--text-muted);
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+
+.chat-visual-toggle {
+  gap: 4px;
+  padding: 4px 10px;
 }
 
 .chat-visual-toggle svg {
@@ -15661,17 +15670,7 @@ td span {
 }
 
 .chat-visual-toggle[aria-expanded="true"] svg {
-  transform: rotate(90deg);
-}
-
-.chat-visual-toggle span {
-  color: var(--text-muted);
-  font-weight: 500;
-  font-variant-numeric: tabular-nums;
-}
-
-.chat-visual-toggle:hover {
-  color: var(--text-primary);
+  transform: rotate(180deg);
 }
 
 /* The session's time in each heart-rate zone it reached (`ZoneShare`), in

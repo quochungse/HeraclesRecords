@@ -649,6 +649,8 @@ const chat: ChatMessages = {
   "chat.chart.noCadence": "Không có mẫu cadence.",
   "chat.chart.noElevation": "Không có biểu đồ độ cao.",
   "chat.chart.point": "Điểm {n}",
+  "chat.chart.showLaps": "Xem các vòng",
+  "chat.chart.hideLaps": "Ẩn các vòng",
   "chat.zones.metric.time": "Thời gian theo vùng",
   "chat.zones.metric.distance": "Quãng đường theo vùng",
   "chat.zones.metric.load": "Tải tập luyện theo vùng",

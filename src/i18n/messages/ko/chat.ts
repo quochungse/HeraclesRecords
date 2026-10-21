@@ -649,6 +649,8 @@ const chat: ChatMessages = {
   "chat.chart.noCadence": "케이던스 샘플이 없습니다.",
   "chat.chart.noElevation": "고도 프로필이 없습니다.",
   "chat.chart.point": "지점 {n}",
+  "chat.chart.showLaps": "랩 보기",
+  "chat.chart.hideLaps": "랩 숨기기",
   "chat.zones.metric.time": "영역별 시간",
   "chat.zones.metric.distance": "영역별 거리",
   "chat.zones.metric.load": "영역별 훈련 부하",

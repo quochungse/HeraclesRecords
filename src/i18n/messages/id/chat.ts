@@ -649,6 +649,8 @@ const chat: ChatMessages = {
   "chat.chart.noCadence": "Sampel kadens tidak tersedia.",
   "chat.chart.noElevation": "Profil elevasi tidak tersedia.",
   "chat.chart.point": "Titik {n}",
+  "chat.chart.showLaps": "Tampilkan putaran",
+  "chat.chart.hideLaps": "Sembunyikan putaran",
   "chat.zones.metric.time": "Waktu per zona",
   "chat.zones.metric.distance": "Jarak per zona",
   "chat.zones.metric.load": "Beban latihan per zona",

@@ -699,6 +699,8 @@ const chat: ChatMessages = {
   "chat.chart.noCadence": "Нет записей каденса.",
   "chat.chart.noElevation": "Нет профиля высоты.",
   "chat.chart.point": "Точка {n}",
+  "chat.chart.showLaps": "Показать круги",
+  "chat.chart.hideLaps": "Скрыть круги",
   "chat.zones.metric.time": "Время по зонам",
   "chat.zones.metric.distance": "Дистанция по зонам",
   "chat.zones.metric.load": "Нагрузка по зонам",
