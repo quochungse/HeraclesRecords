@@ -308,7 +308,7 @@ const chat: ChatMessages = {
   "chat.provider.claude-api": "คีย์ API ของ Claude",
   "chat.provider.openrouter": "OpenRouter",
   "chat.provider.local": "โมเดลในเครื่อง",
-  "chat.models.title": "โมเดลของโค้ช",
+  "chat.models.title": "ผู้ให้บริการโมเดล AI",
   "chat.models.provider": "ผู้ให้บริการ",
   "chat.models.model": "โมเดล",
   "chat.models.status.notChecked": "ยังไม่ได้ตรวจ",

@@ -308,7 +308,7 @@ const chat: ChatMessages = {
   "chat.provider.claude-api": "Claude API 密钥",
   "chat.provider.openrouter": "OpenRouter",
   "chat.provider.local": "本地模型",
-  "chat.models.title": "教练模型",
+  "chat.models.title": "AI 模型提供商",
   "chat.models.provider": "服务商",
   "chat.models.model": "模型",
   "chat.models.status.notChecked": "未检查",

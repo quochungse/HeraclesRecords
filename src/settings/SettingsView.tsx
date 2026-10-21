@@ -79,7 +79,7 @@ interface McpSummary {
   tools: number;
 }
 
-/* The MCP and Coach Models rows state the count on one line and what it
+/* The MCP and AI Model Providers rows state the count on one line and what it
    amounts to on the next, the part worth reading at a glance in bold — joined
    by a dot on one line, the second half wrapped wherever the column ended. */
 const BOLD = { b: (chunk: ReactNode) => <strong>{chunk}</strong> };

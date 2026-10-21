@@ -258,6 +258,7 @@ const library: LibraryMessages = {
   "library.ai.connected": "เชื่อมต่อแล้ว",
   "library.ai.notSetUp": "ยังไม่ได้ตั้งค่า",
   "library.ai.coachSettings": "การตั้งค่าโค้ช",
+  "library.ai.manageProviders": "จัดการผู้ให้บริการ",
   "library.ai.model": "โมเดล",
   "library.ai.runsLocal": "ใช้ {model} ซึ่งเป็นโมเดลในเครื่องที่เลือกไว้ในการตั้งค่าโค้ช",
   "library.ai.effort": "ระดับการคิด",

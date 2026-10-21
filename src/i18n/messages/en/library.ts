@@ -259,6 +259,7 @@ const library = {
   "library.ai.connected": "Connected",
   "library.ai.notSetUp": "Not set up",
   "library.ai.coachSettings": "Coach settings",
+  "library.ai.manageProviders": "Manage providers",
   "library.ai.model": "Model",
   "library.ai.runsLocal": "Runs {model}, the local model chosen in Coach settings.",
   "library.ai.effort": "Reasoning effort",

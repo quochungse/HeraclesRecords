@@ -258,6 +258,7 @@ const library: LibraryMessages = {
   "library.ai.connected": "Đã kết nối",
   "library.ai.notSetUp": "Chưa thiết lập",
   "library.ai.coachSettings": "Cài đặt Huấn luyện viên",
+  "library.ai.manageProviders": "Quản lý nhà cung cấp",
   "library.ai.model": "Mô hình",
   "library.ai.runsLocal": "Chạy {model}, mô hình cục bộ đã chọn trong cài đặt Huấn luyện viên.",
   "library.ai.effort": "Mức suy luận",

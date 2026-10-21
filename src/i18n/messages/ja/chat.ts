@@ -308,7 +308,7 @@ const chat: ChatMessages = {
   "chat.provider.claude-api": "Claude API キー",
   "chat.provider.openrouter": "OpenRouter",
   "chat.provider.local": "ローカルモデル",
-  "chat.models.title": "コーチのモデル",
+  "chat.models.title": "AIモデルプロバイダー",
   "chat.models.provider": "プロバイダ",
   "chat.models.model": "モデル",
   "chat.models.status.notChecked": "未確認",

@@ -46,7 +46,7 @@ const settings: SettingsMessages = {
   "settings.mcp.connected": "{total}개 중 {connected}개 연결됨.",
   "settings.mcp.tools_one": "코치가 쓸 수 있는 <b>도구 {count}개</b>.",
   "settings.mcp.tools_other": "코치가 쓸 수 있는 <b>도구 {count}개</b>.",
-  "settings.coachModels.title": "코치 모델",
+  "settings.coachModels.title": "AI 모델 제공업체",
   "settings.coachModels.none": "아직 연결된 것이 없습니다. 계정이나 API 키를 추가하면 코칭을 시작할 수 있습니다.",
   "settings.coachModels.providers": "제공업체 {total}곳 중 {connected}곳 연결됨.",
   "settings.coachModels.inUse": "<b>{model}</b> 사용 중.",

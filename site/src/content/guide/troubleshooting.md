@@ -38,7 +38,7 @@ Sleep comes through COROS MCP, a separate connection. See [Sleep and health data
 
 ## Coach says it is not set up
 
-Coach needs an AI to run on: [Set up Coach](/guide/set-up-coach). If one was working and stopped, open **Settings → Connections → Coach Models**; a sign-in that expired or a usage limit shows there.
+Coach needs an AI to run on: [Set up Coach](/guide/set-up-coach). If one was working and stopped, open **Settings → Connections → AI Model Providers**; a sign-in that expired or a usage limit shows there.
 
 ## A screen shows an older session or nothing new
 

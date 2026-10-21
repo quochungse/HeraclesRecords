@@ -10184,7 +10184,7 @@ td span {
    dialog inherits the tokens of where it is mounted: `.chat-view` repaints
    the accent grey and the surface its own, so every chip, checkbox, focus
    ring and the Save button drew in Coach's greys instead of the app's accent.
-   The app's tokens come back for the dialog's whole subtree — Coach Models
+   The app's tokens come back for the dialog's whole subtree — AI Model Providers
    opens inside it too — as the conversation list takes them back for its own. */
 .chat-settings-backdrop {
   --accent: var(--palette-accent);
@@ -23951,7 +23951,7 @@ button.settings-about-link {
 }
 
 /* The navigable settings row: icon, copy, chevron. Coach's settings dialog
-   opens Coach Models through one. Settings itself no longer draws these —
+   opens AI Model Providers through one. Settings itself no longer draws these —
    Connections and Sync are `.settings-pref-row`s like the cards above them. */
 .settings-nav-row {
   display: grid;

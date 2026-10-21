@@ -312,7 +312,7 @@ const chat = {
   "chat.provider.claude-api": "Claude API key",
   "chat.provider.openrouter": "OpenRouter",
   "chat.provider.local": "Local model",
-  "chat.models.title": "Coach Models",
+  "chat.models.title": "AI Model Providers",
   "chat.models.provider": "Provider",
   "chat.models.model": "Model",
   "chat.models.status.notChecked": "Not checked",

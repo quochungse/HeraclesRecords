@@ -308,7 +308,7 @@ const chat: ChatMessages = {
   "chat.provider.claude-api": "Chiave API di Claude",
   "chat.provider.openrouter": "OpenRouter",
   "chat.provider.local": "Modello locale",
-  "chat.models.title": "Modelli del coach",
+  "chat.models.title": "Fornitori di modelli IA",
   "chat.models.provider": "Provider",
   "chat.models.model": "Modello",
   "chat.models.status.notChecked": "Non verificato",

@@ -18,7 +18,7 @@ code, and `npm run test:i18n` holds both.
 | P3 | Activities, Running, Cycling, Hiking, Strength, and what they share (`ActivitySeriesChart`, `activityChannels.ts`, `sportTypes.ts`, the heatmap); COROS's zone names (`zoneName`, `zones.*`) | **Done** |
 | P4 | Calendar and Training Library (`WorkoutBuilder`, step kinds, zones, the plan reader and editor, the plan brief steps Coach reuses), sport names through `workoutSportLabel` | **Done** |
 | P5 | Sleep, Hall of Records (the milestones and the Twelve Labours), Where you've been, Personal; clocks and short dates through Intl outside English | **Done** |
-| P6 | Coach's screen: `ChatView`, the conversation list, composer and refs, Coach settings and Coach Models, MCP servers, the plan brief and outline, creation cards and the Workbench, change sets, the chart cards, analyses. **Not the prompt** (below) | **Done** |
+| P6 | Coach's screen: `ChatView`, the conversation list, composer and refs, Coach settings and AI Model Providers (once Coach Models), MCP servers, the plan brief and outline, creation cards and the Workbench, change sets, the chart cards, analyses. **Not the prompt** (below) | **Done** |
 | P7 | Text the main process puts on screen: errors over IPC, dialog titles and filters, Coach's provider statuses; and what the shared modules write: the brief's and outline's checks, the plan editor's issues, a version's changes, effort names. Change lines and plan events stored in English are said again on screen | **Done** |
 
 ## A release ships every language finished
@@ -239,7 +239,7 @@ sentence uses the language's own word, declined where the language declines it (
 *тренер*, *тренера*, *тренеру*): Russian, Indonesian and Thai said "Тренер", "Pelatih" and
 "โค้ช" on the rail and "Coach" in a hundred sentences of Coach's screen until they were
 brought into line. One setting is one term within a language too: "Reasoning effort" is the
-same words in Coach Models and in a plan's AI settings, and a sport COROS names is the same
+same words in AI Model Providers and in a plan's AI settings, and a sport COROS names is the same
 words on Activities and on its own screen (vi: *Trekking* and *Leo núi* for 104 and 105).
 
 The same terms in the five languages added after P1:

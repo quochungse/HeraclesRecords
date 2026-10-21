@@ -4,7 +4,7 @@ description: Connect the AI Coach runs on, choose what each conversation may rea
 order: 3
 ---
 
-Coach needs an AI to run on. Open **Settings → Connections → Coach Models → Manage** and connect one or more of these.
+Coach needs an AI to run on. Open **Settings → Connections → AI Model Providers → Manage** and connect one or more of these.
 
 | Provider | What you need |
 | --- | --- |
@@ -21,7 +21,7 @@ Press **Sign in**. Your browser opens ChatGPT's sign-in page; once you are signe
 ## Claude subscription
 
 1. Install Claude Code on the computer (see [claude.com/claude-code](https://claude.com/claude-code)).
-2. In Coach Models, press **Check**. The app finds the installed Claude Code.
+2. In AI Model Providers, press **Check**. The app finds the installed Claude Code.
 3. Press **Sign in** and finish in your browser.
 
 The app signs in with a Claude login of its own, so a Claude account you use elsewhere on the computer, in a terminal for instance, is left alone. Heracles Records never sees your Claude password.
@@ -36,7 +36,7 @@ Start [Ollama](https://ollama.com) or [LM Studio](https://lmstudio.ai) and load 
 
 ## Choosing per conversation
 
-Coach's default AI is the one you pick in Coach Models. Each conversation can use a different one: the AI chip under the message box says which, and opens the choice for that conversation.
+Coach's default AI is the one you pick in AI Model Providers. Each conversation can use a different one: the AI chip under the message box says which, and opens the choice for that conversation.
 
 The same conversation settings choose what Coach may read: switch off activities, sleep or anything else a conversation has no business seeing. What is switched off is withheld from Coach's tools and from what it is told, not only from the prompt.
 

@@ -258,6 +258,7 @@ const library: LibraryMessages = {
   "library.ai.connected": "Terhubung",
   "library.ai.notSetUp": "Belum diatur",
   "library.ai.coachSettings": "Pengaturan Pelatih",
+  "library.ai.manageProviders": "Kelola penyedia",
   "library.ai.model": "Model",
   "library.ai.runsLocal": "Berjalan di {model}, model lokal yang dipilih di pengaturan Pelatih.",
   "library.ai.effort": "Tingkat penalaran",

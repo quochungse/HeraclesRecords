@@ -46,7 +46,7 @@ const settings: SettingsMessages = {
   "settings.mcp.connected": "{connected} von {total} verbunden.",
   "settings.mcp.tools_one": "<b>{count} Werkzeug</b> steht dem Coach zur Verfügung.",
   "settings.mcp.tools_other": "<b>{count} Werkzeuge</b> stehen dem Coach zur Verfügung.",
-  "settings.coachModels.title": "Coach-Modelle",
+  "settings.coachModels.title": "KI-Modellanbieter",
   "settings.coachModels.none": "Noch nichts verbunden. Füge ein Konto oder einen Schlüssel hinzu, um loszulegen.",
   "settings.coachModels.providers": "{connected} von {total} Anbietern verbunden.",
   "settings.coachModels.inUse": "<b>{model}</b> ist aktiv.",

@@ -258,6 +258,7 @@ const library: LibraryMessages = {
   "library.ai.connected": "연결됨",
   "library.ai.notSetUp": "설정 안 됨",
   "library.ai.coachSettings": "코치 설정",
+  "library.ai.manageProviders": "제공업체 관리",
   "library.ai.model": "모델",
   "library.ai.runsLocal": "코치 설정에서 고른 로컬 모델 {model}로 실행합니다.",
   "library.ai.effort": "추론 수준",

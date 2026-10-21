@@ -99,6 +99,7 @@ import { FitnessTrendCard } from "./FitnessTrendCard";
 import { HrZoneCard } from "./HrZoneCard";
 import { supportsReasoningEffort } from "../../electron/chatModels";
 import { ChatSettingsModal } from "./ChatSettingsModal";
+import { CoachModelsModal } from "../settings/CoachModelsModal";
 import { McpSessionPrompt } from "./McpSessionPrompt";
 import { ComposerRefs, SportRefIcon, type ComposerRef } from "./ComposerRefs";
 import { clearComposerDraft, loadComposerDraft, saveComposerDraft } from "./composerDrafts";
@@ -1359,6 +1360,8 @@ export function ChatView({
   /** Raised when a pull merged another machine's settings for a conversation, to read them again. */
   const [conversationSettingsVersion, setConversationSettingsVersion] = useState(0);
   const [aiSheetOpen, setAiSheetOpen] = useState(false);
+  /** AI Model Providers, opened from the AI sheet, which it returns to on close. */
+  const [providersOpen, setProvidersOpen] = useState(false);
   useEffect(() => {
     setConversationSettingsState(null);
     if (!api || !activeSessionId) return;
@@ -3246,7 +3249,7 @@ export function ChatView({
   };
 
   // First run on the local provider with no model chosen: pick one silently so
-  // Coach is usable without a trip to Settings. The Coach Models dialog runs the
+  // Coach is usable without a trip to Settings. The AI Model Providers dialog runs the
   // same routine from its Detect button — a failure here stays quiet, because
   // nothing the athlete did caused it.
   useEffect(() => {
@@ -5577,9 +5580,22 @@ export function ChatView({
               setAiSheetOpen(false);
               openSettings();
             }}
+            onOpenProviders={() => {
+              setAiSheetOpen(false);
+              setProvidersOpen(true);
+            }}
           />
         </Suspense>
       ) : null}
+      <CoachModelsModal
+        api={api}
+        open={providersOpen}
+        onClose={() => {
+          setProvidersOpen(false);
+          setAiSheetOpen(true);
+        }}
+        onChange={() => void reloadCoachSettings()}
+      />
       {api && calendarFor ? (
         <Suspense fallback={null}>
           <CoachCalendarDialog

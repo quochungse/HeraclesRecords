@@ -308,7 +308,7 @@ const chat: ChatMessages = {
   "chat.provider.claude-api": "Kunci API Claude",
   "chat.provider.openrouter": "OpenRouter",
   "chat.provider.local": "Model lokal",
-  "chat.models.title": "Model pelatih",
+  "chat.models.title": "Penyedia model AI",
   "chat.models.provider": "Penyedia",
   "chat.models.model": "Model",
   "chat.models.status.notChecked": "Belum diperiksa",

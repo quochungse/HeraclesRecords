@@ -79,7 +79,8 @@ export function ConversationAiSheet({
   onChange,
   onConversationChange,
   onClose,
-  onOpenCoachSettings
+  onOpenCoachSettings,
+  onOpenProviders
 }: {
   chatSettings: ChatSettings;
   runtime: GeneratorRuntime;
@@ -91,6 +92,7 @@ export function ConversationAiSheet({
   onConversationChange: (next: ConversationSettings) => void;
   onClose: () => void;
   onOpenCoachSettings: () => void;
+  onOpenProviders: () => void;
 }) {
   return createPortal(
     <div className="coach-sheet">
@@ -103,6 +105,7 @@ export function ConversationAiSheet({
         onChange={onChange}
         onDone={onClose}
         onOpenCoach={onOpenCoachSettings}
+        onOpenProviders={onOpenProviders}
       >
         {conversation ? (
           <Permissions conversation={conversation} provider={runtime.provider} onChange={onConversationChange} />

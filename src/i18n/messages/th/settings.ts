@@ -46,7 +46,7 @@ const settings: SettingsMessages = {
   "settings.mcp.connected": "เชื่อมต่อแล้ว {connected} จาก {total}",
   "settings.mcp.tools_one": "มี<b>เครื่องมือ {count} รายการ</b>พร้อมให้โค้ชใช้",
   "settings.mcp.tools_other": "มี<b>เครื่องมือ {count} รายการ</b>พร้อมให้โค้ชใช้",
-  "settings.coachModels.title": "โมเดลของโค้ช",
+  "settings.coachModels.title": "ผู้ให้บริการโมเดล AI",
   "settings.coachModels.none": "ยังไม่ได้เชื่อมต่ออะไร เพิ่มบัญชีหรือคีย์เพื่อเริ่มใช้งานโค้ช",
   "settings.coachModels.providers": "เชื่อมต่อผู้ให้บริการแล้ว {connected} จาก {total}",
   "settings.coachModels.inUse": "กำลังใช้ <b>{model}</b>",

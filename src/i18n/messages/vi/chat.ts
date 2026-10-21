@@ -308,7 +308,7 @@ const chat: ChatMessages = {
   "chat.provider.claude-api": "Khoá API Claude",
   "chat.provider.openrouter": "OpenRouter",
   "chat.provider.local": "Mô hình cục bộ",
-  "chat.models.title": "Mô hình AI",
+  "chat.models.title": "Nhà cung cấp mô hình AI",
   "chat.models.provider": "Nhà cung cấp",
   "chat.models.model": "Mô hình",
   "chat.models.status.notChecked": "Chưa kiểm tra",

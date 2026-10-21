@@ -22,8 +22,22 @@ import {
 } from "./planGeneratorRuntime";
 import { messageRecord, t } from "../i18n/core";
 
-/** More models than this are offered as a menu rather than a row of chips. */
-const MODEL_CHIP_LIMIT = 6;
+/**
+ * Models are chips only while the row is sure to fit on one line of the sheet;
+ * past that they are a menu, since a track of chips wrapped onto a second line
+ * reads as two controls. Decided from the labels, not measured, so the choice
+ * cannot flip back and forth with the layout it changes. Four Claude names of
+ * 59 characters measured just inside the 480px track.
+ */
+const MODEL_CHIP_LIMIT = 4;
+const MODEL_CHIP_CHARACTERS = 60;
+
+function modelsFitAsChips(labels: readonly string[]): boolean {
+  return (
+    labels.length <= MODEL_CHIP_LIMIT &&
+    labels.reduce((sum, label) => sum + label.length, 0) <= MODEL_CHIP_CHARACTERS
+  );
+}
 
 /** Where to fix a provider that is not ready, per provider. */
 export const PROVIDER_FIX: Readonly<Record<ChatProvider, string>> = messageRecord({
@@ -50,6 +64,8 @@ interface GeneratorProviderPanelProps {
   children?: ReactNode;
   onDone: () => void;
   onOpenCoach: () => void;
+  /** Opens AI Model Providers, where a provider is connected; no link without it. */
+  onOpenProviders?: () => void;
 }
 
 /**
@@ -68,6 +84,7 @@ export function GeneratorProviderPanel({
   onKeepForChatChange,
   onDone,
   onOpenCoach,
+  onOpenProviders,
   subject = "plan",
   children
 }: GeneratorProviderPanelProps) {
@@ -85,6 +102,15 @@ export function GeneratorProviderPanel({
   const listedModel = models.find((option) => option.value === runtime.model);
   const efforts = effortOptionsFor(listedModel);
   const effort = effortForModel(runtime.effort, listedModel?.efforts);
+  // A provider known not to be set up is left out unless it is the one chosen
+  // or Coach's own: a list of six where four cannot answer is noise, and one
+  // is connected under AI Model Providers.
+  const listed = GENERATOR_PROVIDERS.filter(
+    (provider) =>
+      readiness[provider] !== false ||
+      provider === runtime.provider ||
+      provider === settings.provider
+  );
   const pickProvider = (provider: ChatProvider) => {
     if (provider === runtime.provider) return;
     onChange(runtimeFromSettings(settings, provider));
@@ -113,9 +139,22 @@ export function GeneratorProviderPanel({
         </header>
 
         <div className="plan-generator-sheet-body">
-          <p className="tl-eyebrow">{t("library.ai.provider")}</p>
+          <div className="plan-generator-sheet-heading">
+            <p className="tl-eyebrow">{t("library.ai.provider")}</p>
+            {onOpenProviders ? (
+              <button
+                type="button"
+                className="plan-generator-sheet-link"
+                title={t("app.coachModels.title")}
+                onClick={onOpenProviders}
+              >
+                {t("library.ai.manageProviders")}
+                <ArrowRight size={12} aria-hidden="true" />
+              </button>
+            ) : null}
+          </div>
           <div className="plan-generator-provider-list">
-            {GENERATOR_PROVIDERS.map((provider) => {
+            {listed.map((provider) => {
               const state = readiness[provider];
               const selected = provider === runtime.provider;
               return (
@@ -163,8 +202,8 @@ export function GeneratorProviderPanel({
               label={t("library.ai.model")}
               className="plan-generator-sheet-models"
               // A provider's own list can run to dozens (OpenRouter's is cut
-              // at 40); past a handful, chips are a wall rather than a choice.
-              mode={models.length > MODEL_CHIP_LIMIT ? "dropdown" : "expanded"}
+              // at 40); chips only while they hold one line.
+              mode={modelsFitAsChips(models.map((option) => modelChipLabel(option.label))) ? "expanded" : "dropdown"}
               value={models.some((option) => option.value === runtime.model) ? runtime.model : (models[0]?.value ?? "")}
               options={models.map((option) => ({
                 value: option.value,

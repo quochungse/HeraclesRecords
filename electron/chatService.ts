@@ -380,7 +380,7 @@ function getClaudeCodeConfigDir(): string {
 
 /**
  * `forceModels` reads the account's model list again even when the one held
- * is fresh — the way in for Coach Models' Check; everything else waits for the day.
+ * is fresh — the way in for AI Model Providers' Check; everything else waits for the day.
  */
 /**
  * The status the settings screens read: npm is asked for the latest Claude Code

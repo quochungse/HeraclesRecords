@@ -1459,7 +1459,7 @@ lives at module level for the same visit-to-visit reason — see `useCalendarDat
   how a native 2.1.266 kept an npm 2.1.283 and its Opus 5.5 out of the picker. So nothing
   detected is stored any more, and a stored path at a standard location
   (`isStandardClaudeLocation`) is read as that leftover and let go; only a path detection would
-  not find is the athlete's choice — which is why Coach Models shows the path field only when
+  not find is the athlete's choice — which is why AI Model Providers shows the path field only when
   detection finds nothing or a path is already set. The list remembers the CLI it was read from
   (`availableModelsFrom`, `<path>@<version>`) and is read again as soon as that changes.
   **Claude Code always runs against the app's own login** (`<userData>/claude-code` as
@@ -1958,7 +1958,7 @@ lives at module level for the same visit-to-visit reason — see `useCalendarDat
   gets none of it; a failed read leaves the line out rather than saying there was nothing.
 
   The pause and the monthly budget live in **Coach's settings dialog** (`ChatSettingsModal`
-  over `ChatSettingsPanel`, with Coach Models, display, suggestions, instructions and
+  over `ChatSettingsPanel`, with AI Model Providers, display, suggestions, instructions and
   compaction — how much is kept word for word and which model condenses, `CompactContextSection`), which the composer's gear and the sign-in gates open: they are feature-wide and
   the screen that used to host them is gone, so without a home a paused world would have no
   Resume button. R3 moved the panel into the app's Settings as a section; UAT moved it back,
@@ -1968,7 +1968,7 @@ lives at module level for the same visit-to-visit reason — see `useCalendarDat
   budget included (written through `setCoachAnalysisBudget` on Save, which closes the dialog);
   Discard drops it, and closing with a draft held asks first. Every control used to
   save on change and the instructions box on blur, so a half-written instruction reached the
-  next turn and went out through sync with no way back. The Coach Models row and Resume are not
+  next turn and went out through sync with no way back. The AI Model Providers row and Resume are not
   part of the draft — one is its own dialog, the other an action. `test:coach-analysis-renderer`.
   **The dialog wears the app's colours, not Coach's.** It is mounted inside `.chat-view`, whose
   grey `--accent` and own `--surface` it inherited unseen, so every chip and the Save button drew

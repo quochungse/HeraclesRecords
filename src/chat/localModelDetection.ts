@@ -19,7 +19,7 @@ export interface LocalDetectionResult {
  * Find a running Ollama or LM Studio server, adopt it, and persist the choice.
  *
  * Shared because two callers need the same behaviour and neither owns the
- * other: the Coach Models dialog runs it from its Detect button, and Coach runs
+ * other: the AI Model Providers dialog runs it from its Detect button, and Coach runs
  * it once at startup when the athlete is on the local provider with no model
  * chosen yet. Duplicating it would let the two drift on which server wins.
  */
