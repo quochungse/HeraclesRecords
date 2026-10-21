@@ -651,6 +651,7 @@ const chat: ChatMessages = {
   "chat.chart.setOf": "セット {n}/{total}",
   "chat.chart.restAfter": "セット {n} 後の休息",
   "chat.chart.between": "種目間",
+  "chat.chart.afterWorkout": "ワークアウト後",
   "chat.chart.showLaps": "ラップを表示",
   "chat.chart.hideLaps": "ラップを隠す",
   "chat.zones.metric.time": "ゾーン別の時間",

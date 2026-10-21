@@ -651,6 +651,7 @@ const chat: ChatMessages = {
   "chat.chart.setOf": "세트 {n}/{total}",
   "chat.chart.restAfter": "세트 {n} 후 휴식",
   "chat.chart.between": "운동 사이",
+  "chat.chart.afterWorkout": "운동 후",
   "chat.chart.showLaps": "랩 보기",
   "chat.chart.hideLaps": "랩 숨기기",
   "chat.zones.metric.time": "영역별 시간",

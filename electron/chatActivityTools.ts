@@ -20,6 +20,7 @@ import {
 } from "./trainingHubService";
 import type {
   ActivityHrTrendPreview,
+  ActivityLapSection,
   ActivityVisualLapPoint,
   ActivityVisualPreview,
   CorosMcpTool,
@@ -727,16 +728,50 @@ export function formatActivityWindowForChat(
   return `Stretch (${asked}: ${where.join(", ")}; ${stretch.samples} samples): ${figures.join(" · ")}`;
 }
 
+function lapSection(lap: TrainingHubActivityLap): ActivityLapSection | undefined {
+  if (lap.afterWorkout) return "after";
+  switch (lap.phase) {
+    case "warmup":
+      return "warmup";
+    case "cooldown":
+      return "cooldown";
+    case "work":
+    case "recovery":
+      return "training";
+    default:
+      return undefined;
+  }
+}
+
+/**
+ * The part of a structured workout each lap fell in — warm-up, the main part,
+ * cool-down, and whatever was run after the last step — so the card can head
+ * its lap table by them. COROS names no step on a lap, only its `mode`, which
+ * every 1 km lap inside a step carries. A free run, or a workout of one step,
+ * has nothing to tell apart and gets none.
+ */
+function lapSections(laps: TrainingHubActivityLap[]): (ActivityLapSection | undefined)[] {
+  const sections = laps.map(lapSection);
+  return new Set(sections.filter(Boolean)).size > 1 ? sections : laps.map(() => undefined);
+}
+
 function mapLapPoints(laps: TrainingHubActivityLap[]): ActivityVisualLapPoint[] {
-  return laps.slice(0, MAX_LAPS).map((lap) => ({
-    index: lap.index,
-    avgHr: lap.avgHr,
-    maxHr: lap.maxHr,
-    distance: lap.distance,
-    duration: lap.duration,
-    pace: lap.pace,
-    avgCadence: lap.avgCadence
-  }));
+  const capped = laps.slice(0, MAX_LAPS);
+  const sections = lapSections(capped);
+  return capped.map((lap, index) => {
+    const section = sections[index];
+    return {
+      index: lap.index,
+      avgHr: lap.avgHr,
+      maxHr: lap.maxHr,
+      distance: lap.distance,
+      duration: lap.duration,
+      pace: lap.pace,
+      avgCadence: lap.avgCadence,
+      ...(section ? { section } : {}),
+      ...(section === "training" && lap.phase === "recovery" ? { recovery: true } : {})
+    };
+  });
 }
 
 type VisualChannel = "hr" | "pace" | "power" | "cadence";

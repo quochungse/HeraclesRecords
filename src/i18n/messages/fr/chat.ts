@@ -651,6 +651,7 @@ const chat: ChatMessages = {
   "chat.chart.setOf": "Série {n} sur {total}",
   "chat.chart.restAfter": "Repos après la série {n}",
   "chat.chart.between": "Entre deux exercices",
+  "chat.chart.afterWorkout": "Après la séance",
   "chat.chart.showLaps": "Afficher les tours",
   "chat.chart.hideLaps": "Masquer les tours",
   "chat.zones.metric.time": "Temps par zone",

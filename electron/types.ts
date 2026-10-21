@@ -394,6 +394,12 @@ export interface TrainingHubActivityLap {
   mode?: number;
   /** Structured-workout phase, when `mode` names one. */
   phase?: TrainingHubLapPhase;
+  /**
+   * Run past the structured workout's last step — COROS files such a lap as
+   * `mode` 2 with `programExerciseIndex` 255, so its phase alone reads it as
+   * part of the work.
+   */
+  afterWorkout?: boolean;
   /** Steps per minute for foot sports, rpm for cycling. */
   avgCadence?: number;
   maxCadence?: number;
@@ -2968,7 +2974,16 @@ export interface ActivityVisualLapPoint {
   pace?: number;
   /** Steps per minute for foot sports, rpm for cycling. */
   avgCadence?: number;
+  /**
+   * The part of a structured workout the lap fell in (`lapSections`), on a
+   * session with more than one. Absent on a card stored before it.
+   */
+  section?: ActivityLapSection;
+  /** A recovery between repeats, inside the workout's main part. */
+  recovery?: boolean;
 }
+
+export type ActivityLapSection = "warmup" | "training" | "cooldown" | "after";
 
 /**
  * A channel the card can draw either way. `series` is the per-sample recording

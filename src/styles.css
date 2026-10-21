@@ -15784,6 +15784,30 @@ td span {
   border-bottom: 0;
 }
 
+/* A structured workout's part over its laps (warm-up, the main part,
+   cool-down, after the last step): a label across the table, never a lap. */
+.chat-plan-table .chat-lap-section th {
+  padding-top: 10px;
+  color: var(--text-primary);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0;
+  text-align: left;
+  text-transform: none;
+}
+
+/* A recovery between repeats reads a step back from the work beside it. */
+.chat-plan-table tr.is-recovery td {
+  color: var(--text-muted);
+}
+
+/* Inline beside the lap's number: the global `td span` is a block. */
+.chat-plan-table .chat-lap-step {
+  display: inline;
+  margin-left: 6px;
+  font-size: 10px;
+}
+
 .chat-zone-card {
   min-width: min(100%, 520px);
   gap: 14px;

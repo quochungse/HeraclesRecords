@@ -651,6 +651,7 @@ const chat: ChatMessages = {
   "chat.chart.setOf": "第 {n}/{total} 组",
   "chat.chart.restAfter": "第 {n} 组后休息",
   "chat.chart.between": "动作之间",
+  "chat.chart.afterWorkout": "训练结束后",
   "chat.chart.showLaps": "显示分段",
   "chat.chart.hideLaps": "隐藏分段",
   "chat.zones.metric.time": "各区间时间",

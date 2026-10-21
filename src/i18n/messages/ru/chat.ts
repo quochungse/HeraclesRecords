@@ -701,6 +701,7 @@ const chat: ChatMessages = {
   "chat.chart.setOf": "Подход {n} из {total}",
   "chat.chart.restAfter": "Отдых после подхода {n}",
   "chat.chart.between": "Между упражнениями",
+  "chat.chart.afterWorkout": "После тренировки",
   "chat.chart.showLaps": "Показать круги",
   "chat.chart.hideLaps": "Скрыть круги",
   "chat.zones.metric.time": "Время по зонам",

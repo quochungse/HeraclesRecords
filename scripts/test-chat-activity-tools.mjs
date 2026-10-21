@@ -750,6 +750,50 @@ assert.equal(
   undefined
 );
 
+// --- A structured run's laps are headed by the part of the workout they fell in ---
+// COROS names no step on a lap, only its mode (4 warm-up, 2 work, 3 recovery,
+// 5 cool-down); a lap run after the last step is mode 2 with step index 255.
+const tempoPreview = buildActivityVisualPreview(
+  parseActivityDetail({
+    labelId: "act-tempo",
+    summary: { name: "Tempo 3 × 8'", sportType: 100, totalTime: 300000, distance: 600000 },
+    lapList: [{ type: 10, lapItemList: [
+      { mode: 4, programExerciseIndex: 0, time: 30000, distance: 100000, avgHr: 130 },
+      { mode: 2, programExerciseIndex: 1, time: 30000, distance: 100000, avgHr: 160 },
+      { mode: 3, programExerciseIndex: 2, time: 18000, distance: 40000, avgHr: 140 },
+      { mode: 2, programExerciseIndex: 1, time: 30000, distance: 100000, avgHr: 162 },
+      { mode: 5, programExerciseIndex: 3, time: 30000, distance: 100000, avgHr: 135 },
+      { mode: 2, programExerciseIndex: 255, time: 30000, distance: 100000, avgHr: 138 }
+    ] }]
+  }),
+  "req-tempo"
+);
+assert.deepEqual(
+  tempoPreview?.sections.laps?.map((lap) => [lap.section, lap.recovery ?? false]),
+  [
+    ["warmup", false],
+    ["training", false],
+    ["training", true],
+    ["training", false],
+    ["cooldown", false],
+    ["after", false]
+  ]
+);
+// A run of one step has nothing to tell apart.
+assert.ok(
+  buildActivityVisualPreview(
+    parseActivityDetail({
+      labelId: "act-easy",
+      summary: { name: "Easy", sportType: 100, totalTime: 120000, distance: 400000 },
+      lapList: [{ type: 10, lapItemList: [
+        { mode: 2, programExerciseIndex: 0, time: 60000, distance: 200000, avgHr: 130 },
+        { mode: 2, programExerciseIndex: 0, time: 60000, distance: 200000, avgHr: 132 }
+      ] }]
+    }),
+    "req-easy"
+  )?.sections.laps?.every((lap) => lap.section === undefined && lap.recovery === undefined)
+);
+
 // A custom sport is read by its name, which only the main process has: the
 // card stores the reading so the renderer does not fall back to the code.
 assert.equal(

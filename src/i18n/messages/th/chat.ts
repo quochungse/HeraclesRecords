@@ -651,6 +651,7 @@ const chat: ChatMessages = {
   "chat.chart.setOf": "เซ็ตที่ {n}/{total}",
   "chat.chart.restAfter": "พักหลังเซ็ตที่ {n}",
   "chat.chart.between": "ระหว่างท่า",
+  "chat.chart.afterWorkout": "หลังจบการฝึก",
   "chat.chart.showLaps": "แสดงรอบ",
   "chat.chart.hideLaps": "ซ่อนรอบ",
   "chat.zones.metric.time": "เวลาในแต่ละโซน",

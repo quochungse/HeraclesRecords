@@ -6096,6 +6096,9 @@ const COROS_LAP_PHASES: Record<number, TrainingHubLapPhase> = {
   15: "rest"
 };
 
+/** `programExerciseIndex` on a lap run after a structured workout's last step. */
+const COROS_PAST_PROGRAM_STEP = 255;
+
 function isRollupLapItem(item: Record<string, unknown>): boolean {
   const mode = toOptionalNumber(item.mode);
   return mode !== undefined && COROS_LAP_MODE_ROLLUP.has(mode);
@@ -8053,6 +8056,7 @@ function parseActivityLap(raw: unknown, index: number): TrainingHubActivityLap {
     maxHr: toOptionalNumber(lap.maxHr),
     mode,
     phase: mode !== undefined ? COROS_LAP_PHASES[mode] : undefined,
+    ...(toOptionalNumber(lap.programExerciseIndex) === COROS_PAST_PROGRAM_STEP ? { afterWorkout: true } : {}),
     pace:
       (avgPace !== undefined &&
       isPlausiblePaceSecondsPerKm(normalizeActivityDuration(avgPace) ?? avgPace)

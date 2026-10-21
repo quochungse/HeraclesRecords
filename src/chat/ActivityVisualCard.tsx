@@ -1,4 +1,4 @@
-import { memo, useEffect, useId, useMemo, useState, type CSSProperties } from "react";
+import { Fragment, memo, useEffect, useId, useMemo, useState, type CSSProperties } from "react";
 import { ChevronDown } from "lucide-react";
 import {
   Bar,
@@ -10,6 +10,7 @@ import {
 import { ChartWhenNear } from "./charts/ChartWhenNear";
 import type { TooltipContentProps } from "recharts";
 import type {
+  ActivityLapSection,
   ActivityVisualLapPoint,
   ActivityVisualPreview
 } from "../../electron/types";
@@ -276,6 +277,20 @@ function ZoneShare({ zones }: { zones: NonNullable<ActivityVisualPreview["sectio
   );
 }
 
+/** A structured workout's part, as its builder names the step kind. */
+function lapSectionLabel(section: ActivityLapSection): string {
+  switch (section) {
+    case "warmup":
+      return t("workout.step.warmup");
+    case "cooldown":
+      return t("workout.step.cooldown");
+    case "after":
+      return t("chat.chart.afterWorkout");
+    default:
+      return t("workout.step.training");
+  }
+}
+
 /**
  * A lap table this long or longer starts folded: an interval session's twenty
  * rows ran the card a screen down the conversation, past the answer that
@@ -390,6 +405,7 @@ export const ActivityVisualCard = memo(function ActivityVisualCard({
   const lapsHaveCadence = moves && laps.some((lap) => lap.avgCadence !== undefined);
   const lapsHaveDistance =
     moves && (reading !== "effort" || laps.some((lap) => (lap.distance ?? 0) > 0));
+  const lapColumns = 4 + (lapsHaveDistance ? 2 : 0) + (lapsHaveCadence ? 1 : 0);
   const paceLabel = asSpeed ? t("activity.m.speed") : t("activity.m.pace");
   const formatPerformance = (secondsPerKm: number): string =>
     asSpeed
@@ -625,28 +641,40 @@ export const ActivityVisualCard = memo(function ActivityVisualCard({
                 </tr>
               </thead>
               <tbody>
-                {laps.map((lap) => (
-                  <tr key={lap.index}>
-                    <td>{lap.index}</td>
-                    {lapsHaveDistance ? (
-                      <td>{formatDistanceMeters(lap.distance, unitSystem, swim)}</td>
+                {laps.map((lap, position) => (
+                  <Fragment key={lap.index}>
+                    {lap.section && lap.section !== laps[position - 1]?.section ? (
+                      <tr className="chat-lap-section">
+                        <th scope="colgroup" colSpan={lapColumns}>
+                          {lapSectionLabel(lap.section)}
+                        </th>
+                      </tr>
                     ) : null}
-                    <td>{formatDurationSeconds(lap.duration)}</td>
-                    <td>{formatOptionalNumber(lap.avgHr)}</td>
-                    <td>{formatOptionalNumber(lap.maxHr)}</td>
-                    {lapsHaveDistance ? (
+                    <tr className={lap.recovery ? "is-recovery" : undefined}>
                       <td>
-                        {lap.distance && lap.duration
-                          ? formatPerformance(lap.duration / (lap.distance / 1000))
-                          : lap.pace
-                            ? formatPerformance(lap.pace)
-                            : "—"}
+                        {lap.index}
+                        {lap.recovery ? <span className="chat-lap-step">{t("workout.step.rest")}</span> : null}
                       </td>
-                    ) : null}
-                    {lapsHaveCadence ? (
-                      <td>{formatOptionalNumber(lap.avgCadence)}</td>
-                    ) : null}
-                  </tr>
+                      {lapsHaveDistance ? (
+                        <td>{formatDistanceMeters(lap.distance, unitSystem, swim)}</td>
+                      ) : null}
+                      <td>{formatDurationSeconds(lap.duration)}</td>
+                      <td>{formatOptionalNumber(lap.avgHr)}</td>
+                      <td>{formatOptionalNumber(lap.maxHr)}</td>
+                      {lapsHaveDistance ? (
+                        <td>
+                          {lap.distance && lap.duration
+                            ? formatPerformance(lap.duration / (lap.distance / 1000))
+                            : lap.pace
+                              ? formatPerformance(lap.pace)
+                              : "—"}
+                        </td>
+                      ) : null}
+                      {lapsHaveCadence ? (
+                        <td>{formatOptionalNumber(lap.avgCadence)}</td>
+                      ) : null}
+                    </tr>
+                  </Fragment>
                 ))}
               </tbody>
             </table>
