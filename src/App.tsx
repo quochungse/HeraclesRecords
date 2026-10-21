@@ -1,6 +1,5 @@
-import { AlertCircle, CheckCircle2, Loader2, RefreshCw, X } from "lucide-react";
+import { AlertCircle, Loader2, RefreshCw } from "lucide-react";
 import {
-  Children,
   Component,
   type ComponentProps,
   type ComponentType,
@@ -47,7 +46,8 @@ import type {
 import type { HeraclesRecordsApi } from "./heraclesrecords-api";
 import { applySyncedLocalStorageOps } from "./settings/syncLocalStorage";
 import { startLocalStoragePublisher } from "./settings/localStoragePublisher";
-import { subscribeToToasts } from "./toast";
+import { showToast } from "./toast";
+import { Toaster, useToaster } from "./components/Toaster";
 import { isMcpFailure } from "./mcp/mcpNotice";
 import {
   UpdateAvailablePrompt,
@@ -586,10 +586,14 @@ export default function App() {
       return;
     }
 
+    // The download ran in the background, so its failure is the app speaking
+    // unasked: at the top, away from whatever the athlete is doing.
     if (effectiveUpdateSnapshot.status === "error") {
       installAcceptedVersionRef.current = null;
-      setError(
+      showToast(
         effectiveUpdateSnapshot.error ?? t("app.update.downloadFailed"),
+        "error",
+        { placement: "top" },
       );
     }
   }, [
@@ -936,15 +940,22 @@ export default function App() {
   // moment logging back in by itself. So ask whether one is under way, from the
   // main process rather than from the status in state, which was read before
   // any of this began.
+  //
+  // A load nobody asked for (start-up, a session restored) reports at the top;
+  // a refresh the athlete pressed answers at the bottom, like any other action.
   const reportTrainingHubError = useCallback(
-    async (caught: unknown) => {
+    async (caught: unknown, asked = false) => {
       if (api) {
         const status = await api.getTrainingHubStatus().catch(() => null);
         if (status?.restoring) {
           return;
         }
       }
-      setError(toErrorMessage(caught));
+      if (asked) {
+        setError(toErrorMessage(caught));
+      } else {
+        showToast(toErrorMessage(caught), "error", { placement: "top" });
+      }
     },
     [api],
   );
@@ -1001,7 +1012,9 @@ export default function App() {
     void api
       .getTrainingHubStatus()
       .then(applyTrainingHubStatus)
-      .catch((caught) => setError(toErrorMessage(caught)));
+      .catch((caught) =>
+        showToast(toErrorMessage(caught), "error", { placement: "top" }),
+      );
   }, [activeView, api, applyTrainingHubStatus]);
 
 
@@ -1465,7 +1478,7 @@ export default function App() {
     try {
       await refreshTrainingHub();
     } catch (caught) {
-      await reportTrainingHubError(caught);
+      await reportTrainingHubError(caught, true);
     } finally {
       setBusy(null);
     }
@@ -1505,7 +1518,7 @@ export default function App() {
       await refreshTrainingHub();
       setMessage(t("app.refreshed"));
     } catch (caught) {
-      await reportTrainingHubError(caught);
+      await reportTrainingHubError(caught, true);
     } finally {
       setBusy(null);
     }
@@ -2248,20 +2261,26 @@ export default function App() {
           onLater={() => setRestartPromptOpen(false)}
         />
       ) : null}
-      <Toaster toasts={toasts} onDismiss={dismissToast}>
-        {recordsNotices.toasts.map(({ announcement, labour }) => (
-          <LabourToastCard
-            key={announcement.key}
-            announcement={announcement}
-            labour={labour}
-            onOpen={() => {
-              recordsNotices.dismissToast(announcement.key);
-              setActiveView("records");
-            }}
-            onDismiss={() => recordsNotices.dismissToast(announcement.key)}
-          />
-        ))}
-      </Toaster>
+      <Toaster
+        toasts={toasts}
+        onDismiss={dismissToast}
+        frameRef={contentRef}
+        topChildren={
+          // A labour reached is the app speaking unasked, so it comes in at the top.
+          recordsNotices.toasts.map(({ announcement, labour }) => (
+            <LabourToastCard
+              key={announcement.key}
+              announcement={announcement}
+              labour={labour}
+              onOpen={() => {
+                recordsNotices.dismissToast(announcement.key);
+                setActiveView("records");
+              }}
+              onDismiss={() => recordsNotices.dismissToast(announcement.key)}
+            />
+          ))
+        }
+      />
       {recordsNotices.celebration ? (
         <LabourCelebration
           labour={recordsNotices.celebration.labour}
@@ -2369,142 +2388,6 @@ function OverviewTab({
       </header>
 
       {trainingOverview}
-    </div>
-  );
-}
-
-interface ToastItem {
-  id: number;
-  kind: "success" | "error";
-  text: string;
-}
-
-const TOAST_DURATION: Record<ToastItem["kind"], number> = {
-  success: 4500,
-  error: 7000,
-};
-
-// Drives the floating toast stack from the app's existing message/error state,
-// so every setMessage/setError call surfaces as an auto-dismissing toast
-// instead of a banner that shoves the layout down.
-function useToaster(message: string | null, error: string | null) {
-  const [toasts, setToasts] = useState<ToastItem[]>([]);
-  const nextIdRef = useRef(0);
-  const timersRef = useRef(new Map<number, number>());
-  const lastMessageRef = useRef<string | null>(null);
-  const lastErrorRef = useRef<string | null>(null);
-
-  const dismissToast = useCallback((id: number) => {
-    setToasts((current) => current.filter((toast) => toast.id !== id));
-    const timer = timersRef.current.get(id);
-    if (timer !== undefined) {
-      window.clearTimeout(timer);
-      timersRef.current.delete(id);
-    }
-  }, []);
-
-  const pushToast = useCallback(
-    (kind: ToastItem["kind"], text: string) => {
-      const id = (nextIdRef.current += 1);
-      setToasts((current) => [...current.slice(-2), { id, kind, text }]);
-      const timer = window.setTimeout(
-        () => dismissToast(id),
-        TOAST_DURATION[kind],
-      );
-      timersRef.current.set(id, timer);
-    },
-    [dismissToast],
-  );
-
-  // Refs guard against StrictMode's double-invoke and repeated identical values
-  // (e.g. the same COROS error twice) while still re-toasting after the source clears.
-  useEffect(() => {
-    if (message && message !== lastMessageRef.current) {
-      pushToast("success", message);
-    }
-    lastMessageRef.current = message;
-  }, [message, pushToast]);
-
-  useEffect(() => {
-    if (error && error !== lastErrorRef.current) {
-      pushToast("error", error);
-    }
-    lastErrorRef.current = error;
-  }, [error, pushToast]);
-
-  // Toasts raised from outside App's own message/error state — nested views
-  // that have no path to it. Same stack, same auto-dismiss.
-  useEffect(() => subscribeToToasts(pushToast), [pushToast]);
-
-  useEffect(() => {
-    const timers = timersRef.current;
-    return () => {
-      timers.forEach((timer) => window.clearTimeout(timer));
-      timers.clear();
-    };
-  }, []);
-
-  return { toasts, dismissToast };
-}
-
-function Toaster({
-  toasts,
-  onDismiss,
-  children,
-}: {
-  toasts: ToastItem[];
-  onDismiss: (id: number) => void;
-  /** Toasts of another shape that share the stack: the labour notices. */
-  children?: ReactNode;
-}) {
-  const hasExtra = Children.toArray(children).length > 0;
-  if (toasts.length === 0 && !hasExtra) {
-    return null;
-  }
-
-  return (
-    <div className="toast-stack" role="region" aria-label={t("app.notifications")}>
-      {children}
-      {toasts.map((toast) => (
-        <ToastCard key={toast.id} toast={toast} onDismiss={onDismiss} />
-      ))}
-    </div>
-  );
-}
-
-function ToastCard({
-  toast,
-  onDismiss,
-}: {
-  toast: ToastItem;
-  onDismiss: (id: number) => void;
-}) {
-  return (
-    <div
-      className={`toast toast--${toast.kind}`}
-      role={toast.kind === "error" ? "alert" : "status"}
-    >
-      <span className="toast-icon" aria-hidden="true">
-        {toast.kind === "error" ? (
-          <AlertCircle size={18} />
-        ) : (
-          <CheckCircle2 size={18} />
-        )}
-      </span>
-      <span className="toast-text">{toast.text}</span>
-      <button
-        className="toast-close"
-        type="button"
-        aria-label={t("app.dismissNotification")}
-        onClick={() => onDismiss(toast.id)}
-      >
-        <X size={15} aria-hidden="true" />
-      </button>
-      <span
-        className="toast-progress"
-        style={{ animationDuration: `${TOAST_DURATION[toast.kind]}ms` }}
-        aria-hidden="true"
-      />
     </div>
   );
 }

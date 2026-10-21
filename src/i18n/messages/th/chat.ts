@@ -886,7 +886,6 @@ const chat: ChatMessages = {
   "chat.turn.rewriting": "กำลังลบและเขียนใหม่…",
   "chat.turn.deleted": "ลบรอบแล้ว",
   "chat.turn.deletedRewritten": "ลบรอบและเขียนสรุปใหม่แล้ว",
-  "chat.turn.summaryFailed": "ลบรอบแล้ว แต่เขียนสรุปใหม่ไม่ได้ สรุปจึงยังพูดถึงรอบนี้จนกว่าจะเขียนใหม่ครั้งถัดไป",
   "chat.turn.deleteFailed": "ลบรอบนี้ไม่ได้",
   "chat.fail.busy.title": "AI ไม่ว่างในตอนนี้",
   "chat.fail.busy.body": "ระบบตอบว่าโหลดเกิน คำถามของคุณยังอยู่ตรงนี้",

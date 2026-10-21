@@ -68,6 +68,7 @@ import { renderRich, useI18n } from "../i18n/useI18n";
 import { SettingsPrefRow } from "./SettingsPrefRow";
 import { SyncPanel } from "./SyncPanel";
 import { BackupPanel } from "./BackupPanel";
+import { showToast } from "../toast";
 
 const BUY_ME_A_COFFEE_URL = "https://buymeacoffee.com/quochungse";
 
@@ -365,8 +366,11 @@ export function SettingsView({
           setAppInfo(info);
         }
       } catch (caught) {
-        onError(
+        // Read on its own as the screen opens: nothing the athlete pressed.
+        showToast(
           caught instanceof Error ? caught.message : t("settings.about.loadFailed"),
+          "error",
+          { placement: "top" },
         );
       }
     })();
@@ -374,7 +378,7 @@ export function SettingsView({
     return () => {
       cancelled = true;
     };
-  }, [api, onError]);
+  }, [api]);
 
   function toggleSportScreen(screen: SportScreen) {
     onHiddenSportScreensChange(

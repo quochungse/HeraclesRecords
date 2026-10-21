@@ -944,7 +944,6 @@ const chat: ChatMessages = {
   "chat.turn.rewriting": "Удаление и переписывание…",
   "chat.turn.deleted": "Обмен удалён.",
   "chat.turn.deletedRewritten": "Обмен удалён, сводка переписана.",
-  "chat.turn.summaryFailed": "Обмен удалён. Сводку переписать не удалось, поэтому до следующего раза она его упоминает.",
   "chat.turn.deleteFailed": "Не удалось удалить этот обмен.",
   "chat.fail.busy.title": "ИИ сейчас перегружен",
   "chat.fail.busy.body": "Он ответил, что перегружен. Ваш вопрос на месте.",

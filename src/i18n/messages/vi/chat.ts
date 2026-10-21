@@ -886,7 +886,6 @@ const chat: ChatMessages = {
   "chat.turn.rewriting": "Đang xoá và viết lại…",
   "chat.turn.deleted": "Đã xoá lượt.",
   "chat.turn.deletedRewritten": "Đã xoá lượt và viết lại bản tóm tắt.",
-  "chat.turn.summaryFailed": "Đã xoá lượt. Không viết lại được bản tóm tắt, nên nó vẫn nhắc tới lượt này cho tới lần viết lại sau.",
   "chat.turn.deleteFailed": "Không xoá được lượt này.",
   "chat.fail.busy.title": "AI đang quá tải",
   "chat.fail.busy.body": "Nhà cung cấp báo đang quá tải. Câu hỏi của bạn vẫn còn đây.",

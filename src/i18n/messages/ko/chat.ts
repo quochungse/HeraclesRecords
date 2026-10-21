@@ -886,7 +886,6 @@ const chat: ChatMessages = {
   "chat.turn.rewriting": "삭제하고 다시 쓰는 중…",
   "chat.turn.deleted": "차례를 삭제했습니다.",
   "chat.turn.deletedRewritten": "차례를 삭제하고 요약을 다시 썼습니다.",
-  "chat.turn.summaryFailed": "차례를 삭제했습니다. 요약을 다시 쓰지 못해 다음에 다시 쓸 때까지 이 내용을 언급합니다.",
   "chat.turn.deleteFailed": "이 차례를 삭제하지 못했습니다.",
   "chat.fail.busy.title": "AI가 지금 혼잡합니다",
   "chat.fail.busy.body": "과부하라는 응답을 받았습니다. 질문은 그대로 남아 있습니다.",

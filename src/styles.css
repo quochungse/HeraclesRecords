@@ -36,6 +36,8 @@
   --shadow-soft: 0 8px 24px rgba(0, 0, 0, 0.35), 0 1px 2px rgba(0, 0, 0, 0.2);
   --shadow-card: var(--glass-shadow);
   --shadow-elevated: 0 22px 48px rgba(0, 0, 0, 0.42);
+  /* A toast on a near-black page: the shadow alone does not find its edge. */
+  --toast-edge: inset 0 0 0 1px rgba(255, 255, 255, 0.07);
   --shadow-inset: var(--glass-inset);
 
   /*
@@ -324,6 +326,7 @@ svg:focus-visible {
   --shadow-soft: 0 6px 18px rgba(19, 26, 40, 0.09), 0 1px 2px rgba(19, 26, 40, 0.07);
   --shadow-card: 0 1px 2px rgba(19, 26, 40, 0.06), 0 12px 30px rgba(19, 26, 40, 0.09);
   --shadow-elevated: 0 24px 54px rgba(19, 26, 40, 0.18);
+  --toast-edge: 0 0 0 0 transparent; /* white on grey floats on its shadow alone */
   --shadow-inset: inset 0 1px 0 rgba(19, 26, 40, 0.05);
 
   /* A raised face here is white and the hairline does the lifting, which is the
@@ -2932,62 +2935,128 @@ tbody tr.is-selected:hover {
   color: var(--error-text);
 }
 
-/* Floating toast notifications — replaces the top banner so messages no longer
-   push the layout down; they stack bottom-right and auto-dismiss. */
+/* Floating toast notifications. Two stacks, both centred on the content
+   column (Toaster.tsx measures it and writes --toast-frame-*): the bottom one
+   answers what the athlete just did, above Coach's composer where there is
+   one; the top one is the app speaking unasked — a labour reached, a load that
+   failed in the background. A toast is a solid card that holds its words and
+   no more: no countdown bar, no blur, and colour only on a warning, an error or
+   a write that landed. */
 .toast-stack {
   position: fixed;
-  right: 20px;
-  bottom: 20px;
+  left: var(--toast-frame-left, 0px);
   z-index: 1200;
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  width: min(380px, calc(100vw - 32px));
+  align-items: center;
+  gap: 8px;
+  width: var(--toast-frame-width, 100vw);
+  padding: 0 16px;
+  box-sizing: border-box;
   pointer-events: none;
 }
 
+.toast-stack--top {
+  --toast-shift: -8px;
+  top: var(--toast-top, 16px);
+}
+
+.toast-stack--bottom {
+  --toast-shift: 8px;
+  bottom: var(--toast-bottom, 20px);
+}
+
 .toast {
-  position: relative;
   display: flex;
   align-items: center;
   gap: 10px;
-  overflow: hidden;
+  width: fit-content;
+  max-width: min(440px, 100%);
+  min-height: 40px;
+  box-sizing: border-box;
+  padding: 8px 6px 8px 12px;
   pointer-events: auto;
-  border: 1px solid var(--surface-line, var(--success-border));
   border-radius: var(--radius-md);
-  background: var(--glass-bg-elevated);
-  -webkit-backdrop-filter: blur(16px);
-  backdrop-filter: blur(16px);
+  background: var(--menu-surface);
   color: var(--text-primary);
-  padding: 12px 12px 12px 14px;
-  box-shadow: var(--shadow-elevated);
-  animation: toast-in 0.28s cubic-bezier(0.22, 1, 0.36, 1);
+  box-shadow: var(--toast-edge), var(--shadow-elevated);
+  animation: toast-in var(--dur-base) var(--ease) both;
 }
 
-.toast--error {
-  border-color: var(--error-border);
+.toast.is-leaving {
+  pointer-events: none;
+  animation: toast-out var(--dur-fast) var(--ease) both;
+}
+
+.toast.has-detail {
+  align-items: flex-start;
+  padding-top: 10px;
+  padding-bottom: 10px;
 }
 
 .toast-icon {
   display: grid;
   flex-shrink: 0;
   place-items: center;
-  color: var(--success-text);
+  color: var(--text-secondary);
+}
+
+.toast.has-detail .toast-icon {
+  margin-top: 2px;
+}
+
+.toast--warning .toast-icon {
+  color: var(--warning-text);
 }
 
 .toast--error .toast-icon {
   color: var(--error-text);
 }
 
-.toast-text {
-  flex: 1;
+.toast-body {
+  display: grid;
+  gap: 2px;
   min-width: 0;
+  padding-right: 2px;
+}
+
+.toast-text,
+.toast-detail {
   font-size: 13px;
   line-height: 1.45;
-  color: var(--text-primary);
   overflow-wrap: anywhere;
 }
 
+.toast-detail {
+  color: var(--text-secondary);
+}
+
+.toast-action {
+  flex-shrink: 0;
+  padding: 4px 8px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--accent-strong);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.3;
+  cursor: pointer;
+  transition: background var(--dur-fast) var(--ease);
+}
+
+.toast-action:hover {
+  background: var(--glass-bg-hover);
+}
+
+.toast-action:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: -2px;
+}
+
+/* The close waits for the pointer on a passing toast, and is always there on
+   one that asks to be read. */
 .toast-close {
   display: grid;
   flex-shrink: 0;
@@ -2999,9 +3068,18 @@ tbody tr.is-selected:hover {
   background: transparent;
   color: var(--text-muted);
   cursor: pointer;
+  opacity: 0;
   transition:
+    opacity var(--dur-fast) var(--ease),
     background var(--dur-fast) var(--ease),
     color var(--dur-fast) var(--ease);
+}
+
+.toast:hover .toast-close,
+.toast:focus-within .toast-close,
+.toast--warning .toast-close,
+.toast--error .toast-close {
+  opacity: 1;
 }
 
 .toast-close:hover {
@@ -3009,58 +3087,43 @@ tbody tr.is-selected:hover {
   color: var(--text-primary);
 }
 
-.toast-progress {
-  position: absolute;
-  left: 0;
-  bottom: 0;
-  width: 100%;
-  height: 2px;
-  transform-origin: left;
-  background: var(--success-text);
-  opacity: 0.7;
-  animation: toast-progress linear forwards;
-}
-
-.toast--error .toast-progress {
-  background: var(--error-text);
+.toast-close:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: -2px;
 }
 
 @keyframes toast-in {
   from {
     opacity: 0;
-    transform: translateY(12px) scale(0.98);
+    transform: translateY(var(--toast-shift, 8px));
   }
   to {
     opacity: 1;
-    transform: translateY(0) scale(1);
+    transform: none;
   }
 }
 
-@keyframes toast-progress {
-  from {
-    transform: scaleX(1);
-  }
+@keyframes toast-out {
   to {
-    transform: scaleX(0);
+    opacity: 0;
+    transform: translateY(calc(var(--toast-shift, 8px) / 2)) scale(0.98);
   }
 }
 
 @media (max-width: 560px) {
   .toast-stack {
-    right: 12px;
-    left: 12px;
-    bottom: 12px;
-    width: auto;
+    padding: 0 12px;
+  }
+
+  .toast {
+    width: 100%;
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .toast {
+  .toast,
+  .toast.is-leaving {
     animation: none;
-  }
-
-  .toast-progress {
-    display: none;
   }
 }
 

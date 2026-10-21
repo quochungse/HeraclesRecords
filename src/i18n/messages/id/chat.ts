@@ -886,7 +886,6 @@ const chat: ChatMessages = {
   "chat.turn.rewriting": "Menghapus dan menulis ulang…",
   "chat.turn.deleted": "Giliran dihapus.",
   "chat.turn.deletedRewritten": "Giliran dihapus dan ringkasan ditulis ulang.",
-  "chat.turn.summaryFailed": "Giliran dihapus. Ringkasan tidak bisa ditulis ulang, jadi masih menyebutnya sampai penulisan ulang berikutnya.",
   "chat.turn.deleteFailed": "Tidak bisa menghapus giliran ini.",
   "chat.fail.busy.title": "AI sedang sibuk",
   "chat.fail.busy.body": "Responsnya: sedang kelebihan beban. Pertanyaan Anda masih ada di sini.",

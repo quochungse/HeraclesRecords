@@ -21,6 +21,7 @@ import {
   CornerDownRight,
   Database,
   ExternalLink,
+  Eye,
   EyeOff,
   FileDown,
   FileText,
@@ -36,6 +37,7 @@ import {
   Settings2,
   Sparkles,
   Terminal,
+  Trash2,
   User,
   Zap
 } from "lucide-react";
@@ -3504,7 +3506,7 @@ export function ChatView({
       } else if (!result.rolled) {
         showToast(
           t("chat.compact.short"),
-          "error"
+          "warning"
         );
       } else {
         showToast(
@@ -3832,8 +3834,13 @@ export function ChatView({
       await flushPendingSave();
       const change = await api.deleteChatTurn(pending.sessionId, pending.ref, options);
       if (activeSessionIdRef.current === pending.sessionId) applyTurnChange(change);
-      if (change.summary === "failed") showToast(t("chat.turn.summaryFailed"), "error");
-      else showToast(change.summary === "rewritten" ? t("chat.turn.deletedRewritten") : t("chat.turn.deleted"));
+      if (change.summary === "failed") {
+        showToast(t("chat.turn.deleted"), "warning", { detail: t("chat.turn.summaryNotRewritten") });
+      } else {
+        showToast(change.summary === "rewritten" ? t("chat.turn.deletedRewritten") : t("chat.turn.deleted"), "info", {
+          icon: Trash2
+        });
+      }
     } catch (caught) {
       showToast(remoteErrorMessage(caught, t("chat.turn.deleteFailed")), "error");
     } finally {
@@ -3883,7 +3890,12 @@ export function ChatView({
   const toggleTurnHidden = async (question: number, hidden: boolean) => {
     const sessionId = activeSessionIdRef.current;
     const ref = turnRefAt(question);
-    if (!api || !sessionId || !ref) return;
+    if (!sessionId || !ref) return;
+    await requestHidden(sessionId, ref, hidden);
+  };
+
+  const requestHidden = async (sessionId: string, ref: TurnRef, hidden: boolean) => {
+    if (!api) return;
     try {
       await flushPendingSave();
       const description = await api.describeChatTurn(sessionId, ref);
@@ -3904,8 +3916,21 @@ export function ChatView({
     // on screen until the conversation is read again.
     if (activeSessionIdRef.current === sessionId) applyTurnChange(change);
     const done = hidden ? t("chat.turn.hiddenDone") : t("chat.turn.shownDone");
-    if (change.summary === "failed") showToast(`${done} ${t("chat.turn.summaryNotRewritten")}`, "error");
-    else showToast(change.summary === "rewritten" ? `${done} ${t("chat.turn.summaryRewritten")}` : done);
+    if (change.summary === "failed") {
+      showToast(done, "warning", { detail: t("chat.turn.summaryNotRewritten") });
+      return;
+    }
+    // The way back is on the toast, for as long as this conversation is the one open.
+    showToast(done, "info", {
+      icon: hidden ? EyeOff : Eye,
+      detail: change.summary === "rewritten" ? t("chat.turn.summaryRewritten") : undefined,
+      action: {
+        label: hidden ? t("chat.turn.show") : t("chat.turn.hide"),
+        run: () => {
+          if (activeSessionIdRef.current === sessionId) void requestHidden(sessionId, ref, !hidden);
+        }
+      }
+    });
   };
 
   const confirmTurnHiding = async (rewriteSummary: boolean) => {
@@ -3931,7 +3956,7 @@ export function ChatView({
       const branch = await api.branchChatConversation(sessionId, ref);
       await refreshSessions();
       await loadSession(branch.id);
-      showToast(t("chat.turn.branched"));
+      showToast(t("chat.turn.branched"), "info", { icon: GitBranch });
     } catch (caught) {
       showToast(remoteErrorMessage(caught, t("chat.turn.branchFailed")), "error");
     }

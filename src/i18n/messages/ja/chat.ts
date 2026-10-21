@@ -886,7 +886,6 @@ const chat: ChatMessages = {
   "chat.turn.rewriting": "削除して書き直しています…",
   "chat.turn.deleted": "やり取りを削除しました。",
   "chat.turn.deletedRewritten": "やり取りを削除し、要約を書き直しました。",
-  "chat.turn.summaryFailed": "やり取りを削除しました。要約を書き直せなかったため、次に書き直すまでこの内容に触れたままです。",
   "chat.turn.deleteFailed": "このやり取りを削除できませんでした。",
   "chat.fail.busy.title": "AI が混み合っています",
   "chat.fail.busy.body": "過負荷だと応答がありました。質問はそのまま残っています。",

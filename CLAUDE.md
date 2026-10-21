@@ -2875,6 +2875,16 @@ and `THEME_WINDOW_BACKGROUND` must stay in sync with `--bg-base`. Sport colors l
 `src/styles.css` and `src/training/sportColors.ts` (the source of truth) —
 `npm run test:sport-colors` asserts they match.
 
+**A toast says who spoke by where it appears** (`src/toast.ts`, drawn by `Toaster`). The bottom
+stack, the default, answers what the athlete just did; the top one is the app speaking unasked —
+a labour reached, a load that failed at start-up, an update that would not download. Both centre
+on the content column, measured, and a screen with something typed into at its foot marks it
+`data-toast-floor` so the bottom stack waits above it (Coach's composer). There are three kinds:
+`info` (a thing done, no colour), `warning` (done, with a consequence) and `error` (not done); a
+`success` kind existed and was removed with no caller left. The clock stops under the pointer,
+with focus inside and while the window is in the background, and the same sentence again
+restarts its toast rather than stacking a copy.
+
 **An empty result and an unfinished load are different screens.** An array that has not
 arrived reads exactly like one that came back empty, so a view that branches on `length`
 alone tells the athlete they have no strength sessions, no HRV readings and no training in

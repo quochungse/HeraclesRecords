@@ -886,7 +886,6 @@ const chat: ChatMessages = {
   "chat.turn.rewriting": "Eliminazione e riscrittura…",
   "chat.turn.deleted": "Turno eliminato.",
   "chat.turn.deletedRewritten": "Turno eliminato e riepilogo riscritto.",
-  "chat.turn.summaryFailed": "Turno eliminato. Il riepilogo non è stato riscritto, quindi lo menziona fino alla prossima riscrittura.",
   "chat.turn.deleteFailed": "Impossibile eliminare questo turno.",
   "chat.fail.busy.title": "L’IA è occupata in questo momento",
   "chat.fail.busy.body": "Ha risposto di essere sovraccarica. La tua domanda è ancora qui.",

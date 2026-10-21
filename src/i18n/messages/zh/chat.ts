@@ -886,7 +886,6 @@ const chat: ChatMessages = {
   "chat.turn.rewriting": "正在删除并重写…",
   "chat.turn.deleted": "已删除这一轮。",
   "chat.turn.deletedRewritten": "已删除这一轮并重写了摘要。",
-  "chat.turn.summaryFailed": "已删除这一轮。摘要未能重写，在下次重写前仍会提到它。",
   "chat.turn.deleteFailed": "无法删除这一轮。",
   "chat.fail.busy.title": "AI 当前繁忙",
   "chat.fail.busy.body": "它回复说负载过高。你的问题还在这里。",

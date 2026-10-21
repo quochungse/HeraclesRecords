@@ -890,7 +890,6 @@ const chat = {
   "chat.turn.rewriting": "Deleting and rewriting…",
   "chat.turn.deleted": "Turn deleted.",
   "chat.turn.deletedRewritten": "Turn deleted and the summary rewritten.",
-  "chat.turn.summaryFailed": "Turn deleted. The summary could not be rewritten, so it still mentions it until the next rewrite.",
   "chat.turn.deleteFailed": "Could not delete this turn.",
   "chat.fail.busy.title": "The AI is busy right now",
   "chat.fail.busy.body": "It answered that it is overloaded. Your question is still here.",

@@ -886,7 +886,6 @@ const chat: ChatMessages = {
   "chat.turn.rewriting": "Suppression et réécriture…",
   "chat.turn.deleted": "Échange supprimé.",
   "chat.turn.deletedRewritten": "Échange supprimé et résumé réécrit.",
-  "chat.turn.summaryFailed": "Échange supprimé. Le résumé n’a pas pu être réécrit ; il le mentionne jusqu’à la prochaine réécriture.",
   "chat.turn.deleteFailed": "Impossible de supprimer cet échange.",
   "chat.fail.busy.title": "L’IA est occupée pour le moment",
   "chat.fail.busy.body": "Elle a répondu être surchargée. Votre question est toujours là.",

@@ -886,7 +886,6 @@ const chat: ChatMessages = {
   "chat.turn.rewriting": "Wird gelöscht und neu geschrieben …",
   "chat.turn.deleted": "Runde gelöscht.",
   "chat.turn.deletedRewritten": "Runde gelöscht und Zusammenfassung neu geschrieben.",
-  "chat.turn.summaryFailed": "Runde gelöscht. Die Zusammenfassung ließ sich nicht neu schreiben und erwähnt sie bis zum nächsten Mal.",
   "chat.turn.deleteFailed": "Diese Runde ließ sich nicht löschen.",
   "chat.fail.busy.title": "Die KI ist gerade ausgelastet",
   "chat.fail.busy.body": "Sie meldet Überlastung. Deine Frage ist noch da.",
