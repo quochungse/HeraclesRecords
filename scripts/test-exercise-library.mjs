@@ -122,27 +122,43 @@ assert.ok(!equipment.some((entry) => entry.equipment === "sled"), "equipment no 
 const barbellEntry = equipment.find((entry) => entry.equipment === "barbell");
 assert.equal(barbellEntry?.count, 1, "of the leg movements, one is on a barbell");
 
-// COROS files the whole abdominal wall under 6 and has no code for the
-// obliques; the name says which part of the wall a movement works.
+// A COROS movement is described by its row and its entry in
+// exerciseReview.ts, by its key — never by its name. COROS has no code for the
+// obliques: a side plank leads with them, a bicycle crunch shares them with the
+// abs, a plank holds with them, a crunch does not use them.
 const facets = await load("src", "calendar", "exerciseFacets.ts");
-const twist = facets.optionFacets(option("twist", "Russian Twist", [6], []), "Russian Twist");
-assert.ok(twist.loads.obliques > twist.loads.abs, "a twist works the obliques first");
-const plank = facets.optionFacets(option("plank2", "Plank", [6], []), "Plank");
+const coros = (key, name, primary, involved, codes = []) =>
+  facets.optionFacets(option(key, name, primary, involved, codes, { corosKey: key }), name);
+const sidePlank = coros("T1185", "Side Plank", [6], [], [1]);
+assert.ok(sidePlank.loads.obliques > sidePlank.loads.abs, "a side plank works the obliques first");
+const bicycle = coros("T1076", "Bicycle Crunches", [6], [], [1]);
+assert.equal(bicycle.loads.obliques, bicycle.loads.abs, "a bicycle crunch works both alike, which its name does not say");
+const plank = coros("T1010", "Planks", [6], [13], [1]);
 assert.ok(plank.loads.obliques > 0 && plank.loads.obliques < plank.loads.abs, "a plank involves them");
-const crunch = facets.optionFacets(option("crunch2", "Crunch", [6], []), "Crunch");
-assert.equal(crunch.loads.obliques, undefined, "a crunch does not");
-const curl = facets.optionFacets(option("curl", "Side Bend Curl", [3], []), "Side Bend Curl");
-assert.equal(curl.loads.obliques, undefined, "nor does a movement COROS does not file under the abdominal wall");
+assert.equal(coros("T1006", "Sit Ups", [6], [], [1]).loads.obliques, undefined, "a sit-up does not");
+assert.equal(coros("T9999", "Russian Twist", [6], [], [1]).loads.obliques, undefined,
+  "a movement nobody reviewed is as COROS sends it, whatever its name says");
+// The neck, which COROS files under the traps.
+const neck = coros("T1074", "Seated Head Harness Neck Resistance", [11], [], [16]);
+assert.ok(neck.loads.neck > neck.loads.traps && neck.bodyParts.includes("neck"));
+// Only a movement that is not COROS's is read off its name.
+const own = facets.optionFacets(option("own", "Russian Twist", [], []), "Russian Twist");
+assert.ok(own.loads.obliques > 0, "an athlete's own movement has only its name to go on");
 
-// Equipment is COROS's codes, with what the name adds: "Front Arm Raise"
-// names no equipment, and COROS files it under dumbbells (2); its "Ropes" (5)
-// is the cable stack, and the kinds only a code names are kept.
-const raise = facets.optionFacets(option("raise", "Front Arm Raise", [1], [], [2]), "Front Arm Raise");
-assert.deepEqual(raise.equipment, ["dumbbell"]);
-assert.deepEqual(facets.optionFacets(option("pull", "Face Pull", [1], [], [5]), "Face Pull").equipment, ["cable"]);
-assert.deepEqual(facets.optionFacets(option("rower", "Indoor Rower", [12], [], [13]), "Indoor Rower").equipment, ["rower"]);
-const trx = facets.optionFacets(option("trx", "TRX Row", [12], [], [5]), "TRX Row");
-assert.ok(trx.equipment.includes("cable") && trx.equipment.includes("suspension"), "a name keeps the kinds no code has");
+// Equipment is COROS's codes, its "Ropes" (5) being the cable stack, unless
+// the review states otherwise; the name adds nothing.
+assert.deepEqual(coros("T1017", "Lateral Dumbbell Raise", [1], [], [2]).equipment, ["dumbbell"]);
+assert.deepEqual(coros("T1352", "Face Pull", [1], [], [5]).equipment, ["cable"]);
+assert.deepEqual(coros("T1207", "Indoor Rower", [7], [], [13]).equipment, ["rower"]);
+assert.deepEqual(coros("T1081", "Trx Suspended Crunches", [6], [], [5]).equipment, ["suspension"],
+  "a TRX is a suspension trainer, not the cable stack COROS files it under");
+assert.deepEqual(coros("T1080", "Battle Ropes", [3], [], [16]).equipment, ["rope"]);
+assert.deepEqual(coros("T1002", "Pull Ups", [12], [], [6]).equipment, ["bodyweight", "machine"]);
+assert.deepEqual(coros("T1036", "Machine Crunches", [6], [], [6]).equipment, ["machine"],
+  "COROS's code stands, and the name's \"crunch\" adds no bodyweight");
+// "Others" is what is left when nothing else is named.
+assert.deepEqual(coros("T9998", "Thing", [6], [], [16, 1]).equipment, ["bodyweight"]);
+assert.deepEqual(coros("T1370", "Wrist Roller", [5], [], [16]).equipment, ["other"]);
 // COROS's 10 is the abductors, a muscle of the legs drawn on the glutes' shape.
 const walk = facets.optionFacets(option("walk", "Lateral Band Walks", [10], [14], [9]), "Lateral Band Walks");
 assert.ok(walk.loads.abductors > walk.loads.glutes);

@@ -36,13 +36,24 @@ import {
   type ExerciseBodyPartId
 } from "../calendar/exerciseFacets";
 import type { MuscleId } from "../strength/muscles";
+import { messageRecord, t } from "../i18n/core";
 import type { BodyCounts } from "./exerciseLibraryModel";
 
 /** A part with more than one muscle opens a second, zoomed step; one muscle is the part. */
 function hasMuscles(part: ExerciseBodyPartId): boolean {
   return BODY_PART_MUSCLES[part].length > 1;
 }
-import { t } from "../i18n/core";
+
+/** The row at the head of a part's muscles that keeps the whole part chosen. */
+const WHOLE_PART_LABELS = messageRecord<ExerciseBodyPartId>({
+  chest: "library.x.whole.chest",
+  back: "library.x.whole.back",
+  shoulders: "library.x.whole.shoulders",
+  arms: "library.x.whole.arms",
+  core: "library.x.whole.core",
+  legs: "library.x.whole.legs",
+  neck: "library.x.whole.neck"
+});
 
 /** The figure's height on screen, caption excluded. */
 const STAGE_HEIGHT = 320;
@@ -219,7 +230,7 @@ export function BodyFilterPanel({
             </button>
             <p className="tl-body-heading">{BODY_PART_LABELS[part]}</p>
             <NameRow
-              label={t("library.x.anyMuscle")}
+              label={WHOLE_PART_LABELS[part]}
               count={counts.parts.get(part) ?? 0}
               pressed={muscle === null}
               lit={false}
@@ -297,7 +308,9 @@ function NameRow({
     >
       <span className="tl-body-name-label">{label}</span>
       <span className="tl-body-name-count">{count}</span>
-      {drills ? <ChevronRight size={14} aria-hidden="true" /> : null}
+      <span className="tl-body-name-step" aria-hidden="true">
+        {drills ? <ChevronRight size={14} /> : null}
+      </span>
     </button>
   );
 }

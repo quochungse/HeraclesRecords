@@ -4366,12 +4366,15 @@
   text-transform: uppercase;
 }
 
+/* Label, count, then a slot for the step further down that every row keeps,
+   drawn or not, so the counts stand in one right-aligned column. */
 .tl-body-name {
-  display: flex;
+  display: grid;
   min-height: 38px;
+  grid-template-columns: minmax(0, 1fr) auto 14px;
   align-items: center;
-  gap: 10px;
-  padding: 0 10px;
+  column-gap: 8px;
+  padding: 0 8px 0 10px;
   border: 0;
   border-radius: var(--radius-sm);
   color: var(--text-primary);
@@ -4413,6 +4416,16 @@
   color: var(--text-muted);
   font-size: 12px;
   font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.tl-body-name[aria-pressed="true"] .tl-body-name-count {
+  color: inherit;
+}
+
+.tl-body-name-step {
+  display: flex;
+  color: var(--text-muted);
 }
 
 /* The equipment menu draws each kind on a plate of its own, as the picker's

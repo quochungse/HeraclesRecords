@@ -931,14 +931,20 @@ lives at module level for the same visit-to-visit reason — see `useCalendarDat
   the picker's `EquipmentGlyph`. Everything said about a movement comes from the picker's own
   `optionFacets` (`exerciseLibraryModel.ts`): its shares of the work, its body parts, its
   equipment and its effort (`exerciseEffort.ts`), and a chosen part or muscle orders the list
-  by `facetRank`, so the two never disagree. **COROS has no code for the obliques** — its
-  muscle table is 1–15, and every twist, side plank and woodchop is filed under 6 with the
-  crunches (live catalog, 2026-10-22) — so `splitAbdominalWall` reads 6 as the whole
-  abdominal wall and lets the name rules say which part of it works: 25 of 382 movements reach
-  the obliques, where none did. **Equipment is COROS's own codes** (`COROS_EQUIPMENT`, the
-  14 kinds of its picker, `T5035`–`T5047`; its "Ropes" is the cable stack) **with what the
-  name adds** — read off the name alone, 213 of 382 movements had none, and 5 have none now —
-  so `ExerciseEquipment` is the coach's search vocabulary plus plates, hangboard, rower and
+  by `facetRank`, so the two never disagree. **A COROS movement is described by its
+  row and by `exerciseReview.ts`, never by its name**: the codes are read as sent, and what
+  they cannot say is stated per movement by its key, as effort is. COROS's muscle table runs
+  1–15 with **no obliques and no neck** — every twist and side plank is filed under 6 with the
+  crunches, every neck harness under the traps (live catalog, 2026-10-22) — so the review
+  gives 45 of 382 movements the obliques (leading, beside the abs, or holding the trunk) and
+  the five neck movements the neck. **Equipment is COROS's own codes** (`COROS_EQUIPMENT`,
+  the 14 kinds of its picker, `T5035`–`T5047`; its "Ropes" is the cable stack), replaced by
+  the review where they misfile (a TRX under the cable stack; battle ropes, a sled and a hex
+  bar under "Others"; a pull-up bar with no word of bodyweight), and **"Others" is dropped
+  beside any other kind**. A name says nothing of the muscles ("Bicycle Crunches",
+  "Romanian Deadlift"), so only a movement that is not COROS's (no `T####` key) is still read
+  off its name, and one COROS adds later is as COROS sends it until it is reviewed.
+  `ExerciseEquipment` is the coach's search vocabulary plus plates, hangboard, rower and
   COROS's "Others". **The abductors are a muscle of their own** (COROS's 10, Hevy's
   `abductors`), in Legs; the 2D artwork has no shape for them, so they are drawn on the
   gluteal shape (`SLUG_MUSCLES`), and the Strength screen's 3D figure has no mesh for them.
