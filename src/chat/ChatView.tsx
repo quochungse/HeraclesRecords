@@ -4459,6 +4459,8 @@ export function ChatView({
         .catch(() => undefined);
     } finally {
       setApplyingChange(null);
+      // The row's "N to decide" counts the open lines from the table.
+      void refreshSessions().catch(() => undefined);
     }
   };
 
