@@ -31,6 +31,8 @@ const strength: StrengthMessages = {
   "strength.muscle.hamstrings.anatomy": "Двуглавая мышца бедра",
   "strength.muscle.adductors": "Приводящие",
   "strength.muscle.adductors.anatomy": "Внутренняя поверхность бедра",
+  "strength.muscle.abductors": "Отводящие",
+  "strength.muscle.abductors.anatomy": "Внешняя поверхность бедра",
   "strength.muscle.calves": "Икры",
   "strength.muscle.calves.anatomy": "Икроножная и камбаловидная",
   "strength.unknownDate": "Дата неизвестна",

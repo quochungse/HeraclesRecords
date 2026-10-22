@@ -31,6 +31,8 @@ const strength: StrengthMessages = {
   "strength.muscle.hamstrings.anatomy": "대퇴이두근",
   "strength.muscle.adductors": "내전근",
   "strength.muscle.adductors.anatomy": "허벅지 안쪽",
+  "strength.muscle.abductors": "외전근",
+  "strength.muscle.abductors.anatomy": "엉덩이 바깥쪽",
   "strength.muscle.calves": "종아리",
   "strength.muscle.calves.anatomy": "비복근·가자미근",
   "strength.unknownDate": "날짜 알 수 없음",

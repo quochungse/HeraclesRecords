@@ -935,7 +935,14 @@ lives at module level for the same visit-to-visit reason — see `useCalendarDat
   muscle table is 1–15, and every twist, side plank and woodchop is filed under 6 with the
   crunches (live catalog, 2026-10-22) — so `splitAbdominalWall` reads 6 as the whole
   abdominal wall and lets the name rules say which part of it works: 25 of 382 movements reach
-  the obliques, where none did. **The catalog row's default target and rest are
+  the obliques, where none did. **Equipment is COROS's own codes** (`COROS_EQUIPMENT`, the
+  14 kinds of its picker, `T5035`–`T5047`; its "Ropes" is the cable stack) **with what the
+  name adds** — read off the name alone, 213 of 382 movements had none, and 5 have none now —
+  so `ExerciseEquipment` is the coach's search vocabulary plus plates, hangboard, rower and
+  COROS's "Others". **The abductors are a muscle of their own** (COROS's 10, Hevy's
+  `abductors`), in Legs; the 2D artwork has no shape for them, so they are drawn on the
+  gluteal shape (`SLUG_MUSCLES`), and the Strength screen's 3D figure has no mesh for them.
+  **The catalog row's default target and rest are
   not shown** — they are where a builder step starts, not facts about the movement. Favourites
   are rows of `exercise_library_favorites` (`personal`, keyed by COROS's catalog id; a heart
   taken back deletes the row), read through `trainingLibrary:listExerciseFavorites` /

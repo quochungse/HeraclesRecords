@@ -21,7 +21,6 @@ import { Play, Search, X } from "lucide-react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
-import type { ExerciseSearchEquipment } from "../../electron/exerciseCatalogSearch";
 import type { WorkoutExerciseOption } from "../../electron/types";
 import { OptionGroup } from "../components/OptionGroup";
 import type { MuscleId } from "../strength/muscles";
@@ -40,6 +39,7 @@ import {
   muscleLabel,
   optionFacets,
   type ExerciseBodyPartId,
+  type ExerciseEquipment,
   type ExerciseFacetKind
 } from "./exerciseFacets";
 import { plural, t } from "../i18n/core";
@@ -165,7 +165,7 @@ export function ExercisePickerDialog({
         muscleAnatomy(muscle)
       ));
     }
-    return EXERCISE_EQUIPMENT_ORDER.flatMap((item: ExerciseSearchEquipment) => build(
+    return EXERCISE_EQUIPMENT_ORDER.flatMap((item: ExerciseEquipment) => build(
       item,
       EQUIPMENT_LABELS[item],
       <span className="exercise-picker-facet-icon"><EquipmentGlyph equipment={item} size={19} /></span>
@@ -188,7 +188,7 @@ export function ExercisePickerDialog({
         return facetsOf.bodyParts.includes(facetValue as ExerciseBodyPartId);
       }
       if (facetKind === "muscle") return facetsOf.muscles.includes(facetValue as MuscleId);
-      return facetsOf.equipment.includes(facetValue as ExerciseSearchEquipment);
+      return facetsOf.equipment.includes(facetValue as ExerciseEquipment);
     });
     // A chosen muscle or body part puts the movements that load it hardest
     // first: its share of the work, loaded lifts a step ahead of bodyweight

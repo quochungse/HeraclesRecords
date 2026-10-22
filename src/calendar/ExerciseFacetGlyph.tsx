@@ -22,8 +22,12 @@ import {
   Anchor,
   Cable,
   CircleDashed,
+  CircleEllipsis,
   Cog,
+  Disc3,
   Dumbbell,
+  HandGrab,
+  MoveHorizontal,
   PersonStanding,
   Spline,
   Truck,
@@ -32,9 +36,9 @@ import {
   Weight,
   type LucideIcon
 } from "lucide-react";
-import type { ExerciseSearchEquipment } from "../../electron/exerciseCatalogSearch";
 import type { MuscleId } from "../strength/muscles";
 import { chooseView, drawableOn } from "./bodyFigure";
+import type { ExerciseEquipment } from "./exerciseFacets";
 import { BODY_OUTLINE, BODY_SHAPES, BODY_VIEW_BOX } from "./bodyShapes";
 
 export function BodyGlyph({
@@ -66,7 +70,7 @@ export function BodyGlyph({
   );
 }
 
-const EQUIPMENT_ICONS: Readonly<Record<ExerciseSearchEquipment, LucideIcon | "barbell">> = {
+const EQUIPMENT_ICONS: Readonly<Record<ExerciseEquipment, LucideIcon | "barbell">> = {
   bodyweight: PersonStanding,
   barbell: "barbell",
   dumbbell: Dumbbell,
@@ -79,7 +83,11 @@ const EQUIPMENT_ICONS: Readonly<Record<ExerciseSearchEquipment, LucideIcon | "ba
   suspension: Anchor,
   bosu: Waves,
   sled: Truck,
-  rope: Waves
+  rope: Waves,
+  plate: Disc3,
+  hangboard: HandGrab,
+  rower: MoveHorizontal,
+  other: CircleEllipsis
 };
 
 /** Lucide has no barbell, and a dumbbell glyph for one is a different lift. */
@@ -105,7 +113,7 @@ export function EquipmentGlyph({
   equipment,
   size = 20
 }: {
-  equipment: ExerciseSearchEquipment;
+  equipment: ExerciseEquipment;
   size?: number;
 }) {
   const Icon = EQUIPMENT_ICONS[equipment];

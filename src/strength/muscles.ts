@@ -29,6 +29,7 @@ export type MuscleId =
   | "quads"
   | "hamstrings"
   | "adductors"
+  | "abductors"
   | "calves";
 
 /** Which side of the figure a muscle is drawn on. */
@@ -229,6 +230,18 @@ export const MUSCLES: MuscleMeta[] = [
     pattern: "legs"
   },
   {
+    id: "abductors",
+    get label() {
+      return t("strength.muscle.abductors");
+    },
+    get anatomy() {
+      return t("strength.muscle.abductors.anatomy");
+    },
+    view: "back",
+    region: "lower",
+    pattern: "legs"
+  },
+  {
     id: "calves",
     get label() {
       return t("strength.muscle.calves");
@@ -354,8 +367,8 @@ const MUSCLE_RULES: MuscleRule[] = [
   },
   {
     match: /clamshell|hip abduction|lateral band walk|thigh abductor|side leg raise/,
-    primary: ["glutes"],
-    secondary: ["adductors"]
+    primary: ["abductors"],
+    secondary: ["glutes"]
   },
   { match: /adductor|inner thigh|hip adduction/, primary: ["adductors"] },
   { match: /hip flexion/, primary: ["quads"], secondary: ["abs"] },
@@ -486,7 +499,7 @@ const HEVY_GROUPS: Record<string, MuscleId[]> = {
   hamstrings: ["hamstrings"],
   calves: ["calves"],
   glutes: ["glutes"],
-  abductors: ["glutes"],
+  abductors: ["abductors"],
   adductors: ["adductors"],
   lats: ["lats"],
   upper_back: ["lats", "traps"],

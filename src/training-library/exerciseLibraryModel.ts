@@ -15,7 +15,6 @@
  * part is a roll-up of muscles, so picking a muscle is narrowing a part — and
  * the equipment.
  */
-import type { ExerciseSearchEquipment } from "../../electron/exerciseCatalogSearch";
 import type { WorkoutExerciseOption } from "../../electron/types";
 import {
   BODY_PART_MUSCLES,
@@ -25,6 +24,7 @@ import {
   facetRank,
   optionFacets,
   type ExerciseBodyPartId,
+  type ExerciseEquipment,
   type ExerciseFacets
 } from "../calendar/exerciseFacets";
 import type { MuscleId } from "../strength/muscles";
@@ -112,7 +112,7 @@ export interface ExerciseLibraryFilter {
   query: string;
   favoritesOnly: boolean;
   favorites: ReadonlySet<string>;
-  equipment: ExerciseSearchEquipment | null;
+  equipment: ExerciseEquipment | null;
   /** A body part, or the part a chosen muscle belongs to. */
   part: ExerciseBodyPartId | null;
   muscle: MuscleId | null;
@@ -210,7 +210,7 @@ export function bodyCounts(list: readonly LibraryExercise[], filter: ExerciseLib
 export function equipmentCounts(
   list: readonly LibraryExercise[],
   filter: ExerciseLibraryFilter
-): Array<{ equipment: ExerciseSearchEquipment; count: number }> {
+): Array<{ equipment: ExerciseEquipment; count: number }> {
   const rows = beforeEquipment(list, filter);
   const used = new Set(list.flatMap((row) => row.facets.equipment));
   return EXERCISE_EQUIPMENT_ORDER

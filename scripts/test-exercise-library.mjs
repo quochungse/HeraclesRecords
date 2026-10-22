@@ -134,6 +134,23 @@ assert.equal(crunch.loads.obliques, undefined, "a crunch does not");
 const curl = facets.optionFacets(option("curl", "Side Bend Curl", [3], []), "Side Bend Curl");
 assert.equal(curl.loads.obliques, undefined, "nor does a movement COROS does not file under the abdominal wall");
 
+// Equipment is COROS's codes, with what the name adds: "Front Arm Raise"
+// names no equipment, and COROS files it under dumbbells (2); its "Ropes" (5)
+// is the cable stack, and the kinds only a code names are kept.
+const raise = facets.optionFacets(option("raise", "Front Arm Raise", [1], [], [2]), "Front Arm Raise");
+assert.deepEqual(raise.equipment, ["dumbbell"]);
+assert.deepEqual(facets.optionFacets(option("pull", "Face Pull", [1], [], [5]), "Face Pull").equipment, ["cable"]);
+assert.deepEqual(facets.optionFacets(option("rower", "Indoor Rower", [12], [], [13]), "Indoor Rower").equipment, ["rower"]);
+const trx = facets.optionFacets(option("trx", "TRX Row", [12], [], [5]), "TRX Row");
+assert.ok(trx.equipment.includes("cable") && trx.equipment.includes("suspension"), "a name keeps the kinds no code has");
+// COROS's 10 is the abductors, a muscle of the legs drawn on the glutes' shape.
+const walk = facets.optionFacets(option("walk", "Lateral Band Walks", [10], [14], [9]), "Lateral Band Walks");
+assert.ok(walk.loads.abductors > walk.loads.glutes);
+assert.ok(walk.bodyParts.includes("legs"));
+assert.equal(figure.MUSCLE_SLUG.abductors, "gluteal");
+assert.equal(figure.SLUG_MUSCLE.gluteal, "glutes", "the shape is still the glutes' first");
+assert.deepEqual(figure.SLUG_MUSCLES.gluteal, ["glutes", "abductors"]);
+
 // Picking a muscle carries its part; picking it again steps back to the part.
 assert.deepEqual(model.pickMuscle({ part: null, muscle: null }, "glutes"), { part: "legs", muscle: "glutes" });
 assert.deepEqual(model.pickMuscle({ part: "legs", muscle: "glutes" }, "glutes"), { part: "legs", muscle: null });

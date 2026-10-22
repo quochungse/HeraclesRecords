@@ -26,7 +26,6 @@
  */
 import { ChevronDown, Heart, LayoutGrid, LoaderCircle } from "lucide-react";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from "react";
-import type { ExerciseSearchEquipment } from "../../electron/exerciseCatalogSearch";
 import type { WorkoutExerciseOption } from "../../electron/types";
 import { OptionGroup } from "../components/OptionGroup";
 import { SelectDropdown } from "../components/SelectDropdown";
@@ -39,7 +38,8 @@ import {
   BODY_PART_MUSCLES,
   EQUIPMENT_LABELS,
   muscleLabel,
-  type ExerciseBodyPartId
+  type ExerciseBodyPartId,
+  type ExerciseEquipment
 } from "../calendar/exerciseFacets";
 import { useWorkoutExerciseCatalog } from "../calendar/useWorkoutExerciseCatalog";
 import { workoutSportView } from "../calendar/workoutSportIcons";
@@ -79,7 +79,7 @@ const EXERCISE_SPORT_PREFERENCE = defineSelectionPreference<ExerciseLibrarySport
 
 const FAVORITES_TABLE = "exercise_library_favorites";
 const ANY_EQUIPMENT = "any";
-type EquipmentChoice = ExerciseSearchEquipment | typeof ANY_EQUIPMENT;
+type EquipmentChoice = ExerciseEquipment | typeof ANY_EQUIPMENT;
 
 /** The body panel: the names column beside the figure, and the room around both. */
 const PANEL_WIDTH = 600;
@@ -111,7 +111,7 @@ export function ExercisesLibrary({
   const [favorites, setFavorites] = useState<ReadonlySet<string>>(new Set());
   const [query, setQuery] = useState("");
   const [favoritesOnly, setFavoritesOnly] = useState(false);
-  const [equipment, setEquipment] = useState<ExerciseSearchEquipment | null>(null);
+  const [equipment, setEquipment] = useState<ExerciseEquipment | null>(null);
   const [part, setPart] = useState<ExerciseBodyPartId | null>(null);
   const [muscle, setMuscle] = useState<MuscleId | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);

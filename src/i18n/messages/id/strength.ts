@@ -31,6 +31,8 @@ const strength: StrengthMessages = {
   "strength.muscle.hamstrings.anatomy": "Biceps femoris",
   "strength.muscle.adductors": "Aduktor",
   "strength.muscle.adductors.anatomy": "Paha bagian dalam",
+  "strength.muscle.abductors": "Abduktor",
+  "strength.muscle.abductors.anatomy": "Pinggul bagian luar",
   "strength.muscle.calves": "Betis",
   "strength.muscle.calves.anatomy": "Gastroknemius & soleus",
   "strength.unknownDate": "Tanggal tidak diketahui",

@@ -31,6 +31,8 @@ const strength: StrengthMessages = {
   "strength.muscle.hamstrings.anatomy": "Biceps femoris",
   "strength.muscle.adductors": "ต้นขาด้านใน",
   "strength.muscle.adductors.anatomy": "Adductors",
+  "strength.muscle.abductors": "สะโพกด้านนอก",
+  "strength.muscle.abductors.anatomy": "Abductors",
   "strength.muscle.calves": "น่อง",
   "strength.muscle.calves.anatomy": "Gastrocnemius & soleus",
   "strength.unknownDate": "ไม่ทราบวันที่",

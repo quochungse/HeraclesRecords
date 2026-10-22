@@ -25,7 +25,7 @@
  */
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from "react";
-import { SLUG_MUSCLE, viewsOf, zoomViewBox } from "../calendar/bodyFigure";
+import { SLUG_MUSCLES, viewsOf, zoomViewBox } from "../calendar/bodyFigure";
 import { BODY_OUTLINE, BODY_SHAPES, BODY_VIEW_BOX, type BodyView } from "../calendar/bodyShapes";
 import {
   BODY_PART_LABELS,
@@ -131,9 +131,12 @@ export function BodyFilterPanel({
     return { view, box, width, height: STAGE_HEIGHT, unitsPerPixel: boxWidth / width };
   });
 
-  const shapeState = (shapeMuscle: MuscleId): { live: boolean; className: string; target: string | null } => {
+  /* A shape can stand for more than one muscle — the gluteal shape is the
+     glutes' and the abductors' — so it lights for either, and a press on it
+     picks the first of them that has anything to show. */
+  const shapeState = (shapeMuscles: readonly MuscleId[]): { live: boolean; className: string; target: string | null } => {
     if (!zoomed) {
-      const shapePart = bodyPartOf(shapeMuscle) ?? null;
+      const shapePart = bodyPartOf(shapeMuscles[0]!) ?? null;
       const live = shapePart !== null && (counts.parts.get(shapePart) ?? 0) > 0;
       return {
         live,
@@ -143,12 +146,16 @@ export function BodyFilterPanel({
           : shapePart !== null && shapePart === hover ? "is-hover" : live ? "is-live" : "is-dead"
       };
     }
-    if (!partMuscles.includes(shapeMuscle)) return { live: false, target: null, className: "is-outside" };
-    const live = (counts.muscles.get(shapeMuscle) ?? 0) > 0;
+    const inPart = shapeMuscles.filter((entry) => partMuscles.includes(entry));
+    if (!inPart.length) return { live: false, target: null, className: "is-outside" };
+    const target = inPart.find((entry) => (counts.muscles.get(entry) ?? 0) > 0) ?? null;
+    const live = target !== null;
     return {
       live,
-      target: shapeMuscle,
-      className: shapeMuscle === muscle ? "is-picked" : shapeMuscle === hover ? "is-hover" : live ? "is-live" : "is-dead"
+      target,
+      className: muscle !== null && inPart.includes(muscle)
+        ? "is-picked"
+        : hover !== null && inPart.includes(hover as MuscleId) ? "is-hover" : live ? "is-live" : "is-dead"
     };
   };
 
@@ -178,9 +185,9 @@ export function BodyFilterPanel({
             >
               <path className="tl-body-skin" d={BODY_OUTLINE[entry.view]} />
               {Object.entries(BODY_SHAPES[entry.view]).map(([slug, paths]) => {
-                const shapeMuscle = SLUG_MUSCLE[slug];
-                if (!shapeMuscle) return null;
-                const state = shapeState(shapeMuscle);
+                const shapeMuscles = SLUG_MUSCLES[slug];
+                if (!shapeMuscles?.length) return null;
+                const state = shapeState(shapeMuscles);
                 const target = state.live ? state.target : null;
                 return (
                   <g
