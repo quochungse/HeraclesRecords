@@ -4088,9 +4088,13 @@
   background: var(--detail-sport);
 }
 
+/* A wide reader caps the plate's height, so the grid's one track is held to
+   the plate: left `auto`, it took the clip's own height (386px in a 300px
+   plate) and the clip was cropped rather than fitted. */
 .tl-exercise-clip .exercise-preview-stage {
   aspect-ratio: 16 / 9;
   max-height: 300px;
+  grid-template: minmax(0, 1fr) / minmax(0, 1fr);
 }
 
 .tl-exercise-muscles {
