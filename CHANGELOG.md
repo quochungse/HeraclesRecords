@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.2.2] - 2026-10-22
+
+### What's new
+- **Exercises Library** - a third tab in the Training Library: COROS's whole movement catalogue to read. Pick a body part on the figure, then a muscle inside it, or an equipment; each movement shows its clip, the muscles it works and how hard. HYROX's eight stations are one toggle away, in race order, and a heart keeps your favourites.
+- **Exercises described properly** - COROS files a squat as hamstring work, battle ropes as biceps and every twist and side plank with no obliques. The app now describes each movement again, its muscles and equipment one by one, so your strength totals and Coach read the right muscles. It may disagree with COROS here and there, on purpose; if you think it got one wrong, say so in Discussions or Issues.
+- **Abductors** - a muscle of their own, on the body filter and on the Strength screen's 3D figure, no longer counted with the glutes.
+- **Exercise picker** - the heart narrows the search to your favourite movements.
+- **Plan in progress** - a tile among your plans rather than a banner over them, filled as far as the plan has got, with the next session beside it. "Done" counts the sessions trained out of those the plan put on the calendar.
+- **Plan usage** - for Claude and ChatGPT subscriptions, "AI for this conversation" shows how much of your plan's limits is spent.
+- **Coach cards open what they name** - a proposed change opens the session it acts on and what it would write, a session on a plan card opens it in the Workbench, and a question's chips open what they point at.
+
+### Fixed
+- Applying or dismissing a proposed change updates the conversation's "to decide" count straight away.
+- Improve app performance and stability.
+
 ## [1.2.1] - 2026-10-21
 
 The biggest Coach update since 1.0. A conversation is now something you work in rather than scroll through: take a question back, rewrite it, keep a turn out of Coach's reading or branch off to try another idea, and every session Coach shows you reads the way its own page does. Fewer clicks between asking, reading and deciding.

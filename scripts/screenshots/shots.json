@@ -73,7 +73,9 @@
    "demoClick('Plans')",
    1500,
    "demoClick('Hanoi Marathon', 'button')",
-   2500
+   2500,
+   "(() => { const reader = document.querySelector('.plan-reader'); if (!reader) return 'no reader'; reader.scrollTop = 0; return true })()",
+   1500
   ],
   "theme": "dark"
  },

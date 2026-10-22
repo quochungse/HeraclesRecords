@@ -117,7 +117,7 @@ Giọng văn: theo README hiện tại. Tiếng Anh, câu ngắn, cụ thể, **
 | `/changelog/` (+ `/changelog.xml`) | Sinh từ CHANGELOG.md, một trang với neo `#1.0.0` cho mỗi bản, kèm feed RSS. Bỏ trang riêng cho từng bản: GitHub Pages không chắc phục vụ đường dẫn có dấu chấm như `/changelog/1.0.0` |
 | `/guide/*` | Getting started, Connect COROS (vùng, 2FA), Set up Coach (từng provider), Sync qua Google Drive, Backup & restore, Hevy, Troubleshooting, FAQ |
 | `/privacy.html` | Giữ URL; rà lại danh sách dịch vụ (Hevy, OpenRouter, Nominatim/Photon, OpenFreeMap, CDN locale của COROS) |
-| `/about` | Câu chuyện "From CorosLink to Heracles Records", vì sao tên Heracles, Buy me a coffee |
+| `/about` | Câu chuyện "The story behind Heracles Records", vì sao tên Heracles, Buy me a coffee |
 | `/404` | |
 
 ### Trang chủ, từ trên xuống

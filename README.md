@@ -130,6 +130,8 @@ Nights and naps, stages, HRV and stress across the night, kept long after the ni
   </tr>
 </table>
 
+**Strength, described properly.** COROS's exercise data is often wrong: a squat filed as hamstring work, battle ropes as biceps, every twist and side plank with no obliques. That skewed my training totals and gave Coach a muddled picture to analyse. So Heracles Records describes every movement again, its muscles and equipment one by one (browse them in the Training Library's **Exercises Library**), and you may see it disagree with COROS here and there. That is on purpose. If you think the app got one wrong, please say so in [Discussions](https://github.com/quochungse/HeraclesRecords/discussions) or [Issues](https://github.com/quochungse/HeraclesRecords/issues/new).
+
 **Every route, replayed.** Open the map full size and colour the line by pace, heart rate or elevation, then watch the route draw itself the way you covered it.
 
 <img src="docs/readme/16-route.webp" alt="A hike around Hàm Lợn replayed on a satellite map, coloured by elevation" />
@@ -205,11 +207,11 @@ Every place your training has taken you, on a globe beside a list of places. Ope
 - Your training comes from your COROS account and stays on your computer.
 - Back up everything to one file you keep, and restore it whenever you like.
 
-## From CorosLink to Heracles Records
+## The story behind Heracles Records
 
 Heracles Records began as a fork of CorosLink, a desktop companion for COROS watches. As my own training grew, what I wanted from it changed: a full record of everything I had done, analytics deeper than a summary screen, and an AI coach that reads all of it. A complete training system rather than a set of tools. So I rebuilt the app around that: training records, deep analytics and AI.
 
-I also want it to be an app you enjoy opening every day: clear screens, charts that are easy to read, and as few clicks as possible between a question about your training and what to do next.
+And I want it to be a pleasure to open every day: calm screens, charts you read at a glance, and a short path from wondering how your training is going to knowing what to do next.
 
 If you are looking for music and media on your watch, offline maps and routes, watch faces or gear tracking, **CorosLink** does those well and is the app to use. They are not part of Heracles Records.
 
