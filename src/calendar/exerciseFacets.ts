@@ -95,6 +95,11 @@ const MUSCLE_BODY_PART = new Map<MuscleId, ExerciseBodyPartId>(
   )
 );
 
+/** The body part a muscle rolls up into. */
+export function bodyPartOf(muscle: MuscleId): ExerciseBodyPartId | undefined {
+  return MUSCLE_BODY_PART.get(muscle);
+}
+
 export const EQUIPMENT_LABELS: Readonly<Record<ExerciseSearchEquipment, string>> = messageRecord({
   bodyweight: "calendar.equipment.bodyweight",
   barbell: "calendar.equipment.barbell",

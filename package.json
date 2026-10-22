@@ -34,6 +34,7 @@
     "test:oneway-arrows": "cross-env ELECTRON_RUN_AS_NODE=1 electron --experimental-strip-types scripts/test-oneway-arrows.mjs",
     "test:greetings": "node --experimental-strip-types --import ./scripts/register-ts-ext.mjs scripts/test-greetings.mjs",
     "test:overview-greeting": "cross-env ELECTRON_RUN_AS_NODE=1 electron --experimental-strip-types --import ./scripts/register-ts-ext.mjs scripts/test-overview-greeting.mjs",
+    "test:exercise-library": "cross-env ELECTRON_RUN_AS_NODE=1 electron --experimental-strip-types --import ./scripts/register-ts-ext.mjs scripts/test-exercise-library.mjs",
     "test:distance-zones": "cross-env ELECTRON_RUN_AS_NODE=1 electron --experimental-strip-types --import ./scripts/register-ts-ext.mjs scripts/test-distance-zones.mjs",
     "test:run-metrics": "cross-env ELECTRON_RUN_AS_NODE=1 electron --experimental-strip-types --import ./scripts/register-ts-ext.mjs scripts/test-run-metrics.mjs",
     "test:activity-channel-colors": "cross-env ELECTRON_RUN_AS_NODE=1 electron --experimental-strip-types --import ./scripts/register-ts-ext.mjs scripts/test-activity-channel-colors.mjs",
