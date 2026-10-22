@@ -447,6 +447,7 @@ const library: LibraryMessages = {
   "library.tile.noSessions": "还没有训练",
   "library.tile.inProgress": "进行中",
   "library.tile.week": "周",
+  "library.tile.upNext": "下一次",
   "library.index.filter": "筛选计划",
   "library.index.search": "搜索计划",
   "library.index.done": "已完成",

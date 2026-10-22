@@ -23,6 +23,7 @@
 import assert from "node:assert/strict";
 
 const {
+  complianceCount,
   describeCompliance,
   formatCompliance,
   planCompliance,
@@ -159,7 +160,7 @@ function match(schedulePlanId, scheduleIdInPlan, status) {
     match(finished.remoteId, "2", "missed")
   ]);
   assert.equal(compliance.planned, 2, "taking a plan off the calendar does not unmake what was trained");
-  assert.equal(formatCompliance(compliance), "50%");
+  assert.equal(formatCompliance(compliance), "1/2");
 }
 
 // ---------------------------------------------------------------------------
@@ -175,19 +176,27 @@ function match(schedulePlanId, scheduleIdInPlan, status) {
     match(mixedPlan.remoteId, "2", "missed"),
     match(mixedPlan.remoteId, "3", "upcoming")
   ]);
-  assert.equal(formatCompliance(mixed), "50%");
+  assert.equal(formatCompliance(mixed), "1/3", "sessions trained of the plan's, not the share of the days gone");
   assert.equal(
     describeCompliance(mixed),
     "1 done · 1 missed · 1 ahead",
     "the sentence names only what happened — a zero count is left out"
   );
 
-  const cleanPlan = plan(2);
+  /*
+   * Every session so far trained, half the plan still to come and not yet
+   * looked at by the matcher: this read "100% done" two weeks into four. The
+   * total is every session the plan put on the calendar, not `planned`.
+   */
+  const cleanPlan = plan(4);
   const clean = planCompliance(cleanPlan, [
     match(cleanPlan.remoteId, "1", "completed"),
     match(cleanPlan.remoteId, "2", "partial")
   ]);
-  assert.equal(formatCompliance(clean), "100%");
+  assert.equal(clean.planned, 2);
+  assert.equal(clean.sessions, 4);
+  assert.equal(formatCompliance(clean), "2/4", "two weeks into four is not done");
+  assert.deepEqual(complianceCount(clean), { done: 2, of: 4 });
   assert.equal(describeCompliance(clean), "2 done");
 
   const onePlan = plan(1);

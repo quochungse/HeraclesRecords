@@ -448,6 +448,7 @@ const library = {
   "library.tile.noSessions": "No sessions yet",
   "library.tile.inProgress": "In progress",
   "library.tile.week": "week",
+  "library.tile.upNext": "Up next",
   "library.index.filter": "Filter plans",
   "library.index.search": "Search plans",
   "library.index.done": "Done",

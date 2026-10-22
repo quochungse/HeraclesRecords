@@ -25,6 +25,7 @@
  * 9. The session view steps through the plan in the order the reader drew
  *    it, counts steps the way its own hero does, and reports what the
  *    matched activity actually did.
+ * 10. "Up next" is the first session from today on still to be trained.
  *
  * Runs through Electron only so `--experimental-strip-types` is available on
  * a Node built without Amaro; it touches no SQLite and no window. The
@@ -36,6 +37,7 @@
 import assert from "node:assert/strict";
 import {
   formatPlannedDuration,
+  nextPlanSession,
   planSessions,
   stageForWeek,
   readPlan,
@@ -491,9 +493,42 @@ function match(idInPlan, status, overrides = {}) {
   );
 }
 
+// ---------------------------------------------------------------------------
+// 10. Up next: the first session from today on still to be trained
+// ---------------------------------------------------------------------------
+{
+  /* Week 1 from Monday 2 Mar; today is Wednesday 4 Mar. */
+  const today = new Date(2026, 2, 4, 9);
+  const monday = entry({ title: "Monday", dayIndex: 0, idInPlan: "1" });
+  const doneToday = entry({ title: "Done today", dayIndex: 2, idInPlan: "2" });
+  const laterToday = entry({ title: "Later today", dayIndex: 2, idInPlan: "3" });
+  const friday = entry({ title: "Friday", dayIndex: 4, idInPlan: "4" });
+  const plan1 = running({ weekCount: 1, entries: [monday, doneToday, laterToday, friday] });
+
+  const next = (matches) => nextPlanSession(readPlan(plan1, matches), today)?.entry.title;
+  assert.equal(next([]), "Done today", "today's session counts while nothing says it was trained");
+  assert.equal(
+    next([match("1", "missed"), match("2", "completed")]),
+    "Later today",
+    "a session trained today is passed over; one missed on a day gone is behind, not next"
+  );
+  assert.equal(
+    next([match("2", "completed"), match("3", "skipped")]),
+    "Friday",
+    "a skipped session is not next either"
+  );
+  assert.equal(next([match("2", "completed"), match("3", "completed"), match("4", "completed")]), undefined);
+  assert.equal(
+    nextPlanSession(readPlan(plan({ weekCount: 1, entries: [friday] })), today),
+    undefined,
+    "a plan with no dates has nothing next"
+  );
+}
+
 console.log(
   "plan reader OK — empty weeks kept, figures shared with the row, outcomes only " +
     "on the calendar and keyed as COROS keys them, no status is not `upcoming`, " +
     "dates only on the calendar, stages by label, durations only when whole, " +
-    "sessions in reading order, the ridge measures what every week states"
+    "sessions in reading order, the ridge measures what every week states, " +
+    "up next is the first session still to train"
 );

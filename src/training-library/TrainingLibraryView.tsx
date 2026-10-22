@@ -1,5 +1,4 @@
 import {
-  Activity,
   AlertTriangle,
   BookOpen,
   CalendarRange,
@@ -47,6 +46,7 @@ import {
   listedPlans,
   planEmptyState,
   planScopeOptions,
+  planProgress,
   planStartLabel,
   planWeekPosition,
   runOutlivesItsPlan,
@@ -56,16 +56,18 @@ import {
 import { compareFavoriteThenName } from "./libraryOrder";
 import { Ridge } from "./Ridge";
 import {
+  complianceCount,
   describeCompliance,
-  formatCompliance,
   planCompliance,
   type PlanCompliance
 } from "./planCompliance";
 import { PlanEditor } from "./PlanEditor";
+import { plannedFigures } from "./PlanEntryRow";
 import {
   RIDGE_CAPTIONS,
   RIDGE_UNITS,
   formatRidgeValue,
+  nextPlanSession,
   readPlan,
   ridgeMeasure,
   weekRidgeValues
@@ -1071,7 +1073,7 @@ function planView(
      * read as failure.
      */
     compliance,
-    complianceLabel: formatCompliance(compliance),
+    complianceCount: complianceCount(compliance),
     complianceNote: describeCompliance(compliance),
     sessions: summary?.workouts ?? 0,
     dominant: dominantSport(summary?.sportDistribution, plan.sportMix),
@@ -1213,12 +1215,7 @@ function PlanTile({
           {/* Only a plan this app put on the calendar has anything to report,
               which is why this is a figure the tile grows rather than a column
               that was a dash down the whole list. */}
-          {view.complianceLabel ? (
-            <span className="tl-card-fig-done" title={view.complianceNote ?? undefined}>
-              <b>{view.complianceLabel}</b>
-              <small>{t("library.fig.done")}</small>
-            </span>
-          ) : null}
+          <DoneFigure view={view} />
           {/* Where a plan came from, at the far end of the line that says what
               it amounts to. It led the tile before, above the name, which gave
               the first word of every tile to a fact that changes nothing about
@@ -1230,59 +1227,128 @@ function PlanTile({
   );
 }
 
+/** "9/26 done", the total the quieter half of one figure. */
+function DoneFigure({ view }: { view: PlanCardView }) {
+  if (!view.complianceCount) return null;
+  return (
+    <span className="tl-card-fig-done" title={view.complianceNote ?? undefined}>
+      <b>
+        {view.complianceCount.done}
+        <em>/{view.complianceCount.of}</em>
+      </b>
+      <small>{t("library.fig.done")}</small>
+    </span>
+  );
+}
+
 /**
- * The plan being trained right now, above the library rather than in it.
+ * The plan being trained right now, in a section of its own above the library.
  *
  * One question is asked of this screen far more than any other — *what am I
  * on, and where am I in it* — and a grid of equal tiles answers it only after
  * the reader has worked out which tile's dates contain today. There is at most
- * one (`activePlan`), and nothing is drawn at all when there is none: an empty
- * frame saying "no plan running" is a row of pixels spent on the absence of
- * news.
+ * one (`activePlan`), and nothing is drawn at all when there is none.
+ *
+ * **It is a tile, two columns wide, and not a banner.** It was a band of its
+ * own across the grid — a sport-coloured wash, a lift, 28px figures, the name
+ * at 22px — which read as an advertisement over the plans rather than as one
+ * of them. What sets it apart now is what only it can say: how far through its
+ * days it is (the top edge, filled), which week it is in (the ridge, the weeks
+ * ahead faint), and the session that comes next.
+ *
+ * `run` is the calendar copy when `plan` is the library plan it runs from: the
+ * plan has no dates, so the week, the progress and the next session are read
+ * off the copy, while the name, the coach's mark and the priced ridge are the
+ * plan's.
  */
-function PlanHero({
+function PlanInProgress({
   plan,
+  run,
   view,
-  position,
+  matches,
   editing,
   onOpen
 }: {
   plan: TrainingPlanDocument;
+  run?: TrainingPlanDocument;
   view: PlanCardView;
-  position: { week: number; of: number } | undefined;
+  matches: readonly TrainingActivityMatch[];
   /** Edits to this plan are held here as a draft. */
   editing?: boolean;
   onOpen: (plan: TrainingPlanDocument) => void;
 }) {
+  const { unitSystem } = useUnitSystem();
+  // The day under "Up next" is written in the language on screen.
+  const { locale } = useI18n();
+  const dated = run ?? plan;
+  const position = planWeekPosition(dated);
+  const progress = planProgress(dated);
+  const next = useMemo(() => nextPlanSession(readPlan(dated, matches)), [dated, matches, locale]);
+  const nextFigures = next ? plannedFigures(next.entry, unitSystem).slice(0, 2) : [];
+  const currentWeek = position ? position.week - 1 : undefined;
+  const missed = view.compliance?.missed ?? 0;
+
   return (
-    <button
-      type="button"
-      className="tl-hero"
+    <li
+      className="tl-card tl-card-live"
       data-accent={view.dominant ?? undefined}
-      style={view.dominant ? sportAccentStyle(view.dominant) : undefined}
-      onClick={() => onOpen(plan)}
+      data-mark={editing ? "editing" : undefined}
+      style={{
+        ...(view.dominant ? sportAccentStyle(view.dominant) : {}),
+        "--tl-progress": `${Math.round((progress ?? 0) * 100)}%`
+      } as React.CSSProperties}
     >
-      {/* Two columns, each a stack: what the plan is, and where it has got to.
-          They were laid out as one grid with hand-placed rows, which left the
-          ridge stranded in a cell of its own whenever the figures beside it
-          were shorter than the name. */}
-      <span className="tl-hero-main">
-        <span className="tl-hero-eyebrow">
-          <Activity size={12} aria-hidden="true" /> {t("library.tile.inProgress")}
-          {editing ? <PlanDraftMark kind="editing" /> : null}
-        </span>
-        <span className="tl-hero-name">
+      <button type="button" className="tl-card-open" onClick={() => onOpen(plan)}>
+        {plan.favorite ? (
+          <span className="tl-card-fav">
+            <Heart size={13} fill="currentColor" strokeWidth={0} aria-label={t("library.w.favorite")} />
+          </span>
+        ) : null}
+        {editing ? <PlanDraftMark kind="editing" /> : null}
+        <span className="tl-card-name">
           <PlanCalendarBadge plan={plan} />
           {plan.name}
         </span>
-        <span className="tl-hero-note">
-          {view.description ? <span>{view.description}</span> : null}
-          <SportMixDots sports={plan.sportMix} counts={view.sportCounts} />
-          <PlanOriginBadge plan={plan} />
+        {view.description ? <span className="tl-card-desc">{view.description}</span> : null}
+        <SportMixDots sports={plan.sportMix} counts={view.sportCounts} />
+        <span className="tl-live-body">
+          <span className="tl-card-ridge">
+            {view.ridgePeak !== undefined ? (
+              <>
+                {/* No peak mark: its glow would compete with the ring on this
+                    week, and on the peak week it drew over the ring. */}
+                <Ridge {...view.ridge} peakWeek={undefined} currentWeek={currentWeek} />
+                {/* The week numbers only while each still has a bar's width
+                    to sit under; past that the ring on the bar says it. */}
+                {view.ridge.values.length <= 16 ? (
+                  <span className="tl-live-weeks" aria-hidden="true">
+                    {view.ridge.values.map((_, index) => (
+                      <span key={index} className={index === currentWeek ? "is-current" : undefined}>
+                        {index + 1}
+                      </span>
+                    ))}
+                  </span>
+                ) : null}
+                <small>
+                  {view.ridgeCaption}
+                  <b>{view.ridgePeak}</b>
+                </small>
+              </>
+            ) : (
+              <small className="is-empty">{t("library.tile.noSessions")}</small>
+            )}
+          </span>
+          {next ? (
+            <span className="tl-live-next">
+              <small>
+                {t("library.tile.upNext")} · {next.dayLabel}
+              </small>
+              <b>{next.entry.title}</b>
+              {nextFigures.length ? <span>{nextFigures.join(" · ")}</span> : null}
+            </span>
+          ) : null}
         </span>
-      </span>
-      <span className="tl-hero-side">
-        <span className="tl-hero-figs">
+        <span className="tl-card-figs">
           {position ? (
             <span>
               <b>
@@ -1292,28 +1358,24 @@ function PlanHero({
               <small>{t("library.tile.week")}</small>
             </span>
           ) : null}
-          <span>
-            <b className={view.sessions ? "" : "is-nil"}>{view.sessions || "—"}</b>
-            <small>{plural("library.fig.sessions", view.sessions)}</small>
-          </span>
-          {view.complianceLabel ? (
-            <span className="tl-hero-fig-done" title={view.complianceNote ?? undefined}>
-              <b>{view.complianceLabel}</b>
-              <small>{t("library.fig.done")}</small>
+          {view.complianceCount ? (
+            <DoneFigure view={view} />
+          ) : (
+            <span>
+              <b className={view.sessions ? "" : "is-nil"}>{view.sessions || "—"}</b>
+              <small>{plural("library.fig.sessions", view.sessions)}</small>
+            </span>
+          )}
+          {missed ? (
+            <span className="tl-card-fig-missed" title={view.complianceNote ?? undefined}>
+              <b>{missed}</b>
+              <small>{t("library.status.missed")}</small>
             </span>
           ) : null}
+          <PlanOriginBadge plan={plan} className="tl-card-source" />
         </span>
-        {view.ridgePeak !== undefined ? (
-          <span className="tl-hero-ridge">
-            <Ridge {...view.ridge} />
-            <small>
-              {view.ridgeCaption}
-              <b>{view.ridgePeak}</b>
-            </small>
-          </span>
-        ) : null}
-      </span>
-    </button>
+      </button>
+    </li>
   );
 }
 
@@ -1415,11 +1477,6 @@ function PlanIndex({
       ),
     [drafts.loose, locale]
   );
-  const heroPosition = useMemo(
-    () => (sections.hero ? planWeekPosition(sections.hero) : undefined),
-    [sections.hero]
-  );
-
   /* Once per plan, not per render: a view reads the whole plan week by week,
      and a keystroke in the search re-renders every tile. */
   const views = useMemo(
@@ -1514,19 +1571,37 @@ function PlanIndex({
         </div>
       ) : (
         <div className="tl-plans-scroll">
+          {/*
+           * The plan in progress under a heading of its own, the same heading
+           * Done and Archived wear, and the rest under "Plans" — but only then:
+           * with nothing running the grid is the whole list and needs no name.
+           */}
           {sections.hero ? (
-            <PlanHero
-              plan={sections.hero}
-              view={viewOf(sections.hero)}
-              position={heroPosition}
-              editing={drafts.byPlan.has(sections.hero.id)}
-              onOpen={onOpen}
-            />
+            <>
+              <h3 className="tl-section-head">{t("library.tile.inProgress")}</h3>
+              <ul className="tl-grid" role="list" aria-label={t("library.tile.inProgress")}>
+                <PlanInProgress
+                  plan={sections.hero}
+                  run={sections.heroRun}
+                  view={viewOf(sections.hero)}
+                  matches={matches}
+                  editing={drafts.byPlan.has(sections.hero.id)}
+                  onOpen={onOpen}
+                />
+              </ul>
+            </>
           ) : null}
 
-          {sections.current.length || looseDrafts.length
-            ? grid(sections.current, t("library.section.plans"), looseDrafts)
-            : null}
+          {sections.current.length || looseDrafts.length ? (
+            <>
+              {sections.hero ? (
+                <h3 className="tl-section-head">
+                  {t("library.section.plans")} <span>{sections.current.length + looseDrafts.length}</span>
+                </h3>
+              ) : null}
+              {grid(sections.current, t("library.section.plans"), looseDrafts)}
+            </>
+          ) : null}
 
           {/*
            * Two closed sections, each drawn only when it holds something. A

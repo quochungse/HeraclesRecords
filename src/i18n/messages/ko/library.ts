@@ -447,6 +447,7 @@ const library: LibraryMessages = {
   "library.tile.noSessions": "아직 세션이 없습니다",
   "library.tile.inProgress": "진행 중",
   "library.tile.week": "주차",
+  "library.tile.upNext": "다음",
   "library.index.filter": "계획 필터",
   "library.index.search": "계획 검색",
   "library.index.done": "완료",

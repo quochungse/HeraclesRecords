@@ -475,6 +475,7 @@ const library: LibraryMessages = {
   "library.tile.noSessions": "Тренировок пока нет",
   "library.tile.inProgress": "Идёт",
   "library.tile.week": "Неделя",
+  "library.tile.upNext": "Далее",
   "library.index.filter": "Фильтр планов",
   "library.index.search": "Поиск планов",
   "library.index.done": "Завершённые",

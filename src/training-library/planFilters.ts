@@ -168,10 +168,32 @@ export function planWeekPosition(
   };
 }
 
+/**
+ * How far through its days a running plan is, 0–1 — the share of the in-progress
+ * tile's top edge that is filled. `undefined` for anything not running, as
+ * `planWeekPosition` is.
+ */
+export function planProgress(
+  plan: TrainingPlanDocument,
+  today: Date = new Date()
+): number | undefined {
+  if (planLifecycle(plan, today) !== "active") return undefined;
+  const start = planStartDate(plan);
+  if (!start) return undefined;
+  const days = (startOfDay(today).getTime() - start.getTime()) / 86_400_000 + 1;
+  return Math.min(1, Math.max(0, days / (Math.max(1, plan.weekCount) * 7)));
+}
+
 /** The three lists the Plans tab draws, in the order it draws them. */
 export interface PlanSections {
-  /** Running right now, drawn as the hero above everything. */
+  /** Running right now, drawn on its own above everything. */
   hero?: TrainingPlanDocument;
+  /**
+   * The calendar copy the hero is being trained from, when the hero is a plan
+   * in the library: the plan has no dates of its own, so the week, the
+   * progress and the next session are read off this.
+   */
+  heroRun?: TrainingPlanDocument;
   /** Everything still ahead or still usable, the hero excluded. */
   current: TrainingPlanDocument[];
   /** Past their last week. */
@@ -196,16 +218,27 @@ export function groupPlans(
   plans: readonly TrainingPlanDocument[],
   today: Date = new Date()
 ): PlanSections {
-  const hero = activePlan(plans, today);
-  const sections: PlanSections = { hero, current: [], done: [], archived: [] };
+  const running = activePlan(plans, today);
   /* A plan running from a template in the library is that template's
      calendar copy, and the template stands for it — with a mark saying it is
      on the calendar. Listing both drew every scheduled plan twice. */
-  const templates = new Set(
-    plans.filter((plan) => plan.calendar === "unscheduled").map((plan) => plan.remoteId)
+  const templates = new Map(
+    plans.filter((plan) => plan.calendar === "unscheduled").map((plan) => [plan.remoteId, plan])
   );
+  /* The same holds for the plan in progress. The copy was picked as the hero —
+     only it has dates — while its template stayed in the grid below, so the
+     plan was drawn twice, the copy without the coach's mark or a priced load. */
+  const template = running?.sourcePlanId ? templates.get(running.sourcePlanId) : undefined;
+  const hero = template && !template.archived ? template : running;
+  const sections: PlanSections = {
+    hero,
+    heroRun: hero !== running ? running : undefined,
+    current: [],
+    done: [],
+    archived: []
+  };
   for (const plan of plans) {
-    if (plan.id === hero?.id) continue;
+    if (plan.id === hero?.id || plan.id === running?.id) continue;
     if (plan.calendar === "running" && plan.sourcePlanId && templates.has(plan.sourcePlanId)) continue;
     if (plan.archived) sections.archived.push(plan);
     else if (planLifecycle(plan, today) === "done") sections.done.push(plan);

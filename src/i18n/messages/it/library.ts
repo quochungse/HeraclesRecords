@@ -447,6 +447,7 @@ const library: LibraryMessages = {
   "library.tile.noSessions": "Ancora nessuna sessione",
   "library.tile.inProgress": "In corso",
   "library.tile.week": "Settimana",
+  "library.tile.upNext": "Prossima",
   "library.index.filter": "Filtra piani",
   "library.index.search": "Cerca piani",
   "library.index.done": "Completati",
