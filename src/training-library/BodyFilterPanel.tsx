@@ -8,6 +8,8 @@
  * so the target is a region — the legs, the arms — and never a sliver like
  * the forearm or the neck. At the second, the picture frames that part alone
  * (`zoomViewBox`), several times larger, and its muscles are what is picked.
+ * A part that is one muscle — the chest, the shoulders, the neck — has no
+ * second step: picking it is the whole choice, so it is chosen where it stands.
  * Every shape also carries a transparent stroke a few pixels wide on screen,
  * so the edge of a muscle is not a near miss.
  *
@@ -35,6 +37,11 @@ import {
 } from "../calendar/exerciseFacets";
 import type { MuscleId } from "../strength/muscles";
 import type { BodyCounts } from "./exerciseLibraryModel";
+
+/** A part with more than one muscle opens a second, zoomed step; one muscle is the part. */
+function hasMuscles(part: ExerciseBodyPartId): boolean {
+  return BODY_PART_MUSCLES[part].length > 1;
+}
 import { t } from "../i18n/core";
 
 /** The figure's height on screen, caption excluded. */
@@ -109,8 +116,8 @@ export function BodyFilterPanel({
 
   useEffect(() => setHover(null), [part]);
 
-  const zoomed = part !== null;
-  const partMuscles = part ? BODY_PART_MUSCLES[part] : [];
+  const zoomed = part !== null && hasMuscles(part);
+  const partMuscles = part && zoomed ? BODY_PART_MUSCLES[part] : [];
   const views: BodyView[] = zoomed ? viewsOf(partMuscles) : ["front", "back"];
   const gap = 12;
   const stage: StageView[] = views.map((view) => {
@@ -131,7 +138,9 @@ export function BodyFilterPanel({
       return {
         live,
         target: shapePart,
-        className: shapePart !== null && shapePart === hover ? "is-hover" : live ? "is-live" : "is-dead"
+        className: shapePart !== null && shapePart === part
+          ? "is-picked"
+          : shapePart !== null && shapePart === hover ? "is-hover" : live ? "is-live" : "is-dead"
       };
     }
     if (!partMuscles.includes(shapeMuscle)) return { live: false, target: null, className: "is-outside" };
@@ -195,7 +204,7 @@ export function BodyFilterPanel({
       </div>
 
       <div className="tl-body-names">
-        {part ? (
+        {part && zoomed ? (
           <>
             <button type="button" className="tl-body-back" onClick={() => onPickPart(null)}>
               <ChevronLeft size={14} aria-hidden="true" />
@@ -227,7 +236,7 @@ export function BodyFilterPanel({
             <NameRow
               label={t("library.x.wholeBody")}
               count={counts.total}
-              pressed
+              pressed={part === null}
               lit={false}
               onPick={() => onPickPart(null)}
               onHover={() => setHover(null)}
@@ -237,9 +246,9 @@ export function BodyFilterPanel({
                 key={entry}
                 label={BODY_PART_LABELS[entry]}
                 count={counts.parts.get(entry) ?? 0}
-                pressed={false}
+                pressed={part === entry}
                 lit={hover === entry}
-                drills
+                drills={hasMuscles(entry)}
                 onPick={() => onPickPart(entry)}
                 onHover={() => setHover(entry)}
               />
