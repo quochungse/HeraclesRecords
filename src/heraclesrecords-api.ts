@@ -246,6 +246,10 @@ export interface HeraclesRecordsApi {
     programIds: string[],
     patch: WorkoutMetadataPatch
   ) => Promise<void>;
+  /** The COROS exercise ids kept as favourites in the Exercises Library. */
+  listExerciseFavorites: () => Promise<string[]>;
+  /** Keeps a movement as a favourite, or lets it go. */
+  setExerciseFavorite: (exerciseId: string, sport: WorkoutSport, favorite: boolean) => Promise<void>;
   deleteTrainingLibraryWorkouts: (
     request: TrainingLibraryDeleteRequest
   ) => Promise<string[]>;

@@ -401,6 +401,26 @@ for (const table of ["training_plans", "training_plan_workout_links", "training_
   assert.equal(tableNames.has(table), false, `${table} is retired and not created`);
 }
 
+// The Exercises Library's hearts: a row per movement kept, and keeping one
+// twice or letting go of one never kept writes nothing.
+assert.equal(tableNames.has("exercise_library_favorites"), true);
+assert.deepEqual(databaseModule.listExerciseFavorites(), []);
+databaseModule.setExerciseFavorite("426109589008859136", "strength", true);
+databaseModule.setExerciseFavorite("425895398452936705", "hyrox", true);
+const keptAt = db.prepare("SELECT favorited_at FROM exercise_library_favorites WHERE exercise_id = ?")
+  .get("426109589008859136").favorited_at;
+databaseModule.setExerciseFavorite("426109589008859136", "strength", true);
+assert.equal(
+  db.prepare("SELECT favorited_at FROM exercise_library_favorites WHERE exercise_id = ?")
+    .get("426109589008859136").favorited_at,
+  keptAt,
+  "keeping a kept movement again does not rewrite its row"
+);
+assert.deepEqual(databaseModule.listExerciseFavorites(), ["425895398452936705", "426109589008859136"]);
+databaseModule.setExerciseFavorite("426109589008859136", "strength", false);
+databaseModule.setExerciseFavorite("never-kept", "strength", false);
+assert.deepEqual(databaseModule.listExerciseFavorites(), ["425895398452936705"]);
+
 // A statement about a session lands on the matcher's own row for it — the
 // table holds one per session — and `manual: false` hands the session back.
 const auto = { ...matches[0], id: "auto-id" };
