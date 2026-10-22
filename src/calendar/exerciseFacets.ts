@@ -326,6 +326,36 @@ function facetsFromMuscles(
   };
 }
 
+/**
+ * COROS has one code for the whole abdominal wall and none for the obliques
+ * — its table runs 1 to 15, and a Russian twist, a side plank and a woodchop
+ * are all filed under 6 with the crunches (read off the live catalog on
+ * 2026-10-22: of 382 movements, not one names an oblique). Read as "abs" and
+ * nothing else, no movement in the catalog ever worked the obliques.
+ *
+ * So 6 is where on the trunk the work lands, and the name rules say which
+ * part of it: a movement they file under the obliques first (a twist, a side
+ * bend, a side plank) takes the code's weight on the obliques and leaves the
+ * abs involved; one that only involves them (a plank) adds the obliques as
+ * involved. A movement COROS does not file under 6 is left as COROS says.
+ */
+function splitAbdominalWall(weights: Partial<Record<MuscleId, number>>, name: string): void {
+  const wall = weights.abs;
+  if (wall === undefined) return;
+  const named = resolveExerciseTargets(name);
+  if (named.mobility || named.generic) return;
+  const share = (muscle: MuscleId) =>
+    named.activations.find((entry) => entry.muscle === muscle)?.share ?? 0;
+  const obliques = share("obliques");
+  if (obliques <= 0) return;
+  if (obliques > share("abs")) {
+    weights.obliques = wall;
+    weights.abs = Math.min(wall, INVOLVED_WEIGHT);
+  } else {
+    weights.obliques = Math.min(wall, INVOLVED_WEIGHT);
+  }
+}
+
 const optionCache = new WeakMap<WorkoutExerciseOption, ExerciseFacets>();
 
 /**
@@ -349,6 +379,7 @@ export function optionFacets(option: WorkoutExerciseOption, name: string): Exerc
   };
   take(option.involvedMuscles, INVOLVED_WEIGHT);
   take(option.primaryMuscles, PRIMARY_WEIGHT);
+  splitAbdominalWall(weights, name);
 
   // A muscle's load is its share of the movement's work, as the name rules
   // state it: the activations sum to 1. A lateral raise that is all shoulder

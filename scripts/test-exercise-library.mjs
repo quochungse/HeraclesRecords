@@ -122,6 +122,18 @@ assert.ok(!equipment.some((entry) => entry.equipment === "sled"), "equipment no 
 const barbellEntry = equipment.find((entry) => entry.equipment === "barbell");
 assert.equal(barbellEntry?.count, 1, "of the leg movements, one is on a barbell");
 
+// COROS files the whole abdominal wall under 6 and has no code for the
+// obliques; the name says which part of the wall a movement works.
+const facets = await load("src", "calendar", "exerciseFacets.ts");
+const twist = facets.optionFacets(option("twist", "Russian Twist", [6], []), "Russian Twist");
+assert.ok(twist.loads.obliques > twist.loads.abs, "a twist works the obliques first");
+const plank = facets.optionFacets(option("plank2", "Plank", [6], []), "Plank");
+assert.ok(plank.loads.obliques > 0 && plank.loads.obliques < plank.loads.abs, "a plank involves them");
+const crunch = facets.optionFacets(option("crunch2", "Crunch", [6], []), "Crunch");
+assert.equal(crunch.loads.obliques, undefined, "a crunch does not");
+const curl = facets.optionFacets(option("curl", "Side Bend Curl", [3], []), "Side Bend Curl");
+assert.equal(curl.loads.obliques, undefined, "nor does a movement COROS does not file under the abdominal wall");
+
 // Picking a muscle carries its part; picking it again steps back to the part.
 assert.deepEqual(model.pickMuscle({ part: null, muscle: null }, "glutes"), { part: "legs", muscle: "glutes" });
 assert.deepEqual(model.pickMuscle({ part: "legs", muscle: "glutes" }, "glutes"), { part: "legs", muscle: null });

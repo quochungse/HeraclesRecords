@@ -931,7 +931,11 @@ lives at module level for the same visit-to-visit reason — see `useCalendarDat
   the picker's `EquipmentGlyph`. Everything said about a movement comes from the picker's own
   `optionFacets` (`exerciseLibraryModel.ts`): its shares of the work, its body parts, its
   equipment and its effort (`exerciseEffort.ts`), and a chosen part or muscle orders the list
-  by `facetRank`, so the two never disagree. **The catalog row's default target and rest are
+  by `facetRank`, so the two never disagree. **COROS has no code for the obliques** — its
+  muscle table is 1–15, and every twist, side plank and woodchop is filed under 6 with the
+  crunches (live catalog, 2026-10-22) — so `splitAbdominalWall` reads 6 as the whole
+  abdominal wall and lets the name rules say which part of it works: 25 of 382 movements reach
+  the obliques, where none did. **The catalog row's default target and rest are
   not shown** — they are where a builder step starts, not facts about the movement. Favourites
   are rows of `exercise_library_favorites` (`personal`, keyed by COROS's catalog id; a heart
   taken back deletes the row), read through `trainingLibrary:listExerciseFavorites` /
