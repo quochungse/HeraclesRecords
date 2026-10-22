@@ -1,3 +1,5 @@
+import { Gauge } from "lucide-react";
+import { useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import type {
   ChatProvider,
@@ -16,6 +18,7 @@ import {
 import type { GeneratorRuntime } from "../training-library/planGeneratorRuntime";
 import { messageRecord, t } from "../i18n/core";
 import { useI18n } from "../i18n/useI18n";
+import { canReadUsage, ProviderUsageDialog } from "./ProviderUsageDialog";
 import "../training-library/trainingLibrary.css";
 
 type SourceKey = keyof TrainingPlanDataSources;
@@ -69,6 +72,8 @@ function webSearchNote(provider: ChatProvider): string {
  * conversation's or, with none open yet, Coach's.
  *
  * Loaded when first opened, with the library's stylesheet its sheet is drawn by.
+ * A subscription's plan usage opens from the footer's start, over the sheet,
+ * for the two providers whose limits can be read.
  */
 export function ConversationAiSheet({
   chatSettings,
@@ -94,6 +99,10 @@ export function ConversationAiSheet({
   onOpenCoachSettings: () => void;
   onOpenProviders: () => void;
 }) {
+  useI18n();
+  const [usageOpen, setUsageOpen] = useState(false);
+  const usageLinkRef = useRef<HTMLButtonElement>(null);
+  const usageProvider = canReadUsage(runtime.provider) && readiness[runtime.provider] !== false ? runtime.provider : null;
   return createPortal(
     <div className="coach-sheet">
       <GeneratorProviderPanel
@@ -106,11 +115,36 @@ export function ConversationAiSheet({
         onDone={onClose}
         onOpenCoach={onOpenCoachSettings}
         onOpenProviders={onOpenProviders}
+        footerStart={
+          usageProvider ? (
+            <button
+              ref={usageLinkRef}
+              type="button"
+              className="plan-generator-sheet-link coach-sheet-usage-link"
+              aria-haspopup="dialog"
+              title={t("chat.usage.openTitle")}
+              onClick={() => setUsageOpen(true)}
+            >
+              <Gauge size={13} aria-hidden="true" />
+              {t("chat.usage.open")}
+            </button>
+          ) : null
+        }
       >
         {conversation ? (
           <Permissions conversation={conversation} provider={runtime.provider} onChange={onConversationChange} />
         ) : null}
       </GeneratorProviderPanel>
+      {usageOpen && usageProvider ? (
+        <ProviderUsageDialog
+          key={usageProvider}
+          provider={usageProvider}
+          onClose={() => {
+            setUsageOpen(false);
+            usageLinkRef.current?.focus();
+          }}
+        />
+      ) : null}
     </div>,
     document.body
   );

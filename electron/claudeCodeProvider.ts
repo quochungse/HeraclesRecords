@@ -743,6 +743,40 @@ export async function listClaudeCodeModels(options: {
 }
 
 /**
+ * Asks Claude Code what `/usage` shows: the plan and its five-hour and weekly
+ * windows. A control request like `supportedModels()`, so it costs no tokens;
+ * the CLI reads claude.ai's usage endpoint with the app's own login. The SDK
+ * marks the request experimental, so the answer goes out untyped and is read
+ * defensively by `parseClaudeSubscriptionUsage`.
+ */
+export async function readClaudeCodeUsage(options: {
+  executablePath: string;
+  configDir?: string;
+}): Promise<unknown> {
+  const sdk = await import("@anthropic-ai/claude-agent-sdk");
+  const controller = new AbortController();
+  try {
+    const query = sdk.query({
+      prompt: "",
+      options: {
+        abortController: controller,
+        pathToClaudeCodeExecutable: options.executablePath,
+        permissionMode: "dontAsk",
+        tools: [],
+        allowedTools: [],
+        settingSources: [],
+        persistSession: false,
+        cwd: claudeWorkingDirectory(options.configDir),
+        env: createClaudeSubscriptionEnvironment(options.configDir)
+      }
+    });
+    return await query.usage_EXPERIMENTAL_MAY_CHANGE_DO_NOT_RELY_ON_THIS_API_YET();
+  } finally {
+    controller.abort();
+  }
+}
+
+/**
  * `default` is the CLI's name for "you choose"; ours is the empty string, which
  * is what the settings store and both pickers already persist.
  *

@@ -244,6 +244,7 @@ import {
   getChatSessionEntries,
   getChatSettings,
   refreshModelCatalogs,
+  readProviderUsage,
   listAllChatSessions,
   loginChat,
   logoutChat,
@@ -349,6 +350,7 @@ import type {
   AnthropicApiConfig,
   ChatMessage,
   ChatProvider,
+  UsageProvider,
   ChatSettings,
   CoachAnalysisCreateResult,
   CoachAnalysisInput,
@@ -1652,6 +1654,10 @@ function registerIpcHandlers(): void {
     "chat:refreshModels",
     (_event, options?: { provider?: ChatProvider; force?: boolean }) =>
       refreshModelCatalogs(options)
+  );
+
+  ipcMain.handle("chat:readProviderUsage", (_event, provider: UsageProvider) =>
+    readProviderUsage(provider)
   );
 
   ipcMain.handle("chat:getBaseCoachInstructions", () =>

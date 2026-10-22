@@ -111,6 +111,8 @@ import type {
   CoachAnalysisUpdate,
   ChatSettings,
   ModelCatalogRefresh,
+  ProviderUsageResult,
+  UsageProvider,
   ClaudeCodeConnectionTest,
   ClaudeCodeLoginStart,
   ClaudeCodeStatus,
@@ -489,6 +491,8 @@ const api = {
     force?: boolean;
   }): Promise<ModelCatalogRefresh> =>
     ipcRenderer.invoke("chat:refreshModels", options),
+  readProviderUsage: (provider: UsageProvider): Promise<ProviderUsageResult> =>
+    ipcRenderer.invoke("chat:readProviderUsage", provider),
   getBaseCoachInstructions: (): Promise<string> =>
     ipcRenderer.invoke("chat:getBaseCoachInstructions"),
   saveChatSettings: (settings: ChatSettings): Promise<ChatSettings> =>
