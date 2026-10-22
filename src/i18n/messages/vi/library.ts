@@ -447,6 +447,7 @@ const library: LibraryMessages = {
   "library.tile.noSessions": "Chưa có buổi nào",
   "library.tile.inProgress": "Đang tập",
   "library.tile.week": "tuần",
+  "library.tile.upNext": "Buổi tới",
   "library.index.filter": "Lọc giáo án",
   "library.index.search": "Tìm giáo án",
   "library.index.done": "Đã xong",

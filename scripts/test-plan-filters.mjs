@@ -39,6 +39,7 @@ import {
   planOriginLabel,
   planScopeOptions,
   planStartLabel,
+  planProgress,
   planWeekPosition
 } from "../src/training-library/planFilters.ts";
 import { compareFavoriteThenName } from "../src/training-library/libraryOrder.ts";
@@ -224,6 +225,30 @@ const names = (plans) => plans.map((item) => item.name);
   );
   assert.deepEqual(names(sections.done), ["Over"]);
   assert.deepEqual(names(sections.archived), ["Put away"], "archived wins over done, so a plan is listed once");
+
+  /*
+   * The plan in progress is the library plan, not its calendar copy. The copy
+   * was the hero — only it has dates — while the plan it runs from stayed in
+   * the grid, so one plan was drawn twice, and the hero lacked the coach's
+   * mark and the priced ridge the plan carries.
+   */
+  const inLibrary = groupPlans([template, running, anytime], today);
+  assert.equal(inLibrary.hero?.name, "Template", "the plan stands for its running copy here too");
+  assert.equal(inLibrary.heroRun?.name, "Now", "and the copy is kept for its dates");
+  assert.deepEqual(names(inLibrary.current), ["Anytime"], "listed once");
+  const alone = groupPlans([running, anytime], today);
+  assert.equal(alone.hero?.name, "Now", "a copy whose plan is not listed is the hero itself");
+  assert.equal(alone.heroRun, undefined);
+  const putAwayTemplate = groupPlans([{ ...template, archived: true }, running], today);
+  assert.equal(putAwayTemplate.hero?.name, "Now", "an archived plan does not stand for a run still going");
+
+  assert.equal(
+    planProgress(onCalendar("2026-09-07", { weekCount: 4 }), today),
+    17 / 28,
+    "the 23rd is day seventeen of twenty-eight"
+  );
+  assert.equal(planProgress(onCalendar("2026-10-05", { weekCount: 4 }), today), undefined, "not begun");
+  assert.equal(planProgress(template, today), undefined, "no dates");
 
   const orphan = onCalendar("2026-09-07", { name: "Official", weekCount: 12, sourcePlanId: "catalogue" });
   assert.deepEqual(

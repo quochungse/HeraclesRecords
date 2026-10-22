@@ -100,7 +100,8 @@ function marathonPlan(): TrainingPlanDocument {
     entries,
     sportMix: ["run"],
     calendar: "running",
-    startDate: dayKey(planStart()),
+    /* `YYYY-MM-DD`, as the adapter writes it; a happen-day key here reads as no date. */
+    startDate: dayKey(planStart()).replace(/(\d{4})(\d{2})(\d{2})/, "$1-$2-$3"),
     tags: ["Marathon"],
     favorite: true,
     archived: false,

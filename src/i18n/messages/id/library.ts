@@ -447,6 +447,7 @@ const library: LibraryMessages = {
   "library.tile.noSessions": "Belum ada sesi",
   "library.tile.inProgress": "Berjalan",
   "library.tile.week": "Minggu",
+  "library.tile.upNext": "Berikutnya",
   "library.index.filter": "Filter rencana",
   "library.index.search": "Cari rencana",
   "library.index.done": "Selesai",

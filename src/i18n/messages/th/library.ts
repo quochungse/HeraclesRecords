@@ -447,6 +447,7 @@ const library: LibraryMessages = {
   "library.tile.noSessions": "ยังไม่มีเซสชัน",
   "library.tile.inProgress": "กำลังดำเนินอยู่",
   "library.tile.week": "สัปดาห์",
+  "library.tile.upNext": "ถัดไป",
   "library.index.filter": "กรองแผน",
   "library.index.search": "ค้นหาแผน",
   "library.index.done": "เสร็จแล้ว",

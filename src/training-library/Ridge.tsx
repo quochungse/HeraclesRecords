@@ -32,9 +32,14 @@ interface RidgeProps {
   variant: "load" | "count";
   /** Full sentence for assistive technology. */
   label: string;
+  /**
+   * 0-based week the plan is in, on a plan that is running: that bar is
+   * ringed and the weeks after it are drawn faint, still to come.
+   */
+  currentWeek?: number;
 }
 
-export function Ridge({ values, peakWeek, unit, variant, label }: RidgeProps) {
+export function Ridge({ values, peakWeek, unit, variant, label, currentWeek }: RidgeProps) {
   if (values.length === 0) {
     return <span className="tl-ridge is-blank" aria-label={t("library.ridge.noWeeks")}>&mdash;</span>;
   }
@@ -50,10 +55,16 @@ export function Ridge({ values, peakWeek, unit, variant, label }: RidgeProps) {
       {values.map((value, index) => {
         const share = peak > 0 ? value / peak : 0;
         const marked = peakWeek !== undefined && index === peakWeek - 1 && value > 0;
+        const phase =
+          currentWeek === undefined || index < currentWeek
+            ? ""
+            : index === currentWeek
+              ? " is-current"
+              : " is-ahead";
         return (
           <span
             key={index}
-            className={`tl-ridge-bar${value > 0 ? "" : " is-empty"}${marked ? " is-peak" : ""}`}
+            className={`tl-ridge-bar${value > 0 ? "" : " is-empty"}${marked ? " is-peak" : ""}${phase}`}
             style={{
               "--tl-bar-height": value > 0 ? `${Math.max(share, MINIMUM_SHARE) * 100}%` : "2px",
               "--tl-bar-index": index < STAGGER_LIMIT ? index : STAGGER_LIMIT

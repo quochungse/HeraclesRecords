@@ -26,8 +26,12 @@ interface PlanEntryRowProps {
   onOpen?: (entryId: string) => void;
 }
 
-export function PlanEntryRow({ entry, unitSystem, onOpen }: PlanEntryRowProps) {
-  const Icon = sportTheme(entry.sport).icon;
+/**
+ * Only the figures the plan actually states. A session that names a distance
+ * and no duration is a normal thing to write, and filling the gap with a zero
+ * would be this screen inventing a target.
+ */
+export function plannedFigures(entry: PlanEntryFacts, unitSystem: UnitSystem): string[] {
   /* Only a duration that is the whole session: a sum of the timed steps
      beside a distance reads as the session's length and is not. */
   const duration = entry.durationComplete
@@ -36,20 +40,19 @@ export function PlanEntryRow({ entry, unitSystem, onOpen }: PlanEntryRowProps) {
   const distance = entry.distanceMeters
     ? formatDistanceValue(entry.distanceMeters, unitSystem, { digits: 1 })
     : null;
-  const tone = statusTone(entry.status);
-  const label = statusLabel(entry.status);
-
-  /*
-   * Only the figures the plan actually states. A session that names a
-   * distance and no duration is a normal thing to write, and filling the gap
-   * with a zero would be this screen inventing a target.
-   */
-  const figures = [
+  return [
     duration,
     distance,
     entry.trainingLoad ? t("library.entry.load", { n: Math.round(entry.trainingLoad) }) : null,
     entry.strengthSets ? plural("workout.sets", entry.strengthSets) : null
   ].filter((figure): figure is string => Boolean(figure));
+}
+
+export function PlanEntryRow({ entry, unitSystem, onOpen }: PlanEntryRowProps) {
+  const Icon = sportTheme(entry.sport).icon;
+  const tone = statusTone(entry.status);
+  const label = statusLabel(entry.status);
+  const figures = plannedFigures(entry, unitSystem);
 
   const content = (
     <>

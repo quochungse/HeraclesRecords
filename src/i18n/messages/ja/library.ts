@@ -447,6 +447,7 @@ const library: LibraryMessages = {
   "library.tile.noSessions": "セッションはまだありません",
   "library.tile.inProgress": "実施中",
   "library.tile.week": "週目",
+  "library.tile.upNext": "次回",
   "library.index.filter": "プランを絞り込む",
   "library.index.search": "プランを検索",
   "library.index.done": "完了",

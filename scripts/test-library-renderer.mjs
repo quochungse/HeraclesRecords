@@ -629,7 +629,7 @@ async function main() {
     assert.notEqual(done, missed);
 
     // The figure on the row and the sentence under it agree with the badges.
-    assert.deepEqual(await textOf(".plan-reader-fig-done b"), ["50%"], "1 of 2 settled");
+    assert.deepEqual(await textOf(".plan-reader-fig-done b"), ["1/3"], "one of the plan's three sessions trained — not the share of those settled");
     assert.deepEqual(await textOf(".plan-reader-compliance"), ["1 done · 1 missed · 1 ahead"]);
   }
 

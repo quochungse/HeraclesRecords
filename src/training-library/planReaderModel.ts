@@ -400,6 +400,24 @@ export function planSessions(reading: PlanReading): PlanSessionRef[] {
   );
 }
 
+/**
+ * The first session of a plan on the calendar still to be trained, today's
+ * included: what the in-progress tile names under "Up next". A session already
+ * trained, skipped or moved is passed over; one with no outcome yet is not.
+ */
+export function nextPlanSession(
+  reading: PlanReading,
+  today: Date = new Date()
+): PlanSessionRef | undefined {
+  const todayIso = isoDay(today);
+  return planSessions(reading).find(
+    (session) =>
+      session.date !== undefined &&
+      session.date >= todayIso &&
+      (session.entry.status === undefined || session.entry.status === "upcoming")
+  );
+}
+
 /** `1:12` for an hour and twelve, `48m` under the hour, nothing at zero. */
 export function formatPlannedDuration(seconds: number): string | null {
   if (!seconds) return null;

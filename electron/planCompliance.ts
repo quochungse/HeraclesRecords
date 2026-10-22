@@ -16,6 +16,11 @@
 import type { TrainingActivityMatch, TrainingPlanDocument } from "./types";
 
 export interface PlanCompliance {
+  /**
+   * Every session the plan put on the calendar, whether the matcher has looked
+   * at its day or not — the total "9 of 26 done" is out of.
+   */
+  sessions: number;
   /** Live occurrences of this plan the matcher has an opinion about. */
   planned: number;
   /** Of those, the ones whose day has passed. */
@@ -74,6 +79,7 @@ export function planCompliance(
   const done = count("completed") + count("partial");
 
   return {
+    sessions: owned.size,
     planned: ours.length,
     settled: ours.length - upcoming,
     done,
