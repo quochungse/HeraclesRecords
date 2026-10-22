@@ -84,7 +84,9 @@ import {
   deleteSettings,
   getSetting,
   initializeDatabase,
+  listExerciseFavorites,
   readTrainingActivityFeelTypes,
+  setExerciseFavorite,
   setSetting
 } from "./database";
 import { getAppInfo } from "./appInfoService";
@@ -2246,6 +2248,12 @@ function registerIpcHandlers(): void {
   );
   ipcMain.handle("trainingLibrary:deleteWorkouts", (_event, request) =>
     deleteTrainingLibraryWorkouts(request)
+  );
+  ipcMain.handle("trainingLibrary:listExerciseFavorites", () => listExerciseFavorites());
+  ipcMain.handle(
+    "trainingLibrary:setExerciseFavorite",
+    (_event, exerciseId: string, sport: string, favorite: boolean) =>
+      setExerciseFavorite(exerciseId, sport, favorite)
   );
   ipcMain.handle(
     "trainingLibrary:refreshMatches",

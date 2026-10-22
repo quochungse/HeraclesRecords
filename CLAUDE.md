@@ -490,7 +490,8 @@ lives at module level for the same visit-to-visit reason — see `useCalendarDat
   COROS account, so startup sequences the re-login *before* `prepareSync()` and resumes
   the loop after one — see the block in `main.ts`.
 - **Training Library** (`trainingLibraryService.ts`, `corosTrainingPlanAdapter.ts`) —
-  **two entities, two tabs**, and the workouts tab splits **40 / 60** between the list and
+  **two entities, two tabs** — plus the Exercises Library, a third tab that is a catalog
+  rather than an entity (below) — and the workouts tab splits **40 / 60** between the list and
   the reader — the list is a name and two counts, the pane beside it draws a whole step
   structure. A workout is one session with no date; a plan is a multi-week
   schedule of them. They share four attributes (name, tags, favourite, archived) and not one
@@ -916,6 +917,58 @@ lives at module level for the same visit-to-visit reason — see `useCalendarDat
   recorded at the moment of use, which is a change to what is stored rather than to what is
   read — reintroducing any of these starts there.
   See [docs/training-library-architecture.md](docs/training-library-architecture.md).
+  **The Exercises Library** (`ExercisesLibrary.tsx`, built 2026-10-22) is COROS's own
+  movement catalog to read, **one library with no sport tabs**: COROS keeps one catalog, the
+  Strength one, and Hybrid Fitness has none of its own (asked under its sport type the query
+  answers nothing; `workoutSportTypeForService` reads Strength's for it), so a tab per sport
+  listed the same 382 movements twice. **The HYROX stations are a toggle** — the rows COROS
+  gives an `exerciseKind` of 1–8, which is their place in the race (SkiErg, sled push, sled
+  pull, burpee broad jumps, row, farmers carry, lunges, wall balls), listed in that order and
+  worn in Hybrid Fitness's colour in the reader. A run or a ride is built from warm-up and
+  training steps, which are not exercises, so they are not here. The tab has **no count**, and it is **two cards at 35/65** (the list and
+  the movement), not the Workouts tab's split panel; nothing docks under its reader, by
+  decision — it is for reading. **Two filters, not three lists**: a body part is a roll-up of
+  muscles, so the body is one control (`BodyFilterPanel`) — the whole figure picks a *part*
+  (a region, never a sliver like the forearm), then the part zooms in (`zoomViewBox` in
+  `src/calendar/bodyFigure.ts`, the arms framed on one side) and its *muscles* are picked,
+  each shape widened by an invisible stroke; the names beside the figure are full-height rows
+  with counts and are the keyboard's way in, headed by "Whole <part>", which lights every
+  muscle of the part — and the equipment, a `SelectDropdown` drawn with
+  the picker's `EquipmentGlyph`. Everything said about a movement comes from the picker's own
+  `optionFacets` (`exerciseLibraryModel.ts`): its shares of the work, its body parts, its
+  equipment and its effort (`exerciseEffort.ts`), and a chosen part or muscle orders the list
+  by `facetRank`, so the two never disagree. **A COROS movement is described by its
+  row and by `exerciseReview.ts`, never by its name**: the codes are read as sent, and what
+  they cannot say, or say wrongly, is stated per movement by its key, as effort is. COROS's
+  muscle data is corrected for 71 movements (a squat, a leg press and a bridge filed as
+  hamstring work, battle ropes as biceps, an L-sit as glutes; `none` takes a muscle out).
+  COROS's muscle table runs
+  1–15 with **no obliques and no neck** — every twist and side plank is filed under 6 with the
+  crunches, every neck harness under the traps (live catalog, 2026-10-22) — so the review
+  gives 45 of 382 movements the obliques (leading, beside the abs, or holding the trunk) and
+  the five neck movements the neck. **Equipment is COROS's own codes** (`COROS_EQUIPMENT`,
+  the 14 kinds of its picker, `T5035`–`T5047`; its "Ropes" is the cable stack, and its
+  "Gym Equipment" is `machine`, labelled so), replaced by
+  the review where they misfile (a TRX under the cable stack; battle ropes, a sled and a hex
+  bar under "Others"; a pull-up bar with no word of bodyweight), and **"Others" is dropped
+  beside any other kind**. A name says nothing of the muscles ("Bicycle Crunches",
+  "Romanian Deadlift"), so only a movement that is not COROS's (no `T####` key) is still read
+  off its name, and one COROS adds later is as COROS sends it until it is reviewed.
+  `ExerciseEquipment` is the coach's search vocabulary plus plates, hangboard, rower and
+  COROS's "Others". **The abductors are a muscle of their own** (COROS's 10, Hevy's
+  `abductors`), in Legs — the gluteus medius and the tensor fasciae latae. In 2D they are
+  `gluteus-medius`, **drawn for this app** in `body-shapes:fetch` (`ABDUCTOR_PATHS`): the
+  package only had a wedge above each buttock, which read as an upper buttock, so the band runs
+  from it round the outside of the buttock and down the hip, and the maximus
+  (`GLUTEUS_MAXIMUS_PATHS`) is the package's drawn in 5 units down the hip to make the room;
+  on the Strength screen's 3D figure they are the
+  two muscles the bake had put in the glutes, split off by their range in `hero.json` (the
+  range falls between muscles, which `test:anatomy-assets` checks).
+  **The catalog row's default target and rest are
+  not shown** — they are where a builder step starts, not facts about the movement. Favourites
+  are rows of `exercise_library_favorites` (`personal`, keyed by COROS's catalog id; a heart
+  taken back deletes the row), read through `trainingLibrary:listExerciseFavorites` /
+  `setExerciseFavorite`. `npm run test:exercise-library`.
 - **Activities** (`src/training/ActivitiesView.tsx`) — the all-sport log: every session COROS
   has, in one list, with a detail pane beside it. It is the only screen some sports ever
   reach — Running covers sport codes 100–103, Cycling 200–205 and 299, Hiking 104/105 and

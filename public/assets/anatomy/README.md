@@ -24,6 +24,10 @@ group, the linea alba, the visible bones). The bake then:
 - removed the skull, jaw and teeth, and placed a clay head on each figure, its
   eyes smoothed to plain spheres.
 
+The bake put the gluteus medius and the tensor fasciae latae in the glutes'
+range, right after the gluteus maximus; `hero.json` splits that range so the two
+are the abductors group, which is why it lists seventeen groups.
+
 The bake ran offline and is not part of the repository; `npm run
 test:anatomy-assets` checks what it produced. Credits and licences are in
 `NOTICE.txt` and `THIRD_PARTY_NOTICES.md`.

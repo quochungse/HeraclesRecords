@@ -7,7 +7,8 @@ import type { MuscleId } from "./muscles";
  * The Strength hero's body, baked offline from the app's Z-Anatomy atlas.
  *
  * What was baked, so nothing here has to do it at load:
- *  - the superficial muscles only, grouped into the sixteen training groups, the
+ *  - the superficial muscles only, grouped into the training groups (the abductors
+ *    split off the glutes by their range in `hero.json`), the
  *    external oblique's medial aponeurosis trimmed, the intact right half kept
  *    (the page mirrors it);
  *  - the man's muscles thickened as a gym-goer's, each away from the bone under

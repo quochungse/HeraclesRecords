@@ -1,6 +1,7 @@
 // The Strength figure's baked body (public/assets/anatomy/hero), decoded as heroBody.ts decodes it: every block inside
-// its file and decodable by the meshopt decoder the page ships, sixteen groups that cover the muscle triangles, indices
-// inside their vertex buffers, a head for each figure, and a bust for her alone.
+// its file and decodable by the meshopt decoder the page ships, seventeen groups that cover the muscle triangles, indices
+// inside their vertex buffers, a head for each figure, and a bust for her alone. The abductors (gluteus medius and tensor
+// fasciae latae) were baked inside the glutes and are split off by their range, which must not cut through a muscle.
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { gunzipSync } from "node:zlib";
@@ -11,10 +12,10 @@ const dir = new URL("../public/assets/anatomy/hero/", import.meta.url);
 const manifest = JSON.parse(await readFile(new URL("hero.json", dir), "utf8"));
 const read = async (name) => gunzipSync(await readFile(new URL(`${name}.bin.gz`, dir)));
 const GROUPS = ["neck", "traps", "shoulders", "chest", "lats", "biceps", "triceps", "forearms", "abs", "obliques",
-  "lowerBack", "glutes", "quads", "hamstrings", "adductors", "calves"];
+  "lowerBack", "glutes", "abductors", "quads", "hamstrings", "adductors", "calves"];
 assert.equal(manifest.version, 2, "meshopt-coded blocks");
 assert.deepEqual(manifest.groups, GROUPS, "group order");
-assert.equal(manifest.ranges.length, 16);
+assert.equal(manifest.ranges.length, GROUPS.length);
 
 const slice = (file, name, [offset, length]) => {
   assert(offset >= 0 && offset + length <= file.byteLength, `${name} lies inside its file`);
@@ -46,6 +47,13 @@ manifest.ranges.forEach(([start, end], index) => {
 });
 assert.equal(covered * 3, mIdx.length, "the groups cover every muscle triangle");
 assert(maxOf(mIdx) < manifest.half, "muscle indices stay in the half");
+const groupVertices = (group) => {
+  const [start, end] = manifest.ranges[GROUPS.indexOf(group)];
+  return new Set(mIdx.subarray(3 * start, 3 * end));
+};
+const glutes = groupVertices("glutes");
+assert(![...groupVertices("abductors")].some((vertex) => glutes.has(vertex)),
+  "the glutes and the abductors share no vertex: the split falls between two muscles");
 
 for (const sex of ["male", "female"]) {
   const blocks = manifest[sex];
@@ -62,4 +70,4 @@ for (const sex of ["male", "female"]) {
     assert(!blocks.bPos && !blocks.bIdx, "his figure carries no bust");
   }
 }
-console.log("Strength figure assets: 16 groups, both figures and their heads, her bust alone.");
+console.log("Strength figure assets: 17 groups, both figures and their heads, her bust alone.");

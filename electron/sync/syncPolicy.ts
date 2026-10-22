@@ -147,6 +147,9 @@ export const TABLE_POLICY: Readonly<Record<string, TablePolicy>> = {
   // classified would let a row from a machine still on the old build recreate
   // the table on the merge path.
   training_workout_metadata: "personal",
+  // The Exercises Library's hearts, one row per movement kept: pure user
+  // intent, keyed by COROS's own catalog id, which every machine shares.
+  exercise_library_favorites: "personal",
   // The Hall of Records' memory: a milestone whose source forgets it — a
   // VO2max reading past COROS's year, a night past what this machine kept, a
   // plan run gone from COROS's list. Not rebuildable once forgotten, which is

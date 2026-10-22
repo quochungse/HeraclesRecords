@@ -11,8 +11,9 @@
  * **A glyph draws one view, and each muscle says which.** The package carries
  * a front and a back figure, and most muscles have a sliver on both, so the
  * side is declared per muscle rather than read off the path data — see
- * `MUSCLE_VIEW`. A body part takes the side the majority of its muscles are
- * on, so Back and Legs draw the back figure and Arms and Core the front.
+ * `MUSCLE_VIEW` in `bodyFigure.ts`. A body part takes the side the majority
+ * of its muscles are on, so Back and Legs draw the back figure and Arms and
+ * Core the front.
  *
  * Equipment is an icon rather than a picture: a dumbbell, a cable stack and a
  * sled have no shared frame to be drawn in.
@@ -21,8 +22,12 @@ import {
   Anchor,
   Cable,
   CircleDashed,
+  CircleEllipsis,
   Cog,
+  Disc3,
   Dumbbell,
+  HandGrab,
+  MoveHorizontal,
   PersonStanding,
   Spline,
   Truck,
@@ -31,86 +36,10 @@ import {
   Weight,
   type LucideIcon
 } from "lucide-react";
-import type { ExerciseSearchEquipment } from "../../electron/exerciseCatalogSearch";
 import type { MuscleId } from "../strength/muscles";
-import { BODY_OUTLINE, BODY_SHAPES, BODY_VIEW_BOX, type BodyView } from "./bodyShapes";
-
-/**
- * This app's sixteen muscles against the artwork's own slugs.
- *
- * It is not one-to-one by name: the package calls the lats "upper-back" and
- * the hamstrings "hamstring", and it has no separate shape for the traps on
- * the front. A muscle with no slug at all would simply draw the bare figure,
- * which is why the map is exhaustive rather than partial.
- */
-const MUSCLE_SLUG: Readonly<Record<MuscleId, string>> = {
-  neck: "neck",
-  traps: "trapezius",
-  shoulders: "deltoids",
-  chest: "chest",
-  lats: "upper-back",
-  biceps: "biceps",
-  triceps: "triceps",
-  forearms: "forearm",
-  abs: "abs",
-  obliques: "obliques",
-  lowerBack: "lower-back",
-  glutes: "gluteal",
-  quads: "quadriceps",
-  hamstrings: "hamstring",
-  adductors: "adductors",
-  calves: "calves"
-};
-
-/**
- * The side of the body each muscle is drawn on.
- *
- * **Stated, not counted.** The artwork carries a sliver for most muscles on
- * both views — there is a triceps edge on the front figure and a trapezius
- * edge on it too — so choosing the view by "which one has a shape for this"
- * put the triceps on a chest and the traps on a pair of shoulders, both of
- * them a few pixels of green where the muscle is barely visible. A triceps is
- * a back muscle; that is a fact about anatomy, not about the path data.
- */
-const MUSCLE_VIEW: Readonly<Record<MuscleId, BodyView>> = {
-  neck: "front",
-  traps: "back",
-  shoulders: "front",
-  chest: "front",
-  lats: "back",
-  biceps: "front",
-  triceps: "back",
-  forearms: "front",
-  abs: "front",
-  obliques: "front",
-  lowerBack: "back",
-  glutes: "back",
-  quads: "front",
-  hamstrings: "back",
-  adductors: "front",
-  calves: "back"
-};
-
-/** How many of these muscles the artwork can actually draw on a given view. */
-function drawableOn(view: BodyView, muscles: readonly MuscleId[]): string[] {
-  const shapes = BODY_SHAPES[view];
-  return muscles
-    .map((muscle) => MUSCLE_SLUG[muscle])
-    .filter((slug, index, all) => all.indexOf(slug) === index && Boolean(shapes[slug]));
-}
-
-/**
- * The muscles vote with the side they belong to, and the front wins a tie —
- * it is the figure a reader expects when nothing argues otherwise. So Back and
- * Legs draw the back, Arms and Core the front.
- */
-function chooseView(muscles: readonly MuscleId[]): BodyView {
-  let back = 0;
-  for (const muscle of muscles) {
-    if (MUSCLE_VIEW[muscle] === "back") back += 1;
-  }
-  return back > muscles.length - back ? "back" : "front";
-}
+import { chooseView, drawableOn } from "./bodyFigure";
+import type { ExerciseEquipment } from "./exerciseFacets";
+import { BODY_OUTLINE, BODY_SHAPES, BODY_VIEW_BOX } from "./bodyShapes";
 
 export function BodyGlyph({
   muscles,
@@ -141,7 +70,7 @@ export function BodyGlyph({
   );
 }
 
-const EQUIPMENT_ICONS: Readonly<Record<ExerciseSearchEquipment, LucideIcon | "barbell">> = {
+const EQUIPMENT_ICONS: Readonly<Record<ExerciseEquipment, LucideIcon | "barbell">> = {
   bodyweight: PersonStanding,
   barbell: "barbell",
   dumbbell: Dumbbell,
@@ -154,7 +83,11 @@ const EQUIPMENT_ICONS: Readonly<Record<ExerciseSearchEquipment, LucideIcon | "ba
   suspension: Anchor,
   bosu: Waves,
   sled: Truck,
-  rope: Waves
+  rope: Waves,
+  plate: Disc3,
+  hangboard: HandGrab,
+  rower: MoveHorizontal,
+  other: CircleEllipsis
 };
 
 /** Lucide has no barbell, and a dumbbell glyph for one is a different lift. */
@@ -180,7 +113,7 @@ export function EquipmentGlyph({
   equipment,
   size = 20
 }: {
-  equipment: ExerciseSearchEquipment;
+  equipment: ExerciseEquipment;
   size?: number;
 }) {
   const Icon = EQUIPMENT_ICONS[equipment];

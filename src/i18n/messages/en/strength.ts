@@ -32,6 +32,8 @@ const strength = {
   "strength.muscle.hamstrings.anatomy": "Biceps femoris",
   "strength.muscle.adductors": "Adductors",
   "strength.muscle.adductors.anatomy": "Inner thigh",
+  "strength.muscle.abductors": "Abductors",
+  "strength.muscle.abductors.anatomy": "Outer hip",
   "strength.muscle.calves": "Calves",
   "strength.muscle.calves.anatomy": "Gastrocnemius & soleus",
   "strength.unknownDate": "Unknown date",

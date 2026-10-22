@@ -255,6 +255,10 @@ const api = {
     patch: WorkoutMetadataPatch
   ): Promise<void> =>
     ipcRenderer.invoke("trainingLibrary:updateWorkoutMetadata", programIds, patch),
+  listExerciseFavorites: (): Promise<string[]> =>
+    ipcRenderer.invoke("trainingLibrary:listExerciseFavorites"),
+  setExerciseFavorite: (exerciseId: string, sport: WorkoutSport, favorite: boolean): Promise<void> =>
+    ipcRenderer.invoke("trainingLibrary:setExerciseFavorite", exerciseId, sport, favorite),
   deleteTrainingLibraryWorkouts: (
     request: TrainingLibraryDeleteRequest
   ): Promise<string[]> =>

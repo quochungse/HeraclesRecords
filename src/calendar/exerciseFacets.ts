@@ -1,19 +1,23 @@
 /**
  * The four ways the exercise picker narrows COROS's catalog.
  *
- * Muscles come from COROS where it says them. Each catalog row carries
- * `muscle` (the muscles the movement works hardest) and `muscleRelevance`
- * (every muscle that takes part), as codes from the Training Hub's own muscle
- * table — `COROS_MUSCLES` below reads them. A few rows carry neither, and a
- * caller that is handed only a name has nothing but that name, so those fall
- * back to the two rule sets the app already owns:
+ * A movement of COROS's catalog (one with a `T####` key) is described by its
+ * row and nothing else: `muscle` (the muscles the movement works hardest) and
+ * `muscleRelevance` (every muscle that takes part) as codes from the Training
+ * Hub's own muscle table (`COROS_MUSCLES`), its equipment codes
+ * (`COROS_EQUIPMENT`) — and, where those codes cannot say it, what
+ * `exerciseReview.ts` states for that movement by its key: the obliques and
+ * the neck, which COROS has no code for, and equipment its codes misfile. Its
+ * name is never read for either; a name is not a description.
+ *
+ * Only a movement that is not COROS's — an athlete's own, a caller handed
+ * nothing but a name — falls back to the two rule sets the app already owns:
  *
  *   - muscles come from `resolveExerciseTargets` (`src/strength/muscles.ts`),
- *     the same rules the Strength body map is drawn from, so a movement is
- *     attributed to the same muscles on both screens;
- *   - equipment always comes from `classifyWorkoutExerciseName`
- *     (`electron/exerciseCatalogSearch.ts`), the same rules the coach's
- *     `search_coros_exercises` tool filters by — COROS files no equipment.
+ *     the same rules the Strength body map is drawn from;
+ *   - equipment comes from `classifyWorkoutExerciseName`
+ *     (`electron/exerciseCatalogSearch.ts`), the rules the coach's
+ *     `search_coros_exercises` tool filters by.
  *
  * A body part is a roll-up of muscles rather than a third rule set, so the
  * two rows of the picker cannot disagree about where a movement belongs. COROS
@@ -33,6 +37,14 @@ import type { WorkoutExerciseOption } from "../../electron/types";
 import { MUSCLE_BY_ID, resolveExerciseTargets, type MuscleId } from "../strength/muscles";
 import { messageRecord } from "../i18n/core";
 import { EXERCISE_EFFORT, type ExerciseEffort } from "./exerciseEffort";
+import { EXERCISE_REVIEW, type ExerciseReview } from "./exerciseReview";
+
+/**
+ * The equipment a movement is filed under: the coach's search vocabulary plus
+ * the kinds only COROS's codes name — barbell plates, a hangboard, an indoor
+ * rower, and COROS's own "Others".
+ */
+export type ExerciseEquipment = ExerciseSearchEquipment | "plate" | "hangboard" | "rower" | "other";
 
 export type ExerciseFacetKind = "all" | "bodyPart" | "muscle" | "equipment";
 
@@ -73,7 +85,7 @@ export const BODY_PART_MUSCLES: Readonly<Record<ExerciseBodyPartId, readonly Mus
   shoulders: ["shoulders"],
   arms: ["biceps", "triceps", "forearms"],
   core: ["abs", "obliques"],
-  legs: ["quads", "hamstrings", "glutes", "adductors", "calves"],
+  legs: ["quads", "hamstrings", "glutes", "adductors", "abductors", "calves"],
   neck: ["neck"]
 };
 
@@ -95,7 +107,12 @@ const MUSCLE_BODY_PART = new Map<MuscleId, ExerciseBodyPartId>(
   )
 );
 
-export const EQUIPMENT_LABELS: Readonly<Record<ExerciseSearchEquipment, string>> = messageRecord({
+/** The body part a muscle rolls up into. */
+export function bodyPartOf(muscle: MuscleId): ExerciseBodyPartId | undefined {
+  return MUSCLE_BODY_PART.get(muscle);
+}
+
+export const EQUIPMENT_LABELS: Readonly<Record<ExerciseEquipment, string>> = messageRecord({
   bodyweight: "calendar.equipment.bodyweight",
   barbell: "calendar.equipment.barbell",
   dumbbell: "calendar.equipment.dumbbell",
@@ -108,13 +125,18 @@ export const EQUIPMENT_LABELS: Readonly<Record<ExerciseSearchEquipment, string>>
   suspension: "calendar.equipment.suspension",
   bosu: "calendar.equipment.bosu",
   sled: "calendar.equipment.sled",
-  rope: "calendar.equipment.rope"
+  rope: "calendar.equipment.rope",
+  plate: "calendar.equipment.plate",
+  hangboard: "calendar.equipment.hangboard",
+  rower: "calendar.equipment.rower",
+  other: "calendar.equipment.other"
 });
 
-/** The order the equipment column is drawn in: the common bars first. */
-export const EXERCISE_EQUIPMENT_ORDER: readonly ExerciseSearchEquipment[] = [
+/** The order the equipment column is drawn in: the common bars first, COROS's "Others" last. */
+export const EXERCISE_EQUIPMENT_ORDER: readonly ExerciseEquipment[] = [
   "bodyweight",
   "barbell",
+  "plate",
   "dumbbell",
   "kettlebell",
   "machine",
@@ -125,7 +147,10 @@ export const EXERCISE_EQUIPMENT_ORDER: readonly ExerciseSearchEquipment[] = [
   "suspension",
   "bosu",
   "sled",
-  "rope"
+  "rope",
+  "hangboard",
+  "rower",
+  "other"
 ];
 
 /** The muscle column, in the body's own reading order. */
@@ -150,11 +175,11 @@ export interface ExerciseFacets {
    * `exerciseEffort.ts` for the steps and where each comes from.
    */
   effort: ExerciseEffort;
-  equipment: ExerciseSearchEquipment[];
+  equipment: ExerciseEquipment[];
 }
 
 /** Equipment that puts an external load on the muscle. */
-const LOADED_EQUIPMENT: ReadonlySet<ExerciseSearchEquipment> = new Set([
+const LOADED_EQUIPMENT: ReadonlySet<ExerciseEquipment> = new Set([
   "barbell",
   "dumbbell",
   "kettlebell",
@@ -163,7 +188,7 @@ const LOADED_EQUIPMENT: ReadonlySet<ExerciseSearchEquipment> = new Set([
   "sled"
 ]);
 
-function isLoadedByName(equipment: readonly ExerciseSearchEquipment[]): boolean {
+function isLoadedByName(equipment: readonly ExerciseEquipment[]): boolean {
   return equipment.some((item) => LOADED_EQUIPMENT.has(item));
 }
 
@@ -275,9 +300,8 @@ export function facetLoad(
  * is not in doubt (leg extension 7, hip adduction 9, shrug 11, pull-up 12,
  * back extension 13, hip thrust 14, calf raise 15…). The table the web app
  * labels them from has no hamstrings entry, but a deadlift, a Romanian
- * deadlift and a leg curl are filed under 8 and nothing else. There is no
- * abductor in the body map, so 10 — the hip abductors — is filed with the
- * glutes they are part of.
+ * deadlift and a leg curl are filed under 8 and nothing else. 10 is the hip
+ * abductors (COROS's "Abductor": lateral band walks, the abductor machine).
  */
 const COROS_MUSCLES: Readonly<Record<number, MuscleId>> = {
   1: "shoulders",
@@ -289,7 +313,7 @@ const COROS_MUSCLES: Readonly<Record<number, MuscleId>> = {
   7: "quads",
   8: "hamstrings",
   9: "adductors",
-  10: "glutes",
+  10: "abductors",
   11: "traps",
   12: "lats",
   13: "lowerBack",
@@ -301,10 +325,55 @@ const COROS_MUSCLES: Readonly<Record<number, MuscleId>> = {
 const PRIMARY_WEIGHT = 1;
 const INVOLVED_WEIGHT = 0.5;
 
+/**
+ * COROS's equipment codes, against the labels its own exercise picker lists
+ * them under (`T5035`–`T5047` in its string table, in that order) and the
+ * movements filed under each in the live catalog (2026-10-22). Its "Ropes" (5)
+ * is the cable stack — a face pull, a lat pulldown, a cable crossover — the
+ * word being a reading of 绳索; battle ropes are under "Others" (16).
+ */
+const COROS_EQUIPMENT: Readonly<Record<number, ExerciseEquipment>> = {
+  1: "bodyweight",
+  2: "dumbbell",
+  3: "barbell",
+  4: "plate",
+  5: "cable",
+  6: "machine",
+  7: "exercise_ball",
+  8: "bosu",
+  9: "resistance_band",
+  10: "medicine_ball",
+  11: "kettlebell",
+  12: "hangboard",
+  13: "rower",
+  16: "other"
+};
+
+/**
+ * The movement's equipment: what `exerciseReview.ts` states for it, else
+ * COROS's codes. COROS's "Others" is what is left when nothing else is named,
+ * so it is dropped beside any other kind. The name is read only for a movement
+ * that is not COROS's and carries no code.
+ */
+function optionEquipment(
+  option: WorkoutExerciseOption,
+  name: string,
+  review: ExerciseReview | undefined
+): ExerciseEquipment[] {
+  const stated = review?.equipment ?? (option.equipmentCodes ?? []).flatMap((code) => {
+    const equipment = COROS_EQUIPMENT[code];
+    return equipment ? [equipment] : [];
+  });
+  const equipment = stated.length || option.corosKey
+    ? [...new Set(stated)]
+    : classifyWorkoutExerciseName(name).equipment;
+  return equipment.length > 1 ? equipment.filter((kind) => kind !== "other") : equipment;
+}
+
 function facetsFromMuscles(
   loads: Partial<Record<MuscleId, number>>,
   effort: ExerciseEffort,
-  equipment: ExerciseSearchEquipment[]
+  equipment: ExerciseEquipment[]
 ): ExerciseFacets {
   const muscles = Object.keys(loads) as MuscleId[];
   return {
@@ -321,15 +390,22 @@ function facetsFromMuscles(
   };
 }
 
+/** A reviewed muscle's role over whatever COROS said of it; `none` takes it out. */
+function applyReview(weights: Partial<Record<MuscleId, number>>, review: ExerciseReview | undefined): void {
+  for (const [muscle, role] of Object.entries(review?.muscles ?? {}) as [MuscleId, string][]) {
+    if (role === "none") delete weights[muscle];
+    else weights[muscle] = role === "primary" ? PRIMARY_WEIGHT : INVOLVED_WEIGHT;
+  }
+}
+
 const optionCache = new WeakMap<WorkoutExerciseOption, ExerciseFacets>();
 
 /**
  * An option's facets. Everything comes from the catalog row COROS sent — its
  * muscles (a primary mover weighs more than one that only takes part), its
  * equipment and default weight, and whether it counts reps or holds for time —
- * and the name is read only for a row COROS lists no muscles for, which has
- * nothing else to go on. The equipment *filter* still reads the name: COROS's
- * codes are coarser than the picker's thirteen kinds.
+ * with what `exerciseReview.ts` states for the movement over it. The name is
+ * read only for a movement that is not COROS's and lists no muscles.
  */
 export function optionFacets(option: WorkoutExerciseOption, name: string): ExerciseFacets {
   const cached = optionCache.get(option);
@@ -344,6 +420,8 @@ export function optionFacets(option: WorkoutExerciseOption, name: string): Exerc
   };
   take(option.involvedMuscles, INVOLVED_WEIGHT);
   take(option.primaryMuscles, PRIMARY_WEIGHT);
+  const review = option.corosKey ? EXERCISE_REVIEW[option.corosKey.toUpperCase()] : undefined;
+  applyReview(weights, review);
 
   // A muscle's load is its share of the movement's work, as the name rules
   // state it: the activations sum to 1. A lateral raise that is all shoulder
@@ -354,9 +432,10 @@ export function optionFacets(option: WorkoutExerciseOption, name: string): Exerc
     loads[muscle] = weight / total;
   }
 
-  const facets = total > 0
-    ? facetsFromMuscles(loads, corosEffort(option), classifyWorkoutExerciseName(name).equipment)
-    : exerciseFacets(name);
+  const equipment = optionEquipment(option, name, review);
+  const facets = total > 0 || option.corosKey
+    ? facetsFromMuscles(loads, corosEffort(option), equipment)
+    : { ...exerciseFacets(name), equipment };
   optionCache.set(option, facets);
   return facets;
 }

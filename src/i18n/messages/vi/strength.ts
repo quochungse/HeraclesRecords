@@ -31,6 +31,8 @@ const strength: StrengthMessages = {
   "strength.muscle.hamstrings.anatomy": "Cơ nhị đầu đùi",
   "strength.muscle.adductors": "Đùi trong",
   "strength.muscle.adductors.anatomy": "Cơ khép đùi",
+  "strength.muscle.abductors": "Hông ngoài",
+  "strength.muscle.abductors.anatomy": "Cơ dạng đùi",
   "strength.muscle.calves": "Bắp chân",
   "strength.muscle.calves.anatomy": "Cơ bụng chân và cơ dép",
   "strength.unknownDate": "Không rõ ngày",

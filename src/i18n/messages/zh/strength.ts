@@ -31,6 +31,8 @@ const strength: StrengthMessages = {
   "strength.muscle.hamstrings.anatomy": "股二头肌",
   "strength.muscle.adductors": "内收肌",
   "strength.muscle.adductors.anatomy": "大腿内侧",
+  "strength.muscle.abductors": "外展肌",
+  "strength.muscle.abductors.anatomy": "髋部外侧",
   "strength.muscle.calves": "小腿",
   "strength.muscle.calves.anatomy": "腓肠肌与比目鱼肌",
   "strength.unknownDate": "日期未知",

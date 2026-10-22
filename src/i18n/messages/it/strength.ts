@@ -31,6 +31,8 @@ const strength: StrengthMessages = {
   "strength.muscle.hamstrings.anatomy": "Bicipite femorale",
   "strength.muscle.adductors": "Adduttori",
   "strength.muscle.adductors.anatomy": "Interno coscia",
+  "strength.muscle.abductors": "Abduttori",
+  "strength.muscle.abductors.anatomy": "Esterno anca",
   "strength.muscle.calves": "Polpacci",
   "strength.muscle.calves.anatomy": "Gastrocnemio e soleo",
   "strength.unknownDate": "Data sconosciuta",

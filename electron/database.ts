@@ -239,6 +239,16 @@ export function initializeDatabase(userDataPath: string): Database.Database {
       cached_payload_json TEXT
     );
 
+    -- The Exercises Library's hearts: a row per movement kept, keyed by its
+    -- COROS catalog id, which is COROS's own and the same on every machine.
+    -- A row is the favourite; taking it back deletes the row, so two machines
+    -- keeping two different movements merge as two rows rather than one list.
+    CREATE TABLE IF NOT EXISTS exercise_library_favorites (
+      exercise_id TEXT PRIMARY KEY,
+      sport TEXT NOT NULL,
+      favorited_at TEXT NOT NULL
+    );
+
     CREATE TABLE IF NOT EXISTS training_activity_matches (
       id TEXT PRIMARY KEY,
       plan_id TEXT,
@@ -3437,6 +3447,40 @@ export function saveTrainingWorkoutMetadata(
     ["program_id"],
     [metadata.programId]
   );
+}
+
+/** The COROS exercise ids kept as favourites in the Exercises Library. */
+export function listExerciseFavorites(): string[] {
+  const rows = requireDatabase()
+    .prepare("SELECT exercise_id FROM exercise_library_favorites ORDER BY exercise_id")
+    .all() as Array<{ exercise_id: string }>;
+  return rows.map((row) => row.exercise_id);
+}
+
+/**
+ * Keeps or lets go of one movement. Keeping one already kept writes nothing —
+ * the row would only be rewritten with a new time and sent to every machine
+ * again — and letting go of one that is not kept announces no delete.
+ */
+export function setExerciseFavorite(exerciseId: string, sport: string, favorite: boolean): void {
+  const database = requireDatabase();
+  if (favorite) {
+    const result = database
+      .prepare(
+        `INSERT INTO exercise_library_favorites (exercise_id, sport, favorited_at)
+         VALUES (?, ?, ?)
+         ON CONFLICT(exercise_id) DO NOTHING`
+      )
+      .run(exerciseId, sport, new Date().toISOString());
+    if (result.changes) {
+      notifySyncedRow("exercise_library_favorites", ["exercise_id"], [exerciseId]);
+    }
+    return;
+  }
+  const result = database
+    .prepare("DELETE FROM exercise_library_favorites WHERE exercise_id = ?")
+    .run(exerciseId);
+  if (result.changes) notifySyncedDelete("exercise_library_favorites", exerciseId);
 }
 
 function toTrainingActivityMatch(row: TrainingActivityMatchRow): TrainingActivityMatch {

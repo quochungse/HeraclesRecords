@@ -31,6 +31,8 @@ const strength: StrengthMessages = {
   "strength.muscle.hamstrings.anatomy": "Biceps fémoral",
   "strength.muscle.adductors": "Adducteurs",
   "strength.muscle.adductors.anatomy": "Intérieur de la cuisse",
+  "strength.muscle.abductors": "Abducteurs",
+  "strength.muscle.abductors.anatomy": "Extérieur de la hanche",
   "strength.muscle.calves": "Mollets",
   "strength.muscle.calves.anatomy": "Gastrocnémien et soléaire",
   "strength.unknownDate": "Date inconnue",
