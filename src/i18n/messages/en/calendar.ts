@@ -20,7 +20,7 @@ const calendar = {
   "calendar.equipment.barbell": "Barbell",
   "calendar.equipment.dumbbell": "Dumbbell",
   "calendar.equipment.kettlebell": "Kettlebell",
-  "calendar.equipment.machine": "Machine",
+  "calendar.equipment.machine": "Gym equipment",
   "calendar.equipment.cable": "Cable",
   "calendar.equipment.resistance_band": "Resistance band",
   "calendar.equipment.medicine_ball": "Medicine ball",

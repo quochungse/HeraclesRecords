@@ -19,7 +19,7 @@ const calendar: CalendarMessages = {
   "calendar.equipment.barbell": "Штанга",
   "calendar.equipment.dumbbell": "Гантель",
   "calendar.equipment.kettlebell": "Гиря",
-  "calendar.equipment.machine": "Тренажёр",
+  "calendar.equipment.machine": "Оборудование зала",
   "calendar.equipment.cable": "Блок",
   "calendar.equipment.resistance_band": "Резиновая лента",
   "calendar.equipment.medicine_ball": "Медбол",

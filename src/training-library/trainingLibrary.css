@@ -4337,23 +4337,30 @@
   overflow-y: auto;
 }
 
+/* The way back up reads as a control without competing with the rows: a
+   hairline pill around the chevron and the words, filled only on hover. */
 .tl-body-back {
   display: inline-flex;
-  min-height: 32px;
+  min-height: 28px;
+  align-self: flex-start;
   align-items: center;
-  gap: 6px;
-  padding: 0 8px;
-  border: 0;
-  border-radius: var(--radius-sm);
+  gap: 4px;
+  margin: 2px 0 4px 4px;
+  padding: 0 12px 0 8px;
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-pill);
   color: var(--text-secondary);
   background: none;
   font-size: 12px;
   font-weight: 500;
   cursor: pointer;
-  transition: background var(--dur-fast) var(--ease);
+  transition:
+    background var(--dur-fast) var(--ease),
+    color var(--dur-fast) var(--ease);
 }
 
 .tl-body-back:hover {
+  color: var(--text-primary);
   background: var(--glass-bg-hover);
 }
 

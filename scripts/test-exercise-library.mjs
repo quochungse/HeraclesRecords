@@ -141,6 +141,13 @@ assert.equal(coros("T9999", "Russian Twist", [6], [], [1]).loads.obliques, undef
 // The neck, which COROS files under the traps.
 const neck = coros("T1074", "Seated Head Harness Neck Resistance", [11], [], [16]);
 assert.ok(neck.loads.neck > neck.loads.traps && neck.bodyParts.includes("neck"));
+// What COROS files wrongly is corrected per movement: a squat is not hamstring
+// work, and an L-sit's glutes are taken out rather than kept.
+const corosSquat = coros("T1061", "Squats", [8], [7, 14], [1]);
+assert.ok(corosSquat.loads.quads > corosSquat.loads.hamstrings && corosSquat.loads.glutes > corosSquat.loads.hamstrings);
+const lsit = coros("T1161", "The L Sit", [14], [6, 7], [1]);
+assert.equal(lsit.loads.glutes, undefined);
+assert.ok(lsit.loads.abs > lsit.loads.quads);
 // Only a movement that is not COROS's is read off its name.
 const own = facets.optionFacets(option("own", "Russian Twist", [], []), "Russian Twist");
 assert.ok(own.loads.obliques > 0, "an athlete's own movement has only its name to go on");

@@ -19,7 +19,7 @@ const calendar: CalendarMessages = {
   "calendar.equipment.barbell": "Tạ đòn",
   "calendar.equipment.dumbbell": "Tạ đơn",
   "calendar.equipment.kettlebell": "Tạ ấm",
-  "calendar.equipment.machine": "Máy tập",
+  "calendar.equipment.machine": "Thiết bị phòng gym",
   "calendar.equipment.cable": "Cáp",
   "calendar.equipment.resistance_band": "Dây kháng lực",
   "calendar.equipment.medicine_ball": "Bóng tạ",

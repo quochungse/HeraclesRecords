@@ -33,6 +33,11 @@ import {
   classifyWorkoutExerciseName,
   type ExerciseSearchEquipment
 } from "../../electron/exerciseCatalogSearch";
+import type { WorkoutExerciseOption } from "../../electron/types";
+import { MUSCLE_BY_ID, resolveExerciseTargets, type MuscleId } from "../strength/muscles";
+import { messageRecord } from "../i18n/core";
+import { EXERCISE_EFFORT, type ExerciseEffort } from "./exerciseEffort";
+import { EXERCISE_REVIEW, type ExerciseReview } from "./exerciseReview";
 
 /**
  * The equipment a movement is filed under: the coach's search vocabulary plus
@@ -40,11 +45,6 @@ import {
  * rower, and COROS's own "Others".
  */
 export type ExerciseEquipment = ExerciseSearchEquipment | "plate" | "hangboard" | "rower" | "other";
-import type { WorkoutExerciseOption } from "../../electron/types";
-import { MUSCLE_BY_ID, resolveExerciseTargets, type MuscleId } from "../strength/muscles";
-import { messageRecord } from "../i18n/core";
-import { EXERCISE_EFFORT, type ExerciseEffort } from "./exerciseEffort";
-import { EXERCISE_REVIEW, type ExerciseReview } from "./exerciseReview";
 
 export type ExerciseFacetKind = "all" | "bodyPart" | "muscle" | "equipment";
 
@@ -390,10 +390,11 @@ function facetsFromMuscles(
   };
 }
 
-/** A reviewed muscle's role over whatever COROS said of it. */
+/** A reviewed muscle's role over whatever COROS said of it; `none` takes it out. */
 function applyReview(weights: Partial<Record<MuscleId, number>>, review: ExerciseReview | undefined): void {
   for (const [muscle, role] of Object.entries(review?.muscles ?? {}) as [MuscleId, string][]) {
-    weights[muscle] = role === "primary" ? PRIMARY_WEIGHT : INVOLVED_WEIGHT;
+    if (role === "none") delete weights[muscle];
+    else weights[muscle] = role === "primary" ? PRIMARY_WEIGHT : INVOLVED_WEIGHT;
   }
 }
 
