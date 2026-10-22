@@ -330,6 +330,7 @@ const workout: WorkoutMessages = {
   "workout.v.steps": "ステップ",
   "workout.v.pool": "{value} {unit} プール",
   "workout.v.loading": "ワークアウトを読み込み中",
+  "workout.v.which": "どのワークアウト",
 };
 
 export default workout;

@@ -346,6 +346,7 @@ const workout: WorkoutMessages = {
   "workout.v.steps": "Шаги",
   "workout.v.pool": "Бассейн {value} {unit}",
   "workout.v.loading": "Загрузка тренировки",
+  "workout.v.which": "Какая тренировка",
 };
 
 export default workout;

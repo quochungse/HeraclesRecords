@@ -9,6 +9,7 @@ import {
   changeSetHead,
   groupChangeLines,
   lineStatusLabel,
+  lineViews,
   proposedLines
 } from "./scheduleChangeModel";
 import { t } from "../i18n/core";
@@ -26,7 +27,8 @@ export function CoachScheduleChangeCard({
   busyLine,
   disabled = false,
   onApply,
-  onDismiss
+  onDismiss,
+  onView
 }: {
   changeSet: ScheduleChangeSet;
   /** The line being applied, `"*"` for the whole set; the card waits while it runs. */
@@ -35,6 +37,8 @@ export function CoachScheduleChangeCard({
   disabled?: boolean;
   onApply?: (lineId?: string) => void;
   onDismiss?: (lineId?: string) => void;
+  /** Opens a line on the session it acts on and the workout it would write. */
+  onView?: (line: ScheduleChangeLine) => void;
 }) {
   const open = proposedLines(changeSet);
   const busy = Boolean(busyLine) || disabled;
@@ -63,6 +67,7 @@ export function CoachScheduleChangeCard({
           disabled={busy}
           onApply={onApply ? () => onApply(line.lineId) : undefined}
           onDismiss={onDismiss ? () => onDismiss(line.lineId) : undefined}
+          onView={onView && lineViews(line).length ? () => onView(line) : undefined}
         />
       ))}
     </ul>
@@ -139,19 +144,34 @@ function ChangeLine({
   busy,
   disabled,
   onApply,
-  onDismiss
+  onDismiss,
+  onView
 }: {
   line: ScheduleChangeLine;
   busy: boolean;
   disabled: boolean;
   onApply?: () => void;
   onDismiss?: () => void;
+  onView?: () => void;
 }) {
   const destructive = line.op === "remove" || line.op === "deleteWorkout";
   return (
     <li className="chat-change-line" data-status={line.status} data-op={line.op} data-line-id={line.lineId}>
       <div className="chat-change-line-text">
-        <span className="chat-change-line-label">{changeLineLabel(line)}</span>
+        {/* The words are the way in, as a title is elsewhere: a separate
+            Open button on every line would double the row's controls. */}
+        {onView ? (
+          <button
+            type="button"
+            className="chat-change-line-label chat-change-line-open"
+            title={t("chat.change.viewDetails")}
+            onClick={onView}
+          >
+            {changeLineLabel(line)}
+          </button>
+        ) : (
+          <span className="chat-change-line-label">{changeLineLabel(line)}</span>
+        )}
         {line.status !== "proposed" ? (
           <span className="chat-change-line-status">
             {lineStatusLabel(line)}

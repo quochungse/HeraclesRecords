@@ -330,6 +330,7 @@ const workout: WorkoutMessages = {
   "workout.v.steps": "Bước",
   "workout.v.pool": "Hồ {value} {unit}",
   "workout.v.loading": "Đang tải bài tập",
+  "workout.v.which": "Bài tập nào",
 };
 
 export default workout;

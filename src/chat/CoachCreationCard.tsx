@@ -92,7 +92,15 @@ export function creationFigures(document: TrainingPlanDocument): CreationFigures
   };
 }
 
-function WeekStrip({ week, span }: { week: PlanReaderWeek; span?: CreationFigures["span"] }) {
+function WeekStrip({
+  week,
+  span,
+  onOpenSession
+}: {
+  week: PlanReaderWeek;
+  span?: CreationFigures["span"];
+  onOpenSession?: (entryId: string) => void;
+}) {
   return (
     <div className="chat-creation-week">
       <span className="chat-creation-week-label">{t("chat.refs.week", { n: week.weekIndex + 1 })}</span>
@@ -107,11 +115,24 @@ function WeekStrip({ week, span }: { week: PlanReaderWeek; span?: CreationFigure
             >
               <b>{day.label}</b>
               {day.entries.length ? (
-                day.entries.map((entry) => (
-                  <span key={entry.id} style={sportChipStyle(entry.sport)}>
-                    {entry.title}
-                  </span>
-                ))
+                day.entries.map((entry) =>
+                  onOpenSession ? (
+                    <button
+                      key={entry.id}
+                      type="button"
+                      className="chat-creation-session"
+                      style={sportChipStyle(entry.sport)}
+                      title={t("chat.change.viewDetails")}
+                      onClick={() => onOpenSession(entry.id)}
+                    >
+                      {entry.title}
+                    </button>
+                  ) : (
+                    <span key={entry.id} style={sportChipStyle(entry.sport)}>
+                      {entry.title}
+                    </span>
+                  )
+                )
               ) : outside ? null : (
                 <span>{t("library.day.rest")}</span>
               )}
@@ -144,7 +165,8 @@ export function CoachCreationCard({
   onCoros = false,
   calendar,
   onCalendar,
-  onOpen
+  onOpen,
+  onOpenSession
 }: {
   draft: PlanDraftPreview;
   /** Which version of its creation this is; shown from the second on. */
@@ -169,6 +191,8 @@ export function CoachCreationCard({
   /** Opens the calendar dialog for this version. */
   onCalendar?: () => void;
   onOpen: () => void;
+  /** Opens the full view on one session of the strip. */
+  onOpenSession?: (entryId: string) => void;
 }) {
   const isWorkout = draft.artifactType === "workout";
   const status = creationStatus(
@@ -259,7 +283,7 @@ export function CoachCreationCard({
           onJump={setPickedWeek}
         />
       ) : null}
-      {figures && shownWeek ? <WeekStrip week={shownWeek} span={figures.span} /> : null}
+      {figures && shownWeek ? <WeekStrip week={shownWeek} span={figures.span} onOpenSession={onOpenSession} /> : null}
 
       {isWorkout && entry?.stepsSummary ? (
         // Summaries written before the builder stopped printing an empty

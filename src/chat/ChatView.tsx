@@ -119,7 +119,8 @@ import type { AnalysesModalTarget } from "./analyses/AnalysesModal";
 import { CoachCreationCard } from "./CoachCreationCard";
 import { CoachBriefCard } from "./CoachBriefCard";
 import { CoachScheduleChangeCard } from "./CoachScheduleChangeCard";
-import { proposedLines, scheduleChangeIds } from "./scheduleChangeModel";
+import { changeDayLabel, lineViewEyebrow, lineViews, proposedLines, scheduleChangeIds } from "./scheduleChangeModel";
+import type { WorkoutView } from "../calendar/WorkoutViewModal";
 import { CoachOutlineCard } from "./CoachOutlineCard";
 import { CoachStepTrail, stepRunEvent, type StepRun } from "./CoachStepTrail";
 import { EMPTY_NOTES } from "../training-library/runTrail";
@@ -220,6 +221,10 @@ const CoachWorkoutEditor = lazy(() => import("./CoachWorkoutEditor"));
 const CoachCanvas = lazy(() => import("./CoachCanvas"));
 const CorosConflictDialog = lazy(() => import("./CorosConflictDialog"));
 const CoachCalendarDialog = lazy(() => import("./CoachCalendarDialog"));
+/* A session or workout a card names, read: the Calendar's own workout view. */
+const WorkoutViewModal = lazy(() =>
+  import("../calendar/WorkoutViewModal").then((module) => ({ default: module.WorkoutViewModal }))
+);
 const ConversationAiSheet = lazy(() =>
   import("./CoachConversationSettings").then((module) => ({ default: module.ConversationAiSheet }))
 );
@@ -628,6 +633,8 @@ interface ChatViewProps {
    */
   pendingPrompt?: string | CoachOpenRequest | null;
   onPendingPromptConsumed?: () => void;
+  /** Opens a finished activity on its own screen, from a chip a question points with. */
+  onOpenActivity?: (activityId: string) => void;
   /**
    * True while the Coach view is the visible one. The panel stays mounted when
    * the athlete navigates away, so anything that should happen "on opening
@@ -668,15 +675,18 @@ function QuestionRefs({
   timeline,
   index,
   onOpen,
+  openerOf,
   sportOf
 }: {
   timeline: readonly ChatEntry[];
   index: number;
   onOpen?: (draftId: string) => void;
+  /** What a chip opens — the session, the activity, the creation — or nothing it can. */
+  openerOf?: (ref: PlanRef | ScheduleRef) => (() => void) | undefined;
   /** A Coach plan session's sport, read from the plan in hand, for the icon. */
   sportOf?: (ref: PlanRef) => WorkoutSport | undefined;
 }) {
-  const labels: { key: string; text: string; name?: string }[] = [];
+  const labels: { key: string; text: string; name?: string; open?: () => void }[] = [];
   let draftId: string | undefined;
   let sport: WorkoutSport | undefined;
   for (let previous = index - 1; previous >= 0; previous -= 1) {
@@ -688,11 +698,14 @@ function QuestionRefs({
         ...entry.refs.map((ref, position) => ({
           key: `p${previous}:${position}`,
           text: ref.scope === "plan" ? ref.name : `${ref.name} · ${ref.label}`,
-          name: ref.name
+          name: ref.name,
+          open: openerOf?.(ref)
         }))
       );
     } else if (entry?.kind === "scheduleRefs") {
-      labels.unshift(...entry.refs.map((ref, position) => ({ key: `s${previous}:${position}`, text: ref.label })));
+      labels.unshift(
+        ...entry.refs.map((ref, position) => ({ key: `s${previous}:${position}`, text: ref.label, open: openerOf?.(ref) }))
+      );
     } else {
       break;
     }
@@ -714,9 +727,7 @@ function QuestionRefs({
         <CalendarRange size={12} aria-hidden="true" />
       )}
       {labels.map((label) => (
-        <span key={label.key} className="chat-ref-chip">
-          {label.text}
-        </span>
+        <RefChip key={label.key} text={label.text} open={label.open} />
       ))}
       {draftId && onOpen ? (
         <button
@@ -730,6 +741,17 @@ function QuestionRefs({
         </button>
       ) : null}
     </span>
+  );
+}
+
+/** A chip naming what a question is about; the way into it when there is one. */
+function RefChip({ text, open }: { text: string; open?: () => void }) {
+  return open ? (
+    <button type="button" className="chat-ref-chip is-open" title={t("chat.change.viewDetails")} onClick={open}>
+      {text}
+    </button>
+  ) : (
+    <span className="chat-ref-chip">{text}</span>
   );
 }
 
@@ -1098,6 +1120,7 @@ export function ChatView({
   onActivityChange,
   pendingPrompt,
   onPendingPromptConsumed,
+  onOpenActivity,
   active = true
 }: ChatViewProps) {
   useI18n();
@@ -1197,6 +1220,8 @@ export function ChatView({
   const [planPanelOpen, setPlanPanelOpen] = useState(false);
   /** The creation the popup is showing. null is closed. */
   const [openCreationId, setOpenCreationId] = useState<string | null>(null);
+  /** A session of the open creation, picked on its card's week strip. */
+  const [openCreationSession, setOpenCreationSession] = useState<{ entryId: string } | null>(null);
   const [highlightedChatEntryIndex, setHighlightedChatEntryIndex] = useState<
     number | null
   >(null);
@@ -1322,6 +1347,8 @@ export function ChatView({
   const [scheduleChanges, setScheduleChanges] = useState<Record<string, ScheduleChangeSet | null>>({});
   /** The line being applied (`"*"` for a whole set), by set. */
   const [applyingChange, setApplyingChange] = useState<{ changeSetId: string; lineId: string } | null>(null);
+  /** A workout opened from a card — a change line's session, what it would write, a calendar ref. */
+  const [viewedWorkout, setViewedWorkout] = useState<{ views: WorkoutView[]; eyebrow?: string; initialView?: string } | null>(null);
   const missingChangeSets = scheduleChangeIds(timeline)
     .filter((changeSetId) => !(changeSetId in scheduleChanges))
     .join(",");
@@ -4567,6 +4594,36 @@ export function ChatView({
     const card = planDrafts.find((draft) => draft.draftId === draftId);
     return card ? documentOf(card) : undefined;
   };
+  /**
+   * What a question's chip opens: a Coach creation in the Workbench, on the
+   * session it names; a calendar session in the workout view; an activity on
+   * its own screen. A day, a week, a plan of the Library and a creation since
+   * removed open nothing.
+   */
+  const refOpener = (ref: PlanRef | ScheduleRef): (() => void) | undefined => {
+    if ("draftId" in ref) {
+      const artifactId = versionIndex.get(ref.draftId)?.artifactId;
+      if (!artifactId) return undefined;
+      const newest = planDrafts.find((card) => {
+        const info = versionIndex.get(card.draftId);
+        return !card.removedAt && info?.artifactId === artifactId && info.latest;
+      });
+      if (!newest) return undefined;
+      const entryId =
+        ref.scope === "session" && ref.sessionKey
+          ? documentForDraft(newest.draftId)?.entries.find((entry) => (entry.workout.key || entry.id) === ref.sessionKey)?.id
+          : undefined;
+      return () => openCreation(newest.draftId, entryId);
+    }
+    const { activityId, day, planId, idInPlan } = ref;
+    if (activityId) return onOpenActivity ? () => onOpenActivity(activityId) : undefined;
+    if (ref.scope !== "session" || !day || !planId || !idInPlan || !api) return undefined;
+    return () =>
+      setViewedWorkout({
+        views: [{ id: "current", label: "", source: { kind: "scheduled", happenDay: day, planId, idInPlan, planProgramId: "" } }],
+        eyebrow: changeDayLabel(day)
+      });
+  };
   /* The one way into a creation's editor, from the card or the canvas. A
      workout's editor needs its steps, which only the document has. */
   const openCreationEditor = async (draftId: string) => {
@@ -4599,9 +4656,10 @@ export function ChatView({
    * Opening a creation on COROS in the canvas asks the plan cache whether
    * COROS has moved on — no request — and brings a newer COROS version in.
    */
-  const openCreation = (draftId: string) => {
+  const openCreation = (draftId: string, entryId?: string) => {
     setPlanPanelOpen(true);
     setOpenCreationId(draftId);
+    setOpenCreationSession(entryId ? { entryId } : null);
     if (!api || !isOnCoros(versionIndex.get(draftId))) return;
     const sessionId = activeSessionIdRef.current;
     void api
@@ -5593,10 +5651,11 @@ export function ChatView({
                 >
                   <span className="chat-asked-kicker">{t("chat.about")}</span>
                   {entry.refs.map((ref) => (
-                    <span key={refKey(ref)} className="chat-ref-chip">
-                      {ref.name}
-                      {ref.scope === "plan" ? "" : ` · ${ref.label}`}
-                    </span>
+                    <RefChip
+                      key={refKey(ref)}
+                      text={`${ref.name}${ref.scope === "plan" ? "" : ` · ${ref.label}`}`}
+                      open={refOpener(ref)}
+                    />
                   ))}
                 </ChatRow>
               );
@@ -5612,9 +5671,7 @@ export function ChatView({
                 >
                   <span className="chat-asked-kicker">{t("chat.about")}</span>
                   {entry.refs.map((ref) => (
-                    <span key={scheduleRefKey(ref)} className="chat-ref-chip">
-                      {ref.label}
-                    </span>
+                    <RefChip key={scheduleRefKey(ref)} text={ref.label} open={refOpener(ref)} />
                   ))}
                 </ChatRow>
               );
@@ -5861,6 +5918,7 @@ export function ChatView({
                       onOpen={() => {
                         openCreation(draft.draftId);
                       }}
+                      onOpenSession={(entryId) => openCreation(draft.draftId, entryId)}
                     />
                   </div>
                 </ChatRow>
@@ -5906,6 +5964,17 @@ export function ChatView({
                       disabled={Boolean(applyingChange) || streaming}
                       onApply={(lineId) => void settleScheduleChange(entry.changeSetId, lineId, true)}
                       onDismiss={(lineId) => void settleScheduleChange(entry.changeSetId, lineId, false)}
+                      onView={
+                        api
+                          ? (line) =>
+                              setViewedWorkout({
+                                views: lineViews(line),
+                                eyebrow: lineViewEyebrow(line),
+                                // What the line would write is the news; the session it replaces is a switch away.
+                                initialView: line.workout ? "proposed" : undefined
+                              })
+                          : undefined
+                      }
                     />
                   </div>
                 </ChatRow>
@@ -6093,6 +6162,7 @@ export function ChatView({
                         timeline={timeline}
                         index={index}
                         onOpen={openCreation}
+                        openerOf={refOpener}
                         sportOf={(ref) =>
                           ref.scope === "session"
                             ? planRefPreview(ref, documentForDraft(ref.draftId), unitSystem).sport
@@ -6206,6 +6276,7 @@ export function ChatView({
             <CoachCanvas
               api={api}
               artifactId={openCreationId}
+              pickedSession={openCreationSession}
               creations={listedCreations}
               cards={planDrafts}
               versionIndex={versionIndex}
@@ -6406,6 +6477,17 @@ export function ChatView({
               setCalendarRead((value) => value + 1);
             }}
             onError={onError}
+          />
+        </Suspense>
+      ) : null}
+      {api && viewedWorkout ? (
+        <Suspense fallback={null}>
+          <WorkoutViewModal
+            api={api}
+            views={viewedWorkout.views}
+            initialView={viewedWorkout.initialView}
+            eyebrow={viewedWorkout.eyebrow}
+            onClose={() => setViewedWorkout(null)}
           />
         </Suspense>
       ) : null}

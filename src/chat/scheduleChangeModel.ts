@@ -10,6 +10,7 @@ import type {
   ScheduleChangeSet,
   ScheduleChangeStatus
 } from "../../electron/types";
+import type { WorkoutView } from "../calendar/WorkoutViewModal";
 import { getIntlLocale, getLocale, messageRecord, plural, screenSentence, t, type MessageKey } from "../i18n/core";
 
 const KNOWN_OPS: ReadonlySet<string> = new Set(["move", "replace", "remove", "add", "deleteWorkout"]);
@@ -199,6 +200,68 @@ export function planOf(label: string, name: string): string {
   if (at < 0) return "";
   const after = /^ \((.+?)\) (?:from|on) /.exec(label.slice(at + name.length + 2));
   return after ? ` (${after[1]})` : "";
+}
+
+/**
+ * What a line can be opened on: the session it acts on, read from the
+ * calendar where it still stands, and the workout it would put there, which
+ * the line itself carries. A session a line has already taken off the
+ * calendar — removed, replaced, or a library workout deleted — has nothing
+ * left to read; a moved one is read on the day it went to.
+ */
+export function lineViews(line: ScheduleChangeLine): WorkoutView[] {
+  if (!canApply(line)) return [];
+  const applied = line.status === "applied";
+  const session = line.session;
+  const onCalendar = (day: string): WorkoutView | undefined =>
+    session
+      ? {
+          id: "current",
+          label: t("chat.change.view.current"),
+          source: {
+            kind: "scheduled",
+            happenDay: day,
+            planId: session.planId,
+            idInPlan: session.idInPlan,
+            planProgramId: session.planProgramId ?? ""
+          }
+        }
+      : undefined;
+  const proposed: WorkoutView | undefined = line.workout
+    ? { id: "proposed", label: t("chat.change.view.proposed"), source: { kind: "proposed", workout: line.workout } }
+    : undefined;
+  const views: (WorkoutView | undefined)[] = [];
+  switch (line.op) {
+    case "move":
+      views.push(session ? onCalendar(applied && line.toDay ? line.toDay : session.happenDay) : undefined);
+      break;
+    case "remove":
+      if (!applied && session) views.push(onCalendar(session.happenDay));
+      break;
+    case "replace":
+      if (!applied && session) views.push(onCalendar(session.happenDay));
+      views.push(proposed);
+      break;
+    case "add":
+      views.push(proposed);
+      break;
+    case "deleteWorkout":
+      if (!applied && line.program) {
+        views.push({ id: "library", label: "", source: { kind: "library", programId: line.program.id } });
+      }
+      break;
+    default:
+      break;
+  }
+  return views.filter((view): view is WorkoutView => Boolean(view));
+}
+
+/** The dialog's line over the name: the day, or the two days of a move. */
+export function lineViewEyebrow(line: ScheduleChangeLine): string | undefined {
+  const from = line.session?.happenDay;
+  if (line.op === "move" && from && line.toDay) return `${changeDayLabel(from)} → ${changeDayLabel(line.toDay)}`;
+  const day = from ?? line.toDay;
+  return day && /^\d{8}$/.test(day) ? changeDayLabel(day) : undefined;
 }
 
 /** The sentences the main process stores as a reason, keyed by their English. */

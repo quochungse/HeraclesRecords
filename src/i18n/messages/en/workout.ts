@@ -331,6 +331,7 @@ const workout = {
   "workout.v.steps": "Steps",
   "workout.v.pool": "{value} {unit} pool",
   "workout.v.loading": "Loading workout",
+  "workout.v.which": "Which workout",
 };
 
 export default workout;

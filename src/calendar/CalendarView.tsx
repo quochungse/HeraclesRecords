@@ -780,7 +780,7 @@ export function CalendarView({
       {viewedProgramId ? (
         <WorkoutViewModal
           api={api}
-          programId={viewedProgramId}
+          views={[{ id: "library", label: "", source: { kind: "library", programId: viewedProgramId } }]}
           onClose={() => setViewedProgramId(null)}
         />
       ) : null}
