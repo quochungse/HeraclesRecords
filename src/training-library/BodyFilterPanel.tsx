@@ -142,9 +142,11 @@ export function BodyFilterPanel({
     return { view, box, width, height: STAGE_HEIGHT, unitsPerPixel: boxWidth / width };
   });
 
-  /* A shape can stand for more than one muscle — the gluteal shape is the
-     glutes' and the abductors' — so it lights for either, and a press on it
-     picks the first of them that has anything to show. */
+  /* A shape lights for any muscle it stands for (each is one muscle today),
+     and a press on it picks the first of them that has anything to show. With
+     the whole part chosen — no muscle within it — every muscle of the part is
+     lit, as the part is at the first step; the one under the pointer stands
+     out of it. */
   const shapeState = (shapeMuscles: readonly MuscleId[]): { live: boolean; className: string; target: string | null } => {
     if (!zoomed) {
       const shapePart = bodyPartOf(shapeMuscles[0]!) ?? null;
@@ -164,9 +166,11 @@ export function BodyFilterPanel({
     return {
       live,
       target,
-      className: muscle !== null && inPart.includes(muscle)
-        ? "is-picked"
-        : hover !== null && inPart.includes(hover as MuscleId) ? "is-hover" : live ? "is-live" : "is-dead"
+      className: hover !== null && inPart.includes(hover as MuscleId) && !(muscle !== null && inPart.includes(muscle))
+        ? "is-hover"
+        : muscle === null || inPart.includes(muscle)
+          ? "is-picked"
+          : live ? "is-live" : "is-dead"
     };
   };
 

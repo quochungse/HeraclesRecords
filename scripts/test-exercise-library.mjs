@@ -32,8 +32,12 @@ for (const view of ["front", "back"]) {
 const near = (actual, expected, label) =>
   actual.forEach((value, index) => assert.ok(Math.abs(value - expected[index]) <= 2, `${label}: ${actual} vs ${expected}`));
 near(figure.muscleBounds("front", "chest"), [251, 316, 476, 438], "chest");
-near(figure.muscleBounds("back", "glutes"), [974, 629, 1194, 780], "glutes");
-near(figure.muscleBounds("back", "abductors"), [979, 614, 1188, 669], "abductors: the wedges above the buttocks");
+near(figure.muscleBounds("back", "glutes"), [981, 636, 1186, 778], "glutes");
+near(figure.muscleBounds("back", "abductors"), [960, 619, 1207, 732], "abductors: down the sides of the hips");
+const abductors = figure.muscleBounds("back", "abductors");
+const glutesBox = figure.muscleBounds("back", "glutes");
+assert.ok(abductors[0] < glutesBox[0] && abductors[2] > glutesBox[2], "outside the buttocks on both sides");
+assert.ok(abductors[3] > 720, "and down to the top of the thigh, not only above the buttocks");
 assert.equal(figure.muscleBounds("front", "lats"), null, "the lats have no shape on the front");
 
 // A zoom keeps the aspect it is drawn at, and holds what it frames.
@@ -149,6 +153,17 @@ assert.ok(corosSquat.loads.quads > corosSquat.loads.hamstrings && corosSquat.loa
 const lsit = coros("T1161", "The L Sit", [14], [6, 7], [1]);
 assert.equal(lsit.loads.glutes, undefined);
 assert.ok(lsit.loads.abs > lsit.loads.quads);
+// The review is keyed by COROS's own keys, and a muscle is set in one of its
+// two muscle tables for a movement, never both, or one would win in silence.
+const review = await load("src", "calendar", "exerciseReview.ts");
+for (const key of Object.keys(review.EXERCISE_REVIEW)) assert.match(key, /^T\d{4}$/, key);
+const { uncoded, corrections } = review.REVIEW_MUSCLE_TABLES;
+for (const [key, muscles] of Object.entries(uncoded)) {
+  for (const muscle of Object.keys(muscles)) {
+    assert.equal(corrections[key]?.[muscle], undefined, `${key} sets ${muscle} in both tables`);
+  }
+}
+
 // Only a movement that is not COROS's is read off its name.
 const own = facets.optionFacets(option("own", "Russian Twist", [], []), "Russian Twist");
 assert.ok(own.loads.obliques > 0, "an athlete's own movement has only its name to go on");
@@ -171,12 +186,13 @@ assert.deepEqual(coros("T1370", "Wrist Roller", [5], [], [16]).equipment, ["othe
 const walk = facets.optionFacets(option("walk", "Lateral Band Walks", [10], [14], [9]), "Lateral Band Walks");
 assert.ok(walk.loads.abductors > walk.loads.glutes);
 assert.ok(walk.bodyParts.includes("legs"));
-// The abductors are the gluteus medius wedge, split off the package's gluteal
-// shape, so a pick of one does not light the other.
+// The abductors are a shape of their own, down the side of the hip, so a pick
+// of one does not light the other.
 assert.equal(figure.MUSCLE_SLUG.abductors, "gluteus-medius");
-assert.deepEqual(figure.SLUG_MUSCLES.gluteal, ["glutes"]);
-assert.deepEqual(figure.SLUG_MUSCLES["gluteus-medius"], ["abductors"]);
-assert.equal(shapes.BODY_SHAPES.back["gluteus-medius"].length, 2, "a wedge each side");
+assert.equal(figure.SLUG_MUSCLE["gluteus-medius"], "abductors");
+assert.equal(shapes.BODY_SHAPES.back["gluteus-medius"].length, 2, "a band each side");
+assert.equal(Object.keys(figure.SLUG_MUSCLE).length, Object.keys(figure.MUSCLE_SLUG).length,
+  "every muscle has a shape of its own, so a shape picks one muscle");
 
 // One library: the HYROX stations are the catalog rows COROS gives an
 // exerciseKind of 1–8, and alone they are listed in race order.

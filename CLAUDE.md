@@ -932,7 +932,8 @@ lives at module level for the same visit-to-visit reason — see `useCalendarDat
   (a region, never a sliver like the forearm), then the part zooms in (`zoomViewBox` in
   `src/calendar/bodyFigure.ts`, the arms framed on one side) and its *muscles* are picked,
   each shape widened by an invisible stroke; the names beside the figure are full-height rows
-  with counts and are the keyboard's way in — and the equipment, a `SelectDropdown` drawn with
+  with counts and are the keyboard's way in, headed by "Whole <part>", which lights every
+  muscle of the part — and the equipment, a `SelectDropdown` drawn with
   the picker's `EquipmentGlyph`. Everything said about a movement comes from the picker's own
   `optionFacets` (`exerciseLibraryModel.ts`): its shares of the work, its body parts, its
   equipment and its effort (`exerciseEffort.ts`), and a chosen part or muscle orders the list
@@ -955,9 +956,12 @@ lives at module level for the same visit-to-visit reason — see `useCalendarDat
   off its name, and one COROS adds later is as COROS sends it until it is reviewed.
   `ExerciseEquipment` is the coach's search vocabulary plus plates, hangboard, rower and
   COROS's "Others". **The abductors are a muscle of their own** (COROS's 10, Hevy's
-  `abductors`), in Legs — the gluteus medius and the tensor fasciae latae. In 2D they are the
-  wedge the package draws above each buttock inside its gluteal slug, split out by
-  `body-shapes:fetch` as `gluteus-medius`; on the Strength screen's 3D figure they are the
+  `abductors`), in Legs — the gluteus medius and the tensor fasciae latae. In 2D they are
+  `gluteus-medius`, **drawn for this app** in `body-shapes:fetch` (`ABDUCTOR_PATHS`): the
+  package only had a wedge above each buttock, which read as an upper buttock, so the band runs
+  from it round the outside of the buttock and down the hip, and the maximus
+  (`GLUTEUS_MAXIMUS_PATHS`) is the package's drawn in 5 units down the hip to make the room;
+  on the Strength screen's 3D figure they are the
   two muscles the bake had put in the glutes, split off by their range in `hero.json` (the
   range falls between muscles, which `test:anatomy-assets` checks).
   **The catalog row's default target and rest are
