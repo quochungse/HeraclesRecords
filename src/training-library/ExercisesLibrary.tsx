@@ -1,17 +1,19 @@
 /**
  * The Exercises Library tab: COROS's own movement catalog, to read.
  *
- * Only the two sports COROS keeps a catalog of movements for are here —
- * Strength and Hybrid Fitness. A run or a ride is built from warm-up, training
- * and cool-down steps, which are not exercises, so they are left out rather
- * than listed as four rows each.
+ * It is one library, not one per sport. COROS keeps a single catalog of
+ * movements, the Strength one: Hybrid Fitness has none of its own and builds
+ * its workouts from that same list, so a tab per sport showed the same 382
+ * movements twice. The eight HYROX stations are a filter instead, listed in
+ * race order. A run or a ride is built from warm-up, training and cool-down
+ * steps, which are not exercises, so they are not here at all.
  *
  * Two cards, the list and the movement open beside it, rather than the
  * Workouts tab's single split panel: this is a place to read, and nothing
  * docks under the reader. The list narrows by two filters, not three lists —
  * the body (a part, then a muscle within it: `BodyFilterPanel`) and the
  * equipment, drawn with the pictures the exercise picker already uses — plus
- * a search and the athlete's favourites.
+ * a search, the HYROX stations and the athlete's favourites.
  *
  * What the reader says about a movement is what the app can stand behind:
  * the clip COROS ships, where the work lands (the picker's own `optionFacets`
@@ -27,7 +29,6 @@
 import { ChevronDown, Heart, LayoutGrid, LoaderCircle } from "lucide-react";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import type { WorkoutExerciseOption } from "../../electron/types";
-import { OptionGroup } from "../components/OptionGroup";
 import { SelectDropdown } from "../components/SelectDropdown";
 import { BodyGlyph, EquipmentGlyph } from "../calendar/ExerciseFacetGlyph";
 import { ExercisePreview } from "../calendar/ExercisePreview";
@@ -44,18 +45,12 @@ import {
 import { useWorkoutExerciseCatalog } from "../calendar/useWorkoutExerciseCatalog";
 import { workoutSportView } from "../calendar/workoutSportIcons";
 import type { HeraclesRecordsApi } from "../heraclesrecords-api";
-import {
-  defineSelectionPreference,
-  selectionIsOneOf,
-  useSelectionPreference
-} from "../preferences/selectionPreferences";
 import type { MuscleId } from "../strength/muscles";
 import { resolveExerciseName } from "../training/exerciseNames";
 import { workoutSportLabel } from "../training/workoutSport";
 import { BodyFilterPanel } from "./BodyFilterPanel";
 import { CollapsibleSearch } from "./LibrarySearch";
 import {
-  EXERCISE_LIBRARY_SPORTS,
   bodyCounts,
   effortStep,
   equipmentCounts,
@@ -64,18 +59,14 @@ import {
   narrowExercises,
   pickMuscle,
   type ExerciseLibraryFilter,
-  type ExerciseLibrarySport,
   type LibraryExercise
 } from "./exerciseLibraryModel";
 import { sportAccentStyle, sportTheme } from "./sportTheme";
 import { getIntlLocale, plural, t } from "../i18n/core";
 import { useI18n } from "../i18n/useI18n";
 
-const EXERCISE_SPORT_PREFERENCE = defineSelectionPreference<ExerciseLibrarySport>({
-  key: "trainingLibrary.exerciseSport",
-  defaultValue: "strength",
-  validate: selectionIsOneOf(EXERCISE_LIBRARY_SPORTS)
-});
+/** The one catalog COROS keeps, Hybrid Fitness's included. */
+const CATALOG_SPORT = "strength";
 
 const FAVORITES_TABLE = "exercise_library_favorites";
 const ANY_EQUIPMENT = "any";
@@ -106,11 +97,11 @@ export function ExercisesLibrary({
   onError: (message: string | null) => void;
 }) {
   const { locale } = useI18n();
-  const [sport, setSport] = useSelectionPreference(EXERCISE_SPORT_PREFERENCE);
-  const catalog = useWorkoutExerciseCatalog(api, sport);
+  const catalog = useWorkoutExerciseCatalog(api, CATALOG_SPORT);
   const [favorites, setFavorites] = useState<ReadonlySet<string>>(new Set());
   const [query, setQuery] = useState("");
   const [favoritesOnly, setFavoritesOnly] = useState(false);
+  const [hyroxOnly, setHyroxOnly] = useState(false);
   const [equipment, setEquipment] = useState<ExerciseEquipment | null>(null);
   const [part, setPart] = useState<ExerciseBodyPartId | null>(null);
   const [muscle, setMuscle] = useState<MuscleId | null>(null);
@@ -133,49 +124,45 @@ export function ExercisesLibrary({
     });
   }, [api, loadFavorites]);
 
-  /* A new sport is a new catalog: what narrowed the last one means nothing here. */
-  const chooseSport = (next: ExerciseLibrarySport) => {
-    setSport(next);
-    setEquipment(null);
-    setPart(null);
-    setMuscle(null);
-    setSelectedId(null);
-    setBodyOpen(false);
-  };
-
   const rows = useMemo(
     () => libraryExercises(catalog.options, exerciseLabel, getIntlLocale()),
     // The names are read in the language on screen, so a switch re-reads them.
     [catalog.options, locale]
   );
 
-  const filter: ExerciseLibraryFilter = { query, favoritesOnly, favorites, equipment, part, muscle };
+  const filter: ExerciseLibraryFilter = { query, favoritesOnly, favorites, hyroxOnly, equipment, part, muscle };
   const shown = useMemo(
     () => narrowExercises(rows, filter),
     // `filter` is rebuilt every render; these are what it is made of.
-    [rows, query, favoritesOnly, favorites, equipment, part, muscle]
+    [rows, query, favoritesOnly, favorites, hyroxOnly, equipment, part, muscle]
   );
   const counts = useMemo(
     () => bodyCounts(rows, filter),
-    [rows, query, favoritesOnly, favorites, equipment]
+    [rows, query, favoritesOnly, favorites, hyroxOnly, equipment]
   );
   const equipmentOptions = useMemo(
     () => equipmentCounts(rows, filter),
-    [rows, query, favoritesOnly, favorites, part, muscle]
+    [rows, query, favoritesOnly, favorites, hyroxOnly, part, muscle]
   );
 
   const selected = shown.find((row) => row.id === selectedId) ?? shown[0] ?? null;
 
+  /* The heart moves at once and goes back only for the movement that failed:
+     taking back the whole set as it was would undo a second heart pressed
+     while the first was still on its way. */
   const toggleFavorite = async (exercise: LibraryExercise) => {
     const keep = !favorites.has(exercise.id);
-    const next = new Set(favorites);
-    if (keep) next.add(exercise.id);
-    else next.delete(exercise.id);
-    setFavorites(next);
+    const mark = (kept: boolean) => setFavorites((current) => {
+      const next = new Set(current);
+      if (kept) next.add(exercise.id);
+      else next.delete(exercise.id);
+      return next;
+    });
+    mark(keep);
     try {
-      await api.setExerciseFavorite(exercise.id, sport, keep);
+      await api.setExerciseFavorite(exercise.id, CATALOG_SPORT, keep);
     } catch (cause) {
-      setFavorites(favorites);
+      mark(!keep);
       onError(cause instanceof Error ? cause.message : String(cause));
     }
   };
@@ -183,6 +170,7 @@ export function ExercisesLibrary({
   const clearFilters = () => {
     setQuery("");
     setFavoritesOnly(false);
+    setHyroxOnly(false);
     setEquipment(null);
     setPart(null);
     setMuscle(null);
@@ -235,23 +223,13 @@ export function ExercisesLibrary({
     }))
   ];
 
-  const filtering = Boolean(query || favoritesOnly || equipment || part || muscle);
+  const filtering = Boolean(query || favoritesOnly || hyroxOnly || equipment || part || muscle);
+  const HyroxIcon = sportTheme("hyrox").icon;
 
   return (
-    <div className="tl-exercises" ref={boxRef} style={sportAccentStyle(sport)}>
+    <div className="tl-exercises" ref={boxRef} style={sportAccentStyle(CATALOG_SPORT)}>
       <section className="tl-panel tl-exercise-list" aria-label={t("library.section.exercises")}>
         <div className="tl-exercise-filters">
-          <OptionGroup
-            label={t("library.x.sport")}
-            size="md"
-            fill
-            value={sport}
-            options={EXERCISE_LIBRARY_SPORTS.map((value) => {
-              const Icon = sportTheme(value).icon;
-              return { value, label: workoutSportLabel(value), icon: <Icon size={14} aria-hidden="true" /> };
-            })}
-            onChange={chooseSport}
-          />
           <div className="tl-exercise-filter-pair">
             <button
               ref={bodyTriggerRef}
@@ -298,6 +276,19 @@ export function ExercisesLibrary({
             </span>
             <div className="tl-filters-tail">
               <CollapsibleSearch value={query} onChange={setQuery} label={t("library.x.search")} />
+              <button
+                type="button"
+                className={`tl-exercise-favorites tl-exercise-hyrox${hyroxOnly ? " is-active" : ""}`}
+                aria-pressed={hyroxOnly}
+                title={t("library.x.hyroxOnly")}
+                onClick={() => {
+                  setHyroxOnly((current) => !current);
+                  setSelectedId(null);
+                }}
+              >
+                <HyroxIcon size={14} aria-hidden="true" />
+                {t("library.x.hyrox")}
+              </button>
               <button
                 type="button"
                 className={`tl-exercise-favorites${favoritesOnly ? " is-active" : ""}`}
@@ -356,7 +347,6 @@ export function ExercisesLibrary({
           <ExerciseReader
             key={selected.id}
             exercise={selected}
-            sport={sport}
             favorite={favorites.has(selected.id)}
             onToggleFavorite={() => void toggleFavorite(selected)}
           />
@@ -408,6 +398,9 @@ function ExerciseRow({
   const thumbnail = thumbnailOf(exercise.option);
   const muscles = exercise.primary.map(muscleLabel).join(", ");
   const kit = exercise.facets.equipment.map((entry) => EQUIPMENT_LABELS[entry]).join(", ");
+  const station = exercise.hyroxStation !== undefined
+    ? t("library.x.hyroxStation", { station: exercise.hyroxStation })
+    : "";
   return (
     <li className={`tl-row tl-exercise-row${active ? " is-active" : ""}`} onClick={onOpen}>
       <span className="tl-exercise-thumb" aria-hidden="true">
@@ -417,8 +410,8 @@ function ExerciseRow({
         <span className="tl-row-name">
           <span className="tl-row-name-text">{exercise.name}</span>
         </span>
-        {muscles || kit ? (
-          <span className="tl-row-sub">{[muscles, kit].filter(Boolean).join(" · ")}</span>
+        {station || muscles || kit ? (
+          <span className="tl-row-sub">{[station, muscles, kit].filter(Boolean).join(" · ")}</span>
         ) : null}
       </button>
       {/* A slot of its own at the row's end, there or not, so the heart never
@@ -442,15 +435,15 @@ const EFFORT_LABEL_KEYS = {
 
 function ExerciseReader({
   exercise,
-  sport,
   favorite,
   onToggleFavorite
 }: {
   exercise: LibraryExercise;
-  sport: ExerciseLibrarySport;
   favorite: boolean;
   onToggleFavorite: () => void;
 }) {
+  // A station wears Hybrid Fitness's colour and icon, as its workouts do.
+  const sport = exercise.hyroxStation !== undefined ? "hyrox" : CATALOG_SPORT;
   const { category, icon: SportIcon } = workoutSportView(sport);
   const shares = muscleShares(exercise);
   const step = effortStep(exercise);
@@ -468,7 +461,11 @@ function ExerciseReader({
             <div className="sched-hero-title">
               <h2 className="sched-hero-name">{exercise.name}</h2>
               <span className="sched-hero-context">
-                <b>{workoutSportLabel(sport)}</b>
+                <b>
+                  {exercise.hyroxStation !== undefined
+                    ? t("library.x.hyroxStation", { station: exercise.hyroxStation })
+                    : workoutSportLabel(sport)}
+                </b>
                 {exercise.mainPart ? <em className="tl-exercise-chip">{BODY_PART_LABELS[exercise.mainPart]}</em> : null}
                 {kit.map((label) => <em className="tl-exercise-chip" key={label}>{label}</em>)}
               </span>

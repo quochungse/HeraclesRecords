@@ -3,8 +3,11 @@
  * `activityFilters.ts` sits outside `ActivitiesView`: it is the only part a
  * suite can reach.
  *
- * A row is a movement of COROS's own catalog — Strength or Hybrid Fitness,
- * the two sports COROS keeps one for. Everything said about it comes from
+ * A row is a movement of COROS's own catalog. COROS keeps one catalog of
+ * movements, the Strength one: Hybrid Fitness has none of its own (asked
+ * under its sport type, `/training/exercise/query` answers nothing) and its
+ * workouts are built from the Strength catalog, so the library is one list
+ * and the HYROX stations are a filter on it. Everything said about it comes from
  * `optionFacets`, the reading the exercise picker already makes: its muscles
  * and their shares of the work, its body parts, its equipment and how hard
  * it loads what it works. Nothing here reads a figure off the catalog row
@@ -14,6 +17,11 @@
  * Two filters, not three lists: the body, which is one hierarchy — a body
  * part is a roll-up of muscles, so picking a muscle is narrowing a part — and
  * the equipment.
+ *
+ * **A HYROX station is a catalog row with an `exerciseKind` of 1 to 8**, and
+ * the kind is its place in the race: 1 SkiErg, 2 sled push, 3 sled pull,
+ * 4 burpee broad jumps, 5 row, 6 farmers carry, 7 sandbag lunges, 8 wall
+ * balls. Read off the live catalog on 2026-10-22: no other row carries a kind.
  */
 import type { WorkoutExerciseOption } from "../../electron/types";
 import {
@@ -29,9 +37,14 @@ import {
 } from "../calendar/exerciseFacets";
 import type { MuscleId } from "../strength/muscles";
 
-/** The two sports COROS keeps a movement catalog for. */
-export type ExerciseLibrarySport = "strength" | "hyrox";
-export const EXERCISE_LIBRARY_SPORTS: readonly ExerciseLibrarySport[] = ["strength", "hyrox"];
+/** COROS's `exerciseKind` for the last of the eight HYROX stations; the first is 1. */
+const HYROX_STATIONS = 8;
+
+/** The movement's place in a HYROX race, 1–8, or nothing for a movement that is not a station. */
+export function hyroxStation(option: WorkoutExerciseOption): number | undefined {
+  const kind = option.exerciseKind;
+  return kind !== undefined && Number.isInteger(kind) && kind >= 1 && kind <= HYROX_STATIONS ? kind : undefined;
+}
 
 export interface LibraryExercise {
   id: string;
@@ -46,6 +59,8 @@ export interface LibraryExercise {
   mainPart?: ExerciseBodyPartId;
   /** The other parts it works, most first. */
   otherParts: ExerciseBodyPartId[];
+  /** Its place in a HYROX race, when it is one of the eight stations. */
+  hyroxStation?: number;
 }
 
 /**
@@ -74,6 +89,7 @@ function describe(option: WorkoutExerciseOption, name: string): LibraryExercise 
     .sort((left, right) => right[1] - left[1] || EXERCISE_BODY_PARTS.indexOf(left[0]) - EXERCISE_BODY_PARTS.indexOf(right[0]))
     .map(([part]) => part);
 
+  const station = hyroxStation(option);
   return {
     id: option.id,
     name,
@@ -82,7 +98,8 @@ function describe(option: WorkoutExerciseOption, name: string): LibraryExercise 
     primary,
     involved,
     ...(parts[0] ? { mainPart: parts[0] } : {}),
-    otherParts: parts.slice(1)
+    otherParts: parts.slice(1),
+    ...(station !== undefined ? { hyroxStation: station } : {})
   };
 }
 
@@ -112,6 +129,8 @@ export interface ExerciseLibraryFilter {
   query: string;
   favoritesOnly: boolean;
   favorites: ReadonlySet<string>;
+  /** Only the eight HYROX stations. */
+  hyroxOnly: boolean;
   equipment: ExerciseEquipment | null;
   /** A body part, or the part a chosen muscle belongs to. */
   part: ExerciseBodyPartId | null;
@@ -122,6 +141,7 @@ export const NO_EXERCISE_FILTER: ExerciseLibraryFilter = {
   query: "",
   favoritesOnly: false,
   favorites: new Set(),
+  hyroxOnly: false,
   equipment: null,
   part: null,
   muscle: null
@@ -136,6 +156,7 @@ function beforeBody(list: readonly LibraryExercise[], filter: ExerciseLibraryFil
   const term = normalize(filter.query);
   return list.filter((exercise) =>
     (!filter.favoritesOnly || filter.favorites.has(exercise.id))
+    && (!filter.hyroxOnly || exercise.hyroxStation !== undefined)
     && (!filter.equipment || exercise.facets.equipment.includes(filter.equipment))
     && (!term || normalize(exercise.name).includes(term))
   );
@@ -158,7 +179,8 @@ function worksMuscle(exercise: LibraryExercise, muscle: MuscleId): boolean {
  * The rows the filter leaves, in their order: name order, unless a part or a
  * muscle is chosen, which puts the movements that load it hardest first —
  * the picker's own `facetRank`, so the two never disagree about what
- * "shoulders" means. The sort is stable, so equal ranks keep name order.
+ * "shoulders" means. The sort is stable, so equal ranks keep name order. The
+ * HYROX stations alone are in race order, which is how they are known.
  */
 export function narrowExercises(
   list: readonly LibraryExercise[],
@@ -175,6 +197,7 @@ export function narrowExercises(
     const rank = new Map(rows.map((row) => [row, facetRank(row.facets, "bodyPart", part)]));
     return rows.filter((row) => worksPart(row, part)).sort((a, b) => rank.get(b)! - rank.get(a)!);
   }
+  if (filter.hyroxOnly) return rows.sort((a, b) => (a.hyroxStation ?? 0) - (b.hyroxStation ?? 0));
   return rows;
 }
 

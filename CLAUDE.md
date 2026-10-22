@@ -918,9 +918,14 @@ lives at module level for the same visit-to-visit reason — see `useCalendarDat
   read — reintroducing any of these starts there.
   See [docs/training-library-architecture.md](docs/training-library-architecture.md).
   **The Exercises Library** (`ExercisesLibrary.tsx`, built 2026-10-22) is COROS's own
-  movement catalog to read, for the two sports that keep one — Strength and Hybrid Fitness;
-  a run or a ride is built from warm-up and training steps, which are not exercises, so those
-  sports are left out. The tab has **no count**, and it is **two cards at 35/65** (the list and
+  movement catalog to read, **one library with no sport tabs**: COROS keeps one catalog, the
+  Strength one, and Hybrid Fitness has none of its own (asked under its sport type the query
+  answers nothing; `workoutSportTypeForService` reads Strength's for it), so a tab per sport
+  listed the same 382 movements twice. **The HYROX stations are a toggle** — the rows COROS
+  gives an `exerciseKind` of 1–8, which is their place in the race (SkiErg, sled push, sled
+  pull, burpee broad jumps, row, farmers carry, lunges, wall balls), listed in that order and
+  worn in Hybrid Fitness's colour in the reader. A run or a ride is built from warm-up and
+  training steps, which are not exercises, so they are not here. The tab has **no count**, and it is **two cards at 35/65** (the list and
   the movement), not the Workouts tab's split panel; nothing docks under its reader, by
   decision — it is for reading. **Two filters, not three lists**: a body part is a roll-up of
   muscles, so the body is one control (`BodyFilterPanel`) — the whole figure picks a *part*

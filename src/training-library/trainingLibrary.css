@@ -3988,6 +3988,16 @@
   background: var(--accent-soft);
 }
 
+/* The HYROX stations are a toggle like the favourites, with the word beside
+   the icon: a lone flame says nothing about what it narrows to. */
+.tl-exercise-hyrox {
+  width: auto;
+  gap: 5px;
+  padding: 0 10px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
 .tl-exercise-list > .tl-index {
   min-height: 0;
   flex: 1 1 auto;

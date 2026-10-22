@@ -205,7 +205,15 @@ const MUSCLE_CORRECTIONS: Readonly<Record<string, ReviewedMuscles>> = {
   T1205: { biceps: "involved", lats: "involved" }, // Hang With 90 Degree Elbow
   T1206: { biceps: "involved", lats: "involved" }, // Hang With 135 Degree Elbow
   T1329: { traps: "involved" }, // Single Arm Scap Pulls
-  T1336: { traps: "involved" } // Machine Reverse Fly
+  T1336: { traps: "involved" }, // Machine Reverse Fly
+  // The eight HYROX stations, read as the race runs them (the rower is above)
+  T1393: { triceps: "primary", quads: "involved" }, // SkiErg: lats and triceps pull, the legs drop into it
+  T1394: { glutes: "primary", shoulders: "involved", triceps: "involved" }, // Sled push
+  T1395: { forearms: "involved", shoulders: "involved", quads: "involved" }, // Sled pull: hand over hand, legs braced
+  T1396: { glutes: "primary", calves: "involved" }, // Burpee broad jumps
+  T1310: { traps: "primary", obliques: "involved", quads: "involved", glutes: "involved" }, // Farmers carry
+  T1064: { hamstrings: "involved", adductors: "involved" }, // Lunges (sandbag lunges in the race)
+  T1397: { glutes: "primary" } // Wall balls
 };
 
 /** Equipment COROS's codes misfile, replacing them whole. */
@@ -254,15 +262,24 @@ const EQUIPMENT: Readonly<Record<string, readonly ExerciseEquipment[]>> = {
   T1368: ["bodyweight"], // Copenhagen Plank
 
   // A stretch COROS lists no equipment for
-  T1262: ["bodyweight"], // Greatest Stretch
+  T1262: ["bodyweight"] // Greatest Stretch
 };
 
+/** The three tables, joined per movement. */
 export const EXERCISE_REVIEW: Readonly<Record<string, ExerciseReview>> = Object.fromEntries(
   [...new Set([...Object.keys(UNCODED_MUSCLES), ...Object.keys(MUSCLE_CORRECTIONS), ...Object.keys(EQUIPMENT)])]
     .map((key): [string, ExerciseReview] => {
-      const muscles = UNCODED_MUSCLES[key] || MUSCLE_CORRECTIONS[key]
-        ? { ...UNCODED_MUSCLES[key], ...MUSCLE_CORRECTIONS[key] }
-        : undefined;
-      return [key, { ...(muscles ? { muscles } : {}), ...(EQUIPMENT[key] ? { equipment: EQUIPMENT[key] } : {}) }];
+      const muscles = { ...UNCODED_MUSCLES[key], ...MUSCLE_CORRECTIONS[key] };
+      const equipment = EQUIPMENT[key];
+      return [key, {
+        ...(Object.keys(muscles).length ? { muscles } : {}),
+        ...(equipment ? { equipment } : {})
+      }];
     })
 );
+
+/**
+ * The two muscle tables, for a suite to hold apart: a muscle set in both for
+ * one movement would have the correction win in silence.
+ */
+export const REVIEW_MUSCLE_TABLES = { uncoded: UNCODED_MUSCLES, corrections: MUSCLE_CORRECTIONS } as const;

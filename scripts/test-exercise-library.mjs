@@ -174,6 +174,20 @@ assert.equal(figure.MUSCLE_SLUG.abductors, "gluteal");
 assert.equal(figure.SLUG_MUSCLE.gluteal, "glutes", "the shape is still the glutes' first");
 assert.deepEqual(figure.SLUG_MUSCLES.gluteal, ["glutes", "abductors"]);
 
+// One library: the HYROX stations are the catalog rows COROS gives an
+// exerciseKind of 1–8, and alone they are listed in race order.
+const stations = model.libraryExercises([
+  option("wall", "Wallballs", [7], [], [10], { exerciseKind: 8 }),
+  option("ski", "Skierg", [12], [], [16], { exerciseKind: 1 }),
+  option("press", "Bench Press", [2], [], [3]),
+  option("odd", "Odd", [2], [], [3], { exerciseKind: 12 })
+], (entry) => entry.name, "en");
+const race = model.narrowExercises(stations, { ...model.NO_EXERCISE_FILTER, hyroxOnly: true });
+assert.deepEqual(race.map((row) => row.id), ["ski", "wall"]);
+assert.equal(race[1].hyroxStation, 8);
+assert.equal(model.narrowExercises(stations, model.NO_EXERCISE_FILTER).length, 4, "off, every movement is there");
+assert.equal(model.bodyCounts(stations, { ...model.NO_EXERCISE_FILTER, hyroxOnly: true }).total, 2);
+
 // Picking a muscle carries its part; picking it again steps back to the part.
 assert.deepEqual(model.pickMuscle({ part: null, muscle: null }, "glutes"), { part: "legs", muscle: "glutes" });
 assert.deepEqual(model.pickMuscle({ part: "legs", muscle: "glutes" }, "glutes"), { part: "legs", muscle: null });
