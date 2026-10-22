@@ -955,8 +955,11 @@ lives at module level for the same visit-to-visit reason — see `useCalendarDat
   off its name, and one COROS adds later is as COROS sends it until it is reviewed.
   `ExerciseEquipment` is the coach's search vocabulary plus plates, hangboard, rower and
   COROS's "Others". **The abductors are a muscle of their own** (COROS's 10, Hevy's
-  `abductors`), in Legs; the 2D artwork has no shape for them, so they are drawn on the
-  gluteal shape (`SLUG_MUSCLES`), and the Strength screen's 3D figure has no mesh for them.
+  `abductors`), in Legs — the gluteus medius and the tensor fasciae latae. In 2D they are the
+  wedge the package draws above each buttock inside its gluteal slug, split out by
+  `body-shapes:fetch` as `gluteus-medius`; on the Strength screen's 3D figure they are the
+  two muscles the bake had put in the glutes, split off by their range in `hero.json` (the
+  range falls between muscles, which `test:anatomy-assets` checks).
   **The catalog row's default target and rest are
   not shown** — they are where a builder step starts, not facts about the movement. Favourites
   are rows of `exercise_library_favorites` (`personal`, keyed by COROS's catalog id; a heart

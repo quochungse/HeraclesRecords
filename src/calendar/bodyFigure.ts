@@ -11,15 +11,16 @@ import type { MuscleId } from "../strength/muscles";
 import { BODY_SHAPES, BODY_VIEW_BOX, type BodyView } from "./bodyShapes";
 
 /**
- * This app's sixteen muscles against the artwork's own slugs.
+ * This app's seventeen muscles against the artwork's own slugs.
  *
  * It is not one-to-one by name: the package calls the lats "upper-back" and
  * the hamstrings "hamstring", and it has no separate shape for the traps on
  * the front. A muscle with no slug at all would simply draw the bare figure,
  * which is why the map is exhaustive rather than partial.
  *
- * The artwork has no abductor of its own — gluteus medius sits under the
- * gluteal shape — so the abductors are drawn on the glutes' shape.
+ * The abductors are the gluteus medius, the wedge above and outside each
+ * buttock that the package draws inside its gluteal slug; `bodyShapes.ts`
+ * splits it out as `gluteus-medius`, so the two are picked and lit apart.
  */
 export const MUSCLE_SLUG: Readonly<Record<MuscleId, string>> = {
   neck: "neck",
@@ -37,13 +38,14 @@ export const MUSCLE_SLUG: Readonly<Record<MuscleId, string>> = {
   quads: "quadriceps",
   hamstrings: "hamstring",
   adductors: "adductors",
-  abductors: "gluteal",
+  abductors: "gluteus-medius",
   calves: "calves"
 };
 
 /**
  * Every muscle each of the artwork's slugs is drawn for, the one it is named
- * after first: the gluteal shape is the glutes' and the abductors'.
+ * after first. Each slug is one muscle today; a list keeps a shape that ever
+ * stands for two from being picked as only one of them.
  */
 export const SLUG_MUSCLES: Readonly<Record<string, readonly MuscleId[]>> = (() => {
   const bySlug: Record<string, MuscleId[]> = {};

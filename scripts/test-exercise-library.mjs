@@ -28,11 +28,12 @@ for (const view of ["front", "back"]) {
   }
 }
 
-// Boxes read off the artwork by hand: the chest on the front, the glutes on the back.
+// Boxes read off the artwork by hand: the chest on the front, the glutes and abductors on the back.
 const near = (actual, expected, label) =>
   actual.forEach((value, index) => assert.ok(Math.abs(value - expected[index]) <= 2, `${label}: ${actual} vs ${expected}`));
 near(figure.muscleBounds("front", "chest"), [251, 316, 476, 438], "chest");
-near(figure.muscleBounds("back", "glutes"), [974, 614, 1194, 780], "glutes");
+near(figure.muscleBounds("back", "glutes"), [974, 629, 1194, 780], "glutes");
+near(figure.muscleBounds("back", "abductors"), [979, 614, 1188, 669], "abductors: the wedges above the buttocks");
 assert.equal(figure.muscleBounds("front", "lats"), null, "the lats have no shape on the front");
 
 // A zoom keeps the aspect it is drawn at, and holds what it frames.
@@ -166,13 +167,16 @@ assert.deepEqual(coros("T1036", "Machine Crunches", [6], [], [6]).equipment, ["m
 // "Others" is what is left when nothing else is named.
 assert.deepEqual(coros("T9998", "Thing", [6], [], [16, 1]).equipment, ["bodyweight"]);
 assert.deepEqual(coros("T1370", "Wrist Roller", [5], [], [16]).equipment, ["other"]);
-// COROS's 10 is the abductors, a muscle of the legs drawn on the glutes' shape.
+// COROS's 10 is the abductors, a muscle of the legs.
 const walk = facets.optionFacets(option("walk", "Lateral Band Walks", [10], [14], [9]), "Lateral Band Walks");
 assert.ok(walk.loads.abductors > walk.loads.glutes);
 assert.ok(walk.bodyParts.includes("legs"));
-assert.equal(figure.MUSCLE_SLUG.abductors, "gluteal");
-assert.equal(figure.SLUG_MUSCLE.gluteal, "glutes", "the shape is still the glutes' first");
-assert.deepEqual(figure.SLUG_MUSCLES.gluteal, ["glutes", "abductors"]);
+// The abductors are the gluteus medius wedge, split off the package's gluteal
+// shape, so a pick of one does not light the other.
+assert.equal(figure.MUSCLE_SLUG.abductors, "gluteus-medius");
+assert.deepEqual(figure.SLUG_MUSCLES.gluteal, ["glutes"]);
+assert.deepEqual(figure.SLUG_MUSCLES["gluteus-medius"], ["abductors"]);
+assert.equal(shapes.BODY_SHAPES.back["gluteus-medius"].length, 2, "a wedge each side");
 
 // One library: the HYROX stations are the catalog rows COROS gives an
 // exerciseKind of 1–8, and alone they are listed in race order.

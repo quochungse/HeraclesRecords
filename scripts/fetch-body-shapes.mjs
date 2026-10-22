@@ -103,6 +103,26 @@ try {
   };
 
   const shapes = { front: shapesOf(front), back: shapesOf(back) };
+
+  /*
+   * The package's gluteal slug is two muscles: each side draws the gluteus
+   * maximus (the buttock) and, above and outside it, a small wedge that is the
+   * gluteus medius — the hip abductor. They are split so the abductors are a
+   * shape of their own; the wedge is the shorter path of each side.
+   */
+  const gluteal = back.find((entry) => entry.slug === "gluteal");
+  const medius = [];
+  const maximus = [];
+  for (const side of ["left", "right"]) {
+    const paths = gluteal?.path?.[side] ?? [];
+    if (paths.length !== 2) throw new Error(`the ${side} gluteal is no longer two paths`);
+    const [wedge, buttock] = [...paths].sort((a, b) => a.length - b.length);
+    medius.push(wedge);
+    maximus.push(buttock);
+  }
+  shapes.back = Object.fromEntries(Object.entries(shapes.back).flatMap(([slug, paths]) =>
+    slug === "gluteal" ? [["gluteal", maximus], ["gluteus-medius", medius]] : [[slug, paths]]
+  ));
   const missing = WANTED.filter(
     (slug) => !shapes.front[slug] && !shapes.back[slug]
   );
@@ -118,10 +138,12 @@ try {
  * Taken from ${PACKAGE}@${VERSION}, which is not a dependency of this
  * project: the paths are copied in so the app builds and runs with no network,
  * the same reason the three typefaces are committed under src/assets/fonts.
- * Only the sixteen muscle groups this app files exercises under are kept, plus
+ * Only the muscle groups this app files exercises under are kept, plus
  * the body outline for each view — the figure is that outline filled solid
  * with one group lit on top, so the package's other slugs (hands, knees, hair)
- * would be bytes nothing paints.
+ * would be bytes nothing paints. The gluteal slug is split in two: the
+ * gluteus maximus keeps it, and the gluteus medius above it (the abductors)
+ * is \`gluteus-medius\`.
  *
  * Upstream: https://github.com/HichamELBSI/react-native-body-highlighter
  *
