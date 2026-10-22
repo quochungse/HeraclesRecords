@@ -330,6 +330,7 @@ const workout: WorkoutMessages = {
   "workout.v.steps": "Schritte",
   "workout.v.pool": "{value}-{unit}-Becken",
   "workout.v.loading": "Workout wird geladen",
+  "workout.v.which": "Welches Workout",
 };
 
 export default workout;

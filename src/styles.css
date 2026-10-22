@@ -13690,6 +13690,208 @@ td span {
   justify-content: flex-end;
 }
 
+/* Plan usage, at the footer's start: quiet beside Done, for the providers
+   whose limits can be read. */
+.coach-sheet-usage-link { margin-right: auto; }
+
+/* The usage dialog stands over the AI sheet, narrower, in the same frame. */
+.plan-generator-sheet.provider-usage { width: min(400px, 100%); }
+
+.provider-usage > header { align-items: center; }
+.provider-usage > header .icon-button + .icon-button { margin-left: -8px; }
+
+.provider-usage .provider-usage-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  min-height: 18px;
+}
+
+.provider-usage-plan {
+  padding: 2px 7px;
+  border-radius: var(--radius-pill);
+  color: var(--accent-strong);
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+.provider-usage-body { gap: 18px; }
+.provider-usage-body > .tl-eyebrow:not(:first-child) { margin-top: 0; }
+
+.provider-usage-group {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.provider-usage-meter {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  --usage-fill: var(--accent);
+}
+
+.provider-usage-meter.is-high { --usage-fill: var(--warning-text); }
+.provider-usage-meter.is-critical { --usage-fill: var(--error-text); }
+
+.provider-usage-meter-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  color: var(--text-secondary);
+  font-size: 12px;
+  line-height: 1.3;
+}
+
+.provider-usage-figure {
+  color: var(--text-primary);
+  font-family: var(--font-display);
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+}
+
+.provider-usage-meter.is-high .provider-usage-figure,
+.provider-usage-meter.is-critical .provider-usage-figure { color: var(--usage-fill); }
+
+.provider-usage-track {
+  position: relative;
+  height: 6px;
+  overflow: hidden;
+  border-radius: var(--radius-pill);
+  background: var(--tl-rule-soft);
+}
+
+.provider-usage-track > span {
+  position: absolute;
+  inset: 0 auto 0 0;
+  border-radius: inherit;
+  background: var(--usage-fill);
+  transition: width var(--dur-base) var(--ease);
+}
+
+.provider-usage-reset {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 11px;
+  line-height: 1.3;
+  font-variant-numeric: tabular-nums;
+}
+
+.provider-usage-shares {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.provider-usage-shares > li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 96px 40px;
+  align-items: center;
+  gap: 10px;
+  color: var(--text-secondary);
+  font-size: 12px;
+  line-height: 1.3;
+}
+
+.provider-usage-share-track {
+  position: relative;
+  height: 4px;
+  overflow: hidden;
+  border-radius: var(--radius-pill);
+  background: var(--tl-rule-soft);
+}
+
+.provider-usage-share-track > span {
+  position: absolute;
+  inset: 0 auto 0 0;
+  border-radius: inherit;
+  background: color-mix(in srgb, var(--accent) 70%, transparent);
+}
+
+.provider-usage-figure-small {
+  color: var(--text-primary);
+  font-size: 12px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.provider-usage-line {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--tl-rule-soft);
+  color: var(--text-secondary);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.provider-usage-line > span:last-child { color: var(--text-primary); text-align: right; }
+
+.provider-usage-footnote {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.provider-usage-reached { grid-template-columns: auto 1fr; }
+
+/* ChatGPT's one or two windows, side by side, each figure large. */
+.provider-usage-tiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 10px;
+}
+
+.provider-usage-tile {
+  gap: 8px;
+  padding: 12px 14px 13px;
+  border: 1px solid var(--tl-rule);
+  border-radius: var(--radius-sm);
+  background: var(--glass-bg);
+}
+
+.provider-usage-tile-figure {
+  margin: 0 0 2px;
+  color: var(--text-primary);
+  font-family: var(--font-display);
+  font-size: 28px;
+  font-weight: 500;
+  letter-spacing: -0.02em;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+.provider-usage-tile.is-high .provider-usage-tile-figure,
+.provider-usage-tile.is-critical .provider-usage-tile-figure { color: var(--usage-fill); }
+
+/* The first read's outline: two meters, so nothing moves when it lands. */
+.provider-usage-skeleton {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.provider-usage-skeleton .provider-usage-meter-head > span {
+  width: 96px;
+  height: 10px;
+  border-radius: var(--radius-xs);
+  background: var(--tl-rule-soft);
+}
+
+.provider-usage-skeleton .provider-usage-meter-head > span:last-child { width: 48px; }
+
 /* The composer's AI: one chip saying which AI answers, opening the sheet
    that changes it. */
 .chat-ai-chip {
@@ -14517,7 +14719,8 @@ td span {
   font-size: 11px;
 }
 
-.chat-refs-row .chat-ref-chip:not(:last-of-type)::after {
+/* Between chips only: a chip may be a button now, and so is the way back after them. */
+.chat-refs-row .chat-ref-chip:has(+ .chat-ref-chip)::after {
   color: var(--text-muted);
   content: ",";
 }
@@ -14635,6 +14838,28 @@ td span {
   color: var(--text-secondary);
   font-size: 12px;
   line-height: 1.3;
+}
+
+/* A chip that opens what it names. */
+.chat-ref-chip.is-open {
+  border: 0;
+  font-family: inherit;
+  cursor: pointer;
+  text-decoration-color: transparent;
+  text-underline-offset: 2px;
+  transition: text-decoration-color var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease);
+}
+
+.chat-ref-chip.is-open:hover {
+  color: var(--text-primary);
+  text-decoration-line: underline;
+  text-decoration-color: currentColor;
+}
+
+.chat-ref-chip.is-open:focus-visible {
+  --focus-ring-color: var(--chat-signal);
+  outline: var(--focus-ring);
+  outline-offset: 2px;
 }
 
 .chat-ref-remove {
@@ -14802,12 +15027,42 @@ td span {
   line-height: 1.2;
 }
 
-.chat-creation-days span {
+.chat-creation-days span,
+.chat-creation-session {
   padding-left: 5px;
   border-left: 3px solid var(--tl-sport, var(--chat-signal));
   font-size: 11px;
   line-height: 1.3;
   overflow-wrap: anywhere;
+}
+
+/* A session of the strip opens the Workbench on it. */
+.chat-creation-session {
+  padding-block: 0;
+  padding-right: 0;
+  border-block: 0;
+  border-right: 0;
+  border-radius: 0;
+  background: none;
+  color: var(--text-primary);
+  font-family: inherit;
+  font-weight: 400;
+  text-align: left;
+  cursor: pointer;
+  text-decoration-color: transparent;
+  text-underline-offset: 2px;
+  transition: text-decoration-color var(--dur-fast) var(--ease);
+}
+
+.chat-creation-session:hover {
+  text-decoration-line: underline;
+  text-decoration-color: currentColor;
+}
+
+.chat-creation-session:focus-visible {
+  --focus-ring-color: var(--chat-signal);
+  outline: var(--focus-ring);
+  outline-offset: 2px;
 }
 
 .chat-creation-days > li.is-rest span {
@@ -16152,6 +16407,31 @@ td span {
   font-size: 13px;
   line-height: 1.3;
   overflow-wrap: anywhere;
+}
+
+/* A line's words open it, as a title does elsewhere. */
+.chat-change-line-open {
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+  text-decoration-color: transparent;
+  text-underline-offset: 3px;
+  transition: text-decoration-color var(--dur-fast) var(--ease);
+}
+
+.chat-change-line-open:hover {
+  text-decoration-line: underline;
+  text-decoration-color: currentColor;
+}
+
+.chat-change-line-open:focus-visible {
+  --focus-ring-color: var(--chat-signal);
+  outline: var(--focus-ring);
+  outline-offset: 2px;
 }
 
 .chat-change-line-status {
@@ -23070,6 +23350,34 @@ td span {
 .calendar-library-modal .icon-button:hover {
   background: var(--glass-bg-hover);
   color: var(--text-primary);
+}
+
+/* A workout view's names, one cell: the hidden ones keep their room, so a
+   longer name wrapping does not move the dialog on a switch. */
+.workout-view-stack {
+  display: grid;
+}
+
+.workout-view-stack > * {
+  grid-area: 1 / 1;
+  min-width: 0;
+}
+
+.workout-view-stack > [data-shown="false"] {
+  visibility: hidden;
+}
+
+/* A workout view's bodies: only the one on screen is in flow, so only it
+   scrolls; the others are laid out over it, hidden and clipped, to be measured. */
+.workout-view-bodies {
+  position: relative;
+  overflow: clip;
+}
+
+.workout-view-bodies > [data-shown="false"] {
+  position: absolute;
+  inset: 0 0 auto;
+  visibility: hidden;
 }
 
 .workout-editor-scroll {

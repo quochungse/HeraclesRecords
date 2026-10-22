@@ -330,6 +330,7 @@ const workout: WorkoutMessages = {
   "workout.v.steps": "步骤",
   "workout.v.pool": "{value} {unit} 泳池",
   "workout.v.loading": "正在加载训练",
+  "workout.v.which": "哪个训练",
 };
 
 export default workout;

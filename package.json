@@ -135,6 +135,7 @@
     "test:chat-analytics-tools": "npm run build:electron && node scripts/test-chat-analytics-tools.mjs",
     "test:chat-sleep-tools": "npm run build:electron && node scripts/test-chat-sleep-tools.mjs",
     "test:chat-tool-sources": "npm run build:electron && node scripts/test-chat-tool-sources.mjs",
+    "test:provider-usage": "cross-env ELECTRON_RUN_AS_NODE=1 electron --experimental-strip-types scripts/test-provider-usage.mjs",
     "test:mcp-notice": "cross-env ELECTRON_RUN_AS_NODE=1 electron --experimental-strip-types scripts/test-mcp-notice.mjs",
     "test:place-labels": "cross-env ELECTRON_RUN_AS_NODE=1 electron --experimental-strip-types --import ./scripts/register-ts-ext.mjs scripts/test-place-labels.mjs",
     "test:place-summaries": "cross-env ELECTRON_RUN_AS_NODE=1 electron --experimental-strip-types --import ./scripts/register-ts-ext.mjs scripts/test-place-summaries.mjs",

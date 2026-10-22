@@ -330,6 +330,7 @@ const workout: WorkoutMessages = {
   "workout.v.steps": "Langkah",
   "workout.v.pool": "Kolam {value} {unit}",
   "workout.v.loading": "Memuat latihan",
+  "workout.v.which": "Latihan yang mana",
 };
 
 export default workout;

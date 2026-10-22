@@ -108,6 +108,8 @@ import type {
   CoachAnalysisUpdate,
   ChatSettings,
   ModelCatalogRefresh,
+  ProviderUsageResult,
+  UsageProvider,
   ClaudeCodeConnectionTest,
   ClaudeCodeLoginStart,
   ClaudeCodeStatus,
@@ -410,6 +412,8 @@ export interface HeraclesRecordsApi {
     provider?: ChatProvider;
     force?: boolean;
   }) => Promise<ModelCatalogRefresh>;
+  /** A subscription's plan limits, read on request (the usage dialog). */
+  readProviderUsage: (provider: UsageProvider) => Promise<ProviderUsageResult>;
   getBaseCoachInstructions: () => Promise<string>;
   saveChatSettings: (settings: ChatSettings) => Promise<ChatSettings>;
   testLocalChatConnection: (

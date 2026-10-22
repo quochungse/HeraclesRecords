@@ -330,6 +330,7 @@ const workout: WorkoutMessages = {
   "workout.v.steps": "단계",
   "workout.v.pool": "{value} {unit} 수영장",
   "workout.v.loading": "운동 불러오는 중",
+  "workout.v.which": "어떤 운동",
 };
 
 export default workout;

@@ -76,11 +76,14 @@ export default function CoachCanvas({
   onCalendar,
   calendarOf,
   onAsk,
-  planSportStyle
+  planSportStyle,
+  pickedSession
 }: {
   api?: HeraclesRecordsApi;
   /** Any version's draft id of the creation whose details are open, or null. */
   artifactId: string | null;
+  /** A session of it to open on, picked on its card; a new object each time it is picked. */
+  pickedSession?: { entryId: string } | null;
   /** The newest version of each creation, in the order they were made. */
   creations: PlanDraftPreview[];
   /** Every card still in the conversation, older versions included. */
@@ -137,6 +140,7 @@ export default function CoachCanvas({
           onCalendar={onCalendar}
           calendar={calendarOf?.(open.draftId)}
           onAsk={onAsk}
+          pickedSession={pickedSession}
         />
       ) : (
         <CreationIndex
@@ -293,7 +297,8 @@ function ArtifactView({
   onViewInChat,
   onCalendar,
   calendar,
-  onAsk
+  onAsk,
+  pickedSession
 }: {
   api?: HeraclesRecordsApi;
   newest: PlanDraftPreview;
@@ -320,6 +325,7 @@ function ArtifactView({
   onCalendar?: (draftId: string) => void;
   calendar?: CreationCalendar;
   onAsk?: (ref: PlanRef) => void;
+  pickedSession?: { entryId: string } | null;
 }) {
   const { unitSystem } = useUnitSystem();
   const info = versionIndex.get(newest.draftId);
@@ -340,6 +346,14 @@ function ArtifactView({
   useEffect(() => {
     setOpenSession(null);
   }, [shownId]);
+  // After the reset above, so a session picked on the card is what a mount opens on.
+  useEffect(() => {
+    if (pickedSession) {
+      setPinned(null);
+      setTab("plan");
+      setOpenSession(pickedSession.entryId);
+    }
+  }, [pickedSession]);
 
   // Escape steps back one layer — the session, the removal question, then
   // back to the index — and only while the focus is in the panel: the

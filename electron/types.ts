@@ -1439,6 +1439,70 @@ export interface ClaudeCodeStatus {
   message: string;
 }
 
+/** One rate-limit window of a subscription: how much of it is spent, and when it starts over. */
+export interface ProviderUsageWindow {
+  /** 0–100; `null` when the provider names the window but states no figure. */
+  usedPercent: number | null;
+  /** ISO time the window resets, when stated. */
+  resetsAt: string | null;
+}
+
+/**
+ * A Claude subscription's limits, as Claude Code's `/usage` reads them
+ * (`providerUsage.ts`). Coach on Claude Code draws on the same plan as
+ * claude.ai and the terminal, which is what `breakdown` shows.
+ */
+export interface ClaudeSubscriptionUsage {
+  provider: "claude-code";
+  /** `pro`, `max`, `team`, `enterprise`; `null` for a login with no plan. */
+  plan: string | null;
+  /** False when plan limits do not apply (an API key behind the CLI). */
+  limitsApply: boolean;
+  /** The rolling five-hour session. */
+  session: ProviderUsageWindow | null;
+  /** The week, every model together. */
+  week: ProviderUsageWindow | null;
+  /** A week of its own for one model family (Opus, Sonnet, or as the server names it). */
+  weekByModel: { label: string; window: ProviderUsageWindow }[];
+  /** Where the week went, by surface (Claude Code, Chats…); empty when not reported. */
+  breakdown: { label: string; percent: number }[];
+  /** Pay-as-you-go past the plan; `null` when not reported. */
+  extra: {
+    enabled: boolean;
+    usedPercent: number | null;
+    used: { amount: number; currency: string } | null;
+    limit: { amount: number; currency: string } | null;
+  } | null;
+  readAt: string;
+}
+
+/**
+ * ChatGPT's Codex limits (`/backend-api/wham/usage`, what Codex's `/status`
+ * reads). A window is named by its length, because the plans differ: Plus has
+ * five hours and a week, Free one window of thirty days.
+ */
+export interface ChatGptUsage {
+  provider: "chatgpt";
+  /** `free`, `plus`, `pro`, `team`…, as ChatGPT names it. */
+  plan: string | null;
+  limitReached: boolean;
+  windows: (ProviderUsageWindow & { seconds: number | null })[];
+  /** Limits beside the main ones (a model or feature metered apart). */
+  additional: { label: string; windows: (ProviderUsageWindow & { seconds: number | null })[] }[];
+  credits: { unlimited: boolean; balance: string | null } | null;
+  readAt: string;
+}
+
+export type ProviderUsage = ClaudeSubscriptionUsage | ChatGptUsage;
+
+/** The providers whose plan limits can be read. */
+export type UsageProvider = ProviderUsage["provider"];
+
+/** A failure is a reason, worded by the renderer; `detail` is the provider's own, for the tooltip. */
+export type ProviderUsageResult =
+  | { ok: true; usage: ProviderUsage }
+  | { ok: false; reason: "signed-out" | "failed"; detail?: string };
+
 export interface ClaudeCodeConnectionTest {
   ok: boolean;
   status: ClaudeCodeStatus;

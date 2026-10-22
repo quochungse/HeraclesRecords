@@ -330,6 +330,7 @@ const workout: WorkoutMessages = {
   "workout.v.steps": "ขั้น",
   "workout.v.pool": "สระ {value} {unit}",
   "workout.v.loading": "กำลังโหลดการฝึก",
+  "workout.v.which": "การฝึกใด",
 };
 
 export default workout;

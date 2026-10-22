@@ -62,6 +62,8 @@ interface GeneratorProviderPanelProps {
   subject?: "plan" | "conversation";
   /** A section of the caller's under the AI, such as a conversation's permissions. */
   children?: ReactNode;
+  /** A quiet control of the caller's at the footer's start, such as a conversation's plan usage. */
+  footerStart?: ReactNode;
   onDone: () => void;
   onOpenCoach: () => void;
   /** Opens AI Model Providers, where a provider is connected; no link without it. */
@@ -86,7 +88,8 @@ export function GeneratorProviderPanel({
   onOpenCoach,
   onOpenProviders,
   subject = "plan",
-  children
+  children,
+  footerStart
 }: GeneratorProviderPanelProps) {
   const panelRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -238,6 +241,7 @@ export function GeneratorProviderPanel({
         </div>
 
         <footer>
+          {footerStart}
           {onKeepForChatChange ? (
             <label className="plan-generator-sheet-keep">
               <input type="checkbox" checked={keepForChat === true} onChange={(event) => onKeepForChatChange(event.target.checked)} />

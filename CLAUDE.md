@@ -1463,6 +1463,19 @@ lives at module level for the same visit-to-visit reason — see `useCalendarDat
   "not in the provider's list" (`withCurrentModel`); nothing switches a conversation's model
   behind its back. Pickers deep in a modal read the lists through `ModelOptionsContext`.
   `npm run test:model-catalog`.
+  **A subscription's plan usage is read on request, never on a turn** (`chat:readProviderUsage`,
+  `ProviderUsageDialog`, opened by **Plan usage** at the foot of "AI for this conversation" for
+  Claude Code and ChatGPT only). Claude's is the Agent SDK's
+  `usage_EXPERIMENTAL_MAY_CHANGE_DO_NOT_RELY_ON_THIS_API_YET()` — the CLI's `/usage`, a control
+  request that costs no tokens and spawns the CLI (~1 s) — and ChatGPT's is
+  `chatgpt.com/backend-api/wham/usage`, what Codex's `/status` reads. Neither is a published API,
+  so both are read by name and defensively in node-free `electron/providerUsage.ts`
+  (`test:provider-usage`, against the payloads probed on 2026-10-22): Claude's answer carries some
+  twenty windows under internal code names, one of them non-null, and none may reach the screen;
+  ChatGPT's windows are named by their length (Free: one of 30 days; Plus: 5 hours and a week).
+  The two are drawn differently on purpose — Claude by session, week and where the week went,
+  ChatGPT as one tile per window. Anthropic API keys and OpenRouter are not offered: neither has a
+  plan limit to read.
   **Claude Code's list is only as new as the CLI it comes from, so which CLI runs is decided
   afresh** (`detectClaudeCodeExecutable`): with several installs found (the usual places, the
   npm package's own `bin/claude.exe` — PATH on Windows holds only its shell shim and `.cmd` —

@@ -2230,6 +2230,7 @@ export default function App() {
                     onActivityChange={setCoachStreaming}
                     pendingPrompt={coachPrefill}
                     onPendingPromptConsumed={() => setCoachPrefill(null)}
+                    onOpenActivity={(activityId) => openActivityFrom(activityId, "coach")}
                     onMessage={setMessage}
                     active={activeView === "coach"}
                   />

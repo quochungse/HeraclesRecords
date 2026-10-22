@@ -161,6 +161,7 @@ import {
   isStandardClaudeLocation,
   listClaudeCodeModels,
   logoutClaudeCode,
+  readClaudeCodeUsage,
   startClaudeCodeLogin,
   streamClaudeCodeCompletion,
   testClaudeCodeConnection as runClaudeCodeConnectionTest,
@@ -201,6 +202,8 @@ import type {
   ChatProvider,
   ModelCatalogEntry,
   ModelCatalogRefresh,
+  ProviderUsageResult,
+  UsageProvider,
   ChatTokenUsage,
   ChatToolPolicy,
   ClaudeCodeConfig,
@@ -240,6 +243,7 @@ import type {
   UnitSystem
 } from "./types";
 import { formatDistanceValue, normalizeUnitSystem } from "./unitSystem.js";
+import { parseChatGptUsage, parseClaudeSubscriptionUsage } from "./providerUsage";
 import { pipelineWire } from "./chatContextCompaction";
 import {
   buildCoachInstructions,
@@ -1279,6 +1283,65 @@ async function getValidToken(): Promise<StoredChatToken> {
     return refreshed;
   }
   return token;
+}
+
+// ----- Subscription usage -----
+
+const CODEX_USAGE_URL = "https://chatgpt.com/backend-api/wham/usage";
+const USAGE_TIMEOUT_MS = 20_000;
+
+function usageFailure(error: unknown): ProviderUsageResult {
+  if ((error as { authError?: boolean } | null)?.authError) {
+    return { ok: false, reason: "signed-out" };
+  }
+  return {
+    ok: false,
+    reason: "failed",
+    detail: error instanceof Error ? error.message : String(error)
+  };
+}
+
+/**
+ * How much of a subscription's limits are spent, read when the athlete asks
+ * (the usage dialog), never on a turn. Claude's is the CLI's `/usage`; ChatGPT's
+ * is what Codex's `/status` reads. A failure is a reason the renderer words.
+ */
+export async function readProviderUsage(provider: UsageProvider): Promise<ProviderUsageResult> {
+  try {
+    if (provider === "claude-code") {
+      const configDir = getClaudeCodeConfigDir();
+      const status = await inspectClaudeCodeStatus(
+        getChatSettings().claudeCode.executablePath,
+        configDir
+      );
+      if (!status.executablePath || !status.authenticated) {
+        return { ok: false, reason: "signed-out" };
+      }
+      const payload = await readClaudeCodeUsage({
+        executablePath: status.executablePath,
+        configDir
+      });
+      return { ok: true, usage: parseClaudeSubscriptionUsage(payload) };
+    }
+    const token = await getValidToken();
+    const response = await fetch(CODEX_USAGE_URL, {
+      signal: AbortSignal.timeout(USAGE_TIMEOUT_MS),
+      headers: {
+        Authorization: `Bearer ${token.access_token}`,
+        Accept: "application/json",
+        originator: RESPONSES_ORIGINATOR,
+        "User-Agent": RESPONSES_USER_AGENT,
+        ...(token.account_id ? { "chatgpt-account-id": token.account_id } : {})
+      }
+    });
+    if (response.status === 401) return { ok: false, reason: "signed-out" };
+    if (!response.ok) {
+      return { ok: false, reason: "failed", detail: `ChatGPT answered ${response.status}.` };
+    }
+    return { ok: true, usage: parseChatGptUsage(await response.json()) };
+  } catch (error) {
+    return usageFailure(error);
+  }
 }
 
 // ----- Encrypted token persistence (safeStorage) -----

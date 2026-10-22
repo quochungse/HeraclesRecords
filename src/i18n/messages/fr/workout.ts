@@ -330,6 +330,7 @@ const workout: WorkoutMessages = {
   "workout.v.steps": "Étapes",
   "workout.v.pool": "Bassin de {value} {unit}",
   "workout.v.loading": "Chargement de la séance",
+  "workout.v.which": "Quelle séance",
 };
 
 export default workout;

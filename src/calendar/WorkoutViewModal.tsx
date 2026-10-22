@@ -11,18 +11,22 @@ import {
   X,
   type LucideIcon
 } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { createPortal } from "react-dom";
 import type {
+  PlanWorkoutEntryInput,
   RunWorkoutEditorDraft,
   RunWorkoutEditorStep,
-  WorkoutEditorDocument,
+  WorkoutEditRef,
   WorkoutEditorContext,
   WorkoutExerciseOption,
   WorkoutSport
 } from "../../electron/types";
+import { planWorkoutInputToEditorDraft } from "../../electron/planWorkoutEditor";
 import type { HeraclesRecordsApi } from "../heraclesrecords-api";
+import { OptionGroup } from "../components/OptionGroup";
+import { remoteErrorMessage } from "../chat/remoteError";
 import { useUnitSystem } from "../units/UnitSystemProvider";
 import { useWorkoutExerciseCatalog } from "./useWorkoutExerciseCatalog";
 import {
@@ -41,7 +45,9 @@ import { isStrengthStyleWorkout, workoutSportLabel } from "../training/workoutSp
 import { formatCount, plural, t } from "../i18n/core";
 
 /**
- * The Calendar's read-only view of a library workout.
+ * A workout, read in a dialog: a library workout from the Calendar, and from
+ * Coach's conversation the session a proposed change acts on and the workout
+ * it would put there.
  *
  * Every workout that is changed — a scheduled occurrence on the Calendar, a
  * plan session new or edited, and Edit workout in the Training Library — is
@@ -56,35 +62,118 @@ import { formatCount, plural, t } from "../i18n/core";
  * a day cell that only wanted to know what the session is. Training Library
  * owns that.
  */
+export type WorkoutViewSource =
+  | WorkoutEditRef
+  /** A workout no one has saved yet — what a proposed change would write. Drawn as it is, with no request. */
+  | { kind: "proposed"; workout: PlanWorkoutEntryInput };
+
+export interface WorkoutView {
+  id: string;
+  /** The switch's word for it; unused while it is the only view. */
+  label: string;
+  source: WorkoutViewSource;
+}
+
 interface WorkoutViewModalProps {
   api: HeraclesRecordsApi;
-  /** The library workout's COROS program id. */
-  programId: string;
+  /** What can be read, first shown unless `initialView` names another; past one, a switch picks. */
+  views: readonly WorkoutView[];
+  initialView?: string;
+  /** The line over the name; "Library" when absent. */
+  eyebrow?: string;
   onClose: () => void;
 }
 
-export function WorkoutViewModal({ api, programId, onClose }: WorkoutViewModalProps) {
+/**
+ * The two fields `WorkoutReadOnlyBody` reads off a context are the pool length
+ * and the climbing grade system, and both are only a fallback for a draft that
+ * states neither — so a proposed workout is drawn on this at once, and on the
+ * account's own context once it arrives.
+ */
+const LOCAL_CONTEXT: WorkoutEditorContext = {
+  distanceUnit: "metric",
+  paceUnit: "km",
+  heartRateBasis: "maxHr",
+  zones: {},
+  lthrZones: [],
+  defaultPoolLength: { value: 25, unit: "m" },
+  climbSystems: {}
+};
+
+type ViewDocument = { draft: RunWorkoutEditorDraft; context: WorkoutEditorContext };
+type ViewState = { document?: ViewDocument; error?: string };
+
+export function WorkoutViewModal({ api, views, initialView, eyebrow, onClose }: WorkoutViewModalProps) {
   const { unitSystem } = useUnitSystem();
   const reducedMotion = useReducedMotion();
-  const [document, setDocument] = useState<WorkoutEditorDocument | null>(null);
-  const [loadError, setLoadError] = useState<string | null>(null);
+  const [viewId, setViewId] = useState(initialView ?? views[0]?.id ?? "");
+  const view = views.find((item) => item.id === viewId) ?? views[0];
+  // Keyed by content: a caller builds its views every render, and a new
+  // object for the same workout must not read it again.
+  const viewsKey = JSON.stringify(views.map((item) => [item.id, item.source]));
+  /*
+   * Every view is read as the dialog opens and kept, rather than the one on
+   * screen read on each switch: a switch then changes nothing but which one
+   * shows, and no skeleton passes between two workouts.
+   */
+  const [loaded, setLoaded] = useState<Record<string, ViewState>>({});
+  const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     let cancelled = false;
-    setDocument(null);
-    setLoadError(null);
-    void api.getWorkoutForEdit({ kind: "library", programId }, unitSystem).then((loaded) => {
-      if (!cancelled) setDocument(loaded);
-    }).catch((cause: unknown) => {
-      if (!cancelled) setLoadError(cause instanceof Error ? cause.message : String(cause));
-    });
+    setLoaded({});
+    const settle = (id: string, state: ViewState) => {
+      if (!cancelled) setLoaded((previous) => ({ ...previous, [id]: state }));
+    };
+    for (const [id, source] of JSON.parse(viewsKey) as [string, WorkoutViewSource][]) {
+      if (source.kind === "proposed") {
+        const draft = planWorkoutInputToEditorDraft(source.workout);
+        settle(id, { document: { draft, context: LOCAL_CONTEXT } });
+        void api.getWorkoutEditorContext(unitSystem).then((context) => {
+          settle(id, { document: { draft, context } });
+        }).catch(() => undefined);
+      } else {
+        void api.getWorkoutForEdit(source, unitSystem).then((document) => {
+          settle(id, { document });
+        }).catch((cause: unknown) => {
+          settle(id, { error: remoteErrorMessage(cause, "") });
+        });
+      }
+    }
     return () => { cancelled = true; };
-  }, [api, programId, unitSystem]);
+  }, [api, viewsKey, unitSystem]);
 
-  /* Shared with the day drawer, which needs the same catalog to name a
-     strength session — and shared means one request between them rather than
-     one each, because the promise is cached per sport. */
-  const { byId: exercisesById } = useWorkoutExerciseCatalog(api, document?.draft.sport);
+  useEffect(() => {
+    if (scrollRef.current) scrollRef.current.scrollTop = 0;
+  }, [viewId]);
+
+  /*
+   * The box is as tall as the tallest view, so a switch never resizes the
+   * dialog; what scrolls is the view on screen alone, so a shorter one does
+   * not scroll on into the room a longer one needs. The hidden views are
+   * still laid out (clipped out of the scroll), which is what lets them be
+   * measured.
+   */
+  const bodiesRef = useRef<HTMLDivElement>(null);
+  const several = views.length > 1;
+  useLayoutEffect(() => {
+    const scroll = scrollRef.current;
+    const bodies = bodiesRef.current;
+    if (!several || !scroll || !bodies) return;
+    const fit = () => {
+      // Layout heights: a rect would be read through the dialog's opening scale.
+      const tallest = Math.max(0, ...[...bodies.children].map((cell) => (cell as HTMLElement).offsetHeight));
+      const style = getComputedStyle(scroll);
+      const padding = parseFloat(style.paddingTop) + parseFloat(style.paddingBottom);
+      // A basis of its own height, shrinking under the dialog's cap like any box.
+      scroll.style.flex = "0 1 auto";
+      scroll.style.height = `${Math.ceil(tallest + padding)}px`;
+    };
+    fit();
+    const observer = new ResizeObserver(fit);
+    for (const cell of bodies.children) observer.observe(cell);
+    return () => observer.disconnect();
+  }, [several, viewsKey]);
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -96,7 +185,11 @@ export function WorkoutViewModal({ api, programId, onClose }: WorkoutViewModalPr
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [onClose]);
 
-  const draft = document?.draft;
+  const draft = view ? loaded[view.id]?.document?.draft : undefined;
+  const titleOf = (item: WorkoutView) => {
+    const shown = loaded[item.id]?.document?.draft;
+    return shown?.name.trim() || (shown ? workoutSportLabel(shown.sport) : t("workout.untitled"));
+  };
 
   return createPortal(
     <AnimatePresence>
@@ -115,46 +208,79 @@ export function WorkoutViewModal({ api, programId, onClose }: WorkoutViewModalPr
             <div>
               <p className="eyebrow workout-editor-eyebrow">
                 {draft ? <WorkoutSportTag sport={draft.sport} /> : null}
-                <span>{t("workout.e.library")}</span>
+                <span>{eyebrow ?? t("workout.e.library")}</span>
               </p>
-              <h2 id="workout-editor-title">
-                {draft?.name.trim() || (draft ? workoutSportLabel(draft.sport) : t("workout.untitled"))}
+              {/* Every view's name in one cell, so a longer one wrapping does not move the dialog on a switch. */}
+              <h2 id="workout-editor-title" className="workout-view-stack">
+                {views.map((item) => (
+                  <span key={item.id} data-shown={item.id === view?.id} aria-hidden={item.id !== view?.id}>
+                    {titleOf(item)}
+                  </span>
+                ))}
               </h2>
             </div>
+            {views.length > 1 ? (
+              <OptionGroup
+                className="workout-view-switch"
+                label={t("workout.v.which")}
+                options={views.map((item) => ({ value: item.id, label: item.label }))}
+                value={view?.id ?? ""}
+                onChange={setViewId}
+              />
+            ) : null}
             <button type="button" className="icon-button" aria-label={t("workout.e.closeWorkout")} onClick={onClose}>
               <X size={18} aria-hidden="true" />
             </button>
           </header>
 
-          {!document && !loadError ? <EditorSkeleton /> : null}
-          {loadError ? (
-            <div className="workout-editor-state is-error">
-              <AlertTriangle size={22} aria-hidden="true" />
-              <h3>{t("workout.builderModal.loadFailed")}</h3><p>{loadError}</p>
-              <button type="button" className="ghost-button" onClick={onClose}>{t("common.close")}</button>
-            </div>
-          ) : null}
-
-          {document && draft ? (
-            <>
-              <div className="workout-editor-scroll">
-                <WorkoutReadOnlyBody
-                  draft={draft}
-                  context={document.context}
-                  exercisesById={exercisesById}
+          <div className="workout-editor-scroll" ref={scrollRef}>
+            <div className="workout-view-bodies" ref={bodiesRef}>
+              {views.map((item) => (
+                <WorkoutViewCell
+                  key={item.id}
+                  api={api}
+                  state={loaded[item.id]}
+                  shown={item.id === view?.id}
                 />
-              </div>
-              <footer className="workout-editor-footer">
-                <div className="workout-editor-footer-actions">
-                  <button type="button" className="primary-button" onClick={onClose}>{t("common.close")}</button>
-                </div>
-              </footer>
-            </>
-          ) : null}
+              ))}
+            </div>
+          </div>
+          <footer className="workout-editor-footer">
+            <div className="workout-editor-footer-actions">
+              <button type="button" className="primary-button" onClick={onClose}>{t("common.close")}</button>
+            </div>
+          </footer>
         </motion.section>
       </motion.div>
     </AnimatePresence>,
     window.document.body
+  );
+}
+
+/** One view of the dialog: waiting, refused, or the workout. */
+function WorkoutViewCell({ api, state, shown }: { api: HeraclesRecordsApi; state?: ViewState; shown: boolean }) {
+  /* Shared with the day drawer, which needs the same catalog to name a
+     strength session — and shared means one request between them rather than
+     one each, because the promise is cached per sport. */
+  const { byId: exercisesById } = useWorkoutExerciseCatalog(api, state?.document?.draft.sport);
+  return (
+    <div data-shown={shown} aria-hidden={!shown} inert={!shown}>
+      {state?.document ? (
+        <WorkoutReadOnlyBody
+          draft={state.document.draft}
+          context={state.document.context}
+          exercisesById={exercisesById}
+        />
+      ) : state?.error !== undefined ? (
+        <div className="workout-editor-state is-error">
+          <AlertTriangle size={22} aria-hidden="true" />
+          <h3>{t("workout.builderModal.loadFailed")}</h3>
+          {state.error ? <p>{state.error}</p> : null}
+        </div>
+      ) : (
+        <EditorSkeleton />
+      )}
+    </div>
   );
 }
 
