@@ -25,7 +25,7 @@
  */
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from "react";
-import { SLUG_MUSCLES, viewsOf, zoomViewBox } from "../calendar/bodyFigure";
+import { SLUG_MUSCLE, viewsOf, zoomViewBox } from "../calendar/bodyFigure";
 import { BODY_OUTLINE, BODY_SHAPES, BODY_VIEW_BOX, type BodyView } from "../calendar/bodyShapes";
 import {
   BODY_PART_LABELS,
@@ -142,35 +142,32 @@ export function BodyFilterPanel({
     return { view, box, width, height: STAGE_HEIGHT, unitsPerPixel: boxWidth / width };
   });
 
-  /* A shape lights for any muscle it stands for (each is one muscle today),
-     and a press on it picks the first of them that has anything to show. With
-     the whole part chosen — no muscle within it — every muscle of the part is
-     lit, as the part is at the first step; the one under the pointer stands
-     out of it. */
-  const shapeState = (shapeMuscles: readonly MuscleId[]): { live: boolean; className: string; target: string | null } => {
+  /* What a shape shows, and what a press on it picks: a part at the first
+     step, a muscle at the second, nothing where there is nothing to show.
+     With the whole part chosen — no muscle within it — every muscle of the
+     part is lit, as the part is at the first step; while the pointer is on
+     one muscle, that muscle alone takes the colour and the rest step back to
+     the plain light grey, so what a press would narrow to is the one lit. */
+  const shapeState = (shapeMuscle: MuscleId): { className: string; target: string | null } => {
     if (!zoomed) {
-      const shapePart = bodyPartOf(shapeMuscles[0]!) ?? null;
+      const shapePart = bodyPartOf(shapeMuscle) ?? null;
       const live = shapePart !== null && (counts.parts.get(shapePart) ?? 0) > 0;
       return {
-        live,
-        target: shapePart,
+        target: live ? shapePart : null,
         className: shapePart !== null && shapePart === part
           ? "is-picked"
           : shapePart !== null && shapePart === hover ? "is-hover" : live ? "is-live" : "is-dead"
       };
     }
-    const inPart = shapeMuscles.filter((entry) => partMuscles.includes(entry));
-    if (!inPart.length) return { live: false, target: null, className: "is-outside" };
-    const target = inPart.find((entry) => (counts.muscles.get(entry) ?? 0) > 0) ?? null;
-    const live = target !== null;
+    if (!partMuscles.includes(shapeMuscle)) return { target: null, className: "is-outside" };
+    const live = (counts.muscles.get(shapeMuscle) ?? 0) > 0;
+    const resting = live ? "is-live" : "is-dead";
+    const hovered = hover === shapeMuscle;
     return {
-      live,
-      target,
-      className: hover !== null && inPart.includes(hover as MuscleId) && !(muscle !== null && inPart.includes(muscle))
-        ? "is-hover"
-        : muscle === null || inPart.includes(muscle)
-          ? "is-picked"
-          : live ? "is-live" : "is-dead"
+      target: live ? shapeMuscle : null,
+      className: muscle === null
+        ? hover === null || hovered ? "is-picked" : resting
+        : muscle === shapeMuscle ? "is-picked" : hovered ? "is-hover" : resting
     };
   };
 
@@ -192,7 +189,7 @@ export function BodyFilterPanel({
         {stage.map((entry) => (
           <figure className="tl-body-view" key={entry.view}>
             <svg
-              className="tl-body-figure is-interactive"
+              className="tl-body-figure"
               viewBox={entry.box}
               width={entry.width}
               height={entry.height}
@@ -200,14 +197,13 @@ export function BodyFilterPanel({
             >
               <path className="tl-body-skin" d={BODY_OUTLINE[entry.view]} />
               {Object.entries(BODY_SHAPES[entry.view]).map(([slug, paths]) => {
-                const shapeMuscles = SLUG_MUSCLES[slug];
-                if (!shapeMuscles?.length) return null;
-                const state = shapeState(shapeMuscles);
-                const target = state.live ? state.target : null;
+                const shapeMuscle = SLUG_MUSCLE[slug];
+                if (!shapeMuscle) return null;
+                const { className, target } = shapeState(shapeMuscle);
                 return (
                   <g
                     key={slug}
-                    className={`tl-body-muscle ${state.className}`}
+                    className={`tl-body-muscle ${className}${target ? " is-target" : ""}`}
                     {...(target
                       ? {
                           onPointerEnter: () => setHover(target),

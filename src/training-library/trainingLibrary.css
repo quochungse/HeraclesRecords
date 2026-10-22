@@ -4302,8 +4302,10 @@
 }
 
 /* A press lands on a muscle from a few pixels outside its edge: a stroke
-   nobody sees, as wide as the panel sets it for the zoom on screen. */
-.tl-body-figure.is-interactive .tl-body-muscle:is(.is-live, .is-hover, .is-picked) {
+   nobody sees, as wide as the panel sets it for the zoom on screen. Only a
+   shape a press would pick has it — a part lit whole still lights the
+   muscles with nothing to show, and those take no press. */
+.tl-body-muscle.is-target {
   stroke: transparent;
   stroke-width: var(--tl-body-hit);
   stroke-linejoin: round;
@@ -4423,7 +4425,6 @@
 
 .tl-body-name-label {
   min-width: 0;
-  flex: 1 1 auto;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;

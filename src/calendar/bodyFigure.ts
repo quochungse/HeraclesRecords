@@ -18,9 +18,9 @@ import { BODY_SHAPES, BODY_VIEW_BOX, type BodyView } from "./bodyShapes";
  * the front. A muscle with no slug at all would simply draw the bare figure,
  * which is why the map is exhaustive rather than partial.
  *
- * The abductors are the gluteus medius, the wedge above and outside each
- * buttock that the package draws inside its gluteal slug; `bodyShapes.ts`
- * splits it out as `gluteus-medius`, so the two are picked and lit apart.
+ * The abductors are `gluteus-medius`, a shape drawn for this app down the
+ * side of each hip (`scripts/fetch-body-shapes.mjs`), so they are picked and
+ * lit apart from the glutes.
  */
 export const MUSCLE_SLUG: Readonly<Record<MuscleId, string>> = {
   neck: "neck",
@@ -42,22 +42,9 @@ export const MUSCLE_SLUG: Readonly<Record<MuscleId, string>> = {
   calves: "calves"
 };
 
-/**
- * Every muscle each of the artwork's slugs is drawn for, the one it is named
- * after first. Each slug is one muscle today; a list keeps a shape that ever
- * stands for two from being picked as only one of them.
- */
-export const SLUG_MUSCLES: Readonly<Record<string, readonly MuscleId[]>> = (() => {
-  const bySlug: Record<string, MuscleId[]> = {};
-  for (const [muscle, slug] of Object.entries(MUSCLE_SLUG) as [MuscleId, string][]) {
-    (bySlug[slug] ??= []).push(muscle);
-  }
-  return bySlug;
-})();
-
-/** The muscle each of the artwork's slugs stands for. */
+/** The muscle each of the artwork's slugs stands for: one each, so the map turns round. */
 export const SLUG_MUSCLE: Readonly<Record<string, MuscleId>> = Object.fromEntries(
-  Object.entries(SLUG_MUSCLES).map(([slug, muscles]) => [slug, muscles[0]!])
+  (Object.entries(MUSCLE_SLUG) as [MuscleId, string][]).map(([muscle, slug]) => [slug, muscle])
 );
 
 /**
