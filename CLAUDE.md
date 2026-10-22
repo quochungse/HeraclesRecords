@@ -490,7 +490,8 @@ lives at module level for the same visit-to-visit reason — see `useCalendarDat
   COROS account, so startup sequences the re-login *before* `prepareSync()` and resumes
   the loop after one — see the block in `main.ts`.
 - **Training Library** (`trainingLibraryService.ts`, `corosTrainingPlanAdapter.ts`) —
-  **two entities, two tabs**, and the workouts tab splits **40 / 60** between the list and
+  **two entities, two tabs** — plus the Exercises Library, a third tab that is a catalog
+  rather than an entity (below) — and the workouts tab splits **40 / 60** between the list and
   the reader — the list is a name and two counts, the pane beside it draws a whole step
   structure. A workout is one session with no date; a plan is a multi-week
   schedule of them. They share four attributes (name, tags, favourite, archived) and not one
@@ -916,6 +917,25 @@ lives at module level for the same visit-to-visit reason — see `useCalendarDat
   recorded at the moment of use, which is a change to what is stored rather than to what is
   read — reintroducing any of these starts there.
   See [docs/training-library-architecture.md](docs/training-library-architecture.md).
+  **The Exercises Library** (`ExercisesLibrary.tsx`, built 2026-10-22) is COROS's own
+  movement catalog to read, for the two sports that keep one — Strength and Hybrid Fitness;
+  a run or a ride is built from warm-up and training steps, which are not exercises, so those
+  sports are left out. The tab has **no count**, and it is **two cards at 35/65** (the list and
+  the movement), not the Workouts tab's split panel; nothing docks under its reader, by
+  decision — it is for reading. **Two filters, not three lists**: a body part is a roll-up of
+  muscles, so the body is one control (`BodyFilterPanel`) — the whole figure picks a *part*
+  (a region, never a sliver like the forearm), then the part zooms in (`zoomViewBox` in
+  `src/calendar/bodyFigure.ts`, the arms framed on one side) and its *muscles* are picked,
+  each shape widened by an invisible stroke; the names beside the figure are full-height rows
+  with counts and are the keyboard's way in — and the equipment, a `SelectDropdown` drawn with
+  the picker's `EquipmentGlyph`. Everything said about a movement comes from the picker's own
+  `optionFacets` (`exerciseLibraryModel.ts`): its shares of the work, its body parts, its
+  equipment and its effort (`exerciseEffort.ts`), and a chosen part or muscle orders the list
+  by `facetRank`, so the two never disagree. **The catalog row's default target and rest are
+  not shown** — they are where a builder step starts, not facts about the movement. Favourites
+  are rows of `exercise_library_favorites` (`personal`, keyed by COROS's catalog id; a heart
+  taken back deletes the row), read through `trainingLibrary:listExerciseFavorites` /
+  `setExerciseFavorite`. `npm run test:exercise-library`.
 - **Activities** (`src/training/ActivitiesView.tsx`) — the all-sport log: every session COROS
   has, in one list, with a detail pane beside it. It is the only screen some sports ever
   reach — Running covers sport codes 100–103, Cycling 200–205 and 299, Hiking 104/105 and
