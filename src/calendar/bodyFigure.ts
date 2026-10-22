@@ -140,7 +140,7 @@ export function pathBounds(d: string): Bounds {
     skip();
     NUMBER.lastIndex = index;
     const match = NUMBER.exec(d);
-    if (!match) throw new Error(`pathBounds: no number at ${index}`);
+    if (!match) throw new Error(`pathBounds: no number at ${index}`); // i18n-ignore: a malformed artwork path, for the log
     index = NUMBER.lastIndex;
     return Number(match[0]);
   };
@@ -160,7 +160,7 @@ export function pathBounds(d: string): Bounds {
       continue;
     }
     const count = ARGUMENTS[upper];
-    if (count === undefined) throw new Error(`pathBounds: unknown command ${command}`);
+    if (count === undefined) throw new Error(`pathBounds: unknown command ${command}`); // i18n-ignore: a malformed artwork path, for the log
     const values: number[] = [];
     for (let argument = 0; argument < count; argument += 1) {
       if (upper === "A" && (argument === 3 || argument === 4)) {

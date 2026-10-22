@@ -4,6 +4,7 @@ import {
   CalendarRange,
   ChevronRight,
   CloudOff,
+  Dumbbell,
   Heart,
   Plus,
   RefreshCw,
@@ -80,6 +81,7 @@ import { PlanDraftMark, type PlanDraftMarkKind } from "./PlanDraftMark";
 import { ConfirmDialog } from "./ConfirmDialog";
 import { resumeDraft, type PlanDraft } from "./planDraft";
 import { WorkoutWorkspace } from "./WorkoutWorkspace";
+import { ExercisesLibrary } from "./ExercisesLibrary";
 import { TrainingLibrarySkeleton } from "./TrainingLibrarySkeleton";
 import {
   defineSelectionPreference,
@@ -106,7 +108,7 @@ interface TrainingLibraryViewProps {
 }
 
 /**
- * Two entities, two tabs.
+ * Two entities, two tabs — and the catalog they are built from.
  *
  * A workout is one session — a sport, a name and an ordered list of steps,
  * with no date. A plan is a multi-week schedule of them. They share four
@@ -114,20 +116,25 @@ interface TrainingLibraryViewProps {
  * figure either of them carries fits the other. Templates were a third tab
  * rendering this same list over the same data one enum value apart; a
  * template is a plan with no start date, so it is one now.
+ *
+ * The Exercises Library is the third tab and not a third entity: COROS's own
+ * movements, to read, which no tab count describes — so it carries none.
  */
-type LibrarySection = "workouts" | "plans";
+type LibrarySection = "workouts" | "plans" | "exercises";
 
 /* AI Plan's brief (P2.5), the screen Coach edits a brief on: loaded when pressed. */
 const CoachBriefEditor = lazy(() => import("../chat/CoachBriefEditor"));
 
 const SECTION_LABELS = messageRecord<LibrarySection>({
   workouts: "library.section.workouts",
-  plans: "library.section.plans"
+  plans: "library.section.plans",
+  exercises: "library.section.exercises"
 });
 
 const SECTIONS: Array<{ id: LibrarySection; icon: typeof Zap }> = [
   { id: "workouts", icon: Zap },
-  { id: "plans", icon: CalendarRange }
+  { id: "plans", icon: CalendarRange },
+  { id: "exercises", icon: Dumbbell }
 ];
 
 const LIBRARY_SECTION_PREFERENCE =
@@ -136,7 +143,8 @@ const LIBRARY_SECTION_PREFERENCE =
     defaultValue: "workouts",
     validate: selectionIsOneOf([
       "workouts",
-      "plans"
+      "plans",
+      "exercises"
     ])
   });
 
@@ -316,7 +324,7 @@ export function TrainingLibraryView({
      a run taken off is not listed. */
   const removalEndsPlan =
     calendarChange?.action === "remove" && runOutlivesItsPlan(calendarChange.plan, current.plans);
-  const counts: Record<LibrarySection, number> = {
+  const counts: Partial<Record<LibrarySection, number>> = {
     workouts: current.workouts.length,
     plans: plans.length
   };
@@ -726,7 +734,7 @@ export function TrainingLibraryView({
           >
             <Icon aria-hidden="true" />
             {SECTION_LABELS[id]}
-            <span>{counts[id]}</span>
+            {counts[id] === undefined ? null : <span>{counts[id]}</span>}
           </button>
         ))}
       </nav>
@@ -739,6 +747,8 @@ export function TrainingLibraryView({
           onMessage={onMessage}
           onError={onError}
         />
+      ) : section === "exercises" ? (
+        <ExercisesLibrary api={api} onError={onError} />
       ) : (
         <PlanIndex
           plans={plans}

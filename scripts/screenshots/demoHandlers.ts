@@ -246,6 +246,8 @@ export function demoHandlers(): Record<string, unknown> {
           media: [{ coverUrl: e.coverUrls[0], videoUrl: e.videoUrls[0] }]
         }))
       : [],
+    listExerciseFavorites: async () => ["469656067215900672"],
+    setExerciseFavorite: async () => undefined,
     listTrainingActivityMatches: async () => librarySnapshot().matches,
     getWorkoutForEdit: async (ref: { kind: string; programId?: string }) => workoutForEdit(ref),
     getWorkoutEditorContext: async () => EDITOR_CONTEXT,
