@@ -22175,6 +22175,37 @@ td span {
   font-weight: 500;
 }
 
+/* Favourites only: a toggle like the Exercises Library's heart. */
+.exercise-picker-favorites {
+  display: grid;
+  width: 32px;
+  height: 32px;
+  flex: 0 0 32px;
+  place-items: center;
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition:
+    color var(--dur-fast) var(--ease),
+    background var(--dur-fast) var(--ease);
+}
+
+.exercise-picker-favorites:hover {
+  color: var(--accent);
+}
+
+.exercise-picker-favorites.is-active {
+  background: var(--accent-soft);
+  color: var(--accent-strong);
+}
+
+.exercise-picker-favorites:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: 2px;
+}
+
 .exercise-picker-body {
   display: grid;
   min-height: 0;

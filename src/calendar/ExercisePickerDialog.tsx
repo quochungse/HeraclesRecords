@@ -16,8 +16,12 @@
  * the movement's name where it does not — see `exerciseFacets.ts` for why, and
  * for what a movement nothing recognises does. A chosen muscle or body part
  * puts the movements that load it hardest first.
+ *
+ * The heart narrows to the movements hearted in the Exercises Library
+ * (`exercise_library_favorites`, read once as the picker opens). It narrows the
+ * search, so the facet counts follow it too.
  */
-import { Play, Search, X } from "lucide-react";
+import { Heart, Play, Search, X } from "lucide-react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
@@ -95,6 +99,16 @@ export function ExercisePickerDialog({
   const [facetKind, setFacetKind] = useState<ExerciseFacetKind>("all");
   const [facetValue, setFacetValue] = useState<string | null>(null);
   const [playing, setPlaying] = useState<LabeledExerciseOption | null>(null);
+  const [favorites, setFavorites] = useState<ReadonlySet<string>>(new Set());
+  const [favoritesOnly, setFavoritesOnly] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    window.heraclesRecords?.listExerciseFavorites()
+      .then((ids) => { if (!cancelled) setFavorites(new Set(ids)); })
+      .catch(() => undefined);
+    return () => { cancelled = true; };
+  }, []);
 
   /*
    * Escape is taken in the capture phase, and the press is stopped there. This
@@ -125,9 +139,10 @@ export function ExercisePickerDialog({
       rows the athlete cannot reach from where they are. */
   const searched = useMemo(() => {
     const term = normalize(query);
-    if (!term) return options;
-    return options.filter((option) => normalize(option.label).includes(term));
-  }, [options, query]);
+    const kept = favoritesOnly ? options.filter((option) => favorites.has(option.id)) : options;
+    if (!term) return kept;
+    return kept.filter((option) => normalize(option.label).includes(term));
+  }, [favorites, favoritesOnly, options, query]);
 
   const facets = useMemo<FacetValue[]>(() => {
     if (facetKind === "all") return [];
@@ -259,6 +274,16 @@ export function ExercisePickerDialog({
               ? t("workout.picker.loadingCount")
               : plural("units.exercises", results.length)}
           </span>
+          <button
+            type="button"
+            className={`exercise-picker-favorites${favoritesOnly ? " is-active" : ""}`}
+            aria-pressed={favoritesOnly}
+            aria-label={t("library.x.favoritesOnly")}
+            title={t("library.x.favoritesOnly")}
+            onClick={() => setFavoritesOnly((current) => !current)}
+          >
+            <Heart size={15} fill={favoritesOnly ? "currentColor" : "none"} aria-hidden="true" />
+          </button>
         </div>
 
         <div className={`exercise-picker-body ${facetKind === "all" ? "is-unfiltered" : ""}`}>
@@ -288,6 +313,8 @@ export function ExercisePickerDialog({
           <div className="exercise-picker-results">
             {loading ? (
               <p className="exercise-picker-empty">{t("workout.picker.loading")}</p>
+            ) : favoritesOnly && !favorites.size ? (
+              <p className="exercise-picker-empty">{t("library.x.noFavoritesTitle")}</p>
             ) : results.length === 0 ? (
               <p className="exercise-picker-empty">{t("workout.picker.noMatch")}</p>
             ) : (
