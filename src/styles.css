@@ -14579,13 +14579,20 @@ td span {
   box-shadow: none;
 }
 
+/* On paper the composer is a white card over the canvas, like what it sends. */
 :root[data-theme="paper"] .chat-composer .chat-composer-inner {
+  border-color: transparent;
   background: var(--glass-bg-elevated);
-  box-shadow: none;
+  box-shadow: var(--shadow-card);
 }
 
 :root[data-theme="paper"] .chat-composer .chat-composer-inner:focus-within {
-  box-shadow: none;
+  border-color: var(--chat-signal-border);
+  box-shadow: var(--shadow-card);
+}
+
+:root[data-theme="paper"] .chat-composer-row .chat-ai-chip {
+  color: var(--text-secondary);
 }
 
 .chat-composer-row .chat-ai-chip {
@@ -16714,15 +16721,24 @@ td span {
 }
 
 /* --- Chat (Coach) --------------------------------------------------------- */
+/*
+ * Paper's Coach is chrome round a canvas: the rail, the conversation list and
+ * the header are one white frame, and everything said in the conversation is
+ * a white card on the grey canvas inside it. It used to put everything on the
+ * canvas — the header, the list, the athlete's words in the dark theme's 11%
+ * white glass, the charts and plans in --glass-bg, a grey a few levels off the
+ * canvas — so the whole screen read as fogged over. The chat's own grey accent
+ * is the theme's cool ink here; it was a warm grey, off the canvas's hue.
+ */
 :root[data-theme="paper"] .chat-view {
   --surface: var(--glass-bg-elevated);
-  --accent: #6b6560;
-  --accent-strong: #3d3a36;
-  --accent-2: #8a837a;
-  --accent-hover: #5c5752;
-  --accent-glow: rgba(19, 26, 40, 0.15);
-  --accent-soft: rgba(19, 26, 40, 0.09);
-  --accent-gradient: linear-gradient(135deg, #8a837a 0%, #5c5752 100%);
+  --accent: #4a5265;
+  --accent-strong: #262c3a;
+  --accent-2: #6b7385;
+  --accent-hover: #3a4152;
+  --accent-glow: rgba(19, 26, 40, 0.14);
+  --accent-soft: rgba(19, 26, 40, 0.07);
+  --accent-gradient: linear-gradient(135deg, #59627a 0%, #262c3a 100%);
   --chat-signal: var(--palette-accent);
   --chat-signal-strong: var(--palette-accent-strong);
   --chat-signal-soft: color-mix(in srgb, var(--palette-accent) 13%, transparent);
@@ -16730,14 +16746,109 @@ td span {
   --chat-signal-glow: color-mix(in srgb, var(--palette-accent) 30%, transparent);
 }
 
+/* The dark theme's tint at the top was a shade of ink here, so the header sat
+   darker than the title bar above it. */
 :root[data-theme="paper"] .chat-view {
-  background:
-    radial-gradient(
-      1100px 520px at 50% -8%,
-      rgba(19, 26, 40, 0.04),
-      transparent 62%
-    ),
-    linear-gradient(180deg, rgba(19, 26, 40, 0.02), transparent 30%);
+  background: none;
+}
+
+/* The header is white like the rail beside it, and the title bar above it
+   follows while Coach is open (the rail's title bar rule reads this). */
+:root[data-theme="paper"] .app:has(.content-coach-panel:not(.view-panel-hidden)) {
+  --app-titlebar-fill: var(--glass-bg-elevated);
+}
+
+:root[data-theme="paper"] .chat-header {
+  background: var(--glass-bg-elevated);
+  border-bottom-color: var(--sidebar-divider);
+}
+
+:root[data-theme="paper"] .chat-header::after {
+  display: none;
+}
+
+:root[data-theme="paper"] .chat-conversation-subtitle {
+  color: var(--text-secondary);
+}
+
+:root[data-theme="paper"] :is(.chat-coaches-pill, .chat-creations-pill):not([aria-expanded="true"]) {
+  background: var(--glass-bg-elevated);
+  border-color: rgba(19, 26, 40, 0.16);
+  color: var(--text-primary);
+}
+
+:root[data-theme="paper"] :is(.chat-coaches-pill, .chat-creations-pill):not(:disabled):not([aria-expanded="true"]):hover {
+  background: var(--glass-bg);
+}
+
+/* Coach's answer is a card like the charts and plans it draws, as wide as the
+   column they share. A chart placed among the answer's words sits inside it,
+   so that one is drawn flat. */
+:root[data-theme="paper"] .chat-row-assistant > .chat-bubble:not(.chat-bubble-plan):has(.chat-markdown) {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 14px 18px 4px;
+  border-radius: var(--radius-sm) var(--radius-lg) var(--radius-lg) var(--radius-lg);
+  background: var(--glass-bg-elevated);
+  box-shadow: var(--shadow-card);
+}
+
+:root[data-theme="paper"] :is(
+    .chat-plan-card:not(.chat-delete-card),
+    .chat-visual-card,
+    .chat-coach-prompt,
+    .chat-coach-prompt.is-answered
+  ) {
+  border-color: transparent;
+  background: var(--glass-bg-elevated);
+  box-shadow: var(--shadow-card);
+}
+
+:root[data-theme="paper"] .chat-inline-chart > .chat-visual-card {
+  border-color: var(--glass-border);
+  box-shadow: none;
+}
+
+/* What sits inside a card recesses, the other way round from before: these
+   were white tiles on a grey card. The lap table and the zone track carried
+   the dark theme's black and white washes. */
+:root[data-theme="paper"] :is(
+    .chat-creation-figures > div,
+    .chat-creation-days > li:not(.is-outside),
+    .chat-creation-status:not([data-tone="pending"]):not([data-saved="true"]),
+    .chat-brief-rows > div,
+    .chat-outline-week,
+    .chat-change-days > li,
+    .chat-plan-table-wrap
+  ) {
+  background: var(--glass-bg);
+}
+
+:root[data-theme="paper"] .chat-zone-track {
+  background: rgba(19, 26, 40, 0.08);
+}
+
+:root[data-theme="paper"] .chat-plan-review {
+  border-color: rgba(19, 26, 40, 0.16);
+  background: var(--glass-bg-elevated);
+}
+
+:root[data-theme="paper"] :is(
+    .chat-failure:not(.is-warning):not(.is-error),
+    .chat-step-trail:not(.is-quiet),
+    .chat-suggestion
+  ) {
+  background: var(--glass-bg-elevated);
+}
+
+/* The athlete's words are a cool slate a step under the canvas, flat where
+   Coach's cards float. The ink fill tried first read too dark beside them. */
+:root[data-theme="paper"] .chat-row-user .chat-bubble {
+  border-color: transparent;
+  background: #d9e0ea;
+  box-shadow: none;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
 }
 
 /*
@@ -16839,12 +16950,17 @@ td span {
   box-shadow: var(--sidebar-overlay-shadow);
 }
 
-:root[data-theme="paper"] .chat-history-actions {
+/* The list is a white sheet beside the rail. */
+:root[data-theme="paper"] .chat-sidebar {
   background: var(--glass-bg-elevated);
 }
 
+:root[data-theme="paper"] .chat-history-actions {
+  background: var(--glass-bg);
+}
+
 :root[data-theme="paper"] .chat-session-row.is-active {
-  background: color-mix(in srgb, var(--accent) 10%, transparent);
+  background: rgba(19, 26, 40, 0.075);
 }
 
 :root[data-theme="paper"] .chat-settings-modal {

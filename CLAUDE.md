@@ -3337,6 +3337,19 @@ rules are in `styles.css` and reach Coach's ridge. `--tl-ground` stays stated, a
 because the gate and the plan editor paint with it. A few type steps went in for both themes:
 the tabs 14px, a workout's figures 18px and its lifts' names 600 (in `styles.css`, so every
 host), and a plan reader's description 14px and totals 28px.
+**Paper's Coach is a white frame round the canvas** (since 2026-10-23, picked from a mockup
+of three, then the header and the bubble redone at UAT). It put everything straight on the
+canvas: the charts and plans in `--glass-bg`, a grey a few levels off it; the athlete's words
+in the dark theme's 11% white glass, which on paper is only a shadow; and an ink tint over the
+top that left the header darker than the title bar. Now the rail, the conversation list and
+the header are one white frame (the title bar follows while Coach is open, through
+`.app:has(.content-coach-panel:not(.view-panel-hidden))`), and on the canvas inside it Coach's
+answer, its charts, plans, briefs, outlines, change sets and questions are white cards on
+`--shadow-card`; what sits inside them recesses to `--glass-bg`, the other way round from
+before. The athlete's words are a flat cool slate (`#d9e0ea`): an ink fill read too dark
+beside the cards, and white would be the cards' own material. The chat's grey accent is the
+theme's cool ink, not the warm grey it was. Every rule is `:root[data-theme="paper"]`, and the
+dark Coach is the same pixel for pixel.
 
 **`paper` is a grey canvas with white surfaces, and it is not free to be otherwise.** It was
 a warm cream page (`#f6f3ec`) carrying 72%-white glass, which put a card within three levels
