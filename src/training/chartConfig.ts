@@ -27,6 +27,18 @@ export type TrainingTrendWindow = (typeof TRAINING_TREND_WINDOWS)[number];
  */
 export const TRAINING_TREND_MAX_DAYS = Math.max(...TRAINING_TREND_WINDOWS);
 
+/**
+ * The Sleep screen's one window, with no chip: its sleep-length chart draws
+ * the nights of the last 30 days, and its HRV chart the same days beside it.
+ */
+export const SLEEP_SCREEN_TREND_DAYS = 30;
+
+/**
+ * How many trend points the snapshot builds: the widest chart that reads them.
+ * Every other reader cuts its own window or looks a day up by its date.
+ */
+export const TRAINING_TREND_POINT_DAYS = Math.max(TRAINING_TREND_MAX_DAYS, SLEEP_SCREEN_TREND_DAYS);
+
 /** Ranges the load heatmap can be switched between, in render order. */
 export type TrainingHeatmapRange = "year" | "month";
 
@@ -64,7 +76,7 @@ export interface TrainingChartColors {
   worse: string;
 }
 
-export type TrainingMetricKey = "load" | "rpe" | "hrv" | "sleep";
+export type TrainingMetricKey = "load" | "rpe" | "hrv" | "sleep" | "sleepHr";
 
 export interface TrainingMetricPalette {
   /** Series stroke + resting dot color. */
@@ -166,6 +178,15 @@ const DARK_METRIC_PALETTES: Record<TrainingMetricKey, TrainingMetricPalette> = {
     soft: "rgba(122, 184, 255, 0.15)",
     chip: "#aacfff",
     stops: { top: "#7ab8ff", mid: "#4a7fd6", bottom: "#4a7fd6" }
+  },
+  // The heart rate a night was slept at: a calm lavender, not a red, which
+  // read as an alarm. `--sleep-hr` in styles.css mirrors the stroke.
+  sleepHr: {
+    stroke: "#b79bff",
+    halo: "rgba(183, 155, 255, 0.3)",
+    soft: "rgba(183, 155, 255, 0.15)",
+    chip: "#d2c1ff",
+    stops: { top: "#b79bff", mid: "#7b61c9", bottom: "#7b61c9" }
   }
 };
 
@@ -197,6 +218,13 @@ const PAPER_METRIC_PALETTES: Record<TrainingMetricKey, TrainingMetricPalette> = 
     soft: "rgba(61, 111, 214, 0.12)",
     chip: "#2f56ab",
     stops: { top: "#4a80e0", mid: "#3d6fd6", bottom: "#3d6fd6" }
+  },
+  sleepHr: {
+    stroke: "#7c5cd6",
+    halo: "rgba(124, 92, 214, 0.24)",
+    soft: "rgba(124, 92, 214, 0.12)",
+    chip: "#5f44ad",
+    stops: { top: "#8b6ce0", mid: "#6d4fc4", bottom: "#6d4fc4" }
   }
 };
 

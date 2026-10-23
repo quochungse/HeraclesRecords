@@ -119,7 +119,7 @@ function createDefaultDeps(): CoachAnalysisSchedulerDeps {
         ),
         daily: listCoachDailySamples(toDayKey(since)).map((row) => ({
           day: row.day,
-          ...(row.resting_hr === null ? {} : { restingHr: row.resting_hr }),
+          ...(row.sleep_hr === null ? {} : { sleepHr: row.sleep_hr }),
           ...(row.sleep_minutes === null
             ? {}
             : { sleepMinutes: row.sleep_minutes })

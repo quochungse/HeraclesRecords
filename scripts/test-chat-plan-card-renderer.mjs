@@ -377,8 +377,8 @@ async function main() {
       previewId: "trend-1",
       windowDays: 7,
       trendPoints: [
-        { date: "2026-09-09", label: "Wed", trainingLoad: 120, rhr: 47 },
-        { date: "2026-09-10", label: "Thu", trainingLoad: 240, rhr: 48 }
+        { date: "2026-09-09", label: "Wed", trainingLoad: 120, sleepAvgHr: 53, sleepMinHr: 47 },
+        { date: "2026-09-10", label: "Thu", trainingLoad: 240, sleepAvgHr: 55, sleepMinHr: 48 }
       ]
     }
   });

@@ -52,6 +52,13 @@ function HrvChartLegend() {
   );
 }
 
+/** `yyyyMMdd` of the local day `offset` days before today. */
+function dayKeyDaysAgo(offset: number): string {
+  const date = new Date();
+  date.setDate(date.getDate() - offset);
+  return `${date.getFullYear()}${String(date.getMonth() + 1).padStart(2, "0")}${String(date.getDate()).padStart(2, "0")}`;
+}
+
 /**
  * Nightly HRV against the baseline COROS keeps for the athlete. Both series
  * ride on the training snapshot's trend points, which is why the Sleep screen
@@ -59,9 +66,17 @@ function HrvChartLegend() {
  */
 export function HrvBaselineChart({
   points,
-  loading = false
+  loading = false,
+  days
 }: {
   points: TrainingTrendPoint[];
+  /**
+   * A fixed window in days, with no chip and no "Last N days": the Sleep
+   * screen's, the days its sleep-length chart draws. Cut by date, as that
+   * chart's nights are, rather than by count. Without it the window is the
+   * chip's, shared with Overview.
+   */
+  days?: number;
   /**
    * The snapshot these points come from has not arrived. Without it an empty
    * array reads as "this athlete has no HRV readings", which is a claim about
@@ -76,34 +91,39 @@ export function HrvBaselineChart({
     HRV_WINDOW_PREFERENCE
   );
 
-  const hrvPoints = useMemo(
-    () =>
-      points
-        .slice(-trendWindow)
-        .filter(
-          (point) =>
-            point.avgSleepHrv !== undefined || point.sleepHrvBase !== undefined
-        ),
-    [points, trendWindow]
-  );
+  const hrvPoints = useMemo(() => {
+    const from = days !== undefined ? dayKeyDaysAgo(days - 1) : undefined;
+    return (from !== undefined ? points.filter((point) => point.date >= from) : points.slice(-trendWindow))
+      .filter(
+        (point) =>
+          point.avgSleepHrv !== undefined || point.sleepHrvBase !== undefined
+      );
+  }, [points, trendWindow, days]);
 
   return (
     <section className="panel training-chart-panel" data-metric="hrv">
-      <div className="section-heading compact training-chart-heading">
-        <div>
-          <p className="eyebrow">{t("activity.hrv.title")}</p>
-          <h2>{t("overview.sleepTrend.lastDays", { days: trendWindow })}</h2>
-        </div>
-        <div className="training-chart-heading-side">
-          <TrendWindowToggle
-            options={TRAINING_TREND_WINDOWS}
-            value={trendWindow}
-            onChange={setTrendWindow}
-            label={t("activity.hrv.range")}
-          />
+      {days !== undefined ? (
+        <div className="hrv-fixed-heading">
+          <h2 className="sleep-pane-title">{t("activity.hrv.title")}</h2>
           <HrvChartLegend />
         </div>
-      </div>
+      ) : (
+        <div className="section-heading compact training-chart-heading">
+          <div>
+            <p className="eyebrow">{t("activity.hrv.title")}</p>
+            <h2>{t("overview.sleepTrend.lastDays", { days: trendWindow })}</h2>
+          </div>
+          <div className="training-chart-heading-side">
+            <TrendWindowToggle
+              options={TRAINING_TREND_WINDOWS}
+              value={trendWindow}
+              onChange={setTrendWindow}
+              label={t("activity.hrv.range")}
+            />
+            <HrvChartLegend />
+          </div>
+        </div>
+      )}
       {hrvPoints.length > 0 ? (
         <div className="training-chart-shell">
           <ResponsiveContainer width="100%" height="100%">

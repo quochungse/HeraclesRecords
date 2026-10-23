@@ -24,6 +24,7 @@ import type {
   SleepNightSeries,
   TrainingHubSleepRecord
 } from "../../../electron/types";
+import type { TrainingTrendPoint } from "../../training/types";
 import { t } from "../../i18n/core";
 
 interface SleepNightDetailProps {
@@ -37,29 +38,53 @@ interface SleepNightDetailProps {
   hasNights?: boolean;
   /** Explains the "no nights" case when the server is the reason. */
   mcpState?: McpConnectionState;
+  /**
+   * The training snapshot's row for this night's morning, whose HRV and
+   * baseline stand in until the night's own series has answered — the
+   * figure is in the header, and it should not wait on the curve.
+   */
+  trendPoint?: TrainingTrendPoint;
+}
+
+function finite(value: number | undefined): number | undefined {
+  return value !== undefined && Number.isFinite(value) && value > 0 ? value : undefined;
+}
+
+/** "+4", "−2", "±0": a whole-number change, signed as the eye reads it. */
+function signedDelta(value: number): string {
+  const rounded = Math.round(value);
+  return rounded > 0 ? `+${rounded}` : rounded < 0 ? `−${Math.abs(rounded)}` : "±0";
 }
 
 /**
- * The night's heart rate as COROS reports it: an average, and the range it
- * moved through. The range is the half worth having — an average of 50 over a
- * night that touched 44 and 71 is a different night to a flat 50.
+ * One cell of the header's figure box: a label, the figure, and a line under
+ * it. A missing figure is a dash, so the three cells keep their places.
  */
-function formatSleepHeartRate(record: TrainingHubSleepRecord): string {
-  const avg = record.avgHr;
-  const low = record.minHr;
-  const high = record.maxHr;
-
-  if (avg === undefined && low === undefined && high === undefined) {
-    return t("sleep.noData");
-  }
-
-  const average = avg !== undefined ? `${Math.round(avg)} bpm` : "–";
-  const range =
-    low !== undefined && high !== undefined
-      ? ` · ${Math.round(low)}–${Math.round(high)}`
-      : "";
-
-  return `${average}${range}`;
+function Figure({
+  kind,
+  label,
+  value,
+  unit,
+  note,
+  hover
+}: {
+  kind: "hrv" | "hr" | "score";
+  label: string;
+  value?: number;
+  unit?: string;
+  note?: string;
+  hover?: string;
+}) {
+  return (
+    <div className={`sleep-detail-figure is-${kind}`} title={hover}>
+      <dt>{label}</dt>
+      <dd>
+        <strong>{value !== undefined ? Math.round(value) : "–"}</strong>
+        {value !== undefined && unit ? <span> {unit}</span> : null}
+      </dd>
+      <dd className="sleep-detail-figure-note">{note ?? "\u00a0"}</dd>
+    </div>
+  );
 }
 
 function Metric({
@@ -85,7 +110,8 @@ export function SleepNightDetail({
   seriesLoading,
   pending = false,
   hasNights = true,
-  mcpState
+  mcpState,
+  trendPoint
 }: SleepNightDetailProps) {
   if (!record) {
     const empty = hasNights
@@ -110,12 +136,26 @@ export function SleepNightDetail({
   // stand where it would have been — the one line on the card with room for
   // all of them.
   const napWindowLine = napOnly ? napClocks(record).join(" · ") : "";
-  // COROS dates both ends of the window, so a night that began the evening
-  // before can say so instead of leaving "23:48 – 05:30" to be worked out.
-  const startedYesterday =
-    record.sleepStartDay !== undefined &&
-    record.sleepEndDay !== undefined &&
-    record.sleepStartDay !== record.sleepEndDay;
+  // The night's own assessment once its series has answered for this night —
+  // a series still on screen from the night before must not lend its figure.
+  const assessment =
+    series?.happenDay === record.happenDay ? series.assessment : undefined;
+  const hrvAvg = finite(assessment?.avg) ?? finite(trendPoint?.avgSleepHrv);
+  const hrvBaseline = finite(assessment?.baseline) ?? finite(trendPoint?.sleepHrvBase);
+  const hrvHover = [
+    assessment?.evaluation,
+    assessment?.normalLow !== undefined && assessment.normalHigh !== undefined
+      ? t("sleep.curve.normal", {
+          low: Math.round(assessment.normalLow),
+          high: Math.round(assessment.normalHigh)
+        })
+      : undefined
+  ]
+    .filter(Boolean)
+    .join(" · ");
+  const sleepHr = finite(record.avgHr);
+  const sleepHrLow = finite(record.minHr);
+  const sleepHrHigh = finite(record.maxHr);
   const stages = stageBreakdown(record);
   const inBed = timeInBedMinutes(record);
   const efficiency = sleepEfficiencyPercent(record);
@@ -124,7 +164,7 @@ export function SleepNightDetail({
     <div className={`sleep-detail tone-${sleepScoreTone(record.score)}`}>
       <header className="sleep-detail-header">
         <div>
-          <p className="eyebrow">{formatHappenDayLabel(record.happenDay)}</p>
+          <p className="sleep-detail-date">{formatHappenDayLabel(record.happenDay)}</p>
           {/* The whole day's sleep. The stage split below is the main sleep's,
               which is why the naps are named rather than silently added. */}
           <h2>{formatSleepDurationMinutes(totalSleepMinutes(record))}</h2>
@@ -132,11 +172,6 @@ export function SleepNightDetail({
             {window ? (
               <>
                 <Moon size={13} aria-hidden="true" />
-                {startedYesterday ? (
-                  <span className="sleep-detail-window-day">
-                    {formatHappenDayLabel(record.sleepStartDay ?? "")}
-                  </span>
-                ) : null}
                 {window}
                 <AlarmClock size={13} aria-hidden="true" />
               </>
@@ -150,10 +185,44 @@ export function SleepNightDetail({
             )}
           </p>
         </div>
-        <div className="sleep-detail-score">
-          <strong>{record.score !== undefined ? Math.round(record.score) : "–"}</strong>
-          <span>{sleepScoreLabel(record.score)}</span>
-        </div>
+        {/* What the night did for recovery, beside how it scored — one box,
+            so it reads as one glance and never outweighs the night's length. */}
+        <dl className="sleep-detail-figures">
+          <Figure
+            kind="hrv"
+            label={t("sleep.curve.hrvAvg")}
+            value={hrvAvg}
+            unit="ms"
+            note={
+              hrvAvg !== undefined && hrvBaseline !== undefined
+                ? t("sleep.figure.vsBaseline", { delta: signedDelta(hrvAvg - hrvBaseline) })
+                : assessment?.evaluation
+            }
+            hover={hrvHover || undefined}
+          />
+          <Figure
+            kind="hr"
+            label={t("sleep.m.hr")}
+            value={sleepHr}
+            unit="bpm"
+            note={
+              sleepHrLow !== undefined
+                ? t("sleep.figure.lowest", { bpm: Math.round(sleepHrLow) })
+                : undefined
+            }
+            hover={
+              sleepHrLow !== undefined && sleepHrHigh !== undefined
+                ? `${Math.round(sleepHrLow)}–${Math.round(sleepHrHigh)} bpm`
+                : undefined
+            }
+          />
+          <Figure
+            kind="score"
+            label={t("sleep.trend.score")}
+            value={record.score}
+            note={sleepScoreLabel(record.score)}
+          />
+        </dl>
       </header>
 
       {record.completeness === "partial" ? (
@@ -215,7 +284,6 @@ export function SleepNightDetail({
           }
         />
         <Metric label={t("sleep.m.naps")} value={formatNapValue(record)} hover={napHover(record)} />
-        <Metric label={t("sleep.m.hr")} value={formatSleepHeartRate(record)} />
       </dl>
     </div>
   );

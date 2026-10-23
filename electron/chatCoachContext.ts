@@ -8,12 +8,14 @@ import {
   workoutSportFromType
 } from "./workoutCapabilities";
 import { formatPaceSeconds } from "./chatActivityTools";
-import { dateFromDayKey, dayKey, isoFromDayKey } from "./chatDayKeys";
+import { dateFromDayKey, dayKey, dayLabel, isoFromDayKey } from "./chatDayKeys";
+import { sleepHrBaseline, sleepNightsByDay } from "./sleepHeartRate";
 import type {
   CorosProfile,
   TrainingHubActivity,
   TrainingHubDashboard,
   TrainingHubPersonalRecordGroup,
+  TrainingHubSleepRecord,
   UnitSystem,
   WorkoutSport
 } from "./types";
@@ -499,8 +501,10 @@ export function formatCoachDashboard(
   dashboard: TrainingHubDashboard,
   unitSystem: UnitSystem = "metric"
 ): string {
+  // No `dashboard.rhr`: it is the whole day's resting HR, which moves with the
+  // day rather than with recovery. The night's heart rate stands in for it
+  // (`formatCoachSleepHeartRate`).
   const lines: string[] = [];
-  if (dashboard.rhr != null) lines.push(`- Resting HR: ${dashboard.rhr} bpm`);
   if (dashboard.recoveryPct != null) lines.push(`- Recovery: ${dashboard.recoveryPct}%`);
   if (dashboard.fullRecoveryHours != null) {
     lines.push(`- Full recovery in ~${dashboard.fullRecoveryHours} h`);
@@ -524,6 +528,29 @@ export function formatCoachDashboard(
     lines.push(records);
   }
   return lines.join("\n");
+}
+
+/**
+ * The latest night's sleeping heart rate against the median of the 28 nights
+ * before it — one line, so a turn knows whether last night was an ordinary
+ * one without a tool call. Nothing when no night in the last two days has one:
+ * an older night would read as last night.
+ */
+export function formatCoachSleepHeartRate(
+  records: TrainingHubSleepRecord[],
+  today: Date = new Date()
+): string | undefined {
+  const nights = sleepNightsByDay(records);
+  const recent = [dayKey(today), dayKey(new Date(today.getFullYear(), today.getMonth(), today.getDate() - 1))];
+  const day = recent.find((candidate) => nights.get(candidate)?.heartRate);
+  const heartRate = day ? nights.get(day)?.heartRate : undefined;
+  if (!day || !heartRate) return undefined;
+  const baseline = sleepHrBaseline(nights, day);
+  return (
+    `- Sleep HR, night ending ${dayLabel(day)}: ${Math.round(heartRate.avg)} avg` +
+    (heartRate.min !== undefined ? `, ${Math.round(heartRate.min)} lowest` : "") +
+    (baseline !== undefined ? `; 28-night median ${Math.round(baseline)}` : "")
+  );
 }
 
 function formatClockDuration(value: number): string {

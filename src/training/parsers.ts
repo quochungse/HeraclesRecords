@@ -12,7 +12,7 @@ import {
   mergeTrainingDayLists
 } from "../../electron/trainingTrendUtils";
 import { formatHappenDayLabel, recentTrainingHubDateList } from "./formatters";
-import { TRAINING_HEATMAP_DAYS, TRAINING_TREND_MAX_DAYS } from "./chartConfig";
+import { TRAINING_HEATMAP_DAYS, TRAINING_TREND_POINT_DAYS } from "./chartConfig";
 import type {
   HeatmapCell,
   HeatmapGrid,
@@ -257,7 +257,7 @@ export function buildTrainingHubSnapshot(
 ): TrainingHubSnapshot {
   const dayList = mergeTrainingDayLists(dailyMetrics, analytics);
   const trendPoints = mergeSleepIntoTrendPoints(
-    buildTrendPoints(dayList, TRAINING_TREND_MAX_DAYS),
+    buildTrendPoints(dayList, TRAINING_TREND_POINT_DAYS),
     sleep
   );
 

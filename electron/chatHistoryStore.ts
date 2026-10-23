@@ -993,10 +993,12 @@ function parseTrendPoint(value: unknown): TrainingTrendPoint | null {
         typeof value.avgSleepHrv === "number" ? value.avgSleepHrv : undefined,
       sleepHrvBase:
         typeof value.sleepHrvBase === "number" ? value.sleepHrvBase : undefined,
-      rhr: typeof value.rhr === "number" ? value.rhr : undefined
+      rhr: typeof value.rhr === "number" ? value.rhr : undefined,
+      sleepAvgHr: typeof value.sleepAvgHr === "number" ? value.sleepAvgHr : undefined,
+      sleepMinHr: typeof value.sleepMinHr === "number" ? value.sleepMinHr : undefined
     },
     value,
-    ["date", "label", "trainingLoad", "avgSleepHrv", "sleepHrvBase", "rhr"]
+    ["date", "label", "trainingLoad", "avgSleepHrv", "sleepHrvBase", "rhr", "sleepAvgHr", "sleepMinHr"]
   );
 }
 

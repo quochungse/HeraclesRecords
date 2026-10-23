@@ -3,7 +3,7 @@ import { LockKeyhole, RefreshCw } from "lucide-react";
 import { SleepNightDetail } from "./components/SleepNightDetail";
 import { SleepNightList } from "./components/SleepNightList";
 import { SleepTrendChart } from "./components/SleepTrendChart";
-import { useSleepHistory } from "./useSleepHistory";
+import { SLEEP_HISTORY_DAYS, useSleepHistory } from "./useSleepHistory";
 import { useSleepNightSeries } from "./useSleepNightSeries";
 import { HrvBaselineChart } from "../training/components/HrvBaselineChart";
 import { MCP_SLEEP_SUBJECT, mcpNotice } from "../mcp/mcpNotice";
@@ -184,6 +184,7 @@ export function SleepDetailsView({
               pending={loading && records.length === 0}
               hasNights={records.length > 0}
               mcpState={mcpState}
+              trendPoint={trendPoints.find((point) => point.date === selectedDay)}
             />
           </div>
         </div>
@@ -200,7 +201,11 @@ export function SleepDetailsView({
         />
       </section>
 
-      <HrvBaselineChart points={trendPoints} loading={trendPointsLoading} />
+      <HrvBaselineChart
+        points={trendPoints}
+        loading={trendPointsLoading}
+        days={SLEEP_HISTORY_DAYS}
+      />
     </div>
   );
 }

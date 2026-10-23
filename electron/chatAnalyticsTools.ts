@@ -6,6 +6,14 @@ import {
   getTrainingHubStatus
 } from "./trainingHubService";
 import { getTrainingDailyHealthData } from "./dailyHealthDataService";
+import { getSleepHistory } from "./sleepHistoryService";
+import {
+  SLEEP_HR_BASELINE_NIGHTS,
+  SLEEP_HR_RAISED_BPM,
+  sleepHrBaseline,
+  sleepNightsByDay,
+  type SleepNight
+} from "./sleepHeartRate";
 import { buildTrendPoints, mergeTrainingDayLists, recentTrainingHubDateList } from "./trainingTrendUtils";
 import { formatDurationSeconds, formatPaceSeconds } from "./chatActivityTools";
 import { dateFromDayKey, dayKeyDaysAgo, dayLabel } from "./chatDayKeys";
@@ -62,8 +70,9 @@ export function getChatAnalyticsTools(): CorosMcpTool[] {
       name: "get_fitness_trends",
       description:
         "COROS load and recovery markers per day: training load (and RPE load), " +
-        "resting HR, overnight HRV vs baseline (each night listed on the day " +
-        "it followed), Load Impact, load ratio " +
+        "the night after each day — sleep, overnight HRV vs baseline and the heart " +
+        "rate slept at (average and lowest, the recovery heart rate; there is no " +
+        "daytime resting HR on purpose) — Load Impact, load ratio " +
         "(acute:chronic, ~1.0 = steady), Base Fitness, VO2max (from runs, recorded " +
         "on run days only) and cycling VO2max (from rides, when COROS has one), " +
         "plus daily steps, exercise minutes and average stress, led by " +
@@ -133,15 +142,16 @@ async function handleGetFitnessTrends(
   try {
     // The dashboard used to be a third read here, for the latest resting HR and
     // recovery — both already in the snapshot every turn carries.
-    const [analytics, dailyMetrics, wellness] = await Promise.all([
+    const [analytics, dailyMetrics, wellness, nights] = await Promise.all([
       getTrainingAnalytics(),
       getDailyMetrics(recentTrainingHubDateList(days)),
-      readDailyWellness(days)
+      readDailyWellness(days),
+      readSleepNights(days)
     ]);
 
     const window = trendWindow(mergeTrainingDayLists(dailyMetrics, analytics), days);
     const preview = buildFitnessTrendPreview(
-      buildTrendPoints(window, window.length),
+      withSleepHeartRate(buildTrendPoints(window, window.length), nights),
       callbacks?.requestId,
       days
     );
@@ -150,7 +160,7 @@ async function handleGetFitnessTrends(
       callbacks.onFitnessTrend(preview);
     }
 
-    return formatFitnessTrendsForChat(window, days, new Date(), wellness);
+    return formatFitnessTrendsForChat(window, days, new Date(), wellness, nights);
   } catch (caught) {
     throw formatAnalyticsToolError("get_fitness_trends", caught);
   }
@@ -171,13 +181,50 @@ async function readDailyWellness(days: number): Promise<Map<string, TrainingHubD
   }
 }
 
+/**
+ * The nights of the window and the baseline before it, from the sleep cache.
+ * Only the window may cost a COROS fill, as the sleep tools' reads do; the
+ * baseline's nights are settled and read from disk. Optional, like wellness.
+ */
+async function readSleepNights(days: number): Promise<Map<string, SleepNight>> {
+  try {
+    await getSleepHistory({ days });
+    const history = await getSleepHistory({
+      days: days + 7 + SLEEP_HR_BASELINE_NIGHTS,
+      cacheOnly: true
+    });
+    return sleepNightsByDay(history.records);
+  } catch {
+    return new Map();
+  }
+}
+
+/**
+ * The card's points: the night's heart rate on the morning it ended, as HRV
+ * is drawn, and no daytime resting HR. A card stored with one keeps it, undrawn.
+ */
+export function withSleepHeartRate(
+  points: FitnessTrendPreview["trendPoints"],
+  nights: ReadonlyMap<string, SleepNight>
+): FitnessTrendPreview["trendPoints"] {
+  return points.map(({ rhr: _rhr, ...point }) => {
+    const heartRate = nights.get(point.date)?.heartRate;
+    return heartRate
+      ? {
+          ...point,
+          sleepAvgHr: heartRate.avg,
+          ...(heartRate.min !== undefined ? { sleepMinHr: heartRate.min } : {})
+        }
+      : point;
+  });
+}
+
 // ----- Fitness trends -------------------------------------------------------
 
 function hasReading(day: TrainingHubDailyMetric): boolean {
   return [
     day.trainingLoad,
     day.rpeLoad,
-    day.rhr,
     day.avgSleepHrv,
     day.tiredRateNew,
     day.trainingLoadRatio,
@@ -301,6 +348,7 @@ function statusColumns<Row>(
 }
 
 type Wellness = ReadonlyMap<string, TrainingHubDailyHealthRecord>;
+type Nights = ReadonlyMap<string, SleepNight>;
 
 /**
  * The reading that holds the night after a day. COROS files a night under the
@@ -317,16 +365,38 @@ function nightAfter(
   return (day) => byDay.get(dayKeyDaysAgo(dateFromDayKey(day.happenDay), -1));
 }
 
-const NIGHT_AFTER_NOTE =
-  "HRV that night = the sleep after that day (COROS files it under the next morning)";
+/** The sleep record of the night after a day: the next morning's. */
+function sleepAfter(nights: Nights): (day: string) => SleepNight | undefined {
+  return (day) => nights.get(dayKeyDaysAgo(dateFromDayKey(day), -1));
+}
 
-function dailyTable(window: TrainingHubDailyMetric[], wellness: Wellness): string[] {
+const NIGHT_AFTER_NOTE =
+  "\"that night\" = the sleep after that day (COROS files it under the next morning); " +
+  "sleep includes naps; sleep HR is the main sleep's average (lowest)";
+
+/** "7h12" — as the sleep tools write a night. */
+function formatSleepMinutes(minutes: number | undefined): string | undefined {
+  if (minutes === undefined || !Number.isFinite(minutes)) return undefined;
+  const total = Math.max(0, Math.round(minutes));
+  return `${Math.floor(total / 60)}h${String(total % 60).padStart(2, "0")}`;
+}
+
+function sleepHrCell(night: SleepNight | undefined): string | undefined {
+  const heartRate = night?.heartRate;
+  if (!heartRate) return undefined;
+  return heartRate.min !== undefined
+    ? `${Math.round(heartRate.avg)} (${Math.round(heartRate.min)})`
+    : `${Math.round(heartRate.avg)}`;
+}
+
+function dailyTable(window: TrainingHubDailyMetric[], wellness: Wellness, nights: Nights): string[] {
   const of = (day: TrainingHubDailyMetric) => wellness.get(day.happenDay);
   const night = nightAfter(window);
+  const slept = sleepAfter(nights);
   return pipeTable(window, { header: "Day", value: (day) => dayLabel(day.happenDay) }, [
     { header: "Load", value: (day) => rounded(day.trainingLoad) },
     { header: "RPE load", value: (day) => rounded(day.rpeLoad) },
-    { header: "RHR", value: (day) => rounded(day.rhr) },
+    { header: "Sleep that night", value: (day) => formatSleepMinutes(slept(day.happenDay)?.minutes) },
     {
       header: "HRV that night (baseline)",
       value: (day) => {
@@ -334,6 +404,7 @@ function dailyTable(window: TrainingHubDailyMetric[], wellness: Wellness): strin
         return hrvCell(after?.avgSleepHrv, after?.sleepHrvBase);
       }
     },
+    { header: "Sleep HR that night", value: (day) => sleepHrCell(slept(day.happenDay)) },
     ...statusColumns((day: TrainingHubDailyMetric) => day),
     { header: "Steps", value: (day) => rounded(of(day)?.steps) },
     { header: "Exercise min", value: (day) => rounded(of(day)?.exerciseMinutes) },
@@ -376,8 +447,15 @@ function weeklyTable(
   window: TrainingHubDailyMetric[],
   windowStart: string,
   windowEnd: string,
-  wellness: Wellness
+  wellness: Wellness,
+  nights: Nights
 ): string[] {
+  const slept = sleepAfter(nights);
+  const nightMean = (week: TrendWeek, pick: (night: SleepNight) => number | undefined) =>
+    meanOf(week.days.map((day) => {
+      const night = slept(day.happenDay);
+      return night ? pick(night) : undefined;
+    }));
   const wellnessMean = (week: TrendWeek, pick: (record: TrainingHubDailyHealthRecord) => number | undefined) =>
     meanOf(week.days.map((day) => {
       const record = wellness.get(day.happenDay);
@@ -401,7 +479,7 @@ function weeklyTable(
           return seconds ? formatDurationSeconds(seconds) : undefined;
         }
       },
-      { header: "RHR avg", value: (week) => rounded(meanOf(week.days.map((day) => day.rhr))) },
+      { header: "Sleep avg", value: (week) => formatSleepMinutes(nightMean(week, (night) => night.minutes)) },
       {
         header: "HRV avg (baseline)",
         value: (week) =>
@@ -410,6 +488,7 @@ function weeklyTable(
             meanOf(week.days.map((day) => day.sleepHrvBase))
           )
       },
+      { header: "Sleep HR avg", value: (week) => rounded(nightMean(week, (night) => night.heartRate?.avg)) },
       ...statusColumns((week: TrendWeek) => ({
         tiredRateNew: lastValue(week, (day) => day.tiredRateNew),
         trainingLoadRatio: lastValue(week, (day) => day.trainingLoadRatio),
@@ -432,7 +511,8 @@ function trendSummary(
   window: TrainingHubDailyMetric[],
   days: number,
   today: Date,
-  wellness: Wellness
+  wellness: Wellness,
+  nights: Nights
 ): string[] {
   const since = (offset: number) => dayKeyDaysAgo(today, offset);
   const between = (from: string, to: string) =>
@@ -454,14 +534,7 @@ function trendSummary(
     lines.push(`- Training load: ${parts.join("; ")}`);
   }
 
-  const rhr = latestOf(window, (day) => day.rhr);
-  if (rhr) {
-    const average = meanOf(window.map((day) => day.rhr));
-    lines.push(
-      `- Resting HR: ${Math.round(rhr.value)} bpm on ${dayLabel(rhr.day)}` +
-        (average !== undefined ? `; ${days}-day average ${Math.round(average)}` : "")
-    );
-  }
+  lines.push(...sleepSummary(nights, today));
 
   const hrv = latestOf(window, (day) => day.avgSleepHrv);
   if (hrv) {
@@ -532,6 +605,50 @@ function trendSummary(
 }
 
 /**
+ * Last night against the athlete's own usual, said in numbers: the latest
+ * night's sleep and heart rate, the median of the four weeks before the last
+ * seven nights, and how many of those seven sat 5 bpm or more above it. The
+ * baseline stops a week short so a bad week is read against the weeks before
+ * it, not against itself.
+ */
+export function sleepSummary(nights: Nights, today: Date): string[] {
+  const lastSeven = Array.from({ length: 7 }, (_, offset) => dayKeyDaysAgo(today, 6 - offset));
+  const recent = lastSeven
+    .map((day) => ({ day, night: nights.get(day) }))
+    .filter((entry): entry is { day: string; night: SleepNight } => entry.night !== undefined);
+  const lines: string[] = [];
+
+  const slept = recent.filter((entry) => entry.night.minutes !== undefined);
+  const lastSlept = slept.at(-1);
+  if (lastSlept) {
+    const average = meanOf(slept.map((entry) => entry.night.minutes));
+    lines.push(
+      `- Sleep: ${formatSleepMinutes(lastSlept.night.minutes)} the night ending ${dayLabel(lastSlept.day)}` +
+        (slept.length > 1 ? `; ${slept.length}-night average ${formatSleepMinutes(average)}` : "")
+    );
+  }
+
+  const rated = recent.filter((entry) => entry.night.heartRate !== undefined);
+  const lastRated = rated.at(-1);
+  if (lastRated) {
+    const baseline = sleepHrBaseline(nights, lastSeven[0]!);
+    const raised =
+      baseline !== undefined
+        ? rated.filter((entry) => entry.night.heartRate!.avg >= baseline + SLEEP_HR_RAISED_BPM).length
+        : undefined;
+    lines.push(
+      `- Sleep HR: ${sleepHrCell(lastRated.night)} for the night ending ${dayLabel(lastRated.day)}` +
+        (baseline !== undefined
+          ? `; baseline ${Math.round(baseline)} (median of the ${SLEEP_HR_BASELINE_NIGHTS} nights before the last 7)` +
+            `; ${SLEEP_HR_RAISED_BPM}+ bpm above it on ${raised} of the last ${rated.length} nights`
+          : "")
+    );
+  }
+
+  return lines;
+}
+
+/**
  * The trend as the coach reads it: a computed summary first, then the rows.
  * Resting HR and HRV were all this used to say — Load Impact, load ratio, Base
  * Fitness and VO2max were parsed off the same response and dropped.
@@ -540,7 +657,8 @@ export function formatFitnessTrendsForChat(
   window: TrainingHubDailyMetric[],
   days: number,
   today: Date = new Date(),
-  wellness: Wellness = new Map()
+  wellness: Wellness = new Map(),
+  nights: Nights = new Map()
 ): string {
   if (window.length === 0) {
     return `No fitness trend data for the last ${days} days.`;
@@ -551,20 +669,20 @@ export function formatFitnessTrendsForChat(
   const lines = [
     `Fitness trends, last ${days} days (${dayLabel(windowStart)} → ${dayLabel(windowEnd)}; ` +
       "days without any reading are omitted):",
-    ...trendSummary(window, days, today, wellness)
+    ...trendSummary(window, days, today, wellness, nights)
   ];
 
   if (days <= DAILY_TABLE_MAX_DAYS) {
-    lines.push("", `Daily (${NIGHT_AFTER_NOTE}):`, ...dailyTable(window, wellness));
+    lines.push("", `Daily (${NIGHT_AFTER_NOTE}):`, ...dailyTable(window, wellness, nights));
   } else {
     const tailStart = dayKeyDaysAgo(today, DAILY_TAIL_DAYS - 1);
     lines.push(
       "",
-      "Weekly (Mon–Sun; load and time summed, RHR and HRV averaged, COROS status as of the week's last reading):",
-      ...weeklyTable(window, windowStart, windowEnd, wellness),
+      "Weekly (Mon–Sun; load and time summed, sleep, HRV and sleep HR averaged over the nights after its days, COROS status as of the week's last reading):",
+      ...weeklyTable(window, windowStart, windowEnd, wellness, nights),
       "",
       `Daily, last ${DAILY_TAIL_DAYS} days (${NIGHT_AFTER_NOTE}):`,
-      ...dailyTable(window.filter((day) => day.happenDay >= tailStart), wellness)
+      ...dailyTable(window.filter((day) => day.happenDay >= tailStart), wellness, nights)
     );
   }
 
@@ -572,9 +690,9 @@ export function formatFitnessTrendsForChat(
 }
 
 /**
- * The card is recovery only — HRV and resting heart rate — so a window with
- * neither draws none, rather than a card that says so. Training load stays in
- * the points: the card no longer draws it, but an older build's does.
+ * The card is recovery only — HRV and the heart rate slept at — so a window
+ * with neither draws none, rather than a card that says so. Training load
+ * stays in the points: the card no longer draws it, but an older build's does.
  */
 export function buildFitnessTrendPreview(
   trendPoints: FitnessTrendPreview["trendPoints"],
@@ -582,7 +700,8 @@ export function buildFitnessTrendPreview(
   windowDays?: number
 ): FitnessTrendPreview | null {
   const recovery = trendPoints.some(
-    (point) => point.avgSleepHrv !== undefined || point.sleepHrvBase !== undefined || point.rhr !== undefined
+    (point) =>
+      point.avgSleepHrv !== undefined || point.sleepHrvBase !== undefined || point.sleepAvgHr !== undefined
   );
   if (!recovery) {
     return null;

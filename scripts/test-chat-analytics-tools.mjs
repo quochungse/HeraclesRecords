@@ -10,6 +10,7 @@ const {
   buildFitnessTrendPreview,
   buildHrZonePreview,
   formatFitnessTrendsForChat,
+  withSleepHeartRate,
   trendWindow,
   parseTrendDays,
   formatHrZoneSummaryForChat,
@@ -21,6 +22,12 @@ const {
 } = await import(`${distUrl("chatAnalyticsTools.js")}?cacheBust=${Date.now()}`);
 const { buildTrendPoints } = await import(
   `${distUrl("trainingTrendUtils.js")}?cacheBust=${Date.now()}`
+);
+const { sleepNightsByDay, sleepHrBaseline, medianOf } = await import(
+  `${distUrl("sleepHeartRate.js")}?cacheBust=${Date.now()}`
+);
+const { formatCoachSleepHeartRate, formatCoachDashboard } = await import(
+  `${distUrl("chatCoachContext.js")}?cacheBust=${Date.now()}`
 );
 
 const trendPoints = buildTrendPoints([
@@ -81,6 +88,28 @@ assert.equal(
   ),
   null
 );
+
+{
+  // The card draws the night's heart rate where it drew COROS's daytime RHR,
+  // on the morning the night ended (as HRV), and carries no `rhr` of its own.
+  const nights = new Map([["20260702", { heartRate: { avg: 54, min: 47 } }]]);
+  const points = withSleepHeartRate(trendPoints, nights);
+  assert.equal(points.some((point) => "rhr" in point), false, "no daytime resting HR on the card");
+  assert.deepEqual(
+    points.map((point) => [point.date, point.sleepAvgHr, point.sleepMinHr]),
+    [["20260701", undefined, undefined], ["20260702", 54, 47]]
+  );
+  const onlySleepHr = withSleepHeartRate(
+    buildTrendPoints([{ happenDay: "20260702", trainingLoad: 80, rhr: 49 }]),
+    nights
+  );
+  assert.ok(buildFitnessTrendPreview(onlySleepHr, "req-7"), "sleeping HR alone is a recovery card");
+  assert.equal(
+    buildFitnessTrendPreview(buildTrendPoints([{ happenDay: "20260702", rhr: 49 }]), "req-8"),
+    null,
+    "a daytime resting HR alone no longer is"
+  );
+}
 
 assert.equal(buildFitnessTrendPreview(trendPoints, "req-5", 30).windowDays, 30);
 assert.equal("windowDays" in fitnessPreview, false, "a card without a window reads as 7 days");
@@ -143,7 +172,7 @@ assert.match(
   assert.match(formatFitnessTrendsForChat(week, 7, today, lagging), /- 7 days to 09-10 Thu: exercise 70 min/);
 }
 assert.match(weekText, /- Training load: last 7 days 350\n/);
-assert.match(weekText, /- Resting HR: 55 bpm on 09-11 Fri; 7-day average 52\n/);
+assert.doesNotMatch(weekText, /Resting HR|RHR/, "COROS's daytime resting HR is not read");
 assert.match(
   weekText,
   /- Overnight HRV: 60 vs baseline 62 for the night ending 09-11 Fri; below baseline on 7 of the last 7 readings/
@@ -156,11 +185,53 @@ assert.match(
 assert.match(weekText, /- VO2max: 47 on 09-09 Wed\n/);
 assert.match(
   weekText,
-  /Daily \(HRV that night = the sleep after that day \(COROS files it under the next morning\)\):\nDay \| Load \| RHR \| HRV that night \(baseline\) \| Load Impact \| Load ratio \| Base Fitness \| VO2max\n/
+  /Daily \("that night" = the sleep after that day \(COROS files it under the next morning\); sleep includes naps; sleep HR is the main sleep's average \(lowest\)\):\nDay \| Load \| HRV that night \(baseline\) \| Load Impact \| Load ratio \| Base Fitness \| VO2max\n/
 );
-assert.doesNotMatch(weekText, /RPE load/, "a column nobody fills is dropped");
-assert.match(weekText, /09-09 Wed \| 50 \| 55 \| 60 \(62\) \| 30 \| 1\.15 \| 40 \| 47/);
-assert.match(weekText, /09-11 Fri \| 50 \| 55 \| — \| 30 \| 1\.15 \| 40 \| —/, "today's night has not been slept");
+assert.doesNotMatch(weekText, /RPE load|Sleep that night|Sleep HR/, "a column nobody fills is dropped");
+assert.match(weekText, /09-09 Wed \| 50 \| 60 \(62\) \| 30 \| 1\.15 \| 40 \| 47/);
+assert.match(weekText, /09-11 Fri \| 50 \| — \| 30 \| 1\.15 \| 40 \| —/, "today's night has not been slept");
+{
+  // The night after each day: its length and the heart rate it was slept at,
+  // and a summary that sets last night against the four weeks before the
+  // last seven. 35 nights at 50, then the last seven: 52 50 58 50 61 50 54.
+  const recentAvg = [52, 50, 58, 50, 61, 50, 54];
+  const records = Array.from({ length: 35 }, (_, offset) => ({
+    happenDay: key(offset),
+    kind: "main",
+    totalMinutes: 400 + offset,
+    napMinutes: offset === 0 ? 30 : 0,
+    completeness: "complete",
+    avgHr: offset < 7 ? recentAvg[6 - offset] : 50,
+    minHr: offset < 7 ? recentAvg[6 - offset] - 6 : 44
+  }));
+  const nights = sleepNightsByDay(records);
+  const text = formatFitnessTrendsForChat(week, 7, today, new Map(), nights);
+  assert.match(text, /\nDay \| Load \| Sleep that night \| HRV that night \(baseline\) \| Sleep HR that night \| Load Impact/);
+  // 09-09 Wed is followed by the night ending 09-10 Thu (offset 1: 401 min, 50 bpm).
+  assert.match(text, /\n09-09 Wed \| 50 \| 6h41 \| 60 \(62\) \| 50 \(44\) \| 30/);
+  assert.match(text, /\n09-11 Fri \| 50 \| — \| — \| — \| 30/, "the night after today has not been slept");
+  assert.match(text, /- Sleep: 7h10 the night ending 09-11 Fri; 7-night average 6h47\n/);
+  assert.match(
+    text,
+    /- Sleep HR: 54 \(48\) for the night ending 09-11 Fri; baseline 50 \(median of the 28 nights before the last 7\); 5\+ bpm above it on 2 of the last 7 nights\n/
+  );
+  // The summary leads with load, then the night, then HRV.
+  assert.ok(text.indexOf("- Sleep HR:") < text.indexOf("- Overnight HRV:"));
+
+  const monthWithNights = formatFitnessTrendsForChat(trendWindow(dayList, 30, today), 30, today, new Map(), nights);
+  assert.match(monthWithNights, /Week of \| Load \| Sleep avg \| HRV avg \(baseline\) \| Sleep HR avg \| Load Impact/);
+  // Week of 09-07: the nights after Mon–Fri end Tue–Fri (Sat has none yet):
+  // 403 402 401 430 min, 50 61 50 54 bpm.
+  assert.match(monthWithNights, /09-07 Mon \(partial\) \| 250 \| 6h49 \| 60 \(62\) \| 54 \|/);
+}
+{
+  // Under seven nights of history there is no baseline to state.
+  const short = sleepNightsByDay([
+    { happenDay: key(0), kind: "main", totalMinutes: 420, completeness: "complete", avgHr: 55, minHr: 49 }
+  ]);
+  const text = formatFitnessTrendsForChat(week, 7, today, new Map(), short);
+  assert.match(text, /- Sleep HR: 55 \(49\) for the night ending 09-11 Fri\n/);
+}
 {
   // COROS files a night under the morning it ended, so the night after a run
   // is the next day's reading. The 09-26 run was followed by 59, not by the
@@ -188,13 +259,13 @@ assert.match(
 assert.match(monthText, /- VO2max: 47 on 09-09 Wed \(was 46 on 08-22 Sat\)/);
 assert.match(
   monthText,
-  /Week of \| Load \| RHR avg \| HRV avg \(baseline\) \| Load Impact \| Load ratio \| Base Fitness \| VO2max\n/
+  /Week of \| Load \| HRV avg \(baseline\) \| Load Impact \| Load ratio \| Base Fitness \| VO2max\n/
 );
 // Weeks the window cuts into say so, so four days of load is not read against seven.
-assert.match(monthText, /08-10 Mon \(partial\) \| 200 \| 50 \|/);
-assert.match(monthText, /08-17 Mon \| 350 \| 50 \|/);
-assert.match(monthText, /09-07 Mon \(partial\) \| 250 \| 53 \|/);
-assert.match(monthText, /Daily, last 7 days \(HRV that night = [^)]+\)\):\nDay \|/);
+assert.match(monthText, /08-10 Mon \(partial\) \| 200 \| — \|/);
+assert.match(monthText, /08-17 Mon \| 350 \| — \|/);
+assert.match(monthText, /09-07 Mon \(partial\) \| 250 \| 60 \(62\) \|/);
+assert.match(monthText, /Daily, last 7 days \("that night" = the sleep after that day [^\n]+\):\nDay \|/);
 
 {
   // COROS's cycling VO2max is its own field. Parsed, a day without one has
@@ -205,14 +276,71 @@ assert.match(monthText, /Daily, last 7 days \(HRV that night = [^)]+\)\):\nDay \
   const text = formatFitnessTrendsForChat(rideWeek, 7, today);
   assert.match(text, /- VO2max: 47 on 09-09 Wed\n- Cycling VO2max: 52 on 09-11 Fri \(was 51 on 09-09 Wed\)\n/);
   assert.match(text, /\| Base Fitness \| VO2max \| Cycling VO2max\n/);
-  assert.match(text, /09-11 Fri \| 50 \| 55 \| — \| 30 \| 1\.15 \| 40 \| — \| 52/);
-  assert.match(text, /09-07 Mon \| 50 \| 50 \| 60 \(62\) \| 30 \| 1\.15 \| 40 \| — \| —/);
+  assert.match(text, /09-11 Fri \| 50 \| — \| 30 \| 1\.15 \| 40 \| — \| 52/);
+  assert.match(text, /09-07 Mon \| 50 \| 60 \(62\) \| 30 \| 1\.15 \| 40 \| — \| —/);
 }
 
 assert.equal(
   formatFitnessTrendsForChat([], 7, today),
   "No fitness trend data for the last 7 days."
 );
+// ---------------------------------------------------------------------------
+// The night's heart rate, as every reader takes it
+// ---------------------------------------------------------------------------
+{
+  const nights = sleepNightsByDay([
+    { happenDay: "20261016", kind: "main", totalMinutes: 459, completeness: "complete", avgHr: 78, minHr: 63 },
+    // A day of naps only: the daily-health line is one nap's, never a night's.
+    { happenDay: "20261017", kind: "nap-only", napMinutes: 40, completeness: "complete", avgHr: 70, minHr: 66 },
+    // Still arriving: neither its length nor its heart rate is the night's yet.
+    { happenDay: "20261018", kind: "main", totalMinutes: 120, completeness: "partial", avgHr: 60 },
+    // A nap folded into its day is no record of its own.
+    { happenDay: "20261019", kind: "nap", napMinutes: 20, avgHr: 65 },
+    { happenDay: "20261020", kind: "main", totalMinutes: 0, completeness: "complete", avgHr: 0 }
+  ]);
+  assert.deepEqual(nights.get("20261016"), { heartRate: { avg: 78, min: 63 }, minutes: 459 });
+  assert.deepEqual(nights.get("20261017"), { minutes: 40 }, "a nap-only day keeps its sleep, not its heart rate");
+  assert.equal(nights.has("20261018"), false);
+  assert.equal(nights.has("20261019"), false);
+  assert.deepEqual(nights.get("20261020"), { minutes: 0 }, "a zero is no heart rate");
+
+  assert.equal(medianOf([]), undefined);
+  assert.equal(medianOf([55, 50, 78]), 55, "one feverish night does not move a median");
+  assert.equal(medianOf([50, 52, 54, 56]), 53);
+
+  const byDay = new Map(
+    Array.from({ length: 10 }, (_, index) => [`202610${String(index + 1).padStart(2, "0")}`, { heartRate: { avg: 50 + (index === 4 ? 30 : 0) } }])
+  );
+  assert.equal(sleepHrBaseline(byDay, "20261011"), 50, "the ten nights before, a median");
+  assert.equal(sleepHrBaseline(byDay, "20261007"), undefined, "six nights are too few");
+}
+{
+  // The snapshot: COROS's daytime resting HR is gone, and last night's sleeping
+  // HR stands against the 28 nights before it.
+  const dashboard = formatCoachDashboard({ racePredictor: {}, rhr: 60, recoveryPct: 88 });
+  assert.doesNotMatch(dashboard, /Resting HR/);
+  assert.match(dashboard, /^- Recovery: 88%$/m);
+
+  const records = Array.from({ length: 30 }, (_, offset) => ({
+    happenDay: key(offset),
+    kind: "main",
+    totalMinutes: 420,
+    completeness: "complete",
+    avgHr: offset === 0 ? 61 : 52,
+    minHr: offset === 0 ? 50 : 46
+  }));
+  assert.equal(
+    formatCoachSleepHeartRate(records, today),
+    "- Sleep HR, night ending 09-11 Fri: 61 avg, 50 lowest; 28-night median 52"
+  );
+  assert.equal(
+    formatCoachSleepHeartRate(records.slice(1), today),
+    "- Sleep HR, night ending 09-10 Thu: 52 avg, 46 lowest; 28-night median 52",
+    "before this morning's night has synced, yesterday's is last night"
+  );
+  assert.equal(formatCoachSleepHeartRate(records.slice(2), today), undefined, "an older night would read as last night");
+}
+
 assert.equal(parseTrendDays(undefined), 7);
 assert.equal(parseTrendDays("28"), 28);
 assert.equal(parseTrendDays(500), 90);

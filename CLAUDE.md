@@ -1422,6 +1422,14 @@ lives at module level for the same visit-to-visit reason — see `useCalendarDat
   reads the library the Training Library reads, with a movement's name from the exercise
   catalogue (COROS stores "Training" for nearly every strength step). Each formatter computes
   its own totals and deltas so the model reads them rather than doing the arithmetic.
+  **Coach's recovery heart rate is the one slept at, never COROS's resting HR** (2026-10-23,
+  `electron/sleepHeartRate.ts`). COROS's `rhr` is the whole day's and moves with it: over 81
+  nights it read 53 for a night slept at 78 bpm (HRV 24 against 60) and 60 for an ordinary one.
+  The trend tool, the snapshot ("Sleep HR, night ending …"), the trend card and the
+  `restingHrDrift` threshold (id kept, it is stored; `coach_daily_samples.sleep_hr`) all read
+  the main sleep's average and lowest from the sleep cache — never a nap-only day's, whose
+  daily-health line is one nap — against a **median** of 28 nights. The trend lists each day's
+  following night: its length, HRV and sleeping HR. Overview's own RHR is untouched.
   **COROS MCP is left only what it alone has** (September 2026): every remote read with a
   local answer — a tool, or the snapshot, keyed to `get_fitness_trends` — is in
   `SUPERSEDED_COROS_MCP_TOOLS`, which on the live account leaves `queryHealthCheckTimeSeries`

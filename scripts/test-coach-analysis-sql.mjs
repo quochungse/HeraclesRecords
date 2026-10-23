@@ -280,14 +280,14 @@ assert.match(
 {
   database.upsertCoachDailySamples(
     [
-      { day: "20260820", resting_hr: 48, sleep_minutes: 430 },
-      { day: "20260821", resting_hr: 51, sleep_minutes: null }
+      { day: "20260820", sleep_hr: 48, sleep_minutes: 430 },
+      { day: "20260821", sleep_hr: 51, sleep_minutes: null }
     ],
     "2026-08-25T07:00:00.000Z"
   );
   assert.deepEqual(database.listCoachDailySamples("20260820"), [
-    { day: "20260820", resting_hr: 48, sleep_minutes: 430 },
-    { day: "20260821", resting_hr: 51, sleep_minutes: null }
+    { day: "20260820", sleep_hr: 48, sleep_minutes: 430 },
+    { day: "20260821", sleep_hr: 51, sleep_minutes: null }
   ]);
   assert.deepEqual(
     database.listCoachDailySamples("20260821").map((row) => row.day),
@@ -295,16 +295,16 @@ assert.match(
     "the window is a string comparison on a sortable key"
   );
 
-  // A snapshot that reached COROS for resting HR and could not reach the MCP
-  // server for sleep must not blank the sleep it already had — otherwise every
-  // disconnected poll would erase a night.
+  // A snapshot that read a night's heart rate and not its length must not
+  // blank the length it already had — otherwise every such poll would erase a
+  // night.
   database.upsertCoachDailySamples(
-    [{ day: "20260820", resting_hr: 49, sleep_minutes: null }],
+    [{ day: "20260820", sleep_hr: 49, sleep_minutes: null }],
     "2026-08-25T13:00:00.000Z"
   );
   assert.deepEqual(database.listCoachDailySamples("20260820")[0], {
     day: "20260820",
-    resting_hr: 49,
+    sleep_hr: 49,
     sleep_minutes: 430
   });
 }
