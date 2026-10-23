@@ -3285,7 +3285,7 @@ and this one is the only way back from the icon rail.
 **The rows are not `--text-secondary`, and the index carries no scrollbar.** That token is
 the right weight for prose beside a heading; a rail is not prose, it *is* the navigation, and
 at 13px with no fill behind it every row read as grey — so `--sidebar-row-text` steps up
-close to the ink (14.4:1 on dark, 11.7:1 on paper, measured in the running app) while
+close to the ink (14.4:1 on dark, 17.2:1 on paper's white rail) while
 `--sidebar-row-icon` stays a shade back, which puts the reading order inside the row instead
 of flattening it. Active still separates at 18.4:1 with weight 600, the accent icon and the
 bar. The heading sits between the two, one step quieter than a row rather than two.
@@ -3308,6 +3308,16 @@ development build, where the last destination would otherwise run into the accou
 narrow-window drawer is the one deliberate exception to all of this: it floats over the
 content, so it takes a fill and `--shadow-elevated` and drops the hairline, rather than
 drawing two devices for one edge.
+**Paper's rail is a white sheet** (since 2026-10-23, picked from a mockup of five): left on
+the grey canvas, the quiet rail was the palest, greyest thing on a screen of white cards and
+read as fogged over. So on paper only it takes `--glass-bg-elevated`, the headings drop to
+`--text-muted`, and the indicator is drawn as well as its bar — an `--accent-soft` wash that
+slides between rows, with the row's words in `--accent-strong` (hover leaves the active row's
+wash alone). The title bar above carries the white to the window's top edge, hairline
+included, as a gradient over `--app-rail-width`, which `AppSidebar` writes on the root on
+mount, on a switch to or from the drawer, and on every frame of the width spring
+(`onUpdate`) — the bar is App's, not a child of the rail, so it cannot read the width
+otherwise, and 0 while the rail is a drawer leaves it clear. Dark keeps the rail above.
 
 **`paper` is a grey canvas with white surfaces, and it is not free to be otherwise.** It was
 a warm cream page (`#f6f3ec`) carrying 72%-white glass, which put a card within three levels

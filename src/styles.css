@@ -372,8 +372,8 @@ svg:focus-visible {
      --surface-line — that token is transparent here. */
   --sidebar-divider: rgba(19, 26, 40, 0.1);
   --sidebar-drawer-bg: #ffffff;
-  --sidebar-row-text: #262d3c;
-  --sidebar-row-icon: #5c6478;
+  --sidebar-row-text: #161b27;
+  --sidebar-row-icon: #3d4558;
   --sidebar-glass-border: rgba(19, 26, 40, 0.13);
   --sidebar-glass-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.9),
@@ -16740,8 +16740,57 @@ td span {
     linear-gradient(180deg, rgba(19, 26, 40, 0.02), transparent 30%);
 }
 
+/*
+ * Paper's rail is a white sheet, the one place this theme parts from the
+ * quiet rail above. Left on the grey canvas it was the palest, greyest thing
+ * on a screen of white cards, and read as fogged over rather than as chrome
+ * keeping out of the way. The title bar carries the white up to the window's
+ * edge, hairline included, from the width the rail publishes
+ * (--app-rail-width, 0 while the rail is a drawer). Past the rail it shows
+ * the canvas, or the white of a screen whose own head is white
+ * (--app-titlebar-fill, which Coach sets).
+ */
+:root[data-theme="paper"] {
+  --app-titlebar-fill: transparent;
+}
+
+:root[data-theme="paper"] .app-sidebar {
+  background: var(--glass-bg-elevated);
+}
+
+:root[data-theme="paper"] .app-titlebar-drag,
 :root[data-theme="paper"] .dev-toolbar {
+  background: linear-gradient(
+    to right,
+    var(--glass-bg-elevated) 0 calc(var(--app-rail-width, 0px) - 1px),
+    var(--sidebar-divider) calc(var(--app-rail-width, 0px) - 1px) var(--app-rail-width, 0px),
+    var(--app-titlebar-fill) var(--app-rail-width, 0px)
+  );
+}
+
+:root[data-theme="paper"] .app-sidebar-section-label {
+  color: var(--text-muted);
+}
+
+/* On white, a bar and a weight are too little: the indicator becomes a wash
+   of the accent that slides between rows, the bar still at its edge. */
+:root[data-theme="paper"] .app-sidebar-indicator {
+  border-radius: var(--radius-sm);
+  background: var(--accent-soft);
+}
+
+:root[data-theme="paper"] .app-sidebar-nav-item.active,
+:root[data-theme="paper"] .app-sidebar-identity-main.active {
+  color: var(--accent-strong);
+}
+
+/* Hover's grey would cover the wash on the row it marks. */
+:root[data-theme="paper"] .app-sidebar-nav-item.active:hover {
   background: transparent;
+}
+
+:root[data-theme="paper"] .app-sidebar-identity-main.active {
+  background: var(--accent-soft);
 }
 
 :root[data-theme="paper"] .app-sidebar-overlay {
