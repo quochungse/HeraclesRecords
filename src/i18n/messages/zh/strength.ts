@@ -87,6 +87,7 @@ const strength: StrengthMessages = {
   "strength.bodyView": "身体视角",
   "strength.front": "正面",
   "strength.back": "背面",
+  "strength.rotate": "旋转",
   "strength.heatMetric": "着色指标",
   "strength.attribution.eyebrow": "肌群归属",
   "strength.attribution.none": "没有具体的肌群数据",

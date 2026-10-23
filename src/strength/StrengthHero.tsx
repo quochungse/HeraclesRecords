@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Info } from "lucide-react";
 import type { StrengthDataSource } from "../../electron/types";
 import { OptionGroup } from "../components/OptionGroup";
@@ -23,11 +23,29 @@ const metricOptions = (): { id: HeatMetric; label: string }[] => [
   { id: "time", label: t("activity.m.time") }
 ];
 
-const STRENGTH_BODY_VIEW_PREFERENCE = defineSelectionPreference<BodyView>({
-  key: "strength.bodyView",
-  defaultValue: "front",
-  validate: selectionIsOneOf(["front", "back"])
-});
+// Turning is remembered on this machine, and is where a new install starts;
+// front or back only for the session, so a launch after the turn was stopped
+// opens on the front.
+const BODY_ROTATE_STORAGE_KEY = "heraclesrecords.strength.bodyRotate";
+
+function readStoredRotating(): boolean {
+  try {
+    return localStorage.getItem(BODY_ROTATE_STORAGE_KEY) !== "false";
+  } catch {
+    return true;
+  }
+}
+
+function writeStoredRotating(rotating: boolean): void {
+  try {
+    localStorage.setItem(BODY_ROTATE_STORAGE_KEY, String(rotating));
+  } catch {
+    // Storage unavailable: the choice lasts the session.
+  }
+}
+
+let sessionBodyView: BodyView = "front";
+let sessionRotating: boolean | null = null;
 
 const STRENGTH_METRIC_PREFERENCE = defineSelectionPreference<HeatMetric>({
   key: "strength.metric",
@@ -66,7 +84,22 @@ export function StrengthHero({
   scope = "window"
 }: StrengthHeroProps) {
   const { unitSystem } = useUnitSystem();
-  const [view, setView] = useSelectionPreference(STRENGTH_BODY_VIEW_PREFERENCE);
+  const [view, setViewState] = useState<BodyView>(() => sessionBodyView);
+  const setView = useCallback((next: BodyView) => {
+    sessionBodyView = next;
+    setViewState(next);
+  }, []);
+  const [rotating, setRotatingState] = useState(
+    () => (sessionRotating ??= readStoredRotating())
+  );
+  const setRotating = useCallback((next: boolean) => {
+    sessionRotating = next;
+    writeStoredRotating(next);
+    setRotatingState(next);
+  }, []);
+  // Where the turning body faces, so a muscle picked mid-turn stops on the
+  // side it is seen from rather than on the side last chosen.
+  const facingRef = useRef<BodyView>(view);
   const [viewRequest, setViewRequest] = useState(0);
   const [metric, setMetric] = useSelectionPreference(STRENGTH_METRIC_PREFERENCE);
   const [selectedMuscle, setSelectedMuscle] = useState<MuscleId | null>(null);
@@ -83,8 +116,16 @@ export function StrengthHero({
     setSelectedMuscle(null);
     setFigureHover(null);
     setListHover(null);
+    setRotating(false);
     setView(next);
     setViewRequest((current) => current + 1);
+  }, []);
+
+  const startRotating = useCallback(() => {
+    setSelectedMuscle(null);
+    setFigureHover(null);
+    setListHover(null);
+    setRotating(true);
   }, []);
 
   const selectMuscle = useCallback(
@@ -97,14 +138,19 @@ export function StrengthHero({
         return;
       }
 
-      const nextView = resolveMuscleView(MUSCLE_BY_ID[muscle].view, view);
+      // Zooming in ends the turn: the body settles on the side the muscle is on.
+      const facing = rotating ? facingRef.current : view;
+      const nextView = resolveMuscleView(MUSCLE_BY_ID[muscle].view, facing);
+      if (rotating) {
+        setRotating(false);
+      }
       if (nextView !== view) {
         setView(nextView);
         setViewRequest((current) => current + 1);
       }
       setSelectedMuscle(muscle);
     },
-    [selectedMuscle, view]
+    [rotating, selectedMuscle, setRotating, setView, view]
   );
 
   const highlightedMuscle = figureHover ?? listHover ?? selectedMuscle;
@@ -130,12 +176,15 @@ export function StrengthHero({
           <OptionGroup
             label={t("strength.bodyView")}
             tone="quiet"
-            value={view}
+            value={rotating ? "rotate" : view}
             options={[
               { value: "front", label: t("strength.front") },
-              { value: "back", label: t("strength.back") }
+              { value: "back", label: t("strength.back") },
+              { value: "rotate", label: t("strength.rotate") }
             ]}
-            onChange={(next) => requestView(next as BodyView)}
+            onChange={(next) =>
+              next === "rotate" ? startRotating() : requestView(next as BodyView)
+            }
           />
           <OptionGroup
             label={t("strength.heatMetric")}
@@ -152,6 +201,8 @@ export function StrengthHero({
         <BodyMapV2
           view={view}
           viewRequest={viewRequest}
+          rotating={rotating}
+          facingRef={facingRef}
           metric={metric}
           muscleById={heat.muscleById}
           max={heat.max}

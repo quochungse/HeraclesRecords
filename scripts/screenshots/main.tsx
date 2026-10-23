@@ -7,6 +7,8 @@ try {
   if (!keep) localStorage.clear();
   localStorage.setItem("coros-theme", params.get("theme") ?? "dark");
   localStorage.setItem("heraclesrecords.startupView", params.get("view") ?? "overview");
+  // The strength body map turns by default; a shot catches it on the front.
+  localStorage.setItem("heraclesrecords.strength.bodyRotate", "false");
   const extra = params.get("ls");
   if (extra) for (const [k, v] of Object.entries(JSON.parse(extra) as Record<string, string>)) localStorage.setItem(k, v);
 } catch {}

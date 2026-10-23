@@ -88,6 +88,7 @@ const strength = {
   "strength.bodyView": "Body view",
   "strength.front": "Front",
   "strength.back": "Back",
+  "strength.rotate": "Rotate",
   "strength.heatMetric": "Heat metric",
   "strength.attribution.eyebrow": "Muscle attribution",
   "strength.attribution.none": "No specific muscle data",

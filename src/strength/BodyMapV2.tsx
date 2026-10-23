@@ -54,6 +54,10 @@ export type BodyView = "front" | "back";
 interface BodyMapV2Props {
   view: BodyView;
   viewRequest: number;
+  /** Turn the camera round the body without stopping. */
+  rotating?: boolean;
+  /** The side the turning camera faces now, written each frame it turns. */
+  facingRef?: { current: BodyView };
   metric: HeatMetric;
   muscleById: Record<MuscleId, MuscleStat>;
   max: number;
@@ -84,6 +88,11 @@ const SELECT_TRANSITION_MS = 900;
 const CHANGE_SELECTION_MS = 750;
 const CLEAR_SELECTION_MS = 700;
 const CHANGE_VIEW_MS = 650;
+// One turn every 3 s.
+const ROTATE_RADIANS_PER_SECOND = (2 * Math.PI) / 3;
+// A turn alone is drawn at 30 frames a second: the loop still wakes on every
+// display frame, but the GPU is asked for half of them.
+const TURN_FRAME_MS = 1000 / 30;
 const CALLOUT_REVEAL_PROGRESS = 0.58;
 const CAMERA_EYE_LIFT = 0.045;
 
@@ -243,7 +252,11 @@ interface AnatomyWorld {
   setHover: (hovered: MuscleId | null) => void;
   setLayers: (order: MuscleId[], hidden: Set<MuscleId>) => void;
   setLevels: (levels: Record<MuscleId, number>) => void;
-  setPresentation: (view: BodyView, selected: MuscleId | null) => void;
+  setPresentation: (
+    view: BodyView,
+    selected: MuscleId | null,
+    rotating: boolean
+  ) => void;
 }
 
 interface CameraPose {
@@ -267,11 +280,11 @@ function createWorld(
     onHover: (muscle: MuscleId | null) => void;
     onSelect: (muscle: MuscleId | null) => void;
     onViewChange: (view: BodyView) => void;
+    onFacing: (view: BodyView) => void;
     onLoad: () => void;
     onLoadProgress: (progress: number | null) => void;
     onError: () => void;
   },
-  reducedMotion: boolean,
   sex: FigureSex
 ): AnatomyWorld {
   const renderer = new WebGLRenderer({
@@ -410,6 +423,8 @@ function createWorld(
   let externalHover: MuscleId | null = null;
   let selected: MuscleId | null = null;
   let presentationView: BodyView = "front";
+  let rotating = false;
+  let lastTurnAt = 0;
   let modelReady = false;
   let calloutProjectionReady = false;
   let calloutRevealReady = false;
@@ -504,7 +519,11 @@ function createWorld(
     if (!selectedBounds) {
       selectedAnchor = null;
       return {
-        angle: nearestOrbitAngle(cameraPose.angle, angle),
+        // A turning body is not brought round to a side: a resize or a model
+        // arriving mid-turn would snap it to the front or back.
+        angle: rotating
+          ? cameraPose.angle
+          : nearestOrbitAngle(cameraPose.angle, angle),
         target: new Vector3(0, TARGET_Y, 0),
         distance: cameraDistance
       };
@@ -603,7 +622,7 @@ function createWorld(
     calloutRevealReady = false;
     updateCalloutVisibility();
 
-    if (reducedMotion || duration <= 0) {
+    if (duration <= 0) {
       cameraPose = destination;
       applyPresentationImmediately();
       return;
@@ -723,6 +742,15 @@ function createWorld(
   const resizeObserver = new ResizeObserver(resize);
   resizeObserver.observe(container);
 
+  // A hidden window drops the frame loop; coming back has to restart it, or a
+  // turning body stands still until the pointer moves over it.
+  const onVisibilityChange = () => {
+    if (!document.hidden) {
+      start();
+    }
+  };
+  document.addEventListener("visibilitychange", onVisibilityChange);
+
   const intersectionObserver = new IntersectionObserver(
     (entries) => {
       visible = entries.some((entry) => entry.isIntersecting);
@@ -743,6 +771,7 @@ function createWorld(
     const dt = Math.min(0.05, (now - last) / 1000);
     last = now;
     let animating = false;
+    let turning = false;
 
     if (cameraTransition) {
       const progress = Math.min(
@@ -783,6 +812,25 @@ function createWorld(
       }
     }
 
+    // The turn waits for a transition to land, and never runs with a muscle
+    // in focus: the camera is framing that muscle then.
+    if (rotating && !cameraTransition && selected === null) {
+      turning = true;
+      const sinceTurn = now - lastTurnAt;
+      if (sinceTurn > 250) {
+        // The turn starting, or the loop back after a pause: go on from here
+        // rather than jump by the time it was away.
+        lastTurnAt = now;
+      } else if (sinceTurn >= TURN_FRAME_MS - 1) {
+        lastTurnAt = now;
+        cameraPose.angle += (sinceTurn / 1000) * ROTATE_RADIANS_PER_SECOND;
+        applyCameraPose();
+        handlers.onFacing(Math.cos(cameraPose.angle) >= 0 ? "front" : "back");
+        needsRender = true;
+        hoverDirty = pointerInside;
+      }
+    }
+
     if (hoverDirty && pointerInside) {
       hoverDirty = false;
       const hit = pick();
@@ -794,7 +842,7 @@ function createWorld(
     }
 
     const active = localHover ?? externalHover;
-    const colorStep = reducedMotion ? 1 : 1 - Math.exp(-dt * 8);
+    const colorStep = 1 - Math.exp(-dt * 8);
     for (const [id, group] of groups) {
       const dimmed = selected !== null && selected !== id;
       const focused = id === active || id === selected;
@@ -831,7 +879,7 @@ function createWorld(
       needsRender = false;
       renderer.render(scene, camera);
     }
-    if (animating) {
+    if (animating || turning) {
       frame = requestAnimationFrame(tick);
     }
   };
@@ -937,6 +985,7 @@ function createWorld(
       }
       resizeObserver.disconnect();
       intersectionObserver.disconnect();
+      document.removeEventListener("visibilitychange", onVisibilityChange);
       canvas.removeEventListener("pointermove", onPointerMove);
       canvas.removeEventListener("pointerup", onPointerUp);
       canvas.removeEventListener("pointerleave", onPointerLeave);
@@ -975,11 +1024,20 @@ function createWorld(
       needsRender = true;
       start();
     },
-    setPresentation(nextView, nextSelected) {
+    setPresentation(nextView, nextSelected, nextRotating) {
       const previousSelected = selected;
       const previousView = presentationView;
+      const wasRotating = rotating;
       selected = nextSelected;
       presentationView = nextView;
+      rotating = nextRotating;
+
+      if (nextRotating && !nextSelected && !previousSelected) {
+        // Turning carries on from wherever the camera is.
+        needsRender = true;
+        start();
+        return;
+      }
 
       let duration = 0;
       if (previousSelected && nextSelected && previousSelected !== nextSelected) {
@@ -988,7 +1046,7 @@ function createWorld(
         duration = SELECT_TRANSITION_MS;
       } else if (previousSelected && !nextSelected) {
         duration = CLEAR_SELECTION_MS;
-      } else if (previousView !== nextView) {
+      } else if (previousView !== nextView || wasRotating) {
         duration = CHANGE_VIEW_MS;
       }
 
@@ -1002,6 +1060,8 @@ function createWorld(
 export function BodyMapV2({
   view,
   viewRequest,
+  rotating = false,
+  facingRef,
   metric,
   muscleById,
   max,
@@ -1015,8 +1075,8 @@ export function BodyMapV2({
   const containerRef = useRef<HTMLDivElement | null>(null);
   const calloutRef = useRef<HTMLDivElement | null>(null);
   const worldRef = useRef<AnatomyWorld | null>(null);
-  const handlersRef = useRef({ onHover, onSelect, onViewChange });
-  handlersRef.current = { onHover, onSelect, onViewChange };
+  const handlersRef = useRef({ onHover, onSelect, onViewChange, facingRef });
+  handlersRef.current = { onHover, onSelect, onViewChange, facingRef };
   const [loading, setLoading] = useState(true);
   const [progress, setProgress] = useState<number | null>(null);
   const [failed, setFailed] = useState(false);
@@ -1102,10 +1162,6 @@ export function BodyMapV2({
     if (!container || !callout || !shownSex) {
       return;
     }
-    const reducedMotion = window.matchMedia(
-      "(prefers-reduced-motion: reduce)"
-    ).matches;
-
     let world: AnatomyWorld;
     try {
       world = createWorld(
@@ -1115,6 +1171,12 @@ export function BodyMapV2({
           onHover: (muscle) => handlersRef.current.onHover(muscle),
           onSelect: (muscle) => handlersRef.current.onSelect(muscle),
           onViewChange: (next) => handlersRef.current.onViewChange?.(next),
+          onFacing: (next) => {
+            const ref = handlersRef.current.facingRef;
+            if (ref) {
+              ref.current = next;
+            }
+          },
           onLoad: () => {
             setLoading(false);
             setFailed(false);
@@ -1125,7 +1187,6 @@ export function BodyMapV2({
             setFailed(true);
           }
         },
-        reducedMotion,
         shownSex
       );
     } catch {
@@ -1167,8 +1228,8 @@ export function BodyMapV2({
   }, [hovered, worldVersion]);
 
   useEffect(() => {
-    worldRef.current?.setPresentation(view, selected);
-  }, [view, viewRequest, selected, worldVersion]);
+    worldRef.current?.setPresentation(view, selected, rotating);
+  }, [view, viewRequest, rotating, selected, worldVersion]);
 
   useEffect(() => {
     if (!selected) {

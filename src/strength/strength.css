@@ -709,10 +709,8 @@
   );
 }
 
-@media (prefers-reduced-motion: no-preference) {
-  .anatomy-model-skeleton::after {
-    animation: anatomy-model-shimmer 1.4s ease-in-out infinite;
-  }
+.anatomy-model-skeleton::after {
+  animation: anatomy-model-shimmer 1.4s ease-in-out infinite;
 }
 
 @keyframes anatomy-model-shimmer {
@@ -781,14 +779,6 @@
   .anatomy-muscle-callout strong {
     padding: 6px 9px;
     font-size: 12px;
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .anatomy-body-map::after,
-  .anatomy-muscle-callout,
-  .anatomy-muscle-callout strong {
-    transition: none;
   }
 }
 

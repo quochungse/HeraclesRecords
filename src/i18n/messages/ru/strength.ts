@@ -97,6 +97,7 @@ const strength: StrengthMessages = {
   "strength.bodyView": "Вид тела",
   "strength.front": "Спереди",
   "strength.back": "Сзади",
+  "strength.rotate": "Вращать",
   "strength.heatMetric": "Показатель карты",
   "strength.attribution.eyebrow": "Привязка к мышцам",
   "strength.attribution.none": "Нет данных по конкретным мышцам",

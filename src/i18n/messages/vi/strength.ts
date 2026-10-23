@@ -87,6 +87,7 @@ const strength: StrengthMessages = {
   "strength.bodyView": "Góc nhìn cơ thể",
   "strength.front": "Trước",
   "strength.back": "Sau",
+  "strength.rotate": "Xoay",
   "strength.heatMetric": "Chỉ số tô màu",
   "strength.attribution.eyebrow": "Phân bổ nhóm cơ",
   "strength.attribution.none": "Không có dữ liệu nhóm cơ cụ thể",

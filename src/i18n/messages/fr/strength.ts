@@ -87,6 +87,7 @@ const strength: StrengthMessages = {
   "strength.bodyView": "Vue du corps",
   "strength.front": "Face",
   "strength.back": "Dos",
+  "strength.rotate": "Rotation",
   "strength.heatMetric": "Indicateur de la carte",
   "strength.attribution.eyebrow": "Attribution musculaire",
   "strength.attribution.none": "Aucune donnée musculaire précise",

@@ -87,6 +87,7 @@ const strength: StrengthMessages = {
   "strength.bodyView": "Tampilan tubuh",
   "strength.front": "Depan",
   "strength.back": "Belakang",
+  "strength.rotate": "Putar",
   "strength.heatMetric": "Metrik peta",
   "strength.attribution.eyebrow": "Atribusi otot",
   "strength.attribution.none": "Tidak ada data otot spesifik",
