@@ -450,7 +450,7 @@ export function StrengthView({
         </section>
       ) : (
         <>
-          <section className="strength-summary" aria-label={t("strength.summaryLabel")}>
+          <section className="panel strength-card strength-summary" aria-label={t("strength.summaryLabel")}>
             {summaryItems.map((item) => (
               <div key={item.key} className="strength-summary-item">
                 <p className="strength-summary-label">{item.label}</p>
