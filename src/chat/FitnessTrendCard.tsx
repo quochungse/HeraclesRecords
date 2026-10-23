@@ -1,7 +1,6 @@
 import { memo } from "react";
 import {
   Area,
-  AreaChart,
   ComposedChart,
   Line,
   Tooltip,
@@ -44,19 +43,24 @@ function TrendTooltip({ active, payload, label }: TooltipContentProps) {
 /**
  * Memoised on `preview`, as `ActivityVisualCard` is and for the same reason.
  *
- * Recovery only: HRV against its baseline and the resting heart rate. A card
- * stored with training load keeps it in its points, undrawn — it is a
- * training figure, and the coach's words carry it.
+ * Recovery only: HRV against its baseline and the heart rate the night was
+ * slept at, average and lowest. A card stored with training load or COROS's
+ * daytime resting HR keeps them in its points, undrawn — load is a training
+ * figure the coach's words carry, and the daytime figure moves with the day
+ * rather than with recovery.
  */
 export const FitnessTrendCard = memo(function FitnessTrendCard({
   preview
 }: FitnessTrendCardProps) {
   useI18n();
-  const { colors, activeDot } = useChartColors();
+  const { colors, activeDot, metrics } = useChartColors();
+  // The night's heart rate wears its own lavender, as on the Sleep screen, so
+  // it does not read as a second HRV chart in the accent green and gold above.
+  const sleepHr = metrics.sleepHr;
   const hrvPoints = preview.trendPoints.filter(
     (point) => point.avgSleepHrv !== undefined || point.sleepHrvBase !== undefined
   );
-  const rhrPoints = preview.trendPoints.filter((point) => point.rhr !== undefined);
+  const sleepHrPoints = preview.trendPoints.filter((point) => point.sleepAvgHr !== undefined);
 
   return (
     <div className="chat-visual-card">
@@ -123,14 +127,17 @@ export const FitnessTrendCard = memo(function FitnessTrendCard({
         </section>
       ) : null}
 
-      {rhrPoints.length > 0 ? (
+      {sleepHrPoints.length > 0 ? (
         <section className="chat-visual-section">
-          <h5>{t("chat.trend.rhr")}</h5>
+          <h5>{t("chat.trend.sleepHr")}</h5>
           <div className="chat-visual-chart-shell">
             <ChartWhenNear>
-              <AreaChart data={rhrPoints} margin={trainingChartMargin}>
+              <ComposedChart data={sleepHrPoints} margin={trainingChartMargin}>
                 <defs>
-                  <ChartAreaGradient id={`chatRhrFill-${preview.previewId}`} />
+                  <ChartAreaGradient
+                    id={`chatSleepHrFill-${preview.previewId}`}
+                    stops={sleepHr.stops}
+                  />
                 </defs>
                 <XAxis
                   dataKey="label"
@@ -143,6 +150,8 @@ export const FitnessTrendCard = memo(function FitnessTrendCard({
                   axisLine={false}
                   tickLine={false}
                   width={36}
+                  domain={["dataMin - 3", "dataMax + 3"]}
+                  allowDecimals={false}
                 />
                 <Tooltip
                   content={(props) => <TrendTooltip {...props} />}
@@ -150,23 +159,34 @@ export const FitnessTrendCard = memo(function FitnessTrendCard({
                 />
                 <Area
                   type="monotone"
-                  dataKey="rhr"
-                  name={t("chat.trend.rhrShort")}
-                  stroke={colors.accentBright}
-                  fill={`url(#chatRhrFill-${preview.previewId})`}
+                  dataKey="sleepAvgHr"
+                  name={t("chat.trend.sleepHrAvg")}
+                  stroke={sleepHr.stroke}
+                  fill={`url(#chatSleepHrFill-${preview.previewId})`}
                   strokeWidth={2}
                   dot={false}
-                  activeDot={activeDot}
+                  activeDot={{ ...activeDot, fill: sleepHr.stroke }}
                   connectNulls
                   isAnimationActive={false}
                 />
-              </AreaChart>
+                <Line
+                  type="monotone"
+                  dataKey="sleepMinHr"
+                  name={t("chat.trend.sleepHrMin")}
+                  stroke={sleepHr.chip}
+                  strokeWidth={2}
+                  strokeDasharray="5 4"
+                  dot={false}
+                  connectNulls
+                  isAnimationActive={false}
+                />
+              </ComposedChart>
             </ChartWhenNear>
           </div>
         </section>
       ) : null}
 
-      {hrvPoints.length === 0 && rhrPoints.length === 0 ? (
+      {hrvPoints.length === 0 && sleepHrPoints.length === 0 ? (
         <p className="chat-visual-empty">{t("chat.trend.none")}</p>
       ) : null}
     </div>

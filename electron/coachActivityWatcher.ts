@@ -7,16 +7,14 @@ import {
   upsertCoachDailySamples
 } from "./database";
 import type { CoachDailySampleRow, CoachUnseenActivityRow } from "./database";
-import { getCorosMcpStatus } from "./corosMcpService";
-import { getTrainingSleepData } from "./sleepDataService";
-import { isSleepDayRecord, totalSleepMinutes } from "./sleepMetrics";
+import { getSleepHistory } from "./sleepHistoryService";
+import { sleepNightsByDay } from "./sleepHeartRate";
 import { listTriggeredCoachAnalyses } from "./coachAnalysisStore";
 import {
   activityMatchesTrigger,
   runAnalysisTrigger
 } from "./coachAnalysisService";
 import {
-  getDailyMetrics,
   getTrainingHubStatus,
   listTrainingHubActivities
 } from "./trainingHubService";
@@ -36,8 +34,9 @@ export const ACTIVITY_LOOKBACK_DAYS = 7;
 const INITIALIZED_SETTING = "coachAutomation.activityWatcherInitializedAt";
 
 /**
- * 3.3: the two series COROS owns rather than the app — resting HR and sleep —
- * snapshotted into `coach_daily_samples` so the scheduler's 60-second tick can
+ * 3.3: the two series COROS owns rather than the app — the heart rate a night
+ * was slept at, and how long it was — snapshotted into `coach_daily_samples`
+ * so the scheduler's 60-second tick can
  * evaluate a threshold without a request of its own.
  *
  * It lives here because this is already the thing that talks to COROS on a slow
@@ -104,42 +103,22 @@ function createDefaultDeps(): CoachActivityWatcherDeps {
     setSetting: (key, value) => setSetting(key, value),
     runTrigger: (event) => runAnalysisTrigger(event),
     readDailySamples: async (startDay, endDay) => {
-      const byDay = new Map<string, CoachDailySampleRow>();
-      const row = (day: string): CoachDailySampleRow => {
-        let existing = byDay.get(day);
-        if (!existing) {
-          existing = { day, resting_hr: null, sleep_minutes: null };
-          byDay.set(day, existing);
-        }
-        return existing;
-      };
-
-      const metrics = await getDailyMetrics([startDay, endDay]);
-      for (const entry of metrics.dayList) {
-        if (typeof entry.rhr === "number" && Number.isFinite(entry.rhr)) {
-          row(entry.happenDay).resting_hr = entry.rhr;
-        }
-      }
-
-      // Sleep comes through the COROS MCP server. getTrainingSleepData only
-      // ever reconnects silently from stored tokens now, so it cannot raise a
-      // window on this unattended path; the status check just skips the work
-      // when there is no session. Either way the cache keeps yesterday's
-      // answer rather than writing a hole into the samples.
-      if (getCorosMcpStatus().connected) {
-        const sleep = await getTrainingSleepData(DAILY_SAMPLE_LOOKBACK_DAYS);
-        for (const record of sleep.records) {
-          if (!isSleepDayRecord(record)) continue;
+      // Both series come off the sleep cache, which asks COROS MCP only for
+      // nights not yet settled and reconnects silently from stored tokens, so
+      // it cannot raise a window on this unattended path. A server that is
+      // gone leaves the cache answering, and the stored samples keep what
+      // they had rather than taking a hole. COROS's daytime resting HR is not
+      // read: it moves with the day, not with recovery (`sleepHeartRate.ts`).
+      const history = await getSleepHistory({ days: DAILY_SAMPLE_LOOKBACK_DAYS });
+      return [...sleepNightsByDay(history.records)]
+        .filter(([day]) => day >= startDay && day <= endDay)
+        .map(([day, night]) => ({
+          day,
+          sleep_hr: night.heartRate?.avg ?? null,
           // The day's whole sleep, naps included, so a day the athlete only
           // napped is a sample rather than a hole.
-          const minutes = totalSleepMinutes(record);
-          if (minutes !== undefined) {
-            row(record.happenDay).sleep_minutes = minutes;
-          }
-        }
-      }
-
-      return [...byDay.values()];
+          sleep_minutes: night.minutes ?? null
+        }));
     },
     writeDailySamples: (rows, capturedAt) => {
       upsertCoachDailySamples(rows, capturedAt);

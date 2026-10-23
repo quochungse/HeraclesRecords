@@ -454,7 +454,8 @@ export function initializeDatabase(userDataPath: string): Database.Database {
       ON coach_analysis_runs (started_at);
 
     -- 3.3: the two series a threshold metric needs and the app does not
-    -- otherwise keep. COROS owns resting HR and sleep; the activity watcher
+    -- otherwise keep. COROS owns resting HR and sleep (resting_hr is no longer
+    -- written: the sleep_hr column below took its place); the activity watcher
     -- snapshots them here on its slow poll so the scheduler's 60-second tick
     -- can evaluate a threshold without a request of its own.
     CREATE TABLE IF NOT EXISTS coach_daily_samples (
@@ -510,6 +511,10 @@ export function initializeDatabase(userDataPath: string): Database.Database {
   // feel_type caches the COROS end-of-activity feeling (sportFeelInfo.feelType,
   // 1..5; 0 = unrated). NULL = never fetched from the detail endpoint yet.
   ensureColumn(db, "training_activities", "feel_type", "INTEGER");
+  // The main sleep's average heart rate, by the morning it ended: what the
+  // `restingHrDrift` threshold reads since it stopped reading COROS's daytime
+  // `resting_hr`, which nothing writes any more. `derived`, like the row.
+  ensureColumn(db, "coach_daily_samples", "sleep_hr", "REAL");
   // The parse a strength breakdown was cached with (STRENGTH_DETAIL_VERSION in
   // strengthDetail.ts); an older one, NULL included, is parsed again. `derived`.
   ensureColumn(db, "strength_sessions", "parse_version", "INTEGER");
@@ -1449,13 +1454,13 @@ export function deleteAnalysisLocalTriggerRow(analysisId: string): void {
 
 export interface CoachDailySampleRow {
   day: string;
-  resting_hr: number | null;
+  sleep_hr: number | null;
   sleep_minutes: number | null;
 }
 
 /**
- * 3.3's local cache, upserted column by column. A snapshot that reached COROS
- * for resting HR and failed on sleep must not blank the sleep it already had,
+ * 3.3's local cache, upserted column by column. A snapshot that read a night's
+ * heart rate and not its length must not blank the length it already had,
  * so each column keeps its stored value when the incoming row says nothing.
  */
 export function upsertCoachDailySamples(
@@ -1467,10 +1472,10 @@ export function upsertCoachDailySamples(
   }
   const database = requireDatabase();
   const statement = database.prepare(
-    `INSERT INTO coach_daily_samples (day, resting_hr, sleep_minutes, captured_at)
-     VALUES (@day, @resting_hr, @sleep_minutes, @captured_at)
+    `INSERT INTO coach_daily_samples (day, sleep_hr, sleep_minutes, captured_at)
+     VALUES (@day, @sleep_hr, @sleep_minutes, @captured_at)
      ON CONFLICT(day) DO UPDATE SET
-       resting_hr = COALESCE(excluded.resting_hr, coach_daily_samples.resting_hr),
+       sleep_hr = COALESCE(excluded.sleep_hr, coach_daily_samples.sleep_hr),
        sleep_minutes =
          COALESCE(excluded.sleep_minutes, coach_daily_samples.sleep_minutes),
        captured_at = excluded.captured_at`
@@ -1575,7 +1580,7 @@ export function pruneSleepNightSeries(beforeDay: string): void {
 export function listCoachDailySamples(fromDay: string): CoachDailySampleRow[] {
   return requireDatabase()
     .prepare(
-      `SELECT day, resting_hr, sleep_minutes
+      `SELECT day, sleep_hr, sleep_minutes
        FROM coach_daily_samples
        WHERE day >= ?
        ORDER BY day ASC`

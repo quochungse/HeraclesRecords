@@ -10,6 +10,11 @@
   --sleep-light: #3570ff;
   --sleep-rem: #7fbffd;
   --sleep-awake: #fefec7;
+  /* The night's recovery figures beside them: HRV in the HRV chart's green,
+     the heart rate slept at in a calm lavender. Mirrors the `hrv` and `sleepHr`
+     palettes in src/training/chartConfig.ts — change both. */
+  --sleep-hrv: #74c08f;
+  --sleep-hr: #b79bff;
 
   /* Per-sport activity colors. Overridden at runtime from localStorage via
      applySportColors(); customizable in Settings → Activity colors.
@@ -289,6 +294,8 @@ svg:focus-visible {
   color-scheme: light;
 
   --sleep-awake: #e3c94a;
+  --sleep-hrv: #0f7f5f;
+  --sleep-hr: #7c5cd6;
 
   --bg-base: #e9ecf2; /* cool paper */
   --bg-ambient-tertiary: color-mix(in srgb, var(--accent) 8%, transparent);
@@ -2224,7 +2231,7 @@ input::placeholder {
 .activities-summary-value,
 .run-hero-value,
 .running-stat strong,
-.sleep-detail-score strong,
+.sleep-detail-figure strong,
 .sleep-panel-score strong,
 .strength-figure strong,
 .muscle-hero-value strong,

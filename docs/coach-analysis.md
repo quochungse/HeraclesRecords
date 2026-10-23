@@ -94,7 +94,7 @@ so is everything in them. See Migration below for why nothing is carried over.
 | `coach_analyses` | `personal` | the analysis: what it says, where, when, and its clocks |
 | `coach_analysis_local_triggers` | **`device`** | the trigger of an analysis marked "this device only" |
 | `coach_analysis_runs` | `derived` | the run log |
-| `coach_daily_samples` | `derived` | 3.3's resting-HR and sleep cache |
+| `coach_daily_samples` | `derived` | 3.3's sleeping-HR and sleep cache (`sleep_hr`; `resting_hr` is no longer written) |
 
 `coach_analyses` was created rather than grown, so every column it has is in
 the `CREATE TABLE` block — there is nothing here for `ensureColumn` to add and

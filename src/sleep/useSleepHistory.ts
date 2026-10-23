@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { HeraclesRecordsApi } from "../heraclesrecords-api";
 import type { SleepHistorySnapshot } from "../../electron/types";
+import { SLEEP_SCREEN_TREND_DAYS } from "../training/chartConfig";
 
 /** The window the screen opens on. Wide enough for a month's shape, cheap to hold. */
-export const SLEEP_HISTORY_DAYS = 30;
+export const SLEEP_HISTORY_DAYS = SLEEP_SCREEN_TREND_DAYS;
 
 export interface SleepHistoryState {
   snapshot: SleepHistorySnapshot | null;

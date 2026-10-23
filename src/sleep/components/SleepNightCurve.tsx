@@ -14,6 +14,7 @@ import { Loader2 } from "lucide-react";
 import { trainingChartMargin } from "../../training/chartConfig";
 import { useChartColors } from "../../training/useChartColors";
 import { mcpShortTextOr } from "../../mcp/mcpNotice";
+import type { XAxisTickContentProps } from "recharts";
 import type { SleepNightSeries, SleepSeriesPoint } from "../../../electron/types";
 import { t } from "../../i18n/core";
 
@@ -84,6 +85,36 @@ function nearestSample(
   return best && bestGap <= toleranceMs
     ? { point: best, offsetMs: bestGap }
     : undefined;
+}
+
+/**
+ * An hour label at either end of the night, anchored inward. A window that
+ * opens on the hour puts its first mark at the plot's very edge, where a
+ * centred "00:00" spilled half its width into the axis column beside the 0.
+ * Within this share of the span a label is pinned to its edge instead.
+ */
+const EDGE_TICK_SHARE = 0.04;
+
+function HourTick({
+  x,
+  y,
+  payload,
+  start,
+  end,
+  fill
+}: Pick<XAxisTickContentProps, "x" | "y" | "payload"> & {
+  start: number;
+  end: number;
+  fill: string;
+}) {
+  const at = Number(payload?.value);
+  const edge = (end - start) * EDGE_TICK_SHARE;
+  const anchor = at - start < edge ? "start" : end - at < edge ? "end" : "middle";
+  return (
+    <text x={x} y={y} dy="0.71em" textAnchor={anchor} fill={fill} fontSize={11}>
+      {formatClock(at)}
+    </text>
+  );
 }
 
 /** Wide enough to reach the next HRV sample, narrow enough not to span a gap. */
@@ -246,122 +277,119 @@ export function SleepNightCurve({ series, loading }: SleepNightCurveProps) {
   const hasStress = series.stress.length > 0;
   const assessment = series.assessment;
 
+  // No heading line: the window and the night's HRV are in the header above,
+  // and saying them twice is what this line used to do. The figure keeps the
+  // window as its name.
   return (
-    <div ref={box} className="sleep-curve">
-      <div className="sleep-curve-head">
-        <p className="sleep-curve-title">
-          {t("sleep.curve.across")}
-          <span>
-            {formatClock(start)} – {formatClock(end)}
-          </span>
-        </p>
-        {assessment?.avg !== undefined ? (
-          <p className="sleep-curve-assessment">
-            {t("sleep.curve.hrvAvg")} <strong>{Math.round(assessment.avg)} ms</strong>
-            {assessment.evaluation ? ` · ${assessment.evaluation}` : ""}
-            {assessment.normalLow !== undefined && assessment.normalHigh !== undefined
-              ? ` · ${t("sleep.curve.normal", {
-                  low: Math.round(assessment.normalLow),
-                  high: Math.round(assessment.normalHigh)
-                })}`
-              : ""}
-          </p>
-        ) : null}
+    <div
+      ref={box}
+      className="sleep-curve"
+      role="figure"
+      aria-label={`${t("sleep.curve.across")} ${formatClock(start)} – ${formatClock(end)}`}
+    >
+
+      {/* Each axis's unit over its column, above the top value: what the
+          numbers count, said where they are read. */}
+      <div className="sleep-curve-plot">
+        <ResponsiveContainer width="100%" height={210}>
+          <ComposedChart data={rows} margin={trainingChartMargin}>
+            <CartesianGrid stroke={colors.grid} strokeDasharray="3 6" vertical={false} />
+
+            {/* COROS's own normal band, so a reading is judged against its
+                baseline rather than against the shape of one night. */}
+            {assessment?.normalLow !== undefined && assessment.normalHigh !== undefined ? (
+              <ReferenceArea
+                yAxisId="hrv"
+                y1={assessment.normalLow}
+                y2={assessment.normalHigh}
+                fill={colors.accentSoft}
+                fillOpacity={0.35}
+                stroke="none"
+              />
+            ) : null}
+
+            <XAxis
+              dataKey="at"
+              type="number"
+              scale="time"
+              domain={[start, end]}
+              ticks={hourTicks(start, end)}
+              // Every hour, the edge ones too: they are pinned inward below,
+              // where recharts would otherwise drop one it thinks overflows.
+              interval={0}
+              tick={({ x, y, payload }) => (
+                <HourTick x={x} y={y} payload={payload} start={start} end={end} fill={colors.text} />
+              )}
+              stroke={colors.text}
+              tickLine={false}
+              axisLine={false}
+              fontSize={11}
+            />
+            <YAxis
+              yAxisId="hrv"
+              stroke={colors.text}
+              tickLine={false}
+              axisLine={false}
+              width={38}
+              fontSize={11}
+              tickFormatter={(value: number) => `${Math.round(value)}`}
+              label={undefined}
+            />
+            <YAxis
+              yAxisId="stress"
+              orientation="right"
+              stroke={colors.text}
+              tickLine={false}
+              axisLine={false}
+              width={30}
+              domain={[0, 100]}
+              fontSize={11}
+            />
+            <Tooltip
+              cursor={{ stroke: colors.cursor }}
+              content={
+                <CurveTooltip
+                  series={series}
+                  hrvColor={colors.accentBright}
+                  stressColor={colors.gold}
+                />
+              }
+            />
+
+            {hasStress ? (
+              <Area
+                yAxisId="stress"
+                type="monotone"
+                dataKey="stress"
+                name={t("sleep.curve.stress")}
+                stroke={colors.gold}
+                strokeWidth={1.5}
+                fill={colors.gold}
+                fillOpacity={0.14}
+                connectNulls
+                isAnimationActive={false}
+              />
+            ) : null}
+            {hasHrv ? (
+              <Line
+                yAxisId="hrv"
+                type="monotone"
+                dataKey="hrv"
+                name="HRV"
+                stroke={colors.accentBright}
+                strokeWidth={2}
+                dot={false}
+                connectNulls
+                isAnimationActive={false}
+              />
+            ) : null}
+          </ComposedChart>
+        </ResponsiveContainer>
+        {hasHrv ? <span className="sleep-curve-unit is-left">{t("sleep.curve.hrvAxis")}</span> : null}
+        {hasStress ? <span className="sleep-curve-unit is-right">{t("sleep.curve.stress")}</span> : null}
       </div>
 
-      <ResponsiveContainer width="100%" height={210}>
-        <ComposedChart data={rows} margin={trainingChartMargin}>
-          <CartesianGrid stroke={colors.grid} strokeDasharray="3 6" vertical={false} />
-
-          {/* COROS's own normal band, so a reading is judged against its
-              baseline rather than against the shape of one night. */}
-          {assessment?.normalLow !== undefined && assessment.normalHigh !== undefined ? (
-            <ReferenceArea
-              yAxisId="hrv"
-              y1={assessment.normalLow}
-              y2={assessment.normalHigh}
-              fill={colors.accentSoft}
-              fillOpacity={0.35}
-              stroke="none"
-            />
-          ) : null}
-
-          <XAxis
-            dataKey="at"
-            type="number"
-            scale="time"
-            domain={[start, end]}
-            ticks={hourTicks(start, end)}
-            tickFormatter={formatClock}
-            stroke={colors.text}
-            tickLine={false}
-            axisLine={false}
-            fontSize={11}
-          />
-          <YAxis
-            yAxisId="hrv"
-            stroke={colors.text}
-            tickLine={false}
-            axisLine={false}
-            width={38}
-            fontSize={11}
-            tickFormatter={(value: number) => `${Math.round(value)}`}
-            label={undefined}
-          />
-          <YAxis
-            yAxisId="stress"
-            orientation="right"
-            stroke={colors.text}
-            tickLine={false}
-            axisLine={false}
-            width={30}
-            domain={[0, 100]}
-            fontSize={11}
-          />
-          <Tooltip
-            cursor={{ stroke: colors.cursor }}
-            content={
-              <CurveTooltip
-                series={series}
-                hrvColor={colors.accentBright}
-                stressColor={colors.gold}
-              />
-            }
-          />
-
-          {hasStress ? (
-            <Area
-              yAxisId="stress"
-              type="monotone"
-              dataKey="stress"
-              name={t("sleep.curve.stress")}
-              stroke={colors.gold}
-              strokeWidth={1.5}
-              fill={colors.gold}
-              fillOpacity={0.14}
-              connectNulls
-              isAnimationActive={false}
-            />
-          ) : null}
-          {hasHrv ? (
-            <Line
-              yAxisId="hrv"
-              type="monotone"
-              dataKey="hrv"
-              name="HRV"
-              stroke={colors.accentBright}
-              strokeWidth={2}
-              dot={false}
-              connectNulls
-              isAnimationActive={false}
-            />
-          ) : null}
-        </ComposedChart>
-      </ResponsiveContainer>
-
-      <p className="sleep-curve-note">
-        {t("sleep.curve.note")}
-      </p>
+      <p className="sleep-curve-note">{t("sleep.curve.note")}</p>
     </div>
   );
 }

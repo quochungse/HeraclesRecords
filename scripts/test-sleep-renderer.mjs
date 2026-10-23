@@ -157,7 +157,7 @@ async function answerSeries(happenDay, hourOfDay) {
     `a request for ${happenDay} was in flight to answer`
   );
   await waitFor(
-    () => harness("exists", ".sleep-curve-title"),
+    () => harness("exists", '.sleep-curve[role="figure"]'),
     `${happenDay} draws its curve`
   );
   await settle();
@@ -212,6 +212,12 @@ async function main() {
   const chart = await harness("rect", ".sleep-curve");
   assert.ok(chart.height > 200, `a drawn curve is a tall box, got ${chart.height}px`);
 
+  // The fixture's night opens on the hour, so its first mark is the plot's
+  // left edge: centred, "22:00" spilled into the axis column beside the 0.
+  const hourLabel = ".sleep-curve .recharts-xAxis-tick-labels text";
+  assert.equal(await harness("attr", hourLabel, "text-anchor", 0), "start", "the edge hour is pinned inward");
+  assert.equal(await harness("attr", hourLabel, "text-anchor", 1), "middle", "an hour inside the night stays centred");
+
   // -------------------------------------------------------------------------
   // 1. Waiting for the next night holds the box open
   // -------------------------------------------------------------------------
@@ -239,7 +245,9 @@ async function main() {
   // -------------------------------------------------------------------------
   // 2. A night already seen is not asked for again
   // -------------------------------------------------------------------------
-  const secondTitle = await harness("text", ".sleep-curve-title");
+  // The curve names its window; that is what tells one night's from another's.
+  const curveName = () => harness("attr", '.sleep-curve[role="figure"]', "aria-label");
+  const secondTitle = await curveName();
   await harness("clearCalls");
   await selectNight(DAYS[0]);
 
@@ -253,7 +261,7 @@ async function main() {
     false,
     "so nothing ever said it was loading"
   );
-  const backTitle = await harness("text", ".sleep-curve-title");
+  const backTitle = await curveName();
   assert.notEqual(backTitle, secondTitle, "and the curve is the first night's again");
   assert.equal((await harness("rect", ".sleep-curve")).height, chart.height);
 
@@ -262,7 +270,7 @@ async function main() {
   await harness("clearCalls");
   await selectNight(DAYS[1]);
   assert.equal(await harness("callCount", "getSleepNightSeries"), 0);
-  assert.equal(await harness("text", ".sleep-curve-title"), secondTitle);
+  assert.equal(await curveName(), secondTitle);
 
   // -------------------------------------------------------------------------
   // 3. Refresh goes past the memory, because that is what it is for

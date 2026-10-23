@@ -124,7 +124,7 @@ function createWorld(overrides = {}) {
     /** 3.3's local cache: every snapshot asked for, and what landed. */
     sampleReads: [],
     sampleWrites: [],
-    sampleRows: [{ day: "20260821", resting_hr: 48, sleep_minutes: 430 }]
+    sampleRows: [{ day: "20260821", sleep_hr: 48, sleep_minutes: 430 }]
   };
 
   const deps = {

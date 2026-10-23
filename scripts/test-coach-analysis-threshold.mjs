@@ -36,8 +36,8 @@ const {
   ACUTE_WINDOW_DAYS,
   CHRONIC_WINDOW_DAYS,
   PLAN_ADHERENCE_LOOKBACK_DAYS,
-  RESTING_HR_BASELINE_DAYS,
-  RESTING_HR_STREAK_DAYS,
+  SLEEP_HR_DRIFT_BASELINE_NIGHTS,
+  SLEEP_HR_DRIFT_STREAK_NIGHTS,
   SLEEP_TARGET_MINUTES,
   SLEEP_WINDOW_NIGHTS,
   THRESHOLD_LOOKBACK_DAYS,
@@ -45,7 +45,7 @@ const {
   fromDayKey,
   isAcuteChronicRamp,
   isPlanAdherenceBreach,
-  isRestingHrDrift,
+  isSleepHrDrift,
   isSleepDebt,
   toDayKey
 } = require(path.join(repoRoot, "dist-electron", "coachThresholdMetrics.js"));
@@ -60,11 +60,11 @@ const { CoachAnalysisScheduler, THRESHOLD_RETRY_INTERVAL_MS } = require(
 
 assert.equal(ACUTE_WINDOW_DAYS, 7);
 assert.equal(CHRONIC_WINDOW_DAYS, 28);
-assert.equal(RESTING_HR_BASELINE_DAYS, 30);
-assert.equal(RESTING_HR_STREAK_DAYS, 3);
+assert.equal(SLEEP_HR_DRIFT_BASELINE_NIGHTS, 28);
+assert.equal(SLEEP_HR_DRIFT_STREAK_NIGHTS, 3);
 assert.equal(SLEEP_WINDOW_NIGHTS, 7);
 assert.ok(
-  THRESHOLD_LOOKBACK_DAYS >= RESTING_HR_BASELINE_DAYS + RESTING_HR_STREAK_DAYS,
+  THRESHOLD_LOOKBACK_DAYS >= SLEEP_HR_DRIFT_BASELINE_NIGHTS + SLEEP_HR_DRIFT_STREAK_NIGHTS,
   "a snapshot has to reach back past the baseline *and* the streak in front of it"
 );
 
@@ -156,22 +156,23 @@ function loadFixture(chronicTotal, acuteExtra) {
 }
 
 // ---------------------------------------------------------------------------
-// restingHrDrift: N bpm over the 30-day baseline, three days running
+// restingHrDrift, read on sleeping HR: N bpm over the median of the 28
+// nights before, three nights running
 // ---------------------------------------------------------------------------
 
 /** A steady baseline, with the last three days optionally lifted. */
 function hrFixture(baseline, streak) {
   const daily = [];
   for (
-    let daysAgo = RESTING_HR_STREAK_DAYS;
-    daysAgo < RESTING_HR_STREAK_DAYS + RESTING_HR_BASELINE_DAYS;
+    let daysAgo = SLEEP_HR_DRIFT_STREAK_NIGHTS;
+    daysAgo < SLEEP_HR_DRIFT_STREAK_NIGHTS + SLEEP_HR_DRIFT_BASELINE_NIGHTS;
     daysAgo += 1
   ) {
-    daily.push({ day: dayKey(daysAgo), restingHr: baseline });
+    daily.push({ day: dayKey(daysAgo), sleepHr: baseline });
   }
   streak.forEach((value, index) => {
     if (value !== null) {
-      daily.push({ day: dayKey(RESTING_HR_STREAK_DAYS - 1 - index), restingHr: value });
+      daily.push({ day: dayKey(SLEEP_HR_DRIFT_STREAK_NIGHTS - 1 - index), sleepHr: value });
     }
   });
   return daily;
@@ -179,49 +180,49 @@ function hrFixture(baseline, streak) {
 
 {
   assert.equal(
-    isRestingHrDrift(NOW, hrFixture(50, [55, 55, 55]), 5),
+    isSleepHrDrift(NOW, hrFixture(50, [55, 55, 55]), 5),
     true,
     "exactly 5 bpm above *is* 5 bpm above"
   );
   assert.equal(
-    isRestingHrDrift(NOW, hrFixture(50, [54.9, 55, 55]), 5),
+    isSleepHrDrift(NOW, hrFixture(50, [54.9, 55, 55]), 5),
     false,
     "one day short of the bar breaks the streak"
   );
-  assert.equal(isRestingHrDrift(NOW, hrFixture(50, [55, 55, 55]), 5.1), false);
+  assert.equal(isSleepHrDrift(NOW, hrFixture(50, [55, 55, 55]), 5.1), false);
 
   // The streak has to be the three days ending today. Two elevated days and a
   // recovered one is a recovery, not a drift.
-  assert.equal(isRestingHrDrift(NOW, hrFixture(50, [50, 55, 55]), 5), false);
+  assert.equal(isSleepHrDrift(NOW, hrFixture(50, [50, 55, 55]), 5), false);
 
   // A missing reading breaks it rather than passing through: three consecutive
   // days is a claim about three days, and a day with no reading is not one.
   assert.equal(
-    isRestingHrDrift(NOW, hrFixture(50, [55, null, 55]), 5),
+    isSleepHrDrift(NOW, hrFixture(50, [55, null, 55]), 5),
     false,
     "a gap in the streak is a gap, not a pass"
   );
 
   assert.equal(
-    isRestingHrDrift(NOW, [{ day: dayKey(0), restingHr: 90 }], 5),
+    isSleepHrDrift(NOW, [{ day: dayKey(0), sleepHr: 90 }], 5),
     false,
     "with no baseline there is nothing to be above"
   );
 }
 
 {
-  // The baseline is the 30 days *before* the streak. Averaging the elevated
+  // The baseline is the 28 nights *before* the streak. Taking the elevated
   // days into it would raise the bar the longer the drift lasted, which is
   // backwards — so the same readings must fire either way round.
   const daily = hrFixture(50, [55, 55, 55]);
   const withStreakInBaseline =
-    (50 * RESTING_HR_BASELINE_DAYS + 55 * 3) / (RESTING_HR_BASELINE_DAYS + 3);
+    (50 * SLEEP_HR_DRIFT_BASELINE_NIGHTS + 55 * 3) / (SLEEP_HR_DRIFT_BASELINE_NIGHTS + 3);
   assert.ok(
     withStreakInBaseline > 50,
     "fixture sanity: including the streak would move the baseline up"
   );
   assert.equal(
-    isRestingHrDrift(NOW, daily, 5),
+    isSleepHrDrift(NOW, daily, 5),
     true,
     "the baseline excludes the streak, so 5 above 50 still counts"
   );
@@ -664,40 +665,46 @@ function harness({ analyses, firing = false, outcome }) {
 {
   // R4 step 7. `isSleepDebt` has always wanted `> 0` from its nights; this one
   // took anything finite, and it feeds a *baseline* — so one zero from a bad
-  // COROS payload or a hand edit drags the average down and turns an ordinary
-  // morning into three days of drift. A rule that announces a problem the
-  // athlete does not have is worse than one that stays quiet.
+  // COROS payload or a hand edit dragged the average down and turned an
+  // ordinary morning into three days of drift. The baseline is a median now,
+  // which one zero no longer moves; the guard stays, and these still hold.
   // The streak has to sit *between* the two baselines, or both readings agree
   // and the fixture proves nothing — the trap the trimming suite already fell
   // into once. Baseline 50 over 30 days; one zero drags it to 48.3. A streak of
   // 54 clears 48.3 + 5 and does not clear 50 + 5, so the two readings disagree
   // here and only here.
   const withZero = hrFixture(50, [54, 54, 54]);
-  withZero[0] = { ...withZero[0], restingHr: 0 };
+  withZero[0] = { ...withZero[0], sleepHr: 0 };
   assert.equal(
-    isRestingHrDrift(NOW, withZero, 5),
+    isSleepHrDrift(NOW, withZero, 5),
     false,
     "a zero is dropped rather than averaged in"
   );
 
+  // A median: one feverish night in the baseline does not lift the bar, where
+  // a mean would have taken 78 into it and hidden a real drift.
+  const withFever = hrFixture(50, [55, 55, 55]);
+  withFever[0] = { ...withFever[0], sleepHr: 78 };
+  assert.equal(isSleepHrDrift(NOW, withFever, 5), true, "one outlier night leaves the baseline at 50");
+
   // The same fixture with that day simply absent must agree — which is the
   // point: an unreadable value and a missing one are the same fact.
   assert.equal(
-    isRestingHrDrift(NOW, withZero.slice(1), 5),
+    isSleepHrDrift(NOW, withZero.slice(1), 5),
     false,
     "and a missing day reads identically"
   );
 
   // And the guard has not made the metric unable to fire.
   assert.equal(
-    isRestingHrDrift(NOW, hrFixture(50, [56, 56, 56]), 5),
+    isSleepHrDrift(NOW, hrFixture(50, [56, 56, 56]), 5),
     true,
     "a real drift still fires"
   );
   // The fixture is on the right side of the line for the reason above: without
   // the guard, the same 54 would have fired.
   assert.equal(
-    isRestingHrDrift(NOW, hrFixture(48.333333333333336, [54, 54, 54]), 5),
+    isSleepHrDrift(NOW, hrFixture(48.333333333333336, [54, 54, 54]), 5),
     true,
     "fixture sanity: 54 does clear a baseline dragged down by one zero"
   );

@@ -321,11 +321,21 @@
   gap: 18px;
 }
 
+/* Bottom-aligned, so the figures in the box sit on the line of the night's
+   length rather than up beside the date; it wraps under it on a narrow pane. */
 .sleep-detail-header {
   display: flex;
-  align-items: flex-start;
+  flex-wrap: wrap;
+  align-items: flex-end;
   justify-content: space-between;
   gap: 16px;
+}
+
+.sleep-detail-date {
+  margin: 0;
+  color: var(--text-primary);
+  font-size: 14px;
+  font-weight: 600;
 }
 
 .sleep-detail-header h2 {
@@ -345,42 +355,65 @@
   font-variant-numeric: tabular-nums;
 }
 
-.sleep-detail-window-day {
-  border-radius: var(--radius-xs);
-  padding: 1px 5px;
-  background: color-mix(in srgb, var(--text-primary) 9%, transparent);
-  color: var(--text-muted);
-  font-size: 11px;
-  font-weight: 600;
+/* HRV, the heart rate slept at and the score: one box of three cells, read
+   at a glance and kept smaller than the night's length beside it. */
+.sleep-detail-figures {
+  display: flex;
+  margin: 0;
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-sm);
+  padding: 6px 0;
 }
 
-.sleep-detail-score {
+.sleep-detail-figure {
   display: flex;
   flex-direction: column;
-  align-items: flex-end;
-  gap: 2px;
+  gap: 6px;
+  min-width: 84px;
+  padding: 0 12px;
 }
 
-.sleep-detail-score strong {
-  font-size: 28px;
+.sleep-detail-figure + .sleep-detail-figure {
+  border-left: 1px solid var(--glass-border);
 }
 
-.sleep-detail-score span {
+.sleep-detail-figure dt {
+  color: var(--text-secondary);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.sleep-detail-figure dd {
+  margin: 0;
   color: var(--text-secondary);
   font-size: 12px;
-  font-weight: 600;
 }
 
-.sleep-detail.tone-low .sleep-detail-score strong {
+/* The display treatment comes from the shared figure rule in styles.css. */
+.sleep-detail-figure strong {
+  color: var(--text-primary);
+  font-size: 22px;
+  line-height: 1;
+}
+
+.sleep-detail-figure.is-hrv strong {
+  color: var(--sleep-hrv);
+}
+.sleep-detail-figure.is-hr strong {
+  color: var(--sleep-hr);
+}
+.sleep-detail.tone-low .sleep-detail-figure.is-score strong {
   color: var(--error-text);
 }
-.sleep-detail.tone-mid .sleep-detail-score strong {
+.sleep-detail.tone-mid .sleep-detail-figure.is-score strong {
   color: var(--warning-text);
 }
-.sleep-detail.tone-good .sleep-detail-score strong {
+.sleep-detail.tone-good .sleep-detail-figure.is-score strong {
   color: var(--sleep-light);
 }
-.sleep-detail.tone-high .sleep-detail-score strong {
+.sleep-detail.tone-high .sleep-detail-figure.is-score strong {
   color: var(--success-text);
 }
 
@@ -571,50 +604,36 @@
   max-width: 46ch;
 }
 
-.sleep-curve-head {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 8px;
-}
-
-.sleep-curve-title {
-  display: inline-flex;
-  align-items: baseline;
-  gap: 8px;
-  margin: 0;
-  color: var(--text-secondary);
-  font-size: 12px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-}
-
-.sleep-curve-title span {
-  color: var(--text-muted);
-  font-size: 12px;
-  font-weight: 500;
-  font-variant-numeric: tabular-nums;
-  letter-spacing: 0;
-  text-transform: none;
-}
-
-.sleep-curve-assessment {
-  margin: 0;
-  color: var(--text-secondary);
-  font-size: 12px;
-}
-
-.sleep-curve-assessment strong {
-  color: var(--text-primary);
-}
-
 .sleep-curve-tooltip-taken {
   color: var(--text-muted);
   font-size: 11px;
   font-style: normal;
   font-weight: 500;
+}
+
+/* Room above the plot for the units, so they never share a row with a value. */
+.sleep-curve-plot {
+  position: relative;
+  padding-top: 18px;
+}
+
+/* Over each axis, above its top value: the left one starts where the axis
+   column does, the right one ends at the chart's edge. */
+.sleep-curve-unit {
+  position: absolute;
+  top: 0;
+  color: var(--text-secondary);
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1;
+}
+
+.sleep-curve-unit.is-left {
+  left: 0;
+}
+
+.sleep-curve-unit.is-right {
+  right: 0;
 }
 
 .sleep-curve-note {
@@ -671,3 +690,12 @@
 
 /* The chart's own rules moved to src/styles.css: Overview draws it too, and
    this stylesheet only loads with the Sleep screen's chunk. */
+
+/* The HRV panel's heading on this screen: the pane title the sleep-length
+   panel above it wears, with the legend at its far end. */
+.sleep-details-view .hrv-fixed-heading {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}

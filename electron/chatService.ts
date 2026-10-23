@@ -251,12 +251,15 @@ import {
   buildCoachWorkoutDefaultsGuide,
   formatAthleteProfile,
   formatCoachDashboard,
+  formatCoachSleepHeartRate,
   formatCoachToday,
   formatRecentActivityMix,
   formatUpcomingWorkoutSport
 } from "./chatCoachContext";
 import { ScreenError } from "./screenText";
 import { mainText } from "./mainText";
+import { getSleepHistory } from "./sleepHistoryService";
+import { SLEEP_HR_BASELINE_NIGHTS } from "./sleepHeartRate";
 
 // =========================================================================
 // OpenAI "Sign in with ChatGPT" provider details.
@@ -3130,6 +3133,8 @@ const SUPERSEDED_COROS_MCP_TOOLS: Readonly<Record<string, string>> = {
   queryDailyHealthData: "get_fitness_trends",
   queryStressLevel: "get_fitness_trends",
   queryAvgHeartRate: "get_fitness_trends",
+  // Kept from Coach on purpose: the daytime resting HR moves with the day, and
+  // the trend's sleeping HR is the recovery heart rate (`sleepHeartRate.ts`).
   queryRestingHeartRate: "get_fitness_trends",
   queryTrainingLoadAssessment: "get_fitness_trends",
   // In the snapshot: VO2max and threshold pace, the race predictions, recovery.
@@ -4002,7 +4007,7 @@ interface TrainingContextScope {
   activities: boolean;
   /** The threshold anchors in the athlete profile. */
   zones: boolean;
-  /** Nights and HRV — no part of the snapshot, so this only says so in the prompt. */
+  /** Nights and HRV: last night's sleeping heart rate, and the prompt says so. */
   sleep?: boolean;
   /**
    * Say what is withheld in the prompt: a conversation's settings do (P2.0);
@@ -4072,7 +4077,8 @@ async function buildTrainingContext(
   const includeMetrics = permissions?.trainingMetrics !== false;
   const includeDashboard = includeMetrics && scope?.activities !== false;
   const includeUpcoming = permissions?.upcomingWorkouts !== false;
-  const [activities, dashboard, upcoming, profile] = await Promise.allSettled([
+  const includeSleep = permissions?.sleepData !== false && scope?.sleep !== false;
+  const [activities, dashboard, upcoming, profile, sleep] = await Promise.allSettled([
     includeActivities
       ? listTrainingHubActivities(1, 25)
       : Promise.resolve([] as TrainingHubActivity[]),
@@ -4086,7 +4092,12 @@ async function buildTrainingContext(
     // and cost nothing on any turn inside the profile's hour-long cache.
     includeMetrics
       ? getCoachCorosProfile()
-      : Promise.resolve(null as CorosProfile | null)
+      : Promise.resolve(null as CorosProfile | null),
+    // From disk only: a turn waits on nothing for it, and the Sleep screen,
+    // Overview and the sleep tools keep the cache filled.
+    includeSleep
+      ? getSleepHistory({ days: SLEEP_HR_BASELINE_NIGHTS + 2, cacheOnly: true })
+      : Promise.resolve(null)
   ]);
 
   const sections: string[] = [today, ""];
@@ -4123,14 +4134,19 @@ async function buildTrainingContext(
       hasData = true;
     }
   }
-  if (dashboard.status === "fulfilled" && dashboard.value) {
-    const fitness = formatCoachDashboard(dashboard.value, unitSystem);
-    if (fitness) {
-      sections.push("## Fitness & recovery");
-      sections.push(fitness);
-      sections.push("");
-      hasData = true;
-    }
+  const recovery = [
+    dashboard.status === "fulfilled" && dashboard.value
+      ? formatCoachDashboard(dashboard.value, unitSystem)
+      : undefined,
+    sleep.status === "fulfilled" && sleep.value
+      ? formatCoachSleepHeartRate(sleep.value.records)
+      : undefined
+  ].filter(Boolean);
+  if (recovery.length > 0) {
+    sections.push("## Fitness & recovery");
+    sections.push(recovery.join("\n"));
+    sections.push("");
+    hasData = true;
   }
   if (upcoming.status === "fulfilled" && upcoming.value.length > 0) {
     sections.push("## Upcoming workouts");

@@ -1,4 +1,5 @@
 import type { AnalysisTrigger } from "./types";
+import { SLEEP_HR_BASELINE_NIGHTS, medianOf } from "./sleepHeartRate";
 
 /**
  * The four threshold metrics of 3.3, as pure functions over locally cached
@@ -8,7 +9,7 @@ import type { AnalysisTrigger } from "./types";
  * 60-second tick, once per threshold automation, and a metric that fetched
  * would put a request on the tick for every rule the athlete has — on the one
  * path that already learned what an unbounded call costs (section 10). The two
- * series COROS owns rather than the app (resting HR, sleep) are snapshotted
+ * series COROS owns rather than the app (sleeping HR, sleep) are snapshotted
  * into `coach_daily_samples` by the activity watcher, which is already the
  * thing that talks to COROS on a slow cadence.
  *
@@ -22,9 +23,9 @@ import type { AnalysisTrigger } from "./types";
 export const ACUTE_WINDOW_DAYS = 7;
 export const CHRONIC_WINDOW_DAYS = 28;
 
-/** How far back the resting-HR baseline is averaged, and the streak it needs. */
-export const RESTING_HR_BASELINE_DAYS = 30;
-export const RESTING_HR_STREAK_DAYS = 3;
+/** How many nights the sleeping-HR baseline is the median of, and the streak it needs. */
+export const SLEEP_HR_DRIFT_BASELINE_NIGHTS = SLEEP_HR_BASELINE_NIGHTS;
+export const SLEEP_HR_DRIFT_STREAK_NIGHTS = 3;
 
 /** The rolling window the sleep deficit is summed over. */
 export const SLEEP_WINDOW_NIGHTS = 7;
@@ -43,7 +44,7 @@ export const PLAN_ADHERENCE_LOOKBACK_DAYS = 14;
 /** The widest history any metric reads, for the caller filling a snapshot. */
 export const THRESHOLD_LOOKBACK_DAYS = Math.max(
   CHRONIC_WINDOW_DAYS,
-  RESTING_HR_BASELINE_DAYS + RESTING_HR_STREAK_DAYS,
+  SLEEP_HR_DRIFT_BASELINE_NIGHTS + SLEEP_HR_DRIFT_STREAK_NIGHTS,
   SLEEP_WINDOW_NIGHTS
 );
 
@@ -63,7 +64,8 @@ export interface ThresholdActivityLoad {
 export interface ThresholdDailySample {
   /** Local day as COROS keys it, "YYYYMMDD". */
   day: string;
-  restingHr?: number;
+  /** The main sleep's average heart rate, on the morning the night ended. */
+  sleepHr?: number;
   sleepMinutes?: number;
 }
 
@@ -159,52 +161,48 @@ export function isAcuteChronicRamp(
 }
 
 /**
- * 3.3: resting HR is `value` bpm above the 30-day baseline for 3 consecutive
- * days.
+ * 3.3's `restingHrDrift`, read on the heart rate the athlete slept at: the
+ * night's average is `value` bpm above the baseline for 3 nights running. The
+ * id keeps its first name because it is stored in every trigger that uses it;
+ * COROS's daytime resting HR moved with the day rather than with recovery
+ * (`sleepHeartRate.ts`), so it stopped being what the rule reads.
  *
- * The baseline is averaged over the 30 days **ending before** the streak, not
- * the 30 days ending today. Including the elevated days would measure the drift
- * partly against itself, which quietly raises the bar the longer the drift
- * lasts — the opposite of what the rule is for.
+ * The baseline is the median of the 28 nights **before** the streak, not the
+ * 28 ending today. Including the raised nights would measure the drift partly
+ * against itself, which quietly raises the bar the longer the drift lasts —
+ * the opposite of what the rule is for. A median, so one feverish night does
+ * not lift the bar for a month.
  *
- * A day with no reading breaks the streak rather than passing through it: three
- * consecutive days is a claim about three days, and the app cannot make it
- * about a day it has no reading for. `>=`, because a reading exactly `value`
- * above the baseline *is* `value` above it.
+ * A night with no reading breaks the streak rather than passing through it:
+ * three nights running is a claim about three nights, and the app cannot make
+ * it about a night it has no reading for. `>=`, because a reading exactly
+ * `value` above the baseline *is* `value` above it.
  */
-export function isRestingHrDrift(
+export function isSleepHrDrift(
   now: Date,
   daily: ThresholdDailySample[],
   bpm: number
 ): boolean {
   const byDay = new Map(daily.map((sample) => [sample.day, sample]));
   const readingFor = (day: string): number | undefined => {
-    const value = byDay.get(day)?.restingHr;
+    const value = byDay.get(day)?.sleepHr;
     // `> 0` for the same reason `isSleepDebt` below wants it: a nought or a
-    // negative is not a reading, and this one is averaged into the baseline —
-    // so one bad row drags the baseline down and makes an ordinary morning look
-    // like three days of drift.
+    // negative is not a reading, and this one goes into the baseline.
     return typeof value === "number" && Number.isFinite(value) && value > 0
       ? value
       : undefined;
   };
 
-  const baselineDays = recentDayKeys(
-    now,
-    RESTING_HR_BASELINE_DAYS,
-    RESTING_HR_STREAK_DAYS
+  const baseline = medianOf(
+    recentDayKeys(now, SLEEP_HR_DRIFT_BASELINE_NIGHTS, SLEEP_HR_DRIFT_STREAK_NIGHTS)
+      .map(readingFor)
+      .filter((value): value is number => value !== undefined)
   );
-  const baselineReadings = baselineDays
-    .map(readingFor)
-    .filter((value): value is number => value !== undefined);
-  if (!baselineReadings.length) {
+  if (baseline === undefined) {
     return false;
   }
-  const baseline =
-    baselineReadings.reduce((total, value) => total + value, 0) /
-    baselineReadings.length;
 
-  const streakDays = recentDayKeys(now, RESTING_HR_STREAK_DAYS);
+  const streakDays = recentDayKeys(now, SLEEP_HR_DRIFT_STREAK_NIGHTS);
   return streakDays.every((day) => {
     const reading = readingFor(day);
     return reading !== undefined && reading >= baseline + bpm;
@@ -286,7 +284,7 @@ export function evaluateThresholdTrigger(
     case "acuteChronicRamp":
       return isAcuteChronicRamp(now, snapshot.loads, trigger.value);
     case "restingHrDrift":
-      return isRestingHrDrift(now, snapshot.daily, trigger.value);
+      return isSleepHrDrift(now, snapshot.daily, trigger.value);
     case "planAdherence":
       return isPlanAdherenceBreach(now, snapshot.planned, trigger.value);
     case "sleepDebt":

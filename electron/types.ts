@@ -3029,7 +3029,14 @@ export interface TrainingTrendPoint {
   rpeLoad?: number;
   avgSleepHrv?: number;
   sleepHrvBase?: number;
+  /** COROS's daytime resting HR. Overview reads it; Coach's card no longer writes it. */
   rhr?: number;
+  /**
+   * The heart rate the night ending on this day was slept at (main sleep,
+   * average and lowest). What Coach's card draws in place of `rhr`.
+   */
+  sleepAvgHr?: number;
+  sleepMinHr?: number;
   sleepMinutes?: number;
   sleepScore?: number;
 }
