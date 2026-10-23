@@ -2490,6 +2490,17 @@ lives at module level for the same visit-to-visit reason — see `useCalendarDat
   rim — so it follows size and state: **four steps of light, one per stage reached** (grey,
   dim gold, nearly full, full with a glow). Its golds are the artwork's, not `--accent`. The
   relief is never drawn under 24px, and at 24px (the timeline's inline badge) it goes bare.
+  **Paper reads the hall as gold on white** (since 2026-10-23, picked over three rounds of
+  mockups): the accent stays the colour of words, and what is filled (a bar, a pip, a stage's
+  coin, the laurel) takes `--hall-gold*`, a lighter, richer step worked out from the accent with
+  `oklch(from var(--accent) …)` in `recordsNotices.css`, so another palette follows; the
+  Geryon card on Where you've been reads the same tokens. **The year's timeline is one white
+  sheet** (`.records-line`): rows of text sat straight on the grey canvas and sank, and real
+  histories are mostly rows. A big milestone is a white card lifted off the sheet, its sport
+  down the left edge (`--row-sport`, read off its node). **Each labour's head is a black
+  plaque** bled to the card's edges, its myth and stages on white; the apotheosis above stays
+  a white card with a gold-coin laurel, and the timeline's labour badges are white faces (gold
+  wash once complete) — black badges among the rows read as holes. Dark is untouched.
   **Worked out, not stored.** `milestones.ts` (`computeRecords`) walks every activity oldest
   first — the list is complete, COROS keeps it for good — and finds the beginning, a first per
   sport, the ladder distances (1% slack for GPS), a longest or biggest climb once there is a
