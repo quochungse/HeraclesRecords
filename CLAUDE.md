@@ -2394,6 +2394,16 @@ lives at module level for the same visit-to-visit reason — see `useCalendarDat
   the **Cattle of Geryon** card is the Hall's own `LabourState` — the same places, counted
   over all time whatever period the map shows — handed down by App only once the Hall has
   `settled`, and it opens the Hall on The Twelve Labours.
+  **Paper's globe is a pale sphere under ink land** (since 2026-10-23). It was a murky
+  mid-grey under black name chips, the darkest thing on a light page: three.js lights
+  physically, and the old `#cfd7dc` under weak lights came out grey. WebGL reads no custom
+  property, so the sphere, the lights, the land dots and coastlines and the atmosphere are
+  `paperTheme ?` literals in `ActivityGlobeRenderer.tsx`, the lights raised until the sphere
+  reads near white. **Pins on paper take the dark theme's accent** (the paper one is a colour
+  for words and drew dark brown specks), and the strong one a step halfway to the paper
+  accent (`mixHex`). Around it (`activityGlobe.css`): no stars, white name chips, controls and
+  legend on the soft shadow, the panel on the card shadow, and the list's dots, visit bars,
+  Geryon card and Street view in the hall's bright gold (`--hall-gold*`).
   **It asks more than one geocoder, because one host is a single point of failure the app
   cannot route around.** A resolver that answers `*.openstreetmap.org` with loopback — which
   a number of ISPs do, and which `nslookup` against `8.8.8.8` is what proves — took Nominatim
