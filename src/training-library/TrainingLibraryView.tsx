@@ -288,6 +288,12 @@ export function TrainingLibraryView({
     () => attachPlanDrafts(plans, snapshot?.drafts ?? []),
     [plans, snapshot?.drafts]
   );
+  /* The tab counts the rows the list draws: a running copy folded into its
+     plan's tile is one plan, not two. */
+  const planRowCount = useMemo(() => {
+    const sections = groupPlans(plans);
+    return (sections.hero ? 1 : 0) + sections.current.length + sections.done.length + sections.archived.length;
+  }, [plans]);
 
   if (!status?.authenticated) {
     return (
@@ -326,7 +332,7 @@ export function TrainingLibraryView({
     calendarChange?.action === "remove" && runOutlivesItsPlan(calendarChange.plan, current.plans);
   const counts: Partial<Record<LibrarySection, number>> = {
     workouts: current.workouts.length,
-    plans: plans.length
+    plans: planRowCount
   };
 
   /*
