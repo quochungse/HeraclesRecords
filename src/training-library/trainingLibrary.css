@@ -86,6 +86,12 @@
   overflow: hidden;
 }
 
+/* On paper the view is the app's canvas, as every other screen is (see the
+   paper block below for why the library stopped being a room of its own). */
+:root[data-theme="paper"] .training-library-view {
+  background: transparent;
+}
+
 /* Highlighted text takes the accent, never the system blue. */
 :is(.training-library-view, .tl-plan-modal-backdrop, .tl-dialog-backdrop, .coach-sheet) ::selection {
   color: var(--text-primary);
@@ -163,36 +169,56 @@
 :root[data-theme="paper"] :is(.training-library-view, .training-library-gate, .tl-plan-modal-backdrop, .tl-dialog-backdrop, .coach-sheet) {
   color-scheme: light;
 
-  --tl-ground: #e6eaf1;
-  --tl-panel-bg: #fbfcfe;
+  /*
+   * Paper is not a room of its own any more: the view stands on the app's
+   * canvas, as Running and Strength do, its panels are white cards on their
+   * shadow, and the reader is a pale well that the cards inside it lift off.
+   * The library used to lay a deeper grey (#e6eaf1) under near-white panels
+   * with a gold mist over both, which left it a tone apart from every other
+   * paper screen and its tiles sinking into the panel they sat on.
+   *
+   * The ground is still stated, as the canvas, because the gate and the plan
+   * editor are painted with it; the view itself is drawn transparent (below),
+   * so the shell's own canvas shows through it as it does on every screen.
+   */
+  --tl-ground: var(--bg-base);
+  --tl-panel-bg: #ffffff;
   --tl-card: #ffffff;
-  --tl-reader-bg: #eff2f7;
+  --tl-reader-bg: #f5f7fa;
+  --bg-ambient-primary: transparent;
+  --bg-ambient-secondary: transparent;
 
   /*
    * Controls take an ink wash rather than the app's white glass: the library's
-   * panels are already near-white, and a white-on-white fill leaves hover
-   * states with nothing to say.
+   * panels are white, and a white-on-white fill leaves hover states with
+   * nothing to say.
    */
   --surface: #ffffff;
-  --glass-bg: rgba(19, 26, 40, 0.06);
-  --glass-bg-hover: rgba(19, 26, 40, 0.1);
+  --glass-bg: rgba(19, 26, 40, 0.045);
+  --glass-bg-hover: rgba(19, 26, 40, 0.08);
   --glass-bg-elevated: rgba(19, 26, 40, 0.12);
   --glass-border: rgba(19, 26, 40, 0.17);
   --glass-inset: inset 0 1px 0 rgba(255, 255, 255, 0.75);
 
   --text-primary: #151a26;
-  --text-secondary: #4a5265;
-  --text-muted: #6c7488;
+  --text-secondary: #3f4759;
+  --text-muted: #5b6375;
+
+  /* Rules in ink at a fixed strength: mixed off --text-muted they darkened
+     with it, and a row divider read as a border. */
+  --tl-rule: rgba(19, 26, 40, 0.12);
+  --tl-rule-soft: rgba(19, 26, 40, 0.075);
+  --tl-row-hover: rgba(19, 26, 40, 0.035);
 
   /*
-   * The sheen survives only where paper is not already white — the reader
-   * dock, the week frames, the glass cards over a tinted ground. Recesses
-   * invert: a well is an ink wash, and its top edge darkens instead of lights.
+   * No sheen: every surface here is white or the reader's pale well, and a
+   * white gradient over either says nothing. Recesses invert: a well is an
+   * ink wash, and its top edge darkens instead of lights.
    */
-  --tl-sheen: rgba(255, 255, 255, 0.6);
-  --tl-sheen-lit: rgba(255, 255, 255, 0.85);
-  --tl-sheen-fade: rgba(255, 255, 255, 0);
-  --tl-edge-light: rgba(255, 255, 255, 0.8);
+  --tl-sheen: transparent;
+  --tl-sheen-lit: transparent;
+  --tl-sheen-fade: transparent;
+  --tl-edge-light: transparent;
   --tl-well: rgba(19, 26, 40, 0.07);
   --tl-shimmer: rgba(255, 255, 255, 0.9);
   --tl-scrim: rgba(19, 26, 40, 0.34);
@@ -399,6 +425,14 @@
   -webkit-text-fill-color: transparent;
 }
 
+/* On paper the gradient ends in a brown that reads as the title fading out,
+   so the name is ink, as every other screen's is. */
+:root[data-theme="paper"] .tl-masthead h1 {
+  color: var(--text-primary);
+  background: none;
+  -webkit-text-fill-color: currentColor;
+}
+
 .tl-masthead-actions {
   display: flex;
   align-items: center;
@@ -523,7 +557,9 @@
   color: var(--text-muted);
   background: none;
   font-family: var(--font-display);
-  font-size: 13px;
+  /* A step above the chips' 13px: these are the screen's three rooms, read
+     before anything under them. */
+  font-size: 14px;
   font-weight: 600;
   letter-spacing: 0;
   white-space: nowrap;
@@ -590,6 +626,28 @@
   box-shadow: var(--option-lift);
 }
 
+/* And the track is the chips' track: a frosted white on the canvas. The
+   library's ink wash drew it as a grey slab the tabs sank into, and the two
+   not chosen were muted ink on it, the faintest words on the screen. */
+:root[data-theme="paper"] .tl-sections {
+  border-color: var(--option-edge);
+  background: var(--option-well);
+  box-shadow: none;
+}
+
+:root[data-theme="paper"] .tl-sections button:not([aria-current="page"]) {
+  color: var(--text-secondary);
+}
+
+:root[data-theme="paper"] .tl-sections button:not([aria-current="page"]):hover:not(:disabled) {
+  color: var(--text-primary);
+}
+
+:root[data-theme="paper"] .tl-sections button:not([aria-current="page"]) span {
+  color: var(--text-secondary);
+  background: var(--glass-bg-hover);
+}
+
 .tl-sections button[aria-current="page"] span {
   color: #fff;
   background: var(--accent-gradient);
@@ -637,6 +695,18 @@
 /* The Plans panel is the box its two create buttons float in. */
 .tl-plans {
   position: relative;
+}
+
+/* On paper the tiles stand on the canvas as cards (`.tl-card`), so the panel
+   holding them draws nothing; the search keeps a white face to stand on it. */
+:root[data-theme="paper"] .training-library-view > .tl-panel.tl-plans {
+  background: transparent;
+  box-shadow: none;
+  backdrop-filter: none;
+}
+
+:root[data-theme="paper"] .tl-plans .tl-search {
+  background: var(--surface);
 }
 
 /*
@@ -861,6 +931,14 @@
     color-mix(in srgb, var(--tl-ground, var(--bg-base)) 94%, var(--surface));
   box-shadow: var(--shadow-elevated), var(--glass-inset);
   overflow: hidden;
+}
+
+/* On paper the reader is a white sheet, and its weeks sit in a pale well
+   (`.plan-reader-weeks` below) so the week cards still lift off something.
+   It was the canvas grey, and the plan's head — its words, figures and
+   ridge — read as greyed out on it. */
+:root[data-theme="paper"] .tl-dialog-sheet.is-reader {
+  background: var(--surface);
 }
 
 /*
@@ -1228,6 +1306,16 @@
   color: var(--accent-strong);
 }
 
+/* On paper the wash is grey and the name ink: the gold wash on white mixed to
+   a beige the eye read as a stain, and the bar already says which row it is. */
+:root[data-theme="paper"] .tl-row.is-active {
+  background: var(--tl-well);
+}
+
+:root[data-theme="paper"] .tl-row.is-active .tl-row-name {
+  color: var(--text-primary);
+}
+
 /*
  * What it is, how long it takes, and how hard it is. The single figure column
  * held the COROS volume alone, which for a library workout is the one number
@@ -1360,6 +1448,15 @@
 .tl-row:hover .tl-row-shape,
 .tl-row.is-active .tl-row-shape {
   opacity: 0.8;
+}
+
+/* On white the held-back line went pale enough to lose its phases. */
+:root[data-theme="paper"] .tl-row-shape {
+  opacity: 0.62;
+}
+
+:root[data-theme="paper"] :is(.tl-row:hover, .tl-row.is-active) .tl-row-shape {
+  opacity: 0.9;
 }
 
 .tl-row-shape i {
@@ -1938,6 +2035,31 @@
     0 0 0 1px color-mix(in srgb, var(--tl-sport-accent) 22%, transparent);
 }
 
+/*
+ * On paper a tile is a card on the canvas, not a tile inside a panel: the
+ * Plans panel is drawn transparent there (`.tl-plans`), and a white tile with
+ * no edge and no shadow on a white panel was not there at all. It floats on
+ * the card shadow, and its states are a ring in its sport's colour rather
+ * than a border, since a card that floats has no border to colour.
+ */
+:root[data-theme="paper"] .tl-card {
+  box-shadow: var(--shadow-card);
+}
+
+:root[data-theme="paper"] :is(.tl-card, .tl-card[data-accent]):hover {
+  border-color: transparent;
+  box-shadow:
+    var(--shadow-card),
+    0 0 0 1px color-mix(in srgb, var(--tl-sport-accent, var(--accent)) 34%, transparent);
+}
+
+:root[data-theme="paper"] :is(.tl-card, .tl-card[data-accent]).is-active {
+  border-color: transparent;
+  box-shadow:
+    var(--shadow-card),
+    0 0 0 1.5px color-mix(in srgb, var(--tl-sport-accent, var(--accent)) 58%, transparent);
+}
+
 /* A workout row carries no sport stripe: the sport is already named by the
    badge under the title, and a 3px bar in a different hue on every row turned
    the list into a colour chart. The left edge is reserved for the active mark,
@@ -2347,6 +2469,34 @@
   background: linear-gradient(105deg, var(--tl-sheen), transparent 42%);
   content: "";
   pointer-events: none;
+}
+
+/*
+ * The reader on paper: a pale well with no gold mist, for the workout's white
+ * cards to lift off. The cards themselves — the title card, every step and
+ * lift — are the Calendar's pieces (`.sched-*`), so their paper rules sit
+ * beside them in styles.css (after `.sched-circuit`), scoped to the library;
+ * only the library's own pieces are here.
+ */
+:root[data-theme="paper"] .tl-reader {
+  background: var(--tl-reader-bg);
+}
+
+:root[data-theme="paper"] .tl-reader-dock {
+  border-top-color: var(--tl-rule-soft);
+  background: color-mix(in srgb, var(--surface) 94%, transparent);
+}
+
+:root[data-theme="paper"] .tl-reader-dock .ghost-button {
+  background: var(--surface);
+}
+
+/* The clip is shot on a white cyclorama, so on paper its plate is plain white:
+   the grey vignette left a white rectangle standing in a grey letterbox. */
+:root[data-theme="paper"] .training-library-view :is(.tl-exercise-clip .exercise-preview-stage, .tl-exercise-muscles-body) {
+  border-color: transparent;
+  background: var(--surface);
+  box-shadow: var(--shadow-soft);
 }
 
 /*
@@ -4048,6 +4198,12 @@
   overflow: hidden;
   border-radius: var(--radius-sm);
   background: #f1f2f4;
+}
+
+/* On a white list the still's own white is the plate; a hairline frames it. */
+:root[data-theme="paper"] .tl-exercise-thumb {
+  background: var(--surface);
+  box-shadow: inset 0 0 0 1px var(--tl-rule-soft);
 }
 
 .tl-exercise-thumb img {
@@ -5769,6 +5925,25 @@ button.plan-generator-provider:focus-visible {
   list-style: none;
 }
 
+/* The reader's head is read before its weeks, so in either theme it is set a
+   step larger: the description at body size, the totals at a figure's. */
+.tl-dialog-sheet.is-reader .plan-reader-goal {
+  font-size: 14px;
+}
+
+.tl-dialog-sheet.is-reader .plan-reader-figures b {
+  font-size: 28px;
+}
+
+/* On the white sheet the weeks sit in a pale well, reaching nearly to the
+   sheet's edges, so the cards lift off it as the workouts reader's do. */
+:root[data-theme="paper"] .tl-dialog-sheet.is-reader .plan-reader-weeks {
+  margin: 0 -16px;
+  padding: 14px 16px;
+  border-radius: var(--radius-md);
+  background: var(--tl-reader-bg);
+}
+
 /*
  * A week is a card. It floats on its shadow with no border, which is the
  * card recipe here: the hairline spelling is for a well.
@@ -6142,6 +6317,16 @@ button.plan-generator-provider:focus-visible {
 /* The week being trained, lifted off the others by a wash of the accent. */
 .plan-week-card.is-current {
   background: color-mix(in srgb, var(--accent) 5%, var(--tl-panel-bg));
+}
+
+/* On paper's white card that wash is a beige that reads as dirt, so the week
+   keeps the white of the others and is ringed in the accent instead. */
+:root[data-theme="paper"] .tl-dialog-sheet.is-reader .plan-week-card.is-current {
+  background: var(--tl-panel-bg);
+  box-shadow:
+    var(--shadow-soft),
+    inset 3px 0 0 var(--tl-stage, transparent),
+    0 0 0 1.5px color-mix(in srgb, var(--accent) 45%, transparent);
 }
 
 .plan-week-card > header {

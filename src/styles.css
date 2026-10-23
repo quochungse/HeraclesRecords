@@ -19466,6 +19466,67 @@ td span {
   padding: 6px 8px;
 }
 
+/*
+ * A workout read in the Training Library, on paper: white cards on the
+ * reader's pale well. The title card, every step, lift, repeat and circuit,
+ * the structure bar's track and the description are white, and the cards float
+ * on --shadow-soft. They were grey boxes on a grey well, hairline on hairline,
+ * and the title card mixed its sport into that grey and came out a dull pink.
+ * Scoped to the library: these pieces are the Calendar's too, and the plan
+ * reader's session view is inside the library and takes them.
+ */
+:root[data-theme="paper"] .training-library-view .sched-hero {
+  border-color: transparent;
+  background: var(--surface);
+  box-shadow: var(--shadow-soft);
+}
+
+:root[data-theme="paper"] .training-library-view .sched-hero-icon {
+  border-color: transparent;
+  background: color-mix(in srgb, var(--detail-sport) 12%, var(--surface));
+}
+
+:root[data-theme="paper"] .training-library-view .sched-hero-stats {
+  border-color: transparent;
+  background: var(--tl-reader-bg);
+}
+
+:root[data-theme="paper"] .training-library-view .sched-stat + .sched-stat {
+  border-left-color: var(--tl-rule-soft);
+}
+
+:root[data-theme="paper"] .training-library-view :is(.workout-view-overview, .sched-bar) {
+  border-color: var(--tl-rule);
+  background: var(--surface);
+}
+
+:root[data-theme="paper"] .training-library-view :is(.sched-step, .sched-lift, .sched-repeat, .sched-circuit) {
+  border-color: transparent;
+  background: var(--surface);
+  box-shadow: var(--shadow-soft);
+}
+
+/* A step inside a repeat and a lift inside a circuit are rows of the card
+   around them, as they are in the dark. */
+:root[data-theme="paper"] .training-library-view :is(.sched-repeat-steps .sched-step, .sched-circuit .sched-lift) {
+  background: transparent;
+  box-shadow: none;
+}
+
+:root[data-theme="paper"] .training-library-view :is(.sched-lift-scheme, .sched-step-intensity) {
+  color: var(--text-secondary);
+}
+
+/* In either theme the figures of a workout read as figures, and a lift's name
+   as the line its scheme hangs under. */
+.training-library-view .sched-stat-value {
+  font-size: 18px;
+}
+
+.training-library-view .sched-lift-name {
+  font-weight: 600;
+}
+
 /* empty state */
 
 .sched-empty {
@@ -26516,6 +26577,30 @@ body.is-backgrounded .spin {
 .plan-ridge-stage[data-stage] {
   color: var(--tl-stage);
   background: color-mix(in srgb, var(--tl-stage) 16%, transparent);
+}
+
+/*
+ * On paper the ridge is opaque. The 62% stack and the 16% stage band let the
+ * ground through, and on paper's grey that came out a pale mint over a muddy
+ * band, the plan's shape reading as greyed out. Every week takes its sport at
+ * full strength, and the week that is marked (this week, the one pointed at,
+ * the one the Coach card shows) goes a step toward the ink instead.
+ */
+:root[data-theme="paper"] .plan-ridge-week {
+  color: var(--text-secondary);
+}
+
+:root[data-theme="paper"] .plan-ridge-seg {
+  background: var(--tl-sport, var(--text-muted));
+}
+
+:root[data-theme="paper"] :is(.plan-ridge-week:hover, .plan-ridge-week.is-current, .plan-ridge-week.is-selected) .plan-ridge-seg {
+  background: color-mix(in srgb, var(--tl-sport, var(--text-secondary)) 72%, var(--text-primary));
+}
+
+:root[data-theme="paper"] .plan-ridge-stage[data-stage] {
+  color: color-mix(in srgb, var(--tl-stage) 80%, var(--text-primary));
+  background: color-mix(in srgb, var(--tl-stage) 15%, var(--palette-surface));
 }
 
 /* --- Time in zones ------------------------------------------------------- */

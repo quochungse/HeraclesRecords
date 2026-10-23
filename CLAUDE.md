@@ -3318,6 +3318,19 @@ included, as a gradient over `--app-rail-width`, which `AppSidebar` writes on th
 mount, on a switch to or from the drawer, and on every frame of the width spring
 (`onUpdate`) — the bar is App's, not a child of the rail, so it cannot read the width
 otherwise, and 0 while the rail is a drawer leaves it clear. Dark keeps the rail above.
+**Paper's Training Library stands on the canvas like every other screen** (since 2026-10-23,
+picked from a mockup of three). It was a room of its own: a deeper grey ground (`#e6eaf1`)
+under near-white panels with a gold mist over both, so its plan tiles sank into a white panel
+(paper gives them no border and they had no shadow), its title faded into a brown gradient
+and its tabs sat muted on a grey slab. Now the view is transparent, panels are white cards on
+`--shadow-card`, the Plans panel draws nothing and its tiles are the cards, the tabs sit on the
+chips' frosted track, and the reader is a pale well (`--tl-reader-bg`) whose title card, steps,
+lifts, clip and muscles are white cards on `--shadow-soft`; the plan reader is a white sheet
+with its weeks in that well and an opaque ridge. `.sched-*` is the Calendar's, so those rules
+are scoped to `.training-library-view`; the ridge's paper rules are in `styles.css` and reach
+Coach's ridge too. `--tl-ground` stays stated, as the canvas, because the gate and the plan
+editor paint with it. A few type steps went in for both themes: the tabs 14px, a workout's
+figures 18px and its lifts' names 600, and a plan reader's description 14px and totals 28px.
 
 **`paper` is a grey canvas with white surfaces, and it is not free to be otherwise.** It was
 a warm cream page (`#f6f3ec`) carrying 72%-white glass, which put a card within three levels
