@@ -87,6 +87,7 @@ const strength: StrengthMessages = {
   "strength.bodyView": "体の向き",
   "strength.front": "前",
   "strength.back": "後ろ",
+  "strength.rotate": "回転",
   "strength.heatMetric": "色分けの指標",
   "strength.attribution.eyebrow": "部位の特定",
   "strength.attribution.none": "部位ごとのデータがありません",

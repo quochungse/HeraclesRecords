@@ -87,6 +87,7 @@ const strength: StrengthMessages = {
   "strength.bodyView": "신체 방향",
   "strength.front": "앞",
   "strength.back": "뒤",
+  "strength.rotate": "회전",
   "strength.heatMetric": "색상 기준",
   "strength.attribution.eyebrow": "부위 구분",
   "strength.attribution.none": "부위별 데이터가 없습니다",

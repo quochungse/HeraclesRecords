@@ -87,6 +87,7 @@ const strength: StrengthMessages = {
   "strength.bodyView": "Vista do corpo",
   "strength.front": "Frente",
   "strength.back": "Costas",
+  "strength.rotate": "Girar",
   "strength.heatMetric": "Métrica do mapa",
   "strength.attribution.eyebrow": "Atribuição muscular",
   "strength.attribution.none": "Sem dados de músculos específicos",

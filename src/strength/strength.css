@@ -160,18 +160,20 @@
   --panel-floor: rgba(19, 26, 40, 0.09);
   --muscle-focus-vignette: rgba(19, 26, 40, 0.12);
 
-  /* The light stage is a bright warm grey that darkens a little toward the
-     floor, and the figure is lit a touch softer than full (sky and exposure
-     above): a stark white stage under full light washed the amber ramp out,
-     and a mid grey one read dim. */
-  --body-stage-top: #fbfaf8;
-  --body-stage-middle: #f1efeb;
-  --body-stage-bottom: #e3e0da;
-  --body-stage-spotlight: rgba(255, 252, 245, 0.9);
-  --body-stage-reflection: rgba(201, 98, 42, 0.05);
-  --body-stage-floor: rgba(74, 62, 48, 0.14);
-  --body-stage-edge: rgba(255, 255, 255, 0.58);
-  --body-stage-border: rgba(64, 52, 40, 0.14);
+  /* The light stage is a cool slate grey that darkens toward the floor, the
+     dark stage's graphite lifted into the light, and the figure is lit a
+     touch softer than full (sky and exposure above). A near-white warm stage
+     was tried first: the sand of a lightly trained muscle, the pale bones and
+     the hands sank into it, and its cream sat apart from the page's grey. The
+     cool cast is what sets the warm ramp off. */
+  --body-stage-top: #e4e9ef;
+  --body-stage-middle: #d6dde5;
+  --body-stage-bottom: #c4cdd8;
+  --body-stage-spotlight: rgba(255, 255, 255, 0.6);
+  --body-stage-reflection: rgba(201, 98, 42, 0.04);
+  --body-stage-floor: rgba(20, 32, 48, 0.2);
+  --body-stage-edge: rgba(255, 255, 255, 0.6);
+  --body-stage-border: rgba(19, 26, 40, 0.1);
 }
 
 /* ---------- Header ---------- */
@@ -709,10 +711,8 @@
   );
 }
 
-@media (prefers-reduced-motion: no-preference) {
-  .anatomy-model-skeleton::after {
-    animation: anatomy-model-shimmer 1.4s ease-in-out infinite;
-  }
+.anatomy-model-skeleton::after {
+  animation: anatomy-model-shimmer 1.4s ease-in-out infinite;
 }
 
 @keyframes anatomy-model-shimmer {
@@ -781,14 +781,6 @@
   .anatomy-muscle-callout strong {
     padding: 6px 9px;
     font-size: 12px;
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .anatomy-body-map::after,
-  .anatomy-muscle-callout,
-  .anatomy-muscle-callout strong {
-    transition: none;
   }
 }
 
@@ -2136,16 +2128,15 @@
 /* ---------- Summary band ---------- */
 
 /*
- * The band carries no card, so its first figure sits on the page's own left
- * edge — the same spine as the title above it — rather than being inset the
- * way card content is.
+ * A card like the ones under it. It was a band between two hairlines with no
+ * card, its first figure on the page's own edge; on paper's grey canvas that
+ * sank into the page, grey labels on grey, and a card in one theme only would
+ * have made the two pages different shapes.
  */
 .strength-summary {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  padding: 26px 0;
-  border-top: 1px solid var(--sx-hairline);
-  border-bottom: 1px solid var(--sx-hairline);
+  padding: 24px 28px;
 }
 
 .strength-summary-item {

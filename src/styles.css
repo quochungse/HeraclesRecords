@@ -337,9 +337,12 @@ svg:focus-visible {
   --shadow-inset: inset 0 1px 0 rgba(19, 26, 40, 0.05);
 
   /* A raised face here is white and the hairline does the lifting, which is the
-     same move the paper --ax-* and --sx-* sets already made. */
+     same move the paper --ax-* and --sx-* sets already made. The well is a
+     frosted white rather than a grey: a grey track read as a dull smear, on
+     the canvas and on a white card alike, and the chosen chip's shadow and ink
+     already say which one is picked. */
   --option-edge: rgba(19, 26, 40, 0.14);
-  --option-well: rgba(19, 26, 40, 0.06);
+  --option-well: rgba(255, 255, 255, 0.6);
   --option-raised: #ffffff;
   --option-lift: 0 1px 2px rgba(19, 26, 40, 0.18);
 
@@ -2652,6 +2655,24 @@ input::placeholder {
   background: var(--option-raised);
   color: var(--text-primary);
   box-shadow: var(--option-lift);
+}
+
+/*
+ * On paper the chosen chip is the raised white face, in the accent's ink. The
+ * accent wash over the grey track mixed to a muddy beige there, the gold ink
+ * sank into it, and the chip read as pressed in rather than picked. White on
+ * the track is what a light segmented control is; the ink keeps the accent.
+ */
+:root[data-theme="paper"] .option-group button[aria-checked="true"],
+:root[data-theme="paper"] .option-group .option-group-trigger {
+  background: var(--option-raised);
+  color: var(--accent-strong);
+  box-shadow: var(--option-lift);
+}
+
+:root[data-theme="paper"] .option-group--quiet button[aria-checked="true"],
+:root[data-theme="paper"] .option-group--quiet .option-group-trigger {
+  color: var(--text-primary);
 }
 
 /*
@@ -24054,6 +24075,12 @@ button.settings-about-link {
   font-weight: 600;
   line-height: 1;
   white-space: nowrap;
+}
+
+/* On paper the chip it copies is the white face (`.option-group` above). */
+:root[data-theme="paper"] .settings-about-coffee-chip {
+  background: var(--option-raised);
+  box-shadow: var(--option-lift);
 }
 
 /* The Settings screen's last line: which build this is, and whose. */

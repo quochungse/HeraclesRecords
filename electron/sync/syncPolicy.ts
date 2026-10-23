@@ -426,8 +426,11 @@ export const LOCAL_STORAGE_POLICY: Readonly<Record<string, SyncTier>> = {
   // The sport screens taken off the rail — which sports the athlete reads,
   // so it follows them to the next machine.
   "heraclesrecords.hiddenSportScreens": "preference",
-  // Which muscle layers the strength body map draws.
-  "heraclesrecords-strength-muscle-layers-v2": "preference",
+  // Which muscle layers the strength body map draws: a view arrangement on
+  // this machine, not something to carry to the next.
+  "heraclesrecords-strength-muscle-layers-v2": "device",
+  // Whether the strength body map is left turning, on this machine.
+  "heraclesrecords.strength.bodyRotate": "device",
 
   // What the Hall of Records has told the athlete: the milestones they have
   // seen and the labour stages already announced. It follows them, so a stage

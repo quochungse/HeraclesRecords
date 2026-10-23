@@ -87,6 +87,7 @@ const strength: StrengthMessages = {
   "strength.bodyView": "มุมมองร่างกาย",
   "strength.front": "ด้านหน้า",
   "strength.back": "ด้านหลัง",
+  "strength.rotate": "หมุน",
   "strength.heatMetric": "ค่าที่ใช้แสดงสี",
   "strength.attribution.eyebrow": "การระบุกล้ามเนื้อ",
   "strength.attribution.none": "ไม่มีข้อมูลกล้ามเนื้อเฉพาะ",
