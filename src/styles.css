@@ -19036,7 +19036,9 @@ td span {
   overflow: hidden;
   margin: 0;
   color: var(--text-primary);
-  font-size: 14px;
+  /* A figure, read as one: at 14px the hero's totals were the size of the
+     labels over them. */
+  font-size: 18px;
   font-weight: 600;
   font-variant-numeric: tabular-nums;
   letter-spacing: 0;
@@ -19336,7 +19338,8 @@ td span {
 
 .sched-lift-name {
   font-size: 13px;
-  font-weight: 500;
+  /* The line the scheme under it hangs from. */
+  font-weight: 600;
   color: var(--text-primary);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -19467,40 +19470,44 @@ td span {
 }
 
 /*
- * A workout read in the Training Library, on paper: white cards on the
- * reader's pale well. The title card, every step, lift, repeat and circuit,
- * the structure bar's track and the description are white, and the cards float
- * on --shadow-soft. They were grey boxes on a grey well, hairline on hairline,
- * and the title card mixed its sport into that grey and came out a dull pink.
- * Scoped to the library: these pieces are the Calendar's too, and the plan
- * reader's session view is inside the library and takes them.
+ * A workout read in full, on paper: white cards on a grey ground. The title
+ * card, every step, lift, repeat and circuit, the structure bar's track and
+ * the description are white, and the cards float on --shadow-soft. They were
+ * glass boxes on a grey ground, hairline on hairline, and the title card mixed
+ * its sport into that grey and came out a dull tint.
+ *
+ * Scoped to the three places that read a workout and paint a ground behind it:
+ * the Training Library's reader (a pale well), the Calendar's session panel
+ * (the canvas; Overview opens the same panel for an upcoming workout) and the
+ * workout view, WorkoutViewModal (the canvas; Coach opens it too). Elsewhere —
+ * Coach's Workbench reads a plan session — the ground and its `--surface` are
+ * another screen's, and a white card on them is not a decision made here.
  */
-:root[data-theme="paper"] .training-library-view .sched-hero {
+:root[data-theme="paper"] :is(.training-library-view, .calendar-detail-panel, .workout-editor-modal) .sched-hero {
   border-color: transparent;
   background: var(--surface);
   box-shadow: var(--shadow-soft);
 }
 
-:root[data-theme="paper"] .training-library-view .sched-hero-icon {
+:root[data-theme="paper"] :is(.training-library-view, .calendar-detail-panel, .workout-editor-modal) .sched-hero-icon {
   border-color: transparent;
   background: color-mix(in srgb, var(--detail-sport) 12%, var(--surface));
 }
 
-:root[data-theme="paper"] .training-library-view .sched-hero-stats {
+:root[data-theme="paper"] :is(.training-library-view, .calendar-detail-panel, .workout-editor-modal) .sched-hero-stats {
   border-color: transparent;
-  background: var(--tl-reader-bg);
+  background: var(--glass-bg);
 }
 
-:root[data-theme="paper"] .training-library-view .sched-stat + .sched-stat {
-  border-left-color: var(--tl-rule-soft);
+:root[data-theme="paper"] :is(.training-library-view, .calendar-detail-panel, .workout-editor-modal) .sched-stat + .sched-stat {
+  border-left-color: color-mix(in srgb, var(--text-primary) 8%, transparent);
 }
 
-:root[data-theme="paper"] .training-library-view :is(.workout-view-overview, .sched-bar) {
-  border-color: var(--tl-rule);
+:root[data-theme="paper"] :is(.training-library-view, .calendar-detail-panel, .workout-editor-modal) :is(.workout-view-overview, .sched-bar) {
   background: var(--surface);
 }
 
-:root[data-theme="paper"] .training-library-view :is(.sched-step, .sched-lift, .sched-repeat, .sched-circuit) {
+:root[data-theme="paper"] :is(.training-library-view, .calendar-detail-panel, .workout-editor-modal) :is(.sched-step, .sched-lift, .sched-repeat, .sched-circuit) {
   border-color: transparent;
   background: var(--surface);
   box-shadow: var(--shadow-soft);
@@ -19508,23 +19515,20 @@ td span {
 
 /* A step inside a repeat and a lift inside a circuit are rows of the card
    around them, as they are in the dark. */
-:root[data-theme="paper"] .training-library-view :is(.sched-repeat-steps .sched-step, .sched-circuit .sched-lift) {
+:root[data-theme="paper"] :is(.training-library-view, .calendar-detail-panel, .workout-editor-modal) :is(.sched-repeat-steps .sched-step, .sched-circuit .sched-lift) {
   background: transparent;
   box-shadow: none;
 }
 
-:root[data-theme="paper"] .training-library-view :is(.sched-lift-scheme, .sched-step-intensity) {
+:root[data-theme="paper"] :is(.training-library-view, .calendar-detail-panel, .workout-editor-modal) :is(.sched-lift-scheme, .sched-step-intensity) {
   color: var(--text-secondary);
 }
 
-/* In either theme the figures of a workout read as figures, and a lift's name
-   as the line its scheme hangs under. */
-.training-library-view .sched-stat-value {
-  font-size: 18px;
-}
-
-.training-library-view .sched-lift-name {
-  font-weight: 600;
+/* A planned session's status sits above its title card in the Calendar's
+   panel, so on paper it is a white card beside it rather than a grey slab. */
+:root[data-theme="paper"] .calendar-detail-panel .calendar-plan-status {
+  background: var(--surface);
+  box-shadow: var(--shadow-soft);
 }
 
 /* empty state */

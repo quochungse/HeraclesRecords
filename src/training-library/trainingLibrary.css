@@ -2474,9 +2474,9 @@
 /*
  * The reader on paper: a pale well with no gold mist, for the workout's white
  * cards to lift off. The cards themselves — the title card, every step and
- * lift — are the Calendar's pieces (`.sched-*`), so their paper rules sit
- * beside them in styles.css (after `.sched-circuit`), scoped to the library;
- * only the library's own pieces are here.
+ * lift — are drawn by the workout's own paper rules in styles.css (after
+ * `.sched-circuit`), which the Calendar shares; only the library's own pieces
+ * are here.
  */
 :root[data-theme="paper"] .tl-reader {
   background: var(--tl-reader-bg);
