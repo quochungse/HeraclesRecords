@@ -6470,10 +6470,12 @@ td span {
   overflow: visible;
 }
 
-/* The figure's stage is dark in both themes: the figure is light added onto
-   it (`plus-lighter`), and paper's own grey stage, drawn in ink, read as
-   washed out. The figure's colours and strengths (BodyFigure.tsx) live here;
-   `--figure-tone` is the recovery's colour, mixed on the panel (above). */
+/* The figure's stage is dark, and the figure is light added onto it
+   (`plus-lighter`); paper stands it on a slate stage of its own (under
+   "Recovery panel" in the paper block). The figure's colours and strengths
+   (BodyFigure.tsx) live here; `--figure-tone` is the recovery's colour, mixed
+   on the panel (above). The halo takes the lines' colours, and the floor is
+   clear: a dark stage has none. */
 .recovery-figure {
   --figure-rim: 0.1;
   --figure-skin-alpha: 1;
@@ -6484,6 +6486,9 @@ td span {
   --figure-dim: #3b5068;
   --figure-idle: #46b8ff;
   --figure-tone: var(--figure-idle);
+  --figure-halo-dim: var(--figure-dim);
+  --figure-halo-lit: var(--figure-tone);
+  --figure-floor: transparent;
   position: relative;
   width: 100%;
   height: 100%;
@@ -6558,6 +6563,23 @@ td span {
 
 .body-figure-lit {
   stop-color: var(--figure-tone);
+}
+
+.body-figure-halo-dim {
+  stop-color: var(--figure-halo-dim);
+}
+
+.body-figure-halo-lit {
+  stop-color: var(--figure-halo-lit);
+}
+
+.body-figure-floor-core {
+  stop-color: var(--figure-floor);
+}
+
+.body-figure-floor-edge {
+  stop-color: var(--figure-floor);
+  stop-opacity: 0;
 }
 
 /* Under the figure's feet: on a narrow stage the camera stands the figure
@@ -17097,10 +17119,58 @@ td span {
 }
 
 /* --- Recovery panel ------------------------------------------------------- */
-/* The figure is the dark theme's on paper too; its stage is a step lighter,
-   so the black does not sit as a hole in a white page. */
+/* The figure stands as Strength's body map does on paper: on a cool slate
+   stage darkening toward the floor, the dark stage's graphite lifted into the
+   light. A dark stage was kept here first, `#222222`, and read as a hole cut
+   in the white card. The body is frosted white with an ink mesh, laid on in
+   normal blending, since light added onto a light stage only washes it out;
+   what is recovered is the recovery's colour taken darker, backlit by the
+   colour itself, and the rest is backlit white. The ramp is paper's own: the
+   dark one's lime-yellow 70% all but vanishes against white. */
+:root[data-theme="paper"] .training-recovery-panel {
+  --figure-low: #e5484d;
+  --figure-mid: #f06d1f;
+  --figure-high: #c4b10e;
+  --figure-full: #20b26b;
+  --figure-peak: #1f96ee;
+}
+
 :root[data-theme="paper"] .recovery-figure {
-  background: #222222;
+  --figure-rim: 0.3;
+  --figure-line: 0.75;
+  --figure-back-line: 0.16;
+  --figure-halo: 0.4;
+  --figure-skin: #f5f7fa;
+  --figure-dim: #66778d;
+  --figure-idle: #1f96ee;
+  --figure-tone: oklch(from var(--figure-idle) calc(l * 0.8) c h);
+  --figure-halo-dim: #ffffff;
+  --figure-halo-lit: var(--figure-idle);
+  --figure-floor: rgba(20, 32, 48, 0.24);
+  background:
+    radial-gradient(70% 38% at 50% 6%, rgba(255, 255, 255, 0.65), transparent 72%),
+    linear-gradient(180deg, #e4e9ef 0%, #d6dde5 55%, #c4cdd8 100%);
+  box-shadow: inset 0 0 0 1px rgba(19, 26, 40, 0.08);
+}
+
+/* Darker in the same hue: mixed toward an ink in OKLCH, orange turned red. */
+:root[data-theme="paper"] .training-recovery-panel:not(.tone-neutral) .recovery-figure {
+  --figure-tone: oklch(from var(--recovery-tone) calc(l * 0.8) c h);
+  --figure-halo-lit: var(--recovery-tone);
+}
+
+:root[data-theme="paper"] .body-figure {
+  mix-blend-mode: normal;
+}
+
+/* The bloom is a glow, and on a light stage it only blurs the mesh. */
+:root[data-theme="paper"] .body-figure-lines {
+  filter: none;
+}
+
+/* The rim shades the body's turning edges, which gives the white its volume. */
+:root[data-theme="paper"] .body-figure-rim {
+  fill: #4f5f75;
 }
 
 /* --- Training Hub: export dropdown ----------------------------------------- */

@@ -51,6 +51,7 @@ export function BodyFigure({ sex, shape, firmness, level }: BodyFigureProps) {
   // No reading lights the whole figure in the idle colour (`--figure-tone`).
   const fill = level === undefined ? 1 : level / 100;
   const levelY = drawing.levelY(fill);
+  const soles = drawing.levelY(0);
   const lines = `url(#${id}-lines)`;
 
   return (
@@ -73,6 +74,26 @@ export function BodyFigure({ sex, shape, firmness, level }: BodyFigureProps) {
           <stop offset="0" className="body-figure-dim" />
           <stop offset="1" className="body-figure-lit" />
         </linearGradient>
+        {/* The halo's own, across the same band: the lines' colours in the
+            dark, a white backlight over the tone on paper. */}
+        <linearGradient
+          id={`${id}-glow`}
+          gradientUnits="userSpaceOnUse"
+          x1="0"
+          x2="0"
+          y1={levelY - drawing.levelEdge}
+          y2={levelY + drawing.levelEdge}
+        >
+          <stop offset="0" className="body-figure-halo-dim" />
+          <stop offset="1" className="body-figure-halo-lit" />
+        </linearGradient>
+        {/* The shadow the figure stands in, drawn here rather than on the
+            stage so it follows the soles from one frame to the other. Its
+            colour is clear on the dark stage, which has no floor. */}
+        <radialGradient id={`${id}-floor`}>
+          <stop offset="0" className="body-figure-floor-core" />
+          <stop offset="1" className="body-figure-floor-edge" />
+        </radialGradient>
         {/* The glow is two things. The lines' own, a tight blur added back
             onto them; and a halo, the outline blurred wide under the opaque
             skin so only what spills past the edge shows — glowing the lines
@@ -86,7 +107,15 @@ export function BodyFigure({ sex, shape, firmness, level }: BodyFigureProps) {
           <feGaussianBlur stdDeviation="60" />
         </filter>
       </defs>
-      <path className="body-figure-halo" d={drawing.skin} fill={lines} filter={`url(#${id}-halo)`} />
+      <ellipse
+        className="body-figure-floor"
+        cx={drawing.width / 2}
+        cy={soles}
+        rx={drawing.width * 0.46}
+        ry={drawing.height * 0.04}
+        fill={`url(#${id}-floor)`}
+      />
+      <path className="body-figure-halo" d={drawing.skin} fill={`url(#${id}-glow)`} filter={`url(#${id}-halo)`} />
       <path className="body-figure-skin" d={drawing.skin} />
       <g className="body-figure-rim">
         {drawing.rim.map((layer) => (

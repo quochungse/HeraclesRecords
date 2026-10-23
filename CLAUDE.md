@@ -2184,10 +2184,17 @@ lives at module level for the same visit-to-visit reason — see `useCalendarDat
   opaque skin, so only what spills past the edge shows; glowing the lines wide lights the
   whole body as a haze. Every colour and strength is a custom property on the stage
   (`--figure-*`), stepped at 2x (`min-resolution: 1.5dppx`), where a line is one device pixel.
-  **Both themes draw the same figure on a black stage** (paper's a step lighter, `#222222`). Paper had its own — first a
-  dark-grey stage with the glow turned down (washed out and flat), then a light grey one with
-  the lines in ink, deeper tones in normal blending — and the athlete judged both uglier than
-  the dark one on a white page. "88% Ready" sits on the stage: under the feet on a narrow
+  **Paper stands the figure on Strength's slate stage** (since 2026-10-23, picked from a mockup of
+  five): `#e4e9ef` → `#c4cdd8`, a frosted white body (`--figure-skin`), an ink mesh in normal
+  blending with no bloom, the rim as slate shading, the halo a white backlight over the lit part
+  (`--figure-halo-dim`/`-lit`, a gradient of its own so the dark theme's halo is unchanged), a
+  floor shadow drawn in the SVG at the soles (`body-figure-floor`, clear in the dark) so it
+  follows both frames, and a **ramp of its own** (`--figure-*` redeclared on the paper panel:
+  the dark one's lime 70% vanishes on white), taken darker for the lines and the words with
+  `oklch(from … calc(l * 0.8) c h)` — mixed toward an ink in OKLCH, orange turned red. Before it
+  paper drew the dark figure on `#222222`, which read as a hole cut in the white card; earlier
+  still a dark-grey stage with the glow turned down and a flat light grey one with ink lines
+  were both judged uglier. "88% Ready" sits on the stage: under the feet on a narrow
   stage, on the fill line beside the figure from 560px (`WIDE_STAGE_MIN_PX`, the same width as
   the CSS container query; the stylesheet places the drawing at `NARROW_FRAME`/`WIDE_FRAME`
   of `bodyFigureMath.ts` — `test:body-figure` holds the two together — and the line is found
