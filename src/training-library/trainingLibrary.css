@@ -582,6 +582,14 @@
     0 4px 14px color-mix(in srgb, var(--accent) 14%, transparent);
 }
 
+/* Paper's chosen tab is the chosen chip's white face (`.option-group` in
+   styles.css), so the tabs and the chips under them mark a choice one way. */
+:root[data-theme="paper"] .tl-sections button[aria-current="page"] {
+  border-color: transparent;
+  background: var(--option-raised);
+  box-shadow: var(--option-lift);
+}
+
 .tl-sections button[aria-current="page"] span {
   color: #fff;
   background: var(--accent-gradient);
