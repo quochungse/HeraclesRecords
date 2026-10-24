@@ -20683,6 +20683,33 @@ td span {
     color-mix(in srgb, var(--glass-bg) 76%, transparent);
 }
 
+/*
+ * On paper a step is a white card on the builder's white sheet, lifted on the
+ * soft shadow, its kind's colour down the left edge: grey slabs in a hairline
+ * read as wells to type into rather than steps, and the open one's gold wash
+ * as a stain. The open step is ringed in the accent. A drop target and a step
+ * with an error keep the dark theme's marks.
+ */
+:root[data-theme="paper"] .calendar-builder-row:not(.is-drop-target) {
+  background: var(--surface);
+  box-shadow: var(--shadow-soft);
+}
+
+:root[data-theme="paper"] .calendar-builder-row:not(.is-drop-target):not(.has-error) {
+  border-color: transparent;
+  border-left-color: color-mix(in srgb, var(--step-color) 70%, transparent);
+}
+
+:root[data-theme="paper"] .calendar-builder-row.is-collapsed:not(.is-drop-target):hover {
+  box-shadow: var(--shadow-card);
+}
+
+:root[data-theme="paper"] .calendar-builder-row.is-active:not(.is-drop-target) {
+  box-shadow:
+    0 0 0 1.5px color-mix(in srgb, var(--accent) 45%, transparent),
+    var(--shadow-card);
+}
+
 .calendar-builder-row.is-collapsed {
   padding-block: 10px;
 }
