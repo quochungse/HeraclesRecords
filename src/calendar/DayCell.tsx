@@ -1,5 +1,5 @@
 import { Activity, Check, Mountain, Plus, type LucideIcon } from "lucide-react";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import type {
   TrainingHubActivity,
   TrainingHubScheduledWorkoutEntry,
@@ -31,6 +31,7 @@ import {
   scheduledWorkoutSport
 } from "../training/workoutSport";
 import { t } from "../i18n/core";
+import { useI18n } from "../i18n/useI18n";
 
 interface DayCellProps {
   day: CalendarDay;
@@ -88,16 +89,22 @@ function sportIcon(sport: WorkoutSport | undefined, category: SportColorCategory
   return category === "hiking" ? Mountain : Activity;
 }
 
-/** A distance to a tenth, and whole when the tenth is nothing: "8 km", "8.6 km". */
-function cardDistance(meters: number, unitSystem: UnitSystem, swim: boolean): string {
+/**
+ * A distance to a tenth, and whole when the tenth is nothing: "8 km", "8.6 km".
+ * Under a twentieth it is left out rather than written "0 km": a gym session's
+ * few metres of GPS drift are no distance.
+ */
+function cardDistance(meters: number | undefined, unitSystem: UnitSystem, swim: boolean): string | undefined {
+  if (!meters) return undefined;
   if (swim) return formatDistanceValue(meters, unitSystem, { swim });
   const tenths = Math.round(metersToDisplayDistance(meters, unitSystem) * 10);
+  if (tenths === 0) return undefined;
   return formatDistanceValue(meters, unitSystem, { digits: tenths % 10 === 0 ? 0 : 1 });
 }
 
 function activityAmounts(activity: TrainingHubActivity, unitSystem: UnitSystem): string[] {
   return [
-    activity.distance ? cardDistance(activity.distance, unitSystem, isSwimSportType(activity.sportType)) : undefined,
+    cardDistance(activity.distance, unitSystem, isSwimSportType(activity.sportType)),
     activity.duration ? formatDurationSpan(activity.duration) : undefined,
     activity.trainingLoad !== undefined ? t("units.trainingLoadShort", { value: Math.round(activity.trainingLoad) }) : undefined
   ].filter((part): part is string => Boolean(part));
@@ -114,7 +121,7 @@ function plannedAmounts(pair: PlannedActualPair, unitSystem: UnitSystem, swim: b
   const { distanceMeters, durationSeconds, expectedSeconds } = pair.targets;
   const seconds = expectedSeconds ?? (distanceMeters ? undefined : durationSeconds);
   const parts = [
-    distanceMeters ? cardDistance(distanceMeters, unitSystem, swim) : undefined,
+    cardDistance(distanceMeters, unitSystem, swim),
     seconds ? formatDurationSpan(seconds) : undefined
   ].filter((part): part is string => Boolean(part));
   if (!parts.length) {
@@ -328,9 +335,13 @@ export function DayCell({
   placeholderDelayMs
 }: DayCellProps) {
   const { unitSystem } = useUnitSystem();
+  const { locale } = useI18n();
   const [dropTarget, setDropTarget] = useState(false);
   const canReceiveDrop = !day.isPast && !busy && !selectionMode;
-  const cards = dayCards(day, unitSystem);
+  /* Every cell re-renders when the screen's state moves — a panel opening, a
+     drag over another day — and a day only changes when its range is read
+     again, so its lines are worked out once per day, units and language. */
+  const cards = useMemo(() => dayCards(day, unitSystem), [day, unitSystem, locale]);
   /* A day that already holds something (a week shared with the month before,
      still on screen) shows it; only an empty one waits. */
   const waiting = placeholderDelayMs !== undefined && cards.length === 0;

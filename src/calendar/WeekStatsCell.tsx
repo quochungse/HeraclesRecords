@@ -39,9 +39,10 @@ function loadBandTitle(actual: number, min?: number, max?: number): string | und
   if (min === undefined || max === undefined || actual === 0) {
     return undefined;
   }
-  if (actual > max) return t("calendar.week.band.above", { min, max });
-  if (actual < min) return t("calendar.week.band.below", { min, max });
-  return t("calendar.week.band.inside", { min, max });
+  const band = { min: formatCount(min), max: formatCount(max) };
+  if (actual > max) return t("calendar.week.band.above", band);
+  if (actual < min) return t("calendar.week.band.below", band);
+  return t("calendar.week.band.inside", band);
 }
 
 function share(value: number, scale: number): string {
@@ -166,7 +167,7 @@ export function WeekStatsCell({
         className="calendar-weekstats-bar"
         title={
           stats.remainingLoad > 0
-            ? t("calendar.week.barTitle", { done: stats.actualLoad, remaining: stats.remainingLoad })
+            ? t("calendar.week.barTitle", { done: formatCount(stats.actualLoad), remaining: formatCount(stats.remainingLoad) })
             : undefined
         }
         style={

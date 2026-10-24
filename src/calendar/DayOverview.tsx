@@ -13,6 +13,7 @@ import { sportChipStyle, sportTheme } from "../training-library/sportTheme";
 import { dayItems, type CalendarDay, type CalendarItemSelection } from "./calendarTypes";
 import { formatPlannedVolume } from "./scheduledStructure";
 import { t } from "../i18n/core";
+import { useI18n } from "../i18n/useI18n";
 
 function activityLine(activity: TrainingHubActivity, unitSystem: UnitSystem): string {
   return [
@@ -38,6 +39,8 @@ export function DayOverview({
   onOpen: (item: CalendarItemSelection) => void;
   onAdd: () => void;
 }) {
+  // Subscribes to the language, so an open panel redraws on a switch.
+  useI18n();
   const { unitSystem } = useUnitSystem();
   const items = dayItems(day);
   const done = day.activities;
