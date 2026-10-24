@@ -3398,7 +3398,8 @@ stain, and it filled bars a muddy brown. So, as of 2026-10-24, a chosen thing on
 (Settings' tiles, New analysis' starter, the builder's open step); a chosen row is a grey
 wash with the accent at its edge (Activities, the Library's list); today is white with an
 accent edge (the Calendar's cell, the plan reader's day); and what is filled takes
-`--hall-gold*`. The rail's active row keeps its accent wash, by decision.
+`--hall-gold*`. The rail's active row keeps its accent wash, by decision. Gold artwork drawn
+for black — each labour's head, the Personal records banner — stands on a black plaque.
 
 ## Releases
 
