@@ -18215,6 +18215,13 @@ td span {
   background: var(--accent-soft);
 }
 
+/* On paper the accent's wash made today a beige cell between the white days
+   ahead and the grey days gone; it is a white cell marked along its top. */
+:root[data-theme="paper"] .calendar-day.is-today:not(.is-drop-target) {
+  background: var(--surface);
+  box-shadow: inset 0 3px 0 var(--accent);
+}
+
 /* `isPast` drove behaviour — no drag, no add, no remove — and drew nothing, so
    the line the athlete keeps hitting was invisible. A wash, not an opacity: the
    chips in a past day are the record and must stay legible. */
