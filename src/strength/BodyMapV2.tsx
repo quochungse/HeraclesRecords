@@ -23,19 +23,13 @@ import {
   type BufferGeometry,
   type Material
 } from "three";
-import {
-  ChevronDown,
-  ChevronUp,
-  Eye,
-  EyeOff,
-  Layers3,
-  RotateCcw
-} from "lucide-react";
+import { Eye, EyeOff, Layers3 } from "lucide-react";
 import {
   calculateFocusDistance,
   cinematicDollyProgress,
   cinematicEaseOut,
-  nearestOrbitAngle
+  nearestOrbitAngle,
+  turnSpinUp
 } from "./bodyFocus";
 import { figureSex, type FigureSex } from "../training/body/physique";
 import { loadHeroBody } from "./heroBody";
@@ -66,7 +60,7 @@ interface BodyMapV2Props {
   onHover: (muscle: MuscleId | null) => void;
   onSelect: (muscle: MuscleId | null) => void;
   onViewChange?: (view: BodyView) => void;
-  /** Layer visibility/order editing is an authoring tool, hidden in prod. */
+  /** Hiding muscle groups is an authoring tool, hidden in prod. */
   showLayerControls?: boolean;
 }
 
@@ -80,7 +74,10 @@ const Z_ANATOMY_BOUNDS = new Box3(
 );
 const CAMERA_FOV = 25;
 const CAMERA_FRAMING = 1.28;
-const TARGET_Y = MODEL_HEIGHT * 0.51;
+// A touch under the figure's middle, so it stands a little high in the frame:
+// the figure's controls run along its foot and the space over its head is
+// empty.
+const TARGET_Y = MODEL_HEIGHT * 0.485;
 const COLOR_EPSILON = 0.0016;
 const MAX_PIXEL_RATIO = 1.5;
 const LAYER_STORAGE_KEY = "heraclesrecords-strength-muscle-layers-v2";
@@ -90,20 +87,26 @@ const CLEAR_SELECTION_MS = 700;
 const CHANGE_VIEW_MS = 650;
 // One turn every 3 s.
 const ROTATE_RADIANS_PER_SECOND = (2 * Math.PI) / 3;
+// A turn gathers speed rather than starting at it: a camera that has just
+// come to rest — the body brought back from a muscle — would otherwise jump
+// from standing to a third of a turn a second in one frame.
+const TURN_SPIN_UP_MS = 900;
 // A turn alone is drawn at 30 frames a second: the loop still wakes on every
 // display frame, but the GPU is asked for half of them.
 const TURN_FRAME_MS = 1000 / 30;
 const CALLOUT_REVEAL_PROGRESS = 0.58;
 const CAMERA_EYE_LIFT = 0.045;
 
-const DEFAULT_LAYER_ORDER: MuscleId[] = [
+// Draw priority, highest first. It only settles coincident boundaries, so it
+// is fixed: the obliques sit over the abs they share an edge with.
+const LAYER_ORDER: MuscleId[] = [
   "obliques",
   ...MUSCLES.map((muscle) => muscle.id).filter((id) => id !== "obliques")
 ];
 
-function layerPriority(order: MuscleId[], muscle: MuscleId): number {
-  const index = order.indexOf(muscle);
-  return index < 0 ? 0 : order.length - index;
+function layerPriority(muscle: MuscleId): number {
+  const index = LAYER_ORDER.indexOf(muscle);
+  return index < 0 ? 0 : LAYER_ORDER.length - index;
 }
 
 function isMuscleId(value: unknown): value is MuscleId {
@@ -113,28 +116,18 @@ function isMuscleId(value: unknown): value is MuscleId {
   );
 }
 
-function readLayerPreferences(): {
-  order: MuscleId[];
-  hidden: Set<MuscleId>;
-} {
+// An `order` stored by an earlier build, when the panel also reordered the
+// layers, is read past and dropped on the next write.
+function readHiddenLayers(): Set<MuscleId> {
   try {
     const stored = JSON.parse(localStorage.getItem(LAYER_STORAGE_KEY) ?? "null") as {
-      order?: unknown;
       hidden?: unknown;
     } | null;
-    const savedOrder = Array.isArray(stored?.order)
-      ? stored.order.filter(isMuscleId)
-      : [];
-    const order = [
-      ...new Set(savedOrder),
-      ...DEFAULT_LAYER_ORDER.filter((id) => !savedOrder.includes(id))
-    ];
-    const hidden = new Set(
+    return new Set(
       Array.isArray(stored?.hidden) ? stored.hidden.filter(isMuscleId) : []
     );
-    return { order, hidden };
   } catch {
-    return { order: [...DEFAULT_LAYER_ORDER], hidden: new Set() };
+    return new Set();
   }
 }
 
@@ -250,7 +243,7 @@ interface AnatomyWorld {
   dispose: () => void;
   refreshPalette: () => void;
   setHover: (hovered: MuscleId | null) => void;
-  setLayers: (order: MuscleId[], hidden: Set<MuscleId>) => void;
+  setHidden: (hidden: Set<MuscleId>) => void;
   setLevels: (levels: Record<MuscleId, number>) => void;
   setPresentation: (
     view: BodyView,
@@ -355,7 +348,6 @@ function createWorld(
   const geometries = new Set<BufferGeometry>([shadowGeometry]);
   const pickTargets: Mesh[] = [];
   const muscleMeshes = new Map<MuscleId, Mesh[]>();
-  let layerOrder = [...DEFAULT_LAYER_ORDER];
   let hiddenMuscles = new Set<MuscleId>();
 
   for (const muscle of MUSCLES) {
@@ -425,6 +417,8 @@ function createWorld(
   let presentationView: BodyView = "front";
   let rotating = false;
   let lastTurnAt = 0;
+  // How far into its spin-up the turn is, 0 to 1; back to 0 whenever it stops.
+  let turnRamp = 0;
   let modelReady = false;
   let calloutProjectionReady = false;
   let calloutRevealReady = false;
@@ -455,7 +449,7 @@ function createWorld(
       for (const mesh of muscleMeshes.get(id) ?? []) {
         // Draw priority resolves coincident boundaries only. Depth testing
         // remains enabled, so a deeper muscle cannot paint over the surface.
-        mesh.renderOrder = layerPriority(layerOrder, id);
+        mesh.renderOrder = layerPriority(id);
         mesh.visible = !hiddenMuscles.has(id);
       }
     }
@@ -520,9 +514,11 @@ function createWorld(
       selectedAnchor = null;
       return {
         // A turning body is not brought round to a side: a resize or a model
-        // arriving mid-turn would snap it to the front or back.
+        // arriving mid-turn would snap it to the front or back. Coming back
+        // from a muscle it keeps the side the camera was flying to, so the
+        // body settles face on before the turn takes up again.
         angle: rotating
-          ? cameraPose.angle
+          ? (cameraTransition?.to.angle ?? cameraPose.angle)
           : nearestOrbitAngle(cameraPose.angle, angle),
         target: new Vector3(0, TARGET_Y, 0),
         distance: cameraDistance
@@ -823,12 +819,16 @@ function createWorld(
         lastTurnAt = now;
       } else if (sinceTurn >= TURN_FRAME_MS - 1) {
         lastTurnAt = now;
-        cameraPose.angle += (sinceTurn / 1000) * ROTATE_RADIANS_PER_SECOND;
+        turnRamp = Math.min(1, turnRamp + sinceTurn / TURN_SPIN_UP_MS);
+        cameraPose.angle +=
+          (sinceTurn / 1000) * ROTATE_RADIANS_PER_SECOND * turnSpinUp(turnRamp);
         applyCameraPose();
         handlers.onFacing(Math.cos(cameraPose.angle) >= 0 ? "front" : "back");
         needsRender = true;
         hoverDirty = pointerInside;
       }
+    } else {
+      turnRamp = 0;
     }
 
     if (hoverDirty && pointerInside) {
@@ -1007,8 +1007,7 @@ function createWorld(
       needsRender = true;
       start();
     },
-    setLayers(nextOrder, nextHidden) {
-      layerOrder = [...nextOrder];
+    setHidden(nextHidden) {
       hiddenMuscles = new Set(nextHidden);
       if (localHover && hiddenMuscles.has(localHover)) {
         localHover = null;
@@ -1081,9 +1080,8 @@ export function BodyMapV2({
   const [progress, setProgress] = useState<number | null>(null);
   const [failed, setFailed] = useState(false);
   const [layersOpen, setLayersOpen] = useState(false);
-  const [layerPreferences, setLayerPreferences] = useState(
-    readLayerPreferences
-  );
+  const [hiddenLayers, setHiddenLayers] = useState(readHiddenLayers);
+  const layerControlRef = useRef<HTMLDivElement | null>(null);
   // The body follows the athlete's sex on the COROS profile, a man until it
   // says otherwise, and null until the profile has answered, so a woman's
   // figure is not built as a man's first. The snapshot comes from the main
@@ -1120,41 +1118,49 @@ export function BodyMapV2({
     };
   }, []);
 
-  const moveLayer = (muscle: MuscleId, direction: -1 | 1) => {
-    setLayerPreferences((current) => {
-      const index = current.order.indexOf(muscle);
-      const nextIndex = index + direction;
-      if (index < 0 || nextIndex < 0 || nextIndex >= current.order.length) {
-        return current;
-      }
-      const order = [...current.order];
-      [order[index], order[nextIndex]] = [order[nextIndex], order[index]];
-      return { ...current, order };
-    });
-  };
-
   const toggleLayer = (muscle: MuscleId) => {
-    const willHide = !layerPreferences.hidden.has(muscle);
-    if (willHide && selected === muscle) {
-      handlersRef.current.onSelect(null);
-    }
-    setLayerPreferences((current) => {
-      const hidden = new Set(current.hidden);
+    setHiddenLayers((current) => {
+      const hidden = new Set(current);
       if (hidden.has(muscle)) {
         hidden.delete(muscle);
       } else {
         hidden.add(muscle);
       }
-      return { ...current, hidden };
+      return hidden;
     });
   };
 
-  const resetLayers = () => {
-    setLayerPreferences({
-      order: [...DEFAULT_LAYER_ORDER],
-      hidden: new Set()
-    });
-  };
+  // The panel is for the whole figure, so it closes when a muscle is
+  // focused (its trigger goes with the rest of the figure's controls), on
+  // Escape, and on a press anywhere outside it.
+  useEffect(() => {
+    if (selected) {
+      setLayersOpen(false);
+    }
+  }, [selected]);
+
+  useEffect(() => {
+    if (!layersOpen) {
+      return;
+    }
+    const onPointerDown = (event: PointerEvent) => {
+      if (!layerControlRef.current?.contains(event.target as Node)) {
+        setLayersOpen(false);
+      }
+    };
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        event.stopPropagation();
+        setLayersOpen(false);
+      }
+    };
+    document.addEventListener("pointerdown", onPointerDown, true);
+    document.addEventListener("keydown", onKeyDown, true);
+    return () => {
+      document.removeEventListener("pointerdown", onPointerDown, true);
+      document.removeEventListener("keydown", onKeyDown, true);
+    };
+  }, [layersOpen]);
 
   useEffect(() => {
     const container = containerRef.current;
@@ -1235,33 +1241,27 @@ export function BodyMapV2({
     if (!selected) {
       return;
     }
-    setLayerPreferences((current) => {
-      if (!current.hidden.has(selected)) {
+    setHiddenLayers((current) => {
+      if (!current.has(selected)) {
         return current;
       }
-      const hidden = new Set(current.hidden);
+      const hidden = new Set(current);
       hidden.delete(selected);
-      return { ...current, hidden };
+      return hidden;
     });
   }, [selected]);
 
   useEffect(() => {
-    worldRef.current?.setLayers(
-      layerPreferences.order,
-      layerPreferences.hidden
-    );
+    worldRef.current?.setHidden(hiddenLayers);
     try {
       localStorage.setItem(
         LAYER_STORAGE_KEY,
-        JSON.stringify({
-          order: layerPreferences.order,
-          hidden: [...layerPreferences.hidden]
-        })
+        JSON.stringify({ hidden: [...hiddenLayers] })
       );
     } catch {
       // The renderer still works when storage is unavailable.
     }
-  }, [layerPreferences, worldVersion]);
+  }, [hiddenLayers, worldVersion]);
 
   return (
     <div
@@ -1291,79 +1291,58 @@ export function BodyMapV2({
         <strong>{selected ? MUSCLE_BY_ID[selected].label : ""}</strong>
       </div>
       {showLayerControls ? (
-        <div className={`anatomy-layer-control${layersOpen ? " is-open" : ""}`}>
+        <div
+          className={`anatomy-layer-control${layersOpen ? " is-open" : ""}`}
+          ref={layerControlRef}
+          inert={selected !== null}
+        >
           <button
             type="button"
             className="anatomy-layer-trigger"
+            aria-label={t("strength.layers.title")}
+            title={t("strength.layers.title")}
             aria-expanded={layersOpen}
             aria-controls="anatomy-muscle-layers"
             onClick={() => setLayersOpen((current) => !current)}
           >
-            <Layers3 size={13} aria-hidden="true" />
-            <span>{t("strength.layers.title")}</span>
+            <Layers3 size={14} aria-hidden="true" />
           </button>
           {layersOpen ? (
             <section
               className="anatomy-layer-panel"
               id="anatomy-muscle-layers"
-              aria-label={t("strength.layers.label")}
+              aria-label={t("strength.layers.title")}
             >
               <header>
-                <div>
-                  <strong>{t("strength.layers.title")}</strong>
-                  <span>{t("strength.layers.sub")}</span>
-                </div>
+                <strong>{t("strength.layers.title")}</strong>
                 <button
                   type="button"
-                  className="anatomy-layer-reset"
-                  aria-label={t("strength.layers.reset")}
-                  title={t("strength.layers.resetTitle")}
-                  onClick={resetLayers}
+                  className="anatomy-layer-show-all"
+                  disabled={hiddenLayers.size === 0}
+                  onClick={() => setHiddenLayers(new Set())}
                 >
-                  <RotateCcw size={12} aria-hidden="true" />
+                  {t("strength.layers.showAll")}
                 </button>
               </header>
-              <ul aria-label={t("strength.layers.list")}>
-                {layerPreferences.order.map((muscle, index) => {
-                  const hidden = layerPreferences.hidden.has(muscle);
-                  const label = MUSCLE_BY_ID[muscle].label;
+              <ul>
+                {MUSCLES.map(({ id: muscle, label }) => {
+                  const hidden = hiddenLayers.has(muscle);
                   return (
-                    <li key={muscle} className={hidden ? "is-hidden" : ""}>
+                    <li key={muscle}>
                       <button
                         type="button"
-                        className="anatomy-layer-visibility"
-                        aria-label={t(hidden ? "strength.layers.show" : "strength.layers.hide", { muscle: label })}
-                        aria-pressed={!hidden}
-                        title={t(hidden ? "strength.layers.show" : "strength.layers.hide", { muscle: label })}
+                        role="switch"
+                        className="anatomy-layer-row"
+                        aria-checked={!hidden}
                         onClick={() => toggleLayer(muscle)}
                       >
+                        <span>{label}</span>
                         {hidden ? (
-                          <EyeOff size={12} aria-hidden="true" />
+                          <EyeOff size={13} aria-hidden="true" />
                         ) : (
-                          <Eye size={12} aria-hidden="true" />
+                          <Eye size={13} aria-hidden="true" />
                         )}
                       </button>
-                      <span>{label}</span>
-                      <div className="anatomy-layer-move">
-                        <button
-                          type="button"
-                          aria-label={t("strength.layers.up", { muscle: label })}
-                          title={t("strength.layers.upTitle")}
-                          disabled={index === 0}
-                          onClick={() => moveLayer(muscle, -1)}
-                        >
-                          <ChevronUp size={12} aria-hidden="true" />
-                        </button>
-                        <button
-                          type="button"
-                          aria-label={t("strength.layers.down", { muscle: label })}
-                          title={t("strength.layers.downTitle")}
-                          disabled={index === layerPreferences.order.length - 1}
-                          onClick={() => moveLayer(muscle, 1)}
-                        >
-                          <ChevronDown size={12} aria-hidden="true" />
-                        </button>
-                      </div>
                     </li>
                   );
                 })}

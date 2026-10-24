@@ -138,19 +138,20 @@ export function StrengthHero({
         return;
       }
 
-      // Zooming in ends the turn: the body settles on the side the muscle is on.
-      const facing = rotating ? facingRef.current : view;
+      // Zooming in pauses the turn rather than ending it: the body settles on
+      // the side the muscle is on, and turns again once it is let go. Only the
+      // first muscle is picked from a turning body; after that the camera
+      // stands on `view`.
+      const facing =
+        rotating && selectedMuscle === null ? facingRef.current : view;
       const nextView = resolveMuscleView(MUSCLE_BY_ID[muscle].view, facing);
-      if (rotating) {
-        setRotating(false);
-      }
       if (nextView !== view) {
         setView(nextView);
         setViewRequest((current) => current + 1);
       }
       setSelectedMuscle(muscle);
     },
-    [rotating, selectedMuscle, setRotating, setView, view]
+    [rotating, selectedMuscle, setView, view]
   );
 
   const highlightedMuscle = figureHover ?? listHover ?? selectedMuscle;
@@ -172,7 +173,12 @@ export function StrengthHero({
       }}
     >
       <section className="strength-body-panel">
-        <div className="strength-body-controls">
+        {/* The whole figure's controls: with a muscle in focus they step
+            aside, and the way back is the panel's "All muscles". */}
+        <div
+          className={`strength-body-view${selectedMuscle ? " is-hidden" : ""}`}
+          inert={selectedMuscle !== null}
+        >
           <OptionGroup
             label={t("strength.bodyView")}
             tone="quiet"
@@ -185,16 +191,6 @@ export function StrengthHero({
             onChange={(next) =>
               next === "rotate" ? startRotating() : requestView(next as BodyView)
             }
-          />
-          <OptionGroup
-            label={t("strength.heatMetric")}
-            mode="collapsible"
-            tone="quiet"
-            value={metric}
-            options={metricOptions().filter(
-              (option) => source === "coros" || option.id !== "time"
-            ).map((option) => ({ value: option.id, label: option.label }))}
-            onChange={(next) => setMetric(next as HeatMetric)}
           />
         </div>
 
@@ -238,6 +234,18 @@ export function StrengthHero({
             muscles={analytics.muscles}
             muscleById={analytics.muscleById}
             metric={metric}
+            metricSwitch={
+              <OptionGroup
+                label={t("strength.heatMetric")}
+                tone="quiet"
+                className="muscle-panel-metric"
+                value={metric}
+                options={metricOptions()
+                  .filter((option) => source === "coros" || option.id !== "time")
+                  .map((option) => ({ value: option.id, label: option.label }))}
+                onChange={(next) => setMetric(next as HeatMetric)}
+              />
+            }
             max={heat.max}
             active={selectedMuscle}
             onSelect={selectMuscle}
