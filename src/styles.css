@@ -18208,6 +18208,18 @@ td span {
   overflow: hidden;
 }
 
+/* Paper's grid is a white sheet like every other card on the canvas, so the
+   session cards' grey fill reads on it; on the control wash they sank. */
+:root[data-theme="paper"] .calendar-grid {
+  background: var(--surface);
+}
+
+/* The week column is a well beside the days; white on white it was not. */
+:root[data-theme="paper"] .calendar-grid-header-stats,
+:root[data-theme="paper"] .calendar-weekstats {
+  background: color-mix(in srgb, var(--glass-bg) 60%, var(--surface));
+}
+
 /* The header sits outside the scroller, so the two boxes only line up while
    they are the same width -- and the body loses a scrollbar's width the moment
    a month is tall enough to scroll, which slid all eight columns left under a
@@ -18251,6 +18263,7 @@ td span {
 
 .calendar-grid-header-stats {
   border-left: 1px solid var(--glass-border);
+  background: var(--bg-ambient-white);
 }
 
 .calendar-grid-row {
@@ -18263,13 +18276,21 @@ td span {
 
 /* --- day cells --- */
 
+/* A day is its number, its session cards and a "+" under them. Pressing
+   anywhere in it opens the day: the number's button is stretched over the
+   cell (`.calendar-day-open::after`), below the cards and the "+", which
+   answer their own press. The list between the cards lets the press through.
+
+   Past days carry no wash any more. It was there because `isPast` drew
+   nothing; a card says it now — "Missed", "Plan" — and a grey cell under the
+   cards' grey fill took them off the page on paper. */
 .calendar-day {
   position: relative;
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  min-width: 0;
   min-height: 132px;
-  padding: 8px;
+  padding: 6px 6px 8px;
   border-right: 1px solid var(--glass-border);
   transition: background var(--dur-fast) var(--ease);
 }
@@ -18278,30 +18299,18 @@ td span {
   min-height: 320px;
 }
 
-.calendar-day:hover {
-  background: var(--glass-bg-hover);
+.calendar-day.is-openable:hover {
+  background: color-mix(in srgb, var(--text-primary) 3%, transparent);
 }
 
-.calendar-day.is-outside {
-  opacity: 0.45;
+.calendar-day.is-outside .calendar-day-number {
+  font-weight: 500;
+  color: var(--text-muted);
 }
 
-.calendar-day.is-today {
-  background: var(--accent-soft);
-}
-
-/* On paper the accent's wash made today a beige cell between the white days
-   ahead and the grey days gone; it is a white cell marked along its top. */
-:root[data-theme="paper"] .calendar-day.is-today:not(.is-drop-target) {
-  background: var(--surface);
-  box-shadow: inset 0 3px 0 var(--accent);
-}
-
-/* `isPast` drove behaviour — no drag, no add, no remove — and drew nothing, so
-   the line the athlete keeps hitting was invisible. A wash, not an opacity: the
-   chips in a past day are the record and must stay legible. */
-.calendar-day.is-past:not(.is-today):not(:hover) {
-  background: color-mix(in srgb, var(--bg-base) 45%, transparent);
+.calendar-day.is-outside .calendar-day-items,
+.calendar-day.is-outside .calendar-day-more {
+  opacity: 0.55;
 }
 
 .calendar-day.is-drop-target {
@@ -18313,41 +18322,50 @@ td span {
 .calendar-day-head {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  min-height: 22px;
+  height: 26px;
+  padding-left: 2px;
 }
 
 .calendar-day-number {
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--text-secondary);
-}
-
-.calendar-day.is-today .calendar-day-number {
-  color: var(--accent-strong);
-}
-
-/* A day with something on it opens as a whole (UAT); an empty one does not,
-   so only these take the pointer. Its number is the keyboard's way in. */
-.calendar-day.is-openable {
-  cursor: pointer;
-}
-
-.calendar-day-open {
+  display: inline-grid;
+  place-items: center;
+  min-width: 24px;
+  height: 24px;
   padding: 0 4px;
-  margin-left: -4px;
   border: 0;
-  border-radius: var(--radius-xs);
+  border-radius: var(--radius-pill);
   background: transparent;
   font: inherit;
   font-size: 12px;
   font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+  color: var(--text-secondary);
+}
+
+/* Today is the datum a month is read from: its number sits in the accent.
+   The cell itself stays as every other, so its cards read the same. */
+.calendar-day.is-today .calendar-day-number {
+  background: var(--accent);
+  color: var(--bg-base);
+}
+
+:root[data-theme="paper"] .calendar-day.is-today .calendar-day-number {
+  color: #ffffff;
+}
+
+.calendar-day-open {
   cursor: pointer;
 }
 
-.calendar-day-open:hover {
-  background: var(--glass-bg-hover);
-  color: var(--text-primary);
+.calendar-day-open::after {
+  position: absolute;
+  inset: 0;
+  content: "";
+}
+
+.calendar-day-open:disabled {
+  cursor: default;
 }
 
 .calendar-day-open:focus-visible {
@@ -18355,26 +18373,90 @@ td span {
   outline-offset: 2px;
 }
 
-.calendar-day-add {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 22px;
-  height: 22px;
-  border: 1px solid var(--glass-border);
-  border-radius: 50%;
-  background: var(--glass-bg-elevated);
+.calendar-day-items {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 4px;
+  pointer-events: none;
+}
+
+.calendar-day-items > * {
+  pointer-events: auto;
+}
+
+/* What a busy month cell folds away; it opens the day, as the cell does. */
+.calendar-day-more {
+  position: relative;
+  z-index: 1;
+  align-self: flex-start;
+  height: 20px;
+  margin: 4px 0 0 2px;
+  padding: 0 6px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 600;
   color: var(--text-secondary);
   cursor: pointer;
+  transition: background var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease);
+}
+
+.calendar-day-more:hover:not(:disabled) {
+  background: var(--glass-bg-hover);
+  color: var(--text-primary);
+}
+
+.calendar-day-more:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: 2px;
+}
+
+/* The "+" sits right under the last card, or in the middle of an empty day. */
+.calendar-day-add-slot {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  justify-content: center;
+  padding-top: 4px;
+  pointer-events: none;
+}
+
+.calendar-day.is-empty .calendar-day-add-slot {
+  flex: 1;
+  align-items: center;
+  padding-top: 0;
+}
+
+.calendar-day-add {
+  display: inline-grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 1px dashed color-mix(in srgb, var(--text-muted) 55%, transparent);
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
   opacity: 0;
-  transition: opacity var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease);
+  pointer-events: auto;
+  transition:
+    opacity var(--dur-fast) var(--ease),
+    color var(--dur-fast) var(--ease),
+    background var(--dur-fast) var(--ease),
+    border-color var(--dur-fast) var(--ease);
 }
 
 /* A control that exists only under the pointer cannot be tabbed to, and on a
    touch screen it cannot be reached at all — the same trap the sidebar's
    collapse toggle was in. Focus reveals it too, in its own rule so neither
    selector can take the other down. */
-.calendar-day:hover .calendar-day-add {
+.calendar-day:hover .calendar-day-add:not(:disabled) {
   opacity: 1;
 }
 
@@ -18385,18 +18467,16 @@ td span {
 }
 
 .calendar-day-add:hover {
+  border-style: solid;
+  border-color: var(--accent);
+  background: var(--accent-soft);
   color: var(--accent-strong);
 }
 
 .calendar-day-add:disabled {
   cursor: default;
   opacity: 0;
-}
-
-.calendar-day-items {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
+  pointer-events: none;
 }
 
 /* --- stand-ins while the range is read --- */
@@ -18466,21 +18546,27 @@ td span {
   border-radius: var(--radius-pill);
 }
 
-/* --- chips --- */
+/* --- session cards --- */
 
+/* A session is a card of two lines — its sport's icon and name, then
+   distance · time · load — on a soft fill. There is no edge bar: the icon
+   carries the sport, in the colour Settings gives it. A planned card is
+   dashed and unfilled, a missed one dashed in red and struck through. */
 .calendar-chip {
+  --chip-sport: var(--text-muted);
   position: relative;
   display: flex;
   flex-direction: column;
   gap: 2px;
-  padding: 7px 9px;
-  border: 1px solid var(--glass-border);
-  border-left: 3px solid var(--text-muted);
+  width: 100%;
+  min-width: 0;
+  padding: 6px 7px 7px;
+  border: 1px solid transparent;
   border-radius: var(--radius-sm);
-  background: var(--glass-bg-elevated);
+  background: var(--glass-bg);
   color: var(--text-primary);
+  font: inherit;
   text-align: left;
-  font-size: 12px;
   cursor: pointer;
   transition: background var(--dur-fast) var(--ease), transform var(--dur-fast) var(--ease);
 }
@@ -18493,6 +18579,141 @@ td span {
   transform: scale(0.99);
 }
 
+.calendar-chip:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: 2px;
+}
+
+.calendar-chip.calendar-sport-strength {
+  --chip-sport: var(--sport-strength);
+}
+.calendar-chip.calendar-sport-hiking {
+  --chip-sport: var(--sport-hiking);
+}
+.calendar-chip.calendar-sport-run {
+  --chip-sport: var(--sport-run);
+}
+.calendar-chip.calendar-sport-bike {
+  --chip-sport: var(--sport-bike);
+}
+.calendar-chip.calendar-sport-other {
+  --chip-sport: var(--sport-other);
+}
+
+/* Planned, nothing logged against it yet. Said by the card's dashed edge and
+   by the first word of its second line, so it reads without the colour too. */
+.calendar-chip-planned {
+  border-style: dashed;
+  border-color: color-mix(in srgb, var(--text-muted) 45%, transparent);
+  background: transparent;
+}
+
+.calendar-chip-planned.is-missed {
+  border-color: var(--error-border);
+}
+
+.calendar-chip-planned[draggable="true"] {
+  cursor: grab;
+}
+
+.calendar-chip-planned[draggable="true"]:active {
+  cursor: grabbing;
+}
+
+.calendar-chip-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  height: 16px;
+}
+
+.calendar-chip-icon {
+  flex: none;
+  color: var(--chip-sport);
+}
+
+/* The sport colours are set for a dark ground; on white the light ones
+   (run, bike, other) wash out at 12px, so the icon takes them toward the ink. */
+:root[data-theme="paper"] .calendar-chip-icon {
+  color: color-mix(in srgb, var(--chip-sport) 64%, var(--text-primary));
+}
+
+.calendar-chip.is-missed .calendar-chip-icon {
+  color: var(--text-muted);
+}
+
+.calendar-chip-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  font-size: 12px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-primary);
+}
+
+.calendar-chip-planned .calendar-chip-name {
+  font-weight: 500;
+  color: var(--text-secondary);
+}
+
+.calendar-chip-planned.is-missed .calendar-chip-name {
+  color: var(--text-muted);
+  text-decoration: line-through;
+}
+
+.calendar-chip-meta {
+  overflow: hidden;
+  font-size: 11px;
+  line-height: 1.3;
+  font-variant-numeric: tabular-nums;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-secondary);
+}
+
+.calendar-chip-planned .calendar-chip-meta {
+  color: var(--text-muted);
+}
+
+.calendar-chip-planned.is-missed .calendar-chip-meta {
+  color: var(--error-text);
+}
+
+/* Off plan: the share of the planned session, drawn only when it strayed. */
+.calendar-chip-badge {
+  flex: none;
+  padding: 0 6px;
+  border-radius: var(--radius-pill);
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1.6;
+}
+
+.calendar-chip-badge.is-complete {
+  background: var(--success-bg);
+  color: var(--success-text);
+}
+
+.calendar-chip-badge.is-partial {
+  background: var(--warning-bg);
+  color: var(--warning-text);
+}
+
+.calendar-chip-badge.is-missed {
+  background: var(--error-bg);
+  color: var(--error-text);
+}
+
+/* Well over what was prescribed. Not a failure and not "done" either, so it
+   takes the accent rather than one of the three signal colours. */
+.calendar-chip-badge.is-over {
+  background: var(--accent-soft);
+  color: var(--accent-strong);
+}
+
 .calendar-chip.is-selection-enabled {
   min-height: 46px;
   padding-left: 32px;
@@ -18500,6 +18721,7 @@ td span {
 
 .calendar-chip.is-selection-enabled.is-selected {
   border-color: color-mix(in srgb, var(--accent) 55%, var(--glass-border));
+  border-style: solid;
   background:
     linear-gradient(90deg, var(--accent-soft), transparent 88%),
     var(--glass-bg-elevated);
@@ -18531,167 +18753,117 @@ td span {
   opacity: 0.38;
 }
 
-.calendar-chip-planned[draggable="true"] {
+/* --- the week column --- */
+
+/* A week at a glance: its load as a figure and a bar — done solid, still
+   planned hatched — COROS's target in words, then the plan apart from the
+   week as it was. The bar used to mark the target band in green and the load
+   past it in red, and read as noise even once explained; the caption under it
+   says the same thing plainly. */
+.calendar-weekstats {
   position: relative;
-  padding-right: 25px;
-  cursor: grab;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+  padding: 12px 14px;
+  border-left: 1px solid var(--glass-border);
+  background: var(--bg-ambient-white);
 }
 
-.calendar-chip-planned[draggable="true"]:active {
-  cursor: grabbing;
-}
-
-.calendar-chip-drag-handle {
-  position: absolute;
-  top: 50%;
-  right: 6px;
-  color: var(--text-muted);
-  opacity: 0.55;
-  pointer-events: none;
-  transform: translateY(-50%);
-  transition: color var(--dur-fast) var(--ease), opacity var(--dur-fast) var(--ease);
-}
-
-.calendar-chip-planned[draggable="true"]:hover .calendar-chip-drag-handle {
-  color: var(--text-secondary);
-  opacity: 1;
-}
-
-.calendar-chip-activity {
-  border-left-color: var(--accent);
-}
-
-.calendar-chip-paired {
-  border-left-color: var(--accent-strong);
-}
-
-/* Completed-activity chips are tinted by sport, matching the training heatmap.
-   Two classes (.calendar-chip is always present) beat the single-class
-   activity/paired defaults above. */
-.calendar-chip.calendar-sport-strength {
-  border-left-color: var(--sport-strength);
-}
-.calendar-chip.calendar-sport-hiking {
-  border-left-color: var(--sport-hiking);
-}
-.calendar-chip.calendar-sport-run {
-  border-left-color: var(--sport-run);
-}
-.calendar-chip.calendar-sport-bike {
-  border-left-color: var(--sport-bike);
-}
-.calendar-chip.calendar-sport-other {
-  border-left-color: var(--sport-other);
-}
-
-/* A planned chip that COROS sent no sport code for keeps the neutral edge from
-   `.calendar-chip`. The six `.calendar-cat-*` colours that used to sit here were
-   set from an English run-vocabulary regex over the workout's name, and four of
-   them were hand-mixed hexes that ignored the paper theme. */
-
-/* Planned, nothing logged against it yet — said with the chip's own edge
-   rather than with the word "planned" on every meta line. A day cell is about
-   150px wide, so that word wrapped `157 TL / 157 TL planned` onto a third line
-   and made the whole week's row taller for nothing.
-
-   The sport bar on the left stays solid: it is the one part of the border that
-   carries data, and dashing it would break the colour into pieces. */
-.calendar-chip-planned {
-  border-style: dashed;
-  border-left-style: solid;
-  border-color: color-mix(in srgb, var(--text-muted) 40%, transparent);
-}
-
-.calendar-chip-planned.is-missed .calendar-chip-load {
-  color: var(--error-text);
-}
-
-.calendar-chip-title {
+.calendar-weekstats-top {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 6px;
 }
 
-.calendar-chip-name {
-  font-weight: 600;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.calendar-chip-meta {
+.calendar-weekstats-load {
+  min-width: 0;
   font-size: 11px;
-  color: var(--text-secondary);
-}
-
-.calendar-chip-load {
+  font-weight: 500;
+  white-space: nowrap;
   color: var(--text-muted);
 }
 
-.calendar-chip-badge {
-  flex-shrink: 0;
-  padding: 1px 6px;
+.calendar-weekstats-load strong {
+  font-family: var(--font-display);
+  font-size: 18px;
+  font-weight: 500;
+  line-height: 1.2;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-primary);
+}
+
+.calendar-weekstats-bar {
+  position: relative;
+  height: 6px;
+  margin-top: 2px;
   border-radius: var(--radius-pill);
-  font-size: 10px;
-  font-weight: 700;
+  background: color-mix(in srgb, var(--text-primary) 8%, transparent);
+  overflow: hidden;
 }
 
-.calendar-chip-badge.is-complete {
-  background: var(--success-bg);
-  color: var(--success-text);
+.calendar-weekstats-bar-done {
+  position: absolute;
+  inset-block: 0;
+  left: 0;
+  width: var(--week-done);
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--text-primary) 62%, transparent);
 }
 
-.calendar-chip-badge.is-partial {
-  background: var(--warning-bg);
-  color: var(--warning-text);
+.calendar-weekstats-bar-remaining {
+  position: absolute;
+  inset-block: 0;
+  left: var(--week-done);
+  width: var(--week-remaining);
+  background: repeating-linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--text-primary) 40%, transparent) 0 3px,
+    transparent 3px 5px
+  );
 }
 
-.calendar-chip-badge.is-missed {
-  background: var(--error-bg);
-  color: var(--error-text);
+.calendar-weekstats-target {
+  margin: 0;
+  font-size: 11px;
+  line-height: 1.3;
+  color: var(--text-muted);
 }
 
-/* Well over what was prescribed. Not a failure and not "done" either, so it
-   takes the accent rather than one of the three signal colours. */
-.calendar-chip-badge.is-over {
-  background: var(--accent-soft);
-  color: var(--accent-strong);
-}
-
-/* --- weekly stats column --- */
-
-.calendar-weekstats {
+.calendar-weekstats-rows {
   display: flex;
   flex-direction: column;
-  gap: 5px;
-  padding: 10px 12px;
-  border-left: 1px solid var(--glass-border);
-  background: var(--bg-ambient-white);
+  gap: 3px;
+  margin: 2px 0 0;
 }
 
+/* A value too long to sit beside its label drops under it, to the right. */
 .calendar-weekstats-row {
   display: flex;
+  flex-wrap: wrap;
   align-items: baseline;
   justify-content: space-between;
-  gap: 8px;
+  column-gap: 10px;
 }
 
 .calendar-weekstats-label {
+  min-width: 0;
   font-size: 11px;
   color: var(--text-muted);
 }
 
 .calendar-weekstats-value {
+  margin: 0 0 0 auto;
   font-size: 12px;
-  font-weight: 600;
-  color: var(--text-primary);
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
   white-space: nowrap;
+  color: var(--text-secondary);
 }
-
-.calendar-weekstats-value.tone-ok { color: var(--success-text); }
-.calendar-weekstats-value.tone-warn { color: var(--warning-text); }
-.calendar-weekstats-value.tone-danger { color: var(--error-text); }
 
 .calendar-weekstats.is-empty {
   justify-content: center;
@@ -18703,25 +18875,42 @@ td span {
   font-size: 11px;
 }
 
+/* Ask Coach about the week, at the top right under the pointer. Pulled into
+   the column's padding so the 28px target does not make the row taller than
+   the figure beside it. */
 .calendar-weekstats-coach {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  align-self: flex-start;
-  margin-top: 6px;
-  padding: 5px 10px;
-  border: 1px solid var(--glass-border);
+  display: inline-grid;
+  flex: none;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  margin: -4px -6px -4px 0;
+  padding: 0;
+  border: 0;
   border-radius: var(--radius-pill);
   background: transparent;
-  color: var(--text-secondary);
-  font-size: 11px;
+  color: var(--text-muted);
   cursor: pointer;
-  transition: color var(--dur-fast) var(--ease), border-color var(--dur-fast) var(--ease);
+  opacity: 0;
+  transition:
+    opacity var(--dur-fast) var(--ease),
+    color var(--dur-fast) var(--ease),
+    background var(--dur-fast) var(--ease);
+}
+
+.calendar-weekstats:hover .calendar-weekstats-coach {
+  opacity: 1;
+}
+
+.calendar-weekstats-coach:focus-visible {
+  opacity: 1;
+  outline: var(--focus-ring);
+  outline-offset: 2px;
 }
 
 .calendar-weekstats-coach:hover {
+  background: var(--glass-bg-hover);
   color: var(--accent-strong);
-  border-color: var(--accent);
 }
 
 /* Ask Coach on a session's own screen (Activities, Running, Strength): the
@@ -18893,6 +19082,11 @@ td span {
   margin: 0;
   color: var(--text-secondary);
   font-size: 13px;
+}
+
+/* An empty day offers what its cell's "+" does, at the button's own width. */
+.calendar-day-overview-add {
+  justify-self: start;
 }
 
 .calendar-day-overview-list {

@@ -57,6 +57,24 @@ export const PROFILE: CorosProfile = {
   }
 };
 
+// COROS's recommended load band for each week asked about, off the four weeks
+// before it, so the Calendar's week column reads as it does on an account.
+function weekTargets(dates: string[]): Record<string, unknown>[] {
+  const loads = new Map(metrics().map((m) => [m.happenDay, m.trainingLoad ?? 0]));
+  const mondays = dates.filter((day) => new Date(+day.slice(0, 4), +day.slice(4, 6) - 1, +day.slice(6, 8)).getDay() === 1);
+  return mondays.flatMap((monday) => {
+    const start = new Date(+monday.slice(0, 4), +monday.slice(4, 6) - 1, +monday.slice(6, 8));
+    let sum = 0;
+    for (let back = 1; back <= 28; back += 1) {
+      sum += loads.get(dayKey(new Date(start.getFullYear(), start.getMonth(), start.getDate() - back))) ?? 0;
+    }
+    const weekly = sum / 4;
+    return weekly > 0
+      ? [{ firstDayOfWeek: monday, recomendTlMin: Math.round(weekly * 0.85), recomendTlMax: Math.round(weekly * 1.15) }]
+      : [];
+  });
+}
+
 // Daily metrics over the last 400 days, built off the activity list.
 function dailyMetrics(days = 400): TrainingHubDailyMetric[] {
   const loadByDay = new Map<string, number>();
@@ -195,7 +213,7 @@ export function demoHandlers(): Record<string, unknown> {
     getRacePredictor: async () => dashboard().racePredictor,
     getDailyMetrics: async (dates: string[]) => {
       const wanted = new Set(dates);
-      return { dayList: metrics().filter((m) => wanted.size === 0 || wanted.has(m.happenDay)), weekList: [] };
+      return { dayList: metrics().filter((m) => wanted.size === 0 || wanted.has(m.happenDay)), weekList: weekTargets(dates) };
     },
     getAppInfo: async () => ({ version: "1.1.0", userDataPath: "~/Library/Application Support/heracles-records" }),
     getAppUpdateStatus: async () => ({ supported: true, currentVersion: "1.1.0", status: "idle", autoCheck: true, autoDownload: false }),
