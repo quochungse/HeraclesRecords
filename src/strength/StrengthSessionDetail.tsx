@@ -66,9 +66,15 @@ function headlineRecord(group: RecordGroup): SessionPersonalRecord | undefined {
   return group.e1rm ?? group.weight;
 }
 
-/** `+2.4 kg`: how far a record moved its lift. */
-function formatGain(record: SessionPersonalRecord, unitSystem: UnitSystem): string {
-  return `+${formatLiftWeight(Math.round((record.valueKg - record.previousKg) * 10) / 10, unitSystem)}`;
+/**
+ * `+2.4 kg`: how far a record moved its lift. Nothing at all for a gain that
+ * rounds away — a record only has to beat the last best, and "+0 kg" reads as
+ * a record that moved nothing.
+ */
+function RecordGain({ record, unitSystem }: { record: SessionPersonalRecord; unitSystem: UnitSystem }) {
+  const gain = Math.round((record.valueKg - record.previousKg) * 10) / 10;
+  if (gain <= 0) return null;
+  return <em className="strength-session-gain">+{formatLiftWeight(gain, unitSystem)}</em>;
 }
 
 /** How many lifts set a record in the window, as the header's chip counts them. */
@@ -180,17 +186,13 @@ function ExerciseTable({ rows, explorable, onOpenExercise, unitSystem }: Exercis
                     {row.topSet
                       ? `${formatLiftWeight(row.topSet.weightKg, unitSystem)} × ${row.topSet.reps}`
                       : t("strength.bodyweight")}
-                    {group?.weight && !group.e1rm ? (
-                      <em className="strength-session-gain">{formatGain(group.weight, unitSystem)}</em>
-                    ) : null}
+                    {group?.weight && !group.e1rm ? <RecordGain record={group.weight} unitSystem={unitSystem} /> : null}
                   </span>
                   <span className="strength-session-exercise-e1rm">
                     {row.bestE1rmKg > 0
                       ? formatLiftWeight(Math.round(row.bestE1rmKg * 10) / 10, unitSystem)
                       : "—"}
-                    {group?.e1rm ? (
-                      <em className="strength-session-gain">{formatGain(group.e1rm, unitSystem)}</em>
-                    ) : null}
+                    {group?.e1rm ? <RecordGain record={group.e1rm} unitSystem={unitSystem} /> : null}
                   </span>
                 </button>
                 {explorable.has(row.name) ? (
@@ -535,7 +537,7 @@ export function StrengthAggregateRecords({
   const shown = showAll ? recordSessions : recordSessions.slice(0, RECORD_SESSIONS_SHOWN);
 
   return (
-    <section id={RECORDS_ID} className="panel strength-card strength-session-records-card">
+    <section id={RECORDS_ID} className="panel strength-card">
       <div className="strength-card-head">
         <div>
           <h3>{t("strength.records.title")}</h3>
@@ -562,7 +564,7 @@ export function StrengthAggregateRecords({
                         <span className="strength-record-lift" key={group.exercise}>
                           <strong>{exerciseLabel(group.exercise)}</strong>
                           <span>{formatLiftWeight(Math.round(record.valueKg * 10) / 10, unitSystem)}</span>
-                          <em className="strength-session-gain">{formatGain(record, unitSystem)}</em>
+                          <RecordGain record={record} unitSystem={unitSystem} />
                         </span>
                       );
                     })}

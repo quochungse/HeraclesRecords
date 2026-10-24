@@ -14,6 +14,8 @@
   gap: 12px;
   width: 100%;
   padding: 10px 12px;
+  /* A row scrolled to stops below the week's sticky heading, not under it. */
+  scroll-margin-top: 40px;
   border: 1px solid transparent;
   border-radius: var(--radius-sm);
   background: transparent;
@@ -71,6 +73,14 @@
 .strength-session-row.is-aggregate + .strength-session-week {
   padding-top: 6px;
   border-top: 1px solid var(--sx-hairline);
+}
+
+/* The figures' shared artwork: drawn by reference in every row, never itself. */
+.strength-session-figure-sprite {
+  position: absolute;
+  width: 0;
+  height: 0;
+  overflow: hidden;
 }
 
 /* The row's muscles: the front and back figures, lit on the map's heat ramp. */
@@ -241,17 +251,14 @@
   display: flex;
   flex-direction: column;
   min-height: 0;
-  padding: 12px 8px;
+  padding: 12px 2px 12px 8px;
   overflow: hidden;
 }
 
 /*
- * The list scrolls inside the card, not the card itself, and with no
- * scrollbar of the platform's: Chromium draws Windows' overlay bar here,
- * which takes no `::-webkit-scrollbar` styling, and `scrollbar-width: thin`
- * still draws its arrow buttons. `StrengthSessionList` draws the thumb
- * (`.strength-session-scroll-thumb`), and a measured fade at the foot says
- * there is more while the thumb is out of sight.
+ * The list scrolls inside the card, not the card itself, so the scrollbar
+ * (the app's own, from styles.css) stands inside the card's edge rather than
+ * on it, and a measured fade at the foot says there is more.
  */
 .strength-split-list > .strength-session-nav {
   --fade-bottom: 0px;
@@ -259,7 +266,6 @@
   min-height: 0;
   overflow-y: auto;
   overscroll-behavior: contain;
-  scrollbar-width: none;
   -webkit-mask-image: linear-gradient(
     to bottom,
     #000 calc(100% - var(--fade-bottom)),
@@ -274,40 +280,6 @@
 
 .strength-split-list > .strength-session-nav.has-fade-bottom {
   --fade-bottom: 48px;
-}
-
-/* A 4px pill in the card's own padding, so the rows keep their whole width,
-   out of sight until the pointer is over the list or the list moves. Its hit
-   area is wider than what is drawn, so it can be taken hold of. */
-.strength-session-scroll-thumb {
-  position: absolute;
-  top: 0;
-  right: 2px;
-  width: 4px;
-  border-radius: var(--radius-pill);
-  background: color-mix(in srgb, var(--text-secondary) 34%, transparent);
-  opacity: 0;
-  touch-action: none;
-  transition:
-    opacity var(--dur-fast) var(--ease),
-    background-color var(--dur-fast) var(--ease);
-}
-
-.strength-session-scroll-thumb::before {
-  content: "";
-  position: absolute;
-  inset: 0 -4px;
-}
-
-.strength-split-list:hover > .strength-session-scroll-thumb,
-.strength-session-scroll-thumb[data-active],
-.strength-session-scroll-thumb[data-dragging] {
-  opacity: 1;
-}
-
-.strength-session-scroll-thumb:hover,
-.strength-session-scroll-thumb[data-dragging] {
-  background: color-mix(in srgb, var(--text-secondary) 56%, transparent);
 }
 
 /* The body map and its muscle panel sit side by side in a wide pane and stack

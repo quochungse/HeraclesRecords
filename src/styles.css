@@ -625,6 +625,57 @@ body {
   color: var(--text-primary);
 }
 
+/* --- Scrollbars -----------------------------------------------------------
+   One scrollbar for the whole app: a 4px pill in an 8px gutter, faint at rest,
+   clearer while the pointer is over what it scrolls, 6px under the pointer
+   itself. Windows' own is 15px with arrow buttons and a grey track, drawn
+   inside every card that scrolls.
+   Chromium reads either these pseudo-elements or the standard
+   `scrollbar-width` / `scrollbar-color`, never both — setting either standard
+   property on an element switches this styling off for it, and it falls back
+   to the platform's thin bar, arrows included. So no rule sets them, except
+   `scrollbar-width: none`, which hides a bar on purpose. (The screenshot
+   harness hides every bar with `::-webkit-scrollbar { width: 0 }`, so an
+   offscreen capture says nothing about how one looks.) */
+:root {
+  --scrollbar-thumb: color-mix(in srgb, var(--text-secondary) 20%, transparent);
+  --scrollbar-thumb-near: color-mix(in srgb, var(--text-secondary) 34%, transparent);
+  --scrollbar-thumb-held: color-mix(in srgb, var(--text-secondary) 52%, transparent);
+}
+
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track,
+::-webkit-scrollbar-track-piece,
+::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+::-webkit-scrollbar-button {
+  display: none;
+}
+
+::-webkit-scrollbar-thumb {
+  min-width: 32px;
+  min-height: 32px;
+  border: 2px solid transparent;
+  border-radius: var(--radius-pill);
+  background: var(--scrollbar-thumb) padding-box;
+}
+
+:hover::-webkit-scrollbar-thumb {
+  background: var(--scrollbar-thumb-near) padding-box;
+}
+
+::-webkit-scrollbar-thumb:hover,
+::-webkit-scrollbar-thumb:active {
+  border-width: 1px;
+  background: var(--scrollbar-thumb-held) padding-box;
+}
+
 button,
 input,
 select {
@@ -1756,7 +1807,6 @@ input::placeholder {
   color: var(--text-secondary);
   font-size: 13px;
   line-height: 1.6;
-  scrollbar-color: var(--glass-border) transparent;
 }
 
 .update-prompt-changelog:focus-visible {
@@ -3178,18 +3228,6 @@ tbody tr.is-selected:hover {
 
 .table-shell {
   overflow: auto;
-  scrollbar-width: thin;
-  scrollbar-color: rgba(255, 255, 255, 0.15) transparent;
-}
-
-.table-shell::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
-}
-
-.table-shell::-webkit-scrollbar-thumb {
-  border-radius: var(--radius-pill);
-  background: rgba(255, 255, 255, 0.15);
 }
 
 .table-shell thead th {
@@ -8893,7 +8931,6 @@ td span {
 .map-frame .basemap-menu {
   max-height: 100%;
   overflow-y: auto;
-  scrollbar-width: thin;
 }
 
 /* A side-panel map is too short to hold its menu at all — the base maps alone
@@ -9149,8 +9186,6 @@ td span {
   padding: 12px;
   font-size: 12px;
   white-space: pre-wrap;
-  scrollbar-width: thin;
-  scrollbar-color: rgba(255, 255, 255, 0.15) transparent;
 }
 
 @keyframes training-card-enter {
@@ -9865,9 +9900,6 @@ td span {
   min-height: 0;
   overflow-y: auto;
   padding-bottom: 8px;
-  scrollbar-width: thin;
-  scrollbar-color: color-mix(in srgb, var(--text-secondary) 18%, transparent)
-    transparent;
 }
 
 /* The list is laid out by the body that scrolls, not a scroller itself. */
@@ -9939,9 +9971,6 @@ td span {
   padding: 8px;
   overflow-y: auto;
   list-style: none;
-  scrollbar-width: thin;
-  scrollbar-color: color-mix(in srgb, var(--text-secondary) 18%, transparent)
-    transparent;
   animation: chat-plan-panel-enter 0.24s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
@@ -10791,44 +10820,6 @@ td span {
 
 .chat-session-list {
   overflow-y: auto;
-  scrollbar-width: thin;
-  scrollbar-color: color-mix(in srgb, var(--text-secondary) 14%, transparent)
-    transparent;
-}
-
-.chat-session-list:hover {
-  scrollbar-color: color-mix(in srgb, var(--text-secondary) 30%, transparent)
-    transparent;
-}
-
-.chat-session-list::-webkit-scrollbar {
-  width: 6px;
-  background: transparent;
-}
-
-.chat-session-list::-webkit-scrollbar-track,
-.chat-session-list::-webkit-scrollbar-track-piece,
-.chat-session-list::-webkit-scrollbar-corner {
-  background: transparent;
-  box-shadow: none;
-}
-
-.chat-session-list::-webkit-scrollbar-thumb {
-  min-height: 44px;
-  border: 1px solid transparent;
-  border-radius: var(--radius-pill);
-  background: color-mix(in srgb, var(--text-secondary) 12%, transparent);
-  background-clip: padding-box;
-}
-
-.chat-session-list:hover::-webkit-scrollbar-thumb {
-  background: color-mix(in srgb, var(--text-secondary) 28%, transparent);
-  background-clip: padding-box;
-}
-
-.chat-session-list::-webkit-scrollbar-thumb:hover {
-  background: color-mix(in srgb, var(--text-secondary) 42%, transparent);
-  background-clip: padding-box;
 }
 
 .chat-settings-panel {
@@ -12142,44 +12133,6 @@ td span {
   flex: 1;
   min-height: 0;
   overflow-y: auto;
-  scrollbar-width: thin;
-  scrollbar-color: color-mix(in srgb, var(--text-secondary) 14%, transparent)
-    transparent;
-}
-
-.chat-transcript:hover {
-  scrollbar-color: color-mix(in srgb, var(--text-secondary) 30%, transparent)
-    transparent;
-}
-
-.chat-transcript::-webkit-scrollbar {
-  width: 6px;
-  background: transparent;
-}
-
-.chat-transcript::-webkit-scrollbar-track,
-.chat-transcript::-webkit-scrollbar-track-piece,
-.chat-transcript::-webkit-scrollbar-corner {
-  background: transparent;
-  box-shadow: none;
-}
-
-.chat-transcript::-webkit-scrollbar-thumb {
-  min-height: 44px;
-  border: 1px solid transparent;
-  border-radius: var(--radius-pill);
-  background: color-mix(in srgb, var(--text-secondary) 12%, transparent);
-  background-clip: padding-box;
-}
-
-.chat-transcript:hover::-webkit-scrollbar-thumb {
-  background: color-mix(in srgb, var(--text-secondary) 28%, transparent);
-  background-clip: padding-box;
-}
-
-.chat-transcript::-webkit-scrollbar-thumb:hover {
-  background: color-mix(in srgb, var(--text-secondary) 42%, transparent);
-  background-clip: padding-box;
 }
 
 .chat-thread {
@@ -12890,14 +12843,6 @@ td span {
   -webkit-backdrop-filter: blur(22px) saturate(1.35);
   backdrop-filter: blur(22px) saturate(1.35);
   font-size: 13px;
-  scrollbar-color:
-    color-mix(
-      in srgb,
-      var(--chat-select-tone) 54%,
-      var(--text-muted)
-    )
-    transparent;
-  scrollbar-width: thin;
 }
 
 .chat-select-menu .app-select-menu-list {
@@ -13004,37 +12949,6 @@ td span {
     transparent
   );
   color: var(--chat-select-tone-strong);
-}
-
-.chat-select-menu::-webkit-scrollbar {
-  width: 6px;
-}
-
-.chat-select-menu::-webkit-scrollbar-track {
-  margin-block: 9px;
-  background: transparent;
-}
-
-.chat-select-menu::-webkit-scrollbar-thumb {
-  border: 1px solid transparent;
-  border-radius: var(--radius-pill);
-  background:
-    color-mix(
-      in srgb,
-      var(--chat-select-tone) 54%,
-      var(--text-muted)
-    )
-    padding-box;
-}
-
-.chat-select-menu::-webkit-scrollbar-thumb:hover {
-  background:
-    color-mix(
-      in srgb,
-      var(--chat-select-tone) 74%,
-      var(--text-secondary)
-    )
-    padding-box;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -14836,7 +14750,6 @@ td span {
   max-height: calc(6 * 1.45em + 8px);
   overflow-y: auto;
   padding: 4px 0;
-  scrollbar-width: thin;
 }
 
 .chat-composer-row {
@@ -17277,14 +17190,6 @@ td span {
 
 :root[data-theme="paper"] .training-activities-detail {
   border-left-color: var(--glass-border);
-}
-
-:root[data-theme="paper"] .table-shell {
-  scrollbar-color: rgba(19, 26, 40, 0.22) transparent;
-}
-
-:root[data-theme="paper"] .table-shell::-webkit-scrollbar-thumb {
-  background: rgba(19, 26, 40, 0.22);
 }
 
 :root[data-theme="paper"] .table-shell thead th {
@@ -20910,12 +20815,6 @@ td span {
   gap: 12px;
 }
 
-.calendar-builder-rows,
-.calendar-builder-settings {
-  scrollbar-width: thin;
-  scrollbar-color: color-mix(in srgb, var(--text-primary) 16%, transparent) transparent;
-}
-
 .calendar-builder-row {
   /* Each step kind carries the same hue used by the workout editor and the
      scheduled-workout detail view, so the structure reads at a glance. */
@@ -22863,7 +22762,6 @@ td span {
   overflow-y: auto;
   border-right: 1px solid var(--glass-border);
   padding: 12px;
-  scrollbar-width: thin;
 }
 
 .exercise-picker-facet {
@@ -22976,7 +22874,6 @@ td span {
   min-height: 0;
   overflow-y: auto;
   padding: 14px;
-  scrollbar-width: thin;
 }
 
 .exercise-picker-grid {

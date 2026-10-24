@@ -879,8 +879,8 @@ lives at module level for the same visit-to-visit reason — see `useCalendarDat
   scrolling list, not the first thing inside it**: sticky within the scroller it stayed put, but
   the scrollbar is the scroller's own and ran the full height, so a thumb slid past a row that
   does not move. `.tl-catalog > .tl-index-head` reserves the same gutter with `scrollbar-gutter:
-  stable` over `overflow: hidden` — measured, that takes the same 15px off its content box as a
-  real scrollbar does, which is what keeps each label over its own figures.
+  stable` over `overflow: hidden` — measured, that takes the same 8px off its content box as the
+  app's scrollbar takes off the list's, which is what keeps each label over its own figures.
   **The reader's dock is one row, and scheduling is a button in it.** Scheduling had a row of
   its own above the four actions — an icon, a heading, a date field and a button, standing open
   across the whole dock for a decision that is made once and then not again. It is a trigger at
@@ -2613,13 +2613,8 @@ lives at module level for the same visit-to-visit reason — see `useCalendarDat
   `sessionHeat`), not the push/pull/legs/core bar, and "All sessions" is drawn as a row like
   the others, with "‹ All sessions" in the session band as the way back. The list is as tall
   as the detail beside it through `contain: size`, so its own length never sets the row's.
-  **Its scroll thumb is drawn, not styled** (`.strength-session-scroll-thumb`): Chromium here
-  draws Windows' overlay scrollbar, which takes no `::-webkit-scrollbar` styling at all
-  (measured: no gutter, rules ignored), and `scrollbar-width: thin` still carries the arrow
-  buttons. So the native bar is `scrollbar-width: none`, a 4px pill is placed from the scroll
-  and shown under the pointer or while the list moves, and a measured fade at the foot says
-  the list goes on. An offscreen capture paints no scrollbar of any kind — check one in a
-  shown window. **Hevy is its REST API, not MCP**, and no one
+  It scrolls inside its card (the nav, not the aside), so the app's scrollbar stands inside
+  the card's edge, and a measured fade at the foot says the list goes on. **Hevy is its REST API, not MCP**, and no one
   here has had a real Hevy account: the shapes were checked against Hevy's own OpenAPI
   (`https://api.hevyapp.com/docs.json`) on 2026-10-03, and `test:hevy-service` fakes them. Three
   rules it rests on. **The full read stops at a page that is all older than the window**, never
@@ -3235,6 +3230,20 @@ read by someone. A name the renderer builds (`--m3d-heat-${level}`) counts throu
 (`max(28px, (100% - 1440px) / 2)`) so the scrollbar stays at the window edge and no screen
 needs a wrapper. Below about 1750px nothing changes; past it the margins grow rather than the
 tables.
+
+**There is one scrollbar, and the same test holds it** (since 2026-10-24): the bare
+`::-webkit-scrollbar` block near the top of `styles.css` — a 4px pill in an 8px gutter on a
+clear track, no arrow buttons, faint at rest, clearer while the pointer is over what it
+scrolls (`--scrollbar-thumb*`). Windows' own bar is 15px with arrows and a grey track, and it
+was drawn inside every card that scrolls. **Chromium reads either those pseudo-elements or
+the standard `scrollbar-width` / `scrollbar-color`, never both**, so setting either standard
+property on an element hands it back the platform's bar, arrows included —
+`test:design-vocabulary` fails on any `scrollbar-color`, any `scrollbar-width` but `none`
+(which hides a bar on purpose: the rail, the builder's summary), and any second
+`::-webkit-scrollbar` look. Twenty-odd rules had set `scrollbar-width: thin` or their own
+thumb, each a different grey. **The screenshot harness hides every bar**
+(`::-webkit-scrollbar { width: 0 !important }` in `scripts/screenshots/main.tsx`), so an
+offscreen capture of it says nothing about scrollbars: check one in a plain Electron window.
 
 **Motion is part of that vocabulary, and the same test holds it.** A `transition` spends
 `var(--ease)` — one decelerating curve; bare `ease` was 92% of every curve and is the browser

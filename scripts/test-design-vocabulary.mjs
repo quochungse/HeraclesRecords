@@ -434,6 +434,32 @@ for (const { file, code } of stylesheets) {
   }
 }
 
+// --------------------------------------------------------------- scrollbars
+// One scrollbar for the app, the `::-webkit-scrollbar` block in styles.css.
+// Chromium reads either those pseudo-elements or the standard properties,
+// never both, so a `scrollbar-color` or a `scrollbar-width` other than `none`
+// on an element hands it back the platform's bar — on Windows, arrows and
+// all. And a per-element `::-webkit-scrollbar` rule is a second look; only
+// one that hides a bar is let through.
+for (const { file, code } of stylesheets) {
+  for (const m of code.matchAll(/(?<![-\w])(scrollbar-color|scrollbar-width)\s*:\s*([^;{}]+)/g)) {
+    const value = m[2].trim();
+    if (m[1] === "scrollbar-width" && value === "none") continue;
+    fail(file, lineAt(code, m.index), m[1], value,
+      "leave it to the app's scrollbar in styles.css — setting it switches that styling off for the element (only scrollbar-width: none, to hide a bar)");
+  }
+  for (const m of code.matchAll(/([^{};]+)\{([^{}]*)\}/g)) {
+    const selectorText = m[1].trim().replace(/\s+/g, " ");
+    if (!selectorText.includes("::-webkit-scrollbar") || /^::-webkit-scrollbar|^:hover::-webkit-scrollbar/.test(selectorText)) continue;
+    const body = m[2].replace(/\s+/g, " ").trim();
+    const hides = /display:\s*none/.test(body) || /width:\s*0;.*height:\s*0/.test(body);
+    if (!hides) {
+      fail(file, lineAt(code, m.index + m[1].search(/\S/)), "selector", selectorText.slice(0, 90),
+        "a second scrollbar look — the app's one is the bare ::-webkit-scrollbar block in styles.css");
+    }
+  }
+}
+
 for (const key of designedUnused) {
   violations.push(`DESIGNED_LENGTHS  ${key.replaceAll("|", "  ")}   — no such literal transition any more; remove the entry`);
 }

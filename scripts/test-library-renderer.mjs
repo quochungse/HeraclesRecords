@@ -807,9 +807,12 @@ async function main() {
     );
     await settle();
     assert.deepEqual(await fadeOf(), [true, false], "at the foot only the upper one");
+    // The reader's bar is the app's (the ::-webkit-scrollbar block in
+    // styles.css): a scrollbar-width set here would switch that off and hand
+    // it back the platform's bar, arrows and all.
     assert.equal(
       await evaluate(`getComputedStyle(document.querySelector(".plan-reader")).scrollbarWidth`),
-      "thin"
+      "auto"
     );
 
     await evaluate(`document.querySelector(".plan-reader-close").click()`);
@@ -1137,7 +1140,9 @@ async function main() {
     );
     assert.deepEqual(layout.lines, [1, 1, 1], `every answer reads on one line: ${JSON.stringify(layout)}`);
     assert.equal(new Set(layout.tops).size, 1, "and the three stand in one row");
-    assert.ok(layout.width > 460 && layout.inside, `the dialog widens to hold them and stays in the window, ${layout.width}px`);
+    // 460px is the dialog's floor (min-width), and it widens only when the
+    // answers need more; at the button size they fit it exactly.
+    assert.ok(layout.width >= 460 && layout.inside, `the dialog holds them and stays in the window, ${layout.width}px`);
     assert.ok(layout.prose <= layout.width - 40, "the prose wraps to that width rather than setting it");
     assert.equal(await calls("saveTrainingPlanToCoros"), 0, "nothing is written while it asks");
 

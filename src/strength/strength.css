@@ -518,7 +518,6 @@
   overscroll-behavior: contain;
   touch-action: pan-y;
   list-style: none;
-  scrollbar-width: thin;
 }
 
 .anatomy-layer-panel li {
@@ -920,7 +919,6 @@
   overflow-y: auto;
   overscroll-behavior-y: auto;
   scrollbar-gutter: stable;
-  scrollbar-width: thin;
   min-height: 0;
 }
 
@@ -1091,7 +1089,6 @@
   /* The gutter is held whether or not the detail overflows, so opening one
      muscle after another never moves the readout sideways. */
   scrollbar-gutter: stable;
-  scrollbar-width: thin;
   padding-right: 2px;
 }
 
