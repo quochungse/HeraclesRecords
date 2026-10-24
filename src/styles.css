@@ -2858,6 +2858,22 @@ input::placeholder {
   color: var(--bg-base);
 }
 
+/* On paper a chosen tile wore the accent's wash, a beige that read as a stain
+   beside the white ones. The set is a grey wash and a chosen tile is lifted
+   out of it in white and ringed in the accent, the way a chosen chip is picked
+   on a white face. */
+:root[data-theme="paper"] .option-chips.option-chips--tiles button {
+  background: var(--glass-bg);
+}
+
+:root[data-theme="paper"] .option-chips.option-chips--tiles button[aria-pressed="true"] {
+  border-color: transparent;
+  background: var(--option-raised);
+  box-shadow:
+    0 0 0 1.5px color-mix(in srgb, var(--accent) 55%, transparent),
+    var(--option-lift);
+}
+
 /* There is no caret here on purpose. The dropdown mode gets one from
    SelectDropdown, which is a trigger for a floating menu; a collapsible chip
    carries no mark, because at rest it has to read as the current value first
