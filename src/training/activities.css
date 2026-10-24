@@ -287,6 +287,12 @@
   color: var(--text-muted);
 }
 
+/* A grey well on the grey canvas read as a disabled field; on paper a field is
+   white on its hairline, as the Library's search is. */
+:root[data-theme="paper"] .activities-search {
+  background: var(--surface);
+}
+
 .activities-search input {
   min-width: 0;
   flex: 1;
@@ -425,6 +431,19 @@
 .activity-row.is-selected .activity-row-open {
   border-color: color-mix(in srgb, var(--accent) 34%, transparent);
   background: color-mix(in srgb, var(--accent) 10%, transparent);
+}
+
+/* On paper the accent's wash came out a beige on the white list, read as a
+   stain, and a hover in `--ax-raised` was white on white. The chosen row is a
+   grey wash marked by the accent at its edge; a hover is a lighter wash. */
+:root[data-theme="paper"] .activity-row-open:hover {
+  background: rgba(19, 26, 40, 0.035);
+}
+
+:root[data-theme="paper"] .activity-row.is-selected .activity-row-open {
+  border-color: transparent;
+  background: rgba(19, 26, 40, 0.06);
+  box-shadow: inset 3px 0 0 var(--accent);
 }
 
 .activity-row.is-loading .activity-row-open {
@@ -717,6 +736,26 @@
   font-size: 14px;
   font-weight: 600;
   font-variant-numeric: tabular-nums;
+}
+
+/* On paper the pane is a white card, and three grey boxes over a ruled grid of
+   thirteen more read as a spreadsheet inside it. The headline figures keep a
+   faint ground and no edge; the rest are a list of label and value with no
+   box and no rules, the way the totals beside a chart are written elsewhere. */
+:root[data-theme="paper"] .activity-detail-headline > div {
+  border-color: transparent;
+  background: rgba(19, 26, 40, 0.04);
+}
+
+:root[data-theme="paper"] .activity-detail-figures {
+  row-gap: 2px;
+  border-color: transparent;
+  background: transparent;
+}
+
+:root[data-theme="paper"] .activity-detail-figures > div {
+  padding-inline: 14px 10px;
+  box-shadow: none;
 }
 
 /* --- Zones ---------------------------------------------------------------- */
