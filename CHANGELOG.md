@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.3.0] - 2026-10-24
+
+A redesign, and the biggest refinement pass the app has had. Every screen was taken back to three ideas: **refined**, so nothing is drawn that does not need to be; **intuitive**, so a screen shows what you picked and nothing else; and **convenient**, so the thing you want is one press away.
+
+### What's new
+- **Strength** - one thing at a time: a session, or the weeks around it, never both on top of each other. Records sit in the exercises they were set in, each session shows the muscles it worked, and the body figure turns slowly until you pick a side.
+- **Activities** - fewer boxes and lighter rows. The sport filter is the bar that shows your mix, and a session opens on what matters first.
+- **Calendar** - sessions are small cards you read at a glance, and a press anywhere in a day opens it.
+- **Light theme** - redrawn across the app: white cards on a cool grey page, gold where something is filled, and the accent kept for words.
+- **Sleep and recovery** - Coach reads your recovery from the heart rate you slept at, which says far more about a night than COROS's resting heart rate, and the Sleep screen shows it beside HRV and the score.
+
+### Fixed
+- One quiet scrollbar across the app.
+- Improve app performance and stability.
+
 ## [1.2.2] - 2026-10-22
 
 ### What's new

@@ -11,7 +11,8 @@
 
 <p align="center">
   An unofficial desktop app for COROS athletes: every session read in depth,<br />
-  an AI coach that has read all of it, and a hall for every record you set along the way.
+  an AI coach that has read all of it, and a hall for every record you set along the way.<br />
+  Made to be refined, intuitive and convenient.
 </p>
 
 <p align="center">
