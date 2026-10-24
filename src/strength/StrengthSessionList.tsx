@@ -230,12 +230,15 @@ export function StrengthSessionList({
                       <span className="strength-session-row-title">
                         <strong>{session.name?.trim() || t("strength.untitled")}</strong>
                         {records > 0 ? (
+                          // The trophy alone: "PR" beside it cost a long name
+                          // the width it was cut at.
                           <span
-                            className="strength-session-record-badge"
+                            className="strength-session-record-mark"
+                            role="img"
+                            aria-label={plural("strength.list.records", records)}
                             title={plural("strength.list.records", records)}
                           >
-                            <Trophy size={10} aria-hidden="true" />
-                            {t("strength.pr")}
+                            <Trophy size={13} aria-hidden="true" />
                           </span>
                         ) : null}
                       </span>

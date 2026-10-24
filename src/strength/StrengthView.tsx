@@ -26,7 +26,6 @@ import {
   type WindowStat
 } from "./StrengthSessionDetail";
 import { analyticsCoverage, buildStrengthSessionIndex, sessionHeat } from "./sessionAnalytics";
-import { StrengthVolumeLandmarks } from "./StrengthVolumeLandmarks";
 import { StrengthWeeklyChart } from "./StrengthWeeklyChart";
 import { cadencePhrase, formatSpan, formatTotalWeight } from "./strengthFormat";
 import { OptionGroup } from "../components/OptionGroup";
@@ -500,8 +499,6 @@ export function StrengthView({
                 days={days}
                 usesWeights={usesWeights}
               />
-
-              <StrengthVolumeLandmarks analytics={analytics} windowDays={days} />
 
               <StrengthOverviewPanels
                 analytics={analytics}

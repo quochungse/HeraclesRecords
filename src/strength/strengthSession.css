@@ -70,7 +70,14 @@
   margin-bottom: 6px;
 }
 
-.strength-session-row.is-aggregate + .strength-session-week {
+.strength-session-row.is-aggregate + /* A list row's record: the trophy alone, so a long name keeps its width. */
+.strength-session-record-mark {
+  display: inline-flex;
+  flex-shrink: 0;
+  color: var(--sx-record);
+}
+
+.strength-session-week {
   padding-top: 6px;
   border-top: 1px solid var(--sx-hairline);
 }
@@ -852,258 +859,28 @@
   }
 }
 
-/* ---------- Weekly sets per muscle ---------- */
+/* ---------- Paper ---------- */
 
-/* One series, one colour: the page's ember, one step deeper on dark so the bar
-   sits inside the lightness band a chart mark should (validated, not picked).
-   Declared on the card, not on .strength-view, so this sheet owns no token on
-   an element whose other tokens are set in strength.css. */
-.strength-volume-card {
-  --sx-volume-bar: #dc7430;
+/* On paper the accent is a colour for words, never a wash: a gold fill on
+   white reads as a beige stain. A record is gold words in a gold hairline,
+   the gold taken darker so 12px text holds its contrast on white. */
+:root[data-theme="paper"] .strength-session-record-badge {
+  background: none;
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--sx-record) 55%, transparent);
+  color: oklch(from var(--sx-record) calc(l * 0.78) c h);
 }
 
-:root[data-theme="paper"] .strength-volume-card {
-  --sx-volume-bar: #cf6a2a;
+:root[data-theme="paper"] .strength-record-chip {
+  border-color: color-mix(in srgb, var(--sx-record) 55%, transparent);
+  background: none;
+  color: oklch(from var(--sx-record) calc(l * 0.78) c h);
 }
 
-.strength-volume-summary {
-  display: flex;
-  flex-shrink: 0;
-  gap: 16px;
-  margin: 2px 0 0;
-  color: var(--text-secondary);
-  font-size: 13px;
+:root[data-theme="paper"] .strength-record-chip:hover {
+  border-color: var(--sx-record);
 }
 
-.strength-volume-summary strong {
-  margin-right: 4px;
-  color: var(--text-primary);
-  font-size: 14px;
-  font-weight: 600;
-}
-
-.strength-volume-chart {
-  --volume-label: 108px;
-  --volume-value: 76px;
-}
-
-.strength-volume-scale,
-.strength-volume-row {
-  display: grid;
-  grid-template-columns: var(--volume-label) minmax(0, 1fr) var(--volume-value);
-  align-items: center;
-  gap: 14px;
-}
-
-.strength-volume-ticks {
-  position: relative;
-  height: 18px;
-}
-
-.strength-volume-ticks i {
-  position: absolute;
-  top: 0;
-  transform: translateX(-50%);
-  color: var(--text-muted);
-  font-size: 11px;
-  font-style: normal;
-  font-variant-numeric: tabular-nums;
-}
-
-.strength-volume-ticks i:first-child {
-  transform: none;
-}
-
-.strength-volume-ticks i:last-child {
-  transform: translateX(-100%);
-}
-
-.strength-volume-ticks i[data-landmark] {
-  color: var(--text-secondary);
-  font-weight: 600;
-}
-
-.strength-volume-rows {
-  display: grid;
-  margin: 4px 0 0;
-  padding: 0;
-  list-style: none;
-}
-
-.strength-volume-row {
-  position: relative;
-  padding: 3px 0;
-  border-radius: var(--radius-sm);
-  outline: none;
-}
-
-.strength-volume-row[data-region-start] {
-  margin-top: 10px;
-}
-
-.strength-volume-row:hover {
-  background: var(--sx-well);
-}
-
-.strength-volume-row:focus-visible {
-  --focus-ring-color: var(--sx-ember);
-  background: var(--sx-well);
-  outline: var(--focus-ring);
-  outline-offset: 2px;
-}
-
-.strength-volume-name {
-  overflow: hidden;
-  padding-left: 6px;
-  color: var(--text-secondary);
-  font-size: 13px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-/* The row is the hit target; the track only needs to be tall enough to read. */
-.strength-volume-track {
-  position: relative;
-  height: 22px;
-}
-
-.strength-volume-band {
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  border-right: 1px solid var(--sx-edge);
-  border-left: 1px solid var(--sx-edge);
-  background: color-mix(in srgb, var(--text-primary) 6%, transparent);
-}
-
-.strength-volume-bar {
-  position: absolute;
-  top: 6px;
-  left: 0;
-  height: 10px;
-  border-radius: 0 var(--radius-xs) var(--radius-xs) 0;
-  background: var(--sx-volume-bar);
-}
-
-.strength-volume-value {
-  display: flex;
-  align-items: baseline;
-  justify-content: flex-end;
-  gap: 6px;
-  padding-right: 6px;
-  font-variant-numeric: tabular-nums;
-}
-
-.strength-volume-value strong {
-  font-size: 14px;
-  font-weight: 600;
-}
-
-.strength-volume-value em {
-  color: var(--text-muted);
-  font-size: 11px;
-  font-style: normal;
-}
-
-.strength-volume-row[data-status="below"] .strength-volume-value strong {
-  color: var(--text-secondary);
-}
-
-/* Anchored at the bar's end, and held inside the track so it never runs off
-   the card on a long bar. */
-.strength-volume-tip {
-  position: absolute;
-  bottom: calc(100% + 6px);
-  left: min(var(--tip-at, 0%), calc(100% - 220px));
-  z-index: 4;
-  display: flex;
-  gap: 14px;
-  padding: 8px 12px;
-  border: 1px solid var(--surface-line, var(--sx-edge));
-  border-radius: var(--radius-md);
-  background: var(--sx-elevated);
-  box-shadow: var(--shadow-soft);
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity var(--dur-fast) var(--ease);
-  white-space: nowrap;
-}
-
-.strength-volume-row:hover .strength-volume-tip,
-.strength-volume-row:focus-visible .strength-volume-tip {
-  opacity: 1;
-}
-
-/* One tooltip at a time: the row under the pointer wins over the focused one. */
-.strength-volume-rows:hover .strength-volume-row:focus-visible:not(:hover) .strength-volume-tip {
-  opacity: 0;
-}
-
-.strength-volume-tip span {
-  display: grid;
-  gap: 2px;
-}
-
-.strength-volume-tip strong {
-  color: var(--text-primary);
-  font-size: 13px;
-  font-variant-numeric: tabular-nums;
-}
-
-.strength-volume-tip em {
-  color: var(--text-muted);
-  font-size: 11px;
-  font-style: normal;
-}
-
-.strength-volume-note {
-  margin: 18px 0 0;
-  color: var(--text-muted);
-  font-size: 13px;
-  line-height: 1.6;
-}
-
-.strength-volume-table {
-  margin-top: 12px;
-}
-
-.strength-volume-table summary {
-  width: fit-content;
-  color: var(--text-secondary);
-  font-size: 13px;
-  cursor: pointer;
-}
-
-.strength-volume-table-wrap {
-  margin-top: 10px;
-  overflow-x: auto;
-}
-
-/* The global table rule sets min-width: 720px. */
-.strength-volume-table table {
-  min-width: 0;
-  font-size: 13px;
-  font-variant-numeric: tabular-nums;
-}
-
-.strength-volume-table th,
-.strength-volume-table td {
-  padding: 6px 10px;
-  border-bottom: 1px solid var(--sx-hairline);
-  text-align: right;
-}
-
-.strength-volume-table th:first-child {
-  text-align: left;
-}
-
-@media (max-width: 700px) {
-  .strength-volume-card .strength-card-head {
-    flex-direction: column;
-  }
-
-  .strength-volume-chart {
-    --volume-label: 84px;
-    --volume-value: 58px;
-  }
+:root[data-theme="paper"] .strength-record-lift {
+  border-color: color-mix(in srgb, var(--sx-record) 40%, transparent);
+  background: none;
 }

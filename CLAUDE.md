@@ -2601,7 +2601,7 @@ lives at module level for the same visit-to-visit reason — see `useCalendarDat
   strength sessions merged with Hevy imports. **The screen shows one scope at a time**
   (redesigned 2026-10-24, mockup in the memory note `strength-layout-mock`): the session list
   beside a header band and the body map, and under them only what the selection is about — a
-  session's exercises, or the window's weekly chart, weekly sets per muscle, main lifts and
+  session's exercises, or the window's weekly chart, main lifts and
   records. It used to keep the window's totals on top and its charts underneath while a
   session was open, so the two read as one. **The band is one fixed height for a session and
   for "All sessions"** (`--strength-band-height`, raised under a 700px pane where a session's
