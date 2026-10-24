@@ -2,10 +2,10 @@ import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import type { MessageKey } from "../../i18n/core";
 import {
+  ArrowUpRight,
   Braces,
   CloudOff,
   Loader2,
-  Maximize2,
   MessageCircle,
   RefreshCw,
   X
@@ -28,9 +28,8 @@ import {
   formatTrainingTimestamp
 } from "../formatters";
 import { detailMatchesActivity } from "../activityDetail";
-import { sportColorCategory } from "../sportColors";
 import { isSpeedSport, resolveSportName } from "../sportTypes";
-import { classifyRunSurface } from "../../running/runSurface";
+import { classifyRunSurface, isRunSportType } from "../../running/runSurface";
 import { isRideSportType } from "../../cycling/rideType";
 import { isHikeSportType } from "../../hiking/hikeType";
 import { sportScreenFor, type SportScreen } from "../../navigation/sportScreens";
@@ -44,6 +43,8 @@ import {
 } from "../../../electron/activityReading";
 import { ActivityElevationChart } from "./ActivityElevationChart";
 import { ActivityExportMenu } from "./ActivityExportMenu";
+import { ActivityFeelTag } from "./ActivityFeelTag";
+import { ActivitySportBadge } from "./ActivitySportBadge";
 import { ActivityRouteMap } from "./ActivityRouteMap";
 import { ActivitySeriesChart } from "./ActivitySeriesChart";
 import { ActivityZoneBar } from "./ActivityZoneBar";
@@ -77,6 +78,8 @@ interface ActivityDetailPaneProps {
   onAskCoach?: (request: CoachOpenRequest) => void;
   /** The account's heart-rate model the session's label is read on; none until it is known. */
   benefitFamily?: BenefitZoneFamily;
+  /** How the session felt, 1–5, as rated in the COROS app; none when unrated. */
+  feelRating?: number;
 }
 
 interface Figure {
@@ -84,6 +87,25 @@ interface Figure {
   label: string;
   value: string;
   title?: string;
+}
+
+interface FigureGroup {
+  key: string;
+  title: string;
+  figures: Figure[];
+}
+
+/**
+ * "7.10 km" as "7.10" and "km", so the unit can be set smaller than the
+ * figure. Split at the last space, and only when what follows it is not a
+ * number itself: "56:27" stays whole, and "2:13 /100m" keeps its "/100m".
+ */
+function splitFigure(value: string): [string, string | undefined] {
+  const match = /^(.*\d)\s+(\S+)$/u.exec(value);
+  if (!match || !/\D/u.test(match[2]!.replace(/[\d.,]/gu, ""))) {
+    return [value, undefined];
+  }
+  return [match[1]!, match[2]];
 }
 
 /**
@@ -122,7 +144,8 @@ export function ActivityDetailPane({
   onOpenSportScreen,
   hiddenSportScreens,
   onAskCoach,
-  benefitFamily
+  benefitFamily,
+  feelRating
 }: ActivityDetailPaneProps) {
   const { unitSystem, temperatureUnit } = useUnitSystem();
   // A detail belonging to some other session is no detail at all — see
@@ -270,7 +293,8 @@ export function ActivityDetailPane({
       label: readsSpeed ? t("activity.m.avgSpeed") : t("activity.m.avgPace"),
       value: performance
     });
-  } else if (detail.avgHr) {
+  }
+  if (detail.avgHr) {
     headline.push({
       key: "avgHr",
       label: t("activity.m.avgHr"),
@@ -278,13 +302,22 @@ export function ActivityDetailPane({
     });
   }
 
+  /*
+   * Everything the headline did not take, in three groups named for what they
+   * say — how hard it was, the ground it covered, how the body moved — rather
+   * than fifteen equal cells: in a grid a calorie count weighed what the
+   * training load did, and the eye had nowhere to start.
+   */
   const headlineKeys = new Set(headline.map((figure) => figure.key));
-  const rest: Figure[] = [];
-  const push = (figure: Figure | null) => {
+  const effort: Figure[] = [];
+  const terrain: Figure[] = [];
+  const movement: Figure[] = [];
+  const pushTo = (group: Figure[]) => (figure: Figure | null) => {
     if (figure && !headlineKeys.has(figure.key)) {
-      rest.push(figure);
+      group.push(figure);
     }
   };
+  let push = pushTo(effort);
 
   push(
     detail.avgHr
@@ -296,6 +329,7 @@ export function ActivityDetailPane({
       ? { key: "maxHr", label: t("activity.m.maxHr"), value: `${Math.round(detail.maxHr)} bpm` }
       : null
   );
+  push = pushTo(terrain);
   push(
     detail.adjustedPace && !readsSpeed && !swim
       ? {
@@ -306,7 +340,7 @@ export function ActivityDetailPane({
         }
       : null
   );
-  push(
+  pushTo(effort)(
     detail.calories
       ? {
           key: "calories",
@@ -333,6 +367,7 @@ export function ActivityDetailPane({
         }
       : null
   );
+  push = pushTo(effort);
   push(
     detail.trainingLoad
       ? {
@@ -374,6 +409,7 @@ export function ActivityDetailPane({
         }
       : null
   );
+  push = pushTo(movement);
   push(
     detail.dynamics?.avgCadence
       ? {
@@ -420,10 +456,30 @@ export function ActivityDetailPane({
       : null
   );
 
+  // Calories last among the effort figures: it is the one a reader looks for
+  // least, and it was pushed before the load only to keep the old grid's order.
+  effort.sort((a, b) => Number(a.key === "calories") - Number(b.key === "calories"));
+
+  const groups: FigureGroup[] = [
+    { key: "effort", title: t("activity.group.effort"), figures: effort },
+    { key: "terrain", title: t("activity.group.terrain"), figures: terrain },
+    {
+      key: "movement",
+      title: isRideSportType(sportType)
+        ? t("activity.group.pedalling")
+        : isRunSportType(sportType)
+          ? t("activity.group.runForm")
+          : t("activity.group.movement"),
+      figures: movement
+    }
+  ].filter((group) => group.figures.length > 0);
+
   const pausedSeconds =
     detail.elapsedDuration !== undefined && duration !== undefined
       ? detail.elapsedDuration - duration
-      : undefined;
+      : 0;
+  const showPaused = pausedSeconds >= PAUSE_NOTICE_S;
+  const hasZones = detail.hrZones.some((zone) => (zone.seconds ?? 0) > 0);
 
   const weather = detail.weather;
   const laps = detail.laps.filter(
@@ -456,56 +512,47 @@ export function ActivityDetailPane({
 
   return (
     <div className="activity-detail-pane">
+      {/*
+        * The sport and the day lead, small, so the session's own name is the
+        * first thing read; what was a row of a coloured chip, a date and a
+        * weather reading is a line above and a line below it.
+        */}
       <header className="activity-detail-pane-head">
         <div className="activity-detail-pane-title">
+          <p className="activity-detail-kicker">
+            <ActivitySportBadge sportType={sportType} size="sm" />
+            <span>
+              {[sportName, startTime ? formatTrainingTimestamp(startTime) : undefined]
+                .filter(Boolean)
+                .join(" · ")}
+            </span>
+          </p>
           <h2>{detail.name ?? listActivity.name ?? t("activity.selected")}</h2>
-          <div className="activity-detail-pane-meta">
-            {sportName ? (
-              <span className="sport-chip" data-sport={sportColorCategory(sportType)}>
-                {sportName}
-              </span>
-            ) : null}
-            {benefit ? <TrainingBenefitChips reading={benefit} /> : null}
-            {startTime ? <span>{formatTrainingTimestamp(startTime)}</span> : null}
-            {pausedSeconds !== undefined && pausedSeconds >= PAUSE_NOTICE_S ? (
-              <span title={t("activity.pane.pausedTitle")}>
-                {t("activity.pane.paused", { time: formatDurationSpan(pausedSeconds) })}
-              </span>
-            ) : null}
-            {weather?.temperatureC !== undefined ? (
-              <span
-                title={
-                  weather.feelsLikeC !== undefined
-                    ? t("activity.pane.feltLike", { temp: formatTemperatureValue(weather.feelsLikeC, temperatureUnit) })
-                    : undefined
-                }
-              >
-                {formatTemperatureValue(weather.temperatureC, temperatureUnit)}
-                {weather.humidityPct !== undefined
-                  ? t("activity.pane.humidity", { percent: Math.round(weather.humidityPct) })
-                  : ""}
-              </span>
-            ) : null}
-            {onExportFile ? (
-              <ActivityExportMenu
-                activity={listActivity}
-                activityName={detail.name ?? listActivity.name ?? sportName ?? t("activity.activity")}
-                busy={busy}
-                onExportFile={onExportFile}
-              />
-            ) : null}
-            {rawAvailable ? (
-              <button
-                type="button"
-                className="activity-meta-action"
-                aria-label={t("activity.raw.show")}
-                title={t("activity.raw.show")}
-                onClick={() => void openRaw()}
-              >
-                <Braces size={13} aria-hidden="true" />
-              </button>
-            ) : null}
-          </div>
+          {benefit || feelRating !== undefined || showPaused || weather?.temperatureC !== undefined ? (
+            <div className="activity-detail-pane-meta">
+              {benefit ? <TrainingBenefitChips reading={benefit} /> : null}
+              {feelRating !== undefined ? <ActivityFeelTag rating={feelRating} /> : null}
+              {weather?.temperatureC !== undefined ? (
+                <span
+                  title={
+                    weather.feelsLikeC !== undefined
+                      ? t("activity.pane.feltLike", { temp: formatTemperatureValue(weather.feelsLikeC, temperatureUnit) })
+                      : undefined
+                  }
+                >
+                  {formatTemperatureValue(weather.temperatureC, temperatureUnit)}
+                  {weather.humidityPct !== undefined
+                    ? t("activity.pane.humidity", { percent: Math.round(weather.humidityPct) })
+                    : ""}
+                </span>
+              ) : null}
+              {showPaused ? (
+                <span title={t("activity.pane.pausedTitle")}>
+                  {t("activity.pane.paused", { time: formatDurationSpan(pausedSeconds) })}
+                </span>
+              ) : null}
+            </div>
+          ) : null}
         </div>
 
         <div className="activity-detail-pane-actions">
@@ -525,8 +572,6 @@ export function ActivityDetailPane({
             <button
               type="button"
               className="activity-open-screen"
-              aria-label={t("activity.openIn", { screen: t(SPORT_SCREEN_LABELS[sportScreen]) })}
-              title={t("activity.openIn", { screen: t(SPORT_SCREEN_LABELS[sportScreen]) })}
               onClick={() =>
                 onOpenSportScreen({
                   view: sportScreen,
@@ -535,8 +580,29 @@ export function ActivityDetailPane({
                 })
               }
             >
-              <Maximize2 size={14} aria-hidden="true" />
-              {t("activity.open")}
+              {t("activity.openIn", { screen: t(SPORT_SCREEN_LABELS[sportScreen]) })}
+              <ArrowUpRight size={14} aria-hidden="true" />
+            </button>
+          ) : null}
+          {/* Export and raw JSON: bare icons at the end of the row — the rarest
+              actions in the pane, drawn as such. */}
+          {onExportFile ? (
+            <ActivityExportMenu
+              activity={listActivity}
+              activityName={detail.name ?? listActivity.name ?? sportName ?? t("activity.activity")}
+              busy={busy}
+              onExportFile={onExportFile}
+            />
+          ) : null}
+          {rawAvailable ? (
+            <button
+              type="button"
+              className="activity-meta-action"
+              aria-label={t("activity.raw.show")}
+              title={t("activity.raw.show")}
+              onClick={() => void openRaw()}
+            >
+              <Braces size={13} aria-hidden="true" />
             </button>
           ) : null}
         </div>
@@ -546,28 +612,49 @@ export function ActivityDetailPane({
         <StrengthDetailPanel strength={detail.strength} />
       ) : (
         <>
+          {/* Up to four figures in the display face, each with its unit set
+              smaller beside it, on the pane itself rather than in boxes. */}
           <div className="activity-detail-headline">
-            {headline.map((figure) => (
-              <div key={figure.key} title={figure.title}>
-                <span>{figure.label}</span>
-                <strong>{figure.value}</strong>
-              </div>
-            ))}
-          </div>
-
-          {rest.length > 0 ? (
-            <div className="activity-detail-figures">
-              {rest.map((figure) => (
+            {headline.map((figure) => {
+              const [amount, unit] = splitFigure(figure.value);
+              return (
                 <div key={figure.key} title={figure.title}>
                   <span>{figure.label}</span>
-                  <strong>{figure.value}</strong>
+                  <strong>
+                    {amount}
+                    {unit ? <small>{unit}</small> : null}
+                  </strong>
                 </div>
+              );
+            })}
+          </div>
+
+          {hasZones ? (
+            <ActivityZoneBar
+              zones={detail.hrZones}
+              aside={benefit ? <TrainingBenefitReason reading={benefit} /> : null}
+            />
+          ) : benefit ? (
+            <TrainingBenefitReason reading={benefit} />
+          ) : null}
+
+          {groups.length > 0 ? (
+            <div className="activity-detail-groups">
+              {groups.map((group) => (
+                <section className="activity-detail-group" key={group.key}>
+                  <h3>{group.title}</h3>
+                  <dl>
+                    {group.figures.map((figure) => (
+                      <div key={figure.key} title={figure.title}>
+                        <dt>{figure.label}</dt>
+                        <dd>{figure.value}</dd>
+                      </div>
+                    ))}
+                  </dl>
+                </section>
               ))}
             </div>
           ) : null}
-
-          <ActivityZoneBar zones={detail.hrZones} />
-          {benefit ? <TrainingBenefitReason reading={benefit} /> : null}
 
           {hasSeries ? (
             <ActivitySeriesChart

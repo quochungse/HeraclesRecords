@@ -480,6 +480,11 @@ export function OptionChips<T extends string>({
             {color ? <i className="option-chip-dot" aria-hidden="true" /> : null}
             {option.icon}
             <span className="option-group-label">{option.label}</span>
+            {/* A figure the option stands for — a sport's share of the
+                period — set apart from its name. */}
+            {option.detail !== undefined && !tiles ? (
+              <span className="option-chip-detail">{option.detail}</span>
+            ) : null}
             {tiles ? (
               <span className="option-chip-tick" aria-hidden="true">
                 {pressed ? <Check size={11} strokeWidth={3.5} /> : null}

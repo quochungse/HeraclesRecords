@@ -1,5 +1,6 @@
 import { useI18n } from "../../i18n/useI18n";
 import { useMemo, useState, type KeyboardEvent } from "react";
+import { OptionChips } from "../../components/OptionGroup";
 import type { ActivityTotals } from "../activityFilters";
 import { SPORT_COLOR_LABELS, type SportColorCategory } from "../sportColors";
 import {
@@ -11,9 +12,22 @@ import { useUnitSystem } from "../../units/UnitSystemProvider";
 import { formatCount, plural, t } from "../../i18n/core";
 
 interface ActivitiesSummaryProps {
+  /** Everything the filters admit: what the four figures add up. */
   totals: ActivityTotals;
+  /**
+   * The same, with no sport picked: what the bar and its legend draw. Omitted,
+   * it is `totals`. A legend that is also the sport filter cannot be drawn
+   * from the filtered set, or picking one sport would leave only its chip.
+   */
+  mix?: ActivityTotals;
   /** What the period selector says, e.g. "3 months" — the caption's subject. */
   periodLabel: string;
+  /** The sports picked in the legend; empty means every sport. */
+  selectedSports?: readonly SportColorCategory[];
+  /** Without it the legend is not drawn and the bar stands alone. */
+  onToggleSport?: (category: SportColorCategory) => void;
+  /** Offered while anything narrows the list — a sport or a search. */
+  onClearFilters?: () => void;
 }
 
 interface SummaryTile {
@@ -66,20 +80,31 @@ function bandPhrase(band: MixBand): string {
   });
 }
 
+/** "48%", and "<1%" for a sliver that would otherwise read as nothing. */
+function sharePhrase(share: number): string {
+  const percent = Math.round(share * 100);
+  return percent === 0 && share > 0 ? "<1%" : `${percent}%`;
+}
+
 /**
  * What a filtered stretch of training adds up to, and how it is split between
  * sports.
+ *
+ * The four totals are figures on the page rather than four boxes: they are one
+ * statement about one period, and a card each read as four things to compare.
+ * On paper the strip is a white sheet of its own, because figures written
+ * straight on the grey canvas sank into it.
  *
  * The mix bar is the one figure no other screen can draw: Running cannot see a
  * lifting week and Strength cannot see a running one, so the question "what
  * have I actually been doing" has only ever been answerable here.
  *
- * The bar answers the question on its own — a glance says "mostly running,
- * a third lifting" — and the percentages under it were a second line of text
- * above a list that is already the point of the screen. One band at a time
- * answers on hover instead: the band lifts out of the bar, its neighbours fall
- * back, and the figures appear under it. A list of all four said less per word
- * and cost a permanent line.
+ * Its legend is the sport filter. The filter used to be a row of chips of its
+ * own under the bar, naming the same sports a second time with nothing to say
+ * about them; a chip now carries its sport's share, so one line both reads the
+ * mix and narrows the list. The bar keeps the rest on hover — one band at a
+ * time lifts out, its neighbours fall back, and its sessions and time appear
+ * under it.
  *
  * Nothing is lost to a reader who cannot hover. The bar carries the whole mix
  * as its own label — which is why the bands are hidden from the accessibility
@@ -88,11 +113,15 @@ function bandPhrase(band: MixBand): string {
  */
 export function ActivitiesSummary({
   totals,
-  periodLabel
+  mix = totals,
+  periodLabel,
+  selectedSports = [],
+  onToggleSport,
+  onClearFilters
 }: ActivitiesSummaryProps) {
   const { unitSystem } = useUnitSystem();
   const { locale } = useI18n();
-  const mixTotal = totals.sports.reduce((sum, sport) => sum + sport.duration, 0);
+  const mixTotal = mix.sports.reduce((sum, sport) => sum + sport.duration, 0);
 
   const bands = useMemo<MixBand[]>(() => {
     if (mixTotal <= 0) {
@@ -100,7 +129,7 @@ export function ActivitiesSummary({
     }
 
     let start = 0;
-    return totals.sports.map((sport) => {
+    return mix.sports.map((sport) => {
       const share = sport.duration / mixTotal;
       const centre = start + share / 2;
       start += share;
@@ -115,7 +144,7 @@ export function ActivitiesSummary({
       };
     });
     // The bands carry their sport's name, so a new language rebuilds them.
-  }, [mixTotal, totals.sports, locale]);
+  }, [mixTotal, mix.sports, locale]);
 
   /*
    * Held as an index rather than a category so the arrow keys have something
@@ -141,6 +170,31 @@ export function ActivitiesSummary({
         : Math.min(bands.length - 1, Math.max(0, current + delta))
     );
   }
+
+  const filtering = selectedSports.length > 0;
+
+  /*
+   * One chip per sport in the period, each with its share, plus any sport
+   * still picked that the period no longer holds — a filter that cannot be
+   * seen cannot be taken off. A single sport and nothing picked is no choice
+   * at all, and draws no legend.
+   */
+  const legend = useMemo(() => {
+    if (!onToggleSport) {
+      return [];
+    }
+    const chips = bands.map((band) => ({
+      value: band.category,
+      label: band.label,
+      detail: sharePhrase(band.share)
+    }));
+    for (const category of selectedSports) {
+      if (!chips.some((chip) => chip.value === category)) {
+        chips.push({ value: category, label: SPORT_COLOR_LABELS[category], detail: "0%" });
+      }
+    }
+    return chips.length > 1 || filtering ? chips : [];
+  }, [bands, selectedSports, filtering, onToggleSport]);
 
   const tiles: SummaryTile[] = [
     {
@@ -220,7 +274,16 @@ export function ActivitiesSummary({
               <i
                 key={band.category}
                 data-sport={band.category}
-                className={index === activeIndex ? "is-active" : undefined}
+                className={
+                  [
+                    index === activeIndex ? "is-active" : "",
+                    filtering && !selectedSports.includes(band.category)
+                      ? "is-filtered-out"
+                      : ""
+                  ]
+                    .filter(Boolean)
+                    .join(" ") || undefined
+                }
                 style={{ flexGrow: band.share }}
                 onMouseEnter={() => setActiveIndex(index)}
               />
@@ -270,6 +333,35 @@ export function ActivitiesSummary({
                 </p>
               </div>
             </>
+          ) : null}
+        </div>
+      ) : null}
+
+      {legend.length > 0 || onClearFilters ? (
+        <div className="activities-legend">
+          {legend.length > 0 && onToggleSport ? (
+            <OptionChips
+              label={t("activity.filter.sports")}
+              className="activities-sports"
+              options={legend}
+              values={selectedSports}
+              colorOf={(category) => `var(--sport-${category})`}
+              onToggle={(category) => onToggleSport(category as SportColorCategory)}
+            />
+          ) : null}
+          {/*
+           * A filter that hides everything looks exactly like a screen with no
+           * data, so the way back out is stated rather than left to be worked
+           * out from an empty list.
+           */}
+          {onClearFilters ? (
+            <button
+              type="button"
+              className="activities-clear-filters"
+              onClick={onClearFilters}
+            >
+              {t("activity.filter.clear")}
+            </button>
           ) : null}
         </div>
       ) : null}

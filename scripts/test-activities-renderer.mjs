@@ -10,8 +10,8 @@
 //   a band is being pointed at or not.
 // - A tooltip centred on its band runs off the end of the screen for the 1%
 //   sliver at the far right. It has to stay inside the bar at both ends.
-// - Hovering has to name *one* sport. A panel listing all four is the line that
-//   was taken away.
+// - Hovering has to name *one* sport. A panel listing all four would say again
+//   what the sport chips under the bar already say on the screen itself.
 // - The band being pointed at has to be the one that stands out.
 // - Hover is a pointer affordance; the arrow keys are how the same figures are
 //   reached without one, and the bar's own label is how they are read without
@@ -151,9 +151,10 @@ async function main() {
       "no tooltip until a band is pointed at"
     );
     assert.equal(
-      await harness("exists", ".activities-mix-legend"),
+      await harness("exists", ".activities-legend"),
       false,
-      "the permanent legend is gone — that is the line this replaced"
+      "the bar draws no legend of its own — the sport chips under it are the " +
+        "filter, drawn only when the screen hands it one to toggle"
     );
 
     // Everything the legend used to say is still said, once, on the bar itself,

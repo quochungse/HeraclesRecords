@@ -1,7 +1,5 @@
 import { useEffect, useMemo, useRef, type KeyboardEvent } from "react";
-import { Angry, Frown, Laugh, Meh, Smile } from "lucide-react";
 import type {
-  ActivityDetailSummary,
   TrainingHubActivity,
   TrainingHubSportType
 } from "../../../electron/types";
@@ -11,12 +9,11 @@ import {
 } from "../activityFilters";
 import { activityRowFacts } from "../activityFacts";
 import { epochMsFromCorosTime } from "../activityWindow";
-import { formatDurationSpan } from "../formatters";
-import { sportColorCategory } from "../sportColors";
+import { formatDurationSpan, formatTrainingTimestamp } from "../formatters";
 import { resolveSportName } from "../sportTypes";
-import { feltLabel, type ActivityFeelMap } from "../useActivityFeelTypes";
 import { useUnitSystem } from "../../units/UnitSystemProvider";
 import { getIntlLocale, plural, t } from "../../i18n/core";
+import { ActivitySportBadge } from "./ActivitySportBadge";
 
 interface ActivityJournalListProps {
   activities: TrainingHubActivity[];
@@ -25,74 +22,52 @@ interface ActivityJournalListProps {
   busy: string | null;
   /** Clock pinned by the caller, so headings cannot drift mid-render. */
   nowMs: number;
-  /** COROS's end-of-activity feeling, where this machine has read one. */
-  feel: ActivityFeelMap;
-  /**
-   * Stored detail summaries by activity id. They arrive after the list does
-   * and fill in as they are computed, so a row reads what it has rather than
-   * holding the list back.
-   */
-  summaries: ReadonlyMap<string, ActivityDetailSummary>;
   onLoadDetail: (activity: TrainingHubActivity) => void;
 }
 
-/**
- * COROS's five end-of-activity smileys, drawn as the faces they are.
- *
- * A bare "4" says nothing without the scale beside it, and the scale is not on
- * the row. A face is read before it is decoded, and the colour carries the
- * direction — cool to hot, the same way the heart-rate zones point.
- */
-const FEEL_FACES: Record<number, typeof Smile> = {
-  1: Laugh,
-  2: Smile,
-  3: Meh,
-  4: Frown,
-  5: Angry
-};
+/** How many figures a row carries — see {@link ActivityJournalList}. */
+const ROW_FACTS = 3;
 
-function FeelFace({ rating }: { rating: number }) {
-  const Face = FEEL_FACES[rating];
-  if (!Face) {
+/**
+ * "Fri 23" at the end of the name line, with the clock time on hover.
+ *
+ * It used to be a block of its own down the row's left edge — weekday, date
+ * and time stacked in a grey well — which cost every row 54px of a narrow
+ * column, the second session of a day included, where it said the same thing
+ * again. At the end of the name it takes only the width it needs, on the one
+ * line that has room to spare.
+ */
+function RowDate({ startTime }: { startTime?: number }) {
+  const at = epochMsFromCorosTime(startTime);
+  if (at === undefined) {
     return null;
   }
 
   return (
-    <span
-      className="activity-row-feel"
-      data-feel={rating}
-      title={feltLabel(rating) ?? String(rating)}
-    >
-      <Face size={14} aria-hidden="true" />
+    <span className="activity-row-date" title={formatTrainingTimestamp(startTime)}>
+      {weekdayAndDay(at)}
     </span>
   );
 }
 
-/** "Wed" over "12" — the block that lets a week be read down its left edge. */
-function DateBlock({ startTime }: { startTime?: number }) {
-  const at = epochMsFromCorosTime(startTime);
-
-  if (at === undefined) {
-    return (
-      <span className="activity-row-date" aria-hidden="true">
-        <em>—</em>
-      </span>
-    );
+/**
+ * "Fri 23", "ven. 23", "23日(金)": each language's own order — except English,
+ * where Intl writes "23 Fri", a pairing no English reader writes.
+ */
+function weekdayAndDay(at: number): string {
+  const locale = getIntlLocale();
+  const parts = new Intl.DateTimeFormat(locale, {
+    weekday: "short",
+    day: "numeric"
+  }).formatToParts(at);
+  if (locale.toLowerCase().startsWith("en")) {
+    const weekday = parts.find((part) => part.type === "weekday")?.value;
+    const day = parts.find((part) => part.type === "day")?.value;
+    if (weekday && day) {
+      return `${weekday} ${day}`;
+    }
   }
-
-  const date = new Date(at);
-  return (
-    <span className="activity-row-date" aria-hidden="true">
-      <em>{date.toLocaleDateString(getIntlLocale(), { weekday: "short" })}</em>
-      <strong>{date.getDate()}</strong>
-      <i>
-        {date.toLocaleTimeString(getIntlLocale(), {
-          hour: "numeric",
-          minute: "2-digit"
-        })}
-      </i>
-    </span>
-  );
+  return parts.map((part) => part.value).join("");
 }
 
 /**
@@ -109,6 +84,15 @@ function DateBlock({ startTime }: { startTime?: number }) {
  * The row is one button and nothing else. Export used to hang off every row,
  * a column of download icons for the rarest action on the screen; it lives in
  * the detail pane's header now, beside the session it exports.
+ *
+ * The sport is its icon in its colour on a grey disc, ahead of the name,
+ * rather than its name in a coloured capitals chip: a chip on every row in one
+ * of five colours made the list a rainbow, and so did the same icons on discs
+ * washed in their sports' hues. The name it spelled out is on the pane. The figures
+ * are three, on one line — a fourth and a fifth wrapped the line in a column
+ * this narrow, and the pane beside it carries every one of them. How the
+ * session felt is the pane's too: a coloured face on every rated row was one
+ * more hue in a list already wearing five.
  */
 export function ActivityJournalList({
   activities,
@@ -116,8 +100,6 @@ export function ActivityJournalList({
   selectedActivityId,
   busy,
   nowMs,
-  feel,
-  summaries,
   onLoadDetail
 }: ActivityJournalListProps) {
   const { unitSystem } = useUnitSystem();
@@ -197,12 +179,7 @@ export function ActivityJournalList({
                 activity.name?.trim() || sportName || t("activity.untitled");
               const selected = selectedActivityId === activity.activityId;
               const loading = busy === `training-detail:${activity.activityId}`;
-              const facts = activityRowFacts(
-                activity,
-                unitSystem,
-                summaries.get(activity.activityId)
-              );
-              const rating = feel.get(activity.activityId);
+              const facts = activityRowFacts(activity, unitSystem).slice(0, ROW_FACTS);
 
               return (
                 <li
@@ -219,32 +196,22 @@ export function ActivityJournalList({
                     aria-current={selected ? "true" : undefined}
                     onClick={() => onLoadDetail(activity)}
                   >
-                    <DateBlock startTime={activity.startTime} />
-                    <span className="activity-row-main">
-                      <span className="activity-row-title">
-                        <strong title={activityName}>{activityName}</strong>
-                        <span
-                          className="sport-chip"
-                          data-sport={sportColorCategory(activity.sportType)}
-                        >
-                          {sportName}
+                    {/*
+                      * The sport on the name's own line, ahead of it, and the
+                      * figures on the line below from the row's edge: the icon
+                      * takes no column of its own down the list.
+                      */}
+                    <ActivitySportBadge sportType={activity.sportType} label={sportName} />
+                    <span className="activity-row-title">
+                      <strong title={activityName}>{activityName}</strong>
+                      <RowDate startTime={activity.startTime} />
+                    </span>
+                    <span className="activity-row-facts">
+                      {facts.map((fact) => (
+                        <span key={fact.key} title={fact.title}>
+                          {fact.value}
                         </span>
-                        {/*
-                          * How the session felt, as the athlete rated it in the
-                          * COROS app. It is what every RPE figure in the app is
-                          * built from and no screen showed it.
-                          */}
-                        {rating !== undefined ? (
-                          <FeelFace rating={rating} />
-                        ) : null}
-                      </span>
-                      <span className="activity-row-facts">
-                        {facts.map((fact) => (
-                          <span key={fact.key} title={fact.title}>
-                            {fact.value}
-                          </span>
-                        ))}
-                      </span>
+                      ))}
                     </span>
                   </button>
                 </li>

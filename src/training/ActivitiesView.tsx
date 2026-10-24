@@ -1,4 +1,3 @@
-import { renderRich } from "../i18n/useI18n";
 import { useCallback, useMemo, useRef, useState } from "react";
 import {
   ArrowLeft,
@@ -19,11 +18,9 @@ import {
   DEFAULT_ACTIVITY_FILTERS,
   type ActivityFilters,
   filterActivities,
-  sportsPresent,
   summariseActivities
 } from "./activityFilters";
 import { resolveSportName } from "./sportTypes";
-import { useActivityDetailSummaries } from "./useActivityDetailSummaries";
 import { useActivityFeelTypes } from "./useActivityFeelTypes";
 import { useHeartRateZoneModel } from "./useHeartRateZoneModel";
 import { benefitZoneFamily } from "./trainingBenefit";
@@ -105,22 +102,17 @@ export function ActivitiesView({
     [sportTypes]
   );
 
-  const available = useMemo(() => sportsPresent(activities), [activities]);
-
   /*
-   * Both read the whole history rather than the filtered list: each is keyed on
+   * Read for the whole history rather than the filtered list: it is keyed on
    * the activity ids, and narrowing the set would re-read on every keystroke.
-   * Neither holds the screen back — the faces and the drift figure fill in.
+   * It does not hold the screen back — the pane's feel tag fills in.
+   *
+   * The rows used to read the stored detail summaries too, for a drift figure
+   * as their fifth fact. A row carries three now, and drift is never one of
+   * them, so the sweep that computed summaries for this list went with it;
+   * Running, whose list has a Drift column, still runs its own.
    */
   const feel = useActivityFeelTypes(api, activities);
-  const summaries = useActivityDetailSummaries({
-    api,
-    activities,
-    // Held back while a session the athlete just clicked is loading: computing
-    // a summary is a detail fetch of its own, and that payload wants the
-    // connection first.
-    enabled: detailRequest?.status !== "pending"
-  });
   // The open session's label is read on the account's heart-rate model, and waits for it.
   const zoneModel = useHeartRateZoneModel({ api, corosConnected: connected });
   const benefitFamily = benefitZoneFamily(zoneModel);
@@ -137,6 +129,26 @@ export function ActivitiesView({
   );
 
   const totals = useMemo(() => summariseActivities(visible), [visible]);
+
+  /*
+   * The mix is read with every filter but the sports: its legend is how a
+   * sport is picked, and a share that jumped to 100% the moment one was picked
+   * would take the others' chips away with it.
+   */
+  const mixTotals = useMemo(
+    () =>
+      filters.sports.length === 0
+        ? totals
+        : summariseActivities(
+            filterActivities({
+              activities,
+              filters: { ...filters, sports: [] },
+              nowMs,
+              sportName: (activity) => resolveSportName(activity, sportTypeMap)
+            })
+          ),
+    [activities, filters, nowMs, sportTypeMap, totals]
+  );
   const shown = useMemo(() => visible.slice(0, limit), [visible, limit]);
   const hidden = visible.length - shown.length;
 
@@ -187,8 +199,6 @@ export function ActivitiesView({
             selectedActivityId={selectedActivity?.activityId ?? null}
             busy={busy}
             nowMs={nowMs}
-            feel={feel}
-            summaries={summaries}
             onLoadDetail={openActivity}
           />
           {hidden > 0 ? (
@@ -266,6 +276,9 @@ export function ActivitiesView({
       hiddenSportScreens={hiddenSportScreens}
       onAskCoach={onAskCoach}
       benefitFamily={benefitFamily}
+      feelRating={
+        selectedActivity ? feel.get(selectedActivity.activityId) : undefined
+      }
     />
   );
 
@@ -293,28 +306,33 @@ export function ActivitiesView({
     );
   }
 
+  const narrowed = filters.sports.length > 0 || filters.query.trim().length > 0;
+
   return (
     <div className="stack stack-fill training-dashboard activities-view">
       <header className="activities-head">
-        <div>
-          <p className="eyebrow">{t("nav.training")}</p>
-          <h2>
-            {activities.length === 0 && activitiesStatus === "pending"
-              ? t("common.loading")
-              : renderRich(plural("activity.list.count", totals.count, { period: periodLabel }), {
-                  s: (chunk) => <span> {chunk}</span>
-                })}
-          </h2>
-        </div>
+        <h2>{t("nav.training")}</h2>
+        <ActivitiesFilterBar filters={filters} onChange={setFilters} />
       </header>
 
-      <ActivitiesSummary totals={totals} periodLabel={periodLabel} />
-
-      <ActivitiesFilterBar
-        filters={filters}
-        available={available}
-        matched={visible.length}
-        onChange={setFilters}
+      <ActivitiesSummary
+        totals={totals}
+        mix={mixTotals}
+        periodLabel={periodLabel}
+        selectedSports={filters.sports}
+        onToggleSport={(category) =>
+          setFilters((current) => ({
+            ...current,
+            sports: current.sports.includes(category)
+              ? current.sports.filter((entry) => entry !== category)
+              : [...current.sports, category]
+          }))
+        }
+        onClearFilters={
+          narrowed
+            ? () => setFilters((current) => ({ ...current, sports: [], query: "" }))
+            : undefined
+        }
       />
 
       <section className="panel panel-flex training-activities-split-panel">
