@@ -26263,6 +26263,16 @@ body.is-backgrounded .spin {
   background: color-mix(in srgb, var(--accent) 9%, transparent);
 }
 
+/* On paper that wash was a beige among grey cards. The chosen one is white,
+   lifted out of the grey and ringed in the accent. */
+:root[data-theme="paper"] .coach-analysis-starter[data-selected="true"] {
+  border-color: transparent;
+  background: var(--surface);
+  box-shadow:
+    0 0 0 1.5px color-mix(in srgb, var(--accent) 55%, transparent),
+    var(--shadow-soft);
+}
+
 .coach-analysis-starter-head {
   display: inline-flex;
   align-items: center;
