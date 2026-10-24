@@ -2236,7 +2236,6 @@ input::placeholder {
 .running-stat strong,
 .sleep-detail-figure strong,
 .sleep-panel-score strong,
-.strength-figure strong,
 .muscle-hero-value strong,
 .week-totals-value,
 .training-zone-hero-percent {
@@ -27051,10 +27050,9 @@ body.is-backgrounded .spin {
 /* --- Time in zones ------------------------------------------------------- */
 
 /*
- * A session's time in each zone, on the run, ride and hike pages and on a
- * Strength session — which is why it lives here and not in any one screen's
- * stylesheet. Each screen hands its own card; the zone colour comes on the
- * element.
+ * A session's time in each zone, on the run, ride and hike pages — which is
+ * why it lives here and not in any one screen's stylesheet. The zone colour
+ * comes on the element.
  */
 .activity-zone-time-panel {
   --zt-well: color-mix(in srgb, #000 22%, transparent);
@@ -27062,11 +27060,6 @@ body.is-backgrounded .spin {
 
 :root[data-theme="paper"] .activity-zone-time-panel {
   --zt-well: rgba(19, 26, 40, 0.06);
-}
-
-.activity-zone-time-panel.strength-card {
-  display: grid;
-  gap: 12px;
 }
 
 .activity-zone-time-head {

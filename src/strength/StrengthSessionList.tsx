@@ -1,17 +1,24 @@
-import { useEffect, useMemo, useRef, type KeyboardEvent } from "react";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type KeyboardEvent
+} from "react";
 import { Layers, Trophy } from "lucide-react";
 import type { StrengthSession } from "../../electron/types";
 import { useUnitSystem } from "../units/UnitSystemProvider";
-import type { StrengthSessionIndex } from "./sessionAnalytics";
-import { previousWeekStartMs, startOfWeekMs } from "./strengthAnalytics";
+import { SessionBodyGlyph } from "./SessionBodyGlyph";
+import { sessionHeat, type StrengthSessionIndex } from "./sessionAnalytics";
+import { previousWeekStartMs, startOfWeekMs, type StrengthAnalytics } from "./strengthAnalytics";
 import { formatSpan, formatTotalWeight, sessionSourceLabel } from "./strengthFormat";
 import "./strengthSession.css";
 import { getIntlLocale, plural, t } from "../i18n/core";
 
 /** The list's first row: every session in the window at once, rather than one of them. */
 export const AGGREGATE_SELECTION = "aggregate";
-
-const PATTERNS = ["push", "pull", "legs", "core"] as const;
 
 interface WeekGroup {
   /** Epoch ms of the Monday, or undefined for sessions with no start time. */
@@ -66,8 +73,8 @@ interface StrengthSessionListProps {
   index: StrengthSessionIndex;
   selected: string;
   onSelect: (selection: string) => void;
-  /** The window's short label, e.g. "3 months". */
-  windowLabel: string;
+  /** The window as a whole, for the first row's figures and its body figure. */
+  windowAnalytics: StrengthAnalytics;
   /** Tag each row with where it came from — only worth saying when sources are combined. */
   showSource: boolean;
 }
@@ -75,13 +82,18 @@ interface StrengthSessionListProps {
 /**
  * Every session in the window, grouped by week, with the whole window as the
  * first row. Arrow keys walk the rows the way they walk any list of documents.
+ *
+ * The first row is drawn in the sessions' own grammar — a mark where the date
+ * sits, a name, a line of figures, the same body figure — because it is picked
+ * the way they are. Drawn as a card with a filled icon above the weeks, it read
+ * as the list's heading, and nobody pressed it.
  */
 export function StrengthSessionList({
   sessions,
   index,
   selected,
   onSelect,
-  windowLabel,
+  windowAnalytics,
   showSource
 }: StrengthSessionListProps) {
   const { unitSystem } = useUnitSystem();
@@ -95,6 +107,64 @@ export function StrengthSessionList({
   );
   const nowMs = Date.now();
   const navRef = useRef<HTMLElement>(null);
+
+  /*
+   * The list's own scroll thumb. The platform's could not be made quiet:
+   * Chromium draws Windows' overlay scrollbar here, which ignores
+   * `::-webkit-scrollbar`, and `scrollbar-width: thin` still carries the
+   * arrow buttons. So the native one is hidden and this 4px pill stands in,
+   * placed and sized from the scroll each time it moves, shown while the
+   * pointer is over the list or the list is moving, and draggable. It is
+   * written to the element directly rather than through state: a scroll
+   * fires every frame.
+   *
+   * Whether rows wait past the bottom edge is the one figure kept in state,
+   * since it sets the list's class: the list fades there, because a list cut
+   * at a hard line with nothing to say it goes on reads as finished.
+   * Measured, not assumed — at the end, or with everything in view, nothing
+   * is fogged. The top needs no fade: a week's sticky heading is the edge
+   * there once anything scrolls.
+   */
+  const thumbRef = useRef<HTMLSpanElement>(null);
+  const settleTimer = useRef<number | undefined>(undefined);
+  const drag = useRef<{ y: number; top: number } | null>(null);
+  const [moreBelow, setMoreBelow] = useState(false);
+  const syncScroll = useCallback(() => {
+    const node = navRef.current;
+    if (!node) return;
+    const { scrollTop, scrollHeight, clientHeight } = node;
+    const more = scrollTop + clientHeight < scrollHeight - 2;
+    setMoreBelow((held) => (held === more ? held : more));
+    const thumb = thumbRef.current;
+    if (!thumb) return;
+    const range = scrollHeight - clientHeight;
+    thumb.hidden = range <= 1;
+    if (range <= 1) return;
+    const height = Math.max(32, (clientHeight * clientHeight) / scrollHeight);
+    thumb.style.height = `${height}px`;
+    thumb.style.transform = `translateY(${node.offsetTop + ((clientHeight - height) * scrollTop) / range}px)`;
+  }, []);
+  const onScroll = useCallback(() => {
+    syncScroll();
+    const thumb = thumbRef.current;
+    if (!thumb) return;
+    thumb.dataset.active = "";
+    window.clearTimeout(settleTimer.current);
+    settleTimer.current = window.setTimeout(() => {
+      delete thumb.dataset.active;
+    }, 900);
+  }, [syncScroll]);
+  useEffect(() => () => window.clearTimeout(settleTimer.current), []);
+  useLayoutEffect(() => {
+    syncScroll();
+    const node = navRef.current;
+    if (!node || typeof ResizeObserver === "undefined") return;
+    const observer = new ResizeObserver(syncScroll);
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, [syncScroll]);
+  // More sessions arriving lengthen the list without resizing its box.
+  useLayoutEffect(syncScroll, [groups, syncScroll]);
 
   // The selection can come from outside the list — Activities hands a session
   // over — so the chosen row is scrolled to rather than left for the athlete to
@@ -120,105 +190,135 @@ export function StrengthSessionList({
   };
 
   return (
-    <nav
-      className="strength-session-nav"
-      aria-label={t("strength.list.label")}
-      ref={navRef}
-      onKeyDown={moveSelection}
-    >
-      <button
-        type="button"
-        className="strength-session-row is-aggregate"
-        data-selection={AGGREGATE_SELECTION}
-        aria-current={selected === AGGREGATE_SELECTION ? "true" : undefined}
-        onClick={() => onSelect(AGGREGATE_SELECTION)}
+    <>
+      <nav
+        className={`strength-session-nav${moreBelow ? " has-fade-bottom" : ""}`}
+        onScroll={onScroll}
+        aria-label={t("strength.list.label")}
+        ref={navRef}
+        onKeyDown={moveSelection}
       >
-        <span className="strength-session-row-icon" aria-hidden="true">
-          <Layers size={16} />
-        </span>
-        <span className="strength-session-row-main">
-          <strong>{t("strength.allSessions")}</strong>
-          <span className="strength-session-row-facts">
-            <span>{windowLabel}</span>
-            <span>{plural("activity.sessions", sessions.length)}</span>
+        <button
+          type="button"
+          className="strength-session-row is-aggregate"
+          data-selection={AGGREGATE_SELECTION}
+          aria-current={selected === AGGREGATE_SELECTION ? "true" : undefined}
+          onClick={() => onSelect(AGGREGATE_SELECTION)}
+        >
+          <span className="strength-session-row-icon" aria-hidden="true">
+            <Layers size={16} />
           </span>
-        </span>
-      </button>
+          <span className="strength-session-row-main">
+            <strong>{t("strength.allSessions")}</strong>
+            {/* Two figures, not a session's three: beside the body figure a third
+                wrapped onto a line of its own, and the band states the time. */}
+            <span className="strength-session-row-facts">
+              <span>{plural("activity.sessions", sessions.length)}</span>
+              <span>
+                {windowAnalytics.summary.volumeKg > 0
+                  ? formatTotalWeight(windowAnalytics.summary.volumeKg, unitSystem)
+                  : plural("strength.sets", Math.round(windowAnalytics.summary.sets))}
+              </span>
+            </span>
+          </span>
+          <SessionBodyGlyph
+            muscleById={windowAnalytics.muscleById}
+            max={windowAnalytics.muscleMax.sets}
+          />
+        </button>
 
-      {groups.map((group) => (
-        <section className="strength-session-week" key={group.weekStart ?? "undated"}>
-          <h4 className="strength-session-week-head">
-            <span>{weekHeading(group.weekStart, nowMs)}</span>
-            <span>{group.sessions.length}</span>
-          </h4>
-          <ul>
-            {group.sessions.map((session) => {
-              const entry = index.byId.get(session.activityId);
-              const summary = entry?.analytics.summary;
-              const date = session.startTime ? new Date(session.startTime * 1000) : undefined;
-              const balance = entry?.analytics.balance;
-              const balanceTotal = balance
-                ? PATTERNS.reduce((total, pattern) => total + balance[pattern], 0)
-                : 0;
-              const records = entry?.records.length ?? 0;
-              const source = showSource ? sessionSourceLabel(session) : undefined;
-              return (
-                <li key={session.activityId}>
-                  <button
-                    type="button"
-                    className="strength-session-row"
-                    data-selection={session.activityId}
-                    aria-current={selected === session.activityId ? "true" : undefined}
-                    onClick={() => onSelect(session.activityId)}
-                  >
-                    <span className="strength-session-row-date" aria-hidden="true">
-                      <em>
-                        {date?.toLocaleDateString(getIntlLocale(), { weekday: "short" }) ?? "—"}
-                      </em>
-                      <strong>{date?.getDate() ?? ""}</strong>
-                    </span>
-                    <span className="strength-session-row-main">
-                      <span className="strength-session-row-title">
-                        <strong>{session.name?.trim() || t("strength.untitled")}</strong>
-                        {records > 0 ? (
-                          <span
-                            className="strength-session-record-badge"
-                            title={plural("strength.list.records", records)}
-                          >
-                            <Trophy size={10} aria-hidden="true" />
-                            {t("strength.pr")}
+        {groups.map((group) => (
+          <section className="strength-session-week" key={group.weekStart ?? "undated"}>
+            <h4 className="strength-session-week-head">
+              <span>{weekHeading(group.weekStart, nowMs)}</span>
+              <span>{group.sessions.length}</span>
+            </h4>
+            <ul>
+              {group.sessions.map((session) => {
+                const entry = index.byId.get(session.activityId);
+                const summary = entry?.analytics.summary;
+                const date = session.startTime ? new Date(session.startTime * 1000) : undefined;
+                const heat = entry ? sessionHeat(entry, "sets") : undefined;
+                const records = entry?.records.length ?? 0;
+                const source = showSource ? sessionSourceLabel(session) : undefined;
+                return (
+                  <li key={session.activityId}>
+                    <button
+                      type="button"
+                      className="strength-session-row"
+                      data-selection={session.activityId}
+                      aria-current={selected === session.activityId ? "true" : undefined}
+                      onClick={() => onSelect(session.activityId)}
+                    >
+                      <span className="strength-session-row-date" aria-hidden="true">
+                        <em>
+                          {date?.toLocaleDateString(getIntlLocale(), { weekday: "short" }) ?? "—"}
+                        </em>
+                        <strong>{date?.getDate() ?? ""}</strong>
+                      </span>
+                      <span className="strength-session-row-main">
+                        <span className="strength-session-row-title">
+                          <strong>{session.name?.trim() || t("strength.untitled")}</strong>
+                          {records > 0 ? (
+                            <span
+                              className="strength-session-record-badge"
+                              title={plural("strength.list.records", records)}
+                            >
+                              <Trophy size={10} aria-hidden="true" />
+                              {t("strength.pr")}
+                            </span>
+                          ) : null}
+                        </span>
+                        <span className="strength-session-row-facts">
+                          <span>{plural("strength.sets", Math.round(summary?.sets ?? 0))}</span>
+                          <span>
+                            {summary && summary.volumeKg > 0
+                              ? formatTotalWeight(summary.volumeKg, unitSystem)
+                              : t("strength.bodyweight")}
                           </span>
-                        ) : null}
-                      </span>
-                      <span className="strength-session-row-facts">
-                        <span>{plural("strength.sets", Math.round(summary?.sets ?? 0))}</span>
-                        <span>
-                          {summary && summary.volumeKg > 0
-                            ? formatTotalWeight(summary.volumeKg, unitSystem)
-                            : t("strength.bodyweight")}
+                          <span>{formatSpan(summary?.durationSec ?? session.duration ?? 0)}</span>
+                          {source ? <span className="strength-session-row-source">{source}</span> : null}
                         </span>
-                        <span>{formatSpan(summary?.durationSec ?? session.duration ?? 0)}</span>
-                        {source ? <span className="strength-session-row-source">{source}</span> : null}
                       </span>
-                      {balance && balanceTotal > 0 ? (
-                        <span className="strength-session-row-mix" aria-hidden="true">
-                          {PATTERNS.filter((pattern) => balance[pattern] > 0).map((pattern) => (
-                            <i
-                              key={pattern}
-                              data-pattern={pattern}
-                              style={{ flexGrow: balance[pattern] / balanceTotal }}
-                            />
-                          ))}
-                        </span>
-                      ) : null}
-                    </span>
-                  </button>
-                </li>
-              );
-            })}
-          </ul>
-        </section>
-      ))}
-    </nav>
+                      {heat ? <SessionBodyGlyph muscleById={heat.muscleById} max={heat.max} /> : null}
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+          </section>
+        ))}
+      </nav>
+      <span
+        className="strength-session-scroll-thumb"
+        ref={thumbRef}
+        hidden
+        aria-hidden="true"
+        onPointerDown={(event) => {
+          const node = navRef.current;
+          if (!node) return;
+          event.preventDefault();
+          drag.current = { y: event.clientY, top: node.scrollTop };
+          event.currentTarget.setPointerCapture(event.pointerId);
+          event.currentTarget.dataset.dragging = "";
+        }}
+        onPointerMove={(event) => {
+          const start = drag.current;
+          const node = navRef.current;
+          if (!start || !node) return;
+          const travel = node.clientHeight - event.currentTarget.offsetHeight;
+          if (travel <= 0) return;
+          node.scrollTop = start.top + ((event.clientY - start.y) * (node.scrollHeight - node.clientHeight)) / travel;
+        }}
+        onPointerUp={(event) => {
+          drag.current = null;
+          delete event.currentTarget.dataset.dragging;
+        }}
+        onPointerCancel={(event) => {
+          drag.current = null;
+          delete event.currentTarget.dataset.dragging;
+        }}
+      />
+    </>
   );
 }

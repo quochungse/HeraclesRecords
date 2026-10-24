@@ -1136,12 +1136,14 @@ lives at module level for the same visit-to-visit reason — see `useCalendarDat
   the first run to the last; a calendar week's median drawn mid-week started days late and ended
   days early, this week's in the future. `npm run test:run-performance`.
 - **Time in zones on every sport's own page** (`ActivityZoneTimePanel`, `src/training/zoneTime.ts`)
-  — the run, ride and hike pages and an opened Strength session, **not Activities**, which keeps
-  its zone bar. It draws COROS's own seconds per zone off the detail's `zoneList` (never
+  — the run, ride and hike pages, **not Activities**, which keeps its zone bar, **and not
+  Strength**, which dropped it by decision on 2026-10-24 (heart-rate zones say little about a
+  lifting session; `useSessionZones` and the panel's Strength frame went with it). It draws
+  COROS's own seconds per zone off the detail's `zoneList` (never
   re-derived from the samples), every zone listed — one never reached reads 0, so a session is
   read against the whole scale — with seconds stated under a minute. A run switches between
   heart rate and pace (a trail run's pace is the GAP list, type 173, `adjustedPaceZones`); a
-  ride, a hike and a lifting session have heart rate only (a ride's power zones are the Power
+  ride and a hike have heart rate only (a ride's power zones are the Power
   panel's, and the pace zones COROS scores a ride or a hike on are a runner's). Three COROS
   facts it rests on: **`zoneType` on an activity is not reliable** — runs a day apart on one
   HR-reserve account came back 2 and 0 with identical bounds — so 0 falls back to the account's
@@ -1149,9 +1151,7 @@ lives at module level for the same visit-to-visit reason — see `useCalendarDat
   buckets for six named zones**, because `ltspZone` splits Threshold at 100% of threshold speed
   (69.5 / 82.7 / 91.7 / 100 / 102.2 / 112.9, probed 2026-10-19), so buckets 3 and 4 are drawn
   as one Threshold row; and HR-reserve, LTHR and pace share the names Recovery … Anaerobic
-  Power while Max HR has its own. Strength's history carries sets only, so `useSessionZones`
-  asks for the opened session's COROS detail (a Hevy-only session has none; a failure is
-  silent). `npm run test:zone-time`.
+  Power while Max HR has its own. `npm run test:zone-time`.
 - **Cycling** (`src/cycling/`, built 2026-09-30) — Running's page built again for a bike: the
   same shape (a kind filter and a period, a hero, totals, a weekly chart, intensity beside a
   split by kind, a sortable list, a full-page detail that keeps the list's scroll) and **the
@@ -2598,7 +2598,28 @@ lives at module level for the same visit-to-visit reason — see `useCalendarDat
   says so only on the toolbar's trigger, as Strength's does. `test:records` holds what each
   is for, the realistic one on any weekday.
 - **Strength** (`strengthHistoryService`, `hevyService`, `strengthSessionMerge`) — COROS
-  strength sessions merged with Hevy imports. **Hevy is its REST API, not MCP**, and no one
+  strength sessions merged with Hevy imports. **The screen shows one scope at a time**
+  (redesigned 2026-10-24, mockup in the memory note `strength-layout-mock`): the session list
+  beside a header band and the body map, and under them only what the selection is about — a
+  session's exercises, or the window's weekly chart, weekly sets per muscle, main lifts and
+  records. It used to keep the window's totals on top and its charts underneath while a
+  session was open, so the two read as one. **The band is one fixed height for a session and
+  for "All sessions"** (`--strength-band-height`, raised under a 700px pane where a session's
+  six figures take two rows), so picking a session never moves the map — the session header
+  grew with a row per record and dropped the map ~450px. Records are written in the exercise
+  rows (the estimated max and how far it moved; the heaviest set only when that is all the
+  record was), the window's in one line per session. A list row's mark is the front and back
+  of `bodyShapes.ts`'s figure lit on the map's heat ramp (`SessionBodyGlyph`, over
+  `sessionHeat`), not the push/pull/legs/core bar, and "All sessions" is drawn as a row like
+  the others, with "‹ All sessions" in the session band as the way back. The list is as tall
+  as the detail beside it through `contain: size`, so its own length never sets the row's.
+  **Its scroll thumb is drawn, not styled** (`.strength-session-scroll-thumb`): Chromium here
+  draws Windows' overlay scrollbar, which takes no `::-webkit-scrollbar` styling at all
+  (measured: no gutter, rules ignored), and `scrollbar-width: thin` still carries the arrow
+  buttons. So the native bar is `scrollbar-width: none`, a 4px pill is placed from the scroll
+  and shown under the pointer or while the list moves, and a measured fade at the foot says
+  the list goes on. An offscreen capture paints no scrollbar of any kind — check one in a
+  shown window. **Hevy is its REST API, not MCP**, and no one
   here has had a real Hevy account: the shapes were checked against Hevy's own OpenAPI
   (`https://api.hevyapp.com/docs.json`) on 2026-10-03, and `test:hevy-service` fakes them. Three
   rules it rests on. **The full read stops at a page that is all older than the window**, never

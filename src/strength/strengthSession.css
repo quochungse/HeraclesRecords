@@ -6,10 +6,11 @@
   align-content: start;
 }
 
+/* Date, name and figures, then the row's body figure. */
 .strength-session-row {
   display: grid;
-  grid-template-columns: 40px minmax(0, 1fr);
-  align-items: start;
+  grid-template-columns: 40px minmax(0, 1fr) auto;
+  align-items: center;
   gap: 12px;
   width: 100%;
   padding: 10px 12px;
@@ -29,10 +30,12 @@
   background: var(--sx-well);
 }
 
+/* The chosen row, "All sessions" included, is raised and marked at its edge
+   in the accent, so the first row reads as one of the choices. */
 .strength-session-row[aria-current="true"] {
   border-color: var(--sx-edge);
   background: var(--sx-raised);
-  box-shadow: none;
+  box-shadow: inset 3px 0 0 var(--accent);
 }
 
 /* Inside: the session list sits in a panel that clips a ring drawn outside. */
@@ -42,14 +45,63 @@
   outline-offset: -2px;
 }
 
+/* Where a session's date sits: a ring, not a filled tile, which read as a
+   heading's badge. */
 .strength-session-row-icon {
   display: grid;
   place-items: center;
-  width: 40px;
-  height: 40px;
-  border-radius: var(--radius-md);
-  background: var(--sx-well);
-  color: var(--sx-ember);
+  justify-self: center;
+  width: 32px;
+  height: 32px;
+  border: 1px solid var(--sx-edge);
+  border-radius: var(--radius-pill);
+  color: var(--text-secondary);
+}
+
+.strength-session-row[aria-current="true"] .strength-session-row-icon {
+  border-color: color-mix(in srgb, var(--accent) 55%, transparent);
+  color: var(--accent);
+}
+
+/* "All sessions" stands apart from the weeks under it by a hairline. */
+.strength-session-row.is-aggregate {
+  margin-bottom: 6px;
+}
+
+.strength-session-row.is-aggregate + .strength-session-week {
+  padding-top: 6px;
+  border-top: 1px solid var(--sx-hairline);
+}
+
+/* The row's muscles: the front and back figures, lit on the map's heat ramp. */
+.strength-session-row-figure {
+  display: inline-flex;
+  gap: 2px;
+}
+
+.strength-session-row-figure svg {
+  width: 22px;
+  height: 44px;
+}
+
+.strength-session-figure-body {
+  fill: color-mix(in srgb, var(--text-primary) 15%, transparent);
+}
+
+.strength-session-figure-muscle[data-level="1"] {
+  fill: var(--heat-1);
+}
+.strength-session-figure-muscle[data-level="2"] {
+  fill: var(--heat-2);
+}
+.strength-session-figure-muscle[data-level="3"] {
+  fill: var(--heat-3);
+}
+.strength-session-figure-muscle[data-level="4"] {
+  fill: var(--heat-4);
+}
+.strength-session-figure-muscle[data-level="5"] {
+  fill: var(--heat-5);
 }
 
 .strength-session-row-date {
@@ -122,21 +174,6 @@
   color: var(--text-muted);
 }
 
-/* The session's push / pull / legs / core split, as a hairline under its facts. */
-.strength-session-row-mix {
-  display: flex;
-  gap: 2px;
-  height: 4px;
-  margin-top: 4px;
-}
-
-.strength-session-row-mix > i {
-  min-width: 3px;
-  border-radius: var(--radius-pill);
-  background: var(--pattern-color);
-  opacity: 0.85;
-}
-
 .strength-session-record-badge {
   display: inline-flex;
   flex-shrink: 0;
@@ -186,27 +223,98 @@
 
 /* ---------- Split: session list | detail ---------- */
 
+/* The list stands as tall as the band and the body map beside it, and scrolls
+   inside that: it used to set the page's height, a window's worth of weeks
+   long, with every other panel waiting under it. */
 .strength-split {
   display: grid;
   grid-template-columns: minmax(270px, 330px) minmax(0, 1fr);
-  align-items: start;
+  align-items: stretch;
   gap: 18px;
+  scroll-margin-top: 16px;
 }
 
-/* The list keeps its place while a long session scrolls past beside it. */
+/* `contain: size` keeps the list's own length out of the row's height, so the
+   detail beside it decides the height and the list fills it. */
 .strength-split-list {
-  position: sticky;
-  top: 16px;
-  max-height: calc(100vh - 96px);
+  contain: size;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
   padding: 12px 8px;
+  overflow: hidden;
+}
+
+/*
+ * The list scrolls inside the card, not the card itself, and with no
+ * scrollbar of the platform's: Chromium draws Windows' overlay bar here,
+ * which takes no `::-webkit-scrollbar` styling, and `scrollbar-width: thin`
+ * still draws its arrow buttons. `StrengthSessionList` draws the thumb
+ * (`.strength-session-scroll-thumb`), and a measured fade at the foot says
+ * there is more while the thumb is out of sight.
+ */
+.strength-split-list > .strength-session-nav {
+  --fade-bottom: 0px;
+  flex: 1;
+  min-height: 0;
   overflow-y: auto;
   overscroll-behavior: contain;
+  scrollbar-width: none;
+  -webkit-mask-image: linear-gradient(
+    to bottom,
+    #000 calc(100% - var(--fade-bottom)),
+    transparent 100%
+  );
+  mask-image: linear-gradient(
+    to bottom,
+    #000 calc(100% - var(--fade-bottom)),
+    transparent 100%
+  );
+}
+
+.strength-split-list > .strength-session-nav.has-fade-bottom {
+  --fade-bottom: 48px;
+}
+
+/* A 4px pill in the card's own padding, so the rows keep their whole width,
+   out of sight until the pointer is over the list or the list moves. Its hit
+   area is wider than what is drawn, so it can be taken hold of. */
+.strength-session-scroll-thumb {
+  position: absolute;
+  top: 0;
+  right: 2px;
+  width: 4px;
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--text-secondary) 34%, transparent);
+  opacity: 0;
+  touch-action: none;
+  transition:
+    opacity var(--dur-fast) var(--ease),
+    background-color var(--dur-fast) var(--ease);
+}
+
+.strength-session-scroll-thumb::before {
+  content: "";
+  position: absolute;
+  inset: 0 -4px;
+}
+
+.strength-split-list:hover > .strength-session-scroll-thumb,
+.strength-session-scroll-thumb[data-active],
+.strength-session-scroll-thumb[data-dragging] {
+  opacity: 1;
+}
+
+.strength-session-scroll-thumb:hover,
+.strength-session-scroll-thumb[data-dragging] {
+  background: color-mix(in srgb, var(--text-secondary) 56%, transparent);
 }
 
 /* The body map and its muscle panel sit side by side in a wide pane and stack
    in a narrow one; that depends on the pane, not the window, so it is a
    container query rather than the viewport breakpoint the Overview uses. */
 .strength-split-detail {
+  --strength-band-height: 172px;
   min-width: 0;
   container-type: inline-size;
 }
@@ -225,6 +333,16 @@
     border-bottom: 1px solid var(--body-stage-border);
     border-radius: calc(var(--radius-md) - 1px) calc(var(--radius-md) - 1px) 0 0;
   }
+
+  /* A session's six figures take two rows here, and the window's band keeps
+     the same height so the map below still does not move. */
+  .strength-session-detail {
+    --strength-band-height: 236px;
+  }
+
+  .strength-session-stats {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
 }
 
 @media (max-width: 1040px) {
@@ -233,7 +351,7 @@
   }
 
   .strength-split-list {
-    position: static;
+    contain: none;
     max-height: 360px;
   }
 }
@@ -249,17 +367,24 @@
   gap: 18px;
 }
 
-.strength-session-detail-head {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  gap: 4px;
+/* The band over the body map, for a session and for the window alike: one
+   height, a title line and a row of figures, so choosing a session changes
+   the words and never the place of the map. */
+.panel.strength-card.strength-session-detail-head {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 12px;
+  height: var(--strength-band-height);
+  padding: 18px 24px;
+  overflow: hidden;
 }
 
 .strength-session-detail-head .eyebrow {
   margin: 0;
 }
 
-/* The session's name, with Ask Coach at the far end of its line. */
+/* The name, with the PR chip and Ask Coach at the far end of its line. */
 .strength-session-detail-title-row {
   display: flex;
   align-items: flex-start;
@@ -268,52 +393,136 @@
   min-width: 0;
 }
 
+.strength-session-detail-title {
+  min-width: 0;
+}
+
 .strength-session-detail-head h3 {
-  margin: 0;
+  margin: 2px 0 0;
+  overflow: hidden;
   font-size: 22px;
   font-weight: 600;
   letter-spacing: -0.02em;
-  line-height: 1.2;
+  line-height: 1.3;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.strength-session-detail-sub {
-  margin: 4px 0 0;
-  color: var(--text-secondary);
-  font-size: 14px;
-  line-height: 1.45;
+.strength-session-detail-actions {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 8px;
 }
 
+/* "All sessions / Sat, Oct 24": the way back, where the eye already is. */
+.strength-session-crumb {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.strength-session-crumb button {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--accent);
+  font: inherit;
+  letter-spacing: inherit;
+  text-transform: inherit;
+  cursor: pointer;
+}
+
+.strength-session-crumb button:hover {
+  color: var(--accent-strong);
+}
+
+.strength-session-crumb button:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: 2px;
+}
+
+.strength-session-crumb > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.strength-record-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 30px;
+  padding: 0 12px;
+  border: 1px solid color-mix(in srgb, var(--sx-record) 32%, transparent);
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--sx-record) 10%, transparent);
+  color: var(--sx-record);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: border-color var(--dur-fast) var(--ease);
+}
+
+.strength-record-chip:hover {
+  border-color: color-mix(in srgb, var(--sx-record) 60%, transparent);
+}
+
+.strength-record-chip:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: 2px;
+}
+
+/* Six figures to a session, three to the window, all on one row. */
 .strength-session-stats {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(132px, 1fr));
-  gap: 18px 22px;
-  margin-top: 22px;
-  padding-top: 20px;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 12px 18px;
+  padding-top: 12px;
   border-top: 1px solid var(--sx-hairline);
+}
+
+.strength-session-detail-head.is-window .strength-session-stats {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
 .strength-session-stat {
   display: grid;
   align-content: start;
-  gap: 6px;
+  gap: 2px;
   min-width: 0;
 }
 
 .strength-session-stat span {
+  overflow: hidden;
   color: var(--text-secondary);
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 500;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .strength-session-stat strong {
+  overflow: hidden;
   font-size: 22px;
   font-weight: 600;
   font-variant-numeric: tabular-nums;
   letter-spacing: -0.02em;
+  line-height: 1.3;
+  text-overflow: ellipsis;
   white-space: nowrap;
 }
 
+/* Drawn on every figure, caption or not, so the row is one height. */
 .strength-session-stat em {
+  min-height: 1lh;
   overflow: hidden;
   color: var(--text-muted);
   font-size: 12px;
@@ -324,93 +533,169 @@
 
 /* ---------- Records ---------- */
 
-.strength-session-records {
+/* A record's gain, wherever it is stated: in an exercise row and in the
+   window's list. */
+.strength-session-gain {
+  margin-left: 6px;
+  color: var(--success-text);
+  font-size: 12px;
+  font-style: normal;
+  font-weight: 600;
+}
+
+/* The window's records, a line per session that set any. */
+.strength-record-sessions {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
-  gap: 8px;
-  margin: 20px 0 0;
+  margin: 0;
   padding: 0;
   list-style: none;
 }
 
-.strength-session-records li,
-.strength-session-records.is-list button {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  gap: 4px 10px;
-  padding: 10px 14px;
-  border: 1px solid color-mix(in srgb, var(--sx-record) 22%, transparent);
-  border-radius: var(--radius-md);
-  background: color-mix(in srgb, var(--sx-record) 7%, transparent);
-  font-size: 13px;
+.strength-record-sessions li + li {
+  border-top: 1px solid var(--sx-hairline);
 }
 
-.strength-session-records li > svg,
-.strength-session-records button > svg {
-  align-self: center;
-  color: var(--sx-record);
-}
-
-.strength-session-records.is-list {
-  margin: 0;
-}
-
-.strength-session-records.is-list li {
-  padding: 0;
-  border: 0;
-  background: none;
-}
-
-.strength-session-records.is-list button {
+.strength-record-sessions button {
+  display: grid;
+  grid-template-columns: 168px minmax(0, 1fr) 16px;
+  align-items: center;
+  gap: 16px;
   width: 100%;
+  padding: 12px 6px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: none;
   color: inherit;
   font: inherit;
-  font-size: 13px;
   text-align: left;
   cursor: pointer;
-  transition: border-color var(--dur-fast) var(--ease);
+  transition: background-color var(--dur-fast) var(--ease);
 }
 
-.strength-session-records.is-list button:hover {
-  border-color: color-mix(in srgb, var(--sx-record) 48%, transparent);
+.strength-record-sessions button:hover {
+  background: var(--sx-well);
 }
 
-.strength-session-records.is-list button:focus-visible {
+.strength-record-sessions button:focus-visible {
   --focus-ring-color: var(--sx-ember);
   outline: var(--focus-ring);
-  outline-offset: 2px;
+  outline-offset: -2px;
 }
 
-.strength-session-record-figures {
-  display: inline-flex;
-  flex-wrap: wrap;
-  gap: 2px 14px;
-  color: var(--text-secondary);
+.strength-record-sessions button > svg {
+  color: var(--text-muted);
 }
 
-.strength-session-record-figures strong {
-  color: var(--text-primary);
+.strength-record-when {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.strength-record-when strong {
+  font-size: 13px;
   font-weight: 600;
+}
+
+.strength-record-when span {
+  overflow: hidden;
+  color: var(--text-muted);
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.strength-record-lifts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  min-width: 0;
+}
+
+.strength-record-lift {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  padding: 4px 10px;
+  border: 1px solid color-mix(in srgb, var(--sx-record) 22%, transparent);
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--sx-record) 7%, transparent);
+  font-size: 12px;
   font-variant-numeric: tabular-nums;
 }
 
-.strength-session-record-figures em {
-  margin-left: 6px;
-  color: var(--text-muted);
-  font-style: normal;
+.strength-record-lift strong {
+  font-weight: 600;
 }
 
-.strength-session-record-date {
-  margin-left: auto;
-  color: var(--text-muted);
-  font-size: 12px;
+.strength-record-lift span {
+  color: var(--text-secondary);
+}
+
+.strength-record-lift .strength-session-gain {
+  margin-left: 0;
+}
+
+.strength-record-more {
+  margin-top: 12px;
+}
+
+@media (max-width: 700px) {
+  .strength-record-sessions button {
+    grid-template-columns: minmax(0, 1fr) 16px;
+  }
 }
 
 /* ---------- Exercises ---------- */
 
 .strength-session-exercise-card .strength-card-head {
   margin-bottom: 14px;
+}
+
+/* How the work was paced, at the head of the card it describes. */
+.strength-session-pace {
+  display: flex;
+  flex: none;
+  gap: 24px;
+  margin: 0;
+}
+
+.strength-session-pace dt {
+  color: var(--text-muted);
+  font-size: 11px;
+}
+
+.strength-session-pace dd {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+
+/*
+ * One column template for the heads and the rows: name, then sets and reps,
+ * then the top set and the estimated max at fixed widths, so the figures stand
+ * in columns down the card. The right padding is the explore button's room.
+ */
+.strength-session-exercise-columns,
+.strength-session-exercise-toggle {
+  grid-template-columns: 16px minmax(0, 1fr) auto 132px 150px;
+}
+
+.strength-session-exercise-columns {
+  display: grid;
+  gap: 12px;
+  padding: 0 42px 6px 6px;
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.strength-session-exercise-columns > span:nth-child(n + 4) {
+  text-align: right;
 }
 
 .strength-session-exercise-list {
@@ -434,7 +719,6 @@
 .strength-session-exercise-toggle {
   display: grid;
   flex: 1;
-  grid-template-columns: 16px minmax(0, 1fr) auto auto;
   align-items: center;
   gap: 12px;
   min-width: 0;
@@ -484,18 +768,29 @@
 }
 
 .strength-session-exercise-facts,
-.strength-session-exercise-top {
+.strength-session-exercise-top,
+.strength-session-exercise-e1rm {
   color: var(--text-secondary);
   font-size: 13px;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
 
-.strength-session-exercise-top {
-  min-width: 92px;
+.strength-session-exercise-facts {
+  text-align: right;
+}
+
+.strength-session-exercise-top,
+.strength-session-exercise-e1rm {
   color: var(--text-primary);
   font-weight: 500;
   text-align: right;
+}
+
+/* Holds the explore button's place on a row with nothing to explore, so the
+   columns still line up. */
+.strength-session-exercise-explore.is-placeholder {
+  visibility: hidden;
 }
 
 .strength-session-exercise-explore {
@@ -575,8 +870,9 @@
 }
 
 @media (max-width: 700px) {
+  .strength-session-exercise-columns,
   .strength-session-exercise-toggle {
-    grid-template-columns: 16px minmax(0, 1fr) auto;
+    grid-template-columns: 16px minmax(0, 1fr) auto auto;
   }
 
   .strength-session-exercise-facts {

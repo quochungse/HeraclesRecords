@@ -21,12 +21,6 @@ import { TrainingBenefitReason } from "./TrainingBenefitChip";
 
 type ZoneScale = "hr" | "pace";
 
-/**
- * Which screen the panel stands on, so it wears that screen's card: a panel on
- * a run, ride or hike page, a card on a Strength session.
- */
-export type ZoneTimePanelFrame = "page" | "strength";
-
 interface ActivityZoneTimePanelProps {
   hrZones: readonly TrainingHubActivityZoneBucket[];
   /** COROS's model for this activity's heart-rate zones; 0 or absent falls back to the account's. */
@@ -36,7 +30,6 @@ interface ActivityZoneTimePanelProps {
   paceZones?: readonly TrainingHubActivityZoneBucket[];
   /** The pace scale is grade-adjusted (a trail run's), and the switch says so. */
   paceIsGradeAdjusted?: boolean;
-  frame: ZoneTimePanelFrame;
   /** The session's training label, when it has one: why it was given is written under the zones. */
   benefit?: TrainingBenefitReading;
 }
@@ -88,7 +81,6 @@ export function ActivityZoneTimePanel({
   accountFamily,
   paceZones,
   paceIsGradeAdjusted = false,
-  frame,
   benefit
 }: ActivityZoneTimePanelProps) {
   const { unitSystem } = useUnitSystem();
@@ -122,7 +114,7 @@ export function ActivityZoneTimePanel({
   const top = Math.max(...rows.map((row) => row.share));
 
   return (
-    <Frame frame={frame} title={t("activity.zoneTime.title")} control={control}>
+    <Frame title={t("activity.zoneTime.title")} control={control}>
       <ul className="activity-zone-time">
         {rows.map((row) => {
           const name = row.label
@@ -159,29 +151,14 @@ export function ActivityZoneTimePanel({
 }
 
 function Frame({
-  frame,
   title,
   control,
   children
 }: {
-  frame: ZoneTimePanelFrame;
   title: string;
   control: ReactNode;
   children: ReactNode;
 }) {
-  if (frame === "strength") {
-    return (
-      <section className="panel strength-card activity-zone-time-panel">
-        <div className="strength-card-head">
-          <div>
-            <h3>{title}</h3>
-          </div>
-          {control}
-        </div>
-        {children}
-      </section>
-    );
-  }
   return (
     <section className="panel run-detail-panel activity-zone-time-panel">
       <header className="activity-zone-time-head">

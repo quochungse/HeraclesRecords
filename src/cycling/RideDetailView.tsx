@@ -332,7 +332,6 @@ export function RideDetailView({
           hrZones={detail.hrZones}
           hrZoneType={detail.hrZoneType}
           accountFamily={zoneFamily}
-          frame="page"
           benefit={benefit}
         />
       ) : null}
