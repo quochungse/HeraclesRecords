@@ -13,7 +13,8 @@
  * and spent as a fill it reads as a muddy brown. What the hall fills — a bar,
  * a pip, a stage's coin — takes a lighter, richer step worked out from the
  * accent, so another palette still follows; words keep the accent. Read by the
- * hall and by the Geryon card on Where you've been, so declared here.
+ * hall, by the Geryon card on Where you've been and by the fitness score bars,
+ * so declared here in the main bundle.
  */
 :root[data-theme="paper"] {
   --hall-gold: oklch(from var(--accent) calc(l + 0.22) calc(c * 1.25) calc(h + 6));

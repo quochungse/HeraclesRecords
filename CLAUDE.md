@@ -2504,7 +2504,8 @@ lives at module level for the same visit-to-visit reason — see `useCalendarDat
   mockups): the accent stays the colour of words, and what is filled (a bar, a pip, a stage's
   coin, the laurel) takes `--hall-gold*`, a lighter, richer step worked out from the accent with
   `oklch(from var(--accent) …)` in `recordsNotices.css`, so another palette follows; the
-  Geryon card on Where you've been reads the same tokens. **The year's timeline is one white
+  Geryon card on Where you've been and the fitness score bars on Personal (`.score-bar-fill`)
+  read the same tokens. **The year's timeline is one white
   sheet** (`.records-line`): rows of text sat straight on the grey canvas and sank, and real
   histories are mostly rows. A big milestone is a white card lifted off the sheet, its sport
   down the left edge (`--row-sport`, read off its node). **Each labour's head is a black
@@ -3390,6 +3391,14 @@ mirrored in `src/theme/accentPalette.ts` for the globe and the charts, which can
 custom property — change both. Every paper rule is scoped `:root[data-theme="paper"]`, which
 is what keeps dark out of reach of a light-theme edit; nothing in the file relies on a bare
 selector meaning "light".
+**On paper the accent is a colour for words, not for areas.** A wash of it (`--accent-soft`,
+`color-mix(… var(--accent) 6–14% …)`) comes out a beige on the cool canvas that reads as a
+stain, and it filled bars a muddy brown. So, as of 2026-10-24, a chosen thing on paper is
+**lifted or edged, never washed**: a chosen card or tile is white, ringed in the accent
+(Settings' tiles, New analysis' starter, the builder's open step); a chosen row is a grey
+wash with the accent at its edge (Activities, the Library's list); today is white with an
+accent edge (the Calendar's cell, the plan reader's day); and what is filled takes
+`--hall-gold*`. The rail's active row keeps its accent wash, by decision.
 
 ## Releases
 

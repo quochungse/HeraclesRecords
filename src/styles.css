@@ -17479,6 +17479,13 @@ td span {
   background: rgba(19, 26, 40, 0.09);
 }
 
+/* The accent and its strong step are colours for words on paper, and as a
+   fill they ran a muddy brown; the bars take the bright gold the hall fills
+   with (recordsNotices.css), which follows another palette the same way. */
+:root[data-theme="paper"] .score-bar-fill {
+  background: var(--hall-gold-fill);
+}
+
 /* --- Training Hub: upcoming workouts --------------------------------------- */
 :root[data-theme="paper"] .training-upcoming-panel {
   box-shadow: var(--shadow-card);
