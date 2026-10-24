@@ -1465,11 +1465,21 @@ lives at module level for the same visit-to-visit reason — see `useCalendarDat
   or Coach's first mount would switch away from the pick. A `CoachOpenRequest.scheduleRefs` puts
   chips beside the picked conversation's composer, sent as a
   `scheduleRefs` anchor (not a `PlanRef`, which names a Coach creation) that `toWireMessages` folds
-  into the question with the ids the read tools take. **A calendar day opens as a whole** (UAT): pressing a day's cell or
-  its number opens nothing on an empty day, the one thing on it as its chip would
-  (`daySelection`), and otherwise the day panel (`DayOverview`: totals, a row per session
-  with its sport and status, Ask Coach for the day as a `scope: "day"` ref, and a way back to
-  the day from a row it opened). The Calendar's week and session asks used to
+  into the question with the ids the read tools take. **A calendar day opens as a whole** (since 2026-10-24): a press
+  anywhere in a cell opens the day panel, an empty day included (`daySelection`; the number's
+  button is stretched over the cell, under the cards and the hover "+"), and a card opens its
+  own session (`DayOverview`: totals, a row per session with its sport and status, Ask Coach
+  for the day as a `scope: "day"` ref, a way back to the day from a row it opened, and on an
+  empty day the "+"'s Add or Log). A session is a two-line card — sport icon and name, then
+  distance · time · load, "Plan" or "Missed" leading a session not done — three to a month
+  cell before "+N more"; a planned card's time is COROS's own `estimatedTime`
+  (`PlannedTargets.expectedSeconds`), which every scheduled entry carries, strength included,
+  where the steps' own times cover only the timed ones. The week column states its load as a
+  figure and a bar (done solid, still planned hatched), COROS's target in words, and
+  "Planned sessions" / "Planned time" apart from "Total time" / "Total distance", so a
+  session nobody planned never reads as part of the plan; a target band drawn on the bar was
+  tried and dropped as unreadable, and the load ratio's chip was taken off by decision (the
+  ratio is in the column's tooltip; Ask Coach for the week sits where the chip was). The Calendar's week and session asks used to
   paste figures into a prompt; the Library reader's open session offers Ask Coach for any COROS plan.
   **Coach reads the athlete's own COROS plans** (P3.1, `chatPlanTools.ts`): `list_training_plans`
   from the Library's cache and the stored matches (no request unless the cache is empty), and

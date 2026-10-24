@@ -8,6 +8,13 @@ import type {
 export interface PlannedTargets {
   distanceMeters?: number;
   durationSeconds?: number;
+  /**
+   * How long COROS expects the whole session to take: the program's
+   * `estimatedTime`, which every scheduled entry carries, strength included.
+   * `durationSeconds` sums only the steps written in time, so a 70-minute run
+   * built in kilometres with timed strides summed to 450 s.
+   */
+  expectedSeconds?: number;
 }
 
 /** A scheduled workout matched (or not) to the completed activity on the same day. */
@@ -42,6 +49,19 @@ export interface WeeklyStats {
   activityTimeSeconds: number;
   distanceMeters: number;
   plannedDistanceKm: number;
+  /**
+   * The sessions on the calendar and how many an activity answered. Counted
+   * apart from everything done, so a session nobody planned never reads as
+   * part of the plan.
+   */
+  plannedSessions: number;
+  plannedSessionsDone: number;
+  /** Load still to come: planned sessions not done, on a day not gone. */
+  remainingLoad: number;
+  /** COROS's expected time over every planned session; absent when one lacks it. */
+  plannedSeconds?: number;
+  /** Time recorded by the activities that answered a planned session. */
+  plannedDoneSeconds: number;
   elevationGain: number;
   /** staminaLevel — COROS "Base Fitness". */
   baseFitness?: number;
@@ -88,14 +108,12 @@ export function dayItems(day: CalendarDay): CalendarItemSelection[] {
 }
 
 /**
- * What pressing a day's cell opens (UAT): nothing on an empty day, the one
- * thing on it when there is one — as pressing its chip would — and the day
- * as a whole otherwise.
+ * What pressing a day's cell opens: the day as a whole, an empty one too —
+ * a card opens its own session. It used to open nothing on an empty day and
+ * the one thing on a day holding one, so the cell meant three things.
  */
-export function daySelection(day: CalendarDay): CalendarSelection | null {
-  const items = dayItems(day);
-  if (!items.length) return null;
-  return items.length === 1 ? items[0] : { kind: "day", day };
+export function daySelection(day: CalendarDay): CalendarSelection {
+  return { kind: "day", day };
 }
 
 /** Stable identity for selecting scheduled occurrences across calendar cells. */

@@ -27,6 +27,11 @@
 // - **A scheduled session is edited in Create workout's builder.** It had an
 //   editor of its own; now Edit opens the builder every other workout is
 //   written in, saves against the occurrence and asks in the screen's dialog.
+// - **The cell is the day and a card is its session.** A press anywhere in a
+//   cell opens the day as a whole, an empty one too; a card opens its own
+//   session; a month cell folds past three cards into "+N more". A planned
+//   card says "Plan" and states COROS's own time, and the week column counts
+//   the plan apart from everything done.
 //
 // Nothing here removes anything anywhere: `removeScheduledWorkout` is a stub
 // that records its arguments.
@@ -41,6 +46,9 @@ const { app, BrowserWindow } = require("electron");
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
 app.commandLine.appendSwitch("no-sandbox");
+// On a display scaled to 125% every box is a fraction of a pixel off, and the
+// fallback's grid read a pixel lower than the screen's on code that was fine.
+app.commandLine.appendSwitch("force-device-scale-factor", "1");
 app.disableHardwareAcceleration();
 
 let win;
@@ -370,21 +378,49 @@ async function main() {
   }
 
   // -------------------------------------------------------------------------
-  // 4. A day opens (UAT): its one thing directly, or the day as a whole
+  // 4. A press on a cell opens the day as a whole, an empty one too
   // -------------------------------------------------------------------------
+  //
+  // It used to open nothing on an empty day and the one thing on a day holding
+  // one, so the cell meant three things. Now the cell is the day and a card is
+  // its session.
+  const TODAY_OPEN = ".calendar-day.is-today .calendar-day-open";
   {
     await mountCalendar({ listScheduledWorkouts: [entry] });
-    assert.equal(await harness("count", ".calendar-day.is-openable"), 1, "only a day with something on it opens");
-    assert.equal(await harness("click", ".calendar-day.is-openable .calendar-day-open"), true);
+    assert.equal(
+      await harness("count", ".calendar-day.is-openable"),
+      await harness("count", ".calendar-day"),
+      "every day opens"
+    );
+    // The card answers its own press, over the button stretched across the
+    // cell. Asked before any panel opens: a closed one leaves its backdrop on
+    // frames a hidden window never gets.
+    assert.equal(
+      await evaluate(`(() => {
+        const card = document.querySelector(".calendar-day.is-today .calendar-chip-planned").getBoundingClientRect();
+        const hit = document.elementFromPoint(card.left + card.width / 2, card.top + card.height / 2);
+        return Boolean(hit?.closest(".calendar-chip-planned"));
+      })()`),
+      true,
+      "a card sits above the cell's own button"
+    );
+    assert.equal(await harness("click", TODAY_OPEN), true);
     await settle();
-    assert.equal(await harness("text", ".calendar-detail-header h3"), "Easy run", "a day with one thing opens that thing");
-    assert.equal(await harness("exists", ".calendar-day-overview"), false);
+    assert.ok(await harness("exists", ".calendar-day-overview"), "a day with one thing opens as a day");
+    assert.equal(await harness("count", ".calendar-day-overview-item"), 1);
+    await pressOnDocument("Escape");
+    await settle();
+
+    assert.equal(await harness("click", ".calendar-day.is-empty .calendar-day-open"), true);
+    await settle();
+    assert.ok(await harness("exists", ".calendar-day-overview.is-empty"), "an empty day opens too");
+    assert.ok(await harness("exists", ".calendar-day-overview-add"), "and offers what its + does");
     await pressOnDocument("Escape");
     await settle();
 
     const strides = { ...entry, idInPlan: "8", planProgramId: "program-2", name: "Strides", trainingLoad: 15 };
     await mountCalendar({ listScheduledWorkouts: [entry, strides] });
-    assert.equal(await harness("click", ".calendar-day.is-openable .calendar-day-open"), true);
+    assert.equal(await harness("click", TODAY_OPEN), true);
     await settle();
     assert.ok(await harness("exists", ".calendar-day-overview"), "a day with two things opens as a whole");
     assert.equal(await harness("count", ".calendar-day-overview-item"), 2, "a row for each");
@@ -403,6 +439,58 @@ async function main() {
     assert.ok(await harness("exists", ".calendar-day-overview"), "back to the day");
     await pressOnDocument("Escape");
     await settle();
+
+    // A month cell shows three cards; past that, two and the rest folded.
+    const more = [9, 10, 11].map((id) => ({ ...entry, idInPlan: String(id), planProgramId: `program-${id}`, name: `Session ${id}` }));
+    await mountCalendar({ listScheduledWorkouts: [entry, strides, ...more] });
+    assert.equal(await harness("count", ".calendar-day.is-today .calendar-chip"), 2, "two cards and the fold");
+    assert.equal(await harness("text", ".calendar-day.is-today .calendar-day-more"), "+3 more");
+    assert.equal(await harness("click", ".calendar-day.is-today .calendar-day-more"), true);
+    await settle();
+    assert.equal(await harness("count", ".calendar-day-overview-item"), 5, "the fold opens the whole day");
+    await pressOnDocument("Escape");
+    await settle();
+  }
+
+  // -------------------------------------------------------------------------
+  // 4b. A card is two lines, and the week column keeps plan apart from total
+  // -------------------------------------------------------------------------
+  {
+    const strength = {
+      ...entry,
+      idInPlan: "12",
+      planProgramId: "program-12",
+      name: "Full body",
+      sportType: 4,
+      volume: undefined,
+      trainingLoad: undefined,
+      rawProgram: { estimatedTime: 2700 }
+    };
+    await mountCalendar({ listScheduledWorkouts: [{ ...entry, rawProgram: { estimatedTime: 1800 } }, strength] });
+    const metas = await evaluate(
+      `Array.from(document.querySelectorAll(".calendar-day.is-today .calendar-chip-meta"), (node) => node.textContent)`
+    );
+    assert.deepEqual(
+      metas,
+      ["Plan · 5 km · 30m · 40 TL", "Plan · 45m"],
+      "a planned card says so, and a strength session states COROS's own time"
+    );
+    const rows = await evaluate(
+      `Array.from(document.querySelectorAll(".calendar-weekstats-row"), (row) => [row.querySelector("dt")?.textContent, row.querySelector("dd")?.textContent]).filter(([label]) => label)`
+    );
+    assert.deepEqual(
+      rows,
+      [
+        ["Planned sessions", "0 / 2"],
+        ["Planned time", "0m / 1h 15m"]
+      ],
+      "a week of plan only: its sessions and their time, no totals of nothing"
+    );
+    assert.match(
+      await harness("text", ".calendar-weekstats-load"),
+      /40\s*TL planned/,
+      "a week nothing has been done in yet reads as what it will be"
+    );
   }
 
   // -------------------------------------------------------------------------
@@ -533,7 +621,7 @@ async function main() {
   assert.deepEqual(await harness("consoleErrors"), [], "the screen logged no errors");
 
   console.log(
-    "calendar renderer OK — an unread range shimmers and a read one is drawn from cache at once, an empty week waits for its range before saying so, both removals ask first in a portalled dialog, its Escape leaves the panel open, and a scheduled session is edited in Create workout's builder"
+    "calendar renderer OK — an unread range shimmers and a read one is drawn from cache at once, an empty week waits for its range before saying so, both removals ask first in a portalled dialog, its Escape leaves the panel open, a scheduled session is edited in Create workout's builder, every cell opens its day under cards that open their own session, and the week column keeps the plan apart"
   );
 }
 

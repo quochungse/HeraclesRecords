@@ -170,7 +170,7 @@
   "view": "calendar",
   "wait": 4500,
   "steps": [
-   "(()=>{const d=[...document.querySelectorAll('.calendar-day.is-openable.is-past')].filter(x=>x.querySelectorAll('button').length>=2);const el=d[d.length-2]||d[0];if(!el)return 'none';el.click();return 'days '+d.length})()",
+   "(()=>{const d=[...document.querySelectorAll('.calendar-day.is-openable.is-past')].filter(x=>x.querySelector('.calendar-chip'));const el=d[d.length-2]||d[0];if(!el)return 'none';el.querySelector('.calendar-day-open').click();return 'days '+d.length})()",
    2500
   ],
   "theme": "dark"

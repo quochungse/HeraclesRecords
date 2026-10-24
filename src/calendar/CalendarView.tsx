@@ -732,6 +732,11 @@ export function CalendarView({
               }
             : undefined
         }
+        onAdd={(dateKey) => {
+          setDayReturn(null);
+          setSelection(null);
+          setAddTarget(dateKey);
+        }}
         onEdit={(target) => {
           setSelection(null);
           setEditedOccurrence({

@@ -111,8 +111,24 @@ function plannedTargets(
   return {
     distanceMeters:
       totals.distanceMeters ?? (volumeKm ? volumeKm * 1000 : undefined),
-    durationSeconds: totals.durationSeconds
+    durationSeconds: totals.durationSeconds,
+    expectedSeconds: expectedSeconds(scheduled)
   };
+}
+
+/**
+ * COROS's own estimate of the session's length, off the raw program. On a
+ * COROS program a `0` is a field nobody filled in, so it is no estimate.
+ */
+function expectedSeconds(scheduled: TrainingHubScheduledWorkoutEntry): number | undefined {
+  const raw = scheduled.rawProgram;
+  for (const value of [raw?.estimatedTime, raw?.duration]) {
+    const seconds = Number(value);
+    if (Number.isFinite(seconds) && seconds > 0) {
+      return seconds;
+    }
+  }
+  return undefined;
 }
 
 /**
@@ -294,6 +310,11 @@ export function computeWeeklyStats(days: CalendarDay[]): WeeklyStats {
   let activityTimeSeconds = 0;
   let distanceMeters = 0;
   let plannedDistanceKm = 0;
+  let plannedSessions = 0;
+  let plannedSessionsDone = 0;
+  let remainingLoad = 0;
+  let plannedSeconds: number | undefined = 0;
+  let plannedDoneSeconds = 0;
   let elevationGain = 0;
 
   for (const day of days) {
@@ -308,6 +329,18 @@ export function computeWeeklyStats(days: CalendarDay[]): WeeklyStats {
       // The same figures the completion badge reads, so a week's planned column
       // and the chips inside it cannot disagree about what was prescribed.
       plannedDistanceKm += (pair.targets.distanceMeters ?? 0) / 1000;
+      plannedSessions += 1;
+      if (pair.activity) {
+        plannedSessionsDone += 1;
+        plannedDoneSeconds += pair.activity.duration ?? 0;
+      } else if (!day.isPast) {
+        remainingLoad += pair.scheduled.trainingLoad ?? 0;
+      }
+      // A total over some of the sessions would read as the whole plan's.
+      plannedSeconds =
+        plannedSeconds !== undefined && pair.targets.expectedSeconds
+          ? plannedSeconds + pair.targets.expectedSeconds
+          : undefined;
     }
   }
 
@@ -318,6 +351,11 @@ export function computeWeeklyStats(days: CalendarDay[]): WeeklyStats {
     activityTimeSeconds,
     distanceMeters,
     plannedDistanceKm,
+    plannedSessions,
+    plannedSessionsDone,
+    remainingLoad: Math.round(remainingLoad),
+    plannedSeconds: plannedSessions ? plannedSeconds : undefined,
+    plannedDoneSeconds,
     elevationGain: Math.round(elevationGain),
     baseFitness: lastDefined(metrics, (metric) => metric.staminaLevel),
     loadImpact: lastDefined(metrics, (metric) => metric.tiredRateNew),

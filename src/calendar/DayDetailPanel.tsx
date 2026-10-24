@@ -34,6 +34,8 @@ interface DayDetailPanelProps {
   onOpenItem: (item: CalendarItemSelection) => void;
   /** Back to the day a thing was opened from, when it was. */
   onBackToDay?: () => void;
+  /** Adds a workout to the day on screen, or logs an activity on a day gone. */
+  onAdd: (dateKey: string) => void;
   onEdit: (selection: Extract<CalendarSelection, { kind: "scheduled" }>) => void;
   /** Re-reads the range after a manual plan-status change. */
   onReload: () => void;
@@ -49,6 +51,7 @@ export function DayDetailPanel({
   onAskCoach,
   onOpenItem,
   onBackToDay,
+  onAdd,
   onEdit,
   onReload,
   onError
@@ -276,7 +279,11 @@ export function DayDetailPanel({
 
               <div className="calendar-detail-body">
                 {selection.kind === "day" ? (
-                  <DayOverview day={selection.day} onOpen={onOpenItem} />
+                  <DayOverview
+                    day={selection.day}
+                    onOpen={onOpenItem}
+                    onAdd={() => onAdd(selection.day.dateKey)}
+                  />
                 ) : selection.kind === "scheduled" ? (
                   <>
                     {planPair ? (

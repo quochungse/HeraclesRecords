@@ -177,11 +177,7 @@ export function CalendarSkeleton() {
                       .join(" ")}
                   >
                     <div className="calendar-day-head">
-                      <span className="calendar-day-number">
-                        {isToday
-                          ? t("calendar.today", { day: String(dayNumber(dateKey)).padStart(2, "0") })
-                          : dayNumber(dateKey)}
-                      </span>
+                      <span className="calendar-day-number">{dayNumber(dateKey)}</span>
                     </div>
                     <div className="calendar-day-items">
                       <DaySkeletonChips

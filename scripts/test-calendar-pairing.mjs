@@ -345,6 +345,45 @@ const activity = (overrides) => ({
     "a plan whose distance lives only in its steps still fills the week planned column"
   );
   assert.equal(stats.distanceMeters, 11500);
+  assert.equal(stats.plannedSessions, 1);
+  assert.equal(stats.plannedSessionsDone, 1);
+  assert.equal(stats.plannedDoneSeconds, 3600, "the time the activity that answered the plan took");
+  assert.equal(stats.remainingLoad, 0, "a session done leaves nothing still to come");
+  assert.equal(stats.plannedSeconds, undefined, "a plan COROS gave no time for has no planned time");
+}
+
+/* --- 9b. the plan apart from the week as it was --------------------------- */
+
+{
+  // The week column counts the plan's sessions and their time apart from
+  // everything done, so a session nobody planned never reads as part of it.
+  const day = (dateKey, isPast, scheduledEntries, activities) => {
+    const { pairs, unplanned } = pairPlannedWithActual(scheduledEntries, activities, "metric");
+    return { dateKey, inMonth: true, isToday: false, isPast, scheduled: scheduledEntries, activities, pairs, unplannedActivities: unplanned };
+  };
+  const easy = scheduled({ idInPlan: "easy", sportType: 1, trainingLoad: 60, rawProgram: { estimatedTime: 3277, duration: 3277 } });
+  const gym = scheduled({ idInPlan: "gym", sportType: 4, rawProgram: { estimatedTime: 2616 } });
+  const tempo = scheduled({ idInPlan: "tempo", sportType: 1, trainingLoad: 90, rawProgram: { estimatedTime: 3540 } });
+  const longRun = scheduled({ idInPlan: "long", sportType: 1, trainingLoad: 200, rawProgram: { estimatedTime: 0, duration: 7320 } });
+
+  const { pairs } = pairPlannedWithActual([gym], [], "metric");
+  assert.equal(pairs[0].targets.expectedSeconds, 2616, "a strength session has COROS's own time, where its steps have none");
+
+  const stats = computeWeeklyStats([
+    day("20261005", true, [easy], [activity({ sportType: 100, trainingLoad: 58, duration: 3300 }), activity({ activityId: "extra", sportType: 400, trainingLoad: 30, duration: 2400 })]),
+    day("20261006", true, [gym], []),
+    day("20261008", false, [tempo], []),
+    day("20261010", false, [longRun], [])
+  ]);
+  assert.equal(stats.plannedSessions, 4, "the sessions on the calendar, and only those");
+  assert.equal(stats.plannedSessionsDone, 1);
+  assert.equal(stats.plannedDoneSeconds, 3300, "the session nobody planned is not the plan's time");
+  assert.equal(stats.activityTimeSeconds, 5700, "but it is the week's");
+  assert.equal(stats.remainingLoad, 290, "what is still to come: days not gone, sessions not done — the missed gym day is neither");
+  assert.equal(stats.plannedSeconds, 3277 + 2616 + 3540 + 7320, "a 0 is no estimate, so the duration stands in");
+
+  const untimed = computeWeeklyStats([day("20261005", true, [easy, scheduled({ idInPlan: "x", sportType: 4 })], [])]);
+  assert.equal(untimed.plannedSeconds, undefined, "a total over some of the plan would read as all of it");
 }
 
 /* --- 10. the plan's own volume, not COROS's set count -------------------- */

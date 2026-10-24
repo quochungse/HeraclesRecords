@@ -13,7 +13,7 @@ import type { CalendarDragPayload } from "./calendarDrag";
 import { skeletonDelay } from "./CalendarSkeleton";
 import { DayCell } from "./DayCell";
 import { weekdayLabels } from "./dateUtils";
-import { WeekStatsCell } from "./WeekStatsCell";
+import { WeekStatsCell, weekLoadScale } from "./WeekStatsCell";
 import { t } from "../i18n/core";
 
 interface CalendarGridProps {
@@ -35,7 +35,7 @@ interface CalendarGridProps {
   onSelectActivity: (day: CalendarDay, activity: TrainingHubActivity) => void;
   onToggleScheduled: (entry: TrainingHubScheduledWorkoutEntry) => void;
   onAdd: (dateKey: string) => void;
-  /** A press on a day's cell outside its chips (UAT). */
+  /** A press on a day's cell outside its cards. */
   onSelectDay: (day: CalendarDay) => void;
   onDropEntry: (payload: CalendarDragPayload, targetDay: string) => void;
   onAskCoachWeek: (week: CalendarWeek) => void;
@@ -70,6 +70,7 @@ export function CalendarGrid({
      whatever offset September's today-row had scrolled to, with its first week
      above the fold. */
   const rangeKey = weeks.length > 0 ? `${weeks[0]?.key}-${weeks[weeks.length - 1]?.key}` : "";
+  const loadScale = weekLoadScale(weeks.map((week) => week.stats));
 
   useLayoutEffect(() => {
     if (loading) {
@@ -153,6 +154,7 @@ export function CalendarGrid({
               <WeekStatsCell
                 stats={week.stats}
                 loaded={rangeLoaded}
+                loadScale={loadScale}
                 placeholderDelayMs={
                   placeholder ? skeletonDelay(weekIndex, 7) : undefined
                 }

@@ -1,4 +1,4 @@
-import { Activity, ChevronRight } from "lucide-react";
+import { Activity, ChevronRight, Plus } from "lucide-react";
 import type { TrainingHubActivity, UnitSystem } from "../../electron/types";
 import { useUnitSystem } from "../units/UnitSystemProvider";
 import {
@@ -13,6 +13,7 @@ import { sportChipStyle, sportTheme } from "../training-library/sportTheme";
 import { dayItems, type CalendarDay, type CalendarItemSelection } from "./calendarTypes";
 import { formatPlannedVolume } from "./scheduledStructure";
 import { t } from "../i18n/core";
+import { useI18n } from "../i18n/useI18n";
 
 function activityLine(activity: TrainingHubActivity, unitSystem: UnitSystem): string {
   return [
@@ -25,17 +26,21 @@ function activityLine(activity: TrainingHubActivity, unitSystem: UnitSystem): st
 }
 
 /**
- * A day with more than one thing on it, read as a whole (UAT): what was done
- * and what was planned, each a row that opens as its chip does, with the
- * day's totals above them.
+ * A day read as a whole: what was done and what was planned, each a row that
+ * opens as its card does, with the day's totals above them. Any day opens
+ * here, an empty one too, which offers what its cell's "+" does.
  */
 export function DayOverview({
   day,
-  onOpen
+  onOpen,
+  onAdd
 }: {
   day: CalendarDay;
   onOpen: (item: CalendarItemSelection) => void;
+  onAdd: () => void;
 }) {
+  // Subscribes to the language, so an open panel redraws on a switch.
+  useI18n();
   const { unitSystem } = useUnitSystem();
   const items = dayItems(day);
   const done = day.activities;
@@ -50,6 +55,18 @@ export function DayOverview({
     meters ? formatDistanceMeters(meters, unitSystem) : undefined,
     load ? t("units.trainingLoadShort", { value: Math.round(load) }) : undefined
   ].filter(Boolean);
+
+  if (!items.length) {
+    return (
+      <div className="calendar-day-overview is-empty">
+        <p className="calendar-day-overview-totals">{t("calendar.overview.empty")}</p>
+        <button type="button" className="ghost-button calendar-day-overview-add" onClick={onAdd}>
+          <Plus size={15} aria-hidden="true" />
+          {day.isPast ? t("calendar.day.log") : t("calendar.day.add")}
+        </button>
+      </div>
+    );
+  }
 
   return (
     <div className="calendar-day-overview">
