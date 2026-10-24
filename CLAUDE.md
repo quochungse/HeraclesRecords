@@ -2184,10 +2184,17 @@ lives at module level for the same visit-to-visit reason — see `useCalendarDat
   opaque skin, so only what spills past the edge shows; glowing the lines wide lights the
   whole body as a haze. Every colour and strength is a custom property on the stage
   (`--figure-*`), stepped at 2x (`min-resolution: 1.5dppx`), where a line is one device pixel.
-  **Both themes draw the same figure on a black stage** (paper's a step lighter, `#222222`). Paper had its own — first a
-  dark-grey stage with the glow turned down (washed out and flat), then a light grey one with
-  the lines in ink, deeper tones in normal blending — and the athlete judged both uglier than
-  the dark one on a white page. "88% Ready" sits on the stage: under the feet on a narrow
+  **Paper stands the figure on Strength's slate stage** (since 2026-10-23, picked from a mockup of
+  five): `#e4e9ef` → `#c4cdd8`, a frosted white body (`--figure-skin`), an ink mesh in normal
+  blending with no bloom, the rim as slate shading, the halo a white backlight over the lit part
+  (`--figure-halo-dim`/`-lit`, a gradient of its own so the dark theme's halo is unchanged), a
+  floor shadow drawn in the SVG at the soles (`body-figure-floor`, clear in the dark) so it
+  follows both frames, and a **ramp of its own** (`--figure-*` redeclared on the paper panel:
+  the dark one's lime 70% vanishes on white), taken darker for the lines and the words with
+  `oklch(from … calc(l * 0.8) c h)` — mixed toward an ink in OKLCH, orange turned red. Before it
+  paper drew the dark figure on `#222222`, which read as a hole cut in the white card; earlier
+  still a dark-grey stage with the glow turned down and a flat light grey one with ink lines
+  were both judged uglier. "88% Ready" sits on the stage: under the feet on a narrow
   stage, on the fill line beside the figure from 560px (`WIDE_STAGE_MIN_PX`, the same width as
   the CSS container query; the stylesheet places the drawing at `NARROW_FRAME`/`WIDE_FRAME`
   of `bodyFigureMath.ts` — `test:body-figure` holds the two together — and the line is found
@@ -2387,6 +2394,16 @@ lives at module level for the same visit-to-visit reason — see `useCalendarDat
   the **Cattle of Geryon** card is the Hall's own `LabourState` — the same places, counted
   over all time whatever period the map shows — handed down by App only once the Hall has
   `settled`, and it opens the Hall on The Twelve Labours.
+  **Paper's globe is a pale sphere under ink land** (since 2026-10-23). It was a murky
+  mid-grey under black name chips, the darkest thing on a light page: three.js lights
+  physically, and the old `#cfd7dc` under weak lights came out grey. WebGL reads no custom
+  property, so the sphere, the lights, the land dots and coastlines and the atmosphere are
+  `paperTheme ?` literals in `ActivityGlobeRenderer.tsx`, the lights raised until the sphere
+  reads near white. **Pins on paper take the dark theme's accent** (the paper one is a colour
+  for words and drew dark brown specks), and the strong one a step halfway to the paper
+  accent (`mixHex`). Around it (`activityGlobe.css`): no stars, white name chips, controls and
+  legend on the soft shadow, the panel on the card shadow, and the list's dots, visit bars,
+  Geryon card and Street view in the hall's bright gold (`--hall-gold*`).
   **It asks more than one geocoder, because one host is a single point of failure the app
   cannot route around.** A resolver that answers `*.openstreetmap.org` with loopback — which
   a number of ISPs do, and which `nslookup` against `8.8.8.8` is what proves — took Nominatim
@@ -2483,6 +2500,18 @@ lives at module level for the same visit-to-visit reason — see `useCalendarDat
   rim — so it follows size and state: **four steps of light, one per stage reached** (grey,
   dim gold, nearly full, full with a glow). Its golds are the artwork's, not `--accent`. The
   relief is never drawn under 24px, and at 24px (the timeline's inline badge) it goes bare.
+  **Paper reads the hall as gold on white** (since 2026-10-23, picked over three rounds of
+  mockups): the accent stays the colour of words, and what is filled (a bar, a pip, a stage's
+  coin, the laurel) takes `--hall-gold*`, a lighter, richer step worked out from the accent with
+  `oklch(from var(--accent) …)` in `recordsNotices.css`, so another palette follows; the
+  Geryon card on Where you've been and the fitness score bars on Personal (`.score-bar-fill`)
+  read the same tokens. **The year's timeline is one white
+  sheet** (`.records-line`): rows of text sat straight on the grey canvas and sank, and real
+  histories are mostly rows. A big milestone is a white card lifted off the sheet, its sport
+  down the left edge (`--row-sport`, read off its node). **Each labour's head is a black
+  plaque** bled to the card's edges, its myth and stages on white; the apotheosis above stays
+  a white card with a gold-coin laurel, and the timeline's labour badges are white faces (gold
+  wash once complete) — black badges among the rows read as holes. Dark is untouched.
   **Worked out, not stored.** `milestones.ts` (`computeRecords`) walks every activity oldest
   first — the list is complete, COROS keeps it for good — and finds the beginning, a first per
   sport, the ladder distances (1% slack for GPS), a longest or biggest climb once there is a
@@ -3278,7 +3307,7 @@ and this one is the only way back from the icon rail.
 **The rows are not `--text-secondary`, and the index carries no scrollbar.** That token is
 the right weight for prose beside a heading; a rail is not prose, it *is* the navigation, and
 at 13px with no fill behind it every row read as grey — so `--sidebar-row-text` steps up
-close to the ink (14.4:1 on dark, 11.7:1 on paper, measured in the running app) while
+close to the ink (14.4:1 on dark, 17.2:1 on paper's white rail) while
 `--sidebar-row-icon` stays a shade back, which puts the reading order inside the row instead
 of flattening it. Active still separates at 18.4:1 with weight 600, the accent icon and the
 bar. The heading sits between the two, one step quieter than a row rather than two.
@@ -3301,6 +3330,48 @@ development build, where the last destination would otherwise run into the accou
 narrow-window drawer is the one deliberate exception to all of this: it floats over the
 content, so it takes a fill and `--shadow-elevated` and drops the hairline, rather than
 drawing two devices for one edge.
+**Paper's rail is a white sheet** (since 2026-10-23, picked from a mockup of five): left on
+the grey canvas, the quiet rail was the palest, greyest thing on a screen of white cards and
+read as fogged over. So on paper only it takes `--glass-bg-elevated`, the headings drop to
+`--text-muted`, and the indicator is drawn as well as its bar — an `--accent-soft` wash that
+slides between rows, with the row's words in `--accent-strong` (hover leaves the active row's
+wash alone). The title bar above carries the white to the window's top edge, hairline
+included, as a gradient over `--app-rail-width`, which `AppSidebar` writes on the root on
+mount, on a switch to or from the drawer, and on every frame of the width spring
+(`onUpdate`) — the bar is App's, not a child of the rail, so it cannot read the width
+otherwise, and 0 while the rail is a drawer leaves it clear. Dark keeps the rail above.
+**Paper's Training Library stands on the canvas like every other screen** (since 2026-10-23,
+picked from a mockup of three). It was a room of its own: a deeper grey ground (`#e6eaf1`)
+under near-white panels with a gold mist over both, so its plan tiles sank into a white panel
+(paper gives them no border and they had no shadow), its title faded into a brown gradient
+and its tabs sat muted on a grey slab. Now the view is transparent, panels are white cards on
+`--shadow-card`, the Plans panel draws nothing and its tiles are the cards, the tabs sit on the
+chips' frosted track, and the reader is a pale well (`--tl-reader-bg`) whose title card, steps,
+lifts, clip and muscles are white cards on `--shadow-soft`; the plan reader is a white sheet
+with its weeks in that well and an opaque ridge. **A workout read in full is white cards on
+paper wherever it is read**: the `.sched-*` paper rules in `styles.css` (after
+`.sched-circuit`) cover the library's reader, the Calendar's session panel
+(`.calendar-detail-panel`, which Overview opens for an upcoming workout too) and the workout
+view (`.workout-editor-modal`, which Coach opens too), each host painting its own ground —
+the library a pale well, the other two the canvas. Coach's Workbench, which reads a plan
+session, is left out on purpose: its ground and `--surface` are its own. The ridge's paper
+rules are in `styles.css` and reach Coach's ridge. `--tl-ground` stays stated, as the canvas,
+because the gate and the plan editor paint with it. A few type steps went in for both themes:
+the tabs 14px, a workout's figures 18px and its lifts' names 600 (in `styles.css`, so every
+host), and a plan reader's description 14px and totals 28px.
+**Paper's Coach is a white frame round the canvas** (since 2026-10-23, picked from a mockup
+of three, then the header and the bubble redone at UAT). It put everything straight on the
+canvas: the charts and plans in `--glass-bg`, a grey a few levels off it; the athlete's words
+in the dark theme's 11% white glass, which on paper is only a shadow; and an ink tint over the
+top that left the header darker than the title bar. Now the rail, the conversation list and
+the header are one white frame (the title bar follows while Coach is open, through
+`.app:has(.content-coach-panel:not(.view-panel-hidden))`), and on the canvas inside it Coach's
+answer, its charts, plans, briefs, outlines, change sets and questions are white cards on
+`--shadow-card`; what sits inside them recesses to `--glass-bg`, the other way round from
+before. The athlete's words are a flat cool slate (`#d9e0ea`): an ink fill read too dark
+beside the cards, and white would be the cards' own material. The chat's grey accent is the
+theme's cool ink, not the warm grey it was. Every rule is `:root[data-theme="paper"]`, and the
+dark Coach is the same pixel for pixel.
 
 **`paper` is a grey canvas with white surfaces, and it is not free to be otherwise.** It was
 a warm cream page (`#f6f3ec`) carrying 72%-white glass, which put a card within three levels
@@ -3320,6 +3391,15 @@ mirrored in `src/theme/accentPalette.ts` for the globe and the charts, which can
 custom property — change both. Every paper rule is scoped `:root[data-theme="paper"]`, which
 is what keeps dark out of reach of a light-theme edit; nothing in the file relies on a bare
 selector meaning "light".
+**On paper the accent is a colour for words, not for areas.** A wash of it (`--accent-soft`,
+`color-mix(… var(--accent) 6–14% …)`) comes out a beige on the cool canvas that reads as a
+stain, and it filled bars a muddy brown. So, as of 2026-10-24, a chosen thing on paper is
+**lifted or edged, never washed**: a chosen card or tile is white, ringed in the accent
+(Settings' tiles, New analysis' starter, the builder's open step); a chosen row is a grey
+wash with the accent at its edge (Activities, the Library's list); today is white with an
+accent edge (the Calendar's cell, the plan reader's day); and what is filled takes
+`--hall-gold*`. The rail's active row keeps its accent wash, by decision. Gold artwork drawn
+for black — each labour's head, the Personal records banner — stands on a black plaque.
 
 ## Releases
 

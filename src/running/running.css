@@ -51,6 +51,14 @@
   --run-hairline: color-mix(in srgb, var(--text-primary) 9%, transparent);
   --run-well: color-mix(in srgb, var(--text-primary) 4%, transparent);
   --run-raised: color-mix(in srgb, var(--text-primary) 7%, transparent);
+  /* A list row's divider and its hover. Here they are the hairline and the
+     raised face; on paper the list is itself the raised face, so they part
+     from those below. */
+  --run-row-line: var(--run-hairline);
+  --run-row-hover: var(--run-raised);
+  /* The ground of anything standing over a route cover — the stat cards, the
+     back button, the training chips — frosted so the map reads through. */
+  --run-cover-glass: color-mix(in srgb, var(--bg-base) 76%, transparent);
 
   --run-road: var(--sport-run, #2fbe91);
   --run-trail: color-mix(in srgb, var(--sport-run, #2fbe91) 50%, #8a5a2b);
@@ -75,6 +83,14 @@
   --run-hairline: rgba(19, 26, 40, 0.14);
   --run-well: rgba(19, 26, 40, 0.06);
   --run-raised: #ffffff;
+  /* White on a white card would mark nothing, and the header's full hairline
+     between every row ruled the list like a ledger. */
+  --run-row-line: rgba(19, 26, 40, 0.07);
+  --run-row-hover: var(--glass-bg);
+  /* The page's grey at three quarters over a light map left the cards a smear
+     of the streets under them, a level below the white cards that follow.
+     White, so the cards over the map are the cards under it. */
+  --run-cover-glass: color-mix(in srgb, var(--surface) 86%, transparent);
 }
 
 .running-view.running-view-disconnected {
@@ -204,6 +220,15 @@
   background: var(--run-well);
 }
 
+/* On paper the list is a card like the totals above it, white on its shadow:
+   the well it sits in on the dark theme read here as a grey sheet hung under a
+   white header. */
+:root[data-theme="paper"] .running-list-panel {
+  border-color: transparent;
+  background: var(--run-raised);
+  box-shadow: var(--shadow-card);
+}
+
 .running-list-panel .run-list thead th:first-child {
   border-top-left-radius: calc(var(--radius-md) - 1px);
 }
@@ -288,7 +313,7 @@
 }
 
 .run-list tbody tr {
-  border-bottom: 1px solid var(--run-hairline);
+  border-bottom: 1px solid var(--run-row-line);
   cursor: pointer;
   transition: background var(--dur-fast) var(--ease);
 }
@@ -298,13 +323,13 @@
 }
 
 .run-list tbody tr:hover {
-  background: var(--run-raised);
+  background: var(--run-row-hover);
   outline: none;
 }
 
 /* Inside: a row spans the table, and the view clips a ring drawn outside it. */
 .run-list tbody tr:focus-visible {
-  background: var(--run-raised);
+  background: var(--run-row-hover);
   outline: var(--focus-ring);
   outline-offset: -2px;
 }
@@ -448,7 +473,7 @@
 /* Over a cover the chips take the stat cards' frosted ground, or the map shows
    through their wash. */
 .run-detail-hero.has-cover .run-detail-benefit .benefit-chip {
-  background: color-mix(in srgb, var(--bg-base) 76%, transparent);
+  background: var(--run-cover-glass);
   text-shadow: none;
   -webkit-backdrop-filter: blur(10px);
   backdrop-filter: blur(10px);
@@ -460,7 +485,7 @@
       color-mix(in srgb, var(--zone-color) 16%, transparent),
       color-mix(in srgb, var(--zone-color) 16%, transparent)
     ),
-    color-mix(in srgb, var(--bg-base) 76%, transparent);
+    var(--run-cover-glass);
 }
 
 .run-detail-back {
@@ -527,7 +552,7 @@
 .run-detail-hero.has-cover .activity-ask-coach,
 .run-detail-hero.has-cover .running-stat {
   pointer-events: auto;
-  background: color-mix(in srgb, var(--bg-base) 76%, transparent);
+  background: var(--run-cover-glass);
   -webkit-backdrop-filter: blur(10px);
   backdrop-filter: blur(10px);
 }
@@ -1380,7 +1405,7 @@
   align-items: center;
   gap: 14px;
   padding: 16px 12px;
-  border-bottom: 1px solid var(--run-hairline);
+  border-bottom: 1px solid var(--run-row-line);
 }
 
 .run-skeleton-row:last-child {

@@ -372,8 +372,8 @@ svg:focus-visible {
      --surface-line — that token is transparent here. */
   --sidebar-divider: rgba(19, 26, 40, 0.1);
   --sidebar-drawer-bg: #ffffff;
-  --sidebar-row-text: #262d3c;
-  --sidebar-row-icon: #5c6478;
+  --sidebar-row-text: #161b27;
+  --sidebar-row-icon: #3d4558;
   --sidebar-glass-border: rgba(19, 26, 40, 0.13);
   --sidebar-glass-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.9),
@@ -2856,6 +2856,22 @@ input::placeholder {
   border-color: var(--accent);
   background: var(--accent);
   color: var(--bg-base);
+}
+
+/* On paper a chosen tile wore the accent's wash, a beige that read as a stain
+   beside the white ones. The set is a grey wash and a chosen tile is lifted
+   out of it in white and ringed in the accent, the way a chosen chip is picked
+   on a white face. */
+:root[data-theme="paper"] .option-chips.option-chips--tiles button {
+  background: var(--glass-bg);
+}
+
+:root[data-theme="paper"] .option-chips.option-chips--tiles button[aria-pressed="true"] {
+  border-color: transparent;
+  background: var(--option-raised);
+  box-shadow:
+    0 0 0 1.5px color-mix(in srgb, var(--accent) 55%, transparent),
+    var(--option-lift);
 }
 
 /* There is no caret here on purpose. The dropdown mode gets one from
@@ -6470,10 +6486,12 @@ td span {
   overflow: visible;
 }
 
-/* The figure's stage is dark in both themes: the figure is light added onto
-   it (`plus-lighter`), and paper's own grey stage, drawn in ink, read as
-   washed out. The figure's colours and strengths (BodyFigure.tsx) live here;
-   `--figure-tone` is the recovery's colour, mixed on the panel (above). */
+/* The figure's stage is dark, and the figure is light added onto it
+   (`plus-lighter`); paper stands it on a slate stage of its own (under
+   "Recovery panel" in the paper block). The figure's colours and strengths
+   (BodyFigure.tsx) live here; `--figure-tone` is the recovery's colour, mixed
+   on the panel (above). The halo takes the lines' colours, and the floor is
+   clear: a dark stage has none. */
 .recovery-figure {
   --figure-rim: 0.1;
   --figure-skin-alpha: 1;
@@ -6484,6 +6502,9 @@ td span {
   --figure-dim: #3b5068;
   --figure-idle: #46b8ff;
   --figure-tone: var(--figure-idle);
+  --figure-halo-dim: var(--figure-dim);
+  --figure-halo-lit: var(--figure-tone);
+  --figure-floor: transparent;
   position: relative;
   width: 100%;
   height: 100%;
@@ -6558,6 +6579,23 @@ td span {
 
 .body-figure-lit {
   stop-color: var(--figure-tone);
+}
+
+.body-figure-halo-dim {
+  stop-color: var(--figure-halo-dim);
+}
+
+.body-figure-halo-lit {
+  stop-color: var(--figure-halo-lit);
+}
+
+.body-figure-floor-core {
+  stop-color: var(--figure-floor);
+}
+
+.body-figure-floor-edge {
+  stop-color: var(--figure-floor);
+  stop-opacity: 0;
 }
 
 /* Under the figure's feet: on a narrow stage the camera stands the figure
@@ -14557,13 +14595,20 @@ td span {
   box-shadow: none;
 }
 
+/* On paper the composer is a white card over the canvas, like what it sends. */
 :root[data-theme="paper"] .chat-composer .chat-composer-inner {
+  border-color: transparent;
   background: var(--glass-bg-elevated);
-  box-shadow: none;
+  box-shadow: var(--shadow-card);
 }
 
 :root[data-theme="paper"] .chat-composer .chat-composer-inner:focus-within {
-  box-shadow: none;
+  border-color: var(--chat-signal-border);
+  box-shadow: var(--shadow-card);
+}
+
+:root[data-theme="paper"] .chat-composer-row .chat-ai-chip {
+  color: var(--text-secondary);
 }
 
 .chat-composer-row .chat-ai-chip {
@@ -16692,15 +16737,24 @@ td span {
 }
 
 /* --- Chat (Coach) --------------------------------------------------------- */
+/*
+ * Paper's Coach is chrome round a canvas: the rail, the conversation list and
+ * the header are one white frame, and everything said in the conversation is
+ * a white card on the grey canvas inside it. It used to put everything on the
+ * canvas — the header, the list, the athlete's words in the dark theme's 11%
+ * white glass, the charts and plans in --glass-bg, a grey a few levels off the
+ * canvas — so the whole screen read as fogged over. The chat's own grey accent
+ * is the theme's cool ink here; it was a warm grey, off the canvas's hue.
+ */
 :root[data-theme="paper"] .chat-view {
   --surface: var(--glass-bg-elevated);
-  --accent: #6b6560;
-  --accent-strong: #3d3a36;
-  --accent-2: #8a837a;
-  --accent-hover: #5c5752;
-  --accent-glow: rgba(19, 26, 40, 0.15);
-  --accent-soft: rgba(19, 26, 40, 0.09);
-  --accent-gradient: linear-gradient(135deg, #8a837a 0%, #5c5752 100%);
+  --accent: #4a5265;
+  --accent-strong: #262c3a;
+  --accent-2: #6b7385;
+  --accent-hover: #3a4152;
+  --accent-glow: rgba(19, 26, 40, 0.14);
+  --accent-soft: rgba(19, 26, 40, 0.07);
+  --accent-gradient: linear-gradient(135deg, #59627a 0%, #262c3a 100%);
   --chat-signal: var(--palette-accent);
   --chat-signal-strong: var(--palette-accent-strong);
   --chat-signal-soft: color-mix(in srgb, var(--palette-accent) 13%, transparent);
@@ -16708,18 +16762,162 @@ td span {
   --chat-signal-glow: color-mix(in srgb, var(--palette-accent) 30%, transparent);
 }
 
+/* The dark theme's tint at the top was a shade of ink here, so the header sat
+   darker than the title bar above it. */
 :root[data-theme="paper"] .chat-view {
-  background:
-    radial-gradient(
-      1100px 520px at 50% -8%,
-      rgba(19, 26, 40, 0.04),
-      transparent 62%
-    ),
-    linear-gradient(180deg, rgba(19, 26, 40, 0.02), transparent 30%);
+  background: none;
 }
 
+/* The header is white like the rail beside it, and the title bar above it
+   follows while Coach is open (the rail's title bar rule reads this). */
+:root[data-theme="paper"] .app:has(.content-coach-panel:not(.view-panel-hidden)) {
+  --app-titlebar-fill: var(--glass-bg-elevated);
+}
+
+:root[data-theme="paper"] .chat-header {
+  background: var(--glass-bg-elevated);
+  border-bottom-color: var(--sidebar-divider);
+}
+
+:root[data-theme="paper"] .chat-header::after {
+  display: none;
+}
+
+:root[data-theme="paper"] .chat-conversation-subtitle {
+  color: var(--text-secondary);
+}
+
+:root[data-theme="paper"] :is(.chat-coaches-pill, .chat-creations-pill):not([aria-expanded="true"]) {
+  background: var(--glass-bg-elevated);
+  border-color: rgba(19, 26, 40, 0.16);
+  color: var(--text-primary);
+}
+
+:root[data-theme="paper"] :is(.chat-coaches-pill, .chat-creations-pill):not(:disabled):not([aria-expanded="true"]):hover {
+  background: var(--glass-bg);
+}
+
+/* Coach's answer is a card like the charts and plans it draws, as wide as the
+   column they share. A chart placed among the answer's words sits inside it,
+   so that one is drawn flat. */
+:root[data-theme="paper"] .chat-row-assistant > .chat-bubble:not(.chat-bubble-plan):has(.chat-markdown) {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 14px 18px 4px;
+  border-radius: var(--radius-sm) var(--radius-lg) var(--radius-lg) var(--radius-lg);
+  background: var(--glass-bg-elevated);
+  box-shadow: var(--shadow-card);
+}
+
+:root[data-theme="paper"] :is(
+    .chat-plan-card:not(.chat-delete-card),
+    .chat-visual-card,
+    .chat-coach-prompt,
+    .chat-coach-prompt.is-answered
+  ) {
+  border-color: transparent;
+  background: var(--glass-bg-elevated);
+  box-shadow: var(--shadow-card);
+}
+
+:root[data-theme="paper"] .chat-inline-chart > .chat-visual-card {
+  border-color: var(--glass-border);
+  box-shadow: none;
+}
+
+/* What sits inside a card recesses, the other way round from before: these
+   were white tiles on a grey card. The lap table and the zone track carried
+   the dark theme's black and white washes. */
+:root[data-theme="paper"] :is(
+    .chat-creation-figures > div,
+    .chat-creation-days > li:not(.is-outside),
+    .chat-creation-status:not([data-tone="pending"]):not([data-saved="true"]),
+    .chat-brief-rows > div,
+    .chat-outline-week,
+    .chat-change-days > li,
+    .chat-plan-table-wrap
+  ) {
+  background: var(--glass-bg);
+}
+
+:root[data-theme="paper"] .chat-zone-track {
+  background: rgba(19, 26, 40, 0.08);
+}
+
+:root[data-theme="paper"] .chat-plan-review {
+  border-color: rgba(19, 26, 40, 0.16);
+  background: var(--glass-bg-elevated);
+}
+
+:root[data-theme="paper"] :is(
+    .chat-failure:not(.is-warning):not(.is-error),
+    .chat-step-trail:not(.is-quiet),
+    .chat-suggestion
+  ) {
+  background: var(--glass-bg-elevated);
+}
+
+/* The athlete's words are a cool slate a step under the canvas, flat where
+   Coach's cards float. The ink fill tried first read too dark beside them. */
+:root[data-theme="paper"] .chat-row-user .chat-bubble {
+  border-color: transparent;
+  background: #d9e0ea;
+  box-shadow: none;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+
+/*
+ * Paper's rail is a white sheet, the one place this theme parts from the
+ * quiet rail above. Left on the grey canvas it was the palest, greyest thing
+ * on a screen of white cards, and read as fogged over rather than as chrome
+ * keeping out of the way. The title bar carries the white up to the window's
+ * edge, hairline included, from the width the rail publishes
+ * (--app-rail-width, 0 while the rail is a drawer). Past the rail it shows
+ * the canvas, or the white of a screen whose own head is white
+ * (--app-titlebar-fill, which Coach sets).
+ */
+:root[data-theme="paper"] {
+  --app-titlebar-fill: transparent;
+}
+
+:root[data-theme="paper"] .app-sidebar {
+  background: var(--glass-bg-elevated);
+}
+
+:root[data-theme="paper"] .app-titlebar-drag,
 :root[data-theme="paper"] .dev-toolbar {
+  background: linear-gradient(
+    to right,
+    var(--glass-bg-elevated) 0 calc(var(--app-rail-width, 0px) - 1px),
+    var(--sidebar-divider) calc(var(--app-rail-width, 0px) - 1px) var(--app-rail-width, 0px),
+    var(--app-titlebar-fill) var(--app-rail-width, 0px)
+  );
+}
+
+:root[data-theme="paper"] .app-sidebar-section-label {
+  color: var(--text-muted);
+}
+
+/* On white, a bar and a weight are too little: the indicator becomes a wash
+   of the accent that slides between rows, the bar still at its edge. */
+:root[data-theme="paper"] .app-sidebar-indicator {
+  border-radius: var(--radius-sm);
+  background: var(--accent-soft);
+}
+
+:root[data-theme="paper"] .app-sidebar-nav-item.active,
+:root[data-theme="paper"] .app-sidebar-identity-main.active {
+  color: var(--accent-strong);
+}
+
+/* Hover's grey would cover the wash on the row it marks. */
+:root[data-theme="paper"] .app-sidebar-nav-item.active:hover {
   background: transparent;
+}
+
+:root[data-theme="paper"] .app-sidebar-identity-main.active {
+  background: var(--accent-soft);
 }
 
 :root[data-theme="paper"] .app-sidebar-overlay {
@@ -16768,12 +16966,17 @@ td span {
   box-shadow: var(--sidebar-overlay-shadow);
 }
 
-:root[data-theme="paper"] .chat-history-actions {
+/* The list is a white sheet beside the rail. */
+:root[data-theme="paper"] .chat-sidebar {
   background: var(--glass-bg-elevated);
 }
 
+:root[data-theme="paper"] .chat-history-actions {
+  background: var(--glass-bg);
+}
+
 :root[data-theme="paper"] .chat-session-row.is-active {
-  background: color-mix(in srgb, var(--accent) 10%, transparent);
+  background: rgba(19, 26, 40, 0.075);
 }
 
 :root[data-theme="paper"] .chat-settings-modal {
@@ -17097,10 +17300,58 @@ td span {
 }
 
 /* --- Recovery panel ------------------------------------------------------- */
-/* The figure is the dark theme's on paper too; its stage is a step lighter,
-   so the black does not sit as a hole in a white page. */
+/* The figure stands as Strength's body map does on paper: on a cool slate
+   stage darkening toward the floor, the dark stage's graphite lifted into the
+   light. A dark stage was kept here first, `#222222`, and read as a hole cut
+   in the white card. The body is frosted white with an ink mesh, laid on in
+   normal blending, since light added onto a light stage only washes it out;
+   what is recovered is the recovery's colour taken darker, backlit by the
+   colour itself, and the rest is backlit white. The ramp is paper's own: the
+   dark one's lime-yellow 70% all but vanishes against white. */
+:root[data-theme="paper"] .training-recovery-panel {
+  --figure-low: #e5484d;
+  --figure-mid: #f06d1f;
+  --figure-high: #c4b10e;
+  --figure-full: #20b26b;
+  --figure-peak: #1f96ee;
+}
+
 :root[data-theme="paper"] .recovery-figure {
-  background: #222222;
+  --figure-rim: 0.3;
+  --figure-line: 0.75;
+  --figure-back-line: 0.16;
+  --figure-halo: 0.4;
+  --figure-skin: #f5f7fa;
+  --figure-dim: #66778d;
+  --figure-idle: #1f96ee;
+  --figure-tone: oklch(from var(--figure-idle) calc(l * 0.8) c h);
+  --figure-halo-dim: #ffffff;
+  --figure-halo-lit: var(--figure-idle);
+  --figure-floor: rgba(20, 32, 48, 0.24);
+  background:
+    radial-gradient(70% 38% at 50% 6%, rgba(255, 255, 255, 0.65), transparent 72%),
+    linear-gradient(180deg, #e4e9ef 0%, #d6dde5 55%, #c4cdd8 100%);
+  box-shadow: inset 0 0 0 1px rgba(19, 26, 40, 0.08);
+}
+
+/* Darker in the same hue: mixed toward an ink in OKLCH, orange turned red. */
+:root[data-theme="paper"] .training-recovery-panel:not(.tone-neutral) .recovery-figure {
+  --figure-tone: oklch(from var(--recovery-tone) calc(l * 0.8) c h);
+  --figure-halo-lit: var(--recovery-tone);
+}
+
+:root[data-theme="paper"] .body-figure {
+  mix-blend-mode: normal;
+}
+
+/* The bloom is a glow, and on a light stage it only blurs the mesh. */
+:root[data-theme="paper"] .body-figure-lines {
+  filter: none;
+}
+
+/* The rim shades the body's turning edges, which gives the white its volume. */
+:root[data-theme="paper"] .body-figure-rim {
+  fill: #4f5f75;
 }
 
 /* --- Training Hub: export dropdown ----------------------------------------- */
@@ -17228,6 +17479,13 @@ td span {
   background: rgba(19, 26, 40, 0.09);
 }
 
+/* The accent and its strong step are colours for words on paper, and as a
+   fill they ran a muddy brown; the bars take the bright gold the hall fills
+   with (recordsNotices.css), which follows another palette the same way. */
+:root[data-theme="paper"] .score-bar-fill {
+  background: var(--hall-gold-fill);
+}
+
 /* --- Training Hub: upcoming workouts --------------------------------------- */
 :root[data-theme="paper"] .training-upcoming-panel {
   box-shadow: var(--shadow-card);
@@ -17289,45 +17547,97 @@ td span {
   box-shadow: var(--shadow-card);
 }
 
+/* A filter chip is picked as every chip on paper is: a white face lifted off a
+   frosted track and ringed in the accent, not the accent's beige wash. */
 :root[data-theme="paper"] .training-records-tab {
-  border-color: var(--glass-border);
-  background: rgba(19, 26, 40, 0.06);
+  border-color: var(--option-edge);
+  background: var(--option-well);
 }
 
 :root[data-theme="paper"] .training-records-tab:hover {
-  border-color: rgba(19, 26, 40, 0.2);
+  border-color: rgba(19, 26, 40, 0.24);
 }
 
 :root[data-theme="paper"] .training-records-tab.is-active {
-  border-color: color-mix(in srgb, var(--accent) 35%, transparent);
-  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  border-color: transparent;
+  background: var(--option-raised);
+  box-shadow:
+    0 0 0 1.5px color-mix(in srgb, var(--accent) 45%, transparent),
+    var(--option-lift);
   color: var(--accent-strong);
 }
 
+/*
+ * The banner is a black plaque, as each labour's head is in the Hall: its
+ * golds — the title, the laurels, the embers rising — were cast for black, and
+ * on paper's near-white they faded to a cream, the title a pale gold barely
+ * off its ground. The glow and the embers are the dark theme's, added on.
+ */
 :root[data-theme="paper"] .training-records-banner {
-  border-color: rgba(185, 121, 26, 0.22);
+  border-color: transparent;
   background:
-    radial-gradient(90% 120% at 50% 118%, rgba(185, 121, 26, 0.14), transparent 60%),
-    linear-gradient(180deg, rgba(255, 255, 255, 0.5), rgba(248, 250, 252, 0.8));
+    radial-gradient(90% 120% at 50% 118%, rgba(216, 155, 34, 0.24), transparent 60%),
+    radial-gradient(130% 160% at 0% 0%, #2b2317 0%, #15120d 48%, #0b0a08 100%);
+  box-shadow: var(--shadow-soft);
 }
 
-:root[data-theme="paper"] .training-records-banner::before {
-  opacity: 0.45;
-  mix-blend-mode: multiply;
-}
-
-:root[data-theme="paper"] .training-records-embers::before,
-:root[data-theme="paper"] .training-records-embers::after {
-  mix-blend-mode: multiply;
-  opacity: 0.55;
-}
-
+/* The record cards are white cards in the panel, held by a hairline ring and
+   the soft shadow: grey glass in a border read as wells sunk into it. Their
+   badge sits on the hall's gold coin, and the history bars take a green dark
+   enough to read on white. */
 :root[data-theme="paper"] .training-record-card {
-  border-color: rgba(19, 26, 40, 0.12);
+  border-color: transparent;
   background:
-    radial-gradient(120% 120% at 0% 100%, color-mix(in srgb, var(--accent-muted) 8%, transparent), transparent 62%),
-    rgba(19, 26, 40, 0.03);
-  box-shadow: var(--shadow-inset);
+    radial-gradient(120% 120% at 0% 100%, color-mix(in srgb, var(--hall-gold) 9%, transparent), transparent 62%),
+    #ffffff;
+  box-shadow:
+    0 0 0 1px rgba(19, 26, 40, 0.07),
+    var(--shadow-soft);
+}
+
+:root[data-theme="paper"] .training-record-card:not(.is-empty)::before {
+  background: linear-gradient(
+    115deg,
+    transparent 38%,
+    color-mix(in srgb, var(--hall-gold-light) 30%, transparent) 47%,
+    color-mix(in srgb, var(--hall-gold) 22%, transparent) 50%,
+    color-mix(in srgb, var(--hall-gold-light) 30%, transparent) 53%,
+    transparent 62%
+  );
+}
+
+:root[data-theme="paper"] .training-record-card-icon {
+  background: var(--hall-coin);
+  color: var(--hall-gold-ink);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.5), 0 1px 2px rgba(90, 55, 0, 0.22);
+}
+
+:root[data-theme="paper"] .training-record-card.is-empty .training-record-card-icon {
+  background: var(--glass-bg);
+  color: var(--text-muted);
+  box-shadow: none;
+}
+
+/* The laurel is a pale gold drawn for a dark card; on white it is deepened a
+   step so its "PR" reads. */
+:root[data-theme="paper"] .training-record-pr {
+  filter: saturate(1.3) brightness(0.78) drop-shadow(0 1px 1px rgba(90, 55, 0, 0.3));
+}
+
+:root[data-theme="paper"] .training-record-spark.is-bars rect {
+  fill: var(--success-dot);
+}
+
+:root[data-theme="paper"] .training-record-spark-line {
+  stroke: var(--success-dot);
+}
+
+:root[data-theme="paper"] .training-record-spark-fill {
+  fill: color-mix(in srgb, var(--success-dot) 14%, transparent);
+}
+
+:root[data-theme="paper"] .training-record-empty-graphic {
+  fill: rgba(19, 26, 40, 0.08);
 }
 
 /* --- Training Hub: activity detail ----------------------------------------- */
@@ -17978,6 +18288,13 @@ td span {
 
 .calendar-day.is-today {
   background: var(--accent-soft);
+}
+
+/* On paper the accent's wash made today a beige cell between the white days
+   ahead and the grey days gone; it is a white cell marked along its top. */
+:root[data-theme="paper"] .calendar-day.is-today:not(.is-drop-target) {
+  background: var(--surface);
+  box-shadow: inset 0 3px 0 var(--accent);
 }
 
 /* `isPast` drove behaviour — no drag, no add, no remove — and drew nothing, so
@@ -18917,7 +19234,9 @@ td span {
   overflow: hidden;
   margin: 0;
   color: var(--text-primary);
-  font-size: 14px;
+  /* A figure, read as one: at 14px the hero's totals were the size of the
+     labels over them. */
+  font-size: 18px;
   font-weight: 600;
   font-variant-numeric: tabular-nums;
   letter-spacing: 0;
@@ -19217,7 +19536,8 @@ td span {
 
 .sched-lift-name {
   font-size: 13px;
-  font-weight: 500;
+  /* The line the scheme under it hangs from. */
+  font-weight: 600;
   color: var(--text-primary);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -19345,6 +19665,68 @@ td span {
   background: transparent;
   border-color: transparent;
   padding: 6px 8px;
+}
+
+/*
+ * A workout read in full, on paper: white cards on a grey ground. The title
+ * card, every step, lift, repeat and circuit, the structure bar's track and
+ * the description are white, and the cards float on --shadow-soft. They were
+ * glass boxes on a grey ground, hairline on hairline, and the title card mixed
+ * its sport into that grey and came out a dull tint.
+ *
+ * Scoped to the three places that read a workout and paint a ground behind it:
+ * the Training Library's reader (a pale well), the Calendar's session panel
+ * (the canvas; Overview opens the same panel for an upcoming workout) and the
+ * workout view, WorkoutViewModal (the canvas; Coach opens it too). Elsewhere —
+ * Coach's Workbench reads a plan session — the ground and its `--surface` are
+ * another screen's, and a white card on them is not a decision made here.
+ */
+:root[data-theme="paper"] :is(.training-library-view, .calendar-detail-panel, .workout-editor-modal) .sched-hero {
+  border-color: transparent;
+  background: var(--surface);
+  box-shadow: var(--shadow-soft);
+}
+
+:root[data-theme="paper"] :is(.training-library-view, .calendar-detail-panel, .workout-editor-modal) .sched-hero-icon {
+  border-color: transparent;
+  background: color-mix(in srgb, var(--detail-sport) 12%, var(--surface));
+}
+
+:root[data-theme="paper"] :is(.training-library-view, .calendar-detail-panel, .workout-editor-modal) .sched-hero-stats {
+  border-color: transparent;
+  background: var(--glass-bg);
+}
+
+:root[data-theme="paper"] :is(.training-library-view, .calendar-detail-panel, .workout-editor-modal) .sched-stat + .sched-stat {
+  border-left-color: color-mix(in srgb, var(--text-primary) 8%, transparent);
+}
+
+:root[data-theme="paper"] :is(.training-library-view, .calendar-detail-panel, .workout-editor-modal) :is(.workout-view-overview, .sched-bar) {
+  background: var(--surface);
+}
+
+:root[data-theme="paper"] :is(.training-library-view, .calendar-detail-panel, .workout-editor-modal) :is(.sched-step, .sched-lift, .sched-repeat, .sched-circuit) {
+  border-color: transparent;
+  background: var(--surface);
+  box-shadow: var(--shadow-soft);
+}
+
+/* A step inside a repeat and a lift inside a circuit are rows of the card
+   around them, as they are in the dark. */
+:root[data-theme="paper"] :is(.training-library-view, .calendar-detail-panel, .workout-editor-modal) :is(.sched-repeat-steps .sched-step, .sched-circuit .sched-lift) {
+  background: transparent;
+  box-shadow: none;
+}
+
+:root[data-theme="paper"] :is(.training-library-view, .calendar-detail-panel, .workout-editor-modal) :is(.sched-lift-scheme, .sched-step-intensity) {
+  color: var(--text-secondary);
+}
+
+/* A planned session's status sits above its title card in the Calendar's
+   panel, so on paper it is a white card beside it rather than a grey slab. */
+:root[data-theme="paper"] .calendar-detail-panel .calendar-plan-status {
+  background: var(--surface);
+  box-shadow: var(--shadow-soft);
 }
 
 /* empty state */
@@ -20374,6 +20756,33 @@ td span {
   background:
     linear-gradient(180deg, color-mix(in srgb, var(--accent-soft) 24%, transparent), transparent),
     color-mix(in srgb, var(--glass-bg) 76%, transparent);
+}
+
+/*
+ * On paper a step is a white card on the builder's white sheet, lifted on the
+ * soft shadow, its kind's colour down the left edge: grey slabs in a hairline
+ * read as wells to type into rather than steps, and the open one's gold wash
+ * as a stain. The open step is ringed in the accent. A drop target and a step
+ * with an error keep the dark theme's marks.
+ */
+:root[data-theme="paper"] .calendar-builder-row:not(.is-drop-target) {
+  background: var(--surface);
+  box-shadow: var(--shadow-soft);
+}
+
+:root[data-theme="paper"] .calendar-builder-row:not(.is-drop-target):not(.has-error) {
+  border-color: transparent;
+  border-left-color: color-mix(in srgb, var(--step-color) 70%, transparent);
+}
+
+:root[data-theme="paper"] .calendar-builder-row.is-collapsed:not(.is-drop-target):hover {
+  box-shadow: var(--shadow-card);
+}
+
+:root[data-theme="paper"] .calendar-builder-row.is-active:not(.is-drop-target) {
+  box-shadow:
+    0 0 0 1.5px color-mix(in srgb, var(--accent) 45%, transparent),
+    var(--shadow-card);
 }
 
 .calendar-builder-row.is-collapsed {
@@ -22564,6 +22973,12 @@ td span {
     radial-gradient(118% 84% at 50% 4%, #ffffff 0%, #f1f2f4 58%, #dfe3e8 100%);
   box-shadow: var(--glass-inset);
   max-height: 420px;
+}
+
+/* The clips are shot on a white cyclorama, so on paper the plate is plain
+   white: the vignette left a white picture standing in a grey letterbox. */
+:root[data-theme="paper"] .exercise-preview-stage {
+  background: #ffffff;
 }
 
 .exercise-preview-stage video {
@@ -25907,6 +26322,16 @@ body.is-backgrounded .spin {
   background: color-mix(in srgb, var(--accent) 9%, transparent);
 }
 
+/* On paper that wash was a beige among grey cards. The chosen one is white,
+   lifted out of the grey and ringed in the accent. */
+:root[data-theme="paper"] .coach-analysis-starter[data-selected="true"] {
+  border-color: transparent;
+  background: var(--surface);
+  box-shadow:
+    0 0 0 1.5px color-mix(in srgb, var(--accent) 55%, transparent),
+    var(--shadow-soft);
+}
+
 .coach-analysis-starter-head {
   display: inline-flex;
   align-items: center;
@@ -26397,6 +26822,30 @@ body.is-backgrounded .spin {
 .plan-ridge-stage[data-stage] {
   color: var(--tl-stage);
   background: color-mix(in srgb, var(--tl-stage) 16%, transparent);
+}
+
+/*
+ * On paper the ridge is opaque. The 62% stack and the 16% stage band let the
+ * ground through, and on paper's grey that came out a pale mint over a muddy
+ * band, the plan's shape reading as greyed out. Every week takes its sport at
+ * full strength, and the week that is marked (this week, the one pointed at,
+ * the one the Coach card shows) goes a step toward the ink instead.
+ */
+:root[data-theme="paper"] .plan-ridge-week {
+  color: var(--text-secondary);
+}
+
+:root[data-theme="paper"] .plan-ridge-seg {
+  background: var(--tl-sport, var(--text-muted));
+}
+
+:root[data-theme="paper"] :is(.plan-ridge-week:hover, .plan-ridge-week.is-current, .plan-ridge-week.is-selected) .plan-ridge-seg {
+  background: color-mix(in srgb, var(--tl-sport, var(--text-secondary)) 72%, var(--text-primary));
+}
+
+:root[data-theme="paper"] .plan-ridge-stage[data-stage] {
+  color: color-mix(in srgb, var(--tl-stage) 80%, var(--text-primary));
+  background: color-mix(in srgb, var(--tl-stage) 15%, var(--palette-surface));
 }
 
 /* --- Time in zones ------------------------------------------------------- */

@@ -22,22 +22,26 @@
   --map-globe-label-text: #eaf8f3;
 }
 
+/* Paper's globe is a pale sphere on a white card (the sphere itself is lit in
+   ActivityGlobeRenderer): no stars, white controls and white name chips that
+   float on the soft shadow, and an ink stalk down to each pin. It was a murky
+   grey sphere under black chips, the darkest thing on a light page. */
 :root[data-theme="paper"] {
-  --map-border: rgba(26, 35, 42, 0.09);
+  --map-border: transparent;
   --map-border-strong: rgba(26, 35, 42, 0.17);
-  --map-control-surface: rgba(255, 255, 255, 0.86);
+  --map-control-surface: #ffffff;
   --map-text-primary: #171c20;
-  --map-text-secondary: #4d575e;
+  --map-text-secondary: #3d4558;
   --map-accent: var(--accent);
   --map-accent-muted: color-mix(in srgb, var(--accent) 10%, transparent);
-  --map-globe-background: transparent;
-  --map-globe-radial: rgba(57, 116, 156, 0.07);
-  --map-globe-rim-light: rgba(82, 132, 166, 0.045);
-  --map-globe-star: rgba(65, 91, 108, 0.14);
-  --map-globe-star-dim: rgba(65, 91, 108, 0.07);
-  --map-globe-label-bg: rgba(32, 39, 43, 0.91);
-  --map-globe-label-border: rgba(8, 123, 91, 0.2);
-  --map-globe-label-text: #f5faf8;
+  --map-globe-background: #f6f8fb;
+  --map-globe-radial: rgba(255, 255, 255, 0.9);
+  --map-globe-rim-light: rgba(156, 195, 224, 0.18);
+  --map-globe-star: transparent;
+  --map-globe-star-dim: transparent;
+  --map-globe-label-bg: #ffffff;
+  --map-globe-label-border: rgba(19, 26, 40, 0.4);
+  --map-globe-label-text: #151a26;
 }
 
 /*
@@ -1137,4 +1141,72 @@
   .training-map-globe-label-anchor {
     transition: none;
   }
+}
+
+/* ------------------------------------------------------------------ paper */
+
+/* The globe panel and its controls float like the cards beside them. */
+:root[data-theme="paper"] .training-map-globe-panel {
+  box-shadow: var(--shadow-card);
+}
+
+:root[data-theme="paper"] .training-map-zoom button,
+:root[data-theme="paper"] .training-map-globe-back,
+:root[data-theme="paper"] .training-map-legend {
+  box-shadow: var(--shadow-soft);
+}
+
+/* What the list fills is paper's bright gold (recordsNotices.css), as the
+   hall's is; the accent stays the colour of words. */
+:root[data-theme="paper"] .training-map-legend i {
+  background: var(--hall-gold);
+}
+
+:root[data-theme="paper"] .training-map-place-dot {
+  background: var(--hall-gold-deep);
+}
+
+:root[data-theme="paper"] .training-map-place-dot.is-high {
+  background: var(--hall-gold);
+  box-shadow: 0 0 0 3px var(--hall-gold-track);
+}
+
+:root[data-theme="paper"] .training-map-place-count {
+  font-weight: 600;
+}
+
+:root[data-theme="paper"] .training-map-place-visit-bars span {
+  background: var(--hall-gold-track);
+}
+
+:root[data-theme="paper"] .training-map-place-visit-bars span.is-latest {
+  background: linear-gradient(180deg, var(--hall-gold), var(--hall-gold-deep));
+}
+
+:root[data-theme="paper"] .training-map-place-visit-bars span.is-empty {
+  background: var(--hall-track-ink);
+}
+
+:root[data-theme="paper"] .training-map-labour {
+  border-color: var(--hall-gold-edge);
+  background: var(--hall-gold-wash);
+}
+
+:root[data-theme="paper"] .training-map-labour:hover {
+  border-color: var(--hall-gold);
+}
+
+:root[data-theme="paper"] .training-map-labour-bar {
+  background: var(--hall-gold-track);
+}
+
+:root[data-theme="paper"] .training-map-labour-bar span {
+  background: var(--hall-gold-fill);
+}
+
+/* Street view is a gold coin with ink words, not a block of brown. */
+:root[data-theme="paper"] .training-map-view-action {
+  background: var(--hall-coin);
+  color: var(--hall-gold-ink);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.5), 0 1px 2px rgba(90, 55, 0, 0.25);
 }

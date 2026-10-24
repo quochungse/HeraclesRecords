@@ -23,6 +23,14 @@ import { useI18n } from "../i18n/useI18n";
 
 const SIDEBAR_COLLAPSED_KEY = "heraclesrecords.sidebarCollapsed";
 
+/** The rail's width on the root, for the title bar above it: paper paints the
+    two as one white column, and the bar is App's, not a child of the rail. */
+function publishRailWidth(width: number | string | undefined) {
+  if (width === undefined) return;
+  const value = typeof width === "number" ? `${width}px` : width;
+  document.documentElement.style.setProperty("--app-rail-width", value);
+}
+
 const widthSpring = {
   type: "spring" as const,
   stiffness: 420,
@@ -200,6 +208,13 @@ export function AppSidebar({
     : railExpanded
       ? SIDEBAR_EXPANDED_WIDTH
       : SIDEBAR_COLLAPSED_WIDTH;
+
+  // On mount and when the drawer takes over or gives back. A width change in
+  // between is the spring's, and `onUpdate` follows it frame by frame, so
+  // publishing the end value here would jump the title bar ahead of the rail.
+  useLayoutEffect(() => {
+    publishRailWidth(shellWidth);
+  }, [overlayMode]);
 
   const { t } = useI18n();
   const updateNote =
@@ -633,6 +648,7 @@ export function AppSidebar({
           initial={false}
           animate={{ width: shellWidth }}
           transition={widthTransition}
+          onUpdate={(latest) => publishRailWidth(latest.width)}
           style={{ minWidth: 0, overflow: "hidden" }}
         >
           {sidebarPanel}

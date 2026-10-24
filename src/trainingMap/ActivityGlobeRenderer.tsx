@@ -53,6 +53,13 @@ function withAlpha(hex: string, alpha: number): string {
   return `rgba(${r}, ${g}, ${b}, ${alpha})`;
 }
 
+/** Two #rrggbb colours mixed channel by channel, `t` of the way from a to b. */
+function mixHex(a: string, b: string, t: number): string {
+  const channel = (hex: string, at: number) => parseInt(hex.replace("#", "").slice(at, at + 2), 16);
+  return `#${[0, 2, 4]
+    .map((at) => Math.round(channel(a, at) + (channel(b, at) - channel(a, at)) * t).toString(16).padStart(2, "0"))
+    .join("")}`;
+}
 
 interface ActivityGlobeRendererProps {
   frameKey: string;
@@ -224,9 +231,9 @@ function createGeographyPoints(
     blending: NormalBlending,
     uniforms: {
       uColor: {
-        value: new Color(paperTheme ? "#667179" : "#c4d5e1"),
+        value: new Color(paperTheme ? "#3c4a5c" : "#c4d5e1"),
       },
-      uOpacity: { value: paperTheme ? 0.5 : 0.32 },
+      uOpacity: { value: paperTheme ? 0.55 : 0.32 },
       uPointSize: { value: basePointSize(paperTheme) },
       uPixelRatio: {
         value: Math.min(window.devicePixelRatio || 1, 2),
@@ -295,8 +302,8 @@ function createBorderLines(
     depthWrite: false,
     blending: NormalBlending,
     uniforms: {
-      uColor: { value: new Color(paperTheme ? "#5f6b74" : "#c4d5e1") },
-      uOpacity: { value: paperTheme ? 0.42 : 0.26 },
+      uColor: { value: new Color(paperTheme ? "#2c3a4c" : "#c4d5e1") },
+      uOpacity: { value: paperTheme ? 0.5 : 0.26 },
     },
     vertexShader: `
       varying float vFacing;
@@ -402,14 +409,19 @@ const ActivityGlobeRendererComponent = forwardRef<
   /** Read by the mount effect, which must not re-run when the theme changes. */
   const lightsRef = useRef<Light[]>([]);
 
+  // Paper's globe is a pale sphere under ink land. Lit physically, the old
+  // paper set (#cfd7dc, a little metal, under 0.96 + 0.58) came out a murky
+  // mid-grey, the darkest thing on a light page. The lights are raised until
+  // the sphere reads near white and the pins near their own colour, with a
+  // little emissive so its rim greys rather than darkens.
   const globeMaterial = useMemo(
     () =>
       new MeshStandardMaterial({
-        color: paperTheme ? "#cfd7dc" : "#121e28",
-        roughness: paperTheme ? 0.78 : 0.8,
-        metalness: paperTheme ? 0.12 : 0.18,
-        emissive: new Color(paperTheme ? "#000000" : "#061018"),
-        emissiveIntensity: paperTheme ? 0 : 0.08,
+        color: paperTheme ? "#f3f6f9" : "#121e28",
+        roughness: paperTheme ? 1 : 0.8,
+        metalness: paperTheme ? 0 : 0.18,
+        emissive: new Color(paperTheme ? "#f3f6f9" : "#061018"),
+        emissiveIntensity: paperTheme ? 0.12 : 0.08,
         dithering: true,
       }),
     [paperTheme],
@@ -418,12 +430,12 @@ const ActivityGlobeRendererComponent = forwardRef<
   const lights = useMemo(() => {
     const hemisphere = new HemisphereLight(
       paperTheme ? "#ffffff" : "#a9c6db",
-      paperTheme ? "#687681" : "#03080c",
-      paperTheme ? 0.96 : 0.72,
+      paperTheme ? "#dde4ec" : "#03080c",
+      paperTheme ? 2.4 : 0.72,
     );
     const directional = new DirectionalLight(
-      paperTheme ? "#f8fbff" : "#d7e7f2",
-      paperTheme ? 0.58 : 0.62,
+      paperTheme ? "#ffffff" : "#d7e7f2",
+      paperTheme ? 1.3 : 0.62,
     );
     directional.position.set(-3.5, 4.5, 5.5);
     return [hemisphere, directional];
@@ -1114,7 +1126,17 @@ const ActivityGlobeRendererComponent = forwardRef<
 
   // Places, and the globe itself: let through, the globe stands in front of
   // the pins on its far side, which were otherwise hovered and picked through it.
-  const tone = ACCENT_PALETTE_DETAILS[accent][paperTheme ? "paper" : "dark"];
+  // On paper the globe is lit near white, and the paper accent (a colour for
+  // words) made every pin a dark brown speck on it. The pins take the dark
+  // theme's brighter accent instead, and the strong one (every pin before a
+  // place is picked, the picked one after, the route) a deeper step halfway to
+  // the paper accent. Memoised, because a new object is a new pointColor.
+  const tone = useMemo(() => {
+    const palette = ACCENT_PALETTE_DETAILS[accent];
+    return paperTheme
+      ? { accent: palette.dark.accent, strong: mixHex(palette.dark.accent, palette.paper.accent, 0.5) }
+      : palette.dark;
+  }, [accent, paperTheme]);
   const selectedKey = selectedLocation?.key;
 
   const pointAltitude = useCallback(
@@ -1154,9 +1176,9 @@ const ActivityGlobeRendererComponent = forwardRef<
         return tone.strong;
       }
       if (highlightAll) {
-        return withAlpha(tone.strong, paperTheme ? 0.94 : 0.88);
+        return withAlpha(tone.strong, paperTheme ? 1 : 0.88);
       }
-      return withAlpha(tone.accent, paperTheme ? 0.76 : 0.55);
+      return withAlpha(tone.accent, paperTheme ? 1 : 0.55);
     },
     [highlightAll, hoveredKey, paperTheme, selectedKey, tone],
   );
@@ -1214,7 +1236,7 @@ const ActivityGlobeRendererComponent = forwardRef<
         globeMaterial={globeMaterial}
         globeCurvatureResolution={3}
         showAtmosphere
-        atmosphereColor={paperTheme ? "#477f9f" : "#73b4e2"}
+        atmosphereColor={paperTheme ? "#9cc3e0" : "#73b4e2"}
         atmosphereAltitude={0.08}
         customLayerData={landLayerData}
         customThreeObject={customThreeObject}
