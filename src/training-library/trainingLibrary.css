@@ -6236,6 +6236,13 @@ button.plan-generator-provider:focus-visible {
     background: color-mix(in srgb, var(--accent) 6%, transparent);
   }
 
+  /* On paper the wash came out a beige, under a dashed edge when the day is
+     free; today is the white of the days around it, ringed in the accent. */
+  :root[data-theme="paper"] .plan-reader-day.is-today {
+    border-style: solid;
+    background: var(--tl-panel-bg);
+  }
+
   .plan-reader-day-label {
     display: flex;
     align-items: center;

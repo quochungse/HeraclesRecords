@@ -22873,6 +22873,12 @@ td span {
   max-height: 420px;
 }
 
+/* The clips are shot on a white cyclorama, so on paper the plate is plain
+   white: the vignette left a white picture standing in a grey letterbox. */
+:root[data-theme="paper"] .exercise-preview-stage {
+  background: #ffffff;
+}
+
 .exercise-preview-stage video {
   grid-area: 1 / 1;
   width: 100%;
