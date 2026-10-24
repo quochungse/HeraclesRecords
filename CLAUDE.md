@@ -989,6 +989,19 @@ lives at module level for the same visit-to-visit reason — see `useCalendarDat
   totals), `activityFacts.ts` (which figures a row shows, per sport) and `activityDetail.ts`
   (whether a loaded detail belongs to the current selection). `npm run test:activity-filters`
   covers all three.
+  **The frame was cut down on 2026-10-24**: the title row holds the period (a dropdown) and
+  the search; the four totals are unboxed figures (a white sheet on paper); and the mix bar's
+  legend *is* the sport filter, drawn from the period alone (`inPeriod`), so picking a sport or
+  a search that matches nothing never takes the chips away. A row is the sport's icon on a grey
+  disc ahead of the name, the day at the end of the name line and **three** facts
+  (`activityRowFacts` caps there — the drift figure went, and with it this screen's summary
+  sweep), a swim's third being its pace per 100 m; how a session felt is the pane's emoji tag
+  (`ActivityFeelTag`), not a face on the row. A selection the filters no longer admit leaves the
+  pane blank rather than showing a session the list says is not there. On screen a distance and
+  a height group their thousands ("1,245.6 km", `setGroupedDecimalFormatter` in
+  `unitSystem.ts`, installed by `src/i18n/core.ts`); the main process keeps `toFixed`, so
+  the coach still reads "1245.6 km", and `formatDecimal` stays ungrouped because some of its
+  callers fill fields whose text is read back as a number.
   What is left is geometry, and `npm run test:activities-renderer` mounts the summary strip in
   a real window for it: the mix bar's tooltip must name one sport, must not move what is under
   it, and must stay inside the bar at both ends — the 1% sliver at the far right is the case

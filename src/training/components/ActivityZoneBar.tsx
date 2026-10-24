@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import type { TrainingHubActivityZoneBucket } from "../../../electron/types";
 import { formatDurationSpan } from "../formatters";
 import { zoneLabel, zoneNumber } from "./routeColoring";
@@ -5,6 +6,8 @@ import { t } from "../../i18n/core";
 
 interface ActivityZoneBarProps {
   zones: readonly TrainingHubActivityZoneBucket[];
+  /** Said at the end of the heading's line: what the zones were read as. */
+  aside?: ReactNode;
 }
 
 /**
@@ -38,8 +41,13 @@ function bounds(zone: TrainingHubActivityZoneBucket): string | undefined {
  * which left the eight summary chips saying an average and a maximum and
  * nothing at all about the shape in between — the difference between an hour
  * held in zone 2 and an hour that averaged into it.
+ *
+ * Each zone's name and time sit under its own band, as wide as it is, so the
+ * bar and its legend are read as one thing; the share and the bounds are on
+ * the entry's tooltip. A sliver too narrow for its label is cut, not moved —
+ * the list is still whole for a screen reader.
  */
-export function ActivityZoneBar({ zones }: ActivityZoneBarProps) {
+export function ActivityZoneBar({ zones, aside }: ActivityZoneBarProps) {
   const scored = zones.filter((zone) => (zone.seconds ?? 0) > 0);
   const total = scored.reduce((sum, zone) => sum + (zone.seconds ?? 0), 0);
 
@@ -51,7 +59,10 @@ export function ActivityZoneBar({ zones }: ActivityZoneBarProps) {
 
   return (
     <section className="activity-zones">
-      <h3>{t("activity.zones.timeIn")}</h3>
+      <div className="activity-zones-head">
+        <h3>{t("activity.zones.timeIn")}</h3>
+        {aside}
+      </div>
       <div className="activity-zones-bar" aria-hidden="true">
         {ordered.map((zone) => (
           <i
@@ -69,16 +80,19 @@ export function ActivityZoneBar({ zones }: ActivityZoneBarProps) {
           return (
             <li
               key={zone.index}
-              title={[zoneCaption(zone.index), span].filter(Boolean).join(" — ")}
+              style={{ flexGrow: seconds / total }}
+              title={[
+                zoneCaption(zone.index),
+                `${Math.round((seconds / total) * 100)}%`,
+                span
+              ]
+                .filter(Boolean)
+                .join(" — ")}
             >
-              <i data-zone={Math.min(6, Math.max(0, zone.index))} aria-hidden="true" />
               <span className="activity-zones-name">
                 {zoneLabel(zone.index)}
               </span>
               <strong>{formatDurationSpan(seconds)}</strong>
-              <span className="activity-zones-share">
-                {Math.round((seconds / total) * 100)}%
-              </span>
             </li>
           );
         })}

@@ -23,6 +23,22 @@ export function formatDecimal(value: number, digits: number): string {
   return decimal(value, digits);
 }
 
+/**
+ * The same, with the thousands grouped — for a distance and a height, the two
+ * figures that run past a thousand and are read rather than typed back:
+ * "1,245.6 km", "19,861 m". Plain `toFixed` by default too, so the coach still
+ * reads "1245.6 km"; the renderer hands in its language's own. Kept apart from
+ * the formatter above, which stays ungrouped because some of its renderer
+ * callers fill fields whose text is read back as a number.
+ */
+let grouped = (value: number, digits: number): string => value.toFixed(digits);
+
+export function setGroupedDecimalFormatter(
+  format: (value: number, digits: number) => string
+): void {
+  grouped = format;
+}
+
 export function normalizeUnitSystem(value: unknown): UnitSystem {
   return value === "imperial" ? "imperial" : "metric";
 }
@@ -206,11 +222,11 @@ export function formatDistanceValue(
   if (options.swim) {
     const value = metersToSwimDistance(meters ?? 0, unitSystem);
     const digits = options.digits ?? 0;
-    return `${decimal(value, digits)} ${swimDistanceUnit(unitSystem)}`;
+    return `${grouped(value, digits)} ${swimDistanceUnit(unitSystem)}`;
   }
   const value = metersToDisplayDistance(meters ?? 0, unitSystem);
   const digits = options.digits ?? (Math.abs(value) >= 10 ? 1 : 2);
-  return `${decimal(value, digits)} ${distanceUnit(unitSystem)}`;
+  return `${grouped(value, digits)} ${distanceUnit(unitSystem)}`;
 }
 
 export function formatElevationValue(
@@ -219,7 +235,7 @@ export function formatElevationValue(
   empty = "-"
 ): string {
   if (!Number.isFinite(meters) || !meters) return empty;
-  return `${Math.round(metersToElevation(meters ?? 0, unitSystem))} ${elevationUnit(unitSystem)}`;
+  return `${grouped(Math.round(metersToElevation(meters ?? 0, unitSystem)), 0)} ${elevationUnit(unitSystem)}`;
 }
 
 /**

@@ -221,7 +221,17 @@ export function demoHandlers(): Record<string, unknown> {
     setWindowBackground: async () => {},
     getHevyStatus: async () => ({ connected: false, includeWarmups: false }),
     getSampleData: async () => ({ rides: false, hikes: false, trailRuns: false }),
-    getActivityFeelTypes: async () => ({}),
+    // A feeling for most sessions, as an athlete who rates them in the COROS
+    // app would leave: mostly easy or moderate, now and then hard. Read off the
+    // id so every shot of the same session says the same.
+    getActivityFeelTypes: async (ids: string[]) =>
+      Object.fromEntries(
+        ids.flatMap((id) => {
+          const hash = [...id].reduce((sum, char) => (sum * 31 + char.charCodeAt(0)) % 9973, 7);
+          const rating = [2, 3, 2, 3, 4, 2, 3, 4, 1, 0][hash % 10];
+          return rating ? [[id, rating]] : [];
+        })
+      ),
     getRpeLoadByDay: async () => ({}),
     getRpeBackfillStatus: async () => ({ pending: 0, running: false }),
     startRpeBackfill: async () => {},

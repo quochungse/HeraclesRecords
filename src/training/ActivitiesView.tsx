@@ -1,4 +1,3 @@
-import { renderRich } from "../i18n/useI18n";
 import { useCallback, useMemo, useRef, useState } from "react";
 import {
   ArrowLeft,
@@ -19,11 +18,10 @@ import {
   DEFAULT_ACTIVITY_FILTERS,
   type ActivityFilters,
   filterActivities,
-  sportsPresent,
   summariseActivities
 } from "./activityFilters";
 import { resolveSportName } from "./sportTypes";
-import { useActivityDetailSummaries } from "./useActivityDetailSummaries";
+import type { SportColorCategory } from "./sportColors";
 import { useActivityFeelTypes } from "./useActivityFeelTypes";
 import { useHeartRateZoneModel } from "./useHeartRateZoneModel";
 import { benefitZoneFamily } from "./trainingBenefit";
@@ -105,39 +103,93 @@ export function ActivitiesView({
     [sportTypes]
   );
 
-  const available = useMemo(() => sportsPresent(activities), [activities]);
-
   /*
-   * Both read the whole history rather than the filtered list: each is keyed on
+   * Read for the whole history rather than the filtered list: it is keyed on
    * the activity ids, and narrowing the set would re-read on every keystroke.
-   * Neither holds the screen back — the faces and the drift figure fill in.
+   * It does not hold the screen back — the pane's feel tag fills in.
+   *
+   * The rows used to read the stored detail summaries too, for a drift figure
+   * as their fifth fact. A row carries three now, and drift is never one of
+   * them, so the sweep that computed summaries for this list went with it;
+   * Running, whose list has a Drift column, still runs its own.
    */
   const feel = useActivityFeelTypes(api, activities);
-  const summaries = useActivityDetailSummaries({
-    api,
-    activities,
-    // Held back while a session the athlete just clicked is loading: computing
-    // a summary is a detail fetch of its own, and that payload wants the
-    // connection first.
-    enabled: detailRequest?.status !== "pending"
-  });
   // The open session's label is read on the account's heart-rate model, and waits for it.
   const zoneModel = useHeartRateZoneModel({ api, corosConnected: connected });
   const benefitFamily = benefitZoneFamily(zoneModel);
 
-  const visible = useMemo(
+  const sportNameOf = useCallback(
+    (activity: TrainingHubActivity) => resolveSportName(activity, sportTypeMap),
+    [sportTypeMap]
+  );
+
+  /*
+   * The period alone, before a sport or a search narrows it. The mix bar and
+   * its legend are drawn from this: the legend is how a sport is picked, so a
+   * share that jumped to 100% the moment one was picked — or a legend that
+   * emptied while a search matched nothing — would take away the very chips
+   * that undo it.
+   */
+  const inPeriod = useMemo(
     () =>
       filterActivities({
         activities,
-        filters,
-        nowMs,
-        sportName: (activity) => resolveSportName(activity, sportTypeMap)
+        filters: { ...DEFAULT_ACTIVITY_FILTERS, periodDays: filters.periodDays },
+        nowMs
       }),
-    [activities, filters, nowMs, sportTypeMap]
+    [activities, filters.periodDays, nowMs]
+  );
+
+  const narrowed = filters.sports.length > 0 || filters.query.trim().length > 0;
+
+  // Narrowed from the period's list, not from the whole history again.
+  const visible = useMemo(
+    () =>
+      narrowed
+        ? filterActivities({
+            activities: inPeriod,
+            filters,
+            nowMs,
+            sportName: sportNameOf
+          })
+        : inPeriod,
+    [narrowed, inPeriod, filters, nowMs, sportNameOf]
   );
 
   const totals = useMemo(() => summariseActivities(visible), [visible]);
+  const mixTotals = useMemo(
+    () => (narrowed ? summariseActivities(inPeriod) : totals),
+    [narrowed, inPeriod, totals]
+  );
+
+  const toggleSport = useCallback((category: SportColorCategory) => {
+    setFilters((current) => ({
+      ...current,
+      sports: current.sports.includes(category)
+        ? current.sports.filter((entry) => entry !== category)
+        : [...current.sports, category]
+    }));
+  }, []);
+
+  const clearFilters = useCallback(() => {
+    setFilters((current) => ({ ...current, sports: [], query: "" }));
+  }, []);
+
   const shown = useMemo(() => visible.slice(0, limit), [visible, limit]);
+
+  /*
+   * The pane shows the chosen session only while the filters admit it. Kept
+   * there after a search or a sport had taken it off the list, it read as the
+   * one result of a search that the list beside it said had found nothing.
+   */
+  const paneActivity = useMemo(
+    () =>
+      selectedActivity &&
+      visible.some((activity) => activity.activityId === selectedActivity.activityId)
+        ? selectedActivity
+        : null,
+    [selectedActivity, visible]
+  );
   const hidden = visible.length - shown.length;
 
   /**
@@ -187,8 +239,6 @@ export function ActivitiesView({
             selectedActivityId={selectedActivity?.activityId ?? null}
             busy={busy}
             nowMs={nowMs}
-            feel={feel}
-            summaries={summaries}
             onLoadDetail={openActivity}
           />
           {hidden > 0 ? (
@@ -256,7 +306,7 @@ export function ActivitiesView({
     <ActivityDetailPane
       api={api}
       detail={activityDetail}
-      listActivity={selectedActivity}
+      listActivity={paneActivity}
       sportTypes={sportTypes}
       detailRequest={detailRequest}
       busy={busy}
@@ -266,6 +316,7 @@ export function ActivitiesView({
       hiddenSportScreens={hiddenSportScreens}
       onAskCoach={onAskCoach}
       benefitFamily={benefitFamily}
+      feelRating={paneActivity ? feel.get(paneActivity.activityId) : undefined}
     />
   );
 
@@ -296,25 +347,17 @@ export function ActivitiesView({
   return (
     <div className="stack stack-fill training-dashboard activities-view">
       <header className="activities-head">
-        <div>
-          <p className="eyebrow">{t("nav.training")}</p>
-          <h2>
-            {activities.length === 0 && activitiesStatus === "pending"
-              ? t("common.loading")
-              : renderRich(plural("activity.list.count", totals.count, { period: periodLabel }), {
-                  s: (chunk) => <span> {chunk}</span>
-                })}
-          </h2>
-        </div>
+        <h2>{t("nav.training")}</h2>
+        <ActivitiesFilterBar filters={filters} onChange={setFilters} />
       </header>
 
-      <ActivitiesSummary totals={totals} periodLabel={periodLabel} />
-
-      <ActivitiesFilterBar
-        filters={filters}
-        available={available}
-        matched={visible.length}
-        onChange={setFilters}
+      <ActivitiesSummary
+        totals={totals}
+        mix={mixTotals}
+        periodLabel={periodLabel}
+        selectedSports={filters.sports}
+        onToggleSport={toggleSport}
+        onClearFilters={narrowed ? clearFilters : undefined}
       />
 
       <section className="panel panel-flex training-activities-split-panel">

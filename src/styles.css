@@ -2797,6 +2797,12 @@ input::placeholder {
   background: var(--option-chip-color, var(--accent));
 }
 
+.option-chip-detail {
+  color: var(--text-muted);
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+
 /*
  * Tiles: the same multi-select as equal tiles in a grid, each with its icon and
  * a tick at the far end. A row of pills as wide as their words reads as loose

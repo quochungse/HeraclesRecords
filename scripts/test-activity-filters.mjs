@@ -370,7 +370,7 @@ assert.deepEqual(
       trainingLoad: 210
     })
   ),
-  ["1h", "10.0 km", "6:00 /km", "148 bpm", "210 TL"],
+  ["1h", "10.0 km", "6:00 /km"],
   "a run is read by pace"
 );
 
@@ -384,7 +384,7 @@ assert.deepEqual(
       trainingLoad: 150
     })
   ),
-  ["1h", "30.0 km", "30.0 km/h", "132 bpm", "150 TL"],
+  ["1h", "30.0 km", "30.0 km/h"],
   "a ride is read by speed, not by pace"
 );
 
@@ -404,6 +404,11 @@ assert.deepEqual(
   factValues(activity({ sportType: 500, duration: 3600, distance: 20_000 })),
   ["1h", "20.0 km", "20.0 km/h"],
   "a ski session is read by speed"
+);
+assert.deepEqual(
+  factValues(activity({ sportType: 300, duration: 2400, distance: 1800, avgHr: 130 })),
+  ["40m", "1800 m", "2:13 /100m"],
+  "a swim is read per 100 m, as the pane reads it, not by its heart rate"
 );
 assert.deepEqual(
   factValues(activity({ sportType: 402, duration: 3600, distance: 2_000 })),
@@ -444,144 +449,13 @@ assert.deepEqual(
     }),
     "metric"
   ).map((fact) => fact.key),
-  ["duration", "distance", "pace", "avgHr", "climb"],
-  "five figures at most — a sixth is what wraps the line, and load is the " +
-    "one dropped because COROS scores it on every row"
+  ["duration", "distance", "pace"],
+  "three figures at most — the line is cut, not wrapped, and the pane it " +
+    "opens carries the rest"
 );
 
 // ---------------------------------------------------------------------------
-// 10. Drift comes off the stored summary, when there is one
-// ---------------------------------------------------------------------------
-
-const longRun = activity({
-  sportType: 100,
-  duration: 5400,
-  distance: 15_000,
-  trainingLoad: 300
-});
-
-assert.ok(
-  !factKeys(longRun).includes("drift"),
-  "no summary, no drift — the list is not held back for one"
-);
-
-assert.deepEqual(
-  activityRowFacts(longRun, "metric", {
-    activityId: "a1",
-    fingerprint: "f",
-    summaryVersion: 1,
-    decouplingPercent: 4.2,
-    computedAt: 0
-  }).map((fact) => fact.key),
-  ["duration", "distance", "pace", "drift", "load"],
-  "drift comes before climb and load"
-);
-
-// The row a real run produces: the four figures off the list payload plus the
-// one off the stored summary. This is what the cap is sized for.
-assert.deepEqual(
-  activityRowFacts(
-    activity({
-      sportType: 100,
-      duration: 5149,
-      distance: 12_200,
-      avgHr: 162,
-      trainingLoad: 280
-    }),
-    "metric",
-    {
-      activityId: "a1",
-      fingerprint: "f",
-      summaryVersion: 1,
-      decouplingPercent: 4.2,
-      computedAt: 0
-    }
-  ).map((fact) => fact.key),
-  ["duration", "distance", "pace", "avgHr", "drift"]
-);
-
-// Drift is pace against heart rate, which on a ride the road and the wind
-// decide and on a hike or a trail run the gradient does — Cycling, Hiking and
-// a trail run's page leave it out, so the row does too. A summary is stored
-// for every sport all the same; a Tam Đảo climb's came back −172.1%.
-const driftSummary = {
-  activityId: "a1",
-  fingerprint: "f",
-  summaryVersion: 1,
-  decouplingPercent: -172.1,
-  computedAt: 0
-};
-const hillyRow = (sportType) =>
-  activity({
-    sportType,
-    duration: 9000,
-    distance: 40_000,
-    avgHr: 150,
-    elevationGain: 1100,
-    trainingLoad: 260
-  });
-
-assert.deepEqual(
-  activityRowFacts(hillyRow(204), "metric", driftSummary).map((fact) => fact.key),
-  ["duration", "distance", "speed", "avgHr", "climb"],
-  "a ride gets no drift, and climb takes its place"
-);
-assert.ok(
-  !activityRowFacts(hillyRow(200), "metric", driftSummary).some(
-    (fact) => fact.key === "drift"
-  ),
-  "nor does a road ride"
-);
-assert.ok(
-  !activityRowFacts(hillyRow(104), "metric", driftSummary).some(
-    (fact) => fact.key === "drift"
-  ),
-  "a hike gets no drift"
-);
-assert.ok(
-  !activityRowFacts(hillyRow(105), "metric", driftSummary).some(
-    (fact) => fact.key === "drift"
-  ),
-  "nor does a mountain climb"
-);
-assert.ok(
-  !activityRowFacts(hillyRow(102), "metric", driftSummary).some(
-    (fact) => fact.key === "drift"
-  ),
-  "a trail run gets no drift — its run page drops decoupling too"
-);
-assert.ok(
-  !activityRowFacts(
-    activity({ sportType: 300, duration: 2400, distance: 2000 }),
-    "metric",
-    driftSummary
-  ).some((fact) => fact.key === "drift"),
-  "a swim gets no drift"
-);
-assert.ok(
-  !activityRowFacts(
-    activity({ sportType: 402, duration: 3600, avgHr: 118 }),
-    "metric",
-    driftSummary
-  ).some((fact) => fact.key === "drift"),
-  "a strength session gets no drift"
-);
-
-for (const sportType of [100, 101, 103]) {
-  const facts = activityRowFacts(
-    activity({ sportType, duration: 3600, distance: 10_000, avgHr: 148 }),
-    "metric",
-    driftSummary
-  );
-  assert.equal(
-    facts.find((fact) => fact.key === "drift")?.value,
-    "-172.1% drift",
-    `a run off the trail (${sportType}) still reads its drift`
-  );
-}
-
-// ---------------------------------------------------------------------------
-// 11. A detail belongs to exactly one selection
+// 10. A detail belongs to exactly one selection
 // ---------------------------------------------------------------------------
 
 const selected = activity({ activityId: "b" });
