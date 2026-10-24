@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Info,
   Link2,
@@ -9,9 +9,6 @@ import {
 } from "lucide-react";
 import type { CoachOpenRequest, TrainingHubStatus } from "../../electron/types";
 import type { HeraclesRecordsApi } from "../heraclesrecords-api";
-import { ActivityZoneTimePanel } from "../training/components/ActivityZoneTimePanel";
-import { useHeartRateZoneModel } from "../training/useHeartRateZoneModel";
-import { useSessionZones } from "./useSessionZones";
 import type { SportScreenRequest } from "../training/types";
 import { epochMsFromCorosTime } from "../training/activityWindow";
 import { StrengthHero } from "./StrengthHero";
@@ -24,19 +21,13 @@ import {
   StrengthAggregateRecords,
   StrengthSessionCoverage,
   StrengthSessionExercises,
-  StrengthSessionHeader
+  StrengthSessionHeader,
+  countWindowRecords,
+  type WindowStat
 } from "./StrengthSessionDetail";
 import { analyticsCoverage, buildStrengthSessionIndex, sessionHeat } from "./sessionAnalytics";
-import { StrengthVolumeLandmarks } from "./StrengthVolumeLandmarks";
 import { StrengthWeeklyChart } from "./StrengthWeeklyChart";
-import {
-  cadencePhrase,
-  durationParts,
-  formatSpan,
-  liftWeightParts,
-  totalWeightParts,
-  type FigurePart
-} from "./strengthFormat";
+import { cadencePhrase, formatSpan, formatTotalWeight } from "./strengthFormat";
 import { OptionGroup } from "../components/OptionGroup";
 import {
   periodDaysFromValue,
@@ -54,7 +45,6 @@ import "./strength.css";
 import "./exerciseExplorer.css";
 import { useUnitSystem } from "../units/UnitSystemProvider";
 import { formatCount, plural, t } from "../i18n/core";
-import { exerciseLabel } from "./strengthAnalytics";
 
 interface StrengthViewProps {
   api: HeraclesRecordsApi;
@@ -76,19 +66,6 @@ interface StrengthViewProps {
 }
 
 const STRENGTH_PERIOD_OPTIONS = periodGroupOptions(STRENGTH_PERIOD_DAYS);
-
-function Figure({ parts }: { parts: FigurePart[] }) {
-  return (
-    <p className="strength-figure">
-      {parts.map((part) => (
-        <span key={`${part.value}-${part.unit ?? ""}`}>
-          <strong>{part.value}</strong>
-          {part.unit ? <em>{part.unit}</em> : null}
-        </span>
-      ))}
-    </p>
-  );
-}
 
 export function StrengthView({
   api,
@@ -203,51 +180,52 @@ export function StrengthView({
       : AGGREGATE_SELECTION;
   const selectedEntry =
     selection === AGGREGATE_SELECTION ? undefined : sessionIndex.byId.get(selection);
-  // Read only for a session opened, and never for the toolbar's sample sessions.
-  const sessionZones = useSessionZones(api, selectedEntry?.session, corosConnected && !sampleMode);
-  const { model: zoneModel } = useHeartRateZoneModel({ api, corosConnected });
   const explorable = useMemo(
     () => new Set(analytics.exercises.map((exercise) => exercise.name)),
     [analytics.exercises]
   );
+  const windowRecordCount = useMemo(
+    () => countWindowRecords(sessions, sessionIndex),
+    [sessionIndex, sessions]
+  );
+  const splitRef = useRef<HTMLDivElement>(null);
+  const showAllSessions = useCallback(() => setPickedSelection(AGGREGATE_SELECTION), []);
+  // A record is picked at the foot of the page; the session it opens is read
+  // from the band at the top of the split.
+  const openRecordSession = useCallback((activityId: string) => {
+    setPickedSelection(activityId);
+    splitRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, []);
 
-  const summaryItems: { key: string; label: string; parts: FigurePart[]; caption: string }[] = [
+  // The window's totals, in the "All sessions" band. The heaviest lift is not
+  // among them: one set out of hundreds, it read as the window's headline.
+  const windowStats: WindowStat[] = [
     {
       key: "sessions",
       label: t("strength.summary.sessions"),
-      parts: [{ value: String(summary.sessions) }],
+      value: String(summary.sessions),
       caption: cadencePhrase(summary.sessionsPerWeek) || t("strength.summary.nothing")
     },
     usesWeights
       ? {
           key: "lifted",
           label: t("strength.summary.lifted"),
-          parts: totalWeightParts(summary.volumeKg, unitSystem),
+          value: formatTotalWeight(summary.volumeKg, unitSystem),
           caption: plural("strength.summary.acrossSets", Math.round(summary.sets))
         }
       : {
           key: "sets",
           label: t("strength.summary.sets"),
-          parts: [{ value: formatCount(Math.round(summary.sets)) }],
+          value: formatCount(Math.round(summary.sets)),
           caption: plural("strength.reps", Math.round(summary.reps))
         },
     {
       key: "time",
       label: t("strength.summary.time"),
-      parts: durationParts(summary.durationSec),
+      value: formatSpan(summary.durationSec),
       caption: hasSessions
         ? t("strength.summary.perSession", { time: formatSpan(summary.durationSec / summary.sessions) })
         : t("strength.summary.noTime")
-    },
-    {
-      key: "heaviest",
-      label: t("strength.summary.heaviest"),
-      parts: summary.heaviestLift
-        ? liftWeightParts(summary.heaviestLift.weightKg, unitSystem)
-        : [{ value: "—" }],
-      caption: summary.heaviestLift
-        ? `${exerciseLabel(summary.heaviestLift.name)} × ${summary.heaviestLift.reps}`
-        : t("strength.summary.noWeight")
     }
   ];
 
@@ -450,32 +428,29 @@ export function StrengthView({
         </section>
       ) : (
         <>
-          <section className="panel strength-card strength-summary" aria-label={t("strength.summaryLabel")}>
-            {summaryItems.map((item) => (
-              <div key={item.key} className="strength-summary-item">
-                <p className="strength-summary-label">{item.label}</p>
-                <Figure parts={item.parts} />
-                <p className="strength-summary-caption">{item.caption}</p>
-              </div>
-            ))}
-          </section>
-
-          <div className="strength-split">
+          {/*
+           * One scope at a time. The split is the list beside a band and the
+           * body map; everything under it follows the selection — a session's
+           * exercises, or the window's charts and records — so nothing about
+           * the window sits under a session as though it were the session's.
+           * The band is one fixed height for both, so the map never moves.
+           */}
+          <div className="strength-split" ref={splitRef}>
             <aside className="panel strength-card strength-split-list">
               <StrengthSessionList
                 sessions={sessions}
                 index={sessionIndex}
                 selected={selection}
                 onSelect={setPickedSelection}
-                windowLabel={activeWindow.label}
+                windowAnalytics={analytics}
                 showSource={source === "combined"}
               />
             </aside>
             <div className="strength-split-detail">
               {/*
-               * Four slots in a fixed order. Only the first and last change type
-               * between a session and "All sessions", so the body map in the
-               * second keeps its WebGL renderer across every selection.
+               * Two slots in a fixed order. Only the first changes type between
+               * a session and "All sessions", so the body map in the second
+               * keeps its WebGL renderer across every selection.
                */}
               <article
                 className="strength-session-detail"
@@ -485,13 +460,14 @@ export function StrengthView({
                   <StrengthSessionHeader
                     entry={selectedEntry}
                     showSource={source === "combined"}
+                    onShowAll={showAllSessions}
                     onAskCoach={onAskCoach}
                   />
                 ) : (
                   <StrengthAggregateHeader
-                    sessionCount={sessions.length}
                     windowLabel={activeWindow.label}
-                    windowPhrase={activeWindow.phrase}
+                    stats={windowStats}
+                    recordCount={windowRecordCount}
                   />
                 )}
                 <StrengthHero
@@ -503,45 +479,40 @@ export function StrengthView({
                     selectedEntry ? (metric) => sessionHeat(selectedEntry, metric) : undefined
                   }
                 />
-                {selectedEntry ? <StrengthSessionCoverage entry={selectedEntry} /> : null}
-                {selectedEntry ? (
-                  <StrengthSessionExercises
-                    entry={selectedEntry}
-                    explorable={explorable}
-                    onOpenExercise={openExercise}
-                  />
-                ) : (
-                  <StrengthAggregateRecords
-                    sessions={sessions}
-                    index={sessionIndex}
-                    windowPhrase={activeWindow.phrase}
-                    onSelectSession={setPickedSelection}
-                  />
-                )}
-                {selectedEntry && sessionZones ? (
-                  <ActivityZoneTimePanel
-                    hrZones={sessionZones.hrZones}
-                    hrZoneType={sessionZones.hrZoneType}
-                    accountFamily={zoneModel?.family}
-                    frame="strength"
-                  />
-                ) : null}
               </article>
             </div>
           </div>
 
-          <StrengthWeeklyChart
-            weeks={analytics.weeks}
-            days={days}
-            usesWeights={usesWeights}
-          />
+          {selectedEntry ? (
+            <>
+              <StrengthSessionCoverage entry={selectedEntry} />
+              <StrengthSessionExercises
+                entry={selectedEntry}
+                explorable={explorable}
+                onOpenExercise={openExercise}
+              />
+            </>
+          ) : (
+            <>
+              <StrengthWeeklyChart
+                weeks={analytics.weeks}
+                days={days}
+                usesWeights={usesWeights}
+              />
 
-          <StrengthVolumeLandmarks analytics={analytics} windowDays={days} />
+              <StrengthOverviewPanels
+                analytics={analytics}
+                onOpenExercise={openExercise}
+              />
 
-          <StrengthOverviewPanels
-            analytics={analytics}
-            onOpenExercise={openExercise}
-          />
+              <StrengthAggregateRecords
+                sessions={sessions}
+                index={sessionIndex}
+                windowPhrase={activeWindow.phrase}
+                onSelectSession={openRecordSession}
+              />
+            </>
+          )}
         </>
       )}
       {selectedExercise ? (

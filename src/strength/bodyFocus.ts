@@ -64,6 +64,16 @@ export function cinematicEaseOut(progress: number): number {
   return 1 - Math.pow(1 - clamped, 5);
 }
 
+/**
+ * The share of full speed a turn has reached, from standing (0) to turning
+ * (1): it leaves at rest and arrives at speed without a step at either end, so
+ * a body settled face on picks the turn up rather than lurching into it.
+ */
+export function turnSpinUp(progress: number): number {
+  const clamped = Math.min(1, Math.max(0, progress));
+  return clamped * clamped * (3 - 2 * clamped);
+}
+
 /** Let the orbit establish direction before the camera begins its push. */
 export function cinematicDollyProgress(progress: number): number {
   const delayed = (Math.min(1, Math.max(0, progress)) - 0.08) / 0.92;

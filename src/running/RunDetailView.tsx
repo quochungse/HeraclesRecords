@@ -446,7 +446,6 @@ export function RunDetailView({
           // A trail's pace is the gradient's, so its zones are read on GAP.
           paceZones={trail ? detail.adjustedPaceZones : detail.paceZones}
           paceIsGradeAdjusted={trail}
-          frame="page"
           benefit={benefit}
         />
       ) : null}

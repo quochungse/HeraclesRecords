@@ -123,8 +123,8 @@ const EXEMPT = [
   },
   {
     file: "src/strength/BodyMapV2.tsx",
-    marker: "layerPreferences.order.map",
-    why: "Muscle layer visibility is a reorderable list, not a choice between options."
+    marker: "anatomy-layer-row",
+    why: "Muscle group visibility is a list of independent show/hide switches, one per group, not a choice between options."
   }
 ];
 

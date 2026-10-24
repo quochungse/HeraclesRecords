@@ -1,6 +1,6 @@
 import { renderRich } from "../i18n/useI18n";
 import { exerciseLabel } from "./strengthAnalytics";
-import type { CSSProperties } from "react";
+import type { CSSProperties, ReactNode } from "react";
 import type { UnitSystem } from "../../electron/types";
 import { ChevronLeft, Minus, TrendingDown, TrendingUp } from "lucide-react";
 import { MUSCLE_BY_ID, MUSCLES, type MuscleId } from "./muscles";
@@ -21,6 +21,11 @@ interface MusclePanelProps {
   muscles: MuscleStat[];
   muscleById: Record<MuscleId, MuscleStat>;
   metric: HeatMetric;
+  /**
+   * The switch that picks `metric`, drawn at the panel's top right in both
+   * states: it orders the list here and colours the figure beside it.
+   */
+  metricSwitch?: ReactNode;
   max: number;
   active: MuscleId | null;
   onSelect: (muscle: MuscleId | null) => void;
@@ -549,6 +554,7 @@ export function MusclePanel({
   muscles,
   muscleById,
   metric,
+  metricSwitch,
   max,
   active,
   onSelect,
@@ -560,14 +566,14 @@ export function MusclePanel({
       (muscle) => muscleById[muscle.id].sets <= 0
     );
     const trainedCount = MUSCLES.length - untrained.length;
+    // Two rows of two: the title beside the switch that orders the list, and
+    // the instruction beside the count it answers.
     return (
       <div className="muscle-panel">
         <header className="muscle-panel-head">
-          <div className="muscle-panel-title">
-            <p className="muscle-panel-kicker">{t(`strength.coverage.kicker.${metric}` as const)}</p>
-            <h3>{t("strength.coverage.title")}</h3>
-            <p className="muscle-panel-lead">{t("strength.coverage.lead")}</p>
-          </div>
+          <h3>{t("strength.coverage.title")}</h3>
+          {metricSwitch}
+          <p className="muscle-panel-lead">{t("strength.coverage.lead")}</p>
           <p
             className="muscle-panel-summary"
             aria-label={t("strength.coverage.trainedLabel", { trained: trainedCount, total: MUSCLES.length })}
@@ -604,14 +610,17 @@ export function MusclePanel({
 
   return (
     <div className="muscle-panel is-detail" data-level={level}>
-      <button
-        type="button"
-        className="muscle-panel-back"
-        onClick={() => onSelect(null)}
-      >
-        <ChevronLeft size={14} aria-hidden="true" />
-        {t("strength.allMuscles")}
-      </button>
+      <div className="muscle-panel-bar">
+        <button
+          type="button"
+          className="muscle-panel-back"
+          onClick={() => onSelect(null)}
+        >
+          <ChevronLeft size={14} aria-hidden="true" />
+          {t("strength.allMuscles")}
+        </button>
+        {metricSwitch}
+      </div>
 
       <header className="muscle-detail-head">
         <div className="muscle-detail-title">

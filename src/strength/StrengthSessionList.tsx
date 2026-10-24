@@ -1,17 +1,25 @@
-import { useEffect, useMemo, useRef, type KeyboardEvent } from "react";
+import {
+  useCallback,
+  useEffect,
+  useId,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type KeyboardEvent
+} from "react";
 import { Layers, Trophy } from "lucide-react";
 import type { StrengthSession } from "../../electron/types";
 import { useUnitSystem } from "../units/UnitSystemProvider";
-import type { StrengthSessionIndex } from "./sessionAnalytics";
-import { previousWeekStartMs, startOfWeekMs } from "./strengthAnalytics";
+import { SessionBodyGlyph, SessionBodySprite } from "./SessionBodyGlyph";
+import { sessionHeat, type StrengthSessionIndex } from "./sessionAnalytics";
+import { previousWeekStartMs, startOfWeekMs, type StrengthAnalytics } from "./strengthAnalytics";
 import { formatSpan, formatTotalWeight, sessionSourceLabel } from "./strengthFormat";
 import "./strengthSession.css";
 import { getIntlLocale, plural, t } from "../i18n/core";
 
 /** The list's first row: every session in the window at once, rather than one of them. */
 export const AGGREGATE_SELECTION = "aggregate";
-
-const PATTERNS = ["push", "pull", "legs", "core"] as const;
 
 interface WeekGroup {
   /** Epoch ms of the Monday, or undefined for sessions with no start time. */
@@ -66,8 +74,8 @@ interface StrengthSessionListProps {
   index: StrengthSessionIndex;
   selected: string;
   onSelect: (selection: string) => void;
-  /** The window's short label, e.g. "3 months". */
-  windowLabel: string;
+  /** The window as a whole, for the first row's figures and its body figure. */
+  windowAnalytics: StrengthAnalytics;
   /** Tag each row with where it came from — only worth saying when sources are combined. */
   showSource: boolean;
 }
@@ -75,13 +83,18 @@ interface StrengthSessionListProps {
 /**
  * Every session in the window, grouped by week, with the whole window as the
  * first row. Arrow keys walk the rows the way they walk any list of documents.
+ *
+ * The first row is drawn in the sessions' own grammar — a mark where the date
+ * sits, a name, a line of figures, the same body figure — because it is picked
+ * the way they are. Drawn as a card with a filled icon above the weeks, it read
+ * as the list's heading, and nobody pressed it.
  */
 export function StrengthSessionList({
   sessions,
   index,
   selected,
   onSelect,
-  windowLabel,
+  windowAnalytics,
   showSource
 }: StrengthSessionListProps) {
   const { unitSystem } = useUnitSystem();
@@ -95,6 +108,32 @@ export function StrengthSessionList({
   );
   const nowMs = Date.now();
   const navRef = useRef<HTMLElement>(null);
+  // An id for the figures' shared artwork; `useId`'s own is not safe in a URL fragment.
+  const sprite = `strength-body-${useId().replace(/[^\w-]/g, "")}`;
+
+  /*
+   * Whether rows wait past the bottom edge, so the list fades there: the
+   * scrollbar is a faint pill, and a list cut at a hard line with nothing to
+   * say it goes on reads as finished. Measured, not assumed — at the end, or
+   * with everything in view, nothing is fogged. The top needs no fade: a
+   * week's sticky heading is the edge there once anything scrolls.
+   */
+  const [moreBelow, setMoreBelow] = useState(false);
+  const measureMoreBelow = useCallback(() => {
+    const node = navRef.current;
+    if (!node) return;
+    const more = node.scrollTop + node.clientHeight < node.scrollHeight - 2;
+    setMoreBelow((held) => (held === more ? held : more));
+  }, []);
+  useLayoutEffect(() => {
+    const node = navRef.current;
+    if (!node || typeof ResizeObserver === "undefined") return;
+    const observer = new ResizeObserver(measureMoreBelow);
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, [measureMoreBelow]);
+  // More sessions arriving lengthen the list without resizing its box.
+  useLayoutEffect(measureMoreBelow, [groups, measureMoreBelow]);
 
   // The selection can come from outside the list — Activities hands a session
   // over — so the chosen row is scrolled to rather than left for the athlete to
@@ -121,11 +160,13 @@ export function StrengthSessionList({
 
   return (
     <nav
-      className="strength-session-nav"
+      className={`strength-session-nav${moreBelow ? " has-fade-bottom" : ""}`}
+      onScroll={measureMoreBelow}
       aria-label={t("strength.list.label")}
       ref={navRef}
       onKeyDown={moveSelection}
     >
+      <SessionBodySprite id={sprite} />
       <button
         type="button"
         className="strength-session-row is-aggregate"
@@ -138,11 +179,22 @@ export function StrengthSessionList({
         </span>
         <span className="strength-session-row-main">
           <strong>{t("strength.allSessions")}</strong>
+          {/* Two figures, not a session's three: beside the body figure a third
+              wrapped onto a line of its own, and the band states the time. */}
           <span className="strength-session-row-facts">
-            <span>{windowLabel}</span>
             <span>{plural("activity.sessions", sessions.length)}</span>
+            <span>
+              {windowAnalytics.summary.volumeKg > 0
+                ? formatTotalWeight(windowAnalytics.summary.volumeKg, unitSystem)
+                : plural("strength.sets", Math.round(windowAnalytics.summary.sets))}
+            </span>
           </span>
         </span>
+        <SessionBodyGlyph
+          sprite={sprite}
+          muscleById={windowAnalytics.muscleById}
+          max={windowAnalytics.muscleMax.sets}
+        />
       </button>
 
       {groups.map((group) => (
@@ -156,10 +208,7 @@ export function StrengthSessionList({
               const entry = index.byId.get(session.activityId);
               const summary = entry?.analytics.summary;
               const date = session.startTime ? new Date(session.startTime * 1000) : undefined;
-              const balance = entry?.analytics.balance;
-              const balanceTotal = balance
-                ? PATTERNS.reduce((total, pattern) => total + balance[pattern], 0)
-                : 0;
+              const heat = entry ? sessionHeat(entry, "sets") : undefined;
               const records = entry?.records.length ?? 0;
               const source = showSource ? sessionSourceLabel(session) : undefined;
               return (
@@ -181,12 +230,15 @@ export function StrengthSessionList({
                       <span className="strength-session-row-title">
                         <strong>{session.name?.trim() || t("strength.untitled")}</strong>
                         {records > 0 ? (
+                          // The trophy alone: "PR" beside it cost a long name
+                          // the width it was cut at.
                           <span
-                            className="strength-session-record-badge"
+                            className="strength-session-record-mark"
+                            role="img"
+                            aria-label={plural("strength.list.records", records)}
                             title={plural("strength.list.records", records)}
                           >
-                            <Trophy size={10} aria-hidden="true" />
-                            {t("strength.pr")}
+                            <Trophy size={13} aria-hidden="true" />
                           </span>
                         ) : null}
                       </span>
@@ -200,18 +252,8 @@ export function StrengthSessionList({
                         <span>{formatSpan(summary?.durationSec ?? session.duration ?? 0)}</span>
                         {source ? <span className="strength-session-row-source">{source}</span> : null}
                       </span>
-                      {balance && balanceTotal > 0 ? (
-                        <span className="strength-session-row-mix" aria-hidden="true">
-                          {PATTERNS.filter((pattern) => balance[pattern] > 0).map((pattern) => (
-                            <i
-                              key={pattern}
-                              data-pattern={pattern}
-                              style={{ flexGrow: balance[pattern] / balanceTotal }}
-                            />
-                          ))}
-                        </span>
-                      ) : null}
                     </span>
+                    {heat ? <SessionBodyGlyph sprite={sprite} muscleById={heat.muscleById} max={heat.max} /> : null}
                   </button>
                 </li>
               );

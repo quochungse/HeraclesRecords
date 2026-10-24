@@ -19,7 +19,8 @@ const {
   cinematicDollyProgress,
   cinematicEaseOut,
   nearestOrbitAngle,
-  resolveMuscleView
+  resolveMuscleView,
+  turnSpinUp
 } = await import(`${sourceUrl.href}?cacheBust=${Date.now()}`);
 
 assert.equal(resolveMuscleView("front", "back"), "front");
@@ -49,6 +50,19 @@ assert.equal(cinematicEaseOut(2), 1);
 assert.equal(cinematicDollyProgress(0.08), 0);
 assert.equal(cinematicDollyProgress(1), 1);
 assert.ok(cinematicDollyProgress(0.25) < cinematicEaseOut(0.25));
+
+// A turn picked up after the camera has settled starts from standing, gathers
+// speed without overshooting, and arrives at full speed.
+assert.equal(turnSpinUp(-1), 0);
+assert.equal(turnSpinUp(0), 0);
+assert.equal(turnSpinUp(1), 1);
+assert.equal(turnSpinUp(2), 1);
+assert.ok(turnSpinUp(0.05) < 0.01);
+assert.ok(Math.abs(turnSpinUp(0.5) - 0.5) < 1e-9);
+for (let step = 0; step < 20; step += 1) {
+  assert.ok(turnSpinUp((step + 1) / 20) >= turnSpinUp(step / 20));
+}
+assert.ok(1 - turnSpinUp(0.95) < 0.01);
 
 const nearBack = Math.PI - 0.05;
 const targetBack = nearestOrbitAngle(-Math.PI + 0.05, Math.PI);

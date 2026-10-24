@@ -347,7 +347,6 @@ export function HikeDetailView({
           hrZones={detail.hrZones}
           hrZoneType={detail.hrZoneType}
           accountFamily={zoneFamily}
-          frame="page"
         />
       ) : null}
 

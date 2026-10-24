@@ -59,6 +59,10 @@ const { app, BrowserWindow } = require("electron");
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
 app.commandLine.appendSwitch("no-sandbox");
+// A scaled display draws a 1px border as a fraction of a pixel ("the name is
+// drawn as the field it is" read 0.76px at 132%), so pin the scale as the
+// other renderer suites do.
+app.commandLine.appendSwitch("force-device-scale-factor", "1");
 app.disableHardwareAcceleration();
 
 let win;

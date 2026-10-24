@@ -879,8 +879,8 @@ lives at module level for the same visit-to-visit reason — see `useCalendarDat
   scrolling list, not the first thing inside it**: sticky within the scroller it stayed put, but
   the scrollbar is the scroller's own and ran the full height, so a thumb slid past a row that
   does not move. `.tl-catalog > .tl-index-head` reserves the same gutter with `scrollbar-gutter:
-  stable` over `overflow: hidden` — measured, that takes the same 15px off its content box as a
-  real scrollbar does, which is what keeps each label over its own figures.
+  stable` over `overflow: hidden` — measured, that takes the same 8px off its content box as the
+  app's scrollbar takes off the list's, which is what keeps each label over its own figures.
   **The reader's dock is one row, and scheduling is a button in it.** Scheduling had a row of
   its own above the four actions — an icon, a heading, a date field and a button, standing open
   across the whole dock for a decision that is made once and then not again. It is a trigger at
@@ -1136,12 +1136,14 @@ lives at module level for the same visit-to-visit reason — see `useCalendarDat
   the first run to the last; a calendar week's median drawn mid-week started days late and ended
   days early, this week's in the future. `npm run test:run-performance`.
 - **Time in zones on every sport's own page** (`ActivityZoneTimePanel`, `src/training/zoneTime.ts`)
-  — the run, ride and hike pages and an opened Strength session, **not Activities**, which keeps
-  its zone bar. It draws COROS's own seconds per zone off the detail's `zoneList` (never
+  — the run, ride and hike pages, **not Activities**, which keeps its zone bar, **and not
+  Strength**, which dropped it by decision on 2026-10-24 (heart-rate zones say little about a
+  lifting session; `useSessionZones` and the panel's Strength frame went with it). It draws
+  COROS's own seconds per zone off the detail's `zoneList` (never
   re-derived from the samples), every zone listed — one never reached reads 0, so a session is
   read against the whole scale — with seconds stated under a minute. A run switches between
   heart rate and pace (a trail run's pace is the GAP list, type 173, `adjustedPaceZones`); a
-  ride, a hike and a lifting session have heart rate only (a ride's power zones are the Power
+  ride and a hike have heart rate only (a ride's power zones are the Power
   panel's, and the pace zones COROS scores a ride or a hike on are a runner's). Three COROS
   facts it rests on: **`zoneType` on an activity is not reliable** — runs a day apart on one
   HR-reserve account came back 2 and 0 with identical bounds — so 0 falls back to the account's
@@ -1149,9 +1151,7 @@ lives at module level for the same visit-to-visit reason — see `useCalendarDat
   buckets for six named zones**, because `ltspZone` splits Threshold at 100% of threshold speed
   (69.5 / 82.7 / 91.7 / 100 / 102.2 / 112.9, probed 2026-10-19), so buckets 3 and 4 are drawn
   as one Threshold row; and HR-reserve, LTHR and pace share the names Recovery … Anaerobic
-  Power while Max HR has its own. Strength's history carries sets only, so `useSessionZones`
-  asks for the opened session's COROS detail (a Hevy-only session has none; a failure is
-  silent). `npm run test:zone-time`.
+  Power while Max HR has its own. `npm run test:zone-time`.
 - **Cycling** (`src/cycling/`, built 2026-09-30) — Running's page built again for a bike: the
   same shape (a kind filter and a period, a hero, totals, a weekly chart, intensity beside a
   split by kind, a sortable list, a full-page detail that keeps the list's scroll) and **the
@@ -2598,7 +2598,23 @@ lives at module level for the same visit-to-visit reason — see `useCalendarDat
   says so only on the toolbar's trigger, as Strength's does. `test:records` holds what each
   is for, the realistic one on any weekday.
 - **Strength** (`strengthHistoryService`, `hevyService`, `strengthSessionMerge`) — COROS
-  strength sessions merged with Hevy imports. **Hevy is its REST API, not MCP**, and no one
+  strength sessions merged with Hevy imports. **The screen shows one scope at a time**
+  (redesigned 2026-10-24, mockup in the memory note `strength-layout-mock`): the session list
+  beside a header band and the body map, and under them only what the selection is about — a
+  session's exercises, or the window's weekly chart, main lifts and
+  records. It used to keep the window's totals on top and its charts underneath while a
+  session was open, so the two read as one. **The band is one fixed height for a session and
+  for "All sessions"** (`--strength-band-height`, raised under a 700px pane where a session's
+  six figures take two rows), so picking a session never moves the map — the session header
+  grew with a row per record and dropped the map ~450px. Records are written in the exercise
+  rows (the estimated max and how far it moved; the heaviest set only when that is all the
+  record was), the window's in one line per session. A list row's mark is the front and back
+  of `bodyShapes.ts`'s figure lit on the map's heat ramp (`SessionBodyGlyph`, over
+  `sessionHeat`), not the push/pull/legs/core bar, and "All sessions" is drawn as a row like
+  the others, with "‹ All sessions" in the session band as the way back. The list is as tall
+  as the detail beside it through `contain: size`, so its own length never sets the row's.
+  It scrolls inside its card (the nav, not the aside), so the app's scrollbar stands inside
+  the card's edge, and a measured fade at the foot says the list goes on. **Hevy is its REST API, not MCP**, and no one
   here has had a real Hevy account: the shapes were checked against Hevy's own OpenAPI
   (`https://api.hevyapp.com/docs.json`) on 2026-10-03, and `test:hevy-service` fakes them. Three
   rules it rests on. **The full read stops at a page that is all older than the window**, never
@@ -3214,6 +3230,20 @@ read by someone. A name the renderer builds (`--m3d-heat-${level}`) counts throu
 (`max(28px, (100% - 1440px) / 2)`) so the scrollbar stays at the window edge and no screen
 needs a wrapper. Below about 1750px nothing changes; past it the margins grow rather than the
 tables.
+
+**There is one scrollbar, and the same test holds it** (since 2026-10-24): the bare
+`::-webkit-scrollbar` block near the top of `styles.css` — a 4px pill in an 8px gutter on a
+clear track, no arrow buttons, faint at rest, clearer while the pointer is over what it
+scrolls (`--scrollbar-thumb*`). Windows' own bar is 15px with arrows and a grey track, and it
+was drawn inside every card that scrolls. **Chromium reads either those pseudo-elements or
+the standard `scrollbar-width` / `scrollbar-color`, never both**, so setting either standard
+property on an element hands it back the platform's bar, arrows included —
+`test:design-vocabulary` fails on any `scrollbar-color`, any `scrollbar-width` but `none`
+(which hides a bar on purpose: the rail, the builder's summary), and any second
+`::-webkit-scrollbar` look. Twenty-odd rules had set `scrollbar-width: thin` or their own
+thumb, each a different grey. **The screenshot harness hides every bar**
+(`::-webkit-scrollbar { width: 0 !important }` in `scripts/screenshots/main.tsx`), so an
+offscreen capture of it says nothing about scrollbars: check one in a plain Electron window.
 
 **Motion is part of that vocabulary, and the same test holds it.** A `transition` spends
 `var(--ease)` — one decelerating curve; bare `ease` was 92% of every curve and is the browser

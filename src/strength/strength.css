@@ -365,67 +365,77 @@
   pointer-events: none;
 }
 
-.strength-body-controls {
+/* The figure's own controls stand along its foot: the side switch centred
+   under the feet, the muscle groups trigger in the corner. Both are about the
+   whole figure, so they step aside while a muscle is in focus — the camera is
+   framing that muscle, and the way back is the panel's "All muscles". */
+.strength-body-view {
   position: absolute;
-  top: 16px;
-  right: 16px;
-  left: 16px;
+  bottom: 16px;
+  left: 50%;
   z-index: 3;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 4px;
-  flex-wrap: nowrap;
+  transform: translateX(-50%);
+  transition:
+    opacity var(--dur-base) var(--ease),
+    transform var(--dur-base) var(--ease),
+    visibility var(--dur-base) var(--ease);
+}
+
+.strength-body-view.is-hidden {
+  opacity: 0;
+  visibility: hidden;
+  transform: translate(-50%, 6px);
   pointer-events: none;
 }
 
-.strength-body-controls > * {
-  pointer-events: auto;
-}
-
-/* Smaller than the shared chip, so both switches fit one row over a figure
-   column that is 35% of the card. */
-.strength-body-controls .option-group {
-  flex: 0 0 auto;
+/* Smaller than the shared chip: it stands on the figure rather than in a
+   header, and the column is 35% of the card. */
+.strength-body-view .option-group {
   padding: 2px;
-}
-
-.strength-body-controls .option-group button {
-  min-height: 22px;
-  padding: 0 7px;
-  font-size: 11px;
-}
-
-.strength-body-controls .option-group {
   -webkit-backdrop-filter: blur(14px);
   backdrop-filter: blur(14px);
   box-shadow: var(--shadow-soft);
 }
 
+.strength-body-view .option-group button {
+  min-height: 22px;
+  padding: 0 9px;
+  font-size: 11px;
+}
+
 /* A development-only control, so it sits where the figure is not: the bottom
-   left corner, out of the toolbar's row and clear of the callout, which is
+   left corner, level with the side switch and clear of the callout, which is
    drawn beside the selected muscle. Its panel opens upward from there. */
 .anatomy-layer-control {
   position: absolute;
   left: 16px;
   bottom: 16px;
   z-index: 4;
-  pointer-events: auto;
+  transition:
+    opacity var(--dur-base) var(--ease),
+    transform var(--dur-base) var(--ease),
+    visibility var(--dur-base) var(--ease);
 }
 
+.anatomy-body-map.is-focused .anatomy-layer-control {
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(6px);
+  pointer-events: none;
+}
+
+/* The side switch's height (a 22px chip in a 2px well), so the two read as
+   one row along the figure's foot. */
 .anatomy-layer-trigger {
-  display: inline-flex;
-  min-height: 26px;
-  align-items: center;
-  gap: 6px;
-  padding: 0 9px;
+  display: inline-grid;
+  width: 28px;
+  height: 28px;
+  place-items: center;
+  padding: 0;
   border: 1px solid var(--surface-line, var(--glass-border));
   border-radius: var(--radius-pill);
   background: var(--glass-bg);
   color: var(--text-secondary);
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 0.06em;
   -webkit-backdrop-filter: blur(14px);
   backdrop-filter: blur(14px);
   box-shadow: var(--shadow-soft);
@@ -445,11 +455,11 @@
 .anatomy-layer-panel {
   position: absolute;
   left: 0;
-  bottom: 34px;
+  bottom: 36px;
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);
-  width: min(216px, calc(100vw - 48px));
-  max-height: min(340px, calc(100vh - 260px));
+  width: min(200px, calc(100vw - 48px));
+  max-height: min(380px, calc(100vh - 260px));
   overflow: hidden;
   border: 1px solid var(--surface-line, var(--glass-border));
   border-radius: var(--radius-lg);
@@ -465,47 +475,44 @@
   align-items: center;
   justify-content: space-between;
   gap: 10px;
-  padding: 10px 10px 8px;
+  padding: 9px 8px 8px 12px;
   border-bottom: 1px solid var(--glass-border);
 }
 
-.anatomy-layer-panel header > div {
-  display: grid;
-  gap: 2px;
-}
-
 .anatomy-layer-panel header strong {
-  font-size: 11px;
+  font-size: 12px;
   line-height: 1.3;
 }
 
-.anatomy-layer-panel header span {
-  color: var(--text-muted);
-  font-size: 10px;
-}
-
-.anatomy-layer-reset,
-.anatomy-layer-visibility,
-.anatomy-layer-move button {
-  display: inline-grid;
-  width: 22px;
-  height: 22px;
-  flex: 0 0 auto;
-  place-items: center;
+.anatomy-layer-show-all {
+  padding: 4px 6px;
   border: 0;
   border-radius: var(--radius-sm);
   background: transparent;
-  color: var(--text-muted);
+  color: var(--accent-strong);
+  font: inherit;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1;
+  cursor: pointer;
   transition:
     color var(--dur-fast) var(--ease),
     background var(--dur-fast) var(--ease);
 }
 
-.anatomy-layer-reset:hover,
-.anatomy-layer-visibility:hover,
-.anatomy-layer-move button:hover:not(:disabled) {
+.anatomy-layer-show-all:hover:not(:disabled) {
   background: var(--glass-bg-hover);
-  color: var(--text-primary);
+}
+
+.anatomy-layer-show-all:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: -2px;
+}
+
+.anatomy-layer-show-all:disabled {
+  color: var(--text-muted);
+  cursor: default;
+  opacity: 0.6;
 }
 
 .anatomy-layer-panel ul {
@@ -518,43 +525,55 @@
   overscroll-behavior: contain;
   touch-action: pan-y;
   list-style: none;
-  scrollbar-width: thin;
 }
 
-.anatomy-layer-panel li {
-  display: grid;
-  grid-template-columns: 22px minmax(0, 1fr) auto;
+/* A row is the switch: the name, and on the right the eye saying which way
+   it is set. */
+.anatomy-layer-row {
+  display: flex;
+  width: 100%;
   min-height: 28px;
   align-items: center;
-  gap: 6px;
-  padding: 1px 3px;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 0 8px 0 7px;
+  border: 0;
   border-radius: var(--radius-sm);
+  background: transparent;
   color: var(--text-secondary);
-  font-size: 10px;
-  font-weight: 600;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.3;
+  text-align: left;
+  cursor: pointer;
+  transition:
+    color var(--dur-fast) var(--ease),
+    background var(--dur-fast) var(--ease);
 }
 
-.anatomy-layer-panel li:hover {
+.anatomy-layer-row:hover {
   background: color-mix(in srgb, var(--glass-bg-hover) 64%, transparent);
   color: var(--text-primary);
 }
 
-.anatomy-layer-panel li.is-hidden > span {
-  opacity: 0.46;
-  text-decoration: line-through;
+.anatomy-layer-row:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: -2px;
 }
 
-.anatomy-layer-visibility[aria-pressed="true"] {
-  color: var(--text-secondary);
+.anatomy-layer-row svg {
+  flex: 0 0 auto;
+  color: var(--text-muted);
 }
 
-.anatomy-layer-move {
-  display: inline-flex;
-  gap: 1px;
+.anatomy-layer-row[aria-checked="false"] {
+  color: var(--text-muted);
 }
 
-.anatomy-layer-move button:disabled {
-  opacity: 0.22;
+.anatomy-layer-row[aria-checked="false"] span,
+.anatomy-layer-row[aria-checked="false"] svg {
+  opacity: 0.55;
 }
 
 .body-map {
@@ -755,10 +774,8 @@
     min-height: 540px;
   }
 
-  .strength-body-controls {
-    top: 12px;
-    right: 12px;
-    left: 12px;
+  .strength-body-view {
+    bottom: 12px;
   }
 
   .anatomy-layer-control {
@@ -851,24 +868,16 @@
   line-height: 1.6;
 }
 
+/* Two rows of two: the title beside the switch that orders the list and
+   colours the figure, and the instruction beside the count it answers. */
 .muscle-panel-head {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 18px;
-  padding: 0 4px 2px;
-}
-
-.muscle-panel-title {
-  min-width: 0;
-}
-
-.muscle-panel-kicker {
-  margin: 0 0 4px;
-  color: var(--text-muted);
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 6px 18px;
+  /* The detail's right inset, so the switch stands where it does over a
+     muscle's detail and going in and out of one does not nudge it. */
+  padding: 0 2px 2px 4px;
 }
 
 .muscle-panel-head h3 {
@@ -882,33 +891,50 @@
 }
 
 .muscle-panel-lead {
-  margin: 5px 0 0;
+  margin: 0;
   color: var(--text-secondary);
   font-size: 12px;
   line-height: 1.3;
 }
 
 .muscle-panel-summary {
-  display: grid;
-  justify-items: end;
-  gap: 1px;
-  flex: 0 0 auto;
-  margin: 3px 0 0;
+  display: flex;
+  align-items: baseline;
+  justify-self: end;
+  gap: 4px;
+  margin: 0;
   color: var(--text-muted);
-  font-size: 11px;
-  line-height: 1.2;
+  font-size: 12px;
+  line-height: 1.3;
+  white-space: nowrap;
 }
 
 .muscle-panel-summary strong {
   color: var(--text-primary);
-  font-size: 18px;
-  font-weight: 600;
+  font-family: var(--font-display);
+  font-size: 14px;
+  font-weight: 500;
   font-variant-numeric: tabular-nums;
   letter-spacing: -0.02em;
 }
 
-.muscle-panel-summary span {
-  white-space: nowrap;
+/* The metric switch, at the panel's top right in both of its states. A step
+   smaller than a header's chip: it sits beside a title, not over a page. */
+.muscle-panel-metric {
+  justify-self: end;
+  padding: 2px;
+}
+
+.muscle-panel-metric.option-group button {
+  min-height: 24px;
+  padding: 0 10px;
+}
+
+.muscle-panel-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
 }
 
 .muscle-ranking {
@@ -920,7 +946,6 @@
   overflow-y: auto;
   overscroll-behavior-y: auto;
   scrollbar-gutter: stable;
-  scrollbar-width: thin;
   min-height: 0;
 }
 
@@ -1091,8 +1116,14 @@
   /* The gutter is held whether or not the detail overflows, so opening one
      muscle after another never moves the readout sideways. */
   scrollbar-gutter: stable;
-  scrollbar-width: thin;
   padding-right: 2px;
+}
+
+/* The detail scrolls rather than squeezes: a flex item that clips its own
+   overflow may shrink to nothing, and the headline readout did — a muscle
+   with four lifts drew it as an empty pill. */
+.muscle-panel.is-detail > * {
+  flex-shrink: 0;
 }
 
 :root[data-theme="paper"] .muscle-panel.is-detail {
@@ -1129,7 +1160,6 @@
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  align-self: flex-start;
   padding: 5px 12px 5px 8px;
   border: 1px solid var(--glass-border);
   border-radius: var(--radius-pill);
@@ -1928,8 +1958,8 @@
   }
 
   .muscle-panel-head {
-    gap: 12px;
-    padding-inline: 2px;
+    gap: 6px 12px;
+    padding-left: 2px;
   }
 
   .muscle-panel-lead {
@@ -2092,104 +2122,6 @@
   color: var(--text-muted);
   font-size: 14px;
   line-height: 1.6;
-}
-
-/* ---------- Big figures ---------- */
-
-.strength-figure {
-  display: flex;
-  align-items: baseline;
-  gap: 7px;
-  margin: 0;
-  color: var(--text-primary);
-  font-variant-numeric: tabular-nums;
-  white-space: nowrap;
-}
-
-.strength-figure > span {
-  display: inline-flex;
-  align-items: baseline;
-  gap: 3px;
-}
-
-.strength-figure strong {
-  font-size: 36px;
-  line-height: 1;
-}
-
-.strength-figure em {
-  color: var(--text-muted);
-  font-size: 14px;
-  font-style: normal;
-  font-weight: 500;
-  letter-spacing: 0;
-}
-
-/* ---------- Summary band ---------- */
-
-/*
- * A card like the ones under it. It was a band between two hairlines with no
- * card, its first figure on the page's own edge; on paper's grey canvas that
- * sank into the page, grey labels on grey, and a card in one theme only would
- * have made the two pages different shapes.
- */
-.strength-summary {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  padding: 24px 28px;
-}
-
-.strength-summary-item {
-  padding: 0 30px;
-  border-left: 1px solid var(--sx-hairline);
-}
-
-.strength-summary-item:first-child {
-  padding-left: 2px;
-  border-left: 0;
-}
-
-.strength-summary-label {
-  margin: 0 0 12px;
-  color: var(--text-secondary);
-  font-size: 13px;
-  font-weight: 500;
-  letter-spacing: 0;
-}
-
-.strength-summary-caption {
-  margin: 11px 0 0;
-  color: var(--text-muted);
-  font-size: 13px;
-  line-height: 1.45;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-/* The sidebar eats ~240px, so four figures start crowding well before the
-   viewport itself looks narrow. */
-@media (max-width: 1240px) {
-  .strength-summary {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    row-gap: 28px;
-  }
-
-  .strength-summary-item:nth-child(odd) {
-    padding-left: 2px;
-    border-left: 0;
-  }
-}
-
-@media (max-width: 620px) {
-  .strength-summary {
-    grid-template-columns: minmax(0, 1fr);
-  }
-
-  .strength-summary-item {
-    padding-left: 2px;
-    border-left: 0;
-  }
 }
 
 /* ---------- Weekly chart ---------- */

@@ -685,7 +685,6 @@
   flex: 1 1 auto;
   overflow-y: auto;
   overscroll-behavior: contain;
-  scrollbar-color: var(--glass-border) transparent;
   scrollbar-gutter: stable;
 }
 
@@ -730,7 +729,6 @@
   padding: 14px 16px var(--tl-dock-clearance);
   overflow-y: auto;
   overscroll-behavior: contain;
-  scrollbar-color: var(--glass-border) transparent;
   scrollbar-gutter: stable;
 }
 
@@ -2261,7 +2259,6 @@
   padding-bottom: var(--tl-dock-clearance);
   overflow-y: auto;
   overscroll-behavior: contain;
-  scrollbar-color: var(--glass-border) transparent;
   scrollbar-gutter: stable;
 }
 
@@ -2331,7 +2328,6 @@
   overflow-x: hidden;
   overflow-y: auto;
   overscroll-behavior: contain;
-  scrollbar-color: var(--glass-border) transparent;
   scrollbar-gutter: stable;
 }
 
@@ -3237,9 +3233,7 @@
   overflow-y: auto;
   overscroll-behavior: contain;
   padding: 16px 16px 32px 22px;
-  scrollbar-color: color-mix(in srgb, var(--text-muted) 22%, transparent) transparent;
   scrollbar-gutter: stable;
-  scrollbar-width: thin;
   -webkit-mask-image: linear-gradient(
     to bottom,
     transparent 0,
@@ -3805,7 +3799,6 @@
   overflow-y: auto;
   padding: 0;
   list-style: none;
-  scrollbar-width: thin;
 }
 
 .plan-editor-library button {
@@ -4161,7 +4154,6 @@
   flex: 1 1 auto;
   overflow-y: auto;
   overscroll-behavior: contain;
-  scrollbar-color: var(--glass-border) transparent;
   scrollbar-gutter: stable;
 }
 
@@ -4643,7 +4635,6 @@
     align-content: start;
     overflow-y: auto;
     overscroll-behavior: contain;
-    scrollbar-color: var(--glass-border) transparent;
     scrollbar-gutter: stable;
   }
 
@@ -5766,9 +5757,7 @@ button.plan-generator-provider:focus-visible {
   overflow-y: auto;
   overscroll-behavior: contain;
   padding: 4px 12px 32px 2px;
-  scrollbar-color: color-mix(in srgb, var(--text-muted) 22%, transparent) transparent;
   scrollbar-gutter: stable;
-  scrollbar-width: thin;
   -webkit-mask-image: linear-gradient(
     to bottom,
     transparent 0,
@@ -5783,10 +5772,6 @@ button.plan-generator-provider:focus-visible {
     #000 calc(100% - var(--fade-bottom)),
     transparent 100%
   );
-}
-
-.plan-reader:hover {
-  scrollbar-color: color-mix(in srgb, var(--text-muted) 48%, transparent) transparent;
 }
 
 .plan-reader.has-fade-top {
