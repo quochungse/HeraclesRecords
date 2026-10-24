@@ -6,7 +6,10 @@ import {
   type Locale,
 } from "./locales.ts";
 import en from "./messages/en/index.ts";
-import { setDecimalFormatter } from "../../electron/unitSystem.ts";
+import {
+  setDecimalFormatter,
+  setGroupedDecimalFormatter
+} from "../../electron/unitSystem.ts";
 import { screenKeyForEnglish } from "../../electron/screenText.ts";
 
 /**
@@ -99,6 +102,7 @@ function apply(locale: Locale, messages: Dictionary): void {
   pluralRules = new Intl.PluralRules(intl);
   numberFormat = new Intl.NumberFormat(intl);
   setDecimalFormatter(decimalFormatterFor(intl));
+  setGroupedDecimalFormatter(decimalFormatterFor(intl, true));
   if (typeof document !== "undefined") {
     document.documentElement.lang = LOCALE_DETAILS[locale].htmlLang;
   }
@@ -107,8 +111,14 @@ function apply(locale: Locale, messages: Dictionary): void {
   }
 }
 
-/** `toFixed` in a language's digits: 5,2 in German, 5.2 in English; no grouping. */
-function decimalFormatterFor(locale: string): (value: number, digits: number) => string {
+/**
+ * `toFixed` in a language's digits: 5,2 in German, 5.2 in English; no grouping
+ * unless asked for, and then the language's own (1,245.6 · 1.245,6 · 1 245,6).
+ */
+function decimalFormatterFor(
+  locale: string,
+  useGrouping = false
+): (value: number, digits: number) => string {
   const formats = new Map<number, Intl.NumberFormat>();
   return (value, digits) => {
     let format = formats.get(digits);
@@ -116,7 +126,7 @@ function decimalFormatterFor(locale: string): (value: number, digits: number) =>
       format = new Intl.NumberFormat(locale, {
         minimumFractionDigits: digits,
         maximumFractionDigits: digits,
-        useGrouping: false,
+        useGrouping,
       });
       formats.set(digits, format);
     }

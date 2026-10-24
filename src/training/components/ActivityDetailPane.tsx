@@ -122,8 +122,7 @@ const ELEVATION_PROFILE_MIN_GAIN_M = 30;
 const PAUSE_NOTICE_S = 60;
 
 /**
- * The screen the Open button leads to, per sport. The button itself says only
- * "Open" — the screen is in its tooltip and its accessible name.
+ * The screen the "Open in …" button leads to, per sport, named in its words.
  */
 const SPORT_SCREEN_LABELS: Record<SportScreen, MessageKey> = {
   running: "nav.running",

@@ -15,9 +15,10 @@ interface ActivitiesSummaryProps {
   /** Everything the filters admit: what the four figures add up. */
   totals: ActivityTotals;
   /**
-   * The same, with no sport picked: what the bar and its legend draw. Omitted,
-   * it is `totals`. A legend that is also the sport filter cannot be drawn
-   * from the filtered set, or picking one sport would leave only its chip.
+   * The period alone, before a sport or a search narrows it: what the bar and
+   * its legend draw. Omitted, it is `totals`. A legend that is also the sport
+   * filter cannot be drawn from the narrowed set, or picking one sport would
+   * leave only its chip and a search that matched nothing would leave none.
    */
   mix?: ActivityTotals;
   /** What the period selector says, e.g. "3 months" — the caption's subject. */
@@ -174,6 +175,14 @@ export function ActivitiesSummary({
   const filtering = selectedSports.length > 0;
 
   /*
+   * A search or a sport that matches nothing is not an empty history, so the
+   * captions do not say "Nothing logged yet" under it — three times over. The
+   * list beside it says what happened; the captions keep their line, empty, so
+   * the strip does not jump as the last letter is typed.
+   */
+  const noMatch = totals.count === 0 && onClearFilters !== undefined;
+
+  /*
    * One chip per sport in the period, each with its share, plus any sport
    * still picked that the period no longer holds — a filter that cannot be
    * seen cannot be taken off. A single sport and nothing picked is no choice
@@ -249,7 +258,9 @@ export function ActivitiesSummary({
           <div className="activities-summary-tile" key={tile.key}>
             <p className="activities-summary-label">{tile.label}</p>
             <p className="activities-summary-value">{tile.value}</p>
-            <p className="activities-summary-caption">{tile.caption}</p>
+            <p className="activities-summary-caption">
+              {noMatch ? "\u00a0" : tile.caption}
+            </p>
           </div>
         ))}
       </div>

@@ -58,8 +58,8 @@ export function useActivityFeelTypes(
           setFeels(result);
         }
       })
-      // A feeling is a badge on a row; a failed read leaves the badges off
-      // rather than taking the list down with it.
+      // A feeling is a tag on the open session; a failed read leaves the tag
+      // off rather than taking the screen down with it.
       .catch(() => undefined);
 
     return () => {
@@ -78,25 +78,6 @@ export function useActivityFeelTypes(
     return rating.size === 0 ? EMPTY : rating;
   }, [feels]);
 }
-
-/** What COROS's five smileys mean. */
-export const FEEL_LABELS: Readonly<Record<number, string>> = {
-  get 1() {
-    return t("activity.feel.1");
-  },
-  get 2() {
-    return t("activity.feel.2");
-  },
-  get 3() {
-    return t("activity.feel.3");
-  },
-  get 4() {
-    return t("activity.feel.4");
-  },
-  get 5() {
-    return t("activity.feel.5");
-  }
-};
 
 /** "Felt hard": the whole phrase, since an adjective's place differs by language. */
 export function feltLabel(rating: number): string | undefined {

@@ -1,7 +1,15 @@
-import { useEffect, useMemo, useRef, type KeyboardEvent } from "react";
+import {
+  memo,
+  useEffect,
+  useMemo,
+  useRef,
+  type KeyboardEvent,
+  type RefObject
+} from "react";
 import type {
   TrainingHubActivity,
-  TrainingHubSportType
+  TrainingHubSportType,
+  UnitSystem
 } from "../../../electron/types";
 import {
   activityWeekHeading,
@@ -12,6 +20,7 @@ import { epochMsFromCorosTime } from "../activityWindow";
 import { formatDurationSpan, formatTrainingTimestamp } from "../formatters";
 import { resolveSportName } from "../sportTypes";
 import { useUnitSystem } from "../../units/UnitSystemProvider";
+import { useI18n } from "../../i18n/useI18n";
 import { getIntlLocale, plural, t } from "../../i18n/core";
 import { ActivitySportBadge } from "./ActivitySportBadge";
 
@@ -25,8 +34,34 @@ interface ActivityJournalListProps {
   onLoadDetail: (activity: TrainingHubActivity) => void;
 }
 
-/** How many figures a row carries — see {@link ActivityJournalList}. */
-const ROW_FACTS = 3;
+/**
+ * One formatter per language, kept: a list of two hundred rows built one each
+ * on every render, and a selection re-renders the list.
+ */
+let dayFormat: { locale: string; format: Intl.DateTimeFormat } | null = null;
+
+/**
+ * "Fri 23", "ven. 23", "23日(金)": each language's own order — except English,
+ * where Intl writes "23 Fri", a pairing no English reader writes.
+ */
+function weekdayAndDay(at: number): string {
+  const locale = getIntlLocale();
+  if (dayFormat?.locale !== locale) {
+    dayFormat = {
+      locale,
+      format: new Intl.DateTimeFormat(locale, { weekday: "short", day: "numeric" })
+    };
+  }
+  const parts = dayFormat.format.formatToParts(at);
+  if (locale.toLowerCase().startsWith("en")) {
+    const weekday = parts.find((part) => part.type === "weekday")?.value;
+    const day = parts.find((part) => part.type === "day")?.value;
+    if (weekday && day) {
+      return `${weekday} ${day}`;
+    }
+  }
+  return parts.map((part) => part.value).join("");
+}
 
 /**
  * "Fri 23" at the end of the name line, with the clock time on hover.
@@ -50,25 +85,71 @@ function RowDate({ startTime }: { startTime?: number }) {
   );
 }
 
-/**
- * "Fri 23", "ven. 23", "23日(金)": each language's own order — except English,
- * where Intl writes "23 Fri", a pairing no English reader writes.
- */
-function weekdayAndDay(at: number): string {
-  const locale = getIntlLocale();
-  const parts = new Intl.DateTimeFormat(locale, {
-    weekday: "short",
-    day: "numeric"
-  }).formatToParts(at);
-  if (locale.toLowerCase().startsWith("en")) {
-    const weekday = parts.find((part) => part.type === "weekday")?.value;
-    const day = parts.find((part) => part.type === "day")?.value;
-    if (weekday && day) {
-      return `${weekday} ${day}`;
-    }
-  }
-  return parts.map((part) => part.value).join("");
+interface ActivityRowProps {
+  activity: TrainingHubActivity;
+  sportName: string | undefined;
+  selected: boolean;
+  loading: boolean;
+  unitSystem: UnitSystem;
+  /** Only to redraw a row's words when the language changes. */
+  locale: string;
+  buttonRef: RefObject<HTMLButtonElement | null> | undefined;
+  onOpen: (activity: TrainingHubActivity) => void;
 }
+
+/**
+ * One session. Memoised, because choosing a session re-renders the list and
+ * only the two rows whose selection changed have anything new to draw; the
+ * rest were formatting their figures and dates again for nothing.
+ */
+const ActivityRow = memo(function ActivityRow({
+  activity,
+  sportName,
+  selected,
+  loading,
+  unitSystem,
+  buttonRef,
+  onOpen
+}: ActivityRowProps) {
+  const activityName =
+    activity.name?.trim() || sportName || t("activity.untitled");
+  const facts = activityRowFacts(activity, unitSystem);
+
+  return (
+    <li
+      className={`activity-row${selected ? " is-selected" : ""}${
+        loading ? " is-loading" : ""
+      }`}
+    >
+      <button
+        type="button"
+        ref={buttonRef}
+        className="activity-row-open"
+        data-activity-id={activity.activityId}
+        aria-current={selected ? "true" : undefined}
+        onClick={() => onOpen(activity)}
+      >
+        {/*
+          * The sport on the name's own line, ahead of it, and the figures on
+          * the line below from the row's edge: the icon takes no column of its
+          * own down the list.
+          */}
+        <ActivitySportBadge sportType={activity.sportType} label={sportName} />
+        <span className="activity-row-title">
+          <strong title={activityName}>{activityName}</strong>
+          <RowDate startTime={activity.startTime} />
+        </span>
+        <span className="activity-row-facts">
+          {facts.map((fact) => (
+            <span key={fact.key} title={fact.title}>
+              {fact.value}
+            </span>
+          ))}
+        </span>
+      </button>
+    </li>
+  );
+});
 
 /**
  * The athlete's history as a journal: one row per session, grouped by the week
@@ -88,11 +169,11 @@ function weekdayAndDay(at: number): string {
  * The sport is its icon in its colour on a grey disc, ahead of the name,
  * rather than its name in a coloured capitals chip: a chip on every row in one
  * of five colours made the list a rainbow, and so did the same icons on discs
- * washed in their sports' hues. The name it spelled out is on the pane. The figures
- * are three, on one line — a fourth and a fifth wrapped the line in a column
- * this narrow, and the pane beside it carries every one of them. How the
- * session felt is the pane's too: a coloured face on every rated row was one
- * more hue in a list already wearing five.
+ * washed in their sports' hues. The name it spelled out is on the pane. The
+ * figures are three, on one line — a fourth and a fifth wrapped the line in a
+ * column this narrow, and the pane beside it carries every one of them. How
+ * the session felt is the pane's too: a coloured face on every rated row was
+ * one more hue in a list already wearing five.
  */
 export function ActivityJournalList({
   activities,
@@ -103,6 +184,7 @@ export function ActivityJournalList({
   onLoadDetail
 }: ActivityJournalListProps) {
   const { unitSystem } = useUnitSystem();
+  const { locale } = useI18n();
   const listRef = useRef<HTMLDivElement>(null);
   const selectedRef = useRef<HTMLButtonElement>(null);
 
@@ -115,7 +197,8 @@ export function ActivityJournalList({
 
   // The pane is the full history and the selection can come from outside it —
   // the screen opens on the newest activity — so the chosen row is scrolled to
-  // rather than left for the athlete to find.
+  // rather than left for the athlete to find. The row's `scroll-margin-top`
+  // keeps it clear of the week heading stuck over the list.
   useEffect(() => {
     selectedRef.current?.scrollIntoView({ block: "nearest" });
   }, [selectedActivityId]);
@@ -174,47 +257,19 @@ export function ActivityJournalList({
 
           <ul>
             {group.activities.map((activity) => {
-              const sportName = resolveSportName(activity, sportTypeMap);
-              const activityName =
-                activity.name?.trim() || sportName || t("activity.untitled");
               const selected = selectedActivityId === activity.activityId;
-              const loading = busy === `training-detail:${activity.activityId}`;
-              const facts = activityRowFacts(activity, unitSystem).slice(0, ROW_FACTS);
-
               return (
-                <li
-                  className={`activity-row${selected ? " is-selected" : ""}${
-                    loading ? " is-loading" : ""
-                  }`}
+                <ActivityRow
                   key={activity.activityId}
-                >
-                  <button
-                    type="button"
-                    ref={selected ? selectedRef : undefined}
-                    className="activity-row-open"
-                    data-activity-id={activity.activityId}
-                    aria-current={selected ? "true" : undefined}
-                    onClick={() => onLoadDetail(activity)}
-                  >
-                    {/*
-                      * The sport on the name's own line, ahead of it, and the
-                      * figures on the line below from the row's edge: the icon
-                      * takes no column of its own down the list.
-                      */}
-                    <ActivitySportBadge sportType={activity.sportType} label={sportName} />
-                    <span className="activity-row-title">
-                      <strong title={activityName}>{activityName}</strong>
-                      <RowDate startTime={activity.startTime} />
-                    </span>
-                    <span className="activity-row-facts">
-                      {facts.map((fact) => (
-                        <span key={fact.key} title={fact.title}>
-                          {fact.value}
-                        </span>
-                      ))}
-                    </span>
-                  </button>
-                </li>
+                  activity={activity}
+                  sportName={resolveSportName(activity, sportTypeMap)}
+                  selected={selected}
+                  loading={busy === `training-detail:${activity.activityId}`}
+                  unitSystem={unitSystem}
+                  locale={locale}
+                  buttonRef={selected ? selectedRef : undefined}
+                  onOpen={onLoadDetail}
+                />
               );
             })}
           </ul>

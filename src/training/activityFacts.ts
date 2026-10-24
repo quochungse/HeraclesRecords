@@ -8,11 +8,7 @@
  * The set is chosen per sport rather than fixed, because a fixed set is what
  * put a column of "0 km" beside every strength session.
  */
-import type {
-  ActivityDetailSummary,
-  TrainingHubActivity,
-  UnitSystem
-} from "../../electron/types";
+import type { TrainingHubActivity, UnitSystem } from "../../electron/types";
 import {
   formatDistanceMeters,
   formatDurationSpan,
@@ -20,10 +16,9 @@ import {
   formatPaceSecondsPerKm
 } from "./formatters";
 import { isSpeedSport, isSwimSportType } from "./sportTypes";
-import { activityReading } from "../../electron/activityReading";
-import { classifyRunSurface, isRunSportType } from "../running/runSurface";
+import { activityReading, formatSwimPace } from "../../electron/activityReading";
 import { formatSpeedValue } from "../units/units";
-import { formatDecimal, t } from "../i18n/core";
+import { t } from "../i18n/core";
 
 export interface ActivityFact {
   key: string;
@@ -41,36 +36,22 @@ function isPacedSport(sportType: number | undefined): boolean {
 }
 
 /**
- * Whether aerobic decoupling says anything about this sport: a run off the
- * trail — road, track or treadmill — which is where Running reads it. Drift is
- * pace against heart rate, and on a ride the road and the wind move the speed,
- * on a hike and a trail run the gradient does; Cycling, Hiking and a trail
- * run's page all leave it out, so a row for one of those leaves it out too.
- */
-function readsDecoupling(sportType: number | undefined): boolean {
-  return isRunSportType(sportType) && classifyRunSurface(sportType) !== "trail";
-}
-
-/**
  * The most a row's line will carry.
  *
- * Not everything available: the line sits under a title in a pane about 600px
- * wide, and the sixth figure is the one that wraps it. A full run row —
- * time, distance, pace, heart rate, drift — is exactly five.
+ * The line sits under a name in a column about 330px wide and is cut rather
+ * than wrapped, and three figures are what fit it: a run's time, distance and
+ * pace. Everything else is on the pane the row opens. It was five, with a
+ * drift figure off the stored detail summary, when the column was a table's
+ * width and a line could wrap.
  */
-const MAX_FACTS = 5;
+const MAX_FACTS = 3;
 
 /**
  * At most {@link MAX_FACTS}, in the order the sport is usually read.
  */
 export function activityRowFacts(
   activity: TrainingHubActivity,
-  unitSystem: UnitSystem,
-  /**
-   * The stored detail summary, where one has been computed. It fills in behind
-   * the list rather than holding it back, so a row shows what it has.
-   */
-  summary?: ActivityDetailSummary
+  unitSystem: UnitSystem
 ): ActivityFact[] {
   const { sportType, distance, duration, avgHr, trainingLoad, elevationGain } =
     activity;
@@ -94,7 +75,15 @@ export function activityRowFacts(
     });
 
     if (duration && duration > 0) {
-      if (speed) {
+      // A swim is read per 100 m (or yd), as the pane reads it: its heart rate,
+      // which took this slot, is what a swimmer's watch reads worst.
+      if (swim) {
+        facts.push({
+          key: "pace",
+          value: formatSwimPace(duration / (distance / 1000), unitSystem),
+          title: t("activity.fact.avgPace")
+        });
+      } else if (speed) {
         facts.push({
           key: "speed",
           value: formatSpeedValue(distance / 1000 / (duration / 3600), unitSystem),
@@ -115,22 +104,6 @@ export function activityRowFacts(
       key: "avgHr",
       value: `${Math.round(avgHr)} bpm`,
       title: t("activity.fact.avgHr")
-    });
-  }
-
-  // Decoupling before climb and load: it says something about the session that
-  // none of the session's own figures do, and it is the reason the stored
-  // summaries exist at all — on a run, where it measures the runner.
-  if (
-    facts.length < MAX_FACTS &&
-    readsDecoupling(sportType) &&
-    summary?.decouplingPercent !== undefined
-  ) {
-    const drift = summary.decouplingPercent;
-    facts.push({
-      key: "drift",
-      value: t("activity.fact.drift", { value: `${drift > 0 ? "+" : ""}${formatDecimal(drift, 1)}` }),
-      title: t("activity.fact.driftTitle")
     });
   }
 

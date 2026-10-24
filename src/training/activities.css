@@ -416,8 +416,11 @@
   position: sticky;
   top: 0;
   z-index: 1;
-  margin: 0;
+  margin: 0 0 4px;
   padding: 12px 8px 6px;
+  /* A hairline under it, so a row passing beneath is cut on a line rather
+     than reading as the heading's own second line. */
+  border-bottom: 1px solid color-mix(in srgb, var(--text-primary) 8%, transparent);
   background: var(--ax-heading);
   color: var(--text-primary);
   font-size: 13px;
@@ -460,6 +463,9 @@
   gap: 2px 8px;
   width: 100%;
   padding: 8px;
+  /* Scrolled to, the chosen row stops below the week heading stuck at the top
+     of the list instead of under it. */
+  scroll-margin-top: 44px;
   border: 0;
   border-radius: var(--radius-sm);
   background: transparent;
@@ -688,14 +694,12 @@
   flex: 0 0 auto;
 }
 
-/* Export and raw JSON: bare icons at the end of the subtitle, sized to its
-   line — the rarest actions in the pane, drawn as such. The negative margin
-   keeps the hit area from making the line taller than its 12px text. */
+/* Export and raw JSON: bare icons at the end of the actions row, beside the
+   two buttons — the rarest actions in the pane, drawn as such. */
 .activity-meta-action {
   display: inline-grid;
   width: 22px;
   height: 22px;
-  margin: -4px 0;
   place-items: center;
   border: 0;
   border-radius: var(--radius-pill);
@@ -725,7 +729,9 @@
  */
 .activity-detail-headline {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  /* Filled, not fitted, for the same reason as the groups below: a lifting
+     session has two headline figures, and fitted the second sat mid-pane. */
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
   gap: 16px;
 }
 
@@ -766,9 +772,11 @@
  * The hairline over each row is what keeps a label with its value across a
  * column this wide; the groups themselves need no box.
  */
+/* `auto-fill`, not `auto-fit`: a swim or a lifting session has one group, and
+   fitted it ran the whole width with each value 700px from its label. */
 .activity-detail-groups {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
   gap: 20px 36px;
   align-items: start;
 }

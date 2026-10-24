@@ -21,6 +21,7 @@ import {
   summariseActivities
 } from "./activityFilters";
 import { resolveSportName } from "./sportTypes";
+import type { SportColorCategory } from "./sportColors";
 import { useActivityFeelTypes } from "./useActivityFeelTypes";
 import { useHeartRateZoneModel } from "./useHeartRateZoneModel";
 import { benefitZoneFamily } from "./trainingBenefit";
@@ -117,39 +118,78 @@ export function ActivitiesView({
   const zoneModel = useHeartRateZoneModel({ api, corosConnected: connected });
   const benefitFamily = benefitZoneFamily(zoneModel);
 
-  const visible = useMemo(
+  const sportNameOf = useCallback(
+    (activity: TrainingHubActivity) => resolveSportName(activity, sportTypeMap),
+    [sportTypeMap]
+  );
+
+  /*
+   * The period alone, before a sport or a search narrows it. The mix bar and
+   * its legend are drawn from this: the legend is how a sport is picked, so a
+   * share that jumped to 100% the moment one was picked — or a legend that
+   * emptied while a search matched nothing — would take away the very chips
+   * that undo it.
+   */
+  const inPeriod = useMemo(
     () =>
       filterActivities({
         activities,
-        filters,
-        nowMs,
-        sportName: (activity) => resolveSportName(activity, sportTypeMap)
+        filters: { ...DEFAULT_ACTIVITY_FILTERS, periodDays: filters.periodDays },
+        nowMs
       }),
-    [activities, filters, nowMs, sportTypeMap]
+    [activities, filters.periodDays, nowMs]
+  );
+
+  const narrowed = filters.sports.length > 0 || filters.query.trim().length > 0;
+
+  // Narrowed from the period's list, not from the whole history again.
+  const visible = useMemo(
+    () =>
+      narrowed
+        ? filterActivities({
+            activities: inPeriod,
+            filters,
+            nowMs,
+            sportName: sportNameOf
+          })
+        : inPeriod,
+    [narrowed, inPeriod, filters, nowMs, sportNameOf]
   );
 
   const totals = useMemo(() => summariseActivities(visible), [visible]);
+  const mixTotals = useMemo(
+    () => (narrowed ? summariseActivities(inPeriod) : totals),
+    [narrowed, inPeriod, totals]
+  );
+
+  const toggleSport = useCallback((category: SportColorCategory) => {
+    setFilters((current) => ({
+      ...current,
+      sports: current.sports.includes(category)
+        ? current.sports.filter((entry) => entry !== category)
+        : [...current.sports, category]
+    }));
+  }, []);
+
+  const clearFilters = useCallback(() => {
+    setFilters((current) => ({ ...current, sports: [], query: "" }));
+  }, []);
+
+  const shown = useMemo(() => visible.slice(0, limit), [visible, limit]);
 
   /*
-   * The mix is read with every filter but the sports: its legend is how a
-   * sport is picked, and a share that jumped to 100% the moment one was picked
-   * would take the others' chips away with it.
+   * The pane shows the chosen session only while the filters admit it. Kept
+   * there after a search or a sport had taken it off the list, it read as the
+   * one result of a search that the list beside it said had found nothing.
    */
-  const mixTotals = useMemo(
+  const paneActivity = useMemo(
     () =>
-      filters.sports.length === 0
-        ? totals
-        : summariseActivities(
-            filterActivities({
-              activities,
-              filters: { ...filters, sports: [] },
-              nowMs,
-              sportName: (activity) => resolveSportName(activity, sportTypeMap)
-            })
-          ),
-    [activities, filters, nowMs, sportTypeMap, totals]
+      selectedActivity &&
+      visible.some((activity) => activity.activityId === selectedActivity.activityId)
+        ? selectedActivity
+        : null,
+    [selectedActivity, visible]
   );
-  const shown = useMemo(() => visible.slice(0, limit), [visible, limit]);
   const hidden = visible.length - shown.length;
 
   /**
@@ -266,7 +306,7 @@ export function ActivitiesView({
     <ActivityDetailPane
       api={api}
       detail={activityDetail}
-      listActivity={selectedActivity}
+      listActivity={paneActivity}
       sportTypes={sportTypes}
       detailRequest={detailRequest}
       busy={busy}
@@ -276,9 +316,7 @@ export function ActivitiesView({
       hiddenSportScreens={hiddenSportScreens}
       onAskCoach={onAskCoach}
       benefitFamily={benefitFamily}
-      feelRating={
-        selectedActivity ? feel.get(selectedActivity.activityId) : undefined
-      }
+      feelRating={paneActivity ? feel.get(paneActivity.activityId) : undefined}
     />
   );
 
@@ -306,8 +344,6 @@ export function ActivitiesView({
     );
   }
 
-  const narrowed = filters.sports.length > 0 || filters.query.trim().length > 0;
-
   return (
     <div className="stack stack-fill training-dashboard activities-view">
       <header className="activities-head">
@@ -320,19 +356,8 @@ export function ActivitiesView({
         mix={mixTotals}
         periodLabel={periodLabel}
         selectedSports={filters.sports}
-        onToggleSport={(category) =>
-          setFilters((current) => ({
-            ...current,
-            sports: current.sports.includes(category)
-              ? current.sports.filter((entry) => entry !== category)
-              : [...current.sports, category]
-          }))
-        }
-        onClearFilters={
-          narrowed
-            ? () => setFilters((current) => ({ ...current, sports: [], query: "" }))
-            : undefined
-        }
+        onToggleSport={toggleSport}
+        onClearFilters={narrowed ? clearFilters : undefined}
       />
 
       <section className="panel panel-flex training-activities-split-panel">
