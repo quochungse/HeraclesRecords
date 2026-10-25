@@ -106,6 +106,7 @@ const workout: WorkoutMessages = {
   "workout.view.eachTotal": "Mỗi lần {each} · tổng {total}",
   "workout.view.lifted": "Đã nâng {weight}",
   "workout.view.circuit": "Vòng ×{n}",
+  "workout.view.rest": "Nghỉ {time}",
   "workout.untitled": "Bài tập",
   "workout.detail.volume": "Khối lượng",
   "workout.detail.plannedLoad": "Tải dự kiến",

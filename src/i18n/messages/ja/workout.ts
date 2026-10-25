@@ -106,6 +106,7 @@ const workout: WorkoutMessages = {
   "workout.view.eachTotal": "各 {each} · 合計 {total}",
   "workout.view.lifted": "挙上重量 {weight}",
   "workout.view.circuit": "サーキット ×{n}",
+  "workout.view.rest": "休息 {time}",
   "workout.untitled": "ワークアウト",
   "workout.detail.volume": "ボリューム",
   "workout.detail.plannedLoad": "予定負荷",

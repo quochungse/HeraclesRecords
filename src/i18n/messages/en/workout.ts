@@ -107,6 +107,7 @@ const workout = {
   "workout.view.eachTotal": "{each} each · {total} total",
   "workout.view.lifted": "{weight} lifted",
   "workout.view.circuit": "Circuit ×{n}",
+  "workout.view.rest": "Rest {time}",
   "workout.untitled": "Workout",
   "workout.detail.volume": "Volume",
   "workout.detail.plannedLoad": "Planned load",

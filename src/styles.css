@@ -19649,8 +19649,18 @@ td span {
 }
 
 .sched-lift-scheme {
+  display: flex;
+  align-items: center;
+  gap: 10px;
   font-size: 12px;
   color: var(--text-muted);
+}
+
+.sched-lift-rest {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
 }
 
 .sched-lift-weight {

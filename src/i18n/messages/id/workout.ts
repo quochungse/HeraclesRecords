@@ -106,6 +106,7 @@ const workout: WorkoutMessages = {
   "workout.view.eachTotal": "masing-masing {each} · total {total}",
   "workout.view.lifted": "{weight} terangkat",
   "workout.view.circuit": "Sirkuit ×{n}",
+  "workout.view.rest": "Istirahat {time}",
   "workout.untitled": "Latihan",
   "workout.detail.volume": "Volume",
   "workout.detail.plannedLoad": "Beban rencana",

@@ -55,6 +55,11 @@ export interface ScheduledStepView {
   reps?: number;
   weight?: number;
   weightUnit?: "kg" | "lb";
+  /**
+   * Seconds rested after each set. Only a timed rest (COROS's `restType` 1)
+   * is carried: 3 is "none" and 0 is climbing's, and neither is a pause.
+   */
+  restSeconds?: number;
 }
 
 export interface ScheduledRepeatView {
@@ -286,6 +291,16 @@ function localizeIntensity(
   return { label };
 }
 
+/** A set's rest when it is a timed one; see `ScheduledStepView.restSeconds`. */
+function timedRest(
+  kind: ScheduledStepKind,
+  restType: number | undefined,
+  restValue: number | undefined
+): Pick<ScheduledStepView, "restSeconds"> {
+  if (kind !== "training" || (restType !== undefined && restType !== 1)) return {};
+  return restValue !== undefined && restValue > 0 ? { restSeconds: Math.round(restValue) } : {};
+}
+
 function friendlyStepName(rawName: string, kind: ScheduledStepKind): string {
   const trimmed = rawName.trim();
   // COROS template steps carry opaque names like "T3001" — swap in the kind.
@@ -332,7 +347,8 @@ function parseRawStep(
     sets: finiteNumber(exercise.sets),
     reps: targetType === 3 && targetValue > 0 ? Math.round(targetValue) : undefined,
     weight: intensity.weightValue,
-    weightUnit: intensity.weightUnit
+    weightUnit: intensity.weightUnit,
+    ...timedRest(kind, finiteNumber(exercise.restType), finiteNumber(exercise.restValue))
   };
 }
 
@@ -597,6 +613,16 @@ export function liftSchemeLabel(step: ScheduledStepView): string | undefined {
 }
 
 /**
+ * The pause after each set — "Rest 1:30" — beside the scheme. Stated for a
+ * single set too: there it is the pause before the next exercise.
+ */
+export function liftRestLabel(step: ScheduledStepView): string | undefined {
+  return step.restSeconds
+    ? t("workout.view.rest", { time: formatStepTimeLabel(step.restSeconds) })
+    : undefined;
+}
+
+/**
  * The same view, built from an editor draft instead of a COROS payload.
  *
  * A library workout is only ever read through the editor's document, which
@@ -675,7 +701,8 @@ function draftStepView(
     sets: step.sets,
     reps: step.target.type === "reps" ? step.target.count : undefined,
     weight: intensity.weightValue,
-    weightUnit: intensity.weightUnit
+    weightUnit: intensity.weightUnit,
+    ...timedRest(step.kind, step.restType, step.restValue)
   };
 }
 

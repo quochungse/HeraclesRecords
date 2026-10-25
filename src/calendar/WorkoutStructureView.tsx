@@ -17,6 +17,7 @@ import { ExercisePreview } from "./ExercisePreview";
 import {
   formatStepDistanceLabel,
   formatStepTimeLabel,
+  liftRestLabel,
   liftSchemeLabel,
   type ScheduledNodeView,
   type ScheduledStepKind,
@@ -369,7 +370,7 @@ function buildStrengthBarSegments(view: ScheduledStructureView): BarSegment[] {
           ? step.reps * 4
           : 120;
     const scheme = liftSchemeLabel(step);
-    const label = [step.name, repeat && repeat > 1 ? `×${repeat}` : null, scheme]
+    const label = [step.name, repeat && repeat > 1 ? `×${repeat}` : null, scheme, liftRestLabel(step)]
       .filter(Boolean)
       .join(" · ");
     segments.push({ key, kind: step.kind, grow: sets * perSet, label });
@@ -465,6 +466,7 @@ function LiftCard({
 }) {
   const [showClip, setShowClip] = useState(false);
   const scheme = liftSchemeLabel(step);
+  const rest = liftRestLabel(step);
   const option = step.exerciseId ? exercises?.get(step.exerciseId) : undefined;
   const clip = option?.media?.find((entry) => entry.videoUrl);
   const poster = clip?.coverUrl ?? option?.thumbnailUrl;
@@ -492,7 +494,19 @@ function LiftCard({
       )}
       <div className="sched-lift-text">
         <span className="sched-lift-name">{step.name}</span>
-        {scheme ? <span className="sched-lift-scheme">{scheme}</span> : null}
+        {scheme || rest ? (
+          <span className="sched-lift-scheme">
+            {scheme}
+            {/* What a set is, then what follows it: the pause is half of
+                how the session is paced, and the hero only sums it. */}
+            {rest ? (
+              <span className="sched-lift-rest">
+                <Timer size={11} aria-hidden="true" />
+                {rest}
+              </span>
+            ) : null}
+          </span>
+        ) : null}
       </div>
       {weightLabel ? (
         <span className="sched-lift-weight">{weightLabel}</span>

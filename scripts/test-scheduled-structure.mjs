@@ -11,6 +11,7 @@ const {
   buildScheduledWorkoutView,
   formatStepDistanceLabel,
   formatStepTimeLabel,
+  liftRestLabel,
   liftSchemeLabel
 } = await import(`${modUrl.href}?cacheBust=${Date.now()}`);
 
@@ -506,5 +507,39 @@ assert.equal(namedByCatalog.nodes[1].step.name, "Training");
 const unnamed = buildScheduledWorkoutView(scheduledStrength, "metric");
 assert.equal(unnamed.nodes[0].step.name, "Training");
 assert.equal(unnamed.nodes[0].step.exerciseId, "425831217146019840");
+
+// --- the rest after each set rides beside the scheme ---
+// Only a timed rest (restType 1) is one; 3 is COROS's "none", and a warm-up
+// or a run's step carries no set rest at all.
+const restedRaw = buildScheduledWorkoutView({
+  rawProgram: {
+    sportType: 4,
+    exercises: [
+      { id: "1", exerciseType: 2, targetType: 3, targetValue: 10, sets: 4, restType: 1, restValue: 90, sortNo: 1 },
+      { id: "2", exerciseType: 2, targetType: 3, targetValue: 10, sets: 4, restType: 3, restValue: 90, sortNo: 2 },
+      { id: "3", exerciseType: 2, targetType: 3, targetValue: 10, sets: 4, restType: 1, restValue: 0, sortNo: 3 },
+      { id: "4", exerciseType: 1, targetType: 2, targetValue: 300, restType: 1, restValue: 60, sortNo: 4 }
+    ]
+  }
+}, "metric");
+assert.equal(restedRaw.nodes[0].step.restSeconds, 90);
+assert.equal(liftRestLabel(restedRaw.nodes[0].step), "Rest 1:30");
+assert.equal(restedRaw.nodes[1].step.restSeconds, undefined);
+assert.equal(liftRestLabel(restedRaw.nodes[2].step), undefined);
+assert.equal(restedRaw.nodes[3].step.restSeconds, undefined);
+
+const restedDraft = buildEditorDraftView(
+  {
+    sport: "strength",
+    nodes: [
+      step({ id: "r", sets: 4, restType: 1, restValue: 180, target: { type: "reps", count: 15 } }),
+      step({ id: "n", sets: 1, target: { type: "time", seconds: 300 } })
+    ]
+  },
+  "metric"
+);
+assert.equal(liftRestLabel(restedDraft.nodes[0].step), "Rest 3:00");
+assert.equal(liftSchemeLabel(restedDraft.nodes[0].step), "4 × 15 reps");
+assert.equal(liftRestLabel(restedDraft.nodes[1].step), undefined);
 
 console.log("scheduled-structure tests passed");

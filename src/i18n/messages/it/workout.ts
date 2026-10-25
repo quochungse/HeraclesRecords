@@ -106,6 +106,7 @@ const workout: WorkoutMessages = {
   "workout.view.eachTotal": "{each} ciascuna · {total} in totale",
   "workout.view.lifted": "{weight} sollevati",
   "workout.view.circuit": "Circuito ×{n}",
+  "workout.view.rest": "Recupero {time}",
   "workout.untitled": "Allenamento",
   "workout.detail.volume": "Volume",
   "workout.detail.plannedLoad": "Carico previsto",

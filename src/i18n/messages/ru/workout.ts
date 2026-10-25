@@ -114,6 +114,7 @@ const workout: WorkoutMessages = {
   "workout.view.eachTotal": "по {each} · всего {total}",
   "workout.view.lifted": "Поднято {weight}",
   "workout.view.circuit": "Круг ×{n}",
+  "workout.view.rest": "Отдых {time}",
   "workout.untitled": "Тренировка",
   "workout.detail.volume": "Объём",
   "workout.detail.plannedLoad": "Плановая нагрузка",

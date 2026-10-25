@@ -106,6 +106,7 @@ const workout: WorkoutMessages = {
   "workout.view.eachTotal": "ครั้งละ {each} · รวม {total}",
   "workout.view.lifted": "ยกได้ {weight}",
   "workout.view.circuit": "เซอร์กิต ×{n}",
+  "workout.view.rest": "พัก {time}",
   "workout.untitled": "การฝึก",
   "workout.detail.volume": "ปริมาณ",
   "workout.detail.plannedLoad": "ภาระตามแผน",
