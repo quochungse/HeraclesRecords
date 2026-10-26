@@ -17,7 +17,7 @@
 // - **A model is sent only when it names one.** `streamChat` reads `""` as a
 //   model id on the Messages API, so the providers' "Default model" / "Auto"
 //   must travel as no model at all.
-// - **Effort only reaches the two Claude providers**, as everywhere else.
+// - **ChatGPT effort travels unchanged**, including provider-defined new values.
 // - **"Keep this for Coach chat too" writes what Coach's own pickers write**,
 //   provider by provider, and nothing else.
 // - **A run's trail says what the stream said, and only that** (runTrail.ts):
@@ -59,7 +59,7 @@ const settings = {
 await test("the panel starts at what Coach would run", () => {
   assert.deepEqual(runtime.runtimeFromSettings(settings), { provider: "claude-code", model: "opus", effort: "high" });
   assert.deepEqual(runtime.runtimeFromSettings(settings, "claude-api"), { provider: "claude-api", model: "claude-opus-5", effort: "medium" });
-  assert.deepEqual(runtime.runtimeFromSettings(settings, "chatgpt"), { provider: "chatgpt", model: "", effort: "high" });
+  assert.deepEqual(runtime.runtimeFromSettings(settings, "chatgpt"), { provider: "chatgpt", model: "", effort: "" });
 });
 
 await test("an untouched panel sends nothing; a change sends only itself", () => {
@@ -74,11 +74,14 @@ await test("an untouched panel sends nothing; a change sends only itself", () =>
   );
 });
 
-await test("a default model travels as no model, and effort only to Claude", () => {
+await test("a default model travels as no model, and ChatGPT effort is independent of Claude", () => {
   assert.deepEqual(runtime.requestRuntime({ provider: "claude-code", model: "", effort: "high" }, settings), undefined,
     "Claude Code's Default model is not a model id");
-  assert.deepEqual(runtime.requestRuntime({ provider: "chatgpt", model: "", effort: "max" }, settings), { provider: "chatgpt" },
-    "ChatGPT's Auto is no model, and ChatGPT takes no effort");
+  assert.deepEqual(runtime.requestRuntime({ provider: "chatgpt", model: "", effort: "future-depth" }, settings), { provider: "chatgpt", effort: "future-depth" },
+    "ChatGPT effort values are not restricted to Claude's enum");
+  const withEffort = { ...settings, provider: "chatgpt", chatgpt: { effort: "future-depth" } };
+  assert.deepEqual(runtime.requestRuntime({ provider: "chatgpt", model: "", effort: "" }, withEffort), { effort: "" },
+    "Auto explicitly overrides a saved effort");
   assert.deepEqual(runtime.requestRuntime({ provider: "local", model: "llama", effort: "low" }, settings), { provider: "local" },
     "a local model is chosen in Coach settings, not here");
 });
@@ -92,6 +95,7 @@ await test("keeping it for Coach writes what Coach's pickers write", () => {
   assert.deepEqual(code.claudeCode, { model: undefined, effort: "max", defaultModel: "claude-opus-5" });
   assert.equal(runtime.settingsWithRuntime(settings, { provider: "openrouter", model: "", effort: "high" }).openRouter.model, "openrouter/auto");
   assert.equal(runtime.settingsWithRuntime(settings, { provider: "chatgpt", model: "gpt-5.5", effort: "high" }).chatgpt.model, "gpt-5.5");
+  assert.equal(runtime.settingsWithRuntime(settings, { provider: "chatgpt", model: "gpt-test", effort: "future-depth" }).chatgpt.effort, "future-depth");
   assert.equal(settings.provider, "claude-code", "the settings handed in are not changed");
 });
 

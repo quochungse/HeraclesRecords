@@ -17,7 +17,6 @@
  * and weeks the model numbered differently from everything that read them.
  */
 import type {
-  AnthropicEffort,
   ChatProvider,
   CorosMcpTool,
   PlanWorkoutEntryInput,
@@ -43,6 +42,7 @@ import {
 } from "./trainingPlanDomain";
 import { WORKOUT_SPORTS, formatWorkoutSport } from "./workoutCapabilities";
 import { splitToolName } from "./mcpToolNames";
+import { normalizeRuntimeEffort } from "./chatModels";
 import { screenPlural, screenSport, screenText, screenWeekday } from "./screenText";
 
 export const TRAINING_PLAN_GENERATION_LIMITS = {
@@ -67,7 +67,6 @@ export const TRAINING_PLAN_GOAL_KINDS: readonly TrainingPlanGoalKind[] = ["race"
 const DIFFICULTIES: readonly TrainingPlanDifficulty[] = ["beginner", "intermediate", "advanced", "custom"];
 const DAY_KINDS: readonly TrainingPlanDayKind[] = ["rest", "train", "long", "flex"];
 const PROVIDERS: readonly ChatProvider[] = ["claude-code", "claude-api", "chatgpt", "openrouter", "local"];
-const EFFORTS: readonly AnthropicEffort[] = ["low", "medium", "high", "xhigh", "max"];
 
 /** Which part of the form a problem belongs to, so the form can mark that field. */
 export type TrainingPlanGenerationField =
@@ -383,7 +382,7 @@ export function generationRequestProblems(
   const runtime = request.runtime;
   if (runtime) {
     if (runtime.provider !== undefined && !PROVIDERS.includes(runtime.provider)) add("runtime", screenText("screen.gen.provider"));
-    else if (runtime.effort !== undefined && !EFFORTS.includes(runtime.effort)) add("runtime", screenText("screen.gen.effort"));
+    else if (runtime.effort !== undefined && normalizeRuntimeEffort(runtime.effort, runtime.provider) === undefined) add("runtime", screenText("screen.gen.effort"));
     else if (runtime.model !== undefined && (typeof runtime.model !== "string" || runtime.model.length > 200)) add("runtime", screenText("screen.gen.model"));
   }
   return problems;

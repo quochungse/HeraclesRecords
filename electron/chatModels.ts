@@ -3,7 +3,8 @@ import type {
   AnthropicEffort,
   ChatProvider,
   ChatSettings,
-  ClaudeCodeStatus
+  ClaudeCodeStatus,
+  ModelReasoningConfig
 } from "./types";
 import { screenText } from "./screenText";
 
@@ -42,11 +43,11 @@ export function runtimeOver(
   under: AnalysisRuntime | undefined
 ): AnalysisRuntime {
   const pair = over.provider || over.model ? over : under ?? {};
-  const effort = over.effort || under?.effort;
+  const effort = over.effort ?? under?.effort;
   return {
     ...(pair.provider ? { provider: pair.provider } : {}),
     ...(pair.model ? { model: pair.model } : {}),
-    ...(effort ? { effort } : {})
+    ...(effort !== undefined ? { effort } : {})
   };
 }
 
@@ -56,10 +57,11 @@ export interface ChatModelOption {
   /** Qualifier shown only in an open menu, never on the closed pill. */
   detail?: string;
   /**
-   * Effort levels the model takes, where its provider says. Absent means not
+   * Claude effort levels the model takes, where its provider says. Absent means not
    * stated, and every level is offered; `[]` means it takes none.
    */
   efforts?: AnthropicEffort[];
+  reasoning?: ModelReasoningConfig;
 }
 
 export interface ChatEffortOption {
@@ -101,9 +103,18 @@ export function formatEffortOption(option: ChatEffortOption): string {
   return option.detail ? `${option.label} — ${option.detail}` : option.label;
 }
 
-/** Effort only reaches the two Claude backends; the others ignore it. */
+/** Providers with a reasoning effort control; levels are model-specific. */
 export function supportsReasoningEffort(provider: string): boolean {
-  return provider === "claude-code" || provider === "claude-api";
+  return provider === "claude-code" || provider === "claude-api" || provider === "chatgpt";
+}
+
+/** Persist dynamic ChatGPT values; validate actual support against the model at send time. */
+export function normalizeRuntimeEffort(value: unknown, provider?: string): string | undefined {
+  if (typeof value !== "string" || value.length > 200) return undefined;
+  const effort = value.trim();
+  if (provider === undefined || provider === "chatgpt") return effort;
+  return (provider === "claude-code" || provider === "claude-api") &&
+    REASONING_EFFORT_OPTIONS.some((option) => option.value === effort) ? effort : undefined;
 }
 
 /*
@@ -395,13 +406,42 @@ const EFFORT_ORDER: AnthropicEffort[] = ["low", "medium", "high", "xhigh", "max"
  * that stops at "High" should answer at High, not fail.
  */
 export function effortForModel(
-  effort: AnthropicEffort,
+  requested: string,
   efforts?: readonly AnthropicEffort[]
 ): AnthropicEffort | undefined {
+  const effort = EFFORT_ORDER.find((level) => level === requested) ?? "high";
   if (!efforts) return effort;
   if (efforts.length === 0) return undefined;
   if (efforts.includes(effort)) return effort;
   const asked = EFFORT_ORDER.indexOf(effort);
   const below = EFFORT_ORDER.filter((level, index) => index < asked && efforts.includes(level));
   return below.at(-1) ?? EFFORT_ORDER.find((level) => efforts.includes(level));
+}
+
+/** ChatGPT's choices come exclusively from its model catalog, including new levels. */
+export function reasoningEffortOptions(
+  provider: ChatProvider,
+  model?: ChatModelOption
+): Array<{ value: string; label: string; detail?: string }> {
+  if (provider !== "chatgpt") return effortOptionsFor(model);
+  const config = model?.reasoning;
+  if (!config?.efforts.length) return [];
+  const label = (value: string) => value.charAt(0).toUpperCase() + value.slice(1);
+  const auto = screenText("screen.model.auto");
+  return [
+    { value: "", label: config.defaultEffort ? `${auto} (${label(config.defaultEffort)})` : auto },
+    ...config.efforts.map((level) => ({ value: level.value, label: label(level.value), detail: level.description }))
+  ];
+}
+
+/** A stale ChatGPT choice returns to the model default, never a guessed level. */
+export function reasoningEffortForModel(
+  provider: ChatProvider,
+  effort: string,
+  model?: ChatModelOption
+): string | undefined {
+  if (provider !== "chatgpt") return effortForModel(effort, model?.efforts);
+  const levels = model?.reasoning?.efforts;
+  if (!levels?.length) return undefined;
+  return levels.some((level) => level.value === effort) ? effort : "";
 }

@@ -223,6 +223,7 @@ export const SETTING_POLICY: Readonly<Record<string, SyncTier>> = {
   "chat.provider": "preference",
   "chat.model": "preference",
   "chat.chatgpt.model": "preference",
+  "chat.chatgpt.effort": "preference",
   "chat.openRouter.model": "preference",
   "chat.anthropic.model": "preference",
   "chat.anthropic.effort": "preference",

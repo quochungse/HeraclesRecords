@@ -48,6 +48,9 @@ const {
   effortForModel,
   effortOptionsFor,
   providerModelOptions,
+  reasoningEffortForModel,
+  reasoningEffortOptions,
+  runtimeOver,
   withCurrentModel
 } = await import(distUrl("chatModels.js"));
 const { toClaudeModelOption } = await import(distUrl("claudeCodeProvider.js"));
@@ -375,6 +378,37 @@ check(() => {
 });
 
 // ----- Effort -----
+
+check(() => {
+  const [model] = parseCodexModels({ models: [{ slug: "gpt-test", display_name: "Test",
+    default_reasoning_level: "future-depth",
+    supported_reasoning_levels: [
+      { effort: "none", description: "No reasoning" },
+      { effort: "future-depth", description: "Provider-defined depth" },
+      { effort: "future-depth", description: "duplicate" },
+      { effort: "", description: "blank" }, null
+    ]
+  }] });
+  assert.deepEqual(model.reasoning, { defaultEffort: "future-depth", efforts: [
+    { value: "none", description: "No reasoning" },
+    { value: "future-depth", description: "Provider-defined depth" }
+  ] });
+  assert.deepEqual(parseStoredCatalog(serializeCatalog([model])).models[0], model,
+    "reasoning metadata survives persistence without Claude's whitelist");
+  assert.deepEqual(reasoningEffortOptions("chatgpt", model), [
+    { value: "", label: "Auto (Future-depth)" },
+    { value: "none", label: "None", detail: "No reasoning" },
+    { value: "future-depth", label: "Future-depth", detail: "Provider-defined depth" }
+  ]);
+  assert.equal(reasoningEffortForModel("chatgpt", "future-depth", model), "future-depth");
+  assert.equal(reasoningEffortForModel("chatgpt", "retired-level", model), "");
+  assert.equal(reasoningEffortForModel("chatgpt", "", model), "");
+  assert.deepEqual(reasoningEffortOptions("chatgpt", {}), [], "no guessed levels without metadata");
+  assert.equal(reasoningEffortForModel("chatgpt", "high", {}), undefined);
+  assert.deepEqual(reasoningEffortOptions("chatgpt", { reasoning: { efforts: [] } }), []);
+  assert.deepEqual(runtimeOver({ effort: "" }, { provider: "chatgpt", effort: "future-depth" }),
+    { provider: "chatgpt", effort: "" }, "Auto clears an inherited effort");
+});
 
 check(() => {
   assert.deepEqual(effortOptionsFor(undefined), REASONING_EFFORT_OPTIONS);

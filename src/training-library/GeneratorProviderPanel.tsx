@@ -2,8 +2,8 @@ import { AlertTriangle, ArrowRight, Check, LoaderCircle, X } from "lucide-react"
 import { useEffect, useRef, type ReactNode } from "react";
 import type { ChatProvider, ChatSettings, ClaudeCodeStatus } from "../../electron/types";
 import {
-  effortForModel,
-  effortOptionsFor,
+  reasoningEffortForModel,
+  reasoningEffortOptions,
   supportsReasoningEffort,
   withCurrentModel
 } from "../../electron/chatModels";
@@ -103,8 +103,8 @@ export function GeneratorProviderPanel({
     runtime.model
   );
   const listedModel = models.find((option) => option.value === runtime.model);
-  const efforts = effortOptionsFor(listedModel);
-  const effort = effortForModel(runtime.effort, listedModel?.efforts);
+  const efforts = reasoningEffortOptions(runtime.provider, listedModel);
+  const effort = reasoningEffortForModel(runtime.provider, runtime.effort, listedModel);
   // A provider known not to be set up is left out unless it is the one chosen
   // or Coach's own: a list of six where four cannot answer is noise, and one
   // is connected under AI Model Providers.
@@ -222,17 +222,21 @@ export function GeneratorProviderPanel({
           )}
 
           <p className="tl-eyebrow">{t("library.ai.effort")}</p>
-          {supportsReasoningEffort(runtime.provider) && effort && efforts.length > 0 ? (
+          {supportsReasoningEffort(runtime.provider) && effort !== undefined && efforts.length > 0 ? (
             <OptionGroup
               label={t("library.ai.effort")}
+              className="plan-generator-sheet-effort"
+              mode={runtime.provider === "chatgpt" ? "dropdown" : "expanded"}
               value={effort}
-              options={efforts.map((option) => ({ value: option.value, label: option.label, title: option.detail }))}
+              options={efforts.map((option) => ({ ...option, title: option.detail }))}
               onChange={(next) => onChange({ ...runtime, effort: next })}
             />
           ) : (
             <p className="plan-generator-sheet-note">
               {supportsReasoningEffort(runtime.provider)
-                ? t("library.ai.noEffort", { name: listedModel ? listedModel.label : t("library.ai.thisModel") })
+                ? runtime.provider === "chatgpt" && !listedModel?.reasoning
+                  ? t(runtime.model ? "library.ai.refreshEffort" : "library.ai.chooseEffortModel")
+                  : t("library.ai.noEffort", { name: listedModel ? listedModel.label : t("library.ai.thisModel") })
                 : t("library.ai.noEffort", { name: COACH_PROVIDER_LABELS[runtime.provider] })}
             </p>
           )}

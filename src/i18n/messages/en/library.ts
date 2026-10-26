@@ -264,6 +264,8 @@ const library = {
   "library.ai.runsLocal": "Runs {model}, the local model chosen in Coach settings.",
   "library.ai.effort": "Reasoning effort",
   "library.ai.thisModel": "This model",
+  "library.ai.chooseEffortModel": "Select a model to choose reasoning effort.",
+  "library.ai.refreshEffort": "Refresh ChatGPT in Manage providers to load this model’s reasoning options.",
   "library.ai.noEffort": "{name} has no effort setting.",
   "library.ai.keep": "Keep this for Coach chat too",
   "library.cal.eyebrow": "COROS calendar",

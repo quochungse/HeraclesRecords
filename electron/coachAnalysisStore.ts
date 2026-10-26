@@ -45,6 +45,7 @@ import type {
   CoachAnalysisRunRow
 } from "./database";
 import { ScreenError, withScreenKey } from "./screenText";
+import { normalizeRuntimeEffort } from "./chatModels";
 
 export type { AnalysisLocalTriggerRow, CoachAnalysisRow, CoachAnalysisRunRow };
 
@@ -218,7 +219,6 @@ const CHAT_PROVIDERS = new Set<ChatProvider>([
   "claude-code",
   "local"
 ]);
-const ANTHROPIC_EFFORTS = new Set(["low", "medium", "high", "xhigh", "max"]);
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -393,8 +393,11 @@ export function normalizeAnalysisRuntime(value: unknown): AnalysisRuntime {
   if (model) {
     runtime.model = model;
   }
-  if (typeof value.effort === "string" && ANTHROPIC_EFFORTS.has(value.effort)) {
-    runtime.effort = value.effort as AnalysisRuntime["effort"];
+  const effort = value.provider === undefined || runtime.provider
+    ? normalizeRuntimeEffort(value.effort, runtime.provider)
+    : undefined;
+  if (effort !== undefined) {
+    runtime.effort = effort;
   }
   return runtime;
 }

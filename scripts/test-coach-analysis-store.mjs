@@ -344,6 +344,9 @@ assert.equal(
 
 assert.deepEqual(normalizeAnalysisRuntime({ provider: "openai", effort: "turbo" }), {});
 assert.deepEqual(normalizeAnalysisRuntime({ model: "  gpt  " }), { model: "gpt" });
+assert.deepEqual(normalizeAnalysisRuntime({ provider: "chatgpt", effort: "future-depth" }), { provider: "chatgpt", effort: "future-depth" });
+assert.deepEqual(normalizeAnalysisRuntime({ effort: "" }), { effort: "" });
+assert.deepEqual(normalizeAnalysisRuntime({ provider: "claude-code", effort: "future-depth" }), { provider: "claude-code" });
 
 // A row whose JSON is unparseable still yields a usable analysis.
 db._rows.set("corrupt", {

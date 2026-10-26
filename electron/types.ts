@@ -1521,6 +1521,12 @@ export interface ClaudeCodeLoginStart {
  */
 export type AnthropicEffort = "low" | "medium" | "high" | "xhigh" | "max";
 
+/** Provider-defined values, kept open so new ChatGPT levels need no app update. */
+export interface ModelReasoningConfig {
+  efforts: Array<{ value: string; description?: string }>;
+  defaultEffort?: string;
+}
+
 /**
  * One model a provider offers, as its own list states it. A picker row, and
  * — for the Messages API — what a request to it may carry.
@@ -1535,7 +1541,10 @@ export interface ModelCatalogEntry {
   label: string;
   /** Qualifier shown only in an open menu, never on the closed pill. */
   detail?: string;
+  /** Claude's model-reported subset of its API effort enum. */
   efforts?: AnthropicEffort[];
+  /** ChatGPT's open-ended model config, including its descriptions and default. */
+  reasoning?: ModelReasoningConfig;
   /** Accepts `thinking: { type: "adaptive" }` (Messages API). */
   adaptiveThinking?: boolean;
   /** The model's own ceiling for `max_tokens` (Messages API). */
@@ -1602,6 +1611,8 @@ export interface LocalChatConfig {
 export interface ChatGptConfig {
   /** Optional model id. Empty uses the best model available to the account. */
   model?: string;
+  /** Empty or absent lets the selected model use its own reasoning default. */
+  effort?: string;
 }
 
 export interface OpenRouterConfig {
@@ -1920,8 +1931,9 @@ export const DEFAULT_ANALYSIS_CONDITIONS: AnalysisConditions = {
 };
 
 /**
- * Section 7, decided. An analysis with no effort of its own runs at `low`,
- * whatever its trigger and whatever the interactive chat is set to.
+ * Section 7, decided. A Claude analysis with no effort of its own runs at `low`,
+ * whatever its trigger and whatever the interactive chat is set to. ChatGPT
+ * instead follows the reasoning default reported by the selected account model.
  *
  * Two reasons this is a flat default rather than a trigger-kind carve-out:
  *
@@ -1942,7 +1954,8 @@ export interface AnalysisRuntime {
   /** Defaults to the interactive chat provider when unset. */
   provider?: ChatProvider;
   model?: string;
-  effort?: AnthropicEffort;
+  /** Validated against the selected provider/model before sending. */
+  effort?: string;
 }
 
 /**

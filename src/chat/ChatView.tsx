@@ -47,7 +47,6 @@ import type { HeraclesRecordsApi } from "../heraclesrecords-api";
 import { showToast } from "../toast";
 import { useUnitSystem } from "../units/UnitSystemProvider";
 import type {
-  AnthropicEffort,
   ChatAuthStatus,
   ChatContextCompaction,
   ChatContextInspection,
@@ -145,6 +144,7 @@ import {
   runtimeFromSettings,
   runtimeModelOptions,
   runtimeSummary,
+  settingsWithRuntime,
   type GeneratorRuntime
 } from "../training-library/planGeneratorRuntime";
 import { COACH_PROVIDER_LABELS, coachProviderReadiness } from "./CoachModelsPanel";
@@ -3392,12 +3392,9 @@ export function ChatView({
     }
   };
 
-  const handleEffortChange = async (effort: AnthropicEffort) => {
+  const handleEffortChange = async (effort: string) => {
     if (!api || !supportsReasoningEffort(chatSettings.provider)) return;
-    const nextSettings: ChatSettings =
-      chatSettings.provider === "claude-api"
-        ? { ...chatSettings, anthropic: { ...chatSettings.anthropic, effort } }
-        : { ...chatSettings, claudeCode: { ...chatSettings.claudeCode, effort } };
+    const nextSettings = settingsWithRuntime(chatSettings, { ...runtimeFromSettings(chatSettings), effort });
 
     setChatSettings(nextSettings);
     setSavingSettings(true);
@@ -4529,7 +4526,7 @@ export function ChatView({
   const effectiveRuntime: GeneratorRuntime = {
     ...runtimeFromSettings(chatSettings, conversationRuntime?.provider ?? conversationProvider),
     ...(conversationRuntime?.model ? { model: conversationRuntime.model } : {}),
-    ...(conversationRuntime?.effort ? { effort: conversationRuntime.effort } : {})
+    ...(conversationRuntime?.effort !== undefined ? { effort: conversationRuntime.effort } : {})
   };
   const effectiveProvider = effectiveRuntime.provider;
   // What the composer can send is the conversation's AI.

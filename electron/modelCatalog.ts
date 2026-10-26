@@ -20,6 +20,7 @@ import type {
   CatalogProvider,
   ModelCatalog,
   ModelCatalogEntry,
+  ModelReasoningConfig,
   OpenRouterModelOption
 } from "./types";
 import { ScreenError } from "./screenText";
@@ -43,7 +44,26 @@ export function isStale(fetchedAt: string | undefined, now = Date.now()): boolea
   return !Number.isFinite(at) || now - at >= MODEL_CATALOG_TTL_MS || at > now + MODEL_CATALOG_TTL_MS;
 }
 
-const EFFORTS = new Set(["low", "medium", "high", "xhigh", "max"]);
+const ANTHROPIC_EFFORTS = new Set(["low", "medium", "high", "xhigh", "max"]);
+
+/** Parse provider-defined reasoning metadata without a fixed effort vocabulary. */
+function parseReasoningConfig(raw: unknown): ModelReasoningConfig | undefined {
+  if (!raw || typeof raw !== "object") return undefined;
+  const config = raw as Record<string, unknown>;
+  if (!Array.isArray(config.efforts)) return undefined;
+  const seen = new Set<string>();
+  const efforts = config.efforts.flatMap((raw) => {
+    if (!raw || typeof raw !== "object") return [];
+    const row = raw as Record<string, unknown>;
+    const value = typeof row.value === "string" ? row.value.trim() : "";
+    if (!value || seen.has(value)) return [];
+    seen.add(value);
+    const description = typeof row.description === "string" ? row.description.trim() : "";
+    return [{ value, ...(description ? { description } : {}) }];
+  });
+  const defaultEffort = typeof config.defaultEffort === "string" ? config.defaultEffort.trim() : "";
+  return { efforts, ...(seen.has(defaultEffort) ? { defaultEffort } : {}) };
+}
 
 /**
  * One stored row, checked field by field. A row this build cannot read is
@@ -56,10 +76,12 @@ export function parseCatalogEntry(raw: unknown): ModelCatalogEntry | undefined {
   if (typeof row.value !== "string" || typeof row.label !== "string") return undefined;
   const entry: ModelCatalogEntry = { value: row.value, label: row.label };
   if (typeof row.detail === "string" && row.detail) entry.detail = row.detail;
+  const reasoning = parseReasoningConfig(row.reasoning);
+  if (reasoning) entry.reasoning = reasoning;
   if (Array.isArray(row.efforts)) {
     entry.efforts = row.efforts.filter(
       (level): level is NonNullable<ModelCatalogEntry["efforts"]>[number] =>
-        typeof level === "string" && EFFORTS.has(level)
+        typeof level === "string" && ANTHROPIC_EFFORTS.has(level)
     );
   }
   if (typeof row.adaptiveThinking === "boolean") entry.adaptiveThinking = row.adaptiveThinking;
@@ -226,7 +248,16 @@ export function parseCodexModels(payload: unknown): ModelCatalogEntry[] {
       const priority = typeof row.priority === "number" ? row.priority : Number.MAX_SAFE_INTEGER;
       const label = typeof row.display_name === "string" && row.display_name.trim() ? row.display_name.trim() : slug;
       const detail = typeof row.description === "string" && row.description.trim() ? row.description.trim() : undefined;
-      return [{ entry: { value: slug, label, ...(detail ? { detail } : {}) }, priority, index }];
+      const reasoning = parseReasoningConfig({
+        efforts: Array.isArray(row.supported_reasoning_levels)
+          ? row.supported_reasoning_levels.map((raw) => {
+              const level = raw && typeof raw === "object" ? raw as Record<string, unknown> : {};
+              return { value: level.effort, description: level.description };
+            })
+          : undefined,
+        defaultEffort: row.default_reasoning_level
+      });
+      return [{ entry: { value: slug, label, ...(detail ? { detail } : {}), ...(reasoning ? { reasoning } : {}) }, priority, index }];
     })
     .sort((a, b) => a.priority - b.priority || a.index - b.index)
     .map(({ entry }) => entry);

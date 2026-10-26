@@ -263,6 +263,8 @@ const library: LibraryMessages = {
   "library.ai.runsLocal": "Nutzt {model}, das lokale Modell aus den Coach-Einstellungen.",
   "library.ai.effort": "Denktiefe",
   "library.ai.thisModel": "Dieses Modell",
+  "library.ai.chooseEffortModel": "Wähle ein Modell, um den Denkaufwand einzustellen.",
+  "library.ai.refreshEffort": "Aktualisiere ChatGPT unter Anbieter verwalten, um die Denkoptionen dieses Modells zu laden.",
   "library.ai.noEffort": "{name} hat keine Einstellung für die Denktiefe.",
   "library.ai.keep": "Auch für den Coach-Chat übernehmen",
   "library.cal.eyebrow": "COROS-Kalender",

@@ -263,6 +263,8 @@ const library: LibraryMessages = {
   "library.ai.runsLocal": "ใช้ {model} ซึ่งเป็นโมเดลในเครื่องที่เลือกไว้ในการตั้งค่าโค้ช",
   "library.ai.effort": "ระดับการคิด",
   "library.ai.thisModel": "โมเดลนี้",
+  "library.ai.chooseEffortModel": "เลือกโมเดลเพื่อกำหนดระดับการใช้เหตุผล",
+  "library.ai.refreshEffort": "รีเฟรช ChatGPT ในหน้าจัดการผู้ให้บริการเพื่อโหลดตัวเลือกระดับการใช้เหตุผลของโมเดลนี้",
   "library.ai.noEffort": "{name} ไม่มีการตั้งค่าระดับการคิด",
   "library.ai.keep": "ใช้กับแชตโค้ชด้วย",
   "library.cal.eyebrow": "ปฏิทิน COROS",

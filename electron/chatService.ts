@@ -176,7 +176,7 @@ import {
   type ChatApiKeyStores,
   type ChatSettingsStore
 } from "./chatSettingsStore";
-import { getChatGptModelCandidates } from "./chatModels";
+import { effortForModel, getChatGptModelCandidates, normalizeRuntimeEffort, reasoningEffortForModel } from "./chatModels";
 import { addTokenUsage, countableUsage } from "./tokenUsage";
 import { inlineSuggestionsSection } from "./chatCoachContext";
 import { WEB_SEARCH_TOOL } from "./chatToolSources";
@@ -740,10 +740,11 @@ export function getConversationSettings(sessionId: string): import("./types").Co
   try {
     const parsed = row?.runtimeJson ? (JSON.parse(row.runtimeJson) as Record<string, unknown>) : undefined;
     if (parsed) {
+      const effort = normalizeRuntimeEffort(parsed.effort, isChatProviderName(parsed.provider) ? parsed.provider : getChatSessionProvider(sessionId));
       runtime = {
         ...(isChatProviderName(parsed.provider) ? { provider: parsed.provider } : {}),
         ...(typeof parsed.model === "string" && parsed.model ? { model: parsed.model } : {}),
-        ...(isAnthropicEffortName(parsed.effort) ? { effort: parsed.effort } : {})
+        ...(effort !== undefined ? { effort } : {})
       };
       if (!Object.keys(runtime).length) runtime = undefined;
     }
@@ -823,10 +824,6 @@ export async function streamConversationTurn(
 
 function isChatProviderName(value: unknown): value is ChatProvider {
   return value === "claude-code" || value === "claude-api" || value === "chatgpt" || value === "openrouter" || value === "local";
-}
-
-function isAnthropicEffortName(value: unknown): value is import("./types").AnthropicEffort {
-  return value === "low" || value === "medium" || value === "high" || value === "xhigh" || value === "max";
 }
 
 export function deleteChatSessionById(id: string): void {
@@ -2057,7 +2054,7 @@ async function streamChatTurn(
         tools: chatTools,
         signal: controller.signal,
         model: runtime.model ?? settings.claudeCode.model,
-        effort: runtime.effort ?? settings.claudeCode.effort,
+        effort: effortForModel(runtime.effort ?? settings.claudeCode.effort),
         ...(job ? { plainPrompt: true } : {}),
         ...(job?.thinkingBudget ? { thinkingBudget: job.thinkingBudget } : {}),
         ...(webSearch ? { webSearch: true } : {}),
@@ -2217,7 +2214,7 @@ async function streamChatTurn(
       const baseConfig = {
         ...getAnthropicRuntimeConfig(settings.anthropic),
         ...(runtime.model ? { model: runtime.model } : {}),
-        ...(runtime.effort ? { effort: runtime.effort } : {})
+        ...(runtime.effort !== undefined ? { effort: effortForModel(runtime.effort) } : {})
       };
       const runtimeConfig: AnthropicRuntimeConfig = {
         ...baseConfig,
@@ -2432,7 +2429,8 @@ async function streamChatTurn(
         input,
         tools,
         controller.signal,
-        settings.chatgpt.model
+        runtime.model ?? settings.chatgpt.model,
+        runtime.effort ?? settings.chatgpt.effort
       );
       if ("error" in opened) {
         sendStreamError({ message: opened.error, authError: opened.authError });
@@ -3585,20 +3583,25 @@ async function resolveModelAndOpenStream(
   input: Record<string, unknown>[],
   tools: Record<string, unknown>[],
   signal: AbortSignal,
-  selectedModel?: string
+  selectedModel?: string,
+  selectedEffort?: string
 ): Promise<
   | { response: Response; model: string; tools: Record<string, unknown>[] }
   | { error: string; authError: boolean }
 > {
   let requestTools = tools;
   const cached = getSetting(SETTINGS.model);
-  const listed = getChatSettings().modelCatalogs?.chatgpt?.models.map(
+  const catalog = getChatSettings().modelCatalogs?.chatgpt?.models;
+  const listed = catalog?.map(
     (entry) => entry.value
   );
   const candidates = getChatGptModelCandidates(selectedModel, cached, listed);
 
   let lastDetail = "";
   for (const model of candidates) {
+    // Resolve for each actual candidate (Auto can try another model). Never
+    // send a level absent from that model's account-provided configuration.
+    const effort = reasoningEffortForModel("chatgpt", selectedEffort ?? "", catalog?.find((entry) => entry.value === model));
     const open = (includeReasoningSummary: boolean) =>
       fetch(RESPONSES_URL, {
         method: "POST",
@@ -3619,7 +3622,8 @@ async function resolveModelAndOpenStream(
             instructions,
             input,
             requestTools,
-            includeReasoningSummary
+            includeReasoningSummary,
+            effort
           )
         )
       });

@@ -263,6 +263,8 @@ const library: LibraryMessages = {
   "library.ai.runsLocal": "Chạy {model}, mô hình cục bộ đã chọn trong cài đặt Huấn luyện viên.",
   "library.ai.effort": "Mức suy luận",
   "library.ai.thisModel": "Mô hình này",
+  "library.ai.chooseEffortModel": "Chọn một mô hình để điều chỉnh mức suy luận.",
+  "library.ai.refreshEffort": "Làm mới ChatGPT trong Quản lý nhà cung cấp để tải các mức suy luận của mô hình này.",
   "library.ai.noEffort": "{name} không có tuỳ chọn mức suy luận.",
   "library.ai.keep": "Dùng luôn cho trò chuyện với Huấn luyện viên",
   "library.cal.eyebrow": "Lịch COROS",

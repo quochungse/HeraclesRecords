@@ -263,6 +263,8 @@ const library: LibraryMessages = {
   "library.ai.runsLocal": "使用在教练设置中选择的本地模型 {model}。",
   "library.ai.effort": "推理强度",
   "library.ai.thisModel": "这个模型",
+  "library.ai.chooseEffortModel": "请选择模型以设置推理强度。",
+  "library.ai.refreshEffort": "请在管理提供商中刷新 ChatGPT，以加载此模型的推理选项。",
   "library.ai.noEffort": "{name} 没有推理强度设置。",
   "library.ai.keep": "也用于和教练聊天",
   "library.cal.eyebrow": "COROS 日历",

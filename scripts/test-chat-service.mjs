@@ -241,6 +241,10 @@ const responsesRequest = buildResponsesRequest(
   [{ type: "function", name: "get_metrics" }]
 );
 assert.deepEqual(responsesRequest.reasoning, { summary: "auto" });
+assert.deepEqual(buildResponsesRequest("gpt-test", "Coach", [], [], true, "future-depth").reasoning,
+  { summary: "auto", effort: "future-depth" });
+assert.deepEqual(buildResponsesRequest("gpt-test", "Coach", [], [], false, "future-depth").reasoning,
+  { effort: "future-depth" }, "disabling reasoning summaries must preserve the chosen effort");
 assert.equal(responsesRequest.tool_choice, "auto");
 assert.equal(
   "reasoning" in
@@ -769,11 +773,10 @@ const { MODEL_CATALOG_KEYS } = await import(
   `${distUrl("modelCatalog.js")}?cacheBust=${Date.now()}`
 );
 
-// Effort reaches only the Claude backends; offering it elsewhere would send a
-// parameter those providers reject.
+// ChatGPT levels are model-defined; local still has no effort control.
 assert.equal(supportsReasoningEffort("claude-code"), true);
 assert.equal(supportsReasoningEffort("claude-api"), true);
-assert.equal(supportsReasoningEffort("chatgpt"), false);
+assert.equal(supportsReasoningEffort("chatgpt"), true);
 assert.equal(supportsReasoningEffort("local"), false);
 assert.deepEqual(
   REASONING_EFFORT_OPTIONS.map((option) => option.value),
@@ -951,7 +954,8 @@ const fakeKeyStores = {
 const saved = saveChatSettingsToStore(fakeStore, fakeKeyStores, {
   provider: "claude-code",
   chatgpt: {
-    model: "gpt-5.6-terra"
+    model: "gpt-5.6-terra",
+    effort: "future-depth"
   },
   openRouter: {
     model: "anthropic/claude-sonnet-4",
@@ -995,6 +999,7 @@ const saved = saveChatSettingsToStore(fakeStore, fakeKeyStores, {
 );
 assert.equal(saved.provider, "claude-code");
 assert.equal(saved.chatgpt.model, "gpt-5.6-terra");
+assert.equal(saved.chatgpt.effort, "future-depth", "provider-defined effort survives settings persistence");
 assert.equal(saved.openRouter.model, "anthropic/claude-sonnet-4");
 assert.equal(saved.openRouter.hasApiKey, true);
 assert.equal(saved.openRouter.apiKey, undefined);
@@ -1032,6 +1037,10 @@ assert.equal(storedAnthropicKey, "sk-ant-secret");
 
 const loaded = readChatSettingsFromStore(fakeStore, fakeKeyStores);
 assert.deepEqual(loaded, saved);
+assert.equal(saveChatSettingsToStore(fakeStore, fakeKeyStores, {
+  ...saved, chatgpt: { ...saved.chatgpt, effort: "" }
+}).chatgpt.effort, undefined, "clearing effort restores the provider default");
+saveChatSettingsToStore(fakeStore, fakeKeyStores, saved);
 
 // An empty store reads as the defaults.
 const fromEmptyStore = readChatSettingsFromStore(

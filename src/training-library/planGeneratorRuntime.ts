@@ -13,15 +13,15 @@
  */
 import type {
   AnalysisRuntime,
-  AnthropicEffort,
   ChatProvider,
   ChatSettings,
   ClaudeCodeStatus
 } from "../../electron/types";
 import {
-  REASONING_EFFORT_OPTIONS,
   describeChatModel,
   effortForModel,
+  reasoningEffortForModel,
+  reasoningEffortOptions,
   providerModelOptions,
   settingsModel,
   supportsReasoningEffort,
@@ -36,10 +36,11 @@ export interface GeneratorRuntime {
   provider: ChatProvider;
   /** `""` is the provider's own default ("Default model", "Auto"). */
   model: string;
-  effort: AnthropicEffort;
+  effort: string;
 }
 
-export function settingsEffort(settings: ChatSettings, provider: ChatProvider): AnthropicEffort {
+export function settingsEffort(settings: ChatSettings, provider: ChatProvider): string {
+  if (provider === "chatgpt") return settings.chatgpt.effort ?? "";
   return provider === "claude-api" ? settings.anthropic.effort : settings.claudeCode.effort;
 }
 
@@ -78,16 +79,16 @@ export function settingsWithRuntime(settings: ChatSettings, runtime: GeneratorRu
   const next: ChatSettings = { ...settings, provider: runtime.provider };
   switch (runtime.provider) {
     case "claude-api":
-      next.anthropic = { ...settings.anthropic, model: model || settings.anthropic.model, effort: runtime.effort };
+      next.anthropic = { ...settings.anthropic, model: model || settings.anthropic.model, effort: effortForModel(runtime.effort) ?? settings.anthropic.effort };
       break;
     case "claude-code":
-      next.claudeCode = { ...settings.claudeCode, model: model || undefined, effort: runtime.effort };
+      next.claudeCode = { ...settings.claudeCode, model: model || undefined, effort: effortForModel(runtime.effort) ?? settings.claudeCode.effort };
       break;
     case "openrouter":
       next.openRouter = { ...settings.openRouter, model: model || "openrouter/auto" };
       break;
     case "chatgpt":
-      next.chatgpt = { ...settings.chatgpt, model: model || undefined };
+      next.chatgpt = { ...settings.chatgpt, model: model || undefined, effort: runtime.effort || undefined };
       break;
     case "local":
       break;
@@ -127,8 +128,8 @@ export function runtimeSummary(runtime: GeneratorRuntime, options: readonly Chat
   if (!supportsReasoningEffort(runtime.provider)) return model;
   // The level a request will carry, which is not always the one chosen: a
   // model that stops at High answers a "Max" conversation at High.
-  const level = effortForModel(runtime.effort, listed?.efforts);
+  const level = reasoningEffortForModel(runtime.provider, runtime.effort, listed);
   if (!level) return model;
-  const effort = REASONING_EFFORT_OPTIONS.find((option) => option.value === level)?.label ?? level;
+  const effort = reasoningEffortOptions(runtime.provider, listed).find((option) => option.value === level)?.label ?? level;
   return t("library.runtime.effort", { model, effort });
 }

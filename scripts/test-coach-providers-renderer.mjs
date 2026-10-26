@@ -174,6 +174,55 @@ async function main() {
   await closeProviders();
   await waitFor(async () => (await chatGptRow()) === null, "manual refresh updates conversation AI");
   assert.deepEqual(await harness("consoleErrors"), [], "no renderer errors");
+
+  // ChatGPT offers exactly the levels from its catalog, including values the
+  // application has never heard of. Changes belong to this conversation.
+  const chatGptSettings = { ...settings, provider: "chatgpt",
+    chatgpt: { model: "gpt-test", effort: "none" },
+    modelCatalogs: { chatgpt: { fetchedAt: "2026-10-26T00:00:00.000Z", models: [
+      { value: "gpt-test", label: "Test model", reasoning: {
+        defaultEffort: "future-depth", efforts: [
+          { value: "none", description: "No reasoning" },
+          { value: "future-depth", description: "A new depth supplied by ChatGPT" }
+        ] } },
+      { value: "gpt-other", label: "Other model", reasoning: {
+        defaultEffort: "alternate-depth", efforts: [{ value: "alternate-depth" }] } }
+    ] } }
+  };
+  const conversation = { sessionId: "s1", sources: { activities: true, sleep: true, zones: true },
+    runtime: { provider: "chatgpt" } };
+  await harness("mount", "ChatView", { styles: true }, { ...script,
+    getChatSettings: chatGptSettings, getChatAuthStatus: account,
+    refreshChatModels: { settings: chatGptSettings, errors: {} },
+    listChatSessions: script.listChatSessions.map((session) => ({ ...session, provider: "chatgpt" })),
+    getConversationSettings: conversation, setConversationSettings: "__pending"
+  });
+  await waitFor(() => harness("callCount", "getConversationSettings"), "conversation configuration loaded");
+  await waitFor(() => harness("exists", ".chat-ai-chip"), "ChatGPT conversation");
+  await harness("click", ".chat-ai-chip");
+  const effortTrigger = ".plan-generator-sheet-effort .app-select-trigger";
+  await waitFor(() => harness("exists", effortTrigger), "ChatGPT effort picker");
+  await harness("click", effortTrigger);
+  assert.deepEqual(await evaluate(`Array.from(document.querySelectorAll('.app-select-menu [role="option"]')).map(row => row.dataset.value)`),
+    ["", "none", "future-depth"], "no hardcoded effort levels are injected");
+  assert.match(await harness("text", ".app-select-menu"), /A new depth supplied by ChatGPT/);
+  await harness("click", '.app-select-menu [data-value="future-depth"]');
+  await waitFor(() => harness("callCount", "setConversationSettings"), "effort persisted");
+  assert.equal((await harness("calls", "setConversationSettings")).at(-1).args[0].runtime.effort, "future-depth");
+  await harness("resolvePending", "setConversationSettings", { ...conversation, runtime: { provider: "chatgpt", effort: "future-depth" } });
+  await waitFor(async () => /Future-depth/.test(await harness("text", effortTrigger) ?? ""), "selected effort retained");
+
+  await harness("click", effortTrigger);
+  await harness("click", '.app-select-menu [data-value=""]');
+  await waitFor(async () => (await harness("calls", "setConversationSettings")).at(-1)?.args[0].runtime.effort === "", "Auto clears the saved effort override");
+  await harness("resolvePending", "setConversationSettings", { ...conversation, runtime: { provider: "chatgpt", effort: "" } });
+  await waitFor(async () => /Auto/.test(await harness("text", effortTrigger) ?? ""), "model default shown");
+  await harness("click", '.plan-generator-sheet-models [data-option="gpt-other"]');
+  await waitFor(async () => /Alternate-depth/.test(await harness("text", effortTrigger) ?? ""), "model change loads its own reasoning configuration");
+  await harness("click", effortTrigger);
+  assert.deepEqual(await evaluate(`Array.from(document.querySelectorAll('.app-select-menu [role="option"]')).map(row => row.dataset.value)`),
+    ["", "alternate-depth"]);
+  assert.deepEqual(await harness("consoleErrors"), [], "no effort renderer errors");
   console.log("coach providers renderer OK — login, logout, retry, manual refresh, return from Settings, responsive themes");
 }
 

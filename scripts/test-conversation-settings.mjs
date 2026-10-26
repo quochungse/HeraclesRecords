@@ -74,6 +74,14 @@ assert.deepEqual(chat.getConversationSettings(session.id), {
 });
 
 // Deleting the conversation takes its settings with it.
+const chatGptSession = history.createChatSession("chatgpt");
+for (const effort of ["future-depth", ""]) {
+  const saved = chat.setConversationSettings({ sessionId: chatGptSession.id, sources: everything,
+    runtime: { model: "gpt-test", effort } });
+  assert.equal(saved.runtime.effort, effort, "ChatGPT values and an explicit Auto survive storage");
+}
+chat.deleteChatSessionById(chatGptSession.id);
+
 chat.setConversationSettings({ sessionId: session.id, sources: { activities: false, sleep: true, zones: true } });
 chat.deleteChatSessionById(session.id);
 assert.equal(database.getChatConversationSettingsRow(session.id), undefined);

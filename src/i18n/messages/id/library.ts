@@ -263,6 +263,8 @@ const library: LibraryMessages = {
   "library.ai.runsLocal": "Berjalan di {model}, model lokal yang dipilih di pengaturan Pelatih.",
   "library.ai.effort": "Tingkat penalaran",
   "library.ai.thisModel": "Model ini",
+  "library.ai.chooseEffortModel": "Pilih model untuk mengatur upaya penalaran.",
+  "library.ai.refreshEffort": "Segarkan ChatGPT di Kelola penyedia untuk memuat opsi penalaran model ini.",
   "library.ai.noEffort": "{name} tidak punya pengaturan penalaran.",
   "library.ai.keep": "Pakai juga untuk chat Pelatih",
   "library.cal.eyebrow": "Kalender COROS",

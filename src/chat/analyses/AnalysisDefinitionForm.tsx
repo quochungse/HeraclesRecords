@@ -1,5 +1,4 @@
 import type {
-  AnthropicEffort,
   ChatProvider,
   CoachAnalysisInput
 } from "../../../electron/types";
@@ -94,7 +93,7 @@ export function AnalysisDefinitionForm({
               <EffortSwitch
                 provider={runtimeProvider}
                 model={draft.runtime?.model ?? ""}
-                effort={(draft.runtime?.effort ?? "low") as AnthropicEffort}
+                effort={draft.runtime?.effort ?? (runtimeProvider === "chatgpt" ? "" : "low")}
                 onChange={(effort) =>
                   onChange({ runtime: { ...draft.runtime, effort } })
                 }
