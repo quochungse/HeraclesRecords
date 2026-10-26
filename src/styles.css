@@ -24820,6 +24820,54 @@ button.settings-about-link {
   display: block;
 }
 
+/* One connected provider per line, using the same marks as the AI picker. */
+.coach-provider-summary {
+  display: grid;
+  gap: 6px;
+  padding-top: 4px;
+}
+
+.coach-provider-summary-row {
+  --provider-tone: var(--accent);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  color: var(--text-secondary);
+  font-weight: 500;
+  line-height: 1.4;
+}
+
+.coach-provider-summary-row[data-provider="chatgpt"] {
+  --provider-tone: #2e9e7a;
+}
+
+.coach-provider-summary-row[data-provider="claude-code"],
+.coach-provider-summary-row[data-provider="claude-api"] {
+  --provider-tone: #d97757;
+}
+
+.coach-provider-summary-row[data-provider="openrouter"] {
+  --provider-tone: #7986cb;
+}
+
+.coach-provider-summary-icon {
+  display: grid;
+  flex: 0 0 24px;
+  width: 24px;
+  height: 24px;
+  place-items: center;
+  border: 1px solid color-mix(in srgb, var(--provider-tone) 22%, transparent);
+  border-radius: 7px;
+  background: color-mix(in srgb, var(--provider-tone) 10%, transparent);
+  color: var(--provider-tone);
+}
+
+.coach-provider-summary-row > span:last-child {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
 /* The part of a description that has become a warning: Strength hidden with
    Hevy connected. */
 .settings-pref-warning {

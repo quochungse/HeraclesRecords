@@ -10,7 +10,6 @@ import { ConfirmDialog } from "../training-library/ConfirmDialog";
 import "../training-library/trainingLibrary.css";
 import { ChatSettingsPanel } from "./ChatSettingsPanel";
 import {
-  coachModelsSummaryLine,
   summarizeCoachModels,
   type CoachModelsSummary
 } from "./CoachModelsPanel";
@@ -223,8 +222,7 @@ export function ChatSettingsModal({
           <ChatSettingsPanel
             api={api}
             chatSettings={shownSettings}
-            coachModelsSummary={coachModelsSummaryLine(coachModels)}
-            claudeCodeUpdate={coachModels?.claudeCodeUpdate}
+            coachModelsSummary={coachModels}
             onOpenCoachModels={() => setCoachModelsOpen(true)}
             onUpdateChatSettings={(patch) => setDraft((current) => ({ ...current, ...patch }))}
             pendingBudget={pendingBudget}

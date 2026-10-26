@@ -75,15 +75,9 @@ export const COACH_PROVIDER_LABELS: Readonly<Record<ChatProvider, string>> = mes
 });
 
 export interface CoachModelsSummary {
-  /** The provider Coach will actually use. */
-  active: ChatProvider;
-  activeLabel: string;
-  /** Whether that provider is usable right now. */
-  activeReady: boolean;
+  /** Connected providers, in the same order as the provider panel. */
+  connectedProviders: ChatProvider[];
   connected: number;
-  total: number;
-  /** A newer Claude Code than the one installed, while Coach runs on Claude Code. */
-  claudeCodeUpdate?: ClaudeCodeUpdate;
 }
 
 export interface ClaudeCodeUpdate {
@@ -150,42 +144,12 @@ export function summarizeCoachModels(
   claudeStatus: ClaudeCodeStatus | null
 ): CoachModelsSummary {
   const ready = coachProviderReadiness(chatSettings, authStatus, claudeStatus);
-  const providers = Object.keys(ready) as ChatProvider[];
+  const connectedProviders = COACH_PROVIDER_ORDER.filter((provider) => ready[provider]);
 
   return {
-    active: chatSettings.provider,
-    activeLabel: COACH_PROVIDER_LABELS[chatSettings.provider],
-    activeReady: ready[chatSettings.provider],
-    connected: providers.filter((provider) => ready[provider]).length,
-    total: providers.length,
-    claudeCodeUpdate: claudeCodeUpdateFor(chatSettings.provider, claudeStatus)
+    connectedProviders,
+    connected: connectedProviders.length
   };
-}
-
-/**
- * The summary as one line, shared by the Connections row in Settings and the
- * row at the top of Coach settings so the two never word it differently.
- */
-export function coachModelsSummaryLine(
-  summary: CoachModelsSummary | null
-): string {
-  if (!summary) {
-    return t("settings.mcp.checking");
-  }
-  if (summary.connected === 0) {
-    return t("settings.coachModels.none");
-  }
-
-  return t(
-    summary.activeReady
-      ? "settings.coachModels.summaryInUse"
-      : "settings.coachModels.summaryNotReady",
-    {
-      model: summary.activeLabel,
-      connected: summary.connected,
-      total: summary.total,
-    },
-  );
 }
 
 /**
@@ -877,7 +841,6 @@ export function CoachModelsPanel({ api, onChange }: CoachModelsPanelProps) {
     claudeStatus?.state === "not-installed" ||
     Boolean(chatSettings.claudeCode.executablePath) ||
     claudeExecutableEdited;
-  const claudeCodeUpdate = claudeCodeUpdateFor(chatSettings.provider, claudeStatus);
   const availableLocalServers =
     localDiscovery?.servers.filter(
       (server) => server.ok && server.models.length > 0
@@ -1002,8 +965,6 @@ export function CoachModelsPanel({ api, onChange }: CoachModelsPanelProps) {
             ) : null}
           </div>
         </div>
-
-        {claudeCodeUpdate ? <ClaudeCodeUpdateNote update={claudeCodeUpdate} /> : null}
 
         {showClaudeExecutable ? (
           <label className="chat-local-field">

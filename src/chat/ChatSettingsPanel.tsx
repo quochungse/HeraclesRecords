@@ -19,11 +19,8 @@ import {
   normalizeContextDetail
 } from "../../electron/chatContextCompaction";
 import { compressionModelFor, providerModelOptions } from "../../electron/chatModels";
-import {
-  COACH_PROVIDER_LABELS,
-  ClaudeCodeUpdateNote,
-  type ClaudeCodeUpdate
-} from "./CoachModelsPanel";
+import { COACH_PROVIDER_LABELS, type CoachModelsSummary } from "./CoachModelsPanel";
+import { CoachProviderSummary } from "./CoachProviderSummary";
 import type { HeraclesRecordsApi } from "../heraclesrecords-api";
 import { formatTokens } from "./analyses/analysisLabels";
 import { OptionGroup } from "../components/OptionGroup";
@@ -42,7 +39,6 @@ export function ChatSettingsPanel({
   api,
   chatSettings,
   coachModelsSummary,
-  claudeCodeUpdate,
   onOpenCoachModels,
   onUpdateChatSettings,
   pendingBudget,
@@ -50,10 +46,8 @@ export function ChatSettingsPanel({
 }: {
   api: HeraclesRecordsApi | undefined;
   chatSettings: ChatSettings;
-  /** One line describing what is connected, or null while it is being read. */
-  coachModelsSummary: string | null;
-  /** A newer Claude Code than the one installed, while Coach runs on it. */
-  claudeCodeUpdate?: ClaudeCodeUpdate;
+  /** Connected providers, or null while connections are being read. */
+  coachModelsSummary: CoachModelsSummary | null;
   onOpenCoachModels: () => void;
   onUpdateChatSettings: (patch: Partial<ChatSettings>) => void;
   /** The analyses' monthly budget as edited, or `undefined` while it is the saved one. */
@@ -101,7 +95,7 @@ export function ChatSettingsPanel({
         </span>
         <span className="settings-nav-row-copy">
           <strong>{t("chat.models.title")}</strong>
-          <span>{coachModelsSummary ?? t("chat.set.checking")}</span>
+          <CoachProviderSummary summary={coachModelsSummary} />
         </span>
         <ChevronRight
           className="settings-row-chevron"
@@ -110,8 +104,6 @@ export function ChatSettingsPanel({
           aria-hidden="true"
         />
       </button>
-
-      {claudeCodeUpdate ? <ClaudeCodeUpdateNote update={claudeCodeUpdate} /> : null}
 
       <section className="chat-settings-section">
         <h3>{t("chat.set.style")}</h3>

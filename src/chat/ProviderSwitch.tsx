@@ -1,8 +1,8 @@
-import { Bot, KeyRound, Network, Sparkles, Terminal } from "lucide-react";
 import type { ChatProvider } from "../../electron/types";
 import { SelectDropdown } from "../components/SelectDropdown";
 import { t } from "../i18n/core";
 import { COACH_PROVIDER_LABELS } from "./CoachModelsPanel";
+import { ProviderIcon } from "./ProviderIcon";
 
 const PROVIDERS: ChatProvider[] = ["chatgpt", "claude-code", "claude-api", "openrouter", "local"];
 
@@ -18,19 +18,7 @@ function getProviderTone(provider: ChatProvider) {
 }
 
 function renderProviderIcon(provider: ChatProvider) {
-  if (provider === "claude-code") {
-    return <Terminal size={14} strokeWidth={2.1} aria-hidden="true" />;
-  }
-  if (provider === "claude-api") {
-    return <KeyRound size={14} strokeWidth={2.1} aria-hidden="true" />;
-  }
-  if (provider === "local") {
-    return <Bot size={14} strokeWidth={2.1} aria-hidden="true" />;
-  }
-  if (provider === "openrouter") {
-    return <Network size={14} strokeWidth={2.1} aria-hidden="true" />;
-  }
-  return <Sparkles size={14} strokeWidth={2.1} aria-hidden="true" />;
+  return <ProviderIcon provider={provider} />;
 }
 
 export function ProviderSwitch({

@@ -34,7 +34,7 @@ const account = {
 const script = {
   getChatAuthStatus: { signedIn: false },
   getChatSettings: settings,
-  getClaudeCodeStatus: { state: "connected" },
+  getClaudeCodeStatus: { state: "connected", version: "2.0.0", newerVersion: "2.1.0" },
   refreshChatModels: { settings, errors: {} },
   getCorosMcpStatus: { connected: false },
   getMcpStatuses: [],
@@ -82,6 +82,8 @@ async function main() {
 
   // A failed login stays local to the account card and can be retried.
   await openProviders();
+  assert.doesNotMatch(await harness("text", ".app-modal-body"), /claude update|Claude Code 2\.1\.0 is available/,
+    "provider settings omit the Claude upgrade reminder even when an update is available");
   await harness("setScript", { loginChat: { __reject: "Sign-in cancelled" } });
   await harness("click", ".chat-settings-signin");
   await waitFor(() => harness("exists", ".chatgpt-account-card [role='alert']"), "inline login error");
@@ -223,6 +225,54 @@ async function main() {
   assert.deepEqual(await evaluate(`Array.from(document.querySelectorAll('.app-select-menu [role="option"]')).map(row => row.dataset.value)`),
     ["", "alternate-depth"]);
   assert.deepEqual(await harness("consoleErrors"), [], "no effort renderer errors");
+
+  // Settings summaries list every connected provider, regardless of which
+  // provider is selected. Missing connections never appear in that list.
+  const allConnected = { ...settings,
+    anthropic: { ...settings.anthropic, hasApiKey: true },
+    openRouter: { ...settings.openRouter, hasApiKey: true },
+    local: { ...settings.local, model: "local-test-model" }
+  };
+  for (const scenario of [
+    { settings: allConnected, auth: account, claude: script.getClaudeCodeStatus,
+      providers: ["ChatGPT", "Claude subscription", "Claude API key", "OpenRouter", "Local model"] },
+    { settings: allConnected, auth: { signedIn: false }, claude: { state: "sign-in-required" },
+      providers: ["Claude API key", "OpenRouter", "Local model"] },
+    { settings, auth: { signedIn: false }, claude: { state: "sign-in-required" },
+      providers: [] }
+  ]) {
+    await harness("mount", "ChatSettingsModal", { styles: true }, { ...script,
+      getChatSettings: scenario.settings, getChatAuthStatus: scenario.auth,
+      getClaudeCodeStatus: scenario.claude,
+      getCoachAnalysisPause: null, getCoachAnalysisSpend: null
+    });
+    const providerRows = () => evaluate(`Array.from(document.querySelectorAll('.coach-provider-summary-row')).map(row => row.textContent)`);
+    await waitFor(async () => scenario.providers.length > 0
+      ? JSON.stringify(await providerRows()) === JSON.stringify(scenario.providers)
+      : (await harness("text", ".chat-settings-nav-row .settings-nav-row-copy > span")) === "Nothing connected yet. Add an account or key to start coaching.",
+      `connected provider rows: ${scenario.providers.join(", ") || "none"}`);
+    assert.doesNotMatch(await harness("text", ".chat-settings-nav-row"), /\d+ of \d+ providers connected/,
+      "connection counts are omitted");
+    assert.equal(await evaluate(`Array.from(document.querySelectorAll('.coach-provider-summary-row')).every(row => row.querySelector('svg[aria-hidden="true"]'))`), true,
+      "each provider has an icon");
+    if (scenario.providers.length > 0) {
+      await waitFor(() => harness("appStylesReady"), "provider summary styles");
+      for (const width of [1200, 420]) {
+        win.setSize(width, 900);
+        for (const theme of ["dark", "paper"]) {
+          await evaluate(`document.documentElement.dataset.theme = ${JSON.stringify(theme)}`);
+          assert.ok((await harness("overflowX", ".chat-settings-nav-row")) <= 1, `${width}px ${theme}: providers fit`);
+          assert.equal(await evaluate(`(() => {
+            const rows = Array.from(document.querySelectorAll('.coach-provider-summary-row')).map(row => row.getBoundingClientRect());
+            return rows.every((row, index) => index === 0 || row.top > rows[index - 1].bottom);
+          })()`), true, "each provider occupies a separate line");
+        }
+      }
+    }
+    assert.doesNotMatch(await harness("text", ".chat-settings-modal-body"), /claude update|Claude Code 2\.1\.0 is available/,
+      "Coach settings omit the Claude upgrade reminder");
+    assert.deepEqual(await harness("consoleErrors"), [], "no settings renderer errors");
+  }
   console.log("coach providers renderer OK — login, logout, retry, manual refresh, return from Settings, responsive themes");
 }
 

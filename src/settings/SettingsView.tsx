@@ -36,10 +36,10 @@ import { getPrimaryViewLabel } from "../navigation/startupView";
 import { SPORT_SCREENS, type SportScreen } from "../navigation/sportScreens";
 import { RunnerIcon } from "../running/runnerIcon";
 import {
-  coachModelsSummaryLine,
   summarizeCoachModels,
   type CoachModelsSummary
 } from "../chat/CoachModelsPanel";
+import { CoachProviderSummary } from "../chat/CoachProviderSummary";
 import { summarizeMcpStatuses } from "../chat/McpServersPanel";
 import type { HeraclesRecordsApi } from "../heraclesrecords-api";
 import { CoachModelsModal } from "./CoachModelsModal";
@@ -80,9 +80,7 @@ interface McpSummary {
   tools: number;
 }
 
-/* The MCP and AI Model Providers rows state the count on one line and what it
-   amounts to on the next, the part worth reading at a glance in bold — joined
-   by a dot on one line, the second half wrapped wherever the column ended. */
+/* Emphasize the number of tools in the MCP connection summary. */
 const BOLD = { b: (chunk: ReactNode) => <strong>{chunk}</strong> };
 
 function mcpSummaryDetail(summary: McpSummary | null): ReactNode {
@@ -106,42 +104,6 @@ function mcpSummaryDetail(summary: McpSummary | null): ReactNode {
       <span className="settings-pref-line">
         {renderRich(plural("settings.mcp.tools", summary.tools), BOLD)}
       </span>
-    </>
-  );
-}
-
-function coachModelsDetail(summary: CoachModelsSummary | null): ReactNode {
-  if (!summary || summary.connected === 0) {
-    return coachModelsSummaryLine(summary);
-  }
-  return (
-    <>
-      {t("settings.coachModels.providers", {
-        connected: summary.connected,
-        total: summary.total,
-      })}
-      <span className="settings-pref-line">
-        {renderRich(
-          t(
-            summary.activeReady
-              ? "settings.coachModels.inUse"
-              : "settings.coachModels.notReady",
-            { model: summary.activeLabel },
-          ),
-          BOLD,
-        )}
-      </span>
-      {summary.claudeCodeUpdate ? (
-        <span className="settings-pref-line settings-pref-warning">
-          {renderRich(
-            t("settings.coachModels.claudeUpdate", {
-              latest: summary.claudeCodeUpdate.latest,
-              installed: summary.claudeCodeUpdate.installed,
-            }),
-            { code: (chunk: ReactNode) => <code>{chunk}</code> },
-          )}
-        </span>
-      ) : null}
     </>
   );
 }
@@ -786,14 +748,8 @@ export function SettingsView({
 
           <SettingsPrefRow
             title={t("settings.coachModels.title")}
-            detail={coachModelsDetail(coachModels)}
-            tone={
-              !coachModels || coachModels.connected === 0
-                ? undefined
-                : coachModels.activeReady
-                  ? "success"
-                  : "warning"
-            }
+            detail={<CoachProviderSummary summary={coachModels} />}
+            tone={coachModels && coachModels.connected > 0 ? "success" : undefined}
           >
             <button
               className="settings-row-button"
