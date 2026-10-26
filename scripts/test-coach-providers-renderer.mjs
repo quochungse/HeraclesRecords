@@ -1,6 +1,7 @@
 // Exercise the real Manage providers → conversation AI flow. ChatGPT must
 // become selectable without remounting Coach, including after visiting Settings.
 import assert from "node:assert/strict";
+import fs from "node:fs";
 import path from "node:path";
 import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
@@ -45,6 +46,10 @@ const script = {
   listCoachAnalysesForSession: []
 };
 let win;
+let providerLoads = 0;
+let blockProviderLoad = true;
+let failProviderLoad = false;
+let releaseProviderLoad;
 const evaluate = (source) => win.webContents.executeJavaScript(source, true);
 const harness = (method, ...args) => evaluate(`window.__harness.${method}(${args.map((arg) => JSON.stringify(arg)).join(",")})`);
 async function waitFor(read, description) {
@@ -75,7 +80,22 @@ async function main() {
   await app.whenReady();
   win = new BrowserWindow({ show: false, width: 1200, height: 900,
     webPreferences: { backgroundThrottling: false } });
+  const providerAsset = fs.readdirSync(path.join(repoRoot, "dist-harness/assets"))
+    .find((name) => /^CoachModelsPanel-.*\.js$/.test(name));
+  assert.ok(providerAsset, "provider management must be a separate renderer chunk");
   win.webContents.session.webRequest.onBeforeRequest((details, callback) => {
+    if (details.url.endsWith(`/assets/${providerAsset}`)) {
+      providerLoads += 1;
+      if (failProviderLoad) {
+        failProviderLoad = false;
+        callback({ cancel: true });
+        return;
+      }
+      if (blockProviderLoad) {
+        releaseProviderLoad = callback;
+        return;
+      }
+    }
     callback({ cancel: /^(https?|wss?):/.test(details.url) });
   });
   await win.loadFile(path.join(repoRoot, "dist-harness/index.html"));
@@ -85,9 +105,18 @@ async function main() {
   await harness("click", ".chat-ai-chip");
   await waitFor(() => harness("exists", ".plan-generator-provider-list"), "conversation AI sheet");
   assert.equal(await chatGptRow(), null, "signed-out, nonselected ChatGPT is initially hidden");
+  assert.equal(providerLoads, 0, "opening Coach and its AI sheet does not fetch provider management");
 
   // A failed login stays local to the account card and can be retried.
-  await openProviders();
+  await harness("clickText", ".plan-generator-sheet-link", "Manage providers");
+  await waitFor(() => Boolean(releaseProviderLoad), "Manage starts loading the provider chunk");
+  assert.equal(await harness("exists", ".coach-models-panel[aria-busy='true'] .coach-models-skeleton"), true,
+    "the modal shows a skeleton while its code is loading");
+  assert.equal(await harness("exists", ".chatgpt-account-card"), false);
+  blockProviderLoad = false;
+  releaseProviderLoad({ cancel: false });
+  releaseProviderLoad = undefined;
+  await waitFor(() => harness("exists", ".chatgpt-account-card"), "provider chunk finishes loading");
   assert.doesNotMatch(await harness("text", ".app-modal-body"), /claude update|Claude Code 2\.1\.0 is available/,
     "provider settings omit the Claude upgrade reminder even when an update is available");
   await harness("setScript", { loginChat: { __reject: "Sign-in cancelled" } });
@@ -415,7 +444,29 @@ async function main() {
   assert.equal(await harness("attr", apiModel, "data-value"), "claude-opus-5");
   assert.deepEqual(await harness("consoleErrors"), [], "save failures are handled");
 
-  console.log("coach providers renderer OK — login, logout, retry, manual refresh, return from Settings, responsive themes");
+  // A failed chunk stays inside the provider modal, whose close control keeps
+  // working. Closing it preserves the Coach settings draft held by the caller.
+  // A browser caches failed module imports, so resetting React.lazy would
+  // offer a retry that can never succeed in the same document.
+  failProviderLoad = true;
+  await win.loadFile(path.join(repoRoot, "dist-harness/index.html"));
+  await harness("mount", "ChatSettingsModal", { styles: true }, { ...script,
+    getCoachAnalysisPause: null, getCoachAnalysisSpend: null
+  });
+  await waitFor(() => harness("exists", ".chat-custom-instructions"), "Coach settings is ready for a draft");
+  assert.equal(await harness("setValue", ".chat-custom-instructions", "Keep my unsaved instructions"), true);
+  await waitFor(async () => /Unsaved changes/.test(await harness("text", ".chat-settings-modal-footer")), "instructions draft is retained");
+  await harness("click", ".chat-settings-nav-row .settings-row-button");
+  await waitFor(() => harness("exists", ".coach-models-panel > [role='alert']"), "chunk failure stays in the dialog");
+  assert.equal(await harness("callCount", "getChatSettings"), 0, "failed code never reads provider settings");
+  await harness("click", ".coach-models-backdrop .app-modal-header .icon-button");
+  await waitFor(async () => !(await harness("exists", ".coach-models-backdrop")), "failed provider dialog can close");
+  assert.equal(await harness("value", ".chat-custom-instructions"), "Keep my unsaved instructions");
+  assert.equal(await harness("callCount", "prop:onClose"), 0, "chunk failure preserves the parent dialog");
+  assert.equal((await harness("consoleErrors")).some((error) => /unhandled rejection|uncaught:/.test(error)), false,
+    "the chunk error is caught by the provider boundary");
+
+  console.log("coach providers renderer OK — lazy loading, chunk failure, login, logout, manual refresh, return from Settings, responsive themes");
 }
 
 main().then(() => app.quit()).catch((error) => {

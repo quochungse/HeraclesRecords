@@ -1,13 +1,11 @@
 import type { ChatProvider } from "../../electron/types";
 import { SelectDropdown } from "../components/SelectDropdown";
 import { t } from "../i18n/core";
-import { COACH_PROVIDER_LABELS } from "./CoachModelsPanel";
+import { COACH_PROVIDER_LABELS, COACH_PROVIDER_ORDER } from "./coachProviders";
 import { ProviderIcon } from "./ProviderIcon";
 
-const PROVIDERS: ChatProvider[] = ["chatgpt", "claude-code", "claude-api", "openrouter", "local"];
-
 function providerOptions(): Array<{ value: ChatProvider; label: string }> {
-  return PROVIDERS.map((value) => ({ value, label: COACH_PROVIDER_LABELS[value] }));
+  return COACH_PROVIDER_ORDER.map((value) => ({ value, label: COACH_PROVIDER_LABELS[value] }));
 }
 
 function getProviderTone(provider: ChatProvider) {

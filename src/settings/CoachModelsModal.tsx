@@ -1,7 +1,7 @@
-import { useEffect, type MouseEvent } from "react";
+import { Component, Suspense, lazy, useEffect, type MouseEvent, type ReactNode } from "react";
 import { BrainCircuit, X } from "lucide-react";
 import type { HeraclesRecordsApi } from "../heraclesrecords-api";
-import { CoachModelsPanel } from "../chat/CoachModelsPanel";
+import { CoachModelsSkeleton } from "../chat/CoachModelsSkeleton";
 import { t } from "../i18n/core";
 
 export interface CoachModelsModalProps {
@@ -9,6 +9,27 @@ export interface CoachModelsModalProps {
   open: boolean;
   onClose: () => void;
   onChange?: () => void | Promise<void>;
+}
+
+const LazyProviderPanel = lazy(() => import("../chat/CoachModelsPanel").then(({ CoachModelsPanel }) => ({
+  default: CoachModelsPanel
+})));
+
+class ProviderPanelBoundary extends Component<{ children: ReactNode }, { failed: boolean }> {
+  state = { failed: false };
+
+  static getDerivedStateFromError() {
+    return { failed: true };
+  }
+
+  render() {
+    if (!this.state.failed) return this.props.children;
+    return (
+      <div className="chat-settings-panel coach-models-panel">
+        <p className="mcp-servers-error" role="alert">{t("chat.models.err.load")}</p>
+      </div>
+    );
+  }
 }
 
 /**
@@ -80,7 +101,11 @@ export function CoachModelsModal({
           <p className="app-modal-copy">
             {t("app.coachModels.intro")}
           </p>
-          <CoachModelsPanel api={api} onChange={onChange} />
+          <ProviderPanelBoundary>
+            <Suspense fallback={<CoachModelsSkeleton />}>
+              <LazyProviderPanel api={api} onChange={onChange} />
+            </Suspense>
+          </ProviderPanelBoundary>
         </div>
       </section>
     </div>

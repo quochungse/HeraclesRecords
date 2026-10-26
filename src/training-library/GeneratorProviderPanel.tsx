@@ -10,9 +10,9 @@ import {
 import { OptionGroup } from "../components/OptionGroup";
 import {
   COACH_PROVIDER_LABELS,
-  ClaudeCodeUpdateNote,
   claudeCodeUpdateFor
-} from "../chat/CoachModelsPanel";
+} from "../chat/coachProviders";
+import { ClaudeCodeUpdateNote } from "../chat/ClaudeCodeUpdateNote";
 import {
   GENERATOR_PROVIDERS,
   modelChipLabel,

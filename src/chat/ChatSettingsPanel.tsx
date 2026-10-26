@@ -19,7 +19,7 @@ import {
   normalizeContextDetail
 } from "../../electron/chatContextCompaction";
 import { compressionModelFor, providerModelOptions } from "../../electron/chatModels";
-import { COACH_PROVIDER_LABELS } from "./CoachModelsPanel";
+import { COACH_PROVIDER_LABELS } from "./coachProviders";
 import type { HeraclesRecordsApi } from "../heraclesrecords-api";
 import { formatTokens } from "./analyses/analysisLabels";
 import { OptionGroup } from "../components/OptionGroup";

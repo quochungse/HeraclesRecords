@@ -2,7 +2,6 @@ import { useCallback, useEffect, useState } from "react";
 import {
   AlertCircle,
   Bot,
-  CircleArrowUp,
   CircleCheck,
   ExternalLink,
   KeyRound,
@@ -18,7 +17,6 @@ import { OptionGroup } from "../components/OptionGroup";
 import type {
   AnthropicApiConnectionTest,
   ChatAuthStatus,
-  ChatProvider,
   ChatSettings,
   ClaudeCodeStatus,
   LocalChatConnectionTest,
@@ -39,8 +37,8 @@ import { ProviderIcon } from "./ProviderIcon";
 import { ClaudeCodeLoginCard } from "./ClaudeCodeLoginCard";
 import { detectAndAdoptLocalServer } from "./localModelDetection";
 import type { HeraclesRecordsApi } from "../heraclesrecords-api";
-import { getIntlLocale, messageRecord, plural, t } from "../i18n/core";
-import { renderRich } from "../i18n/useI18n";
+import { getIntlLocale, plural, t } from "../i18n/core";
+import { CoachModelsSkeleton } from "./CoachModelsSkeleton";
 
 function claudeStatusLabel(status: ClaudeCodeStatus | null): string {
   if (!status) return t("chat.models.status.notChecked");
@@ -52,105 +50,9 @@ function claudeStatusLabel(status: ClaudeCodeStatus | null): string {
   return t("chat.models.status.failed");
 }
 
-/** Section order in the panel, which is also the skeleton's row count. */
-const COACH_PROVIDER_ORDER: ChatProvider[] = [
-  "chatgpt",
-  "claude-code",
-  "claude-api",
-  "openrouter",
-  "local"
-];
-
 /** "plus" → "Plus", "prolite" stays readable: the claim is a lowercase slug. */
 function chatGptPlanLabel(plan: string): string {
   return plan.charAt(0).toUpperCase() + plan.slice(1);
-}
-
-/** Each provider's name: two brands, and three that say what they are. */
-export const COACH_PROVIDER_LABELS: Readonly<Record<ChatProvider, string>> = messageRecord<ChatProvider>({
-  chatgpt: "chat.provider.chatgpt",
-  "claude-code": "chat.provider.claude-code",
-  "claude-api": "chat.provider.claude-api",
-  openrouter: "chat.provider.openrouter",
-  local: "chat.provider.local"
-});
-
-export interface CoachModelsSummary {
-  /** Connected providers, in the same order as the provider panel. */
-  connectedProviders: ChatProvider[];
-  connected: number;
-}
-
-export interface ClaudeCodeUpdate {
-  installed: string;
-  latest: string;
-}
-
-/**
- * A newer Claude Code to tell the athlete about — only while `provider` (Coach's,
- * or a conversation's) is Claude Code, since nothing else runs the CLI.
- */
-export function claudeCodeUpdateFor(
-  provider: ChatProvider,
-  claudeStatus: ClaudeCodeStatus | null
-): ClaudeCodeUpdate | undefined {
-  if (provider !== "claude-code") return undefined;
-  const installed = claudeStatus?.version?.match(/\d+\.\d+\.\d+/)?.[0];
-  const latest = claudeStatus?.newerVersion;
-  return installed && latest ? { installed, latest } : undefined;
-}
-
-/** The notice itself, worded once for every screen that shows it. */
-export function ClaudeCodeUpdateNote({ update }: { update: ClaudeCodeUpdate }) {
-  return (
-    <p className="coach-analysis-banner" role="status">
-      <CircleArrowUp size={15} aria-hidden="true" />
-      <span>
-        {renderRich(t("chat.models.claudeUpdate", { latest: update.latest, installed: update.installed }), {
-          b: (chunk) => <strong>{chunk}</strong>,
-          code: (chunk) => <code>{chunk}</code>
-        })}
-      </span>
-    </p>
-  );
-}
-
-/**
- * Whether each provider is usable, by the rule `summarizeCoachModels` states
- * below. A status not read yet (`null`) counts as not ready.
- */
-export function coachProviderReadiness(
-  chatSettings: ChatSettings,
-  authStatus: ChatAuthStatus | null,
-  claudeStatus: ClaudeCodeStatus | null
-): Record<ChatProvider, boolean> {
-  return {
-    chatgpt: authStatus?.signedIn === true,
-    "claude-code": claudeStatus?.state === "connected",
-    "claude-api": chatSettings.anthropic.hasApiKey === true,
-    openrouter: chatSettings.openRouter.hasApiKey === true,
-    local: chatSettings.local.model.trim().length > 0
-  };
-}
-
-/**
- * Which providers are actually usable, for the Connections row that opens this
- * panel. "Connected" means the credential each provider needs is in place — a
- * signed-in account, a stored key, or a chosen local model — not that a request
- * has been made with it.
- */
-export function summarizeCoachModels(
-  chatSettings: ChatSettings,
-  authStatus: ChatAuthStatus | null,
-  claudeStatus: ClaudeCodeStatus | null
-): CoachModelsSummary {
-  const ready = coachProviderReadiness(chatSettings, authStatus, claudeStatus);
-  const connectedProviders = COACH_PROVIDER_ORDER.filter((provider) => ready[provider]);
-
-  return {
-    connectedProviders,
-    connected: connectedProviders.length
-  };
 }
 
 /**
@@ -297,16 +199,11 @@ export function CoachModelsPanel({ api, onChange }: CoachModelsPanelProps) {
   // small and jump to full height once the settings arrived.
   if (!api || !chatSettings) {
     return (
-      <div className="chat-settings-panel coach-models-panel" aria-busy={!error}>
-        {error ? <p className="mcp-servers-error" role="alert">{error}</p> : null}
-        {COACH_PROVIDER_ORDER.map((provider) => (
-          <div className="coach-models-skeleton" key={provider}>
-            <i className="coach-models-skeleton-title" />
-            <i className="coach-models-skeleton-line" />
-            <i className="coach-models-skeleton-field" />
-          </div>
-        ))}
-      </div>
+      error ? (
+        <div className="chat-settings-panel coach-models-panel" aria-busy="false">
+          <p className="mcp-servers-error" role="alert">{error}</p>
+        </div>
+      ) : <CoachModelsSkeleton />
     );
   }
 

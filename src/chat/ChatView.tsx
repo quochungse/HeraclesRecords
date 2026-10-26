@@ -146,7 +146,7 @@ import {
   settingsWithRuntime,
   type GeneratorRuntime
 } from "../training-library/planGeneratorRuntime";
-import { COACH_PROVIDER_LABELS, coachProviderReadiness } from "./CoachModelsPanel";
+import { COACH_PROVIDER_LABELS, coachProviderReadiness } from "./coachProviders";
 import {
   creationVersions,
   isLatestVersion,

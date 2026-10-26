@@ -38,7 +38,7 @@ import { RunnerIcon } from "../running/runnerIcon";
 import {
   summarizeCoachModels,
   type CoachModelsSummary
-} from "../chat/CoachModelsPanel";
+} from "../chat/coachProviders";
 import { CoachProviderSummary } from "../chat/CoachProviderSummary";
 import { summarizeMcpStatuses } from "../chat/McpServersPanel";
 import type { HeraclesRecordsApi } from "../heraclesrecords-api";

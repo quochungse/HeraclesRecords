@@ -1,4 +1,4 @@
-import { COACH_PROVIDER_LABELS, type CoachModelsSummary } from "./CoachModelsPanel";
+import { COACH_PROVIDER_LABELS, type CoachModelsSummary } from "./coachProviders";
 import { ProviderIcon } from "./ProviderIcon";
 import { t } from "../i18n/core";
 
