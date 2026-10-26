@@ -47,7 +47,6 @@ import type { HeraclesRecordsApi } from "../heraclesrecords-api";
 import { showToast } from "../toast";
 import { useUnitSystem } from "../units/UnitSystemProvider";
 import type {
-  AnthropicEffort,
   ChatAuthStatus,
   ChatContextCompaction,
   ChatContextInspection,
@@ -141,13 +140,13 @@ import { linkDestination } from "../../electron/externalLinks";
 import { defaultPlanBriefRequest } from "../../electron/planBrief";
 import { creationCalendar, localDayKey } from "./creationCalendar";
 import {
-  requestRuntime,
   runtimeFromSettings,
   runtimeModelOptions,
   runtimeSummary,
+  settingsWithRuntime,
   type GeneratorRuntime
 } from "../training-library/planGeneratorRuntime";
-import { COACH_PROVIDER_LABELS, coachProviderReadiness } from "./CoachModelsPanel";
+import { COACH_PROVIDER_LABELS, coachProviderReadiness } from "./coachProviders";
 import {
   creationVersions,
   isLatestVersion,
@@ -1816,7 +1815,9 @@ export function ChatView({
       const created = await api.createChatSession(chatSettings.provider);
       const brief = await api.createPlanBrief(created.id, request);
       if (!(sources.activities && sources.sleep && sources.zones)) {
-        await api.setConversationSettings({ sessionId: created.id, sources }).catch(() => undefined);
+        await api.getConversationSettings(created.id)
+          .then((conversation) => api.setConversationSettings({ ...conversation, sources }))
+          .catch(() => undefined);
       }
       const title = brief.request.goal.trim() ? briefTitle(brief.request) : NEW_PLAN_TITLE;
       const titled = (await api.renameChatSession(created.id, title).catch(() => null)) ?? created;
@@ -2601,24 +2602,26 @@ export function ChatView({
   }, [streaming, exportingLatestActivity]);
 
   /**
-   * Coach's settings and the Claude account as the main process holds them.
+   * Coach's settings and both accounts as the main process holds them.
    * `isCurrent` lets an effect drop an answer that lands after it was torn down.
    */
   const reloadCoachSettings = useCallback(
     async (isCurrent: () => boolean = () => true) => {
       if (!api) return;
-      const [settings, claude] = await Promise.allSettled([
+      const [settings, claude, auth] = await Promise.allSettled([
         api.getChatSettings(),
-        api.getClaudeCodeStatus()
+        api.getClaudeCodeStatus(),
+        api.getChatAuthStatus()
       ]);
       if (!isCurrent()) return;
       if (settings.status === "fulfilled") setChatSettings(settings.value);
       if (claude.status === "fulfilled") setClaudeStatus(claude.value);
+      if (auth.status === "fulfilled") setAuthStatus(auth.value);
     },
     [api]
   );
 
-  // Provider settings and the Claude account are edited in Settings now, under
+  // Provider settings and accounts are edited in Settings now, under
   // Connections, so re-read them whenever Coach comes back to the front. This
   // panel stays mounted once opened; without this the provider picker would
   // still show whatever was configured the first time it was shown.
@@ -3390,12 +3393,9 @@ export function ChatView({
     }
   };
 
-  const handleEffortChange = async (effort: AnthropicEffort) => {
+  const handleEffortChange = async (effort: string) => {
     if (!api || !supportsReasoningEffort(chatSettings.provider)) return;
-    const nextSettings: ChatSettings =
-      chatSettings.provider === "claude-api"
-        ? { ...chatSettings, anthropic: { ...chatSettings.anthropic, effort } }
-        : { ...chatSettings, claudeCode: { ...chatSettings.claudeCode, effort } };
+    const nextSettings = settingsWithRuntime(chatSettings, { ...runtimeFromSettings(chatSettings), effort });
 
     setChatSettings(nextSettings);
     setSavingSettings(true);
@@ -4526,8 +4526,8 @@ export function ChatView({
     sessions.find((session) => session.id === activeSessionId)?.provider ?? chatSettings.provider;
   const effectiveRuntime: GeneratorRuntime = {
     ...runtimeFromSettings(chatSettings, conversationRuntime?.provider ?? conversationProvider),
-    ...(conversationRuntime?.model ? { model: conversationRuntime.model } : {}),
-    ...(conversationRuntime?.effort ? { effort: conversationRuntime.effort } : {})
+    ...(conversationRuntime?.model !== undefined ? { model: conversationRuntime.model } : {}),
+    ...(conversationRuntime?.effort !== undefined ? { effort: conversationRuntime.effort } : {})
   };
   const effectiveProvider = effectiveRuntime.provider;
   // What the composer can send is the conversation's AI.
@@ -4723,11 +4723,8 @@ export function ChatView({
   const workbenchCovers = workbenchOpen && viewportWidth < WORKBENCH_SHEET_WIDTH;
 
   /*
-   * A change made in the composer is this conversation's (Q1 of the Coach
-   * Workbench review): it is written to the conversation's settings, and only
-   * what differs from Coach's settings is stored, so picking Coach's own AI
-   * clears the override. With no conversation open yet, there is nothing to
-   * scope it to and it changes Coach's settings as before.
+   * Keep the complete choice in this conversation. The main process remembers
+   * it for new conversations without changing the AI in any existing one.
    */
   const coachRuntime = runtimeFromSettings(chatSettings);
   const changeCoachRuntime = (next: GeneratorRuntime) => {
@@ -4740,9 +4737,14 @@ export function ChatView({
       changeCoachRuntime(next);
       return;
     }
-    const override = requestRuntime(next, chatSettings, conversationProvider);
-    const { runtime: _previous, ...rest } = conversationSettings;
-    updateConversationSettings(override ? { ...rest, runtime: override } : rest);
+    updateConversationSettings({
+      ...conversationSettings,
+      runtime: {
+        provider: next.provider,
+        model: next.model,
+        ...(supportsReasoningEffort(next.provider) ? { effort: next.effort } : {})
+      }
+    });
     if (next.provider === "claude-code" && api) {
       void api.getClaudeCodeStatus().then(setClaudeStatus).catch(() => undefined);
     }
@@ -4886,7 +4888,7 @@ export function ChatView({
       chatSettings={chatSettings}
       onClose={() => setSettingsOpen(false)}
       onSaveChatSettings={saveChatSettingsPatch}
-      onCoachModelsChange={() => void reloadCoachSettings()}
+      onCoachModelsChange={reloadCoachSettings}
     />
   );
 
@@ -6454,7 +6456,7 @@ export function ChatView({
                 setProvidersOpen(false);
                 setAiSheetOpen(true);
               }}
-              onChange={() => void reloadCoachSettings()}
+              onChange={reloadCoachSettings}
             />,
             document.body
           )

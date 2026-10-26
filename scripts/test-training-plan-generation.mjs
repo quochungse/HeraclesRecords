@@ -166,7 +166,10 @@ await test("each problem names the field it belongs to, in the form's order", ()
   assert.deepEqual(fields({ goal: "", sports: [], week: days(REST) }), ["goal", "sports", "days"]);
   assert.deepEqual(fields({ runtime: { provider: "claude-api", effort: "max", model: "claude-sonnet-5" } }), []);
   assert.deepEqual(fields({ runtime: { provider: "gemini" } }), ["runtime"]);
-  assert.deepEqual(fields({ runtime: { effort: "extreme" } }), ["runtime"]);
+  assert.deepEqual(fields({ runtime: { provider: "claude-api", effort: "extreme" } }), ["runtime"]);
+  assert.deepEqual(fields({ runtime: { provider: "chatgpt", effort: "future-depth" } }), [],
+    "ChatGPT values are checked against the account's model catalog at inference time");
+  assert.deepEqual(fields({ runtime: { effort: 123 } }), ["runtime"]);
 });
 
 await test("the start is a Monday, not in a week already begun, and within a year", () => {

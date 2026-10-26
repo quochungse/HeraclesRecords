@@ -7,6 +7,9 @@ records what the web app does, what the app did differently, and what was change
 `npm run test:coros-write-parity` holds the program side; `test:coros-plan-writes`
 and `test:schedule-changes` hold plans and the calendar.
 
+Text-input limits, including UTF-8 byte counting and the 200-byte session
+note policy, are reviewed separately in [coros-text-limits.md](coros-text-limits.md).
+
 ## How the reference was taken
 
 - The web app's bundle (`https://t.coros.com/` → `static.coros.com/coros-traininghub-v2/assets/main-*.js`

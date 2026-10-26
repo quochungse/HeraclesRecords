@@ -1,13 +1,14 @@
 import type { ChatTokenUsage } from "./types";
 import { countableUsage } from "./tokenUsage";
 
-/** Build the ChatGPT Responses request with safe reasoning summaries enabled. */
+/** Build a ChatGPT request with an already-validated effort and optional safe summaries. */
 export function buildResponsesRequest(
   model: string,
   instructions: string,
   input: Record<string, unknown>[],
   tools: Record<string, unknown>[],
-  includeReasoningSummary = true
+  includeReasoningSummary = true,
+  effort?: string
 ): Record<string, unknown> {
   const request: Record<string, unknown> = {
     model,
@@ -16,8 +17,11 @@ export function buildResponsesRequest(
     stream: true,
     store: false
   };
-  if (includeReasoningSummary) {
-    request.reasoning = { summary: "auto" };
+  if (includeReasoningSummary || effort) {
+    request.reasoning = {
+      ...(includeReasoningSummary ? { summary: "auto" } : {}),
+      ...(effort ? { effort } : {})
+    };
   }
   if (tools.length > 0) {
     request.tools = tools;

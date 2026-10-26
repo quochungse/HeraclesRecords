@@ -969,6 +969,11 @@ function addSession(world, id, entries = []) {
   }
 
   // resolveAnalysisRuntime is the one place that decision lives.
+  assert.deepEqual(resolveAnalysisRuntime({ runtime: { provider: "chatgpt" } }), { provider: "chatgpt" },
+    "ChatGPT uses its own model default instead of a hardcoded Claude effort");
+  assert.deepEqual(resolveAnalysisRuntime({ runtime: { provider: "chatgpt", effort: "" } }), { provider: "chatgpt", effort: "" });
+  assert.deepEqual(resolveAnalysisRuntime({ runtime: { model: "gpt-test" } }, "chatgpt"), { model: "gpt-test" },
+    "an inherited ChatGPT provider also retains the model's own default");
   assert.deepEqual(
     resolveAnalysisRuntime({ runtime: {} }),
     { effort: ANALYSIS_DEFAULT_EFFORT }

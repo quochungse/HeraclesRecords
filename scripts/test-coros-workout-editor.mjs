@@ -200,6 +200,25 @@ assert.equal(draft.nodes[4]?.editable, false);
 
 const roundTrip = workoutDraftToCorosProgram(source, draft, metricContext);
 
+// Editing and creating enforce the same limits, including nested steps.
+const atLimit = { ...structuredClone(draft), name: "ế".repeat(30), overview: "Ấ".repeat(66) + "Â" };
+assert.equal(validateWorkoutDraft(atLimit).valid, true);
+assert.equal(workoutDraftToCorosProgram(source, atLimit, metricContext).overview, atLimit.overview);
+for (const [field, value, pattern] of [
+  ["name", "ế".repeat(31), /90 UTF-8 bytes/],
+  ["overview", "Ấ".repeat(67), /200 UTF-8 bytes/]
+]) {
+  const invalid = { ...structuredClone(atLimit), [field]: value };
+  assert.equal(validateWorkoutDraft(invalid).valid, false);
+  assert.throws(() => workoutDraftToCorosProgram(source, invalid, metricContext), pattern);
+}
+const longStepNote = structuredClone(draft);
+longStepNote.nodes[1].steps[0].overview = "Ấ".repeat(67);
+assert.match(validateWorkoutDraft(longStepNote).errors["nodes.1.steps.0.overview"], /200 UTF-8 bytes/);
+longStepNote.nodes[1].steps[0].overview = "Ấ".repeat(66) + "Â";
+assert.equal(validateWorkoutDraft(longStepNote).valid, true);
+assert.equal(workoutDraftToCorosProgram(source, longStepNote, metricContext).exercises.find((step) => step.id === "72").overview, longStepNote.nodes[1].steps[0].overview);
+
 // Upstream CorosLink #124: editing must normalize legacy long meter targets, including groups.
 for (const [meters, expectedUnit] of [[400, 2], [1000, 2], [1001, 1], [2000, 1]]) {
   const edited = structuredClone(draft);

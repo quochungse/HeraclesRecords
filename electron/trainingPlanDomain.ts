@@ -10,6 +10,7 @@ import type {
   WorkoutSport
 } from "./types";
 import { screenPlural, screenText } from "./screenText";
+import { COROS_NAME_MAX_BYTES, COROS_PLAN_DESCRIPTION_MAX_BYTES, corosTextLimitError } from "./corosTextLimits";
 
 export interface TrainingPlanValidationIssue {
   path: string;
@@ -398,6 +399,10 @@ export function validateTrainingPlan(
   if (!plan.name.trim()) {
     issues.push({ path: "name", message: screenText("screen.planIssue.name"), severity: "error" });
   }
+  const nameError = corosTextLimitError(plan.name.trim(), "Plan name", COROS_NAME_MAX_BYTES, "bytes");
+  if (nameError) issues.push({ path: "name", message: nameError, severity: "error" });
+  const descriptionError = corosTextLimitError(plan.description, "Plan description", COROS_PLAN_DESCRIPTION_MAX_BYTES, "bytes");
+  if (descriptionError) issues.push({ path: "description", message: descriptionError, severity: "error" });
   if (plan.weekCount < 1 || plan.weekCount > TRAINING_PLAN_MAX_WEEKS) {
     issues.push({ path: "weekCount", message: screenText("screen.planIssue.weeks", { max: TRAINING_PLAN_MAX_WEEKS }), severity: "error" });
   }

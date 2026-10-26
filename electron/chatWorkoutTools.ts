@@ -1,4 +1,5 @@
 import crypto from "node:crypto";
+import { COROS_NAME_MAX_BYTES, COROS_PLAN_DESCRIPTION_MAX_BYTES } from "./corosTextLimits";
 import { handleRequestPlanBrief } from "./chatPlanBriefs";
 import { PLAN_BRIEF_TOOL_DEFINITION } from "./planBrief";
 import {
@@ -1659,8 +1660,8 @@ export function buildRevisePlanInputSchema(): Record<string, unknown> {
             schedule_date: { type: "string", pattern: "^\\d{8}$" },
             workout: REVISION_WORKOUT_FIELD,
             stage: { type: "string", enum: COROS_WEEK_STAGES.map((stage) => stage.slug) },
-            name: { type: "string" },
-            description: { type: "string" }
+            name: { type: "string", maxLength: COROS_NAME_MAX_BYTES },
+            description: { type: "string", maxLength: COROS_PLAN_DESCRIPTION_MAX_BYTES }
           },
           required: ["op"]
         }

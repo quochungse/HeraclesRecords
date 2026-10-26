@@ -64,6 +64,8 @@ export default defineConfig({
   build: {
     outDir: "dist",
     emptyOutDir: true,
+    // The Coach check verifies which chunks are loaded before Manage opens.
+    manifest: process.env.HERACLES_CHECK_COACH === "1",
     rolldownOptions: {
       output: {
         codeSplitting: {

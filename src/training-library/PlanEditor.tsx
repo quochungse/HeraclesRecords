@@ -77,6 +77,7 @@ import {
 } from "../../electron/trainingPlanDomain";
 import { replaceTrainingPlanEntryWorkout } from "../../electron/planWorkoutEditor";
 import type { HeraclesRecordsApi } from "../heraclesrecords-api";
+import { COROS_NAME_MAX_BYTES, COROS_PLAN_DESCRIPTION_MAX_BYTES, clampCorosUtf8 } from "../../electron/corosTextLimits";
 import { WorkoutBuilderModal } from "../calendar/WorkoutBuilderModal";
 import { OptionGroup } from "../components/OptionGroup";
 import { SelectDropdown } from "../components/SelectDropdown";
@@ -669,12 +670,13 @@ export function PlanEditor({
           <div className="plan-editor-title">
             <input
               className="plan-editor-name"
+              maxLength={COROS_NAME_MAX_BYTES}
               aria-label={t("library.ed.planName")}
               aria-invalid={!plan.name.trim() || undefined}
               placeholder={t("library.ed.namePh")}
               ref={nameField}
               value={plan.name}
-              onChange={(event) => type("name")(event.target.value)}
+              onChange={(event) => type("name")(clampCorosUtf8(event.target.value, COROS_NAME_MAX_BYTES))}
               onBlur={seal}
             />
             <p className="plan-reader-meta">
@@ -691,9 +693,10 @@ export function PlanEditor({
                 <span>{t("library.ed.description")}</span>
                 <textarea
                   rows={3}
+                  maxLength={COROS_PLAN_DESCRIPTION_MAX_BYTES}
                   value={plan.description}
                   placeholder={t("library.ed.descriptionPh")}
-                  onChange={(event) => type("description")(event.target.value)}
+                  onChange={(event) => type("description")(clampCorosUtf8(event.target.value, COROS_PLAN_DESCRIPTION_MAX_BYTES))}
                   onBlur={seal}
                 />
               </label>

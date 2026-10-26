@@ -10589,72 +10589,123 @@ td span {
   padding: 16px;
 }
 
-/* Field rows inside Coach models size themselves to the dialog, not to the
-   window. `.chat-local-settings` was written for the full-width Coach view:
-   five fixed columns, relaxed only by a `max-width: 1080px` media query — and
-   a media query asks about the window, which says nothing about an 860px
-   dialog. So on any window wider than 1080px the five columns kept their
-   desktop widths and ran ~200px past the dialog edge, clipping Save and
-   squeezing the reasoning-effort explainer to one word per line; below 1080px
-   the same layout happened to fit, which is why it read as a large-window bug.
-   `auto-fit` reflows on the width actually available, so a field that no
-   longer fits drops to the next row instead of overflowing. */
+/* Provider fields reflow with the dialog rather than the viewport. */
 .coach-models-panel .chat-local-settings-panel {
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr));
+  gap: 12px;
+  padding: 0;
+  border: 0;
 }
 
-/* Direct children only: the permission checkboxes in `.chat-claude-permissions`
-   are `.chat-local-tools` too, and they keep their own two-column grid.
-   These are the rows that want the whole line — a prose paragraph, a row of
-   buttons, a connection result — rather than one column among the fields. */
 .coach-models-panel .chat-local-settings-panel > .chat-settings-copy,
 .coach-models-panel .chat-local-settings-panel > .chat-local-tools,
 .coach-models-panel .chat-local-settings-panel > .chat-local-actions,
 .coach-models-panel .chat-local-settings-panel > .chat-local-result,
-.coach-models-panel .chat-local-settings-panel > .chat-model-list-status {
+.coach-models-panel .chat-local-settings-panel > .chat-model-list-status,
+.coach-models-panel .chat-local-field-key {
   grid-column: 1 / -1;
 }
 
-/* Buttons wrap onto a second line rather than running off the dialog. The
-   OpenRouter and Claude-subscription rows already carried their own
-   `flex-wrap`; the Claude API key and Local model rows did not, and those are
-   the two that ran off the edge. */
-.coach-models-panel .chat-local-actions {
+.coach-models-panel .chat-local-actions,
+.provider-account-actions {
   flex-wrap: wrap;
 }
 
-/* `nowrap` belongs to the wide Coach layout, where this label sits in a
-   fixed column. On its own full-width row it can wrap like any other text,
-   which is what keeps it inside a narrow dialog. */
+.coach-models-panel .chat-claude-actions {
+  width: auto;
+}
+
+.coach-models-panel .chat-local-action {
+  flex: 0 0 auto;
+}
+
 .coach-models-panel .chat-local-settings-panel > .chat-local-tools {
   white-space: normal;
 }
 
-/* The Claude subscription section is the longest one in the dialog and its
-   `.chat-settings-section` gap spaces every child the same 10px, so its
-   groups — what the section is, what the connection is doing, and which
-   model to use — ran together as one list. Only what *starts* a group takes
-   the extra margin, so it lands on the seam rather than inside a group: the
-   executable field stays tucked under the status that asks for it, and a
-   group's heading carries the seam rather than the control underneath it. */
-.coach-models-panel .chat-claude-section > .chat-claude-group-title,
-.coach-models-panel .chat-claude-section > .chat-claude-status {
-  margin-top: 14px;
+.coach-models-panel .chat-local-field,
+.provider-account-brand,
+.provider-account-actions {
+  min-width: 0;
 }
 
-/* Names the group the way `.chat-claude-permissions > strong` names its own,
-   so the two sub-headings in this section read as the same thing rather than
-   as a heading and a stray bold line. */
-.chat-claude-group-title {
-  color: var(--text-secondary);
+.coach-models-panel .chat-local-field > input {
+  width: 100%;
+}
+
+.provider-card-footer {
+  justify-content: space-between;
+  border-top: 1px solid var(--glass-border);
+  padding-top: 12px;
+  margin-top: 2px;
+}
+
+.provider-card-links,
+.provider-card-controls {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 14px;
+}
+
+.provider-card-controls {
+  margin-left: auto;
+  gap: 8px;
+}
+
+.coach-models-panel .provider-card-help {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
   font-size: 12px;
+  color: var(--text-secondary);
+  text-decoration: none;
 }
 
-/* The same row as the Connections list, sitting above the Coach settings
-   sections. It matches their background rather than the panel's so the stack
-   reads as one list. */
+.coach-models-panel .provider-card-help:hover {
+  color: var(--text-primary);
+}
+
+.coach-models-panel .provider-card-local-actions {
+  justify-content: flex-end;
+}
+
+.provider-account-status[data-state="connection-failed"],
+.provider-account-status[data-state="usage-limit-reached"] {
+  border-color: var(--error-border);
+  background: var(--error-bg);
+  color: var(--error-text);
+}
+
+/* Icon, title and Manage share one row. */
 .chat-settings-nav-row {
-  background: rgba(0, 0, 0, 0.16);
+  display: grid;
+  grid-template-columns: 32px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px 12px;
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-sm);
+  background: var(--option-well);
+}
+
+.chat-settings-nav-row > strong {
+  color: var(--text-primary);
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+.chat-settings-nav-row .settings-nav-row-icon {
+  width: 32px;
+  height: 32px;
+}
+
+.chat-settings-nav-row .settings-row-button {
+  min-height: 32px;
+  padding-inline: 12px;
+  font-size: 12px;
 }
 
 /* One block per provider section, at roughly the height the real ones settle
@@ -10690,17 +10741,223 @@ td span {
   border-radius: var(--radius-sm);
 }
 
+.chat-settings-modal-header,
+.chat-settings-modal-footer {
+  flex-shrink: 0;
+  padding-inline: 24px;
+}
+
+.chat-settings-modal .chat-settings-modal-body {
+  overflow-y: auto;
+  scrollbar-gutter: stable;
+}
+
 .chat-settings-modal .chat-settings-panel {
+  flex: none;
   height: auto;
-  /* The header (58px) and the Save/Discard footer (61px) stand outside the
-     scroll, so the actions are always in reach. */
-  max-height: calc(min(92vh, 900px) - 58px - 61px);
-  padding: 16px;
-  gap: 16px;
+  overflow: visible;
+  padding: 16px 24px 8px;
+  gap: 0;
 }
 
 .chat-settings-modal .chat-settings-section {
-  padding: 16px;
+  flex-shrink: 0;
+  min-width: 0;
+  padding: 20px 0;
+  border: 0;
+  border-bottom: 1px solid var(--glass-border);
+  border-radius: 0;
+  background: transparent;
+  gap: 10px;
+}
+
+.chat-settings-modal .chat-settings-section:last-child {
+  border-bottom: 0;
+}
+
+.chat-settings-modal .chat-settings-section h3 {
+  color: var(--text-primary);
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.chat-settings-modal .chat-settings-style-detail {
+  color: var(--text-secondary);
+}
+
+.chat-settings-advanced {
+  flex-shrink: 0;
+  min-width: 0;
+}
+
+.chat-settings-advanced > summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 48px;
+  padding-block: 14px;
+  color: var(--text-secondary);
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.3;
+  list-style: none;
+  cursor: pointer;
+}
+
+.chat-settings-advanced > summary::-webkit-details-marker {
+  display: none;
+}
+
+.chat-settings-advanced > summary:hover {
+  color: var(--text-primary);
+}
+
+.chat-settings-advanced > summary:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: 2px;
+}
+
+.chat-settings-advanced > summary > svg {
+  flex: none;
+  transition: transform var(--dur-fast) var(--ease);
+}
+
+.chat-settings-advanced[open] > summary > svg {
+  transform: rotate(90deg);
+}
+
+.chat-settings-toggle-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  min-width: 0;
+  min-height: 24px;
+}
+
+label.chat-settings-toggle-row {
+  cursor: pointer;
+}
+
+.chat-settings-row-copy {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.chat-settings-row-copy strong,
+.chat-settings-row-label {
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+/* The panel's text fields fill their row; checkboxes keep their native size. */
+.chat-settings-panel input.chat-settings-checkbox {
+  appearance: auto;
+  flex: 0 0 16px;
+  width: 16px;
+  height: 16px;
+  min-height: 16px;
+  margin: 0;
+  padding: 0;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
+.chat-settings-checkbox:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: 2px;
+}
+
+.chat-settings-preference-row {
+  display: grid;
+  gap: 8px;
+  padding-top: 6px;
+}
+
+.chat-settings-compact-options {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+}
+
+.chat-settings-compact-options[data-disabled="true"] {
+  opacity: 0.55;
+}
+
+.chat-settings-panel .chat-custom-instructions {
+  field-sizing: content;
+  min-height: calc(4lh + 22px);
+  max-height: calc(10lh + 22px);
+  overflow-y: auto;
+  padding: 10px 12px;
+  resize: none;
+}
+
+.chat-settings-instructions-footer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 16px;
+}
+
+.chat-settings-base-link {
+  min-width: 0;
+  border: 0;
+  background: transparent;
+  padding: 0;
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: 12px;
+  line-height: 1.45;
+  text-align: left;
+  text-decoration: underline;
+  text-decoration-color: var(--glass-border);
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+.chat-settings-base-link:hover {
+  color: var(--accent);
+  text-decoration-color: currentColor;
+}
+
+.chat-settings-base-link:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: 2px;
+}
+
+.chat-settings-modal .coach-analysis-spend {
+  flex-wrap: wrap;
+  padding: 12px;
+  background: var(--option-well);
+}
+
+.chat-settings-modal .coach-analysis-budget {
+  flex-wrap: wrap;
+}
+
+.chat-settings-modal .coach-analysis-budget input {
+  width: 120px;
+}
+
+@media (max-width: 520px) {
+  .chat-settings-backdrop {
+    padding: 12px;
+  }
+
+  .chat-settings-modal-header,
+  .chat-settings-modal-footer {
+    padding-inline: 16px;
+  }
+
+  .chat-settings-modal .chat-settings-panel {
+    padding-inline: 16px;
+  }
 }
 
 /* The status reads at the start of the row, the actions at its end. */
@@ -11429,72 +11686,8 @@ td span {
   padding: 0;
 }
 
-.chat-claude-status {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
-  align-items: start;
-  gap: 9px;
-  border: 1px solid var(--glass-border);
-  border-radius: var(--radius-sm);
-  background: rgba(255, 255, 255, 0.025);
-  color: var(--text-muted);
-  padding: 10px;
-}
-
-.chat-claude-status[data-state="connected"] {
-  border-color: rgba(45, 212, 191, 0.3);
-  background: rgba(20, 184, 166, 0.08);
-  color: #5eead4;
-}
-
-.chat-claude-status[data-state="usage-limit-reached"],
-.chat-claude-status[data-state="connection-failed"] {
-  border-color: var(--error-border);
-  background: var(--error-bg);
-  color: var(--error-text);
-}
-
-.chat-claude-status > div {
-  display: grid;
-  gap: 3px;
-  min-width: 0;
-}
-
-/* Sits as its own row in .chat-claude-status > div (a 3px-gap grid). Slightly
-   brighter than the status message so the signed-in account reads first. */
-.chat-claude-status .chat-claude-account {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  color: var(--text-secondary);
-  font-weight: 600;
-}
-
-.chat-claude-status strong {
-  color: currentColor;
-  font-size: 12px;
-}
-
-.chat-claude-status span {
-  color: var(--text-muted);
-  font-size: 12px;
-  line-height: 1.45;
-  word-break: break-word;
-}
-
 .chat-claude-actions {
   flex-wrap: wrap;
-}
-
-.chat-claude-model-row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
-}
-
-.chat-claude-model-row > .chat-local-field {
-  flex: 1 1 150px;
-  min-width: 0;
 }
 
 .chat-claude-login-flow {
@@ -11526,20 +11719,6 @@ td span {
   margin-top: 2px;
 }
 
-.chat-claude-permissions {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 8px 14px;
-  border-top: 1px solid var(--glass-border);
-  padding-top: 10px;
-}
-
-.chat-claude-permissions > strong {
-  grid-column: 1 / -1;
-  color: var(--text-secondary);
-  font-size: 12px;
-}
-
 .chat-login-actions {
   display: flex;
   justify-content: center;
@@ -11568,11 +11747,6 @@ td span {
   line-height: 1.45;
 }
 
-.chat-settings-account {
-  display: grid;
-  gap: 10px;
-}
-
 .chat-settings-account-who {
   display: grid;
   gap: 2px;
@@ -11590,9 +11764,123 @@ td span {
   font-size: 12px;
 }
 
-.chat-signout-settings,
 .chat-settings-signin {
   width: fit-content;
+}
+
+.provider-account-card {
+  gap: 18px;
+  min-width: 0;
+  background: var(--glass-bg);
+}
+
+.provider-api-card,
+.provider-local-card {
+  gap: 12px;
+}
+
+.provider-account-header,
+.provider-account-brand,
+.provider-account-actions,
+.provider-account-status,
+.provider-account-footer {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.provider-account-header,
+.provider-account-footer {
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.provider-account-brand {
+  color: var(--text-secondary);
+}
+
+.provider-account-card h3 {
+  color: var(--text-primary);
+  font-size: 13px;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.provider-account-status,
+.provider-account-plan {
+  width: fit-content;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-pill);
+  padding: 5px 9px;
+  color: var(--text-secondary);
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1.3;
+}
+
+.provider-account-status.is-connected {
+  border-color: var(--success-border);
+  background: var(--success-bg);
+  color: var(--success-text);
+}
+
+.provider-account-identity {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 6px 12px;
+  padding-block: 2px;
+}
+
+.provider-account-avatar {
+  display: grid;
+  place-items: center;
+  grid-row: span 2;
+  width: 46px;
+  height: 46px;
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-md);
+  background: var(--glass-bg-elevated);
+  color: var(--text-secondary);
+}
+
+.provider-account-identity .chat-settings-email {
+  font-size: 14px;
+}
+
+.provider-account-identity small {
+  overflow-wrap: anywhere;
+}
+
+.provider-account-card .chat-settings-copy,
+.provider-account-card .chat-settings-account-who small {
+  color: var(--text-secondary);
+}
+
+.provider-account-plan {
+  grid-column: 2;
+  overflow-wrap: anywhere;
+}
+
+.provider-account-footer {
+  border-top: 1px solid var(--glass-border);
+  padding-top: 14px;
+}
+
+.provider-account-footer .chat-settings-copy {
+  flex: 1 1 220px;
+}
+
+.provider-account-footer button {
+  flex: 0 1 auto;
+}
+
+.provider-account-signout:hover:not(:disabled) {
+  background: var(--glass-bg-hover);
+  color: var(--text-primary);
 }
 
 .chat-local-settings-panel {
@@ -16908,6 +17196,10 @@ td span {
   border-color: var(--glass-border);
 }
 
+:root[data-theme="paper"] .chat-settings-modal .chat-settings-section {
+  background: transparent;
+}
+
 :root[data-theme="paper"] .chat-composer-inner {
   box-shadow: var(--shadow-card), var(--glass-inset);
 }
@@ -17060,6 +17352,98 @@ td span {
   background: var(--glass-bg);
   border-color: var(--glass-border);
   box-shadow: var(--shadow-inset);
+}
+
+/* Coach's three AI settings surfaces share one light palette, including when
+   providers open inside Coach or a conversation sheet is portalled to body. */
+:root[data-theme="paper"] :is(.chat-settings-backdrop, .coach-models-backdrop, .coach-sheet.coach-conversation-sheet) {
+  color-scheme: light;
+  color: var(--text-primary);
+  --surface: #ffffff;
+  --glass-bg: #f5f7fa;
+  --glass-bg-hover: #e9edf3;
+  --glass-bg-elevated: #ffffff;
+  --glass-border: rgba(19, 26, 40, 0.14);
+  --surface-line: var(--glass-border);
+  --text-primary: #151a26;
+  --text-secondary: #4a5265;
+  --text-muted: #61687a;
+  --option-well: #edf0f5;
+  --option-raised: #ffffff;
+  --option-edge: rgba(19, 26, 40, 0.16);
+  --option-lift: 0 1px 3px rgba(19, 26, 40, 0.12);
+  --accent: var(--palette-accent);
+  --accent-strong: var(--palette-accent-strong);
+  --accent-2: var(--palette-accent-2);
+  --accent-hover: var(--palette-accent-hover);
+  --accent-glow: var(--palette-accent-glow);
+  --accent-soft: var(--palette-accent-soft);
+  --accent-gradient: var(--palette-accent-gradient);
+  --tl-reader-bg: var(--surface);
+  --tl-scrim: rgba(19, 26, 40, 0.35);
+}
+
+:root[data-theme="paper"] :is(.chat-settings-backdrop, .coach-models-backdrop) {
+  background: rgba(19, 26, 40, 0.35);
+}
+
+:root[data-theme="paper"] :is(.chat-settings-backdrop, .coach-models-backdrop, .coach-conversation-sheet) :is(.panel.chat-settings-modal, .panel.app-modal, .plan-generator-sheet) {
+  background: var(--surface);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--shadow-elevated);
+}
+
+:root[data-theme="paper"] :is(.chat-settings-modal-header, .coach-models-backdrop .app-modal-header) {
+  background: var(--surface);
+}
+
+:root[data-theme="paper"] :is(.chat-settings-modal-footer, .coach-models-backdrop .app-modal-body, .coach-conversation-sheet .plan-generator-sheet > footer) {
+  background: var(--glass-bg);
+}
+
+:root[data-theme="paper"] .coach-models-backdrop :is(.provider-account-card, .coach-models-skeleton) {
+  background: var(--surface);
+  border-color: var(--glass-border);
+}
+
+:root[data-theme="paper"] .coach-models-backdrop :is(.provider-account-plan, .provider-account-status:not(.is-connected):not([data-state="connection-failed"]):not([data-state="usage-limit-reached"]), .chat-claude-path-row, .chat-local-key-row, .chat-claude-login-flow) {
+  background: var(--glass-bg);
+}
+
+:root[data-theme="paper"] :is(.chat-settings-modal .chat-custom-instructions, .coach-models-backdrop .chat-local-field > input, .chat-settings-modal .coach-analysis-budget input) {
+  background: var(--glass-bg);
+}
+
+:root[data-theme="paper"] .coach-models-backdrop :is(.chat-local-key-row, .chat-claude-path-row) input {
+  background: transparent;
+}
+
+:root[data-theme="paper"] .coach-conversation-sheet .plan-generator-provider-option {
+  background: var(--glass-bg);
+}
+
+:root[data-theme="paper"] .coach-conversation-sheet .plan-generator-provider-option:hover:not(.is-selected) {
+  background: var(--glass-bg-hover);
+}
+
+:root[data-theme="paper"] .coach-conversation-sheet .plan-generator-provider-option.is-selected {
+  background: var(--option-raised);
+  border-color: var(--accent);
+  box-shadow: var(--option-lift);
+}
+
+/* Solid accent keeps the small white button labels legible for every palette. */
+:root[data-theme="paper"] :is(.chat-settings-backdrop, .coach-models-backdrop, .coach-conversation-sheet) :is(.primary-button, .chat-local-action.primary) {
+  background: var(--accent);
+  color: #ffffff;
+  box-shadow: none;
+  text-shadow: none;
+}
+
+:root[data-theme="paper"] :is(.chat-settings-backdrop, .coach-models-backdrop, .coach-conversation-sheet) :is(.primary-button, .chat-local-action.primary):hover:not(:disabled) {
+  background: var(--accent-hover);
+  filter: none;
+  box-shadow: none;
 }
 
 :root[data-theme="paper"] .sleep-stage-bar,
@@ -24716,6 +25100,54 @@ button.settings-about-link {
 /* A second line of a description — Drive's usage under its account. */
 .settings-pref-line {
   display: block;
+}
+
+/* One connected provider per line, using the same marks as the AI picker. */
+.coach-provider-summary {
+  display: grid;
+  gap: 6px;
+  padding-top: 4px;
+}
+
+.coach-provider-summary-row {
+  --provider-tone: var(--accent);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  color: var(--text-secondary);
+  font-weight: 500;
+  line-height: 1.45;
+}
+
+.coach-provider-summary-row[data-provider="chatgpt"] {
+  --provider-tone: #2e9e7a;
+}
+
+.coach-provider-summary-row[data-provider="claude-code"],
+.coach-provider-summary-row[data-provider="claude-api"] {
+  --provider-tone: #d97757;
+}
+
+.coach-provider-summary-row[data-provider="openrouter"] {
+  --provider-tone: #7986cb;
+}
+
+.coach-provider-summary-icon {
+  display: grid;
+  flex: 0 0 24px;
+  width: 24px;
+  height: 24px;
+  place-items: center;
+  border: 1px solid color-mix(in srgb, var(--provider-tone) 22%, transparent);
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--provider-tone) 10%, transparent);
+  color: var(--provider-tone);
+}
+
+.coach-provider-summary-row > span:last-child {
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 /* The part of a description that has become a warning: Strength hidden with

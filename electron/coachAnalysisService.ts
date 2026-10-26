@@ -179,11 +179,12 @@ export { ANALYSIS_DEFAULT_EFFORT };
 /** An analysis's runtime over its conversation's (P2.0, D14): `runtimeOver`, the analysis first. */
 export const analysisRuntimeOver = runtimeOver;
 
-/** The runtime a run actually uses, with section 7's default filled in. */
+/** Claude's section-7 default; ChatGPT retains the account model's own default. */
 export function resolveAnalysisRuntime(
-  analysis: CoachAnalysis
+  analysis: CoachAnalysis,
+  defaultProvider?: ChatProvider
 ): AnalysisRuntime {
-  return analysis.runtime.effort
+  return (analysis.runtime.provider ?? defaultProvider) === "chatgpt" || analysis.runtime.effort !== undefined
     ? analysis.runtime
     : { ...analysis.runtime, effort: ANALYSIS_DEFAULT_EFFORT };
 }
@@ -1683,7 +1684,7 @@ async function runInConversation(
   const runtime = resolveAnalysisRuntime({
     ...analysis,
     runtime: analysisRuntimeOver(analysis.runtime, conversation?.runtime)
-  });
+  }, resolved.getChatProvider());
   const context = await applyTranscriptContext({
     entries: readable,
     stored: resolved.getSessionSummary(session.sessionId),
@@ -1729,7 +1730,7 @@ async function runInConversation(
     triggerKind: event.kind,
     sessionId: session.sessionId,
     ...(runtime.model ? { model: runtime.model } : {}),
-    ...(runtime.effort ? { effort: runtime.effort } : {}),
+    ...(runtime.effort !== undefined ? { effort: runtime.effort } : {}),
     ...(event.payload ? { triggerPayload: event.payload } : {}),
     startedAt
   } as Omit<CoachAnalysisRun, "id" | "startedAt">);

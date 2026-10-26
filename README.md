@@ -232,6 +232,10 @@ npm run rebuild   # rebuilds the SQLite module for Electron
 npm run dev
 ```
 
+Before submitting Coach changes, run `npm run check:coach`. It builds each target
+once and runs the provider, runtime, settings and renderer checks. See
+[Coach checks](docs/coach-checks.md) for coverage, logs and headless Linux setup.
+
 </details>
 
 ## License

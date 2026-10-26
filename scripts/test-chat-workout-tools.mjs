@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
+import { z } from "zod";
 
 const repoRoot = path.resolve(import.meta.dirname, "..");
 const distUrl = (file) =>
@@ -150,6 +151,29 @@ assert.deepEqual(
 const workoutSchema = buildDraftWorkoutInputSchema();
 assert.equal(workoutSchema.properties.workout.oneOf, undefined);
 assert.equal(workoutSchema.properties.calendar_date.pattern, "^\\d{8}$");
+// The Claude Code bridge rebuilds properties through zod. Session notes must
+// survive that conversion for both draft tools, with the same COROS limit.
+const coachingNotes = "Giữ vai thả lỏng; uống nước từng ngụm nhỏ.";
+for (const workoutShape of [workoutItem, workoutSchema.properties.workout]) {
+  const validator = z.fromJSONSchema(workoutShape);
+  const session = { key: "easy", name: "Easy", sport: "run", distance_km: 5, description: coachingNotes };
+  assert.equal(validator.parse(session).description, coachingNotes);
+  assert.equal(validator.parse({ ...session, description: "x".repeat(200) }).description.length, 200);
+  assert.equal(validator.safeParse({ ...session, description: "x".repeat(201) }).success, false);
+  const step = { kind: "training", target_type: "time", target_duration_seconds: 600, overview: "x".repeat(201) };
+  assert.equal(validator.safeParse({ key: "easy", name: "Easy", steps: [step] }).success, false);
+  assert.equal(validator.safeParse({ key: "easy", name: "Easy", steps: [{ repeat: 2, steps: [step] }] }).success, false);
+  // JSON Schema's maxLength cannot measure UTF-8 bytes. Runtime validation
+  // must reject multibyte notes even when the provider's schema accepts them.
+  const atByteLimit = validator.parse({ ...session, description: "Ấ".repeat(66) + "Â" });
+  assert.equal(validatePlanDraft({ name: "Plan", workouts: [atByteLimit] }).ok, true);
+  const overByteLimit = validator.parse({ ...session, description: "Ấ".repeat(67) });
+  const result = validatePlanDraft({ name: "Plan", workouts: [overByteLimit] });
+  assert.equal(result.ok, false);
+  assert.match(result.errors.join(" "), /200 UTF-8 bytes/);
+  const overlongStep = validator.parse({ key: "easy", name: "Easy", steps: [{ ...step, overview: "Ấ".repeat(67) }] });
+  assert.equal(validatePlanDraft({ name: "Plan", workouts: [overlongStep] }).ok, false);
+}
 for (const field of ["schedule_date", "save_to_library", "sort_no"]) {
   assert.equal(field in workoutSchema.properties.workout.properties, false);
   assert.equal(field in schema.properties.workouts.items.properties, true, "the plan keeps them");

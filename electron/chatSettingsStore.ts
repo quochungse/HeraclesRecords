@@ -26,7 +26,15 @@ import {
 
 export const CHAT_SETTINGS_KEYS = {
   provider: "chat.provider",
+  conversationLastUsed: {
+    chatgpt: "chat.conversation.lastUsed.chatgpt",
+    "claude-code": "chat.conversation.lastUsed.claude-code",
+    "claude-api": "chat.conversation.lastUsed.claude-api",
+    openrouter: "chat.conversation.lastUsed.openrouter",
+    local: "chat.conversation.lastUsed.local"
+  },
   chatgptModel: "chat.chatgpt.model",
+  chatgptEffort: "chat.chatgpt.effort",
   openRouterModel: "chat.openRouter.model",
   openRouterApiKey: "chat.openRouter.apiKey",
   anthropicModel: "chat.anthropic.model",
@@ -106,7 +114,8 @@ export function readChatSettingsFromStore(
   return {
     provider: normalizeProvider(store.get(CHAT_SETTINGS_KEYS.provider)),
     chatgpt: {
-      model: store.get(CHAT_SETTINGS_KEYS.chatgptModel) || undefined
+      model: store.get(CHAT_SETTINGS_KEYS.chatgptModel) || undefined,
+      effort: store.get(CHAT_SETTINGS_KEYS.chatgptEffort) || undefined
     },
     openRouter: {
       model:
@@ -217,6 +226,9 @@ export function saveChatSettingsToStore(
     store.delete([CHAT_SETTINGS_KEYS.chatgptModel]);
   }
   const openRouterModel = settings.openRouter?.model?.trim();
+  const chatgptEffort = typeof settings.chatgpt?.effort === "string" ? settings.chatgpt.effort.trim() : "";
+  if (chatgptEffort) store.set(CHAT_SETTINGS_KEYS.chatgptEffort, chatgptEffort);
+  else store.delete([CHAT_SETTINGS_KEYS.chatgptEffort]);
   store.set(
     CHAT_SETTINGS_KEYS.openRouterModel,
     openRouterModel || DEFAULT_OPENROUTER_MODEL

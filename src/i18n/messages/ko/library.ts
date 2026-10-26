@@ -263,6 +263,8 @@ const library: LibraryMessages = {
   "library.ai.runsLocal": "코치 설정에서 고른 로컬 모델 {model}로 실행합니다.",
   "library.ai.effort": "추론 수준",
   "library.ai.thisModel": "이 모델",
+  "library.ai.chooseEffortModel": "추론 수준을 설정하려면 모델을 선택하세요.",
+  "library.ai.refreshEffort": "공급자 관리에서 ChatGPT를 새로고침하여 이 모델의 추론 옵션을 불러오세요.",
   "library.ai.noEffort": "{name}에는 추론 수준 설정이 없습니다.",
   "library.ai.keep": "코치 채팅에도 사용",
   "library.cal.eyebrow": "COROS 캘린더",

@@ -152,6 +152,36 @@ app.whenReady().then(async () => {
     "and it opens straight into the builder"
   );
 
+  assert.equal(await evaluate("document.querySelector('.calendar-builder-description textarea').maxLength"), 200);
+  for (const [value, accepted, bytes] of [
+    ["A", "A", 1], ["Â", "Â", 2], ["Ấ", "Ấ", 3],
+    ["Ấ".repeat(67), "Ấ".repeat(66), 198],
+    ["Â".repeat(101), "Â".repeat(100), 200],
+    ["😀".repeat(51), "😀".repeat(50), 200],
+    ["A".repeat(199) + "😀", "A".repeat(199), 199],
+    ["", "", 0]
+  ]) {
+    await evaluate(`(() => {
+      const input = document.querySelector('.calendar-builder-description textarea');
+      Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value').set.call(input, ${JSON.stringify(value)});
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+    })()`);
+    await settle(1);
+    assert.equal(await evaluate("document.querySelector('.calendar-builder-description textarea').value"), accepted);
+    assert.equal(await evaluate("document.querySelector('#calendar-builder-description-count').textContent"), `${bytes} / 200 B`, "notes count and clamp UTF-8 bytes like COROS iOS");
+  }
+  await evaluate(`(() => {
+    const input = document.querySelector('.calendar-builder-settings input[type="text"]');
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(input, 'ế'.repeat(31));
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+  })()`);
+  await settle(2);
+  assert.equal(
+    await evaluate("document.querySelector('.calendar-builder-settings input[type=\"text\"]').value"),
+    "ế".repeat(30),
+    "the name field clamps at 90 UTF-8 bytes, not 90 Vietnamese characters"
+  );
+
   // -------------------------------------------------------------------------
   // 2. The settings column is as tall as what it holds
   // -------------------------------------------------------------------------

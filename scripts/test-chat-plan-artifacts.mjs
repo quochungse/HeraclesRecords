@@ -112,6 +112,36 @@ test("the document has every step, for a plan and for a workout", () => {
   assert.equal(single.entries[0].workout.steps[0].target_duration_seconds, 2100);
 });
 
+test("session notes survive drafting, reading and revising plans and standalone workouts", async () => {
+  for (const tool of ["draft_training_plan", "draft_workout"]) {
+    const description = "Giữ vai thả lỏng; chạy ở mức có thể trò chuyện.";
+    const session = run("Easy with notes", 1800, { description });
+    const preview = await draft(tool, tool === "draft_workout"
+      ? { workout: session }
+      : { name: "Base with notes", description: "Build endurance.", workouts: [{ ...session, week: 1, day: "tue" }] });
+    const read = JSON.parse(await tools.handleChatWorkoutTool("get_plan_draft", {
+      draft_id: preview.draftId, sessions: [session.key]
+    }));
+    assert.equal(read.workouts[0].description, description);
+    assert.equal(tools.planDraftDocument(preview.draftId).entries[0].workout.description, description);
+
+    const revisedDescription = `${description} Uống nước từng ngụm nhỏ.`;
+    const { response } = await revise({
+      draft_id: preview.draftId,
+      summary: "Add a hydration reminder",
+      ops: [{ op: "replace_session", key: session.key, workout: { ...read.workouts[0], description: revisedDescription } }]
+    });
+    assert.equal(response.ok, true, JSON.stringify(response));
+    const row = database.getChatPlanDraft(response.draft_id);
+    assert.equal(JSON.parse(row.planJson).workouts[0].description, revisedDescription);
+    assert.equal(JSON.parse(row.previewJson).entries[0].source.description, revisedDescription);
+    const document = tools.planDraftDocument(response.draft_id);
+    assert.equal(document.entries[0].workout.description, revisedDescription);
+    assert.deepEqual(document.entries[0].workout.steps, session.steps, "adding a note preserves the steps");
+    assert.equal(tools.planDraftDocument(preview.draftId).entries[0].workout.description, description, "the old version keeps its notes");
+  }
+});
+
 test("an edit is the next version, by the athlete; a light card, the steps in the row", () => {
   const written = tools.saveWorkoutDraftEdit(workout.draftId, run("Recovery run", 2400), "metric");
   assert.equal(written.kind, "written");

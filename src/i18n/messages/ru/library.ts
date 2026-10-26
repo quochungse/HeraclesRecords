@@ -275,6 +275,8 @@ const library: LibraryMessages = {
   "library.ai.runsLocal": "Работает на {model} — локальной модели из настроек тренера.",
   "library.ai.effort": "Глубина рассуждений",
   "library.ai.thisModel": "Эта модель",
+  "library.ai.chooseEffortModel": "Выберите модель, чтобы настроить глубину рассуждений.",
+  "library.ai.refreshEffort": "Обновите ChatGPT в разделе управления провайдерами, чтобы загрузить варианты глубины рассуждений для этой модели.",
   "library.ai.noEffort": "У {name} нет настройки глубины рассуждений.",
   "library.ai.keep": "Использовать и для чата с тренером",
   "library.cal.eyebrow": "Календарь COROS",

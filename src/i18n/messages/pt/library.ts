@@ -263,6 +263,8 @@ const library: LibraryMessages = {
   "library.ai.runsLocal": "Usa {model}, o modelo local escolhido nas configurações do treinador.",
   "library.ai.effort": "Nível de raciocínio",
   "library.ai.thisModel": "Este modelo",
+  "library.ai.chooseEffortModel": "Selecione um modelo para escolher o esforço de raciocínio.",
+  "library.ai.refreshEffort": "Atualize o ChatGPT em Gerenciar provedores para carregar as opções de raciocínio deste modelo.",
   "library.ai.noEffort": "{name} não tem ajuste de raciocínio.",
   "library.ai.keep": "Usar também no chat do treinador",
   "library.cal.eyebrow": "Calendário do COROS",

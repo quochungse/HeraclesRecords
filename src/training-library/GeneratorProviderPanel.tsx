@@ -2,17 +2,17 @@ import { AlertTriangle, ArrowRight, Check, LoaderCircle, X } from "lucide-react"
 import { useEffect, useRef, type ReactNode } from "react";
 import type { ChatProvider, ChatSettings, ClaudeCodeStatus } from "../../electron/types";
 import {
-  effortForModel,
-  effortOptionsFor,
+  reasoningEffortForModel,
+  reasoningEffortOptions,
   supportsReasoningEffort,
   withCurrentModel
 } from "../../electron/chatModels";
 import { OptionGroup } from "../components/OptionGroup";
 import {
   COACH_PROVIDER_LABELS,
-  ClaudeCodeUpdateNote,
   claudeCodeUpdateFor
-} from "../chat/CoachModelsPanel";
+} from "../chat/coachProviders";
+import { ClaudeCodeUpdateNote } from "../chat/ClaudeCodeUpdateNote";
 import {
   GENERATOR_PROVIDERS,
   modelChipLabel,
@@ -23,7 +23,7 @@ import {
 import { messageRecord, t } from "../i18n/core";
 
 /**
- * Models are chips only while the row is sure to fit on one line of the sheet;
+ * In the plan sheet, models are chips while they fit on one line;
  * past that they are a menu, since a track of chips wrapped onto a second line
  * reads as two controls. Decided from the labels, not measured, so the choice
  * cannot flip back and forth with the layout it changes. Four Claude names of
@@ -103,8 +103,8 @@ export function GeneratorProviderPanel({
     runtime.model
   );
   const listedModel = models.find((option) => option.value === runtime.model);
-  const efforts = effortOptionsFor(listedModel);
-  const effort = effortForModel(runtime.effort, listedModel?.efforts);
+  const efforts = reasoningEffortOptions(runtime.provider, listedModel);
+  const effort = reasoningEffortForModel(runtime.provider, runtime.effort, listedModel);
   // A provider known not to be set up is left out unless it is the one chosen
   // or Coach's own: a list of six where four cannot answer is noise, and one
   // is connected under AI Model Providers.
@@ -118,6 +118,57 @@ export function GeneratorProviderPanel({
     if (provider === runtime.provider) return;
     onChange(runtimeFromSettings(settings, provider));
   };
+
+  const isConversation = subject === "conversation";
+  const canChooseEffort = supportsReasoningEffort(runtime.provider) && effort !== undefined && efforts.length > 0;
+  const effortDescription = efforts.find((option) => option.value === effort)?.detail
+    ?? t(runtime.provider === "claude-code" || runtime.provider === "chatgpt"
+      ? "chat.models.claudeEffortNote"
+      : "chat.models.effortNote");
+  const modelControl = runtime.provider === "local" ? (
+      <p className="plan-generator-sheet-note">
+        {runtime.model.trim()
+          ? t("library.ai.runsLocal", { model: runtime.model.trim() })
+          : t("library.fix.local")}
+      </p>
+  ) : (
+      <OptionGroup
+        label={t("library.ai.model")}
+        className="plan-generator-sheet-models"
+        mode={isConversation || !modelsFitAsChips(models.map((option) => modelChipLabel(option.label))) ? "dropdown" : "expanded"}
+        size={isConversation ? "md" : "sm"}
+        value={models.some((option) => option.value === runtime.model) ? runtime.model : (models[0]?.value ?? "")}
+        options={models.map((option) => ({
+          value: option.value,
+          label: isConversation ? option.label : modelChipLabel(option.label),
+          title: option.label,
+          ...(option.detail ? { detail: option.detail } : {})
+        }))}
+        // As ModelSwitch: a qualifier wraps at the menu's floor, and the
+        // trigger alone is too narrow to read one in.
+        minMenuWidth={models.some((option) => option.detail) ? 420 : undefined}
+        onChange={(model) => onChange({ ...runtime, model })}
+      />
+  );
+  const effortControl = canChooseEffort ? (
+      <OptionGroup
+        label={t("library.ai.effort")}
+        className="plan-generator-sheet-effort"
+        mode={isConversation || runtime.provider === "chatgpt" ? "dropdown" : "expanded"}
+        size={isConversation ? "md" : "sm"}
+        value={effort ?? ""}
+        options={efforts.map((option) => ({ ...option, title: option.detail }))}
+        onChange={(next) => onChange({ ...runtime, effort: next })}
+      />
+  ) : (
+      <p className="plan-generator-sheet-note">
+        {supportsReasoningEffort(runtime.provider)
+          ? runtime.provider === "chatgpt" && !listedModel?.reasoning
+            ? t(runtime.model ? "library.ai.refreshEffort" : "library.ai.chooseEffortModel")
+            : t("library.ai.noEffort", { name: listedModel ? listedModel.label : t("library.ai.thisModel") })
+          : t("library.ai.noEffort", { name: COACH_PROVIDER_LABELS[runtime.provider] })}
+      </p>
+  );
 
   return (
     <div className="plan-generator-sheet-layer">
@@ -193,48 +244,25 @@ export function GeneratorProviderPanel({
 
           {claudeCodeUpdate ? <ClaudeCodeUpdateNote update={claudeCodeUpdate} /> : null}
 
-          <p className="tl-eyebrow">{t("library.ai.model")}</p>
-          {runtime.provider === "local" ? (
-            <p className="plan-generator-sheet-note">
-              {settings.local.model.trim()
-                ? t("library.ai.runsLocal", { model: settings.local.model.trim() })
-                : t("library.fix.local")}
-            </p>
+          {isConversation ? (
+            <div className="conversation-ai-runtime">
+              <div className="conversation-ai-field">
+                <span className="conversation-ai-field-label">{t("library.ai.model")}</span>
+                {modelControl}
+              </div>
+              <div className="conversation-ai-field">
+                <span className="conversation-ai-field-label">{t("library.ai.effort")}</span>
+                {effortControl}
+                {canChooseEffort ? <p className="plan-generator-sheet-note">{effortDescription}</p> : null}
+              </div>
+            </div>
           ) : (
-            <OptionGroup
-              label={t("library.ai.model")}
-              className="plan-generator-sheet-models"
-              // A provider's own list can run to dozens (OpenRouter's is cut
-              // at 40); chips only while they hold one line.
-              mode={modelsFitAsChips(models.map((option) => modelChipLabel(option.label))) ? "expanded" : "dropdown"}
-              value={models.some((option) => option.value === runtime.model) ? runtime.model : (models[0]?.value ?? "")}
-              options={models.map((option) => ({
-                value: option.value,
-                label: modelChipLabel(option.label),
-                title: option.label,
-                ...(option.detail ? { detail: option.detail } : {})
-              }))}
-              // As ModelSwitch: a qualifier wraps at the menu's floor, and the
-              // trigger alone is too narrow to read one in.
-              minMenuWidth={models.some((option) => option.detail) ? 420 : undefined}
-              onChange={(model) => onChange({ ...runtime, model })}
-            />
-          )}
-
-          <p className="tl-eyebrow">{t("library.ai.effort")}</p>
-          {supportsReasoningEffort(runtime.provider) && effort && efforts.length > 0 ? (
-            <OptionGroup
-              label={t("library.ai.effort")}
-              value={effort}
-              options={efforts.map((option) => ({ value: option.value, label: option.label, title: option.detail }))}
-              onChange={(next) => onChange({ ...runtime, effort: next })}
-            />
-          ) : (
-            <p className="plan-generator-sheet-note">
-              {supportsReasoningEffort(runtime.provider)
-                ? t("library.ai.noEffort", { name: listedModel ? listedModel.label : t("library.ai.thisModel") })
-                : t("library.ai.noEffort", { name: COACH_PROVIDER_LABELS[runtime.provider] })}
-            </p>
+            <>
+              <p className="tl-eyebrow">{t("library.ai.model")}</p>
+              {modelControl}
+              <p className="tl-eyebrow">{t("library.ai.effort")}</p>
+              {effortControl}
+            </>
           )}
 
           {children}

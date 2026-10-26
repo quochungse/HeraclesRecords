@@ -1,13 +1,11 @@
-import { Bot, KeyRound, Network, Sparkles, Terminal } from "lucide-react";
 import type { ChatProvider } from "../../electron/types";
 import { SelectDropdown } from "../components/SelectDropdown";
 import { t } from "../i18n/core";
-import { COACH_PROVIDER_LABELS } from "./CoachModelsPanel";
-
-const PROVIDERS: ChatProvider[] = ["chatgpt", "claude-code", "claude-api", "openrouter", "local"];
+import { COACH_PROVIDER_LABELS, COACH_PROVIDER_ORDER } from "./coachProviders";
+import { ProviderIcon } from "./ProviderIcon";
 
 function providerOptions(): Array<{ value: ChatProvider; label: string }> {
-  return PROVIDERS.map((value) => ({ value, label: COACH_PROVIDER_LABELS[value] }));
+  return COACH_PROVIDER_ORDER.map((value) => ({ value, label: COACH_PROVIDER_LABELS[value] }));
 }
 
 function getProviderTone(provider: ChatProvider) {
@@ -18,19 +16,7 @@ function getProviderTone(provider: ChatProvider) {
 }
 
 function renderProviderIcon(provider: ChatProvider) {
-  if (provider === "claude-code") {
-    return <Terminal size={14} strokeWidth={2.1} aria-hidden="true" />;
-  }
-  if (provider === "claude-api") {
-    return <KeyRound size={14} strokeWidth={2.1} aria-hidden="true" />;
-  }
-  if (provider === "local") {
-    return <Bot size={14} strokeWidth={2.1} aria-hidden="true" />;
-  }
-  if (provider === "openrouter") {
-    return <Network size={14} strokeWidth={2.1} aria-hidden="true" />;
-  }
-  return <Sparkles size={14} strokeWidth={2.1} aria-hidden="true" />;
+  return <ProviderIcon provider={provider} />;
 }
 
 export function ProviderSwitch({

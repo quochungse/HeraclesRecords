@@ -263,6 +263,8 @@ const library: LibraryMessages = {
   "library.ai.runsLocal": "コーチの設定で選んだローカルモデル {model} で動きます。",
   "library.ai.effort": "推論レベル",
   "library.ai.thisModel": "このモデル",
+  "library.ai.chooseEffortModel": "推論の強度を選ぶには、モデルを選択してください。",
+  "library.ai.refreshEffort": "プロバイダー管理で ChatGPT を更新し、このモデルの推論オプションを読み込んでください。",
   "library.ai.noEffort": "{name} には推論レベルの設定がありません。",
   "library.ai.keep": "コーチとのチャットにも使う",
   "library.cal.eyebrow": "COROS カレンダー",
