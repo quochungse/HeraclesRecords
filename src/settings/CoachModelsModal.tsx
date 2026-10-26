@@ -52,7 +52,7 @@ export function CoachModelsModal({
 
   return (
     <div
-      className="app-modal-backdrop"
+      className="app-modal-backdrop coach-models-backdrop"
       role="dialog"
       aria-modal="true"
       aria-labelledby="coach-models-title"

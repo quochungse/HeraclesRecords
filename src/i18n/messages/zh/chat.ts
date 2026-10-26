@@ -226,6 +226,7 @@ const chat: ChatMessages = {
   "chat.cost.tokens": "{count} Token",
   "chat.cost.input": "输入 {count}",
   "chat.cost.output": "输出 {count}",
+  "chat.set.advanced": "高级设置",
   "chat.set.close": "关闭设置",
   "chat.set.unsaved": "有未保存的更改",
   "chat.set.saved": "所有更改已保存",

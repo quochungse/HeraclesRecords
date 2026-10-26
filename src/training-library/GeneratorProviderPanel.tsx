@@ -23,7 +23,7 @@ import {
 import { messageRecord, t } from "../i18n/core";
 
 /**
- * Models are chips only while the row is sure to fit on one line of the sheet;
+ * In the plan sheet, models are chips while they fit on one line;
  * past that they are a menu, since a track of chips wrapped onto a second line
  * reads as two controls. Decided from the labels, not measured, so the choice
  * cannot flip back and forth with the layout it changes. Four Claude names of
@@ -119,6 +119,57 @@ export function GeneratorProviderPanel({
     onChange(runtimeFromSettings(settings, provider));
   };
 
+  const isConversation = subject === "conversation";
+  const canChooseEffort = supportsReasoningEffort(runtime.provider) && effort !== undefined && efforts.length > 0;
+  const effortDescription = efforts.find((option) => option.value === effort)?.detail
+    ?? t(runtime.provider === "claude-code" || runtime.provider === "chatgpt"
+      ? "chat.models.claudeEffortNote"
+      : "chat.models.effortNote");
+  const modelControl = runtime.provider === "local" ? (
+      <p className="plan-generator-sheet-note">
+        {settings.local.model.trim()
+          ? t("library.ai.runsLocal", { model: settings.local.model.trim() })
+          : t("library.fix.local")}
+      </p>
+  ) : (
+      <OptionGroup
+        label={t("library.ai.model")}
+        className="plan-generator-sheet-models"
+        mode={isConversation || !modelsFitAsChips(models.map((option) => modelChipLabel(option.label))) ? "dropdown" : "expanded"}
+        size={isConversation ? "md" : "sm"}
+        value={models.some((option) => option.value === runtime.model) ? runtime.model : (models[0]?.value ?? "")}
+        options={models.map((option) => ({
+          value: option.value,
+          label: isConversation ? option.label : modelChipLabel(option.label),
+          title: option.label,
+          ...(option.detail ? { detail: option.detail } : {})
+        }))}
+        // As ModelSwitch: a qualifier wraps at the menu's floor, and the
+        // trigger alone is too narrow to read one in.
+        minMenuWidth={models.some((option) => option.detail) ? 420 : undefined}
+        onChange={(model) => onChange({ ...runtime, model })}
+      />
+  );
+  const effortControl = canChooseEffort ? (
+      <OptionGroup
+        label={t("library.ai.effort")}
+        className="plan-generator-sheet-effort"
+        mode={isConversation || runtime.provider === "chatgpt" ? "dropdown" : "expanded"}
+        size={isConversation ? "md" : "sm"}
+        value={effort ?? ""}
+        options={efforts.map((option) => ({ ...option, title: option.detail }))}
+        onChange={(next) => onChange({ ...runtime, effort: next })}
+      />
+  ) : (
+      <p className="plan-generator-sheet-note">
+        {supportsReasoningEffort(runtime.provider)
+          ? runtime.provider === "chatgpt" && !listedModel?.reasoning
+            ? t(runtime.model ? "library.ai.refreshEffort" : "library.ai.chooseEffortModel")
+            : t("library.ai.noEffort", { name: listedModel ? listedModel.label : t("library.ai.thisModel") })
+          : t("library.ai.noEffort", { name: COACH_PROVIDER_LABELS[runtime.provider] })}
+      </p>
+  );
+
   return (
     <div className="plan-generator-sheet-layer">
       <button type="button" className="plan-generator-scrim" aria-label={t("library.ai.close")} tabIndex={-1} onClick={onDone} />
@@ -193,52 +244,25 @@ export function GeneratorProviderPanel({
 
           {claudeCodeUpdate ? <ClaudeCodeUpdateNote update={claudeCodeUpdate} /> : null}
 
-          <p className="tl-eyebrow">{t("library.ai.model")}</p>
-          {runtime.provider === "local" ? (
-            <p className="plan-generator-sheet-note">
-              {settings.local.model.trim()
-                ? t("library.ai.runsLocal", { model: settings.local.model.trim() })
-                : t("library.fix.local")}
-            </p>
+          {isConversation ? (
+            <div className="conversation-ai-runtime">
+              <div className="conversation-ai-field">
+                <span className="conversation-ai-field-label">{t("library.ai.model")}</span>
+                {modelControl}
+              </div>
+              <div className="conversation-ai-field">
+                <span className="conversation-ai-field-label">{t("library.ai.effort")}</span>
+                {effortControl}
+                {canChooseEffort ? <p className="plan-generator-sheet-note">{effortDescription}</p> : null}
+              </div>
+            </div>
           ) : (
-            <OptionGroup
-              label={t("library.ai.model")}
-              className="plan-generator-sheet-models"
-              // A provider's own list can run to dozens (OpenRouter's is cut
-              // at 40); chips only while they hold one line.
-              mode={modelsFitAsChips(models.map((option) => modelChipLabel(option.label))) ? "expanded" : "dropdown"}
-              value={models.some((option) => option.value === runtime.model) ? runtime.model : (models[0]?.value ?? "")}
-              options={models.map((option) => ({
-                value: option.value,
-                label: modelChipLabel(option.label),
-                title: option.label,
-                ...(option.detail ? { detail: option.detail } : {})
-              }))}
-              // As ModelSwitch: a qualifier wraps at the menu's floor, and the
-              // trigger alone is too narrow to read one in.
-              minMenuWidth={models.some((option) => option.detail) ? 420 : undefined}
-              onChange={(model) => onChange({ ...runtime, model })}
-            />
-          )}
-
-          <p className="tl-eyebrow">{t("library.ai.effort")}</p>
-          {supportsReasoningEffort(runtime.provider) && effort !== undefined && efforts.length > 0 ? (
-            <OptionGroup
-              label={t("library.ai.effort")}
-              className="plan-generator-sheet-effort"
-              mode={runtime.provider === "chatgpt" ? "dropdown" : "expanded"}
-              value={effort}
-              options={efforts.map((option) => ({ ...option, title: option.detail }))}
-              onChange={(next) => onChange({ ...runtime, effort: next })}
-            />
-          ) : (
-            <p className="plan-generator-sheet-note">
-              {supportsReasoningEffort(runtime.provider)
-                ? runtime.provider === "chatgpt" && !listedModel?.reasoning
-                  ? t(runtime.model ? "library.ai.refreshEffort" : "library.ai.chooseEffortModel")
-                  : t("library.ai.noEffort", { name: listedModel ? listedModel.label : t("library.ai.thisModel") })
-                : t("library.ai.noEffort", { name: COACH_PROVIDER_LABELS[runtime.provider] })}
-            </p>
+            <>
+              <p className="tl-eyebrow">{t("library.ai.model")}</p>
+              {modelControl}
+              <p className="tl-eyebrow">{t("library.ai.effort")}</p>
+              {effortControl}
+            </>
           )}
 
           {children}

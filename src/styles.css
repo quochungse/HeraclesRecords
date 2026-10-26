@@ -10677,11 +10677,35 @@ td span {
   color: var(--error-text);
 }
 
-/* The same row as the Connections list, sitting above the Coach settings
-   sections. It matches their background rather than the panel's so the stack
-   reads as one list. */
+/* Icon, title and Manage share one row. */
 .chat-settings-nav-row {
-  background: rgba(0, 0, 0, 0.16);
+  display: grid;
+  grid-template-columns: 32px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px 12px;
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-sm);
+  background: var(--option-well);
+}
+
+.chat-settings-nav-row > strong {
+  color: var(--text-primary);
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+.chat-settings-nav-row .settings-nav-row-icon {
+  width: 32px;
+  height: 32px;
+}
+
+.chat-settings-nav-row .settings-row-button {
+  min-height: 32px;
+  padding-inline: 12px;
+  font-size: 12px;
 }
 
 /* One block per provider section, at roughly the height the real ones settle
@@ -10717,17 +10741,223 @@ td span {
   border-radius: var(--radius-sm);
 }
 
+.chat-settings-modal-header,
+.chat-settings-modal-footer {
+  flex-shrink: 0;
+  padding-inline: 24px;
+}
+
+.chat-settings-modal .chat-settings-modal-body {
+  overflow-y: auto;
+  scrollbar-gutter: stable;
+}
+
 .chat-settings-modal .chat-settings-panel {
+  flex: none;
   height: auto;
-  /* The header (58px) and the Save/Discard footer (61px) stand outside the
-     scroll, so the actions are always in reach. */
-  max-height: calc(min(92vh, 900px) - 58px - 61px);
-  padding: 16px;
-  gap: 16px;
+  overflow: visible;
+  padding: 16px 24px 8px;
+  gap: 0;
 }
 
 .chat-settings-modal .chat-settings-section {
-  padding: 16px;
+  flex-shrink: 0;
+  min-width: 0;
+  padding: 20px 0;
+  border: 0;
+  border-bottom: 1px solid var(--glass-border);
+  border-radius: 0;
+  background: transparent;
+  gap: 10px;
+}
+
+.chat-settings-modal .chat-settings-section:last-child {
+  border-bottom: 0;
+}
+
+.chat-settings-modal .chat-settings-section h3 {
+  color: var(--text-primary);
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.chat-settings-modal .chat-settings-style-detail {
+  color: var(--text-secondary);
+}
+
+.chat-settings-advanced {
+  flex-shrink: 0;
+  min-width: 0;
+}
+
+.chat-settings-advanced > summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 48px;
+  padding-block: 14px;
+  color: var(--text-secondary);
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.3;
+  list-style: none;
+  cursor: pointer;
+}
+
+.chat-settings-advanced > summary::-webkit-details-marker {
+  display: none;
+}
+
+.chat-settings-advanced > summary:hover {
+  color: var(--text-primary);
+}
+
+.chat-settings-advanced > summary:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: 2px;
+}
+
+.chat-settings-advanced > summary > svg {
+  flex: none;
+  transition: transform var(--dur-fast) var(--ease);
+}
+
+.chat-settings-advanced[open] > summary > svg {
+  transform: rotate(90deg);
+}
+
+.chat-settings-toggle-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  min-width: 0;
+  min-height: 24px;
+}
+
+label.chat-settings-toggle-row {
+  cursor: pointer;
+}
+
+.chat-settings-row-copy {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.chat-settings-row-copy strong,
+.chat-settings-row-label {
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+/* The panel's text fields fill their row; checkboxes keep their native size. */
+.chat-settings-panel input.chat-settings-checkbox {
+  appearance: auto;
+  flex: 0 0 16px;
+  width: 16px;
+  height: 16px;
+  min-height: 16px;
+  margin: 0;
+  padding: 0;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
+.chat-settings-checkbox:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: 2px;
+}
+
+.chat-settings-preference-row {
+  display: grid;
+  gap: 8px;
+  padding-top: 6px;
+}
+
+.chat-settings-compact-options {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+}
+
+.chat-settings-compact-options[data-disabled="true"] {
+  opacity: 0.55;
+}
+
+.chat-settings-panel .chat-custom-instructions {
+  field-sizing: content;
+  min-height: calc(4lh + 22px);
+  max-height: calc(10lh + 22px);
+  overflow-y: auto;
+  padding: 10px 12px;
+  resize: none;
+}
+
+.chat-settings-instructions-footer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 16px;
+}
+
+.chat-settings-base-link {
+  min-width: 0;
+  border: 0;
+  background: transparent;
+  padding: 0;
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: 12px;
+  line-height: 1.45;
+  text-align: left;
+  text-decoration: underline;
+  text-decoration-color: var(--glass-border);
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+.chat-settings-base-link:hover {
+  color: var(--accent);
+  text-decoration-color: currentColor;
+}
+
+.chat-settings-base-link:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: 2px;
+}
+
+.chat-settings-modal .coach-analysis-spend {
+  flex-wrap: wrap;
+  padding: 12px;
+  background: var(--option-well);
+}
+
+.chat-settings-modal .coach-analysis-budget {
+  flex-wrap: wrap;
+}
+
+.chat-settings-modal .coach-analysis-budget input {
+  width: 120px;
+}
+
+@media (max-width: 520px) {
+  .chat-settings-backdrop {
+    padding: 12px;
+  }
+
+  .chat-settings-modal-header,
+  .chat-settings-modal-footer {
+    padding-inline: 16px;
+  }
+
+  .chat-settings-modal .chat-settings-panel {
+    padding-inline: 16px;
+  }
 }
 
 /* The status reads at the start of the row, the actions at its end. */
@@ -16966,6 +17196,10 @@ td span {
   border-color: var(--glass-border);
 }
 
+:root[data-theme="paper"] .chat-settings-modal .chat-settings-section {
+  background: transparent;
+}
+
 :root[data-theme="paper"] .chat-composer-inner {
   box-shadow: var(--shadow-card), var(--glass-inset);
 }
@@ -17118,6 +17352,98 @@ td span {
   background: var(--glass-bg);
   border-color: var(--glass-border);
   box-shadow: var(--shadow-inset);
+}
+
+/* Coach's three AI settings surfaces share one light palette, including when
+   providers open inside Coach or a conversation sheet is portalled to body. */
+:root[data-theme="paper"] :is(.chat-settings-backdrop, .coach-models-backdrop, .coach-sheet.coach-conversation-sheet) {
+  color-scheme: light;
+  color: var(--text-primary);
+  --surface: #ffffff;
+  --glass-bg: #f5f7fa;
+  --glass-bg-hover: #e9edf3;
+  --glass-bg-elevated: #ffffff;
+  --glass-border: rgba(19, 26, 40, 0.14);
+  --surface-line: var(--glass-border);
+  --text-primary: #151a26;
+  --text-secondary: #4a5265;
+  --text-muted: #61687a;
+  --option-well: #edf0f5;
+  --option-raised: #ffffff;
+  --option-edge: rgba(19, 26, 40, 0.16);
+  --option-lift: 0 1px 3px rgba(19, 26, 40, 0.12);
+  --accent: var(--palette-accent);
+  --accent-strong: var(--palette-accent-strong);
+  --accent-2: var(--palette-accent-2);
+  --accent-hover: var(--palette-accent-hover);
+  --accent-glow: var(--palette-accent-glow);
+  --accent-soft: var(--palette-accent-soft);
+  --accent-gradient: var(--palette-accent-gradient);
+  --tl-reader-bg: var(--surface);
+  --tl-scrim: rgba(19, 26, 40, 0.35);
+}
+
+:root[data-theme="paper"] :is(.chat-settings-backdrop, .coach-models-backdrop) {
+  background: rgba(19, 26, 40, 0.35);
+}
+
+:root[data-theme="paper"] :is(.chat-settings-backdrop, .coach-models-backdrop, .coach-conversation-sheet) :is(.panel.chat-settings-modal, .panel.app-modal, .plan-generator-sheet) {
+  background: var(--surface);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--shadow-elevated);
+}
+
+:root[data-theme="paper"] :is(.chat-settings-modal-header, .coach-models-backdrop .app-modal-header) {
+  background: var(--surface);
+}
+
+:root[data-theme="paper"] :is(.chat-settings-modal-footer, .coach-models-backdrop .app-modal-body, .coach-conversation-sheet .plan-generator-sheet > footer) {
+  background: var(--glass-bg);
+}
+
+:root[data-theme="paper"] .coach-models-backdrop :is(.provider-account-card, .coach-models-skeleton) {
+  background: var(--surface);
+  border-color: var(--glass-border);
+}
+
+:root[data-theme="paper"] .coach-models-backdrop :is(.provider-account-plan, .provider-account-status:not(.is-connected):not([data-state="connection-failed"]):not([data-state="usage-limit-reached"]), .chat-claude-path-row, .chat-local-key-row, .chat-claude-login-flow) {
+  background: var(--glass-bg);
+}
+
+:root[data-theme="paper"] :is(.chat-settings-modal .chat-custom-instructions, .coach-models-backdrop .chat-local-field > input, .chat-settings-modal .coach-analysis-budget input) {
+  background: var(--glass-bg);
+}
+
+:root[data-theme="paper"] .coach-models-backdrop :is(.chat-local-key-row, .chat-claude-path-row) input {
+  background: transparent;
+}
+
+:root[data-theme="paper"] .coach-conversation-sheet .plan-generator-provider-option {
+  background: var(--glass-bg);
+}
+
+:root[data-theme="paper"] .coach-conversation-sheet .plan-generator-provider-option:hover:not(.is-selected) {
+  background: var(--glass-bg-hover);
+}
+
+:root[data-theme="paper"] .coach-conversation-sheet .plan-generator-provider-option.is-selected {
+  background: var(--option-raised);
+  border-color: var(--accent);
+  box-shadow: var(--option-lift);
+}
+
+/* Solid accent keeps the small white button labels legible for every palette. */
+:root[data-theme="paper"] :is(.chat-settings-backdrop, .coach-models-backdrop, .coach-conversation-sheet) :is(.primary-button, .chat-local-action.primary) {
+  background: var(--accent);
+  color: #ffffff;
+  box-shadow: none;
+  text-shadow: none;
+}
+
+:root[data-theme="paper"] :is(.chat-settings-backdrop, .coach-models-backdrop, .coach-conversation-sheet) :is(.primary-button, .chat-local-action.primary):hover:not(:disabled) {
+  background: var(--accent-hover);
+  filter: none;
+  box-shadow: none;
 }
 
 :root[data-theme="paper"] .sleep-stage-bar,

@@ -65,6 +65,12 @@ async function closeProviders() {
   await waitFor(() => harness("exists", ".plan-generator-provider-list"), "return to conversation AI");
 }
 
+async function chooseConversationModel(value) {
+  await harness("click", ".plan-generator-sheet-models .app-select-trigger");
+  await waitFor(() => harness("exists", ".app-select-menu"), "conversation model menu");
+  await harness("click", `.app-select-menu [data-value="${value}"]`);
+}
+
 async function main() {
   await app.whenReady();
   win = new BrowserWindow({ show: false, width: 1200, height: 900,
@@ -219,7 +225,7 @@ async function main() {
   await waitFor(async () => (await harness("calls", "setConversationSettings")).at(-1)?.args[0].runtime.effort === "", "Auto clears the saved effort override");
   await harness("resolvePending", "setConversationSettings", { ...conversation, runtime: { provider: "chatgpt", effort: "" } });
   await waitFor(async () => /Auto/.test(await harness("text", effortTrigger) ?? ""), "model default shown");
-  await harness("click", '.plan-generator-sheet-models [data-option="gpt-other"]');
+  await chooseConversationModel("gpt-other");
   await waitFor(async () => /Alternate-depth/.test(await harness("text", effortTrigger) ?? ""), "model change loads its own reasoning configuration");
   await harness("click", effortTrigger);
   assert.deepEqual(await evaluate(`Array.from(document.querySelectorAll('.app-select-menu [role="option"]')).map(row => row.dataset.value)`),
@@ -238,58 +244,44 @@ async function main() {
   });
   await waitFor(() => harness("callCount", "getConversationSettings"), "Auto conversation loaded");
   await harness("click", ".chat-ai-chip");
-  await waitFor(() => harness("exists", '.plan-generator-sheet-models [data-option=""][aria-checked="true"]'), "conversation Auto overrides saved provider model");
-  await harness("click", '.plan-generator-sheet-models [data-option="gpt-test"]');
+  await waitFor(() => harness("exists", '.plan-generator-sheet-models[data-value=""]'), "conversation Auto overrides saved provider model");
+  await chooseConversationModel("gpt-test");
   await waitFor(() => harness("callCount", "setConversationSettings"), "complete runtime persisted");
   assert.deepEqual((await harness("calls", "setConversationSettings")).at(-1).args[0].runtime,
     { provider: "chatgpt", model: "gpt-test", effort: "" });
   await harness("resolvePending", "setConversationSettings", { ...autoConversation, runtime: { provider: "chatgpt", model: "gpt-test", effort: "" } });
-  await waitFor(() => harness("exists", '.plan-generator-sheet-models [data-option="gpt-test"][aria-checked="true"]'), "chosen model retained");
-  await harness("click", '.plan-generator-sheet-models [data-option=""]');
+  await waitFor(() => harness("exists", '.plan-generator-sheet-models[data-value="gpt-test"]'), "chosen model retained");
+  await chooseConversationModel("");
   await waitFor(async () => (await harness("calls", "setConversationSettings")).at(-1)?.args[0].runtime.model === "", "Auto is explicitly persisted");
   assert.deepEqual(await harness("consoleErrors"), [], "no Auto runtime renderer errors");
 
-  // Settings summaries list every connected provider, regardless of which
-  // provider is selected. Missing connections never appear in that list.
+  // Coach settings offers Manage without listing or loading provider connections.
   const allConnected = { ...settings,
     anthropic: { ...settings.anthropic, hasApiKey: true },
     openRouter: { ...settings.openRouter, hasApiKey: true },
     local: { ...settings.local, model: "local-test-model" }
   };
   for (const scenario of [
-    { settings: allConnected, auth: account, claude: script.getClaudeCodeStatus,
-      providers: ["ChatGPT", "Claude subscription", "Claude API key", "OpenRouter", "Local model"] },
-    { settings: allConnected, auth: { signedIn: false }, claude: { state: "sign-in-required" },
-      providers: ["Claude API key", "OpenRouter", "Local model"] },
-    { settings, auth: { signedIn: false }, claude: { state: "sign-in-required" },
-      providers: [] }
+    { settings: allConnected, auth: account, claude: script.getClaudeCodeStatus },
+    { settings: allConnected, auth: { signedIn: false }, claude: { state: "sign-in-required" } },
+    { settings, auth: { signedIn: false }, claude: { state: "sign-in-required" } }
   ]) {
     await harness("mount", "ChatSettingsModal", { styles: true }, { ...script,
       getChatSettings: scenario.settings, getChatAuthStatus: scenario.auth,
       getClaudeCodeStatus: scenario.claude,
       getCoachAnalysisPause: null, getCoachAnalysisSpend: null
     });
-    const providerRows = () => evaluate(`Array.from(document.querySelectorAll('.coach-provider-summary-row')).map(row => row.textContent)`);
-    await waitFor(async () => scenario.providers.length > 0
-      ? JSON.stringify(await providerRows()) === JSON.stringify(scenario.providers)
-      : (await harness("text", ".chat-settings-nav-row .settings-nav-row-copy > span")) === "Nothing connected yet. Add an account or key to start coaching.",
-      `connected provider rows: ${scenario.providers.join(", ") || "none"}`);
-    assert.doesNotMatch(await harness("text", ".chat-settings-nav-row"), /\d+ of \d+ providers connected/,
-      "connection counts are omitted");
-    assert.equal(await evaluate(`Array.from(document.querySelectorAll('.coach-provider-summary-row')).every(row => row.querySelector('svg[aria-hidden="true"]'))`), true,
-      "each provider has an icon");
-    if (scenario.providers.length > 0) {
-      await waitFor(() => harness("appStylesReady"), "provider summary styles");
-      for (const width of [1200, 420]) {
-        win.setSize(width, 900);
-        for (const theme of ["dark", "paper"]) {
-          await evaluate(`document.documentElement.dataset.theme = ${JSON.stringify(theme)}`);
-          assert.ok((await harness("overflowX", ".chat-settings-nav-row")) <= 1, `${width}px ${theme}: providers fit`);
-          assert.equal(await evaluate(`(() => {
-            const rows = Array.from(document.querySelectorAll('.coach-provider-summary-row')).map(row => row.getBoundingClientRect());
-            return rows.every((row, index) => index === 0 || row.top > rows[index - 1].bottom);
-          })()`), true, "each provider occupies a separate line");
-        }
+    await waitFor(() => harness("exists", ".chat-settings-nav-row button"), "provider management button");
+    assert.equal(await harness("text", ".chat-settings-nav-row button"), "Manage");
+    assert.equal(await harness("exists", ".chat-settings-nav-row .coach-provider-summary"), false);
+    assert.equal(await harness("exists", ".chat-settings-nav-row .settings-nav-row-copy"), false);
+    assert.equal(await harness("callCount", "getChatSettings"), 0, "connections load only when Manage opens");
+    await waitFor(() => harness("appStylesReady"), "Coach settings styles");
+    for (const width of [1200, 420]) {
+      win.setSize(width, 900);
+      for (const theme of ["dark", "paper"]) {
+        await evaluate(`document.documentElement.dataset.theme = ${JSON.stringify(theme)}`);
+        assert.ok((await harness("overflowX", ".chat-settings-nav-row")) <= 1, `${width}px ${theme}: Manage row fits`);
       }
     }
     assert.doesNotMatch(await harness("text", ".chat-settings-modal-body"), /claude update|Claude Code 2\.1\.0 is available/,
@@ -305,7 +297,7 @@ async function main() {
     getChatAuthStatus: account, getClaudeCodeStatus: claudeAccount,
     getCoachAnalysisPause: null, getCoachAnalysisSpend: null
   });
-  await harness("click", ".chat-settings-nav-row");
+  await harness("click", ".chat-settings-nav-row .settings-row-button");
   await waitFor(() => harness("exists", ".claude-account-card"), "Claude account card");
   assert.equal(await harness("text", ".claude-account-card .chat-settings-email"), account.email);
   assert.equal(await harness("text", ".claude-account-card .provider-account-plan"), "Claude Max");

@@ -9,10 +9,6 @@ import { ConfirmDialog } from "../training-library/ConfirmDialog";
 // ConfirmDialogs are.
 import "../training-library/trainingLibrary.css";
 import { ChatSettingsPanel } from "./ChatSettingsPanel";
-import {
-  summarizeCoachModels,
-  type CoachModelsSummary
-} from "./CoachModelsPanel";
 import { t } from "../i18n/core";
 
 /** The settings this dialog edits; everything else is saved elsewhere. */
@@ -75,10 +71,6 @@ export function ChatSettingsModal({
   onCoachModelsChange?: () => void;
 }) {
   const [coachModelsOpen, setCoachModelsOpen] = useState(false);
-  const [coachModels, setCoachModels] = useState<CoachModelsSummary | null>(
-    null
-  );
-  const [coachRefreshVersion, setCoachRefreshVersion] = useState(0);
   const [draft, setDraft] = useState<SettingsDraft>({});
   /** The monthly budget as edited; `undefined` while it is the saved one. */
   const [pendingBudget, setPendingBudget] = useState<number | null | undefined>(undefined);
@@ -156,34 +148,6 @@ export function ChatSettingsModal({
     return () => document.removeEventListener("keydown", handleKeyDown);
   });
 
-  useEffect(() => {
-    if (!open || !api) {
-      return;
-    }
-    let cancelled = false;
-
-    void (async () => {
-      try {
-        const [chatSettings, authStatus, claudeStatus] = await Promise.all([
-          api.getChatSettings(),
-          api.getChatAuthStatus(),
-          api.getClaudeCodeStatus()
-        ]);
-        if (!cancelled) {
-          setCoachModels(
-            summarizeCoachModels(chatSettings, authStatus, claudeStatus)
-          );
-        }
-      } catch {
-        if (!cancelled) setCoachModels(null);
-      }
-    })();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [api, open, coachRefreshVersion]);
-
   if (!open) {
     return null;
   }
@@ -222,7 +186,6 @@ export function ChatSettingsModal({
           <ChatSettingsPanel
             api={api}
             chatSettings={shownSettings}
-            coachModelsSummary={coachModels}
             onOpenCoachModels={() => setCoachModelsOpen(true)}
             onUpdateChatSettings={(patch) => setDraft((current) => ({ ...current, ...patch }))}
             pendingBudget={pendingBudget}
@@ -274,10 +237,7 @@ export function ChatSettingsModal({
         api={api}
         open={coachModelsOpen}
         onClose={() => setCoachModelsOpen(false)}
-        onChange={() => {
-          setCoachRefreshVersion((version) => version + 1);
-          onCoachModelsChange?.();
-        }}
+        onChange={onCoachModelsChange}
       />
     </div>
   );

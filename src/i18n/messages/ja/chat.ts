@@ -226,6 +226,7 @@ const chat: ChatMessages = {
   "chat.cost.tokens": "{count} トークン",
   "chat.cost.input": "入力 {count}",
   "chat.cost.output": "出力 {count}",
+  "chat.set.advanced": "詳細設定",
   "chat.set.close": "設定を閉じる",
   "chat.set.unsaved": "未保存の変更があります",
   "chat.set.saved": "すべての変更を保存しました",

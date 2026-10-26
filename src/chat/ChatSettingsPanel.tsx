@@ -19,8 +19,7 @@ import {
   normalizeContextDetail
 } from "../../electron/chatContextCompaction";
 import { compressionModelFor, providerModelOptions } from "../../electron/chatModels";
-import { COACH_PROVIDER_LABELS, type CoachModelsSummary } from "./CoachModelsPanel";
-import { CoachProviderSummary } from "./CoachProviderSummary";
+import { COACH_PROVIDER_LABELS } from "./CoachModelsPanel";
 import type { HeraclesRecordsApi } from "../heraclesrecords-api";
 import { formatTokens } from "./analyses/analysisLabels";
 import { OptionGroup } from "../components/OptionGroup";
@@ -38,7 +37,6 @@ import { plural, t, type MessageKey } from "../i18n/core";
 export function ChatSettingsPanel({
   api,
   chatSettings,
-  coachModelsSummary,
   onOpenCoachModels,
   onUpdateChatSettings,
   pendingBudget,
@@ -46,8 +44,6 @@ export function ChatSettingsPanel({
 }: {
   api: HeraclesRecordsApi | undefined;
   chatSettings: ChatSettings;
-  /** Connected providers, or null while connections are being read. */
-  coachModelsSummary: CoachModelsSummary | null;
   onOpenCoachModels: () => void;
   onUpdateChatSettings: (patch: Partial<ChatSettings>) => void;
   /** The analyses' monthly budget as edited, or `undefined` while it is the saved one. */
@@ -85,25 +81,19 @@ export function ChatSettingsPanel({
 
   return (
     <div className="chat-settings-panel">
-      <button
-        className="settings-nav-row chat-settings-nav-row"
-        type="button"
-        onClick={onOpenCoachModels}
-      >
+      <div className="chat-settings-nav-row">
         <span className="settings-nav-row-icon" aria-hidden="true">
           <BrainCircuit size={22} strokeWidth={1.9} />
         </span>
-        <span className="settings-nav-row-copy">
-          <strong>{t("chat.models.title")}</strong>
-          <CoachProviderSummary summary={coachModelsSummary} />
-        </span>
-        <ChevronRight
-          className="settings-row-chevron"
-          size={20}
-          strokeWidth={2}
-          aria-hidden="true"
-        />
-      </button>
+        <strong>{t("chat.models.title")}</strong>
+        <button
+          className="settings-row-button"
+          type="button"
+          onClick={onOpenCoachModels}
+        >
+          {t("common.manage")}
+        </button>
+      </div>
 
       <section className="chat-settings-section">
         <h3>{t("chat.set.style")}</h3>
@@ -121,74 +111,73 @@ export function ChatSettingsPanel({
             title: t(`chat.style.${style}.detail` as MessageKey)
           }))}
         />
-        <p className="chat-settings-copy">
-          {t(`chat.style.${coachStyle}.detail` as MessageKey)} {t("chat.set.styleNote")}
+        <p className="chat-settings-copy chat-settings-style-detail">
+          {t(`chat.style.${coachStyle}.detail` as MessageKey)}
         </p>
+        <p className="chat-settings-copy">{t("chat.set.styleNote")}</p>
       </section>
 
       <section className="chat-settings-section">
         <h3>{t("chat.set.display")}</h3>
-        <label className="chat-local-tools">
+        <label className="chat-settings-toggle-row">
           <input
+            className="chat-settings-checkbox"
             type="checkbox"
+            aria-label={t("chat.set.charts")}
             checked={chatSettings.visualizationsEnabled === true}
             onChange={(event) =>
-              onUpdateChatSettings({
-                visualizationsEnabled: event.target.checked
-              })
+              onUpdateChatSettings({ visualizationsEnabled: event.target.checked })
             }
           />
-          <span>{t("chat.set.charts")}</span>
+          <span className="chat-settings-row-copy">
+            <strong>{t("chat.set.charts")}</strong>
+            <span className="chat-settings-copy">{t("chat.set.chartsNote")}</span>
+          </span>
         </label>
-        <p className="chat-settings-copy">{t("chat.set.chartsNote")}</p>
-      </section>
-
-      <section className="chat-settings-section">
-        <h3>{t("chat.set.suggestions")}</h3>
-        <OptionGroup<InlineSuggestionsMode>
-          label={t("chat.set.suggestionsLabel")}
-          size="md"
-          fill
-          value={chatSettings.inlineSuggestions ?? "auto"}
-          onChange={(inlineSuggestions) => onUpdateChatSettings({ inlineSuggestions })}
-          options={[
-            { value: "on", label: t("chat.set.on") },
-            { value: "auto", label: t("chat.set.automatic") },
-            { value: "off", label: t("chat.set.off") }
-          ]}
-        />
-        <p className="chat-settings-copy">
-          {t("chat.set.suggestionsNote")}
-        </p>
+        <div className="chat-settings-preference-row">
+          <span className="chat-settings-row-label">{t("chat.set.suggestions")}</span>
+          <OptionGroup<InlineSuggestionsMode>
+            label={t("chat.set.suggestionsLabel")}
+            size="md"
+            fill
+            value={chatSettings.inlineSuggestions ?? "auto"}
+            onChange={(inlineSuggestions) => onUpdateChatSettings({ inlineSuggestions })}
+            options={[
+              { value: "on", label: t("chat.set.on") },
+              { value: "auto", label: t("chat.set.automatic") },
+              { value: "off", label: t("chat.set.off") }
+            ]}
+          />
+        </div>
+        <p className="chat-settings-copy">{t("chat.set.suggestionsNote")}</p>
       </section>
 
       <section className="chat-settings-section">
         <h3>{t("chat.set.instructions")}</h3>
         <p className="chat-settings-copy">{t("chat.set.instructionsNote")}</p>
-        <p className="chat-settings-copy">
-          {t("chat.set.withBase")}{" "}
-          <button
-            type="button"
-            className="chat-inline-link"
-            onClick={() => void openBaseInstructions()}
-          >
-            {t("chat.set.base")}
-          </button>
-        </p>
         <label className="chat-local-field">
-          <span>{t("chat.set.custom")}</span>
+          <span className="sr-only">{t("chat.set.custom")}</span>
           <textarea
             className="chat-custom-instructions"
-            rows={5}
+            rows={4}
             maxLength={MAX_CUSTOM_COACH_INSTRUCTIONS}
             placeholder={t("chat.set.customPh")}
             value={customInstructions}
             onChange={(event) => onUpdateChatSettings({ customInstructions: event.target.value })}
           />
         </label>
-        <p className="chat-settings-copy">
-          {t("chat.set.characters", { n: customInstructions.length, max: MAX_CUSTOM_COACH_INSTRUCTIONS })}
-        </p>
+        <div className="chat-settings-instructions-footer">
+          <button
+            type="button"
+            className="chat-settings-base-link"
+            onClick={() => void openBaseInstructions()}
+          >
+            {t("chat.set.base")}
+          </button>
+          <span className="chat-settings-copy">
+            {t("chat.set.characters", { n: customInstructions.length, max: MAX_CUSTOM_COACH_INSTRUCTIONS })}
+          </span>
+        </div>
         {baseInstructionsOpen ? (
           <BaseCoachInstructionsDialog
             instructions={baseInstructions}
@@ -198,19 +187,24 @@ export function ChatSettingsPanel({
         ) : null}
       </section>
 
-      <CompactContextSection
-        chatSettings={chatSettings}
-        enabled={compactEnabled}
-        detail={normalizeContextDetail(compactContext.detail)}
-        model={normalizeCompactModelChoice(compactContext.model)}
-        onChange={updateCompact}
-      />
-
-      <AnalysesSettingsSection
-        api={api}
-        pendingBudget={pendingBudget}
-        onPendingBudgetChange={onPendingBudgetChange}
-      />
+      <details className="chat-settings-advanced">
+        <summary>
+          <span>{t("chat.set.advanced")}</span>
+          <ChevronRight size={16} aria-hidden="true" />
+        </summary>
+        <CompactContextSection
+          chatSettings={chatSettings}
+          enabled={compactEnabled}
+          detail={normalizeContextDetail(compactContext.detail)}
+          model={normalizeCompactModelChoice(compactContext.model)}
+          onChange={updateCompact}
+        />
+        <AnalysesSettingsSection
+          api={api}
+          pendingBudget={pendingBudget}
+          onPendingBudgetChange={onPendingBudgetChange}
+        />
+      </details>
     </div>
   );
 }
@@ -278,99 +272,103 @@ function CompactContextSection({
 
   return (
     <section className="chat-settings-section">
-      <h3>{t("chat.row.compact")}</h3>
+      <h3>
+        <label className="chat-settings-toggle-row">
+          <input
+            className="chat-settings-checkbox"
+            type="checkbox"
+            aria-label={t("chat.set.compactAuto")}
+            checked={enabled}
+            onChange={(event) => onChange({ enabled: event.target.checked })}
+          />
+          <span>{t("chat.row.compact")}</span>
+        </label>
+      </h3>
       <p className="chat-settings-copy">{t("chat.set.compactNote")}</p>
-      <label className="chat-local-tools">
-        <input
-          type="checkbox"
-          checked={enabled}
-          onChange={(event) => onChange({ enabled: event.target.checked })}
-        />
-        <span>{t("chat.set.compactAuto")}</span>
-      </label>
+      <div className="chat-settings-compact-options" data-disabled={!enabled}>
+        <div className="chat-local-field">
+          <span>{t("chat.set.verbatim")}</span>
+          <OptionGroup<ContextDetail>
+            label={t("chat.set.verbatimLabel")}
+            size="md"
+            fill
+            disabled={!enabled}
+            value={detail}
+            onChange={(next) => onChange({ detail: next })}
+            options={detailOptions()}
+          />
+        </div>
+        <p className="chat-settings-copy">
+          {detail === "lean"
+            ? t("chat.set.lean")
+            : detail === "full"
+              ? t("chat.set.full")
+              : t("chat.set.default")}
+        </p>
 
-      <div className="chat-local-field">
-        <span>{t("chat.set.verbatim")}</span>
-        <OptionGroup<ContextDetail>
-          label={t("chat.set.verbatimLabel")}
-          size="md"
-          fill
-          disabled={!enabled}
-          value={detail}
-          onChange={(next) => onChange({ detail: next })}
-          options={detailOptions()}
-        />
+        <div className="chat-local-field">
+          <span>{t("chat.set.condenseWith")}</span>
+          <OptionGroup<ModelChoiceKind>
+            label={t("chat.set.condenseLabel")}
+            size="md"
+            fill
+            disabled={!enabled}
+            value={model.kind}
+            onChange={chooseKind}
+            options={modelChoiceOptions()}
+          />
+        </div>
+        {model.kind === "fixed" ? (
+          <div className="chat-compact-fields">
+            <div className="chat-local-field">
+              <span>{t("chat.models.provider")}</span>
+              <OptionGroup<ChatProvider>
+                label={t("chat.set.condenseProvider")}
+                mode="dropdown"
+                disabled={!enabled}
+                value={model.provider}
+                onChange={chooseProvider}
+                options={CHOOSABLE_PROVIDERS.map((provider) => ({
+                  value: provider,
+                  label: COACH_PROVIDER_LABELS[provider]
+                }))}
+              />
+            </div>
+            <div className="chat-local-field">
+              <span>{t("chat.models.model")}</span>
+              <OptionGroup<string>
+                label={t("chat.set.condenseModel")}
+                mode="dropdown"
+                disabled={!enabled}
+                value={model.model}
+                onChange={(next) => onChange({ model: { kind: "fixed", provider: model.provider, model: next } })}
+                options={[
+                  ...fixedOptions.map((option) => ({ value: option.value, label: option.label })),
+                  ...(fixedModelKnown ? [] : [{ value: model.model, label: t("chat.set.notListed", { model: model.model }) }])
+                ]}
+              />
+            </div>
+          </div>
+        ) : null}
+        <p className="chat-settings-copy">
+          {model.kind === "auto"
+            ? automatic
+              ? t("chat.set.autoModel", { provider: COACH_PROVIDER_LABELS[coachProvider], model: automatic.label })
+              : t("chat.set.autoNone", { provider: COACH_PROVIDER_LABELS[coachProvider] })
+            : model.kind === "conversation"
+              ? t("chat.set.conversationNote")
+              : t("chat.set.fixedNote")}
+        </p>
       </div>
       <p className="chat-settings-copy">
         {t("chat.set.budget", {
           keep: thousands(budget.keep),
           rollAt: thousands(budget.rollAt),
           middle: thousands(budget.middle)
-        })}{" "}
-        {detail === "lean"
-          ? t("chat.set.lean")
-          : detail === "full"
-            ? t("chat.set.full")
-            : t("chat.set.default")}
+        })}
       </p>
-
-      <div className="chat-local-field">
-        <span>{t("chat.set.condenseWith")}</span>
-        <OptionGroup<ModelChoiceKind>
-          label={t("chat.set.condenseLabel")}
-          size="md"
-          fill
-          disabled={!enabled}
-          value={model.kind}
-          onChange={chooseKind}
-          options={modelChoiceOptions()}
-        />
-      </div>
-      {model.kind === "fixed" ? (
-        <div className="chat-compact-fields">
-          <div className="chat-local-field">
-            <span>{t("chat.models.provider")}</span>
-            <OptionGroup<ChatProvider>
-              label={t("chat.set.condenseProvider")}
-              mode="dropdown"
-              disabled={!enabled}
-              value={model.provider}
-              onChange={chooseProvider}
-              options={CHOOSABLE_PROVIDERS.map((provider) => ({
-                value: provider,
-                label: COACH_PROVIDER_LABELS[provider]
-              }))}
-            />
-          </div>
-          <div className="chat-local-field">
-            <span>{t("chat.models.model")}</span>
-            <OptionGroup<string>
-              label={t("chat.set.condenseModel")}
-              mode="dropdown"
-              disabled={!enabled}
-              value={model.model}
-              onChange={(next) => onChange({ model: { kind: "fixed", provider: model.provider, model: next } })}
-              options={[
-                ...fixedOptions.map((option) => ({ value: option.value, label: option.label })),
-                ...(fixedModelKnown ? [] : [{ value: model.model, label: t("chat.set.notListed", { model: model.model }) }])
-              ]}
-            />
-          </div>
-        </div>
-      ) : null}
-      <p className="chat-settings-copy">
-        {model.kind === "auto"
-          ? automatic
-            ? t("chat.set.autoModel", { provider: COACH_PROVIDER_LABELS[coachProvider], model: automatic.label })
-            : t("chat.set.autoNone", { provider: COACH_PROVIDER_LABELS[coachProvider] })
-          : model.kind === "conversation"
-            ? t("chat.set.conversationNote")
-            : t("chat.set.fixedNote")}{" "}
-        {t("chat.set.digestRefused")}
-      </p>
-      <p className="chat-settings-copy">
-        {t("chat.set.compactNow")}
-      </p>
+      <p className="chat-settings-copy">{t("chat.set.digestRefused")}</p>
+      <p className="chat-settings-copy">{t("chat.set.compactNow")}</p>
     </section>
   );
 }
@@ -493,7 +491,7 @@ function AnalysesSettingsSection({
       ) : null}
 
       {spend ? (
-        <p className="coach-analysis-spend">
+        <div className="coach-analysis-spend">
           <span>
             <strong>
               {formatTokens(spend.countedTokens)}
@@ -536,7 +534,7 @@ function AnalysesSettingsSection({
               onBlur={() => setBudgetText(null)}
             />
           </label>
-        </p>
+        </div>
       ) : null}
     </section>
   );

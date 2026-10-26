@@ -226,6 +226,7 @@ const chat: ChatMessages = {
   "chat.cost.tokens": "{count} token",
   "chat.cost.input": "Masukan {count}",
   "chat.cost.output": "Keluaran {count}",
+  "chat.set.advanced": "Pengaturan lanjutan",
   "chat.set.close": "Tutup pengaturan",
   "chat.set.unsaved": "Ada perubahan yang belum disimpan",
   "chat.set.saved": "Semua perubahan tersimpan",

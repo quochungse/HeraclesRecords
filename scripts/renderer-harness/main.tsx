@@ -726,7 +726,6 @@ const MOUNTS: Record<string, (options: Record<string, unknown>) => ReactElement>
         customInstructions: "",
         compactContext: { enabled: true, limit: 60, keep: 20 }
       }}
-      coachModelsSummary={null}
       onOpenCoachModels={spy("onOpenCoachModels")}
       onUpdateChatSettings={spy("onUpdateChatSettings")}
       pendingBudget={undefined}

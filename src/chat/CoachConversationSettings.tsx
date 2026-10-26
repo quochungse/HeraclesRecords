@@ -104,7 +104,7 @@ export function ConversationAiSheet({
   const usageLinkRef = useRef<HTMLButtonElement>(null);
   const usageProvider = canReadUsage(runtime.provider) && readiness[runtime.provider] !== false ? runtime.provider : null;
   return createPortal(
-    <div className="coach-sheet">
+    <div className="coach-sheet coach-conversation-sheet">
       <GeneratorProviderPanel
         subject="conversation"
         settings={chatSettings}

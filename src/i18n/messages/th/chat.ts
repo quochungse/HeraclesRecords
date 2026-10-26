@@ -226,6 +226,7 @@ const chat: ChatMessages = {
   "chat.cost.tokens": "{count} โทเคน",
   "chat.cost.input": "อินพุต {count}",
   "chat.cost.output": "เอาต์พุต {count}",
+  "chat.set.advanced": "การตั้งค่าขั้นสูง",
   "chat.set.close": "ปิดการตั้งค่า",
   "chat.set.unsaved": "มีการเปลี่ยนแปลงที่ยังไม่บันทึก",
   "chat.set.saved": "บันทึกการเปลี่ยนแปลงทั้งหมดแล้ว",

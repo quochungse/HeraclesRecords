@@ -226,6 +226,7 @@ const chat: ChatMessages = {
   "chat.cost.tokens": "토큰 {count}개",
   "chat.cost.input": "입력 {count}",
   "chat.cost.output": "출력 {count}",
+  "chat.set.advanced": "고급 설정",
   "chat.set.close": "설정 닫기",
   "chat.set.unsaved": "저장하지 않은 변경 사항",
   "chat.set.saved": "모든 변경 사항 저장됨",

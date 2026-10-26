@@ -2,7 +2,7 @@ import { COACH_PROVIDER_LABELS, type CoachModelsSummary } from "./CoachModelsPan
 import { ProviderIcon } from "./ProviderIcon";
 import { t } from "../i18n/core";
 
-/** Connected providers, shared by app Settings and Coach settings. */
+/** Connected providers in app Settings. */
 export function CoachProviderSummary({ summary }: { summary: CoachModelsSummary | null }) {
   if (!summary) return <span>{t("settings.mcp.checking")}</span>;
   if (summary.connected === 0) return <span>{t("settings.coachModels.none")}</span>;

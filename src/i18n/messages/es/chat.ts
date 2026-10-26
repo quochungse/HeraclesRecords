@@ -226,6 +226,7 @@ const chat: ChatMessages = {
   "chat.cost.tokens": "{count} tokens",
   "chat.cost.input": "Entrada {count}",
   "chat.cost.output": "Salida {count}",
+  "chat.set.advanced": "Ajustes avanzados",
   "chat.set.close": "Cerrar ajustes",
   "chat.set.unsaved": "Cambios sin guardar",
   "chat.set.saved": "Todos los cambios guardados",
