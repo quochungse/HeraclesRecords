@@ -62,6 +62,8 @@ interface UseStrengthDataOptions {
   corosConnected: boolean;
   /** Development builds only: generated sample history in place of the athlete's. */
   sampleMode?: boolean;
+  /** A read-only surface can request enough history without changing the sport page's preference. */
+  windowDays?: number;
 }
 
 export interface StrengthData {
@@ -108,9 +110,11 @@ export interface StrengthData {
 export function useStrengthData({
   api,
   corosConnected,
-  sampleMode = false
+  sampleMode = false,
+  windowDays
 }: UseStrengthDataOptions): StrengthData {
-  const [days, setDays] = useSelectionPreference(STRENGTH_DAYS_PREFERENCE);
+  const [preferredDays, setDays] = useSelectionPreference(STRENGTH_DAYS_PREFERENCE);
+  const days = windowDays ?? preferredDays;
   const [source, setSource, sourcePreference] = useSelectionPreference(
     STRENGTH_SOURCE_PREFERENCE
   );

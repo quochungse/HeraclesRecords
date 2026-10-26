@@ -386,6 +386,25 @@ const activity = (overrides) => ({
   assert.equal(untimed.plannedSeconds, undefined, "a total over some of the plan would read as all of it");
 }
 
+// COROS's Training Status fields are independent of Running Fitness / fatigue.
+{
+  const statusDay = (dateKey, metric) => ({
+    dateKey, metric, activities: [], pairs: [],
+  });
+  const stats = computeWeeklyStats([
+    statusDay("20261024", { happenDay: "20261024", cti: 108, ati: 120 }),
+    statusDay("20261025", {
+      happenDay: "20261025", cti: 109, ati: 123,
+      staminaLevel: 75, tiredRateNew: 47,
+    }),
+    statusDay("20261026", {
+      happenDay: "20261026", staminaLevel: 76, tiredRateNew: 48,
+    }),
+  ]);
+  assert.equal(stats.baseFitness, 109);
+  assert.equal(stats.loadImpact, 123);
+}
+
 /* --- 10. the plan's own volume, not COROS's set count -------------------- */
 
 {

@@ -1,6 +1,22 @@
 import type { OverviewMessages } from "../en/overview.ts";
 
 const overview: OverviewMessages = {
+  "overview.briefing.enduranceOnly": "Chỉ gồm các buổi endurance.",
+  "overview.briefing.loadAllocation": "Tải được phân bổ theo tỷ lệ thời gian trong từng zone.",
+  "overview.briefing.unplaced": "Thiếu dữ liệu: loại {count} buổi.",
+  "overview.briefing.status": "Trạng thái tập luyện",
+  "overview.briefing.noStatus": "Chưa có trạng thái hiện tại",
+  "overview.briefing.asOf": "Dữ liệu gần nhất · {date}",
+  "overview.briefing.weeks": "4 tuần trọn vẹn + tuần này",
+  "overview.briefing.avgHr": "Số buổi ước tính theo nhịp tim trung bình: {count}.",
+  "overview.briefing.perWeek": "/ tuần",
+  "overview.briefing.ridingMix": "Loại hình đạp xe",
+  "overview.briefing.averageSession": "Trung bình mỗi buổi",
+  "overview.briefing.planning": "Kế hoạch tiếp theo",
+  "overview.briefing.distribution": "Phân bố tải tập luyện",
+  "overview.briefing.overnightHrv": "HRV qua đêm",
+  "overview.briefing.restingHr": "Nhịp tim nghỉ",
+  "overview.briefing.hikeRate": "Trung vị độ cao mỗi giờ ghi nhận · buổi hiking tăng ít nhất {floor} · 30 ngày qua",
   "overview.greeting.today.race": "Hôm nay là ngày đua. Tin vào quá trình tập luyện và chiến hết mình.",
   "overview.greeting.today.long": "Hôm nay có bài chạy dài. Cứ thong thả và tận hưởng.",
   "overview.greeting.today.easy": "Hôm nay chạy nhẹ. Giữ nhịp vừa đủ để vẫn nói chuyện được.",

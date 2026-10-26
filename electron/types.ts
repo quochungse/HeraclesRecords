@@ -287,9 +287,15 @@ export interface TrainingHubDailyMetric {
   rhr?: number;
   avgSleepHrv?: number;
   sleepHrvBase?: number;
+  /** COROS Training Status: chronic training index, shown as Base Fitness. */
+  cti?: number;
+  /** COROS Training Status: acute training index, shown as Load Impact. */
+  ati?: number;
+  /** Fatigue reading; this is not Load Impact (ati). */
   tiredRateNew?: number;
   tiredRateStateNew?: number;
   trainingLoadRatio?: number;
+  /** Running Fitness; this is not Base Fitness (cti). */
   staminaLevel?: number;
   /** COROS's running VO2max, filled in only on days with a run. */
   vo2max?: number;

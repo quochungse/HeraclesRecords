@@ -1,0 +1,986 @@
+/* Overview shares the app surfaces, typography and sport colours. */
+.athlete-overview {
+  container: athlete-overview / inline-size;
+  gap: 28px;
+}
+.overview-daily-grid {
+  display: grid;
+  grid-template-columns: minmax(180px, 0.66fr) minmax(320px, 1.2fr) minmax(
+      310px,
+      1.3fr
+    );
+  gap: 16px;
+  align-items: stretch;
+}
+.overview-daily-grid > .panel {
+  min-width: 0;
+  padding: 16px;
+}
+.overview-daily-grid .overview-card-header {
+  min-height: 24px;
+}
+.overview-section-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 14px;
+}
+.overview-section-heading h2 {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  margin: 0;
+  font-family: var(--font-title);
+  font-size: 22px;
+  font-weight: 500;
+}
+.overview-section-heading svg {
+  color: var(--overview-tone, var(--text-secondary));
+  flex-shrink: 0;
+}
+.overview-entry,
+.overview-icon-entry {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  flex-shrink: 0;
+  border: 0;
+  border-radius: var(--radius-xs);
+  background: transparent;
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: 11px;
+  cursor: pointer;
+}
+.overview-entry {
+  min-height: 32px;
+  padding: 6px 8px;
+  font-size: 12px;
+}
+.overview-icon-entry {
+  width: 32px;
+  height: 32px;
+}
+.overview-entry:hover,
+.overview-icon-entry:hover {
+  color: var(--overview-tone, var(--accent));
+  background: color-mix(in srgb, var(--overview-tone, var(--accent)) 8%, transparent);
+}
+.overview-entry:focus-visible,
+.overview-icon-entry:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: 2px;
+}
+.overview-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-height: 28px;
+}
+.overview-card-header .eyebrow,
+.overview-hr .eyebrow {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin: 0;
+  font-size: 10px;
+  color: var(--text-secondary);
+}
+.overview-caption,
+.overview-sport-caption {
+  color: var(--text-secondary);
+  font-size: 11px;
+  line-height: 1.45;
+  margin: 0;
+}
+.overview-sport-caption {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+}
+.overview-empty {
+  padding: 22px 0;
+  color: var(--text-secondary);
+  font-size: 12px;
+  line-height: 1.6;
+}
+.overview-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+.overview-stat > span {
+  color: var(--text-secondary);
+  font-size: 11px;
+  line-height: 1.3;
+}
+.overview-stat > strong {
+  font: 500 28px/1.2 var(--font-display);
+  color: var(--text-primary);
+  font-variant-numeric: tabular-nums;
+}
+.overview-stat strong small {
+  margin-left: 4px;
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 400;
+  line-height: 1.3;
+  color: var(--text-secondary);
+}
+.overview-daily-grid .training-recovery-panel {
+  gap: 6px;
+  min-height: 0;
+  padding: 12px;
+}
+.overview-daily-grid .training-recovery-header {
+  min-height: 18px;
+}
+.overview-daily-grid .training-recovery-header .eyebrow {
+  font-size: 10px;
+}
+.overview-daily-grid .training-recovery-content {
+  gap: 6px;
+}
+.overview-daily-grid .recovery-figure {
+  min-height: 270px;
+  height: 100%;
+}
+.overview-daily-grid .body-figure {
+  bottom: 9%;
+  height: 90%;
+}
+.overview-daily-grid .recovery-figure-level {
+  bottom: 5px;
+  gap: 5px;
+}
+.overview-daily-grid .recovery-figure-level strong {
+  font-size: 18px;
+}
+.overview-daily-grid .recovery-figure-level span {
+  font-size: 11px;
+  font-weight: 500;
+}
+.overview-daily-grid .training-recovery-message {
+  margin: 0;
+  font-size: 11px;
+  line-height: 1.45;
+}
+.overview-sleep,
+.overview-status {
+  display: flex;
+  flex-direction: column;
+}
+.overview-sleep-day {
+  display: flex;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  margin-top: 4px;
+  color: var(--text-muted);
+  font-size: 10px;
+}
+.overview-sleep-breakdown {
+  display: grid;
+  grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.2fr);
+  gap: 16px;
+  align-items: center;
+  flex: 1;
+  margin-top: 10px;
+}
+.overview-sleep-chart-column {
+  text-align: center;
+}
+.overview-sleep-ring {
+  position: relative;
+  max-width: 144px;
+  margin: 0 auto 5px;
+}
+.overview-sleep-ring svg {
+  display: block;
+  width: 100%;
+}
+.overview-sleep-ring > div {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  gap: 5px;
+}
+.overview-sleep-ring strong {
+  font: 500 22px/1.2 var(--font-display);
+}
+.overview-sleep-ring span {
+  color: var(--text-muted);
+  font-size: 10px;
+}
+.overview-sleep-right {
+  display: flex;
+  flex-direction: column;
+  align-self: center;
+  justify-content: center;
+  min-width: 0;
+}
+.overview-sleep-vitals {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--glass-border);
+}
+.overview-sleep-vitals .overview-stat > span {
+  min-height: 24px;
+  font-size: 10px;
+}
+.overview-sleep-vitals .overview-stat > strong {
+  font-size: 22px;
+}
+.overview-sleep-stages {
+  display: flex;
+  flex-direction: column;
+  margin-top: 6px;
+}
+.overview-sleep-stages > div {
+  display: grid;
+  grid-template-columns: 5px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 7px;
+  padding: 4px 0;
+  font-size: 11px;
+}
+.overview-sleep-stages i {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+}
+.overview-sleep-stages span {
+  color: var(--text-secondary);
+}
+.overview-sleep-stages strong {
+  font-weight: 500;
+  white-space: nowrap;
+}
+.overview-sleep .sleep-week-totals {
+  display: grid;
+  gap: 8px;
+  padding: 10px 0 0;
+  margin-top: 10px;
+  border: 0;
+  border-top: 1px solid var(--glass-border);
+}
+.overview-sleep .week-totals-caption {
+  margin: 0;
+  font-size: 10px;
+}
+.overview-sleep .week-totals-list {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0;
+}
+.overview-sleep .week-totals-row {
+  padding: 0 10px;
+  border: 0;
+}
+.overview-sleep .week-totals-row:first-child {
+  padding-left: 0;
+}
+.overview-sleep .week-totals-row:last-child {
+  padding-right: 0;
+}
+.overview-sleep .week-totals-row + li {
+  border-left: 1px solid var(--glass-border);
+}
+.overview-sleep .week-totals-label {
+  font-size: 10px;
+  font-weight: 400;
+  text-transform: none;
+  letter-spacing: 0;
+}
+.overview-sleep .week-totals-icon {
+  display: none;
+}
+.overview-sleep .week-totals-value {
+  font-family: var(--font-display);
+  font-size: 18px;
+}
+.overview-sleep .week-totals-notice {
+  font-size: 10px;
+}
+.overview-status > h3 {
+  font: 500 28px/1.2 var(--font-title);
+  margin: 10px 0 4px;
+}
+.overview-status-metrics {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin: 12px 0 10px;
+}
+.overview-status-metrics .overview-stat > strong {
+  font-size: 22px;
+}
+.overview-status-chart {
+  display: block;
+  width: 100%;
+  height: auto;
+  min-height: 104px;
+  flex-shrink: 0;
+  margin-top: 0;
+}
+.overview-status-chart line,
+.overview-volume line {
+  stroke: var(--glass-border);
+}
+.overview-status-chart text,
+.overview-volume text {
+  fill: var(--text-muted);
+  font-size: 10px;
+}
+.overview-volume text {
+  font-size: 12px;
+}
+.overview-chart-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin: 6px 0 8px;
+  color: var(--text-muted);
+  font-size: 10px;
+}
+.overview-chart-legend span::before {
+  content: "";
+  display: inline-block;
+  vertical-align: middle;
+  width: 12px;
+  height: 2px;
+  margin-right: 5px;
+  background: var(--sport-run);
+}
+.overview-chart-legend span + span::before {
+  background: var(--accent);
+}
+.overview-status-footer {
+  border-top: 1px solid var(--glass-border);
+  padding-top: 8px;
+  margin: 8px 0 0;
+  font-size: 10px;
+  color: var(--text-muted);
+}
+/* Keep Today legible on the same neutral surface as its neighbours. */
+.athlete-overview .training-upcoming-header {
+  display: none;
+}
+.athlete-overview .training-upcoming-panel {
+  padding: 20px;
+}
+.athlete-overview .training-upcoming-body {
+  grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.4fr);
+  gap: 24px;
+  align-items: stretch;
+}
+.athlete-overview .training-upcoming-body:not(:has(.training-upcoming-list)) {
+  grid-template-columns: minmax(0, 1fr);
+}
+.athlete-overview .training-upcoming-today-stack {
+  align-content: center;
+}
+.athlete-overview .training-upcoming-today {
+  align-items: center;
+  background: color-mix(in srgb, var(--text-primary) 3%, transparent);
+  border: 1px solid var(--glass-border);
+  box-shadow: none;
+}
+.athlete-overview .training-upcoming-today-icon {
+  background: transparent;
+  border: 1px solid var(--glass-border);
+  box-shadow: none;
+  color: var(--text-secondary);
+}
+.athlete-overview .training-upcoming-today-pill,
+.athlete-overview .training-upcoming-today-tag {
+  background: transparent;
+  color: var(--text-secondary);
+  border-color: var(--glass-border);
+  font-size: 10px;
+  font-weight: 400;
+}
+.athlete-overview .training-upcoming-today-title {
+  font-family: var(--font-title);
+  font-size: 22px;
+  font-weight: 500;
+}
+.athlete-overview .training-upcoming-list {
+  gap: 0;
+  align-content: center;
+}
+.athlete-overview .training-upcoming-row {
+  grid-template-columns: 12px 64px minmax(0, 1fr) auto;
+  padding: 14px 8px;
+  gap: 12px;
+  border-radius: var(--radius-xs);
+}
+.athlete-overview .training-upcoming-title {
+  font-weight: 500;
+}
+.athlete-overview .training-upcoming-tag {
+  font-weight: 400;
+  font-size: 10px;
+}
+.athlete-overview .training-upcoming-date {
+  font-size: 11px;
+}
+.athlete-overview .training-upcoming-dot {
+  background: var(--accent);
+  box-shadow: none;
+}
+.athlete-overview .training-upcoming-rail::before {
+  background: var(--glass-border);
+}
+/* The four-week calendar and year grid scroll inside the card. */
+.athlete-overview .training-heatmap-panel {
+  min-width: 0;
+}
+.athlete-overview .training-heatmap-strip {
+  overflow-x: auto;
+}
+.athlete-overview .training-heatmap-week-titles,
+.athlete-overview .training-heatmap-band {
+  min-width: 650px;
+}
+.overview-hr {
+  display: grid;
+  grid-template-columns: minmax(0, 0.75fr) minmax(0, 1.5fr);
+  gap: 32px;
+  padding: 24px;
+}
+.overview-hr-intro {
+  display: flex;
+  flex-direction: column;
+  border-right: 1px solid var(--glass-border);
+  padding-right: 28px;
+}
+.overview-hr-intro > .eyebrow + .overview-caption {
+  margin-top: 8px;
+}
+.overview-hr-dominant {
+  font: 500 36px/1.2 var(--font-display);
+  margin-top: 20px;
+}
+.overview-hr-dominant small {
+  font-size: 14px;
+  color: var(--text-muted);
+  margin-left: 4px;
+}
+.overview-hr h3 {
+  font: 500 22px/1.3 var(--font-title);
+  margin: 8px 0;
+}
+.overview-hr-segments {
+  display: flex;
+  gap: 3px;
+  height: 8px;
+  border-radius: var(--radius-xs);
+  overflow: hidden;
+  margin: 20px 0 12px;
+}
+.overview-hr-details > header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+.overview-hr-row {
+  display: grid;
+  grid-template-columns: 24px minmax(100px, 1fr) minmax(30px, 1fr) 65px 34px;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--glass-border);
+  font-size: 11px;
+}
+.overview-hr-row > div {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.overview-hr-row strong {
+  font-weight: 500;
+}
+.overview-hr-row small {
+  color: var(--text-muted);
+  font-size: 10px;
+}
+.overview-hr-row > strong,
+.overview-hr-row > small {
+  text-align: right;
+  white-space: nowrap;
+}
+.overview-hr-row > i {
+  display: block;
+  height: 4px;
+  background: var(--glass-border);
+  border-radius: var(--radius-xs);
+  overflow: hidden;
+}
+.overview-hr-row b {
+  display: block;
+  height: 100%;
+  border-radius: var(--radius-xs);
+}
+.overview-sports {
+  display: grid;
+  gap: 28px;
+  min-width: 0;
+}
+.overview-sport {
+  min-width: 0;
+}
+.overview-sport-panel {
+  padding: 24px;
+}
+.overview-sport-metrics {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 20px;
+  margin-bottom: 24px;
+}
+.overview-sport-metrics.is-five {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+.overview-sport-metrics .overview-stat + .overview-stat {
+  padding-left: 20px;
+  border-left: 1px solid var(--glass-border);
+}
+.overview-sport-body {
+  display: grid;
+  grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr);
+  gap: 32px;
+  border-top: 1px solid var(--glass-border);
+  padding-top: 20px;
+}
+.overview-sport-body > * {
+  min-width: 0;
+}
+.overview-chart-heading {
+  display: flex;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 6px 12px;
+  margin-bottom: 10px;
+  font-size: 12px;
+}
+.overview-chart-heading small {
+  color: var(--text-muted);
+  font-size: 10px;
+}
+.overview-volume svg {
+  display: block;
+  width: 100%;
+}
+.overview-volume .overview-chart-value {
+  fill: var(--text-secondary);
+}
+.overview-mix h3 {
+  font-size: 12px;
+  font-weight: 500;
+  margin: 0 0 18px;
+}
+.overview-mix-track {
+  display: flex;
+  height: 6px;
+  gap: 3px;
+  border-radius: var(--radius-xs);
+  overflow: hidden;
+  margin-bottom: 12px;
+}
+.overview-mix-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto 36px;
+  gap: 12px;
+  padding: 9px 0;
+  font-size: 12px;
+}
+.overview-mix-row > span {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--text-secondary);
+}
+.overview-mix-row i {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.overview-mix-row strong {
+  font-weight: 500;
+}
+.overview-mix-row small {
+  text-align: right;
+  color: var(--text-muted);
+  font-size: 10px;
+}
+.overview-mix > .overview-caption {
+  margin-top: 12px;
+}
+.overview-sport-footer {
+  display: grid;
+  grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr);
+  gap: 32px;
+  border-top: 1px solid var(--glass-border);
+  padding-top: 18px;
+  margin-top: 20px;
+}
+.overview-sport-highlight {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  min-width: 0;
+}
+.overview-sport-highlight > strong {
+  font-size: 14px;
+  font-weight: 500;
+}
+.overview-sport-highlight p {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 11px;
+}
+.overview-sport-footer .overview-stat > strong {
+  font-size: 22px;
+}
+.overview-climbing-rate {
+  font: 500 36px/1.2 var(--font-display);
+}
+.overview-strength-distribution {
+  container: overview-strength / inline-size;
+}
+.overview-strength-placeholder {
+  min-height: 120px;
+}
+.overview-strength-ready {
+  display: contents;
+}
+.overview-strength-metrics {
+  margin-bottom: 20px;
+  padding-bottom: 20px;
+  border-bottom: 1px solid var(--glass-border);
+}
+.overview-strength-metrics .overview-stat > span {
+  min-height: 28px;
+}
+.athlete-overview .overview-strength-distribution > .strength-hero {
+  grid-template-columns: minmax(280px, 38fr) minmax(0, 62fr);
+  gap: 24px;
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+  backdrop-filter: none;
+}
+.athlete-overview .overview-strength-distribution .strength-body-panel {
+  min-height: 560px;
+  border: 1px solid var(--body-stage-border);
+  border-radius: var(--radius-sm);
+}
+.athlete-overview .overview-strength-distribution .strength-muscle-panel {
+  min-width: 0;
+  padding: 4px 0 0;
+  contain: size;
+}
+.overview-strength-distribution .muscle-panel-head h3 {
+  font-size: 18px;
+  font-weight: 500;
+}
+.overview-strength-distribution .muscle-panel-lead,
+.overview-strength-distribution .muscle-panel-summary {
+  font-size: 11px;
+}
+.overview-strength-distribution .muscle-ranking-row {
+  grid-template-columns: minmax(86px, 0.8fr) minmax(48px, 2fr) 72px;
+  min-height: 32px;
+}
+.overview-strength-distribution .muscle-ranking-name {
+  font-size: 12px;
+}
+@container overview-strength (max-width: 760px) {
+  .athlete-overview .overview-strength-distribution > .strength-hero {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 20px;
+  }
+  .athlete-overview .overview-strength-distribution .strength-body-panel {
+    min-height: 440px;
+  }
+  .athlete-overview .overview-strength-distribution .strength-muscle-panel {
+    contain: none;
+  }
+  .overview-strength-distribution .muscle-panel-head {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 10px;
+  }
+  .overview-strength-distribution .muscle-panel-metric,
+  .overview-strength-distribution .muscle-panel-summary {
+    justify-self: start;
+  }
+}
+@container athlete-overview (max-width: 1050px) {
+  .overview-daily-grid {
+    grid-template-columns: minmax(170px, 0.65fr) minmax(300px, 1.2fr) minmax(
+        270px,
+        1.2fr
+      );
+    gap: 12px;
+  }
+  .overview-daily-grid > .overview-sleep,
+  .overview-daily-grid > .overview-status {
+    padding: 16px;
+  }
+  .overview-sleep-breakdown {
+    gap: 10px;
+  }
+  .overview-sport-metrics .overview-stat > strong {
+    font-size: 22px;
+  }
+}
+@container athlete-overview (max-width: 920px) {
+  .overview-daily-grid {
+    grid-template-columns: minmax(180px, 0.7fr) minmax(0, 1.3fr);
+  }
+  .overview-daily-grid > .overview-status {
+    grid-column: 1 / -1;
+  }
+  .overview-status-chart {
+    max-height: 180px;
+  }
+  .overview-status-metrics {
+    max-width: 600px;
+  }
+  .overview-hr {
+    gap: 24px;
+    grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.3fr);
+  }
+  .athlete-overview .training-upcoming-body {
+    gap: 16px;
+  }
+  .athlete-overview .training-upcoming-row {
+    grid-template-columns: 10px 64px minmax(0, 1fr) auto;
+    gap: 8px;
+  }
+}
+@container athlete-overview (max-width: 700px) {
+  .overview-hr,
+  .overview-sport-body,
+  .athlete-overview .training-upcoming-body {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .overview-hr-intro {
+    border-right: 0;
+    border-bottom: 1px solid var(--glass-border);
+    padding: 0 0 20px;
+  }
+  .overview-sport-metrics,
+  .overview-sport-metrics.is-five {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 20px 12px;
+  }
+  .overview-sport-metrics .overview-stat:nth-child(2n + 1) {
+    padding-left: 0;
+    border-left: 0;
+  }
+  .overview-sport-footer {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 20px;
+  }
+}
+@container athlete-overview (max-width: 520px) {
+  .overview-daily-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .overview-daily-grid > .overview-status {
+    grid-column: auto;
+  }
+  .overview-daily-grid .recovery-figure {
+    height: 290px;
+  }
+  .overview-daily-grid .training-recovery-content {
+    height: auto;
+  }
+  .overview-sleep-breakdown {
+    gap: 16px;
+  }
+  .overview-sleep-stages > div {
+    padding: 5px 0;
+  }
+  .overview-hr,
+  .overview-sport-panel,
+  .athlete-overview .training-upcoming-panel {
+    padding: 16px;
+  }
+  .overview-hr-row {
+    grid-template-columns: 22px minmax(80px, 1fr) 30px 58px 30px;
+    gap: 7px;
+  }
+  .overview-chart-heading small {
+    max-width: 100%;
+  }
+}
+
+/* A single stage contains the physique title, figure and readiness. */
+.athlete-overview .training-recovery-panel.is-compact {
+  display: block;
+  padding: 0;
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+}
+.athlete-overview .is-compact .training-recovery-content {
+  display: block;
+  height: 100%;
+}
+.athlete-overview .is-compact .recovery-figure {
+  height: 100%;
+  min-height: 320px;
+  border: 1px solid var(--glass-border);
+  background: linear-gradient(
+    160deg,
+    color-mix(in srgb, var(--glass-bg-elevated) 35%, var(--bg-base)),
+    var(--bg-base)
+  );
+}
+.athlete-overview .is-compact .body-figure {
+  height: 74%;
+  bottom: 13%;
+}
+.athlete-overview .is-compact .recovery-figure-level {
+  bottom: 12px;
+}
+.athlete-overview .recovery-figure-title {
+  position: absolute;
+  top: 16px;
+  left: 16px;
+  z-index: 2;
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 10px;
+}
+.athlete-overview .training-upcoming-date {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  align-items: flex-start;
+  line-height: 1.3;
+}
+.athlete-overview .training-upcoming-date > span {
+  font: inherit;
+  font-size: 10px;
+  color: var(--text-muted);
+}
+.athlete-overview .training-upcoming-date > small {
+  font: inherit;
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+.overview-volume {
+  position: relative;
+  min-width: 0;
+}
+.overview-volume g[tabindex] {
+  cursor: pointer;
+}
+.overview-volume g[tabindex]:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: 2px;
+}
+.overview-chart-tooltip {
+  position: fixed;
+  z-index: 1000;
+  width: min(220px, calc(100vw - 16px));
+  max-height: calc(100vh - 16px);
+  overflow: hidden;
+  padding: 14px;
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--bg-base) 96%, var(--text-primary));
+  box-shadow: var(--shadow-elevated);
+  pointer-events: none;
+  font-size: 11px;
+}
+.overview-chart-tooltip > strong {
+  font-size: 12px;
+  font-weight: 500;
+}
+.overview-chart-tooltip dl {
+  display: grid;
+  gap: 9px;
+  margin: 12px 0 0;
+}
+.overview-chart-tooltip dl > div {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+.overview-chart-tooltip dt {
+  color: var(--text-muted);
+}
+.overview-chart-tooltip dd {
+  margin: 0;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+.overview-status-chart:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: 2px;
+}
+.overview-status-chart .overview-status-guide {
+  stroke: var(--text-muted);
+}
+.overview-sleep {
+  --sleep-tone: rgba(120, 146, 255, 0.72);
+}
+.overview-sleep.tone-low {
+  --sleep-tone: rgba(255, 79, 95, 0.78);
+}
+.overview-sleep.tone-mid {
+  --sleep-tone: rgba(255, 178, 63, 0.78);
+}
+.overview-sleep.tone-good {
+  --sleep-tone: rgba(62, 232, 142, 0.78);
+}
+.overview-sleep.tone-high {
+  --sleep-tone: rgba(74, 163, 255, 0.82);
+}
+.overview-sleep-score {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  padding: 4px 9px;
+  border: 1px solid color-mix(in srgb, var(--sleep-tone) 22%, transparent);
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--sleep-tone) 6%, transparent);
+}
+.overview-sleep-score > span {
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+.overview-sleep-score > strong {
+  font: 500 28px/1 var(--font-display);
+  color: var(--sleep-tone);
+}
+:root[data-theme="paper"] .overview-sleep-score > strong {
+  color: color-mix(in srgb, var(--sleep-tone) 55%, var(--text-primary));
+}
+.overview-sleep-chart-column > .overview-caption {
+  font-size: 10px;
+  margin-top: 6px;
+}
+.overview-sleep-vitals .overview-stat {
+  gap: 4px;
+}

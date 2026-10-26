@@ -2,6 +2,22 @@ import type { Translation } from "../../types.ts";
 
 /** overview */
 const overview = {
+  "overview.briefing.enduranceOnly": "Endurance sessions only.",
+  "overview.briefing.loadAllocation": "Load is allocated in proportion to time in each zone.",
+  "overview.briefing.unplaced": "Insufficient data: {count} sessions excluded.",
+  "overview.briefing.status": "Training status",
+  "overview.briefing.noStatus": "Current status unavailable",
+  "overview.briefing.asOf": "Latest reading · {date}",
+  "overview.briefing.weeks": "4 full weeks + this week",
+  "overview.briefing.avgHr": "Sessions estimated from average heart rate: {count}.",
+  "overview.briefing.perWeek": "/ week",
+  "overview.briefing.ridingMix": "Ride types",
+  "overview.briefing.averageSession": "Average session",
+  "overview.briefing.planning": "Upcoming training",
+  "overview.briefing.distribution": "Training load distribution",
+  "overview.briefing.overnightHrv": "Overnight HRV",
+  "overview.briefing.restingHr": "Resting heart rate",
+  "overview.briefing.hikeRate": "Median ascent per recorded hour · hikes gaining at least {floor} · last 30 days",
   "overview.greeting.today.race": "Race day. Trust the training and go get it.",
   "overview.greeting.today.long": "Long run on the plan today — settle in and enjoy it.",
   "overview.greeting.today.easy": "An easy run today. Keep it conversational.",

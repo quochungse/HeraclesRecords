@@ -30,6 +30,7 @@ import { ChatSettingsPanel } from "../../src/chat/ChatSettingsPanel";
 import { ChatSettingsModal } from "../../src/chat/ChatSettingsModal";
 import type { ChatSettings } from "../../electron/types";
 import { RunningView } from "../../src/running/RunningView";
+import { TrainingOverview } from "../../src/training/TrainingOverview";
 import { CyclingView } from "../../src/cycling/CyclingView";
 import { HikingView } from "../../src/hiking/HikingView";
 import { ActivitiesSummary } from "../../src/training/components/ActivitiesSummary";
@@ -313,6 +314,43 @@ function EscapeClosingPanel({ children }: { children: ReactNode }) {
 }
 
 const MOUNTS: Record<string, (options: Record<string, unknown>) => ReactElement> = {
+  TrainingOverview: (options) => {
+    loadAppStyles();
+    return (
+      <main className="content content-overview" style={{
+        width: `${(options.width as number | undefined) ?? 1100}px`,
+        height: `${(options.height as number | undefined) ?? 700}px`,
+      }}>
+        <TrainingOverview
+          api={api}
+          status={{ authenticated: true } as never}
+          email=""
+          password=""
+          remember={false}
+          twoFactorEmail={null}
+          twoFactorCode=""
+          activities={[]}
+          upcomingWorkouts={[]}
+          sportTypes={[]}
+          snapshot={null}
+          busy={null}
+          showStrength={false}
+          onEmailChange={spy("onEmailChange")}
+          onPasswordChange={spy("onPasswordChange")}
+          onRememberChange={spy("onRememberChange")}
+          onLogin={spy("onLogin")}
+          onTwoFactorCodeChange={spy("onTwoFactorCodeChange")}
+          onVerifyTwoFactor={spy("onVerifyTwoFactor")}
+          onResendTwoFactor={spy("onResendTwoFactor")}
+          onCancelTwoFactor={spy("onCancelTwoFactor")}
+          onReconnect={spy("onReconnect")}
+          onOpenView={spy("onOpenView")}
+          onOpenSleepDetails={spy("onOpenSleepDetails")}
+          {...options as Partial<ComponentProps<typeof TrainingOverview>>}
+        />
+      </main>
+    );
+  },
   // Inside the same column the app gives it — `.content.content-fill` clips, so
   // the page has to scroll itself — at a fixed height, because every layout
   // trap this screen has hit only exists in a column that cannot grow.

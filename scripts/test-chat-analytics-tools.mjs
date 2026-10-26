@@ -135,9 +135,11 @@ const dayList = [
     trainingLoad: 50,
     rhr: offset < 3 ? 55 : 50,
     ...(offset < 7 ? { avgSleepHrv: 60, sleepHrvBase: 62 } : {}),
-    tiredRateNew: 30,
+    ati: 30,
+    tiredRateNew: 9,
     trainingLoadRatio: 1.15,
-    staminaLevel: 40,
+    cti: 40,
+    staminaLevel: 75,
     ...(offset === 2 ? { vo2max: 47 } : {}),
     ...(offset === 20 ? { vo2max: 46 } : {})
   })),

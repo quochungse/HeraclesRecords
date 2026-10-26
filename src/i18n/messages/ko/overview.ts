@@ -1,6 +1,22 @@
 import type { OverviewMessages } from "../en/overview.ts";
 
 const overview: OverviewMessages = {
+  "overview.briefing.enduranceOnly": "지구력 세션만 포함합니다.",
+  "overview.briefing.loadAllocation": "각 구간의 시간 비율에 따라 부하를 배분합니다.",
+  "overview.briefing.unplaced": "데이터 부족: {count}개 세션 제외.",
+  "overview.briefing.status": "훈련 상태",
+  "overview.briefing.noStatus": "현재 상태를 확인할 수 없습니다",
+  "overview.briefing.asOf": "최근 측정 · {date}",
+  "overview.briefing.weeks": "완료된 4주 + 이번 주",
+  "overview.briefing.avgHr": "평균 심박수로 추정한 세션 수: {count}.",
+  "overview.briefing.perWeek": "/ 주",
+  "overview.briefing.ridingMix": "라이딩 유형",
+  "overview.briefing.averageSession": "평균 세션",
+  "overview.briefing.planning": "다음 계획",
+  "overview.briefing.distribution": "훈련 부하 분포",
+  "overview.briefing.overnightHrv": "야간 HRV",
+  "overview.briefing.restingHr": "안정시 심박수",
+  "overview.briefing.hikeRate": "기록 시간당 상승량 중앙값 · {floor} 이상 상승한 하이킹 · 최근 30일",
   "overview.greeting.today.race": "오늘은 레이스 날입니다. 그동안의 훈련을 믿고 힘껏 달리세요.",
   "overview.greeting.today.long": "오늘은 장거리 달리기가 있습니다. 여유를 갖고 즐기세요.",
   "overview.greeting.today.easy": "오늘은 가볍게 달리는 날. 대화가 가능한 속도로 유지하세요.",

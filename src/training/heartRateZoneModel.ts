@@ -5,6 +5,18 @@ import type {
 } from "../../electron/types";
 import { t } from "../i18n/core";
 
+export function heartRateZoneCaption(zoneIndex: number): string {
+  switch (zoneIndex) {
+    case 1: return t("overview.zones.hr1");
+    case 2: return t("overview.zones.hr2");
+    case 3: return t("overview.zones.hr3");
+    case 4: return t("overview.zones.hr4");
+    case 5: return t("overview.zones.hr5");
+    case 6: return t("overview.zones.hr6");
+    default: return t("overview.zones.hrOther");
+  }
+}
+
 /**
  * COROS `hrZoneType`, labelled as its own web client labels the picker.
  * `title` is the same name in the heading case the panels use.

@@ -36,7 +36,10 @@ export function mergeTrainingDayLists(
 
     combined.set(day.happenDay, {
       ...combined.get(day.happenDay),
-      ...day
+      // The daily endpoint omits some EvoLab fields. An absent reading must
+      // not erase a value returned by analytics for the same calendar day.
+      ...Object.fromEntries(Object.entries(day).filter(([, value]) => value !== undefined)),
+      happenDay: day.happenDay
     });
   }
 

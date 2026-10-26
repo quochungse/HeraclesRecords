@@ -16,9 +16,10 @@ import {
   getLocalHappenDayKey,
   isUpcomingWorkoutToday
 } from "../formatters";
-import { planTag } from "../workoutSport";
+import { planTag, scheduledWorkoutSport } from "../workoutSport";
 import { UpcomingWorkoutDetailPanel } from "./UpcomingWorkoutDetailPanel";
-import { plural, t } from "../../i18n/core";
+import { getIntlLocale, plural, t } from "../../i18n/core";
+import { workoutSportView } from "../../calendar/workoutSportIcons";
 
 // Today and tomorrow show every session (COROS allows ten a day); the days
 // after tomorrow only fill the list up to three, tomorrow's included.
@@ -109,6 +110,11 @@ export function UpcomingWorkoutsPanel({
                 unitSystem
               );
               const tag = planTag(workout);
+              const date = new Date(
+                Number(workout.happenDay.slice(0, 4)),
+                Number(workout.happenDay.slice(4, 6)) - 1,
+                Number(workout.happenDay.slice(6, 8)),
+              );
 
               return (
                 <li
@@ -123,9 +129,13 @@ export function UpcomingWorkoutsPanel({
                     <span className="training-upcoming-rail" aria-hidden="true">
                       <span className="training-upcoming-dot" />
                     </span>
-                    <span className="training-upcoming-date">
-                      {formatUpcomingWorkoutDate(workout.happenDay)}
-                    </span>
+                    <time
+                      className="training-upcoming-date"
+                      dateTime={`${workout.happenDay.slice(0, 4)}-${workout.happenDay.slice(4, 6)}-${workout.happenDay.slice(6, 8)}`}
+                    >
+                      <span>{date.toLocaleDateString(getIntlLocale(), { weekday: "short" })}</span>
+                      <small>{date.toLocaleDateString(getIntlLocale(), { day: "numeric", month: "short" })}</small>
+                    </time>
                     <span className="training-upcoming-main">
                       <span className="training-upcoming-title-row">
                         <strong className="training-upcoming-title">
@@ -174,6 +184,9 @@ function TodayWorkoutCard({
 }) {
   const { unitSystem } = useUnitSystem();
   const tag = planTag(workout);
+  const sport = scheduledWorkoutSport(workout.sportType);
+  const sportView = sport ? workoutSportView(sport) : undefined;
+  const SportIcon = sportView?.icon ?? CalendarDays;
   const detailLine = formatUpcomingWorkoutDetailLine(
     tag,
     workout.volume,
@@ -187,8 +200,12 @@ function TodayWorkoutCard({
       className="training-upcoming-today training-upcoming-today-button"
       onClick={onOpen}
     >
-      <span className="training-upcoming-today-icon" aria-hidden="true">
-        <CalendarDays size={22} strokeWidth={2.2} />
+      <span
+        className="training-upcoming-today-icon"
+        aria-hidden="true"
+        style={{ color: `var(--sport-${sportView?.category ?? "other"})` }}
+      >
+        <SportIcon size={22} strokeWidth={2.2} />
       </span>
       <span className="training-upcoming-today-copy">
         <span className="training-upcoming-today-heading">

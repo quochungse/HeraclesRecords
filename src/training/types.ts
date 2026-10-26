@@ -189,6 +189,8 @@ export type TrainingOverviewProps = Omit<
    * does not keep a panel on the Overview.
    */
   showStrength?: boolean;
+  hiddenSportScreens?: readonly SportScreen[];
+  onOpenView?: (view: PrimaryView) => void;
 };
 
 /** The Activities screen: the activity list plus its detail pane. */

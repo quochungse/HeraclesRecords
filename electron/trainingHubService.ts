@@ -390,6 +390,8 @@ interface RawDailyMetric {
   rhr?: number;
   avgSleepHrv?: number;
   sleepHrvBase?: number;
+  cti?: number;
+  ati?: number;
   tiredRateNew?: number;
   tiredRateStateNew?: number;
   trainingLoadRatio?: number;
@@ -4647,6 +4649,10 @@ function parseDailyMetric(raw: RawDailyMetric): TrainingHubDailyMetric {
     rhr: toOptionalNumber(raw.rhr),
     avgSleepHrv: toOptionalNumber(raw.avgSleepHrv),
     sleepHrvBase: toOptionalNumber(raw.sleepHrvBase),
+    // COROS's own Training Hub plots cti / ati as Base Fitness / Load Impact.
+    // staminaLevel is Running Fitness; tiredRateNew is a separate fatigue metric.
+    cti: toOptionalNumber(raw.cti),
+    ati: toOptionalNumber(raw.ati),
     tiredRateNew: toOptionalNumber(raw.tiredRateNew),
     tiredRateStateNew: toOptionalNumber(raw.tiredRateStateNew),
     trainingLoadRatio: toOptionalNumber(raw.trainingLoadRatio),

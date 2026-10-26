@@ -108,10 +108,12 @@ function dailyMetrics(days = 400): TrainingHubDailyMetric[] {
       rhr: Math.round(49 + r() * 3 + Math.max(0, acute - chronic) * 0.01),
       avgSleepHrv: hrv,
       sleepHrvBase: 65,
+      cti: Math.round(chronic * 10) / 10,
+      ati: Math.round(acute * 10) / 10,
       tiredRateNew: Math.round(Math.max(-30, Math.min(40, (acute - chronic) * 0.9))),
       tiredRateStateNew: 2,
       trainingLoadRatio: chronic > 0 ? Math.round((acute / chronic) * 100) / 100 : 1,
-      staminaLevel: Math.round(chronic * 10) / 10,
+      staminaLevel: 72,
       vo2max: vo2At(day) ?? 52,
       distance: distByDay.get(day) ?? 0,
       duration: durByDay.get(day) ?? 0
@@ -188,7 +190,7 @@ function analytics(): TrainingHubAnalytics {
     zoneDistributions: {
       hrTrainingLoad: zones([180, 820, 610, 240, 160, 40]),
       hrDistance: zones([20, 140, 92, 30, 18, 3]),
-      hrTime: zones([3.1, 15.6, 9.2, 2.6, 1.4, 0.3])
+      hrTime: zones([3.1, 15.6, 9.2, 2.6, 1.4, 0.3].map(hours => hours * 3600))
     },
     rpeDistribution: { buckets: [], coverage: { rated: 0, total: 0 } }
   };

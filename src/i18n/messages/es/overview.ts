@@ -1,6 +1,22 @@
 import type { OverviewMessages } from "../en/overview.ts";
 
 const overview: OverviewMessages = {
+  "overview.briefing.enduranceOnly": "Solo sesiones de resistencia.",
+  "overview.briefing.loadAllocation": "La carga se reparte según el tiempo en cada zona.",
+  "overview.briefing.unplaced": "Datos insuficientes: {count} sesiones excluidas.",
+  "overview.briefing.status": "Estado de entrenamiento",
+  "overview.briefing.noStatus": "Estado actual no disponible",
+  "overview.briefing.asOf": "Última lectura · {date}",
+  "overview.briefing.weeks": "4 semanas completas + esta semana",
+  "overview.briefing.avgHr": "Sesiones estimadas a partir de la frecuencia cardíaca media: {count}.",
+  "overview.briefing.perWeek": "/ semana",
+  "overview.briefing.ridingMix": "Tipos de ciclismo",
+  "overview.briefing.averageSession": "Sesión media",
+  "overview.briefing.planning": "Próximos planes",
+  "overview.briefing.distribution": "Distribución de carga",
+  "overview.briefing.overnightHrv": "HRV nocturna",
+  "overview.briefing.restingHr": "Frecuencia cardíaca en reposo",
+  "overview.briefing.hikeRate": "Mediana de ascenso por hora registrada · rutas con al menos {floor} de ascenso · últimos 30 días",
   "overview.greeting.today.race": "Hoy es día de carrera. Confía en tu entrenamiento y a por ello.",
   "overview.greeting.today.long": "Hoy toca tirada larga. Tómatela con calma y disfrútala.",
   "overview.greeting.today.easy": "Hoy toca rodaje suave. A ritmo de poder charlar.",

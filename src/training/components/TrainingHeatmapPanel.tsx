@@ -1,6 +1,7 @@
 import {
   useEffect,
   useLayoutEffect,
+  useId,
   useMemo,
   useRef,
   useState,
@@ -12,6 +13,7 @@ import type {
   StrengthSession,
   TrainingHubActivity
 } from "../../../electron/types";
+import type { HeraclesRecordsApi } from "../../heraclesrecords-api";
 import {
   formatDistanceMeters,
   formatDurationSeconds,
@@ -50,6 +52,8 @@ import {
   buildSportCategoriesByDay,
   SPORT_COLOR_CATEGORIES,
   SPORT_COLOR_LABELS,
+  happenDayFromTimestamp,
+  sportColorCategory,
   type SportColorCategory
 } from "../sportColors";
 import type {
@@ -65,6 +69,7 @@ import {
   useSelectionPreference
 } from "../../preferences/selectionPreferences";
 import { plural, t, weekdayNames } from "../../i18n/core";
+import { OverviewChartTooltip, type ChartAnchor } from "../overview/OverviewChartTooltip";
 
 const HEATMAP_METRIC_PREFERENCE = defineSelectionPreference<HeatmapMetric>({
   key: "training.heatmapMetric",
@@ -74,11 +79,12 @@ const HEATMAP_METRIC_PREFERENCE = defineSelectionPreference<HeatmapMetric>({
 
 const HEATMAP_RANGE_PREFERENCE = defineSelectionPreference<TrainingHeatmapRange>({
   key: "training.heatmapRange",
-  defaultValue: "year",
+  defaultValue: "month",
   validate: selectionIsOneOf(TRAINING_HEATMAP_RANGES)
 });
 
 interface TrainingHeatmapPanelProps {
+  api: HeraclesRecordsApi;
   snapshot: TrainingHubSnapshot | null;
   activities?: TrainingHubActivity[];
   /**
@@ -155,11 +161,18 @@ function formatCellAriaLabel(
 }
 
 export function TrainingHeatmapPanel({
+  api,
   snapshot,
   activities = [],
   loading = false
 }: TrainingHeatmapPanelProps) {
   const { unitSystem } = useUnitSystem();
+  const tooltipId = useId();
+  const [tooltip, setTooltip] = useState<{ cell: HeatmapCell; anchor: ChartAnchor } | null>(null);
+  const showTooltip = (cell: HeatmapCell, element: HTMLElement) => {
+    const box = element.getBoundingClientRect();
+    setTooltip({ cell, anchor: { x: box.x + box.width / 2, y: box.y } });
+  };
   const reducedMotion = usePrefersReducedMotion();
   const [metric, setMetric] = useSelectionPreference(
     HEATMAP_METRIC_PREFERENCE
@@ -168,7 +181,7 @@ export function TrainingHeatmapPanel({
   const [strengthSessions, setStrengthSessions] = useState<StrengthSession[]>(
     []
   );
-  const strengthRequestedRef = useRef(false);
+  const strengthRequestRef = useRef<Promise<StrengthSession[]> | null>(null);
   const gridRef = useRef<HTMLDivElement>(null);
   const pointerFrameRef = useRef<number | null>(null);
   const pointerClientRef = useRef({ x: 0, y: 0 });
@@ -222,27 +235,32 @@ export function TrainingHeatmapPanel({
     return SPORT_COLOR_CATEGORIES.filter((cat) => seen.has(cat));
   }, [cells, sportsByDay]);
   const hasData = cells.some((cell) => cell.level > 0);
+  const hasStrengthInRange = useMemo(() => {
+    const days = new Set(cells.map((cell) => cell.happenDay));
+    return activities.some((activity) =>
+      sportColorCategory(activity.sportType) === "strength" &&
+      days.has(happenDayFromTimestamp(activity.startTime) ?? ""),
+    );
+  }, [activities, cells]);
   // Cards name what a strength day worked ("Strength: Shoulders, Chest"), which
   // only the cached breakdown knows. Fetch it the first time the short range is
   // opened — the year heatmap never needs it, and the service serves from
   // SQLite, pulling at most a chunk of missing details from COROS per call.
   useEffect(() => {
-    if (!isCompactRange || strengthRequestedRef.current) {
+    if (!isCompactRange || !hasStrengthInRange) {
       return;
     }
 
-    const api = window.heraclesRecords;
-    if (!api?.syncStrengthHistory) {
-      return;
-    }
-
-    strengthRequestedRef.current = true;
+    // Reuse the request, not a "requested" flag: a replayed effect or a quick
+    // range switch still needs to subscribe to the answer already in flight.
+    const request = strengthRequestRef.current ??= api
+      .syncStrengthHistory({ days: rangeDays, source: "coros" })
+      .then((history) => history.sessions);
     let cancelled = false;
-    void api
-      .syncStrengthHistory({ days: rangeDays })
-      .then((history) => {
+    void request
+      .then((sessions) => {
         if (!cancelled) {
-          setStrengthSessions(history.sessions);
+          setStrengthSessions(sessions);
         }
       })
       .catch(() => {
@@ -252,7 +270,7 @@ export function TrainingHeatmapPanel({
     return () => {
       cancelled = true;
     };
-  }, [isCompactRange, rangeDays]);
+  }, [api, isCompactRange, rangeDays, hasStrengthInRange]);
 
   const strengthByActivity = useMemo(
     () => indexStrengthSessions(strengthSessions),
@@ -684,6 +702,12 @@ export function TrainingHeatmapPanel({
                           cell,
                           unitSystem
                         )}${spoken ? `, ${spoken}` : ""}`}
+                        aria-describedby={tooltip?.cell.happenDay === cell.happenDay ? tooltipId : undefined}
+                        onPointerEnter={(e) => showTooltip(cell, e.currentTarget)}
+                        onPointerLeave={() => setTooltip(null)}
+                        onFocus={(e) => showTooltip(cell, e.currentTarget)}
+                        onBlur={() => setTooltip(null)}
+                        onKeyDown={(e) => { if (e.key === "Escape") setTooltip(null); }}
                         style={cardStyle as CSSProperties}
                       >
                         <span
@@ -739,21 +763,6 @@ export function TrainingHeatmapPanel({
                         ) : (
                           <span className="training-heatmap-card-rest">{t("overview.heatmap.rest")}</span>
                         )}
-
-                        <span className="training-heatmap-tooltip" role="tooltip">
-                          <strong>{cell.label}</strong>
-                          <span>
-                            {t("overview.heatmap.load", { value: formatOptionalNumber(cell.trainingLoad) })}
-                          </span>
-                          <span>
-                            {t("overview.heatmap.distance", {
-                              value: formatDistanceMeters(cell.distance, unitSystem)
-                            })}
-                          </span>
-                          <span>
-                            {t("overview.heatmap.duration", { value: formatDurationSeconds(cell.duration) })}
-                          </span>
-                        </span>
                       </div>
                     );
                   })}
@@ -817,9 +826,6 @@ export function TrainingHeatmapPanel({
                     );
                   }
 
-                  const loadLabel = formatOptionalNumber(cell.trainingLoad);
-                  const distanceLabel = formatDistanceMeters(cell.distance, unitSystem);
-                  const durationLabel = formatDurationSeconds(cell.duration);
                   const dominantSport =
                     cell.level > 0 ? sportByDay.get(cell.happenDay) : undefined;
                   const daySports =
@@ -849,15 +855,14 @@ export function TrainingHeatmapPanel({
                       role="gridcell"
                       tabIndex={0}
                       aria-label={formatCellAriaLabel(cell, unitSystem)}
+                      aria-describedby={tooltip?.cell.happenDay === cell.happenDay ? tooltipId : undefined}
+                      onPointerEnter={(e) => showTooltip(cell, e.currentTarget)}
+                      onPointerLeave={() => setTooltip(null)}
+                      onFocus={(e) => showTooltip(cell, e.currentTarget)}
+                      onBlur={() => setTooltip(null)}
+                      onKeyDown={(e) => { if (e.key === "Escape") setTooltip(null); }}
                       style={cellStyle as CSSProperties}
-                    >
-                      <span className="training-heatmap-tooltip" role="tooltip">
-                        <strong>{cell.label}</strong>
-                        <span>{t("overview.heatmap.load", { value: loadLabel })}</span>
-                        <span>{t("overview.heatmap.distance", { value: distanceLabel })}</span>
-                        <span>{t("overview.heatmap.duration", { value: durationLabel })}</span>
-                      </span>
-                    </span>
+                    />
                   );
                 })}
               </div>
@@ -911,6 +916,25 @@ export function TrainingHeatmapPanel({
               : t("overview.heatmap.empty", { days: rangeDays })}
           </p>
         </div>
+      )}
+      {tooltip && hasData && (
+        <OverviewChartTooltip id={tooltipId} anchor={tooltip.anchor} onDismiss={() => setTooltip(null)}>
+          <strong>{tooltip.cell.label}</strong>
+          <dl>
+            <div>
+              <dt>{t("overview.trainingLoad")}</dt>
+              <dd>{formatOptionalNumber(tooltip.cell.trainingLoad)}</dd>
+            </div>
+            <div>
+              <dt>{t("overview.tiles.distance")}</dt>
+              <dd>{formatDistanceMeters(tooltip.cell.distance, unitSystem)}</dd>
+            </div>
+            <div>
+              <dt>{t("overview.tiles.duration")}</dt>
+              <dd>{formatDurationSeconds(tooltip.cell.duration)}</dd>
+            </div>
+          </dl>
+        </OverviewChartTooltip>
       )}
     </section>
   );

@@ -11,7 +11,10 @@
   display: grid;
   gap: 24px;
   min-height: 0;
+}
 
+.strength-view,
+.strength-theme {
   /* Surface kit for the redrawn sections: one hairline, one well, one raised
      face. Everything below is built from these three, so the page keeps a
      single depth story instead of a new border colour per card. */
@@ -102,7 +105,8 @@
   min-height: 1px;
 }
 
-:root[data-theme="paper"] .strength-view {
+:root[data-theme="paper"] .strength-view,
+:root[data-theme="paper"] .strength-theme {
   /* On paper a "raised" face is white and the shadow does the lifting, so the
      three surfaces are respecified rather than derived from the ink. */
   --sx-edge: rgba(19, 26, 40, 0.14);

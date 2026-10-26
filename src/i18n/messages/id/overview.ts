@@ -1,6 +1,22 @@
 import type { OverviewMessages } from "../en/overview.ts";
 
 const overview: OverviewMessages = {
+  "overview.briefing.enduranceOnly": "Hanya sesi daya tahan.",
+  "overview.briefing.loadAllocation": "Beban dibagi sesuai proporsi waktu di setiap zona.",
+  "overview.briefing.unplaced": "Data tidak cukup: {count} sesi dikecualikan.",
+  "overview.briefing.status": "Status latihan",
+  "overview.briefing.noStatus": "Status saat ini belum tersedia",
+  "overview.briefing.asOf": "Pengukuran terakhir · {date}",
+  "overview.briefing.weeks": "4 minggu penuh + minggu ini",
+  "overview.briefing.avgHr": "Sesi yang diperkirakan dari detak jantung rata-rata: {count}.",
+  "overview.briefing.perWeek": "/ minggu",
+  "overview.briefing.ridingMix": "Jenis bersepeda",
+  "overview.briefing.averageSession": "Rata-rata sesi",
+  "overview.briefing.planning": "Rencana berikutnya",
+  "overview.briefing.distribution": "Distribusi beban latihan",
+  "overview.briefing.overnightHrv": "HRV semalam",
+  "overview.briefing.restingHr": "Detak jantung istirahat",
+  "overview.briefing.hikeRate": "Median kenaikan per jam tercatat · pendakian dengan kenaikan minimal {floor} · 30 hari terakhir",
   "overview.greeting.today.race": "Hari ini hari lomba. Percayai latihan Anda dan berikan yang terbaik.",
   "overview.greeting.today.long": "Hari ini ada lari jauh. Santai saja dan nikmati.",
   "overview.greeting.today.easy": "Hari ini lari santai. Jaga tempo sampai masih bisa mengobrol.",

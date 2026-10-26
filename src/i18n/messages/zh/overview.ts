@@ -1,6 +1,22 @@
 import type { OverviewMessages } from "../en/overview.ts";
 
 const overview: OverviewMessages = {
+  "overview.briefing.enduranceOnly": "仅包含耐力训练。",
+  "overview.briefing.loadAllocation": "负荷按各心率区间的时间比例分配。",
+  "overview.briefing.unplaced": "数据不足：已排除{count}次训练。",
+  "overview.briefing.status": "训练状态",
+  "overview.briefing.noStatus": "暂无当前状态",
+  "overview.briefing.asOf": "最近记录 · {date}",
+  "overview.briefing.weeks": "完整4周＋本周",
+  "overview.briefing.avgHr": "根据平均心率估算的训练次数：{count}。",
+  "overview.briefing.perWeek": "/ 周",
+  "overview.briefing.ridingMix": "骑行类型",
+  "overview.briefing.averageSession": "平均每次训练",
+  "overview.briefing.planning": "接下来的计划",
+  "overview.briefing.distribution": "训练负荷分布",
+  "overview.briefing.overnightHrv": "夜间HRV",
+  "overview.briefing.restingHr": "静息心率",
+  "overview.briefing.hikeRate": "每记录小时爬升中位数 · 爬升至少{floor}的徒步 · 过去30天",
   "overview.greeting.today.race": "今天是比赛日。相信你的训练，全力以赴。",
   "overview.greeting.today.long": "今天计划长距离跑。放松心态，享受过程。",
   "overview.greeting.today.easy": "今天是轻松跑，保持能说话的配速。",

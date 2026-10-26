@@ -1,6 +1,22 @@
 import type { OverviewMessages } from "../en/overview.ts";
 
 const overview: OverviewMessages = {
+  "overview.briefing.enduranceOnly": "持久系セッションのみ。",
+  "overview.briefing.loadAllocation": "負荷は各ゾーンの滞在時間に比例して配分されます。",
+  "overview.briefing.unplaced": "データ不足により{count}セッションを除外。",
+  "overview.briefing.status": "トレーニング状態",
+  "overview.briefing.noStatus": "現在の状態は不明です",
+  "overview.briefing.asOf": "最新の測定 · {date}",
+  "overview.briefing.weeks": "過去4週間＋今週",
+  "overview.briefing.avgHr": "平均心拍数から推定したセッション数：{count}。",
+  "overview.briefing.perWeek": "/ 週",
+  "overview.briefing.ridingMix": "ライドの種類",
+  "overview.briefing.averageSession": "平均セッション",
+  "overview.briefing.planning": "次の予定",
+  "overview.briefing.distribution": "トレーニング負荷の分布",
+  "overview.briefing.overnightHrv": "夜間HRV",
+  "overview.briefing.restingHr": "安静時心拍数",
+  "overview.briefing.hikeRate": "記録時間あたりの上昇量の中央値 · 上昇{floor}以上のハイク · 過去30日",
   "overview.greeting.today.race": "今日はレース当日。積み重ねてきた練習を信じて、全力で。",
   "overview.greeting.today.long": "今日はロング走の予定です。落ち着いて楽しみましょう。",
   "overview.greeting.today.easy": "今日はイージーラン。会話できるペースで。",

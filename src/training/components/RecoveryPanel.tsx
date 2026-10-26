@@ -33,6 +33,8 @@ interface RecoveryPanelProps {
   profileSettled: boolean;
   /** COROS's VO2max by day, which tones the figure (`readFirmness`). */
   vo2Readings: readonly Vo2Reading[];
+  /** Overview puts the title on the figure's own stage. */
+  compact?: boolean;
 }
 
 function readinessCopy(
@@ -104,16 +106,17 @@ export function RecoveryPanel(props: RecoveryPanelProps) {
 
   return (
     <section
-      className={`panel training-recovery-panel${colour ? "" : " tone-neutral"}`}
+      className={`panel training-recovery-panel${colour ? "" : " tone-neutral"}${props.compact ? " is-compact" : ""}`}
       style={colour ? ({ "--recovery-tone": colour } as CSSProperties) : undefined}
       aria-busy={waiting || undefined}
     >
-      <div className="training-recovery-header">
+      {!props.compact && <div className="training-recovery-header">
         <p className="eyebrow">{t("overview.physique.title")}</p>
-      </div>
+      </div>}
 
       <div className="training-recovery-content">
         <div className="recovery-figure" role="img" aria-label={figureDescription}>
+          {props.compact && <p className="eyebrow recovery-figure-title">{t("overview.physique.title")}</p>}
           {profileSettled ? (
             <Suspense fallback={null}>
               <LazyBodyFigure
@@ -134,7 +137,7 @@ export function RecoveryPanel(props: RecoveryPanelProps) {
           </div>
         </div>
 
-        <p className="training-recovery-message">{message}</p>
+        {!props.compact && <p className="training-recovery-message">{message}</p>}
       </div>
     </section>
   );

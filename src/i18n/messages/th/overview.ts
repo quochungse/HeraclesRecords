@@ -1,6 +1,22 @@
 import type { OverviewMessages } from "../en/overview.ts";
 
 const overview: OverviewMessages = {
+  "overview.briefing.enduranceOnly": "เฉพาะเซสชันความทนทาน",
+  "overview.briefing.loadAllocation": "จัดสรรภาระตามสัดส่วนเวลาในแต่ละโซน",
+  "overview.briefing.unplaced": "ข้อมูลไม่เพียงพอ: ไม่รวม {count} เซสชัน",
+  "overview.briefing.status": "สถานะการฝึก",
+  "overview.briefing.noStatus": "ยังไม่มีสถานะปัจจุบัน",
+  "overview.briefing.asOf": "ค่าล่าสุด · {date}",
+  "overview.briefing.weeks": "4 สัปดาห์เต็ม + สัปดาห์นี้",
+  "overview.briefing.avgHr": "จำนวนเซสชันที่ประมาณจากอัตราการเต้นหัวใจเฉลี่ย: {count}",
+  "overview.briefing.perWeek": "/ สัปดาห์",
+  "overview.briefing.ridingMix": "ประเภทการปั่น",
+  "overview.briefing.averageSession": "ค่าเฉลี่ยต่อเซสชัน",
+  "overview.briefing.planning": "แผนถัดไป",
+  "overview.briefing.distribution": "การกระจายภาระการฝึก",
+  "overview.briefing.overnightHrv": "HRV ขณะนอน",
+  "overview.briefing.restingHr": "อัตราหัวใจขณะพัก",
+  "overview.briefing.hikeRate": "ค่ามัธยฐานการไต่ต่อชั่วโมงที่บันทึก · เดินป่าที่ไต่ไม่น้อยกว่า {floor} · 30 วันที่ผ่านมา",
   "overview.greeting.today.race": "วันนี้วันแข่ง เชื่อมั่นในการซ้อมแล้วลุยให้สุด",
   "overview.greeting.today.long": "วันนี้มีวิ่งยาวตามแผน ค่อยๆ ไปและสนุกกับมัน",
   "overview.greeting.today.easy": "วันนี้วิ่งเบาๆ ในเพซที่ยังคุยได้",

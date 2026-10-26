@@ -1,4 +1,13 @@
-import { Suspense, lazy, type CSSProperties, useMemo, useState } from "react";
+import {
+  Suspense,
+  lazy,
+  type ComponentProps,
+  type CSSProperties,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import {
   ArrowRightFromLine,
   ChartNoAxesColumnIncreasing,
@@ -13,14 +22,10 @@ import {
   Monitor,
   ShieldCheck,
   Trophy,
-  RefreshCw
+  RefreshCw,
 } from "lucide-react";
-import { FitnessTrendPanel } from "./components/FitnessTrendPanel";
 import { RecoveryPanel } from "./components/RecoveryPanel";
-import { SleepSummaryPanel } from "./components/SleepSummaryPanel";
 import { TrainingHeatmapPanel } from "./components/TrainingHeatmapPanel";
-import { TrainingTrendCharts } from "./components/TrainingTrendChart";
-import { TrainingZoneDistributionCharts } from "./components/TrainingZoneDistributionCharts";
 import { UpcomingWorkoutsPanel } from "./components/UpcomingWorkoutsPanel";
 import { snapshotVo2Readings } from "./parsers";
 import { renderRich } from "../i18n/useI18n";
@@ -28,16 +33,53 @@ import type { TrainingOverviewProps } from "./types";
 import { useHeartRateZoneModel } from "./useHeartRateZoneModel";
 import loginPageBackground from "../assets/training-hub/login-bg.webp";
 import { t } from "../i18n/core";
+import { filterUpcomingWorkoutsFromToday, getLocalHappenDayKey } from "./formatters";
+import { OverviewHeading } from "./overview/OverviewParts";
+import { OverviewSleepCard } from "./overview/OverviewSleepCard";
+import { OverviewTrainingStatus } from "./overview/OverviewTrainingStatus";
+import { OverviewHeartRateCard } from "./overview/OverviewHeartRateCard";
+import { OverviewSports } from "./overview/OverviewSports";
+import { overviewActivities } from "./overview/overviewModel";
+import { useOverviewSummaries } from "./overview/useOverviewSummaries";
+import "./overview/overview.css";
 
 // The body map drags in three.js and a GLTF mannequin. Overview is the default
 // startup view, so that weight stays out of its first chunk.
-const LazyStrengthDistributionSection = lazy(() =>
-  import("../strength/StrengthDistributionSection").then(
-    ({ StrengthDistributionSection }) => ({
-      default: StrengthDistributionSection
-    })
-  )
+const LazyOverviewStrength = lazy(() =>
+  import("./overview/OverviewStrength").then(({ OverviewStrength }) => ({
+    default: OverviewStrength,
+  })),
 );
+
+function DeferredOverviewStrength(props: ComponentProps<typeof LazyOverviewStrength>) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [near, setNear] = useState(() => typeof IntersectionObserver === "undefined");
+  useEffect(() => {
+    const node = ref.current;
+    if (near || !node) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((entry) => entry.isIntersecting)) {
+          setNear(true);
+          observer.disconnect();
+        }
+      },
+      { root: node.closest(".content"), rootMargin: "400px 0px" },
+    );
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, [near]);
+  const placeholder = (
+    <p className="overview-empty" role="status">{t("strength.readingSessions")}</p>
+  );
+  return (
+    <div ref={ref} className={near ? "overview-strength-ready" : "overview-strength-placeholder"}>
+      {near ? (
+        <Suspense fallback={placeholder}><LazyOverviewStrength {...props} /></Suspense>
+      ) : placeholder}
+    </div>
+  );
+}
 
 export function TrainingOverview({
   api,
@@ -65,7 +107,9 @@ export function TrainingOverview({
   onResendTwoFactor,
   onCancelTwoFactor,
   onReconnect,
-  showStrength = true
+  showStrength = true,
+  hiddenSportScreens = [],
+  onOpenView,
 }: TrainingOverviewProps) {
   const connected = Boolean(status?.authenticated);
   // Every panel below draws from one of these two loads, and each answers an
@@ -113,9 +157,16 @@ export function TrainingOverview({
   );
   // Every day COROS reported a VO2max for, which tones the figure.
   const vo2Readings = useMemo(() => snapshotVo2Readings(snapshot), [snapshot]);
+  const today = getLocalHappenDayKey();
+  const recentActivities = useMemo(
+    () => connected ? overviewActivities(activities) : [],
+    [activities, connected, today],
+  );
+  // Both distributions read the same cached splits in a single bridge request.
+  const { summaries, loading: summariesLoading } = useOverviewSummaries(api, recentActivities);
 
   return (
-    <div className="stack training-dashboard">
+    <div className="stack training-dashboard athlete-overview">
       {connected ? null : (
         <section
           className="panel training-command-center is-disconnected"
@@ -411,68 +462,82 @@ export function TrainingOverview({
 
       {connected ? (
         <>
-          <section className="training-intelligence">
-            <div className="training-intelligence-grid">
-              <div className="training-intelligence-column">
-                <RecoveryPanel
-                  summary={summary}
-                  loading={snapshotPending}
-                  profile={corosProfile}
-                  profileSettled={corosProfileSettled}
-                  vo2Readings={vo2Readings}
-                />
-              </div>
-              <div className="training-intelligence-column">
-                <FitnessTrendPanel
-                  snapshot={snapshot}
-                  activities={activities}
-                  loading={snapshotPending || activitiesPending}
-                />
-                <SleepSummaryPanel
-                  sleep={snapshot?.sleep}
-                  points={snapshot?.trendPoints}
-                  connecting={sleepConnecting}
-                  refreshing={busy === "training-refresh"}
-                  onOpenDetails={onOpenSleepDetails}
-                />
-              </div>
-            </div>
+          <section className="overview-daily-grid">
+            <RecoveryPanel
+              compact
+              summary={summary}
+              loading={snapshotPending}
+              profile={corosProfile}
+              profileSettled={corosProfileSettled}
+              vo2Readings={vo2Readings}
+            />
+            <OverviewSleepCard
+              sleep={snapshot?.sleep}
+              points={snapshot?.trendPoints}
+              connecting={sleepConnecting || snapshotPending}
+              refreshing={busy === "training-refresh"}
+              onOpen={onOpenSleepDetails}
+            />
+            <OverviewTrainingStatus
+              snapshot={snapshot}
+              loading={snapshotPending}
+            />
           </section>
-
-          {/* Its own row, directly under Training Intelligence. The panel
-              renders nothing when the calendar is empty, so a week with no
-              scheduled sessions leaves no gap here. */}
-          <UpcomingWorkoutsPanel
-            api={api}
-            workouts={upcomingWorkouts}
-            sportTypes={sportTypes}
-          />
-
-          <div className="training-heatmap-wrap">
+          {filterUpcomingWorkoutsFromToday(upcomingWorkouts).length > 0 && (
+            <section className="overview-planning">
+              <OverviewHeading
+                title={t("overview.briefing.planning")}
+                onOpen={onOpenView ? () => onOpenView("calendar") : undefined}
+              />
+              <UpcomingWorkoutsPanel
+                api={api}
+                workouts={upcomingWorkouts}
+                sportTypes={sportTypes}
+              />
+            </section>
+          )}
+          <section className="overview-activity">
             <TrainingHeatmapPanel
+              api={api}
               snapshot={snapshot}
               activities={activities}
               loading={snapshotPending || activitiesPending}
             />
-          </div>
-          <TrainingZoneDistributionCharts
-            hrZoneModel={hrZoneModel}
-            lthrZones={snapshot?.dashboard?.lthrZones ?? []}
-            activities={activities}
-            analytics={snapshot?.analytics ?? null}
-            loading={snapshotPending || activitiesPending}
-          />
-          {showStrength ? (
-            <Suspense fallback={null}>
-              <LazyStrengthDistributionSection api={api} status={status} />
-            </Suspense>
-          ) : null}
-          <TrainingTrendCharts
-            points={snapshot?.trendPoints ?? []}
-            mcpState={snapshot?.sleep?.mcpState}
-            loading={snapshotPending}
-            sleepLoading={sleepConnecting && !snapshot?.sleep}
-          />
+          </section>
+          <section className="overview-load">
+            <OverviewHeading title={t("overview.briefing.distribution")} />
+            <OverviewHeartRateCard
+              snapshot={snapshot}
+              activities={activities}
+              model={hrZoneModel}
+              loading={snapshotPending || activitiesPending || !corosProfileSettled}
+              summaries={summaries}
+              summariesLoading={summariesLoading}
+            />
+          </section>
+          {activitiesPending ? (
+            <p className="overview-empty" role="status">
+              {t("overview.zones.reading")}
+            </p>
+          ) : (
+            <OverviewSports
+              activities={activities}
+              snapshot={snapshot}
+              profile={corosProfile}
+              model={hrZoneModel}
+              summaries={summaries}
+              hidden={hiddenSportScreens}
+              summariesLoading={summariesLoading || !corosProfileSettled}
+              onOpen={onOpenView}
+            />
+          )}
+          {showStrength && !hiddenSportScreens.includes("strength") && (
+            <DeferredOverviewStrength
+              api={api}
+              connected={connected}
+              onOpen={onOpenView}
+            />
+          )}
         </>
       ) : null}
     </div>

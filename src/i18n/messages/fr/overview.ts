@@ -1,6 +1,22 @@
 import type { OverviewMessages } from "../en/overview.ts";
 
 const overview: OverviewMessages = {
+  "overview.briefing.enduranceOnly": "Séances d’endurance uniquement.",
+  "overview.briefing.loadAllocation": "La charge est répartie au prorata du temps dans chaque zone.",
+  "overview.briefing.unplaced": "Données insuffisantes : {count} séances exclues.",
+  "overview.briefing.status": "État d’entraînement",
+  "overview.briefing.noStatus": "État actuel indisponible",
+  "overview.briefing.asOf": "Dernière mesure · {date}",
+  "overview.briefing.weeks": "4 semaines complètes + cette semaine",
+  "overview.briefing.avgHr": "Séances estimées à partir de la fréquence cardiaque moyenne : {count}.",
+  "overview.briefing.perWeek": "/ semaine",
+  "overview.briefing.ridingMix": "Types de sorties vélo",
+  "overview.briefing.averageSession": "Séance moyenne",
+  "overview.briefing.planning": "Prochaines séances",
+  "overview.briefing.distribution": "Répartition de la charge",
+  "overview.briefing.overnightHrv": "VFC nocturne",
+  "overview.briefing.restingHr": "Fréquence cardiaque au repos",
+  "overview.briefing.hikeRate": "Dénivelé médian par heure enregistrée · randonnées avec au moins {floor} d’ascension · 30 derniers jours",
   "overview.greeting.today.race": "Jour de course. Faites confiance à votre entraînement et foncez.",
   "overview.greeting.today.long": "Sortie longue au programme aujourd’hui. Prenez votre temps et profitez.",
   "overview.greeting.today.easy": "Footing facile aujourd’hui. À une allure où l’on peut parler.",

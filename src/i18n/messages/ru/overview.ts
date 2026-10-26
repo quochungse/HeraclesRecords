@@ -1,6 +1,22 @@
 import type { OverviewMessages } from "../en/overview.ts";
 
 const overview: OverviewMessages = {
+  "overview.briefing.enduranceOnly": "Только тренировки на выносливость.",
+  "overview.briefing.loadAllocation": "Нагрузка распределяется пропорционально времени в каждой зоне.",
+  "overview.briefing.unplaced": "Недостаточно данных: исключено тренировок — {count}.",
+  "overview.briefing.status": "Статус тренировок",
+  "overview.briefing.noStatus": "Текущий статус недоступен",
+  "overview.briefing.asOf": "Последнее измерение · {date}",
+  "overview.briefing.weeks": "4 полные недели + эта неделя",
+  "overview.briefing.avgHr": "Тренировок с оценкой по среднему пульсу: {count}.",
+  "overview.briefing.perWeek": "/ неделю",
+  "overview.briefing.ridingMix": "Типы велотренировок",
+  "overview.briefing.averageSession": "Средняя тренировка",
+  "overview.briefing.planning": "Ближайшие планы",
+  "overview.briefing.distribution": "Распределение нагрузки",
+  "overview.briefing.overnightHrv": "Ночная ВСР",
+  "overview.briefing.restingHr": "Пульс покоя",
+  "overview.briefing.hikeRate": "Медианный подъём за час записи · походы с подъёмом не менее {floor} · последние 30 дней",
   "overview.greeting.today.race": "Сегодня старт. Доверьтесь подготовке и выкладывайтесь.",
   "overview.greeting.today.long": "Сегодня по плану длительная. Не спешите и получайте удовольствие.",
   "overview.greeting.today.easy": "Сегодня лёгкий бег. В темпе, при котором можно разговаривать.",

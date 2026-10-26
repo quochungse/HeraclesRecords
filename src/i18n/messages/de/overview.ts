@@ -1,6 +1,22 @@
 import type { OverviewMessages } from "../en/overview.ts";
 
 const overview: OverviewMessages = {
+  "overview.briefing.enduranceOnly": "Nur Ausdauereinheiten.",
+  "overview.briefing.loadAllocation": "Die Last wird anteilig nach der Zeit in jeder Zone verteilt.",
+  "overview.briefing.unplaced": "Unzureichende Daten: {count} Einheiten ausgeschlossen.",
+  "overview.briefing.status": "Trainingsstatus",
+  "overview.briefing.noStatus": "Aktueller Status nicht verfügbar",
+  "overview.briefing.asOf": "Letzter Messwert · {date}",
+  "overview.briefing.weeks": "4 volle Wochen + diese Woche",
+  "overview.briefing.avgHr": "Anhand der durchschnittlichen Herzfrequenz geschätzte Einheiten: {count}.",
+  "overview.briefing.perWeek": "/ Woche",
+  "overview.briefing.ridingMix": "Fahrtarten",
+  "overview.briefing.averageSession": "Durchschnittliche Einheit",
+  "overview.briefing.planning": "Nächste Planung",
+  "overview.briefing.distribution": "Verteilung der Trainingslast",
+  "overview.briefing.overnightHrv": "Nächtliche HRV",
+  "overview.briefing.restingHr": "Ruheherzfrequenz",
+  "overview.briefing.hikeRate": "Medianer Anstieg je aufgezeichneter Stunde · Wanderungen mit mindestens {floor} Anstieg · letzte 30 Tage",
   "overview.greeting.today.race": "Heute ist Wettkampftag. Vertrau deinem Training und gib alles.",
   "overview.greeting.today.long": "Heute steht ein langer Lauf an. Lass es ruhig angehen und genieß ihn.",
   "overview.greeting.today.easy": "Heute ein lockerer Lauf. Im Plaudertempo.",

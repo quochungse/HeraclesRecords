@@ -43,4 +43,29 @@ assert.equal(cycling.dayList[0]?.cycleVo2max, undefined, "a 0 is no reading");
 assert.equal(cycling.dayList[1]?.cycleVo2max, 52);
 assert.equal(cycling.dayList[1]?.vo2max, undefined, "the two are not mixed");
 
+// Training Status uses cti / ati, not Running Fitness or the fatigue metric.
+// Reference supplied from COROS for 25 October: Base Fitness 109, Load Impact 123.
+const status = parseDailyMetrics({
+  dayList: [
+    { happenDay: 20261025, cti: 109, ati: 123, staminaLevel: 75, tiredRateNew: 47 },
+    { happenDay: 20261026, staminaLevel: 76, tiredRateNew: 48 },
+    { happenDay: 20261027, cti: 0, ati: 0 },
+    { happenDay: 20261028, cti: "109", ati: "123" },
+    { happenDay: 20261029, cti: "invalid", ati: NaN }
+  ]
+});
+assert.equal(status.dayList[0]?.happenDay, "20261025");
+assert.equal(status.dayList[0]?.cti, 109);
+assert.equal(status.dayList[0]?.ati, 123);
+assert.equal(status.dayList[0]?.staminaLevel, 75);
+assert.equal(status.dayList[0]?.tiredRateNew, 47);
+assert.equal(status.dayList[1]?.cti, undefined, "no fallback to Running Fitness");
+assert.equal(status.dayList[1]?.ati, undefined, "no fallback to fatigue");
+assert.equal(status.dayList[2]?.cti, 0);
+assert.equal(status.dayList[2]?.ati, 0);
+assert.equal(status.dayList[3]?.cti, 109);
+assert.equal(status.dayList[3]?.ati, 123);
+assert.equal(status.dayList[4]?.cti, undefined);
+assert.equal(status.dayList[4]?.ati, undefined);
+
 console.log("daily metrics parser tests passed");

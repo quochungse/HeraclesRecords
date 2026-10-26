@@ -21,7 +21,7 @@ function rounded(value?: number): string {
  * Weekly Activity has, built of the same rows. Every figure is over the days
  * that have it (`buildSleepWeekTotals`), so a night without data is not a zero.
  */
-export function SleepWeekTotals({ totals }: { totals: Totals }) {
+export function SleepWeekTotals({ totals, showAverageRhr = true }: { totals: Totals; showAverageRhr?: boolean }) {
   useI18n();
   const hrv =
     totals.hrvMin !== undefined && totals.hrvMax !== undefined
@@ -57,13 +57,13 @@ export function SleepWeekTotals({ totals }: { totals: Totals }) {
           value={rounded(totals.avgScore)}
           hover={overNights(totals.scoreNights)}
         />
-        <WeekTotalsRow
+        {showAverageRhr ? <WeekTotalsRow
           icon={<HeartPulse size={WEEK_TOTALS_ICON_SIZE} />}
           label={t("overview.sleepWeek.avgRhr")}
           value={rounded(totals.avgRhr)}
           unit="bpm"
           hover={overNights(totals.rhrDays, "day")}
-        />
+        /> : null}
         <WeekTotalsRow
           icon={<Activity size={WEEK_TOTALS_ICON_SIZE} />}
           label={t("overview.sleepWeek.hrvRange")}

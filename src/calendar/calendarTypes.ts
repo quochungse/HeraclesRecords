@@ -63,9 +63,9 @@ export interface WeeklyStats {
   /** Time recorded by the activities that answered a planned session. */
   plannedDoneSeconds: number;
   elevationGain: number;
-  /** staminaLevel — COROS "Base Fitness". */
+  /** cti — COROS "Base Fitness". */
   baseFitness?: number;
-  /** tiredRateNew — COROS "Load Impact". */
+  /** ati — COROS "Load Impact". */
   loadImpact?: number;
   /** trainingLoadRatio — acute:chronic style load ratio (~1.0 = steady). */
   loadRatio?: number;

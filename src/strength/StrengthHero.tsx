@@ -16,6 +16,7 @@ import { analyticsCoverage, type SessionHeat } from "./sessionAnalytics";
 import type { HeatMetric, StrengthAnalytics } from "./strengthAnalytics";
 import "./strength.css";
 import { plural, t } from "../i18n/core";
+import { usePrefersReducedMotion } from "../training/components/trendChartParts";
 
 const metricOptions = (): { id: HeatMetric; label: string }[] => [
   { id: "sets", label: t("strength.summary.sets") },
@@ -84,6 +85,7 @@ export function StrengthHero({
   scope = "window"
 }: StrengthHeroProps) {
   const { unitSystem } = useUnitSystem();
+  const reducedMotion = usePrefersReducedMotion();
   const [view, setViewState] = useState<BodyView>(() => sessionBodyView);
   const setView = useCallback((next: BodyView) => {
     sessionBodyView = next;
@@ -92,6 +94,9 @@ export function StrengthHero({
   const [rotating, setRotatingState] = useState(
     () => (sessionRotating ??= readStoredRotating())
   );
+  // Reduced motion stops autoplay; pressing Rotate is an explicit request to turn.
+  const [rotationRequested, setRotationRequested] = useState(false);
+  const turning = rotating && (!reducedMotion || rotationRequested);
   const setRotating = useCallback((next: boolean) => {
     sessionRotating = next;
     writeStoredRotating(next);
@@ -117,6 +122,7 @@ export function StrengthHero({
     setFigureHover(null);
     setListHover(null);
     setRotating(false);
+    setRotationRequested(false);
     setView(next);
     setViewRequest((current) => current + 1);
   }, []);
@@ -125,6 +131,7 @@ export function StrengthHero({
     setSelectedMuscle(null);
     setFigureHover(null);
     setListHover(null);
+    setRotationRequested(true);
     setRotating(true);
   }, []);
 
@@ -143,7 +150,7 @@ export function StrengthHero({
       // first muscle is picked from a turning body; after that the camera
       // stands on `view`.
       const facing =
-        rotating && selectedMuscle === null ? facingRef.current : view;
+        turning && selectedMuscle === null ? facingRef.current : view;
       const nextView = resolveMuscleView(MUSCLE_BY_ID[muscle].view, facing);
       if (nextView !== view) {
         setView(nextView);
@@ -151,7 +158,7 @@ export function StrengthHero({
       }
       setSelectedMuscle(muscle);
     },
-    [rotating, selectedMuscle, setView, view]
+    [turning, selectedMuscle, setView, view]
   );
 
   const highlightedMuscle = figureHover ?? listHover ?? selectedMuscle;
@@ -182,7 +189,7 @@ export function StrengthHero({
           <OptionGroup
             label={t("strength.bodyView")}
             tone="quiet"
-            value={rotating ? "rotate" : view}
+            value={turning ? "rotate" : view}
             options={[
               { value: "front", label: t("strength.front") },
               { value: "back", label: t("strength.back") },
@@ -197,7 +204,7 @@ export function StrengthHero({
         <BodyMapV2
           view={view}
           viewRequest={viewRequest}
-          rotating={rotating}
+          rotating={turning}
           facingRef={facingRef}
           metric={metric}
           muscleById={heat.muscleById}
