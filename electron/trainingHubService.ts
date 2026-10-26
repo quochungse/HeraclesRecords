@@ -141,6 +141,7 @@ import {
   type CorosExerciseCatalog
 } from "./corosExerciseCatalog";
 import { corosText, hasCorosLocaleTable, loadCorosLocale } from "./corosLocale";
+import { COROS_NAME_MAX_BYTES, assertCorosTextLimit, corosCopyName } from "./corosTextLimits";
 import {
   WORKOUT_SPORT_CAPABILITIES,
   decodeCorosIntensity,
@@ -2924,6 +2925,7 @@ export async function duplicateLibraryWorkout(
   name: string,
   targetSportType?: number
 ): Promise<TrainingHubLibraryWorkout> {
+  assertCorosTextLimit(name.trim(), "Workout name", COROS_NAME_MAX_BYTES, "bytes");
   const source = await getWorkoutProgramDetail(programId);
   if (!source) throw new ScreenError("main.coros.workoutNotLoaded");
   const sourceSport = toOptionalNumber(source.sportType);
@@ -2954,7 +2956,7 @@ export async function duplicateLibraryWorkout(
     );
   }
   const duplicate = resetProgramForCreate(source);
-  duplicate.name = name.trim() || `${String(source.name ?? "Workout")} Copy`;
+  duplicate.name = name.trim() || corosCopyName(String(source.name ?? "Workout"));
   duplicate.sportType = targetSport;
   const created = await createWorkoutProgram(duplicate);
   return {

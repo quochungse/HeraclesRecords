@@ -36,6 +36,14 @@ import {
 } from "./workoutCapabilities";
 import { resolveStepDefaults } from "./workoutDefaults.js";
 import { corosDistanceTargetDisplayUnit } from "./corosWorkoutDistance";
+import {
+  COROS_NAME_MAX_BYTES,
+  COROS_PLAN_DESCRIPTION_MAX_BYTES,
+  COROS_WORKOUT_DESCRIPTION_MAX_BYTES,
+  COROS_STEP_DESCRIPTION_MAX_BYTES,
+  assertCorosTextLimit,
+  corosTextLimitError
+} from "./corosTextLimits";
 import { describePlanShape } from "./trainingPlanDomain";
 import {
   HYROX_RUN_STEP_NAME,
@@ -774,9 +782,12 @@ const RUN_TRAINING_EXERCISE_SOURCE_URL =
 export function buildEasyRun(options: {
   name: string;
   distanceKm: number;
+  description?: string;
   sportType?: number;
   context?: WorkoutEditorContext;
 }): Record<string, unknown> {
+  assertCorosTextLimit(options.name.trim(), "Workout name", COROS_NAME_MAX_BYTES, "bytes");
+  assertCorosTextLimit(options.description?.trim(), "Workout description", COROS_WORKOUT_DESCRIPTION_MAX_BYTES, "bytes");
   const distance = metersToCorosDistance(options.distanceKm * 1000);
   const sportType = options.sportType ?? 1;
 
@@ -836,7 +847,7 @@ export function buildEasyRun(options: {
 
   return {
     id: "0",
-    name: options.name,
+    name: options.name.trim(),
     sportType,
     subType: 0,
     totalSets: 1,
@@ -853,7 +864,7 @@ export function buildEasyRun(options: {
     essence: 0,
     estimatedTime: 0,
     originEssence: 0,
-    overview: "",
+    overview: options.description?.trim() ?? "",
     type: 0,
     unit: options.context?.distanceUnit === "imperial" ? 1 : 0,
     pbVersion: 2,
@@ -899,6 +910,8 @@ export function buildWorkoutPayload(
   description = "",
   catalog?: CorosExerciseCatalog
 ): Record<string, unknown> {
+  assertCorosTextLimit(name.trim(), "Workout name", COROS_NAME_MAX_BYTES, "bytes");
+  assertCorosTextLimit(description.trim(), "Workout description", COROS_WORKOUT_DESCRIPTION_MAX_BYTES, "bytes");
   const capability = WORKOUT_SPORT_CAPABILITIES[sport];
   if (!capability) throw new Error(`Unsupported workout sport "${String(sport)}".`);
   const sportOptionErrors = validateWorkoutSportOptions(sport, sportOptions);
@@ -913,6 +926,8 @@ export function buildWorkoutPayload(
   let totalTime = 0;
 
   for (const step of steps) {
+    assertCorosTextLimit(step.name, "Step name", COROS_NAME_MAX_BYTES, "bytes");
+    assertCorosTextLimit(step.overview, "Step instructions", COROS_STEP_DESCRIPTION_MAX_BYTES, "bytes");
     if ("repeat" in step) {
       topIndex += 1;
       exId += 1;
@@ -931,6 +946,8 @@ export function buildWorkoutPayload(
       const builtSubSteps: Record<string, unknown>[] = [];
 
       for (let j = 0; j < subSteps.length; j++) {
+        assertCorosTextLimit(subSteps[j]!.name, "Step name", COROS_NAME_MAX_BYTES, "bytes");
+        assertCorosTextLimit(subSteps[j]!.overview, "Step instructions", COROS_STEP_DESCRIPTION_MAX_BYTES, "bytes");
         exId += 1;
         const built = buildRunExercise(
           subSteps[j]!,
@@ -1019,7 +1036,7 @@ export function buildWorkoutPayload(
     deleted: 0,
     status: 1,
     version: 0,
-    name,
+    name: name.trim(),
     sportType: capability.sportType,
     subType: 65535,
     pbVersion: requiredWorkoutPbVersion(sport, exercises),
@@ -1051,7 +1068,7 @@ export function buildWorkoutPayload(
     access: 1,
     essence: 0,
     originEssence: 0,
-    overview: description.trim().slice(0, 300),
+    overview: description.trim(),
     type: 0,
     unit: context?.distanceUnit === "imperial" ? 1 : 0,
     // A cover, as the web app gives every program it writes.
@@ -1115,6 +1132,7 @@ export function buildWorkoutPayloadFromEntry(
     return buildEasyRun({
       name: entry.name,
       distanceKm: entry.distance_km,
+      description: entry.description,
       sportType: workoutSportType(sport),
       context
     });
@@ -1338,6 +1356,10 @@ export function validatePlanDraft(
   if (!draft.name?.trim()) {
     errors.push("Plan name is required.");
   }
+  const nameError = corosTextLimitError(draft.name?.trim(), "Plan name", COROS_NAME_MAX_BYTES, "bytes");
+  if (nameError) errors.push(nameError);
+  const descriptionError = corosTextLimitError(draft.description?.trim(), "Plan description", COROS_PLAN_DESCRIPTION_MAX_BYTES, "bytes");
+  if (descriptionError) errors.push(descriptionError);
   if (!Array.isArray(draft.workouts) || draft.workouts.length === 0) {
     errors.push("At least one workout is required.");
   }
@@ -1361,9 +1383,10 @@ export function validatePlanDraft(
     if (!entry.name?.trim()) {
       errors.push(`Workout ${entry.key} needs a name.`);
     }
-    if (entry.description && entry.description.length > 300) {
-      errors.push(`Workout "${entry.name || entry.key}" description must be 300 characters or fewer.`);
-    }
+    const nameError = corosTextLimitError(entry.name?.trim(), `Workout "${entry.name || entry.key}" name`, COROS_NAME_MAX_BYTES, "bytes");
+    if (nameError) errors.push(nameError);
+    const descriptionError = corosTextLimitError(entry.description?.trim(), `Workout "${entry.name || entry.key}" description`, COROS_WORKOUT_DESCRIPTION_MAX_BYTES, "bytes");
+    if (descriptionError) errors.push(descriptionError);
 
     const hasSteps = Array.isArray(entry.steps) && entry.steps.length > 0;
     const hasDistance = entry.distance_km !== undefined && entry.distance_km > 0;

@@ -213,6 +213,12 @@ the coach is told on the athlete's next message; each turn also lists the
 conversation's creations (`creationIndex`), and the coach reads one back with
 `get_plan_draft`. A conversation's drafts are deleted with it.
 
+Both draft actions expose each workout's `description` (up to 200 UTF-8 bytes).
+Coach puts session-specific cues and reminders there, and step-specific cues in
+the step's `overview`. Session descriptions become the program's `overview` on
+COROS for structured workouts and simple distance runs; the plan's description
+remains its overall overview.
+
 ## Verified COROS surface
 
 Every plan write was probed live on 2026-09-24 with temporary data, cleaned up

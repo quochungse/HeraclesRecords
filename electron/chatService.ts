@@ -186,6 +186,7 @@ import {
 } from "./chatModels";
 import { addTokenUsage, countableUsage } from "./tokenUsage";
 import { inlineSuggestionsSection } from "./chatCoachContext";
+import { COROS_WORKOUT_DESCRIPTION_MAX_BYTES } from "./corosTextLimits";
 import { WEB_SEARCH_TOOL } from "./chatToolSources";
 import { chartHandle, chartHandleNote, isChartKind, orderTurn } from "./chartPlacement";
 import {
@@ -3951,6 +3952,13 @@ function workoutToolGuide(
     );
   }
   if (choosing.length > 0) lines.push(...choosing);
+  if (writes || has("propose_schedule_changes")) {
+    lines.push(
+      "Put session-specific coaching cues and reminders in that workout's description when creating or revising it, " +
+        `so the athlete has them with the session, not only in this conversation. Each description and step overview is limited to ${COROS_WORKOUT_DESCRIPTION_MAX_BYTES} UTF-8 bytes; ` +
+        "accented letters and emoji use multiple bytes. Put instructions for one step in its overview. Preserve relevant existing notes when revising."
+    );
+  }
   if (!writes) return lines;
 
   lines.push(

@@ -46,6 +46,7 @@ import type {
   WorkoutSport
 } from "../../electron/types";
 import type { HeraclesRecordsApi } from "../heraclesrecords-api";
+import { COROS_NAME_MAX_BYTES, COROS_WORKOUT_DESCRIPTION_MAX_BYTES, clampCorosUtf8, corosUtf8Length } from "../../electron/corosTextLimits";
 import { useUnitSystem } from "../units/UnitSystemProvider";
 import { RunnerIcon } from "../running/runnerIcon";
 import { distanceUnit, swimDistanceUnit } from "../units/units";
@@ -1200,11 +1201,11 @@ export function useWorkoutBuilder(api: HeraclesRecordsApi, options: UseWorkoutBu
   }, []);
   const setBuilderName = useCallback((value: string) => {
     setEdited(true);
-    setBuilderNameState(value);
+    setBuilderNameState(clampCorosUtf8(value, COROS_NAME_MAX_BYTES));
   }, []);
   const setBuilderDescription = useCallback((value: string) => {
     setEdited(true);
-    setBuilderDescriptionState(value);
+    setBuilderDescriptionState(clampCorosUtf8(value, COROS_WORKOUT_DESCRIPTION_MAX_BYTES));
   }, []);
   const setBuilderPoolLength = useCallback((value: string) => {
     setEdited(true);
@@ -1516,6 +1517,7 @@ export function WorkoutBuilderWorkspace({
             </span>
             <input
               type="text"
+              maxLength={COROS_NAME_MAX_BYTES}
               value={builderName}
               onChange={(event) => setBuilderName(event.target.value)}
               placeholder={builderSport === "strength" ? t("workout.b.w.ph.strength") : builderSport === "swim" ? t("workout.b.w.ph.swim") : builderSport === "bike" ? t("workout.b.w.ph.bike") : builderSport === "indoorClimb" || builderSport === "bouldering" ? t("workout.b.w.ph.climb") : builderSport === "hyrox" ? t("workout.b.w.ph.hyrox") : t("workout.b.w.ph.run")}
@@ -1524,11 +1526,11 @@ export function WorkoutBuilderWorkspace({
           <label className="calendar-field calendar-builder-description">
             <span className="calendar-field-label">
               <span>{t("workout.b.w.description")}</span>
-              <small id="calendar-builder-description-count">{builderDescription.length} / 300</small>
+              <small id="calendar-builder-description-count">{corosUtf8Length(builderDescription)} / {COROS_WORKOUT_DESCRIPTION_MAX_BYTES} B</small>
             </span>
             <textarea
               value={builderDescription}
-              maxLength={300}
+              maxLength={COROS_WORKOUT_DESCRIPTION_MAX_BYTES}
               rows={4}
               onChange={(event) => setBuilderDescription(event.target.value)}
               aria-describedby="calendar-builder-description-count"

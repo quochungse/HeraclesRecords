@@ -11,6 +11,7 @@ const {
   buildEasyRun,
   buildIntervalWorkout,
   buildWorkoutPayload,
+  buildWorkoutPayloadFromEntry,
   formatEntryStepsSummary,
   buildRunWorkoutPayload,
   buildPlanPreview,
@@ -19,6 +20,7 @@ const {
   resetProgramForCreate,
   validatePlanDraft
 } = await import(`${distUrl("corosWorkoutBuilder.js")}?cacheBust=${Date.now()}`);
+const { corosUtf8Length, clampCorosUtf8, corosCopyName } = await import(distUrl("corosTextLimits.js"));
 
 const imperialContext = {
   distanceUnit: "imperial",
@@ -66,6 +68,64 @@ assert.equal(easy.targetType, "");
 assert.equal(easy.targetValue, "");
 assert.equal(Array.isArray(easy.exerciseBarChart), true);
 assert.equal(easy.exerciseBarChart[0].targetValue, 700000);
+
+// Session notes reach COROS for structured workouts and the distance shorthand.
+const coachingNotes = "Thả lỏng vai; giữ sức cho buổi tập tiếp theo.";
+for (const sport of ["run", "trailRun"]) {
+  for (const target of [
+    { distance_km: 7 },
+    { steps: [{ kind: "training", target_type: "distance", target_distance_meters: 7000 }] }
+  ]) {
+    const program = buildWorkoutPayloadFromEntry({
+      key: "easy", name: "Easy", sport, description: `  ${coachingNotes}  `, ...target
+    });
+    assert.equal(program.overview, coachingNotes);
+    assert.equal(program.exercises[0].targetValue, 700000);
+  }
+}
+
+// Names and notes count UTF-8 bytes. Reject an overlong note
+// instead of silently losing the end of the coach's instructions.
+for (const [text, bytes] of [["A", 1], ["Â", 2], ["Ấ", 3], ["😀", 4], ["A\u0302", 3]]) {
+  assert.equal(corosUtf8Length(text), bytes, `iOS-compatible byte count for ${text}`);
+}
+const unicodeName = "ế".repeat(30);
+assert.equal(corosUtf8Length(unicodeName), 90);
+assert.equal(clampCorosUtf8(`${unicodeName}ế`, 90), unicodeName);
+assert.equal(clampCorosUtf8("a".repeat(89) + "😀", 90), "a".repeat(89), "never split an emoji");
+const copyName = corosCopyName(unicodeName);
+assert.ok(corosUtf8Length(copyName) <= 90);
+assert.ok(copyName.endsWith(" Copy"));
+for (const target of [
+  { distance_km: 7 },
+  { steps: [{ kind: "training", target_type: "distance", target_distance_meters: 7000 }] }
+]) {
+  const entry = { key: "limits", name: unicodeName, description: "x".repeat(200), ...target };
+  assert.equal(buildWorkoutPayloadFromEntry(entry).overview.length, 200);
+  assert.equal(buildWorkoutPayloadFromEntry({ ...entry, name: `  ${unicodeName}  ` }).name, unicodeName, "validate and submit the same trimmed name");
+  assert.throws(() => buildWorkoutPayloadFromEntry({ ...entry, description: "x".repeat(201) }), /200 UTF-8 bytes/);
+  assert.throws(() => buildWorkoutPayloadFromEntry({ ...entry, name: `${unicodeName}ế` }), /90 UTF-8 bytes/);
+  assert.equal(validatePlanDraft({ name: "Plan", workouts: [{ ...entry, name: `${unicodeName}ế` }] }).ok, false);
+  for (const description of ["A".repeat(200), "Â".repeat(100), "Ấ".repeat(66) + "Â", "😀".repeat(50)]) {
+    const described = { ...entry, description };
+    assert.equal(corosUtf8Length(description), 200);
+    assert.equal(buildWorkoutPayloadFromEntry(described).overview, description, "all 200 bytes are preserved");
+    assert.equal(validatePlanDraft({ name: "Plan", workouts: [described] }).ok, true);
+    assert.throws(() => buildWorkoutPayloadFromEntry({ ...described, description: description + "A" }), /200 UTF-8 bytes/);
+    assert.equal(validatePlanDraft({ name: "Plan", workouts: [{ ...described, description: description + "A" }] }).ok, false);
+  }
+  assert.throws(() => buildWorkoutPayloadFromEntry({ ...entry, description: "Ấ".repeat(67) }), /200 UTF-8 bytes/, "67 Vietnamese characters already occupy 201 bytes");
+}
+const stepWithNotes = { kind: "training", target_type: "time", target_duration_seconds: 600, overview: "Ấ".repeat(66) + "Â" };
+assert.equal(buildWorkoutPayload("Notes", [stepWithNotes]).exercises[0].overview, stepWithNotes.overview);
+assert.equal(buildWorkoutPayload("Notes", [{ repeat: 2, steps: [stepWithNotes] }]).exercises[1].overview, stepWithNotes.overview);
+for (const steps of [
+  [{ ...stepWithNotes, overview: "Ấ".repeat(67) }],
+  [{ repeat: 2, steps: [{ ...stepWithNotes, overview: "Ấ".repeat(67) }] }],
+  [{ repeat: 2, overview: "Ấ".repeat(67), steps: [stepWithNotes] }]
+]) {
+  assert.throws(() => buildWorkoutPayload("Notes", steps), /200 UTF-8 bytes/);
+}
 
 const intervals = buildIntervalWorkout({
   name: "Rolling 400s",

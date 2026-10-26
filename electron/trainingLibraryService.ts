@@ -37,6 +37,7 @@ import {
 } from "./corosTrainingPlanAdapter";
 import { libraryProgramForCalendar, withProgramIdentity } from "./corosExerciseCatalog";
 import { corosText, loadCorosLocale } from "./corosLocale";
+import { corosCopyName } from "./corosTextLimits";
 import { corosProgramToWorkoutDraft } from "./corosWorkoutEditor";
 import { editorDraftToPlanWorkoutInput } from "./planWorkoutEditor";
 import {
@@ -760,7 +761,7 @@ export async function savePlanToCoros(request: TrainingPlanSaveRequest): Promise
 export async function duplicatePlanOnCoros(planId: string): Promise<TrainingPlanDocument> {
   const remoteId = remoteIdOf(planId);
   const copy = await copyNativeCorosPlan(remoteId);
-  const name = `${corosText(copy.name) ?? copy.name} Copy`;
+  const name = corosCopyName(corosText(copy.name) ?? copy.name);
   const rawOverview = copy.rawPayload.overview;
   await updateNativeCorosPlan(copy.remoteId, nativePlanWriteInputFromRaw(copy.rawPayload, {
     name,

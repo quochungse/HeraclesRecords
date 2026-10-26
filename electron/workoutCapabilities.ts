@@ -15,6 +15,13 @@ import type {
   WorkoutSwimStroke,
   WorkoutZone
 } from "./types";
+import {
+  COROS_NAME_MAX_BYTES,
+  COROS_PLAN_DESCRIPTION_MAX_BYTES,
+  COROS_WORKOUT_DESCRIPTION_MAX_BYTES,
+  COROS_STEP_DESCRIPTION_MAX_BYTES,
+  corosTextLimitError
+} from "./corosTextLimits";
 
 export type WorkoutIntensityType = Exclude<WorkoutIntensityInput["type"], "lthrPercent">;
 export type WorkoutTargetType = RunWorkoutEditorTarget["type"];
@@ -1219,8 +1226,10 @@ export function validateWorkoutDraftShared(
 ): { valid: boolean; errors: Record<string, string> } {
   const errors: Record<string, string> = {};
   if (!draft.name.trim()) errors.name = "Name is required.";
-  else if (draft.name.trim().length > 90) errors.name = "Name must be 90 characters or fewer.";
-  if (draft.overview.length > 300) errors.overview = "Description must be 300 characters or fewer.";
+  const nameError = corosTextLimitError(draft.name.trim(), "Name", COROS_NAME_MAX_BYTES, "bytes");
+  if (nameError) errors.name = nameError;
+  const descriptionError = corosTextLimitError(draft.overview.trim(), "Description", COROS_WORKOUT_DESCRIPTION_MAX_BYTES, "bytes");
+  if (descriptionError) errors.overview = descriptionError;
   if (!draft.nodes.length) errors.nodes = "Add at least one workout step.";
   const capability = WORKOUT_SPORT_CAPABILITIES[draft.sport];
   if (!capability || capability.sportType !== draft.sportType) {
@@ -1231,6 +1240,10 @@ export function validateWorkoutDraftShared(
   if (!capability) return { valid: false, errors };
   const checkStep = (step: RunWorkoutEditorStep, path: string): void => {
     if (!step.editable) return;
+    const nameError = corosTextLimitError(step.name, "Step name", COROS_NAME_MAX_BYTES, "bytes");
+    if (nameError) errors[`${path}.name`] = nameError;
+    const overviewError = corosTextLimitError(step.overview, "Step instructions", COROS_STEP_DESCRIPTION_MAX_BYTES, "bytes");
+    if (overviewError) errors[`${path}.overview`] = overviewError;
     const targetError = validateWorkoutTarget(draft.sport, step.kind, step.target, step.exerciseKind);
     if (targetError) errors[`${path}.target`] = targetError;
     const intensityError = validateWorkoutIntensity(draft.sport, step.intensity, step.kind, step.exerciseKind);
@@ -1253,6 +1266,8 @@ export function validateWorkoutDraftShared(
   };
   draft.nodes.forEach((node, index) => {
     if (node.nodeType === "step") return checkStep(node, `nodes.${index}`);
+    const nameError = corosTextLimitError(node.name, "Repeat group name", COROS_NAME_MAX_BYTES, "bytes");
+    if (nameError) errors[`nodes.${index}.name`] = nameError;
     if (!Number.isInteger(node.repeat) || node.repeat < 1 || node.repeat > 99) errors[`nodes.${index}.repeat`] = "Repeat count must be from 1 to 99.";
     if (!node.steps.length) errors[`nodes.${index}.steps`] = "Repeat groups need at least one step.";
     node.steps.forEach((step, childIndex) => checkStep(step, `nodes.${index}.steps.${childIndex}`));
@@ -1405,7 +1420,7 @@ export function buildDraftTrainingPlanInputSchema(): Record<string, unknown> {
     type: "object",
     properties: {
       kind: { type: "string", enum: ["warmup", "training", "interval", "rest", "cooldown", "sendOff"] },
-      name: { type: "string" },
+      name: { type: "string", maxLength: COROS_NAME_MAX_BYTES, description: "At most 90 UTF-8 bytes." },
       target_type: { type: "string", enum: ["distance", "time", "load", "hrRecovery", "open", "reps", "elevationGain", "routes"] },
       target_distance_meters: { type: "number", exclusiveMinimum: 0 },
       target_duration_seconds: { type: "number", exclusiveMinimum: 0 },
@@ -1422,7 +1437,7 @@ export function buildDraftTrainingPlanInputSchema(): Record<string, unknown> {
       sets: { type: "integer", minimum: 1, maximum: 99, description: "Strength sets for this exercise." },
       rest_type: { type: "integer", enum: [1], description: "Timed recovery between Strength sets." },
       rest_value: { type: "integer", minimum: 0, maximum: 3600, description: "Recovery seconds between Strength sets." },
-      overview: { type: "string", maxLength: 300, description: "Optional step instructions." }
+      overview: { type: "string", maxLength: COROS_STEP_DESCRIPTION_MAX_BYTES, description: "Optional step instructions, at most 200 UTF-8 bytes." }
     },
     required: ["kind", "target_type"]
   };
@@ -1448,7 +1463,7 @@ export function buildDraftTrainingPlanInputSchema(): Record<string, unknown> {
     type: "object",
     properties: {
       repeat: { type: "integer", minimum: 1, maximum: 99 },
-      name: { type: "string" },
+      name: { type: "string", maxLength: COROS_NAME_MAX_BYTES, description: "At most 90 UTF-8 bytes." },
       steps: { type: "array", minItems: 1, items: step }
     },
     required: ["repeat", "steps"]
@@ -1457,7 +1472,14 @@ export function buildDraftTrainingPlanInputSchema(): Record<string, unknown> {
     type: "object",
     properties: {
       key: { type: "string" },
-      name: { type: "string" },
+      name: { type: "string", maxLength: COROS_NAME_MAX_BYTES, description: "At most 90 UTF-8 bytes." },
+      description: {
+        type: "string",
+        maxLength: COROS_WORKOUT_DESCRIPTION_MAX_BYTES,
+        description:
+          "Coaching notes for this session: technique, pacing strategy, fueling, recovery or other reminders. " +
+          "Becomes the workout's overview on COROS. At most 200 UTF-8 bytes, including spaces and line breaks."
+      },
       sport: {
         type: "string",
         enum: [...WORKOUT_SPORTS],
@@ -1519,10 +1541,11 @@ export function buildDraftTrainingPlanInputSchema(): Record<string, unknown> {
   return {
     type: "object",
     properties: {
-      name: { type: "string", description: "Plan name" },
+      name: { type: "string", maxLength: COROS_NAME_MAX_BYTES, description: "Plan name, at most 90 UTF-8 bytes." },
       description: {
         type: "string",
-        description: "What the plan is for and how it is built; becomes the plan's overview on COROS."
+        maxLength: COROS_PLAN_DESCRIPTION_MAX_BYTES,
+        description: "What the plan is for and how it is built; becomes the plan's overview on COROS. At most 800 UTF-8 bytes."
       },
       week_stages: {
         type: "array",

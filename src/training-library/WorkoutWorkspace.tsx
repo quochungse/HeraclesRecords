@@ -24,6 +24,7 @@ import { SportBadge, sportAccentStyle } from "./sportTheme";
 import { keyFromDate } from "../calendar/dateUtils";
 import { MonthDayPicker } from "./MonthDayPicker";
 import { PromptDialog } from "./PromptDialog";
+import { COROS_NAME_MAX_BYTES, clampCorosUtf8, corosCopyName } from "../../electron/corosTextLimits";
 import { compareFavoriteThenName } from "./libraryOrder";
 import { TAG_MAX_LENGTH, clampTagInput, parseTagInput } from "./tagInput";
 import { WorkoutReadOnlyBody } from "../calendar/WorkoutViewModal";
@@ -1007,7 +1008,8 @@ export function WorkoutWorkspace({
           title={t("library.w.dupTitle")}
           description={t("library.w.dupBody", { name: active.name })}
           label={t("library.w.dupLabel")}
-          initialValue={`${active.name} Copy`} // i18n-ignore: saved to COROS as the name, as COROS's own copy names it
+          initialValue={corosCopyName(active.name)}
+          sanitize={(value) => clampCorosUtf8(value, COROS_NAME_MAX_BYTES)}
           confirmLabel={t("library.w.duplicate")}
           onConfirm={(name) => void duplicate(name)}
           onCancel={() => setPrompting(null)}

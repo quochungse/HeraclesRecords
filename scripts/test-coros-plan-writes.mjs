@@ -183,6 +183,25 @@ test("what COROS would refuse is refused before it is sent", () => {
   assert.throws(() => adapter.buildNativePlanCreateBody({ ...base, sessions: eleven }, { region: 1 }), /at most 10 sessions/);
 });
 
+test("plan text limits count UTF-8 bytes on create and update", () => {
+  const input = {
+    name: "ế".repeat(30), overview: "ế".repeat(266) + "ab",
+    sessions: [{ dayNo: 0, program: libraryProgram }], weekStages: []
+  };
+  for (const build of [
+    (input) => adapter.buildNativePlanCreateBody(input, { region: 1 }),
+    (input) => adapter.buildNativePlanUpdateBody(template, input)
+  ]) {
+    assert.equal(build(input).overview, input.overview, "800 UTF-8 bytes are preserved");
+    assert.throws(() => build({ ...input, name: `${input.name}ế` }), /90 UTF-8 bytes/);
+    assert.throws(() => build({ ...input, overview: `${input.overview}a` }), /800 UTF-8 bytes/);
+    assert.throws(() => build({ ...input, overview: `${input.overview} ` }), /800 UTF-8 bytes/, "validate the actual submitted text");
+  }
+  const plan = domain.createTrainingPlan(input.name);
+  plan.description = `${input.overview}a`;
+  assert.ok(domain.validateTrainingPlan(plan).some((issue) => issue.path === "description" && issue.severity === "error"));
+});
+
 // --- update ------------------------------------------------------------------
 
 const templateInput = (sessions, extra = {}) => ({

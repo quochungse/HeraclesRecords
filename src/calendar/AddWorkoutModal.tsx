@@ -60,6 +60,7 @@ import { workoutSportLabel } from "../training/workoutSport";
 import { formatDecimal, messageRecord, t } from "../i18n/core";
 import { swimStrokeLabel } from "../i18n/workoutWords";
 import { knownSportName } from "../training/sportTypes";
+import { COROS_NAME_MAX_BYTES, clampCorosUtf8 } from "../../electron/corosTextLimits";
 
 type AddTab = "quick" | "library" | "builder" | "activity";
 
@@ -926,8 +927,9 @@ export function AddWorkoutModal({
                     </span>
                     <input
                       type="text"
+                      maxLength={COROS_NAME_MAX_BYTES}
                       value={quickName}
-                      onChange={(event) => setQuickName(event.target.value)}
+                      onChange={(event) => setQuickName(clampCorosUtf8(event.target.value, COROS_NAME_MAX_BYTES))}
                       placeholder={QUICK_DEFAULT_NAME[quickSport]}
                     />
                   </label>

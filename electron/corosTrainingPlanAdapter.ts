@@ -14,6 +14,7 @@ import type {
 } from "./types";
 import { ScreenError } from "./screenText";
 import { PROGRAM_IDENTITY_KEYS, sourceThumbnailFor } from "./corosExerciseCatalog";
+import { COROS_NAME_MAX_BYTES, COROS_PLAN_DESCRIPTION_MAX_BYTES, assertCorosTextLimit } from "./corosTextLimits";
 
 type RawPlan = Record<string, unknown>;
 
@@ -236,6 +237,8 @@ export interface NativePlanWriteInput {
 
 function validateWriteInput(input: NativePlanWriteInput): void {
   if (!input.name.trim()) throw new ScreenError("main.plan.needsName");
+  assertCorosTextLimit(input.name.trim(), "Plan name", COROS_NAME_MAX_BYTES, "bytes");
+  assertCorosTextLimit(input.overview, "Plan description", COROS_PLAN_DESCRIPTION_MAX_BYTES, "bytes");
   if (input.sessions.length === 0) {
     throw new ScreenError("main.plan.needsSession");
   }
