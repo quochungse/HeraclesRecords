@@ -10,6 +10,7 @@ import {
   LogOut,
   RefreshCw,
   Save,
+  Sparkles,
   Terminal,
   UserRound
 } from "lucide-react";
@@ -240,6 +241,9 @@ export function CoachModelsPanel({ api, onChange }: CoachModelsPanelProps) {
   const [error, setError] = useState<string | null>(null);
 
   const [signingIn, setSigningIn] = useState(false);
+  const [signingOut, setSigningOut] = useState(false);
+  const [refreshingChatGpt, setRefreshingChatGpt] = useState(false);
+  const [chatGptError, setChatGptError] = useState<string | null>(null);
   const [savingSettings, setSavingSettings] = useState(false);
   const [checkingClaude, setCheckingClaude] = useState(false);
   const [testingClaude, setTestingClaude] = useState(false);
@@ -442,13 +446,14 @@ export function CoachModelsPanel({ api, onChange }: CoachModelsPanelProps) {
     (openRouterConnection?.models ?? []).map((model) => ({ value: model.id, label: model.name }));
 
   const handleSignIn = async () => {
+    if (signingIn || signingOut || refreshingChatGpt) return;
     setSigningIn(true);
-    setError(null);
+    setChatGptError(null);
     try {
       setAuthStatus(await api.loginChat());
       await onChange?.();
     } catch (caught) {
-      setError(
+      setChatGptError(
         caught instanceof Error ? caught.message : t("chat.err.chatgptSignIn")
       );
     } finally {
@@ -457,14 +462,44 @@ export function CoachModelsPanel({ api, onChange }: CoachModelsPanelProps) {
   };
 
   const handleSignOut = async () => {
-    setError(null);
+    if (signingIn || signingOut || refreshingChatGpt) return;
+    setSigningOut(true);
+    setChatGptError(null);
     try {
       setAuthStatus(await api.logoutChat());
       await onChange?.();
     } catch (caught) {
-      setError(
+      setChatGptError(
         caught instanceof Error ? caught.message : t("chat.models.err.chatgptSignOut")
       );
+    } finally {
+      setSigningOut(false);
+    }
+  };
+
+  const refreshChatGptAccount = async () => {
+    if (refreshingChatGpt || signingIn || signingOut || busy) return;
+    setRefreshingChatGpt(true);
+    setChatGptError(null);
+    try {
+      const status = await api.getChatAuthStatus();
+      setAuthStatus(status);
+      try {
+        if (status.signedIn) {
+          const result = await api.refreshChatModels({ provider: "chatgpt", force: true });
+          takeModelLists(result.settings);
+          setChatGptError(result.errors.chatgpt ?? null);
+        }
+      } finally {
+        // Reading models can renew or invalidate the saved credentials. Keep
+        // the account and conversation picker current even if that read fails.
+        setAuthStatus(await api.getChatAuthStatus());
+        await onChange?.();
+      }
+    } catch (caught) {
+      setChatGptError(caught instanceof Error ? caught.message : t("chat.models.err.list"));
+    } finally {
+      setRefreshingChatGpt(false);
     }
   };
 
@@ -862,53 +897,73 @@ export function CoachModelsPanel({ api, onChange }: CoachModelsPanelProps) {
         </p>
       ) : null}
 
-      <section className="chat-settings-section">
-        <h3>{t("chat.models.chatgptAccount")}</h3>
-        {authStatus?.signedIn ? (
-          <div className="chat-settings-account">
-            {/* Which account is signed in (UAT), not only that one is. */}
-            <span className="chat-settings-account-who">
-              <strong className="chat-settings-email">
-                {authStatus.name ?? authStatus.email ?? t("chat.models.signedIn")}
-              </strong>
-              <small>
-                {[
-                  authStatus.name && authStatus.email ? authStatus.email : null,
-                  authStatus.plan ? `ChatGPT ${chatGptPlanLabel(authStatus.plan)}` : null,
-                  t("chat.models.signedIn")
-                ]
-                  .filter(Boolean)
-                  .join(" · ")}
-              </small>
+      <section className="chat-settings-section chatgpt-account-card" aria-busy={signingIn || signingOut || refreshingChatGpt}>
+        <header className="chatgpt-account-header">
+          <div className="chatgpt-account-brand">
+            <Sparkles size={16} aria-hidden="true" />
+            <h3>{t("chat.models.chatgptAccount")}</h3>
+          </div>
+          <div className="chatgpt-account-actions">
+            <span className={`chatgpt-account-status${authStatus?.signedIn ? " is-connected" : ""}`} role="status">
+              {authStatus?.signedIn ? <CircleCheck size={13} aria-hidden="true" /> : null}
+              {authStatus?.signedIn ? t("chat.models.status.connected") : t("library.ai.notSetUp")}
             </span>
             <button
               type="button"
-              className="chat-signout chat-signout-settings"
-              onClick={() => void handleSignOut()}
-              disabled={busy}
+              className="chat-local-action chatgpt-account-refresh"
+              onClick={() => void refreshChatGptAccount()}
+              disabled={signingIn || signingOut || refreshingChatGpt || busy}
             >
-              <LogOut size={14} aria-hidden="true" />
-              {t("chat.signOut")}
+              <RefreshCw size={13} className={refreshingChatGpt ? "chat-spinner" : undefined} aria-hidden="true" />
+              {t("common.refresh")}
             </button>
           </div>
+        </header>
+        {authStatus?.signedIn ? (
+          <>
+            <div className="chatgpt-account-identity">
+              <span className="chatgpt-account-avatar" aria-hidden="true"><UserRound size={22} /></span>
+              <div className="chat-settings-account-who">
+                <strong className="chat-settings-email">
+                  {authStatus.name || authStatus.email || t("chat.models.signedIn")}
+                </strong>
+                {authStatus.name && authStatus.email ? <small>{authStatus.email}</small> : null}
+              </div>
+              {authStatus.plan ? <span className="chatgpt-account-plan">ChatGPT {chatGptPlanLabel(authStatus.plan)}</span> : null}
+            </div>
+            <footer className="chatgpt-account-footer">
+              <p className="chat-settings-copy">{t("chat.models.chatgptReady")}</p>
+              <button
+                type="button"
+                className="chat-local-action chatgpt-account-signout"
+                onClick={() => void handleSignOut()}
+                disabled={signingIn || signingOut || refreshingChatGpt || busy}
+              >
+                {signingOut ? <Loader2 className="chat-spinner" size={14} aria-hidden="true" /> : <LogOut size={14} aria-hidden="true" />}
+                {t("chat.signOut")}
+              </button>
+            </footer>
+          </>
         ) : (
-          <div className="chat-settings-account">
+          <>
             <p className="chat-settings-copy">
               {t("chat.models.chatgptHint")}
             </p>
-            <button
-              type="button"
-              className="primary-button chat-settings-signin"
-              onClick={() => void handleSignIn()}
-              disabled={signingIn || busy}
-            >
-              {signingIn ? (
-                <Loader2 className="chat-spinner" size={16} aria-hidden="true" />
-              ) : null}
-              {t("chat.gate.chatgpt.signIn")}
-            </button>
-          </div>
+            <footer className="chatgpt-account-footer">
+              <p className="chat-settings-copy" role="status">{t(signingIn ? "chat.models.chatgptWaiting" : "chat.models.chatgptSignInHint")}</p>
+              <button
+                type="button"
+                className="primary-button chat-settings-signin"
+                onClick={() => void handleSignIn()}
+                disabled={signingIn || signingOut || refreshingChatGpt || busy}
+              >
+                {signingIn ? <Loader2 className="chat-spinner" size={15} aria-hidden="true" /> : <ExternalLink size={15} aria-hidden="true" />}
+                {t("chat.gate.chatgpt.signIn")}
+              </button>
+            </footer>
+          </>
         )}
+        {chatGptError ? <p className="mcp-servers-error" role="alert"><AlertCircle size={15} aria-hidden="true" /><span>{chatGptError}</span></p> : null}
       </section>
 
       <section className="chat-settings-section chat-claude-section">

@@ -2601,24 +2601,26 @@ export function ChatView({
   }, [streaming, exportingLatestActivity]);
 
   /**
-   * Coach's settings and the Claude account as the main process holds them.
+   * Coach's settings and both accounts as the main process holds them.
    * `isCurrent` lets an effect drop an answer that lands after it was torn down.
    */
   const reloadCoachSettings = useCallback(
     async (isCurrent: () => boolean = () => true) => {
       if (!api) return;
-      const [settings, claude] = await Promise.allSettled([
+      const [settings, claude, auth] = await Promise.allSettled([
         api.getChatSettings(),
-        api.getClaudeCodeStatus()
+        api.getClaudeCodeStatus(),
+        api.getChatAuthStatus()
       ]);
       if (!isCurrent()) return;
       if (settings.status === "fulfilled") setChatSettings(settings.value);
       if (claude.status === "fulfilled") setClaudeStatus(claude.value);
+      if (auth.status === "fulfilled") setAuthStatus(auth.value);
     },
     [api]
   );
 
-  // Provider settings and the Claude account are edited in Settings now, under
+  // Provider settings and accounts are edited in Settings now, under
   // Connections, so re-read them whenever Coach comes back to the front. This
   // panel stays mounted once opened; without this the provider picker would
   // still show whatever was configured the first time it was shown.
@@ -6454,7 +6456,7 @@ export function ChatView({
                 setProvidersOpen(false);
                 setAiSheetOpen(true);
               }}
-              onChange={() => void reloadCoachSettings()}
+              onChange={reloadCoachSettings}
             />,
             document.body
           )
