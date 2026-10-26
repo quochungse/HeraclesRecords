@@ -35,6 +35,7 @@ import {
   withCurrentModel,
   type ChatModelOption
 } from "../../electron/chatModels";
+import { ProviderIcon } from "./ProviderIcon";
 import { ClaudeCodeLoginCard } from "./ClaudeCodeLoginCard";
 import { detectAndAdoptLocalServer } from "./localModelDetection";
 import type { HeraclesRecordsApi } from "../heraclesrecords-api";
@@ -155,7 +156,7 @@ export function summarizeCoachModels(
 /**
  * Where a provider's model list stands: read from the account and when, or the
  * shipped one. There is no refresh button of its own — `readBy` names the
- * provider's own action that reads it (Check, a key's Save or Test).
+ * provider's own action that reads it (Refresh, a key's Save or Test).
  */
 export function modelListLine(
   source: { fetchedAt?: string; count: number } | undefined,
@@ -210,7 +211,6 @@ export function CoachModelsPanel({ api, onChange }: CoachModelsPanelProps) {
   const [chatGptError, setChatGptError] = useState<string | null>(null);
   const [savingSettings, setSavingSettings] = useState(false);
   const [checkingClaude, setCheckingClaude] = useState(false);
-  const [testingClaude, setTestingClaude] = useState(false);
   const [revokingClaude, setRevokingClaude] = useState(false);
 
   const [openRouterApiKey, setOpenRouterApiKey] = useState("");
@@ -234,7 +234,7 @@ export function CoachModelsPanel({ api, onChange }: CoachModelsPanelProps) {
   const [testingLocal, setTestingLocal] = useState(false);
   const [detectingLocal, setDetectingLocal] = useState(false);
 
-  // Per provider: a key's Save and Claude's Check can each be reading a list at once.
+  // Per provider: a key's Save and Claude's Refresh can each be reading a list at once.
   const [refreshingModels, setRefreshingModels] = useState<
     Partial<Record<ModelListProvider, boolean>>
   >({});
@@ -397,10 +397,6 @@ export function CoachModelsPanel({ api, onChange }: CoachModelsPanelProps) {
       value: option.value,
       label: formatModelOptionLabel(option)
     }));
-  const claudeCodeModels = providerModelOptions("claude-code", chatSettings, claudeStatus);
-  const claudeCodeModel = claudeCodeModels.find(
-    (option) => option.value === (chatSettings.claudeCode.model ?? "")
-  );
   const anthropicModels = providerModelOptions("claude-api", chatSettings);
   const anthropicModel = anthropicModels.find(
     (option) => option.value === chatSettings.anthropic.model
@@ -467,21 +463,27 @@ export function CoachModelsPanel({ api, onChange }: CoachModelsPanelProps) {
     }
   };
 
-  /** Check also reads the account's model list again — it is the section's refresh. */
+  /** One refresh discovers the runtime, verifies sign-in and tests an authenticated account. */
   const refreshClaudeCodeStatus = async () => {
-    if (checkingClaude) return;
+    if (checkingClaude || revokingClaude) return;
     setCheckingClaude(true);
     setRefreshing("claude-code", true);
-    setError(null);
+    setClaudeLoginError(null);
     try {
-      applyModelRefresh(
-        "claude-code",
-        await api.refreshChatModels({ provider: "claude-code", force: true })
-      );
+      const status = await api.getClaudeCodeStatus();
+      setClaudeStatus(status);
+      if (status.authenticated) {
+        // The connection test also refreshes the account's model list.
+        const result = await api.testClaudeCodeConnection();
+        setClaudeStatus(result.status);
+        if (!result.ok) setClaudeLoginError(result.message);
+        await rereadModelLists();
+      }
+      setModelListErrors((current) => ({ ...current, "claude-code": undefined }));
       await onChange?.();
     } catch (caught) {
-      setError(
-        caught instanceof Error ? caught.message : t("chat.err.claudeDetect")
+      setClaudeLoginError(
+        caught instanceof Error ? caught.message : t("chat.models.err.claudeTest")
       );
     } finally {
       setCheckingClaude(false);
@@ -499,41 +501,18 @@ export function CoachModelsPanel({ api, onChange }: CoachModelsPanelProps) {
   const handleRevokeClaudeCode = async () => {
     if (revokingClaude) return;
     setRevokingClaude(true);
-    setError(null);
+    setClaudeLoginError(null);
     try {
       setClaudeStatus(await api.revokeClaudeCodeLogin());
       await onChange?.();
     } catch (caught) {
-      setError(
+      setClaudeLoginError(
         caught instanceof Error
           ? caught.message
           : t("chat.models.err.claudeSignOut")
       );
     } finally {
       setRevokingClaude(false);
-    }
-  };
-
-  const handleTestClaudeCode = async () => {
-    if (testingClaude) return;
-    setTestingClaude(true);
-    setRefreshing("claude-code", true);
-    setError(null);
-    try {
-      // The test reads the model list again on the main side as well.
-      const result = await api.testClaudeCodeConnection();
-      setClaudeStatus(result.status);
-      setModelListErrors((current) => ({ ...current, "claude-code": undefined }));
-      if (!result.ok) setError(result.message);
-      await rereadModelLists();
-      await onChange?.();
-    } catch (caught) {
-      setError(
-        caught instanceof Error ? caught.message : t("chat.models.err.claudeTest")
-      );
-    } finally {
-      setTestingClaude(false);
-      setRefreshing("claude-code", false);
     }
   };
 
@@ -860,14 +839,14 @@ export function CoachModelsPanel({ api, onChange }: CoachModelsPanelProps) {
         </p>
       ) : null}
 
-      <section className="chat-settings-section chatgpt-account-card" aria-busy={signingIn || signingOut || refreshingChatGpt}>
-        <header className="chatgpt-account-header">
-          <div className="chatgpt-account-brand">
+      <section className="chat-settings-section chatgpt-account-card provider-account-card" aria-busy={signingIn || signingOut || refreshingChatGpt}>
+        <header className="chatgpt-account-header provider-account-header">
+          <div className="chatgpt-account-brand provider-account-brand">
             <Sparkles size={16} aria-hidden="true" />
             <h3>{t("chat.models.chatgptAccount")}</h3>
           </div>
-          <div className="chatgpt-account-actions">
-            <span className={`chatgpt-account-status${authStatus?.signedIn ? " is-connected" : ""}`} role="status">
+          <div className="chatgpt-account-actions provider-account-actions">
+            <span className={`chatgpt-account-status provider-account-status${authStatus?.signedIn ? " is-connected" : ""}`} role="status">
               {authStatus?.signedIn ? <CircleCheck size={13} aria-hidden="true" /> : null}
               {authStatus?.signedIn ? t("chat.models.status.connected") : t("library.ai.notSetUp")}
             </span>
@@ -884,21 +863,21 @@ export function CoachModelsPanel({ api, onChange }: CoachModelsPanelProps) {
         </header>
         {authStatus?.signedIn ? (
           <>
-            <div className="chatgpt-account-identity">
-              <span className="chatgpt-account-avatar" aria-hidden="true"><UserRound size={22} /></span>
+            <div className="chatgpt-account-identity provider-account-identity">
+              <span className="chatgpt-account-avatar provider-account-avatar" aria-hidden="true"><UserRound size={22} /></span>
               <div className="chat-settings-account-who">
                 <strong className="chat-settings-email">
                   {authStatus.name || authStatus.email || t("chat.models.signedIn")}
                 </strong>
                 {authStatus.name && authStatus.email ? <small>{authStatus.email}</small> : null}
               </div>
-              {authStatus.plan ? <span className="chatgpt-account-plan">ChatGPT {chatGptPlanLabel(authStatus.plan)}</span> : null}
+              {authStatus.plan ? <span className="chatgpt-account-plan provider-account-plan">ChatGPT {chatGptPlanLabel(authStatus.plan)}</span> : null}
             </div>
-            <footer className="chatgpt-account-footer">
+            <footer className="chatgpt-account-footer provider-account-footer">
               <p className="chat-settings-copy">{t("chat.models.chatgptReady")}</p>
               <button
                 type="button"
-                className="chat-local-action chatgpt-account-signout"
+                className="chat-local-action chatgpt-account-signout provider-account-signout"
                 onClick={() => void handleSignOut()}
                 disabled={signingIn || signingOut || refreshingChatGpt || busy}
               >
@@ -912,7 +891,7 @@ export function CoachModelsPanel({ api, onChange }: CoachModelsPanelProps) {
             <p className="chat-settings-copy">
               {t("chat.models.chatgptHint")}
             </p>
-            <footer className="chatgpt-account-footer">
+            <footer className="chatgpt-account-footer provider-account-footer">
               <p className="chat-settings-copy" role="status">{t(signingIn ? "chat.models.chatgptWaiting" : "chat.models.chatgptSignInHint")}</p>
               <button
                 type="button"
@@ -929,42 +908,43 @@ export function CoachModelsPanel({ api, onChange }: CoachModelsPanelProps) {
         {chatGptError ? <p className="mcp-servers-error" role="alert"><AlertCircle size={15} aria-hidden="true" /><span>{chatGptError}</span></p> : null}
       </section>
 
-      <section className="chat-settings-section chat-claude-section">
-        <h3>{t("chat.provider.claude-code")}</h3>
-        <p className="chat-settings-copy">
-          Runs the Claude Code CLI installed on this computer against your Claude
-          subscription. Heracles Records signs in with a Claude login of its own,
-          so any Claude account you use elsewhere on this computer — including in
-          a terminal — is left alone. Sign-in happens in your browser; Heracles
-          Records never sees your Claude password.
-        </p>
-
-        <div className="chat-claude-status" data-state={claudeStatus?.state}>
-          {checkingClaude ? (
-            <Loader2 className="chat-spinner" size={15} aria-hidden="true" />
-          ) : claudeStatus?.state === "connected" ? (
-            <CircleCheck size={15} aria-hidden="true" />
-          ) : (
-            <Terminal size={15} aria-hidden="true" />
-          )}
-          <div>
-            <strong>{claudeStatusLabel(claudeStatus)}</strong>
-            <span>
-              {claudeStatus?.message ??
-                t("chat.models.checkHint")}
-            </span>
-            {claudeStatus?.email ? (
-              <span className="chat-claude-account">
-                <UserRound size={12} aria-hidden="true" />
-                {claudeStatus.email}
-                {claudeStatus.orgName ? ` · ${claudeStatus.orgName}` : ""}
-                {claudeStatus.subscriptionType
-                  ? ` · ${claudeStatus.subscriptionType}`
-                  : ""}
-              </span>
-            ) : null}
+      <section className="chat-settings-section chat-claude-section claude-account-card provider-account-card" aria-busy={checkingClaude || revokingClaude}>
+        <header className="provider-account-header">
+          <div className="provider-account-brand">
+            <ProviderIcon provider="claude-code" />
+            <h3>{t("chat.provider.claude-code")}</h3>
           </div>
-        </div>
+          <div className="provider-account-actions">
+            <span className={`provider-account-status${claudeStatus?.state === "connected" ? " is-connected" : ""}`} data-state={claudeStatus?.state} role="status">
+              {claudeStatus?.state === "connected" ? <CircleCheck size={13} aria-hidden="true" /> : null}
+              {claudeStatusLabel(claudeStatus)}
+            </span>
+            <button
+              type="button"
+              className="chat-local-action claude-account-refresh"
+              onClick={() => void refreshClaudeCodeStatus()}
+              disabled={checkingClaude || revokingClaude || busy}
+            >
+              <RefreshCw size={13} className={checkingClaude ? "chat-spinner" : undefined} aria-hidden="true" />
+              {t("common.refresh")}
+            </button>
+          </div>
+        </header>
+        {claudeStatus?.authenticated ? (
+          <div className="provider-account-identity">
+            <span className="provider-account-avatar" aria-hidden="true"><UserRound size={22} /></span>
+            <div className="chat-settings-account-who">
+              <strong className="chat-settings-email">{claudeStatus.email || t("chat.models.signedIn")}</strong>
+              {claudeStatus.orgName ? <small>{claudeStatus.orgName}</small> : null}
+            </div>
+            {claudeStatus.subscriptionType ? <span className="provider-account-plan">Claude {chatGptPlanLabel(claudeStatus.subscriptionType)}</span> : null}
+          </div>
+        ) : (
+          <p className="chat-settings-copy">{t("chat.models.claudeHint")}</p>
+        )}
+        {claudeStatus && claudeStatus.state !== "connected" && !claudeLoginError ? (
+          <p className="chat-settings-copy" role="status">{claudeStatus.message}</p>
+        ) : null}
 
         {showClaudeExecutable ? (
           <label className="chat-local-field">
@@ -984,164 +964,64 @@ export function CoachModelsPanel({ api, onChange }: CoachModelsPanelProps) {
           </label>
         ) : null}
 
-        <div className="chat-local-actions chat-claude-actions">
-          <button
-            type="button"
-            className="chat-local-action"
-            onClick={() => void refreshClaudeCodeStatus()}
-            disabled={checkingClaude || testingClaude || busy}
-          >
-            {checkingClaude ? (
-              <Loader2 className="chat-spinner" size={14} aria-hidden="true" />
-            ) : (
-              <RefreshCw size={14} aria-hidden="true" />
-            )}
-            {t("chat.models.check")}
-          </button>
-          {claudeStatus?.state === "not-installed" ? (
-            <button
-              type="button"
-              className="chat-local-action"
-              onClick={() => void api.openClaudeCodeSetupGuide()}
-            >
-              <ExternalLink size={14} aria-hidden="true" />
-              {t("chat.gate.claude.install")}
-            </button>
-          ) : null}
-          {claudeStatus?.installed && claudeStatus.state !== "connected" ? (
-            <ClaudeCodeLoginCard
-              api={api}
-              disabled={busy}
-              onSignedIn={handleClaudeSignedIn}
-              onError={(message) => setClaudeLoginError(message)}
-            />
-          ) : null}
-          {claudeStatus?.state === "connected" ? (
-            <button
-              type="button"
-              className="chat-local-action primary"
-              onClick={() => void handleTestClaudeCode()}
-              disabled={testingClaude || busy}
-            >
-              {testingClaude ? (
-                <Loader2 className="chat-spinner" size={14} aria-hidden="true" />
-              ) : (
-                <Bot size={14} aria-hidden="true" />
-              )}
-              {t("chat.models.testConnection")}
-            </button>
-          ) : null}
-          {claudeStatus?.authenticated ? (
-            <button
-              type="button"
-              className="chat-local-action is-danger"
-              onClick={() => {
-                if (
-                  window.confirm(
-                    t("chat.models.signOutConfirm")
-                  )
-                ) {
-                  void handleRevokeClaudeCode();
-                }
-              }}
-              disabled={revokingClaude || busy}
-            >
-              {revokingClaude ? (
-                <Loader2 className="chat-spinner" size={14} aria-hidden="true" />
-              ) : (
-                <LogOut size={14} aria-hidden="true" />
-              )}
-              {t("chat.signOut")}
-            </button>
-          ) : null}
-          <button
-            type="button"
-            className="chat-local-action"
-            onClick={() => void api.openClaudeCodeSetupGuide()}
-          >
-            <ExternalLink size={14} aria-hidden="true" />
-            {t("chat.models.setupGuide")}
-          </button>
-        </div>
+        <footer className="provider-account-footer">
+          <p className="chat-settings-copy">{t("chat.models.claudeAccountNote")}</p>
+          <div className="chat-local-actions chat-claude-actions">
+            {claudeStatus?.state === "not-installed" ? (
+              <button
+                type="button"
+                className="chat-local-action"
+                onClick={() => void api.openClaudeCodeSetupGuide()}
+              >
+                <ExternalLink size={14} aria-hidden="true" />
+                {t("chat.gate.claude.install")}
+              </button>
+            ) : null}
+            {claudeStatus?.installed && !claudeStatus.authenticated ? (
+              <ClaudeCodeLoginCard
+                api={api}
+                disabled={checkingClaude || revokingClaude || busy}
+                onSignedIn={handleClaudeSignedIn}
+                onError={(message) => setClaudeLoginError(message)}
+              />
+            ) : null}
+            {claudeStatus?.authenticated ? (
+              <button
+                type="button"
+                className="chat-local-action claude-account-signout provider-account-signout"
+                onClick={() => {
+                  if (
+                    window.confirm(
+                      t("chat.models.signOutConfirm")
+                    )
+                  ) {
+                    void handleRevokeClaudeCode();
+                  }
+                }}
+                disabled={revokingClaude || checkingClaude || busy}
+              >
+                {revokingClaude ? (
+                  <Loader2 className="chat-spinner" size={14} aria-hidden="true" />
+                ) : (
+                  <LogOut size={14} aria-hidden="true" />
+                )}
+                {t("chat.signOut")}
+              </button>
+            ) : null}
+          </div>
+        </footer>
 
         {claudeLoginError ? (
-          <p className="chat-local-result is-error">{claudeLoginError}</p>
+          <p className="mcp-servers-error" role="alert"><AlertCircle size={15} aria-hidden="true" /><span>{claudeLoginError}</span></p>
         ) : null}
 
-        <strong className="chat-claude-group-title">{t("chat.models.model")}</strong>
-        <div className="chat-claude-model-row">
-          <label className="chat-local-field">
-            <span>{t("chat.models.claudeModel")}</span>
-            <OptionGroup
-              label={t("chat.models.claudeModel")}
-              mode="dropdown"
-              size="md"
-              value={chatSettings.claudeCode.model ?? ""}
-              options={pickerRows(claudeCodeModels, chatSettings.claudeCode.model ?? "")}
-              onChange={(model) => updateClaudeCode({ model })}
-            />
-          </label>
-
-          <label className="chat-local-field">
-            <span>{t("chat.models.effort")}</span>
-            <OptionGroup
-              label={t("chat.models.effort")}
-              mode="dropdown"
-              size="md"
-              value={
-                effortForModel(chatSettings.claudeCode.effort, claudeCodeModel?.efforts) ??
-                chatSettings.claudeCode.effort
-              }
-              options={effortOptionsFor(claudeCodeModel).map((option) => ({
-                value: option.value,
-                label: formatEffortOption(option)
-              }))}
-              onChange={(effort) => updateClaudeCode({ effort })}
-            />
-          </label>
-        </div>
-        {renderModelListStatus(
-          "claude-code",
-          claudeStatus?.authenticated ? t("chat.models.pressCheck") : t("common.signIn")
-        )}
-        <p className="chat-settings-copy">
-          {t("chat.models.claudeEffortNote")}
-        </p>
-
-        <div className="chat-claude-permissions">
-          <strong>{t("chat.models.canAccess")}</strong>
-          {(
-            [
-              ["recentActivities", t("chat.models.perm.activities")],
-              ["trainingMetrics", t("chat.models.perm.metrics")],
-              ["upcomingWorkouts", t("chat.models.perm.workouts")],
-              ["sleepData", t("chat.models.perm.sleep")]
-            ] as const
-          ).map(([permission, label]) => (
-            <label key={permission} className="chat-local-tools">
-              <input
-                type="checkbox"
-                checked={chatSettings.claudeCode.permissions[permission]}
-                onChange={(event) =>
-                  updateClaudeCode({
-                    permissions: {
-                      ...chatSettings.claudeCode.permissions,
-                      [permission]: event.target.checked
-                    }
-                  })
-                }
-              />
-              <span>{label}</span>
-            </label>
-          ))}
-        </div>
-        <p className="chat-settings-copy">
-          {t("chat.models.permNote")}
-        </p>
       </section>
 
-      <section className="chat-settings-section chat-claude-section">
-        <h3>{t("chat.provider.claude-api")}</h3>
+      <section className="chat-settings-section chat-claude-section provider-account-card provider-api-card">
+        <header className="provider-account-header">
+          <div className="provider-account-brand"><ProviderIcon provider="claude-api" /><h3>{t("chat.provider.claude-api")}</h3></div>
+          <span className="provider-account-status">{t(chatSettings.anthropic.hasApiKey ? "chat.models.savedKey" : "library.ai.notSetUp")}</span>
+        </header>
         <p className="chat-settings-copy">
           {t("chat.models.anthropicNote")}
         </p>
@@ -1210,41 +1090,45 @@ export function CoachModelsPanel({ api, onChange }: CoachModelsPanelProps) {
           </p>
           {renderModelListStatus("claude-api", t("chat.models.saveOrTest"))}
 
-          <div className="chat-local-actions">
-            <button
-              type="button"
-              className="chat-local-action"
-              onClick={() => void api.openAnthropicKeyGuide()}
-            >
-              <ExternalLink size={14} aria-hidden="true" />
-              {t("chat.gate.getKey")}
-            </button>
-            <button
-              type="button"
-              className="chat-local-action"
-              onClick={() => void handleTestAnthropicConnection()}
-              disabled={testingAnthropic || busy}
-            >
-              {testingAnthropic ? (
-                <Loader2 className="chat-spinner" size={14} aria-hidden="true" />
-              ) : (
-                <Bot size={14} aria-hidden="true" />
-              )}
-              {t("chat.models.test")}
-            </button>
-            <button
-              type="button"
-              className="chat-local-action primary"
-              onClick={() => void handleSaveAnthropicSettings()}
-              disabled={savingSettings || busy}
-            >
-              {savingSettings ? (
-                <Loader2 className="chat-spinner" size={14} aria-hidden="true" />
-              ) : (
-                <Save size={14} aria-hidden="true" />
-              )}
-              {t("chat.set.save")}
-            </button>
+          <div className="chat-local-actions provider-card-footer">
+            <div className="provider-card-links">
+              <button
+                type="button"
+                className="chat-inline-link provider-card-help"
+                onClick={() => void api.openAnthropicKeyGuide()}
+              >
+                <ExternalLink size={14} aria-hidden="true" />
+                {t("chat.gate.getKey")}
+              </button>
+            </div>
+            <div className="provider-card-controls">
+              <button
+                type="button"
+                className="chat-local-action"
+                onClick={() => void handleTestAnthropicConnection()}
+                disabled={testingAnthropic || busy || (!anthropicApiKey.trim() && !chatSettings.anthropic.hasApiKey)}
+              >
+                {testingAnthropic ? (
+                  <Loader2 className="chat-spinner" size={14} aria-hidden="true" />
+                ) : (
+                  <Bot size={14} aria-hidden="true" />
+                )}
+                {t("chat.models.test")}
+              </button>
+              <button
+                type="button"
+                className="chat-local-action primary"
+                onClick={() => void handleSaveAnthropicSettings()}
+                disabled={savingSettings || busy}
+              >
+                {savingSettings ? (
+                  <Loader2 className="chat-spinner" size={14} aria-hidden="true" />
+                ) : (
+                  <Save size={14} aria-hidden="true" />
+                )}
+                {t("chat.set.save")}
+              </button>
+            </div>
           </div>
           {anthropicConnection ? (
             <p
@@ -1260,33 +1144,16 @@ export function CoachModelsPanel({ api, onChange }: CoachModelsPanelProps) {
         </div>
       </section>
 
-      <section className="chat-settings-section chat-openrouter-section">
-        <div className="chat-settings-section-title">
-          <h3>{t("chat.models.openrouterApi")}</h3>
-          <span className="chat-beta-badge">BYOK</span>{/* i18n-ignore: OpenRouter's own term */}
-        </div>
+      <section className="chat-settings-section chat-openrouter-section provider-account-card provider-api-card">
+        <header className="provider-account-header">
+          <div className="provider-account-brand"><ProviderIcon provider="openrouter" /><h3>{t("chat.models.openrouterApi")}</h3></div>
+          <span className="provider-account-status">{t(chatSettings.openRouter.hasApiKey ? "chat.models.savedKey" : "library.ai.notSetUp")}</span>
+        </header>
         <p className="chat-settings-copy">
           {t("chat.models.openrouterNote")}
         </p>
 
         <div className="chat-local-settings chat-local-settings-panel">
-          <label className="chat-local-field">
-            <span>{t("chat.models.model")}</span>
-            <input
-              value={chatSettings.openRouter.model}
-              onChange={(event) =>
-                updateOpenRouterDraft({ model: event.target.value })
-              }
-              list="chat-openrouter-models"
-              placeholder="openrouter/auto" // i18n-ignore: a model id
-              spellCheck={false}
-            />
-            <datalist id="chat-openrouter-models">
-              {openRouterModels.map((model) => (
-                <option key={model.value} value={model.value} label={model.label} />
-              ))}
-            </datalist>
-          </label>
           <div className="chat-local-field chat-local-field-key">
             <label htmlFor="chat-openrouter-api-key">
               <span>{t("chat.models.apiKey")}</span>
@@ -1319,62 +1186,83 @@ export function CoachModelsPanel({ api, onChange }: CoachModelsPanelProps) {
                 ) : null}
             </div>
           </div>
-          <div className="chat-local-actions chat-openrouter-actions">
-            <button
-              type="button"
-              className="chat-local-action"
-              onClick={() => void api.openOpenRouterKeys()}
-              disabled={!api}
-            >
-              <ExternalLink size={14} aria-hidden="true" />
-              {t("chat.models.getApiKey")}
-            </button>
-            <button
-              type="button"
-              className="chat-local-action"
-              onClick={() => void api.openOpenRouterModels()}
-              disabled={!api}
-            >
-              <ExternalLink size={14} aria-hidden="true" />
-              {t("chat.models.browse")}
-            </button>
-            <button
-              type="button"
-              className="chat-local-action"
-              onClick={() => void handleTestOpenRouterConnection()}
-              disabled={
-                testingOpenRouter ||
-                busy ||
-                (!openRouterApiKey.trim() &&
-                  !chatSettings.openRouter.hasApiKey)
+          <label className="chat-local-field">
+            <span>{t("chat.models.model")}</span>
+            <input
+              value={chatSettings.openRouter.model}
+              onChange={(event) =>
+                updateOpenRouterDraft({ model: event.target.value })
               }
-            >
-              {testingOpenRouter ? (
-                <Loader2 className="chat-spinner" size={14} aria-hidden="true" />
-              ) : (
-                <Bot size={14} aria-hidden="true" />
-              )}
-              {t("chat.models.test")}
-            </button>
-            <button
-              type="button"
-              className="chat-local-action primary"
-              onClick={() => void handleSaveOpenRouterSettings()}
-              disabled={
-                savingSettings ||
-                busy ||
-                !chatSettings.openRouter.model.trim() ||
-                (!openRouterApiKey.trim() &&
-                  !chatSettings.openRouter.hasApiKey)
-              }
-            >
-              {savingSettings ? (
-                <Loader2 className="chat-spinner" size={14} aria-hidden="true" />
-              ) : (
-                <Save size={14} aria-hidden="true" />
-              )}
-              {t("chat.set.save")}
-            </button>
+              list="chat-openrouter-models"
+              placeholder="openrouter/auto" // i18n-ignore: a model id
+              spellCheck={false}
+            />
+            <datalist id="chat-openrouter-models">
+              {openRouterModels.map((model) => (
+                <option key={model.value} value={model.value} label={model.label} />
+              ))}
+            </datalist>
+          </label>
+          <div className="chat-local-actions chat-openrouter-actions provider-card-footer">
+            <div className="provider-card-links">
+              <button
+                type="button"
+                className="chat-inline-link provider-card-help"
+                onClick={() => void api.openOpenRouterKeys()}
+                disabled={!api}
+              >
+                <ExternalLink size={14} aria-hidden="true" />
+                {t("chat.models.getApiKey")}
+              </button>
+              <button
+                type="button"
+                className="chat-inline-link provider-card-help"
+                onClick={() => void api.openOpenRouterModels()}
+                disabled={!api}
+              >
+                <ExternalLink size={14} aria-hidden="true" />
+                {t("chat.models.browse")}
+              </button>
+            </div>
+            <div className="provider-card-controls">
+              <button
+                type="button"
+                className="chat-local-action"
+                onClick={() => void handleTestOpenRouterConnection()}
+                disabled={
+                  testingOpenRouter ||
+                  busy ||
+                  (!openRouterApiKey.trim() &&
+                    !chatSettings.openRouter.hasApiKey)
+                }
+              >
+                {testingOpenRouter ? (
+                  <Loader2 className="chat-spinner" size={14} aria-hidden="true" />
+                ) : (
+                  <Bot size={14} aria-hidden="true" />
+                )}
+                {t("chat.models.test")}
+              </button>
+              <button
+                type="button"
+                className="chat-local-action primary"
+                onClick={() => void handleSaveOpenRouterSettings()}
+                disabled={
+                  savingSettings ||
+                  busy ||
+                  !chatSettings.openRouter.model.trim() ||
+                  (!openRouterApiKey.trim() &&
+                    !chatSettings.openRouter.hasApiKey)
+                }
+              >
+                {savingSettings ? (
+                  <Loader2 className="chat-spinner" size={14} aria-hidden="true" />
+                ) : (
+                  <Save size={14} aria-hidden="true" />
+                )}
+                {t("chat.set.save")}
+              </button>
+            </div>
           </div>
           {openRouterConnection ? (
             <p
@@ -1394,8 +1282,15 @@ export function CoachModelsPanel({ api, onChange }: CoachModelsPanelProps) {
         </p>
       </section>
 
-      <section className="chat-settings-section">
-        <h3>{t("chat.provider.local")}</h3>
+      <section className="chat-settings-section provider-account-card provider-local-card">
+        <header className="provider-account-header">
+          <div className="provider-account-brand"><ProviderIcon provider="local" /><h3>{t("chat.provider.local")}</h3></div>
+          <button type="button" className="chat-local-action" onClick={() => void handleDetectLocalServers()} disabled={detectingLocal || busy}>
+            <RefreshCw size={13} className={detectingLocal ? "chat-spinner" : undefined} aria-hidden="true" />
+            {t("chat.models.detect")}
+          </button>
+        </header>
+        <p className="chat-settings-copy">{t("chat.models.localNote")}</p>
         <div className="chat-local-settings chat-local-settings-panel">
             <label className="chat-local-field">
               <span>{t("chat.models.server")}</span>
@@ -1498,20 +1393,7 @@ export function CoachModelsPanel({ api, onChange }: CoachModelsPanelProps) {
               />
               <span>{t("chat.models.useTools")}</span>
             </label>
-            <div className="chat-local-actions">
-              <button
-                type="button"
-                className="chat-local-action"
-                onClick={() => void handleDetectLocalServers()}
-                disabled={detectingLocal || busy}
-              >
-                {detectingLocal ? (
-                  <Loader2 className="chat-spinner" size={14} aria-hidden="true" />
-                ) : (
-                  <RefreshCw size={14} aria-hidden="true" />
-                )}
-                {t("chat.models.detect")}
-              </button>
+            <div className="chat-local-actions provider-card-footer provider-card-local-actions">
               <button
                 type="button"
                 className="chat-local-action"

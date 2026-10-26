@@ -26,6 +26,7 @@ import {
 
 export const CHAT_SETTINGS_KEYS = {
   provider: "chat.provider",
+  conversationLastUsed: "chat.conversation.lastUsed",
   chatgptModel: "chat.chatgpt.model",
   chatgptEffort: "chat.chatgpt.effort",
   openRouterModel: "chat.openRouter.model",

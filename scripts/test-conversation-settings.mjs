@@ -22,7 +22,7 @@ database.initializeDatabase(fs.mkdtempSync(path.join(os.tmpdir(), "conversation-
 
 const everything = { activities: true, sleep: true, zones: true };
 
-// Until changed: everything shared, the provider it was started with, and no
+// Legacy conversations: everything shared, their original provider, and no
 // row at all (Q1 of the Coach Workbench review: a conversation keeps its AI).
 const session = history.createChatSession("claude-code");
 assert.deepEqual(chat.getConversationSettings(session.id), {
@@ -101,6 +101,58 @@ assert.equal(
   "even a switch its tools have nothing to do with, since nothing says what they read"
 );
 assert.deepEqual(reach.context, { activities: false, zones: true, sleep: false, announce: true });
+
+// New conversations inherit the most recently selected model/effort for their
+// provider. Each conversation keeps a snapshot; no global settings are rewritten.
+const lastUsedKey = (provider) => `chat.conversation.lastUsed.${provider}`;
+database.deleteSettings([lastUsedKey("claude-code"), lastUsedKey("chatgpt"), lastUsedKey("openrouter")]);
+database.setSetting("chat.claudeCode.model", "opus");
+database.setSetting("chat.claudeCode.effort", "high");
+const first = chat.createChatSessionForProvider("claude-code");
+assert.deepEqual(chat.getConversationSettings(first.id).runtime, { provider: "claude-code", model: "opus", effort: "high" });
+chat.setConversationSettings({ sessionId: first.id, sources: everything,
+  runtime: { provider: "claude-code", model: "sonnet", effort: "low" } });
+const second = chat.createChatSessionForProvider("claude-code");
+assert.deepEqual(chat.getConversationSettings(second.id).runtime, { provider: "claude-code", model: "sonnet", effort: "low" });
+chat.setConversationSettings({ sessionId: first.id, sources: everything,
+  runtime: { provider: "claude-code", model: "opus", effort: "max" } });
+assert.deepEqual(chat.getConversationSettings(second.id).runtime, { provider: "claude-code", model: "sonnet", effort: "low" },
+  "a later selection in another chat does not alter an existing chat");
+assert.equal(chat.getChatSettings().claudeCode.model, "opus");
+assert.equal(chat.getChatSettings().claudeCode.effort, "high", "last-used preferences do not overwrite provider settings");
+const latest = JSON.parse(database.getSetting(lastUsedKey("claude-code")));
+assert.deepEqual(latest, { provider: "claude-code", model: "opus", effort: "max" }, "preference is persisted");
+const secondSettings = chat.getConversationSettings(second.id);
+chat.setConversationSettings({ ...secondSettings, sources: { ...everything, sleep: false }, web: true });
+assert.deepEqual(JSON.parse(database.getSetting(lastUsedKey("claude-code"))), latest,
+  "changing permissions does not overwrite the last model choice");
+const third = chat.createChatSessionForProvider("claude-code");
+assert.deepEqual(chat.getConversationSettings(third.id).runtime, latest);
+assert.deepEqual(chat.getConversationSettings(third.id).sources, everything, "permissions are not copied from the last chat");
+assert.equal(chat.getConversationSettings(third.id).web, false);
+
+const gpt = chat.createChatSessionForProvider("chatgpt");
+chat.setConversationSettings({ sessionId: gpt.id, sources: everything,
+  runtime: { provider: "chatgpt", model: "gpt-test", effort: "future-depth" } });
+const nextGpt = chat.createChatSessionForProvider("chatgpt");
+assert.deepEqual(chat.getConversationSettings(nextGpt.id).runtime, { provider: "chatgpt", model: "gpt-test", effort: "future-depth" });
+assert.deepEqual(chat.getConversationSettings(chat.createChatSessionForProvider("claude-code").id).runtime, latest,
+  "providers remember independent choices");
+chat.setConversationSettings({ ...chat.getConversationSettings(gpt.id), runtime: { provider: "chatgpt", model: "", effort: "" } });
+assert.deepEqual(chat.getConversationSettings(chat.createChatSessionForProvider("chatgpt").id).runtime,
+  { provider: "chatgpt", model: "", effort: "" }, "Auto model and effort survive in a new conversation");
+chat.setConversationSettings({ ...chat.getConversationSettings(first.id), runtime: { provider: "claude-code", model: "", effort: "high" } });
+assert.deepEqual(chat.getConversationSettings(chat.createChatSessionForProvider("claude-code").id).runtime,
+  { provider: "claude-code", model: "", effort: "high" }, "explicit account default does not revert to the saved Opus model");
+
+// Seed existing installations from the latest conversation's stored choice.
+const legacy = history.createChatSession("openrouter");
+database.saveChatConversationSettingsRow(legacy.id, null, JSON.stringify({ model: "some/recent-model" }));
+assert.deepEqual(chat.getConversationSettings(chat.createChatSessionForProvider("openrouter").id).runtime,
+  { provider: "openrouter", model: "some/recent-model" });
+database.setSetting(lastUsedKey("openrouter"), "{invalid json");
+assert.deepEqual(chat.getConversationSettings(chat.createChatSessionForProvider("openrouter").id).runtime,
+  { provider: "openrouter", model: "some/recent-model" }, "an unreadable preference falls back to a stored conversation choice");
 
 console.log("conversation settings tests passed");
 process.exit(0);

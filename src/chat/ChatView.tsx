@@ -140,7 +140,6 @@ import { linkDestination } from "../../electron/externalLinks";
 import { defaultPlanBriefRequest } from "../../electron/planBrief";
 import { creationCalendar, localDayKey } from "./creationCalendar";
 import {
-  requestRuntime,
   runtimeFromSettings,
   runtimeModelOptions,
   runtimeSummary,
@@ -1816,7 +1815,9 @@ export function ChatView({
       const created = await api.createChatSession(chatSettings.provider);
       const brief = await api.createPlanBrief(created.id, request);
       if (!(sources.activities && sources.sleep && sources.zones)) {
-        await api.setConversationSettings({ sessionId: created.id, sources }).catch(() => undefined);
+        await api.getConversationSettings(created.id)
+          .then((conversation) => api.setConversationSettings({ ...conversation, sources }))
+          .catch(() => undefined);
       }
       const title = brief.request.goal.trim() ? briefTitle(brief.request) : NEW_PLAN_TITLE;
       const titled = (await api.renameChatSession(created.id, title).catch(() => null)) ?? created;
@@ -4525,7 +4526,7 @@ export function ChatView({
     sessions.find((session) => session.id === activeSessionId)?.provider ?? chatSettings.provider;
   const effectiveRuntime: GeneratorRuntime = {
     ...runtimeFromSettings(chatSettings, conversationRuntime?.provider ?? conversationProvider),
-    ...(conversationRuntime?.model ? { model: conversationRuntime.model } : {}),
+    ...(conversationRuntime?.model !== undefined ? { model: conversationRuntime.model } : {}),
     ...(conversationRuntime?.effort !== undefined ? { effort: conversationRuntime.effort } : {})
   };
   const effectiveProvider = effectiveRuntime.provider;
@@ -4722,11 +4723,8 @@ export function ChatView({
   const workbenchCovers = workbenchOpen && viewportWidth < WORKBENCH_SHEET_WIDTH;
 
   /*
-   * A change made in the composer is this conversation's (Q1 of the Coach
-   * Workbench review): it is written to the conversation's settings, and only
-   * what differs from Coach's settings is stored, so picking Coach's own AI
-   * clears the override. With no conversation open yet, there is nothing to
-   * scope it to and it changes Coach's settings as before.
+   * Keep the complete choice in this conversation. The main process remembers
+   * it for new conversations without changing the AI in any existing one.
    */
   const coachRuntime = runtimeFromSettings(chatSettings);
   const changeCoachRuntime = (next: GeneratorRuntime) => {
@@ -4739,9 +4737,14 @@ export function ChatView({
       changeCoachRuntime(next);
       return;
     }
-    const override = requestRuntime(next, chatSettings, conversationProvider);
-    const { runtime: _previous, ...rest } = conversationSettings;
-    updateConversationSettings(override ? { ...rest, runtime: override } : rest);
+    updateConversationSettings({
+      ...conversationSettings,
+      runtime: {
+        provider: next.provider,
+        model: next.model,
+        ...(supportsReasoningEffort(next.provider) ? { effort: next.effort } : {})
+      }
+    });
     if (next.provider === "claude-code" && api) {
       void api.getClaudeCodeStatus().then(setClaudeStatus).catch(() => undefined);
     }

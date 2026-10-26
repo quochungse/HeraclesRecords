@@ -226,6 +226,29 @@ async function main() {
     ["", "alternate-depth"]);
   assert.deepEqual(await harness("consoleErrors"), [], "no effort renderer errors");
 
+  // An explicit Auto belongs to the conversation even when provider settings
+  // still name a model. Changing it stores the complete choice for future chats.
+  const autoSettings = { ...chatGptSettings, chatgpt: { model: "gpt-other", effort: "future-depth" } };
+  const autoConversation = { ...conversation, runtime: { provider: "chatgpt", model: "", effort: "" } };
+  await harness("mount", "ChatView", { styles: true }, { ...script,
+    getChatSettings: autoSettings, getChatAuthStatus: account,
+    refreshChatModels: { settings: autoSettings, errors: {} },
+    listChatSessions: script.listChatSessions.map((session) => ({ ...session, provider: "chatgpt" })),
+    getConversationSettings: autoConversation, setConversationSettings: "__pending"
+  });
+  await waitFor(() => harness("callCount", "getConversationSettings"), "Auto conversation loaded");
+  await harness("click", ".chat-ai-chip");
+  await waitFor(() => harness("exists", '.plan-generator-sheet-models [data-option=""][aria-checked="true"]'), "conversation Auto overrides saved provider model");
+  await harness("click", '.plan-generator-sheet-models [data-option="gpt-test"]');
+  await waitFor(() => harness("callCount", "setConversationSettings"), "complete runtime persisted");
+  assert.deepEqual((await harness("calls", "setConversationSettings")).at(-1).args[0].runtime,
+    { provider: "chatgpt", model: "gpt-test", effort: "" });
+  await harness("resolvePending", "setConversationSettings", { ...autoConversation, runtime: { provider: "chatgpt", model: "gpt-test", effort: "" } });
+  await waitFor(() => harness("exists", '.plan-generator-sheet-models [data-option="gpt-test"][aria-checked="true"]'), "chosen model retained");
+  await harness("click", '.plan-generator-sheet-models [data-option=""]');
+  await waitFor(async () => (await harness("calls", "setConversationSettings")).at(-1)?.args[0].runtime.model === "", "Auto is explicitly persisted");
+  assert.deepEqual(await harness("consoleErrors"), [], "no Auto runtime renderer errors");
+
   // Settings summaries list every connected provider, regardless of which
   // provider is selected. Missing connections never appear in that list.
   const allConnected = { ...settings,
@@ -273,6 +296,80 @@ async function main() {
       "Coach settings omit the Claude upgrade reminder");
     assert.deepEqual(await harness("consoleErrors"), [], "no settings renderer errors");
   }
+  // Claude's one Refresh action checks the runtime, tests the signed-in
+  // connection and updates model lists without overwriting another card's draft.
+  const claudeAccount = { state: "connected", installed: true, authenticated: true,
+    email: account.email, orgName: "Training team", subscriptionType: "max",
+    message: "Ready for coaching." };
+  await harness("mount", "ChatSettingsModal", { styles: true }, { ...script,
+    getChatAuthStatus: account, getClaudeCodeStatus: claudeAccount,
+    getCoachAnalysisPause: null, getCoachAnalysisSpend: null
+  });
+  await harness("click", ".chat-settings-nav-row");
+  await waitFor(() => harness("exists", ".claude-account-card"), "Claude account card");
+  assert.equal(await harness("text", ".claude-account-card .chat-settings-email"), account.email);
+  assert.equal(await harness("text", ".claude-account-card .provider-account-plan"), "Claude Max");
+  assert.doesNotMatch(await harness("text", ".claude-account-card"), /Test connection|Press Check/);
+  assert.equal(await harness("exists", ".claude-account-card details"), false, "connection card has no model or data-access settings");
+  assert.equal(await harness("exists", ".claude-account-card .app-select-trigger, .claude-account-card input[type='checkbox']"), false);
+  await harness("setValue", ".chat-openrouter-section input[type='password']", "unsaved-key");
+  await harness("setScript", { testClaudeCodeConnection: "__pending" });
+  await harness("clearCalls");
+  await harness("click", ".claude-account-refresh");
+  await waitFor(() => harness("callCount", "testClaudeCodeConnection"), "combined connection test");
+  assert.equal(await harness("callCount", "getClaudeCodeStatus"), 1);
+  assert.notEqual(await harness("attr", ".claude-account-refresh", "disabled"), null);
+  assert.notEqual(await harness("attr", ".claude-account-signout", "disabled"), null);
+  await harness("click", ".claude-account-refresh");
+  assert.equal(await harness("callCount", "testClaudeCodeConnection"), 1, "duplicate refresh is blocked");
+  await harness("resolvePending", "testClaudeCodeConnection", { ok: true, status: claudeAccount });
+  await waitFor(async () => (await harness("attr", ".claude-account-refresh", "disabled")) === null, "Claude refresh finishes");
+  assert.ok((await harness("callCount", "getChatSettings")) > 0, "test rereads model lists");
+  assert.equal(await harness("value", ".chat-openrouter-section input[type='password']"), "unsaved-key");
+
+  // Errors remain in Claude's own card and the same action can retry.
+  await harness("setScript", { testClaudeCodeConnection: { __reject: "Claude temporarily unavailable" } });
+  await harness("click", ".claude-account-refresh");
+  await waitFor(() => harness("exists", ".claude-account-card [role='alert']"), "inline Claude error");
+  assert.match(await harness("text", ".claude-account-card [role='alert']"), /Claude temporarily unavailable/);
+  assert.equal(await harness("exists", ".coach-models-panel > [role='alert']"), false);
+  await harness("setScript", { testClaudeCodeConnection: { ok: true, status: claudeAccount } });
+  await harness("click", ".claude-account-refresh");
+  await waitFor(async () => (await harness("attr", ".claude-account-refresh", "disabled")) === null, "Claude retry finishes");
+  assert.equal(await harness("exists", ".claude-account-card [role='alert']"), false);
+
+  // All five connection cards fit both dialog sizes/themes.
+  await waitFor(() => harness("appStylesReady"), "provider card styles");
+  for (const width of [1200, 420]) {
+    win.setSize(width, 900);
+    for (const theme of ["dark", "paper"]) {
+      await evaluate(`document.documentElement.dataset.theme = ${JSON.stringify(theme)}`);
+      assert.equal(await evaluate(`Array.from(document.querySelectorAll('.provider-account-card, .provider-card-footer, .provider-account-header, .provider-account-footer')).every(card => card.scrollWidth <= card.clientWidth + 1)`),
+        true, `${width}px ${theme}: provider cards and actions fit`);
+      assert.equal(await evaluate(`Array.from(document.querySelectorAll('.provider-account-card button, .provider-account-card input')).filter(el => el.getClientRects().length).every(el => {
+        const card = el.closest('.provider-account-card').getBoundingClientRect();
+        const bounds = el.getBoundingClientRect();
+        return bounds.left >= card.left && bounds.right <= card.right + 1;
+      })`), true, `${width}px ${theme}: controls stay inside their card`);
+    }
+  }
+  win.setSize(1200, 900);
+
+  // Signed-out and missing-runtime refreshes must never send a model request.
+  for (const state of ["sign-in-required", "not-installed"]) {
+    await harness("setScript", { getClaudeCodeStatus: { state,
+      installed: state !== "not-installed", authenticated: false, message: "Connect Claude." } });
+    await harness("clearCalls");
+    await harness("click", ".claude-account-refresh");
+    await waitFor(async () => (await harness("attr", ".claude-account-refresh", "disabled")) === null, `${state} refresh finishes`);
+    assert.equal(await harness("callCount", "testClaudeCodeConnection"), 0);
+    assert.equal(await harness("exists", ".claude-account-signout"), false);
+    assert.equal(await harness("exists", ".chat-claude-path-row"), state === "not-installed");
+    assert.equal(await evaluate(`Array.from(document.querySelectorAll('.claude-account-card button')).some(button => button.textContent.includes('Sign in'))`),
+      state === "sign-in-required");
+  }
+  assert.deepEqual(await harness("consoleErrors"), [], "no provider renderer errors");
+
   console.log("coach providers renderer OK — login, logout, retry, manual refresh, return from Settings, responsive themes");
 }
 

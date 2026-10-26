@@ -176,7 +176,7 @@ import {
   type ChatApiKeyStores,
   type ChatSettingsStore
 } from "./chatSettingsStore";
-import { effortForModel, getChatGptModelCandidates, normalizeRuntimeEffort, reasoningEffortForModel } from "./chatModels";
+import { effortForModel, getChatGptModelCandidates, normalizeRuntimeEffort, reasoningEffortForModel, settingsModel, supportsReasoningEffort } from "./chatModels";
 import { addTokenUsage, countableUsage } from "./tokenUsage";
 import { inlineSuggestionsSection } from "./chatCoachContext";
 import { WEB_SEARCH_TOOL } from "./chatToolSources";
@@ -707,7 +707,52 @@ export function getChatSessionEntries(id: string) {
 }
 
 export function createChatSessionForProvider(provider: ChatProvider) {
-  return createChatSession(provider);
+  const session = createChatSession(provider);
+  const runtime = lastConversationRuntime(session.provider);
+  // Snapshot the choice: a later model selection only affects future chats.
+  saveChatConversationSettingsRow(session.id, null, JSON.stringify(runtime), false);
+  return session;
+}
+
+/** Resolve missing fields against the provider's saved settings, never another chat. */
+function resolvedConversationRuntime(runtime: import("./types").AnalysisRuntime = {}) {
+  const settings = getChatSettings();
+  const provider = runtime.provider ?? settings.provider;
+  const model = typeof runtime.model === "string" ? runtime.model.trim() : settingsModel(settings, provider);
+  const defaultEffort = provider === "chatgpt" ? settings.chatgpt.effort ?? ""
+    : provider === "claude-api" ? settings.anthropic.effort : settings.claudeCode.effort;
+  return {
+    provider,
+    model,
+    ...(supportsReasoningEffort(provider)
+      ? { effort: normalizeRuntimeEffort(runtime.effort, provider) ?? defaultEffort }
+      : {})
+  };
+}
+
+/** Kept separately from provider settings so existing conversations cannot drift. */
+function lastConversationRuntime(provider: ChatProvider) {
+  try {
+    const stored = JSON.parse(getSetting(`${CHAT_SETTINGS_KEYS.conversationLastUsed}.${provider}`) ?? "null");
+    if (stored && typeof stored.model === "string") {
+      return resolvedConversationRuntime({ provider, model: stored.model, effort: stored.effort });
+    }
+  } catch {
+    // An unreadable preference falls back to this provider's saved settings.
+  }
+  // Existing installations already have choices stored in their conversations.
+  for (const session of listChatSessions()) {
+    const runtime = getConversationSettings(session.id).runtime;
+    if (runtime?.provider === provider && (runtime.model !== undefined || runtime.effort !== undefined)) {
+      return resolvedConversationRuntime(runtime);
+    }
+  }
+  return resolvedConversationRuntime({ provider });
+}
+
+function rememberConversationRuntime(runtime: import("./types").AnalysisRuntime) {
+  const resolved = resolvedConversationRuntime(runtime);
+  setSetting(`${CHAT_SETTINGS_KEYS.conversationLastUsed}.${resolved.provider}`, JSON.stringify(resolved));
 }
 
 export function saveChatSessionEntries(
@@ -722,7 +767,7 @@ export function setChatSessionPinnedById(id: string, pinned: boolean) {
   return setChatSessionPinned(id, pinned);
 }
 
-/** A conversation's settings (P2.0): everything shared, and Coach's AI, until changed. */
+/** A conversation keeps its model and effort; legacy rows inherit provider settings. */
 export function getConversationSettings(sessionId: string): import("./types").ConversationSettings {
   const row = getChatConversationSettingsRow(sessionId);
   let sources = { activities: true, sleep: true, zones: true };
@@ -743,7 +788,7 @@ export function getConversationSettings(sessionId: string): import("./types").Co
       const effort = normalizeRuntimeEffort(parsed.effort, isChatProviderName(parsed.provider) ? parsed.provider : getChatSessionProvider(sessionId));
       runtime = {
         ...(isChatProviderName(parsed.provider) ? { provider: parsed.provider } : {}),
-        ...(typeof parsed.model === "string" && parsed.model ? { model: parsed.model } : {}),
+        ...(typeof parsed.model === "string" ? { model: parsed.model } : {}),
         ...(effort !== undefined ? { effort } : {})
       };
       if (!Object.keys(runtime).length) runtime = undefined;
@@ -762,6 +807,7 @@ export function getConversationSettings(sessionId: string): import("./types").Co
 export function setConversationSettings(
   settings: import("./types").ConversationSettings
 ): import("./types").ConversationSettings {
+  const previous = getConversationSettings(settings.sessionId);
   const sources = {
     activities: settings.sources?.activities !== false,
     sleep: settings.sources?.sleep !== false,
@@ -786,7 +832,15 @@ export function setConversationSettings(
       web
     );
   }
-  return getConversationSettings(settings.sessionId);
+  const saved = getConversationSettings(settings.sessionId);
+  if (saved.runtime && (
+    previous.runtime?.provider !== saved.runtime.provider ||
+    previous.runtime?.model !== saved.runtime.model ||
+    previous.runtime?.effort !== saved.runtime.effort
+  )) {
+    rememberConversationRuntime(saved.runtime);
+  }
+  return saved;
 }
 
 /**
@@ -807,6 +861,7 @@ export async function streamConversationTurn(
   } catch {
     settings = undefined;
   }
+  if (!pipeline && settings?.runtime) rememberConversationRuntime(settings.runtime);
   if (pipeline?.step === "outline") {
     return streamOutlineStep(sink, requestId, messages, unitSystem, pipeline, sessionId, settings);
   }

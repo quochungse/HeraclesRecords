@@ -10589,65 +10589,92 @@ td span {
   padding: 16px;
 }
 
-/* Field rows inside Coach models size themselves to the dialog, not to the
-   window. `.chat-local-settings` was written for the full-width Coach view:
-   five fixed columns, relaxed only by a `max-width: 1080px` media query — and
-   a media query asks about the window, which says nothing about an 860px
-   dialog. So on any window wider than 1080px the five columns kept their
-   desktop widths and ran ~200px past the dialog edge, clipping Save and
-   squeezing the reasoning-effort explainer to one word per line; below 1080px
-   the same layout happened to fit, which is why it read as a large-window bug.
-   `auto-fit` reflows on the width actually available, so a field that no
-   longer fits drops to the next row instead of overflowing. */
+/* Provider fields reflow with the dialog rather than the viewport. */
 .coach-models-panel .chat-local-settings-panel {
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr));
+  gap: 12px;
+  padding: 0;
+  border: 0;
 }
 
-/* Direct children only: the permission checkboxes in `.chat-claude-permissions`
-   are `.chat-local-tools` too, and they keep their own two-column grid.
-   These are the rows that want the whole line — a prose paragraph, a row of
-   buttons, a connection result — rather than one column among the fields. */
 .coach-models-panel .chat-local-settings-panel > .chat-settings-copy,
 .coach-models-panel .chat-local-settings-panel > .chat-local-tools,
 .coach-models-panel .chat-local-settings-panel > .chat-local-actions,
 .coach-models-panel .chat-local-settings-panel > .chat-local-result,
-.coach-models-panel .chat-local-settings-panel > .chat-model-list-status {
+.coach-models-panel .chat-local-settings-panel > .chat-model-list-status,
+.coach-models-panel .chat-local-field-key {
   grid-column: 1 / -1;
 }
 
-/* Buttons wrap onto a second line rather than running off the dialog. The
-   OpenRouter and Claude-subscription rows already carried their own
-   `flex-wrap`; the Claude API key and Local model rows did not, and those are
-   the two that ran off the edge. */
-.coach-models-panel .chat-local-actions {
+.coach-models-panel .chat-local-actions,
+.provider-account-actions {
   flex-wrap: wrap;
 }
 
-/* `nowrap` belongs to the wide Coach layout, where this label sits in a
-   fixed column. On its own full-width row it can wrap like any other text,
-   which is what keeps it inside a narrow dialog. */
+.coach-models-panel .chat-claude-actions {
+  width: auto;
+}
+
+.coach-models-panel .chat-local-action {
+  flex: 0 0 auto;
+}
+
 .coach-models-panel .chat-local-settings-panel > .chat-local-tools {
   white-space: normal;
 }
 
-/* The Claude subscription section is the longest one in the dialog and its
-   `.chat-settings-section` gap spaces every child the same 10px, so its
-   groups — what the section is, what the connection is doing, and which
-   model to use — ran together as one list. Only what *starts* a group takes
-   the extra margin, so it lands on the seam rather than inside a group: the
-   executable field stays tucked under the status that asks for it, and a
-   group's heading carries the seam rather than the control underneath it. */
-.coach-models-panel .chat-claude-section > .chat-claude-group-title,
-.coach-models-panel .chat-claude-section > .chat-claude-status {
-  margin-top: 14px;
+.coach-models-panel .chat-local-field,
+.provider-account-brand,
+.provider-account-actions {
+  min-width: 0;
 }
 
-/* Names the group the way `.chat-claude-permissions > strong` names its own,
-   so the two sub-headings in this section read as the same thing rather than
-   as a heading and a stray bold line. */
-.chat-claude-group-title {
-  color: var(--text-secondary);
+.coach-models-panel .chat-local-field > input {
+  width: 100%;
+}
+
+.provider-card-footer {
+  justify-content: space-between;
+  border-top: 1px solid var(--glass-border);
+  padding-top: 12px;
+  margin-top: 2px;
+}
+
+.provider-card-links,
+.provider-card-controls {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 14px;
+}
+
+.provider-card-controls {
+  margin-left: auto;
+  gap: 8px;
+}
+
+.coach-models-panel .provider-card-help {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
   font-size: 12px;
+  color: var(--text-secondary);
+  text-decoration: none;
+}
+
+.coach-models-panel .provider-card-help:hover {
+  color: var(--text-primary);
+}
+
+.coach-models-panel .provider-card-local-actions {
+  justify-content: flex-end;
+}
+
+.provider-account-status[data-state="connection-failed"],
+.provider-account-status[data-state="usage-limit-reached"] {
+  border-color: var(--error-border);
+  background: var(--error-bg);
+  color: var(--error-text);
 }
 
 /* The same row as the Connections list, sitting above the Coach settings
@@ -11429,72 +11456,8 @@ td span {
   padding: 0;
 }
 
-.chat-claude-status {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
-  align-items: start;
-  gap: 9px;
-  border: 1px solid var(--glass-border);
-  border-radius: var(--radius-sm);
-  background: rgba(255, 255, 255, 0.025);
-  color: var(--text-muted);
-  padding: 10px;
-}
-
-.chat-claude-status[data-state="connected"] {
-  border-color: rgba(45, 212, 191, 0.3);
-  background: rgba(20, 184, 166, 0.08);
-  color: #5eead4;
-}
-
-.chat-claude-status[data-state="usage-limit-reached"],
-.chat-claude-status[data-state="connection-failed"] {
-  border-color: var(--error-border);
-  background: var(--error-bg);
-  color: var(--error-text);
-}
-
-.chat-claude-status > div {
-  display: grid;
-  gap: 3px;
-  min-width: 0;
-}
-
-/* Sits as its own row in .chat-claude-status > div (a 3px-gap grid). Slightly
-   brighter than the status message so the signed-in account reads first. */
-.chat-claude-status .chat-claude-account {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  color: var(--text-secondary);
-  font-weight: 600;
-}
-
-.chat-claude-status strong {
-  color: currentColor;
-  font-size: 12px;
-}
-
-.chat-claude-status span {
-  color: var(--text-muted);
-  font-size: 12px;
-  line-height: 1.45;
-  word-break: break-word;
-}
-
 .chat-claude-actions {
   flex-wrap: wrap;
-}
-
-.chat-claude-model-row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
-}
-
-.chat-claude-model-row > .chat-local-field {
-  flex: 1 1 150px;
-  min-width: 0;
 }
 
 .chat-claude-login-flow {
@@ -11524,20 +11487,6 @@ td span {
 
 .chat-claude-login-flow .chat-local-actions {
   margin-top: 2px;
-}
-
-.chat-claude-permissions {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 8px 14px;
-  border-top: 1px solid var(--glass-border);
-  padding-top: 10px;
-}
-
-.chat-claude-permissions > strong {
-  grid-column: 1 / -1;
-  color: var(--text-secondary);
-  font-size: 12px;
 }
 
 .chat-login-actions {
@@ -11589,43 +11538,50 @@ td span {
   width: fit-content;
 }
 
-.chatgpt-account-card {
+.provider-account-card {
   gap: 18px;
   min-width: 0;
   background: var(--glass-bg);
 }
 
-.chatgpt-account-header,
-.chatgpt-account-brand,
-.chatgpt-account-actions,
-.chatgpt-account-status,
-.chatgpt-account-footer {
+.provider-api-card,
+.provider-local-card {
+  gap: 12px;
+}
+
+.provider-account-header,
+.provider-account-brand,
+.provider-account-actions,
+.provider-account-status,
+.provider-account-footer {
   display: flex;
   align-items: center;
   gap: 8px;
 }
 
-.chatgpt-account-header,
-.chatgpt-account-footer {
+.provider-account-header,
+.provider-account-footer {
   justify-content: space-between;
   flex-wrap: wrap;
   gap: 12px;
 }
 
-.chatgpt-account-brand {
+.provider-account-brand {
   color: var(--text-secondary);
 }
 
-.chatgpt-account-card h3 {
+.provider-account-card h3 {
   color: var(--text-primary);
   font-size: 13px;
   letter-spacing: 0;
   text-transform: none;
 }
 
-.chatgpt-account-status,
-.chatgpt-account-plan {
+.provider-account-status,
+.provider-account-plan {
   width: fit-content;
+  max-width: 100%;
+  overflow-wrap: anywhere;
   border: 1px solid var(--glass-border);
   border-radius: var(--radius-pill);
   padding: 5px 9px;
@@ -11635,13 +11591,13 @@ td span {
   line-height: 1.3;
 }
 
-.chatgpt-account-status.is-connected {
+.provider-account-status.is-connected {
   border-color: var(--success-border);
   background: var(--success-bg);
   color: var(--success-text);
 }
 
-.chatgpt-account-identity {
+.provider-account-identity {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
   align-items: center;
@@ -11649,7 +11605,7 @@ td span {
   padding-block: 2px;
 }
 
-.chatgpt-account-avatar {
+.provider-account-avatar {
   display: grid;
   place-items: center;
   grid-row: span 2;
@@ -11661,38 +11617,38 @@ td span {
   color: var(--text-secondary);
 }
 
-.chatgpt-account-identity .chat-settings-email {
+.provider-account-identity .chat-settings-email {
   font-size: 14px;
 }
 
-.chatgpt-account-identity small {
+.provider-account-identity small {
   overflow-wrap: anywhere;
 }
 
-.chatgpt-account-card .chat-settings-copy,
-.chatgpt-account-card .chat-settings-account-who small {
+.provider-account-card .chat-settings-copy,
+.provider-account-card .chat-settings-account-who small {
   color: var(--text-secondary);
 }
 
-.chatgpt-account-plan {
+.provider-account-plan {
   grid-column: 2;
   overflow-wrap: anywhere;
 }
 
-.chatgpt-account-footer {
+.provider-account-footer {
   border-top: 1px solid var(--glass-border);
   padding-top: 14px;
 }
 
-.chatgpt-account-footer .chat-settings-copy {
+.provider-account-footer .chat-settings-copy {
   flex: 1 1 220px;
 }
 
-.chatgpt-account-footer button {
+.provider-account-footer button {
   flex: 0 1 auto;
 }
 
-.chatgpt-account-signout:hover:not(:disabled) {
+.provider-account-signout:hover:not(:disabled) {
   background: var(--glass-bg-hover);
   color: var(--text-primary);
 }
