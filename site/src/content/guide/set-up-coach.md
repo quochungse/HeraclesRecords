@@ -16,12 +16,12 @@ Coach needs an AI to run on. Open **Settings → Connections → AI Model Provid
 
 ## ChatGPT
 
-Press **Sign in**. Your browser opens ChatGPT's sign-in page; once you are signed in, come back to the app. The models your account offers appear in the list.
+Press **Sign in**. Your browser opens ChatGPT's sign-in page; once you are signed in, come back to the app. Choose a model from the AI chip under Coach's message box. Its reasoning levels come from the model list for your account. **Auto** uses the model's own default.
 
 ## Claude subscription
 
 1. Install Claude Code on the computer (see [claude.com/claude-code](https://claude.com/claude-code)).
-2. In AI Model Providers, press **Check**. The app finds the installed Claude Code.
+2. In AI Model Providers, press **Refresh**. The app finds the installed Claude Code.
 3. Press **Sign in** and finish in your browser.
 
 The app signs in with a Claude login of its own, so a Claude account you use elsewhere on the computer, in a terminal for instance, is left alone. Heracles Records never sees your Claude password.
@@ -36,7 +36,7 @@ Start [Ollama](https://ollama.com) or [LM Studio](https://lmstudio.ai) and load 
 
 ## Choosing per conversation
 
-Coach's default AI is the one you pick in AI Model Providers. Each conversation can use a different one: the AI chip under the message box says which, and opens the choice for that conversation.
+Connect accounts and keys in AI Model Providers, then use the AI chip under the message box to choose the provider, model and reasoning effort for a conversation. New conversations remember the last model and effort used for their provider. Each existing conversation keeps its own choice.
 
 The same conversation settings choose what Coach may read: switch off activities, sleep or anything else a conversation has no business seeing. What is switched off is withheld from Coach's tools and from what it is told, not only from the prompt.
 
@@ -47,8 +47,10 @@ The same conversation settings choose what Coach may read: switch off activities
 The gear in Coach opens its settings:
 
 - **Coach style**: Friendly, Motivating, Neutral, Straight talk or No filter. It changes the tone only, never what goes on a workout or a plan.
-- **Instructions**: anything Coach should always know or do, in your own words.
-- **Automatic analyses**: pause them all, and set a monthly budget for what they may spend.
+- **Custom instructions**: anything Coach should always know or do, in your own words.
+- **Advanced settings**: choose how long conversations are condensed, resume paused analyses, and set a monthly token budget.
+
+Press **Save** to apply your changes, or **Discard** to leave the saved settings as they were. Provider connections save separately in **Manage**.
 
 ## What it costs
 

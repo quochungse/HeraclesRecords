@@ -4888,7 +4888,7 @@ export function ChatView({
       chatSettings={chatSettings}
       onClose={() => setSettingsOpen(false)}
       onSaveChatSettings={saveChatSettingsPatch}
-      onCoachModelsChange={() => void reloadCoachSettings()}
+      onCoachModelsChange={reloadCoachSettings}
     />
   );
 

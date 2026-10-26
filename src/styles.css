@@ -25117,7 +25117,7 @@ button.settings-about-link {
   min-width: 0;
   color: var(--text-secondary);
   font-weight: 500;
-  line-height: 1.4;
+  line-height: 1.45;
 }
 
 .coach-provider-summary-row[data-provider="chatgpt"] {
@@ -25140,7 +25140,7 @@ button.settings-about-link {
   height: 24px;
   place-items: center;
   border: 1px solid color-mix(in srgb, var(--provider-tone) 22%, transparent);
-  border-radius: 7px;
+  border-radius: var(--radius-sm);
   background: color-mix(in srgb, var(--provider-tone) 10%, transparent);
   color: var(--provider-tone);
 }

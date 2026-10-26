@@ -230,7 +230,7 @@ const chat = {
   "chat.cost.tokens": "{count} Tokens",
   "chat.cost.input": "Input {count}",
   "chat.cost.output": "Output {count}",
-  "chat.set.advanced": "Advance settings",
+  "chat.set.advanced": "Advanced settings",
   "chat.set.close": "Close settings",
   "chat.set.unsaved": "Unsaved changes",
   "chat.set.saved": "All changes saved",

@@ -176,7 +176,14 @@ import {
   type ChatApiKeyStores,
   type ChatSettingsStore
 } from "./chatSettingsStore";
-import { effortForModel, getChatGptModelCandidates, normalizeRuntimeEffort, reasoningEffortForModel, settingsModel, supportsReasoningEffort } from "./chatModels";
+import {
+  effortForModel,
+  getChatGptModelCandidates,
+  normalizeRuntimeEffort,
+  reasoningEffortForModel,
+  settingsModel,
+  supportsReasoningEffort
+} from "./chatModels";
 import { addTokenUsage, countableUsage } from "./tokenUsage";
 import { inlineSuggestionsSection } from "./chatCoachContext";
 import { WEB_SEARCH_TOOL } from "./chatToolSources";
@@ -711,6 +718,9 @@ export function createChatSessionForProvider(provider: ChatProvider) {
   const runtime = lastConversationRuntime(session.provider);
   // Snapshot the choice: a later model selection only affects future chats.
   saveChatConversationSettingsRow(session.id, null, JSON.stringify(runtime), false);
+  // Seed once, including untouched installations, so every later new chat
+  // reads the preference instead of parsing the entire conversation history.
+  rememberConversationRuntime(runtime);
   return session;
 }
 
@@ -733,7 +743,7 @@ function resolvedConversationRuntime(runtime: import("./types").AnalysisRuntime 
 /** Kept separately from provider settings so existing conversations cannot drift. */
 function lastConversationRuntime(provider: ChatProvider) {
   try {
-    const stored = JSON.parse(getSetting(`${CHAT_SETTINGS_KEYS.conversationLastUsed}.${provider}`) ?? "null");
+    const stored = JSON.parse(getSetting(CHAT_SETTINGS_KEYS.conversationLastUsed[provider]) ?? "null");
     if (stored && typeof stored.model === "string") {
       return resolvedConversationRuntime({ provider, model: stored.model, effort: stored.effort });
     }
@@ -752,7 +762,7 @@ function lastConversationRuntime(provider: ChatProvider) {
 
 function rememberConversationRuntime(runtime: import("./types").AnalysisRuntime) {
   const resolved = resolvedConversationRuntime(runtime);
-  setSetting(`${CHAT_SETTINGS_KEYS.conversationLastUsed}.${resolved.provider}`, JSON.stringify(resolved));
+  setSetting(CHAT_SETTINGS_KEYS.conversationLastUsed[resolved.provider], JSON.stringify(resolved));
 }
 
 export function saveChatSessionEntries(
@@ -770,6 +780,7 @@ export function setChatSessionPinnedById(id: string, pinned: boolean) {
 /** A conversation keeps its model and effort; legacy rows inherit provider settings. */
 export function getConversationSettings(sessionId: string): import("./types").ConversationSettings {
   const row = getChatConversationSettingsRow(sessionId);
+  const own = getChatSessionProvider(sessionId);
   let sources = { activities: true, sleep: true, zones: true };
   let runtime: import("./types").AnalysisRuntime | undefined;
   try {
@@ -785,7 +796,7 @@ export function getConversationSettings(sessionId: string): import("./types").Co
   try {
     const parsed = row?.runtimeJson ? (JSON.parse(row.runtimeJson) as Record<string, unknown>) : undefined;
     if (parsed) {
-      const effort = normalizeRuntimeEffort(parsed.effort, isChatProviderName(parsed.provider) ? parsed.provider : getChatSessionProvider(sessionId));
+      const effort = normalizeRuntimeEffort(parsed.effort, isChatProviderName(parsed.provider) ? parsed.provider : own);
       runtime = {
         ...(isChatProviderName(parsed.provider) ? { provider: parsed.provider } : {}),
         ...(typeof parsed.model === "string" ? { model: parsed.model } : {}),
@@ -799,7 +810,6 @@ export function getConversationSettings(sessionId: string): import("./types").Co
   // A conversation keeps the provider it was started with (Q1 of the Coach
   // Workbench review): Coach's default names the provider of a new one, and
   // changing it later moves no conversation already under way.
-  const own = getChatSessionProvider(sessionId);
   if (own && !runtime?.provider) runtime = { ...(runtime ?? {}), provider: own };
   return { sessionId, sources, ...(runtime ? { runtime } : {}), web: row?.webSearch === true };
 }

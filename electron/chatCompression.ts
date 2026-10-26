@@ -85,7 +85,7 @@ export function resolveCompressionRuntime(
         : { provider, model: compressionModelFor(provider, providerModelOptions(provider, settings))?.value ?? model };
   const runtime: AnalysisRuntime = {
     provider: picked.provider,
-    ...(picked.model ? { model: picked.model } : {}),
+    ...(picked.model !== undefined ? { model: picked.model } : {}),
     effort: ANALYSIS_DEFAULT_EFFORT
   };
   const row = providerModelOptions(picked.provider, settings).find((option) => option.value === picked.model);

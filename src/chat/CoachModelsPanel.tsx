@@ -270,6 +270,7 @@ export function CoachModelsPanel({ api, onChange }: CoachModelsPanelProps) {
         const modelCatalogs = refreshed?.settings?.modelCatalogs;
         if (cancelled || !modelCatalogs) return;
         setChatSettings((current) => (current ? { ...current, modelCatalogs } : current));
+        await onChange?.();
       } catch {
         // The lists already held stay on screen.
       }
@@ -296,7 +297,8 @@ export function CoachModelsPanel({ api, onChange }: CoachModelsPanelProps) {
   // small and jump to full height once the settings arrived.
   if (!api || !chatSettings) {
     return (
-      <div className="chat-settings-panel coach-models-panel" aria-busy="true">
+      <div className="chat-settings-panel coach-models-panel" aria-busy={!error}>
+        {error ? <p className="mcp-servers-error" role="alert">{error}</p> : null}
         {COACH_PROVIDER_ORDER.map((provider) => (
           <div className="coach-models-skeleton" key={provider}>
             <i className="coach-models-skeleton-title" />
@@ -520,6 +522,8 @@ export function CoachModelsPanel({ api, onChange }: CoachModelsPanelProps) {
     void persist({
       ...chatSettings,
       claudeCode: { ...chatSettings.claudeCode, ...patch }
+    }).catch((caught) => {
+      setError(caught instanceof Error ? caught.message : t("chat.err.settings"));
     });
   };
 
@@ -616,6 +620,8 @@ export function CoachModelsPanel({ api, onChange }: CoachModelsPanelProps) {
     void persist({
       ...chatSettings,
       anthropic: { ...chatSettings.anthropic, ...patch }
+    }).catch((caught) => {
+      setError(caught instanceof Error ? caught.message : t("chat.err.settings"));
     });
   };
 

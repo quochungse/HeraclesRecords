@@ -255,6 +255,21 @@ async function main() {
   await waitFor(async () => (await harness("calls", "setConversationSettings")).at(-1)?.args[0].runtime.model === "", "Auto is explicitly persisted");
   assert.deepEqual(await harness("consoleErrors"), [], "no Auto runtime renderer errors");
 
+  // Existing local conversations keep their snapshotted model even after the
+  // default changes. The AI sheet must name the model that will answer here.
+  const localSettings = { ...settings, provider: "local",
+    local: { ...settings.local, model: "new-local-default" } };
+  await harness("mount", "ChatView", { styles: true }, { ...script,
+    getChatSettings: localSettings, refreshChatModels: { settings: localSettings, errors: {} },
+    listChatSessions: script.listChatSessions.map((session) => ({ ...session, provider: "local" })),
+    getConversationSettings: { ...conversation, runtime: { provider: "local", model: "conversation-local-model" } }
+  });
+  await waitFor(() => harness("callCount", "getConversationSettings"), "local conversation loaded");
+  await harness("click", ".chat-ai-chip");
+  await waitFor(() => harness("exists", ".plan-generator-sheet"), "local AI sheet");
+  assert.match(await harness("text", ".plan-generator-sheet"), /conversation-local-model/);
+  assert.doesNotMatch(await harness("text", ".plan-generator-sheet"), /new-local-default/);
+
   // Coach settings offers Manage without listing or loading provider connections.
   const allConnected = { ...settings,
     anthropic: { ...settings.anthropic, hasApiKey: true },
@@ -361,6 +376,44 @@ async function main() {
       state === "sign-in-required");
   }
   assert.deepEqual(await harness("consoleErrors"), [], "no provider renderer errors");
+
+  // A background catalog refresh reaches the caller as well as this panel,
+  // so conversation model and effort pickers use the newly read metadata.
+  const freshSettings = { ...settings, modelCatalogs: chatGptSettings.modelCatalogs };
+  await harness("mount", "ChatSettingsModal", { styles: true }, { ...script,
+    refreshChatModels: "__pending", getCoachAnalysisPause: null, getCoachAnalysisSpend: null
+  });
+  await harness("click", ".chat-settings-nav-row .settings-row-button");
+  await waitFor(() => harness("callCount", "refreshChatModels"), "background model refresh starts");
+  await harness("clearCalls");
+  await harness("resolvePending", "refreshChatModels", { settings: freshSettings, errors: {} });
+  await waitFor(() => harness("callCount", "prop:onCoachModelsChange"), "background metadata refresh notifies Coach");
+
+  // A read failure must not hide behind an endless loading skeleton.
+  await harness("mount", "ChatSettingsModal", { styles: true }, { ...script,
+    getChatSettings: { __reject: "Settings unavailable" },
+    getCoachAnalysisPause: null, getCoachAnalysisSpend: null
+  });
+  await harness("click", ".chat-settings-nav-row .settings-row-button");
+  await waitFor(() => harness("exists", ".coach-models-panel > [role='alert']"), "settings read error is visible");
+  assert.equal(await harness("attr", ".coach-models-panel", "aria-busy"), "false");
+  assert.deepEqual(await harness("consoleErrors"), [], "read failures are handled");
+
+  // Auto-saving a model reports persistence failures without an unhandled
+  // promise rejection. The saved model stays selected so a retry is possible.
+  await harness("mount", "ChatSettingsModal", { styles: true }, { ...script,
+    saveChatSettings: { __reject: "Could not save model" },
+    getCoachAnalysisPause: null, getCoachAnalysisSpend: null
+  });
+  await harness("click", ".chat-settings-nav-row .settings-row-button");
+  const apiModel = ".provider-api-card.chat-claude-section .option-group-select";
+  await waitFor(() => harness("exists", `${apiModel} .app-select-trigger`), "API model picker");
+  await harness("click", `${apiModel} .app-select-trigger`);
+  await harness("click", '.app-select-menu [data-value="claude-sonnet-5"]');
+  await waitFor(() => harness("exists", ".coach-models-panel > [role='alert']"), "model save error is visible");
+  assert.match(await harness("text", ".coach-models-panel > [role='alert']"), /Could not save model/);
+  assert.equal(await harness("attr", apiModel, "data-value"), "claude-opus-5");
+  assert.deepEqual(await harness("consoleErrors"), [], "save failures are handled");
 
   console.log("coach providers renderer OK — login, logout, retry, manual refresh, return from Settings, responsive themes");
 }

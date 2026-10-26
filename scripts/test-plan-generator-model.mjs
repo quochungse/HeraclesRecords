@@ -14,9 +14,8 @@
 // - **The summary counts a week as the draft tool does** — the same band.
 // - **An untouched AI panel sends nothing.** The run is then exactly Coach's,
 //   and a request never carries a copy of settings that could go stale.
-// - **A model is sent only when it names one.** `streamChat` reads `""` as a
-//   model id on the Messages API, so the providers' "Default model" / "Auto"
-//   must travel as no model at all.
+// - **Auto is an explicit choice** when it replaces a saved model; omitting
+//   the model would silently select the saved one again.
 // - **ChatGPT effort travels unchanged**, including provider-defined new values.
 // - **"Keep this for Coach chat too" writes what Coach's own pickers write**,
 //   provider by provider, and nothing else.
@@ -74,14 +73,17 @@ await test("an untouched panel sends nothing; a change sends only itself", () =>
   );
 });
 
-await test("a default model travels as no model, and ChatGPT effort is independent of Claude", () => {
-  assert.deepEqual(runtime.requestRuntime({ provider: "claude-code", model: "", effort: "high" }, settings), undefined,
-    "Claude Code's Default model is not a model id");
+await test("a default model overrides a saved model, and ChatGPT effort is independent of Claude", () => {
+  assert.deepEqual(runtime.requestRuntime({ provider: "claude-code", model: "", effort: "high" }, settings), { model: "" },
+    "Claude Code's Default model must override the saved Opus selection");
   assert.deepEqual(runtime.requestRuntime({ provider: "chatgpt", model: "", effort: "future-depth" }, settings), { provider: "chatgpt", effort: "future-depth" },
     "ChatGPT effort values are not restricted to Claude's enum");
   const withEffort = { ...settings, provider: "chatgpt", chatgpt: { effort: "future-depth" } };
   assert.deepEqual(runtime.requestRuntime({ provider: "chatgpt", model: "", effort: "" }, withEffort), { effort: "" },
     "Auto explicitly overrides a saved effort");
+  assert.deepEqual(runtime.requestRuntime({ provider: "chatgpt", model: "", effort: "" },
+    { ...withEffort, chatgpt: { model: "gpt-test", effort: "future-depth" } }), { model: "", effort: "" },
+    "ChatGPT Auto overrides both saved model and effort");
   assert.deepEqual(runtime.requestRuntime({ provider: "local", model: "llama", effort: "low" }, settings), { provider: "local" },
     "a local model is chosen in Coach settings, not here");
 });

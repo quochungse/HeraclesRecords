@@ -68,7 +68,7 @@ export function ChatSettingsModal({
    * own copy of the settings — the composer's AI chip and every picker read
    * the lists from it — so it has to hear this, not only the summary here.
    */
-  onCoachModelsChange?: () => void;
+  onCoachModelsChange?: () => void | Promise<void>;
 }) {
   const [coachModelsOpen, setCoachModelsOpen] = useState(false);
   const [draft, setDraft] = useState<SettingsDraft>({});

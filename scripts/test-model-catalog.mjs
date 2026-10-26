@@ -408,6 +408,10 @@ check(() => {
   assert.deepEqual(reasoningEffortOptions("chatgpt", { reasoning: { efforts: [] } }), []);
   assert.deepEqual(runtimeOver({ effort: "" }, { provider: "chatgpt", effort: "future-depth" }),
     { provider: "chatgpt", effort: "" }, "Auto clears an inherited effort");
+  assert.deepEqual(runtimeOver({ model: "" }, { provider: "chatgpt", model: "gpt-test" }),
+    { model: "" }, "an explicit Auto replaces an inherited model");
+  assert.deepEqual(runtimeOver({}, { provider: "chatgpt", model: "", effort: "" }),
+    { provider: "chatgpt", model: "", effort: "" }, "inherited Auto remains explicit");
 });
 
 check(() => {

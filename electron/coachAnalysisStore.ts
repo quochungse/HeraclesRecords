@@ -389,9 +389,8 @@ export function normalizeAnalysisRuntime(value: unknown): AnalysisRuntime {
   ) {
     runtime.provider = value.provider as ChatProvider;
   }
-  const model = optionalText(value.model);
-  if (model) {
-    runtime.model = model;
+  if (typeof value.model === "string") {
+    runtime.model = value.model.trim();
   }
   const effort = value.provider === undefined || runtime.provider
     ? normalizeRuntimeEffort(value.effort, runtime.provider)

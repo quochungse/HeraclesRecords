@@ -200,6 +200,7 @@ function ChatSettingsModalHarness() {
         calls.push({ method: "prop:onSaveChatSettings", args: [patch] });
         setSettings((current) => ({ ...current, ...patch }));
       }}
+      onCoachModelsChange={spy("onCoachModelsChange")}
     />
   );
 }

@@ -85,7 +85,7 @@ assert.deepEqual(
 // settings key cannot slip through by being declared in a novel way.
 // ---------------------------------------------------------------------------
 
-const DOTTED_LITERAL = /"([a-z][A-Za-z0-9]*(?:\.[A-Za-z0-9]+)+)"/g;
+const DOTTED_LITERAL = /"([a-z][A-Za-z0-9]*(?:\.[A-Za-z0-9-]+)+)"/g;
 
 // Dotted literals in electron/ that are not settings keys. Each entry is a
 // deliberate exclusion; add to it only after confirming the string never

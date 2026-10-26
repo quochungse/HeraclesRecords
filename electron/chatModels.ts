@@ -42,11 +42,11 @@ export function runtimeOver(
   over: AnalysisRuntime,
   under: AnalysisRuntime | undefined
 ): AnalysisRuntime {
-  const pair = over.provider || over.model ? over : under ?? {};
+  const pair = over.provider !== undefined || over.model !== undefined ? over : under ?? {};
   const effort = over.effort ?? under?.effort;
   return {
     ...(pair.provider ? { provider: pair.provider } : {}),
-    ...(pair.model ? { model: pair.model } : {}),
+    ...(pair.model !== undefined ? { model: pair.model } : {}),
     ...(effort !== undefined ? { effort } : {})
   };
 }

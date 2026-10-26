@@ -51,9 +51,9 @@ export function runtimeFromSettings(settings: ChatSettings, provider: ChatProvid
 
 /**
  * What goes on the request: only what differs from Coach's settings, so an
- * untouched panel sends nothing and the run is exactly Coach's. A model is
- * sent only when it names one — `streamChat` reads `""` as a model id on the
- * Messages API — and an effort only where the provider takes one.
+ * untouched panel sends nothing and the run is exactly Coach's. An explicit
+ * `""` overrides a saved model with Auto; an absent model inherits it. Effort
+ * is sent only where the provider takes one.
  */
 export function requestRuntime(
   runtime: GeneratorRuntime,
@@ -68,7 +68,8 @@ export function requestRuntime(
   const coach = runtimeFromSettings(settings, runtime.provider);
   const override: AnalysisRuntime = {};
   if (runtime.provider !== baseProvider) override.provider = runtime.provider;
-  if (runtime.provider !== "local" && runtime.model.trim() && runtime.model !== coach.model) override.model = runtime.model.trim();
+  const model = runtime.model.trim();
+  if (runtime.provider !== "local" && model !== coach.model) override.model = model;
   if (supportsReasoningEffort(runtime.provider) && runtime.effort !== coach.effort) override.effort = runtime.effort;
   return Object.keys(override).length ? override : undefined;
 }

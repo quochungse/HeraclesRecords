@@ -1,6 +1,6 @@
 // What one conversation reads and which AI answers it (docs/coach-plan-canvas.md,
-// P2.0, D13/D14): stored per conversation, only where it differs from Coach's
-// settings, gone with the conversation, and turned into the turn's reach.
+// P2.0, D13/D14): model and effort kept per conversation, gone with the
+// conversation, and turned into the turn's reach.
 //
 // Runs under Electron for the better-sqlite3 ABI.
 
@@ -17,6 +17,7 @@ const distUrl = (file) =>
 const database = await import(distUrl("database.js"));
 const chat = await import(distUrl("chatService.js"));
 const history = await import(distUrl("chatHistoryStore.js"));
+const { policyForSetting } = await import(distUrl("sync/syncPolicy.js"));
 
 database.initializeDatabase(fs.mkdtempSync(path.join(os.tmpdir(), "conversation-settings-")));
 
@@ -105,11 +106,16 @@ assert.deepEqual(reach.context, { activities: false, zones: true, sleep: false, 
 // New conversations inherit the most recently selected model/effort for their
 // provider. Each conversation keeps a snapshot; no global settings are rewritten.
 const lastUsedKey = (provider) => `chat.conversation.lastUsed.${provider}`;
+for (const provider of ["chatgpt", "claude-code", "claude-api", "openrouter", "local"]) {
+  assert.equal(policyForSetting(lastUsedKey(provider)), "preference", "last-used choices follow preference sync");
+}
 database.deleteSettings([lastUsedKey("claude-code"), lastUsedKey("chatgpt"), lastUsedKey("openrouter")]);
 database.setSetting("chat.claudeCode.model", "opus");
 database.setSetting("chat.claudeCode.effort", "high");
 const first = chat.createChatSessionForProvider("claude-code");
 assert.deepEqual(chat.getConversationSettings(first.id).runtime, { provider: "claude-code", model: "opus", effort: "high" });
+assert.deepEqual(JSON.parse(database.getSetting(lastUsedKey("claude-code"))), chat.getConversationSettings(first.id).runtime,
+  "even an untouched first conversation seeds the preference instead of rescanning history next time");
 chat.setConversationSettings({ sessionId: first.id, sources: everything,
   runtime: { provider: "claude-code", model: "sonnet", effort: "low" } });
 const second = chat.createChatSessionForProvider("claude-code");

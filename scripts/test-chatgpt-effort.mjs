@@ -23,6 +23,8 @@ Module._load = function (name, ...args) {
 const database = require(path.join(root, "dist-electron/database.js"));
 const chat = require(path.join(root, "dist-electron/chatService.js"));
 const { MODEL_CATALOG_KEYS, parseCodexModels, serializeCatalog } = require(path.join(root, "dist-electron/modelCatalog.js"));
+const { runtimeOver } = require(path.join(root, "dist-electron/chatModels.js"));
+const { resolveCompressionRuntime } = require(path.join(root, "dist-electron/chatCompression.js"));
 database.initializeDatabase(temporary);
 database.setSetting("chat.oauthToken", Buffer.from(JSON.stringify({
   access_token: "dummy-token", refresh_token: "dummy-refresh", expires_at: Math.floor(Date.now() / 1000) + 3600
@@ -83,6 +85,18 @@ database.setSetting("chat.model", "gpt-saved");
 const fallback = await run({ model: "", effort: "saved-depth" });
 assert.equal(fallback.at(-1).model, "gpt-override");
 assert.equal("effort" in fallback.at(-1).reasoning, false, "Auto revalidates effort for each actual model candidate");
+rejectSavedModel = false;
+database.setSetting("chat.model", "gpt-override");
+const auto = { provider: "chatgpt", model: "", effort: "" };
+const inherited = runtimeOver({}, auto);
+assert.equal((await run(inherited))[0].model, "gpt-override",
+  "an analysis inheriting Auto must not fall back to the provider's explicitly saved model");
+const compression = resolveCompressionRuntime(undefined, auto, {
+  ...chat.getChatSettings(), compactContext: { enabled: true, model: { kind: "conversation" } }
+});
+assert.deepEqual(compression.runtime, { ...auto, effort: "low" },
+  "conversation-model compression preserves Auto through to the provider request");
+assert.equal((await run(compression.runtime))[0].model, "gpt-override");
 console.log("ChatGPT effort OK — dynamic metadata, saved settings, runtime overrides, defaults, summary retry, Auto fallback");
 database.closeDatabase();
 fs.rmSync(temporary, { recursive: true, force: true });

@@ -127,8 +127,8 @@ export function GeneratorProviderPanel({
       : "chat.models.effortNote");
   const modelControl = runtime.provider === "local" ? (
       <p className="plan-generator-sheet-note">
-        {settings.local.model.trim()
-          ? t("library.ai.runsLocal", { model: settings.local.model.trim() })
+        {runtime.model.trim()
+          ? t("library.ai.runsLocal", { model: runtime.model.trim() })
           : t("library.fix.local")}
       </p>
   ) : (
