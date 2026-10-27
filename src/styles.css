@@ -12589,6 +12589,56 @@ label.chat-settings-toggle-row {
   width: min(100%, 620px);
 }
 
+.chat-responding {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+  color: var(--text-muted);
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.chat-responding-dots {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 14px;
+}
+
+.chat-responding-dots i {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--accent-strong);
+  animation: chat-responding-bounce 1.2s ease-in-out infinite;
+}
+
+.chat-responding-dots i:nth-child(2) {
+  animation-delay: 150ms;
+}
+
+.chat-responding-dots i:nth-child(3) {
+  animation-delay: 300ms;
+}
+
+@keyframes chat-responding-bounce {
+  0%, 60%, 100% {
+    opacity: 0.35;
+    transform: translateY(0);
+  }
+
+  30% {
+    opacity: 1;
+    transform: translateY(-4px);
+  }
+}
+
+@keyframes chat-responding-fade {
+  0%, 60%, 100% { opacity: 0.35; }
+  30% { opacity: 1; }
+}
+
 .chat-thinking-text .chat-markdown > :first-child {
   margin-top: 0;
 }
@@ -12769,6 +12819,11 @@ label.chat-settings-toggle-row {
   .chat-plan-list-header,
   .chat-plan-list {
     animation: none;
+  }
+
+  /* Keep the live response cue; reduced motion uses opacity without movement. */
+  .chat-responding-dots i {
+    animation-name: chat-responding-fade;
   }
 
   .chat-stream-status {

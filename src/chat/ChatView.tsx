@@ -404,6 +404,20 @@ const AssistantMarkdown = memo(function AssistantMarkdown({
   );
 });
 
+/** Stays visible between output chunks, independently of the last Markdown block. */
+function RespondingIndicator() {
+  return (
+    <div className="chat-responding" role="status">
+      <span className="chat-responding-dots" aria-hidden="true">
+        <i />
+        <i />
+        <i />
+      </span>
+      <span>{t("chat.row.answering")}</span>
+    </div>
+  );
+}
+
 type ChatChartEntry = ChatActivityVisualEntry | ChatFitnessTrendEntry | ChatHrZoneEntry;
 
 /** A chart card, drawn the same in a row of its own and inside an answer. */
@@ -5390,6 +5404,7 @@ export function ChatView({
     <>
       {thinkingText ? <ThinkingDisclosure content={thinkingText} live /> : null}
       <AnswerBody content={shownStreamingText} placement={streamingPlacement} streaming />
+      {shownStreamingText.trim() ? <RespondingIndicator /> : null}
     </>
   ) : null;
   const assistantRow = (key: string, children: ReactNode, withCharts = false) => (
@@ -6227,7 +6242,10 @@ export function ChatView({
                   </span>
                 </span>
                 {liveAnalysisText ? (
-                  <AssistantMarkdown content={liveAnalysisText} streaming />
+                  <>
+                    <AssistantMarkdown content={liveAnalysisText} streaming />
+                    {liveAnalysisText.trim() ? <RespondingIndicator /> : null}
+                  </>
                 ) : (
                   <div className="chat-stream-pending">
                     <span className="chat-stream-status">
