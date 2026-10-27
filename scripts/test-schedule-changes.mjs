@@ -198,6 +198,13 @@ function fakeCoros() {
           state.writes.push({ path: target.pathname, body });
           state.library = state.library.filter((program) => !body.includes(program.id));
           return ok();
+        case "/training/program/update": {
+          state.writes.push({ path: target.pathname, body });
+          const refused = failing();
+          if (refused) return refused;
+          state.libraryPrograms.set(String(body.id), structuredClone(body));
+          return ok();
+        }
         default:
           throw new Error(`unexpected COROS request: ${init.method ?? "GET"} ${target.pathname}`);
       }
@@ -579,7 +586,7 @@ test("a proposal names every line as the card reads it, and writes nothing", asy
   assert.match(result.lines[3], /^Add "Shakeout" on /);
   assert.equal(staged.lines[1].workout.name, "Easy 45");
   assert.equal(staged.lines[3].toDay, daysFromNow(4));
-  assert.match(result.message, /Nothing has changed on the calendar yet/);
+  assert.match(result.message, /Nothing has been written to COROS yet/);
   assert.equal(coros.state.writes.length, 0);
 });
 
@@ -817,6 +824,105 @@ test("an analysis run leaves at most two cards, and says why the third is refuse
   }
   service.endRunForTests("run-2");
   service.endRunForTests("turn-1");
+});
+
+const patchProgram = (name = "Patch run") => ({
+  name, overview: "Keep this note", sportType: 1, pbVersion: 2, privateProgramField: "preserved",
+  exercises: [{ id: "70", name: "Training", exerciseType: 2, sportType: 1, targetType: 2, targetValue: 600, intensityType: 0, sets: 1, groupId: "0", isGroup: false, sortNo: 16777216, privateStepField: "preserved" }]
+});
+
+test("a calendar metadata patch is persisted, writes only on Apply, and keeps raw identity", async () => {
+  const coros = fakeCoros();
+  coros.put({ idInPlan: 81, happenDay: tomorrow, name: "Patch run" });
+  Object.assign(coros.state.programs[0], patchProgram());
+  const { result, staged } = await propose([{ op: "patch", session: { plan_id: OWN_SCHEDULE, id_in_plan: "81", date: tomorrow }, set: { "/description": "Relax your shoulders." } }]);
+  assert.equal(result.ok, true, JSON.stringify(result));
+  assert.equal(coros.state.writes.length, 0);
+  assert.equal(staged.lines[0].workout.description, "Relax your shoulders.");
+  const restored = changes.readScheduleChanges([staged.changeSetId])[0];
+  assert.deepEqual(restored.lines[0].patch, staged.lines[0].patch);
+  const applied = await changes.applyScheduleChange(staged.changeSetId);
+  assert.equal(applied.lines[0].status, "applied", JSON.stringify(applied));
+  const [write] = coros.writesTo("/training/schedule/update");
+  assert.equal(write.body.programs[0].overview, "Relax your shoulders.");
+  assert.equal(write.body.programs[0].exercises[0].id, "70");
+  assert.equal(write.body.programs[0].exercises[0].privateStepField, "preserved");
+  assert.equal(write.body.programs[0].privateProgramField, "preserved");
+  await changes.applyScheduleChange(staged.changeSetId);
+  assert.equal(coros.writesTo("/training/schedule/update").length, 1);
+});
+
+test("calendar step patches require the read revision and refuse changes without version counters", async () => {
+  const coros = fakeCoros();
+  coros.put({ idInPlan: 82, happenDay: tomorrow, name: "Patch run" });
+  Object.assign(coros.state.programs[0], patchProgram());
+  const change = { op: "patch", session: { plan_id: OWN_SCHEDULE, id_in_plan: "82", date: tomorrow }, set: { "/steps/0/target_duration_seconds": 300 } };
+  const missing = await propose([change]);
+  assert.equal(missing.result.ok, false);
+  assert.match(missing.result.errors.join(" "), /revision/);
+  const read = JSON.parse(await workoutTools.handleChatWorkoutTool("list_scheduled_workouts", { start_date: tomorrow, end_date: tomorrow, sessions: ["82"] }));
+  const revision = read.workouts[0].revision;
+  assert.equal(typeof revision, "string");
+  assert.equal(read.workouts[0].workout.steps[0].target_duration_seconds, 600);
+  const { result, staged } = await propose([{ ...change, revision }]);
+  assert.equal(result.ok, true, JSON.stringify(result));
+  coros.state.programs[0].exercises[0].targetValue = 900;
+  const applied = await changes.applyScheduleChange(staged.changeSetId);
+  assert.equal(applied.lines[0].status, "stale");
+  assert.equal(coros.state.writes.length, 0);
+  const staleProposal = await propose([{ ...change, revision }]);
+  assert.equal(staleProposal.result.ok, false);
+});
+
+test("library patches use the existing editor update and clear notes without creating another workout", async () => {
+  const coros = fakeCoros();
+  coros.library("LIBPATCH", "Patch run");
+  coros.state.libraryPrograms.set("LIBPATCH", { id: "LIBPATCH", ...patchProgram() });
+  const read = await workoutTools.handleChatWorkoutTool("get_workout_library", { workout_ids: ["LIBPATCH"] });
+  const [workout] = JSON.parse(read.slice(read.indexOf("[")));
+  assert.equal(typeof workout.revision, "string");
+  const { result, staged } = await propose([{ op: "patch", workout_id: "LIBPATCH", revision: workout.revision, set: { "/steps/0/target_duration_seconds": 300 }, unset: ["/description"] }]);
+  assert.equal(result.ok, true, JSON.stringify(result));
+  assert.equal(coros.state.writes.length, 0);
+  const applied = await changes.applyScheduleChange(staged.changeSetId);
+  assert.equal(applied.lines[0].status, "applied", JSON.stringify(applied));
+  assert.equal(coros.writesTo("/training/program/update").length, 1);
+  const updated = coros.state.libraryPrograms.get("LIBPATCH");
+  assert.equal(updated.id, "LIBPATCH");
+  assert.equal(updated.overview, "");
+  assert.equal(updated.exercises[0].targetValue, 300);
+  assert.equal(updated.exercises[0].id, "70");
+  assert.equal(updated.privateProgramField, "preserved");
+});
+
+test("invalid patch batches and duplicate targets never leave a proposal or a write", async () => {
+  const coros = fakeCoros();
+  coros.library("LIBPATCH", "Patch run");
+  coros.state.libraryPrograms.set("LIBPATCH", { id: "LIBPATCH", ...patchProgram() });
+  const valid = { op: "patch", workout_id: "LIBPATCH", set: { "/description": "New" } };
+  const bad = await propose([valid, { ...valid, set: { "/steps": [] } }]);
+  assert.equal(bad.result.ok, false);
+  assert.equal(bad.staged, undefined);
+  const byteLimit = await propose([{ ...valid, set: { "/description": "Ấ".repeat(67) } }]);
+  assert.equal(byteLimit.result.ok, false);
+  assert.match(byteLimit.result.errors.join(" "), /200 UTF-8 bytes/);
+  const duplicate = await propose([valid, valid]);
+  assert.equal(duplicate.result.ok, false);
+  assert.equal(coros.state.writes.length, 0);
+});
+
+test("a patch of a running plan occurrence keeps it in that plan", async () => {
+  const coros = fakeCoros();
+  coros.runningCopy("PATCHCOPY", tomorrow, [["1", 1, "Patch run"]]);
+  Object.assign(coros.copy("PATCHCOPY").programs[0], patchProgram());
+  const day = dayOf(tomorrow, 1);
+  const { result, staged } = await propose([{ op: "patch", session: { plan_id: "PATCHCOPY", id_in_plan: "1", date: day }, set: { "/description": "Occurrence note" } }]);
+  assert.equal(result.ok, true, JSON.stringify(result));
+  const applied = await changes.applyScheduleChange(staged.changeSetId);
+  assert.equal(applied.lines[0].status, "applied", JSON.stringify(applied));
+  assert.equal(coros.copy("PATCHCOPY").programs[0].overview, "Occurrence note");
+  assert.equal(coros.copy("PATCHCOPY").entities[0].idInPlan, "1");
+  assert.equal(coros.writesTo("/training/plan/update").length, 0);
 });
 
 let failed = 0;

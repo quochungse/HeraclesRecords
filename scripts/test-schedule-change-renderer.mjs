@@ -337,6 +337,27 @@ async function main() {
   await waitFor(() => harness("exists", ".plan-session"), "the session opens");
   assert.equal(await harness("exists", ".plan-session-ask"), false, "no button without somewhere to send it");
 
+  // Partial updates use the same review and Apply flow, with a current/proposed view.
+  const patchSet = {
+    ...SET,
+    lines: [line("p1", "patch", 'Update "Easy" in the workout library', "proposed", {
+      program: { id: "LIB1", name: "Easy" },
+      patch: { ref: { kind: "library", programId: "LIB1" }, revision: "revision-1", changes: { set: { "/description": "Relax shoulders" } } },
+      workout: { key: "easy", name: "Easy", description: "Relax shoulders", sport: "run", steps: [{ kind: "training", target_type: "time", target_duration_seconds: 600, intensity: { type: "none" } }] }
+    })]
+  };
+  await harness("mount", "ChatView", {}, {
+    ...BASE_SCRIPT, getScheduleChanges: [patchSet],
+    applyScheduleChange: { ...patchSet, lines: [{ ...patchSet.lines[0], status: "applied" }] }
+  });
+  await waitFor(() => harness("exists", '[data-op="patch"] .chat-change-apply'), "a partial update can be applied");
+  assert.match(await harness("text", ".chat-change-line-label"), /Update "Easy"/);
+  assert.equal(await harness("exists", ".chat-change-line-open"), true, "the update opens a review");
+  await harness("clearCalls");
+  await harness("click", ".chat-change-apply");
+  await waitFor(async () => (await lineStates())[0][0] === "applied", "the partial update is settled");
+  assert.deepEqual((await harness("calls", "applyScheduleChange"))[0].args, ["sc-1", "p1"]);
+
   const errors = await harness("consoleErrors");
   assert.deepEqual(errors.filter((text) => !/act\(|ReactDOMTestUtils|COROS is away/.test(text)), []);
   console.log("schedule change renderer tests passed");

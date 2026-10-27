@@ -13,7 +13,7 @@ import type {
 import type { WorkoutView } from "../calendar/WorkoutViewModal";
 import { getIntlLocale, getLocale, messageRecord, plural, screenSentence, t, type MessageKey } from "../i18n/core";
 
-const KNOWN_OPS: ReadonlySet<string> = new Set(["move", "replace", "remove", "add", "deleteWorkout"]);
+const KNOWN_OPS: ReadonlySet<string> = new Set(["move", "replace", "patch", "remove", "add", "deleteWorkout"]);
 
 /** A line this build can apply: an op a newer build added is drawn and left alone, as the main process leaves it. */
 export function canApply(line: ScheduleChangeLine): boolean {
@@ -166,6 +166,10 @@ export function changeLineLabel(line: ScheduleChangeLine): string {
   const plan = session ? planOf(line.label, session.name) : "";
   const quoted = (name: string) => t("chat.change.line.quoted", { name });
   switch (line.op) {
+    case "patch": {
+      const name = session?.name ?? line.program?.name ?? line.workout?.name;
+      return name ? `${t("library.ed.editName", { name: quoted(name) })}${session ? ` · ${changeDayLabel(session.happenDay)}` : ""}` : line.label;
+    }
     case "move":
       return session && line.toDay
         ? t("chat.change.line.move", { name: quoted(session.name), plan, from: changeDayLabel(session.happenDay), to: changeDayLabel(line.toDay) })
@@ -234,6 +238,12 @@ export function lineViews(line: ScheduleChangeLine): WorkoutView[] {
   switch (line.op) {
     case "move":
       views.push(session ? onCalendar(applied && line.toDay ? line.toDay : session.happenDay) : undefined);
+      break;
+    case "patch":
+      if (line.patch?.ref.kind === "library") {
+        views.push({ id: "current", label: t("chat.change.view.current"), source: { kind: "library", programId: line.patch.ref.programId } });
+      } else if (session) views.push(onCalendar(session.happenDay));
+      if (!applied) views.push(proposed);
       break;
     case "remove":
       if (!applied && session) views.push(onCalendar(session.happenDay));

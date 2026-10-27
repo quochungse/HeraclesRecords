@@ -129,7 +129,7 @@ test("session notes survive drafting, reading and revising plans and standalone 
     const { response } = await revise({
       draft_id: preview.draftId,
       summary: "Add a hydration reminder",
-      ops: [{ op: "replace_session", key: session.key, workout: { ...read.workouts[0], description: revisedDescription } }]
+      ops: [{ op: "patch_session", key: session.key, set: { "/description": revisedDescription } }]
     });
     assert.equal(response.ok, true, JSON.stringify(response));
     const row = database.getChatPlanDraft(response.draft_id);
@@ -416,7 +416,7 @@ test("a workout takes a whole new workout and keeps its day", async () => {
     ops: [{ op: "move_session", key: "hill-repeats", schedule_date: "20991004" }]
   });
   assert.equal(moved.response.ok, false);
-  assert.match(moved.response.errors[0], /only replace_session and rename/);
+  assert.match(moved.response.errors[0], /only patch_session, replace_session and rename/);
 
   const { response, card } = await revise({
     draft_id: single.draftId,
@@ -557,6 +557,30 @@ test("removing a creation lets every version go", () => {
   for (const id of ids) {
     assert.equal(database.getChatPlanDraft(id), undefined, `${id} is gone`);
   }
+});
+
+test("partial revisions preserve nested steps and placement, reject stale and invalid edits atomically", async () => {
+  const session = run("Patch intervals", 600, { week: 1, day: "tue" });
+  session.steps.push({ repeat: 4, steps: run("Interval", 120).steps });
+  const initial = await draft("draft_training_plan", { name: "Patch block", workouts: [session] });
+  const { response } = await revise({ draft_id: initial.draftId, summary: "Shorter intervals", ops: [
+    { op: "patch_session", key: session.key, set: { "/steps/1/steps/0/target_duration_seconds": 90, "/steps/1/repeat": 3 } }
+  ] });
+  assert.equal(response.ok, true, JSON.stringify(response));
+  const revised = tools.planDraftDocument(response.draft_id).entries[0];
+  assert.equal(revised.dayIndex, 1);
+  assert.equal(revised.workout.steps[1].repeat, 3);
+  assert.equal(revised.workout.steps[1].steps[0].target_duration_seconds, 90);
+  const stale = await revise({ draft_id: initial.draftId, summary: "Old version", ops: [{ op: "patch_session", key: session.key, set: { "/description": "Old" } }] });
+  assert.equal(stale.response.error_code, "not_latest_version");
+  const bad = await revise({ draft_id: response.draft_id, summary: "Invalid batch", ops: [
+    { op: "patch_session", key: session.key, set: { "/name": "Should not land" } },
+    { op: "patch_session", key: session.key, set: { "/description": "Ấ".repeat(67) } }
+  ] });
+  assert.equal(bad.response.ok, false);
+  assert.match(bad.response.errors.join(" "), /200 UTF-8 bytes/);
+  assert.equal(tools.planArtifacts([initial.draftId]).length, 2);
+  assert.equal(tools.planDraftDocument(response.draft_id).entries[0].workout.name, session.name);
 });
 
 let failed = 0;

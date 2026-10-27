@@ -202,6 +202,11 @@ assert.equal(reviseWorkout.type, "object");
 assert.equal(reviseWorkout.properties, undefined, "an open object, not the workout schema again");
 assert.equal(reviseWorkout.additionalProperties, true, "Claude Code rebuilds it through zod, which must keep its keys");
 assert.ok(JSON.stringify(buildRevisePlanInputSchema()).length < 2_500, "the revision schema is its ops, not a workout");
+const revisionSchema = buildRevisePlanInputSchema();
+assert.ok(revisionSchema.properties.ops.items.properties.op.enum.includes("patch_session"));
+const patchValidator = z.fromJSONSchema(revisionSchema);
+const tinyPatch = { draft_id: "draft", summary: "Add note", ops: [{ op: "patch_session", key: "easy", set: { "/description": "Relax shoulders.", "/steps/0/target_duration_seconds": 300 }, unset: ["/steps/0/overview"] }] };
+assert.deepEqual(patchValidator.parse(tinyPatch), tinyPatch, "provider schema bridges must retain path keys and typed values");
 
 // Representative typed result for: “Create a 5 km run at 135–145 bpm.”
 const heartRateDraft = {

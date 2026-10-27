@@ -9,6 +9,8 @@
  * the checks and the card are the caller's.
  */
 import type { CorosTrainingPlanDraft } from "./corosWorkoutBuilder";
+import { applyWorkoutPatch } from "./workoutPatch";
+import type { PlanWorkoutEntryInput } from "./types";
 import {
   COROS_WEEK_STAGES,
   formatPlanDay,
@@ -21,6 +23,7 @@ export const PLAN_DAYS = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"] as co
 export const PLAN_REVISION_OPS = [
   "move_session",
   "replace_session",
+  "patch_session",
   "remove_session",
   "add_session",
   "set_week_stage",
@@ -31,7 +34,7 @@ export const PLAN_REVISION_OPS = [
 export type PlanRevisionOp = (typeof PLAN_REVISION_OPS)[number];
 
 /** Only these apply to a one-off workout: it has one session and no weeks. */
-const WORKOUT_OPS: ReadonlySet<string> = new Set(["replace_session", "rename"]);
+const WORKOUT_OPS: ReadonlySet<string> = new Set(["replace_session", "patch_session", "rename"]);
 
 type DraftArgs = Record<string, unknown> & {
   name: string;
@@ -157,11 +160,25 @@ export function applyPlanRevision(
       return;
     }
     if (artifactType === "workout" && !WORKOUT_OPS.has(op)) {
-      errors.push(`${label}: a single workout takes only replace_session and rename.`);
+      errors.push(`${label}: a single workout takes only patch_session, replace_session and rename.`);
       return;
     }
     const key = text(raw.key);
     switch (op as PlanRevisionOp) {
+      case "patch_session": {
+        const at = artifactType === "workout" && !key ? 0 : find(key);
+        if (at < 0 || !args.workouts[at]) {
+          errors.push(`${label}: no session with key "${key}".`);
+          return;
+        }
+        try {
+          args.workouts[at] = applyWorkoutPatch(args.workouts[at] as unknown as PlanWorkoutEntryInput, raw) as unknown as Record<string, unknown>;
+          if (artifactType === "workout") args.name = String(args.workouts[at].name);
+        } catch (error) {
+          errors.push(`${label}: ${error instanceof Error ? error.message : String(error)}`);
+        }
+        return;
+      }
       case "move_session": {
         const at = find(key);
         if (at < 0) {
