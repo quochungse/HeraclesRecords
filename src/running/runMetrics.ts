@@ -536,7 +536,7 @@ const MAX_HR_EASY_ZONE_SHIFT = 1;
  * average and easy by the clock, so the intensity panel called most of the
  * running easy while the efficiency chart beside it left those runs out.
  */
-function intensityForZone(zone: number, family: CorosProfileZoneFamily): RunIntensity {
+export function intensityForZone(zone: number, family: CorosProfileZoneFamily): RunIntensity {
   const position = zone - (family === "maxHr" ? MAX_HR_EASY_ZONE_SHIFT : 0);
   if (position <= 2) {
     return "easy";

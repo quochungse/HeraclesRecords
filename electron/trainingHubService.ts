@@ -4712,10 +4712,10 @@ function parseAnalytics(raw: Record<string, unknown>): TrainingHubAnalytics {
  * every session, so seven distance-less strength workouts sat in the first
  * bucket, reading 8 where the honest answer was 1.
  *
- * The panel now uses those same 5 km boundaries, but tallies the activity
- * list itself so distance-less sessions stay out — see
- * `src/training/distanceZones.ts`. Parsing these again would only invite the
- * unstated boundaries and the padded first bucket back.
+ * Overview stopped drawing distance zones on 2026-10-27; the panel that did
+ * had tallied the activity list itself on those 5 km boundaries. Parsing
+ * these again would only invite the unstated boundaries and the padded first
+ * bucket back.
  */
 function parseZoneDistributions(
   summary: Record<string, unknown>

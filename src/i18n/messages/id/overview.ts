@@ -241,6 +241,19 @@ const overview: OverviewMessages = {
   "overview.comingUp.doneOf": "{done} dari {total} selesai",
   "overview.comingUp.nextDays": "Hari berikutnya",
   "overview.comingUp.nothingNext": "Tidak ada lagi di kalender dalam dua minggu ke depan.",
+  "overview.heatmap.title": "Aktivitas latihan",
+  "overview.distribution.title": "Distribusi beban latihan",
+  "overview.distribution.bySport": "Per olahraga",
+  "overview.distribution.loadTotal": "Total beban {load}",
+  "overview.distribution.noLoad": "Tidak ada beban latihan dalam empat minggu terakhir.",
+  "overview.distribution.byZone": "Per zona detak jantung",
+  "overview.distribution.measure": "Ukuran zona",
+  "overview.distribution.easy": "ringan",
+  "overview.distribution.ofTime": "dari {time} dengan detak jantung",
+  "overview.distribution.ofLoad": "dari beban {load} dengan detak jantung",
+  "overview.distribution.easyShare": "Ringan {percent}",
+  "overview.distribution.moderateShare": "Sedang {percent}",
+  "overview.distribution.hardShare": "Berat {percent}",
 };
 
 export default overview;

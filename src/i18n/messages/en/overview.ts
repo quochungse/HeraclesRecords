@@ -242,6 +242,19 @@ const overview = {
   "overview.comingUp.doneOf": "{done} of {total} done",
   "overview.comingUp.nextDays": "Next days",
   "overview.comingUp.nothingNext": "Nothing else on the calendar in the next two weeks.",
+  "overview.heatmap.title": "Training activity",
+  "overview.distribution.title": "Training load distribution",
+  "overview.distribution.bySport": "By sport",
+  "overview.distribution.loadTotal": "{load} load in total",
+  "overview.distribution.noLoad": "No training load in the last four weeks.",
+  "overview.distribution.byZone": "By heart-rate zone",
+  "overview.distribution.measure": "Zone measure",
+  "overview.distribution.easy": "easy",
+  "overview.distribution.ofTime": "of {time} with heart rate",
+  "overview.distribution.ofLoad": "of {load} load with heart rate",
+  "overview.distribution.easyShare": "Easy {percent}",
+  "overview.distribution.moderateShare": "Moderate {percent}",
+  "overview.distribution.hardShare": "Hard {percent}",
 };
 
 export default overview;

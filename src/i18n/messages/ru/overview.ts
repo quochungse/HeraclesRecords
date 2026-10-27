@@ -259,6 +259,19 @@ const overview: OverviewMessages = {
   "overview.comingUp.doneOf": "выполнено {done} из {total}",
   "overview.comingUp.nextDays": "Следующие дни",
   "overview.comingUp.nothingNext": "В ближайшие две недели в календаре больше ничего нет.",
+  "overview.heatmap.title": "Тренировочная активность",
+  "overview.distribution.title": "Распределение нагрузки",
+  "overview.distribution.bySport": "По видам спорта",
+  "overview.distribution.loadTotal": "Всего нагрузки: {load}",
+  "overview.distribution.noLoad": "За последние четыре недели тренировочной нагрузки нет.",
+  "overview.distribution.byZone": "По пульсовым зонам",
+  "overview.distribution.measure": "Мера по зонам",
+  "overview.distribution.easy": "легко",
+  "overview.distribution.ofTime": "из {time} с пульсом",
+  "overview.distribution.ofLoad": "из {load} нагрузки с пульсом",
+  "overview.distribution.easyShare": "Легко {percent}",
+  "overview.distribution.moderateShare": "Умеренно {percent}",
+  "overview.distribution.hardShare": "Тяжело {percent}",
 };
 
 export default overview;

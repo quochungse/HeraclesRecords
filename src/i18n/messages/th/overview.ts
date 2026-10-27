@@ -241,6 +241,19 @@ const overview: OverviewMessages = {
   "overview.comingUp.doneOf": "เสร็จแล้ว {done} จาก {total}",
   "overview.comingUp.nextDays": "วันถัดไป",
   "overview.comingUp.nothingNext": "ไม่มีอะไรอื่นในปฏิทินอีกในสองสัปดาห์ข้างหน้า",
+  "overview.heatmap.title": "กิจกรรมการฝึก",
+  "overview.distribution.title": "การกระจายภาระการฝึก",
+  "overview.distribution.bySport": "ตามกีฬา",
+  "overview.distribution.loadTotal": "ภาระรวม {load}",
+  "overview.distribution.noLoad": "ไม่มีภาระการฝึกในสี่สัปดาห์ที่ผ่านมา",
+  "overview.distribution.byZone": "ตามโซนหัวใจ",
+  "overview.distribution.measure": "หน่วยวัดของโซน",
+  "overview.distribution.easy": "เบา",
+  "overview.distribution.ofTime": "จาก {time} ที่มีอัตราการเต้นหัวใจ",
+  "overview.distribution.ofLoad": "จากภาระ {load} ที่มีอัตราการเต้นหัวใจ",
+  "overview.distribution.easyShare": "เบา {percent}",
+  "overview.distribution.moderateShare": "ปานกลาง {percent}",
+  "overview.distribution.hardShare": "หนัก {percent}",
 };
 
 export default overview;

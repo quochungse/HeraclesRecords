@@ -16,10 +16,10 @@ import {
   RefreshCw
 } from "lucide-react";
 import { OverviewComingUp } from "./overview/OverviewComingUp";
+import { OverviewDistribution } from "./overview/OverviewDistribution";
 import { OverviewToday } from "./overview/OverviewToday";
 import { TrainingHeatmapPanel } from "./components/TrainingHeatmapPanel";
 import { TrainingTrendCharts } from "./components/TrainingTrendChart";
-import { TrainingZoneDistributionCharts } from "./components/TrainingZoneDistributionCharts";
 import { snapshotVo2Readings } from "./parsers";
 import { renderRich } from "../i18n/useI18n";
 import type { TrainingOverviewProps } from "./types";
@@ -436,18 +436,21 @@ export function TrainingOverview({
             onOpenCalendar={onOpenView ? () => onOpenView("calendar") : undefined}
           />
 
-          <div className="training-heatmap-wrap">
+          <section className="overview-section" aria-labelledby="overview-heat-title">
+            <h2 id="overview-heat-title" className="overview-section-title">
+              {t("overview.heatmap.title")}
+            </h2>
             <TrainingHeatmapPanel
               snapshot={snapshot}
               activities={activities}
               loading={snapshotPending || activitiesPending}
             />
-          </div>
-          <TrainingZoneDistributionCharts
-            hrZoneModel={hrZoneModel}
-            lthrZones={snapshot?.dashboard?.lthrZones ?? []}
+          </section>
+          <OverviewDistribution
             activities={activities}
             analytics={snapshot?.analytics ?? null}
+            hrZoneModel={hrZoneModel}
+            lthrZones={snapshot?.dashboard?.lthrZones ?? []}
             loading={snapshotPending || activitiesPending}
           />
           {showStrength ? (

@@ -241,6 +241,19 @@ const overview: OverviewMessages = {
   "overview.comingUp.doneOf": "已完成 {done}/{total}",
   "overview.comingUp.nextDays": "接下来几天",
   "overview.comingUp.nothingNext": "未来两周日历上没有其他安排。",
+  "overview.heatmap.title": "训练活动",
+  "overview.distribution.title": "训练负荷分布",
+  "overview.distribution.bySport": "按运动",
+  "overview.distribution.loadTotal": "总负荷 {load}",
+  "overview.distribution.noLoad": "过去四周没有训练负荷。",
+  "overview.distribution.byZone": "按心率区间",
+  "overview.distribution.measure": "区间度量",
+  "overview.distribution.easy": "轻松",
+  "overview.distribution.ofTime": "占有心率记录的 {time}",
+  "overview.distribution.ofLoad": "占有心率记录的负荷 {load}",
+  "overview.distribution.easyShare": "轻松 {percent}",
+  "overview.distribution.moderateShare": "中等 {percent}",
+  "overview.distribution.hardShare": "高强度 {percent}",
 };
 
 export default overview;

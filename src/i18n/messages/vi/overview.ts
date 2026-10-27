@@ -241,6 +241,19 @@ const overview: OverviewMessages = {
   "overview.comingUp.doneOf": "đã tập {done}/{total}",
   "overview.comingUp.nextDays": "Các ngày tới",
   "overview.comingUp.nothingNext": "Lịch không còn gì khác trong hai tuần tới.",
+  "overview.heatmap.title": "Hoạt động tập luyện",
+  "overview.distribution.title": "Phân bổ tải tập luyện",
+  "overview.distribution.bySport": "Theo môn",
+  "overview.distribution.loadTotal": "Tổng {load} tải",
+  "overview.distribution.noLoad": "Không có tải tập luyện nào trong bốn tuần qua.",
+  "overview.distribution.byZone": "Theo vùng nhịp tim",
+  "overview.distribution.measure": "Đơn vị đo theo vùng",
+  "overview.distribution.easy": "nhẹ",
+  "overview.distribution.ofTime": "trên {time} có nhịp tim",
+  "overview.distribution.ofLoad": "trên {load} tải có nhịp tim",
+  "overview.distribution.easyShare": "Nhẹ {percent}",
+  "overview.distribution.moderateShare": "Vừa {percent}",
+  "overview.distribution.hardShare": "Nặng {percent}",
 };
 
 export default overview;

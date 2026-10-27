@@ -241,6 +241,19 @@ const overview: OverviewMessages = {
   "overview.comingUp.doneOf": "{done} de {total} feitos",
   "overview.comingUp.nextDays": "Próximos dias",
   "overview.comingUp.nothingNext": "Nada mais no calendário nas próximas duas semanas.",
+  "overview.heatmap.title": "Atividade de treino",
+  "overview.distribution.title": "Distribuição da carga de treino",
+  "overview.distribution.bySport": "Por esporte",
+  "overview.distribution.loadTotal": "{load} de carga no total",
+  "overview.distribution.noLoad": "Nenhuma carga de treino nas últimas quatro semanas.",
+  "overview.distribution.byZone": "Por zona de frequência cardíaca",
+  "overview.distribution.measure": "Medida das zonas",
+  "overview.distribution.easy": "leve",
+  "overview.distribution.ofTime": "de {time} com frequência cardíaca",
+  "overview.distribution.ofLoad": "de {load} de carga com frequência cardíaca",
+  "overview.distribution.easyShare": "Leve {percent}",
+  "overview.distribution.moderateShare": "Moderado {percent}",
+  "overview.distribution.hardShare": "Intenso {percent}",
 };
 
 export default overview;

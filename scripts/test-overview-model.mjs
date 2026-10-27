@@ -1,7 +1,9 @@
 /**
- * Overview's Readiness panel: where a figure sits on COROS's training status
- * bands, which band it is in, the load reading the trend comes with, and the
- * week drawn a column a day with a block a session — done, and still planned.
+ * Overview's arithmetic. The Readiness panel: where a figure sits on COROS's
+ * training status bands, which band it is in, the load reading the trend comes
+ * with, and the week drawn a column a day with a block a session — done, and
+ * still planned. Training load distribution: load by sport, COROS's zone
+ * lists, and the easy / moderate / hard split.
  *
  * Run through Electron (`ELECTRON_RUN_AS_NODE=1 electron
  * --experimental-strip-types`): this machine's Node is built without Amaro, so
@@ -166,4 +168,58 @@ assert.deepEqual(
   "the leftover load has no icon"
 );
 
-console.log("overview today OK");
+// --- Training load distribution.
+const distributionUrl = pathToFileURL(
+  path.join(repoRoot, "src", "training", "overview", "distributionModel.ts")
+);
+const { sportLoadShares, zoneShares, intensityShares } = await import(
+  `${distributionUrl.href}?cacheBust=${Date.now()}`
+);
+const daysAgo = (days) => Math.floor(now.getTime() / 1000) - days * 86_400;
+const mix = sportLoadShares(
+  [
+    { activityId: "r1", sportType: 100, startTime: daysAgo(2), trainingLoad: 300 },
+    { activityId: "r2", sportType: 102, startTime: daysAgo(9), trainingLoad: 100 },
+    { activityId: "b1", sportType: 200, startTime: daysAgo(3), trainingLoad: 200 },
+    { activityId: "s1", sportType: 402, startTime: daysAgo(5), trainingLoad: 0 },
+    { activityId: "old", sportType: 200, startTime: daysAgo(40), trainingLoad: 900 }
+  ],
+  now
+);
+assert.equal(mix.total, 600, "four weeks of load, the old ride left out");
+assert.deepEqual(
+  mix.sports.map((sport) => [sport.category, sport.load]),
+  [
+    ["run", 400],
+    ["bike", 200]
+  ],
+  "biggest first; a trail run is a run, a session with no load is no sliver"
+);
+close(mix.sports[0].share, 2 / 3, "a sport's share of the load");
+
+const zones = zoneShares([
+  { index: 2, value: 600 },
+  { index: 0, value: 1200 },
+  { index: 1, value: 1800 },
+  { index: 3, value: 300 },
+  { index: 4, value: 100 },
+  { index: 5 }
+]);
+assert.equal(zones.total, 4000);
+assert.deepEqual(zones.rows.map((row) => row.value), [1200, 1800, 600, 300, 100, 0], "easiest first, every zone kept");
+close(zones.rows[1].share, 0.45, "a zone's share of the total");
+assert.deepEqual(zoneShares([{ index: 0 }, { index: 1 }]), { total: 0, rows: [] }, "nothing in any zone is no list");
+const ratioOnly = zoneShares([
+  { index: 0, ratio: 30 },
+  { index: 1, ratio: 70 }
+]);
+close(ratioOnly.rows[1].share, 0.7, "COROS's own ratio stands where it sent one");
+
+const reserve = intensityShares(zones.rows, "restingHr");
+close(reserve.easy, 0.75, "zones 1 and 2 are easy");
+close(reserve.moderate, 0.15, "zone 3 is moderate");
+close(reserve.hard, 0.1, "zones 4 and up are hard");
+const maxHr = intensityShares(zones.rows, "maxHr");
+close(maxHr.easy, 0.9, "under Max HR the easy band reaches a zone further");
+
+console.log("overview model OK");

@@ -2246,7 +2246,7 @@ lives at module level for the same visit-to-visit reason — see `useCalendarDat
   Impact, Base Fitness (`staminaLevel`) and the trend. **Load Impact is the ratio times Base
   Fitness, not `tiredRateNew`**: the Calendar's week tooltip reads that field as Load
   Impact while the screenshot demo fakes it as a fatigue difference (−30 to 40), and nothing
-  here settles which. The arithmetic is `todayModel.ts`; `npm run test:overview-today`.
+  here settles which. The arithmetic is `todayModel.ts`; `npm run test:overview-model`.
   **Coming up** (`OverviewComingUp`, `comingUpModel.ts`) is today on the left and the days
   after on the right, in place of the Upcoming Workouts card. Today pairs the calendar's
   sessions with what was recorded today by sport family (`pairTodayPlan`, which the week
@@ -2258,6 +2258,18 @@ lives at module level for the same visit-to-visit reason — see `useCalendarDat
   right column keeps the old card's rule (all of tomorrow, then up to three rows), the
   heading states the next seven days, and nothing scheduled with nothing done today draws
   no section. `npm run test:overview-renderer` mounts the four states.
+  **Training activity** is the heatmap (`TrainingHeatmapPanel`) under a section name of its
+  own: the range's figures lead inside the panel and its two switches are `tone="quiet"`.
+  **Training load distribution** (`OverviewDistribution`, `distributionModel.ts`) replaced
+  the two donuts: the last four weeks' load by sport as a thin bar in the sport colours,
+  toned down (`filter`) so the zone colours under it stay the louder, each sport's name under
+  its segment; then COROS's own time — or load — per heart-rate zone
+  (`analytics.zoneDistributions.hrTime` / `hrTrainingLoad`, seconds and load, COROS's last
+  four weeks), read first as the easy share against the 80/20 line, split as the Running
+  screen splits it (`intensityForZone`, exported from `runMetrics.ts` for this), then zone
+  by zone in the app's zone colours (`zoneColor`) and COROS's names (`zoneNamesFor`). **Distance
+  zones went with the donuts**, by decision, and `distanceZones.ts` and its suite with them.
+  The screenshot demo's `hrTime` had been in hours; COROS sends seconds.
 - **Sleep** (`sleepDataService`, `sleepHistoryService`, `sleepSeriesService`, `src/sleep/`) —
   nights from the COROS MCP server, cached in `sleep_nights` because COROS keeps only ~9
   weeks. **`totalMinutes` is the main sleep and nothing else** — the stage percentages, the

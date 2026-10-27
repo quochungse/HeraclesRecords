@@ -1075,3 +1075,277 @@
 :root[data-theme="paper"] .overview-plan-today.is-planned > .eyebrow {
   color: var(--accent);
 }
+
+/* ── Training load distribution ─────────────────────────────────────────── */
+
+.overview-dist {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  padding: 20px;
+}
+
+.overview-dist-part + .overview-dist-part {
+  padding-top: 18px;
+  border-top: 1px solid var(--overview-rule);
+}
+
+.overview-dist-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+  margin: 0 0 12px;
+  color: var(--text-primary);
+  font-size: 13px;
+  line-height: 1.3;
+}
+
+.overview-dist-head strong {
+  font-weight: 600;
+}
+
+.overview-dist-aside {
+  color: var(--text-muted);
+}
+
+.overview-dist-head > :last-child:not(:first-child) {
+  margin-left: auto;
+}
+
+.overview-dist-empty {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+/* Load by sport: a thin bar in the sports' colours, toned down so the zone
+   colours below stay the louder of the two, and each sport's name under its
+   own segment. */
+.overview-dist-sports {
+  display: flex;
+  gap: 3px;
+  height: 8px;
+  filter: saturate(0.62) brightness(0.88);
+}
+
+.overview-dist-sports i {
+  --segment: var(--sport-other);
+  display: block;
+  min-width: 3px;
+  border-radius: var(--radius-xs);
+  background: var(--segment);
+}
+
+.overview-dist-sports i:first-child {
+  border-radius: var(--radius-pill) var(--radius-xs) var(--radius-xs) var(--radius-pill);
+}
+
+.overview-dist-sports i:last-child {
+  border-radius: var(--radius-xs) var(--radius-pill) var(--radius-pill) var(--radius-xs);
+}
+
+.overview-dist-sports i:only-child {
+  border-radius: var(--radius-pill);
+}
+
+.overview-dist-sports [data-sport="run"] { --segment: var(--sport-run); }
+.overview-dist-sports [data-sport="bike"] { --segment: var(--sport-bike); }
+.overview-dist-sports [data-sport="hiking"] { --segment: var(--sport-hiking); }
+.overview-dist-sports [data-sport="strength"] { --segment: var(--sport-strength); }
+
+.overview-dist-sport-labels {
+  display: flex;
+  gap: 3px;
+  margin: 10px 0 0;
+  padding: 0;
+  list-style: none;
+  color: var(--text-secondary);
+  font-size: 12px;
+  line-height: 1.3;
+}
+
+.overview-dist-sport-labels li {
+  min-width: 0;
+  white-space: nowrap;
+}
+
+/* The smallest share comes last and its segment is often narrower than its
+   name: it stands at the bar's end and runs back over the room the larger
+   segment before it leaves. */
+.overview-dist-sport-labels li:last-child:not(:first-child) {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.overview-dist-sport-labels .figure {
+  margin-left: 6px;
+  color: var(--text-primary);
+  font-size: 12px;
+}
+
+/* By zone: the easy share against the 80/20 line beside the zones. */
+.overview-dist-body {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 32px;
+}
+
+.overview-dist-summary {
+  flex: 1 1 260px;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.overview-dist-easy {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin: 0;
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+.overview-dist-easy .figure {
+  font-size: 36px;
+  line-height: 1;
+}
+
+.overview-dist-easy small {
+  font-size: 18px;
+}
+
+.overview-dist-caption {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 12px;
+  line-height: 1.3;
+}
+
+.overview-dist-split {
+  position: relative;
+  margin-top: 6px;
+}
+
+.overview-dist-split-bar {
+  display: flex;
+  gap: 2px;
+  height: 10px;
+  overflow: hidden;
+  border-radius: var(--radius-pill);
+}
+
+.overview-dist-split-bar i {
+  display: block;
+  min-width: 0;
+}
+
+.overview-dist-split b {
+  position: absolute;
+  top: -4px;
+  width: 2px;
+  height: 18px;
+  margin-left: -1px;
+  border-radius: var(--radius-xs);
+  background: var(--text-primary);
+}
+
+/* Easy to hard in the accent's own steps, deepest for the hardest. */
+.overview-dist [data-intensity="easy"] { --intensity: color-mix(in srgb, var(--accent) 42%, transparent); }
+.overview-dist [data-intensity="moderate"] { --intensity: color-mix(in srgb, var(--accent) 72%, transparent); }
+.overview-dist [data-intensity="hard"] { --intensity: var(--accent-strong); }
+
+.overview-dist-split-bar [data-intensity] {
+  background: var(--intensity);
+}
+
+.overview-dist-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 16px;
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 12px;
+  line-height: 1.3;
+}
+
+.overview-dist-legend span::before {
+  content: "";
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  margin-right: 6px;
+  border-radius: var(--radius-xs);
+  background: var(--intensity);
+}
+
+.overview-dist-zones {
+  flex: 2 1 440px;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.overview-dist-zones li {
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1.3fr) minmax(0, 1fr) 64px 40px;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 0;
+  font-size: 13px;
+  line-height: 1.3;
+}
+
+.overview-dist-zones li + li {
+  border-top: 1px solid var(--overview-rule);
+}
+
+.overview-dist-zone {
+  color: var(--text-muted);
+  font-weight: 600;
+}
+
+.overview-dist-zone-name {
+  min-width: 0;
+  color: var(--text-primary);
+}
+
+.overview-dist-zone-name span {
+  margin-left: 6px;
+  color: var(--text-muted);
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.overview-dist-zones i {
+  display: block;
+  height: 6px;
+  border-radius: var(--radius-pill);
+  background:
+    linear-gradient(90deg, var(--zone-colour) var(--zone-fill), transparent 0),
+    color-mix(in srgb, var(--text-primary) 8%, transparent);
+}
+
+.overview-dist-zones .figure {
+  color: var(--text-primary);
+  font-size: 13px;
+  text-align: right;
+}
+
+.overview-dist-zone-share {
+  color: var(--text-secondary);
+  font-size: 12px;
+  text-align: right;
+}
+
+:root[data-theme="paper"] .overview-dist-sports {
+  filter: saturate(0.8);
+}
+
+:root[data-theme="paper"] .overview-dist [data-intensity="easy"] { --intensity: var(--hall-gold-light); }
+:root[data-theme="paper"] .overview-dist [data-intensity="moderate"] { --intensity: var(--hall-gold); }
+:root[data-theme="paper"] .overview-dist [data-intensity="hard"] { --intensity: var(--hall-gold-deep); }

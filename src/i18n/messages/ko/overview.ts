@@ -241,6 +241,19 @@ const overview: OverviewMessages = {
   "overview.comingUp.doneOf": "{total}개 중 {done}개 완료",
   "overview.comingUp.nextDays": "다음 날들",
   "overview.comingUp.nothingNext": "앞으로 2주 동안 캘린더에 다른 일정이 없습니다.",
+  "overview.heatmap.title": "훈련 활동",
+  "overview.distribution.title": "훈련 부하 분포",
+  "overview.distribution.bySport": "종목별",
+  "overview.distribution.loadTotal": "총 부하 {load}",
+  "overview.distribution.noLoad": "지난 4주 동안 훈련 부하가 없습니다.",
+  "overview.distribution.byZone": "심박 구간별",
+  "overview.distribution.measure": "구간 측정 기준",
+  "overview.distribution.easy": "쉬움",
+  "overview.distribution.ofTime": "심박이 기록된 {time} 중",
+  "overview.distribution.ofLoad": "심박이 기록된 부하 {load} 중",
+  "overview.distribution.easyShare": "쉬움 {percent}",
+  "overview.distribution.moderateShare": "보통 {percent}",
+  "overview.distribution.hardShare": "힘듦 {percent}",
 };
 
 export default overview;

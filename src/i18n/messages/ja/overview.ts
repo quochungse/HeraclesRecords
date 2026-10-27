@@ -241,6 +241,19 @@ const overview: OverviewMessages = {
   "overview.comingUp.doneOf": "{total} 件中 {done} 件完了",
   "overview.comingUp.nextDays": "この先の日",
   "overview.comingUp.nothingNext": "今後 2 週間、カレンダーにほかの予定はありません。",
+  "overview.heatmap.title": "トレーニング活動",
+  "overview.distribution.title": "トレーニング負荷の配分",
+  "overview.distribution.bySport": "スポーツ別",
+  "overview.distribution.loadTotal": "合計負荷 {load}",
+  "overview.distribution.noLoad": "過去 4 週間にトレーニング負荷はありません。",
+  "overview.distribution.byZone": "心拍ゾーン別",
+  "overview.distribution.measure": "ゾーンの指標",
+  "overview.distribution.easy": "イージー",
+  "overview.distribution.ofTime": "心拍のある {time} のうち",
+  "overview.distribution.ofLoad": "心拍のある負荷 {load} のうち",
+  "overview.distribution.easyShare": "イージー {percent}",
+  "overview.distribution.moderateShare": "中程度 {percent}",
+  "overview.distribution.hardShare": "ハード {percent}",
 };
 
 export default overview;
