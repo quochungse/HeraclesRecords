@@ -1,18 +1,16 @@
 // The arithmetic under the Overview's body figure, out of the component so a
-// suite can reach it and so the panel can place its words without loading the
-// figure. Node-free.
+// suite can reach it and so the column can colour its words without loading
+// the figure. Node-free.
 
 import { shapeBlend, type BakedBody, type FigureSex } from "./physique";
 
 /**
  * Where the figure stands in its frame, as fractions of the frame's height
  * from the bottom: the soles at `feet`, the top of the head at `feet + span`.
- * The stylesheet places the drawing so (`.body-figure`), and the panel draws
- * the recovery level against it, so the two agree by construction. A stage
- * narrower than `WIDE_STAGE_MIN_PX` has no room beside the figure for the
- * words, so the figure stands higher and the words go under its feet; a wide
- * one keeps the words on the fill line. The width and both frames are the
- * stylesheet's container query on `.recovery-figure` too — change both.
+ * The stylesheet places the drawing so (`.body-figure`). A stage narrower than
+ * `WIDE_STAGE_MIN_PX` stands the figure higher, clear of the floor; a wide one
+ * gives it the height. The width and both frames are the stylesheet's
+ * container query on `.recovery-figure` too — change both.
  */
 export const WIDE_STAGE_MIN_PX = 560;
 export const WIDE_FRAME = { feet: 0.05, span: 0.88 };
@@ -176,12 +174,4 @@ export function lineBrightness(positions: Float32Array, edges: Uint16Array, powe
     out[i] = count[i] ? Math.min(1, Math.max(floor, Math.pow(sum[i] / count[i] / reference, power))) : 0;
   }
   return out;
-}
-
-/**
- * Where the line for `level` (0–1) sits on a wide stage, as a fraction of the
- * frame from the bottom — the only layout that draws the words on it.
- */
-export function levelInFrame(level: number): number {
-  return WIDE_FRAME.feet + WIDE_FRAME.span * Math.min(1, Math.max(0, level));
 }

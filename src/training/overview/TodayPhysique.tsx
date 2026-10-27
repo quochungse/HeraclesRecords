@@ -1,6 +1,6 @@
 import { Suspense, lazy, type CSSProperties } from "react";
 import { recoveryTone } from "../parsers";
-import { figureColourFor, levelInFrame } from "../body/bodyFigureMath";
+import { figureColourFor } from "../body/bodyFigureMath";
 import { DEFAULT_SHAPE, readFirmness, readPhysique, type Vo2Reading } from "../body/physique";
 import { getLocalHappenDayKey } from "../formatters";
 import { useFigureSample } from "../body/sampleFigure";
@@ -9,23 +9,39 @@ import type { TrainingSummaryMetrics } from "../types";
 import { t } from "../../i18n/core";
 import { useI18n } from "../../i18n/useI18n";
 
-// The baked bodies (175 KB) stay out of Overview's chunk; the panel's words do
-// not wait on them.
+// The baked bodies (175 KB) stay out of Overview's chunk; the column's words
+// do not wait on them.
 const LazyBodyFigure = lazy(() =>
   import("../body/BodyFigure").then(({ BodyFigure }) => ({ default: BodyFigure }))
 );
 
-/** The level label never climbs so high that its words leave the stage. */
-const LEVEL_LABEL_CEILING = 0.8;
+/** COROS's three recovery bands, in its words; a reading still on its way says so. */
+function recoveryWord(tone: "low" | "mid" | "high" | "neutral", waiting: boolean): string {
+  if (waiting) {
+    return t("overview.recovery.reading.label");
+  }
+  switch (tone) {
+    case "high":
+      return t("overview.recovery.high.label");
+    case "mid":
+      return t("overview.recovery.mid.label");
+    case "low":
+      return t("overview.recovery.low.label");
+    default:
+      return t("overview.recovery.waiting.label");
+  }
+}
 
-interface RecoveryPanelProps {
+/**
+ * The Today panel's first column: the athlete's figure lit from the feet up to
+ * COROS's recovery %, with the figure and its stage exactly as the Recovery
+ * card drew them (styles.css, `.recovery-figure`), and the reading under it.
+ * The column is a subgrid of the panel, so its stage takes the rows the Sleep
+ * and This week columns lay out beside it, whatever height they come to.
+ */
+export function TodayPhysique(props: {
   summary: TrainingSummaryMetrics;
-  /**
-   * The snapshot has not arrived. Without it the panel falls to its neutral
-   * tone, whose line is "Sync your watch to see live recovery guidance here" —
-   * a job for the athlete, handed to them on every launch while the app was
-   * mid-request and about to fill the figure in by itself.
-   */
+  /** The snapshot has not arrived; the reading says it is on its way. */
   loading?: boolean;
   /** The COROS profile, for the figure's sex, height and weight. */
   profile: CorosProfile | null;
@@ -33,36 +49,7 @@ interface RecoveryPanelProps {
   profileSettled: boolean;
   /** COROS's VO2max by day, which tones the figure (`readFirmness`). */
   vo2Readings: readonly Vo2Reading[];
-}
-
-function readinessCopy(
-  tone: "low" | "mid" | "high" | "neutral"
-): { label: string; message: string } {
-  switch (tone) {
-    case "high":
-      return {
-        label: t("overview.recovery.high.label"),
-        message: t("overview.recovery.high.message")
-      };
-    case "mid":
-      return {
-        label: t("overview.recovery.mid.label"),
-        message: t("overview.recovery.mid.message")
-      };
-    case "low":
-      return {
-        label: t("overview.recovery.low.label"),
-        message: t("overview.recovery.low.message")
-      };
-    default:
-      return {
-        label: t("overview.recovery.waiting.label"),
-        message: t("overview.recovery.waiting.message")
-      };
-  }
-}
-
-export function RecoveryPanel(props: RecoveryPanelProps) {
+}) {
   useI18n();
   // A development build's Sample menu can stand in for the profile and the
   // recovery % (sampleFigure.ts); otherwise this is COROS's answer as given.
@@ -82,37 +69,28 @@ export function RecoveryPanel(props: RecoveryPanelProps) {
   const hasData = percent > 0;
   // The words follow COROS's three bands; the colour runs with the figure.
   const colour = figureColourFor(percent);
-  const waiting = loading && !hasData;
-  const { label, message } = waiting
-    ? { label: t("overview.recovery.reading.label"), message: t("overview.recovery.reading.message") }
-    : readinessCopy(hasData ? recoveryTone(percent) : "neutral");
+  const word = recoveryWord(hasData ? recoveryTone(percent) : "neutral", loading && !hasData);
   const body = readPhysique(profile);
   const firmness = readFirmness(profile, vo2Readings, today);
-  // Under the figure's feet; where the stage is wide enough to hold them
-  // beside the figure, on the fill line instead (halfway up with no level).
-  const labelBottom = hasData
-    ? Math.min(levelInFrame(percent / 100), LEVEL_LABEL_CEILING)
-    : 0.5;
   const figureDescription = [
     body.shape !== undefined
       ? t("overview.physique.drawnFrom", { height: profile?.statureCm ?? "", weight: profile?.weightKg ?? "" })
       : null,
-    hasData ? t("overview.recovery.percent", { percent }) : label
+    hasData ? t("overview.recovery.percent", { percent }) : word
   ]
     .filter(Boolean)
     .join(", ");
 
   return (
-    <section
-      className={`panel training-recovery-panel${colour ? "" : " tone-neutral"}`}
+    <div
+      className={`overview-physique training-recovery-panel${colour ? "" : " tone-neutral"}`}
       style={colour ? ({ "--recovery-tone": colour } as CSSProperties) : undefined}
-      aria-busy={waiting || undefined}
+      aria-busy={(loading && !hasData) || undefined}
     >
-      <div className="training-recovery-header">
+      <div className="overview-physique-head">
         <p className="eyebrow">{t("overview.physique.title")}</p>
       </div>
-
-      <div className="training-recovery-content">
+      <div className="overview-physique-stage">
         <div className="recovery-figure" role="img" aria-label={figureDescription}>
           {profileSettled ? (
             <Suspense fallback={null}>
@@ -124,18 +102,15 @@ export function RecoveryPanel(props: RecoveryPanelProps) {
               />
             </Suspense>
           ) : null}
-          <div
-            className="recovery-figure-level"
-            style={{ "--level-bottom": `${labelBottom * 100}%` } as CSSProperties}
-            aria-hidden="true"
-          >
-            <strong>{hasData ? `${percent}%` : "–"}</strong>
-            <span>{label}</span>
-          </div>
         </div>
-
-        <p className="training-recovery-message">{message}</p>
       </div>
-    </section>
+      <div className="overview-physique-foot">
+        <p className="eyebrow">{t("overview.recovery.title")}</p>
+        <p className="overview-physique-reading">
+          <span className="figure">{hasData ? `${percent}%` : "–"}</span>
+          <span>{word}</span>
+        </p>
+      </div>
+    </div>
   );
 }

@@ -1,0 +1,726 @@
+/*
+ * Overview's sections (src/training/overview/). Imported by TrainingOverview,
+ * so it loads with the screen's chunk, after styles.css; the figure's own
+ * stage (`.recovery-figure`, `.body-figure`) stays in styles.css, where
+ * test:body-figure holds it to bodyFigureMath.ts.
+ */
+
+.training-dashboard {
+  gap: 32px;
+}
+
+/* Each section is a container: whether a section's columns fit is a question
+   about its own width, not the window's. */
+.overview-section {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-width: 0;
+  container-type: inline-size;
+}
+
+/* A section's name, in the interface face: the serif is the screen's own
+   title (the greeting) and nothing under it. */
+.overview-section-title {
+  margin: 0;
+  color: var(--text-primary);
+  font-size: 22px;
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+/* ── Readiness ──────────────────────────────────────────────────────────── */
+
+/* One grid for the three columns, so the Sleep and This week columns share
+   their rows: head, the night's figures beside the week's status, ring beside
+   chart, footer. The physique column is a subgrid spanning all four, its
+   stage taking the middle two. */
+.overview-today {
+  --overview-rule: rgba(255, 255, 255, 0.08);
+  /* Done in the accent, planned hatched in it. */
+  --overview-week-fill: color-mix(in srgb, var(--accent) 82%, transparent);
+  --overview-week-plan: color-mix(in srgb, var(--accent) 62%, transparent);
+  /* COROS's sleep score bands: Poor, Fair, Good, Excellent. */
+  --overview-sleep-low: #e5484d;
+  --overview-sleep-mid: #e6b800;
+  --overview-sleep-good: #2fbe91;
+  --overview-sleep-high: #7fb0e6;
+  /* COROS's training status, yellow through orange to red as its app draws it. */
+  --overview-status-decreasing: #e6d23a;
+  --overview-status-resuming: #f2b632;
+  --overview-status-maintaining: #f59a2f;
+  --overview-status-optimized: #f07b2a;
+  --overview-status-excessive: #e5484d;
+  display: grid;
+  grid-template-columns: minmax(200px, 240px) minmax(0, 1.12fr) minmax(0, 1.2fr);
+  grid-template-rows: auto auto minmax(0, 1fr) auto;
+  padding: 0;
+  overflow: hidden;
+}
+
+.overview-today dd {
+  margin: 0;
+}
+
+.overview-today-cell {
+  box-sizing: border-box;
+  min-width: 0;
+  margin: 0;
+  padding: 0 22px;
+}
+
+.overview-today-cell.is-sleep {
+  grid-column: 2;
+  border-right: 1px solid var(--overview-rule);
+}
+
+.overview-today-cell.is-week {
+  grid-column: 3;
+}
+
+.overview-today-head {
+  grid-row: 1;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 22px;
+  padding-top: 16px;
+}
+
+.overview-today-head .eyebrow,
+.overview-today-foot .eyebrow,
+.overview-physique .eyebrow {
+  margin: 0;
+}
+
+.overview-today-date {
+  min-width: 0;
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.3;
+}
+
+.overview-today-date-aside {
+  color: var(--text-muted);
+  font-weight: 400;
+}
+
+/* Bare, as a link out of the column is: the column is not a control panel. */
+.overview-today-open {
+  display: inline-grid;
+  width: 28px;
+  height: 28px;
+  margin: -6px -8px -6px auto;
+  place-items: center;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: none;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition:
+    color var(--dur-fast) var(--ease),
+    background var(--dur-fast) var(--ease);
+}
+
+.overview-today-open:hover {
+  background: var(--glass-bg);
+  color: var(--text-primary);
+}
+
+.overview-today-open:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: 2px;
+}
+
+.overview-today-hero {
+  grid-row: 2;
+  display: grid;
+  grid-template-columns: minmax(0, 1.15fr) 1px minmax(0, 1fr) minmax(0, 1fr);
+  align-items: end;
+  gap: 14px;
+  padding-top: 12px;
+  padding-bottom: 2px;
+}
+
+.overview-today-hero dt,
+.overview-today-foot dt {
+  color: var(--text-secondary);
+  font-size: 12px;
+  line-height: 1.3;
+}
+
+.overview-today-hero dd {
+  margin-top: 6px;
+  font-size: 18px;
+  line-height: 1;
+}
+
+.overview-today-lead dd {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.overview-today-lead .figure {
+  font-size: 28px;
+}
+
+/* The score's band in COROS's word, in the score's colour. */
+.overview-sleep-band {
+  font-size: 12px;
+  font-weight: 600;
+}
+
+/* The week's status on its bands, in the row the night's figures take. */
+.overview-today-status {
+  grid-row: 2;
+  align-self: end;
+  padding-top: 12px;
+  padding-bottom: 2px;
+}
+
+.overview-today-rule {
+  align-self: stretch;
+  background: var(--overview-rule);
+}
+
+.overview-today-unit {
+  margin-left: 4px;
+  color: var(--text-secondary);
+  font-size: 11px;
+}
+
+.overview-today-vis {
+  grid-row: 3;
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  min-height: 168px;
+  padding-top: 10px;
+  padding-bottom: 12px;
+}
+
+/* The ring and its stages as one group, centred under the night's figures,
+   the list as wide as its words rather than the column. */
+.overview-today-vis.is-sleep {
+  justify-content: center;
+  gap: 36px;
+  padding-top: 6px;
+}
+
+/* Clear of the status bands above it: the bands' names and the figures over
+   the tallest column would otherwise read as one line. */
+.overview-today-vis.is-week {
+  padding-top: 20px;
+}
+
+.overview-today-foot {
+  grid-row: 4;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-top: 12px;
+  padding-bottom: 16px;
+  border-top: 1px solid var(--overview-rule);
+}
+
+.overview-today-foot dl {
+  margin: 0;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.overview-today-foot dd {
+  margin-top: 6px;
+  font-size: 18px;
+  line-height: 1;
+}
+
+/* No night to show: a sentence in the rows the night would take. */
+.overview-today-body {
+  grid-row: 2 / span 2;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 8px;
+  padding-top: 16px;
+  padding-bottom: 16px;
+}
+
+.overview-today-message {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.overview-today-note {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+/* Your physique: the Recovery card's figure and stage as they were, in a
+   column of the panel. */
+.overview-physique {
+  grid-column: 1;
+  grid-row: 1 / span 4;
+  display: grid;
+  grid-template-rows: subgrid;
+  min-width: 0;
+  border-right: 1px solid var(--overview-rule);
+}
+
+.overview-physique-head {
+  grid-row: 1;
+  display: flex;
+  align-items: center;
+  min-height: 22px;
+  padding: 16px 20px 0;
+}
+
+.overview-physique-stage {
+  grid-row: 2 / span 2;
+  display: flex;
+  min-height: 0;
+  padding: 12px 14px 14px;
+}
+
+/* The stage takes the rows beside it, down to a floor that still holds a
+   figure; the Recovery card's taller floor was for a card standing alone. */
+.overview-physique-stage .recovery-figure {
+  min-height: 260px;
+}
+
+.overview-physique-foot {
+  grid-row: 4;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px 20px 16px;
+  border-top: 1px solid var(--overview-rule);
+}
+
+.overview-physique-reading {
+  margin: 0;
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.overview-physique-reading .figure {
+  color: var(--text-primary);
+  font-size: 28px;
+  line-height: 1;
+}
+
+/* A figure on its bands (BandScale.tsx). */
+.overview-scale {
+  --scale-bands: 5;
+  margin: 0;
+}
+
+.overview-scale-ticks {
+  position: relative;
+  height: 11px;
+  margin-bottom: 4px;
+  color: var(--text-muted);
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+
+.overview-scale-ticks span {
+  position: absolute;
+  transform: translateX(-50%);
+}
+
+.overview-scale-bar {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(var(--scale-bands), minmax(0, 1fr));
+  gap: 2px;
+  height: 5px;
+}
+
+.overview-scale-bar i {
+  display: block;
+  background: color-mix(in srgb, var(--band) 28%, transparent);
+}
+
+.overview-scale-bar i:first-child {
+  border-radius: var(--radius-pill) 0 0 var(--radius-pill);
+}
+
+.overview-scale-bar i:last-of-type {
+  border-radius: 0 var(--radius-pill) var(--radius-pill) 0;
+}
+
+.overview-scale-bar i.is-current {
+  background: var(--band);
+}
+
+.overview-scale-bar b {
+  position: absolute;
+  top: -4px;
+  width: 2px;
+  height: 13px;
+  margin-left: -1px;
+  border-radius: var(--radius-xs);
+  background: var(--text-primary);
+}
+
+.overview-scale-names {
+  display: grid;
+  grid-template-columns: repeat(var(--scale-bands), minmax(0, 1fr));
+  gap: 2px;
+  margin-top: 7px;
+  color: var(--text-muted);
+  font-size: 10px;
+  line-height: 1.2;
+  text-align: center;
+}
+
+.overview-scale-names .is-current {
+  color: var(--band-text, var(--band));
+  font-weight: 600;
+}
+
+.overview-scale [data-band="decreasing"] { --band: var(--overview-status-decreasing); }
+.overview-scale [data-band="resuming"] { --band: var(--overview-status-resuming); }
+.overview-scale [data-band="maintaining"] { --band: var(--overview-status-maintaining); }
+.overview-scale [data-band="optimized"] { --band: var(--overview-status-optimized); }
+.overview-scale [data-band="excessive"] { --band: var(--overview-status-excessive); }
+
+/* Sleep: the score and its word in its band's colour, the ring, the stages. */
+.overview-sleep-score.tone-low { color: var(--overview-sleep-low); }
+.overview-sleep-score.tone-mid { color: var(--overview-sleep-mid); }
+.overview-sleep-score.tone-good { color: var(--overview-sleep-good); }
+.overview-sleep-score.tone-high { color: var(--overview-sleep-high); }
+
+.overview-sleep-night {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+}
+
+.overview-sleep-ring {
+  display: block;
+  width: 144px;
+  height: 144px;
+}
+
+.overview-sleep-ring circle {
+  fill: none;
+  stroke-width: 9;
+}
+
+.overview-sleep-ring-track {
+  stroke: var(--overview-rule);
+}
+
+.overview-sleep-ring-figure {
+  fill: var(--text-primary);
+  font-family: var(--font-display);
+  font-size: 18px;
+  font-variant-numeric: tabular-nums;
+  font-weight: 500;
+  letter-spacing: -0.02em;
+  text-anchor: middle;
+}
+
+.overview-sleep-ring-caption {
+  fill: var(--text-secondary);
+  font-size: 10px;
+  text-anchor: middle;
+}
+
+.overview-sleep-clock {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 12px;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.overview-sleep-side {
+  flex: 0 1 176px;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 10px;
+}
+
+.overview-sleep-stages {
+  margin: 0;
+  display: grid;
+  gap: 14px;
+}
+
+.overview-sleep-stages div {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 12px;
+  line-height: 1.2;
+}
+
+.overview-sleep-stages dt {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text-secondary);
+}
+
+.overview-sleep-stages dt i {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+}
+
+.overview-sleep-stages dd {
+  color: var(--text-primary);
+}
+
+/* This week: a column a day, every session a block. The axis, the gridlines
+   and the columns share one vertical frame — a strip for the figures over the
+   tallest column, the plot, then a row of icons and a row of day names — so
+   a block's height and the gridline it reaches are one measure. */
+.overview-week-chart {
+  --week-axis: 30px;
+  --week-top: 16px;
+  --week-bottom: 40px;
+  position: relative;
+  flex: 1 1 auto;
+  align-self: stretch;
+  min-width: 0;
+  min-height: 172px;
+}
+
+.overview-week-axis {
+  position: absolute;
+  top: var(--week-top);
+  bottom: var(--week-bottom);
+  left: 0;
+  width: calc(var(--week-axis) - 8px);
+}
+
+.overview-week-axis span {
+  position: absolute;
+  right: 0;
+  color: var(--text-muted);
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+  transform: translateY(50%);
+}
+
+.overview-week-grid {
+  position: absolute;
+  top: var(--week-top);
+  right: 0;
+  bottom: var(--week-bottom);
+  left: var(--week-axis);
+  pointer-events: none;
+}
+
+.overview-week-grid i {
+  position: absolute;
+  right: 0;
+  left: 0;
+  height: 0;
+  border-top: 1px solid var(--overview-rule);
+}
+
+.overview-week-cols {
+  position: absolute;
+  inset: 0 0 0 var(--week-axis);
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.overview-week-day {
+  display: grid;
+  grid-template-rows: var(--week-top) minmax(0, 1fr) 22px 18px;
+  min-width: 0;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+}
+
+.overview-week-day.is-today {
+  border-color: color-mix(in srgb, var(--text-primary) 16%, transparent);
+  background: color-mix(in srgb, var(--text-primary) 4%, transparent);
+}
+
+.overview-week-plot {
+  grid-row: 2;
+  position: relative;
+}
+
+.overview-week-stack {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  display: flex;
+  flex-direction: column-reverse;
+  gap: 2px;
+  width: min(34px, 68%);
+  transform: translateX(-50%);
+}
+
+.overview-week-block {
+  display: block;
+  flex: 0 0 auto;
+  box-sizing: border-box;
+  min-height: 3px;
+  border-radius: var(--radius-xs);
+  background: var(--overview-week-fill);
+}
+
+.overview-week-block.is-residual {
+  background: color-mix(in srgb, var(--overview-week-fill) 45%, transparent);
+}
+
+.overview-week-block.is-planned {
+  border: 1px dashed var(--overview-week-plan);
+  background: repeating-linear-gradient(
+    45deg,
+    var(--overview-week-plan) 0 2px,
+    transparent 2px 6px
+  );
+}
+
+.overview-week-value,
+.overview-week-rest {
+  align-self: center;
+  margin-bottom: 3px;
+  font-size: 10px;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.overview-week-value {
+  color: var(--text-secondary);
+}
+
+.overview-week-rest {
+  color: var(--text-muted);
+}
+
+.overview-week-icons {
+  grid-row: 3;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  min-width: 0;
+  color: var(--text-secondary);
+  font-size: 10px;
+  line-height: 1;
+}
+
+.overview-week-icons .is-planned {
+  opacity: 0.5;
+}
+
+.overview-week-label {
+  grid-row: 4;
+  color: var(--text-secondary);
+  font-size: 11px;
+  line-height: 1.2;
+  text-align: center;
+}
+
+.overview-week-day.is-today .overview-week-label {
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+/* Too narrow for three columns: the figure and the night side by side as
+   before, sharing their rows, and the week under both at the full width. */
+@container (max-width: 940px) {
+  .overview-today {
+    grid-template-columns: minmax(190px, 220px) minmax(0, 1fr);
+    grid-template-rows:
+      auto auto minmax(0, 1fr) auto
+      auto auto minmax(0, 1fr) auto;
+  }
+
+  .overview-today-cell.is-sleep {
+    border-right: 0;
+  }
+
+  .overview-today-cell.is-week {
+    grid-column: 1 / -1;
+  }
+
+  .overview-today-head.is-week {
+    grid-row: 5;
+    border-top: 1px solid var(--overview-rule);
+  }
+
+  .overview-today-status.is-week {
+    grid-row: 6;
+  }
+
+  .overview-today-vis.is-week {
+    grid-row: 7;
+  }
+
+  .overview-today-foot.is-week {
+    grid-row: 8;
+  }
+}
+
+/* A phone-width column: one under the other, the figure on a stage of its
+   own height. */
+@container (max-width: 620px) {
+  .overview-today {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .overview-physique {
+    display: flex;
+    flex-direction: column;
+    border-right: 0;
+    border-bottom: 1px solid var(--overview-rule);
+  }
+
+  .overview-physique-stage .recovery-figure {
+    min-height: 320px;
+  }
+}
+
+:root[data-theme="paper"] .overview-today {
+  --overview-rule: rgba(19, 26, 40, 0.08);
+  --overview-week-fill: var(--hall-gold);
+  --overview-week-plan: var(--hall-gold-deep);
+  --overview-sleep-low: #d93d42;
+  --overview-sleep-mid: #c79a00;
+  --overview-sleep-good: #1f9e74;
+  --overview-sleep-high: #3d7fd1;
+  --overview-status-decreasing: #c9b31c;
+  --overview-status-resuming: #dc9d16;
+  --overview-status-maintaining: #e38318;
+  --overview-status-optimized: #e06413;
+  --overview-status-excessive: #d93d42;
+}
+
+/* A band's name in its colour reads on white only taken darker. */
+:root[data-theme="paper"] .overview-scale-names .is-current {
+  --band-text: oklch(from var(--band) calc(l * 0.78) c h);
+}

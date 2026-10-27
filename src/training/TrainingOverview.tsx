@@ -15,9 +15,7 @@ import {
   Trophy,
   RefreshCw
 } from "lucide-react";
-import { FitnessTrendPanel } from "./components/FitnessTrendPanel";
-import { RecoveryPanel } from "./components/RecoveryPanel";
-import { SleepSummaryPanel } from "./components/SleepSummaryPanel";
+import { OverviewToday } from "./overview/OverviewToday";
 import { TrainingHeatmapPanel } from "./components/TrainingHeatmapPanel";
 import { TrainingTrendCharts } from "./components/TrainingTrendChart";
 import { TrainingZoneDistributionCharts } from "./components/TrainingZoneDistributionCharts";
@@ -28,6 +26,7 @@ import type { TrainingOverviewProps } from "./types";
 import { useHeartRateZoneModel } from "./useHeartRateZoneModel";
 import loginPageBackground from "../assets/training-hub/login-bg.webp";
 import { t } from "../i18n/core";
+import "./overview/overview.css";
 
 // The body map drags in three.js and a GLTF mannequin. Overview is the default
 // startup view, so that weight stays out of its first chunk.
@@ -411,35 +410,22 @@ export function TrainingOverview({
 
       {connected ? (
         <>
-          <section className="training-intelligence">
-            <div className="training-intelligence-grid">
-              <div className="training-intelligence-column">
-                <RecoveryPanel
-                  summary={summary}
-                  loading={snapshotPending}
-                  profile={corosProfile}
-                  profileSettled={corosProfileSettled}
-                  vo2Readings={vo2Readings}
-                />
-              </div>
-              <div className="training-intelligence-column">
-                <FitnessTrendPanel
-                  snapshot={snapshot}
-                  activities={activities}
-                  loading={snapshotPending || activitiesPending}
-                />
-                <SleepSummaryPanel
-                  sleep={snapshot?.sleep}
-                  points={snapshot?.trendPoints}
-                  connecting={sleepConnecting}
-                  refreshing={busy === "training-refresh"}
-                  onOpenDetails={onOpenSleepDetails}
-                />
-              </div>
-            </div>
-          </section>
+          <OverviewToday
+            summary={summary}
+            snapshot={snapshot}
+            activities={activities}
+            upcomingWorkouts={upcomingWorkouts}
+            profile={corosProfile}
+            profileSettled={corosProfileSettled}
+            vo2Readings={vo2Readings}
+            snapshotLoading={snapshotPending}
+            weekLoading={snapshotPending || activitiesPending}
+            sleepConnecting={sleepConnecting}
+            refreshing={busy === "training-refresh"}
+            onOpenSleepDetails={onOpenSleepDetails}
+          />
 
-          {/* Its own row, directly under Training Intelligence. The panel
+          {/* Its own row, directly under Today. The panel
               renders nothing when the calendar is empty, so a week with no
               scheduled sessions leaves no gap here. */}
           <UpcomingWorkoutsPanel
