@@ -54,6 +54,13 @@ export function UpdateAvailablePrompt({
   const [visibleVersion, setVisibleVersion] = useState<string | null>(null);
   const promptedVersions = useRef(new Set<string>());
   const handledPreviewKey = useRef<number | undefined>(undefined);
+  const dialogRef = useRef<HTMLElement>(null);
+
+  useEffect(() => {
+    if (visibleVersion) {
+      dialogRef.current?.focus();
+    }
+  }, [visibleVersion]);
 
   useEffect(() => {
     if (!canPromptForUpdate(snapshot) || !snapshot.availableVersion) {
@@ -145,8 +152,10 @@ export function UpdateAvailablePrompt({
   return (
     <div className="update-prompt-backdrop" role="presentation">
       <section
+        ref={dialogRef}
         className="update-prompt"
         role="dialog"
+        tabIndex={-1}
         aria-modal="true"
         aria-labelledby="update-prompt-title"
         aria-describedby="update-prompt-description"
@@ -199,7 +208,6 @@ export function UpdateAvailablePrompt({
             <button
               className="primary-button"
               type="button"
-              autoFocus
               onClick={accept}
             >
               {isDownloaded ? (
@@ -239,6 +247,11 @@ export function UpdateRestartPrompt({
   onLater,
 }: UpdateRestartPromptProps) {
   const installing = snapshot.status === "installing";
+  const dialogRef = useRef<HTMLElement>(null);
+
+  useEffect(() => {
+    dialogRef.current?.focus();
+  }, []);
 
   useEffect(() => {
     if (installing) {
@@ -279,8 +292,10 @@ export function UpdateRestartPrompt({
   return (
     <div className="update-prompt-backdrop" role="presentation">
       <section
+        ref={dialogRef}
         className="update-prompt update-prompt--compact"
         role="dialog"
+        tabIndex={-1}
         aria-modal="true"
         aria-labelledby="update-restart-title"
         aria-describedby="update-restart-description"
@@ -333,7 +348,6 @@ export function UpdateRestartPrompt({
               <button
                 className="primary-button"
                 type="button"
-                autoFocus
                 disabled={installing}
                 onClick={onRestart}
               >

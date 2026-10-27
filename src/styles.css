@@ -1913,6 +1913,19 @@ input::placeholder {
   box-shadow: none;
 }
 
+/* Focus lands on the sheet, not on a button: a prompt that opens on its own at
+   start-up, before any click, made Chromium draw its own white focus ring
+   round an autofocused "Update now". The keyboard still gets the app's ring. */
+.update-prompt:focus {
+  outline: none;
+}
+
+.update-prompt-actions .primary-button:focus-visible,
+.update-prompt-actions .secondary-button:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: 2px;
+}
+
 .update-prompt-actions .primary-button:hover:not(:disabled) {
   box-shadow: none;
   transform: none;

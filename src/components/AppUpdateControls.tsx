@@ -200,42 +200,26 @@ export function AppUpdateControl({
                 <p className="update-settings-note">{t("update.unsupported")}</p>
               )}
 
-              {pendingAction ? (
+              {pendingAction === "download" ? (
                 <div className="update-settings-actions">
-                  {pendingAction === "install" ? (
-                    <button
-                      className="update-settings-action"
-                      type="button"
-                      onClick={() => {
-                        onInstall();
-                        setOpen(false);
-                      }}
-                    >
-                      <Sparkles size={14} aria-hidden="true" />
-                      {snapshot.installMethod === "manual"
-                        ? t("update.download", { version: snapshot.availableVersion ?? "" })
-                        : t("update.restart")}
-                    </button>
-                  ) : (
-                    <button
-                      className="update-settings-action"
-                      type="button"
-                      disabled={downloading}
-                      onClick={() => {
-                        onDownload();
-                        setOpen(false);
-                      }}
-                    >
-                      {downloading ? (
-                        <Loader2 className="spin" size={14} aria-hidden="true" />
-                      ) : (
-                        <Download size={14} aria-hidden="true" />
-                      )}
-                      {downloading
-                        ? t("update.starting")
-                        : t("update.download", { version: snapshot.availableVersion ?? "" })}
-                    </button>
-                  )}
+                  <button
+                    className="update-settings-action"
+                    type="button"
+                    disabled={downloading}
+                    onClick={() => {
+                      onDownload();
+                      setOpen(false);
+                    }}
+                  >
+                    {downloading ? (
+                      <Loader2 className="spin" size={14} aria-hidden="true" />
+                    ) : (
+                      <Download size={14} aria-hidden="true" />
+                    )}
+                    {downloading
+                      ? t("update.starting")
+                      : t("update.download", { version: snapshot.availableVersion ?? "" })}
+                  </button>
                 </div>
               ) : null}
 
@@ -274,23 +258,41 @@ export function AppUpdateControl({
                 </span>
               </label>
 
+              {/* Downloaded, there is nothing left to check for: the one thing
+                  to do is restart, so it takes the check's place. */}
               <div className="update-settings-actions">
-                <button
-                  className="update-settings-action"
-                  type="button"
-                  disabled={busy || snapshot.status === "checking"}
-                  onClick={() => {
-                    onCheck();
-                    setOpen(false);
-                  }}
-                >
-                  {busy || snapshot.status === "checking" ? (
-                    <Loader2 className="spin" size={14} aria-hidden="true" />
-                  ) : (
-                    <RefreshCw size={14} aria-hidden="true" />
-                  )}
-                  {t("update.check")}
-                </button>
+                {pendingAction === "install" ? (
+                  <button
+                    className="update-settings-action"
+                    type="button"
+                    onClick={() => {
+                      onInstall();
+                      setOpen(false);
+                    }}
+                  >
+                    <Sparkles size={14} aria-hidden="true" />
+                    {snapshot.installMethod === "manual"
+                      ? t("update.download", { version: snapshot.availableVersion ?? "" })
+                      : t("update.restart")}
+                  </button>
+                ) : (
+                  <button
+                    className="update-settings-action"
+                    type="button"
+                    disabled={busy || snapshot.status === "checking"}
+                    onClick={() => {
+                      onCheck();
+                      setOpen(false);
+                    }}
+                  >
+                    {busy || snapshot.status === "checking" ? (
+                      <Loader2 className="spin" size={14} aria-hidden="true" />
+                    ) : (
+                      <RefreshCw size={14} aria-hidden="true" />
+                    )}
+                    {t("update.check")}
+                  </button>
+                )}
               </div>
             </div>,
             document.body
