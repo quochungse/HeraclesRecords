@@ -231,6 +231,17 @@ const overview = {
   "overview.status.maintaining": "Maintaining",
   "overview.status.optimized": "Optimized",
   "overview.status.excessive": "Excessive",
+  "overview.comingUp.title": "Coming up",
+  "overview.comingUp.summary": "Next 7 days · {stats}",
+  "overview.comingUp.tomorrow": "Tomorrow",
+  "overview.comingUp.openWorkout": "Open workout",
+  "overview.comingUp.open": "Open",
+  "overview.comingUp.done": "Done",
+  "overview.comingUp.session": "Session",
+  "overview.comingUp.ofPlannedLoad": "{percent}% of planned load",
+  "overview.comingUp.doneOf": "{done} of {total} done",
+  "overview.comingUp.nextDays": "Next days",
+  "overview.comingUp.nothingNext": "Nothing else on the calendar in the next two weeks.",
 };
 
 export default overview;

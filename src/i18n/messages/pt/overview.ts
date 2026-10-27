@@ -230,6 +230,17 @@ const overview: OverviewMessages = {
   "overview.status.maintaining": "Mantendo",
   "overview.status.optimized": "Otimizado",
   "overview.status.excessive": "Excessivo",
+  "overview.comingUp.title": "Em breve",
+  "overview.comingUp.summary": "Próximos 7 dias · {stats}",
+  "overview.comingUp.tomorrow": "Amanhã",
+  "overview.comingUp.openWorkout": "Abrir treino",
+  "overview.comingUp.open": "Abrir",
+  "overview.comingUp.done": "Feito",
+  "overview.comingUp.session": "Sessão",
+  "overview.comingUp.ofPlannedLoad": "{percent}% da carga planejada",
+  "overview.comingUp.doneOf": "{done} de {total} feitos",
+  "overview.comingUp.nextDays": "Próximos dias",
+  "overview.comingUp.nothingNext": "Nada mais no calendário nas próximas duas semanas.",
 };
 
 export default overview;

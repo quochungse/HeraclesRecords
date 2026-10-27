@@ -248,6 +248,17 @@ const overview: OverviewMessages = {
   "overview.status.maintaining": "Поддержание",
   "overview.status.optimized": "Оптимально",
   "overview.status.excessive": "Чрезмерно",
+  "overview.comingUp.title": "Впереди",
+  "overview.comingUp.summary": "Ближайшие 7 дней · {stats}",
+  "overview.comingUp.tomorrow": "Завтра",
+  "overview.comingUp.openWorkout": "Открыть тренировку",
+  "overview.comingUp.open": "Открыть",
+  "overview.comingUp.done": "Выполнено",
+  "overview.comingUp.session": "Тренировка",
+  "overview.comingUp.ofPlannedLoad": "{percent}% от запланированной нагрузки",
+  "overview.comingUp.doneOf": "выполнено {done} из {total}",
+  "overview.comingUp.nextDays": "Следующие дни",
+  "overview.comingUp.nothingNext": "В ближайшие две недели в календаре больше ничего нет.",
 };
 
 export default overview;

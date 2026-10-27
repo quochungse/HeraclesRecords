@@ -230,6 +230,17 @@ const overview: OverviewMessages = {
   "overview.status.maintaining": "Bertahan",
   "overview.status.optimized": "Optimal",
   "overview.status.excessive": "Berlebihan",
+  "overview.comingUp.title": "Mendatang",
+  "overview.comingUp.summary": "7 hari ke depan · {stats}",
+  "overview.comingUp.tomorrow": "Besok",
+  "overview.comingUp.openWorkout": "Buka latihan",
+  "overview.comingUp.open": "Buka",
+  "overview.comingUp.done": "Selesai",
+  "overview.comingUp.session": "Sesi",
+  "overview.comingUp.ofPlannedLoad": "{percent}% dari beban terencana",
+  "overview.comingUp.doneOf": "{done} dari {total} selesai",
+  "overview.comingUp.nextDays": "Hari berikutnya",
+  "overview.comingUp.nothingNext": "Tidak ada lagi di kalender dalam dua minggu ke depan.",
 };
 
 export default overview;

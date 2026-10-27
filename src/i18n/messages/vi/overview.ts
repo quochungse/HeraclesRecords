@@ -230,6 +230,17 @@ const overview: OverviewMessages = {
   "overview.status.maintaining": "Duy trì",
   "overview.status.optimized": "Tối ưu",
   "overview.status.excessive": "Quá tải",
+  "overview.comingUp.title": "Sắp tới",
+  "overview.comingUp.summary": "7 ngày tới · {stats}",
+  "overview.comingUp.tomorrow": "Ngày mai",
+  "overview.comingUp.openWorkout": "Mở bài tập",
+  "overview.comingUp.open": "Mở",
+  "overview.comingUp.done": "Đã tập",
+  "overview.comingUp.session": "Buổi tập",
+  "overview.comingUp.ofPlannedLoad": "{percent}% tải theo kế hoạch",
+  "overview.comingUp.doneOf": "đã tập {done}/{total}",
+  "overview.comingUp.nextDays": "Các ngày tới",
+  "overview.comingUp.nothingNext": "Lịch không còn gì khác trong hai tuần tới.",
 };
 
 export default overview;

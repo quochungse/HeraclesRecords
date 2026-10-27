@@ -15,11 +15,11 @@ import {
   Trophy,
   RefreshCw
 } from "lucide-react";
+import { OverviewComingUp } from "./overview/OverviewComingUp";
 import { OverviewToday } from "./overview/OverviewToday";
 import { TrainingHeatmapPanel } from "./components/TrainingHeatmapPanel";
 import { TrainingTrendCharts } from "./components/TrainingTrendChart";
 import { TrainingZoneDistributionCharts } from "./components/TrainingZoneDistributionCharts";
-import { UpcomingWorkoutsPanel } from "./components/UpcomingWorkoutsPanel";
 import { snapshotVo2Readings } from "./parsers";
 import { renderRich } from "../i18n/useI18n";
 import type { TrainingOverviewProps } from "./types";
@@ -64,7 +64,9 @@ export function TrainingOverview({
   onResendTwoFactor,
   onCancelTwoFactor,
   onReconnect,
-  showStrength = true
+  showStrength = true,
+  onOpenActivity,
+  onOpenView
 }: TrainingOverviewProps) {
   const connected = Boolean(status?.authenticated);
   // Every panel below draws from one of these two loads, and each answers an
@@ -425,13 +427,13 @@ export function TrainingOverview({
             onOpenSleepDetails={onOpenSleepDetails}
           />
 
-          {/* Its own row, directly under Today. The panel
-              renders nothing when the calendar is empty, so a week with no
-              scheduled sessions leaves no gap here. */}
-          <UpcomingWorkoutsPanel
+          <OverviewComingUp
             api={api}
-            workouts={upcomingWorkouts}
+            upcomingWorkouts={upcomingWorkouts}
+            activities={activities}
             sportTypes={sportTypes}
+            onOpenActivity={onOpenActivity}
+            onOpenCalendar={onOpenView ? () => onOpenView("calendar") : undefined}
           />
 
           <div className="training-heatmap-wrap">

@@ -230,6 +230,17 @@ const overview: OverviewMessages = {
   "overview.status.maintaining": "유지",
   "overview.status.optimized": "최적",
   "overview.status.excessive": "과도",
+  "overview.comingUp.title": "다가오는 일정",
+  "overview.comingUp.summary": "앞으로 7일 · {stats}",
+  "overview.comingUp.tomorrow": "내일",
+  "overview.comingUp.openWorkout": "운동 열기",
+  "overview.comingUp.open": "열기",
+  "overview.comingUp.done": "완료",
+  "overview.comingUp.session": "세션",
+  "overview.comingUp.ofPlannedLoad": "계획 부하의 {percent}%",
+  "overview.comingUp.doneOf": "{total}개 중 {done}개 완료",
+  "overview.comingUp.nextDays": "다음 날들",
+  "overview.comingUp.nothingNext": "앞으로 2주 동안 캘린더에 다른 일정이 없습니다.",
 };
 
 export default overview;

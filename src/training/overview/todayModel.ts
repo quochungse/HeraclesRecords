@@ -7,14 +7,9 @@ import type {
 } from "../../../electron/types";
 import { buildWeeklyActivitySeries, WEEKLY_ACTIVITY_RESIDUAL_KEY } from "../weeklyActivity";
 import { sportColorCategory, type SportColorCategory } from "../sportColors";
-import {
-  activitySportFamily,
-  scheduledSportCategory,
-  scheduledSportFamily,
-  scheduledWorkoutSport,
-  sportFamiliesCompatible
-} from "../workoutSport";
+import { scheduledSportCategory, scheduledWorkoutSport } from "../workoutSport";
 import { activityWorkoutSport } from "../askCoachAbout";
+import { pairTodayPlan } from "./comingUpModel";
 
 /*
  * The arithmetic behind Overview's Readiness panel, out of the components so a
@@ -185,28 +180,15 @@ function happenDayOf(timestamp: number | undefined): string | undefined {
 }
 
 /**
- * Today's planned sessions that a session already recorded today stands for.
- * Greedy and by sport family, as the Calendar pairs a day: a run done today
- * answers today's planned run, and the plan stops being "still planned".
+ * Today's planned sessions that no session recorded today stands for — the
+ * pairing Coming up shows (`pairTodayPlan`), so the two sections cannot read
+ * one day two ways.
  */
 export function plannedStillOpen(
   planned: readonly TrainingHubUpcomingWorkout[],
   doneToday: readonly TrainingHubActivity[]
 ): TrainingHubUpcomingWorkout[] {
-  const used = new Set<string>();
-  return planned.filter((workout) => {
-    const family = scheduledSportFamily(workout.sportType);
-    const match = doneToday.find(
-      (activity) =>
-        !used.has(activity.activityId) &&
-        sportFamiliesCompatible(family, activitySportFamily(activity.sportType))
-    );
-    if (match) {
-      used.add(match.activityId);
-      return false;
-    }
-    return true;
-  });
+  return pairTodayPlan(planned, doneToday).open;
 }
 
 /** 0–100 a gridline at a time, rounded up to a step a reader can add. */

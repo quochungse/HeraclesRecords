@@ -230,6 +230,17 @@ const overview: OverviewMessages = {
   "overview.status.maintaining": "保持",
   "overview.status.optimized": "优化",
   "overview.status.excessive": "过量",
+  "overview.comingUp.title": "即将进行",
+  "overview.comingUp.summary": "未来 7 天 · {stats}",
+  "overview.comingUp.tomorrow": "明天",
+  "overview.comingUp.openWorkout": "打开训练",
+  "overview.comingUp.open": "打开",
+  "overview.comingUp.done": "已完成",
+  "overview.comingUp.session": "训练记录",
+  "overview.comingUp.ofPlannedLoad": "计划负荷的 {percent}%",
+  "overview.comingUp.doneOf": "已完成 {done}/{total}",
+  "overview.comingUp.nextDays": "接下来几天",
+  "overview.comingUp.nothingNext": "未来两周日历上没有其他安排。",
 };
 
 export default overview;

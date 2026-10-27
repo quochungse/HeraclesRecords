@@ -189,6 +189,10 @@ export type TrainingOverviewProps = Omit<
    * does not keep a panel on the Overview.
    */
   showStrength?: boolean;
+  /** Opens a session on its own sport's page (App's `openActivityFrom`). */
+  onOpenActivity?: (activityId: string) => void;
+  /** Opens another screen: the Calendar from Coming up. */
+  onOpenView?: (view: PrimaryView) => void;
 };
 
 /** The Activities screen: the activity list plus its detail pane. */

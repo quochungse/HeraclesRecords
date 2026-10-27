@@ -230,6 +230,17 @@ const overview: OverviewMessages = {
   "overview.status.maintaining": "คงที่",
   "overview.status.optimized": "เหมาะสม",
   "overview.status.excessive": "มากเกินไป",
+  "overview.comingUp.title": "ที่จะมาถึง",
+  "overview.comingUp.summary": "7 วันข้างหน้า · {stats}",
+  "overview.comingUp.tomorrow": "พรุ่งนี้",
+  "overview.comingUp.openWorkout": "เปิดการฝึก",
+  "overview.comingUp.open": "เปิด",
+  "overview.comingUp.done": "เสร็จแล้ว",
+  "overview.comingUp.session": "การฝึก",
+  "overview.comingUp.ofPlannedLoad": "{percent}% ของภาระที่วางแผนไว้",
+  "overview.comingUp.doneOf": "เสร็จแล้ว {done} จาก {total}",
+  "overview.comingUp.nextDays": "วันถัดไป",
+  "overview.comingUp.nothingNext": "ไม่มีอะไรอื่นในปฏิทินอีกในสองสัปดาห์ข้างหน้า",
 };
 
 export default overview;

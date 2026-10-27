@@ -230,6 +230,17 @@ const overview: OverviewMessages = {
   "overview.status.maintaining": "維持",
   "overview.status.optimized": "最適",
   "overview.status.excessive": "過剰",
+  "overview.comingUp.title": "この先の予定",
+  "overview.comingUp.summary": "今後 7 日間 · {stats}",
+  "overview.comingUp.tomorrow": "明日",
+  "overview.comingUp.openWorkout": "ワークアウトを開く",
+  "overview.comingUp.open": "開く",
+  "overview.comingUp.done": "完了",
+  "overview.comingUp.session": "セッション",
+  "overview.comingUp.ofPlannedLoad": "予定負荷の {percent}%",
+  "overview.comingUp.doneOf": "{total} 件中 {done} 件完了",
+  "overview.comingUp.nextDays": "この先の日",
+  "overview.comingUp.nothingNext": "今後 2 週間、カレンダーにほかの予定はありません。",
 };
 
 export default overview;

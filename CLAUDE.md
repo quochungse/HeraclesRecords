@@ -2247,6 +2247,17 @@ lives at module level for the same visit-to-visit reason — see `useCalendarDat
   Fitness, not `tiredRateNew`**: the Calendar's week tooltip reads that field as Load
   Impact while the screenshot demo fakes it as a fatigue difference (−30 to 40), and nothing
   here settles which. The arithmetic is `todayModel.ts`; `npm run test:overview-today`.
+  **Coming up** (`OverviewComingUp`, `comingUpModel.ts`) is today on the left and the days
+  after on the right, in place of the Upcoming Workouts card. Today pairs the calendar's
+  sessions with what was recorded today by sport family (`pairTodayPlan`, which the week
+  chart above uses too, so the two never read the day two ways): done comes first, named
+  by its plan and read against the plan's load on a bar as long as whichever is greater,
+  and opens the session (`onOpenActivity` → App's `openActivityFrom`); what is still to do
+  opens the Calendar's detail sheet (`UpcomingWorkoutDetailPanel`); a rest day has nothing
+  to press — no "Plan a session", and no "Not started" chip on a plan, by decision. The
+  right column keeps the old card's rule (all of tomorrow, then up to three rows), the
+  heading states the next seven days, and nothing scheduled with nothing done today draws
+  no section. `npm run test:overview-renderer` mounts the four states.
 - **Sleep** (`sleepDataService`, `sleepHistoryService`, `sleepSeriesService`, `src/sleep/`) —
   nights from the COROS MCP server, cached in `sleep_nights` because COROS keeps only ~9
   weeks. **`totalMinutes` is the main sleep and nothing else** — the stage percentages, the
