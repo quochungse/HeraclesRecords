@@ -2,14 +2,12 @@
  * Aggregations behind the Strength view.
  *
  * Everything here is derived from cached COROS strength sessions: each set
- * carries reps, weight, work time and rest, and each exercise carries a name
- * that `resolveExerciseTargets` turns into weighted muscle activations. A set
- * is credited to a muscle in proportion to its activation share, so a bench
- * press adds a full set to the chest and a quarter-set to the triceps.
+ * carries reps, weight, work time and rest. Muscle attribution uses the
+ * exercise's stable identity and metadata, sharing the Exercises Library's
+ * corrections and weights. Names are used only for display and lift history.
  */
 
 import type {
-  StrengthExercise,
   StrengthSession,
   UnitSystem
 } from "../../electron/types";
@@ -17,10 +15,10 @@ import { resolveExerciseName } from "../training/exerciseNames";
 import { kilogramsToDisplayWeight, weightUnit } from "../units/units";
 import {
   MUSCLES,
-  resolveCorosExerciseTargets,
-  resolveProviderMuscleTargets,
   type MuscleId
 } from "./muscles";
+import { exerciseTargets } from "./exerciseTargets";
+export { exerciseTargets } from "./exerciseTargets";
 import { startOfWeekMs } from "../training/activityWindow";
 import { formatCount, formatDecimal, getIntlLocale, t } from "../i18n/core";
 
@@ -136,7 +134,7 @@ export interface StrengthAnalytics {
   attributedSets: number;
   /** COROS sets reported only as the non-anatomical S4208 "Full Body" label. */
   genericSets: number;
-  /** Sets whose exercise name has no muscle mapping. */
+  /** Sets whose exercise identity and metadata have no muscle mapping. */
   unmappedSets: number;
 }
 
@@ -271,16 +269,6 @@ export function exerciseDisplayName(nameKey: string, rawName: string | undefined
     : canonicalExerciseDisplayName(resolved);
 }
 
-/** Muscle targets from the name rules, falling back to the provider's own muscle metadata. */
-export function exerciseTargets(exercise: StrengthExercise, name: string) {
-  const named = resolveCorosExerciseTargets(exercise.nameKey, name);
-  if (named.mobility || named.generic || named.activations.length > 0) return named;
-  return resolveProviderMuscleTargets(
-    exercise.primaryMuscleGroup,
-    exercise.secondaryMuscleGroups
-  );
-}
-
 export function buildStrengthAnalytics(
   sessions: StrengthSession[],
   windowDays: number
@@ -338,7 +326,7 @@ export function buildStrengthAnalytics(
 
     for (const exercise of session.detail.exercises) {
       const name = exerciseDisplayName(exercise.nameKey, exercise.rawName);
-      const targets = exerciseTargets(exercise, name);
+      const targets = exerciseTargets(exercise);
       const setCount = exercise.entries.length;
 
       let exerciseReps = 0;

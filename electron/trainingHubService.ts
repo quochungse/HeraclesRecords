@@ -167,6 +167,7 @@ import {
   decodeStsCredentials
 } from "./corosUploadConfig";
 import { parseStrengthDetail } from "./strengthDetail";
+import { strengthProgramFromSchedule } from "./strengthExerciseMetadata";
 import { parseSessionSets } from "./sessionSets";
 import {
   formatSwimPace,
@@ -2478,6 +2479,8 @@ export async function syncStrengthHistory(
 
   let fetched = 0;
   let consecutiveFailures = 0;
+  let catalog: ReturnType<typeof catalogIndex> | undefined;
+  const schedules = new Map<string, Promise<Record<string, unknown>>>();
   for (const { activityId, sportType } of missing) {
     try {
       // Same rule as the feel backfill: read a file if there is one, write
@@ -2485,11 +2488,25 @@ export async function syncStrengthHistory(
       const { raw } = await loadActivityDetailRaw(activityId, sportType, {
         persist: false
       });
-      upsertStrengthSessionDetail(
-        activityId,
-        sportType,
-        parseStrengthDetail(raw)
-      );
+      catalog ??= catalogIndex(await loadWorkoutExerciseCatalog("strength"));
+      let detail = parseStrengthDetail(raw, { catalog });
+      const summary = raw.summary as Record<string, unknown> | undefined;
+      if (Number(summary?.hasProgram) > 0 && detail) {
+        const at = getStoredTrainingActivity(activityId)?.startTime;
+        if (at) {
+          const day = formatScheduleDay(new Date(at * 1000));
+          let schedule = schedules.get(day);
+          if (!schedule) {
+            schedule = trainingHubGet<Record<string, unknown>>("/training/schedule/query", {
+              startDate: day, endDate: day, supportRestExercise: 1
+            });
+            schedules.set(day, schedule);
+          }
+          const program = strengthProgramFromSchedule(raw, await schedule);
+          detail = parseStrengthDetail(raw, { catalog, program });
+        }
+      }
+      upsertStrengthSessionDetail(activityId, sportType, detail);
       cacheFeelTypeFromDetail(activityId, raw);
       fetched += 1;
       consecutiveFailures = 0;

@@ -137,7 +137,7 @@ function sessionLiftBests(session: StrengthSession): Map<string, LiftBest> {
   for (const exercise of session.detail.exercises) {
     const name = exerciseDisplayName(exercise.nameKey, exercise.rawName);
     if (name === UNNAMED_EXERCISE) continue;
-    const targets = exerciseTargets(exercise, name);
+    const targets = exerciseTargets(exercise);
     if (targets.generic || targets.mobility) continue;
 
     // A superset can list the same exercise twice in one session; merge.

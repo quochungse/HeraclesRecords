@@ -14,6 +14,7 @@
 import assert from "node:assert/strict";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
+import { strengthExerciseMetadata } from "./fixtures/strength-exercises.mjs";
 
 const repoRoot = path.resolve(import.meta.dirname, "..");
 const bust = Date.now();
@@ -22,12 +23,13 @@ const load = async (...segments) => {
   return import(`${url.href}?cacheBust=${bust}`);
 };
 
-const { MUSCLES, resolveExerciseTargets } = await load("src", "strength", "muscles.ts");
+const { MUSCLES } = await load("src", "strength", "muscles.ts");
 const { buildStrengthAnalytics, heatLevel, metricValue } = await load(
   "src",
   "strength",
   "strengthAnalytics.ts"
 );
+const { exerciseTargets } = await load("src", "strength", "exerciseTargets.ts");
 const { buildExerciseRows, buildSessionStats, buildStrengthSessionIndex, sessionHeat } = await load(
   "src",
   "strength",
@@ -59,6 +61,7 @@ const session = (activityId, startTime, exercises) => ({
 
 const exercise = (nameKey, entries, extra = {}) => ({
   nameKey,
+  ...strengthExerciseMetadata(nameKey),
   sets: entries.length,
   totalReps: entries.reduce((n, e) => n + e.reps, 0),
   entries: entries.map((entry) => ({ restSec: 90, calories: 8, workSec: 40, ...entry })),
@@ -79,7 +82,7 @@ const levels = (heat, metric) =>
 // T1041 = Bench Press, T1061 = Squats, S4208 = COROS "Full Body".
 const UNMAPPED = "Landmine Wobble";
 assert.equal(
-  resolveExerciseTargets(UNMAPPED).activations.length,
+  exerciseTargets(exercise(UNMAPPED, sets(1, 8, 40))).activations.length,
   0,
   "fixture: the unmapped exercise must match no muscle rule"
 );
@@ -103,7 +106,7 @@ assert.equal(
     working: 5
   });
 
-  const benchChest = resolveExerciseTargets("Bench Press").activations.find(
+  const benchChest = exerciseTargets(exercise("T1041", sets(1, 8, 80))).activations.find(
     (a) => a.muscle === "chest"
   ).share;
   assert.ok(Math.abs(entry.analytics.muscleById.chest.sets - 3 * benchChest) < 1e-9);
@@ -147,7 +150,7 @@ assert.equal(
 
 {
   const unmapped = session("unmapped", now - DAY, [exercise(UNMAPPED, sets(3, 10, 40))]);
-  const warmup = session("warmup", now - DAY, [exercise("Warm Up", sets(2, 1, 0))]);
+  const warmup = session("warmup", now - DAY, [exercise("T1120", sets(2, 1, 0))]);
   const empty = session("empty", now - DAY, []);
   const index = buildStrengthSessionIndex([unmapped, warmup, empty]);
 

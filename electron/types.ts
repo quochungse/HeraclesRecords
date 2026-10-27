@@ -569,9 +569,16 @@ export interface StrengthExercise {
   rawName?: string;  // payload name, used to resolve custom exercises
   /** Provider exercise/template identity, when one exists. */
   externalId?: string;
+  /** Stable COROS catalog key, recovered by originId even when the step was renamed. */
+  corosKey?: string;
+  /** Per-exercise COROS metadata: muscle / muscleRelevance, never the session's muscleList. */
+  primaryMuscles?: number[];
+  involvedMuscles?: number[];
+  /** COROS step type: 1 warm-up, 2 work, 3 cool-down, 4 rest. */
+  corosExerciseType?: number;
   /** Provider exercise classification (for example, `weight_reps`). */
   exerciseType?: string;
-  /** Hevy muscle metadata, used only when name-based resolution has no match. */
+  /** Hevy exercise-template muscle metadata. */
   primaryMuscleGroup?: string;
   secondaryMuscleGroups?: string[];
   sets: number;

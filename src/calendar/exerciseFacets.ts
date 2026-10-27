@@ -400,6 +400,24 @@ function applyReview(weights: Partial<Record<MuscleId, number>>, review: Exercis
 
 const optionCache = new WeakMap<WorkoutExerciseOption, ExerciseFacets>();
 
+/** Shared by the Exercises Library and completed-session body charts. No name lookup. */
+export function reviewedMuscleLoads(
+  option: Pick<WorkoutExerciseOption, "corosKey" | "primaryMuscles" | "involvedMuscles">
+): Partial<Record<MuscleId, number>> {
+  const weights: Partial<Record<MuscleId, number>> = {};
+  const take = (codes: readonly number[] | undefined, weight: number) => {
+    for (const code of codes ?? []) {
+      const muscle = COROS_MUSCLES[code];
+      if (muscle) weights[muscle] = Math.max(weights[muscle] ?? 0, weight);
+    }
+  };
+  take(option.involvedMuscles, INVOLVED_WEIGHT);
+  take(option.primaryMuscles, PRIMARY_WEIGHT);
+  applyReview(weights, option.corosKey ? EXERCISE_REVIEW[option.corosKey.toUpperCase()] : undefined);
+  const total = Object.values(weights).reduce((sum, weight) => sum + weight, 0);
+  return Object.fromEntries(Object.entries(weights).map(([muscle, weight]) => [muscle, weight / total]));
+}
+
 /**
  * An option's facets. Everything comes from the catalog row COROS sent — its
  * muscles (a primary mover weighs more than one that only takes part), its
@@ -411,29 +429,10 @@ export function optionFacets(option: WorkoutExerciseOption, name: string): Exerc
   const cached = optionCache.get(option);
   if (cached) return cached;
 
-  const weights: Partial<Record<MuscleId, number>> = {};
-  const take = (codes: readonly number[] | undefined, weight: number) => {
-    for (const code of codes ?? []) {
-      const muscle = COROS_MUSCLES[code];
-      if (muscle) weights[muscle] = Math.max(weights[muscle] ?? 0, weight);
-    }
-  };
-  take(option.involvedMuscles, INVOLVED_WEIGHT);
-  take(option.primaryMuscles, PRIMARY_WEIGHT);
   const review = option.corosKey ? EXERCISE_REVIEW[option.corosKey.toUpperCase()] : undefined;
-  applyReview(weights, review);
-
-  // A muscle's load is its share of the movement's work, as the name rules
-  // state it: the activations sum to 1. A lateral raise that is all shoulder
-  // is 1; a press that leans on the triceps is two thirds shoulder.
-  const total = Object.values(weights).reduce((sum, weight) => sum + weight, 0);
-  const loads: Partial<Record<MuscleId, number>> = {};
-  for (const [muscle, weight] of Object.entries(weights) as [MuscleId, number][]) {
-    loads[muscle] = weight / total;
-  }
-
+  const loads = reviewedMuscleLoads(option);
   const equipment = optionEquipment(option, name, review);
-  const facets = total > 0 || option.corosKey
+  const facets = Object.keys(loads).length > 0 || option.corosKey
     ? facetsFromMuscles(loads, corosEffort(option), equipment)
     : { ...exerciseFacets(name), equipment };
   optionCache.set(option, facets);

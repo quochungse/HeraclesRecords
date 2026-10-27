@@ -4,6 +4,7 @@ import type {
   StrengthSet,
   StrengthSummary
 } from "./types";
+import { strengthExerciseMetadata, type StrengthExerciseContext } from "./strengthExerciseMetadata";
 
 export const REST_MARKER_KEY = "S3618";
 const MODE_SET = 14;
@@ -14,9 +15,10 @@ const TARGET_TIME = 2;
 /**
  * Bumped when the parse changes what it keeps, so `strength_sessions` rows
  * written by an older one are parsed again. 2: sets read by `mode`, timed
- * sets kept, exercises told apart by name as well as index.
+ * sets kept, exercises told apart by name as well as index. 3: preserve the
+ * catalog identity and per-exercise muscle metadata for body attribution.
  */
-export const STRENGTH_DETAIL_VERSION = 2;
+export const STRENGTH_DETAIL_VERSION = 3;
 
 function num(value: unknown): number | undefined {
   return typeof value === "number" && Number.isFinite(value) ? value : undefined;
@@ -97,7 +99,8 @@ function groupByExercise(
 }
 
 function buildExercise(
-  group: Record<string, unknown>[]
+  group: Record<string, unknown>[],
+  context: StrengthExerciseContext
 ): StrengthExercise | undefined {
   // Drop section-rest marker laps entirely.
   const laps = group.filter((l) => l.exerciseNameKey !== REST_MARKER_KEY);
@@ -142,7 +145,7 @@ function buildExercise(
     ? num(aggregate.reps) ?? entries.reduce((s, e) => s + e.reps, 0)
     : entries.reduce((s, e) => s + e.reps, 0);
 
-  return { nameKey, rawName, sets, totalReps, entries };
+  return { nameKey, rawName, sets, totalReps, entries, ...strengthExerciseMetadata(laps, context) };
 }
 
 function parseSummary(raw: Record<string, unknown>): StrengthSummary {
@@ -173,7 +176,8 @@ function parseSummary(raw: Record<string, unknown>): StrengthSummary {
  * Returns undefined when the payload has no strength exercise breakdown.
  */
 export function parseStrengthDetail(
-  raw: Record<string, unknown>
+  raw: Record<string, unknown>,
+  context: StrengthExerciseContext = {}
 ): StrengthDetail | undefined {
   const items = getLapItems(raw);
   const hasExerciseData = items.some(
@@ -183,7 +187,7 @@ export function parseStrengthDetail(
     return undefined;
   }
   const exercises = groupByExercise(items)
-    .map(buildExercise)
+    .map((group) => buildExercise(group, context))
     .filter((e): e is StrengthExercise => e !== undefined && e.entries.length > 0);
   if (exercises.length === 0) {
     return undefined;

@@ -34,6 +34,13 @@ export type CorosExerciseRow = Record<string, unknown>;
 /** Catalog rows by their id, which is a step's `originId`. */
 export type CorosExerciseCatalog = ReadonlyMap<string, CorosExerciseRow>;
 
+/** Stable catalog key, not a display-name match. */
+export function corosExerciseKey(value: unknown): string | undefined {
+  return typeof value === "string" && /^[TS]\d+$/i.test(value)
+    ? value.toUpperCase()
+    : undefined;
+}
+
 /** COROS's exerciseType: 1 warm-up, 2 training, 3 cool-down, 4 rest. */
 type CorosStepExerciseType = 1 | 2 | 3 | 4;
 

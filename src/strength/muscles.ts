@@ -1,16 +1,9 @@
 import { t } from "../i18n/core";
 
 /**
- * Muscle taxonomy for the Strength view.
- *
- * COROS records an exercise key per set (`T####`/`S####` catalogue codes, or a
- * free-text name for user-defined exercises) but never says which muscles the
- * movement works. This module resolves a display name — the same one
- * `resolveExerciseName` produces — into weighted muscle activations, so a
- * session's sets can be attributed to the body map.
- *
- * Matching is name-based rather than code-based on purpose: custom exercises
- * only ever carry a name, and the rules then cover them for free.
+ * Shared muscle taxonomy, provider muscle-code translation, and the legacy
+ * name fallback used by name-only exercise pickers and previews. Completed
+ * sessions use exerciseTargets.ts: identity + metadata + the Library's review.
  */
 
 export type MuscleId =
@@ -471,24 +464,6 @@ const NO_TARGETS: ExerciseTargets = {
   generic: false
 };
 
-const GENERIC_TARGETS: ExerciseTargets = {
-  activations: [],
-  mobility: false,
-  generic: true
-};
-
-/**
- * COROS uses S4208 for unstructured segments it can only describe as "Full
- * Body". That label is useful for display, but it contains no evidence that a
- * particular anatomical muscle was trained.
- */
-export function resolveCorosExerciseTargets(
-  nameKey: string,
-  displayName: string
-): ExerciseTargets {
-  return nameKey === "S4208" ? GENERIC_TARGETS : resolveExerciseTargets(displayName);
-}
-
 const HEVY_GROUPS: Record<string, MuscleId[]> = {
   abdominals: ["abs"],
   shoulders: ["shoulders"],
@@ -510,7 +485,7 @@ const HEVY_GROUPS: Record<string, MuscleId[]> = {
   full_body: ["chest", "lats", "quads", "glutes", "abs"]
 };
 
-/** Use provider muscle metadata only when the richer name rules cannot resolve. */
+/** Translate Hevy's exercise-template muscle metadata without reading a name. */
 export function resolveProviderMuscleTargets(
   primary: string | undefined,
   secondary: string[] | undefined
@@ -539,8 +514,8 @@ export function resolveProviderMuscleTargets(
 
 /**
  * Resolve a display exercise name into weighted muscle activations. Unknown
- * names return no activations rather than a guess, so the body map only ever
- * shows work it can actually account for.
+ * names return no activations rather than a guess. This fallback is for
+ * name-only pickers and previews, not completed-session body charts.
  */
 export function resolveExerciseTargets(name: string): ExerciseTargets {
   const normalized = normalizeExerciseName(name);

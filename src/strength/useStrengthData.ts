@@ -15,6 +15,8 @@ import {
   useSelectionPreference
 } from "../preferences/selectionPreferences";
 import { buildSampleStrengthSessions } from "./sampleSessions";
+import { useWorkoutExerciseCatalog } from "../calendar/useWorkoutExerciseCatalog";
+import { strengthSessionsWithCatalog } from "./exerciseTargets";
 import {
   buildStrengthAnalytics,
   type StrengthAnalytics
@@ -127,6 +129,7 @@ export function useStrengthData({
   const sourceInitializedRef = useRef(sourcePreference.restored);
   const hevyConnected = Boolean(hevyStatus?.connected);
   const anyConnected = corosConnected || hevyConnected;
+  const catalog = useWorkoutExerciseCatalog(api, corosConnected ? "strength" : undefined);
 
   useEffect(() => {
     let active = true;
@@ -275,8 +278,11 @@ export function useStrengthData({
   // Sample mode swaps in a generated history so the page can be worked on
   // without a populated account; nothing about it touches the API or the cache.
   const sessions = useMemo(
-    () => (sampleMode ? buildSampleStrengthSessions(days) : loadedSessions),
-    [sampleMode, days, loadedSessions]
+    () => strengthSessionsWithCatalog(
+      sampleMode ? buildSampleStrengthSessions(days) : loadedSessions,
+      catalog.options
+    ),
+    [sampleMode, days, loadedSessions, catalog.options]
   );
 
   const analytics = useMemo(

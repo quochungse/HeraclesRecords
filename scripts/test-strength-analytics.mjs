@@ -7,6 +7,7 @@
 import assert from "node:assert/strict";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
+import { strengthExerciseMetadata } from "./fixtures/strength-exercises.mjs";
 
 const repoRoot = path.resolve(import.meta.dirname, "..");
 const bust = Date.now();
@@ -15,11 +16,12 @@ const load = async (...segments) => {
   return import(`${url.href}?cacheBust=${bust}`);
 };
 
-const { resolveCorosExerciseTargets, resolveExerciseTargets, MUSCLES } = await load(
+const { resolveExerciseTargets, MUSCLES } = await load(
   "src",
   "strength",
   "muscles.ts"
 );
+const { exerciseTargets } = await load("src", "strength", "exerciseTargets.ts");
 const {
   buildStrengthAnalytics,
   estimateOneRepMax,
@@ -60,7 +62,7 @@ assert.ok(shareOf("Legs & Hips", "quads") > 0);
 assert.ok(shareOf("Arms", "biceps") > 0 && shareOf("Arms", "triceps") > 0);
 
 // COROS S4208 means only "Full Body"; it cannot support specific attribution.
-const genericCorosTargets = resolveCorosExerciseTargets("S4208", "Full Body");
+const genericCorosTargets = exerciseTargets({ nameKey: "S4208" });
 assert.equal(genericCorosTargets.generic, true);
 assert.equal(genericCorosTargets.activations.length, 0);
 assert.equal(shareOf("Full Body", "quads"), 0);
@@ -110,6 +112,7 @@ const session = (activityId, startTime, exercises) => ({
 
 const exercise = (nameKey, entries) => ({
   nameKey,
+  ...strengthExerciseMetadata(nameKey),
   sets: entries.length,
   totalReps: entries.reduce((n, e) => n + e.reps, 0),
   entries: entries.map((entry) => ({ restSec: 90, calories: 8, workSec: 40, ...entry }))
