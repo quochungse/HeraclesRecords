@@ -1253,10 +1253,11 @@
   background: var(--text-primary);
 }
 
-/* Easy to hard in the accent's own steps, deepest for the hardest. */
-.overview-dist [data-intensity="easy"] { --intensity: color-mix(in srgb, var(--accent) 42%, transparent); }
-.overview-dist [data-intensity="moderate"] { --intensity: color-mix(in srgb, var(--accent) 72%, transparent); }
-.overview-dist [data-intensity="hard"] { --intensity: var(--accent-strong); }
+/* Easy to hard in the accent's own steps, deepest for the hardest — here and
+   in the sport sections' intensity. */
+.training-dashboard [data-intensity="easy"] { --intensity: color-mix(in srgb, var(--accent) 42%, transparent); }
+.training-dashboard [data-intensity="moderate"] { --intensity: color-mix(in srgb, var(--accent) 72%, transparent); }
+.training-dashboard [data-intensity="hard"] { --intensity: var(--accent-strong); }
 
 .overview-dist-split-bar [data-intensity] {
   background: var(--intensity);
@@ -1346,6 +1347,427 @@
   filter: saturate(0.8);
 }
 
-:root[data-theme="paper"] .overview-dist [data-intensity="easy"] { --intensity: var(--hall-gold-light); }
-:root[data-theme="paper"] .overview-dist [data-intensity="moderate"] { --intensity: var(--hall-gold); }
-:root[data-theme="paper"] .overview-dist [data-intensity="hard"] { --intensity: var(--hall-gold-deep); }
+:root[data-theme="paper"] .training-dashboard [data-intensity="easy"] { --intensity: var(--hall-gold-light); }
+:root[data-theme="paper"] .training-dashboard [data-intensity="moderate"] { --intensity: var(--hall-gold); }
+:root[data-theme="paper"] .training-dashboard [data-intensity="hard"] { --intensity: var(--hall-gold-deep); }
+
+/* ── One section a sport ────────────────────────────────────────────────── */
+
+.overview-section[data-sport] {
+  --sport-tone: var(--sport-other);
+}
+
+.overview-section[data-sport="run"] { --sport-tone: var(--sport-run); }
+.overview-section[data-sport="bike"] { --sport-tone: var(--sport-bike); }
+.overview-section[data-sport="hiking"] { --sport-tone: var(--sport-hiking); }
+.overview-section[data-sport="strength"] { --sport-tone: var(--sport-strength); }
+
+.overview-sport-icon {
+  align-self: center;
+  color: var(--sport-tone);
+}
+
+.overview-sport {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  padding: 20px;
+}
+
+/* The sport's headline figures in a row, a hairline between them. */
+.overview-sport-kpis {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 16px 0;
+  margin: 0;
+}
+
+.overview-sport-kpis > div {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+  padding: 0 16px;
+  border-left: 1px solid var(--overview-rule);
+}
+
+.overview-sport-kpis > div:first-child {
+  padding-left: 0;
+  border-left: 0;
+}
+
+.overview-sport-kpis dt {
+  color: var(--text-secondary);
+  font-size: 12px;
+  line-height: 1.3;
+}
+
+.overview-sport-kpis dd {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+  margin: 0;
+}
+
+.overview-sport-kpis .figure {
+  color: var(--text-primary);
+  font-size: 28px;
+  line-height: 1;
+}
+
+.overview-sport-unit {
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
+.overview-sport-note {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1.3;
+}
+
+.overview-sport-note .is-up {
+  color: var(--success-text);
+}
+
+.overview-sport-note .is-down {
+  color: var(--warning-text);
+}
+
+.overview-sport-body {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 32px;
+  padding-top: 18px;
+  border-top: 1px solid var(--overview-rule);
+}
+
+.overview-sport-chart {
+  flex: 3 1 420px;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.overview-sport-side {
+  flex: 2 1 300px;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.overview-sport-subhead {
+  margin: 0 0 8px;
+  color: var(--text-primary);
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+.overview-sport-subhead span {
+  color: var(--text-muted);
+  font-weight: 400;
+}
+
+/* Five weeks a column, drawn to the height the column beside it comes to: the
+   plot takes whatever the row leaves, and every bar is a share of it. A right
+   margin past the last column holds the average's figure, over its line. */
+.overview-sport-weeks {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  min-height: 210px;
+}
+
+.overview-sport-plot {
+  position: relative;
+  flex: 1 1 auto;
+  margin: 14px 30px 0 40px;
+}
+
+.overview-sport-grid {
+  position: absolute;
+  right: 0;
+  left: 0;
+  height: 0;
+  border-top: 1px solid var(--overview-rule);
+}
+
+.overview-sport-grid span {
+  position: absolute;
+  top: 0;
+  right: calc(100% + 8px);
+  color: var(--text-muted);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+  white-space: nowrap;
+  transform: translateY(-50%);
+}
+
+.overview-sport-columns {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+
+.overview-sport-column {
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  align-items: center;
+  min-width: 0;
+}
+
+.overview-sport-column b {
+  display: block;
+  box-sizing: border-box;
+  width: min(48px, 56%);
+  border-radius: var(--radius-xs);
+  background: color-mix(in srgb, var(--sport-tone) 70%, transparent);
+}
+
+.overview-sport-column.is-current b {
+  background: var(--sport-tone);
+}
+
+.overview-sport-column b.is-planned {
+  border: 1px dashed var(--sport-tone);
+  border-radius: var(--radius-xs) var(--radius-xs) 0 0;
+  background: repeating-linear-gradient(
+    45deg,
+    color-mix(in srgb, var(--sport-tone) 60%, transparent) 0 2px,
+    transparent 2px 6px
+  );
+}
+
+.overview-sport-column b.is-planned + b {
+  border-radius: 0 0 var(--radius-xs) var(--radius-xs);
+}
+
+.overview-sport-column em {
+  max-width: 100%;
+  margin-bottom: 6px;
+  overflow: hidden;
+  color: var(--text-secondary);
+  font-size: 11px;
+  font-style: normal;
+  line-height: 1;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.overview-sport-average {
+  position: absolute;
+  right: -30px;
+  left: -6px;
+  height: 0;
+  border-top: 1.5px dashed var(--accent);
+}
+
+.overview-sport-average span {
+  position: absolute;
+  right: 0;
+  bottom: 4px;
+  color: var(--accent);
+  font-size: 11px;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.overview-sport-labels {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  margin: 8px 30px 0 40px;
+  color: var(--text-muted);
+  font-size: 11px;
+  line-height: 1.3;
+  text-align: center;
+}
+
+.overview-sport-labels .is-current {
+  color: var(--text-primary);
+}
+
+/* Easy, moderate and hard under the split bar the distribution draws. */
+.overview-sport-split {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin: 12px 0 0;
+  font-size: 12px;
+  line-height: 1.3;
+}
+
+.overview-sport-split dt {
+  color: var(--text-secondary);
+}
+
+.overview-sport-split dd {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+  margin: 2px 0 0;
+}
+
+.overview-sport-split .figure {
+  color: var(--text-primary);
+  font-size: 14px;
+}
+
+.overview-sport-types ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.overview-sport-types li {
+  display: grid;
+  grid-template-columns: 96px minmax(0, 1fr) 40px;
+  align-items: center;
+  gap: 12px;
+  padding: 6px 0;
+  color: var(--text-primary);
+  font-size: 13px;
+  line-height: 1.3;
+}
+
+.overview-sport-types i {
+  display: block;
+  height: 6px;
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--text-primary) 8%, transparent);
+}
+
+.overview-sport-types i b {
+  display: block;
+  height: 100%;
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--text-primary) 62%, transparent);
+}
+
+.overview-sport-types .figure {
+  font-size: 13px;
+  text-align: right;
+}
+
+.overview-sport-types > .overview-sport-note {
+  margin-top: 8px;
+}
+
+/* The longest, the last and the next, as one line of links. */
+.overview-sport-facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 32px;
+  padding-top: 14px;
+  border-top: 1px solid var(--overview-rule);
+  color: var(--text-primary);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.overview-sport-fact-label,
+.overview-sport-fact-meta {
+  color: var(--text-muted);
+}
+
+.overview-sport-fact-link {
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-xs);
+  background: none;
+  color: var(--accent);
+  font: inherit;
+  cursor: pointer;
+  transition: color var(--dur-fast) var(--ease);
+}
+
+.overview-sport-fact-link:hover {
+  color: var(--accent-strong);
+}
+
+.overview-sport-fact-link:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: 2px;
+}
+
+.overview-sport-hikes {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.overview-sport-hike {
+  display: grid;
+  grid-template-columns: 40px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+  padding: 12px 14px;
+  border: 1px solid var(--overview-rule);
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--text-primary) 3%, transparent);
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: background var(--dur-fast) var(--ease);
+}
+
+.overview-sport-hike:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--text-primary) 6%, transparent);
+}
+
+.overview-sport-hike:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: 2px;
+}
+
+.overview-sport-hike-icon {
+  display: inline-grid;
+  width: 40px;
+  height: 40px;
+  place-items: center;
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--sport-tone) 14%, transparent);
+  color: var(--sport-tone);
+}
+
+.overview-sport-hike-copy {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+  color: var(--text-secondary);
+  font-size: 12px;
+  line-height: 1.3;
+}
+
+.overview-sport-hike-copy strong {
+  overflow: hidden;
+  color: var(--text-primary);
+  font-size: 14px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.overview-sport-hike-figures {
+  display: grid;
+  justify-items: end;
+  gap: 3px;
+  color: var(--text-secondary);
+  font-size: 12px;
+  line-height: 1.3;
+}
+
+.overview-sport-hike-figures .figure {
+  color: var(--text-primary);
+  font-size: 18px;
+}

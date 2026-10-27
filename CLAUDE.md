@@ -2270,6 +2270,18 @@ lives at module level for the same visit-to-visit reason — see `useCalendarDat
   by zone in the app's zone colours (`zoneColor`) and COROS's names (`zoneNamesFor`). **Distance
   zones went with the donuts**, by decision, and `distanceZones.ts` and its suite with them.
   The screenshot demo's `hrTime` had been in hours; COROS sends seconds.
+  **One section a sport** (`OverviewSports`, `sportModel.ts`): Running, Cycling and Hiking,
+  each drawn only when the athlete trained in it in the last four calendar weeks (cut at the
+  Monday the sport screens cut at) and its screen is on the rail (`hiddenSportScreens`). Each
+  is its screen's own figures in brief — the screens' builders (`buildRunWeeks`,
+  `buildRideWeeks`, `buildHikeWeeks`, `runIntensityMix`, `climbingRate`…), never a copy — a
+  five-week chart drawn to the height of the column beside it with the four weeks before as a
+  dashed mean, and the way out to the screen and to a session (`onOpenActivity`). A run's or
+  a ride's **session type** is its training label (`trainingBenefit`: a shape — intervals,
+  strides, long — before its primary benefit), counted over the window from summaries the
+  section sweeps as the Running and Cycling lists sweep theirs (`requireIntensity`). This
+  week's planned distance on Running is the calendar's from today, less what a session today
+  answered (`plannedThisWeek`, through `pairTodayPlan`).
 - **Sleep** (`sleepDataService`, `sleepHistoryService`, `sleepSeriesService`, `src/sleep/`) —
   nights from the COROS MCP server, cached in `sleep_nights` because COROS keeps only ~9
   weeks. **`totalMinutes` is the main sleep and nothing else** — the stage percentages, the

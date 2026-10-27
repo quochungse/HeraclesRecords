@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import { OverviewComingUp } from "./overview/OverviewComingUp";
 import { OverviewDistribution } from "./overview/OverviewDistribution";
+import { OverviewSports } from "./overview/OverviewSports";
 import { OverviewToday } from "./overview/OverviewToday";
 import { TrainingHeatmapPanel } from "./components/TrainingHeatmapPanel";
 import { TrainingTrendCharts } from "./components/TrainingTrendChart";
@@ -65,6 +66,7 @@ export function TrainingOverview({
   onCancelTwoFactor,
   onReconnect,
   showStrength = true,
+  hiddenSportScreens,
   onOpenActivity,
   onOpenView
 }: TrainingOverviewProps) {
@@ -452,6 +454,20 @@ export function TrainingOverview({
             hrZoneModel={hrZoneModel}
             lthrZones={snapshot?.dashboard?.lthrZones ?? []}
             loading={snapshotPending || activitiesPending}
+          />
+          <OverviewSports
+            api={api}
+            connected={connected}
+            activities={activities}
+            upcomingWorkouts={upcomingWorkouts}
+            profile={corosProfile}
+            hrZoneModel={hrZoneModel}
+            zonesSettled={corosProfileSettled}
+            lthrZones={snapshot?.dashboard?.lthrZones ?? []}
+            vo2Readings={vo2Readings}
+            hiddenSportScreens={hiddenSportScreens}
+            onOpenActivity={onOpenActivity}
+            onOpenView={onOpenView}
           />
           {showStrength ? (
             <Suspense fallback={null}>

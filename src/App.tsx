@@ -1917,6 +1917,7 @@ export default function App() {
                         onLogin={handleTrainingHubLogin}
                         onReconnect={handleTrainingHubReconnect}
                         showStrength={!hiddenSportScreens.includes("strength")}
+                        hiddenSportScreens={hiddenSportScreens}
                         onOpenActivity={(activityId) => openActivityFrom(activityId, "overview")}
                         onOpenView={setActiveView}
                       />

@@ -222,4 +222,55 @@ close(reserve.hard, 0.1, "zones 4 and up are hard");
 const maxHr = intensityShares(zones.rows, "maxHr");
 close(maxHr.easy, 0.9, "under Max HR the easy band reaches a zone further");
 
+// --- The sport sections' shared arithmetic.
+const sportUrl = pathToFileURL(path.join(repoRoot, "src", "training", "overview", "sportModel.ts"));
+const { sportWindow, previousWeeksAverage, plannedThisWeek, nextPlanned, longestAndLast } = await import(
+  `${sportUrl.href}?cacheBust=${Date.now()}`
+);
+// Saturday 24 October 2026: the four weeks start on Monday 28 September.
+const inWindow = sportWindow(
+  [
+    { activityId: "sunday-before", startTime: Math.floor(new Date(2026, 8, 27, 18).getTime() / 1000) },
+    { activityId: "monday-start", startTime: Math.floor(new Date(2026, 8, 28, 7).getTime() / 1000) },
+    { activityId: "today", startTime: at(24, 7) },
+    { activityId: "tomorrow", startTime: at(25, 7) }
+  ],
+  now.getTime()
+).map((activity) => activity.activityId);
+assert.ok(inWindow.includes("monday-start") && inWindow.includes("today"), "four calendar weeks, this one included");
+assert.ok(!inWindow.includes("sunday-before"), "cut at the Monday the sport screens cut at");
+assert.ok(!inWindow.includes("tomorrow"), "nothing from the future");
+
+assert.equal(previousWeeksAverage([40, 20, 60, 36, 28]), 39, "the four weeks before this one");
+assert.equal(previousWeeksAverage([12]), undefined, "no weeks before, no average");
+
+const plans = [
+  { happenDay: "20261024", name: "Easy run", sportType: 1, volume: "8.00km" },
+  { happenDay: "20261024", name: "Spin", sportType: 2, volume: "30.00km" },
+  { happenDay: "20261025", name: "Long run", sportType: 1, volume: "20.00km" },
+  { happenDay: "20261026", name: "Next week", sportType: 1, volume: "10.00km" }
+];
+assert.deepEqual(plannedThisWeek(plans, [], "run", now), { count: 2, km: 28 }, "today's run and Sunday's, not Monday's");
+assert.deepEqual(
+  plannedThisWeek(plans, [{ activityId: "done", sportType: 100, startTime: at(24, 7) }], "run", now),
+  { count: 1, km: 20 },
+  "today's run, done, is no longer planned"
+);
+assert.equal(nextPlanned(plans, "bike", now)?.name, "Spin");
+assert.equal(nextPlanned(plans, "swim", now), undefined);
+
+const { longest, last } = longestAndLast(
+  [
+    { activityId: "a", distance: 8000, startTime: 1 },
+    { activityId: "b", distance: 21000, startTime: 2 },
+    { activityId: "c", startTime: 3 }
+  ],
+  [
+    { activityId: "a", startTime: 1 },
+    { activityId: "z", startTime: 9 }
+  ]
+);
+assert.equal(longest?.activityId, "b", "the longest by distance; a session with none is no candidate");
+assert.equal(last?.activityId, "z", "the newest of all, not only the window's");
+
 console.log("overview model OK");
