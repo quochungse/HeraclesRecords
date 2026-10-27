@@ -79,7 +79,7 @@ async function chooseConversationModel(value) {
 async function main() {
   await app.whenReady();
   win = new BrowserWindow({ show: false, width: 1200, height: 900,
-    webPreferences: { backgroundThrottling: false } });
+    webPreferences: { backgroundThrottling: false, offscreen: true } });
   const providerAsset = fs.readdirSync(path.join(repoRoot, "dist-harness/assets"))
     .find((name) => /^CoachModelsPanel-.*\.js$/.test(name));
   assert.ok(providerAsset, "provider management must be a separate renderer chunk");
@@ -223,7 +223,16 @@ async function main() {
           { value: "future-depth", description: "A new depth supplied by ChatGPT" }
         ] } },
       { value: "gpt-other", label: "Other model", reasoning: {
-        defaultEffort: "alternate-depth", efforts: [{ value: "alternate-depth" }] } }
+        defaultEffort: "alternate-depth", efforts: [{ value: "alternate-depth" }] } },
+      { value: "gpt-full", label: "Full effort model", reasoning: {
+        defaultEffort: "low", efforts: [
+          { value: "low", description: "Fast responses with lighter reasoning" },
+          { value: "medium", description: "Balances speed and reasoning depth for everyday tasks" },
+          { value: "high", description: "Greater reasoning depth for complex problems" },
+          { value: "xhigh", description: "Extra high reasoning depth for complex problems" },
+          { value: "max", description: "Maximum reasoning depth for the hardest problems" },
+          { value: "ultra", description: "Maximum reasoning with automatic task delegation" }
+        ] } }
     ] } }
   };
   const conversation = { sessionId: "s1", sources: { activities: true, sleep: true, zones: true },
@@ -260,6 +269,47 @@ async function main() {
   assert.deepEqual(await evaluate(`Array.from(document.querySelectorAll('.app-select-menu [role="option"]')).map(row => row.dataset.value)`),
     ["", "alternate-depth"]);
   assert.deepEqual(await harness("consoleErrors"), [], "no effort renderer errors");
+
+  // Wrapped effort descriptions at fractional zoom used to toggle the menu's
+  // scrollbar and height on every ResizeObserver pass. Offscreen rendering
+  // above keeps animation frames running in this hidden test window.
+  await harness("click", effortTrigger);
+  await chooseConversationModel("gpt-full");
+  for (const { zoom, height, scrolls } of [
+    { zoom: 1.1, height: 1400, scrolls: false },
+    { zoom: 1.25, height: 1400, scrolls: false },
+    { zoom: 1.3, height: 1400, scrolls: false },
+    { zoom: 1.25, height: 450, scrolls: true }
+  ]) {
+    win.setContentSize(520, height);
+    win.webContents.setZoomFactor(zoom);
+    await new Promise((resolve) => setTimeout(resolve, 300));
+    await evaluate(`document.querySelector(${JSON.stringify(effortTrigger)}).scrollIntoView({ block: 'nearest' })`);
+    await harness("click", effortTrigger);
+    const samples = await evaluate(`new Promise((resolve) => {
+      const samples = [];
+      let frames = 0;
+      function sample() {
+        const menu = document.querySelector('.app-select-menu');
+        const rect = menu.getBoundingClientRect();
+        if (frames++ >= 20) samples.push({
+          height: rect.height, side: menu.dataset.side,
+          scrolls: menu.scrollHeight > menu.clientHeight + 1,
+          onScreen: rect.top >= 0 && rect.bottom <= window.innerHeight
+        });
+        if (samples.length < 20) requestAnimationFrame(sample);
+        else resolve(samples);
+      }
+      requestAnimationFrame(sample);
+    })`);
+    assert.equal(new Set(samples.map((sample) => JSON.stringify(sample))).size, 1,
+      `${zoom} zoom: effort menu settles instead of flickering: ${JSON.stringify(samples)}`);
+    assert.equal(samples[0].scrolls, scrolls, `${zoom} zoom, ${height}px: only a constrained list scrolls`);
+    assert.equal(samples[0].onScreen, true, `${zoom} zoom: effort menu stays in the viewport`);
+    await harness("click", effortTrigger);
+  }
+  win.webContents.setZoomFactor(1);
+  win.setContentSize(1200, 900);
 
   // An explicit Auto belongs to the conversation even when provider settings
   // still name a model. Changing it stores the complete choice for future chats.
@@ -466,7 +516,7 @@ async function main() {
   assert.equal((await harness("consoleErrors")).some((error) => /unhandled rejection|uncaught:/.test(error)), false,
     "the chunk error is caught by the provider boundary");
 
-  console.log("coach providers renderer OK — lazy loading, chunk failure, login, logout, manual refresh, return from Settings, responsive themes");
+  console.log("coach providers renderer OK — lazy loading, chunk failure, login, logout, manual refresh, return from Settings, responsive themes, stable effort menu at fractional zoom");
 }
 
 main().then(() => app.quit()).catch((error) => {

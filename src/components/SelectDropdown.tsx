@@ -163,8 +163,8 @@ export function SelectDropdown<T extends string>({
      * picker and every model list opened already scrolled — with the scrollbar
      * as the only sign there was more. `scrollHeight` is the content, and the
      * border it does not include is added back, so a list that fits shows a
-     * menu exactly as tall as itself and no scrollbar at all. What is left
-     * bounding it is the window, which is a real limit rather than a guess.
+     * menu exactly as tall as itself and no scrollbar at all. This measurement
+     * decides which side opens; CSS sizes the menu within the available room.
      */
     const menu = menuRef.current;
     // Only trusted once the menu has been laid out. Before that there is
@@ -195,7 +195,11 @@ export function SelectDropdown<T extends string>({
       top: opensUp ? trigger.top - MENU_GAP : trigger.bottom + MENU_GAP,
       minWidth,
       maxWidth,
-      maxHeight: Math.min(wanted, availableRoom),
+      // Cap only at the viewport; let CSS keep a shorter list at its natural
+      // height. Capping at the measured scrollHeight feeds rounded dimensions
+      // back into ResizeObserver: at fractional zoom a scrollbar can appear,
+      // wrap a label, then disappear on the next pass, forever.
+      maxHeight: availableRoom,
       transform: opensUp ? "translateY(-100%)" : undefined
     });
     setPortalTheme({
