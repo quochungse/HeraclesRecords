@@ -211,7 +211,7 @@ await test("a run's trail is what the stream said, a line each", () => {
   notes = trail.noteRead(notes, "coros__querySleepData");
   assert.deepEqual(
     notes.trail.map((item) => [item.done, item.count]),
-    [["Read your training snapshot", 1], ["Read your recent activities", 1], ["Looked at a session in detail", 2], ["Read COROS", 1]],
+    [["Caught up on your training", 1], ["Read your recent activities", 1], ["Looked at a session in detail", 2], ["Read COROS", 1]],
     "three sessions looked at is one line, counted"
   );
   notes = trail.noteHandOver(notes, "outline", 1);

@@ -383,7 +383,7 @@ test("the step's trail: reads, the hand-over, the check sent back, the check pas
   run = stepRun.stepRunEvent(run, { kind: "passed" });
   assert.equal(run.attempts, 2);
   assert.deepEqual(run.notes.trail.map((item) => item.done), [
-    "Read your training snapshot",
+    "Caught up on your training",
     "Read your training zones",
     "Weighing the long run",
     "Handed the sessions to the check",
