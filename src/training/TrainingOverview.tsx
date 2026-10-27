@@ -20,7 +20,6 @@ import { OverviewDistribution } from "./overview/OverviewDistribution";
 import { OverviewSports } from "./overview/OverviewSports";
 import { OverviewToday } from "./overview/OverviewToday";
 import { TrainingHeatmapPanel } from "./components/TrainingHeatmapPanel";
-import { TrainingTrendCharts } from "./components/TrainingTrendChart";
 import { snapshotVo2Readings } from "./parsers";
 import { renderRich } from "../i18n/useI18n";
 import type { TrainingOverviewProps } from "./types";
@@ -31,13 +30,7 @@ import "./overview/overview.css";
 
 // The body map drags in three.js and a GLTF mannequin. Overview is the default
 // startup view, so that weight stays out of its first chunk.
-const LazyStrengthDistributionSection = lazy(() =>
-  import("../strength/StrengthDistributionSection").then(
-    ({ StrengthDistributionSection }) => ({
-      default: StrengthDistributionSection
-    })
-  )
-);
+const LazyOverviewStrength = lazy(() => import("./overview/OverviewStrength"));
 
 export function TrainingOverview({
   api,
@@ -471,15 +464,15 @@ export function TrainingOverview({
           />
           {showStrength ? (
             <Suspense fallback={null}>
-              <LazyStrengthDistributionSection api={api} status={status} />
+              <LazyOverviewStrength
+                api={api}
+                connected={connected}
+                upcomingWorkouts={upcomingWorkouts}
+                onOpenActivity={onOpenActivity}
+                onOpenView={onOpenView}
+              />
             </Suspense>
           ) : null}
-          <TrainingTrendCharts
-            points={snapshot?.trendPoints ?? []}
-            mcpState={snapshot?.sleep?.mcpState}
-            loading={snapshotPending}
-            sleepLoading={sleepConnecting && !snapshot?.sleep}
-          />
         </>
       ) : null}
     </div>

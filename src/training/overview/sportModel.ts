@@ -27,10 +27,10 @@ export const SPORT_WINDOW_WEEKS = 4;
 export const SPORT_CHART_WEEKS = 5;
 
 /** The sessions of the last four calendar weeks, cut at the Monday the sport screens cut at. */
-export function sportWindow(
-  activities: readonly TrainingHubActivity[],
+export function sportWindow<T extends { startTime?: number }>(
+  activities: readonly T[],
   nowMs: number
-): TrainingHubActivity[] {
+): T[] {
   const cutoff = runWindowStartMs(SPORT_WINDOW_WEEKS, nowMs) / 1000;
   return activities.filter((activity) => {
     const start = activity.startTime ?? 0;

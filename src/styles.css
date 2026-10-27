@@ -5700,16 +5700,6 @@ td span {
   }
 }
 
-/* HRV and sleep, side by side. The positional rules that used to live here —
-   a full-width span for the load chart, and a parity swap for the training
-   calendar it shared a row with — went with those two panels: the grid now
-   holds exactly two, and neither is ever the odd one out. */
-.training-chart-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 18px;
-}
-
 .training-chart-panel {
   --chart-panel-tint: color-mix(in srgb, var(--accent-strong) 8%, transparent);
   --chart-curve-glow: color-mix(in srgb, var(--accent-strong) 30%, transparent);
@@ -5834,24 +5824,6 @@ td span {
   border-top: 2px dashed var(--accent-gold);
 }
 
-/* A baseline is drawn dashed; a scored series is not. */
-.training-chart-legend-line.is-solid {
-  border-top-style: solid;
-}
-
-/* `is-series` takes its color from the chart palette, handed in inline — the
-   theme's `--accent` is switchable from Settings and says nothing about what a
-   chart drew. The swatch mirrors a bar: `--swatch-fill` inside a hairline of
-   `--swatch-color`, which is left set so the base glow still resolves. */
-.training-chart-legend-swatch.is-series {
-  border-color: var(--swatch-color);
-  background: var(--swatch-fill);
-}
-
-.training-chart-legend-line.is-series {
-  border-top-color: var(--swatch-color);
-}
-
 .training-chart-tooltip {
   position: relative;
   display: grid;
@@ -5926,23 +5898,6 @@ td span {
   font-weight: 700;
 }
 
-/* A miniature of one column block, so the key and the chart are visibly the
-   same object: same gradient, same hairline, same rounded top. */
-.training-chart-legend-swatch {
-  width: 9px;
-  height: 14px;
-  flex-shrink: 0;
-  border: 1px solid color-mix(in srgb, var(--swatch-color) 55%, transparent);
-  border-radius: var(--radius-xs) var(--radius-xs) var(--radius-xs) var(--radius-xs);
-  background:
-    linear-gradient(
-      180deg,
-      var(--swatch-color),
-      color-mix(in srgb, var(--swatch-color) 62%, transparent)
-    );
-  box-shadow: none;
-}
-
 .training-chart-empty {
   display: grid;
   align-content: center;
@@ -5998,26 +5953,6 @@ td span {
   background: rgba(255, 255, 255, 0.025);
   padding: 24px 12px;
   text-align: center;
-}
-
-.training-load-profile {
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-}
-
-.training-load-profile-header .eyebrow {
-  margin: 0;
-}
-
-.training-load-profile-header h2 {
-  margin: 2px 0 0;
-  font-size: 18px;
-}
-
-.training-load-profile-header h2 span {
-  opacity: 0.6;
-  font-weight: 500;
 }
 
 .sr-only {
@@ -7712,7 +7647,6 @@ td span {
     padding: clamp(30px, 3.8vw, 48px) clamp(28px, 4vw, 50px);
   }
 
-  .training-chart-grid,
   .training-activities-split,
   .activity-detail-visuals {
     grid-template-columns: 1fr;
@@ -7763,8 +7697,7 @@ td span {
   }
 
   .training-command-center,
-.training-login-fields,
-.training-chart-grid {
+.training-login-fields {
     grid-template-columns: 1fr;
   }
 
@@ -15953,10 +15886,6 @@ label.chat-settings-toggle-row {
 
 :root[data-theme="paper"] .training-chart-legend-dot.is-accent {
   box-shadow: 0 0 6px color-mix(in srgb, var(--accent) 35%, transparent);
-}
-
-:root[data-theme="paper"] .training-chart-legend-swatch {
-  box-shadow: 0 0 5px color-mix(in srgb, var(--swatch-color) 22%, transparent);
 }
 
 /* --- Training Hub: tooltips ------------------------------------------------ */

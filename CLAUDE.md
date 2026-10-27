@@ -2282,6 +2282,17 @@ lives at module level for the same visit-to-visit reason — see `useCalendarDat
   section sweeps as the Running and Cycling lists sweep theirs (`requireIntensity`). This
   week's planned distance on Running is the calendar's from today, less what a session today
   answered (`plannedThisWeek`, through `pairTodayPlan`).
+  **Strength** (`OverviewStrength`, lazy — the body map is three.js) is the same section for
+  lifting: the four weeks' sessions, tonnage, sets and time, the Strength screen's own
+  `StrengthHero` (the 3D body map and the muscle breakdown, its figure on a 350px stage and
+  the breakdown scrolling beside it) read over **these four weeks** — `buildStrengthAnalytics`
+  on the window, not the screen's `strength.days` window, which is shared and left alone —
+  and the last session and the next. The hero sits inside a `.strength-view`, whose scope
+  carries the heat ramp and the stage the hero reads; outside it the bars and the stage draw
+  empty. It replaced Strength Distribution. **The HRV and Sleep trend charts left Overview**
+  with the approved design (they stay on the Sleep screen), as did the Upcoming Workouts,
+  Recovery, Weekly Activity and Sleep cards, the zone donuts and their CSS; the strings only
+  those panels read went from all thirteen languages.
 - **Sleep** (`sleepDataService`, `sleepHistoryService`, `sleepSeriesService`, `src/sleep/`) —
   nights from the COROS MCP server, cached in `sleep_nights` because COROS keeps only ~9
   weeks. **`totalMinutes` is the main sleep and nothing else** — the stage percentages, the

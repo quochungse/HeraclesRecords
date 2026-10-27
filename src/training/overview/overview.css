@@ -1771,3 +1771,31 @@
   color: var(--text-primary);
   font-size: 18px;
 }
+
+/* Strength: the Strength screen's body map and muscle breakdown, inside the
+   section's panel rather than a card of their own, the figure on a stage the
+   width of the mockup's and the breakdown scrolling beside it. */
+.overview-strength-hero .panel.strength-hero {
+  grid-template-columns: minmax(280px, 350px) minmax(0, 1fr);
+  border: 0;
+  background: none;
+  box-shadow: none;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+
+.overview-strength-hero .strength-body-panel {
+  min-height: 560px;
+  border: 1px solid var(--body-stage-border);
+  border-radius: var(--radius-md);
+}
+
+.overview-strength-hero .strength-muscle-panel {
+  padding: 0 0 0 24px;
+}
+
+.overview-strength .overview-sport-note[role="status"] {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
