@@ -75,7 +75,11 @@ function SportTile({ category, icon: Icon, done }: { category: SportColorCategor
   );
 }
 
-/** One of today's sessions: what it is, what it came to, and the way into it. */
+/**
+ * One of today's sessions, what it is and what it came to, pressed as a whole
+ * as a day on the right is: a plan opens the Calendar's sheet, a session its
+ * own page. A session with no way to open it is not a button.
+ */
 function TodayEntry({
   item,
   lead,
@@ -89,25 +93,24 @@ function TodayEntry({
   onOpenActivity?: (activityId: string) => void;
 }) {
   const { unitSystem } = useUnitSystem();
+  const className = `overview-plan-entry${item.kind === "done" ? " is-done" : ""}${lead ? " is-lead" : ""}`;
+  const chevron = <ChevronRight className="overview-plan-chevron" size={18} aria-hidden="true" />;
   if (item.kind === "planned") {
     const view = plannedView(item.workout);
     const tag = planTag(item.workout);
     const stats = formatUpcomingWorkoutRowStats(item.workout.volume, item.workout.trainingLoad, unitSystem);
     return (
-      <div className={`overview-plan-entry${lead ? " is-lead" : ""}`}>
+      <button type="button" className={className} onClick={() => onOpenWorkout(item.workout)}>
         <SportTile category={view.category} icon={view.icon} />
-        <div className="overview-plan-copy">
-          <p className="overview-plan-title">
+        <span className="overview-plan-copy">
+          <span className="overview-plan-title">
             <span>{item.workout.name}</span>
             {tag ? <span className="overview-chip">{tag}</span> : null}
-          </p>
-          {stats ? <p className="overview-plan-meta">{stats}</p> : null}
-        </div>
-        <button type="button" className="overview-plan-open" onClick={() => onOpenWorkout(item.workout)}>
-          {lead ? t("overview.comingUp.openWorkout") : t("overview.comingUp.open")}
-          <ChevronRight size={14} aria-hidden="true" />
-        </button>
-      </div>
+          </span>
+          {stats ? <span className="overview-plan-meta">{stats}</span> : null}
+        </span>
+        {chevron}
+      </button>
     );
   }
 
@@ -115,36 +118,42 @@ function TodayEntry({
   const category = sportColorCategory(activity.sportType);
   const against = lead ? loadAgainstPlan(activity.trainingLoad, workout?.trainingLoad) : undefined;
   const name = activityTitle(activity);
-  return (
-    <div className={`overview-plan-entry is-done${lead ? " is-lead" : ""}`}>
+  // Named by its plan, the session's own name goes with its figures.
+  const meta = [workout && workout.name !== name ? name : null, doneLine(activity, unitSystem)]
+    .filter(Boolean)
+    .join(" · ");
+  const body = (
+    <>
       <SportTile category={category} icon={Check} done />
-      <div className="overview-plan-copy">
-        <p className="overview-plan-title">
+      <span className="overview-plan-copy">
+        <span className="overview-plan-title">
           <span>{workout?.name ?? name}</span>
           <span className="overview-chip is-done">{t("overview.comingUp.done")}</span>
-        </p>
-        <p className="overview-plan-meta">{doneLine(activity, unitSystem)}</p>
-      </div>
-      {onOpenActivity ? (
-        <button type="button" className="overview-plan-open" onClick={() => onOpenActivity(activity.activityId)}>
-          {lead ? name : t("overview.comingUp.session")}
-          <ChevronRight size={14} aria-hidden="true" />
-        </button>
-      ) : null}
+        </span>
+        <span className="overview-plan-meta">{meta}</span>
+      </span>
+      {onOpenActivity ? chevron : null}
       {against ? (
-        <div className="overview-plan-against">
-          <div
+        <span className="overview-plan-against">
+          <span
             className="overview-plan-against-bar"
             style={{ "--against-fill": against.fill, "--against-mark": against.mark } as CSSProperties}
             aria-hidden="true"
           >
             <span />
             <b />
-          </div>
-          <p className="overview-plan-meta">{t("overview.comingUp.ofPlannedLoad", { percent: against.percent })}</p>
-        </div>
+          </span>
+          <span className="overview-plan-meta">{t("overview.comingUp.ofPlannedLoad", { percent: against.percent })}</span>
+        </span>
       ) : null}
-    </div>
+    </>
+  );
+  return onOpenActivity ? (
+    <button type="button" className={className} onClick={() => onOpenActivity(activity.activityId)}>
+      {body}
+    </button>
+  ) : (
+    <div className={className}>{body}</div>
   );
 }
 
@@ -224,15 +233,18 @@ export function OverviewComingUp({
               <p className="overview-plan-meta">{t("overview.upcoming.noneToday")}</p>
             </div>
           ) : (
-            today.map((item) => (
-              <TodayEntry
-                key={item.key}
-                item={item}
-                lead={today.length === 1}
-                onOpenWorkout={setSelected}
-                onOpenActivity={onOpenActivity}
-              />
-            ))
+            <ul className="overview-plan-list">
+              {today.map((item) => (
+                <li key={item.key}>
+                  <TodayEntry
+                    item={item}
+                    lead={today.length === 1}
+                    onOpenWorkout={setSelected}
+                    onOpenActivity={onOpenActivity}
+                  />
+                </li>
+              ))}
+            </ul>
           )}
         </div>
 

@@ -101,7 +101,10 @@ function blockName(block: WeekBlock): string {
   return block.name || SPORT_COLOR_LABELS[block.category];
 }
 
-/** A tooltip's sessions, a row each: the sport in its colour, the name, its figures. */
+/**
+ * A tooltip's sessions, two lines each: the sport in its colour beside the
+ * name, and its figures under the name, so a long name is not cut short.
+ */
 function TipSessions({ blocks }: { blocks: readonly WeekBlock[] }) {
   if (blocks.length === 0) {
     return null;

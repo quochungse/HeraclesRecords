@@ -2,8 +2,8 @@
 //
 // Today is read four ways, and each is a different screen:
 //
-// - a session planned and not done: the plan, and the way into it;
-// - done: the session, read against what was planned, and the way into the
+// - a session planned and not done: the plan, pressed as a whole to open it;
+// - done: the session, read against what was planned, pressed to open the
 //   session rather than the plan;
 // - two today, one done: both, the done one first, and a count;
 // - nothing today: a rest day, and nothing to press.
@@ -120,7 +120,8 @@ async function main() {
   assert.equal(await harness("exists", ".overview-plan-today.is-planned"), true);
   assert.equal(await harness("count", ".overview-plan-today .overview-plan-entry.is-lead"), 1);
   assert.match(await harness("text", ".overview-plan-today .overview-plan-title"), /Easy run 8 km/);
-  assert.match(await harness("text", ".overview-plan-today .overview-plan-open"), /Open workout/);
+  assert.equal(await harness("exists", ".overview-plan-today button.overview-plan-entry"), true, "the plan is pressed as a whole, as a day after it is");
+  assert.equal(await harness("count", ".overview-plan-today button"), 1, "no button of its own inside it");
   assert.equal(await harness("exists", ".overview-plan-against"), false, "nothing to read a plan against yet");
   assert.match(await harness("text", ".overview-section-aside"), /^Next 7 days · 4 workouts/, "the week ahead, today's included");
   assert.equal(await harness("count", ".overview-plan-row"), 3, "three of the days after, the tenth day left off");
@@ -131,8 +132,12 @@ async function main() {
   assert.equal(await harness("exists", ".overview-plan-today.is-done"), true);
   assert.match(await harness("text", ".overview-plan-today .overview-plan-title"), /Easy run 8 km\s*Done/, "the plan's name, marked done");
   assert.match(await harness("text", ".overview-plan-against"), /109% of planned load/);
-  assert.equal(await harness("text", ".overview-plan-today .overview-plan-open"), "Morning run");
-  assert.equal(await harness("click", ".overview-plan-today .overview-plan-open"), true);
+  assert.match(
+    await harness("text", ".overview-plan-today .overview-plan-copy > .overview-plan-meta"),
+    /^Morning run · /,
+    "named by its plan, the session's own name goes with its figures"
+  );
+  assert.equal(await harness("click", ".overview-plan-today button.overview-plan-entry"), true);
   assert.deepEqual(
     (await harness("calls", "prop:onOpenActivity")).map((call) => call.args),
     [["run-today"]],
@@ -144,7 +149,7 @@ async function main() {
   assert.match(await harness("text", ".overview-plan-today .eyebrow"), /1 of 2 done/);
   assert.equal(await harness("count", ".overview-plan-today .overview-plan-entry"), 2);
   assert.equal(await harness("exists", ".overview-plan-entry.is-lead"), false, "two sessions are two rows, neither at full size");
-  assert.equal(await harness("exists", ".overview-plan-today .overview-plan-entry.is-done:first-of-type"), true, "the done one first");
+  assert.equal(await harness("exists", ".overview-plan-today li:first-child .overview-plan-entry.is-done"), true, "the done one first");
   assert.equal(await harness("exists", ".overview-plan-against"), false);
 
   // 4. Nothing today.

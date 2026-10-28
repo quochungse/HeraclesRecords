@@ -897,11 +897,12 @@
   list-style: none;
 }
 
+/* A session: its sport beside its name, its figures under the name. */
 .overview-tip li {
   display: grid;
-  grid-template-columns: 12px minmax(0, 1fr) auto;
-  align-items: center;
-  gap: 8px;
+  grid-template-columns: 12px minmax(0, 1fr);
+  align-items: start;
+  gap: 2px 8px;
 }
 
 /* What is still on the plan, under a heading of its own. */
@@ -918,6 +919,7 @@
    draw it; load no session claims has none. */
 .overview-tip-sport {
   display: inline-flex;
+  margin-top: 2px;
   color: var(--text-muted);
 }
 
@@ -929,10 +931,12 @@
 
 .overview-tip-name {
   min-width: 0;
-  overflow: hidden;
   color: var(--text-primary);
-  text-overflow: ellipsis;
-  white-space: nowrap;
+}
+
+.overview-tip li .overview-tip-value {
+  grid-column: 2;
+  text-align: left;
 }
 
 .overview-tip-value,
@@ -1018,33 +1022,44 @@
   padding: 18px 20px 6px;
 }
 
+/* Today's sessions, laid out as the days on the right are: a session reaches
+   past the column's edge by its own padding, so its words stay on the
+   column's line while the hover's wash has room around them. */
 .overview-plan-entry {
   display: grid;
   grid-template-columns: 40px minmax(0, 1fr) auto;
   align-items: center;
   gap: 4px 14px;
+  box-sizing: border-box;
+  width: calc(100% + 24px);
+  margin: 0 -12px;
+  padding: 12px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
 }
 
-.overview-plan-entry + .overview-plan-entry {
-  padding-top: 12px;
-  border-top: 1px solid var(--overview-rule);
+button.overview-plan-entry {
+  cursor: pointer;
+  transition: background var(--dur-fast) var(--ease);
 }
 
-/* Today's one session, at full size: its plan read under it, the way into it
-   at the foot. */
+button.overview-plan-entry:hover {
+  background: var(--glass-bg);
+}
+
+button.overview-plan-entry:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: -2px;
+}
+
+/* Today's one session, at full size, its plan read under it. */
 .overview-plan-entry.is-lead {
-  grid-template-columns: 44px minmax(0, 1fr);
+  grid-template-columns: 44px minmax(0, 1fr) auto;
   row-gap: 14px;
-}
-
-.overview-plan-entry.is-lead .overview-plan-against {
-  order: 3;
-}
-
-.overview-plan-entry.is-lead .overview-plan-open {
-  order: 4;
-  grid-column: 1 / -1;
-  justify-self: end;
 }
 
 .overview-plan-icon {
@@ -1069,6 +1084,7 @@
 .overview-plan-icon[data-sport="strength"] { --tile: var(--sport-strength); }
 
 .overview-plan-copy {
+  display: grid;
   min-width: 0;
 }
 
@@ -1099,33 +1115,6 @@
 .overview-plan-entry.is-lead .overview-plan-meta {
   margin-top: 4px;
   font-size: 13px;
-}
-
-.overview-plan-open {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  max-width: 100%;
-  min-height: 32px;
-  padding: 0 12px;
-  border: 1px solid color-mix(in srgb, var(--text-primary) 16%, transparent);
-  border-radius: var(--radius-pill);
-  background: color-mix(in srgb, var(--text-primary) 4%, transparent);
-  color: var(--text-primary);
-  font: inherit;
-  font-size: 13px;
-  white-space: nowrap;
-  cursor: pointer;
-  transition: background var(--dur-fast) var(--ease);
-}
-
-.overview-plan-open:hover {
-  background: color-mix(in srgb, var(--text-primary) 9%, transparent);
-}
-
-.overview-plan-open:focus-visible {
-  outline: var(--focus-ring);
-  outline-offset: 2px;
 }
 
 /* What was done against what was planned: the fill is the session, the mark
@@ -1243,7 +1232,8 @@
     transform var(--dur-base) var(--ease);
 }
 
-.overview-plan-row:hover .overview-plan-chevron {
+.overview-plan-row:hover .overview-plan-chevron,
+button.overview-plan-entry:hover .overview-plan-chevron {
   color: var(--text-primary);
   transform: translateX(3px);
 }

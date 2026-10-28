@@ -2263,9 +2263,11 @@ lives at module level for the same visit-to-visit reason — see `useCalendarDat
   after on the right, in place of the Upcoming Workouts card. Today pairs the calendar's
   sessions with what was recorded today by sport family (`pairTodayPlan`, which the week
   chart above uses too, so the two never read the day two ways): done comes first, named
-  by its plan and read against the plan's load on a bar as long as whichever is greater,
-  and opens the session (`onOpenActivity` → App's `openActivityFrom`); what is still to do
-  opens the Calendar's detail sheet (`UpcomingWorkoutDetailPanel`); a rest day has nothing
+  by its plan (the session's own name joins its figures) and read against the plan's load
+  on a bar as long as whichever is greater, and opens the session (`onOpenActivity` → App's
+  `openActivityFrom`); what is still to do opens the Calendar's detail sheet
+  (`UpcomingWorkoutDetailPanel`). Each is pressed as a whole, as a day on the right is —
+  a row with a chevron, washed on hover, no button of its own; a rest day has nothing
   to press — no "Plan a session", and no "Not started" chip on a plan, by decision. The
   right column keeps the old card's rule (all of tomorrow, then up to three rows), the
   heading states the next seven days, and nothing scheduled with nothing done today draws
