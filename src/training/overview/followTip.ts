@@ -42,12 +42,27 @@ export function followTip(event: PointerEvent<HTMLElement>): void {
   tip.style.top = `${top - own.top}px`;
 }
 
-/** The pointer has gone: the stylesheet's place again, for a later focus. */
+/**
+ * The pointer has gone: the stylesheet's place again, for a later focus — once
+ * the tooltip has faded, or it would jump back beside the column mid-fade. A
+ * tooltip a focus keeps open stays where it is.
+ */
 export function releaseTip(event: PointerEvent<HTMLElement>): void {
   const tip = tipOf(event.currentTarget);
-  if (tip) {
-    tip.style.left = "";
-    tip.style.right = "";
-    tip.style.top = "";
+  if (!tip) {
+    return;
   }
+  // Visibility ends its transition last of all, at the end of the fade.
+  const clear = (transition: TransitionEvent) => {
+    if (transition.propertyName !== "visibility") {
+      return;
+    }
+    tip.removeEventListener("transitionend", clear);
+    if (getComputedStyle(tip).visibility === "hidden") {
+      tip.style.left = "";
+      tip.style.right = "";
+      tip.style.top = "";
+    }
+  };
+  tip.addEventListener("transitionend", clear);
 }

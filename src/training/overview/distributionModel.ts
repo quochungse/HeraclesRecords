@@ -4,6 +4,7 @@ import type {
   TrainingHubZoneDistributionEntry
 } from "../../../electron/types";
 import { intensityForZone, type RunIntensity } from "../../running/runMetrics";
+import { activityStartTimeMs } from "../activityWindow";
 import { sportColorCategory, SPORT_COLOR_CATEGORIES, type SportColorCategory } from "../sportColors";
 
 /*
@@ -30,13 +31,12 @@ export function sportLoadShares(
   now = new Date(),
   days = DISTRIBUTION_DAYS
 ): { total: number; sports: SportShare[] } {
-  const since = now.getTime() / 1000 - days * 86_400;
+  const since = now.getTime() - days * 86_400_000;
   const loads = new Map<SportColorCategory, number>();
   for (const activity of activities) {
-    const start = activity.startTime ?? 0;
-    const seconds = start > 10_000_000_000 ? start / 1000 : start;
+    const start = activityStartTimeMs(activity) ?? 0;
     const load = activity.trainingLoad ?? 0;
-    if (seconds < since || seconds > now.getTime() / 1000 || !Number.isFinite(load) || load <= 0) {
+    if (start < since || start > now.getTime() || !Number.isFinite(load) || load <= 0) {
       continue;
     }
     const category = sportColorCategory(activity.sportType);
@@ -61,8 +61,9 @@ export interface ZoneShare {
 
 /**
  * COROS's zone area list, one row a zone, easiest first. COROS numbers the
- * buckets from zero, as it numbers the zones, so the nth bucket is the nth
- * zone. Its own ratio stands where it sent one; otherwise the value's share.
+ * buckets from zero, as it numbers the zones, so a bucket's `index` is its
+ * zone — read from the bucket, so a list missing one does not shift the rest.
+ * Its own ratio stands where it sent one; otherwise the value's share.
  */
 export function zoneShares(entries: readonly TrainingHubZoneDistributionEntry[]): {
   total: number;
@@ -82,7 +83,7 @@ export function zoneShares(entries: readonly TrainingHubZoneDistributionEntry[])
   return {
     total,
     rows: sorted.map((entry, position) => ({
-      position,
+      position: Number.isInteger(entry.index) && entry.index >= 0 ? entry.index : position,
       value: value(entry),
       share:
         entry.ratio !== undefined && Number.isFinite(entry.ratio) && ratioTotal > 0

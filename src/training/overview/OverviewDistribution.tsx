@@ -2,7 +2,8 @@ import { useMemo, type CSSProperties } from "react";
 import type {
   TrainingHubActivity,
   TrainingHubAnalytics,
-  TrainingHubThresholdZone
+  TrainingHubThresholdZone,
+  TrainingHubZoneDistributionEntry
 } from "../../../electron/types";
 import { OptionGroup } from "../../components/OptionGroup";
 import {
@@ -17,7 +18,7 @@ import { formatHeartRateZoneRange, type HeartRateZoneModel } from "../heartRateZ
 import { SPORT_COLOR_LABELS } from "../sportColors";
 import { zoneColor, zoneLabel } from "../components/routeColoring";
 import { zoneNamesFor } from "../zoneTime";
-import { getIntlLocale, t } from "../../i18n/core";
+import { formatCount, t } from "../../i18n/core";
 import { useI18n } from "../../i18n/useI18n";
 import {
   DISTRIBUTION_DAYS,
@@ -37,8 +38,16 @@ const ZONE_MEASURE = defineSelectionPreference<ZoneMeasure>({
 /** The 80/20 rule's line: four fifths of the time easy. */
 const EASY_TARGET = 0.8;
 
+/**
+ * Below this share a sport's segment is too narrow to stand its name under,
+ * except the last, which runs back into the room before it.
+ */
+const LABELLED_SHARE = 0.07;
+
+const NO_ZONES: readonly TrainingHubZoneDistributionEntry[] = [];
+
 function whole(value: number): string {
-  return new Intl.NumberFormat(getIntlLocale()).format(Math.round(value));
+  return formatCount(Math.round(value));
 }
 
 function percent(share: number): string {
@@ -68,8 +77,8 @@ export function OverviewDistribution({
   const bySport = useMemo(() => sportLoadShares(activities), [activities]);
   const entries =
     measure === "time"
-      ? (analytics?.zoneDistributions.hrTime ?? [])
-      : (analytics?.zoneDistributions.hrTrainingLoad ?? []);
+      ? (analytics?.zoneDistributions.hrTime ?? NO_ZONES)
+      : (analytics?.zoneDistributions.hrTrainingLoad ?? NO_ZONES);
   const byZone = useMemo(() => zoneShares(entries), [entries]);
   // The zones are the account's own model, as the Running screen reads them.
   const family = hrZoneModel?.family ?? "lthr";
@@ -77,6 +86,12 @@ export function OverviewDistribution({
   const names = zoneNamesFor(family);
   const split = intensityShares(byZone.rows, family);
   const figure = (value: number) => (measure === "time" ? formatDurationSpan(value) : whole(value));
+  // A narrow sport in the middle of the bar has no room for its name under
+  // its segment: the names then read as a legend, each with its colour, as
+  // they do in a narrow section whatever the shares (overview.css).
+  const crowded = bySport.sports.some(
+    (sport, index) => index < bySport.sports.length - 1 && sport.share < LABELLED_SHARE
+  );
 
   return (
     <section className="overview-section" aria-labelledby="overview-dist-title">
@@ -108,14 +123,13 @@ export function OverviewDistribution({
                   />
                 ))}
               </div>
-              <ul
-                className="overview-dist-sport-labels"
-                aria-label={bySport.sports
-                  .map((sport) => `${SPORT_COLOR_LABELS[sport.category]} ${percent(sport.share)}`)
-                  .join(", ")}
-              >
+              <ul className={`overview-dist-sport-labels${crowded ? " is-legend" : ""}`}>
                 {bySport.sports.map((sport) => (
-                  <li key={sport.category} style={{ flex: sport.share }}>
+                  <li
+                    key={sport.category}
+                    data-sport={sport.category}
+                    style={{ "--share": sport.share } as CSSProperties}
+                  >
                     {SPORT_COLOR_LABELS[sport.category]}
                     <span className="figure">{percent(sport.share)}</span>
                   </li>
@@ -134,7 +148,6 @@ export function OverviewDistribution({
             <strong>{t("overview.distribution.byZone")}</strong>
             {hrZoneModel ? <span className="overview-dist-aside">· {hrZoneModel.label}</span> : null}
             <OptionGroup
-              className="overview-dist-measure"
               label={t("overview.distribution.measure")}
               tone="quiet"
               value={measure}

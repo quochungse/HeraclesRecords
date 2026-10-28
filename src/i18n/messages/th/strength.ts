@@ -297,7 +297,6 @@ const strength: StrengthMessages = {
   "strength.week.less": "น้อยกว่า {weeks} สัปดาห์ก่อนหน้า {percent}%",
   "strength.week.noSessions": "ไม่มีเซสชัน",
   "strength.week.average": "สัปดาห์เฉลี่ยของคุณ: {value}",
-  "strength.distribution": "การกระจายของเวท",
   "strength.readingSessions": "กำลังอ่านเซสชันเวทของคุณ…",
 };
 

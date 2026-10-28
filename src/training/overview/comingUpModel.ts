@@ -1,22 +1,11 @@
 import type { TrainingHubActivity, TrainingHubUpcomingWorkout } from "../../../electron/types";
+import { getLocalHappenDayKey, happenDayFromTimestamp } from "../formatters";
 import { activitySportFamily, scheduledSportFamily, sportFamiliesCompatible } from "../workoutSport";
 
 /*
  * The arithmetic behind Overview's Coming up: what today holds — done, still
  * to do, or nothing — the days after it, and the week ahead in one line.
  */
-
-function happenDayOf(timestamp: number | undefined): string | undefined {
-  if (timestamp === undefined || !Number.isFinite(timestamp) || timestamp <= 0) {
-    return undefined;
-  }
-  const date = new Date(timestamp < 10_000_000_000 ? timestamp * 1000 : timestamp);
-  return dayKey(date);
-}
-
-function dayKey(date: Date): string {
-  return `${date.getFullYear()}${String(date.getMonth() + 1).padStart(2, "0")}${String(date.getDate()).padStart(2, "0")}`;
-}
 
 function addDays(date: Date, days: number): Date {
   const next = new Date(date);
@@ -25,9 +14,27 @@ function addDays(date: Date, days: number): Date {
 }
 
 /**
+ * How far a session is from a plan, lower closer: by load where both state
+ * one, then distance, then time — the Calendar's own order (`matchScore` in
+ * calendar/pairing.ts), so the two choose alike between two runs of one day.
+ */
+function fitScore(workout: TrainingHubUpcomingWorkout, activity: TrainingHubActivity): number {
+  const relative = (actual: number | undefined, planned: number | undefined) =>
+    actual !== undefined && planned !== undefined && planned > 0 ? Math.abs(actual - planned) / planned : undefined;
+  return (
+    relative(activity.trainingLoad, workout.trainingLoad) ??
+    relative(activity.distance, workout.distanceMeters) ??
+    relative(activity.duration, workout.durationSeconds) ??
+    1
+  );
+}
+
+/**
  * Today's plan read against today's sessions, greedily and by sport family as
- * the Calendar pairs a day: a run recorded today answers today's planned run,
- * and a session nothing planned stands on its own.
+ * the Calendar pairs a day: each plan in the calendar's order takes the
+ * compatible session closest to it (`fitScore`), the earlier on a tie, and a
+ * session nothing planned stands on its own. The Calendar's hand-made links
+ * and skips are not read here.
  */
 export function pairTodayPlan(
   planned: readonly TrainingHubUpcomingWorkout[],
@@ -40,13 +47,21 @@ export function pairTodayPlan(
   const used = new Set<string>();
   const pairs: Array<{ workout: TrainingHubUpcomingWorkout; activity: TrainingHubActivity }> = [];
   const open: TrainingHubUpcomingWorkout[] = [];
+  const sessions = [...done].sort((left, right) => (left.startTime ?? 0) - (right.startTime ?? 0));
   for (const workout of planned) {
     const family = scheduledSportFamily(workout.sportType);
-    const activity = done.find(
-      (candidate) =>
-        !used.has(candidate.activityId) &&
-        sportFamiliesCompatible(family, activitySportFamily(candidate.sportType))
-    );
+    let activity: TrainingHubActivity | undefined;
+    let best = Number.POSITIVE_INFINITY;
+    for (const candidate of sessions) {
+      if (used.has(candidate.activityId) || !sportFamiliesCompatible(family, activitySportFamily(candidate.sportType))) {
+        continue;
+      }
+      const score = fitScore(workout, candidate);
+      if (score < best) {
+        activity = candidate;
+        best = score;
+      }
+    }
     if (activity) {
       used.add(activity.activityId);
       pairs.push({ workout, activity });
@@ -54,7 +69,7 @@ export function pairTodayPlan(
       open.push(workout);
     }
   }
-  return { pairs, open, unplanned: done.filter((activity) => !used.has(activity.activityId)) };
+  return { pairs, open, unplanned: sessions.filter((activity) => !used.has(activity.activityId)) };
 }
 
 export type TodayItem =
@@ -67,10 +82,6 @@ export type TodayItem =
     }
   | { kind: "planned"; key: string; workout: TrainingHubUpcomingWorkout };
 
-function workoutKey(workout: TrainingHubUpcomingWorkout, index: number): string {
-  return `${workout.happenDay}:${workout.sortNo ?? index}:${workout.name}`;
-}
-
 /**
  * Today, in the order it is read: what is done first, in the order it was
  * done, then what is still to do, in the calendar's order.
@@ -80,13 +91,16 @@ export function todayItems(
   activities: readonly TrainingHubActivity[],
   now = new Date()
 ): TodayItem[] {
-  const today = dayKey(now);
+  const today = getLocalHappenDayKey(now);
   const planned = upcoming.filter((workout) => workout.happenDay === today);
-  const done = activities
-    .filter((activity) => happenDayOf(activity.startTime) === today)
-    .sort((left, right) => (left.startTime ?? 0) - (right.startTime ?? 0));
-  const { pairs, open } = pairTodayPlan(planned, done);
+  const { pairs, open, unplanned } = pairTodayPlan(
+    planned,
+    activities.filter((activity) => happenDayFromTimestamp(activity.startTime) === today)
+  );
   const answered = new Map(pairs.map((pair) => [pair.activity.activityId, pair.workout]));
+  const done = [...pairs.map((pair) => pair.activity), ...unplanned].sort(
+    (left, right) => (left.startTime ?? 0) - (right.startTime ?? 0)
+  );
   return [
     ...done.map(
       (activity): TodayItem => ({
@@ -99,7 +113,8 @@ export function todayItems(
     ...open.map(
       (workout): TodayItem => ({
         kind: "planned",
-        key: `planned:${workoutKey(workout, planned.indexOf(workout))}`,
+        // Its place in the day's plan: the same however many are done.
+        key: `planned:${workout.happenDay}:${planned.indexOf(workout)}`,
         workout
       })
     )
@@ -116,8 +131,8 @@ export function nextDays(
   now = new Date(),
   rows = 3
 ): TrainingHubUpcomingWorkout[] {
-  const today = dayKey(now);
-  const tomorrow = dayKey(addDays(now, 1));
+  const today = getLocalHappenDayKey(now);
+  const tomorrow = getLocalHappenDayKey(addDays(now, 1));
   const later = upcoming
     .filter((workout) => workout.happenDay > today)
     .sort((left, right) => left.happenDay.localeCompare(right.happenDay));
@@ -130,14 +145,22 @@ export function nextDays(
   ];
 }
 
-/** What the calendar holds from today through the sixth day after it. */
+/**
+ * What the calendar still holds from today through the sixth day after it:
+ * today's sessions a session recorded today answers are behind, not ahead.
+ */
 export function weekAhead(
   upcoming: readonly TrainingHubUpcomingWorkout[],
+  activities: readonly TrainingHubActivity[],
   now = new Date()
 ): TrainingHubUpcomingWorkout[] {
-  const today = dayKey(now);
-  const last = dayKey(addDays(now, 6));
-  return upcoming.filter((workout) => workout.happenDay >= today && workout.happenDay <= last);
+  const today = getLocalHappenDayKey(now);
+  const last = getLocalHappenDayKey(addDays(now, 6));
+  const { open } = pairTodayPlan(
+    upcoming.filter((workout) => workout.happenDay === today),
+    activities.filter((activity) => happenDayFromTimestamp(activity.startTime) === today)
+  );
+  return [...open, ...upcoming.filter((workout) => workout.happenDay > today && workout.happenDay <= last)];
 }
 
 /**

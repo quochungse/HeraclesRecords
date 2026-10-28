@@ -239,6 +239,11 @@ const overview: OverviewMessages = {
   "overview.today.plannedTag": "План",
   "overview.today.total": "Итого",
   "overview.sport.ridesLabel": "Заезды",
+  "overview.today.recommendedRange": "Рекомендуется {min}–{max}",
+  "overview.today.sevenDayAverage": "Сред. 7 дн.",
+  "overview.today.sixWeekAverage": "Сред. 6 нед.",
+  "overview.today.weekLoad": "Нагрузка за неделю",
+  "overview.today.trendExplain": "{loadImpact} относительно {baseFitness}: последние 7 дней против последних 6 недель.",
 };
 
 export default overview;

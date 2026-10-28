@@ -227,6 +227,11 @@ const overview: OverviewMessages = {
   "overview.today.plannedTag": "Kế hoạch",
   "overview.today.total": "Tổng",
   "overview.sport.ridesLabel": "Số buổi",
+  "overview.today.recommendedRange": "Khuyến nghị {min}–{max}",
+  "overview.today.sevenDayAverage": "TB 7 ngày",
+  "overview.today.sixWeekAverage": "TB 6 tuần",
+  "overview.today.weekLoad": "Tải tuần này",
+  "overview.today.trendExplain": "{loadImpact} so với {baseFitness}: 7 ngày gần nhất so với 6 tuần gần nhất.",
 };
 
 export default overview;

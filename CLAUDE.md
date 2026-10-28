@@ -2209,7 +2209,8 @@ lives at module level for the same visit-to-visit reason — see `useCalendarDat
   whole body as a haze. Every colour and strength is a custom property on the stage
   (`--figure-*`), stepped at 2x (`min-resolution: 1.5dppx`), where a line is one device pixel.
   **Paper stands the figure on Strength's slate stage** (since 2026-10-23, picked from a mockup of
-  five): `#e4e9ef` → `#c4cdd8`, a frosted white body (`--figure-skin`), an ink mesh in normal
+  five, lightened on 2026-10-28 to `#f0f4fa` → `#cfdbea` under a wider white glow at the
+  head): a frosted white body (`--figure-skin`), an ink mesh in normal
   blending with no bloom, the rim as slate shading, the halo a white backlight over the lit part
   (`--figure-halo-dim`/`-lit`, a gradient of its own so the dark theme's halo is unchanged), a
   floor shadow drawn in the SVG at the soles (`body-figure-floor`, clear in the dark) so it
@@ -2231,18 +2232,24 @@ lives at module level for the same visit-to-visit reason — see `useCalendarDat
   columns whose cells share rows (head · the night's figures beside the week's status ·
   ring beside the week's columns · footer), and the Recovery column is a **subgrid** over all
   four, its stage taking the last three, so the figure takes whatever height the other two
-  come to. Under 940px the week moves under the other two at full width; under 620px all
+  come to. A figure's column is never narrower than its name, which keeps to one line, and
+  the panel stays one row until that no longer fits: under 840px (measured — the names
+  wrap below 860) the week moves under the other two at full width; under 620px all
   three stack. "Today" was its first name and was dropped: more than today is in it.
   **Sleep** is last night only (`pickLastNightSleep`, with the same development-build
-  fallback the old card had), the score with COROS's word for its band, overnight HRV off the
+  fallback the old card had), the score with COROS's word for its band, in the colour the
+  Sleep screen gives that band, overnight HRV off the
   daily metrics, and **Sleep HR, the sleep record's own `avgHr`** — never COROS's daytime
   resting HR; the stages round a ring with the night's clock under it, and the seven days
   ending on the night (`buildSleepWeekTotals`) in the footer. **This week** is COROS's
   **training status**: the Intensity Trend (`trainingLoadRatio` × 100) on the COROS app's
   five bands — Decreasing < 50, Resuming 50–79 ("Resuming / Performance" there), Maintaining
   80–99, Optimized 100–149, Excessive ≥ 150 — drawn as equal segments with the figure placed
-  inside its band (`bandMarker`), the bands' names over the bar and no boundary figures: a
-  band states its range on hover. Then a column a day with **a block a session** in the
+  inside its band (`bandMarker`), headed as the night's score is — "Intensity trend 109%",
+  with a tooltip on hover that says what it is worked out from (Load
+  Impact over Base Fitness, the last 7 days against the last 6 weeks, in the footer's own
+  words) — with the bands' names over the bar and no boundary figures: a band states its
+  range on hover. Then a column a day with **a block a session** in the
   accent (paper: `--hall-gold`), from today on the calendar's sessions hatched; today's
   planned session is dropped once a session of its sport family is recorded today
   (`plannedStillOpen`). **The columns are in time or in load** (a quiet switch in the head,
@@ -2254,22 +2261,34 @@ lives at module level for the same visit-to-visit reason — see `useCalendarDat
   figure for. The columns carry no icons: a column's tooltip (`.overview-tip`) lists its
   sessions, each sport's icon in its colour, with both figures and a total. It follows the
   pointer, flipped and held inside the panel (`followTip.ts`, written onto its style so it
-  costs no render); focused from the keyboard it stands beside the column. The footer is Load
-  Impact, Base Fitness and the trend. **Load Impact is `ati` and Base Fitness `cti`**
-  (probed on the real account 2026-10-28: both come on every day, and `ati / cti` is the
-  day's `trainingLoadRatio`). `tiredRateNew` is `ati − cti`, and `staminaLevel` comes only on
+  costs no render); focused from the keyboard it stands beside the column. **A chart is one
+  tab stop** (`useColumnFocus`, `chartFocus.ts`, here and in the sport sections): tabbed into
+  at today or at this week, the arrow keys move between its columns, Home and End to its
+  ends. The footer is Load
+  Impact and Base Fitness, each with the span it averages (7 days, 6 weeks: both are
+  exponentially weighted daily loads, verified day by day as `x + (load − x) / 7` and
+  `/ 42`), and **this calendar week's load so far** under the range COROS recommends for the
+  week (`thisWeekLoad`; `recommendedLoadMin`/`Max`, COROS's `recomendTlMin`/`Max`), the trend
+  itself being on the bar. **That range is the calendar week's**: the same Monday to Sunday,
+  set on Monday from the Sunday before's Base Fitness × 7 and × 1.3, so it is read against
+  Monday-to-today and never against COROS's rolling `t7d`, which matches it only on a
+  Sunday. **Load Impact is `ati` and Base Fitness `cti`** (probed on the real account
+  2026-10-28: both come on every day, and `ati / cti` is the day's `trainingLoadRatio`). `tiredRateNew` is `ati − cti`, and `staminaLevel` comes only on
   a day with a run (the same 71.8 run after run) — read as Base Fitness it blanked both
   figures on every day without a run. The Calendar's week tooltip (`computeWeeklyStats`,
   `test:calendar-pairing`) and Coach's `get_fitness_trends` (`test:chat-analytics-tools`)
   read the same two fields, and neither reads `tiredRateNew` or `staminaLevel` any more:
   the difference is two columns already in the table, and the stamina level is the
-  dashboard's, said once in the snapshot. The day also carries `t7d`/`t28d` (7- and
-  28-day load) and `recomendTlMin`/`Max` (the 7-day load COROS recommends, about `cti` ×
-  7 to × 9.1). The arithmetic is `todayModel.ts`; `npm run test:overview-model`.
+  dashboard's, said once in the snapshot. The day also carries `t7d` and `t28d`, rolling
+  7- and 28-day load totals, which nothing here reads. The arithmetic is `todayModel.ts`;
+  `npm run test:overview-model`.
   **Coming up** (`OverviewComingUp`, `comingUpModel.ts`) is today on the left and the days
   after on the right, in place of the Upcoming Workouts card. Today pairs the calendar's
   sessions with what was recorded today by sport family (`pairTodayPlan`, which the week
-  chart above uses too, so the two never read the day two ways): done comes first, named
+  chart above uses too, so the two never read the day two ways — each plan in order takes
+  the compatible session closest to it by load, then distance, then time, as the
+  Calendar's `matchScore` ranks them; the Calendar's hand-made links and skips are not
+  read): done comes first, named
   by its plan (the session's own name joins its figures) and read against the plan's load
   on a bar as long as whichever is greater, and opens the session (`onOpenActivity` → App's
   `openActivityFrom`); what is still to do opens the Calendar's detail sheet
@@ -2277,22 +2296,27 @@ lives at module level for the same visit-to-visit reason — see `useCalendarDat
   a row with a chevron, washed on hover, no button of its own; a rest day has nothing
   to press — no "Plan a session", and no "Not started" chip on a plan, by decision. The
   right column keeps the old card's rule (all of tomorrow, then up to three rows), the
-  heading states the next seven days, and nothing scheduled with nothing done today draws
-  no section. A day on the right is washed on hover. `npm run test:overview-renderer`
+  heading states the next seven days — what is still ahead, not today's sessions already
+  done — and nothing scheduled with nothing done today draws no section. A day on the right
+  is washed on hover. **Every "today" on Overview turns over at midnight**: the Readiness
+  week, Coming up and the sport sections key their memos on `useTodayKey`
+  (`src/training/useTodayKey.ts`, shared with the Calendar), so a window left open overnight
+  does not keep yesterday's week under today's dates. `npm run test:overview-renderer`
   mounts the four states.
   **Training activity** is the heatmap (`TrainingHeatmapPanel`) under a section name of its
   own: the range's figures lead inside the panel and its two switches are `tone="quiet"`.
   **Training load distribution** (`OverviewDistribution`, `distributionModel.ts`) replaced
   the two donuts: the last four weeks' load by sport as a thin bar in the sport colours,
   toned down (`filter`) so the zone colours under it stay the louder, each sport's name under
-  its segment; then COROS's own time — or load — per heart-rate zone
+  its segment where the section is wide and no sport in the middle is a sliver, and a
+  wrapping legend otherwise; then COROS's own time — or load — per heart-rate zone
   (`analytics.zoneDistributions.hrTime` / `hrTrainingLoad`, seconds and load, COROS's last
   four weeks), read first as the easy share against the 80/20 line, split as the Running
-  screen splits it (`intensityForZone`, exported from `runMetrics.ts` for this) on a ramp
-  from a yellow-leaning green (apart from Z3's bluer green in the list beside it) through
-  amber to orange —
-  fixed hues, not the accent, so the hotter colour is the harder effort whatever the
-  palette — then zone
+  screen splits it (`intensityForZone`, exported from `runMetrics.ts` for this) on the app's
+  effort ramp, `--intensity-easy|moderate|hard` on `:root` (styles.css, paper's own),
+  which the sport screens' intensity panel draws too: a yellow-leaning green (apart from
+  Z3's bluer green in the list beside it) through amber to orange, fixed hues rather than
+  the accent, so the hotter colour is the harder effort whatever the palette — then zone
   by zone in the app's zone colours (`zoneColor`) and COROS's names (`zoneNamesFor`). **Distance
   zones went with the donuts**, by decision, and `distanceZones.ts` and its suite with them.
   The screenshot demo's `hrTime` had been in hours; COROS sends seconds.
@@ -2309,12 +2333,16 @@ lives at module level for the same visit-to-visit reason — see `useCalendarDat
   strides, long — before its primary benefit), counted over the window from summaries the
   section sweeps as the Running and Cycling lists sweep theirs (`requireIntensity`). This
   week's planned distance on Running is the calendar's from today, less what a session today
-  answered (`plannedThisWeek`, through `pairTodayPlan`).
+  answered (`plannedThisWeek`, through `pairTodayPlan`), each session's own distance
+  (`TrainingHubUpcomingWorkout.distanceMeters`) before its `volume`, which for a structured
+  session is a set count. A figure "a week" is read over the weeks the window has run so far
+  (`sportWindowWeeks`: three whole weeks and the part of this one gone), not over four.
   **Strength** (`OverviewStrength`, lazy — the body map is three.js) is the same section for
   lifting: the four weeks' sessions, tonnage, sets and time, the Strength screen's own
   `StrengthHero` (the 3D body map and the muscle breakdown, its figure on a 350px stage and
   the breakdown scrolling beside it) read over **these four weeks** — `buildStrengthAnalytics`
-  on the window, not the screen's `strength.days` window, which is shared and left alone —
+  on the window, and only four weeks read (`useStrengthData`'s `windowDays: 28`, which
+  leaves the screen's own `strength.days` choice alone) —
   and the last session and the next. The hero sits inside a `.strength-view`, whose scope
   carries the heat ramp and the stage the hero reads; outside it the bars and the stage draw
   empty. It replaced Strength Distribution. **The HRV and Sleep trend charts left Overview**

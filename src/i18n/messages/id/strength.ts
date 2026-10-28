@@ -297,7 +297,6 @@ const strength: StrengthMessages = {
   "strength.week.less": "{percent}% lebih sedikit dari {weeks} minggu sebelumnya",
   "strength.week.noSessions": "Tidak ada sesi",
   "strength.week.average": "Minggu rata-rata Anda: {value}",
-  "strength.distribution": "Distribusi kekuatan",
   "strength.readingSessions": "Membaca sesi latihan beban Anda…",
 };
 

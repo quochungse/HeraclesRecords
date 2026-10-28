@@ -329,7 +329,6 @@ const strength: StrengthMessages = {
   "strength.week.less": "На {percent}% меньше, чем за {weeks} нед. до этого",
   "strength.week.noSessions": "Тренировок нет",
   "strength.week.average": "Ваша средняя неделя: {value}",
-  "strength.distribution": "Распределение силовой нагрузки",
   "strength.readingSessions": "Читаем силовые тренировки…",
 };
 

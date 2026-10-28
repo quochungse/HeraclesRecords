@@ -5,10 +5,15 @@ import type {
   UnitSystem,
   WorkoutSport
 } from "../../../electron/types";
-import { buildWeeklyActivitySeries, WEEKLY_ACTIVITY_RESIDUAL_KEY } from "../weeklyActivity";
+import {
+  buildWeeklyActivitySeries,
+  getCalendarWeekDateKeys,
+  WEEKLY_ACTIVITY_RESIDUAL_KEY
+} from "../weeklyActivity";
 import { sportColorCategory, type SportColorCategory } from "../sportColors";
 import { scheduledSportCategory, scheduledWorkoutSport } from "../workoutSport";
 import { activityWorkoutSport } from "../askCoachAbout";
+import { happenDayFromTimestamp } from "../formatters";
 import { pairTodayPlan } from "./comingUpModel";
 
 /*
@@ -136,6 +141,54 @@ export function latestTrainingLoad(
  */
 export type WeekMeasure = "time" | "load";
 
+export interface WeekLoadReading {
+  /** The load from this Monday to today. */
+  load?: number;
+  /** The range COROS recommends for the whole week. */
+  recommended?: { min: number; max: number };
+}
+
+/**
+ * This calendar week's load so far against the range COROS recommends for it.
+ * COROS sets that range per calendar week — the same Monday to Sunday, changed
+ * on Monday — so it is read against the week's own days, never a rolling seven
+ * (COROS's `t7d`, which matches the week only on a Sunday). The load is the
+ * week chart's own (`buildWeeklyActivitySeries`: a day's COROS figure, or its
+ * sessions' where they add up to more), so the footer and the columns agree.
+ * Nothing for a week with no day in the list yet.
+ */
+export function thisWeekLoad({
+  dayList,
+  activities,
+  now = new Date(),
+  unitSystem
+}: {
+  dayList: readonly TrainingHubDailyMetric[];
+  activities: TrainingHubActivity[];
+  now?: Date;
+  unitSystem: UnitSystem;
+}): WeekLoadReading {
+  const week = new Set(getCalendarWeekDateKeys(now));
+  const today = happenDayFromTimestamp(now.getTime()) ?? "";
+  const days = dayList.filter((day) => week.has(day.happenDay) && day.happenDay <= today);
+  if (days.length === 0) {
+    return {};
+  }
+  const series = buildWeeklyActivitySeries([...dayList], "trainingLoad", now, unitSystem, activities);
+  const load = series.days
+    .filter((day) => day.happenDay <= today)
+    .reduce((sum, day) => sum + day.value, 0);
+  const ranged = [...days]
+    .reverse()
+    .find((day) => positive(day.recommendedLoadMin) !== undefined && positive(day.recommendedLoadMax) !== undefined);
+  const min = positive(ranged?.recommendedLoadMin);
+  const max = positive(ranged?.recommendedLoadMax);
+  return {
+    load: Math.round(load),
+    recommended: min !== undefined && max !== undefined && max >= min ? { min: Math.round(min), max: Math.round(max) } : undefined
+  };
+}
+
 /** One session in a day's column, done or still on the plan. */
 export interface WeekBlock {
   key: string;
@@ -181,26 +234,6 @@ function activitySport(sportType: number | undefined): WorkoutSport | "hiking" |
     return sport;
   }
   return sportColorCategory(sportType) === "hiking" ? "hiking" : undefined;
-}
-
-function happenDayOf(timestamp: number | undefined): string | undefined {
-  if (timestamp === undefined || !Number.isFinite(timestamp) || timestamp <= 0) {
-    return undefined;
-  }
-  const date = new Date(timestamp < 10_000_000_000 ? timestamp * 1000 : timestamp);
-  return `${date.getFullYear()}${String(date.getMonth() + 1).padStart(2, "0")}${String(date.getDate()).padStart(2, "0")}`;
-}
-
-/**
- * Today's planned sessions that no session recorded today stands for — the
- * pairing Coming up shows (`pairTodayPlan`), so the two sections cannot read
- * one day two ways.
- */
-export function plannedStillOpen(
-  planned: readonly TrainingHubUpcomingWorkout[],
-  doneToday: readonly TrainingHubActivity[]
-): TrainingHubUpcomingWorkout[] {
-  return pairTodayPlan(planned, doneToday).open;
 }
 
 /** Three gridlines or more over the tallest column, at a step a reader can add. */
@@ -261,12 +294,12 @@ export function buildWeekChart({
   const weekDays = new Set(series.days.map((day) => day.happenDay));
   const byDay = new Map<string, TrainingHubActivity[]>();
   for (const activity of activities) {
-    const happenDay = happenDayOf(activity.startTime);
+    const happenDay = happenDayFromTimestamp(activity.startTime);
     if (happenDay && weekDays.has(happenDay)) {
       byDay.set(happenDay, [...(byDay.get(happenDay) ?? []), activity]);
     }
   }
-  const todayKey = happenDayOf(now.getTime()) ?? "";
+  const todayKey = happenDayFromTimestamp(now.getTime()) ?? "";
   const pick = (load: number, time: number) => (measure === "time" ? time : load);
 
   const columns = series.days.map((day): WeekColumn => {
@@ -291,13 +324,14 @@ export function buildWeekChart({
       };
     });
     // Load COROS counted outside a session (or for sessions not loaded yet).
-    // It has no time of its own, so the time chart has nothing to draw for it.
+    // It has no time of its own, so in time it stands at zero: not drawn, but
+    // still in the tooltip, and the day still not a rest day.
     const residual =
       loads.get(WEEKLY_ACTIVITY_RESIDUAL_KEY) ?? (day.segments.length === 0 ? day.value : 0);
-    if (residual > 0 && measure === "load") {
+    if (residual > 0) {
       blocks.push({
         key: WEEKLY_ACTIVITY_RESIDUAL_KEY,
-        value: residual,
+        value: pick(residual, 0),
         load: residual,
         seconds: 0,
         name: "",
@@ -312,10 +346,10 @@ export function buildWeekChart({
       const onDay = upcoming.filter((workout) => workout.happenDay === day.happenDay);
       const open =
         day.happenDay === todayKey
-          ? plannedStillOpen(
+          ? pairTodayPlan(
               onDay,
-              activities.filter((activity) => happenDayOf(activity.startTime) === todayKey)
-            )
+              activities.filter((activity) => happenDayFromTimestamp(activity.startTime) === todayKey)
+            ).open
           : onDay;
       open.forEach((workout) => {
         const load = positive(workout.trainingLoad) ?? 0;
@@ -325,7 +359,7 @@ export function buildWeekChart({
         blocks.push({
           // Its place in the day's plan, not among what is still open: the key
           // must not change when the session before it is done.
-          key: `planned:${workout.happenDay}:${workout.sortNo ?? onDay.indexOf(workout)}:${workout.name}`,
+          key: `planned:${workout.happenDay}:${onDay.indexOf(workout)}`,
           value,
           load,
           seconds: time,

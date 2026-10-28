@@ -62,6 +62,12 @@ export function activeStrengthWindow(days: number) {
 interface UseStrengthDataOptions {
   api: HeraclesRecordsApi;
   corosConnected: boolean;
+  /**
+   * A window of the caller's own, read in place of the screen's chosen one and
+   * leaving that choice alone: Overview's section shows four weeks and reads
+   * no more.
+   */
+  windowDays?: number;
   /** Development builds only: generated sample history in place of the athlete's. */
   sampleMode?: boolean;
 }
@@ -104,15 +110,18 @@ export interface StrengthData {
 /**
  * Owns the strength history: which window and source it is read for, the Hevy
  * account it may come from, the drain loop that fills it in, and the analytics
- * built off it. Shared so the Strength screen and the Overview's Strength
- * Distribution section read the same sessions under the same preferences.
+ * built off it. Shared so the Strength screen and Overview's Strength
+ * section read the same sessions under the same source; Overview reads its
+ * own four weeks (`windowDays`) rather than the screen's window.
  */
 export function useStrengthData({
   api,
   corosConnected,
+  windowDays,
   sampleMode = false
 }: UseStrengthDataOptions): StrengthData {
-  const [days, setDays] = useSelectionPreference(STRENGTH_DAYS_PREFERENCE);
+  const [chosenDays, setDays] = useSelectionPreference(STRENGTH_DAYS_PREFERENCE);
+  const days = windowDays ?? chosenDays;
   const [source, setSource, sourcePreference] = useSelectionPreference(
     STRENGTH_SOURCE_PREFERENCE
   );

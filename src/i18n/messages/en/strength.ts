@@ -298,7 +298,6 @@ const strength = {
   "strength.week.less": "{percent}% less than the {weeks} weeks before",
   "strength.week.noSessions": "No sessions",
   "strength.week.average": "Your average week: {value}",
-  "strength.distribution": "Strength Distribution",
   "strength.readingSessions": "Reading your strength sessions…",
 };
 

@@ -227,6 +227,11 @@ const overview: OverviewMessages = {
   "overview.today.plannedTag": "予定",
   "overview.today.total": "合計",
   "overview.sport.ridesLabel": "ライド回数",
+  "overview.today.recommendedRange": "推奨 {min}–{max}",
+  "overview.today.sevenDayAverage": "7 日間の平均",
+  "overview.today.sixWeekAverage": "6 週間の平均",
+  "overview.today.weekLoad": "今週の負荷",
+  "overview.today.trendExplain": "{loadImpact} を {baseFitness} で割った値。直近 7 日と直近 6 週間の比較です。",
 };
 
 export default overview;

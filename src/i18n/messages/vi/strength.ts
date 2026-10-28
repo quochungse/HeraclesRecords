@@ -297,7 +297,6 @@ const strength: StrengthMessages = {
   "strength.week.less": "Ít hơn {percent}% so với {weeks} tuần trước đó",
   "strength.week.noSessions": "Không có buổi nào",
   "strength.week.average": "Tuần trung bình của bạn: {value}",
-  "strength.distribution": "Phân bố sức mạnh",
   "strength.readingSessions": "Đang đọc các buổi tập sức mạnh…",
 };
 

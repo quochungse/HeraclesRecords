@@ -227,6 +227,11 @@ const overview: OverviewMessages = {
   "overview.today.plannedTag": "Planejada",
   "overview.today.total": "Total",
   "overview.sport.ridesLabel": "Pedaladas",
+  "overview.today.recommendedRange": "Recomendada {min}–{max}",
+  "overview.today.sevenDayAverage": "Média 7 dias",
+  "overview.today.sixWeekAverage": "Média 6 semanas",
+  "overview.today.weekLoad": "Carga da semana",
+  "overview.today.trendExplain": "{loadImpact} em relação a {baseFitness}: os últimos 7 dias contra as últimas 6 semanas.",
 };
 
 export default overview;

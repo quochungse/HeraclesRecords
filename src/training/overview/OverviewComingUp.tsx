@@ -8,6 +8,7 @@ import type {
 import type { HeraclesRecordsApi } from "../../heraclesrecords-api";
 import { workoutSportView } from "../../calendar/workoutSportIcons";
 import { useUnitSystem } from "../../units/UnitSystemProvider";
+import { useTodayKey } from "../useTodayKey";
 import {
   filterUpcomingWorkoutsFromToday,
   formatDistanceMeters,
@@ -180,11 +181,17 @@ export function OverviewComingUp({
   useI18n();
   const { unitSystem } = useUnitSystem();
   const [selected, setSelected] = useState<TrainingHubUpcomingWorkout | null>(null);
-  const now = new Date();
-  const scheduled = useMemo(() => filterUpcomingWorkoutsFromToday(upcomingWorkouts), [upcomingWorkouts]);
-  const today = useMemo(() => todayItems(scheduled, activities), [scheduled, activities]);
-  const later = useMemo(() => nextDays(scheduled), [scheduled]);
-  const ahead = useMemo(() => weekAhead(scheduled), [scheduled]);
+  // Read again when the day turns over: left open past midnight, today's
+  // sessions must not stay under Today and turn up under the next days too.
+  const todayKey = useTodayKey();
+  const now = useMemo(() => new Date(), [todayKey]);
+  const scheduled = useMemo(
+    () => filterUpcomingWorkoutsFromToday(upcomingWorkouts, now),
+    [upcomingWorkouts, now]
+  );
+  const today = useMemo(() => todayItems(scheduled, activities, now), [scheduled, activities, now]);
+  const later = useMemo(() => nextDays(scheduled, now), [scheduled, now]);
+  const ahead = useMemo(() => weekAhead(scheduled, activities, now), [scheduled, activities, now]);
 
   // Nothing on the calendar and nothing done today: no section at all, rather
   // than a row spent saying so.
@@ -257,7 +264,7 @@ export function OverviewComingUp({
                 const tag = planTag(workout);
                 const stats = formatUpcomingWorkoutRowStats(workout.volume, workout.trainingLoad, unitSystem);
                 return (
-                  <li key={`${workout.happenDay}:${workout.sortNo ?? index}:${workout.name}`}>
+                  <li key={`${workout.happenDay}:${index}`}>
                     <button
                       type="button"
                       className="overview-plan-row"

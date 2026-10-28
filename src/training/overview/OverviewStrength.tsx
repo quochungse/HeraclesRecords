@@ -9,22 +9,18 @@ import { useStrengthData } from "../../strength/useStrengthData";
 import "../../strength/strength.css";
 import { periodLabel, periodPhrase } from "../../preferences/periodScale";
 import { useUnitSystem } from "../../units/UnitSystemProvider";
+import { startOfRunWeekMs } from "../../running/runMetrics";
+import { epochMsFromCorosTime } from "../activityWindow";
 import { formatDurationSpan, formatHappenDayLabel, happenDayFromTimestamp } from "../formatters";
-import { formatDecimal, getIntlLocale, plural, t } from "../../i18n/core";
+import { useTodayKey } from "../useTodayKey";
+import { formatCount, formatDecimal, plural, t } from "../../i18n/core";
 import { useI18n } from "../../i18n/useI18n";
-import { nextPlanned, sportWindow, SPORT_WINDOW_WEEKS } from "./sportModel";
+import { nextPlanned, sportWindow, sportWindowWeeks } from "./sportModel";
 
 const WINDOW_DAYS = 28;
 
 function whole(value: number): string {
-  return new Intl.NumberFormat(getIntlLocale()).format(Math.round(value));
-}
-
-function mondayMs(nowMs: number): number {
-  const monday = new Date(nowMs);
-  monday.setHours(0, 0, 0, 0);
-  monday.setDate(monday.getDate() - ((monday.getDay() + 6) % 7));
-  return monday.getTime();
+  return formatCount(Math.round(value));
 }
 
 /**
@@ -49,9 +45,15 @@ export default function OverviewStrength({
 }) {
   useI18n();
   const { unitSystem } = useUnitSystem();
-  const { sessions, source, error, initializing } = useStrengthData({ api, corosConnected: connected });
-  const nowMs = Date.now();
-  const window = useMemo(() => sportWindow(sessions, Date.now()), [sessions]);
+  // Four weeks, read as such: not the Strength screen's window, which may be a year.
+  const { sessions, source, error, initializing } = useStrengthData({
+    api,
+    corosConnected: connected,
+    windowDays: WINDOW_DAYS
+  });
+  const todayKey = useTodayKey();
+  const nowMs = useMemo(() => Date.now(), [todayKey, sessions]);
+  const window = useMemo(() => sportWindow(sessions, nowMs), [sessions, nowMs]);
   const analytics = useMemo(() => buildStrengthAnalytics(window, WINDOW_DAYS), [window]);
 
   // Nothing lifted in four weeks, once the history has been read: no section.
@@ -60,14 +62,14 @@ export default function OverviewStrength({
   }
 
   const summary = analytics.summary;
-  const sinceMonday = mondayMs(nowMs) / 1000;
-  const thisWeek = window.filter((session) => (session.startTime ?? 0) >= sinceMonday);
+  const sinceMonday = startOfRunWeekMs(nowMs);
+  const thisWeek = window.filter((session) => (epochMsFromCorosTime(session.startTime) ?? 0) >= sinceMonday);
   const thisWeekSeconds = thisWeek.reduce((sum, session) => sum + (session.duration ?? 0), 0);
   const volume = formatVolumeKg(summary.volumeKg, unitSystem);
   const split = volume.indexOf(" ");
   const last = [...window].sort((left, right) => (right.startTime ?? 0) - (left.startTime ?? 0))[0];
   const lastDay = last ? happenDayFromTimestamp(last.startTime) : undefined;
-  const next = nextPlanned(upcomingWorkouts, "strength");
+  const next = nextPlanned(upcomingWorkouts, "strength", new Date(nowMs));
   const title = t("nav.strength");
 
   return (
@@ -77,9 +79,12 @@ export default function OverviewStrength({
         <h2 id="overview-sport-strength" className="overview-section-title">
           {title}
         </h2>
-        <span className="overview-section-aside">
-          {`${plural("overview.sport.sessions", window.length)} · ${periodPhrase(WINDOW_DAYS)}`}
-        </span>
+        {/* Not "0 sessions" while the history is still being read. */}
+        {initializing ? null : (
+          <span className="overview-section-aside">
+            {`${plural("overview.sport.sessions", window.length)} · ${periodPhrase(WINDOW_DAYS)}`}
+          </span>
+        )}
         {onOpenView ? (
           <button
             type="button"
@@ -101,7 +106,7 @@ export default function OverviewStrength({
         ) : (
           <>
             {error ? (
-              <p className="overview-sport-note" role="alert">
+              <p className="overview-sport-note" role="status">
                 {error}
               </p>
             ) : null}
@@ -115,7 +120,7 @@ export default function OverviewStrength({
                 <dd className="overview-sport-note">
                   {t("overview.sport.timeAndAverage", {
                     time: formatDurationSpan(thisWeekSeconds),
-                    avg: formatDecimal(summary.sessions / SPORT_WINDOW_WEEKS, 1)
+                    avg: formatDecimal(summary.sessions / sportWindowWeeks(nowMs), 1)
                   })}
                 </dd>
               </div>
