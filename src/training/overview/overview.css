@@ -810,8 +810,8 @@
 /* Paper's slate stage (styles.css), on the column as the dark one is. */
 :root[data-theme="paper"] .overview-physique {
   background:
-    radial-gradient(70% 38% at 50% 6%, rgba(255, 255, 255, 0.65), transparent 72%),
-    linear-gradient(180deg, #e4e9ef 0%, #d6dde5 55%, #c4cdd8 100%);
+    radial-gradient(85% 55% at 50% 0%, rgba(255, 255, 255, 0.79), transparent 80%),
+    linear-gradient(180deg, #f0f4fa 0%, #e3eaf4 56%, #cfdbea 100%);
 }
 
 :root[data-theme="paper"] .overview-physique-stage .recovery-figure {
