@@ -393,6 +393,8 @@ interface RawDailyMetric {
   tiredRateNew?: number;
   tiredRateStateNew?: number;
   trainingLoadRatio?: number;
+  ati?: number;
+  cti?: number;
   staminaLevel?: number;
   vo2max?: number;
   cycleVo2max?: number;
@@ -4653,6 +4655,8 @@ function parseDailyMetric(raw: RawDailyMetric): TrainingHubDailyMetric {
     tiredRateNew: toOptionalNumber(raw.tiredRateNew),
     tiredRateStateNew: toOptionalNumber(raw.tiredRateStateNew),
     trainingLoadRatio: toOptionalNumber(raw.trainingLoadRatio),
+    ati: toOptionalNumber(raw.ati),
+    cti: toOptionalNumber(raw.cti),
     staminaLevel: toOptionalNumber(raw.staminaLevel),
     vo2max: toOptionalNumber(raw.vo2max),
     cycleVo2max: positiveNumber(raw.cycleVo2max),

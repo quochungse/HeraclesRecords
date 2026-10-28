@@ -2255,10 +2255,14 @@ lives at module level for the same visit-to-visit reason — see `useCalendarDat
   sessions, each sport's icon in its colour, with both figures and a total. It follows the
   pointer, flipped and held inside the panel (`followTip.ts`, written onto its style so it
   costs no render); focused from the keyboard it stands beside the column. The footer is Load
-  Impact, Base Fitness (`staminaLevel`) and the trend. **Load Impact is the ratio times Base
-  Fitness, not `tiredRateNew`**: the Calendar's week tooltip reads that field as Load
-  Impact while the screenshot demo fakes it as a fatigue difference (−30 to 40), and nothing
-  here settles which. The arithmetic is `todayModel.ts`; `npm run test:overview-model`.
+  Impact, Base Fitness and the trend. **Load Impact is `ati` and Base Fitness `cti`**
+  (probed on the real account 2026-10-28: both come on every day, and `ati / cti` is the
+  day's `trainingLoadRatio`). `tiredRateNew` is `ati − cti`, and `staminaLevel` comes only on
+  a day with a run (the same 71.8 run after run) — read as Base Fitness it blanked both
+  figures on every day without a run, and the Calendar's week tooltip and Coach's analytics
+  tools still read those two fields that way. The day also carries `t7d`/`t28d` (7- and
+  28-day load) and `recomendTlMin`/`Max` (the 7-day load COROS recommends, about `cti` ×
+  7 to × 9.1). The arithmetic is `todayModel.ts`; `npm run test:overview-model`.
   **Coming up** (`OverviewComingUp`, `comingUpModel.ts`) is today on the left and the days
   after on the right, in place of the Upcoming Workouts card. Today pairs the calendar's
   sessions with what was recorded today by sport family (`pairTodayPlan`, which the week

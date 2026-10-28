@@ -111,6 +111,9 @@ function dailyMetrics(days = 400): TrainingHubDailyMetric[] {
       tiredRateNew: Math.round(Math.max(-30, Math.min(40, (acute - chronic) * 0.9))),
       tiredRateStateNew: 2,
       trainingLoadRatio: chronic > 0 ? Math.round((acute / chronic) * 100) / 100 : 1,
+      // COROS's Load Impact and Base Fitness, as it sends them every day.
+      ati: Math.round(acute),
+      cti: Math.round(chronic),
       staminaLevel: Math.round(chronic * 10) / 10,
       vo2max: vo2At(day) ?? 52,
       distance: distByDay.get(day) ?? 0,

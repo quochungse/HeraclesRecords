@@ -88,9 +88,9 @@ export function trainingStatusMarker(percent: number): number {
 export interface TrainingLoadReading {
   /** Intensity Trend, Load Impact over Base Fitness, in percent. */
   percent?: number;
-  /** COROS's Load Impact, read back from the trend and Base Fitness. */
+  /** COROS's Load Impact (`ati`). */
   loadImpact?: number;
-  /** COROS's Base Fitness (`staminaLevel`). */
+  /** COROS's Base Fitness (`cti`). */
   baseFitness?: number;
 }
 
@@ -104,11 +104,11 @@ function positive(value: number | undefined): number | undefined {
  * that carries no ratio is skipped, since the ratio is what the panel leads
  * with.
  *
- * Load Impact is the ratio times Base Fitness rather than the day's
- * `tiredRateNew`. That field has been read as Load Impact (the Calendar's week
- * tooltip) and as a fatigue difference (the screenshot demo, where it runs
- * −30 to 40), and nothing here settles which; the product is the figure COROS
- * divides by Base Fitness to state its Intensity Trend, whichever it is.
+ * Load Impact is `ati` and Base Fitness `cti` (probed on a real account,
+ * 2026-10-28: `ati / cti` is the day's ratio on every day, and both come on
+ * every day). Neither is `tiredRateNew`, which is `ati − cti`, nor
+ * `staminaLevel`, which COROS sends only on a day with a run — read as Base
+ * Fitness, it left both figures blank on any day without one.
  */
 export function latestTrainingLoad(
   dayList: readonly TrainingHubDailyMetric[]
@@ -117,11 +117,12 @@ export function latestTrainingLoad(
     const day = dayList[index];
     const ratio = positive(day.trainingLoadRatio);
     if (ratio !== undefined) {
-      const baseFitness = positive(day.staminaLevel);
+      const loadImpact = positive(day.ati);
+      const baseFitness = positive(day.cti);
       return {
         percent: Math.round(ratio * 100),
-        loadImpact: baseFitness !== undefined ? Math.round(ratio * baseFitness) : undefined,
-        baseFitness
+        loadImpact: loadImpact !== undefined ? Math.round(loadImpact) : undefined,
+        baseFitness: baseFitness !== undefined ? Math.round(baseFitness) : undefined
       };
     }
   }

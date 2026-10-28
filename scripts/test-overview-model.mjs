@@ -53,20 +53,23 @@ assert.equal(trainingStatusMarker(400), 1, "past the end pins to the end");
 close(bandMarker(77, [60, 75, 90], 0, 100), (2 + 2 / 15) / 4, "a generic scale reads the same way");
 
 // --- The load reading: one day's three figures, the newest day with a ratio.
+// The days are a real account's (2026-10-27/28): `ati` over `cti` is the
+// ratio, `tiredRateNew` is their difference, and `staminaLevel` comes only on
+// a day with a run — the 28th had none.
 assert.deepEqual(latestTrainingLoad([]), {}, "no days, no reading");
 assert.deepEqual(
   latestTrainingLoad([
-    { happenDay: "20261022", trainingLoadRatio: 1.02, staminaLevel: 150, tiredRateNew: 9 },
-    { happenDay: "20261023", trainingLoadRatio: 1.09, staminaLevel: 158, tiredRateNew: 12 },
-    { happenDay: "20261024", trainingLoad: 80 }
+    { happenDay: "20261027", trainingLoadRatio: 1.09, ati: 118, cti: 108, tiredRateNew: 10, staminaLevel: 71.8 },
+    { happenDay: "20261028", trainingLoadRatio: 0.95, ati: 101, cti: 106, tiredRateNew: -5 },
+    { happenDay: "20261029", trainingLoad: 80 }
   ]),
-  { percent: 109, loadImpact: 172, baseFitness: 158 },
-  "the newest day that states a ratio; Load Impact is the ratio of Base Fitness"
+  { percent: 95, loadImpact: 101, baseFitness: 106 },
+  "the newest day that states a ratio: Load Impact is ati and Base Fitness cti, on a day with no run too"
 );
 assert.deepEqual(
   latestTrainingLoad([{ happenDay: "20261024", trainingLoadRatio: 0.8 }]),
   { percent: 80, loadImpact: undefined, baseFitness: undefined },
-  "a ratio with no Base Fitness says nothing of Load Impact"
+  "a ratio without its two figures states neither"
 );
 
 // --- A session done today answers today's plan of its sport family.
