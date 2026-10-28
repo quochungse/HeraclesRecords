@@ -128,10 +128,23 @@ export function latestTrainingLoad(
   return {};
 }
 
+/**
+ * What the week's columns measure. Time is every sport's; COROS's load is a
+ * heart-rate figure built for endurance work, and a strength session reads
+ * light in it whatever it took out of the legs.
+ */
+export type WeekMeasure = "time" | "load";
+
 /** One session in a day's column, done or still on the plan. */
 export interface WeekBlock {
   key: string;
+  /** Its height: seconds or load, by the chart's measure. */
+  value: number;
+  /** Both figures, whichever is drawn, for the column's tooltip. */
   load: number;
+  seconds: number;
+  /** The session's or the plan's name; empty on the day's leftover load. */
+  name: string;
   /** null on the day's leftover load, which no session claims. */
   category: SportColorCategory | null;
   /** The sport it is drawn with; undefined for the leftover and an unknown code. */
@@ -146,16 +159,14 @@ export interface WeekColumn {
   isPast: boolean;
   /** Bottom to top: what was done, in start order, then what is planned. */
   blocks: WeekBlock[];
-  doneLoad: number;
-  plannedLoad: number;
+  /** The column's two parts in the chart's measure. */
+  done: number;
+  planned: number;
 }
 
 export interface WeekChart {
+  measure: WeekMeasure;
   columns: WeekColumn[];
-  doneLoad: number;
-  plannedLoad: number;
-  doneSessions: number;
-  plannedSessions: number;
   /** The top of the axis, a round number above the tallest column. */
   axisMax: number;
   /** Gridlines, bottom to top, 0 first. */
@@ -191,9 +202,25 @@ export function plannedStillOpen(
   return pairTodayPlan(planned, doneToday).open;
 }
 
-/** 0–100 a gridline at a time, rounded up to a step a reader can add. */
-function axisFor(max: number): { axisMax: number; ticks: number[] } {
-  const step = max <= 90 ? 30 : max <= 300 ? 100 : max <= 600 ? 200 : Math.ceil(max / 3 / 100) * 100;
+/** Three gridlines or more over the tallest column, at a step a reader can add. */
+function axisFor(max: number, measure: WeekMeasure): { axisMax: number; ticks: number[] } {
+  const step =
+    measure === "time"
+      ? // Half an hour, then whole hours.
+        max <= 5_400
+        ? 1_800
+        : max <= 10_800
+          ? 3_600
+          : max <= 21_600
+            ? 7_200
+            : Math.ceil(max / 3 / 3_600) * 3_600
+      : max <= 90
+        ? 30
+        : max <= 300
+          ? 100
+          : max <= 600
+            ? 200
+            : Math.ceil(max / 3 / 100) * 100;
   const axisMax = Math.max(step * 3, Math.ceil(max / step) * step);
   const ticks: number[] = [];
   for (let value = 0; value <= axisMax; value += step) {
@@ -202,24 +229,32 @@ function axisFor(max: number): { axisMax: number; ticks: number[] } {
   return { axisMax, ticks };
 }
 
+function seconds(value: number | undefined): number {
+  return value !== undefined && Number.isFinite(value) && value > 0 ? value : 0;
+}
+
 /**
- * Monday to Sunday of this week, every session a block: what was done (COROS's
- * daily load, split by the sessions that carry it — `buildWeeklyActivitySeries`,
- * so the figure is the one the Calendar and the old Weekly Activity chart drew)
- * and, from today on, what the calendar still holds.
+ * Monday to Sunday of this week, every session a block: what was done and,
+ * from today on, what the calendar still holds. In load, a done session is
+ * COROS's daily load split by the sessions that carry it
+ * (`buildWeeklyActivitySeries`, the figure the Calendar draws), with what no
+ * session claims as a block of its own; in time, it is the session's own
+ * activity time, and a planned one COROS's estimate of it.
  */
 export function buildWeekChart({
   dayList,
   activities,
   upcoming,
   now = new Date(),
-  unitSystem
+  unitSystem,
+  measure = "load"
 }: {
   dayList: TrainingHubDailyMetric[];
   activities: TrainingHubActivity[];
   upcoming: readonly TrainingHubUpcomingWorkout[];
   now?: Date;
   unitSystem: UnitSystem;
+  measure?: WeekMeasure;
 }): WeekChart {
   const series = buildWeeklyActivitySeries(dayList, "trainingLoad", now, unitSystem, activities);
   const weekDays = new Set(series.days.map((day) => day.happenDay));
@@ -231,8 +266,7 @@ export function buildWeekChart({
     }
   }
   const todayKey = happenDayOf(now.getTime()) ?? "";
-  let doneSessions = 0;
-  let plannedSessions = 0;
+  const pick = (load: number, time: number) => (measure === "time" ? time : load);
 
   const columns = series.days.map((day): WeekColumn => {
     const dayActivities = (byDay.get(day.happenDay) ?? []).sort(
@@ -241,41 +275,60 @@ export function buildWeekChart({
     const loads = new Map(day.segments.map((segment) => [segment.key, segment.value]));
     // Every session of the day, the ones COROS gave no load included: they
     // still happened, and the icon under the column says so.
-    const blocks: WeekBlock[] = dayActivities.map((activity) => ({
-      key: activity.activityId,
-      load: loads.get(activity.activityId) ?? 0,
-      category: sportColorCategory(activity.sportType),
-      sport: activitySport(activity.sportType),
-      planned: false
-    }));
+    const blocks: WeekBlock[] = dayActivities.map((activity) => {
+      const load = loads.get(activity.activityId) ?? 0;
+      const time = seconds(activity.duration);
+      return {
+        key: activity.activityId,
+        value: pick(load, time),
+        load,
+        seconds: time,
+        name: activity.name?.trim() ?? "",
+        category: sportColorCategory(activity.sportType),
+        sport: activitySport(activity.sportType),
+        planned: false
+      };
+    });
     // Load COROS counted outside a session (or for sessions not loaded yet).
+    // It has no time of its own, so the time chart has nothing to draw for it.
     const residual =
       loads.get(WEEKLY_ACTIVITY_RESIDUAL_KEY) ?? (day.segments.length === 0 ? day.value : 0);
-    if (residual > 0) {
-      blocks.push({ key: WEEKLY_ACTIVITY_RESIDUAL_KEY, load: residual, category: null, planned: false });
+    if (residual > 0 && measure === "load") {
+      blocks.push({
+        key: WEEKLY_ACTIVITY_RESIDUAL_KEY,
+        value: residual,
+        load: residual,
+        seconds: 0,
+        name: "",
+        category: null,
+        planned: false
+      });
     }
-    doneSessions += dayActivities.length;
-    const doneLoad = blocks.reduce((sum, block) => sum + block.load, 0);
+    const done = blocks.reduce((sum, block) => sum + block.value, 0);
 
-    let plannedLoad = 0;
+    let planned = 0;
     if (day.happenDay >= todayKey) {
-      const planned = upcoming.filter((workout) => workout.happenDay === day.happenDay);
+      const onDay = upcoming.filter((workout) => workout.happenDay === day.happenDay);
       const open =
         day.happenDay === todayKey
           ? plannedStillOpen(
-              planned,
+              onDay,
               activities.filter((activity) => happenDayOf(activity.startTime) === todayKey)
             )
-          : planned;
+          : onDay;
       open.forEach((workout) => {
         const load = positive(workout.trainingLoad) ?? 0;
-        plannedLoad += load;
-        plannedSessions += 1;
+        const time = seconds(workout.durationSeconds);
+        const value = pick(load, time);
+        planned += value;
         blocks.push({
           // Its place in the day's plan, not among what is still open: the key
           // must not change when the session before it is done.
-          key: `planned:${workout.happenDay}:${workout.sortNo ?? planned.indexOf(workout)}:${workout.name}`,
+          key: `planned:${workout.happenDay}:${workout.sortNo ?? onDay.indexOf(workout)}:${workout.name}`,
+          value,
           load,
+          seconds: time,
+          name: workout.name,
           category: scheduledSportCategory(workout.sportType) ?? "other",
           sport: scheduledWorkoutSport(workout.sportType),
           planned: true
@@ -288,34 +341,11 @@ export function buildWeekChart({
       isToday: day.happenDay === todayKey,
       isPast: day.happenDay < todayKey,
       blocks,
-      doneLoad,
-      plannedLoad
+      done,
+      planned
     };
   });
 
-  const tallest = Math.max(0, ...columns.map((column) => column.doneLoad + column.plannedLoad));
-  return {
-    columns,
-    doneLoad: columns.reduce((sum, column) => sum + column.doneLoad, 0),
-    plannedLoad: columns.reduce((sum, column) => sum + column.plannedLoad, 0),
-    doneSessions,
-    plannedSessions,
-    ...axisFor(tallest)
-  };
-}
-
-/** A day's icons: all of them up to three, past that the two biggest and a count. */
-export function columnIcons(blocks: readonly WeekBlock[]): {
-  shown: WeekBlock[];
-  more: number;
-} {
-  const sessions = blocks.filter((block) => block.key !== WEEKLY_ACTIVITY_RESIDUAL_KEY);
-  if (sessions.length <= 3) {
-    return { shown: sessions, more: 0 };
-  }
-  const biggest = [...sessions].sort((left, right) => right.load - left.load).slice(0, 2);
-  return {
-    shown: sessions.filter((block) => biggest.includes(block)),
-    more: sessions.length - 2
-  };
+  const tallest = Math.max(0, ...columns.map((column) => column.done + column.planned));
+  return { measure, columns, ...axisFor(tallest, measure) };
 }

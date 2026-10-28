@@ -159,9 +159,10 @@
   line-height: 1.3;
 }
 
-.overview-today-date-aside {
-  color: var(--text-muted);
-  font-weight: 400;
+/* The week's Time · Load switch, at the head's far end, kept out of the
+   row's height so the three heads stay one line. */
+.overview-week-measure {
+  margin: -8px 0 -8px auto;
 }
 
 /* Bare, as a link out of the column is: the column is not a control panel. */
@@ -267,8 +268,8 @@
   padding-top: 6px;
 }
 
-/* Clear of the status bands above it: the bands' names and the figures over
-   the tallest column would otherwise read as one line. */
+/* Clear of the status bar above it, which would otherwise read as the top of
+   the chart, and of a band's range shown under the bar on hover. */
 .overview-today-vis.is-week {
   padding-top: 20px;
 }
@@ -321,8 +322,10 @@
   line-height: 1.45;
 }
 
-/* Your physique: the Recovery card's figure and stage as they were, in a
-   column of the panel. */
+/* Recovery: the whole column is the figure's stage, bled to the panel's
+   edges, its ground the stage's own (styles.css, `.recovery-figure`) moved out
+   onto the column. The figure is drawn there as before, standing on the
+   stage's floor, with the reading under its feet. */
 .overview-physique {
   grid-column: 1;
   grid-row: 1 / span 4;
@@ -330,6 +333,7 @@
   grid-template-rows: subgrid;
   min-width: 0;
   border-right: 1px solid var(--overview-rule);
+  background: linear-gradient(180deg, #0e1215, #06090c);
 }
 
 .overview-physique-head {
@@ -341,30 +345,33 @@
 }
 
 .overview-physique-stage {
-  grid-row: 2 / span 2;
-  display: flex;
-  min-height: 0;
-  padding: 12px 14px 14px;
-}
-
-/* The stage takes the rows beside it, down to a floor that still holds a
-   figure; the Recovery card's taller floor was for a card standing alone. */
-.overview-physique-stage .recovery-figure {
-  min-height: 260px;
-}
-
-.overview-physique-foot {
-  grid-row: 4;
+  grid-row: 2 / span 3;
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  padding: 12px 20px 16px;
-  border-top: 1px solid var(--overview-rule);
+  min-height: 0;
+  padding-bottom: 18px;
+}
+
+/* No card of its own: the column is the stage. The figure takes the rows the
+   other two columns lay out, down to a floor that still holds one. */
+.overview-physique-stage .recovery-figure {
+  flex: 1 1 auto;
+  min-height: 280px;
+  border-radius: 0;
+  background: none;
+}
+
+/* Standing on the stage's floor rather than above it: the reading under the
+   feet is the floor's room. */
+.overview-physique-stage .body-figure {
+  bottom: 3%;
+  height: 93%;
 }
 
 .overview-physique-reading {
-  margin: 0;
+  margin: 4px 0 0;
   display: flex;
+  justify-content: center;
   align-items: baseline;
   gap: 8px;
   color: var(--text-secondary);
@@ -384,70 +391,99 @@
   margin: 0;
 }
 
-.overview-scale-ticks {
-  position: relative;
-  height: 11px;
-  margin-bottom: 4px;
-  color: var(--text-muted);
-  font-size: 10px;
-  font-variant-numeric: tabular-nums;
-  line-height: 1;
-}
-
-.overview-scale-ticks span {
-  position: absolute;
-  transform: translateX(-50%);
-}
-
-.overview-scale-bar {
+/* A band a column: its name over its segment, its range under it on hover.
+   The marker spans the row, at the segments' height. */
+.overview-scale-bands {
   position: relative;
   display: grid;
   grid-template-columns: repeat(var(--scale-bands), minmax(0, 1fr));
   gap: 2px;
-  height: 5px;
 }
 
-.overview-scale-bar i {
+.overview-scale-band {
+  position: relative;
+  display: grid;
+  gap: 7px;
+  min-width: 0;
+}
+
+.overview-scale-name {
+  overflow: hidden;
+  color: var(--text-muted);
+  font-size: 10px;
+  line-height: 1.2;
+  text-align: center;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.overview-scale-band.is-current .overview-scale-name {
+  color: var(--band-text, var(--band));
+  font-weight: 600;
+}
+
+.overview-scale-segment {
   display: block;
+  height: 5px;
   background: color-mix(in srgb, var(--band) 28%, transparent);
+  transition: background var(--dur-fast) var(--ease);
 }
 
-.overview-scale-bar i:first-child {
+.overview-scale-band:first-child .overview-scale-segment {
   border-radius: var(--radius-pill) 0 0 var(--radius-pill);
 }
 
-.overview-scale-bar i:last-of-type {
+.overview-scale-band:last-of-type .overview-scale-segment {
   border-radius: 0 var(--radius-pill) var(--radius-pill) 0;
 }
 
-.overview-scale-bar i.is-current {
+.overview-scale-band:hover .overview-scale-segment {
+  background: color-mix(in srgb, var(--band) 55%, transparent);
+}
+
+.overview-scale-band.is-current .overview-scale-segment {
   background: var(--band);
 }
 
-.overview-scale-bar b {
+.overview-scale-marker {
   position: absolute;
-  top: -4px;
+  bottom: -4px;
   width: 2px;
   height: 13px;
   margin-left: -1px;
   border-radius: var(--radius-xs);
   background: var(--text-primary);
+  pointer-events: none;
 }
 
-.overview-scale-names {
-  display: grid;
-  grid-template-columns: repeat(var(--scale-bands), minmax(0, 1fr));
-  gap: 2px;
-  margin-top: 7px;
-  color: var(--text-muted);
-  font-size: 10px;
-  line-height: 1.2;
-  text-align: center;
+/* The band's figures, under its segment while it is pointed at. */
+.overview-scale-range {
+  position: absolute;
+  z-index: 5;
+  top: calc(100% + 8px);
+  left: 50%;
+  padding: 4px 8px;
+  border: 1px solid var(--surface-line, var(--glass-border));
+  border-radius: var(--radius-sm);
+  background: var(--menu-surface);
+  box-shadow: var(--shadow-elevated);
+  color: var(--text-primary);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.3;
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  visibility: hidden;
+  transform: translateX(-50%);
+  transition:
+    opacity var(--dur-fast) var(--ease),
+    visibility var(--dur-fast) var(--ease);
 }
 
-.overview-scale-names .is-current {
-  color: var(--band-text, var(--band));
-  font-weight: 600;
+.overview-scale-band:hover .overview-scale-range {
+  opacity: 1;
+  visibility: visible;
 }
 
 .overview-scale [data-band="decreasing"] { --band: var(--overview-status-decreasing); }
@@ -553,12 +589,13 @@
 
 /* This week: a column a day, every session a block. The axis, the gridlines
    and the columns share one vertical frame — a strip for the figures over the
-   tallest column, the plot, then a row of icons and a row of day names — so
-   a block's height and the gridline it reaches are one measure. */
+   tallest column, the plot, then a row of day names — so a block's height and
+   the gridline it reaches are one measure. What a day held, sport by sport,
+   is its tooltip's. */
 .overview-week-chart {
   --week-axis: 30px;
   --week-top: 16px;
-  --week-bottom: 40px;
+  --week-bottom: 24px;
   position: relative;
   flex: 1 1 auto;
   align-self: stretch;
@@ -610,16 +647,34 @@
 }
 
 .overview-week-day {
+  position: relative;
   display: grid;
-  grid-template-rows: var(--week-top) minmax(0, 1fr) 22px 18px;
+  grid-template-rows: var(--week-top) minmax(0, 1fr) var(--week-bottom);
   min-width: 0;
   border: 1px solid transparent;
   border-radius: var(--radius-sm);
+  transition: background var(--dur-fast) var(--ease);
+}
+
+/* A column's figures on hover or focus, beside the column rather than over
+   the panel's rows above it: the panel clips what leaves it. */
+.overview-week-day .overview-tip {
+  top: var(--week-top);
 }
 
 .overview-week-day.is-today {
   border-color: color-mix(in srgb, var(--text-primary) 16%, transparent);
   background: color-mix(in srgb, var(--text-primary) 4%, transparent);
+}
+
+/* The day under the pointer, so its tooltip reads as its own. */
+.overview-week-day:hover {
+  background: color-mix(in srgb, var(--text-primary) 6%, transparent);
+}
+
+.overview-week-day:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: 2px;
 }
 
 .overview-week-plot {
@@ -678,24 +733,9 @@
   color: var(--text-muted);
 }
 
-.overview-week-icons {
-  grid-row: 3;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 2px;
-  min-width: 0;
-  color: var(--text-secondary);
-  font-size: 10px;
-  line-height: 1;
-}
-
-.overview-week-icons .is-planned {
-  opacity: 0.5;
-}
-
 .overview-week-label {
-  grid-row: 4;
+  grid-row: 3;
+  align-self: center;
   color: var(--text-secondary);
   font-size: 11px;
   line-height: 1.2;
@@ -767,6 +807,18 @@
   --overview-rule: rgba(19, 26, 40, 0.08);
 }
 
+/* Paper's slate stage (styles.css), on the column as the dark one is. */
+:root[data-theme="paper"] .overview-physique {
+  background:
+    radial-gradient(70% 38% at 50% 6%, rgba(255, 255, 255, 0.65), transparent 72%),
+    linear-gradient(180deg, #e4e9ef 0%, #d6dde5 55%, #c4cdd8 100%);
+}
+
+:root[data-theme="paper"] .overview-physique-stage .recovery-figure {
+  background: none;
+  box-shadow: none;
+}
+
 :root[data-theme="paper"] .overview-today {
   --overview-week-fill: var(--hall-gold);
   --overview-week-plan: var(--hall-gold-deep);
@@ -782,8 +834,136 @@
 }
 
 /* A band's name in its colour reads on white only taken darker. */
-:root[data-theme="paper"] .overview-scale-names .is-current {
+:root[data-theme="paper"] .overview-scale-band.is-current .overview-scale-name {
   --band-text: oklch(from var(--band) calc(l * 0.78) c h);
+}
+
+/* A chart column's tooltip (the week's days, a sport's weeks): beside the
+   column, on the side that keeps it inside the panel, shown while the column
+   is pointed at or focused. */
+.overview-tip {
+  position: absolute;
+  z-index: 5;
+  display: grid;
+  gap: 6px;
+  box-sizing: border-box;
+  width: max-content;
+  min-width: 168px;
+  max-width: 260px;
+  padding: 10px 12px;
+  border: 1px solid var(--surface-line, var(--glass-border));
+  border-radius: var(--radius-md);
+  background: var(--menu-surface);
+  box-shadow: var(--shadow-elevated);
+  color: var(--text-secondary);
+  font-size: 12px;
+  line-height: 1.3;
+  text-align: left;
+  pointer-events: none;
+  opacity: 0;
+  visibility: hidden;
+  transition:
+    opacity var(--dur-fast) var(--ease),
+    visibility var(--dur-fast) var(--ease);
+}
+
+.overview-tip.is-after {
+  left: calc(100% + 6px);
+}
+
+.overview-tip.is-before {
+  right: calc(100% + 6px);
+}
+
+:hover > .overview-tip,
+:focus-visible > .overview-tip {
+  opacity: 1;
+  visibility: visible;
+}
+
+.overview-tip strong {
+  color: var(--text-primary);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.overview-tip ul,
+.overview-tip dl {
+  display: grid;
+  gap: 5px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.overview-tip li {
+  display: grid;
+  grid-template-columns: 12px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+}
+
+/* What is still on the plan, under a heading of its own. */
+.overview-tip-group {
+  margin-top: 2px;
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+/* The sport in its own colour, as the activity heatmap and the plan's tiles
+   draw it; load no session claims has none. */
+.overview-tip-sport {
+  display: inline-flex;
+  color: var(--text-muted);
+}
+
+.overview-tip-sport[data-sport="run"] { color: var(--sport-run); }
+.overview-tip-sport[data-sport="bike"] { color: var(--sport-bike); }
+.overview-tip-sport[data-sport="hiking"] { color: var(--sport-hiking); }
+.overview-tip-sport[data-sport="strength"] { color: var(--sport-strength); }
+.overview-tip-sport[data-sport="other"] { color: var(--sport-other); }
+
+.overview-tip-name {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--text-primary);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.overview-tip-value,
+.overview-tip dd {
+  margin: 0;
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.overview-tip dl div,
+.overview-tip-total {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.overview-tip dd {
+  color: var(--text-primary);
+}
+
+.overview-tip-total {
+  padding-top: 6px;
+  border-top: 1px solid var(--overview-rule);
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+.overview-tip-more,
+.overview-tip-empty {
+  color: var(--text-muted);
 }
 
 /* ── Coming up ───────────────────────────────────────────────────────────── */
@@ -998,13 +1178,17 @@
   border-top: 1px solid var(--overview-rule);
 }
 
+/* A day reaches past the column's edge by its own padding, so its words stay
+   on the column's line while the hover's wash has room around them. */
 .overview-plan-row {
   display: grid;
   grid-template-columns: 10px 104px minmax(0, 1fr) auto;
   align-items: center;
   gap: 14px;
-  width: 100%;
-  padding: 12px 0;
+  box-sizing: border-box;
+  width: calc(100% + 24px);
+  margin: 0 -12px;
+  padding: 12px;
   border: 0;
   border-radius: var(--radius-sm);
   background: none;
@@ -1012,6 +1196,11 @@
   font: inherit;
   text-align: left;
   cursor: pointer;
+  transition: background var(--dur-fast) var(--ease);
+}
+
+.overview-plan-row:hover {
+  background: var(--glass-bg);
 }
 
 .overview-plan-row:focus-visible {
@@ -1048,11 +1237,14 @@
 
 .overview-plan-chevron {
   color: var(--text-muted);
-  transition: color var(--dur-fast) var(--ease);
+  transition:
+    color var(--dur-fast) var(--ease),
+    transform var(--dur-base) var(--ease);
 }
 
 .overview-plan-row:hover .overview-plan-chevron {
   color: var(--text-primary);
+  transform: translateX(3px);
 }
 
 .overview-plan-empty {
@@ -1253,11 +1445,12 @@
   background: var(--text-primary);
 }
 
-/* Easy to hard in the accent's own steps, deepest for the hardest — here and
-   in the sport sections' intensity. */
-.training-dashboard [data-intensity="easy"] { --intensity: color-mix(in srgb, var(--accent) 42%, transparent); }
-.training-dashboard [data-intensity="moderate"] { --intensity: color-mix(in srgb, var(--accent) 72%, transparent); }
-.training-dashboard [data-intensity="hard"] { --intensity: var(--accent-strong); }
+/* Easy to hard from a brownish gold to orange, so the hotter colour is the
+   harder effort — here and in the sport sections' intensity. Data, so fixed
+   hues rather than the accent, which an athlete may have made blue. */
+.training-dashboard [data-intensity="easy"] { --intensity: #b8974a; }
+.training-dashboard [data-intensity="moderate"] { --intensity: #e8973a; }
+.training-dashboard [data-intensity="hard"] { --intensity: #f2652a; }
 
 .overview-dist-split-bar [data-intensity] {
   background: var(--intensity);
@@ -1347,9 +1540,9 @@
   filter: saturate(0.8);
 }
 
-:root[data-theme="paper"] .training-dashboard [data-intensity="easy"] { --intensity: var(--hall-gold-light); }
-:root[data-theme="paper"] .training-dashboard [data-intensity="moderate"] { --intensity: var(--hall-gold); }
-:root[data-theme="paper"] .training-dashboard [data-intensity="hard"] { --intensity: var(--hall-gold-deep); }
+:root[data-theme="paper"] .training-dashboard [data-intensity="easy"] { --intensity: #c9a24a; }
+:root[data-theme="paper"] .training-dashboard [data-intensity="moderate"] { --intensity: #e8891e; }
+:root[data-theme="paper"] .training-dashboard [data-intensity="hard"] { --intensity: #e2541a; }
 
 /* ── One section a sport ────────────────────────────────────────────────── */
 
@@ -1515,11 +1708,29 @@
 }
 
 .overview-sport-column {
+  position: relative;
   display: flex;
   flex-direction: column;
   justify-content: flex-end;
   align-items: center;
   min-width: 0;
+  margin: 0 4px;
+  border-radius: var(--radius-sm);
+  transition: background var(--dur-fast) var(--ease);
+}
+
+/* The week under the pointer, so its tooltip reads as its own. */
+.overview-sport-column:hover {
+  background: color-mix(in srgb, var(--text-primary) 5%, transparent);
+}
+
+.overview-sport-column:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: 2px;
+}
+
+.overview-sport-column .overview-tip {
+  top: 0;
 }
 
 .overview-sport-column b {
@@ -1562,10 +1773,12 @@
 
 .overview-sport-average {
   position: absolute;
+  z-index: 1;
   right: -30px;
   left: -6px;
   height: 0;
   border-top: 1.5px dashed var(--accent);
+  pointer-events: none;
 }
 
 .overview-sport-average span {

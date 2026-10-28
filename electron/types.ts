@@ -872,6 +872,8 @@ export interface TrainingHubUpcomingWorkout {
   name: string;
   volume?: string;
   trainingLoad?: number;
+  /** COROS's own estimate of the session's length (`estimatedTime`), in seconds. */
+  durationSeconds?: number;
   sportType?: number;
   sortNo?: number;
   exercises?: TrainingHubScheduledExercise[];

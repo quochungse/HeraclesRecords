@@ -33,11 +33,12 @@ function recoveryWord(tone: "low" | "mid" | "high" | "neutral", waiting: boolean
 }
 
 /**
- * The Today panel's first column: the athlete's figure lit from the feet up to
- * COROS's recovery %, with the figure and its stage exactly as the Recovery
- * card drew them (styles.css, `.recovery-figure`), and the reading under it.
- * The column is a subgrid of the panel, so its stage takes the rows the Sleep
- * and This week columns lay out beside it, whatever height they come to.
+ * The Readiness panel's first column, Recovery: the athlete's figure lit from
+ * the feet up to COROS's recovery %, the figure drawn as the Recovery card drew
+ * it (styles.css, `.recovery-figure`), and the reading under its feet. The
+ * whole column is the stage, and it is a subgrid of the panel, so the figure
+ * takes the rows the Sleep and This week columns lay out beside it, whatever
+ * height they come to.
  */
 export function TodayPhysique(props: {
   summary: TrainingSummaryMetrics;
@@ -88,7 +89,7 @@ export function TodayPhysique(props: {
       aria-busy={(loading && !hasData) || undefined}
     >
       <div className="overview-physique-head">
-        <p className="eyebrow">{t("overview.physique.title")}</p>
+        <p className="eyebrow">{t("overview.recovery.title")}</p>
       </div>
       <div className="overview-physique-stage">
         <div className="recovery-figure" role="img" aria-label={figureDescription}>
@@ -103,9 +104,6 @@ export function TodayPhysique(props: {
             </Suspense>
           ) : null}
         </div>
-      </div>
-      <div className="overview-physique-foot">
-        <p className="eyebrow">{t("overview.recovery.title")}</p>
         <p className="overview-physique-reading">
           <span className="figure">{hasData ? `${percent}%` : "–"}</span>
           <span>{word}</span>

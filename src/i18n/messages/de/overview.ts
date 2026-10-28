@@ -124,7 +124,6 @@ const overview: OverviewMessages = {
   "overview.signin.or": "oder",
   "overview.signin.openBrowser": "COROS Training Hub im Browser öffnen",
   "overview.weekly.unreadable": "Deine Wochen konnten nicht von COROS gelesen werden.",
-  "overview.physique.title": "Deine Statur",
   "overview.physique.drawnFrom": "Gezeichnet nach {height} cm und {weight} kg",
   "overview.sleepWeek.avgSleep": "Ø Schlaf",
   "overview.sleepWeek.avgScore": "Ø Score",
@@ -135,10 +134,6 @@ const overview: OverviewMessages = {
   "overview.today.sleepHr": "Schlaf-HF",
   "overview.today.asleep": "Schlaf",
   "overview.today.stages": "Schlafphasen",
-  "overview.today.sessions_one": "{count} Einheit",
-  "overview.today.sessions_other": "{count} Einheiten",
-  "overview.today.planned_one": "+ {count} geplant",
-  "overview.today.planned_other": "+ {count} geplant",
   "overview.today.intensityTrend": "Intensitätstrend",
   "overview.today.weekChart": "Trainingslast pro Tag in dieser Woche, ein Block pro Einheit, geplante schraffiert",
   "overview.today.statusScale": "Intensitätstrend {percent} %: {status}",
@@ -229,6 +224,12 @@ const overview: OverviewMessages = {
   "overview.sport.sets": "Sätze",
   "overview.sport.perSession": "{value} pro Einheit",
   "overview.sport.timeLifting": "Trainingszeit",
+  "overview.today.weekMeasure": "Woche gemessen in",
+  "overview.today.weekChartTime": "Trainingszeit pro Tag in dieser Woche, ein Block pro Einheit, geplante schraffiert",
+  "overview.today.outsideSessions": "Außerhalb einer Einheit",
+  "overview.today.plannedTag": "Geplant",
+  "overview.today.total": "Gesamt",
+  "overview.sport.ridesLabel": "Fahrten",
 };
 
 export default overview;

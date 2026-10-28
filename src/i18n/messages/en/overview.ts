@@ -125,7 +125,6 @@ const overview = {
   "overview.signin.or": "or",
   "overview.signin.openBrowser": "Open COROS Training Hub in Browser",
   "overview.weekly.unreadable": "Your weeks could not be read from COROS.",
-  "overview.physique.title": "Your physique",
   "overview.physique.drawnFrom": "Drawn from {height} cm and {weight} kg",
   "overview.sleepWeek.avgSleep": "Avg sleep",
   "overview.sleepWeek.avgScore": "Avg score",
@@ -136,10 +135,6 @@ const overview = {
   "overview.today.sleepHr": "Sleep HR",
   "overview.today.asleep": "asleep",
   "overview.today.stages": "Sleep stages",
-  "overview.today.sessions_one": "{count} session",
-  "overview.today.sessions_other": "{count} sessions",
-  "overview.today.planned_one": "+ {count} planned",
-  "overview.today.planned_other": "+ {count} planned",
   "overview.today.intensityTrend": "Intensity trend",
   "overview.today.weekChart": "Training load by day this week, one block per session, planned sessions hatched",
   "overview.today.statusScale": "Intensity trend {percent}%: {status}",
@@ -230,6 +225,12 @@ const overview = {
   "overview.sport.sets": "Sets",
   "overview.sport.perSession": "{value} a session",
   "overview.sport.timeLifting": "Time lifting",
+  "overview.today.weekMeasure": "Week measured in",
+  "overview.today.weekChartTime": "Time trained by day this week, one block per session, planned sessions hatched",
+  "overview.today.outsideSessions": "Outside a session",
+  "overview.today.plannedTag": "Planned",
+  "overview.today.total": "Total",
+  "overview.sport.ridesLabel": "Rides",
 };
 
 export default overview;

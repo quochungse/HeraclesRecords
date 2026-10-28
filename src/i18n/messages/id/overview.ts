@@ -124,7 +124,6 @@ const overview: OverviewMessages = {
   "overview.signin.or": "atau",
   "overview.signin.openBrowser": "Buka COROS Training Hub di browser",
   "overview.weekly.unreadable": "Data mingguan Anda tidak dapat dibaca dari COROS.",
-  "overview.physique.title": "Postur Anda",
   "overview.physique.drawnFrom": "Digambar dari {height} cm dan {weight} kg",
   "overview.sleepWeek.avgSleep": "Rata-rata tidur",
   "overview.sleepWeek.avgScore": "Rata-rata skor",
@@ -135,10 +134,6 @@ const overview: OverviewMessages = {
   "overview.today.sleepHr": "HR saat tidur",
   "overview.today.asleep": "tidur",
   "overview.today.stages": "Tahap tidur",
-  "overview.today.sessions_one": "{count} sesi",
-  "overview.today.sessions_other": "{count} sesi",
-  "overview.today.planned_one": "+ {count} terencana",
-  "overview.today.planned_other": "+ {count} terencana",
   "overview.today.intensityTrend": "Tren intensitas",
   "overview.today.weekChart": "Beban latihan per hari minggu ini, satu blok per sesi, sesi terencana diarsir",
   "overview.today.statusScale": "Tren intensitas {percent}%: {status}",
@@ -229,6 +224,12 @@ const overview: OverviewMessages = {
   "overview.sport.sets": "Set",
   "overview.sport.perSession": "{value} per sesi",
   "overview.sport.timeLifting": "Waktu latihan beban",
+  "overview.today.weekMeasure": "Minggu diukur dalam",
+  "overview.today.weekChartTime": "Waktu latihan per hari minggu ini, satu blok per sesi, sesi terencana diarsir",
+  "overview.today.outsideSessions": "Di luar sesi",
+  "overview.today.plannedTag": "Terencana",
+  "overview.today.total": "Total",
+  "overview.sport.ridesLabel": "Bersepeda",
 };
 
 export default overview;

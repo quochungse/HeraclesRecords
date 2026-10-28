@@ -5,16 +5,23 @@ import type {
   TrainingHubUpcomingWorkout
 } from "../../../electron/types";
 import { workoutSportView } from "../../calendar/workoutSportIcons";
+import { OptionGroup } from "../../components/OptionGroup";
+import {
+  defineSelectionPreference,
+  selectionIsOneOf,
+  useSelectionPreference
+} from "../../preferences/selectionPreferences";
+import { formatDurationSpan } from "../formatters";
 import { happenDayToDate, mergeTrainingDayLists } from "../parsers";
+import { SPORT_COLOR_LABELS } from "../sportColors";
 import { enrichDayListWithActivityTotals, getCalendarWeekDateKeys } from "../weeklyActivity";
 import type { TrainingHubSnapshot } from "../types";
 import { useUnitSystem } from "../../units/UnitSystemProvider";
-import { getIntlLocale, plural, t, weekdayNames } from "../../i18n/core";
+import { formatDecimal, getIntlLocale, t, weekdayNames } from "../../i18n/core";
 import { useI18n } from "../../i18n/useI18n";
 import { BandScale } from "./BandScale";
 import {
   buildWeekChart,
-  columnIcons,
   latestTrainingLoad,
   trainingStatusBand,
   trainingStatusMarker,
@@ -22,8 +29,18 @@ import {
   TRAINING_STATUS_EDGES,
   type WeekBlock,
   type WeekChart,
-  type WeekColumn
+  type WeekColumn,
+  type WeekMeasure
 } from "./todayModel";
+
+const WEEK_MEASURE = defineSelectionPreference<WeekMeasure>({
+  key: "overview.weekMeasure",
+  defaultValue: "time",
+  validate: selectionIsOneOf(["time", "load"])
+});
+
+/** A tooltip lists this many sessions, and counts the rest. */
+const TIP_SESSIONS = 5;
 
 function blockIcon(block: WeekBlock): LucideIcon {
   if (block.sport === "hiking") {
@@ -50,21 +67,105 @@ function figure(value: number): string {
   return new Intl.NumberFormat(getIntlLocale()).format(Math.round(value));
 }
 
+/** An axis step: "0", "30m", "1h", "1.5h". */
+function axisLabel(value: number, measure: WeekMeasure): string {
+  if (measure === "load" || value === 0) {
+    return figure(value);
+  }
+  if (value > 0 && value < 3_600) {
+    return t("units.duration.m", { m: Math.round(value / 60) });
+  }
+  const hours = value / 3_600;
+  return t("units.duration.h", { h: formatDecimal(hours, Number.isInteger(hours) ? 0 : 1) });
+}
+
+function amount(value: number, measure: WeekMeasure): string {
+  return measure === "time" ? formatDurationSpan(value) : figure(value);
+}
+
+/** A session's two figures, time then load, each only where it has one. */
+function blockFigures(block: { seconds: number; load: number }): string {
+  return [
+    block.seconds > 0 ? formatDurationSpan(block.seconds) : null,
+    block.load > 0 ? t("units.trainingLoadShort", { value: Math.round(block.load) }) : null
+  ]
+    .filter(Boolean)
+    .join(" · ");
+}
+
+function blockName(block: WeekBlock): string {
+  if (block.category === null) {
+    return t("overview.today.outsideSessions");
+  }
+  return block.name || SPORT_COLOR_LABELS[block.category];
+}
+
+/** A tooltip's sessions, a row each: the sport in its colour, the name, its figures. */
+function TipSessions({ blocks }: { blocks: readonly WeekBlock[] }) {
+  if (blocks.length === 0) {
+    return null;
+  }
+  return (
+    <ul>
+      {blocks.map((block) => {
+        const Icon = blockIcon(block);
+        return (
+          <li key={block.key}>
+            <span className="overview-tip-sport" data-sport={block.category ?? undefined} aria-hidden="true">
+              <Icon size={12} strokeWidth={2} />
+            </span>
+            <span className="overview-tip-name">{blockName(block)}</span>
+            <span className="overview-tip-value">{blockFigures(block)}</span>
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
+
 function WeekDay({
   column,
   chart,
-  label
+  label,
+  date,
+  tipSide
 }: {
   column: WeekColumn;
   chart: WeekChart;
   label: string;
+  /** "Thu, Oct 22": the tooltip's heading. */
+  date: string;
+  /** Which side of the column its tooltip opens on, so it stays inside the panel. */
+  tipSide: "after" | "before";
 }) {
-  const { shown, more } = columnIcons(column.blocks);
-  const total = column.doneLoad + column.plannedLoad;
+  const total = column.done + column.planned;
   const rest = column.isPast && column.blocks.length === 0;
+  const listed = column.blocks.slice(0, TIP_SESSIONS);
+  const totals = column.blocks.reduce(
+    (sum, block) => ({ seconds: sum.seconds + block.seconds, load: sum.load + block.load }),
+    { seconds: 0, load: 0 }
+  );
+  const empty = column.isPast
+    ? t("overview.heatmap.rest")
+    : t("overview.sport.nothingPlanned");
+  const description = [
+    date,
+    ...(column.blocks.length > 0
+      ? column.blocks.map((block) =>
+          [blockName(block), block.planned ? t("overview.today.plannedTag") : null, blockFigures(block)]
+            .filter(Boolean)
+            .join(", ")
+        )
+      : [empty])
+  ].join(". ");
   return (
-    <div className={`overview-week-day${column.isToday ? " is-today" : ""}`}>
-      <div className="overview-week-plot">
+    <div
+      className={`overview-week-day${column.isToday ? " is-today" : ""}`}
+      role="img"
+      tabIndex={0}
+      aria-label={description}
+    >
+      <div className="overview-week-plot" aria-hidden="true">
         <div className="overview-week-stack">
           {column.blocks.map((block) => (
             <i
@@ -76,29 +177,42 @@ function WeekDay({
               ]
                 .filter(Boolean)
                 .join(" ")}
-              style={{ height: `${(block.load / chart.axisMax) * 100}%` }}
+              style={{ height: `${(block.value / chart.axisMax) * 100}%` }}
             />
           ))}
-          {total > 0 ? <span className="overview-week-value figure">{figure(total)}</span> : null}
+          {total > 0 ? <span className="overview-week-value figure">{amount(total, chart.measure)}</span> : null}
           {rest ? <span className="overview-week-rest">{t("overview.heatmap.rest")}</span> : null}
         </div>
       </div>
-      <div className="overview-week-icons">
-        {shown.map((block) => {
-          const Icon = blockIcon(block);
-          return (
-            <Icon
-              key={block.key}
-              size={12}
-              strokeWidth={2}
-              className={block.planned ? "is-planned" : undefined}
-              aria-hidden="true"
-            />
-          );
-        })}
-        {more > 0 ? <span className="figure">+{more}</span> : null}
-      </div>
-      <span className="overview-week-label">{label}</span>
+      <span className="overview-week-label" aria-hidden="true">{label}</span>
+
+      <span className={`overview-tip is-${tipSide}`} aria-hidden="true">
+        <strong>{date}</strong>
+        {column.blocks.length > 0 ? (
+          <>
+            <TipSessions blocks={listed.filter((block) => !block.planned)} />
+            {listed.some((block) => block.planned) ? (
+              <>
+                <span className="overview-tip-group">{t("overview.today.plannedTag")}</span>
+                <TipSessions blocks={listed.filter((block) => block.planned)} />
+              </>
+            ) : null}
+            {column.blocks.length > TIP_SESSIONS ? (
+              <span className="overview-tip-more">
+                {t("overview.heatmap.more", { count: column.blocks.length - TIP_SESSIONS })}
+              </span>
+            ) : null}
+            {column.blocks.length > 1 ? (
+              <span className="overview-tip-total">
+                <span>{t("overview.today.total")}</span>
+                <span className="overview-tip-value">{blockFigures(totals)}</span>
+              </span>
+            ) : null}
+          </>
+        ) : (
+          <span className="overview-tip-empty">{empty}</span>
+        )}
+      </span>
     </div>
   );
 }
@@ -106,8 +220,8 @@ function WeekDay({
 /**
  * This week, as the Readiness panel's right-hand column: COROS's training
  * status on its five bands, a column a day with every session a block (done
- * in the accent, planned hatched), and the trend with the two figures it is
- * the ratio of.
+ * in the accent, planned hatched) in time or in load, and the trend with the
+ * two figures it is the ratio of. A column opens what it holds on hover.
  */
 export function TodayWeek({
   snapshot,
@@ -131,9 +245,10 @@ export function TodayWeek({
     [snapshot, activities]
   );
   const now = new Date();
+  const [measure, setMeasure] = useSelectionPreference(WEEK_MEASURE);
   const chart = useMemo(
-    () => buildWeekChart({ dayList, activities, upcoming: upcomingWorkouts, unitSystem }),
-    [dayList, activities, upcomingWorkouts, unitSystem]
+    () => buildWeekChart({ dayList, activities, upcoming: upcomingWorkouts, unitSystem, measure }),
+    [dayList, activities, upcomingWorkouts, unitSystem, measure]
   );
   const reading = useMemo(() => latestTrainingLoad(dayList), [dayList]);
   const percent = reading.percent;
@@ -142,29 +257,41 @@ export function TodayWeek({
   // with nothing recorded yet is seven empty columns.
   const answered = !loading && snapshot !== null;
   const weekdays = weekdayNames("short");
-  const bands = TRAINING_STATUS_BANDS.map((key) => ({ key, label: t(`overview.status.${key}`) }));
+  const dayFormat = new Intl.DateTimeFormat(getIntlLocale(), { weekday: "short", month: "short", day: "numeric" });
+  const edges = TRAINING_STATUS_EDGES;
+  const bands = TRAINING_STATUS_BANDS.map((key, index) => ({
+    key,
+    label: t(`overview.status.${key}`),
+    range:
+      index === 0
+        ? `< ${edges[0]}%`
+        : index === edges.length
+          ? `≥ ${edges[index - 1]}%`
+          : `${edges[index - 1]}–${edges[index] - 1}%`
+  }));
 
   return (
     <>
       <div className="overview-today-cell overview-today-head is-week">
         <p className="eyebrow">{t("overview.tiles.thisWeek")}</p>
-        <span className="overview-today-date">
-          {weekDates(now)}
-          <span className="overview-today-date-aside">
-            {" · "}
-            {plural("overview.today.sessions", chart.doneSessions)}
-            {chart.plannedSessions > 0
-              ? ` ${plural("overview.today.planned", chart.plannedSessions)}`
-              : null}
-          </span>
-        </span>
+        <span className="overview-today-date">{weekDates(now)}</span>
+        <OptionGroup
+          className="overview-week-measure"
+          label={t("overview.today.weekMeasure")}
+          tone="quiet"
+          value={measure}
+          options={[
+            { value: "time", label: t("overview.zones.time") },
+            { value: "load", label: t("overview.tiles.load") }
+          ]}
+          onChange={setMeasure}
+        />
       </div>
 
       <div className="overview-today-cell overview-today-status is-week">
         <BandScale
           scale="status"
           bands={bands}
-          ticks={TRAINING_STATUS_EDGES.map((edge) => `${edge}%`)}
           marker={percent !== undefined ? trainingStatusMarker(percent) : undefined}
           current={status}
           label={
@@ -177,11 +304,15 @@ export function TodayWeek({
 
       <div className="overview-today-cell overview-today-vis is-week">
         {answered ? (
-          <div className="overview-week-chart" role="img" aria-label={t("overview.today.weekChart")}>
+          <div
+            className="overview-week-chart"
+            role="group"
+            aria-label={t(measure === "time" ? "overview.today.weekChartTime" : "overview.today.weekChart")}
+          >
             <div className="overview-week-axis" aria-hidden="true">
               {chart.ticks.map((tick) => (
                 <span key={tick} style={{ bottom: `${(tick / chart.axisMax) * 100}%` }}>
-                  {figure(tick)}
+                  {axisLabel(tick, measure)}
                 </span>
               ))}
             </div>
@@ -190,15 +321,20 @@ export function TodayWeek({
                 <i key={tick} style={{ bottom: `${(tick / chart.axisMax) * 100}%` }} />
               ))}
             </div>
-            <div className="overview-week-cols" aria-hidden="true">
-              {chart.columns.map((column, index) => (
-                <WeekDay
-                  key={column.happenDay}
-                  column={column}
-                  chart={chart}
-                  label={column.isToday ? t("overview.today") : weekdays[index]}
-                />
-              ))}
+            <div className="overview-week-cols">
+              {chart.columns.map((column, index) => {
+                const date = happenDayToDate(column.happenDay);
+                return (
+                  <WeekDay
+                    key={column.happenDay}
+                    column={column}
+                    chart={chart}
+                    label={column.isToday ? t("overview.today") : weekdays[index]}
+                    date={date ? dayFormat.format(date) : column.happenDay}
+                    tipSide={index < 3 ? "after" : "before"}
+                  />
+                );
+              })}
             </div>
           </div>
         ) : (

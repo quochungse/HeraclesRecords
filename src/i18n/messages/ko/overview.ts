@@ -124,7 +124,6 @@ const overview: OverviewMessages = {
   "overview.signin.or": "또는",
   "overview.signin.openBrowser": "브라우저에서 COROS Training Hub 열기",
   "overview.weekly.unreadable": "COROS에서 주간 데이터를 읽지 못했습니다.",
-  "overview.physique.title": "나의 체형",
   "overview.physique.drawnFrom": "{height} cm, {weight} kg 기준으로 그림",
   "overview.sleepWeek.avgSleep": "평균 수면",
   "overview.sleepWeek.avgScore": "평균 점수",
@@ -135,10 +134,6 @@ const overview: OverviewMessages = {
   "overview.today.sleepHr": "수면 심박수",
   "overview.today.asleep": "수면",
   "overview.today.stages": "수면 단계",
-  "overview.today.sessions_one": "{count}회",
-  "overview.today.sessions_other": "{count}회",
-  "overview.today.planned_one": "+ 예정 {count}회",
-  "overview.today.planned_other": "+ 예정 {count}회",
   "overview.today.intensityTrend": "강도 추세",
   "overview.today.weekChart": "이번 주 일별 훈련 부하, 세션마다 블록 하나, 예정된 세션은 빗금",
   "overview.today.statusScale": "강도 추세 {percent}%: {status}",
@@ -229,6 +224,12 @@ const overview: OverviewMessages = {
   "overview.sport.sets": "세트 수",
   "overview.sport.perSession": "세션당 {value}",
   "overview.sport.timeLifting": "운동 시간",
+  "overview.today.weekMeasure": "주간 측정 기준",
+  "overview.today.weekChartTime": "이번 주 일별 훈련 시간, 세션마다 블록 하나, 예정된 세션은 빗금",
+  "overview.today.outsideSessions": "세션 외",
+  "overview.today.plannedTag": "예정",
+  "overview.today.total": "합계",
+  "overview.sport.ridesLabel": "라이딩 수",
 };
 
 export default overview;

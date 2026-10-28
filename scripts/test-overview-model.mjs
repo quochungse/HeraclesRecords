@@ -18,7 +18,6 @@ const modelUrl = pathToFileURL(path.join(repoRoot, "src", "training", "overview"
 const {
   bandMarker,
   buildWeekChart,
-  columnIcons,
   latestTrainingLoad,
   plannedStillOpen,
   trainingStatusBand,
@@ -87,8 +86,8 @@ assert.deepEqual(
 const now = new Date(2026, 9, 24, 15, 0);
 const at = (day, hour) => Math.floor(new Date(2026, 9, day, hour).getTime() / 1000);
 const activities = [
-  { activityId: "mon-ride", sportType: 200, startTime: at(19, 7), trainingLoad: 200 },
-  { activityId: "mon-lift", sportType: 402, startTime: at(19, 18), trainingLoad: 60 },
+  { activityId: "mon-ride", sportType: 200, startTime: at(19, 7), trainingLoad: 200, duration: 5_400 },
+  { activityId: "mon-lift", name: "Leg day", sportType: 402, startTime: at(19, 18), trainingLoad: 60, duration: 4_200 },
   { activityId: "wed-run", sportType: 100, startTime: at(21, 6), trainingLoad: 110 },
   { activityId: "thu-run", sportType: 100, startTime: at(22, 6), trainingLoad: 80 },
   { activityId: "thu-ride", sportType: 200, startTime: at(22, 12), trainingLoad: 140 },
@@ -105,7 +104,7 @@ const dayList = [
 const upcoming = [
   { happenDay: "20261024", name: "Easy run", sportType: 1, trainingLoad: 75 },
   { happenDay: "20261024", name: "Core", sportType: 4, trainingLoad: 20 },
-  { happenDay: "20261025", name: "Long run", sportType: 1, trainingLoad: 160 },
+  { happenDay: "20261025", name: "Long run", sportType: 1, trainingLoad: 160, durationSeconds: 7_200 },
   { happenDay: "20261025", name: "Spin", sportType: 2 },
   { happenDay: "20261026", name: "Next week", sportType: 1, trainingLoad: 90 }
 ];
@@ -139,7 +138,7 @@ assert.deepEqual(
   ],
   "today: the run done answers the run planned; the core session is still to do"
 );
-assert.equal(sat.plannedLoad, 20);
+assert.equal(sat.planned, 20);
 assert.deepEqual(
   sun.blocks.map((block) => [block.load, block.planned, block.sport]),
   [
@@ -148,25 +147,47 @@ assert.deepEqual(
   ],
   "a plan with no load still stands as a block"
 );
-assert.equal(chart.doneSessions, 8, "sessions this week, last week's left out");
-assert.equal(chart.plannedSessions, 3, "what is left: today's core and Sunday's two");
-assert.equal(chart.doneLoad, 260 + 130 + 300 + 82);
-assert.equal(chart.plannedLoad, 20 + 160);
+const sum = (pick) => chart.columns.reduce((total, column) => total + pick(column), 0);
+assert.equal(
+  sum((column) => column.blocks.filter((block) => !block.planned && block.category !== null).length),
+  8,
+  "sessions this week, last week's left out"
+);
+assert.equal(sum((column) => column.blocks.filter((block) => block.planned).length), 3, "what is left: today's core and Sunday's two");
+assert.equal(sum((column) => column.done), 260 + 130 + 300 + 82);
+assert.equal(sum((column) => column.planned), 20 + 160);
 assert.deepEqual(chart.ticks, [0, 100, 200, 300], "a round axis over Thursday's 300");
 assert.equal(chart.axisMax, 300);
+assert.deepEqual(
+  [mon.blocks[1].name, mon.blocks[1].seconds, mon.blocks[1].value],
+  ["Leg day", 4_200, 60],
+  "a block carries its name and both figures, and stands at its load"
+);
 
-// --- Icons: up to three a day, past that the two biggest and a count.
-assert.equal(columnIcons(mon.blocks).shown.length, 2);
+// --- The same week in time: every sport on one measure, a strength session
+// as long as it took rather than as light as its heart rate read.
+const timed = buildWeekChart({ dayList, activities, upcoming, now, unitSystem: "metric", measure: "time" });
+const [tMon, , tWed, , , , tSun] = timed.columns;
+assert.equal(timed.measure, "time");
 assert.deepEqual(
-  (({ shown, more }) => [shown.map((block) => block.key), more])(columnIcons(thu.blocks)),
-  [["thu-run", "thu-ride"], 2],
-  "four sessions: the two biggest, in their order, and +2"
+  tMon.blocks.map((block) => [block.key, block.value, block.load]),
+  [
+    ["mon-ride", 5_400, 200],
+    ["mon-lift", 4_200, 60]
+  ],
+  "a block a session at its activity time, its load kept for the tooltip"
 );
+assert.equal(tMon.done, 9_600);
+assert.deepEqual(tWed.blocks.map((block) => block.key), ["wed-run"], "load no session claims has no time to draw");
 assert.deepEqual(
-  columnIcons(wed.blocks).shown.map((block) => block.key),
-  ["wed-run"],
-  "the leftover load has no icon"
+  tSun.blocks.map((block) => [block.value, block.planned]),
+  [
+    [7_200, true],
+    [0, true]
+  ],
+  "a planned session at COROS's estimate of it, none stated none drawn"
 );
+assert.deepEqual(timed.ticks, [0, 3_600, 7_200, 10_800], "whole hours over Monday's 2h 40m");
 
 // --- Training load distribution.
 const distributionUrl = pathToFileURL(

@@ -124,7 +124,6 @@ const overview: OverviewMessages = {
   "overview.signin.or": "または",
   "overview.signin.openBrowser": "ブラウザーで COROS Training Hub を開く",
   "overview.weekly.unreadable": "COROS から週のデータを読み込めませんでした。",
-  "overview.physique.title": "あなたの体型",
   "overview.physique.drawnFrom": "{height} cm・{weight} kg をもとに描画",
   "overview.sleepWeek.avgSleep": "平均睡眠",
   "overview.sleepWeek.avgScore": "平均スコア",
@@ -135,10 +134,6 @@ const overview: OverviewMessages = {
   "overview.today.sleepHr": "睡眠時心拍",
   "overview.today.asleep": "睡眠",
   "overview.today.stages": "睡眠ステージ",
-  "overview.today.sessions_one": "{count} セッション",
-  "overview.today.sessions_other": "{count} セッション",
-  "overview.today.planned_one": "+ 予定 {count}",
-  "overview.today.planned_other": "+ 予定 {count}",
   "overview.today.intensityTrend": "強度トレンド",
   "overview.today.weekChart": "今週の日別トレーニング負荷。1 ブロックが 1 セッションで、予定はハッチング",
   "overview.today.statusScale": "強度トレンド {percent}%：{status}",
@@ -229,6 +224,12 @@ const overview: OverviewMessages = {
   "overview.sport.sets": "セット数",
   "overview.sport.perSession": "1 回あたり {value}",
   "overview.sport.timeLifting": "トレーニング時間",
+  "overview.today.weekMeasure": "週の表示単位",
+  "overview.today.weekChartTime": "今週の日別トレーニング時間。1 ブロックが 1 セッションで、予定はハッチング",
+  "overview.today.outsideSessions": "セッション外",
+  "overview.today.plannedTag": "予定",
+  "overview.today.total": "合計",
+  "overview.sport.ridesLabel": "ライド回数",
 };
 
 export default overview;

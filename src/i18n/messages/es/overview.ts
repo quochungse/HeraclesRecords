@@ -124,7 +124,6 @@ const overview: OverviewMessages = {
   "overview.signin.or": "o",
   "overview.signin.openBrowser": "Abrir COROS Training Hub en el navegador",
   "overview.weekly.unreadable": "No se pudieron leer tus semanas desde COROS.",
-  "overview.physique.title": "Tu físico",
   "overview.physique.drawnFrom": "Dibujado a partir de {height} cm y {weight} kg",
   "overview.sleepWeek.avgSleep": "Sueño medio",
   "overview.sleepWeek.avgScore": "Puntuación media",
@@ -135,10 +134,6 @@ const overview: OverviewMessages = {
   "overview.today.sleepHr": "FC durante el sueño",
   "overview.today.asleep": "de sueño",
   "overview.today.stages": "Fases del sueño",
-  "overview.today.sessions_one": "{count} sesión",
-  "overview.today.sessions_other": "{count} sesiones",
-  "overview.today.planned_one": "+ {count} planificada",
-  "overview.today.planned_other": "+ {count} planificadas",
   "overview.today.intensityTrend": "Tendencia de intensidad",
   "overview.today.weekChart": "Carga de entrenamiento por día esta semana, un bloque por sesión, las planificadas rayadas",
   "overview.today.statusScale": "Tendencia de intensidad {percent} %: {status}",
@@ -229,6 +224,12 @@ const overview: OverviewMessages = {
   "overview.sport.sets": "Series",
   "overview.sport.perSession": "{value} por sesión",
   "overview.sport.timeLifting": "Tiempo de fuerza",
+  "overview.today.weekMeasure": "Semana medida en",
+  "overview.today.weekChartTime": "Tiempo entrenado por día esta semana, un bloque por sesión, las planificadas rayadas",
+  "overview.today.outsideSessions": "Fuera de una sesión",
+  "overview.today.plannedTag": "Planificada",
+  "overview.today.total": "Total",
+  "overview.sport.ridesLabel": "Salidas",
 };
 
 export default overview;

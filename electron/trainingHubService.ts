@@ -4305,6 +4305,9 @@ export function parseUpcomingWorkouts(
       name: resolveUpcomingWorkoutName(program, entity),
       volume: formatUpcomingWorkoutVolume(program, entity),
       trainingLoad: resolveUpcomingWorkoutLoad(program, entity),
+      durationSeconds: program
+        ? (toProgramFigure(program.estimatedTime) ?? toProgramFigure(program.duration))
+        : undefined,
       sportType: toOptionalNumber(program?.sportType),
       sortNo: toOptionalNumber(entity.sortNoInSchedule ?? entity.sortNo),
       exercises: parseScheduledExercises(program)

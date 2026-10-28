@@ -124,7 +124,6 @@ const overview: OverviewMessages = {
   "overview.signin.or": "หรือ",
   "overview.signin.openBrowser": "เปิด COROS Training Hub ในเบราว์เซอร์",
   "overview.weekly.unreadable": "อ่านข้อมูลรายสัปดาห์ของคุณจาก COROS ไม่ได้",
-  "overview.physique.title": "รูปร่างของคุณ",
   "overview.physique.drawnFrom": "วาดจากส่วนสูง {height} ซม. และน้ำหนัก {weight} กก.",
   "overview.sleepWeek.avgSleep": "การนอนเฉลี่ย",
   "overview.sleepWeek.avgScore": "คะแนนเฉลี่ย",
@@ -135,10 +134,6 @@ const overview: OverviewMessages = {
   "overview.today.sleepHr": "ชีพจรขณะนอน",
   "overview.today.asleep": "นอนหลับ",
   "overview.today.stages": "ระยะการนอน",
-  "overview.today.sessions_one": "{count} ครั้ง",
-  "overview.today.sessions_other": "{count} ครั้ง",
-  "overview.today.planned_one": "+ วางแผนไว้ {count} ครั้ง",
-  "overview.today.planned_other": "+ วางแผนไว้ {count} ครั้ง",
   "overview.today.intensityTrend": "แนวโน้มความหนัก",
   "overview.today.weekChart": "ภาระการฝึกรายวันของสัปดาห์นี้ หนึ่งบล็อกต่อหนึ่งครั้ง ครั้งที่วางแผนไว้เป็นลายเส้นทแยง",
   "overview.today.statusScale": "แนวโน้มความหนัก {percent}%: {status}",
@@ -229,6 +224,12 @@ const overview: OverviewMessages = {
   "overview.sport.sets": "จำนวนเซต",
   "overview.sport.perSession": "{value} ต่อครั้ง",
   "overview.sport.timeLifting": "เวลายกน้ำหนัก",
+  "overview.today.weekMeasure": "วัดสัปดาห์เป็น",
+  "overview.today.weekChartTime": "เวลาฝึกรายวันของสัปดาห์นี้ หนึ่งบล็อกต่อหนึ่งครั้ง ครั้งที่วางแผนไว้เป็นลายเส้นทแยง",
+  "overview.today.outsideSessions": "นอกการฝึก",
+  "overview.today.plannedTag": "วางแผนไว้",
+  "overview.today.total": "รวม",
+  "overview.sport.ridesLabel": "จำนวนการปั่น",
 };
 
 export default overview;

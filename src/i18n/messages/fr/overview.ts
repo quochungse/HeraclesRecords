@@ -124,7 +124,6 @@ const overview: OverviewMessages = {
   "overview.signin.or": "ou",
   "overview.signin.openBrowser": "Ouvrir COROS Training Hub dans le navigateur",
   "overview.weekly.unreadable": "Impossible de lire vos semaines depuis COROS.",
-  "overview.physique.title": "Votre silhouette",
   "overview.physique.drawnFrom": "Dessinée d’après {height} cm et {weight} kg",
   "overview.sleepWeek.avgSleep": "Sommeil moyen",
   "overview.sleepWeek.avgScore": "Score moyen",
@@ -135,10 +134,6 @@ const overview: OverviewMessages = {
   "overview.today.sleepHr": "FC de sommeil",
   "overview.today.asleep": "de sommeil",
   "overview.today.stages": "Phases du sommeil",
-  "overview.today.sessions_one": "{count} séance",
-  "overview.today.sessions_other": "{count} séances",
-  "overview.today.planned_one": "+ {count} prévue",
-  "overview.today.planned_other": "+ {count} prévues",
   "overview.today.intensityTrend": "Tendance d’intensité",
   "overview.today.weekChart": "Charge d’entraînement par jour cette semaine, un bloc par séance, les séances prévues hachurées",
   "overview.today.statusScale": "Tendance d’intensité {percent} % : {status}",
@@ -229,6 +224,12 @@ const overview: OverviewMessages = {
   "overview.sport.sets": "Séries",
   "overview.sport.perSession": "{value} par séance",
   "overview.sport.timeLifting": "Temps de musculation",
+  "overview.today.weekMeasure": "Semaine mesurée en",
+  "overview.today.weekChartTime": "Temps d’entraînement par jour cette semaine, un bloc par séance, les séances prévues hachurées",
+  "overview.today.outsideSessions": "Hors séance",
+  "overview.today.plannedTag": "Prévue",
+  "overview.today.total": "Total",
+  "overview.sport.ridesLabel": "Sorties",
 };
 
 export default overview;

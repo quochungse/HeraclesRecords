@@ -124,7 +124,6 @@ const overview: OverviewMessages = {
   "overview.signin.or": "或",
   "overview.signin.openBrowser": "在浏览器中打开 COROS Training Hub",
   "overview.weekly.unreadable": "无法从 COROS 读取你的每周数据。",
-  "overview.physique.title": "你的体型",
   "overview.physique.drawnFrom": "按 {height} cm、{weight} kg 绘制",
   "overview.sleepWeek.avgSleep": "平均睡眠",
   "overview.sleepWeek.avgScore": "平均得分",
@@ -135,10 +134,6 @@ const overview: OverviewMessages = {
   "overview.today.sleepHr": "睡眠心率",
   "overview.today.asleep": "睡眠",
   "overview.today.stages": "睡眠阶段",
-  "overview.today.sessions_one": "{count} 次训练",
-  "overview.today.sessions_other": "{count} 次训练",
-  "overview.today.planned_one": "+ 计划 {count} 次",
-  "overview.today.planned_other": "+ 计划 {count} 次",
   "overview.today.intensityTrend": "强度趋势",
   "overview.today.weekChart": "本周每日训练负荷，每次训练一个色块，计划中的训练为斜线",
   "overview.today.statusScale": "强度趋势 {percent}%：{status}",
@@ -229,6 +224,12 @@ const overview: OverviewMessages = {
   "overview.sport.sets": "组数",
   "overview.sport.perSession": "每次 {value}",
   "overview.sport.timeLifting": "训练时间",
+  "overview.today.weekMeasure": "本周计量方式",
+  "overview.today.weekChartTime": "本周每日训练时间，每次训练一个色块，计划中的训练为斜线",
+  "overview.today.outsideSessions": "训练之外",
+  "overview.today.plannedTag": "计划",
+  "overview.today.total": "合计",
+  "overview.sport.ridesLabel": "骑行次数",
 };
 
 export default overview;

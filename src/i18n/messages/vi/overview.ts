@@ -124,7 +124,6 @@ const overview: OverviewMessages = {
   "overview.signin.or": "hoặc",
   "overview.signin.openBrowser": "Mở COROS Training Hub trên trình duyệt",
   "overview.weekly.unreadable": "Không đọc được các tuần của bạn từ COROS.",
-  "overview.physique.title": "Vóc dáng của bạn",
   "overview.physique.drawnFrom": "Dựng theo {height} cm và {weight} kg",
   "overview.sleepWeek.avgSleep": "Ngủ TB",
   "overview.sleepWeek.avgScore": "Điểm TB",
@@ -135,10 +134,6 @@ const overview: OverviewMessages = {
   "overview.today.sleepHr": "Nhịp tim khi ngủ",
   "overview.today.asleep": "ngủ",
   "overview.today.stages": "Các giai đoạn ngủ",
-  "overview.today.sessions_one": "{count} buổi",
-  "overview.today.sessions_other": "{count} buổi",
-  "overview.today.planned_one": "+ {count} theo kế hoạch",
-  "overview.today.planned_other": "+ {count} theo kế hoạch",
   "overview.today.intensityTrend": "Xu hướng cường độ",
   "overview.today.weekChart": "Tải tập luyện theo ngày trong tuần này, mỗi buổi một khối, buổi theo kế hoạch gạch chéo",
   "overview.today.statusScale": "Xu hướng cường độ {percent}%: {status}",
@@ -229,6 +224,12 @@ const overview: OverviewMessages = {
   "overview.sport.sets": "Số set",
   "overview.sport.perSession": "{value} mỗi buổi",
   "overview.sport.timeLifting": "Thời gian tập",
+  "overview.today.weekMeasure": "Đo tuần theo",
+  "overview.today.weekChartTime": "Thời gian tập theo ngày trong tuần này, mỗi buổi một khối, buổi theo kế hoạch gạch chéo",
+  "overview.today.outsideSessions": "Ngoài buổi tập",
+  "overview.today.plannedTag": "Kế hoạch",
+  "overview.today.total": "Tổng",
+  "overview.sport.ridesLabel": "Số buổi",
 };
 
 export default overview;

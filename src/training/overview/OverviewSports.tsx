@@ -101,12 +101,41 @@ function Kpis({ items }: { items: readonly Kpi[] }) {
   );
 }
 
+interface ChartFact {
+  label: string;
+  value: string;
+}
+
 interface ChartWeek {
   label: string;
   value: number;
   planned?: number;
   /** A word over the column: the week's hike, say. */
   note?: string;
+  /** "Oct 13 – 19", the heading of the column's tooltip. */
+  dates: string;
+  /** What the tooltip states, a label and a figure a row. */
+  facts: readonly ChartFact[];
+}
+
+/** The seven days from a week's Monday, the month said once. */
+function weekRange(weekStartMs: number): string {
+  return new Intl.DateTimeFormat(getIntlLocale(), { month: "short", day: "numeric" }).formatRange(
+    new Date(weekStartMs),
+    new Date(weekStartMs + 6 * 86_400_000)
+  );
+}
+
+/** What every sport's tooltip states besides its own measure. */
+function weekFacts(
+  week: { count: number; duration: number; trainingLoad: number },
+  countLabel: string
+): ChartFact[] {
+  return [
+    { label: countLabel, value: whole(week.count) },
+    { label: t("overview.zones.time"), value: formatDurationSpan(week.duration) },
+    ...(week.trainingLoad > 0 ? [{ label: t("overview.tiles.load"), value: whole(week.trainingLoad) }] : [])
+  ];
 }
 
 /** A round axis over the tallest column: steps of 1, 2, 2.5 or 5 at its scale. */
@@ -128,7 +157,8 @@ function axisFor(max: number): { top: number; ticks: number[] } {
 /**
  * Five weeks a column — the four before this one faded, this one solid, what
  * the calendar still holds for it hatched on top — with the four weeks' mean
- * as a dashed line whose figure stands over the line past the last column.
+ * as a dashed line whose figure stands over the line past the last column. A
+ * column opens its week's figures on hover or focus.
  */
 function WeekChart({
   title,
@@ -148,32 +178,49 @@ function WeekChart({
   return (
     <div className="overview-sport-chart">
       <p className="overview-sport-subhead">{title}</p>
-      <div className="overview-sport-weeks" role="img" aria-label={title}>
-        <div className="overview-sport-plot" aria-hidden="true">
+      <div className="overview-sport-weeks" role="group" aria-label={title}>
+        <div className="overview-sport-plot">
           {ticks.map((tick) => (
-            <i key={tick} className="overview-sport-grid" style={{ bottom: at(tick) }}>
+            <i key={tick} className="overview-sport-grid" style={{ bottom: at(tick) }} aria-hidden="true">
               <span>{format(tick)}</span>
             </i>
           ))}
+          {average !== undefined && average > 0 ? (
+            <i className="overview-sport-average" style={{ bottom: at(average) }} aria-hidden="true">
+              <span>{t("overview.sport.average", { value: format(average) })}</span>
+            </i>
+          ) : null}
           <div className="overview-sport-columns">
             {weeks.map((week, index) => {
               const current = index === weeks.length - 1;
               return (
-                <div key={week.label} className={`overview-sport-column${current ? " is-current" : ""}`}>
-                  {week.note ? <em>{week.note}</em> : null}
+                <div
+                  key={week.label}
+                  className={`overview-sport-column${current ? " is-current" : ""}`}
+                  role="img"
+                  tabIndex={0}
+                  aria-label={[week.dates, ...week.facts.map((fact) => `${fact.label} ${fact.value}`)].join(", ")}
+                >
+                  {week.note ? <em aria-hidden="true">{week.note}</em> : null}
                   {week.planned && week.planned > 0 ? (
                     <b className="is-planned" style={{ height: at(week.planned) }} />
                   ) : null}
                   <b style={{ height: week.value > 0 ? at(week.value) : "2px" }} />
+                  <span className={`overview-tip is-${index < 3 ? "after" : "before"}`} aria-hidden="true">
+                    <strong>{week.dates}</strong>
+                    <dl>
+                      {week.facts.map((fact) => (
+                        <div key={fact.label}>
+                          <dt>{fact.label}</dt>
+                          <dd>{fact.value}</dd>
+                        </div>
+                      ))}
+                    </dl>
+                  </span>
                 </div>
               );
             })}
           </div>
-          {average !== undefined && average > 0 ? (
-            <i className="overview-sport-average" style={{ bottom: at(average) }}>
-              <span>{t("overview.sport.average", { value: format(average) })}</span>
-            </i>
-          ) : null}
         </div>
         <div className="overview-sport-labels" aria-hidden="true">
           {weeks.map((week, index) => (
@@ -459,11 +506,22 @@ function RunningSection({
       <div className="overview-sport-body">
         <WeekChart
           title={t("overview.sport.weeklyDistance", { unit: distUnit })}
-          weeks={weeks.map((_week, index) => ({
-            label: labels[index],
-            value: values[index],
-            planned: index === weeks.length - 1 ? plannedDistance : undefined
-          }))}
+          weeks={weeks.map((week, index) => {
+            const planned = index === weeks.length - 1 ? plannedDistance : undefined;
+            return {
+              label: labels[index],
+              value: values[index],
+              planned,
+              dates: weekRange(week.weekStartMs),
+              facts: [
+                { label: t("overview.sport.distance"), value: `${formatDecimal(values[index], 1)} ${distUnit}` },
+                ...(planned && planned > 0
+                  ? [{ label: t("overview.today.plannedTag"), value: `${formatDecimal(planned, 1)} ${distUnit}` }]
+                  : []),
+                ...weekFacts(week, t("overview.sport.runsLabel"))
+              ]
+            };
+          })}
           average={average}
           format={(value) => formatDecimal(value, value >= 10 || value === 0 ? 0 : 1)}
         />
@@ -591,7 +649,19 @@ function CyclingSection({
       <div className="overview-sport-body">
         <WeekChart
           title={t("overview.sport.weeklyRidingTime")}
-          weeks={weeks.map((_week, index) => ({ label: labels[index], value: seconds[index] / 3600 }))}
+          weeks={weeks.map((week, index) => ({
+            label: labels[index],
+            value: seconds[index] / 3600,
+            dates: weekRange(week.weekStartMs),
+            facts: [
+              ...weekFacts(week, t("overview.sport.ridesLabel")),
+              { label: t("overview.sport.distance"), value: `${distance(week.distance, unitSystem)} ${distUnit}` },
+              {
+                label: t("overview.sport.climb"),
+                value: `${whole(metersToElevation(week.elevationGain, unitSystem))} ${climbUnit}`
+              }
+            ]
+          }))}
           average={average !== undefined ? average / 3600 : undefined}
           format={(value) => formatDecimal(value, value === 0 || Number.isInteger(value) ? 0 : 1)}
         />
@@ -708,7 +778,13 @@ function HikingSection({
           weeks={weeks.map((week, index) => ({
             label: labels[index],
             value: values[index],
-            note: week.elevationGain > 0 ? biggestOf(week.weekStartMs)?.name?.trim() || undefined : undefined
+            note: week.elevationGain > 0 ? biggestOf(week.weekStartMs)?.name?.trim() || undefined : undefined,
+            dates: weekRange(week.weekStartMs),
+            facts: [
+              { label: t("overview.sport.ascent"), value: `${ascent(week.elevationGain)} ${climbUnit}` },
+              ...weekFacts(week, t("overview.sport.hikesTitle")),
+              { label: t("overview.sport.distance"), value: `${distance(week.distance, unitSystem)} ${distUnit}` }
+            ]
           }))}
           format={(value) => whole(value)}
         />
