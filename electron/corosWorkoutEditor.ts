@@ -787,30 +787,24 @@ export function validateWorkoutDraft(draft: RunWorkoutEditorDraft): WorkoutDraft
 }
 
 export function workoutEditRevision(source: WorkoutEditSource): string {
-  const programVersion = {
-    id: source.program.id,
-    idInPlan: source.program.idInPlan,
-    version: source.program.version,
-    pbVersion: source.program.pbVersion,
-    updateTimestamp: source.program.updateTimestamp,
-    modifyTimestamp: source.program.modifyTimestamp
-  };
-  const entityVersion = source.entity
-    ? {
-        planId: source.entity.planId,
-        idInPlan: source.entity.idInPlan,
-        planProgramId: source.entity.planProgramId,
-        happenDay: source.entity.happenDay,
-        version: source.entity.version,
-        pbVersion: source.entity.pbVersion,
-        updateTimestamp: source.entity.updateTimestamp,
-        modifyTimestamp: source.entity.modifyTimestamp
-      }
-    : undefined;
   return crypto
     .createHash("sha256")
-    .update(JSON.stringify({ ref: source.ref, programVersion, entityVersion }))
-    .digest("hex");
+    // Some COROS responses omit version counters. Content changes must still
+    // invalidate a pending edit, including a reorder of identical-kind steps.
+    .update(stableWorkoutRevisionJson(source))
+    .digest("hex")
+    // Coach reads and writes it back on every patch: 64 bits tell two copies
+    // of one workout apart at a quarter of the tokens.
+    .slice(0, 16);
+}
+
+function stableWorkoutRevisionJson(value: unknown): string {
+  if (Array.isArray(value)) return `[${value.map(stableWorkoutRevisionJson).join(",")}]`;
+  if (value && typeof value === "object") {
+    const record = value as Record<string, unknown>;
+    return `{${Object.keys(record).filter((key) => record[key] !== undefined).sort().map((key) => `${JSON.stringify(key)}:${stableWorkoutRevisionJson(record[key])}`).join(",")}}`;
+  }
+  return JSON.stringify(value) ?? "null";
 }
 
 function normalizedDraft(draft: RunWorkoutEditorDraft): unknown {

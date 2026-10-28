@@ -4,6 +4,7 @@ import { handleRequestPlanBrief } from "./chatPlanBriefs";
 import { PLAN_BRIEF_TOOL_DEFINITION } from "./planBrief";
 import {
   buildPlanPreview,
+  formatEntryStepsOutline,
   formatScheduleDay,
   validatePlanDraft,
   type CorosTrainingPlanDraft,
@@ -15,11 +16,19 @@ import {
   formatScheduledExercisesForChat,
   getTrainingHubStatus,
   listScheduledWorkoutEntries,
+  listScheduledWorkoutEntriesForEdit,
+  scheduledWorkoutEditRef,
+  getWorkoutForEdit,
+  getWorkoutEditorContext,
+  calculateExistingWorkoutProgram,
   resolveTrainingPlanExercises,
   searchWorkoutExercises,
   uploadTrainingPlan,
   PartialUploadError
 } from "./trainingHubService";
+import { corosProgramToWorkoutDraft, parseWorkoutEditorContext, validateWorkoutDraft, workoutDraftToCorosProgram } from "./corosWorkoutEditor";
+import { editorDraftToPlanWorkoutInput } from "./planWorkoutEditor";
+import { WORKOUT_PATCH_PROPERTIES, parseWorkoutPatch, patchTouchesSteps, patchWorkoutEditorDraft } from "./workoutPatch";
 import {
   deleteChatPlanDraft,
   findCachedRunningCorosPlan,
@@ -49,8 +58,10 @@ import {
   getChatPlanTools,
   handleChatPlanTool,
   isChatPlanTool,
+  nameExercises,
   readLibraryWorkout
 } from "./chatPlanTools";
+import { corosText, loadCorosLocale } from "./corosLocale";
 import { planDiff, sameWorkoutInput } from "./planDiff";
 import {
   PLAN_DAYS,
@@ -79,6 +90,7 @@ import type {
   TrainingPlanWeekStage,
   UploadPlanResult,
   ScheduleChangeSet,
+  WorkoutEditRef,
   UnitSystem
 } from "./types";
 import {
@@ -398,7 +410,8 @@ export function getChatWorkoutTools(): CorosMcpTool[] {
         "Change a plan or workout you already drafted in this conversation, by listing only what changes. " +
         "The result is a new version of the same card; the old one folds away. " +
         "draft_id must be the newest version's; if it is not, the newest is returned to revise instead. " +
-        "Sessions are named by their key. A single workout takes only replace_session (with the whole new workout) and rename. " +
+        "Sessions are named by their key. Prefer patch_session for small edits; replace_session rewrites a workout. " +
+        "A single workout takes patch_session, replace_session and rename. " +
         "The revised plan is checked like a new draft; a refusal lists every problem, and nothing is changed.",
       inputSchema: buildRevisePlanInputSchema()
     },
@@ -427,7 +440,8 @@ export function getChatWorkoutTools(): CorosMcpTool[] {
       name: "list_scheduled_workouts",
       description:
         "List workouts on the COROS training calendar for a date range. " +
-        "Use before delete_workout to get plan_id and id_in_plan when needed.",
+        "Use before delete_workout to get plan_id and id_in_plan when needed. " +
+        "Each session carries the revision a patch needs and its steps numbered for patch paths: [i] is /steps/i, [i.j] is /steps/i/steps/j.",
       inputSchema: {
         type: "object",
         properties: {
@@ -438,6 +452,10 @@ export function getChatWorkoutTools(): CorosMcpTool[] {
           end_date: {
             type: "string",
             description: "End date YYYYMMDD (defaults to 14 days from start)"
+          },
+          sessions: {
+            type: "array", items: { type: "string" }, maxItems: 5,
+            description: "id_in_plan to read with every field of its workout."
           }
         }
       }
@@ -484,7 +502,7 @@ export function getChatWorkoutTools(): CorosMcpTool[] {
       name: "propose_schedule_changes",
       description:
         "Propose changes to the athlete's calendar for them to apply: move a session to another day, replace its workout, " +
-        "remove it, or add a new one — several at once, e.g. to rearrange a week. Nothing is written: the athlete applies " +
+        "remove it, add a new one, or patch fields of a session or library workout. Nothing is written: the athlete applies " +
         "each line, or all of them, from the card under your reply. Name sessions by plan_id, id_in_plan and date from " +
         "list_scheduled_workouts (or calendar_plan_id from get_training_plan). A session of a plan on the calendar stays " +
         "in its plan when moved or replaced. Every line is checked now; a refusal lists every problem and nothing is kept.",
@@ -499,7 +517,10 @@ export function getChatWorkoutTools(): CorosMcpTool[] {
             items: {
               type: "object",
               properties: {
-                op: { type: "string", enum: ["move", "replace", "remove", "add"] },
+                op: { type: "string", enum: ["move", "replace", "patch", "remove", "add"] },
+                workout_id: { type: "string", description: "patch only: library workout_id instead of session." },
+                revision: { type: "string", description: "patch: the revision list_scheduled_workouts or get_workout_library gave; required for step edits." },
+                ...WORKOUT_PATCH_PROPERTIES,
                 session: {
                   type: "object",
                   description: "The session a move, replace or remove acts on.",
@@ -1264,7 +1285,7 @@ function revisionTarget(draftId: string, only?: "plan"): RevisionTarget {
   if (only === "plan" && named.preview.artifactType === "workout") {
     return refuse({
       error_code: "draft_is_a_workout",
-      errors: [`${draftId} is a single workout. Change it with revise_training_plan and replace_session.`]
+      errors: [`${draftId} is a single workout. Change it with revise_training_plan: patch_session, replace_session or rename.`]
     });
   }
   const versions = versionsOf(named.artifactId);
@@ -1273,11 +1294,23 @@ function revisionTarget(draftId: string, only?: "plan"): RevisionTarget {
   // workout saved to the library or the calendar has nothing to update, so a
   // change to it would be a second workout.
   if (named.preview.artifactType === "workout" && versions.some((version) => version.uploadedAt)) {
+    const saved = versions.find((version) => version.uploadedAt)?.preview.uploadResult;
+    const where = [
+      saved?.programId
+        ? `It is library workout_id ${saved.programId}: patch it with that workout_id (a step edit takes the revision get_workout_library gives).`
+        : undefined,
+      saved?.scheduleDate
+        ? `It is on the calendar on ${saved.scheduleDate}: list_scheduled_workouts for that day gives its session and revision.`
+        : undefined
+    ].filter(Boolean);
     return refuse({
       error_code: "draft_saved",
       errors: [
-        "This workout is already saved to COROS. Draft a new one with draft_workout if the athlete wants a different session."
-      ]
+        "This workout is already saved to COROS. Change it with propose_schedule_changes op patch" +
+          (where.length ? `. ${where.join(" ")}` : ", naming its library workout_id or its calendar session.")
+      ],
+      ...(saved?.programId ? { workout_id: saved.programId } : {}),
+      ...(saved?.scheduleDate ? { schedule_date: saved.scheduleDate } : {})
     });
   }
   if (latest.draftId !== named.draftId) {
@@ -1304,7 +1337,8 @@ function storeRevision(
   prepared: Extract<PreparedDraft, { ok: true }>,
   unitSystem: UnitSystem,
   changeSummary: string,
-  onPlanDraft?: (preview: PlanDraftPreview) => void
+  onPlanDraft?: (preview: PlanDraftPreview) => void,
+  patchedPrograms?: ReadonlyMap<string, Record<string, unknown>>
 ): string {
   const artifactType = latest.preview.artifactType ?? "plan";
   const draftId = crypto.randomUUID();
@@ -1328,6 +1362,12 @@ function storeRevision(
     changeSummary
   };
   withCorosIdentityOf(stored, latest);
+  if (stored.document && patchedPrograms?.size) {
+    stored.document.entries = stored.document.entries.map((entry) => {
+      const program = patchedPrograms.get(entry.workout.key);
+      return program ? { ...entry, corosProgram: program } : entry;
+    });
+  }
   persistPlanDraft(stored);
   onPlanDraft?.(lightPreview(preview));
   return JSON.stringify({
@@ -1423,7 +1463,18 @@ async function handleRevisePlan(
   if (!draftId || !summary) {
     return JSON.stringify({ ok: false, errors: ["draft_id, ops and summary are required."] });
   }
-  const synced = await syncForRevision(draftId, unitSystem, onPlanDraft, onPlanEvent);
+  const isPatch = Array.isArray(args.ops) && args.ops.some((op) => op?.op === "patch_session");
+  let synced: string | undefined;
+  try {
+    synced = await syncForRevision(draftId, unitSystem, onPlanDraft, onPlanEvent, isPatch);
+  } catch (error) {
+    return JSON.stringify({ ok: false, error_code: "revision_not_applied", errors: [error instanceof Error ? error.message : String(error)] });
+  }
+  // Index-based edits must never be silently replayed on a different version.
+  if (synced && isPatch) {
+    const previous = revisionTarget(draftId);
+    if (!previous.ok) return previous.response;
+  }
   const target = revisionTarget(synced ?? draftId);
   if (!target.ok) return target.response;
   const artifactType = target.latest.preview.artifactType ?? "plan";
@@ -1442,12 +1493,26 @@ async function handleRevisePlan(
     unitSystem
   });
   if (!prepared.ok) return prepared.response;
+  let patchedPrograms: Map<string, Record<string, unknown>>;
+  try {
+    patchedPrograms = await patchedPlanPrograms(target.latest, args.ops, unitSystem);
+  } catch (error) {
+    return JSON.stringify({ ok: false, error_code: "revision_not_applied", errors: [error instanceof Error ? error.message : String(error)] });
+  }
+  if (isPatch) {
+    const current = revisionTarget(target.latest.draftId);
+    if (!current.ok) return current.response;
+    if (planHash(current.latest.plan) !== planHash(target.latest.plan)) {
+      return JSON.stringify({ ok: false, error_code: "revision_not_applied", errors: ["The workout changed while preparing the patch. Read its latest draft and retry."] });
+    }
+  }
   const answer = storeRevision(
     target.latest,
     prepared,
     unitSystem,
     summary.slice(0, 200),
-    onPlanDraft
+    onPlanDraft,
+    patchedPrograms
   );
   if (!synced) return answer;
   // Said to the model, which named the version before COROS's: its changes
@@ -1456,6 +1521,40 @@ async function handleRevisePlan(
     ...JSON.parse(answer),
     note: "The plan had changed on COROS since you last read it; that version was brought in first, and your changes were applied to it. Mention this."
   });
+}
+
+/** Patch the original COROS nodes too, so saving a small edit retains their private fields. */
+async function patchedPlanPrograms(base: StoredPlanDraft, ops: unknown, unitSystem: UnitSystem): Promise<Map<string, Record<string, unknown>>> {
+  const programs = new Map<string, Record<string, unknown>>();
+  if (!Array.isArray(ops)) return programs;
+  const document = draftDocument(base);
+  let context: Awaited<ReturnType<typeof getWorkoutEditorContext>> | undefined;
+  for (const op of ops) {
+    const key = String(op.key ?? "");
+    if (op.op === "replace_session" || op.op === "remove_session") {
+      programs.delete(key);
+      continue;
+    }
+    if (op.op !== "patch_session") continue;
+    if (ops.some((other) => other !== op && other.key === key && ["replace_session", "remove_session", "add_session"].includes(other.op))) {
+      throw new Error(`Patch and structural edits of session ${key} must be separate revisions.`);
+    }
+    const raw = programs.get(key) ?? document.entries.find((entry) => entry.workout.key === key)?.corosProgram;
+    if (!raw) continue;
+    const patch = parseWorkoutPatch(op);
+    if (!patchTouchesSteps(patch) && [...Object.keys(patch.set ?? {}), ...(patch.unset ?? [])].every((path) => path === "/name" || path === "/description")) {
+      const copy = structuredClone(raw);
+      if (Object.hasOwn(patch.set ?? {}, "/name")) copy.name = String(patch.set!["/name"]).trim();
+      if (Object.hasOwn(patch.set ?? {}, "/description")) copy.overview = String(patch.set!["/description"]).trim();
+      if (patch.unset?.includes("/description")) copy.overview = "";
+      programs.set(key, copy);
+    } else {
+      context ??= await getWorkoutEditorContext(unitSystem);
+      const edited = patchWorkoutEditorDraft(corosProgramToWorkoutDraft(raw, context), patch);
+      programs.set(key, await calculateExistingWorkoutProgram(workoutDraftToCorosProgram(raw, edited, context)));
+    }
+  }
+  return programs;
 }
 
 /**
@@ -1470,7 +1569,8 @@ async function syncForRevision(
   draftId: string,
   unitSystem: UnitSystem,
   onPlanDraft?: (preview: PlanDraftPreview) => void,
-  onPlanEvent?: (event: PlanEvent) => void
+  onPlanEvent?: (event: PlanEvent) => void,
+  requireRead = false
 ): Promise<string | undefined> {
   let sync: PlanCorosSync;
   try {
@@ -1479,7 +1579,8 @@ async function syncForRevision(
     const versions = versionsOf(named.artifactId);
     if ((versions[versions.length - 1]?.draftId ?? named.draftId) !== named.draftId) return undefined;
     sync = await syncPlanDraftFromCoros(draftId, unitSystem);
-  } catch {
+  } catch (error) {
+    if (requireRead) throw error;
     return undefined;
   }
   if (sync.kind === "current") return undefined;
@@ -1648,7 +1749,7 @@ export function buildRevisePlanInputSchema(): Record<string, unknown> {
         minItems: 1,
         description:
           "Changes in order. move_session {key, week, day}; replace_session {key, workout}; remove_session {key}; " +
-          "add_session {week, day, workout}; set_week_stage {week, stage}; rename {name}; set_description {description}. " +
+          "add_session {week, day, workout}; patch_session {key, set, unset}; set_week_stage {week, stage}; rename {name}; set_description {description}. " +
           "On a dated plan a session may take schedule_date instead of week and day; week 1 is the week of its first session.",
         items: {
           type: "object",
@@ -1659,6 +1760,7 @@ export function buildRevisePlanInputSchema(): Record<string, unknown> {
             day: { type: "string", enum: [...PLAN_DAYS] },
             schedule_date: { type: "string", pattern: "^\\d{8}$" },
             workout: REVISION_WORKOUT_FIELD,
+            ...WORKOUT_PATCH_PROPERTIES,
             stage: { type: "string", enum: COROS_WEEK_STAGES.map((stage) => stage.slug) },
             name: { type: "string", maxLength: COROS_NAME_MAX_BYTES },
             description: { type: "string", maxLength: COROS_PLAN_DESCRIPTION_MAX_BYTES }
@@ -1700,16 +1802,33 @@ async function handleListScheduledWorkouts(
     return JSON.stringify({ ok: false, error: "end_date must be YYYYMMDD." });
   }
 
-  const entries = await listScheduledWorkoutEntries(startDate, endDate);
+  const entries = await listScheduledWorkoutEntriesForEdit(startDate, endDate);
+  const wanted = new Set(Array.isArray(args.sessions) ? args.sessions.slice(0, 5).map(String) : []);
+  const shown = wanted.size ? entries.filter((entry) => wanted.has(entry.idInPlan)).slice(0, 5) : entries;
+  const outlines = await stepOutlines(shown, unitSystem);
+  const details = new Map<string, Record<string, unknown>>();
+  for (const entry of wanted.size ? shown : []) {
+    try {
+      const document = await getWorkoutForEdit(scheduledWorkoutEditRef(entry), unitSystem);
+      details.set(`${entry.planId}:${entry.idInPlan}`, {
+        revision: document.revision,
+        workout: editorDraftToPlanWorkoutInput(document.draft, { key: entry.idInPlan, name: entry.name })
+      });
+    } catch (error) {
+      details.set(`${entry.planId}:${entry.idInPlan}`, { detail_error: error instanceof Error ? error.message : String(error) });
+    }
+  }
   return JSON.stringify({
     ok: true,
-    count: entries.length,
-    workouts: entries.map((entry) => ({
+    count: shown.length,
+    workouts: shown.map((entry) => ({
       schedule_date: entry.happenDay,
       name: entry.name,
       volume: formatScheduledVolume(entry.volume, unitSystem),
       training_load: entry.trainingLoad,
-      exercises: entry.exercises?.length
+      ...(entry.revision ? { revision: entry.revision } : {}),
+      steps: outlines.get(entry),
+      exercises: !outlines.get(entry) && !details.get(`${entry.planId}:${entry.idInPlan}`)?.workout && entry.exercises?.length
         ? formatScheduledExercisesForChat(
             entry.exercises,
             unitSystem,
@@ -1722,9 +1841,39 @@ async function handleListScheduledWorkouts(
       ...(planNames(entry.planId) ? { in_plan: planNames(entry.planId) } : {}),
       plan_program_id: entry.planProgramId,
       program_id: entry.programId,
-      sort_no: entry.sortNo
+      sort_no: entry.sortNo,
+      ...details.get(`${entry.planId}:${entry.idInPlan}`)
     }))
   });
+}
+
+/**
+ * Each session's steps numbered as a patch addresses them, read from the
+ * program the list already holds, as the editor reads it — no request but the
+ * movement names, which the catalogue keeps for minutes. One at a time, so the
+ * second strength session finds the catalogue the first one read.
+ */
+async function stepOutlines(
+  entries: Array<{ rawProgram?: Record<string, unknown>; idInPlan: string; name: string }>,
+  unitSystem: UnitSystem
+): Promise<Map<object, string>> {
+  const outlines = new Map<object, string>();
+  if (!entries.some((entry) => entry.rawProgram)) return outlines;
+  await loadCorosLocale().catch(() => undefined);
+  const context = parseWorkoutEditorContext({}, unitSystem);
+  for (const entry of entries) {
+    if (!entry.rawProgram) continue;
+    try {
+      const draft = corosProgramToWorkoutDraft(entry.rawProgram, context);
+      await nameExercises(draft);
+      const workout = editorDraftToPlanWorkoutInput(draft, { key: entry.idInPlan, name: entry.name });
+      const outline = formatEntryStepsOutline(workout as PlanWorkoutEntry, unitSystem);
+      if (outline) outlines.set(entry, outline);
+    } catch {
+      /* the exercise summary stands in */
+    }
+  }
+  return outlines;
 }
 
 /** A running plan's name by calendar `planId`, each plan read from the cache once per call. */
@@ -1916,8 +2065,24 @@ async function handleProposeScheduleChanges(
   for (const [index, change] of changes.entries()) {
     const at = `changes[${index}]`;
     const op = String(change.op ?? "");
-    if (!["move", "replace", "remove", "add"].includes(op)) {
-      errors.push(`${at}: op must be move, replace, remove or add.`);
+    if (!["move", "replace", "patch", "remove", "add"].includes(op)) {
+      errors.push(`${at}: op must be move, replace, patch, remove or add.`);
+      continue;
+    }
+
+    if (op === "patch" && change.workout_id) {
+      const id = String(change.workout_id).trim();
+      if (change.session || seen.has(`library:${id}`)) {
+        errors.push(`${at}: name one target and one patch per library workout.`);
+        continue;
+      }
+      try {
+        const line = await proposedWorkoutPatch({ kind: "library", programId: id }, change, unitSystem);
+        lines.push(line);
+        seen.add(`library:${id}`);
+      } catch (error) {
+        errors.push(`${at}: ${error instanceof Error ? error.message : String(error)}`);
+      }
       continue;
     }
 
@@ -1996,7 +2161,14 @@ async function handleProposeScheduleChanges(
           ...(entry.sportType !== undefined ? { sportType: entry.sportType } : {})
         }
       : undefined;
-    if (op === "move") {
+    if (op === "patch") {
+      try {
+        const line = await proposedWorkoutPatch(scheduledWorkoutEditRef(entry!), change, unitSystem);
+        lines.push({ ...line, label: `Update "${entry!.name}"${inPlan} on ${cardDay(entry!.happenDay)}`, session });
+      } catch (error) {
+        errors.push(`${at}: ${error instanceof Error ? error.message : String(error)}`);
+      }
+    } else if (op === "move") {
       lines.push({ op, label: `Move "${entry!.name}"${inPlan} from ${cardDay(entry!.happenDay)} to ${cardDay(toDay!)}`, session, toDay });
     } else if (op === "replace") {
       lines.push({ op, label: `Replace "${entry!.name}"${inPlan} on ${cardDay(entry!.happenDay)} with "${workout!.name}"`, session, workout });
@@ -2024,8 +2196,31 @@ async function handleProposeScheduleChanges(
     lines: changeSet.lines.map((line) => line.label),
     message:
       "Proposed to the athlete: the card under your reply lets them apply each change or all of them. " +
-      "Nothing has changed on the calendar yet; do not say it has."
+      "Nothing has been written to COROS yet; do not say it has."
   });
+}
+
+async function proposedWorkoutPatch(ref: WorkoutEditRef, change: Record<string, unknown>, unitSystem: UnitSystem): Promise<NewScheduleChangeLine> {
+  const patch = parseWorkoutPatch(change);
+  const document = await getWorkoutForEdit(ref, unitSystem);
+  if (!document.canEdit) throw new Error(document.unsupportedReason ?? "This workout is read-only.");
+  if ((patchTouchesSteps(patch) && !change.revision) || (change.revision && change.revision !== document.revision)) {
+    throw new Error("Read the latest workout and pass its revision before patching steps. Nothing was proposed.");
+  }
+  const draft = patchWorkoutEditorDraft(document.draft, patch);
+  const checked = validateWorkoutDraft(draft);
+  if (!checked.valid) throw new Error(Object.values(checked.errors).join(" "));
+  const workout = editorDraftToPlanWorkoutInput(draft, { key: "patch", name: draft.name });
+  // A calendar line is labelled by its caller, from the session as listed.
+  if (ref.kind === "library") await loadCorosLocale().catch(() => undefined);
+  const name = corosText(document.draft.name);
+  return {
+    op: "patch",
+    label: `Update "${name}" in the workout library`,
+    workout,
+    ...(ref.kind === "library" ? { program: { id: ref.programId, name } } : {}),
+    patch: { ref, revision: document.revision, changes: patch }
+  };
 }
 
 /**
@@ -2262,11 +2457,14 @@ async function saveDraftTo(
 function markDraftSaved(stored: StoredPlanDraft, result: UploadPlanResult): void {
   stored.uploadedAt = Date.now();
   stored.preview.uploadedAt = stored.uploadedAt;
+  const workout = stored.preview.artifactType === "workout" ? result.entries[0] : undefined;
   stored.preview.uploadResult = {
     workoutsScheduled: result.workoutsScheduled,
     workoutsCreated: result.workoutsCreated,
     destination: result.destination,
-    ...(result.planId ? { planId: result.planId } : {})
+    ...(result.planId ? { planId: result.planId } : {}),
+    ...(workout?.programId ? { programId: workout.programId } : {}),
+    ...(workout?.date ? { scheduleDate: workout.date } : {})
   };
   persistPlanDraft(stored);
   markChatPlanDraftUploaded(stored.draftId, stored.uploadedAt);

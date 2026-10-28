@@ -2875,11 +2875,8 @@ async function readScheduledSession(
   throw new ScreenError("main.coros.scheduledNotFound");
 }
 
-export async function listScheduledWorkoutEntries(
-  startDay: string,
-  endDay: string
-): Promise<TrainingHubScheduledWorkoutEntry[]> {
-  const raw = await trainingHubGet<Record<string, unknown>>(
+function readSchedule(startDay: string, endDay: string): Promise<Record<string, unknown>> {
+  return trainingHubGet<Record<string, unknown>>(
     "/training/schedule/query",
     {
       startDate: startDay,
@@ -2887,7 +2884,72 @@ export async function listScheduledWorkoutEntries(
       supportRestExercise: 1
     }
   );
-  return parseScheduledWorkoutEntries(raw);
+}
+
+export async function listScheduledWorkoutEntries(
+  startDay: string,
+  endDay: string
+): Promise<TrainingHubScheduledWorkoutEntry[]> {
+  return parseScheduledWorkoutEntries(await readSchedule(startDay, endDay));
+}
+
+/** The editor's ref for a session as the calendar lists it: the ref its revision is hashed with. */
+export function scheduledWorkoutEditRef(
+  entry: Pick<TrainingHubScheduledWorkoutEntry, "planId" | "idInPlan" | "happenDay" | "planProgramId">
+): WorkoutEditRef {
+  return {
+    kind: "scheduled",
+    planId: entry.planId,
+    idInPlan: entry.idInPlan,
+    happenDay: entry.happenDay,
+    planProgramId: entry.planProgramId ?? ""
+  };
+}
+
+/**
+ * The calendar over a range, each session with the revision `getWorkoutForEdit`
+ * would give it, from the one read. A range of /training/schedule/query and a
+ * single day of it return the same entity and program — probed on a real
+ * account on 2026-10-28, 11 of 11 sessions over 14 and over 42 days — so Coach
+ * can patch a session it has listed without reading it again.
+ */
+export async function listScheduledWorkoutEntriesForEdit(
+  startDay: string,
+  endDay: string
+): Promise<Array<TrainingHubScheduledWorkoutEntry & { revision?: string }>> {
+  const raw = await readSchedule(startDay, endDay);
+  const entities = extractArray(raw, ["entities"]) ?? [];
+  return parseScheduledWorkoutEntries(raw).map((entry) => {
+    const index = scheduledEntityIndex(entities, entry);
+    if (index < 0 || !entry.rawProgram) return entry;
+    return {
+      ...entry,
+      revision: workoutEditRevision({
+        ref: scheduledWorkoutEditRef(entry),
+        entity: entities[index] as Record<string, unknown>,
+        program: entry.rawProgram
+      })
+    };
+  });
+}
+
+/** Where a session stands in a schedule/query answer, a removed one (status 3) never. */
+function scheduledEntityIndex(
+  entities: unknown[],
+  ref: { planId: string; idInPlan: string; happenDay: string }
+): number {
+  return entities.findIndex((candidate) => {
+    if (!candidate || typeof candidate !== "object") {
+      return false;
+    }
+    const item = candidate as Record<string, unknown>;
+    return (
+      String(item.planId ?? "") === ref.planId &&
+      String(item.idInPlan ?? "") === ref.idInPlan &&
+      String(item.happenDay ?? "") === ref.happenDay &&
+      toOptionalNumber(item.status) !== 3
+    );
+  });
 }
 
 export async function removeScheduledWorkout(entry: {
@@ -3007,28 +3069,10 @@ async function resolveWorkoutEditSource(ref: WorkoutEditRef): Promise<WorkoutEdi
   if (!/^\d{8}$/.test(ref.happenDay)) {
     throw new Error("Scheduled workout date must be YYYYMMDD.");
   }
-  const raw = await trainingHubGet<Record<string, unknown>>(
-    "/training/schedule/query",
-    {
-      startDate: ref.happenDay,
-      endDate: ref.happenDay,
-      supportRestExercise: 1
-    }
-  );
+  const raw = await readSchedule(ref.happenDay, ref.happenDay);
   const entities = extractArray(raw, ["entities"]) ?? [];
   const programs = extractArray(raw, ["programs"]) ?? [];
-  const entityIndex = entities.findIndex((candidate) => {
-    if (!candidate || typeof candidate !== "object") {
-      return false;
-    }
-    const item = candidate as Record<string, unknown>;
-    return (
-      String(item.planId ?? "") === ref.planId &&
-      String(item.idInPlan ?? "") === ref.idInPlan &&
-      String(item.happenDay ?? "") === ref.happenDay &&
-      toOptionalNumber(item.status) !== 3
-    );
-  });
+  const entityIndex = scheduledEntityIndex(entities, ref);
   if (entityIndex < 0) {
     throw new ScreenError("main.coros.scheduledNotFound");
   }

@@ -32,8 +32,11 @@ import {
   invalidateLibraryWorkoutPrograms,
   listLibraryWorkouts,
   listScheduledWorkoutEntries,
-  removeScheduledWorkout
+  removeScheduledWorkout,
+  getWorkoutForEdit,
+  saveWorkoutEdit
 } from "./trainingHubService";
+import { patchWorkoutEditorDraft } from "./workoutPatch";
 import { formatScheduleDay } from "./corosWorkoutBuilder";
 import {
   defaultScheduleMoveDeps,
@@ -53,7 +56,7 @@ import type {
 } from "./types";
 import { ScreenError } from "./screenText";
 
-const OPS: readonly ScheduleChangeOp[] = ["move", "replace", "remove", "add", "deleteWorkout"];
+const OPS: readonly ScheduleChangeOp[] = ["move", "replace", "patch", "remove", "add", "deleteWorkout"];
 
 // ---------------------------------------------------------------------------
 // Reading and writing the row
@@ -225,6 +228,8 @@ export interface ScheduleChangeDeps {
   /** The library list is cached for minutes; a check before a delete reads it afresh. */
   invalidateLibraryWorkoutPrograms: typeof invalidateLibraryWorkoutPrograms;
   deleteWorkoutProgram: typeof deleteWorkoutProgram;
+  getWorkoutForEdit: typeof getWorkoutForEdit;
+  saveWorkoutEdit: typeof saveWorkoutEdit;
 }
 
 const defaultDeps: ScheduleChangeDeps = {
@@ -234,7 +239,9 @@ const defaultDeps: ScheduleChangeDeps = {
   removeScheduledWorkout,
   listLibraryWorkouts,
   invalidateLibraryWorkoutPrograms,
-  deleteWorkoutProgram
+  deleteWorkoutProgram,
+  getWorkoutForEdit,
+  saveWorkoutEdit
 };
 
 type LineOutcome = Pick<ScheduleChangeLine, "status" | "reason" | "retry">;
@@ -316,6 +323,8 @@ async function applyLine(
         return await applyMove(line, deps);
       case "replace":
         return await applyReplace(line, deps, unitSystem);
+      case "patch":
+        return await applyPatch(line, deps, unitSystem);
       case "add":
         return await applyAdd(line, deps, unitSystem);
       default:
@@ -327,6 +336,22 @@ async function applyLine(
       reason: error instanceof Error ? error.message : String(error)
     };
   }
+}
+
+async function applyPatch(line: ScheduleChangeLine, deps: ScheduleChangeDeps, unitSystem: UnitSystem): Promise<LineOutcome> {
+  if (!line.patch?.ref || !line.patch.revision || !line.patch.changes) return { status: "failed", reason: "The proposal does not say which workout fields to update." };
+  const { ref, revision, changes } = line.patch;
+  if (ref.kind === "scheduled") {
+    const passed = pastDay(ref.happenDay, deps);
+    if (passed) return { status: "stale", reason: passed };
+  }
+  const current = await deps.getWorkoutForEdit(ref, unitSystem);
+  if (current.revision !== revision) return { status: "stale", reason: "The workout changed since this proposal. Ask Coach for a new update." };
+  if (!current.canEdit) return { status: "stale", reason: current.unsupportedReason ?? "This workout is read-only." };
+  const edited = patchWorkoutEditorDraft(current.draft, changes);
+  const saved = await deps.saveWorkoutEdit(ref, revision, edited, unitSystem);
+  // An accepted but not yet verifiable write must never be offered for retry.
+  return { status: "applied", ...(saved.warning ? { reason: saved.warning } : {}) };
 }
 
 /**

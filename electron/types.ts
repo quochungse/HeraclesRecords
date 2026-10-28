@@ -3292,6 +3292,9 @@ export interface PlanDraftPreview {
     destination?: TrainingPlanDestination;
     /** The COROS plan it became, for a plan saved whole. */
     planId?: string;
+    /** Where a one-off workout went, so Coach can patch it there: its library id, its calendar day. */
+    programId?: string;
+    scheduleDate?: string;
   };
   /**
    * Set when the athlete changed the plan in the editor after the coach wrote
@@ -3951,7 +3954,12 @@ export interface DeleteWorkoutResult {
  * Every line is checked against COROS again when it is applied, and one
  * already applied is never written twice.
  */
-export type ScheduleChangeOp = "move" | "replace" | "remove" | "add" | "deleteWorkout";
+export interface WorkoutPatch {
+  set?: Record<string, unknown>;
+  unset?: string[];
+}
+
+export type ScheduleChangeOp = "move" | "replace" | "patch" | "remove" | "add" | "deleteWorkout";
 export type ScheduleChangeStatus = "proposed" | "applied" | "failed" | "dismissed" | "stale";
 
 /** A session on the calendar as the proposal found it. */
@@ -3978,6 +3986,8 @@ export interface ScheduleChangeLine {
   toDay?: string;
   /** What a replace or an add puts on the calendar. */
   workout?: PlanWorkoutEntryInput;
+  /** A partial edit, applied only to the exact source revision reviewed on the card. */
+  patch?: { ref: WorkoutEditRef; revision: string; changes: WorkoutPatch };
   /** A library workout a deletion removes. */
   program?: { id: string; name: string };
   /**

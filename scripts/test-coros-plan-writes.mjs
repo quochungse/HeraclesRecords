@@ -1244,6 +1244,35 @@ test("a coach plan on COROS is changed by a version that updates it (P1.6)", asy
   assert.equal(workoutRevision.error_code, "draft_saved");
 });
 
+test("a saved one-off workout's refusal says where it went, so Coach can patch it there", async () => {
+  stubCoros({
+    "/training/program/calculate": () => ok({ planDuration: 900, planTrainingLoad: 20, exerciseBarChart: [] }),
+    "/training/program/add": () => ok("LIB77"),
+    "/training/schedule/query": () => ok({ entities: [], programs: [] }),
+    "/training/schedule/update": () => ok(),
+    "/account/query": ok({}),
+    "coros-traininghub-v2": ok({})
+  });
+  let workout;
+  await chatWorkoutTools.handleChatWorkoutTool(
+    "draft_workout",
+    { workout: coachRun("Shakeout", 900), calendar_date: "20990805" },
+    { allowUpcomingWorkouts: false, onPlanDraft: (drafted) => { workout = drafted; } }
+  );
+  await chatWorkoutTools.uploadPlanDraftById(workout.draftId, "metric", "calendar", undefined, true);
+  const refused = JSON.parse(
+    await chatWorkoutTools.handleChatWorkoutTool(
+      "revise_training_plan",
+      { draft_id: workout.draftId, summary: "Note", ops: [{ op: "patch_session", set: { "/description": "Easy" } }] },
+      { allowUpcomingWorkouts: false }
+    )
+  );
+  assert.equal(refused.error_code, "draft_saved");
+  assert.equal(refused.workout_id, "LIB77");
+  assert.equal(refused.schedule_date, "20990805");
+  assert.match(refused.errors[0], /workout_id LIB77.*20990805/);
+});
+
 test("an update written over a change made on COROS replaces it (P1.6)", async () => {
   const coros = fakeCoros();
   const preview = await coachDraft(datedBlock);
@@ -1695,6 +1724,60 @@ test("deleting a conversation's drafts lets them go", async () => {
   const preview = await coachDraft(datedBlock);
   chatWorkoutTools.deletePlanDraftsOf([preview.draftId]);
   assert.throws(() => chatWorkoutTools.planDraftDocument(preview.draftId), /not found/);
+});
+
+test("a saved Coach plan patches raw programs without losing their ids or private COROS fields", async () => {
+  const coros = fakeCoros();
+  coros.mangleAdd = (body) => ({ ...body, programs: body.programs.map((program) => ({
+    ...program, privateProgramField: "kept", exercises: program.exercises.map((exercise) => ({ ...exercise, privateStepField: "kept" }))
+  })) });
+  const preview = await coachDraft(datedBlock);
+  await chatWorkoutTools.uploadPlanDraftById(preview.draftId, "metric", "nativePlan");
+  const before = chatWorkoutTools.planDraftDocument(preview.draftId);
+  const source = before.entries.find((entry) => entry.workout.key === "easy-monday");
+  const response = JSON.parse(await chatWorkoutTools.handleChatWorkoutTool("revise_training_plan", {
+    draft_id: preview.draftId, summary: "Shorten with notes", ops: [
+      { op: "patch_session", key: "easy-monday", set: { "/description": "Relax shoulders", "/steps/0/target_duration_seconds": 1200 } }
+    ]
+  }, { allowUpcomingWorkouts: false }));
+  assert.equal(response.ok, true, JSON.stringify(response));
+  const next = chatWorkoutTools.planDraftDocument(response.draft_id);
+  const changed = next.entries.find((entry) => entry.workout.key === "easy-monday");
+  assert.equal(changed.corosProgram.privateProgramField, "kept");
+  assert.equal(changed.corosProgram.overview, "Relax shoulders");
+  assert.equal(changed.corosProgram.exercises[0].privateStepField, "kept");
+  assert.equal(changed.corosProgram.exercises[0].id, source.corosProgram.exercises[0].id);
+  assert.equal(changed.corosProgram.exercises[0].targetValue, 1200);
+  assert.deepEqual(next.entries.find((entry) => entry.workout.key === "long-sunday").corosProgram, before.entries.find((entry) => entry.workout.key === "long-sunday").corosProgram);
+  assert.equal(coros.to("/training/plan/update").length, 0, "revision is only a preview");
+  const description = "Ấ".repeat(66);
+  const metadata = JSON.parse(await chatWorkoutTools.handleChatWorkoutTool("revise_training_plan", {
+    draft_id: response.draft_id, summary: "Metadata only", ops: [{ op: "patch_session", key: "easy-monday", set: { "/description": ` ${description} ` } }]
+  }, { allowUpcomingWorkouts: false }));
+  assert.equal(metadata.ok, true, JSON.stringify(metadata));
+  const metadataEntry = chatWorkoutTools.planDraftDocument(metadata.draft_id).entries.find((entry) => entry.workout.key === "easy-monday");
+  assert.equal(metadataEntry.corosProgram.overview, description, "raw metadata uses the same trimming and byte limit as the draft");
+  assert.deepEqual(metadataEntry.corosProgram.exercises, changed.corosProgram.exercises, "metadata changes no exercise data");
+  await chatWorkoutTools.uploadPlanDraftById(metadata.draft_id, "metric", "nativePlan");
+  const [write] = coros.to("/training/plan/update");
+  const program = write.body.programs.find((program) => String(program.idInPlan) === changed.idInPlan);
+  assert.equal(program.overview, description);
+  assert.equal(program.privateProgramField, "kept");
+});
+
+test("a patch never rebases step indices onto a plan changed on COROS", async () => {
+  const coros = fakeCoros();
+  const preview = await coachDraft(datedBlock);
+  await chatWorkoutTools.uploadPlanDraftById(preview.draftId, "metric", "nativePlan");
+  const remote = coros.plans.get("900");
+  remote.version += 1;
+  remote.name = "Changed on COROS";
+  const response = JSON.parse(await chatWorkoutTools.handleChatWorkoutTool("revise_training_plan", {
+    draft_id: preview.draftId, summary: "Stale step edit", ops: [{ op: "patch_session", key: "easy-monday", set: { "/steps/0/target_duration_seconds": 1200 } }]
+  }, { allowUpcomingWorkouts: false }));
+  assert.equal(response.ok, false);
+  assert.equal(response.error_code, "not_latest_version");
+  assert.equal(coros.to("/training/plan/update").length, 0);
 });
 
 let failed = 0;

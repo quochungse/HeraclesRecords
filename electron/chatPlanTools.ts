@@ -167,7 +167,7 @@ export async function handleChatPlanTool(
  * the step's exercise id (verified on the live library, 2026-09-28). A
  * catalogue that does not answer leaves the names as they came.
  */
-async function nameExercises(draft: RunWorkoutEditorDraft): Promise<void> {
+export async function nameExercises(draft: RunWorkoutEditorDraft): Promise<void> {
   const steps = draft.nodes.flatMap((node) => (node.nodeType === "repeat" ? node.steps : [node]));
   let catalog = new Map<string, string>();
   if (steps.some((step) => step.exerciseId)) {
@@ -194,11 +194,15 @@ async function nameExercises(draft: RunWorkoutEditorDraft): Promise<void> {
  * read and copied by hand.
  */
 export async function readLibraryWorkout(id: string, unitSystem: UnitSystem): Promise<PlanWorkoutEntryInput> {
+  return (await readLibraryWorkoutWithRevision(id, unitSystem)).workout;
+}
+
+async function readLibraryWorkoutWithRevision(id: string, unitSystem: UnitSystem) {
   await loadCorosLocale().catch(() => undefined);
   const document = await getWorkoutForEdit({ kind: "library", programId: id }, unitSystem);
   await nameExercises(document.draft);
   const workout = editorDraftToPlanWorkoutInput(document.draft, { key: id, name: document.draft.name });
-  return { ...workout, name: corosText(workout.name) };
+  return { workout: { ...workout, name: corosText(workout.name) }, revision: document.revision };
 }
 
 /**
@@ -248,10 +252,11 @@ async function getWorkoutLibrary(args: Record<string, unknown>, options: ChatPla
   const whole = await Promise.all(
     wanted.map(async (id) => {
       try {
-        const workout = await readLibraryWorkout(id, unitSystem);
+        const { workout, revision } = await readLibraryWorkoutWithRevision(id, unitSystem);
         const steps = formatEntryStepsSummary(workout as PlanWorkoutEntry, unitSystem);
         return {
           workout_id: id,
+          revision,
           name: workout.name,
           sport: workout.sport ?? "run",
           ...(workout.description ? { description: workout.description } : {}),

@@ -3932,6 +3932,11 @@ function workoutToolGuide(
         "and addition the week needs, rather than drafting new workouts: a plan's session moved or replaced " +
         "that way stays in its plan."
       : undefined,
+    has("propose_schedule_changes")
+      ? "- Changing part of a saved workout (a calendar session or a library workout: a target, a pace, the reps, " +
+        "a note) → propose_schedule_changes with op patch and only what changes, steps by their position in the read " +
+        "(zero-based); replace only when steps are added, removed or swapped."
+      : undefined,
     has("delete_workout")
       ? "- Removing a workout → find it with list_scheduled_workouts, then delete_workout."
       : undefined,

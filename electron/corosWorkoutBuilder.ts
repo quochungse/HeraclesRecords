@@ -1249,6 +1249,32 @@ export function formatEntryStepsSummary(
   return parts.length > 0 ? parts.join(" → ") : undefined;
 }
 
+/**
+ * The steps as a line a patch can address: `[i]` is /steps/i and `[i.j]` the
+ * j-th step of repeat group i. Every step is listed, and a movement goes by
+ * its display name, which `exercise_name` (COROS's key) is not.
+ */
+export function formatEntryStepsOutline(
+  entry: PlanWorkoutEntry,
+  unitSystem: UnitSystem = "metric"
+): string | undefined {
+  if (!entry.steps || entry.steps.length === 0) {
+    return undefined;
+  }
+  const swim = entry.sport === "swim";
+  const line = (step: RunWorkoutStep, at: string) => {
+    const named = step.exercise_id && step.name ? { ...step, exercise_name: step.name } : step;
+    return `[${at}] ${formatRunStepSummary(named, unitSystem, swim) ?? step.kind ?? "training"}`;
+  };
+  return entry.steps
+    .map((step, index) =>
+      "repeat" in step
+        ? `[${index}] ${step.repeat}x (${step.steps.map((sub, child) => line(sub, `${index}.${child}`)).join(", ")})`
+        : line(step, String(index))
+    )
+    .join(" → ");
+}
+
 function formatRunStepSummary(
   step: RunWorkoutStep,
   unitSystem: UnitSystem,

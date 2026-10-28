@@ -565,10 +565,18 @@ function parsePlanDraft(value: unknown): PlanDraftPreview | null {
                 planId:
                   typeof value.uploadResult.planId === "string"
                     ? value.uploadResult.planId
+                    : undefined,
+                programId:
+                  typeof value.uploadResult.programId === "string"
+                    ? value.uploadResult.programId
+                    : undefined,
+                scheduleDate:
+                  typeof value.uploadResult.scheduleDate === "string"
+                    ? value.uploadResult.scheduleDate
                     : undefined
               },
               value.uploadResult,
-              ["workoutsScheduled", "workoutsCreated", "destination", "planId"]
+              ["workoutsScheduled", "workoutsCreated", "destination", "planId", "programId", "scheduleDate"]
             )
           : undefined
     },
