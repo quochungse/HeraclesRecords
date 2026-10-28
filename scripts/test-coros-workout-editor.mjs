@@ -410,7 +410,7 @@ const revision = workoutEditRevision({
   ref: { kind: "library", programId: "program-44" },
   program: source
 });
-assert.match(revision, /^[a-f0-9]{64}$/);
+assert.match(revision, /^[a-f0-9]{16}$/);
 assert.notEqual(
   revision,
   workoutEditRevision({

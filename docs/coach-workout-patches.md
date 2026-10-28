@@ -2,7 +2,9 @@
 
 Coach sends only changed fields. The app reads and retains the complete source,
 validates the result, and constructs COROS's full write request after the athlete
-chooses Save or Apply. No new tool or system-prompt section is needed.
+chooses Save or Apply. No new tool is needed; one line of the workout guide in
+the system prompt (`workoutToolGuide`) sends small edits of a saved workout here
+rather than to a replacement.
 
 For a draft workout or a session of a Coach plan, use the existing
 `revise_training_plan` with `patch_session`:
@@ -28,19 +30,31 @@ For an existing calendar session or library workout, use
 `propose_schedule_changes` with `op: "patch"`, the same `set` and `unset`, and
 either `session: {plan_id, id_in_plan, date}` or `workout_id`.
 An existing one-off workout saved from a Coach card is edited this way rather
-than revising its saved draft into a second workout.
+than revising its saved draft into a second workout: `revise_training_plan`
+refuses it with `draft_saved` and names where it went (`workout_id`,
+`schedule_date`), recorded on the card's `uploadResult` when it was saved.
 
-Step edits of saved workouts require the `revision` returned by
-`list_scheduled_workouts` with `sessions: [id_in_plan]`, or
-`get_workout_library` with `workout_ids`. Metadata-only changes can be proposed
-without a preliminary full read; the backend captures the current revision.
-Every proposal checks that revision again at Apply and in the existing editor's
-save path. Revision hashes include content, so a changed workout is detected
-even when COROS omits its version counter.
+Step edits of saved workouts require the `revision` of the copy Coach read.
+`list_scheduled_workouts` gives every session its revision and its steps
+numbered as patch paths (`[1.0]` is `/steps/1/steps/0`) from the one range read
+it already makes (`listScheduledWorkoutEntriesForEdit`), so a step edit costs
+no second read; `sessions: [id_in_plan]` adds every field of the workout.
+`get_workout_library` with `workout_ids` gives a library workout's.
+Metadata-only changes can be proposed without a revision; the backend captures
+the current one. Every proposal checks that revision again at Apply and in the
+existing editor's save path.
+
+A revision is the first 16 hex characters of a SHA-256 over the editor's ref,
+the program and (for a session) the calendar entity, keys sorted. It hashes
+content, so a changed workout is detected even when COROS omits its version
+counter. It is shared with the Library and Calendar editors, which is why it was
+probed on a real account (2026-10-28, reads only): two reads five seconds apart
+gave the same revision for 11 of 11 calendar sessions and 4 of 4 library
+workouts, and a 14-day and a 42-day range read gave the same revision as the
+single-day read the editor makes for all 11.
 These are read-before-write checks, not a server-side compare-and-swap: the
 existing COROS write path still has a small interval between the final check
-and the write. A targeted calendar read returns only the requested sessions,
-without duplicating their full steps as an exercise summary.
+and the write.
 
 ## Deliberate limits
 
@@ -71,9 +85,12 @@ workout schema or a general document-editing language. The revision schema
 grew from 1,591 to 2,022 serialized characters (+431), below the existing
 2,500-character regression budget. It saves model
 input/output tokens; it does not assume COROS supports partial HTTP payloads.
-The complete set remains 12 tools: its serialized definitions grew from 47,394
-to 48,628 characters (+1,234, about 2.6%). These are character measurements,
-not tokenizer-specific token estimates.
+The complete set of workout and plan tools grew from 47,365 to 48,751
+serialized characters (+1,386, about 2.9%). On the account above, the numbered
+steps and revisions made a 14-day list 38% longer than the exercise summary
+they replace (2,607 to 3,609 characters for 11 sessions), and they carry each
+step's intensity and rest, which the summary did not. These are character
+measurements, not tokenizer-specific token estimates.
 
 Validation: `test:workout-patch`, `test:chat-workout-tools`,
 `test:chat-plan-artifacts`, `test:schedule-changes`, `test:coros-plan-writes`,

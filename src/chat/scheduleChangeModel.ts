@@ -166,10 +166,9 @@ export function changeLineLabel(line: ScheduleChangeLine): string {
   const plan = session ? planOf(line.label, session.name) : "";
   const quoted = (name: string) => t("chat.change.line.quoted", { name });
   switch (line.op) {
-    case "patch": {
-      const name = session?.name ?? line.program?.name ?? line.workout?.name;
-      return name ? `${t("library.ed.editName", { name: quoted(name) })}${session ? ` · ${changeDayLabel(session.happenDay)}` : ""}` : line.label;
-    }
+    case "patch":
+      if (session) return t("chat.change.line.patch", { name: quoted(session.name), plan, day: changeDayLabel(session.happenDay) });
+      return line.program ? t("chat.change.line.patchLibrary", { name: quoted(line.program.name) }) : line.label;
     case "move":
       return session && line.toDay
         ? t("chat.change.line.move", { name: quoted(session.name), plan, from: changeDayLabel(session.happenDay), to: changeDayLabel(line.toDay) })
@@ -241,7 +240,7 @@ export function lineViews(line: ScheduleChangeLine): WorkoutView[] {
       break;
     case "patch":
       if (line.patch?.ref.kind === "library") {
-        views.push({ id: "current", label: t("chat.change.view.current"), source: { kind: "library", programId: line.patch.ref.programId } });
+        views.push({ id: "current", label: t("chat.change.view.library"), source: { kind: "library", programId: line.patch.ref.programId } });
       } else if (session) views.push(onCalendar(session.happenDay));
       if (!applied) views.push(proposed);
       break;

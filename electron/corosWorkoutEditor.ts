@@ -792,7 +792,10 @@ export function workoutEditRevision(source: WorkoutEditSource): string {
     // Some COROS responses omit version counters. Content changes must still
     // invalidate a pending edit, including a reorder of identical-kind steps.
     .update(stableWorkoutRevisionJson(source))
-    .digest("hex");
+    .digest("hex")
+    // Coach reads and writes it back on every patch: 64 bits tell two copies
+    // of one workout apart at a quarter of the tokens.
+    .slice(0, 16);
 }
 
 function stableWorkoutRevisionJson(value: unknown): string {

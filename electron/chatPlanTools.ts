@@ -167,7 +167,7 @@ export async function handleChatPlanTool(
  * the step's exercise id (verified on the live library, 2026-09-28). A
  * catalogue that does not answer leaves the names as they came.
  */
-async function nameExercises(draft: RunWorkoutEditorDraft): Promise<void> {
+export async function nameExercises(draft: RunWorkoutEditorDraft): Promise<void> {
   const steps = draft.nodes.flatMap((node) => (node.nodeType === "repeat" ? node.steps : [node]));
   let catalog = new Map<string, string>();
   if (steps.some((step) => step.exerciseId)) {

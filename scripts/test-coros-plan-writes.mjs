@@ -1244,6 +1244,35 @@ test("a coach plan on COROS is changed by a version that updates it (P1.6)", asy
   assert.equal(workoutRevision.error_code, "draft_saved");
 });
 
+test("a saved one-off workout's refusal says where it went, so Coach can patch it there", async () => {
+  stubCoros({
+    "/training/program/calculate": () => ok({ planDuration: 900, planTrainingLoad: 20, exerciseBarChart: [] }),
+    "/training/program/add": () => ok("LIB77"),
+    "/training/schedule/query": () => ok({ entities: [], programs: [] }),
+    "/training/schedule/update": () => ok(),
+    "/account/query": ok({}),
+    "coros-traininghub-v2": ok({})
+  });
+  let workout;
+  await chatWorkoutTools.handleChatWorkoutTool(
+    "draft_workout",
+    { workout: coachRun("Shakeout", 900), calendar_date: "20990805" },
+    { allowUpcomingWorkouts: false, onPlanDraft: (drafted) => { workout = drafted; } }
+  );
+  await chatWorkoutTools.uploadPlanDraftById(workout.draftId, "metric", "calendar", undefined, true);
+  const refused = JSON.parse(
+    await chatWorkoutTools.handleChatWorkoutTool(
+      "revise_training_plan",
+      { draft_id: workout.draftId, summary: "Note", ops: [{ op: "patch_session", set: { "/description": "Easy" } }] },
+      { allowUpcomingWorkouts: false }
+    )
+  );
+  assert.equal(refused.error_code, "draft_saved");
+  assert.equal(refused.workout_id, "LIB77");
+  assert.equal(refused.schedule_date, "20990805");
+  assert.match(refused.errors[0], /workout_id LIB77.*20990805/);
+});
+
 test("an update written over a change made on COROS replaces it (P1.6)", async () => {
   const coros = fakeCoros();
   const preview = await coachDraft(datedBlock);

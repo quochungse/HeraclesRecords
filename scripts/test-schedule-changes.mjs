@@ -862,8 +862,13 @@ test("calendar step patches require the read revision and refuse changes without
   assert.match(missing.result.errors.join(" "), /revision/);
   const read = JSON.parse(await workoutTools.handleChatWorkoutTool("list_scheduled_workouts", { start_date: tomorrow, end_date: tomorrow, sessions: ["82"] }));
   const revision = read.workouts[0].revision;
-  assert.equal(typeof revision, "string");
+  assert.match(revision, /^[a-f0-9]{16}$/);
   assert.equal(read.workouts[0].workout.steps[0].target_duration_seconds, 600);
+  // The plain list gives the same revision from its one read, and numbers the steps for patch paths.
+  const listed = JSON.parse(await workoutTools.handleChatWorkoutTool("list_scheduled_workouts", { start_date: tomorrow, end_date: tomorrow }));
+  assert.equal(listed.workouts[0].revision, revision);
+  assert.match(listed.workouts[0].steps, /^\[0\] /);
+  assert.equal(listed.workouts[0].exercises, undefined, "the numbered steps stand in for the summary");
   const { result, staged } = await propose([{ ...change, revision }]);
   assert.equal(result.ok, true, JSON.stringify(result));
   coros.state.programs[0].exercises[0].targetValue = 900;
@@ -913,9 +918,9 @@ test("invalid patch batches and duplicate targets never leave a proposal or a wr
 
 test("a patch of a running plan occurrence keeps it in that plan", async () => {
   const coros = fakeCoros();
-  coros.runningCopy("PATCHCOPY", tomorrow, [["1", 1, "Patch run"]]);
+  coros.runningCopy("PATCHCOPY", planMonday, [["1", 1, "Patch run"]]);
   Object.assign(coros.copy("PATCHCOPY").programs[0], patchProgram());
-  const day = dayOf(tomorrow, 1);
+  const day = dayOf(planMonday, 1);
   const { result, staged } = await propose([{ op: "patch", session: { plan_id: "PATCHCOPY", id_in_plan: "1", date: day }, set: { "/description": "Occurrence note" } }]);
   assert.equal(result.ok, true, JSON.stringify(result));
   const applied = await changes.applyScheduleChange(staged.changeSetId);

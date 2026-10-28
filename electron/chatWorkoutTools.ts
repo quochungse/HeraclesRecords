@@ -4,6 +4,7 @@ import { handleRequestPlanBrief } from "./chatPlanBriefs";
 import { PLAN_BRIEF_TOOL_DEFINITION } from "./planBrief";
 import {
   buildPlanPreview,
+  formatEntryStepsOutline,
   formatScheduleDay,
   validatePlanDraft,
   type CorosTrainingPlanDraft,
@@ -15,6 +16,8 @@ import {
   formatScheduledExercisesForChat,
   getTrainingHubStatus,
   listScheduledWorkoutEntries,
+  listScheduledWorkoutEntriesForEdit,
+  scheduledWorkoutEditRef,
   getWorkoutForEdit,
   getWorkoutEditorContext,
   calculateExistingWorkoutProgram,
@@ -23,7 +26,7 @@ import {
   uploadTrainingPlan,
   PartialUploadError
 } from "./trainingHubService";
-import { corosProgramToWorkoutDraft, validateWorkoutDraft, workoutDraftToCorosProgram } from "./corosWorkoutEditor";
+import { corosProgramToWorkoutDraft, parseWorkoutEditorContext, validateWorkoutDraft, workoutDraftToCorosProgram } from "./corosWorkoutEditor";
 import { editorDraftToPlanWorkoutInput } from "./planWorkoutEditor";
 import { WORKOUT_PATCH_PROPERTIES, parseWorkoutPatch, patchTouchesSteps, patchWorkoutEditorDraft } from "./workoutPatch";
 import {
@@ -55,8 +58,10 @@ import {
   getChatPlanTools,
   handleChatPlanTool,
   isChatPlanTool,
+  nameExercises,
   readLibraryWorkout
 } from "./chatPlanTools";
+import { corosText, loadCorosLocale } from "./corosLocale";
 import { planDiff, sameWorkoutInput } from "./planDiff";
 import {
   PLAN_DAYS,
@@ -435,7 +440,8 @@ export function getChatWorkoutTools(): CorosMcpTool[] {
       name: "list_scheduled_workouts",
       description:
         "List workouts on the COROS training calendar for a date range. " +
-        "Use before delete_workout to get plan_id and id_in_plan when needed.",
+        "Use before delete_workout to get plan_id and id_in_plan when needed. " +
+        "Each session carries the revision a patch needs and its steps numbered for patch paths: [i] is /steps/i, [i.j] is /steps/i/steps/j.",
       inputSchema: {
         type: "object",
         properties: {
@@ -449,7 +455,7 @@ export function getChatWorkoutTools(): CorosMcpTool[] {
           },
           sessions: {
             type: "array", items: { type: "string" }, maxItems: 5,
-            description: "id_in_plan to read with full workout steps and revision before patching steps."
+            description: "id_in_plan to read with every field of its workout."
           }
         }
       }
@@ -513,7 +519,7 @@ export function getChatWorkoutTools(): CorosMcpTool[] {
               properties: {
                 op: { type: "string", enum: ["move", "replace", "patch", "remove", "add"] },
                 workout_id: { type: "string", description: "patch only: library workout_id instead of session." },
-                revision: { type: "string", description: "patch: revision from reading the workout; required for step edits." },
+                revision: { type: "string", description: "patch: the revision list_scheduled_workouts or get_workout_library gave; required for step edits." },
                 ...WORKOUT_PATCH_PROPERTIES,
                 session: {
                   type: "object",
@@ -1279,7 +1285,7 @@ function revisionTarget(draftId: string, only?: "plan"): RevisionTarget {
   if (only === "plan" && named.preview.artifactType === "workout") {
     return refuse({
       error_code: "draft_is_a_workout",
-      errors: [`${draftId} is a single workout. Change it with revise_training_plan and replace_session.`]
+      errors: [`${draftId} is a single workout. Change it with revise_training_plan: patch_session, replace_session or rename.`]
     });
   }
   const versions = versionsOf(named.artifactId);
@@ -1288,11 +1294,23 @@ function revisionTarget(draftId: string, only?: "plan"): RevisionTarget {
   // workout saved to the library or the calendar has nothing to update, so a
   // change to it would be a second workout.
   if (named.preview.artifactType === "workout" && versions.some((version) => version.uploadedAt)) {
+    const saved = versions.find((version) => version.uploadedAt)?.preview.uploadResult;
+    const where = [
+      saved?.programId
+        ? `It is library workout_id ${saved.programId}: patch it with that workout_id (a step edit takes the revision get_workout_library gives).`
+        : undefined,
+      saved?.scheduleDate
+        ? `It is on the calendar on ${saved.scheduleDate}: list_scheduled_workouts for that day gives its session and revision.`
+        : undefined
+    ].filter(Boolean);
     return refuse({
       error_code: "draft_saved",
       errors: [
-        "This workout is already saved to COROS. Use propose_schedule_changes with patch and its library workout_id or calendar session to edit it."
-      ]
+        "This workout is already saved to COROS. Change it with propose_schedule_changes op patch" +
+          (where.length ? `. ${where.join(" ")}` : ", naming its library workout_id or its calendar session.")
+      ],
+      ...(saved?.programId ? { workout_id: saved.programId } : {}),
+      ...(saved?.scheduleDate ? { schedule_date: saved.scheduleDate } : {})
     });
   }
   if (latest.draftId !== named.draftId) {
@@ -1784,13 +1802,14 @@ async function handleListScheduledWorkouts(
     return JSON.stringify({ ok: false, error: "end_date must be YYYYMMDD." });
   }
 
-  const entries = await listScheduledWorkoutEntries(startDate, endDate);
+  const entries = await listScheduledWorkoutEntriesForEdit(startDate, endDate);
   const wanted = new Set(Array.isArray(args.sessions) ? args.sessions.slice(0, 5).map(String) : []);
   const shown = wanted.size ? entries.filter((entry) => wanted.has(entry.idInPlan)).slice(0, 5) : entries;
+  const outlines = await stepOutlines(shown, unitSystem);
   const details = new Map<string, Record<string, unknown>>();
   for (const entry of wanted.size ? shown : []) {
     try {
-      const document = await getWorkoutForEdit({ kind: "scheduled", planId: entry.planId, idInPlan: entry.idInPlan, happenDay: entry.happenDay, planProgramId: entry.planProgramId ?? "" }, unitSystem);
+      const document = await getWorkoutForEdit(scheduledWorkoutEditRef(entry), unitSystem);
       details.set(`${entry.planId}:${entry.idInPlan}`, {
         revision: document.revision,
         workout: editorDraftToPlanWorkoutInput(document.draft, { key: entry.idInPlan, name: entry.name })
@@ -1807,7 +1826,9 @@ async function handleListScheduledWorkouts(
       name: entry.name,
       volume: formatScheduledVolume(entry.volume, unitSystem),
       training_load: entry.trainingLoad,
-      exercises: !details.get(`${entry.planId}:${entry.idInPlan}`)?.workout && entry.exercises?.length
+      ...(entry.revision ? { revision: entry.revision } : {}),
+      steps: outlines.get(entry),
+      exercises: !outlines.get(entry) && !details.get(`${entry.planId}:${entry.idInPlan}`)?.workout && entry.exercises?.length
         ? formatScheduledExercisesForChat(
             entry.exercises,
             unitSystem,
@@ -1824,6 +1845,35 @@ async function handleListScheduledWorkouts(
       ...details.get(`${entry.planId}:${entry.idInPlan}`)
     }))
   });
+}
+
+/**
+ * Each session's steps numbered as a patch addresses them, read from the
+ * program the list already holds, as the editor reads it — no request but the
+ * movement names, which the catalogue keeps for minutes. One at a time, so the
+ * second strength session finds the catalogue the first one read.
+ */
+async function stepOutlines(
+  entries: Array<{ rawProgram?: Record<string, unknown>; idInPlan: string; name: string }>,
+  unitSystem: UnitSystem
+): Promise<Map<object, string>> {
+  const outlines = new Map<object, string>();
+  if (!entries.some((entry) => entry.rawProgram)) return outlines;
+  await loadCorosLocale().catch(() => undefined);
+  const context = parseWorkoutEditorContext({}, unitSystem);
+  for (const entry of entries) {
+    if (!entry.rawProgram) continue;
+    try {
+      const draft = corosProgramToWorkoutDraft(entry.rawProgram, context);
+      await nameExercises(draft);
+      const workout = editorDraftToPlanWorkoutInput(draft, { key: entry.idInPlan, name: entry.name });
+      const outline = formatEntryStepsOutline(workout as PlanWorkoutEntry, unitSystem);
+      if (outline) outlines.set(entry, outline);
+    } catch {
+      /* the exercise summary stands in */
+    }
+  }
+  return outlines;
 }
 
 /** A running plan's name by calendar `planId`, each plan read from the cache once per call. */
@@ -2113,8 +2163,8 @@ async function handleProposeScheduleChanges(
       : undefined;
     if (op === "patch") {
       try {
-        const line = await proposedWorkoutPatch({ kind: "scheduled", planId: entry!.planId, idInPlan: entry!.idInPlan, happenDay: entry!.happenDay, planProgramId: entry!.planProgramId ?? "" }, change, unitSystem);
-        lines.push({ ...line, session });
+        const line = await proposedWorkoutPatch(scheduledWorkoutEditRef(entry!), change, unitSystem);
+        lines.push({ ...line, label: `Update "${entry!.name}"${inPlan} on ${cardDay(entry!.happenDay)}`, session });
       } catch (error) {
         errors.push(`${at}: ${error instanceof Error ? error.message : String(error)}`);
       }
@@ -2161,12 +2211,14 @@ async function proposedWorkoutPatch(ref: WorkoutEditRef, change: Record<string, 
   const checked = validateWorkoutDraft(draft);
   if (!checked.valid) throw new Error(Object.values(checked.errors).join(" "));
   const workout = editorDraftToPlanWorkoutInput(draft, { key: "patch", name: draft.name });
-  const location = ref.kind === "scheduled" ? ` on ${cardDay(ref.happenDay)}` : " in the workout library";
+  // A calendar line is labelled by its caller, from the session as listed.
+  if (ref.kind === "library") await loadCorosLocale().catch(() => undefined);
+  const name = corosText(document.draft.name);
   return {
     op: "patch",
-    label: `Update "${document.draft.name}"${location}`,
+    label: `Update "${name}" in the workout library`,
     workout,
-    ...(ref.kind === "library" ? { program: { id: ref.programId, name: document.draft.name } } : {}),
+    ...(ref.kind === "library" ? { program: { id: ref.programId, name } } : {}),
     patch: { ref, revision: document.revision, changes: patch }
   };
 }
@@ -2405,11 +2457,14 @@ async function saveDraftTo(
 function markDraftSaved(stored: StoredPlanDraft, result: UploadPlanResult): void {
   stored.uploadedAt = Date.now();
   stored.preview.uploadedAt = stored.uploadedAt;
+  const workout = stored.preview.artifactType === "workout" ? result.entries[0] : undefined;
   stored.preview.uploadResult = {
     workoutsScheduled: result.workoutsScheduled,
     workoutsCreated: result.workoutsCreated,
     destination: result.destination,
-    ...(result.planId ? { planId: result.planId } : {})
+    ...(result.planId ? { planId: result.planId } : {}),
+    ...(workout?.programId ? { programId: workout.programId } : {}),
+    ...(workout?.date ? { scheduleDate: workout.date } : {})
   };
   persistPlanDraft(stored);
   markChatPlanDraftUploaded(stored.draftId, stored.uploadedAt);

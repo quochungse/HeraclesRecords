@@ -3292,6 +3292,9 @@ export interface PlanDraftPreview {
     destination?: TrainingPlanDestination;
     /** The COROS plan it became, for a plan saved whole. */
     planId?: string;
+    /** Where a one-off workout went, so Coach can patch it there: its library id, its calendar day. */
+    programId?: string;
+    scheduleDate?: string;
   };
   /**
    * Set when the athlete changed the plan in the editor after the coach wrote
