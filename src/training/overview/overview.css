@@ -260,10 +260,10 @@
   padding-bottom: 12px;
 }
 
-/* The ring and its stages as one group, centred under the night's figures,
-   the list as wide as its words rather than the column. */
+/* The ring at the column's left edge, under the score, and the stages with
+   their figures at its right edge, as wide as their words. */
 .overview-today-vis.is-sleep {
-  justify-content: center;
+  justify-content: space-between;
   gap: 36px;
   padding-top: 6px;
 }
