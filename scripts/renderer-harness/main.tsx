@@ -47,6 +47,7 @@ import { ExercisePickerDialog } from "../../src/calendar/ExercisePickerDialog";
 import { AddWorkoutModal } from "../../src/calendar/AddWorkoutModal";
 import { CalendarView } from "../../src/calendar/CalendarView";
 import { CalendarSkeleton } from "../../src/calendar/CalendarSkeleton";
+import { OverviewComingUp } from "../../src/training/overview/OverviewComingUp";
 import type { HeraclesRecordsApi } from "../../src/heraclesrecords-api";
 
 // ---------------------------------------------------------------------------
@@ -244,6 +245,17 @@ function loadAppStyles() {
  * passing. Kept apart from `loadAppStyles` so the suites that predate it go on
  * standing on exactly the ground they were written against.
  */
+/** The same, plus Overview's own stylesheet, which the screen imports. */
+function loadOverviewStyles() {
+  if (appStylesReady) return;
+  void Promise.all([
+    import("../../src/styles.css"),
+    import("../../src/training/overview/overview.css")
+  ]).then(() => {
+    appStylesReady = true;
+  });
+}
+
 /** The same, plus the Training Library's own stylesheet. */
 function loadLibraryStyles() {
   if (appStylesReady) return;
@@ -634,6 +646,25 @@ const MOUNTS: Record<string, (options: Record<string, unknown>) => ReactElement>
           </section>
         </div>
       </EscapeClosingPanel>
+    );
+  },
+  // Overview's Coming up, inside the page's own wrapper so its tokens resolve.
+  OverviewComingUp: (options) => {
+    loadOverviewStyles();
+    return (
+      <div
+        className="stack training-dashboard"
+        style={{ width: `${(options.width as number | undefined) ?? 1100}px` }}
+      >
+        <OverviewComingUp
+          api={api}
+          upcomingWorkouts={(options.upcoming as never) ?? []}
+          activities={(options.activities as never) ?? []}
+          sportTypes={[]}
+          onOpenActivity={spy("onOpenActivity")}
+          onOpenCalendar={spy("onOpenCalendar")}
+        />
+      </div>
     );
   },
   ActivitiesSummary: (options) => {

@@ -25,8 +25,8 @@
 //   hides from the front (a depth buffer, as WebGL tested a line); the skin
 //   is the triangles facing the camera; the fill line runs from the soles to
 //   the crown.
-// - **The level and the frame agree**: the words stand where the stylesheet
-//   puts the fill line.
+// - **The frames are the stylesheet's**: `.body-figure` places the drawing at
+//   the narrow frame, and at the wide one from the switch width.
 // - **The colour runs with the recovery**: red at 20% and under, orange at 60,
 //   yellow at 70, green toward 100 (mixed in OKLCH between), and sky blue at 100 itself; no reading has none.
 //   The four colours are declared on the panel, where the mix is written —
@@ -360,13 +360,10 @@ assert.equal(math.figureColourFor(99), "color-mix(in oklch, var(--figure-high), 
 }
 
 const { WIDE_FRAME, NARROW_FRAME } = math;
-assert.equal(math.levelInFrame(0), WIDE_FRAME.feet, "an empty figure's line is at the soles");
-assert.equal(math.levelInFrame(1), WIDE_FRAME.feet + WIDE_FRAME.span, "a full one's at the crown");
-assert.equal(math.levelInFrame(2), math.levelInFrame(1));
 for (const frame of [WIDE_FRAME, NARROW_FRAME]) {
   assert.ok(frame.feet + frame.span < 1, "the crown stays inside the frame");
 }
-assert.ok(NARROW_FRAME.feet > WIDE_FRAME.feet + 0.05, "a narrow stage leaves room under the feet for the words");
+assert.ok(NARROW_FRAME.feet > WIDE_FRAME.feet + 0.05, "a narrow stage stands the figure clear of the floor");
 {
   // The stylesheet places the figure in both frames and switches at one width.
   const css = readFileSync(path.join(repoRoot, "src/styles.css"), "utf8");

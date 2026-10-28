@@ -357,8 +357,8 @@ export function computeWeeklyStats(days: CalendarDay[]): WeeklyStats {
     plannedSeconds: plannedSessions ? plannedSeconds : undefined,
     plannedDoneSeconds,
     elevationGain: Math.round(elevationGain),
-    baseFitness: lastDefined(metrics, (metric) => metric.staminaLevel),
-    loadImpact: lastDefined(metrics, (metric) => metric.tiredRateNew),
+    baseFitness: lastDefined(metrics, (metric) => metric.cti),
+    loadImpact: lastDefined(metrics, (metric) => metric.ati),
     loadRatio: lastDefined(metrics, (metric) => metric.trainingLoadRatio)
   };
 }

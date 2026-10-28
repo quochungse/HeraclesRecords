@@ -72,8 +72,9 @@ export function getChatAnalyticsTools(): CorosMcpTool[] {
         "COROS load and recovery markers per day: training load (and RPE load), " +
         "the night after each day — sleep, overnight HRV vs baseline and the heart " +
         "rate slept at (average and lowest, the recovery heart rate; there is no " +
-        "daytime resting HR on purpose) — Load Impact, load ratio " +
-        "(acute:chronic, ~1.0 = steady), Base Fitness, VO2max (from runs, recorded " +
+        "daytime resting HR on purpose) — Load Impact (acute load), load ratio " +
+        "(Load Impact over Base Fitness, ~1.0 = steady), Base Fitness (chronic " +
+        "load), VO2max (from runs, recorded " +
         "on run days only) and cycling VO2max (from rides, when COROS has one), " +
         "plus daily steps, exercise minutes and average stress, led by " +
         "a summary of the latest values and 7-day totals. " +
@@ -226,9 +227,9 @@ function hasReading(day: TrainingHubDailyMetric): boolean {
     day.trainingLoad,
     day.rpeLoad,
     day.avgSleepHrv,
-    day.tiredRateNew,
+    day.ati,
     day.trainingLoadRatio,
-    day.staminaLevel,
+    day.cti,
     day.vo2max,
     day.cycleVo2max
   ].some((value) => value !== undefined && Number.isFinite(value));
@@ -334,13 +335,15 @@ function hrvCell(hrv: number | undefined, base: number | undefined): string | un
 function statusColumns<Row>(
   pick: (row: Row) => Pick<
     TrainingHubDailyMetric,
-    "tiredRateNew" | "trainingLoadRatio" | "staminaLevel" | "vo2max" | "cycleVo2max"
+    "ati" | "trainingLoadRatio" | "cti" | "vo2max" | "cycleVo2max"
   >
 ): Column<Row>[] {
+  // Load Impact is COROS's `ati` and Base Fitness its `cti`, not `tiredRateNew`
+  // (their difference) or `staminaLevel` (sent only on a day with a run).
   return [
-    { header: "Load Impact", value: (row) => rounded(pick(row).tiredRateNew) },
+    { header: "Load Impact", value: (row) => rounded(pick(row).ati) },
     { header: "Load ratio", value: (row) => pick(row).trainingLoadRatio?.toFixed(2) },
-    { header: "Base Fitness", value: (row) => rounded(pick(row).staminaLevel) },
+    { header: "Base Fitness", value: (row) => rounded(pick(row).cti) },
     { header: "VO2max", value: (row) => rounded(pick(row).vo2max) },
     // Dropped by pipeTable, like every column, while COROS has none.
     { header: "Cycling VO2max", value: (row) => rounded(pick(row).cycleVo2max) }
@@ -490,9 +493,9 @@ function weeklyTable(
       },
       { header: "Sleep HR avg", value: (week) => rounded(nightMean(week, (night) => night.heartRate?.avg)) },
       ...statusColumns((week: TrendWeek) => ({
-        tiredRateNew: lastValue(week, (day) => day.tiredRateNew),
+        ati: lastValue(week, (day) => day.ati),
         trainingLoadRatio: lastValue(week, (day) => day.trainingLoadRatio),
-        staminaLevel: lastValue(week, (day) => day.staminaLevel),
+        cti: lastValue(week, (day) => day.cti),
         vo2max: lastValue(week, (day) => day.vo2max),
         cycleVo2max: lastValue(week, (day) => day.cycleVo2max)
       })),
@@ -552,9 +555,9 @@ function trendSummary(
   }
 
   const status = [
-    ["Load Impact", latestOf(window, (day) => day.tiredRateNew), 0],
+    ["Load Impact", latestOf(window, (day) => day.ati), 0],
     ["load ratio", latestOf(window, (day) => day.trainingLoadRatio), 2],
-    ["Base Fitness", latestOf(window, (day) => day.staminaLevel), 0]
+    ["Base Fitness", latestOf(window, (day) => day.cti), 0]
   ] as const;
   const statusParts = status
     .filter(([, reading]) => reading !== undefined)

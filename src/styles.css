@@ -2298,10 +2298,7 @@ input::placeholder {
 .run-hero-value,
 .running-stat strong,
 .sleep-detail-figure strong,
-.sleep-panel-score strong,
-.muscle-hero-value strong,
-.week-totals-value,
-.training-zone-hero-percent {
+.muscle-hero-value strong {
   font-family: var(--font-display);
   font-weight: 500;
   letter-spacing: -0.02em;
@@ -4225,7 +4222,6 @@ td span {
 
 .training-detail-panel,
 .training-activities-split-panel,
-.training-upcoming-panel,
 .training-records-panel,
 .training-scores-panel,
 .training-chart-panel {
@@ -4242,49 +4238,10 @@ td span {
 }
 
 /* ── Training Intelligence (Recovery + Fitness Trend) ───────────────── */
-/* No heading and no frame: the three panels are the cards, sitting on the
-   page like every other panel on the screen. A container, because whether the
-   two columns fit is a question about this section's width, not the window's —
-   a viewport query folded them at 1200px, where the section still had ~900px. */
-.training-intelligence {
-  position: relative;
-  animation: training-card-enter 0.55s cubic-bezier(0.2, 0.8, 0.2, 1) both;
-  container: training-intelligence / inline-size;
-}
-
-.training-intelligence-grid {
-  display: grid;
-  grid-template-columns: minmax(270px, 0.82fr) minmax(420px, 1.76fr);
-  align-items: stretch;
-  gap: 14px;
-}
-
-/* Under 760px the two minimums no longer fit side by side. */
-@container training-intelligence (max-width: 760px) {
-  .training-intelligence-grid {
-    grid-template-columns: minmax(0, 1fr);
-  }
-}
-
-/* Two stacks side by side: recovery on its own, weekly activity over sleep.
-   A column is one grid item, so its panels keep their own heights, and the last
-   one takes the slack — which is what keeps both columns ending level however
-   much taller the pair on the right runs. */
-.training-intelligence-column {
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-  min-width: 0;
-}
-
-.training-intelligence-column > :last-child {
-  flex: 1 1 auto;
-}
 
 /* Matte cards in dark. Paper's `.panel` rule outranks this, so there they are
    white cards on their shadow like every other panel. */
-.training-intelligence .training-recovery-panel,
-.training-fitness-panel,
+
 .vo2-widget-panel {
   border: 1px solid rgba(255, 255, 255, 0.07);
   border-radius: var(--radius-md);
@@ -4784,248 +4741,6 @@ td span {
   white-space: nowrap;
 }
 
-/* ── Sleep summary panel ───────────────────────────────────────────── */
-.sleep-panel {
-  --sleep-tone: rgba(120, 146, 255, 0.72);
-  container: totals-column / inline-size;
-  display: grid;
-  grid-template-rows: auto minmax(0, 1fr);
-  align-content: start;
-  gap: 14px;
-  /* A floor, not a share of the window. The `clamp(282px, 31vh, 392px)` that
-     stood here grew the card on a tall window for no reason the card's own
-     content gave, and this panel is the last child of its column — so it sets
-     that column's height, and every pixel it took by viewport arithmetic was a
-     pixel the recovery ring beside it had to stretch across. The figure is what
-     holds the four blocks at their own heights with the stage bar unsqueezed;
-     above it the content decides, and `flex: 1 1 auto` still fills any slack
-     the column has left. */
-  min-height: 260px;
-  padding: clamp(16px, 1.55vw, 21px);
-  border: 1px solid rgba(255, 255, 255, 0.09);
-  border-radius: var(--radius-md);
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.02) 52%),
-    radial-gradient(120% 80% at 0% 0%, color-mix(in srgb, var(--sleep-tone) 16%, transparent), transparent 58%),
-    rgba(255, 255, 255, 0.034);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.09);
-}
-
-.sleep-panel.tone-low {
-  --sleep-tone: rgba(255, 79, 95, 0.78);
-}
-
-.sleep-panel.tone-mid {
-  --sleep-tone: rgba(255, 178, 63, 0.78);
-}
-
-.sleep-panel.tone-good {
-  --sleep-tone: rgba(62, 232, 142, 0.78);
-}
-
-.sleep-panel.tone-high {
-  --sleep-tone: rgba(74, 163, 255, 0.82);
-}
-
-.sleep-panel-header {
-  display: flex;
-  /* Centred, not `flex-start`: the title is one line now and the open button is
-     the taller of the two, so the line reads against the button's middle. */
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-}
-
-/* Which night the score is for, over the score: a label, well under it. */
-.sleep-panel-night {
-  margin: 0 0 12px;
-  overflow: hidden;
-  color: var(--text-secondary);
-  font-size: 12px;
-  font-weight: 600;
-  letter-spacing: 0;
-  line-height: 1.3;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.sleep-panel-icon {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 34px;
-  height: 34px;
-  border-radius: var(--radius-pill);
-  background: color-mix(in srgb, var(--sleep-tone) 18%, rgba(255, 255, 255, 0.04));
-  color: color-mix(in srgb, var(--sleep-tone) 88%, white);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
-}
-
-.sleep-panel-message {
-  margin: 0;
-  color: var(--text-secondary);
-  font-size: 13px;
-  line-height: 1.45;
-}
-
-.sleep-panel.is-openable {
-  cursor: pointer;
-  transition:
-    border-color var(--dur-fast) var(--ease),
-    transform var(--dur-base) var(--ease);
-}
-
-.sleep-panel.is-openable:hover {
-  border-color: color-mix(in srgb, var(--text-primary) 20%, transparent);
-  transform: translateY(-1px);
-}
-
-.sleep-panel-open {
-  display: inline-flex;
-  align-items: center;
-  gap: 2px;
-  border: 1px solid transparent;
-  border-radius: var(--radius-sm);
-  padding: 5px 6px;
-  background: transparent;
-  color: var(--text-secondary);
-  cursor: pointer;
-  transition:
-    background var(--dur-fast) var(--ease),
-    color var(--dur-fast) var(--ease);
-}
-
-.sleep-panel.is-openable:hover .sleep-panel-open,
-.sleep-panel-open:hover {
-  background: color-mix(in srgb, var(--text-primary) 10%, transparent);
-  color: var(--text-primary);
-}
-
-.sleep-panel-open:focus-visible {
-  background: color-mix(in srgb, var(--text-primary) 10%, transparent);
-  color: var(--text-primary);
-  outline: var(--focus-ring);
-  outline-offset: 2px;
-}
-
-.sleep-panel-empty {
-  display: grid;
-  align-content: start;
-  gap: 6px;
-}
-
-.sleep-panel-stale {
-  margin: 0;
-  color: var(--text-muted);
-  font-size: 12px;
-  line-height: 1.45;
-}
-
-/* The seven days on the left, the night they end on to the right of them —
-   the arrangement Weekly Activity has, and the same rows. */
-.sleep-panel-body {
-  display: grid;
-  grid-template-columns: minmax(148px, 0.28fr) minmax(0, 1fr);
-  gap: 20px;
-  min-height: 0;
-}
-
-.sleep-panel-main {
-  container: sleep-summary / inline-size;
-  display: grid;
-  grid-template-rows: auto minmax(0, 1fr) auto;
-  align-content: start;
-  gap: 14px;
-  min-width: 0;
-}
-
-/* A caption over the rows saying which days they cover: the date in the card
-   is the night's, over the score. */
-.sleep-week-totals {
-  grid-template-rows: auto minmax(0, 1fr);
-  gap: 4px;
-}
-
-.week-totals-caption {
-  margin: 0;
-  color: var(--text-muted);
-  font-size: 10px;
-  font-weight: 600;
-  letter-spacing: 0.06em;
-  line-height: 1.2;
-  text-transform: uppercase;
-}
-
-.sleep-panel-hero {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  align-items: end;
-  gap: 12px;
-}
-
-.sleep-panel-score strong {
-  display: block;
-  color: var(--text-primary);
-  font-size: clamp(36px, 3vw, 36px);
-  line-height: 1;
-}
-
-.sleep-panel-score span {
-  display: block;
-  margin-top: 6px;
-  color: color-mix(in srgb, var(--sleep-tone) 72%, var(--text-secondary));
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-}
-
-.sleep-panel-duration span {
-  display: block;
-  color: var(--text-muted);
-  font-size: 10px;
-  font-weight: 600;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-}
-
-.sleep-panel-duration strong {
-  display: block;
-  margin-top: 4px;
-  color: var(--text-primary);
-  font-size: 18px;
-  font-weight: 700;
-}
-
-.sleep-stage-stack {
-  display: grid;
-  /* The bar and its key stay together when the card is taller than they are —
-     the column beside it sets the height now. */
-  align-content: start;
-  gap: 10px;
-}
-
-.sleep-stage-bar {
-  position: relative;
-  display: flex;
-  height: 12px;
-  isolation: isolate;
-  overflow: visible;
-  border-radius: var(--radius-pill);
-  background: rgba(255, 255, 255, 0.06);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
-}
-
-.sleep-stage-bar::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  z-index: -1;
-  border-radius: inherit;
-  background: rgba(255, 255, 255, 0.06);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
-}
-
 .sleep-stage-segment {
   position: relative;
   z-index: 1;
@@ -5179,75 +4894,6 @@ td span {
   --sleep-stage-color: var(--sleep-awake);
 }
 
-.sleep-stage-legend {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px 12px;
-}
-
-.sleep-stage-legend-item {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  color: var(--text-secondary);
-  font-size: 11px;
-  font-weight: 600;
-}
-
-.sleep-stage-legend-item strong {
-  color: var(--text-primary);
-  font-size: 11px;
-  font-weight: 700;
-}
-
-.sleep-stage-legend-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: var(--radius-pill);
-}
-
-.sleep-stage-legend-dot.is-deep {
-  background: var(--sleep-deep);
-}
-
-.sleep-stage-legend-dot.is-light {
-  background: var(--sleep-light);
-}
-
-.sleep-stage-legend-dot.is-rem {
-  background: var(--sleep-rem);
-}
-
-.sleep-stage-legend-dot.is-awake {
-  background: var(--sleep-awake);
-}
-
-.sleep-panel-empty-stages {
-  margin: 0;
-  color: var(--text-muted);
-  font-size: 12px;
-}
-
-.sleep-panel-partial {
-  margin: 0;
-  border: 1px solid color-mix(in srgb, var(--sleep-tone) 36%, rgba(255, 255, 255, 0.08));
-  border-radius: var(--radius-sm);
-  padding: 9px 10px;
-  background: color-mix(in srgb, var(--sleep-tone) 12%, rgba(255, 255, 255, 0.04));
-  color: var(--text-secondary);
-  font-size: 12px;
-  line-height: 1.3;
-}
-
-.sleep-panel-metrics {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 10px 16px;
-  margin: 0;
-  border-top: 1px solid var(--glass-border);
-  padding-top: 12px;
-}
-
 .sleep-metric {
   position: relative;
   display: grid;
@@ -5341,68 +4987,6 @@ td span {
   white-space: nowrap;
 }
 
-.sleep-window-value {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 13px;
-  letter-spacing: -0.02em;
-}
-
-.sleep-window-time {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  min-width: 0;
-}
-
-.sleep-window-arrow {
-  color: var(--text-muted);
-  font-size: 11px;
-}
-
-/* Six to a card, in pairs that share a column: when (the window, the naps),
-   awake (time, then how often), and the heart (HRV, RHR). The window takes a
-   row of its own only where a third of the card is too narrow for its clocks. */
-.sleep-panel-metrics {
-  grid-template-areas:
-    "window window window"
-    "awake hrv naps"
-    "wakeups rhr .";
-}
-
-.sleep-panel-metrics .is-window {
-  grid-area: window;
-}
-
-.sleep-panel-metrics .is-awake {
-  grid-area: awake;
-}
-
-.sleep-panel-metrics .is-wakeups {
-  grid-area: wakeups;
-}
-
-.sleep-panel-metrics .is-naps {
-  grid-area: naps;
-}
-
-.sleep-panel-metrics .is-hrv {
-  grid-area: hrv;
-}
-
-.sleep-panel-metrics .is-rhr {
-  grid-area: rhr;
-}
-
-@container sleep-summary (min-width: 520px) {
-  .sleep-panel-metrics {
-    grid-template-areas:
-      "window awake hrv"
-      "naps wakeups rhr";
-  }
-}
-
 @keyframes vo2-band-reveal {
   0% {
     opacity: 0;
@@ -5415,508 +4999,7 @@ td span {
   }
 }
 
-/* ── Fitness Trend / Weekly Activity card ──────────────────────────── */
-.training-fitness-panel {
-  display: grid;
-  /* Header, then the chart. The sport key had the middle row until it moved up
-     beside the metric chip. */
-  grid-template-rows: auto minmax(0, 1fr);
-  align-content: stretch;
-  gap: 14px;
-  /* A floor, not a share of the window — `clamp(282px, 31vh, 392px)` stood here
-     and was the height this panel actually took on any tall window, so moving a
-     row out of it would have changed nothing on screen. What the panel owes its
-     chart is stated by the chart itself (`.training-fitness-chart` min-height);
-     this only stops the card collapsing while the week is still loading. */
-  min-height: 240px;
-  padding: clamp(16px, 1.55vw, 21px);
-  container: totals-column / inline-size;
-}
-
-/* The week's totals on the left, the columns they total on the right. */
-.training-fitness-body {
-  display: grid;
-  grid-template-columns: minmax(148px, 0.28fr) minmax(0, 1fr);
-  gap: 20px;
-  min-height: 0;
-}
-
-/* One box for four figures of one kind: a list divided by hairlines, the days
-   it covers said once in the panel's title. Its rule against the chart divides
-   rather than encloses, so it does not read `--surface-line`. */
-.week-totals {
-  display: grid;
-  min-width: 0;
-  padding-right: 18px;
-  border-right: 1px solid var(--glass-border);
-}
-
-.week-totals-list {
-  display: grid;
-  align-content: space-evenly;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.week-totals-row {
-  display: grid;
-  gap: 4px;
-  min-width: 0;
-  padding: 10px 0;
-}
-
-.week-totals-row + .week-totals-row {
-  border-top: 1px solid var(--glass-border);
-}
-
-.week-totals-label {
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  color: var(--text-secondary);
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.06em;
-  line-height: 1.2;
-  text-transform: uppercase;
-}
-
-.week-totals-icon {
-  display: inline-grid;
-  color: var(--accent);
-}
-
-.week-totals-value {
-  color: var(--text-primary);
-  font-size: 22px;
-  line-height: 1.2;
-  white-space: nowrap;
-}
-
-.week-totals-value.is-empty {
-  color: var(--text-muted);
-}
-
-/* `em`, so the suffix follows the figure; `letter-spacing: 0` because the
-   figure's own -0.02em is for display digits and closes the gap after them. */
-.week-totals-unit {
-  margin-left: 1px;
-  color: var(--text-secondary);
-  font-size: 0.6em;
-  font-weight: 600;
-  letter-spacing: 0;
-}
-
-/* Why there are no steps: a setting, not a training state. */
-.week-totals-notice {
-  color: var(--text-muted);
-  font-size: 11px;
-  line-height: 1.3;
-}
-
-/* A narrow panel has no room for a column beside the chart: the four go in a
-   row above it. The Sleep card's column folds the same way. */
-@container totals-column (max-width: 480px) {
-  .training-fitness-body,
-  .sleep-panel-body {
-    grid-template-columns: minmax(0, 1fr);
-    gap: 14px;
-  }
-
-  .week-totals {
-    padding: 0 0 12px;
-    border-right: 0;
-    border-bottom: 1px solid var(--glass-border);
-  }
-
-  .week-totals-list {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-  }
-
-  .week-totals-row {
-    padding: 4px 0 0;
-  }
-
-  .week-totals-row + .week-totals-row {
-    padding-left: 12px;
-    border-top: 0;
-    border-left: 1px solid var(--glass-border);
-  }
-}
-
-.training-fitness-header {
-  display: flex;
-  /* Wraps only when the title and the two keys cannot share a line: the header
-     is then as tall as the row the key used to have, and no taller. */
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px 12px;
-}
-
-.training-fitness-title {
-  display: flex;
-  align-items: baseline;
-  gap: 8px;
-  min-width: 0;
-}
-
-.training-fitness-title .eyebrow {
-  margin: 0;
-}
-
-/* The days, as the Sleep card states its night: the content of the line, the
-   eyebrow its label. */
-.training-fitness-title h2 {
-  margin: 0;
-  overflow: hidden;
-  color: var(--text-secondary);
-  font-size: 12px;
-  font-weight: 600;
-  letter-spacing: 0;
-  line-height: 1.3;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-/* The two keys, together at the end of the header: what the colours mean, then
-   what the columns measure. The legend takes the slack so it sits against the
-   chip rather than against the title. */
-.training-fitness-header-keys {
-  display: flex;
-  flex: 1 1 auto;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 12px;
-  min-width: 0;
-}
-
-.training-fitness-header .eyebrow {
-  margin: 0;
-}
-
-.training-metric-select-wrap {
-  display: flex;
-  flex-shrink: 0;
-}
-
-.training-fitness-chart {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
-  gap: 10px;
-  align-items: stretch;
-  height: 100%;
-  min-height: clamp(188px, 24vh, 286px);
-}
-
-.training-fitness-y-axis {
-  display: grid;
-  grid-template-rows: auto 1fr;
-  gap: 6px;
-  min-width: 2.35rem;
-  padding-bottom: calc(8px + 10px * 1.1);
-}
-
-.training-fitness-y-unit {
-  color: var(--text-muted);
-  font-size: 10px;
-  font-weight: 600;
-  letter-spacing: 0.06em;
-  line-height: 1;
-  text-align: right;
-  text-transform: uppercase;
-}
-
-.training-fitness-y-ticks {
-  display: flex;
-  flex-direction: column;
-  justify-content: space-between;
-  align-items: flex-end;
-  padding-top: 8px;
-}
-
-.training-fitness-y-tick {
-  color: var(--text-muted);
-  font-size: 10px;
-  font-weight: 600;
-  font-variant-numeric: tabular-nums;
-  line-height: 1;
-}
-
-.training-fitness-plot {
-  position: relative;
-  min-height: 0;
-  min-width: 0;
-}
-
-.training-fitness-grid-lines {
-  position: absolute;
-  inset: 0 0 calc(8px + 10px * 1.1);
-  pointer-events: none;
-  z-index: 0;
-}
-
-.training-fitness-grid-line {
-  position: absolute;
-  left: 0;
-  right: 0;
-  height: 1px;
-  background: rgba(255, 255, 255, 0.07);
-  transform: translateY(50%);
-}
-
-.training-fitness-bars {
-  position: relative;
-  z-index: 1;
-  display: grid;
-  grid-template-columns: repeat(7, minmax(0, 1fr));
-  align-items: stretch;
-  gap: clamp(8px, 1.3vw, 16px);
-  height: 100%;
-  min-height: clamp(188px, 24vh, 286px);
-  overflow: visible;
-  padding-top: 8px;
-}
-
-.training-fitness-day {
-  position: relative;
-  display: grid;
-  grid-template-rows: minmax(0, 1fr) auto;
-  align-items: end;
-  justify-items: center;
-  min-width: 0;
-  outline: none;
-}
-
-.training-fitness-bar-group {
-  display: flex;
-  align-items: flex-end;
-  justify-content: center;
-  gap: 3px;
-  width: 100%;
-  height: 100%;
-  min-height: 0;
-}
-
-/* The bare bar carries no colour of the metric it measures — hue is the sport's
-   on this chart. What it wears is the unattributed tone: a day COROS reported
-   whose activities carry nothing for this metric (a gym session under distance,
-   or a week whose activity list has not loaded) draws as one neutral column, the
-   same tone the residual block inside a stack uses. */
-.training-fitness-bar {
-  display: block;
-  flex: 1 1 0;
-  max-width: 42px;
-  min-width: 0;
-  min-height: 6px;
-  height: 0;
-  border-radius: var(--radius-sm) var(--radius-sm) var(--radius-xs) var(--radius-xs);
-  background: linear-gradient(
-    180deg,
-    color-mix(in srgb, var(--text-muted) 58%, transparent) 0%,
-    color-mix(in srgb, var(--text-muted) 34%, transparent) 100%
-  );
-  /* A fill growing to its value: a designed length, not a reaction time. */
-  transition:
-    height 0.85s cubic-bezier(0.2, 0.8, 0.2, 1),
-    box-shadow var(--dur-base) var(--ease),
-    background 0.35s var(--ease);
-}
-
-/* A day that has activities draws one block per activity, coloured by its sport
-   — the same split the training-load columns make. */
-.training-fitness-bar.is-stacked {
-  display: flex;
-  flex-direction: column-reverse;
-  gap: 2px;
-  overflow: hidden;
-  background: none;
-  box-shadow: none;
-}
-
-.training-fitness-segment {
-  --segment-color: var(--sport-other);
-  display: block;
-  width: 100%;
-  /* flex-grow is set inline, in chart units, so blocks divide the column in
-     proportion to their value; the floor keeps a short session on screen. */
-  flex: 0 1 0;
-  min-height: 4px;
-  border-radius: var(--radius-xs);
-  background: linear-gradient(
-    180deg,
-    color-mix(in srgb, var(--segment-color) 58%, #ffffff) 0%,
-    var(--segment-color) 55%,
-    color-mix(in srgb, var(--segment-color) 78%, #000000) 100%
-  );
-  box-shadow: 0 0 12px color-mix(in srgb, var(--segment-color) 18%, transparent);
-}
-
-/* column-reverse: the first child is the bottom block, the last the top one. */
-.training-fitness-segment:first-child {
-  border-radius: var(--radius-xs) var(--radius-xs) var(--radius-xs) var(--radius-xs);
-}
-
-.training-fitness-segment:last-child {
-  border-radius: var(--radius-sm) var(--radius-sm) var(--radius-xs) var(--radius-xs);
-}
-
-.training-fitness-segment:only-child {
-  border-radius: var(--radius-sm) var(--radius-sm) var(--radius-xs) var(--radius-xs);
-}
-
-/* Load or distance COROS counted outside any session: neutral on purpose, so it
-   cannot be read as a sixth sport. */
-.training-fitness-segment.is-residual {
-  /* Mixed off --text-muted rather than a fixed white wash, so the block stays
-     visible on the paper theme's light ground. Same tone as a bar with nothing
-     attributed at all, so neutral always reads as "no sport". */
-  background: linear-gradient(
-    180deg,
-    color-mix(in srgb, var(--text-muted) 58%, transparent) 0%,
-    color-mix(in srgb, var(--text-muted) 34%, transparent) 100%
-  );
-  box-shadow: none;
-}
-
-.training-fitness-bar.is-empty {
-  height: 6px !important;
-  background: rgba(255, 255, 255, 0.1);
-  box-shadow: none;
-}
-
-/* A rest day opens no tooltip, so it lights up for nothing — leave its stub
-   inert rather than offering an affordance that leads nowhere. */
-.training-fitness-day:not(.is-empty):hover .training-fitness-bar,
-.training-fitness-day:not(.is-empty):focus-visible .training-fitness-bar {
-  box-shadow:
-    0 0 0 1px rgba(255, 255, 255, 0.2),
-    0 0 20px rgba(255, 255, 255, 0.12);
-}
-
-/* The sport key, wrapped so the panel keeps the three grid rows its template
-   declares even when no sport is on the chart yet. */
-.training-fitness-sport-legend {
-  justify-content: flex-end;
-  gap: 5px 14px;
-  min-width: 0;
-}
-
-.training-fitness-legend-item {
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  color: var(--text-secondary);
-  font-size: 12px;
-  font-weight: 600;
-}
-
-.training-fitness-swatch {
-  display: inline-block;
-  width: 10px;
-  height: 10px;
-  flex-shrink: 0;
-  border-radius: var(--radius-xs);
-}
-
-/* Sport labels are short, but the row still truncates rather than growing the
-   tooltip wide enough to cover the columns beside the one being read. */
-.training-fitness-tooltip-row {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  max-width: 208px;
-}
-
-.training-fitness-tooltip-text {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.training-fitness-date {
-  display: block;
-  width: 100%;
-  overflow: hidden;
-  margin-top: 8px;
-  color: var(--text-muted);
-  font-size: 10px;
-  font-weight: 700;
-  line-height: 1.2;
-  text-align: center;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.training-fitness-day.is-today .training-fitness-date {
-  color: var(--text-primary);
-}
-
-.training-fitness-tooltip {
-  position: absolute;
-  z-index: 4;
-  top: 0;
-  left: 50%;
-  display: grid;
-  min-width: 148px;
-  gap: 3px;
-  border: 1px solid var(--surface-line, rgba(255, 255, 255, 0.12));
-  border-radius: var(--radius-sm);
-  background: rgba(18, 18, 20, 0.96);
-  box-shadow: var(--shadow-soft);
-  color: var(--text-secondary);
-  opacity: 0;
-  padding: 9px 10px;
-  pointer-events: none;
-  transform: translate(-50%, -4px);
-  transition:
-    opacity var(--dur-base) var(--ease),
-    transform var(--dur-base) var(--ease);
-}
-
-.training-fitness-day:first-child .training-fitness-tooltip {
-  left: 0;
-  transform: translate(0, -4px);
-}
-
-.training-fitness-day:last-child .training-fitness-tooltip {
-  right: 0;
-  left: auto;
-  transform: translate(0, -4px);
-}
-
-.training-fitness-day:hover .training-fitness-tooltip,
-.training-fitness-day:focus-visible .training-fitness-tooltip {
-  opacity: 1;
-  transform: translate(-50%, -10px);
-}
-
-.training-fitness-day:first-child:hover .training-fitness-tooltip,
-.training-fitness-day:first-child:focus-visible .training-fitness-tooltip,
-.training-fitness-day:last-child:hover .training-fitness-tooltip,
-.training-fitness-day:last-child:focus-visible .training-fitness-tooltip {
-  transform: translate(0, -10px);
-}
-
-.training-fitness-tooltip strong {
-  color: var(--text-primary);
-  font-size: 12px;
-  font-weight: 700;
-}
-
-.training-fitness-tooltip span {
-  font-size: 11px;
-  font-weight: 600;
-  line-height: 1.3;
-  white-space: nowrap;
-}
-
 /* ── Training heatmap ───────────────────────────────────────────────── */
-.training-heatmap-wrap {
-  width: 100%;
-}
-
 .training-heatmap-panel {
   display: grid;
   gap: clamp(16px, 2vw, 22px);
@@ -5935,15 +5018,6 @@ td span {
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-}
-
-.training-heatmap-header .eyebrow {
-  margin: 0;
-}
-
-.training-heatmap-header h2 {
-  margin: 6px 0 0;
-  font-size: clamp(22px, 2vw, 28px);
 }
 
 .training-heatmap-controls {
@@ -6413,13 +5487,15 @@ td span {
   text-align: center;
 }
 
+/* The legend, under a hairline: the sports the range's colours stand for. */
 .training-heatmap-footer {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
   gap: 16px 24px;
-  padding-top: 4px;
+  padding-top: 14px;
+  border-top: 1px solid var(--overview-rule);
 }
 
 .training-heatmap-sport-legend {
@@ -6449,25 +5525,20 @@ td span {
   box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.12) inset;
 }
 
+/* The range in one line of figures, at the head of the panel. */
 .training-heatmap-summary {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 10px 14px;
+  gap: 4px 8px;
+  margin: 0;
   color: var(--text-secondary);
-  font-size: clamp(12px, 1vw, 14px);
-  font-weight: 600;
-}
-
-.training-heatmap-summary > span:not([aria-hidden="true"]) {
-  padding: 6px 12px;
-  border: 1px solid var(--glass-border);
-  border-radius: var(--radius-pill);
-  background: rgba(255, 255, 255, 0.04);
+  font-size: 13px;
+  line-height: 1.3;
 }
 
 .training-heatmap-summary > span[aria-hidden="true"] {
-  display: none;
+  color: var(--text-muted);
 }
 
 .training-heatmap-empty {
@@ -6484,69 +5555,24 @@ td span {
   font-size: 14px;
 }
 
-/* The recovery's colours, 20% to 100% (`FIGURE_COLOUR_STOPS`). On the panel,
-   not the stage: the renderer's mix of them is written here as
-   `--recovery-tone`, and a custom property holding `var()` resolves where it
-   is declared, so these have to be in scope on the panel itself. */
+/* The recovery's colours, 20% to 100% (`FIGURE_COLOUR_STOPS`). On the column
+   holding the stage (Overview's Your physique, src/training/overview), not the
+   stage: the renderer's mix of them is written there as `--recovery-tone`, and
+   a custom property holding `var()` resolves where it is declared, so these
+   have to be in scope on that element itself. */
 .training-recovery-panel {
   --figure-low: #f87171;
   --figure-mid: #fb923c;
   --figure-high: #d4e34c;
   --figure-full: #6ee7a8;
   --figure-peak: #46b8ff; /* 100% alone: the stage's idle sky blue (`--figure-idle`) */
-  position: relative;
-  display: grid;
-  grid-template-rows: auto minmax(0, 1fr);
-  align-content: stretch;
-  gap: 14px;
-  min-height: clamp(282px, 31vh, 392px);
-  overflow: visible;
-}
-
-/* The edge in the recovery's colour, or the glass edge with no reading. Two
-   classes deep, both: one class loses to the matte edge
-   `.training-intelligence .training-recovery-panel` gives the card. */
-.training-recovery-panel:not(.tone-neutral) {
-  border-color: color-mix(in srgb, var(--recovery-tone) 18%, transparent);
-}
-
-.training-recovery-panel.tone-neutral {
-  border-color: var(--glass-border);
-}
-
-.training-recovery-panel > * {
-  position: relative;
-  z-index: 1;
-}
-
-.training-recovery-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-}
-
-.training-recovery-header .eyebrow {
-  margin: 0;
-}
-
-/* Its column holds this one card against two stacked ones, so the row runs
-   taller than the card needs: the figure's stage takes the surplus and the
-   figure grows with it, the line of advice keeping its own height below. */
-.training-recovery-content {
-  display: grid;
-  grid-template-rows: minmax(0, 1fr) auto;
-  justify-items: center;
-  gap: clamp(13px, 1.8vh, 19px);
-  height: 100%;
-  overflow: visible;
 }
 
 /* The figure's stage is dark, and the figure is light added onto it
    (`plus-lighter`); paper stands it on a slate stage of its own (under
    "Recovery panel" in the paper block). The figure's colours and strengths
    (BodyFigure.tsx) live here; `--figure-tone` is the recovery's colour, mixed
-   on the panel (above). The halo takes the lines' colours, and the floor is
+   on the column (above). The halo takes the lines' colours, and the floor is
    clear: a dark stage has none. */
 .recovery-figure {
   --figure-rim: 0.1;
@@ -6654,25 +5680,6 @@ td span {
   stop-opacity: 0;
 }
 
-/* Under the figure's feet: on a narrow stage the camera stands the figure
-   higher to leave this strip free (`NARROW_FRAME` in bodyFigureMath.ts). */
-.recovery-figure-level {
-  position: absolute;
-  right: 0;
-  bottom: 14px;
-  left: 0;
-  display: flex;
-  align-items: baseline;
-  justify-content: center;
-  gap: 8px;
-  color: var(--figure-tone);
-  pointer-events: none;
-}
-
-/* A stage wide enough to hold the words beside the figure puts them on the
-   fill line. The figure's soles and crown sit at fixed heights there
-   (`WIDE_FRAME`), so the line is found by arithmetic rather than by asking the
-   renderer. 560px is `WIDE_STAGE_MIN_PX` — change both. */
 @media (min-resolution: 1.5dppx) {
   .recovery-figure {
     --figure-line: 0.75;
@@ -6684,55 +5691,13 @@ td span {
   }
 }
 
+/* A stage 560px wide or more stands the figure at `WIDE_FRAME`
+   (bodyFigureMath.ts). 560px is `WIDE_STAGE_MIN_PX` — change both. */
 @container recovery-figure (min-width: 560px) {
   .body-figure {
     bottom: 5%;
     height: 88%;
   }
-
-  .recovery-figure-level {
-    right: auto;
-    bottom: var(--level-bottom);
-    left: 16px;
-    display: grid;
-    justify-content: start;
-    gap: 4px;
-  }
-}
-
-.recovery-figure-level strong {
-  font-family: var(--font-display);
-  font-size: 28px;
-  font-weight: 500;
-  font-variant-numeric: tabular-nums;
-  letter-spacing: -0.02em;
-  line-height: 1;
-}
-
-.recovery-figure-level span {
-  font-size: 13px;
-  font-weight: 600;
-  line-height: 1;
-}
-
-.training-recovery-message {
-  margin: 0;
-  max-width: 30ch;
-  color: var(--text-secondary);
-  font-size: 14px;
-  line-height: 1.45;
-  text-align: center;
-  text-wrap: balance;
-}
-
-/* HRV and sleep, side by side. The positional rules that used to live here —
-   a full-width span for the load chart, and a parity swap for the training
-   calendar it shared a row with — went with those two panels: the grid now
-   holds exactly two, and neither is ever the odd one out. */
-.training-chart-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 18px;
 }
 
 .training-chart-panel {
@@ -6859,24 +5824,6 @@ td span {
   border-top: 2px dashed var(--accent-gold);
 }
 
-/* A baseline is drawn dashed; a scored series is not. */
-.training-chart-legend-line.is-solid {
-  border-top-style: solid;
-}
-
-/* `is-series` takes its color from the chart palette, handed in inline — the
-   theme's `--accent` is switchable from Settings and says nothing about what a
-   chart drew. The swatch mirrors a bar: `--swatch-fill` inside a hairline of
-   `--swatch-color`, which is left set so the base glow still resolves. */
-.training-chart-legend-swatch.is-series {
-  border-color: var(--swatch-color);
-  background: var(--swatch-fill);
-}
-
-.training-chart-legend-line.is-series {
-  border-top-color: var(--swatch-color);
-}
-
 .training-chart-tooltip {
   position: relative;
   display: grid;
@@ -6951,33 +5898,6 @@ td span {
   font-weight: 700;
 }
 
-.training-chart-sport-legend {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 6px 16px;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-/* A miniature of one column block, so the key and the chart are visibly the
-   same object: same gradient, same hairline, same rounded top. */
-.training-chart-legend-swatch {
-  width: 9px;
-  height: 14px;
-  flex-shrink: 0;
-  border: 1px solid color-mix(in srgb, var(--swatch-color) 55%, transparent);
-  border-radius: var(--radius-xs) var(--radius-xs) var(--radius-xs) var(--radius-xs);
-  background:
-    linear-gradient(
-      180deg,
-      var(--swatch-color),
-      color-mix(in srgb, var(--swatch-color) 62%, transparent)
-    );
-  box-shadow: none;
-}
-
 .training-chart-empty {
   display: grid;
   align-content: center;
@@ -7035,121 +5955,6 @@ td span {
   text-align: center;
 }
 
-.training-zone-panel {
-  display: grid;
-  grid-template-rows: auto 1fr;
-  gap: 0;
-  min-height: clamp(360px, 38vh, 460px);
-  padding: 0;
-  overflow: hidden;
-  border: 1px solid rgba(255, 255, 255, 0.09);
-  border-radius: var(--radius-md);
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.02) 52%),
-    rgba(255, 255, 255, 0.034);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.09);
-  -webkit-backdrop-filter: none;
-  backdrop-filter: none;
-}
-
-.training-zone-panel-heart {
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.02) 52%),
-    radial-gradient(120% 80% at 0% 0%, rgba(255, 111, 128, 0.09), transparent 58%),
-    rgba(255, 255, 255, 0.034);
-}
-
-.training-zone-panel-distance {
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.02) 52%),
-    radial-gradient(120% 80% at 100% 0%, rgba(79, 195, 243, 0.09), transparent 58%),
-    rgba(255, 255, 255, 0.034);
-}
-
-.training-load-profile {
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-}
-
-.training-load-profile-header .eyebrow {
-  margin: 0;
-}
-
-.training-load-profile-header h2 {
-  margin: 2px 0 0;
-  font-size: 18px;
-}
-
-.training-load-profile-header h2 span {
-  opacity: 0.6;
-  font-weight: 500;
-}
-
-/* Standalone grid (not a .training-chart-grid) so the grouped max-width
-   collapse rules further down never override its own breakpoints. */
-.training-zone-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 18px;
-}
-
-@media (max-width: 1100px) {
-  .training-zone-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-}
-
-@media (max-width: 720px) {
-  .training-zone-grid {
-    grid-template-columns: minmax(0, 1fr);
-  }
-}
-
-.training-zone-coverage {
-  margin: 4px 0 0;
-  font-size: 12px;
-  opacity: 0.7;
-}
-
-.training-zone-header {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 16px;
-  border-bottom: 1px solid var(--glass-border);
-  padding: clamp(16px, 1.8vw, 22px) clamp(18px, 2vw, 24px);
-}
-
-.training-zone-heading .eyebrow {
-  margin: 0 0 4px;
-  color: var(--text-secondary);
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-}
-
-.training-zone-header h2 {
-  margin: 0;
-  color: var(--text-primary);
-  font-size: clamp(18px, 1.6vw, 22px);
-  font-weight: 700;
-  letter-spacing: 0;
-  line-height: 1.2;
-}
-
-.training-zone-header h2 span {
-  color: var(--text-secondary);
-  font-size: 0.9em;
-  font-weight: 600;
-}
-
-.training-zone-header-actions {
-  flex: 0 0 auto;
-  min-width: 0;
-}
-
 .sr-only {
   position: absolute;
   width: 1px;
@@ -7157,239 +5962,6 @@ td span {
   overflow: hidden;
   clip: rect(0, 0, 0, 0);
   white-space: nowrap;
-}
-
-.training-zone-body {
-  display: grid;
-  grid-template-columns: minmax(120px, 0.95fr) minmax(110px, 0.85fr) minmax(0, 1.35fr);
-  align-items: center;
-  gap: clamp(14px, 2vw, 24px);
-  min-width: 0;
-  min-height: 0;
-  padding: clamp(16px, 2vw, 22px) clamp(18px, 2vw, 24px) clamp(18px, 2.2vw, 26px);
-}
-
-.training-zone-body-empty {
-  grid-template-columns: 1fr;
-  min-height: clamp(240px, 28vh, 320px);
-  place-items: center;
-  padding: 24px;
-}
-
-.training-zone-body-empty .training-empty-chart {
-  text-align: center;
-}
-
-.training-zone-donut-wrap {
-  position: relative;
-  justify-self: center;
-  width: min(100%, 168px);
-  aspect-ratio: 1;
-}
-
-.training-zone-donut {
-  position: relative;
-  width: 100%;
-  height: 100%;
-  min-height: 140px;
-}
-
-.training-zone-donut .recharts-wrapper {
-  animation: training-chart-rise 0.7s var(--ease) both;
-}
-
-.training-zone-donut-icon {
-  position: absolute;
-  inset: 0;
-  display: grid;
-  place-items: center;
-  color: rgba(255, 255, 255, 0.72);
-  pointer-events: none;
-}
-
-.training-zone-panel-heart .training-zone-donut-icon {
-  color: rgba(255, 146, 159, 0.95);
-}
-
-.training-zone-panel-distance .training-zone-donut-icon {
-  color: rgba(79, 195, 243, 0.95);
-}
-
-.training-zone-empty-ring {
-  width: 72%;
-  aspect-ratio: 1;
-  margin: 14% auto;
-  border: clamp(36px, 5vw, 52px) solid rgba(255, 255, 255, 0.08);
-  border-radius: 50%;
-}
-
-.training-zone-hero {
-  display: grid;
-  gap: 4px;
-  align-content: center;
-  min-width: 0;
-  padding: 4px 0;
-}
-
-.training-zone-hero-kicker {
-  margin: 0;
-  color: var(--text-secondary);
-  font-size: 10px;
-  font-weight: 600;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-}
-
-.training-zone-hero h3 {
-  margin: 2px 0 0;
-  color: var(--text-primary);
-  font-size: clamp(18px, 1.4vw, 22px);
-  font-weight: 700;
-  line-height: 1.2;
-}
-
-.training-zone-panel-heart .training-zone-hero-percent {
-  color: #ff929f;
-}
-
-.training-zone-panel-distance .training-zone-hero-percent {
-  color: #4fc3f3;
-}
-
-.training-zone-hero-percent {
-  margin: 4px 0 0;
-  font-size: clamp(28px, 2.8vw, 36px);
-  line-height: 1;
-}
-
-.training-zone-hero-detail {
-  margin: 2px 0 0;
-  color: var(--text-primary);
-  font-size: clamp(14px, 1.2vw, 18px);
-  font-weight: 600;
-  line-height: 1.2;
-}
-
-.training-zone-hero-caption {
-  margin: 8px 0 0;
-  color: var(--text-secondary);
-  font-size: 12px;
-  font-weight: 600;
-  line-height: 1.3;
-}
-
-/* The head and every row are subgrids of this one track list, so the column
-   widths are resolved once against all of their content together. They used to
-   be separate grids sharing a copy of the template, which only lines up while
-   the `fr` and `auto` tracks happen to resolve the same in both — they stop
-   agreeing the moment a heading and the numbers under it have different
-   max-content widths ("Training Load" over "1623", "Sessions" over
-   "11 sessions"), and the headings then sit off their own columns. */
-.training-zone-table {
-  display: grid;
-  grid-template-columns:
-    minmax(64px, 0.9fr) minmax(0, 1.4fr) minmax(46px, auto) minmax(56px, auto);
-  gap: 8px;
-  min-width: 0;
-}
-
-.training-zone-table-head {
-  display: grid;
-  grid-column: 1 / -1;
-  grid-template-columns: subgrid;
-  align-items: center;
-  color: var(--text-secondary);
-  font-size: 10px;
-  font-weight: 600;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-}
-
-.training-zone-table-head span:nth-child(2) {
-  visibility: hidden;
-}
-
-/* Column 3 is a right-aligned number, so its heading has to sit on the same
-   edge — the uppercase letter-spacing is trailing space on the final letter,
-   which is what the negative margin takes back off. The head carries no
-   horizontal padding of its own for the same reason: 2px of inset here put
-   every heading 2px off the column it labels. Column 4 reads left, so it needs
-   neither. */
-.training-zone-table-head span:nth-child(3) {
-  margin-right: -0.08em;
-  text-align: right;
-}
-
-/* Subgrid passes the table's columns through the list to the rows; only the
-   row gap is the list's own, the column gutter comes from the parent. */
-.training-zone-list {
-  display: grid;
-  grid-column: 1 / -1;
-  grid-template-columns: subgrid;
-  row-gap: 10px;
-}
-
-.training-zone-row {
-  display: grid;
-  grid-column: 1 / -1;
-  grid-template-columns: subgrid;
-  align-items: center;
-  min-width: 0;
-  animation: training-row-enter 0.55s var(--ease) both;
-}
-
-.training-zone-percent,
-.training-zone-name,
-.training-zone-detail {
-  line-height: 1.2;
-  white-space: nowrap;
-}
-
-.training-zone-name {
-  display: grid;
-  gap: 1px;
-  color: var(--text-primary);
-  font-size: 13px;
-  font-weight: 600;
-}
-
-/* The zone's bpm span, sitting under its name so the column stays narrow. */
-.training-zone-range {
-  color: var(--text-muted);
-  font-size: 11px;
-  font-style: normal;
-  font-weight: 600;
-  letter-spacing: 0;
-}
-
-.training-zone-percent {
-  color: var(--text-secondary);
-  font-size: 13px;
-  font-weight: 600;
-  text-align: right;
-}
-
-.training-zone-track {
-  overflow: hidden;
-  height: 8px;
-  border-radius: var(--radius-pill);
-  background: rgba(150, 158, 178, 0.18);
-}
-
-.training-zone-fill {
-  display: block;
-  height: 100%;
-  min-width: 0;
-  border-radius: inherit;
-  transform-origin: left center;
-  animation: training-fill 0.85s var(--ease) both;
-}
-
-.training-zone-detail {
-  color: var(--text-muted);
-  font-size: 13px;
-  font-weight: 600;
-  text-align: left;
 }
 
 .training-zone-tooltip {
@@ -7667,335 +6239,6 @@ td span {
     justify-items: start;
   }
 
-}
-
-.training-upcoming-panel {
-  display: grid;
-  gap: 18px;
-  align-content: start;
-  /* Kept at the chart panels' padding now that it has its own row, so its
-     eyebrow still lines up with theirs down the left edge of the column. */
-  padding: clamp(18px, 1.8vw, 24px);
-  border: 1px solid rgba(255, 255, 255, 0.09);
-  border-radius: var(--radius-md);
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.02) 52%),
-    radial-gradient(120% 80% at 0% 0%, color-mix(in srgb, var(--accent-muted) 7%, transparent), transparent 58%),
-    rgba(255, 255, 255, 0.034);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.09);
-  -webkit-backdrop-filter: none;
-  backdrop-filter: none;
-}
-
-.training-upcoming-header {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 16px;
-}
-
-.training-upcoming-heading h2 {
-  margin: 0;
-}
-
-.training-upcoming-count {
-  margin: 6px 0 0;
-  color: var(--text-muted);
-  font-size: 13px;
-}
-
-.training-upcoming-stats {
-  margin: 0;
-  color: var(--text-muted);
-  font-size: 13px;
-  text-align: right;
-  white-space: nowrap;
-}
-
-.training-upcoming-body {
-  display: grid;
-  gap: 12px;
-}
-
-.training-upcoming-today-stack {
-  display: grid;
-  gap: 10px;
-}
-
-.training-upcoming-today {
-  display: flex;
-  align-items: flex-start;
-  gap: 16px;
-  padding: 18px 20px;
-  border: 1px solid color-mix(in srgb, var(--accent-muted) 48%, transparent);
-  /* Inside the panel, so L2: the accent wash and edge single it out, and it
-     does not float off the card on a glow of its own. */
-  border-radius: var(--radius-sm);
-  background:
-    linear-gradient(135deg, color-mix(in srgb, var(--accent-muted) 20%, transparent), color-mix(in srgb, var(--accent-muted) 6%, transparent)),
-    rgba(255, 255, 255, 0.04);
-  box-shadow: var(--shadow-inset);
-}
-
-.training-upcoming-today-empty {
-  border-color: rgba(255, 255, 255, 0.1);
-  background:
-    linear-gradient(135deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.02)),
-    rgba(255, 255, 255, 0.02);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
-}
-
-.training-upcoming-today-empty .training-upcoming-today-icon {
-  background: rgba(255, 255, 255, 0.08);
-  color: var(--text-secondary);
-  box-shadow: none;
-}
-
-.training-upcoming-today-empty .training-upcoming-today-pill {
-  border-color: rgba(255, 255, 255, 0.12);
-  background: rgba(255, 255, 255, 0.05);
-  color: var(--text-secondary);
-}
-
-.training-upcoming-today-icon {
-  display: grid;
-  flex-shrink: 0;
-  place-items: center;
-  width: 44px;
-  height: 44px;
-  border-radius: var(--radius-sm);
-  background: linear-gradient(180deg, var(--accent-2), var(--accent));
-  color: #fff;
-  box-shadow: 0 8px 20px color-mix(in srgb, var(--accent-muted) 32%, transparent);
-}
-
-/* The today card is a button too, so its copy elements are spans: keep them
-   stacking the way the <h3>/<p> they replaced did. */
-.training-upcoming-today-button {
-  width: 100%;
-  color: inherit;
-  font: inherit;
-  text-align: left;
-  cursor: pointer;
-  transition: border-color var(--dur-fast) var(--ease), box-shadow var(--dur-fast) var(--ease);
-}
-
-.training-upcoming-today-button:hover {
-  border-color: color-mix(in srgb, var(--accent-strong) 62%, transparent);
-}
-
-.training-upcoming-today-button:focus-visible {
-  border-color: color-mix(in srgb, var(--accent-strong) 62%, transparent);
-  outline: var(--focus-ring);
-  outline-offset: 2px;
-}
-
-.training-upcoming-today-button .training-upcoming-chevron {
-  align-self: center;
-}
-
-.training-upcoming-today-copy {
-  flex: 1;
-  min-width: 0;
-}
-
-.training-upcoming-today-heading {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 8px;
-  margin-bottom: 6px;
-}
-
-.training-upcoming-today-pill {
-  border: 1px solid color-mix(in srgb, var(--accent-strong) 35%, transparent);
-  border-radius: var(--radius-pill);
-  background: color-mix(in srgb, var(--accent-muted) 22%, transparent);
-  color: var(--accent-strong);
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.06em;
-  padding: 4px 10px;
-  text-transform: uppercase;
-}
-
-.training-upcoming-today-tag {
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: var(--radius-pill);
-  background: rgba(255, 255, 255, 0.06);
-  color: var(--text-secondary);
-  font-size: 11px;
-  font-weight: 600;
-  padding: 4px 10px;
-}
-
-.training-upcoming-today-title {
-  display: block;
-  margin: 0;
-  font-size: 22px;
-  font-weight: 700;
-  line-height: 1.3;
-}
-
-.training-upcoming-today-meta {
-  display: block;
-  margin: 8px 0 0;
-  color: var(--text-secondary);
-  font-size: 13px;
-}
-
-.training-upcoming-today-next {
-  margin: 10px 0 0;
-  color: var(--text-muted);
-  font-size: 13px;
-}
-
-.training-upcoming-today-next strong {
-  color: var(--text-secondary);
-  font-weight: 600;
-}
-
-.training-upcoming-list {
-  display: grid;
-  gap: 8px;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-/* Each row opens the workout's detail slide-over, so it is a real button —
-   the grid lives on it rather than on the <li>, which keeps only the rail's
-   first/last bookkeeping. */
-.training-upcoming-row {
-  display: grid;
-  grid-template-columns: 12px 52px minmax(0, 1fr) auto;
-  align-items: center;
-  gap: 14px;
-  width: 100%;
-  padding: 14px 16px;
-  border: 1px solid transparent;
-  border-radius: var(--radius-md);
-  background: transparent;
-  color: inherit;
-  font: inherit;
-  text-align: left;
-  cursor: pointer;
-  transition: border-color var(--dur-fast) var(--ease), background var(--dur-fast) var(--ease);
-}
-
-.training-upcoming-row:hover {
-  border-color: color-mix(in srgb, var(--accent-muted) 45%, transparent);
-  background: rgba(255, 255, 255, 0.045);
-}
-
-.training-upcoming-row:focus-visible {
-  border-color: color-mix(in srgb, var(--accent-muted) 45%, transparent);
-  background: rgba(255, 255, 255, 0.045);
-  outline: var(--focus-ring);
-  outline-offset: 2px;
-}
-
-.training-upcoming-row:hover .training-upcoming-chevron,
-.training-upcoming-row:focus-visible .training-upcoming-chevron,
-.training-upcoming-today-button:hover .training-upcoming-chevron,
-.training-upcoming-today-button:focus-visible .training-upcoming-chevron {
-  color: var(--text-secondary);
-}
-
-.training-upcoming-rail {
-  position: relative;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  align-self: stretch;
-  width: 12px;
-  min-height: 100%;
-}
-
-.training-upcoming-rail::before {
-  content: "";
-  position: absolute;
-  top: -4px;
-  bottom: -4px;
-  left: 50%;
-  width: 1px;
-  background: rgba(255, 255, 255, 0.1);
-  transform: translateX(-50%);
-}
-
-.training-upcoming-item:first-child .training-upcoming-rail::before {
-  top: 50%;
-}
-
-.training-upcoming-item:last-child .training-upcoming-rail::before {
-  bottom: 50%;
-}
-
-.training-upcoming-item:only-child .training-upcoming-rail::before {
-  display: none;
-}
-
-.training-upcoming-dot {
-  position: relative;
-  z-index: 1;
-  flex-shrink: 0;
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-  background: var(--accent);
-  box-shadow: 0 0 10px var(--accent-glow);
-}
-
-.training-upcoming-date {
-  color: var(--text-muted);
-  font-size: 13px;
-  font-weight: 600;
-  white-space: nowrap;
-}
-
-.training-upcoming-main {
-  display: grid;
-  gap: 4px;
-  min-width: 0;
-}
-
-.training-upcoming-title-row {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  min-width: 0;
-}
-
-.training-upcoming-title {
-  overflow: hidden;
-  color: var(--text-primary);
-  font-size: 14px;
-  font-weight: 700;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.training-upcoming-tag {
-  flex-shrink: 0;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: var(--radius-pill);
-  background: rgba(255, 255, 255, 0.04);
-  color: var(--text-secondary);
-  font-size: 11px;
-  font-weight: 600;
-  padding: 4px 10px;
-  white-space: nowrap;
-}
-
-.training-upcoming-row-stats {
-  margin: 0;
-  color: var(--text-muted);
-  font-size: 12px;
-}
-
-.training-upcoming-chevron {
-  flex-shrink: 0;
-  color: var(--text-muted);
 }
 
 .training-records-panel {
@@ -9284,11 +7527,8 @@ td span {
   .training-scores-panel,
   .training-chart-panel,
   .training-heatmap-panel,
-  .training-recovery-panel,
   .training-chart-shell .recharts-wrapper,
   .training-chart-tooltip,
-  .training-zone-donut .recharts-wrapper,
-  .training-zone-fill,
   .vo2-widget-panel.is-ready,
   .vo2-gauge-band,
   .vo2-widget-panel.is-ready .vo2-gauge-value.has-value strong,
@@ -9296,7 +7536,6 @@ td span {
     animation: none;
   }
 
-  .training-fitness-bar,
   .training-heatmap-panel,
   .training-heatmap-cell,
   .training-heatmap-cell::before,
@@ -9311,10 +7550,6 @@ td span {
   .vo2-plateau-tip,
   .vo2-widget-footer {
     transition: none;
-  }
-
-  .training-intelligence {
-    animation: none;
   }
 
   .training-heatmap-grid.is-wave-loading .training-heatmap-cell:not(.is-empty) {
@@ -9335,12 +7570,6 @@ td span {
   }
 
   .score-bar-fill {
-    transform: none;
-  }
-
-  .training-zone-fill,
-  .training-zone-row {
-    animation: none;
     transform: none;
   }
 
@@ -9418,7 +7647,6 @@ td span {
     padding: clamp(30px, 3.8vw, 48px) clamp(28px, 4vw, 50px);
   }
 
-  .training-chart-grid,
   .training-activities-split,
   .activity-detail-visuals {
     grid-template-columns: 1fr;
@@ -9431,31 +7659,6 @@ td span {
     padding-top: 18px;
   }
 
-  .training-zone-body {
-    grid-template-columns: 1fr;
-    gap: 18px;
-  }
-
-  .training-upcoming-header {
-    flex-direction: column;
-    gap: 8px;
-  }
-
-  .training-upcoming-stats {
-    text-align: left;
-    white-space: normal;
-  }
-
-  .training-upcoming-row {
-    grid-template-columns: 12px 44px minmax(0, 1fr) auto;
-    gap: 10px 12px;
-    padding: 12px 14px;
-  }
-
-  .training-upcoming-title-row {
-    flex-wrap: wrap;
-  }
-
   .training-records-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -9464,23 +7667,6 @@ td span {
     flex-wrap: wrap;
   }
 
-  .training-zone-hero {
-    text-align: center;
-    justify-items: center;
-  }
-
-  .training-zone-donut-wrap {
-    width: min(100%, 220px);
-    margin: 0 auto;
-  }
-
-  .training-zone-panel {
-    min-height: 0;
-  }
-
-  .training-zone-body-empty {
-    min-height: 260px;
-  }
 }
 
 @media (max-width: 1024px) {
@@ -9511,8 +7697,7 @@ td span {
   }
 
   .training-command-center,
-.training-login-fields,
-.training-chart-grid {
+.training-login-fields {
     grid-template-columns: 1fr;
   }
 
@@ -9558,37 +7743,6 @@ td span {
 
   .training-login-actions .primary-button {
     width: 100%;
-  }
-
-  .training-recovery-panel {
-    min-height: auto;
-  }
-
-  .training-zone-header {
-    flex-direction: column;
-    align-items: stretch;
-    padding: 18px 20px;
-  }
-
-  .training-zone-header-actions {
-    width: 100%;
-  }
-
-  .training-zone-body {
-    padding-right: 20px;
-    padding-left: 20px;
-  }
-
-  .training-zone-table {
-    grid-template-columns:
-      minmax(56px, 0.85fr) minmax(0, 1.2fr) minmax(42px, auto) minmax(52px, auto);
-    gap: 6px;
-  }
-
-  .training-zone-percent,
-  .training-zone-name,
-  .training-zone-detail {
-    font-size: 13px;
   }
 
   .section-heading {
@@ -17514,12 +15668,6 @@ label.chat-settings-toggle-row {
   box-shadow: none;
 }
 
-:root[data-theme="paper"] .sleep-stage-bar,
-:root[data-theme="paper"] .sleep-stage-bar::before {
-  background: rgba(19, 26, 40, 0.1);
-  box-shadow: inset 0 1px 0 rgba(19, 26, 40, 0.07);
-}
-
 :root[data-theme="paper"] .sleep-stage-segment::after {
   border-color: rgba(19, 26, 40, 0.17);
   background:
@@ -17769,11 +15917,6 @@ label.chat-settings-toggle-row {
   box-shadow: var(--shadow-soft);
 }
 
-:root[data-theme="paper"] .training-heatmap-summary > span:not([aria-hidden="true"]) {
-  background: rgba(19, 26, 40, 0.06);
-  border-color: var(--glass-border);
-}
-
 /* --- Training Hub: charts -------------------------------------------------- */
 :root[data-theme="paper"] .training-chart-panel {
   --chart-curve-glow: color-mix(in srgb, var(--accent-2) 20%, transparent);
@@ -17800,12 +15943,8 @@ label.chat-settings-toggle-row {
   box-shadow: 0 0 6px color-mix(in srgb, var(--accent) 35%, transparent);
 }
 
-:root[data-theme="paper"] .training-chart-legend-swatch {
-  box-shadow: 0 0 5px color-mix(in srgb, var(--swatch-color) 22%, transparent);
-}
-
 /* --- Training Hub: tooltips ------------------------------------------------ */
-:root[data-theme="paper"] .training-fitness-tooltip,
+
 :root[data-theme="paper"] .training-zone-tooltip {
   border-color: var(--glass-border);
   background: var(--glass-bg-elevated);
@@ -17820,15 +15959,6 @@ label.chat-settings-toggle-row {
   box-shadow:
     var(--shadow-soft),
     inset 0 1px 0 rgba(255, 255, 255, 0.7);
-}
-
-/* --- Training Hub: zone distribution --------------------------------------- */
-:root[data-theme="paper"] .training-zone-panel {
-  box-shadow: var(--shadow-card);
-}
-
-:root[data-theme="paper"] .training-zone-track {
-  background: rgba(19, 26, 40, 0.1);
 }
 
 /* --- Training Hub: fitness scores ------------------------------------------ */
@@ -17848,60 +15978,12 @@ label.chat-settings-toggle-row {
   background: var(--hall-gold-fill);
 }
 
-/* --- Training Hub: upcoming workouts --------------------------------------- */
-:root[data-theme="paper"] .training-upcoming-panel {
-  box-shadow: var(--shadow-card);
-}
-
 :root[data-theme="paper"] .data-connect-panel {
   border-color: var(--glass-border);
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.62), rgba(255, 255, 255, 0.4)),
     rgba(19, 26, 40, 0.03);
   box-shadow: var(--shadow-card);
-}
-
-:root[data-theme="paper"] .training-upcoming-today {
-  border-color: color-mix(in srgb, var(--accent) 35%, transparent);
-  background:
-    linear-gradient(135deg, color-mix(in srgb, var(--accent) 12%, transparent), color-mix(in srgb, var(--accent) 4%, transparent)),
-    rgba(255, 255, 255, 0.6);
-  box-shadow: var(--shadow-inset);
-}
-
-:root[data-theme="paper"] .training-upcoming-today-empty {
-  border-color: var(--glass-border);
-  background: rgba(19, 26, 40, 0.03);
-  box-shadow: var(--shadow-inset);
-}
-
-:root[data-theme="paper"] .training-upcoming-today-empty .training-upcoming-today-icon {
-  background: rgba(19, 26, 40, 0.1);
-}
-
-:root[data-theme="paper"] .training-upcoming-today-empty .training-upcoming-today-pill {
-  border-color: var(--glass-border);
-  background: rgba(19, 26, 40, 0.06);
-}
-
-:root[data-theme="paper"] .training-upcoming-today-pill {
-  border-color: color-mix(in srgb, var(--accent) 30%, transparent);
-  background: color-mix(in srgb, var(--accent) 12%, transparent);
-  color: var(--success-text);
-}
-
-:root[data-theme="paper"] .training-upcoming-today-tag,
-:root[data-theme="paper"] .training-upcoming-tag {
-  border-color: var(--glass-border);
-  background: rgba(19, 26, 40, 0.06);
-}
-
-:root[data-theme="paper"] .training-upcoming-rail::before {
-  background: rgba(19, 26, 40, 0.15);
-}
-
-:root[data-theme="paper"] .training-upcoming-dot {
-  box-shadow: 0 0 8px color-mix(in srgb, var(--accent) 25%, transparent);
 }
 
 /* --- Training Hub: personal records ---------------------------------------- */

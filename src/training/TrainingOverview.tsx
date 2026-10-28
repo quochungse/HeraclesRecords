@@ -15,29 +15,22 @@ import {
   Trophy,
   RefreshCw
 } from "lucide-react";
-import { FitnessTrendPanel } from "./components/FitnessTrendPanel";
-import { RecoveryPanel } from "./components/RecoveryPanel";
-import { SleepSummaryPanel } from "./components/SleepSummaryPanel";
+import { OverviewComingUp } from "./overview/OverviewComingUp";
+import { OverviewDistribution } from "./overview/OverviewDistribution";
+import { OverviewSports } from "./overview/OverviewSports";
+import { OverviewToday } from "./overview/OverviewToday";
 import { TrainingHeatmapPanel } from "./components/TrainingHeatmapPanel";
-import { TrainingTrendCharts } from "./components/TrainingTrendChart";
-import { TrainingZoneDistributionCharts } from "./components/TrainingZoneDistributionCharts";
-import { UpcomingWorkoutsPanel } from "./components/UpcomingWorkoutsPanel";
 import { snapshotVo2Readings } from "./parsers";
 import { renderRich } from "../i18n/useI18n";
 import type { TrainingOverviewProps } from "./types";
 import { useHeartRateZoneModel } from "./useHeartRateZoneModel";
 import loginPageBackground from "../assets/training-hub/login-bg.webp";
 import { t } from "../i18n/core";
+import "./overview/overview.css";
 
 // The body map drags in three.js and a GLTF mannequin. Overview is the default
 // startup view, so that weight stays out of its first chunk.
-const LazyStrengthDistributionSection = lazy(() =>
-  import("../strength/StrengthDistributionSection").then(
-    ({ StrengthDistributionSection }) => ({
-      default: StrengthDistributionSection
-    })
-  )
-);
+const LazyOverviewStrength = lazy(() => import("./overview/OverviewStrength"));
 
 export function TrainingOverview({
   api,
@@ -65,7 +58,10 @@ export function TrainingOverview({
   onResendTwoFactor,
   onCancelTwoFactor,
   onReconnect,
-  showStrength = true
+  showStrength = true,
+  hiddenSportScreens,
+  onOpenActivity,
+  onOpenView
 }: TrainingOverviewProps) {
   const connected = Boolean(status?.authenticated);
   // Every panel below draws from one of these two loads, and each answers an
@@ -411,68 +407,72 @@ export function TrainingOverview({
 
       {connected ? (
         <>
-          <section className="training-intelligence">
-            <div className="training-intelligence-grid">
-              <div className="training-intelligence-column">
-                <RecoveryPanel
-                  summary={summary}
-                  loading={snapshotPending}
-                  profile={corosProfile}
-                  profileSettled={corosProfileSettled}
-                  vo2Readings={vo2Readings}
-                />
-              </div>
-              <div className="training-intelligence-column">
-                <FitnessTrendPanel
-                  snapshot={snapshot}
-                  activities={activities}
-                  loading={snapshotPending || activitiesPending}
-                />
-                <SleepSummaryPanel
-                  sleep={snapshot?.sleep}
-                  points={snapshot?.trendPoints}
-                  connecting={sleepConnecting}
-                  refreshing={busy === "training-refresh"}
-                  onOpenDetails={onOpenSleepDetails}
-                />
-              </div>
-            </div>
-          </section>
-
-          {/* Its own row, directly under Training Intelligence. The panel
-              renders nothing when the calendar is empty, so a week with no
-              scheduled sessions leaves no gap here. */}
-          <UpcomingWorkoutsPanel
-            api={api}
-            workouts={upcomingWorkouts}
-            sportTypes={sportTypes}
+          <OverviewToday
+            summary={summary}
+            snapshot={snapshot}
+            activities={activities}
+            upcomingWorkouts={upcomingWorkouts}
+            profile={corosProfile}
+            profileSettled={corosProfileSettled}
+            vo2Readings={vo2Readings}
+            snapshotLoading={snapshotPending}
+            weekLoading={snapshotPending || activitiesPending}
+            sleepConnecting={sleepConnecting}
+            refreshing={busy === "training-refresh"}
+            onOpenSleepDetails={onOpenSleepDetails}
           />
 
-          <div className="training-heatmap-wrap">
+          <OverviewComingUp
+            api={api}
+            upcomingWorkouts={upcomingWorkouts}
+            activities={activities}
+            sportTypes={sportTypes}
+            onOpenActivity={onOpenActivity}
+            onOpenCalendar={onOpenView ? () => onOpenView("calendar") : undefined}
+          />
+
+          <section className="overview-section" aria-labelledby="overview-heat-title">
+            <h2 id="overview-heat-title" className="overview-section-title">
+              {t("overview.heatmap.title")}
+            </h2>
             <TrainingHeatmapPanel
               snapshot={snapshot}
               activities={activities}
               loading={snapshotPending || activitiesPending}
             />
-          </div>
-          <TrainingZoneDistributionCharts
-            hrZoneModel={hrZoneModel}
-            lthrZones={snapshot?.dashboard?.lthrZones ?? []}
+          </section>
+          <OverviewDistribution
             activities={activities}
             analytics={snapshot?.analytics ?? null}
+            hrZoneModel={hrZoneModel}
+            lthrZones={snapshot?.dashboard?.lthrZones ?? []}
             loading={snapshotPending || activitiesPending}
+          />
+          <OverviewSports
+            api={api}
+            connected={connected}
+            activities={activities}
+            upcomingWorkouts={upcomingWorkouts}
+            profile={corosProfile}
+            hrZoneModel={hrZoneModel}
+            zonesSettled={corosProfileSettled}
+            lthrZones={snapshot?.dashboard?.lthrZones ?? []}
+            vo2Readings={vo2Readings}
+            hiddenSportScreens={hiddenSportScreens}
+            onOpenActivity={onOpenActivity}
+            onOpenView={onOpenView}
           />
           {showStrength ? (
             <Suspense fallback={null}>
-              <LazyStrengthDistributionSection api={api} status={status} />
+              <LazyOverviewStrength
+                api={api}
+                connected={connected}
+                upcomingWorkouts={upcomingWorkouts}
+                onOpenActivity={onOpenActivity}
+                onOpenView={onOpenView}
+              />
             </Suspense>
           ) : null}
-          <TrainingTrendCharts
-            points={snapshot?.trendPoints ?? []}
-            mcpState={snapshot?.sleep?.mcpState}
-            loading={snapshotPending}
-            sleepLoading={sleepConnecting && !snapshot?.sleep}
-          />
         </>
       ) : null}
     </div>

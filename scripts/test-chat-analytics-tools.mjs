@@ -135,10 +135,14 @@ const dayList = [
     trainingLoad: 50,
     rhr: offset < 3 ? 55 : 50,
     ...(offset < 7 ? { avgSleepHrv: 60, sleepHrvBase: 62 } : {}),
-    tiredRateNew: 30,
+    // Load Impact and Base Fitness are `ati` and `cti`, whose ratio is the
+    // day's; `tiredRateNew` is their difference and `staminaLevel` comes only
+    // on a day with a run, and neither is read as either (probed 2026-10-28).
+    ati: 46,
+    cti: 40,
+    tiredRateNew: 6,
     trainingLoadRatio: 1.15,
-    staminaLevel: 40,
-    ...(offset === 2 ? { vo2max: 47 } : {}),
+    ...(offset === 2 ? { vo2max: 47, staminaLevel: 71.8 } : {}),
     ...(offset === 20 ? { vo2max: 46 } : {})
   })),
   // What getDailyMetrics appends: an RPE-only day from far outside the window.
@@ -180,16 +184,17 @@ assert.match(
 // Parsed off the same response all along, and never shown before.
 assert.match(
   weekText,
-  /- Latest COROS status: Load Impact 30 \(09-11 Fri\) · load ratio 1\.15 \(09-11 Fri\) · Base Fitness 40 \(09-11 Fri\)/
+  /- Latest COROS status: Load Impact 46 \(09-11 Fri\) · load ratio 1\.15 \(09-11 Fri\) · Base Fitness 40 \(09-11 Fri\)/
 );
+assert.doesNotMatch(weekText, /\b71\.8\b|\b72\b/, "`staminaLevel` is not Base Fitness");
 assert.match(weekText, /- VO2max: 47 on 09-09 Wed\n/);
 assert.match(
   weekText,
   /Daily \("that night" = the sleep after that day \(COROS files it under the next morning\); sleep includes naps; sleep HR is the main sleep's average \(lowest\)\):\nDay \| Load \| HRV that night \(baseline\) \| Load Impact \| Load ratio \| Base Fitness \| VO2max\n/
 );
 assert.doesNotMatch(weekText, /RPE load|Sleep that night|Sleep HR/, "a column nobody fills is dropped");
-assert.match(weekText, /09-09 Wed \| 50 \| 60 \(62\) \| 30 \| 1\.15 \| 40 \| 47/);
-assert.match(weekText, /09-11 Fri \| 50 \| — \| 30 \| 1\.15 \| 40 \| —/, "today's night has not been slept");
+assert.match(weekText, /09-09 Wed \| 50 \| 60 \(62\) \| 46 \| 1\.15 \| 40 \| 47/);
+assert.match(weekText, /09-11 Fri \| 50 \| — \| 46 \| 1\.15 \| 40 \| —/, "today's night has not been slept");
 {
   // The night after each day: its length and the heart rate it was slept at,
   // and a summary that sets last night against the four weeks before the
@@ -208,8 +213,8 @@ assert.match(weekText, /09-11 Fri \| 50 \| — \| 30 \| 1\.15 \| 40 \| —/, "to
   const text = formatFitnessTrendsForChat(week, 7, today, new Map(), nights);
   assert.match(text, /\nDay \| Load \| Sleep that night \| HRV that night \(baseline\) \| Sleep HR that night \| Load Impact/);
   // 09-09 Wed is followed by the night ending 09-10 Thu (offset 1: 401 min, 50 bpm).
-  assert.match(text, /\n09-09 Wed \| 50 \| 6h41 \| 60 \(62\) \| 50 \(44\) \| 30/);
-  assert.match(text, /\n09-11 Fri \| 50 \| — \| — \| — \| 30/, "the night after today has not been slept");
+  assert.match(text, /\n09-09 Wed \| 50 \| 6h41 \| 60 \(62\) \| 50 \(44\) \| 46/);
+  assert.match(text, /\n09-11 Fri \| 50 \| — \| — \| — \| 46/, "the night after today has not been slept");
   assert.match(text, /- Sleep: 7h10 the night ending 09-11 Fri; 7-night average 6h47\n/);
   assert.match(
     text,
@@ -276,8 +281,8 @@ assert.match(monthText, /Daily, last 7 days \("that night" = the sleep after tha
   const text = formatFitnessTrendsForChat(rideWeek, 7, today);
   assert.match(text, /- VO2max: 47 on 09-09 Wed\n- Cycling VO2max: 52 on 09-11 Fri \(was 51 on 09-09 Wed\)\n/);
   assert.match(text, /\| Base Fitness \| VO2max \| Cycling VO2max\n/);
-  assert.match(text, /09-11 Fri \| 50 \| — \| 30 \| 1\.15 \| 40 \| — \| 52/);
-  assert.match(text, /09-07 Mon \| 50 \| 60 \(62\) \| 30 \| 1\.15 \| 40 \| — \| —/);
+  assert.match(text, /09-11 Fri \| 50 \| — \| 46 \| 1\.15 \| 40 \| — \| 52/);
+  assert.match(text, /09-07 Mon \| 50 \| 60 \(62\) \| 46 \| 1\.15 \| 40 \| — \| —/);
 }
 
 assert.equal(

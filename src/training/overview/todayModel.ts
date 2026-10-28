@@ -1,0 +1,352 @@
+import type {
+  TrainingHubActivity,
+  TrainingHubDailyMetric,
+  TrainingHubUpcomingWorkout,
+  UnitSystem,
+  WorkoutSport
+} from "../../../electron/types";
+import { buildWeeklyActivitySeries, WEEKLY_ACTIVITY_RESIDUAL_KEY } from "../weeklyActivity";
+import { sportColorCategory, type SportColorCategory } from "../sportColors";
+import { scheduledSportCategory, scheduledWorkoutSport } from "../workoutSport";
+import { activityWorkoutSport } from "../askCoachAbout";
+import { pairTodayPlan } from "./comingUpModel";
+
+/*
+ * The arithmetic behind Overview's Readiness panel, out of the components so a
+ * test can reach it: where a figure sits on its scale, which COROS band it is
+ * in, and the week's sessions day by day.
+ */
+
+/**
+ * A scale of named bands drawn as equal segments, each band's own range
+ * stretched over its segment — so a band COROS draws narrow in its numbers
+ * (Maintaining is 80–99%) is as wide on screen as the others, and the marker
+ * still lands where the figure is inside its band.
+ *
+ * `edges` are the floors of every band but the first; `min` and `max` close
+ * the two ends. Answers 0–1, clamped.
+ */
+export function bandMarker(
+  value: number,
+  edges: readonly number[],
+  min: number,
+  max: number
+): number {
+  const bounds = [min, ...edges, max];
+  const segments = bounds.length - 1;
+  if (!Number.isFinite(value) || value <= min) {
+    return 0;
+  }
+  for (let index = 0; index < segments; index += 1) {
+    const low = bounds[index];
+    const high = bounds[index + 1];
+    if (value < high || index === segments - 1) {
+      const inside = Math.min(1, Math.max(0, (value - low) / (high - low)));
+      return (index + inside) / segments;
+    }
+  }
+  return 1;
+}
+
+/**
+ * COROS's training status, read off its Intensity Trend: Load Impact over Base
+ * Fitness, as a percentage. The five bands and their floors are the COROS
+ * app's own (its Training Status screen); "Resuming" and "Performance" share
+ * 50–79% there, and nothing it shows says which it picks, so the band is named
+ * by the first.
+ */
+export const TRAINING_STATUS_BANDS = [
+  "decreasing",
+  "resuming",
+  "maintaining",
+  "optimized",
+  "excessive"
+] as const;
+
+export type TrainingStatusBand = (typeof TRAINING_STATUS_BANDS)[number];
+
+/** Floors of every band after Decreasing, in percent. */
+export const TRAINING_STATUS_EDGES = [50, 80, 100, 150] as const;
+
+/** Where the scale ends: a figure past it pins the marker to the end. */
+const TRAINING_STATUS_MAX = 200;
+
+export function trainingStatusBand(percent: number): TrainingStatusBand {
+  let band: TrainingStatusBand = "decreasing";
+  TRAINING_STATUS_EDGES.forEach((edge, index) => {
+    if (percent >= edge) {
+      band = TRAINING_STATUS_BANDS[index + 1];
+    }
+  });
+  return band;
+}
+
+export function trainingStatusMarker(percent: number): number {
+  return bandMarker(percent, TRAINING_STATUS_EDGES, 0, TRAINING_STATUS_MAX);
+}
+
+export interface TrainingLoadReading {
+  /** Intensity Trend, Load Impact over Base Fitness, in percent. */
+  percent?: number;
+  /** COROS's Load Impact (`ati`). */
+  loadImpact?: number;
+  /** COROS's Base Fitness (`cti`). */
+  baseFitness?: number;
+}
+
+function positive(value: number | undefined): number | undefined {
+  return value !== undefined && Number.isFinite(value) && value > 0 ? value : undefined;
+}
+
+/**
+ * The newest day COROS stated a load ratio for, with the two figures it is the
+ * ratio of. Read off one day, so the three always agree with each other; a day
+ * that carries no ratio is skipped, since the ratio is what the panel leads
+ * with.
+ *
+ * Load Impact is `ati` and Base Fitness `cti` (probed on a real account,
+ * 2026-10-28: `ati / cti` is the day's ratio on every day, and both come on
+ * every day). Neither is `tiredRateNew`, which is `ati − cti`, nor
+ * `staminaLevel`, which COROS sends only on a day with a run — read as Base
+ * Fitness, it left both figures blank on any day without one.
+ */
+export function latestTrainingLoad(
+  dayList: readonly TrainingHubDailyMetric[]
+): TrainingLoadReading {
+  for (let index = dayList.length - 1; index >= 0; index -= 1) {
+    const day = dayList[index];
+    const ratio = positive(day.trainingLoadRatio);
+    if (ratio !== undefined) {
+      const loadImpact = positive(day.ati);
+      const baseFitness = positive(day.cti);
+      return {
+        percent: Math.round(ratio * 100),
+        loadImpact: loadImpact !== undefined ? Math.round(loadImpact) : undefined,
+        baseFitness: baseFitness !== undefined ? Math.round(baseFitness) : undefined
+      };
+    }
+  }
+  return {};
+}
+
+/**
+ * What the week's columns measure. Time is every sport's; COROS's load is a
+ * heart-rate figure built for endurance work, and a strength session reads
+ * light in it whatever it took out of the legs.
+ */
+export type WeekMeasure = "time" | "load";
+
+/** One session in a day's column, done or still on the plan. */
+export interface WeekBlock {
+  key: string;
+  /** Its height: seconds or load, by the chart's measure. */
+  value: number;
+  /** Both figures, whichever is drawn, for the column's tooltip. */
+  load: number;
+  seconds: number;
+  /** The session's or the plan's name; empty on the day's leftover load. */
+  name: string;
+  /** null on the day's leftover load, which no session claims. */
+  category: SportColorCategory | null;
+  /** The sport it is drawn with; undefined for the leftover and an unknown code. */
+  sport?: WorkoutSport | "hiking";
+  planned: boolean;
+}
+
+export interface WeekColumn {
+  happenDay: string;
+  isToday: boolean;
+  /** Before today: a day with nothing on it was a rest day. */
+  isPast: boolean;
+  /** Bottom to top: what was done, in start order, then what is planned. */
+  blocks: WeekBlock[];
+  /** The column's two parts in the chart's measure. */
+  done: number;
+  planned: number;
+}
+
+export interface WeekChart {
+  measure: WeekMeasure;
+  columns: WeekColumn[];
+  /** The top of the axis, a round number above the tallest column. */
+  axisMax: number;
+  /** Gridlines, bottom to top, 0 first. */
+  ticks: number[];
+}
+
+/** A hike has no workout sport; it is drawn as its colour group is. */
+function activitySport(sportType: number | undefined): WorkoutSport | "hiking" | undefined {
+  const sport = activityWorkoutSport(sportType);
+  if (sport) {
+    return sport;
+  }
+  return sportColorCategory(sportType) === "hiking" ? "hiking" : undefined;
+}
+
+function happenDayOf(timestamp: number | undefined): string | undefined {
+  if (timestamp === undefined || !Number.isFinite(timestamp) || timestamp <= 0) {
+    return undefined;
+  }
+  const date = new Date(timestamp < 10_000_000_000 ? timestamp * 1000 : timestamp);
+  return `${date.getFullYear()}${String(date.getMonth() + 1).padStart(2, "0")}${String(date.getDate()).padStart(2, "0")}`;
+}
+
+/**
+ * Today's planned sessions that no session recorded today stands for — the
+ * pairing Coming up shows (`pairTodayPlan`), so the two sections cannot read
+ * one day two ways.
+ */
+export function plannedStillOpen(
+  planned: readonly TrainingHubUpcomingWorkout[],
+  doneToday: readonly TrainingHubActivity[]
+): TrainingHubUpcomingWorkout[] {
+  return pairTodayPlan(planned, doneToday).open;
+}
+
+/** Three gridlines or more over the tallest column, at a step a reader can add. */
+function axisFor(max: number, measure: WeekMeasure): { axisMax: number; ticks: number[] } {
+  const step =
+    measure === "time"
+      ? // Half an hour, then whole hours.
+        max <= 5_400
+        ? 1_800
+        : max <= 10_800
+          ? 3_600
+          : max <= 21_600
+            ? 7_200
+            : Math.ceil(max / 3 / 3_600) * 3_600
+      : max <= 90
+        ? 30
+        : max <= 300
+          ? 100
+          : max <= 600
+            ? 200
+            : Math.ceil(max / 3 / 100) * 100;
+  const axisMax = Math.max(step * 3, Math.ceil(max / step) * step);
+  const ticks: number[] = [];
+  for (let value = 0; value <= axisMax; value += step) {
+    ticks.push(value);
+  }
+  return { axisMax, ticks };
+}
+
+function seconds(value: number | undefined): number {
+  return value !== undefined && Number.isFinite(value) && value > 0 ? value : 0;
+}
+
+/**
+ * Monday to Sunday of this week, every session a block: what was done and,
+ * from today on, what the calendar still holds. In load, a done session is
+ * COROS's daily load split by the sessions that carry it
+ * (`buildWeeklyActivitySeries`, the figure the Calendar draws), with what no
+ * session claims as a block of its own; in time, it is the session's own
+ * activity time, and a planned one COROS's estimate of it.
+ */
+export function buildWeekChart({
+  dayList,
+  activities,
+  upcoming,
+  now = new Date(),
+  unitSystem,
+  measure = "load"
+}: {
+  dayList: TrainingHubDailyMetric[];
+  activities: TrainingHubActivity[];
+  upcoming: readonly TrainingHubUpcomingWorkout[];
+  now?: Date;
+  unitSystem: UnitSystem;
+  measure?: WeekMeasure;
+}): WeekChart {
+  const series = buildWeeklyActivitySeries(dayList, "trainingLoad", now, unitSystem, activities);
+  const weekDays = new Set(series.days.map((day) => day.happenDay));
+  const byDay = new Map<string, TrainingHubActivity[]>();
+  for (const activity of activities) {
+    const happenDay = happenDayOf(activity.startTime);
+    if (happenDay && weekDays.has(happenDay)) {
+      byDay.set(happenDay, [...(byDay.get(happenDay) ?? []), activity]);
+    }
+  }
+  const todayKey = happenDayOf(now.getTime()) ?? "";
+  const pick = (load: number, time: number) => (measure === "time" ? time : load);
+
+  const columns = series.days.map((day): WeekColumn => {
+    const dayActivities = (byDay.get(day.happenDay) ?? []).sort(
+      (left, right) => (left.startTime ?? 0) - (right.startTime ?? 0)
+    );
+    const loads = new Map(day.segments.map((segment) => [segment.key, segment.value]));
+    // Every session of the day, the ones COROS gave no load included: they
+    // still happened, and the icon under the column says so.
+    const blocks: WeekBlock[] = dayActivities.map((activity) => {
+      const load = loads.get(activity.activityId) ?? 0;
+      const time = seconds(activity.duration);
+      return {
+        key: activity.activityId,
+        value: pick(load, time),
+        load,
+        seconds: time,
+        name: activity.name?.trim() ?? "",
+        category: sportColorCategory(activity.sportType),
+        sport: activitySport(activity.sportType),
+        planned: false
+      };
+    });
+    // Load COROS counted outside a session (or for sessions not loaded yet).
+    // It has no time of its own, so the time chart has nothing to draw for it.
+    const residual =
+      loads.get(WEEKLY_ACTIVITY_RESIDUAL_KEY) ?? (day.segments.length === 0 ? day.value : 0);
+    if (residual > 0 && measure === "load") {
+      blocks.push({
+        key: WEEKLY_ACTIVITY_RESIDUAL_KEY,
+        value: residual,
+        load: residual,
+        seconds: 0,
+        name: "",
+        category: null,
+        planned: false
+      });
+    }
+    const done = blocks.reduce((sum, block) => sum + block.value, 0);
+
+    let planned = 0;
+    if (day.happenDay >= todayKey) {
+      const onDay = upcoming.filter((workout) => workout.happenDay === day.happenDay);
+      const open =
+        day.happenDay === todayKey
+          ? plannedStillOpen(
+              onDay,
+              activities.filter((activity) => happenDayOf(activity.startTime) === todayKey)
+            )
+          : onDay;
+      open.forEach((workout) => {
+        const load = positive(workout.trainingLoad) ?? 0;
+        const time = seconds(workout.durationSeconds);
+        const value = pick(load, time);
+        planned += value;
+        blocks.push({
+          // Its place in the day's plan, not among what is still open: the key
+          // must not change when the session before it is done.
+          key: `planned:${workout.happenDay}:${workout.sortNo ?? onDay.indexOf(workout)}:${workout.name}`,
+          value,
+          load,
+          seconds: time,
+          name: workout.name,
+          category: scheduledSportCategory(workout.sportType) ?? "other",
+          sport: scheduledWorkoutSport(workout.sportType),
+          planned: true
+        });
+      });
+    }
+
+    return {
+      happenDay: day.happenDay,
+      isToday: day.happenDay === todayKey,
+      isPast: day.happenDay < todayKey,
+      blocks,
+      done,
+      planned
+    };
+  });
+
+  const tallest = Math.max(0, ...columns.map((column) => column.done + column.planned));
+  return { measure, columns, ...axisFor(tallest, measure) };
+}

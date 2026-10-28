@@ -394,6 +394,8 @@ interface RawDailyMetric {
   tiredRateNew?: number;
   tiredRateStateNew?: number;
   trainingLoadRatio?: number;
+  ati?: number;
+  cti?: number;
   staminaLevel?: number;
   vo2max?: number;
   cycleVo2max?: number;
@@ -4322,6 +4324,9 @@ export function parseUpcomingWorkouts(
       name: resolveUpcomingWorkoutName(program, entity),
       volume: formatUpcomingWorkoutVolume(program, entity),
       trainingLoad: resolveUpcomingWorkoutLoad(program, entity),
+      durationSeconds: program
+        ? (toProgramFigure(program.estimatedTime) ?? toProgramFigure(program.duration))
+        : undefined,
       sportType: toOptionalNumber(program?.sportType),
       sortNo: toOptionalNumber(entity.sortNoInSchedule ?? entity.sortNo),
       exercises: parseScheduledExercises(program)
@@ -4667,6 +4672,8 @@ function parseDailyMetric(raw: RawDailyMetric): TrainingHubDailyMetric {
     tiredRateNew: toOptionalNumber(raw.tiredRateNew),
     tiredRateStateNew: toOptionalNumber(raw.tiredRateStateNew),
     trainingLoadRatio: toOptionalNumber(raw.trainingLoadRatio),
+    ati: toOptionalNumber(raw.ati),
+    cti: toOptionalNumber(raw.cti),
     staminaLevel: toOptionalNumber(raw.staminaLevel),
     vo2max: toOptionalNumber(raw.vo2max),
     cycleVo2max: positiveNumber(raw.cycleVo2max),
@@ -4729,10 +4736,10 @@ function parseAnalytics(raw: Record<string, unknown>): TrainingHubAnalytics {
  * every session, so seven distance-less strength workouts sat in the first
  * bucket, reading 8 where the honest answer was 1.
  *
- * The panel now uses those same 5 km boundaries, but tallies the activity
- * list itself so distance-less sessions stay out — see
- * `src/training/distanceZones.ts`. Parsing these again would only invite the
- * unstated boundaries and the padded first bucket back.
+ * Overview stopped drawing distance zones on 2026-10-27; the panel that did
+ * had tallied the activity list itself on those 5 km boundaries. Parsing
+ * these again would only invite the unstated boundaries and the padded first
+ * bucket back.
  */
 function parseZoneDistributions(
   summary: Record<string, unknown>

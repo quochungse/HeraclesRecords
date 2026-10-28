@@ -111,6 +111,9 @@ function dailyMetrics(days = 400): TrainingHubDailyMetric[] {
       tiredRateNew: Math.round(Math.max(-30, Math.min(40, (acute - chronic) * 0.9))),
       tiredRateStateNew: 2,
       trainingLoadRatio: chronic > 0 ? Math.round((acute / chronic) * 100) / 100 : 1,
+      // COROS's Load Impact and Base Fitness, as it sends them every day.
+      ati: Math.round(acute),
+      cti: Math.round(chronic),
       staminaLevel: Math.round(chronic * 10) / 10,
       vo2max: vo2At(day) ?? 52,
       distance: distByDay.get(day) ?? 0,
@@ -188,7 +191,8 @@ function analytics(): TrainingHubAnalytics {
     zoneDistributions: {
       hrTrainingLoad: zones([180, 820, 610, 240, 160, 40]),
       hrDistance: zones([20, 140, 92, 30, 18, 3]),
-      hrTime: zones([3.1, 15.6, 9.2, 2.6, 1.4, 0.3])
+      // Seconds, as COROS sends them: 3.1 h, 15.6 h …
+      hrTime: zones([3.1, 15.6, 9.2, 2.6, 1.4, 0.3].map((hours) => Math.round(hours * 3600)))
     },
     rpeDistribution: { buckets: [], coverage: { rated: 0, total: 0 } }
   };

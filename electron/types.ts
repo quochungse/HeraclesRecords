@@ -287,9 +287,19 @@ export interface TrainingHubDailyMetric {
   rhr?: number;
   avgSleepHrv?: number;
   sleepHrvBase?: number;
+  /** COROS's `ati` less its `cti` (probed 2026-10-28): how far the acute load stands from the chronic. */
   tiredRateNew?: number;
   tiredRateStateNew?: number;
+  /** COROS's Intensity Trend, `ati` over `cti`. */
   trainingLoadRatio?: number;
+  /** COROS's Load Impact, the acute load (`ati`); sent on every day. */
+  ati?: number;
+  /** COROS's Base Fitness, the chronic load (`cti`); sent on every day. */
+  cti?: number;
+  /**
+   * Not Base Fitness: COROS sends it only on a day with a run, and the same
+   * figure run after run, so it reads as a running stamina level.
+   */
   staminaLevel?: number;
   /** COROS's running VO2max, filled in only on days with a run. */
   vo2max?: number;
@@ -879,6 +889,8 @@ export interface TrainingHubUpcomingWorkout {
   name: string;
   volume?: string;
   trainingLoad?: number;
+  /** COROS's own estimate of the session's length (`estimatedTime`), in seconds. */
+  durationSeconds?: number;
   sportType?: number;
   sortNo?: number;
   exercises?: TrainingHubScheduledExercise[];

@@ -2144,13 +2144,14 @@ lives at module level for the same visit-to-visit reason — see `useCalendarDat
   it says outright that it changes tone only and never what goes onto a card — names and
   descriptions are saved to COROS and shown on the watch.
 
-- **Overview's body figure** (`src/training/body/`, built 2026-10-07) — the panel titled
-  "Your physique" (`RecoveryPanel`, which replaced the recovery ring) draws a low-poly
+- **Overview's body figure** (`src/training/body/`, built 2026-10-07) — the column titled
+  "Recovery" (`TodayPhysique`, in the Readiness panel below; it was the Recovery card,
+  which replaced the recovery ring) draws a low-poly
   wireframe of the athlete, lit from the feet up to COROS's recovery %, in a colour that runs
   with it (`figureColourFor`, since 2026-10-08; it was four bands): red at 20% and under, orange
   at 60, yellow at 70, green toward 100, mixed in OKLCH between, and a full 100 sky blue (`--figure-peak`, the stage's idle colour) — the words keep COROS's three bands.
-  The mix is written on the panel as `--recovery-tone`, so the four stop colours are declared on
-  `.training-recovery-panel` and not on the stage: a custom property holding `var()` resolves
+  The mix is written on the column as `--recovery-tone`, so the four stop colours are declared on
+  `.training-recovery-panel` (the column carries that class for them) and not on the stage: a custom property holding `var()` resolves
   where it is declared, and on the stage they were out of its reach. **The physique is height and weight
   from the COROS profile and nothing else** (`physique.ts`), read on **Trefethen's
   height-adjusted BMI**, 1.3 kg / m^2.5, not kg / m²: BMI reads the same build heavier on a
@@ -2217,23 +2218,109 @@ lives at module level for the same visit-to-visit reason — see `useCalendarDat
   `oklch(from … calc(l * 0.8) c h)` — mixed toward an ink in OKLCH, orange turned red. Before it
   paper drew the dark figure on `#222222`, which read as a hole cut in the white card; earlier
   still a dark-grey stage with the glow turned down and a flat light grey one with ink lines
-  were both judged uglier. "88% Ready" sits on the stage: under the feet on a narrow
-  stage, on the fill line beside the figure from 560px (`WIDE_STAGE_MIN_PX`, the same width as
-  the CSS container query; the stylesheet places the drawing at `NARROW_FRAME`/`WIDE_FRAME`
-  of `bodyFigureMath.ts` — `test:body-figure` holds the two together — and the line is found
-  by arithmetic). The week's four totals left the panel for Weekly Activity: `WeekTotals`, a
-  list in a column left of the chart, a row above it when the panel is under 480px
-  (`@container totals-column`); the days they cover are the panel's title, beside "Weekly
-  Activity". **That chart is drawn whenever COROS has answered**, an empty week included — a
-  Monday morning is seven empty columns on a 0–6 axis, and the totals beside them read 0 (steps
-  keep their dash: the daily-health feed runs a day behind) — and its "could not be read" line
-  is for no answer at all. **The Sleep card has the same column** (`SleepWeekTotals`, built of
-  `WeekTotalsRow`, folding under the same query): the seven days ending on the night shown —
-  average main sleep (naps and nap-only days left out), average score, average RHR and the HRV
-  range — each **over the days that have the figure, never over seven**, so a night with no
-  data is not a zero (`buildSleepWeekTotals`, `sleepWeekTotals.ts`). The night's own HRV and
-  RHR come from the daily metrics (`trendPoints`, keyed by the day woken up), since the sleep
-  feed carries neither. `npm run test:body-figure`, `test:weekly-activity`.
+  were both judged uglier. The stage stands the figure at `NARROW_FRAME`, or `WIDE_FRAME` from
+  560px (`WIDE_STAGE_MIN_PX`, the same width as the CSS container query; `test:body-figure`
+  holds the stylesheet and `bodyFigureMath.ts` together). On Overview the whole column is the
+  stage — its ground moved off `.recovery-figure` onto `.overview-physique`, no card inside the
+  column — and the figure stands on the stage's floor there (`.body-figure` placed in
+  `overview.css`, the frames above untouched) with the reading ("58% Moderate") under its feet,
+  centred. `npm run test:body-figure`.
+- **Overview's Readiness panel** (`src/training/overview/`, `overview.css`, built 2026-10-27
+  from the approved mockup — memory note `overview-redesign-mockups`) — the body, last night
+  and this week in **one grid**, not three cards: Recovery, Sleep and This week are
+  columns whose cells share rows (head · the night's figures beside the week's status ·
+  ring beside the week's columns · footer), and the Recovery column is a **subgrid** over all
+  four, its stage taking the last three, so the figure takes whatever height the other two
+  come to. Under 940px the week moves under the other two at full width; under 620px all
+  three stack. "Today" was its first name and was dropped: more than today is in it.
+  **Sleep** is last night only (`pickLastNightSleep`, with the same development-build
+  fallback the old card had), the score with COROS's word for its band, overnight HRV off the
+  daily metrics, and **Sleep HR, the sleep record's own `avgHr`** — never COROS's daytime
+  resting HR; the stages round a ring with the night's clock under it, and the seven days
+  ending on the night (`buildSleepWeekTotals`) in the footer. **This week** is COROS's
+  **training status**: the Intensity Trend (`trainingLoadRatio` × 100) on the COROS app's
+  five bands — Decreasing < 50, Resuming 50–79 ("Resuming / Performance" there), Maintaining
+  80–99, Optimized 100–149, Excessive ≥ 150 — drawn as equal segments with the figure placed
+  inside its band (`bandMarker`), the bands' names over the bar and no boundary figures: a
+  band states its range on hover. Then a column a day with **a block a session** in the
+  accent (paper: `--hall-gold`), from today on the calendar's sessions hatched; today's
+  planned session is dropped once a session of its sport family is recorded today
+  (`plannedStillOpen`). **The columns are in time or in load** (a quiet switch in the head,
+  `overview.weekMeasure`, time by default): COROS's load is a heart-rate figure, and a
+  strength session read light in it whatever it took. Time is the session's activity time
+  and a plan's COROS estimate (`durationSeconds` on `TrainingHubUpcomingWorkout`, the
+  program's `estimatedTime`, as the Calendar reads it); load is COROS's daily load split by
+  session, the day's load no session claims a fainter block of its own, which time has no
+  figure for. The columns carry no icons: a column's tooltip (`.overview-tip`) lists its
+  sessions, each sport's icon in its colour, with both figures and a total. It follows the
+  pointer, flipped and held inside the panel (`followTip.ts`, written onto its style so it
+  costs no render); focused from the keyboard it stands beside the column. The footer is Load
+  Impact, Base Fitness and the trend. **Load Impact is `ati` and Base Fitness `cti`**
+  (probed on the real account 2026-10-28: both come on every day, and `ati / cti` is the
+  day's `trainingLoadRatio`). `tiredRateNew` is `ati − cti`, and `staminaLevel` comes only on
+  a day with a run (the same 71.8 run after run) — read as Base Fitness it blanked both
+  figures on every day without a run. The Calendar's week tooltip (`computeWeeklyStats`,
+  `test:calendar-pairing`) and Coach's `get_fitness_trends` (`test:chat-analytics-tools`)
+  read the same two fields, and neither reads `tiredRateNew` or `staminaLevel` any more:
+  the difference is two columns already in the table, and the stamina level is the
+  dashboard's, said once in the snapshot. The day also carries `t7d`/`t28d` (7- and
+  28-day load) and `recomendTlMin`/`Max` (the 7-day load COROS recommends, about `cti` ×
+  7 to × 9.1). The arithmetic is `todayModel.ts`; `npm run test:overview-model`.
+  **Coming up** (`OverviewComingUp`, `comingUpModel.ts`) is today on the left and the days
+  after on the right, in place of the Upcoming Workouts card. Today pairs the calendar's
+  sessions with what was recorded today by sport family (`pairTodayPlan`, which the week
+  chart above uses too, so the two never read the day two ways): done comes first, named
+  by its plan (the session's own name joins its figures) and read against the plan's load
+  on a bar as long as whichever is greater, and opens the session (`onOpenActivity` → App's
+  `openActivityFrom`); what is still to do opens the Calendar's detail sheet
+  (`UpcomingWorkoutDetailPanel`). Each is pressed as a whole, as a day on the right is —
+  a row with a chevron, washed on hover, no button of its own; a rest day has nothing
+  to press — no "Plan a session", and no "Not started" chip on a plan, by decision. The
+  right column keeps the old card's rule (all of tomorrow, then up to three rows), the
+  heading states the next seven days, and nothing scheduled with nothing done today draws
+  no section. A day on the right is washed on hover. `npm run test:overview-renderer`
+  mounts the four states.
+  **Training activity** is the heatmap (`TrainingHeatmapPanel`) under a section name of its
+  own: the range's figures lead inside the panel and its two switches are `tone="quiet"`.
+  **Training load distribution** (`OverviewDistribution`, `distributionModel.ts`) replaced
+  the two donuts: the last four weeks' load by sport as a thin bar in the sport colours,
+  toned down (`filter`) so the zone colours under it stay the louder, each sport's name under
+  its segment; then COROS's own time — or load — per heart-rate zone
+  (`analytics.zoneDistributions.hrTime` / `hrTrainingLoad`, seconds and load, COROS's last
+  four weeks), read first as the easy share against the 80/20 line, split as the Running
+  screen splits it (`intensityForZone`, exported from `runMetrics.ts` for this) on a ramp
+  from a yellow-leaning green (apart from Z3's bluer green in the list beside it) through
+  amber to orange —
+  fixed hues, not the accent, so the hotter colour is the harder effort whatever the
+  palette — then zone
+  by zone in the app's zone colours (`zoneColor`) and COROS's names (`zoneNamesFor`). **Distance
+  zones went with the donuts**, by decision, and `distanceZones.ts` and its suite with them.
+  The screenshot demo's `hrTime` had been in hours; COROS sends seconds.
+  **One section a sport** (`OverviewSports`, `sportModel.ts`): Running, Cycling and Hiking,
+  each drawn only when the athlete trained in it in the last four calendar weeks (cut at the
+  Monday the sport screens cut at) and its screen is on the rail (`hiddenSportScreens`). Each
+  is its screen's own figures in brief — the screens' builders (`buildRunWeeks`,
+  `buildRideWeeks`, `buildHikeWeeks`, `runIntensityMix`, `climbingRate`…), never a copy — a
+  five-week chart drawn to the height of the column beside it with the four weeks before as a
+  dashed mean, each week's figures in a tooltip that follows the pointer (`followTip.ts`, as
+  the week columns' above do), and the way out to the
+  screen and to a session (`onOpenActivity`). A run's or
+  a ride's **session type** is its training label (`trainingBenefit`: a shape — intervals,
+  strides, long — before its primary benefit), counted over the window from summaries the
+  section sweeps as the Running and Cycling lists sweep theirs (`requireIntensity`). This
+  week's planned distance on Running is the calendar's from today, less what a session today
+  answered (`plannedThisWeek`, through `pairTodayPlan`).
+  **Strength** (`OverviewStrength`, lazy — the body map is three.js) is the same section for
+  lifting: the four weeks' sessions, tonnage, sets and time, the Strength screen's own
+  `StrengthHero` (the 3D body map and the muscle breakdown, its figure on a 350px stage and
+  the breakdown scrolling beside it) read over **these four weeks** — `buildStrengthAnalytics`
+  on the window, not the screen's `strength.days` window, which is shared and left alone —
+  and the last session and the next. The hero sits inside a `.strength-view`, whose scope
+  carries the heat ramp and the stage the hero reads; outside it the bars and the stage draw
+  empty. It replaced Strength Distribution. **The HRV and Sleep trend charts left Overview**
+  with the approved design (they stay on the Sleep screen), as did the Upcoming Workouts,
+  Recovery, Weekly Activity and Sleep cards, the zone donuts and their CSS; the strings only
+  those panels read went from all thirteen languages.
 - **Sleep** (`sleepDataService`, `sleepHistoryService`, `sleepSeriesService`, `src/sleep/`) —
   nights from the COROS MCP server, cached in `sleep_nights` because COROS keeps only ~9
   weeks. **`totalMinutes` is the main sleep and nothing else** — the stage percentages, the
@@ -3054,9 +3141,9 @@ throws a `ScreenError` (English `message`, for the log, tools and any regex), an
 again on screen from its fields.
 
 Styling is plain CSS with custom properties — no Tailwind, no CSS modules.
-`src/styles.css` (~28k lines) holds the design tokens and most rules; fourteen feature
+`src/styles.css` (~28k lines) holds the design tokens and most rules; fifteen feature
 stylesheets sit beside their components (strength ×3, training ×2, records ×2, profile, running,
-cycling, sleep, training-library, activity globe, hiking). Sixteen in all, counting `fonts.css` — which is the number
+cycling, sleep, training-library, activity globe, hiking, overview). Seventeen in all, counting `fonts.css` — which is the number
 the four CSS suites report. Themes are `dark` | `paper` via `src/theme/`, persisted to localStorage,
 and `THEME_WINDOW_BACKGROUND` must stay in sync with `--bg-base`. Sport colors live in both
 `src/styles.css` and `src/training/sportColors.ts` (the source of truth) —

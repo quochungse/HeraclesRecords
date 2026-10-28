@@ -582,14 +582,29 @@ export function TrainingHeatmapPanel({
 
   return (
     <section className="panel training-heatmap-panel">
+      {/* The section's name stands over the panel (Overview's "Training
+          activity"); inside it the range's figures lead, the two switches
+          quiet beside them. */}
       <div className="training-heatmap-header">
-        <div>
-          <p className="eyebrow">{t("overview.heatmap.eyebrow")}</p>
-          <h2>{isDuration ? t("overview.heatmap.durationTitle") : t("overview.heatmap.loadTitle")}</h2>
-        </div>
+        {hasData ? (
+          <p className="training-heatmap-summary">
+            <span>{plural("overview.heatmap.activeDays", summary.activeDays)}</span>
+            <span aria-hidden="true">·</span>
+            <span>{plural("overview.heatmap.streak", summary.currentStreak)}</span>
+            <span aria-hidden="true">·</span>
+            <span>
+              {isDuration
+                ? t("overview.heatmap.totalTime", { value: formatDurationSpan(summary.totalLoad) })
+                : t("overview.heatmap.totalLoad", { value: formatOptionalNumber(summary.totalLoad) })}
+            </span>
+          </p>
+        ) : (
+          <span />
+        )}
         <div className="training-heatmap-controls">
           <OptionGroup
             label={t("overview.heatmap.metric")}
+            tone="quiet"
             value={metric}
             options={[
               { value: "trainingLoad", label: t("overview.trainingLoad") },
@@ -605,6 +620,7 @@ export function TrainingHeatmapPanel({
               short cost less room than the fold they were hiding behind. */}
           <OptionGroup
             label={t("overview.heatmap.range")}
+            tone="quiet"
             value={range}
             options={TRAINING_HEATMAP_RANGES.map((option) => ({
               value: option,
@@ -885,17 +901,6 @@ export function TrainingHeatmapPanel({
               </ul>
             ) : null}
 
-            <div className="training-heatmap-summary">
-              <span>{plural("overview.heatmap.activeDays", summary.activeDays)}</span>
-              <span aria-hidden="true">·</span>
-              <span>{plural("overview.heatmap.streak", summary.currentStreak)}</span>
-              <span aria-hidden="true">·</span>
-              <span>
-                {isDuration
-                  ? t("overview.heatmap.totalTime", { value: formatDurationSpan(summary.totalLoad) })
-                  : t("overview.heatmap.totalLoad", { value: formatOptionalNumber(summary.totalLoad) })}
-              </span>
-            </div>
           </div>
         </>
       ) : (
