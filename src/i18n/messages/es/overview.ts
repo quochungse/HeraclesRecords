@@ -231,6 +231,7 @@ const overview: OverviewMessages = {
   "overview.today.sevenDayAverage": "Media 7 días",
   "overview.today.sixWeekAverage": "Media 6 semanas",
   "overview.today.weekLoad": "Carga semanal",
+  "overview.today.trendExplain": "{loadImpact} en relación con {baseFitness}: los últimos 7 días frente a las últimas 6 semanas.",
 };
 
 export default overview;

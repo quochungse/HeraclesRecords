@@ -232,6 +232,7 @@ const overview = {
   "overview.today.sevenDayAverage": "7-day avg",
   "overview.today.sixWeekAverage": "6-week avg",
   "overview.today.weekLoad": "This week’s load",
+  "overview.today.trendExplain": "{loadImpact} as a share of {baseFitness}: the last 7 days against the last 6 weeks.",
 };
 
 export default overview;

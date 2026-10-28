@@ -231,6 +231,7 @@ const overview: OverviewMessages = {
   "overview.today.sevenDayAverage": "7 天平均",
   "overview.today.sixWeekAverage": "6 周平均",
   "overview.today.weekLoad": "本周负荷",
+  "overview.today.trendExplain": "{loadImpact} 与 {baseFitness} 之比：最近 7 天对比最近 6 周。",
 };
 
 export default overview;

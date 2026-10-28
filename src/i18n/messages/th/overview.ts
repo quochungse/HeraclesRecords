@@ -231,6 +231,7 @@ const overview: OverviewMessages = {
   "overview.today.sevenDayAverage": "เฉลี่ย 7 วัน",
   "overview.today.sixWeekAverage": "เฉลี่ย 6 สัปดาห์",
   "overview.today.weekLoad": "ภาระสัปดาห์นี้",
+  "overview.today.trendExplain": "{loadImpact} เทียบกับ {baseFitness}: 7 วันล่าสุดเทียบกับ 6 สัปดาห์ล่าสุด",
 };
 
 export default overview;

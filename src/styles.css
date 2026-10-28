@@ -78,6 +78,15 @@
    */
   --menu-surface: #141920;
 
+  /* Easy, moderate, hard — an effort, wherever one is split three ways
+     (Overview's distribution and sport sections, the sport screens' intensity
+     panel): a young-rice green through amber to orange, so the hotter colour
+     is the harder effort. Data, so fixed hues rather than the accent. Easy's
+     green leans yellow to stand apart from Z3's bluer green beside it. */
+  --intensity-easy: #8cc63f;
+  --intensity-moderate: #eab13c;
+  --intensity-hard: #f2652a;
+
   --accent-gold: #d89b22;
 
   --success-bg: rgba(47, 190, 145, 0.15);
@@ -352,6 +361,9 @@ svg:focus-visible {
 
   --surface: #ffffff;
   --menu-surface: #ffffff;
+  --intensity-easy: #6fae2a;
+  --intensity-moderate: #e0a020;
+  --intensity-hard: #e2541a;
 
   --accent-gold: #905e0e;
 

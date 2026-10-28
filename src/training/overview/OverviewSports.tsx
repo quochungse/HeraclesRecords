@@ -50,6 +50,7 @@ import { useActivityDetailSummaries } from "../useActivityDetailSummaries";
 import { useTodayKey } from "../useTodayKey";
 import { formatCount, formatDecimal, getIntlLocale, plural, t, type MessageKey } from "../../i18n/core";
 import { useI18n } from "../../i18n/useI18n";
+import { useColumnFocus } from "./chartFocus";
 import { followTip, releaseTip } from "./followTip";
 import {
   longestAndLast,
@@ -190,6 +191,8 @@ function WeekChart({
   );
   const at = (value: number) => `${(value / top) * 100}%`;
   const titleId = useId();
+  // Tabbed into at this week, the last column.
+  const columnFocus = useColumnFocus(weeks.length, weeks.length - 1);
   return (
     <div className="overview-sport-chart">
       <p id={titleId} className="overview-sport-subhead">
@@ -215,7 +218,7 @@ function WeekChart({
                   key={week.label}
                   className={`overview-sport-column${current ? " is-current" : ""}`}
                   role="img"
-                  tabIndex={0}
+                  {...columnFocus(index)}
                   aria-label={[week.dates, ...week.facts.map((fact) => `${fact.label} ${fact.value}`)].join(", ")}
                   onPointerMove={followTip}
                   onPointerLeave={releaseTip}

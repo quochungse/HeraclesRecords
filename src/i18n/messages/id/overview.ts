@@ -231,6 +231,7 @@ const overview: OverviewMessages = {
   "overview.today.sevenDayAverage": "Rata² 7 hari",
   "overview.today.sixWeekAverage": "Rata² 6 minggu",
   "overview.today.weekLoad": "Beban minggu ini",
+  "overview.today.trendExplain": "{loadImpact} dibanding {baseFitness}: 7 hari terakhir terhadap 6 minggu terakhir.",
 };
 
 export default overview;

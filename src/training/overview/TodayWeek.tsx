@@ -21,6 +21,7 @@ import { useTodayKey } from "../useTodayKey";
 import { formatCount, formatDecimal, getIntlLocale, t, weekdayNames } from "../../i18n/core";
 import { useI18n } from "../../i18n/useI18n";
 import { BandScale } from "./BandScale";
+import { useColumnFocus } from "./chartFocus";
 import { followTip, releaseTip } from "./followTip";
 import {
   buildWeekChart,
@@ -134,11 +135,14 @@ function WeekDay({
   chart,
   label,
   date,
-  tipSide
+  tipSide,
+  focus
 }: {
   column: WeekColumn;
   chart: WeekChart;
   label: string;
+  /** Its place in the chart's one tab stop (`useColumnFocus`). */
+  focus: ReturnType<ReturnType<typeof useColumnFocus>>;
   /** "Thu, Oct 22": the tooltip's heading. */
   date: string;
   /** Which side of the column its tooltip opens on when focused, so it stays inside the panel. */
@@ -168,7 +172,7 @@ function WeekDay({
     <div
       className={`overview-week-day${column.isToday ? " is-today" : ""}`}
       role="img"
-      tabIndex={0}
+      {...focus}
       aria-label={description}
       onPointerMove={followTip}
       onPointerLeave={releaseTip}
@@ -265,6 +269,11 @@ export function TodayWeek({
     [dayList, activities, upcomingWorkouts, now, unitSystem, measure]
   );
   const reading = useMemo(() => latestTrainingLoad(dayList), [dayList]);
+  // Tabbed into at today, or at the week's end once it is behind.
+  const columnFocus = useColumnFocus(
+    chart.columns.length,
+    Math.max(0, chart.columns.findIndex((column) => column.isToday))
+  );
   const week = useMemo(
     () => thisWeekLoad({ dayList, activities, now, unitSystem }),
     [dayList, activities, now, unitSystem]
@@ -308,10 +317,15 @@ export function TodayWeek({
 
       <div className="overview-today-cell overview-today-status is-week">
         <BandScale
+          title={t("overview.today.intensityTrend")}
+          value={percent !== undefined ? `${percent}%` : undefined}
+          explain={t("overview.today.trendExplain", {
+            loadImpact: t("overview.today.loadImpact"),
+            baseFitness: t("overview.today.baseFitness")
+          })}
           bands={bands}
           marker={percent !== undefined ? trainingStatusMarker(percent) : undefined}
           current={status}
-          value={percent !== undefined ? `${percent}%` : undefined}
           label={
             percent !== undefined && status
               ? t("overview.today.statusScale", { percent, status: t(`overview.status.${status}`) })
@@ -350,6 +364,7 @@ export function TodayWeek({
                     label={column.isToday ? t("overview.today") : weekdays[index]}
                     date={date ? dayFormat.format(date) : column.happenDay}
                     tipSide={index < 3 ? "after" : "before"}
+                    focus={columnFocus(index)}
                   />
                 );
               })}
@@ -380,9 +395,10 @@ export function TodayWeek({
             <dd className="figure">{week.load !== undefined ? figure(week.load) : "–"}</dd>
             {week.recommended ? (
               <dd className="overview-today-sub">
+                {/* Word joiners about the dash, so the range wraps whole rather than at it. */}
                 {t("overview.today.recommendedRange", {
-                  min: figure(week.recommended.min),
-                  max: figure(week.recommended.max)
+                  min: `${figure(week.recommended.min)}\u2060`,
+                  max: `\u2060${figure(week.recommended.max)}`
                 })}
               </dd>
             ) : null}

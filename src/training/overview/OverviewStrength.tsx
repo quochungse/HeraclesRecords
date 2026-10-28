@@ -45,7 +45,12 @@ export default function OverviewStrength({
 }) {
   useI18n();
   const { unitSystem } = useUnitSystem();
-  const { sessions, source, error, initializing } = useStrengthData({ api, corosConnected: connected });
+  // Four weeks, read as such: not the Strength screen's window, which may be a year.
+  const { sessions, source, error, initializing } = useStrengthData({
+    api,
+    corosConnected: connected,
+    windowDays: WINDOW_DAYS
+  });
   const todayKey = useTodayKey();
   const nowMs = useMemo(() => Date.now(), [todayKey, sessions]);
   const window = useMemo(() => sportWindow(sessions, nowMs), [sessions, nowMs]);

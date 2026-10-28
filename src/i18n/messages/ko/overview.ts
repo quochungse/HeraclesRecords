@@ -231,6 +231,7 @@ const overview: OverviewMessages = {
   "overview.today.sevenDayAverage": "7일 평균",
   "overview.today.sixWeekAverage": "6주 평균",
   "overview.today.weekLoad": "이번 주 부하",
+  "overview.today.trendExplain": "{loadImpact}을(를) {baseFitness}로 나눈 값: 최근 7일과 최근 6주의 비교.",
 };
 
 export default overview;

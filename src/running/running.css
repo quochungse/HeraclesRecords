@@ -1168,27 +1168,29 @@
   justify-content: center;
   min-width: 4px;
   border-radius: var(--radius-xs);
-  /* A fixed dark ink, not --bg-base. The fills below are the same on both
-     themes, so the label has to be too: --bg-base is near-white on paper, which
-     put "Easy 72%" at about 2:1 on the green — the block's primary reading. */
+  /* A fixed dark ink, not --bg-base. The fills below are mid-tones on both
+     themes, so the label has to be dark on both: --bg-base is near-white on
+     paper, which put "Easy 72%" at about 2:1 on the green — the block's primary
+     reading. */
   color: #0b0f14;
   font-size: 11px;
   font-weight: 700;
 }
 
-/* Easy, moderate, hard: a green-to-red ramp that carries its own meaning, not
-   the sport palette — these are efforts, not surfaces. */
+/* Easy, moderate, hard: the app's effort ramp (`--intensity-*`, styles.css),
+   the one Overview draws too, not the sport palette — these are efforts, not
+   surfaces. */
 .run-intensity-seg.tone-easy,
 .run-intensity-legend i.tone-easy {
-  background: #2fbe91;
+  background: var(--intensity-easy);
 }
 .run-intensity-seg.tone-moderate,
 .run-intensity-legend i.tone-moderate {
-  background: #d89b22;
+  background: var(--intensity-moderate);
 }
 .run-intensity-seg.tone-hard,
 .run-intensity-legend i.tone-hard {
-  background: #e5484d;
+  background: var(--intensity-hard);
 }
 
 .run-intensity-legend {

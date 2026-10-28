@@ -122,7 +122,9 @@
   --overview-status-optimized: #f07b2a;
   --overview-status-excessive: #e5484d;
   display: grid;
-  grid-template-columns: minmax(200px, 240px) minmax(0, 1.12fr) minmax(0, 1.2fr);
+  /* The figure's column gives way first, down to a figure still worth
+     drawing; the night and the week share the rest evenly. */
+  grid-template-columns: clamp(180px, 20%, 240px) minmax(0, 1fr) minmax(0, 1fr);
   grid-template-rows: auto auto minmax(0, 1fr) auto;
   padding: 0;
   overflow: hidden;
@@ -204,10 +206,12 @@
   outline-offset: 2px;
 }
 
+/* A figure's column is never narrower than its name, which keeps to one
+   line: the panel goes to two rows before a name has to wrap. */
 .overview-today-hero {
   grid-row: 2;
   display: grid;
-  grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr) minmax(0, 1fr);
+  grid-template-columns: minmax(auto, 1.15fr) minmax(auto, 1fr) minmax(auto, 1fr);
   align-items: end;
   gap: 14px;
   padding-top: 12px;
@@ -219,6 +223,7 @@
   color: var(--text-secondary);
   font-size: 12px;
   line-height: 1.3;
+  white-space: nowrap;
 }
 
 .overview-today-hero dd,
@@ -306,7 +311,7 @@
 .overview-today-foot dl {
   margin: 0;
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(auto, 1fr));
   gap: 14px;
 }
 
@@ -411,6 +416,48 @@
   margin: 0;
 }
 
+/* What the bar measures and where the figure stands, headed as the night's
+   score is beside it, with a tooltip on hover saying what the figure is
+   worked out from. */
+.overview-scale-head {
+  position: relative;
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  width: max-content;
+  max-width: 100%;
+  margin: 0 0 10px;
+}
+
+.overview-scale-title {
+  color: var(--text-secondary);
+  font-size: 12px;
+  line-height: 1.3;
+}
+
+.overview-scale-value {
+  color: var(--text-primary);
+  font-size: 18px;
+  line-height: 1;
+}
+
+.overview-scale-explain {
+  top: calc(100% + 6px);
+  left: 0;
+  width: max-content;
+  max-width: 280px;
+  padding: 8px 10px;
+  border-radius: var(--radius-sm);
+  color: var(--text-secondary);
+  font-size: 12px;
+  white-space: normal;
+}
+
+.overview-scale-head:hover .overview-scale-explain {
+  opacity: 1;
+  visibility: visible;
+}
+
 /* A band a column: its name over its segment, its range under it on hover.
    The marker spans the row, at the segments' height. */
 .overview-scale-bands {
@@ -442,10 +489,6 @@
   font-weight: 600;
 }
 
-.overview-scale-name b {
-  font-variant-numeric: tabular-nums;
-  font-weight: 600;
-}
 
 .overview-scale-segment {
   display: block;
@@ -762,7 +805,7 @@
 
 /* Too narrow for three columns: the figure and the night side by side as
    before, sharing their rows, and the week under both at the full width. */
-@container (max-width: 1040px) {
+@container (max-width: 840px) {
   .overview-today {
     grid-template-columns: minmax(190px, 220px) minmax(0, 1fr);
     grid-template-rows:
@@ -849,10 +892,12 @@
    the column is pointed at or focused. Focused, it stands beside the column on
    the side that keeps it inside the panel; pointed at, it follows the cursor
    (followTip.ts writes its place over these). */
-/* What every tooltip here floats on: a column's (below) and a band's range
-   on the status bar (`.overview-scale-range`, above). Hidden until shown. */
+/* What every tooltip here floats on: a column's (below), and on the status
+   bar a band's range and what the figure is worked out from (above). Hidden
+   until shown. */
 .overview-tip,
-.overview-scale-range {
+.overview-scale-range,
+.overview-scale-explain {
   position: absolute;
   z-index: 5;
   border: 1px solid var(--surface-line, var(--glass-border));
@@ -1459,14 +1504,11 @@ button.overview-plan-entry:hover .overview-plan-chevron {
   background: var(--text-primary);
 }
 
-/* Easy to hard from a young-rice green through amber to orange, so the
-   hotter colour is the harder effort — here and in the sport sections'
-   intensity. Easy's green leans yellow so it reads apart from Z3's bluer
-   green in the zone list beside it, which is not easy. Data, so fixed hues
-   rather than the accent, which an athlete may have made blue. */
-.training-dashboard [data-intensity="easy"] { --intensity: #8cc63f; }
-.training-dashboard [data-intensity="moderate"] { --intensity: #eab13c; }
-.training-dashboard [data-intensity="hard"] { --intensity: #f2652a; }
+/* Easy to hard in the app's effort ramp (`--intensity-*`, styles.css) — here
+   and in the sport sections' intensity, as the sport screens draw it. */
+.training-dashboard [data-intensity="easy"] { --intensity: var(--intensity-easy); }
+.training-dashboard [data-intensity="moderate"] { --intensity: var(--intensity-moderate); }
+.training-dashboard [data-intensity="hard"] { --intensity: var(--intensity-hard); }
 
 .overview-dist-split-bar [data-intensity] {
   background: var(--intensity);
@@ -1557,9 +1599,6 @@ button.overview-plan-entry:hover .overview-plan-chevron {
   filter: saturate(0.8);
 }
 
-:root[data-theme="paper"] .training-dashboard [data-intensity="easy"] { --intensity: #6fae2a; }
-:root[data-theme="paper"] .training-dashboard [data-intensity="moderate"] { --intensity: #e0a020; }
-:root[data-theme="paper"] .training-dashboard [data-intensity="hard"] { --intensity: #e2541a; }
 
 /* ── One section a sport ────────────────────────────────────────────────── */
 
