@@ -2279,8 +2279,8 @@ lives at module level for the same visit-to-visit reason — see `useCalendarDat
   (`analytics.zoneDistributions.hrTime` / `hrTrainingLoad`, seconds and load, COROS's last
   four weeks), read first as the easy share against the 80/20 line, split as the Running
   screen splits it (`intensityForZone`, exported from `runMetrics.ts` for this) on a ramp
-  from a brownish gold to orange — fixed hues, not the accent, so the hotter colour is the
-  harder effort whatever the palette — then zone
+  from green (the Running screen's easy) through amber to orange — fixed hues, not the
+  accent, so the hotter colour is the harder effort whatever the palette — then zone
   by zone in the app's zone colours (`zoneColor`) and COROS's names (`zoneNamesFor`). **Distance
   zones went with the donuts**, by decision, and `distanceZones.ts` and its suite with them.
   The screenshot demo's `hrTime` had been in hours; COROS sends seconds.

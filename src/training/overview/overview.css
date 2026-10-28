@@ -1445,11 +1445,12 @@
   background: var(--text-primary);
 }
 
-/* Easy to hard from a brownish gold to orange, so the hotter colour is the
-   harder effort — here and in the sport sections' intensity. Data, so fixed
-   hues rather than the accent, which an athlete may have made blue. */
-.training-dashboard [data-intensity="easy"] { --intensity: #b8974a; }
-.training-dashboard [data-intensity="moderate"] { --intensity: #e8973a; }
+/* Easy to hard from green through amber to orange, so the hotter colour is
+   the harder effort — here and in the sport sections' intensity. Easy is the
+   green the Running screen's intensity panel gives it. Data, so fixed hues
+   rather than the accent, which an athlete may have made blue. */
+.training-dashboard [data-intensity="easy"] { --intensity: #2fbe91; }
+.training-dashboard [data-intensity="moderate"] { --intensity: #eab13c; }
 .training-dashboard [data-intensity="hard"] { --intensity: #f2652a; }
 
 .overview-dist-split-bar [data-intensity] {
@@ -1540,8 +1541,8 @@
   filter: saturate(0.8);
 }
 
-:root[data-theme="paper"] .training-dashboard [data-intensity="easy"] { --intensity: #c9a24a; }
-:root[data-theme="paper"] .training-dashboard [data-intensity="moderate"] { --intensity: #e8891e; }
+:root[data-theme="paper"] .training-dashboard [data-intensity="easy"] { --intensity: #22a87d; }
+:root[data-theme="paper"] .training-dashboard [data-intensity="moderate"] { --intensity: #e0a020; }
 :root[data-theme="paper"] .training-dashboard [data-intensity="hard"] { --intensity: #e2541a; }
 
 /* ── One section a sport ────────────────────────────────────────────────── */
