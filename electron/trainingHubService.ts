@@ -396,6 +396,8 @@ interface RawDailyMetric {
   trainingLoadRatio?: number;
   ati?: number;
   cti?: number;
+  recomendTlMin?: number;
+  recomendTlMax?: number;
   staminaLevel?: number;
   vo2max?: number;
   cycleVo2max?: number;
@@ -4327,6 +4329,7 @@ export function parseUpcomingWorkouts(
       durationSeconds: program
         ? (toProgramFigure(program.estimatedTime) ?? toProgramFigure(program.duration))
         : undefined,
+      distanceMeters: resolveUpcomingWorkoutDistanceMeters(program, entity),
       sportType: toOptionalNumber(program?.sportType),
       sortNo: toOptionalNumber(entity.sortNoInSchedule ?? entity.sortNo),
       exercises: parseScheduledExercises(program)
@@ -4445,6 +4448,18 @@ function corosWorkoutDistanceToMeters(value?: number): number {
 
   // COROS schedule workout distance fields are stored in centimeters.
   return value / 100;
+}
+
+/** The distance a scheduled session states, as the volume reads it; undefined for none. */
+function resolveUpcomingWorkoutDistanceMeters(
+  program: Record<string, unknown> | undefined,
+  entity: Record<string, unknown>
+): number | undefined {
+  const sportData = pickObject(entity, ["sportData"]);
+  const meters =
+    corosWorkoutDistanceToMeters(toOptionalNumber(sportData?.distance)) ||
+    resolveWorkoutDistanceMeters(program);
+  return meters > 0 ? meters : undefined;
 }
 
 function formatUpcomingWorkoutVolume(
@@ -4674,6 +4689,8 @@ function parseDailyMetric(raw: RawDailyMetric): TrainingHubDailyMetric {
     trainingLoadRatio: toOptionalNumber(raw.trainingLoadRatio),
     ati: toOptionalNumber(raw.ati),
     cti: toOptionalNumber(raw.cti),
+    recommendedLoadMin: positiveNumber(raw.recomendTlMin),
+    recommendedLoadMax: positiveNumber(raw.recomendTlMax),
     staminaLevel: toOptionalNumber(raw.staminaLevel),
     vo2max: toOptionalNumber(raw.vo2max),
     cycleVo2max: positiveNumber(raw.cycleVo2max),

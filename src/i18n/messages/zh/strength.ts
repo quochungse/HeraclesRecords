@@ -297,7 +297,6 @@ const strength: StrengthMessages = {
   "strength.week.less": "比之前 {weeks} 周少 {percent}%",
   "strength.week.noSessions": "没有训练",
   "strength.week.average": "平均每周：{value}",
-  "strength.distribution": "力量分布",
   "strength.readingSessions": "正在读取力量训练…",
 };
 

@@ -1,13 +1,16 @@
 /*
  * Overview's sections (src/training/overview/). Imported by TrainingOverview,
- * so it loads with the screen's chunk, after styles.css; the figure's own
- * stage (`.recovery-figure`, `.body-figure`) stays in styles.css, where
- * test:body-figure holds it to bodyFigureMath.ts.
+ * so it loads with the screen's chunk, after styles.css; the figure itself
+ * (`.recovery-figure`, `.body-figure`) stays in styles.css, where
+ * test:body-figure holds it to bodyFigureMath.ts, and its stage is the
+ * Recovery column's here.
  */
 
 .training-dashboard {
   /* A hairline that divides inside a panel: columns, footers, rows. */
-  --overview-rule: rgba(255, 255, 255, 0.08);
+  --overview-rule: color-mix(in srgb, var(--text-primary) 8%, transparent);
+  /* What is pointed at in a chart: a day's or a week's column. */
+  --overview-wash: color-mix(in srgb, var(--text-primary) 6%, transparent);
   gap: 32px;
 }
 
@@ -88,6 +91,15 @@
   color: var(--success-text);
 }
 
+/* A sport's colour, wherever an element of Overview names one with
+   `data-sport`: a section, a plan's tile, a segment of the load by sport, a
+   session in a tooltip. Other sports wear Other's. */
+.training-dashboard [data-sport] { --sport-tone: var(--sport-other); }
+.training-dashboard [data-sport="run"] { --sport-tone: var(--sport-run); }
+.training-dashboard [data-sport="bike"] { --sport-tone: var(--sport-bike); }
+.training-dashboard [data-sport="hiking"] { --sport-tone: var(--sport-hiking); }
+.training-dashboard [data-sport="strength"] { --sport-tone: var(--sport-strength); }
+
 /* ── Readiness ──────────────────────────────────────────────────────────── */
 
 /* One grid for the three columns, so the Sleep and This week columns share
@@ -98,11 +110,11 @@
   /* Done in the accent, planned hatched in it. */
   --overview-week-fill: color-mix(in srgb, var(--accent) 82%, transparent);
   --overview-week-plan: color-mix(in srgb, var(--accent) 62%, transparent);
-  /* COROS's sleep score bands: Poor, Fair, Good, Excellent. */
-  --overview-sleep-low: #e5484d;
-  --overview-sleep-mid: #e6b800;
-  --overview-sleep-good: #2fbe91;
-  --overview-sleep-high: #7fb0e6;
+  /* COROS's sleep score bands, Poor to Excellent, as the Sleep screen colours them. */
+  --overview-sleep-low: var(--error-text);
+  --overview-sleep-mid: var(--warning-text);
+  --overview-sleep-good: var(--sleep-light);
+  --overview-sleep-high: var(--success-text);
   /* COROS's training status, yellow through orange to red as its app draws it. */
   --overview-status-decreasing: #e6d23a;
   --overview-status-resuming: #f2b632;
@@ -195,7 +207,7 @@
 .overview-today-hero {
   grid-row: 2;
   display: grid;
-  grid-template-columns: minmax(0, 1.15fr) 1px minmax(0, 1fr) minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr) minmax(0, 1fr);
   align-items: end;
   gap: 14px;
   padding-top: 12px;
@@ -209,7 +221,8 @@
   line-height: 1.3;
 }
 
-.overview-today-hero dd {
+.overview-today-hero dd,
+.overview-today-foot dd {
   margin-top: 6px;
   font-size: 18px;
   line-height: 1;
@@ -239,9 +252,15 @@
   padding-bottom: 2px;
 }
 
-.overview-today-rule {
+/* A hairline after the score, the height of the row: a border on the next
+   figure, since a <dl> holds nothing but its groups. */
+.overview-today-hero > div:nth-child(2) {
   align-self: stretch;
-  background: var(--overview-rule);
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  padding-left: 14px;
+  border-left: 1px solid var(--overview-rule);
 }
 
 .overview-today-unit {
@@ -291,10 +310,13 @@
   gap: 14px;
 }
 
-.overview-today-foot dd {
-  margin-top: 6px;
-  font-size: 18px;
-  line-height: 1;
+/* What a figure is read over, under it: the span an average runs over, the
+   range COROS recommends for the week. */
+.overview-today-foot .overview-today-sub {
+  margin-top: 4px;
+  color: var(--text-muted);
+  font-size: 11px;
+  line-height: 1.3;
 }
 
 /* No night to show: a sentence in the rows the night would take. */
@@ -357,8 +379,6 @@
 .overview-physique-stage .recovery-figure {
   flex: 1 1 auto;
   min-height: 280px;
-  border-radius: 0;
-  background: none;
 }
 
 /* Standing on the stage's floor rather than above it: the reading under the
@@ -422,6 +442,11 @@
   font-weight: 600;
 }
 
+.overview-scale-name b {
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+
 .overview-scale-segment {
   display: block;
   height: 5px;
@@ -458,27 +483,15 @@
 
 /* The band's figures, under its segment while it is pointed at. */
 .overview-scale-range {
-  position: absolute;
-  z-index: 5;
   top: calc(100% + 8px);
   left: 50%;
   padding: 4px 8px;
-  border: 1px solid var(--surface-line, var(--glass-border));
   border-radius: var(--radius-sm);
-  background: var(--menu-surface);
-  box-shadow: var(--shadow-elevated);
   color: var(--text-primary);
   font-size: 11px;
   font-variant-numeric: tabular-nums;
-  line-height: 1.3;
   white-space: nowrap;
-  pointer-events: none;
-  opacity: 0;
-  visibility: hidden;
   transform: translateX(-50%);
-  transition:
-    opacity var(--dur-fast) var(--ease),
-    visibility var(--dur-fast) var(--ease);
 }
 
 .overview-scale-band:hover .overview-scale-range {
@@ -669,7 +682,7 @@
 
 /* The day under the pointer, so its tooltip reads as its own. */
 .overview-week-day:hover {
-  background: color-mix(in srgb, var(--text-primary) 6%, transparent);
+  background: var(--overview-wash);
 }
 
 .overview-week-day:focus-visible {
@@ -749,7 +762,7 @@
 
 /* Too narrow for three columns: the figure and the night side by side as
    before, sharing their rows, and the week under both at the full width. */
-@container (max-width: 940px) {
+@container (max-width: 1040px) {
   .overview-today {
     grid-template-columns: minmax(190px, 220px) minmax(0, 1fr);
     grid-template-rows:
@@ -803,34 +816,28 @@
   }
 }
 
-:root[data-theme="paper"] .training-dashboard {
-  --overview-rule: rgba(19, 26, 40, 0.08);
-}
-
-/* Paper's slate stage (styles.css), on the column as the dark one is. */
+/* Paper's stage, a light slate brightening toward the head, on the column as
+   the dark one is. */
 :root[data-theme="paper"] .overview-physique {
   background:
     radial-gradient(85% 55% at 50% 0%, rgba(255, 255, 255, 0.79), transparent 80%),
     linear-gradient(180deg, #f0f4fa 0%, #e3eaf4 56%, #cfdbea 100%);
 }
 
-:root[data-theme="paper"] .overview-physique-stage .recovery-figure {
-  background: none;
-  box-shadow: none;
-}
-
 :root[data-theme="paper"] .overview-today {
   --overview-week-fill: var(--hall-gold);
   --overview-week-plan: var(--hall-gold-deep);
-  --overview-sleep-low: #d93d42;
-  --overview-sleep-mid: #c79a00;
-  --overview-sleep-good: #1f9e74;
-  --overview-sleep-high: #3d7fd1;
   --overview-status-decreasing: #c9b31c;
   --overview-status-resuming: #dc9d16;
   --overview-status-maintaining: #e38318;
   --overview-status-optimized: #e06413;
   --overview-status-excessive: #d93d42;
+}
+
+/* Paper marks today as the Calendar does: white, with an accent edge. */
+:root[data-theme="paper"] .overview-week-day.is-today {
+  border-color: var(--accent);
+  background: none;
 }
 
 /* A band's name in its colour reads on white only taken darker. */
@@ -842,9 +849,25 @@
    the column is pointed at or focused. Focused, it stands beside the column on
    the side that keeps it inside the panel; pointed at, it follows the cursor
    (followTip.ts writes its place over these). */
-.overview-tip {
+/* What every tooltip here floats on: a column's (below) and a band's range
+   on the status bar (`.overview-scale-range`, above). Hidden until shown. */
+.overview-tip,
+.overview-scale-range {
   position: absolute;
   z-index: 5;
+  border: 1px solid var(--surface-line, var(--glass-border));
+  background: var(--menu-surface);
+  box-shadow: var(--shadow-elevated);
+  line-height: 1.3;
+  pointer-events: none;
+  opacity: 0;
+  visibility: hidden;
+  transition:
+    opacity var(--dur-fast) var(--ease),
+    visibility var(--dur-fast) var(--ease);
+}
+
+.overview-tip {
   display: grid;
   gap: 6px;
   box-sizing: border-box;
@@ -852,20 +875,10 @@
   min-width: 168px;
   max-width: 260px;
   padding: 10px 12px;
-  border: 1px solid var(--surface-line, var(--glass-border));
   border-radius: var(--radius-md);
-  background: var(--menu-surface);
-  box-shadow: var(--shadow-elevated);
   color: var(--text-secondary);
   font-size: 12px;
-  line-height: 1.3;
   text-align: left;
-  pointer-events: none;
-  opacity: 0;
-  visibility: hidden;
-  transition:
-    opacity var(--dur-fast) var(--ease),
-    visibility var(--dur-fast) var(--ease);
 }
 
 .overview-tip.is-after {
@@ -923,11 +936,9 @@
   color: var(--text-muted);
 }
 
-.overview-tip-sport[data-sport="run"] { color: var(--sport-run); }
-.overview-tip-sport[data-sport="bike"] { color: var(--sport-bike); }
-.overview-tip-sport[data-sport="hiking"] { color: var(--sport-hiking); }
-.overview-tip-sport[data-sport="strength"] { color: var(--sport-strength); }
-.overview-tip-sport[data-sport="other"] { color: var(--sport-other); }
+.overview-tip-sport[data-sport] {
+  color: var(--sport-tone);
+}
 
 .overview-tip-name {
   min-width: 0;
@@ -974,16 +985,15 @@
 /* ── Coming up ───────────────────────────────────────────────────────────── */
 
 /* Today on the left, the days after on the right; under 820px, one over the
-   other. */
+   other — a grid, so the divider and the columns change at the same width. */
 .overview-plan {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr);
   padding: 0;
   overflow: hidden;
 }
 
 .overview-plan-today {
-  flex: 1 1 360px;
   min-width: 0;
   box-sizing: border-box;
   display: flex;
@@ -1016,20 +1026,19 @@
 }
 
 .overview-plan-next {
-  flex: 1.4 1 420px;
   min-width: 0;
   box-sizing: border-box;
   padding: 18px 20px 6px;
 }
 
-/* Today's sessions, laid out as the days on the right are: a session reaches
+/* A session today and a day after it, read the same way: a row reaching
    past the column's edge by its own padding, so its words stay on the
-   column's line while the hover's wash has room around them. */
-.overview-plan-entry {
+   column's line while the hover's wash has room around them, pressed as a
+   whole. A session with no way into it is not a button. */
+.overview-plan-entry,
+.overview-plan-row {
   display: grid;
-  grid-template-columns: 40px minmax(0, 1fr) auto;
   align-items: center;
-  gap: 4px 14px;
   box-sizing: border-box;
   width: calc(100% + 24px);
   margin: 0 -12px;
@@ -1042,18 +1051,30 @@
   text-align: left;
 }
 
-button.overview-plan-entry {
+button.overview-plan-entry,
+.overview-plan-row {
   cursor: pointer;
   transition: background var(--dur-fast) var(--ease);
 }
 
-button.overview-plan-entry:hover {
+button.overview-plan-entry:hover,
+.overview-plan-row:hover {
   background: var(--glass-bg);
 }
 
 button.overview-plan-entry:focus-visible {
   outline: var(--focus-ring);
   outline-offset: -2px;
+}
+
+.overview-plan-row:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: -2px;
+}
+
+.overview-plan-entry {
+  grid-template-columns: 40px minmax(0, 1fr) auto;
+  gap: 4px 14px;
 }
 
 /* Today's one session, at full size, its plan read under it. */
@@ -1063,25 +1084,19 @@ button.overview-plan-entry:focus-visible {
 }
 
 .overview-plan-icon {
-  --tile: var(--sport-other);
   display: inline-grid;
   width: 40px;
   height: 40px;
   place-items: center;
   border-radius: var(--radius-md);
-  background: color-mix(in srgb, var(--tile) 14%, transparent);
-  color: var(--tile);
+  background: color-mix(in srgb, var(--sport-tone) 14%, transparent);
+  color: var(--sport-tone);
 }
 
 .overview-plan-entry.is-lead .overview-plan-icon {
   width: 44px;
   height: 44px;
 }
-
-.overview-plan-icon[data-sport="run"] { --tile: var(--sport-run); }
-.overview-plan-icon[data-sport="bike"] { --tile: var(--sport-bike); }
-.overview-plan-icon[data-sport="hiking"] { --tile: var(--sport-hiking); }
-.overview-plan-icon[data-sport="strength"] { --tile: var(--sport-strength); }
 
 .overview-plan-copy {
   display: grid;
@@ -1168,34 +1183,9 @@ button.overview-plan-entry:focus-visible {
   border-top: 1px solid var(--overview-rule);
 }
 
-/* A day reaches past the column's edge by its own padding, so its words stay
-   on the column's line while the hover's wash has room around them. */
 .overview-plan-row {
-  display: grid;
   grid-template-columns: 10px 104px minmax(0, 1fr) auto;
-  align-items: center;
   gap: 14px;
-  box-sizing: border-box;
-  width: calc(100% + 24px);
-  margin: 0 -12px;
-  padding: 12px;
-  border: 0;
-  border-radius: var(--radius-sm);
-  background: none;
-  color: inherit;
-  font: inherit;
-  text-align: left;
-  cursor: pointer;
-  transition: background var(--dur-fast) var(--ease);
-}
-
-.overview-plan-row:hover {
-  background: var(--glass-bg);
-}
-
-.overview-plan-row:focus-visible {
-  outline: var(--focus-ring);
-  outline-offset: -2px;
 }
 
 .overview-plan-dot {
@@ -1243,6 +1233,10 @@ button.overview-plan-entry:hover .overview-plan-chevron {
 }
 
 @container (max-width: 820px) {
+  .overview-plan {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
   .overview-plan-today {
     border-right: 0;
     border-bottom: 1px solid var(--overview-rule);
@@ -1265,7 +1259,6 @@ button.overview-plan-entry:hover .overview-plan-chevron {
   display: flex;
   flex-direction: column;
   gap: 20px;
-  padding: 20px;
 }
 
 .overview-dist-part + .overview-dist-part {
@@ -1314,11 +1307,10 @@ button.overview-plan-entry:hover .overview-plan-chevron {
 }
 
 .overview-dist-sports i {
-  --segment: var(--sport-other);
   display: block;
   min-width: 3px;
   border-radius: var(--radius-xs);
-  background: var(--segment);
+  background: var(--sport-tone);
 }
 
 .overview-dist-sports i:first-child {
@@ -1333,14 +1325,13 @@ button.overview-plan-entry:hover .overview-plan-chevron {
   border-radius: var(--radius-pill);
 }
 
-.overview-dist-sports [data-sport="run"] { --segment: var(--sport-run); }
-.overview-dist-sports [data-sport="bike"] { --segment: var(--sport-bike); }
-.overview-dist-sports [data-sport="hiking"] { --segment: var(--sport-hiking); }
-.overview-dist-sports [data-sport="strength"] { --segment: var(--sport-strength); }
-
+/* Each sport's name and share, as a legend that wraps, each with its colour
+   toned as the bar is — or, where the section is wide and no sport in the
+   middle is a sliver (`is-legend` says one is), each under its own segment. */
 .overview-dist-sport-labels {
   display: flex;
-  gap: 3px;
+  flex-wrap: wrap;
+  gap: 4px 16px;
   margin: 10px 0 0;
   padding: 0;
   list-style: none;
@@ -1350,22 +1341,54 @@ button.overview-plan-entry:hover .overview-plan-chevron {
 }
 
 .overview-dist-sport-labels li {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   min-width: 0;
   white-space: nowrap;
 }
 
-/* The smallest share comes last and its segment is often narrower than its
-   name: it stands at the bar's end and runs back over the room the larger
-   segment before it leaves. */
-.overview-dist-sport-labels li:last-child:not(:first-child) {
-  display: flex;
-  justify-content: flex-end;
+.overview-dist-sport-labels li::before {
+  content: "";
+  width: 8px;
+  height: 8px;
+  border-radius: var(--radius-xs);
+  background: var(--sport-tone);
+  filter: saturate(0.62) brightness(0.88);
 }
 
 .overview-dist-sport-labels .figure {
-  margin-left: 6px;
   color: var(--text-primary);
   font-size: 12px;
+}
+
+@container (min-width: 901px) {
+  .overview-dist-sport-labels:not(.is-legend) {
+    flex-wrap: nowrap;
+    gap: 3px;
+  }
+
+  .overview-dist-sport-labels:not(.is-legend) li {
+    display: block;
+    flex: var(--share) 1 0;
+    gap: 0;
+  }
+
+  .overview-dist-sport-labels:not(.is-legend) li::before {
+    content: none;
+  }
+
+  .overview-dist-sport-labels:not(.is-legend) .figure {
+    margin-left: 6px;
+  }
+
+  /* The smallest share comes last and its segment is often narrower than its
+     name: it stands at the bar's end and runs back over the room the larger
+     segment before it leaves. */
+  .overview-dist-sport-labels:not(.is-legend) li:last-child:not(:first-child) {
+    display: flex;
+    justify-content: flex-end;
+  }
 }
 
 /* By zone: the easy share against the 80/20 line beside the zones. */
@@ -1529,7 +1552,8 @@ button.overview-plan-entry:hover .overview-plan-chevron {
   text-align: right;
 }
 
-:root[data-theme="paper"] .overview-dist-sports {
+:root[data-theme="paper"] .overview-dist-sports,
+:root[data-theme="paper"] .overview-dist-sport-labels li::before {
   filter: saturate(0.8);
 }
 
@@ -1538,15 +1562,6 @@ button.overview-plan-entry:hover .overview-plan-chevron {
 :root[data-theme="paper"] .training-dashboard [data-intensity="hard"] { --intensity: #e2541a; }
 
 /* ── One section a sport ────────────────────────────────────────────────── */
-
-.overview-section[data-sport] {
-  --sport-tone: var(--sport-other);
-}
-
-.overview-section[data-sport="run"] { --sport-tone: var(--sport-run); }
-.overview-section[data-sport="bike"] { --sport-tone: var(--sport-bike); }
-.overview-section[data-sport="hiking"] { --sport-tone: var(--sport-hiking); }
-.overview-section[data-sport="strength"] { --sport-tone: var(--sport-strength); }
 
 .overview-sport-icon {
   align-self: center;
@@ -1557,15 +1572,18 @@ button.overview-plan-entry:hover .overview-plan-chevron {
   display: flex;
   flex-direction: column;
   gap: 20px;
-  padding: 20px;
 }
 
-/* The sport's headline figures in a row, a hairline between them. */
+/* The sport's headline figures in a row, a hairline between them. Every
+   figure carries its hairline and its indent, and the row starts that far to
+   the left with the strip clipped off — so whichever figure opens a row when
+   they wrap, its line and indent fall outside and its words stand at the edge. */
 .overview-sport-kpis {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
   gap: 16px 0;
-  margin: 0;
+  margin: 0 0 0 -17px;
+  clip-path: inset(0 0 0 17px);
 }
 
 .overview-sport-kpis > div {
@@ -1577,18 +1595,13 @@ button.overview-plan-entry:hover .overview-plan-chevron {
   border-left: 1px solid var(--overview-rule);
 }
 
-.overview-sport-kpis > div:first-child {
-  padding-left: 0;
-  border-left: 0;
-}
-
 .overview-sport-kpis dt {
   color: var(--text-secondary);
   font-size: 12px;
   line-height: 1.3;
 }
 
-.overview-sport-kpis dd {
+.overview-sport-kpis dd:not(.overview-sport-note) {
   display: flex;
   align-items: baseline;
   gap: 4px;
@@ -1661,6 +1674,9 @@ button.overview-plan-entry:hover .overview-plan-chevron {
    plot takes whatever the row leaves, and every bar is a share of it. A right
    margin past the last column holds the average's figure, over its line. */
 .overview-sport-weeks {
+  /* The axis's figures to the left, the average's past the last column. */
+  --weeks-axis: 40px;
+  --weeks-tail: 30px;
   flex: 1 1 auto;
   display: flex;
   flex-direction: column;
@@ -1670,7 +1686,7 @@ button.overview-plan-entry:hover .overview-plan-chevron {
 .overview-sport-plot {
   position: relative;
   flex: 1 1 auto;
-  margin: 14px 30px 0 40px;
+  margin: 14px var(--weeks-tail) 0 var(--weeks-axis);
 }
 
 .overview-sport-grid {
@@ -1714,7 +1730,7 @@ button.overview-plan-entry:hover .overview-plan-chevron {
 
 /* The week under the pointer, so its tooltip reads as its own. */
 .overview-sport-column:hover {
-  background: color-mix(in srgb, var(--text-primary) 5%, transparent);
+  background: var(--overview-wash);
 }
 
 .overview-sport-column:focus-visible {
@@ -1767,7 +1783,7 @@ button.overview-plan-entry:hover .overview-plan-chevron {
 .overview-sport-average {
   position: absolute;
   z-index: 1;
-  right: -30px;
+  right: calc(var(--weeks-tail) * -1);
   left: -6px;
   height: 0;
   border-top: 1.5px dashed var(--accent);
@@ -1787,7 +1803,7 @@ button.overview-plan-entry:hover .overview-plan-chevron {
 .overview-sport-labels {
   display: grid;
   grid-template-columns: repeat(5, minmax(0, 1fr));
-  margin: 8px 30px 0 40px;
+  margin: 8px var(--weeks-tail) 0 var(--weeks-axis);
   color: var(--text-muted);
   font-size: 11px;
   line-height: 1.3;
@@ -1996,8 +2012,24 @@ button.overview-plan-entry:hover .overview-plan-chevron {
   border-radius: var(--radius-md);
 }
 
-.overview-strength-hero .strength-muscle-panel {
+/* Side by side the breakdown scrolls within the figure's height, as on the
+   Strength screen (`contain: size`), whatever the window: that screen lets go
+   of it on a narrow window, and here the section decides, not the window. */
+.overview-strength-hero .strength-hero .strength-muscle-panel {
   padding: 0 0 0 24px;
+  contain: size;
+}
+
+/* A narrow section stacks them, the breakdown at the height of what it holds. */
+@container (max-width: 900px) {
+  .overview-strength-hero .panel.strength-hero {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .overview-strength-hero .strength-hero .strength-muscle-panel {
+    padding: 20px 0 0;
+    contain: none;
+  }
 }
 
 .overview-strength .overview-sport-note[role="status"] {

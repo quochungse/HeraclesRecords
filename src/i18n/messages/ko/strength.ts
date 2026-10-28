@@ -297,7 +297,6 @@ const strength: StrengthMessages = {
   "strength.week.less": "이전 {weeks}주보다 {percent}% 적음",
   "strength.week.noSessions": "세션 없음",
   "strength.week.average": "평균적인 한 주: {value}",
-  "strength.distribution": "근력 분포",
   "strength.readingSessions": "근력 세션을 불러오는 중…",
 };
 

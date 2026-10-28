@@ -227,6 +227,10 @@ const overview: OverviewMessages = {
   "overview.today.plannedTag": "计划",
   "overview.today.total": "合计",
   "overview.sport.ridesLabel": "骑行次数",
+  "overview.today.recommendedRange": "建议 {min}–{max}",
+  "overview.today.sevenDayAverage": "7 天平均",
+  "overview.today.sixWeekAverage": "6 周平均",
+  "overview.today.weekLoad": "本周负荷",
 };
 
 export default overview;

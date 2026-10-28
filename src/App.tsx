@@ -1919,7 +1919,12 @@ export default function App() {
                         showStrength={!hiddenSportScreens.includes("strength")}
                         hiddenSportScreens={hiddenSportScreens}
                         onOpenActivity={(activityId) => openActivityFrom(activityId, "overview")}
-                        onOpenView={setActiveView}
+                        onOpenView={(view) => {
+                          // A sport screen taken off the rail is not opened from here either.
+                          if (!(hiddenSportScreens as readonly PrimaryView[]).includes(view)) {
+                            setActiveView(view);
+                          }
+                        }}
                       />
                     </Suspense>
                   </div>

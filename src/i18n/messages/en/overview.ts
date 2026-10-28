@@ -228,6 +228,10 @@ const overview = {
   "overview.today.plannedTag": "Planned",
   "overview.today.total": "Total",
   "overview.sport.ridesLabel": "Rides",
+  "overview.today.recommendedRange": "Recommended {min}–{max}",
+  "overview.today.sevenDayAverage": "7-day avg",
+  "overview.today.sixWeekAverage": "6-week avg",
+  "overview.today.weekLoad": "This week’s load",
 };
 
 export default overview;

@@ -10,28 +10,30 @@ export interface ScaleBand {
 /**
  * A figure on a scale of named bands: the bands' names over equal segments,
  * and the marker where the figure is. The band the figure is in is the one
- * drawn solid and the one name in its colour; the colours are the scale's own
- * (`data-scale` in overview.css), keyed by each band's `key`. The boundaries'
- * figures are not written out: a band states its own range on hover.
+ * drawn solid and the one name in its colour, with the figure beside it; the
+ * colours are keyed by each band's `key` (`data-band` in overview.css). The
+ * boundaries' figures are not written out: a band states its own range on
+ * hover.
  */
 export function BandScale({
-  scale,
   bands,
   marker,
   current,
+  value,
   label
 }: {
-  scale: string;
   bands: readonly ScaleBand[];
   /** 0–1 along the bar; undefined draws no marker. */
   marker: number | undefined;
   /** The band the figure is in. */
   current: string | undefined;
+  /** The figure, written after the current band's name: "95%". */
+  value?: string;
   label: string;
 }) {
   const columns = { "--scale-bands": bands.length } as CSSProperties;
   return (
-    <div className="overview-scale" data-scale={scale} role="img" aria-label={label} style={columns}>
+    <div className="overview-scale" role="img" aria-label={label} style={columns}>
       <div className="overview-scale-bands">
         {bands.map((band) => (
           <span
@@ -39,7 +41,10 @@ export function BandScale({
             data-band={band.key}
             className={`overview-scale-band${band.key === current ? " is-current" : ""}`}
           >
-            <span className="overview-scale-name">{band.label}</span>
+            <span className="overview-scale-name">
+              {band.label}
+              {band.key === current && value ? <b> {value}</b> : null}
+            </span>
             <i className="overview-scale-segment" />
             <span className="overview-scale-range">{band.range}</span>
           </span>

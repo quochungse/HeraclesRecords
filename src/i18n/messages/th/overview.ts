@@ -227,6 +227,10 @@ const overview: OverviewMessages = {
   "overview.today.plannedTag": "วางแผนไว้",
   "overview.today.total": "รวม",
   "overview.sport.ridesLabel": "จำนวนการปั่น",
+  "overview.today.recommendedRange": "แนะนำ {min}–{max}",
+  "overview.today.sevenDayAverage": "เฉลี่ย 7 วัน",
+  "overview.today.sixWeekAverage": "เฉลี่ย 6 สัปดาห์",
+  "overview.today.weekLoad": "ภาระสัปดาห์นี้",
 };
 
 export default overview;

@@ -227,6 +227,10 @@ const overview: OverviewMessages = {
   "overview.today.plannedTag": "예정",
   "overview.today.total": "합계",
   "overview.sport.ridesLabel": "라이딩 수",
+  "overview.today.recommendedRange": "권장 {min}–{max}",
+  "overview.today.sevenDayAverage": "7일 평균",
+  "overview.today.sixWeekAverage": "6주 평균",
+  "overview.today.weekLoad": "이번 주 부하",
 };
 
 export default overview;

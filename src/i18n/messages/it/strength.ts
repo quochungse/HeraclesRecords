@@ -297,7 +297,6 @@ const strength: StrengthMessages = {
   "strength.week.less": "Il {percent}% in meno delle {weeks} settimane prima",
   "strength.week.noSessions": "Nessuna sessione",
   "strength.week.average": "La tua settimana media: {value}",
-  "strength.distribution": "Distribuzione della forza",
   "strength.readingSessions": "Lettura delle tue sessioni di forza…",
 };
 

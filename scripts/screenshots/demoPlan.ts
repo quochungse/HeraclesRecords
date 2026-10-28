@@ -101,6 +101,7 @@ export function upcomingWorkouts(days = 14): TrainingHubUpcomingWorkout[] {
     volume: e.volume,
     trainingLoad: e.trainingLoad,
     durationSeconds: Number(e.rawProgram?.estimatedTime) || undefined,
+    distanceMeters: Number(/([\d.]+)\s*km/.exec(e.volume ?? "")?.[1]) * 1000 || undefined,
     sportType: e.sportType,
     sortNo: e.sortNo,
     exercises: e.exercises

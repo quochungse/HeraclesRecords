@@ -6,7 +6,7 @@ import { getLocalHappenDayKey } from "../formatters";
 import { useFigureSample } from "../body/sampleFigure";
 import type { CorosProfile } from "../../../electron/types";
 import type { TrainingSummaryMetrics } from "../types";
-import { t } from "../../i18n/core";
+import { formatDecimal, t } from "../../i18n/core";
 import { useI18n } from "../../i18n/useI18n";
 
 // The baked bodies (175 KB) stay out of Overview's chunk; the column's words
@@ -75,7 +75,14 @@ export function TodayPhysique(props: {
   const firmness = readFirmness(profile, vo2Readings, today);
   const figureDescription = [
     body.shape !== undefined
-      ? t("overview.physique.drawnFrom", { height: profile?.statureCm ?? "", weight: profile?.weightKg ?? "" })
+      ? t("overview.physique.drawnFrom", {
+          height: profile?.statureCm ?? "",
+          // In the language's own decimal mark: "72,5" in German.
+          weight:
+            profile?.weightKg !== undefined
+              ? formatDecimal(profile.weightKg, Number.isInteger(profile.weightKg) ? 0 : 1)
+              : ""
+        })
       : null,
     hasData ? t("overview.recovery.percent", { percent }) : word
   ]

@@ -297,6 +297,13 @@ export interface TrainingHubDailyMetric {
   /** COROS's Base Fitness, the chronic load (`cti`); sent on every day. */
   cti?: number;
   /**
+   * The load COROS recommends for the calendar week this day is in
+   * (`recomendTlMin`/`recomendTlMax`, its spelling): the same Monday to Sunday,
+   * Base Fitness at the end of the week before × 7, and that × 1.3.
+   */
+  recommendedLoadMin?: number;
+  recommendedLoadMax?: number;
+  /**
    * Not Base Fitness: COROS sends it only on a day with a run, and the same
    * figure run after run, so it reads as a running stamina level.
    */
@@ -891,6 +898,11 @@ export interface TrainingHubUpcomingWorkout {
   trainingLoad?: number;
   /** COROS's own estimate of the session's length (`estimatedTime`), in seconds. */
   durationSeconds?: number;
+  /**
+   * The session's distance in metres, where it states one — including a
+   * structured session, whose `volume` reads as a set count instead.
+   */
+  distanceMeters?: number;
   sportType?: number;
   sortNo?: number;
   exercises?: TrainingHubScheduledExercise[];

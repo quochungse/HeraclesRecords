@@ -227,6 +227,10 @@ const overview: OverviewMessages = {
   "overview.today.plannedTag": "Planificada",
   "overview.today.total": "Total",
   "overview.sport.ridesLabel": "Salidas",
+  "overview.today.recommendedRange": "Recomendada {min}–{max}",
+  "overview.today.sevenDayAverage": "Media 7 días",
+  "overview.today.sixWeekAverage": "Media 6 semanas",
+  "overview.today.weekLoad": "Carga semanal",
 };
 
 export default overview;

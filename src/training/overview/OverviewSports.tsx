@@ -1,4 +1,4 @@
-import { useMemo, type ReactNode } from "react";
+import { useId, useMemo, type ReactNode } from "react";
 import { ArrowUpRight, Bike, Mountain, type LucideIcon } from "lucide-react";
 import type {
   CorosProfile,
@@ -41,12 +41,14 @@ import {
   speedUnit
 } from "../../units/units";
 import type { Vo2Reading } from "../body/physique";
+import { epochMsFromCorosTime } from "../activityWindow";
 import { formatDurationSpan, formatHappenDayLabel, happenDayFromTimestamp } from "../formatters";
 import type { HeartRateZoneModel } from "../heartRateZoneModel";
 import { benefitZoneFamily } from "../trainingBenefit";
 import { trainingBenefitName } from "../components/TrainingBenefitChip";
 import { useActivityDetailSummaries } from "../useActivityDetailSummaries";
-import { formatDecimal, getIntlLocale, plural, t, type MessageKey } from "../../i18n/core";
+import { useTodayKey } from "../useTodayKey";
+import { formatCount, formatDecimal, getIntlLocale, plural, t, type MessageKey } from "../../i18n/core";
 import { useI18n } from "../../i18n/useI18n";
 import { followTip, releaseTip } from "./followTip";
 import {
@@ -56,20 +58,21 @@ import {
   previousWeeksAverage,
   sessionTypeCounts,
   sportWindow,
+  sportWindowWeeks,
   SPORT_CHART_WEEKS,
-  SPORT_WINDOW_WEEKS,
   type SessionTypeCount
 } from "./sportModel";
 
 const WINDOW_DAYS = 28;
 
 function whole(value: number): string {
-  return new Intl.NumberFormat(getIntlLocale()).format(Math.round(value));
+  return formatCount(Math.round(value));
 }
 
+/** A distance in the athlete's unit: a tenth under a hundred, its thousands grouped past it. */
 function distance(meters: number, unitSystem: UnitSystem): string {
   const value = metersToDisplayDistance(meters, unitSystem);
-  return formatDecimal(value, value >= 100 ? 0 : 1);
+  return value >= 100 ? whole(value) : formatDecimal(value, 1);
 }
 
 /** "Sat Oct 17", the day a session was on. */
@@ -119,12 +122,22 @@ interface ChartWeek {
   facts: readonly ChartFact[];
 }
 
+/** The day `days` after a moment, on the local calendar, so a clock change cannot land it on the wrong day. */
+function daysAfter(ms: number, days: number): Date {
+  const date = new Date(ms);
+  date.setDate(date.getDate() + days);
+  return date;
+}
+
+let rangeFormat: { locale: string; format: Intl.DateTimeFormat } | undefined;
+
 /** The seven days from a week's Monday, the month said once. */
 function weekRange(weekStartMs: number): string {
-  return new Intl.DateTimeFormat(getIntlLocale(), { month: "short", day: "numeric" }).formatRange(
-    new Date(weekStartMs),
-    new Date(weekStartMs + 6 * 86_400_000)
-  );
+  const locale = getIntlLocale();
+  if (rangeFormat?.locale !== locale) {
+    rangeFormat = { locale, format: new Intl.DateTimeFormat(locale, { month: "short", day: "numeric" }) };
+  }
+  return rangeFormat.format.formatRange(new Date(weekStartMs), daysAfter(weekStartMs, 6));
 }
 
 /** What every sport's tooltip states besides its own measure. */
@@ -176,10 +189,13 @@ function WeekChart({
     Math.max(average ?? 0, ...weeks.map((week) => week.value + (week.planned ?? 0)))
   );
   const at = (value: number) => `${(value / top) * 100}%`;
+  const titleId = useId();
   return (
     <div className="overview-sport-chart">
-      <p className="overview-sport-subhead">{title}</p>
-      <div className="overview-sport-weeks" role="group" aria-label={title}>
+      <p id={titleId} className="overview-sport-subhead">
+        {title}
+      </p>
+      <div className="overview-sport-weeks" role="group" aria-labelledby={titleId}>
         <div className="overview-sport-plot">
           {ticks.map((tick) => (
             <i key={tick} className="overview-sport-grid" style={{ bottom: at(tick) }} aria-hidden="true">
@@ -372,7 +388,7 @@ function IntensitySplit({
   }
   const share = (seconds: number) => seconds / total;
   return (
-    <div className="overview-sport-intensity">
+    <div>
       <p className="overview-sport-subhead">
         {t("overview.sport.intensity")} <span>· {note}</span>
       </p>
@@ -443,21 +459,31 @@ function RunningSection({
   zoneScale: Parameters<typeof runIntensityMix>[1];
   vo2Readings: readonly Vo2Reading[];
 }) {
-  const { unitSystem, nowMs, summaries, family, onOpenActivity, onOpenView } = context;
+  const { unitSystem, nowMs, upcomingWorkouts, activities, summaries, family, onOpenActivity, onOpenView } = context;
   const distUnit = distanceUnit(unitSystem);
-  const weeks = buildRunWeeks(runs, { weeks: SPORT_CHART_WEEKS, nowMs });
-  const values = weeks.map((week) => metersToDisplayDistance(week.distance, unitSystem));
-  const average = previousWeeksAverage(values);
-  const planned = plannedThisWeek(context.upcomingWorkouts, context.activities, "run");
-  const plannedDistance = metersToDisplayDistance(planned.km * 1000, unitSystem);
-  const totals = summariseRuns(window);
-  const mix = runIntensityMix(window, zoneScale, summaries);
+  // Worked out once a change, not once a render: the summary sweep renders
+  // the section again with every few summaries it reads.
+  const { weeks, values, average, plannedDistance, totals, surfaces, longest, last } = useMemo(() => {
+    const runWeeks = buildRunWeeks(runs, { weeks: SPORT_CHART_WEEKS, nowMs });
+    const distances = runWeeks.map((week) => metersToDisplayDistance(week.distance, unitSystem));
+    const planned = plannedThisWeek(upcomingWorkouts, activities, "run", new Date(nowMs));
+    return {
+      weeks: runWeeks,
+      values: distances,
+      average: previousWeeksAverage(distances),
+      plannedDistance: metersToDisplayDistance(planned.km * 1000, unitSystem),
+      totals: summariseRuns(window),
+      surfaces: runSurfaceBreakdown(window),
+      ...longestAndLast(window, runs)
+    };
+  }, [runs, window, nowMs, unitSystem, upcomingWorkouts, activities]);
+  const mix = useMemo(() => runIntensityMix(window, zoneScale, summaries), [window, zoneScale, summaries]);
+  const types = useMemo(() => sessionTypeCounts(window, summaries, family), [window, summaries, family]);
   const timed = mix.easy.duration + mix.moderate.duration + mix.hard.duration;
   const vo2 = [...vo2Readings].sort((left, right) => left.day.localeCompare(right.day)).at(-1)?.value;
-  const surfaces = runSurfaceBreakdown(window)
+  const surfaceLine = surfaces
     .map((entry) => `${RUN_SURFACE_LABELS[entry.surface]} ${distance(entry.distance, unitSystem)} ${distUnit}`)
     .join(" · ");
-  const { longest, last } = longestAndLast(window, runs);
   const current = values[values.length - 1] ?? 0;
   const labels = weekLabels(weeks);
   return (
@@ -492,7 +518,7 @@ function RunningSection({
           {
             label: t("overview.sport.runsLabel"),
             value: whole(totals.count),
-            note: t("overview.sport.perWeek", { count: formatDecimal(totals.count / SPORT_WINDOW_WEEKS, 1) })
+            note: t("overview.sport.perWeek", { count: formatDecimal(totals.count / sportWindowWeeks(nowMs), 1) })
           },
           {
             label: t("overview.sport.vo2max"),
@@ -533,12 +559,7 @@ function RunningSection({
             mix={mix}
             note={t("overview.sport.zoneTimed", { count: mix.zoneTimed, total: window.length })}
           />
-          <SessionTypes
-            counts={sessionTypeCounts(window, summaries, family)}
-            note={t("overview.sport.typesRunNote")}
-            ride={false}
-            footer={surfaces}
-          />
+          <SessionTypes counts={types} note={t("overview.sport.typesRunNote")} ride={false} footer={surfaceLine} />
         </div>
       </div>
       <div className="overview-sport-facts">
@@ -558,7 +579,7 @@ function RunningSection({
             onOpenActivity={onOpenActivity}
           />
         ) : null}
-        <NextFact next={nextPlanned(context.upcomingWorkouts, "run")} />
+        <NextFact next={nextPlanned(upcomingWorkouts, "run", new Date(nowMs))} />
       </div>
     </Section>
   );
@@ -578,17 +599,25 @@ function CyclingSection({
   const { unitSystem, nowMs, summaries, family, onOpenActivity, onOpenView } = context;
   const distUnit = distanceUnit(unitSystem);
   const climbUnit = elevationUnit(unitSystem);
-  const weeks = buildRideWeeks(rides, { weeks: SPORT_CHART_WEEKS, nowMs });
-  const seconds = weeks.map((week) => week.duration);
-  const average = previousWeeksAverage(seconds);
+  const { weeks, seconds, average, totals, kinds, longest, last } = useMemo(() => {
+    const rideWeeks = buildRideWeeks(rides, { weeks: SPORT_CHART_WEEKS, nowMs });
+    const durations = rideWeeks.map((week) => week.duration);
+    return {
+      weeks: rideWeeks,
+      seconds: durations,
+      average: previousWeeksAverage(durations),
+      totals: summariseRides(window),
+      kinds: rideTypeBreakdown(window),
+      ...longestAndLast(window, rides)
+    };
+  }, [rides, window, nowMs]);
+  const types = useMemo(() => sessionTypeCounts(window, summaries, family), [window, summaries, family]);
   const current = seconds[seconds.length - 1] ?? 0;
   const delta = average && average > 0 ? Math.round(((current - average) / average) * 100) : undefined;
-  const totals = summariseRides(window);
   const speed = totalsSpeedKmh(totals);
-  const kinds = rideTypeBreakdown(window)
+  const kindLine = kinds
     .map((entry) => `${RIDE_TYPE_LABELS[entry.type]} ${formatDurationSpan(entry.duration)}`)
     .join(" · ");
-  const { longest, last } = longestAndLast(window, rides);
   const labels = weekLabels(weeks);
   return (
     <Section
@@ -669,12 +698,7 @@ function CyclingSection({
           format={(value) => formatDecimal(value, value === 0 || Number.isInteger(value) ? 0 : 1)}
         />
         <div className="overview-sport-side">
-          <SessionTypes
-            counts={sessionTypeCounts(window, summaries, family)}
-            note={t("overview.sport.typesRideNote")}
-            ride
-            footer={kinds}
-          />
+          <SessionTypes counts={types} note={t("overview.sport.typesRideNote")} ride footer={kindLine} />
         </div>
       </div>
       <div className="overview-sport-facts">
@@ -694,7 +718,7 @@ function CyclingSection({
             onOpenActivity={onOpenActivity}
           />
         ) : null}
-        <NextFact next={nextPlanned(context.upcomingWorkouts, "bike")} />
+        <NextFact next={nextPlanned(context.upcomingWorkouts, "bike", new Date(nowMs))} />
       </div>
     </Section>
   );
@@ -712,20 +736,30 @@ function HikingSection({
   const { unitSystem, nowMs, onOpenActivity, onOpenView } = context;
   const distUnit = distanceUnit(unitSystem);
   const climbUnit = elevationUnit(unitSystem);
-  const weeks = buildHikeWeeks(hikes, { weeks: SPORT_CHART_WEEKS, nowMs });
-  const values = weeks.map((week) => metersToElevation(week.elevationGain, unitSystem));
-  const totals = summariseHikes(window);
-  const rate = climbingRate(hikes, { days: WINDOW_DAYS, nowMs }).rate;
+  const { weeks, values, totals, rate, biggest, recent } = useMemo(() => {
+    const hikeWeeks = buildHikeWeeks(hikes, { weeks: SPORT_CHART_WEEKS, nowMs });
+    // A week's column is named by its biggest hike, as the Hiking screen's chart names it.
+    const biggestOf = (startMs: number) => {
+      const endMs = daysAfter(startMs, 7).getTime();
+      let top: TrainingHubActivity | undefined;
+      for (const hike of hikes) {
+        const ms = epochMsFromCorosTime(hike.startTime) ?? 0;
+        if (ms >= startMs && ms < endMs && (hike.elevationGain ?? 0) > (top?.elevationGain ?? 0)) {
+          top = hike;
+        }
+      }
+      return top;
+    };
+    return {
+      weeks: hikeWeeks,
+      values: hikeWeeks.map((week) => metersToElevation(week.elevationGain, unitSystem)),
+      totals: summariseHikes(window),
+      rate: climbingRate(hikes, { days: WINDOW_DAYS, nowMs }).rate,
+      biggest: hikeWeeks.map((week) => (week.elevationGain > 0 ? biggestOf(week.weekStartMs) : undefined)),
+      recent: [...window].sort((left, right) => (right.startTime ?? 0) - (left.startTime ?? 0)).slice(0, 3)
+    };
+  }, [hikes, window, nowMs, unitSystem]);
   const current = weeks[weeks.length - 1];
-  // A week's column is named by its biggest hike, as the Hiking screen's chart names it.
-  const biggestOf = (startMs: number) =>
-    hikes
-      .filter((hike) => {
-        const ms = (hike.startTime ?? 0) * 1000;
-        return ms >= startMs && ms < startMs + 7 * 86_400_000;
-      })
-      .sort((left, right) => (right.elevationGain ?? 0) - (left.elevationGain ?? 0))[0];
-  const recent = [...window].sort((left, right) => (right.startTime ?? 0) - (left.startTime ?? 0)).slice(0, 3);
   const labels = weekLabels(weeks);
   const ascent = (meters: number) => whole(metersToElevation(meters, unitSystem));
   return (
@@ -744,7 +778,7 @@ function HikingSection({
             value: ascent(totals.elevationGain),
             unit: climbUnit,
             note: t("overview.sport.perWeekValue", {
-              value: `${ascent(totals.elevationGain / SPORT_WINDOW_WEEKS)} ${climbUnit}`
+              value: `${ascent(totals.elevationGain / sportWindowWeeks(nowMs))} ${climbUnit}`
             })
           },
           {
@@ -781,7 +815,7 @@ function HikingSection({
           weeks={weeks.map((week, index) => ({
             label: labels[index],
             value: values[index],
-            note: week.elevationGain > 0 ? biggestOf(week.weekStartMs)?.name?.trim() || undefined : undefined,
+            note: biggest[index]?.name?.trim() || undefined,
             dates: weekRange(week.weekStartMs),
             facts: [
               { label: t("overview.sport.ascent"), value: `${ascent(week.elevationGain)} ${climbUnit}` },
@@ -866,12 +900,20 @@ export function OverviewSports({
 }) {
   useI18n();
   const { unitSystem } = useUnitSystem();
+  // One moment for every figure below, taken again when the sessions change
+  // or the day turns over, so the windows, the weeks and the figures agree.
+  const todayKey = useTodayKey();
+  const nowMs = useMemo(() => Date.now(), [todayKey, activities]);
   const runs = useMemo(() => runsOnly(activities), [activities]);
   const rides = useMemo(() => ridesOnly(activities), [activities]);
   const hikes = useMemo(() => hikesOnly(activities), [activities]);
-  const runWindow = useMemo(() => sportWindow(runs, Date.now()), [runs]);
-  const rideWindow = useMemo(() => sportWindow(rides, Date.now()), [rides]);
-  const hikeWindow = useMemo(() => sportWindow(hikes, Date.now()), [hikes]);
+  const runWindow = useMemo(() => sportWindow(runs, nowMs), [runs, nowMs]);
+  const rideWindow = useMemo(() => sportWindow(rides, nowMs), [rides, nowMs]);
+  const hikeWindow = useMemo(() => sportWindow(hikes, nowMs), [hikes, nowMs]);
+  const zoneScale = useMemo(
+    () => hrZoneModel ?? { family: "lthr" as const, zones: lthrZones },
+    [hrZoneModel, lthrZones]
+  );
   const showRuns = runWindow.length > 0 && !hiddenSportScreens.includes("running");
   const showRides = rideWindow.length > 0 && !hiddenSportScreens.includes("cycling");
   const showHikes = hikeWindow.length > 0 && !hiddenSportScreens.includes("hiking");
@@ -889,7 +931,7 @@ export function OverviewSports({
   });
   const context: SportContext = {
     unitSystem,
-    nowMs: Date.now(),
+    nowMs,
     activities,
     upcomingWorkouts,
     summaries,
@@ -904,7 +946,7 @@ export function OverviewSports({
           context={context}
           runs={runs}
           window={runWindow}
-          zoneScale={hrZoneModel ?? { family: "lthr", zones: lthrZones }}
+          zoneScale={zoneScale}
           vo2Readings={vo2Readings}
         />
       ) : null}

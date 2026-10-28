@@ -19,7 +19,7 @@ const {
   bandMarker,
   buildWeekChart,
   latestTrainingLoad,
-  plannedStillOpen,
+  thisWeekLoad,
   trainingStatusBand,
   trainingStatusMarker
 } = await import(`${modelUrl.href}?cacheBust=${Date.now()}`);
@@ -72,18 +72,103 @@ assert.deepEqual(
   "a ratio without its two figures states neither"
 );
 
+// --- This week's load against COROS's recommended range, on the same real
+// days. The range is the calendar week's: 756–982.8 through Sunday the 25th,
+// 763–991.9 from Monday the 26th (Base Fitness on the 25th, 109, × 7 and
+// × 1.3). On Wednesday the 28th the week so far is 22 + 175 + 0, not COROS's
+// rolling seven days (752), which a calendar-week range does not measure.
+const realWeeks = [
+  ["20261019", 7, 756, 982.8],
+  ["20261020", 161, 756, 982.8],
+  ["20261021", 52, 756, 982.8],
+  ["20261022", 128, 756, 982.8],
+  ["20261023", 72, 756, 982.8],
+  ["20261024", 65, 756, 982.8],
+  ["20261025", 290, 756, 982.8],
+  ["20261026", 22, 763, 991.9],
+  ["20261027", 175, 763, 991.9],
+  ["20261028", 0, 763, 991.9]
+].map(([happenDay, trainingLoad, recommendedLoadMin, recommendedLoadMax]) => ({
+  happenDay,
+  trainingLoad,
+  recommendedLoadMin,
+  recommendedLoadMax
+}));
+const weekOf = (dayList, now) => thisWeekLoad({ dayList, activities: [], now, unitSystem: "metric" });
+assert.deepEqual(
+  weekOf(realWeeks, new Date(2026, 9, 28, 9, 0)),
+  { load: 197, recommended: { min: 763, max: 992 } },
+  "Monday to today, against this week's range"
+);
+assert.deepEqual(
+  weekOf(realWeeks, new Date(2026, 9, 25, 21, 0)),
+  { load: 775, recommended: { min: 756, max: 983 } },
+  "on a Sunday the week is whole, against its own range"
+);
+assert.deepEqual(weekOf([], new Date(2026, 9, 28)), {}, "no days, no reading");
+assert.equal(
+  thisWeekLoad({
+    dayList: realWeeks,
+    activities: [{ activityId: "late", sportType: 100, startTime: Math.floor(new Date(2026, 9, 28, 7).getTime() / 1000), trainingLoad: 60 }],
+    now: new Date(2026, 9, 28, 9, 0),
+    unitSystem: "metric"
+  }).load,
+  257,
+  "a session COROS's daily figure has not caught up with counts, as the week chart counts it"
+);
+
 // --- A session done today answers today's plan of its sport family.
+const comingUpUrl = pathToFileURL(path.join(repoRoot, "src", "training", "overview", "comingUpModel.ts"));
+const { pairTodayPlan, todayItems, weekAhead } = await import(`${comingUpUrl.href}?cacheBust=${Date.now()}`);
+const stillOpen = (planned, done) => pairTodayPlan(planned, done).open;
 const plannedRun = { happenDay: "20261024", name: "Easy run", sportType: 1, trainingLoad: 75 };
 const plannedLift = { happenDay: "20261024", name: "Upper body", sportType: 4, trainingLoad: 40 };
 const doneRun = { activityId: "a-run", sportType: 100, startTime: 0, trainingLoad: 82 };
 const doneRide = { activityId: "a-ride", sportType: 200, startTime: 0, trainingLoad: 60 };
-assert.deepEqual(plannedStillOpen([plannedRun], [doneRun]), [], "the run done answers the run planned");
-assert.deepEqual(plannedStillOpen([plannedRun, plannedLift], [doneRide]), [plannedRun, plannedLift], "a ride answers neither");
+assert.deepEqual(stillOpen([plannedRun], [doneRun]), [], "the run done answers the run planned");
+assert.deepEqual(stillOpen([plannedRun, plannedLift], [doneRide]), [plannedRun, plannedLift], "a ride answers neither");
 assert.deepEqual(
-  plannedStillOpen([plannedRun, { ...plannedRun, name: "Strides" }], [doneRun]),
+  stillOpen([plannedRun, { ...plannedRun, name: "Strides" }], [doneRun]),
   [{ ...plannedRun, name: "Strides" }],
   "one session answers one plan"
 );
+// An easy 5 km and a long 20 km planned, the long one run: the long plan is
+// the one done, as the Calendar pairs them, whatever the order they come in.
+const easy = { happenDay: "20261024", name: "Easy 5 km", sportType: 1, trainingLoad: 40 };
+const long = { happenDay: "20261024", name: "Long 20 km", sportType: 1, trainingLoad: 200 };
+const longRun = { activityId: "long-run", sportType: 100, startTime: 100, trainingLoad: 210 };
+assert.deepEqual(
+  pairTodayPlan([easy, long], [longRun]).pairs.map((pair) => pair.workout.name),
+  ["Easy 5 km"],
+  "plans are taken in the calendar's order; the first compatible plan takes the closest session"
+);
+assert.deepEqual(
+  pairTodayPlan([long, easy], [{ ...longRun, activityId: "short", trainingLoad: 45 }, longRun]).pairs.map((pair) => [
+    pair.workout.name,
+    pair.activity.activityId
+  ]),
+  [
+    ["Long 20 km", "long-run"],
+    ["Easy 5 km", "short"]
+  ],
+  "each plan takes the session closest to it in load, not the first it meets"
+);
+// Today in the week ahead is only what is still to do.
+const saturday = new Date(2026, 9, 24, 15, 0);
+const ahead = weekAhead(
+  [plannedRun, { happenDay: "20261025", name: "Long run", sportType: 1 }, { happenDay: "20261031", name: "Too far", sportType: 1 }],
+  [{ ...doneRun, startTime: Math.floor(new Date(2026, 9, 24, 7).getTime() / 1000) }],
+  saturday
+);
+assert.deepEqual(ahead.map((workout) => workout.name), ["Long run"], "today's run, done, is not ahead; a week on is past the seven days");
+// A planned item's key is its place in the day's plan, so two plans of one
+// name and order cannot collide.
+const twins = todayItems(
+  [{ ...plannedRun, sortNo: 1 }, { ...plannedRun, sortNo: 1 }],
+  [],
+  saturday
+).map((item) => item.key);
+assert.equal(new Set(twins).size, 2, "two identical plans, two keys");
 
 // --- The week, Monday to Sunday, on Saturday 24 October 2026.
 const now = new Date(2026, 9, 24, 15, 0);
@@ -137,7 +222,7 @@ assert.deepEqual(
   sat.blocks.map((block) => [block.key, block.planned]),
   [
     ["sat-run", false],
-    ["planned:20261024:1:Core", true]
+    ["planned:20261024:1", true]
   ],
   "today: the run done answers the run planned; the core session is still to do"
 );
@@ -181,7 +266,14 @@ assert.deepEqual(
   "a block a session at its activity time, its load kept for the tooltip"
 );
 assert.equal(tMon.done, 9_600);
-assert.deepEqual(tWed.blocks.map((block) => block.key), ["wed-run"], "load no session claims has no time to draw");
+assert.deepEqual(
+  tWed.blocks.map((block) => [block.key, block.value, block.load]),
+  [
+    ["wed-run", 0, 110],
+    ["residual", 0, 20]
+  ],
+  "load no session claims has no time to draw, but stays for the tooltip and keeps the day from reading as rest"
+);
 assert.deepEqual(
   tSun.blocks.map((block) => [block.value, block.planned]),
   [
@@ -248,7 +340,7 @@ close(maxHr.easy, 0.9, "under Max HR the easy band reaches a zone further");
 
 // --- The sport sections' shared arithmetic.
 const sportUrl = pathToFileURL(path.join(repoRoot, "src", "training", "overview", "sportModel.ts"));
-const { sportWindow, previousWeeksAverage, plannedThisWeek, nextPlanned, longestAndLast } = await import(
+const { sportWindow, sportWindowWeeks, previousWeeksAverage, plannedThisWeek, nextPlanned, longestAndLast } = await import(
   `${sportUrl.href}?cacheBust=${Date.now()}`
 );
 // Saturday 24 October 2026: the four weeks start on Monday 28 September.
@@ -280,6 +372,20 @@ assert.deepEqual(
   { count: 1, km: 20 },
   "today's run, done, is no longer planned"
 );
+assert.deepEqual(
+  plannedThisWeek(
+    [{ happenDay: "20261025", name: "Intervals", sportType: 1, volume: "4 set(s)", distanceMeters: 12000 }],
+    [],
+    "run",
+    now
+  ),
+  { count: 1, km: 12 },
+  "a structured session's distance, where its volume is a set count"
+);
+// The window on a Monday is three weeks and a day, not four.
+const monday = new Date(2026, 9, 26, 12, 0).getTime();
+close(sportWindowWeeks(monday), 3 + 0.5 / 7, "three whole weeks and the half day of this one");
+close(sportWindowWeeks(new Date(2026, 9, 25, 23, 59, 59).getTime()), 4 - 1 / 7 / 86_400, "a Sunday night is all but four");
 assert.equal(nextPlanned(plans, "bike", now)?.name, "Spin");
 assert.equal(nextPlanned(plans, "swim", now), undefined);
 

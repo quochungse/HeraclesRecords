@@ -17,13 +17,15 @@ import { SPORT_COLOR_LABELS } from "../sportColors";
 import { enrichDayListWithActivityTotals, getCalendarWeekDateKeys } from "../weeklyActivity";
 import type { TrainingHubSnapshot } from "../types";
 import { useUnitSystem } from "../../units/UnitSystemProvider";
-import { formatDecimal, getIntlLocale, t, weekdayNames } from "../../i18n/core";
+import { useTodayKey } from "../useTodayKey";
+import { formatCount, formatDecimal, getIntlLocale, t, weekdayNames } from "../../i18n/core";
 import { useI18n } from "../../i18n/useI18n";
 import { BandScale } from "./BandScale";
 import { followTip, releaseTip } from "./followTip";
 import {
   buildWeekChart,
   latestTrainingLoad,
+  thisWeekLoad,
   trainingStatusBand,
   trainingStatusMarker,
   TRAINING_STATUS_BANDS,
@@ -65,7 +67,7 @@ function weekDates(now: Date): string {
 }
 
 function figure(value: number): string {
-  return new Intl.NumberFormat(getIntlLocale()).format(Math.round(value));
+  return formatCount(Math.round(value));
 }
 
 /** An axis step: "0", "30m", "1h", "1.5h". */
@@ -173,7 +175,8 @@ function WeekDay({
     >
       <div className="overview-week-plot" aria-hidden="true">
         <div className="overview-week-stack">
-          {column.blocks.map((block) => (
+          {/* Load no session claims has no time: in time it stands at zero, undrawn. */}
+          {column.blocks.filter((block) => block.value > 0 || block.category !== null).map((block) => (
             <i
               key={block.key}
               className={[
@@ -226,8 +229,10 @@ function WeekDay({
 /**
  * This week, as the Readiness panel's right-hand column: COROS's training
  * status on its five bands, a column a day with every session a block (done
- * in the accent, planned hatched) in time or in load, and the trend with the
- * two figures it is the ratio of. A column opens what it holds on hover.
+ * in the accent, planned hatched) in time or in load, and under them the two
+ * figures the trend is the ratio of, each with the span it averages, and the
+ * week's load so far against the range COROS recommends for the week. A
+ * column opens what it holds on hover.
  */
 export function TodayWeek({
   snapshot,
@@ -250,13 +255,20 @@ export function TodayWeek({
       ),
     [snapshot, activities]
   );
-  const now = new Date();
+  // Read again when the day turns over, so a window left open past midnight
+  // or into a Monday does not keep yesterday's week under today's dates.
+  const todayKey = useTodayKey();
+  const now = useMemo(() => new Date(), [todayKey]);
   const [measure, setMeasure] = useSelectionPreference(WEEK_MEASURE);
   const chart = useMemo(
-    () => buildWeekChart({ dayList, activities, upcoming: upcomingWorkouts, unitSystem, measure }),
-    [dayList, activities, upcomingWorkouts, unitSystem, measure]
+    () => buildWeekChart({ dayList, activities, upcoming: upcomingWorkouts, now, unitSystem, measure }),
+    [dayList, activities, upcomingWorkouts, now, unitSystem, measure]
   );
   const reading = useMemo(() => latestTrainingLoad(dayList), [dayList]);
+  const week = useMemo(
+    () => thisWeekLoad({ dayList, activities, now, unitSystem }),
+    [dayList, activities, now, unitSystem]
+  );
   const percent = reading.percent;
   const status = percent !== undefined ? trainingStatusBand(percent) : undefined;
   // Drawn once COROS has answered, an empty week included: a Monday morning
@@ -296,10 +308,10 @@ export function TodayWeek({
 
       <div className="overview-today-cell overview-today-status is-week">
         <BandScale
-          scale="status"
           bands={bands}
           marker={percent !== undefined ? trainingStatusMarker(percent) : undefined}
           current={status}
+          value={percent !== undefined ? `${percent}%` : undefined}
           label={
             percent !== undefined && status
               ? t("overview.today.statusScale", { percent, status: t(`overview.status.${status}`) })
@@ -356,14 +368,24 @@ export function TodayWeek({
           <div>
             <dt>{t("overview.today.loadImpact")}</dt>
             <dd className="figure">{reading.loadImpact !== undefined ? figure(reading.loadImpact) : "–"}</dd>
+            <dd className="overview-today-sub">{t("overview.today.sevenDayAverage")}</dd>
           </div>
           <div>
             <dt>{t("overview.today.baseFitness")}</dt>
             <dd className="figure">{reading.baseFitness !== undefined ? figure(reading.baseFitness) : "–"}</dd>
+            <dd className="overview-today-sub">{t("overview.today.sixWeekAverage")}</dd>
           </div>
           <div>
-            <dt>{t("overview.today.intensityTrend")}</dt>
-            <dd className="figure">{percent !== undefined ? `${percent}%` : "–"}</dd>
+            <dt>{t("overview.today.weekLoad")}</dt>
+            <dd className="figure">{week.load !== undefined ? figure(week.load) : "–"}</dd>
+            {week.recommended ? (
+              <dd className="overview-today-sub">
+                {t("overview.today.recommendedRange", {
+                  min: figure(week.recommended.min),
+                  max: figure(week.recommended.max)
+                })}
+              </dd>
+            ) : null}
           </div>
         </dl>
       </div>

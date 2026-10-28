@@ -4,7 +4,8 @@ import type {
   TrainingHubUpcomingWorkout
 } from "../../../electron/types";
 import { runWindowStartMs } from "../../running/runMetrics";
-import { parseUpcomingWorkoutDistanceKm } from "../formatters";
+import { epochMsFromCorosTime } from "../activityWindow";
+import { getLocalHappenDayKey, happenDayFromTimestamp, parseUpcomingWorkoutDistanceKm } from "../formatters";
 import {
   TRAINING_BENEFITS,
   trainingBenefit,
@@ -27,16 +28,21 @@ export const SPORT_WINDOW_WEEKS = 4;
 export const SPORT_CHART_WEEKS = 5;
 
 /** The sessions of the last four calendar weeks, cut at the Monday the sport screens cut at. */
-export function sportWindow<T extends { startTime?: number }>(
-  activities: readonly T[],
-  nowMs: number
-): T[] {
-  const cutoff = runWindowStartMs(SPORT_WINDOW_WEEKS, nowMs) / 1000;
+export function sportWindow<T extends { startTime?: number }>(activities: readonly T[], nowMs: number): T[] {
+  const cutoff = runWindowStartMs(SPORT_WINDOW_WEEKS, nowMs);
   return activities.filter((activity) => {
-    const start = activity.startTime ?? 0;
-    const seconds = start > 10_000_000_000 ? start / 1000 : start;
-    return seconds >= cutoff && seconds <= nowMs / 1000;
+    const start = epochMsFromCorosTime(activity.startTime) ?? 0;
+    return start >= cutoff && start <= nowMs;
   });
+}
+
+/**
+ * How many weeks the window spans so far: three whole ones and as much of
+ * this one as has passed, so a per-week figure on a Monday is not read over a
+ * week that has hardly begun.
+ */
+export function sportWindowWeeks(nowMs: number): number {
+  return Math.max(1, (nowMs - runWindowStartMs(SPORT_WINDOW_WEEKS, nowMs)) / (7 * 86_400_000));
 }
 
 /** The mean of every week but the last, which is this one and still running. */
@@ -79,10 +85,6 @@ export function sessionTypeCounts(
     .sort((left, right) => right.count - left.count || order.indexOf(left.key) - order.indexOf(right.key));
 }
 
-function dayKey(date: Date): string {
-  return `${date.getFullYear()}${String(date.getMonth() + 1).padStart(2, "0")}${String(date.getDate()).padStart(2, "0")}`;
-}
-
 /**
  * What the calendar still holds for one sport family this week, today to
  * Sunday: today's sessions less those a session recorded today answers
@@ -94,26 +96,30 @@ export function plannedThisWeek(
   family: SportFamily,
   now = new Date()
 ): { count: number; km: number } {
-  const today = dayKey(now);
+  const today = getLocalHappenDayKey(now);
   const sunday = new Date(now);
   sunday.setDate(now.getDate() + ((7 - now.getDay()) % 7));
-  const last = dayKey(sunday);
+  const last = getLocalHappenDayKey(sunday);
   const ofSport = upcoming.filter(
     (workout) =>
       workout.happenDay >= today && workout.happenDay <= last && scheduledSportFamily(workout.sportType) === family
   );
-  const doneToday = activities.filter((activity) => {
-    const start = activity.startTime ?? 0;
-    const date = new Date(start > 10_000_000_000 ? start : start * 1000);
-    return start > 0 && dayKey(date) === today;
-  });
+  const doneToday = activities.filter((activity) => happenDayFromTimestamp(activity.startTime) === today);
   const open = [
     ...pairTodayPlan(ofSport.filter((workout) => workout.happenDay === today), doneToday).open,
     ...ofSport.filter((workout) => workout.happenDay > today)
   ];
   return {
     count: open.length,
-    km: open.reduce((sum, workout) => sum + (parseUpcomingWorkoutDistanceKm(workout.volume) ?? 0), 0)
+    // A structured session's volume is a set count, so its own distance first.
+    km: open.reduce(
+      (sum, workout) =>
+        sum +
+        (workout.distanceMeters !== undefined
+          ? workout.distanceMeters / 1000
+          : (parseUpcomingWorkoutDistanceKm(workout.volume) ?? 0)),
+      0
+    )
   };
 }
 
@@ -123,20 +129,28 @@ export function nextPlanned(
   family: SportFamily,
   now = new Date()
 ): TrainingHubUpcomingWorkout | undefined {
-  const today = dayKey(now);
+  const today = getLocalHappenDayKey(now);
   return [...upcoming]
     .filter((workout) => workout.happenDay >= today && scheduledSportFamily(workout.sportType) === family)
     .sort((left, right) => left.happenDay.localeCompare(right.happenDay))[0];
 }
 
-/** The window's longest session by distance, and the newest of all of them. */
+/** The window's longest session by distance, and the newest of all of them, in one pass each. */
 export function longestAndLast(
   window: readonly TrainingHubActivity[],
   all: readonly TrainingHubActivity[]
 ): { longest?: TrainingHubActivity; last?: TrainingHubActivity } {
-  const longest = [...window]
-    .filter((activity) => (activity.distance ?? 0) > 0)
-    .sort((left, right) => (right.distance ?? 0) - (left.distance ?? 0))[0];
-  const last = [...all].sort((left, right) => (right.startTime ?? 0) - (left.startTime ?? 0))[0];
+  let longest: TrainingHubActivity | undefined;
+  for (const activity of window) {
+    if ((activity.distance ?? 0) > (longest?.distance ?? 0)) {
+      longest = activity;
+    }
+  }
+  let last: TrainingHubActivity | undefined;
+  for (const activity of all) {
+    if (!last || (activity.startTime ?? 0) > (last.startTime ?? 0)) {
+      last = activity;
+    }
+  }
   return { longest, last };
 }

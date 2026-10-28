@@ -297,7 +297,6 @@ const strength: StrengthMessages = {
   "strength.week.less": "その前の {weeks} 週より {percent}% 少ない",
   "strength.week.noSessions": "セッションなし",
   "strength.week.average": "平均的な1週間：{value}",
-  "strength.distribution": "筋トレの分布",
   "strength.readingSessions": "筋トレのセッションを読み込んでいます…",
 };
 

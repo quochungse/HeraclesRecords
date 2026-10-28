@@ -70,7 +70,12 @@ function SleepRing({ record }: { record: TrainingHubSleepRecord }) {
   let offset = 0;
 
   return (
-    <svg className="overview-sleep-ring" viewBox="0 0 120 120" aria-hidden="true">
+    <svg
+      className="overview-sleep-ring"
+      viewBox="0 0 120 120"
+      role="img"
+      aria-label={`${formatWholeMinutes(record.totalMinutes)} ${t("overview.today.asleep")}`}
+    >
       <circle className="overview-sleep-ring-track" cx="60" cy="60" r={radius} />
       {total > 0
         ? slices.map((slice) => {
@@ -219,7 +224,6 @@ export function TodaySleep({
                 {score !== undefined ? <span className="overview-sleep-band">{sleepScoreLabel(score)}</span> : null}
               </dd>
             </div>
-            <i className="overview-today-rule" aria-hidden="true" />
             <div>
               <dt>{t("overview.today.overnightHrv")}</dt>
               <dd>

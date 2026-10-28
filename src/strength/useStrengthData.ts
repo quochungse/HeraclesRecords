@@ -104,8 +104,8 @@ export interface StrengthData {
 /**
  * Owns the strength history: which window and source it is read for, the Hevy
  * account it may come from, the drain loop that fills it in, and the analytics
- * built off it. Shared so the Strength screen and the Overview's Strength
- * Distribution section read the same sessions under the same preferences.
+ * built off it. Shared so the Strength screen and Overview's Strength
+ * section read the same sessions under the same preferences.
  */
 export function useStrengthData({
   api,

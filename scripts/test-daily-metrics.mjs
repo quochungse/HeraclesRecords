@@ -46,10 +46,22 @@ assert.equal(cycling.dayList[1]?.vo2max, undefined, "the two are not mixed");
 // Load Impact and Base Fitness are `ati` and `cti`, on every day (a real
 // account's 28 October 2026, a day with no run and so no `staminaLevel`).
 const load = parseDailyMetrics({
-  dayList: [{ happenDay: 20261028, trainingLoadRatio: 0.95, ati: 101, cti: 106, tiredRateNew: -5 }]
+  dayList: [
+    {
+      happenDay: 20261028,
+      trainingLoadRatio: 0.95,
+      ati: 101,
+      cti: 106,
+      tiredRateNew: -5,
+      recomendTlMin: 763,
+      recomendTlMax: 991.9
+    }
+  ]
 });
 assert.equal(load.dayList[0]?.ati, 101);
 assert.equal(load.dayList[0]?.cti, 106);
+assert.equal(load.dayList[0]?.recommendedLoadMin, 763);
+assert.equal(load.dayList[0]?.recommendedLoadMax, 991.9);
 assert.equal(load.dayList[0]?.staminaLevel, undefined);
 
 console.log("daily metrics parser tests passed");

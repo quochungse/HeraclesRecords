@@ -227,6 +227,10 @@ const overview: OverviewMessages = {
   "overview.today.plannedTag": "Terencana",
   "overview.today.total": "Total",
   "overview.sport.ridesLabel": "Bersepeda",
+  "overview.today.recommendedRange": "Disarankan {min}–{max}",
+  "overview.today.sevenDayAverage": "Rata² 7 hari",
+  "overview.today.sixWeekAverage": "Rata² 6 minggu",
+  "overview.today.weekLoad": "Beban minggu ini",
 };
 
 export default overview;
