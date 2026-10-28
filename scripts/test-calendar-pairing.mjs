@@ -352,6 +352,32 @@ const activity = (overrides) => ({
   assert.equal(stats.plannedSeconds, undefined, "a plan COROS gave no time for has no planned time");
 }
 
+/* --- 9a. Load Impact and Base Fitness are COROS's `ati` and `cti` ---------- */
+
+{
+  // Probed on a real account (2026-10-28): both come on every day and their
+  // ratio is the day's. `tiredRateNew` is `ati − cti`, and `staminaLevel` comes
+  // only on a day with a run, so the week's last day has none.
+  const day = (dateKey, metric) => ({
+    dateKey,
+    inMonth: true,
+    isToday: false,
+    isPast: true,
+    scheduled: [],
+    activities: [],
+    unplannedActivities: [],
+    metric,
+    ...pairPlannedWithActual([], [], "metric")
+  });
+  const stats = computeWeeklyStats([
+    day("20261027", { happenDay: "20261027", ati: 118, cti: 108, tiredRateNew: 10, trainingLoadRatio: 1.09, staminaLevel: 71.8 }),
+    day("20261028", { happenDay: "20261028", ati: 101, cti: 106, tiredRateNew: -5, trainingLoadRatio: 0.95 })
+  ]);
+  assert.equal(stats.loadImpact, 101, "the week's newest `ati`");
+  assert.equal(stats.baseFitness, 106, "the week's newest `cti`, not the last run's `staminaLevel`");
+  assert.equal(stats.loadRatio, 0.95);
+}
+
 /* --- 9b. the plan apart from the week as it was --------------------------- */
 
 {

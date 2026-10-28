@@ -2259,8 +2259,11 @@ lives at module level for the same visit-to-visit reason — see `useCalendarDat
   (probed on the real account 2026-10-28: both come on every day, and `ati / cti` is the
   day's `trainingLoadRatio`). `tiredRateNew` is `ati − cti`, and `staminaLevel` comes only on
   a day with a run (the same 71.8 run after run) — read as Base Fitness it blanked both
-  figures on every day without a run, and the Calendar's week tooltip and Coach's analytics
-  tools still read those two fields that way. The day also carries `t7d`/`t28d` (7- and
+  figures on every day without a run. The Calendar's week tooltip (`computeWeeklyStats`,
+  `test:calendar-pairing`) and Coach's `get_fitness_trends` (`test:chat-analytics-tools`)
+  read the same two fields, and neither reads `tiredRateNew` or `staminaLevel` any more:
+  the difference is two columns already in the table, and the stamina level is the
+  dashboard's, said once in the snapshot. The day also carries `t7d`/`t28d` (7- and
   28-day load) and `recomendTlMin`/`Max` (the 7-day load COROS recommends, about `cti` ×
   7 to × 9.1). The arithmetic is `todayModel.ts`; `npm run test:overview-model`.
   **Coming up** (`OverviewComingUp`, `comingUpModel.ts`) is today on the left and the days
