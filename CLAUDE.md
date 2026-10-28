@@ -2251,9 +2251,10 @@ lives at module level for the same visit-to-visit reason — see `useCalendarDat
   and a plan's COROS estimate (`durationSeconds` on `TrainingHubUpcomingWorkout`, the
   program's `estimatedTime`, as the Calendar reads it); load is COROS's daily load split by
   session, the day's load no session claims a fainter block of its own, which time has no
-  figure for. The columns carry no icons: a column's tooltip (hover or focus, `.overview-tip`,
-  opened on the side that keeps it in the panel) lists its sessions, each sport's icon in
-  its colour, with both figures and a total. The footer is Load
+  figure for. The columns carry no icons: a column's tooltip (`.overview-tip`) lists its
+  sessions, each sport's icon in its colour, with both figures and a total. It follows the
+  pointer, flipped and held inside the panel (`followTip.ts`, written onto its style so it
+  costs no render); focused from the keyboard it stands beside the column. The footer is Load
   Impact, Base Fitness (`staminaLevel`) and the trend. **Load Impact is the ratio times Base
   Fitness, not `tiredRateNew`**: the Calendar's week tooltip reads that field as Load
   Impact while the screenshot demo fakes it as a fatigue difference (−30 to 40), and nothing
@@ -2279,8 +2280,10 @@ lives at module level for the same visit-to-visit reason — see `useCalendarDat
   (`analytics.zoneDistributions.hrTime` / `hrTrainingLoad`, seconds and load, COROS's last
   four weeks), read first as the easy share against the 80/20 line, split as the Running
   screen splits it (`intensityForZone`, exported from `runMetrics.ts` for this) on a ramp
-  from green (the Running screen's easy) through amber to orange — fixed hues, not the
-  accent, so the hotter colour is the harder effort whatever the palette — then zone
+  from a yellow-leaning green (apart from Z3's bluer green in the list beside it) through
+  amber to orange —
+  fixed hues, not the accent, so the hotter colour is the harder effort whatever the
+  palette — then zone
   by zone in the app's zone colours (`zoneColor`) and COROS's names (`zoneNamesFor`). **Distance
   zones went with the donuts**, by decision, and `distanceZones.ts` and its suite with them.
   The screenshot demo's `hrTime` had been in hours; COROS sends seconds.
@@ -2290,7 +2293,8 @@ lives at module level for the same visit-to-visit reason — see `useCalendarDat
   is its screen's own figures in brief — the screens' builders (`buildRunWeeks`,
   `buildRideWeeks`, `buildHikeWeeks`, `runIntensityMix`, `climbingRate`…), never a copy — a
   five-week chart drawn to the height of the column beside it with the four weeks before as a
-  dashed mean, each week's figures in a tooltip on hover or focus, and the way out to the
+  dashed mean, each week's figures in a tooltip that follows the pointer (`followTip.ts`, as
+  the week columns' above do), and the way out to the
   screen and to a session (`onOpenActivity`). A run's or
   a ride's **session type** is its training label (`trainingBenefit`: a shape — intervals,
   strides, long — before its primary benefit), counted over the window from summaries the

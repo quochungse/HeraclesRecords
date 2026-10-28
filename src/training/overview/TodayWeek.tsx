@@ -20,6 +20,7 @@ import { useUnitSystem } from "../../units/UnitSystemProvider";
 import { formatDecimal, getIntlLocale, t, weekdayNames } from "../../i18n/core";
 import { useI18n } from "../../i18n/useI18n";
 import { BandScale } from "./BandScale";
+import { followTip, releaseTip } from "./followTip";
 import {
   buildWeekChart,
   latestTrainingLoad,
@@ -135,7 +136,7 @@ function WeekDay({
   label: string;
   /** "Thu, Oct 22": the tooltip's heading. */
   date: string;
-  /** Which side of the column its tooltip opens on, so it stays inside the panel. */
+  /** Which side of the column its tooltip opens on when focused, so it stays inside the panel. */
   tipSide: "after" | "before";
 }) {
   const total = column.done + column.planned;
@@ -164,6 +165,8 @@ function WeekDay({
       role="img"
       tabIndex={0}
       aria-label={description}
+      onPointerMove={followTip}
+      onPointerLeave={releaseTip}
     >
       <div className="overview-week-plot" aria-hidden="true">
         <div className="overview-week-stack">

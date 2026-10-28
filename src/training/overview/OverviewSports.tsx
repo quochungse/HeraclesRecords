@@ -48,6 +48,7 @@ import { trainingBenefitName } from "../components/TrainingBenefitChip";
 import { useActivityDetailSummaries } from "../useActivityDetailSummaries";
 import { formatDecimal, getIntlLocale, plural, t, type MessageKey } from "../../i18n/core";
 import { useI18n } from "../../i18n/useI18n";
+import { followTip, releaseTip } from "./followTip";
 import {
   longestAndLast,
   nextPlanned,
@@ -158,7 +159,7 @@ function axisFor(max: number): { top: number; ticks: number[] } {
  * Five weeks a column — the four before this one faded, this one solid, what
  * the calendar still holds for it hatched on top — with the four weeks' mean
  * as a dashed line whose figure stands over the line past the last column. A
- * column opens its week's figures on hover or focus.
+ * column opens its week's figures on focus, and beside the pointer on hover.
  */
 function WeekChart({
   title,
@@ -200,6 +201,8 @@ function WeekChart({
                   role="img"
                   tabIndex={0}
                   aria-label={[week.dates, ...week.facts.map((fact) => `${fact.label} ${fact.value}`)].join(", ")}
+                  onPointerMove={followTip}
+                  onPointerLeave={releaseTip}
                 >
                   {week.note ? <em aria-hidden="true">{week.note}</em> : null}
                   {week.planned && week.planned > 0 ? (

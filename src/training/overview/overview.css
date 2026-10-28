@@ -838,9 +838,10 @@
   --band-text: oklch(from var(--band) calc(l * 0.78) c h);
 }
 
-/* A chart column's tooltip (the week's days, a sport's weeks): beside the
-   column, on the side that keeps it inside the panel, shown while the column
-   is pointed at or focused. */
+/* A chart column's tooltip (the week's days, a sport's weeks), shown while
+   the column is pointed at or focused. Focused, it stands beside the column on
+   the side that keeps it inside the panel; pointed at, it follows the cursor
+   (followTip.ts writes its place over these). */
 .overview-tip {
   position: absolute;
   z-index: 5;
@@ -1445,11 +1446,12 @@
   background: var(--text-primary);
 }
 
-/* Easy to hard from green through amber to orange, so the hotter colour is
-   the harder effort — here and in the sport sections' intensity. Easy is the
-   green the Running screen's intensity panel gives it. Data, so fixed hues
+/* Easy to hard from a young-rice green through amber to orange, so the
+   hotter colour is the harder effort — here and in the sport sections'
+   intensity. Easy's green leans yellow so it reads apart from Z3's bluer
+   green in the zone list beside it, which is not easy. Data, so fixed hues
    rather than the accent, which an athlete may have made blue. */
-.training-dashboard [data-intensity="easy"] { --intensity: #2fbe91; }
+.training-dashboard [data-intensity="easy"] { --intensity: #8cc63f; }
 .training-dashboard [data-intensity="moderate"] { --intensity: #eab13c; }
 .training-dashboard [data-intensity="hard"] { --intensity: #f2652a; }
 
@@ -1541,7 +1543,7 @@
   filter: saturate(0.8);
 }
 
-:root[data-theme="paper"] .training-dashboard [data-intensity="easy"] { --intensity: #22a87d; }
+:root[data-theme="paper"] .training-dashboard [data-intensity="easy"] { --intensity: #6fae2a; }
 :root[data-theme="paper"] .training-dashboard [data-intensity="moderate"] { --intensity: #e0a020; }
 :root[data-theme="paper"] .training-dashboard [data-intensity="hard"] { --intensity: #e2541a; }
 
