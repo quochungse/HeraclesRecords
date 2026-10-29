@@ -10,7 +10,7 @@ import type { HeraclesLoad, PlanLoadEntry, TrainingPlanDocument, TrainingPlanEnt
 /** The estimates, by `planLoadKey`; undefined while strength is read in COROS's load. */
 export type PlanHeraclesLoads = ReadonlyMap<string, HeraclesLoad>;
 
-export function planLoadKey(planId: string, entryId: string): string {
+function planLoadKey(planId: string, entryId: string): string {
   return `${planId}:${entryId}`;
 }
 

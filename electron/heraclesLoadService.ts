@@ -48,7 +48,7 @@ import type {
 } from "./types";
 
 export const STRENGTH_LOAD_SOURCE_SETTING = "strength.loadSource";
-export const STRENGTH_LOAD_SPORT_TYPES: ReadonlySet<number> = new Set([400, 402]);
+const STRENGTH_LOAD_SPORT_TYPES: ReadonlySet<number> = new Set([400, 402]);
 /** As far back as a lift's capacity reaches, and the bridge's runs. */
 const HISTORY_DAYS = 3650;
 const SECONDS_PER_DAY = 86_400;
@@ -226,7 +226,13 @@ export function heraclesLoadFor(
   deps?: HeraclesLoadDeps
 ): HeraclesLoad | undefined {
   if (!STRENGTH_LOAD_SPORT_TYPES.has(activity.sportType)) return undefined;
-  const snapshot = snapshotFor(depsOrDefault(deps));
+  return strengthLoadOf(activity, snapshotFor(depsOrDefault(deps)));
+}
+
+function strengthLoadOf(
+  activity: Pick<TrainingHubActivity, "activityId" | "trainingLoad">,
+  snapshot: HeraclesLoadSnapshot
+): HeraclesLoad {
   const session = snapshot.byId.get(activity.activityId);
   const scored = session ? snapshot.run.sessions.get(session.activityId) : undefined;
   if (scored) {
@@ -246,10 +252,13 @@ export function heraclesLoadFor(
 /** The list as COROS sent it, each strength session carrying its Heracles load. */
 export function withHeraclesLoads<T extends TrainingHubActivity>(activities: T[], deps?: HeraclesLoadDeps): T[] {
   if (!activities.some((activity) => STRENGTH_LOAD_SPORT_TYPES.has(activity.sportType))) return activities;
-  return activities.map((activity) => {
-    const heraclesLoad = heraclesLoadFor(activity, deps);
-    return heraclesLoad ? { ...activity, heraclesLoad } : activity;
-  });
+  // One snapshot for the list: asking whether the inputs moved costs a query.
+  const snapshot = snapshotFor(depsOrDefault(deps));
+  return activities.map((activity) =>
+    STRENGTH_LOAD_SPORT_TYPES.has(activity.sportType)
+      ? { ...activity, heraclesLoad: strengthLoadOf(activity, snapshot) }
+      : activity
+  );
 }
 
 function sameShape(left: StrengthSession, right: StrengthSession): boolean {
@@ -286,16 +295,22 @@ export function withStrengthSessionLoads(sessions: StrengthSession[], deps?: Her
 
 /** A strength session still on the plan; undefined when the plan states neither sets nor a length. */
 export function plannedHeraclesLoad(plan: PlannedStrengthSession, deps?: HeraclesLoadDeps): HeraclesLoad | undefined {
+  return plannedEstimator(deps)(plan);
+}
+
+/** `plannedHeraclesLoad` for a batch, over one snapshot. */
+function plannedEstimator(deps: HeraclesLoadDeps | undefined): (plan: PlannedStrengthSession) => HeraclesLoad | undefined {
   const resolved = depsOrDefault(deps);
-  const snapshot = snapshotFor(resolved);
-  return estimatePlannedLoad(plan, snapshot.run.state, resolved.now());
+  const { state } = snapshotFor(resolved).run;
+  const now = resolved.now();
+  return (plan) => estimatePlannedLoad(plan, state, now);
 }
 
 /** COROS's workout sport for strength. */
 const PLANNED_STRENGTH_SPORT = 4;
 
 /** A planned session's steps, as the schedule parse reads them, in the engine's terms. */
-export function plannedStrengthSession(
+function plannedStrengthSession(
   exercises: readonly TrainingHubScheduledExercise[] | undefined,
   estimatedSeconds: number | undefined,
   corosLoad: number | undefined
@@ -336,13 +351,11 @@ export function withPlannedHeraclesLoads<
   }
 >(workouts: T[], deps?: HeraclesLoadDeps): T[] {
   if (!workouts.some((workout) => workout.sportType === PLANNED_STRENGTH_SPORT)) return workouts;
+  const estimate = plannedEstimator(deps);
   return workouts.map((workout) => {
     if (workout.sportType !== PLANNED_STRENGTH_SPORT) return workout;
     const estimated = workout.durationSeconds ?? estimatedSecondsOf(workout.rawProgram);
-    const heraclesLoad = plannedHeraclesLoad(
-      plannedStrengthSession(workout.exercises, estimated, workout.trainingLoad),
-      deps
-    );
+    const heraclesLoad = estimate(plannedStrengthSession(workout.exercises, estimated, workout.trainingLoad));
     return heraclesLoad ? { ...workout, heraclesLoad } : workout;
   });
 }
@@ -406,9 +419,11 @@ export function planEntryHeraclesLoads(
   deps?: HeraclesLoadDeps
 ): Record<string, HeraclesLoad> {
   const loads: Record<string, HeraclesLoad> = {};
-  for (const entry of entries) {
-    if (entry.workout.sport !== "strength") continue;
-    const load = plannedHeraclesLoad(plannedPlanSession(entry), deps);
+  const strength = entries.filter((entry) => entry.workout?.sport === "strength");
+  if (!strength.length) return loads;
+  const estimate = plannedEstimator(deps);
+  for (const entry of strength) {
+    const load = estimate(plannedPlanSession(entry));
     if (load) loads[entry.key] = load;
   }
   return loads;

@@ -160,7 +160,7 @@ interface ResolvedFactor {
 }
 
 /** The movement's identity: COROS's key, or Hevy's template. */
-export function heraclesExerciseKey(exercise: StrengthExercise): string | undefined {
+function heraclesExerciseKey(exercise: StrengthExercise): string | undefined {
   if (exercise.corosKey) return exercise.corosKey.toUpperCase();
   if (/^[TS]\d{4}$/i.test(exercise.nameKey)) return exercise.nameKey.toUpperCase();
   if (exercise.externalId) return `hevy:${exercise.externalId}`;
@@ -413,7 +413,11 @@ export function runHeraclesLoads(
         // A rep count misread by the watch can claim a best no lift backs.
         const beyond = estimates.filter((estimate) => estimate > ceiling);
         const kept = beyond.length === 1 ? estimates.filter((estimate) => estimate <= ceiling) : estimates;
-        const points = capacity.get(entry.key) ?? [];
+        // Sessions come oldest first, so a point past the window is past it for
+        // every session after this one, and for a plan read today.
+        const points = (capacity.get(entry.key) ?? []).filter(
+          (point) => point.day >= day - CAPACITY_WINDOW_DAYS
+        );
         for (const estimate of kept) points.push({ day, estimate });
         capacity.set(entry.key, points);
       }
