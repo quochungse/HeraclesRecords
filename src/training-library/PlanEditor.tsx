@@ -120,6 +120,8 @@ import {
   type PlanEntryFacts,
   type PlanReaderWeek
 } from "./planReaderModel";
+import { heraclesEntryLoad } from "./planHeraclesLoads";
+import { usePlanHeraclesLoads } from "./usePlanHeraclesLoads";
 import { PlanOriginBadge, SportMixDots, dominantSport, sportAccentStyle, sportChipStyle, sportTheme } from "./sportTheme";
 import { workoutSportLabel } from "../training/workoutSport";
 import { formatCount, formatDecimal, plural, t, weekdayNames } from "../i18n/core";
@@ -281,12 +283,17 @@ export function PlanEditor({
   /* Only the shape is read, so only the shape is a dependency. A plan on the
      calendar is read without its dates: the editor places sessions in weeks,
      and is not the place to be told a session was missed. */
+  const shaped = useMemo(() => [{ ...plan, ...shape }], [shape]);
+  const heraclesLoads = usePlanHeraclesLoads(shaped);
   const reading = useMemo(
-    () => readPlan({ ...plan, ...shape, startDate: undefined, calendar: "unscheduled" }),
+    () => readPlan({ ...plan, ...shape, startDate: undefined, calendar: "unscheduled" }, [], heraclesLoads),
     // The day labels and stage names are in the language on screen.
-    [shape, locale]
+    [shape, locale, heraclesLoads]
   );
-  const summary = useMemo(() => summarizeTrainingPlan({ ...plan, ...shape }), [shape]);
+  const summary = useMemo(
+    () => summarizeTrainingPlan(shaped[0], heraclesEntryLoad(plan, heraclesLoads)),
+    [shaped, heraclesLoads]
+  );
   const validation = useMemo(() => validateTrainingPlan(plan), [plan]);
   const errors = validation.filter((issue) => issue.severity === "error");
   /* An empty plan is not listed as a problem: the hint under the figures says

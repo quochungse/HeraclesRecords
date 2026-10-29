@@ -1,10 +1,12 @@
 import type {
+  StrengthLoadSource,
   TrainingHubActivity,
   TrainingHubDailyMetric,
   TrainingHubScheduledWorkoutEntry,
   UnitSystem
 } from "../../electron/types";
 import { parseUpcomingWorkoutDistanceKm } from "../training/formatters";
+import { activityLoad, comparableLoads, plannedLoad as plannedLoadOf } from "../training/loadFigures";
 import {
   scheduledWorkoutKey,
   type CalendarDay,
@@ -133,17 +135,18 @@ function expectedSeconds(scheduled: TrainingHubScheduledWorkoutEntry): number | 
 
 /**
  * How much of the plan the session covered, in percent. Load is the honest
- * measure and is asked first; distance and then duration stand in when COROS
- * prescribed one of those instead.
+ * measure and is asked first, both sides in one load (`comparableLoads`);
+ * distance and then duration stand in when COROS prescribed one of those instead.
  */
 function completionPct(
   scheduled: TrainingHubScheduledWorkoutEntry,
   activity: TrainingHubActivity,
-  targets: PlannedTargets
+  targets: PlannedTargets,
+  loadSource: StrengthLoadSource
 ): number | undefined {
-  const plannedLoad = scheduled.trainingLoad;
-  if (plannedLoad && plannedLoad > 0 && activity.trainingLoad !== undefined) {
-    return Math.round((activity.trainingLoad / plannedLoad) * 100);
+  const { planned: plannedLoad, done } = comparableLoads(scheduled, activity, loadSource);
+  if (plannedLoad && plannedLoad > 0 && done !== undefined) {
+    return Math.round((done / plannedLoad) * 100);
   }
   if (targets.distanceMeters && activity.distance !== undefined) {
     return Math.round((activity.distance / targets.distanceMeters) * 100);
@@ -158,11 +161,12 @@ function completionPct(
 function matchScore(
   scheduled: TrainingHubScheduledWorkoutEntry,
   activity: TrainingHubActivity,
-  targets: PlannedTargets
+  targets: PlannedTargets,
+  loadSource: StrengthLoadSource
 ): number {
-  const plannedLoad = scheduled.trainingLoad;
-  if (plannedLoad && plannedLoad > 0 && activity.trainingLoad !== undefined) {
-    return Math.abs(activity.trainingLoad - plannedLoad) / plannedLoad;
+  const { planned: plannedLoad, done } = comparableLoads(scheduled, activity, loadSource);
+  if (plannedLoad && plannedLoad > 0 && done !== undefined) {
+    return Math.abs(done - plannedLoad) / plannedLoad;
   }
   if (targets.distanceMeters && activity.distance !== undefined) {
     return (
@@ -207,7 +211,8 @@ export function pairPlannedWithActual(
   scheduled: TrainingHubScheduledWorkoutEntry[],
   activities: TrainingHubActivity[],
   unitSystem: UnitSystem,
-  overrides?: ReadonlyMap<string, PairingOverride>
+  overrides?: ReadonlyMap<string, PairingOverride>,
+  loadSource: StrengthLoadSource = "coros"
 ): { pairs: PlannedActualPair[]; unplanned: TrainingHubActivity[] } {
   const remaining = [...activities];
   const pairs: PlannedActualPair[] = [];
@@ -242,7 +247,7 @@ export function pairPlannedWithActual(
       pairs.push({
         scheduled: entry,
         activity: chosen,
-        completionPct: chosen ? completionPct(entry, chosen, targets) : undefined,
+        completionPct: chosen ? completionPct(entry, chosen, targets, loadSource) : undefined,
         targets
       });
       continue;
@@ -254,7 +259,7 @@ export function pairPlannedWithActual(
       if (!sportsCompatible(entry, activity)) {
         continue;
       }
-      const score = matchScore(entry, activity, targets);
+      const score = matchScore(entry, activity, targets, loadSource);
       if (score < bestScore) {
         best = activity;
         bestScore = score;
@@ -266,7 +271,7 @@ export function pairPlannedWithActual(
       pairs.push({
         scheduled: entry,
         activity: best,
-        completionPct: completionPct(entry, best, targets),
+        completionPct: completionPct(entry, best, targets, loadSource),
         targets
       });
     } else {
@@ -303,9 +308,13 @@ function lastDefined<T>(
  * for its week. `PlannedActualPair` carries what that produced, so the second
  * pass bought nothing, and reading it here is what makes the comment below
  * true rather than merely intended.
+ *
+ * Loads are summed twice, in the load strength is read in and in COROS's: the
+ * week's figure is the first, COROS's recommended band is set against the second.
  */
-export function computeWeeklyStats(days: CalendarDay[]): WeeklyStats {
+export function computeWeeklyStats(days: CalendarDay[], loadSource: StrengthLoadSource = "coros"): WeeklyStats {
   let actualLoad = 0;
+  let actualCorosLoad = 0;
   let plannedLoad = 0;
   let activityTimeSeconds = 0;
   let distanceMeters = 0;
@@ -313,19 +322,21 @@ export function computeWeeklyStats(days: CalendarDay[]): WeeklyStats {
   let plannedSessions = 0;
   let plannedSessionsDone = 0;
   let remainingLoad = 0;
+  let remainingCorosLoad = 0;
   let plannedSeconds: number | undefined = 0;
   let plannedDoneSeconds = 0;
   let elevationGain = 0;
 
   for (const day of days) {
     for (const activity of day.activities) {
-      actualLoad += activity.trainingLoad ?? 0;
+      actualLoad += activityLoad(activity, loadSource) ?? 0;
+      actualCorosLoad += activity.trainingLoad ?? 0;
       activityTimeSeconds += activity.duration ?? 0;
       distanceMeters += activity.distance ?? 0;
       elevationGain += activity.elevationGain ?? 0;
     }
     for (const pair of day.pairs) {
-      plannedLoad += pair.scheduled.trainingLoad ?? 0;
+      plannedLoad += plannedLoadOf(pair.scheduled, loadSource) ?? 0;
       // The same figures the completion badge reads, so a week's planned column
       // and the chips inside it cannot disagree about what was prescribed.
       plannedDistanceKm += (pair.targets.distanceMeters ?? 0) / 1000;
@@ -334,7 +345,8 @@ export function computeWeeklyStats(days: CalendarDay[]): WeeklyStats {
         plannedSessionsDone += 1;
         plannedDoneSeconds += pair.activity.duration ?? 0;
       } else if (!day.isPast) {
-        remainingLoad += pair.scheduled.trainingLoad ?? 0;
+        remainingLoad += plannedLoadOf(pair.scheduled, loadSource) ?? 0;
+        remainingCorosLoad += pair.scheduled.trainingLoad ?? 0;
       }
       // A total over some of the sessions would read as the whole plan's.
       plannedSeconds =
@@ -348,6 +360,8 @@ export function computeWeeklyStats(days: CalendarDay[]): WeeklyStats {
   return {
     actualLoad: Math.round(actualLoad),
     plannedLoad: Math.round(plannedLoad),
+    actualCorosLoad: Math.round(actualCorosLoad),
+    remainingCorosLoad: Math.round(remainingCorosLoad),
     activityTimeSeconds,
     distanceMeters,
     plannedDistanceKm,

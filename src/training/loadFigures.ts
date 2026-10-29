@@ -33,6 +33,23 @@ export function plannedLoad(workout: Loaded, source: StrengthLoadSource): number
 }
 
 /**
+ * A session's load and its plan's, both in one load: Heracles's only where
+ * both sides carry it, so a plan COROS priced is never set against a figure
+ * of the other scale. The main process compares the same way
+ * (`loadsToCompare` in `trainingLibraryService.ts`).
+ */
+export function comparableLoads(
+  planned: Loaded,
+  done: Loaded | undefined,
+  source: StrengthLoadSource
+): { planned?: number; done?: number } {
+  if (source === "heracles" && planned.heraclesLoad && done?.heraclesLoad) {
+    return { planned: planned.heraclesLoad.value, done: done.heraclesLoad.value };
+  }
+  return { planned: planned.trainingLoad, done: done?.trainingLoad };
+}
+
+/**
  * Sessions (done or planned) whose `trainingLoad` reads in the chosen load,
  * for code that only adds loads up or compares them — never for anything set
  * against COROS's own figures. The list as given while COROS is chosen.

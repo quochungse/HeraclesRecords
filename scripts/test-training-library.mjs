@@ -378,6 +378,21 @@ const manual = library.buildTrainingActivityMatches(
 );
 assert.equal(manual[1].status, "skipped");
 
+// Strength read in Heracles Training Load: a lift COROS prices at a fraction
+// of its plan is kept, because both sides are read in the one load.
+{
+  const heracles = (value) => ({ value, muscular: value, quality: "sets" });
+  const gymPlan = [{ planId: "schedule", idInPlan: "gym", planProgramId: "pp3", happenDay: "20991201", name: "Gym", sportType: 4, trainingLoad: 40, heraclesLoad: heracles(150) }];
+  const lift = [{ activityId: "lift", name: "Gym", sportType: 4, startTime: day, duration: 3_000, trainingLoad: 12, heraclesLoad: heracles(146) }];
+  const coros = library.buildTrainingActivityMatches(gymPlan, lift, [], "20991202");
+  assert.equal(coros[0].status, "partial", "12 of a planned 40 in COROS's load");
+  const chosen = library.buildTrainingActivityMatches(gymPlan, lift, [], "20991202", "heracles");
+  assert.equal(chosen[0].status, "completed", "146 of a planned 150 in Heracles's");
+  assert.equal(chosen[0].plannedHeraclesLoad, 150);
+  assert.equal(chosen[0].completedHeraclesLoad, 146);
+  assert.equal(chosen[0].completedTrainingLoad, 12, "COROS's figure is stored beside it");
+}
+
 
 // --- storage ------------------------------------------------------------------
 
@@ -432,6 +447,11 @@ assert.equal(databaseModule.listTrainingActivityMatches()[0].status, "skipped");
 assert.equal(databaseModule.listTrainingActivityMatches()[0].manual, true);
 library.saveManualActivityMatch({ ...said, status: "missed", manual: false });
 assert.equal(databaseModule.listTrainingActivityMatches()[0].manual, false, "Match automatically lets the matcher decide again");
+library.saveManualActivityMatch({ ...said, status: "completed", manual: true, plannedHeraclesLoad: 150.5, completedHeraclesLoad: 146 });
+assert.equal(databaseModule.listTrainingActivityMatches()[0].plannedHeraclesLoad, 150.5, "Heracles's loads are kept on the row");
+assert.equal(databaseModule.listTrainingActivityMatches()[0].completedHeraclesLoad, 146);
+library.saveManualActivityMatch({ ...said, status: "completed", manual: true });
+assert.equal(databaseModule.listTrainingActivityMatches()[0].completedHeraclesLoad, undefined, "and cleared with them");
 
 // Drafts: kept, listed, replaced in place, discarded.
 const kept = library.savePlanDraft({ baseRemoteId: "remote-1", baseVersion: 7, plan: nativeDocument });

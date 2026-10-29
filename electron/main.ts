@@ -138,8 +138,10 @@ import {
 import { syncStrengthHistory } from "./strengthHistoryService";
 import {
   getHeraclesLoadInfo,
+  planEntryHeraclesLoads,
   setStrengthLoadSource,
   withHeraclesLoads,
+  withPlannedHeraclesLoads,
   withStrengthSessionLoads
 } from "./heraclesLoadService";
 import {
@@ -154,6 +156,7 @@ import type {
   SaveChatSessionOptions,
   DeleteTurnOptions,
   HideTurnOptions,
+  PlanLoadEntry,
   TurnRef,
   StrengthHistoryRequest,
   TrainingHubStatus,
@@ -2195,8 +2198,8 @@ function registerIpcHandlers(): void {
 
   ipcMain.handle(
     "trainingHub:listScheduledWorkouts",
-    (_event, startDay: string, endDay: string) =>
-      listScheduledWorkoutEntries(startDay, endDay)
+    async (_event, startDay: string, endDay: string) =>
+      withPlannedHeraclesLoads(await listScheduledWorkoutEntries(startDay, endDay))
   );
 
   ipcMain.handle("trainingHub:listLibraryWorkouts", () =>
@@ -2515,6 +2518,10 @@ function registerIpcHandlers(): void {
     return getHeraclesLoadInfo();
   });
 
+  ipcMain.handle("strength:estimatePlanLoads", (_event, entries: unknown) =>
+    planEntryHeraclesLoads(Array.isArray(entries) ? (entries as PlanLoadEntry[]) : [])
+  );
+
   ipcMain.handle("hevy:getStatus", () => getHevyStatus());
   ipcMain.handle("hevy:connect", (_event, apiKey: string) => connectHevy(apiKey));
   ipcMain.handle("hevy:updateSettings", (_event, input: HevySettingsInput) =>
@@ -2524,8 +2531,8 @@ function registerIpcHandlers(): void {
 
   ipcMain.handle("trainingHub:getSportTypeMap", () => getSportTypeMap());
 
-  ipcMain.handle("trainingHub:getUpcomingWorkouts", (_event, days?: number) =>
-    getUpcomingWorkouts(days)
+  ipcMain.handle("trainingHub:getUpcomingWorkouts", async (_event, days?: number) =>
+    withPlannedHeraclesLoads(await getUpcomingWorkouts(days))
   );
 
   // Through the cache, not straight at COROS: one sleep fetch is ~20 sequential

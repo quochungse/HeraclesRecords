@@ -518,6 +518,10 @@ export function initializeDatabase(userDataPath: string): Database.Database {
   // The parse a strength breakdown was cached with (STRENGTH_DETAIL_VERSION in
   // strengthDetail.ts); an older one, NULL included, is parsed again. `derived`.
   ensureColumn(db, "strength_sessions", "parse_version", "INTEGER");
+  // Heracles Training Load's planned and done figures, beside COROS's: what a
+  // match's status was read from when strength is read in Heracles.
+  ensureColumn(db, "training_activity_matches", "planned_heracles_load", "REAL");
+  ensureColumn(db, "training_activity_matches", "completed_heracles_load", "REAL");
   // The Hall of Records' share of a summary, versioned apart from the zone
   // split and the drift (RECORDS_SUMMARY_VERSION in activityMetrics.ts): a row
   // written before these existed keeps serving the run screens, and NULL here
@@ -3221,6 +3225,8 @@ interface TrainingActivityMatchRow {
   completed_distance_meters: number | null;
   planned_training_load: number | null;
   completed_training_load: number | null;
+  planned_heracles_load: number | null;
+  completed_heracles_load: number | null;
   updated_at: string;
 }
 
@@ -3597,6 +3603,8 @@ function toTrainingActivityMatch(row: TrainingActivityMatchRow): TrainingActivit
     completedDistanceMeters: row.completed_distance_meters ?? undefined,
     plannedTrainingLoad: row.planned_training_load ?? undefined,
     completedTrainingLoad: row.completed_training_load ?? undefined,
+    plannedHeraclesLoad: row.planned_heracles_load ?? undefined,
+    completedHeraclesLoad: row.completed_heracles_load ?? undefined,
     updatedAt: row.updated_at
   };
 }
@@ -3698,7 +3706,8 @@ export function listTrainingActivityMatches(): TrainingActivityMatch[] {
                 activity_id, happen_day, status, confidence, manual,
                 planned_duration_seconds, completed_duration_seconds,
                 planned_distance_meters, completed_distance_meters,
-                planned_training_load, completed_training_load, updated_at
+                planned_training_load, completed_training_load,
+                planned_heracles_load, completed_heracles_load, updated_at
          FROM training_activity_matches
          ORDER BY happen_day DESC`
       )
@@ -3714,8 +3723,9 @@ export function saveTrainingActivityMatch(match: TrainingActivityMatch): void {
          activity_id, happen_day, status, confidence, manual,
          planned_duration_seconds, completed_duration_seconds,
          planned_distance_meters, completed_distance_meters,
-         planned_training_load, completed_training_load, updated_at
-       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+         planned_training_load, completed_training_load,
+         planned_heracles_load, completed_heracles_load, updated_at
+       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
        ON CONFLICT(id) DO UPDATE SET
          plan_id = excluded.plan_id,
          plan_entry_id = excluded.plan_entry_id,
@@ -3727,6 +3737,8 @@ export function saveTrainingActivityMatch(match: TrainingActivityMatch): void {
          completed_duration_seconds = excluded.completed_duration_seconds,
          completed_distance_meters = excluded.completed_distance_meters,
          completed_training_load = excluded.completed_training_load,
+         planned_heracles_load = excluded.planned_heracles_load,
+         completed_heracles_load = excluded.completed_heracles_load,
          updated_at = excluded.updated_at`
     )
     .run(
@@ -3746,6 +3758,8 @@ export function saveTrainingActivityMatch(match: TrainingActivityMatch): void {
       match.completedDistanceMeters ?? null,
       match.plannedTrainingLoad ?? null,
       match.completedTrainingLoad ?? null,
+      match.plannedHeraclesLoad ?? null,
+      match.completedHeraclesLoad ?? null,
       match.updatedAt
     );
 }

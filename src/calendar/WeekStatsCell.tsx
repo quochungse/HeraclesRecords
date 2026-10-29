@@ -1,6 +1,8 @@
 import { MessageCircle } from "lucide-react";
 import type { CSSProperties } from "react";
 import { formatDurationSpan } from "../training/formatters";
+import { loadPairTitle } from "../training/loadFigures";
+import { useLoadSource } from "../training/loadSource";
 import type { WeeklyStats } from "./calendarTypes";
 import { WeekStatsSkeleton } from "./CalendarSkeleton";
 import { useUnitSystem } from "../units/UnitSystemProvider";
@@ -34,7 +36,10 @@ export function weekLoadScale(weeks: WeeklyStats[]): number {
   return most * 1.15;
 }
 
-/** Where the week's load sits against COROS's band, said in words on hover. */
+/**
+ * Where the week's load sits against COROS's band, said in words on hover.
+ * Always COROS's own load: the band is set in it.
+ */
 function loadBandTitle(actual: number, min?: number, max?: number): string | undefined {
   if (min === undefined || max === undefined || actual === 0) {
     return undefined;
@@ -69,6 +74,7 @@ export function WeekStatsCell({
 }: WeekStatsCellProps) {
   const { rich } = useI18n();
   const { unitSystem } = useUnitSystem();
+  const { source } = useLoadSource();
   const hasAny =
     stats.actualLoad > 0 ||
     stats.plannedLoad > 0 ||
@@ -105,6 +111,16 @@ export function WeekStatsCell({
   const min = stats.recommendedLoadMin;
   const max = stats.recommendedLoadMax;
   const hasTarget = min !== undefined && max !== undefined;
+  /* With strength read in Heracles Training Load the figure is that load, and
+     the hover says COROS's beside it before placing COROS's in the band. */
+  const loadTitle = [
+    upcoming
+      ? loadPairTitle(source, stats.remainingLoad, stats.remainingCorosLoad)
+      : loadPairTitle(source, stats.actualLoad, stats.actualCorosLoad),
+    upcoming ? undefined : loadBandTitle(stats.actualCorosLoad, min, max)
+  ]
+    .filter(Boolean)
+    .join("\n");
 
   const rows: Array<{ label: string; value: string }> = [];
   if (stats.plannedSessions > 0) {
@@ -145,7 +161,7 @@ export function WeekStatsCell({
       <div className="calendar-weekstats-top">
         <span
           className="calendar-weekstats-load"
-          title={upcoming ? undefined : loadBandTitle(stats.actualLoad, min, max)}
+          title={loadTitle || undefined}
         >
           {rich(
             upcoming ? "calendar.week.loadPlanned" : "calendar.week.load",

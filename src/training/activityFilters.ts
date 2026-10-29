@@ -5,13 +5,14 @@
  * can reach: the renderer holds every activity COROS has, and the question
  * "which of these does the athlete mean" is arithmetic, not layout.
  */
-import type { TrainingHubActivity } from "../../electron/types";
+import type { StrengthLoadSource, TrainingHubActivity } from "../../electron/types";
 import {
   periodOptions,
   type PeriodDays,
   type PeriodOption
 } from "../preferences/periodScale";
 import { activityStartTimeMs, startOfWeekMs, weekWindowStartMs } from "./activityWindow";
+import { activityLoad } from "./loadFigures";
 import { type SportColorCategory, sportColorCategory } from "./sportColors";
 import { getIntlLocale, t } from "../i18n/core";
 
@@ -148,7 +149,10 @@ export interface ActivityTotals {
   distance: number;
   /** Metres. */
   elevationGain: number;
+  /** In the load strength is read in (`useLoadSource`). */
   trainingLoad: number;
+  /** COROS's Training Load over the same sessions, for the hover beside it. */
+  corosTrainingLoad: number;
   /** Distinct calendar days with at least one activity. */
   activeDays: number;
   /** Calendar weeks between the oldest and newest activity, both included. */
@@ -169,6 +173,7 @@ function emptyActivityTotals(): ActivityTotals {
     distance: 0,
     elevationGain: 0,
     trainingLoad: 0,
+    corosTrainingLoad: 0,
     activeDays: 0,
     weeks: 0,
     sports: []
@@ -183,7 +188,8 @@ function emptyActivityTotals(): ActivityTotals {
  * divided by 52 on the "1 year" filter.
  */
 export function summariseActivities(
-  activities: readonly TrainingHubActivity[]
+  activities: readonly TrainingHubActivity[],
+  loadSource: StrengthLoadSource = "coros"
 ): ActivityTotals {
   if (activities.length === 0) {
     return emptyActivityTotals();
@@ -195,6 +201,7 @@ export function summariseActivities(
   let distance = 0;
   let elevationGain = 0;
   let trainingLoad = 0;
+  let corosTrainingLoad = 0;
   let earliestWeek: number | undefined;
   let latestWeek: number | undefined;
 
@@ -202,7 +209,9 @@ export function summariseActivities(
     duration += activity.duration ?? 0;
     distance += activity.distance ?? 0;
     elevationGain += activity.elevationGain ?? 0;
-    trainingLoad += activity.trainingLoad ?? 0;
+    const load = activityLoad(activity, loadSource) ?? 0;
+    trainingLoad += load;
+    corosTrainingLoad += activity.trainingLoad ?? 0;
 
     const category = sportColorCategory(activity.sportType);
     const total = bySport.get(category) ?? {
@@ -213,7 +222,7 @@ export function summariseActivities(
     };
     total.count += 1;
     total.duration += activity.duration ?? 0;
-    total.trainingLoad += activity.trainingLoad ?? 0;
+    total.trainingLoad += load;
     bySport.set(category, total);
 
     const at = activityStartTimeMs(activity);
@@ -240,6 +249,7 @@ export function summariseActivities(
     distance,
     elevationGain,
     trainingLoad,
+    corosTrainingLoad,
     activeDays: days.size,
     weeks,
     sports: [...bySport.values()].sort(

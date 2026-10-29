@@ -1,6 +1,7 @@
 import { Activity, Check, Mountain, Plus, type LucideIcon } from "lucide-react";
 import { useMemo, useState } from "react";
 import type {
+  StrengthLoadSource,
   TrainingHubActivity,
   TrainingHubScheduledWorkoutEntry,
   UnitSystem,
@@ -13,6 +14,8 @@ import {
   formatHappenDayLabel,
   formatUpcomingWorkoutVolumeDisplay
 } from "../training/formatters";
+import { activityLoad, activityLoadTitle, plannedLoad } from "../training/loadFigures";
+import { useLoadSource } from "../training/loadSource";
 import { sportColorCategory, type SportColorCategory } from "../training/sportColors";
 import { isSwimSportType } from "../training/sportTypes";
 import { activityWorkoutSport } from "../training/askCoachAbout";
@@ -102,11 +105,12 @@ function cardDistance(meters: number | undefined, unitSystem: UnitSystem, swim: 
   return formatDistanceValue(meters, unitSystem, { digits: tenths % 10 === 0 ? 0 : 1 });
 }
 
-function activityAmounts(activity: TrainingHubActivity, unitSystem: UnitSystem): string[] {
+function activityAmounts(activity: TrainingHubActivity, unitSystem: UnitSystem, source: StrengthLoadSource): string[] {
+  const load = activityLoad(activity, source);
   return [
     cardDistance(activity.distance, unitSystem, isSwimSportType(activity.sportType)),
     activity.duration ? formatDurationSpan(activity.duration) : undefined,
-    activity.trainingLoad !== undefined ? t("units.trainingLoadShort", { value: Math.round(activity.trainingLoad) }) : undefined
+    load !== undefined ? t("units.trainingLoadShort", { value: Math.round(load) }) : undefined
   ].filter((part): part is string => Boolean(part));
 }
 
@@ -141,13 +145,15 @@ interface CardView {
   completionPct?: number;
   pair?: PlannedActualPair;
   activity?: TrainingHubActivity;
+  /** Both loads, while strength is read in Heracles Training Load and they differ. */
+  loadNote?: string;
 }
 
 /**
  * A day's cards, in the order the day panel lists them: each planned session —
  * as the activity that did it, when one did — then what no plan asked for.
  */
-function dayCards(day: CalendarDay, unitSystem: UnitSystem): CardView[] {
+function dayCards(day: CalendarDay, unitSystem: UnitSystem, source: StrengthLoadSource): CardView[] {
   const planned = day.pairs.map((pair): CardView => {
     const { scheduled, activity } = pair;
     const key = `pair-${scheduled.planId}-${scheduled.idInPlan}`;
@@ -155,19 +161,20 @@ function dayCards(day: CalendarDay, unitSystem: UnitSystem): CardView[] {
       return {
         key,
         name: activity.name ?? scheduled.name,
-        meta: activityAmounts(activity, unitSystem).join(" · "),
+        meta: activityAmounts(activity, unitSystem, source).join(" · "),
         sport: activityWorkoutSport(activity.sportType),
         category: sportColorCategory(activity.sportType),
         kind: "done",
         completionPct: pair.completionPct,
         pair,
-        activity
+        activity,
+        loadNote: activityLoadTitle(activity, source)
       };
     }
     // A program sport code, not an activity code: swim is 3 here.
     const sport = scheduledWorkoutSport(scheduled.sportType);
     const missed = day.isPast;
-    const load = scheduled.trainingLoad;
+    const load = plannedLoad(scheduled, source);
     return {
       key,
       name: scheduled.name,
@@ -187,17 +194,19 @@ function dayCards(day: CalendarDay, unitSystem: UnitSystem): CardView[] {
       sport,
       category: scheduledSportCategory(scheduled.sportType),
       kind: missed ? "missed" : "planned",
-      pair
+      pair,
+      loadNote: activityLoadTitle(scheduled, source)
     };
   });
   const unplanned = day.unplannedActivities.map((activity): CardView => ({
     key: `activity-${activity.activityId}`,
     name: activity.name ?? activity.sportName ?? t("activity.untitled"),
-    meta: activityAmounts(activity, unitSystem).join(" · "),
+    meta: activityAmounts(activity, unitSystem, source).join(" · "),
     sport: activityWorkoutSport(activity.sportType),
     category: sportColorCategory(activity.sportType),
     kind: "done",
-    activity
+    activity,
+    loadNote: activityLoadTitle(activity, source)
   }));
   return [...planned, ...unplanned];
 }
@@ -285,7 +294,7 @@ function SessionCard({
       }}
       disabled={unavailable}
       aria-pressed={selectable ? selected : undefined}
-      title={card.meta ? `${title}\n${card.meta}` : title}
+      title={[title, card.meta, card.loadNote].filter(Boolean).join("\n")}
       /* The dashed edge is what says "planned" on screen, and a border says
          nothing to a screen reader, so the word lives here as well. */
       aria-label={
@@ -335,13 +344,14 @@ export function DayCell({
   placeholderDelayMs
 }: DayCellProps) {
   const { unitSystem } = useUnitSystem();
+  const { source } = useLoadSource();
   const { locale } = useI18n();
   const [dropTarget, setDropTarget] = useState(false);
   const canReceiveDrop = !day.isPast && !busy && !selectionMode;
   /* Every cell re-renders when the screen's state moves — a panel opening, a
      drag over another day — and a day only changes when its range is read
      again, so its lines are worked out once per day, units and language. */
-  const cards = useMemo(() => dayCards(day, unitSystem), [day, unitSystem, locale]);
+  const cards = useMemo(() => dayCards(day, unitSystem, source), [day, unitSystem, source, locale]);
   /* A day that already holds something (a week shared with the month before,
      still on screen) shows it; only an empty one waits. */
   const waiting = placeholderDelayMs !== undefined && cards.length === 0;

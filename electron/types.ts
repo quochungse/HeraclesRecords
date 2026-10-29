@@ -333,6 +333,14 @@ export interface HeraclesLoadInfo {
   bodyWeightKg?: number;
 }
 
+/** A plan session sent to be estimated, under a key the screen chooses. */
+export interface PlanLoadEntry {
+  key: string;
+  workout: PlanWorkoutEntryInput;
+  plannedDurationSeconds?: number;
+  plannedTrainingLoad?: number;
+}
+
 export interface RpeDistributionBucket {
   /** RPE level 1..5. */
   level: number;
@@ -962,6 +970,14 @@ export interface TrainingHubScheduledExercise {
   weight?: number;
   targetType?: number;
   targetLabel?: string;
+  /** COROS's key, when the step was not renamed: what Heracles Training Load reads a planned set against. */
+  key?: string;
+  /** COROS step type: 1 warm-up, 2 work, 3 cool-down, 4 rest. */
+  corosExerciseType?: number;
+  /** Rest after each set, in seconds, where the step states one. */
+  restSec?: number;
+  /** A timed step's length, in seconds. */
+  holdSec?: number;
 }
 
 export interface TrainingHubSportType {
@@ -3104,6 +3120,10 @@ export interface TrainingActivityMatch {
   completedDistanceMeters?: number;
   plannedTrainingLoad?: number;
   completedTrainingLoad?: number;
+  /** Heracles Training Load's estimate for a planned strength session. */
+  plannedHeraclesLoad?: number;
+  /** Heracles Training Load of the strength session that answered it. */
+  completedHeraclesLoad?: number;
   updatedAt: string;
 }
 

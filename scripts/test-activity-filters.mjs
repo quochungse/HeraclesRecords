@@ -275,6 +275,32 @@ assert.deepEqual(
   "busiest sport first, by time rather than by count"
 );
 
+// With strength read in Heracles Training Load the lift counts that load, and
+// COROS's total stays beside it for the hover.
+{
+  const lift = activity({
+    activityId: "h1",
+    sportType: 402,
+    startTime: at(MONDAY + 2 * DAY),
+    duration: 4500,
+    trainingLoad: 60,
+    heraclesLoad: { value: 190, cardio: 60, muscular: 130, quality: "sets" }
+  });
+  const run = activity({ activityId: "h2", sportType: 100, startTime: at(MONDAY + DAY), duration: 3600, trainingLoad: 280 });
+  const coros = summariseActivities([lift, run]);
+  assert.equal(coros.trainingLoad, 340);
+  assert.equal(coros.corosTrainingLoad, 340);
+  const heracles = summariseActivities([lift, run], "heracles");
+  assert.equal(heracles.trainingLoad, 470);
+  assert.equal(heracles.corosTrainingLoad, 340);
+  assert.equal(heracles.sports.find((sport) => sport.category === "strength").trainingLoad, 190);
+  assert.deepEqual(
+    activityRowFacts({ ...lift, duration: undefined }, "metric", "heracles").map((fact) => fact.key),
+    ["load"]
+  );
+  assert.match(activityRowFacts({ ...lift, duration: undefined }, "metric", "heracles")[0].value, /190/);
+}
+
 // `weeks` spans the activities, not the filter: three weeks of history read
 // under the "1 year" period must not divide every per-week figure by 52.
 const sparse = summariseActivities([

@@ -37,7 +37,9 @@ import type {
   StrengthHistory,
   StrengthHistoryRequest,
   StrengthLoadSource,
+  HeraclesLoad,
   HeraclesLoadInfo,
+  PlanLoadEntry,
   TrainingHubActivity,
   TrainingHubActivityDetail,
   TrainingHubActivityFileType,
@@ -421,6 +423,8 @@ const api = {
   getStrengthLoadSource: (): Promise<HeraclesLoadInfo> => ipcRenderer.invoke("strength:getLoadSource"),
   setStrengthLoadSource: (source: StrengthLoadSource): Promise<HeraclesLoadInfo> =>
     ipcRenderer.invoke("strength:setLoadSource", source),
+  estimatePlanLoads: (entries: PlanLoadEntry[]): Promise<Record<string, HeraclesLoad>> =>
+    ipcRenderer.invoke("strength:estimatePlanLoads", entries),
   getHevyStatus: (): Promise<HevyStatus> => ipcRenderer.invoke("hevy:getStatus"),
   connectHevy: (apiKey: string): Promise<HevyStatus> =>
     ipcRenderer.invoke("hevy:connect", apiKey),

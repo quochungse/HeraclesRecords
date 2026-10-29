@@ -471,4 +471,40 @@ const activity = (overrides) => ({
   }
 }
 
+/* --- 11. strength read in Heracles Training Load -------------------------- */
+
+{
+  // The week's figure is the chosen load; COROS's band is set against COROS's
+  // own sum, which is kept apart (docs/heracles-training-load.md).
+  const heracles = (value) => ({ value, muscular: value, quality: "sets" });
+  const gym = scheduled({ idInPlan: "gym", sportType: 4, trainingLoad: 20, heraclesLoad: heracles(150) });
+  const next = scheduled({ idInPlan: "next", sportType: 4, heraclesLoad: heracles(140) });
+  const lift = activity({ activityId: "lift", sportType: 402, trainingLoad: 25, heraclesLoad: heracles(160) });
+  const run = activity({ activityId: "run", sportType: 100, trainingLoad: 80 });
+  const day = (dateKey, isPast, scheduledEntries, activities, source) => {
+    const { pairs, unplanned } = pairPlannedWithActual(scheduledEntries, activities, "metric", undefined, source);
+    return { dateKey, inMonth: true, isToday: false, isPast, scheduled: scheduledEntries, activities, pairs, unplannedActivities: unplanned };
+  };
+  const week = (source) => [day("20261005", true, [gym], [lift, run], source), day("20261008", false, [next], [], source)];
+
+  const coros = computeWeeklyStats(week("coros"));
+  assert.equal(coros.actualLoad, 105);
+  assert.equal(coros.actualCorosLoad, 105, "with COROS chosen both sums are COROS's");
+  assert.equal(coros.remainingLoad, 0, "COROS priced the strength plan at nothing");
+  assert.equal(week("coros")[0].pairs[0].completionPct, 125, "25 of a planned 20");
+
+  const chosen = computeWeeklyStats(week("heracles"), "heracles");
+  assert.equal(chosen.actualLoad, 240, "the lift in Heracles's load, the run in COROS's");
+  assert.equal(chosen.actualCorosLoad, 105, "the band is still read against COROS's load");
+  assert.equal(chosen.plannedLoad, 290);
+  assert.equal(chosen.remainingLoad, 140);
+  assert.equal(chosen.remainingCorosLoad, 0);
+  assert.equal(week("heracles")[0].pairs[0].completionPct, 107, "160 of a planned 150, one scale on both sides");
+
+  // A plan only COROS priced is never set against a figure of the other scale.
+  const priced = scheduled({ idInPlan: "priced", sportType: 4, trainingLoad: 20 });
+  const { pairs } = pairPlannedWithActual([priced], [lift], "metric", undefined, "heracles");
+  assert.equal(pairs[0].completionPct, 125, "COROS against COROS where the plan has no estimate");
+}
+
 console.log("calendar pairing tests passed");

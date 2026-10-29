@@ -22,6 +22,7 @@ import {
   runHeraclesLoads,
   type HeraclesBridge,
   type HeraclesLoadRun,
+  type PlannedStrengthExercise,
   type PlannedStrengthSession,
   type RatedRun
 } from "./heraclesLoad";
@@ -34,9 +35,12 @@ import type {
   HeraclesLoadInfo,
   HeraclesRunEquivalent,
   HeraclesSessionLoad,
+  PlanLoadEntry,
+  RunWorkoutCreateStep,
   StrengthLoadSource,
   StrengthSession,
-  TrainingHubActivity
+  TrainingHubActivity,
+  TrainingHubScheduledExercise
 } from "./types";
 
 export const STRENGTH_LOAD_SOURCE_SETTING = "strength.loadSource";
@@ -248,4 +252,127 @@ export function plannedHeraclesLoad(plan: PlannedStrengthSession, deps?: Heracle
   const resolved = depsOrDefault(deps);
   const snapshot = snapshotFor(resolved);
   return estimatePlannedLoad(plan, snapshot.run.state, resolved.now());
+}
+
+/** COROS's workout sport for strength. */
+const PLANNED_STRENGTH_SPORT = 4;
+
+/** A planned session's steps, as the schedule parse reads them, in the engine's terms. */
+export function plannedStrengthSession(
+  exercises: readonly TrainingHubScheduledExercise[] | undefined,
+  estimatedSeconds: number | undefined,
+  corosLoad: number | undefined
+): PlannedStrengthSession {
+  return {
+    exercises: (exercises ?? []).map((exercise) => ({
+      key: exercise.key,
+      corosExerciseType: exercise.corosExerciseType,
+      sets: exercise.sets ?? 1,
+      reps: exercise.reps,
+      weightKg: exercise.weight,
+      holdSec: exercise.holdSec,
+      restSec: exercise.restSec
+    })),
+    estimatedSeconds,
+    corosLoad
+  };
+}
+
+/** COROS's `estimatedTime` of a raw program, in seconds; COROS writes 0 for a field not filled in. */
+function estimatedSecondsOf(rawProgram: Record<string, unknown> | undefined): number | undefined {
+  const value = Number(rawProgram?.estimatedTime);
+  return Number.isFinite(value) && value > 0 ? value : undefined;
+}
+
+/**
+ * Planned sessions as the schedule returned them, each strength one carrying
+ * Heracles Training Load's estimate. `durationSeconds` (upcoming workouts) or
+ * the raw program's `estimatedTime` (scheduled entries) is the session's length.
+ */
+export function withPlannedHeraclesLoads<
+  T extends {
+    sportType?: number;
+    trainingLoad?: number;
+    exercises?: TrainingHubScheduledExercise[];
+    durationSeconds?: number;
+    rawProgram?: Record<string, unknown>;
+  }
+>(workouts: T[], deps?: HeraclesLoadDeps): T[] {
+  if (!workouts.some((workout) => workout.sportType === PLANNED_STRENGTH_SPORT)) return workouts;
+  return workouts.map((workout) => {
+    if (workout.sportType !== PLANNED_STRENGTH_SPORT) return workout;
+    const estimated = workout.durationSeconds ?? estimatedSecondsOf(workout.rawProgram);
+    const heraclesLoad = plannedHeraclesLoad(
+      plannedStrengthSession(workout.exercises, estimated, workout.trainingLoad),
+      deps
+    );
+    return heraclesLoad ? { ...workout, heraclesLoad } : workout;
+  });
+}
+
+const COROS_EXERCISE_KEY = /^[TS]\d{4}$/;
+const POUNDS_TO_KG = 0.45359237;
+const STEP_TYPES: Partial<Record<RunWorkoutCreateStep["kind"], number>> = {
+  warmup: 1,
+  training: 2,
+  interval: 2,
+  cooldown: 3
+};
+
+function plannedExerciseOf(step: RunWorkoutCreateStep, repeat: number): PlannedStrengthExercise | undefined {
+  // A step with no kind is a training step: older plans lack it.
+  const corosExerciseType = STEP_TYPES[step.kind ?? "training"];
+  if (corosExerciseType === undefined) return undefined;
+  const name = step.exercise_name?.trim();
+  const intensity = step.intensity;
+  const weightKg =
+    intensity?.type === "weight" && intensity.mode === "weight"
+      ? intensity.unit === "lb" ? intensity.value * POUNDS_TO_KG : intensity.value
+      : undefined;
+  const timed = step.target_type === "time" && (step.target_duration_seconds ?? 0) > 0;
+  return {
+    key: name && COROS_EXERCISE_KEY.test(name) ? name : undefined,
+    corosExerciseType,
+    sets: Math.max(1, step.sets ?? 1) * repeat,
+    reps: step.target_type === "reps" ? step.target_reps : undefined,
+    weightKg,
+    holdSec: timed ? step.target_duration_seconds : undefined,
+    restSec: step.rest_type === 1 ? step.rest_value : undefined
+  };
+}
+
+/** A plan's strength session in the engine's terms: its steps, a repeat counted per round. */
+function plannedPlanSession(entry: PlanLoadEntry): PlannedStrengthSession {
+  const exercises: PlannedStrengthExercise[] = [];
+  for (const node of entry.workout.steps ?? []) {
+    const steps = "repeat" in node ? node.steps : [node];
+    const repeat = "repeat" in node ? Math.max(1, node.repeat) : 1;
+    for (const step of steps) {
+      const planned = plannedExerciseOf(step, repeat);
+      if (planned) exercises.push(planned);
+    }
+  }
+  return {
+    exercises,
+    estimatedSeconds: entry.plannedDurationSeconds,
+    corosLoad: entry.plannedTrainingLoad
+  };
+}
+
+/**
+ * Heracles Training Load's estimate of each strength session in the plans a
+ * screen is reading, by the key the screen sent. A session of another sport,
+ * or one stating neither sets nor a length, has no entry.
+ */
+export function planEntryHeraclesLoads(
+  entries: readonly PlanLoadEntry[],
+  deps?: HeraclesLoadDeps
+): Record<string, HeraclesLoad> {
+  const loads: Record<string, HeraclesLoad> = {};
+  for (const entry of entries) {
+    if (entry.workout.sport !== "strength") continue;
+    const load = plannedHeraclesLoad(plannedPlanSession(entry), deps);
+    if (load) loads[entry.key] = load;
+  }
+  return loads;
 }

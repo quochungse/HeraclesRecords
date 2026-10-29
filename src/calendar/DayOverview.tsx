@@ -1,11 +1,13 @@
 import { Activity, ChevronRight, Plus } from "lucide-react";
-import type { TrainingHubActivity, UnitSystem } from "../../electron/types";
+import type { StrengthLoadSource, TrainingHubActivity, UnitSystem } from "../../electron/types";
 import { useUnitSystem } from "../units/UnitSystemProvider";
 import {
   formatDistanceMeters,
   formatDurationSeconds,
   formatUpcomingWorkoutVolumeDisplay
 } from "../training/formatters";
+import { activityLoad, activityLoadTitle, plannedLoad } from "../training/loadFigures";
+import { useLoadSource } from "../training/loadSource";
 import { isSwimSportType } from "../training/sportTypes";
 import { scheduledWorkoutSport } from "../training/workoutSport";
 import { activityWorkoutSport } from "../training/askCoachAbout";
@@ -15,11 +17,12 @@ import { formatPlannedVolume } from "./scheduledStructure";
 import { t } from "../i18n/core";
 import { useI18n } from "../i18n/useI18n";
 
-function activityLine(activity: TrainingHubActivity, unitSystem: UnitSystem): string {
+function activityLine(activity: TrainingHubActivity, unitSystem: UnitSystem, source: StrengthLoadSource): string {
+  const load = activityLoad(activity, source);
   return [
     activity.duration ? formatDurationSeconds(activity.duration) : undefined,
     activity.distance ? formatDistanceMeters(activity.distance, unitSystem, isSwimSportType(activity.sportType)) : undefined,
-    activity.trainingLoad !== undefined ? t("units.trainingLoadShort", { value: Math.round(activity.trainingLoad) }) : undefined
+    load !== undefined ? t("units.trainingLoadShort", { value: Math.round(load) }) : undefined
   ]
     .filter(Boolean)
     .join(" · ");
@@ -42,12 +45,13 @@ export function DayOverview({
   // Subscribes to the language, so an open panel redraws on a switch.
   useI18n();
   const { unitSystem } = useUnitSystem();
+  const { source } = useLoadSource();
   const items = dayItems(day);
   const done = day.activities;
   const planned = day.scheduled.length;
   const seconds = done.reduce((sum, activity) => sum + (activity.duration ?? 0), 0);
   const meters = done.reduce((sum, activity) => sum + (activity.distance ?? 0), 0);
-  const load = done.reduce((sum, activity) => sum + (activity.trainingLoad ?? 0), 0);
+  const load = done.reduce((sum, activity) => sum + (activityLoad(activity, source) ?? 0), 0);
   const totals = [
     done.length ? t("calendar.overview.done", { count: done.length }) : undefined,
     planned ? t("calendar.overview.planned", { count: planned }) : undefined,
@@ -87,12 +91,14 @@ export function DayOverview({
               : item.entry.name;
           const line =
             item.kind === "activity"
-              ? activityLine(item.activity, unitSystem)
+              ? activityLine(item.activity, unitSystem, source)
               : [
                   formatPlannedVolume(pair?.targets ?? {}, unitSystem, sport === "swim", () =>
                     formatUpcomingWorkoutVolumeDisplay(item.entry.volume, unitSystem)
                   ),
-                  item.entry.trainingLoad !== undefined ? t("units.trainingLoadShort", { value: Math.round(item.entry.trainingLoad) }) : undefined
+                  plannedLoad(item.entry, source) !== undefined
+                    ? t("units.trainingLoadShort", { value: Math.round(plannedLoad(item.entry, source)!) })
+                    : undefined
                 ]
                   .filter(Boolean)
                   .join(" · ");
@@ -106,7 +112,12 @@ export function DayOverview({
                 : { label: t("calendar.status.planned"), tone: "planned" };
           return (
             <li key={key}>
-              <button type="button" className="calendar-day-overview-item" onClick={() => onOpen(item)}>
+              <button
+                type="button"
+                className="calendar-day-overview-item"
+                onClick={() => onOpen(item)}
+                title={activityLoadTitle(item.kind === "activity" ? item.activity : item.entry, source)}
+              >
                 <span className="calendar-day-overview-icon" style={sportChipStyle(sport)} aria-hidden="true">
                   <Icon size={16} />
                 </span>

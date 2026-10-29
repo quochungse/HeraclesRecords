@@ -243,7 +243,7 @@ export function ActivityDetailPanel({
       </div>
 
       {detail.strength ? (
-        <StrengthDetailPanel strength={detail.strength} />
+        <StrengthDetailPanel strength={detail.strength} heraclesLoad={listActivity?.heraclesLoad} />
       ) : (
         <>
           <div className="activity-detail-grid">

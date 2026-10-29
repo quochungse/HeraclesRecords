@@ -63,6 +63,7 @@ import type {
   NativeCorosPlanProgram,
   PlanWorkoutEntryInput,
   RunWorkoutEditorStep,
+  StrengthLoadSource,
   TrainingActivityMatch,
   TrainingHubActivity,
   TrainingHubLibraryWorkout,
@@ -86,6 +87,7 @@ import type {
   WorkoutSport
 } from "./types";
 import { ScreenError } from "./screenText";
+import { getStrengthLoadSource, withHeraclesLoads, withPlannedHeraclesLoads } from "./heraclesLoadService";
 
 function dateKey(date: Date): string {
   return formatPlanDay(date, false);
@@ -1049,15 +1051,31 @@ export function activityDay(activity: TrainingHubActivity): string | undefined {
   return dateKey(new Date(raw));
 }
 
+/**
+ * A session's load and its plan's in the load the athlete reads strength in,
+ * both sides alike: Heracles Training Load only where both carry it.
+ */
+function loadsToCompare(
+  scheduled: TrainingHubScheduledWorkoutEntry,
+  activity: TrainingHubActivity | undefined,
+  loadSource: StrengthLoadSource
+): { planned?: number; done?: number } {
+  if (loadSource === "heracles" && scheduled.heraclesLoad && activity?.heraclesLoad) {
+    return { planned: scheduled.heraclesLoad.value, done: activity.heraclesLoad.value };
+  }
+  return { planned: scheduled.trainingLoad, done: activity?.trainingLoad };
+}
+
 export function scheduledActivityScore(
   scheduled: TrainingHubScheduledWorkoutEntry,
-  activity: TrainingHubActivity
+  activity: TrainingHubActivity,
+  loadSource: StrengthLoadSource = "coros"
 ): number {
   let score = 0.35;
   if (scheduled.sportType && scheduled.sportType === activity.sportType) score += 0.35;
-  const plannedLoad = scheduled.trainingLoad;
-  if (plannedLoad && activity.trainingLoad !== undefined) {
-    score += 0.2 * Math.max(0, 1 - Math.abs(activity.trainingLoad - plannedLoad) / plannedLoad);
+  const { planned: plannedLoad, done } = loadsToCompare(scheduled, activity, loadSource);
+  if (plannedLoad && done !== undefined) {
+    score += 0.2 * Math.max(0, 1 - Math.abs(done - plannedLoad) / plannedLoad);
   }
   const normalizedName = scheduled.name.trim().toLowerCase();
   if (normalizedName && activity.name?.trim().toLowerCase() === normalizedName) score += 0.1;
@@ -1068,7 +1086,8 @@ export function buildTrainingActivityMatches(
   scheduled: TrainingHubScheduledWorkoutEntry[],
   activities: TrainingHubActivity[],
   previous: TrainingActivityMatch[],
-  today = dateKey(new Date())
+  today = dateKey(new Date()),
+  loadSource: StrengthLoadSource = "coros"
 ): TrainingActivityMatch[] {
   const existing = new Map(
     previous.map((match) => [
@@ -1089,7 +1108,7 @@ export function buildTrainingActivityMatches(
       const candidates = activities
         .filter((candidate) => activityDay(candidate) === entry.happenDay)
         .filter((candidate) => !usedActivities.has(candidate.activityId))
-        .map((candidate) => ({ candidate, score: scheduledActivityScore(entry, candidate) }))
+        .map((candidate) => ({ candidate, score: scheduledActivityScore(entry, candidate, loadSource) }))
         .sort((left, right) => right.score - left.score);
       if (candidates[0]?.score >= 0.5) {
         activity = candidates[0].candidate;
@@ -1097,8 +1116,9 @@ export function buildTrainingActivityMatches(
       }
     }
     if (activity) usedActivities.add(activity.activityId);
-    const ratio = entry.trainingLoad && activity?.trainingLoad !== undefined
-      ? activity.trainingLoad / entry.trainingLoad
+    const compared = loadsToCompare(entry, activity, loadSource);
+    const ratio = compared.planned && compared.done !== undefined
+      ? compared.done / compared.planned
       : undefined;
     const status: TrainingActivityMatch["status"] = manual?.status === "skipped"
       ? "skipped"
@@ -1120,6 +1140,8 @@ export function buildTrainingActivityMatches(
       completedDistanceMeters: activity?.distance,
       plannedTrainingLoad: entry.trainingLoad,
       completedTrainingLoad: activity?.trainingLoad,
+      plannedHeraclesLoad: entry.heraclesLoad?.value,
+      completedHeraclesLoad: activity?.heraclesLoad?.value,
       updatedAt: new Date().toISOString()
     });
   }
@@ -1135,9 +1157,11 @@ export async function refreshTrainingActivityMatches(
     listTrainingHubActivities(1, 500, startDay, endDay)
   ]);
   const results = buildTrainingActivityMatches(
-    scheduled,
-    activities,
-    listTrainingActivityMatches()
+    withPlannedHeraclesLoads(scheduled),
+    withHeraclesLoads(activities),
+    listTrainingActivityMatches(),
+    undefined,
+    getStrengthLoadSource()
   );
   for (const match of results) {
     saveTrainingActivityMatch(match);

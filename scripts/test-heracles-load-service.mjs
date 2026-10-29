@@ -123,4 +123,51 @@ const deps = {
   assert.equal(service.plannedHeraclesLoad({ exercises: [] }, deps), undefined);
 }
 
+// ---- A plan's sessions, as the Training Library sends them ----
+{
+  const liftStep = {
+    kind: "training",
+    exercise_name: "T1041",
+    target_type: "reps",
+    target_reps: 8,
+    sets: 3,
+    intensity: { type: "weight", mode: "weight", value: 55, unit: "kg" },
+    rest_type: 1,
+    rest_value: 150
+  };
+  const fromSteps = service.plannedHeraclesLoad(
+    { exercises: [{ key: "T1041", corosExerciseType: 2, sets: 3, reps: 8, weightKg: 55, restSec: 150 }] },
+    deps
+  );
+  const loads = service.planEntryHeraclesLoads(
+    [
+      { key: "p:lift", workout: { key: "w1", name: "Lift", sport: "strength", steps: [liftStep] } },
+      // The same three sets as one set repeated three times, in pounds.
+      {
+        key: "p:repeat",
+        workout: {
+          key: "w2",
+          name: "Lift",
+          sport: "strength",
+          steps: [
+            {
+              repeat: 3,
+              steps: [{ ...liftStep, sets: 1, intensity: { type: "weight", mode: "weight", value: 55 / 0.45359237, unit: "lb" } }]
+            },
+            { kind: "rest", target_type: "time", target_duration_seconds: 600 }
+          ]
+        }
+      },
+      { key: "p:length", workout: { key: "w3", name: "Gym", sport: "strength" }, plannedDurationSeconds: 2700 },
+      { key: "p:run", workout: { key: "w4", name: "Easy", sport: "run" }, plannedDurationSeconds: 2700 },
+      { key: "p:nothing", workout: { key: "w5", name: "Gym", sport: "strength" } }
+    ],
+    deps
+  );
+  assert.deepEqual(Object.keys(loads).sort(), ["p:length", "p:lift", "p:repeat"], "strength sessions that state sets or a length");
+  assert.equal(loads["p:lift"].value, fromSteps.value, "a step reads as the schedule parse reads it");
+  assert.ok(Math.abs(loads["p:repeat"].value - fromSteps.value) < 1e-6, "a repeat counts per round, a rest step is no exercise, pounds are kilograms");
+  assert.equal(loads["p:length"].quality, "planned");
+}
+
 console.log("heracles load service: ok");

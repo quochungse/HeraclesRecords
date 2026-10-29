@@ -7,6 +7,7 @@ import type {
 import type { HeraclesRecordsApi } from "../heraclesrecords-api";
 import { useUnitSystem } from "../units/UnitSystemProvider";
 import { happenDayFromTimestamp } from "../training/formatters";
+import { useLoadSource } from "../training/loadSource";
 import { useTodayKey } from "../training/useTodayKey";
 import {
   moveScheduledWorkoutEntries,
@@ -126,6 +127,7 @@ export function useCalendarData({
   isInMonth
 }: UseCalendarDataOptions) {
   const { unitSystem } = useUnitSystem();
+  const { source: loadSource } = useLoadSource();
   const todayKey = useTodayKey();
   const dateKeys = useMemo(() => weekKeys.flat(), [weekKeys]);
   const rangeStart = dateKeys[0];
@@ -297,7 +299,8 @@ export function useCalendarData({
           scheduled,
           activities,
           unitSystem,
-          data?.overrides
+          data?.overrides,
+          loadSource
         );
         return {
           dateKey,
@@ -323,7 +326,7 @@ export function useCalendarData({
         key: weekKey,
         days,
         stats: {
-          ...computeWeeklyStats(days),
+          ...computeWeeklyStats(days, loadSource),
           recommendedLoadMin: Number.isFinite(recommendedMin)
             ? Math.round(recommendedMin)
             : undefined,
@@ -333,7 +336,7 @@ export function useCalendarData({
         }
       };
     });
-  }, [data, weekKeys, isInMonth, todayKey, unitSystem]);
+  }, [data, weekKeys, isInMonth, todayKey, unitSystem, loadSource]);
 
   /*
    * Whether the range on screen has been read at least once. `loading` cannot

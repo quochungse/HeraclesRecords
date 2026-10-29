@@ -49,6 +49,8 @@ import { ActivityRouteMap } from "./ActivityRouteMap";
 import { ActivitySeriesChart } from "./ActivitySeriesChart";
 import { ActivityZoneBar } from "./ActivityZoneBar";
 import { StrengthDetailPanel } from "./StrengthDetailPanel";
+import { loadPairTitle } from "../loadFigures";
+import { useLoadSource } from "../loadSource";
 import { activityCoachRequest } from "../askCoachAbout";
 import { detailTrainingBenefit, type BenefitZoneFamily } from "../trainingBenefit";
 import { TrainingBenefitChips, TrainingBenefitReason } from "./TrainingBenefitChip";
@@ -147,6 +149,7 @@ export function ActivityDetailPane({
   feelRating
 }: ActivityDetailPaneProps) {
   const { unitSystem, temperatureUnit } = useUnitSystem();
+  const { source: loadSource } = useLoadSource();
   // A detail belonging to some other session is no detail at all — see
   // `detailMatchesActivity` for the window in which that happens.
   const detail = detailMatchesActivity(incomingDetail, listActivity)
@@ -367,13 +370,21 @@ export function ActivityDetailPane({
       : null
   );
   push = pushTo(effort);
+  // The list row carries Heracles Training Load; COROS's detail never does.
+  const heraclesLoad = loadSource === "heracles" ? listActivity?.heraclesLoad : undefined;
+  const shownLoad = heraclesLoad?.value ?? detail.trainingLoad;
   push(
-    detail.trainingLoad
+    shownLoad
       ? {
           key: "load",
           label: t("activity.m.trainingLoad"),
-          value: formatCount(Math.round(detail.trainingLoad)),
-          title: t("activity.pane.loadTitle")
+          value: formatCount(Math.round(shownLoad)),
+          title: [
+            t("activity.pane.loadTitle"),
+            loadPairTitle(loadSource, heraclesLoad?.value, detail.trainingLoad, heraclesLoad?.quality)
+          ]
+            .filter(Boolean)
+            .join("\n")
         }
       : null
   );
@@ -608,7 +619,7 @@ export function ActivityDetailPane({
       </header>
 
       {detail.strength ? (
-        <StrengthDetailPanel strength={detail.strength} />
+        <StrengthDetailPanel strength={detail.strength} heraclesLoad={listActivity?.heraclesLoad} />
       ) : (
         <>
           {/* Up to four figures in the display face, each with its unit set

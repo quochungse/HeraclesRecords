@@ -44,8 +44,15 @@ export interface CalendarDay {
 }
 
 export interface WeeklyStats {
+  /** Load done and planned in the load strength is read in (`useLoadSource`). */
   actualLoad: number;
   plannedLoad: number;
+  /**
+   * The same weeks in COROS's Training Load, for what is only ever set against
+   * COROS's figures — its recommended band. Equal to the above while COROS is chosen.
+   */
+  actualCorosLoad: number;
+  remainingCorosLoad: number;
   activityTimeSeconds: number;
   distanceMeters: number;
   plannedDistanceKm: number;

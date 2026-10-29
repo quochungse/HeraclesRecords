@@ -70,6 +70,8 @@ export function PlanStatusBlock({
         completedDurationSeconds: activity?.duration,
         completedDistanceMeters: activity?.distance,
         completedTrainingLoad: activity?.trainingLoad,
+        plannedHeraclesLoad: pair.scheduled.heraclesLoad?.value,
+        completedHeraclesLoad: activity?.heraclesLoad?.value,
         updatedAt: new Date().toISOString()
       });
       onChanged();

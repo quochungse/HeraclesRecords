@@ -446,7 +446,15 @@ export function weekStageOf(plan: Pick<TrainingPlanDocument, "weekStages">, week
   return plan.weekStages.find((item) => item.weekIndex === weekIndex)?.stage ?? 0;
 }
 
-export function summarizeTrainingPlan(plan: TrainingPlanDocument): TrainingPlanSummary {
+/**
+ * `entryLoad` replaces a session's planned load where it answers, so a
+ * screen reading strength in Heracles Training Load sums the same figures it
+ * draws on each session.
+ */
+export function summarizeTrainingPlan(
+  plan: TrainingPlanDocument,
+  entryLoad?: (entry: TrainingPlanEntry) => number | undefined
+): TrainingPlanSummary {
   const weekly: TrainingPlanWeekSummary[] = Array.from({ length: plan.weekCount }, (_, weekIndex) => ({
     weekIndex,
     workouts: 0,
@@ -462,6 +470,7 @@ export function summarizeTrainingPlan(plan: TrainingPlanDocument): TrainingPlanS
 
   for (const entry of plan.entries) {
     const metrics = planEntryMetrics(entry);
+    metrics.trainingLoad = entryLoad?.(entry) ?? metrics.trainingLoad;
     durationSeconds += metrics.durationSeconds;
     distanceMeters += metrics.distanceMeters;
     trainingLoad += metrics.trainingLoad;

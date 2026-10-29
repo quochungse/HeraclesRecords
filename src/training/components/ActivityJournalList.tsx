@@ -16,6 +16,7 @@ import {
   groupActivitiesByWeek
 } from "../activityFilters";
 import { activityRowFacts } from "../activityFacts";
+import { useLoadSource } from "../loadSource";
 import { epochMsFromCorosTime } from "../activityWindow";
 import { formatDurationSpan, formatTrainingTimestamp } from "../formatters";
 import { resolveSportName } from "../sportTypes";
@@ -113,7 +114,8 @@ const ActivityRow = memo(function ActivityRow({
 }: ActivityRowProps) {
   const activityName =
     activity.name?.trim() || sportName || t("activity.untitled");
-  const facts = activityRowFacts(activity, unitSystem);
+  const { source } = useLoadSource();
+  const facts = activityRowFacts(activity, unitSystem, source);
 
   return (
     <li

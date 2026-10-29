@@ -7456,6 +7456,10 @@ export function parseScheduledExercises(
         : undefined);
     const weight = scheduledExerciseWeightKg(exercise);
     const targetLabel = formatScheduledExerciseTarget(exercise, targetType);
+    const targetValue = toOptionalNumber(exercise.targetValue);
+    // Rest type 1 is a timed rest; the others are none or until pressed.
+    const restSec = toOptionalNumber(exercise.restType) === 1 ? toOptionalNumber(exercise.restValue) : undefined;
+    const corosExerciseType = toOptionalNumber(exercise.exerciseType);
 
     parsed.push({
       name,
@@ -7463,7 +7467,13 @@ export function parseScheduledExercises(
       reps,
       weight,
       targetType,
-      targetLabel
+      targetLabel,
+      ...(/^[TS]\d{4}$/i.test(name) ? { key: name.toUpperCase() } : {}),
+      ...(corosExerciseType !== undefined ? { corosExerciseType } : {}),
+      ...(restSec !== undefined && restSec > 0 ? { restSec } : {}),
+      ...(targetType === COROS_TARGET_TYPE_TIME && targetValue
+        ? { holdSec: normalizeActivityDuration(targetValue) ?? targetValue }
+        : {})
     });
   }
 
