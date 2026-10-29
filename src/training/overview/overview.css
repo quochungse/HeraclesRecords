@@ -173,10 +173,11 @@
   line-height: 1.3;
 }
 
-/* The week's Time · Load switch, at the head's far end, kept out of the
-   row's height so the three heads stay one line. */
+/* The week's Time · Distance · Load switch, at the head's far end, kept out
+   of the row's height so the three heads stay one line. */
 .overview-week-measure {
-  margin: -8px 0 -8px auto;
+  flex: none;
+  margin: -2px 0 -2px auto;
 }
 
 /* Bare, as a link out of the column is: the column is not a control panel. */

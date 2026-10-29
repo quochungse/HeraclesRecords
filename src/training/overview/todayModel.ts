@@ -15,6 +15,7 @@ import { scheduledSportCategory, scheduledWorkoutSport } from "../workoutSport";
 import { activityWorkoutSport } from "../askCoachAbout";
 import { happenDayFromTimestamp } from "../formatters";
 import { pairTodayPlan } from "./comingUpModel";
+import { displayDistanceToMeters, metersToDisplayDistance } from "../../units/units";
 
 /*
  * The arithmetic behind Overview's Readiness panel, out of the components so a
@@ -135,11 +136,12 @@ export function latestTrainingLoad(
 }
 
 /**
- * What the week's columns measure. Time is every sport's; COROS's load is a
+ * What the week's columns measure. Time is every sport's; distance is what a
+ * run, ride or swim covered (a strength session has none); COROS's load is a
  * heart-rate figure built for endurance work, and a strength session reads
  * light in it whatever it took out of the legs.
  */
-export type WeekMeasure = "time" | "load";
+export type WeekMeasure = "time" | "distance" | "load";
 
 export interface WeekLoadReading {
   /** The load from this Monday to today. */
@@ -192,11 +194,12 @@ export function thisWeekLoad({
 /** One session in a day's column, done or still on the plan. */
 export interface WeekBlock {
   key: string;
-  /** Its height: seconds or load, by the chart's measure. */
+  /** Its height: seconds, metres or load, by the chart's measure. */
   value: number;
-  /** Both figures, whichever is drawn, for the column's tooltip. */
+  /** Every figure, whichever is drawn, for the column's tooltip. */
   load: number;
   seconds: number;
+  meters: number;
   /** The session's or the plan's name; empty on the day's leftover load. */
   name: string;
   /** null on the day's leftover load, which no session claims. */
@@ -236,10 +239,22 @@ function activitySport(sportType: number | undefined): WorkoutSport | "hiking" |
   return sportColorCategory(sportType) === "hiking" ? "hiking" : undefined;
 }
 
+/** Round kilometres or miles: 2, 5, 10, 20, then tens. */
+function distanceStep(maxMeters: number, unitSystem: UnitSystem): number {
+  const max = metersToDisplayDistance(maxMeters, unitSystem);
+  const step = max <= 6 ? 2 : max <= 15 ? 5 : max <= 30 ? 10 : max <= 60 ? 20 : Math.ceil(max / 3 / 10) * 10;
+  return displayDistanceToMeters(step, unitSystem);
+}
+
 /** Three gridlines or more over the tallest column, at a step a reader can add. */
-function axisFor(max: number, measure: WeekMeasure): { axisMax: number; ticks: number[] } {
-  const step =
-    measure === "time"
+function axisFor(
+  max: number,
+  measure: WeekMeasure,
+  unitSystem: UnitSystem
+): { axisMax: number; ticks: number[] } {
+  const step = measure === "distance"
+    ? distanceStep(max, unitSystem)
+    : measure === "time"
       ? // Half an hour, then whole hours.
         max <= 5_400
         ? 1_800
@@ -255,15 +270,14 @@ function axisFor(max: number, measure: WeekMeasure): { axisMax: number; ticks: n
           : max <= 600
             ? 200
             : Math.ceil(max / 3 / 100) * 100;
-  const axisMax = Math.max(step * 3, Math.ceil(max / step) * step);
-  const ticks: number[] = [];
-  for (let value = 0; value <= axisMax; value += step) {
-    ticks.push(value);
-  }
-  return { axisMax, ticks };
+  // Counted in steps, so a mile step's fraction of a metre never drops a tick.
+  const steps = Math.max(3, Math.ceil(max / step));
+  const ticks = Array.from({ length: steps + 1 }, (_, index) => index * step);
+  return { axisMax: steps * step, ticks };
 }
 
-function seconds(value: number | undefined): number {
+/** A figure the column can stand on: positive and finite, else 0. */
+function amount(value: number | undefined): number {
   return value !== undefined && Number.isFinite(value) && value > 0 ? value : 0;
 }
 
@@ -273,7 +287,8 @@ function seconds(value: number | undefined): number {
  * COROS's daily load split by the sessions that carry it
  * (`buildWeeklyActivitySeries`, the figure the Calendar draws), with what no
  * session claims as a block of its own; in time, it is the session's own
- * activity time, and a planned one COROS's estimate of it.
+ * activity time, and a planned one COROS's estimate of it; in distance, what
+ * the session covered, and a planned one the distance its steps state.
  */
 export function buildWeekChart({
   dayList,
@@ -300,7 +315,8 @@ export function buildWeekChart({
     }
   }
   const todayKey = happenDayFromTimestamp(now.getTime()) ?? "";
-  const pick = (load: number, time: number) => (measure === "time" ? time : load);
+  const pick = (load: number, time: number, meters: number) =>
+    measure === "time" ? time : measure === "distance" ? meters : load;
 
   const columns = series.days.map((day): WeekColumn => {
     const dayActivities = (byDay.get(day.happenDay) ?? []).sort(
@@ -311,12 +327,14 @@ export function buildWeekChart({
     // still happened, and the icon under the column says so.
     const blocks: WeekBlock[] = dayActivities.map((activity) => {
       const load = loads.get(activity.activityId) ?? 0;
-      const time = seconds(activity.duration);
+      const time = amount(activity.duration);
+      const meters = amount(activity.distance);
       return {
         key: activity.activityId,
-        value: pick(load, time),
+        value: pick(load, time, meters),
         load,
         seconds: time,
+        meters,
         name: activity.name?.trim() ?? "",
         category: sportColorCategory(activity.sportType),
         sport: activitySport(activity.sportType),
@@ -324,16 +342,17 @@ export function buildWeekChart({
       };
     });
     // Load COROS counted outside a session (or for sessions not loaded yet).
-    // It has no time of its own, so in time it stands at zero: not drawn, but
-    // still in the tooltip, and the day still not a rest day.
+    // It has no time or distance of its own, so there it stands at zero: not
+    // drawn, but still in the tooltip, and the day still not a rest day.
     const residual =
       loads.get(WEEKLY_ACTIVITY_RESIDUAL_KEY) ?? (day.segments.length === 0 ? day.value : 0);
     if (residual > 0) {
       blocks.push({
         key: WEEKLY_ACTIVITY_RESIDUAL_KEY,
-        value: pick(residual, 0),
+        value: pick(residual, 0, 0),
         load: residual,
         seconds: 0,
+        meters: 0,
         name: "",
         category: null,
         planned: false
@@ -353,8 +372,9 @@ export function buildWeekChart({
           : onDay;
       open.forEach((workout) => {
         const load = positive(workout.trainingLoad) ?? 0;
-        const time = seconds(workout.durationSeconds);
-        const value = pick(load, time);
+        const time = amount(workout.durationSeconds);
+        const meters = amount(workout.distanceMeters);
+        const value = pick(load, time, meters);
         planned += value;
         blocks.push({
           // Its place in the day's plan, not among what is still open: the key
@@ -363,6 +383,7 @@ export function buildWeekChart({
           value,
           load,
           seconds: time,
+          meters,
           name: workout.name,
           category: scheduledSportCategory(workout.sportType) ?? "other",
           sport: scheduledWorkoutSport(workout.sportType),
@@ -382,5 +403,5 @@ export function buildWeekChart({
   });
 
   const tallest = Math.max(0, ...columns.map((column) => column.done + column.planned));
-  return { measure, columns, ...axisFor(tallest, measure) };
+  return { measure, columns, ...axisFor(tallest, measure, unitSystem) };
 }

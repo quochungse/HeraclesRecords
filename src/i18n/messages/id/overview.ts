@@ -223,6 +223,7 @@ const overview: OverviewMessages = {
   "overview.sport.timeLifting": "Waktu latihan beban",
   "overview.today.weekMeasure": "Minggu diukur dalam",
   "overview.today.weekChartTime": "Waktu latihan per hari minggu ini, satu blok per sesi, sesi terencana diarsir",
+  "overview.today.weekChartDistance": "Jarak per hari minggu ini, satu blok per sesi, sesi terencana diarsir",
   "overview.today.outsideSessions": "Di luar sesi",
   "overview.today.plannedTag": "Terencana",
   "overview.today.total": "Total",

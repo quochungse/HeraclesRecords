@@ -223,6 +223,7 @@ const overview: OverviewMessages = {
   "overview.sport.timeLifting": "训练时间",
   "overview.today.weekMeasure": "本周计量方式",
   "overview.today.weekChartTime": "本周每日训练时间，每次训练一个色块，计划中的训练为斜线",
+  "overview.today.weekChartDistance": "本周每日距离，每次训练一个色块，计划中的训练为斜线",
   "overview.today.outsideSessions": "训练之外",
   "overview.today.plannedTag": "计划",
   "overview.today.total": "合计",

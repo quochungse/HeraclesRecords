@@ -223,6 +223,7 @@ const overview: OverviewMessages = {
   "overview.sport.timeLifting": "เวลายกน้ำหนัก",
   "overview.today.weekMeasure": "วัดสัปดาห์เป็น",
   "overview.today.weekChartTime": "เวลาฝึกรายวันของสัปดาห์นี้ หนึ่งบล็อกต่อหนึ่งครั้ง ครั้งที่วางแผนไว้เป็นลายเส้นทแยง",
+  "overview.today.weekChartDistance": "ระยะทางรายวันของสัปดาห์นี้ หนึ่งบล็อกต่อหนึ่งครั้ง ครั้งที่วางแผนไว้เป็นลายเส้นทแยง",
   "overview.today.outsideSessions": "นอกการฝึก",
   "overview.today.plannedTag": "วางแผนไว้",
   "overview.today.total": "รวม",

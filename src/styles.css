@@ -2564,6 +2564,19 @@ input::placeholder {
   font-size: 13px;
 }
 
+/* A switch inside a panel, beside what it changes: it is read after the
+   figure, so it stays a step below the panel's own words. */
+.option-group--xs {
+  gap: 0;
+  padding: 2px;
+}
+
+.option-group--xs button {
+  min-height: 20px;
+  padding: 0 8px;
+  font-size: 11px;
+}
+
 .option-group button:hover:not(:disabled):not([aria-checked="true"]) {
   color: var(--text-primary);
 }

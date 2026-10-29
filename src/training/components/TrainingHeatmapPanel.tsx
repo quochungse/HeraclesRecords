@@ -605,6 +605,7 @@ export function TrainingHeatmapPanel({
           <OptionGroup
             label={t("overview.heatmap.metric")}
             tone="quiet"
+            size="xs"
             value={metric}
             options={[
               { value: "trainingLoad", label: t("overview.trainingLoad") },
@@ -621,6 +622,7 @@ export function TrainingHeatmapPanel({
           <OptionGroup
             label={t("overview.heatmap.range")}
             tone="quiet"
+            size="xs"
             value={range}
             options={TRAINING_HEATMAP_RANGES.map((option) => ({
               value: option,

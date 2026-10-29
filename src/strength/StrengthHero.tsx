@@ -183,6 +183,7 @@ export function StrengthHero({
           <OptionGroup
             label={t("strength.bodyView")}
             tone="quiet"
+            size="xs"
             value={rotating ? "rotate" : view}
             options={[
               { value: "front", label: t("strength.front") },
@@ -239,6 +240,7 @@ export function StrengthHero({
               <OptionGroup
                 label={t("strength.heatMetric")}
                 tone="quiet"
+                size="xs"
                 className="muscle-panel-metric"
                 value={metric}
                 options={metricOptions()

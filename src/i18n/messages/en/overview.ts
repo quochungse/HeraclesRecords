@@ -224,6 +224,7 @@ const overview = {
   "overview.sport.timeLifting": "Time lifting",
   "overview.today.weekMeasure": "Week measured in",
   "overview.today.weekChartTime": "Time trained by day this week, one block per session, planned sessions hatched",
+  "overview.today.weekChartDistance": "Distance covered by day this week, one block per session, planned sessions hatched",
   "overview.today.outsideSessions": "Outside a session",
   "overview.today.plannedTag": "Planned",
   "overview.today.total": "Total",

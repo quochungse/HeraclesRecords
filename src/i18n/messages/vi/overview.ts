@@ -223,6 +223,7 @@ const overview: OverviewMessages = {
   "overview.sport.timeLifting": "Thời gian tập",
   "overview.today.weekMeasure": "Đo tuần theo",
   "overview.today.weekChartTime": "Thời gian tập theo ngày trong tuần này, mỗi buổi một khối, buổi theo kế hoạch gạch chéo",
+  "overview.today.weekChartDistance": "Quãng đường theo ngày trong tuần này, mỗi buổi một khối, buổi theo kế hoạch gạch chéo",
   "overview.today.outsideSessions": "Ngoài buổi tập",
   "overview.today.plannedTag": "Kế hoạch",
   "overview.today.total": "Tổng",

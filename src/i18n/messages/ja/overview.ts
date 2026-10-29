@@ -223,6 +223,7 @@ const overview: OverviewMessages = {
   "overview.sport.timeLifting": "トレーニング時間",
   "overview.today.weekMeasure": "週の表示単位",
   "overview.today.weekChartTime": "今週の日別トレーニング時間。1 ブロックが 1 セッションで、予定はハッチング",
+  "overview.today.weekChartDistance": "今週の日別距離。1 ブロックが 1 セッションで、予定はハッチング",
   "overview.today.outsideSessions": "セッション外",
   "overview.today.plannedTag": "予定",
   "overview.today.total": "合計",

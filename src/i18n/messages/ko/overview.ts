@@ -223,6 +223,7 @@ const overview: OverviewMessages = {
   "overview.sport.timeLifting": "운동 시간",
   "overview.today.weekMeasure": "주간 측정 기준",
   "overview.today.weekChartTime": "이번 주 일별 훈련 시간, 세션마다 블록 하나, 예정된 세션은 빗금",
+  "overview.today.weekChartDistance": "이번 주 일별 거리, 세션마다 블록 하나, 예정된 세션은 빗금",
   "overview.today.outsideSessions": "세션 외",
   "overview.today.plannedTag": "예정",
   "overview.today.total": "합계",

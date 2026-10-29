@@ -2,7 +2,8 @@ import { useMemo } from "react";
 import { Activity, Mountain, type LucideIcon } from "lucide-react";
 import type {
   TrainingHubActivity,
-  TrainingHubUpcomingWorkout
+  TrainingHubUpcomingWorkout,
+  UnitSystem
 } from "../../../electron/types";
 import { workoutSportView } from "../../calendar/workoutSportIcons";
 import { OptionGroup } from "../../components/OptionGroup";
@@ -17,6 +18,7 @@ import { SPORT_COLOR_LABELS } from "../sportColors";
 import { enrichDayListWithActivityTotals, getCalendarWeekDateKeys } from "../weeklyActivity";
 import type { TrainingHubSnapshot } from "../types";
 import { useUnitSystem } from "../../units/UnitSystemProvider";
+import { formatDistanceValue, metersToDisplayDistance } from "../../units/units";
 import { useTodayKey } from "../useTodayKey";
 import { formatCount, formatDecimal, getIntlLocale, t, weekdayNames } from "../../i18n/core";
 import { useI18n } from "../../i18n/useI18n";
@@ -40,7 +42,7 @@ import {
 const WEEK_MEASURE = defineSelectionPreference<WeekMeasure>({
   key: "overview.weekMeasure",
   defaultValue: "time",
-  validate: selectionIsOneOf(["time", "load"])
+  validate: selectionIsOneOf(["time", "distance", "load"])
 });
 
 /** A tooltip lists this many sessions, and counts the rest. */
@@ -71,8 +73,11 @@ function figure(value: number): string {
   return formatCount(Math.round(value));
 }
 
-/** An axis step: "0", "30m", "1h", "1.5h". */
-function axisLabel(value: number, measure: WeekMeasure): string {
+/** An axis step: "0", "30m", "1h", "1.5h"; distance in whole km or miles. */
+function axisLabel(value: number, measure: WeekMeasure, unitSystem: UnitSystem): string {
+  if (measure === "distance") {
+    return figure(metersToDisplayDistance(value, unitSystem));
+  }
   if (measure === "load" || value === 0) {
     return figure(value);
   }
@@ -83,14 +88,23 @@ function axisLabel(value: number, measure: WeekMeasure): string {
   return t("units.duration.h", { h: formatDecimal(hours, Number.isInteger(hours) ? 0 : 1) });
 }
 
-function amount(value: number, measure: WeekMeasure): string {
-  return measure === "time" ? formatDurationSpan(value) : figure(value);
+function distance(meters: number, unitSystem: UnitSystem): string {
+  return formatDistanceValue(meters, unitSystem, { digits: 1 });
 }
 
-/** A session's two figures, time then load, each only where it has one. */
-function blockFigures(block: { seconds: number; load: number }): string {
+function amount(value: number, measure: WeekMeasure, unitSystem: UnitSystem): string {
+  if (measure === "time") return formatDurationSpan(value);
+  return measure === "distance" ? distance(value, unitSystem) : figure(value);
+}
+
+/** A session's figures, time, distance and load, each only where it has one. */
+function blockFigures(
+  block: { seconds: number; meters: number; load: number },
+  unitSystem: UnitSystem
+): string {
   return [
     block.seconds > 0 ? formatDurationSpan(block.seconds) : null,
+    block.meters > 0 ? distance(block.meters, unitSystem) : null,
     block.load > 0 ? t("units.trainingLoadShort", { value: Math.round(block.load) }) : null
   ]
     .filter(Boolean)
@@ -108,7 +122,7 @@ function blockName(block: WeekBlock): string {
  * A tooltip's sessions, two lines each: the sport in its colour beside the
  * name, and its figures under the name, so a long name is not cut short.
  */
-function TipSessions({ blocks }: { blocks: readonly WeekBlock[] }) {
+function TipSessions({ blocks, unitSystem }: { blocks: readonly WeekBlock[]; unitSystem: UnitSystem }) {
   if (blocks.length === 0) {
     return null;
   }
@@ -122,7 +136,7 @@ function TipSessions({ blocks }: { blocks: readonly WeekBlock[] }) {
               <Icon size={12} strokeWidth={2} />
             </span>
             <span className="overview-tip-name">{blockName(block)}</span>
-            <span className="overview-tip-value">{blockFigures(block)}</span>
+            <span className="overview-tip-value">{blockFigures(block, unitSystem)}</span>
           </li>
         );
       })}
@@ -133,6 +147,7 @@ function TipSessions({ blocks }: { blocks: readonly WeekBlock[] }) {
 function WeekDay({
   column,
   chart,
+  unitSystem,
   label,
   date,
   tipSide,
@@ -140,6 +155,7 @@ function WeekDay({
 }: {
   column: WeekColumn;
   chart: WeekChart;
+  unitSystem: UnitSystem;
   label: string;
   /** Its place in the chart's one tab stop (`useColumnFocus`). */
   focus: ReturnType<ReturnType<typeof useColumnFocus>>;
@@ -152,8 +168,12 @@ function WeekDay({
   const rest = column.isPast && column.blocks.length === 0;
   const listed = column.blocks.slice(0, TIP_SESSIONS);
   const totals = column.blocks.reduce(
-    (sum, block) => ({ seconds: sum.seconds + block.seconds, load: sum.load + block.load }),
-    { seconds: 0, load: 0 }
+    (sum, block) => ({
+      seconds: sum.seconds + block.seconds,
+      meters: sum.meters + block.meters,
+      load: sum.load + block.load
+    }),
+    { seconds: 0, meters: 0, load: 0 }
   );
   const empty = column.isPast
     ? t("overview.heatmap.rest")
@@ -162,7 +182,7 @@ function WeekDay({
     date,
     ...(column.blocks.length > 0
       ? column.blocks.map((block) =>
-          [blockName(block), block.planned ? t("overview.today.plannedTag") : null, blockFigures(block)]
+          [blockName(block), block.planned ? t("overview.today.plannedTag") : null, blockFigures(block, unitSystem)]
             .filter(Boolean)
             .join(", ")
         )
@@ -179,7 +199,7 @@ function WeekDay({
     >
       <div className="overview-week-plot" aria-hidden="true">
         <div className="overview-week-stack">
-          {/* Load no session claims has no time: in time it stands at zero, undrawn. */}
+          {/* Load no session claims has no time or distance: there it stands at zero, undrawn. */}
           {column.blocks.filter((block) => block.value > 0 || block.category !== null).map((block) => (
             <i
               key={block.key}
@@ -193,7 +213,7 @@ function WeekDay({
               style={{ height: `${(block.value / chart.axisMax) * 100}%` }}
             />
           ))}
-          {total > 0 ? <span className="overview-week-value figure">{amount(total, chart.measure)}</span> : null}
+          {total > 0 ? <span className="overview-week-value figure">{amount(total, chart.measure, unitSystem)}</span> : null}
           {rest ? <span className="overview-week-rest">{t("overview.heatmap.rest")}</span> : null}
         </div>
       </div>
@@ -203,11 +223,11 @@ function WeekDay({
         <strong>{date}</strong>
         {column.blocks.length > 0 ? (
           <>
-            <TipSessions blocks={listed.filter((block) => !block.planned)} />
+            <TipSessions blocks={listed.filter((block) => !block.planned)} unitSystem={unitSystem} />
             {listed.some((block) => block.planned) ? (
               <>
                 <span className="overview-tip-group">{t("overview.today.plannedTag")}</span>
-                <TipSessions blocks={listed.filter((block) => block.planned)} />
+                <TipSessions blocks={listed.filter((block) => block.planned)} unitSystem={unitSystem} />
               </>
             ) : null}
             {column.blocks.length > TIP_SESSIONS ? (
@@ -218,7 +238,7 @@ function WeekDay({
             {column.blocks.length > 1 ? (
               <span className="overview-tip-total">
                 <span>{t("overview.today.total")}</span>
-                <span className="overview-tip-value">{blockFigures(totals)}</span>
+                <span className="overview-tip-value">{blockFigures(totals, unitSystem)}</span>
               </span>
             ) : null}
           </>
@@ -233,10 +253,10 @@ function WeekDay({
 /**
  * This week, as the Readiness panel's right-hand column: COROS's training
  * status on its five bands, a column a day with every session a block (done
- * in the accent, planned hatched) in time or in load, and under them the two
- * figures the trend is the ratio of, each with the span it averages, and the
- * week's load so far against the range COROS recommends for the week. A
- * column opens what it holds on hover.
+ * in the accent, planned hatched) in time, distance or load, and under them
+ * the two figures the trend is the ratio of, each with the span it averages,
+ * and the week's load so far against the range COROS recommends for the week.
+ * A column opens what it holds on hover.
  */
 export function TodayWeek({
   snapshot,
@@ -269,7 +289,7 @@ export function TodayWeek({
     [dayList, activities, upcomingWorkouts, now, unitSystem, measure]
   );
   const reading = useMemo(() => latestTrainingLoad(dayList), [dayList]);
-  // Tabbed into at today, or at the week's end once it is behind.
+  // Tabbed into at today, which this week always holds.
   const columnFocus = useColumnFocus(
     chart.columns.length,
     Math.max(0, chart.columns.findIndex((column) => column.isToday))
@@ -306,9 +326,11 @@ export function TodayWeek({
           className="overview-week-measure"
           label={t("overview.today.weekMeasure")}
           tone="quiet"
+          size="xs"
           value={measure}
           options={[
             { value: "time", label: t("overview.zones.time") },
+            { value: "distance", label: t("overview.tiles.distance") },
             { value: "load", label: t("overview.tiles.load") }
           ]}
           onChange={setMeasure}
@@ -339,12 +361,18 @@ export function TodayWeek({
           <div
             className="overview-week-chart"
             role="group"
-            aria-label={t(measure === "time" ? "overview.today.weekChartTime" : "overview.today.weekChart")}
+            aria-label={t(
+              measure === "time"
+                ? "overview.today.weekChartTime"
+                : measure === "distance"
+                  ? "overview.today.weekChartDistance"
+                  : "overview.today.weekChart"
+            )}
           >
             <div className="overview-week-axis" aria-hidden="true">
               {chart.ticks.map((tick) => (
                 <span key={tick} style={{ bottom: `${(tick / chart.axisMax) * 100}%` }}>
-                  {axisLabel(tick, measure)}
+                  {axisLabel(tick, measure, unitSystem)}
                 </span>
               ))}
             </div>
@@ -361,6 +389,7 @@ export function TodayWeek({
                     key={column.happenDay}
                     column={column}
                     chart={chart}
+                    unitSystem={unitSystem}
                     label={column.isToday ? t("overview.today") : weekdays[index]}
                     date={date ? dayFormat.format(date) : column.happenDay}
                     tipSide={index < 3 ? "after" : "before"}

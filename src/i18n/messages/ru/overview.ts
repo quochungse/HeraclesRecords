@@ -235,6 +235,7 @@ const overview: OverviewMessages = {
   "overview.sport.sessions_many": "{count} тренировок",
   "overview.today.weekMeasure": "Неделя в",
   "overview.today.weekChartTime": "Время тренировок по дням этой недели, по блоку на тренировку, запланированные заштрихованы",
+  "overview.today.weekChartDistance": "Дистанция по дням этой недели, по блоку на тренировку, запланированные заштрихованы",
   "overview.today.outsideSessions": "Вне тренировки",
   "overview.today.plannedTag": "План",
   "overview.today.total": "Итого",

@@ -284,6 +284,35 @@ assert.deepEqual(
 );
 assert.deepEqual(timed.ticks, [0, 3_600, 7_200, 10_800], "whole hours over Monday's 2h 40m");
 
+// --- The same week in distance: what each session covered, a strength
+// session none, a planned session the distance its steps state.
+const covered = activities.map((activity) => ({
+  ...activity,
+  distance: { "mon-ride": 42_000, "wed-run": 10_000, "thu-run": 8_000, "thu-ride": 25_000, "thu-swim": 2_000 }[activity.activityId]
+}));
+const planDistance = upcoming.map((workout) => workout.name === "Long run" ? { ...workout, distanceMeters: 21_100 } : workout);
+const far = buildWeekChart({ dayList, activities: covered, upcoming: planDistance, now, unitSystem: "metric", measure: "distance" });
+const [dMon, , dWed, dThu, , , dSun] = far.columns;
+assert.equal(far.measure, "distance");
+assert.deepEqual(
+  dMon.blocks.map((block) => [block.key, block.value, block.seconds]),
+  [
+    ["mon-ride", 42_000, 5_400],
+    ["mon-lift", 0, 4_200]
+  ],
+  "a session at the distance it covered, a lift at none, every figure kept for the tooltip"
+);
+assert.equal(dWed.blocks.find((block) => block.key === "residual").value, 0, "load no session claims has no distance");
+assert.equal(dThu.done, 35_000);
+assert.deepEqual(dSun.blocks.map((block) => block.value), [21_100, 0], "a plan at its stated distance");
+assert.deepEqual(far.ticks, [0, 20_000, 40_000, 60_000], "round kilometres over Monday's 42 km");
+const miles = buildWeekChart({ dayList, activities: covered, upcoming: planDistance, now, unitSystem: "imperial", measure: "distance" });
+assert.equal(miles.ticks.length, 4, "three steps over Monday's 26 miles");
+assert.ok(
+  miles.ticks.every((tick, index) => Math.abs(tick - index * 10 * 1_609.344) < 1e-6),
+  "miles step in whole tens"
+);
+
 // --- Training load distribution.
 const distributionUrl = pathToFileURL(
   path.join(repoRoot, "src", "training", "overview", "distributionModel.ts")

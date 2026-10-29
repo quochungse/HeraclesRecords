@@ -223,6 +223,7 @@ const overview: OverviewMessages = {
   "overview.sport.timeLifting": "Tempo di forza",
   "overview.today.weekMeasure": "Settimana misurata in",
   "overview.today.weekChartTime": "Tempo di allenamento per giorno questa settimana, un blocco per sessione, quelle pianificate tratteggiate",
+  "overview.today.weekChartDistance": "Distanza percorsa per giorno questa settimana, un blocco per sessione, quelle pianificate tratteggiate",
   "overview.today.outsideSessions": "Fuori da una sessione",
   "overview.today.plannedTag": "Pianificata",
   "overview.today.total": "Totale",

@@ -79,8 +79,11 @@ export interface OptionGroupProps<T extends string> {
   /** Names the group for a screen reader. Required: a bare row of chips says nothing. */
   label: string;
   mode?: OptionGroupMode;
-  /** `sm` is the header default (28px); `md` (32px) suits a form row. */
-  size?: "sm" | "md";
+  /**
+   * `sm` is the header default (28px); `md` (32px) suits a form row; `xs`
+   * (20px) is a switch inside a panel, beside the figure or chart it changes.
+   */
+  size?: "xs" | "sm" | "md";
   /**
    * Draws the icons alone and leaves each label to the screen reader. Only for
    * options whose icon is unmistakable on its own — a grid and a list — and
@@ -415,7 +418,7 @@ export interface OptionChipsProps<T extends string> {
   values: readonly T[];
   onToggle: (value: T) => void;
   label: string;
-  size?: "sm" | "md";
+  size?: "xs" | "sm" | "md";
   className?: string;
   disabled?: boolean;
   /**

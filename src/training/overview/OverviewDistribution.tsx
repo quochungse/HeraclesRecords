@@ -150,6 +150,7 @@ export function OverviewDistribution({
             <OptionGroup
               label={t("overview.distribution.measure")}
               tone="quiet"
+              size="xs"
               value={measure}
               options={[
                 { value: "time", label: t("overview.zones.time") },

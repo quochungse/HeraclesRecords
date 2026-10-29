@@ -388,19 +388,11 @@
   pointer-events: none;
 }
 
-/* Smaller than the shared chip: it stands on the figure rather than in a
-   header, and the column is 35% of the card. */
+/* It stands on the figure rather than in a header, so it floats. */
 .strength-body-view .option-group {
-  padding: 2px;
   -webkit-backdrop-filter: blur(14px);
   backdrop-filter: blur(14px);
   box-shadow: var(--shadow-soft);
-}
-
-.strength-body-view .option-group button {
-  min-height: 22px;
-  padding: 0 9px;
-  font-size: 11px;
 }
 
 /* A development-only control, so it sits where the figure is not: the bottom
@@ -918,16 +910,9 @@
   letter-spacing: -0.02em;
 }
 
-/* The metric switch, at the panel's top right in both of its states. A step
-   smaller than a header's chip: it sits beside a title, not over a page. */
+/* The metric switch, at the panel's top right in both of its states. */
 .muscle-panel-metric {
   justify-self: end;
-  padding: 2px;
-}
-
-.muscle-panel-metric.option-group button {
-  min-height: 24px;
-  padding: 0 10px;
 }
 
 .muscle-panel-bar {
