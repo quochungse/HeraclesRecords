@@ -255,6 +255,68 @@ export interface TrainingHubActivity {
   calories?: number;
   trainingLoad?: number;
   elevationGain?: number;
+  /**
+   * Heracles Training Load, on a strength session only (400, 402). Never
+   * replaces `trainingLoad`: everything COROS derives from its own figure
+   * (Base Fitness, Load Impact, the recommended range) is read against that.
+   */
+  heraclesLoad?: HeraclesLoad;
+}
+
+/** Which load the athlete reads strength sessions in (`strength.loadSource`). */
+export type StrengthLoadSource = "coros" | "heracles";
+
+/**
+ * How a Heracles figure was reached: from the session's sets; from its length,
+ * when the sets could not be read; COROS's figure, for drills and jumps, which
+ * heart rate measures, or for a session whose sets have not been read yet; or
+ * an estimate for a session still on the plan.
+ */
+export type HeraclesLoadQuality = "sets" | "estimate" | "conditioning" | "pending" | "planned";
+
+export interface HeraclesLoad {
+  /** Heracles Training Load: never below COROS's own figure. */
+  value: number;
+  /** COROS's Training Load, the heart-rate part. Absent for a session COROS never saw. */
+  cardio?: number;
+  /** What COROS's figure leaves out: `value` less `cardio`. */
+  muscular: number;
+  quality: HeraclesLoadQuality;
+}
+
+export interface HeraclesSetLoad {
+  load: number;
+  /** Predicted RPE on the CR-10 scale. */
+  rpe: number;
+  /** Reps left in reserve, for a set scored by its reps. */
+  rir?: number;
+  /** Load over capacity: the share of the estimated one-rep max. */
+  intensity?: number;
+  /** The set's time, its rest after included up to three minutes. */
+  seconds: number;
+  /** Nothing to score it by: the set took the session's median RPE. */
+  filled?: boolean;
+}
+
+export interface HeraclesSessionLoad extends HeraclesLoad {
+  /** Session RPE on the CR-10 scale, time between sets included. */
+  sessionRpe?: number;
+  /**
+   * One array per `detail.exercises[i]`, one entry per `entries[j]`; null for
+   * what is not a working set (rest, stretching, a drill).
+   */
+  sets?: (HeraclesSetLoad | null)[][];
+}
+
+/** The setting and what the figures are being read with, for the Strength screen's note. */
+export interface HeraclesLoadInfo {
+  source: StrengthLoadSource;
+  /** COROS Training Load per RPE-minute, measured on the athlete's runs. */
+  k: number;
+  bridgeRuns: number;
+  /** False while there are too few rated runs and `k` is the default. */
+  bridgeMeasured: boolean;
+  bodyWeightKg?: number;
 }
 
 export interface RpeDistributionBucket {
@@ -639,6 +701,8 @@ export interface StrengthSession {
   maxHr?: number;
   trainingLoad?: number;
   detail: StrengthDetail;
+  /** Heracles Training Load, its sets aligned with `detail`. */
+  heracles?: HeraclesSessionLoad;
 }
 
 export interface StrengthHistory {

@@ -137,6 +137,12 @@ import {
 } from "./trainingHubService";
 import { syncStrengthHistory } from "./strengthHistoryService";
 import {
+  getHeraclesLoadInfo,
+  setStrengthLoadSource,
+  withHeraclesLoads,
+  withStrengthSessionLoads
+} from "./heraclesLoadService";
+import {
   connectHevy,
   disconnectHevy,
   getHevyStatus,
@@ -2183,7 +2189,7 @@ function registerIpcHandlers(): void {
       if (sampleTrailRunsEnabled()) {
         activities = withSampleTrailRuns(activities, { page, startDay, endDay });
       }
-      return activities;
+      return withHeraclesLoads(activities);
     }
   );
 
@@ -2493,8 +2499,21 @@ function registerIpcHandlers(): void {
 
   ipcMain.handle(
     "trainingHub:syncStrengthHistory",
-    (_event, request?: StrengthHistoryRequest) => syncStrengthHistory(request)
+    async (_event, request?: StrengthHistoryRequest) => {
+      const history = await syncStrengthHistory(request);
+      return { ...history, sessions: withStrengthSessionLoads(history.sessions) };
+    }
   );
+
+  ipcMain.handle("strength:getLoadSource", () => getHeraclesLoadInfo());
+
+  ipcMain.handle("strength:setLoadSource", (_event, source: unknown) => {
+    if (source !== "coros" && source !== "heracles") {
+      throw new Error(`Unknown load source: ${String(source)}`);
+    }
+    setStrengthLoadSource(source);
+    return getHeraclesLoadInfo();
+  });
 
   ipcMain.handle("hevy:getStatus", () => getHevyStatus());
   ipcMain.handle("hevy:connect", (_event, apiKey: string) => connectHevy(apiKey));

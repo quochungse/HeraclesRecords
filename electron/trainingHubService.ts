@@ -1410,6 +1410,11 @@ export function lastKnownCorosProfileSex(): number | undefined {
   return corosProfileCache?.snapshot.profile.sex ?? coachProfileCache?.profile.sex;
 }
 
+/** The account's body weight as last read, however long ago; undefined until one has been. */
+export function lastKnownCorosWeightKg(): number | undefined {
+  return corosProfileCache?.snapshot.profile.weightKg ?? coachProfileCache?.profile.weightKg;
+}
+
 /**
  * The account's heart-rate model as last read (`hrZoneType`: 1 Max HR, 2 HR
  * Reserve, 3 LTHR), for an activity that says 0 — COROS writes 0 on some

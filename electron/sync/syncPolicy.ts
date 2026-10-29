@@ -221,6 +221,8 @@ export const SETTING_POLICY: Readonly<Record<string, SyncTier>> = {
 
   // --- Preferences ---------------------------------------------------------
   "chat.provider": "preference",
+  // Whether strength sessions read in COROS's load or Heracles Training Load.
+  "strength.loadSource": "preference",
   "chat.model": "preference",
   "chat.chatgpt.model": "preference",
   "chat.chatgpt.effort": "preference",
