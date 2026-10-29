@@ -73,7 +73,7 @@ A tour of the main screens. [heraclesrecords.com](https://heraclesrecords.com) g
 
 ### Today at a glance
 
-Recovery, the week's load, last night's sleep and the next session on your plan. The screen to open in the morning.
+Recovery, last night's sleep and the week's training status side by side, what is coming up, and a section for every sport you trained in the last four weeks. The screen to open in the morning.
 
 <img src="docs/readme/01-overview.webp" alt="Overview: recovery, the week's training, last night's sleep and what is planned next" />
 

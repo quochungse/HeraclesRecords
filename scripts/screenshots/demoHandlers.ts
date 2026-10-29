@@ -13,6 +13,7 @@ import { reverseGeocode } from "./demoPlaces";
 import { CHAT_SETTINGS, chatSessions, chatSession, planArtifacts, planDraftDocument, setCoachFirst } from "./demoCoach";
 import { librarySnapshot, workoutForEdit, planById, EDITOR_CONTEXT } from "./demoLibrary";
 import EXERCISE_MEDIA from "./exercise-media.json";
+import { version as APP_VERSION } from "../../package.json";
 import { sleepHistory, sleepSummary, dailyHealth, nightSeries } from "./demoSleep";
 import { buildSampleStrengthSessions } from "../../src/strength/sampleSessions";
 import { allActivities, dayKey, daysAgoDate, realisticInput, TODAY } from "./demoData";
@@ -221,8 +222,8 @@ export function demoHandlers(): Record<string, unknown> {
       const wanted = new Set(dates);
       return { dayList: metrics().filter((m) => wanted.size === 0 || wanted.has(m.happenDay)), weekList: weekTargets(dates) };
     },
-    getAppInfo: async () => ({ version: "1.1.0", userDataPath: "~/Library/Application Support/heracles-records" }),
-    getAppUpdateStatus: async () => ({ supported: true, currentVersion: "1.1.0", status: "idle", autoCheck: true, autoDownload: false }),
+    getAppInfo: async () => ({ version: APP_VERSION, userDataPath: "~/Library/Application Support/heracles-records" }),
+    getAppUpdateStatus: async () => ({ supported: true, currentVersion: APP_VERSION, status: "idle", autoCheck: true, autoDownload: false }),
     isWindowFullscreen: async () => false,
     setWindowBackground: async () => {},
     getHevyStatus: async () => ({ connected: false, includeWarmups: false }),

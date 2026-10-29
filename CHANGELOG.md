@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.4.0] - 2026-10-29
+
+Overview, rebuilt around one question: how ready you are, and what the week holds. And Coach can now change one step of a saved workout without rewriting the whole of it.
+
+### What's new
+- **Overview** - redrawn from top to bottom. Readiness sets your recovery, last night's sleep and this week side by side: the body figure lit to your recovery, the night's score, overnight HRV and the heart rate you slept at, and COROS's training status over a column a day, in time, distance or load. Coming up puts today beside the days after it, and every sport you trained in the last four weeks gets a section of its own, Strength with its body map.
+- **Training load** - Load Impact and Base Fitness read the way COROS reads them, on Overview, in the Calendar and in Coach, and this week's load is set against the range COROS recommends for the week.
+- **Coach edits a workout in place** - ask for a change to one step of a session on your calendar or a workout in your library, and Coach proposes just that change. Before applying it, the app checks the workout has not changed since Coach read it.
+- **Session notes** - Coach reads and writes a session's notes, and every name and note sent to COROS stays within what the COROS app can show.
+- **AI Model Providers** - a clearer place to connect Claude, ChatGPT, OpenRouter and a local model. ChatGPT offers the reasoning efforts each model supports, and a new conversation starts on the AI you used last.
+- **What Coach may read** - set in each conversation, the same way for every AI. Claude Code no longer has switches of its own.
+- **Updates** - once an update has downloaded, Restart takes the place of Check for updates.
+- **Workout view** - each strength exercise states its rest after a set.
+
+### Fixed
+- Strength reads each exercise by what it is rather than by its name, so a renamed movement is no longer counted on the wrong muscles.
+- The reasoning effort menu no longer flickers at fractional zoom.
+- Improve app performance and stability.
+
 ## [1.3.0] - 2026-10-24
 
 A redesign, and the biggest refinement pass the app has had. Every screen was taken back to three ideas: **refined**, so nothing is drawn that does not need to be; **intuitive**, so a screen shows what you picked and nothing else; and **convenient**, so the thing you want is one press away.
