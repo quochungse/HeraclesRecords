@@ -1,16 +1,12 @@
 /**
  * Which load strength sessions are read in — COROS's Training Load or Heracles
- * Training Load (docs/heracles-training-load.md) — and the helpers every
- * screen reads a session's load through.
+ * Training Load (docs/heracles-training-load.md). The figures themselves are
+ * read through `loadFigures.ts`.
  *
  * The choice is made on the Strength screen and kept by the main process
  * (`strength.loadSource`), which needs it too: the Training Library decides a
  * plan's completion there. This keeps a copy for the first paint, as the unit
  * system does, so a launch never draws one frame in the other load.
- *
- * Only a strength session reads differently: every other sport's Heracles load
- * is COROS's, and anything COROS derives from its own load — Base Fitness,
- * Load Impact, the recommended range — is only ever set against COROS's load.
  */
 import {
   createContext,
@@ -21,13 +17,7 @@ import {
   useState,
   type ReactNode
 } from "react";
-import type {
-  HeraclesLoad,
-  HeraclesLoadInfo,
-  HeraclesLoadQuality,
-  StrengthLoadSource
-} from "../../electron/types";
-import { formatCount, t } from "../i18n/core";
+import type { HeraclesLoadInfo, StrengthLoadSource } from "../../electron/types";
 
 const CACHE_KEY = "heraclesrecords.loadSource";
 
@@ -108,50 +98,4 @@ export function LoadSourceProvider({ children }: { children: ReactNode }) {
 
 export function useLoadSource(): LoadSourceContextValue {
   return useContext(LoadSourceContext);
-}
-
-/** A session's load as the athlete reads it: Heracles's for a strength session when chosen, else COROS's. */
-export function activityLoad(
-  activity: { trainingLoad?: number; heraclesLoad?: HeraclesLoad },
-  source: StrengthLoadSource
-): number | undefined {
-  return source === "heracles" && activity.heraclesLoad ? activity.heraclesLoad.value : activity.trainingLoad;
-}
-
-function qualityNote(quality: HeraclesLoadQuality | undefined): string | undefined {
-  if (quality === "estimate") return t("units.load.estimate");
-  if (quality === "pending") return t("units.load.pending");
-  if (quality === "planned") return t("units.load.planned");
-  return undefined;
-}
-
-/**
- * The hover that states both figures, so whoever reads Heracles TL always
- * sees COROS's beside it. Undefined while COROS is the chosen load, and where
- * the two agree with nothing to flag.
- */
-export function loadPairTitle(
-  source: StrengthLoadSource,
-  heracles: number | undefined,
-  coros: number | undefined,
-  quality?: HeraclesLoadQuality
-): string | undefined {
-  if (source !== "heracles" || heracles === undefined) return undefined;
-  const note = qualityNote(quality);
-  const shown = Math.round(heracles);
-  const corosShown = coros !== undefined ? Math.round(coros) : undefined;
-  if (corosShown === shown && !note) return undefined;
-  const pair =
-    corosShown !== undefined
-      ? t("units.load.pair", { heracles: formatCount(shown), coros: formatCount(corosShown) })
-      : t("units.load.pairNoCoros", { heracles: formatCount(shown) });
-  return note ? `${pair}\n${note}` : pair;
-}
-
-/** `loadPairTitle` for one session. */
-export function activityLoadTitle(
-  activity: { trainingLoad?: number; heraclesLoad?: HeraclesLoad },
-  source: StrengthLoadSource
-): string | undefined {
-  return loadPairTitle(source, activity.heraclesLoad?.value, activity.trainingLoad, activity.heraclesLoad?.quality);
 }

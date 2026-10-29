@@ -984,6 +984,8 @@ export interface TrainingHubUpcomingWorkout {
   sportType?: number;
   sortNo?: number;
   exercises?: TrainingHubScheduledExercise[];
+  /** Heracles Training Load's estimate, on a strength session only. */
+  heraclesLoad?: HeraclesLoad;
 }
 
 export interface TrainingHubThresholdZone {
@@ -3796,6 +3798,8 @@ export interface TrainingHubScheduledWorkoutEntry {
   exercises?: TrainingHubScheduledExercise[];
   /** Raw program payload from schedule/query — required to re-add the workout when rescheduling. */
   rawProgram?: Record<string, unknown>;
+  /** Heracles Training Load's estimate, on a strength session only. */
+  heraclesLoad?: HeraclesLoad;
 }
 
 export interface TrainingHubLibraryWorkout {

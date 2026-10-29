@@ -9,7 +9,8 @@ import type {
   UnitSystem
 } from "../../electron/types";
 import { activityCoachRequest } from "../training/askCoachAbout";
-import { loadPairTitle, useLoadSource } from "../training/loadSource";
+import { loadPairTitle } from "../training/loadFigures";
+import { useLoadSource } from "../training/loadSource";
 import { formatDistanceValue } from "../units/units";
 import { useUnitSystem } from "../units/UnitSystemProvider";
 import {

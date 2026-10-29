@@ -1,5 +1,6 @@
-import type { TrainingHubActivity, TrainingHubDailyMetric } from "../../electron/types";
+import type { StrengthLoadSource, TrainingHubActivity, TrainingHubDailyMetric } from "../../electron/types";
 import type { MessageKey } from "../i18n/core";
+import { heraclesSurplus } from "./loadFigures";
 import type { UnitSystem } from "../../electron/types";
 import { SPORT_COLOR_LABELS, sportColorCategory } from "./sportColors";
 import type { SportColorCategory } from "./sportColors";
@@ -137,6 +138,40 @@ export function enrichDayListWithActivityTotals(
   return [...dayMap.values()].sort((left, right) =>
     left.happenDay.localeCompare(right.happenDay)
   );
+}
+
+/** A day whose load may read in Heracles Training Load, with COROS's daily figure kept beside it. */
+export type LoadSourceDayMetric = TrainingHubDailyMetric & { corosTrainingLoad?: number };
+
+/**
+ * The day list with each day's load read in the chosen load: COROS's daily
+ * figure plus what Heracles Training Load adds for that day's strength
+ * sessions, COROS's figure kept beside it for the hover. The list as given
+ * while COROS is chosen.
+ */
+export function withHeraclesDayLoads(
+  dayList: TrainingHubDailyMetric[],
+  activities: TrainingHubActivity[],
+  loadSource: StrengthLoadSource
+): LoadSourceDayMetric[] {
+  if (loadSource !== "heracles") return dayList;
+  const surplusByDay = new Map<string, number>();
+  for (const activity of activities) {
+    const surplus = heraclesSurplus(activity, loadSource);
+    const happenDay = happenDayFromTimestamp(activity.startTime);
+    if (surplus > 0 && happenDay) surplusByDay.set(happenDay, (surplusByDay.get(happenDay) ?? 0) + surplus);
+  }
+  if (surplusByDay.size === 0) return dayList;
+  const days = new Map(dayList.map((day) => [day.happenDay, day]));
+  for (const [happenDay, surplus] of surplusByDay) {
+    const day = days.get(happenDay) ?? { happenDay };
+    days.set(happenDay, {
+      ...day,
+      trainingLoad: (day.trainingLoad ?? 0) + surplus,
+      corosTrainingLoad: day.trainingLoad ?? 0
+    } as LoadSourceDayMetric);
+  }
+  return [...days.values()].sort((left, right) => left.happenDay.localeCompare(right.happenDay));
 }
 
 export function getCalendarWeekDateKeys(referenceDate = new Date()): string[] {

@@ -91,6 +91,8 @@ export type HeatmapMetric = "trainingLoad" | "duration";
 export interface HeatmapCell {
   happenDay: string;
   trainingLoad?: number;
+  /** COROS's own figure, where the day reads in Heracles Training Load and differs. */
+  corosTrainingLoad?: number;
   /** Value of the currently selected metric — drives level and summary. */
   value?: number;
   distance?: number;

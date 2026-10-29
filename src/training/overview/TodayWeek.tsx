@@ -20,6 +20,8 @@ import type { TrainingHubSnapshot } from "../types";
 import { useUnitSystem } from "../../units/UnitSystemProvider";
 import { formatDistanceValue, metersToDisplayDistance } from "../../units/units";
 import { useTodayKey } from "../useTodayKey";
+import { loadPairTitle } from "../loadFigures";
+import { useLoadSource } from "../loadSource";
 import { formatCount, formatDecimal, getIntlLocale, t, weekdayNames } from "../../i18n/core";
 import { useI18n } from "../../i18n/useI18n";
 import { BandScale } from "./BandScale";
@@ -97,15 +99,22 @@ function amount(value: number, measure: WeekMeasure, unitSystem: UnitSystem): st
   return measure === "distance" ? distance(value, unitSystem) : figure(value);
 }
 
-/** A session's figures, time, distance and load, each only where it has one. */
+/**
+ * A session's figures, time, distance and load, each only where it has one. A
+ * load read in Heracles names COROS's figure beside it.
+ */
 function blockFigures(
-  block: { seconds: number; meters: number; load: number },
+  block: { seconds: number; meters: number; load: number; corosLoad?: number },
   unitSystem: UnitSystem
 ): string {
+  const coros = block.corosLoad !== undefined && Math.round(block.corosLoad) !== Math.round(block.load)
+    ? t("strength.load.coros", { value: figure(block.corosLoad) })
+    : null;
   return [
     block.seconds > 0 ? formatDurationSpan(block.seconds) : null,
     block.meters > 0 ? distance(block.meters, unitSystem) : null,
-    block.load > 0 ? t("units.trainingLoadShort", { value: Math.round(block.load) }) : null
+    block.load > 0 ? t("units.trainingLoadShort", { value: Math.round(block.load) }) : null,
+    block.load > 0 ? coros : null
   ]
     .filter(Boolean)
     .join(" · ");
@@ -171,9 +180,10 @@ function WeekDay({
     (sum, block) => ({
       seconds: sum.seconds + block.seconds,
       meters: sum.meters + block.meters,
-      load: sum.load + block.load
+      load: sum.load + block.load,
+      corosLoad: sum.corosLoad + (block.corosLoad ?? block.load)
     }),
-    { seconds: 0, meters: 0, load: 0 }
+    { seconds: 0, meters: 0, load: 0, corosLoad: 0 }
   );
   const empty = column.isPast
     ? t("overview.heatmap.rest")
@@ -271,6 +281,7 @@ export function TodayWeek({
 }) {
   useI18n();
   const { unitSystem } = useUnitSystem();
+  const { source: loadSource } = useLoadSource();
   const dayList = useMemo(
     () =>
       enrichDayListWithActivityTotals(
@@ -285,8 +296,8 @@ export function TodayWeek({
   const now = useMemo(() => new Date(), [todayKey]);
   const [measure, setMeasure] = useSelectionPreference(WEEK_MEASURE);
   const chart = useMemo(
-    () => buildWeekChart({ dayList, activities, upcoming: upcomingWorkouts, now, unitSystem, measure }),
-    [dayList, activities, upcomingWorkouts, now, unitSystem, measure]
+    () => buildWeekChart({ dayList, activities, upcoming: upcomingWorkouts, now, unitSystem, measure, loadSource }),
+    [dayList, activities, upcomingWorkouts, now, unitSystem, measure, loadSource]
   );
   const reading = useMemo(() => latestTrainingLoad(dayList), [dayList]);
   // Tabbed into at today, which this week always holds.
@@ -295,8 +306,8 @@ export function TodayWeek({
     Math.max(0, chart.columns.findIndex((column) => column.isToday))
   );
   const week = useMemo(
-    () => thisWeekLoad({ dayList, activities, now, unitSystem }),
-    [dayList, activities, now, unitSystem]
+    () => thisWeekLoad({ dayList, activities, now, unitSystem, loadSource }),
+    [dayList, activities, now, unitSystem, loadSource]
   );
   const percent = reading.percent;
   const status = percent !== undefined ? trainingStatusBand(percent) : undefined;
@@ -419,7 +430,9 @@ export function TodayWeek({
             <dd className="figure">{reading.baseFitness !== undefined ? figure(reading.baseFitness) : "–"}</dd>
             <dd className="overview-today-sub">{t("overview.today.sixWeekAverage")}</dd>
           </div>
-          <div>
+          {/* Always COROS's, against COROS's range; the hover names the
+              Heracles figure the columns above add up to. */}
+          <div title={loadPairTitle(loadSource, week.heraclesLoad, week.load)}>
             <dt>{t("overview.today.weekLoad")}</dt>
             <dd className="figure">{week.load !== undefined ? figure(week.load) : "–"}</dd>
             {week.recommended ? (

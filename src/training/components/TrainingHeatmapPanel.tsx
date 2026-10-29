@@ -42,8 +42,11 @@ import {
   mondayWeekIndex
 } from "../parsers";
 import {
-  enrichDayListWithActivityTotals
+  enrichDayListWithActivityTotals,
+  withHeraclesDayLoads
 } from "../weeklyActivity";
+import { inLoadSource } from "../loadFigures";
+import { useLoadSource } from "../loadSource";
 import { usePrefersReducedMotion } from "./trendChartParts";
 import {
   buildDominantSportByDay,
@@ -143,6 +146,17 @@ function pieBackground(
   return `conic-gradient(${stops.join(", ")})`;
 }
 
+/** A day read in Heracles Training Load names COROS's figure under its own. */
+function CorosLine({ cell }: { cell: HeatmapCell }) {
+  if (
+    cell.corosTrainingLoad === undefined ||
+    Math.round(cell.corosTrainingLoad) === Math.round(cell.trainingLoad ?? 0)
+  ) {
+    return null;
+  }
+  return <span>{t("strength.load.coros", { value: formatOptionalNumber(cell.corosTrainingLoad) })}</span>;
+}
+
 function formatCellAriaLabel(
   cell: HeatmapCell,
   unitSystem: UnitSystem
@@ -182,16 +196,24 @@ export function TrainingHeatmapPanel({
   // the top-right corner and naming what was actually trained that day.
   const isCompactRange = range === "month";
 
+  const { source: loadSource } = useLoadSource();
+  // Read in the chosen load: a strength day's load and its sport's share
+  // stand at Heracles Training Load, COROS's figure kept for the tooltip.
+  const loadActivities = useMemo(() => inLoadSource(activities, loadSource), [activities, loadSource]);
   const dayList = useMemo(
     () =>
-      enrichDayListWithActivityTotals(
-        mergeTrainingDayLists(
-          snapshot?.dailyMetrics ?? null,
-          snapshot?.analytics ?? null
+      withHeraclesDayLoads(
+        enrichDayListWithActivityTotals(
+          mergeTrainingDayLists(
+            snapshot?.dailyMetrics ?? null,
+            snapshot?.analytics ?? null
+          ),
+          activities
         ),
-        activities
+        activities,
+        loadSource
       ),
-    [snapshot, activities]
+    [snapshot, activities, loadSource]
   );
   const cells = useMemo(
     () => buildHeatmapCells(dayList, rangeDays, metric),
@@ -201,8 +223,8 @@ export function TrainingHeatmapPanel({
   const summary = useMemo(() => buildHeatmapSummary(cells), [cells]);
   // Color each day by the sport of that day's highest-training-load activity.
   const sportByDay = useMemo(
-    () => buildDominantSportByDay(activities),
-    [activities]
+    () => buildDominantSportByDay(loadActivities),
+    [loadActivities]
   );
   // Distinct sport categories per day → equal pie slices when there are 2+.
   const sportsByDay = useMemo(
@@ -261,14 +283,14 @@ export function TrainingHeatmapPanel({
   const dayEntries = useMemo(
     () =>
       isCompactRange
-        ? buildHeatmapDayEntries(activities, strengthByActivity, unitSystem)
+        ? buildHeatmapDayEntries(loadActivities, strengthByActivity, unitSystem)
         : new Map<string, HeatmapDayEntry[]>(),
-    [isCompactRange, activities, strengthByActivity, unitSystem]
+    [isCompactRange, loadActivities, strengthByActivity, unitSystem]
   );
   // Stripe segments per day, so a day holding two sports shows both.
   const sportShares = useMemo(
-    () => (isCompactRange ? buildSportSharesByDay(activities) : new Map()),
-    [isCompactRange, activities]
+    () => (isCompactRange ? buildSportSharesByDay(loadActivities) : new Map()),
+    [isCompactRange, loadActivities]
   );
   // The strip reads oldest first, one row per calendar week. Every card sits in
   // its own weekday column, so the leading slots of the first week and the
@@ -763,6 +785,7 @@ export function TrainingHeatmapPanel({
                           <span>
                             {t("overview.heatmap.load", { value: formatOptionalNumber(cell.trainingLoad) })}
                           </span>
+                          <CorosLine cell={cell} />
                           <span>
                             {t("overview.heatmap.distance", {
                               value: formatDistanceMeters(cell.distance, unitSystem)
@@ -872,6 +895,7 @@ export function TrainingHeatmapPanel({
                       <span className="training-heatmap-tooltip" role="tooltip">
                         <strong>{cell.label}</strong>
                         <span>{t("overview.heatmap.load", { value: loadLabel })}</span>
+                        <CorosLine cell={cell} />
                         <span>{t("overview.heatmap.distance", { value: distanceLabel })}</span>
                         <span>{t("overview.heatmap.duration", { value: durationLabel })}</span>
                       </span>

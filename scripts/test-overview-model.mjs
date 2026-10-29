@@ -252,6 +252,46 @@ assert.deepEqual(
   "a block carries its name and both figures, and stands at its load"
 );
 
+// --- The same week with strength read in Heracles Training Load: a strength
+// block stands at its Heracles load, COROS's figure kept for the tooltip, and
+// every other block, the leftover included, is as before.
+{
+  const heracles = (load, cardio) => ({ value: load, cardio, muscular: load - cardio, quality: "sets" });
+  const lifted = activities.map((activity) =>
+    activity.activityId === "mon-lift" ? { ...activity, heraclesLoad: heracles(180, 60) }
+      : activity.activityId === "thu-lift" ? { ...activity, heraclesLoad: heracles(90, 20) }
+        : activity
+  );
+  const plannedCore = upcoming.map((workout) =>
+    workout.name === "Core" ? { ...workout, heraclesLoad: { value: 70, cardio: 20, muscular: 50, quality: "planned" } } : workout
+  );
+  const read = buildWeekChart({ dayList, activities: lifted, upcoming: plannedCore, now, unitSystem: "metric", loadSource: "heracles" });
+  const [hMon, , hWed, hThu, , hSat] = read.columns;
+  assert.deepEqual(hMon.blocks.map((block) => [block.key, block.load, block.corosLoad]), [
+    ["mon-ride", 200, undefined],
+    ["mon-lift", 180, 60]
+  ], "the lift at its Heracles load, COROS's beside it");
+  assert.deepEqual(hWed.blocks.map((block) => [block.key, block.load]), [["wed-run", 110], ["residual", 20]]);
+  assert.equal(hThu.done, 300 + 70, "Thursday's lift adds what Heracles reads over COROS");
+  assert.deepEqual(hSat.blocks.at(-1).load, 70, "a planned strength session at its Heracles estimate");
+  assert.equal(hSat.blocks.at(-1).corosLoad, 20);
+  const unchanged = buildWeekChart({ dayList, activities: lifted, upcoming: plannedCore, now, unitSystem: "metric" });
+  assert.equal(unchanged.columns[0].blocks[1].load, 60, "with COROS chosen nothing moves");
+
+  const coros = thisWeekLoad({ dayList, activities: lifted, now, unitSystem: "metric" });
+  const both = thisWeekLoad({ dayList, activities: lifted, now, unitSystem: "metric", loadSource: "heracles" });
+  assert.equal(both.load, coros.load, "the week's load against COROS's range stays COROS's");
+  assert.equal(both.heraclesLoad, coros.load + (180 - 60) + (90 - 20), "the Heracles figure the columns add up to, for the hover");
+  assert.equal(coros.heraclesLoad, undefined);
+
+  // Coming up pairs by load in the chosen load, both sides alike.
+  const heavyLift = { happenDay: "20261024", name: "Heavy", sportType: 4, trainingLoad: 20, heraclesLoad: { value: 200, muscular: 180, cardio: 20, quality: "planned" } };
+  const light = { activityId: "light", sportType: 402, startTime: 0, trainingLoad: 20, heraclesLoad: heracles(60, 20) };
+  const heavy = { activityId: "heavy", sportType: 402, startTime: 10, trainingLoad: 21, heraclesLoad: heracles(190, 21) };
+  assert.equal(pairTodayPlan([heavyLift], [light, heavy], "heracles").pairs[0].activity.activityId, "heavy");
+  assert.equal(pairTodayPlan([heavyLift], [light, heavy]).pairs[0].activity.activityId, "light", "in COROS's load the light one is closer");
+}
+
 // --- The same week in time: every sport on one measure, a strength session
 // as long as it took rather than as light as its heart rate read.
 const timed = buildWeekChart({ dayList, activities, upcoming, now, unitSystem: "metric", measure: "time" });

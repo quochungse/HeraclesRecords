@@ -1,10 +1,12 @@
 import type {
+  StrengthLoadSource,
   TrainingHubActivity,
   TrainingHubDailyMetric,
   TrainingHubUpcomingWorkout,
   UnitSystem,
   WorkoutSport
 } from "../../../electron/types";
+import { heraclesSurplus, plannedLoad } from "../loadFigures";
 import {
   buildWeeklyActivitySeries,
   getCalendarWeekDateKeys,
@@ -144,8 +146,13 @@ export function latestTrainingLoad(
 export type WeekMeasure = "time" | "distance" | "load";
 
 export interface WeekLoadReading {
-  /** The load from this Monday to today. */
+  /**
+   * COROS's load from this Monday to today. Always COROS's: it is read
+   * against the range COROS recommends, which COROS sets from its own load.
+   */
   load?: number;
+  /** The same days in Heracles Training Load, while that is the chosen load and a strength session makes it differ. */
+  heraclesLoad?: number;
   /** The range COROS recommends for the whole week. */
   recommended?: { min: number; max: number };
 }
@@ -163,12 +170,14 @@ export function thisWeekLoad({
   dayList,
   activities,
   now = new Date(),
-  unitSystem
+  unitSystem,
+  loadSource = "coros"
 }: {
   dayList: readonly TrainingHubDailyMetric[];
   activities: TrainingHubActivity[];
   now?: Date;
   unitSystem: UnitSystem;
+  loadSource?: StrengthLoadSource;
 }): WeekLoadReading {
   const week = new Set(getCalendarWeekDateKeys(now));
   const today = happenDayFromTimestamp(now.getTime()) ?? "";
@@ -185,8 +194,15 @@ export function thisWeekLoad({
     .find((day) => positive(day.recommendedLoadMin) !== undefined && positive(day.recommendedLoadMax) !== undefined);
   const min = positive(ranged?.recommendedLoadMin);
   const max = positive(ranged?.recommendedLoadMax);
+  const surplus = activities
+    .filter((activity) => {
+      const day = happenDayFromTimestamp(activity.startTime);
+      return day !== undefined && week.has(day) && day <= today;
+    })
+    .reduce((sum, activity) => sum + heraclesSurplus(activity, loadSource), 0);
   return {
     load: Math.round(load),
+    ...(surplus > 0 ? { heraclesLoad: Math.round(load + surplus) } : {}),
     recommended: min !== undefined && max !== undefined && max >= min ? { min: Math.round(min), max: Math.round(max) } : undefined
   };
 }
@@ -198,6 +214,8 @@ export interface WeekBlock {
   value: number;
   /** Every figure, whichever is drawn, for the column's tooltip. */
   load: number;
+  /** COROS's figure, where Heracles Training Load reads the session heavier. */
+  corosLoad?: number;
   seconds: number;
   meters: number;
   /** The session's or the plan's name; empty on the day's leftover load. */
@@ -296,7 +314,8 @@ export function buildWeekChart({
   upcoming,
   now = new Date(),
   unitSystem,
-  measure = "load"
+  measure = "load",
+  loadSource = "coros"
 }: {
   dayList: TrainingHubDailyMetric[];
   activities: TrainingHubActivity[];
@@ -304,6 +323,8 @@ export function buildWeekChart({
   now?: Date;
   unitSystem: UnitSystem;
   measure?: WeekMeasure;
+  /** With Heracles chosen, a strength session's block stands at its Heracles load. */
+  loadSource?: StrengthLoadSource;
 }): WeekChart {
   const series = buildWeeklyActivitySeries(dayList, "trainingLoad", now, unitSystem, activities);
   const weekDays = new Set(series.days.map((day) => day.happenDay));
@@ -326,13 +347,18 @@ export function buildWeekChart({
     // Every session of the day, the ones COROS gave no load included: they
     // still happened, and the icon under the column says so.
     const blocks: WeekBlock[] = dayActivities.map((activity) => {
-      const load = loads.get(activity.activityId) ?? 0;
+      // COROS's daily load split by its sessions, and for a strength session
+      // read in Heracles, what Heracles adds on top.
+      const corosLoad = loads.get(activity.activityId) ?? 0;
+      const surplus = heraclesSurplus(activity, loadSource);
+      const load = corosLoad + surplus;
       const time = amount(activity.duration);
       const meters = amount(activity.distance);
       return {
         key: activity.activityId,
         value: pick(load, time, meters),
         load,
+        ...(surplus > 0 ? { corosLoad } : {}),
         seconds: time,
         meters,
         name: activity.name?.trim() ?? "",
@@ -367,11 +393,13 @@ export function buildWeekChart({
         day.happenDay === todayKey
           ? pairTodayPlan(
               onDay,
-              activities.filter((activity) => happenDayFromTimestamp(activity.startTime) === todayKey)
+              activities.filter((activity) => happenDayFromTimestamp(activity.startTime) === todayKey),
+              loadSource
             ).open
           : onDay;
       open.forEach((workout) => {
-        const load = positive(workout.trainingLoad) ?? 0;
+        const load = positive(plannedLoad(workout, loadSource)) ?? 0;
+        const corosLoad = positive(workout.trainingLoad) ?? 0;
         const time = amount(workout.durationSeconds);
         const meters = amount(workout.distanceMeters);
         const value = pick(load, time, meters);
@@ -382,6 +410,7 @@ export function buildWeekChart({
           key: `planned:${workout.happenDay}:${onDay.indexOf(workout)}`,
           value,
           load,
+          ...(load > corosLoad ? { corosLoad } : {}),
           seconds: time,
           meters,
           name: workout.name,
