@@ -1348,4 +1348,45 @@ assert.equal(activitySportFamily(701, "Indoor Rowing"), "other");
   );
 }
 
+// A strength session also states Heracles Training Load where it says more
+// than COROS's figure; totals add it up beside COROS's, never in its place.
+{
+  const lift = {
+    activityId: "h1",
+    sportType: 402,
+    sportName: "Strength",
+    startTime: at(9, 4, 18),
+    duration: 3_000,
+    trainingLoad: 25,
+    heraclesLoad: { value: 160.4, cardio: 25, muscular: 135.4, quality: "sets" }
+  };
+  assert.match(formatActivityListLine(lift, "metric"), /· load 25 · Heracles load 160$/);
+  assert.match(
+    formatActivityListLine({ ...lift, heraclesLoad: { ...lift.heraclesLoad, quality: "estimate" } }, "metric"),
+    /Heracles load 160 \(estimated\)$/
+  );
+  for (const quality of ["pending", "conditioning"]) {
+    assert.doesNotMatch(
+      formatActivityListLine({ ...lift, heraclesLoad: { value: 25, cardio: 25, muscular: 0, quality } }, "metric"),
+      /Heracles/,
+      `${quality}: COROS's figure is all there is to say`
+    );
+  }
+  const week = formatActivityListForChat([listFixture[0], lift], "metric", {
+    window: { startDay: "20260901", endDay: "20260907" },
+    limit: 10
+  });
+  assert.match(week, /- Strength: 1 · 50:00 · load 25 · Heracles load 160\n/);
+  assert.match(week, /- All: 2 · 1:40:00 · load 105 · Heracles load 240 · \+40 m\n/);
+  assert.doesNotMatch(week, /- Run: .*Heracles/, "a run's two loads are one");
+
+  const detailText = formatActivityDetailForChat(strengthDetail, false, "metric", DEFAULT_ACTIVITY_DETAIL_SECTIONS, {
+    value: 203,
+    cardio: 65,
+    muscular: 138,
+    quality: "sets"
+  });
+  assert.match(detailText, /Heracles Training Load: 203 \(cardio 65 from COROS, muscular 138\)/);
+  assert.doesNotMatch(formatActivityDetailForChat(strengthDetail, false, "metric"), /Heracles/);
+}
 console.log("test-chat-activity-tools: ok");

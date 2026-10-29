@@ -184,6 +184,13 @@ imports) and `electron/i18n/<locale>.ts`; main throws `ScreenError` (English mes
 logs and tools) and `diagnosticIpcMain` re-throws it in the renderer's language. Text main
 *stores* stays English and is rendered again from its fields.
 
+**Two loads, never mixed.** A strength session has COROS's Training Load and Heracles Training
+Load (`src/strength/CLAUDE.md`); the Strength screen chooses which one every screen counts
+strength in, and other sports are COROS's either way. A figure set against another is in the
+same load on both sides (`comparableLoads`, `loadsToCompare`), and anything COROS derives from
+its own load — Base Fitness, Load Impact, the load ratio, the recommended weekly range — is only
+ever compared with COROS's load. Where Heracles is shown, the hover states COROS's figure too.
+
 **Loading is not empty.** An array that has not arrived reads like one that came back
 empty; each load states where it stands (`TrainingHubLoadStatus`, `initializing`,
 `loading`), and loading copy outranks both the empty copy and the MCP copy.

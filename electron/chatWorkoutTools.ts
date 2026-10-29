@@ -1,5 +1,6 @@
 import crypto from "node:crypto";
 import { COROS_NAME_MAX_BYTES, COROS_PLAN_DESCRIPTION_MAX_BYTES } from "./corosTextLimits";
+import { coachHeraclesLoadValue, withCoachPlannedHeraclesLoads } from "./chatActivityTools";
 import { handleRequestPlanBrief } from "./chatPlanBriefs";
 import { PLAN_BRIEF_TOOL_DEFINITION } from "./planBrief";
 import {
@@ -442,7 +443,8 @@ export function getChatWorkoutTools(): CorosMcpTool[] {
       description:
         "List workouts on the COROS training calendar for a date range. " +
         "Use before delete_workout to get plan_id and id_in_plan when needed. " +
-        "Each session carries the revision a patch needs and its steps numbered for patch paths: [i] is /steps/i, [i.j] is /steps/i/steps/j.",
+        "Each session carries the revision a patch needs and its steps numbered for patch paths: [i] is /steps/i, [i.j] is /steps/i/steps/j. " +
+        "A strength session may carry heracles_load, the estimate of its Heracles load.",
       inputSchema: {
         type: "object",
         properties: {
@@ -1803,7 +1805,7 @@ async function handleListScheduledWorkouts(
     return JSON.stringify({ ok: false, error: "end_date must be YYYYMMDD." });
   }
 
-  const entries = await listScheduledWorkoutEntriesForEdit(startDate, endDate);
+  const entries = withCoachPlannedHeraclesLoads(await listScheduledWorkoutEntriesForEdit(startDate, endDate));
   const wanted = new Set(Array.isArray(args.sessions) ? args.sessions.slice(0, 5).map(String) : []);
   const shown = wanted.size ? entries.filter((entry) => wanted.has(entry.idInPlan)).slice(0, 5) : entries;
   const outlines = await stepOutlines(shown, unitSystem);
@@ -1827,6 +1829,7 @@ async function handleListScheduledWorkouts(
       name: entry.name,
       volume: formatScheduledVolume(entry.volume, unitSystem),
       training_load: entry.trainingLoad,
+      ...(coachHeraclesLoadValue(entry) !== undefined ? { heracles_load: coachHeraclesLoadValue(entry) } : {}),
       ...(entry.revision ? { revision: entry.revision } : {}),
       steps: outlines.get(entry),
       exercises: !outlines.get(entry) && !details.get(`${entry.planId}:${entry.idInPlan}`)?.workout && entry.exercises?.length

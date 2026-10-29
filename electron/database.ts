@@ -1833,6 +1833,7 @@ export function listCoachActivityRowsAfter(
 
 export interface CoachPrecedingActivityRow extends CoachUnseenActivityRow {
   avg_hr: number | null;
+  training_load: number | null;
   /** The cached strength breakdown (`StrengthDetail` JSON), when there is one. */
   strength_json: string | null;
 }
@@ -1849,7 +1850,7 @@ export function listCoachActivityRowsBetween(
   return requireDatabase()
     .prepare(
       `SELECT a.activity_id, a.name, a.sport_type, a.sport_name, a.start_time,
-              a.duration, a.distance, a.avg_hr, s.detail_json AS strength_json
+              a.duration, a.distance, a.avg_hr, a.training_load, s.detail_json AS strength_json
        FROM training_activities a
        LEFT JOIN strength_sessions s ON s.activity_id = a.activity_id
        WHERE a.start_time >= ? AND a.start_time < ?

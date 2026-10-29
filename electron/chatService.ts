@@ -87,6 +87,9 @@ import {
 } from "./trainingPlanSimulation";
 import {
   formatActivityListLine,
+  formatHeraclesLoadPart,
+  withCoachHeraclesLoads,
+  withCoachPlannedHeraclesLoads,
   formatActivitySpan,
   getChatActivityTools,
   handleChatActivityTool,
@@ -4098,12 +4101,12 @@ async function buildTrainingContext(
   const includeSleep = scope?.sleep !== false;
   const [activities, dashboard, upcoming, profile, sleep] = await Promise.allSettled([
     includeActivities
-      ? listTrainingHubActivities(1, 25)
+      ? listTrainingHubActivities(1, 25).then(withCoachHeraclesLoads)
       : Promise.resolve([] as TrainingHubActivity[]),
     includeActivities
       ? getTrainingDashboard()
       : Promise.resolve(null as TrainingHubDashboard | null),
-    getUpcomingWorkouts(14),
+    getUpcomingWorkouts(14).then(withCoachPlannedHeraclesLoads),
     // Body metrics and thresholds cost nothing on any turn inside the
     // profile's hour-long cache.
     getCoachCorosProfile(),
@@ -4207,6 +4210,7 @@ function formatUpcoming(
         workout.name,
         formatUpcomingVolume(workout.volume, unitSystem),
         workout.trainingLoad ? `load ${workout.trainingLoad}` : "",
+        formatHeraclesLoadPart(workout) ?? "",
         exerciseDetail ? `exercises: ${exerciseDetail}` : ""
       ].filter(Boolean);
       return `- ${parts.join(" · ")}`;

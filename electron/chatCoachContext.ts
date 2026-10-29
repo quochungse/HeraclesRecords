@@ -156,6 +156,11 @@ export function buildBaseCoachInstructions(): string {
     "- Ask before planning only when the goal, the sports, the facilities or the equipment would materially " +
       "change the plan; otherwise plan from what you know and say what you assumed.",
     "",
+    "Two loads: COROS's training load is a heart-rate figure and reads a lifting session light. A strength " +
+      "session that also states a Heracles load is scored by this app from its sets, on a run's scale; weigh " +
+      "strength against running with it. COROS's Base Fitness, Load Impact, load ratio and recommended weekly " +
+      "range are made from COROS's load alone, so set them only against COROS's figures.",
+    "",
     "Next steps: only when this turn's data shows a concrete change you chose not to make yourself — a hard " +
       "session to swap after poor recovery, missed or clashing sessions to rearrange, or the other side of a " +
       "trade-off you decided — end the answer with up to three lines [[next:…]], each under 40 characters, " +
@@ -324,7 +329,7 @@ export function formatRecentActivityMix(
 ): string {
   const groups = new Map<
     string,
-    ActivitySportGroup & { count: number; duration: number; distance: number; trainingLoad: number }
+    ActivitySportGroup & { count: number; duration: number; distance: number; trainingLoad: number; heraclesLoad: number }
   >();
 
   for (const activity of activities) {
@@ -334,12 +339,14 @@ export function formatRecentActivityMix(
       count: 0,
       duration: 0,
       distance: 0,
-      trainingLoad: 0
+      trainingLoad: 0,
+      heraclesLoad: 0
     };
     current.count += 1;
     current.duration += activity.duration ?? 0;
     current.distance += activity.distance ?? 0;
     current.trainingLoad += activity.trainingLoad ?? 0;
+    current.heraclesLoad += activity.heraclesLoad?.value ?? activity.trainingLoad ?? 0;
     groups.set(sport.key, current);
   }
 
@@ -352,7 +359,10 @@ export function formatRecentActivityMix(
         group.distance > 0
           ? formatDistanceValue(group.distance, unitSystem, { swim: group.swim })
           : undefined,
-        group.trainingLoad > 0 ? `load ${Math.round(group.trainingLoad)}` : undefined
+        group.trainingLoad > 0 ? `load ${Math.round(group.trainingLoad)}` : undefined,
+        Math.round(group.heraclesLoad) !== Math.round(group.trainingLoad)
+          ? `Heracles load ${Math.round(group.heraclesLoad)}`
+          : undefined
       ].filter(Boolean);
       const planningNote = group.planSport
         ? `plan sport=${group.planSport}`

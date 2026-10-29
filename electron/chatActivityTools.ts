@@ -11,6 +11,7 @@ import { dayKey, isoDay, isoFromDayKey, padTwo } from "./chatDayKeys";
 import { sessionSetsCardExercises, sessionSetsHeartRate } from "./sessionSets";
 import { isRecoveryLap, lapSections } from "./lapSections";
 import { getStoredTrainingActivity } from "./database";
+import { heraclesLoadFor, withHeraclesLoads, withPlannedHeraclesLoads } from "./heraclesLoadService";
 import {
   getTrainingHubStatus,
   getTrainingHubActivityDetail,
@@ -24,6 +25,7 @@ import type {
   ActivityVisualLapPoint,
   ActivityVisualPreview,
   CorosMcpTool,
+  HeraclesLoad,
   SessionSet,
   TrainingHubActivity,
   TrainingHubActivityDetail,
@@ -137,7 +139,8 @@ export function getChatActivityTools(): CorosMcpTool[] {
       name: "list_recent_activities",
       description:
         "List COROS activities: activity_id, sport_type, local start, distance, " +
-        "duration, HR, training load and climb. With start_date (and optionally " +
+        "duration, HR, training load and climb; a strength session also states its " +
+        "Heracles load where it differs. With start_date (and optionally " +
         "end_date) it returns every activity in that period plus per-sport totals — " +
         "use this for a week or block review instead of paging. Without dates it " +
         "returns the most recent ones; the snapshot already lists the latest 8. " +
@@ -188,7 +191,8 @@ export function getChatActivityTools(): CorosMcpTool[] {
         "power. Optional sections: laps (per-lap table with structured-workout " +
         "phase), zones (this activity's HR zone time), trend (first → last third " +
         "drift of pace, HR and form), elevation (8-segment profile), strength " +
-        "(sets × reps × load), series (~60-sample table; large). Default: every " +
+        "(sets × reps × load), series (~60-sample table; large); a strength " +
+        "session also states its Heracles Training Load. Default: every " +
         "section except series. Request only the sections the question needs. " +
         "Pass window for one stretch's pace, HR, cadence, power and climb.",
       inputSchema: {
@@ -413,9 +417,11 @@ async function handleListRecentActivities(
   try {
     // A sport filter is applied here, not by COROS, so an undated filtered list
     // reads one full page to have enough of that sport to fill `limit`.
-    const fetched = window
-      ? await listTrainingHubActivities(1, MAX_DATED_LIMIT, window.startDay, window.endDay)
-      : await listTrainingHubActivities(page, sport || length ? MAX_DATED_LIMIT : limit);
+    const fetched = withCoachHeraclesLoads(
+      window
+        ? await listTrainingHubActivities(1, MAX_DATED_LIMIT, window.startDay, window.endDay)
+        : await listTrainingHubActivities(page, sport || length ? MAX_DATED_LIMIT : limit)
+    );
     return formatActivityListForChat(fetched, unitSystem, {
       ...(window ? { window } : {}),
       ...(sport ? { sport } : {}),
@@ -520,7 +526,7 @@ function formatActivityTotals(
 ): string[] {
   const groups = new Map<
     ActivitySportFamily,
-    { count: number; duration: number; distance: number; load: number; climb: number }
+    { count: number; duration: number; distance: number; load: number; heraclesLoad: number; climb: number }
   >();
   for (const activity of activities) {
     const family = activitySportFamily(activity.sportType, activity.sportName);
@@ -529,19 +535,21 @@ function formatActivityTotals(
       duration: 0,
       distance: 0,
       load: 0,
+      heraclesLoad: 0,
       climb: 0
     };
     group.count += 1;
     group.duration += activity.duration ?? 0;
     group.distance += activity.distance ?? 0;
     group.load += activity.trainingLoad ?? 0;
+    group.heraclesLoad += activity.heraclesLoad?.value ?? activity.trainingLoad ?? 0;
     group.climb += activity.elevationGain ?? 0;
     groups.set(family, group);
   }
 
   const describe = (
     label: string,
-    group: { count: number; duration: number; distance: number; load: number; climb: number },
+    group: { count: number; duration: number; distance: number; load: number; heraclesLoad: number; climb: number },
     swim: boolean
   ): string =>
     [
@@ -553,6 +561,9 @@ function formatActivityTotals(
         ? formatDistanceValue(group.distance, unitSystem, { swim })
         : undefined,
       group.load > 0 ? `load ${Math.round(group.load)}` : undefined,
+      Math.round(group.heraclesLoad) !== Math.round(group.load)
+        ? `Heracles load ${Math.round(group.heraclesLoad)}`
+        : undefined,
       group.climb > 0 ? `+${formatElevationValue(group.climb, unitSystem)}` : undefined
     ]
       .filter(Boolean)
@@ -571,9 +582,10 @@ function formatActivityTotals(
         duration: total.duration + group.duration,
         distance: 0,
         load: total.load + group.load,
+        heraclesLoad: total.heraclesLoad + group.heraclesLoad,
         climb: total.climb + group.climb
       }),
-      { count: 0, duration: 0, distance: 0, load: 0, climb: 0 }
+      { count: 0, duration: 0, distance: 0, load: 0, heraclesLoad: 0, climb: 0 }
     );
     rows.push(`- ${describe("All", all, false)}`);
   }
@@ -654,7 +666,13 @@ async function handleGetActivityDetail(
     }
 
     const unitSystem = callbacks?.unitSystem ?? "metric";
-    const text = formatActivityDetailForChat(detail, sections.has("series"), unitSystem, sections);
+    const text = formatActivityDetailForChat(
+      detail,
+      sections.has("series"),
+      unitSystem,
+      sections,
+      coachHeraclesLoad({ activityId, sportType, trainingLoad: detail.trainingLoad ?? listActivity?.trainingLoad })
+    );
     const window = parseActivityWindow(args.window);
     return window ? `${formatActivityWindowForChat(detail, window, unitSystem)}\n\n${text}` : text;
   } catch (caught) {
@@ -1066,11 +1084,71 @@ export function formatActivityListLine(
     activity.avgHr ? `avg HR ${activity.avgHr}` : undefined,
     activity.maxHr ? `max HR ${activity.maxHr}` : undefined,
     activity.trainingLoad ? `load ${activity.trainingLoad}` : undefined,
+    formatHeraclesLoadPart(activity),
     activity.elevationGain
       ? `+${formatElevationValue(activity.elevationGain, unitSystem)}`
       : undefined
   ].filter(Boolean);
   return `- ${parts.join(" · ")}`;
+}
+
+/**
+ * Strength sessions with Heracles Training Load beside COROS's. Coach reads
+ * both whatever the Strength screen shows; a failure to work it out leaves
+ * the list as COROS sent it, since COROS's figure is still the answer.
+ */
+export function withCoachHeraclesLoads<T extends TrainingHubActivity>(activities: T[]): T[] {
+  try {
+    return withHeraclesLoads(activities);
+  } catch {
+    return activities;
+  }
+}
+
+/** Planned sessions the same way, a strength one carrying the estimate of its Heracles load. */
+export function withCoachPlannedHeraclesLoads<T extends Parameters<typeof withPlannedHeraclesLoads>[0][number]>(
+  workouts: T[]
+): T[] {
+  try {
+    return withPlannedHeraclesLoads(workouts);
+  } catch {
+    return workouts;
+  }
+}
+
+function coachHeraclesLoad(
+  activity: Pick<TrainingHubActivity, "activityId" | "sportType" | "trainingLoad">
+): HeraclesLoad | undefined {
+  try {
+    return heraclesLoadFor(activity);
+  } catch {
+    return undefined;
+  }
+}
+
+/** What Heracles Training Load says of a session or a plan, where it says more than COROS's figure. */
+function heraclesSays(
+  load: HeraclesLoad | undefined,
+  corosLoad: number | undefined
+): HeraclesLoad | undefined {
+  if (!load || load.quality === "pending" || load.quality === "conditioning") return undefined;
+  return Math.round(load.value) === Math.round(corosLoad ?? 0) ? undefined : load;
+}
+
+/** A session's or a plan's Heracles load, rounded, where it says more than COROS's figure. */
+export function coachHeraclesLoadValue(item: { trainingLoad?: number; heraclesLoad?: HeraclesLoad }): number | undefined {
+  const load = heraclesSays(item.heraclesLoad, item.trainingLoad);
+  return load ? Math.round(load.value) : undefined;
+}
+
+/** "Heracles load 203" on a list row; "(estimated)" when it is not read off the sets. */
+export function formatHeraclesLoadPart(item: {
+  trainingLoad?: number;
+  heraclesLoad?: HeraclesLoad;
+}): string | undefined {
+  const value = coachHeraclesLoadValue(item);
+  if (value === undefined) return undefined;
+  return `Heracles load ${value}${item.heraclesLoad?.quality === "sets" ? "" : " (estimated)"}`;
 }
 
 /**
@@ -1126,8 +1204,10 @@ export function formatActivityDetailForChat(
   detail: TrainingHubActivityDetail,
   includeSeries: boolean,
   unitSystem: UnitSystem = "metric",
-  include: ReadonlySet<ActivityDetailSection> = DEFAULT_ACTIVITY_DETAIL_SECTIONS
+  include: ReadonlySet<ActivityDetailSection> = DEFAULT_ACTIVITY_DETAIL_SECTIONS,
+  heraclesLoad?: HeraclesLoad
 ): string {
+  const heracles = heraclesSays(heraclesLoad, detail.trainingLoad);
   const wants = (section: ActivityDetailSection): boolean =>
     section === "series" ? includeSeries || include.has("series") : include.has(section);
   const reading = activityReading(detail.sportType, detail.sportName);
@@ -1160,6 +1240,17 @@ export function formatActivityDetailForChat(
     detail.maxHr ? `Max HR: ${detail.maxHr} bpm` : undefined,
     formatElevationTotals(detail, unitSystem),
     detail.trainingLoad ? `Training load: ${detail.trainingLoad}` : undefined,
+    heracles
+      ? `Heracles Training Load: ${Math.round(heracles.value)} (` +
+        [
+          heracles.cardio !== undefined ? `cardio ${Math.round(heracles.cardio)} from COROS` : undefined,
+          `muscular ${Math.round(heracles.muscular)}`,
+          heracles.quality === "sets" ? undefined : "estimated: the sets could not all be read"
+        ]
+          .filter(Boolean)
+          .join(", ") +
+        ")"
+      : undefined,
     detail.calories ? `Calories: ${Math.round(detail.calories)}` : undefined
   ].filter(Boolean);
 

@@ -42,6 +42,28 @@ decision). The 3D hero (`StrengthHero`) is reused by Overview inside a `.strengt
 - A Coach card stored before `setList` is redrawn from the detail on render
   (`useStoredSetsRedraw`), asked once a window per session, never written back.
 
+## Heracles Training Load
+
+The app's own load for a strength session, on a run's scale
+([docs/heracles-training-load.md](../../docs/heracles-training-load.md)): engine
+`electron/heraclesLoad.ts` (node-free), factors per COROS key `heraclesLoadFactors.ts` (bump
+`HERACLES_FACTORS_VERSION` with any change), service `heraclesLoadService.ts`. Chosen on this
+screen (`strength.loadSource`, `preference`; `useLoadSource()` in the renderer); the body map
+offers **Load** only then. `npm run test:heracles-load`, `test:heracles-load-service`.
+- **Computed, never stored**: one run scores every session oldest first and is kept until
+  `heraclesLoadInputsVersion` (breakdowns, rated runs, Hevy, body weight) moves. It rides on the
+  payloads main already sends (`heraclesLoad` on activities and planned sessions,
+  `StrengthSession.heracles`); `trainingLoad` is never overwritten. A plan's sessions are asked
+  for over `strength:estimatePlanLoads`, never saved with the plan.
+- **Feel is never an input** for a lift; it is read only on runs, to scale RPE-minutes to COROS's
+  load (`bridgeFactor`, default 0.5 under eight rated runs).
+- **A session's value is at least COROS's** (cardio) and `quality` says how it was read:
+  `sets`, `estimate` (sets unreadable: COROS's floor or the usual session RPE), `conditioning`
+  (drills, or a session COROS kept no sets for: COROS's figure), `pending` (breakdown not read
+  yet: COROS's figure), `planned`. Only `sets` and `estimate` say more than COROS.
+- A display reads a load through `src/training/loadFigures.ts` and shows the other figure on
+  hover (`loadPairTitle`).
+
 ## Hevy
 
 Hevy is its REST API; nobody here has a real Hevy account, so shapes are checked against
