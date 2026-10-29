@@ -8,6 +8,7 @@ import { installRendererDiagnostics } from "./diagnostics";
 import { initLocale } from "./i18n/core";
 import "./i18n/screenTextHooks";
 import { UnitSystemProvider } from "./units/UnitSystemProvider";
+import { LoadSourceProvider } from "./training/loadSource";
 import "./styles.css";
 // In the main bundle, after the base sheet, because the library's skeleton is
 // App's Suspense fallback and is drawn before the library's chunk has loaded.
@@ -30,7 +31,9 @@ void initLocale().then(() => {
     <React.StrictMode>
       <ThemeProvider>
         <UnitSystemProvider>
-          <App />
+          <LoadSourceProvider>
+            <App />
+          </LoadSourceProvider>
         </UnitSystemProvider>
       </ThemeProvider>
     </React.StrictMode>

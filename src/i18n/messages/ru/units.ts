@@ -26,6 +26,11 @@ const units: UnitsMessages = {
   "units.exercises_few": "{count} упражнения",
   "units.exercises_many": "{count} упражнений",
   "units.exercises_other": "{count} упражнения",
+  "units.load.pair": "Heracles TL {heracles} · COROS TL {coros}",
+  "units.load.pairNoCoros": "Heracles TL {heracles} · без TL COROS",
+  "units.load.estimate": "Оценка: подходы не удалось прочитать",
+  "units.load.pending": "Ещё не рассчитано: подходы тренировки загружаются",
+  "units.load.planned": "Оценка по плану",
 };
 
 export default units;

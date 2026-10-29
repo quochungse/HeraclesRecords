@@ -7,7 +7,8 @@ import {
   RefreshCw,
   Settings2
 } from "lucide-react";
-import type { CoachOpenRequest, TrainingHubStatus } from "../../electron/types";
+import type { CoachOpenRequest, HeraclesLoadInfo, StrengthLoadSource, TrainingHubStatus, UnitSystem } from "../../electron/types";
+import { useLoadSource } from "../training/loadSource";
 import type { HeraclesRecordsApi } from "../heraclesrecords-api";
 import type { SportScreenRequest } from "../training/types";
 import { epochMsFromCorosTime } from "../training/activityWindow";
@@ -27,7 +28,7 @@ import {
 } from "./StrengthSessionDetail";
 import { analyticsCoverage, buildStrengthSessionIndex, sessionHeat } from "./sessionAnalytics";
 import { StrengthWeeklyChart } from "./StrengthWeeklyChart";
-import { cadencePhrase, formatSpan, formatTotalWeight } from "./strengthFormat";
+import { cadencePhrase, formatLiftWeight, formatSpan, formatTotalWeight } from "./strengthFormat";
 import { OptionGroup } from "../components/OptionGroup";
 import {
   periodDaysFromValue,
@@ -44,7 +45,26 @@ import {
 import "./strength.css";
 import "./exerciseExplorer.css";
 import { useUnitSystem } from "../units/UnitSystemProvider";
-import { formatCount, plural, t } from "../i18n/core";
+import { formatCount, formatDecimal, plural, t } from "../i18n/core";
+
+/** The (i) beside the load setting: what Heracles Training Load is, and what it is being read with. */
+function loadSourceNote(info: HeraclesLoadInfo | undefined, unitSystem: UnitSystem): string {
+  const lines = [t("strength.loadSource.explain")];
+  if (info) {
+    const k = formatDecimal(info.k, 2);
+    lines.push(
+      info.bridgeMeasured
+        ? t("strength.loadSource.bridge", { k, count: formatCount(info.bridgeRuns) })
+        : t("strength.loadSource.bridgeDefault", { k })
+    );
+    lines.push(
+      info.bodyWeightKg !== undefined
+        ? t("strength.loadSource.weight", { weight: formatLiftWeight(info.bodyWeightKg, unitSystem) })
+        : t("strength.loadSource.noWeight", { weight: formatLiftWeight(75, unitSystem) })
+    );
+  }
+  return lines.join("\n");
+}
 
 interface StrengthViewProps {
   api: HeraclesRecordsApi;
@@ -78,6 +98,7 @@ export function StrengthView({
   onAskCoach
 }: StrengthViewProps) {
   const { unitSystem } = useUnitSystem();
+  const { source: loadSource, info: loadInfo, setSource: setLoadSource } = useLoadSource();
   const corosConnected = Boolean(status?.authenticated);
 
   const {
@@ -286,6 +307,28 @@ export function StrengthView({
             options={STRENGTH_PERIOD_OPTIONS}
             onChange={(next) => setDays(periodDaysFromValue(next) ?? 90)}
           />
+          {/* The load every screen reads a strength session in, set here
+              because this is where a strength session is read. */}
+          <span className="strength-load-source">
+            <OptionGroup
+              label={t("strength.loadSource")}
+              mode="collapsible"
+              value={loadSource}
+              options={[
+                { value: "coros", label: t("strength.loadSource.coros") },
+                { value: "heracles", label: t("strength.loadSource.heracles") }
+              ]}
+              onChange={(next) => void setLoadSource(next as StrengthLoadSource)}
+            />
+            <button
+              type="button"
+              className="strength-load-info"
+              aria-label={t("strength.loadSource.about")}
+              title={loadSourceNote(loadInfo, unitSystem)}
+            >
+              <Info size={14} aria-hidden="true" />
+            </button>
+          </span>
           </>
         ) : null}
         <div className="strength-header-actions">
@@ -472,7 +515,6 @@ export function StrengthView({
                 )}
                 <StrengthHero
                   analytics={selectedEntry?.analytics ?? analytics}
-                  source={source}
                   showDevelopmentTools={showDevelopmentTools}
                   scope={selectedEntry ? "session" : "window"}
                   resolveHeat={

@@ -256,5 +256,26 @@ assert.equal(emptyAnalytics.summary.sessions, 0);
 assert.equal(emptyAnalytics.summary.avgSessionVolumeKg, 0);
 assert.equal(emptyAnalytics.muscleMax.sets, 0);
 assert.equal(emptyAnalytics.muscles.length, MUSCLES.length);
+assert.equal(emptyAnalytics.muscleMax.load, 0);
+
+// ---- Heracles Training Load on the body map ----
+// Each set's load is split by the movement's muscle shares, so the muscles add
+// up to the session's set load; a session the main process has not scored adds none.
+{
+  const benchSets = [{ reps: 8, weightKg: 70 }, { reps: 8, weightKg: 70 }];
+  const scored = {
+    ...session("h", now - DAY, [exercise("T1041", benchSets)]),
+    heracles: {
+      value: 30, cardio: 10, muscular: 20, quality: "sets",
+      sets: [[{ load: 9, rpe: 7, seconds: 120 }, { load: 11, rpe: 8, seconds: 120 }]]
+    }
+  };
+  const unscored = session("u", now - 2 * DAY, [exercise("T1041", benchSets)]);
+  const loaded = buildStrengthAnalytics([scored, unscored], 90);
+  const total = loaded.muscles.reduce((sum, stat) => sum + stat.loadTl, 0);
+  assert.ok(Math.abs(total - 20) < 1e-9, `muscles add up to the sets' load: ${total}`);
+  assert.equal(loaded.muscleMax.load, Math.max(...loaded.muscles.map((stat) => stat.loadTl)));
+  assert.ok(loaded.muscleById.chest.loadTl > loaded.muscleById.triceps.loadTl, "the prime mover takes the larger share");
+}
 
 console.log("strength-analytics tests passed");

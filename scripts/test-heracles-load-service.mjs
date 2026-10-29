@@ -37,6 +37,7 @@ const combined = strength("combined:h1:c1", 2, [set(8, 55, 32, 150), set(8, 55, 
 
 let version = "1";
 let reads = 0;
+let runs = [];
 const deps = {
   strengthSessions: () => {
     reads += 1;
@@ -44,6 +45,7 @@ const deps = {
   },
   withoutBreakdown: () => ["gym-cardio"],
   ratedRuns: () => Array.from({ length: 8 }, () => ({ sportType: 100, feelType: 3, duration: 3600, trainingLoad: 170, startTime: NOW - 5 * DAY })),
+  runs: () => runs,
   bodyWeightKg: () => 75,
   inputsVersion: () => version,
   now: () => NOW
@@ -80,6 +82,24 @@ const deps = {
   assert.equal(scored.heracles.quality, "sets", "COROS's copy reads the merged session's load");
   assert.equal(scored.heracles.sets, undefined, "but its one set does not line up with Hevy's three");
   assert.equal(shaped.heracles.sets[0].length, 3, "the merged session keeps its sets");
+}
+
+// ---- The run a session is set beside ----
+{
+  const value = service.withStrengthSessionLoads([day], deps)[0].heracles.value;
+  version = "with-runs";
+  runs = [
+    { activityId: "far", startTime: day.startTime - 70 * DAY, trainingLoad: value, distance: 9000, duration: 3000 },
+    { activityId: "off", startTime: day.startTime - 3 * DAY, trainingLoad: value * 1.3, distance: 12000, duration: 4000 },
+    { activityId: "near", startTime: day.startTime - 5 * DAY, trainingLoad: value * 1.05, distance: 6000, duration: 2400 },
+    { activityId: "later", startTime: day.startTime + DAY, trainingLoad: value, distance: 6000, duration: 2400 }
+  ];
+  const [withRun] = service.withStrengthSessionLoads([day], deps);
+  assert.equal(withRun.heracles.runEquivalent.activityId, "near", "within eight weeks before it and 15% of its load");
+  runs = [runs[0], runs[1], runs[3]];
+  version = "without-a-match";
+  assert.equal(service.withStrengthSessionLoads([day], deps)[0].heracles.runEquivalent, undefined);
+  runs = [];
 }
 
 // ---- One run until an input moves ----

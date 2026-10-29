@@ -2134,6 +2134,36 @@ export function listRatedActivityLoads(sinceEpochSeconds: number): {
   }));
 }
 
+/** Runs on/after `sinceEpochSeconds` that carry a COROS load: what a strength session is set beside. */
+export function listRunLoads(sinceEpochSeconds: number): {
+  activityId: string;
+  startTime?: number;
+  duration?: number;
+  distance?: number;
+  trainingLoad: number;
+}[] {
+  const rows = requireDatabase()
+    .prepare(
+      `SELECT activity_id, start_time, duration, distance, training_load
+       FROM training_activities
+       WHERE start_time >= ? AND sport_type IN (100, 101, 102, 103) AND training_load > 0`
+    )
+    .all(sinceEpochSeconds) as {
+    activity_id: string;
+    start_time: number | null;
+    duration: number | null;
+    distance: number | null;
+    training_load: number;
+  }[];
+  return rows.map((row) => ({
+    activityId: row.activity_id,
+    startTime: row.start_time ?? undefined,
+    duration: row.duration ?? undefined,
+    distance: row.distance ?? undefined,
+    trainingLoad: row.training_load
+  }));
+}
+
 /** Strength activities cached with no breakdown: gym cardio, or a watch that kept no exercise laps. */
 export function listStrengthActivitiesWithoutBreakdown(): string[] {
   const rows = requireDatabase()
@@ -2156,11 +2186,13 @@ export function heraclesLoadInputsVersion(): string {
             FROM training_activities WHERE sport_type IN (400, 402)) AS strength,
          (SELECT count(*) || ':' || ifnull(sum(feel_type), 0) || ':' || ifnull(max(start_time), 0)
             FROM training_activities WHERE feel_type > 0) AS rated,
+         (SELECT count(*) || ':' || ifnull(sum(training_load), 0)
+            FROM training_activities WHERE sport_type IN (100, 101, 102, 103)) AS runs,
          (SELECT count(*) || ':' || ifnull(max(updated_at), '') || ':' || ifnull(max(synced_at), '')
             FROM hevy_workouts) AS hevy`
     )
-    .get() as { breakdowns: string; strength: string; rated: string; hevy: string };
-  return [row.breakdowns, row.strength, row.rated, row.hevy].join("|");
+    .get() as { breakdowns: string; strength: string; rated: string; runs: string; hevy: string };
+  return [row.breakdowns, row.strength, row.rated, row.runs, row.hevy].join("|");
 }
 
 /** One stored activity by id, as every activity list call has written it. */

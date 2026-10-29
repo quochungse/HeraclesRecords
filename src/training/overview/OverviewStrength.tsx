@@ -49,7 +49,7 @@ export default function OverviewStrength({
   useI18n();
   const { unitSystem } = useUnitSystem();
   // Four weeks, read as such: not the Strength screen's window, which may be a year.
-  const { sessions, source, error, initializing } = useStrengthData({
+  const { sessions, error, initializing } = useStrengthData({
     api,
     corosConnected: connected,
     windowDays: WINDOW_DAYS
@@ -162,7 +162,7 @@ export default function OverviewStrength({
                 ramp, the stage, the 3D figure's materials — which the hero
                 reads; without it the bars and the stage draw empty. */}
             <div className="overview-strength-hero strength-view">
-              <StrengthHero analytics={analytics} source={source} />
+              <StrengthHero analytics={analytics} />
             </div>
             <div className="overview-sport-facts">
               {last ? (

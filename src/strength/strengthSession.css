@@ -510,6 +510,32 @@
   white-space: nowrap;
 }
 
+/* Heracles Training Load's two parts, inside the caption line so the band keeps
+   its height: COROS's heart-rate part, then what the sets add. */
+.strength-load-split {
+  display: inline-flex;
+  width: 36px;
+  height: 4px;
+  margin-right: 6px;
+  overflow: hidden;
+  border-radius: var(--radius-pill);
+  background: var(--sx-well);
+  vertical-align: middle;
+}
+
+.strength-load-split > i {
+  display: block;
+  height: 100%;
+}
+
+.strength-load-split > .is-cardio {
+  background: var(--text-muted);
+}
+
+.strength-load-split > .is-muscular {
+  background: var(--sx-ember);
+}
+
 /* ---------- Records ---------- */
 
 /* A record's gain, wherever it is stated: in an exercise row and in the

@@ -209,6 +209,36 @@
   padding-bottom: 4px;
 }
 
+.strength-load-source {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+/* What Heracles Training Load is and what it is read with, on hover. */
+.strength-load-info {
+  display: inline-grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--text-muted);
+  cursor: help;
+}
+
+.strength-load-info:hover {
+  background: var(--sx-well);
+  color: var(--text-primary);
+}
+
+.strength-load-info:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: 2px;
+}
+
 .strength-header-actions {
   display: inline-flex;
   align-items: center;

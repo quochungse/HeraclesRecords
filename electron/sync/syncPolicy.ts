@@ -421,6 +421,8 @@ export const LOCAL_STORAGE_POLICY: Readonly<Record<string, SyncTier>> = {
   // launch's first paint is already in the right unit. Every machine of one
   // account recomputes the same value from the account itself.
   "heraclesrecords.unitSystem": "derived",
+  // The first paint's copy of `strength.loadSource`, which travels as a setting.
+  "heraclesrecords.loadSource": "derived",
   // COROS's other display setting, cached for the same reason and on the same
   // terms as the one above.
   "heraclesrecords.temperatureUnit": "derived",

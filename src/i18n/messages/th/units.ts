@@ -22,6 +22,11 @@ const units: UnitsMessages = {
   "units.weekly.distanceUnit": "ระยะทาง ({unit})",
   "units.exercises_one": "{count} ท่า",
   "units.exercises_other": "{count} ท่า",
+  "units.load.pair": "Heracles TL {heracles} · COROS TL {coros}",
+  "units.load.pairNoCoros": "Heracles TL {heracles} · ไม่มี TL ของ COROS",
+  "units.load.estimate": "ประมาณการ: อ่านเซ็ตไม่ได้",
+  "units.load.pending": "ยังไม่ได้คำนวณ: กำลังโหลดเซ็ตของเซสชัน",
+  "units.load.planned": "ประมาณจากแผน",
 };
 
 export default units;

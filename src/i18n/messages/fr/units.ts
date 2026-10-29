@@ -22,6 +22,11 @@ const units: UnitsMessages = {
   "units.weekly.distanceUnit": "Distance ({unit})",
   "units.exercises_one": "{count} exercice",
   "units.exercises_other": "{count} exercices",
+  "units.load.pair": "Heracles TL {heracles} · COROS TL {coros}",
+  "units.load.pairNoCoros": "Heracles TL {heracles} · pas de TL COROS",
+  "units.load.estimate": "Estimée : les séries n’ont pas pu être lues",
+  "units.load.pending": "Pas encore calculée : les séries de la séance sont en cours de chargement",
+  "units.load.planned": "Estimée d’après le plan",
 };
 
 export default units;

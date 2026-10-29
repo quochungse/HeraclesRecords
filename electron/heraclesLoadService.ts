@@ -11,6 +11,7 @@ import {
   getSetting,
   heraclesLoadInputsVersion,
   listRatedActivityLoads,
+  listRunLoads,
   listStoredStrengthSessions,
   listStrengthActivitiesWithoutBreakdown,
   setSetting
@@ -31,6 +32,8 @@ import { lastKnownCorosWeightKg } from "./trainingHubService";
 import type {
   HeraclesLoad,
   HeraclesLoadInfo,
+  HeraclesRunEquivalent,
+  HeraclesSessionLoad,
   StrengthLoadSource,
   StrengthSession,
   TrainingHubActivity
@@ -41,6 +44,10 @@ export const STRENGTH_LOAD_SPORT_TYPES: ReadonlySet<number> = new Set([400, 402]
 /** As far back as a lift's capacity reaches, and the bridge's runs. */
 const HISTORY_DAYS = 3650;
 const SECONDS_PER_DAY = 86_400;
+/** A run set beside a strength session is from the eight weeks before it… */
+const EQUIVALENT_WINDOW_DAYS = 56;
+/** …and within this share of its load, or none is named. */
+const EQUIVALENT_TOLERANCE = 0.15;
 
 export interface HeraclesLoadDeps {
   /** Every cached strength session, COROS's and Hevy's. */
@@ -48,6 +55,8 @@ export interface HeraclesLoadDeps {
   /** Strength activities stored with no breakdown. */
   withoutBreakdown(): string[];
   ratedRuns(): RatedRun[];
+  /** Runs with a COROS load, for the run a strength session is set beside. */
+  runs(): HeraclesRunEquivalent[];
   bodyWeightKg(startTime: number | undefined): number | undefined;
   /** Changes whenever the inputs do. */
   inputsVersion(): string;
@@ -62,6 +71,7 @@ export function createDefaultDeps(): HeraclesLoadDeps {
       combineStrengthSessions(listStoredStrengthSessions(since()), getStoredHevyStrengthSessions(HISTORY_DAYS)),
     withoutBreakdown: () => listStrengthActivitiesWithoutBreakdown(),
     ratedRuns: () => listRatedActivityLoads(since()),
+    runs: () => listRunLoads(since()),
     bodyWeightKg: () => lastKnownCorosWeightKg(),
     inputsVersion: () => heraclesLoadInputsVersion(),
     now: () => Math.floor(Date.now() / 1000)
@@ -82,6 +92,8 @@ interface HeraclesLoadSnapshot {
   /** By every id a session goes by: its own, COROS's, Hevy's. */
   byId: Map<string, StrengthSession>;
   withoutBreakdown: ReadonlySet<string>;
+  /** Oldest first. */
+  runs: HeraclesRunEquivalent[];
 }
 
 const snapshots = new WeakMap<HeraclesLoadDeps, HeraclesLoadSnapshot>();
@@ -113,10 +125,32 @@ function snapshotFor(deps: HeraclesLoadDeps): HeraclesLoadSnapshot {
     bridge,
     run,
     byId,
-    withoutBreakdown: new Set(deps.withoutBreakdown())
+    withoutBreakdown: new Set(deps.withoutBreakdown()),
+    runs: [...deps.runs()].sort((left, right) => (left.startTime ?? 0) - (right.startTime ?? 0))
   };
   snapshots.set(deps, snapshot);
   return snapshot;
+}
+
+/** The run in the eight weeks before a session whose COROS load is closest to the session's own. */
+function runEquivalentFor(
+  scored: HeraclesSessionLoad,
+  startTime: number | undefined,
+  runs: readonly HeraclesRunEquivalent[]
+): HeraclesRunEquivalent | undefined {
+  if (startTime === undefined || scored.value <= 0) return undefined;
+  const since = startTime - EQUIVALENT_WINDOW_DAYS * SECONDS_PER_DAY;
+  let best: HeraclesRunEquivalent | undefined;
+  for (const run of runs) {
+    const at = run.startTime ?? 0;
+    if (at < since || at >= startTime) continue;
+    const gap = Math.abs(run.trainingLoad - scored.value);
+    if (gap > scored.value * EQUIVALENT_TOLERANCE) continue;
+    // The closer load wins; between two as close, the more recent run.
+    const bestGap = best ? Math.abs(best.trainingLoad - scored.value) : Number.POSITIVE_INFINITY;
+    if (gap < bestGap || (gap === bestGap && at > (best?.startTime ?? 0))) best = run;
+  }
+  return best;
 }
 
 export function getStrengthLoadSource(): StrengthLoadSource {
@@ -199,8 +233,12 @@ export function withStrengthSessionLoads(sessions: StrengthSession[], deps?: Her
       (session.sourceIds?.hevy ? snapshot.byId.get(`hevy:${session.sourceIds.hevy}`) : undefined);
     const scored = scoredSession ? snapshot.run.sessions.get(scoredSession.activityId) : undefined;
     if (!scored || !scoredSession) return session;
-    if (sameShape(scoredSession, session)) return { ...session, heracles: scored };
-    const { sets: _sets, ...withoutSets } = scored;
+    const runEquivalent = scored.quality === "sets" || scored.quality === "estimate"
+      ? runEquivalentFor(scored, session.startTime, snapshot.runs)
+      : undefined;
+    const withRun = runEquivalent ? { ...scored, runEquivalent } : scored;
+    if (sameShape(scoredSession, session)) return { ...session, heracles: withRun };
+    const { sets: _sets, ...withoutSets } = withRun;
     return { ...session, heracles: withoutSets };
   });
 }

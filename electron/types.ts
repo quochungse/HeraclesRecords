@@ -298,9 +298,23 @@ export interface HeraclesSetLoad {
   filled?: boolean;
 }
 
+/** A run of the athlete's whose COROS load is closest to a strength session's Heracles load. */
+export interface HeraclesRunEquivalent {
+  activityId: string;
+  /** Epoch seconds. */
+  startTime?: number;
+  /** Seconds. */
+  duration?: number;
+  /** Metres. */
+  distance?: number;
+  trainingLoad: number;
+}
+
 export interface HeraclesSessionLoad extends HeraclesLoad {
   /** Session RPE on the CR-10 scale, time between sets included. */
   sessionRpe?: number;
+  /** The run in the eight weeks before it that carried about the same load. */
+  runEquivalent?: HeraclesRunEquivalent;
   /**
    * One array per `detail.exercises[i]`, one entry per `entries[j]`; null for
    * what is not a working set (rest, stretching, a drill).

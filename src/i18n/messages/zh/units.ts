@@ -22,6 +22,11 @@ const units: UnitsMessages = {
   "units.weekly.distanceUnit": "距离（{unit}）",
   "units.exercises_one": "{count} 个动作",
   "units.exercises_other": "{count} 个动作",
+  "units.load.pair": "Heracles TL {heracles} · COROS TL {coros}",
+  "units.load.pairNoCoros": "Heracles TL {heracles} · 无 COROS TL",
+  "units.load.estimate": "估算：无法读取各组数据",
+  "units.load.pending": "尚未计算：正在加载本次训练的各组数据",
+  "units.load.planned": "根据计划估算",
 };
 
 export default units;
