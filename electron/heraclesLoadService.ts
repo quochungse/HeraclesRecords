@@ -8,14 +8,18 @@
  */
 
 import {
+  bodyWeightHistoryVersion,
   getSetting,
   heraclesLoadInputsVersion,
+  listBodyWeights,
   listRatedActivityLoads,
   listRunLoads,
   listStoredStrengthSessions,
   listStrengthActivitiesWithoutBreakdown,
-  setSetting
+  setSetting,
+  type BodyWeightReading
 } from "./database";
+import { dayKey } from "./chatDayKeys";
 import {
   bridgeFactor,
   estimatePlannedLoad,
@@ -61,6 +65,7 @@ export interface HeraclesLoadDeps {
   ratedRuns(): RatedRun[];
   /** Runs with a COROS load, for the run a strength session is set beside. */
   runs(): HeraclesRunEquivalent[];
+  /** The weight of a session's day; `now()` for today's. */
   bodyWeightKg(startTime: number | undefined): number | undefined;
   /** Changes whenever the inputs do. */
   inputsVersion(): string;
@@ -68,15 +73,47 @@ export interface HeraclesLoadDeps {
   now(): number;
 }
 
+/**
+ * The weight of a session's day from the readings kept (oldest first): the
+ * newest on or before it, else the first — a session older than every
+ * reading is nearest the earliest one. Undefined with no reading at all.
+ */
+export function bodyWeightOn(readings: readonly BodyWeightReading[], startTime: number | undefined): number | undefined {
+  if (!readings.length) return undefined;
+  if (startTime === undefined) return readings[readings.length - 1]!.weightKg;
+  const day = dayKey(new Date(startTime * 1000));
+  let low = 0;
+  let high = readings.length - 1;
+  let found = -1;
+  while (low <= high) {
+    const middle = (low + high) >> 1;
+    if (readings[middle]!.day <= day) {
+      found = middle;
+      low = middle + 1;
+    } else {
+      high = middle - 1;
+    }
+  }
+  return readings[Math.max(0, found)]!.weightKg;
+}
+
 export function createDefaultDeps(): HeraclesLoadDeps {
   const since = () => Math.floor(Date.now() / 1000) - HISTORY_DAYS * SECONDS_PER_DAY;
+  // Read again only when the history moves, a sync's rows included: a run
+  // asks for every session's weight.
+  let weights: { version: string; readings: BodyWeightReading[] } | undefined;
+  const readings = () => {
+    const version = bodyWeightHistoryVersion();
+    if (weights?.version !== version) weights = { version, readings: listBodyWeights() };
+    return weights.readings;
+  };
   return {
     strengthSessions: () =>
       combineStrengthSessions(listStoredStrengthSessions(since()), getStoredHevyStrengthSessions(HISTORY_DAYS)),
     withoutBreakdown: () => listStrengthActivitiesWithoutBreakdown(),
     ratedRuns: () => listRatedActivityLoads(since()),
     runs: () => listRunLoads(since()),
-    bodyWeightKg: () => lastKnownCorosWeightKg(),
+    bodyWeightKg: (startTime) => bodyWeightOn(readings(), startTime) ?? lastKnownCorosWeightKg(),
     inputsVersion: () => heraclesLoadInputsVersion(),
     now: () => Math.floor(Date.now() / 1000)
   };

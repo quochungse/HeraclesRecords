@@ -506,6 +506,15 @@ export function initializeDatabase(userDataPath: string): Database.Database {
       payload     TEXT NOT NULL,     -- JSON object, the figures it was reached with
       recorded_at INTEGER NOT NULL   -- epoch ms it was first written here
     );
+
+    -- The body weight COROS's profile stated, a row for each day it was read
+    -- different. COROS keeps only the current weight, so a past one exists only
+    -- here; Heracles Training Load scores a session at its day's weight.
+    CREATE TABLE IF NOT EXISTS body_weight_history (
+      day         TEXT PRIMARY KEY,  -- local "YYYYMMDD" it was read on
+      weight_kg   REAL NOT NULL,
+      recorded_at INTEGER NOT NULL   -- epoch ms of the reading
+    );
   `);
 
   // feel_type caches the COROS end-of-activity feeling (sportFeelInfo.feelType,
@@ -2194,10 +2203,57 @@ export function heraclesLoadInputsVersion(): string {
          (SELECT count(*) || ':' || ifnull(sum(training_load), 0)
             FROM training_activities WHERE sport_type IN (100, 101, 102, 103)) AS runs,
          (SELECT count(*) || ':' || ifnull(max(updated_at), '') || ':' || ifnull(max(synced_at), '')
-            FROM hevy_workouts) AS hevy`
+            FROM hevy_workouts) AS hevy,
+         (${BODY_WEIGHT_VERSION_SQL}) AS weights`
     )
-    .get() as { breakdowns: string; strength: string; rated: string; runs: string; hevy: string };
-  return [row.breakdowns, row.strength, row.rated, row.runs, row.hevy].join("|");
+    .get() as { breakdowns: string; strength: string; rated: string; runs: string; hevy: string; weights: string };
+  return [row.breakdowns, row.strength, row.rated, row.runs, row.hevy, row.weights].join("|");
+}
+
+const BODY_WEIGHT_VERSION_SQL =
+  "SELECT count(*) || ':' || ifnull(max(recorded_at), 0) || ':' || ifnull(sum(weight_kg), 0) FROM body_weight_history";
+
+/** Changes whenever the body weight history does, a sync's rows included. */
+export function bodyWeightHistoryVersion(): string {
+  return (requireDatabase().prepare(BODY_WEIGHT_VERSION_SQL).pluck().get() as string | null) ?? "";
+}
+
+export interface BodyWeightReading {
+  /** Local "YYYYMMDD". */
+  day: string;
+  weightKg: number;
+}
+
+/** Every weight kept, oldest first. */
+export function listBodyWeights(): BodyWeightReading[] {
+  return (
+    requireDatabase()
+      .prepare("SELECT day, weight_kg FROM body_weight_history ORDER BY day")
+      .all() as Array<{ day: string; weight_kg: number }>
+  ).map((row) => ({ day: row.day, weightKg: row.weight_kg }));
+}
+
+/**
+ * Keep a weight COROS's profile stated, on the day it was read. A reading
+ * that moves nothing — the weight the newest row already holds — is not
+ * written, so a profile read on every launch sends nothing to sync. Answers
+ * whether a row moved.
+ */
+export function recordBodyWeight(weightKg: number, day: string, now = Date.now()): boolean {
+  if (!Number.isFinite(weightKg) || weightKg <= 0 || !/^\d{8}$/.test(day)) return false;
+  const database = requireDatabase();
+  const latest = database
+    .prepare("SELECT day, weight_kg FROM body_weight_history WHERE day <= ? ORDER BY day DESC LIMIT 1")
+    .get(day) as { day: string; weight_kg: number } | undefined;
+  if (latest && Math.abs(latest.weight_kg - weightKg) < 0.05) return false;
+  database
+    .prepare(
+      `INSERT INTO body_weight_history (day, weight_kg, recorded_at) VALUES (?, ?, ?)
+       ON CONFLICT(day) DO UPDATE SET weight_kg = excluded.weight_kg, recorded_at = excluded.recorded_at`
+    )
+    .run(day, weightKg, now);
+  notifySyncedRow("body_weight_history", ["day"], [day]);
+  return true;
 }
 
 /** One stored activity by id, as every activity list call has written it. */

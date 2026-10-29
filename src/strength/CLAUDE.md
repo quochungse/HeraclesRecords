@@ -61,6 +61,10 @@ offers **Load** only then. `npm run test:heracles-load`, `test:heracles-load-ser
   `sets`, `estimate` (sets unreadable: COROS's floor or the usual session RPE), `conditioning`
   (drills, or a session COROS kept no sets for: COROS's figure), `pending` (breakdown not read
   yet: COROS's figure), `planned`. Only `sets` and `estimate` say more than COROS.
+- **A session is scored at its day's body weight** (`bodyWeightOn`): every profile read keeps
+  COROS's weight in `body_weight_history` (`personal`, a row per day it changed;
+  `recordBodyWeight` writes nothing when it did not), since COROS holds only the current one.
+  `test:body-weight-history`.
 - A display reads a load through `src/training/loadFigures.ts` and shows the other figure on
   hover (`loadPairTitle`).
 

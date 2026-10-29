@@ -43,12 +43,14 @@ import {
   listStrengthActivitiesMissingDetail,
   listTrainingActivitiesMissingFeelType,
   listTrainingActivityRpeInputs,
+  recordBodyWeight,
   setSetting,
   setTrainingActivityFeelType,
   upsertActivityDetailSummary,
   upsertStrengthSessionDetail,
   upsertTrainingActivities
 } from "./database";
+import { dayKey } from "./chatDayKeys";
 import { getSecretSetting, setSecretSetting } from "./secretSettings";
 import { annotateDiagnosticRequest } from "./diagnosticsLog";
 import { simplifyRoute } from "./routeSimplification";
@@ -1360,7 +1362,24 @@ export function buildCorosProfileUpdateFields(
  * COROS trains from and the zone tables it derives from them.
  */
 export async function getCorosProfile(): Promise<CorosProfile> {
-  return normalizeCorosProfile(await readCorosAccount());
+  return keepingBodyWeight(normalizeCorosProfile(await readCorosAccount()));
+}
+
+/**
+ * The profile as read, its weight kept for the day (`recordBodyWeight`):
+ * COROS holds only the current one, and Heracles Training Load scores a past
+ * session at the weight of its day. Best-effort: a profile read never fails
+ * for it.
+ */
+function keepingBodyWeight(profile: CorosProfile): CorosProfile {
+  if (profile.weightKg !== undefined) {
+    try {
+      recordBodyWeight(profile.weightKg, dayKey(new Date()));
+    } catch {
+      // No database yet: the next read keeps it.
+    }
+  }
+  return profile;
 }
 
 /**
@@ -1565,7 +1584,7 @@ export async function updateCorosProfile(
   // a future response ever trims it.
   const profile =
     updated && typeof updated === "object" && updated.userId !== undefined
-      ? normalizeCorosProfile(updated)
+      ? keepingBodyWeight(normalizeCorosProfile(updated))
       : await getCorosProfile();
 
   // The write is the newest truth there is, so it seeds the cache rather than

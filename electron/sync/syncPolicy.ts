@@ -156,6 +156,10 @@ export const TABLE_POLICY: Readonly<Record<string, TablePolicy>> = {
   // the whole reason it exists, and it is what lets the other machine show the
   // same labours.
   athlete_milestones: "personal",
+  // The body weight on each day COROS's profile stated a new one. COROS keeps
+  // only the current weight, so a past one is not rebuildable once read over,
+  // and both machines score a past strength session at the same weight.
+  body_weight_history: "personal",
   // Server config only. The bearer tokens and OAuth client info live in
   // app_settings under `mcp.<id>.*`, and stay on the machine that authorised
   // them — so a restored machine lists its servers and signs in to them again.
