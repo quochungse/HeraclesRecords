@@ -105,7 +105,7 @@
 /* One grid for the three columns, so the Sleep and This week columns share
    their rows: head, the night's figures beside the week's status, ring beside
    chart, footer. The physique column is a subgrid spanning all four, its
-   stage taking the middle two. */
+   stage taking the last three. */
 .overview-today {
   /* Done in the accent, planned hatched in it. */
   --overview-week-fill: color-mix(in srgb, var(--accent) 82%, transparent);

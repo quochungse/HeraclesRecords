@@ -215,10 +215,8 @@ import type {
   ChatTokenUsage,
   ChatToolPolicy,
   ClaudeCodeConfig,
-  CorosProfile,
   ClaudeCodeConnectionTest,
   ClaudeCodeLoginStart,
-  ClaudeCodePermissions,
   ClaudeCodeStatus,
   CoachInputPrompt,
   CorosMcpTool,
@@ -2063,13 +2061,10 @@ async function streamChatTurn(
   let fullText = "";
   try {
     const settings = getChatSettings();
-    const turnContext = (
-      permissions?: Parameters<typeof buildTrainingContext>[0]
-    ): ReturnType<typeof buildTrainingContext> =>
+    const turnContext = (): ReturnType<typeof buildTrainingContext> =>
       job
         ? Promise.resolve({ head: job.system, live: "", hasData: false })
         : buildTrainingContext(
-            permissions,
             unitSystem,
             settings.customInstructions,
             roleInstructions,
@@ -2094,11 +2089,8 @@ async function streamChatTurn(
       }
 
       await prepare(turnToolSurface());
-      const chatTools = toolsForRun(
-        requestId,
-        getClaudeCodeTools(settings.claudeCode.permissions, toolPolicy)
-      );
-      const { hasData, ...context } = await prepare(turnContext(settings.claudeCode.permissions));
+      const chatTools = toolsForRun(requestId, getClaudeCodeTools(toolPolicy));
+      const { hasData, ...context } = await prepare(turnContext());
       const systemPrompt = coachSystemPrompt(
         context,
         chatTools,
@@ -2130,9 +2122,9 @@ async function streamChatTurn(
           // says what it ran, and the answer is named after it whether or not
           // the run also gets to update the saved default below.
           noteModel(model);
-          // An analysis's override says nothing about the interactive
-          // default, so never let one overwrite the saved defaultModel.
-          if (runtime.model?.trim() || settings.claudeCode.model?.trim()) return;
+          // A named model says nothing about what Default resolves to, so only
+          // a run on Default records it. `""` is Default chosen explicitly.
+          if ((runtime.model ?? settings.claudeCode.model)?.trim()) return;
           const current = getChatSettings();
           if (current.claudeCode.defaultModel === model) return;
           saveChatSettings({
@@ -2174,7 +2166,6 @@ async function streamChatTurn(
             send,
             requestId,
             unitSystem,
-            settings.claudeCode.permissions,
             toolPolicy
           );
         }
@@ -2264,7 +2255,6 @@ async function streamChatTurn(
             send,
             requestId,
             unitSystem,
-            undefined,
             toolPolicy
           );
         }
@@ -2352,7 +2342,6 @@ async function streamChatTurn(
             send,
             requestId,
             unitSystem,
-            undefined,
             toolPolicy
           );
         }
@@ -2444,7 +2433,6 @@ async function streamChatTurn(
             send,
             requestId,
             unitSystem,
-            undefined,
             toolPolicy
           );
         }
@@ -2595,7 +2583,6 @@ async function streamChatTurn(
             send,
             requestId,
             unitSystem,
-            undefined,
             toolPolicy
           );
         } catch (toolError) {
@@ -2733,7 +2720,7 @@ async function simulatedPlanTurn(
   const callTool = async (name: string, args: Record<string, unknown>) => {
     send("chat:streamInfo", { requestId, kind: "mcp", tool: name, status: "call" });
     await pause(600);
-    return JSON.parse(await executeChatTool(name, args, send, requestId, unitSystem, undefined, "read-only")) as {
+    return JSON.parse(await executeChatTool(name, args, send, requestId, unitSystem, "read-only")) as {
       ok: boolean;
       error_code?: string;
       errors?: string[];
@@ -3238,56 +3225,48 @@ export function narrowCorosMcpTools(
 }
 
 /**
- * The COROS MCP reads each Claude Code permission lets through, by the server's
- * own names. Until September 2026 this listed names the server never had
- * (`get_training_load`, `get_sleep_data`…), so Claude Code was offered no COROS
- * MCP tool whatever was switched on. Most of these are then hidden again by
- * `narrowCorosMcpTools` while the local tool that answers them is on offer —
- * they are here for a machine where it is not (Training Hub signed out), and so
- * that each permission covers the remote reads of its kind as well as the local.
- * A write is never listed: `COROS_MCP_WRITE_TOOLS` refuses them regardless.
+ * The COROS MCP reads Claude Code is offered, by the server's own names. Until
+ * September 2026 this listed names the server never had (`get_training_load`,
+ * `get_sleep_data`…), so Claude Code was offered no COROS MCP tool at all. Most
+ * of these are then hidden again by `narrowCorosMcpTools` while the local tool
+ * that answers them is on offer — they are here for a machine where it is not
+ * (Training Hub signed out). What a conversation withholds is taken out after,
+ * by name (`toolReadsWithheldSource`), as for every provider. A write is never
+ * listed: `COROS_MCP_WRITE_TOOLS` refuses them regardless.
  */
-const CLAUDE_REMOTE_READ_TOOLS: Record<
-  keyof ClaudeCodePermissions,
-  readonly string[]
-> = {
-  recentActivities: [
-    "getActivityDetail",
-    "queryActivityLapData",
-    "queryCustomActivityLapData",
-    "querySportRecords"
-  ],
-  trainingMetrics: [
-    "queryFitnessAssessmentOverview",
-    "queryTrainingLoadAssessment",
-    "queryRecoveryStatus",
-    "queryDailyHealthData",
-    "queryAvgHeartRate",
-    "queryRestingHeartRate",
-    "queryUserInfo",
-    // Offered only to an account COROS knows as female (`narrowCorosMcpTools`).
-    "queryMenstruationCycles"
-  ],
-  upcomingWorkouts: [
-    "queryTrainingSchedule",
-    "queryScheduledWorkoutDetails",
-    "queryTrainingPlanLibrary",
-    "queryTrainingPlanDetails",
-    "queryWorkoutLibrary",
-    "queryWorkoutDetails"
-  ],
-  sleepData: [
-    "querySleepOverview",
-    "querySleepData",
-    "querySleepHrv",
-    "queryStressLevel",
-    "queryStressTimeSeries",
-    // A wellness check's HRV, stress, SpO2 and respiration: the recovery
-    // readings the sleep permission and the sleep source cover.
-    "queryHealthCheckTimeSeries"
-  ],
-  fullActivityFiles: []
-};
+const CLAUDE_REMOTE_READ_TOOLS: ReadonlySet<string> = new Set([
+  // Activities.
+  "getActivityDetail",
+  "queryActivityLapData",
+  "queryCustomActivityLapData",
+  "querySportRecords",
+  // Training metrics.
+  "queryFitnessAssessmentOverview",
+  "queryTrainingLoadAssessment",
+  "queryRecoveryStatus",
+  "queryDailyHealthData",
+  "queryAvgHeartRate",
+  "queryRestingHeartRate",
+  "queryUserInfo",
+  // Offered only to an account COROS knows as female (`narrowCorosMcpTools`).
+  "queryMenstruationCycles",
+  // The calendar and the libraries.
+  "queryTrainingSchedule",
+  "queryScheduledWorkoutDetails",
+  "queryTrainingPlanLibrary",
+  "queryTrainingPlanDetails",
+  "queryWorkoutLibrary",
+  "queryWorkoutDetails",
+  // Sleep and recovery.
+  "querySleepOverview",
+  "querySleepData",
+  "querySleepHrv",
+  "queryStressLevel",
+  "queryStressTimeSeries",
+  // A wellness check's HRV, stress, SpO2 and respiration: the recovery
+  // readings the sleep source covers.
+  "queryHealthCheckTimeSeries"
+]);
 
 /**
  * Section 6, decision 3: an auto run may draft and propose, never write — and
@@ -3371,61 +3350,24 @@ export function applyChatToolPolicy(
 }
 
 export function getClaudeCodeTools(
-  permissions: ClaudeCodePermissions,
   toolPolicy: ChatToolPolicy = "interactive"
 ): CorosMcpTool[] {
-  const remoteAllowedNames = new Set<string>();
-  for (const [permission, names] of Object.entries(CLAUDE_REMOTE_READ_TOOLS)) {
-    if (permissions[permission as keyof ClaudeCodePermissions]) {
-      for (const name of names) remoteAllowedNames.add(name);
-    }
-  }
-
-  // COROS remote tools are permission-gated by their (unprefixed) names, then
+  // COROS remote tools are let through by their (unprefixed) names, then
   // exposed prefixed. Other MCP servers the user configured are exposed in full.
   const remoteTools = [
     ...getMcpServerCachedTools("coros")
-      .filter((tool) => remoteAllowedNames.has(tool.name))
+      .filter((tool) => CLAUDE_REMOTE_READ_TOOLS.has(tool.name))
       .map((tool) => ({ ...tool, name: prefixToolName("coros", tool.name) })),
     ...getAllMcpTools().filter((tool) => !tool.name.startsWith("coros__"))
   ];
-  const activityTools = permissions.recentActivities
-    ? getChatActivityTools()
-    : [];
-  const analyticsTools = permissions.trainingMetrics
-    ? getChatAnalyticsTools()
-    : [];
-  // The sleep permission's first local tool. Its remote list below names tools
-  // the COROS server does not have, so before this the switch reached nothing.
-  const sleepTools = permissions.sleepData ? getChatSleepTools() : [];
-  const workoutTools = getChatWorkoutTools().filter((tool) => {
-    if (
-      tool.name === "list_scheduled_workouts" ||
-      tool.name === "delete_workout" ||
-      tool.name === "propose_schedule_changes" ||
-      tool.name === "list_training_plans" ||
-      tool.name === "get_training_plan" ||
-      tool.name === "get_workout_library"
-    ) {
-      return permissions.upcomingWorkouts;
-    }
-    return (
-      tool.name === "draft_workout" ||
-      tool.name === "draft_training_plan" ||
-      tool.name === "revise_training_plan" ||
-      tool.name === "get_plan_draft" ||
-      tool.name === PLAN_BRIEF_TOOL ||
-      tool.name === "search_coros_exercises"
-    );
-  });
 
   return applyChatToolPolicy(
     narrowCorosMcpTools([
       ...remoteTools,
-      ...activityTools,
-      ...analyticsTools,
-      ...sleepTools,
-      ...workoutTools,
+      ...getChatActivityTools(),
+      ...getChatAnalyticsTools(),
+      ...getChatSleepTools(),
+      ...getChatWorkoutTools(),
       ...getChatInteractionTools(),
       ...getChatConversationTools()
     ]),
@@ -3439,7 +3381,6 @@ async function executeChatTool(
   send: (channel: string, payload: unknown) => void,
   requestId: string,
   unitSystem: UnitSystem,
-  claudePermissions?: ClaudeCodePermissions,
   toolPolicy: ChatToolPolicy = "interactive"
 ): Promise<string> {
   // A run's own tools, and the ones it withholds, are settled before the
@@ -3529,7 +3470,6 @@ async function executeChatTool(
         leaveCard(changeSet);
         send("chat:streamInfo", { requestId, kind: "scheduleChange", changeSet });
       },
-      allowUpcomingWorkouts: claudePermissions?.upcomingWorkouts !== false,
       progress: run?.context?.activities !== false,
       unitSystem
     });
@@ -3614,7 +3554,7 @@ export function callChatToolForTests(
   { requestId, toolPolicy, sessionId }: { requestId: string; toolPolicy: ChatToolPolicy; sessionId?: string }
 ): Promise<string> {
   if (sessionId) turnSessions.set(requestId, sessionId);
-  return executeChatTool(name, args, () => undefined, requestId, "metric", undefined, toolPolicy);
+  return executeChatTool(name, args, () => undefined, requestId, "metric", toolPolicy);
 }
 
 /** A chart drawn in a turn, for suites: the handle `executeChatTool` gives it. */
@@ -4117,7 +4057,6 @@ interface TrainingContext {
 }
 
 async function buildTrainingContext(
-  permissions?: ClaudeCodePermissions,
   unitSystem: UnitSystem = "metric",
   customInstructions?: string,
   roleInstructions?: string,
@@ -4155,26 +4094,19 @@ async function buildTrainingContext(
         "data is available. Encourage them to connect it for personalised advice."
     };
   }
-  const includeActivities = permissions?.recentActivities !== false && scope?.activities !== false;
-  const includeMetrics = permissions?.trainingMetrics !== false;
-  const includeDashboard = includeMetrics && scope?.activities !== false;
-  const includeUpcoming = permissions?.upcomingWorkouts !== false;
-  const includeSleep = permissions?.sleepData !== false && scope?.sleep !== false;
+  const includeActivities = scope?.activities !== false;
+  const includeSleep = scope?.sleep !== false;
   const [activities, dashboard, upcoming, profile, sleep] = await Promise.allSettled([
     includeActivities
       ? listTrainingHubActivities(1, 25)
       : Promise.resolve([] as TrainingHubActivity[]),
-    includeDashboard
+    includeActivities
       ? getTrainingDashboard()
       : Promise.resolve(null as TrainingHubDashboard | null),
-    includeUpcoming
-      ? getUpcomingWorkouts(14)
-      : Promise.resolve([] as TrainingHubUpcomingWorkout[]),
-    // Body metrics and thresholds ride with the training-metrics permission,
-    // and cost nothing on any turn inside the profile's hour-long cache.
-    includeMetrics
-      ? getCoachCorosProfile()
-      : Promise.resolve(null as CorosProfile | null),
+    getUpcomingWorkouts(14),
+    // Body metrics and thresholds cost nothing on any turn inside the
+    // profile's hour-long cache.
+    getCoachCorosProfile(),
     // From disk only: a turn waits on nothing for it, and the Sleep screen,
     // Overview and the sleep tools keep the cache filled.
     includeSleep
@@ -4235,13 +4167,6 @@ async function buildTrainingContext(
     sections.push(formatUpcoming(upcoming.value, unitSystem));
     sections.push("");
     hasData = true;
-  }
-
-  if (permissions && !hasData) {
-    sections.push(
-      "The athlete's current Claude privacy settings did not include a training " +
-        "snapshot for this request. Do not infer private COROS values."
-    );
   }
 
   return { head, live: sections.join("\n").trim(), hasData };

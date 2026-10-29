@@ -40,8 +40,12 @@ function identity(entry: TrainingPlanEntry): string {
   return entry.workout.key || entry.id;
 }
 
-/** JSON with its keys sorted, so two copies of one workout compare equal. */
-function canonical(value: unknown): string {
+/**
+ * JSON with its keys sorted, so two copies of one workout compare equal. Also
+ * what a workout edit's revision hashes (`workoutEditRevision`), so its output
+ * must not change.
+ */
+export function canonical(value: unknown): string {
   if (Array.isArray(value)) return `[${value.map(canonical).join(",")}]`;
   if (value && typeof value === "object") {
     return `{${Object.keys(value as Record<string, unknown>)
@@ -50,7 +54,7 @@ function canonical(value: unknown): string {
       .map((key) => `${JSON.stringify(key)}:${canonical((value as Record<string, unknown>)[key])}`)
       .join(",")}}`;
   }
-  return JSON.stringify(value);
+  return JSON.stringify(value) ?? "null";
 }
 
 /** A workout, without what only places it. */

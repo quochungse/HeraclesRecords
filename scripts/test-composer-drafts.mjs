@@ -5,9 +5,8 @@
  *    beside them — survives leaving the conversation (`composerDrafts.ts`).
  *    Each conversation keeps its own, an empty draft is removed rather than
  *    stored, and a sent or deleted conversation lets it go.
- * 2. Pressing a calendar day opens what is on it (`daySelection`): nothing on
- *    an empty day, the one thing itself when there is one — exactly what its
- *    chip opens — and the day as a whole otherwise.
+ * 2. Pressing a calendar day opens the day as a whole (`daySelection`), an
+ *    empty one too; a card on it opens its own session.
  *
  * Runs through Electron only so `--experimental-strip-types` is available on
  * a Node built without Amaro; it touches no SQLite and no window.
@@ -80,16 +79,12 @@ const calendarDay = (overrides) => ({
   ...overrides
 });
 
-assert.equal(daySelection(calendarDay({})), null, "an empty day does not open");
+// A press anywhere in a cell opens the day as a whole, an empty one too; a card
+// on it opens its own session (`DayOverview`).
+assert.deepEqual(daySelection(calendarDay({})), { kind: "day", day: calendarDay({}) }, "an empty day opens");
 
 const onlyPlanned = calendarDay({ scheduled: [planned], pairs: [{ scheduled: planned, targets: {} }] });
-assert.deepEqual(daySelection(onlyPlanned), { kind: "scheduled", day: onlyPlanned, entry: planned }, "one planned session opens itself");
-
-const onlyDone = calendarDay({ scheduled: [planned], activities: [run], pairs: [{ scheduled: planned, activity: run, targets: {} }] });
-assert.deepEqual(daySelection(onlyDone), { kind: "activity", day: onlyDone, activity: run }, "a planned session that was done opens as the activity, as its chip does");
-
-const onlyExtra = calendarDay({ activities: [ride], unplannedActivities: [ride] });
-assert.deepEqual(daySelection(onlyExtra), { kind: "activity", day: onlyExtra, activity: ride });
+assert.deepEqual(daySelection(onlyPlanned), { kind: "day", day: onlyPlanned }, "one planned session opens its day");
 
 const busy = calendarDay({
   scheduled: [planned],

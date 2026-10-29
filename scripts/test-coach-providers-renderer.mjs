@@ -16,10 +16,7 @@ const settings = {
   provider: "claude-code",
   chatgpt: {},
   anthropic: { model: "claude-opus-5", effort: "high", hasApiKey: false },
-  claudeCode: { effort: "high", permissions: {
-    recentActivities: true, trainingMetrics: true, upcomingWorkouts: true,
-    sleepData: false, fullActivityFiles: false
-  } },
+  claudeCode: { effort: "high" },
   local: { baseUrl: "http://localhost:11434/v1", model: "", hasApiKey: false, toolsEnabled: true },
   openRouter: { model: "openrouter/auto", hasApiKey: false },
   sidebarOpen: true,

@@ -50,11 +50,6 @@ const settings: SettingsMessages = {
   "settings.mcp.tools_other": "Тренеру доступно <b>{count} инструмента</b>.",
   "settings.coachModels.title": "Поставщики моделей ИИ",
   "settings.coachModels.none": "Пока ничего не подключено. Добавьте аккаунт или ключ, чтобы начать.",
-  "settings.coachModels.providers": "Подключено провайдеров: {connected} из {total}.",
-  "settings.coachModels.inUse": "Используется <b>{model}</b>.",
-  "settings.coachModels.notReady": "Выбрана <b>{model}</b>, но она не подключена.",
-  "settings.coachModels.summaryInUse": "Используется {model} · подключено провайдеров: {connected} из {total}",
-  "settings.coachModels.summaryNotReady": "Выбрана {model}, но не подключена · подключено провайдеров: {connected} из {total}",
 
   "palette.gold.label": "Золото Геракла",
   "palette.gold.description": "Начищенное золото, заработанное подвиг за подвигом.",
@@ -94,7 +89,6 @@ const settings: SettingsMessages = {
   "update.autoDownload": "Скачивать автоматически",
   "update.autoDownloadHint": "Иначе скачивать только по запросу.",
   "update.check": "Проверить обновления",
-  "settings.coachModels.claudeUpdate": "Вышел Claude Code {latest} (на этом компьютере стоит {installed}). Выполните <code>claude update</code> в терминале.",
   "update.installing": "Установка…",
 };
 

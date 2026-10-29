@@ -44,6 +44,45 @@ interface SessionTemplate {
   exercises: ExercisePlan[];
 }
 
+/**
+ * Each code's row in COROS's strength catalogue (`/training/exercise/query`,
+ * read 2026-10-29): its id, `muscle` (primary), `muscleRelevance` (involved)
+ * and `exerciseType` (1 warm-up, 2 work).
+ */
+const SAMPLE_CATALOG: Readonly<Record<string, {
+  id: string;
+  muscle?: number[];
+  muscleRelevance?: number[];
+  exerciseType: number;
+}>> = {
+  T1002: { id: "425827615547506689", muscle: [12], muscleRelevance: [3, 12], exerciseType: 2 },
+  T1010: { id: "425827856334110721", muscle: [6], muscleRelevance: [6, 13], exerciseType: 2 },
+  T1011: { id: "425827936327876608", muscle: [6], muscleRelevance: [6], exerciseType: 2 },
+  T1015: { id: "425828538697039873", muscle: [1], muscleRelevance: [1, 4], exerciseType: 2 },
+  T1017: { id: "425828813574946817", muscle: [1], muscleRelevance: [1, 11], exerciseType: 2 },
+  T1020: { id: "425829167909748736", muscle: [1], muscleRelevance: [1, 11], exerciseType: 2 },
+  T1021: { id: "425829167909748737", muscle: [3], muscleRelevance: [3], exerciseType: 2 },
+  T1025: { id: "425829279310462977", muscle: [4], muscleRelevance: [4], exerciseType: 2 },
+  T1032: { id: "425830760537309185", muscle: [6], muscleRelevance: [6, 7], exerciseType: 2 },
+  T1041: { id: "425831217146019840", muscle: [2], muscleRelevance: [2, 4], exerciseType: 2 },
+  T1042: { id: "425831217146019841", muscle: [2], muscleRelevance: [1, 2, 4], exerciseType: 2 },
+  T1049: { id: "425831619262332929", muscle: [2], muscleRelevance: [2, 4], exerciseType: 2 },
+  T1051: { id: "425831711335694337", muscle: [2], muscleRelevance: [1, 2, 4], exerciseType: 2 },
+  T1052: { id: "425831789450412032", muscle: [12], muscleRelevance: [3, 12], exerciseType: 2 },
+  T1054: { id: "425831875618193408", muscle: [12], muscleRelevance: [3, 11, 12], exerciseType: 2 },
+  T1058: { id: "425831979771150336", muscle: [11], muscleRelevance: [11], exerciseType: 2 },
+  T1061: { id: "425832054396207105", muscle: [8], muscleRelevance: [7, 8, 14], exerciseType: 2 },
+  T1065: { id: "425832210088771584", muscle: [8], muscleRelevance: [7, 8, 14], exerciseType: 2 },
+  T1066: { id: "425832210088771585", muscle: [7], muscleRelevance: [7], exerciseType: 2 },
+  T1067: { id: "425832295182811136", muscle: [8, 14], muscleRelevance: [8, 13, 14, 15], exerciseType: 2 },
+  T1069: { id: "425832417320943616", muscle: [8], muscleRelevance: [8, 15], exerciseType: 2 },
+  T1070: { id: "425832417320943617", muscle: [15], muscleRelevance: [15], exerciseType: 2 },
+  T1076: { id: "425832906678779905", muscle: [6], muscleRelevance: [6], exerciseType: 2 },
+  T1115: { id: "425846666680254465", muscle: [9], muscleRelevance: [9], exerciseType: 2 },
+  T1120: { id: "425898928110747648", exerciseType: 1 },
+  T1289: { id: "469655241508438016", muscle: [14], muscleRelevance: [14, 8, 13], exerciseType: 2 }
+};
+
 const PUSH: SessionTemplate = {
   name: "Upper Push",
   exercises: [
@@ -138,8 +177,19 @@ function buildExercise(
     });
   }
 
+  const catalog = SAMPLE_CATALOG[plan.nameKey];
   return {
     nameKey: plan.nameKey,
+    // What a real parse carries: muscles are read by identity, never by name.
+    ...(catalog
+      ? {
+          externalId: catalog.id,
+          corosKey: plan.nameKey,
+          primaryMuscles: catalog.muscle ?? [],
+          involvedMuscles: catalog.muscleRelevance ?? [],
+          corosExerciseType: catalog.exerciseType
+        }
+      : {}),
     sets: entries.length,
     totalReps: entries.reduce((total, entry) => total + entry.reps, 0),
     entries

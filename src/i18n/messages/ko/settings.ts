@@ -48,11 +48,6 @@ const settings: SettingsMessages = {
   "settings.mcp.tools_other": "코치가 쓸 수 있는 <b>도구 {count}개</b>.",
   "settings.coachModels.title": "AI 모델 제공업체",
   "settings.coachModels.none": "아직 연결된 것이 없습니다. 계정이나 API 키를 추가하면 코칭을 시작할 수 있습니다.",
-  "settings.coachModels.providers": "제공업체 {total}곳 중 {connected}곳 연결됨.",
-  "settings.coachModels.inUse": "<b>{model}</b> 사용 중.",
-  "settings.coachModels.notReady": "<b>{model}</b> 선택됨, 연결되지 않음.",
-  "settings.coachModels.summaryInUse": "{model} 사용 중 · 제공업체 {total}곳 중 {connected}곳 연결됨",
-  "settings.coachModels.summaryNotReady": "{model} 선택됨, 연결되지 않음 · 제공업체 {total}곳 중 {connected}곳 연결됨",
 
   "palette.gold.label": "헤라클레스 골드",
   "palette.gold.description": "과업을 하나씩 이뤄 얻은, 윤이 나는 금빛.",
@@ -90,7 +85,6 @@ const settings: SettingsMessages = {
   "update.autoDownload": "자동으로 다운로드",
   "update.autoDownloadHint": "끄면 요청할 때만 다운로드합니다.",
   "update.check": "업데이트 확인",
-  "settings.coachModels.claudeUpdate": "Claude Code {latest}이(가) 나왔습니다(이 컴퓨터는 {installed}). 터미널에서 <code>claude update</code>를 실행하세요.",
   "update.installing": "설치 중…",
 };
 

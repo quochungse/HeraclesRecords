@@ -1,7 +1,26 @@
 import type { StrengthExercise, StrengthSession, WorkoutExerciseOption } from "../../electron/types";
 import { corosExerciseKey } from "../../electron/corosExerciseCatalog";
 import { reviewedMuscleLoads } from "../calendar/exerciseFacets";
-import { resolveProviderMuscleTargets, type ExerciseTargets, type MuscleId } from "./muscles";
+import {
+  resolveExerciseTargets,
+  resolveProviderMuscleTargets,
+  type ExerciseTargets,
+  type MuscleId
+} from "./muscles";
+
+/**
+ * A free session's segments are body-region codes with no catalog row and no
+ * metadata: still an identity, read with the region rules under their English
+ * names (the display name is translated, so it cannot be the key).
+ */
+const BODY_REGION_RULE_NAMES: Readonly<Record<string, string>> = {
+  S4209: "Shoulders", // i18n-ignore: a rule key
+  S4210: "Arms", // i18n-ignore: a rule key
+  S4211: "Chest", // i18n-ignore: a rule key
+  S4212: "Back", // i18n-ignore: a rule key
+  S4213: "Abs", // i18n-ignore: a rule key
+  S4214: "Legs & Hips" // i18n-ignore: a rule key
+};
 
 /** Resolve the identity and metadata already on the exercise. Names are display only. */
 export function exerciseTargets(exercise: StrengthExercise): ExerciseTargets {
@@ -11,6 +30,8 @@ export function exerciseTargets(exercise: StrengthExercise): ExerciseTargets {
   if (mobility || corosKey === "S4208") {
     return { activations: [], mobility, generic: !mobility };
   }
+  const region = corosKey ? BODY_REGION_RULE_NAMES[corosKey] : undefined;
+  if (region) return resolveExerciseTargets(region);
   const loads = reviewedMuscleLoads({
     corosKey,
     primaryMuscles: exercise.primaryMuscles,

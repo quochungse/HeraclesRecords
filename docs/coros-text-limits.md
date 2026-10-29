@@ -59,8 +59,9 @@ test has not been performed.
 ## Enforcement
 
 `electron/corosTextLimits.ts` owns the shared constants, UTF-8 counter, safe
-input clamp and validation helpers. The byte clamp iterates Unicode characters,
-so it cannot split an emoji or a multibyte character. Session note counters show
+input clamp and validation helpers. The byte clamp iterates grapheme clusters
+(`Intl.Segmenter`), so it cannot split an emoji, a multibyte character or a
+decomposed Vietnamese letter from its combining marks. Session note counters show
 bytes (`B`); validation helpers require callers to state the unit explicitly.
 
 - Plan, quick workout and shared workout editor inputs use these limits.

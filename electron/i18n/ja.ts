@@ -186,6 +186,8 @@ const main: ScreenMessages = {
   "screen.outline.tooLong": "第 {n} 週の「{name}」は {minutes} 分ですが、{day}は {available} 分までです。",
   "screen.outline.blockedDay": "第 {n} 週の「{name}」は{day}で、トレーニングできない日です。",
   "screen.planIssue.name": "プランの名前を入れてください。",
+  "screen.planIssue.nameTooLong": "プラン名を短くしてください。COROS が保存できるのは {max} バイトまでです。",
+  "screen.planIssue.descriptionTooLong": "プランの説明を短くしてください。COROS が保存できるのは {max} バイトまでです。",
   "screen.planIssue.weeks": "プランは 1〜{max} 週にしてください。",
   "screen.planIssue.empty": "セッションを追加してください。COROS は空のプランを保存しません。",
   "screen.planIssue.outsideWeeks": "プランの週の外にあるセッションがあります。",

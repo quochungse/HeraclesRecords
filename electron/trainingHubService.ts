@@ -128,7 +128,6 @@ import {
   parseWorkoutEditorContext,
   runWorkoutEditPreview,
   runWorkoutEditWrite,
-  validateWorkoutDraft,
   workoutDraftsMatch,
   workoutDraftToCorosProgram,
   workoutEditRevision,
@@ -2492,7 +2491,9 @@ export async function syncStrengthHistory(
       const { raw } = await loadActivityDetailRaw(activityId, sportType, {
         persist: false
       });
-      catalog ??= catalogIndex(await loadWorkoutExerciseCatalog("strength"));
+      // The catalog only refines the parse (the renderer fills the rest from
+      // its own copy), so a failed read must not hold the whole backfill.
+      catalog ??= await loadWorkoutExerciseCatalog("strength").then(catalogIndex, () => new Map());
       let detail = parseStrengthDetail(raw, { catalog });
       const summary = raw.summary as Record<string, unknown> | undefined;
       if (Number(summary?.hasProgram) > 0 && detail) {
@@ -3008,7 +3009,7 @@ export async function duplicateLibraryWorkout(
   name: string,
   targetSportType?: number
 ): Promise<TrainingHubLibraryWorkout> {
-  assertCorosTextLimit(name.trim(), "Workout name", COROS_NAME_MAX_BYTES, "bytes");
+  assertCorosTextLimit(name.trim(), "Workout name", COROS_NAME_MAX_BYTES);
   const source = await getWorkoutProgramDetail(programId);
   if (!source) throw new ScreenError("main.coros.workoutNotLoaded");
   const sourceSport = toOptionalNumber(source.sportType);
@@ -3262,10 +3263,7 @@ export async function previewWorkoutEdit(
   draft: RunWorkoutEditorDraft,
   unitSystem: UnitSystem = "metric"
 ): Promise<WorkoutEditPreview> {
-  const validation = validateWorkoutDraft(draft);
-  if (!validation.valid) {
-    throw new Error(Object.values(validation.errors)[0] ?? "Workout is invalid.");
-  }
+  // Validated in workoutDraftToCorosProgram, against the source's own text.
   const source = await resolveWorkoutEditSource(ref);
   if (ref.kind === "scheduled" && ref.happenDay < formatScheduleDay(new Date())) {
     throw new ScreenError("main.coros.pastReadOnly");
@@ -3339,11 +3337,7 @@ export async function saveWorkoutEdit(
   draft: RunWorkoutEditorDraft,
   unitSystem: UnitSystem = "metric"
 ): Promise<WorkoutEditSaveResult> {
-  const validation = validateWorkoutDraft(draft);
-  if (!validation.valid) {
-    throw new Error(Object.values(validation.errors)[0] ?? "Workout is invalid.");
-  }
-
+  // Validated in workoutDraftToCorosProgram, against the source's own text.
   const source = await resolveWorkoutEditSource(ref);
   if (ref.kind === "scheduled" && ref.happenDay < formatScheduleDay(new Date())) {
     throw new ScreenError("main.coros.pastReadOnly");

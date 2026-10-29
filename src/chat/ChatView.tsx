@@ -296,14 +296,7 @@ const DEFAULT_CHAT_SETTINGS: ChatSettings = {
     hasApiKey: false
   },
   claudeCode: {
-    effort: "high",
-    permissions: {
-      recentActivities: true,
-      trainingMetrics: true,
-      upcomingWorkouts: true,
-      sleepData: false,
-      fullActivityFiles: false
-    }
+    effort: "high"
   },
   openRouter: {
     model: "openrouter/auto",

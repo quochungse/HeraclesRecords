@@ -507,8 +507,8 @@ await test("both pipeline steps withhold what the conversation does not share, f
   assert.equal((source.match(/runTools\.get\(requestId\)\?\.context/g) ?? []).length, 1, "the snapshot is built with the run's scope in one place");
   assert.equal((source.match(/await prepare\(turnContext\(/g) ?? []).length, 5, "every provider's snapshot goes through it");
   const context = source.slice(source.indexOf("async function buildTrainingContext("));
-  assert.match(context, /includeActivities = permissions\?\.recentActivities !== false && scope\?\.activities !== false/);
-  assert.match(context, /includeDashboard = includeMetrics && scope\?\.activities !== false/, "records and predictions come from the history");
+  assert.match(context, /includeActivities = scope\?\.activities !== false;/);
+  assert.match(context, /includeActivities\s*\?\s*getTrainingDashboard\(\)/, "records and predictions come from the history");
   assert.match(context, /scope\?\.zones === false\s*\?\s*\{ \.\.\.profile\.value, thresholds: \{ zones: profile\.value\.thresholds\.zones, ranges: \{\} \} \}/, "the threshold anchors go with the zones");
 });
 

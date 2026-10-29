@@ -95,7 +95,8 @@ import type {
 } from "./types";
 import {
   buildDraftTrainingPlanInputSchema,
-  buildDraftWorkoutInputSchema
+  buildDraftWorkoutInputSchema,
+  carriedWorkoutText
 } from "./workoutCapabilities";
 import { formatDistanceValue } from "./unitSystem.js";
 import {
@@ -2208,7 +2209,7 @@ async function proposedWorkoutPatch(ref: WorkoutEditRef, change: Record<string, 
     throw new Error("Read the latest workout and pass its revision before patching steps. Nothing was proposed.");
   }
   const draft = patchWorkoutEditorDraft(document.draft, patch);
-  const checked = validateWorkoutDraft(draft);
+  const checked = validateWorkoutDraft(draft, carriedWorkoutText(document.draft));
   if (!checked.valid) throw new Error(Object.values(checked.errors).join(" "));
   const workout = editorDraftToPlanWorkoutInput(draft, { key: "patch", name: draft.name });
   // A calendar line is labelled by its caller, from the session as listed.

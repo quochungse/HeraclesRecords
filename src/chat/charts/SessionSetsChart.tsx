@@ -67,7 +67,7 @@ function SetsTooltip({
   const ended = spans.length > 0 && label > spans[spans.length - 1]!.to;
 
   return (
-    <div className="training-chart-tooltip chat-sets-tooltip">
+    <div className="training-chart-tooltip">
       <span className="training-chart-tooltip-label">{formatDurationSeconds(label)}</span>
       {exercise ? (
         <strong className="chat-sets-tooltip-name">
@@ -171,7 +171,7 @@ export function SessionSetsChart({
   }
 
   return (
-    <div className="chat-visual-chart-shell chat-sets-chart">
+    <div className="chat-visual-chart-shell">
       <ChartWhenNear>
         <AreaChart data={data} margin={MARGIN}>
           <defs>

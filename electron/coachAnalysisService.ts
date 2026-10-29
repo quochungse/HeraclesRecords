@@ -32,7 +32,7 @@ import {
 } from "./chatContextService";
 import { coachTranscript } from "./chatHiddenTurns";
 import { requestDigests, transcriptDigests } from "./chatCompression";
-import { runtimeOver } from "./chatModels";
+import { normalizeRuntimeEffort, runtimeOver } from "./chatModels";
 import {
   chatSessionExists,
   createChatSession,
@@ -184,9 +184,14 @@ export function resolveAnalysisRuntime(
   analysis: CoachAnalysis,
   defaultProvider?: ChatProvider
 ): AnalysisRuntime {
-  return (analysis.runtime.provider ?? defaultProvider) === "chatgpt" || analysis.runtime.effort !== undefined
-    ? analysis.runtime
-    : { ...analysis.runtime, effort: ANALYSIS_DEFAULT_EFFORT };
+  const provider = analysis.runtime.provider ?? defaultProvider;
+  if (provider === "chatgpt") return analysis.runtime;
+  // An effort inherited from another provider's conversation (ChatGPT's Auto
+  // is "") is none for Claude, which would otherwise send it as High.
+  const effort = provider === "claude-code" || provider === "claude-api"
+    ? normalizeRuntimeEffort(analysis.runtime.effort, provider)
+    : analysis.runtime.effort;
+  return effort !== undefined ? analysis.runtime : { ...analysis.runtime, effort: ANALYSIS_DEFAULT_EFFORT };
 }
 
 // ---------------------------------------------------------------------------

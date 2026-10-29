@@ -582,7 +582,7 @@ function RunningSection({
             onOpenActivity={onOpenActivity}
           />
         ) : null}
-        <NextFact next={nextPlanned(upcomingWorkouts, "run", new Date(nowMs))} />
+        <NextFact next={nextPlanned(upcomingWorkouts, "run", new Date(nowMs), activities)} />
       </div>
     </Section>
   );
@@ -721,7 +721,7 @@ function CyclingSection({
             onOpenActivity={onOpenActivity}
           />
         ) : null}
-        <NextFact next={nextPlanned(context.upcomingWorkouts, "bike", new Date(nowMs))} />
+        <NextFact next={nextPlanned(context.upcomingWorkouts, "bike", new Date(nowMs), context.activities)} />
       </div>
     </Section>
   );

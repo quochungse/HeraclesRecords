@@ -22,6 +22,7 @@ import { OverviewToday } from "./overview/OverviewToday";
 import { TrainingHeatmapPanel } from "./components/TrainingHeatmapPanel";
 import { snapshotVo2Readings } from "./parsers";
 import { renderRich } from "../i18n/useI18n";
+import type { TrainingHubThresholdZone } from "../../electron/types";
 import type { TrainingOverviewProps } from "./types";
 import { useHeartRateZoneModel } from "./useHeartRateZoneModel";
 import loginPageBackground from "../assets/training-hub/login-bg.webp";
@@ -31,6 +32,9 @@ import "./overview/overview.css";
 // The body map drags in three.js and a GLTF mannequin. Overview is the default
 // startup view, so that weight stays out of its first chunk.
 const LazyOverviewStrength = lazy(() => import("./overview/OverviewStrength"));
+
+// One empty list, not a new one each render: the sport sections memoise on it.
+const NO_ZONES: TrainingHubThresholdZone[] = [];
 
 export function TrainingOverview({
   api,
@@ -445,7 +449,7 @@ export function TrainingOverview({
             activities={activities}
             analytics={snapshot?.analytics ?? null}
             hrZoneModel={hrZoneModel}
-            lthrZones={snapshot?.dashboard?.lthrZones ?? []}
+            lthrZones={snapshot?.dashboard?.lthrZones ?? NO_ZONES}
             loading={snapshotPending || activitiesPending}
           />
           <OverviewSports
@@ -456,7 +460,7 @@ export function TrainingOverview({
             profile={corosProfile}
             hrZoneModel={hrZoneModel}
             zonesSettled={corosProfileSettled}
-            lthrZones={snapshot?.dashboard?.lthrZones ?? []}
+            lthrZones={snapshot?.dashboard?.lthrZones ?? NO_ZONES}
             vo2Readings={vo2Readings}
             hiddenSportScreens={hiddenSportScreens}
             onOpenActivity={onOpenActivity}
@@ -467,6 +471,7 @@ export function TrainingOverview({
               <LazyOverviewStrength
                 api={api}
                 connected={connected}
+                activities={activities}
                 upcomingWorkouts={upcomingWorkouts}
                 onOpenActivity={onOpenActivity}
                 onOpenView={onOpenView}

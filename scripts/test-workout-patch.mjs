@@ -36,6 +36,15 @@ assert.equal({}.polluted, undefined);
 const changedTarget = applyWorkoutPatch(original, { set: { "/steps/0/target_type": "distance", "/steps/0/target_distance_meters": 1000 } });
 assert.equal(changedTarget.steps[0].target_duration_seconds, undefined);
 assert.equal(changedTarget.steps[0].target_distance_meters, 1000);
+// A step written before the typed target fields still holds `target_value`, and a step
+// with no target_type is a timed one: neither refuses an edit that leaves the target alone.
+const legacy = structuredClone(original);
+legacy.steps[0] = { kind: "training", target_type: "distance", target_value: 1000 };
+assert.equal(applyWorkoutPatch(legacy, { set: { "/steps/0/overview": "Relax" } }).steps[0].target_value, 1000);
+assert.throws(() => applyWorkoutPatch(legacy, { set: { "/steps/0/target_type": "time" } }), /requires target_duration_seconds/);
+const untyped = structuredClone(original);
+delete untyped.steps[0].target_type;
+assert.equal(applyWorkoutPatch(untyped, { set: { "/steps/0/target_type": "time" } }).steps[0].target_duration_seconds, 600);
 const oldIntensity = structuredClone(original);
 oldIntensity.steps[0].intensity_type = 3;
 const changedIntensity = applyWorkoutPatch(oldIntensity, { set: { "/steps/0/intensity": { type: "heartRate", lowBpm: 120, highBpm: 140 } } });

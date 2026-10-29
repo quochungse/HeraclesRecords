@@ -41,7 +41,11 @@ import {
   editorDraftToPlanWorkoutInput,
   planWorkoutInputToEditorDraft
 } from "../../electron/planWorkoutEditor";
-import { WORKOUT_SPORT_CAPABILITIES, validateWorkoutDraftShared } from "../../electron/workoutCapabilities";
+import {
+  WORKOUT_SPORT_CAPABILITIES,
+  carriedWorkoutText,
+  validateWorkoutDraftShared
+} from "../../electron/workoutCapabilities";
 import { useUnitSystem } from "../units/UnitSystemProvider";
 import { WorkoutBuilderWorkspace, useWorkoutBuilder } from "./WorkoutBuilder";
 import { t } from "../i18n/core";
@@ -274,8 +278,10 @@ function LoadedWorkoutBuilder({
   const draftKey = JSON.stringify(draft);
   /* The builder's rows have the first word; the shared validator has the
      last, as it did for every save these three used to make. */
-  const shared = useMemo(() => validateWorkoutDraftShared(draft), [draftKey]);
   const document = loaded.document;
+  // Text the workout already holds on COROS is not held to the app's limits.
+  const carried = useMemo(() => carriedWorkoutText(document?.draft), [document]);
+  const shared = useMemo(() => validateWorkoutDraftShared(draft, carried), [draftKey, carried]);
   const blocked = document && !document.canEdit
     ? document.unsupportedReason ?? t("workout.builderModal.cannotEdit")
     : undefined;

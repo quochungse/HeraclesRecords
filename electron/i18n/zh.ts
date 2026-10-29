@@ -186,6 +186,8 @@ const main: ScreenMessages = {
   "screen.outline.tooLong": "第 {n} 周的“{name}”需要 {minutes} 分钟，而{day}只有 {available} 分钟。",
   "screen.outline.blockedDay": "第 {n} 周的“{name}”在{day}，那天你不能训练。",
   "screen.planIssue.name": "请添加计划名称。",
+  "screen.planIssue.nameTooLong": "请缩短计划名称：COROS 最多保存 {max} 字节。",
+  "screen.planIssue.descriptionTooLong": "请缩短计划说明：COROS 最多保存 {max} 字节。",
   "screen.planIssue.weeks": "计划必须为 1 到 {max} 周。",
   "screen.planIssue.empty": "请添加一节训练——COROS 不保存空计划。",
   "screen.planIssue.outsideWeeks": "有训练课超出了计划的周数。",

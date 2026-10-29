@@ -11,16 +11,19 @@ export const COROS_WORKOUT_DESCRIPTION_MAX_BYTES = 200;
 export const COROS_STEP_DESCRIPTION_MAX_BYTES = 200;
 
 const encoder = new TextEncoder();
+// By grapheme, not code point: a decomposed Vietnamese "ế" is e + U+0302 +
+// U+0301, and cutting between them leaves a different letter.
+const graphemes = new Intl.Segmenter(undefined, { granularity: "grapheme" });
 
 export function corosUtf8Length(value: string): number {
   return encoder.encode(value).length;
 }
 
-/** Clamp typed text without splitting an emoji or a multibyte character. */
+/** Clamp typed text without splitting an emoji, a multibyte character or a letter and its marks. */
 export function clampCorosUtf8(value: string, maxBytes: number): string {
   let bytes = 0;
   let result = "";
-  for (const character of value) {
+  for (const { segment: character } of graphemes.segment(value)) {
     bytes += corosUtf8Length(character);
     if (bytes > maxBytes) break;
     result += character;
@@ -31,20 +34,17 @@ export function clampCorosUtf8(value: string, maxBytes: number): string {
 export function corosTextLimitError(
   value: string | undefined,
   label: string,
-  limit: number,
-  unit: "bytes" | "characters"
+  limit: number
 ): string | undefined {
-  const length = unit === "bytes" ? corosUtf8Length(value ?? "") : (value ?? "").length;
-  return length > limit ? `${label} must be ${limit} ${unit === "bytes" ? "UTF-8 bytes" : "characters"} or fewer.` : undefined;
+  return corosUtf8Length(value ?? "") > limit ? `${label} must be ${limit} UTF-8 bytes or fewer.` : undefined;
 }
 
 export function assertCorosTextLimit(
   value: string | undefined,
   label: string,
-  limit: number,
-  unit: "bytes" | "characters"
+  limit: number
 ): void {
-  const error = corosTextLimitError(value, label, limit, unit);
+  const error = corosTextLimitError(value, label, limit);
   if (error) throw new Error(error);
 }
 

@@ -48,11 +48,6 @@ const settings: SettingsMessages = {
   "settings.mcp.tools_other": "มี<b>เครื่องมือ {count} รายการ</b>พร้อมให้โค้ชใช้",
   "settings.coachModels.title": "ผู้ให้บริการโมเดล AI",
   "settings.coachModels.none": "ยังไม่ได้เชื่อมต่ออะไร เพิ่มบัญชีหรือคีย์เพื่อเริ่มใช้งานโค้ช",
-  "settings.coachModels.providers": "เชื่อมต่อผู้ให้บริการแล้ว {connected} จาก {total}",
-  "settings.coachModels.inUse": "กำลังใช้ <b>{model}</b>",
-  "settings.coachModels.notReady": "เลือก <b>{model}</b> ไว้แต่ยังไม่ได้เชื่อมต่อ",
-  "settings.coachModels.summaryInUse": "กำลังใช้ {model} · เชื่อมต่อผู้ให้บริการแล้ว {connected} จาก {total}",
-  "settings.coachModels.summaryNotReady": "เลือก {model} ไว้แต่ยังไม่ได้เชื่อมต่อ · เชื่อมต่อผู้ให้บริการแล้ว {connected} จาก {total}",
 
   "palette.gold.label": "ทองเฮราคลีส",
   "palette.gold.description": "ทองขัดเงา ที่ได้มาทีละภารกิจ",
@@ -90,7 +85,6 @@ const settings: SettingsMessages = {
   "update.autoDownload": "ดาวน์โหลดอัตโนมัติ",
   "update.autoDownloadHint": "ถ้าปิดไว้ จะดาวน์โหลดเมื่อคุณสั่งเท่านั้น",
   "update.check": "ตรวจหาอัปเดต",
-  "settings.coachModels.claudeUpdate": "Claude Code {latest} พร้อมใช้งานแล้ว (เครื่องนี้ใช้ {installed} อยู่) เรียก <code>claude update</code> ในเทอร์มินัล",
   "update.installing": "กำลังติดตั้ง…",
 };
 

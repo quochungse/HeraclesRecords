@@ -1,5 +1,6 @@
 import crypto from "node:crypto";
 import { corosDistanceTargetDisplayUnit } from "./corosWorkoutDistance";
+import { canonical } from "./planDiff";
 import {
   HYROX_RUN_STEP_NAME,
   poolLengthPresetId,
@@ -33,6 +34,7 @@ import {
   encodeCorosIntensity,
   requiredWorkoutPbVersion,
   validateWorkoutIntensity,
+  carriedWorkoutText,
   validateWorkoutDraftShared,
   validateWorkoutTarget,
   workoutSportFromType,
@@ -583,7 +585,10 @@ export function workoutDraftToCorosProgram(
   /** The strength catalog, for a movement new to the workout. */
   catalog?: CorosExerciseCatalog
 ): Record<string, unknown> {
-  const validation = validateWorkoutDraft(draft);
+  const validation = validateWorkoutDraft(
+    draft,
+    carriedWorkoutText(corosProgramToWorkoutDraft(sourceProgram, context))
+  );
   if (!validation.valid) {
     throw new Error(Object.values(validation.errors)[0] ?? "Workout is invalid.");
   }
@@ -782,8 +787,11 @@ export function workoutDraftToCorosProgram(
   return program;
 }
 
-export function validateWorkoutDraft(draft: RunWorkoutEditorDraft): WorkoutDraftValidation {
-  return validateWorkoutDraftShared(draft);
+export function validateWorkoutDraft(
+  draft: RunWorkoutEditorDraft,
+  carried?: ReadonlySet<string>
+): WorkoutDraftValidation {
+  return validateWorkoutDraftShared(draft, carried);
 }
 
 export function workoutEditRevision(source: WorkoutEditSource): string {
@@ -791,20 +799,11 @@ export function workoutEditRevision(source: WorkoutEditSource): string {
     .createHash("sha256")
     // Some COROS responses omit version counters. Content changes must still
     // invalidate a pending edit, including a reorder of identical-kind steps.
-    .update(stableWorkoutRevisionJson(source))
+    .update(canonical(source))
     .digest("hex")
     // Coach reads and writes it back on every patch: 64 bits tell two copies
     // of one workout apart at a quarter of the tokens.
     .slice(0, 16);
-}
-
-function stableWorkoutRevisionJson(value: unknown): string {
-  if (Array.isArray(value)) return `[${value.map(stableWorkoutRevisionJson).join(",")}]`;
-  if (value && typeof value === "object") {
-    const record = value as Record<string, unknown>;
-    return `{${Object.keys(record).filter((key) => record[key] !== undefined).sort().map((key) => `${JSON.stringify(key)}:${stableWorkoutRevisionJson(record[key])}`).join(",")}}`;
-  }
-  return JSON.stringify(value) ?? "null";
 }
 
 function normalizedDraft(draft: RunWorkoutEditorDraft): unknown {

@@ -93,6 +93,8 @@ const unicodeName = "ế".repeat(30);
 assert.equal(corosUtf8Length(unicodeName), 90);
 assert.equal(clampCorosUtf8(`${unicodeName}ế`, 90), unicodeName);
 assert.equal(clampCorosUtf8("a".repeat(89) + "😀", 90), "a".repeat(89), "never split an emoji");
+assert.equal(clampCorosUtf8("a".repeat(86) + "ế", 89), "a".repeat(86), "never split a letter from its marks");
+assert.equal(clampCorosUtf8("a".repeat(80) + "👨‍👩‍👧", 90), "a".repeat(80), "never split a joined emoji");
 const copyName = corosCopyName(unicodeName);
 assert.ok(corosUtf8Length(copyName) <= 90);
 assert.ok(copyName.endsWith(" Copy"));

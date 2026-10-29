@@ -303,7 +303,7 @@ const tierOf = (policy, table) =>
 }
 
 // ---------------------------------------------------------------------------
-// 6. Two tabs, and no third entity hiding in `source`
+// 6. Two entities and one catalogue, and no third entity hiding in `source`
 // ---------------------------------------------------------------------------
 {
   const view = read(path.join(libraryRoot, "TrainingLibraryView.tsx"));
@@ -311,9 +311,10 @@ const tierOf = (policy, table) =>
   assert.ok(sections, "the tab list must be findable");
   assert.equal(
     sections[1].replace(/\s+/g, " ").trim(),
-    '"workouts" | "plans"',
-    "a workout and a plan are the two entities COROS serves; anything else here " +
-      "is a usage mode or a view, and belongs in a filter"
+    '"workouts" | "plans" | "exercises"',
+    "a workout and a plan are the two entities COROS serves, and the Exercises " +
+      "Library is its catalogue to read; anything else here is a usage mode or a " +
+      "view, and belongs in a filter"
   );
 
   /*

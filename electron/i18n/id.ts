@@ -186,6 +186,8 @@ const main: ScreenMessages = {
   "screen.outline.tooLong": "\"{name}\" di minggu {n} berlangsung {minutes} menit; {day} hanya punya {available}.",
   "screen.outline.blockedDay": "\"{name}\" di minggu {n} jatuh pada {day}, hari Anda tidak bisa berlatih.",
   "screen.planIssue.name": "Beri nama rencana.",
+  "screen.planIssue.nameTooLong": "Persingkat nama rencana: COROS menyimpan {max} byte.",
+  "screen.planIssue.descriptionTooLong": "Persingkat deskripsi rencana: COROS menyimpan {max} byte.",
   "screen.planIssue.weeks": "Rencana harus berisi 1 sampai {max} minggu.",
   "screen.planIssue.empty": "Tambahkan sesi — COROS tidak menyimpan rencana kosong.",
   "screen.planIssue.outsideWeeks": "Ada sesi di luar minggu-minggu rencana.",

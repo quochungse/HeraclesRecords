@@ -49,11 +49,6 @@ const settings = {
   "settings.mcp.tools_other": "<b>{count} tools</b> ready for the coach.",
   "settings.coachModels.title": "AI Model Providers",
   "settings.coachModels.none": "Nothing connected yet. Add an account or key to start coaching.",
-  "settings.coachModels.providers": "{connected} of {total} providers connected.",
-  "settings.coachModels.inUse": "<b>{model}</b> in use.",
-  "settings.coachModels.notReady": "<b>{model}</b> selected but not connected.",
-  "settings.coachModels.summaryInUse": "{model} in use · {connected} of {total} providers connected",
-  "settings.coachModels.summaryNotReady": "{model} selected but not connected · {connected} of {total} providers connected",
 
   "palette.gold.label": "Heracles Gold",
   "palette.gold.description": "Burnished gold, earned one labour at a time.",
@@ -91,7 +86,6 @@ const settings = {
   "update.autoDownload": "Download automatically",
   "update.autoDownloadHint": "Otherwise, download only when you ask.",
   "update.check": "Check for updates",
-  "settings.coachModels.claudeUpdate": "Claude Code {latest} is available (this computer has {installed}). Run <code>claude update</code> in a terminal.",
   "update.installing": "Installing…",
 };
 

@@ -33,10 +33,9 @@ export interface TrainingTrendPoint {
 }
 
 /**
- * What Overview's recovery panel and the greeting read. Only those two consume
- * it, so a figure with no reader on either is not carried: the week totals are
- * built from {@link WeekToDateTotals} instead, and the profile reads the COROS
- * dashboard directly.
+ * What Overview's Recovery column and the greeting read. Only those two
+ * consume it, so a figure with no reader on either is not carried: the profile
+ * reads the COROS dashboard directly.
  */
 export interface TrainingSummaryMetrics {
   recoveryPct?: number;
@@ -137,7 +136,7 @@ export interface TrainingHubViewProps {
   selectedActivity: TrainingHubActivity | null;
   busy: string | null;
   sleepConnecting?: boolean;
-  /** Opens the Sleep screen from the Overview's sleep card. */
+  /** Opens the Sleep screen from the Sleep column of Overview's Readiness panel. */
   onOpenSleepDetails?: () => void;
   // Two-factor: non-null email means a verification code is being awaited.
   twoFactorEmail: string | null;
@@ -184,7 +183,7 @@ export type TrainingOverviewProps = Omit<
   /** Whether `activities` has arrived; the same question, for the other load. */
   activitiesStatus?: TrainingHubLoadStatus;
   /**
-   * Whether Strength Distribution is drawn. Off when the Strength screen is
+   * Whether Overview's Strength section is drawn. Off when the Strength screen is
    * hidden in Settings → Navigation, so a sport the athlete took off the rail
    * does not keep a panel on the Overview.
    */

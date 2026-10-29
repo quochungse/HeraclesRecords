@@ -48,11 +48,6 @@ const settings: SettingsMessages = {
   "settings.mcp.tools_other": "コーチが使える<b>ツールは {count} 個</b>です。",
   "settings.coachModels.title": "AIモデルプロバイダー",
   "settings.coachModels.none": "まだ何も接続されていません。アカウントか API キーを追加すると、コーチを使い始められます。",
-  "settings.coachModels.providers": "{total} 件中 {connected} 件のプロバイダーが接続済み。",
-  "settings.coachModels.inUse": "<b>{model}</b> を使用中。",
-  "settings.coachModels.notReady": "<b>{model}</b> を選択中ですが、未接続です。",
-  "settings.coachModels.summaryInUse": "{model} を使用中 · {total} 件中 {connected} 件のプロバイダーが接続済み",
-  "settings.coachModels.summaryNotReady": "{model} を選択中（未接続） · {total} 件中 {connected} 件のプロバイダーが接続済み",
 
   "palette.gold.label": "ヘラクレス・ゴールド",
   "palette.gold.description": "ひとつずつ功業を重ねて手にした、磨かれた金色。",
@@ -90,7 +85,6 @@ const settings: SettingsMessages = {
   "update.autoDownload": "自動でダウンロード",
   "update.autoDownloadHint": "オフの場合は、指示したときだけダウンロードします。",
   "update.check": "アップデートを確認",
-  "settings.coachModels.claudeUpdate": "Claude Code {latest} が公開されています（このコンピューターは {installed}）。ターミナルで <code>claude update</code> を実行してください。",
   "update.installing": "インストール中…",
 };
 

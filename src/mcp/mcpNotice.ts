@@ -45,9 +45,8 @@ export function mcpRetryHint(): string {
  * What a surface's data is. The sentence is whole per subject and per way the
  * server failed: built from an opening and an ending, it read in English only.
  */
-export type McpSubject = "sleep" | "sleepTrend" | "dailyHealth";
+export type McpSubject = "sleep" | "dailyHealth";
 export const MCP_SLEEP_SUBJECT: McpSubject = "sleep";
-export const MCP_SLEEP_TREND_SUBJECT: McpSubject = "sleepTrend";
 export const MCP_DAILY_HEALTH_SUBJECT: McpSubject = "dailyHealth";
 
 /**
@@ -60,20 +59,6 @@ export function mcpUnavailableShort(): string {
 }
 export function mcpUnreachableShort(): string {
   return t("app.mcp.short.unreachable");
-}
-
-/** A stat tile's one short line. The sentence it abbreviates sits below it. */
-export function mcpDailyHealthTileDetail(): string {
-  return t("app.mcp.tileDetail");
-}
-
-/**
- * The same room, for a server that is there and did not answer: a stat tile's
- * line and a panel heading. One message because it is one piece of news —
- * "connect it" is what differs per surface, not this.
- */
-export function mcpUnreachableLabel(): string {
-  return t("app.mcp.unreachableLabel");
 }
 
 /**
@@ -125,22 +110,5 @@ export function mcpShortTextOr(
 ): string {
   if (state === "disconnected") return `${lead} ${mcpUnavailableShort()}`;
   if (state === "unreachable") return `${lead} ${mcpUnreachableShort()}`;
-  return fallback;
-}
-
-/**
- * A heading, which has room for neither a hint nor a subject.
- *
- * Only the `disconnected` title is the caller's, because only that one has
- * anything to say about *their* data ("Sleep needs MCP"). A server that is
- * there and silent is the same news on every screen, so it reads the same.
- */
-export function mcpTitleOr(
-  state: McpConnectionState,
-  disconnected: string,
-  fallback: string
-): string {
-  if (state === "disconnected") return disconnected;
-  if (state === "unreachable") return mcpUnreachableLabel();
   return fallback;
 }

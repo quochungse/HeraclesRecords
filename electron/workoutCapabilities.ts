@@ -1221,14 +1221,42 @@ export function validateWorkoutSportOptions(
   return errors;
 }
 
+/**
+ * The text a workout already holds on COROS. COROS's own editors allow more
+ * than this app writes (300 characters for a description, 200 UTF-16 units for
+ * a custom exercise's note), so a limit applies to text written here and never
+ * to text carried through unchanged — the builder has no field to shorten a
+ * step's note, and an edit of anything else would be refused for good.
+ */
+export function carriedWorkoutText(draft: RunWorkoutEditorDraft | undefined): ReadonlySet<string> {
+  const texts = new Set<string>();
+  const add = (value: string | undefined) => {
+    const text = value?.trim();
+    if (text) texts.add(text);
+  };
+  if (!draft) return texts;
+  add(draft.name);
+  add(draft.overview);
+  for (const node of draft.nodes) {
+    add(node.name);
+    if (node.nodeType === "step") add(node.overview);
+    else node.steps.forEach((step) => { add(step.name); add(step.overview); });
+  }
+  return texts;
+}
+
 export function validateWorkoutDraftShared(
-  draft: RunWorkoutEditorDraft
+  draft: RunWorkoutEditorDraft,
+  /** `carriedWorkoutText` of the workout as read, when this edits one. */
+  carried: ReadonlySet<string> = new Set()
 ): { valid: boolean; errors: Record<string, string> } {
   const errors: Record<string, string> = {};
+  const limitError = (value: string | undefined, label: string, limit: number) =>
+    carried.has(value?.trim() ?? "") ? undefined : corosTextLimitError(value, label, limit);
   if (!draft.name.trim()) errors.name = "Name is required.";
-  const nameError = corosTextLimitError(draft.name.trim(), "Name", COROS_NAME_MAX_BYTES, "bytes");
+  const nameError = limitError(draft.name.trim(), "Name", COROS_NAME_MAX_BYTES);
   if (nameError) errors.name = nameError;
-  const descriptionError = corosTextLimitError(draft.overview.trim(), "Description", COROS_WORKOUT_DESCRIPTION_MAX_BYTES, "bytes");
+  const descriptionError = limitError(draft.overview.trim(), "Description", COROS_WORKOUT_DESCRIPTION_MAX_BYTES);
   if (descriptionError) errors.overview = descriptionError;
   if (!draft.nodes.length) errors.nodes = "Add at least one workout step.";
   const capability = WORKOUT_SPORT_CAPABILITIES[draft.sport];
@@ -1240,9 +1268,9 @@ export function validateWorkoutDraftShared(
   if (!capability) return { valid: false, errors };
   const checkStep = (step: RunWorkoutEditorStep, path: string): void => {
     if (!step.editable) return;
-    const nameError = corosTextLimitError(step.name, "Step name", COROS_NAME_MAX_BYTES, "bytes");
+    const nameError = limitError(step.name, "Step name", COROS_NAME_MAX_BYTES);
     if (nameError) errors[`${path}.name`] = nameError;
-    const overviewError = corosTextLimitError(step.overview, "Step instructions", COROS_STEP_DESCRIPTION_MAX_BYTES, "bytes");
+    const overviewError = limitError(step.overview, "Step instructions", COROS_STEP_DESCRIPTION_MAX_BYTES);
     if (overviewError) errors[`${path}.overview`] = overviewError;
     const targetError = validateWorkoutTarget(draft.sport, step.kind, step.target, step.exerciseKind);
     if (targetError) errors[`${path}.target`] = targetError;
@@ -1266,7 +1294,7 @@ export function validateWorkoutDraftShared(
   };
   draft.nodes.forEach((node, index) => {
     if (node.nodeType === "step") return checkStep(node, `nodes.${index}`);
-    const nameError = corosTextLimitError(node.name, "Repeat group name", COROS_NAME_MAX_BYTES, "bytes");
+    const nameError = limitError(node.name, "Repeat group name", COROS_NAME_MAX_BYTES);
     if (nameError) errors[`nodes.${index}.name`] = nameError;
     if (!Number.isInteger(node.repeat) || node.repeat < 1 || node.repeat > 99) errors[`nodes.${index}.repeat`] = "Repeat count must be from 1 to 99.";
     if (!node.steps.length) errors[`nodes.${index}.steps`] = "Repeat groups need at least one step.";

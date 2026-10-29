@@ -1,7 +1,7 @@
 /**
- * The Overview weekly-activity chart: the calendar week it draws, the per-sport
- * blocks inside a column, its legend, and the Monday-to-today tile totals —
- * and the Sleep card's column beside it, the seven days up to a night.
+ * The Overview weekly-activity chart: the calendar week it draws and the
+ * per-sport blocks inside a column — and the Sleep card's column beside it, the
+ * seven days up to a night.
  *
  * Run through Electron (`ELECTRON_RUN_AS_NODE=1 electron
  * --experimental-strip-types`): this machine's Node is built without Amaro, so
@@ -18,15 +18,9 @@ const weeklyActivityUrl = pathToFileURL(
 
 const {
   buildWeeklyActivitySeries,
-  buildWeeklyActivityYAxisTicks,
-  buildWeekToDateTotals,
   enrichDayListWithActivityTotals,
   formatDurationTotal,
-  formatWeekToDateRange,
-  formatWeeklyActivityAxisTick,
   getCalendarWeekDateKeys,
-  getWeeklyActivityYAxisUnitLabel,
-  weeklyActivitySportLegend,
   WEEKLY_ACTIVITY_RESIDUAL_KEY
 } = await import(`${weeklyActivityUrl.href}?cacheBust=${Date.now()}`);
 
@@ -76,7 +70,6 @@ assert.equal(emptySeries.weeklyTotal, "—");
 assert.equal(emptySeries.days.every((day) => day.value === 0), true);
 // An empty week still has an axis to draw, one whole unit a division.
 assert.equal(emptySeries.yMax, 6);
-assert.deepEqual(buildWeeklyActivityYAxisTicks(emptySeries.yMax), [0, 1, 2, 3, 4, 5, 6]);
 
 const activityEnriched = buildWeeklyActivitySeries(
   enrichDayListWithActivityTotals(
@@ -111,61 +104,12 @@ assert.equal(imperialSeries.days[3].displayValue, "5.00 mi");
 assert.equal(imperialSeries.weeklyTotal, "5.00 mi");
 assert.equal(imperialSeries.yAxisUnit, "mi");
 
-const yTicks = buildWeeklyActivityYAxisTicks(distanceSeries.yMax);
-assert.equal(yTicks.length, 7);
-assert.equal(yTicks[0], 0);
-assert.equal(yTicks.at(-1), distanceSeries.yMax);
-assert.equal(
-  formatWeeklyActivityAxisTick(6, "distance", distanceSeries.yAxisUnit),
-  "6.0"
-);
-assert.equal(getWeeklyActivityYAxisUnitLabel("distance", "km"), "km");
-assert.equal(getWeeklyActivityYAxisUnitLabel("trainingLoad", ""), "Load");
-
-// Week to date: Monday through today, and nothing on either side of that.
+// The week is the calendar week, whichever day of it is today.
 const saturday = new Date(2026, 5, 27);
-const weekTotals = buildWeekToDateTotals(
-  [
-    // Sunday of the week before, and Sunday of this one: both out, the first
-    // for being last week, the second for being later today than today.
-    { happenDay: "20260621", distance: 9000, duration: 3000, trainingLoad: 60 },
-    ...dayList,
-    { happenDay: "20260628", distance: 5000, duration: 1800, trainingLoad: 30 }
-  ],
-  [
-    { happenDay: "20260621", steps: 20000 },
-    { happenDay: "20260622", steps: 8000 },
-    { happenDay: "20260627", steps: 12000 }
-  ],
-  saturday
-);
-
-assert.equal(weekTotals.distance, 25900);
-assert.equal(weekTotals.duration, 9000);
-assert.equal(weekTotals.trainingLoad, 161);
-assert.equal(weekTotals.steps, 20000);
-// The distance total and the chart's legend read the same week.
 assert.equal(
   buildWeeklyActivitySeries(dayList, "distance", saturday, "metric").weeklyTotal,
   "25.90 km"
 );
-
-// Nothing loaded reads as unknown; a loaded week with no training is a zero.
-const nothingLoaded = buildWeekToDateTotals([], [], saturday);
-assert.equal(nothingLoaded.distance, undefined);
-assert.equal(nothingLoaded.trainingLoad, undefined);
-assert.equal(nothingLoaded.steps, undefined);
-
-const idleWeek = buildWeekToDateTotals(
-  [{ happenDay: "20260601", distance: 12000, trainingLoad: 70 }],
-  [],
-  saturday
-);
-assert.equal(idleWeek.distance, 0);
-assert.equal(idleWeek.duration, 0);
-assert.equal(idleWeek.trainingLoad, 0);
-// Steps ride on the MCP daily-health feed, which is absent on its own.
-assert.equal(idleWeek.steps, undefined);
 
 // A day with two sports splits into one block per activity, bottom to top in
 // start order, coloured by the sport each one belongs to.
@@ -309,22 +253,6 @@ const strengthDay = buildWeeklyActivitySeries(
 assert.equal(strengthDay.days[4].segments.length, 0);
 assert.equal(strengthDay.days[4].value, 0);
 
-// The legend names the sports actually on the chart, in canonical order, with
-// the residual entry last when one is drawn.
-assert.deepEqual(
-  weeklyActivitySportLegend(stacked.days).map((entry) => entry.key),
-  ["run", "bike"]
-);
-assert.deepEqual(
-  weeklyActivitySportLegend(withResidual.days).map((entry) => entry.key),
-  ["run", "bike", WEEKLY_ACTIVITY_RESIDUAL_KEY]
-);
-assert.equal(weeklyActivitySportLegend(emptySeries.days).length, 0);
-assert.equal(
-  weeklyActivitySportLegend(stacked.days)[0].label,
-  "Running"
-);
-
 assert.equal(formatDurationTotal(9000), "2h 30m");
 assert.equal(formatDurationTotal(3600), "1h");
 assert.equal(formatDurationTotal(0), "0m");
@@ -334,21 +262,6 @@ assert.equal(formatDurationTotal(21576), "6h");
 assert.equal(formatDurationTotal(21546), "5h 59m");
 assert.equal(formatDurationTotal(3599), "1h");
 assert.equal(formatDurationTotal(3569), "59m");
-
-// The line above the four tiles. It replaced a "this week" pill on each of
-// them, so it has to say what they could not: which days the totals cover.
-// Monday to today, never to Sunday.
-assert.equal(formatWeekToDateRange(new Date(2026, 8, 19)), "Mon 14 – Sat 19");
-assert.equal(formatWeekToDateRange(new Date(2026, 8, 20)), "Mon 14 – Sun 20");
-// Monday itself is one day, not a range back to itself.
-assert.equal(formatWeekToDateRange(new Date(2026, 8, 14)), "Mon 14");
-// A week that crosses a month names both, or "Mon 31 – Wed 2" reads backwards.
-assert.equal(
-  formatWeekToDateRange(new Date(2026, 8, 2)),
-  "Mon Aug 31 – Wed Sep 2"
-);
-// Sunday is the seventh day of this app's week, not the first.
-assert.equal(formatWeekToDateRange(new Date(2026, 0, 4)), "Mon Dec 29 – Sun Jan 4");
 
 // The Sleep card's column: seven days ending on the night shown, each figure
 // over the days that have it.

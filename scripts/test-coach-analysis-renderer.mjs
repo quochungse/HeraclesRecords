@@ -39,14 +39,7 @@ const CHAT_SETTINGS = {
   chatgpt: {},
   anthropic: { model: "claude-opus-5", effort: "high", hasApiKey: false },
   claudeCode: {
-    effort: "high",
-    permissions: {
-      recentActivities: true,
-      trainingMetrics: true,
-      upcomingWorkouts: true,
-      sleepData: false,
-      fullActivityFiles: false
-    }
+    effort: "high"
   },
   local: {
     baseUrl: "http://localhost:11434/v1",

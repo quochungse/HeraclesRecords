@@ -231,6 +231,8 @@ export const SCREEN_TEXT_EN = {
   "screen.outline.blockedDay": "Week {n}'s \"{name}\" is on {day}, a day the athlete can't train.",
   // What stops a plan being saved to COROS (shared: the plan editor)
   "screen.planIssue.name": "Add a plan name.",
+  "screen.planIssue.nameTooLong": "Shorten the plan name: COROS keeps {max} bytes of it.",
+  "screen.planIssue.descriptionTooLong": "Shorten the plan description: COROS keeps {max} bytes of it.",
   "screen.planIssue.weeks": "Plans must contain 1 to {max} weeks.",
   "screen.planIssue.empty": "Add a session — COROS does not keep an empty plan.",
   "screen.planIssue.outsideWeeks": "A session is outside the plan's weeks.",

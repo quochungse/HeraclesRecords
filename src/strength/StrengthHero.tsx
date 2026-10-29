@@ -72,7 +72,8 @@ interface StrengthHeroProps {
 
 /**
  * The body heat map and the muscle breakdown beside it — the pair the Strength
- * screen opens with, and the whole of the Overview's Strength Distribution.
+ * screen opens with, and the one Overview's Strength section reads over four
+ * weeks.
  * Selection and hover are shared between the two halves, so they live here
  * rather than in either caller.
  */

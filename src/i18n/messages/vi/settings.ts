@@ -48,11 +48,6 @@ const settings: SettingsMessages = {
   "settings.mcp.tools_other": "<b>{count} công cụ</b> sẵn sàng cho huấn luyện viên.",
   "settings.coachModels.title": "Nhà cung cấp mô hình AI",
   "settings.coachModels.none": "Chưa kết nối gì. Thêm tài khoản hoặc khoá API để bắt đầu.",
-  "settings.coachModels.providers": "Đã kết nối {connected}/{total} nhà cung cấp.",
-  "settings.coachModels.inUse": "Đang dùng <b>{model}</b>.",
-  "settings.coachModels.notReady": "Đã chọn <b>{model}</b> nhưng chưa kết nối.",
-  "settings.coachModels.summaryInUse": "Đang dùng {model} · đã kết nối {connected}/{total} nhà cung cấp",
-  "settings.coachModels.summaryNotReady": "Đã chọn {model} nhưng chưa kết nối · đã kết nối {connected}/{total} nhà cung cấp",
 
   "palette.gold.label": "Vàng Heracles",
   "palette.gold.description": "Ánh vàng đồng, có được qua từng kỳ công.",
@@ -90,7 +85,6 @@ const settings: SettingsMessages = {
   "update.autoDownload": "Tự động tải về",
   "update.autoDownloadHint": "Nếu tắt, chỉ tải khi bạn yêu cầu.",
   "update.check": "Kiểm tra cập nhật",
-  "settings.coachModels.claudeUpdate": "Đã có Claude Code {latest} (máy này đang dùng {installed}). Chạy <code>claude update</code> trong terminal.",
   "update.installing": "Đang cài đặt…",
 };
 

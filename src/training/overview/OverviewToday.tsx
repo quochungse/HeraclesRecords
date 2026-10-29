@@ -64,7 +64,8 @@ export function OverviewToday({
           sleep={snapshot?.sleep}
           points={snapshot?.trendPoints}
           connecting={sleepConnecting}
-          refreshing={refreshing}
+          // The first snapshot still on its way is not "no sleep recorded".
+          refreshing={refreshing || snapshotLoading}
           onOpenDetails={onOpenSleepDetails}
         />
         <TodayWeek

@@ -17,8 +17,9 @@ const TARGET_TIME = 2;
  * written by an older one are parsed again. 2: sets read by `mode`, timed
  * sets kept, exercises told apart by name as well as index. 3: preserve the
  * catalog identity and per-exercise muscle metadata for body attribution.
+ * 4: a step found by position must carry the lap's own key when it has one.
  */
-export const STRENGTH_DETAIL_VERSION = 3;
+export const STRENGTH_DETAIL_VERSION = 4;
 
 function num(value: unknown): number | undefined {
   return typeof value === "number" && Number.isFinite(value) ? value : undefined;

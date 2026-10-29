@@ -43,6 +43,23 @@ const KNOWN_UNSTYLED = new Set([
   "is-url"
 ]);
 
+/**
+ * Hooks a renderer suite selects by (test-coach-providers-renderer): the two
+ * account cards share `provider-account-*` for their look and are told apart
+ * by these.
+ */
+const TEST_HOOKS = new Set([
+  "chatgpt-account-card",
+  "chatgpt-account-refresh",
+  "chatgpt-account-identity",
+  "chatgpt-account-plan",
+  "chatgpt-account-footer",
+  "chatgpt-account-signout",
+  "claude-account-card",
+  "claude-account-refresh",
+  "claude-account-signout"
+]);
+
 /** The old spelling, which must not survive anywhere in the stylesheet. */
 const RENAMED_AWAY = [
   "chat-automation-chip",
@@ -69,6 +86,13 @@ const classesDefinedIn = (text) =>
   new Set([...text.matchAll(/\.(-?[_a-zA-Z][\w-]*)/g)].map((match) => match[1]));
 const css = readFileSync(path.join(repoRoot, "src", "styles.css"), "utf8");
 const defined = classesDefinedIn(css);
+// main.tsx loads the Training Library's sheet for every screen (its skeleton
+// is a Suspense fallback), so a Coach file may use its plan-generator sheets.
+const mainSource = readFileSync(path.join(repoRoot, "src", "main.tsx"), "utf8");
+for (const match of mainSource.matchAll(/^import\s+"([^"]+\.css)";/gm)) {
+  const sheet = readFileSync(path.resolve(repoRoot, "src", match[1]), "utf8");
+  for (const name of classesDefinedIn(sheet)) defined.add(name);
+}
 
 /**
  * A Coach file may also bring a stylesheet of its own — the plan editor the
@@ -119,7 +143,7 @@ for (const file of files) {
   const source = readFileSync(file, "utf8");
   const own = importedClasses(file, source);
   for (const name of classesIn(source)) {
-    if (defined.has(name) || own.has(name) || KNOWN_UNSTYLED.has(name)) continue;
+    if (defined.has(name) || own.has(name) || KNOWN_UNSTYLED.has(name) || TEST_HOOKS.has(name)) continue;
     missing.push(`${name}  (${relative})`);
   }
 }

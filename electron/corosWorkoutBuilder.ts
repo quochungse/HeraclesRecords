@@ -786,8 +786,8 @@ export function buildEasyRun(options: {
   sportType?: number;
   context?: WorkoutEditorContext;
 }): Record<string, unknown> {
-  assertCorosTextLimit(options.name.trim(), "Workout name", COROS_NAME_MAX_BYTES, "bytes");
-  assertCorosTextLimit(options.description?.trim(), "Workout description", COROS_WORKOUT_DESCRIPTION_MAX_BYTES, "bytes");
+  assertCorosTextLimit(options.name.trim(), "Workout name", COROS_NAME_MAX_BYTES);
+  assertCorosTextLimit(options.description?.trim(), "Workout description", COROS_WORKOUT_DESCRIPTION_MAX_BYTES);
   const distance = metersToCorosDistance(options.distanceKm * 1000);
   const sportType = options.sportType ?? 1;
 
@@ -910,8 +910,8 @@ export function buildWorkoutPayload(
   description = "",
   catalog?: CorosExerciseCatalog
 ): Record<string, unknown> {
-  assertCorosTextLimit(name.trim(), "Workout name", COROS_NAME_MAX_BYTES, "bytes");
-  assertCorosTextLimit(description.trim(), "Workout description", COROS_WORKOUT_DESCRIPTION_MAX_BYTES, "bytes");
+  assertCorosTextLimit(name.trim(), "Workout name", COROS_NAME_MAX_BYTES);
+  assertCorosTextLimit(description.trim(), "Workout description", COROS_WORKOUT_DESCRIPTION_MAX_BYTES);
   const capability = WORKOUT_SPORT_CAPABILITIES[sport];
   if (!capability) throw new Error(`Unsupported workout sport "${String(sport)}".`);
   const sportOptionErrors = validateWorkoutSportOptions(sport, sportOptions);
@@ -926,8 +926,8 @@ export function buildWorkoutPayload(
   let totalTime = 0;
 
   for (const step of steps) {
-    assertCorosTextLimit(step.name, "Step name", COROS_NAME_MAX_BYTES, "bytes");
-    assertCorosTextLimit(step.overview, "Step instructions", COROS_STEP_DESCRIPTION_MAX_BYTES, "bytes");
+    assertCorosTextLimit(step.name, "Step name", COROS_NAME_MAX_BYTES);
+    assertCorosTextLimit(step.overview, "Step instructions", COROS_STEP_DESCRIPTION_MAX_BYTES);
     if ("repeat" in step) {
       topIndex += 1;
       exId += 1;
@@ -946,8 +946,8 @@ export function buildWorkoutPayload(
       const builtSubSteps: Record<string, unknown>[] = [];
 
       for (let j = 0; j < subSteps.length; j++) {
-        assertCorosTextLimit(subSteps[j]!.name, "Step name", COROS_NAME_MAX_BYTES, "bytes");
-        assertCorosTextLimit(subSteps[j]!.overview, "Step instructions", COROS_STEP_DESCRIPTION_MAX_BYTES, "bytes");
+        assertCorosTextLimit(subSteps[j]!.name, "Step name", COROS_NAME_MAX_BYTES);
+        assertCorosTextLimit(subSteps[j]!.overview, "Step instructions", COROS_STEP_DESCRIPTION_MAX_BYTES);
         exId += 1;
         const built = buildRunExercise(
           subSteps[j]!,
@@ -1382,9 +1382,9 @@ export function validatePlanDraft(
   if (!draft.name?.trim()) {
     errors.push("Plan name is required.");
   }
-  const nameError = corosTextLimitError(draft.name?.trim(), "Plan name", COROS_NAME_MAX_BYTES, "bytes");
+  const nameError = corosTextLimitError(draft.name?.trim(), "Plan name", COROS_NAME_MAX_BYTES);
   if (nameError) errors.push(nameError);
-  const descriptionError = corosTextLimitError(draft.description?.trim(), "Plan description", COROS_PLAN_DESCRIPTION_MAX_BYTES, "bytes");
+  const descriptionError = corosTextLimitError(draft.description?.trim(), "Plan description", COROS_PLAN_DESCRIPTION_MAX_BYTES);
   if (descriptionError) errors.push(descriptionError);
   if (!Array.isArray(draft.workouts) || draft.workouts.length === 0) {
     errors.push("At least one workout is required.");
@@ -1409,9 +1409,9 @@ export function validatePlanDraft(
     if (!entry.name?.trim()) {
       errors.push(`Workout ${entry.key} needs a name.`);
     }
-    const nameError = corosTextLimitError(entry.name?.trim(), `Workout "${entry.name || entry.key}" name`, COROS_NAME_MAX_BYTES, "bytes");
+    const nameError = corosTextLimitError(entry.name?.trim(), `Workout "${entry.name || entry.key}" name`, COROS_NAME_MAX_BYTES);
     if (nameError) errors.push(nameError);
-    const descriptionError = corosTextLimitError(entry.description?.trim(), `Workout "${entry.name || entry.key}" description`, COROS_WORKOUT_DESCRIPTION_MAX_BYTES, "bytes");
+    const descriptionError = corosTextLimitError(entry.description?.trim(), `Workout "${entry.name || entry.key}" description`, COROS_WORKOUT_DESCRIPTION_MAX_BYTES);
     if (descriptionError) errors.push(descriptionError);
 
     const hasSteps = Array.isArray(entry.steps) && entry.steps.length > 0;

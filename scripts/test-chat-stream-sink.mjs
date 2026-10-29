@@ -303,7 +303,7 @@ assert.doesNotMatch(readOnlyGuide, /recall_conversation/, "a conversation with n
   // One `turnContext` builds every provider's context, the chosen style with it.
   assert.match(
     service,
-    /buildTrainingContext\(\s*permissions,[\s\S]*?runTools\.get\(requestId\)\?\.context,\s*settings\.coachStyle\s*\)/,
+    /buildTrainingContext\(\s*unitSystem,[\s\S]*?runTools\.get\(requestId\)\?\.context,\s*settings\.coachStyle\s*\)/,
     "the turn's context carries the chosen Coach style"
   );
   assert.equal(

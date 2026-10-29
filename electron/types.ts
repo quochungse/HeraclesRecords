@@ -1413,14 +1413,6 @@ export type ClaudeCodeConnectionState =
   | "connection-failed"
   | "usage-limit-reached";
 
-export interface ClaudeCodePermissions {
-  recentActivities: boolean;
-  trainingMetrics: boolean;
-  upcomingWorkouts: boolean;
-  sleepData: boolean;
-  fullActivityFiles: boolean;
-}
-
 export interface ClaudeCodeConfig {
   /** Optional user-selected path. Heracles Records never reads Claude credential files. */
   executablePath?: string;
@@ -1442,7 +1434,6 @@ export interface ClaudeCodeConfig {
   availableModelsFrom?: string;
   lastConnectionStatus?: ClaudeCodeConnectionState;
   lastCheckedAt?: string;
-  permissions: ClaudeCodePermissions;
 }
 
 export interface ClaudeCodeStatus {
@@ -3944,6 +3935,12 @@ export interface DeleteWorkoutResult {
   message: string;
 }
 
+/** A Coach edit of a workout's fields by `/path` (docs/coach-workout-patches.md). */
+export interface WorkoutPatch {
+  set?: Record<string, unknown>;
+  unset?: string[];
+}
+
 /**
  * What Coach proposes to do to the calendar or the workout library, line by
  * line, for the athlete to apply or dismiss (P3.2–P3.3 of
@@ -3954,11 +3951,6 @@ export interface DeleteWorkoutResult {
  * Every line is checked against COROS again when it is applied, and one
  * already applied is never written twice.
  */
-export interface WorkoutPatch {
-  set?: Record<string, unknown>;
-  unset?: string[];
-}
-
 export type ScheduleChangeOp = "move" | "replace" | "patch" | "remove" | "add" | "deleteWorkout";
 export type ScheduleChangeStatus = "proposed" | "applied" | "failed" | "dismissed" | "stale";
 

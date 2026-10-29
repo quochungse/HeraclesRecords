@@ -186,6 +186,8 @@ const main: ScreenMessages = {
   "screen.outline.tooLong": "\"{name}\" ในสัปดาห์ที่ {n} ยาว {minutes} นาที แต่{day}มีแค่ {available}",
   "screen.outline.blockedDay": "\"{name}\" ในสัปดาห์ที่ {n} ตรงกับ{day} ซึ่งเป็นวันที่คุณฝึกไม่ได้",
   "screen.planIssue.name": "ตั้งชื่อแผน",
+  "screen.planIssue.nameTooLong": "ย่อชื่อแผนให้สั้นลง COROS เก็บได้ {max} ไบต์",
+  "screen.planIssue.descriptionTooLong": "ย่อคำอธิบายแผนให้สั้นลง COROS เก็บได้ {max} ไบต์",
   "screen.planIssue.weeks": "แผนต้องยาว 1 ถึง {max} สัปดาห์",
   "screen.planIssue.empty": "เพิ่มการฝึก COROS ไม่เก็บแผนที่ว่างเปล่า",
   "screen.planIssue.outsideWeeks": "มีการฝึกอยู่นอกสัปดาห์ของแผน",

@@ -21,7 +21,6 @@ import { dirname, join } from "node:path";
 import {
   MCP_DAILY_HEALTH_SUBJECT,
   MCP_SLEEP_SUBJECT,
-  MCP_SLEEP_TREND_SUBJECT,
   isMcpFailure,
   mcpConnectHint,
   mcpConnectLocation,
@@ -30,8 +29,7 @@ import {
   mcpUnreachableShort,
   mcpNotice,
   mcpShortTextOr,
-  mcpTextOr,
-  mcpTitleOr
+  mcpTextOr
 } from "../src/mcp/mcpNotice.ts";
 
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), "..");
@@ -44,11 +42,7 @@ const MCP_UNAVAILABLE_SHORT = mcpUnavailableShort();
 const MCP_UNREACHABLE_SHORT = mcpUnreachableShort();
 const read = (relative) => readFileSync(join(repoRoot, relative), "utf8");
 
-const SUBJECTS = [
-  MCP_SLEEP_SUBJECT,
-  MCP_SLEEP_TREND_SUBJECT,
-  MCP_DAILY_HEALTH_SUBJECT
-];
+const SUBJECTS = [MCP_SLEEP_SUBJECT, MCP_DAILY_HEALTH_SUBJECT];
 
 for (const subject of SUBJECTS) {
   const disconnected = mcpNotice(subject, "disconnected");
@@ -126,15 +120,6 @@ assert.equal(
 );
 assert.equal(mcpShortTextOr("ready", "No nights.", "fallback"), "fallback");
 assert.equal(mcpShortTextOr(undefined, "No nights.", "fallback"), "fallback");
-
-assert.equal(mcpTitleOr("disconnected", "Sleep needs MCP", "fallback"), "Sleep needs MCP");
-assert.notEqual(
-  mcpTitleOr("unreachable", "Sleep needs MCP", "fallback"),
-  "Sleep needs MCP",
-  "a reachable-but-silent server gets its own heading"
-);
-assert.equal(mcpTitleOr("ready", "Sleep needs MCP", "fallback"), "fallback");
-assert.equal(mcpTitleOr(undefined, "Sleep needs MCP", "fallback"), "fallback");
 
 assert.equal(isMcpFailure("disconnected"), true);
 assert.equal(isMcpFailure("unreachable"), true);

@@ -186,6 +186,8 @@ const main: ScreenMessages = {
   "screen.outline.tooLong": "“{name}” ở tuần {n} kéo dài {minutes} phút; {day} chỉ có {available}.",
   "screen.outline.blockedDay": "“{name}” ở tuần {n} rơi vào {day}, ngày bạn không tập được.",
   "screen.planIssue.name": "Thêm tên giáo án.",
+  "screen.planIssue.nameTooLong": "Rút ngắn tên giáo án: COROS chỉ giữ {max} byte.",
+  "screen.planIssue.descriptionTooLong": "Rút ngắn mô tả giáo án: COROS chỉ giữ {max} byte.",
   "screen.planIssue.weeks": "Giáo án phải có từ 1 đến {max} tuần.",
   "screen.planIssue.empty": "Thêm một buổi tập — COROS không giữ giáo án trống.",
   "screen.planIssue.outsideWeeks": "Có buổi tập nằm ngoài các tuần của giáo án.",

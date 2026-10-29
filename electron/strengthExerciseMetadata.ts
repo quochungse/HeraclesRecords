@@ -38,10 +38,12 @@ export function strengthExerciseMetadata(
   const index = aggregate?.programExerciseIndex;
   if (!step && !stepId && typeof index === "number" && Number.isInteger(index) && index >= 0) {
     const candidate = steps[index];
-    const candidateKey = corosExerciseKey(context.catalog?.get(String(candidate?.originId))?.name);
+    const candidateKey = corosExerciseKey(context.catalog?.get(String(candidate?.originId))?.name) ??
+      corosExerciseKey(candidate?.name);
     // A program edited since completion may no longer have this movement at
-    // that position. A known activity key must never become a different lift.
-    if (!lapKey || !candidateKey || lapKey === candidateKey) step = candidate;
+    // that position. A known activity key must never become a different lift,
+    // nor a step whose key cannot be read.
+    if (!lapKey || lapKey === candidateKey) step = candidate;
   }
 
   const originId = exactId(step?.originId) ?? exactId(aggregate?.originId) ?? exactId(first?.originId);

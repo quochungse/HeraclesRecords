@@ -573,19 +573,6 @@ export function formatUpcomingWorkoutStats(
   return parts.join(" · ");
 }
 
-export function formatUpcomingWorkoutDetailLine(
-  category: string | undefined,
-  volume: string | undefined,
-  trainingLoad: number | undefined,
-  unitSystem: UnitSystem
-): string {
-  const volumeLabel = formatUpcomingWorkoutVolumeDisplay(volume, unitSystem);
-  const loadLabel = formatUpcomingWorkoutLoad(trainingLoad);
-  // A workout whose sport COROS did not state and whose name says nothing has
-  // no honest tag; the line is its figures alone rather than a leading dot.
-  return [category, volumeLabel, loadLabel].filter(Boolean).join(" · ");
-}
-
 export function formatUpcomingWorkoutRowStats(
   volume: string | undefined,
   trainingLoad: number | undefined,

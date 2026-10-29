@@ -18,6 +18,9 @@ const {
   workoutDraftToCorosProgram,
   workoutEditRevision
 } = await import(`${moduleUrl}?cacheBust=${Date.now()}`);
+const { carriedWorkoutText } = await import(
+  `${pathToFileURL(path.join(repoRoot, "dist-electron", "workoutCapabilities.js")).href}?cacheBust=${Date.now()}`
+);
 
 const source = {
   id: "program-44",
@@ -218,6 +221,22 @@ assert.match(validateWorkoutDraft(longStepNote).errors["nodes.1.steps.0.overview
 longStepNote.nodes[1].steps[0].overview = "Ấ".repeat(66) + "Â";
 assert.equal(validateWorkoutDraft(longStepNote).valid, true);
 assert.equal(workoutDraftToCorosProgram(source, longStepNote, metricContext).exercises.find((step) => step.id === "72").overview, longStepNote.nodes[1].steps[0].overview);
+
+// COROS's own editors allow longer text than the app writes: a description and
+// a step note the workout already holds pass through an edit of anything else.
+const longOnCoros = structuredClone(source);
+longOnCoros.overview = "Ấ".repeat(90);
+longOnCoros.exercises.find((step) => step.id === "72").overview = "Ấ".repeat(80);
+const carriedDraft = corosProgramToWorkoutDraft(longOnCoros, metricContext);
+carriedDraft.name = "Renamed";
+assert.equal(validateWorkoutDraft(carriedDraft).valid, false);
+assert.equal(validateWorkoutDraft(carriedDraft, carriedWorkoutText(corosProgramToWorkoutDraft(longOnCoros, metricContext))).valid, true);
+const carriedProgram = workoutDraftToCorosProgram(longOnCoros, carriedDraft, metricContext);
+assert.equal(carriedProgram.overview, longOnCoros.overview);
+assert.equal(carriedProgram.exercises.find((step) => step.id === "72").overview, "Ấ".repeat(80));
+// Text written here is still held to the limit.
+carriedDraft.overview = "Ấ".repeat(91);
+assert.throws(() => workoutDraftToCorosProgram(longOnCoros, carriedDraft, metricContext), /200 UTF-8 bytes/);
 
 // Upstream CorosLink #124: editing must normalize legacy long meter targets, including groups.
 for (const [meters, expectedUnit] of [[400, 2], [1000, 2], [1001, 1], [2000, 1]]) {

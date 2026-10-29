@@ -66,6 +66,12 @@ for (const lap of moved.lapList[0].lapItemList) lap.exerciseNameKey = "T1164";
 moved.lapList[0].lapItemList.at(-1).programExerciseIndex = 0;
 assert.equal(parseStrengthDetail(moved, { program, catalog }).exercises[0].externalId, split.id,
   "a known activity key survives a later edit to the program's order");
+const customFirst = structuredClone(program);
+customFirst.exercises[0] = { id: "1", originId: "999", name: "My own lift", sortNo: 1,
+  exerciseType: 2, muscle: [1], muscleRelevance: [1] };
+const keptKey = parseStrengthDetail(moved, { program: customFirst, catalog }).exercises[0];
+assert.equal(keptKey.externalId, split.id, "a step whose key cannot be read does not replace a known one");
+assert.deepEqual(keptKey.primaryMuscles, [7]);
 
 // Existing per-movement reviews override the provider's muscle roles.
 const squat = { ...exercise, ...strengthExerciseMetadata("T1061"), primaryMuscles: [8] };
@@ -100,6 +106,10 @@ assert.deepEqual(exerciseTargets(strengthSessionsWithCatalog([legacy], strengthE
 // No id/metadata means unmapped, even if a name happens to match an old rule.
 assert.equal(exerciseTargets({ nameKey: "Squats", entries: [] }).activations.length, 0);
 assert.equal(exerciseTargets({ nameKey: "S4208", entries: [] }).generic, true);
+// A free session's body-region codes are identities too (most real free sets).
+assert.deepEqual(Object.keys(loadsOf(exerciseTargets({ nameKey: "S4211", entries: [] }))).sort(),
+  ["chest", "shoulders", "triceps"]);
+assert.ok(loadsOf(exerciseTargets({ nameKey: "S4214", corosKey: "S4214", corosExerciseType: 0, entries: [] })).quads > 0);
 assert.equal(exerciseTargets({ ...exercise, corosExerciseType: 3 }).mobility, true);
 assert.deepEqual(Object.keys(loadsOf(exerciseTargets({ nameKey: "Bench Press", primaryMuscleGroup: "quadriceps", entries: [] }))), ["quads"],
   "Hevy also uses template metadata, never its display name");

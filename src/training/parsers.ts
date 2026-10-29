@@ -195,6 +195,11 @@ export function buildHeatmapGrid(cells: HeatmapCell[]): HeatmapGrid {
       break;
     }
   }
+  // A range that starts in a month's last days would print that month's name
+  // over the next one's, so a first month shorter than three weeks goes unnamed.
+  if (monthLabels.length > 1 && monthLabels[1].column - monthLabels[0].column < 3) {
+    monthLabels.shift();
+  }
 
   return {
     cells: paddedCells,

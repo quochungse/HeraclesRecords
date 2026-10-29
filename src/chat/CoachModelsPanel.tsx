@@ -81,7 +81,7 @@ export function modelListLine(
     : t("chat.models.list.readOn", { models, date: at.toLocaleDateString(getIntlLocale()) });
 }
 
-type ModelListProvider = "claude-code" | "claude-api" | "openrouter";
+type ModelListProvider = "claude-api" | "openrouter";
 
 export interface CoachModelsPanelProps {
   api: HeraclesRecordsApi | undefined;
@@ -136,7 +136,7 @@ export function CoachModelsPanel({ api, onChange }: CoachModelsPanelProps) {
   const [testingLocal, setTestingLocal] = useState(false);
   const [detectingLocal, setDetectingLocal] = useState(false);
 
-  // Per provider: a key's Save and Claude's Refresh can each be reading a list at once.
+  // Per provider: each key's Save or Test can be reading its list at once.
   const [refreshingModels, setRefreshingModels] = useState<
     Partial<Record<ModelListProvider, boolean>>
   >({});
@@ -266,12 +266,6 @@ export function CoachModelsPanel({ api, onChange }: CoachModelsPanelProps) {
   };
 
   const modelListSource = (provider: ModelListProvider) => {
-    if (provider === "claude-code") {
-      const listed = chatSettings.claudeCode.availableModels;
-      return listed?.length
-        ? { fetchedAt: chatSettings.claudeCode.availableModelsAt, count: listed.length }
-        : undefined;
-    }
     const catalog = chatSettings.modelCatalogs?.[provider];
     return catalog ? { fetchedAt: catalog.fetchedAt, count: catalog.models.length } : undefined;
   };
@@ -366,7 +360,6 @@ export function CoachModelsPanel({ api, onChange }: CoachModelsPanelProps) {
   const refreshClaudeCodeStatus = async () => {
     if (checkingClaude || revokingClaude) return;
     setCheckingClaude(true);
-    setRefreshing("claude-code", true);
     setClaudeLoginError(null);
     try {
       const status = await api.getClaudeCodeStatus();
@@ -378,7 +371,6 @@ export function CoachModelsPanel({ api, onChange }: CoachModelsPanelProps) {
         if (!result.ok) setClaudeLoginError(result.message);
         await rereadModelLists();
       }
-      setModelListErrors((current) => ({ ...current, "claude-code": undefined }));
       await onChange?.();
     } catch (caught) {
       setClaudeLoginError(
@@ -386,7 +378,6 @@ export function CoachModelsPanel({ api, onChange }: CoachModelsPanelProps) {
       );
     } finally {
       setCheckingClaude(false);
-      setRefreshing("claude-code", false);
     }
   };
 
@@ -743,12 +734,12 @@ export function CoachModelsPanel({ api, onChange }: CoachModelsPanelProps) {
       ) : null}
 
       <section className="chat-settings-section chatgpt-account-card provider-account-card" aria-busy={signingIn || signingOut || refreshingChatGpt}>
-        <header className="chatgpt-account-header provider-account-header">
-          <div className="chatgpt-account-brand provider-account-brand">
+        <header className="provider-account-header">
+          <div className="provider-account-brand">
             <Sparkles size={16} aria-hidden="true" />
             <h3>{t("chat.models.chatgptAccount")}</h3>
           </div>
-          <div className="chatgpt-account-actions provider-account-actions">
+          <div className="provider-account-actions">
             <span className={`chatgpt-account-status provider-account-status${authStatus?.signedIn ? " is-connected" : ""}`} role="status">
               {authStatus?.signedIn ? <CircleCheck size={13} aria-hidden="true" /> : null}
               {authStatus?.signedIn ? t("chat.models.status.connected") : t("library.ai.notSetUp")}
@@ -767,7 +758,7 @@ export function CoachModelsPanel({ api, onChange }: CoachModelsPanelProps) {
         {authStatus?.signedIn ? (
           <>
             <div className="chatgpt-account-identity provider-account-identity">
-              <span className="chatgpt-account-avatar provider-account-avatar" aria-hidden="true"><UserRound size={22} /></span>
+              <span className="provider-account-avatar" aria-hidden="true"><UserRound size={22} /></span>
               <div className="chat-settings-account-who">
                 <strong className="chat-settings-email">
                   {authStatus.name || authStatus.email || t("chat.models.signedIn")}

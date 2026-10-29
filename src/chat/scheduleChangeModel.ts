@@ -280,7 +280,10 @@ const FIXED_REASONS: Record<string, MessageKey> = {
   "The proposal does not say which session or where to.": "chat.change.reason.noSessionOrDay", // i18n-ignore: the stored English it stands for
   "The proposal does not say which session or what with.": "chat.change.reason.noSessionOrWorkout", // i18n-ignore: the stored English it stands for
   "The proposal does not say what or where.": "chat.change.reason.noWhatOrWhere", // i18n-ignore: the stored English it stands for
-  "The proposal does not say which workout.": "chat.change.reason.noWorkout" // i18n-ignore: the stored English it stands for
+  "The proposal does not say which workout.": "chat.change.reason.noWorkout", // i18n-ignore: the stored English it stands for
+  "The proposal does not say which workout fields to update.": "chat.change.reason.noPatch", // i18n-ignore: the stored English it stands for
+  "The workout changed since this proposal. Ask Coach for a new update.": "chat.change.reason.workoutChanged", // i18n-ignore: the stored English it stands for
+  "This workout is read-only.": "chat.change.reason.readOnly" // i18n-ignore: the stored English it stands for
 };
 
 /**

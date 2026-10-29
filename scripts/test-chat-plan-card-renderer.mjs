@@ -32,14 +32,7 @@ const CHAT_SETTINGS = {
   chatgpt: {},
   anthropic: { model: "claude-opus-5", effort: "high", hasApiKey: false },
   claudeCode: {
-    effort: "high",
-    permissions: {
-      recentActivities: true,
-      trainingMetrics: true,
-      upcomingWorkouts: true,
-      sleepData: false,
-      fullActivityFiles: false
-    }
+    effort: "high"
   },
   local: { baseUrl: "http://localhost:11434/v1", model: "", hasApiKey: false, toolsEnabled: true },
   openRouter: { model: "openrouter/auto", hasApiKey: false },
@@ -1338,7 +1331,8 @@ async function main() {
   await page(`[...document.querySelectorAll('.coach-sheet .plan-generator-provider-option')].find((node) => node.textContent.includes("Claude subscription")).click()`);
   await waitFor(() => harness("callCount", "setConversationSettings"), "the conversation's AI is written");
   const written = (await harness("calls", "setConversationSettings"))[0].args[0];
-  assert.equal(written.runtime, undefined, "picking Coach's own AI clears the conversation's override");
+  // A conversation keeps its whole AI, so the pick is written as this one's.
+  assert.equal(written.runtime?.provider, "claude-code", "the AI picked becomes the conversation's");
   assert.equal(await harness("callCount", "saveChatSettings"), 0, "and Coach's settings are left alone");
 
   // A pull that merged another machine's brief and settings.

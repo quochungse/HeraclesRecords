@@ -1,18 +1,10 @@
-import type {
-  TrainingHubActivity,
-  TrainingHubDailyHealthRecord,
-  TrainingHubDailyMetric
-} from "../../electron/types";
+import type { TrainingHubActivity, TrainingHubDailyMetric } from "../../electron/types";
 import type { MessageKey } from "../i18n/core";
 import type { UnitSystem } from "../../electron/types";
-import {
-  SPORT_COLOR_CATEGORIES,
-  SPORT_COLOR_LABELS,
-  sportColorCategory
-} from "./sportColors";
+import { SPORT_COLOR_LABELS, sportColorCategory } from "./sportColors";
 import type { SportColorCategory } from "./sportColors";
 import { distanceUnit, metersToDisplayDistance } from "../units/units";
-import { formatDecimal, getIntlLocale, getLocale, t, weekdayNames } from "../i18n/core";
+import { formatDecimal, t, weekdayNames } from "../i18n/core";
 
 export type WeeklyActivityMetric = "distance" | "duration" | "trainingLoad";
 
@@ -57,12 +49,6 @@ export interface WeeklyActivitySeries {
   hasData: boolean;
   metricLabel: string;
   yAxisUnit: string;
-}
-
-export interface WeeklyActivityLegendEntry {
-  key: string;
-  label: string;
-  category: SportColorCategory | null;
 }
 
 const METRIC_LABELS: Record<WeeklyActivityMetric, MessageKey> = {
@@ -276,22 +262,6 @@ function yAxisUnitForMetric(
   return maxValue >= 1 ? "h" : "m";
 }
 
-function formatAxisTick(value: number, metric: WeeklyActivityMetric, useMinutes: boolean): string {
-  if (metric === "distance") {
-    return formatDecimal(value, value >= 10 ? 0 : 1);
-  }
-
-  if (metric === "trainingLoad") {
-    return String(Math.round(value));
-  }
-
-  if (useMinutes) {
-    return String(Math.round(value * 60));
-  }
-
-  return formatDecimal(value, value >= 1 ? 1 : 2);
-}
-
 /**
  * Below this a block rounds to nothing on screen, so it is treated as absent
  * rather than drawn as a sliver claiming a session that carried no distance.
@@ -457,188 +427,7 @@ export function buildWeeklyActivitySeries(
   };
 }
 
-/**
- * Legend for a week's columns: the sports actually present, in the canonical
- * order the colour settings list them, plus the residual entry when one is
- * drawn. One metric is on the chart at a time, so one day array says it all.
- */
-export function weeklyActivitySportLegend(
-  days: readonly WeeklyActivityDay[]
-): WeeklyActivityLegendEntry[] {
-  const present = new Set<SportColorCategory>();
-  let hasResidual = false;
-
-  for (const day of days) {
-    for (const segment of day.segments) {
-      if (segment.category) {
-        present.add(segment.category);
-      } else {
-        hasResidual = true;
-      }
-    }
-  }
-
-  const entries: WeeklyActivityLegendEntry[] = SPORT_COLOR_CATEGORIES.filter(
-    (category) => present.has(category)
-  ).map((category) => ({
-    key: category,
-    label: SPORT_COLOR_LABELS[category],
-    category
-  }));
-
-  if (hasResidual) {
-    entries.push({
-      key: WEEKLY_ACTIVITY_RESIDUAL_KEY,
-      label: residualLabel(),
-      category: null
-    });
-  }
-
-  return entries;
-}
-
-export function formatWeeklyActivityAxisTick(
-  value: number,
-  metric: WeeklyActivityMetric,
-  yAxisUnit: string
-): string {
-  const useMinutes = metric === "duration" && yAxisUnit === "m";
-  return formatAxisTick(value, metric, useMinutes);
-}
-
-export function buildWeeklyActivityYAxisTicks(
-  yMax: number,
-  divisions = 6
-): number[] {
-  if (yMax <= 0 || divisions <= 0) {
-    return [0];
-  }
-
-  return Array.from({ length: divisions + 1 }, (_value, index) =>
-    (yMax * index) / divisions
-  );
-}
-
-export function getWeeklyActivityYAxisUnitLabel(
-  metric: WeeklyActivityMetric,
-  yAxisUnit: string
-): string {
-  if (metric === "trainingLoad") {
-    return t("overview.tiles.load");
-  }
-
-  return yAxisUnit;
-}
-
-export interface WeekToDateTotals {
-  trainingLoad?: number;
-  /** Metres. */
-  distance?: number;
-  /** Seconds. */
-  duration?: number;
-  steps?: number;
-}
-
-/**
- * Monday through `referenceDate`, summed — the same calendar week the weekly
- * activity chart draws, cut off at today. An empty day list means nothing has
- * loaded yet and reads as undefined; a loaded list with nothing since Monday is
- * a real zero. Steps come from the MCP daily-health feed, which can be absent
- * on its own, so they stay undefined unless a day of this week carried a count.
- */
-export function buildWeekToDateTotals(
-  dayList: TrainingHubDailyMetric[],
-  healthRecords: TrainingHubDailyHealthRecord[],
-  referenceDate = new Date()
-): WeekToDateTotals {
-  const todayKey = dateToHappenDay(referenceDate);
-  const weekKeys = new Set(
-    getCalendarWeekDateKeys(referenceDate).filter((key) => key <= todayKey)
-  );
-  const isCounted = (value?: number): value is number =>
-    value !== undefined && Number.isFinite(value);
-  const weekDays = dayList.filter((day) => weekKeys.has(day.happenDay));
-  const total = (read: (day: TrainingHubDailyMetric) => number | undefined) =>
-    dayList.length === 0
-      ? undefined
-      : weekDays.reduce((sum, day) => {
-          const value = read(day);
-          return isCounted(value) ? sum + value : sum;
-        }, 0);
-  const weekSteps = healthRecords
-    .filter((record) => weekKeys.has(record.happenDay))
-    .map((record) => record.steps)
-    .filter(isCounted);
-
-  return {
-    trainingLoad: total((day) => day.trainingLoad),
-    distance: total((day) => day.distance),
-    duration: total((day) => day.duration),
-    steps:
-      weekSteps.length > 0
-        ? weekSteps.reduce((sum, value) => sum + value, 0)
-        : undefined
-  };
-}
-
-/** "Mon 4" or "Mon, Oct 4", in the language on screen's own order. */
-function describeWeekDay(happenDay: string, _weekdayIndex: number, withMonth: boolean): string {
-  const date = new Date(
-    Number(happenDay.slice(0, 4)),
-    Number(happenDay.slice(4, 6)) - 1,
-    Number(happenDay.slice(6, 8))
-  );
-  /* English names the weekday first ("Mon 14", "Mon Aug 31"); Intl's en-US puts the day ahead of it. */
-  if (getLocale() === "en") {
-    const weekday = new Intl.DateTimeFormat("en-US", { weekday: "short" }).format(date); // i18n-ignore: English's own order
-    const month = withMonth ? `${new Intl.DateTimeFormat("en-US", { month: "short" }).format(date)} ` : ""; // i18n-ignore
-    return `${weekday} ${month}${date.getDate()}`;
-  }
-  return new Intl.DateTimeFormat(getIntlLocale(), {
-    weekday: "short",
-    day: "numeric",
-    ...(withMonth ? { month: "short" as const } : {})
-  }).format(date);
-}
-
-/**
- * The days the week-to-date totals actually add up: Monday through the
- * reference day, the window `buildWeekToDateTotals` sums. It is said once above
- * the four week totals, which is what lets each of them drop its own "this week"
- * line — and it says more than that line did, because "this week" never told
- * anyone the totals stop at today rather than Sunday.
- *
- * The month is named only when the week crosses one, so an ordinary week reads
- * "Mon 14 – Sat 19" and the last week of August reads "Mon Aug 31 – Wed Sep 2".
- * Labels are this module's own rather than the platform's: the copy around them
- * is English either way, and a locale-formatted date would make the test for
- * this depend on the machine it runs on.
- */
-export function formatWeekToDateRange(referenceDate = new Date()): string {
-  const monday = getCalendarWeekDateKeys(referenceDate)[0];
-  const today = dateToHappenDay(referenceDate);
-  const todayIndex = (referenceDate.getDay() + 6) % 7;
-
-  if (monday === today) {
-    return describeWeekDay(today, 0, false);
-  }
-
-  const crossesMonths = monday.slice(0, 6) !== today.slice(0, 6);
-
-  return `${describeWeekDay(monday, 0, crossesMonths)} – ${describeWeekDay(
-    today,
-    todayIndex,
-    crossesMonths
-  )}`;
-}
-
-export const WEEKLY_ACTIVITY_METRICS: WeeklyActivityMetric[] = [
-  "distance",
-  "duration",
-  "trainingLoad"
-];
-
-export function getWeeklyActivityMetricLabel(
+function getWeeklyActivityMetricLabel(
   metric: WeeklyActivityMetric,
   unitSystem: UnitSystem
 ): string {

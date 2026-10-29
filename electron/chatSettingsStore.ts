@@ -49,11 +49,6 @@ export const CHAT_SETTINGS_KEYS = {
   claudeAvailableModelsFrom: "chat.claudeCode.availableModelsFrom",
   claudeLastConnectionStatus: "chat.claudeCode.lastConnectionStatus",
   claudeLastCheckedAt: "chat.claudeCode.lastCheckedAt",
-  claudeRecentActivities: "chat.claudeCode.permissions.recentActivities",
-  claudeTrainingMetrics: "chat.claudeCode.permissions.trainingMetrics",
-  claudeUpcomingWorkouts: "chat.claudeCode.permissions.upcomingWorkouts",
-  claudeSleepData: "chat.claudeCode.permissions.sleepData",
-  claudeFullActivityFiles: "chat.claudeCode.permissions.fullActivityFiles",
   localBaseUrl: "chat.local.baseUrl",
   localModel: "chat.local.model",
   localApiKey: "chat.local.apiKey",
@@ -149,19 +144,7 @@ export function readChatSettingsFromStore(
         store.get(CHAT_SETTINGS_KEYS.claudeLastConnectionStatus)
       ),
       lastCheckedAt:
-        store.get(CHAT_SETTINGS_KEYS.claudeLastCheckedAt) || undefined,
-      permissions: {
-        recentActivities:
-          store.get(CHAT_SETTINGS_KEYS.claudeRecentActivities) !== "false",
-        trainingMetrics:
-          store.get(CHAT_SETTINGS_KEYS.claudeTrainingMetrics) !== "false",
-        upcomingWorkouts:
-          store.get(CHAT_SETTINGS_KEYS.claudeUpcomingWorkouts) !== "false",
-        sleepData:
-          store.get(CHAT_SETTINGS_KEYS.claudeSleepData) === "true",
-        fullActivityFiles:
-          store.get(CHAT_SETTINGS_KEYS.claudeFullActivityFiles) === "true"
-      }
+        store.get(CHAT_SETTINGS_KEYS.claudeLastCheckedAt) || undefined
     },
     local: {
       baseUrl:
@@ -289,27 +272,6 @@ export function saveChatSettingsToStore(
       settings.claudeCode.lastCheckedAt
     );
   }
-  const claudePermissions = settings.claudeCode?.permissions;
-  store.set(
-    CHAT_SETTINGS_KEYS.claudeRecentActivities,
-    claudePermissions?.recentActivities === false ? "false" : "true"
-  );
-  store.set(
-    CHAT_SETTINGS_KEYS.claudeTrainingMetrics,
-    claudePermissions?.trainingMetrics === false ? "false" : "true"
-  );
-  store.set(
-    CHAT_SETTINGS_KEYS.claudeUpcomingWorkouts,
-    claudePermissions?.upcomingWorkouts === false ? "false" : "true"
-  );
-  store.set(
-    CHAT_SETTINGS_KEYS.claudeSleepData,
-    claudePermissions?.sleepData === true ? "true" : "false"
-  );
-  store.set(
-    CHAT_SETTINGS_KEYS.claudeFullActivityFiles,
-    claudePermissions?.fullActivityFiles === true ? "true" : "false"
-  );
   store.set(
     CHAT_SETTINGS_KEYS.localBaseUrl,
     normalizeLocalChatBaseUrl(settings.local.baseUrl)

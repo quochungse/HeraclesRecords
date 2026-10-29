@@ -25,8 +25,7 @@ export const CHAT_SETTINGS: ChatSettings = {
   chatgpt: {},
   anthropic: { model: MODEL, effort: "high", hasApiKey: true },
   claudeCode: {
-    effort: "high",
-    permissions: { recentActivities: true, trainingMetrics: true, upcomingWorkouts: true, sleepData: true, fullActivityFiles: false }
+    effort: "high"
   },
   openRouter: { model: "", hasApiKey: false },
   local: { baseUrl: "http://127.0.0.1:11434/v1", model: "", hasApiKey: false, toolsEnabled: true },

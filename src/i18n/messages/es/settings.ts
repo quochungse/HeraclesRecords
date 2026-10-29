@@ -48,11 +48,6 @@ const settings: SettingsMessages = {
   "settings.mcp.tools_other": "<b>{count} herramientas</b> listas para el entrenador.",
   "settings.coachModels.title": "Proveedores de modelos de IA",
   "settings.coachModels.none": "Aún no hay nada conectado. Añade una cuenta o una clave para empezar.",
-  "settings.coachModels.providers": "{connected} de {total} proveedores conectados.",
-  "settings.coachModels.inUse": "Usando <b>{model}</b>.",
-  "settings.coachModels.notReady": "<b>{model}</b> seleccionado, pero sin conectar.",
-  "settings.coachModels.summaryInUse": "Usando {model} · {connected} de {total} proveedores conectados",
-  "settings.coachModels.summaryNotReady": "{model} seleccionado, pero sin conectar · {connected} de {total} proveedores conectados",
 
   "palette.gold.label": "Oro de Heracles",
   "palette.gold.description": "Oro bruñido, ganado trabajo a trabajo.",
@@ -90,7 +85,6 @@ const settings: SettingsMessages = {
   "update.autoDownload": "Descargar automáticamente",
   "update.autoDownloadHint": "Si no, solo se descarga cuando lo pidas.",
   "update.check": "Buscar actualizaciones",
-  "settings.coachModels.claudeUpdate": "Claude Code {latest} está disponible (este ordenador tiene la {installed}). Ejecuta <code>claude update</code> en una terminal.",
   "update.installing": "Instalando…",
 };
 

@@ -978,14 +978,7 @@ const saved = saveChatSettingsToStore(fakeStore, fakeKeyStores, {
     ],
     executablePath: "/opt/claude/bin/claude",
     lastConnectionStatus: "connected",
-    lastCheckedAt: "2026-07-10T12:00:00.000Z",
-    permissions: {
-      recentActivities: true,
-      trainingMetrics: false,
-      upcomingWorkouts: true,
-      sleepData: true,
-      fullActivityFiles: false
-    }
+    lastCheckedAt: "2026-07-10T12:00:00.000Z"
   },
   local: {
     baseUrl: "localhost:11434",
@@ -1013,13 +1006,8 @@ assert.deepEqual(saved.claudeCode.availableModels, [
   { value: "", label: "Default (Sonnet 4.6)" },
   { value: "sonnet", label: "Sonnet 4.6" }
 ]);
-assert.deepEqual(saved.claudeCode.permissions, {
-  recentActivities: true,
-  trainingMetrics: false,
-  upcomingWorkouts: true,
-  sleepData: true,
-  fullActivityFiles: false
-});
+// What Coach reads is the conversation's Permissions alone, for every provider.
+assert.equal("permissions" in saved.claudeCode, false);
 assert.equal(saved.local.baseUrl, "http://localhost:11434/v1");
 assert.equal(saved.local.model, "llama3.2");
 assert.equal(saved.local.toolsEnabled, false);

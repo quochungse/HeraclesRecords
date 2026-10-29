@@ -123,15 +123,29 @@ export function plannedThisWeek(
   };
 }
 
-/** The next session of a sport family on the calendar from today on. */
+/**
+ * The next session of a sport family on the calendar from today on. One of
+ * today's that a session recorded today answers (`pairTodayPlan`) is done, not
+ * next: the line beside it already names that session as the last.
+ */
 export function nextPlanned(
   upcoming: readonly TrainingHubUpcomingWorkout[],
   family: SportFamily,
-  now = new Date()
+  now = new Date(),
+  activities: readonly TrainingHubActivity[] = []
 ): TrainingHubUpcomingWorkout | undefined {
   const today = getLocalHappenDayKey(now);
-  return [...upcoming]
-    .filter((workout) => workout.happenDay >= today && scheduledSportFamily(workout.sportType) === family)
+  const ofSport = upcoming.filter(
+    (workout) => workout.happenDay >= today && scheduledSportFamily(workout.sportType) === family
+  );
+  const answered = new Set(
+    pairTodayPlan(
+      ofSport.filter((workout) => workout.happenDay === today),
+      activities.filter((activity) => happenDayFromTimestamp(activity.startTime) === today)
+    ).pairs.map((pair) => pair.workout)
+  );
+  return ofSport
+    .filter((workout) => !answered.has(workout))
     .sort((left, right) => left.happenDay.localeCompare(right.happenDay))[0];
 }
 

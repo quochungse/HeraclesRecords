@@ -426,7 +426,11 @@ export function reasoningEffortOptions(
   if (provider !== "chatgpt") return effortOptionsFor(model);
   const config = model?.reasoning;
   if (!config?.efforts.length) return [];
-  const label = (value: string) => value.charAt(0).toUpperCase() + value.slice(1);
+  // A level Claude shares keeps its translated name ("xhigh" is "Extra high");
+  // one only ChatGPT lists is shown as it is named.
+  const label = (value: string) =>
+    REASONING_EFFORT_OPTIONS.find((option) => option.value === value)?.label ??
+    value.charAt(0).toUpperCase() + value.slice(1);
   const auto = screenText("screen.model.auto");
   return [
     { value: "", label: config.defaultEffort ? `${auto} (${label(config.defaultEffort)})` : auto },

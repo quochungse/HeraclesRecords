@@ -113,7 +113,7 @@ export function applyWorkoutPatch(base: PlanWorkoutEntryInput, value: unknown): 
     } else {
       const replacement = patch.set![path];
       if (!validField(kind, field, replacement)) throw new Error(`Invalid value for ${path}; use the workout field's typed value.`);
-      if (field === "target_type" && target.target_type !== replacement) {
+      if (field === "target_type" && (target.target_type ?? "time") !== replacement) {
         // A different target variant must not inherit any of the old variant's parameters.
         const prefix = path.slice(0, -field.length);
         for (const oldField of Object.values(TARGET_FIELDS)) {
@@ -132,7 +132,8 @@ export function applyWorkoutPatch(base: PlanWorkoutEntryInput, value: unknown): 
   for (const step of changedSteps) {
     const targetType = String(step.target_type ?? "time");
     const active = TARGET_FIELDS[targetType];
-    if (!own(TARGET_FIELDS, targetType) || (active && !own(step, active))) {
+    // A legacy `target_value` the builder still reads stands in, and is gone once any target field is set.
+    if (!own(TARGET_FIELDS, targetType) || (active && !own(step, active) && !own(step, "target_value"))) {
       throw new Error(`Target ${targetType} requires ${active ?? "a supported target type"}.`);
     }
     for (const field of Object.values(TARGET_FIELDS)) {

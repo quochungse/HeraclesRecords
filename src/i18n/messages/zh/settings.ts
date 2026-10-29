@@ -48,11 +48,6 @@ const settings: SettingsMessages = {
   "settings.mcp.tools_other": "教练可用 <b>{count} 个工具</b>。",
   "settings.coachModels.title": "AI 模型提供商",
   "settings.coachModels.none": "尚未连接任何服务。添加账号或 API 密钥即可开始使用教练。",
-  "settings.coachModels.providers": "已连接 {connected}/{total} 个服务商。",
-  "settings.coachModels.inUse": "正在使用 <b>{model}</b>。",
-  "settings.coachModels.notReady": "已选择 <b>{model}</b>，但尚未连接。",
-  "settings.coachModels.summaryInUse": "正在使用 {model} · 已连接 {connected}/{total} 个服务商",
-  "settings.coachModels.summaryNotReady": "已选择 {model}，但尚未连接 · 已连接 {connected}/{total} 个服务商",
 
   "palette.gold.label": "赫拉克勒斯金",
   "palette.gold.description": "一项项功业换来的，打磨过的金色。",
@@ -90,7 +85,6 @@ const settings: SettingsMessages = {
   "update.autoDownload": "自动下载",
   "update.autoDownloadHint": "关闭后，只在你需要时下载。",
   "update.check": "检查更新",
-  "settings.coachModels.claudeUpdate": "Claude Code {latest} 已发布（这台电脑是 {installed}）。在终端运行 <code>claude update</code>。",
   "update.installing": "正在安装…",
 };
 

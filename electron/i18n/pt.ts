@@ -186,6 +186,8 @@ const main: ScreenMessages = {
   "screen.outline.tooLong": "“{name}” da semana {n} dura {minutes} minutos; {day} tem {available}.",
   "screen.outline.blockedDay": "“{name}” da semana {n} cai em {day}, um dia em que você não pode treinar.",
   "screen.planIssue.name": "Dê um nome ao plano.",
+  "screen.planIssue.nameTooLong": "Encurte o nome do plano: o COROS guarda {max} bytes.",
+  "screen.planIssue.descriptionTooLong": "Encurte a descrição do plano: o COROS guarda {max} bytes.",
   "screen.planIssue.weeks": "Os planos precisam ter de 1 a {max} semanas.",
   "screen.planIssue.empty": "Adicione uma sessão: o COROS não guarda um plano vazio.",
   "screen.planIssue.outsideWeeks": "Há uma sessão fora das semanas do plano.",

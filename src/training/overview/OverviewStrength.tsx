@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 import { ArrowUpRight, Dumbbell, Loader2 } from "lucide-react";
-import type { TrainingHubUpcomingWorkout } from "../../../electron/types";
+import type { TrainingHubActivity, TrainingHubUpcomingWorkout } from "../../../electron/types";
 import type { HeraclesRecordsApi } from "../../heraclesrecords-api";
 import type { PrimaryView } from "../../navigation/primaryNav";
 import { StrengthHero } from "../../strength/StrengthHero";
@@ -33,12 +33,15 @@ function whole(value: number): string {
 export default function OverviewStrength({
   api,
   connected,
+  activities,
   upcomingWorkouts,
   onOpenActivity,
   onOpenView
 }: {
   api: HeraclesRecordsApi;
   connected: boolean;
+  /** COROS's sessions, for whether today's planned session is done (`nextPlanned`). */
+  activities: TrainingHubActivity[];
   upcomingWorkouts: TrainingHubUpcomingWorkout[];
   onOpenActivity?: (activityId: string) => void;
   onOpenView?: (view: PrimaryView) => void;
@@ -69,7 +72,7 @@ export default function OverviewStrength({
   const split = volume.indexOf(" ");
   const last = [...window].sort((left, right) => (right.startTime ?? 0) - (left.startTime ?? 0))[0];
   const lastDay = last ? happenDayFromTimestamp(last.startTime) : undefined;
-  const next = nextPlanned(upcomingWorkouts, "strength", new Date(nowMs));
+  const next = nextPlanned(upcomingWorkouts, "strength", new Date(nowMs), activities);
   const title = t("nav.strength");
 
   return (

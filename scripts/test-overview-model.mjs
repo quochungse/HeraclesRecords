@@ -388,6 +388,12 @@ close(sportWindowWeeks(monday), 3 + 0.5 / 7, "three whole weeks and the half day
 close(sportWindowWeeks(new Date(2026, 9, 25, 23, 59, 59).getTime()), 4 - 1 / 7 / 86_400, "a Sunday night is all but four");
 assert.equal(nextPlanned(plans, "bike", now)?.name, "Spin");
 assert.equal(nextPlanned(plans, "swim", now), undefined);
+assert.equal(nextPlanned(plans, "run", now)?.name, "Easy run", "today's run, still to do");
+assert.equal(
+  nextPlanned(plans, "run", now, [{ activityId: "done", sportType: 100, startTime: at(24, 7) }])?.name,
+  "Long run",
+  "today's run, done, is not next"
+);
 
 const { longest, last } = longestAndLast(
   [

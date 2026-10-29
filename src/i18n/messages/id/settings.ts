@@ -48,11 +48,6 @@ const settings: SettingsMessages = {
   "settings.mcp.tools_other": "<b>{count} alat</b> siap dipakai pelatih.",
   "settings.coachModels.title": "Penyedia model AI",
   "settings.coachModels.none": "Belum ada yang terhubung. Tambahkan akun atau kunci untuk mulai.",
-  "settings.coachModels.providers": "{connected} dari {total} penyedia terhubung.",
-  "settings.coachModels.inUse": "Memakai <b>{model}</b>.",
-  "settings.coachModels.notReady": "<b>{model}</b> dipilih, tetapi belum terhubung.",
-  "settings.coachModels.summaryInUse": "Memakai {model} · {connected} dari {total} penyedia terhubung",
-  "settings.coachModels.summaryNotReady": "{model} dipilih, tetapi belum terhubung · {connected} dari {total} penyedia terhubung",
 
   "palette.gold.label": "Emas Herakles",
   "palette.gold.description": "Emas berkilau, didapat dari satu tugas ke tugas berikutnya.",
@@ -90,7 +85,6 @@ const settings: SettingsMessages = {
   "update.autoDownload": "Unduh otomatis",
   "update.autoDownloadHint": "Jika tidak, unduh hanya saat Anda minta.",
   "update.check": "Periksa pembaruan",
-  "settings.coachModels.claudeUpdate": "Claude Code {latest} sudah tersedia (komputer ini memakai {installed}). Jalankan <code>claude update</code> di terminal.",
   "update.installing": "Memasang…",
 };
 

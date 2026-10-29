@@ -186,6 +186,8 @@ const main: ScreenMessages = {
   "screen.outline.tooLong": "{n}주차의 \"{name}\"은(는) {minutes}분인데, {day}에는 {available}분뿐입니다.",
   "screen.outline.blockedDay": "{n}주차의 \"{name}\"이(가) {day}, 훈련할 수 없는 날에 있습니다.",
   "screen.planIssue.name": "계획 이름을 넣으세요.",
+  "screen.planIssue.nameTooLong": "플랜 이름을 줄이세요. COROS는 {max}바이트까지 저장합니다.",
+  "screen.planIssue.descriptionTooLong": "플랜 설명을 줄이세요. COROS는 {max}바이트까지 저장합니다.",
   "screen.planIssue.weeks": "계획은 1~{max}주여야 합니다.",
   "screen.planIssue.empty": "세션을 추가하세요. COROS는 빈 계획을 저장하지 않습니다.",
   "screen.planIssue.outsideWeeks": "계획의 주 밖에 있는 세션이 있습니다.",
