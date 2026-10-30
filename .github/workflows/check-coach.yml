@@ -47,12 +47,16 @@ jobs:
         run: sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
 
       # xvfb-run's default screen is 640x480 at 8 bits; the suites' windows
-      # are up to 1600x1200 and Chromium wants a 24-bit visual.
+      # are up to 1600x1200 and Chromium wants a 24-bit visual. Chromium's own
+      # log (sandbox, shared memory, GPU process) goes to stderr, so a window
+      # that never loads says why in the step's log and its annotation.
       - name: Check Coach in a virtual display
         run: xvfb-run --auto-servernum --server-args="-screen 0 1920x1200x24" npm run check:coach
+        env:
+          ELECTRON_ENABLE_LOGGING: "1"
 
       - name: Upload failed check logs
-        if: failure()
+        if: failure() || cancelled()
         uses: actions/upload-artifact@v4
         with:
           name: coach-check-logs

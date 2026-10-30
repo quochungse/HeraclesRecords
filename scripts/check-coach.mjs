@@ -49,19 +49,50 @@ fs.rmSync(logs, { recursive: true, force: true });
 fs.mkdirSync(logs, { recursive: true });
 const started = Date.now();
 
+// The whole check takes under two minutes. A step that hangs (an Electron
+// window that never loads) would otherwise run into the CI job's limit, which
+// cancels the job before anything says which step it was.
+const STEP_TIMEOUT_MS = 5 * 60_000;
+
+// A renderer step is a launcher with Electron under it: kill the whole tree.
+function killTree(child) {
+  if (process.platform === "win32") spawn("taskkill", ["/pid", String(child.pid), "/T", "/F"], { stdio: "ignore" });
+  else try { process.kill(-child.pid, "SIGKILL"); } catch { /* already gone */ }
+}
+
+// On POSIX a step runs in its own process group, out of reach of the
+// terminal's Ctrl+C: pass it on.
+let active;
+for (const signal of ["SIGINT", "SIGTERM"]) {
+  process.on(signal, () => {
+    if (active) killTree(active);
+    process.exit(130);
+  });
+}
+
 async function run(step) {
   console.log(`\n[check:coach] ${step.name}`);
   const log = fs.createWriteStream(path.join(logs, `${step.name}.log`));
+  const write = (chunk) => { if (!log.writableEnded) log.write(chunk); };
   try {
     await new Promise((resolve, reject) => {
       const child = spawn(step.command, step.args, {
         cwd: root, env: { ...process.env, HERACLES_CHECK_COACH: "1", ...step.env },
-        stdio: ["ignore", "pipe", "pipe"]
+        stdio: ["ignore", "pipe", "pipe"],
+        detached: process.platform !== "win32"
       });
-      child.stdout.on("data", (chunk) => { process.stdout.write(chunk); log.write(chunk); });
-      child.stderr.on("data", (chunk) => { process.stderr.write(chunk); log.write(chunk); });
-      child.on("error", reject);
+      active = child;
+      const timer = setTimeout(() => {
+        const message = `${step.name} timed out after ${STEP_TIMEOUT_MS / 60_000} minutes. Log: ${path.relative(root, log.path)}`;
+        write(`\n[check:coach] ${message}\n`);
+        killTree(child);
+        reject(new Error(message));
+      }, STEP_TIMEOUT_MS);
+      child.stdout.on("data", (chunk) => { process.stdout.write(chunk); write(chunk); });
+      child.stderr.on("data", (chunk) => { process.stderr.write(chunk); write(chunk); });
+      child.on("error", (error) => { clearTimeout(timer); reject(error); });
       child.on("close", (code, signal) => {
+        clearTimeout(timer);
         if (code === 0) resolve();
         else reject(new Error(`${step.name} failed (${signal ?? `exit ${code}`}). Log: ${path.relative(root, log.path)}`));
       });
@@ -94,4 +125,6 @@ try {
   console.error(`\n[check:coach] ${error.message}`);
   annotateFailure(current);
   process.exitCode = 1;
+  // A killed step's pipes may outlive it for a moment; never wait on them.
+  setTimeout(() => process.exit(1), 1_000).unref();
 }
