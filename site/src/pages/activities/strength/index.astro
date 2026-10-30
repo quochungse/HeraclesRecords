@@ -1,0 +1,270 @@
+---
+import Base from "../../../layouts/Base.astro";
+import FeatureRow from "../../../components/FeatureRow.astro";
+import Shot from "../../../components/Shot.astro";
+import SubNav from "../../../components/SubNav.astro";
+import { ACTIVITIES_PAGES, TRAINING_LOAD_PAGE } from "../../../sections";
+
+const problems = [
+  {
+    title: "A load read from heart rate",
+    text: "COROS scores every session by heart rate. Lifting raises it in short bursts, so an hour of heavy squats can count for less than a short jog, and your week's load, fitness and recommended range all under-count the work.",
+  },
+  {
+    title: "Movements on the wrong muscles",
+    text: "COROS's catalogue files a squat as hamstring work, battle ropes as biceps, and every twist and side plank with no obliques at all. Your totals by muscle, and anything that reads them, inherit the mistake.",
+  },
+  {
+    title: "Half the lifting in another app",
+    text: "Plenty of lifters log in Hevy, where the weights and reps are easier to enter. COROS never sees those workouts, so its picture of your week has a hole in it.",
+  },
+];
+
+const counts = [
+  { where: "Overview", what: "the week's load and its recommended range, Load Impact, Base Fitness, Intensity Trend, Coming up and the load heatmap" },
+  { where: "Calendar", what: "every strength session, done or planned, and each week's load against its target" },
+  { where: "Training Library", what: "the planned load of a plan's strength sessions, its weeks and the whole plan" },
+  { where: "Activities", what: "each session's load and the totals of a period" },
+  { where: "Coach and AI Plan", what: "how Coach weighs your lifting against your other sport, and the weekly load it plans to" },
+];
+---
+
+<Base og="strength"
+  title="Strength"
+  description="Strength in Heracles Records: COROS and Hevy sessions on a 3D map of the muscles they worked, every movement described again, and Heracles Training Load, scored from your sets."
+>
+  <SubNav pages={ACTIVITIES_PAGES} label="Activities" />
+
+  <section class="wrap page-hero">
+    <p class="eyebrow">Strength</p>
+    <h1>Strength, read set by set.</h1>
+    <p class="lede">
+      COROS strength sessions and your Hevy workouts in one place, on the muscles they really
+      worked, and scored by what you lifted rather than by your heart rate. Made for anyone who
+      runs, rides or hikes and lifts in the same week.
+    </p>
+  </section>
+
+  <section class="wrap section-tight">
+    <Shot name="07-strength" alt="Strength: sessions and a 3D muscle map" eager />
+  </section>
+
+  <section class="wrap section">
+    <div class="section-head">
+      <p class="eyebrow">Why it needed work</p>
+      <h2 class="section-title">COROS reads lifting poorly.</h2>
+      <p class="lede">
+        A COROS watch records your sets well. What happens to them afterwards is the problem,
+        and it matters most when strength sits beside an endurance sport, because the lifting
+        is what goes missing.
+      </p>
+    </div>
+    <ul class="cards">
+      {
+        problems.map((item) => (
+          <li class="card">
+            <h3>{item.title}</h3>
+            <p>{item.text}</p>
+          </li>
+        ))
+      }
+    </ul>
+  </section>
+
+  <div class="wrap">
+    <section class="feature-text">
+      <p class="eyebrow">The Strength screen</p>
+      <h2>Every set, on the muscles it worked.</h2>
+      <p>
+        One session at a time, or the weeks around it, beside a 3D figure lit by what each
+        muscle did. Turn the figure, pick a muscle and see its training.
+      </p>
+      <ul class="ticks columns">
+        <li><strong>Sets, Volume or Load</strong> on the figure, and every muscle ranked by it.</li>
+        <li><strong>Muscle coverage</strong>: how many muscle groups the period trained, and which it left out.</li>
+        <li><strong>Records</strong> written in the exercise rows they were set in, and your main lifts across the window.</li>
+        <li><strong>Weekly sets</strong>, so a block's build-up and its deload are plain to see.</li>
+        <li><strong>Each set's effort and load</strong>, with Heracles TL chosen: how many reps it had left and what it added.</li>
+        <li><strong>Honest about gaps</strong>: sets COROS filed only as Full Body are left off the map, and the screen says how many.</li>
+      </ul>
+    </section>
+
+    <FeatureRow shot="29-exercises-library" alt="Exercises Library: a goblet squat with its clip and the muscles it works" flip>
+      <p class="eyebrow">Exercises Library</p>
+      <h2>Every movement, described again.</h2>
+      <p>
+        The app reads a movement by what it is, never by its name, and describes each one again,
+        its muscles and equipment one by one: the obliques for twists and side planks, the neck
+        for neck work, a squat on the quads and glutes, a battle rope on the shoulders. Where it
+        disagrees with COROS, that is on purpose, and your totals and Coach read the right muscles.
+      </p>
+      <a class="more" href="/plan/exercises">Browse the Exercises Library</a>
+    </FeatureRow>
+
+    <section class="feature-text">
+      <p class="eyebrow">Hevy</p>
+      <h2>Your Hevy workouts, beside COROS's.</h2>
+      <p>
+        Connect Hevy and its workouts join your COROS sessions on the same screen. A session
+        recorded in both is merged into one, a Hevy movement is scored like its COROS twin, and the
+        RPE you log for a set in Hevy is used over any guess. Choose whether warm-up sets count.
+      </p>
+      <a class="more" href="/guide/hevy">Connect Hevy</a>
+    </section>
+  </div>
+
+  <section class="wrap section">
+    <div class="load">
+      <div class="load-intro">
+        <p class="eyebrow">Heracles Training Load</p>
+        <h2>A training load that counts lifting.</h2>
+        <p>
+          Heracles Training Load scores a strength session from its sets: the weight, the reps,
+          your body weight and the most you have lifted on each exercise. It works out how close
+          to failure each set went, and weighs a minute of lifting as a steady minute at the same
+          effort weighs. So a hard gym session lands on the same scale as COROS's load for a run,
+          and your week adds up to what you actually did.
+        </p>
+        <p>
+          One formula for everyone, built from published research, with nothing tuned on your
+          own data. COROS's figure stays the floor: a session never scores less than COROS gave it.
+        </p>
+        <a class="button primary load-cta" href={TRAINING_LOAD_PAGE}>How Heracles Training Load is worked out</a>
+      </div>
+
+      <div class="load-how">
+        <h3>Turn it on</h3>
+        <p>
+          On the Strength screen, press <strong>Settings</strong> and, under
+          <strong>Training load formula</strong>, choose <strong>Heracles TL</strong> over
+          <strong>COROS TL</strong>. Each set then shows its predicted effort and load, and the
+          body map gains <strong>Load</strong>.
+        </p>
+        <h3>Where it counts</h3>
+        <ul class="load-list">
+          {
+            counts.map((item) => (
+              <li>
+                <strong>{item.where}</strong>
+                <span>{item.what}</span>
+              </li>
+            ))
+          }
+        </ul>
+        <p class="load-note">
+          Other sports keep COROS's load. Recovery and training effect stay COROS's, as on your
+          watch. Where a figure differs from the COROS app, hovering it shows COROS's own.
+        </p>
+      </div>
+    </div>
+
+    <figure class="figure load-shot">
+      <Shot name="30-strength-session" alt="A strength session with Heracles TL chosen: each set's reps, weight, estimated max, rest and load" />
+      <figcaption>
+        <strong>Every set scored.</strong> With Heracles TL chosen, a session's exercises carry a
+        <strong>TL</strong> column, the load of each set. Hover one for its predicted RPE and the
+        reps it had left.
+      </figcaption>
+    </figure>
+  </section>
+
+  <section class="wrap section">
+    <div class="section-head">
+      <h2 class="section-title">Ask Coach about a session.</h2>
+      <p class="lede">
+        Coach reads every set, its weight and reps, and with Heracles TL chosen the load of each
+        session. Ask whether last week's lifting left room for Sunday's long run,
+        and the answer weighs both.
+      </p>
+      <a class="more" href="/coach">How Coach works</a>
+    </div>
+  </section>
+</Base>
+
+<style>
+  .load {
+    display: grid;
+    grid-template-columns: minmax(0, 6fr) minmax(0, 5fr);
+    gap: 32px 48px;
+    padding: 36px;
+    border: 1px solid var(--line);
+    border-radius: var(--radius-lg);
+    background: linear-gradient(180deg, var(--accent-soft), transparent 70%), var(--surface);
+  }
+
+  @media (max-width: 860px) {
+    .load {
+      grid-template-columns: 1fr;
+      padding: 24px;
+    }
+  }
+
+  .load h2 {
+    margin: 0;
+    font: 600 clamp(26px, 3.4vw, 32px) / 1.2 var(--font-title);
+    letter-spacing: -0.02em;
+    text-wrap: balance;
+  }
+
+  .load-intro p:not(.eyebrow) {
+    margin: 14px 0 0;
+    color: var(--ink-2);
+    font-size: 17px;
+    line-height: 1.6;
+  }
+
+  .load-how h3 {
+    margin: 0 0 6px;
+    font-size: 15px;
+    font-weight: 600;
+  }
+
+  .load-how h3 + p {
+    margin: 0;
+    color: var(--ink-2);
+    font-size: 15px;
+  }
+
+  .load-how p + h3 {
+    margin-top: 22px;
+  }
+
+  .load-list {
+    display: grid;
+    gap: 10px;
+    margin: 8px 0 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .load-list li {
+    display: grid;
+    gap: 2px;
+    padding-top: 10px;
+    border-top: 1px solid var(--line);
+    font-size: 14px;
+    line-height: 1.5;
+  }
+
+  .load-list span {
+    color: var(--ink-2);
+  }
+
+  .load-note {
+    margin: 16px 0 0;
+    color: var(--ink-3);
+    font-size: 14px;
+  }
+
+  .load-cta {
+    margin-top: 24px;
+  }
+
+  .load-shot {
+    margin-top: 40px;
+  }
+
+  .load-cta::after {
+    content: " \2192";
+  }
+</style>

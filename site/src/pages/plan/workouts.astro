@@ -1,0 +1,69 @@
+---
+import Base from "../../layouts/Base.astro";
+import FeatureRow from "../../components/FeatureRow.astro";
+import Shot from "../../components/Shot.astro";
+import SubNav from "../../components/SubNav.astro";
+import { PLAN_PAGES } from "../../sections";
+---
+
+<Base og="plan"
+  title="Workouts"
+  description="Workouts in Heracles Records: your COROS workout library read step by step, and one builder for every sport with targets in your own zones, saved to your COROS account."
+>
+  <SubNav pages={PLAN_PAGES} label="Plan and Library" />
+
+  <section class="wrap page-hero">
+    <p class="eyebrow">Workouts</p>
+    <h1>Every workout you keep on COROS.</h1>
+    <p class="lede">
+      Your COROS workout library in one list, each workout read step by step: the repeats and
+      recoveries of a run with targets in your own zones, or a strength session movement by
+      movement, with sets, reps, weight and rest.
+    </p>
+  </section>
+
+  <section class="wrap section-tight">
+    <Shot name="22-library-workouts" alt="Training Library: a strength workout with each movement's demonstration clip" eager />
+  </section>
+
+  <div class="wrap">
+    <section class="feature-text">
+      <p class="eyebrow">The library</p>
+      <h2>Read, schedule, keep.</h2>
+      <ul class="ticks columns">
+        <li><strong>See the movement.</strong> Every strength exercise carries COROS's own picture, and opens its demonstration clip right in the list.</li>
+        <li><strong>Schedule</strong> a workout on a day from a month view that shows the week it lands in.</li>
+        <li><strong>Edit, duplicate, tag</strong> and favourite, all saved to COROS.</li>
+        <li><strong>Search and filter</strong> the list to find a workout fast.</li>
+      </ul>
+    </section>
+
+    <FeatureRow shot="23-workout-builder" alt="The workout builder: warm-up, training and cool-down steps with zone targets" flip>
+      <p class="eyebrow">Builder</p>
+      <h2>One builder for every sport.</h2>
+      <p>
+        Run, ride, swim, strength and the rest are built in the same place, step by step, with
+        repeat groups for intervals. The same builder edits a library workout and a session
+        already on your calendar.
+      </p>
+      <ul class="ticks">
+        <li><strong>Targets in your zones.</strong> Pick a heart-rate, pace or power zone and the builder shows what it means for you, from the thresholds on your COROS account.</li>
+        <li><strong>Sensible from the first step.</strong> A new step starts with a length and an intensity that suit its sport and its place in the workout.</li>
+        <li><strong>Strength from COROS's own catalogue</strong> of exercises, with sets, reps and weight. The heart narrows the search to your favourites.</li>
+        <li><strong>Nothing lost on save.</strong> A step you did not touch is written back exactly as COROS had it.</li>
+      </ul>
+    </FeatureRow>
+  </div>
+
+  <section class="wrap section">
+    <div class="section-head">
+      <h2 class="section-title">Or ask Coach.</h2>
+      <p class="lede">
+        Describe the session you want and Coach builds it to your zones, saved to your library or
+        straight onto your calendar. Ask for one step of a saved workout to change and Coach
+        proposes just that change.
+      </p>
+      <a class="more" href="/coach">How Coach works</a>
+    </div>
+  </section>
+</Base>

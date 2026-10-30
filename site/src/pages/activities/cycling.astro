@@ -1,0 +1,65 @@
+---
+import Base from "../../layouts/Base.astro";
+import FeatureRow from "../../components/FeatureRow.astro";
+import Shot from "../../components/Shot.astro";
+import SubNav from "../../components/SubNav.astro";
+import { ACTIVITIES_PAGES } from "../../sections";
+---
+
+<Base og="activities"
+  title="Cycling"
+  description="Cycling in Heracles Records: a week read in hours, FTP and watts per kilo, normalised power, TSS, peak power and the climbs of every ride."
+>
+  <SubNav pages={ACTIVITIES_PAGES} label="Activities" />
+
+  <section class="wrap page-hero">
+    <p class="eyebrow">Cycling</p>
+    <h1>Hours, power and climb.</h1>
+    <p class="lede">
+      A week of riding is read in hours, because an indoor ride may record no distance and an
+      hour off-road covers half the road's. Then every ride, read for the power behind it.
+    </p>
+  </section>
+
+  <section class="wrap section-tight">
+    <Shot name="25-cycling" alt="Cycling: hours this week, load ratio, FTP and climb" eager />
+  </section>
+
+  <div class="wrap">
+    <section class="feature-text">
+      <p class="eyebrow">The Cycling screen</p>
+      <h2>Your riding, week by week.</h2>
+      <ul class="ticks columns">
+        <li><strong>Hours first</strong>, then distance and climb, against your four-week average and the same span a year ago.</li>
+        <li><strong>FTP and watts per kilo</strong> from your COROS account, beside your load ratio.</li>
+        <li><strong>Every kind of bike</strong>: road, gravel, mountain, indoor and e-bike, each with its share of your time.</li>
+        <li><strong>Speed</strong> over the time the bike was moving, so a café stop does not slow your average.</li>
+      </ul>
+    </section>
+
+    <FeatureRow shot="05-ride" alt="A ride: normalised power, intensity, TSS and peak power" flip>
+      <p class="eyebrow">A ride's page</p>
+      <h2>The power behind a ride.</h2>
+      <ul class="ticks">
+        <li><strong>Normalised power, IF and TSS</strong> against your FTP, variability and work.</li>
+        <li><strong>Peak power</strong> from 5 seconds to an hour.</li>
+        <li><strong>Time in your COROS power zones</strong>, with coasting set apart.</li>
+        <li><strong>The climbs</strong>, found in the elevation and categorised by length and grade.</li>
+        <li><strong>A top speed held for five seconds</strong>, so one GPS jump does not count.</li>
+        <li><strong>The route</strong> coloured by your speed, never by running pace zones.</li>
+      </ul>
+    </FeatureRow>
+  </div>
+
+  <section class="wrap section">
+    <div class="section-head">
+      <h2 class="section-title">Ask about any ride.</h2>
+      <p class="lede">
+        Press <strong>Ask Coach</strong> on a ride's page and the question arrives already
+        pointing at it: how the power held on the climbs, or whether the week has room for
+        another long one.
+      </p>
+      <a class="more" href="/coach">How Coach works</a>
+    </div>
+  </section>
+</Base>

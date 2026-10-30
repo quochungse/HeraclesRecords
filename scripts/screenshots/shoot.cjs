@@ -1,10 +1,18 @@
 // Usage: electron shoot.cjs <plan.json>
 // plan: [{ out, view, theme, steps:[js | ms], wait, ls, format }]
 // SHOT_DPR (default 2), SHOT_DIR, SHOT_ROUND=1 (rounded macOS corners, webp out), SHOT_ONLY
+//
+// Two things here broke every reshoot until they lived in this file:
+// - Chromium's sandbox stays on. With `no-sandbox` an offscreen renderer dies
+//   creating shared memory (/dev/shm) on Linux and the run hangs with no output;
+//   the app's other Electron scripts (site:og, the renderer suites) run sandboxed.
+// - Every <canvas> is flattened into an <img> before the capture (`flatten`). At
+//   2x, Page.captureScreenshot leaves out composited canvases: a run's MapLibre
+//   map came out as a grey band with only the route on it, the Strength figure
+//   as an empty box. main.tsx keeps WebGL's drawing buffer so they can be read.
 const { app, BrowserWindow } = require("electron");
 const fs = require("node:fs");
 const path = require("node:path");
-app.commandLine.appendSwitch("no-sandbox");
 const FORCE = process.env.SHOT_MODE !== "emulate"; // native OSR scale + CDP viewport
 
 app.setPath("userData", path.join(__dirname, "userdata"));
@@ -19,6 +27,65 @@ if (plan.length === 0) { console.error("No shot in the plan matches SHOT_ONLY=" 
 const outDir = process.env.SHOT_DIR || path.join(__dirname, "shots");
 fs.mkdirSync(outDir, { recursive: true });
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+// A cheap picture of every drawn canvas: each one shrunk to 32 × 32, hashed,
+// with how much its pixels vary. A map whose tiles never arrived varies by
+// next to nothing.
+const CANVAS_STATE = `(() => {
+  const probe = document.createElement("canvas");
+  probe.width = 32; probe.height = 32;
+  const g = probe.getContext("2d", { willReadFrequently: true });
+  return [...document.querySelectorAll("canvas")]
+    .filter((c) => c.clientWidth > 0 && c.clientHeight > 0 && c.width > 0 && c.style.display !== "none")
+    .map((c) => {
+      g.clearRect(0, 0, 32, 32);
+      try { g.drawImage(c, 0, 0, 32, 32); } catch { return { hash: "unreadable", spread: 0, map: false }; }
+      const d = g.getImageData(0, 0, 32, 32).data;
+      let hash = 0, sum = 0, sq = 0;
+      for (let i = 0; i < d.length; i += 4) {
+        hash = (hash * 31 + d[i] + d[i + 1] * 7 + d[i + 2] * 13) >>> 0;
+        const y = 0.3 * d[i] + 0.59 * d[i + 1] + 0.11 * d[i + 2];
+        sum += y; sq += y * y;
+      }
+      const n = d.length / 4;
+      return { hash, spread: Math.sqrt(Math.max(0, sq / n - (sum / n) ** 2)), map: c.classList.contains("maplibregl-canvas") };
+    });
+})()`;
+
+// Each canvas as an <img> of its pixels, right after it with its class and
+// inline style (Leaflet and MapLibre place theirs by transform) at its size.
+const FLATTEN = `[...document.querySelectorAll("canvas")]
+  .filter((c) => c.clientWidth > 0 && c.clientHeight > 0 && c.style.display !== "none")
+  .map((c) => {
+    const i = new Image();
+    i.src = c.toDataURL();
+    i.className = c.className;
+    i.style.cssText = c.style.cssText;
+    i.style.width = c.clientWidth + "px";
+    i.style.height = c.clientHeight + "px";
+    c.after(i);
+    c.style.display = "none";
+    return c.clientWidth;
+  }).length`;
+
+/** Waits until no canvas changes between two looks (tiles in, figure drawn), then flattens them. */
+async function flatten(win, shot) {
+  const deadline = Date.now() + (shot.canvasWait ?? 15000);
+  let previous = "";
+  let state = [];
+  while (Date.now() < deadline) {
+    state = await win.webContents.executeJavaScript(CANVAS_STATE);
+    const now = state.map((entry) => entry.hash).join(",");
+    if (now === previous) break;
+    previous = now;
+    await sleep(1000);
+  }
+  for (const entry of state) {
+    if (entry.map && entry.spread < 4) console.log(`WARNING ${shot.out}: a map is blank (its tiles never drew). Check the picture before using it.`);
+  }
+  if (state.length > 0) await win.webContents.executeJavaScript(FLATTEN);
+  await sleep(500);
+}
 
 const ROUNDER = `async (src, dpr, dark, quality) => {
   const img = new Image();
@@ -64,6 +131,7 @@ app.whenReady().then(async () => {
       await sleep(shot.stepWait ?? 900);
     }
     await sleep(shot.settle ?? 1200);
+    await flatten(win, shot);
     const data = (await dbg.sendCommand("Page.captureScreenshot", { format: "png", captureBeyondViewport: false })).data;
     let file;
     if (ROUND) {

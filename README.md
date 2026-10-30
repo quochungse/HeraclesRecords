@@ -69,7 +69,7 @@ You sign in with your COROS account. Coach also needs an AI: your ChatGPT accoun
 
 ## What's inside
 
-A tour of the main screens. [heraclesrecords.com](https://heraclesrecords.com) goes further into activities, plans, Coach and the Twelve Labours, and the [guide](https://heraclesrecords.com/guide/) walks through setting up COROS, Coach, sync and backups.
+A tour of the main screens. [heraclesrecords.com](https://heraclesrecords.com) goes further into [each sport](https://heraclesrecords.com/activities/), [strength](https://heraclesrecords.com/activities/strength/), [plans and the library](https://heraclesrecords.com/plan/), [Coach](https://heraclesrecords.com/coach) and the [Twelve Labours](https://heraclesrecords.com/labours), and the [guide](https://heraclesrecords.com/guide/) walks through setting up COROS, Coach, sync and backups.
 
 ### Today at a glance
 
@@ -125,25 +125,54 @@ Nights and naps, stages, HRV and stress across the night, kept long after the ni
       <p><strong>Hikes</strong>: the moving time inside a long day, your rests, the terrain you covered and your climbing rate.</p>
     </td>
     <td width="50%" valign="top">
-      <img src="docs/readme/07-strength.webp" alt="Strength: sessions and a 3D muscle map" />
-      <p><strong>Strength</strong>: COROS strength sessions and Hevy workouts in one place, on a 3D map of the muscles you trained.</p>
+      <img src="docs/readme/16-route.webp" alt="A hike around Hàm Lợn replayed on a satellite map, coloured by elevation" />
+      <p><strong>Every route, replayed</strong>: open the map full size, colour the line by pace, heart rate or elevation, and watch the route draw itself the way you covered it.</p>
     </td>
   </tr>
 </table>
 
-**Strength, described properly.** COROS's exercise data is often wrong: a squat filed as hamstring work, battle ropes as biceps, every twist and side plank with no obliques. That skewed my training totals and gave Coach a muddled picture to analyse. So Heracles Records describes every movement again, its muscles and equipment one by one (browse them in the Training Library's **Exercises Library**), and you may see it disagree with COROS here and there. That is on purpose. If you think the app got one wrong, please say so in [Discussions](https://github.com/quochungse/HeraclesRecords/discussions) or [Issues](https://github.com/quochungse/HeraclesRecords/issues/new).
+### Strength, done properly
 
-**Every route, replayed.** Open the map full size and colour the line by pace, heart rate or elevation, then watch the route draw itself the way you covered it.
+I run and I lift, and strength was the part of my training I could not trust COROS with. The watch records the sets well. What COROS does with them afterwards is the problem:
 
-<img src="docs/readme/16-route.webp" alt="A hike around Hàm Lợn replayed on a satellite map, coloured by elevation" />
+- **A training load read from heart rate.** COROS scores every session by heart rate. Lifting raises it in short bursts, so an hour of heavy squats can count for less than a short jog. The week's load, Base Fitness and the recommended range all under-count the gym, and so does any plan built on them.
+- **Movements on the wrong muscles.** COROS's catalogue files a squat as hamstring work and battle ropes as biceps, and its muscle list has no obliques or neck at all, so a side plank works neither. Totals by muscle, and Coach's reading of them, inherit the mistake.
+- **Half the lifting in another app.** Plenty of lifters log in Hevy. COROS never sees those workouts.
 
-### Plan your training
+So Heracles Records reads strength again, from the sets up, for anyone who mixes lifting with running, cycling or hiking.
+
+<img src="docs/readme/07-strength.webp" alt="Strength: sessions and a 3D muscle map" />
+
+- **Every set on the muscles it worked.** A 3D body map lit by sets, volume or load, every muscle ranked, your coverage of each muscle group, records written in the rows they were set in, your main lifts and your weekly sets.
+- **Every movement described again.** The app reviews COROS's catalogue movement by movement: muscles corrected, obliques and neck added, equipment fixed. Browse it in the Training Library's **Exercises Library**. It disagrees with COROS here and there, on purpose; if you think it got one wrong, please say so in [Discussions](https://github.com/quochungse/HeraclesRecords/discussions) or [an issue](https://github.com/quochungse/HeraclesRecords/issues/new).
+- **Hevy beside COROS.** Hevy workouts join your COROS sessions on one screen, a session logged in both is merged into one, and the RPE you log for a set is used over any guess.
+- **Heracles Training Load.** A load scored from the sets themselves. The weight, the reps, your body weight and the most you have lifted on each exercise say how close to failure every set went; each minute of lifting then weighs what a steady minute at the same effort weighs on COROS's own TRIMP curve. A hard gym session lands on the same scale as a run, so your week finally adds up. One formula for everyone, built from published research (Nuzzo 2024, Zourdos 2016, Foster 2001) and a public dataset (PMData), with nothing tuned on you.
+
+<table>
+  <tr>
+    <td width="50%" valign="top">
+      <img src="docs/readme/30-strength-session.webp" alt="A strength session with Heracles TL chosen: each set's reps, weight, estimated max, rest and load" />
+      <p><strong>Every set scored</strong>: with Heracles TL chosen, each set carries its load, and its hover the predicted RPE and the reps it had left.</p>
+    </td>
+    <td width="50%" valign="top">
+      <img src="docs/readme/29-exercises-library.webp" alt="Exercises Library: a goblet squat with its clip and the muscles it works" />
+      <p><strong>Exercises Library</strong>: COROS's whole catalogue by body part, muscle or equipment, each movement with its clip and the muscles it really works.</p>
+    </td>
+  </tr>
+</table>
+
+Choose **Heracles TL** under **Strength → Settings → Training load formula**, and Overview, the Calendar, the Training Library, Activities and Coach count strength that way. Load Impact, Base Fitness, Intensity Trend and the recommended weekly range follow, by COROS's own formulas. Ask Coach whether to go long on Sunday and it weighs Tuesday's leg day at what it cost, and a plan's weekly load includes the gym. Other sports, recovery and training effect stay COROS's.
+
+> [!TIP]
+> **How the formula works:** every step, the research behind each constant and a worked example are public at **[heraclesrecords.com/activities/strength/training-load](https://heraclesrecords.com/activities/strength/training-load)**.
+
+### Plan & Library
 
 **Calendar**: planned and done side by side, by week or month, with a plan's compliance on every session. Drag a session to another day and it moves on your COROS calendar too.
 
 <img src="docs/readme/09-calendar.webp" alt="Calendar: planned and completed sessions by month" />
 
-**Training Library**: your COROS workouts and plans. Read them, build new ones, edit, duplicate and put a plan on the calendar. Everything saves straight to your COROS account, so your watch has it.
+**Training Library**: your COROS workouts and plans. Read them, build new ones in one builder for every sport with targets in your own zones, edit, duplicate and put a plan on the calendar. Everything saves straight to your COROS account, so your watch has it. Its **Exercises Library** holds COROS's whole movement catalogue, by body part, muscle or equipment, each movement with its clip and the muscles it really works.
 
 <img src="docs/readme/10-library.webp" alt="Training Library: a 12-week marathon plan, week by week" />
 

@@ -22,6 +22,9 @@ export const SIZES_HALF = "(max-width: 760px) calc(100vw - 40px), 530px";
 /** `sizes` for a shot beside its words (.split, FeatureRow: seven twelfths). */
 export const SIZES_SIDE = "(max-width: 860px) calc(100vw - 40px), 630px";
 
+/** `sizes` for a shot in a column of prose (.prose, `--prose`). */
+export const SIZES_PROSE = "(max-width: 720px) calc(100vw - 40px), 680px";
+
 /** Widths a screenshot is offered at (plus its own, 3024px). */
 export const SHOT_WIDTHS = [640, 960, 1280, 1920, 2560];
 

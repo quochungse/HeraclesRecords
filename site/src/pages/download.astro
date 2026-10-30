@@ -5,7 +5,6 @@ import { formatReleaseDate, latestRelease } from "../release.mjs";
 import { softwareApplication } from "../structuredData.mjs";
 
 const release = await latestRelease();
-const repo = "https://github.com/quochungse/HeraclesRecords";
 
 // One section per system, in the order the release lists its installers.
 const groups = (release?.installers ?? []).reduce<{ id: string; os: string; entries: any[] }[]>((all, entry) => {
@@ -69,14 +68,11 @@ const requirements: Record<string, string> = {
             </ul>
           </section>
         ))}
-        <p class="older">
-          Looking for an earlier version? Every release is on <a href={`${repo}/releases`}>GitHub</a>.
-        </p>
       </section>
     ) : (
       <section class="wrap section-tight" id="installers">
         <p class="lede">
-          Every installer is on <a href={`${repo}/releases/latest`}>the latest GitHub release</a>.
+          The installers could not be listed just now. Try again in a minute.
         </p>
       </section>
     )
@@ -118,8 +114,8 @@ const requirements: Record<string, string> = {
 
     <h2>Check a download</h2>
     <p>
-      Each installer's SHA-256 is listed above, as GitHub computed it when the release was
-      published. To compare it with the file you downloaded:
+      Each installer's SHA-256 is listed above, as computed when the release was published. To
+      compare it with the file you downloaded:
     </p>
     <pre><code># macOS and Linux
 shasum -a 256 HeraclesRecords-*
@@ -143,8 +139,9 @@ Get-FileHash .\HeraclesRecords-Setup-*.exe -Algorithm SHA256</code></pre>
 
     <h2>Updates</h2>
     <p>
-      The app checks GitHub for a new version and tells you when one is out. You can also check
-      by hand under <strong>Settings → About</strong>.
+      The app checks for a new version and tells you when one is out. It downloads in the
+      background and asks before restarting. You can also check by hand under
+      <strong>Settings → About</strong>.
     </p>
   </article>
   </div>
@@ -228,9 +225,4 @@ Get-FileHash .\HeraclesRecords-Setup-*.exe -Algorithm SHA256</code></pre>
     font-size: 13px;
   }
 
-  .older {
-    margin: 24px 0 0;
-    color: var(--ink-3);
-    font-size: 15px;
-  }
 </style>

@@ -1,0 +1,99 @@
+---
+import Base from "../../layouts/Base.astro";
+import Shot from "../../components/Shot.astro";
+import SubNav from "../../components/SubNav.astro";
+import { SIZES_HALF } from "../../assets";
+import { PLAN_PAGES } from "../../sections";
+
+const parts = [
+  {
+    href: "/plan/calendar",
+    shot: "09-calendar",
+    alt: "Calendar: planned and completed sessions by month",
+    title: "Calendar",
+    text: "Planned and done side by side, by month or by week. Drag a session to another day and it moves on your COROS calendar too.",
+  },
+  {
+    href: "/plan/plans",
+    shot: "10-library",
+    alt: "A 12-week marathon plan in the Training Library, week by week",
+    title: "Plans",
+    text: "Your COROS training plans, read week by week: the load of each week, its stages and every session, then on the calendar from a start date.",
+  },
+  {
+    href: "/plan/workouts",
+    shot: "23-workout-builder",
+    alt: "The workout builder: warm-up, training and cool-down steps with zone targets",
+    title: "Workouts",
+    text: "One builder for every sport, with targets in your own zones, and every workout you keep on COROS read step by step.",
+  },
+  {
+    href: "/plan/exercises",
+    shot: "29-exercises-library",
+    alt: "Exercises Library: a goblet squat with its clip and the muscles it works",
+    title: "Exercises Library",
+    text: "COROS's whole movement catalogue to read, by body part, muscle or equipment, each movement described again muscle by muscle.",
+  },
+];
+---
+
+<Base og="plan"
+  title="Plan and Library"
+  description="Plan your training in Heracles Records: a calendar of planned and done, your COROS plans and workouts, one builder for every sport, and the Exercises Library. Everything saves to your COROS account."
+>
+  <SubNav pages={PLAN_PAGES} label="Plan and Library" />
+
+  <section class="wrap page-hero">
+    <p class="eyebrow">Plan &amp; Library</p>
+    <h1>Plan it here, and your watch has it.</h1>
+    <p class="lede">
+      Your COROS calendar, plans and workouts, with room to read and build them, and every
+      movement COROS knows. Everything you save goes straight to your COROS account, so it is
+      on your watch the next time it syncs.
+    </p>
+  </section>
+
+  <section class="wrap section-tight">
+    <div class="grid-2">
+      {
+        parts.map((part, index) => (
+          <figure class="figure linked">
+            <a href={part.href} class="figure-link">
+              <Shot name={part.shot} alt={part.alt} sizes={SIZES_HALF} eager={index === 0} />
+            </a>
+            <figcaption>
+              <a href={part.href} class="figure-title">{part.title}</a>
+              <span>{part.text}</span>
+            </figcaption>
+          </figure>
+        ))
+      }
+    </div>
+  </section>
+
+  <section class="wrap section">
+    <div class="section-head">
+      <p class="eyebrow">COROS first</p>
+      <h2 class="section-title">One plan, wherever you open it.</h2>
+      <p class="lede">
+        Heracles Records keeps no plans of its own. A workout, a plan or a moved session is
+        written to your COROS account, so the COROS app, the Training Hub website and your watch
+        all show the same thing. The app checks a plan has not changed on COROS before saving
+        over it, and asks you what to do if it has.
+      </p>
+    </div>
+  </section>
+
+  <section class="wrap section">
+    <div class="section-head">
+      <h2 class="section-title">Want a plan written for you?</h2>
+      <p class="lede">
+        Ask Coach. It starts from a brief you can edit, draws an outline of the weeks, then writes
+        every session to your zones. Read it in the Workbench, change what you like, and save it to
+        COROS and your calendar like any other plan.
+      </p>
+      <a class="more" href="/coach">How Coach works</a>
+    </div>
+  </section>
+</Base>
+

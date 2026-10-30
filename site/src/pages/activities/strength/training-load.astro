@@ -1,0 +1,479 @@
+---
+// Every number in the tables and the worked example is computed by the app's
+// own engine when the site is built (site/src/trainingLoad.ts). The words
+// follow docs/heracles-training-load.md: change both with the formula.
+import Base from "../../../layouts/Base.astro";
+import Shot from "../../../components/Shot.astro";
+import SubNav from "../../../components/SubNav.astro";
+import { SIZES_PROSE } from "../../../assets";
+import { ACTIVITIES_PAGES } from "../../../sections";
+import { DISCUSSIONS, NEW_ISSUE } from "../../../github";
+import { loadPerMinute } from "../../../../../electron/heraclesLoad";
+import { bodyShares, example, EXAMPLE_BODY_KG, perMinuteTable, repsTable, rpeTable } from "../../../trainingLoad";
+
+const contents = [
+  ["why", "Why not heart rate"],
+  ["idea", "The idea"],
+  ["steps", "The formula, step by step"],
+  ["example", "A worked example"],
+  ["unreadable", "When the sets cannot be read"],
+  ["planned", "Planned sessions"],
+  ["scope", "What changes when you choose it"],
+  ["evidence", "Where the numbers come from"],
+  ["limits", "Known limits"],
+  ["sources", "Sources"],
+];
+
+// Average load a minute PMData measured at each rating, beside the curve's.
+const measured = [
+  { rpe: 5, measured: 1.32 },
+  { rpe: 7, measured: 1.86 },
+  { rpe: 8, measured: 1.95 },
+].map((row) => ({ ...row, curve: loadPerMinute(row.rpe).toFixed(2) }));
+---
+
+<Base og="training-load"
+  title="Heracles Training Load: the formula"
+  description="How Heracles Records scores a strength session from its sets: weight, reps, body weight and capacity, reps in reserve, RPE and COROS's own TRIMP curve, with the research and data behind every number."
+>
+  <SubNav pages={ACTIVITIES_PAGES} label="Activities" />
+
+  <section class="wrap page-hero">
+    <p class="eyebrow"><a href="/activities/strength/">Strength</a> · Heracles Training Load</p>
+    <h1>How a strength session is scored.</h1>
+    <p class="lede">
+      Heracles Training Load scores a strength session from its sets: the weight, the reps, your
+      body weight and the most you have lifted on each exercise. One formula for everyone, built
+      from published research and public data, on the same scale as COROS's Training Load for a
+      run. This page sets out all of it.
+    </p>
+  </section>
+
+  <div class="wrap">
+    <article class="prose formula">
+      <nav class="contents" aria-label="On this page">
+        <p>On this page</p>
+        <ol>
+          {contents.map(([id, label]) => <li><a href={`#${id}`}>{label}</a></li>)}
+        </ol>
+      </nav>
+
+      <h2 id="why">Why not heart rate</h2>
+      <p>
+        COROS's Training Load is a TRIMP: every minute counts by how far your heart rate sits
+        into its reserve, the range between resting and maximum. That suits a run or a ride, where
+        heart rate follows the effort. Lifting is different. A hard set lasts half a minute, heart
+        rate climbs after it and falls through the rest, and the muscles do work the heart barely
+        sees.
+      </p>
+      <p>
+        PMData, a public dataset of people who rated each session beside the heart rate their
+        watch recorded, shows the size of the gap. At the same rating of 5 to 7 out of 10, its
+        weights sessions earned 0.55 to 0.8 load a minute from heart rate, while steady endurance
+        sessions earned 1.3 to 1.9. <strong>Read by heart rate, lifting counts two to three times
+        less than it felt.</strong> Your week's load, Base Fitness and recommended range all
+        inherit that.
+      </p>
+
+      <h2 id="idea">The idea</h2>
+      <p>
+        <strong>A minute of lifting at an effort weighs what a steady minute at the same effort
+        weighs.</strong> So the formula works out how hard each set was, from how close it went to
+        failure, and charges its minutes at the load COROS gives a steady effort that feels the
+        same. Being on a run's scale follows from that; nothing is tuned to make it so.
+      </p>
+      <pre><code>Heracles TL = max( COROS TL,
+                   Σ f(set RPE) × set minutes  +  f(1.5) × minutes between sets )
+
+f(RPE) = h × 0.2445 × e^(3.411 × h)        h = 0.48 + 0.031 × RPE</code></pre>
+      <p>
+        <code>f</code> is COROS's own TRIMP weighting of a minute; <code>h</code> is the share of
+        heart-rate reserve a steady effort at that rating usually reaches. Every constant is
+        published or fitted on many people, none on you.
+      </p>
+
+      <h2 id="steps">The formula, step by step</h2>
+
+      <h3>1. What the set moves</h3>
+      <pre><code>L = weight lifted + α × body weight − assistance</code></pre>
+      <p>
+        <code>α</code> is the share of your body the working muscles move, from force plates
+        (push-up variations, Ebben 2011) and body segment masses (de Leva 1996). It is 0 for a
+        lift where the bar is the whole load. A weighted squat or lunge counts the bar and most
+        of you.
+      </p>
+      <table>
+        <thead><tr><th>Movement</th><th>α</th></tr></thead>
+        <tbody>
+          {bodyShares.map((row) => <tr><td>{row.name}</td><td>{row.share.toFixed(2)}</td></tr>)}
+        </tbody>
+      </table>
+      <p>
+        A Hevy movement takes the share of the COROS movement it is, by name, and an assisted
+        pull-up or dip has its assistance taken off the body. A movement the app does not know
+        counts as bodyweight (α 0.6) until a set of it carries a weight. Body weight is the one
+        on your COROS profile on the session's day: the app keeps each change, since COROS holds
+        only the current one.
+      </p>
+
+      <h3>2. What you can lift</h3>
+      <pre><code>C = best, over 120 days, of  L ÷ %1RM(reps + reps in reserve)</code></pre>
+      <p>
+        Your capacity on a lift is the one-rep max your sets imply. Every set of 1 to 20 reps in
+        the last 120 days, the session's own included, gives an estimate, and the best one stands.
+        <strong>A set with no RPE logged is taken to have stopped two reps short of
+        failure</strong>: lifters judge themselves closer to failure than they are, by one to two
+        reps with experience and four to five without (Steele 2017, Refalo 2024). A Hevy set
+        marked failure counts as zero, and an RPE of 5 or more logged in Hevy says how far from
+        failure that set was.
+      </p>
+      <ul>
+        <li>A new best more than 15% above the old one needs a second set of the session to back it: one set that far ahead is usually a miscounted rep.</li>
+        <li>A bodyweight movement never reads below what a recreational adult of your weight manages, with strength growing as body mass to the power 0.67 (Jaric 2002).</li>
+        <li>Warm-up sets never count. Capacity only looks back, so a new best never rewrites an old session.</li>
+      </ul>
+
+      <h3>3. How close to failure</h3>
+      <pre><code>I = min(1, L ÷ C)
+reps in reserve = reps to failure at I − reps done</code></pre>
+      <p>
+        Reps to failure at a share of the one-rep max come from Nuzzo et al. 2024, a
+        meta-regression of 952 tests on 7,289 people in 269 studies, in which sex, age and
+        training status did not clearly move them. The app reads between the rows.
+      </p>
+      <table class="compact">
+        <thead><tr><th>% of 1RM</th>{repsTable.map((row) => <th>{row.percent}</th>)}</tr></thead>
+        <tbody><tr><td>Reps to failure</td>{repsTable.map((row) => <td>{row.reps}</td>)}</tr></tbody>
+      </table>
+      <p>
+        Epley's formula, the usual one-rep max estimate, reads 13 reps at 70% and 3.3 at 90%,
+        where the meta-regression reads 14.8 and 4.9.
+      </p>
+
+      <h3>4. How hard the set was</h3>
+      <p>
+        Reps in reserve become an RPE on the scale lifters use (Zourdos 2016, Helms 2016): one
+        rep left is 9, three is 7, six is 5, and past that the effort eases off gently. An RPE
+        you log in Hevy replaces the prediction.
+      </p>
+      <table class="compact">
+        <thead><tr><th>Reps in reserve</th>{rpeTable.map((row) => <th>{row.rir}</th>)}</tr></thead>
+        <tbody><tr><td>RPE</td>{rpeTable.map((row) => <td>{row.rpe}</td>)}</tr></tbody>
+      </table>
+      <p>
+        <strong>Reps lost to fatigue.</strong> Within one exercise, a set ends no further from
+        failure than an earlier set at a weight no heavier. Lifters hold their effort across
+        sets; when the reps drop at the same weight, that is fatigue, not reps held back. Without
+        this rule, 25 kg × 17, 13, 11, 10 would read RPE 8, 5, 4.1 and 3.8. With it, all four
+        read 8.
+      </p>
+      <p>
+        <strong>Holds</strong>, a plank or a side plank, score by time held against your longest
+        hold (or a hard hold for a recreational adult): RPE = 2 + 8 × the share.
+      </p>
+
+      <h3>5. How long the set counts</h3>
+      <p>
+        A set counts its work and the rest after it, up to three minutes: the time it holds you
+        at that effort. COROS clocks both in its laps. Hevy keeps no clock for a set of reps, so a
+        Hevy set counts 3 seconds a rep, and the time the session's sets leave is shared between
+        them as rest, still up to three minutes each. A session reads the same whichever app
+        logged it. With no session length either, each set rests 90 seconds.
+      </p>
+
+      <h3>6. What a minute weighs</h3>
+      <p>
+        Each set's minutes are charged at <code>f(RPE)</code>: the load COROS gives a minute of
+        steady exercise at the share of heart-rate reserve that effort usually reaches.
+      </p>
+      <table>
+        <thead><tr><th>RPE (0 to 10)</th><th>Heart-rate reserve</th><th>Load a minute</th></tr></thead>
+        <tbody>
+          {perMinuteTable.map((row) => <tr><td>{row.rpe}</td><td>{row.reserve}%</td><td>{row.perMinute}</td></tr>)}
+        </tbody>
+      </table>
+      <p>
+        The line from rating to heart-rate reserve was fitted on PMData: 429 runs, rides and
+        other steady sessions of 14 athletes, each rating matched to the watch recording it
+        rates. The slope is read within each person and the level averaged across them.
+      </p>
+
+      <h3>7. The session</h3>
+      <p>
+        Add up the sets, then the time between them (the warm-up, changing lifts, stretching, a
+        watch left running) at RPE 1.5, very easy. Warm-up and cool-down steps, rests, drills and
+        stretches held three minutes or more belong to that time. The result never falls below
+        COROS's own figure for the session: COROS's part is the cardio, the rest is the muscular
+        work.
+      </p>
+
+      <h2 id="example">A worked example</h2>
+      <p>
+        A {EXAMPLE_BODY_KG} kg athlete whose best bench press in the last 120 days was
+        {example.best.weightKg} kg × {example.best.reps}. Two reps short of failure, that is about
+        {example.benchCapacity} kg for one rep. Today: three sets of bench press at 70 kg and
+        three sets of pull-ups, each set {example.workSec} seconds with {example.restSec / 60}
+        minutes' rest, after a {example.warmUpMin}-minute warm-up: {example.minutes} minutes in all.
+      </p>
+      <table>
+        <thead>
+          <tr><th>Set</th><th>% of 1RM</th><th>Reps left</th><th>RPE</th><th>Load</th></tr>
+        </thead>
+        <tbody>
+          {
+            example.exercises.map((exercise) => (
+              <>
+                <tr class="group"><th colspan="5">{exercise.name}</th></tr>
+                {exercise.sets.map((row) => (
+                  <tr>
+                    <td>{row.lifted}</td>
+                    <td>{row.percent}%</td>
+                    <td>{row.rir}{row.fatigued && <span class="held" title="Fewer reps at the same weight: held to the earlier set's reserve"> held</span>}</td>
+                    <td>{row.rpe}</td>
+                    <td>{row.load}</td>
+                  </tr>
+                ))}
+              </>
+            ))
+          }
+          <tr><td colspan="4">Warm-up, {example.warmUpMin} minutes at RPE 1.5</td><td>{example.betweenLoad}</td></tr>
+          <tr class="total"><th colspan="4">Heracles Training Load</th><th>{example.total}</th></tr>
+        </tbody>
+      </table>
+      <p>
+        The pull-ups have no history, so their first set sets the capacity: {example.pullUpShare}
+        of {EXAMPLE_BODY_KG} kg, taken as two reps short of failure. The later sets of each
+        exercise lost reps at the same weight, so they keep the first set's reserve
+        (<span class="held">held</span>). The session comes to {example.total}, about what
+        {example.steadyMinutes} minutes of steady exercise at RPE 5 would carry.
+      </p>
+
+      <h2 id="unreadable">When the sets cannot be read</h2>
+      <table>
+        <thead><tr><th>The session</th><th>How it is scored</th></tr></thead>
+        <tbody>
+          <tr><td>Every set readable</td><td>The formula above.</td></tr>
+          <tr><td>Mostly drills and jumps, over half its time</td><td>COROS's figure: heart rate measures these well.</td></tr>
+          <tr><td>No sets kept (gym cardio, or a watch that logged no exercise laps)</td><td>COROS's figure.</td></tr>
+          <tr><td>Sets the app cannot read: one lap of over 40 reps, sets COROS filed only by body region, or over half the sets of unknown movements</td><td>Your usual session RPE over the last 56 days, for the session's minutes, or COROS's figure if that is higher. With no history yet, RPE 6.5.</td></tr>
+          <tr><td>Sets not loaded yet</td><td>COROS's figure, until they arrive.</td></tr>
+          <tr><td>One set with reps but no weight, or of an unknown movement</td><td>The median RPE of the session's other sets.</td></tr>
+        </tbody>
+      </table>
+      <p>
+        A workout logged only in Hevy has no COROS figure, so it is scored from its sets alone,
+        and has no load at all with COROS TL chosen.
+      </p>
+
+      <h2 id="planned">Planned sessions</h2>
+      <p>
+        COROS usually plans a strength session at a load of 0, which leaves a plan's weekly load
+        short by every gym day. A strength session on your calendar or in a plan is estimated
+        with the same formula: your capacity and weight today, 3 seconds a rep and the planned
+        rest (90 seconds when the plan gives none), the rest of its planned length at RPE 1.5. A
+        weighted lift planned with no weight takes your usual RPE, and a session with no readable
+        steps takes your usual RPE for its planned length.
+      </p>
+
+      <h2 id="scope">What changes when you choose it</h2>
+      <p>
+        Heracles TL is a setting: on the Strength screen, <strong>Settings</strong>, then
+        <strong>Training load formula</strong>. COROS TL is the default. With Heracles TL chosen:
+      </p>
+      <ul>
+        <li><strong>Every strength session's load</strong>, and every total that adds them up, on Strength, Overview, the Calendar, the Training Library and Activities. Each set shows its predicted RPE and load, and the body map gains Load.</li>
+        <li><strong>COROS's fitness figures</strong>, by COROS's own arithmetic on the daily load.</li>
+        <li><strong>Coach and AI Plan</strong> read it beside COROS's figure, and plan the weekly load in it.</li>
+      </ul>
+      <figure class="figure">
+        <Shot
+          name="30-strength-session"
+          alt="A strength session with Heracles TL chosen: each set's reps, weight, estimated max, rest and load"
+          sizes={SIZES_PROSE}
+        />
+        <figcaption>
+          A session's exercises with Heracles TL chosen: the <strong>TL</strong> column is each
+          set's load. Hover one for its predicted RPE, the reps it had left and its share of your
+          estimated max.
+        </figcaption>
+      </figure>
+      <pre><code>Load Impact       += (day's load − Load Impact) ÷ 7
+Base Fitness      += (day's load − Base Fitness) ÷ 42
+Intensity Trend    = Load Impact ÷ Base Fitness
+Recommended week   = Base Fitness on the Sunday before × 7, up to 30% more</code></pre>
+      <p>
+        These are linear in the daily load, so the app adds what Heracles adds each day to
+        COROS's own figures rather than rebuilding your history. Where a figure differs from the
+        COROS app, hovering it shows COROS's own.
+      </p>
+      <p>
+        <strong>What stays COROS's:</strong> other sports, recovery and recovery time, training
+        effect, and everything on your watch. The app never writes Heracles TL back to COROS.
+      </p>
+
+      <h2 id="evidence">Where the numbers come from</h2>
+      <ul>
+        <li>
+          <strong>The effort curve</strong> was fitted on PMData (Thambawita et al. 2020). Each
+          session rating was matched to the Fitbit exercise it rates, the TRIMP of its heart rate
+          read back to a steady share of reserve, with each person's measured maximum and daily
+          resting heart rate. Across 429 steady sessions of 14 people:
+          <code>h = 0.481 + 0.0310 × RPE</code>. Age-predicted maximum heart rate (Nes 2013) in
+          place of the measured one gives 0.486 + 0.0312. Leaving each person out in turn moves the
+          load a minute at RPE 8 between 2.01 and 2.29.
+        </li>
+        <li>
+          <strong>The curve against the data</strong>, average load a minute at each rating:
+          {measured.map((row, index) => <>{index > 0 && "; "}RPE {row.rpe}, {row.curve} on the curve and {row.measured} measured</>)}.
+        </li>
+        <li>
+          <strong>Weights sessions in the same data</strong>: at RPE 5 to 7, heart rate gave them
+          0.55 to 0.8 a minute, against 1.3 to 1.9 for steady endurance at the same rating.
+        </li>
+        <li>
+          <strong>On real training</strong>: over the developer's own ten strength sessions read
+          by set, Heracles TL came to about 2.4 times COROS's figure (median), in line with the
+          two- to threefold gap in PMData.
+        </li>
+      </ul>
+      <p>
+        Only two constants come from the data, and the app ships none of the data itself. The fit
+        is a script in the app's source, ready to run again on a larger public dataset.
+      </p>
+
+      <h2 id="limits">Known limits</h2>
+      <ul>
+        <li><strong>Capacity is read from your own sets.</strong> Your best set in 120 days is taken as two reps short of failure. If you often train to failure, those sets read 16 to 34% light; if you rarely push hard, a little heavy. Logging RPE in Hevy corrects it.</li>
+        <li><strong>Rest counts at the set's effort.</strong> The same sets with longer rests score higher, though short rests often feel harder. That is how session RPE has always worked (Foster 2001); the fatigue rule makes up part of it.</li>
+        <li><strong>One bridge is assumed, not yet measured</strong>: that a set's RPE, judged by reps in reserve, matches a whole session's rating on the 0 to 10 scale.</li>
+        <li><strong>The curve is a typical person.</strong> If your heart rate runs high for an effort, your own runs read heavier than lifting at the same RPE.</li>
+        <li><strong>PMData is small</strong>: 14 recreational athletes in Norway, with Fitbits on the wrist.</li>
+        <li><strong>COROS does not know Heracles TL.</strong> Recovery time and everything on your watch still under-count the gym.</li>
+      </ul>
+
+      <h2 id="sources">Sources</h2>
+      <ul class="sources">
+        <li>Nuzzo JL, Pinto MD, Nosaka K, Steele J (2024). Maximal number of repetitions at percentages of the one repetition maximum: a meta-regression and moderator analysis of sex, age, training status, and exercise. <em>Sports Medicine</em>.</li>
+        <li>Zourdos MC et al. (2016). Novel resistance training-specific rating of perceived exertion scale measuring repetitions in reserve. <em>Journal of Strength and Conditioning Research</em>.</li>
+        <li>Helms ER et al. (2016). Application of the repetitions in reserve-based rating of perceived exertion scale for resistance training. <em>Strength and Conditioning Journal</em>.</li>
+        <li>Steele J et al. (2017). Ability to predict repetitions to momentary failure is not perfectly accurate, though improves with resistance training experience. <em>PeerJ</em>.</li>
+        <li>Refalo MC et al. (2024), on how accurately trained lifters judge their repetitions in reserve.</li>
+        <li>Foster C et al. (2001). A new approach to monitoring exercise training. <em>Journal of Strength and Conditioning Research</em>.</li>
+        <li>Day ML et al. (2004). Monitoring exercise intensity during resistance training using the session RPE scale. <em>Journal of Strength and Conditioning Research</em>.</li>
+        <li>Ebben WP et al. (2011). Kinetic analysis of several variations of push-ups. <em>Journal of Strength and Conditioning Research</em>.</li>
+        <li>de Leva P (1996). Adjustments to Zatsiorsky-Seluyanov's segment inertia parameters. <em>Journal of Biomechanics</em>.</li>
+        <li>Jaric S (2002). Muscle strength testing: use of normalisation for body size. <em>Sports Medicine</em>.</li>
+        <li>Thambawita V et al. (2020). PMData: a sports logging dataset. <em>ACM Multimedia Systems Conference</em>. CC BY-NC 4.0.</li>
+        <li>Nes BM et al. (2013). Age-predicted maximal heart rate in healthy subjects: the HUNT Fitness Study. <em>Scandinavian Journal of Medicine and Science in Sports</em>.</li>
+        <li>COROS's Training Load: the TRIMP weighting COROS has described for its watches, minutes × HRr × 0.2445 × e^(3.411 × HRr).</li>
+      </ul>
+
+      <p class="ask">
+        Think a number is wrong, or know a better source? Tell me in
+        <a href={DISCUSSIONS}>Discussions</a> or <a href={NEW_ISSUE}>open an issue</a>.
+      </p>
+    </article>
+  </div>
+</Base>
+
+<style>
+  .page-hero .eyebrow a {
+    color: inherit;
+    text-decoration: none;
+  }
+
+  .page-hero .eyebrow a:hover {
+    color: var(--accent-strong);
+  }
+
+  .formula {
+    padding-top: 40px;
+  }
+
+  .contents {
+    padding: 18px 20px;
+    border: 1px solid var(--line);
+    border-radius: var(--radius-lg);
+    background: var(--surface);
+  }
+
+  .contents p {
+    margin: 0 0 6px;
+    color: var(--ink);
+    font-size: 14px;
+    font-weight: 600;
+  }
+
+  .contents ol {
+    columns: 2;
+    column-gap: 24px;
+    margin: 0;
+    padding-left: 20px;
+    font-size: 15px;
+  }
+
+  .contents li {
+    margin: 4px 0;
+    break-inside: avoid;
+  }
+
+  @media (max-width: 560px) {
+    .contents ol {
+      columns: 1;
+    }
+  }
+
+  .formula h2 {
+    margin-top: 56px;
+    font: 600 26px/1.25 var(--font-title);
+    scroll-margin-top: 16px;
+  }
+
+  .formula pre {
+    white-space: pre;
+  }
+
+  .formula .figure {
+    margin: 28px 0;
+  }
+
+  .formula table.compact {
+    display: block;
+    overflow-x: auto;
+    font-size: 14px;
+  }
+
+  .formula table.compact th,
+  .formula table.compact td {
+    padding-right: 14px;
+    white-space: nowrap;
+  }
+
+  .formula tr.group th {
+    padding-top: 18px;
+    color: var(--accent);
+    font-size: 13px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+  }
+
+  .formula tr.total th {
+    border-bottom: 0;
+    font-size: 16px;
+  }
+
+  .held {
+    color: var(--accent);
+    font-size: 13px;
+  }
+
+  .sources li {
+    font-size: 15px;
+  }
+
+  .ask {
+    margin-top: 48px;
+    padding-top: 20px;
+    border-top: 1px solid var(--line);
+  }
+</style>

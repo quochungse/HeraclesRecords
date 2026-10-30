@@ -1,7 +1,6 @@
 ---
 import Base from "../layouts/Base.astro";
-
-const repo = "https://github.com/quochungse/HeraclesRecords";
+import { DISCUSSIONS, NEW_ISSUE, REPO } from "../github";
 ---
 
 <Base
@@ -41,7 +40,7 @@ const repo = "https://github.com/quochungse/HeraclesRecords";
     <h2>How it is made</h2>
     <ul>
       <li>
-        <strong>Open source.</strong> The whole app is on <a href={repo}>GitHub</a> under the MIT
+        <strong>Open source.</strong> The whole app is on <a href={REPO}>GitHub</a> under the MIT
         license. Heracles Records is based on CorosLink by AtoZ, also MIT, and credits every
         other piece of software and font it ships in its third-party notices.
       </li>
@@ -59,8 +58,13 @@ const repo = "https://github.com/quochungse/HeraclesRecords";
     <h2>Get in touch</h2>
     <ul>
       <li>
-        Found a bug or have an idea? <a href={`${repo}/issues/new`}>Open an issue</a>, or use
-        <strong>Settings → About → Report an issue</strong> in the app.
+        Found a bug? <a href={NEW_ISSUE}>Open an issue</a>, or use
+        <strong>Settings → About → Report an issue</strong> in the app: it offers the app's recent
+        error log to paste in, with emails, paths and keys taken out.
+      </li>
+      <li>
+        Have an idea or a question about your training data? Start one in
+        <a href={DISCUSSIONS}>Discussions</a>.
       </li>
       <li>
         If the app helps your training, you can

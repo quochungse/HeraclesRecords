@@ -10,7 +10,17 @@ ships the license of every package in the root lockfile with the app, and the in
   `CHANGELOG.md` (a content loader, one entry per released section up to the latest published
   release). Guides (`site/src/content/guide/`) name the app's buttons and screens by their
   labels — a renamed button or Settings section means a guide to fix.
-- **Screenshots** `01-`–`18-` and `27-`/`28-` are the README's, `19-`–`26-` the site's; every
+- **Activities and Plan & Library are directories** (`/activities/`, `/plan/`) with a page per
+  sport or screen; `site/src/sections.ts` lists them for the header, `SubNav` and the sitemap.
+  A directory page is linked with its trailing slash (`/activities/strength/`).
+- **The Heracles Training Load page computes its numbers**: `site/src/trainingLoad.ts` runs
+  `electron/heraclesLoad.ts` at build time for every table and the worked example. Its words
+  follow `docs/heracles-training-load.md` and change with the formula.
+- **GitHub is linked for talking, not for reading**: the footer and About link the
+  repository, Issues and Discussions, and a page that asks for a report or an opinion links
+  those two (`site/src/github.ts`). What a visitor comes to read (releases, notes, docs) is a
+  page of the site, never a GitHub page; the installers are the exception.
+- **Screenshots** `01-`–`18-` and `27-`–`30-` are the README's, `19-`–`26-` the site's; every
   one is taken by `scripts/screenshots/` (`npm run screenshots`, demo data only — one invented
   athlete, never a real database). A screen that changes is reshot there, not by hand.
 - **Screenshots go through `Shot`/`ShotSlider`, never a bare `<img>`** (they are 3024px;

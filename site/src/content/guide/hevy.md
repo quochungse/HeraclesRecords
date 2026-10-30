@@ -23,6 +23,8 @@ COROS's Training Load is read from heart rate, which counts lifting light. **Tra
 
 Hevy keeps no training load of its own, so a workout logged only in Hevy has one only with Heracles TL. Other sports keep COROS's load either way. With Heracles TL, Load Impact, Base Fitness, Intensity trend and the recommended weekly load are worked out by COROS's own formulas on it; hover one to see COROS's own figure. Recovery and training effect stay COROS's, as on your watch.
 
+Every step of the formula, the research behind it and a worked example are on [How a strength session is scored](/activities/strength/training-load).
+
 ## Good to know
 
 - Hevy is read only on the Strength screen, so keep Strength on the sidebar while Hevy is connected (Settings → Navigation → Sport screens says so if you hide it).

@@ -2,7 +2,7 @@
 const { app, BrowserWindow } = require("electron");
 const fs = require("node:fs");
 const path = require("node:path");
-app.commandLine.appendSwitch("no-sandbox");
+// The sandbox stays on: without it an offscreen renderer dies on /dev/shm (shoot.cjs).
 app.setPath("userData", path.join(__dirname, "userdata"));
 const W = 1512, H = 982, DPR = Number(process.env.SHOT_DPR || 2);
 const FPS = 25, REPLAY_MS = 4000, HIKE = process.env.HIKE || "Hàm Lợn loop";

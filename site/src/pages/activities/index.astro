@@ -1,0 +1,123 @@
+---
+import Base from "../../layouts/Base.astro";
+import Shot from "../../components/Shot.astro";
+import SubNav from "../../components/SubNav.astro";
+import { SIZES_HALF } from "../../assets";
+import { ACTIVITIES_PAGES } from "../../sections";
+
+const sports = [
+  {
+    href: "/activities/running",
+    shot: "03-running",
+    alt: "Running: weekly volume, load ratio, VO2max and threshold pace",
+    title: "Running",
+    text: "Pace, load and form: weekly volume, load ratio, VO₂max, threshold pace and running efficiency. Trail runs read as climb, not pace.",
+  },
+  {
+    href: "/activities/cycling",
+    shot: "25-cycling",
+    alt: "Cycling: hours this week, load ratio, FTP and climb",
+    title: "Cycling",
+    text: "Hours, power and climb: FTP and watts per kilo, normalised power, TSS, peak power and the climbs of every ride.",
+  },
+  {
+    href: "/activities/hiking",
+    shot: "26-hiking",
+    alt: "Hiking: time, ascent, biggest day and ascent per hour",
+    title: "Hiking",
+    text: "Height and hours before distance: the moving time inside a long day, every rest, the terrain and your climbing rate.",
+  },
+  {
+    href: "/activities/strength/",
+    shot: "07-strength",
+    alt: "Strength: sessions and a 3D muscle map",
+    title: "Strength",
+    text: "Every set on the muscles it worked, COROS and Hevy together, and a training load worked out from what you lifted.",
+  },
+];
+---
+
+<Base og="activities"
+  title="Activities and sports"
+  description="Every COROS session in one list, and a screen each for running, cycling, hiking and strength that reads what that sport is about."
+>
+  <SubNav pages={ACTIVITIES_PAGES} label="Activities" />
+
+  <section class="wrap page-hero">
+    <p class="eyebrow">Every session</p>
+    <h1>Every session, read in depth.</h1>
+    <p class="lede">
+      One list holds everything your watch has recorded. Running, Cycling, Hiking and Strength
+      each get a screen of their own that reads what that sport is about, and every session a
+      page with every channel the watch recorded.
+    </p>
+  </section>
+
+  <section class="wrap section-tight">
+    <Shot name="02-activities" alt="Activities: every session in one list with a detail pane" eager />
+  </section>
+
+  <div class="wrap">
+    <section class="feature-text">
+      <p class="eyebrow">Activities</p>
+      <h2>Every sport in one list.</h2>
+      <ul class="ticks columns">
+        <li><strong>Everything COROS holds</strong>, swims and hybrid sessions included, grouped by week with the week's totals.</li>
+        <li><strong>Filter</strong> by period, by sport or by name.</li>
+        <li><strong>Compare sports</strong> on one bar: how your time splits between them.</li>
+        <li><strong>A detail pane</strong> beside the list: zones, laps, running dynamics, power and every channel, and a link to the session's own sport page.</li>
+      </ul>
+    </section>
+  </div>
+
+  <section class="wrap section">
+    <div class="section-head">
+      <p class="eyebrow">A screen for each sport</p>
+      <h2 class="section-title">Each sport, read for what it is.</h2>
+      <p class="lede">
+        A run is read in pace, a ride in hours and power, a hike in height, and a strength
+        session in sets. Keep the screens for the sports you train under
+        <strong>Settings → Navigation → Sport screens</strong>.
+      </p>
+    </div>
+    <div class="grid-2">
+      {
+        sports.map((sport) => (
+          <figure class="figure linked">
+            <a href={sport.href} class="figure-link">
+              <Shot name={sport.shot} alt={sport.alt} sizes={SIZES_HALF} />
+            </a>
+            <figcaption>
+              <a href={sport.href} class="figure-title">{sport.title}</a>
+              <span>{sport.text}</span>
+            </figcaption>
+          </figure>
+        ))
+      }
+    </div>
+  </section>
+
+  <section class="wrap section">
+    <figure class="figure">
+      <Shot name="16-route" alt="A hike replayed on a satellite map, coloured by elevation" />
+      <figcaption>
+        <strong>Every route, replayed.</strong> Open any route full size on a street, satellite
+        or topographic map. Colour the line by pace, heart rate or elevation, then watch it draw
+        itself the way you covered it.
+      </figcaption>
+    </figure>
+  </section>
+
+  <section class="wrap section">
+    <div class="section-head">
+      <h2 class="section-title">Ask about any session.</h2>
+      <p class="lede">
+        Every session's page has <strong>Ask Coach</strong>. The question arrives in Coach
+        already pointing at that session, and the answer comes with the figures and charts
+        behind it.
+      </p>
+      <a class="more" href="/coach">How Coach works</a>
+    </div>
+  </section>
+</Base>
+

@@ -28,6 +28,10 @@ On your computer. The app has no account of its own and its developer runs no se
 
 No. Workouts, plans and calendar changes it proposes wait on a button you press. Automatic analyses can only read.
 
+## Why does my strength load differ from COROS's?
+
+COROS scores a strength session by heart rate, which counts lifting two to three times light. With **Heracles TL** chosen in the Strength screen's **Settings**, the app scores each session from its sets instead, on the same scale as a run. [How a strength session is scored](/activities/strength/training-load) sets out the whole formula.
+
 ## Does it work offline?
 
 Partly. What the app has already read stays readable, and sessions you have opened open again without a network. New activities, plans and Coach need the internet.
@@ -46,4 +50,4 @@ The app tells you when a new version is out. The [changelog](/changelog/) lists 
 
 ## How can I help?
 
-[Report a bug or suggest an idea](https://github.com/quochungse/HeraclesRecords/issues/new), tell a training partner, or [buy me a coffee](https://buymeacoffee.com/quochungse).
+[Report a bug](https://github.com/quochungse/HeraclesRecords/issues/new) (**Settings → About → Report an issue** in the app gives you its error log to paste in), share an idea in [Discussions](https://github.com/quochungse/HeraclesRecords/discussions), tell a training partner, or [buy me a coffee](https://buymeacoffee.com/quochungse).

@@ -1,0 +1,62 @@
+---
+import Base from "../../layouts/Base.astro";
+import FeatureRow from "../../components/FeatureRow.astro";
+import Shot from "../../components/Shot.astro";
+import SubNav from "../../components/SubNav.astro";
+import { PLAN_PAGES } from "../../sections";
+---
+
+<Base og="plan"
+  title="Calendar"
+  description="The Heracles Records calendar: every planned and completed session side by side, each week's load against its target, and drag to move a session on your COROS calendar."
+>
+  <SubNav pages={PLAN_PAGES} label="Plan and Library" />
+
+  <section class="wrap page-hero">
+    <p class="eyebrow">Calendar</p>
+    <h1>Planned and done, side by side.</h1>
+    <p class="lede">
+      Every scheduled workout and every completed activity, by month or by week, matched to
+      each other so a session shows how much of its plan you did. It is your COROS calendar, so
+      a change here is a change on your watch.
+    </p>
+  </section>
+
+  <section class="wrap section-tight">
+    <Shot name="09-calendar" alt="Calendar: planned and completed sessions by month" eager />
+  </section>
+
+  <div class="wrap">
+    <FeatureRow shot="21-calendar-detail" alt="Calendar with a day open beside the month">
+      <p class="eyebrow">A day at a time</p>
+      <h2>Open any day.</h2>
+      <p>
+        Press anywhere in a day and it opens beside the month with what was planned and done on
+        it. Press a session and it opens with its route, elevation and laps.
+      </p>
+      <ul class="ticks">
+        <li><strong>Cards you read at a glance</strong>: the sport, then distance, time and load, or Plan and Missed.</li>
+        <li><strong>Drag to move.</strong> Drop a session on another day and it moves on your COROS calendar too. A session from a plan stays part of that plan.</li>
+        <li><strong>From the library.</strong> Put any workout on a day, or create one there and then.</li>
+        <li><strong>Edit a scheduled session</strong> in the same builder as a new workout.</li>
+      </ul>
+    </FeatureRow>
+
+    <section class="feature-text">
+      <p class="eyebrow">Week by week</p>
+      <h2>Each week against its target.</h2>
+      <p>
+        Beside every week sits its load as a figure and a bar, done solid and planned hatched,
+        set against the range COROS recommends for the week, with Load Impact and Base Fitness a
+        hover away.
+      </p>
+      <ul class="ticks columns">
+        <li><strong>Planned and done</strong>: how much of the week's plan is behind you, its sessions and time apart from the totals.</li>
+        <li><strong>Matched fairly</strong>: a session pairs with the plan of its sport closest in load, then distance, then time.</li>
+        <li><strong>Strength counted properly</strong>: with Heracles Training Load chosen, gym days, done or planned, add to the week what they really cost.</li>
+        <li><strong>Ask Coach</strong> about a day, a week or a single session.</li>
+      </ul>
+      <a class="more" href="/activities/strength/training-load">How Heracles Training Load is worked out</a>
+    </section>
+  </div>
+</Base>

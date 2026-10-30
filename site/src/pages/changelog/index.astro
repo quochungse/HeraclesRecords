@@ -8,7 +8,6 @@ import { compareVersions } from "../../assets";
 import { formatReleaseDate, latestRelease } from "../../release.mjs";
 
 const release = await latestRelease();
-const repo = "https://github.com/quochungse/HeraclesRecords";
 const entries = (await getCollection("changelog"))
   .filter((entry) => !release || compareVersions(entry.data.version, release.version) <= 0)
   .sort((a, b) => compareVersions(b.data.version, a.data.version));
@@ -20,8 +19,8 @@ const rendered = await Promise.all(entries.map(async (entry) => ({ entry, ...(aw
     <p class="eyebrow">Changelog</p>
     <h1>What's new</h1>
     <p class="lede">
-      Every release of Heracles Records. Follow along with the <a href="/changelog.xml">RSS feed</a>,
-      or watch the repository's releases on <a href={`${repo}/releases`}>GitHub</a>.
+      Every release of Heracles Records. Follow along with the <a href="/changelog.xml">RSS feed</a>.
+      The app tells you when a new version is out.
     </p>
   </section>
 
@@ -32,10 +31,7 @@ const rendered = await Promise.all(entries.map(async (entry) => ({ entry, ...(aw
         <h2>
           <a href={`#${entry.data.version}`}>{entry.data.version}</a>
         </h2>
-        <p class="meta">
-          {entry.data.date ? formatReleaseDate(entry.data.date) : "Unreleased"} ·{" "}
-          <a href={`${repo}/releases/tag/v${entry.data.version}`}>Release on GitHub</a>
-        </p>
+        <p class="meta">{entry.data.date ? formatReleaseDate(entry.data.date) : "Unreleased"}</p>
         <Content />
       </article>
     ))
