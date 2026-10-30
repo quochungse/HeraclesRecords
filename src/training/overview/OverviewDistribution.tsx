@@ -20,6 +20,8 @@ import { zoneColor, zoneLabel } from "../components/routeColoring";
 import { zoneNamesFor } from "../zoneTime";
 import { formatCount, t } from "../../i18n/core";
 import { useI18n } from "../../i18n/useI18n";
+import { loadPairTitle } from "../loadFigures";
+import { useLoadSource } from "../loadSource";
 import {
   DISTRIBUTION_DAYS,
   intensityShares,
@@ -55,9 +57,10 @@ function percent(share: number): string {
 }
 
 /**
- * Training load distribution: the last four weeks' load by sport, then COROS's
- * own time (or load) in each heart-rate zone, read first as the easy share
- * against the 80/20 line and then zone by zone.
+ * Training load distribution: the last four weeks' load by sport, in the
+ * chosen load (strength at Heracles Training Load when that is chosen, COROS's
+ * figure on hover), then COROS's own time (or load) in each heart-rate zone,
+ * read first as the easy share against the 80/20 line and then zone by zone.
  */
 export function OverviewDistribution({
   activities,
@@ -74,7 +77,11 @@ export function OverviewDistribution({
 }) {
   useI18n();
   const [measure, setMeasure] = useSelectionPreference(ZONE_MEASURE);
-  const bySport = useMemo(() => sportLoadShares(activities), [activities]);
+  const { source: loadSource } = useLoadSource();
+  const bySport = useMemo(
+    () => sportLoadShares(activities, undefined, undefined, loadSource),
+    [activities, loadSource]
+  );
   const entries =
     measure === "time"
       ? (analytics?.zoneDistributions.hrTime ?? NO_ZONES)
@@ -107,7 +114,10 @@ export function OverviewDistribution({
           <p className="overview-dist-head">
             <strong>{t("overview.distribution.bySport")}</strong>
             {bySport.total > 0 ? (
-              <span className="overview-dist-aside">
+              <span
+                className="overview-dist-aside"
+                title={loadPairTitle(loadSource, bySport.total, bySport.corosTotal)}
+              >
                 {t("overview.distribution.loadTotal", { load: whole(bySport.total) })}
               </span>
             ) : null}
@@ -129,6 +139,7 @@ export function OverviewDistribution({
                     key={sport.category}
                     data-sport={sport.category}
                     style={{ "--share": sport.share } as CSSProperties}
+                    title={loadPairTitle(loadSource, sport.load, sport.corosLoad)}
                   >
                     {SPORT_COLOR_LABELS[sport.category]}
                     <span className="figure">{percent(sport.share)}</span>

@@ -563,6 +563,11 @@ function match(idInPlan, status, overrides = {}) {
   const unanswered = readPlan(document, [match("7", "completed", { activityId: "a7", completedTrainingLoad: 22 })], new Map());
   assert.equal(unanswered.weeks[0].days[0].entries[0].trainingLoad, 15, "no estimate yet: COROS's figure stands");
   assert.equal(unanswered.weeks[0].days[0].entries[0].outcome.trainingLoad, 22, "a match stored before Heracles reports COROS's");
+  // Planned and done are set side by side, so they are always one scale.
+  const priced = readPlan(document, matches, new Map());
+  assert.equal(priced.weeks[0].days[0].entries[0].outcome.trainingLoad, 22, "a plan COROS priced reports COROS's load done");
+  const old = readPlan(document, [match("7", "completed", { activityId: "a7", completedTrainingLoad: 22 })], loads);
+  assert.equal(old.weeks[0].days[0].entries[0].outcome.trainingLoad, undefined, "an estimate is never set against COROS's figure");
 }
 console.log(
   "plan reader OK — empty weeks kept, figures shared with the row, outcomes only " +

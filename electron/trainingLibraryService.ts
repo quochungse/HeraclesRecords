@@ -463,11 +463,7 @@ export async function getTrainingLibrarySnapshot(): Promise<TrainingLibrarySnaps
    * so one failed request would write a wrong answer that outlives it.
    */
   if (scheduleResult.status === "fulfilled" && activityResult.status === "fulfilled") {
-    for (const match of buildTrainingActivityMatches(
-      scheduleResult.value,
-      activityResult.value,
-      listTrainingActivityMatches()
-    )) {
+    for (const match of matchesInChosenLoad(scheduleResult.value, activityResult.value)) {
       saveTrainingActivityMatch(match);
     }
   }
@@ -1156,17 +1152,28 @@ export async function refreshTrainingActivityMatches(
     listScheduledWorkoutEntries(startDay, endDay),
     listTrainingHubActivities(1, 500, startDay, endDay)
   ]);
-  const results = buildTrainingActivityMatches(
+  const results = matchesInChosenLoad(scheduled, activities);
+  for (const match of results) {
+    saveTrainingActivityMatch(match);
+  }
+  return results;
+}
+
+/**
+ * The matches as the athlete reads load: each side carrying its Heracles
+ * figure, and a status read in Heracles Training Load while that is chosen.
+ */
+function matchesInChosenLoad(
+  scheduled: TrainingHubScheduledWorkoutEntry[],
+  activities: TrainingHubActivity[]
+): TrainingActivityMatch[] {
+  return buildTrainingActivityMatches(
     withPlannedHeraclesLoads(scheduled),
     withHeraclesLoads(activities),
     listTrainingActivityMatches(),
     undefined,
     getStrengthLoadSource()
   );
-  for (const match of results) {
-    saveTrainingActivityMatch(match);
-  }
-  return results;
 }
 
 /**

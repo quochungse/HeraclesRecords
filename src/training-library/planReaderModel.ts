@@ -174,9 +174,14 @@ function leafStepCount(steps: readonly RunWorkoutStepInput[]): number {
   return steps.reduce((total, node) => total + ("repeat" in node ? node.steps.length : 1), 0);
 }
 
-function outcomeOf(match: TrainingActivityMatch | undefined, heracles: boolean): PlanEntryOutcome | undefined {
+/**
+ * What the session done reports, its load in the plan's scale: Heracles's
+ * where the plan states a Heracles estimate, else COROS's — the two are set
+ * side by side (`PlanSessionView`), so never one of each.
+ */
+function outcomeOf(match: TrainingActivityMatch | undefined, plannedInHeracles: boolean): PlanEntryOutcome | undefined {
   if (!match?.activityId) return undefined;
-  const trainingLoad = (heracles ? match.completedHeraclesLoad : undefined) ?? match.completedTrainingLoad;
+  const trainingLoad = plannedInHeracles ? match.completedHeraclesLoad : match.completedTrainingLoad;
   return {
     activityId: match.activityId,
     happenDay: match.happenDay,
@@ -208,7 +213,7 @@ function entryFacts(
     stepCount: leafStepCount(entry.workout.steps ?? []),
     status: match?.status,
     scheduledDate: onCalendar ? entry.happenDay : undefined,
-    outcome: outcomeOf(match, loads !== undefined)
+    outcome: outcomeOf(match, heraclesLoad !== undefined)
   };
 }
 

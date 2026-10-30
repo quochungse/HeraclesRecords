@@ -235,6 +235,7 @@ import type {
   PersistedChatSource,
   SaveChatSessionOptions,
   StoredChatToken,
+  StrengthLoadSource,
   TrainingHubActivity,
   TrainingHubDashboard,
   TrainingHubUpcomingWorkout,
@@ -258,6 +259,7 @@ import {
   buildCoachInstructions,
   buildCoachSportCapabilityGuide,
   buildCoachWorkoutDefaultsGuide,
+  coachWeeklyLoadInstruction,
   formatAthleteProfile,
   formatCoachDashboard,
   formatCoachSleepHeartRate,
@@ -266,6 +268,7 @@ import {
   formatUpcomingWorkoutSport
 } from "./chatCoachContext";
 import { ScreenError } from "./screenText";
+import { getStrengthLoadSource } from "./heraclesLoadService";
 import { mainText } from "./mainText";
 import { getSleepHistory } from "./sleepHistoryService";
 import { SLEEP_HR_BASELINE_NIGHTS } from "./sleepHeartRate";
@@ -4045,7 +4048,7 @@ interface TrainingContextScope {
  * A turn's system prompt in two parts, by how often each changes.
  *
  * `head` is the same on every turn of a conversation: the coach's rules, the
- * athlete's instructions and units. `live` is what this turn read — the date
+ * athlete's instructions, units and the load a week is counted in. `live` is what this turn read — the date
  * and the COROS snapshot — and changes with the day, the recovery figure and
  * the calendar. The tool guide goes between them (`coachSystemPrompt`), so the
  * part that never changes comes first and the part that does comes last. A
@@ -4079,7 +4082,13 @@ async function buildTrainingContext(
     `The athlete selected ${unitSystem === "imperial" ? "Imperial" : "Metric"} units. ` +
     `Use ${unitSystem === "imperial" ? "miles, feet, min/mi, mph, pounds, and yards for swims" : "kilometres, metres, min/km, km/h, and kilograms"} in every user-facing answer and tool summary. ` +
     "Keep tool-schema distance, elevation, pace, and weight fields canonical internally; do not reinterpret their numeric values.";
-  const head = `${coachInstructions}\n\n${unitInstruction}`;
+  let loadSource: StrengthLoadSource;
+  try {
+    loadSource = getStrengthLoadSource();
+  } catch {
+    loadSource = "coros";
+  }
+  const head = `${coachInstructions}\n\n${unitInstruction}\n\n${coachWeeklyLoadInstruction(loadSource)}`;
   const today = formatCoachToday();
   let status: Awaited<ReturnType<typeof getTrainingHubStatus>>;
   try {

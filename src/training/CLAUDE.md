@@ -75,15 +75,17 @@ would wrap (under 840px the week moves below; under 620px all stack).
   100–149, Excessive ≥ 150) — over a column a day, a block a session; from today on the
   calendar's sessions are hatched, and today's plan is dropped once a session of its sport
   family pairs with it (`pairTodayPlan`, shared with Coming up and the sport sections). The
-  columns measure **time, distance or load** (`overview.weekMeasure`): COROS's load is a
-  heart-rate figure and reads strength light. A planned session's time is COROS's
-  `estimatedTime` (`durationSeconds`), its distance `distanceMeters`. Load the day's sessions
-  do not claim is a block of its own, drawn in load only.
+  columns measure **time, distance or load** (`overview.weekMeasure`); in load a strength
+  block stands at the chosen load (COROS's day split by session, plus what Heracles adds). A
+  planned session's time is COROS's `estimatedTime` (`durationSeconds`), its distance
+  `distanceMeters`. Load the day's sessions do not claim is a block of its own, drawn in load
+  only.
 - The footer: **Load Impact is `ati`, Base Fitness `cti`** (EWMA of daily load, 7 and 42
   days; `ati / cti` is the trend). Never `tiredRateNew` (= `ati − cti`) or `staminaLevel`
   (present only on run days). This week's load is read **Monday to today** against COROS's
   recommended range (`recommendedLoadMin`/`Max`), which is set per calendar week — never
-  against the rolling `t7d`.
+  against the rolling `t7d` — and stays COROS's with Heracles chosen; only its hover names
+  the Heracles sum the columns reach.
 - Chart tooltips follow the pointer (`followTip.ts`, written onto style, no render); a chart is
   one tab stop with arrow keys between columns (`useColumnFocus`, `chartFocus.ts`).
 
@@ -91,9 +93,10 @@ would wrap (under 840px the week moves below; under 620px all stack).
 (`pairTodayPlan`); a row is pressed as a whole (done opens the session, to-do opens
 `UpcomingWorkoutDetailPanel`).
 
-**Training load distribution** (`distributionModel.ts`): four weeks' load by sport, then
-COROS's time or load per HR zone (seconds), read as the easy share against 80/20 with
-`intensityForZone` on the effort ramp.
+**Training load distribution** (`distributionModel.ts`): four weeks' load by sport in the
+chosen load (`sportLoadShares`, COROS's sums kept for the hover), then COROS's time or load
+per HR zone (seconds) — COROS's either way, Heracles has no zones — read as the easy share
+against 80/20 with `intensityForZone` on the effort ramp.
 
 **Sport sections** (`sportModel.ts`): Running, Cycling, Hiking, each only when trained in the
 last four calendar weeks and shown on the rail, built from the screens' own builders, never a

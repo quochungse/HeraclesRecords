@@ -12,6 +12,7 @@ import { dateFromDayKey, dayKey, dayLabel, isoFromDayKey } from "./chatDayKeys";
 import { sleepHrBaseline, sleepNightsByDay } from "./sleepHeartRate";
 import type {
   CorosProfile,
+  StrengthLoadSource,
   TrainingHubActivity,
   TrainingHubDashboard,
   TrainingHubPersonalRecordGroup,
@@ -171,6 +172,27 @@ export function buildBaseCoachInstructions(): string {
     "Pain, injury, illness or other medical symptoms belong with a professional: say so, and do not prescribe " +
       "training through them."
   ].join("\n");
+}
+
+/**
+ * The load a week is counted in, as the athlete's screens add it up
+ * (`strength.loadSource`): a plan's weekly load is set and progressed in the
+ * same figure the Calendar and the Training Library show for it. A setting,
+ * so it sits beside the units rather than in the base prompt Settings shows.
+ */
+export function coachWeeklyLoadInstruction(source: StrengthLoadSource): string {
+  if (source === "heracles") {
+    return (
+      "The athlete reads strength in Heracles Training Load. Count a week's load that way — a strength session at " +
+      "its Heracles load (a planned one at its heracles_load estimate, else at what a like session scored), every " +
+      "other session at COROS's training load — and set and progress weekly load targets, in a plan or an answer, " +
+      "in that figure. COROS's recommended weekly range stays a COROS figure, set only against COROS's load."
+    );
+  }
+  return (
+    "The athlete reads every load in COROS's training load: set and progress weekly load targets, in a plan or an " +
+    "answer, in it. A Heracles load on a strength session says how hard the lifting was, not what the week adds up to."
+  );
 }
 
 /**

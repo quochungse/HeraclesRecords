@@ -1,6 +1,6 @@
 import type { StrengthLoadSource, TrainingHubActivity, TrainingHubUpcomingWorkout } from "../../../electron/types";
 import { getLocalHappenDayKey, happenDayFromTimestamp } from "../formatters";
-import { activityLoad, plannedLoad } from "../loadFigures";
+import { comparableLoads } from "../loadFigures";
 import { activitySportFamily, scheduledSportFamily, sportFamiliesCompatible } from "../workoutSport";
 
 /*
@@ -18,7 +18,8 @@ function addDays(date: Date, days: number): Date {
  * How far a session is from a plan, lower closer: by load where both state
  * one, then distance, then time — the Calendar's own order (`matchScore` in
  * calendar/pairing.ts), so the two choose alike between two runs of one day.
- * Load is read in the load the athlete reads strength in, both sides alike.
+ * Load is read in the load the athlete reads strength in, both sides alike
+ * (`comparableLoads`): a plan only COROS priced is set against COROS's figure.
  */
 function fitScore(
   workout: TrainingHubUpcomingWorkout,
@@ -27,8 +28,9 @@ function fitScore(
 ): number {
   const relative = (actual: number | undefined, planned: number | undefined) =>
     actual !== undefined && planned !== undefined && planned > 0 ? Math.abs(actual - planned) / planned : undefined;
+  const loads = comparableLoads(workout, activity, loadSource);
   return (
-    relative(activityLoad(activity, loadSource), plannedLoad(workout, loadSource)) ??
+    relative(loads.done, loads.planned) ??
     relative(activity.distance, workout.distanceMeters) ??
     relative(activity.duration, workout.durationSeconds) ??
     1

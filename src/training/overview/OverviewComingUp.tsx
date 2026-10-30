@@ -6,7 +6,7 @@ import type {
   TrainingHubSportType,
   TrainingHubUpcomingWorkout
 } from "../../../electron/types";
-import { activityLoad, activityLoadTitle, inLoadSource, plannedLoad } from "../loadFigures";
+import { activityLoad, activityLoadTitle, comparableLoads, inLoadSource, plannedLoad } from "../loadFigures";
 import { useLoadSource } from "../loadSource";
 import type { HeraclesRecordsApi } from "../../heraclesrecords-api";
 import { workoutSportView } from "../../calendar/workoutSportIcons";
@@ -124,9 +124,8 @@ function TodayEntry({
 
   const { activity, workout } = item;
   const category = sportColorCategory(activity.sportType);
-  const against = lead
-    ? loadAgainstPlan(activityLoad(activity, loadSource), workout ? plannedLoad(workout, loadSource) : undefined)
-    : undefined;
+  const compared = lead && workout ? comparableLoads(workout, activity, loadSource) : undefined;
+  const against = compared ? loadAgainstPlan(compared.done, compared.planned) : undefined;
   const name = activityTitle(activity);
   // Named by its plan, the session's own name goes with its figures.
   const meta = [workout && workout.name !== name ? name : null, doneLine(activity, unitSystem, loadSource)]
