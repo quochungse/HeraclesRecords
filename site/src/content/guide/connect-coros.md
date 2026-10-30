@@ -12,7 +12,7 @@ Sign in when the app first opens, or later under **Settings → Connections → 
 
 - **Two-step verification.** If your account uses it, COROS emails you a verification code. Type it in and you are done.
 - **Your region.** COROS keeps accounts in several regions (US, Europe, Asia, China). The app finds yours on its own.
-- **Staying signed in.** The app keeps your COROS session on this computer, encrypted with your system's secure storage. If you let it remember your sign-in, it signs itself back in at the next launch when the session has expired. With two-step verification it cannot, so it waits for you to press **Reconnect**.
+- **Staying signed in.** The app keeps your COROS session on this computer, encrypted with your system's secure storage. If you tick **Stay signed in**, it signs itself back in at the next launch when the session has expired. With two-step verification it cannot, so it waits for you to press **Reconnect**.
 
 ## What the app reads and writes
 

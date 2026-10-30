@@ -231,6 +231,7 @@
     "site:dev": "npm --prefix site run dev",
     "site:build": "npm --prefix site run build",
     "site:og": "node scripts/run-electron-gui.mjs scripts/site-og/render.cjs",
+    "signin-art:generate": "node scripts/run-electron-gui.mjs scripts/signin-art/render.cjs",
     "screenshots": "node scripts/screenshots/run.mjs",
     "test:site": "npm --prefix site run build && node scripts/test-site.mjs",
     "test:release-data": "node scripts/test-release-data.mjs",

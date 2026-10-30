@@ -1,0 +1,511 @@
+/* Overview before COROS is connected (TrainingSignIn.tsx). The page is the
+   sign-in alone, so the column it sits in is stretched to the window's height
+   and the frame fills it rather than pushing the page into a scroll. */
+.content-overview:has(.signin) > .dashboard {
+  flex: 1;
+  grid-template-rows: minmax(0, 1fr);
+}
+
+.dashboard-block:has(> .training-dashboard > .signin) {
+  display: grid;
+}
+
+.signin {
+  /* The artwork stands on the page's own ground, under a veil of the same
+     colour that keeps the words legible over it; then the words' colours. */
+  --signin-art-fade: color-mix(in srgb, var(--bg-base) 94%, transparent);
+  --signin-intro-ink: #f5f5f7;
+  --signin-intro-ink-2: rgba(245, 245, 247, 0.74);
+  --signin-intro-line: rgba(255, 255, 255, 0.14);
+  display: grid;
+  grid-template-rows: minmax(0, 1fr) auto;
+  gap: 14px;
+  min-height: 0;
+  padding: 20px 0 0;
+}
+
+:root[data-theme="paper"] .signin {
+  --signin-intro-ink: var(--text-primary);
+  --signin-intro-ink-2: var(--text-secondary);
+  --signin-intro-line: var(--glass-border);
+}
+
+/* Artwork on the left, the sheet on the right of one card. */
+.signin-frame {
+  display: grid;
+  grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr);
+  grid-template-areas: "art pane";
+  min-height: 0;
+  overflow: hidden;
+  border: 1px solid var(--surface-line, var(--glass-border));
+  border-radius: var(--radius-lg);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.075), rgba(255, 255, 255, 0.045)),
+    var(--glass-bg);
+  box-shadow: var(--shadow-card);
+}
+
+:root[data-theme="paper"] .signin-frame {
+  background: var(--glass-bg-elevated);
+}
+
+/* ---- Artwork ----
+   A mask of white ink on transparent (`npm run signin-art:generate`), painted
+   in the accent over its ground, so it follows the accent and the theme. */
+
+.signin-art {
+  position: relative;
+  grid-area: art;
+  min-width: 0;
+  min-height: 0;
+  background: var(--bg-base);
+}
+
+.signin-art::before,
+.signin-art::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+}
+
+.signin-art::before {
+  background: var(--accent);
+  -webkit-mask: var(--signin-art-mask) 62% 50% / cover no-repeat;
+  mask: var(--signin-art-mask) 62% 50% / cover no-repeat;
+  opacity: 0.9;
+}
+
+:root[data-theme="paper"] .signin-art::before {
+  opacity: 0.85;
+}
+
+.signin-art::after {
+  background: linear-gradient(0deg, var(--signin-art-fade) 0%, var(--signin-art-fade) 34%, transparent 76%);
+}
+
+/* ---- Introduction, at the foot of the artwork ---- */
+
+.signin-intro {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-area: art;
+  align-content: end;
+  gap: 12px;
+  min-width: 0;
+  padding: 48px;
+  color: var(--signin-intro-ink);
+}
+
+.signin-intro-name {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  min-width: 0;
+}
+
+.signin-intro-logo {
+  display: block;
+  flex: none;
+  width: 44px;
+  height: 44px;
+  border-radius: var(--radius-sm);
+}
+
+.signin-intro-title {
+  margin: 0;
+  color: var(--signin-intro-ink);
+  font-family: var(--font-title);
+  font-size: 36px;
+  font-weight: 600;
+  line-height: 1.3;
+  text-wrap: balance;
+}
+
+.signin-intro-tagline {
+  margin: -6px 0 0;
+  color: var(--accent);
+  font-size: 18px;
+  font-weight: 500;
+  line-height: 1.45;
+  text-wrap: balance;
+}
+
+.signin-intro-body {
+  max-width: 48ch;
+  margin: 0;
+  color: var(--signin-intro-ink-2);
+  font-size: 14px;
+  line-height: 1.6;
+  text-wrap: pretty;
+}
+
+.signin-list {
+  display: grid;
+  gap: 10px;
+  margin: 6px 0 0;
+  padding: 16px 0 0;
+  border-top: 1px solid var(--signin-intro-line);
+  list-style: none;
+}
+
+.signin-list li {
+  display: grid;
+  grid-template-columns: 16px minmax(0, 1fr);
+  gap: 10px;
+  max-width: 52ch;
+  color: var(--signin-intro-ink-2);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.signin-list svg {
+  margin-top: 2px;
+  color: var(--signin-intro-ink);
+}
+
+/* ---- The sheet ---- */
+
+.signin-pane {
+  display: grid;
+  grid-area: pane;
+  align-content: center;
+  justify-items: start;
+  min-width: 0;
+  padding: 48px clamp(32px, 5vw, 72px);
+}
+
+.signin-sheet {
+  display: grid;
+  gap: 20px;
+  width: 100%;
+  max-width: 380px;
+}
+
+.signin-head {
+  display: grid;
+  justify-items: start;
+  gap: 6px;
+}
+
+.signin-spinner {
+  display: grid;
+  width: 44px;
+  height: 44px;
+  margin-bottom: 8px;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--glass-bg);
+  color: var(--accent);
+}
+
+.signin-title {
+  margin: 0;
+  color: var(--text-primary);
+  font-family: var(--font-title);
+  font-size: 28px;
+  font-weight: 600;
+  line-height: 1.3;
+  text-wrap: balance;
+}
+
+.signin-lead {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 14px;
+  line-height: 1.45;
+  text-wrap: pretty;
+}
+
+.signin-lead strong {
+  color: var(--text-primary);
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.signin-fields {
+  display: grid;
+  gap: 14px;
+}
+
+.signin-field {
+  display: grid;
+  gap: 6px;
+  color: var(--text-secondary);
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.signin-input {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  height: 44px;
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-sm);
+  background: var(--glass-bg);
+  padding: 0 6px 0 14px;
+  transition: border-color var(--dur-fast) var(--ease);
+}
+
+/* The field's own edge is its focus mark; the input inside draws none. */
+.signin-input:focus-within {
+  border-color: var(--accent);
+}
+
+.signin-input > svg {
+  color: var(--text-muted);
+}
+
+.signin-input input {
+  width: 100%;
+  height: 42px;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  padding: 0;
+  color: var(--text-primary);
+  font-size: 14px;
+}
+
+.signin-input input::placeholder {
+  color: var(--text-muted);
+}
+
+.signin-input.is-code input {
+  font-family: var(--font-mono);
+  font-size: 18px;
+  letter-spacing: 0.1em;
+}
+
+.signin-visibility {
+  display: grid;
+  width: 32px;
+  height: 32px;
+  place-items: center;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-muted);
+  padding: 0;
+  transition:
+    background var(--dur-fast) var(--ease),
+    color var(--dur-fast) var(--ease);
+}
+
+.signin-visibility:hover:not(:disabled) {
+  background: var(--glass-bg-hover);
+  color: var(--text-primary);
+}
+
+.signin-visibility:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: -2px;
+}
+
+.signin-remember {
+  display: grid;
+  grid-template-columns: 16px minmax(0, 1fr);
+  gap: 10px;
+  cursor: pointer;
+}
+
+.signin-remember input {
+  display: grid;
+  width: 16px;
+  height: 16px;
+  margin: 2px 0 0;
+  place-items: center;
+  appearance: none;
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-xs);
+  background: var(--glass-bg);
+  cursor: pointer;
+  transition:
+    background var(--dur-fast) var(--ease),
+    border-color var(--dur-fast) var(--ease);
+}
+
+.signin-remember input:checked {
+  border-color: var(--accent);
+  background: var(--accent);
+}
+
+.signin-remember input:checked::after {
+  content: "";
+  width: 8px;
+  height: 5px;
+  border-bottom: 2px solid var(--bg-base);
+  border-left: 2px solid var(--bg-base);
+  transform: rotate(-45deg) translateY(-1px);
+}
+
+:root[data-theme="paper"] .signin-remember input:checked::after {
+  border-color: #ffffff;
+}
+
+.signin-remember input:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: 2px;
+}
+
+.signin-remember span {
+  display: grid;
+  gap: 2px;
+}
+
+.signin-remember strong {
+  color: var(--text-primary);
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.45;
+}
+
+.signin-remember small {
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.signin-submit {
+  width: 100%;
+}
+
+.signin-links {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.signin-text-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  border: 0;
+  border-radius: var(--radius-xs);
+  background: none;
+  color: var(--text-secondary);
+  padding: 2px 0;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: color var(--dur-fast) var(--ease);
+}
+
+.signin-text-button:hover:not(:disabled) {
+  color: var(--text-primary);
+}
+
+.signin-text-button:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: 2px;
+}
+
+.signin-text-button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.signin-back {
+  justify-self: start;
+  margin-top: -6px;
+}
+
+.signin-account {
+  display: grid;
+  grid-template-columns: 36px minmax(0, 1fr);
+  align-items: center;
+  gap: 12px;
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-md);
+  padding: 10px 14px 10px 10px;
+}
+
+.signin-account-mark {
+  display: grid;
+  width: 36px;
+  height: 36px;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--glass-bg-hover);
+  color: var(--text-secondary);
+}
+
+.signin-account-email {
+  overflow: hidden;
+  color: var(--text-primary);
+  font-size: 14px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.signin-note {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.signin-note > svg {
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+/* ---- Under the frame ---- */
+
+.signin-foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 6px 18px;
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.signin-browser {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border-radius: var(--radius-xs);
+  color: var(--text-secondary);
+  font-weight: 500;
+  text-decoration: none;
+  transition: color var(--dur-fast) var(--ease);
+}
+
+.signin-browser:hover {
+  color: var(--text-primary);
+}
+
+.signin-browser:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: 2px;
+}
+
+/* Under 1080px the artwork goes and the sheet stands alone in the card. */
+@media (max-width: 1080px) {
+  .signin-frame {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas: "pane";
+  }
+
+  .signin-art,
+  .signin-intro {
+    display: none;
+  }
+
+  .signin-pane {
+    justify-items: center;
+  }
+}

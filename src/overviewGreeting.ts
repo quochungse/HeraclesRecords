@@ -31,7 +31,6 @@ import { formatCount, getIntlLocale, getLocale, t, type MessageKey } from "./i18
  * copy without a renderer.
  */
 export interface OverviewGreetingContext {
-  trainingConnected: boolean;
   upcomingWorkouts?: TrainingHubUpcomingWorkout[];
   activities?: TrainingHubActivity[];
   sportTypes?: TrainingHubSportType[];
@@ -435,20 +434,6 @@ function activityLines(
   return lines;
 }
 
-function setupLines(context: OverviewGreetingContext): OverviewGreetingLine[] {
-  if (context.trainingConnected) {
-    return [];
-  }
-
-  return [
-    {
-      id: "connect-coros",
-      priority: 46,
-      text: t("overview.greeting.connect")
-    }
-  ];
-}
-
 /**
  * Every line that currently holds true, most important first. Ties break on
  * `id` so the order never depends on which builder ran first.
@@ -463,8 +448,7 @@ export function buildOverviewGreetingCandidates(
     ...planLines(context, now),
     ...sleepLines(context, now),
     ...(summary ? recoveryLines(summary) : []),
-    ...activityLines(context, now),
-    ...setupLines(context)
+    ...activityLines(context, now)
   ];
 
   return lines.sort(

@@ -48,6 +48,7 @@ import { AddWorkoutModal } from "../../src/calendar/AddWorkoutModal";
 import { CalendarView } from "../../src/calendar/CalendarView";
 import { CalendarSkeleton } from "../../src/calendar/CalendarSkeleton";
 import { OverviewComingUp } from "../../src/training/overview/OverviewComingUp";
+import { TrainingSignIn } from "../../src/training/TrainingSignIn";
 import type { HeraclesRecordsApi } from "../../src/heraclesrecords-api";
 
 // ---------------------------------------------------------------------------
@@ -663,6 +664,41 @@ const MOUNTS: Record<string, (options: Record<string, unknown>) => ReactElement>
           sportTypes={[]}
           onOpenActivity={spy("onOpenActivity")}
           onOpenCalendar={spy("onOpenCalendar")}
+        />
+      </div>
+    );
+  },
+  // Overview signed out. The fields are the caller's to fill, as App holds them.
+  TrainingSignIn: (options) => {
+    loadOverviewStyles();
+    return (
+      <div
+        className="stack training-dashboard"
+        style={{ width: `${(options.width as number | undefined) ?? 1100}px` }}
+      >
+        <TrainingSignIn
+          status={(options.status as never) ?? { authenticated: false }}
+          email={(options.email as string | undefined) ?? ""}
+          password={(options.password as string | undefined) ?? ""}
+          remember={(options.remember as boolean | undefined) ?? true}
+          twoFactorEmail={(options.twoFactorEmail as string | undefined) ?? null}
+          twoFactorCode=""
+          busy={(options.busy as string | undefined) ?? null}
+          onEmailChange={spy("onEmailChange")}
+          onPasswordChange={spy("onPasswordChange")}
+          onRememberChange={spy("onRememberChange")}
+          onLogin={(event) => {
+            event.preventDefault();
+            spy("onLogin")();
+          }}
+          onReconnect={() => spy("onReconnect")()}
+          onTwoFactorCodeChange={spy("onTwoFactorCodeChange")}
+          onVerifyTwoFactor={(event) => {
+            event.preventDefault();
+            spy("onVerifyTwoFactor")();
+          }}
+          onResendTwoFactor={() => spy("onResendTwoFactor")()}
+          onCancelTwoFactor={() => spy("onCancelTwoFactor")()}
         />
       </div>
     );

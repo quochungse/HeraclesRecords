@@ -70,7 +70,7 @@ Development variants: `dev:simulate-plan-ai` (plan steps without a provider),
 `sample:coach` (sample Coach conversations; app closed). Generators whose output is
 committed and never run by a build: `fonts:fetch`, `admin-regions:fetch`,
 `body-shapes:fetch`, `body-figures:bake`, `sample-rides:fetch`, `sample-hikes:fetch`,
-`icons:generate`, `site:og`.
+`icons:generate`, `site:og`, `signin-art:generate`.
 
 ## Tests
 

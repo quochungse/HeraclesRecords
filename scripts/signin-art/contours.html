@@ -1,0 +1,80 @@
+<!doctype html>
+<meta charset="utf-8">
+<!--
+  The sign-in artwork: topographic contours of an invented massif, an index
+  contour every fifth line as on a real map. Drawn as white ink on transparent
+  so the app can paint it in the accent (signIn.css masks with it). Seeded
+  Perlin noise over a few peaks, traced by marching squares.
+-->
+<script>
+const W = 2400, H = 1600;
+
+const rng = (seed) => () => {
+  seed |= 0; seed = (seed + 0x6d2b79f5) | 0;
+  let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+  t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+  return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+};
+
+function perlin(seed) {
+  const random = rng(seed), p = new Uint16Array(512), grad = [];
+  for (let i = 0; i < 256; i++) { p[i] = i; const a = random() * Math.PI * 2; grad.push([Math.cos(a), Math.sin(a)]); }
+  for (let i = 255; i > 0; i--) { const j = Math.floor(random() * (i + 1)); const tmp = p[i]; p[i] = p[j]; p[j] = tmp; }
+  for (let i = 0; i < 256; i++) p[i + 256] = p[i];
+  const fade = (t) => t * t * t * (t * (t * 6 - 15) + 10);
+  const dot = (h, x, y) => { const v = grad[h & 255]; return v[0] * x + v[1] * y; };
+  return (x, y) => {
+    const xi = Math.floor(x), yi = Math.floor(y), xf = x - xi, yf = y - yi, X = xi & 255, Y = yi & 255;
+    const u = fade(xf), v = fade(yf);
+    const aa = p[p[X] + Y], ab = p[p[X] + Y + 1], ba = p[p[X + 1] + Y], bb = p[p[X + 1] + Y + 1];
+    const l1 = dot(aa, xf, yf) + u * (dot(ba, xf - 1, yf) - dot(aa, xf, yf));
+    const l2 = dot(ab, xf, yf - 1) + u * (dot(bb, xf - 1, yf - 1) - dot(ab, xf, yf - 1));
+    return l1 + v * (l2 - l1);
+  };
+}
+
+const fbm = (noise, x, y, octaves = 5) => {
+  let sum = 0, amp = 0.5, freq = 1;
+  for (let i = 0; i < octaves; i++) { sum += amp * noise(x * freq, y * freq); freq *= 2.03; amp *= 0.5; }
+  return sum;
+};
+
+function render() {
+  const canvas = document.createElement("canvas");
+  canvas.width = W; canvas.height = H;
+  const g = canvas.getContext("2d");
+  const noise = perlin(11), step = 3, gw = Math.ceil(W / step) + 1, gh = Math.ceil(H / step) + 1;
+  // [x, y, radius, height] of each peak, in the canvas's fractions.
+  const peaks = [[0.68, 0.42, 0.34, 1.0], [0.84, 0.66, 0.22, 0.7], [0.5, 0.75, 0.28, 0.55], [0.3, 0.3, 0.3, 0.35]];
+  const height = new Float32Array(gw * gh);
+  for (let j = 0; j < gh; j++) for (let i = 0; i < gw; i++) {
+    const x = (i * step) / W, y = (j * step) / H;
+    let h = 0;
+    for (const [px, py, r, a] of peaks) { const dx = (x - px) * 1.5, dy = y - py; h += a * Math.exp(-(dx * dx + dy * dy) / (r * r)); }
+    h += 0.22 * fbm(noise, x * 3.2, y * 3.2) + 0.05 * fbm(noise, x * 11, y * 11, 3);
+    height[j * gw + i] = h;
+  }
+  // Marching squares: for each corner pattern, the cell edges (top, right,
+  // bottom, left) a contour crosses, in pairs.
+  const crossings = { 1: [3, 2], 2: [2, 1], 3: [3, 1], 4: [0, 1], 5: [3, 0, 2, 1], 6: [0, 2], 7: [3, 0], 8: [3, 0], 9: [0, 2], 10: [3, 2, 0, 1], 11: [0, 1], 12: [3, 1], 13: [2, 1], 14: [3, 2] };
+  const levels = 46, lo = -0.15, hi = 1.15;
+  g.lineCap = "round"; g.lineJoin = "round"; g.strokeStyle = "#fff";
+  for (let k = 0; k < levels; k++) {
+    const level = lo + ((hi - lo) * k) / levels, index = k % 5 === 0;
+    g.globalAlpha = index ? 0.95 : 0.42; g.lineWidth = index ? 2.4 : 1.2;
+    g.beginPath();
+    for (let j = 0; j < gh - 1; j++) for (let i = 0; i < gw - 1; i++) {
+      const a = height[j * gw + i], b = height[j * gw + i + 1], c = height[(j + 1) * gw + i + 1], d = height[(j + 1) * gw + i];
+      const pattern = (a > level ? 8 : 0) | (b > level ? 4 : 0) | (c > level ? 2 : 0) | (d > level ? 1 : 0);
+      if (pattern === 0 || pattern === 15) continue;
+      const x0 = i * step, y0 = j * step;
+      const at = (va, vb) => (level - va) / (vb - va);
+      const edge = [[x0 + step * at(a, b), y0], [x0 + step, y0 + step * at(b, c)], [x0 + step * at(d, c), y0 + step], [x0, y0 + step * at(a, d)]];
+      const pairs = crossings[pattern];
+      for (let s = 0; s < pairs.length; s += 2) { g.moveTo(edge[pairs[s]][0], edge[pairs[s]][1]); g.lineTo(edge[pairs[s + 1]][0], edge[pairs[s + 1]][1]); }
+    }
+    g.stroke();
+  }
+  return canvas.toDataURL("image/webp", 0.9);
+}
+</script>
