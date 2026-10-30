@@ -13,6 +13,9 @@ The command builds Electron, the production renderer and the renderer harness
 once each, then runs the checks directly. It stops at the first failed step,
 returns a nonzero exit code and keeps each step's output in
 `.work/check-coach/`. These logs are replaced at the start of the next check.
+A step still running after five minutes is killed with everything it started
+and counts as failed, so a window that never loads names itself rather than
+running into the CI job's limit.
 
 The checks cover:
 
