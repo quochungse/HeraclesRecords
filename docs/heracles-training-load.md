@@ -10,8 +10,8 @@ Người dùng chọn nguồn tải trên màn Strength. Khi chọn Heracles, c�
 
 | Quyết định | Nội dung |
 | --- | --- |
-| Tên | Heracles Training Load. UI vẫn ghi "Training load", "Load", "TL"; tên đầy đủ chỉ có trong phần giải thích ở Settings, trong hover hiện hai số, trong mô tả tool của Coach và trên website. |
-| Cài đặt | Nút Settings trên màn Strength, mục "Training load formula": COROS · Heracles. Mặc định COROS. |
+| Tên | Heracles Training Load. UI vẫn ghi "Training load", "Load", "TL"; "Heracles TL" ở công tắc trong Settings và trong hover hiện hai số; tên đầy đủ trong mô tả tool của Coach và trên website. |
+| Cài đặt | Nút Settings trên màn Strength, mục "Training load formula": COROS TL · Heracles TL. Mặc định COROS TL. |
 | Dùng Heracles TL | Strength, biểu đồ tuần, Coming up, heatmap và Training load distribution ở Overview, Calendar, Training Library, Activities. Coach và AI Plan đặt mục tiêu tải tuần theo Heracles TL. |
 | Giữ TL COROS | Dải khuyến nghị tuần, Base Fitness, Load Impact, Intensity Trend, load ratio, tải theo vùng nhịp tim, tải tuần ở chân biểu đồ tuần. |
 | Hover | Chỗ nào hiện Heracles TL của buổi sức mạnh thì hover hiện kèm TL COROS. Ngoại lệ chưa làm: xem mục Chưa làm. |
@@ -88,9 +88,9 @@ Một cài đặt duy nhất trên màn Strength quyết định nguồn tải c
 
 - **Vị trí:** đầu màn Strength chỉ còn ba nút: khoảng thời gian, Refresh, Settings. Settings mở popup "Strength settings" (`StrengthSettingsDialog`) có hai mục:
     - **Data source:** chọn Combined · COROS · Hevy, và một dòng trạng thái cho mỗi tài khoản. Dòng Hevy có nút Connect hoặc Manage; nút này đóng popup và mở dialog Hevy riêng (`StrengthHevyDialog`, nhập key, warm-up, ngắt kết nối). Đóng dialog Hevy thì quay lại popup. Khi chưa có nguồn nào, nút "Connect Hevy" trên màn mở thẳng dialog Hevy.
-    - **Training load formula:** `OptionGroup` hai lựa chọn **COROS · Heracles**, dưới là một đoạn giải thích lựa chọn đang chọn. Khi chọn Heracles có thêm hai dòng giá trị đang dùng: "Scale to running: 0,47, measured on your rated runs (17)" (hoặc "the default until you have rated 8 runs") và "Body weight: 75 kg, from your COROS profile" (hoặc "not read yet, 75 kg assumed").
+    - **Training load formula:** công tắc **COROS TL · Heracles TL**, dưới là một câu giải thích lựa chọn đang chọn. Heracles TL được giới thiệu là công thức riêng của Heracles Records, chấm từng set từ mức tạ, số rep, cân nặng và năng lực ở bài đó, để tải của từng buổi và từng nhóm cơ phản ánh đúng khối lượng đã tập. UI không so với thang chạy và không hiện hệ số k hay cân nặng đang dùng.
 - **Lưu trữ:** `app_settings`, khóa `strength.loadSource`, giá trị `coros` hoặc `heracles`; `preference` trong `syncPolicy.ts`. Renderer giữ một bản ở localStorage `heraclesrecords.loadSource` (`derived`) chỉ để lần vẽ đầu đúng nguồn.
-- **IPC:** `strength:getLoadSource` và `strength:setLoadSource` trả về `HeraclesLoadInfo` (nguồn, k, số buổi chạy đo k, cân nặng). Renderer giữ giá trị trong `LoadSourceProvider` (`src/training/loadSource.tsx`), các màn đọc qua `useLoadSource()`; mỗi lần sync kéo về, provider hỏi lại main.
+- **IPC:** `strength:getLoadSource` và `strength:setLoadSource` trả về `HeraclesLoadInfo` (nguồn, k, số buổi chạy đo k, cân nặng); renderer hiện chỉ dùng nguồn. Renderer giữ giá trị trong `LoadSourceProvider` (`src/training/loadSource.tsx`), các màn đọc qua `useLoadSource()`; mỗi lần sync kéo về, provider hỏi lại main.
 - **Buổi chưa có chi tiết:** đổi nguồn không tự tải gì. Chi tiết buổi sức mạnh được tải khi mở màn Strength (theo khoảng đang xem) hoặc mục Strength ở Overview (4 tuần). Trước đó buổi hiện TL COROS, cờ `pending`.
 
 **Hover hai số** (`loadPairTitle` trong `src/training/loadFigures.ts`) chỉ hiện khi đang chọn Heracles và hai số làm tròn khác nhau, hoặc khi có cờ:
@@ -281,7 +281,8 @@ Nhãn mới có đủ 13 ngôn ngữ (`strength.*`, `units.load.*`). Câu chữ 
 | `b9e49db3` | Lịch sử cân nặng |
 | `ff537bcc` | Mỗi lô một lần hỏi khóa đệm; năng lực chỉ giữ 120 ngày |
 | `857fa459` | Training load distribution theo nguồn; dòng mục tiêu tải tuần cho Coach và AI Plan; Coming up và "đã tập so với dự kiến" của Library luôn cùng thang; snapshot Training Library ghép plan theo nguồn đã chọn |
-| commit kế tiếp | Popup Settings của màn Strength (nguồn dữ liệu, công thức tải); dialog Hevy giữ riêng |
+| `a3f70646` | Popup Settings của màn Strength (nguồn dữ liệu, công thức tải); dialog Hevy giữ riêng |
+| commit kế tiếp | Công tắc COROS TL · Heracles TL, viết lại câu giới thiệu Heracles TL, bỏ phần hệ số và cân nặng trong Settings |
 
 Test: `test:heracles-load`, `test:heracles-load-service`, `test:body-weight-history`, `test:overview-model`, `test:calendar-pairing`, `test:plan-reader`, `test:training-library`, `test:activity-filters`, `test:strength-analytics`, `test:chat-activity-tools`, `test:coach-analysis-runner`, `test:chat-service`, `test:ipc-surface`, `test:sync-policy`, `test:i18n`, `check:coach`.
 
@@ -298,7 +299,7 @@ Test: `test:heracles-load`, `test:heracles-load-service`, `test:body-weight-hist
 
 | Rủi ro | Ảnh hưởng | Xử lý |
 | --- | --- | --- |
-| Năng lực tự tham chiếu | Người tập nhẹ được nhiều TL hơn thực tế | Ghi rõ trong phần giải thích ở Settings |
+| Năng lực tự tham chiếu | Người tập nhẹ được nhiều TL hơn thực tế | Chưa ghi trên UI |
 | k đo từ feel của buổi chạy | TL mỗi phút của buổi chạy gần như không đổi theo feel (2,3–3,3), nên k lệch khoảng ±15% tùy dải feel | Chỉ đo ở feel ≥ 3; dưới 8 buổi thì dùng 0,5 |
 | Mẫu kiểm chứng nhỏ | 8 buổi, thang feel 5 mức | Kiểm lại khi có thêm buổi gym có feel |
 | Buổi chưa có chi tiết trong cache | Hiện TL COROS cho tới khi tải xong | Cờ `pending` |

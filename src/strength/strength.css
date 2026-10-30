@@ -2788,7 +2788,7 @@
 }
 
 .strength-settings-section-head p,
-.strength-settings-formula p {
+.strength-settings-formula {
   margin: 0;
   color: var(--text-secondary);
   font-size: 12px;
@@ -2899,27 +2899,6 @@
 
 .strength-settings-button:disabled {
   opacity: 0.55;
-}
-
-.strength-settings-formula {
-  display: grid;
-  gap: 10px;
-}
-
-/* What the formula is being read with, as a quiet readout. */
-.strength-settings-formula ul {
-  display: grid;
-  gap: 4px;
-  margin: 0;
-  padding: 10px 12px;
-  list-style: none;
-  border: 1px solid var(--sx-hairline);
-  border-radius: var(--radius-md);
-  background: var(--sx-well);
-  color: var(--text-secondary);
-  font-size: 12px;
-  line-height: 1.45;
-  font-variant-numeric: tabular-nums;
 }
 
 .strength-settings-foot {

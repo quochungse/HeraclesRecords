@@ -39,8 +39,6 @@ function cacheSource(source: StrengthLoadSource): void {
 
 interface LoadSourceContextValue {
   source: StrengthLoadSource;
-  /** What the figures are read with; undefined until the main process has answered. */
-  info?: HeraclesLoadInfo;
   setSource: (source: StrengthLoadSource) => Promise<void>;
 }
 
@@ -52,12 +50,10 @@ const LoadSourceContext = createContext<LoadSourceContextValue>({
 
 export function LoadSourceProvider({ children }: { children: ReactNode }) {
   const [source, setSourceState] = useState<StrengthLoadSource>(readCachedSource);
-  const [info, setInfo] = useState<HeraclesLoadInfo>();
 
   const apply = useCallback((next: HeraclesLoadInfo) => {
     cacheSource(next.source);
     setSourceState(next.source);
-    setInfo(next);
   }, []);
 
   const refresh = useCallback(async () => {
@@ -92,7 +88,7 @@ export function LoadSourceProvider({ children }: { children: ReactNode }) {
     [apply, refresh]
   );
 
-  const value = useMemo(() => ({ source, info, setSource }), [info, setSource, source]);
+  const value = useMemo(() => ({ source, setSource }), [setSource, source]);
   return <LoadSourceContext.Provider value={value}>{children}</LoadSourceContext.Provider>;
 }
 

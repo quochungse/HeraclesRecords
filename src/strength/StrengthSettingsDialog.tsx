@@ -1,16 +1,10 @@
 import { useEffect } from "react";
 import { Dumbbell, Watch, X } from "lucide-react";
-import type {
-  HeraclesLoadInfo,
-  HevyStatus,
-  StrengthDataSource,
-  StrengthLoadSource,
-  UnitSystem
-} from "../../electron/types";
+import type { HevyStatus, StrengthDataSource, StrengthLoadSource } from "../../electron/types";
 import { OptionGroup } from "../components/OptionGroup";
-import { formatLiftWeight, formatSyncTime } from "./strengthFormat";
+import { formatSyncTime } from "./strengthFormat";
 import "./strength.css";
-import { formatCount, formatDecimal, t } from "../i18n/core";
+import { t } from "../i18n/core";
 
 interface StrengthSettingsDialogProps {
   source: StrengthDataSource;
@@ -21,24 +15,8 @@ interface StrengthSettingsDialogProps {
   /** Opens the Hevy dialog, which connects, changes and disconnects Hevy. */
   onOpenHevy: () => void;
   loadSource: StrengthLoadSource;
-  loadInfo?: HeraclesLoadInfo;
   onLoadSourceChange: (source: StrengthLoadSource) => void;
-  unitSystem: UnitSystem;
   onClose: () => void;
-}
-
-/** What Heracles Training Load is being read with: the scale to running and the body weight. */
-function formulaReadings(info: HeraclesLoadInfo | undefined, unitSystem: UnitSystem): string[] {
-  if (!info) return [];
-  const k = formatDecimal(info.k, 2);
-  return [
-    info.bridgeMeasured
-      ? t("strength.loadSource.bridge", { k, count: formatCount(info.bridgeRuns) })
-      : t("strength.loadSource.bridgeDefault", { k }),
-    info.bodyWeightKg !== undefined
-      ? t("strength.loadSource.weight", { weight: formatLiftWeight(info.bodyWeightKg, unitSystem) })
-      : t("strength.loadSource.noWeight", { weight: formatLiftWeight(75, unitSystem) })
-  ];
 }
 
 /**
@@ -54,9 +32,7 @@ export function StrengthSettingsDialog({
   hevyConnected,
   onOpenHevy,
   loadSource,
-  loadInfo,
   onLoadSourceChange,
-  unitSystem,
   onClose
 }: StrengthSettingsDialogProps) {
   useEffect(() => {
@@ -66,8 +42,6 @@ export function StrengthSettingsDialog({
     document.addEventListener("keydown", closeOnEscape);
     return () => document.removeEventListener("keydown", closeOnEscape);
   }, [onClose]);
-
-  const readings = loadSource === "heracles" ? formulaReadings(loadInfo, unitSystem) : [];
 
   return (
     <div
@@ -160,16 +134,9 @@ export function StrengthSettingsDialog({
             ]}
             onChange={onLoadSourceChange}
           />
-          <div className="strength-settings-formula">
-            <p>{loadSource === "heracles" ? t("strength.loadSource.explain") : t("strength.loadSource.corosExplain")}</p>
-            {readings.length ? (
-              <ul>
-                {readings.map((reading) => (
-                  <li key={reading}>{reading}</li>
-                ))}
-              </ul>
-            ) : null}
-          </div>
+          <p className="strength-settings-formula">
+            {loadSource === "heracles" ? t("strength.loadSource.explain") : t("strength.loadSource.corosExplain")}
+          </p>
         </section>
 
         <footer className="strength-settings-foot">

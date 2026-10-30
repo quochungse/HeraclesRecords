@@ -80,7 +80,7 @@ export function StrengthView({
   onAskCoach
 }: StrengthViewProps) {
   const { unitSystem } = useUnitSystem();
-  const { source: loadSource, info: loadInfo, setSource: setLoadSource } = useLoadSource();
+  const { source: loadSource, setSource: setLoadSource } = useLoadSource();
   const corosConnected = Boolean(status?.authenticated);
 
   const {
@@ -252,9 +252,7 @@ export function StrengthView({
       hevyConnected={hevyConnected}
       onOpenHevy={openHevyFromSettings}
       loadSource={loadSource}
-      loadInfo={loadInfo}
       onLoadSourceChange={(next) => void setLoadSource(next)}
-      unitSystem={unitSystem}
       onClose={closeSettings}
     />
   ) : hevyDialog ? (
