@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.4.1] - 2026-10-30
+
+Heracles Training Load: strength scored from the sets themselves, on the same scale as a run, so a week of running and lifting finally adds up.
+
+### What's new
+- **Heracles Training Load** - COROS reads a gym session from heart rate, so an hour of heavy squats can count for less than a short jog. Heracles Training Load scores it set by set instead: the weight, the reps, your body weight and the most you have lifted on each exercise say how close to failure every set went, and each minute of lifting weighs what a steady minute at the same effort weighs on COROS's own curve. One formula for everyone, built on published research and a public dataset, with nothing tuned on you. Every step is explained at heraclesrecords.com/activities/strength/training-load.
+- **One load across the app** - choose Heracles TL under Strength, Settings, Training load formula, and Overview, the Calendar, the Training Library, Activities and Coach count strength that way. Load Impact, Base Fitness, Intensity Trend and the recommended weekly range follow, by COROS's own formulas, and where a figure differs from the COROS app its hover gives COROS's. Other sports, recovery and training effect stay COROS's. COROS TL stays the default.
+- **Every set scored** - with Heracles TL chosen, each set of a session carries its load, and its hover the predicted RPE and the reps it had left. The muscle map can be lit by load beside sets and volume.
+- **Coach and plans in the same load** - Coach weighs a strength session at what it cost, and Coach and AI Plan set and progress the weekly load in the load you chose, the gym included.
+- **Strength settings** - one dialog for the data source (Combined, COROS or Hevy) and the training load formula. The header keeps the window, Refresh and Settings.
+- **Hevy** - Hevy clocks no rest, so the time its sets leave of a session now counts as rest between them, as COROS's laps do, and a session reads the same from either app. An assisted movement has its assistance taken off your body weight, and the RPE you log outranks any prediction.
+- **Body weight by day** - the app keeps each day your weight changed, so a session is scored at what you weighed that day, not today.
+- **Overview** - Training activity becomes the Training load heatmap, each session on a month card named by its load. Training load distribution reads its heart-rate zones over the sports heart rate measures, so a lifting session no longer counts in them.
+
+### Fixed
+- Improve app performance and stability.
+
 ## [1.4.0] - 2026-10-29
 
 Overview, rebuilt around one question: how ready you are, and what the week holds. And Coach can now change one step of a saved workout without rewriting the whole of it.
