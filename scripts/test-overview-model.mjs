@@ -117,6 +117,26 @@ assert.equal(
   "a session COROS's daily figure has not caught up with counts, as the week chart counts it"
 );
 
+// --- With Heracles chosen, Load Impact, Base Fitness, Intensity Trend and the
+// range are COROS's own plus what Heracles adds (`heraclesFitness.ts`), COROS's
+// kept beside them; with COROS chosen nothing moves.
+{
+  const fitnessUrl = pathToFileURL(path.join(repoRoot, "electron", "heraclesFitness.ts"));
+  const { fitnessInLoadSource } = await import(`${fitnessUrl.href}?cacheBust=${Date.now()}`);
+  const delta = { load: 0, ati: 20, cti: 12, range: 70 };
+  const days = realWeeks.map((day) => ({ ...day, ati: 118, cti: 108, trainingLoadRatio: 118 / 108, heracles: delta }));
+  assert.equal(fitnessInLoadSource(days, "coros"), days, "COROS chosen: the list as given");
+  const heracles = fitnessInLoadSource(days, "heracles");
+  assert.deepEqual(latestTrainingLoad(heracles), { percent: Math.round((138 / 120) * 100), loadImpact: 138, baseFitness: 120 });
+  assert.deepEqual(latestTrainingLoad(days), { percent: 109, loadImpact: 118, baseFitness: 108 });
+  assert.equal(heracles.at(-1).trainingLoad, days.at(-1).trainingLoad, "the day's own load is the screens' to add to");
+  assert.deepEqual(
+    thisWeekLoad({ dayList: heracles, activities: [], now: new Date(2026, 9, 28, 9, 0), unitSystem: "metric", loadSource: "heracles" }),
+    { load: 197, recommended: { min: 833, max: 1083 }, corosRecommended: { min: 763, max: 992 } },
+    "the range moves by Base Fitness's addition × 7 and × 9.1, COROS's beside it"
+  );
+}
+
 // --- A session done today answers today's plan of its sport family.
 const comingUpUrl = pathToFileURL(path.join(repoRoot, "src", "training", "overview", "comingUpModel.ts"));
 const { pairTodayPlan, todayItems, weekAhead } = await import(`${comingUpUrl.href}?cacheBust=${Date.now()}`);
@@ -252,6 +272,51 @@ assert.deepEqual(
   "a block carries its name and both figures, and stands at its load"
 );
 
+// --- The same week with strength read in Heracles Training Load: a strength
+// block stands at its Heracles load, COROS's figure kept for the tooltip, and
+// every other block, the leftover included, is as before.
+{
+  const heracles = (load, cardio) => ({ value: load, cardio, muscular: load - cardio, quality: "sets" });
+  const lifted = activities.map((activity) =>
+    activity.activityId === "mon-lift" ? { ...activity, heraclesLoad: heracles(180, 60) }
+      : activity.activityId === "thu-lift" ? { ...activity, heraclesLoad: heracles(90, 20) }
+        : activity
+  );
+  const plannedCore = upcoming.map((workout) =>
+    workout.name === "Core" ? { ...workout, heraclesLoad: { value: 70, cardio: 20, muscular: 50, quality: "planned" } } : workout
+  );
+  const read = buildWeekChart({ dayList, activities: lifted, upcoming: plannedCore, now, unitSystem: "metric", loadSource: "heracles" });
+  const [hMon, , hWed, hThu, , hSat] = read.columns;
+  assert.deepEqual(hMon.blocks.map((block) => [block.key, block.load]), [
+    ["mon-ride", 200],
+    ["mon-lift", 180]
+  ], "the lift at its Heracles load");
+  assert.deepEqual(hWed.blocks.map((block) => [block.key, block.load]), [["wed-run", 110], ["residual", 20]]);
+  assert.equal(hThu.done, 300 + 70, "Thursday's lift adds what Heracles reads over COROS");
+  assert.deepEqual(hSat.blocks.at(-1).load, 70, "a planned strength session at its Heracles estimate");
+  const unchanged = buildWeekChart({ dayList, activities: lifted, upcoming: plannedCore, now, unitSystem: "metric" });
+  assert.equal(unchanged.columns[0].blocks[1].load, 60, "with COROS chosen nothing moves");
+
+  const coros = thisWeekLoad({ dayList, activities: lifted, now, unitSystem: "metric" });
+  const both = thisWeekLoad({ dayList, activities: lifted, now, unitSystem: "metric", loadSource: "heracles" });
+  assert.equal(both.load, coros.load + (180 - 60) + (90 - 20), "the week's load is what the columns add up to");
+  assert.equal(both.corosLoad, coros.load, "COROS's figure kept for the hover");
+  assert.equal(coros.corosLoad, undefined);
+
+  // Coming up pairs by load in the chosen load, both sides alike.
+  const heavyLift = { happenDay: "20261024", name: "Heavy", sportType: 4, trainingLoad: 20, heraclesLoad: { value: 200, muscular: 180, cardio: 20, quality: "planned" } };
+  const light = { activityId: "light", sportType: 402, startTime: 0, trainingLoad: 20, heraclesLoad: heracles(60, 20) };
+  const heavy = { activityId: "heavy", sportType: 402, startTime: 10, trainingLoad: 21, heraclesLoad: heracles(190, 21) };
+  assert.equal(pairTodayPlan([heavyLift], [light, heavy], "heracles").pairs[0].activity.activityId, "heavy");
+  assert.equal(pairTodayPlan([heavyLift], [light, heavy]).pairs[0].activity.activityId, "light", "in COROS's load the light one is closer");
+  // A plan only COROS priced is set against COROS's figures, never Heracles's.
+  // Read across scales, the 150 lift is 6.5 plans away and the 40 one only 1.
+  const priced = { happenDay: "20261024", name: "Priced", sportType: 4, trainingLoad: 20 };
+  const asPriced = { activityId: "as-priced", sportType: 402, startTime: 0, trainingLoad: 20, heraclesLoad: heracles(150, 20) };
+  const harder = { activityId: "harder", sportType: 402, startTime: 10, trainingLoad: 40, heraclesLoad: heracles(40, 40) };
+  assert.equal(pairTodayPlan([priced], [asPriced, harder], "heracles").pairs[0].activity.activityId, "as-priced");
+}
+
 // --- The same week in time: every sport on one measure, a strength session
 // as long as it took rather than as light as its heart rate read.
 const timed = buildWeekChart({ dayList, activities, upcoming, now, unitSystem: "metric", measure: "time" });
@@ -317,7 +382,7 @@ assert.ok(
 const distributionUrl = pathToFileURL(
   path.join(repoRoot, "src", "training", "overview", "distributionModel.ts")
 );
-const { sportLoadShares, zoneShares, intensityShares } = await import(
+const { heartRateSessions, isHeartRateSport, sportLoadShares, zoneShares, zoneTimeEntries, intensityShares } = await import(
   `${distributionUrl.href}?cacheBust=${Date.now()}`
 );
 const daysAgo = (days) => Math.floor(now.getTime() / 1000) - days * 86_400;
@@ -341,6 +406,39 @@ assert.deepEqual(
   "biggest first; a trail run is a run, a session with no load is no sliver"
 );
 close(mix.sports[0].share, 2 / 3, "a sport's share of the load");
+
+// Training load distribution: the load by sport is every sport's, a lift at
+// its Heracles load when that is chosen; the zones are read over the sports
+// heart rate measures alone — a lift, gym cardio or a climb is out, a swim and
+// a walk stay in.
+{
+  const mixed = [
+    { activityId: "r1", sportType: 100, startTime: daysAgo(2), trainingLoad: 300 },
+    { activityId: "sw", sportType: 300, startTime: daysAgo(3), trainingLoad: 50 },
+    { activityId: "s1", sportType: 402, startTime: daysAgo(5), trainingLoad: 60, heraclesLoad: { value: 200, cardio: 60, muscular: 140, quality: "sets" } },
+    { activityId: "gc", sportType: 400, startTime: daysAgo(6), trainingLoad: 40 },
+    { activityId: "cl", sportType: 800, startTime: daysAgo(7), trainingLoad: 30 },
+    { activityId: "old", sportType: 100, startTime: daysAgo(40), trainingLoad: 90 }
+  ];
+  const shares = sportLoadShares(mixed, now);
+  assert.equal(shares.total, 480, "every sport of the four weeks");
+  assert.deepEqual(shares.sports.map((sport) => sport.category), ["run", "strength", "other"]);
+  const heracles = sportLoadShares(mixed, now, undefined, "heracles");
+  assert.equal(heracles.total, 480 - 60 + 200, "the lift at its Heracles load");
+  assert.equal(isHeartRateSport(900), true, "a walk is steady");
+  assert.equal(isHeartRateSport(402), false);
+  const sessions = heartRateSessions(mixed, now);
+  assert.deepEqual(sessions.map((session) => session.activityId), ["r1", "sw"]);
+  const summaries = new Map([
+    ["r1", { activityId: "r1", zoneSeconds: [600, 1200, 300, 0, 0, 0] }],
+    ["s1", { activityId: "s1", zoneSeconds: [0, 0, 0, 900, 900, 0] }]
+  ]);
+  const time = zoneTimeEntries(sessions, summaries);
+  assert.equal(time.read, 1, "the swim's detail is not read yet");
+  assert.equal(time.total, 2);
+  assert.deepEqual(time.entries.map((entry) => entry.value), [600, 1200, 300, 0, 0, 0], "the lift's zones never join");
+  close(zoneShares(time.entries).rows[1].share, 1200 / 2100, "a zone's share of the time");
+}
 
 const zones = zoneShares([
   { index: 2, value: 600 },

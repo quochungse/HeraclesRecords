@@ -1,5 +1,6 @@
-import type { TrainingHubActivity, TrainingHubUpcomingWorkout } from "../../../electron/types";
+import type { StrengthLoadSource, TrainingHubActivity, TrainingHubUpcomingWorkout } from "../../../electron/types";
 import { getLocalHappenDayKey, happenDayFromTimestamp } from "../formatters";
+import { comparableLoads } from "../loadFigures";
 import { activitySportFamily, scheduledSportFamily, sportFamiliesCompatible } from "../workoutSport";
 
 /*
@@ -17,12 +18,19 @@ function addDays(date: Date, days: number): Date {
  * How far a session is from a plan, lower closer: by load where both state
  * one, then distance, then time — the Calendar's own order (`matchScore` in
  * calendar/pairing.ts), so the two choose alike between two runs of one day.
+ * Load is read in the load the athlete reads strength in, both sides alike
+ * (`comparableLoads`): a plan only COROS priced is set against COROS's figure.
  */
-function fitScore(workout: TrainingHubUpcomingWorkout, activity: TrainingHubActivity): number {
+function fitScore(
+  workout: TrainingHubUpcomingWorkout,
+  activity: TrainingHubActivity,
+  loadSource: StrengthLoadSource
+): number {
   const relative = (actual: number | undefined, planned: number | undefined) =>
     actual !== undefined && planned !== undefined && planned > 0 ? Math.abs(actual - planned) / planned : undefined;
+  const loads = comparableLoads(workout, activity, loadSource);
   return (
-    relative(activity.trainingLoad, workout.trainingLoad) ??
+    relative(loads.done, loads.planned) ??
     relative(activity.distance, workout.distanceMeters) ??
     relative(activity.duration, workout.durationSeconds) ??
     1
@@ -38,7 +46,8 @@ function fitScore(workout: TrainingHubUpcomingWorkout, activity: TrainingHubActi
  */
 export function pairTodayPlan(
   planned: readonly TrainingHubUpcomingWorkout[],
-  done: readonly TrainingHubActivity[]
+  done: readonly TrainingHubActivity[],
+  loadSource: StrengthLoadSource = "coros"
 ): {
   pairs: Array<{ workout: TrainingHubUpcomingWorkout; activity: TrainingHubActivity }>;
   open: TrainingHubUpcomingWorkout[];
@@ -56,7 +65,7 @@ export function pairTodayPlan(
       if (used.has(candidate.activityId) || !sportFamiliesCompatible(family, activitySportFamily(candidate.sportType))) {
         continue;
       }
-      const score = fitScore(workout, candidate);
+      const score = fitScore(workout, candidate, loadSource);
       if (score < best) {
         activity = candidate;
         best = score;
@@ -89,13 +98,15 @@ export type TodayItem =
 export function todayItems(
   upcoming: readonly TrainingHubUpcomingWorkout[],
   activities: readonly TrainingHubActivity[],
-  now = new Date()
+  now = new Date(),
+  loadSource: StrengthLoadSource = "coros"
 ): TodayItem[] {
   const today = getLocalHappenDayKey(now);
   const planned = upcoming.filter((workout) => workout.happenDay === today);
   const { pairs, open, unplanned } = pairTodayPlan(
     planned,
-    activities.filter((activity) => happenDayFromTimestamp(activity.startTime) === today)
+    activities.filter((activity) => happenDayFromTimestamp(activity.startTime) === today),
+    loadSource
   );
   const answered = new Map(pairs.map((pair) => [pair.activity.activityId, pair.workout]));
   const done = [...pairs.map((pair) => pair.activity), ...unplanned].sort(
@@ -152,13 +163,15 @@ export function nextDays(
 export function weekAhead(
   upcoming: readonly TrainingHubUpcomingWorkout[],
   activities: readonly TrainingHubActivity[],
-  now = new Date()
+  now = new Date(),
+  loadSource: StrengthLoadSource = "coros"
 ): TrainingHubUpcomingWorkout[] {
   const today = getLocalHappenDayKey(now);
   const last = getLocalHappenDayKey(addDays(now, 6));
   const { open } = pairTodayPlan(
     upcoming.filter((workout) => workout.happenDay === today),
-    activities.filter((activity) => happenDayFromTimestamp(activity.startTime) === today)
+    activities.filter((activity) => happenDayFromTimestamp(activity.startTime) === today),
+    loadSource
   );
   return [...open, ...upcoming.filter((workout) => workout.happenDay > today && workout.happenDay <= last)];
 }

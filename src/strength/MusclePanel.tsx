@@ -15,7 +15,7 @@ import {
   type MuscleWeekPoint
 } from "./strengthAnalytics";
 import { formatDurationSeconds } from "../training/formatters";
-import { formatDecimal, plural, t } from "../i18n/core";
+import { formatCount, formatDecimal, plural, t } from "../i18n/core";
 
 interface MusclePanelProps {
   muscles: MuscleStat[];
@@ -44,15 +44,15 @@ function formatMetric(
   unitSystem: UnitSystem
 ): FormattedMetric {
   if (metric === "volume") return { value: formatVolumeKg(value, unitSystem) };
-  if (metric === "time") {
-    return { value: formatDurationSeconds(Math.round(value)) };
+  if (metric === "load") {
+    return { value: t("units.trainingLoadShort", { value: formatCount(Math.round(value)) }) };
   }
   return { value: formatSets(value), unit: t("strength.unit.sets") };
 }
 
 function emptyMetricLabel(metric: HeatMetric): string {
   if (metric === "volume") return t("strength.empty.volume");
-  if (metric === "time") return t("strength.empty.time");
+  if (metric === "load") return t("strength.empty.load");
   return t("strength.empty.sets");
 }
 
@@ -314,7 +314,7 @@ function statCells(
 const SECONDARY_BY_METRIC: Record<HeatMetric, string[]> = {
   sets: ["repRange", "perSession"],
   volume: ["sets", "repRange", "perSession"],
-  time: ["sets", "repRange", "perSession"]
+  load: ["sets", "repRange", "perSession"]
 };
 
 interface WeeklyTrend {

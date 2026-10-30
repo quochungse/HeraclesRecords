@@ -26,6 +26,8 @@ import {
   formatUpcomingWorkoutVolumeDisplay,
   inferUpcomingWorkoutCategory
 } from "../training/formatters";
+import { plannedLoad } from "../training/loadFigures";
+import { useLoadSource } from "../training/loadSource";
 import { sportColorCategory } from "../training/sportColors";
 import { resolveSportName } from "../training/sportTypes";
 import { workoutSportView } from "./workoutSportIcons";
@@ -71,6 +73,7 @@ export function ScheduledWorkoutDetail({
   api
 }: ScheduledWorkoutDetailProps) {
   const { unitSystem } = useUnitSystem();
+  const { source } = useLoadSource();
   const reduceMotion = useReducedMotion();
   const sport = workoutSportFromType(entry.sportType);
   const { byId: exercises } = useWorkoutExerciseCatalog(api, sport);
@@ -114,7 +117,7 @@ export function ScheduledWorkoutDetail({
     {
       icon: Gauge,
       label: t("workout.detail.plannedLoad"),
-      value: formatDetailLoad(entry.trainingLoad)
+      value: formatDetailLoad(plannedLoad(entry, source))
     }
   ];
   if (view.totals.durationSeconds) {

@@ -1,8 +1,17 @@
 import { exerciseLabel } from "./strengthAnalytics";
 import { useMemo, useState } from "react";
 import { ArrowUpRight, ChevronLeft, ChevronRight, Info, MessageCircle, Trophy } from "lucide-react";
-import type { CoachOpenRequest, StrengthSession, UnitSystem } from "../../electron/types";
+import type {
+  CoachOpenRequest,
+  HeraclesSetLoad,
+  StrengthLoadSource,
+  StrengthSession,
+  UnitSystem
+} from "../../electron/types";
 import { activityCoachRequest } from "../training/askCoachAbout";
+import { activityLoadNote } from "../training/loadFigures";
+import { useLoadSource } from "../training/loadSource";
+import { formatDistanceValue } from "../units/units";
 import { useUnitSystem } from "../units/UnitSystemProvider";
 import {
   buildExerciseRows,
@@ -10,6 +19,7 @@ import {
   type SessionAnalytics,
   type SessionExerciseRow,
   type SessionPersonalRecord,
+  type SessionStats,
   type StrengthSessionIndex
 } from "./sessionAnalytics";
 import {
@@ -89,15 +99,74 @@ function scrollToCard(id: string) {
   document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" });
 }
 
-function Stat({ label, value, caption }: { label: string; value: string; caption?: string }) {
+function Stat({ label, value, caption, title }: { label: string; value: string; caption?: string; title?: string }) {
   return (
-    <div className="strength-session-stat">
+    <div className="strength-session-stat" title={title}>
       <span>{label}</span>
       <strong>{value}</strong>
       {/* Always drawn, so every stat in the band is the same height. */}
       <em>{caption ?? ""}</em>
     </div>
   );
+}
+
+/**
+ * The session's training load in the load the athlete reads strength in, one
+ * figure. As Heracles Training Load, the hover says when it is estimated, and
+ * names the run of theirs that carried about the same load.
+ */
+function LoadStat({
+  stats,
+  source,
+  unitSystem
+}: {
+  stats: SessionStats;
+  source: StrengthLoadSource;
+  unitSystem: UnitSystem;
+}) {
+  const heracles = source === "heracles" ? stats.heracles : undefined;
+  if (!heracles) {
+    return stats.trainingLoad !== undefined ? (
+      <Stat label={t("activity.m.trainingLoad")} value={formatCount(Math.round(stats.trainingLoad))} />
+    ) : null;
+  }
+  const run = heracles.runEquivalent;
+  const title = [
+    activityLoadNote({ heraclesLoad: heracles }, source),
+    run
+      ? t("strength.load.runEquivalent", {
+          distance: formatDistanceValue(run.distance ?? 0, unitSystem, { digits: 1 }),
+          time: formatSpan(run.duration ?? 0),
+          date: new Intl.DateTimeFormat(getIntlLocale(), { day: "numeric", month: "short" }).format(
+            new Date((run.startTime ?? 0) * 1000)
+          ),
+          load: formatCount(Math.round(run.trainingLoad))
+        })
+      : undefined
+  ]
+    .filter(Boolean)
+    .join("\n");
+  return (
+    <Stat
+      label={t("activity.m.trainingLoad")}
+      value={formatCount(Math.round(heracles.value))}
+      title={title || undefined}
+    />
+  );
+}
+
+/** What a set's load was read from, for its hover. */
+function setLoadTitle(load: HeraclesSetLoad): string {
+  const rpe = formatDecimal(load.rpe, 1);
+  if (load.logged) return t("strength.load.setLogged", { rpe });
+  if (load.filled) return t("strength.load.setFilled", { rpe });
+  if (load.rir === undefined || load.intensity === undefined) return t("strength.load.setHold", { rpe });
+  if (load.fatigued) return t("strength.load.setFatigued", { rpe, rir: formatDecimal(load.rir, 1) });
+  return t("strength.load.set", {
+    rpe,
+    rir: formatDecimal(load.rir, 1),
+    intensity: formatCount(Math.round(load.intensity * 100))
+  });
 }
 
 /** The band's PR chip; it takes the reader down to where the records are written out. */
@@ -123,9 +192,11 @@ interface ExerciseTableProps {
   explorable: ReadonlySet<string>;
   onOpenExercise: (name: string) => void;
   unitSystem: UnitSystem;
+  /** Each set's Heracles load, while that is the load strength is read in. */
+  showLoad: boolean;
 }
 
-function ExerciseTable({ rows, explorable, onOpenExercise, unitSystem }: ExerciseTableProps) {
+function ExerciseTable({ rows, explorable, onOpenExercise, unitSystem, showLoad }: ExerciseTableProps) {
   const [open, setOpen] = useState<ReadonlySet<string>>(
     () => new Set(rows.length <= EXPANDED_EXERCISE_LIMIT ? rows.map((row) => row.key) : [])
   );
@@ -155,6 +226,7 @@ function ExerciseTable({ rows, explorable, onOpenExercise, unitSystem }: Exercis
           const hasReps = row.sets.some((set) => !set.timed);
           const hasTime = row.sets.some((set) => set.timed);
           const hasRpe = row.sets.some((set) => set.rpe !== undefined);
+          const hasLoad = showLoad && row.sets.some((set) => set.heracles !== undefined);
           const group = groupRecords(row.records)[0];
           const panelId = `strength-session-exercise-${row.key}`;
           return (
@@ -222,6 +294,7 @@ function ExerciseTable({ rows, explorable, onOpenExercise, unitSystem }: Exercis
                         {hasE1rm ? <th scope="col">{t("strength.col.e1rm")}</th> : null}
                         {hasRest ? <th scope="col">{t("strength.col.rest")}</th> : null}
                         {hasRpe ? <th scope="col">{t("strength.col.rpe")}</th> : null}
+                        {hasLoad ? <th scope="col">{t("strength.col.load")}</th> : null}
                       </tr>
                     </thead>
                     <tbody>
@@ -248,6 +321,11 @@ function ExerciseTable({ rows, explorable, onOpenExercise, unitSystem }: Exercis
                             ) : null}
                             {hasRest ? <td>{set.restSec > 0 ? formatSeconds(set.restSec) : "—"}</td> : null}
                             {hasRpe ? <td>{set.rpe ?? "—"}</td> : null}
+                            {hasLoad ? (
+                              <td title={set.heracles ? setLoadTitle(set.heracles) : undefined}>
+                                {set.heracles ? formatDecimal(set.heracles.load, 1) : "—"}
+                              </td>
+                            ) : null}
                           </tr>
                         );
                       })}
@@ -289,6 +367,7 @@ interface StrengthSessionHeaderProps {
 /** What the session was and how much work it held. */
 export function StrengthSessionHeader({ entry, showSource, onShowAll, onAskCoach }: StrengthSessionHeaderProps) {
   const { unitSystem } = useUnitSystem();
+  const { source: loadSource } = useLoadSource();
   const { session } = entry;
   const stats = useMemo(() => buildSessionStats(session), [session]);
   const recordCount = useMemo(() => groupRecords(entry.records).length, [entry.records]);
@@ -367,9 +446,7 @@ export function StrengthSessionHeader({ entry, showSource, onShowAll, onAskCoach
             }
           />
         ) : null}
-        {stats.trainingLoad !== undefined ? (
-          <Stat label={t("activity.m.trainingLoad")} value={String(Math.round(stats.trainingLoad))} />
-        ) : null}
+        <LoadStat stats={stats} source={loadSource} unitSystem={unitSystem} />
         {stats.calories !== undefined ? (
           <Stat label={t("activity.m.calories")} value={`${formatCount(Math.round(stats.calories))} kcal`} />
         ) : null}
@@ -462,6 +539,7 @@ export function StrengthSessionExercises({
   onOpenExercise
 }: StrengthSessionExercisesProps) {
   const { unitSystem } = useUnitSystem();
+  const { source: loadSource } = useLoadSource();
   const rows = useMemo(() => buildExerciseRows(entry), [entry]);
   const stats = useMemo(() => buildSessionStats(entry.session), [entry.session]);
 
@@ -496,6 +574,7 @@ export function StrengthSessionExercises({
           explorable={explorable}
           onOpenExercise={onOpenExercise}
           unitSystem={unitSystem}
+          showLoad={loadSource === "heracles"}
         />
       )}
     </section>

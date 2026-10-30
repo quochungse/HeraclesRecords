@@ -22,8 +22,8 @@ export { exerciseTargets } from "./exerciseTargets";
 import { startOfWeekMs } from "../training/activityWindow";
 import { formatCount, formatDecimal, getIntlLocale, t } from "../i18n/core";
 
-/** What the body map shades muscles by. */
-export type HeatMetric = "sets" | "volume" | "time";
+/** What the body map shades muscles by. `load` is Heracles Training Load, offered only when it is the chosen load. */
+export type HeatMetric = "sets" | "volume" | "load";
 
 export interface MuscleExerciseShare {
   name: string;
@@ -51,6 +51,12 @@ export interface MuscleStat {
    */
   bodyweightSets: number;
   workSec: number;
+  /**
+   * Heracles Training Load credited to the muscle: each set's load split by
+   * the movement's muscle shares, so the muscles of a session add up to its
+   * sets' load (time between sets belongs to no muscle).
+   */
+  loadTl: number;
   /** Sessions that trained this muscle at all. */
   sessions: number;
   /** Epoch seconds of the most recent session that trained it. */
@@ -159,8 +165,8 @@ export function metricValue(stat: MuscleStat, metric: HeatMetric): number {
   if (metric === "volume") {
     return stat.volumeKg;
   }
-  if (metric === "time") {
-    return stat.workSec;
+  if (metric === "load") {
+    return stat.loadTl;
   }
   return stat.sets;
 }
@@ -213,6 +219,7 @@ function emptyMuscleStat(muscle: MuscleId): MuscleStat {
     volumeKg: 0,
     bodyweightSets: 0,
     workSec: 0,
+    loadTl: 0,
     sessions: 0,
     topExercises: [],
     weekly: []
@@ -324,10 +331,14 @@ export function buildStrengthAnalytics(
       week.durationSec += summary.durationSec || session.duration || 0;
     }
 
-    for (const exercise of session.detail.exercises) {
+    for (const [exerciseIndex, exercise] of session.detail.exercises.entries()) {
       const name = exerciseDisplayName(exercise.nameKey, exercise.rawName);
       const targets = exerciseTargets(exercise);
       const setCount = exercise.entries.length;
+      const exerciseLoadTl = (session.heracles?.sets?.[exerciseIndex] ?? []).reduce(
+        (sum, set) => sum + (set?.load ?? 0),
+        0
+      );
 
       let exerciseReps = 0;
       let exerciseVolumeKg = 0;
@@ -426,6 +437,7 @@ export function buildStrengthAnalytics(
           stat.bodyweightSets += setCount * activation.share;
         }
         stat.workSec += exerciseWorkSec * activation.share;
+        stat.loadTl += exerciseLoadTl * activation.share;
         if (at !== undefined && at > (stat.lastTrained ?? 0)) {
           stat.lastTrained = at;
         }
@@ -475,7 +487,7 @@ export function buildStrengthAnalytics(
   const muscleMax: Record<HeatMetric, number> = {
     sets: Math.max(0, ...muscleList.map((stat) => stat.sets)),
     volume: Math.max(0, ...muscleList.map((stat) => stat.volumeKg)),
-    time: Math.max(0, ...muscleList.map((stat) => stat.workSec))
+    load: Math.max(0, ...muscleList.map((stat) => stat.loadTl))
   };
 
   const exerciseStats: ExerciseStat[] = [...exercises.values()]

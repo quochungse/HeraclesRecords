@@ -5,13 +5,14 @@
  * can reach: the renderer holds every activity COROS has, and the question
  * "which of these does the athlete mean" is arithmetic, not layout.
  */
-import type { TrainingHubActivity } from "../../electron/types";
+import type { StrengthLoadSource, TrainingHubActivity } from "../../electron/types";
 import {
   periodOptions,
   type PeriodDays,
   type PeriodOption
 } from "../preferences/periodScale";
 import { activityStartTimeMs, startOfWeekMs, weekWindowStartMs } from "./activityWindow";
+import { activityLoad } from "./loadFigures";
 import { type SportColorCategory, sportColorCategory } from "./sportColors";
 import { getIntlLocale, t } from "../i18n/core";
 
@@ -148,6 +149,7 @@ export interface ActivityTotals {
   distance: number;
   /** Metres. */
   elevationGain: number;
+  /** In the load strength is read in (`useLoadSource`). */
   trainingLoad: number;
   /** Distinct calendar days with at least one activity. */
   activeDays: number;
@@ -183,7 +185,8 @@ function emptyActivityTotals(): ActivityTotals {
  * divided by 52 on the "1 year" filter.
  */
 export function summariseActivities(
-  activities: readonly TrainingHubActivity[]
+  activities: readonly TrainingHubActivity[],
+  loadSource: StrengthLoadSource = "coros"
 ): ActivityTotals {
   if (activities.length === 0) {
     return emptyActivityTotals();
@@ -202,7 +205,8 @@ export function summariseActivities(
     duration += activity.duration ?? 0;
     distance += activity.distance ?? 0;
     elevationGain += activity.elevationGain ?? 0;
-    trainingLoad += activity.trainingLoad ?? 0;
+    const load = activityLoad(activity, loadSource) ?? 0;
+    trainingLoad += load;
 
     const category = sportColorCategory(activity.sportType);
     const total = bySport.get(category) ?? {
@@ -213,7 +217,7 @@ export function summariseActivities(
     };
     total.count += 1;
     total.duration += activity.duration ?? 0;
-    total.trainingLoad += activity.trainingLoad ?? 0;
+    total.trainingLoad += load;
     bySport.set(category, total);
 
     const at = activityStartTimeMs(activity);

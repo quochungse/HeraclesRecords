@@ -22,6 +22,12 @@ const units: UnitsMessages = {
   "units.weekly.distanceUnit": "거리({unit})",
   "units.exercises_one": "운동 {count}개",
   "units.exercises_other": "운동 {count}개",
+  "units.load.pair": "Heracles TL {heracles} · COROS TL {coros}",
+  "units.load.estimate": "추정: 세트를 읽을 수 없었습니다",
+  "units.load.pending": "아직 계산되지 않음: 세션의 세트를 불러오는 중입니다",
+  "units.load.pairFigure": "Heracles {heracles} · COROS {coros}",
+  "units.load.rangePair": "권장 범위: Heracles {heracles} · COROS {coros}",
+  "units.load.fitnessPartial": "추정치: 일부 근력 세션의 세트를 아직 불러오는 중입니다",
 };
 
 export default units;

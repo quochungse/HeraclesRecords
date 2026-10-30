@@ -22,6 +22,12 @@ const units: UnitsMessages = {
   "units.weekly.distanceUnit": "距離（{unit}）",
   "units.exercises_one": "{count} 種目",
   "units.exercises_other": "{count} 種目",
+  "units.load.pair": "Heracles TL {heracles} · COROS TL {coros}",
+  "units.load.estimate": "推定：セットを読み取れませんでした",
+  "units.load.pending": "未計算：セッションのセットを読み込み中です",
+  "units.load.pairFigure": "Heracles {heracles} · COROS {coros}",
+  "units.load.rangePair": "推奨範囲：Heracles {heracles} · COROS {coros}",
+  "units.load.fitnessPartial": "概算：一部の筋トレのセットをまだ読み込み中です",
 };
 
 export default units;

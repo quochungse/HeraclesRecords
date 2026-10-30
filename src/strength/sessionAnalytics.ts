@@ -1,4 +1,11 @@
-import type { StrengthSession, StrengthSetType } from "../../electron/types";
+import type {
+  HeraclesLoad,
+  HeraclesRunEquivalent,
+  HeraclesSessionLoad,
+  HeraclesSetLoad,
+  StrengthSession,
+  StrengthSetType
+} from "../../electron/types";
 import type { MuscleId } from "./muscles";
 import {
   buildStrengthAnalytics,
@@ -92,7 +99,7 @@ const FULL_BODY_FAINT: SessionHeat = {
   muscleById: Object.fromEntries(
     Object.entries(buildStrengthAnalytics([], 1).muscleById).map(([id, stat]) => [
       id,
-      { ...stat, sets: FAINT_VALUE, volumeKg: FAINT_VALUE, workSec: FAINT_VALUE }
+      { ...stat, sets: FAINT_VALUE, volumeKg: FAINT_VALUE, workSec: FAINT_VALUE, loadTl: FAINT_VALUE }
     ])
   ) as Record<MuscleId, MuscleStat>,
   max: FAINT_MAX
@@ -260,7 +267,14 @@ export interface SessionStats {
   avgHr?: number;
   maxHr?: number;
   trainingLoad?: number;
+  /** Heracles Training Load, without its sets. */
+  heracles?: HeraclesLoad & { runEquivalent?: HeraclesRunEquivalent };
   calories?: number;
+}
+
+/** A session's Heracles load as its header reads it: the sets and the session RPE left out. */
+function withoutSets({ sets: _sets, sessionRpe: _rpe, ...load }: HeraclesSessionLoad): NonNullable<SessionStats["heracles"]> {
+  return load;
 }
 
 export function buildSessionStats(session: StrengthSession): SessionStats {
@@ -295,6 +309,7 @@ export function buildSessionStats(session: StrengthSession): SessionStats {
     avgHr: optional(session.avgHr ?? summary.avgHr),
     maxHr: optional(session.maxHr ?? summary.maxHr),
     trainingLoad: optional(session.trainingLoad ?? summary.trainingLoad),
+    ...(session.heracles ? { heracles: withoutSets(session.heracles) } : {}),
     calories: optional(session.calories ?? summary.calories)
   };
 }
@@ -310,6 +325,8 @@ export interface ExerciseSetRow {
   workSec: number;
   restSec: number;
   rpe?: number;
+  /** Heracles Training Load's reading of the set; absent for what is not a working set. */
+  heracles?: HeraclesSetLoad;
 }
 
 export interface SessionExerciseRow {
@@ -331,7 +348,8 @@ export interface SessionExerciseRow {
 /** The exercise table, in the order the session logged it. */
 export function buildExerciseRows(entry: SessionAnalytics): SessionExerciseRow[] {
   const rows: SessionExerciseRow[] = entry.session.detail.exercises.map((exercise, index) => {
-    const sets = exercise.entries.map((set) => ({
+    const loads = entry.session.heracles?.sets?.[index];
+    const sets = exercise.entries.map((set, setIndex): ExerciseSetRow => ({
       type: set.type ?? "normal",
       reps: set.reps,
       // COROS says so; a Hevy duration set says it by its zero reps.
@@ -340,7 +358,8 @@ export function buildExerciseRows(entry: SessionAnalytics): SessionExerciseRow[]
       e1rmKg: estimateOneRepMax(set.weightKg, set.reps),
       workSec: set.workSec,
       restSec: set.restSec,
-      ...(set.rpe !== undefined ? { rpe: set.rpe } : {})
+      ...(set.rpe !== undefined ? { rpe: set.rpe } : {}),
+      ...(loads?.[setIndex] ? { heracles: loads[setIndex] } : {})
     }));
     const top = sets.reduce<ExerciseSetRow | undefined>(
       (best, set) =>

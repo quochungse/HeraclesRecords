@@ -1,10 +1,13 @@
 import { useMemo, useState, type CSSProperties } from "react";
 import { Activity, ArrowUpRight, Check, ChevronRight, type LucideIcon } from "lucide-react";
 import type {
+  StrengthLoadSource,
   TrainingHubActivity,
   TrainingHubSportType,
   TrainingHubUpcomingWorkout
 } from "../../../electron/types";
+import { activityLoad, activityLoadNote, comparableLoads, inLoadSource, plannedLoad } from "../loadFigures";
+import { useLoadSource } from "../loadSource";
 import type { HeraclesRecordsApi } from "../../heraclesrecords-api";
 import { workoutSportView } from "../../calendar/workoutSportIcons";
 import { useUnitSystem } from "../../units/UnitSystemProvider";
@@ -30,13 +33,16 @@ function plannedView(workout: TrainingHubUpcomingWorkout): { category: SportColo
   return sport ? workoutSportView(sport) : { category: "other", icon: Activity };
 }
 
-function doneLine(activity: TrainingHubActivity, unitSystem: Parameters<typeof formatDistanceMeters>[1]): string {
+function doneLine(
+  activity: TrainingHubActivity,
+  unitSystem: Parameters<typeof formatDistanceMeters>[1],
+  loadSource: StrengthLoadSource
+): string {
+  const load = activityLoad(activity, loadSource);
   return [
     activity.distance && activity.distance > 0 ? formatDistanceMeters(activity.distance, unitSystem) : null,
     activity.duration && activity.duration > 0 ? formatDurationSpan(activity.duration) : null,
-    activity.trainingLoad && activity.trainingLoad > 0
-      ? t("units.trainingLoadShort", { value: Math.round(activity.trainingLoad) })
-      : null
+    load && load > 0 ? t("units.trainingLoadShort", { value: Math.round(load) }) : null
   ]
     .filter(Boolean)
     .join(" · ");
@@ -94,12 +100,13 @@ function TodayEntry({
   onOpenActivity?: (activityId: string) => void;
 }) {
   const { unitSystem } = useUnitSystem();
+  const { source: loadSource } = useLoadSource();
   const className = `overview-plan-entry${item.kind === "done" ? " is-done" : ""}${lead ? " is-lead" : ""}`;
   const chevron = <ChevronRight className="overview-plan-chevron" size={18} aria-hidden="true" />;
   if (item.kind === "planned") {
     const view = plannedView(item.workout);
     const tag = planTag(item.workout);
-    const stats = formatUpcomingWorkoutRowStats(item.workout.volume, item.workout.trainingLoad, unitSystem);
+    const stats = formatUpcomingWorkoutRowStats(item.workout.volume, plannedLoad(item.workout, loadSource), unitSystem);
     return (
       <button type="button" className={className} onClick={() => onOpenWorkout(item.workout)}>
         <SportTile category={view.category} icon={view.icon} />
@@ -117,12 +124,14 @@ function TodayEntry({
 
   const { activity, workout } = item;
   const category = sportColorCategory(activity.sportType);
-  const against = lead ? loadAgainstPlan(activity.trainingLoad, workout?.trainingLoad) : undefined;
+  const compared = lead && workout ? comparableLoads(workout, activity, loadSource) : undefined;
+  const against = compared ? loadAgainstPlan(compared.done, compared.planned) : undefined;
   const name = activityTitle(activity);
   // Named by its plan, the session's own name goes with its figures.
-  const meta = [workout && workout.name !== name ? name : null, doneLine(activity, unitSystem)]
+  const meta = [workout && workout.name !== name ? name : null, doneLine(activity, unitSystem, loadSource)]
     .filter(Boolean)
     .join(" · ");
+  const loadTitle = activityLoadNote(activity, loadSource);
   const body = (
     <>
       <SportTile category={category} icon={Check} done />
@@ -131,7 +140,7 @@ function TodayEntry({
           <span>{workout?.name ?? name}</span>
           <span className="overview-chip is-done">{t("overview.comingUp.done")}</span>
         </span>
-        <span className="overview-plan-meta">{meta}</span>
+        <span className="overview-plan-meta" title={loadTitle}>{meta}</span>
       </span>
       {onOpenActivity ? chevron : null}
       {against ? (
@@ -180,6 +189,7 @@ export function OverviewComingUp({
 }) {
   useI18n();
   const { unitSystem } = useUnitSystem();
+  const { source: loadSource } = useLoadSource();
   const [selected, setSelected] = useState<TrainingHubUpcomingWorkout | null>(null);
   // Read again when the day turns over: left open past midnight, today's
   // sessions must not stay under Today and turn up under the next days too.
@@ -189,9 +199,15 @@ export function OverviewComingUp({
     () => filterUpcomingWorkoutsFromToday(upcomingWorkouts, now),
     [upcomingWorkouts, now]
   );
-  const today = useMemo(() => todayItems(scheduled, activities, now), [scheduled, activities, now]);
+  const today = useMemo(
+    () => todayItems(scheduled, activities, now, loadSource),
+    [scheduled, activities, now, loadSource]
+  );
   const later = useMemo(() => nextDays(scheduled, now), [scheduled, now]);
-  const ahead = useMemo(() => weekAhead(scheduled, activities, now), [scheduled, activities, now]);
+  const ahead = useMemo(
+    () => inLoadSource(weekAhead(scheduled, activities, now, loadSource), loadSource),
+    [scheduled, activities, now, loadSource]
+  );
 
   // Nothing on the calendar and nothing done today: no section at all, rather
   // than a row spent saying so.
@@ -262,7 +278,7 @@ export function OverviewComingUp({
               {later.map((workout, index) => {
                 const labels = dayLabels(workout.happenDay, now);
                 const tag = planTag(workout);
-                const stats = formatUpcomingWorkoutRowStats(workout.volume, workout.trainingLoad, unitSystem);
+                const stats = formatUpcomingWorkoutRowStats(workout.volume, plannedLoad(workout, loadSource), unitSystem);
                 return (
                   <li key={`${workout.happenDay}:${index}`}>
                     <button

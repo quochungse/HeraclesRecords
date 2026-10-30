@@ -1666,6 +1666,12 @@ const analysedIds = (world) =>
   assert.doesNotMatch(turn, /\(id run\)/, "the analysed activity is not its own context");
   assert.ok(turn.indexOf("Leg day") < turn.indexOf("Two house rules"), "the context sits in the focus, not after the contract");
 
+  // A strength session read in Heracles Training Load says so on its line.
+  assert.match(
+    formatPrecedingTraining({ activity_id: "run", start_time: runStart }, [{ ...legDay, heracles_load: 161 }]),
+    /ended 25 h before: 60 min, avg HR 118, Heracles load 161\./
+  );
+
   // Nothing before it is said, rather than left for the model to guess.
   assert.equal(
     formatPrecedingTraining({ activity_id: "run", start_time: runStart }, []),

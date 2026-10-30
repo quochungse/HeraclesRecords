@@ -86,7 +86,11 @@ import {
   withExerciseCandidates
 } from "./trainingPlanSimulation";
 import {
+  coachHeraclesLoadValue,
   formatActivityListLine,
+  formatHeraclesLoadPart,
+  withCoachHeraclesLoads,
+  withCoachPlannedHeraclesLoads,
   formatActivitySpan,
   getChatActivityTools,
   handleChatActivityTool,
@@ -232,6 +236,7 @@ import type {
   PersistedChatSource,
   SaveChatSessionOptions,
   StoredChatToken,
+  HeraclesLoad,
   TrainingHubActivity,
   TrainingHubDashboard,
   TrainingHubUpcomingWorkout,
@@ -255,6 +260,7 @@ import {
   buildCoachInstructions,
   buildCoachSportCapabilityGuide,
   buildCoachWorkoutDefaultsGuide,
+  COACH_HERACLES_INSTRUCTION,
   formatAthleteProfile,
   formatCoachDashboard,
   formatCoachSleepHeartRate,
@@ -4041,8 +4047,9 @@ interface TrainingContextScope {
 /**
  * A turn's system prompt in two parts, by how often each changes.
  *
- * `head` is the same on every turn of a conversation: the coach's rules, the
- * athlete's instructions and units. `live` is what this turn read — the date
+ * `head` is the same on nearly every turn of a conversation: the coach's
+ * rules, the athlete's instructions and units, and a line on Heracles Training
+ * Load while the snapshot states one. `live` is what this turn read — the date
  * and the COROS snapshot — and changes with the day, the recovery figure and
  * the calendar. The tool guide goes between them (`coachSystemPrompt`), so the
  * part that never changes comes first and the part that does comes last. A
@@ -4098,12 +4105,12 @@ async function buildTrainingContext(
   const includeSleep = scope?.sleep !== false;
   const [activities, dashboard, upcoming, profile, sleep] = await Promise.allSettled([
     includeActivities
-      ? listTrainingHubActivities(1, 25)
+      ? listTrainingHubActivities(1, 25).then(withCoachHeraclesLoads)
       : Promise.resolve([] as TrainingHubActivity[]),
     includeActivities
       ? getTrainingDashboard()
       : Promise.resolve(null as TrainingHubDashboard | null),
-    getUpcomingWorkouts(14),
+    getUpcomingWorkouts(14).then(withCoachPlannedHeraclesLoads),
     // Body metrics and thresholds cost nothing on any turn inside the
     // profile's hour-long cache.
     getCoachCorosProfile(),
@@ -4169,7 +4176,17 @@ async function buildTrainingContext(
     hasData = true;
   }
 
-  return { head, live: sections.join("\n").trim(), hasData };
+  // Heracles Training Load is explained only where the snapshot states one.
+  const showsHeracles = [activities, upcoming].some(
+    (result) =>
+      result.status === "fulfilled" &&
+      result.value.some((item: { trainingLoad?: number; heraclesLoad?: HeraclesLoad }) => coachHeraclesLoadValue(item) !== undefined)
+  );
+  return {
+    head: showsHeracles ? `${head}\n\n${COACH_HERACLES_INSTRUCTION}` : head,
+    live: sections.join("\n").trim(),
+    hasData
+  };
 }
 
 function formatUpcomingVolume(
@@ -4207,6 +4224,7 @@ function formatUpcoming(
         workout.name,
         formatUpcomingVolume(workout.volume, unitSystem),
         workout.trainingLoad ? `load ${workout.trainingLoad}` : "",
+        formatHeraclesLoadPart(workout) ?? "",
         exerciseDetail ? `exercises: ${exerciseDetail}` : ""
       ].filter(Boolean);
       return `- ${parts.join(" · ")}`;

@@ -22,6 +22,12 @@ const units: UnitsMessages = {
   "units.weekly.distanceUnit": "Jarak ({unit})",
   "units.exercises_one": "{count} gerakan",
   "units.exercises_other": "{count} gerakan",
+  "units.load.pair": "Heracles TL {heracles} · COROS TL {coros}",
+  "units.load.estimate": "Perkiraan: set tidak dapat dibaca",
+  "units.load.pending": "Belum dihitung: set sesi ini masih dimuat",
+  "units.load.pairFigure": "Heracles {heracles} · COROS {coros}",
+  "units.load.rangePair": "Rentang yang disarankan: Heracles {heracles} · COROS {coros}",
+  "units.load.fitnessPartial": "Perkiraan: set beberapa sesi latihan beban masih dimuat",
 };
 
 export default units;

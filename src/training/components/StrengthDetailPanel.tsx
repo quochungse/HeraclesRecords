@@ -1,13 +1,15 @@
-import type { StrengthDetail } from "../../../electron/types";
+import type { HeraclesLoad, StrengthDetail } from "../../../electron/types";
 import { formatDurationSeconds, formatOptionalNumber } from "../formatters";
 import { resolveExerciseName } from "../exerciseNames";
 import { useUnitSystem } from "../../units/UnitSystemProvider";
 import { formatVolumeKg, formatWeightKg } from "../../strength/strengthAnalytics";
 import { formatCount, formatDecimal, t } from "../../i18n/core";
+import { activityLoadNote } from "../loadFigures";
+import { useLoadSource } from "../loadSource";
 
-function StatTile({ label, value }: { label: string; value: string }) {
+function StatTile({ label, value, title }: { label: string; value: string; title?: string }) {
   return (
-    <div className="activity-detail-stat">
+    <div className="activity-detail-stat" title={title}>
       <span>{label}</span>
       <strong>{value}</strong>
     </div>
@@ -30,9 +32,13 @@ function displayExerciseName(
   return /^[TS]\d/.test(resolved) ? `Exercise ${index + 1}` : resolved;
 }
 
-export function StrengthDetailPanel({ strength }: { strength: StrengthDetail }) {
+/** `heraclesLoad` is the list row's: COROS's detail does not carry it. */
+export function StrengthDetailPanel({ strength, heraclesLoad }: { strength: StrengthDetail; heraclesLoad?: HeraclesLoad }) {
   const { unitSystem } = useUnitSystem();
+  const { source } = useLoadSource();
   const { summary, exercises } = strength;
+  const heracles = source === "heracles" ? heraclesLoad : undefined;
+  const load = heracles?.value ?? summary.trainingLoad;
   return (
     <div className="strength-detail">
       <div className="activity-detail-grid">
@@ -47,8 +53,12 @@ export function StrengthDetailPanel({ strength }: { strength: StrengthDetail }) 
         {summary.maxHr !== undefined ? (
           <StatTile label={t("activity.m.maxHr")} value={formatOptionalNumber(summary.maxHr)} />
         ) : null}
-        {summary.trainingLoad !== undefined ? (
-          <StatTile label={t("activity.m.trainingLoad")} value={formatOptionalNumber(summary.trainingLoad)} />
+        {load !== undefined ? (
+          <StatTile
+            label={t("activity.m.trainingLoad")}
+            value={formatOptionalNumber(Math.round(load))}
+            title={activityLoadNote({ heraclesLoad: heracles }, source)}
+          />
         ) : null}
         {summary.aerobicEffect !== undefined ? (
           <StatTile label={t("activity.strength.aerobic")} value={formatDecimal(summary.aerobicEffect, 1)} />

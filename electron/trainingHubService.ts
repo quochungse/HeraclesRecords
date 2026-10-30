@@ -43,12 +43,14 @@ import {
   listStrengthActivitiesMissingDetail,
   listTrainingActivitiesMissingFeelType,
   listTrainingActivityRpeInputs,
+  recordBodyWeight,
   setSetting,
   setTrainingActivityFeelType,
   upsertActivityDetailSummary,
   upsertStrengthSessionDetail,
   upsertTrainingActivities
 } from "./database";
+import { dayKey } from "./chatDayKeys";
 import { getSecretSetting, setSecretSetting } from "./secretSettings";
 import { annotateDiagnosticRequest } from "./diagnosticsLog";
 import { simplifyRoute } from "./routeSimplification";
@@ -1360,7 +1362,24 @@ export function buildCorosProfileUpdateFields(
  * COROS trains from and the zone tables it derives from them.
  */
 export async function getCorosProfile(): Promise<CorosProfile> {
-  return normalizeCorosProfile(await readCorosAccount());
+  return keepingBodyWeight(normalizeCorosProfile(await readCorosAccount()));
+}
+
+/**
+ * The profile as read, its weight kept for the day (`recordBodyWeight`):
+ * COROS holds only the current one, and Heracles Training Load scores a past
+ * session at the weight of its day. Best-effort: a profile read never fails
+ * for it.
+ */
+function keepingBodyWeight(profile: CorosProfile): CorosProfile {
+  if (profile.weightKg !== undefined) {
+    try {
+      recordBodyWeight(profile.weightKg, dayKey(new Date()));
+    } catch {
+      // No database yet: the next read keeps it.
+    }
+  }
+  return profile;
 }
 
 /**
@@ -1408,6 +1427,11 @@ function cachedCorosProfile(): CorosProfile | null {
  */
 export function lastKnownCorosProfileSex(): number | undefined {
   return corosProfileCache?.snapshot.profile.sex ?? coachProfileCache?.profile.sex;
+}
+
+/** The account's body weight as last read, however long ago; undefined until one has been. */
+export function lastKnownCorosWeightKg(): number | undefined {
+  return corosProfileCache?.snapshot.profile.weightKg ?? coachProfileCache?.profile.weightKg;
 }
 
 /**
@@ -1560,7 +1584,7 @@ export async function updateCorosProfile(
   // a future response ever trims it.
   const profile =
     updated && typeof updated === "object" && updated.userId !== undefined
-      ? normalizeCorosProfile(updated)
+      ? keepingBodyWeight(normalizeCorosProfile(updated))
       : await getCorosProfile();
 
   // The write is the newest truth there is, so it seeds the cache rather than
@@ -7451,6 +7475,10 @@ export function parseScheduledExercises(
         : undefined);
     const weight = scheduledExerciseWeightKg(exercise);
     const targetLabel = formatScheduledExerciseTarget(exercise, targetType);
+    const targetValue = toOptionalNumber(exercise.targetValue);
+    // Rest type 1 is a timed rest; the others are none or until pressed.
+    const restSec = toOptionalNumber(exercise.restType) === 1 ? toOptionalNumber(exercise.restValue) : undefined;
+    const corosExerciseType = toOptionalNumber(exercise.exerciseType);
 
     parsed.push({
       name,
@@ -7458,7 +7486,13 @@ export function parseScheduledExercises(
       reps,
       weight,
       targetType,
-      targetLabel
+      targetLabel,
+      ...(/^[TS]\d{4}$/i.test(name) ? { key: name.toUpperCase() } : {}),
+      ...(corosExerciseType !== undefined ? { corosExerciseType } : {}),
+      ...(restSec !== undefined && restSec > 0 ? { restSec } : {}),
+      ...(targetType === COROS_TARGET_TYPE_TIME && targetValue
+        ? { holdSec: normalizeActivityDuration(targetValue) ?? targetValue }
+        : {})
     });
   }
 

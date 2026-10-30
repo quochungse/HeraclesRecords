@@ -8,13 +8,14 @@
  * The set is chosen per sport rather than fixed, because a fixed set is what
  * put a column of "0 km" beside every strength session.
  */
-import type { TrainingHubActivity, UnitSystem } from "../../electron/types";
+import type { StrengthLoadSource, TrainingHubActivity, UnitSystem } from "../../electron/types";
 import {
   formatDistanceMeters,
   formatDurationSpan,
   formatElevationMeters,
   formatPaceSecondsPerKm
 } from "./formatters";
+import { activityLoad, activityLoadNote } from "./loadFigures";
 import { isSpeedSport, isSwimSportType } from "./sportTypes";
 import { activityReading, formatSwimPace } from "../../electron/activityReading";
 import { formatSpeedValue } from "../units/units";
@@ -51,10 +52,11 @@ const MAX_FACTS = 3;
  */
 export function activityRowFacts(
   activity: TrainingHubActivity,
-  unitSystem: UnitSystem
+  unitSystem: UnitSystem,
+  loadSource: StrengthLoadSource = "coros"
 ): ActivityFact[] {
-  const { sportType, distance, duration, avgHr, trainingLoad, elevationGain } =
-    activity;
+  const { sportType, distance, duration, avgHr, elevationGain } = activity;
+  const trainingLoad = activityLoad(activity, loadSource);
   const swim = isSwimSportType(sportType);
   const speed = isSpeedSport(sportType);
   const facts: ActivityFact[] = [];
@@ -122,7 +124,7 @@ export function activityRowFacts(
     facts.push({
       key: "load",
       value: t("units.trainingLoadShort", { value: Math.round(trainingLoad) }),
-      title: t("activity.fact.loadTitle")
+      title: [t("activity.fact.loadTitle"), activityLoadNote(activity, loadSource)].filter(Boolean).join("\n")
     });
   }
 

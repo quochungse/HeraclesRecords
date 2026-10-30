@@ -60,8 +60,8 @@ list, type 173). Pace's seven buckets draw buckets 3 and 4 as one Threshold row.
 
 ## Overview
 
-The Readiness panel, Coming up, Training activity, Training load distribution, one section
-per sport, Strength. Arithmetic in `overview/*Model.ts` (`test:overview-model`); the renderer
+The Readiness panel, Coming up, Training load heatmap, Training load distribution, one
+section per sport, Strength. Arithmetic in `overview/*Model.ts` (`test:overview-model`); the renderer
 suite mounts four states (`test:overview-renderer`). **Every "today" turns over at midnight**
 (`useTodayKey`).
 
@@ -75,15 +75,17 @@ would wrap (under 840px the week moves below; under 620px all stack).
   100–149, Excessive ≥ 150) — over a column a day, a block a session; from today on the
   calendar's sessions are hatched, and today's plan is dropped once a session of its sport
   family pairs with it (`pairTodayPlan`, shared with Coming up and the sport sections). The
-  columns measure **time, distance or load** (`overview.weekMeasure`): COROS's load is a
-  heart-rate figure and reads strength light. A planned session's time is COROS's
-  `estimatedTime` (`durationSeconds`), its distance `distanceMeters`. Load the day's sessions
-  do not claim is a block of its own, drawn in load only.
+  columns measure **time, distance or load** (`overview.weekMeasure`); in load a strength
+  block stands at the chosen load (COROS's day split by session, plus what Heracles adds). A
+  planned session's time is COROS's `estimatedTime` (`durationSeconds`), its distance
+  `distanceMeters`. Load the day's sessions do not claim is a block of its own, drawn in load
+  only.
 - The footer: **Load Impact is `ati`, Base Fitness `cti`** (EWMA of daily load, 7 and 42
   days; `ati / cti` is the trend). Never `tiredRateNew` (= `ati − cti`) or `staminaLevel`
-  (present only on run days). This week's load is read **Monday to today** against COROS's
-  recommended range (`recommendedLoadMin`/`Max`), which is set per calendar week — never
-  against the rolling `t7d`.
+  (present only on run days). This week's load is read **Monday to today** against the
+  recommended range (`recommendedLoadMin`/`Max`), which COROS sets per calendar week — never
+  against the rolling `t7d`. With Heracles chosen the footer, the Intensity Trend and the range
+  are all in Heracles (`fitnessInLoadSource`), each hover naming COROS's own figure.
 - Chart tooltips follow the pointer (`followTip.ts`, written onto style, no render); a chart is
   one tab stop with arrow keys between columns (`useColumnFocus`, `chartFocus.ts`).
 
@@ -91,9 +93,16 @@ would wrap (under 840px the week moves below; under 620px all stack).
 (`pairTodayPlan`); a row is pressed as a whole (done opens the session, to-do opens
 `UpcomingWorkoutDetailPanel`).
 
-**Training load distribution** (`distributionModel.ts`): four weeks' load by sport, then
-COROS's time or load per HR zone (seconds), read as the easy share against 80/20 with
-`intensityForZone` on the effort ramp.
+**Training load heatmap** (`TrainingHeatmapPanel`) reads training load alone, in the chosen
+load; there is no duration switch, and a month card names each session's load.
+
+**Training load distribution** (`distributionModel.ts`): four weeks' load by sport, every
+sport, in the chosen load (`sportLoadShares`). Then time per HR zone over the sports heart rate
+measures only (`isHeartRateSport`: running, hiking, cycling, swimming, XC skiing, rowing,
+flatwater paddling, walking, stairs, elliptical — not strength, gym cardio, climbing, ball
+sports), summed from each session's own `zoneSeconds` (`zoneTimeEntries`, through
+`useActivityDetailSummaries`), never COROS's all-sport zone totals; time only, since no session
+carries load per zone. Read as the easy share against 80/20 with `intensityForZone`.
 
 **Sport sections** (`sportModel.ts`): Running, Cycling, Hiking, each only when trained in the
 last four calendar weeks and shown on the rail, built from the screens' own builders, never a

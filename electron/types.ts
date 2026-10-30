@@ -255,6 +255,88 @@ export interface TrainingHubActivity {
   calories?: number;
   trainingLoad?: number;
   elevationGain?: number;
+  /**
+   * Heracles Training Load, on a strength session only (400, 402). Never
+   * replaces `trainingLoad`: everything COROS derives from its own figure
+   * (Base Fitness, Load Impact, the recommended range) is read against that.
+   */
+  heraclesLoad?: HeraclesLoad;
+}
+
+/** Which load the athlete reads strength sessions in (`strength.loadSource`). */
+export type StrengthLoadSource = "coros" | "heracles";
+
+/**
+ * How a Heracles figure was reached: from the session's sets; from its length,
+ * when the sets could not be read; COROS's figure, for drills and jumps, which
+ * heart rate measures, or for a session whose sets have not been read yet; or
+ * an estimate for a session still on the plan.
+ */
+export type HeraclesLoadQuality = "sets" | "estimate" | "conditioning" | "pending" | "planned";
+
+export interface HeraclesLoad {
+  /** Heracles Training Load: never below COROS's own figure. */
+  value: number;
+  /** COROS's Training Load, the heart-rate part. Absent for a session COROS never saw. */
+  cardio?: number;
+  /** What COROS's figure leaves out: `value` less `cardio`. */
+  muscular: number;
+  quality: HeraclesLoadQuality;
+}
+
+export interface HeraclesSetLoad {
+  load: number;
+  /** Predicted RPE on the CR-10 scale. */
+  rpe: number;
+  /** Reps left in reserve, for a set scored by its reps. */
+  rir?: number;
+  /** Load over capacity: the share of the estimated one-rep max. */
+  intensity?: number;
+  /** The set's time, its rest after included up to three minutes. */
+  seconds: number;
+  /** Nothing to score it by: the set took the session's median RPE. */
+  filled?: boolean;
+  /** The RPE the athlete logged for the set (Hevy), taken over the prediction. */
+  logged?: boolean;
+  /** Fewer reps than an earlier set at this weight: held to that set's reserve, as fatigue. */
+  fatigued?: boolean;
+}
+
+/** A run of the athlete's whose COROS load is closest to a strength session's Heracles load. */
+export interface HeraclesRunEquivalent {
+  activityId: string;
+  /** Epoch seconds. */
+  startTime?: number;
+  /** Seconds. */
+  duration?: number;
+  /** Metres. */
+  distance?: number;
+  trainingLoad: number;
+}
+
+export interface HeraclesSessionLoad extends HeraclesLoad {
+  /** Session RPE on the CR-10 scale, time between sets included. */
+  sessionRpe?: number;
+  /** The run in the eight weeks before it that carried about the same load. */
+  runEquivalent?: HeraclesRunEquivalent;
+  /**
+   * One array per `detail.exercises[i]`, one entry per `entries[j]`; null for
+   * what is not a working set (rest, stretching, a drill).
+   */
+  sets?: (HeraclesSetLoad | null)[][];
+}
+
+/** The load strength sessions are read in, as `strength:getLoadSource` answers it. */
+export interface HeraclesLoadInfo {
+  source: StrengthLoadSource;
+}
+
+/** A plan session sent to be estimated, under a key the screen chooses. */
+export interface PlanLoadEntry {
+  key: string;
+  workout: PlanWorkoutEntryInput;
+  plannedDurationSeconds?: number;
+  plannedTrainingLoad?: number;
 }
 
 export interface RpeDistributionBucket {
@@ -318,6 +400,25 @@ export interface TrainingHubDailyMetric {
   cycleVo2max?: number;
   distance?: number;
   duration?: number;
+  /** What Heracles Training Load adds to this day's figures (`heraclesFitness.ts`). */
+  heracles?: HeraclesDayDelta;
+}
+
+/** What Heracles Training Load adds to one day of COROS's figures. */
+export interface HeraclesDayDelta {
+  /** Heracles TL over COROS's, for the day's strength sessions. */
+  load: number;
+  /** Added to Load Impact (`ati`). */
+  ati: number;
+  /** Added to Base Fitness (`cti`). */
+  cti: number;
+  /** Added to the week's recommended minimum; the maximum takes 1.3 × it. */
+  range: number;
+  /**
+   * A strength session in the 126 days to this one whose sets are not read
+   * yet counts at COROS's figure, so the additions read low.
+   */
+  partial?: boolean;
 }
 
 export interface TrainingHubDailyMetrics {
@@ -564,6 +665,11 @@ export interface StrengthSet {
   /** Rating of perceived exertion, on Hevy's 1–10 scale. */
   rpe?: number;
   /**
+   * Hevy's assisted movements: the weight the machine or band takes off the
+   * body, kg. Never lifted weight, so `weightKg` stays 0.
+   */
+  assistKg?: number;
+  /**
    * Held for a time — a plank, a stretch — so `workSec` is its figure and
    * `reps` is 0, whatever the watch counted through it.
    */
@@ -639,6 +745,8 @@ export interface StrengthSession {
   maxHr?: number;
   trainingLoad?: number;
   detail: StrengthDetail;
+  /** Heracles Training Load, its sets aligned with `detail`. */
+  heracles?: HeraclesSessionLoad;
 }
 
 export interface StrengthHistory {
@@ -884,6 +992,14 @@ export interface TrainingHubScheduledExercise {
   weight?: number;
   targetType?: number;
   targetLabel?: string;
+  /** COROS's key, when the step was not renamed: what Heracles Training Load reads a planned set against. */
+  key?: string;
+  /** COROS step type: 1 warm-up, 2 work, 3 cool-down, 4 rest. */
+  corosExerciseType?: number;
+  /** Rest after each set, in seconds, where the step states one. */
+  restSec?: number;
+  /** A timed step's length, in seconds. */
+  holdSec?: number;
 }
 
 export interface TrainingHubSportType {
@@ -906,6 +1022,8 @@ export interface TrainingHubUpcomingWorkout {
   sportType?: number;
   sortNo?: number;
   exercises?: TrainingHubScheduledExercise[];
+  /** Heracles Training Load's estimate, on a strength session only. */
+  heraclesLoad?: HeraclesLoad;
 }
 
 export interface TrainingHubThresholdZone {
@@ -3024,6 +3142,10 @@ export interface TrainingActivityMatch {
   completedDistanceMeters?: number;
   plannedTrainingLoad?: number;
   completedTrainingLoad?: number;
+  /** Heracles Training Load's estimate for a planned strength session. */
+  plannedHeraclesLoad?: number;
+  /** Heracles Training Load of the strength session that answered it. */
+  completedHeraclesLoad?: number;
   updatedAt: string;
 }
 
@@ -3718,6 +3840,8 @@ export interface TrainingHubScheduledWorkoutEntry {
   exercises?: TrainingHubScheduledExercise[];
   /** Raw program payload from schedule/query — required to re-add the workout when rescheduling. */
   rawProgram?: Record<string, unknown>;
+  /** Heracles Training Load's estimate, on a strength session only. */
+  heraclesLoad?: HeraclesLoad;
 }
 
 export interface TrainingHubLibraryWorkout {

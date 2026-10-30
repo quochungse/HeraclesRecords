@@ -815,6 +815,7 @@ input::placeholder {
 .tl-dialog-backdrop,
 .plan-generator-backdrop,
 .plan-calendar-backdrop,
+.strength-settings-backdrop,
 .strength-hevy-backdrop,
 .exercise-explorer-backdrop {
   -webkit-app-region: no-drag;

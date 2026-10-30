@@ -20,6 +20,9 @@ import type { TrainingHubSnapshot } from "../types";
 import { useUnitSystem } from "../../units/UnitSystemProvider";
 import { formatDistanceValue, metersToDisplayDistance } from "../../units/units";
 import { useTodayKey } from "../useTodayKey";
+import { figurePairTitle, loadPairTitle } from "../loadFigures";
+import { fitnessInLoadSource } from "../../../electron/heraclesFitness";
+import { useLoadSource } from "../loadSource";
 import { formatCount, formatDecimal, getIntlLocale, t, weekdayNames } from "../../i18n/core";
 import { useI18n } from "../../i18n/useI18n";
 import { BandScale } from "./BandScale";
@@ -271,6 +274,7 @@ export function TodayWeek({
 }) {
   useI18n();
   const { unitSystem } = useUnitSystem();
+  const { source: loadSource } = useLoadSource();
   const dayList = useMemo(
     () =>
       enrichDayListWithActivityTotals(
@@ -285,18 +289,28 @@ export function TodayWeek({
   const now = useMemo(() => new Date(), [todayKey]);
   const [measure, setMeasure] = useSelectionPreference(WEEK_MEASURE);
   const chart = useMemo(
-    () => buildWeekChart({ dayList, activities, upcoming: upcomingWorkouts, now, unitSystem, measure }),
-    [dayList, activities, upcomingWorkouts, now, unitSystem, measure]
+    () => buildWeekChart({ dayList, activities, upcoming: upcomingWorkouts, now, unitSystem, measure, loadSource }),
+    [dayList, activities, upcomingWorkouts, now, unitSystem, measure, loadSource]
   );
-  const reading = useMemo(() => latestTrainingLoad(dayList), [dayList]);
+  // Load Impact, Base Fitness, Intensity Trend and the range in the chosen
+  // load; COROS's own beside them on hover, as the COROS app shows those.
+  const fitnessDays = useMemo(() => fitnessInLoadSource(dayList, loadSource), [dayList, loadSource]);
+  const reading = useMemo(() => latestTrainingLoad(fitnessDays), [fitnessDays]);
+  const corosReading = useMemo(() => latestTrainingLoad(dayList), [dayList]);
+  const partial =
+    loadSource === "heracles" && fitnessDays.at(-1)?.heracles?.partial ? t("units.load.fitnessPartial") : undefined;
+  const fitnessTitle = (heracles: string | undefined, coros: string | undefined) =>
+    [figurePairTitle(loadSource, heracles, coros), partial].filter(Boolean).join("\n") || undefined;
+  const asFigure = (value: number | undefined) => (value !== undefined ? figure(value) : undefined);
+  const asPercent = (value: number | undefined) => (value !== undefined ? `${value}%` : undefined);
   // Tabbed into at today, which this week always holds.
   const columnFocus = useColumnFocus(
     chart.columns.length,
     Math.max(0, chart.columns.findIndex((column) => column.isToday))
   );
   const week = useMemo(
-    () => thisWeekLoad({ dayList, activities, now, unitSystem }),
-    [dayList, activities, now, unitSystem]
+    () => thisWeekLoad({ dayList: fitnessDays, activities, now, unitSystem, loadSource }),
+    [fitnessDays, activities, now, unitSystem, loadSource]
   );
   const percent = reading.percent;
   const status = percent !== undefined ? trainingStatusBand(percent) : undefined;
@@ -337,7 +351,10 @@ export function TodayWeek({
         />
       </div>
 
-      <div className="overview-today-cell overview-today-status is-week">
+      <div
+        className="overview-today-cell overview-today-status is-week"
+        title={fitnessTitle(asPercent(percent), asPercent(corosReading.percent))}
+      >
         <BandScale
           title={t("overview.today.intensityTrend")}
           value={percent !== undefined ? `${percent}%` : undefined}
@@ -409,17 +426,34 @@ export function TodayWeek({
       <div className="overview-today-cell overview-today-foot is-week">
         <p className="eyebrow">{t("overview.trainingLoad")}</p>
         <dl>
-          <div>
+          <div title={fitnessTitle(asFigure(reading.loadImpact), asFigure(corosReading.loadImpact))}>
             <dt>{t("overview.today.loadImpact")}</dt>
             <dd className="figure">{reading.loadImpact !== undefined ? figure(reading.loadImpact) : "–"}</dd>
             <dd className="overview-today-sub">{t("overview.today.sevenDayAverage")}</dd>
           </div>
-          <div>
+          <div title={fitnessTitle(asFigure(reading.baseFitness), asFigure(corosReading.baseFitness))}>
             <dt>{t("overview.today.baseFitness")}</dt>
             <dd className="figure">{reading.baseFitness !== undefined ? figure(reading.baseFitness) : "–"}</dd>
             <dd className="overview-today-sub">{t("overview.today.sixWeekAverage")}</dd>
           </div>
-          <div>
+          {/* The columns' sum against the range, one load on both sides; the
+              hover names COROS's figures, which the COROS app shows. */}
+          <div
+            title={
+              [
+                loadPairTitle(loadSource, week.load, week.corosLoad),
+                week.recommended && week.corosRecommended
+                  ? t("units.load.rangePair", {
+                      heracles: `${figure(week.recommended.min)}–${figure(week.recommended.max)}`,
+                      coros: `${figure(week.corosRecommended.min)}–${figure(week.corosRecommended.max)}`
+                    })
+                  : undefined,
+                partial
+              ]
+                .filter(Boolean)
+                .join("\n") || undefined
+            }
+          >
             <dt>{t("overview.today.weekLoad")}</dt>
             <dd className="figure">{week.load !== undefined ? figure(week.load) : "–"}</dd>
             {week.recommended ? (

@@ -155,6 +155,12 @@ assert.equal(week.length, 7);
 assert.equal(week[0].happenDay, key(6), "oldest first");
 
 const weekText = formatFitnessTrendsForChat(week, 7, today);
+assert.doesNotMatch(weekText, /Heracles/, "COROS's figures say nothing of another load");
+assert.match(
+  formatFitnessTrendsForChat(week, 7, today, new Map(), new Map(), true),
+  /Loads are Heracles Training Load .* Load Impact, Base Fitness and load ratio are COROS's formulas run on it/,
+  "Heracles's figures say what they are"
+);
 assert.match(
   weekText,
   /^Fitness trends, last 7 days \(09-05 Sat → 09-11 Fri; days without any reading are omitted\):/

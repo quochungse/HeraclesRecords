@@ -34,6 +34,7 @@ import {
 import { WORKOUT_SPORTS } from "../../electron/workoutCapabilities";
 import { formatDecimal, getIntlLocale, messageRecord, plural, t, weekdayNames } from "../i18n/core";
 import { planStageLabel } from "../i18n/workoutWords";
+import { heraclesEntryLoad, type PlanHeraclesLoads } from "./planHeraclesLoads";
 
 /** Where a planned session stands, once its plan is on the calendar. */
 export type PlanEntryStatus = TrainingActivityMatch["status"];
@@ -173,23 +174,31 @@ function leafStepCount(steps: readonly RunWorkoutStepInput[]): number {
   return steps.reduce((total, node) => total + ("repeat" in node ? node.steps.length : 1), 0);
 }
 
-function outcomeOf(match: TrainingActivityMatch | undefined): PlanEntryOutcome | undefined {
+/**
+ * What the session done reports, its load in the plan's scale: Heracles's
+ * where the plan states a Heracles estimate, else COROS's — the two are set
+ * side by side (`PlanSessionView`), so never one of each.
+ */
+function outcomeOf(match: TrainingActivityMatch | undefined, plannedInHeracles: boolean): PlanEntryOutcome | undefined {
   if (!match?.activityId) return undefined;
+  const trainingLoad = plannedInHeracles ? match.completedHeraclesLoad : match.completedTrainingLoad;
   return {
     activityId: match.activityId,
     happenDay: match.happenDay,
     ...(match.completedDurationSeconds ? { durationSeconds: match.completedDurationSeconds } : {}),
     ...(match.completedDistanceMeters ? { distanceMeters: match.completedDistanceMeters } : {}),
-    ...(match.completedTrainingLoad ? { trainingLoad: match.completedTrainingLoad } : {})
+    ...(trainingLoad ? { trainingLoad } : {})
   };
 }
 
 function entryFacts(
   plan: TrainingPlanDocument,
   entry: TrainingPlanEntry,
-  matchByKey: Map<string, TrainingActivityMatch>
+  matchByKey: Map<string, TrainingActivityMatch>,
+  loads: PlanHeraclesLoads | undefined
 ): PlanEntryFacts {
   const metrics = planEntryMetrics(entry);
+  const heraclesLoad = heraclesEntryLoad(plan, loads)?.(entry);
   const onCalendar = plan.calendar !== "unscheduled" && plan.remoteId && entry.idInPlan;
   const match = onCalendar ? matchByKey.get(`${plan.remoteId}:${entry.idInPlan}`) : undefined;
   return {
@@ -199,12 +208,12 @@ function entryFacts(
     durationSeconds: metrics.durationSeconds,
     durationComplete: durationIsComplete(entry, metrics.durationSeconds),
     distanceMeters: metrics.distanceMeters,
-    trainingLoad: metrics.trainingLoad,
+    trainingLoad: heraclesLoad ?? metrics.trainingLoad,
     strengthSets: metrics.strengthSets,
     stepCount: leafStepCount(entry.workout.steps ?? []),
     status: match?.status,
     scheduledDate: onCalendar ? entry.happenDay : undefined,
-    outcome: outcomeOf(match)
+    outcome: outcomeOf(match, heraclesLoad !== undefined)
   };
 }
 
@@ -214,12 +223,17 @@ function entryFacts(
  * Every week the plan declares gets a row even when it holds nothing — a gap
  * in a training block is a fact about the plan, and dropping empty weeks
  * renumbers everything after them.
+ *
+ * `loads` are Heracles Training Load's estimates (`usePlanHeraclesLoads`), there
+ * while strength is read in it: a strength session then plans and reports that
+ * load, and every week sums it.
  */
 export function readPlan(
   plan: TrainingPlanDocument,
-  matches: readonly TrainingActivityMatch[] = []
+  matches: readonly TrainingActivityMatch[] = [],
+  loads?: PlanHeraclesLoads
 ): PlanReading {
-  const summary = summarizeTrainingPlan(plan);
+  const summary = summarizeTrainingPlan(plan, heraclesEntryLoad(plan, loads));
   const matchByKey = new Map(
     matches.map((match) => [`${match.schedulePlanId}:${match.scheduleIdInPlan}`, match])
   );
@@ -239,7 +253,7 @@ export function readPlan(
         date: date ? isoDay(date) : undefined,
         entries: inWeek
           .filter((entry) => entry.dayIndex === dayIndex)
-          .map((entry) => entryFacts(plan, entry, matchByKey))
+          .map((entry) => entryFacts(plan, entry, matchByKey, loads))
       };
     });
 

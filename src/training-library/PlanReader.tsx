@@ -50,6 +50,8 @@ import type {
   TrainingPlanEntry
 } from "../../electron/types";
 import { summarizeTrainingPlan } from "../../electron/trainingPlanDomain";
+import { heraclesEntryLoad } from "./planHeraclesLoads";
+import { usePlanHeraclesLoads } from "./usePlanHeraclesLoads";
 import type { HeraclesRecordsApi } from "../heraclesrecords-api";
 import { useUnitSystem } from "../units/UnitSystemProvider";
 import { formatDistanceValue } from "../units/units";
@@ -147,10 +149,15 @@ export function PlanReader({
   onOpenActivity
 }: PlanReaderProps) {
   const { unitSystem } = useUnitSystem();
-  const summary = useMemo(() => summarizeTrainingPlan(plan), [plan]);
+  const plans = useMemo(() => [plan], [plan]);
+  const heraclesLoads = usePlanHeraclesLoads(plans);
+  const summary = useMemo(
+    () => summarizeTrainingPlan(plan, heraclesEntryLoad(plan, heraclesLoads)),
+    [plan, heraclesLoads]
+  );
   const { locale } = useI18n();
   // The day labels and stage names are in the language on screen.
-  const reading = useMemo(() => readPlan(plan, matches), [plan, matches, locale]);
+  const reading = useMemo(() => readPlan(plan, matches, heraclesLoads), [plan, matches, locale, heraclesLoads]);
   const compliance = useMemo(() => planCompliance(plan, matches), [plan, matches]);
 
   const onCalendar = isOnCalendar(plan);

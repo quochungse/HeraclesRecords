@@ -66,6 +66,8 @@ import { corosText, loadCorosLocale } from "./corosLocale";
 import { EXERCISE_SEARCH_MUSCLES, classifyWorkoutExerciseName } from "./exerciseCatalogSearch";
 import { getTrainingHubStatus, reconnectTrainingHub } from "./trainingHubService";
 import { corosSportName } from "./corosSportTypes";
+import { heraclesLoadFor } from "./heraclesLoadService";
+import { coachHeraclesLoadValue, coachReadsHeracles } from "./chatActivityTools";
 import { runExclusively } from "./sync/automationLease";
 import { listPlanBriefs } from "./chatPlanBriefs";
 import { readScheduleChanges } from "./chatScheduleChanges";
@@ -583,7 +585,7 @@ export interface CoachAnalysisRunnerDeps {
   listActivitiesBetween?(
     fromEpochSeconds: number,
     toEpochSeconds: number
-  ): Promise<CoachPrecedingActivityRow[]>;
+  ): Promise<CoachPrecedingTraining[]>;
   recordRun(input: Omit<CoachAnalysisRun, "id" | "startedAt">): CoachAnalysisRun;
   updateRun(
     id: string,
@@ -784,7 +786,7 @@ function createDefaultDeps(): CoachAnalysisRunnerDeps {
     // The locale table turns an exercise code (T1041) into its name.
     listActivitiesBetween: async (from, to) => {
       await loadCorosLocale().catch(() => undefined);
-      return listCoachActivityRowsBetween(from, to);
+      return withPrecedingHeraclesLoads(listCoachActivityRowsBetween(from, to));
     },
     recordRun: (input) => recordCoachAnalysisRun(input),
     updateRun: (id, patch) => updateCoachAnalysisRun(id, patch),
@@ -1396,6 +1398,28 @@ function describeStrength(exercises: StrengthExercise[]): string {
   );
 }
 
+/** A row of the training before an analysed activity, a strength one with its Heracles Training Load. */
+export type CoachPrecedingTraining = CoachPrecedingActivityRow & { heracles_load?: number };
+
+/**
+ * The rows with Heracles Training Load where Coach states it (`coachHeraclesLoadValue`):
+ * while the athlete reads strength in it, and where it says more than COROS's figure.
+ * Best-effort, since COROS's figure is still an answer.
+ */
+function withPrecedingHeraclesLoads(rows: CoachPrecedingActivityRow[]): CoachPrecedingTraining[] {
+  if (!coachReadsHeracles()) return rows;
+  try {
+    return rows.map((row) => {
+      const trainingLoad = row.training_load ?? undefined;
+      const heraclesLoad = heraclesLoadFor({ activityId: row.activity_id, sportType: row.sport_type, trainingLoad });
+      const value = coachHeraclesLoadValue({ trainingLoad, heraclesLoad });
+      return value !== undefined ? { ...row, heracles_load: value } : row;
+    });
+  } catch {
+    return rows;
+  }
+}
+
 /**
  * What the athlete did in the days before the activity, for the focus line.
  *
@@ -1407,7 +1431,7 @@ function describeStrength(exercises: StrengthExercise[]): string {
  */
 export function formatPrecedingTraining(
   activity: CoachActivityRow,
-  rows: CoachPrecedingActivityRow[]
+  rows: CoachPrecedingTraining[]
 ): string {
   const start = activity.start_time ?? 0;
   const lines = rows
@@ -1419,7 +1443,8 @@ export function formatPrecedingTraining(
       const name = asText(row.name);
       const figures = [
         row.duration ? `${Math.round(row.duration / 60)} min` : undefined,
-        row.avg_hr ? `avg HR ${row.avg_hr}` : undefined
+        row.avg_hr ? `avg HR ${row.avg_hr}` : undefined,
+        row.heracles_load !== undefined ? `Heracles load ${row.heracles_load}` : undefined
       ].filter(Boolean);
       const exercises = strengthExercises(row.strength_json);
       return (
@@ -1433,7 +1458,8 @@ export function formatPrecedingTraining(
   }
   return [
     `Training in the ${PRECEDING_TRAINING_HOURS} h before it, oldest first. ` +
-      "COROS training load undercounts strength; judge it by duration and the muscles worked:",
+      "COROS training load undercounts strength; judge it by its Heracles load where stated " +
+      "(the app's measure of a lift, on a run's scale), else by duration and the muscles worked:",
     ...lines
   ].join("\n");
 }

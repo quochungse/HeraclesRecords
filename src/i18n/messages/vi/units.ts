@@ -22,6 +22,12 @@ const units: UnitsMessages = {
   "units.weekly.distanceUnit": "Quãng đường ({unit})",
   "units.exercises_one": "{count} bài",
   "units.exercises_other": "{count} bài",
+  "units.load.pair": "Heracles TL {heracles} · COROS TL {coros}",
+  "units.load.estimate": "Ước lượng: không đọc được từng hiệp",
+  "units.load.pending": "Chưa tính: đang tải các hiệp của buổi tập",
+  "units.load.pairFigure": "Heracles {heracles} · COROS {coros}",
+  "units.load.rangePair": "Mức đề xuất: Heracles {heracles} · COROS {coros}",
+  "units.load.fitnessPartial": "Ước tính: một số buổi sức mạnh vẫn đang tải dữ liệu hiệp",
 };
 
 export default units;

@@ -86,12 +86,10 @@ export interface TrainingHubSnapshot {
 
 export type HeatmapIntensityLevel = 0 | 1 | 2 | 3 | 4;
 
-export type HeatmapMetric = "trainingLoad" | "duration";
-
 export interface HeatmapCell {
   happenDay: string;
   trainingLoad?: number;
-  /** Value of the currently selected metric — drives level and summary. */
+  /** The day's training load as the cell reads it — drives level and summary. */
   value?: number;
   distance?: number;
   duration?: number;

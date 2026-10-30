@@ -5,6 +5,11 @@ COROS strength sessions merged with Hevy imports (`electron/strengthHistoryServi
 
 ## The screen
 
+**The header holds three controls**: the window, Refresh and Settings. Settings
+(`StrengthSettingsDialog`) holds what is set once — the data source with each account's state, and
+the load formula; Hevy is connected and managed in its own dialog (`StrengthHevyDialog`), opened
+from there one sheet at a time.
+
 **One scope at a time**: the session list beside a header band and the body map, and under
 them only what the selection is about — a session's exercises, or the window's weekly chart,
 main lifts and records. **The band is one fixed height** (`--strength-band-height`) for a
@@ -41,6 +46,60 @@ decision). The 3D hero (`StrengthHero`) is reused by Overview inside a `.strengt
   read falls back to an empty map) and, for a program session, the day's schedule.
 - A Coach card stored before `setList` is redrawn from the detail on render
   (`useStoredSetsRedraw`), asked once a window per session, never written back.
+
+## Heracles Training Load
+
+The app's own load for a strength session, on a run's scale
+([docs/heracles-training-load.md](../../docs/heracles-training-load.md)): engine
+`electron/heraclesLoad.ts` (node-free), factors per COROS key `heraclesLoadFactors.ts` (bump
+`HERACLES_FACTORS_VERSION` with any change), service `heraclesLoadService.ts`. Chosen in this
+screen's Settings (`strength.loadSource`, `preference`; `useLoadSource()` in the renderer); the
+body map offers **Load** only then. `npm run test:heracles-load`, `test:heracles-load-service`.
+The formula is public at `/activities/strength/training-load` (`site/`): its figures are the
+engine's own, its words a change to the formula has to follow.
+- **Computed, never stored**: one run scores every session oldest first and is kept until
+  `heraclesLoadInputsVersion` (breakdowns, strength loads, Hevy, body weight) moves; runs are
+  read only for a session's run equivalent, so a new run rescores nothing. It rides on the
+  payloads main already sends (`heraclesLoad` on activities and planned sessions,
+  `StrengthSession.heracles`); `trainingLoad` is never overwritten. A plan's sessions are asked
+  for over `strength:estimatePlanLoads`, never saved with the plan.
+- **One formula for everyone, nothing fitted on the athlete**: reps to failure from Nuzzo et al.
+  2024 (`repsAtIntensity`), RIR 2 when no RPE is logged, set RPE from Zourdos 2016, and load per
+  minute at that effort on COROS's published TRIMP curve (`loadPerMinute`, the heart-rate reserve
+  of an effort fitted on PMData's steady sessions, `scripts/fit-heracles-effort-curve.py`). A
+  run's scale follows; nothing is read off runs, and the feeling recorded after a session is
+  never an input.
+- **Reps lost at a weight already lifted are fatigue, not reserve**: a set ends no further from
+  failure than an earlier set of the lift that session at a load no heavier (`fatigued`, said in
+  its hover). Without it 25 kg × 17/13/11/10 read RPE 8/5/4/4.
+- **A session's value is at least COROS's** (cardio) and `quality` says how it was read:
+  `sets`, `estimate` (sets unreadable: COROS's floor or the usual session RPE), `conditioning`
+  (drills, or a session COROS kept no sets for: COROS's figure), `pending` (breakdown not read
+  yet: COROS's figure), `planned`. Only `sets` and `estimate` say more than COROS.
+- **A session is scored at its day's body weight** (`bodyWeightOn`): every profile read keeps
+  COROS's weight in `body_weight_history` (`personal`, a row per day it changed;
+  `recordBodyWeight` writes nothing when it did not), since COROS holds only the current one.
+  `test:body-weight-history`.
+- A display reads a load through `src/training/loadFigures.ts`: one figure, with a note only
+  when it is estimated or still COROS's (`activityLoadNote`); both figures only where it
+  differs from what the COROS app shows (`loadPairTitle`, `figurePairTitle`).
+- **COROS's fitness figures follow the choice** (`electron/heraclesFitness.ts`): Load Impact,
+  Base Fitness, Intensity Trend and the week's range are COROS's own plus the same averages run
+  on what Heracles adds each day (`heraclesDeltaSeries`, linear, so no COROS history is
+  rebuilt), attached in main as `heracles` on each day and `heraclesRange` on each week
+  (`withHeraclesDayDeltas`). Recovery and training effect stay COROS's.
+  `test:heracles-fitness`.
+- **Coach reads Heracles only while it is chosen** (`coachReadsHeracles`), and is told what it
+  is in one line of the turn's head only when the snapshot states one
+  (`COACH_HERACLES_INSTRUCTION`), so Coach and AI Plan set a plan's weekly load in the load
+  the screens add up.
+- **Hevy has no training load**: with Heracles chosen a Hevy session is scored from its sets
+  alone (3 s a rep, no COROS floor); with COROS chosen it has none. Hevy clocks no rest, so the
+  session's time its sets leave is shared out between them as rest (`restReader`, capped at
+  180 s like a lap; 90 s with no session length), and a session reads as COROS's laps of it would. A Hevy movement
+  takes the factor of its COROS twin by name (`heraclesFactorByName`), an assisted one has its
+  assistance taken off the body (`StrengthSet.assistKg`, never lifted weight), and a logged RPE
+  outranks the prediction and sets the reps in reserve for capacity.
 
 ## Hevy
 

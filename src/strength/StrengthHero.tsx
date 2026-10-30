@@ -1,7 +1,7 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { Info } from "lucide-react";
-import type { StrengthDataSource } from "../../electron/types";
 import { OptionGroup } from "../components/OptionGroup";
+import { useLoadSource } from "../training/loadSource";
 import {
   defineSelectionPreference,
   selectionIsOneOf,
@@ -17,10 +17,11 @@ import type { HeatMetric, StrengthAnalytics } from "./strengthAnalytics";
 import "./strength.css";
 import { plural, t } from "../i18n/core";
 
-const metricOptions = (): { id: HeatMetric; label: string }[] => [
+/** Load is Heracles Training Load, offered only while it is the load strength sessions are read in. */
+const metricOptions = (withLoad: boolean): { id: HeatMetric; label: string }[] => [
   { id: "sets", label: t("strength.summary.sets") },
   { id: "volume", label: t("strength.metric.volume") },
-  { id: "time", label: t("activity.m.time") }
+  ...(withLoad ? [{ id: "load" as const, label: t("strength.metric.load") }] : [])
 ];
 
 // Turning is remembered on this machine, and is where a new install starts;
@@ -50,14 +51,12 @@ let sessionRotating: boolean | null = null;
 const STRENGTH_METRIC_PREFERENCE = defineSelectionPreference<HeatMetric>({
   key: "strength.metric",
   defaultValue: "sets",
-  validate: selectionIsOneOf(["sets", "volume", "time"])
+  validate: selectionIsOneOf(["sets", "volume", "load"])
 });
 
 interface StrengthHeroProps {
   /** What the muscle panel reads, and by default what the figure draws. */
   analytics: StrengthAnalytics;
-  /** COROS is the only source that reports time under load. */
-  source: StrengthDataSource;
   /** Dev view unlocks the figure's layer controls. */
   showDevelopmentTools?: boolean;
   /**
@@ -79,7 +78,6 @@ interface StrengthHeroProps {
  */
 export function StrengthHero({
   analytics,
-  source,
   showDevelopmentTools = false,
   resolveHeat,
   scope = "window"
@@ -102,16 +100,15 @@ export function StrengthHero({
   // side it is seen from rather than on the side last chosen.
   const facingRef = useRef<BodyView>(view);
   const [viewRequest, setViewRequest] = useState(0);
-  const [metric, setMetric] = useSelectionPreference(STRENGTH_METRIC_PREFERENCE);
+  const [storedMetric, setMetric] = useSelectionPreference(STRENGTH_METRIC_PREFERENCE);
+  const { source: loadSource } = useLoadSource();
+  const withLoad = loadSource === "heracles";
+  // Read as Sets while COROS's load is chosen, and kept, so choosing Heracles
+  // again brings the map back to Load.
+  const metric: HeatMetric = storedMetric === "load" && !withLoad ? "sets" : storedMetric;
   const [selectedMuscle, setSelectedMuscle] = useState<MuscleId | null>(null);
   const [figureHover, setFigureHover] = useState<MuscleId | null>(null);
   const [listHover, setListHover] = useState<MuscleId | null>(null);
-
-  useEffect(() => {
-    if (source !== "coros" && metric === "time") {
-      setMetric("sets");
-    }
-  }, [metric, source]);
 
   const requestView = useCallback((next: BodyView) => {
     setSelectedMuscle(null);
@@ -243,9 +240,7 @@ export function StrengthHero({
                 size="xs"
                 className="muscle-panel-metric"
                 value={metric}
-                options={metricOptions()
-                  .filter((option) => source === "coros" || option.id !== "time")
-                  .map((option) => ({ value: option.id, label: option.label }))}
+                options={metricOptions(withLoad).map((option) => ({ value: option.id, label: option.label }))}
                 onChange={(next) => setMetric(next as HeatMetric)}
               />
             }

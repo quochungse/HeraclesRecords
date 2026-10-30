@@ -20,6 +20,7 @@ import {
   filterActivities,
   summariseActivities
 } from "./activityFilters";
+import { useLoadSource } from "./loadSource";
 import { resolveSportName } from "./sportTypes";
 import type { SportColorCategory } from "./sportColors";
 import { useActivityFeelTypes } from "./useActivityFeelTypes";
@@ -156,10 +157,11 @@ export function ActivitiesView({
     [narrowed, inPeriod, filters, nowMs, sportNameOf]
   );
 
-  const totals = useMemo(() => summariseActivities(visible), [visible]);
+  const { source: loadSource } = useLoadSource();
+  const totals = useMemo(() => summariseActivities(visible, loadSource), [visible, loadSource]);
   const mixTotals = useMemo(
-    () => (narrowed ? summariseActivities(inPeriod) : totals),
-    [narrowed, inPeriod, totals]
+    () => (narrowed ? summariseActivities(inPeriod, loadSource) : totals),
+    [narrowed, inPeriod, totals, loadSource]
   );
 
   const toggleSport = useCallback((category: SportColorCategory) => {

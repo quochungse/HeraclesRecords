@@ -137,6 +137,15 @@ import {
 } from "./trainingHubService";
 import { syncStrengthHistory } from "./strengthHistoryService";
 import {
+  getHeraclesLoadInfo,
+  planEntryHeraclesLoads,
+  setStrengthLoadSource,
+  withHeraclesDayDeltas,
+  withHeraclesLoads,
+  withPlannedHeraclesLoads,
+  withStrengthSessionLoads
+} from "./heraclesLoadService";
+import {
   connectHevy,
   disconnectHevy,
   getHevyStatus,
@@ -148,6 +157,7 @@ import type {
   SaveChatSessionOptions,
   DeleteTurnOptions,
   HideTurnOptions,
+  PlanLoadEntry,
   TurnRef,
   StrengthHistoryRequest,
   TrainingHubStatus,
@@ -2183,14 +2193,14 @@ function registerIpcHandlers(): void {
       if (sampleTrailRunsEnabled()) {
         activities = withSampleTrailRuns(activities, { page, startDay, endDay });
       }
-      return activities;
+      return withHeraclesLoads(activities);
     }
   );
 
   ipcMain.handle(
     "trainingHub:listScheduledWorkouts",
-    (_event, startDay: string, endDay: string) =>
-      listScheduledWorkoutEntries(startDay, endDay)
+    async (_event, startDay: string, endDay: string) =>
+      withPlannedHeraclesLoads(await listScheduledWorkoutEntries(startDay, endDay))
   );
 
   ipcMain.handle("trainingHub:listLibraryWorkouts", () =>
@@ -2471,8 +2481,8 @@ function registerIpcHandlers(): void {
     }
   );
 
-  ipcMain.handle("trainingHub:getTrainingAnalytics", () =>
-    getTrainingAnalytics()
+  ipcMain.handle("trainingHub:getTrainingAnalytics", async () =>
+    withHeraclesDayDeltas(await getTrainingAnalytics())
   );
 
   ipcMain.handle("trainingHub:getRacePredictor", () => getRacePredictor());
@@ -2487,13 +2497,30 @@ function registerIpcHandlers(): void {
 
   ipcMain.handle("trainingHub:getDashboard", () => getTrainingDashboard());
 
-  ipcMain.handle("trainingHub:getDailyMetrics", (_event, dateList: string[]) =>
-    getDailyMetrics(dateList)
+  ipcMain.handle("trainingHub:getDailyMetrics", async (_event, dateList: string[]) =>
+    withHeraclesDayDeltas(await getDailyMetrics(dateList))
   );
 
   ipcMain.handle(
     "trainingHub:syncStrengthHistory",
-    (_event, request?: StrengthHistoryRequest) => syncStrengthHistory(request)
+    async (_event, request?: StrengthHistoryRequest) => {
+      const history = await syncStrengthHistory(request);
+      return { ...history, sessions: withStrengthSessionLoads(history.sessions) };
+    }
+  );
+
+  ipcMain.handle("strength:getLoadSource", () => getHeraclesLoadInfo());
+
+  ipcMain.handle("strength:setLoadSource", (_event, source: unknown) => {
+    if (source !== "coros" && source !== "heracles") {
+      throw new Error(`Unknown load source: ${String(source)}`);
+    }
+    setStrengthLoadSource(source);
+    return getHeraclesLoadInfo();
+  });
+
+  ipcMain.handle("strength:estimatePlanLoads", (_event, entries: unknown) =>
+    planEntryHeraclesLoads(Array.isArray(entries) ? (entries as PlanLoadEntry[]) : [])
   );
 
   ipcMain.handle("hevy:getStatus", () => getHevyStatus());
@@ -2505,8 +2532,8 @@ function registerIpcHandlers(): void {
 
   ipcMain.handle("trainingHub:getSportTypeMap", () => getSportTypeMap());
 
-  ipcMain.handle("trainingHub:getUpcomingWorkouts", (_event, days?: number) =>
-    getUpcomingWorkouts(days)
+  ipcMain.handle("trainingHub:getUpcomingWorkouts", async (_event, days?: number) =>
+    withPlannedHeraclesLoads(await getUpcomingWorkouts(days))
   );
 
   // Through the cache, not straight at COROS: one sleep fetch is ~20 sequential

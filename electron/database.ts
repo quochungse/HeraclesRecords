@@ -506,6 +506,15 @@ export function initializeDatabase(userDataPath: string): Database.Database {
       payload     TEXT NOT NULL,     -- JSON object, the figures it was reached with
       recorded_at INTEGER NOT NULL   -- epoch ms it was first written here
     );
+
+    -- The body weight COROS's profile stated, a row for each day it was read
+    -- different. COROS keeps only the current weight, so a past one exists only
+    -- here; Heracles Training Load scores a session at its day's weight.
+    CREATE TABLE IF NOT EXISTS body_weight_history (
+      day         TEXT PRIMARY KEY,  -- local "YYYYMMDD" it was read on
+      weight_kg   REAL NOT NULL,
+      recorded_at INTEGER NOT NULL   -- epoch ms of the reading
+    );
   `);
 
   // feel_type caches the COROS end-of-activity feeling (sportFeelInfo.feelType,
@@ -518,6 +527,10 @@ export function initializeDatabase(userDataPath: string): Database.Database {
   // The parse a strength breakdown was cached with (STRENGTH_DETAIL_VERSION in
   // strengthDetail.ts); an older one, NULL included, is parsed again. `derived`.
   ensureColumn(db, "strength_sessions", "parse_version", "INTEGER");
+  // Heracles Training Load's planned and done figures, beside COROS's: what a
+  // match's status was read from when strength is read in Heracles.
+  ensureColumn(db, "training_activity_matches", "planned_heracles_load", "REAL");
+  ensureColumn(db, "training_activity_matches", "completed_heracles_load", "REAL");
   // The Hall of Records' share of a summary, versioned apart from the zone
   // split and the drift (RECORDS_SUMMARY_VERSION in activityMetrics.ts): a row
   // written before these existed keeps serving the run screens, and NULL here
@@ -1829,6 +1842,7 @@ export function listCoachActivityRowsAfter(
 
 export interface CoachPrecedingActivityRow extends CoachUnseenActivityRow {
   avg_hr: number | null;
+  training_load: number | null;
   /** The cached strength breakdown (`StrengthDetail` JSON), when there is one. */
   strength_json: string | null;
 }
@@ -1845,7 +1859,7 @@ export function listCoachActivityRowsBetween(
   return requireDatabase()
     .prepare(
       `SELECT a.activity_id, a.name, a.sport_type, a.sport_name, a.start_time,
-              a.duration, a.distance, a.avg_hr, s.detail_json AS strength_json
+              a.duration, a.distance, a.avg_hr, a.training_load, s.detail_json AS strength_json
        FROM training_activities a
        LEFT JOIN strength_sessions s ON s.activity_id = a.activity_id
        WHERE a.start_time >= ? AND a.start_time < ?
@@ -2102,6 +2116,137 @@ export function listTrainingActivityRpeInputs(
     duration: row.duration ?? undefined,
     feelType: row.feel_type
   }));
+}
+
+/** Strength activities on/after `sinceEpochSeconds`, for the days Heracles Training Load adds to. */
+export function listStrengthActivityLoads(sinceEpochSeconds: number): {
+  activityId: string;
+  sportType: number;
+  startTime?: number;
+  trainingLoad?: number;
+}[] {
+  const rows = requireDatabase()
+    .prepare(
+      `SELECT activity_id, sport_type, start_time, training_load
+       FROM training_activities
+       WHERE start_time >= ? AND sport_type IN (400, 402)`
+    )
+    .all(sinceEpochSeconds) as {
+    activity_id: string;
+    sport_type: number;
+    start_time: number | null;
+    training_load: number | null;
+  }[];
+  return rows.map((row) => ({
+    activityId: row.activity_id,
+    sportType: row.sport_type,
+    startTime: row.start_time ?? undefined,
+    trainingLoad: row.training_load ?? undefined
+  }));
+}
+
+/** Runs on/after `sinceEpochSeconds` that carry a COROS load: what a strength session is set beside. */
+export function listRunLoads(sinceEpochSeconds: number): {
+  activityId: string;
+  startTime?: number;
+  duration?: number;
+  distance?: number;
+  trainingLoad: number;
+}[] {
+  const rows = requireDatabase()
+    .prepare(
+      `SELECT activity_id, start_time, duration, distance, training_load
+       FROM training_activities
+       WHERE start_time >= ? AND sport_type IN (100, 101, 102, 103) AND training_load > 0`
+    )
+    .all(sinceEpochSeconds) as {
+    activity_id: string;
+    start_time: number | null;
+    duration: number | null;
+    distance: number | null;
+    training_load: number;
+  }[];
+  return rows.map((row) => ({
+    activityId: row.activity_id,
+    startTime: row.start_time ?? undefined,
+    duration: row.duration ?? undefined,
+    distance: row.distance ?? undefined,
+    trainingLoad: row.training_load
+  }));
+}
+
+/** Strength activities cached with no breakdown: gym cardio, or a watch that kept no exercise laps. */
+export function listStrengthActivitiesWithoutBreakdown(): string[] {
+  const rows = requireDatabase()
+    .prepare("SELECT activity_id FROM strength_sessions WHERE detail_json IS NULL")
+    .all() as { activity_id: string }[];
+  return rows.map((row) => row.activity_id);
+}
+
+/**
+ * One string that changes whenever anything Heracles Training Load is scored
+ * from changes: the cached breakdowns, the strength activities' COROS load,
+ * the Hevy workouts and the body weight. Cheap enough to ask on every read.
+ */
+export function heraclesLoadInputsVersion(): string {
+  const row = requireDatabase()
+    .prepare(
+      `SELECT
+         (SELECT count(*) || ':' || ifnull(max(fetched_at), '') FROM strength_sessions) AS breakdowns,
+         (SELECT count(*) || ':' || ifnull(sum(training_load), 0) || ':' || ifnull(max(start_time), 0)
+            FROM training_activities WHERE sport_type IN (400, 402)) AS strength,
+         (SELECT count(*) || ':' || ifnull(max(updated_at), '') || ':' || ifnull(max(synced_at), '')
+            FROM hevy_workouts) AS hevy,
+         (${BODY_WEIGHT_VERSION_SQL}) AS weights`
+    )
+    .get() as { breakdowns: string; strength: string; hevy: string; weights: string };
+  return [row.breakdowns, row.strength, row.hevy, row.weights].join("|");
+}
+
+const BODY_WEIGHT_VERSION_SQL =
+  "SELECT count(*) || ':' || ifnull(max(recorded_at), 0) || ':' || ifnull(sum(weight_kg), 0) FROM body_weight_history";
+
+/** Changes whenever the body weight history does, a sync's rows included. */
+export function bodyWeightHistoryVersion(): string {
+  return (requireDatabase().prepare(BODY_WEIGHT_VERSION_SQL).pluck().get() as string | null) ?? "";
+}
+
+export interface BodyWeightReading {
+  /** Local "YYYYMMDD". */
+  day: string;
+  weightKg: number;
+}
+
+/** Every weight kept, oldest first. */
+export function listBodyWeights(): BodyWeightReading[] {
+  return (
+    requireDatabase()
+      .prepare("SELECT day, weight_kg FROM body_weight_history ORDER BY day")
+      .all() as Array<{ day: string; weight_kg: number }>
+  ).map((row) => ({ day: row.day, weightKg: row.weight_kg }));
+}
+
+/**
+ * Keep a weight COROS's profile stated, on the day it was read. A reading
+ * that moves nothing — the weight the newest row already holds — is not
+ * written, so a profile read on every launch sends nothing to sync. Answers
+ * whether a row moved.
+ */
+export function recordBodyWeight(weightKg: number, day: string, now = Date.now()): boolean {
+  if (!Number.isFinite(weightKg) || weightKg <= 0 || !/^\d{8}$/.test(day)) return false;
+  const database = requireDatabase();
+  const latest = database
+    .prepare("SELECT day, weight_kg FROM body_weight_history WHERE day <= ? ORDER BY day DESC LIMIT 1")
+    .get(day) as { day: string; weight_kg: number } | undefined;
+  if (latest && Math.abs(latest.weight_kg - weightKg) < 0.05) return false;
+  database
+    .prepare(
+      `INSERT INTO body_weight_history (day, weight_kg, recorded_at) VALUES (?, ?, ?)
+       ON CONFLICT(day) DO UPDATE SET weight_kg = excluded.weight_kg, recorded_at = excluded.recorded_at`
+    )
+    .run(day, weightKg, now);
+  notifySyncedRow("body_weight_history", ["day"], [day]);
+  return true;
 }
 
 /** One stored activity by id, as every activity list call has written it. */
@@ -3130,6 +3275,8 @@ interface TrainingActivityMatchRow {
   completed_distance_meters: number | null;
   planned_training_load: number | null;
   completed_training_load: number | null;
+  planned_heracles_load: number | null;
+  completed_heracles_load: number | null;
   updated_at: string;
 }
 
@@ -3506,6 +3653,8 @@ function toTrainingActivityMatch(row: TrainingActivityMatchRow): TrainingActivit
     completedDistanceMeters: row.completed_distance_meters ?? undefined,
     plannedTrainingLoad: row.planned_training_load ?? undefined,
     completedTrainingLoad: row.completed_training_load ?? undefined,
+    plannedHeraclesLoad: row.planned_heracles_load ?? undefined,
+    completedHeraclesLoad: row.completed_heracles_load ?? undefined,
     updatedAt: row.updated_at
   };
 }
@@ -3607,7 +3756,8 @@ export function listTrainingActivityMatches(): TrainingActivityMatch[] {
                 activity_id, happen_day, status, confidence, manual,
                 planned_duration_seconds, completed_duration_seconds,
                 planned_distance_meters, completed_distance_meters,
-                planned_training_load, completed_training_load, updated_at
+                planned_training_load, completed_training_load,
+                planned_heracles_load, completed_heracles_load, updated_at
          FROM training_activity_matches
          ORDER BY happen_day DESC`
       )
@@ -3623,8 +3773,9 @@ export function saveTrainingActivityMatch(match: TrainingActivityMatch): void {
          activity_id, happen_day, status, confidence, manual,
          planned_duration_seconds, completed_duration_seconds,
          planned_distance_meters, completed_distance_meters,
-         planned_training_load, completed_training_load, updated_at
-       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+         planned_training_load, completed_training_load,
+         planned_heracles_load, completed_heracles_load, updated_at
+       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
        ON CONFLICT(id) DO UPDATE SET
          plan_id = excluded.plan_id,
          plan_entry_id = excluded.plan_entry_id,
@@ -3636,6 +3787,8 @@ export function saveTrainingActivityMatch(match: TrainingActivityMatch): void {
          completed_duration_seconds = excluded.completed_duration_seconds,
          completed_distance_meters = excluded.completed_distance_meters,
          completed_training_load = excluded.completed_training_load,
+         planned_heracles_load = excluded.planned_heracles_load,
+         completed_heracles_load = excluded.completed_heracles_load,
          updated_at = excluded.updated_at`
     )
     .run(
@@ -3655,6 +3808,8 @@ export function saveTrainingActivityMatch(match: TrainingActivityMatch): void {
       match.completedDistanceMeters ?? null,
       match.plannedTrainingLoad ?? null,
       match.completedTrainingLoad ?? null,
+      match.plannedHeraclesLoad ?? null,
+      match.completedHeraclesLoad ?? null,
       match.updatedAt
     );
 }

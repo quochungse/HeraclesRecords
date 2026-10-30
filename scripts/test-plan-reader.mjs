@@ -525,6 +525,50 @@ function match(idInPlan, status, overrides = {}) {
   );
 }
 
+// ---------------------------------------------------------------------------
+// 11. Strength read in Heracles Training Load
+// ---------------------------------------------------------------------------
+{
+  // The estimates arrive by `planId:entryId` (`usePlanHeraclesLoads`); a
+  // session with one plans that load, a week sums it, and a session done
+  // reports the load the matcher stored in the same scale.
+  const lift = entry({
+    title: "Lift",
+    idInPlan: "7",
+    happenDay: "20260302",
+    plannedTrainingLoad: 15,
+    workout: { key: "w-lift", name: "Lift", sport: "strength" }
+  });
+  const easy = entry({ title: "Easy", dayIndex: 1, plannedTrainingLoad: 60 });
+  const document = running({ weekCount: 1, entries: [lift, easy] });
+  const loads = new Map([[`${document.id}:${lift.id}`, { value: 140, muscular: 125, cardio: 15, quality: "planned" }]]);
+  const matches = [match("7", "completed", { activityId: "a7", completedTrainingLoad: 22, completedHeraclesLoad: 151 })];
+
+  const coros = readPlan(document, matches);
+  assert.equal(coros.weeks[0].days[0].entries[0].trainingLoad, 15);
+  assert.equal(coros.weeks[0].days[0].entries[0].outcome.trainingLoad, 22);
+  assert.equal(coros.weeks[0].summary.trainingLoad, 75);
+
+  const heracles = readPlan(document, matches, loads);
+  assert.equal(heracles.weeks[0].days[0].entries[0].trainingLoad, 140, "the strength session plans the estimate");
+  assert.equal(heracles.weeks[0].days[1].entries[0].trainingLoad, 60, "a run plans COROS's load as before");
+  assert.equal(heracles.weeks[0].days[0].entries[0].outcome.trainingLoad, 151, "and reports the stored Heracles load");
+  assert.equal(heracles.weeks[0].summary.trainingLoad, 200, "the week sums what its sessions say");
+  assert.equal(
+    summarizeTrainingPlan(document, (item) => loads.get(`${document.id}:${item.id}`)?.value).trainingLoad,
+    200,
+    "the plan's total is the same arithmetic"
+  );
+
+  const unanswered = readPlan(document, [match("7", "completed", { activityId: "a7", completedTrainingLoad: 22 })], new Map());
+  assert.equal(unanswered.weeks[0].days[0].entries[0].trainingLoad, 15, "no estimate yet: COROS's figure stands");
+  assert.equal(unanswered.weeks[0].days[0].entries[0].outcome.trainingLoad, 22, "a match stored before Heracles reports COROS's");
+  // Planned and done are set side by side, so they are always one scale.
+  const priced = readPlan(document, matches, new Map());
+  assert.equal(priced.weeks[0].days[0].entries[0].outcome.trainingLoad, 22, "a plan COROS priced reports COROS's load done");
+  const old = readPlan(document, [match("7", "completed", { activityId: "a7", completedTrainingLoad: 22 })], loads);
+  assert.equal(old.weeks[0].days[0].entries[0].outcome.trainingLoad, undefined, "an estimate is never set against COROS's figure");
+}
 console.log(
   "plan reader OK — empty weeks kept, figures shared with the row, outcomes only " +
     "on the calendar and keyed as COROS keys them, no status is not `upcoming`, " +

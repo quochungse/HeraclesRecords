@@ -33,6 +33,10 @@ import type {
   HevyStatus,
   StrengthHistory,
   StrengthHistoryRequest,
+  StrengthLoadSource,
+  HeraclesLoad,
+  HeraclesLoadInfo,
+  PlanLoadEntry,
   TrainingHubActivity,
   TrainingHubActivityDetail,
   TrainingHubActivityFileType,
@@ -365,6 +369,10 @@ export interface HeraclesRecordsApi {
   getTrainingDashboard: () => Promise<TrainingHubDashboard>;
   getDailyMetrics: (dateList: string[]) => Promise<TrainingHubDailyMetrics>;
   syncStrengthHistory: (request?: StrengthHistoryRequest) => Promise<StrengthHistory>;
+  getStrengthLoadSource: () => Promise<HeraclesLoadInfo>;
+  setStrengthLoadSource: (source: StrengthLoadSource) => Promise<HeraclesLoadInfo>;
+  /** Heracles Training Load's estimate of each strength session sent, by its key. */
+  estimatePlanLoads: (entries: PlanLoadEntry[]) => Promise<Record<string, HeraclesLoad>>;
   getHevyStatus: () => Promise<HevyStatus>;
   connectHevy: (apiKey: string) => Promise<HevyStatus>;
   updateHevySettings: (input: HevySettingsInput) => Promise<HevyStatus>;

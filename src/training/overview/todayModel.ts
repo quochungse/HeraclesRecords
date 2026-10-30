@@ -1,10 +1,13 @@
 import type {
+  StrengthLoadSource,
   TrainingHubActivity,
   TrainingHubDailyMetric,
   TrainingHubUpcomingWorkout,
   UnitSystem,
   WorkoutSport
 } from "../../../electron/types";
+import { heraclesSurplus, plannedLoad } from "../loadFigures";
+import type { FitnessDay } from "../../../electron/heraclesFitness";
 import {
   buildWeeklyActivitySeries,
   getCalendarWeekDateKeys,
@@ -144,14 +147,31 @@ export function latestTrainingLoad(
 export type WeekMeasure = "time" | "distance" | "load";
 
 export interface WeekLoadReading {
-  /** The load from this Monday to today. */
+  /**
+   * The load from this Monday to today, in the chosen load — read against the
+   * range below, which is in the same load (`fitnessInLoadSource`).
+   */
   load?: number;
-  /** The range COROS recommends for the whole week. */
+  /** COROS's own figure, where Heracles Training Load reads the week heavier. */
+  corosLoad?: number;
+  /** The range recommended for the whole week, in the chosen load. */
   recommended?: { min: number; max: number };
+  /** COROS's own range, where Heracles Training Load moves it. */
+  corosRecommended?: { min: number; max: number };
+}
+
+function rangeOf(min: number | undefined, max: number | undefined): { min: number; max: number } | undefined {
+  const low = positive(min);
+  const high = positive(max);
+  return low !== undefined && high !== undefined && high >= low ? { min: Math.round(low), max: Math.round(high) } : undefined;
 }
 
 /**
- * This calendar week's load so far against the range COROS recommends for it.
+ * This calendar week's load so far against the range recommended for it, both
+ * in the chosen load: `dayList` comes through `fitnessInLoadSource`, and a
+ * strength session adds what Heracles reads over COROS. COROS's own figures
+ * ride along where they differ, for the hover.
+ *
  * COROS sets that range per calendar week — the same Monday to Sunday, changed
  * on Monday — so it is read against the week's own days, never a rolling seven
  * (COROS's `t7d`, which matches the week only on a Sunday). The load is the
@@ -163,12 +183,14 @@ export function thisWeekLoad({
   dayList,
   activities,
   now = new Date(),
-  unitSystem
+  unitSystem,
+  loadSource = "coros"
 }: {
-  dayList: readonly TrainingHubDailyMetric[];
+  dayList: readonly FitnessDay[];
   activities: TrainingHubActivity[];
   now?: Date;
   unitSystem: UnitSystem;
+  loadSource?: StrengthLoadSource;
 }): WeekLoadReading {
   const week = new Set(getCalendarWeekDateKeys(now));
   const today = happenDayFromTimestamp(now.getTime()) ?? "";
@@ -180,14 +202,26 @@ export function thisWeekLoad({
   const load = series.days
     .filter((day) => day.happenDay <= today)
     .reduce((sum, day) => sum + day.value, 0);
-  const ranged = [...days]
+  const ranged: FitnessDay | undefined = [...days]
     .reverse()
     .find((day) => positive(day.recommendedLoadMin) !== undefined && positive(day.recommendedLoadMax) !== undefined);
-  const min = positive(ranged?.recommendedLoadMin);
-  const max = positive(ranged?.recommendedLoadMax);
+  const recommended = rangeOf(ranged?.recommendedLoadMin, ranged?.recommendedLoadMax);
+  const corosRecommended = ranged?.coros
+    ? rangeOf(ranged.coros.recommendedLoadMin, ranged.coros.recommendedLoadMax)
+    : undefined;
+  const surplus = activities
+    .filter((activity) => {
+      const day = happenDayFromTimestamp(activity.startTime);
+      return day !== undefined && week.has(day) && day <= today;
+    })
+    .reduce((sum, activity) => sum + heraclesSurplus(activity, loadSource), 0);
   return {
-    load: Math.round(load),
-    recommended: min !== undefined && max !== undefined && max >= min ? { min: Math.round(min), max: Math.round(max) } : undefined
+    load: Math.round(load + surplus),
+    ...(surplus > 0 ? { corosLoad: Math.round(load) } : {}),
+    recommended,
+    ...(corosRecommended && (corosRecommended.min !== recommended?.min || corosRecommended.max !== recommended?.max)
+      ? { corosRecommended }
+      : {})
   };
 }
 
@@ -296,7 +330,8 @@ export function buildWeekChart({
   upcoming,
   now = new Date(),
   unitSystem,
-  measure = "load"
+  measure = "load",
+  loadSource = "coros"
 }: {
   dayList: TrainingHubDailyMetric[];
   activities: TrainingHubActivity[];
@@ -304,6 +339,8 @@ export function buildWeekChart({
   now?: Date;
   unitSystem: UnitSystem;
   measure?: WeekMeasure;
+  /** With Heracles chosen, a strength session's block stands at its Heracles load. */
+  loadSource?: StrengthLoadSource;
 }): WeekChart {
   const series = buildWeeklyActivitySeries(dayList, "trainingLoad", now, unitSystem, activities);
   const weekDays = new Set(series.days.map((day) => day.happenDay));
@@ -326,7 +363,11 @@ export function buildWeekChart({
     // Every session of the day, the ones COROS gave no load included: they
     // still happened, and the icon under the column says so.
     const blocks: WeekBlock[] = dayActivities.map((activity) => {
-      const load = loads.get(activity.activityId) ?? 0;
+      // COROS's daily load split by its sessions, and for a strength session
+      // read in Heracles, what Heracles adds on top.
+      const corosLoad = loads.get(activity.activityId) ?? 0;
+      const surplus = heraclesSurplus(activity, loadSource);
+      const load = corosLoad + surplus;
       const time = amount(activity.duration);
       const meters = amount(activity.distance);
       return {
@@ -367,11 +408,12 @@ export function buildWeekChart({
         day.happenDay === todayKey
           ? pairTodayPlan(
               onDay,
-              activities.filter((activity) => happenDayFromTimestamp(activity.startTime) === todayKey)
+              activities.filter((activity) => happenDayFromTimestamp(activity.startTime) === todayKey),
+              loadSource
             ).open
           : onDay;
       open.forEach((workout) => {
-        const load = positive(workout.trainingLoad) ?? 0;
+        const load = positive(plannedLoad(workout, loadSource)) ?? 0;
         const time = amount(workout.durationSeconds);
         const meters = amount(workout.distanceMeters);
         const value = pick(load, time, meters);

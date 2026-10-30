@@ -8,7 +8,6 @@ const modUrl = pathToFileURL(
 );
 const {
   buildHeatmapDayEntries,
-  formatCardDuration,
   formatHappenDayShort,
   formatStrengthFocus,
   indexStrengthSessions,
@@ -16,13 +15,6 @@ const {
   sportStripeGradient
 } = await import(`${modUrl.href}?c=${Date.now()}`);
 
-// --- formatCardDuration -----------------------------------------------------
-assert.equal(formatCardDuration(2760), "46'", "under an hour reads as minutes");
-assert.equal(formatCardDuration(4883), "1:21", "over an hour reads as h:mm");
-assert.equal(formatCardDuration(3600), "1:00", "exactly an hour keeps the zero");
-assert.equal(formatCardDuration(20), "1'", "a short session never rounds to 0");
-assert.equal(formatCardDuration(0), "", "no duration renders nothing");
-assert.equal(formatCardDuration(undefined), "", "missing duration renders nothing");
 
 // --- formatHappenDayShort ---------------------------------------------------
 assert.equal(formatHappenDayShort("20260805"), "5/8", "d/M, leading zeros dropped");
@@ -138,22 +130,22 @@ assert.equal(day.length, 2);
 assert.equal(day[0].title, "Strength: Shoulders, Chest");
 assert.deepEqual(
   day[0].meta,
-  ["46'"],
-  "a session with no distance shows only its duration"
+  ["36 TL"],
+  "a session with no distance shows only its training load"
 );
 assert.equal(day[0].sport, "strength");
 assert.equal(day[1].title, "Run", "a non-strength sport keeps its COROS name");
 assert.deepEqual(
   day[1].meta,
-  ["10.0 km", "1:21"],
-  "distance and duration stay separate so a narrow card can wrap between them"
+  ["10.0 km", "226 TL"],
+  "distance and load stay separate so a narrow card can wrap between them"
 );
 assert.equal(day[1].sport, "run");
 
 const imperial = buildHeatmapDayEntries(activities, new Map(), "imperial");
 assert.deepEqual(
   imperial.get("20260805")[1].meta,
-  ["6.23 mi", "1:21"],
+  ["6.23 mi", "226 TL"],
   "distance follows the unit system"
 );
 assert.equal(

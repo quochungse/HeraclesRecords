@@ -106,6 +106,11 @@ assert.equal(
   0,
   "assistance must not be counted as lifted weight"
 );
+assert.equal(
+  withoutWarmups.detail.exercises[2].entries[0].assistKg,
+  25,
+  "but it is kept, for what the body still moved"
+);
 assert.equal(withoutWarmups.detail.summary.totalWeightKg, 80 * 8 + 60 * 10 + 50 * 12);
 
 const withWarmups = normalizeHevyWorkout(rawWorkout, templates, true);
