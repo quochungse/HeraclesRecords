@@ -9,7 +9,9 @@ import { fileURLToPath } from "node:url";
 const require = createRequire(import.meta.url);
 const { app, BrowserWindow } = require("electron");
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-app.commandLine.appendSwitch("no-sandbox");
+// No `no-sandbox`: this window is offscreen, and an offscreen window under
+// `no-sandbox` dies at start-up on Linux ("Creating shared memory in /dev/shm
+// … failed", then the GPU process).
 app.disableHardwareAcceleration();
 
 const settings = {

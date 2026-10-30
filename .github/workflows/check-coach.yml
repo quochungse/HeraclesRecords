@@ -39,8 +39,17 @@ jobs:
           sudo apt-get update
           sudo apt-get install --no-install-recommends -y xvfb libgtk-3-0t64 libgbm1 libnss3 libasound2t64
 
+      # Ubuntu 24.04 denies unprivileged user namespaces to programs AppArmor
+      # has no profile for, Electron among them. Chromium's sandbox then falls
+      # back to the SUID helper, which `npm ci` leaves unowned by root, and
+      # aborts at start-up; the offscreen suites cannot run unsandboxed.
+      - name: Let Chromium's sandbox use user namespaces
+        run: sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+
+      # xvfb-run's default screen is 640x480 at 8 bits; the suites' windows
+      # are up to 1600x1200 and Chromium wants a 24-bit visual.
       - name: Check Coach in a virtual display
-        run: xvfb-run --auto-servernum npm run check:coach
+        run: xvfb-run --auto-servernum --server-args="-screen 0 1920x1200x24" npm run check:coach
 
       - name: Upload failed check logs
         if: failure()

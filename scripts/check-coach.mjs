@@ -71,10 +71,27 @@ async function run(step) {
   }
 }
 
+// GitHub shows a job's log and artifacts only to a signed-in viewer, its
+// annotations to anyone: the failed step's last lines go there, so a red run
+// says why on its summary page.
+function annotateFailure(step) {
+  if (process.env.GITHUB_ACTIONS !== "true") return;
+  let text = "";
+  try { text = fs.readFileSync(path.join(logs, `${step.name}.log`), "utf8"); } catch { /* no log yet */ }
+  const tail = text.replace(/\x1b\[[0-9;]*m/g, "").trimEnd().split(/\r?\n/).slice(-60).join("\n");
+  const escape = (value) => value.replace(/%/g, "%25").replace(/\r/g, "%0D").replace(/\n/g, "%0A");
+  console.log(`::error title=${step.name} failed::${escape(tail || "(the step wrote nothing)")}`);
+}
+
+let current;
 try {
-  for (const step of steps) await run(step);
+  for (const step of steps) {
+    current = step;
+    await run(step);
+  }
   console.log(`\n[check:coach] Passed ${steps.length - 3} checks after 3 builds in ${((Date.now() - started) / 1000).toFixed(1)}s.`);
 } catch (error) {
   console.error(`\n[check:coach] ${error.message}`);
+  annotateFailure(current);
   process.exitCode = 1;
 }
