@@ -33,8 +33,8 @@ export interface HeraclesExerciseFactor {
   maxHoldSec?: number;
 }
 
-/** Raised with any change to the table, so the service recomputes. */
-export const HERACLES_FACTORS_VERSION = 1;
+/** Raised with any change to the tables, so the service recomputes. */
+export const HERACLES_FACTORS_VERSION = 2;
 
 export const HERACLES_EXERCISE_FACTORS: Readonly<Record<string, HeraclesExerciseFactor>> = {
   // Bodyweight on a bar or a station.
@@ -101,3 +101,59 @@ export const HERACLES_EXERCISE_FACTORS: Readonly<Record<string, HeraclesExercise
   T1248: { kind: "skip" }, // Thoracic Spine Rotation
   T1262: { kind: "skip" } // Greatest Stretch
 };
+
+/**
+ * A movement with no COROS key — a Hevy template — read by its name, as the
+ * Exercises Library reads one. Most reuse the factor of the COROS movement they
+ * are, so a pull-up moves 0.95 of the body whichever app logged it; push-up
+ * variations take Ebben et al. 2011's own shares. Matched against the name
+ * lowercased with punctuation as spaces ("Pull Up (Assisted)" → "pull up
+ * assisted"), the first pattern that matches winning. A name none matches is
+ * read from its sets.
+ */
+const NAMED_FACTORS: readonly [RegExp, HeraclesExerciseFactor][] = [
+  // Before "pull up", which "australian pull up" also matches.
+  [/\binverted rows?\b|\baustralian pull ?ups?\b/, HERACLES_EXERCISE_FACTORS.T1340],
+  [/\bmuscle ?ups?\b/, HERACLES_EXERCISE_FACTORS.T1330],
+  [/\b(pull|chin) ?ups?\b/, HERACLES_EXERCISE_FACTORS.T1002],
+  // A bench dip keeps the feet on the floor, a machine carries the body: read from their sets.
+  [/^(?!.*\b(bench|machine)\b).*\bdips?\b/, HERACLES_EXERCISE_FACTORS.T1051],
+  [/\bknee push ?ups?\b/, { kind: "bodyweight", bodyShare: 0.49, repsAtBodyweight: 25 }],
+  [/\bincline push ?ups?\b/, { kind: "bodyweight", bodyShare: 0.41, repsAtBodyweight: 25 }],
+  [/\bdecline push ?ups?\b/, { kind: "bodyweight", bodyShare: 0.7, repsAtBodyweight: 12 }],
+  [/\bpush ?ups?\b/, HERACLES_EXERCISE_FACTORS.T1148],
+  [/\btoes? to bar\b/, HERACLES_EXERCISE_FACTORS.T1159],
+  [/\bhanging leg raises?\b/, HERACLES_EXERCISE_FACTORS.T1032],
+  [/\bleg raises?\b/, HERACLES_EXERCISE_FACTORS.T1034],
+  // Jumps before the squats and lunges they are named after.
+  [/\b(jump squats?|squat jumps?)\b/, HERACLES_EXERCISE_FACTORS.T1078],
+  [/\bjumping lunges?\b/, HERACLES_EXERCISE_FACTORS.T1136],
+  [/\bbox jumps?\b/, HERACLES_EXERCISE_FACTORS.T1014],
+  [/\b(jump rope|skipping)\b/, HERACLES_EXERCISE_FACTORS.T1005],
+  [/\bhigh knees?\b/, HERACLES_EXERCISE_FACTORS.T1013],
+  [/\bburpees?\b/, HERACLES_EXERCISE_FACTORS.T1396],
+  [/\bsplit squats?\b/, HERACLES_EXERCISE_FACTORS.T1164],
+  // The body moves under the bar too; a machine (hack, leg press) carries it.
+  [/^(?!.*\b(machine|hack|smith|press)\b).*\bsquats?\b/, HERACLES_EXERCISE_FACTORS.T1061],
+  [/^(?!.*\bmachine\b).*\blunges?\b/, HERACLES_EXERCISE_FACTORS.T1064],
+  [/\bsingle leg (standing )?calf raises?\b/, HERACLES_EXERCISE_FACTORS.T1275],
+  [/\bglute bridges?\b/, HERACLES_EXERCISE_FACTORS.T1033],
+  [/\bdead ?bugs?\b/, HERACLES_EXERCISE_FACTORS.T1243],
+  [/\bbird ?dogs?\b/, HERACLES_EXERCISE_FACTORS.T1150],
+  [/\bbicycle crunch(es)?\b/, HERACLES_EXERCISE_FACTORS.T1076],
+  [/\bcopenhagen\b/, HERACLES_EXERCISE_FACTORS.T1368],
+  [/\bplank jacks?\b/, HERACLES_EXERCISE_FACTORS.T1077],
+  [/\bside plank\b/, HERACLES_EXERCISE_FACTORS.T1185],
+  [/\bplank\b/, HERACLES_EXERCISE_FACTORS.T1010],
+  [/\bstretch(es|ing)?\b/, HERACLES_EXERCISE_FACTORS.T1215]
+];
+
+export function heraclesFactorByName(name: string): HeraclesExerciseFactor | undefined {
+  const words = name
+    .normalize("NFKD")
+    .replace(/[̀-ͯ]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+  return NAMED_FACTORS.find(([pattern]) => pattern.test(words))?.[1];
+}

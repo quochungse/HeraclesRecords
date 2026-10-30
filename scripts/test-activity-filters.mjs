@@ -275,8 +275,7 @@ assert.deepEqual(
   "busiest sport first, by time rather than by count"
 );
 
-// With strength read in Heracles Training Load the lift counts that load, and
-// COROS's total stays beside it for the hover.
+// With strength read in Heracles Training Load the lift counts that load.
 {
   const lift = activity({
     activityId: "h1",
@@ -289,10 +288,8 @@ assert.deepEqual(
   const run = activity({ activityId: "h2", sportType: 100, startTime: at(MONDAY + DAY), duration: 3600, trainingLoad: 280 });
   const coros = summariseActivities([lift, run]);
   assert.equal(coros.trainingLoad, 340);
-  assert.equal(coros.corosTrainingLoad, 340);
   const heracles = summariseActivities([lift, run], "heracles");
   assert.equal(heracles.trainingLoad, 470);
-  assert.equal(heracles.corosTrainingLoad, 340);
   assert.equal(heracles.sports.find((sport) => sport.category === "strength").trainingLoad, 190);
   assert.deepEqual(
     activityRowFacts({ ...lift, duration: undefined }, "metric", "heracles").map((fact) => fact.key),

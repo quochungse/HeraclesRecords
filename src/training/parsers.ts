@@ -81,8 +81,7 @@ function loadToLevel(
 }
 
 export function buildHeatmapCells(
-  /** `corosTrainingLoad` where the day reads in Heracles Training Load (`withHeraclesDayLoads`). */
-  dayList: Array<TrainingHubDailyMetric & { corosTrainingLoad?: number }>,
+  dayList: TrainingHubDailyMetric[],
   days = TRAINING_HEATMAP_DAYS,
   metric: HeatmapMetric = "trainingLoad"
 ): HeatmapCell[] {
@@ -100,11 +99,9 @@ export function buildHeatmapCells(
     const day = dayMap.get(happenDay);
     const value = day?.[metric];
 
-    const corosTrainingLoad = day?.corosTrainingLoad;
     return {
       happenDay,
       trainingLoad: day?.trainingLoad,
-      ...(corosTrainingLoad !== undefined ? { corosTrainingLoad } : {}),
       value,
       distance: day?.distance,
       duration: day?.duration,

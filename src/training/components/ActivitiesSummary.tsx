@@ -9,8 +9,6 @@ import {
   formatElevationMeters
 } from "../formatters";
 import { useUnitSystem } from "../../units/UnitSystemProvider";
-import { loadPairTitle } from "../loadFigures";
-import { useLoadSource } from "../loadSource";
 import { formatCount, plural, t } from "../../i18n/core";
 
 interface ActivitiesSummaryProps {
@@ -38,7 +36,6 @@ interface SummaryTile {
   label: string;
   value: string;
   caption: string;
-  title?: string;
 }
 
 /** "3.4 sessions a week", "One every 5 days" — a rate the athlete can picture. */
@@ -124,7 +121,6 @@ export function ActivitiesSummary({
   onClearFilters
 }: ActivitiesSummaryProps) {
   const { unitSystem } = useUnitSystem();
-  const { source } = useLoadSource();
   const { locale } = useI18n();
   const mixTotal = mix.sports.reduce((sum, sport) => sum + sport.duration, 0);
 
@@ -251,8 +247,7 @@ export function ActivitiesSummary({
       caption:
         totals.trainingLoad > 0 && totals.weeks > 0
           ? t("activity.summary.aWeek", { value: formatCount(Math.round(totals.trainingLoad / totals.weeks)) })
-          : t("activity.summary.loadCaption"),
-      title: totals.trainingLoad > 0 ? loadPairTitle(source, totals.trainingLoad, totals.corosTrainingLoad) : undefined
+          : t("activity.summary.loadCaption")
     }
   ];
 
@@ -260,7 +255,7 @@ export function ActivitiesSummary({
     <section className="activities-summary" aria-label={t("activity.summary.label", { period: periodLabel })}>
       <div className="activities-summary-tiles">
         {tiles.map((tile) => (
-          <div className="activities-summary-tile" key={tile.key} title={tile.title}>
+          <div className="activities-summary-tile" key={tile.key}>
             <p className="activities-summary-label">{tile.label}</p>
             <p className="activities-summary-value">{tile.value}</p>
             <p className="activities-summary-caption">

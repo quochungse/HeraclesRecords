@@ -214,8 +214,6 @@ export interface WeekBlock {
   value: number;
   /** Every figure, whichever is drawn, for the column's tooltip. */
   load: number;
-  /** COROS's figure, where Heracles Training Load reads the session heavier. */
-  corosLoad?: number;
   seconds: number;
   meters: number;
   /** The session's or the plan's name; empty on the day's leftover load. */
@@ -358,7 +356,6 @@ export function buildWeekChart({
         key: activity.activityId,
         value: pick(load, time, meters),
         load,
-        ...(surplus > 0 ? { corosLoad } : {}),
         seconds: time,
         meters,
         name: activity.name?.trim() ?? "",
@@ -399,7 +396,6 @@ export function buildWeekChart({
           : onDay;
       open.forEach((workout) => {
         const load = positive(plannedLoad(workout, loadSource)) ?? 0;
-        const corosLoad = positive(workout.trainingLoad) ?? 0;
         const time = amount(workout.durationSeconds);
         const meters = amount(workout.distanceMeters);
         const value = pick(load, time, meters);
@@ -410,7 +406,6 @@ export function buildWeekChart({
           key: `planned:${workout.happenDay}:${onDay.indexOf(workout)}`,
           value,
           load,
-          ...(load > corosLoad ? { corosLoad } : {}),
           seconds: time,
           meters,
           name: workout.name,

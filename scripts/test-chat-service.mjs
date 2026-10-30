@@ -1344,17 +1344,14 @@ assert.equal(
   assert.doesNotMatch(buildCoachInstructions(), /What the athlete shares in this conversation/);
 }
 
-// --- A week's load is counted in the load the athlete reads strength in ---
+// --- Heracles Training Load is explained only where a turn's snapshot states it ---
 {
-  const { coachWeeklyLoadInstruction } = await import(
+  const { COACH_HERACLES_INSTRUCTION } = await import(
     `${distUrl("chatCoachContext.js")}?cacheBust=${Date.now()}`
   );
-  const heracles = coachWeeklyLoadInstruction("heracles");
-  assert.match(heracles, /set and progress weekly load targets.*in that figure/);
-  assert.match(heracles, /heracles_load estimate/, "a planned strength session counts at its estimate");
-  assert.match(heracles, /recommended weekly range stays a COROS figure/);
-  assert.match(coachWeeklyLoadInstruction("coros"), /weekly load targets, in a plan or an answer, in it/);
-  assert.doesNotMatch(buildBaseCoachInstructions(), /weekly load targets/, "a setting, not the prompt Settings shows");
+  assert.match(COACH_HERACLES_INSTRUCTION, /set and progress weekly load targets in it/);
+  assert.match(COACH_HERACLES_INSTRUCTION, /compare them only with COROS's figures/);
+  assert.doesNotMatch(buildBaseCoachInstructions(), /Heracles/, "the prompt Settings shows names one load");
 }
 
 console.log("chat service tests passed");

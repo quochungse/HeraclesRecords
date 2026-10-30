@@ -296,6 +296,8 @@ export interface HeraclesSetLoad {
   seconds: number;
   /** Nothing to score it by: the set took the session's median RPE. */
   filled?: boolean;
+  /** The RPE the athlete logged for the set (Hevy), taken over the prediction. */
+  logged?: boolean;
 }
 
 /** A run of the athlete's whose COROS load is closest to a strength session's Heracles load. */
@@ -647,6 +649,11 @@ export interface StrengthSet {
   type?: StrengthSetType;
   /** Rating of perceived exertion, on Hevy's 1–10 scale. */
   rpe?: number;
+  /**
+   * Hevy's assisted movements: the weight the machine or band takes off the
+   * body, kg. Never lifted weight, so `weightKg` stays 0.
+   */
+  assistKg?: number;
   /**
    * Held for a time — a plank, a stretch — so `workSec` is its figure and
    * `reps` is 0, whatever the watch counted through it.

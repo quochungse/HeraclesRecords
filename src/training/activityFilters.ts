@@ -151,8 +151,6 @@ export interface ActivityTotals {
   elevationGain: number;
   /** In the load strength is read in (`useLoadSource`). */
   trainingLoad: number;
-  /** COROS's Training Load over the same sessions, for the hover beside it. */
-  corosTrainingLoad: number;
   /** Distinct calendar days with at least one activity. */
   activeDays: number;
   /** Calendar weeks between the oldest and newest activity, both included. */
@@ -173,7 +171,6 @@ function emptyActivityTotals(): ActivityTotals {
     distance: 0,
     elevationGain: 0,
     trainingLoad: 0,
-    corosTrainingLoad: 0,
     activeDays: 0,
     weeks: 0,
     sports: []
@@ -201,7 +198,6 @@ export function summariseActivities(
   let distance = 0;
   let elevationGain = 0;
   let trainingLoad = 0;
-  let corosTrainingLoad = 0;
   let earliestWeek: number | undefined;
   let latestWeek: number | undefined;
 
@@ -211,7 +207,6 @@ export function summariseActivities(
     elevationGain += activity.elevationGain ?? 0;
     const load = activityLoad(activity, loadSource) ?? 0;
     trainingLoad += load;
-    corosTrainingLoad += activity.trainingLoad ?? 0;
 
     const category = sportColorCategory(activity.sportType);
     const total = bySport.get(category) ?? {
@@ -249,7 +244,6 @@ export function summariseActivities(
     distance,
     elevationGain,
     trainingLoad,
-    corosTrainingLoad,
     activeDays: days.size,
     weeks,
     sports: [...bySport.values()].sort(

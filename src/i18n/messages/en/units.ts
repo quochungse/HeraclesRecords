@@ -24,10 +24,8 @@ const units = {
   "units.exercises_one": "{count} exercise",
   "units.exercises_other": "{count} exercises",
   "units.load.pair": "Heracles TL {heracles} · COROS TL {coros}",
-  "units.load.pairNoCoros": "Heracles TL {heracles} · no COROS TL",
   "units.load.estimate": "Estimated: the sets could not be read",
   "units.load.pending": "Not calculated yet: the session's sets are still loading",
-  "units.load.planned": "Estimated from the plan",
 };
 
 export default units;

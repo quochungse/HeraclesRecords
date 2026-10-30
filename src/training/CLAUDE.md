@@ -94,7 +94,7 @@ would wrap (under 840px the week moves below; under 620px all stack).
 `UpcomingWorkoutDetailPanel`).
 
 **Training load distribution** (`distributionModel.ts`): four weeks' load by sport in the
-chosen load (`sportLoadShares`, COROS's sums kept for the hover), then COROS's time or load
+chosen load (`sportLoadShares`), then COROS's time or load
 per HR zone (seconds) — COROS's either way, Heracles has no zones — read as the easy share
 against 80/20 with `intensityForZone` on the effort ramp.
 

@@ -15,7 +15,7 @@ import {
   formatElevationMeters,
   formatPaceSecondsPerKm
 } from "./formatters";
-import { activityLoad, activityLoadTitle } from "./loadFigures";
+import { activityLoad, activityLoadNote } from "./loadFigures";
 import { isSpeedSport, isSwimSportType } from "./sportTypes";
 import { activityReading, formatSwimPace } from "../../electron/activityReading";
 import { formatSpeedValue } from "../units/units";
@@ -124,7 +124,7 @@ export function activityRowFacts(
     facts.push({
       key: "load",
       value: t("units.trainingLoadShort", { value: Math.round(trainingLoad) }),
-      title: [t("activity.fact.loadTitle"), activityLoadTitle(activity, loadSource)].filter(Boolean).join("\n")
+      title: [t("activity.fact.loadTitle"), activityLoadNote(activity, loadSource)].filter(Boolean).join("\n")
     });
   }
 

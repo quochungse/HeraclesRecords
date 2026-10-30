@@ -4,7 +4,7 @@ import { resolveExerciseName } from "../exerciseNames";
 import { useUnitSystem } from "../../units/UnitSystemProvider";
 import { formatVolumeKg, formatWeightKg } from "../../strength/strengthAnalytics";
 import { formatCount, formatDecimal, t } from "../../i18n/core";
-import { loadPairTitle } from "../loadFigures";
+import { activityLoadNote } from "../loadFigures";
 import { useLoadSource } from "../loadSource";
 
 function StatTile({ label, value, title }: { label: string; value: string; title?: string }) {
@@ -57,7 +57,7 @@ export function StrengthDetailPanel({ strength, heraclesLoad }: { strength: Stre
           <StatTile
             label={t("activity.m.trainingLoad")}
             value={formatOptionalNumber(Math.round(load))}
-            title={loadPairTitle(source, heracles?.value, summary.trainingLoad, heracles?.quality)}
+            title={activityLoadNote({ heraclesLoad: heracles }, source)}
           />
         ) : null}
         {summary.aerobicEffect !== undefined ? (

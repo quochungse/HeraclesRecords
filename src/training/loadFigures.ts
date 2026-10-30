@@ -1,14 +1,15 @@
 /**
  * A session's load in the load the athlete reads strength in — COROS's
- * Training Load or Heracles Training Load (docs/heracles-training-load.md) —
- * and the hover that states both. Pure, so the screens' models can use it;
+ * Training Load or Heracles Training Load (docs/heracles-training-load.md).
+ * One figure, the chosen one; both only where a COROS-made figure stands
+ * beside it (`loadPairTitle`). Pure, so the screens' models can use it;
  * the setting itself is `useLoadSource()` (`loadSource.tsx`).
  *
  * Only a strength session reads differently: every other sport's Heracles load
  * is COROS's, and anything COROS derives from its own load — Base Fitness,
  * Load Impact, the recommended range — is only ever set against COROS's load.
  */
-import type { HeraclesLoad, HeraclesLoadQuality, StrengthLoadSource } from "../../electron/types";
+import type { HeraclesLoad, StrengthLoadSource } from "../../electron/types";
 import { formatCount, t } from "../i18n/core";
 
 interface Loaded {
@@ -61,37 +62,33 @@ export function inLoadSource<T extends Loaded>(sessions: readonly T[], source: S
   );
 }
 
-function qualityNote(quality: HeraclesLoadQuality | undefined): string | undefined {
+/**
+ * What a single Heracles figure needs said beside it: that it is estimated,
+ * or that it is still COROS's while the sets load. Nothing while COROS is the
+ * chosen load, and nothing for a figure read off the sets.
+ */
+export function activityLoadNote(activity: Loaded, source: StrengthLoadSource): string | undefined {
+  if (source !== "heracles") return undefined;
+  const quality = activity.heraclesLoad?.quality;
   if (quality === "estimate") return t("units.load.estimate");
   if (quality === "pending") return t("units.load.pending");
-  if (quality === "planned") return t("units.load.planned");
   return undefined;
 }
 
 /**
- * The hover that states both figures, so whoever reads Heracles TL always
- * sees COROS's beside it. Undefined while COROS is the chosen load, and where
- * the two agree with nothing to flag.
+ * Both figures, for the few places a Heracles total stands beside something
+ * COROS made from its own load — the recommended weekly range — where one
+ * figure alone would read as a contradiction. Everywhere else a load is one
+ * figure. Undefined while COROS is chosen, or where the two agree.
  */
 export function loadPairTitle(
   source: StrengthLoadSource,
   heracles: number | undefined,
-  coros: number | undefined,
-  quality?: HeraclesLoadQuality
+  coros: number | undefined
 ): string | undefined {
-  if (source !== "heracles" || heracles === undefined) return undefined;
-  const note = qualityNote(quality);
+  if (source !== "heracles" || heracles === undefined || coros === undefined) return undefined;
   const shown = Math.round(heracles);
-  const corosShown = coros !== undefined ? Math.round(coros) : undefined;
-  if (corosShown === shown && !note) return undefined;
-  const pair =
-    corosShown !== undefined
-      ? t("units.load.pair", { heracles: formatCount(shown), coros: formatCount(corosShown) })
-      : t("units.load.pairNoCoros", { heracles: formatCount(shown) });
-  return note ? `${pair}\n${note}` : pair;
-}
-
-/** `loadPairTitle` for one session. */
-export function activityLoadTitle(activity: Loaded, source: StrengthLoadSource): string | undefined {
-  return loadPairTitle(source, activity.heraclesLoad?.value, activity.trainingLoad, activity.heraclesLoad?.quality);
+  const corosShown = Math.round(coros);
+  if (corosShown === shown) return undefined;
+  return t("units.load.pair", { heracles: formatCount(shown), coros: formatCount(corosShown) });
 }

@@ -6,7 +6,7 @@ import type {
   TrainingHubSportType,
   TrainingHubUpcomingWorkout
 } from "../../../electron/types";
-import { activityLoad, activityLoadTitle, comparableLoads, inLoadSource, plannedLoad } from "../loadFigures";
+import { activityLoad, activityLoadNote, comparableLoads, inLoadSource, plannedLoad } from "../loadFigures";
 import { useLoadSource } from "../loadSource";
 import type { HeraclesRecordsApi } from "../../heraclesrecords-api";
 import { workoutSportView } from "../../calendar/workoutSportIcons";
@@ -131,7 +131,7 @@ function TodayEntry({
   const meta = [workout && workout.name !== name ? name : null, doneLine(activity, unitSystem, loadSource)]
     .filter(Boolean)
     .join(" · ");
-  const loadTitle = activityLoadTitle(activity, loadSource);
+  const loadTitle = activityLoadNote(activity, loadSource);
   const body = (
     <>
       <SportTile category={category} icon={Check} done />

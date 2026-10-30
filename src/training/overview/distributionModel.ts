@@ -24,24 +24,22 @@ export interface SportShare {
   category: SportColorCategory;
   /** In the chosen load. */
   load: number;
-  /** COROS's figure for the same sessions, for the hover. */
-  corosLoad: number;
   share: number;
 }
 
 /**
  * Load by sport over the last `days` days, the biggest first; a sport with no
  * load is left out rather than drawn as a sliver. With Heracles chosen a
- * strength session counts its Heracles load, and COROS's sums stand beside.
+ * strength session counts its Heracles load.
  */
 export function sportLoadShares(
   activities: readonly TrainingHubActivity[],
   now = new Date(),
   days = DISTRIBUTION_DAYS,
   source: StrengthLoadSource = "coros"
-): { total: number; corosTotal: number; sports: SportShare[] } {
+): { total: number; sports: SportShare[] } {
   const since = now.getTime() - days * 86_400_000;
-  const loads = new Map<SportColorCategory, { load: number; corosLoad: number }>();
+  const loads = new Map<SportColorCategory, number>();
   for (const activity of activities) {
     const start = activityStartTimeMs(activity) ?? 0;
     const load = activityLoad(activity, source) ?? 0;
@@ -49,21 +47,16 @@ export function sportLoadShares(
       continue;
     }
     const category = sportColorCategory(activity.sportType);
-    const sum = loads.get(category) ?? { load: 0, corosLoad: 0 };
-    sum.load += load;
-    sum.corosLoad += Math.max(0, activity.trainingLoad ?? 0);
-    loads.set(category, sum);
+    loads.set(category, (loads.get(category) ?? 0) + load);
   }
-  const sums = [...loads.values()];
-  const total = sums.reduce((sum, entry) => sum + entry.load, 0);
-  const corosTotal = sums.reduce((sum, entry) => sum + entry.corosLoad, 0);
-  const sports = SPORT_COLOR_CATEGORIES.filter((category) => (loads.get(category)?.load ?? 0) > 0)
+  const total = [...loads.values()].reduce((sum, load) => sum + load, 0);
+  const sports = SPORT_COLOR_CATEGORIES.filter((category) => (loads.get(category) ?? 0) > 0)
     .map((category) => {
-      const { load, corosLoad } = loads.get(category)!;
-      return { category, load, corosLoad, share: total > 0 ? load / total : 0 };
+      const load = loads.get(category) ?? 0;
+      return { category, load, share: total > 0 ? load / total : 0 };
     })
     .sort((left, right) => right.load - left.load);
-  return { total, corosTotal, sports };
+  return { total, sports };
 }
 
 export interface ZoneShare {

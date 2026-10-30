@@ -267,14 +267,13 @@ assert.deepEqual(
   );
   const read = buildWeekChart({ dayList, activities: lifted, upcoming: plannedCore, now, unitSystem: "metric", loadSource: "heracles" });
   const [hMon, , hWed, hThu, , hSat] = read.columns;
-  assert.deepEqual(hMon.blocks.map((block) => [block.key, block.load, block.corosLoad]), [
-    ["mon-ride", 200, undefined],
-    ["mon-lift", 180, 60]
-  ], "the lift at its Heracles load, COROS's beside it");
+  assert.deepEqual(hMon.blocks.map((block) => [block.key, block.load]), [
+    ["mon-ride", 200],
+    ["mon-lift", 180]
+  ], "the lift at its Heracles load");
   assert.deepEqual(hWed.blocks.map((block) => [block.key, block.load]), [["wed-run", 110], ["residual", 20]]);
   assert.equal(hThu.done, 300 + 70, "Thursday's lift adds what Heracles reads over COROS");
   assert.deepEqual(hSat.blocks.at(-1).load, 70, "a planned strength session at its Heracles estimate");
-  assert.equal(hSat.blocks.at(-1).corosLoad, 20);
   const unchanged = buildWeekChart({ dayList, activities: lifted, upcoming: plannedCore, now, unitSystem: "metric" });
   assert.equal(unchanged.columns[0].blocks[1].load, 60, "with COROS chosen nothing moves");
 
@@ -388,8 +387,8 @@ assert.deepEqual(
 );
 close(mix.sports[0].share, 2 / 3, "a sport's share of the load");
 
-// With strength read in Heracles Training Load, the lift counts that load and
-// COROS's sums stand beside for the hover; with COROS chosen nothing moves.
+// With strength read in Heracles Training Load, the lift counts that load;
+// with COROS chosen nothing moves.
 {
   const lifts = [
     { activityId: "r1", sportType: 100, startTime: daysAgo(2), trainingLoad: 300 },
@@ -403,15 +402,13 @@ close(mix.sports[0].share, 2 / 3, "a sport's share of the load");
   ];
   const coros = sportLoadShares(lifts, now);
   assert.equal(coros.total, 360);
-  assert.equal(coros.corosTotal, 360);
   const heracles = sportLoadShares(lifts, now, undefined, "heracles");
   assert.equal(heracles.total, 500, "the lift at its Heracles load");
-  assert.equal(heracles.corosTotal, 360, "COROS's figure kept for the hover");
   assert.deepEqual(
-    heracles.sports.map((sport) => [sport.category, sport.load, sport.corosLoad]),
+    heracles.sports.map((sport) => [sport.category, sport.load]),
     [
-      ["run", 300, 300],
-      ["strength", 200, 60]
+      ["run", 300],
+      ["strength", 200]
     ]
   );
 }

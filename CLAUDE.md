@@ -189,7 +189,9 @@ Load (`src/strength/CLAUDE.md`); the Strength screen chooses which one every scr
 strength in, and other sports are COROS's either way. A figure set against another is in the
 same load on both sides (`comparableLoads`, `loadsToCompare`), and anything COROS derives from
 its own load — Base Fitness, Load Impact, the load ratio, the recommended weekly range — is only
-ever compared with COROS's load. Where Heracles is shown, the hover states COROS's figure too.
+ever compared with COROS's load. A load is shown as one figure, the chosen one; both appear
+(`loadPairTitle`) only where a Heracles total stands beside a COROS-made figure — the week's load
+against COROS's recommended range — so the two never read as a contradiction.
 
 **Loading is not empty.** An array that has not arrived reads like one that came back
 empty; each load states where it stands (`TrainingHubLoadStatus`, `initializing`,

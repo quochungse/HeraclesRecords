@@ -70,11 +70,18 @@ body map offers **Load** only then. `npm run test:heracles-load`, `test:heracles
   COROS's weight in `body_weight_history` (`personal`, a row per day it changed;
   `recordBodyWeight` writes nothing when it did not), since COROS holds only the current one.
   `test:body-weight-history`.
-- A display reads a load through `src/training/loadFigures.ts` and shows the other figure on
-  hover (`loadPairTitle`).
-- **Coach reads both figures whatever is chosen**; the choice reaches it as one line of the
-  turn's head (`coachWeeklyLoadInstruction`, beside the units), so Coach and AI Plan set a
-  plan's weekly load in the load the screens add up.
+- A display reads a load through `src/training/loadFigures.ts`: one figure, with a note only
+  when it is estimated or still COROS's (`activityLoadNote`); both figures only beside a
+  COROS-made one (`loadPairTitle`).
+- **Coach reads Heracles only while it is chosen** (`coachReadsHeracles`), and is told what it
+  is in one line of the turn's head only when the snapshot states one
+  (`COACH_HERACLES_INSTRUCTION`), so Coach and AI Plan set a plan's weekly load in the load
+  the screens add up.
+- **Hevy has no training load**: with Heracles chosen a Hevy session is scored from its sets
+  alone (3 s a rep, 90 s rest, no COROS floor); with COROS chosen it has none. A Hevy movement
+  takes the factor of its COROS twin by name (`heraclesFactorByName`), an assisted one has its
+  assistance taken off the body (`StrengthSet.assistKg`, never lifted weight), and a logged RPE
+  outranks the prediction and sets the reps in reserve for capacity.
 
 ## Hevy
 

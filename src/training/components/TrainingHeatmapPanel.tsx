@@ -146,17 +146,6 @@ function pieBackground(
   return `conic-gradient(${stops.join(", ")})`;
 }
 
-/** A day read in Heracles Training Load names COROS's figure under its own. */
-function CorosLine({ cell }: { cell: HeatmapCell }) {
-  if (
-    cell.corosTrainingLoad === undefined ||
-    Math.round(cell.corosTrainingLoad) === Math.round(cell.trainingLoad ?? 0)
-  ) {
-    return null;
-  }
-  return <span>{t("strength.load.coros", { value: formatOptionalNumber(cell.corosTrainingLoad) })}</span>;
-}
-
 function formatCellAriaLabel(
   cell: HeatmapCell,
   unitSystem: UnitSystem
@@ -198,7 +187,7 @@ export function TrainingHeatmapPanel({
 
   const { source: loadSource } = useLoadSource();
   // Read in the chosen load: a strength day's load and its sport's share
-  // stand at Heracles Training Load, COROS's figure kept for the tooltip.
+  // stand at Heracles Training Load.
   const loadActivities = useMemo(() => inLoadSource(activities, loadSource), [activities, loadSource]);
   const dayList = useMemo(
     () =>
@@ -785,7 +774,6 @@ export function TrainingHeatmapPanel({
                           <span>
                             {t("overview.heatmap.load", { value: formatOptionalNumber(cell.trainingLoad) })}
                           </span>
-                          <CorosLine cell={cell} />
                           <span>
                             {t("overview.heatmap.distance", {
                               value: formatDistanceMeters(cell.distance, unitSystem)
@@ -895,7 +883,6 @@ export function TrainingHeatmapPanel({
                       <span className="training-heatmap-tooltip" role="tooltip">
                         <strong>{cell.label}</strong>
                         <span>{t("overview.heatmap.load", { value: loadLabel })}</span>
-                        <CorosLine cell={cell} />
                         <span>{t("overview.heatmap.distance", { value: distanceLabel })}</span>
                         <span>{t("overview.heatmap.duration", { value: durationLabel })}</span>
                       </span>

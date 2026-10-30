@@ -11,7 +11,7 @@ import { dayKey, isoDay, isoFromDayKey, padTwo } from "./chatDayKeys";
 import { sessionSetsCardExercises, sessionSetsHeartRate } from "./sessionSets";
 import { isRecoveryLap, lapSections } from "./lapSections";
 import { getStoredTrainingActivity } from "./database";
-import { heraclesLoadFor, withHeraclesLoads, withPlannedHeraclesLoads } from "./heraclesLoadService";
+import { getStrengthLoadSource, heraclesLoadFor, withHeraclesLoads, withPlannedHeraclesLoads } from "./heraclesLoadService";
 import {
   getTrainingHubStatus,
   getTrainingHubActivityDetail,
@@ -1093,11 +1093,25 @@ export function formatActivityListLine(
 }
 
 /**
- * Strength sessions with Heracles Training Load beside COROS's. Coach reads
- * both whatever the Strength screen shows; a failure to work it out leaves
- * the list as COROS sent it, since COROS's figure is still the answer.
+ * Whether Coach reads strength in Heracles Training Load: only while the
+ * athlete does (`strength.loadSource`), so Coach speaks the load the screens
+ * show. Unreadable reads as COROS's, whose figure is always there.
+ */
+export function coachReadsHeracles(): boolean {
+  try {
+    return getStrengthLoadSource() === "heracles";
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Strength sessions with Heracles Training Load beside COROS's, while that is
+ * the athlete's load; a failure to work it out leaves the list as COROS sent
+ * it, since COROS's figure is still the answer.
  */
 export function withCoachHeraclesLoads<T extends TrainingHubActivity>(activities: T[]): T[] {
+  if (!coachReadsHeracles()) return activities;
   try {
     return withHeraclesLoads(activities);
   } catch {
@@ -1109,6 +1123,7 @@ export function withCoachHeraclesLoads<T extends TrainingHubActivity>(activities
 export function withCoachPlannedHeraclesLoads<T extends Parameters<typeof withPlannedHeraclesLoads>[0][number]>(
   workouts: T[]
 ): T[] {
+  if (!coachReadsHeracles()) return workouts;
   try {
     return withPlannedHeraclesLoads(workouts);
   } catch {
@@ -1119,6 +1134,7 @@ export function withCoachPlannedHeraclesLoads<T extends Parameters<typeof withPl
 function coachHeraclesLoad(
   activity: Pick<TrainingHubActivity, "activityId" | "sportType" | "trainingLoad">
 ): HeraclesLoad | undefined {
+  if (!coachReadsHeracles()) return undefined;
   try {
     return heraclesLoadFor(activity);
   } catch {
@@ -1141,14 +1157,14 @@ export function coachHeraclesLoadValue(item: { trainingLoad?: number; heraclesLo
   return load ? Math.round(load.value) : undefined;
 }
 
-/** "Heracles load 203" on a list row; "(estimated)" when it is not read off the sets. */
+/** "Heracles load 203" on a list row. */
 export function formatHeraclesLoadPart(item: {
   trainingLoad?: number;
   heraclesLoad?: HeraclesLoad;
 }): string | undefined {
   const value = coachHeraclesLoadValue(item);
   if (value === undefined) return undefined;
-  return `Heracles load ${value}${item.heraclesLoad?.quality === "sets" ? "" : " (estimated)"}`;
+  return `Heracles load ${value}`;
 }
 
 /**
@@ -1244,8 +1260,7 @@ export function formatActivityDetailForChat(
       ? `Heracles Training Load: ${Math.round(heracles.value)} (` +
         [
           heracles.cardio !== undefined ? `cardio ${Math.round(heracles.cardio)} from COROS` : undefined,
-          `muscular ${Math.round(heracles.muscular)}`,
-          heracles.quality === "sets" ? undefined : "estimated: the sets could not all be read"
+          `muscular ${Math.round(heracles.muscular)}`
         ]
           .filter(Boolean)
           .join(", ") +

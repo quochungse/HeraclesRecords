@@ -12,10 +12,11 @@
  *   athlete's own runs.
  *
  * The feeling an athlete records after a session is never an input. It is
- * read only off runs, to measure k. Node-free: the renderer imports the types.
+ * read only off runs, to measure k. A set's RPE logged in Hevy is, over the
+ * prediction. Node-free: the renderer imports the types.
  */
 
-import { HERACLES_EXERCISE_FACTORS, type HeraclesExerciseFactor } from "./heraclesLoadFactors";
+import { HERACLES_EXERCISE_FACTORS, heraclesFactorByName, type HeraclesExerciseFactor } from "./heraclesLoadFactors";
 import type {
   HeraclesLoad,
   HeraclesLoadQuality,
@@ -95,6 +96,22 @@ export function rpeFromRir(rir: number): number {
   return 2 + 3 * Math.exp(-(rir - 6) / 6);
 }
 
+/**
+ * `rpeFromRir` read back, for an RPE the athlete logged: only from 5 up, where
+ * the scale still counts reps left; an easier set says too little about the
+ * lift's best to read a capacity off it.
+ */
+function rirFromRpe(rpe: number): number | undefined {
+  if (rpe >= 7) return 10 - rpe;
+  if (rpe >= 5) return 3 + ((7 - rpe) * 3) / 2;
+  return undefined;
+}
+
+/** The RPE the athlete logged for a set (Hevy), when it is on the scale. */
+function loggedRpe(set: StrengthSet): number | undefined {
+  return set.rpe !== undefined && Number.isFinite(set.rpe) && set.rpe >= 1 && set.rpe <= 10 ? set.rpe : undefined;
+}
+
 /** Epley's reps to failure at a share of the one-rep max. */
 function repsToFailure(intensity: number): number {
   return Math.max(0, 30 * (1 / intensity - 1));
@@ -155,9 +172,9 @@ interface ResolvedFactor {
   bodyShare: number;
   repsAtBodyweight: number;
   maxHoldSec?: number;
-  /** Hevy: the weight logged is assistance, taken off the body's share. */
-  assisted?: boolean;
 }
+
+const COROS_KEY = /^[TS]\d{4}$/;
 
 /** The movement's identity: COROS's key, or Hevy's template. */
 function heraclesExerciseKey(exercise: StrengthExercise): string | undefined {
@@ -172,7 +189,10 @@ function resolveFactor(exercise: StrengthExercise, key: string | undefined): Res
   const type = exercise.corosExerciseType;
   if (type === 1 || type === 3 || type === 4) return { ...base, kind: "skip" };
   if (!key || UNREADABLE_KEYS.has(key)) return { ...base, kind: "unreadable" };
-  const listed = HERACLES_EXERCISE_FACTORS[key];
+  // A movement with no COROS key (Hevy's) is known by its name.
+  const listed = COROS_KEY.test(key)
+    ? HERACLES_EXERCISE_FACTORS[key]
+    : heraclesFactorByName(exercise.rawName ?? exercise.nameKey);
   if (listed) {
     return {
       kind: listed.kind,
@@ -181,6 +201,7 @@ function resolveFactor(exercise: StrengthExercise, key: string | undefined): Res
       maxHoldSec: listed.maxHoldSec
     };
   }
+  // Hevy's template types.
   switch (exercise.exerciseType) {
     case "duration":
       return { ...base, kind: "hold" };
@@ -189,10 +210,8 @@ function resolveFactor(exercise: StrengthExercise, key: string | undefined): Res
       return { ...base, kind: "plyo" };
     case "reps_only":
     case "bodyweight_reps":
-    case "weighted_bodyweight":
+    case "bodyweight_assisted_reps":
       return { ...base, kind: "bodyweight", bodyShare: DEFAULT_BODY_SHARE };
-    case "assisted_bodyweight":
-      return { ...base, kind: "bodyweight", bodyShare: DEFAULT_BODY_SHARE, assisted: true };
     default:
       return { ...base, kind: "load" };
   }
@@ -265,9 +284,9 @@ function bodyweightPrior(factor: ResolvedFactor, bodyWeightKg: number): number {
   );
 }
 
-function systemLoad(set: Pick<StrengthSet, "weightKg">, factor: ResolvedFactor, bodyWeightKg: number): number {
-  const body = factor.bodyShare * bodyWeightKg;
-  return factor.assisted ? body - set.weightKg : body + set.weightKg;
+/** The body's share, plus the weight lifted, less any assistance (Hevy's assisted movements). */
+function systemLoad(set: Pick<StrengthSet, "weightKg" | "assistKg">, factor: ResolvedFactor, bodyWeightKg: number): number {
+  return factor.bodyShare * bodyWeightKg + set.weightKg - (set.assistKg ?? 0);
 }
 
 /**
@@ -405,7 +424,12 @@ export function runHeraclesLoads(
           if (factor === "missing") continue;
           const load = systemLoad(set, factor, bodyWeightKg);
           if (load <= 0 || set.reps < 1 || set.reps > MAX_CAPACITY_REPS) continue;
-          estimates.push(capacityEstimate(load, set.reps, set.type === "failure" ? 0 : BEST_SET_RIR));
+          // A logged RPE says how far from failure the set stopped; without
+          // one, the best set is taken to have stopped one rep short.
+          const logged = loggedRpe(set);
+          const rir = set.type === "failure" ? 0 : logged !== undefined ? rirFromRpe(logged) : BEST_SET_RIR;
+          if (rir === undefined) continue;
+          estimates.push(capacityEstimate(load, set.reps, rir));
         }
         if (estimates.length === 0) continue;
         const previous = capacityAt(capacity.get(entry.key), day);
@@ -434,6 +458,9 @@ export function runHeraclesLoads(
     const scored: (HeraclesSetLoad | null)[][] = exercises.map((entry) =>
       entry.sets.map(({ set, seconds, role }): HeraclesSetLoad | null => {
         if (role === "between") return null;
+        // The athlete's own rating outranks the prediction.
+        const logged = loggedRpe(set);
+        if (logged !== undefined) return { load: 0, rpe: logged, seconds, logged: true };
         if (role === "hold") {
           const maxHold = (entry.key ? holds.get(entry.key) : undefined) ?? entry.factor.maxHoldSec ?? DEFAULT_MAX_HOLD_SEC;
           const share = Math.min(1, set.workSec / maxHold);

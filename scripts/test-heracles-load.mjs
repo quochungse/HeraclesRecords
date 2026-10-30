@@ -220,6 +220,62 @@ const perSet = (0.5 * rpe * 182) / 60;
   assert.equal(result.sets[0][1].seconds, 8 * 3 + 90);
 }
 
+// A Hevy movement is known by its name: a pull-up moves 0.95 of the body,
+// as COROS's does, and a barbell squat moves the body under the bar too.
+{
+  const pullUps = (id, title, exerciseType) =>
+    session(id, 0, [exercise(title, [set(5, 0, 0, 0), set(5, 0, 0, 0)], { rawName: title, externalId: id, exerciseType })], { trainingLoad: null });
+  const hevy = runHeraclesLoads([pullUps("hp", "Pull Up", "bodyweight_reps")], context(0.5, 80)).sessions.get("hp");
+  const coros = runHeraclesLoads([session("cp", 0, [exercise("T1002", [set(5, 0, 0, 0), set(5, 0, 0, 0)])])], context(0.5, 80))
+    .sessions.get("cp");
+  close(hevy.sets[0][0].rpe, coros.sets[0][0].rpe, "Hevy's pull-up reads as COROS's");
+  close(hevy.sets[0][0].intensity, coros.sets[0][0].intensity, "same share of the body");
+  const unnamed = runHeraclesLoads([pullUps("hx", "Something Else", "bodyweight_reps")], context(0.5, 80)).sessions.get("hx");
+  assert.notEqual(unnamed.sets[0][0].intensity, hevy.sets[0][0].intensity, "a name it does not know keeps the default share");
+
+  // A squat at 100 kg is 100 + 0.88 × 80 = 170.4 kg moved; its own set is the
+  // history, so intensity is that over its capacity whichever share is used —
+  // but a lighter squat the next day reads against the body-inclusive best.
+  const squat = (id, day, kg) =>
+    session(id, day, [exercise("Squat (Barbell)", [set(5, kg, 0, 0), set(5, kg, 0, 0)], { rawName: "Squat (Barbell)", externalId: "sq", exerciseType: "weight_reps" })], { trainingLoad: null });
+  const light = runHeraclesLoads([squat("s1", 0, 100), squat("s2", 1, 60)], context(0.5, 80)).sessions.get("s2");
+  close(light.sets[0][0].intensity, (60 + 0.88 * 80) / ((100 + 0.88 * 80) * (1 + 6 / 30)), "body under the bar");
+}
+
+// Hevy's assisted movement: the assistance comes off the body, so more help
+// is an easier set.
+{
+  const assisted = (assistKg) =>
+    session(`a${assistKg}`, 0, [
+      exercise("Pull Up (Assisted)", [set(8, 0, 0, 0, { assistKg }), set(8, 0, 0, 0, { assistKg })], {
+        rawName: "Pull Up (Assisted)",
+        externalId: "pa",
+        exerciseType: "bodyweight_assisted_reps"
+      })
+    ], { trainingLoad: null });
+  // With a history set heavier than both, the sets read against one capacity.
+  const history = session("ph", -1, [exercise("Pull Up", [set(5, 0, 0, 0), set(5, 0, 0, 0)], { rawName: "Pull Up", externalId: "pa", exerciseType: "bodyweight_reps" })], { trainingLoad: null });
+  const little = runHeraclesLoads([history, assisted(10)], context(0.5, 80)).sessions.get("a10").sets[0][0];
+  const much = runHeraclesLoads([history, assisted(30)], context(0.5, 80)).sessions.get("a30").sets[0][0];
+  close(little.intensity, (0.95 * 80 - 10) / (0.95 * 80 * (1 + 6 / 30)), "the body less 10 kg of help");
+  assert.ok(much.rpe < little.rpe, `30 kg of help (${much.rpe}) easier than 10 kg (${little.rpe})`);
+}
+
+// An RPE logged in Hevy is taken over the prediction, and says how close to
+// failure the set was for the lift's capacity.
+{
+  const logged = session("lg", 0, [exercise("bench", [
+    set(8, 60, 0, 0, { rpe: 7 }),
+    set(8, 60, 0, 0)
+  ], { externalId: "tmpl-2", exerciseType: "weight_reps" })], { trainingLoad: null });
+  const result = runHeraclesLoads([logged], context()).sessions.get("lg");
+  assert.equal(result.sets[0][0].rpe, 7);
+  assert.equal(result.sets[0][0].logged, true);
+  // RPE 7 is three reps left: capacity 60 × (1 + 11/30), above the one-rep-short guess.
+  close(result.sets[0][1].intensity, 60 / (60 * (1 + 11 / 30)), "capacity from the logged RPE");
+  assert.equal(result.sets[0][1].logged, undefined, "an unlogged set is still predicted");
+}
+
 // ---- Planned sessions ----
 {
   const { state } = runHeraclesLoads([benchTop, bench], context());

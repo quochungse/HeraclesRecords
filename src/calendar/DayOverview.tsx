@@ -6,7 +6,7 @@ import {
   formatDurationSeconds,
   formatUpcomingWorkoutVolumeDisplay
 } from "../training/formatters";
-import { activityLoad, activityLoadTitle, plannedLoad } from "../training/loadFigures";
+import { activityLoad, activityLoadNote, plannedLoad } from "../training/loadFigures";
 import { useLoadSource } from "../training/loadSource";
 import { isSwimSportType } from "../training/sportTypes";
 import { scheduledWorkoutSport } from "../training/workoutSport";
@@ -116,7 +116,7 @@ export function DayOverview({
                 type="button"
                 className="calendar-day-overview-item"
                 onClick={() => onOpen(item)}
-                title={activityLoadTitle(item.kind === "activity" ? item.activity : item.entry, source)}
+                title={item.kind === "activity" ? activityLoadNote(item.activity, source) : undefined}
               >
                 <span className="calendar-day-overview-icon" style={sportChipStyle(sport)} aria-hidden="true">
                   <Icon size={16} />

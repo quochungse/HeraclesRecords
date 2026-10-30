@@ -23,10 +23,8 @@ const units: UnitsMessages = {
   "units.exercises_one": "{count} 種目",
   "units.exercises_other": "{count} 種目",
   "units.load.pair": "Heracles TL {heracles} · COROS TL {coros}",
-  "units.load.pairNoCoros": "Heracles TL {heracles} · COROS TL なし",
   "units.load.estimate": "推定：セットを読み取れませんでした",
   "units.load.pending": "未計算：セッションのセットを読み込み中です",
-  "units.load.planned": "プランからの推定",
 };
 
 export default units;

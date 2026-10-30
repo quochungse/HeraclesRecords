@@ -1,5 +1,5 @@
 import { exerciseLabel } from "./strengthAnalytics";
-import { useMemo, useState, type ReactNode } from "react";
+import { useMemo, useState } from "react";
 import { ArrowUpRight, ChevronLeft, ChevronRight, Info, MessageCircle, Trophy } from "lucide-react";
 import type {
   CoachOpenRequest,
@@ -9,7 +9,7 @@ import type {
   UnitSystem
 } from "../../electron/types";
 import { activityCoachRequest } from "../training/askCoachAbout";
-import { loadPairTitle } from "../training/loadFigures";
+import { activityLoadNote } from "../training/loadFigures";
 import { useLoadSource } from "../training/loadSource";
 import { formatDistanceValue } from "../units/units";
 import { useUnitSystem } from "../units/UnitSystemProvider";
@@ -99,7 +99,7 @@ function scrollToCard(id: string) {
   document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" });
 }
 
-function Stat({ label, value, caption, title }: { label: string; value: string; caption?: ReactNode; title?: string }) {
+function Stat({ label, value, caption, title }: { label: string; value: string; caption?: string; title?: string }) {
   return (
     <div className="strength-session-stat" title={title}>
       <span>{label}</span>
@@ -111,11 +111,9 @@ function Stat({ label, value, caption, title }: { label: string; value: string; 
 }
 
 /**
- * The session's training load in the load the athlete reads strength in. As
- * Heracles Training Load, the caption names COROS's figure beside a bar of the
- * two parts — COROS's heart-rate part, then what the sets add — inside the
- * caption line, so the band keeps its height. The hover adds the run of theirs
- * that carried about the same load.
+ * The session's training load in the load the athlete reads strength in, one
+ * figure. As Heracles Training Load, the hover says when it is estimated, and
+ * names the run of theirs that carried about the same load.
  */
 function LoadStat({
   stats,
@@ -132,14 +130,9 @@ function LoadStat({
       <Stat label={t("activity.m.trainingLoad")} value={String(Math.round(stats.trainingLoad))} />
     ) : null;
   }
-  const corosLabel =
-    heracles.cardio !== undefined
-      ? t("strength.load.coros", { value: formatCount(Math.round(heracles.cardio)) })
-      : t("strength.load.corosNone");
-  const showSplit = heracles.quality === "sets" && heracles.value > 0 && heracles.cardio !== undefined;
   const run = heracles.runEquivalent;
   const title = [
-    loadPairTitle(source, heracles.value, heracles.cardio, heracles.quality),
+    activityLoadNote({ heraclesLoad: heracles }, source),
     run
       ? t("strength.load.runEquivalent", {
           distance: formatDistanceValue(run.distance ?? 0, unitSystem, { digits: 1 }),
@@ -158,17 +151,6 @@ function LoadStat({
       label={t("activity.m.trainingLoad")}
       value={formatCount(Math.round(heracles.value))}
       title={title || undefined}
-      caption={
-        <>
-          {showSplit ? (
-            <i className="strength-load-split" aria-hidden="true">
-              <i className="is-cardio" style={{ flexGrow: heracles.cardio }} />
-              <i className="is-muscular" style={{ flexGrow: heracles.muscular }} />
-            </i>
-          ) : null}
-          {corosLabel}
-        </>
-      }
     />
   );
 }
@@ -176,6 +158,7 @@ function LoadStat({
 /** What a set's load was read from, for its hover. */
 function setLoadTitle(load: HeraclesSetLoad): string {
   const rpe = formatDecimal(load.rpe, 1);
+  if (load.logged) return t("strength.load.setLogged", { rpe });
   if (load.filled) return t("strength.load.setFilled", { rpe });
   if (load.rir === undefined || load.intensity === undefined) return t("strength.load.setHold", { rpe });
   return t("strength.load.set", {

@@ -23,10 +23,8 @@ const units: UnitsMessages = {
   "units.exercises_one": "{count} esercizio",
   "units.exercises_other": "{count} esercizi",
   "units.load.pair": "Heracles TL {heracles} · COROS TL {coros}",
-  "units.load.pairNoCoros": "Heracles TL {heracles} · nessun TL COROS",
   "units.load.estimate": "Stimato: non è stato possibile leggere le serie",
   "units.load.pending": "Non ancora calcolato: le serie della sessione sono in caricamento",
-  "units.load.planned": "Stimato dal piano",
 };
 
 export default units;

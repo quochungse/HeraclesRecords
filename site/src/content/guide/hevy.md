@@ -19,9 +19,9 @@ Your Hevy workouts appear beside your COROS sessions, and a session recorded in 
 COROS's Training Load is read from heart rate, which counts lifting light. **Training load formula**, in the Strength screen's **Settings**, chooses how strength sessions are counted:
 
 - **COROS TL**: COROS's own figure, as on your watch.
-- **Heracles TL**: Heracles Training Load, worked out from each set's weight and reps, your body weight and the most you have lifted on each exercise, on the same scale as COROS's load for a run. The muscle map gains a **Load** view, and Overview, the Calendar, the Training Library and Activities count strength this way. Coach and AI Plan set a plan's weekly load in it too. Hover a figure to see COROS's beside it.
+- **Heracles TL**: Heracles Training Load, worked out from each set's weight and reps (and the RPE you log in Hevy), your body weight and the most you have lifted on each exercise, on the same scale as COROS's load for a run. The muscle map gains a **Load** view, and Overview, the Calendar, the Training Library and Activities count strength this way. Coach and AI Plan set a plan's weekly load in it too. Where a week's total sits beside the range COROS recommends, hover it to see COROS's figure too.
 
-Other sports keep COROS's load either way, and so do the figures COROS works out from it: Base Fitness, Load Impact and the weekly range it recommends.
+Hevy keeps no training load of its own, so a workout logged only in Hevy has one only with Heracles TL. Other sports keep COROS's load either way, and so do the figures COROS works out from it: Base Fitness, Load Impact and the weekly range it recommends.
 
 ## Good to know
 

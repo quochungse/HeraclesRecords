@@ -26,7 +26,7 @@ import {
   formatUpcomingWorkoutVolumeDisplay,
   inferUpcomingWorkoutCategory
 } from "../training/formatters";
-import { activityLoadTitle, plannedLoad } from "../training/loadFigures";
+import { plannedLoad } from "../training/loadFigures";
 import { useLoadSource } from "../training/loadSource";
 import { sportColorCategory } from "../training/sportColors";
 import { resolveSportName } from "../training/sportTypes";
@@ -106,7 +106,7 @@ export function ScheduledWorkoutDetail({
           transition: { duration: 0.28, delay, ease: "easeOut" as const }
         };
 
-  const stats: Array<{ icon: LucideIcon; label: string; value: string; title?: string }> = [
+  const stats: Array<{ icon: LucideIcon; label: string; value: string }> = [
     {
       icon: Route,
       label: t("workout.detail.volume"),
@@ -117,8 +117,7 @@ export function ScheduledWorkoutDetail({
     {
       icon: Gauge,
       label: t("workout.detail.plannedLoad"),
-      value: formatDetailLoad(plannedLoad(entry, source)),
-      title: activityLoadTitle(entry, source)
+      value: formatDetailLoad(plannedLoad(entry, source))
     }
   ];
   if (view.totals.durationSeconds) {
@@ -159,7 +158,7 @@ export function ScheduledWorkoutDetail({
         </div>
         <dl className={`sched-hero-stats is-${stats.length}`}>
           {stats.map((stat) => (
-            <div className="sched-stat" key={stat.label} title={stat.title}>
+            <div className="sched-stat" key={stat.label}>
               <dt className="sched-stat-label">
                 <stat.icon size={12} aria-hidden="true" />
                 {stat.label}

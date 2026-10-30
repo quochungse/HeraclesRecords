@@ -12,7 +12,6 @@ import { dateFromDayKey, dayKey, dayLabel, isoFromDayKey } from "./chatDayKeys";
 import { sleepHrBaseline, sleepNightsByDay } from "./sleepHeartRate";
 import type {
   CorosProfile,
-  StrengthLoadSource,
   TrainingHubActivity,
   TrainingHubDashboard,
   TrainingHubPersonalRecordGroup,
@@ -157,11 +156,6 @@ export function buildBaseCoachInstructions(): string {
     "- Ask before planning only when the goal, the sports, the facilities or the equipment would materially " +
       "change the plan; otherwise plan from what you know and say what you assumed.",
     "",
-    "Two loads: COROS's training load is a heart-rate figure and reads a lifting session light. A strength " +
-      "session that also states a Heracles load is scored by this app from its sets, on a run's scale; weigh " +
-      "strength against running with it. COROS's Base Fitness, Load Impact, load ratio and recommended weekly " +
-      "range are made from COROS's load alone, so set them only against COROS's figures.",
-    "",
     "Next steps: only when this turn's data shows a concrete change you chose not to make yourself — a hard " +
       "session to swap after poor recovery, missed or clashing sessions to rearrange, or the other side of a " +
       "trade-off you decided — end the answer with up to three lines [[next:…]], each under 40 characters, " +
@@ -175,25 +169,16 @@ export function buildBaseCoachInstructions(): string {
 }
 
 /**
- * The load a week is counted in, as the athlete's screens add it up
- * (`strength.loadSource`): a plan's weekly load is set and progressed in the
- * same figure the Calendar and the Training Library show for it. A setting,
- * so it sits beside the units rather than in the base prompt Settings shows.
+ * One line on Heracles Training Load, for a turn whose snapshot shows it — a
+ * strength session or a planned one stating its Heracles load, which Coach is
+ * handed only while the athlete reads strength in it. Otherwise Coach reads
+ * COROS's load alone and is told nothing about another.
  */
-export function coachWeeklyLoadInstruction(source: StrengthLoadSource): string {
-  if (source === "heracles") {
-    return (
-      "The athlete reads strength in Heracles Training Load. Count a week's load that way — a strength session at " +
-      "its Heracles load (a planned one at its heracles_load estimate, else at what a like session scored), every " +
-      "other session at COROS's training load — and set and progress weekly load targets, in a plan or an answer, " +
-      "in that figure. COROS's recommended weekly range stays a COROS figure, set only against COROS's load."
-    );
-  }
-  return (
-    "The athlete reads every load in COROS's training load: set and progress weekly load targets, in a plan or an " +
-    "answer, in it. A Heracles load on a strength session says how hard the lifting was, not what the week adds up to."
-  );
-}
+export const COACH_HERACLES_INSTRUCTION =
+  "Heracles load: the athlete reads strength in Heracles Training Load, this app's load for a lifting session, " +
+  "scored from its sets on a run's scale. Weigh strength against other training with it, and set and progress " +
+  "weekly load targets in it (other sports at COROS's load). COROS's Base Fitness, Load Impact, load ratio and " +
+  "recommended weekly range come from COROS's load alone: compare them only with COROS's figures."
 
 /**
  * What day it is, as the machine's clock and time zone say.

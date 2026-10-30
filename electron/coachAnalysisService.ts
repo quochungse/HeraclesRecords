@@ -66,7 +66,7 @@ import { corosText, loadCorosLocale } from "./corosLocale";
 import { EXERCISE_SEARCH_MUSCLES, classifyWorkoutExerciseName } from "./exerciseCatalogSearch";
 import { getTrainingHubStatus, reconnectTrainingHub } from "./trainingHubService";
 import { corosSportName } from "./corosSportTypes";
-import { heraclesLoadFor } from "./heraclesLoadService";
+import { getStrengthLoadSource, heraclesLoadFor } from "./heraclesLoadService";
 import { runExclusively } from "./sync/automationLease";
 import { listPlanBriefs } from "./chatPlanBriefs";
 import { readScheduleChanges } from "./chatScheduleChanges";
@@ -1412,6 +1412,8 @@ export type CoachPrecedingTraining = CoachPrecedingActivityRow & { heracles_load
 /** Best-effort: Heracles Training Load is a better word on a strength session, not a needed one. */
 function withPrecedingHeraclesLoads(rows: CoachPrecedingActivityRow[]): CoachPrecedingTraining[] {
   try {
+    // Only while the athlete reads strength in it, as everywhere Coach looks.
+    if (getStrengthLoadSource() !== "heracles") return rows;
     return rows.map((row) => {
       const load = heraclesLoadFor({
         activityId: row.activity_id,

@@ -73,9 +73,11 @@ export function hevyWorkoutStartTime(raw: JsonRecord): number | undefined {
 
 function normalizeSet(raw: JsonRecord, exerciseType: string | undefined): StrengthSet {
   const rawWeight = nonNegative(raw.weight_kg);
-  // Assisted weight is assistance, not load lifted. Other bodyweight variants
-  // may carry explicit added weight, which is safe to preserve as external load.
-  const weightKg = exerciseType === "bodyweight_assisted_reps" ? 0 : rawWeight;
+  // Assisted weight is assistance, not load lifted: kept apart, for what the
+  // body still moves. Other bodyweight variants may carry explicit added
+  // weight, which is safe to preserve as external load.
+  const assisted = exerciseType === "bodyweight_assisted_reps";
+  const weightKg = assisted ? 0 : rawWeight;
   const rpeValue = finite(raw.rpe);
   return {
     reps: nonNegative(raw.reps),
@@ -84,6 +86,7 @@ function normalizeSet(raw: JsonRecord, exerciseType: string | undefined): Streng
     restSec: 0,
     calories: 0,
     type: setType(raw.type),
+    ...(assisted && rawWeight > 0 ? { assistKg: rawWeight } : {}),
     ...(rpeValue !== undefined && rpeValue >= 0 && rpeValue <= 10
       ? { rpe: rpeValue }
       : {})

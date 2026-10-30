@@ -140,20 +140,16 @@ export function enrichDayListWithActivityTotals(
   );
 }
 
-/** A day whose load may read in Heracles Training Load, with COROS's daily figure kept beside it. */
-export type LoadSourceDayMetric = TrainingHubDailyMetric & { corosTrainingLoad?: number };
-
 /**
  * The day list with each day's load read in the chosen load: COROS's daily
  * figure plus what Heracles Training Load adds for that day's strength
- * sessions, COROS's figure kept beside it for the hover. The list as given
- * while COROS is chosen.
+ * sessions. The list as given while COROS is chosen.
  */
 export function withHeraclesDayLoads(
   dayList: TrainingHubDailyMetric[],
   activities: TrainingHubActivity[],
   loadSource: StrengthLoadSource
-): LoadSourceDayMetric[] {
+): TrainingHubDailyMetric[] {
   if (loadSource !== "heracles") return dayList;
   const surplusByDay = new Map<string, number>();
   for (const activity of activities) {
@@ -165,11 +161,7 @@ export function withHeraclesDayLoads(
   const days = new Map(dayList.map((day) => [day.happenDay, day]));
   for (const [happenDay, surplus] of surplusByDay) {
     const day = days.get(happenDay) ?? { happenDay };
-    days.set(happenDay, {
-      ...day,
-      trainingLoad: (day.trainingLoad ?? 0) + surplus,
-      corosTrainingLoad: day.trainingLoad ?? 0
-    } as LoadSourceDayMetric);
+    days.set(happenDay, { ...day, trainingLoad: (day.trainingLoad ?? 0) + surplus });
   }
   return [...days.values()].sort((left, right) => left.happenDay.localeCompare(right.happenDay));
 }

@@ -1363,7 +1363,7 @@ assert.equal(activitySportFamily(701, "Indoor Rowing"), "other");
   assert.match(formatActivityListLine(lift, "metric"), /· load 25 · Heracles load 160$/);
   assert.match(
     formatActivityListLine({ ...lift, heraclesLoad: { ...lift.heraclesLoad, quality: "estimate" } }, "metric"),
-    /Heracles load 160 \(estimated\)$/
+    /Heracles load 160$/
   );
   for (const quality of ["pending", "conditioning"]) {
     assert.doesNotMatch(

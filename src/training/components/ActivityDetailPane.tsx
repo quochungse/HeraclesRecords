@@ -49,7 +49,7 @@ import { ActivityRouteMap } from "./ActivityRouteMap";
 import { ActivitySeriesChart } from "./ActivitySeriesChart";
 import { ActivityZoneBar } from "./ActivityZoneBar";
 import { StrengthDetailPanel } from "./StrengthDetailPanel";
-import { loadPairTitle } from "../loadFigures";
+import { activityLoadNote } from "../loadFigures";
 import { useLoadSource } from "../loadSource";
 import { activityCoachRequest } from "../askCoachAbout";
 import { detailTrainingBenefit, type BenefitZoneFamily } from "../trainingBenefit";
@@ -381,7 +381,7 @@ export function ActivityDetailPane({
           value: formatCount(Math.round(shownLoad)),
           title: [
             t("activity.pane.loadTitle"),
-            loadPairTitle(loadSource, heraclesLoad?.value, detail.trainingLoad, heraclesLoad?.quality)
+            activityLoadNote({ heraclesLoad }, loadSource)
           ]
             .filter(Boolean)
             .join("\n")

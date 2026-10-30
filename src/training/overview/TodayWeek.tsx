@@ -99,22 +99,15 @@ function amount(value: number, measure: WeekMeasure, unitSystem: UnitSystem): st
   return measure === "distance" ? distance(value, unitSystem) : figure(value);
 }
 
-/**
- * A session's figures, time, distance and load, each only where it has one. A
- * load read in Heracles names COROS's figure beside it.
- */
+/** A session's figures, time, distance and load, each only where it has one. */
 function blockFigures(
-  block: { seconds: number; meters: number; load: number; corosLoad?: number },
+  block: { seconds: number; meters: number; load: number },
   unitSystem: UnitSystem
 ): string {
-  const coros = block.corosLoad !== undefined && Math.round(block.corosLoad) !== Math.round(block.load)
-    ? t("strength.load.coros", { value: figure(block.corosLoad) })
-    : null;
   return [
     block.seconds > 0 ? formatDurationSpan(block.seconds) : null,
     block.meters > 0 ? distance(block.meters, unitSystem) : null,
-    block.load > 0 ? t("units.trainingLoadShort", { value: Math.round(block.load) }) : null,
-    block.load > 0 ? coros : null
+    block.load > 0 ? t("units.trainingLoadShort", { value: Math.round(block.load) }) : null
   ]
     .filter(Boolean)
     .join(" · ");
@@ -180,10 +173,9 @@ function WeekDay({
     (sum, block) => ({
       seconds: sum.seconds + block.seconds,
       meters: sum.meters + block.meters,
-      load: sum.load + block.load,
-      corosLoad: sum.corosLoad + (block.corosLoad ?? block.load)
+      load: sum.load + block.load
     }),
-    { seconds: 0, meters: 0, load: 0, corosLoad: 0 }
+    { seconds: 0, meters: 0, load: 0 }
   );
   const empty = column.isPast
     ? t("overview.heatmap.rest")

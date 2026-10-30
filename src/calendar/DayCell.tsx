@@ -14,7 +14,7 @@ import {
   formatHappenDayLabel,
   formatUpcomingWorkoutVolumeDisplay
 } from "../training/formatters";
-import { activityLoad, activityLoadTitle, plannedLoad } from "../training/loadFigures";
+import { activityLoad, activityLoadNote, plannedLoad } from "../training/loadFigures";
 import { useLoadSource } from "../training/loadSource";
 import { sportColorCategory, type SportColorCategory } from "../training/sportColors";
 import { isSwimSportType } from "../training/sportTypes";
@@ -168,7 +168,7 @@ function dayCards(day: CalendarDay, unitSystem: UnitSystem, source: StrengthLoad
         completionPct: pair.completionPct,
         pair,
         activity,
-        loadNote: activityLoadTitle(activity, source)
+        loadNote: activityLoadNote(activity, source)
       };
     }
     // A program sport code, not an activity code: swim is 3 here.
@@ -194,8 +194,7 @@ function dayCards(day: CalendarDay, unitSystem: UnitSystem, source: StrengthLoad
       sport,
       category: scheduledSportCategory(scheduled.sportType),
       kind: missed ? "missed" : "planned",
-      pair,
-      loadNote: activityLoadTitle(scheduled, source)
+      pair
     };
   });
   const unplanned = day.unplannedActivities.map((activity): CardView => ({
@@ -206,7 +205,7 @@ function dayCards(day: CalendarDay, unitSystem: UnitSystem, source: StrengthLoad
     category: sportColorCategory(activity.sportType),
     kind: "done",
     activity,
-    loadNote: activityLoadTitle(activity, source)
+    loadNote: activityLoadNote(activity, source)
   }));
   return [...planned, ...unplanned];
 }
