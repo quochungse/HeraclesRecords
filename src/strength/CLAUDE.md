@@ -5,6 +5,11 @@ COROS strength sessions merged with Hevy imports (`electron/strengthHistoryServi
 
 ## The screen
 
+**The header holds three controls**: the window, Refresh and Settings. Settings
+(`StrengthSettingsDialog`) holds what is set once — the data source with each account's state, and
+the load formula; Hevy is connected and managed in its own dialog (`StrengthHevyDialog`), opened
+from there one sheet at a time.
+
 **One scope at a time**: the session list beside a header band and the body map, and under
 them only what the selection is about — a session's exercises, or the window's weekly chart,
 main lifts and records. **The band is one fixed height** (`--strength-band-height`) for a
@@ -47,9 +52,9 @@ decision). The 3D hero (`StrengthHero`) is reused by Overview inside a `.strengt
 The app's own load for a strength session, on a run's scale
 ([docs/heracles-training-load.md](../../docs/heracles-training-load.md)): engine
 `electron/heraclesLoad.ts` (node-free), factors per COROS key `heraclesLoadFactors.ts` (bump
-`HERACLES_FACTORS_VERSION` with any change), service `heraclesLoadService.ts`. Chosen on this
-screen (`strength.loadSource`, `preference`; `useLoadSource()` in the renderer); the body map
-offers **Load** only then. `npm run test:heracles-load`, `test:heracles-load-service`.
+`HERACLES_FACTORS_VERSION` with any change), service `heraclesLoadService.ts`. Chosen in this
+screen's Settings (`strength.loadSource`, `preference`; `useLoadSource()` in the renderer); the
+body map offers **Load** only then. `npm run test:heracles-load`, `test:heracles-load-service`.
 - **Computed, never stored**: one run scores every session oldest first and is kept until
   `heraclesLoadInputsVersion` (breakdowns, rated runs, Hevy, body weight) moves. It rides on the
   payloads main already sends (`heraclesLoad` on activities and planned sessions,
@@ -67,6 +72,9 @@ offers **Load** only then. `npm run test:heracles-load`, `test:heracles-load-ser
   `test:body-weight-history`.
 - A display reads a load through `src/training/loadFigures.ts` and shows the other figure on
   hover (`loadPairTitle`).
+- **Coach reads both figures whatever is chosen**; the choice reaches it as one line of the
+  turn's head (`coachWeeklyLoadInstruction`, beside the units), so Coach and AI Plan set a
+  plan's weekly load in the load the screens add up.
 
 ## Hevy
 

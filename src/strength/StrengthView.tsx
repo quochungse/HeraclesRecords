@@ -7,13 +7,14 @@ import {
   RefreshCw,
   Settings2
 } from "lucide-react";
-import type { CoachOpenRequest, HeraclesLoadInfo, StrengthLoadSource, TrainingHubStatus, UnitSystem } from "../../electron/types";
+import type { CoachOpenRequest, TrainingHubStatus } from "../../electron/types";
 import { useLoadSource } from "../training/loadSource";
 import type { HeraclesRecordsApi } from "../heraclesrecords-api";
 import type { SportScreenRequest } from "../training/types";
 import { epochMsFromCorosTime } from "../training/activityWindow";
 import { StrengthHero } from "./StrengthHero";
 import { StrengthHevyDialog } from "./StrengthHevyDialog";
+import { StrengthSettingsDialog } from "./StrengthSettingsDialog";
 import { ExerciseExplorer } from "./ExerciseExplorer";
 import { StrengthOverviewPanels } from "./StrengthOverviewPanels";
 import { AGGREGATE_SELECTION, StrengthSessionList } from "./StrengthSessionList";
@@ -28,7 +29,7 @@ import {
 } from "./StrengthSessionDetail";
 import { analyticsCoverage, buildStrengthSessionIndex, sessionHeat } from "./sessionAnalytics";
 import { StrengthWeeklyChart } from "./StrengthWeeklyChart";
-import { cadencePhrase, formatLiftWeight, formatSpan, formatTotalWeight } from "./strengthFormat";
+import { cadencePhrase, formatSpan, formatTotalWeight } from "./strengthFormat";
 import { OptionGroup } from "../components/OptionGroup";
 import {
   periodDaysFromValue,
@@ -45,26 +46,7 @@ import {
 import "./strength.css";
 import "./exerciseExplorer.css";
 import { useUnitSystem } from "../units/UnitSystemProvider";
-import { formatCount, formatDecimal, plural, t } from "../i18n/core";
-
-/** The (i) beside the load setting: what Heracles Training Load is, and what it is being read with. */
-function loadSourceNote(info: HeraclesLoadInfo | undefined, unitSystem: UnitSystem): string {
-  const lines = [t("strength.loadSource.explain")];
-  if (info) {
-    const k = formatDecimal(info.k, 2);
-    lines.push(
-      info.bridgeMeasured
-        ? t("strength.loadSource.bridge", { k, count: formatCount(info.bridgeRuns) })
-        : t("strength.loadSource.bridgeDefault", { k })
-    );
-    lines.push(
-      info.bodyWeightKg !== undefined
-        ? t("strength.loadSource.weight", { weight: formatLiftWeight(info.bodyWeightKg, unitSystem) })
-        : t("strength.loadSource.noWeight", { weight: formatLiftWeight(75, unitSystem) })
-    );
-  }
-  return lines.join("\n");
-}
+import { formatCount, plural, t } from "../i18n/core";
 
 interface StrengthViewProps {
   api: HeraclesRecordsApi;
@@ -124,7 +106,10 @@ export function StrengthView({
     disconnectHevy
   } = useStrengthData({ api, corosConnected, sampleMode: sampleModeRequested });
 
-  const [hevyDialogOpen, setHevyDialogOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  /* Hevy keeps its own dialog. Opened from Settings it stands in for it, one
+     sheet at a time, and closing it goes back there. */
+  const [hevyDialog, setHevyDialog] = useState<"screen" | "settings" | null>(null);
   const [selectedExerciseName, setSelectedExerciseName] = useState<string | null>(null);
   const [pickedSelection, setPickedSelection] = useState<string | null>(null);
 
@@ -168,7 +153,15 @@ export function StrengthView({
     onOpenRequestHandled?.();
   }, [days, onOpenRequestHandled, openRequest, setDays]);
 
-  const closeHevyDialog = useCallback(() => setHevyDialogOpen(false), []);
+  const closeSettings = useCallback(() => setSettingsOpen(false), []);
+  const openHevyFromSettings = useCallback(() => {
+    setSettingsOpen(false);
+    setHevyDialog("settings");
+  }, []);
+  const closeHevyDialog = useCallback(() => {
+    if (hevyDialog === "settings") setSettingsOpen(true);
+    setHevyDialog(null);
+  }, [hevyDialog]);
 
   const selectedExercise = selectedExerciseName
     ? analytics.exercises.find((exercise) => exercise.name === selectedExerciseName) ?? null
@@ -250,7 +243,21 @@ export function StrengthView({
     }
   ];
 
-  const hevyDialog = hevyDialogOpen ? (
+  const settingsDialog = settingsOpen ? (
+    <StrengthSettingsDialog
+      source={source}
+      onSourceChange={setSource}
+      corosConnected={corosConnected}
+      hevyStatus={hevyStatus}
+      hevyConnected={hevyConnected}
+      onOpenHevy={openHevyFromSettings}
+      loadSource={loadSource}
+      loadInfo={loadInfo}
+      onLoadSourceChange={(next) => void setLoadSource(next)}
+      unitSystem={unitSystem}
+      onClose={closeSettings}
+    />
+  ) : hevyDialog ? (
     <StrengthHevyDialog
       status={hevyStatus}
       connected={hevyConnected}
@@ -262,8 +269,9 @@ export function StrengthView({
     />
   ) : null;
 
-  // The controls only appear once there is something to control: on the
-  // connect screen a window picker and a Refresh button would both be dead.
+  // Three controls and no more: the window, Refresh, and Settings for what is
+  // set once — the data source and the load formula. On the connect screen
+  // the window and Refresh would both be dead, so only Settings stands.
   const renderHeader = (withControls: boolean) => (
     <header className="strength-header">
       <div className="strength-title">
@@ -280,26 +288,6 @@ export function StrengthView({
       </div>
       <div className="strength-header-controls">
         {withControls ? (
-          <>
-          {/* Both folded. Seven chips between them is more than this header
-              has room for, and neither is read often: the source is set once
-              per athlete and the window once per session. Folded, each reads
-              as what it currently is — which is what a header is for. */}
-          <OptionGroup
-            label={t("strength.source")}
-            mode="collapsible"
-            value={source}
-            options={[
-              {
-                value: "combined",
-                label: t("strength.combined"),
-                disabled: !(corosConnected && hevyConnected)
-              },
-              { value: "hevy", label: "Hevy", disabled: !hevyConnected },
-              { value: "coros", label: "COROS", disabled: !corosConnected }
-            ]}
-            onChange={setSource}
-          />
           <OptionGroup
             label={t("strength.timeCovered")}
             mode="collapsible"
@@ -307,65 +295,31 @@ export function StrengthView({
             options={STRENGTH_PERIOD_OPTIONS}
             onChange={(next) => setDays(periodDaysFromValue(next) ?? 90)}
           />
-          {/* The load every screen reads a strength session in, set here
-              because this is where a strength session is read. */}
-          <span className="strength-load-source">
-            <OptionGroup
-              label={t("strength.loadSource")}
-              mode="collapsible"
-              value={loadSource}
-              options={[
-                { value: "coros", label: t("strength.loadSource.coros") },
-                { value: "heracles", label: t("strength.loadSource.heracles") }
-              ]}
-              onChange={(next) => void setLoadSource(next as StrengthLoadSource)}
-            />
-            <button
-              type="button"
-              className="strength-load-info"
-              aria-label={t("strength.loadSource.about")}
-              title={loadSourceNote(loadInfo, unitSystem)}
-            >
-              <Info size={14} aria-hidden="true" />
-            </button>
-          </span>
-          </>
         ) : null}
-        <div className="strength-header-actions">
-          {withControls ? (
-            <button
-              type="button"
-              className="strength-action"
-              disabled={loading || sampleMode}
-              onClick={() => void runSync(true)}
-            >
-              {loading ? (
-                <Loader2 className="spin" size={14} aria-hidden="true" />
-              ) : (
-                <RefreshCw size={14} aria-hidden="true" />
-              )}
-              {t("common.refresh")}
-            </button>
-          ) : null}
+        {withControls ? (
           <button
             type="button"
             className="strength-action"
-            onClick={() => setHevyDialogOpen(true)}
+            disabled={loading || sampleMode}
+            onClick={() => void runSync(true)}
           >
-            {hevyConnected ? (
-              <>
-                <span className="strength-hevy-dot" aria-hidden="true" />
-                <Settings2 size={14} aria-hidden="true" />
-                Hevy
-              </>
+            {loading ? (
+              <Loader2 className="spin" size={14} aria-hidden="true" />
             ) : (
-              <>
-                <Link2 size={14} aria-hidden="true" />
-                {t("strength.connectHevy")}
-              </>
+              <RefreshCw size={14} aria-hidden="true" />
             )}
+            {t("common.refresh")}
           </button>
-        </div>
+        ) : null}
+        <button
+          type="button"
+          className="strength-action"
+          aria-haspopup="dialog"
+          onClick={() => setSettingsOpen(true)}
+        >
+          <Settings2 size={14} aria-hidden="true" />
+          {t("strength.settings")}
+        </button>
       </div>
     </header>
   );
@@ -378,7 +332,7 @@ export function StrengthView({
           <Loader2 className="spin" size={14} aria-hidden="true" />
           {t("strength.checking")}
         </p>
-        {hevyDialog}
+        {settingsDialog}
       </section>
     );
   }
@@ -398,7 +352,7 @@ export function StrengthView({
             <button
               type="button"
               className="primary-button"
-              onClick={() => setHevyDialogOpen(true)}
+              onClick={() => setHevyDialog("screen")}
             >
               <Link2 size={16} aria-hidden="true" />
               {t("strength.connectHevy")}
@@ -409,7 +363,7 @@ export function StrengthView({
           </div>
         </section>
 
-        {hevyDialog}
+        {settingsDialog}
       </section>
     );
   }
@@ -417,7 +371,7 @@ export function StrengthView({
   return (
     <section className="strength-view">
       {renderHeader(true)}
-      {hevyDialog}
+      {settingsDialog}
 
       {error && !sampleMode ? (
         <p className="strength-notice is-error" role="alert">

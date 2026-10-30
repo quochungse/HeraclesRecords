@@ -201,6 +201,11 @@ function analytics(): TrainingHubAnalytics {
   };
 }
 
+let demoLoadSource: "coros" | "heracles" = "coros";
+function loadInfo() {
+  return { source: demoLoadSource, k: 0.47, bridgeRuns: 17, bridgeMeasured: true, bodyWeightKg: 72 };
+}
+
 export function demoHandlers(): Record<string, unknown> {
   const snapshot = (): CorosProfileSnapshot => ({
     profile: { ...PROFILE, activityCount: allActivities().length },
@@ -227,6 +232,13 @@ export function demoHandlers(): Record<string, unknown> {
     isWindowFullscreen: async () => false,
     setWindowBackground: async () => {},
     getHevyStatus: async () => ({ connected: false, includeWarmups: false }),
+    // The load Strength is read in, kept for the run, with the figures a
+    // measured athlete's Settings states beside Heracles Training Load.
+    getStrengthLoadSource: async () => loadInfo(),
+    setStrengthLoadSource: async (source: "coros" | "heracles") => {
+      demoLoadSource = source;
+      return loadInfo();
+    },
     getSampleData: async () => ({ rides: false, hikes: false, trailRuns: false }),
     // A feeling for most sessions, as an athlete who rates them in the COROS
     // app would leave: mostly easy or moderate, now and then hard. Read off the
