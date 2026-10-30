@@ -42,7 +42,8 @@ jobs:
       # Ubuntu 24.04 denies unprivileged user namespaces to programs AppArmor
       # has no profile for, Electron among them. Chromium's sandbox then falls
       # back to the SUID helper, which `npm ci` leaves unowned by root, and
-      # aborts at start-up; the offscreen suites cannot run unsandboxed.
+      # aborts at start-up. The suites cannot opt out with `no-sandbox`: their
+      # renderers then die creating shared memory in /dev/shm.
       - name: Let Chromium's sandbox use user namespaces
         run: sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
 

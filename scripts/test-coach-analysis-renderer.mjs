@@ -25,9 +25,9 @@ const { app, BrowserWindow } = require("electron");
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
-// Headless CI and containers have no usable sandbox, and this window never
-// loads anything but a local file the repo built a moment ago.
-app.commandLine.appendSwitch("no-sandbox");
+// No `no-sandbox`: under it the renderer dies at start-up on Linux, creating
+// shared memory in /dev/shm (Ubuntu 24.04 on CI), and the suite waits on it.
+// The workflow gives the sandbox what it needs.
 app.disableHardwareAcceleration();
 
 // ---------------------------------------------------------------------------
@@ -177,6 +177,11 @@ async function main() {
     width: 1600,
     height: 1200,
     webPreferences: { backgroundThrottling: false }
+  });
+  // A dead renderer answers no executeJavaScript: fail now, not at a timeout.
+  win.webContents.on("render-process-gone", (_event, details) => {
+    console.error(`renderer process gone: ${details.reason} (exit ${details.exitCode})`);
+    app.exit(1);
   });
   await win.loadFile(path.join(repoRoot, "dist-harness", "index.html"));
 
