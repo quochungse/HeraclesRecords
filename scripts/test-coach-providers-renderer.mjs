@@ -9,9 +9,8 @@ import { fileURLToPath } from "node:url";
 const require = createRequire(import.meta.url);
 const { app, BrowserWindow } = require("electron");
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-// No `no-sandbox`: this window is offscreen, and an offscreen window under
-// `no-sandbox` dies at start-up on Linux ("Creating shared memory in /dev/shm
-// … failed", then the GPU process).
+// No `no-sandbox`: a window under it dies at start-up on Linux, offscreen or
+// not ("Creating shared memory in /dev/shm … failed").
 app.disableHardwareAcceleration();
 
 const settings = {
@@ -79,6 +78,11 @@ async function main() {
   await app.whenReady();
   win = new BrowserWindow({ show: false, width: 1200, height: 900,
     webPreferences: { backgroundThrottling: false, offscreen: true } });
+  // A dead renderer answers no executeJavaScript: fail now, not at a timeout.
+  win.webContents.on("render-process-gone", (_event, details) => {
+    console.error(`renderer process gone: ${details.reason} (exit ${details.exitCode})`);
+    app.exit(1);
+  });
   const providerAsset = fs.readdirSync(path.join(repoRoot, "dist-harness/assets"))
     .find((name) => /^CoachModelsPanel-.*\.js$/.test(name));
   assert.ok(providerAsset, "provider management must be a separate renderer chunk");
