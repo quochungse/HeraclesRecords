@@ -30,14 +30,21 @@ The provider tests use stubs and temporary data. No real sign-in or API key is
 needed. Production builds made by this check include a Vite manifest for the
 import-graph check; ordinary builds keep their existing output settings.
 
-On a Linux machine without a display, run under Xvfb:
+On a Linux machine without a display, run under Xvfb with a 24-bit screen
+(xvfb-run's default is 640x480 at 8 bits):
 
 ```sh
-xvfb-run --auto-servernum npm run check:coach
+xvfb-run --auto-servernum --server-args="-screen 0 1920x1200x24" npm run check:coach
 ```
+
+On Ubuntu 23.10 and later, Chromium's sandbox needs unprivileged user
+namespaces, which AppArmor denies to Electron by default; the workflow lifts
+that with `sysctl kernel.apparmor_restrict_unprivileged_userns=0`.
 
 `.github/workflows/check-coach.yml` runs the same command for pull requests,
 pushes to `main` and manual dispatches. The job uses read-only repository
-permissions and uploads only this command's logs when a step fails. Its stable
+permissions and uploads only this command's logs when a step fails. A failed
+step's last 60 lines also become an annotation on the run's summary, which
+GitHub shows without signing in, unlike the log and the artifact. Its stable
 status name is **Coach checks**, suitable for a required branch protection
 check. Enabling that requirement is a repository setting.
