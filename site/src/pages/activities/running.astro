@@ -1,0 +1,99 @@
+---
+import Base from "../../layouts/Base.astro";
+import FeatureRow from "../../components/FeatureRow.astro";
+import Shot from "../../components/Shot.astro";
+import SubNav from "../../components/SubNav.astro";
+import { ACTIVITIES_PAGES } from "../../sections";
+---
+
+<Base og="activities"
+  title="Running"
+  description="Running in Heracles Records: weekly volume, load ratio, VO2max and threshold pace, running efficiency, and every channel of every run."
+>
+  <SubNav pages={ACTIVITIES_PAGES} label="Activities" />
+
+  <section class="wrap page-hero">
+    <p class="eyebrow">Running</p>
+    <h1>Pace, load and form.</h1>
+    <p class="lede">
+      Weekly volume against its four-week average, your load ratio, VO₂max and threshold pace,
+      how much of your running is easy, and a split by surface. Then every run, read down to
+      the minute.
+    </p>
+  </section>
+
+  <section class="wrap section-tight">
+    <Shot name="03-running" alt="Running: weekly volume, load ratio, VO2max and threshold pace" eager />
+  </section>
+
+  <div class="wrap">
+    <section class="feature-text">
+      <p class="eyebrow">The Running screen</p>
+      <h2>Your running, week by week.</h2>
+      <ul class="ticks columns">
+        <li><strong>Volume</strong> in distance or time, against your four-week average and the same span a year ago.</li>
+        <li><strong>Load ratio</strong>: this week's load against what you are used to, so a jump shows before it hurts.</li>
+        <li><strong>VO₂max and threshold pace</strong> as COROS measures them, with how they have moved.</li>
+        <li><strong>Intensity</strong>: how much of your running is easy, and a split by road, track, trail and treadmill.</li>
+        <li><strong>Trail runs read as trail runs.</strong> Switch to Trail and the screen counts hours and climb instead of pace, with climb per hour as the measure of progress.</li>
+        <li><strong>A sortable list</strong> of every run, each opening on its own page.</li>
+      </ul>
+    </section>
+
+    <FeatureRow shot="04-run" alt="A run: map, pace, heart rate, running form and every channel" flip>
+      <p class="eyebrow">A run's page</p>
+      <h2>Every channel the watch recorded.</h2>
+      <p>
+        The route on a map, then running form, the session's effect, weather and conditions,
+        time in every zone as COROS scored it, and a label for what the session trained: Tempo,
+        Threshold, VO2 Max, Intervals 6 × 1000 m.
+      </p>
+      <ul class="ticks">
+        <li><strong>Laps</strong> headed by the workout's parts, with the recoveries marked Rest.</li>
+        <li><strong>Trail runs</strong> add the terrain and the climbs, as a hike's page does.</li>
+      </ul>
+    </FeatureRow>
+
+    <FeatureRow shot="28-run-performance" alt="Performance chart split in two: pace and running power above, heart rate below">
+      <p class="eyebrow">Performance</p>
+      <h2>Every surge and stop, drawn.</h2>
+      <p>
+        Pace, effort pace, heart rate, cadence, running power, stride, ground time and stride
+        height on one chart, in COROS's own colours, read a stretch at a time rather than
+        averaged away.
+      </p>
+      <ul class="ticks">
+        <li><strong>Split it in two</strong>: what you produced above, what it cost below, on one clock.</li>
+        <li><strong>Colour-blind safe</strong>: lines drawn together stay apart.</li>
+      </ul>
+    </FeatureRow>
+
+    <FeatureRow shot="27-run-efficiency" alt="Running efficiency: a long run against the athlete's usual, minute by minute" flip>
+      <p class="eyebrow">Running efficiency</p>
+      <h2>Speed for the heartbeats it cost.</h2>
+      <p>
+        How much speed each minute of a road or track run bought for the heart rate it cost, on
+        your COROS VO₂max scale and against your usual from the six weeks before. On the Running
+        screen the same reading becomes a line across the period.
+      </p>
+      <ul class="ticks">
+        <li><strong>Durability</strong>: how well you held it to the end, against how much you usually fade.</li>
+        <li><strong>Read fairly</strong>: the warm-up, surges and stops are marked rather than counted, and each says why.</li>
+        <li><strong>Hills taken into account</strong>: speed is read as grade-adjusted pace.</li>
+      </ul>
+    </FeatureRow>
+  </div>
+
+  <section class="wrap section">
+    <div class="section-head">
+      <h2 class="section-title">Run and lift in the same week?</h2>
+      <p class="lede">
+        COROS counts a strength session by heart rate, so your running load looks like most of
+        your training even when it is not. Heracles Training Load scores lifting from its sets,
+        on the same scale as your runs.
+      </p>
+      <a class="more" href="/activities/strength/">Strength in Heracles Records</a>
+    </div>
+  </section>
+</Base>
+

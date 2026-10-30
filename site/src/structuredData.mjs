@@ -16,14 +16,13 @@ export function softwareApplication(release, site) {
     license: "https://opensource.org/licenses/MIT",
     isAccessibleForFree: true,
     offers: { "@type": "Offer", price: "0", priceCurrency: "USD" },
-    author: { "@type": "Person", name: "quochungse", url: "https://github.com/quochungse" },
-    codeRepository: "https://github.com/quochungse/HeraclesRecords",
+    author: { "@type": "Person", name: "quochungse", url: new URL("/about", site).href },
     ...(release
       ? {
           softwareVersion: release.version,
           datePublished: release.publishedAt?.slice(0, 10),
           downloadUrl: release.installers.map((entry) => entry.url),
-          releaseNotes: release.notesUrl,
+          releaseNotes: new URL(`/changelog/#${release.version}`, site).href,
         }
       : {}),
   };

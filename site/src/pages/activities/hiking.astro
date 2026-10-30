@@ -1,0 +1,62 @@
+---
+import Base from "../../layouts/Base.astro";
+import FeatureRow from "../../components/FeatureRow.astro";
+import Shot from "../../components/Shot.astro";
+import SubNav from "../../components/SubNav.astro";
+import { ACTIVITIES_PAGES } from "../../sections";
+---
+
+<Base og="activities"
+  title="Hiking"
+  description="Hiking in Heracles Records: this week's ascent, your biggest day, ascent per hour, and every hike's moving time, rests and terrain."
+>
+  <SubNav pages={ACTIVITIES_PAGES} label="Activities" />
+
+  <section class="wrap page-hero">
+    <p class="eyebrow">Hiking</p>
+    <h1>Height and hours before distance.</h1>
+    <p class="lede">
+      Hikes and mountain climbs, read the way a walker thinks about them: this week's ascent,
+      your biggest day, and ascent per hour as the measure of how fit you are on a hill.
+    </p>
+  </section>
+
+  <section class="wrap section-tight">
+    <Shot name="26-hiking" alt="Hiking: time, ascent, biggest day and ascent per hour" eager />
+  </section>
+
+  <div class="wrap">
+    <FeatureRow shot="06-hike" alt="A hike: moving time, ascent, terrain and climbing rate">
+      <p class="eyebrow">A hike's page</p>
+      <h2>A long day, taken apart.</h2>
+      <ul class="ticks">
+        <li><strong>Moving time</strong> worked out from the samples, because a watch records the lunch stop too.</li>
+        <li><strong>Every rest</strong> of two minutes or more, with the time, the kilometre and the altitude.</li>
+        <li><strong>Terrain</strong>: time climbing, on the flat and descending, and your speed on each.</li>
+        <li><strong>Ascents and descents</strong>, the highest point, and your time against Naismith's rule.</li>
+        <li><strong>Climbing rate</strong> along the way, beside heart rate and elevation.</li>
+      </ul>
+    </FeatureRow>
+
+    <FeatureRow shot="16-route" alt="A hike replayed on a satellite map, coloured by elevation" flip>
+      <p class="eyebrow">Every route</p>
+      <h2>Replayed on the map.</h2>
+      <p>
+        Open any route full size on a street, satellite or topographic map. Colour the line by
+        pace, heart rate or elevation, then watch it draw itself the way you covered it.
+      </p>
+    </FeatureRow>
+  </div>
+
+  <section class="wrap section">
+    <div class="section-head">
+      <h2 class="section-title">Where your hikes have taken you.</h2>
+      <p class="lede">
+        Every place you trained is on a globe in the app. In the Hall of Records, the Erymanthian
+        Boar counts your climbing, from 750 m in one activity to one Everest in 30 days, and Geryon
+        the places you have trained in.
+      </p>
+      <a class="more" href="/labours">The Twelve Labours</a>
+    </div>
+  </section>
+</Base>

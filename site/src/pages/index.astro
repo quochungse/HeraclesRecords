@@ -65,7 +65,7 @@ const analyses = [
 ];
 
 const trust = [
-  { title: "Free and open source", text: "MIT licensed, with the source on GitHub." },
+  { title: "Free and open source", text: "MIT licensed. No ads, no subscription." },
   { title: "Any COROS watch", text: "PACE, APEX, VERTIX, NOMAD and the rest, through your COROS account." },
   { title: "No account, no server", text: "Your training stays on your computer." },
   { title: "macOS, Windows, Linux", text: "One app on every computer you train from." },
@@ -73,28 +73,32 @@ const trust = [
 
 const sports = [
   {
+    href: "/activities/running",
     shot: "03-running",
     alt: "Running: weekly volume, load ratio, VO2max and threshold",
     title: "Running",
     text: "Weekly volume, load ratio, VO₂max and threshold pace. Switch to Trail and the screen reads climb instead of pace.",
   },
   {
+    href: "/activities/cycling",
     shot: "05-ride",
     alt: "A ride: normalised power, intensity, TSS and peak power",
     title: "Rides",
     text: "Normalised power, IF and TSS against your FTP, peak power from 5 seconds to an hour, power zones and the climbs.",
   },
   {
+    href: "/activities/hiking",
     shot: "06-hike",
     alt: "A hike: moving time, ascent, terrain and climbing rate",
     title: "Hikes",
     text: "The moving time inside a long day, your rests, the terrain you covered and your climbing rate.",
   },
   {
+    href: "/activities/strength/",
     shot: "07-strength",
     alt: "Strength: sessions and a 3D muscle map",
     title: "Strength",
-    text: "COROS strength sessions and Hevy workouts in one place, on a 3D map of the muscles you trained.",
+    text: "COROS strength sessions and Hevy workouts in one place, on a 3D map of the muscles you trained, scored from your sets rather than your heart rate.",
   },
 ];
 
@@ -180,7 +184,7 @@ const faq = [
           <figure class="figure">
             <Shot name={sport.shot} alt={sport.alt} sizes={SIZES_HALF} />
             <figcaption>
-              <strong>{sport.title}</strong>: {sport.text}
+              <a href={sport.href}><strong>{sport.title}</strong></a>: {sport.text}
             </figcaption>
           </figure>
         ))
@@ -193,12 +197,31 @@ const faq = [
         heart rate or elevation, and watch the route draw itself the way you covered it.
       </figcaption>
     </figure>
-    <a class="more" href="/activities">Every sport, in depth</a>
+    <a class="more" href="/activities/">Every sport, in depth</a>
+  </section>
+
+  <section class="wrap section">
+    <div class="strength">
+      <div>
+        <p class="eyebrow">Strength</p>
+        <h2 class="section-title">Lifting, counted for what it cost.</h2>
+        <p class="lede">
+          COROS scores a gym session by heart rate, so an hour of heavy squats can count for less
+          than a short jog, and it files a squat as hamstring work. Heracles Records puts every
+          set on the muscles it really worked and scores it from the weight, the reps and how
+          close to failure it went, on the same scale as your runs. Your week finally adds up.
+        </p>
+      </div>
+      <div class="strength-links">
+        <a class="button primary" href="/activities/strength/">Strength in Heracles Records</a>
+        <a class="more" href="/activities/strength/training-load">How Heracles Training Load is worked out</a>
+      </div>
+    </div>
   </section>
 
   <section class="wrap section">
     <div class="section-head">
-      <p class="eyebrow">Plan</p>
+      <p class="eyebrow">Plan &amp; Library</p>
       <h2 class="section-title">Plan it here, and your watch has it.</h2>
       <p class="lede">
         Your COROS workouts, plans and calendar. Everything you build, edit or schedule is
@@ -221,7 +244,7 @@ const faq = [
         </figcaption>
       </figure>
     </div>
-    <a class="more" href="/plan">The calendar and library in depth</a>
+    <a class="more" href="/plan/">The calendar and library in depth</a>
   </section>
 
   <section class="wrap section">
@@ -495,6 +518,39 @@ const faq = [
 
   .route {
     margin-top: 40px;
+  }
+
+  .sports figcaption a {
+    color: inherit;
+    text-decoration: none;
+  }
+
+  .sports figcaption a:hover strong {
+    color: var(--accent);
+  }
+
+  .strength {
+    display: grid;
+    grid-template-columns: minmax(0, 7fr) minmax(0, 4fr);
+    gap: 24px 48px;
+    align-items: end;
+    padding: 36px;
+    border: 1px solid var(--line);
+    border-radius: var(--radius-lg);
+    background: linear-gradient(180deg, var(--accent-soft), transparent 70%), var(--surface);
+  }
+
+  .strength-links {
+    display: grid;
+    justify-items: start;
+    gap: 4px;
+  }
+
+  @media (max-width: 860px) {
+    .strength {
+      grid-template-columns: 1fr;
+      padding: 24px;
+    }
   }
 
   .columns {

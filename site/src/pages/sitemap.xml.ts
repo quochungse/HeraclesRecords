@@ -3,8 +3,22 @@
 // test:site checks that each address here is a page in the build.
 import type { APIRoute } from "astro";
 import { getCollection } from "astro:content";
+import { ACTIVITIES_PAGES, PLAN_PAGES, TRAINING_LOAD_PAGE } from "../sections";
 
-const PAGES = ["/", "/download", "/activities", "/plan", "/coach", "/labours", "/guide/", "/changelog/", "/about", "/privacy.html"];
+const PAGES = [
+  "/",
+  "/download",
+  ...ACTIVITIES_PAGES.map((page) => page.href),
+  TRAINING_LOAD_PAGE,
+  "/plan/",
+  ...PLAN_PAGES.map((page) => page.href),
+  "/coach",
+  "/labours",
+  "/guide/",
+  "/changelog/",
+  "/about",
+  "/privacy.html",
+];
 
 export const GET: APIRoute = async ({ site }) => {
   const guides = (await getCollection("guide")).sort((a, b) => a.data.order - b.data.order);

@@ -1,0 +1,71 @@
+---
+// The pages of one part of the site, as a row of tabs under the header. The
+// tab whose address is the longest start of this page's is current, so the
+// formula page under Strength keeps Strength lit. On a narrow screen the row
+// scrolls sideways rather than wrapping.
+import type { SectionPage } from "../sections";
+
+interface Props {
+  pages: readonly SectionPage[];
+  label: string;
+}
+
+const { pages, label } = Astro.props;
+const path = Astro.url.pathname.replace(/\.html$/, "").replace(/\/index$/, "/");
+const current = pages
+  .filter((page) => path === page.href || (page.href.endsWith("/") && path.startsWith(page.href)))
+  .sort((a, b) => b.href.length - a.href.length)[0];
+---
+
+<nav class="wrap subnav" aria-label={label}>
+  <ul>
+    {
+      pages.map((page) => (
+        <li>
+          <a href={page.href} aria-current={page === current ? "page" : undefined}>
+            {page.label}
+          </a>
+        </li>
+      ))
+    }
+  </ul>
+</nav>
+
+<style>
+  .subnav {
+    padding-top: 20px;
+  }
+
+  .subnav ul {
+    display: flex;
+    gap: 8px;
+    margin: 0;
+    padding: 0 0 2px;
+    overflow-x: auto;
+    list-style: none;
+    scrollbar-width: none;
+  }
+
+  .subnav a {
+    display: inline-block;
+    padding: 7px 14px;
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    color: var(--ink-2);
+    font-size: 14px;
+    font-weight: 500;
+    text-decoration: none;
+    white-space: nowrap;
+  }
+
+  .subnav a:hover {
+    border-color: var(--ink-3);
+    color: var(--ink);
+  }
+
+  .subnav a[aria-current="page"] {
+    border-color: var(--accent);
+    background: var(--accent-soft);
+    color: var(--ink);
+  }
+</style>

@@ -1,0 +1,172 @@
+---
+import Base from "../../layouts/Base.astro";
+import FeatureRow from "../../components/FeatureRow.astro";
+import SubNav from "../../components/SubNav.astro";
+import { PLAN_PAGES } from "../../sections";
+// The app's own review of COROS's catalogue, counted at build time.
+import { EXERCISE_REVIEW, REVIEW_MUSCLE_TABLES } from "../../../../src/calendar/exerciseReview";
+
+const reviewed = Object.keys(EXERCISE_REVIEW).length;
+const musclesFixed = Object.keys(REVIEW_MUSCLE_TABLES.corrections).length;
+const musclesAdded = Object.keys(REVIEW_MUSCLE_TABLES.uncoded).length;
+const equipmentFixed = Object.values(EXERCISE_REVIEW).filter((review) => review.equipment).length;
+
+const corrections = [
+  { movement: "Squat, leg press, box step-up", coros: "Hamstrings first", app: "Quads and glutes, hamstrings assisting" },
+  { movement: "Battle ropes", coros: "Biceps", app: "Shoulders, arms and core assisting" },
+  { movement: "Side plank, twists, woodchops", coros: "Abs only: COROS has no obliques", app: "Obliques first, abs assisting" },
+  { movement: "Neck harness work", coros: "Traps: COROS has no neck", app: "Neck, traps assisting" },
+  { movement: "TRX movements", coros: "Cable machine", app: "Suspension trainer" },
+  { movement: "Battle ropes, sled push and pull", coros: "Others", app: "Rope, sled" },
+];
+---
+
+<Base og="plan"
+  title="Exercises Library"
+  description="The Exercises Library in Heracles Records: COROS's whole strength catalogue by body part, muscle or equipment, with every movement's muscles and equipment described again where COROS gets them wrong."
+>
+  <SubNav pages={PLAN_PAGES} label="Plan and Library" />
+
+  <section class="wrap page-hero">
+    <p class="eyebrow">Exercises Library</p>
+    <h1>Every movement, and what it really works.</h1>
+    <p class="lede">
+      COROS's whole movement catalogue to read, a third tab in the Training Library. Pick a body
+      part on the figure, then a muscle inside it, or an equipment, and each movement shows its
+      clip, the muscles it works and how hard.
+    </p>
+  </section>
+
+  <div class="wrap">
+    <section class="feature-text">
+      <p class="eyebrow">Browse</p>
+      <h2>Find a movement by what it trains.</h2>
+      <ul class="ticks columns">
+        <li><strong>The body as the filter.</strong> Pick a part on the figure and it zooms in so you can pick a single muscle, or the whole part.</li>
+        <li><strong>By equipment</strong>: barbell, dumbbell, kettlebell, cable, bands, suspension, bodyweight and the rest.</li>
+        <li><strong>Each movement read in full</strong>: its demonstration clip, the muscles it leads with and those that assist, and how hard it is.</li>
+        <li><strong>HYROX</strong>: the eight stations are one toggle away, in race order.</li>
+        <li><strong>Favourites</strong>: a heart keeps the movements you use, and narrows the builder's search to them.</li>
+        <li><strong>The abductors</strong> are a muscle of their own, no longer counted with the glutes.</li>
+      </ul>
+    </section>
+  </div>
+
+  <section class="wrap section">
+    <div class="section-head">
+      <p class="eyebrow">Described again</p>
+      <h2 class="section-title">Where COROS gets a movement wrong, the app says so.</h2>
+      <p class="lede">
+        COROS's catalogue names each movement's muscles and equipment as codes, and some of them
+        are wrong. Its muscle list has no obliques and no neck at all. Read as it comes, a side
+        plank works no obliques and a squat is mostly hamstrings, and every total by muscle, on the
+        Strength screen and in Coach, is skewed with it.
+      </p>
+    </div>
+    <ul class="stats">
+      <li><strong>{reviewed}</strong><span>movements described again</span></li>
+      <li><strong>{musclesFixed}</strong><span>with their muscles corrected</span></li>
+      <li><strong>{musclesAdded}</strong><span>given the obliques or the neck</span></li>
+      <li><strong>{equipmentFixed}</strong><span>with their equipment fixed</span></li>
+    </ul>
+    <div class="prose-table">
+      <table>
+        <thead><tr><th>Movement</th><th>COROS says</th><th>Heracles Records says</th></tr></thead>
+        <tbody>
+          {corrections.map((row) => <tr><td>{row.movement}</td><td>{row.coros}</td><td>{row.app}</td></tr>)}
+        </tbody>
+      </table>
+    </div>
+    <p class="note">
+      Each movement is decided by its COROS key, never by its name: "Bicycle Crunches" says
+      nothing of the obliques, "Romanian Deadlift" nothing of the hamstrings. A movement the app
+      has not reviewed is exactly as COROS sends it. Think one is wrong? Say so from the app,
+      under <strong>Settings → About → Report an issue</strong>.
+    </p>
+  </section>
+
+  <div class="wrap">
+    <FeatureRow shot="22-library-workouts" alt="A strength workout: each movement with COROS's picture and its demonstration clip">
+      <p class="eyebrow">Where it is used</p>
+      <h2>The same description, everywhere.</h2>
+      <p>
+        What the Exercises Library says of a movement is what the rest of the app reads: the
+        Strength screen's body map and muscle totals, and the muscles Coach is told a session
+        worked.
+      </p>
+      <a class="more" href="/activities/strength/">Strength in Heracles Records</a>
+    </FeatureRow>
+  </div>
+</Base>
+
+<style>
+  .stats {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 20px;
+    margin: 0 0 32px;
+    padding: 0;
+    list-style: none;
+  }
+
+  @media (max-width: 760px) {
+    .stats {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+  }
+
+  .stats li {
+    display: grid;
+    gap: 2px;
+    padding-top: 14px;
+    border-top: 1px solid var(--line);
+  }
+
+  .stats strong {
+    color: var(--accent);
+    font: 600 34px/1.1 var(--font-title);
+  }
+
+  .stats span {
+    color: var(--ink-2);
+    font-size: 14px;
+  }
+
+  .prose-table {
+    overflow-x: auto;
+  }
+
+  .prose-table table {
+    width: 100%;
+    min-width: 560px;
+    border-collapse: collapse;
+    font-size: 15px;
+  }
+
+  .prose-table th,
+  .prose-table td {
+    padding: 12px 16px 12px 0;
+    border-bottom: 1px solid var(--line);
+    text-align: left;
+    vertical-align: top;
+  }
+
+  .prose-table th {
+    font-weight: 600;
+  }
+
+  .prose-table td {
+    color: var(--ink-2);
+  }
+
+  .prose-table td:first-child {
+    color: var(--ink);
+  }
+
+  .note {
+    max-width: 760px;
+    margin: 20px 0 0;
+    color: var(--ink-2);
+    font-size: 15px;
+  }
+</style>

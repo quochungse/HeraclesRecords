@@ -1,0 +1,58 @@
+---
+import Base from "../../layouts/Base.astro";
+import FeatureRow from "../../components/FeatureRow.astro";
+import Shot from "../../components/Shot.astro";
+import SubNav from "../../components/SubNav.astro";
+import { PLAN_PAGES } from "../../sections";
+---
+
+<Base og="plan"
+  title="Training plans"
+  description="Multi-week training plans in Heracles Records: read your COROS plans week by week, edit them, put them on the calendar, follow their compliance, or have Coach write one for you."
+>
+  <SubNav pages={PLAN_PAGES} label="Plan and Library" />
+
+  <section class="wrap page-hero">
+    <p class="eyebrow">Plans</p>
+    <h1>Multi-week plans, read and run.</h1>
+    <p class="lede">
+      Your COROS training plans, read week by week: the load of each week, the stages from base
+      to taper, and every session in its day. Put one on the calendar and follow how it is going.
+    </p>
+  </section>
+
+  <section class="wrap section-tight">
+    <Shot name="10-library" alt="A 12-week marathon plan in the Training Library, week by week" eager />
+  </section>
+
+  <div class="wrap">
+    <section class="feature-text">
+      <p class="eyebrow">In the Training Library</p>
+      <h2>From a draft to your calendar.</h2>
+      <ul class="ticks columns">
+        <li><strong>Edit</strong> sessions, weeks and stages, and keep a draft until you are ready to save it.</li>
+        <li><strong>Add to calendar</strong> from a start date, with a preview of exactly which sessions land where.</li>
+        <li><strong>See how it is going.</strong> Once a plan is running, each session shows whether it was done, and the plan its overall compliance.</li>
+        <li><strong>Plan in progress</strong>: a tile filled as far as the plan has got, with the next session beside it.</li>
+        <li><strong>Change a running plan</strong> and choose whether your calendar follows.</li>
+        <li><strong>Saved to COROS</strong>: if the plan changed there since you began editing, you choose what wins.</li>
+      </ul>
+    </section>
+
+    <FeatureRow shot="12-coach-plan" alt="Coach: a marathon plan in the Workbench beside the conversation" flip>
+      <p class="eyebrow">A plan from Coach</p>
+      <h2>Written with you, to your zones.</h2>
+      <p>
+        Ask Coach for a plan and it starts from a brief you can edit, draws an outline of the
+        weeks, then writes every session to your zones. Read it in the Workbench beside the
+        conversation, change what you like, and save it to COROS and your calendar like any
+        other plan.
+      </p>
+      <ul class="ticks">
+        <li><strong>Gym days in the week's load.</strong> With Heracles Training Load chosen, Coach sets each week's load in the same figure the Calendar adds up, lifting included.</li>
+        <li><strong>Nothing changes without you.</strong> The plan waits in the conversation until you save it.</li>
+      </ul>
+      <a class="more" href="/coach">How Coach works</a>
+    </FeatureRow>
+  </div>
+</Base>
