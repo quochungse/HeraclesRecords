@@ -144,6 +144,7 @@ code {
 .site-nav a {
   color: var(--ink-2);
   text-decoration: none;
+  white-space: nowrap;
 }
 
 .site-nav a:hover,
