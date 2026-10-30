@@ -58,6 +58,18 @@ from `zoneList`, every zone listed. A run switches HR / pace (a trail run's pace
 list, type 173). Pace's seven buckets draw buckets 3 and 4 as one Threshold row.
 `npm run test:zone-time`.
 
+## Signed out (`TrainingSignIn.tsx`, `signIn.css`)
+
+Overview before COROS is connected is the sign-in alone, with no greeting: one card, the
+artwork with the app's introduction on the left, the sheet on the right (the artwork goes
+under 1080px). The sheet has four states: restoring (nothing to press, it resolves on its
+own), the emailed code, a saved account (one Sign in; the form is behind "Use a different
+account"), the form.
+- **The artwork is our own**: `src/assets/signin/contours.webp`, white ink on transparent
+  drawn by `npm run signin-art:generate` (seeded, so it redraws the same file), painted in the
+  accent through a CSS `mask`, so it follows the accent and the theme, which a photograph
+  cannot. Upstream's mountain picture was dropped on purpose.
+
 ## Overview
 
 The Readiness panel, Coming up, Training load heatmap, Training load distribution, one

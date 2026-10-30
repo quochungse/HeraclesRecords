@@ -2349,7 +2349,6 @@ function OverviewTab({
     () =>
       selectOverviewGreeting(
         {
-          trainingConnected,
           upcomingWorkouts: trainingUpcomingWorkouts,
           activities: trainingActivities,
           sportTypes: trainingSportTypes,
@@ -2363,7 +2362,6 @@ function OverviewTab({
     [
       greeting,
       locale,
-      trainingConnected,
       trainingUpcomingWorkouts,
       trainingActivities,
       trainingSportTypes,
@@ -2374,27 +2372,31 @@ function OverviewTab({
 
   return (
     <div className="dashboard">
-      <header className="dashboard-welcome dashboard-block">
-        <div>
-          <h1 className="dashboard-greeting">{greeting}</h1>
-          <p className="dashboard-subtitle">{subtitle}</p>
-        </div>
-        <button
-          className="icon-button dashboard-welcome-action"
-          type="button"
-          onClick={onRefresh}
-          disabled={refreshing}
-          title={refreshing ? t("app.refreshing") : t("app.refreshCoros")}
-          aria-label={refreshing ? t("app.refreshing") : t("common.refresh")}
-          aria-busy={refreshing}
-        >
-          <RefreshCw
-            size={16}
-            aria-hidden="true"
-            className={refreshing ? "spin" : ""}
-          />
-        </button>
-      </header>
+      {/* Signed out, the page is the sign-in sheet alone: there is nothing to
+          greet with yet and nothing to refresh. */}
+      {trainingConnected ? (
+        <header className="dashboard-welcome dashboard-block">
+          <div>
+            <h1 className="dashboard-greeting">{greeting}</h1>
+            <p className="dashboard-subtitle">{subtitle}</p>
+          </div>
+          <button
+            className="icon-button dashboard-welcome-action"
+            type="button"
+            onClick={onRefresh}
+            disabled={refreshing}
+            title={refreshing ? t("app.refreshing") : t("app.refreshCoros")}
+            aria-label={refreshing ? t("app.refreshing") : t("common.refresh")}
+            aria-busy={refreshing}
+          >
+            <RefreshCw
+              size={16}
+              aria-hidden="true"
+              className={refreshing ? "spin" : ""}
+            />
+          </button>
+        </header>
+      ) : null}
 
       {trainingOverview}
     </div>

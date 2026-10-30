@@ -27,6 +27,24 @@ const STATUS: TrainingHubStatus = {
   rememberCredentials: true
 };
 
+// The sign-in screen, for a shot that seeds `demo.signin` through `ls`: "fresh"
+// (never signed in here), "saved" (a remembered account), "code" (signing in
+// asks for the emailed code) or "restoring" (the start-up re-login).
+const signInShot = (): string | null => {
+  try {
+    return localStorage.getItem("demo.signin");
+  } catch {
+    return null;
+  }
+};
+
+const signedOutStatus = (): TrainingHubStatus => {
+  const shot = signInShot();
+  if (shot === "saved") return { authenticated: false, email: STATUS.email, rememberCredentials: true };
+  if (shot === "restoring") return { authenticated: false, email: STATUS.email, rememberCredentials: true, restoring: true };
+  return { authenticated: false };
+};
+
 const hrZones = (ceilings: number[]) => ceilings.map((bpm, index) => ({ index, bpm }));
 
 export const PROFILE: CorosProfile = {
@@ -233,7 +251,11 @@ export function demoHandlers(): Record<string, unknown> {
       loop: { pendingChanges: 0, lastPulledAt: new Date(Date.now() - 7 * 60_000).toISOString(), seed: { state: "done", entries: 18432, error: null } } }),
     prepareSyncVault: async () => "ready",
     googleDriveAccount: async () => ({ email: "alex@example.com", name: "Alex Pham", quota: { used: 6.4e9, limit: 15e9 } }),
-    getTrainingHubStatus: async () => STATUS,
+    getTrainingHubStatus: async () => (signInShot() ? signedOutStatus() : STATUS),
+    loginTrainingHub: async (email: string) =>
+      signInShot() === "code"
+        ? { twoFactorRequired: true, status: signedOutStatus(), email }
+        : { twoFactorRequired: false, status: STATUS },
     getCorosProfileSnapshot: async () => snapshot(),
     getTrainingDashboard: async () => dashboard(),
     getTrainingAnalytics: async () => analytics(),

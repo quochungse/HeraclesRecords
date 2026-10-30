@@ -48,7 +48,6 @@ function startTime(offsetDays = 0) {
 function context(overrides = {}) {
   return {
     now: NOW,
-    trainingConnected: true,
     ...overrides
   };
 }
@@ -60,16 +59,13 @@ function ids(ctx) {
 // --- Nothing to say falls back to the caller's fixed copy -------------------
 
 assert.equal(
-  selectOverviewGreeting(
-    context({ trainingConnected: true }),
-    FALLBACK
-  ),
+  selectOverviewGreeting(context(), FALLBACK),
   FALLBACK,
   "no signals at all keeps the original subtitle"
 );
 
 assert.equal(
-  selectOverviewGreetingLine(context({ trainingConnected: true })),
+  selectOverviewGreetingLine(context()),
   null,
   "no signals produces no line"
 );
@@ -274,13 +270,6 @@ const streakThroughRestDay = context({
 assert.ok(
   ids(streakThroughRestDay).includes("streak"),
   "a streak ending yesterday still counts"
-);
-
-// --- Setup ---------------------------------------------------------------
-
-assert.equal(
-  selectOverviewGreeting(context({ trainingConnected: false }), FALLBACK),
-  "Sign in to COROS to see your training at a glance."
 );
 
 // --- Ordering, urgency and rotation ----------------------------------------

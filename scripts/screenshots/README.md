@@ -31,6 +31,9 @@ Shots are 1512 × 982 at 2×, with the macOS window corners, written as WebP int
   how long to wait, localStorage to seed (`ls`), and `steps`, JavaScript run in the page in
   order (`demoClick(text, selector)` clicks the shortest element holding that text) with
   pauses in milliseconds between them. Add a shot by adding an entry.
+- **The sign-in screen** is shot by seeding `"demo.signin"` through `ls`: `fresh` (never
+  signed in here), `saved` (a remembered account), `restoring` (the start-up re-login) or
+  `code` (signing in asks for the emailed code; fill the form and press Sign in in `steps`).
 - **`shoot.cjs`** opens each one in an offscreen Electron window and captures it
   (`SHOT_DPR`, `SHOT_DIR`, `SHOT_ROUND`, `SHOT_ONLY`). Launch Electron only through
   `scripts/run-electron-gui.mjs`, which clears `ELECTRON_RUN_AS_NODE`.

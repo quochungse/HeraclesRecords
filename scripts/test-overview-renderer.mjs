@@ -9,7 +9,13 @@
 // - nothing today: a rest day, and nothing to press.
 //
 // And nothing on the calendar at all, with nothing done today, draws no
-// section. Set OVERVIEW_SHOTS=<dir> to keep a picture of each state.
+// section.
+//
+// Signed out, Overview is the sign-in, in four states: the form, a saved
+// account (one button, the form behind "Use a different account"), the emailed
+// code, and the start-up re-login, which offers nothing to press.
+//
+// Set OVERVIEW_SHOTS=<dir> to keep a picture of each state.
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
@@ -99,6 +105,17 @@ async function mountComingUp(name, options) {
   }
 }
 
+async function mountSignIn(name, options) {
+  await harness("mount", "TrainingSignIn", options);
+  await waitFor(() => harness("appStylesReady"), "the app stylesheet loads");
+  await waitFor(() => harness("exists", ".signin-sheet"), "the sign-in sheet");
+  if (shots) {
+    await new Promise((resolve) => setTimeout(resolve, 300));
+    const image = await win.webContents.capturePage();
+    fs.writeFileSync(path.join(shots, `signin-${name}.png`), image.toPNG());
+  }
+}
+
 async function main() {
   await app.whenReady();
   if (shots) fs.mkdirSync(shots, { recursive: true });
@@ -162,6 +179,48 @@ async function main() {
   await harness("mount", "OverviewComingUp", { upcoming: [], activities: [] });
   await new Promise((resolve) => setTimeout(resolve, 100));
   assert.equal(await harness("exists", ".overview-section"), false, "no section to say there is nothing");
+
+  // 6. Signed out: the form.
+  await mountSignIn("form", {});
+  assert.match(await harness("text", ".signin-title"), /^Connect your COROS account$/);
+  assert.match(await harness("text", ".signin-intro-title"), /^Heracles Records$/, "the app's name, not COROS's");
+  assert.equal(await harness("count", ".signin-list li"), 3);
+  assert.match(await harness("style", ".signin-art", "--signin-art-mask"), /contours/, "the artwork is ours");
+  assert.equal(await harness("exists", "input[type=email]"), true);
+  assert.equal(await harness("attr", ".signin-submit", "disabled"), "", "nothing to send yet");
+  assert.equal(await harness("attr", ".signin-browser", "href"), "https://t.coros.com/");
+  assert.match(await harness("text", ".signin-foot"), /not made by COROS/);
+
+  // 7. A saved account: one Sign in, the form one press away and back.
+  await mountSignIn("saved", { status: { authenticated: false, email: "alex@example.com", rememberCredentials: true } });
+  assert.match(await harness("text", ".signin-title"), /^Welcome back$/);
+  assert.equal(await harness("text", ".signin-account-email"), "alex@example.com");
+  assert.equal(await harness("exists", "input[type=email]"), false, "no form beside the saved account");
+  assert.equal(await harness("count", ".signin-submit"), 1, "one way to sign in");
+  assert.equal(await harness("click", ".signin-submit"), true);
+  assert.equal((await harness("calls", "prop:onReconnect")).length, 1);
+  assert.equal(await harness("clickText", ".signin-text-button", "Use a different account"), true);
+  await waitFor(() => harness("exists", "input[type=email]"), "the form opens");
+  assert.match(await harness("text", ".signin-back"), /Saved COROS account: alex@example\.com/);
+  assert.equal(await harness("click", ".signin-back"), true);
+  await waitFor(() => harness("exists", ".signin-account"), "back to the saved account");
+
+  // 8. The emailed code: the address reads at the lead's size, inside it.
+  await mountSignIn("code", { twoFactorEmail: "alex@example.com" });
+  assert.match(await harness("text", ".signin-title"), /^Verify it's you$/);
+  assert.equal(await harness("text", ".signin-lead strong"), "alex@example.com");
+  assert.equal(
+    await harness("style", ".signin-lead strong", "font-size"),
+    await harness("style", ".signin-lead", "font-size"),
+    "the address is not set at the title's size"
+  );
+  assert.equal(await harness("exists", "input[autocomplete=one-time-code]"), true);
+
+  // 9. Restoring at start-up: nothing to press, not even the browser link.
+  await mountSignIn("restoring", { status: { authenticated: false, email: "alex@example.com", rememberCredentials: true, restoring: true } });
+  assert.match(await harness("text", ".signin-title"), /^Restoring your session$/);
+  assert.equal(await harness("count", ".signin button"), 0, "restoring offers nothing to press");
+  assert.equal(await harness("exists", ".signin a"), false);
 
   assert.deepEqual(await harness("consoleErrors"), [], "no console errors");
   console.log("overview renderer OK");
