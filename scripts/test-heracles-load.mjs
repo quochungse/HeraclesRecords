@@ -1,13 +1,21 @@
 // Heracles Training Load's engine (electron/heraclesLoad.ts): the set RPE
-// scale, the bridge to COROS's scale, a session worked by hand, and every way
-// a session can fall back.
+// scale, reps to failure (Nuzzo et al. 2024), load per minute on COROS's TRIMP
+// curve, a session worked by hand, and every way a session can fall back.
 import assert from "node:assert/strict";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 
 const repoRoot = path.resolve(import.meta.dirname, "..");
 const modUrl = pathToFileURL(path.join(repoRoot, "electron", "heraclesLoad.ts"));
-const { rpeFromRir, bridgeFactor, runHeraclesLoads, estimatePlannedLoad, HERACLES_DEFAULT_K } = await import(
+const {
+  rpeFromRir,
+  repsAtIntensity,
+  intensityAtReps,
+  heartRateReserveAtRpe,
+  loadPerMinute,
+  runHeraclesLoads,
+  estimatePlannedLoad
+} = await import(
   `${modUrl.href}?c=${Date.now()}`
 );
 
@@ -29,7 +37,7 @@ const session = (id, day, exercises, { duration, trainingLoad = 10 } = {}) => {
     detail: { summary: { sets: 0, totalReps: 0, totalWeightKg: 0, exercises: exercises.length, calories: 0, durationSec: duration ?? worked }, exercises }
   };
 };
-const context = (k = 0.5, weight = 75) => ({ k, bodyWeightKg: () => weight });
+const context = (weight = 75) => ({ bodyWeightKg: () => weight });
 
 // ---- The RIR scale (Zourdos 2016) ----
 assert.equal(rpeFromRir(0), 10);
@@ -39,35 +47,32 @@ close(rpeFromRir(6), 5, "6 in reserve");
 close(rpeFromRir(12), 2 + 3 * Math.exp(-1), "12 in reserve");
 assert.ok(rpeFromRir(4) < rpeFromRir(3) && rpeFromRir(7) < rpeFromRir(6), "the scale falls with every rep in reserve");
 
-// ---- The bridge: COROS load per RPE-minute on rated runs ----
-const run = (feelType, minutes, trainingLoad, daysAgo = 10, sportType = 100) => ({
-  sportType, feelType, duration: minutes * 60, trainingLoad, startTime: T0 - daysAgo * DAY
-});
-const fewRuns = Array.from({ length: 7 }, () => run(3, 60, 170));
-assert.deepEqual(bridgeFactor(fewRuns, T0), { k: HERACLES_DEFAULT_K, runs: 7, measured: false });
-const runs = [
-  ...Array.from({ length: 8 }, () => run(3, 60, 170)),
-  run(1, 50, 120), // rated easy: off the line strength sessions sit on
-  run(2, 80, 200),
-  run(4, 60, 170, 10, 402), // not a run
-  run(3, 60, 170, 200) // outside the window
-];
-const bridge = bridgeFactor(runs, T0);
-assert.equal(bridge.runs, 8);
-assert.equal(bridge.measured, true);
-close(bridge.k, 170 / (6 * 60), "k from runs rated 3");
+// ---- Reps to failure at a share of 1RM (Nuzzo et al. 2024) ----
+assert.equal(repsAtIntensity(1), 1, "one rep at the one-rep max");
+close(repsAtIntensity(0.7), 14.8, "the meta-regression's 70%");
+close(repsAtIntensity(0.725), (12.37 + 14.8) / 2, "linear between rows");
+close(intensityAtReps(14.8), 0.7, "read back");
+close(intensityAtReps(repsAtIntensity(0.63)), 0.63, "a round trip");
+assert.equal(intensityAtReps(1), 1);
+
+// ---- Load per minute: COROS's TRIMP at the heart-rate reserve of the effort ----
+for (const rating of [1.5, 5, 7, 9]) {
+  const reserve = heartRateReserveAtRpe(rating);
+  close(loadPerMinute(rating), reserve * 0.2445 * Math.exp(3.411 * reserve), `RPE ${rating}`);
+}
+assert.ok(loadPerMinute(9) > loadPerMinute(7) && loadPerMinute(7) > loadPerMinute(5), "harder weighs more");
+assert.ok(loadPerMinute(9) / loadPerMinute(5) > 9 / 5, "and more than in proportion, as on COROS's curve");
 
 // ---- A session worked by hand ----
-// Day 0: bench 8 × 60 kg, taken to stop one rep short → capacity 60 × (1 + 9/30) = 78 kg.
-// Day 7: 4 × 8 × 55 kg, 32 s each and 150 s rest.
-//   intensity 55/78; reps to failure 30 × (78/55 − 1) = 12.545; 4.545 in reserve;
-//   RPE 7 − 1.545 × 2/3 = 5.969; 182 s a set → k × 5.969 × 182/60 a set.
+// Day 0: bench 8 × 60 kg, taken to stop two reps short → capacity 60 / %1RM(10 reps).
+// Day 7: 4 × 8 × 55 kg, 32 s each and 150 s rest: intensity 55 / capacity, the
+//   reps the table holds there less 8 in reserve, RPE off Zourdos's scale, and
+//   182 s a set at that effort's load per minute.
 const benchTop = session("a", 0, [exercise("T1041", [set(8, 60, 48, 120)])]);
 const bench = session("b", 7, [exercise("T1041", Array.from({ length: 4 }, () => set(8, 55, 32, 150)))]);
-const capacity = 60 * (1 + 9 / 30);
-const reps = 30 * (capacity / 55 - 1);
-const rpe = 7 - ((reps - 8 - 3) * 2) / 3;
-const perSet = (0.5 * rpe * 182) / 60;
+const capacity = 60 / intensityAtReps(10);
+const rpe = rpeFromRir(repsAtIntensity(55 / capacity) - 8);
+const perSet = (loadPerMinute(rpe) * 182) / 60;
 {
   const result = runHeraclesLoads([bench, benchTop], context()).sessions.get("b");
   assert.equal(result.quality, "sets");
@@ -84,7 +89,7 @@ const perSet = (0.5 * rpe * 182) / 60;
 {
   const longer = { ...bench, duration: bench.duration + 1800 };
   const result = runHeraclesLoads([benchTop, longer], context()).sessions.get("b");
-  close(result.value, 4 * perSet + (0.5 * 1.5 * 1800) / 60, "30 idle minutes add k × 1.5 × 30");
+  close(result.value, 4 * perSet + loadPerMinute(1.5) * 30, "30 idle minutes add 30 minutes at RPE 1.5");
 }
 
 // COROS's figure is the floor.
@@ -118,14 +123,14 @@ const perSet = (0.5 * rpe * 182) / 60;
 {
   const muchLater = session("z", 200, [exercise("T1041", Array.from({ length: 4 }, () => set(8, 55, 32, 150)))]);
   const result = runHeraclesLoads([benchTop, muchLater], context()).sessions.get("z");
-  close(result.sets[0][0].intensity, 55 / (55 * (1 + 9 / 30)), "the old best no longer counts");
+  close(result.sets[0][0].intensity, intensityAtReps(10), "the old best no longer counts");
 }
 
 // ---- Bodyweight: the same 8 dips are harder for a heavier body ----
 {
   const dips = session("dips", 0, [exercise("T1051", [set(8, 0, 30, 120)])]);
-  const light = runHeraclesLoads([dips], context(0.5, 50)).sessions.get("dips").sets[0][0];
-  const heavy = runHeraclesLoads([dips], context(0.5, 100)).sessions.get("dips").sets[0][0];
+  const light = runHeraclesLoads([dips], context(50)).sessions.get("dips").sets[0][0];
+  const heavy = runHeraclesLoads([dips], context(100)).sessions.get("dips").sets[0][0];
   // Its own set is the history: 0.95 × body × (1 + 9/30); the population prior
   // (10 reps at 70 kg, scaled by body^0.67) is higher for the lighter athlete.
   assert.ok(heavy.rpe > light.rpe, `100 kg (${heavy.rpe}) above 50 kg (${light.rpe})`);
@@ -163,7 +168,7 @@ const perSet = (0.5 * rpe * 182) / 60;
   ], { duration: 728 + 300 });
   const result = runHeraclesLoads([benchTop, withStretch], context()).sessions.get("s");
   assert.equal(result.sets[1][0], null);
-  close(result.value, 4 * perSet + (0.5 * 1.5 * 300) / 60, "stretching counts as time between sets");
+  close(result.value, 4 * perSet + loadPerMinute(1.5) * 5, "stretching counts as time between sets");
 
   const drills = session("d", 7, [
     exercise("T1013", [set(70, 0, 60, 30), set(70, 0, 60, 30)]),
@@ -177,19 +182,19 @@ const perSet = (0.5 * rpe * 182) / 60;
 // ---- Sessions whose sets cannot be read ----
 {
   const ready = runHeraclesLoads([benchTop, bench], context());
-  // The upper middle of two: the 8 × 60 kg best (RPE 9) over the 55 kg day.
+  // The upper middle of two: the 8 × 60 kg best (RPE 8) over the 55 kg day.
   const knownRpe = Math.max(ready.sessions.get("a").sessionRpe, ready.sessions.get("b").sessionRpe);
-  close(ready.sessions.get("a").sessionRpe, 9, "a best set is one rep short");
+  close(ready.sessions.get("a").sessionRpe, 8, "a best set is two reps short");
   const regions = session("r", 10, [exercise("S4211", [set(10, 40, 40, 90), set(10, 40, 40, 90)])], { duration: 3600 });
   const merged = session("m", 11, [exercise("T1041", [set(72, 50, 857, 90)])], { duration: 3600 });
   const result = runHeraclesLoads([benchTop, bench, regions, merged], context()).sessions;
   for (const id of ["r", "m"]) {
     assert.equal(result.get(id).quality, "estimate", id);
-    close(result.get(id).value, 0.5 * knownRpe * 60, `${id}: k × the usual session RPE × minutes`);
+    close(result.get(id).value, loadPerMinute(knownRpe) * 60, `${id}: the usual session RPE × minutes`);
   }
   // With no readable session to go by, the default RPE.
   const alone = runHeraclesLoads([regions], context()).sessions.get("r");
-  close(alone.value, 0.5 * 6.5 * 60, "default session RPE");
+  close(alone.value, loadPerMinute(6.5) * 60, "default session RPE");
 }
 
 // A weighted lift logged with no weight takes the session's median RPE.
@@ -214,8 +219,8 @@ const perSet = (0.5 * rpe * 182) / 60;
   assert.equal(result.cardio, undefined, "Hevy alone: no COROS figure");
   assert.equal(result.sets[0][1].rir, 0);
   assert.equal(result.sets[0][1].rpe, 10, "failure is no rep in reserve");
-  // The warm-up set's 100 kg did not count as capacity: 60 × (1 + 8/30).
-  close(result.sets[0][1].intensity, 60 / (60 * (1 + 8 / 30)), "capacity from the failure set alone");
+  // The warm-up set's 100 kg did not count as capacity: 8 reps at failure.
+  close(result.sets[0][1].intensity, intensityAtReps(8), "capacity from the failure set alone");
   // No clock: 3 s a rep and 90 s rest.
   assert.equal(result.sets[0][1].seconds, 8 * 3 + 90);
 }
@@ -225,12 +230,12 @@ const perSet = (0.5 * rpe * 182) / 60;
 {
   const pullUps = (id, title, exerciseType) =>
     session(id, 0, [exercise(title, [set(5, 0, 0, 0), set(5, 0, 0, 0)], { rawName: title, externalId: id, exerciseType })], { trainingLoad: null });
-  const hevy = runHeraclesLoads([pullUps("hp", "Pull Up", "bodyweight_reps")], context(0.5, 80)).sessions.get("hp");
-  const coros = runHeraclesLoads([session("cp", 0, [exercise("T1002", [set(5, 0, 0, 0), set(5, 0, 0, 0)])])], context(0.5, 80))
+  const hevy = runHeraclesLoads([pullUps("hp", "Pull Up", "bodyweight_reps")], context(80)).sessions.get("hp");
+  const coros = runHeraclesLoads([session("cp", 0, [exercise("T1002", [set(5, 0, 0, 0), set(5, 0, 0, 0)])])], context(80))
     .sessions.get("cp");
   close(hevy.sets[0][0].rpe, coros.sets[0][0].rpe, "Hevy's pull-up reads as COROS's");
   close(hevy.sets[0][0].intensity, coros.sets[0][0].intensity, "same share of the body");
-  const unnamed = runHeraclesLoads([pullUps("hx", "Something Else", "bodyweight_reps")], context(0.5, 80)).sessions.get("hx");
+  const unnamed = runHeraclesLoads([pullUps("hx", "Something Else", "bodyweight_reps")], context(80)).sessions.get("hx");
   assert.notEqual(unnamed.sets[0][0].intensity, hevy.sets[0][0].intensity, "a name it does not know keeps the default share");
 
   // A squat at 100 kg is 100 + 0.88 × 80 = 170.4 kg moved; its own set is the
@@ -238,8 +243,8 @@ const perSet = (0.5 * rpe * 182) / 60;
   // but a lighter squat the next day reads against the body-inclusive best.
   const squat = (id, day, kg) =>
     session(id, day, [exercise("Squat (Barbell)", [set(5, kg, 0, 0), set(5, kg, 0, 0)], { rawName: "Squat (Barbell)", externalId: "sq", exerciseType: "weight_reps" })], { trainingLoad: null });
-  const light = runHeraclesLoads([squat("s1", 0, 100), squat("s2", 1, 60)], context(0.5, 80)).sessions.get("s2");
-  close(light.sets[0][0].intensity, (60 + 0.88 * 80) / ((100 + 0.88 * 80) * (1 + 6 / 30)), "body under the bar");
+  const light = runHeraclesLoads([squat("s1", 0, 100), squat("s2", 1, 60)], context(80)).sessions.get("s2");
+  close(light.sets[0][0].intensity, ((60 + 0.88 * 80) / (100 + 0.88 * 80)) * intensityAtReps(7), "body under the bar");
 }
 
 // Hevy's assisted movement: the assistance comes off the body, so more help
@@ -255,9 +260,9 @@ const perSet = (0.5 * rpe * 182) / 60;
     ], { trainingLoad: null });
   // With a history set heavier than both, the sets read against one capacity.
   const history = session("ph", -1, [exercise("Pull Up", [set(5, 0, 0, 0), set(5, 0, 0, 0)], { rawName: "Pull Up", externalId: "pa", exerciseType: "bodyweight_reps" })], { trainingLoad: null });
-  const little = runHeraclesLoads([history, assisted(10)], context(0.5, 80)).sessions.get("a10").sets[0][0];
-  const much = runHeraclesLoads([history, assisted(30)], context(0.5, 80)).sessions.get("a30").sets[0][0];
-  close(little.intensity, (0.95 * 80 - 10) / (0.95 * 80 * (1 + 6 / 30)), "the body less 10 kg of help");
+  const little = runHeraclesLoads([history, assisted(10)], context(80)).sessions.get("a10").sets[0][0];
+  const much = runHeraclesLoads([history, assisted(30)], context(80)).sessions.get("a30").sets[0][0];
+  close(little.intensity, ((0.95 * 80 - 10) / (0.95 * 80)) * intensityAtReps(7), "the body less 10 kg of help");
   assert.ok(much.rpe < little.rpe, `30 kg of help (${much.rpe}) easier than 10 kg (${little.rpe})`);
 }
 
@@ -271,8 +276,8 @@ const perSet = (0.5 * rpe * 182) / 60;
   const result = runHeraclesLoads([logged], context()).sessions.get("lg");
   assert.equal(result.sets[0][0].rpe, 7);
   assert.equal(result.sets[0][0].logged, true);
-  // RPE 7 is three reps left: capacity 60 × (1 + 11/30), above the one-rep-short guess.
-  close(result.sets[0][1].intensity, 60 / (60 * (1 + 11 / 30)), "capacity from the logged RPE");
+  // RPE 7 is three reps left: capacity at 11 reps, above the two-reps-short guess.
+  close(result.sets[0][1].intensity, intensityAtReps(11), "capacity from the logged RPE");
   assert.equal(result.sets[0][1].logged, undefined, "an unlogged set is still predicted");
 }
 
@@ -282,12 +287,12 @@ const perSet = (0.5 * rpe * 182) / 60;
   const now = T0 + 10 * DAY;
   const planned = estimatePlannedLoad({ exercises: [{ key: "T1041", sets: 4, reps: 8, weightKg: 55, restSec: 150 }] }, state, now);
   assert.equal(planned.quality, "planned");
-  close(planned.value, (4 * 0.5 * rpe * (8 * 3 + 150)) / 60, "the plan's sets read like done ones");
+  close(planned.value, (4 * loadPerMinute(rpe) * (8 * 3 + 150)) / 60, "the plan's sets read like done ones");
   const padded = estimatePlannedLoad({ exercises: [{ key: "T1041", sets: 4, reps: 8, weightKg: 55, restSec: 150 }], estimatedSeconds: 4 * 174 + 600 }, state, now);
-  close(padded.value - planned.value, (0.5 * 1.5 * 600) / 60, "the rest of the plan's length is time between sets");
+  close(padded.value - planned.value, loadPerMinute(1.5) * 10, "the rest of the plan's length is time between sets");
   const lengthOnly = estimatePlannedLoad({ exercises: [], estimatedSeconds: 3600 }, state, now);
   const usual = [...state.sessionRpes.map((entry) => entry.rpe)].sort((a, b) => a - b)[1];
-  close(lengthOnly.value, 0.5 * usual * 60, "length × the usual session RPE");
+  close(lengthOnly.value, loadPerMinute(usual) * 60, "length × the usual session RPE");
   assert.equal(estimatePlannedLoad({ exercises: [] }, state, now), undefined);
   const withCoros = estimatePlannedLoad({ exercises: [], estimatedSeconds: 60, corosLoad: 400 }, state, now);
   assert.equal(withCoros.value, 400, "never below COROS's planned figure");

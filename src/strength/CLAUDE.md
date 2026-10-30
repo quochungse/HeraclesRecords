@@ -60,8 +60,11 @@ body map offers **Load** only then. `npm run test:heracles-load`, `test:heracles
   payloads main already sends (`heraclesLoad` on activities and planned sessions,
   `StrengthSession.heracles`); `trainingLoad` is never overwritten. A plan's sessions are asked
   for over `strength:estimatePlanLoads`, never saved with the plan.
-- **Feel is never an input** for a lift; it is read only on runs, to scale RPE-minutes to COROS's
-  load (`bridgeFactor`, default 0.5 under eight rated runs).
+- **One formula for everyone, nothing fitted on the athlete**: reps to failure from Nuzzo et al.
+  2024 (`repsAtIntensity`), RIR 2 when no RPE is logged, set RPE from Zourdos 2016, and load per
+  minute at that effort on COROS's published TRIMP curve (`loadPerMinute`, the heart-rate reserve
+  of an effort fitted on PMData's 16 athletes). A run's scale follows; nothing is read off runs,
+  and the feeling recorded after a session is never an input.
 - **A session's value is at least COROS's** (cardio) and `quality` says how it was read:
   `sets`, `estimate` (sets unreadable: COROS's floor or the usual session RPE), `conditioning`
   (drills, or a session COROS kept no sets for: COROS's figure), `pending` (breakdown not read

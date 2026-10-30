@@ -203,7 +203,7 @@ function analytics(): TrainingHubAnalytics {
 
 let demoLoadSource: "coros" | "heracles" = "coros";
 function loadInfo() {
-  return { source: demoLoadSource, k: 0.47, bridgeRuns: 17, bridgeMeasured: true, bodyWeightKg: 72 };
+  return { source: demoLoadSource, bodyWeightKg: 72 };
 }
 
 export function demoHandlers(): Record<string, unknown> {

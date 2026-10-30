@@ -324,14 +324,9 @@ export interface HeraclesSessionLoad extends HeraclesLoad {
   sets?: (HeraclesSetLoad | null)[][];
 }
 
-/** The setting and what the figures are being read with, for the Strength screen's note. */
+/** The setting, and the body weight the figures are being read with. */
 export interface HeraclesLoadInfo {
   source: StrengthLoadSource;
-  /** COROS Training Load per RPE-minute, measured on the athlete's runs. */
-  k: number;
-  bridgeRuns: number;
-  /** False while there are too few rated runs and `k` is the default. */
-  bridgeMeasured: boolean;
   bodyWeightKg?: number;
 }
 

@@ -12,7 +12,6 @@ import {
   getSetting,
   heraclesLoadInputsVersion,
   listBodyWeights,
-  listRatedActivityLoads,
   listRunLoads,
   listStoredStrengthSessions,
   listStrengthActivityLoads,
@@ -22,14 +21,11 @@ import {
 } from "./database";
 import { dayKey } from "./chatDayKeys";
 import {
-  bridgeFactor,
   estimatePlannedLoad,
   runHeraclesLoads,
-  type HeraclesBridge,
   type HeraclesLoadRun,
   type PlannedStrengthExercise,
-  type PlannedStrengthSession,
-  type RatedRun
+  type PlannedStrengthSession
 } from "./heraclesLoad";
 import { HERACLES_FACTORS_VERSION } from "./heraclesLoadFactors";
 import { heraclesDeltaSeries, type HeraclesDaySurplus } from "./heraclesFitness";
@@ -53,7 +49,7 @@ import type {
 
 export const STRENGTH_LOAD_SOURCE_SETTING = "strength.loadSource";
 const STRENGTH_LOAD_SPORT_TYPES: ReadonlySet<number> = new Set([400, 402]);
-/** As far back as a lift's capacity reaches, and the bridge's runs. */
+/** As far back as a lift's capacity reaches. */
 const HISTORY_DAYS = 3650;
 const SECONDS_PER_DAY = 86_400;
 /** A run set beside a strength session is from the eight weeks before it… */
@@ -68,7 +64,6 @@ export interface HeraclesLoadDeps {
   withoutBreakdown(): string[];
   /** COROS's strength activities, for the days Heracles adds to its fitness figures. */
   strengthActivities(): Pick<TrainingHubActivity, "activityId" | "sportType" | "startTime" | "trainingLoad">[];
-  ratedRuns(): RatedRun[];
   /** Runs with a COROS load, for the run a strength session is set beside. */
   runs(): HeraclesRunEquivalent[];
   /** The weight of a session's day; `now()` for today's. */
@@ -118,7 +113,6 @@ export function createDefaultDeps(): HeraclesLoadDeps {
       combineStrengthSessions(listStoredStrengthSessions(since()), getStoredHevyStrengthSessions(HISTORY_DAYS)),
     withoutBreakdown: () => listStrengthActivitiesWithoutBreakdown(),
     strengthActivities: () => listStrengthActivityLoads(since()),
-    ratedRuns: () => listRatedActivityLoads(since()),
     runs: () => listRunLoads(since()),
     bodyWeightKg: (startTime) => bodyWeightOn(readings(), startTime) ?? lastKnownCorosWeightKg(),
     inputsVersion: () => heraclesLoadInputsVersion(),
@@ -135,7 +129,6 @@ function depsOrDefault(deps: HeraclesLoadDeps | undefined): HeraclesLoadDeps {
 
 interface HeraclesLoadSnapshot {
   version: string;
-  bridge: HeraclesBridge;
   run: HeraclesLoadRun;
   /** By every id a session goes by: its own, COROS's, Hevy's. */
   byId: Map<string, StrengthSession>;
@@ -151,7 +144,7 @@ const snapshots = new WeakMap<HeraclesLoadDeps, HeraclesLoadSnapshot>();
 function snapshotFor(deps: HeraclesLoadDeps): HeraclesLoadSnapshot {
   const now = deps.now();
   const weight = deps.bodyWeightKg(now);
-  // The day is part of it: the bridge's window and the capacities' move daily.
+  // The day is part of it: the capacities' window moves daily.
   const version = [
     deps.inputsVersion(),
     weight ?? "",
@@ -161,9 +154,8 @@ function snapshotFor(deps: HeraclesLoadDeps): HeraclesLoadSnapshot {
   const cached = snapshots.get(deps);
   if (cached?.version === version) return cached;
 
-  const bridge = bridgeFactor(deps.ratedRuns(), now);
   const sessions = deps.strengthSessions();
-  const run = runHeraclesLoads(sessions, { k: bridge.k, bodyWeightKg: (startTime) => deps.bodyWeightKg(startTime) });
+  const run = runHeraclesLoads(sessions, { bodyWeightKg: (startTime) => deps.bodyWeightKg(startTime) });
   const byId = new Map<string, StrengthSession>();
   for (const session of sessions) {
     byId.set(session.activityId, session);
@@ -172,7 +164,6 @@ function snapshotFor(deps: HeraclesLoadDeps): HeraclesLoadSnapshot {
   }
   const snapshot: HeraclesLoadSnapshot = {
     version,
-    bridge,
     run,
     byId,
     withoutBreakdown: new Set(deps.withoutBreakdown()),
@@ -213,13 +204,9 @@ export function setStrengthLoadSource(source: StrengthLoadSource): void {
 
 export function getHeraclesLoadInfo(deps?: HeraclesLoadDeps): HeraclesLoadInfo {
   const resolved = depsOrDefault(deps);
-  const { bridge } = snapshotFor(resolved);
   const bodyWeightKg = resolved.bodyWeightKg(resolved.now());
   return {
     source: getStrengthLoadSource(),
-    k: bridge.k,
-    bridgeRuns: bridge.runs,
-    bridgeMeasured: bridge.measured,
     ...(bodyWeightKg !== undefined ? { bodyWeightKg } : {})
   };
 }

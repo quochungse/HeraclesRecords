@@ -1,19 +1,20 @@
 /**
- * Heracles Training Load: a strength session's load on the scale of COROS's
- * running Training Load (docs/heracles-training-load.md).
+ * Heracles Training Load: a strength session's load from the effort of its
+ * sets (docs/heracles-training-load.md). One formula for everyone, every
+ * constant published or fitted on many people, none on the athlete's own runs:
  *
- * COROS scores every session from heart rate (Banister's TRIMP), which reads a
- * strength session a third to a quarter as heavy per minute as a run the
- * athlete rates the same. This scores the session from its sets instead:
+ *   kg, reps, body weight → share of the athlete's capacity at that lift
+ *   → reps left in reserve (reps to failure at a share of 1RM: Nuzzo et al.
+ *   2024, 7,289 people) → set RPE (Zourdos et al. 2016)
+ *   → load per minute at that effort (`loadPerMinute`: the heart-rate reserve
+ *   that effort corresponds to in steady exercise, fitted on PMData's 16
+ *   athletes, through COROS's published TRIMP weighting) × the set's minutes.
  *
- *   kg, reps, body weight → share of the athlete's own capacity at that lift
- *   → reps left in reserve → set RPE (Zourdos 2016) → RPE × minutes
- *   (Foster's session-RPE) → × k, COROS's load per RPE-minute on the
- *   athlete's own runs.
- *
- * The feeling an athlete records after a session is never an input. It is
- * read only off runs, to measure k. A set's RPE logged in Hevy is, over the
- * prediction. Node-free: the renderer imports the types.
+ * A minute of lifting at an effort weighs what a steady minute at the same
+ * effort weighs, so the load reads on a run's scale as a consequence, not by
+ * calibration. The feeling recorded after a session is never an input; a set's
+ * RPE logged in Hevy is, over the prediction. Node-free: the renderer imports
+ * the types.
  */
 
 import { HERACLES_EXERCISE_FACTORS, heraclesFactorByName, type HeraclesExerciseFactor } from "./heraclesLoadFactors";
@@ -27,43 +28,19 @@ import type {
   StrengthSet
 } from "./types";
 
-export interface HeraclesBridge {
-  /** COROS Training Load per RPE-minute. */
-  k: number;
-  /** Runs it was measured on. */
-  runs: number;
-  /** False when too few rated runs: `k` is the default. */
-  measured: boolean;
-}
-
-export interface RatedRun {
-  sportType: number;
-  /** Epoch seconds. */
-  startTime?: number;
-  /** Seconds. */
-  duration?: number;
-  trainingLoad?: number;
-  /** COROS feelType, 1..5. */
-  feelType?: number | null;
-}
-
 export interface HeraclesLoadContext {
-  k: number;
   /** Body weight on the day of a session (epoch seconds), when known. */
   bodyWeightKg: (startTime: number | undefined) => number | undefined;
 }
 
-export const HERACLES_DEFAULT_K = 0.5;
-const MIN_BRIDGE_RUNS = 8;
-const BRIDGE_WINDOW_DAYS = 120;
-/** Runs rated easier than this sit off the line strength sessions are rated on. */
-const MIN_BRIDGE_FEEL = 3;
-const RUN_SPORT_TYPES: ReadonlySet<number> = new Set([100, 101, 102, 103]);
-
 const CAPACITY_WINDOW_DAYS = 120;
-/** The best set of a lift is taken to have stopped one rep short of failure. */
-const BEST_SET_RIR = 1;
-/** Epley's line is read only where it holds. */
+/**
+ * A set with no logged RPE is taken to have stopped two reps short of failure:
+ * trainees put their own sets one to two reps (experienced) or four to five
+ * (new) closer to failure than they were (Steele et al. 2017; Refalo et al. 2024).
+ */
+const BEST_SET_RIR = 2;
+/** Reps to failure are read only where the table's spread stays narrow (about 60% 1RM and up). */
 const MAX_CAPACITY_REPS = 20;
 /** A new best counts only when a second set of the session backs it. */
 const CAPACITY_JUMP = 1.15;
@@ -112,14 +89,99 @@ function loggedRpe(set: StrengthSet): number | undefined {
   return set.rpe !== undefined && Number.isFinite(set.rpe) && set.rpe >= 1 && set.rpe <= 10 ? set.rpe : undefined;
 }
 
-/** Epley's reps to failure at a share of the one-rep max. */
-function repsToFailure(intensity: number): number {
-  return Math.max(0, 30 * (1 / intensity - 1));
+/**
+ * Mean repetitions to failure at a share of the one-rep max, Nuzzo et al. 2024
+ * (Sports Med 54:303; 952 tests of 7,289 people in 269 studies; sex, age and
+ * training status did not clearly move it). The main model's estimates, 1 rep
+ * at 100% by definition. Epley's line, used before, reads 13 reps at 70% where
+ * the meta-regression reads 14.8, and 3.3 at 90% where it reads 4.9.
+ */
+const REPS_AT_INTENSITY: readonly (readonly [number, number])[] = [
+  [1, 1],
+  [0.95, 3.28],
+  [0.9, 4.94],
+  [0.85, 7.15],
+  [0.8, 9.75],
+  [0.75, 12.37],
+  [0.7, 14.8],
+  [0.65, 17.11],
+  [0.6, 19.53],
+  [0.55, 22.43],
+  [0.5, 25.99],
+  [0.45, 30.37],
+  [0.4, 35.75],
+  [0.35, 42.37],
+  [0.3, 50.5],
+  [0.25, 60.48],
+  [0.2, 72.75],
+  [0.15, 87.79]
+];
+
+/** Reps to failure at a share of the one-rep max (`REPS_AT_INTENSITY`, linear between rows). */
+export function repsAtIntensity(intensity: number): number {
+  const table = REPS_AT_INTENSITY;
+  if (intensity >= 1) return 1;
+  for (let index = 1; index < table.length; index += 1) {
+    const [high, highReps] = table[index - 1]!;
+    const [low, lowReps] = table[index]!;
+    if (intensity >= low || index === table.length - 1) {
+      return highReps + ((high - intensity) / (high - low)) * (lowReps - highReps);
+    }
+  }
+  return table[table.length - 1]![1];
+}
+
+/** The share of the one-rep max at which `reps` is the most a set holds: `repsAtIntensity` read back. */
+export function intensityAtReps(reps: number): number {
+  const table = REPS_AT_INTENSITY;
+  if (reps <= 1) return 1;
+  for (let index = 1; index < table.length; index += 1) {
+    const [high, highReps] = table[index - 1]!;
+    const [low, lowReps] = table[index]!;
+    if (reps <= lowReps || index === table.length - 1) {
+      return Math.max(0.05, high - ((reps - highReps) / (lowReps - highReps)) * (high - low));
+    }
+  }
+  return table[table.length - 1]![0];
 }
 
 /** A one-rep max from a set, the set taken to stop `rir` reps short of failure. */
 function capacityEstimate(load: number, reps: number, rir: number): number {
-  return load * (1 + (reps + rir) / 30);
+  return load / intensityAtReps(reps + rir);
+}
+
+/** Reps a set at this share of the one-rep max had left: what the table holds there, less those done. */
+function repsInReserve(intensity: number, reps: number): number {
+  return Math.max(0, repsAtIntensity(intensity) - reps);
+}
+
+/*
+ * Load per minute at an effort. COROS's Training Load is a TRIMP, published
+ * for its watches: minutes × HRr × 0.2445·e^(3.411·HRr), HRr the share of
+ * heart-rate reserve. The heart-rate reserve a steady effort sits at for a
+ * given CR-10 rating is fitted on PMData (Thambawita et al. 2020): 429 runs,
+ * rides and other steady sessions of 14 athletes, each session-RPE report
+ * matched to the Fitbit exercise it rates, the TRIMP of its heart rate read
+ * back to a steady HRr, then a within-person slope (0.031 a point) and the
+ * people's mean level (0.48 at RPE 0). Age-predicted maxima (Nes et al. 2013)
+ * in place of the measured ones move it by under 0.006.
+ * `scripts/fit-heracles-effort-curve.py` reproduces it. So a minute rated 7
+ * weighs what a steady minute rated 7 weighs, whoever lifts it.
+ */
+const TRIMP_SCALE = 0.2445;
+const TRIMP_EXPONENT = 3.411;
+const HRR_AT_REST_RPE = 0.48;
+const HRR_PER_RPE = 0.031;
+
+/** The share of heart-rate reserve a steady effort at this CR-10 rating sits at. */
+export function heartRateReserveAtRpe(rpe: number): number {
+  return Math.min(1, Math.max(0, HRR_AT_REST_RPE + HRR_PER_RPE * rpe));
+}
+
+/** Training Load per minute at a CR-10 effort, on COROS's TRIMP curve. */
+export function loadPerMinute(rpe: number): number {
+  const reserve = heartRateReserveAtRpe(rpe);
+  return reserve * TRIMP_SCALE * Math.exp(TRIMP_EXPONENT * reserve);
 }
 
 function median(values: readonly number[]): number | undefined {
@@ -130,41 +192,6 @@ function median(values: readonly number[]): number | undefined {
 
 function positive(value: number | undefined): number | undefined {
   return value !== undefined && Number.isFinite(value) && value > 0 ? value : undefined;
-}
-
-/**
- * COROS load per RPE-minute on the athlete's rated runs, feel × 2 standing for
- * CR-10. Only runs rated 3 and up: this athlete's runs carry 2.3–3.3 TL a minute
- * whatever they are rated, so the easy ratings pull k up, and strength sessions
- * are rated 3–4.
- */
-export function bridgeFactor(runs: readonly RatedRun[], nowSec: number): HeraclesBridge {
-  const since = nowSec - BRIDGE_WINDOW_DAYS * SECONDS_PER_DAY;
-  let load = 0;
-  let rpeMinutes = 0;
-  let count = 0;
-  for (const run of runs) {
-    const feel = run.feelType ?? 0;
-    const duration = positive(run.duration);
-    const trainingLoad = positive(run.trainingLoad);
-    if (
-      !RUN_SPORT_TYPES.has(run.sportType) ||
-      feel < MIN_BRIDGE_FEEL ||
-      feel > 5 ||
-      duration === undefined ||
-      trainingLoad === undefined ||
-      (run.startTime ?? 0) < since
-    ) {
-      continue;
-    }
-    load += trainingLoad;
-    rpeMinutes += feel * 2 * (duration / 60);
-    count += 1;
-  }
-  if (count < MIN_BRIDGE_RUNS || rpeMinutes <= 0) {
-    return { k: HERACLES_DEFAULT_K, runs: count, measured: false };
-  }
-  return { k: load / rpeMinutes, runs: count, measured: true };
 }
 
 interface ResolvedFactor {
@@ -277,9 +304,7 @@ function capacityAt(points: readonly CapacityPoint[] | undefined, day: number): 
 
 function bodyweightPrior(factor: ResolvedFactor, bodyWeightKg: number): number {
   return (
-    factor.bodyShare *
-    REFERENCE_BODY_WEIGHT_KG *
-    (1 + factor.repsAtBodyweight / 30) *
+    ((factor.bodyShare * REFERENCE_BODY_WEIGHT_KG) / intensityAtReps(factor.repsAtBodyweight)) *
     Math.pow(bodyWeightKg / REFERENCE_BODY_WEIGHT_KG, STRENGTH_ALLOMETRY)
   );
 }
@@ -451,7 +476,7 @@ export function runHeraclesLoads(
       const minutes = (sessionDurationSec(session) ?? 0) / 60;
       const recent = sessionRpes.filter((entry) => entry.day >= day - MEDIAN_WINDOW_DAYS && entry.day <= day);
       const rpe = median(recent.map((entry) => entry.rpe)) ?? DEFAULT_SESSION_RPE;
-      results.set(session.activityId, { ...finish(context.k * rpe * minutes, cardio, "estimate"), sessionRpe: rpe });
+      results.set(session.activityId, { ...finish(loadPerMinute(rpe) * minutes, cardio, "estimate"), sessionRpe: rpe });
       continue;
     }
 
@@ -474,7 +499,7 @@ export function runHeraclesLoads(
         const capacityKg = capacityFor(factor, set.weightKg, entry.key ? capacity.get(entry.key) : undefined, day, bodyWeightKg);
         if (load <= 0 || capacityKg <= 0) return filled;
         const intensity = Math.min(1, load / capacityKg);
-        const rir = set.type === "failure" ? 0 : Math.max(0, repsToFailure(intensity) - set.reps);
+        const rir = set.type === "failure" ? 0 : repsInReserve(intensity, set.reps);
         return { load: 0, rpe: rpeFromRir(rir), rir, intensity, seconds };
       })
     );
@@ -483,28 +508,30 @@ export function runHeraclesLoads(
     const fill = median(known.map((set) => set.rpe));
     if (fill === undefined) {
       const minutes = (sessionDurationSec(session) ?? 0) / 60;
-      results.set(session.activityId, { ...finish(context.k * DEFAULT_SESSION_RPE * minutes, cardio, "estimate"), sessionRpe: DEFAULT_SESSION_RPE });
+      results.set(session.activityId, { ...finish(loadPerMinute(DEFAULT_SESSION_RPE) * minutes, cardio, "estimate"), sessionRpe: DEFAULT_SESSION_RPE });
       continue;
     }
 
     let rpeSeconds = 0;
     let workSeconds = 0;
+    let setLoad = 0;
     for (const exerciseSets of scored) {
       for (const set of exerciseSets) {
         if (!set) continue;
         if (set.filled) set.rpe = fill;
-        set.load = (context.k * set.rpe * set.seconds) / 60;
+        set.load = (loadPerMinute(set.rpe) * set.seconds) / 60;
+        setLoad += set.load;
         rpeSeconds += set.rpe * set.seconds;
         workSeconds += set.seconds;
       }
     }
     const duration = sessionDurationSec(session) ?? workSeconds;
     const between = Math.max(0, duration - workSeconds);
-    const total = rpeSeconds + NON_SET_RPE * between;
-    const sessionRpe = total / Math.max(1, workSeconds + between);
+    // The session's RPE, set time and the time between alike (Foster's session RPE).
+    const sessionRpe = (rpeSeconds + NON_SET_RPE * between) / Math.max(1, workSeconds + between);
     sessionRpes.push({ day, rpe: sessionRpe });
     results.set(session.activityId, {
-      ...finish((context.k * total) / 60, cardio, "sets"),
+      ...finish(setLoad + (loadPerMinute(NON_SET_RPE) * between) / 60, cardio, "sets"),
       sessionRpe,
       sets: scored
     });
@@ -544,13 +571,12 @@ export function estimatePlannedLoad(
   nowSec: number
 ): HeraclesLoad | undefined {
   const day = dayOf(nowSec);
-  const { k } = state.context;
   const bodyWeightKg = state.context.bodyWeightKg(nowSec) ?? DEFAULT_BODY_WEIGHT_KG;
   const recent = state.sessionRpes.filter((entry) => entry.day >= day - MEDIAN_WINDOW_DAYS);
   const usual = median(recent.map((entry) => entry.rpe)) ?? DEFAULT_SESSION_RPE;
   const cardio = positive(plan.corosLoad);
 
-  let rpeSeconds = 0;
+  let setLoad = 0;
   let workSeconds = 0;
   for (const planned of plan.exercises) {
     const exercise: StrengthExercise = {
@@ -567,7 +593,7 @@ export function estimatePlannedLoad(
     if (planned.holdSec !== undefined && planned.holdSec > 0) {
       const maxHold = (planned.key ? state.holds.get(planned.key) : undefined) ?? factor.maxHoldSec ?? DEFAULT_MAX_HOLD_SEC;
       const seconds = planned.holdSec + rest;
-      rpeSeconds += planned.sets * (2 + 8 * Math.min(1, planned.holdSec / maxHold)) * seconds;
+      setLoad += (planned.sets * loadPerMinute(2 + 8 * Math.min(1, planned.holdSec / maxHold)) * seconds) / 60;
       workSeconds += planned.sets * seconds;
       continue;
     }
@@ -582,20 +608,20 @@ export function estimatePlannedLoad(
       const points = planned.key ? state.capacity.get(planned.key) : undefined;
       const capacityKg = capacityFor(setScoring, weightKg, points, day, bodyWeightKg);
       if (load > 0 && capacityKg > 0) {
-        rpe = rpeFromRir(Math.max(0, repsToFailure(Math.min(1, load / capacityKg)) - reps));
+        rpe = rpeFromRir(repsInReserve(Math.min(1, load / capacityKg), reps));
       }
     }
-    rpeSeconds += planned.sets * rpe * seconds;
+    setLoad += (planned.sets * loadPerMinute(rpe) * seconds) / 60;
     workSeconds += planned.sets * seconds;
   }
 
   const estimated = positive(plan.estimatedSeconds);
   if (workSeconds > 0) {
     const between = Math.max(0, (estimated ?? workSeconds) - workSeconds);
-    return finish((k * (rpeSeconds + NON_SET_RPE * between)) / 60, cardio, "planned");
+    return finish(setLoad + (loadPerMinute(NON_SET_RPE) * between) / 60, cardio, "planned");
   }
   if (estimated !== undefined) {
-    return finish((k * usual * estimated) / 60, cardio, "planned");
+    return finish((loadPerMinute(usual) * estimated) / 60, cardio, "planned");
   }
   return undefined;
 }

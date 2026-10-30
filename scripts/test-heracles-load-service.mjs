@@ -44,7 +44,6 @@ const deps = {
     return [top, day, combined];
   },
   withoutBreakdown: () => ["gym-cardio"],
-  ratedRuns: () => Array.from({ length: 8 }, () => ({ sportType: 100, feelType: 3, duration: 3600, trainingLoad: 170, startTime: NOW - 5 * DAY })),
   runs: () => runs,
   bodyWeightKg: () => 75,
   inputsVersion: () => version,
