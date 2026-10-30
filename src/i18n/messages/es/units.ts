@@ -25,6 +25,9 @@ const units: UnitsMessages = {
   "units.load.pair": "Heracles TL {heracles} · COROS TL {coros}",
   "units.load.estimate": "Estimada: no se pudieron leer las series",
   "units.load.pending": "Aún sin calcular: las series de la sesión se están cargando",
+  "units.load.pairFigure": "Heracles {heracles} · COROS {coros}",
+  "units.load.rangePair": "Rango recomendado: Heracles {heracles} · COROS {coros}",
+  "units.load.fitnessPartial": "Aproximado: algunas sesiones de fuerza aún están cargando sus series",
 };
 
 export default units;

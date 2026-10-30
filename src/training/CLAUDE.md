@@ -82,10 +82,10 @@ would wrap (under 840px the week moves below; under 620px all stack).
   only.
 - The footer: **Load Impact is `ati`, Base Fitness `cti`** (EWMA of daily load, 7 and 42
   days; `ati / cti` is the trend). Never `tiredRateNew` (= `ati − cti`) or `staminaLevel`
-  (present only on run days). This week's load is read **Monday to today** against COROS's
-  recommended range (`recommendedLoadMin`/`Max`), which is set per calendar week — never
-  against the rolling `t7d` — and stays COROS's with Heracles chosen; only its hover names
-  the Heracles sum the columns reach.
+  (present only on run days). This week's load is read **Monday to today** against the
+  recommended range (`recommendedLoadMin`/`Max`), which COROS sets per calendar week — never
+  against the rolling `t7d`. With Heracles chosen the footer, the Intensity Trend and the range
+  are all in Heracles (`fitnessInLoadSource`), each hover naming COROS's own figure.
 - Chart tooltips follow the pointer (`followTip.ts`, written onto style, no render); a chart is
   one tab stop with arrow keys between columns (`useColumnFocus`, `chartFocus.ts`).
 

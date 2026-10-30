@@ -8,6 +8,7 @@ import type { HeraclesRecordsApi } from "../heraclesrecords-api";
 import { useUnitSystem } from "../units/UnitSystemProvider";
 import { happenDayFromTimestamp } from "../training/formatters";
 import { useLoadSource } from "../training/loadSource";
+import { fitnessInLoadSource, weekRangeInLoadSource } from "../../electron/heraclesFitness";
 import { useTodayKey } from "../training/useTodayKey";
 import {
   moveScheduledWorkoutEntries,
@@ -283,7 +284,8 @@ export function useCalendarData({
       list.push(activity);
       activitiesByDay.set(key, list);
     }
-    for (const metric of data?.metrics ?? []) {
+    // Load Impact, Base Fitness and the load ratio in the chosen load.
+    for (const metric of fitnessInLoadSource(data?.metrics ?? [], loadSource)) {
       metricByDay.set(metric.happenDay, metric);
     }
 
@@ -319,20 +321,18 @@ export function useCalendarData({
       const aggregate = (data?.weekAggregates ?? []).find(
         (candidate) => String(candidate.firstDayOfWeek ?? "") === weekKey
       );
-      const recommendedMin = Number(aggregate?.recomendTlMin);
-      const recommendedMax = Number(aggregate?.recomendTlMax);
+      const range = weekRangeInLoadSource(aggregate, loadSource);
+      const round = (value: number | undefined) => (value !== undefined ? Math.round(value) : undefined);
 
       return {
         key: weekKey,
         days,
         stats: {
           ...computeWeeklyStats(days, loadSource),
-          recommendedLoadMin: Number.isFinite(recommendedMin)
-            ? Math.round(recommendedMin)
-            : undefined,
-          recommendedLoadMax: Number.isFinite(recommendedMax)
-            ? Math.round(recommendedMax)
-            : undefined
+          recommendedLoadMin: round(range.min),
+          recommendedLoadMax: round(range.max),
+          recommendedCorosLoadMin: round(range.corosMin),
+          recommendedCorosLoadMax: round(range.corosMax)
         }
       };
     });

@@ -137,6 +137,9 @@ export function StrengthSettingsDialog({
           <p className="strength-settings-formula">
             {loadSource === "heracles" ? t("strength.loadSource.explain") : t("strength.loadSource.corosExplain")}
           </p>
+          {loadSource === "heracles" ? (
+            <p className="strength-settings-formula">{t("strength.loadSource.fitnessNote")}</p>
+          ) : null}
         </section>
 
         <footer className="strength-settings-foot">

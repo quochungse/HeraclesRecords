@@ -311,6 +311,7 @@ const strength = {
   "strength.loadSource.coros": "COROS TL",
   "strength.loadSource.heracles": "Heracles TL",
   "strength.loadSource.explain": "Heracles Records' own training load formula for strength. Each set is scored from its weight and reps, your body weight and your capacity on that lift, so the load of every session, and of every muscle group, reflects the work you actually put in.",
+  "strength.loadSource.fitnessNote": "With Heracles TL, Load Impact, Base Fitness, Intensity Trend and the recommended weekly load are worked out by COROS's own formulas on this load. Recovery, recovery time and training effect stay COROS's, as on your watch.",
   "strength.load.runEquivalent": "About your {distance} run of {time} on {date} (TL {load})",
   "strength.load.set": "Predicted RPE {rpe} · {rir} reps in reserve · {intensity}% of estimated 1RM",
   "strength.load.setHold": "Predicted RPE {rpe}",

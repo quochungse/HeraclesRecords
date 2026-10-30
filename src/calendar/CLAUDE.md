@@ -32,7 +32,8 @@ read-only: `WorkoutViewModal` and `WorkoutReadOnlyBody` (Library reader, plan re
 - The week column states its load as a figure and a bar (done solid, planned hatched),
   COROS's target in words, and planned sessions/time apart from totals. Load Impact and Base
   Fitness are COROS's `ati`/`cti` (`computeWeeklyStats`, `test:calendar-pairing`). The figure
-  and bar are in the chosen load; the target is set against `actualCorosLoad`.
+  and bar, the target (`weekRangeInLoadSource`) and the tooltip's figures are in the chosen load;
+  the hovers name COROS's own.
 - Sessions pair with plans by sport family, closest by load, then distance, then time
   (`matchScore` in `pairing.ts`); Overview reads today with the same order.
 - Ask Coach for a day, week or session sends a `scheduleRefs` chip, never pasted figures.

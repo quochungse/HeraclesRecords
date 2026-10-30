@@ -177,8 +177,9 @@ export function buildBaseCoachInstructions(): string {
 export const COACH_HERACLES_INSTRUCTION =
   "Heracles load: the athlete reads strength in Heracles Training Load, this app's load for a lifting session, " +
   "scored from its sets on a run's scale. Weigh strength against other training with it, and set and progress " +
-  "weekly load targets in it (other sports at COROS's load). COROS's Base Fitness, Load Impact, load ratio and " +
-  "recommended weekly range come from COROS's load alone: compare them only with COROS's figures."
+  "weekly load targets in it (other sports at COROS's load). The fitness trends' Load Impact, Base Fitness and " +
+  "load ratio are COROS's formulas run on this load, higher than the COROS app shows; recovery and training " +
+  "effect stay COROS's own."
 
 /**
  * What day it is, as the machine's clock and time zone say.

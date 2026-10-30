@@ -310,6 +310,7 @@ const strength: StrengthMessages = {
   "strength.loadSource.coros": "COROS TL",
   "strength.loadSource.heracles": "Heracles TL",
   "strength.loadSource.explain": "Heracles Records 고유의 근력 운동 훈련 부하 공식입니다. 각 세트를 무게와 반복 수, 체중, 해당 종목에서의 능력으로 평가해, 세션별·근육군별 부하가 실제로 해낸 운동량을 그대로 보여 줍니다.",
+  "strength.loadSource.fitnessNote": "Heracles TL을 선택하면 부하 영향, 기초 체력, 강도 추세, 권장 주간 부하는 이 부하에 COROS 자체 공식을 적용해 계산합니다. 회복, 회복 시간, 훈련 효과는 시계와 같은 COROS 값을 그대로 씁니다.",
   "strength.load.runEquivalent": "{date} {distance} 러닝({time})과 비슷함 (TL {load})",
   "strength.load.set": "예상 RPE {rpe} · 여유 반복 {rir}회 · 추정 1RM의 {intensity}%",
   "strength.load.setHold": "예상 RPE {rpe}",

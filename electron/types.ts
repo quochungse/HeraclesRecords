@@ -404,6 +404,25 @@ export interface TrainingHubDailyMetric {
   cycleVo2max?: number;
   distance?: number;
   duration?: number;
+  /** What Heracles Training Load adds to this day's figures (`heraclesFitness.ts`). */
+  heracles?: HeraclesDayDelta;
+}
+
+/** What Heracles Training Load adds to one day of COROS's figures. */
+export interface HeraclesDayDelta {
+  /** Heracles TL over COROS's, for the day's strength sessions. */
+  load: number;
+  /** Added to Load Impact (`ati`). */
+  ati: number;
+  /** Added to Base Fitness (`cti`). */
+  cti: number;
+  /** Added to the week's recommended minimum; the maximum takes 1.3 × it. */
+  range: number;
+  /**
+   * A strength session in the 126 days to this one whose sets are not read
+   * yet counts at COROS's figure, so the additions read low.
+   */
+  partial?: boolean;
 }
 
 export interface TrainingHubDailyMetrics {

@@ -2148,6 +2148,33 @@ export function listRatedActivityLoads(sinceEpochSeconds: number): {
   }));
 }
 
+/** Strength activities on/after `sinceEpochSeconds`, for the days Heracles Training Load adds to. */
+export function listStrengthActivityLoads(sinceEpochSeconds: number): {
+  activityId: string;
+  sportType: number;
+  startTime?: number;
+  trainingLoad?: number;
+}[] {
+  const rows = requireDatabase()
+    .prepare(
+      `SELECT activity_id, sport_type, start_time, training_load
+       FROM training_activities
+       WHERE start_time >= ? AND sport_type IN (400, 402)`
+    )
+    .all(sinceEpochSeconds) as {
+    activity_id: string;
+    sport_type: number;
+    start_time: number | null;
+    training_load: number | null;
+  }[];
+  return rows.map((row) => ({
+    activityId: row.activity_id,
+    sportType: row.sport_type,
+    startTime: row.start_time ?? undefined,
+    trainingLoad: row.training_load ?? undefined
+  }));
+}
+
 /** Runs on/after `sinceEpochSeconds` that carry a COROS load: what a strength session is set beside. */
 export function listRunLoads(sinceEpochSeconds: number): {
   activityId: string;

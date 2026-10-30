@@ -25,6 +25,9 @@ const units: UnitsMessages = {
   "units.load.pair": "Heracles TL {heracles} · COROS TL {coros}",
   "units.load.estimate": "ประมาณการ: อ่านเซ็ตไม่ได้",
   "units.load.pending": "ยังไม่ได้คำนวณ: กำลังโหลดเซ็ตของเซสชัน",
+  "units.load.pairFigure": "Heracles {heracles} · COROS {coros}",
+  "units.load.rangePair": "ช่วงที่แนะนำ: Heracles {heracles} · COROS {coros}",
+  "units.load.fitnessPartial": "โดยประมาณ: เซ็ตของบางเซสชันเวทยังโหลดไม่เสร็จ",
 };
 
 export default units;

@@ -117,6 +117,26 @@ assert.equal(
   "a session COROS's daily figure has not caught up with counts, as the week chart counts it"
 );
 
+// --- With Heracles chosen, Load Impact, Base Fitness, Intensity Trend and the
+// range are COROS's own plus what Heracles adds (`heraclesFitness.ts`), COROS's
+// kept beside them; with COROS chosen nothing moves.
+{
+  const fitnessUrl = pathToFileURL(path.join(repoRoot, "electron", "heraclesFitness.ts"));
+  const { fitnessInLoadSource } = await import(`${fitnessUrl.href}?cacheBust=${Date.now()}`);
+  const delta = { load: 0, ati: 20, cti: 12, range: 70 };
+  const days = realWeeks.map((day) => ({ ...day, ati: 118, cti: 108, trainingLoadRatio: 118 / 108, heracles: delta }));
+  assert.equal(fitnessInLoadSource(days, "coros"), days, "COROS chosen: the list as given");
+  const heracles = fitnessInLoadSource(days, "heracles");
+  assert.deepEqual(latestTrainingLoad(heracles), { percent: Math.round((138 / 120) * 100), loadImpact: 138, baseFitness: 120 });
+  assert.deepEqual(latestTrainingLoad(days), { percent: 109, loadImpact: 118, baseFitness: 108 });
+  assert.equal(heracles.at(-1).trainingLoad, days.at(-1).trainingLoad, "the day's own load is the screens' to add to");
+  assert.deepEqual(
+    thisWeekLoad({ dayList: heracles, activities: [], now: new Date(2026, 9, 28, 9, 0), unitSystem: "metric", loadSource: "heracles" }),
+    { load: 197, recommended: { min: 833, max: 1083 }, corosRecommended: { min: 763, max: 992 } },
+    "the range moves by Base Fitness's addition × 7 and × 9.1, COROS's beside it"
+  );
+}
+
 // --- A session done today answers today's plan of its sport family.
 const comingUpUrl = pathToFileURL(path.join(repoRoot, "src", "training", "overview", "comingUpModel.ts"));
 const { pairTodayPlan, todayItems, weekAhead } = await import(`${comingUpUrl.href}?cacheBust=${Date.now()}`);
@@ -279,9 +299,9 @@ assert.deepEqual(
 
   const coros = thisWeekLoad({ dayList, activities: lifted, now, unitSystem: "metric" });
   const both = thisWeekLoad({ dayList, activities: lifted, now, unitSystem: "metric", loadSource: "heracles" });
-  assert.equal(both.load, coros.load, "the week's load against COROS's range stays COROS's");
-  assert.equal(both.heraclesLoad, coros.load + (180 - 60) + (90 - 20), "the Heracles figure the columns add up to, for the hover");
-  assert.equal(coros.heraclesLoad, undefined);
+  assert.equal(both.load, coros.load + (180 - 60) + (90 - 20), "the week's load is what the columns add up to");
+  assert.equal(both.corosLoad, coros.load, "COROS's figure kept for the hover");
+  assert.equal(coros.corosLoad, undefined);
 
   // Coming up pairs by load in the chosen load, both sides alike.
   const heavyLift = { happenDay: "20261024", name: "Heavy", sportType: 4, trainingLoad: 20, heraclesLoad: { value: 200, muscular: 180, cardio: 20, quality: "planned" } };

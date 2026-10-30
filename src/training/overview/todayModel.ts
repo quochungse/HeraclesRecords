@@ -7,6 +7,7 @@ import type {
   WorkoutSport
 } from "../../../electron/types";
 import { heraclesSurplus, plannedLoad } from "../loadFigures";
+import type { FitnessDay } from "../../../electron/heraclesFitness";
 import {
   buildWeeklyActivitySeries,
   getCalendarWeekDateKeys,
@@ -147,18 +148,30 @@ export type WeekMeasure = "time" | "distance" | "load";
 
 export interface WeekLoadReading {
   /**
-   * COROS's load from this Monday to today. Always COROS's: it is read
-   * against the range COROS recommends, which COROS sets from its own load.
+   * The load from this Monday to today, in the chosen load — read against the
+   * range below, which is in the same load (`fitnessInLoadSource`).
    */
   load?: number;
-  /** The same days in Heracles Training Load, while that is the chosen load and a strength session makes it differ. */
-  heraclesLoad?: number;
-  /** The range COROS recommends for the whole week. */
+  /** COROS's own figure, where Heracles Training Load reads the week heavier. */
+  corosLoad?: number;
+  /** The range recommended for the whole week, in the chosen load. */
   recommended?: { min: number; max: number };
+  /** COROS's own range, where Heracles Training Load moves it. */
+  corosRecommended?: { min: number; max: number };
+}
+
+function rangeOf(min: number | undefined, max: number | undefined): { min: number; max: number } | undefined {
+  const low = positive(min);
+  const high = positive(max);
+  return low !== undefined && high !== undefined && high >= low ? { min: Math.round(low), max: Math.round(high) } : undefined;
 }
 
 /**
- * This calendar week's load so far against the range COROS recommends for it.
+ * This calendar week's load so far against the range recommended for it, both
+ * in the chosen load: `dayList` comes through `fitnessInLoadSource`, and a
+ * strength session adds what Heracles reads over COROS. COROS's own figures
+ * ride along where they differ, for the hover.
+ *
  * COROS sets that range per calendar week — the same Monday to Sunday, changed
  * on Monday — so it is read against the week's own days, never a rolling seven
  * (COROS's `t7d`, which matches the week only on a Sunday). The load is the
@@ -173,7 +186,7 @@ export function thisWeekLoad({
   unitSystem,
   loadSource = "coros"
 }: {
-  dayList: readonly TrainingHubDailyMetric[];
+  dayList: readonly FitnessDay[];
   activities: TrainingHubActivity[];
   now?: Date;
   unitSystem: UnitSystem;
@@ -189,11 +202,13 @@ export function thisWeekLoad({
   const load = series.days
     .filter((day) => day.happenDay <= today)
     .reduce((sum, day) => sum + day.value, 0);
-  const ranged = [...days]
+  const ranged: FitnessDay | undefined = [...days]
     .reverse()
     .find((day) => positive(day.recommendedLoadMin) !== undefined && positive(day.recommendedLoadMax) !== undefined);
-  const min = positive(ranged?.recommendedLoadMin);
-  const max = positive(ranged?.recommendedLoadMax);
+  const recommended = rangeOf(ranged?.recommendedLoadMin, ranged?.recommendedLoadMax);
+  const corosRecommended = ranged?.coros
+    ? rangeOf(ranged.coros.recommendedLoadMin, ranged.coros.recommendedLoadMax)
+    : undefined;
   const surplus = activities
     .filter((activity) => {
       const day = happenDayFromTimestamp(activity.startTime);
@@ -201,9 +216,12 @@ export function thisWeekLoad({
     })
     .reduce((sum, activity) => sum + heraclesSurplus(activity, loadSource), 0);
   return {
-    load: Math.round(load),
-    ...(surplus > 0 ? { heraclesLoad: Math.round(load + surplus) } : {}),
-    recommended: min !== undefined && max !== undefined && max >= min ? { min: Math.round(min), max: Math.round(max) } : undefined
+    load: Math.round(load + surplus),
+    ...(surplus > 0 ? { corosLoad: Math.round(load) } : {}),
+    recommended,
+    ...(corosRecommended && (corosRecommended.min !== recommended?.min || corosRecommended.max !== recommended?.max)
+      ? { corosRecommended }
+      : {})
   };
 }
 

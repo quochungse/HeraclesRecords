@@ -1,5 +1,6 @@
 import { MessageCircle } from "lucide-react";
 import type { CSSProperties } from "react";
+import type { StrengthLoadSource } from "../../electron/types";
 import { formatDurationSpan } from "../training/formatters";
 import { loadPairTitle } from "../training/loadFigures";
 import { useLoadSource } from "../training/loadSource";
@@ -26,7 +27,7 @@ interface WeekStatsCellProps {
 
 /**
  * The bar's full width: past the biggest week on screen — done and still
- * planned together — or its highest COROS target, whichever is more.
+ * planned together — or its highest target, whichever is more.
  */
 export function weekLoadScale(weeks: WeeklyStats[]): number {
   const most = Math.max(
@@ -37,17 +38,19 @@ export function weekLoadScale(weeks: WeeklyStats[]): number {
 }
 
 /**
- * Where the week's load sits against COROS's band, said in words on hover.
- * Always COROS's own load: the band is set in it.
+ * Where the week's load sits against the recommended band, said in words on
+ * hover. Load and band are in one load: COROS's, or both on Heracles Training
+ * Load, the band then COROS's arithmetic on it (`weekRangeInLoadSource`).
  */
-function loadBandTitle(actual: number, min?: number, max?: number): string | undefined {
+function loadBandTitle(source: StrengthLoadSource, actual: number, min?: number, max?: number): string | undefined {
   if (min === undefined || max === undefined || actual === 0) {
     return undefined;
   }
   const band = { min: formatCount(min), max: formatCount(max) };
-  if (actual > max) return t("calendar.week.band.above", band);
-  if (actual < min) return t("calendar.week.band.below", band);
-  return t("calendar.week.band.inside", band);
+  const heracles = source === "heracles";
+  if (actual > max) return t(heracles ? "calendar.week.bandHeracles.above" : "calendar.week.band.above", band);
+  if (actual < min) return t(heracles ? "calendar.week.bandHeracles.below" : "calendar.week.band.below", band);
+  return t(heracles ? "calendar.week.bandHeracles.inside" : "calendar.week.band.inside", band);
 }
 
 function share(value: number, scale: number): string {
@@ -111,13 +114,13 @@ export function WeekStatsCell({
   const min = stats.recommendedLoadMin;
   const max = stats.recommendedLoadMax;
   const hasTarget = min !== undefined && max !== undefined;
-  /* With strength read in Heracles Training Load the figure is that load, and
-     the hover says COROS's beside it before placing COROS's in the band. */
+  /* With strength read in Heracles Training Load the figure and the band are
+     both that load; the hover names COROS's figure, which the COROS app shows. */
   const loadTitle = [
     upcoming
       ? loadPairTitle(source, stats.remainingLoad, stats.remainingCorosLoad)
       : loadPairTitle(source, stats.actualLoad, stats.actualCorosLoad),
-    upcoming ? undefined : loadBandTitle(stats.actualCorosLoad, min, max)
+    upcoming ? undefined : loadBandTitle(source, stats.actualLoad, min, max)
   ]
     .filter(Boolean)
     .join("\n");
@@ -197,7 +200,22 @@ export function WeekStatsCell({
         <span className="calendar-weekstats-bar-done" />
         <span className="calendar-weekstats-bar-remaining" />
       </div>
-      <p className="calendar-weekstats-target" title={hasTarget ? t("calendar.week.targetRangeTitle") : undefined}>
+      <p
+        className="calendar-weekstats-target"
+        title={
+          !hasTarget
+            ? undefined
+            : source === "heracles" &&
+                stats.recommendedCorosLoadMin !== undefined &&
+                stats.recommendedCorosLoadMax !== undefined &&
+                (stats.recommendedCorosLoadMin !== min || stats.recommendedCorosLoadMax !== max)
+              ? t("calendar.week.targetRangeTitleHeracles", {
+                  min: formatCount(stats.recommendedCorosLoadMin),
+                  max: formatCount(stats.recommendedCorosLoadMax)
+                })
+              : t("calendar.week.targetRangeTitle")
+        }
+      >
         {min !== undefined && max !== undefined
           ? t("calendar.week.target", { min: formatCount(min), max: formatCount(max) })
           : t("calendar.week.noTarget")}

@@ -140,6 +140,7 @@ import {
   getHeraclesLoadInfo,
   planEntryHeraclesLoads,
   setStrengthLoadSource,
+  withHeraclesDayDeltas,
   withHeraclesLoads,
   withPlannedHeraclesLoads,
   withStrengthSessionLoads
@@ -2480,8 +2481,8 @@ function registerIpcHandlers(): void {
     }
   );
 
-  ipcMain.handle("trainingHub:getTrainingAnalytics", () =>
-    getTrainingAnalytics()
+  ipcMain.handle("trainingHub:getTrainingAnalytics", async () =>
+    withHeraclesDayDeltas(await getTrainingAnalytics())
   );
 
   ipcMain.handle("trainingHub:getRacePredictor", () => getRacePredictor());
@@ -2496,8 +2497,8 @@ function registerIpcHandlers(): void {
 
   ipcMain.handle("trainingHub:getDashboard", () => getTrainingDashboard());
 
-  ipcMain.handle("trainingHub:getDailyMetrics", (_event, dateList: string[]) =>
-    getDailyMetrics(dateList)
+  ipcMain.handle("trainingHub:getDailyMetrics", async (_event, dateList: string[]) =>
+    withHeraclesDayDeltas(await getDailyMetrics(dateList))
   );
 
   ipcMain.handle(

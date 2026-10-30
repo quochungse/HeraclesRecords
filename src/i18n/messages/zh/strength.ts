@@ -310,6 +310,7 @@ const strength: StrengthMessages = {
   "strength.loadSource.coros": "COROS TL",
   "strength.loadSource.heracles": "Heracles TL",
   "strength.loadSource.explain": "Heracles Records 专为力量训练设计的训练负荷公式。每一组都根据重量、次数、你的体重以及你在该动作上的能力来计算，让每次训练、每个肌群的负荷都如实反映你真正完成的训练量。",
+  "strength.loadSource.fitnessNote": "选择 Heracles TL 时，负荷影响、基础体能、强度趋势和每周推荐负荷都用 COROS 自己的公式基于该负荷计算。恢复、恢复时间和训练效果仍是 COROS 的数值，与手表一致。",
   "strength.load.runEquivalent": "约等于你 {date} 的 {distance} 跑步，用时 {time}（TL {load}）",
   "strength.load.set": "预测 RPE {rpe} · 余力 {rir} 次 · 估算 1RM 的 {intensity}%",
   "strength.load.setHold": "预测 RPE {rpe}",

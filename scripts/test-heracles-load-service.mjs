@@ -48,7 +48,11 @@ const deps = {
   runs: () => runs,
   bodyWeightKg: () => 75,
   inputsVersion: () => version,
-  now: () => NOW
+  now: () => NOW,
+  strengthActivities: () => [
+    { activityId: "b", sportType: 402, startTime: day.startTime, trainingLoad: 5 },
+    { activityId: "not-read-yet", sportType: 402, startTime: NOW - 3 * DAY, trainingLoad: 15 }
+  ]
 };
 
 // ---- The activity list ----
@@ -168,6 +172,30 @@ const deps = {
   assert.equal(loads["p:lift"].value, fromSteps.value, "a step reads as the schedule parse reads it");
   assert.ok(Math.abs(loads["p:repeat"].value - fromSteps.value) < 1e-6, "a repeat counts per round, a rest step is no exercise, pounds are kilograms");
   assert.equal(loads["p:length"].quality, "planned");
+}
+
+// ---- What Heracles adds to COROS's daily figures ----
+{
+  const localDay = (epochSeconds) => {
+    const date = new Date(epochSeconds * 1000);
+    return `${date.getFullYear()}${String(date.getMonth() + 1).padStart(2, "0")}${String(date.getDate()).padStart(2, "0")}`;
+  };
+  const sessionDay = localDay(day.startTime);
+  const surplus = service.withHeraclesLoads([{ activityId: "b", sportType: 402, trainingLoad: 5 }], deps)[0].heraclesLoad.value - 5;
+  const payload = {
+    dayList: [{ happenDay: sessionDay, trainingLoad: 80, ati: 90, cti: 85 }, { happenDay: "20200101", trainingLoad: 10 }],
+    weekList: [{ firstDayOfWeek: "20200106", recomendTlMin: 500 }]
+  };
+  const read = service.withHeraclesDayDeltas(payload, deps);
+  assert.ok(Math.abs(read.dayList[0].heracles.load - surplus) < 1e-9, "the day adds its session's Heracles load over COROS's");
+  assert.ok(Math.abs(read.dayList[0].heracles.ati - surplus / 7) < 1e-9, "a first session: a seventh of it on Load Impact");
+  assert.equal(read.dayList[0].heracles.partial, undefined, "nothing still loading before it");
+  assert.equal(read.dayList[1].heracles, undefined, "a day before any strength session adds nothing");
+  assert.equal(read.weekList[0].heraclesRange, undefined);
+  assert.equal(read.dayList[0].ati, 90, "COROS's figures are never replaced");
+  const later = service.withHeraclesDayDeltas({ dayList: [{ happenDay: localDay(NOW) }], weekList: [] }, deps);
+  assert.equal(later.dayList[0].heracles.partial, true, "a session still loading flags what follows");
+  assert.equal(service.withHeraclesDayDeltas(payload, { ...deps, strengthActivities: () => { throw new Error("no db"); } }), payload);
 }
 
 console.log("heracles load service: ok");

@@ -15,7 +15,9 @@ import {
   type SleepNight
 } from "./sleepHeartRate";
 import { buildTrendPoints, mergeTrainingDayLists, recentTrainingHubDateList } from "./trainingTrendUtils";
-import { formatDurationSeconds, formatPaceSeconds } from "./chatActivityTools";
+import { fitnessInLoadSource } from "./heraclesFitness";
+import { withHeraclesDayDeltas } from "./heraclesLoadService";
+import { coachReadsHeracles, formatDurationSeconds, formatPaceSeconds } from "./chatActivityTools";
 import { dateFromDayKey, dayKeyDaysAgo, dayLabel } from "./chatDayKeys";
 import type {
   CorosMcpTool,
@@ -150,7 +152,17 @@ async function handleGetFitnessTrends(
       readSleepNights(days)
     ]);
 
-    const window = trendWindow(mergeTrainingDayLists(dailyMetrics, analytics), days);
+    // In Heracles Training Load while the athlete reads strength in it: the
+    // daily load and COROS's figures made from it, by COROS's own formulas.
+    const heracles = coachReadsHeracles();
+    const merged = heracles
+      ? fitnessInLoadSource(
+          mergeTrainingDayLists(withHeraclesDayDeltas(dailyMetrics), withHeraclesDayDeltas(analytics)),
+          "heracles",
+          { withLoad: true }
+        )
+      : mergeTrainingDayLists(dailyMetrics, analytics);
+    const window = trendWindow(merged, days);
     const preview = buildFitnessTrendPreview(
       withSleepHeartRate(buildTrendPoints(window, window.length), nights),
       callbacks?.requestId,
@@ -161,7 +173,7 @@ async function handleGetFitnessTrends(
       callbacks.onFitnessTrend(preview);
     }
 
-    return formatFitnessTrendsForChat(window, days, new Date(), wellness, nights);
+    return formatFitnessTrendsForChat(window, days, new Date(), wellness, nights, heracles);
   } catch (caught) {
     throw formatAnalyticsToolError("get_fitness_trends", caught);
   }
@@ -661,7 +673,9 @@ export function formatFitnessTrendsForChat(
   days: number,
   today: Date = new Date(),
   wellness: Wellness = new Map(),
-  nights: Nights = new Map()
+  nights: Nights = new Map(),
+  /** The loads and Load Impact, Base Fitness and load ratio are Heracles Training Load's. */
+  heracles = false
 ): string {
   if (window.length === 0) {
     return `No fitness trend data for the last ${days} days.`;
@@ -672,6 +686,12 @@ export function formatFitnessTrendsForChat(
   const lines = [
     `Fitness trends, last ${days} days (${dayLabel(windowStart)} → ${dayLabel(windowEnd)}; ` +
       "days without any reading are omitted):",
+    ...(heracles
+      ? [
+          "Loads are Heracles Training Load (strength at its Heracles load), and Load Impact, Base Fitness and load " +
+            "ratio are COROS's formulas run on it; the COROS app shows lower ones."
+        ]
+      : []),
     ...trendSummary(window, days, today, wellness, nights)
   ];
 

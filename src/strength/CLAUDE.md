@@ -71,8 +71,14 @@ body map offers **Load** only then. `npm run test:heracles-load`, `test:heracles
   `recordBodyWeight` writes nothing when it did not), since COROS holds only the current one.
   `test:body-weight-history`.
 - A display reads a load through `src/training/loadFigures.ts`: one figure, with a note only
-  when it is estimated or still COROS's (`activityLoadNote`); both figures only beside a
-  COROS-made one (`loadPairTitle`).
+  when it is estimated or still COROS's (`activityLoadNote`); both figures only where it
+  differs from what the COROS app shows (`loadPairTitle`, `figurePairTitle`).
+- **COROS's fitness figures follow the choice** (`electron/heraclesFitness.ts`): Load Impact,
+  Base Fitness, Intensity Trend and the week's range are COROS's own plus the same averages run
+  on what Heracles adds each day (`heraclesDeltaSeries`, linear, so no COROS history is
+  rebuilt), attached in main as `heracles` on each day and `heraclesRange` on each week
+  (`withHeraclesDayDeltas`). Recovery and training effect stay COROS's.
+  `test:heracles-fitness`.
 - **Coach reads Heracles only while it is chosen** (`coachReadsHeracles`), and is told what it
   is in one line of the turn's head only when the snapshot states one
   (`COACH_HERACLES_INSTRUCTION`), so Coach and AI Plan set a plan's weekly load in the load

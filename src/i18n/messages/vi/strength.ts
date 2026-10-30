@@ -310,6 +310,7 @@ const strength: StrengthMessages = {
   "strength.loadSource.coros": "COROS TL",
   "strength.loadSource.heracles": "Heracles TL",
   "strength.loadSource.explain": "Công thức tính tải tập luyện riêng của Heracles Records cho tập sức mạnh. Mỗi hiệp được chấm từ mức tạ, số lần, cân nặng và sức của bạn ở bài đó, để tải của từng buổi và từng nhóm cơ phản ánh đúng khối lượng bạn đã thực sự tập.",
+  "strength.loadSource.fitnessNote": "Khi chọn Heracles TL, Ảnh hưởng tải, Thể lực nền, Xu hướng cường độ và mức tải tuần đề xuất được tính bằng chính công thức của COROS trên tải này. Mức hồi phục, thời gian hồi phục và hiệu quả tập luyện vẫn là số của COROS, như trên đồng hồ.",
   "strength.load.runEquivalent": "Ngang buổi chạy {distance}, {time} ngày {date} của bạn (TL {load})",
   "strength.load.set": "RPE dự đoán {rpe} · còn {rir} lần dự trữ · {intensity}% 1RM ước tính",
   "strength.load.setHold": "RPE dự đoán {rpe}",

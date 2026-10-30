@@ -15,6 +15,7 @@ import {
   listRatedActivityLoads,
   listRunLoads,
   listStoredStrengthSessions,
+  listStrengthActivityLoads,
   listStrengthActivitiesWithoutBreakdown,
   setSetting,
   type BodyWeightReading
@@ -31,10 +32,12 @@ import {
   type RatedRun
 } from "./heraclesLoad";
 import { HERACLES_FACTORS_VERSION } from "./heraclesLoadFactors";
+import { heraclesDeltaSeries, type HeraclesDaySurplus } from "./heraclesFitness";
 import { getStoredHevyStrengthSessions } from "./hevyService";
 import { combineStrengthSessions } from "./strengthSessionMerge";
 import { lastKnownCorosWeightKg } from "./trainingHubService";
 import type {
+  HeraclesDayDelta,
   HeraclesLoad,
   HeraclesLoadInfo,
   HeraclesRunEquivalent,
@@ -44,6 +47,7 @@ import type {
   StrengthLoadSource,
   StrengthSession,
   TrainingHubActivity,
+  TrainingHubDailyMetric,
   TrainingHubScheduledExercise
 } from "./types";
 
@@ -62,6 +66,8 @@ export interface HeraclesLoadDeps {
   strengthSessions(): StrengthSession[];
   /** Strength activities stored with no breakdown. */
   withoutBreakdown(): string[];
+  /** COROS's strength activities, for the days Heracles adds to its fitness figures. */
+  strengthActivities(): Pick<TrainingHubActivity, "activityId" | "sportType" | "startTime" | "trainingLoad">[];
   ratedRuns(): RatedRun[];
   /** Runs with a COROS load, for the run a strength session is set beside. */
   runs(): HeraclesRunEquivalent[];
@@ -111,6 +117,7 @@ export function createDefaultDeps(): HeraclesLoadDeps {
     strengthSessions: () =>
       combineStrengthSessions(listStoredStrengthSessions(since()), getStoredHevyStrengthSessions(HISTORY_DAYS)),
     withoutBreakdown: () => listStrengthActivitiesWithoutBreakdown(),
+    strengthActivities: () => listStrengthActivityLoads(since()),
     ratedRuns: () => listRatedActivityLoads(since()),
     runs: () => listRunLoads(since()),
     bodyWeightKg: (startTime) => bodyWeightOn(readings(), startTime) ?? lastKnownCorosWeightKg(),
@@ -135,6 +142,8 @@ interface HeraclesLoadSnapshot {
   withoutBreakdown: ReadonlySet<string>;
   /** Oldest first. */
   runs: HeraclesRunEquivalent[];
+  /** What Heracles adds to COROS's daily figures, worked out when first asked. */
+  deltas?: Map<string, HeraclesDayDelta>;
 }
 
 const snapshots = new WeakMap<HeraclesLoadDeps, HeraclesLoadSnapshot>();
@@ -427,4 +436,54 @@ export function planEntryHeraclesLoads(
     if (load) loads[entry.key] = load;
   }
   return loads;
+}
+
+/**
+ * What Heracles Training Load adds to COROS's daily fitness figures, by day
+ * (`heraclesFitness.ts`): each strength session's Heracles load over COROS's,
+ * run through COROS's own averages. Once per snapshot.
+ */
+function dayDeltas(snapshot: HeraclesLoadSnapshot, deps: HeraclesLoadDeps): Map<string, HeraclesDayDelta> {
+  if (snapshot.deltas) return snapshot.deltas;
+  const byDay = new Map<string, HeraclesDaySurplus>();
+  for (const activity of deps.strengthActivities()) {
+    if (!STRENGTH_LOAD_SPORT_TYPES.has(activity.sportType) || activity.startTime === undefined) continue;
+    const load = strengthLoadOf(activity, snapshot);
+    const day = dayKey(new Date(activity.startTime * 1000));
+    const entry = byDay.get(day) ?? { surplus: 0, pending: 0 };
+    entry.surplus += Math.max(0, load.value - (activity.trainingLoad ?? 0));
+    if (load.quality === "pending") entry.pending += 1;
+    byDay.set(day, entry);
+  }
+  snapshot.deltas = heraclesDeltaSeries(byDay, dayKey(new Date(deps.now() * 1000)));
+  return snapshot.deltas;
+}
+
+/**
+ * COROS's daily and weekly figures as it sent them, each day carrying what
+ * Heracles Training Load adds to it (`heracles`) and each week what it adds to
+ * the recommended range (`heraclesRange`). The screens and Coach choose; a
+ * failure to work it out leaves the payload as COROS sent it.
+ */
+export function withHeraclesDayDeltas<
+  T extends { dayList: TrainingHubDailyMetric[]; weekList: Record<string, unknown>[] }
+>(payload: T, deps?: HeraclesLoadDeps): T {
+  try {
+    const resolved = depsOrDefault(deps);
+    const deltas = dayDeltas(snapshotFor(resolved), resolved);
+    if (!deltas.size) return payload;
+    return {
+      ...payload,
+      dayList: payload.dayList.map((day) => {
+        const heracles = deltas.get(day.happenDay);
+        return heracles ? { ...day, heracles } : day;
+      }),
+      weekList: payload.weekList.map((week) => {
+        const range = deltas.get(String(week.firstDayOfWeek ?? ""))?.range;
+        return range ? { ...week, heraclesRange: range } : week;
+      })
+    };
+  } catch {
+    return payload;
+  }
 }

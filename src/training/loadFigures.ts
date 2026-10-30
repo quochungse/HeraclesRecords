@@ -6,8 +6,9 @@
  * the setting itself is `useLoadSource()` (`loadSource.tsx`).
  *
  * Only a strength session reads differently: every other sport's Heracles load
- * is COROS's, and anything COROS derives from its own load — Base Fitness,
- * Load Impact, the recommended range — is only ever set against COROS's load.
+ * is COROS's. What COROS derives from the daily load — Base Fitness, Load
+ * Impact, the recommended range — follows the choice through
+ * `electron/heraclesFitness.ts`, never figure by figure here.
  */
 import type { HeraclesLoad, StrengthLoadSource } from "../../electron/types";
 import { formatCount, t } from "../i18n/core";
@@ -73,6 +74,20 @@ export function activityLoadNote(activity: Loaded, source: StrengthLoadSource): 
   if (quality === "estimate") return t("units.load.estimate");
   if (quality === "pending") return t("units.load.pending");
   return undefined;
+}
+
+/**
+ * One of COROS's own fitness figures run on Heracles Training Load, beside
+ * COROS's — "Heracles 167 · COROS 108" — since the COROS app shows the other.
+ * Undefined while COROS is chosen, or where the two read alike.
+ */
+export function figurePairTitle(
+  source: StrengthLoadSource,
+  heracles: string | undefined,
+  coros: string | undefined
+): string | undefined {
+  if (source !== "heracles" || heracles === undefined || coros === undefined || heracles === coros) return undefined;
+  return t("units.load.pairFigure", { heracles, coros });
 }
 
 /**

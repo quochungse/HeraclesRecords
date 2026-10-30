@@ -48,8 +48,8 @@ export interface WeeklyStats {
   actualLoad: number;
   plannedLoad: number;
   /**
-   * The same weeks in COROS's Training Load, for what is only ever set against
-   * COROS's figures — its recommended band. Equal to the above while COROS is chosen.
+   * The same weeks in COROS's Training Load, for the hover that names COROS's
+   * figures. Equal to the above while COROS is chosen.
    */
   actualCorosLoad: number;
   remainingCorosLoad: number;
@@ -72,16 +72,20 @@ export interface WeeklyStats {
   elevationGain: number;
   /**
    * cti — COROS "Base Fitness", the chronic load; sent on every day. Not
-   * `staminaLevel`, which COROS sends only on a day with a run.
+   * `staminaLevel`, which COROS sends only on a day with a run. In the chosen
+   * load, as the two below (`fitnessInLoadSource`).
    */
   baseFitness?: number;
   /** ati — COROS "Load Impact", the acute load. Not `tiredRateNew`, which is `ati − cti`. */
   loadImpact?: number;
   /** trainingLoadRatio — Load Impact over Base Fitness (~1.0 = steady). */
   loadRatio?: number;
-  /** COROS recommended weekly training-load band. */
+  /** The recommended weekly training-load band, in the chosen load. */
   recommendedLoadMin?: number;
   recommendedLoadMax?: number;
+  /** COROS's own band, for the hover. */
+  recommendedCorosLoadMin?: number;
+  recommendedCorosLoadMax?: number;
 }
 
 export interface CalendarWeek {

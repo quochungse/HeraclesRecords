@@ -310,6 +310,7 @@ const strength: StrengthMessages = {
   "strength.loadSource.coros": "COROS TL",
   "strength.loadSource.heracles": "Heracles TL",
   "strength.loadSource.explain": "Rumus beban latihan milik Heracles Records sendiri untuk latihan beban. Setiap set dinilai dari beban dan repetisinya, berat badan Anda, serta kemampuan Anda pada gerakan itu, sehingga beban setiap sesi, dan setiap kelompok otot, mencerminkan kerja yang benar-benar Anda lakukan.",
+  "strength.loadSource.fitnessNote": "Dengan Heracles TL, Dampak beban, Kebugaran dasar, Tren intensitas, dan beban mingguan yang disarankan dihitung dengan rumus COROS sendiri pada beban ini. Pemulihan, waktu pemulihan, dan efek latihan tetap milik COROS, seperti di jam Anda.",
   "strength.load.runEquivalent": "Setara lari Anda sejauh {distance} selama {time} pada {date} (TL {load})",
   "strength.load.set": "RPE perkiraan {rpe} · {rir} repetisi cadangan · {intensity}% dari perkiraan 1RM",
   "strength.load.setHold": "RPE perkiraan {rpe}",

@@ -310,6 +310,7 @@ const strength: StrengthMessages = {
   "strength.loadSource.coros": "COROS TL",
   "strength.loadSource.heracles": "Heracles TL",
   "strength.loadSource.explain": "Heracles Records 独自の筋トレ用トレーニング負荷の計算式です。各セットを重量・レップ数・体重とその種目でのあなたの能力から評価するので、セッションごと、筋群ごとの負荷が実際にこなしたトレーニング量を反映します。",
+  "strength.loadSource.fitnessNote": "Heracles TL を選ぶと、負荷インパクト、ベースフィットネス、強度トレンド、推奨週間負荷は、この負荷に COROS 自身の計算式を当てて算出します。リカバリー、回復時間、トレーニング効果は時計と同じく COROS の値のままです。",
   "strength.load.runEquivalent": "{date} の {distance}・{time} のランとほぼ同じ（TL {load}）",
   "strength.load.set": "予測 RPE {rpe} · 余力 {rir} レップ · 推定 1RM の {intensity}%",
   "strength.load.setHold": "予測 RPE {rpe}",

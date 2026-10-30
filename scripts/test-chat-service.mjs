@@ -1350,7 +1350,8 @@ assert.equal(
     `${distUrl("chatCoachContext.js")}?cacheBust=${Date.now()}`
   );
   assert.match(COACH_HERACLES_INSTRUCTION, /set and progress weekly load targets in it/);
-  assert.match(COACH_HERACLES_INSTRUCTION, /compare them only with COROS's figures/);
+  assert.match(COACH_HERACLES_INSTRUCTION, /COROS's formulas run on this load/);
+  assert.match(COACH_HERACLES_INSTRUCTION, /recovery and training effect stay COROS's own/);
   assert.doesNotMatch(buildBaseCoachInstructions(), /Heracles/, "the prompt Settings shows names one load");
 }
 

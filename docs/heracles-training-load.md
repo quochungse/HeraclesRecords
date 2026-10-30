@@ -12,10 +12,10 @@ Người dùng chọn nguồn tải trên màn Strength. Khi chọn Heracles, c�
 | --- | --- |
 | Tên | Heracles Training Load. UI vẫn ghi "Training load", "Load", "TL"; "Heracles TL" ở công tắc trong Settings và trong hover hai số; tên đầy đủ trong chỉ dẫn của Coach và trên website. |
 | Cài đặt | Nút Settings trên màn Strength, mục "Training load formula": COROS TL · Heracles TL. Mặc định COROS TL. |
-| Dùng Heracles TL | Strength, biểu đồ tuần, Coming up, heatmap và Training load distribution ở Overview, Calendar, Training Library, Activities. Coach và AI Plan đặt mục tiêu tải tuần theo Heracles TL. |
-| Giữ TL COROS | Dải khuyến nghị tuần, Base Fitness, Load Impact, Intensity Trend, load ratio, tải theo vùng nhịp tim, tải tuần ở chân biểu đồ tuần. |
-| Hover | Mỗi chỗ chỉ hiện một số TL, theo nguồn đã chọn. Hai số chỉ hiện ở chỗ dễ hiểu nhầm: tổng tải tuần đặt cạnh dải khuyến nghị của COROS (chân biểu đồ tuần ở Overview, ô tuần của Calendar) (chốt 30/10). |
-| Chân biểu đồ tuần | Giữ số COROS; khi khác tổng các cột thì chỉ ghi chú bằng hover, không thêm dòng (chốt 30/10). |
+| Dùng Heracles TL | Strength, biểu đồ tuần, Coming up, heatmap và Training load distribution ở Overview, Calendar, Training Library, Activities. Load Impact, Base Fitness, Intensity Trend và dải khuyến nghị tuần tính theo công thức của COROS trên Heracles TL (chốt 30/10, phương án A). Coach và AI Plan đặt mục tiêu tải tuần theo Heracles TL. |
+| Giữ số COROS | Recovery %, thời gian hồi phục, training effect (COROS không công bố cách tính hoặc tính từ nhịp tim), tải theo vùng nhịp tim. Load balance của Running/Cycling chỉ tính riêng môn đó nên không đổi. |
+| Hover | Mỗi chỗ chỉ hiện một số, theo nguồn đã chọn. Hai số chỉ hiện ở chỗ con số khác với app COROS: tải tuần và dải khuyến nghị (Overview, Calendar), Load Impact, Base Fitness, Intensity Trend (chốt 30/10). |
+| Chân biểu đồ tuần | Theo nguồn đã chọn, khớp tổng các cột; hover nêu số của COROS, không thêm dòng (chốt 30/10). |
 | Bản đồ cơ | Set · Volume; thêm Load khi chọn Heracles. Bỏ Time. |
 | Feel | Không phải đầu vào của một buổi tạ. Chỉ dùng để đo hệ số k trên các buổi chạy. RPE ghi cho từng set trong Hevy thì có được dùng (mục Buổi Hevy). |
 | Lap gộp | Buổi không bấm nghỉ là lỗi người dùng, không tách set. |
@@ -70,17 +70,17 @@ TL plan của COROS (thường là 0 cho buổi sức mạnh) là mức sàn, nh
 
 ## Phạm vi
 
-Khi chọn Heracles, mọi con số tải của từng buổi và các tổng cộng từ chúng dùng Heracles TL. Mọi chỉ số COROS tính từ TL COROS vẫn giữ nguyên. Quy tắc để biết một chỗ thuộc bên nào: con số được so với một dải hoặc một tỷ lệ COROS tính thì phải là TL COROS. Hai số đặt cạnh nhau để so (plan với buổi đã tập) luôn cùng thang: Heracles cả hai vế chỉ khi cả hai đều có, không thì COROS cả hai vế (`comparableLoads` ở renderer, `loadsToCompare` ở main).
+Khi chọn Heracles, mọi con số tải của từng buổi và các tổng cộng từ chúng dùng Heracles TL. Các chỉ số COROS tính từ TL theo ngày bằng công thức đã biết (Load Impact, Base Fitness, Intensity Trend, dải khuyến nghị) cũng chuyển theo (mục Chỉ số thể lực theo Heracles TL), nên một tổng và dải nó được so luôn cùng thang. Chỉ số COROS không công bố cách tính thì giữ nguyên. Hai số đặt cạnh nhau để so (plan với buổi đã tập) luôn cùng thang: Heracles cả hai vế chỉ khi cả hai đều có, không thì COROS cả hai vế (`comparableLoads` ở renderer, `loadsToCompare` ở main).
 
 | Màn | Dùng Heracles TL | Giữ TL COROS |
 | --- | --- | --- |
 | Strength | Ô Training load trong chi tiết buổi, cột TL từng set, lựa chọn Load của bản đồ cơ | Danh sách buổi và biểu đồ tuần (Set, Volume, thời lượng) |
-| Overview | Biểu đồ tuần ở chế độ Load, Coming up, heatmap ở chế độ Training load, phần "theo môn" của Training load distribution, bản đồ cơ ở mục Strength | Intensity Trend; chân biểu đồ tuần (Load Impact, Base Fitness, tải tuần so với dải khuyến nghị); phần "theo vùng nhịp tim" của distribution; Running, Cycling, Hiking |
-| Calendar | Thẻ buổi, panel ngày, số tải và thanh của ô tuần, ghép cặp với plan, phần trăm hoàn thành, chi tiết buổi dự kiến | Dòng mục tiêu COROS của tuần và phép so trên/trong/dưới dải; Load ratio, Base Fitness, Load Impact trong tooltip; tải xem trước trong workout builder |
+| Overview | Biểu đồ tuần ở chế độ Load, chân biểu đồ (Load Impact, Base Fitness, tải tuần, dải khuyến nghị), Intensity Trend, Coming up, heatmap ở chế độ Training load, phần "theo môn" của Training load distribution, bản đồ cơ ở mục Strength | Recovery % (hình cơ thể); phần "theo vùng nhịp tim" của distribution; Running, Cycling, Hiking |
+| Calendar | Thẻ buổi, panel ngày, số tải và thanh của ô tuần, dòng Target và chữ trên/trong/dưới dải, Load ratio, Base Fitness, Load Impact trong tooltip, ghép cặp với plan, phần trăm hoàn thành, chi tiết buổi dự kiến | Tải xem trước trong workout builder |
 | Training Library | Tải dự kiến của buổi sức mạnh trong plan, tổng tải tuần và cả plan, ridge "Weekly load", đã tập so với dự kiến, trạng thái hoàn thành | Tải COROS tính cho bước có mục tiêu cường độ (chạy, đạp) |
 | Activities | Fact Training load trên dòng, tổng Training load và trung bình tuần, tổng theo nhóm môn, ô Training load trong chi tiết | Không có |
 | Running, Cycling, Hiking | Không đổi | Load ratio từng môn |
-| Coach, AI Plan | Luôn thấy cả hai số. Mục tiêu tải tuần của plan và câu trả lời theo nguồn đã chọn | Dải khuyến nghị, Base Fitness, Load Impact, load ratio |
+| Coach, AI Plan | Khi chọn Heracles: Heracles load cạnh TL COROS, tool fitness trends theo Heracles; mục tiêu tải tuần theo nguồn đã chọn | Recovery, training effect |
 
 ## Cài đặt và cách hiển thị
 
@@ -96,7 +96,11 @@ Một cài đặt duy nhất trên màn Strength quyết định nguồn tải c
 **Một số, trừ chỗ dễ hiểu nhầm** (`src/training/loadFigures.ts`, chốt 30/10):
 
 - Mọi chỗ hiện tải chỉ hiện một số, theo nguồn đã chọn, như trước khi có Heracles.
-- **Hai số** (`loadPairTitle`: `Heracles TL 1.033 · COROS TL 723`) chỉ hiện khi một tổng theo Heracles đứng cạnh một chỉ số COROS tính từ TL của chính nó, để người dùng không thấy hai con số mâu thuẫn. Hiện có hai chỗ: tải tuần ở chân biểu đồ tuần của Overview, và số tải của ô tuần trên Calendar (cạnh dòng "Target x–y TL"). Hover chỉ hiện khi đang chọn Heracles và hai số làm tròn khác nhau.
+- **Hai số** chỉ hiện ở chỗ con số khác với con số app COROS hiện cho cùng chỉ số, để người dùng đối chiếu được:
+    - tải tuần (`loadPairTitle`: `Heracles TL 1.033 · COROS TL 723`) và dải khuyến nghị (`Recommended range: Heracles 1.170–1.520 · COROS 756–983`) ở chân biểu đồ tuần của Overview;
+    - Load Impact, Base Fitness, Intensity Trend ở Overview (`figurePairTitle`: `Heracles 167 · COROS 108`);
+    - số tải của ô tuần trên Calendar, và dòng Target (hover nêu dải của COROS).
+  Chỉ hiện khi đang chọn Heracles và hai số khác nhau. Khi trong 126 ngày gần đây còn buổi tạ chưa tải xong set, hover thêm dòng `Approximate: some strength sessions' sets are still loading`.
 - **Ghi chú cho một số** (`activityLoadNote`), khi đang chọn Heracles: buổi `estimate` ghi `Estimated: the sets could not be read`; buổi `pending` (số đang hiện là của COROS vì chưa tải xong set) ghi `Not calculated yet: the session's sets are still loading`. Buổi đọc từ set và buổi dự kiến không có ghi chú.
 
 ## Strength
@@ -140,7 +144,7 @@ Biểu đồ tuần là nơi so chạy với sức mạnh rõ nhất.
     - số trên đầu cột là tổng theo Heracles; trục tự tính lại từ cột cao nhất;
 - Khối dự kiến của buổi sức mạnh dùng Heracles TL ước tính, vẫn tô gạch chéo; tooltip ghi kèm số COROS.
 
-**Chân biểu đồ tuần** giữ số COROS: Load Impact, Base Fitness, tải tuần và dải khuyến nghị. Tải tuần cộng TL COROS từ thứ Hai tới hôm nay, vì nếu đổi sang Heracles thì cả 8/8 tuần tháng 9–10 bị báo vượt dải. Khi có buổi sức mạnh, hover vào tải tuần hiện "Heracles TL 1.033 · COROS TL 723" để người dùng hiểu vì sao số này nhỏ hơn tổng các cột. Không thêm dòng ghi chú.
+**Chân biểu đồ tuần và Intensity Trend** theo nguồn đã chọn (`fitnessInLoadSource`, mục Chỉ số thể lực theo Heracles TL): Load Impact, Base Fitness, Intensity Trend kèm dải trạng thái, tải tuần (thứ Hai tới hôm nay, bằng tổng các cột) và dải khuyến nghị. Hover mỗi số nêu số của COROS. Không thêm dòng ghi chú.
 
 **Coming up** (`comingUpModel`, `OverviewComingUp`): số tải của buổi đã tập và buổi dự kiến theo nguồn đã chọn. Ghép buổi với plan (`pairTodayPlan`) và thanh "so với plan" dùng `comparableLoads`, cùng thứ tự với Calendar, để hai màn không ghép khác nhau. Biểu đồ tuần dùng cùng phép ghép để bỏ plan hôm nay đã tập.
 
@@ -151,9 +155,10 @@ Biểu đồ tuần là nơi so chạy với sức mạnh rõ nhất.
 
 | Phần | Nguồn khi chọn Heracles |
 | --- | --- |
-| Intensity Trend | COROS |
+| Intensity Trend | Heracles (công thức COROS), hover có số COROS |
 | Biểu đồ tuần (Load) | Heracles |
-| Chân biểu đồ tuần | COROS, hover có số Heracles |
+| Chân biểu đồ tuần | Heracles (công thức COROS), hover có số COROS |
+| Recovery % (hình cơ thể) | COROS |
 | Coming up | Heracles |
 | Training activity heatmap | Heracles (mục dưới) |
 | Training load distribution | Heracles theo môn; COROS theo vùng nhịp tim |
@@ -179,12 +184,12 @@ Calendar đọc tải qua `activityLoad(activity, source)` và `plannedLoad(entr
 | --- | --- |
 | Thẻ buổi (`DayCell`) | "x TL" là Heracles TL cho buổi sức mạnh, đã tập hoặc dự kiến |
 | Panel ngày (`DayOverview`) | Tổng tải và tải từng dòng theo Heracles |
-| Ô tuần (`WeekStatsCell`, `computeWeeklyStats`) | Số tải và thanh (đã tập, còn lại) theo Heracles. Dòng "Target x–y TL" và chữ trên/trong/dưới dải so với `actualCorosLoad`. Hover số tải hiện hai số rồi vị trí so với dải |
+| Ô tuần (`WeekStatsCell`, `computeWeeklyStats`) | Số tải và thanh (đã tập, còn lại) theo Heracles. Dòng "Target x–y TL" là dải theo Heracles (`weekRangeInLoadSource`), chữ trên/trong/dưới dải so tải Heracles với dải đó. Hover số tải hiện hai số rồi vị trí so với dải; hover dòng Target nêu dải của COROS |
 | Phần trăm hoàn thành (`completionPct`) | Load trước, cùng thang hai vế; plan không có ước tính thì COROS hai vế, rồi distance, rồi thời lượng |
 | Ghép cặp (`matchScore`) | Gần nhất theo load (cùng thang), rồi distance, rồi thời lượng |
 | Khối trạng thái plan (`PlanStatusBlock`) | Khi người dùng ghép tay, lưu thêm `plannedHeraclesLoad` và `completedHeraclesLoad` |
 | Chi tiết buổi dự kiến (`ScheduledWorkoutDetail`) | Buổi sức mạnh hiện Heracles TL ước tính |
-| Tooltip Load ratio, Base Fitness, Load Impact | Không đổi |
+| Tooltip Load ratio, Base Fitness, Load Impact | Theo Heracles (công thức COROS) |
 | Workout builder, thư viện workout trong modal | Không đổi |
 
 Buổi dự kiến trên lịch được ước tính ở main (`withPlannedHeraclesLoads`) từ các bước của program COROS: mã bài, loại bước, set, rep, tạ, nghỉ có giờ, thời gian giữ; thời lượng là `estimatedTime` của program.
@@ -232,9 +237,30 @@ Coach nói theo tải người dùng đang chọn (chốt 30/10). Prompt của C
 
 Không ghi "estimated" ở đâu cả. Buổi `pending` và `conditioning`, hoặc buổi có hai số bằng nhau, không ghi Heracles.
 
-**Dòng giải thích có điều kiện** (`COACH_HERACLES_INSTRUCTION`): chỉ được thêm vào phần đầu của lượt Coach khi snapshot của lượt đó có hiện Heracles load, tức là đang chọn Heracles và trong các buổi gần đây hoặc sắp tới có buổi sức mạnh. Nội dung: Heracles load là tải của buổi tạ do app chấm từ các set, cùng thang với chạy; dùng nó để cân sức mạnh với các môn khác và để đặt và tăng mục tiêu tải tuần (môn khác theo TL COROS); Base Fitness, Load Impact, load ratio và dải khuyến nghị tuần chỉ so với TL COROS. Mọi lượt Coach đi qua cùng chỗ này, gồm cả hai bước outline và sessions của AI Plan và các bản phân tích. Chỉ dẫn gốc (`buildBaseCoachInstructions`, hiện ở Settings) không nhắc tới Heracles.
+**Tool fitness trends** (`get_fitness_trends`) khi chọn Heracles: tải theo ngày, Load Impact, Base Fitness và load ratio là bản Heracles (cùng phép tính với màn hình), có thêm một dòng nói rõ đây là công thức của COROS chạy trên Heracles TL, cao hơn số app COROS hiện.
+
+**Dòng giải thích có điều kiện** (`COACH_HERACLES_INSTRUCTION`): chỉ được thêm vào phần đầu của lượt Coach khi snapshot của lượt đó có hiện Heracles load, tức là đang chọn Heracles và trong các buổi gần đây hoặc sắp tới có buổi sức mạnh. Nội dung: Heracles load là tải của buổi tạ do app chấm từ các set, cùng thang với chạy; dùng nó để cân sức mạnh với các môn khác và để đặt và tăng mục tiêu tải tuần (môn khác theo TL COROS); Load Impact, Base Fitness và load ratio của tool fitness trends là công thức COROS trên tải này, cao hơn app COROS; recovery và training effect vẫn là của COROS. Mọi lượt Coach đi qua cùng chỗ này, gồm cả hai bước outline và sessions của AI Plan và các bản phân tích. Chỉ dẫn gốc (`buildBaseCoachInstructions`, hiện ở Settings) không nhắc tới Heracles.
 
 Như vậy mục tiêu Coach đặt khớp với con số Calendar và Training Library cộng cho tuần đó. Ước tính Heracles của buổi tạ trong plan mới soạn không được gửi lại cho model; model ước theo các buổi tạ đã tập.
+
+## Chỉ số thể lực theo Heracles TL
+
+COROS tính các chỉ số này từ TL theo ngày (đối chiếu trên tài khoản thật ngày 28/10):
+
+```
+Load Impact   ati += (TL ngày − ati) / 7
+Base Fitness  cti += (TL ngày − cti) / 42
+Intensity Trend = ati / cti        (5 dải: < 50, 50–79, 80–99, 100–149, ≥ 150%)
+Dải khuyến nghị tuần = cti của Chủ nhật trước × 7, max = min × 1,3
+```
+
+Các phép này tuyến tính theo TL ngày, nên bản Heracles bằng số của chính COROS cộng cùng phép tính chạy trên phần Heracles chênh thêm mỗi ngày (Heracles TL − TL COROS của các buổi tạ trong ngày). Không phải dựng lại lịch sử của COROS; ngày trước buổi tạ đầu tiên thì hai bản bằng nhau.
+
+- **Main** (`heraclesLoadService.ts`, `withHeraclesDayDeltas`): đọc các buổi tạ COROS (400, 402) trong DB, lấy phần chênh của từng buổi, cộng theo ngày, chạy `heraclesDeltaSeries` (`electron/heraclesFitness.ts`) từ buổi tạ đầu tiên tới hôm nay. Kết quả gắn vào payload của `trainingHub:getDailyMetrics` và `trainingHub:getTrainingAnalytics`: mỗi ngày một trường `heracles` (`load`, `ati`, `cti`, `range`, `partial`), mỗi tuần trong `weekList` một trường `heraclesRange`. Gắn luôn, bất kể đang chọn gì, nên đổi nguồn là hiện ngay. Lỗi thì trả payload như COROS gửi.
+- **Renderer** (`fitnessInLoadSource`, `weekRangeInLoadSource`): khi chọn Heracles thì `ati`, `cti`, `trainingLoadRatio`, `recommendedLoadMin/Max` của mỗi ngày được cộng phần chênh; số của COROS giữ trong `coros` cho hover. `trainingLoad` của ngày không đổi, vì các màn đã tự cộng phần chênh từ danh sách buổi.
+- **Coach** dùng cùng hàm, có cộng cả `trainingLoad` ngày (`withLoad`).
+- **Ước tính (`partial`):** buổi tạ chưa tải xong set (`pending`) tính phần chênh bằng 0. Nếu trong 126 ngày tới ngày đó còn buổi như vậy thì ngày bị đánh dấu, và hover ghi "Approximate". 126 ngày là lúc trung bình 42 ngày đã giữ 95% ảnh hưởng.
+- **Giữ số COROS:** Recovery %, thời gian hồi phục, training effect. COROS chỉ trả giá trị lúc đọc (`recoveryPct`, `recoveryState`, `fullRecoveryHours`), không công bố cách tính; training effect đọc từ nhịp tim nên Heracles không thay đổi nó.
 
 ## Kiến trúc và luồng dữ liệu
 
@@ -285,9 +311,10 @@ Nhãn mới có đủ 13 ngôn ngữ (`strength.*`, `units.load.*`). Câu chữ 
 | `857fa459` | Training load distribution theo nguồn; dòng mục tiêu tải tuần cho Coach và AI Plan; Coming up và "đã tập so với dự kiến" của Library luôn cùng thang; snapshot Training Library ghép plan theo nguồn đã chọn |
 | `a3f70646` | Popup Settings của màn Strength (nguồn dữ liệu, công thức tải); dialog Hevy giữ riêng |
 | `aa98ae5c` | Công tắc COROS TL · Heracles TL, viết lại câu giới thiệu Heracles TL, bỏ phần hệ số và cân nặng trong Settings |
-| commit kế tiếp | Một số TL mỗi chỗ, hai số chỉ ở tổng tuần cạnh dải COROS; Coach chỉ thấy Heracles khi được chọn, dòng giải thích có điều kiện, bỏ "estimated"; Hevy: bài nhận theo tên, trợ lực được trừ, RPE đã ghi được dùng |
+| `a6e32572` | Một số TL mỗi chỗ, hai số chỉ ở tổng tuần cạnh dải COROS; Coach chỉ thấy Heracles khi được chọn, dòng giải thích có điều kiện, bỏ "estimated"; Hevy: bài nhận theo tên, trợ lực được trừ, RPE đã ghi được dùng |
+| commit kế tiếp | Phương án A: Load Impact, Base Fitness, Intensity Trend, dải khuyến nghị theo Heracles TL ở Overview, Calendar và Coach; ghi chú trong Settings |
 
-Test: `test:heracles-load`, `test:heracles-load-service`, `test:body-weight-history`, `test:overview-model`, `test:calendar-pairing`, `test:plan-reader`, `test:training-library`, `test:activity-filters`, `test:strength-analytics`, `test:chat-activity-tools`, `test:coach-analysis-runner`, `test:chat-service`, `test:ipc-surface`, `test:sync-policy`, `test:i18n`, `check:coach`.
+Test: `test:heracles-load`, `test:heracles-load-service`, `test:heracles-fitness`, `test:body-weight-history`, `test:overview-model`, `test:calendar-pairing`, `test:plan-reader`, `test:training-library`, `test:activity-filters`, `test:strength-analytics`, `test:chat-activity-tools`, `test:coach-analysis-runner`, `test:chat-service`, `test:ipc-surface`, `test:sync-policy`, `test:i18n`, `check:coach`.
 
 ## Chưa làm và giới hạn đã biết
 
@@ -295,6 +322,9 @@ Test: `test:heracles-load`, `test:heracles-load-service`, `test:body-weight-hist
 - **Trạng thái plan trong Library** chỉ tính lại khi Library tải snapshot, không tính lại ngay lúc đổi nguồn.
 - **Kênh `trainingHub:refreshTrainingActivityMatches`** có ở cả ba file IPC nhưng renderer không gọi.
 - **Coach không nhận ước tính Heracles của plan nó vừa soạn**; mục tiêu tải tuần theo Heracles dựa trên các buổi đã tập.
+- **Lịch sử buổi tạ cho Base Fitness:** chi tiết buổi tạ chỉ được tải theo khoảng đang xem ở màn Strength. Buổi cũ hơn chưa tải thì tính phần chênh bằng 0 và các chỉ số mang cờ "Approximate"; muốn đủ thì mở màn Strength với khoảng 6 tháng.
+- **Buổi chỉ có trên Hevy** không có trong số liệu ngày của COROS nên chưa được cộng vào các chỉ số thể lực (cũng như biểu đồ tuần).
+- **Recovery %, thời gian hồi phục** vẫn là của COROS. Chưa ghi lịch sử của chúng để thử dựng lại mô hình.
 
 ## Rủi ro
 
@@ -304,5 +334,5 @@ Test: `test:heracles-load`, `test:heracles-load-service`, `test:body-weight-hist
 | k đo từ feel của buổi chạy | TL mỗi phút của buổi chạy gần như không đổi theo feel (2,3–3,3), nên k lệch khoảng ±15% tùy dải feel | Chỉ đo ở feel ≥ 3; dưới 8 buổi thì dùng 0,5 |
 | Mẫu kiểm chứng nhỏ | 8 buổi, thang feel 5 mức | Kiểm lại khi có thêm buổi gym có feel |
 | Buổi chưa có chi tiết trong cache | Hiện TL COROS cho tới khi tải xong | Cờ `pending` |
-| COROS không biết Heracles TL | Thời gian hồi phục, dải khuyến nghị và plan của COROS vẫn đánh giá thấp buổi gym | Không ghi ngược lên COROS |
-| Mục tiêu tải tuần theo Heracles cao hơn dải COROS | Plan của Coach hoặc AI Plan có thể vượt dải khuyến nghị dù đúng theo Heracles | Chỉ dẫn bảo chỉ so dải với TL COROS |
+| COROS không biết Heracles TL | Thời gian hồi phục, Recovery %, và các chỉ số trên đồng hồ và app COROS vẫn đánh giá thấp buổi gym | Không ghi ngược lên COROS; app ghi rõ số nào là của COROS |
+| Số trong app khác app COROS | Load Impact, Base Fitness, Intensity Trend, dải khuyến nghị cao hơn số COROS khi chọn Heracles | Hover nêu số của COROS; Settings ghi chú rõ |

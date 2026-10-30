@@ -310,6 +310,7 @@ const strength: StrengthMessages = {
   "strength.loadSource.coros": "COROS TL",
   "strength.loadSource.heracles": "Heracles TL",
   "strength.loadSource.explain": "La fórmula de carga de entrenamiento propia de Heracles Records para la fuerza. Cada serie se puntúa por su peso y repeticiones, tu peso corporal y tu capacidad en ese ejercicio, para que la carga de cada sesión, y de cada grupo muscular, refleje el trabajo que de verdad hiciste.",
+  "strength.loadSource.fitnessNote": "Con Heracles TL, el Impacto de carga, la Forma base, la Tendencia de intensidad y la carga semanal recomendada se calculan con las propias fórmulas de COROS sobre esta carga. La recuperación, el tiempo de recuperación y el efecto del entrenamiento siguen siendo los de COROS, como en tu reloj.",
   "strength.load.runEquivalent": "Como tu carrera de {distance} en {time} del {date} (TL {load})",
   "strength.load.set": "RPE prevista {rpe} · {rir} repeticiones en reserva · {intensity} % del 1RM estimado",
   "strength.load.setHold": "RPE prevista {rpe}",

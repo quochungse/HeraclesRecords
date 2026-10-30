@@ -310,6 +310,7 @@ const strength: StrengthMessages = {
   "strength.loadSource.coros": "COROS TL",
   "strength.loadSource.heracles": "Heracles TL",
   "strength.loadSource.explain": "สูตรภาระการฝึกเฉพาะของ Heracles Records สำหรับเวทเทรนนิ่ง แต่ละเซ็ตคำนวณจากน้ำหนักและจำนวนครั้ง น้ำหนักตัว และความสามารถของคุณในท่านั้น ภาระของแต่ละเซสชันและแต่ละกลุ่มกล้ามเนื้อจึงสะท้อนงานที่คุณทำจริง",
+  "strength.loadSource.fitnessNote": "เมื่อเลือก Heracles TL ผลของภาระ ความฟิตพื้นฐาน แนวโน้มความหนัก และภาระรายสัปดาห์ที่แนะนำจะคำนวณด้วยสูตรของ COROS เองบนภาระนี้ ส่วนการฟื้นตัว เวลาฟื้นตัว และผลการฝึกยังเป็นค่าของ COROS เหมือนบนนาฬิกา",
   "strength.load.runEquivalent": "ใกล้เคียงการวิ่ง {distance} เวลา {time} เมื่อ {date} (TL {load})",
   "strength.load.set": "RPE ที่คาด {rpe} · เหลือ {rir} ครั้ง · {intensity}% ของ 1RM ที่ประมาณ",
   "strength.load.setHold": "RPE ที่คาด {rpe}",

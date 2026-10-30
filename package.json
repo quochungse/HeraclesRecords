@@ -60,6 +60,7 @@
     "test:scheduled-structure": "node --experimental-strip-types --import ./scripts/register-ts-ext.mjs scripts/test-scheduled-structure.mjs",
     "test:rpe-load": "node --experimental-strip-types scripts/test-rpe-load.mjs",
     "test:heracles-load": "node --experimental-strip-types --import ./scripts/register-ts-ext.mjs scripts/test-heracles-load.mjs",
+    "test:heracles-fitness": "node --experimental-strip-types --import ./scripts/register-ts-ext.mjs scripts/test-heracles-fitness.mjs",
     "test:heracles-load-service": "npm run build:electron && node scripts/test-heracles-load-service.mjs",
     "test:body-weight-history": "npm run build:electron && cross-env ELECTRON_RUN_AS_NODE=1 electron scripts/test-body-weight-history.mjs",
     "test:mcp-oauth-compatibility": "node --experimental-strip-types scripts/test-mcp-oauth-compatibility.mjs",
