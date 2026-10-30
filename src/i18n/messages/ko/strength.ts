@@ -316,6 +316,7 @@ const strength: StrengthMessages = {
   "strength.load.setHold": "예상 RPE {rpe}",
   "strength.load.setFilled": "평가할 무게 없음: 세션의 RPE 중앙값 {rpe}",
   "strength.load.setLogged": "기록한 RPE: {rpe}",
+  "strength.load.setFatigued": "예상 RPE {rpe} · 여유 반복 {rir}회, 같은 무게의 앞 세트와 같음: 줄어든 반복은 피로 때문",
   "strength.metric.load": "부하",
   "strength.empty.load": "훈련 부하 없음",
   "strength.col.load": "TL",

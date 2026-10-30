@@ -316,6 +316,7 @@ const strength: StrengthMessages = {
   "strength.load.setHold": "RPE dự đoán {rpe}",
   "strength.load.setFilled": "Không có mức tạ để chấm: dùng RPE trung vị của buổi, {rpe}",
   "strength.load.setLogged": "RPE bạn đã ghi: {rpe}",
+  "strength.load.setFatigued": "RPE dự đoán {rpe} · còn {rir} lần dự trữ, như set trước cùng mức tạ: số rep giảm là do mỏi",
   "strength.metric.load": "Tải",
   "strength.empty.load": "Không có tải tập luyện",
   "strength.col.load": "TL",

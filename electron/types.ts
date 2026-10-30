@@ -298,6 +298,8 @@ export interface HeraclesSetLoad {
   filled?: boolean;
   /** The RPE the athlete logged for the set (Hevy), taken over the prediction. */
   logged?: boolean;
+  /** Fewer reps than an earlier set at this weight: held to that set's reserve, as fatigue. */
+  fatigued?: boolean;
 }
 
 /** A run of the athlete's whose COROS load is closest to a strength session's Heracles load. */

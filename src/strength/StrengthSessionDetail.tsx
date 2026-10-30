@@ -161,6 +161,7 @@ function setLoadTitle(load: HeraclesSetLoad): string {
   if (load.logged) return t("strength.load.setLogged", { rpe });
   if (load.filled) return t("strength.load.setFilled", { rpe });
   if (load.rir === undefined || load.intensity === undefined) return t("strength.load.setHold", { rpe });
+  if (load.fatigued) return t("strength.load.setFatigued", { rpe, rir: formatDecimal(load.rir, 1) });
   return t("strength.load.set", {
     rpe,
     rir: formatDecimal(load.rir, 1),

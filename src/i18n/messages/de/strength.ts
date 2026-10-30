@@ -316,6 +316,7 @@ const strength: StrengthMessages = {
   "strength.load.setHold": "Erwartete RPE {rpe}",
   "strength.load.setFilled": "Kein Gewicht zum Bewerten: die mittlere RPE der Einheit, {rpe}",
   "strength.load.setLogged": "Dein erfasstes RPE: {rpe}",
+  "strength.load.setFatigued": "Erwartete RPE {rpe} · {rir} Wdh. in Reserve, wie ein früherer Satz mit diesem Gewicht: die verlorenen Wdh. sind Ermüdung",
   "strength.metric.load": "Last",
   "strength.empty.load": "Keine Trainingslast",
   "strength.col.load": "TL",

@@ -126,6 +126,28 @@ const perSet = (loadPerMinute(rpe) * 182) / 60;
   close(result.sets[0][0].intensity, intensityAtReps(10), "the old best no longer counts");
 }
 
+// ---- Reps lost at a weight already lifted are fatigue, not reserve ----
+{
+  const curls = session("f", 0, [exercise("T1041", [set(17, 25, 50, 90), set(13, 25, 40, 90), set(11, 25, 35, 90), set(10, 25, 30, 90)])]);
+  const [first, ...later] = runHeraclesLoads([curls], context()).sessions.get("f").sets[0];
+  close(first.rir, 2, "the best set stopped two reps short");
+  assert.equal(first.fatigued, undefined);
+  for (const [index, held] of later.entries()) {
+    close(held.rir, 2, `set ${index + 2} is held to the first set's reserve`);
+    close(held.rpe, 8, `set ${index + 2} reads as hard as the first`);
+    assert.equal(held.fatigued, true);
+  }
+}
+
+// A heavier set doing fewer reps, or a lighter one after it, is read on its own.
+{
+  const pyramid = session("p", 0, [exercise("T1041", [set(12, 50, 40, 90), set(10, 60, 35, 90), set(8, 70, 30, 90), set(12, 50, 40, 90)])]);
+  const sets = runHeraclesLoads([pyramid], context()).sessions.get("p").sets[0];
+  assert.ok(sets.every((entry) => !entry.fatigued), "no set of a pyramid is held");
+  assert.ok(sets[0].rir > sets[1].rir && sets[1].rir > sets[2].rir, "lighter sets keep more in reserve");
+  close(sets[3].rir, sets[0].rir, "the same set again reads the same");
+}
+
 // ---- Bodyweight: the same 8 dips are harder for a heavier body ----
 {
   const dips = session("dips", 0, [exercise("T1051", [set(8, 0, 30, 120)])]);
@@ -221,8 +243,31 @@ const perSet = (loadPerMinute(rpe) * 182) / 60;
   assert.equal(result.sets[0][1].rpe, 10, "failure is no rep in reserve");
   // The warm-up set's 100 kg did not count as capacity: 8 reps at failure.
   close(result.sets[0][1].intensity, intensityAtReps(8), "capacity from the failure set alone");
-  // No clock: 3 s a rep and 90 s rest.
+  // No clock and no session length: 3 s a rep and 90 s rest.
   assert.equal(result.sets[0][1].seconds, 8 * 3 + 90);
+}
+
+// Hevy clocks no rest: the time its sets leave of the session is shared out
+// between them, so a session reads as COROS's laps of it would.
+{
+  const hevySets = () => Array.from({ length: 3 }, () => set(10, 60, 0, 0));
+  const lapSets = () => Array.from({ length: 3 }, () => set(10, 60, 30, 170));
+  const hevy = (duration) =>
+    session("hs", 0, [
+      exercise("bench", hevySets(), { externalId: "b", exerciseType: "weight_reps" }),
+      exercise("row", hevySets(), { externalId: "r", exerciseType: "weight_reps" })
+    ], { duration, trainingLoad: null });
+  const coros = session("cs", 0, [exercise("T1041", lapSets()), exercise("T1043", lapSets())], { trainingLoad: null });
+  const fromHevy = runHeraclesLoads([hevy(1200)], context()).sessions.get("hs");
+  const fromCoros = runHeraclesLoads([coros], context()).sessions.get("cs");
+  // 1,200 s less 6 × 30 s of reps, over 6 sets: 170 s of rest each.
+  assert.equal(fromHevy.sets[0][0].seconds, 30 + 170);
+  close(fromHevy.value, fromCoros.value, "the same session from either app");
+  // Rest past three minutes a set is time between sets, as on COROS.
+  const long = runHeraclesLoads([hevy(3600)], context()).sessions.get("hs");
+  assert.equal(long.sets[0][0].seconds, 30 + 180);
+  const sets = long.sets.flat().reduce((sum, entry) => sum + entry.load, 0);
+  close(long.value, sets + (loadPerMinute(1.5) * (3600 - 6 * 210)) / 60, "the rest at RPE 1.5");
 }
 
 // A Hevy movement is known by its name: a pull-up moves 0.95 of the body,

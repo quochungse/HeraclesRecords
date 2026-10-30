@@ -316,6 +316,7 @@ const strength: StrengthMessages = {
   "strength.load.setHold": "予測 RPE {rpe}",
   "strength.load.setFilled": "評価に使える重量なし：セッションの RPE 中央値 {rpe}",
   "strength.load.setLogged": "記録した RPE：{rpe}",
+  "strength.load.setFatigued": "予測 RPE {rpe} · 余力 {rir} レップ（同じ重量の前のセットと同じ）：減ったレップは疲労によるもの",
   "strength.metric.load": "負荷",
   "strength.empty.load": "トレーニング負荷なし",
   "strength.col.load": "TL",

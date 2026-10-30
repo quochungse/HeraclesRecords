@@ -7,8 +7,8 @@
  *   → reps left in reserve (reps to failure at a share of 1RM: Nuzzo et al.
  *   2024, 7,289 people) → set RPE (Zourdos et al. 2016)
  *   → load per minute at that effort (`loadPerMinute`: the heart-rate reserve
- *   that effort corresponds to in steady exercise, fitted on PMData's 16
- *   athletes, through COROS's published TRIMP weighting) × the set's minutes.
+ *   that effort corresponds to in steady exercise, fitted on PMData's steady
+ *   sessions, through COROS's published TRIMP weighting) × the set's minutes.
  *
  * A minute of lifting at an effort weighs what a steady minute at the same
  * effort weighs, so the load reads on a run's scale as a consequence, not by
@@ -62,6 +62,8 @@ const MEDIAN_WINDOW_DAYS = 56;
 const DEFAULT_SESSION_RPE = 6.5;
 const SECONDS_PER_REP = 3;
 const DEFAULT_REST_SEC = 90;
+/** Slack when two sets' loads are compared: both carry a body weight's decimals. */
+const LOAD_TOLERANCE_KG = 0.01;
 const SECONDS_PER_DAY = 86_400;
 /** COROS body-region codes (Shoulders … Legs & Hips) and its generic Full Body. */
 const UNREADABLE_KEYS: ReadonlySet<string> = new Set(["S4208", "S4209", "S4210", "S4211", "S4212", "S4213", "S4214"]);
@@ -284,13 +286,23 @@ function dayOf(startTime: number | undefined): number {
   return Math.floor((startTime ?? 0) / SECONDS_PER_DAY);
 }
 
-function setSeconds(set: StrengthSet): { work: number; rest: number } {
-  if (set.workSec > 0) return { work: set.workSec, rest: Math.max(0, set.restSec) };
+function setWorkSeconds(set: StrengthSet): number {
+  if (set.workSec > 0) return set.workSec;
   // Hevy keeps no clock for a set.
-  return {
-    work: set.timed ? 0 : set.reps * SECONDS_PER_REP,
-    rest: set.restSec > 0 ? set.restSec : DEFAULT_REST_SEC
-  };
+  return set.timed ? 0 : set.reps * SECONDS_PER_REP;
+}
+
+/**
+ * The rest after each set. COROS's laps clock it. Hevy clocks none, so the
+ * session's time its sets do not fill is shared out between them, as laps would
+ * have shown it: a session reads the same whichever app logged it.
+ */
+function restReader(entries: readonly StrengthSet[], durationSec: number | undefined): (set: StrengthSet) => number {
+  if (entries.some((set) => set.restSec > 0)) return (set) => Math.max(0, set.restSec);
+  if (durationSec === undefined || entries.length === 0) return () => DEFAULT_REST_SEC;
+  const worked = entries.reduce((sum, set) => sum + setWorkSeconds(set), 0);
+  const shared = Math.max(0, durationSec - worked) / entries.length;
+  return () => shared;
 }
 
 function capacityAt(points: readonly CapacityPoint[] | undefined, day: number): number | undefined {
@@ -383,6 +395,10 @@ export function runHeraclesLoads(
     const day = dayOf(session.startTime);
     const bodyWeightKg = context.bodyWeightKg(session.startTime) ?? DEFAULT_BODY_WEIGHT_KG;
     const cardio = corosLoadOf(session);
+    const restOf = restReader(
+      session.detail.exercises.flatMap((exercise) => exercise.entries),
+      sessionDurationSec(session)
+    );
 
     const exercises: PreparedExercise[] = session.detail.exercises.map((exercise) => {
       const key = heraclesExerciseKey(exercise);
@@ -394,8 +410,8 @@ export function runHeraclesLoads(
         (factor.kind !== "skip" && factor.kind !== "plyo" && exercise.entries.length > 0 &&
           exercise.entries.every((set) => set.timed));
       const sets = exercise.entries.map((set): PreparedSet => {
-        const { work, rest } = setSeconds(set);
-        const seconds = work + Math.min(rest, REST_CAP_SEC);
+        const work = setWorkSeconds(set);
+        const seconds = work + Math.min(restOf(set), REST_CAP_SEC);
         const isBetween =
           factor.kind === "skip" ||
           factor.kind === "plyo" ||
@@ -450,7 +466,7 @@ export function runHeraclesLoads(
           const load = systemLoad(set, factor, bodyWeightKg);
           if (load <= 0 || set.reps < 1 || set.reps > MAX_CAPACITY_REPS) continue;
           // A logged RPE says how far from failure the set stopped; without
-          // one, the best set is taken to have stopped one rep short.
+          // one, the best set is taken to have stopped two reps short.
           const logged = loggedRpe(set);
           const rir = set.type === "failure" ? 0 : logged !== undefined ? rirFromRpe(logged) : BEST_SET_RIR;
           if (rir === undefined) continue;
@@ -480,29 +496,51 @@ export function runHeraclesLoads(
       continue;
     }
 
-    const scored: (HeraclesSetLoad | null)[][] = exercises.map((entry) =>
-      entry.sets.map(({ set, seconds, role }): HeraclesSetLoad | null => {
+    const scored: (HeraclesSetLoad | null)[][] = exercises.map((entry) => {
+      // The lift's earlier work sets this session: their load and the reps they had left.
+      const earlier: { load: number; rir: number }[] = [];
+      // What a set moves and the factor it is scored by; nothing for a set no weight scores.
+      const moved = (set: StrengthSet): { factor: ResolvedFactor; load: number } | undefined => {
+        if (entry.factor.kind === "unreadable" || set.reps < 1) return undefined;
+        const factor = setFactor(entry.factor, entry.key, set.weightKg, weightedKeys);
+        return factor === "missing" ? undefined : { factor, load: systemLoad(set, factor, bodyWeightKg) };
+      };
+      return entry.sets.map(({ set, seconds, role }): HeraclesSetLoad | null => {
         if (role === "between") return null;
         // The athlete's own rating outranks the prediction.
         const logged = loggedRpe(set);
-        if (logged !== undefined) return { load: 0, rpe: logged, seconds, logged: true };
+        if (logged !== undefined) {
+          const rir = rirFromRpe(logged);
+          const lifted = set.timed ? undefined : moved(set);
+          if (rir !== undefined && lifted && set.type !== "warmup") earlier.push({ load: lifted.load, rir });
+          return { load: 0, rpe: logged, seconds, logged: true };
+        }
         if (role === "hold") {
           const maxHold = (entry.key ? holds.get(entry.key) : undefined) ?? entry.factor.maxHoldSec ?? DEFAULT_MAX_HOLD_SEC;
           const share = Math.min(1, set.workSec / maxHold);
           return { load: 0, rpe: 2 + 8 * share, seconds };
         }
         const filled: HeraclesSetLoad = { load: 0, rpe: Number.NaN, seconds, filled: true };
-        if (entry.factor.kind === "unreadable" || set.reps < 1) return filled;
-        const factor = setFactor(entry.factor, entry.key, set.weightKg, weightedKeys);
-        if (factor === "missing") return filled;
-        const load = systemLoad(set, factor, bodyWeightKg);
+        const lifted = moved(set);
+        if (!lifted) return filled;
+        const { factor, load } = lifted;
         const capacityKg = capacityFor(factor, set.weightKg, entry.key ? capacity.get(entry.key) : undefined, day, bodyWeightKg);
         if (load <= 0 || capacityKg <= 0) return filled;
         const intensity = Math.min(1, load / capacityKg);
-        const rir = set.type === "failure" ? 0 : repsInReserve(intensity, set.reps);
-        return { load: 0, rpe: rpeFromRir(rir), rir, intensity, seconds };
-      })
-    );
+        let rir = set.type === "failure" ? 0 : repsInReserve(intensity, set.reps);
+        // Reps lost at a weight already lifted are fatigue, not reserve: a set
+        // ends no further from failure than an earlier one at a load no heavier.
+        let fatigued = false;
+        for (const before of earlier) {
+          if (before.load <= load + LOAD_TOLERANCE_KG && before.rir < rir) {
+            rir = before.rir;
+            fatigued = true;
+          }
+        }
+        if (set.type !== "warmup") earlier.push({ load, rir });
+        return { load: 0, rpe: rpeFromRir(rir), rir, intensity, seconds, ...(fatigued ? { fatigued: true } : {}) };
+      });
+    });
 
     const known = scored.flat().filter((set): set is HeraclesSetLoad => set !== null && !set.filled);
     const fill = median(known.map((set) => set.rpe));

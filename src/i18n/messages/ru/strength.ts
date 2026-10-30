@@ -348,6 +348,7 @@ const strength: StrengthMessages = {
   "strength.load.setHold": "Ожидаемый RPE {rpe}",
   "strength.load.setFilled": "Нет веса для оценки: медианный RPE тренировки, {rpe}",
   "strength.load.setLogged": "Записанный вами RPE: {rpe}",
+  "strength.load.setFatigued": "Ожидаемый RPE {rpe} · в запасе {rir} повт., как в предыдущем подходе с этим весом: потерянные повторения — это усталость",
   "strength.metric.load": "Нагрузка",
   "strength.empty.load": "Нет тренировочной нагрузки",
   "strength.col.load": "TL",

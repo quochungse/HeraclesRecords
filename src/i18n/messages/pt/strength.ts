@@ -316,6 +316,7 @@ const strength: StrengthMessages = {
   "strength.load.setHold": "RPE prevista {rpe}",
   "strength.load.setFilled": "Sem peso para pontuá-la: a RPE mediana da sessão, {rpe}",
   "strength.load.setLogged": "Seu RPE registrado: {rpe}",
+  "strength.load.setFatigued": "RPE prevista {rpe} · {rir} repetições em reserva, como uma série anterior com este peso: as repetições perdidas são fadiga",
   "strength.metric.load": "Carga",
   "strength.empty.load": "Sem carga de treino",
   "strength.col.load": "TL",

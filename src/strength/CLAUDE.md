@@ -56,15 +56,19 @@ The app's own load for a strength session, on a run's scale
 screen's Settings (`strength.loadSource`, `preference`; `useLoadSource()` in the renderer); the
 body map offers **Load** only then. `npm run test:heracles-load`, `test:heracles-load-service`.
 - **Computed, never stored**: one run scores every session oldest first and is kept until
-  `heraclesLoadInputsVersion` (breakdowns, rated runs, Hevy, body weight) moves. It rides on the
+  `heraclesLoadInputsVersion` (breakdowns, strength and run loads, Hevy, body weight) moves. It rides on the
   payloads main already sends (`heraclesLoad` on activities and planned sessions,
   `StrengthSession.heracles`); `trainingLoad` is never overwritten. A plan's sessions are asked
   for over `strength:estimatePlanLoads`, never saved with the plan.
 - **One formula for everyone, nothing fitted on the athlete**: reps to failure from Nuzzo et al.
   2024 (`repsAtIntensity`), RIR 2 when no RPE is logged, set RPE from Zourdos 2016, and load per
   minute at that effort on COROS's published TRIMP curve (`loadPerMinute`, the heart-rate reserve
-  of an effort fitted on PMData's 16 athletes). A run's scale follows; nothing is read off runs,
-  and the feeling recorded after a session is never an input.
+  of an effort fitted on PMData's steady sessions, `scripts/fit-heracles-effort-curve.py`). A
+  run's scale follows; nothing is read off runs, and the feeling recorded after a session is
+  never an input.
+- **Reps lost at a weight already lifted are fatigue, not reserve**: a set ends no further from
+  failure than an earlier set of the lift that session at a load no heavier (`fatigued`, said in
+  its hover). Without it 25 kg × 17/13/11/10 read RPE 8/5/4/4.
 - **A session's value is at least COROS's** (cardio) and `quality` says how it was read:
   `sets`, `estimate` (sets unreadable: COROS's floor or the usual session RPE), `conditioning`
   (drills, or a session COROS kept no sets for: COROS's figure), `pending` (breakdown not read
@@ -87,7 +91,9 @@ body map offers **Load** only then. `npm run test:heracles-load`, `test:heracles
   (`COACH_HERACLES_INSTRUCTION`), so Coach and AI Plan set a plan's weekly load in the load
   the screens add up.
 - **Hevy has no training load**: with Heracles chosen a Hevy session is scored from its sets
-  alone (3 s a rep, 90 s rest, no COROS floor); with COROS chosen it has none. A Hevy movement
+  alone (3 s a rep, no COROS floor); with COROS chosen it has none. Hevy clocks no rest, so the
+  session's time its sets leave is shared out between them as rest (`restReader`, capped at
+  180 s like a lap; 90 s with no session length), and a session reads as COROS's laps of it would. A Hevy movement
   takes the factor of its COROS twin by name (`heraclesFactorByName`), an assisted one has its
   assistance taken off the body (`StrengthSet.assistKg`, never lifted weight), and a logged RPE
   outranks the prediction and sets the reps in reserve for capacity.

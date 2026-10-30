@@ -316,6 +316,7 @@ const strength: StrengthMessages = {
   "strength.load.setHold": "RPE ที่คาด {rpe}",
   "strength.load.setFilled": "ไม่มีน้ำหนักให้คิดคะแนน: ใช้ค่ามัธยฐาน RPE ของเซสชัน {rpe}",
   "strength.load.setLogged": "RPE ที่คุณบันทึก: {rpe}",
+  "strength.load.setFatigued": "RPE ที่คาด {rpe} · เหลือ {rir} ครั้ง เท่ากับเซ็ตก่อนหน้าที่น้ำหนักเดียวกัน: จำนวนครั้งที่ลดลงมาจากความล้า",
   "strength.metric.load": "ภาระ",
   "strength.empty.load": "ไม่มีภาระการฝึก",
   "strength.col.load": "TL",

@@ -32,7 +32,8 @@ Heracles TL là một công thức chung cho mọi người (chốt 30/10): đo 
     - Bài bodyweight lấy max(lịch sử, mức dân số), với mức dân số = α × 70 ÷ %1RM(rep_bw) × (cân nặng / 70)^0,67; rep_bw là số rep một người 70 kg tập phong trào làm được (theo bảng, mặc định 15).
 3. **Cường độ và số rep dự trữ:** I = min(1, L / C). Số rep tối đa ở I lấy từ meta-regression của Nuzzo 2024 (952 bài test, 7.289 người, 269 nghiên cứu; giới tính, tuổi, trình độ không làm lệch đáng kể), nội suy tuyến tính giữa các mốc: 100% → 1 rep, 95% → 3,28, 90% → 4,94, 85% → 7,15, 80% → 9,75, 75% → 12,37, 70% → 14,8, 65% → 17,11, 60% → 19,53, 55% → 22,43, 50% → 25,99, … 15% → 87,79. RIR = max(0, số rep tối đa − rep). Set failure là RIR 0. Công thức Epley (1985) dùng trước đây cho 13 rep ở 70% và 3,3 rep ở 90%, đều thấp hơn bảng.
 4. **RPE của set:** RPE người dùng ghi trong Hevy nếu có; không thì dự đoán theo thang RIR của Zourdos 2016: RIR ≤ 3 cho 10 − RIR; RIR 3–6 cho 7 − (RIR − 3) × 2/3; RIR > 6 cho 2 + 3 × e^(−(RIR − 6)/6) (phần đuôi nối liền cho mức "nhẹ"). Bài giữ tĩnh: 2 + 8 × min(1, thời gian giữ / mức tối đa), mức tối đa = 1,15 × lần giữ lâu nhất, hoặc theo bảng, mặc định 60 s.
-5. **Thời lượng set:** τ = thời gian làm + min(thời gian nghỉ sau set, 180 s). Set Hevy không có đồng hồ: 3 s mỗi rep, nghỉ 90 s nếu không ghi.
+    - **Rep giảm do mỏi** (chốt 30/10): trong một bài của một buổi, set nào có tải không nhỏ hơn một set trước đó thì RIR không được cao hơn RIR của set trước đó. Giả định là người tập giữ mức gắng sức qua các set, còn rep giảm ở cùng mức tạ là do mỏi, không phải do còn dư sức. Set warm-up không tính. Set có RPE ghi trong Hevy cũng làm mốc. Set bị giữ mang cờ `fatigued`, hover ghi rõ. Không có luật này thì 25 kg × 17 / 13 / 11 / 10 đọc ra RPE 8,0 / 5,0 / 4,1 / 3,8; có luật thì cả bốn là 8,0.
+5. **Thời lượng set:** τ = thời gian làm + min(thời gian nghỉ sau set, 180 s). Set Hevy không có đồng hồ: 3 s mỗi rep. Hevy cũng không ghi thời gian nghỉ, nên phần thời gian của buổi mà các set không chiếm được chia đều cho các set làm thời gian nghỉ (`restReader`), vẫn tối đa 180 s mỗi set như lap của COROS. Nhờ vậy một buổi ghi bằng Hevy hay COROS cho cùng một số. Không biết thời lượng buổi thì nghỉ 90 s mỗi set.
 6. **Tải mỗi phút ở một mức nỗ lực** (`loadPerMinute`): một phút tạ ở RPE r được tính bằng một phút vận động đều ở cùng mức nỗ lực.
     - HRr(r) = 0,48 + 0,031 × r là tỷ lệ nhịp tim dự trữ mà vận động đều ở RPE r (thang CR-10) thường đạt, fit trên PMData (mục Kiểm chứng).
     - TL/phút = HRr × 0,2445 × e^(3,411 × HRr), tức TRIMP mà COROS công bố cho đồng hồ của họ (theo DC Rainmaker).
@@ -60,6 +61,7 @@ f(r) = h × 0,2445 × e^(3,411 × h),   h = 0,48 + 0,031 × r
 | Đường cong nỗ lực → tải | h = 0,48 + 0,031 × RPE; TRIMP 0,2445·e^(3,411h) | PMData 2020 (14 người, 429 buổi); công thức TRIMP của COROS |
 | Số rep tối đa theo %1RM | Bảng 18 mốc ở bước 3 | Nuzzo et al. 2024 (7.289 người) |
 | RIR khi không có RPE ghi lại | 2 | Steele 2017, Refalo 2024 |
+| Rep giảm ở cùng mức tạ | RIR không cao hơn set trước có tải không nặng hơn | Thiết kế (mỏi, giữ mức gắng sức) |
 | Thang RIR → RPE | Bước 4 | Zourdos 2016, Helms 2016 |
 | Cân nặng | Lịch sử cân nặng theo ngày (`body_weight_history`); chưa có thì cân nặng hồ sơ COROS đọc gần nhất; không có gì thì 75 kg | COROS |
 | RPE ngoài set | 1,5 | Thiết kế (CR-10: rất nhẹ) |
@@ -78,10 +80,19 @@ PMData (Thambawita et al. 2020, Simula, giấy phép CC BY-NC 4.0): 16 người 
     - Quy về HRr đều tương đương, rồi hồi quy HRr theo RPE: độ dốc lấy trong từng người, mức nền lấy trung bình giữa các người.
 - **Kết quả:** 429 buổi sức bền của 14 người, mô hình chạy trên 11 người đủ dữ liệu: HRr = 0,481 + 0,0310 × RPE, độ lệch mức nền giữa người là 0,057.
     - Dùng HRmax theo tuổi thay cho HRmax đo được: 0,486 + 0,0312.
-    - Bỏ lần lượt từng người: TL/phút ở RPE 8 dao động 2,4–3,05.
+    - Bỏ lần lượt từng người: TL/phút ở RPE 8 dao động 2,01–2,29, ở RPE 5 dao động 1,31–1,43.
     - Đường cong khớp trung bình hình học theo từng mức RPE: RPE 5 là 1,36 so với 1,32 đo được; RPE 7 là 1,84 so với 1,86; RPE 8 là 2,14 so với 1,95.
 - **Buổi tạ trong PMData** (75 buổi ghép với Weights/Workout): ở cùng RPE 5–7, nhịp tim chỉ cho 0,55–0,8 TL/phút, trong khi buổi sức bền cho 1,3–1,9. TL theo nhịp tim tính thiếu buổi tạ khoảng 2–3 lần, đúng giả thuyết ban đầu.
-- **Trên dữ liệu thật của bạn** (10 buổi đọc được set trong 120 ngày): số mới bằng khoảng 0,52 lần số cũ, ví dụ buổi 24/10 từ 203 xuống 103 (COROS 65). So với COROS, số mới gấp khoảng 2,2 lần (số cũ gấp 4,2), khớp với mức chênh 2–3 lần thấy trong PMData. Nguyên nhân chính: k cũ (0,47, đo trên buổi chạy của bạn) cho khoảng 3,8 TL/phút ở RPE 8, còn đường cong chung cho 2,14.
+- **Trên dữ liệu thật của bạn** (10 buổi đọc được set trong 120 ngày): công thức chung bằng khoảng 0,52 lần công thức cũ (có k), ví dụ buổi 24/10 từ 203 xuống 103 (COROS 65). Nguyên nhân chính: k cũ (0,47, đo trên buổi chạy của bạn) cho khoảng 3,8 TL/phút ở RPE 8, còn đường cong chung cho 2,14.
+    - Luật rep giảm do mỏi (bước 4) làm tổng 10 buổi tăng 8%, từng buổi tăng 0–24%: 14/10 từ 73 lên 85, 21/10 từ 83 lên 97, 24/10 từ 103 lên 109. 42 trên 206 set (20%) trước đó bị đọc nhẹ hơn set trước cùng mức tạ.
+    - So với COROS, số hiện tại gấp khoảng 2,4 lần (trung vị), khớp với mức chênh 2–3 lần thấy trong PMData.
+
+**Đã xét và giữ nguyên** (rà soát 30/10):
+
+- RPE 1,5 cho thời gian ngoài set (0,78 TL/phút) là ngoại suy dưới vùng dữ liệu, cao hơn mức nhịp tim cả buổi tạ trong PMData (khoảng 0,7). Nhưng lap của COROS phủ gần kín buổi (0–6 phút ngoài set trên dữ liệu của bạn), và buổi Hevy giờ chia phần còn lại làm thời gian nghỉ, nên phần này rất nhỏ.
+- Độ dốc 0,031 mỗi điểm là hồi quy HRr theo RPE; hồi quy ngược cho 0,145, tương quan trong từng người 0,46. Bài toán là "biết RPE, đoán tải trung bình" nên hồi quy thuận là đúng. Đường cong khớp dữ liệu từ RPE 3 đến 9; chỉ cao hơn ở RPE 10 (5 buổi).
+- Bảng Nuzzo chủ yếu đo bench press (42%) và leg press (14%). Năng lực và RIR cùng đọc một bảng nên sai số của bảng gần như triệt tiêu khi số rep gần set tốt nhất.
+- Đường cong là người điển hình (trung bình mức nền trong thang HRr); trung bình số học của TL/phút cao hơn khoảng 5–10% ở RPE 5–7.
 
 **Buổi dự kiến** (`estimatePlannedLoad`) dùng cùng công thức với năng lực tới hôm nay và cân nặng hôm nay:
 
@@ -134,7 +145,7 @@ Heracles TL vào màn Strength ở bốn chỗ. Danh sách buổi và biểu đ�
 2. **Ô Training load trong chi tiết buổi** (`LoadStat` trong `StrengthSessionDetail`). Khi chọn Heracles:
     - một số: Heracles TL, không có dòng phụ COROS;
     - hover hiện ghi chú (nếu là `estimate` hoặc `pending`) và, nếu có, buổi chạy tương đương: "About your 10.2 km run of 1:10:00 on 25 Jul (TL 208)". Đó là buổi chạy trong 56 ngày trước buổi tạ có TL COROS gần nhất với Heracles TL, lệch không quá 15%; hai buổi gần như nhau thì lấy buổi mới hơn. Chỉ có cho buổi `sets` và `estimate`.
-3. **Cột TL từng set** trong bảng bài tập của chi tiết buổi, ví dụ 8,5. Hover: "Predicted RPE 8.0 · 2.0 reps in reserve · 82% of estimated 1RM"; set giữ tĩnh chỉ có RPE; set thiếu tạ ghi "No weight to score it by: the session's median RPE". Chỉ hiện khi chọn Heracles và khi set của buổi khớp với buổi đã chấm (buổi gộp COROS + Hevy có số set khác thì không có cột).
+3. **Cột TL từng set** trong bảng bài tập của chi tiết buổi, ví dụ 8,5. Hover: "Predicted RPE 8.0 · 2.0 reps in reserve · 82% of estimated 1RM"; set bị giữ theo set trước vì rep giảm ghi "Predicted RPE 8.0 · 2.0 reps in reserve, as an earlier set at this weight: the reps lost are fatigue"; set giữ tĩnh chỉ có RPE; set thiếu tạ ghi "No weight to score it by: the session's median RPE". Chỉ hiện khi chọn Heracles và khi set của buổi khớp với buổi đã chấm (buổi gộp COROS + Hevy có số set khác thì không có cột).
 4. **Bản đồ cơ** (`StrengthHero`, cả mục Strength trên Overview):
     - lựa chọn là Set · Volume, thêm Load khi chọn Heracles; bỏ Time;
     - `HeatMetric` là `"sets" | "volume" | "load"`. Lựa chọn đã lưu `time` không còn hợp lệ nên về Set; đã lưu `load` mà đang chọn COROS thì đọc như Set nhưng vẫn giữ, chọn lại Heracles thì quay về Load;
@@ -146,7 +157,7 @@ Heracles TL vào màn Strength ở bốn chỗ. Danh sách buổi và biểu đ�
 Hevy không có TL: API của Hevy không có nhịp tim hay chỉ số tải nào. Một buổi Hevy có giờ bắt đầu, giờ kết thúc và từng set (tạ, số rep, thời gian với bài tính giờ, loại set warm-up/normal/failure/dropset, RPE nếu người dùng ghi).
 
 - **Chọn COROS TL:** buổi chỉ có trên Hevy không có tải nào; ô Training load không hiện.
-- **Chọn Heracles TL:** buổi được chấm bằng đúng công thức trên, chỉ từ các set, không có mức sàn COROS (`cardio` để trống, toàn bộ là phần cơ). Hevy không ghi đồng hồ cho từng set nên mỗi set tính 3 s mỗi rep (bài tính giờ lấy thời gian của set) cộng 90 s nghỉ. Thời lượng buổi là giờ kết thúc trừ giờ bắt đầu; phần còn lại ngoài các set tính RPE 1,5.
+- **Chọn Heracles TL:** buổi được chấm bằng đúng công thức trên, chỉ từ các set, không có mức sàn COROS (`cardio` để trống, toàn bộ là phần cơ). Hevy không ghi đồng hồ cho từng set nên mỗi set tính 3 s mỗi rep (bài tính giờ lấy thời gian của set). Thời lượng buổi là giờ kết thúc trừ giờ bắt đầu; phần thời lượng các set không chiếm được chia đều cho các set làm thời gian nghỉ, tối đa 180 s mỗi set như lap của COROS, phần vượt tính RPE 1,5 (bước 5).
 - **Warm-up:** khi tắt "Include warm-up sets", set warm-up bị bỏ trước khi chấm, thời gian của nó rơi vào phần ngoài set. Khi bật, set warm-up được chấm như set thường nhưng không dùng để ước tính năng lực. Set failure tính 0 rep dự trữ.
 - **Bài tập:** bài Hevy được nhận theo tên template (`heraclesFactorByName`): hít xà, chin-up, dips, hít đất (gối, dốc lên, dốc xuống theo Ebben 2011), squat và lunge có tạ hay không, split squat, leg raise, plank, drill, giãn cơ… dùng hệ số của bài COROS tương ứng, nên cùng một bài cho cùng một tải dù ghi ở app nào. Bài máy (squat máy, hack squat, dip máy) và bench dip không nhận theo tên. Tên không nhận ra thì đọc theo loại template: `bodyweight_reps`, `bodyweight_assisted_reps`, `reps_only` là bodyweight α 0,6; `duration` là giữ tĩnh; `distance_duration`, `short_distance_weight` là drill; còn lại là bài có tạ. Năng lực lấy theo template Hevy (`hevy:<id>`).
 - **Bài assisted** (`bodyweight_assisted_reps`): tạ trợ lực được giữ riêng (`assistKg`) và trừ vào phần cân nặng, nên trợ lực càng nhiều thì set càng nhẹ. Nó không bao giờ tính là tạ đã nâng (volume).
@@ -302,7 +313,7 @@ app_settings (strength.loadSource) ┘                              + tool và p
     - `TrainingHubScheduledWorkoutEntry.heraclesLoad?` và `TrainingHubUpcomingWorkout.heraclesLoad?`: ước tính, `quality: "planned"`.
 - **Nơi gắn ở main:** `trainingHub:listActivities` (`withHeraclesLoads`), `trainingHub:listScheduledWorkouts` và `trainingHub:getUpcomingWorkouts` (`withPlannedHeraclesLoads`), `trainingHub:syncStrengthHistory` (`withStrengthSessionLoads`), snapshot Training Library (`matchesInChosenLoad`), các tool và snapshot của Coach (chỉ khi chọn Heracles).
 - **Ba kênh IPC mới:** `strength:getLoadSource`, `strength:setLoadSource`, `strength:estimatePlanLoads`.
-- **Đệm:** một lần chạy chấm mọi buổi sức mạnh từ cũ tới mới và được giữ cho tới khi khóa đổi. Khóa gồm `heraclesLoadInputsVersion()` (số dòng và `fetched_at` mới nhất của `strength_sessions`; số buổi, tổng TL và buổi mới nhất của môn 400/402; số buổi có feel; số buổi chạy và tổng TL; Hevy; lịch sử cân nặng), cân nặng hôm nay, `HERACLES_FACTORS_VERSION` và ngày hôm nay. Mỗi lô (một danh sách buổi, một lô plan) chỉ hỏi khóa một lần.
+- **Đệm:** một lần chạy chấm mọi buổi sức mạnh từ cũ tới mới và được giữ cho tới khi khóa đổi. Khóa gồm `heraclesLoadInputsVersion()` (số dòng và `fetched_at` mới nhất của `strength_sessions`; số buổi, tổng TL và buổi mới nhất của môn 400/402; số buổi chạy và tổng TL; Hevy; lịch sử cân nặng), cân nặng hôm nay, `HERACLES_FACTORS_VERSION` và ngày hôm nay. Mỗi lô (một danh sách buổi, một lô plan) chỉ hỏi khóa một lần.
 - **Nhân quả:** năng lực của một buổi chỉ dùng các buổi tới ngày đó, nên PR mới không viết lại quá khứ.
 - **Dependency injection:** service nhận `HeraclesLoadDeps` có `createDefaultDeps()`, để suite truyền dữ liệu giả.
 
@@ -336,7 +347,8 @@ Nhãn mới có đủ 13 ngôn ngữ (`strength.*`, `units.load.*`). Câu chữ 
 | `a6e32572` | Một số TL mỗi chỗ, hai số chỉ ở tổng tuần cạnh dải COROS; Coach chỉ thấy Heracles khi được chọn, dòng giải thích có điều kiện, bỏ "estimated"; Hevy: bài nhận theo tên, trợ lực được trừ, RPE đã ghi được dùng |
 | `c5694324` | Phương án A: Load Impact, Base Fitness, Intensity Trend, dải khuyến nghị theo Heracles TL ở Overview, Calendar và Coach; ghi chú trong Settings |
 | `7299cdbe` | Overview: Training load heatmap chỉ tính tải, thẻ ngày ghi TL; vùng nhịp tim của Training load distribution chỉ tính các môn nhịp tim |
-| commit kế tiếp | Công thức chung: bỏ k đo trên buổi chạy, đường cong nỗ lực → tải fit trên PMData qua TRIMP của COROS, bảng Nuzzo 2024 thay Epley, RIR mặc định 2 |
+| `b0a10557` | Công thức chung: bỏ k đo trên buổi chạy, đường cong nỗ lực → tải fit trên PMData qua TRIMP của COROS, bảng Nuzzo 2024 thay Epley, RIR mặc định 2 |
+| commit kế tiếp | Rep giảm ở cùng mức tạ đọc là mỏi; buổi Hevy chia thời gian còn lại làm thời gian nghỉ như lap COROS; sửa số leave-one-out trong docs |
 
 Test: `test:heracles-load`, `test:heracles-load-service`, `test:heracles-fitness`, (fit: `scripts/fit-heracles-effort-curve.py`), `test:body-weight-history`, `test:overview-model`, `test:calendar-pairing`, `test:plan-reader`, `test:training-library`, `test:activity-filters`, `test:strength-analytics`, `test:chat-activity-tools`, `test:coach-analysis-runner`, `test:chat-service`, `test:ipc-surface`, `test:sync-policy`, `test:i18n`, `check:coach`.
 
@@ -354,7 +366,9 @@ Test: `test:heracles-load`, `test:heracles-load-service`, `test:heracles-fitness
 
 | Rủi ro | Ảnh hưởng | Xử lý |
 | --- | --- | --- |
-| Năng lực tự tham chiếu | Người tập nhẹ được nhiều TL hơn thực tế | Chưa ghi trên UI |
+| Năng lực tự tham chiếu | Set tốt nhất trong 120 ngày luôn được coi là RIR 2 (RPE 8). Người thường tập tới thất bại bị đọc thấp 16–34% ở các set đó; người tập nhẹ bị đọc cao | Chỉ RPE ghi trong Hevy sửa được; chưa ghi trên UI |
+| Tải theo thời lượng | Thời gian nghỉ (tới 180 s) tính ở RPE của set, chiếm 55–70% thời gian được tính trên dữ liệu của bạn. Cùng số set, nghỉ dài cho TL cao hơn nghỉ ngắn, dù nghỉ ngắn thường mệt hơn | Tính chất của session-RPE (Foster); luật rep giảm do mỏi bù một phần |
+| Cầu nối chưa kiểm chứng | Công thức coi RPE theo RIR của một set (Zourdos) ngang RPE cả buổi CR-10 của buổi vận động đều | Kiểm bằng cách tự chấm RPE cả buổi (CR-10) khoảng 30 phút sau tập ở 5–10 buổi, so với RPE buổi app tính; chỉ để xác nhận, không fit |
 | Đường cong là trung bình nhiều người | Người có nhịp tim cao hơn trung bình ở cùng mức nỗ lực sẽ thấy buổi chạy của chính mình (TL COROS) nặng hơn buổi tạ cùng RPE. Ví dụ buổi chạy của bạn cho 2,3–3,3 TL/phút, trong khi tạ ở RPE 7–8 cho 1,8–2,1 | Đúng chủ đích "một công thức cho mọi người"; ghi rõ ở đây |
 | Mẫu PMData nhỏ | 14 người, Fitbit đeo tay, người tập phong trào ở Na Uy | Script fit chạy lại được khi có bộ dữ liệu công khai lớn hơn |
 | Buổi chưa có chi tiết trong cache | Hiện TL COROS cho tới khi tải xong | Cờ `pending` |

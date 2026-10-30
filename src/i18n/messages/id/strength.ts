@@ -316,6 +316,7 @@ const strength: StrengthMessages = {
   "strength.load.setHold": "RPE perkiraan {rpe}",
   "strength.load.setFilled": "Tidak ada beban untuk menilainya: RPE median sesi, {rpe}",
   "strength.load.setLogged": "RPE yang Anda catat: {rpe}",
+  "strength.load.setFatigued": "RPE perkiraan {rpe} · {rir} repetisi cadangan, seperti set sebelumnya dengan beban ini: repetisi yang berkurang adalah kelelahan",
   "strength.metric.load": "Beban",
   "strength.empty.load": "Tanpa beban latihan",
   "strength.col.load": "TL",

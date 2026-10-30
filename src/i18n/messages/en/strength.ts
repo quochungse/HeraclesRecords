@@ -317,6 +317,7 @@ const strength = {
   "strength.load.setHold": "Predicted RPE {rpe}",
   "strength.load.setFilled": "No weight to score it by: the session's median RPE, {rpe}",
   "strength.load.setLogged": "Your logged RPE: {rpe}",
+  "strength.load.setFatigued": "Predicted RPE {rpe} · {rir} reps in reserve, as an earlier set at this weight: the reps lost are fatigue",
   "strength.metric.load": "Load",
   "strength.empty.load": "No training load",
   "strength.col.load": "TL",

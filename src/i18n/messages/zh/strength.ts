@@ -316,6 +316,7 @@ const strength: StrengthMessages = {
   "strength.load.setHold": "预测 RPE {rpe}",
   "strength.load.setFilled": "没有可用于评分的重量：取本次训练 RPE 中位数 {rpe}",
   "strength.load.setLogged": "你记录的 RPE：{rpe}",
+  "strength.load.setFatigued": "预测 RPE {rpe} · 余力 {rir} 次，与同重量的前一组相同：减少的次数来自疲劳",
   "strength.metric.load": "负荷",
   "strength.empty.load": "无训练负荷",
   "strength.col.load": "TL",
