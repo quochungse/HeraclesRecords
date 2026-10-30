@@ -1,5 +1,6 @@
 ---
 import Base from "../../../layouts/Base.astro";
+import FeatureRow from "../../../components/FeatureRow.astro";
 import Shot from "../../../components/Shot.astro";
 import SubNav from "../../../components/SubNav.astro";
 import { ACTIVITIES_PAGES, TRAINING_LOAD_PAGE } from "../../../sections";
@@ -88,7 +89,7 @@ const counts = [
       </ul>
     </section>
 
-    <section class="feature-text">
+    <FeatureRow shot="29-exercises-library" alt="Exercises Library: a goblet squat with its clip and the muscles it works" flip>
       <p class="eyebrow">Exercises Library</p>
       <h2>Every movement, described again.</h2>
       <p>
@@ -98,7 +99,7 @@ const counts = [
         disagrees with COROS, that is on purpose, and your totals and Coach read the right muscles.
       </p>
       <a class="more" href="/plan/exercises">Browse the Exercises Library</a>
-    </section>
+    </FeatureRow>
 
     <section class="feature-text">
       <p class="eyebrow">Hevy</p>
@@ -155,8 +156,16 @@ const counts = [
           watch. Where a figure differs from the COROS app, hovering it shows COROS's own.
         </p>
       </div>
-
     </div>
+
+    <figure class="figure load-shot">
+      <Shot name="30-strength-session" alt="A strength session with Heracles TL chosen: each set's reps, weight, estimated max, rest and load" />
+      <figcaption>
+        <strong>Every set scored.</strong> With Heracles TL chosen, a session's exercises carry a
+        <strong>TL</strong> column, the load of each set. Hover one for its predicted RPE and the
+        reps it had left.
+      </figcaption>
+    </figure>
   </section>
 
   <section class="wrap section">
@@ -249,6 +258,10 @@ const counts = [
 
   .load-cta {
     margin-top: 24px;
+  }
+
+  .load-shot {
+    margin-top: 40px;
   }
 
   .load-cta::after {

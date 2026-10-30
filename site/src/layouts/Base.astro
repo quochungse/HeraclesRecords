@@ -9,6 +9,7 @@ import icon from "../../../build/icon-256.png";
 // the first paint on a slow connection.
 import interLatin from "../../../src/assets/fonts/inter-latin.woff2?url";
 import { formatReleaseDate, latestRelease } from "../release.mjs";
+import { DISCUSSIONS, NEW_ISSUE, REPO } from "../github";
 
 interface Props {
   title?: string;
@@ -108,8 +109,10 @@ const current = (href: string) =>
           <a href="/guide/faq">FAQ</a>
           <a href="/changelog/">Changelog</a>
           <a href="/about">About</a>
-          <a href="/guide/troubleshooting#something-else">Report an issue</a>
           <a href="/privacy.html">Privacy policy</a>
+          <a href={REPO}>GitHub</a>
+          <a href={NEW_ISSUE}>Report an issue</a>
+          <a href={DISCUSSIONS}>Discussions</a>
           <a href="https://buymeacoffee.com/quochungse">Buy me a coffee</a>
         </nav>
         {

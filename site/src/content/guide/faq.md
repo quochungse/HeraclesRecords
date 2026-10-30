@@ -50,4 +50,4 @@ The app tells you when a new version is out. The [changelog](/changelog/) lists 
 
 ## How can I help?
 
-Report a bug or suggest an idea from **Settings → About → Report an issue** in the app, tell a training partner, or [buy me a coffee](https://buymeacoffee.com/quochungse).
+[Report a bug](https://github.com/quochungse/HeraclesRecords/issues/new) (**Settings → About → Report an issue** in the app gives you its error log to paste in), share an idea in [Discussions](https://github.com/quochungse/HeraclesRecords/discussions), tell a training partner, or [buy me a coffee](https://buymeacoffee.com/quochungse).

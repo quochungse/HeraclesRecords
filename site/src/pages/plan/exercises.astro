@@ -1,8 +1,10 @@
 ---
 import Base from "../../layouts/Base.astro";
 import FeatureRow from "../../components/FeatureRow.astro";
+import Shot from "../../components/Shot.astro";
 import SubNav from "../../components/SubNav.astro";
 import { PLAN_PAGES } from "../../sections";
+import { DISCUSSIONS, NEW_ISSUE } from "../../github";
 // The app's own review of COROS's catalogue, counted at build time.
 import { EXERCISE_REVIEW, REVIEW_MUSCLE_TABLES } from "../../../../src/calendar/exerciseReview";
 
@@ -35,6 +37,10 @@ const corrections = [
       part on the figure, then a muscle inside it, or an equipment, and each movement shows its
       clip, the muscles it works and how hard.
     </p>
+  </section>
+
+  <section class="wrap section-tight">
+    <Shot name="29-exercises-library" alt="Exercises Library: a goblet squat with its clip and the muscles it works" eager />
   </section>
 
   <div class="wrap">
@@ -80,8 +86,8 @@ const corrections = [
     <p class="note">
       Each movement is decided by its COROS key, never by its name: "Bicycle Crunches" says
       nothing of the obliques, "Romanian Deadlift" nothing of the hamstrings. A movement the app
-      has not reviewed is exactly as COROS sends it. Think one is wrong? Say so from the app,
-      under <strong>Settings → About → Report an issue</strong>.
+      has not reviewed is exactly as COROS sends it. Think one is wrong? Say so in
+      <a href={DISCUSSIONS}>Discussions</a> or <a href={NEW_ISSUE}>open an issue</a>.
     </p>
   </section>
 

@@ -51,9 +51,11 @@
   "out": "07-strength",
   "view": "strength",
   "wait": 7000,
+  "ls": {
+   "heraclesrecords.loadSource": "heracles"
+  },
   "steps": [
-   15000,
-   "[...document.querySelectorAll('canvas')].map((c) => { const i = new Image(); i.src = c.toDataURL(); i.className = c.className; i.style.cssText = c.style.cssText; i.style.width = c.clientWidth + 'px'; i.style.height = c.clientHeight + 'px'; c.after(i); c.style.display = 'none'; return c.clientWidth; })"
+   15000
   ],
   "theme": "dark"
  },
@@ -252,6 +254,37 @@
    1000,
    "(() => { const page = document.querySelector(\".run-detail\"); const panel = [...page.querySelectorAll(\".panel\")].find((p) => p.textContent.startsWith(\"Performance\")); if (!panel) return \"no panel\"; page.scrollTop += panel.getBoundingClientRect().top - 70; return true; })()",
    1500
+  ],
+  "theme": "dark"
+ },
+ {
+  "out": "29-exercises-library",
+  "view": "library",
+  "wait": 4500,
+  "settle": 3000,
+  "steps": [
+   "demoClick('Exercises Library')",
+   2500,
+   "demoClick('Goblet Squat', '.training-library-view button')",
+   2500
+  ],
+  "theme": "dark"
+ },
+ {
+  "out": "30-strength-session",
+  "view": "strength",
+  "wait": 7000,
+  "ls": {
+   "heraclesrecords.loadSource": "heracles"
+  },
+  "steps": [
+   6000,
+   "(() => { const row = [...document.querySelectorAll('.strength-session-row')].find((r) => r.textContent.includes('Lower Body')); if (!row) return 'no session'; row.click(); return true; })()",
+   4000,
+   "(() => { const toggles = [...document.querySelectorAll('.strength-session-exercise-toggle')].filter((b) => /Squats|Deadlifts/.test(b.textContent)); toggles.forEach((b) => { if (b.getAttribute('aria-expanded') !== 'true') b.click(); }); return toggles.length === 2 || 'toggles ' + toggles.length; })()",
+   1500,
+   "(() => { const list = document.querySelector('.strength-session-exercise-list'); const card = list.closest('section, .panel') ?? list; const page = document.querySelector('.content'); page.scrollTop += card.getBoundingClientRect().top - 60; return true; })()",
+   1000
   ],
   "theme": "dark"
  }

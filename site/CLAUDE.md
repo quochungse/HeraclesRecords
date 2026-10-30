@@ -16,9 +16,11 @@ ships the license of every package in the root lockfile with the app, and the in
 - **The Heracles Training Load page computes its numbers**: `site/src/trainingLoad.ts` runs
   `electron/heraclesLoad.ts` at build time for every table and the worked example. Its words
   follow `docs/heracles-training-load.md` and change with the formula.
-- **The site links no GitHub page** but the installers it offers (and the host's privacy
-  statement); a bug report goes through **Settings → About → Report an issue** in the app.
-- **Screenshots** `01-`–`18-` and `27-`/`28-` are the README's, `19-`–`26-` the site's; every
+- **GitHub is linked for talking, not for reading**: the footer and About link the
+  repository, Issues and Discussions, and a page that asks for a report or an opinion links
+  those two (`site/src/github.ts`). What a visitor comes to read (releases, notes, docs) is a
+  page of the site, never a GitHub page; the installers are the exception.
+- **Screenshots** `01-`–`18-` and `27-`–`30-` are the README's, `19-`–`26-` the site's; every
   one is taken by `scripts/screenshots/` (`npm run screenshots`, demo data only — one invented
   athlete, never a real database). A screen that changes is reshot there, not by hand.
 - **Screenshots go through `Shot`/`ShotSlider`, never a bare `<img>`** (they are 3024px;

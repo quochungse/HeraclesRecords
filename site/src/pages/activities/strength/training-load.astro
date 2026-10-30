@@ -3,8 +3,11 @@
 // own engine when the site is built (site/src/trainingLoad.ts). The words
 // follow docs/heracles-training-load.md: change both with the formula.
 import Base from "../../../layouts/Base.astro";
+import Shot from "../../../components/Shot.astro";
 import SubNav from "../../../components/SubNav.astro";
+import { SIZES_PROSE } from "../../../assets";
 import { ACTIVITIES_PAGES } from "../../../sections";
+import { DISCUSSIONS, NEW_ISSUE } from "../../../github";
 import { loadPerMinute } from "../../../../../electron/heraclesLoad";
 import { bodyShares, example, EXAMPLE_BODY_KG, perMinuteTable, repsTable, rpeTable } from "../../../trainingLoad";
 
@@ -282,6 +285,18 @@ reps in reserve = reps to failure at I − reps done</code></pre>
         <li><strong>COROS's fitness figures</strong>, by COROS's own arithmetic on the daily load.</li>
         <li><strong>Coach and AI Plan</strong> read it beside COROS's figure, and plan the weekly load in it.</li>
       </ul>
+      <figure class="figure">
+        <Shot
+          name="30-strength-session"
+          alt="A strength session with Heracles TL chosen: each set's reps, weight, estimated max, rest and load"
+          sizes={SIZES_PROSE}
+        />
+        <figcaption>
+          A session's exercises with Heracles TL chosen: the <strong>TL</strong> column is each
+          set's load. Hover one for its predicted RPE, the reps it had left and its share of your
+          estimated max.
+        </figcaption>
+      </figure>
       <pre><code>Load Impact       += (day's load − Load Impact) ÷ 7
 Base Fitness      += (day's load − Base Fitness) ÷ 42
 Intensity Trend    = Load Impact ÷ Base Fitness
@@ -354,8 +369,8 @@ Recommended week   = Base Fitness on the Sunday before × 7, up to 30% more</cod
       </ul>
 
       <p class="ask">
-        Think a number is wrong, or know a better source? Tell me from the app:
-        <strong>Settings → About → Report an issue</strong>.
+        Think a number is wrong, or know a better source? Tell me in
+        <a href={DISCUSSIONS}>Discussions</a> or <a href={NEW_ISSUE}>open an issue</a>.
       </p>
     </article>
   </div>
@@ -416,6 +431,10 @@ Recommended week   = Base Fitness on the Sunday before × 7, up to 30% more</cod
 
   .formula pre {
     white-space: pre;
+  }
+
+  .formula .figure {
+    margin: 28px 0;
   }
 
   .formula table.compact {

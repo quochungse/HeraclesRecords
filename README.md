@@ -144,9 +144,22 @@ So Heracles Records reads strength again, from the sets up, for anyone who mixes
 <img src="docs/readme/07-strength.webp" alt="Strength: sessions and a 3D muscle map" />
 
 - **Every set on the muscles it worked.** A 3D body map lit by sets, volume or load, every muscle ranked, your coverage of each muscle group, records written in the rows they were set in, your main lifts and your weekly sets.
-- **Every movement described again.** The app reviews COROS's catalogue movement by movement: muscles corrected, obliques and neck added, equipment fixed. Browse it in the Training Library's **Exercises Library**. It disagrees with COROS here and there, on purpose; if you think it got one wrong, please [say so](https://github.com/quochungse/HeraclesRecords/issues/new).
+- **Every movement described again.** The app reviews COROS's catalogue movement by movement: muscles corrected, obliques and neck added, equipment fixed. Browse it in the Training Library's **Exercises Library**. It disagrees with COROS here and there, on purpose; if you think it got one wrong, please say so in [Discussions](https://github.com/quochungse/HeraclesRecords/discussions) or [an issue](https://github.com/quochungse/HeraclesRecords/issues/new).
 - **Hevy beside COROS.** Hevy workouts join your COROS sessions on one screen, a session logged in both is merged into one, and the RPE you log for a set is used over any guess.
 - **Heracles Training Load.** A load scored from the sets themselves. The weight, the reps, your body weight and the most you have lifted on each exercise say how close to failure every set went; each minute of lifting then weighs what a steady minute at the same effort weighs on COROS's own TRIMP curve. A hard gym session lands on the same scale as a run, so your week finally adds up. One formula for everyone, built from published research (Nuzzo 2024, Zourdos 2016, Foster 2001) and a public dataset (PMData), with nothing tuned on you.
+
+<table>
+  <tr>
+    <td width="50%" valign="top">
+      <img src="docs/readme/30-strength-session.webp" alt="A strength session with Heracles TL chosen: each set's reps, weight, estimated max, rest and load" />
+      <p><strong>Every set scored</strong>: with Heracles TL chosen, each set carries its load, and its hover the predicted RPE and the reps it had left.</p>
+    </td>
+    <td width="50%" valign="top">
+      <img src="docs/readme/29-exercises-library.webp" alt="Exercises Library: a goblet squat with its clip and the muscles it works" />
+      <p><strong>Exercises Library</strong>: COROS's whole catalogue by body part, muscle or equipment, each movement with its clip and the muscles it really works.</p>
+    </td>
+  </tr>
+</table>
 
 Choose **Heracles TL** under **Strength → Settings → Training load formula**, and Overview, the Calendar, the Training Library, Activities and Coach count strength that way. Load Impact, Base Fitness, Intensity Trend and the recommended weekly range follow, by COROS's own formulas. Ask Coach whether to go long on Sunday and it weighs Tuesday's leg day at what it cost, and a plan's weekly load includes the gym. Other sports, recovery and training effect stay COROS's.
 

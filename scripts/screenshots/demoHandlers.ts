@@ -12,10 +12,11 @@ import { scheduledEntries, upcomingWorkouts } from "./demoPlan";
 import { reverseGeocode } from "./demoPlaces";
 import { CHAT_SETTINGS, chatSessions, chatSession, planArtifacts, planDraftDocument, setCoachFirst } from "./demoCoach";
 import { librarySnapshot, workoutForEdit, planById, EDITOR_CONTEXT } from "./demoLibrary";
-import EXERCISE_MEDIA from "./exercise-media.json";
+import { exerciseOptions } from "./demoExercises";
 import { version as APP_VERSION } from "../../package.json";
 import { sleepHistory, sleepSummary, dailyHealth, nightSeries } from "./demoSleep";
 import { buildSampleStrengthSessions } from "../../src/strength/sampleSessions";
+import { runHeraclesLoads } from "../../electron/heraclesLoad";
 import { allActivities, dayKey, daysAgoDate, realisticInput, TODAY } from "./demoData";
 
 const STATUS: TrainingHubStatus = {
@@ -201,9 +202,23 @@ function analytics(): TrainingHubAnalytics {
   };
 }
 
-let demoLoadSource: "coros" | "heracles" = "coros";
+const DEMO_BODY_WEIGHT_KG = 72;
+// A shot asks for Heracles TL by seeding the renderer's own cache of the choice
+// (`ls` in shots.json); main.tsx writes it before the first question arrives.
+let demoLoadSource: "coros" | "heracles" | undefined;
 function loadInfo() {
-  return { source: demoLoadSource, bodyWeightKg: 72 };
+  demoLoadSource ??= localStorage.getItem("heraclesrecords.loadSource") === "heracles" ? "heracles" : "coros";
+  return { source: demoLoadSource };
+}
+
+/** The window's sample sessions, each scored by the app's engine as main scores it. */
+function strengthHistory(days: number) {
+  const sessions = buildSampleStrengthSessions(days);
+  const run = runHeraclesLoads(sessions, { bodyWeightKg: () => DEMO_BODY_WEIGHT_KG });
+  return sessions.map((session) => {
+    const heracles = run.sessions.get(session.activityId);
+    return heracles ? { ...session, heracles } : session;
+  });
 }
 
 export function demoHandlers(): Record<string, unknown> {
@@ -232,8 +247,7 @@ export function demoHandlers(): Record<string, unknown> {
     isWindowFullscreen: async () => false,
     setWindowBackground: async () => {},
     getHevyStatus: async () => ({ connected: false, includeWarmups: false }),
-    // The load Strength is read in, kept for the run, with the figures a
-    // measured athlete's Settings states beside Heracles Training Load.
+    // The load Strength is read in, kept for the run.
     getStrengthLoadSource: async () => loadInfo(),
     setStrengthLoadSource: async (source: "coros" | "heracles") => {
       demoLoadSource = source;
@@ -260,7 +274,7 @@ export function demoHandlers(): Record<string, unknown> {
     getTrainingSleepData: async (days?: number) => sleepSummary(days ?? 28),
     getTrainingDailyHealthData: async (days?: number) => dailyHealth(days ?? 30),
     getSleepNightSeries: async (req: { happenDay: string }) => nightSeries(req.happenDay),
-    syncStrengthHistory: async (req?: { days?: number }) => { const days = req?.days ?? 90; const sessions = buildSampleStrengthSessions(days); return { sessions, pending: 0, fetched: sessions.length, days, source: "coros" }; },
+    syncStrengthHistory: async (req?: { days?: number }) => { const days = req?.days ?? 90; const sessions = strengthHistory(days); return { sessions, pending: 0, fetched: sessions.length, days, source: "coros" }; },
     listCoachAnalysisRuns: async () => [],
     getChatSettings: async () => CHAT_SETTINGS,
     saveChatSettings: async (s: unknown) => s,
@@ -287,12 +301,7 @@ export function demoHandlers(): Record<string, unknown> {
     findChatSessionForDraft: async () => "c-plan",
     markCoachAnalysisSessionSeen: async () => 0,
     getTrainingLibrarySnapshot: async () => librarySnapshot(),
-    listWorkoutExercises: async (sport: string) => sport === "strength" || sport === "hyrox"
-      ? (EXERCISE_MEDIA as Array<{ id: string; name: string; coverUrls: string[]; videoUrls: string[] }>).map((e) => ({
-          id: e.id, name: e.name, thumbnailUrl: e.coverUrls[0],
-          media: [{ coverUrl: e.coverUrls[0], videoUrl: e.videoUrls[0] }]
-        }))
-      : [],
+    listWorkoutExercises: async (sport: string) => sport === "strength" || sport === "hyrox" ? exerciseOptions() : [],
     listExerciseFavorites: async () => ["469656067215900672"],
     setExerciseFavorite: async () => undefined,
     listTrainingActivityMatches: async () => librarySnapshot().matches,

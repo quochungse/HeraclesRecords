@@ -1,5 +1,6 @@
 ---
 import Base from "../layouts/Base.astro";
+import { DISCUSSIONS, NEW_ISSUE, REPO } from "../github";
 ---
 
 <Base
@@ -39,9 +40,9 @@ import Base from "../layouts/Base.astro";
     <h2>How it is made</h2>
     <ul>
       <li>
-        <strong>Open source.</strong> The whole app is open source under the MIT license.
-        Heracles Records is based on CorosLink by AtoZ, also MIT, and credits every other piece
-        of software and font it ships in its third-party notices.
+        <strong>Open source.</strong> The whole app is on <a href={REPO}>GitHub</a> under the MIT
+        license. Heracles Records is based on CorosLink by AtoZ, also MIT, and credits every
+        other piece of software and font it ships in its third-party notices.
       </li>
       <li>
         <strong>Local first.</strong> No account, no server. Your training stays on your computer,
@@ -57,8 +58,13 @@ import Base from "../layouts/Base.astro";
     <h2>Get in touch</h2>
     <ul>
       <li>
-        Found a bug or have an idea? Use <strong>Settings → About → Report an issue</strong> in
-        the app. It offers the app's recent error log, with emails, paths and keys taken out.
+        Found a bug? <a href={NEW_ISSUE}>Open an issue</a>, or use
+        <strong>Settings → About → Report an issue</strong> in the app: it offers the app's recent
+        error log to paste in, with emails, paths and keys taken out.
+      </li>
+      <li>
+        Have an idea or a question about your training data? Start one in
+        <a href={DISCUSSIONS}>Discussions</a>.
       </li>
       <li>
         If the app helps your training, you can

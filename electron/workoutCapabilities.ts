@@ -10,6 +10,7 @@ import type {
   WorkoutHeartRatePreset,
   WorkoutIntensityInput,
   WorkoutExerciseMedia,
+  WorkoutExerciseOption,
   WorkoutPacePreset,
   WorkoutSport,
   WorkoutSwimStroke,
@@ -451,6 +452,41 @@ export function workoutExerciseLoading(
     equipment,
     ...(Number.isInteger(targetType) && targetType > 0 ? { targetType } : {}),
     ...(Number.isFinite(defaultLoad) && row.intensityValue != null ? { defaultLoad } : {})
+  };
+}
+
+/**
+ * One catalog row as the picker, the Exercises Library and a workout's reader
+ * take it, or nothing for a row with no id or name. Node-free, so the
+ * screenshot demo reads its saved catalogue through the same door.
+ */
+export function workoutExerciseOption(row: Record<string, unknown>): WorkoutExerciseOption | undefined {
+  const id = workoutExerciseId(row);
+  const name = workoutExerciseName(row);
+  if (!id || !name) return undefined;
+  const kind = typeof row.exerciseKind === "string" && row.exerciseKind.trim()
+    ? Number(row.exerciseKind)
+    : row.exerciseKind;
+  const exerciseKind = typeof kind === "number" && Number.isFinite(kind) ? kind : undefined;
+  const media = workoutExerciseMedia(row);
+  const thumbnailUrl = media.find((entry) => entry.coverUrl)?.coverUrl;
+  const muscles = workoutExerciseMuscles(row);
+  const loading = workoutExerciseLoading(row);
+  const corosKey = typeof row.name === "string" && /^[TS]\d+$/i.test(row.name.trim())
+    ? row.name.trim()
+    : undefined;
+  return {
+    id,
+    name,
+    ...(exerciseKind !== undefined ? { exerciseKind } : {}),
+    ...(thumbnailUrl ? { thumbnailUrl } : {}),
+    ...(media.length ? { media } : {}),
+    ...(corosKey ? { corosKey } : {}),
+    ...(muscles.primary.length ? { primaryMuscles: muscles.primary } : {}),
+    ...(muscles.involved.length ? { involvedMuscles: muscles.involved } : {}),
+    ...(loading.equipment.length ? { equipmentCodes: loading.equipment } : {}),
+    ...(loading.targetType !== undefined ? { targetType: loading.targetType } : {}),
+    ...(loading.defaultLoad !== undefined ? { defaultLoad: loading.defaultLoad } : {})
   };
 }
 
