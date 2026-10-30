@@ -203,12 +203,17 @@ interface ResolvedFactor {
   maxHoldSec?: number;
 }
 
-const COROS_KEY = /^[TS]\d{4}$/;
+const COROS_KEY = /^[TS]\d{4}$/i;
+
+/** A COROS movement key (T1041, S4211); any other name is a Hevy template's or the athlete's. */
+export function isCorosExerciseKey(name: string): boolean {
+  return COROS_KEY.test(name);
+}
 
 /** The movement's identity: COROS's key, or Hevy's template. */
 function heraclesExerciseKey(exercise: StrengthExercise): string | undefined {
   if (exercise.corosKey) return exercise.corosKey.toUpperCase();
-  if (/^[TS]\d{4}$/i.test(exercise.nameKey)) return exercise.nameKey.toUpperCase();
+  if (isCorosExerciseKey(exercise.nameKey)) return exercise.nameKey.toUpperCase();
   if (exercise.externalId) return `hevy:${exercise.externalId}`;
   return undefined;
 }
@@ -219,7 +224,7 @@ function resolveFactor(exercise: StrengthExercise, key: string | undefined): Res
   if (type === 1 || type === 3 || type === 4) return { ...base, kind: "skip" };
   if (!key || UNREADABLE_KEYS.has(key)) return { ...base, kind: "unreadable" };
   // A movement with no COROS key (Hevy's) is known by its name.
-  const listed = COROS_KEY.test(key)
+  const listed = isCorosExerciseKey(key)
     ? HERACLES_EXERCISE_FACTORS[key]
     : heraclesFactorByName(exercise.rawName ?? exercise.nameKey);
   if (listed) {

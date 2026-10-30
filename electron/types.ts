@@ -326,10 +326,9 @@ export interface HeraclesSessionLoad extends HeraclesLoad {
   sets?: (HeraclesSetLoad | null)[][];
 }
 
-/** The setting, and the body weight the figures are being read with. */
+/** The load strength sessions are read in, as `strength:getLoadSource` answers it. */
 export interface HeraclesLoadInfo {
   source: StrengthLoadSource;
-  bodyWeightKg?: number;
 }
 
 /** A plan session sent to be estimated, under a key the screen chooses. */

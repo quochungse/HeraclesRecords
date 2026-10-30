@@ -127,7 +127,7 @@ function LoadStat({
   const heracles = source === "heracles" ? stats.heracles : undefined;
   if (!heracles) {
     return stats.trainingLoad !== undefined ? (
-      <Stat label={t("activity.m.trainingLoad")} value={String(Math.round(stats.trainingLoad))} />
+      <Stat label={t("activity.m.trainingLoad")} value={formatCount(Math.round(stats.trainingLoad))} />
     ) : null;
   }
   const run = heracles.runEquivalent;

@@ -2184,10 +2184,9 @@ export function listStrengthActivitiesWithoutBreakdown(): string[] {
 }
 
 /**
- * One string that changes whenever anything Heracles Training Load is read
+ * One string that changes whenever anything Heracles Training Load is scored
  * from changes: the cached breakdowns, the strength activities' COROS load,
- * the runs a session is set beside and the Hevy workouts. Cheap enough to ask
- * on every read.
+ * the Hevy workouts and the body weight. Cheap enough to ask on every read.
  */
 export function heraclesLoadInputsVersion(): string {
   const row = requireDatabase()
@@ -2196,14 +2195,12 @@ export function heraclesLoadInputsVersion(): string {
          (SELECT count(*) || ':' || ifnull(max(fetched_at), '') FROM strength_sessions) AS breakdowns,
          (SELECT count(*) || ':' || ifnull(sum(training_load), 0) || ':' || ifnull(max(start_time), 0)
             FROM training_activities WHERE sport_type IN (400, 402)) AS strength,
-         (SELECT count(*) || ':' || ifnull(sum(training_load), 0)
-            FROM training_activities WHERE sport_type IN (100, 101, 102, 103)) AS runs,
          (SELECT count(*) || ':' || ifnull(max(updated_at), '') || ':' || ifnull(max(synced_at), '')
             FROM hevy_workouts) AS hevy,
          (${BODY_WEIGHT_VERSION_SQL}) AS weights`
     )
-    .get() as { breakdowns: string; strength: string; runs: string; hevy: string; weights: string };
-  return [row.breakdowns, row.strength, row.runs, row.hevy, row.weights].join("|");
+    .get() as { breakdowns: string; strength: string; hevy: string; weights: string };
+  return [row.breakdowns, row.strength, row.hevy, row.weights].join("|");
 }
 
 const BODY_WEIGHT_VERSION_SQL =

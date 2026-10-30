@@ -124,7 +124,7 @@ Một cài đặt duy nhất trên màn Strength quyết định nguồn tải c
     - **Data source:** chọn Combined · COROS · Hevy, và một dòng trạng thái cho mỗi tài khoản. Dòng Hevy có nút Connect hoặc Manage; nút này đóng popup và mở dialog Hevy riêng (`StrengthHevyDialog`, nhập key, warm-up, ngắt kết nối). Đóng dialog Hevy thì quay lại popup. Khi chưa có nguồn nào, nút "Connect Hevy" trên màn mở thẳng dialog Hevy.
     - **Training load formula:** công tắc **COROS TL · Heracles TL**, dưới là một câu giải thích lựa chọn đang chọn. Heracles TL được giới thiệu là công thức riêng của Heracles Records, chấm từng set từ mức tạ, số rep, cân nặng và năng lực ở bài đó, để tải của từng buổi và từng nhóm cơ phản ánh đúng khối lượng đã tập. UI không so với thang chạy và không hiện cân nặng đang dùng.
 - **Lưu trữ:** `app_settings`, khóa `strength.loadSource`, giá trị `coros` hoặc `heracles`; `preference` trong `syncPolicy.ts`. Renderer giữ một bản ở localStorage `heraclesrecords.loadSource` (`derived`) chỉ để lần vẽ đầu đúng nguồn.
-- **IPC:** `strength:getLoadSource` và `strength:setLoadSource` trả về `HeraclesLoadInfo` (nguồn, cân nặng); renderer hiện chỉ dùng nguồn. Renderer giữ giá trị trong `LoadSourceProvider` (`src/training/loadSource.tsx`), các màn đọc qua `useLoadSource()`; mỗi lần sync kéo về, provider hỏi lại main.
+- **IPC:** `strength:getLoadSource` và `strength:setLoadSource` trả về `HeraclesLoadInfo` (chỉ có nguồn). Renderer giữ giá trị trong `LoadSourceProvider` (`src/training/loadSource.tsx`), các màn đọc qua `useLoadSource()`; mỗi lần sync kéo về, provider hỏi lại main.
 - **Buổi chưa có chi tiết:** đổi nguồn không tự tải gì. Chi tiết buổi sức mạnh được tải khi mở màn Strength (theo khoảng đang xem) hoặc mục Strength ở Overview (4 tuần). Trước đó buổi hiện TL COROS, cờ `pending`.
 
 **Một số, trừ chỗ dễ hiểu nhầm** (`src/training/loadFigures.ts`, chốt 30/10):
@@ -313,7 +313,7 @@ app_settings (strength.loadSource) ┘                              + tool và p
     - `TrainingHubScheduledWorkoutEntry.heraclesLoad?` và `TrainingHubUpcomingWorkout.heraclesLoad?`: ước tính, `quality: "planned"`.
 - **Nơi gắn ở main:** `trainingHub:listActivities` (`withHeraclesLoads`), `trainingHub:listScheduledWorkouts` và `trainingHub:getUpcomingWorkouts` (`withPlannedHeraclesLoads`), `trainingHub:syncStrengthHistory` (`withStrengthSessionLoads`), snapshot Training Library (`matchesInChosenLoad`), các tool và snapshot của Coach (chỉ khi chọn Heracles).
 - **Ba kênh IPC mới:** `strength:getLoadSource`, `strength:setLoadSource`, `strength:estimatePlanLoads`.
-- **Đệm:** một lần chạy chấm mọi buổi sức mạnh từ cũ tới mới và được giữ cho tới khi khóa đổi. Khóa gồm `heraclesLoadInputsVersion()` (số dòng và `fetched_at` mới nhất của `strength_sessions`; số buổi, tổng TL và buổi mới nhất của môn 400/402; số buổi chạy và tổng TL; Hevy; lịch sử cân nặng), cân nặng hôm nay, `HERACLES_FACTORS_VERSION` và ngày hôm nay. Mỗi lô (một danh sách buổi, một lô plan) chỉ hỏi khóa một lần.
+- **Đệm:** một lần chạy chấm mọi buổi sức mạnh từ cũ tới mới và được giữ cho tới khi khóa đổi. Khóa gồm `heraclesLoadInputsVersion()` (số dòng và `fetched_at` mới nhất của `strength_sessions`; số buổi, tổng TL và buổi mới nhất của môn 400/402; Hevy; lịch sử cân nặng), cân nặng hôm nay, `HERACLES_FACTORS_VERSION` và ngày hôm nay. Buổi chạy không nằm trong khóa: chúng chỉ dùng cho buổi chạy tương đương, được đọc lại mỗi lần màn Strength hỏi, nên đồng bộ thêm buổi chạy không làm chấm lại mọi buổi tạ. Mỗi lô (một danh sách buổi, một lô plan) chỉ hỏi khóa một lần.
 - **Nhân quả:** năng lực của một buổi chỉ dùng các buổi tới ngày đó, nên PR mới không viết lại quá khứ.
 - **Dependency injection:** service nhận `HeraclesLoadDeps` có `createDefaultDeps()`, để suite truyền dữ liệu giả.
 
@@ -327,7 +327,7 @@ app_settings (strength.loadSource) ┘                              + tool và p
 | Lịch sử cân nặng | Bảng mới `body_weight_history` (`day` YYYYMMDD, `weight_kg`, `recorded_at`) | `personal` | Ghi mỗi lần đọc hoặc sửa hồ sơ COROS, chỉ khi cân nặng khác dòng gần nhất ≥ 0,05 kg. Buổi lấy cân nặng gần nhất tới ngày của nó; buổi cũ hơn mọi dòng lấy dòng đầu tiên |
 | Heracles TL của từng buổi, từng set | Không lưu; đệm trong main | không | Hết hiệu lực khi khóa đệm đổi |
 
-Nhãn mới có đủ 13 ngôn ngữ (`strength.*`, `units.load.*`). Câu chữ của Coach ở main process không dịch. Website: guide Hevy có mục "Training load" (hai lựa chọn, Load trên bản đồ cơ, các màn tính theo Heracles, Coach và AI Plan đặt tải tuần theo nó); trang Activities thôi nhắc thời gian nâng tạ và có một đoạn giới thiệu lựa chọn Heracles.
+Nhãn mới có đủ 13 ngôn ngữ (`strength.*`, `units.load.*`). Câu chữ của Coach ở main process không dịch. Website: trang Strength (`/activities/strength/`) giới thiệu Heracles TL và nơi nó được dùng; trang `/activities/strength/training-load` công bố toàn bộ công thức, nguồn và giới hạn, với mọi bảng số và ví dụ tính do chính `heraclesLoad.ts` chạy lúc build (`site/src/trainingLoad.ts`), nên đổi công thức thì sửa câu chữ của trang đó theo. Guide Hevy có mục "Training load" trỏ tới trang công thức.
 
 ## Trạng thái triển khai
 
@@ -348,7 +348,8 @@ Nhãn mới có đủ 13 ngôn ngữ (`strength.*`, `units.load.*`). Câu chữ 
 | `c5694324` | Phương án A: Load Impact, Base Fitness, Intensity Trend, dải khuyến nghị theo Heracles TL ở Overview, Calendar và Coach; ghi chú trong Settings |
 | `7299cdbe` | Overview: Training load heatmap chỉ tính tải, thẻ ngày ghi TL; vùng nhịp tim của Training load distribution chỉ tính các môn nhịp tim |
 | `b0a10557` | Công thức chung: bỏ k đo trên buổi chạy, đường cong nỗ lực → tải fit trên PMData qua TRIMP của COROS, bảng Nuzzo 2024 thay Epley, RIR mặc định 2 |
-| commit kế tiếp | Rep giảm ở cùng mức tạ đọc là mỏi; buổi Hevy chia thời gian còn lại làm thời gian nghỉ như lap COROS; sửa số leave-one-out trong docs |
+| `fffb3af1` | Rep giảm ở cùng mức tạ đọc là mỏi; buổi Hevy chia thời gian còn lại làm thời gian nghỉ như lap COROS; sửa số leave-one-out trong docs |
+| commit kế tiếp | Rà soát nhánh: buổi chạy ra khỏi khóa đệm, `HeraclesLoadInfo` chỉ còn nguồn, phân tích tự động của Coach dùng chung luật nêu Heracles với chat, sửa comment cũ |
 
 Test: `test:heracles-load`, `test:heracles-load-service`, `test:heracles-fitness`, (fit: `scripts/fit-heracles-effort-curve.py`), `test:body-weight-history`, `test:overview-model`, `test:calendar-pairing`, `test:plan-reader`, `test:training-library`, `test:activity-filters`, `test:strength-analytics`, `test:chat-activity-tools`, `test:coach-analysis-runner`, `test:chat-service`, `test:ipc-surface`, `test:sync-policy`, `test:i18n`, `check:coach`.
 

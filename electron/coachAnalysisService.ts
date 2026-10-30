@@ -66,7 +66,8 @@ import { corosText, loadCorosLocale } from "./corosLocale";
 import { EXERCISE_SEARCH_MUSCLES, classifyWorkoutExerciseName } from "./exerciseCatalogSearch";
 import { getTrainingHubStatus, reconnectTrainingHub } from "./trainingHubService";
 import { corosSportName } from "./corosSportTypes";
-import { getStrengthLoadSource, heraclesLoadFor } from "./heraclesLoadService";
+import { heraclesLoadFor } from "./heraclesLoadService";
+import { coachHeraclesLoadValue, coachReadsHeracles } from "./chatActivityTools";
 import { runExclusively } from "./sync/automationLease";
 import { listPlanBriefs } from "./chatPlanBriefs";
 import { readScheduleChanges } from "./chatScheduleChanges";
@@ -1397,6 +1398,28 @@ function describeStrength(exercises: StrengthExercise[]): string {
   );
 }
 
+/** A row of the training before an analysed activity, a strength one with its Heracles Training Load. */
+export type CoachPrecedingTraining = CoachPrecedingActivityRow & { heracles_load?: number };
+
+/**
+ * The rows with Heracles Training Load where Coach states it (`coachHeraclesLoadValue`):
+ * while the athlete reads strength in it, and where it says more than COROS's figure.
+ * Best-effort, since COROS's figure is still an answer.
+ */
+function withPrecedingHeraclesLoads(rows: CoachPrecedingActivityRow[]): CoachPrecedingTraining[] {
+  if (!coachReadsHeracles()) return rows;
+  try {
+    return rows.map((row) => {
+      const trainingLoad = row.training_load ?? undefined;
+      const heraclesLoad = heraclesLoadFor({ activityId: row.activity_id, sportType: row.sport_type, trainingLoad });
+      const value = coachHeraclesLoadValue({ trainingLoad, heraclesLoad });
+      return value !== undefined ? { ...row, heracles_load: value } : row;
+    });
+  } catch {
+    return rows;
+  }
+}
+
 /**
  * What the athlete did in the days before the activity, for the focus line.
  *
@@ -1406,29 +1429,6 @@ function describeStrength(exercises: StrengthExercise[]): string {
  * unmentioned. Strength sessions carry the muscles they worked, read from the
  * breakdown already cached for the Strength screen; nothing here asks COROS.
  */
-/** A row of the training before an analysed activity, a strength one with its Heracles Training Load. */
-export type CoachPrecedingTraining = CoachPrecedingActivityRow & { heracles_load?: number };
-
-/** Best-effort: Heracles Training Load is a better word on a strength session, not a needed one. */
-function withPrecedingHeraclesLoads(rows: CoachPrecedingActivityRow[]): CoachPrecedingTraining[] {
-  try {
-    // Only while the athlete reads strength in it, as everywhere Coach looks.
-    if (getStrengthLoadSource() !== "heracles") return rows;
-    return rows.map((row) => {
-      const load = heraclesLoadFor({
-        activityId: row.activity_id,
-        sportType: row.sport_type,
-        trainingLoad: row.training_load ?? undefined
-      });
-      return load?.quality === "sets" || load?.quality === "estimate"
-        ? { ...row, heracles_load: Math.round(load.value) }
-        : row;
-    });
-  } catch {
-    return rows;
-  }
-}
-
 export function formatPrecedingTraining(
   activity: CoachActivityRow,
   rows: CoachPrecedingTraining[]

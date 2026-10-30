@@ -99,9 +99,11 @@ const deps = {
   ];
   const [withRun] = service.withStrengthSessionLoads([day], deps);
   assert.equal(withRun.heracles.runEquivalent.activityId, "near", "within eight weeks before it and 15% of its load");
+  // Runs are no input of the scoring: a new one names itself with nothing rescored.
+  reads = 0;
   runs = [runs[0], runs[1], runs[3]];
-  version = "without-a-match";
   assert.equal(service.withStrengthSessionLoads([day], deps)[0].heracles.runEquivalent, undefined);
+  assert.equal(reads, 0, "the runs moved, the sessions were not read again");
   runs = [];
 }
 

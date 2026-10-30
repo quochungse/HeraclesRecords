@@ -17,12 +17,15 @@ import { formatPlannedVolume } from "./scheduledStructure";
 import { t } from "../i18n/core";
 import { useI18n } from "../i18n/useI18n";
 
+function loadPart(load: number | undefined): string | undefined {
+  return load !== undefined ? t("units.trainingLoadShort", { value: Math.round(load) }) : undefined;
+}
+
 function activityLine(activity: TrainingHubActivity, unitSystem: UnitSystem, source: StrengthLoadSource): string {
-  const load = activityLoad(activity, source);
   return [
     activity.duration ? formatDurationSeconds(activity.duration) : undefined,
     activity.distance ? formatDistanceMeters(activity.distance, unitSystem, isSwimSportType(activity.sportType)) : undefined,
-    load !== undefined ? t("units.trainingLoadShort", { value: Math.round(load) }) : undefined
+    loadPart(activityLoad(activity, source))
   ]
     .filter(Boolean)
     .join(" · ");
@@ -96,9 +99,7 @@ export function DayOverview({
                   formatPlannedVolume(pair?.targets ?? {}, unitSystem, sport === "swim", () =>
                     formatUpcomingWorkoutVolumeDisplay(item.entry.volume, unitSystem)
                   ),
-                  plannedLoad(item.entry, source) !== undefined
-                    ? t("units.trainingLoadShort", { value: Math.round(plannedLoad(item.entry, source)!) })
-                    : undefined
+                  loadPart(plannedLoad(item.entry, source))
                 ]
                   .filter(Boolean)
                   .join(" · ");

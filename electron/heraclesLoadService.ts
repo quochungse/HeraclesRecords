@@ -3,8 +3,9 @@
  * payloads the screens already receive (docs/heracles-training-load.md).
  *
  * Every figure is recomputed from what is stored — the cached breakdowns, the
- * rated runs, the body weight — and never stored itself. One run scores every
- * strength session oldest first and is kept until any of those inputs moves.
+ * strength activities' COROS load, the Hevy workouts, the body weight — and
+ * never stored itself. One run scores every strength session oldest first and
+ * is kept until any of those inputs moves.
  */
 
 import {
@@ -22,6 +23,7 @@ import {
 import { dayKey } from "./chatDayKeys";
 import {
   estimatePlannedLoad,
+  isCorosExerciseKey,
   runHeraclesLoads,
   type HeraclesLoadRun,
   type PlannedStrengthExercise,
@@ -64,11 +66,11 @@ export interface HeraclesLoadDeps {
   withoutBreakdown(): string[];
   /** COROS's strength activities, for the days Heracles adds to its fitness figures. */
   strengthActivities(): Pick<TrainingHubActivity, "activityId" | "sportType" | "startTime" | "trainingLoad">[];
-  /** Runs with a COROS load, for the run a strength session is set beside. */
+  /** Runs with a COROS load, for the run a strength session is set beside; read when asked, never cached. */
   runs(): HeraclesRunEquivalent[];
   /** The weight of a session's day; `now()` for today's. */
   bodyWeightKg(startTime: number | undefined): number | undefined;
-  /** Changes whenever the inputs do. */
+  /** Changes whenever anything the sessions are scored from does; running activities are not among it. */
   inputsVersion(): string;
   /** Epoch seconds. */
   now(): number;
@@ -133,8 +135,6 @@ interface HeraclesLoadSnapshot {
   /** By every id a session goes by: its own, COROS's, Hevy's. */
   byId: Map<string, StrengthSession>;
   withoutBreakdown: ReadonlySet<string>;
-  /** Oldest first. */
-  runs: HeraclesRunEquivalent[];
   /** What Heracles adds to COROS's daily figures, worked out when first asked. */
   deltas?: Map<string, HeraclesDayDelta>;
 }
@@ -166,14 +166,16 @@ function snapshotFor(deps: HeraclesLoadDeps): HeraclesLoadSnapshot {
     version,
     run,
     byId,
-    withoutBreakdown: new Set(deps.withoutBreakdown()),
-    runs: [...deps.runs()].sort((left, right) => (left.startTime ?? 0) - (right.startTime ?? 0))
+    withoutBreakdown: new Set(deps.withoutBreakdown())
   };
   snapshots.set(deps, snapshot);
   return snapshot;
 }
 
-/** The run in the eight weeks before a session whose COROS load is closest to the session's own. */
+/**
+ * The run in the eight weeks before a session whose COROS load is closest to
+ * the session's own; between two as close, the more recent.
+ */
 function runEquivalentFor(
   scored: HeraclesSessionLoad,
   startTime: number | undefined,
@@ -187,7 +189,6 @@ function runEquivalentFor(
     if (at < since || at >= startTime) continue;
     const gap = Math.abs(run.trainingLoad - scored.value);
     if (gap > scored.value * EQUIVALENT_TOLERANCE) continue;
-    // The closer load wins; between two as close, the more recent run.
     const bestGap = best ? Math.abs(best.trainingLoad - scored.value) : Number.POSITIVE_INFINITY;
     if (gap < bestGap || (gap === bestGap && at > (best?.startTime ?? 0))) best = run;
   }
@@ -202,13 +203,8 @@ export function setStrengthLoadSource(source: StrengthLoadSource): void {
   setSetting(STRENGTH_LOAD_SOURCE_SETTING, source === "heracles" ? "heracles" : "coros");
 }
 
-export function getHeraclesLoadInfo(deps?: HeraclesLoadDeps): HeraclesLoadInfo {
-  const resolved = depsOrDefault(deps);
-  const bodyWeightKg = resolved.bodyWeightKg(resolved.now());
-  return {
-    source: getStrengthLoadSource(),
-    ...(bodyWeightKg !== undefined ? { bodyWeightKg } : {})
-  };
+export function getHeraclesLoadInfo(): HeraclesLoadInfo {
+  return { source: getStrengthLoadSource() };
 }
 
 /**
@@ -271,7 +267,10 @@ function sameShape(left: StrengthSession, right: StrengthSession): boolean {
  */
 export function withStrengthSessionLoads(sessions: StrengthSession[], deps?: HeraclesLoadDeps): StrengthSession[] {
   if (sessions.length === 0) return sessions;
-  const snapshot = snapshotFor(depsOrDefault(deps));
+  const resolved = depsOrDefault(deps);
+  const snapshot = snapshotFor(resolved);
+  // Read here rather than kept with the scoring: a new run moves no strength session's load.
+  let runs: HeraclesRunEquivalent[] | undefined;
   return sessions.map((session) => {
     const scoredSession =
       snapshot.byId.get(session.activityId) ??
@@ -280,7 +279,7 @@ export function withStrengthSessionLoads(sessions: StrengthSession[], deps?: Her
     const scored = scoredSession ? snapshot.run.sessions.get(scoredSession.activityId) : undefined;
     if (!scored || !scoredSession) return session;
     const runEquivalent = scored.quality === "sets" || scored.quality === "estimate"
-      ? runEquivalentFor(scored, session.startTime, snapshot.runs)
+      ? runEquivalentFor(scored, session.startTime, (runs ??= resolved.runs()))
       : undefined;
     const withRun = runEquivalent ? { ...scored, runEquivalent } : scored;
     if (sameShape(scoredSession, session)) return { ...session, heracles: withRun };
@@ -356,7 +355,6 @@ export function withPlannedHeraclesLoads<
   });
 }
 
-const COROS_EXERCISE_KEY = /^[TS]\d{4}$/;
 const POUNDS_TO_KG = 0.45359237;
 const STEP_TYPES: Partial<Record<RunWorkoutCreateStep["kind"], number>> = {
   warmup: 1,
@@ -377,7 +375,7 @@ function plannedExerciseOf(step: RunWorkoutCreateStep, repeat: number): PlannedS
       : undefined;
   const timed = step.target_type === "time" && (step.target_duration_seconds ?? 0) > 0;
   return {
-    key: name && COROS_EXERCISE_KEY.test(name) ? name : undefined,
+    key: name && isCorosExerciseKey(name) ? name.toUpperCase() : undefined,
     corosExerciseType,
     sets: Math.max(1, step.sets ?? 1) * repeat,
     reps: step.target_type === "reps" ? step.target_reps : undefined,

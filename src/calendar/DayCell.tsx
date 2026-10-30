@@ -145,7 +145,7 @@ interface CardView {
   completionPct?: number;
   pair?: PlannedActualPair;
   activity?: TrainingHubActivity;
-  /** Both loads, while strength is read in Heracles Training Load and they differ. */
+  /** What the load figure needs said: estimated, or still COROS's (`activityLoadNote`). */
   loadNote?: string;
 }
 

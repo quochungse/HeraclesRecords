@@ -310,7 +310,8 @@ function lastDefined<T>(
  * true rather than merely intended.
  *
  * Loads are summed twice, in the load strength is read in and in COROS's: the
- * week's figure is the first, COROS's recommended band is set against the second.
+ * week's figure and its band are the first; the second is COROS's own, for the
+ * hover that names what the COROS app shows.
  */
 export function computeWeeklyStats(days: CalendarDay[], loadSource: StrengthLoadSource = "coros"): WeeklyStats {
   let actualLoad = 0;

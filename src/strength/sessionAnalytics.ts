@@ -1,6 +1,7 @@
 import type {
   HeraclesLoad,
   HeraclesRunEquivalent,
+  HeraclesSessionLoad,
   HeraclesSetLoad,
   StrengthSession,
   StrengthSetType
@@ -271,6 +272,11 @@ export interface SessionStats {
   calories?: number;
 }
 
+/** A session's Heracles load as its header reads it: the sets and the session RPE left out. */
+function withoutSets({ sets: _sets, sessionRpe: _rpe, ...load }: HeraclesSessionLoad): NonNullable<SessionStats["heracles"]> {
+  return load;
+}
+
 export function buildSessionStats(session: StrengthSession): SessionStats {
   const summary = session.detail.summary;
   let workingSets = 0;
@@ -303,17 +309,7 @@ export function buildSessionStats(session: StrengthSession): SessionStats {
     avgHr: optional(session.avgHr ?? summary.avgHr),
     maxHr: optional(session.maxHr ?? summary.maxHr),
     trainingLoad: optional(session.trainingLoad ?? summary.trainingLoad),
-    ...(session.heracles
-      ? {
-          heracles: {
-            value: session.heracles.value,
-            cardio: session.heracles.cardio,
-            muscular: session.heracles.muscular,
-            quality: session.heracles.quality,
-            runEquivalent: session.heracles.runEquivalent
-          }
-        }
-      : {}),
+    ...(session.heracles ? { heracles: withoutSets(session.heracles) } : {}),
     calories: optional(session.calories ?? summary.calories)
   };
 }

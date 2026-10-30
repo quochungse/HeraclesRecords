@@ -55,8 +55,11 @@ The app's own load for a strength session, on a run's scale
 `HERACLES_FACTORS_VERSION` with any change), service `heraclesLoadService.ts`. Chosen in this
 screen's Settings (`strength.loadSource`, `preference`; `useLoadSource()` in the renderer); the
 body map offers **Load** only then. `npm run test:heracles-load`, `test:heracles-load-service`.
+The formula is public at `/activities/strength/training-load` (`site/`): its figures are the
+engine's own, its words a change to the formula has to follow.
 - **Computed, never stored**: one run scores every session oldest first and is kept until
-  `heraclesLoadInputsVersion` (breakdowns, strength and run loads, Hevy, body weight) moves. It rides on the
+  `heraclesLoadInputsVersion` (breakdowns, strength loads, Hevy, body weight) moves; runs are
+  read only for a session's run equivalent, so a new run rescores nothing. It rides on the
   payloads main already sends (`heraclesLoad` on activities and planned sessions,
   `StrengthSession.heracles`); `trainingLoad` is never overwritten. A plan's sessions are asked
   for over `strength:estimatePlanLoads`, never saved with the plan.
