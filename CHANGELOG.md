@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.4.3] - 2026-10-30
+
+A smoother way to sign in to COROS.
+
+### What's new
+- **Sign-in** - a streamlined sign-in flow.
+
 ## [1.4.1] - 2026-10-30
 
 Heracles Training Load: strength scored from the sets themselves, on the same scale as a run, so a week of running and lifting finally adds up.
