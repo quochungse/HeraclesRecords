@@ -382,7 +382,7 @@ assert.ok(
 const distributionUrl = pathToFileURL(
   path.join(repoRoot, "src", "training", "overview", "distributionModel.ts")
 );
-const { sportLoadShares, zoneShares, intensityShares } = await import(
+const { heartRateSessions, isHeartRateSport, sportLoadShares, zoneShares, zoneTimeEntries, intensityShares } = await import(
   `${distributionUrl.href}?cacheBust=${Date.now()}`
 );
 const daysAgo = (days) => Math.floor(now.getTime() / 1000) - days * 86_400;
@@ -407,30 +407,37 @@ assert.deepEqual(
 );
 close(mix.sports[0].share, 2 / 3, "a sport's share of the load");
 
-// With strength read in Heracles Training Load, the lift counts that load;
-// with COROS chosen nothing moves.
+// Training load distribution: the load by sport is every sport's, a lift at
+// its Heracles load when that is chosen; the zones are read over the sports
+// heart rate measures alone — a lift, gym cardio or a climb is out, a swim and
+// a walk stay in.
 {
-  const lifts = [
+  const mixed = [
     { activityId: "r1", sportType: 100, startTime: daysAgo(2), trainingLoad: 300 },
-    {
-      activityId: "s1",
-      sportType: 402,
-      startTime: daysAgo(5),
-      trainingLoad: 60,
-      heraclesLoad: { value: 200, cardio: 60, muscular: 140, quality: "sets" }
-    }
+    { activityId: "sw", sportType: 300, startTime: daysAgo(3), trainingLoad: 50 },
+    { activityId: "s1", sportType: 402, startTime: daysAgo(5), trainingLoad: 60, heraclesLoad: { value: 200, cardio: 60, muscular: 140, quality: "sets" } },
+    { activityId: "gc", sportType: 400, startTime: daysAgo(6), trainingLoad: 40 },
+    { activityId: "cl", sportType: 800, startTime: daysAgo(7), trainingLoad: 30 },
+    { activityId: "old", sportType: 100, startTime: daysAgo(40), trainingLoad: 90 }
   ];
-  const coros = sportLoadShares(lifts, now);
-  assert.equal(coros.total, 360);
-  const heracles = sportLoadShares(lifts, now, undefined, "heracles");
-  assert.equal(heracles.total, 500, "the lift at its Heracles load");
-  assert.deepEqual(
-    heracles.sports.map((sport) => [sport.category, sport.load]),
-    [
-      ["run", 300],
-      ["strength", 200]
-    ]
-  );
+  const shares = sportLoadShares(mixed, now);
+  assert.equal(shares.total, 480, "every sport of the four weeks");
+  assert.deepEqual(shares.sports.map((sport) => sport.category), ["run", "strength", "other"]);
+  const heracles = sportLoadShares(mixed, now, undefined, "heracles");
+  assert.equal(heracles.total, 480 - 60 + 200, "the lift at its Heracles load");
+  assert.equal(isHeartRateSport(900), true, "a walk is steady");
+  assert.equal(isHeartRateSport(402), false);
+  const sessions = heartRateSessions(mixed, now);
+  assert.deepEqual(sessions.map((session) => session.activityId), ["r1", "sw"]);
+  const summaries = new Map([
+    ["r1", { activityId: "r1", zoneSeconds: [600, 1200, 300, 0, 0, 0] }],
+    ["s1", { activityId: "s1", zoneSeconds: [0, 0, 0, 900, 900, 0] }]
+  ]);
+  const time = zoneTimeEntries(sessions, summaries);
+  assert.equal(time.read, 1, "the swim's detail is not read yet");
+  assert.equal(time.total, 2);
+  assert.deepEqual(time.entries.map((entry) => entry.value), [600, 1200, 300, 0, 0, 0], "the lift's zones never join");
+  close(zoneShares(time.entries).rows[1].share, 1200 / 2100, "a zone's share of the time");
 }
 
 const zones = zoneShares([

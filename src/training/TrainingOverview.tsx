@@ -446,8 +446,8 @@ export function TrainingOverview({
             />
           </section>
           <OverviewDistribution
+            api={api}
             activities={activities}
-            analytics={snapshot?.analytics ?? null}
             hrZoneModel={hrZoneModel}
             lthrZones={snapshot?.dashboard?.lthrZones ?? NO_ZONES}
             loading={snapshotPending || activitiesPending}

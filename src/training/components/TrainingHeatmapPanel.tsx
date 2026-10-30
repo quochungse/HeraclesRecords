@@ -15,7 +15,6 @@ import type {
 import {
   formatDistanceMeters,
   formatDurationSeconds,
-  formatDurationSpan,
   formatOptionalNumber
 } from "../formatters";
 import { OptionGroup } from "../../components/OptionGroup";
@@ -57,7 +56,6 @@ import {
 } from "../sportColors";
 import type {
   HeatmapCell,
-  HeatmapMetric,
   TrainingHubSnapshot
 } from "../types";
 import type { UnitSystem } from "../../../electron/types";
@@ -68,12 +66,6 @@ import {
   useSelectionPreference
 } from "../../preferences/selectionPreferences";
 import { plural, t, weekdayNames } from "../../i18n/core";
-
-const HEATMAP_METRIC_PREFERENCE = defineSelectionPreference<HeatmapMetric>({
-  key: "training.heatmapMetric",
-  defaultValue: "trainingLoad",
-  validate: selectionIsOneOf(["trainingLoad", "duration"])
-});
 
 const HEATMAP_RANGE_PREFERENCE = defineSelectionPreference<TrainingHeatmapRange>({
   key: "training.heatmapRange",
@@ -164,9 +156,6 @@ export function TrainingHeatmapPanel({
 }: TrainingHeatmapPanelProps) {
   const { unitSystem } = useUnitSystem();
   const reducedMotion = usePrefersReducedMotion();
-  const [metric, setMetric] = useSelectionPreference(
-    HEATMAP_METRIC_PREFERENCE
-  );
   const [range, setRange] = useSelectionPreference(HEATMAP_RANGE_PREFERENCE);
   const [strengthSessions, setStrengthSessions] = useState<StrengthSession[]>(
     []
@@ -178,7 +167,6 @@ export function TrainingHeatmapPanel({
   const proximityCellsRef = useRef<ProximityCell[]>([]);
   const activeProximityCellsRef = useRef<Set<HTMLSpanElement>>(new Set());
   const heatmapWaveHasPlayedRef = useRef(false);
-  const isDuration = metric === "duration";
   const rangeDays = TRAINING_HEATMAP_RANGE_DAYS[range];
   // The short range keeps the weekday columns but trades squares for cards:
   // thirty days fit as calendar weeks of cards, each carrying its own date in
@@ -205,8 +193,8 @@ export function TrainingHeatmapPanel({
     [snapshot, activities, loadSource]
   );
   const cells = useMemo(
-    () => buildHeatmapCells(dayList, rangeDays, metric),
-    [dayList, rangeDays, metric]
+    () => buildHeatmapCells(dayList, rangeDays),
+    [dayList, rangeDays]
   );
   const grid = useMemo(() => buildHeatmapGrid(cells), [cells]);
   const summary = useMemo(() => buildHeatmapSummary(cells), [cells]);
@@ -594,7 +582,7 @@ export function TrainingHeatmapPanel({
   return (
     <section className="panel training-heatmap-panel">
       {/* The section's name stands over the panel (Overview's "Training
-          activity"); inside it the range's figures lead, the two switches
+          load heatmap"); inside it the range's figures lead, the range switch
           quiet beside them. */}
       <div className="training-heatmap-header">
         {hasData ? (
@@ -603,29 +591,12 @@ export function TrainingHeatmapPanel({
             <span aria-hidden="true">·</span>
             <span>{plural("overview.heatmap.streak", summary.currentStreak)}</span>
             <span aria-hidden="true">·</span>
-            <span>
-              {isDuration
-                ? t("overview.heatmap.totalTime", { value: formatDurationSpan(summary.totalLoad) })
-                : t("overview.heatmap.totalLoad", { value: formatOptionalNumber(summary.totalLoad) })}
-            </span>
+            <span>{t("overview.heatmap.totalLoad", { value: formatOptionalNumber(summary.totalLoad) })}</span>
           </p>
         ) : (
           <span />
         )}
         <div className="training-heatmap-controls">
-          <OptionGroup
-            label={t("overview.heatmap.metric")}
-            tone="quiet"
-            size="xs"
-            value={metric}
-            options={[
-              { value: "trainingLoad", label: t("overview.trainingLoad") },
-              { value: "duration", label: t("overview.tiles.duration") }
-            ]}
-            onChange={(next) =>
-              setMetric(next === "duration" ? "duration" : "trainingLoad")
-            }
-          />
           {/* Left open. It folded while the labels were "Last 365 days" and
               "Last 30 days", which were the widest thing in the header; on the
               shared scale they are "1 year" and "4 weeks", and two chips that
@@ -652,10 +623,7 @@ export function TrainingHeatmapPanel({
             <div
               className="training-heatmap-strip"
               role="list"
-              aria-label={t(
-                isDuration ? "overview.heatmap.rangeDuration" : "overview.heatmap.rangeLoad",
-                { days: rangeDays }
-              )}
+              aria-label={t("overview.heatmap.rangeLoad", { days: rangeDays })}
               style={
                 {
                   "--heatmap-strip-columns": HEATMAP_STRIP_COLUMNS
@@ -779,9 +747,6 @@ export function TrainingHeatmapPanel({
                               value: formatDistanceMeters(cell.distance, unitSystem)
                             })}
                           </span>
-                          <span>
-                            {t("overview.heatmap.duration", { value: formatDurationSeconds(cell.duration) })}
-                          </span>
                         </span>
                       </div>
                     );
@@ -829,10 +794,7 @@ export function TrainingHeatmapPanel({
                 onPointerEnter={handleGridPointerEnter}
                 onPointerMove={handleGridPointerMove}
                 onPointerLeave={handleGridPointerLeave}
-                aria-label={t(
-                  isDuration ? "overview.heatmap.rangeDuration" : "overview.heatmap.rangeLoad",
-                  { days: rangeDays }
-                )}
+                aria-label={t("overview.heatmap.rangeLoad", { days: rangeDays })}
               >
                 {grid.cells.map((cell, index) => {
                   if (!cell) {
@@ -848,7 +810,6 @@ export function TrainingHeatmapPanel({
 
                   const loadLabel = formatOptionalNumber(cell.trainingLoad);
                   const distanceLabel = formatDistanceMeters(cell.distance, unitSystem);
-                  const durationLabel = formatDurationSeconds(cell.duration);
                   const dominantSport =
                     cell.level > 0 ? sportByDay.get(cell.happenDay) : undefined;
                   const daySports =
@@ -884,7 +845,6 @@ export function TrainingHeatmapPanel({
                         <strong>{cell.label}</strong>
                         <span>{t("overview.heatmap.load", { value: loadLabel })}</span>
                         <span>{t("overview.heatmap.distance", { value: distanceLabel })}</span>
-                        <span>{t("overview.heatmap.duration", { value: durationLabel })}</span>
                       </span>
                     </span>
                   );

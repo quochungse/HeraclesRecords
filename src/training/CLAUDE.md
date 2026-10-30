@@ -60,8 +60,8 @@ list, type 173). Pace's seven buckets draw buckets 3 and 4 as one Threshold row.
 
 ## Overview
 
-The Readiness panel, Coming up, Training activity, Training load distribution, one section
-per sport, Strength. Arithmetic in `overview/*Model.ts` (`test:overview-model`); the renderer
+The Readiness panel, Coming up, Training load heatmap, Training load distribution, one
+section per sport, Strength. Arithmetic in `overview/*Model.ts` (`test:overview-model`); the renderer
 suite mounts four states (`test:overview-renderer`). **Every "today" turns over at midnight**
 (`useTodayKey`).
 
@@ -93,10 +93,16 @@ would wrap (under 840px the week moves below; under 620px all stack).
 (`pairTodayPlan`); a row is pressed as a whole (done opens the session, to-do opens
 `UpcomingWorkoutDetailPanel`).
 
-**Training load distribution** (`distributionModel.ts`): four weeks' load by sport in the
-chosen load (`sportLoadShares`), then COROS's time or load
-per HR zone (seconds) — COROS's either way, Heracles has no zones — read as the easy share
-against 80/20 with `intensityForZone` on the effort ramp.
+**Training load heatmap** (`TrainingHeatmapPanel`) reads training load alone, in the chosen
+load; there is no duration switch, and a month card names each session's load.
+
+**Training load distribution** (`distributionModel.ts`): four weeks' load by sport, every
+sport, in the chosen load (`sportLoadShares`). Then time per HR zone over the sports heart rate
+measures only (`isHeartRateSport`: running, hiking, cycling, swimming, XC skiing, rowing,
+flatwater paddling, walking, stairs, elliptical — not strength, gym cardio, climbing, ball
+sports), summed from each session's own `zoneSeconds` (`zoneTimeEntries`, through
+`useActivityDetailSummaries`), never COROS's all-sport zone totals; time only, since no session
+carries load per zone. Read as the easy share against 80/20 with `intensityForZone`.
 
 **Sport sections** (`sportModel.ts`): Running, Cycling, Hiking, each only when trained in the
 last four calendar weeks and shown on the rail, built from the screens' own builders, never a

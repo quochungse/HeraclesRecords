@@ -11,7 +11,7 @@ import {
   SPORT_COLOR_LABELS,
   type SportColorCategory
 } from "./sportColors";
-import { plural } from "../i18n/core";
+import { plural, t } from "../i18n/core";
 
 /** One activity as it reads inside a Last-30-days heatmap card. */
 export interface HeatmapDayEntry {
@@ -21,8 +21,9 @@ export interface HeatmapDayEntry {
   /** "Run", or "Strength: Shoulders, Chest" once the breakdown is cached. */
   title: string;
   /**
-   * ["10.0 km", "1:21"] — kept apart rather than joined so a narrow card wraps
-   * between them instead of ellipsing the tail of a single string away.
+   * ["10.0 km", "226 TL"] — kept apart rather than joined so a narrow card wraps
+   * between them instead of ellipsing the tail of a single string away. The load
+   * is the session's as the list was handed in (the chosen load).
    */
   meta: string[];
 }
@@ -35,25 +36,6 @@ const MAX_STRENGTH_PARTS = 2;
  * names ("Seated Lat Pulldowns, Seated Cable Row") that blow straight past it.
  */
 const MAX_FOCUS_CHARS = 22;
-
-/**
- * Duration in the shape a card can hold: "46'" under an hour, "1:21" above it.
- * Deliberately coarser than `formatDurationSeconds` — seconds do not fit in a
- * column a tenth of the panel wide, and are not what the summary is for.
- */
-export function formatCardDuration(seconds?: number): string {
-  if (!Number.isFinite(seconds) || (seconds ?? 0) <= 0) {
-    return "";
-  }
-
-  const totalMinutes = Math.max(1, Math.round((seconds ?? 0) / 60));
-  const hours = Math.floor(totalMinutes / 60);
-  const minutes = totalMinutes % 60;
-
-  return hours > 0
-    ? `${hours}:${String(minutes).padStart(2, "0")}`
-    : `${minutes}'`;
-}
 
 /**
  * What a strength session worked, e.g. "Shoulders, Chest".
@@ -153,9 +135,10 @@ export function buildHeatmapDayEntries(
     if ((activity.distance ?? 0) > 0) {
       meta.push(formatDistanceMeters(activity.distance, unitSystem));
     }
-    const duration = formatCardDuration(activity.duration);
-    if (duration) {
-      meta.push(duration);
+    // The heatmap reads training load, so each session says what it added.
+    const load = activity.trainingLoad;
+    if (load !== undefined && Number.isFinite(load) && load > 0) {
+      meta.push(t("units.trainingLoadShort", { value: Math.round(load) }));
     }
 
     const entries = byDay.get(happenDay) ?? [];

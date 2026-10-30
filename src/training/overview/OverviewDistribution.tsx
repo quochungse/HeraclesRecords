@@ -1,16 +1,6 @@
 import { useMemo, type CSSProperties } from "react";
-import type {
-  TrainingHubActivity,
-  TrainingHubAnalytics,
-  TrainingHubThresholdZone,
-  TrainingHubZoneDistributionEntry
-} from "../../../electron/types";
-import { OptionGroup } from "../../components/OptionGroup";
-import {
-  defineSelectionPreference,
-  selectionIsOneOf,
-  useSelectionPreference
-} from "../../preferences/selectionPreferences";
+import type { TrainingHubActivity, TrainingHubThresholdZone } from "../../../electron/types";
+import type { HeraclesRecordsApi } from "../../heraclesrecords-api";
 import { periodLabel } from "../../preferences/periodScale";
 import { zoneName } from "../../i18n/zoneNames";
 import { formatDurationSpan } from "../formatters";
@@ -20,21 +10,16 @@ import { zoneColor, zoneLabel } from "../components/routeColoring";
 import { zoneNamesFor } from "../zoneTime";
 import { formatCount, t } from "../../i18n/core";
 import { useI18n } from "../../i18n/useI18n";
+import { useActivityDetailSummaries } from "../useActivityDetailSummaries";
 import { useLoadSource } from "../loadSource";
 import {
   DISTRIBUTION_DAYS,
+  heartRateSessions,
   intensityShares,
   sportLoadShares,
-  zoneShares
+  zoneShares,
+  zoneTimeEntries
 } from "./distributionModel";
-
-type ZoneMeasure = "time" | "trainingLoad";
-
-const ZONE_MEASURE = defineSelectionPreference<ZoneMeasure>({
-  key: "overview.zoneMeasure",
-  defaultValue: "time",
-  validate: selectionIsOneOf(["time", "trainingLoad"])
-});
 
 /** The 80/20 rule's line: four fifths of the time easy. */
 const EASY_TARGET = 0.8;
@@ -45,8 +30,6 @@ const EASY_TARGET = 0.8;
  */
 const LABELLED_SHARE = 0.07;
 
-const NO_ZONES: readonly TrainingHubZoneDistributionEntry[] = [];
-
 function whole(value: number): string {
   return formatCount(Math.round(value));
 }
@@ -56,41 +39,41 @@ function percent(share: number): string {
 }
 
 /**
- * Training load distribution: the last four weeks' load by sport, in the
- * chosen load (strength at Heracles Training Load when that is chosen), then COROS's own time (or load) in each heart-rate zone,
- * read first as the easy share against the 80/20 line and then zone by zone.
+ * Training load distribution: the last four weeks' load by sport, every sport
+ * in the chosen load (strength at Heracles Training Load when that is chosen),
+ * then time in each heart-rate zone over the sports heart rate measures
+ * (`isHeartRateSport`), read first as the easy share against the 80/20 line and
+ * then zone by zone. The zones are each session's own (its detail's summary),
+ * not COROS's all-sport total, which counts a lifting session alike.
  */
 export function OverviewDistribution({
+  api,
   activities,
-  analytics,
   hrZoneModel,
   lthrZones,
   loading = false
 }: {
+  api: HeraclesRecordsApi | null;
   activities: TrainingHubActivity[];
-  analytics: TrainingHubAnalytics | null;
   hrZoneModel: HeartRateZoneModel | null;
   lthrZones: TrainingHubThresholdZone[];
   loading?: boolean;
 }) {
   useI18n();
-  const [measure, setMeasure] = useSelectionPreference(ZONE_MEASURE);
   const { source: loadSource } = useLoadSource();
   const bySport = useMemo(
     () => sportLoadShares(activities, undefined, undefined, loadSource),
     [activities, loadSource]
   );
-  const entries =
-    measure === "time"
-      ? (analytics?.zoneDistributions.hrTime ?? NO_ZONES)
-      : (analytics?.zoneDistributions.hrTrainingLoad ?? NO_ZONES);
-  const byZone = useMemo(() => zoneShares(entries), [entries]);
+  const sessions = useMemo(() => heartRateSessions(activities), [activities]);
+  const summaries = useActivityDetailSummaries({ api, activities: sessions, enabled: !loading });
+  const zoneTime = useMemo(() => zoneTimeEntries(sessions, summaries), [sessions, summaries]);
+  const byZone = useMemo(() => zoneShares(zoneTime.entries), [zoneTime]);
   // The zones are the account's own model, as the Running screen reads them.
   const family = hrZoneModel?.family ?? "lthr";
   const zones = hrZoneModel?.zones ?? lthrZones;
   const names = zoneNamesFor(family);
   const split = intensityShares(byZone.rows, family);
-  const figure = (value: number) => (measure === "time" ? formatDurationSpan(value) : whole(value));
   // A narrow sport in the middle of the bar has no room for its name under
   // its segment: the names then read as a legend, each with its colour, as
   // they do in a narrow section whatever the shares (overview.css).
@@ -150,19 +133,8 @@ export function OverviewDistribution({
 
         <div className="overview-dist-part">
           <div className="overview-dist-head">
-            <strong>{t("overview.distribution.byZone")}</strong>
+            <strong title={t("overview.distribution.sportsNote")}>{t("overview.distribution.byZone")}</strong>
             {hrZoneModel ? <span className="overview-dist-aside">· {hrZoneModel.label}</span> : null}
-            <OptionGroup
-              label={t("overview.distribution.measure")}
-              tone="quiet"
-              size="xs"
-              value={measure}
-              options={[
-                { value: "time", label: t("overview.zones.time") },
-                { value: "trainingLoad", label: t("overview.tiles.load") }
-              ]}
-              onChange={setMeasure}
-            />
           </div>
 
           {byZone.rows.length > 0 ? (
@@ -176,9 +148,10 @@ export function OverviewDistribution({
                   <span>{t("overview.distribution.easy")}</span>
                 </p>
                 <p className="overview-dist-caption">
-                  {measure === "time"
-                    ? t("overview.distribution.ofTime", { time: formatDurationSpan(byZone.total) })
-                    : t("overview.distribution.ofLoad", { load: whole(byZone.total) })}
+                  {t("overview.distribution.ofTime", { time: formatDurationSpan(byZone.total) })}
+                  {zoneTime.read < zoneTime.total
+                    ? ` · ${t("overview.distribution.zoneCoverage", { read: zoneTime.read, total: zoneTime.total })}`
+                    : null}
                 </p>
                 <div className="overview-dist-split" aria-hidden="true">
                   <div className="overview-dist-split-bar">
@@ -217,7 +190,7 @@ export function OverviewDistribution({
                         aria-hidden="true"
                         style={{ "--zone-fill": `${row.share * 100}%`, "--zone-colour": zoneColor(row.position) } as CSSProperties}
                       />
-                      <span className="figure">{figure(row.value)}</span>
+                      <span className="figure">{formatDurationSpan(row.value)}</span>
                       <span className="overview-dist-zone-share">{percent(row.share)}</span>
                     </li>
                   );
@@ -226,7 +199,7 @@ export function OverviewDistribution({
             </div>
           ) : (
             <p className="overview-dist-empty">
-              {loading ? t("overview.zones.reading") : t("overview.zones.hrEmpty")}
+              {loading || zoneTime.total > 0 ? t("overview.zones.reading") : t("overview.zones.hrEmpty")}
             </p>
           )}
         </div>

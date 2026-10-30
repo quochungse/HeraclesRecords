@@ -1,4 +1,5 @@
 import type {
+  ActivityDetailSummary,
   CorosProfileZoneFamily,
   StrengthLoadSource,
   TrainingHubActivity,
@@ -11,14 +12,43 @@ import { sportColorCategory, SPORT_COLOR_CATEGORIES, type SportColorCategory } f
 
 /*
  * The arithmetic behind Overview's Training load distribution: the last four
- * weeks' load by sport, in the load the athlete reads strength in, and COROS's
- * own time and load in each heart-rate zone with the easy / moderate / hard
- * split it adds up to. The zones stay COROS's: its load is a heart-rate
- * figure, and Heracles Training Load has no zone to fall in.
+ * weeks' load by sport, every sport, in the load the athlete reads strength
+ * in; then time in each heart-rate zone over the sports heart rate measures,
+ * with the easy / moderate / hard split it adds up to. A stop-start session
+ * (lifting, climbing, a match) is left out of the zones: its heart rate says
+ * little of the effort.
  */
 
-/** The window, and the one COROS's zone area lists cover. */
+/** The window. */
 export const DISTRIBUTION_DAYS = 28;
+
+/**
+ * COROS's codes for the steady sports heart rate measures: running, hiking,
+ * cycling, swimming, cross-country skiing and ski touring, rowing, flatwater
+ * paddling, walking, stair climbing and the elliptical. Anything else —
+ * strength and gym cardio, climbing, downhill skiing, ball and racket sports,
+ * yoga, a custom sport — is stop-start or unknown, and stays out.
+ */
+const HEART_RATE_SPORT_TYPES: ReadonlySet<number> = new Set([
+  100, 101, 102, 103, 104, 105, 200, 201, 202, 203, 204, 205, 299, 300, 301, 502, 503, 700, 701, 704, 900, 902, 903
+]);
+
+export function isHeartRateSport(sportType: number | undefined): boolean {
+  return sportType !== undefined && HEART_RATE_SPORT_TYPES.has(sportType);
+}
+
+/** The heart-rate sports' sessions of the last `days` days: what the zones are read over. */
+export function heartRateSessions(
+  activities: readonly TrainingHubActivity[],
+  now = new Date(),
+  days = DISTRIBUTION_DAYS
+): TrainingHubActivity[] {
+  const since = now.getTime() - days * 86_400_000;
+  return activities.filter((activity) => {
+    const start = activityStartTimeMs(activity) ?? 0;
+    return isHeartRateSport(activity.sportType) && start >= since && start <= now.getTime();
+  });
+}
 
 export interface SportShare {
   category: SportColorCategory;
@@ -28,9 +58,9 @@ export interface SportShare {
 }
 
 /**
- * Load by sport over the last `days` days, the biggest first; a sport with no
- * load is left out rather than drawn as a sliver. With Heracles chosen a
- * strength session counts its Heracles load.
+ * Load by sport over the last `days` days, every sport, the biggest first; a
+ * sport with no load is left out rather than drawn as a sliver. With Heracles
+ * chosen a strength session counts its Heracles load.
  */
 export function sportLoadShares(
   activities: readonly TrainingHubActivity[],
@@ -57,6 +87,33 @@ export function sportLoadShares(
     })
     .sort((left, right) => right.load - left.load);
   return { total, sports };
+}
+
+/**
+ * Time in each heart-rate zone over the given sessions, from each one's own
+ * detail (`ActivityDetailSummary.zoneSeconds`, COROS's seconds per zone), as
+ * entries `zoneShares` reads. `read` of `total` sessions had one; the rest are
+ * still being fetched, or kept no heart rate.
+ */
+export function zoneTimeEntries(
+  sessions: readonly TrainingHubActivity[],
+  summaries: ReadonlyMap<string, ActivityDetailSummary>
+): { entries: TrainingHubZoneDistributionEntry[]; read: number; total: number } {
+  const seconds: number[] = [];
+  let read = 0;
+  for (const session of sessions) {
+    const zones = summaries.get(session.activityId)?.zoneSeconds;
+    if (!zones?.some((value) => value > 0)) continue;
+    read += 1;
+    zones.forEach((value, index) => {
+      seconds[index] = (seconds[index] ?? 0) + (Number.isFinite(value) && value > 0 ? value : 0);
+    });
+  }
+  return {
+    entries: Array.from(seconds, (value, index) => ({ index, value: value ?? 0 })),
+    read,
+    total: sessions.length
+  };
 }
 
 export interface ZoneShare {

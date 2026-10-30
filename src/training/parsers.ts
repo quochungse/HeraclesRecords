@@ -17,7 +17,6 @@ import type {
   HeatmapCell,
   HeatmapGrid,
   HeatmapIntensityLevel,
-  HeatmapMetric,
   HeatmapMonthLabel,
   HeatmapSummary,
   TrainingHubSnapshot,
@@ -80,15 +79,15 @@ function loadToLevel(
   return 4;
 }
 
+/** The heatmap reads training load alone: a day's colour is how much it loaded. */
 export function buildHeatmapCells(
   dayList: TrainingHubDailyMetric[],
-  days = TRAINING_HEATMAP_DAYS,
-  metric: HeatmapMetric = "trainingLoad"
+  days = TRAINING_HEATMAP_DAYS
 ): HeatmapCell[] {
   const dayMap = new Map(dayList.map((day) => [day.happenDay, day]));
   const dateKeys = recentTrainingHubDateList(days).reverse();
   const values = dateKeys
-    .map((key) => dayMap.get(key)?.[metric])
+    .map((key) => dayMap.get(key)?.trainingLoad)
     .filter(
       (value): value is number =>
         value !== undefined && Number.isFinite(value) && value > 0
@@ -97,7 +96,7 @@ export function buildHeatmapCells(
 
   return dateKeys.map((happenDay) => {
     const day = dayMap.get(happenDay);
-    const value = day?.[metric];
+    const value = day?.trainingLoad;
 
     return {
       happenDay,
