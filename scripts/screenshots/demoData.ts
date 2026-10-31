@@ -9,6 +9,7 @@ import { withSampleRides, sampleRideDetail, withSampleRideSummaries, isSampleRid
 import { withSampleHikes, sampleHikeDetail, withSampleHikeSummaries, isSampleHikeId } from "../../electron/sampleHikes";
 import { withSampleTrailRuns, sampleTrailRunDetail, withSampleTrailRunSummaries, isSampleTrailRunId } from "../../electron/sampleTrailRuns";
 import { withSampleRoadRuns, sampleRoadRunDetail, withSampleRoadRunSummaries, isSampleRoadRunId } from "./sampleRoadRuns";
+import { withSampleSwims, sampleSwimDetail, withSampleSwimSummaries, isSampleSwimId } from "../../electron/sampleSwims";
 import { sampleRecordsInput } from "../../src/records/sampleRecords";
 import { buildSampleStrengthSessions } from "../../src/strength/sampleSessions";
 import { historyTrack } from "./demoTracks";
@@ -60,33 +61,9 @@ const history = realistic.activities
 
 // --------------------------------------------------------- recent extras --
 
-/** Strength sessions and swims for the last twelve weeks: list rows only. */
+/** Strength sessions for the last twelve weeks: list rows only. The swims are electron/sampleSwims.ts. */
 function recentExtras(): TrainingHubActivity[] {
   const rows: TrainingHubActivity[] = [];
-  for (let day = 1; day < RECENT_DAYS; day += 1) {
-    const date = daysAgoDate(day);
-    const weekday = date.getDay();
-    const r = seededRandom(`extra-${day}`);
-    if (weekday === 3 && day % 14 < 7) {
-      const start = daysAgoDate(day, 18, 40);
-      const duration = 2400 + Math.round(r() * 600);
-      rows.push({
-        activityId: `demo-swim-${day}`,
-        name: "Pool swim",
-        sportType: 300,
-        sportName: "Pool Swim",
-        startTime: start.getTime() / 1000,
-        endTime: start.getTime() / 1000 + duration,
-        duration,
-        elapsedDuration: duration,
-        distance: 1800 + Math.round(r() * 6) * 100,
-        avgHr: 128 + Math.round(r() * 10),
-        maxHr: 152 + Math.round(r() * 10),
-        calories: 380 + Math.round(r() * 60),
-        trainingLoad: 42 + Math.round(r() * 14)
-      });
-    }
-  }
   for (const s of buildSampleStrengthSessions(RECENT_DAYS)) {
     const wd = new Date((s.startTime ?? 0) * 1000).getDay();
     if (wd !== 1 && wd !== 4) continue;
@@ -105,6 +82,7 @@ export function allActivities(): TrainingHubActivity[] {
   list = withSampleHikes(list, req);
   list = withSampleTrailRuns(list, req);
   list = withSampleRoadRuns(list, req);
+  list = withSampleSwims(list, req);
   // One outdoor session a day at most, besides the gym and the pool: a run beats a trail run beats a hike beats a ride.
   const rank = (a: TrainingHubActivity) => isSampleRoadRunId(a.activityId) ? 4 : isSampleTrailRunId(a.activityId) ? 3 : isSampleHikeId(a.activityId) ? 2 : isSampleRideId(a.activityId) ? 1 : 0;
   const best = new Map<string, number>();
@@ -149,6 +127,7 @@ export function activityDetail(id: string): TrainingHubActivityDetail {
   if (isSampleHikeId(id)) return sampleHikeDetail(id);
   if (isSampleTrailRunId(id)) return sampleTrailRunDetail(id);
   if (isSampleRoadRunId(id)) return sampleRoadRunDetail(id);
+  if (isSampleSwimId(id)) return sampleSwimDetail(id);
   const a = findActivity(id);
   if (!a) throw new Error(`No demo activity ${id}`);
   return minimalDetail(a);
@@ -163,6 +142,7 @@ export function activitySummaries(ids: string[]): ActivityDetailSummary[] {
   out = withSampleHikeSummaries(ids, out);
   out = withSampleTrailRunSummaries(ids, out);
   out = withSampleRoadRunSummaries(ids, out);
+  out = withSampleSwimSummaries(ids, out);
   // Drift is a road-run figure (see the Activities fix): rides, hikes and trail runs carry none.
   return out.map((s) => (isSampleRoadRunId(s.activityId) ? s : { ...s, decouplingPercent: undefined }));
 }

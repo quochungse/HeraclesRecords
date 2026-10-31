@@ -9,6 +9,7 @@ export interface SampleDataState {
   rides: boolean;
   hikes: boolean;
   trailRuns: boolean;
+  swims: boolean;
 }
 
 /** A coordinate resolved to a human-readable place (Nominatim). */
@@ -838,6 +839,13 @@ export interface ActivityDetailSummary {
    */
   performanceVersion?: number;
   performance?: RunPerformanceCurve;
+  /**
+   * A swim's strokes, pool and best efforts (`electron/swimDetail.ts`),
+   * versioned on its own for the reason the intensity is. Absent on another
+   * sport and on a row computed before it existed.
+   */
+  swimVersion?: number;
+  swim?: SwimSummary;
   /** Epoch milliseconds. */
   computedAt: number;
 }
@@ -983,6 +991,119 @@ export interface TrainingHubActivityDetail {
    * reading of the same laps and leaves the timed sets out.
    */
   exerciseSets?: SessionSetExercise[];
+  /** A swim's lengths, intervals and rests (`swimDetail.ts`). Swims only. */
+  swim?: TrainingHubSwimDetail;
+}
+
+/**
+ * The stroke a length was swum in, as the watch detected it — COROS's
+ * `swimStyle`. `medley` is an individual medley interval; `mixed` an interval
+ * whose lengths changed stroke; `unknown` a length the watch could not place.
+ */
+export type SwimStyle =
+  | "free"
+  | "back"
+  | "breast"
+  | "fly"
+  | "medley"
+  | "mixed"
+  | "drill"
+  | "unknown";
+
+/** One length of the pool, wall to wall. */
+export interface TrainingHubSwimLength {
+  /** 1-based, in the order swum. */
+  index: number;
+  /** The interval it belongs to, by `TrainingHubSwimInterval.index`. */
+  interval?: number;
+  style: SwimStyle;
+  /** Metres: the pool's length, or what a drill logged. */
+  distance: number;
+  /** Seconds, to the hundredth. */
+  seconds: number;
+  /** Strokes of the arm wearing the watch. Absent on a drill. */
+  strokes?: number;
+  /** Seconds plus strokes, as COROS scored the length. */
+  swolf?: number;
+  /** Strokes a minute. */
+  strokeRate?: number;
+  avgHr?: number;
+  /** Seconds rested just before it, when a rest broke the swim there. */
+  restBefore?: number;
+}
+
+/** What the swimmer swam between two rests: a COROS lap. */
+export interface TrainingHubSwimInterval {
+  /** 1-based, rests not counted. */
+  index: number;
+  style: SwimStyle;
+  /** Metres. */
+  distance: number;
+  /** Seconds, to the hundredth. */
+  seconds: number;
+  /** Lengths in it; absent in open water. */
+  lengths?: number;
+  strokes?: number;
+  /** Average SWOLF of its lengths. */
+  swolf?: number;
+  strokeRate?: number;
+  avgHr?: number;
+  maxHr?: number;
+  /** Seconds rested after it, before the next interval. */
+  restAfter?: number;
+}
+
+export interface TrainingHubSwimDetail {
+  /** Metres, found from the lengths. Absent in open water. */
+  poolLength?: number;
+  /** The pool's own unit: a 25 yd pool is 22.86 m and is said in yards. */
+  poolUnit?: "m" | "yd";
+  lengths: TrainingHubSwimLength[];
+  intervals: TrainingHubSwimInterval[];
+  /** Seconds swimming, rests out. */
+  swimSeconds?: number;
+  /** Seconds resting at the wall. */
+  restSeconds?: number;
+  totalStrokes?: number;
+  /** COROS's average SWOLF for the session. */
+  avgSwolf?: number;
+  /** Strokes a minute, COROS's average. */
+  avgStrokeRate?: number;
+  waterTemperatureC?: number;
+}
+
+/** One stroke's share of a swim, over the lengths swum in it. */
+export interface SwimStyleTotals {
+  style: SwimStyle;
+  /** Metres. */
+  meters: number;
+  /** Seconds. */
+  seconds: number;
+  lengths: number;
+  /** The lengths of it that carry a stroke count: what SWOLF and stroke figures are read over. */
+  counted?: { lengths: number; meters: number; seconds: number; strokes: number };
+}
+
+/** The fastest stretch of one swim over a standard distance, freestyle without a rest. */
+export interface SwimEffort {
+  /** Metres: 100, 200, 400, 800 or 1 500. */
+  distance: number;
+  seconds: number;
+}
+
+/** What a swim's list row, trend and stroke mix are read from (`swimSummaryOf`). */
+export interface SwimSummary {
+  version: number;
+  /** Metres. Absent in open water. */
+  poolLength?: number;
+  poolUnit?: "m" | "yd";
+  lengths?: number;
+  swimSeconds: number;
+  restSeconds: number;
+  /** Per stroke, in the order the app lists strokes; empty in open water. */
+  byStyle: SwimStyleTotals[];
+  best: SwimEffort[];
+  waterTemperatureC?: number;
 }
 
 export interface TrainingHubScheduledExercise {

@@ -287,5 +287,33 @@
    1000
   ],
   "theme": "dark"
+ },
+ {
+  "out": "31-swimming",
+  "view": "swimming",
+  "wait": 4500,
+  "theme": "dark"
+ },
+ {
+  "out": "32-swim",
+  "view": "swimming",
+  "wait": 4000,
+  "steps": [
+   "(() => { const row = [...document.querySelectorAll(\"tr\")].filter((t) => t.textContent.includes(\"CSS 8 × 100\"))[0]; if (!row) return \"no swim\"; row.click(); return true; })()",
+   3500
+  ],
+  "theme": "dark"
+ },
+ {
+  "out": "33-swim-lengths",
+  "view": "swimming",
+  "wait": 4000,
+  "steps": [
+   "(() => { const row = [...document.querySelectorAll(\"tr\")].filter((t) => t.textContent.includes(\"CSS 8 × 100\"))[0]; if (!row) return \"no swim\"; row.click(); return true; })()",
+   3500,
+   "(() => { const page = document.querySelector(\".run-detail\"); const panel = [...page.querySelectorAll(\".panel\")].find((p) => p.textContent.startsWith(\"Lengths\")); if (!panel) return \"no panel\"; page.scrollTop += panel.getBoundingClientRect().top - 70; return true; })()",
+   1500
+  ],
+  "theme": "dark"
  }
 ]

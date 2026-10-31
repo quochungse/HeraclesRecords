@@ -31,8 +31,11 @@ import {
   metersToDisplayDistance,
   metersToElevation,
   secondsPerKmToDisplayPace,
-  speedUnit
+  speedUnit,
+  swimDistanceUnit
 } from "../../units/units";
+import { formatDistanceValue } from "../../../electron/unitSystem";
+import { swimPacePer100 } from "../../../electron/activityReading";
 import { formatDurationSeconds } from "../formatters";
 import {
   activityAxisTicks,
@@ -140,24 +143,34 @@ type ChartRow = ActivityChannelPoint & {
 };
 
 /** Which activity the chart is about, for its two sentences that name it. */
-const ACTIVITY_NOUN: Record<ActivityMotion, "run" | "ride" | "hike"> = {
+const ACTIVITY_NOUN: Record<ActivityMotion, "run" | "ride" | "hike" | "swim"> = {
   pace: "run",
   speed: "ride",
   hike: "hike",
-  trail: "run"
+  trail: "run",
+  swim: "swim"
 };
 
-/** Whether a whole activity's movement is stated as a pace — a run's, on the road or a trail. */
+/** Whether a whole activity's movement is stated as a pace — a run's, on the road or a trail, or a swim's. */
 function readsPace(motion: ActivityMotion): boolean {
-  return motion === "pace" || motion === "trail";
+  return motion === "pace" || motion === "trail" || motion === "swim";
 }
 
 function cadenceUnit(motion: ActivityMotion): string {
   return motion === "speed" ? "rpm" : "spm";
 }
 
-function formatPaceTick(secondsPerKm: number, unitSystem: UnitSystem): string {
-  const perDisplayUnit = Math.round(secondsPerKmToDisplayPace(secondsPerKm, unitSystem));
+/** A pace's unit: per kilometre or mile, or per 100 m or yd in the water. */
+function paceUnit(unitSystem: UnitSystem, motion: ActivityMotion): string {
+  return motion === "swim" ? `/100${swimDistanceUnit(unitSystem)}` : `/${distanceUnit(unitSystem)}`;
+}
+
+function formatPaceTick(secondsPerKm: number, unitSystem: UnitSystem, motion: ActivityMotion): string {
+  const perDisplayUnit = Math.round(
+    motion === "swim"
+      ? swimPacePer100(secondsPerKm, unitSystem)
+      : secondsPerKmToDisplayPace(secondsPerKm, unitSystem)
+  );
   const minutes = Math.floor(perDisplayUnit / 60);
   const seconds = perDisplayUnit % 60;
   return `${minutes}:${String(seconds).padStart(2, "0")}`;
@@ -172,7 +185,7 @@ function formatChannelValue(
   const definition = activityChannel(key);
 
   if (key === "pace" || key === "adjustedPace") {
-    return `${formatPaceTick(value, unitSystem)} /${distanceUnit(unitSystem)}`;
+    return `${formatPaceTick(value, unitSystem, motion)} ${paceUnit(unitSystem, motion)}`;
   }
   if (key === "speed") {
     return `${formatDecimal(kmhToDisplaySpeed(value, unitSystem), 1)} ${speedUnit(unitSystem)}`;
@@ -193,10 +206,11 @@ function formatChannelValue(
 function formatAxisTick(
   key: ActivityChannelKey,
   value: number,
-  unitSystem: UnitSystem
+  unitSystem: UnitSystem,
+  motion: ActivityMotion
 ): string {
   if (key === "pace" || key === "adjustedPace") {
-    return formatPaceTick(value, unitSystem);
+    return formatPaceTick(value, unitSystem, motion);
   }
   if (key === "speed") {
     return formatDecimal(kmhToDisplaySpeed(value, unitSystem), 0);
@@ -592,7 +606,7 @@ export function ActivitySeriesChart({
                 axisLine={false}
                 tickCount={5}
                 tickFormatter={(value: number) =>
-                  formatAxisTick(channel.key, value, unitSystem)
+                  formatAxisTick(channel.key, value, unitSystem, motion)
                 }
               />
             ))}
@@ -846,8 +860,15 @@ export function ActivitySeriesChart({
           </span>
           {segment.distance !== undefined ? (
             <span>
-              {formatDecimal(metersToDisplayDistance(segment.distance, unitSystem), 2)}{" "}
-              {distanceUnit(unitSystem)}
+              {motion === "swim" ? (
+                // A swim is said in metres (or yards), never in kilometres.
+                formatDistanceValue(segment.distance, unitSystem, { swim: true })
+              ) : (
+                <>
+                  {formatDecimal(metersToDisplayDistance(segment.distance, unitSystem), 2)}{" "}
+                  {distanceUnit(unitSystem)}
+                </>
+              )}
             </span>
           ) : null}
           {segment.duration !== undefined ? (
@@ -913,7 +934,7 @@ function PlotAxisCaptions({
 
 /** The unit a channel's axis ticks are written in, for its caption. */
 function axisUnit(key: ActivityChannelKey, unitSystem: UnitSystem, motion: ActivityMotion): string {
-  if (key === "pace" || key === "adjustedPace") return `/${distanceUnit(unitSystem)}`;
+  if (key === "pace" || key === "adjustedPace") return paceUnit(unitSystem, motion);
   if (key === "speed") return speedUnit(unitSystem);
   if (key === "verticalSpeed") return `${elevationUnit(unitSystem)}/h`;
   if (key === "cadence") return cadenceUnit(motion);

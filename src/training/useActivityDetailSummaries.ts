@@ -60,6 +60,8 @@ export interface ActivityDetailSummariesInput {
   requireIntensity?: boolean;
   /** Also count a road or track run as missing until it carries its performance curve. */
   requirePerformance?: boolean;
+  /** Also count a swim as missing until it carries its strokes, pool and best efforts. */
+  requireSwim?: boolean;
 }
 
 export function useActivityDetailSummaries({
@@ -67,7 +69,8 @@ export function useActivityDetailSummaries({
   activities,
   enabled,
   requireIntensity = false,
-  requirePerformance = false
+  requirePerformance = false,
+  requireSwim = false
 }: ActivityDetailSummariesInput): ReadonlyMap<string, ActivityDetailSummary> {
   const [summaries, setSummaries] =
     useState<ReadonlyMap<string, ActivityDetailSummary>>(EMPTY);
@@ -106,7 +109,7 @@ export function useActivityDetailSummaries({
           const pass = await api.syncActivityDetailSummaries(
             ids,
             SUMMARY_CHUNK,
-            { requireIntensity, requirePerformance }
+            { requireIntensity, requirePerformance, requireSwim }
           );
           // Charged before anything else: the fetches happened whether or not
           // this effect is still around to see them, and a period change tears
@@ -137,7 +140,7 @@ export function useActivityDetailSummaries({
     return () => {
       cancelled = true;
     };
-  }, [api, enabled, key, requireIntensity, requirePerformance]);
+  }, [api, enabled, key, requireIntensity, requirePerformance, requireSwim]);
 
   return summaries;
 }

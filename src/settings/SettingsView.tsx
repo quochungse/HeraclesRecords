@@ -121,14 +121,16 @@ const SPORT_COLOR_ICONS: Record<SportColorCategory, LucideIcon> = {
 };
 
 /** The colour tiles in the sport screens' order — Running, Cycling, Hiking,
-    Strength — so each colour sits under its sport's screen in the card above,
-    the two grids sharing their columns. Other, which has no screen, ends it. */
+    Swimming, Strength — so each colour sits under its sport's screen in the
+    card above, the two grids sharing their columns. Swims wear Other, the
+    colour every sport without one of its own wears, so it stands under
+    Swimming. */
 const SPORT_COLOR_ORDER: SportColorCategory[] = [
   "run",
   "bike",
   "hiking",
-  "strength",
   "other",
+  "strength",
 ];
 
 /** The sport screens as tiles, each wearing the icon it has on the sidebar.

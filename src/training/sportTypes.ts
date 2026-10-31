@@ -25,9 +25,8 @@ export function knownSportName(code: number): string | undefined {
   return KNOWN_SPORT_CODES.has(code) ? t(`sports.code.${code}` as MessageKey) : undefined;
 }
 
-export function isSwimSportType(sportType?: number): boolean {
-  return sportType === 300 || sportType === 301;
-}
+/** Pool Swim and Open Water — the Swimming screen's two, decided in one place. */
+export { isSwimSportType } from "../../electron/swimDetail";
 
 /**
  * The codes the Strength screen reads, matching `STRENGTH_SPORT_TYPES` in

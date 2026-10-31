@@ -3,7 +3,7 @@
 ## Activities (`ActivitiesView.tsx`)
 
 The all-sport log, and the only home for sports no sport screen covers (Running 100–103,
-Cycling 200–205/299, Hiking 104/105, Strength 400/402). Depth per sport belongs on the sport
+Cycling 200–205/299, Hiking 104/105, Swimming 300/301, Strength 400/402). Depth per sport belongs on the sport
 screens; Activities links out with the session (`SportScreenRequest`).
 - The arithmetic is out of the view: `activityFilters.ts` (periods cut at a Monday,
   categories, search, totals), `activityFacts.ts` (a row's facts, capped at three) and
@@ -34,7 +34,7 @@ sport (anything two screens need moves here rather than being copied).
   pairs named over `DARK_CHANNEL_COLORS`. Names are COROS's: Effort pace, Ground time, Stride
   height, Stride ratio, Running power (decided by `isRunSportType`, never `motion`).
 - `motion` picks the sport's reading: `"speed"` (rides: speed, rpm), `"hike"` (km/h, climbing
-  rate), `"trail"` (pace, GAP, climbing rate).
+  rate), `"trail"` (pace, GAP, climbing rate), `"swim"` (pace per 100 m/yd, cadence named Stroke rate).
 
 ## Training label (`electron/sessionIntensity.ts` reads, `trainingBenefit.ts` names)
 

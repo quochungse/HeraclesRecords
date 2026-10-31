@@ -1,0 +1,102 @@
+/*
+ * Swimming view.
+ *
+ * The page is Running's, as Cycling's and Hiking's are: it carries
+ * `.running-view` and draws with running.css. This file holds only what a
+ * swim has and a run does not — its two kinds, its strokes and their colours,
+ * and the marks on a length chart.
+ *
+ * A pool swim is the colour swims already wear in the app (the "other" sport
+ * colour) and open water is mixed off it towards a deep blue; the strokes take
+ * one hue each. Both are resolved to hex for the charts in swimColors.ts;
+ * change both together.
+ */
+
+.swimming-view {
+  --swim-pool: var(--sport-other, #7fd8cf);
+  --swim-open: color-mix(in srgb, var(--sport-other, #7fd8cf) 40%, #2f5bd3);
+  --swim-style-free: #4cb8e8;
+  --swim-style-back: #9b8cff;
+  --swim-style-breast: #4fc483;
+  --swim-style-fly: #f08a4b;
+  --swim-style-medley: #e2b33c;
+  --swim-style-mixed: #e27aa6;
+  --swim-style-drill: #8d96a3;
+  --swim-style-unknown: #5c6167;
+}
+
+/* The chip is `.run-surface-chip` — its size and type are Running's — worn in
+   the swim's colour. */
+.swim-type-pool {
+  background: color-mix(in srgb, var(--swim-pool) 22%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--swim-pool) 45%, transparent);
+}
+
+.swim-type-open {
+  background: color-mix(in srgb, var(--swim-open) 22%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--swim-open) 45%, transparent);
+}
+
+.swim-style-free { --swim-style: var(--swim-style-free); }
+.swim-style-back { --swim-style: var(--swim-style-back); }
+.swim-style-breast { --swim-style: var(--swim-style-breast); }
+.swim-style-fly { --swim-style: var(--swim-style-fly); }
+.swim-style-medley { --swim-style: var(--swim-style-medley); }
+.swim-style-mixed { --swim-style: var(--swim-style-mixed); }
+.swim-style-drill { --swim-style: var(--swim-style-drill); }
+.swim-style-unknown { --swim-style: var(--swim-style-unknown); }
+
+/* A stroke named in a table cell, behind its colour. */
+.swim-style-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text-primary);
+  white-space: nowrap;
+}
+
+.swim-style-tag::before {
+  content: "";
+  width: 8px;
+  height: 8px;
+  border-radius: var(--radius-pill);
+  background: var(--swim-style);
+}
+
+/* A swim page states more than a run's — swim time and rest, SWOLF, strokes,
+   the pool — and its pace is per 100: at Running's 120px "Strokes / length"
+   wrapped, and at 140px so did "1:54 /100m". */
+.swimming-view .run-detail-stats {
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+}
+
+/* A run of equal intervals, named as a swimmer writes it: 8 × 100 m. */
+.swim-set-row th {
+  padding-top: 14px;
+  color: var(--text-secondary);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-align: left;
+  text-transform: uppercase;
+}
+
+.swim-set-row th span {
+  margin-left: 8px;
+  color: var(--text-muted);
+  font-weight: 500;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+/* The rest after an interval, under the interval it followed. */
+.swim-rest-cell {
+  color: var(--text-secondary);
+}
+
+.swim-hero-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

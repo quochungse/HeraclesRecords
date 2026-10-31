@@ -32,6 +32,7 @@ import { isSpeedSport, resolveSportName } from "../sportTypes";
 import { classifyRunSurface, isRunSportType } from "../../running/runSurface";
 import { isRideSportType } from "../../cycling/rideType";
 import { isHikeSportType } from "../../hiking/hikeType";
+import { isSwimSportType } from "../../swimming/swimType";
 import { sportScreenFor, type SportScreen } from "../../navigation/sportScreens";
 import { useUnitSystem } from "../../units/UnitSystemProvider";
 import { formatTemperatureValue } from "../../units/units";
@@ -130,6 +131,7 @@ const SPORT_SCREEN_LABELS: Record<SportScreen, MessageKey> = {
   running: "nav.running",
   cycling: "nav.cycling",
   hiking: "nav.hiking",
+  swimming: "nav.swimming",
   strength: "nav.strength"
 };
 
@@ -677,16 +679,19 @@ export function ActivityDetailPane({
               embedded
               sportType={sportType}
               // A ride reads in km/h and rpm here as it does on Cycling, a
-              // hike in km/h and metres an hour as it does on Hiking, and a
-              // trail run in pace and metres an hour as it does on Running.
+              // hike in km/h and metres an hour as it does on Hiking, a trail
+              // run in pace and metres an hour as it does on Running, and a
+              // swim in pace per 100 and stroke rate as it does on Swimming.
               motion={
                 isRideSportType(sportType)
                   ? "speed"
                   : isHikeSportType(sportType)
                     ? "hike"
-                    : classifyRunSurface(sportType) === "trail"
-                      ? "trail"
-                      : "pace"
+                    : isSwimSportType(sportType)
+                      ? "swim"
+                      : classifyRunSurface(sportType) === "trail"
+                        ? "trail"
+                        : "pace"
               }
             />
           ) : null}

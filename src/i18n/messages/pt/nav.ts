@@ -15,6 +15,7 @@ const nav: NavMessages = {
   "nav.running": "Corrida",
   "nav.cycling": "Ciclismo",
   "nav.hiking": "Trilha",
+  "nav.swimming": "Natação",
   "nav.strength": "Força",
   "nav.records": "Galeria de recordes",
   "nav.places": "Por onde você passou",

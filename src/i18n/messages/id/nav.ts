@@ -15,6 +15,7 @@ const nav: NavMessages = {
   "nav.running": "Lari",
   "nav.cycling": "Bersepeda",
   "nav.hiking": "Mendaki",
+  "nav.swimming": "Renang",
   "nav.strength": "Latihan beban",
   "nav.records": "Galeri rekor",
   "nav.places": "Jejak Anda",

@@ -11,6 +11,7 @@ import {
   Mountain,
   Settings,
   User,
+  Waves,
   type LucideIcon,
 } from "lucide-react";
 import { t, type MessageKey } from "../i18n/core.ts";
@@ -24,6 +25,7 @@ export type PrimaryView =
   | "running"
   | "cycling"
   | "hiking"
+  | "swimming"
   | "library"
   | "strength"
   | "sleep"
@@ -125,13 +127,14 @@ export const PRIMARY_NAV_SECTIONS: PrimaryNavSection[] = [
       return t("nav.section.history");
     },
     // What is behind. Activities holds every sport; Running, Cycling,
-    // Hiking and Strength are separate destinations because they are read
-    // through different numbers, not because they are filters.
+    // Hiking, Swimming and Strength are separate destinations because they
+    // are read through different numbers, not because they are filters.
     items: [
       navItem("training", "nav.training", Activity),
       navItem("running", "nav.running", RunnerIcon),
       navItem("cycling", "nav.cycling", Bike),
       navItem("hiking", "nav.hiking", Mountain),
+      navItem("swimming", "nav.swimming", Waves),
       navItem("strength", "nav.strength", Dumbbell),
     ],
   },

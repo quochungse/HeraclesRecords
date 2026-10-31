@@ -4,7 +4,7 @@
 
 - `src/App.tsx` holds view routing and most cross-cutting state; `src/navigation/primaryNav.ts`
   defines `PrimaryView` (its `developmentOnly` and `beta` flags still work; nothing sets them).
-- Heavy screens are lazy (Training Hub, Library, Running, Cycling, Hiking, Strength,
+- Heavy screens are lazy (Training Hub, Library, Running, Cycling, Hiking, Swimming, Strength,
   Calendar, Coach, Where you've been, Hall of Records); Overview and Settings are in the main
   bundle. **Calendar and Training Library are `preloadableLazy`** — fetched once the first
   paint is idle, and before that their Suspense fallback is the screen's own skeleton

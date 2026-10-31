@@ -366,7 +366,12 @@ const api = {
   syncActivityDetailSummaries: (
     activityIds: string[],
     limit?: number,
-    options?: { requireRecords?: boolean; requireIntensity?: boolean; requirePerformance?: boolean }
+    options?: {
+      requireRecords?: boolean;
+      requireIntensity?: boolean;
+      requirePerformance?: boolean;
+      requireSwim?: boolean;
+    }
   ): Promise<ActivityDetailSummarySync> =>
     ipcRenderer.invoke(
       "trainingHub:syncActivityDetailSummaries",

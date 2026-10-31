@@ -24,6 +24,7 @@ import {
   runPerformanceCurve,
   sportHasRunPerformance
 } from "./runPerformance";
+import { SWIM_SUMMARY_VERSION, isSwimSportType, swimSummaryOf } from "./swimDetail";
 
 const METERS_PER_KM = 1000;
 const SECONDS_PER_MINUTE = 60;
@@ -432,7 +433,7 @@ export interface ActivityDetailSummaryInput {
     Partial<
       Pick<
         TrainingHubActivityDetail,
-        "sportType" | "track" | "laps" | "paceZones" | "adjustedPaceZones" | "duration"
+        "sportType" | "track" | "laps" | "paceZones" | "adjustedPaceZones" | "duration" | "swim"
       >
     >;
   /** The payload as COROS sent it, for the fields the parser has no use for. */
@@ -471,6 +472,10 @@ export function summarizeActivityDetail(
         )
       )
     : undefined;
+  const swim =
+    detail.swim && isSwimSportType(detail.sportType)
+      ? swimSummaryOf(detail.swim, { duration: detail.duration })
+      : undefined;
 
   return {
     activityId,
@@ -487,6 +492,7 @@ export function summarizeActivityDetail(
     ...(startPoint ? { startPoint } : {}),
     ...(intensity ? { intensityVersion: INTENSITY_SUMMARY_VERSION, intensity } : {}),
     ...(performance ? { performanceVersion: PERFORMANCE_SUMMARY_VERSION, performance } : {}),
+    ...(swim ? { swimVersion: SWIM_SUMMARY_VERSION, swim } : {}),
     computedAt: now ?? Date.now()
   };
 }

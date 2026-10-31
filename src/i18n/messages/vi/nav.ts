@@ -15,6 +15,7 @@ const nav: NavMessages = {
   "nav.running": "Chạy bộ",
   "nav.cycling": "Đạp xe",
   "nav.hiking": "Leo núi",
+  "nav.swimming": "Bơi lội",
   "nav.strength": "Sức mạnh",
   "nav.records": "Đại sảnh Kỷ lục",
   "nav.places": "Những nơi bạn đã qua",

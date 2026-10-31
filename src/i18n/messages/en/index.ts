@@ -11,6 +11,7 @@ import run from "./run.ts";
 import zones from "./zones.ts";
 import ride from "./ride.ts";
 import hike from "./hike.ts";
+import swim from "./swim.ts";
 import strength from "./strength.ts";
 import calendar from "./calendar.ts";
 import workout from "./workout.ts";
@@ -42,6 +43,7 @@ const en = {
   ...zones,
   ...ride,
   ...hike,
+  ...swim,
   ...strength,
   ...calendar,
   ...workout,

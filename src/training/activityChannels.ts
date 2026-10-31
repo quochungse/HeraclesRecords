@@ -44,8 +44,11 @@ export type ActivityChannelKey =
  * A trail run is read as a run — pace and grade-adjusted pace, which is still
  * how a runner speaks — with a hike's climbing rate beside them, because on a
  * trail the pace mostly says how steep the ground was.
+ *
+ * A swim is read in a pace per 100 m (or yd), and its cadence is the stroke
+ * rate — strokes a minute of the arm wearing the watch.
  */
-export type ActivityMotion = "pace" | "speed" | "hike" | "trail";
+export type ActivityMotion = "pace" | "speed" | "hike" | "trail" | "swim";
 
 /** A sample as the chart reads it: the series point, plus what the chart derives from it. */
 export type ActivityChannelPoint = TrainingHubActivitySeriesPoint & {
@@ -120,11 +123,24 @@ const ACTIVITY_CHANNELS: readonly ActivityChannelDefinition[] = [
  */
 const RUNNING_POWER = channel("power", POWER, "runningPower");
 
+/** A swim's cadence: its stroke rate. */
+const STROKE_RATE: ActivityChannelDefinition = {
+  key: "cadence",
+  get label() {
+    return t("activity.channel.strokeRate");
+  },
+  unit: "spm",
+  decimals: 0
+};
+
 function forMotion(
   channel: ActivityChannelDefinition,
   motion: ActivityMotion | undefined,
   sportType: number | undefined
 ): ActivityChannelDefinition {
+  if (channel.key === "cadence" && motion === "swim") {
+    return STROKE_RATE;
+  }
   const run = (motion === "pace" || motion === "trail") && (sportType === undefined || isRunSportType(sportType));
   return channel.key === "power" && run ? RUNNING_POWER : channel;
 }
@@ -165,7 +181,7 @@ const MIN_ALTITUDE_RANGE_METERS = 10;
  * it was recorded.
  */
 const MOTION_ONLY: Partial<Record<ActivityChannelKey, readonly ActivityMotion[]>> = {
-  pace: ["pace", "trail"],
+  pace: ["pace", "trail", "swim"],
   adjustedPace: ["pace", "trail"],
   speed: ["speed", "hike"],
   verticalSpeed: ["hike", "trail"]
@@ -327,7 +343,9 @@ const PREFERRED_CHANNELS: Record<
   // elevation: whether the effort held across the hills, which raw pace hides
   // under the gradient. Raw pace stands in where the watch sent no GAP — a
   // list entry is one slot, filled by the first of its keys the run has.
-  trail: [["adjustedPace", "pace"], "hr"]
+  trail: [["adjustedPace", "pace"], "hr"],
+  // A swim opens on its pace against heart rate, as a run does.
+  swim: ["pace", "hr"]
 };
 
 export function defaultSelectedChannels(

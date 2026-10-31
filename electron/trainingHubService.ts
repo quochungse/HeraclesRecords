@@ -30,6 +30,7 @@ import {
 } from "./activityMetrics";
 import { INTENSITY_SUMMARY_VERSION, sportHasTrainingBenefit } from "./sessionIntensity";
 import { PERFORMANCE_SUMMARY_VERSION, sportHasRunPerformance } from "./runPerformance";
+import { SWIM_SUMMARY_VERSION, isSwimSportType, parseSwimDetail } from "./swimDetail";
 import {
   countStrengthActivitiesMissingDetail,
   countTrainingActivitiesMissingFeelType,
@@ -1897,7 +1898,7 @@ export async function getTrainingHubActivityDetail(
     { listActivity }
   );
 
-  let detail = parseActivityDetail(raw);
+  let detail = parseActivityDetail(raw, sportType);
   // Opportunistically cache the end-of-activity feeling while we have the detail.
   cacheFeelTypeFromDetail(activityId, raw);
   // And the list-level figures, so opening a run is also what fills its row.
@@ -2090,6 +2091,12 @@ export interface ActivityDetailSummarySyncOptions {
    * before them, not swept across the whole history.
    */
   requirePerformance?: boolean;
+  /**
+   * Count a swim's summary as missing until it carries the current swim
+   * figures (`SWIM_SUMMARY_VERSION`): its strokes, pool and best efforts. Only
+   * the Swimming screen asks, for the swims it shows.
+   */
+  requireSwim?: boolean;
 }
 
 export async function syncActivityDetailSummaries(
@@ -2109,7 +2116,10 @@ export async function syncActivityDetailSummaries(
         summary.intensityVersion === INTENSITY_SUMMARY_VERSION) &&
       (!options.requirePerformance ||
         !sportHasRunPerformance(sportType) ||
-        summary.performanceVersion === PERFORMANCE_SUMMARY_VERSION)
+        summary.performanceVersion === PERFORMANCE_SUMMARY_VERSION) &&
+      (!options.requireSwim ||
+        !isSwimSportType(sportType) ||
+        summary.swimVersion === SWIM_SUMMARY_VERSION)
     );
   };
   const valid = new Set(
@@ -2170,7 +2180,7 @@ export async function syncActivityDetailSummaries(
       const summary = cacheActivityDetailSummary(
         activityId,
         fingerprint,
-        parseActivityDetail(raw),
+        parseActivityDetail(raw, activity.sportType),
         raw,
         activity.sportType
       );
@@ -8063,7 +8073,14 @@ function parseActivityPauses(
   return pauses.sort((left, right) => left.start - right.start);
 }
 
-export function parseActivityDetail(raw: Record<string, unknown>): TrainingHubActivityDetail {
+/**
+ * One COROS detail payload, parsed. `listSportType` is the list row's sport,
+ * for a payload that names none: a swim's lengths are read only on a swim.
+ */
+export function parseActivityDetail(
+  raw: Record<string, unknown>,
+  listSportType?: number
+): TrainingHubActivityDetail {
   const summary = pickObject(raw, ["summaryInfo", "summary", "activitySummary"]) ?? raw;
   const laps = extractActivityLaps(raw);
 
@@ -8091,14 +8108,15 @@ export function parseActivityDetail(raw: Record<string, unknown>): TrainingHubAc
   // the 10% band on any run that stopped long enough to matter.
   const wallClock = elapsedDuration ?? duration;
   const track = parseActivityTrack(raw, wallClock);
+  const sportType = toOptionalNumber(raw.sportType) ?? toOptionalNumber(summary.sportType);
+  const swim = parseSwimDetail(raw, { sportType: sportType ?? listSportType, laps });
 
   return {
     activityId:
       pickString(raw, ["labelId", "activityId"]) ??
       pickString(summary, ["labelId", "activityId"]),
     name: pickString(raw, ["name"]) ?? pickString(summary, ["name"]),
-    sportType:
-      toOptionalNumber(raw.sportType) ?? toOptionalNumber(summary.sportType),
+    sportType,
     sportName:
       pickString(raw, ["sportName", "sport_name"]) ??
       pickString(summary, ["sportName", "sport_name", "modeName"]),
@@ -8135,7 +8153,8 @@ export function parseActivityDetail(raw: Record<string, unknown>): TrainingHubAc
     track,
     series: parseActivitySeries(raw, wallClock),
     strength: parseStrengthDetail(raw),
-    exerciseSets: parseSessionSets(raw)
+    exerciseSets: parseSessionSets(raw),
+    ...(swim ? { swim } : {})
   };
 }
 
