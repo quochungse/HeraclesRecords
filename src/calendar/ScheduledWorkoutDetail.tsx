@@ -62,10 +62,6 @@ interface ScheduledWorkoutDetailProps {
   estimatedMeters?: number;
 }
 
-function formatDetailLoad(load?: number): string {
-  return formatUpcomingWorkoutLoad(load);
-}
-
 export function ScheduledWorkoutDetail({
   entry,
   sportTypes,
@@ -114,20 +110,23 @@ export function ScheduledWorkoutDetail({
     meters: estimatedMeters,
     seconds: estimatedSeconds
   });
-  const stats: Array<{ icon: LucideIcon; label: string; value: string }> = [
-    {
-      icon: Route,
-      label: t("workout.detail.volume"),
-      value: formatPlannedVolume({ distanceMeters: planned.distanceMeters }, unitSystem, sport === "swim", () =>
+  // A strength or HYROX session's volume is its sets, never the time of its
+  // holds or the metres of its carries ("6:00" for 21 sets). Only figures the
+  // session holds: a "--" in a box is not information, and COROS gives no
+  // strength session a load.
+  const volume = isStrength
+    ? formatUpcomingWorkoutVolumeDisplay(entry.volume, unitSystem)
+    : formatPlannedVolume({ distanceMeters: planned.distanceMeters }, unitSystem, sport === "swim", () =>
         formatUpcomingWorkoutVolumeDisplay(entry.volume, unitSystem)
-      )
-    },
-    {
-      icon: Gauge,
-      label: t("workout.detail.plannedLoad"),
-      value: formatDetailLoad(plannedLoad(entry, source))
-    }
-  ];
+      );
+  const load = plannedLoad(entry, source);
+  const stats: Array<{ icon: LucideIcon; label: string; value: string }> = [];
+  if (volume !== "--") {
+    stats.push({ icon: Route, label: t("workout.detail.volume"), value: volume });
+  }
+  if (load !== undefined && load > 0) {
+    stats.push({ icon: Gauge, label: t("workout.detail.plannedLoad"), value: formatUpcomingWorkoutLoad(load) });
+  }
   if (planned.plannedSeconds) {
     stats.push({
       icon: Clock,
@@ -164,17 +163,19 @@ export function ScheduledWorkoutDetail({
             ) : null}
           </div>
         </div>
-        <dl className={`sched-hero-stats is-${stats.length}`}>
-          {stats.map((stat) => (
-            <div className="sched-stat" key={stat.label}>
-              <dt className="sched-stat-label">
-                <stat.icon size={12} aria-hidden="true" />
-                {stat.label}
-              </dt>
-              <dd className="sched-stat-value">{stat.value}</dd>
-            </div>
-          ))}
-        </dl>
+        {stats.length > 0 ? (
+          <dl className={`sched-hero-stats is-${stats.length}`}>
+            {stats.map((stat) => (
+              <div className="sched-stat" key={stat.label}>
+                <dt className="sched-stat-label">
+                  <stat.icon size={12} aria-hidden="true" />
+                  {stat.label}
+                </dt>
+                <dd className="sched-stat-value">{stat.value}</dd>
+              </div>
+            ))}
+          </dl>
+        ) : null}
       </motion.div>
 
       {/* The same framed box the library and plan readers draw, so the

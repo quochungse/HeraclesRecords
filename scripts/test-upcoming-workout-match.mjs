@@ -127,6 +127,7 @@ const fallback = scheduledEntryFromUpcoming({
   sportType: 100,
   sortNo: 2,
   description: "Even splits.",
+  heraclesLoad: { value: 64, muscular: 64, quality: "planned" },
   exercises: [{ name: "Warm up" }]
 });
 assert.equal(fallback.planId, "");
@@ -139,5 +140,6 @@ assert.equal(fallback.trainingLoad, 88);
 assert.equal(fallback.sportType, 100);
 assert.deepEqual(fallback.exercises, [{ name: "Warm up" }]);
 assert.equal(fallback.description, "Even splits.");
+assert.equal(fallback.heraclesLoad?.value, 64, "a strength session's only planned load comes along");
 
 console.log("upcoming workout match: all assertions passed");
