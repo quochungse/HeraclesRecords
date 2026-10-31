@@ -65,6 +65,7 @@ export function scheduledEntryFromUpcoming(
     sortNo: workout.sortNo,
     volume: workout.volume,
     trainingLoad: workout.trainingLoad,
+    ...(workout.description ? { description: workout.description } : {}),
     exercises: workout.exercises
   };
 }

@@ -1021,6 +1021,8 @@ export interface TrainingHubUpcomingWorkout {
   distanceMeters?: number;
   sportType?: number;
   sortNo?: number;
+  /** The session's description (the program's `overview`), absent when it has none. */
+  description?: string;
   exercises?: TrainingHubScheduledExercise[];
   /** Heracles Training Load's estimate, on a strength session only. */
   heraclesLoad?: HeraclesLoad;
@@ -3837,6 +3839,8 @@ export interface TrainingHubScheduledWorkoutEntry {
   sortNo?: number;
   volume?: string;
   trainingLoad?: number;
+  /** The session's description (the program's `overview`), absent when it has none. */
+  description?: string;
   exercises?: TrainingHubScheduledExercise[];
   /** Raw program payload from schedule/query — required to re-add the workout when rescheduling. */
   rawProgram?: Record<string, unknown>;

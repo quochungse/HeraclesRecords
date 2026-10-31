@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { parseUpcomingWorkouts } from "../dist-electron/trainingHubService.js";
+import { parseScheduledWorkoutEntries, parseUpcomingWorkouts } from "../dist-electron/trainingHubService.js";
 
 const fixture = {
   entities: [
@@ -39,6 +39,7 @@ const fixture = {
       id: "p101",
       idInPlan: 101,
       name: "Rolling 400s",
+      overview: "  Jog the recoveries; hold 5k pace.  ",
       exerciseNum: 13,
       trainingLoad: 94,
       distance: 0
@@ -55,6 +56,7 @@ const fixture = {
       id: "p103",
       idInPlan: 103,
       name: "Taper 400s",
+      overview: "   ",
       exerciseNum: 15,
       trainingLoad: 83,
       distance: 0
@@ -100,5 +102,14 @@ assert.equal(workouts[2]?.volume, "15 set(s)");
 assert.equal(workouts[3]?.volume, "7.00km");
 assert.equal(workouts[3]?.trainingLoad, undefined);
 assert.equal(workouts[4]?.volume, "7.50km");
+
+// The program's `overview` is the session's description: trimmed, and no key
+// at all for a session with none (blank counts as none).
+assert.equal(workouts[0]?.description, "Jog the recoveries; hold 5k pace.");
+assert.equal("description" in workouts[1], false);
+assert.equal("description" in workouts[2], false);
+const scheduled = parseScheduledWorkoutEntries(fixture);
+assert.equal(scheduled[0]?.description, "Jog the recoveries; hold 5k pace.");
+assert.equal("description" in scheduled[2], false);
 
 console.log("upcoming workout parsing tests passed");

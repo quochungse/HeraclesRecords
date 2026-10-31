@@ -147,6 +147,8 @@ interface CardView {
   activity?: TrainingHubActivity;
   /** What the load figure needs said: estimated, or still COROS's (`activityLoadNote`). */
   loadNote?: string;
+  /** A session still to do (or missed): its description, for the hover. */
+  description?: string;
 }
 
 /**
@@ -194,7 +196,8 @@ function dayCards(day: CalendarDay, unitSystem: UnitSystem, source: StrengthLoad
       sport,
       category: scheduledSportCategory(scheduled.sportType),
       kind: missed ? "missed" : "planned",
-      pair
+      pair,
+      description: scheduled.description
     };
   });
   const unplanned = day.unplannedActivities.map((activity): CardView => ({
@@ -293,7 +296,7 @@ function SessionCard({
       }}
       disabled={unavailable}
       aria-pressed={selectable ? selected : undefined}
-      title={[title, card.meta, card.loadNote].filter(Boolean).join("\n")}
+      title={[title, card.meta, card.loadNote, card.description].filter(Boolean).join("\n")}
       /* The dashed edge is what says "planned" on screen, and a border says
          nothing to a screen reader, so the word lives here as well. */
       aria-label={

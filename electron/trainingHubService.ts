@@ -3751,6 +3751,7 @@ export function parseScheduledWorkoutEntries(
       sortNo: toOptionalNumber(entity.sortNoInSchedule ?? entity.sortNo),
       volume: formatUpcomingWorkoutVolume(program, entity),
       trainingLoad: resolveUpcomingWorkoutLoad(program, entity),
+      ...scheduledWorkoutDescription(program),
       exercises: parseScheduledExercises(program),
       rawProgram: program
     });
@@ -4369,6 +4370,7 @@ export function parseUpcomingWorkouts(
       distanceMeters: resolveUpcomingWorkoutDistanceMeters(program, entity),
       sportType: toOptionalNumber(program?.sportType),
       sortNo: toOptionalNumber(entity.sortNoInSchedule ?? entity.sortNo),
+      ...scheduledWorkoutDescription(program),
       exercises: parseScheduledExercises(program)
     });
   });
@@ -4459,6 +4461,20 @@ function resolveUpcomingWorkoutName(
     pickString(entity, ["name"]) ??
     "Scheduled workout"
   );
+}
+
+/**
+ * A session's description, as a field to spread: the program's `overview`,
+ * the text the builder's Description box writes. A session of an official
+ * plan is described by key (`P11058`) like its name, so it goes through
+ * `corosText`; one with none adds no key at all.
+ */
+function scheduledWorkoutDescription(
+  program: Record<string, unknown> | undefined
+): { description?: string } {
+  const overview = program ? pickString(program, ["overview"]) : undefined;
+  const description = overview ? corosText(overview).trim() : "";
+  return description ? { description } : {};
 }
 
 function resolveUpcomingWorkoutLoad(

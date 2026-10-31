@@ -117,7 +117,7 @@ export function DayOverview({
                 type="button"
                 className="calendar-day-overview-item"
                 onClick={() => onOpen(item)}
-                title={item.kind === "activity" ? activityLoadNote(item.activity, source) : undefined}
+                title={item.kind === "activity" ? activityLoadNote(item.activity, source) : item.entry.description}
               >
                 <span className="calendar-day-overview-icon" style={sportChipStyle(sport)} aria-hidden="true">
                   <Icon size={16} />

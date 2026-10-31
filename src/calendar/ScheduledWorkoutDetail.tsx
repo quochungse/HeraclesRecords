@@ -169,6 +169,15 @@ export function ScheduledWorkoutDetail({
         </dl>
       </motion.div>
 
+      {/* The same framed box the library and plan readers draw, so the
+          instructions a session was written with are read where it is due. */}
+      {entry.description ? (
+        <motion.fieldset className="workout-view-overview" {...rise(0.03)}>
+          <legend>{t("workout.b.w.description")}</legend>
+          <p>{entry.description}</p>
+        </motion.fieldset>
+      ) : null}
+
       {view.nodes.length > 0 ? (
         <motion.div className="sched-structure" {...rise(0.06)}>
           <div className="sched-structure-head">

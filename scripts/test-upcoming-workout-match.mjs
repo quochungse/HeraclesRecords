@@ -126,6 +126,7 @@ const fallback = scheduledEntryFromUpcoming({
   trainingLoad: 88,
   sportType: 100,
   sortNo: 2,
+  description: "Even splits.",
   exercises: [{ name: "Warm up" }]
 });
 assert.equal(fallback.planId, "");
@@ -137,5 +138,6 @@ assert.equal(fallback.volume, "12.00km");
 assert.equal(fallback.trainingLoad, 88);
 assert.equal(fallback.sportType, 100);
 assert.deepEqual(fallback.exercises, [{ name: "Warm up" }]);
+assert.equal(fallback.description, "Even splits.");
 
 console.log("upcoming workout match: all assertions passed");
