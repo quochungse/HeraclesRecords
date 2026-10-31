@@ -370,13 +370,17 @@ assert.equal(matches[0].status, "completed");
 assert.equal(matches[0].activityId, "activity-1");
 assert.equal(matches[0].confidence >= 0.9, true);
 assert.equal(matches[1].status, "upcoming");
-const manual = library.buildTrainingActivityMatches(
+// A row an older build stored as said by hand (skipped) keeps its identity
+// and is matched again: nothing in the app says it any more.
+const rebuilt = library.buildTrainingActivityMatches(
   scheduled,
   activities,
   [{ ...matches[1], status: "skipped", manual: true }],
   "21000101"
 );
-assert.equal(manual[1].status, "skipped");
+assert.equal(rebuilt[1].id, matches[1].id);
+assert.equal(rebuilt[1].status, "missed");
+assert.equal(rebuilt[1].manual, false);
 
 // Strength read in Heracles Training Load: a lift COROS prices at a fraction
 // of its plan is kept, because both sides are read in the one load.
@@ -436,21 +440,13 @@ databaseModule.setExerciseFavorite("426109589008859136", "strength", false);
 databaseModule.setExerciseFavorite("never-kept", "strength", false);
 assert.deepEqual(databaseModule.listExerciseFavorites(), ["425895398452936705"]);
 
-// A statement about a session lands on the matcher's own row for it — the
-// table holds one per session — and `manual: false` hands the session back.
+// A match's row keeps Heracles's loads, and clears them with them.
 const auto = { ...matches[0], id: "auto-id" };
-databaseModule.saveTrainingActivityMatch(auto);
-const said = library.saveManualActivityMatch({ ...auto, id: "schedule:one", activityId: undefined, status: "skipped", manual: true });
-assert.equal(said.id, "auto-id", "the stored row is replaced, not collided with");
+databaseModule.saveTrainingActivityMatch({ ...auto, plannedHeraclesLoad: 150.5, completedHeraclesLoad: 146 });
 assert.equal(databaseModule.listTrainingActivityMatches().length, 1);
-assert.equal(databaseModule.listTrainingActivityMatches()[0].status, "skipped");
-assert.equal(databaseModule.listTrainingActivityMatches()[0].manual, true);
-library.saveManualActivityMatch({ ...said, status: "missed", manual: false });
-assert.equal(databaseModule.listTrainingActivityMatches()[0].manual, false, "Match automatically lets the matcher decide again");
-library.saveManualActivityMatch({ ...said, status: "completed", manual: true, plannedHeraclesLoad: 150.5, completedHeraclesLoad: 146 });
 assert.equal(databaseModule.listTrainingActivityMatches()[0].plannedHeraclesLoad, 150.5, "Heracles's loads are kept on the row");
 assert.equal(databaseModule.listTrainingActivityMatches()[0].completedHeraclesLoad, 146);
-library.saveManualActivityMatch({ ...said, status: "completed", manual: true });
+databaseModule.saveTrainingActivityMatch(auto);
 assert.equal(databaseModule.listTrainingActivityMatches()[0].completedHeraclesLoad, undefined, "and cleared with them");
 
 // Drafts: kept, listed, replaced in place, discarded.

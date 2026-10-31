@@ -240,64 +240,29 @@ function matchScore(
 }
 
 /**
- * What the athlete said, for a scheduled entry this greedy pass would
- * otherwise guess about. Keyed by `scheduledWorkoutKey`.
- *
- * `none` is not the absence of a statement: none of the day's activities was
- * this session, so no activity may be paired to it and whatever was done that
- * day stays unplanned rather than being claimed.
- */
-export type PairingOverride =
-  | { kind: "activity"; activityId: string }
-  | { kind: "none" };
-
-/**
  * Greedy per-day matching of scheduled workouts to completed activities.
  * Each activity is consumed by at most one scheduled workout.
  *
- * Overrides are applied *before* the greedy pass, not after, and in their own
- * loop: a hand-linked activity has to be taken out of the pool before any
- * scoring happens, or the entry standing next to it can be given the activity
- * the athlete already assigned and the override quietly loses. COROS's link
- * (`completedActivityId`) is taken next, the same way.
+ * COROS's own record of which activity did a session (`completedActivityId`)
+ * is applied *before* the greedy pass, in its own loop: a linked activity has
+ * to be taken out of the pool before any scoring happens, or the entry beside
+ * it can be given that activity and the link quietly loses.
  */
 export function pairPlannedWithActual(
   scheduled: TrainingHubScheduledWorkoutEntry[],
   activities: TrainingHubActivity[],
   unitSystem: UnitSystem,
-  overrides?: ReadonlyMap<string, PairingOverride>,
   loadSource: StrengthLoadSource = "coros"
 ): { pairs: PlannedActualPair[]; unplanned: TrainingHubActivity[] } {
   const remaining = [...activities];
   const pairs: PlannedActualPair[] = [];
-  const decided = new Map<string, TrainingHubActivity | null>();
+  const decided = new Map<string, TrainingHubActivity>();
 
-  if (overrides?.size) {
-    for (const entry of scheduled) {
-      const override = overrides.get(scheduledWorkoutKey(entry));
-      if (!override) continue;
-      if (override.kind !== "activity") {
-        decided.set(scheduledWorkoutKey(entry), null);
-        continue;
-      }
-      const index = remaining.findIndex(
-        (activity) => activity.activityId === override.activityId
-      );
-      // An override naming an activity outside this range is not an error and
-      // not a skip: it simply cannot be shown here, so the entry falls through
-      // to the greedy pass rather than being drawn as deliberately undone.
-      if (index < 0) continue;
-      decided.set(scheduledWorkoutKey(entry), remaining[index]!);
-      remaining.splice(index, 1);
-    }
-  }
-
-  // Then COROS's own record of which activity did a session: it is the
-  // answer wherever the athlete has not given one, and the greedy pass only
+  // COROS's own record of which activity did a session; the greedy pass only
   // guesses for what COROS has not linked.
   for (const entry of scheduled) {
     const key = scheduledWorkoutKey(entry);
-    if (decided.has(key) || !entry.completedActivityId) continue;
+    if (!entry.completedActivityId) continue;
     const index = remaining.findIndex(
       (activity) => activity.activityId === entry.completedActivityId
     );
@@ -310,12 +275,12 @@ export function pairPlannedWithActual(
     const targets = plannedTargets(entry, unitSystem);
     const key = scheduledWorkoutKey(entry);
 
-    if (decided.has(key)) {
-      const chosen = decided.get(key) ?? undefined;
+    const linked = decided.get(key);
+    if (linked) {
       pairs.push({
         scheduled: entry,
-        activity: chosen,
-        ...(chosen ? completion(entry, chosen, targets, loadSource) : {}),
+        activity: linked,
+        ...completion(entry, linked, targets, loadSource),
         targets
       });
       continue;

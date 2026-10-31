@@ -257,14 +257,10 @@ export interface HeraclesRecordsApi {
   deleteTrainingLibraryWorkouts: (
     request: TrainingLibraryDeleteRequest
   ) => Promise<string[]>;
-  listTrainingActivityMatches: () => Promise<TrainingActivityMatch[]>;
   refreshTrainingActivityMatches: (
     startDay: string,
     endDay: string
   ) => Promise<TrainingActivityMatch[]>;
-  saveManualActivityMatch: (
-    match: TrainingActivityMatch
-  ) => Promise<TrainingActivityMatch>;
   listWorkoutExercises: (sport: WorkoutSport) => Promise<WorkoutExerciseOption[]>;
   getWorkoutEditorContext: (unitSystem: UnitSystem) => Promise<WorkoutEditorContext>;
   getWorkoutForEdit: (

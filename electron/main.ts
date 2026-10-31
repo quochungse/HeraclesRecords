@@ -172,12 +172,10 @@ import {
   getNativeTrainingPlan,
   getTrainingLibrarySnapshot,
   libraryWorkoutAsPlanSession,
-  listActivityMatches,
   previewPlanOnCalendar,
   putPlanOnCalendar,
   listTrainingLibraryWorkouts,
   refreshTrainingActivityMatches,
-  saveManualActivityMatch,
   savePlanDraft,
   savePlanToCoros,
   syncPlanToCalendar,
@@ -2269,10 +2267,6 @@ function registerIpcHandlers(): void {
     "trainingLibrary:refreshMatches",
     (_event, startDay: string, endDay: string) =>
       refreshTrainingActivityMatches(startDay, endDay)
-  );
-  ipcMain.handle("trainingLibrary:listMatches", () => listActivityMatches());
-  ipcMain.handle("trainingLibrary:saveManualMatch", (_event, match) =>
-    saveManualActivityMatch(match)
   );
 
   ipcMain.handle(

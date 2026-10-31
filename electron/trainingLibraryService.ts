@@ -1095,44 +1095,40 @@ export function buildTrainingActivityMatches(
   const usedActivities = new Set<string>();
   const results: TrainingActivityMatch[] = [];
   for (const entry of scheduled) {
-    const key = `${entry.planId}:${entry.idInPlan}`;
-    const manual = existing.get(key);
-    let activity = manual?.manual
-      ? activities.find((candidate) => candidate.activityId === manual.activityId)
-      : undefined;
-    let confidence = manual?.manual ? manual.confidence : undefined;
-    if (!manual?.manual) {
-      const candidates = activities
-        .filter((candidate) => activityDay(candidate) === entry.happenDay)
-        .filter((candidate) => !usedActivities.has(candidate.activityId))
-        .map((candidate) => ({ candidate, score: scheduledActivityScore(entry, candidate, loadSource) }))
-        .sort((left, right) => right.score - left.score);
-      if (candidates[0]?.score >= 0.5) {
-        activity = candidates[0].candidate;
-        confidence = candidates[0].score;
-      }
+    // The row this session already has keeps its identity; what an older
+    // build stored as said by hand (`manual`, `skipped`) is not read: nothing
+    // in the app says it any more, and the Calendar no longer honours it.
+    const held = existing.get(`${entry.planId}:${entry.idInPlan}`);
+    let activity: TrainingHubActivity | undefined;
+    let confidence: number | undefined;
+    const candidates = activities
+      .filter((candidate) => activityDay(candidate) === entry.happenDay)
+      .filter((candidate) => !usedActivities.has(candidate.activityId))
+      .map((candidate) => ({ candidate, score: scheduledActivityScore(entry, candidate, loadSource) }))
+      .sort((left, right) => right.score - left.score);
+    if (candidates[0]?.score >= 0.5) {
+      activity = candidates[0].candidate;
+      confidence = candidates[0].score;
     }
     if (activity) usedActivities.add(activity.activityId);
     const compared = loadsToCompare(entry, activity, loadSource);
     const ratio = compared.planned && compared.done !== undefined
       ? compared.done / compared.planned
       : undefined;
-    const status: TrainingActivityMatch["status"] = manual?.status === "skipped"
-      ? "skipped"
-      : activity
-        ? ratio !== undefined && ratio < 0.75 ? "partial" : "completed"
-        : entry.happenDay < today ? "missed" : "upcoming";
+    const status: TrainingActivityMatch["status"] = activity
+      ? ratio !== undefined && ratio < 0.75 ? "partial" : "completed"
+      : entry.happenDay < today ? "missed" : "upcoming";
     results.push({
-      id: manual?.id ?? crypto.randomUUID(),
-      planId: manual?.planId,
-      planEntryId: manual?.planEntryId,
+      id: held?.id ?? crypto.randomUUID(),
+      planId: held?.planId,
+      planEntryId: held?.planEntryId,
       schedulePlanId: entry.planId,
       scheduleIdInPlan: entry.idInPlan,
       activityId: activity?.activityId,
       happenDay: entry.happenDay,
       status,
       confidence,
-      manual: manual?.manual ?? false,
+      manual: false,
       completedDurationSeconds: activity?.duration,
       completedDistanceMeters: activity?.distance,
       plannedTrainingLoad: entry.trainingLoad,
@@ -1175,42 +1171,4 @@ function matchesInChosenLoad(
     undefined,
     getStrengthLoadSource()
   );
-}
-
-/**
- * Every stored plan-versus-done match, straight out of SQLite.
- *
- * The Calendar needs these to honour a manual override — its own pairing in
- * `pairing.ts` is a fresh greedy pass that knows nothing about a session the
- * athlete linked by hand or marked skipped. Read-only and local: no COROS
- * request, which is what makes it safe to call on every calendar range change
- * alongside the three that are already there.
- */
-export function listActivityMatches(): TrainingActivityMatch[] {
-  return listTrainingActivityMatches();
-}
-
-/**
- * What the athlete said about one calendar session: this activity was it, none
- * was, it was skipped — or, with `manual: false`, "match it again", which the
- * next rebuild does.
- *
- * Keyed by the session, not by the caller's id. The matcher already holds a row
- * for the session under an id of its own, and the table takes one row per
- * session, so a statement carrying a fresh id would collide with it rather than
- * replace it.
- */
-export function saveManualActivityMatch(match: TrainingActivityMatch): TrainingActivityMatch {
-  const held = listTrainingActivityMatches().find(
-    (item) =>
-      item.schedulePlanId === match.schedulePlanId && item.scheduleIdInPlan === match.scheduleIdInPlan
-  );
-  const next = {
-    ...match,
-    id: held?.id ?? match.id,
-    manual: match.manual !== false,
-    updatedAt: new Date().toISOString()
-  };
-  saveTrainingActivityMatch(next);
-  return next;
 }

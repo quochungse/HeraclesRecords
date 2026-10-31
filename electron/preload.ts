@@ -272,12 +272,6 @@ const api = {
     endDay: string
   ): Promise<TrainingActivityMatch[]> =>
     ipcRenderer.invoke("trainingLibrary:refreshMatches", startDay, endDay),
-  listTrainingActivityMatches: (): Promise<TrainingActivityMatch[]> =>
-    ipcRenderer.invoke("trainingLibrary:listMatches"),
-  saveManualActivityMatch: (
-    match: TrainingActivityMatch
-  ): Promise<TrainingActivityMatch> =>
-    ipcRenderer.invoke("trainingLibrary:saveManualMatch", match),
   listWorkoutExercises: (sport: WorkoutSport): Promise<WorkoutExerciseOption[]> =>
     ipcRenderer.invoke("trainingHub:listWorkoutExercises", sport),
   getWorkoutEditorContext: (unitSystem: UnitSystem): Promise<WorkoutEditorContext> =>

@@ -718,7 +718,6 @@ export function CalendarView({
           setSelection(null);
         }}
         onDelete={handleDelete}
-        onReload={reload}
         onAskCoach={handleAskCoachSelection}
         onOpenItem={(item) => {
           setDayReturn(item.day);

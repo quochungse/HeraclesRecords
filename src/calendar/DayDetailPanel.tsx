@@ -17,7 +17,6 @@ import {
 } from "./calendarTypes";
 import { DayOverview } from "./DayOverview";
 import { PlanCompletionBlock } from "./PlanCompletion";
-import { PlanStatusBlock } from "./PlanStatusBlock";
 import { ScheduledWorkoutDetail } from "./ScheduledWorkoutDetail";
 import { scheduledWorkoutSport } from "../training/workoutSport";
 import { t } from "../i18n/core";
@@ -38,8 +37,6 @@ interface DayDetailPanelProps {
   /** Adds a workout to the day on screen, or logs an activity on a day gone. */
   onAdd: (dateKey: string) => void;
   onEdit: (selection: Extract<CalendarSelection, { kind: "scheduled" }>) => void;
-  /** Re-reads the range after a manual plan-status change. */
-  onReload: () => void;
   onError: (message: string | null) => void;
 }
 export function DayDetailPanel({
@@ -54,7 +51,6 @@ export function DayDetailPanel({
   onBackToDay,
   onAdd,
   onEdit,
-  onReload,
   onError
 }: DayDetailPanelProps) {
   const [detail, setDetail] = useState<TrainingHubActivityDetail | null>(null);
@@ -83,15 +79,7 @@ export function DayDetailPanel({
       ? scheduledWorkoutSport(selection.entry.sportType)
       : undefined;
 
-  /* The pairing this day already computed, for the entry on screen. */
-  const planPair =
-    selection?.kind === "scheduled"
-      ? selection.day.pairs.find(
-          (pair) =>
-            scheduledWorkoutKey(pair.scheduled) === scheduledWorkoutKey(selection.entry)
-        )
-      : undefined;
-  /* And the plan a done session answered, for the activity on screen. */
+  /* The plan a done session answered, for the activity on screen. */
   const answeredPair =
     selection?.kind === "activity"
       ? selection.day.pairs.find((pair) => pair.activity?.activityId === selection.activity.activityId)
@@ -291,22 +279,11 @@ export function DayDetailPanel({
                     onAdd={() => onAdd(selection.day.dateKey)}
                   />
                 ) : selection.kind === "scheduled" ? (
-                  <>
-                    {planPair ? (
-                      <PlanStatusBlock
-                        api={api}
-                        day={selection.day}
-                        pair={planPair}
-                        onChanged={onReload}
-                        onError={onError}
-                      />
-                    ) : null}
-                    <ScheduledWorkoutDetail
-                      entry={selection.entry}
-                      sportTypes={sportTypes}
-                      api={api}
-                    />
-                  </>
+                  <ScheduledWorkoutDetail
+                    entry={selection.entry}
+                    sportTypes={sportTypes}
+                    api={api}
+                  />
                 ) : (
                   <>
                   {answeredPair ? <PlanCompletionBlock pair={answeredPair} /> : null}

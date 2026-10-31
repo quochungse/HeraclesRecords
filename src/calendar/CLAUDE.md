@@ -34,7 +34,9 @@ read-only: `WorkoutViewModal` and `WorkoutReadOnlyBody` (Library reader, plan re
   read as the whole session's.
 - **A plan's figures are its program's**, never the entity's `sportData`, which is the activity
   COROS recorded as the session done; that activity's id (`labelId`, carried as
-  `completedActivityId`) pairs it, after the athlete's own link and before any guess.
+  `completedActivityId`) pairs it before any guess. There is no pairing by hand: the panel's
+  plan status, with its pick, "Mark skipped" and "Match automatically", is gone, and rows an
+  older build stored as said by hand (`manual`, `skipped`) are matched again, never read.
 - The week column states its load as a figure and a bar (done solid, planned hatched),
   COROS's target in words, and planned sessions/time apart from totals. Load Impact and Base
   Fitness are COROS's `ati`/`cti` (`computeWeeklyStats`, `test:calendar-pairing`). The figure

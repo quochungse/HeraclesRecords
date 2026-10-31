@@ -15,12 +15,7 @@ import {
   type CalendarDragPayload
 } from "./calendarDrag";
 import type { CalendarDay, CalendarWeek } from "./calendarTypes";
-import {
-  computeWeeklyStats,
-  pairPlannedWithActual,
-  type PairingOverride
-} from "./pairing";
-import { scheduledWorkoutKey } from "./calendarTypes";
+import { computeWeeklyStats, pairPlannedWithActual } from "./pairing";
 
 interface CalendarRangeData {
   /**
@@ -33,13 +28,6 @@ interface CalendarRangeData {
   rangeEnd: string;
   scheduled: TrainingHubScheduledWorkoutEntry[];
   activities: TrainingHubActivity[];
-  /**
-   * What the athlete said by hand about a planned session — this one was
-   * really that activity, or it was skipped. Stored locally, so reading them
-   * costs no COROS request; without them the calendar's own greedy pairing
-   * would silently overrule an override made on the day panel.
-   */
-  overrides: Map<string, PairingOverride>;
   metrics: TrainingHubDailyMetric[];
   /** Raw week aggregates from /analyse/dayDetail (recommended TL band per week). */
   weekAggregates: Record<string, unknown>[];
@@ -165,26 +153,11 @@ export function useCalendarData({
     void Promise.all([
       api.listScheduledWorkouts(rangeStart, rangeEnd),
       api.listTrainingHubActivities(1, 200, rangeStart, rangeEnd),
-      api.getDailyMetrics(keysForRange),
-      // Local read, so it adds no round trip and cannot fail the range.
-      api.listTrainingActivityMatches().catch(() => [])
+      api.getDailyMetrics(keysForRange)
     ])
-      .then(([scheduled, activities, dailyMetrics, matches]) => {
+      .then(([scheduled, activities, dailyMetrics]) => {
         if (cancelled || rangeKeyRef.current !== rangeKey) {
           return;
-        }
-        const overrides = new Map<string, PairingOverride>();
-        for (const match of matches) {
-          if (!match.manual) continue;
-          const key = scheduledWorkoutKey({
-            planId: match.schedulePlanId,
-            idInPlan: match.scheduleIdInPlan
-          });
-          // A session marked skipped by an older build pairs as "none" does.
-          overrides.set(
-            key,
-            match.activityId ? { kind: "activity", activityId: match.activityId } : { kind: "none" }
-          );
         }
         const next: CalendarRangeData = {
           rangeKey,
@@ -192,7 +165,6 @@ export function useCalendarData({
           rangeEnd,
           scheduled,
           activities,
-          overrides,
           metrics: dailyMetrics.dayList ?? [],
           weekAggregates: dailyMetrics.weekList ?? []
         };
@@ -299,7 +271,6 @@ export function useCalendarData({
           scheduled,
           activities,
           unitSystem,
-          data?.overrides,
           loadSource
         );
         return {
