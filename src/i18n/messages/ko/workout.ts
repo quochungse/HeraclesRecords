@@ -324,6 +324,7 @@ const workout: WorkoutMessages = {
   "workout.v.sets": "세트",
   "workout.v.lifted": "들어 올린 무게",
   "workout.v.setRest": "세트 간 휴식",
+  "workout.v.estLoad": "예상 부하",
   "workout.v.distance": "거리",
   "workout.v.timedSteps": "시간 지정 단계",
   "workout.v.duration": "시간",

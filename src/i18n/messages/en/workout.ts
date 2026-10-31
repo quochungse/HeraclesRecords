@@ -325,6 +325,7 @@ const workout = {
   "workout.v.sets": "Sets",
   "workout.v.lifted": "Lifted",
   "workout.v.setRest": "Set rest",
+  "workout.v.estLoad": "Est. load",
   "workout.v.distance": "Distance",
   "workout.v.timedSteps": "Timed steps",
   "workout.v.duration": "Duration",

@@ -29,6 +29,8 @@ const units: UnitsMessages = {
   "units.load.pair": "Heracles TL {heracles} · COROS TL {coros}",
   "units.load.estimate": "Оценка: подходы не удалось прочитать",
   "units.load.pending": "Ещё не рассчитано: подходы тренировки загружаются",
+  "units.load.planned": "Оценка по подходам плана",
+  "units.load.plannedFromLength": "Оценка по длительности плана: подходы в нём не указаны",
   "units.load.pairFigure": "Heracles {heracles} · COROS {coros}",
   "units.load.rangePair": "Рекомендуемый диапазон: Heracles {heracles} · COROS {coros}",
   "units.load.fitnessPartial": "Приблизительно: подходы некоторых силовых тренировок ещё загружаются",

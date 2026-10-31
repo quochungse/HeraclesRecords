@@ -25,6 +25,8 @@ const units: UnitsMessages = {
   "units.load.pair": "Heracles TL {heracles} · COROS TL {coros}",
   "units.load.estimate": "Ước lượng: không đọc được từng hiệp",
   "units.load.pending": "Chưa tính: đang tải các hiệp của buổi tập",
+  "units.load.planned": "Ước lượng từ các hiệp trong kế hoạch",
+  "units.load.plannedFromLength": "Ước lượng từ thời lượng kế hoạch: kế hoạch không ghi hiệp nào",
   "units.load.pairFigure": "Heracles {heracles} · COROS {coros}",
   "units.load.rangePair": "Mức đề xuất: Heracles {heracles} · COROS {coros}",
   "units.load.fitnessPartial": "Ước tính: một số buổi sức mạnh vẫn đang tải dữ liệu hiệp",

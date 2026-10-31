@@ -10,11 +10,14 @@ import {
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type {
+  PlanWorkoutEntryInput,
   RunWorkoutEditorNode,
   TrainingLibraryWorkout,
   UnitSystem,
   WorkoutEditorDocument
 } from "../../electron/types";
+import { editorDraftToPlanWorkoutInput } from "../../electron/planWorkoutEditor";
+import { useLoadSource } from "../training/loadSource";
 import type { HeraclesRecordsApi } from "../heraclesrecords-api";
 import { OptionGroup } from "../components/OptionGroup";
 import { CollapsibleSearch } from "./LibrarySearch";
@@ -198,6 +201,17 @@ function workoutDetail(
 ): WorkoutDetail {
   const swim = document.draft.sport === "swim";
   return { shape: workoutShape(document.draft.nodes, unitSystem, swim) };
+}
+
+/** Whether a workout's steps state reps or holds: what Heracles Training Load reads its sets from. */
+function statesSets(workout: PlanWorkoutEntryInput): boolean {
+  return (workout.steps ?? []).some((node) =>
+    ("repeat" in node ? node.steps : [node]).some(
+      (step) =>
+        (step.target_type === "reps" && (step.target_reps ?? 0) > 0) ||
+        (step.target_type === "time" && (step.target_duration_seconds ?? 0) > 0)
+    )
+  );
 }
 
 export function WorkoutWorkspace({
@@ -453,6 +467,38 @@ export function WorkoutWorkspace({
     () => (editId ? { kind: "library" as const, programId: editId } : null),
     [editId]
   );
+
+  /*
+   * Heracles Training Load's estimate of a strength workout, while strength is
+   * read in it — the estimate the plan reader gives a session, asked of the
+   * main process, which holds the athlete's capacity per movement. COROS
+   * prices no strength workout, so with its load chosen there is none to show.
+   */
+  const { source: loadSource } = useLoadSource();
+  const [estimatedLoad, setEstimatedLoad] = useState<{ value: number; note?: string }>();
+  const activeName = active?.name ?? "";
+  const activeSeconds = active?.durationSeconds;
+  useEffect(() => {
+    setEstimatedLoad(undefined);
+    const draft = previewDocument?.draft;
+    if (loadSource !== "heracles" || !activeId || draft?.sport !== "strength") return;
+    let cancelled = false;
+    const workout = editorDraftToPlanWorkoutInput(draft, { key: activeId, name: activeName });
+    void api
+      .estimatePlanLoads([{ key: activeId, workout, plannedDurationSeconds: activeSeconds }])
+      .then((loads) => {
+        const load = loads[activeId];
+        if (cancelled || !load) return;
+        setEstimatedLoad({
+          value: load.value,
+          note: t(statesSets(workout) ? "units.load.planned" : "units.load.plannedFromLength")
+        });
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, [api, loadSource, activeId, activeName, activeSeconds, previewDocument]);
 
   useEffect(() => {
     if (!activeId) {
@@ -820,6 +866,7 @@ export function WorkoutWorkspace({
                     context={previewDocument.context}
                     exercisesById={exerciseCatalog.byId}
                     title={active.name}
+                    estimatedLoad={estimatedLoad}
                     heroAside={
                       <button
                         type="button"

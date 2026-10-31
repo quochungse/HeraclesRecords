@@ -81,8 +81,14 @@ engine's own, its words a change to the formula has to follow.
   `recordBodyWeight` writes nothing when it did not), since COROS holds only the current one.
   `test:body-weight-history`.
 - A display reads a load through `src/training/loadFigures.ts`: one figure, with a note only
-  when it is estimated or still COROS's (`activityLoadNote`); both figures only where it
-  differs from what the COROS app shows (`loadPairTitle`, `figurePairTitle`).
+  when it is estimated or still COROS's (`activityLoadNote`, `plannedLoadNote`); both figures
+  only where it differs from what the COROS app shows (`loadPairTitle`, `figurePairTitle`).
+- **A planned session** (`withPlannedHeraclesLoads`, `strength:estimatePlanLoads`) is scored from
+  its sets, else its length (COROS's `estimatedTime`, kept even with Heracles chosen: it is the
+  closer estimate). One already behind the athlete is read at that day's capacity, and its COROS
+  floor is the program's load, never the load of the activity that did it. A done session still
+  `pending` is not compared in Heracles (`comparableLoads`), and a plan that is only a length (no
+  sets, no COROS load: `planIsOnlyALength`) is read against nothing.
 - **COROS's fitness figures follow the choice** (`electron/heraclesFitness.ts`): Load Impact,
   Base Fitness, Intensity Trend and the week's range are COROS's own plus the same averages run
   on what Heracles adds each day (`heraclesDeltaSeries`, linear, so no COROS history is

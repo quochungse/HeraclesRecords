@@ -25,6 +25,8 @@ const units: UnitsMessages = {
   "units.load.pair": "Heracles TL {heracles} · COROS TL {coros}",
   "units.load.estimate": "Stimato: non è stato possibile leggere le serie",
   "units.load.pending": "Non ancora calcolato: le serie della sessione sono in caricamento",
+  "units.load.planned": "Stimato dalle serie del piano",
+  "units.load.plannedFromLength": "Stimato dalla durata del piano: non indica serie",
   "units.load.pairFigure": "Heracles {heracles} · COROS {coros}",
   "units.load.rangePair": "Intervallo consigliato: Heracles {heracles} · COROS {coros}",
   "units.load.fitnessPartial": "Approssimato: le serie di alcune sessioni di forza sono ancora in caricamento",

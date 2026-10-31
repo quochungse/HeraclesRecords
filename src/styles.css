@@ -16982,6 +16982,10 @@ label.chat-settings-toggle-row {
   grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
+.sched-hero-stats.is-4 {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
 .sched-stat {
   display: flex;
   min-width: 0;
@@ -17036,6 +17040,18 @@ label.chat-settings-toggle-row {
   .sched-hero-stats.is-3 .sched-stat:last-child {
     grid-column: 1 / -1;
     border-top: 1px solid var(--glass-border);
+    border-left: 0;
+  }
+
+  .sched-hero-stats.is-4 {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .sched-hero-stats.is-4 .sched-stat:nth-child(n + 3) {
+    border-top: 1px solid var(--glass-border);
+  }
+
+  .sched-hero-stats.is-4 .sched-stat:nth-child(3) {
     border-left: 0;
   }
 }

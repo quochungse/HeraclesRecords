@@ -615,7 +615,9 @@ export function estimatePlannedLoad(
 ): HeraclesLoad | undefined {
   const day = dayOf(nowSec);
   const bodyWeightKg = state.context.bodyWeightKg(nowSec) ?? DEFAULT_BODY_WEIGHT_KG;
-  const recent = state.sessionRpes.filter((entry) => entry.day >= day - MEDIAN_WINDOW_DAYS);
+  // Up to the day read: a session already behind the athlete is read against
+  // them as they were (capacity is bounded the same way, `capacityAt`).
+  const recent = state.sessionRpes.filter((entry) => entry.day <= day && entry.day >= day - MEDIAN_WINDOW_DAYS);
   const usual = median(recent.map((entry) => entry.rpe)) ?? DEFAULT_SESSION_RPE;
   const cardio = positive(plan.corosLoad);
 

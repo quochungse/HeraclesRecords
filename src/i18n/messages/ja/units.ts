@@ -25,6 +25,8 @@ const units: UnitsMessages = {
   "units.load.pair": "Heracles TL {heracles} · COROS TL {coros}",
   "units.load.estimate": "推定：セットを読み取れませんでした",
   "units.load.pending": "未計算：セッションのセットを読み込み中です",
+  "units.load.planned": "推定：プランのセットから算出",
+  "units.load.plannedFromLength": "推定：プランの所要時間から算出（セットの指定なし）",
   "units.load.pairFigure": "Heracles {heracles} · COROS {coros}",
   "units.load.rangePair": "推奨範囲：Heracles {heracles} · COROS {coros}",
   "units.load.fitnessPartial": "概算：一部の筋トレのセットをまだ読み込み中です",

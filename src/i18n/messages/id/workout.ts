@@ -324,6 +324,7 @@ const workout: WorkoutMessages = {
   "workout.v.sets": "Set",
   "workout.v.lifted": "Terangkat",
   "workout.v.setRest": "Istirahat antar set",
+  "workout.v.estLoad": "Perkiraan beban",
   "workout.v.distance": "Jarak",
   "workout.v.timedSteps": "Langkah berwaktu",
   "workout.v.duration": "Durasi",

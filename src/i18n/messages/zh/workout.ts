@@ -324,6 +324,7 @@ const workout: WorkoutMessages = {
   "workout.v.sets": "组数",
   "workout.v.lifted": "举起重量",
   "workout.v.setRest": "组间休息",
+  "workout.v.estLoad": "预计负荷",
   "workout.v.distance": "距离",
   "workout.v.timedSteps": "计时步骤",
   "workout.v.duration": "时长",

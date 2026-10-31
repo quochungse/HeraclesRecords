@@ -324,6 +324,7 @@ const workout: WorkoutMessages = {
   "workout.v.sets": "เซ็ต",
   "workout.v.lifted": "ยกได้",
   "workout.v.setRest": "พักระหว่างเซ็ต",
+  "workout.v.estLoad": "โหลดโดยประมาณ",
   "workout.v.distance": "ระยะทาง",
   "workout.v.timedSteps": "ขั้นที่จับเวลา",
   "workout.v.duration": "ระยะเวลา",

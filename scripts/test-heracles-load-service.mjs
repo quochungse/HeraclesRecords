@@ -128,6 +128,38 @@ const deps = {
   assert.equal(service.plannedHeraclesLoad({ exercises: [] }, deps), undefined);
 }
 
+// ---- A scheduled plan: its own load, read against the athlete as they were ----
+{
+  const ymd = (sec) => {
+    const d = new Date(sec * 1000);
+    return `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, "0")}${String(d.getDate()).padStart(2, "0")}`;
+  };
+  // A done session's plan is its program's: the parse never hands it the
+  // activity's load, which floored the estimate at what was done (61 for a
+  // 12-minute plan on a real schedule).
+  const hub = await import(`${pathToFileURL(path.join(repoRoot, "dist-electron", "trainingHubService.js")).href}?cacheBust=${Date.now()}`);
+  const [done] = hub.parseScheduledWorkoutEntries({
+    entities: [{ happenDay: ymd(NOW - DAY), idInPlan: "1", planProgramId: "1", planId: "p", labelId: "x", sportData: { trainingLoad: 61, labelId: "x" } }],
+    programs: [{ id: "p1", idInPlan: "1", name: "Full chest", sportType: 4, trainingLoad: 0, estimatedTime: 720, exercises: [] }]
+  });
+  const [planned] = service.withPlannedHeraclesLoads([done], deps);
+  assert.equal(planned.heraclesLoad.cardio, undefined, "no COROS floor taken from the activity");
+  assert.ok(planned.heraclesLoad.value < 61, "the plan's own estimate");
+
+  const plan = (happenDay) => ({
+    sportType: 4,
+    happenDay,
+    durationSeconds: 1500,
+    exercises: [{ key: "T1041", sets: 3, reps: 8, weight: 55, restSec: 150 }]
+  });
+  const [before, today, ahead] = service.withPlannedHeraclesLoads(
+    [plan(ymd(NOW - 20 * DAY)), plan(ymd(NOW)), plan(ymd(NOW + 5 * DAY))],
+    deps
+  );
+  assert.notEqual(before.heraclesLoad.value, today.heraclesLoad.value, "a plan before any set of the lift is read without its capacity");
+  assert.equal(today.heraclesLoad.value, ahead.heraclesLoad.value, "today and ahead read the athlete as they are now");
+}
+
 // ---- A plan's sessions, as the Training Library sends them ----
 {
   const liftStep = {

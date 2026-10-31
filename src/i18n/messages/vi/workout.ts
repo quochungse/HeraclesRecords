@@ -324,6 +324,7 @@ const workout: WorkoutMessages = {
   "workout.v.sets": "Số hiệp",
   "workout.v.lifted": "Đã nâng",
   "workout.v.setRest": "Nghỉ giữa hiệp",
+  "workout.v.estLoad": "Tải ước tính",
   "workout.v.distance": "Quãng đường",
   "workout.v.timedSteps": "Các bước tính giờ",
   "workout.v.duration": "Thời lượng",

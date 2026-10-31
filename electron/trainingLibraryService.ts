@@ -1056,7 +1056,8 @@ function loadsToCompare(
   activity: TrainingHubActivity | undefined,
   loadSource: StrengthLoadSource
 ): { planned?: number; done?: number } {
-  if (loadSource === "heracles" && scheduled.heraclesLoad && activity?.heraclesLoad) {
+  // A session whose sets are still loading carries COROS's figure (`comparableLoads`).
+  if (loadSource === "heracles" && scheduled.heraclesLoad && activity?.heraclesLoad && activity.heraclesLoad.quality !== "pending") {
     return { planned: scheduled.heraclesLoad.value, done: activity.heraclesLoad.value };
   }
   return { planned: scheduled.trainingLoad, done: activity?.trainingLoad };

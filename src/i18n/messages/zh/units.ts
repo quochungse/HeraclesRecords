@@ -25,6 +25,8 @@ const units: UnitsMessages = {
   "units.load.pair": "Heracles TL {heracles} · COROS TL {coros}",
   "units.load.estimate": "估算：无法读取各组数据",
   "units.load.pending": "尚未计算：正在加载本次训练的各组数据",
+  "units.load.planned": "估算：根据计划中的各组数据",
+  "units.load.plannedFromLength": "估算：根据计划时长（计划未写明组数）",
   "units.load.pairFigure": "Heracles {heracles} · COROS {coros}",
   "units.load.rangePair": "推荐范围：Heracles {heracles} · COROS {coros}",
   "units.load.fitnessPartial": "近似值：部分力量训练的组数据仍在加载",

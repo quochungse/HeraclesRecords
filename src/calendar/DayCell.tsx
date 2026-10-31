@@ -14,7 +14,7 @@ import {
   formatHappenDayLabel,
   formatUpcomingWorkoutVolumeDisplay
 } from "../training/formatters";
-import { activityLoad, activityLoadNote, plannedLoad } from "../training/loadFigures";
+import { activityLoad, activityLoadNote, plannedLoad, plannedLoadNote } from "../training/loadFigures";
 import { useLoadSource } from "../training/loadSource";
 import { sportColorCategory, type SportColorCategory } from "../training/sportColors";
 import { isSwimSportType } from "../training/sportTypes";
@@ -144,7 +144,7 @@ interface CardView {
   completionPct?: number;
   pair?: PlannedActualPair;
   activity?: TrainingHubActivity;
-  /** What the load figure needs said: estimated, or still COROS's (`activityLoadNote`). */
+  /** What the load figure needs said: estimated, or still COROS's (`activityLoadNote`, `plannedLoadNote`). */
   loadNote?: string;
   /** A session still to do (or missed): its description, for the hover. */
   description?: string;
@@ -196,6 +196,7 @@ function dayCards(day: CalendarDay, unitSystem: UnitSystem, source: StrengthLoad
       category: scheduledSportCategory(scheduled.sportType),
       kind: missed ? "missed" : "planned",
       pair,
+      loadNote: plannedLoadNote(scheduled, source),
       description: scheduled.description
     };
   });

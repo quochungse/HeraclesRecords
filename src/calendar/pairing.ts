@@ -6,7 +6,7 @@ import type {
   UnitSystem
 } from "../../electron/types";
 import { parseUpcomingWorkoutDistanceKm } from "../training/formatters";
-import { activityLoad, comparableLoads, plannedLoad as plannedLoadOf } from "../training/loadFigures";
+import { activityLoad, comparableLoads, planIsOnlyALength, plannedLoad as plannedLoadOf } from "../training/loadFigures";
 import {
   scheduledWorkoutKey,
   type CalendarDay,
@@ -178,6 +178,8 @@ function completionPct(
   targets: PlannedTargets,
   loadSource: StrengthLoadSource
 ): number | undefined {
+  // A plan that is only a length has nothing to read the session against.
+  if (planIsOnlyALength(scheduled)) return undefined;
   const { planned: plannedLoad, done } = comparableLoads(scheduled, activity, loadSource);
   if (plannedLoad && plannedLoad > 0 && done !== undefined) {
     return Math.round((done / plannedLoad) * 100);

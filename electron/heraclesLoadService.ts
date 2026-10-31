@@ -293,12 +293,24 @@ export function plannedHeraclesLoad(plan: PlannedStrengthSession, deps?: Heracle
   return plannedEstimator(deps)(plan);
 }
 
-/** `plannedHeraclesLoad` for a batch, over one snapshot. */
-function plannedEstimator(deps: HeraclesLoadDeps | undefined): (plan: PlannedStrengthSession) => HeraclesLoad | undefined {
+/**
+ * `plannedHeraclesLoad` for a batch, over one snapshot. `atSec` reads a plan
+ * against the athlete as they were then (a session already behind them);
+ * nothing later than now.
+ */
+function plannedEstimator(
+  deps: HeraclesLoadDeps | undefined
+): (plan: PlannedStrengthSession, atSec?: number) => HeraclesLoad | undefined {
   const resolved = depsOrDefault(deps);
   const { state } = snapshotFor(resolved).run;
   const now = resolved.now();
-  return (plan) => estimatePlannedLoad(plan, state, now);
+  return (plan, atSec) => estimatePlannedLoad(plan, state, atSec !== undefined ? Math.min(atSec, now) : now);
+}
+
+/** Local midnight of a `YYYYMMDD` day, in epoch seconds; undefined for anything else. */
+function happenDayStartSec(happenDay: string | undefined): number | undefined {
+  const match = /^(\d{4})(\d{2})(\d{2})$/.exec(happenDay ?? "");
+  return match ? Math.floor(new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3])).valueOf() / 1000) : undefined;
 }
 
 /** COROS's workout sport for strength. */
@@ -334,7 +346,11 @@ function estimatedSecondsOf(rawProgram: Record<string, unknown> | undefined): nu
 /**
  * Planned sessions as the schedule returned them, each strength one carrying
  * Heracles Training Load's estimate. `durationSeconds` (upcoming workouts) or
- * the raw program's `estimatedTime` (scheduled entries) is the session's length.
+ * the raw program's `estimatedTime` (scheduled entries) is the session's length,
+ * and `trainingLoad` is the program's own (the parse never hands it the load of
+ * the activity that did the session, which floored the plan at it). A session
+ * already behind the athlete is read against them as they were that day, so its
+ * plan does not move as they grow stronger.
  */
 export function withPlannedHeraclesLoads<
   T extends {
@@ -343,6 +359,7 @@ export function withPlannedHeraclesLoads<
     exercises?: TrainingHubScheduledExercise[];
     durationSeconds?: number;
     rawProgram?: Record<string, unknown>;
+    happenDay?: string;
   }
 >(workouts: T[], deps?: HeraclesLoadDeps): T[] {
   if (!workouts.some((workout) => workout.sportType === PLANNED_STRENGTH_SPORT)) return workouts;
@@ -350,7 +367,10 @@ export function withPlannedHeraclesLoads<
   return workouts.map((workout) => {
     if (workout.sportType !== PLANNED_STRENGTH_SPORT) return workout;
     const estimated = workout.durationSeconds ?? estimatedSecondsOf(workout.rawProgram);
-    const heraclesLoad = estimate(plannedStrengthSession(workout.exercises, estimated, workout.trainingLoad));
+    const heraclesLoad = estimate(
+      plannedStrengthSession(workout.exercises, estimated, workout.trainingLoad),
+      happenDayStartSec(workout.happenDay)
+    );
     return heraclesLoad ? { ...workout, heraclesLoad } : workout;
   });
 }

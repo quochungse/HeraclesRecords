@@ -6,7 +6,15 @@ import type {
   TrainingHubSportType,
   TrainingHubUpcomingWorkout
 } from "../../../electron/types";
-import { activityLoad, activityLoadNote, comparableLoads, inLoadSource, plannedLoad } from "../loadFigures";
+import {
+  activityLoad,
+  activityLoadNote,
+  comparableLoads,
+  inLoadSource,
+  planIsOnlyALength,
+  plannedLoad,
+  plannedLoadNote
+} from "../loadFigures";
 import { useLoadSource } from "../loadSource";
 import type { HeraclesRecordsApi } from "../../heraclesrecords-api";
 import { workoutSportView } from "../../calendar/workoutSportIcons";
@@ -115,7 +123,11 @@ function TodayEntry({
             <span>{item.workout.name}</span>
             {tag ? <span className="overview-chip">{tag}</span> : null}
           </span>
-          {stats ? <span className="overview-plan-meta">{stats}</span> : null}
+          {stats ? (
+            <span className="overview-plan-meta" title={plannedLoadNote(item.workout, loadSource)}>
+              {stats}
+            </span>
+          ) : null}
         </span>
         {chevron}
       </button>
@@ -124,7 +136,8 @@ function TodayEntry({
 
   const { activity, workout } = item;
   const category = sportColorCategory(activity.sportType);
-  const compared = lead && workout ? comparableLoads(workout, activity, loadSource) : undefined;
+  // A plan that is only a length has nothing to read the session against.
+  const compared = lead && workout && !planIsOnlyALength(workout) ? comparableLoads(workout, activity, loadSource) : undefined;
   const against = compared ? loadAgainstPlan(compared.done, compared.planned) : undefined;
   const name = activityTitle(activity);
   // Named by its plan, the session's own name goes with its figures.
@@ -296,7 +309,11 @@ export function OverviewComingUp({
                           <span>{workout.name}</span>
                           {tag ? <span className="overview-chip">{tag}</span> : null}
                         </span>
-                        {stats ? <span className="overview-plan-meta">{stats}</span> : null}
+                        {stats ? (
+                          <span className="overview-plan-meta" title={plannedLoadNote(workout, loadSource)}>
+                            {stats}
+                          </span>
+                        ) : null}
                       </span>
                       <ChevronRight className="overview-plan-chevron" size={18} aria-hidden="true" />
                     </button>

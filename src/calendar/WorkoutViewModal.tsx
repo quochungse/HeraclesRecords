@@ -314,7 +314,8 @@ export function WorkoutReadOnlyBody({
   title,
   heroAside,
   subtitleAside,
-  heroFooter
+  heroFooter,
+  estimatedLoad
 }: {
   draft: RunWorkoutEditorDraft;
   context: WorkoutEditorContext;
@@ -342,6 +343,11 @@ export function WorkoutReadOnlyBody({
   subtitleAside?: ReactNode;
   /** A closing line inside the hero, under its figures. */
   heroFooter?: ReactNode;
+  /**
+   * Heracles Training Load's estimate of the workout, with what its hover
+   * says: the Training Library's strength workout while that load is chosen.
+   */
+  estimatedLoad?: { value: number; note?: string };
 }) {
   const { unitSystem } = useUnitSystem();
   const view = useMemo(
@@ -362,7 +368,7 @@ export function WorkoutReadOnlyBody({
 
   // Only figures the draft actually holds. A strength session has no distance
   // and an open-ended run has no duration; a "--" in a box is not information.
-  const stats: Array<{ icon: LucideIcon; label: string; value: string }> = [];
+  const stats: Array<{ icon: LucideIcon; label: string; value: string; note?: string }> = [];
   if (isStrength) {
     stats.push({ icon: Dumbbell, label: t("workout.v.exercises"), value: formatCount(strength.exercises) });
     if (strength.sets > 0) {
@@ -374,6 +380,14 @@ export function WorkoutReadOnlyBody({
       stats.push({ icon: Gauge, label: t("workout.v.lifted"), value: formatTonnage(tonnage, unitSystem) });
     } else if (strength.restSeconds > 0) {
       stats.push({ icon: Clock, label: t("workout.v.setRest"), value: clockFromSeconds(strength.restSeconds) });
+    }
+    if (estimatedLoad && estimatedLoad.value > 0) {
+      stats.push({
+        icon: Gauge,
+        label: t("workout.v.estLoad"),
+        value: t("units.trainingLoadShort", { value: Math.round(estimatedLoad.value) }),
+        note: estimatedLoad.note
+      });
     }
   } else {
     if (view.totals.distanceMeters) {
@@ -453,7 +467,7 @@ export function WorkoutReadOnlyBody({
         </div>
         <dl className={`sched-hero-stats is-${stats.length}`}>
           {stats.map((stat) => (
-            <div className="sched-stat" key={stat.label}>
+            <div className="sched-stat" key={stat.label} title={stat.note}>
               <dt className="sched-stat-label">
                 <stat.icon size={12} aria-hidden="true" />
                 {stat.label}

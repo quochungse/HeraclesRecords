@@ -26,6 +26,8 @@ const units = {
   "units.load.pair": "Heracles TL {heracles} · COROS TL {coros}",
   "units.load.estimate": "Estimated: the sets could not be read",
   "units.load.pending": "Not calculated yet: the session's sets are still loading",
+  "units.load.planned": "Estimated from the plan's sets",
+  "units.load.plannedFromLength": "Estimated from the plan's length: it states no sets",
   "units.load.pairFigure": "Heracles {heracles} · COROS {coros}",
   "units.load.rangePair": "Recommended range: Heracles {heracles} · COROS {coros}",
   "units.load.fitnessPartial": "Approximate: some strength sessions' sets are still loading",

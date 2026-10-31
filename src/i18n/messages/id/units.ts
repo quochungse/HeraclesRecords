@@ -25,6 +25,8 @@ const units: UnitsMessages = {
   "units.load.pair": "Heracles TL {heracles} · COROS TL {coros}",
   "units.load.estimate": "Perkiraan: set tidak dapat dibaca",
   "units.load.pending": "Belum dihitung: set sesi ini masih dimuat",
+  "units.load.planned": "Perkiraan dari set dalam rencana",
+  "units.load.plannedFromLength": "Perkiraan dari durasi rencana: rencana tidak mencantumkan set",
   "units.load.pairFigure": "Heracles {heracles} · COROS {coros}",
   "units.load.rangePair": "Rentang yang disarankan: Heracles {heracles} · COROS {coros}",
   "units.load.fitnessPartial": "Perkiraan: set beberapa sesi latihan beban masih dimuat",

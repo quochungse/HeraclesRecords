@@ -12,10 +12,17 @@
  */
 import type { HeraclesLoad, StrengthLoadSource } from "../../electron/types";
 import { formatCount, t } from "../i18n/core";
+import { isStrengthStyleWorkout, scheduledWorkoutSport } from "./workoutSport";
 
 interface Loaded {
   trainingLoad?: number;
   heraclesLoad?: HeraclesLoad;
+}
+
+/** A session on the plan, as the schedule lists it. */
+interface PlannedSession extends Loaded {
+  sportType?: number;
+  exercises?: readonly { reps?: number; holdSec?: number }[];
 }
 
 /** A session's load as the athlete reads it: Heracles's for a strength session when chosen, else COROS's. */
@@ -35,17 +42,47 @@ export function plannedLoad(workout: Loaded, source: StrengthLoadSource): number
 }
 
 /**
+ * A strength or HYROX plan that states no reps and no holds — its steps left
+ * open — so the load Heracles gives it is guessed from its length.
+ */
+export function planStatesNoSets(workout: PlannedSession): boolean {
+  if (!isStrengthStyleWorkout(scheduledWorkoutSport(workout.sportType))) return false;
+  return !(workout.exercises ?? []).some((exercise) => (exercise.reps ?? 0) > 0 || (exercise.holdSec ?? 0) > 0);
+}
+
+/**
+ * A plan that is only a length — no sets stated, and no load COROS gave it —
+ * so nothing done can be read against it: a 6-minute plan of open steps, done
+ * in 61, read 1010%.
+ */
+export function planIsOnlyALength(workout: PlannedSession): boolean {
+  return planStatesNoSets(workout) && !((workout.trainingLoad ?? 0) > 0);
+}
+
+/**
+ * What a planned load needs said while Heracles is chosen: that it is
+ * Heracles's estimate of the plan, from its sets or, where it states none,
+ * from its length. Nothing for COROS's own planned figure.
+ */
+export function plannedLoadNote(workout: PlannedSession, source: StrengthLoadSource): string | undefined {
+  if (source !== "heracles" || workout.heraclesLoad?.quality !== "planned") return undefined;
+  return t(planStatesNoSets(workout) ? "units.load.plannedFromLength" : "units.load.planned");
+}
+
+/**
  * A session's load and its plan's, both in one load: Heracles's only where
  * both sides carry it, so a plan COROS priced is never set against a figure
- * of the other scale. The main process compares the same way
- * (`loadsToCompare` in `trainingLibraryService.ts`).
+ * of the other scale. A session whose sets are still loading (`pending`)
+ * carries COROS's figure as its Heracles load, so it is not one of them yet.
+ * The main process compares the same way (`loadsToCompare` in
+ * `trainingLibraryService.ts`).
  */
 export function comparableLoads(
   planned: Loaded,
   done: Loaded | undefined,
   source: StrengthLoadSource
 ): { planned?: number; done?: number } {
-  if (source === "heracles" && planned.heraclesLoad && done?.heraclesLoad) {
+  if (source === "heracles" && planned.heraclesLoad && done?.heraclesLoad && done.heraclesLoad.quality !== "pending") {
     return { planned: planned.heraclesLoad.value, done: done.heraclesLoad.value };
   }
   return { planned: planned.trainingLoad, done: done?.trainingLoad };

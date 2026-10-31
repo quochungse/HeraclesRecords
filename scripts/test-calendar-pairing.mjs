@@ -461,6 +461,7 @@ const activity = (overrides) => ({
   // session of planks (6 timed minutes) that COROS gives 27 minutes, done in 31.
   const core = scheduled({
     sportType: 4,
+    exercises: [{ name: "Crunch", sets: 1, reps: 12 }, { name: "Plank", sets: 1, holdSec: 360 }],
     rawProgram: { sportType: 4, estimatedTime: 1620, exercises: [step("1", 3, 12), step("2", 2, 360)] }
   });
   const coreDone = activity({ activityId: "core", sportType: 402, duration: 1860 });
@@ -471,6 +472,49 @@ const activity = (overrides) => ({
     plannedSessionFigures(scheduled({ volume: "3 set(s)" }), { stepCount: 0, timedSteps: 0, distanceSteps: 0 }, { meters: 17080, seconds: 7080 }),
     { distanceMeters: 17080, plannedSeconds: 7080, expectedSeconds: 7080 }
   );
+}
+
+/* --- 9d. strength with Heracles Training Load chosen ------------------------ */
+
+{
+  const { plannedLoadNote, planIsOnlyALength, planStatesNoSets } = await load("src", "training", "loadFigures.ts");
+  const lift = (id, targetType, targetValue) => ({ id, exerciseType: 2, targetType, targetValue, sets: 3, sortNo: Number(id) });
+  const planned = { value: 60, muscular: 60, quality: "planned" };
+
+  // A session whose sets are still loading carries COROS's figure as its
+  // Heracles load; it is not read against a Heracles plan until they load.
+  const plan = scheduled({
+    sportType: 4,
+    heraclesLoad: planned,
+    exercises: [{ name: "Bench", sets: 3, reps: 8 }],
+    rawProgram: { sportType: 4, estimatedTime: 1800, exercises: [lift("1", 3, 8)] }
+  });
+  const loading = activity({ activityId: "lift", sportType: 402, trainingLoad: 20, duration: 2160, heraclesLoad: { value: 20, cardio: 20, muscular: 0, quality: "pending" } });
+  assert.equal(pairPlannedWithActual([plan], [loading], "metric", undefined, "heracles").pairs[0].completionPct, 120, "by time, not 33% by scale");
+  const read = { ...loading, heraclesLoad: { value: 66, muscular: 46, cardio: 20, quality: "sets" } };
+  assert.equal(pairPlannedWithActual([plan], [read], "metric", undefined, "heracles").pairs[0].completionPct, 110, "Heracles both sides once read");
+
+  // A plan of open steps is only a length: no completion against it, in
+  // either load, and its estimate says it came from that length.
+  const open = scheduled({
+    sportType: 4,
+    heraclesLoad: { ...planned, value: 11 },
+    exercises: [{ name: "Row", sets: 1 }],
+    rawProgram: { sportType: 4, estimatedTime: 360, exercises: [lift("1", 1, 0)] }
+  });
+  const long = activity({ activityId: "long", sportType: 402, trainingLoad: 46, duration: 3660, heraclesLoad: { value: 103, muscular: 57, cardio: 46, quality: "estimate" } });
+  for (const source of ["coros", "heracles"]) {
+    const [pair] = pairPlannedWithActual([open], [long], "metric", undefined, source).pairs;
+    assert.equal(pair.activity.activityId, "long", `${source}: still paired`);
+    assert.equal(pair.completionPct, undefined, `${source}: no percentage against a plan of no sets`);
+  }
+  assert.equal(planStatesNoSets(open), true);
+  assert.equal(planStatesNoSets(plan), false);
+  assert.equal(planStatesNoSets(scheduled({ sportType: 1, exercises: [] })), false, "only strength-style plans");
+  assert.equal(planIsOnlyALength({ ...open, trainingLoad: 20 }), false, "a plan COROS priced is more than its length");
+  assert.equal(plannedLoadNote(plan, "heracles"), "Estimated from the plan's sets");
+  assert.equal(plannedLoadNote(open, "heracles"), "Estimated from the plan's length: it states no sets");
+  assert.equal(plannedLoadNote(plan, "coros"), undefined, "COROS's own planned figure needs no note");
 }
 
 /* --- 10. the plan's own volume, not COROS's set count -------------------- */

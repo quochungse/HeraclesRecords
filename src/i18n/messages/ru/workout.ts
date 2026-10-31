@@ -340,6 +340,7 @@ const workout: WorkoutMessages = {
   "workout.v.sets": "Подходы",
   "workout.v.lifted": "Поднято",
   "workout.v.setRest": "Отдых между подходами",
+  "workout.v.estLoad": "Расчётная нагрузка",
   "workout.v.distance": "Дистанция",
   "workout.v.timedSteps": "Шаги по времени",
   "workout.v.duration": "Длительность",

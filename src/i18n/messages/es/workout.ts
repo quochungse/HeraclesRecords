@@ -324,6 +324,7 @@ const workout: WorkoutMessages = {
   "workout.v.sets": "Series",
   "workout.v.lifted": "Levantado",
   "workout.v.setRest": "Descanso entre series",
+  "workout.v.estLoad": "Carga est.",
   "workout.v.distance": "Distancia",
   "workout.v.timedSteps": "Pasos con tiempo",
   "workout.v.duration": "Duración",
