@@ -187,6 +187,8 @@ const overview: OverviewMessages = {
   "overview.sport.plannedAvg": "+ {planned} terencana · rata-rata {avg}",
   "overview.sport.recordedTime": "Waktu tercatat",
   "overview.sport.restsIncluded": "termasuk istirahat",
+  "overview.sport.restsOut": "tanpa istirahat di dinding",
+  "overview.sport.strokesNote": "lintasan kolam, menurut jarak",
   "overview.sport.rides_one": "{count} sesi bersepeda",
   "overview.sport.rides_other": "{count} sesi bersepeda",
   "overview.sport.runs_one": "{count} lari",

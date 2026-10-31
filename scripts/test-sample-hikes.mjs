@@ -40,8 +40,8 @@ const kitImporters = fs
   .sort();
 assert.deepEqual(
   kitImporters,
-  ["sampleHikes.ts", "sampleRides.ts", "sampleTrailRuns.ts"],
-  "the shared kit serves the three samples and nothing else"
+  ["sampleHikes.ts", "sampleRides.ts", "sampleSwims.ts", "sampleTrailRuns.ts"],
+  "the shared kit serves the four samples and nothing else"
 );
 
 const main = fs.readFileSync(path.join(repoRoot, "electron", "main.ts"), "utf8");

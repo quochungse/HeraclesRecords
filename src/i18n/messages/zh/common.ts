@@ -19,6 +19,7 @@ const common: CommonMessages = {
 
   "sport.run": "跑步",
   "sport.bike": "骑行",
+  "sport.swim": "游泳",
   "sport.hiking": "徒步",
   "sport.strength": "力量训练",
   "sport.other": "其他",

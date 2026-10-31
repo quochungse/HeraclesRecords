@@ -187,6 +187,8 @@ const overview: OverviewMessages = {
   "overview.sport.plannedAvg": "+ 예정 {planned} · 평균 {avg}",
   "overview.sport.recordedTime": "기록 시간",
   "overview.sport.restsIncluded": "휴식 포함",
+  "overview.sport.restsOut": "벽에서의 휴식 제외",
+  "overview.sport.strokesNote": "수영장 바퀴, 거리 기준",
   "overview.sport.rides_one": "라이딩 {count}회",
   "overview.sport.rides_other": "라이딩 {count}회",
   "overview.sport.runs_one": "러닝 {count}회",

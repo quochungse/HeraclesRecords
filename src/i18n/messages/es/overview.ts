@@ -187,6 +187,8 @@ const overview: OverviewMessages = {
   "overview.sport.plannedAvg": "+ {planned} planificados · media {avg}",
   "overview.sport.recordedTime": "Tiempo registrado",
   "overview.sport.restsIncluded": "con descansos",
+  "overview.sport.restsOut": "sin los descansos en la pared",
+  "overview.sport.strokesNote": "largos de piscina, por distancia",
   "overview.sport.rides_one": "{count} salida",
   "overview.sport.rides_other": "{count} salidas",
   "overview.sport.runs_one": "{count} carrera",

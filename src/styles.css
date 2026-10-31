@@ -24,6 +24,7 @@
   --sport-hiking: #4c8dff;
   --sport-run: #2fbe91;
   --sport-bike: #e6b800;
+  --sport-swim: #36c2f0;
   --sport-other: #7fd8cf;
 
   --bg-base: #05080b;
@@ -6234,6 +6235,10 @@ td span {
 
 .sport-chip[data-sport="bike"] {
   --sport-chip-color: var(--sport-bike);
+}
+
+.sport-chip[data-sport="swim"] {
+  --sport-chip-color: var(--sport-swim);
 }
 
 .sport-chip[data-sport="other"] {
@@ -16181,6 +16186,9 @@ label.chat-settings-toggle-row {
 .calendar-chip.calendar-sport-bike {
   --chip-sport: var(--sport-bike);
 }
+.calendar-chip.calendar-sport-swim {
+  --chip-sport: var(--sport-swim);
+}
 .calendar-chip.calendar-sport-other {
   --chip-sport: var(--sport-other);
 }
@@ -16801,6 +16809,7 @@ label.chat-settings-toggle-row {
 .sched-detail.is-hiking { --detail-sport: var(--sport-hiking); }
 .sched-detail.is-bike { --detail-sport: var(--sport-bike); }
 .sched-detail.is-strength { --detail-sport: var(--sport-strength); }
+.sched-detail.is-swim { --detail-sport: var(--sport-swim); }
 .sched-detail.is-other { --detail-sport: var(--sport-other); }
 
 /* hero */
@@ -21559,6 +21568,7 @@ label.chat-settings-toggle-row {
 .workout-editor-sport.is-hiking { --workout-sport: var(--sport-hiking); }
 .workout-editor-sport.is-bike { --workout-sport: var(--sport-bike); }
 .workout-editor-sport.is-strength { --workout-sport: var(--sport-strength); }
+.workout-editor-sport.is-swim { --workout-sport: var(--sport-swim); }
 
 .workout-editor-header h2 {
   margin: 3px 0 0;

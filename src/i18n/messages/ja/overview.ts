@@ -187,6 +187,8 @@ const overview: OverviewMessages = {
   "overview.sport.plannedAvg": "+ 予定 {planned} · 平均 {avg}",
   "overview.sport.recordedTime": "記録時間",
   "overview.sport.restsIncluded": "休憩を含む",
+  "overview.sport.restsOut": "壁際の休憩を除く",
+  "overview.sport.strokesNote": "プールの本数、距離ベース",
   "overview.sport.rides_one": "ライド {count} 回",
   "overview.sport.rides_other": "ライド {count} 回",
   "overview.sport.runs_one": "ラン {count} 回",

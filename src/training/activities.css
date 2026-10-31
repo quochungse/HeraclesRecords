@@ -276,6 +276,10 @@
   --sport-mix-color: var(--sport-bike);
 }
 
+.activities-view [data-sport="swim"] {
+  --sport-mix-color: var(--sport-swim);
+}
+
 .activities-view [data-sport="other"] {
   --sport-mix-color: var(--sport-other);
 }

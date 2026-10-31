@@ -1,7 +1,7 @@
 # Screenshots
 
 Every screenshot in `docs/readme/` comes from here: the README uses `01`–`18` and
-`27`–`30`, the website `01`–`30`. They are taken of the real renderer (`src/main.tsx`) running on demo data, so no
+`27`–`30`, the website `01`–`33`. They are taken of the real renderer (`src/main.tsx`) running on demo data, so no
 athlete's own training ever appears in them.
 
 ```sh
@@ -21,7 +21,7 @@ Shots are 1512 × 982 at 2×, with the macOS window corners, written as WebP int
   the preload bridge (`demoApi.ts`, answering from `demoHandlers.ts`) and then mounts the
   app's own `src/main.tsx`.
 - **The demo data** is one believable athlete, Alex Pham in Hà Nội: runs (`sampleRoadRuns.ts`),
-  and the rides, hikes and trail runs of `electron/sample*.ts`; sleep (`demoSleep.ts`); a
+  and the rides, hikes, trail runs and swims of `electron/sample*.ts`; sleep (`demoSleep.ts`); a
   12-week marathon plan and a workout library (`demoPlan.ts`, `demoLibrary.ts`); Coach
   conversations in English (`demoCoach.ts`); and the Hall of Records' realistic history.
   Emails are `example.com`. Its today is always the last Saturday (`clock.ts`, imported first):

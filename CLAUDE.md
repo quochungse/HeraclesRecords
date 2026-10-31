@@ -66,7 +66,7 @@ npm run release:prepare -- vX.Y.Z
 ```
 
 Development variants: `dev:simulate-plan-ai` (plan steps without a provider),
-`dev:sample-rides|hikes|trail-runs` (simulated sessions added at the window's door only),
+`dev:sample-rides|hikes|trail-runs|swims` (simulated sessions added at the window's door only),
 `sample:coach` (sample Coach conversations; app closed). Generators whose output is
 committed and never run by a build: `fonts:fetch`, `admin-regions:fetch`,
 `body-shapes:fetch`, `body-figures:bake`, `sample-rides:fetch`, `sample-hikes:fetch`,
@@ -218,7 +218,7 @@ in". The COROS API notes are in `electron/CLAUDE.md`.
 | Training Library (plans, workouts, Exercises Library, AI Plan) | `electron/trainingLibraryService.ts`, `src/training-library/` | `src/training-library/CLAUDE.md` |
 | Calendar, workout builder | `src/calendar/` | `src/calendar/CLAUDE.md` |
 | Activities, Overview, channel chart, training label, zones, body figure | `src/training/` | `src/training/CLAUDE.md` |
-| Running, Cycling, Hiking, trail view, running efficiency | `src/running/`, `src/cycling/`, `src/hiking/` | `src/running/CLAUDE.md` |
+| Running, Cycling, Hiking, Swimming, trail view, running efficiency | `src/running/`, `src/cycling/`, `src/hiking/`, `src/swimming/`, `electron/swimDetail.ts` | `src/running/CLAUDE.md` |
 | Strength, Hevy | `src/strength/`, `electron/strength*`, `hevyService.ts` | `src/strength/CLAUDE.md` |
 | Sleep | `src/sleep/`, `electron/sleep*` | `src/sleep/CLAUDE.md` |
 | Where you've been, places, geocoding | `src/trainingMap/`, `reverseGeocodeService.ts` | `src/trainingMap/CLAUDE.md` |

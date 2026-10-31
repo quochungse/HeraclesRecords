@@ -17,6 +17,7 @@ import type {
   BestEffort,
   RunPerformanceCurve,
   SessionIntensity,
+  SwimSummary,
   CoachAnalysisRunQuery,
   StrengthDetail,
   StrengthSession,
@@ -545,6 +546,10 @@ export function initializeDatabase(userDataPath: string): Database.Database {
   // on its own like the intensity.
   ensureColumn(db, "training_activity_summaries", "performance_version", "INTEGER");
   ensureColumn(db, "training_activity_summaries", "performance", "TEXT");
+  // A swim's strokes, pool and best efforts (swimDetail.ts), versioned on its
+  // own like the intensity.
+  ensureColumn(db, "training_activity_summaries", "swim_version", "INTEGER");
+  ensureColumn(db, "training_activity_summaries", "swim", "TEXT");
   // The part of input_tokens a run read from the prompt cache, which the
   // budget counts at a tenth (tokenUsage.ts). NULL on a run from before it was
   // kept, and on one whose provider said nothing about a cache: both count in full.
@@ -2324,6 +2329,8 @@ interface ActivitySummaryRow {
   intensity: string | null;
   performance_version: number | null;
   performance: string | null;
+  swim_version: number | null;
+  swim: string | null;
   computed_at: number;
 }
 
@@ -2374,6 +2381,28 @@ function parsePerformance(value: string | null): RunPerformanceCurve | undefined
   }
 }
 
+/** A stored swim summary, or nothing when the column is empty or not the shape this build reads. */
+function parseSwimSummary(value: string | null): SwimSummary | undefined {
+  if (!value) return undefined;
+  try {
+    const parsed = JSON.parse(value) as Partial<SwimSummary>;
+    if (
+      typeof parsed !== "object" ||
+      parsed === null ||
+      typeof parsed.version !== "number" ||
+      typeof parsed.swimSeconds !== "number" ||
+      typeof parsed.restSeconds !== "number" ||
+      !Array.isArray(parsed.byStyle) ||
+      !Array.isArray(parsed.best)
+    ) {
+      return undefined;
+    }
+    return parsed as SwimSummary;
+  } catch {
+    return undefined;
+  }
+}
+
 function parseBestEfforts(value: string | null): BestEffort[] | undefined {
   if (!value) return undefined;
   try {
@@ -2396,6 +2425,7 @@ function toActivityDetailSummary(row: ActivitySummaryRow): ActivityDetailSummary
   const bestEfforts = parseBestEfforts(row.best_efforts);
   const intensity = parseIntensity(row.intensity);
   const performance = parsePerformance(row.performance);
+  const swim = parseSwimSummary(row.swim);
   let zoneSeconds: number[] | undefined;
   if (row.zone_seconds) {
     try {
@@ -2433,6 +2463,7 @@ function toActivityDetailSummary(row: ActivitySummaryRow): ActivityDetailSummary
     ...(performance && row.performance_version !== null
       ? { performanceVersion: row.performance_version, performance }
       : {}),
+    ...(swim && row.swim_version !== null ? { swimVersion: row.swim_version, swim } : {}),
     computedAt: row.computed_at
   };
 }
@@ -2461,7 +2492,7 @@ export function getActivityDetailSummaries(
         `SELECT activity_id, fingerprint, summary_version, zone_seconds,
                 decoupling_percent, last_upload_time, records_version,
                 best_efforts, start_lat, start_lon, intensity_version, intensity,
-                performance_version, performance, computed_at
+                performance_version, performance, swim_version, swim, computed_at
          FROM training_activity_summaries
          WHERE activity_id IN (${chunk.map(() => "?").join(", ")})`
       )
@@ -2483,12 +2514,12 @@ export function upsertActivityDetailSummary(
          activity_id, fingerprint, summary_version, zone_seconds,
          decoupling_percent, last_upload_time, records_version,
          best_efforts, start_lat, start_lon, intensity_version, intensity,
-         performance_version, performance, computed_at
+         performance_version, performance, swim_version, swim, computed_at
        )
        VALUES (@activityId, @fingerprint, @summaryVersion, @zoneSeconds,
                @decouplingPercent, @lastUploadTime, @recordsVersion,
                @bestEfforts, @startLat, @startLon, @intensityVersion, @intensity,
-               @performanceVersion, @performance, @computedAt)
+               @performanceVersion, @performance, @swimVersion, @swim, @computedAt)
        ON CONFLICT(activity_id) DO UPDATE SET
          fingerprint = excluded.fingerprint,
          summary_version = excluded.summary_version,
@@ -2503,6 +2534,8 @@ export function upsertActivityDetailSummary(
          intensity = excluded.intensity,
          performance_version = excluded.performance_version,
          performance = excluded.performance,
+         swim_version = excluded.swim_version,
+         swim = excluded.swim,
          computed_at = excluded.computed_at`
     )
     .run({
@@ -2524,6 +2557,8 @@ export function upsertActivityDetailSummary(
       intensity: summary.intensity ? JSON.stringify(summary.intensity) : null,
       performanceVersion: summary.performance ? (summary.performanceVersion ?? null) : null,
       performance: summary.performance ? JSON.stringify(summary.performance) : null,
+      swimVersion: summary.swim ? (summary.swimVersion ?? null) : null,
+      swim: summary.swim ? JSON.stringify(summary.swim) : null,
       computedAt: summary.computedAt
     });
 }

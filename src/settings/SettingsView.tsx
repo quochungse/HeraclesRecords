@@ -17,6 +17,7 @@ import {
   RefreshCw,
   Server,
   Sun,
+  Waves,
   type LucideIcon,
 } from "lucide-react";
 import { useEffect, useState, type CSSProperties, type ReactNode } from "react";
@@ -117,16 +118,19 @@ const SPORT_COLOR_ICONS: Record<SportColorCategory, LucideIcon> = {
   hiking: Mountain,
   run: RunnerIcon,
   bike: Bike,
+  swim: Waves,
   other: Ellipsis,
 };
 
 /** The colour tiles in the sport screens' order — Running, Cycling, Hiking,
-    Strength — so each colour sits under its sport's screen in the card above,
-    the two grids sharing their columns. Other, which has no screen, ends it. */
+    Swimming, Strength — so each colour sits under its sport's screen in the
+    card above, the two grids sharing their columns. Other, which has no
+    screen, ends it. */
 const SPORT_COLOR_ORDER: SportColorCategory[] = [
   "run",
   "bike",
   "hiking",
+  "swim",
   "strength",
   "other",
 ];

@@ -60,17 +60,39 @@ export interface ActivityDetailSummariesInput {
   requireIntensity?: boolean;
   /** Also count a road or track run as missing until it carries its performance curve. */
   requirePerformance?: boolean;
+  /** Also count a swim as missing until it carries its strokes, pool and best efforts. */
+  requireSwim?: boolean;
 }
 
-export function useActivityDetailSummaries({
+export interface ActivityDetailSummariesState {
+  summaries: ReadonlyMap<string, ActivityDetailSummary>;
+  /**
+   * Whether the stored summaries have been read and the sweep for these
+   * activities has stopped — done, capped or failing. Until then a figure that
+   * needs a summary is on its way, not missing: loading is not empty.
+   */
+  settled: boolean;
+}
+
+export function useActivityDetailSummaries(
+  input: ActivityDetailSummariesInput
+): ReadonlyMap<string, ActivityDetailSummary> {
+  return useActivityDetailSummariesState(input).summaries;
+}
+
+export function useActivityDetailSummariesState({
   api,
   activities,
   enabled,
   requireIntensity = false,
-  requirePerformance = false
-}: ActivityDetailSummariesInput): ReadonlyMap<string, ActivityDetailSummary> {
+  requirePerformance = false,
+  requireSwim = false
+}: ActivityDetailSummariesInput): ActivityDetailSummariesState {
   const [summaries, setSummaries] =
     useState<ReadonlyMap<string, ActivityDetailSummary>>(EMPTY);
+  // The ids whose read last stopped, so a new set reads as unsettled at once
+  // rather than a render later.
+  const [settledKey, setSettledKey] = useState<string | null>(null);
 
   // Keyed by the ids themselves rather than by the array: every activity list
   // call pushes a new array holding the same activities, and an effect that restarted
@@ -106,7 +128,7 @@ export function useActivityDetailSummaries({
           const pass = await api.syncActivityDetailSummaries(
             ids,
             SUMMARY_CHUNK,
-            { requireIntensity, requirePerformance }
+            { requireIntensity, requirePerformance, requireSwim }
           );
           // Charged before anything else: the fetches happened whether or not
           // this effect is still around to see them, and a period change tears
@@ -131,13 +153,17 @@ export function useActivityDetailSummaries({
       } catch {
         // COROS unreachable, or the channel is not there in this build: the
         // screen keeps whatever was stored and says nothing about it.
+      } finally {
+        if (!cancelled) {
+          setSettledKey(key);
+        }
       }
     })();
 
     return () => {
       cancelled = true;
     };
-  }, [api, enabled, key, requireIntensity, requirePerformance]);
+  }, [api, enabled, key, requireIntensity, requirePerformance, requireSwim]);
 
-  return summaries;
+  return { summaries, settled: !api || key.length === 0 || settledKey === key };
 }

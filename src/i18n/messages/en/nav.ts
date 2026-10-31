@@ -16,6 +16,7 @@ const nav = {
   "nav.running": "Running",
   "nav.cycling": "Cycling",
   "nav.hiking": "Hiking",
+  "nav.swimming": "Swimming",
   "nav.strength": "Strength",
   "nav.records": "Hall of Records",
   "nav.places": "Where you’ve been",

@@ -940,4 +940,40 @@ assert.equal(
   7102
 );
 
+// A pool swim's generic laps are its lengths with the rests among them; every
+// reader of `laps` — the Activities table, Coach — gets its intervals instead.
+const poolLength = (seconds, relation) => ({
+  distance: 2500,
+  time: seconds * 100,
+  swimStyle: 1,
+  strokes: 14,
+  swimRelationIndex: relation
+});
+const poolRest = (seconds) => ({ distance: 0, time: seconds * 100, swimStyle: 0 });
+const poolSwim = parseActivityDetail({
+  sportType: 300,
+  summary: { sportType: 300, distance: 15000, workoutTime: 16000 },
+  lapList: [
+    { type: 1, lapItemList: [poolLength(25, 1), poolLength(26, 1), poolRest(20), poolLength(24, 2), poolLength(25, 2)] },
+    {
+      type: 2,
+      lapItemList: [
+        { distance: 5000, time: 5100, swimStyle: 1, swimRelationIndex: 1 },
+        poolRest(20),
+        { distance: 5000, time: 4900, swimStyle: 1, swimRelationIndex: 2 }
+      ]
+    }
+  ]
+});
+assert.equal(poolSwim.swim?.poolLength, 25, "the pool, from its lengths");
+assert.deepEqual(
+  poolSwim.laps.map((lap) => [lap.distance, lap.duration]),
+  [
+    [50, 51],
+    [50, 49]
+  ],
+  "a pool swim's laps are its intervals, not its lengths and rests"
+);
+assert.equal(poolSwim.swim?.intervals[0].restAfter, 20);
+
 console.log("Activity detail parser tests passed.");

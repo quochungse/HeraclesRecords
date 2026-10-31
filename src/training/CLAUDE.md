@@ -3,7 +3,7 @@
 ## Activities (`ActivitiesView.tsx`)
 
 The all-sport log, and the only home for sports no sport screen covers (Running 100–103,
-Cycling 200–205/299, Hiking 104/105, Strength 400/402). Depth per sport belongs on the sport
+Cycling 200–205/299, Hiking 104/105, Swimming 300/301, Strength 400/402). Depth per sport belongs on the sport
 screens; Activities links out with the session (`SportScreenRequest`).
 - The arithmetic is out of the view: `activityFilters.ts` (periods cut at a Monday,
   categories, search, totals), `activityFacts.ts` (a row's facts, capped at three) and
@@ -20,7 +20,8 @@ screens; Activities links out with the session (`SportScreenRequest`).
 ## The channel chart ("Performance")
 
 `ActivitySeriesChart`, `activityChannels.ts`, `useActivityDetailSummaries.ts` — shared by every
-sport (anything two screens need moves here rather than being copied).
+sport (anything two screens need moves here rather than being copied). A screen that must tell
+"still reading" from "none" takes `useActivityDetailSummariesState` (`settled`).
 - **The line is drawn from what was recorded**: `smoothActivitySeries` averages noisy channels
   over a few seconds (never heart rate), then `envelopeActivitySeries` cuts to 1 000 rows of
   per-bucket min and max. Every figure the page *states*, the segment line included, comes off
@@ -34,7 +35,7 @@ sport (anything two screens need moves here rather than being copied).
   pairs named over `DARK_CHANNEL_COLORS`. Names are COROS's: Effort pace, Ground time, Stride
   height, Stride ratio, Running power (decided by `isRunSportType`, never `motion`).
 - `motion` picks the sport's reading: `"speed"` (rides: speed, rpm), `"hike"` (km/h, climbing
-  rate), `"trail"` (pace, GAP, climbing rate).
+  rate), `"trail"` (pace, GAP, climbing rate), `"swim"` (pace per 100 m/yd, cadence named Stroke rate).
 
 ## Training label (`electron/sessionIntensity.ts` reads, `trainingBenefit.ts` names)
 
@@ -116,7 +117,7 @@ sports), summed from each session's own `zoneSeconds` (`zoneTimeEntries`, throug
 `useActivityDetailSummaries`), never COROS's all-sport zone totals; time only, since no session
 carries load per zone. Read as the easy share against 80/20 with `intensityForZone`.
 
-**Sport sections** (`sportModel.ts`): Running, Cycling, Hiking, each only when trained in the
+**Sport sections** (`sportModel.ts`): Running, Cycling, Hiking, Swimming, each only when trained in the
 last four calendar weeks and shown on the rail, built from the screens' own builders, never a
 copy. "A week" figures divide by the weeks the window has run (`sportWindowWeeks`). **Strength**
 (`OverviewStrength`, lazy) is the Strength screen's own `StrengthHero` over four weeks

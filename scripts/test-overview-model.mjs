@@ -434,7 +434,7 @@ close(mix.sports[0].share, 2 / 3, "a sport's share of the load");
   ];
   const shares = sportLoadShares(mixed, now);
   assert.equal(shares.total, 480, "every sport of the four weeks");
-  assert.deepEqual(shares.sports.map((sport) => sport.category), ["run", "strength", "other"]);
+  assert.deepEqual(shares.sports.map((sport) => sport.category), ["run", "strength", "swim", "other"], "a swim is its own sport");
   const heracles = sportLoadShares(mixed, now, undefined, "heracles");
   assert.equal(heracles.total, 480 - 60 + 200, "the lift at its Heracles load");
   assert.equal(isHeartRateSport(900), true, "a walk is steady");

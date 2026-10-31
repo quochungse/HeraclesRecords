@@ -1,5 +1,5 @@
 import { useId, useMemo, type ReactNode } from "react";
-import { ArrowUpRight, Bike, Mountain, type LucideIcon } from "lucide-react";
+import { ArrowUpRight, Bike, Mountain, Waves, type LucideIcon } from "lucide-react";
 import type {
   CorosProfile,
   TrainingHubActivity,
@@ -29,6 +29,20 @@ import {
   summariseHikes
 } from "../../hiking/hikeMetrics";
 import { hikesOnly } from "../../hiking/hikeType";
+import {
+  buildSwimWeeks,
+  combineSwimStyles,
+  formatPer100,
+  formatPoolLength,
+  poolsSwum,
+  summariseSwims,
+  swimSummaryFor,
+  swimmingPaceOf,
+  techniqueWindow
+} from "../../swimming/swimMetrics";
+import { SWIM_STYLE_LABELS, swimsOnly } from "../../swimming/swimType";
+import { SWIM_STYLE_COLORS } from "../../swimming/swimColors";
+import { metersToSwimDistance, swimDistanceUnit } from "../../../electron/unitSystem";
 import { periodLabel, periodPhrase } from "../../preferences/periodScale";
 import { useUnitSystem } from "../../units/UnitSystemProvider";
 import {
@@ -46,7 +60,7 @@ import { formatDurationSpan, formatHappenDayLabel, happenDayFromTimestamp } from
 import type { HeartRateZoneModel } from "../heartRateZoneModel";
 import { benefitZoneFamily } from "../trainingBenefit";
 import { trainingBenefitName } from "../components/TrainingBenefitChip";
-import { useActivityDetailSummaries } from "../useActivityDetailSummaries";
+import { useActivityDetailSummariesState, type ActivityDetailSummariesState } from "../useActivityDetailSummaries";
 import { useTodayKey } from "../useTodayKey";
 import { formatCount, formatDecimal, getIntlLocale, plural, t, type MessageKey } from "../../i18n/core";
 import { useI18n } from "../../i18n/useI18n";
@@ -424,7 +438,7 @@ interface SportContext {
   nowMs: number;
   activities: TrainingHubActivity[];
   upcomingWorkouts: TrainingHubUpcomingWorkout[];
-  summaries: ReturnType<typeof useActivityDetailSummaries>;
+  summaries: ActivityDetailSummariesState["summaries"];
   family: ReturnType<typeof benefitZoneFamily>;
   onOpenActivity?: (activityId: string) => void;
   onOpenView?: (view: PrimaryView) => void;
@@ -868,11 +882,179 @@ function HikingSection({
   );
 }
 
+/** SWOLF is read over four weeks, as the Swimming screen's hero reads it. */
+const SWOLF_DAYS = 28;
+
+function SwimmingSection({
+  context,
+  swims,
+  window,
+  settled
+}: {
+  context: SportContext;
+  swims: TrainingHubActivity[];
+  window: TrainingHubActivity[];
+  /** Whether the swims' summaries have all been read: until then a missing figure is on its way. */
+  settled: boolean;
+}) {
+  const { unitSystem, nowMs, upcomingWorkouts, activities, summaries, onOpenActivity, onOpenView } = context;
+  const swimUnit = swimDistanceUnit(unitSystem);
+  const inUnit = (meters: number) => metersToSwimDistance(meters, unitSystem);
+  const { weeks, values, average, plannedMeters, totals, longest, last } = useMemo(() => {
+    const swimWeeks = buildSwimWeeks(swims, { weeks: SPORT_CHART_WEEKS, nowMs });
+    const distances = swimWeeks.map((week) => metersToSwimDistance(week.distance, unitSystem));
+    return {
+      weeks: swimWeeks,
+      values: distances,
+      average: previousWeeksAverage(distances),
+      plannedMeters: plannedThisWeek(upcomingWorkouts, activities, "swim", new Date(nowMs)).km * 1000,
+      totals: summariseSwims(window),
+      ...longestAndLast(window, swims)
+    };
+  }, [swims, window, nowMs, unitSystem, upcomingWorkouts, activities]);
+  // What only the swims' details know: the swimming without the rests, SWOLF
+  // in the usual pool, the strokes.
+  const { pace, swolf, strokes } = useMemo(() => {
+    const pool = poolsSwum(window, summaries)[0];
+    return {
+      pace: swimmingPaceOf(window, summaries),
+      swolf: pool
+        ? { pool, ...techniqueWindow(swims, summaries, "swolf", { days: SWOLF_DAYS, nowMs, poolLength: pool.poolLength }) }
+        : undefined,
+      strokes: combineSwimStyles(
+        window.flatMap((activity) => {
+          const summary = swimSummaryFor(activity, summaries);
+          return summary ? [summary] : [];
+        })
+      )
+    };
+  }, [window, swims, summaries, nowMs]);
+  const planned = inUnit(plannedMeters);
+  const current = values[values.length - 1] ?? 0;
+  const labels = weekLabels(weeks);
+  const strokeMeters = strokes.reduce((sum, entry) => sum + entry.meters, 0);
+  const most = Math.max(1, ...strokes.map((entry) => entry.meters));
+  return (
+    <Section
+      sport="swim"
+      icon={Waves}
+      title={t("nav.swimming")}
+      aside={`${plural("swim.count", window.length)} · ${periodPhrase(WINDOW_DAYS)}`}
+      screen="swimming"
+      onOpenView={onOpenView}
+    >
+      <Kpis
+        items={[
+          {
+            label: t("overview.tiles.thisWeek"),
+            value: whole(current),
+            unit: swimUnit,
+            note:
+              planned > 0
+                ? t("overview.sport.plannedAvg", { planned: whole(planned), avg: whole(average ?? 0) })
+                : t("overview.sport.average", { value: whole(average ?? 0) })
+          },
+          {
+            label: periodLabel(WINDOW_DAYS),
+            value: whole(inUnit(totals.distance)),
+            unit: swimUnit,
+            note: formatDurationSpan(totals.duration)
+          },
+          {
+            label: t("swim.swims"),
+            value: whole(totals.count),
+            note: t("overview.sport.perWeek", { count: formatDecimal(totals.count / sportWindowWeeks(nowMs), 1) })
+          },
+          {
+            label: t("activity.m.avgPace"),
+            value: pace !== undefined ? formatPer100(pace, unitSystem).split(" ")[0]! : "–",
+            unit: pace !== undefined ? `/100${swimUnit}` : undefined,
+            note: t("overview.sport.restsOut")
+          },
+          {
+            label: t("swim.m.swolf"),
+            value: swolf?.median !== undefined ? whole(swolf.median) : "–",
+            note: swolf
+              ? t("swim.hero.swolfFoot", { pool: formatPoolLength(swolf.pool.poolLength, swolf.pool.poolUnit) })
+              : settled
+                ? t("swim.hero.swolfNone")
+                : t("swim.reading")
+          }
+        ]}
+      />
+      <div className="overview-sport-body">
+        <WeekChart
+          title={t("overview.sport.weeklyDistance", { unit: swimUnit })}
+          weeks={weeks.map((week, index) => {
+            const plannedHere = index === weeks.length - 1 ? planned : undefined;
+            return {
+              label: labels[index],
+              value: values[index],
+              planned: plannedHere,
+              dates: weekRange(week.weekStartMs),
+              facts: [
+                { label: t("overview.sport.distance"), value: `${whole(values[index])} ${swimUnit}` },
+                ...(plannedHere && plannedHere > 0
+                  ? [{ label: t("overview.today.plannedTag"), value: `${whole(plannedHere)} ${swimUnit}` }]
+                  : []),
+                ...weekFacts(week, t("swim.swims"))
+              ]
+            };
+          })}
+          average={average}
+          format={(value) => whole(value)}
+        />
+        <div className="overview-sport-side">
+          <div className="overview-sport-types">
+            <p className="overview-sport-subhead">
+              {t("swim.strokes.title")} <span>· {t("overview.sport.strokesNote")}</span>
+            </p>
+            {strokes.length > 0 ? (
+              <ul>
+                {strokes.map((entry) => (
+                  <li key={entry.style}>
+                    <span>{SWIM_STYLE_LABELS[entry.style]}</span>
+                    <i aria-hidden="true">
+                      <b style={{ width: `${(entry.meters / most) * 100}%`, background: SWIM_STYLE_COLORS[entry.style] }} />
+                    </i>
+                    <span className="figure">{`${Math.round((entry.meters / Math.max(1, strokeMeters)) * 100)}%`}</span>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="overview-sport-note">{settled ? t("swim.strokes.none") : t("swim.reading")}</p>
+            )}
+          </div>
+        </div>
+      </div>
+      <div className="overview-sport-facts">
+        {longest ? (
+          <SessionFact
+            label={t("overview.sport.longest")}
+            activity={longest}
+            meta={`${sessionDay(longest)} · ${whole(inUnit(longest.distance ?? 0))} ${swimUnit} · ${formatDurationSpan(longest.duration)}`}
+            onOpenActivity={onOpenActivity}
+          />
+        ) : null}
+        {last ? (
+          <SessionFact
+            label={t("overview.sport.last")}
+            activity={last}
+            meta={`${sessionDay(last)} · ${whole(inUnit(last.distance ?? 0))} ${swimUnit}`}
+            onOpenActivity={onOpenActivity}
+          />
+        ) : null}
+        <NextFact next={nextPlanned(upcomingWorkouts, "swim", new Date(nowMs), activities)} />
+      </div>
+    </Section>
+  );
+}
+
 /**
  * One section a sport the athlete has trained in the last four weeks —
- * Running, Cycling, Hiking — each its own screen's figures in brief, with the
- * way out to that screen. A sport whose screen is taken off the rail has no
- * section here either.
+ * Running, Cycling, Hiking, Swimming — each its own screen's figures in brief,
+ * with the way out to that screen. A sport whose screen is taken off the rail
+ * has no section here either.
  */
 export function OverviewSports({
   api,
@@ -910,9 +1092,11 @@ export function OverviewSports({
   const runs = useMemo(() => runsOnly(activities), [activities]);
   const rides = useMemo(() => ridesOnly(activities), [activities]);
   const hikes = useMemo(() => hikesOnly(activities), [activities]);
+  const swims = useMemo(() => swimsOnly(activities), [activities]);
   const runWindow = useMemo(() => sportWindow(runs, nowMs), [runs, nowMs]);
   const rideWindow = useMemo(() => sportWindow(rides, nowMs), [rides, nowMs]);
   const hikeWindow = useMemo(() => sportWindow(hikes, nowMs), [hikes, nowMs]);
+  const swimWindow = useMemo(() => sportWindow(swims, nowMs), [swims, nowMs]);
   const zoneScale = useMemo(
     () => hrZoneModel ?? { family: "lthr" as const, zones: lthrZones },
     [hrZoneModel, lthrZones]
@@ -920,17 +1104,20 @@ export function OverviewSports({
   const showRuns = runWindow.length > 0 && !hiddenSportScreens.includes("running");
   const showRides = rideWindow.length > 0 && !hiddenSportScreens.includes("cycling");
   const showHikes = hikeWindow.length > 0 && !hiddenSportScreens.includes("hiking");
+  const showSwims = swimWindow.length > 0 && !hiddenSportScreens.includes("swimming");
   // The labels and the time in zone come off the sessions' summaries, swept as
-  // the Running and Cycling lists sweep theirs.
+  // the Running and Cycling lists sweep theirs; a swim's strokes and SWOLF, as
+  // the Swimming screen sweeps its own. One sweep for all of them.
   const labelled = useMemo(
-    () => [...(showRuns ? runWindow : []), ...(showRides ? rideWindow : [])],
-    [showRuns, showRides, runWindow, rideWindow]
+    () => [...(showRuns ? runWindow : []), ...(showRides ? rideWindow : []), ...(showSwims ? swimWindow : [])],
+    [showRuns, showRides, showSwims, runWindow, rideWindow, swimWindow]
   );
-  const summaries = useActivityDetailSummaries({
+  const { summaries, settled } = useActivityDetailSummariesState({
     api,
     activities: labelled,
     enabled: connected && labelled.length > 0,
-    requireIntensity: true
+    requireIntensity: true,
+    requireSwim: showSwims
   });
   const context: SportContext = {
     unitSystem,
@@ -957,6 +1144,7 @@ export function OverviewSports({
         <CyclingSection context={context} rides={rides} window={rideWindow} ftp={profile?.thresholds.ftp} />
       ) : null}
       {showHikes ? <HikingSection context={context} hikes={hikes} window={hikeWindow} /> : null}
+      {showSwims ? <SwimmingSection context={context} swims={swims} window={swimWindow} settled={settled} /> : null}
     </>
   );
 }

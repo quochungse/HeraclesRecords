@@ -28,7 +28,8 @@ assert.equal(sportColorCategory(200), "bike"); //     Bike
 assert.equal(sportColorCategory(204), "bike"); //     Mountain Bike
 assert.equal(sportColorCategory(400), "strength"); // Gym Cardio
 assert.equal(sportColorCategory(402), "strength"); // Strength
-assert.equal(sportColorCategory(300), "other"); //    Pool Swim
+assert.equal(sportColorCategory(300), "swim"); //     Pool Swim — the Swimming screen's
+assert.equal(sportColorCategory(301), "swim"); //     Open Water
 assert.equal(sportColorCategory(700), "other"); //    Rowing
 assert.equal(sportColorCategory(10000), "other"); //  Triathlon
 assert.equal(sportColorCategory(999), "other"); //    unknown code

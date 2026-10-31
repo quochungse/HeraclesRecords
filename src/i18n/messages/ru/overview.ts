@@ -191,6 +191,8 @@ const overview: OverviewMessages = {
   "overview.sport.plannedAvg": "+ {planned} запланировано · в среднем {avg}",
   "overview.sport.recordedTime": "Записанное время",
   "overview.sport.restsIncluded": "с остановками",
+  "overview.sport.restsOut": "без пауз у бортика",
+  "overview.sport.strokesNote": "бассейны, по дистанции",
   "overview.sport.rides_one": "{count} заезд",
   "overview.sport.rides_other": "{count} заезда",
   "overview.sport.runs_one": "{count} пробежка",

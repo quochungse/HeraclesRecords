@@ -21,6 +21,7 @@ const SAMPLE_OPTIONS: readonly { value: SampleKind; label: string; title: string
     label: "Trail runs",
     title: "Simulated trail runs (electron/sampleTrailRuns.ts)",
   },
+  { value: "swims", label: "Swims", title: "Simulated pool and open-water swims (electron/sampleSwims.ts)" },
   {
     value: "strength",
     label: "Strength",
@@ -39,9 +40,9 @@ interface SampleDataControlsProps {
 
 /**
  * The switches `npm run dev:sample-*` and the Strength screen's "Preview with
- * sample data" used to be, as one menu of checkboxes. Rides, hikes and trail
- * runs are added by the main process, so a change there reloads the window:
- * the activity list, the Calendar's range cache and the summaries all hold
+ * sample data" used to be, as one menu of checkboxes. Rides, hikes, trail
+ * runs and swims are added by the main process, so a change there reloads the
+ * window: the activity list, the Calendar's range cache and the summaries all hold
  * what they read, and a reload is the one way to have every one of them read
  * again. Strength's is renderer state and switches in place, and so is the
  * Hall of Records' — one preset at a time (`sampleRecords.ts`), standing in for

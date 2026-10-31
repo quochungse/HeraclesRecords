@@ -1,5 +1,6 @@
 import { isRideSportType } from "../cycling/rideType";
 import { isHikeSportType } from "../hiking/hikeType";
+import { isSwimSportType } from "../swimming/swimType";
 import { isRunSportType } from "../running/runSurface";
 import { isStrengthSportType } from "../training/sportTypes";
 import type { PrimaryView } from "./primaryNav";
@@ -13,13 +14,14 @@ import type { PrimaryView } from "./primaryNav";
  */
 export type SportScreen = Extract<
   PrimaryView,
-  "running" | "cycling" | "hiking" | "strength"
+  "running" | "cycling" | "hiking" | "swimming" | "strength"
 >;
 
 export const SPORT_SCREENS: readonly SportScreen[] = [
   "running",
   "cycling",
   "hiking",
+  "swimming",
   "strength",
 ];
 
@@ -86,6 +88,7 @@ export function sportScreenFor(
   if (isRunSportType(sportType)) return "running";
   if (isRideSportType(sportType)) return "cycling";
   if (isHikeSportType(sportType)) return "hiking";
+  if (isSwimSportType(sportType)) return "swimming";
   if (isStrengthSportType(sportType)) return "strength";
   return null;
 }

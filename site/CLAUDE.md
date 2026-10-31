@@ -20,9 +20,9 @@ ships the license of every package in the root lockfile with the app, and the in
   repository, Issues and Discussions, and a page that asks for a report or an opinion links
   those two (`site/src/github.ts`). What a visitor comes to read (releases, notes, docs) is a
   page of the site, never a GitHub page; the installers are the exception.
-- **Screenshots** `01-`–`18-` and `27-`–`30-` are the README's, `19-`–`26-` the site's; every
-  one is taken by `scripts/screenshots/` (`npm run screenshots`, demo data only — one invented
-  athlete, never a real database). A screen that changes is reshot there, not by hand.
+- **Screenshots** `01-`–`18-` and `27-`–`30-` are the README's, `19-`–`26-` and `31-`–`33-`
+  (Swimming) the site's; every one is taken by `scripts/screenshots/` (`npm run screenshots`,
+  demo data only — one invented athlete, never a real database). A screen that changes is reshot there, not by hand.
 - **Screenshots go through `Shot`/`ShotSlider`, never a bare `<img>`** (they are 3024px;
   Astro's image service writes a `srcset`); pass `sizes` when a shot is not full width.
   `16-route` is animated and served untouched (`isAnimated`).
