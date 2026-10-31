@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.4.4] - 2026-10-31
+
+Swimming gets a screen of its own.
+
+### What's new
+- **Swimming** - pool swims and open water, read the way a swimmer reads them: pace per 100 m (or yd), the week in metres, and in the pool every length. Critical Swim Speed from your fastest freestyle 200 and 400, freestyle SWOLF in your usual pool against the four weeks before, and your best 100. Technique follows SWOLF, distance per stroke, pace and stroke rate swim by swim. A swim's page draws every length in its stroke's colour with the rests as gaps, and groups the intervals into the sets they make (8 x 100 m Freestyle). Open water keeps its route and the watch's laps. Explained at heraclesrecords.com/activities/swimming.
+- **Calendar** - a scheduled session shows its description. A done session's panel opens with the plan it answered and how much of it was done, COROS's own figure where it has one, in place of the badge on the card.
+
+### Fixed
+- A planned session's distance and time are COROS's estimate of the whole session, so a 17 km long run with a timed float no longer reads 14.5 km, and the session panel gives the same time as its card.
+- A done session's planned load and distance are the plan's again, not the activity's, so completion no longer reads 100% for every session.
+- A strength session's volume is its sets, not the time of its holds, and the session panel leaves out boxes with nothing to show.
+- Overview's coming sessions give a run's distance and a strength session's sets, not a count of steps.
+- Activities and Coach read a pool swim by its intervals, not as a list of every length and rest.
+- Improve app performance and stability.
+
 ## [1.4.3] - 2026-10-30
 
 A smoother way to sign in to COROS.

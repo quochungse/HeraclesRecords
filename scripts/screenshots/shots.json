@@ -9,6 +9,10 @@
   "out": "02-activities",
   "view": "training",
   "wait": 5000,
+  "steps": [
+   "demoClick('Hàm Lợn hill repeats', 'button')",
+   2500
+  ],
   "theme": "dark"
  },
  {
