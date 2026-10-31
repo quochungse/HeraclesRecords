@@ -27,6 +27,8 @@ interface SwimStrokePanelProps {
   /** Pool swims in the period: open water records no stroke. */
   swims: readonly TrainingHubActivity[];
   summaries: ReadonlyMap<string, ActivityDetailSummary>;
+  /** Whether those summaries have all been read: until then an empty table is not yet an answer. */
+  settled: boolean;
 }
 
 /**
@@ -38,7 +40,7 @@ interface SwimStrokePanelProps {
  * them — distance per stroke and stroke rate — and not SWOLF or strokes a
  * length, which a swim's own page states in its one pool.
  */
-export function SwimStrokePanel({ swims, summaries }: SwimStrokePanelProps) {
+export function SwimStrokePanel({ swims, summaries, settled }: SwimStrokePanelProps) {
   const totals = useMemo(
     () =>
       combineSwimStyles(
@@ -56,7 +58,7 @@ export function SwimStrokePanel({ swims, summaries }: SwimStrokePanelProps) {
       {totals.length > 0 ? (
         <SwimStrokeTable totals={totals} />
       ) : (
-        <p className="run-block-empty">{t("swim.strokes.reading")}</p>
+        <p className="run-block-empty">{settled ? t("swim.strokes.none") : t("swim.reading")}</p>
       )}
       <p className="run-block-note">{t("swim.strokes.note")}</p>
     </section>

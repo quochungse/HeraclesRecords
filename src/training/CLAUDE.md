@@ -20,7 +20,8 @@ screens; Activities links out with the session (`SportScreenRequest`).
 ## The channel chart ("Performance")
 
 `ActivitySeriesChart`, `activityChannels.ts`, `useActivityDetailSummaries.ts` — shared by every
-sport (anything two screens need moves here rather than being copied).
+sport (anything two screens need moves here rather than being copied). A screen that must tell
+"still reading" from "none" takes `useActivityDetailSummariesState` (`settled`).
 - **The line is drawn from what was recorded**: `smoothActivitySeries` averages noisy channels
   over a few seconds (never heart rate), then `envelopeActivitySeries` cuts to 1 000 rows of
   per-bucket min and max. Every figure the page *states*, the segment line included, comes off

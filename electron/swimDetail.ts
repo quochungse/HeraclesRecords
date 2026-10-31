@@ -315,13 +315,14 @@ export function parseSwimDetail(
   raw: Record<string, unknown>,
   { sportType, laps = [] }: ParseSwimOptions = {}
 ): TrainingHubSwimDetail | undefined {
-  const lengthPieces = lapGroupItems(raw, LAP_TYPE_LENGTH).map(readPiece);
-  const lapPieces = lapGroupItems(raw, LAP_TYPE_LAP).map(readPiece);
-  const looksLikeSwim =
-    lengthPieces.length > 0 && lengthPieces.some((piece) => piece.style !== "unknown");
-  if (!isSwimSportType(sportType) && !looksLikeSwim) {
+  const lengthItems = lapGroupItems(raw, LAP_TYPE_LENGTH);
+  // Every activity is asked: a payload naming no sport is a swim only when its
+  // lengths carry a stroke, and a run's hundreds of laps are not read for one.
+  if (!isSwimSportType(sportType) && !lengthItems.some((item) => swimStyleOf(item.swimStyle) !== "unknown")) {
     return undefined;
   }
+  const lengthPieces = lengthItems.map(readPiece);
+  const lapPieces = lapGroupItems(raw, LAP_TYPE_LAP).map(readPiece);
   const summary = asRecord(raw.summary) ?? raw;
   const openWater = sportType === OPEN_WATER_SPORT_TYPE;
 
@@ -621,6 +622,43 @@ export function swimSummaryOf(
     best: bestSwimEfforts(swim.lengths),
     ...(swim.waterTemperatureC !== undefined ? { waterTemperatureC: swim.waterTemperatureC } : {})
   };
+}
+
+/**
+ * A pool swim's intervals as the laps every other reader of a detail reads —
+ * the Activities lap table, Coach's lap tool, the chart's lap focus. COROS's
+ * generic lap list for one is its lengths, rests among them, which read as
+ * sixty 25 m "laps" and a row of zero-metre ones.
+ */
+export function swimLaps(swim: TrainingHubSwimDetail): TrainingHubActivityLap[] {
+  return swim.intervals.map((interval) => ({
+    index: interval.index,
+    distance: interval.distance,
+    duration: Math.round(interval.seconds),
+    ...(interval.avgHr !== undefined ? { avgHr: interval.avgHr } : {}),
+    ...(interval.maxHr !== undefined ? { maxHr: interval.maxHr } : {}),
+    ...(interval.strokeRate !== undefined ? { avgCadence: interval.strokeRate } : {}),
+    ...(interval.distance > 0 ? { pace: Math.round((interval.seconds / interval.distance) * 1000) } : {})
+  }));
+}
+
+/**
+ * A swim's SWOLF: seconds plus strokes a length, over every length that
+ * carries a count — drills carry none. The one figure the list row and the
+ * swim's own page both state, so they cannot disagree.
+ */
+export function sessionSwolf(totals: readonly SwimStyleTotals[]): number | undefined {
+  let seconds = 0;
+  let strokes = 0;
+  let lengths = 0;
+  for (const entry of totals) {
+    if (entry.counted) {
+      seconds += entry.counted.seconds;
+      strokes += entry.counted.strokes;
+      lengths += entry.counted.lengths;
+    }
+  }
+  return lengths > 0 ? (seconds + strokes) / lengths : undefined;
 }
 
 /** Seconds per 100 m. */

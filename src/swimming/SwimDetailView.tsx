@@ -9,6 +9,7 @@ import type {
 import {
   bestSwimEfforts,
   secondsPer100m,
+  sessionSwolf,
   styleDistancePerStroke,
   swimStyleTotals
 } from "../../electron/swimDetail";
@@ -31,8 +32,13 @@ import { useBackGesture } from "../running/sportPage";
 import { SwimLengthsChart } from "./SwimLengthsChart";
 import { SwimSetsPanel } from "./SwimSetsPanel";
 import { SwimStrokeTable } from "./SwimStrokePanel";
-import { formatClock } from "./SwimmingHero";
-import { formatDistancePerStroke, formatPer100, formatPoolLength, swimSeconds } from "./swimMetrics";
+import {
+  formatClock,
+  formatDistancePerStroke,
+  formatPer100,
+  formatPoolLength,
+  swimSeconds
+} from "./swimMetrics";
 import { SWIM_TYPE_LABELS, classifySwimType } from "./swimType";
 import { formatDecimal, t } from "../i18n/core";
 import { useI18n } from "../i18n/useI18n";
@@ -139,13 +145,6 @@ export function SwimDetailView({
       value: formatPer100(pace, unitSystem),
       title: swim?.swimSeconds !== undefined ? t("swim.detail.paceTitle") : t("swim.avgPaceTitle")
     });
-    if (swim?.poolLength !== undefined) {
-      stats.push({
-        label: t("swim.detail.pool"),
-        value: formatPoolLength(swim.poolLength, swim.poolUnit),
-        title: t("swim.detail.poolTitle", { lengths: swim.lengths.length })
-      });
-    }
     const best100 = best.find((effort) => effort.distance === 100);
     if (best100) {
       stats.push({
@@ -154,15 +153,23 @@ export function SwimDetailView({
         title: t("swim.detail.bestTitle")
       });
     }
-    if (swim?.avgSwolf !== undefined) {
-      stats.push({ label: t("swim.m.swolf"), value: String(swim.avgSwolf), title: t("swim.m.swolfTitle") });
+    // The list row's figure, off the same lengths; COROS's own only where no
+    // length carries a count.
+    const swolf = sessionSwolf(styleTotals) ?? swim?.avgSwolf;
+    if (swolf !== undefined) {
+      stats.push({ label: t("swim.m.swolf"), value: formatDecimal(swolf, 0), title: t("swim.m.swolfTitle") });
     }
-    const counted = swim?.lengths.filter((length) => length.strokes !== undefined) ?? [];
-    if (counted.length > 0) {
-      const strokes = counted.reduce((sum, length) => sum + length.strokes!, 0);
+    const counted = styleTotals.reduce(
+      (sum, entry) => ({
+        strokes: sum.strokes + (entry.counted?.strokes ?? 0),
+        lengths: sum.lengths + (entry.counted?.lengths ?? 0)
+      }),
+      { strokes: 0, lengths: 0 }
+    );
+    if (counted.lengths > 0) {
       stats.push({
         label: t("swim.m.strokesPerLength"),
-        value: formatDecimal(strokes / counted.length, 1),
+        value: formatDecimal(counted.strokes / counted.lengths, 1),
         title: t("swim.m.strokesTitle")
       });
     }
@@ -216,7 +223,8 @@ export function SwimDetailView({
     if (detail?.effect?.anaerobic !== undefined) {
       stats.push({ label: t("run.detail.anaerobic"), value: formatDecimal(detail.effect.anaerobic, 1) });
     }
-    for (const effort of best) {
+    // The 100 stands in the headline; the longer ones are read here.
+    for (const effort of best.filter((entry) => entry.distance !== 100)) {
       stats.push({
         label: t("swim.detail.bestOver", { distance: formatDistanceMeters(effort.distance, unitSystem, true) }),
         value: formatClock(effort.seconds),
@@ -256,7 +264,15 @@ export function SwimDetailView({
             </div>
             <div className="run-detail-title">
               <p className="running-eyebrow">
-                {kindLabel} · {formatTrainingTimestamp(activity.startTime)}
+                {kindLabel}
+                {swim?.poolLength !== undefined ? (
+                  <span title={t("swim.detail.poolTitle", { lengths: swim.lengths.length })}>
+                    {" · "}
+                    {formatPoolLength(swim.poolLength, swim.poolUnit)}
+                  </span>
+                ) : null}
+                {" · "}
+                {formatTrainingTimestamp(activity.startTime)}
               </p>
               <h1>{activity.name?.trim() || kindLabel}</h1>
             </div>

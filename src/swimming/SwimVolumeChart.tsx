@@ -57,12 +57,19 @@ function measureUnit(measure: SwimVolumeMeasure, unitSystem: UnitSystem): string
   return swimDistanceUnit(unitSystem);
 }
 
+/** One formatter per language and precision: every tick and tooltip asks. */
+const groupedFormats = new Map<string, Intl.NumberFormat>();
+
 /** A week runs to thousands of metres, so the figures group them: "8,400 m". */
 function grouped(value: number, digits: number): string {
-  return new Intl.NumberFormat(getIntlLocale(), {
-    minimumFractionDigits: digits,
-    maximumFractionDigits: digits
-  }).format(value);
+  const locale = getIntlLocale();
+  const key = `${locale}|${digits}`;
+  let format = groupedFormats.get(key);
+  if (!format) {
+    format = new Intl.NumberFormat(locale, { minimumFractionDigits: digits, maximumFractionDigits: digits });
+    groupedFormats.set(key, format);
+  }
+  return format.format(value);
 }
 
 function formatMeasure(value: number, measure: SwimVolumeMeasure, unitSystem: UnitSystem): string {

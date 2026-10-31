@@ -10,6 +10,7 @@ import {
 } from "recharts";
 import type { TooltipContentProps } from "recharts";
 import type { ActivityDetailSummary, TrainingHubActivity, UnitSystem } from "../../electron/types";
+import { swimPacePer100 } from "../../electron/activityReading";
 import { OptionGroup } from "../components/OptionGroup";
 import { trainingChartTooltipStyle } from "../training/chartConfig";
 import { useChartColors } from "../training/useChartColors";
@@ -34,6 +35,8 @@ interface SwimTechniquePanelProps {
   /** Pool swims in the period: open water has no lengths to read. */
   swims: readonly TrainingHubActivity[];
   summaries: ReadonlyMap<string, ActivityDetailSummary>;
+  /** Whether those summaries have all been read: until then too few points is not yet an answer. */
+  settled: boolean;
 }
 
 const metricOptions = (): { value: SwimTechniqueMetric; label: string }[] => [
@@ -46,7 +49,7 @@ const metricOptions = (): { value: SwimTechniqueMetric; label: string }[] => [
 /** Swims the line takes its median over. */
 const ROLLING_SWIMS = 5;
 
-export function formatTechnique(
+function formatTechnique(
   metric: SwimTechniqueMetric,
   value: number | undefined,
   unitSystem: UnitSystem
@@ -79,7 +82,7 @@ interface Row {
  * stroke rate, so the last two say how a change in pace was bought: a longer
  * stroke, or a quicker one.
  */
-export function SwimTechniquePanel({ swims, summaries }: SwimTechniquePanelProps) {
+export function SwimTechniquePanel({ swims, summaries, settled }: SwimTechniquePanelProps) {
   const { unitSystem } = useUnitSystem();
   const { colors } = useChartColors();
   const [metric, setMetric] = useState<SwimTechniqueMetric>("swolf");
@@ -136,7 +139,7 @@ export function SwimTechniquePanel({ swims, summaries }: SwimTechniquePanelProps
             <strong className={better === undefined ? undefined : better ? "tone-up" : "tone-down"}>
               {change > 0 ? "+" : change < 0 ? "−" : ""}
               {metric === "pace"
-                ? `${formatDecimal(Math.abs(change), 1)} s`
+                ? `${formatDecimal(swimPacePer100(Math.abs(change) * 10, unitSystem), 1)} s`
                 : metric === "dps"
                   ? formatDistancePerStroke(Math.abs(change), unitSystem)
                   : formatDecimal(Math.abs(change), metric === "swolf" ? 1 : 0)}
@@ -220,7 +223,7 @@ export function SwimTechniquePanel({ swims, summaries }: SwimTechniquePanelProps
           </ResponsiveContainer>
         </div>
       ) : (
-        <p className="run-block-empty">{t("swim.technique.empty")}</p>
+        <p className="run-block-empty">{settled ? t("swim.technique.empty") : t("swim.reading")}</p>
       )}
 
       <div className="run-legend">

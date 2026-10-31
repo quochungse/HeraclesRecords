@@ -20,7 +20,7 @@ import {
   type PeriodDays
 } from "../preferences/periodScale";
 import { useHeartRateZoneModel } from "../training/useHeartRateZoneModel";
-import { useActivityDetailSummaries } from "../training/useActivityDetailSummaries";
+import { useActivityDetailSummariesState } from "../training/useActivityDetailSummaries";
 import { useUnitSystem } from "../units/UnitSystemProvider";
 import type { PrimaryView } from "../navigation/primaryNav";
 import { RunningPageSkeleton } from "../running/RunningSkeleton";
@@ -32,7 +32,7 @@ import { SwimTechniquePanel } from "./SwimTechniquePanel";
 import { SwimVolumeChart } from "./SwimVolumeChart";
 import { SwimmingHero, SWIM_HERO_DAYS } from "./SwimmingHero";
 import { formatPer100, summariseSwims, swimTypesPresent, swimmingPaceOf } from "./swimMetrics";
-import { SWIM_TYPE_LABELS, swimsOfType, type SwimType } from "./swimType";
+import { SWIM_TYPE_LABELS, classifySwimType, swimsOfType, type SwimType } from "./swimType";
 import "../running/running.css";
 import "./swimming.css";
 import { t } from "../i18n/core";
@@ -156,10 +156,11 @@ export function SwimmingView({
   }, [availableTypes, swimType]);
 
   // The strokes, pools and best efforts live in each swim's detail, so the
-  // swims on screen are read — and the hero's weeks before them, which a short
-  // period would otherwise leave unread.
+  // swims on screen are read — and the hero's twelve weeks, which a short
+  // period would otherwise leave unread. No further: every swim read is a
+  // payload fetched from COROS.
   const summarySwims = useMemo(() => {
-    const heroFrom = (nowMs - 2 * SWIM_HERO_DAYS * MS_PER_DAY) / 1000;
+    const heroFrom = (nowMs - SWIM_HERO_DAYS * MS_PER_DAY) / 1000;
     const ids = new Set(swimsInPeriod.map((activity) => activity.activityId));
     return [
       ...swimsInPeriod,
@@ -168,7 +169,7 @@ export function SwimmingView({
       )
     ];
   }, [allSwims, nowMs, swimsInPeriod]);
-  const summaries = useActivityDetailSummaries({
+  const { summaries, settled: summariesSettled } = useActivityDetailSummariesState({
     api,
     activities: summarySwims,
     enabled: connected && selectedSwimId === null,
@@ -265,7 +266,7 @@ export function SwimmingView({
   }
 
   const pace = swimmingPaceOf(swims, summaries);
-  const poolSwims = swims.filter((activity) => activity.sportType === 300);
+  const poolSwims = swims.filter((activity) => classifySwimType(activity.sportType) === "pool");
 
   return (
     <section className="running-view swimming-view" ref={pageRef}>
@@ -292,7 +293,7 @@ export function SwimmingView({
       </div>
 
       <div className="running-body">
-        <SwimmingHero swims={swimsAllTime} summaries={summaries} nowMs={nowMs} />
+        <SwimmingHero swims={swimsAllTime} summaries={summaries} settled={summariesSettled} nowMs={nowMs} />
 
         <div className="running-totals">
           <div className="running-stat">
@@ -332,8 +333,8 @@ export function SwimmingView({
             />
             {poolSwims.length > 0 ? (
               <div className="running-columns">
-                <SwimTechniquePanel swims={poolSwims} summaries={summaries} />
-                <SwimStrokePanel swims={poolSwims} summaries={summaries} />
+                <SwimTechniquePanel swims={poolSwims} summaries={summaries} settled={summariesSettled} />
+                <SwimStrokePanel swims={poolSwims} summaries={summaries} settled={summariesSettled} />
               </div>
             ) : null}
           </>

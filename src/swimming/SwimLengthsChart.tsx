@@ -105,21 +105,42 @@ export function SwimLengthsChart({ swim }: { swim: TrainingHubSwimDetail }) {
     return built;
   }, [swim]);
 
-  const values = rows.flatMap((row) => {
-    const value = valueOf(row, metric);
-    return value === undefined ? [] : [value];
-  });
-  const average = values.length > 0 ? values.reduce((sum, value) => sum + value, 0) / values.length : undefined;
-  const low = values.length > 0 ? Math.min(...values) : 0;
-  const high = values.length > 0 ? Math.max(...values) : 1;
-  // Bars stand on a floor under the lowest length, not on zero: a 1:40 and a
-  // 1:50 length differ by a tenth, which bars from zero would flatten away.
-  const floor = Math.max(0, low - (high - low) * 0.35 - (metric === "pace" ? 5 : 2));
-  const styles = [...new Set(swim.lengths.map((length) => length.style))];
-  const fastest = swim.lengths.reduce<number | undefined>((best, length) => {
-    const pace = secondsPer100m(length.seconds, length.distance);
-    return length.style !== "drill" && pace !== undefined && (best === undefined || pace < best) ? pace : best;
-  }, undefined);
+  const { average, floor, hasValues } = useMemo(() => {
+    const values = rows.flatMap((row) => {
+      const value = valueOf(row, metric);
+      return value === undefined ? [] : [value];
+    });
+    if (values.length === 0) {
+      return { average: undefined, floor: 0, hasValues: false };
+    }
+    const low = Math.min(...values);
+    const high = Math.max(...values);
+    // The pace line is the headline's — the lengths' seconds over their metres —
+    // not a mean of paces, which lets a slow drill length weigh as much as a
+    // fast hundred's.
+    const meters = rows.reduce((sum, row) => sum + (row.distance ?? 0), 0);
+    const seconds = rows.reduce((sum, row) => sum + (row.seconds ?? 0), 0);
+    return {
+      average:
+        metric === "pace"
+          ? secondsPer100m(seconds, meters)
+          : values.reduce((sum, value) => sum + value, 0) / values.length,
+      // Bars stand on a floor under the lowest length, not on zero: a 1:40 and
+      // a 1:50 length differ by a tenth, which bars from zero would flatten away.
+      floor: Math.max(0, low - (high - low) * 0.35 - (metric === "pace" ? 5 : 2)),
+      hasValues: true
+    };
+  }, [metric, rows]);
+  const { styles, fastest } = useMemo(
+    () => ({
+      styles: [...new Set(swim.lengths.map((length) => length.style))],
+      fastest: swim.lengths.reduce<number | undefined>((best, length) => {
+        const pace = secondsPer100m(length.seconds, length.distance);
+        return length.style !== "drill" && pace !== undefined && (best === undefined || pace < best) ? pace : best;
+      }, undefined)
+    }),
+    [swim]
+  );
 
   return (
     <section className="panel run-detail-panel run-block">
@@ -150,7 +171,7 @@ export function SwimLengthsChart({ swim }: { swim: TrainingHubSwimDetail }) {
         onChange={(next) => setMetric(next as LengthMetric)}
       />
 
-      {values.length > 0 ? (
+      {hasValues ? (
         <div className="run-block-plot">
           <ResponsiveContainer width="100%" height={220}>
             <ComposedChart data={rows} margin={{ top: 8, right: 8, bottom: 0, left: 0 }} barCategoryGap={1}>

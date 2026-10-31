@@ -8,6 +8,7 @@ import {
   bestEffortIn,
   buildSwimWeeks,
   criticalSwimSpeed,
+  formatClock,
   formatPer100,
   formatPoolLength,
   poolsSwum,
@@ -23,6 +24,8 @@ interface SwimmingHeroProps {
    */
   swims: readonly TrainingHubActivity[];
   summaries: ReadonlyMap<string, ActivityDetailSummary>;
+  /** Whether those summaries have all been read: until then a missing figure is on its way. */
+  settled: boolean;
   /** The page's clock, so every block agrees on which week is "this" one. */
   nowMs: number;
 }
@@ -45,7 +48,7 @@ const SWOLF_DAYS = 28;
  * where a lower number is the better one. And the best 100, the distance
  * every swimmer knows their time for.
  */
-export function SwimmingHero({ swims, summaries, nowMs }: SwimmingHeroProps) {
+export function SwimmingHero({ swims, summaries, settled, nowMs }: SwimmingHeroProps) {
   const { unitSystem } = useUnitSystem();
 
   const thisWeek = useMemo(() => {
@@ -116,7 +119,11 @@ export function SwimmingHero({ swims, summaries, nowMs }: SwimmingHeroProps) {
                   t200: formatClock(css.t200.seconds),
                   t400: formatClock(css.t400.seconds)
                 })
-              : t("swim.hero.cssNone")}
+              : css.t200 && css.t400
+                ? t("swim.hero.cssFlat")
+                : settled
+                  ? t("swim.hero.cssNone")
+                  : t("swim.reading")}
           </span>
         </div>
       </div>
@@ -130,7 +137,9 @@ export function SwimmingHero({ swims, summaries, nowMs }: SwimmingHeroProps) {
           <span>
             {swolf
               ? t("swim.hero.swolfFoot", { pool: formatPoolLength(swolf.pool.poolLength, swolf.pool.poolUnit) })
-              : t("swim.hero.swolfNone")}
+              : settled
+                ? t("swim.hero.swolfNone")
+                : t("swim.reading")}
           </span>
           {swolf?.median !== undefined && swolf.previous !== undefined ? (
             <SwolfDelta change={swolf.median - swolf.previous} />
@@ -145,7 +154,9 @@ export function SwimmingHero({ swims, summaries, nowMs }: SwimmingHeroProps) {
           <span className="swim-hero-name" title={best100?.activity.name}>
             {best100
               ? `${best100.activity.name?.trim() || t("swim.type.pool")} · ${formatTrainingTableWhen(best100.activity.startTime)}`
-              : t("swim.hero.best100None")}
+              : settled
+                ? t("swim.hero.best100None")
+                : t("swim.reading")}
           </span>
         </div>
       </div>
@@ -153,26 +164,11 @@ export function SwimmingHero({ swims, summaries, nowMs }: SwimmingHeroProps) {
   );
 }
 
-/** `1:38.4` under ten minutes, `12:05` above — how a swimmer writes a time. */
-export function formatClock(seconds: number): string {
-  if (seconds < 600) {
-    const whole = Math.floor(seconds);
-    const tenths = Math.round((seconds - whole) * 10);
-    const carried = tenths === 10 ? whole + 1 : whole;
-    return `${Math.floor(carried / 60)}:${String(carried % 60).padStart(2, "0")}.${tenths === 10 ? 0 : tenths}`;
-  }
-  const rounded = Math.round(seconds);
-  const hours = Math.floor(rounded / 3600);
-  const minutes = Math.floor((rounded % 3600) / 60);
-  const rest = String(rounded % 60).padStart(2, "0");
-  return hours > 0 ? `${hours}:${String(minutes).padStart(2, "0")}:${rest}` : `${minutes}:${rest}`;
-}
-
 /**
  * SWOLF against the window before: a fall is the good news, so it wears the
  * colour a rise does on every other card.
  */
-export function SwolfDelta({ change }: { change: number }) {
+function SwolfDelta({ change }: { change: number }) {
   const rounded = Math.round(change);
   if (rounded === 0) {
     return (

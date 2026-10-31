@@ -19,10 +19,12 @@ const {
   isSwimSportType,
   parseSwimDetail,
   poolFromLengths,
+  sessionSwolf,
   styleDistancePerStroke,
   styleStrokeRate,
   styleStrokesPerLength,
   styleSwolf,
+  swimLaps,
   swimStyleOf,
   swimSummaryOf
 } = await import(moduleUrl("electron", "swimDetail.ts"));
@@ -30,15 +32,16 @@ const {
   buildSwimWeeks,
   combineSwimStyles,
   criticalSwimSpeed,
+  formatClock,
   formatPer100,
   formatPoolLength,
   poolsSwum,
   rollingMedian,
-  sessionSwolf,
   summariseSwims,
-  swimPacePer100m,
   swimSets,
   swimTypesPresent,
+  swimmingPace,
+  swimmingPaceOf,
   techniquePoints,
   techniqueValue
 } = await import(moduleUrl("src", "swimming", "swimMetrics.ts"));
@@ -262,7 +265,16 @@ near(styleSwolf(freeTotals), (99 + 52) / 4, 0.001, "SWOLF is seconds plus stroke
 near(styleStrokesPerLength(freeTotals), 13, 0.001);
 near(styleDistancePerStroke(freeTotals), 100 / 52, 0.001);
 near(styleStrokeRate(freeTotals), (52 / 99) * 60, 0.001);
-near(sessionSwolf(summary), (99 + 52 + 63 + 19) / 6, 0.001, "a row's SWOLF leaves the drills out");
+near(sessionSwolf(summary.byStyle), (99 + 52 + 63 + 19) / 6, 0.001, "a row's SWOLF leaves the drills out");
+assert.equal(sessionSwolf([]), undefined);
+
+// The laps every other reader reads: the intervals, not sixty lengths and the rests.
+const laps = swimLaps(swim);
+assert.deepEqual(laps.map((entry) => entry.distance), [100, 50, 50]);
+assert.equal(laps[0].duration, 99);
+assert.equal(laps[0].avgHr, 142);
+assert.equal(laps[0].pace, 990, "seconds a kilometre, as every lap states its pace");
+assert.equal(laps[0].avgCadence, swim.intervals[0].strokeRate, "a lap's cadence is the stroke rate");
 assert.equal(summary.byStyle[2].counted, undefined, "drills carry no count");
 assert.equal(summary.swimSeconds, 243);
 assert.equal(summary.restSeconds, 35);
@@ -279,6 +291,10 @@ assert.equal(criticalSwimSpeed(0, 300), undefined);
 assert.equal(formatPer100(100, "metric"), "1:40 /100m");
 assert.equal(formatPer100(100, "imperial"), "1:31 /100yd");
 assert.equal(formatPer100(undefined, "metric"), "—");
+assert.equal(formatClock(98.44), "1:38.4");
+assert.equal(formatClock(59.96), "1:00.0", "a tenth that rounds up carries into the second");
+assert.equal(formatClock(725), "12:05");
+assert.equal(formatClock(3725), "1:02:05");
 
 // --- Sets, as a swimmer writes them ------------------------------------------------------
 
@@ -301,6 +317,12 @@ assert.deepEqual(
   ],
   "runs of one distance and stroke; the rest is the one between them, not after the last"
 );
+const paced = (index, seconds) => ({ index, distance: 100, seconds, style: "free", restAfter: 15 });
+assert.deepEqual(
+  swimSets([paced(1, 110), paced(2, 96), paced(3, 94), paced(4, 92), paced(5, 90)]).map((set) => [set.start, set.count]),
+  [[1, 4]],
+  "an easy warm-up hundred is not the first rep of the hard set after it; a descending set stays one"
+);
 
 // --- The screen: kinds, weeks, totals -------------------------------------------------------
 
@@ -318,7 +340,10 @@ assert.deepEqual(swimTypesPresent(activities), ["pool", "open"]);
 const totals = summariseSwims(activities);
 assert.equal(totals.count, 3);
 assert.equal(totals.distance, 6500);
-near(swimPacePer100m(activities[0]), 135, 0.001, "the list's pace is over its time, per 100");
+near(swimmingPace(activities[0], new Map()), 135, 0.001, "a swim not read yet is paced over the list's time");
+const readSummaries = new Map([["a", { activityId: "a", swimVersion: SWIM_SUMMARY_VERSION, swim: { version: SWIM_SUMMARY_VERSION, swimSeconds: 2400, restSeconds: 300, byStyle: [], best: [] } }]]);
+near(swimmingPace(activities[0], readSummaries), 120, 0.001, "a read swim is paced over its swimming, rests out");
+near(swimmingPaceOf(activities.slice(0, 2), readSummaries), ((2400 + 3600) / 5000) * 100, 0.001, "many swims: distance over swimming");
 const weeks = buildSwimWeeks(activities, { weeks: 3, nowMs: NOW });
 assert.equal(weeks.length, 3);
 assert.equal(weeks[2].distance, 2000, "this week");

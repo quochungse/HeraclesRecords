@@ -15,7 +15,8 @@ scroll). **Shared, never copied**:
 - `RunIntensityPanel` (`sport="ride"|"hike"`) over `intensityMix`, `LoadRatioCard` over
   `acuteChronicLoad`, `DeltaChip`, the skeletons.
 - Renderer suites pin `force-device-scale-factor` to 1 (a scaled display puts every box a few
-  thousandths off). `test:running-renderer`, `test:cycling-renderer`, `test:hiking-renderer`.
+  thousandths off). `test:running-renderer`, `test:cycling-renderer`, `test:hiking-renderer`,
+  `test:swimming-renderer`.
 
 ## Running
 
@@ -83,7 +84,13 @@ week in metres, and in the pool **the length**: strokes, SWOLF, stroke, stroke r
   field**: `poolFromLengths` takes the median length (25 yd is 22.86 m, said in yards).
 - `parseSwimDetail` → `detail.swim` (lengths with `restBefore`, intervals with `restAfter`);
   `swimSummaryOf` → `training_activity_summaries.swim` (`SWIM_SUMMARY_VERSION`, swept by the
-  Swimming screen alone with `requireSwim`).
+  Swimming screen alone with `requireSwim`). **A pool swim's `detail.laps` are its
+  intervals** (`swimLaps`) for every reader — Activities, Coach, the chart — never COROS's
+  generic list, which is the lengths with the rests among them; open water keeps its watch laps.
+- **One figure, one definition**: SWOLF is `sessionSwolf` (counted lengths, drills out) on the
+  row and the page; pace is over the swimming (`swimmingPace`, rests out once read), the
+  lengths chart's pace line too. Until the summaries are read (`settled` from
+  `useActivityDetailSummariesState`) the hero and panels say they are reading, never "none".
 - **Read honestly**: SWOLF only within one pool length and on freestyle (a 50 m length has a
   turn fewer); the stroke mix across pools shows distance per stroke and stroke rate, a swim's
   page adds SWOLF and strokes a length. Best efforts are freestyle lengths in a row inside one
@@ -91,7 +98,9 @@ week in metres, and in the pool **the length**: strokes, SWOLF, stroke, stroke r
   the 400 was no slower a metre than the 200. No HR intensity panel or load ratio (heart rate
   runs lower in water and a wrist reads it roughly).
 - Swims wear the "other" sport colour; open water and the strokes are `--swim-*`.
-- `npm run test:swim-metrics`.
+- Sets are intervals in a row of one distance, one stroke and about one pace (6% rep to rep:
+  a descending set stays one, an easy warm-up hundred does not join the hard set after it).
+- `npm run test:swim-metrics`, `test:swimming-renderer`.
 
 ## Sample sessions for screenshots
 

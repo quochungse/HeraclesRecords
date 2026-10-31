@@ -37,7 +37,7 @@ import type {
   TrainingHubTrackPoint
 } from "./types";
 import { summarizeActivityDetail } from "./activityMetrics";
-import { parseSwimDetail } from "./swimDetail";
+import { parseSwimDetail, swimLaps } from "./swimDetail";
 import { simplifyRoute } from "./routeSimplification";
 import {
   decimate,
@@ -410,15 +410,7 @@ function simulatePool(plan: Extract<SwimPlan, { kind: "pool" }>, startMs: number
     distance: Math.round(meters),
     series,
     swim,
-    laps: swim.intervals.map((interval) => ({
-      index: interval.index,
-      distance: interval.distance,
-      duration: Math.round(interval.seconds),
-      ...(interval.avgHr !== undefined ? { avgHr: interval.avgHr } : {}),
-      ...(interval.maxHr !== undefined ? { maxHr: interval.maxHr } : {}),
-      ...(interval.strokeRate !== undefined ? { avgCadence: interval.strokeRate } : {}),
-      pace: Math.round((interval.seconds / interval.distance) * 1000)
-    })),
+    laps: swimLaps(swim),
     calories: Math.round((swimmingSeconds / 60) * 10 + ((clock - swimmingSeconds) / 60) * 3)
   });
 }

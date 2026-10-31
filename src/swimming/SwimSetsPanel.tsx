@@ -1,11 +1,9 @@
 import { Fragment, useMemo } from "react";
 import type { TrainingHubSwimInterval } from "../../electron/types";
 import { secondsPer100m } from "../../electron/swimDetail";
-import { metersToSwimDistance, swimDistanceUnit } from "../../electron/unitSystem";
 import { formatDistanceMeters, formatDurationSeconds } from "../training/formatters";
 import { useUnitSystem } from "../units/UnitSystemProvider";
-import { formatPer100, swimSets } from "./swimMetrics";
-import { formatClock } from "./SwimmingHero";
+import { formatClock, formatPer100, swimSets } from "./swimMetrics";
 import { SWIM_STYLE_LABELS } from "./swimType";
 import { formatDecimal, t } from "../i18n/core";
 
@@ -73,13 +71,13 @@ export function SwimSetsPanel({
                       <th scope="rowgroup" colSpan={COLUMNS}>
                         {t("swim.sets.set", {
                           count: set.count,
-                          distance: `${formatDecimal(metersToSwimDistance(set.distance, unitSystem), 0)} ${swimDistanceUnit(unitSystem)}`,
+                          distance: formatDistanceMeters(set.distance, unitSystem, true),
                           style: SWIM_STYLE_LABELS[set.style]
                         })}
                         <span>
                           {[
                             set.pace !== undefined ? formatPer100(set.pace, unitSystem) : null,
-                            set.rest !== undefined ? t("swim.sets.setRest", { rest: formatClock(set.rest).replace(/\.0$/, "") }) : null
+                            set.rest !== undefined ? t("swim.sets.setRest", { rest: formatDurationSeconds(set.rest) }) : null
                           ]
                             .filter(Boolean)
                             .join(" · ")}

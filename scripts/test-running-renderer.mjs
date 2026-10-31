@@ -991,8 +991,8 @@ async function main() {
     );
     assert.deepEqual(
       sweeps[0].args[2],
-      { requireIntensity: true, requirePerformance: true },
-      "and asks for the labels its rows wear and the performance curves the road and track runs need"
+      { requireIntensity: true, requirePerformance: true, requireSwim: false },
+      "and asks for the labels its rows wear and the performance curves the road and track runs need, and no swim's lengths"
     );
 
     assert.equal(

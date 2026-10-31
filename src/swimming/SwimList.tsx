@@ -2,6 +2,7 @@ import type { MessageKey } from "../i18n/core";
 import { useMemo, type KeyboardEvent } from "react";
 import { ArrowDown, ArrowUp } from "lucide-react";
 import type { ActivityDetailSummary, TrainingHubActivity } from "../../electron/types";
+import { sessionSwolf } from "../../electron/swimDetail";
 import {
   formatDistanceMeters,
   formatDurationSeconds,
@@ -11,7 +12,6 @@ import { useUnitSystem } from "../units/UnitSystemProvider";
 import {
   formatPer100,
   formatPoolLength,
-  sessionSwolf,
   swimSeconds,
   swimSummaryFor,
   swimmingPace
@@ -125,7 +125,7 @@ function buildRow(
     distance: positive(activity.distance),
     duration: swimSeconds(activity),
     pace: swimmingPace(activity, summaries),
-    swolf: summary ? sessionSwolf(summary) : undefined,
+    swolf: summary ? sessionSwolf(summary.byStyle) : undefined,
     avgHr: positive(activity.avgHr),
     load: positive(activity.trainingLoad)
   };

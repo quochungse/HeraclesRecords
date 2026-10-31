@@ -30,7 +30,7 @@ import {
 } from "./activityMetrics";
 import { INTENSITY_SUMMARY_VERSION, sportHasTrainingBenefit } from "./sessionIntensity";
 import { PERFORMANCE_SUMMARY_VERSION, sportHasRunPerformance } from "./runPerformance";
-import { SWIM_SUMMARY_VERSION, isSwimSportType, parseSwimDetail } from "./swimDetail";
+import { SWIM_SUMMARY_VERSION, isSwimSportType, parseSwimDetail, swimLaps } from "./swimDetail";
 import {
   countStrengthActivitiesMissingDetail,
   countTrainingActivitiesMissingFeelType,
@@ -8142,7 +8142,9 @@ export function parseActivityDetail(
       toOptionalNumber(raw.trainingLoad) ??
       toOptionalNumber(summary.trainingLoad),
     adjustedPace: parseAdjustedPace(summary),
-    laps,
+    // A pool swim's generic laps are its lengths, rests among them; open water's
+    // are the watch's own distance laps, and stay as read.
+    laps: swim?.poolLength !== undefined && swim.intervals.length > 0 ? swimLaps(swim) : laps,
     dynamics: parseActivityDynamics(raw, summary),
     hrZones: parseActivityHrZones(raw),
     hrZoneType: parseActivityHrZoneType(raw),

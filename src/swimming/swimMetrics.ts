@@ -48,13 +48,18 @@ export function swimSeconds(activity: Pick<TrainingHubActivity, "duration">): nu
   return positive(activity.duration);
 }
 
-/** Seconds per 100 m over the list's time, or nothing. */
-export function swimPacePer100m(
-  activity: Pick<TrainingHubActivity, "distance" | "duration">
-): number | undefined {
-  const distance = positive(activity.distance);
-  const seconds = swimSeconds(activity);
-  return distance === undefined || seconds === undefined ? undefined : secondsPer100m(seconds, distance);
+/** `1:38.4` under ten minutes, `12:05` above — how a swimmer writes a time. */
+export function formatClock(seconds: number): string {
+  if (seconds < 600) {
+    const tenths = Math.round(seconds * 10);
+    const whole = Math.floor(tenths / 10);
+    return `${Math.floor(whole / 60)}:${String(whole % 60).padStart(2, "0")}.${tenths % 10}`;
+  }
+  const rounded = Math.round(seconds);
+  const hours = Math.floor(rounded / 3600);
+  const minutes = Math.floor((rounded % 3600) / 60);
+  const rest = String(rounded % 60).padStart(2, "0");
+  return hours > 0 ? `${hours}:${String(minutes).padStart(2, "0")}:${rest}` : `${minutes}:${rest}`;
 }
 
 /** `1:52 /100m` (or /100yd) from seconds per 100 m. */
@@ -114,11 +119,6 @@ export function summariseSwims(activities: readonly TrainingHubActivity[]): Swim
     }
   }
   return totals;
-}
-
-/** Seconds per 100 m of a total. */
-export function totalsPace(totals: SwimTotals): number | undefined {
-  return secondsPer100m(totals.duration, totals.distance);
 }
 
 // ---------------------------------------------------------------- weeks --
@@ -523,26 +523,6 @@ export function swimmingPaceOf(
   return secondsPer100m(seconds, meters);
 }
 
-/** A swim's SWOLF for its row: over every counted length but the drills, which have none. */
-export function sessionSwolf(summary: SwimSummary): number | undefined {
-  let seconds = 0;
-  let strokes = 0;
-  let lengths = 0;
-  for (const entry of summary.byStyle) {
-    if (entry.counted) {
-      seconds += entry.counted.seconds;
-      strokes += entry.counted.strokes;
-      lengths += entry.counted.lengths;
-    }
-  }
-  return lengths > 0 ? (seconds + strokes) / lengths : undefined;
-}
-
-/** Share of a swim's time spent swimming rather than resting at the wall. */
-export function swimmingShare(summary: SwimSummary): number | undefined {
-  const total = summary.swimSeconds + summary.restSeconds;
-  return total > 0 ? summary.swimSeconds / total : undefined;
-}
 
 // ----------------------------------------------------------------- sets --
 
@@ -565,10 +545,23 @@ function sameDistance(left: number, right: number): boolean {
 }
 
 /**
- * The sets in a swim: two or more intervals in a row of one distance and one
- * stroke — `8 × 100 m` — which is how a session is written on the board and
- * how a swimmer remembers it. An interval that stands alone is no set and
- * keeps no header.
+ * How far an interval's pace may sit from the one before it and still be the
+ * same set: a descending set drops two or three seconds a hundred a rep, while
+ * an easy warm-up hundred before a hard set is ten per cent and more slower.
+ */
+const SET_PACE_TOLERANCE = 0.06;
+
+function samePace(left: TrainingHubSwimInterval, right: TrainingHubSwimInterval): boolean {
+  const a = secondsPer100m(left.seconds, left.distance);
+  const b = secondsPer100m(right.seconds, right.distance);
+  return a !== undefined && b !== undefined && Math.abs(a - b) <= a * SET_PACE_TOLERANCE;
+}
+
+/**
+ * The sets in a swim: two or more intervals in a row of one distance, one
+ * stroke and about one pace — `8 × 100 m` — which is how a session is written
+ * on the board and how a swimmer remembers it. An interval that stands alone
+ * is no set and keeps no header.
  */
 export function swimSets(intervals: readonly TrainingHubSwimInterval[]): SwimSet[] {
   const sets: SwimSet[] = [];
@@ -579,7 +572,8 @@ export function swimSets(intervals: readonly TrainingHubSwimInterval[]): SwimSet
     while (
       end < intervals.length &&
       sameDistance(intervals[end]!.distance, first.distance) &&
-      intervals[end]!.style === first.style
+      intervals[end]!.style === first.style &&
+      samePace(intervals[end - 1]!, intervals[end]!)
     ) {
       end += 1;
     }
