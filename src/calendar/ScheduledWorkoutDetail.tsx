@@ -11,8 +11,7 @@ import {
 import { useMemo } from "react";
 import type {
   TrainingHubScheduledWorkoutEntry,
-  TrainingHubSportType,
-  UnitSystem
+  TrainingHubSportType
 } from "../../electron/types";
 import type { HeraclesRecordsApi } from "../heraclesrecords-api";
 import { useUnitSystem } from "../units/UnitSystemProvider";
@@ -38,7 +37,7 @@ import {
   formatStepDistanceLabel
 } from "./scheduledStructure";
 import { WorkoutStructure } from "./WorkoutStructureView";
-import { expectedSeconds, plannedSessionSeconds } from "./pairing";
+import { plannedSessionFigures } from "./pairing";
 import { plural, t } from "../i18n/core";
 
 interface ScheduledWorkoutDetailProps {
@@ -55,18 +54,12 @@ interface ScheduledWorkoutDetailProps {
    */
   api?: HeraclesRecordsApi;
   /**
-   * COROS's estimate of the session's length, for an entry with no raw
-   * program to read it from: Overview's row, drawn before its day is read.
+   * COROS's estimates of the session's length and distance, for an entry with
+   * no raw program to read them from: Overview's row, drawn before its day is
+   * read.
    */
   estimatedSeconds?: number;
-}
-
-function formatDetailVolume(volume: string | undefined, unitSystem: UnitSystem): string {
-  const value = formatUpcomingWorkoutVolumeDisplay(volume, unitSystem);
-  const setCount = value.match(/^(\d+(?:\.\d+)?)\s+set\(s\)$/i);
-  if (!setCount) return value;
-
-  return plural("workout.sets", Number(setCount[1]));
+  estimatedMeters?: number;
 }
 
 function formatDetailLoad(load?: number): string {
@@ -77,7 +70,8 @@ export function ScheduledWorkoutDetail({
   entry,
   sportTypes,
   api,
-  estimatedSeconds
+  estimatedSeconds,
+  estimatedMeters
 }: ScheduledWorkoutDetailProps) {
   const { unitSystem } = useUnitSystem();
   const { source } = useLoadSource();
@@ -113,12 +107,19 @@ export function ScheduledWorkoutDetail({
           transition: { duration: 0.28, delay, ease: "easeOut" as const }
         };
 
+  // The card's figures in the card's words, not the steps' sums: a 14 km run
+  // with one timed float said "3:00" here while its card said 1h 12m, and a
+  // 17 km run built of 14.5 km and 20 timed minutes said 14.5 km.
+  const planned = plannedSessionFigures(entry, view.totals, {
+    meters: estimatedMeters,
+    seconds: estimatedSeconds
+  });
   const stats: Array<{ icon: LucideIcon; label: string; value: string }> = [
     {
       icon: Route,
       label: t("workout.detail.volume"),
-      value: formatPlannedVolume(view.totals, unitSystem, sport === "swim", () =>
-        formatDetailVolume(entry.volume, unitSystem)
+      value: formatPlannedVolume({ distanceMeters: planned.distanceMeters }, unitSystem, sport === "swim", () =>
+        formatUpcomingWorkoutVolumeDisplay(entry.volume, unitSystem)
       )
     },
     {
@@ -127,17 +128,11 @@ export function ScheduledWorkoutDetail({
       value: formatDetailLoad(plannedLoad(entry, source))
     }
   ];
-  // The card's figure in the card's words, not the timed steps' sum: a 14 km
-  // run with one timed float said "3:00" here while its card said 1h 12m.
-  const plannedSeconds = plannedSessionSeconds(
-    expectedSeconds(entry) ?? estimatedSeconds,
-    view.totals
-  );
-  if (plannedSeconds) {
+  if (planned.plannedSeconds) {
     stats.push({
       icon: Clock,
       label: t("workout.detail.estDuration"),
-      value: formatDurationSpan(plannedSeconds)
+      value: formatDurationSpan(planned.plannedSeconds)
     });
   }
   const structureSummary = view.totals.stepCount > 0
@@ -198,7 +193,8 @@ export function ScheduledWorkoutDetail({
               <ListChecks size={14} aria-hidden="true" />
               {t("workout.detail.structure")}
             </h4>
-            {view.totals.distanceMeters ? (
+            {/* The steps' own sum, so only where it is the whole session. */}
+            {view.totals.distanceMeters && view.totals.distanceSteps === view.totals.stepCount ? (
               <span className="sched-structure-total">
                 {t("workout.detail.total", {
                   value: formatStepDistanceLabel(view.totals.distanceMeters, unitSystem, sport === "swim")

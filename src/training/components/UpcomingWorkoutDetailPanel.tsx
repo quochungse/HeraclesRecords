@@ -157,6 +157,7 @@ export function UpcomingWorkoutDetailPanel({
                 sportTypes={sportTypes}
                 api={api}
                 estimatedSeconds={workout.durationSeconds}
+                estimatedMeters={workout.distanceMeters}
               />
             </div>
           </motion.aside>

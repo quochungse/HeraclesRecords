@@ -42,6 +42,7 @@ const fixture = {
       id: "p101",
       idInPlan: 101,
       name: "Rolling 400s",
+      sportType: 1,
       overview: "  Jog the recoveries; hold 5k pace.  ",
       exerciseNum: 13,
       trainingLoad: 94,
@@ -58,9 +59,11 @@ const fixture = {
     {
       id: "p103",
       idInPlan: 103,
-      name: "Taper 400s",
+      name: "Full chest & back",
+      sportType: 4,
       overview: "   ",
-      exerciseNum: 15,
+      exerciseNum: 9,
+      totalSets: 26,
       trainingLoad: 83,
       distance: 0
     },
@@ -103,11 +106,11 @@ assert.equal(
 
 const workouts = workoutsToday;
 assert.equal(workouts[0]?.name, "Rolling 400s");
-assert.equal(workouts[0]?.volume, "13 set(s)");
+assert.equal(workouts[0]?.volume, undefined, "a run's 13 steps are no volume");
 assert.equal(workouts[0]?.trainingLoad, 94);
 assert.equal(workouts[1]?.volume, "5.00km");
 assert.equal(workouts[1]?.trainingLoad, 167);
-assert.equal(workouts[2]?.volume, "15 set(s)");
+assert.equal(workouts[2]?.volume, "26 set(s)", "a strength session's sets, not its 9 exercises");
 assert.equal(workouts[3]?.volume, "7.00km");
 assert.equal(workouts[3]?.trainingLoad, undefined);
 assert.equal(workouts[4]?.volume, "7.50km");

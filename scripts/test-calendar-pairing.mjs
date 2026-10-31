@@ -36,7 +36,7 @@ const load = async (...segments) => {
   return import(`${url.href}?cacheBust=${Date.now()}`);
 };
 
-const { pairPlannedWithActual, computeWeeklyStats, plannedSessionSeconds } = await load(
+const { pairPlannedWithActual, computeWeeklyStats, plannedSessionFigures } = await load(
   "src",
   "calendar",
   "pairing.ts"
@@ -437,12 +437,12 @@ const activity = (overrides) => ({
   assert.equal(gone.pairs[0].activity.activityId, "short", "a link to nothing here leaves the guess");
 }
 
-/* --- 9c. the time a card and the session panel state ---------------------- */
+/* --- 9c. the distance and time a card, the panel and completion state ----- */
 
 {
-  // A run in kilometres with one timed float: its steps sum to the float, and
-  // that sum is no figure for the session. COROS's estimate is; without one,
-  // only a session timed in every step adds up to its own length.
+  // A run of 10 km in kilometres and one timed float: its steps sum to 10 km
+  // and 3:00, and neither is a figure for the session. COROS's estimates are;
+  // without them, only a session in one unit throughout adds up to itself.
   const step = (id, targetType, targetValue) => ({ id, exerciseType: 2, targetType, targetValue, sets: 1, sortNo: Number(id) });
   const mixed = (rawExtra = {}) => scheduled({
     sportType: 1,
@@ -450,14 +450,26 @@ const activity = (overrides) => ({
   });
   const target = (entry) => pairPlannedWithActual([entry], [], "metric").pairs[0].targets;
 
-  assert.equal(target(mixed()).durationSeconds, 180, "the timed steps alone, as completion reads them");
   assert.equal(target(mixed()).plannedSeconds, undefined, "a float is not the session's length");
+  assert.equal(target(mixed()).distanceMeters, undefined, "nor are its distance steps the session's distance");
   assert.equal(target(mixed({ estimatedTime: 4320 })).plannedSeconds, 4320, "COROS's estimate first");
+  assert.equal(target(mixed({ distance: 1170800 })).distanceMeters, 11708, "COROS's distance counts the float too");
   assert.equal(target(scheduled({ sportType: 1, ...timedProgram(2700) })).plannedSeconds, 2700, "every step timed adds up to the session");
-  assert.equal(
-    plannedSessionSeconds(undefined, { durationSeconds: undefined, stepCount: 0, timedSteps: 0 }),
-    undefined,
-    "no steps, no time"
+  assert.equal(target(scheduled({ sportType: 1, ...runProgram(10000) })).distanceMeters, 10000, "every step in distance adds up too");
+
+  // Completion by time reads the session's time, not its timed steps': a core
+  // session of planks (6 timed minutes) that COROS gives 27 minutes, done in 31.
+  const core = scheduled({
+    sportType: 4,
+    rawProgram: { sportType: 4, estimatedTime: 1620, exercises: [step("1", 3, 12), step("2", 2, 360)] }
+  });
+  const coreDone = activity({ activityId: "core", sportType: 402, duration: 1860 });
+  assert.equal(pairPlannedWithActual([core], [coreDone], "metric").pairs[0].completionPct, 115, "not 517%");
+
+  // Overview's row arrives without its program and states COROS's figures itself.
+  assert.deepEqual(
+    plannedSessionFigures(scheduled({ volume: "3 set(s)" }), { stepCount: 0, timedSteps: 0, distanceSteps: 0 }, { meters: 17080, seconds: 7080 }),
+    { distanceMeters: 17080, plannedSeconds: 7080, expectedSeconds: 7080 }
   );
 }
 

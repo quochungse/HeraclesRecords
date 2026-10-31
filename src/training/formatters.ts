@@ -476,6 +476,11 @@ export function formatUpcomingWorkoutVolumeDisplay(
       return formatDistanceValue(value, unitSystem, { swim: true });
     }
   }
+  // A strength session's sets, as the main process writes them.
+  const sets = volume.match(/^(\d+)\s+set\(s\)$/i);
+  if (sets) {
+    return plural("workout.sets", Number(sets[1]));
+  }
   return volume;
 }
 

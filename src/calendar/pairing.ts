@@ -92,14 +92,8 @@ function sportsCompatible(
 }
 
 /**
- * What the plan asked for, in base units.
- *
- * COROS's `volume` string is only ever a distance in km or a set count — a
- * workout prescribed in minutes arrives with no volume at all — so a
- * time-based plan had nothing to measure adherence against and showed no
- * completion badge anywhere. The steps carry both figures, so read the
- * structure first and keep the volume string as the fallback for an entry whose
- * steps did not come through.
+ * What the plan asked for, in base units: `plannedSessionFigures` over the
+ * workout's own structure.
  *
  * `unitSystem` reaches `buildScheduledWorkoutView` for its labels only; the
  * magnitudes it totals are metres and seconds either way.
@@ -109,44 +103,65 @@ function plannedTargets(
   unitSystem: UnitSystem
 ): PlannedTargets {
   const { totals } = buildScheduledWorkoutView(scheduled, unitSystem);
-  const volumeKm = parseUpcomingWorkoutDistanceKm(scheduled.volume);
-  const expected = expectedSeconds(scheduled);
-  return {
-    distanceMeters:
-      totals.distanceMeters ?? (volumeKm ? volumeKm * 1000 : undefined),
-    durationSeconds: totals.durationSeconds,
-    expectedSeconds: expected,
-    plannedSeconds: plannedSessionSeconds(expected, totals)
-  };
+  return plannedSessionFigures(scheduled, totals);
 }
 
 /**
- * How long a planned session takes, said the same way on its Calendar card
- * and in its session panel: COROS's own estimate, else the sum of the steps
- * when every one of them is timed. A step in metres, in reps or left to the
- * lap button has no time of its own, so a sum over some of the steps read as
- * the whole session's: a 14 km run with a timed float was "3:00".
+ * How far and how long a planned session goes, said the same way on its
+ * Calendar card, in its session panel and in its completion: COROS's own
+ * estimates first, else the sum of the steps when every one of them is in
+ * that unit. COROS estimates the whole session — its `distance` counts the
+ * timed steps too (probed: 14.5 km of distance steps and 20 timed minutes
+ * came to 17.08 km) — and a sum over some of the steps read as the whole
+ * session's: a 14 km run with a timed float was "3:00", a 17 km run "14.5 km".
+ *
+ * `known` is what a caller already holds of COROS's estimates for an entry
+ * that arrived without its program (Overview's row). The main process's
+ * `volume` string stands in only where there are no steps to say anything (a
+ * run whose target COROS keeps at the program's level, an entry with no
+ * program): beside steps it may be a sum of some of them.
  */
-export function plannedSessionSeconds(
-  expected: number | undefined,
-  totals: Pick<ScheduledStructureTotals, "durationSeconds" | "stepCount" | "timedSteps">
-): number | undefined {
-  if (expected) return expected;
-  return totals.stepCount > 0 && totals.timedSteps === totals.stepCount
-    ? totals.durationSeconds
-    : undefined;
+export function plannedSessionFigures(
+  scheduled: TrainingHubScheduledWorkoutEntry,
+  totals: Pick<
+    ScheduledStructureTotals,
+    "distanceMeters" | "durationSeconds" | "stepCount" | "timedSteps" | "distanceSteps"
+  >,
+  known: { meters?: number; seconds?: number } = {}
+): PlannedTargets {
+  const volumeKm = totals.stepCount === 0 ? parseUpcomingWorkoutDistanceKm(scheduled.volume) : null;
+  const meters = expectedMeters(scheduled) ?? known.meters ?? (volumeKm ? volumeKm * 1000 : undefined);
+  const seconds = expectedSeconds(scheduled) ?? known.seconds;
+  const everyStep = (count: number) => totals.stepCount > 0 && count === totals.stepCount;
+  return {
+    distanceMeters: meters ?? (everyStep(totals.distanceSteps) ? totals.distanceMeters : undefined),
+    plannedSeconds: seconds ?? (everyStep(totals.timedSteps) ? totals.durationSeconds : undefined),
+    expectedSeconds: seconds
+  };
 }
 
 /**
  * COROS's own estimate of the session's length, off the raw program. On a
  * COROS program a `0` is a field nobody filled in, so it is no estimate.
  */
-export function expectedSeconds(scheduled: TrainingHubScheduledWorkoutEntry): number | undefined {
+function expectedSeconds(scheduled: TrainingHubScheduledWorkoutEntry): number | undefined {
   const raw = scheduled.rawProgram;
   for (const value of [raw?.estimatedTime, raw?.duration]) {
     const seconds = Number(value);
     if (Number.isFinite(seconds) && seconds > 0) {
       return seconds;
+    }
+  }
+  return undefined;
+}
+
+/** COROS's own estimate of the session's distance, in metres (it writes centimetres; `0` is none). */
+function expectedMeters(scheduled: TrainingHubScheduledWorkoutEntry): number | undefined {
+  const raw = scheduled.rawProgram;
+  for (const value of [raw?.distance, raw?.estimatedDistance]) {
+    const centimetres = Number(value);
+    if (Number.isFinite(centimetres) && centimetres > 0) {
+      return centimetres / 100;
     }
   }
   return undefined;
@@ -170,8 +185,8 @@ function completionPct(
   if (targets.distanceMeters && activity.distance !== undefined) {
     return Math.round((activity.distance / targets.distanceMeters) * 100);
   }
-  if (targets.durationSeconds && activity.duration !== undefined) {
-    return Math.round((activity.duration / targets.durationSeconds) * 100);
+  if (targets.plannedSeconds && activity.duration !== undefined) {
+    return Math.round((activity.duration / targets.plannedSeconds) * 100);
   }
   return undefined;
 }
@@ -193,10 +208,10 @@ function matchScore(
       targets.distanceMeters
     );
   }
-  if (targets.durationSeconds && activity.duration !== undefined) {
+  if (targets.plannedSeconds && activity.duration !== undefined) {
     return (
-      Math.abs(activity.duration - targets.durationSeconds) /
-      targets.durationSeconds
+      Math.abs(activity.duration - targets.plannedSeconds) /
+      targets.plannedSeconds
     );
   }
   return 1;

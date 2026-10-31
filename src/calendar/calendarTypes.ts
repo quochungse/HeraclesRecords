@@ -4,19 +4,18 @@ import type {
   TrainingHubScheduledWorkoutEntry
 } from "../../electron/types";
 
-/** What the plan asked for, in base units, read from the workout's own steps. */
+/** What the plan asked for, in base units (`plannedSessionFigures`). */
 export interface PlannedTargets {
+  /** The whole session's distance: COROS's estimate, else every step's in distance. */
   distanceMeters?: number;
-  durationSeconds?: number;
+  /** The whole session's time: COROS's estimate, else every step's in time. */
+  plannedSeconds?: number;
   /**
-   * How long COROS expects the whole session to take: the program's
-   * `estimatedTime`, which every scheduled entry carries, strength included.
-   * `durationSeconds` sums only the steps written in time, so a 70-minute run
-   * built in kilometres with timed strides summed to 450 s.
+   * COROS's estimate alone (`estimatedTime`, which every scheduled entry
+   * carries, strength included): the week sums only these, since a total
+   * over some of the sessions would read as the whole plan's.
    */
   expectedSeconds?: number;
-  /** The time a card and the session panel state (`plannedSessionSeconds`). */
-  plannedSeconds?: number;
 }
 
 /** A scheduled workout matched (or not) to the completed activity on the same day. */

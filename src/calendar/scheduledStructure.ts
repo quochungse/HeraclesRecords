@@ -84,6 +84,8 @@ export interface ScheduledStructureTotals {
   stepCount: number;
   /** Of those, the steps written in time — `durationSeconds` is the whole session only when this is all of them. */
   timedSteps: number;
+  /** And the steps written in distance, which `distanceMeters` is the whole session for only when this is all of them. */
+  distanceSteps: number;
   repeatGroups: number;
 }
 
@@ -536,12 +538,14 @@ function computeTotals(nodes: ScheduledNodeView[]): ScheduledStructureTotals {
   let durationSeconds = 0;
   let stepCount = 0;
   let timedSteps = 0;
+  let distanceSteps = 0;
   let repeatGroups = 0;
 
   const accumulate = (step: ScheduledStepView, factor: number) => {
     stepCount += 1;
     if (step.magnitudeType === "distance" && step.magnitude) {
       distanceMeters += step.magnitude * factor;
+      distanceSteps += 1;
     } else if (step.magnitudeType === "time" && step.magnitude) {
       durationSeconds += step.magnitude * factor;
       timedSteps += 1;
@@ -564,6 +568,7 @@ function computeTotals(nodes: ScheduledNodeView[]): ScheduledStructureTotals {
     durationSeconds: durationSeconds > 0 ? durationSeconds : undefined,
     stepCount,
     timedSteps,
+    distanceSteps,
     repeatGroups
   };
 }
@@ -753,18 +758,10 @@ function draftTargetView(
 }
 
 /**
- * What a planned workout asks for, as one phrase.
- *
- * COROS's own `volume` string reports a **step count** whenever a program has
- * more than one step — `resolveWorkoutSetCount` wins over distance in
- * `formatUpcomingWorkoutVolume` — so a 13 km long run built as warm-up, main
- * and cool-down arrived as "3 set(s)". The scheduled detail drew that under
- * "Volume" and "13.0 km total" two lines below it, in the same panel.
- *
- * The steps know better, so they are asked first: their own distance, then
- * their own duration, and only then COROS's string, which is the right answer
- * for a strength workout — where sets are the volume and there is no distance
- * to total.
+ * What a planned workout asks for, as one phrase: its distance, then its
+ * time — the session's own figures (`plannedSessionFigures`), never a sum of
+ * some of its steps — and only then the main process's `volume` string, which
+ * is the answer for a strength workout, where sets are the volume.
  */
 export function formatPlannedVolume(
   /*

@@ -4532,26 +4532,27 @@ function resolveUpcomingWorkoutDistanceMeters(
   return meters > 0 ? meters : undefined;
 }
 
+/**
+ * A session's volume as one string: a strength or HYROX session's sets
+ * (`totalSets`, the sum of its steps' sets; `exerciseNum` counts its
+ * exercises, and was read as sets), anything else's distance. On another
+ * sport both count steps, which is no volume: "4 set(s)" was a 17 km run.
+ */
 function formatUpcomingWorkoutVolume(
   program: Record<string, unknown> | undefined
 ): string | undefined {
-  const setCount = resolveWorkoutSetCount(program);
+  if (!program) {
+    return undefined;
+  }
 
-  if (setCount > 1) {
-    return `${setCount} set(s)`;
+  const sport = workoutSportFromType(program.sportType);
+  if (sport === "strength" || sport === "hyrox") {
+    const sets = toProgramFigure(program.totalSets) ?? resolveWorkoutSetCount(program);
+    return sets > 0 ? `${sets} set(s)` : undefined;
   }
 
   const distanceMeters = resolveWorkoutDistanceMeters(program);
-
-  if (distanceMeters > 0) {
-    return `${(distanceMeters / 1000).toFixed(2)}km`;
-  }
-
-  if (setCount > 0) {
-    return `${setCount} set(s)`;
-  }
-
-  return undefined;
+  return distanceMeters > 0 ? `${(distanceMeters / 1000).toFixed(2)}km` : undefined;
 }
 
 function resolveWorkoutDistanceMeters(
