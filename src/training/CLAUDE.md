@@ -117,7 +117,7 @@ sports), summed from each session's own `zoneSeconds` (`zoneTimeEntries`, throug
 `useActivityDetailSummaries`), never COROS's all-sport zone totals; time only, since no session
 carries load per zone. Read as the easy share against 80/20 with `intensityForZone`.
 
-**Sport sections** (`sportModel.ts`): Running, Cycling, Hiking, each only when trained in the
+**Sport sections** (`sportModel.ts`): Running, Cycling, Hiking, Swimming, each only when trained in the
 last four calendar weeks and shown on the rail, built from the screens' own builders, never a
 copy. "A week" figures divide by the weeks the window has run (`sportWindowWeeks`). **Strength**
 (`OverviewStrength`, lazy) is the Strength screen's own `StrengthHero` over four weeks

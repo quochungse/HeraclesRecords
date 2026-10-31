@@ -187,6 +187,8 @@ const overview: OverviewMessages = {
   "overview.sport.plannedAvg": "+ {planned} theo kế hoạch · TB {avg}",
   "overview.sport.recordedTime": "Thời gian ghi",
   "overview.sport.restsIncluded": "tính cả lúc nghỉ",
+  "overview.sport.restsOut": "không tính lúc nghỉ ở thành hồ",
+  "overview.sport.strokesNote": "các lượt ở hồ, theo quãng",
   "overview.sport.rides_one": "{count} buổi",
   "overview.sport.rides_other": "{count} buổi",
   "overview.sport.runs_one": "{count} buổi",

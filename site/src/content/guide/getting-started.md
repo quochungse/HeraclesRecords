@@ -22,7 +22,7 @@ The sidebar groups the screens by when you reach for them:
 
 - **Today**: Overview and Sleep.
 - **Plan**: Coach, Calendar and Training Library.
-- **History**: Activities, then a screen each for Running, Cycling, Hiking and Strength.
+- **History**: Activities, then a screen each for Running, Cycling, Hiking, Swimming and Strength.
 - **Your journey**: the Hall of Records and Where you've been.
 
 Your name at the foot of the sidebar opens **Personal**: your profile, zones and units. The gear beside it opens **Settings**.

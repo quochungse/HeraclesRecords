@@ -17,7 +17,7 @@ Under **Settings → Appearance**:
 
 Under **Settings → Navigation**:
 
-- **Sport screens**: Running, Cycling, Hiking and Strength each have a screen. Keep the ones you train. Activities still lists every session, whatever you hide.
+- **Sport screens**: Running, Cycling, Hiking, Swimming and Strength each have a screen. Keep the ones you train. Activities still lists every session, whatever you hide.
 - **Opens on**: the screen the app starts on.
 
 ## Units and zones

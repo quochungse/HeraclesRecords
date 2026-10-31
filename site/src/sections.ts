@@ -12,6 +12,7 @@ export const ACTIVITIES_PAGES: readonly SectionPage[] = [
   { href: "/activities/running", label: "Running" },
   { href: "/activities/cycling", label: "Cycling" },
   { href: "/activities/hiking", label: "Hiking" },
+  { href: "/activities/swimming", label: "Swimming" },
   { href: "/activities/strength/", label: "Strength" },
 ];
 

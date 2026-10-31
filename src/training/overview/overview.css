@@ -98,6 +98,7 @@
 .training-dashboard [data-sport="run"] { --sport-tone: var(--sport-run); }
 .training-dashboard [data-sport="bike"] { --sport-tone: var(--sport-bike); }
 .training-dashboard [data-sport="hiking"] { --sport-tone: var(--sport-hiking); }
+.training-dashboard [data-sport="swim"] { --sport-tone: var(--sport-swim); }
 .training-dashboard [data-sport="strength"] { --sport-tone: var(--sport-strength); }
 
 /* ── Readiness ──────────────────────────────────────────────────────────── */

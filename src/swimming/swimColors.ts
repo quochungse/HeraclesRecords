@@ -6,17 +6,17 @@ import type { SwimType } from "./swimType";
  * Swim colours as concrete hex, for the charts — `var()` does not resolve in
  * the SVG attributes recharts writes; see `rideTypeColors`.
  *
- * A pool swim wears the colour swims already wear everywhere else in the app
- * (`sportColorCategory` files them under "other"); open water is mixed off it
- * towards a deep blue, so the two read as one family and follow the athlete
+ * A pool swim is the athlete's own swim colour, which swims wear everywhere
+ * else in the app (`sportColorCategory`); open water is mixed off it towards a
+ * deep blue, so the two read as one family and follow the athlete
  * when they recolour it in Settings. The mix must match `.swimming-view` in
  * swimming.css.
  */
 export function swimTypeColors(): Record<SwimType, string> {
   const sport = readStoredSportColors();
   return {
-    pool: sport.other,
-    open: mixHex(sport.other, "#2f5bd3", 0.4)
+    pool: sport.swim,
+    open: mixHex(sport.swim, "#2f5bd3", 0.4)
   };
 }
 

@@ -26,7 +26,7 @@ export const WORKOUT_SPORT_COLOR_CATEGORY: Record<
   run: "run",
   trailRun: "run",
   bike: "bike",
-  swim: "other",
+  swim: "swim",
   strength: "strength",
   hyrox: "other",
   indoorClimb: "other",

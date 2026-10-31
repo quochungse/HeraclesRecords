@@ -187,6 +187,8 @@ const overview: OverviewMessages = {
   "overview.sport.plannedAvg": "+ วางแผนไว้ {planned} · เฉลี่ย {avg}",
   "overview.sport.recordedTime": "เวลาที่บันทึก",
   "overview.sport.restsIncluded": "รวมช่วงพัก",
+  "overview.sport.restsOut": "ไม่รวมเวลาพักที่ขอบสระ",
+  "overview.sport.strokesNote": "เที่ยวในสระ ตามระยะทาง",
   "overview.sport.rides_one": "ปั่น {count} ครั้ง",
   "overview.sport.rides_other": "ปั่น {count} ครั้ง",
   "overview.sport.runs_one": "วิ่ง {count} ครั้ง",

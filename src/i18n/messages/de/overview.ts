@@ -187,6 +187,8 @@ const overview: OverviewMessages = {
   "overview.sport.plannedAvg": "+ {planned} geplant · Ø {avg}",
   "overview.sport.recordedTime": "Aufgezeichnete Zeit",
   "overview.sport.restsIncluded": "Pausen eingeschlossen",
+  "overview.sport.restsOut": "ohne die Pausen am Rand",
+  "overview.sport.strokesNote": "Beckenbahnen, nach Strecke",
   "overview.sport.rides_one": "{count} Fahrt",
   "overview.sport.rides_other": "{count} Fahrten",
   "overview.sport.runs_one": "{count} Lauf",

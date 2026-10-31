@@ -97,7 +97,8 @@ week in metres, and in the pool **the length**: strokes, SWOLF, stroke, stroke r
   interval with no rest; CSS = (400 − 200) / (T400 − T200) over 12 weeks, and nothing when
   the 400 was no slower a metre than the 200. No HR intensity panel or load ratio (heart rate
   runs lower in water and a wrist reads it roughly).
-- Swims wear the "other" sport colour; open water and the strokes are `--swim-*`.
+- Swims (300, 301) have their own sport colour group, **Swim** (`swim`, `--sport-swim`); open
+  water is mixed off it and the strokes are `--swim-*`.
 - Sets are intervals in a row of one distance, one stroke and about one pace (6% rep to rep:
   a descending set stays one, an easy warm-up hundred does not join the hard set after it).
 - `npm run test:swim-metrics`, `test:swimming-renderer`.

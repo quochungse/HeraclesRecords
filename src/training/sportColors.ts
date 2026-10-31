@@ -1,13 +1,14 @@
 import type { TrainingHubActivity } from "../../electron/types";
 import { t } from "../i18n/core.ts";
 
-export type SportColorCategory = "strength" | "hiking" | "run" | "bike" | "other";
+export type SportColorCategory = "strength" | "hiking" | "run" | "bike" | "swim" | "other";
 
 export const SPORT_COLOR_CATEGORIES: SportColorCategory[] = [
   "strength",
   "hiking",
   "run",
   "bike",
+  "swim",
   "other"
 ];
 
@@ -18,6 +19,7 @@ export const DEFAULT_SPORT_COLORS: Record<SportColorCategory, string> = {
   hiking: "#4c8dff",
   run: "#2fbe91",
   bike: "#e6b800",
+  swim: "#36c2f0",
   other: "#7fd8cf"
 };
 
@@ -34,6 +36,9 @@ export const SPORT_COLOR_LABELS: Readonly<Record<SportColorCategory, string>> = 
   },
   get bike() {
     return t("sport.bike");
+  },
+  get swim() {
+    return t("sport.swim");
   },
   get other() {
     return t("sport.other");
@@ -88,10 +93,11 @@ const LEGACY_CATEGORY_KEYS: Partial<Record<SportColorCategory, string>> = {
 const HEX_RE = /^#[0-9a-fA-F]{6}$/;
 
 // Stable COROS sportType codes → color category; keep the codes in sync with
-// electron/corosSportTypes.ts. Everything not listed (swim, triathlon, ski,
+// electron/corosSportTypes.ts. Everything not listed (triathlon, ski,
 // rowing, climbing, walk, unknown codes) falls back to "other". A trail run is
 // a run — it is on the Running screen, a surface there — and wears the run
-// colour; hiking is the hike and the mountain climb, the Hiking screen's two.
+// colour; hiking is the hike and the mountain climb, the Hiking screen's two;
+// swim is the pool and open water, the Swimming screen's.
 const SPORT_TYPE_CATEGORY: Record<number, SportColorCategory> = {
   100: "run", //      Run
   101: "run", //      Indoor Run
@@ -106,6 +112,8 @@ const SPORT_TYPE_CATEGORY: Record<number, SportColorCategory> = {
   204: "bike", //     Mountain Bike
   205: "bike", //     Mountain E-Bike
   299: "bike", //     Helmet Bike
+  300: "swim", //     Pool Swim
+  301: "swim", //     Open Water
   400: "strength", // Gym Cardio
   402: "strength" //  Strength
 };

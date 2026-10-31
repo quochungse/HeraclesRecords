@@ -6,15 +6,15 @@
  * swim has and a run does not — its two kinds, its strokes and their colours,
  * and the marks on a length chart.
  *
- * A pool swim is the colour swims already wear in the app (the "other" sport
- * colour) and open water is mixed off it towards a deep blue; the strokes take
+ * A pool swim is the athlete's own swim colour, which swims wear everywhere in
+ * the app, and open water is mixed off it towards a deep blue; the strokes take
  * one hue each. Both are resolved to hex for the charts in swimColors.ts;
  * change both together.
  */
 
 .swimming-view {
-  --swim-pool: var(--sport-other, #7fd8cf);
-  --swim-open: color-mix(in srgb, var(--sport-other, #7fd8cf) 40%, #2f5bd3);
+  --swim-pool: var(--sport-swim, #36c2f0);
+  --swim-open: color-mix(in srgb, var(--sport-swim, #36c2f0) 40%, #2f5bd3);
   --swim-style-free: #4cb8e8;
   --swim-style-back: #9b8cff;
   --swim-style-breast: #4fc483;

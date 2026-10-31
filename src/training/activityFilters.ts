@@ -268,7 +268,7 @@ export function sportsPresent(
   const present = new Set(
     activities.map((activity) => sportColorCategory(activity.sportType))
   );
-  return (["run", "hiking", "bike", "strength", "other"] as const).filter(
+  return (["run", "hiking", "bike", "swim", "strength", "other"] as const).filter(
     (category) => present.has(category)
   );
 }

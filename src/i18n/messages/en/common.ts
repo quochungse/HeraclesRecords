@@ -19,6 +19,7 @@ const common = {
   "common.newCount": "{count} new",
   "sport.run": "Running",
   "sport.bike": "Cycling",
+  "sport.swim": "Swimming",
   "sport.hiking": "Hiking",
   "sport.strength": "Strength",
   "sport.other": "Other",

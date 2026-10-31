@@ -187,6 +187,8 @@ const overview: OverviewMessages = {
   "overview.sport.plannedAvg": "+ 计划 {planned} · 平均 {avg}",
   "overview.sport.recordedTime": "记录时间",
   "overview.sport.restsIncluded": "含休息",
+  "overview.sport.restsOut": "不含池边休息",
+  "overview.sport.strokesNote": "泳池趟数，按距离",
   "overview.sport.rides_one": "{count} 次骑行",
   "overview.sport.rides_other": "{count} 次骑行",
   "overview.sport.runs_one": "{count} 次跑步",

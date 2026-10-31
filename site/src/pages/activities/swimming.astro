@@ -1,0 +1,76 @@
+---
+import Base from "../../layouts/Base.astro";
+import FeatureRow from "../../components/FeatureRow.astro";
+import Shot from "../../components/Shot.astro";
+import SubNav from "../../components/SubNav.astro";
+import { ACTIVITIES_PAGES } from "../../sections";
+---
+
+<Base og="activities"
+  title="Swimming"
+  description="Swimming in Heracles Records: pace per 100, Critical Swim Speed, SWOLF in your pool, your strokes, and every swim read length by length."
+>
+  <SubNav pages={ACTIVITIES_PAGES} label="Activities" />
+
+  <section class="wrap page-hero">
+    <p class="eyebrow">Swimming</p>
+    <h1>Length by length.</h1>
+    <p class="lede">
+      Pool swims and open water, read the way a swimmer thinks about them: a pace per 100, a
+      week in metres, Critical Swim Speed as the pace you hold for a long set, and SWOLF as the
+      measure of how much each length costs you.
+    </p>
+  </section>
+
+  <section class="wrap section-tight">
+    <Shot name="31-swimming" alt="Swimming: this week in metres, CSS, SWOLF and the best 100" eager />
+  </section>
+
+  <div class="wrap">
+    <section class="feature-text">
+      <p class="eyebrow">The screen</p>
+      <h2>A swimmer's numbers, not a runner's.</h2>
+      <ul class="ticks columns">
+        <li><strong>Pace per 100 m</strong>, or per 100 yd, never per kilometre, over the swimming with the rests at the wall left out.</li>
+        <li><strong>Critical Swim Speed</strong> from your fastest freestyle 200 and 400 swum without stopping, as a CSS test works it out.</li>
+        <li><strong>SWOLF</strong>, seconds plus strokes a length, read in one length of pool at a time: a 50 m length has one turn fewer.</li>
+        <li><strong>Technique over time</strong>: SWOLF, distance per stroke, pace and stroke rate, each swim a dot and a median line through them.</li>
+        <li><strong>Your strokes</strong>: how far you swam freestyle, backstroke, breaststroke, butterfly and drills, and how each went.</li>
+        <li><strong>Pool and open water</strong> apart or together, a week at a time in metres.</li>
+      </ul>
+    </section>
+
+    <FeatureRow shot="33-swim-lengths" alt="A swim's lengths as bars in their stroke's colour, the rests as gaps">
+      <p class="eyebrow">A swim's page</p>
+      <h2>Every length, as the watch counted it.</h2>
+      <ul class="ticks">
+        <li><strong>A bar for every length</strong> in its stroke's colour, by pace, SWOLF, strokes or stroke rate, with the rests as gaps.</li>
+        <li><strong>Swim time apart from rest</strong>, and the pool, found from the lengths: 25 m, 50 m, 33⅓ m or 25 yd.</li>
+        <li><strong>Strokes a length, stroke rate and distance per stroke</strong>: speed is the last two multiplied, so you see how a faster swim was bought.</li>
+        <li><strong>Your best 100, 200 and 400</strong> inside the session, freestyle without a rest.</li>
+      </ul>
+    </FeatureRow>
+
+    <FeatureRow shot="32-swim" alt="A swim's figures and its intervals grouped into sets" flip>
+      <p class="eyebrow">Sets</p>
+      <h2>Written the way the board was.</h2>
+      <p>
+        The intervals you swam between rests are grouped into the sets they made, 8 × 100 m
+        freestyle on 15 seconds, with each one's pace, strokes, SWOLF, stroke rate, heart rate
+        and the rest after it. An open-water swim gets its route on the map, its pace and heart
+        rate over time, and the watch's laps.
+      </p>
+    </FeatureRow>
+  </div>
+
+  <section class="wrap section">
+    <div class="section-head">
+      <h2 class="section-title">Heart rate reads low in the water.</h2>
+      <p class="lede">
+        Lying flat in cool water, your heart beats slower than it does on land, and a wrist reads
+        it roughly while the arm is moving. So the screen leans on pace, strokes and SWOLF, and
+        keeps the zones on each swim's page for what they are.
+      </p>
+    </div>
+  </section>
+</Base>

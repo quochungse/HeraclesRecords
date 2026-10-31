@@ -188,6 +188,8 @@ const overview = {
   "overview.sport.plannedAvg": "+ {planned} planned · avg {avg}",
   "overview.sport.recordedTime": "Recorded time",
   "overview.sport.restsIncluded": "rests included",
+  "overview.sport.restsOut": "rests at the wall left out",
+  "overview.sport.strokesNote": "pool lengths, by distance",
   "overview.sport.rides_one": "{count} ride",
   "overview.sport.rides_other": "{count} rides",
   "overview.sport.runs_one": "{count} run",
