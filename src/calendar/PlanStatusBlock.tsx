@@ -5,6 +5,8 @@ import type { HeraclesRecordsApi } from "../heraclesrecords-api";
 import { SelectDropdown } from "../components/SelectDropdown";
 import type { CalendarDay, PlannedActualPair } from "./calendarTypes";
 import { t } from "../i18n/core";
+import { useUnitSystem } from "../units/UnitSystemProvider";
+import { completionLine } from "./PlanCompletion";
 
 interface PlanStatusBlockProps {
   api: HeraclesRecordsApi;
@@ -47,6 +49,8 @@ export function PlanStatusBlock({
   onError
 }: PlanStatusBlockProps) {
   const [saving, setSaving] = useState(false);
+  const { unitSystem } = useUnitSystem();
+  const completion = pair.activity ? completionLine(pair, unitSystem) : undefined;
 
   const save = async (
     patch: { activityId?: string; status: "completed" | "skipped" | "missed" | "upcoming" },
@@ -104,6 +108,7 @@ export function PlanStatusBlock({
                 ? t("calendar.match.noMatch")
                 : t("calendar.match.notYet")}
           </strong>
+          {completion ? <small title={completion.note}>{completion.text}</small> : null}
           <small>
             {day.activities.length
               ? t("calendar.match.pick")

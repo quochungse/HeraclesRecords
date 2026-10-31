@@ -16267,38 +16267,6 @@ label.chat-settings-toggle-row {
   color: var(--error-text);
 }
 
-/* Off plan: the share of the planned session, drawn only when it strayed. */
-.calendar-chip-badge {
-  flex: none;
-  padding: 0 6px;
-  border-radius: var(--radius-pill);
-  font-size: 10px;
-  font-weight: 700;
-  line-height: 1.6;
-}
-
-.calendar-chip-badge.is-complete {
-  background: var(--success-bg);
-  color: var(--success-text);
-}
-
-.calendar-chip-badge.is-partial {
-  background: var(--warning-bg);
-  color: var(--warning-text);
-}
-
-.calendar-chip-badge.is-missed {
-  background: var(--error-bg);
-  color: var(--error-text);
-}
-
-/* Well over what was prescribed. Not a failure and not "done" either, so it
-   takes the accent rather than one of the three signal colours. */
-.calendar-chip-badge.is-over {
-  background: var(--accent-soft);
-  color: var(--accent-strong);
-}
-
 .calendar-chip.is-selection-enabled {
   min-height: 46px;
   padding-left: 32px;

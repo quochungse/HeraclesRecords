@@ -1025,6 +1025,8 @@ export interface TrainingHubUpcomingWorkout {
   description?: string;
   /** The activity COROS recorded as this session done (the entity's `labelId`). */
   completedActivityId?: string;
+  /** COROS's share of the session that activity covered (`completeRate`, 0–1). */
+  corosCompleteRate?: number;
   exercises?: TrainingHubScheduledExercise[];
   /** Heracles Training Load's estimate, on a strength session only. */
   heraclesLoad?: HeraclesLoad;
@@ -3845,6 +3847,8 @@ export interface TrainingHubScheduledWorkoutEntry {
   description?: string;
   /** The activity COROS recorded as this session done (the entity's `labelId`). */
   completedActivityId?: string;
+  /** COROS's share of the session that activity covered (`completeRate`, 0–1). */
+  corosCompleteRate?: number;
   exercises?: TrainingHubScheduledExercise[];
   /** Raw program payload from schedule/query — required to re-add the workout when rescheduling. */
   rawProgram?: Record<string, unknown>;

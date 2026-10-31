@@ -67,6 +67,7 @@ export function scheduledEntryFromUpcoming(
     trainingLoad: workout.trainingLoad,
     ...(workout.description ? { description: workout.description } : {}),
     ...(workout.completedActivityId ? { completedActivityId: workout.completedActivityId } : {}),
+    ...(workout.corosCompleteRate !== undefined ? { corosCompleteRate: workout.corosCompleteRate } : {}),
     // Heracles Training Load's estimate is a strength session's only planned
     // load (COROS prices none), so the panel must not wait for the day's read.
     ...(workout.heraclesLoad ? { heraclesLoad: workout.heraclesLoad } : {}),

@@ -63,27 +63,6 @@ interface DayCellProps {
 const MONTH_CARDS = 3;
 
 /**
- * Bands for the planned-vs-actual badge. Over-completion gets a band of its
- * own: three times a prescribed easy run is not "done", and reading it as
- * complete hid exactly the sessions worth a second look.
- */
-function completionTone(pct?: number): string {
-  if (pct === undefined) {
-    return "";
-  }
-  if (pct > 115) {
-    return "is-over";
-  }
-  if (pct >= 90) {
-    return "is-complete";
-  }
-  if (pct >= 50) {
-    return "is-partial";
-  }
-  return "is-missed";
-}
-
-/**
  * The card's icon: the sport's own, as the day panel draws it. A hike has no
  * workout sport, so it is read off the colour group it is drawn in.
  */
@@ -141,7 +120,6 @@ interface CardView {
   sport: WorkoutSport | undefined;
   category: SportColorCategory | undefined;
   kind: "done" | "planned" | "missed";
-  completionPct?: number;
   pair?: PlannedActualPair;
   activity?: TrainingHubActivity;
   /** What the load figure needs said: estimated, or still COROS's (`activityLoadNote`, `plannedLoadNote`). */
@@ -166,7 +144,6 @@ function dayCards(day: CalendarDay, unitSystem: UnitSystem, source: StrengthLoad
         sport: activityWorkoutSport(activity.sportType),
         category: sportColorCategory(activity.sportType),
         kind: "done",
-        completionPct: pair.completionPct,
         pair,
         activity,
         loadNote: activityLoadNote(activity, source)
@@ -215,8 +192,9 @@ function dayCards(day: CalendarDay, unitSystem: UnitSystem, source: StrengthLoad
 
 /**
  * A session is a card of two lines: its sport's icon and name, then distance ·
- * time · load. The right of the name is kept for a session that strayed from
- * its plan, so a chip there means something; one done as planned wears none.
+ * time · load. How much of its plan a session covered is told in its panel
+ * (`PlanCompletionBlock`), not here: a percentage on the card read every run
+ * as off plan.
  * A planned card is dashed, a missed one dashed in red and struck through, and
  * its first word says which, for whoever cannot see the edge.
  */
@@ -245,8 +223,6 @@ function SessionCard({
   const unavailable = selectionMode && !selectable;
   const canDrag = card.kind === "planned" && !busy && !selectionMode;
   const Icon = sportIcon(card.sport, card.category);
-  const offPlan =
-    card.completionPct !== undefined && (card.completionPct < 90 || card.completionPct > 115);
 
   const title = selectable
     ? t(selected ? "calendar.chip.deselect" : "calendar.chip.select", { name: card.name })
@@ -317,14 +293,6 @@ function SessionCard({
       <span className="calendar-chip-title">
         <Icon className="calendar-chip-icon" size={12} strokeWidth={2.2} aria-hidden="true" />
         <span className="calendar-chip-name">{card.name}</span>
-        {offPlan ? (
-          <span
-            className={`calendar-chip-badge ${completionTone(card.completionPct)}`}
-            title={t("calendar.chip.completion", { percent: card.completionPct ?? 0 })}
-          >
-            {Math.min(card.completionPct ?? 0, 999)}%
-          </span>
-        ) : null}
       </span>
       {card.meta ? <span className="calendar-chip-meta">{card.meta}</span> : null}
     </button>

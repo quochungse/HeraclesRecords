@@ -17,7 +17,9 @@ import {
 import { buildScheduledWorkoutView, type ScheduledStructureTotals } from "./scheduledStructure";
 import {
   activitySportFamily,
+  isStrengthStyleWorkout,
   scheduledSportFamily,
+  scheduledWorkoutSport,
   sportFamiliesCompatible
 } from "../training/workoutSport";
 
@@ -168,29 +170,47 @@ function expectedMeters(scheduled: TrainingHubScheduledWorkoutEntry): number | u
 }
 
 /**
- * How much of the plan the session covered, in percent. Load is the honest
- * measure and is asked first, both sides in one load (`comparableLoads`);
- * distance and then duration stand in when COROS prescribed one of those instead.
+ * How much of the plan the session covered, in percent, never past 100: a
+ * session that did more did all of it. COROS's own figure first
+ * (`corosCompleteRate`), where the activity is the one COROS recorded as the
+ * session done. Otherwise it is measured the way the plan is written: a
+ * strength session in Heracles Training Load when that is chosen and both
+ * sides carry it, any session by its distance where the plan states one, else
+ * its time. Load is not the measure for the rest: COROS's planned load ran a
+ * steady 1.6× under what the same runs scored (a real schedule: 1 of 28 runs
+ * within 90-115% by load, 27 by distance), which reads every run as off plan.
  */
-function completionPct(
+function completion(
   scheduled: TrainingHubScheduledWorkoutEntry,
   activity: TrainingHubActivity,
   targets: PlannedTargets,
   loadSource: StrengthLoadSource
-): number | undefined {
+): Pick<PlannedActualPair, "completionPct" | "completionBasis"> {
+  const pct = (done: number, planned: number) => Math.min(100, Math.round((done / planned) * 100));
+  if (scheduled.corosCompleteRate !== undefined && activity.activityId === scheduled.completedActivityId) {
+    return { completionPct: Math.min(100, Math.round(scheduled.corosCompleteRate * 100)), completionBasis: { kind: "coros" } };
+  }
   // A plan that is only a length has nothing to read the session against.
-  if (planIsOnlyALength(scheduled)) return undefined;
-  const { planned: plannedLoad, done } = comparableLoads(scheduled, activity, loadSource);
-  if (plannedLoad && plannedLoad > 0 && done !== undefined) {
-    return Math.round((done / plannedLoad) * 100);
+  if (planIsOnlyALength(scheduled)) return {};
+  if (isStrengthStyleWorkout(scheduledWorkoutSport(scheduled.sportType))) {
+    const { planned, done } = comparableLoads(scheduled, activity, loadSource);
+    if (loadSource === "heracles" && planned && planned > 0 && done !== undefined) {
+      return { completionPct: pct(done, planned), completionBasis: { kind: "load", done, planned } };
+    }
   }
   if (targets.distanceMeters && activity.distance !== undefined) {
-    return Math.round((activity.distance / targets.distanceMeters) * 100);
+    return {
+      completionPct: pct(activity.distance, targets.distanceMeters),
+      completionBasis: { kind: "distance", done: activity.distance, planned: targets.distanceMeters }
+    };
   }
   if (targets.plannedSeconds && activity.duration !== undefined) {
-    return Math.round((activity.duration / targets.plannedSeconds) * 100);
+    return {
+      completionPct: pct(activity.duration, targets.plannedSeconds),
+      completionBasis: { kind: "time", done: activity.duration, planned: targets.plannedSeconds }
+    };
   }
-  return undefined;
+  return {};
 }
 
 /** Lower is a closer fit; used only to choose between candidates on one day. */
@@ -298,7 +318,7 @@ export function pairPlannedWithActual(
       pairs.push({
         scheduled: entry,
         activity: chosen,
-        completionPct: chosen ? completionPct(entry, chosen, targets, loadSource) : undefined,
+        ...(chosen ? completion(entry, chosen, targets, loadSource) : {}),
         targets
       });
       continue;
@@ -322,7 +342,7 @@ export function pairPlannedWithActual(
       pairs.push({
         scheduled: entry,
         activity: best,
-        completionPct: completionPct(entry, best, targets, loadSource),
+        ...completion(entry, best, targets, loadSource),
         targets
       });
     } else {

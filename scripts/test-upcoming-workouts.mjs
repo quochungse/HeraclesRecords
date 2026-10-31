@@ -10,6 +10,7 @@ const fixture = {
       status: 1,
       // The activity that did it: COROS's link, and never the plan's figures.
       labelId: "478804000000000001",
+      completeRate: "0.95",
       sportData: { name: "Morning Run", trainingLoad: 222, distance: 1001000, labelId: "478804000000000001" }
     },
     {
@@ -119,6 +120,7 @@ assert.equal(workouts[4]?.volume, "7.50km");
 assert.equal(workouts[0]?.name, "Rolling 400s", "the plan's name, not the activity's");
 assert.equal(workouts[0]?.trainingLoad, 94, "the plan's load, not the 222 the activity scored");
 assert.equal(workouts[0]?.completedActivityId, "478804000000000001");
+assert.equal(workouts[0]?.corosCompleteRate, 0.95, "COROS's own completion, sent as a string");
 assert.equal("completedActivityId" in workouts[1], false, "a session not done carries no link");
 assert.equal(workouts[3]?.trainingLoad, undefined, "`essence` is no load, nor an `estimatedValue` of another type");
 assert.equal(workouts[4]?.trainingLoad, 81, "`estimatedValue` stands in when it is a load");

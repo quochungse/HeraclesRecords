@@ -16,6 +16,7 @@ import {
   type CalendarSelection
 } from "./calendarTypes";
 import { DayOverview } from "./DayOverview";
+import { PlanCompletionBlock } from "./PlanCompletion";
 import { PlanStatusBlock } from "./PlanStatusBlock";
 import { ScheduledWorkoutDetail } from "./ScheduledWorkoutDetail";
 import { scheduledWorkoutSport } from "../training/workoutSport";
@@ -89,6 +90,11 @@ export function DayDetailPanel({
           (pair) =>
             scheduledWorkoutKey(pair.scheduled) === scheduledWorkoutKey(selection.entry)
         )
+      : undefined;
+  /* And the plan a done session answered, for the activity on screen. */
+  const answeredPair =
+    selection?.kind === "activity"
+      ? selection.day.pairs.find((pair) => pair.activity?.activityId === selection.activity.activityId)
       : undefined;
 
   const selectionKey = selection
@@ -302,6 +308,8 @@ export function DayDetailPanel({
                     />
                   </>
                 ) : (
+                  <>
+                  {answeredPair ? <PlanCompletionBlock pair={answeredPair} /> : null}
                   <ActivityDetailPanel
                     embedded
                     api={api}
@@ -323,6 +331,7 @@ export function DayDetailPanel({
                         : null
                     }
                   />
+                  </>
                 )}
               </div>
             </motion.aside>

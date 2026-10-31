@@ -172,7 +172,7 @@ const activity = (overrides) => ({
     "metric"
   );
   assert.equal(pairs[0].activity.activityId, "run-on-plan");
-  assert.equal(pairs[0].completionPct, 96);
+  assert.equal(pairs[0].completionPct, undefined, "a run plan stating only a load is read by neither distance nor time");
   assert.deepEqual(unplanned.map((entry) => entry.activityId), ["run-short"]);
 }
 
@@ -269,9 +269,10 @@ const activity = (overrides) => ({
   const { pairs } = pairPlannedWithActual([withLoad], [ran], "metric");
   assert.equal(
     pairs[0].completionPct,
-    75,
-    "load is the honest measure and is asked first, even when the distance was met exactly"
+    100,
+    "the plan's own distance, not the load: COROS's planned load ran a steady 1.6x under what runs scored"
   );
+  assert.deepEqual(pairs[0].completionBasis, { kind: "distance", done: 10000, planned: 10000 });
 }
 
 {
@@ -421,17 +422,21 @@ const activity = (overrides) => ({
   // a link the athlete made still outranks it, and a link to an activity not
   // in the day falls back to the guess.
   const key = (entry) => JSON.stringify([entry.planId, entry.idInPlan]);
-  const plan = scheduled({ idInPlan: "lr", sportType: 1, trainingLoad: 144, completedActivityId: "long" });
+  const plan = scheduled({ idInPlan: "lr", sportType: 1, trainingLoad: 144, completedActivityId: "long", corosCompleteRate: 0.95 });
   const long = activity({ activityId: "long", sportType: 100, trainingLoad: 230 });
   const short = activity({ activityId: "short", sportType: 100, trainingLoad: 62 });
 
   const linked = pairPlannedWithActual([plan], [short, long], "metric");
   assert.equal(linked.pairs[0].activity.activityId, "long", "COROS's link, not the closer load");
-  assert.equal(linked.pairs[0].completionPct, 160);
+  assert.equal(linked.pairs[0].completionPct, 95, "COROS's own completion of the session it linked");
+  assert.deepEqual(linked.pairs[0].completionBasis, { kind: "coros" });
+  const over = pairPlannedWithActual([{ ...plan, corosCompleteRate: 1.2 }], [short, long], "metric");
+  assert.equal(over.pairs[0].completionPct, 100, "never past 100");
   assert.deepEqual(linked.unplanned.map((entry) => entry.activityId), ["short"]);
 
   const handLinked = pairPlannedWithActual([plan], [short, long], "metric", new Map([[key(plan), { kind: "activity", activityId: "short" }]]));
   assert.equal(handLinked.pairs[0].activity.activityId, "short", "the athlete's link outranks COROS's");
+  assert.equal(handLinked.pairs[0].completionBasis, undefined, "COROS's figure is for the activity it linked, not this one");
 
   const gone = pairPlannedWithActual([{ ...plan, completedActivityId: "elsewhere" }], [short, long], "metric");
   assert.equal(gone.pairs[0].activity.activityId, "short", "a link to nothing here leaves the guess");
@@ -465,7 +470,7 @@ const activity = (overrides) => ({
     rawProgram: { sportType: 4, estimatedTime: 1620, exercises: [step("1", 3, 12), step("2", 2, 360)] }
   });
   const coreDone = activity({ activityId: "core", sportType: 402, duration: 1860 });
-  assert.equal(pairPlannedWithActual([core], [coreDone], "metric").pairs[0].completionPct, 115, "not 517%");
+  assert.equal(pairPlannedWithActual([core], [coreDone], "metric").pairs[0].completionPct, 100, "31 of 27 minutes, not 517%, and never past 100");
 
   // Overview's row arrives without its program and states COROS's figures itself.
   assert.deepEqual(
@@ -489,10 +494,11 @@ const activity = (overrides) => ({
     exercises: [{ name: "Bench", sets: 3, reps: 8 }],
     rawProgram: { sportType: 4, estimatedTime: 1800, exercises: [lift("1", 3, 8)] }
   });
-  const loading = activity({ activityId: "lift", sportType: 402, trainingLoad: 20, duration: 2160, heraclesLoad: { value: 20, cardio: 20, muscular: 0, quality: "pending" } });
-  assert.equal(pairPlannedWithActual([plan], [loading], "metric", undefined, "heracles").pairs[0].completionPct, 120, "by time, not 33% by scale");
-  const read = { ...loading, heraclesLoad: { value: 66, muscular: 46, cardio: 20, quality: "sets" } };
-  assert.equal(pairPlannedWithActual([plan], [read], "metric", undefined, "heracles").pairs[0].completionPct, 110, "Heracles both sides once read");
+  const loading = activity({ activityId: "lift", sportType: 402, trainingLoad: 20, duration: 1620, heraclesLoad: { value: 20, cardio: 20, muscular: 0, quality: "pending" } });
+  assert.equal(pairPlannedWithActual([plan], [loading], "metric", undefined, "heracles").pairs[0].completionPct, 90, "by time, not 33% by scale");
+  const read = { ...loading, heraclesLoad: { value: 54, muscular: 34, cardio: 20, quality: "sets" } };
+  assert.equal(pairPlannedWithActual([plan], [read], "metric", undefined, "heracles").pairs[0].completionPct, 90, "Heracles both sides once read");
+  assert.equal(pairPlannedWithActual([plan], [read], "metric", undefined, "heracles").pairs[0].completionBasis.kind, "load");
 
   // A plan of open steps is only a length: no completion against it, in
   // either load, and its estimate says it came from that length.
@@ -596,7 +602,7 @@ const activity = (overrides) => ({
   assert.equal(coros.actualLoad, 105);
   assert.equal(coros.actualCorosLoad, 105, "with COROS chosen both sums are COROS's");
   assert.equal(coros.remainingLoad, 0, "COROS priced the strength plan at nothing");
-  assert.equal(week("coros")[0].pairs[0].completionPct, 125, "25 of a planned 20");
+  assert.equal(week("coros")[0].pairs[0].completionPct, undefined, "in COROS's load a strength plan is read by time, and this one states none");
 
   const chosen = computeWeeklyStats(week("heracles"), "heracles");
   assert.equal(chosen.actualLoad, 240, "the lift in Heracles's load, the run in COROS's");
@@ -604,12 +610,12 @@ const activity = (overrides) => ({
   assert.equal(chosen.plannedLoad, 290);
   assert.equal(chosen.remainingLoad, 140);
   assert.equal(chosen.remainingCorosLoad, 0);
-  assert.equal(week("heracles")[0].pairs[0].completionPct, 107, "160 of a planned 150, one scale on both sides");
+  assert.equal(week("heracles")[0].pairs[0].completionPct, 100, "160 of a planned 150, one scale on both sides, and never past 100");
 
   // A plan only COROS priced is never set against a figure of the other scale.
   const priced = scheduled({ idInPlan: "priced", sportType: 4, trainingLoad: 20 });
   const { pairs } = pairPlannedWithActual([priced], [lift], "metric", undefined, "heracles");
-  assert.equal(pairs[0].completionPct, 125, "COROS against COROS where the plan has no estimate");
+  assert.deepEqual(pairs[0].completionBasis, { kind: "load", done: 25, planned: 20 }, "COROS against COROS where the plan has no estimate");
 }
 
 console.log("calendar pairing tests passed");

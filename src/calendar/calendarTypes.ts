@@ -22,8 +22,12 @@ export interface PlannedTargets {
 export interface PlannedActualPair {
   scheduled: TrainingHubScheduledWorkoutEntry;
   activity?: TrainingHubActivity;
-  /** actual / planned, in percent (load first, then distance, then duration). */
+  /** How much of the plan was done, in percent, at most 100 (`completion` in `pairing.ts`). */
   completionPct?: number;
+  /** What that percentage was read from, for the line that states it. */
+  completionBasis?:
+    | { kind: "coros" }
+    | { kind: "load" | "distance" | "time"; done: number; planned: number };
   /**
    * Computed once while pairing and carried so a chip can label its volume
    * without walking the workout structure again for every day in a month.

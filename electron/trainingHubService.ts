@@ -4474,12 +4474,18 @@ function resolveUpcomingWorkoutName(
 }
 
 /**
- * The activity COROS recorded as this session done: the entity's `labelId`,
- * which is that activity's id. Absent on a session not done.
+ * The activity COROS recorded as this session done — the entity's `labelId`,
+ * which is that activity's id — and how much of the session COROS says it
+ * covered (`completeRate`, a string "0.95"; "-1.00" on a session not done).
+ * Absent on a session not done.
  */
-function completedActivityOf(entity: Record<string, unknown>): { completedActivityId?: string } {
+function completedActivityOf(
+  entity: Record<string, unknown>
+): { completedActivityId?: string; corosCompleteRate?: number } {
   const id = pickString(entity, ["labelId"]);
-  return id && id !== "0" ? { completedActivityId: id } : {};
+  if (!id || id === "0") return {};
+  const rate = Number(entity.completeRate);
+  return { completedActivityId: id, ...(Number.isFinite(rate) && rate >= 0 ? { corosCompleteRate: rate } : {}) };
 }
 
 /**
