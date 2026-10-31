@@ -85,9 +85,11 @@ export function scheduledEntries(startDay: string, endDay: string): TrainingHubS
       volume: `${s.km % 1 === 0 ? s.km.toFixed(0) : s.km.toFixed(1)} km`,
       trainingLoad: s.load,
       exercises: s.steps,
-      // COROS's own estimate of the session, which the Calendar's cards and
-      // its week column state; no `exercises` here, so the steps above stand.
-      rawProgram: { estimatedTime: s.minutes * 60 }
+      // COROS's own estimates of the whole session — its length and its
+      // distance, timed steps included (centimetres) — which the cards, the
+      // session panel and the week column state; no `exercises` here, so the
+      // steps above stand.
+      rawProgram: { estimatedTime: s.minutes * 60, distance: Math.round(s.km * 100000) }
     }));
 }
 
