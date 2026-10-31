@@ -307,10 +307,17 @@ function plannedEstimator(
   return (plan, atSec) => estimatePlannedLoad(plan, state, atSec !== undefined ? Math.min(atSec, now) : now);
 }
 
-/** Local midnight of a `YYYYMMDD` day, in epoch seconds; undefined for anything else. */
-function happenDayStartSec(happenDay: string | undefined): number | undefined {
+/**
+ * The last second of a `YYYYMMDD` day, local, in epoch seconds; undefined for
+ * anything else. The day's own sets count: read at its start, a movement first
+ * lifted that day had no capacity and its plan fell to the usual effort (a
+ * real session read 204% of its plan, 109% with that day's sets).
+ */
+function happenDayEndSec(happenDay: string | undefined): number | undefined {
   const match = /^(\d{4})(\d{2})(\d{2})$/.exec(happenDay ?? "");
-  return match ? Math.floor(new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3])).valueOf() / 1000) : undefined;
+  return match
+    ? Math.floor(new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]), 23, 59, 59).valueOf() / 1000)
+    : undefined;
 }
 
 /** COROS's workout sport for strength. */
@@ -369,7 +376,7 @@ export function withPlannedHeraclesLoads<
     const estimated = workout.durationSeconds ?? estimatedSecondsOf(workout.rawProgram);
     const heraclesLoad = estimate(
       plannedStrengthSession(workout.exercises, estimated, workout.trainingLoad),
-      happenDayStartSec(workout.happenDay)
+      happenDayEndSec(workout.happenDay)
     );
     return heraclesLoad ? { ...workout, heraclesLoad } : workout;
   });
