@@ -539,6 +539,51 @@ async function main() {
     );
   }
 
+  // -------------------------------------------------------------------------
+  // 9. A swim's cadence is its stroke rate
+  // -------------------------------------------------------------------------
+  // The pane named a pool swim's 24 strokes a minute "Avg cadence", under the
+  // chart's own "Stroke rate" chip. It states the figure the swim's page does:
+  // the parsed stroke rate first, COROS's cadence only without one.
+  {
+    const figures = async () =>
+      new Map(
+        await win.webContents.executeJavaScript(
+          `[...document.querySelectorAll(".activity-detail-group dl > div")].map((row) => [row.querySelector("dt").textContent, row.querySelector("dd").textContent])`,
+          true
+        )
+      );
+    const mountSession = async (activity, extra) => {
+      await harness("mount", "ActivityDetailPane", {
+        activity,
+        detail: { ...activity, laps: [], hrZones: [], ...extra }
+      });
+      await waitFor(() => harness("exists", ".activity-detail-groups"), `${activity.name}'s figures render`);
+      return figures();
+    };
+    const session = { startTime: 1_761_800_000, distance: 2000, duration: 2651 };
+
+    const swim = await mountSession(
+      { ...session, activityId: "swim-1", sportType: 300, name: "Aerobic 3 x 400" },
+      { dynamics: { avgCadence: 24 }, swim: { avgStrokeRate: 27 } }
+    );
+    assert.equal(swim.get("Stroke rate"), "27 spm", "a swim states its own stroke rate");
+    assert.equal(swim.has("Avg cadence"), false, "never a runner's cadence");
+
+    const unparsed = await mountSession(
+      { ...session, activityId: "swim-2", sportType: 301, name: "Open water" },
+      { dynamics: { avgCadence: 24 } }
+    );
+    assert.equal(unparsed.get("Stroke rate"), "24 spm", "COROS's cadence stands in when nothing was parsed");
+
+    const run = await mountSession(
+      { ...session, activityId: "run-1", sportType: 100, name: "Easy run", distance: 9000 },
+      { dynamics: { avgCadence: 170 } }
+    );
+    assert.equal(run.get("Avg cadence"), "170 spm", "a run keeps its cadence");
+    assert.equal(run.has("Stroke rate"), false);
+  }
+
   const errors = await harness("consoleErrors");
   assert.deepEqual(errors, [], `the page complained: ${errors.join("\n")}`);
 

@@ -422,14 +422,24 @@ export function ActivityDetailPane({
       : null
   );
   push = pushTo(movement);
+  // A swim's cadence is its stroke rate: the figure, name and unit the swim's
+  // own page gives, never a runner's "Avg cadence".
+  const strokeRate = swim ? (detail.swim?.avgStrokeRate ?? detail.dynamics?.avgCadence) : undefined;
   push(
-    detail.dynamics?.avgCadence
+    strokeRate
       ? {
           key: "cadence",
-          label: t("activity.m.avgCadence"),
-          value: `${Math.round(detail.dynamics.avgCadence)} ${cycling ? "rpm" : "spm"}`
+          label: t("swim.m.strokeRate"),
+          value: t("swim.rateValue", { value: Math.round(strokeRate) }),
+          title: t("swim.m.strokeRateTitle")
         }
-      : null
+      : !swim && detail.dynamics?.avgCadence
+        ? {
+            key: "cadence",
+            label: t("activity.m.avgCadence"),
+            value: `${Math.round(detail.dynamics.avgCadence)} ${cycling ? "rpm" : "spm"}`
+          }
+        : null
   );
   push(
     detail.dynamics?.avgPower

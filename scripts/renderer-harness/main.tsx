@@ -34,6 +34,7 @@ import { CyclingView } from "../../src/cycling/CyclingView";
 import { HikingView } from "../../src/hiking/HikingView";
 import { SwimmingView } from "../../src/swimming/SwimmingView";
 import { ActivitiesSummary } from "../../src/training/components/ActivitiesSummary";
+import { ActivityDetailPane } from "../../src/training/components/ActivityDetailPane";
 import { ActivityRouteMap } from "../../src/training/components/ActivityRouteMap";
 import { SleepDetailsView } from "../../src/sleep/SleepDetailsView";
 import { PromptDialog } from "../../src/training-library/PromptDialog";
@@ -744,6 +745,24 @@ const MOUNTS: Record<string, (options: Record<string, unknown>) => ReactElement>
         <ActivitiesSummary
           totals={options.totals as never}
           periodLabel={(options.periodLabel as string | undefined) ?? "3 months"}
+        />
+      </div>
+    );
+  },
+  // Activities' detail pane, handed a session and its detail outright.
+  ActivityDetailPane: (options) => {
+    loadActivitiesStyles();
+    return (
+      <div
+        className="activities-view"
+        style={{ width: `${(options.width as number | undefined) ?? 900}px` }}
+      >
+        <ActivityDetailPane
+          detail={options.detail as never}
+          listActivity={options.activity as never}
+          sportTypes={[]}
+          detailRequest={null}
+          onRetry={spy("onRetry")}
         />
       </div>
     );
