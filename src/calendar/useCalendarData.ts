@@ -180,13 +180,11 @@ export function useCalendarData({
             planId: match.schedulePlanId,
             idInPlan: match.scheduleIdInPlan
           });
-          if (match.status === "skipped") {
-            overrides.set(key, { kind: "skipped" });
-          } else if (match.activityId) {
-            overrides.set(key, { kind: "activity", activityId: match.activityId });
-          } else {
-            overrides.set(key, { kind: "none" });
-          }
+          // A session marked skipped by an older build pairs as "none" does.
+          overrides.set(
+            key,
+            match.activityId ? { kind: "activity", activityId: match.activityId } : { kind: "none" }
+          );
         }
         const next: CalendarRangeData = {
           rangeKey,

@@ -16783,11 +16783,6 @@ label.chat-settings-toggle-row {
   line-height: 1.45;
 }
 
-.calendar-plan-status-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
 
 /* --- scheduled workout detail (sport-aware) --- */
 

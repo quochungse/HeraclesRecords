@@ -566,20 +566,18 @@ const activity = (overrides) => ({
   assert.equal(linked.pairs[0].activity.activityId, "other", "the activity linked by hand, not the closer guess");
   assert.deepEqual(linked.unplanned.map((entry) => entry.activityId), ["on-plan"]);
 
-  for (const kind of ["skipped", "none"]) {
-    const { pairs, unplanned } = pairPlannedWithActual(
-      [easy],
-      [onPlan],
-      "metric",
-      new Map([[key(easy), { kind }]])
-    );
-    assert.equal(pairs[0].activity, undefined, `${kind}: nothing is paired to the session`);
-    assert.deepEqual(
-      unplanned.map((entry) => entry.activityId),
-      ["on-plan"],
-      `${kind}: what was done that day stays unplanned rather than being claimed`
-    );
-  }
+  const { pairs, unplanned } = pairPlannedWithActual(
+    [easy],
+    [onPlan],
+    "metric",
+    new Map([[key(easy), { kind: "none" }]])
+  );
+  assert.equal(pairs[0].activity, undefined, "none: nothing is paired to the session");
+  assert.deepEqual(
+    unplanned.map((entry) => entry.activityId),
+    ["on-plan"],
+    "none: what was done that day stays unplanned rather than being claimed"
+  );
 }
 
 /* --- 11. strength read in Heracles Training Load -------------------------- */

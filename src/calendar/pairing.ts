@@ -243,15 +243,12 @@ function matchScore(
  * What the athlete said, for a scheduled entry this greedy pass would
  * otherwise guess about. Keyed by `scheduledWorkoutKey`.
  *
- * `skipped` is not the absence of an activity — it is the statement that the
- * session was deliberately not done, so no activity may be paired to it and
- * whatever *was* done that day stays unplanned rather than being claimed.
- * `none` pairs the same way and says less: none of the day's activities was
- * this session.
+ * `none` is not the absence of a statement: none of the day's activities was
+ * this session, so no activity may be paired to it and whatever was done that
+ * day stays unplanned rather than being claimed.
  */
 export type PairingOverride =
   | { kind: "activity"; activityId: string }
-  | { kind: "skipped" }
   | { kind: "none" };
 
 /**
