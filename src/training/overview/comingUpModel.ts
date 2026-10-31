@@ -38,11 +38,12 @@ function fitScore(
 }
 
 /**
- * Today's plan read against today's sessions, greedily and by sport family as
- * the Calendar pairs a day: each plan in the calendar's order takes the
- * compatible session closest to it (`fitScore`), the earlier on a tie, and a
- * session nothing planned stands on its own. The Calendar's hand-made links
- * and skips are not read here.
+ * Today's plan read against today's sessions as the Calendar pairs a day: a
+ * plan COROS recorded as done takes that activity (`completedActivityId`),
+ * then each other plan in the calendar's order takes the compatible session
+ * closest to it (`fitScore`), the earlier on a tie, and a session nothing
+ * planned stands on its own. The Calendar's hand-made links and skips are not
+ * read here.
  */
 export function pairTodayPlan(
   planned: readonly TrainingHubUpcomingWorkout[],
@@ -57,18 +58,31 @@ export function pairTodayPlan(
   const pairs: Array<{ workout: TrainingHubUpcomingWorkout; activity: TrainingHubActivity }> = [];
   const open: TrainingHubUpcomingWorkout[] = [];
   const sessions = [...done].sort((left, right) => (left.startTime ?? 0) - (right.startTime ?? 0));
+  // COROS's own record of which activity did a plan is taken first, so no
+  // guess for another plan can claim it.
+  const linked = new Map<TrainingHubUpcomingWorkout, TrainingHubActivity>();
   for (const workout of planned) {
-    const family = scheduledSportFamily(workout.sportType);
-    let activity: TrainingHubActivity | undefined;
-    let best = Number.POSITIVE_INFINITY;
-    for (const candidate of sessions) {
-      if (used.has(candidate.activityId) || !sportFamiliesCompatible(family, activitySportFamily(candidate.sportType))) {
-        continue;
-      }
-      const score = fitScore(workout, candidate, loadSource);
-      if (score < best) {
-        activity = candidate;
-        best = score;
+    const activity = sessions.find(
+      (candidate) => candidate.activityId === workout.completedActivityId && !used.has(candidate.activityId)
+    );
+    if (!activity) continue;
+    linked.set(workout, activity);
+    used.add(activity.activityId);
+  }
+  for (const workout of planned) {
+    let activity = linked.get(workout);
+    if (!activity) {
+      const family = scheduledSportFamily(workout.sportType);
+      let best = Number.POSITIVE_INFINITY;
+      for (const candidate of sessions) {
+        if (used.has(candidate.activityId) || !sportFamiliesCompatible(family, activitySportFamily(candidate.sportType))) {
+          continue;
+        }
+        const score = fitScore(workout, candidate, loadSource);
+        if (score < best) {
+          activity = candidate;
+          best = score;
+        }
       }
     }
     if (activity) {

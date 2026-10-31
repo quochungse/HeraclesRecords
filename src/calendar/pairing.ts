@@ -224,7 +224,8 @@ export type PairingOverride =
  * Overrides are applied *before* the greedy pass, not after, and in their own
  * loop: a hand-linked activity has to be taken out of the pool before any
  * scoring happens, or the entry standing next to it can be given the activity
- * the athlete already assigned and the override quietly loses.
+ * the athlete already assigned and the override quietly loses. COROS's link
+ * (`completedActivityId`) is taken next, the same way.
  */
 export function pairPlannedWithActual(
   scheduled: TrainingHubScheduledWorkoutEntry[],
@@ -255,6 +256,20 @@ export function pairPlannedWithActual(
       decided.set(scheduledWorkoutKey(entry), remaining[index]!);
       remaining.splice(index, 1);
     }
+  }
+
+  // Then COROS's own record of which activity did a session: it is the
+  // answer wherever the athlete has not given one, and the greedy pass only
+  // guesses for what COROS has not linked.
+  for (const entry of scheduled) {
+    const key = scheduledWorkoutKey(entry);
+    if (decided.has(key) || !entry.completedActivityId) continue;
+    const index = remaining.findIndex(
+      (activity) => activity.activityId === entry.completedActivityId
+    );
+    if (index < 0) continue;
+    decided.set(key, remaining[index]!);
+    remaining.splice(index, 1);
   }
 
   for (const entry of scheduled) {

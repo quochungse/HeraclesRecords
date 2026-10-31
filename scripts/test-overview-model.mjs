@@ -173,6 +173,18 @@ assert.deepEqual(
   ],
   "each plan takes the session closest to it in load, not the first it meets"
 );
+// A plan COROS recorded as done takes that activity, whatever is closer.
+assert.deepEqual(
+  pairTodayPlan([{ ...easy, completedActivityId: "long-run" }, long], [{ ...longRun, activityId: "short", trainingLoad: 45 }, longRun]).pairs.map((pair) => [
+    pair.workout.name,
+    pair.activity.activityId
+  ]),
+  [
+    ["Easy 5 km", "long-run"],
+    ["Long 20 km", "short"]
+  ],
+  "COROS's link first; the guess takes what is left"
+);
 // Today in the week ahead is only what is still to do.
 const saturday = new Date(2026, 9, 24, 15, 0);
 const ahead = weekAhead(

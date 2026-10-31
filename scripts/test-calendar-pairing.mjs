@@ -413,6 +413,30 @@ const activity = (overrides) => ({
   assert.equal(untimed.plannedSeconds, undefined, "a total over some of the plan would read as all of it");
 }
 
+/* --- 9b2. COROS's own link -------------------------------------------------- */
+
+{
+  // COROS records which activity did a session (`completedActivityId`). That
+  // activity is the pair, though another run sits closer to the plan's load;
+  // a link the athlete made still outranks it, and a link to an activity not
+  // in the day falls back to the guess.
+  const key = (entry) => JSON.stringify([entry.planId, entry.idInPlan]);
+  const plan = scheduled({ idInPlan: "lr", sportType: 1, trainingLoad: 144, completedActivityId: "long" });
+  const long = activity({ activityId: "long", sportType: 100, trainingLoad: 230 });
+  const short = activity({ activityId: "short", sportType: 100, trainingLoad: 62 });
+
+  const linked = pairPlannedWithActual([plan], [short, long], "metric");
+  assert.equal(linked.pairs[0].activity.activityId, "long", "COROS's link, not the closer load");
+  assert.equal(linked.pairs[0].completionPct, 160);
+  assert.deepEqual(linked.unplanned.map((entry) => entry.activityId), ["short"]);
+
+  const handLinked = pairPlannedWithActual([plan], [short, long], "metric", new Map([[key(plan), { kind: "activity", activityId: "short" }]]));
+  assert.equal(handLinked.pairs[0].activity.activityId, "short", "the athlete's link outranks COROS's");
+
+  const gone = pairPlannedWithActual([{ ...plan, completedActivityId: "elsewhere" }], [short, long], "metric");
+  assert.equal(gone.pairs[0].activity.activityId, "short", "a link to nothing here leaves the guess");
+}
+
 /* --- 9c. the time a card and the session panel state ---------------------- */
 
 {

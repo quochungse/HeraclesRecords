@@ -1023,6 +1023,8 @@ export interface TrainingHubUpcomingWorkout {
   sortNo?: number;
   /** The session's description (the program's `overview`), absent when it has none. */
   description?: string;
+  /** The activity COROS recorded as this session done (the entity's `labelId`). */
+  completedActivityId?: string;
   exercises?: TrainingHubScheduledExercise[];
   /** Heracles Training Load's estimate, on a strength session only. */
   heraclesLoad?: HeraclesLoad;
@@ -3841,6 +3843,8 @@ export interface TrainingHubScheduledWorkoutEntry {
   trainingLoad?: number;
   /** The session's description (the program's `overview`), absent when it has none. */
   description?: string;
+  /** The activity COROS recorded as this session done (the entity's `labelId`). */
+  completedActivityId?: string;
   exercises?: TrainingHubScheduledExercise[];
   /** Raw program payload from schedule/query — required to re-add the workout when rescheduling. */
   rawProgram?: Record<string, unknown>;

@@ -66,6 +66,7 @@ export function scheduledEntryFromUpcoming(
     volume: workout.volume,
     trainingLoad: workout.trainingLoad,
     ...(workout.description ? { description: workout.description } : {}),
+    ...(workout.completedActivityId ? { completedActivityId: workout.completedActivityId } : {}),
     exercises: workout.exercises
   };
 }

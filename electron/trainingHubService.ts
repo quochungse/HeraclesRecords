@@ -3016,8 +3016,8 @@ export async function listLibraryWorkouts(): Promise<TrainingHubLibraryWorkout[]
       id: String(program.id),
       name: pickString(program, ["name"]) ?? "Workout",
       sportType: toOptionalNumber(program.sportType),
-      volume: formatUpcomingWorkoutVolume(program, {}),
-      trainingLoad: resolveUpcomingWorkoutLoad(program, {}),
+      volume: formatUpcomingWorkoutVolume(program),
+      trainingLoad: resolveUpcomingWorkoutLoad(program),
       durationSeconds: previewFromProgram(program).durationSeconds,
       exerciseCount: toProgramFigure(program.exerciseNum),
       setCount: toProgramFigure(program.totalSets) ?? toProgramFigure(program.sets),
@@ -3069,8 +3069,8 @@ export async function duplicateLibraryWorkout(
     id: created.programId,
     name: String(created.program.name ?? duplicate.name),
     sportType: toOptionalNumber(created.program.sportType),
-    volume: formatUpcomingWorkoutVolume(created.program, {}),
-    trainingLoad: resolveUpcomingWorkoutLoad(created.program, {}),
+    volume: formatUpcomingWorkoutVolume(created.program),
+    trainingLoad: resolveUpcomingWorkoutLoad(created.program),
     durationSeconds: previewFromProgram(created.program).durationSeconds,
     exerciseCount: toProgramFigure(created.program.exerciseNum),
     setCount:
@@ -3749,9 +3749,10 @@ export function parseScheduledWorkoutEntries(
           : planProgramId || undefined,
       sportType: toOptionalNumber(program?.sportType ?? entity.sportType),
       sortNo: toOptionalNumber(entity.sortNoInSchedule ?? entity.sortNo),
-      volume: formatUpcomingWorkoutVolume(program, entity),
-      trainingLoad: resolveUpcomingWorkoutLoad(program, entity),
+      volume: formatUpcomingWorkoutVolume(program),
+      trainingLoad: resolveUpcomingWorkoutLoad(program),
       ...scheduledWorkoutDescription(program),
+      ...completedActivityOf(entity),
       exercises: parseScheduledExercises(program),
       rawProgram: program
     });
@@ -4362,15 +4363,16 @@ export function parseUpcomingWorkouts(
     workouts.push({
       happenDay,
       name: resolveUpcomingWorkoutName(program, entity),
-      volume: formatUpcomingWorkoutVolume(program, entity),
-      trainingLoad: resolveUpcomingWorkoutLoad(program, entity),
+      volume: formatUpcomingWorkoutVolume(program),
+      trainingLoad: resolveUpcomingWorkoutLoad(program),
       durationSeconds: program
         ? (toProgramFigure(program.estimatedTime) ?? toProgramFigure(program.duration))
         : undefined,
-      distanceMeters: resolveUpcomingWorkoutDistanceMeters(program, entity),
+      distanceMeters: resolveUpcomingWorkoutDistanceMeters(program),
       sportType: toOptionalNumber(program?.sportType),
       sortNo: toOptionalNumber(entity.sortNoInSchedule ?? entity.sortNo),
       ...scheduledWorkoutDescription(program),
+      ...completedActivityOf(entity),
       exercises: parseScheduledExercises(program)
     });
   });
@@ -4449,6 +4451,14 @@ function resolveScheduledProgram(
   );
 }
 
+/*
+ * A session's planned figures are read off its program, never off the entity's
+ * `sportData`: that is the activity COROS recorded as the session done (probed
+ * 2026-10-31, 44 of 44 done sessions: its load, start and `labelId` are the
+ * activity's). Read first, it gave a done session the activity's load as its
+ * plan, so every one paired at 100%. Its name stands in only where the program
+ * has none.
+ */
 function resolveUpcomingWorkoutName(
   program: Record<string, unknown> | undefined,
   entity: Record<string, unknown>
@@ -4456,11 +4466,20 @@ function resolveUpcomingWorkoutName(
   const sportData = pickObject(entity, ["sportData"]);
 
   return (
-    (sportData ? pickString(sportData, ["name"]) : undefined) ??
     (program ? pickString(program, ["name"]) : undefined) ??
     pickString(entity, ["name"]) ??
+    (sportData ? pickString(sportData, ["name"]) : undefined) ??
     "Scheduled workout"
   );
+}
+
+/**
+ * The activity COROS recorded as this session done: the entity's `labelId`,
+ * which is that activity's id. Absent on a session not done.
+ */
+function completedActivityOf(entity: Record<string, unknown>): { completedActivityId?: string } {
+  const id = pickString(entity, ["labelId"]);
+  return id && id !== "0" ? { completedActivityId: id } : {};
 }
 
 /**
@@ -4477,20 +4496,22 @@ function scheduledWorkoutDescription(
   return description ? { description } : {};
 }
 
-function resolveUpcomingWorkoutLoad(
-  program: Record<string, unknown> | undefined,
-  entity: Record<string, unknown>
-): number | undefined {
-  const sportData = pickObject(entity, ["sportData"]);
+/** COROS's `estimatedType` when `estimatedValue` is a training load. */
+const ESTIMATED_TYPE_LOAD = 6;
 
+function resolveUpcomingWorkoutLoad(
+  program: Record<string, unknown> | undefined
+): number | undefined {
+  if (!program) return undefined;
   // `toProgramFigure`, not `toOptionalNumber`: a `trainingLoad` of 0 is COROS
-  // saying it has not computed one, and reading it as a figure stopped this
-  // chain before it reached either fallback. See that function's header.
+  // saying it has not computed one (every strength program), and reading it
+  // as a figure stopped this chain before its fallback. `estimatedValue` is
+  // the same figure when `estimatedType` says it is a load (60 of 60 probed).
   return (
-    (sportData ? toProgramFigure(sportData.trainingLoad) : undefined) ??
-    (program ? toProgramFigure(program.trainingLoad) : undefined) ??
-    (program ? toProgramFigure(program.essence) : undefined) ??
-    (program ? toProgramFigure(program.estimatedValue) : undefined)
+    toProgramFigure(program.trainingLoad) ??
+    (toOptionalNumber(program.estimatedType) === ESTIMATED_TYPE_LOAD
+      ? toProgramFigure(program.estimatedValue)
+      : undefined)
   );
 }
 
@@ -4505,30 +4526,22 @@ function corosWorkoutDistanceToMeters(value?: number): number {
 
 /** The distance a scheduled session states, as the volume reads it; undefined for none. */
 function resolveUpcomingWorkoutDistanceMeters(
-  program: Record<string, unknown> | undefined,
-  entity: Record<string, unknown>
+  program: Record<string, unknown> | undefined
 ): number | undefined {
-  const sportData = pickObject(entity, ["sportData"]);
-  const meters =
-    corosWorkoutDistanceToMeters(toOptionalNumber(sportData?.distance)) ||
-    resolveWorkoutDistanceMeters(program);
+  const meters = resolveWorkoutDistanceMeters(program);
   return meters > 0 ? meters : undefined;
 }
 
 function formatUpcomingWorkoutVolume(
-  program: Record<string, unknown> | undefined,
-  entity: Record<string, unknown>
+  program: Record<string, unknown> | undefined
 ): string | undefined {
-  const sportData = pickObject(entity, ["sportData"]);
   const setCount = resolveWorkoutSetCount(program);
 
   if (setCount > 1) {
     return `${setCount} set(s)`;
   }
 
-  const distanceMeters =
-    corosWorkoutDistanceToMeters(toOptionalNumber(sportData?.distance)) ||
-    resolveWorkoutDistanceMeters(program);
+  const distanceMeters = resolveWorkoutDistanceMeters(program);
 
   if (distanceMeters > 0) {
     return `${(distanceMeters / 1000).toFixed(2)}km`;

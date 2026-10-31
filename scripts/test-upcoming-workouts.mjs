@@ -7,7 +7,10 @@ const fixture = {
       happenDay: 20260627,
       planProgramId: "101",
       sortNo: 1,
-      status: 1
+      status: 1,
+      // The activity that did it: COROS's link, and never the plan's figures.
+      labelId: "478804000000000001",
+      sportData: { name: "Morning Run", trainingLoad: 222, distance: 1001000, labelId: "478804000000000001" }
     },
     {
       happenDay: 20260628,
@@ -65,6 +68,9 @@ const fixture = {
       id: "p104",
       idInPlan: 104,
       name: "7km Easy Run",
+      essence: 55,
+      estimatedType: 2,
+      estimatedValue: 3000,
       exerciseNum: 1,
       distance: 700000
     },
@@ -72,6 +78,9 @@ const fixture = {
       id: "p105",
       idInPlan: 105,
       name: "7.5km Long Run",
+      trainingLoad: 0,
+      estimatedType: 6,
+      estimatedValue: 81,
       exerciseNum: 1,
       distance: 750000
     }
@@ -102,6 +111,14 @@ assert.equal(workouts[2]?.volume, "15 set(s)");
 assert.equal(workouts[3]?.volume, "7.00km");
 assert.equal(workouts[3]?.trainingLoad, undefined);
 assert.equal(workouts[4]?.volume, "7.50km");
+
+// A done session's planned figures are its program's, not its activity's.
+assert.equal(workouts[0]?.name, "Rolling 400s", "the plan's name, not the activity's");
+assert.equal(workouts[0]?.trainingLoad, 94, "the plan's load, not the 222 the activity scored");
+assert.equal(workouts[0]?.completedActivityId, "478804000000000001");
+assert.equal("completedActivityId" in workouts[1], false, "a session not done carries no link");
+assert.equal(workouts[3]?.trainingLoad, undefined, "`essence` is no load, nor an `estimatedValue` of another type");
+assert.equal(workouts[4]?.trainingLoad, 81, "`estimatedValue` stands in when it is a load");
 
 // The program's `overview` is the session's description: trimmed, and no key
 // at all for a session with none (blank counts as none).
