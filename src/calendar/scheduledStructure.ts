@@ -82,6 +82,8 @@ export interface ScheduledStructureTotals {
   durationSeconds?: number;
   /** Leaf steps (repeat children counted once each). */
   stepCount: number;
+  /** Of those, the steps written in time — `durationSeconds` is the whole session only when this is all of them. */
+  timedSteps: number;
   repeatGroups: number;
 }
 
@@ -533,6 +535,7 @@ function computeTotals(nodes: ScheduledNodeView[]): ScheduledStructureTotals {
   let distanceMeters = 0;
   let durationSeconds = 0;
   let stepCount = 0;
+  let timedSteps = 0;
   let repeatGroups = 0;
 
   const accumulate = (step: ScheduledStepView, factor: number) => {
@@ -541,6 +544,7 @@ function computeTotals(nodes: ScheduledNodeView[]): ScheduledStructureTotals {
       distanceMeters += step.magnitude * factor;
     } else if (step.magnitudeType === "time" && step.magnitude) {
       durationSeconds += step.magnitude * factor;
+      timedSteps += 1;
     }
   };
 
@@ -559,6 +563,7 @@ function computeTotals(nodes: ScheduledNodeView[]): ScheduledStructureTotals {
     distanceMeters: distanceMeters > 0 ? distanceMeters : undefined,
     durationSeconds: durationSeconds > 0 ? durationSeconds : undefined,
     stepCount,
+    timedSteps,
     repeatGroups
   };
 }

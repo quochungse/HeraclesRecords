@@ -36,7 +36,7 @@ const load = async (...segments) => {
   return import(`${url.href}?cacheBust=${Date.now()}`);
 };
 
-const { pairPlannedWithActual, computeWeeklyStats } = await load(
+const { pairPlannedWithActual, computeWeeklyStats, plannedSessionSeconds } = await load(
   "src",
   "calendar",
   "pairing.ts"
@@ -394,6 +394,7 @@ const activity = (overrides) => ({
 
   const { pairs } = pairPlannedWithActual([gym], [], "metric");
   assert.equal(pairs[0].targets.expectedSeconds, 2616, "a strength session has COROS's own time, where its steps have none");
+  assert.equal(pairs[0].targets.plannedSeconds, 2616);
 
   const stats = computeWeeklyStats([
     day("20261005", true, [easy], [activity({ sportType: 100, trainingLoad: 58, duration: 3300 }), activity({ activityId: "extra", sportType: 400, trainingLoad: 30, duration: 2400 })]),
@@ -410,6 +411,30 @@ const activity = (overrides) => ({
 
   const untimed = computeWeeklyStats([day("20261005", true, [easy, scheduled({ idInPlan: "x", sportType: 4 })], [])]);
   assert.equal(untimed.plannedSeconds, undefined, "a total over some of the plan would read as all of it");
+}
+
+/* --- 9c. the time a card and the session panel state ---------------------- */
+
+{
+  // A run in kilometres with one timed float: its steps sum to the float, and
+  // that sum is no figure for the session. COROS's estimate is; without one,
+  // only a session timed in every step adds up to its own length.
+  const step = (id, targetType, targetValue) => ({ id, exerciseType: 2, targetType, targetValue, sets: 1, sortNo: Number(id) });
+  const mixed = (rawExtra = {}) => scheduled({
+    sportType: 1,
+    rawProgram: { sportType: 1, ...rawExtra, exercises: [step("1", 5, 500000), step("2", 2, 180), step("3", 5, 500000)] }
+  });
+  const target = (entry) => pairPlannedWithActual([entry], [], "metric").pairs[0].targets;
+
+  assert.equal(target(mixed()).durationSeconds, 180, "the timed steps alone, as completion reads them");
+  assert.equal(target(mixed()).plannedSeconds, undefined, "a float is not the session's length");
+  assert.equal(target(mixed({ estimatedTime: 4320 })).plannedSeconds, 4320, "COROS's estimate first");
+  assert.equal(target(scheduled({ sportType: 1, ...timedProgram(2700) })).plannedSeconds, 2700, "every step timed adds up to the session");
+  assert.equal(
+    plannedSessionSeconds(undefined, { durationSeconds: undefined, stepCount: 0, timedSteps: 0 }),
+    undefined,
+    "no steps, no time"
+  );
 }
 
 /* --- 10. the plan's own volume, not COROS's set count -------------------- */

@@ -27,8 +27,9 @@ read-only: `WorkoutViewModal` and `WorkoutReadOnlyBody` (Library reader, plan re
 - **A day opens as a whole**: a press anywhere in a cell opens the day panel (`daySelection`,
   the number's button stretched over the cell), an empty day included; a card opens its own
   session (`DayOverview`). A card is two lines (sport icon and name; distance · time · load, or
-  "Plan"/"Missed"), three per month cell before "+N more". A planned card's time is COROS's
-  `estimatedTime` (`PlannedTargets.expectedSeconds`).
+  "Plan"/"Missed"), three per month cell before "+N more". A planned card's time and its session
+  panel's are one figure, `plannedSessionSeconds`: COROS's `estimatedTime`, else the steps' sum
+  only when every step is timed (a sum over some steps read as the whole session's).
 - The week column states its load as a figure and a bar (done solid, planned hatched),
   COROS's target in words, and planned sessions/time apart from totals. Load Impact and Base
   Fitness are COROS's `ati`/`cti` (`computeWeeklyStats`, `test:calendar-pairing`). The figure

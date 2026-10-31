@@ -14,7 +14,7 @@ import {
   type PlannedTargets,
   type WeeklyStats
 } from "./calendarTypes";
-import { buildScheduledWorkoutView } from "./scheduledStructure";
+import { buildScheduledWorkoutView, type ScheduledStructureTotals } from "./scheduledStructure";
 import {
   activitySportFamily,
   scheduledSportFamily,
@@ -110,19 +110,38 @@ function plannedTargets(
 ): PlannedTargets {
   const { totals } = buildScheduledWorkoutView(scheduled, unitSystem);
   const volumeKm = parseUpcomingWorkoutDistanceKm(scheduled.volume);
+  const expected = expectedSeconds(scheduled);
   return {
     distanceMeters:
       totals.distanceMeters ?? (volumeKm ? volumeKm * 1000 : undefined),
     durationSeconds: totals.durationSeconds,
-    expectedSeconds: expectedSeconds(scheduled)
+    expectedSeconds: expected,
+    plannedSeconds: plannedSessionSeconds(expected, totals)
   };
+}
+
+/**
+ * How long a planned session takes, said the same way on its Calendar card
+ * and in its session panel: COROS's own estimate, else the sum of the steps
+ * when every one of them is timed. A step in metres, in reps or left to the
+ * lap button has no time of its own, so a sum over some of the steps read as
+ * the whole session's: a 14 km run with a timed float was "3:00".
+ */
+export function plannedSessionSeconds(
+  expected: number | undefined,
+  totals: Pick<ScheduledStructureTotals, "durationSeconds" | "stepCount" | "timedSteps">
+): number | undefined {
+  if (expected) return expected;
+  return totals.stepCount > 0 && totals.timedSteps === totals.stepCount
+    ? totals.durationSeconds
+    : undefined;
 }
 
 /**
  * COROS's own estimate of the session's length, off the raw program. On a
  * COROS program a `0` is a field nobody filled in, so it is no estimate.
  */
-function expectedSeconds(scheduled: TrainingHubScheduledWorkoutEntry): number | undefined {
+export function expectedSeconds(scheduled: TrainingHubScheduledWorkoutEntry): number | undefined {
   const raw = scheduled.rawProgram;
   for (const value of [raw?.estimatedTime, raw?.duration]) {
     const seconds = Number(value);

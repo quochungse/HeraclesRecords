@@ -122,8 +122,7 @@ function activityAmounts(activity: TrainingHubActivity, unitSystem: UnitSystem, 
  * built as warm-up, main and cool-down reads "3 set(s)".
  */
 function plannedAmounts(pair: PlannedActualPair, unitSystem: UnitSystem, swim: boolean): string[] {
-  const { distanceMeters, durationSeconds, expectedSeconds } = pair.targets;
-  const seconds = expectedSeconds ?? (distanceMeters ? undefined : durationSeconds);
+  const { distanceMeters, plannedSeconds: seconds } = pair.targets;
   const parts = [
     cardDistance(distanceMeters, unitSystem, swim),
     seconds ? formatDurationSpan(seconds) : undefined

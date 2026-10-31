@@ -15,6 +15,8 @@ export interface PlannedTargets {
    * built in kilometres with timed strides summed to 450 s.
    */
   expectedSeconds?: number;
+  /** The time a card and the session panel state (`plannedSessionSeconds`). */
+  plannedSeconds?: number;
 }
 
 /** A scheduled workout matched (or not) to the completed activity on the same day. */

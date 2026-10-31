@@ -21,7 +21,7 @@ import {
   workoutSportFromType
 } from "../../electron/workoutCapabilities";
 import {
-  formatDurationSeconds,
+  formatDurationSpan,
   formatUpcomingWorkoutLoad,
   formatUpcomingWorkoutVolumeDisplay,
   inferUpcomingWorkoutCategory
@@ -38,6 +38,7 @@ import {
   formatStepDistanceLabel
 } from "./scheduledStructure";
 import { WorkoutStructure } from "./WorkoutStructureView";
+import { expectedSeconds, plannedSessionSeconds } from "./pairing";
 import { plural, t } from "../i18n/core";
 
 interface ScheduledWorkoutDetailProps {
@@ -53,6 +54,11 @@ interface ScheduledWorkoutDetailProps {
    * draws exactly as it did before; the clips go with it.
    */
   api?: HeraclesRecordsApi;
+  /**
+   * COROS's estimate of the session's length, for an entry with no raw
+   * program to read it from: Overview's row, drawn before its day is read.
+   */
+  estimatedSeconds?: number;
 }
 
 function formatDetailVolume(volume: string | undefined, unitSystem: UnitSystem): string {
@@ -70,7 +76,8 @@ function formatDetailLoad(load?: number): string {
 export function ScheduledWorkoutDetail({
   entry,
   sportTypes,
-  api
+  api,
+  estimatedSeconds
 }: ScheduledWorkoutDetailProps) {
   const { unitSystem } = useUnitSystem();
   const { source } = useLoadSource();
@@ -120,11 +127,17 @@ export function ScheduledWorkoutDetail({
       value: formatDetailLoad(plannedLoad(entry, source))
     }
   ];
-  if (view.totals.durationSeconds) {
+  // The card's figure in the card's words, not the timed steps' sum: a 14 km
+  // run with one timed float said "3:00" here while its card said 1h 12m.
+  const plannedSeconds = plannedSessionSeconds(
+    expectedSeconds(entry) ?? estimatedSeconds,
+    view.totals
+  );
+  if (plannedSeconds) {
     stats.push({
       icon: Clock,
       label: t("workout.detail.estDuration"),
-      value: formatDurationSeconds(view.totals.durationSeconds)
+      value: formatDurationSpan(plannedSeconds)
     });
   }
   const structureSummary = view.totals.stepCount > 0
