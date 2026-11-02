@@ -225,8 +225,10 @@ function MuscleRecovery({ recovery }: { recovery: Recovery | undefined }) {
   );
 }
 
+type StatCellId = HeatMetric | "time" | "repRange" | "perSession";
+
 interface StatCell {
-  id: string;
+  id: StatCellId;
   label: string;
   value: string;
   unit?: string;
@@ -258,7 +260,7 @@ function statCells(
   stat: MuscleStat,
   weeks: number,
   unitSystem: UnitSystem
-): Record<string, StatCell> {
+): Record<StatCellId, StatCell> {
   const setsPerWeek = weeks > 0 ? stat.sets / weeks : 0;
   const repsPerSet = stat.sets > 0 ? Math.round(stat.reps / stat.sets) : 0;
 
@@ -282,6 +284,15 @@ function statCells(
       caveat:
         stat.bodyweightSets >= 0.5
           ? t("strength.cell.excludes", { value: formatSets(stat.bodyweightSets) })
+          : undefined
+    },
+    load: {
+      id: "load",
+      label: t("strength.metric.load"),
+      value: formatMetric(stat.loadTl, "load", unitSystem).value,
+      note:
+        stat.loadTl > 0 && stat.sessions > 0
+          ? t("strength.cell.perSession", { value: formatMetric(stat.loadTl / stat.sessions, "load", unitSystem).value })
           : undefined
     },
     time: {
@@ -311,7 +322,7 @@ function statCells(
   };
 }
 
-const SECONDARY_BY_METRIC: Record<HeatMetric, string[]> = {
+const SECONDARY_BY_METRIC: Record<HeatMetric, StatCellId[]> = {
   sets: ["repRange", "perSession"],
   volume: ["sets", "repRange", "perSession"],
   load: ["sets", "repRange", "perSession"]

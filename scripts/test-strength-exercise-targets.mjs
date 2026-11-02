@@ -117,7 +117,13 @@ const missingIndex = structuredClone(raw);
 missingIndex.lapList[0].lapItemList.at(-1).programExerciseIndex = 999;
 assert.equal(parseStrengthDetail(missingIndex, { program, catalog }).exercises[0].externalId, undefined);
 
-const session = { activityId: "split", sportType: 402, startTime: Math.floor(Date.now() / 1000), detail };
+const session = {
+  activityId: "split", sportType: 402, startTime: Math.floor(Date.now() / 1000), detail,
+  heracles: {
+    value: 50, cardio: 10, muscular: 40, quality: "sets",
+    sets: [exercise.entries.map(() => ({ load: 10, rpe: 8, seconds: 40 }))]
+  }
+};
 const analytics = buildStrengthAnalytics([session], 28);
 assert.equal(analytics.attributedSets, 4);
 assert.equal(analytics.unmappedSets, 0);
@@ -126,11 +132,13 @@ assert.equal(analytics.muscleById.chest.sets, 0, "muscleList is not per-exercise
 assert.ok(Math.abs(analytics.muscles.reduce((n, muscle) => n + muscle.sets, 0) - 4) < 1e-9);
 const entry = buildStrengthSessionIndex([session]).byId.get("split");
 assert.equal(entry.coverage.attributed, 4);
-for (const metric of ["sets", "volume", "time"]) {
+for (const metric of ["sets", "volume", "load"]) {
   const heat = sessionHeat(entry, metric);
   for (const muscle of ["quads", "glutes"]) {
     assert.ok(heatLevel(metricValue(heat.muscleById[muscle], metric), heat.max) > 0);
     assert.ok(metricValue(analytics.muscleById[muscle], metric) > 0);
   }
 }
+assert.equal(analytics.muscles.reduce((sum, muscle) => sum + muscle.loadTl, 0), 40);
+assert.ok(analytics.muscleById.quads.workSec > 0 && analytics.muscleById.glutes.workSec > 0);
 console.log("strength exercise identity and metadata tests passed");

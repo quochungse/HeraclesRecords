@@ -33,6 +33,11 @@ import { RunningView } from "../../src/running/RunningView";
 import { CyclingView } from "../../src/cycling/CyclingView";
 import { HikingView } from "../../src/hiking/HikingView";
 import { SwimmingView } from "../../src/swimming/SwimmingView";
+import { StrengthHero } from "../../src/strength/StrengthHero";
+import { buildStrengthAnalytics } from "../../src/strength/strengthAnalytics";
+import { buildStrengthSessionIndex, sessionHeat } from "../../src/strength/sessionAnalytics";
+import { LoadSourceProvider } from "../../src/training/loadSource";
+import type { StrengthSession } from "../../electron/types";
 import { ActivitiesSummary } from "../../src/training/components/ActivitiesSummary";
 import { ActivityDetailPane } from "../../src/training/components/ActivityDetailPane";
 import { ActivityRouteMap } from "../../src/training/components/ActivityRouteMap";
@@ -328,6 +333,24 @@ function EscapeClosingPanel({ children }: { children: ReactNode }) {
 }
 
 const MOUNTS: Record<string, (options: Record<string, unknown>) => ReactElement> = {
+  StrengthHero: (options) => {
+    loadAppStyles();
+    const sessions = (options.sessions as StrengthSession[]) ?? [];
+    const entry = options.scope === "session"
+      ? buildStrengthSessionIndex(sessions).byId.get(sessions[0]?.activityId)
+      : undefined;
+    return (
+      <LoadSourceProvider>
+        <div className="strength-view" style={{ width: 1100 }}>
+          <StrengthHero
+            analytics={entry?.analytics ?? buildStrengthAnalytics(sessions, 90)}
+            resolveHeat={entry ? (metric) => sessionHeat(entry, metric) : undefined}
+            scope={options.scope === "session" ? "session" : "window"}
+          />
+        </div>
+      </LoadSourceProvider>
+    );
+  },
   // Inside the same column the app gives it — `.content.content-fill` clips, so
   // the page has to scroll itself — at a fixed height, because every layout
   // trap this screen has hit only exists in a column that cannot grow.

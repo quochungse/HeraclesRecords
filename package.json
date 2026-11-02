@@ -180,6 +180,7 @@
     "test:exercise-explorer": "cross-env ELECTRON_RUN_AS_NODE=1 electron --experimental-strip-types --import ./scripts/register-ts-ext.mjs scripts/test-exercise-explorer.mjs",
     "test:strength-session-analytics": "cross-env ELECTRON_RUN_AS_NODE=1 electron --experimental-strip-types --import ./scripts/register-ts-ext.mjs scripts/test-strength-session-analytics.mjs",
     "test:strength-body-focus": "cross-env ELECTRON_RUN_AS_NODE=1 electron --experimental-strip-types --import ./scripts/register-ts-ext.mjs scripts/test-strength-body-focus.mjs",
+    "test:strength-renderer": "npm run build:renderer-harness && node scripts/run-electron-gui.mjs scripts/test-strength-renderer.mjs",
     "test:anatomy-assets": "node scripts/test-anatomy-assets.mjs",
     "test:chat-workout-tools": "npm run build:electron && node scripts/test-chat-workout-tools.mjs",
     "test:workout-patch": "npm run build:electron && node scripts/test-workout-patch.mjs",

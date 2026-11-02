@@ -19,6 +19,11 @@ in the exercise rows. A row's mark is the body figure lit on the heat ramp
 `contain: size` and scrolls inside its card with a measured fade. No time-in-zones panel (by
 decision). The 3D hero (`StrengthHero`) is reused by Overview inside a `.strength-view`.
 
+**Every heat metric has a muscle-detail cell** (`MusclePanel.statCells`, keyed by
+`HeatMetric` plus the supporting cells). Load reads the muscle's credited `loadTl`, in TL.
+`test:strength-renderer` opens every muscle in all three metrics, in both window and session
+views, and exercises map selection, empty data and the saved metric preference.
+
 ## Reading COROS's sets
 
 - **Laps are read by their `mode`** (`lapItemKind` in `strengthDetail.ts`): 14 set, 15 rest,
