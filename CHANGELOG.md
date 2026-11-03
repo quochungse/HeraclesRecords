@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.4.6] - 2026-11-03
+
+Improve coach response and optimize token costs.
+
+### What's new
+- **Coach asks** - when how a session felt, what you ate or drank, pain or why a session was cut would change its answer, Coach asks instead of noting it as missing. Up to three questions come as one card: pick a choice or type your own answer under each, and send them together.
+- **Coach costs less** - Claude Code and ChatGPT now read a conversation back from the prompt cache, so a follow-up no longer pays for the whole conversation again.
+
+### Fixed
+- A planned workout's distance and time are the whole session's on every screen - the workout view, the builder, the Training Library, the plan reader and Coach's cards - the same figures as the Calendar, so a long run with timed steps no longer reads shorter than it is. A sum of only some steps is named as one.
+- Applying a revised Coach proposal dismisses the earlier cards it replaces.
+
 ## [1.4.5] - 2026-11-02
 
 Improve app performance and stability.
