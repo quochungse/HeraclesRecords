@@ -27,6 +27,7 @@ Module._load = function patchedLoad(request, ...rest) {
 };
 
 const {
+  callChatToolForTests,
   countableUsage,
   createCollectorSink,
   createWindowSink,
@@ -226,6 +227,18 @@ endRunForTests("turn-a");
 assert.equal(drawChartForTests("turn-a", "trend"), "c1", "a finished turn's handles go with it");
 endRunForTests("turn-a");
 endRunForTests("turn-b");
+// A turn asks once: every question goes in its one call, so a second call is
+// refused rather than drawn as a second card answered apart.
+{
+  const asked = { questions: [{ question: "Carbs?", choices: [{ label: "Yes" }, { label: "No" }] }] };
+  const run = { requestId: "turn-ask", toolPolicy: "interactive" };
+  assert.equal(JSON.parse(await callChatToolForTests("request_coach_input", asked, run)).status, "waiting_for_athlete");
+  await assert.rejects(callChatToolForTests("request_coach_input", asked, run), /already called in this response/);
+  endRunForTests("turn-ask");
+  assert.equal(JSON.parse(await callChatToolForTests("request_coach_input", asked, run)).status, "waiting_for_athlete",
+    "the next turn asks again");
+  endRunForTests("turn-ask");
+}
 const chartGuide = withLiveToolInstructions("Coach.", [
   { name: "get_activity_detail", description: "", inputSchema: {} }
 ]);
@@ -264,7 +277,7 @@ for (const rule of [
   /exercise_resolution_required/,
   /call the same draft tool again in the same response/,
   /typed intensity field/,
-  /request_coach_input — at most once per turn/,
+  /request_coach_input — once per turn, with one to three concise questions/,
   /write it first and ask\s+at the end/,
   /Nothing you call writes to COROS/,
   /Every sport takes step kinds/

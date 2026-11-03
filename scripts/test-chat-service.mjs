@@ -191,7 +191,8 @@ assert.equal(
 
 const interactionTool = getChatInteractionTools()[0];
 assert.equal(interactionTool.name, "request_coach_input");
-assert.deepEqual(interactionTool.inputSchema.required, ["question", "choices"]);
+assert.deepEqual(interactionTool.inputSchema.required, ["questions"]);
+assert.equal(interactionTool.inputSchema.properties.questions.maxItems, 3, "a turn asks at most three questions");
 
 const prompt = buildCoachInputPrompt(
   {
@@ -235,7 +236,25 @@ const interactionResult = JSON.parse(
   )
 );
 assert.equal(interactionResult.status, "waiting_for_athlete");
-assert.equal(emittedPrompt.allowCustom, false);
+assert.equal(emittedPrompt.allowCustom, false, "the one-question shape of old still asks one question");
+
+// One call carries up to three questions, each its own card, in order.
+{
+  const emitted = [];
+  const ask = (count) => ({
+    questions: Array.from({ length: count }, (_, n) => ({
+      question: `Question ${n + 1}?`,
+      choices: [{ label: "Yes" }, { label: "No" }]
+    }))
+  });
+  const result = JSON.parse(handleChatInteractionTool("request_coach_input", ask(3), (next) => emitted.push(next)));
+  assert.deepEqual(emitted.map((next) => next.question), ["Question 1?", "Question 2?", "Question 3?"]);
+  assert.deepEqual(result.prompt_ids, emitted.map((next) => next.promptId));
+  assert.equal(new Set(result.prompt_ids).size, 3);
+  assert.throws(() => handleChatInteractionTool("request_coach_input", ask(4), () => assert.fail("nothing is asked")),
+    /at most 3 questions/, "four questions are refused whole");
+  assert.throws(() => handleChatInteractionTool("request_coach_input", { questions: [] }), /at least one question/);
+}
 
 const responsesRequest = buildResponsesRequest(
   "gpt-test",

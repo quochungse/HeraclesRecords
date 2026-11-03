@@ -1888,6 +1888,7 @@ export async function streamChat(
   } finally {
     if (ownsReach) runTools.delete(requestId);
     turnSessions.delete(requestId);
+    turnsAsked.delete(requestId);
     runCards.delete(requestId);
     turnCharts.delete(requestId);
   }
@@ -1895,6 +1896,9 @@ export async function streamChat(
 
 /** The conversation each turn in flight belongs to, for the tools that file something under it. */
 const turnSessions = new Map<string, string>();
+
+/** The turns in flight that have asked the athlete already: one call each. */
+const turnsAsked = new Set<string>();
 
 /**
  * The cards an analysis run has left, by request id (P3.4, D4): a run nobody
@@ -3419,7 +3423,15 @@ async function executeChatTool(
     });
   }
   if (isChatInteractionTool(name)) {
-    return handleChatInteractionTool(
+    // Every question of a turn goes in its one call: they are drawn as one
+    // card answered together, and a second call would be a second card the
+    // athlete answers apart, a turn each.
+    if (turnsAsked.has(requestId)) {
+      throw new Error(
+        "request_coach_input was already called in this response; the athlete has those questions. End this response now."
+      );
+    }
+    const answer = handleChatInteractionTool(
       name as ChatInteractionToolName,
       args,
       (prompt) => {
@@ -3431,6 +3443,8 @@ async function executeChatTool(
       },
       toolPolicy
     );
+    turnsAsked.add(requestId);
+    return answer;
   }
   if (isChatWorkoutTool(name)) {
     const generation = planGenerations.get(requestId);
@@ -3570,6 +3584,7 @@ export function drawChartForTests(requestId: string, previewId: string): string 
 
 export function endRunForTests(requestId: string): void {
   turnSessions.delete(requestId);
+  turnsAsked.delete(requestId);
   turnCharts.delete(requestId);
   runCards.delete(requestId);
 }
@@ -3838,11 +3853,12 @@ export function withLiveToolInstructions(
     sections.push(
       "",
       "## Athlete questions",
-      "Ask the athlete through request_coach_input — at most once per turn — with one concise question and " +
-        "2–5 distinct choices, the recommended one first, each description stating the tradeoff that matters. " +
-        "Never ask a question only in prose. When your answer can stand without theirs, write it first and ask " +
-        "at the end; ask first only when you cannot answer without it, and then before reading data the answer " +
-        "would change. After calling it, stop and wait for the athlete's next message."
+      "Ask the athlete through request_coach_input — once per turn, with one to three concise questions in that " +
+        "call, only as many as are worth asking — each with 2–5 distinct choices, the recommended one first, each " +
+        "description stating the tradeoff that matters. Never ask a question only in prose. When your answer can " +
+        "stand without theirs, write it first and ask at the end; ask first only when you cannot answer without " +
+        "it, and then before reading data the answer would change. After calling it, stop and wait for the " +
+        "athlete's next message."
     );
   }
   return sections.join("\n");
