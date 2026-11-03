@@ -53,7 +53,10 @@ Coach never writes to COROS directly; it writes drafts and change sets the athle
   turn and refused whole; it writes nothing, so it is read-only-allowed. `delete_workout`
   stages one. **Every line reads COROS again before it writes** (a session gone or renamed goes
   `stale`), **one line is one write**, recorded as it lands, never written twice. Moves and
-  replacements go through `electron/scheduleMoves.ts`, as the Calendar's do.
+  replacements go through `electron/scheduleMoves.ts`, as the Calendar's do. A set has no
+  versions: an apply that lands dismisses the sets of earlier answers still wholly untouched
+  (`supersededChangeSets`, re-read first), so Coach's prompt has a revision restate every
+  change still wanted.
 - **Partial edits** ([docs/coach-workout-patches.md](../../docs/coach-workout-patches.md),
   `electron/workoutPatch.ts`): Coach sends only changed fields — `patch_session` in
   `revise_training_plan` for a draft or a Coach plan session, `op: "patch"` in

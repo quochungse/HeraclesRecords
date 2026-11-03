@@ -119,7 +119,15 @@ import type { AnalysesModalTarget } from "./analyses/AnalysesModal";
 import { CoachCreationCard } from "./CoachCreationCard";
 import { CoachBriefCard } from "./CoachBriefCard";
 import { CoachScheduleChangeCard } from "./CoachScheduleChangeCard";
-import { changeDayLabel, lineViewEyebrow, lineViews, proposedLines, scheduleChangeIds } from "./scheduleChangeModel";
+import {
+  changeDayLabel,
+  isUntouched,
+  lineViewEyebrow,
+  lineViews,
+  proposedLines,
+  scheduleChangeIds,
+  supersededChangeSets
+} from "./scheduleChangeModel";
 import type { WorkoutView } from "../calendar/WorkoutViewModal";
 import { CoachOutlineCard } from "./CoachOutlineCard";
 import { CoachStepTrail, stepRunEvent, type StepRun } from "./CoachStepTrail";
@@ -4438,16 +4446,45 @@ export function ChatView({
     });
   };
 
+  /**
+   * Applying a later proposal dismisses the untouched ones of earlier answers
+   * (`supersededChangeSets`), each read again first: a line applied on the
+   * other machine meanwhile makes that card the athlete's to finish.
+   */
+  const dismissSuperseded = async (changeSetId: string) => {
+    if (!api) return;
+    const candidates = supersededChangeSets(timeline, changeSetId, scheduleChanges);
+    if (!candidates.length) return;
+    const fresh = await api.getScheduleChanges(candidates).catch(() => []);
+    for (const earlier of fresh.filter(isUntouched)) {
+      try {
+        const dismissed = await api.dismissScheduleChange(earlier.changeSetId);
+        setScheduleChanges((current) => ({ ...current, [earlier.changeSetId]: dismissed }));
+      } catch {
+        // Left as it was, still offering its lines.
+      }
+    }
+  };
+
   const settleScheduleChange = async (changeSetId: string, lineId: string | undefined, apply: boolean) => {
     if (!api || applyingChange) return;
     setApplyingChange({ changeSetId, lineId: lineId ?? "*" });
     onError(null);
+    const before = scheduleChanges[changeSetId];
     try {
       const set = apply
         ? await api.applyScheduleChange(changeSetId, lineId)
         : await api.dismissScheduleChange(changeSetId, lineId);
       setScheduleChanges((current) => ({ ...current, [changeSetId]: set }));
       if (apply) onPlanUploaded?.();
+      // Only once something landed: an apply that went stale or failed leaves
+      // the earlier proposal as the one still to hand.
+      const landed = set.lines.some(
+        (line) =>
+          line.status === "applied" &&
+          before?.lines.find((old) => old.lineId === line.lineId)?.status !== "applied"
+      );
+      if (apply && landed) await dismissSuperseded(changeSetId);
     } catch (caught) {
       onError(remoteErrorMessage(caught, apply ? t("chat.err.notApplied") : t("chat.err.notDismissed")));
       // What COROS did before the failure is in the row: read it again.

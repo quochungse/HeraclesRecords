@@ -3894,7 +3894,8 @@ function workoutToolGuide(
       ? "- Rearranging the calendar (a missed day, an illness, a busy week) → read it with " +
         "list_scheduled_workouts, then call propose_schedule_changes once with every move, replacement, removal " +
         "and addition the week needs, rather than drafting new workouts: a plan's session moved or replaced " +
-        "that way stays in its plan."
+        "that way stays in its plan. A revised proposal restates every change still wanted, since applying it " +
+        "dismisses the earlier proposals the athlete has not touched."
       : undefined,
     has("propose_schedule_changes")
       ? "- Changing part of a saved workout (a calendar session or a library workout: a target, a pace, the reps, " +
