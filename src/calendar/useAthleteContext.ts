@@ -10,8 +10,10 @@ import type { HeraclesRecordsApi } from "../heraclesrecords-api";
  *
  * **One read per hour, shared.** It is `/account/query`, and a plan reader, a
  * Coach card and a session view mounting together would otherwise ask three
- * times; the promise is cached rather than the answer so they share one. A
- * failure is forgotten at once, so the next mount asks again, and until then
+ * times; the promise is cached rather than the answer so they share one. An
+ * answer without the heart-rate anchors is not kept — signed out, or read
+ * before the start-up sign-in finished, the main process answers an empty
+ * account rather than failing — so the next mount asks again, and until then
  * the figures fall back to what the steps alone can say.
  */
 const CONTEXT_TTL_MS = 60 * 60_000;
@@ -28,13 +30,15 @@ export function useAthleteContext(
     let live = true;
     let entry = cached.get(unitSystem);
     if (!entry || Date.now() - entry.at > CONTEXT_TTL_MS) {
+      const forget = () => cached.delete(unitSystem);
       const promise = api.getWorkoutEditorContext(unitSystem).then(
         (value) => {
-          if (value) answered.set(unitSystem, value);
+          if (value?.maxHr && value.restingHr && value.lthrBpm) answered.set(unitSystem, value);
+          else forget();
           return value;
         },
         () => {
-          cached.delete(unitSystem);
+          forget();
           return undefined;
         }
       );

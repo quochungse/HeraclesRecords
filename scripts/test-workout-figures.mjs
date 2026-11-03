@@ -108,6 +108,11 @@ const LONG_RUN = [timed(900, hr(125, 150), "warmup"), dist(6500, hr(135, 156)), 
     "an untargeted warm-up is not 0 m, whatever COROS adds"
   );
   assert.deepEqual(estimateWorkoutFigures(run([{ kind: "training", target_type: "open", intensity: hr(140, 140) }]), context), {});
+  assert.deepEqual(
+    estimateWorkoutFigures(run([timed(600, { type: "unheardOf" })]), context),
+    { durationSeconds: 600 },
+    "an intensity the encoder does not know is never handed to it (it would throw, and take the plan reader with it)"
+  );
 }
 
 // 4. The real long run, and sessions COROS stored in September and October.

@@ -124,13 +124,22 @@ export function sessionFigures(steps: StepFigures, estimate: WorkoutFigures = {}
  * here, else the steps' sum when every step is in that unit.
  */
 export function workoutFigures(
-  workout: Pick<PlanWorkoutEntryInput, "sport" | "steps" | "distance_km">,
-  options: { coros?: WorkoutFigures; context?: WorkoutEditorContext } = {}
+  workout: FiguredWorkout,
+  options: FigureOptions = {}
 ): WorkoutFigures {
-  const estimated = estimateWorkoutFigures(workout, options.context);
-  return sessionFigures(stepFigures(workout.steps), {
-    distanceMeters: positive(options.coros?.distanceMeters) ?? estimated.distanceMeters,
-    durationSeconds: positive(options.coros?.durationSeconds) ?? estimated.durationSeconds
+  return wholeFigures(workout, stepFigures(workout.steps), options);
+}
+
+type FiguredWorkout = Pick<PlanWorkoutEntryInput, "sport" | "steps" | "distance_km">;
+type FigureOptions = { coros?: WorkoutFigures; context?: WorkoutEditorContext };
+
+function wholeFigures(workout: FiguredWorkout, steps: StepFigures, options: FigureOptions): WorkoutFigures {
+  const coros = options.coros ?? {};
+  const known = positive(coros.distanceMeters) !== undefined && positive(coros.durationSeconds) !== undefined;
+  const estimated = known ? {} : estimateWorkoutFigures(workout, options.context);
+  return sessionFigures(steps, {
+    distanceMeters: positive(coros.distanceMeters) ?? estimated.distanceMeters,
+    durationSeconds: positive(coros.durationSeconds) ?? estimated.durationSeconds
   });
 }
 
@@ -146,11 +155,11 @@ export interface StatedFigures {
 
 /** `workoutFigures`, with the partial sums a screen names as such where the rule has no whole figure. */
 export function statedWorkoutFigures(
-  workout: Pick<PlanWorkoutEntryInput, "sport" | "steps" | "distance_km">,
-  options: { coros?: WorkoutFigures; context?: WorkoutEditorContext } = {}
+  workout: FiguredWorkout,
+  options: FigureOptions = {}
 ): StatedFigures {
-  const whole = workoutFigures(workout, options);
   const steps = stepFigures(workout.steps);
+  const whole = wholeFigures(workout, steps, options);
   const distanceMeters = whole.distanceMeters ?? steps.distanceMeters;
   const durationSeconds = whole.durationSeconds ?? steps.durationSeconds;
   return {
@@ -185,7 +194,7 @@ const CONVERTING_SPORTS = new Set(["run", "trailRun"]);
 
 /** COROS's whole-session figures for a workout nobody has saved, as `calculate` would answer. */
 export function estimateWorkoutFigures(
-  workout: Pick<PlanWorkoutEntryInput, "sport" | "steps" | "distance_km">,
+  workout: FiguredWorkout,
   context?: WorkoutEditorContext
 ): WorkoutFigures {
   const sport = workout.sport ?? "run";
@@ -197,6 +206,7 @@ export function estimateWorkoutFigures(
   let meters: number | undefined = 0;
   let seconds: number | undefined = 0;
   for (const { step, repeat } of leaves) {
+    if (meters === undefined && seconds === undefined) return {};
     const type = targetOf(step);
     const speed = stepSpeed(step, context) ?? (step.kind === "rest" && !hasIntensity(step) ? 0 : undefined);
     if (type === "time") {
@@ -222,8 +232,14 @@ function hasIntensity(step: RunWorkoutCreateStep): boolean {
   return step.intensity ? step.intensity.type !== "none" : Boolean(step.intensity_type);
 }
 
+/** The intensities COROS turns into a speed; anything else is not handed to the encoder at all. */
+const SPEED_INTENSITIES = new Set([
+  "heartRate", "heartRatePercent", "lthrPercent", "pace", "effortPace", "thresholdPacePercent", "effortPacePercent"
+]);
+
 /** Metres a second COROS drives a step at; undefined where it converts nothing or cannot be known here. */
 function stepSpeed(step: RunWorkoutCreateStep, context?: WorkoutEditorContext): number | undefined {
+  if (step.intensity && !SPEED_INTENSITIES.has(step.intensity.type)) return undefined;
   const encoded = step.intensity
     ? encodeCorosIntensity(step.intensity, context)
     : {

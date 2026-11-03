@@ -126,13 +126,6 @@ export function WorkoutViewModal({ api, views, initialView, eyebrow, onClose }: 
     const settle = (id: string, state: ViewState) => {
       if (!cancelled) setLoaded((previous) => ({ ...previous, [id]: state }));
     };
-    const amend = (id: string, change: Partial<ViewDocument>) => {
-      if (cancelled) return;
-      setLoaded((previous) => {
-        const document = previous[id]?.document;
-        return document ? { ...previous, [id]: { document: { ...document, ...change } } } : previous;
-      });
-    };
     for (const [id, source] of JSON.parse(viewsKey) as [string, WorkoutViewSource][]) {
       if (source.kind === "proposed") {
         const draft = planWorkoutInputToEditorDraft(source.workout);
@@ -141,7 +134,7 @@ export function WorkoutViewModal({ api, views, initialView, eyebrow, onClose }: 
         // (`workoutFigures`): a heart-rate step goes as far as COROS's
         // arithmetic on the athlete's own thresholds says.
         void api.getWorkoutEditorContext(unitSystem).then((context) => {
-          amend(id, { context });
+          settle(id, { document: { draft, context } });
         }).catch(() => undefined);
       } else {
         void api.getWorkoutForEdit(source, unitSystem).then((document) => {
@@ -396,6 +389,10 @@ export function WorkoutReadOnlyBody({
     () => buildEditorDraftView(draft, unitSystem, exercisesById),
     [draft, exercisesById, unitSystem]
   );
+  const figures = useMemo(
+    () => heroFigures(draft, view.totals, estimate, context),
+    [draft, view.totals, estimate, context]
+  );
   const { category, icon: SportIcon } = workoutSportView(draft.sport);
   const isStrength = isStrengthStyleWorkout(draft.sport);
   const strength = useMemo(() => strengthTotals(draft), [draft]);
@@ -434,7 +431,6 @@ export function WorkoutReadOnlyBody({
   } else {
     // The whole session's figures where they are known (`workoutFigures`);
     // otherwise what the steps in that unit add up to, named as only that.
-    const figures = heroFigures(draft, view.totals, estimate, context);
     if (figures.distanceMeters) {
       stats.push({
         icon: Route,
