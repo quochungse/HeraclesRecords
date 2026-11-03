@@ -238,7 +238,8 @@ Coach never writes to COROS directly; it writes drafts and change sets the athle
   is best-effort.
 - What is not sent verbatim stays readable through `recall_conversation` (search in node-free
   `chatRecall.ts`), offered only while there is something to recall.
-- Claude Code's prompt is every message it is handed (`formatClaudePrompt`).
+- Claude Code is handed every message, a text block each (`claudePromptBlocks`): it caches by
+  block, and joined into one string the whole transcript went into the cache again every turn.
 
 ## The screen
 
