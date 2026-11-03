@@ -109,6 +109,7 @@
     "test:chat-plan-card-renderer": "npm run build:renderer-harness && node scripts/run-electron-gui.mjs scripts/test-chat-plan-card-renderer.mjs",
     "test:schedule-change-renderer": "npm run build:renderer-harness && node scripts/run-electron-gui.mjs scripts/test-schedule-change-renderer.mjs",
     "test:chat-transcript-race": "npm run build:renderer-harness && node scripts/run-electron-gui.mjs scripts/test-chat-transcript-race.mjs",
+    "test:chat-coach-questions": "npm run build:renderer-harness && node scripts/run-electron-gui.mjs scripts/test-chat-coach-questions.mjs",
     "test:activities-renderer": "npm run build:renderer-harness && node scripts/run-electron-gui.mjs scripts/test-activities-renderer.mjs",
     "test:running-renderer": "npm run build:renderer-harness && node scripts/run-electron-gui.mjs scripts/test-running-renderer.mjs",
     "test:cycling-renderer": "npm run build:renderer-harness && node scripts/run-electron-gui.mjs scripts/test-cycling-renderer.mjs",

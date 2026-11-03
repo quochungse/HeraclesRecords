@@ -1,6 +1,7 @@
 import type {
   ChatMessage,
   ChatTokenUsage,
+  CoachInputPrompt,
   CompactContextSettings,
   CompactModelChoice,
   ContextDetail,
@@ -344,7 +345,8 @@ export function toWireMessages(
     }
     wire.push(message);
   };
-  for (const entry of entries) {
+  for (let index = 0; index < entries.length; index += 1) {
+    const entry = entries[index]!;
     if (entry.kind === "message") {
       // A placeholder names a chart of the turn it was written in; on a later
       // turn it would name nothing, or the wrong chart.
@@ -355,18 +357,52 @@ export function toWireMessages(
     } else if (ridesOnNextMessage(entry)) {
       events.push(wireNote(entry));
     } else if (entry.kind === "coachPrompt") {
-      const choices = entry.prompt.choices
-        .map((choice) => `- ${choice.label}`)
-        .join("\n");
+      const asked = askedTogether(entries, index);
+      index += asked.length - 1;
+      const choices = (prompt: CoachInputPrompt) => prompt.choices.map((choice) => `- ${choice.label}`).join("\n");
+      if (asked.length === 1) {
+        push({
+          role: "assistant",
+          content: `I need the athlete's answer before continuing:\n${entry.prompt.question}\n${choices(entry.prompt)}`
+        });
+        if (entry.prompt.answer) push({ role: "user", content: entry.prompt.answer });
+        continue;
+      }
       push({
         role: "assistant",
-        content: `I need the athlete's answer before continuing:\n${entry.prompt.question}\n${choices}`
+        content: `I need the athlete's answers before continuing:\n${asked
+          .map((prompt, n) => `${n + 1}. ${prompt.question}\n${choices(prompt)}`)
+          .join("\n")}`
       });
-      if (entry.prompt.answer) push({ role: "user", content: entry.prompt.answer });
+      if (asked.some((prompt) => prompt.answer)) {
+        push({
+          role: "user",
+          content: asked.map((prompt, n) => `${n + 1}. ${prompt.answer || "(no answer)"}`).join("\n")
+        });
+      }
     }
   }
   flushEvents();
   return wire;
+}
+
+/**
+ * The questions asked in one call, from the one at `start`: the coach's
+ * questions that follow it with the same `answeredAt`, answered together or
+ * all still waiting. Two single questions from turns of their own can sit side
+ * by side — a turn that only asked, answered, then another — and were
+ * answered apart, so they stay two exchanges.
+ */
+function askedTogether(entries: readonly PersistedChatEntry[], start: number): CoachInputPrompt[] {
+  const first = entries[start];
+  if (first?.kind !== "coachPrompt") return [];
+  const asked = [first.prompt];
+  for (let index = start + 1; index < entries.length; index += 1) {
+    const entry = entries[index]!;
+    if (entry.kind !== "coachPrompt" || entry.prompt.answeredAt !== first.prompt.answeredAt) break;
+    asked.push(entry.prompt);
+  }
+  return asked;
 }
 
 type WireNoteEntry = Extract<PersistedChatEntry, { kind: "planEvent" | "planRefs" | "scheduleRefs" }>;

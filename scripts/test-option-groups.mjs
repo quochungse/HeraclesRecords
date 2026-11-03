@@ -87,6 +87,11 @@ const EXEMPT = [
     why: "A chart of the outline's weeks on its card in the conversation (P2.2), each bar as tall as its hours and in its stage's hue: picking one shows that week. The arrangement is the control, as a month of days is."
   },
   {
+    file: "src/chat/ChatView.tsx",
+    marker: "chat-coach-prompt-choice",
+    why: "Coach's answers to a question are cards: a label, Recommended on the first, and the trade-off the coach wrote in a sentence — a chip holds none of it. Several questions are picked on one card and sent together, so a picked answer says so."
+  },
+  {
     file: "src/chat/analyses/AnalysisCreate.tsx",
     marker: "coach-analysis-starter",
     why: "Starter cards carry a description and the trigger they would set — a chip holds neither."

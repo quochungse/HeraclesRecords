@@ -195,6 +195,44 @@ assert.deepEqual(
   assert.equal(unanswered[0].role, "assistant");
 }
 
+// The questions of one call were answered together (one `answeredAt`): one
+// exchange, numbered, a question left blank said to be so, so the transcript
+// still ends on the athlete — an assistant turn last would be a prefill.
+{
+  const question = (promptId, text, answer) => ({
+    kind: "coachPrompt",
+    prompt: {
+      promptId,
+      question: text,
+      choices: [{ id: "a", label: "Yes" }, { id: "b", label: "No" }],
+      answer,
+      answeredAt: 7
+    }
+  });
+  const wire = toWireMessages([
+    { kind: "message", role: "assistant", content: "Sunday held up." },
+    question("q1", "Carbs at 40–45 g an hour?", "Yes, stomach fine"),
+    question("q2", "Why was Thursday missed?", ""),
+    question("q3", "Gym tomorrow?", "No")
+  ]);
+  assert.deepEqual(wire.map((message) => message.role), ["assistant", "assistant", "user"]);
+  assert.match(wire[1].content, /^I need the athlete's answers before continuing:\n1\. Carbs[\s\S]*\n2\. Why was Thursday missed\?\n- Yes\n- No\n3\. Gym tomorrow\?/);
+  assert.equal(wire[2].content, "1. Yes, stomach fine\n2. (no answer)\n3. No");
+
+  const allSkipped = toWireMessages([question("q1", "One?", ""), question("q2", "Two?", "")]);
+  assert.deepEqual(allSkipped.map((message) => message.role), ["assistant"], "nothing answered sends no answer");
+
+  // Two single questions answered apart stay two exchanges.
+  const apart = toWireMessages([
+    { kind: "coachPrompt", prompt: { promptId: "s1", question: "First?", choices: [], answer: "A", answeredAt: 1 } },
+    { kind: "coachPrompt", prompt: { promptId: "s2", question: "Second?", choices: [], answer: "B", answeredAt: 2 } }
+  ]);
+  assert.deepEqual(apart.map((message) => message.content.split("\n")[0]), [
+    "I need the athlete's answer before continuing:", "A",
+    "I need the athlete's answer before continuing:", "B"
+  ]);
+}
+
 // ---------------------------------------------------------------------------
 // Planning
 // ---------------------------------------------------------------------------

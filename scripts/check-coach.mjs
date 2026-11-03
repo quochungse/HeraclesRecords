@@ -40,7 +40,8 @@ const steps = [
   electronTest("plan-generator-model", true),
   nodeTest("coach-provider-bundle"),
   rendererTest("coach-providers-renderer"),
-  rendererTest("coach-analysis-renderer")
+  rendererTest("coach-analysis-renderer"),
+  rendererTest("chat-coach-questions")
 ];
 
 // Remove only this command's old logs, so a failed early build cannot leave a

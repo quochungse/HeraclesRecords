@@ -11341,6 +11341,63 @@ label.chat-settings-toggle-row {
   cursor: default;
 }
 
+/* Several questions asked together: numbered, picked one by one, sent at the foot. */
+.chat-coach-prompt-list {
+  display: grid;
+  gap: 16px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.chat-coach-prompt-item {
+  display: grid;
+  gap: 8px;
+}
+
+.chat-coach-prompt-item h4 {
+  display: flex;
+  gap: 8px;
+  margin: 0;
+  color: var(--text-primary);
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.45;
+}
+
+.chat-coach-prompt-number {
+  color: var(--accent-strong);
+  font-variant-numeric: tabular-nums;
+}
+
+.chat-coach-prompt-input {
+  width: 100%;
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--surface) 58%, transparent);
+  color: var(--text-primary);
+  padding: 8px 12px;
+  font: inherit;
+  font-size: 13px;
+}
+
+.chat-coach-prompt-input:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: 2px;
+}
+
+.chat-coach-prompt-foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 12px;
+  border-top: 1px solid var(--glass-border);
+  padding-top: 12px;
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
 .chat-plan-card {
   border: 1px solid var(--glass-border);
   border-radius: var(--radius-md);
@@ -11407,6 +11464,11 @@ label.chat-settings-toggle-row {
 .chat-asked-answer {
   color: var(--text-primary);
   font-weight: 600;
+}
+
+.chat-asked-answer.is-skipped {
+  color: var(--text-muted);
+  font-weight: 400;
 }
 
 .chat-version-note {
