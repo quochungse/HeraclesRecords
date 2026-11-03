@@ -10,6 +10,7 @@ const providerUrl = pathToFileURL(
 ).href;
 
 const {
+  claudePromptBlocks,
   createClaudeSubscriptionEnvironment,
   extractLoginUrl,
   logoutClaudeCode,
@@ -334,5 +335,23 @@ const missing = await getClaudeCodeStatus(
 assert.equal(missing.state, "not-installed");
 assert.equal(missing.installed, false);
 assert.equal(missing.authenticated, false);
+
+// The transcript goes as a block per message: Claude Code caches by block, and
+// one joined string was written to the cache again in full every turn.
+{
+  const blocks = claudePromptBlocks([
+    { role: "user", content: "How was Sunday?" },
+    { role: "assistant", content: "Steady." },
+    { role: "user", content: "And the carbs?" }
+  ]);
+  assert.equal(blocks.length, 4, "a header, then one block per message");
+  assert.match(blocks[0].text, /^Continue the Heracles Records Coach conversation below\./);
+  assert.deepEqual(blocks.slice(1).map((block) => block.text), [
+    "Athlete: How was Sunday?",
+    "Assistant: Steady.",
+    "Athlete: And the carbs?"
+  ]);
+  assert.ok(blocks.every((block) => block.type === "text"));
+}
 
 console.log("claude code provider tests passed");

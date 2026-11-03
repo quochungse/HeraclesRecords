@@ -450,7 +450,7 @@ assert.equal(autoResult.ok, true);
 assert.ok(autoPrompt, "the prompt is still emitted in an auto run");
 assert.equal(autoPrompt.question, "How did the long run feel?");
 assert.equal(autoPrompt.choices.length, 2);
-assert.equal(autoResult.prompt_id, autoPrompt.promptId);
+assert.deepEqual(autoResult.prompt_ids, [autoPrompt.promptId]);
 
 // An explicit "interactive" policy behaves like the default.
 assert.equal(

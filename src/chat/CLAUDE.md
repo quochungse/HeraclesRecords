@@ -53,7 +53,10 @@ Coach never writes to COROS directly; it writes drafts and change sets the athle
   turn and refused whole; it writes nothing, so it is read-only-allowed. `delete_workout`
   stages one. **Every line reads COROS again before it writes** (a session gone or renamed goes
   `stale`), **one line is one write**, recorded as it lands, never written twice. Moves and
-  replacements go through `electron/scheduleMoves.ts`, as the Calendar's do.
+  replacements go through `electron/scheduleMoves.ts`, as the Calendar's do. A set has no
+  versions: an apply that lands dismisses the sets of earlier answers still wholly untouched
+  (`supersededChangeSets`, re-read first), so Coach's prompt has a revision restate every
+  change still wanted.
 - **Partial edits** ([docs/coach-workout-patches.md](../../docs/coach-workout-patches.md),
   `electron/workoutPatch.ts`): Coach sends only changed fields — `patch_session` in
   `revise_training_plan` for a draft or a Coach plan session, `op: "patch"` in
@@ -207,7 +210,9 @@ Coach never writes to COROS directly; it writes drafts and change sets the athle
   row. `npm run test:chat-turn-actions`.
 - **A turn reads chart, answer, then creations** (`orderTurn`, `isChartKind` in node-free
   `electron/chartPlacement.ts`, used by the settle, the streaming bubble and the headless
-  sink). An answer may place a chart with `[[chart:c2]]` on a line of its own; nothing is
+  sink). While an ordinary turn runs its creations stay off screen (`holdTurnCards`) and
+  mount at the settle, drawn as they are — shown as the tool returned, a card stood under an
+  answer not yet written; a pipeline step shows its cards as they land. An answer may place a chart with `[[chart:c2]]` on a line of its own; nothing is
   stored beside the entry, and every reader of the words as text strips placeholders
   (`stripChartPlaceholders`).
 - **Rows a settle or reload mounts do not animate in** (`ChatRow`, `.is-settled`, marked by
@@ -238,7 +243,8 @@ Coach never writes to COROS directly; it writes drafts and change sets the athle
   is best-effort.
 - What is not sent verbatim stays readable through `recall_conversation` (search in node-free
   `chatRecall.ts`), offered only while there is something to recall.
-- Claude Code's prompt is every message it is handed (`formatClaudePrompt`).
+- Claude Code is handed every message, a text block each (`claudePromptBlocks`): it caches by
+  block, and joined into one string the whole transcript went into the cache again every turn.
 
 ## The screen
 
@@ -258,6 +264,14 @@ Coach never writes to COROS directly; it writes drafts and change sets the athle
 - **A turn belongs to its conversation** (`turnSessionId`): leaving mid-turn parks it
   (`parkedTurnRef`) and its stream writes into the parked copy, saved to its own row. **Two
   turns at once are refused**, not queued.
+- **Coach asks at most three questions a turn** (`request_coach_input`, counted per turn across
+  calls; past three a call is refused as an answer, never thrown — a thrown tool error is an
+  error line in the transcript). Each is its own `coachPrompt` entry, answered in its own
+  fields — no new field. While they wait they are one card (`coachQuestions.ts`), sent in one
+  turn; on the wire they are one numbered exchange, and a closed question with no words is
+  `(no answer)`, so the transcript never ends on a question already closed (an assistant turn
+  last is a prefill, refused by Opus 4.6+). Words typed beside such a card are a message and
+  close it. `test:chat-coach-questions`.
 - A blank conversation is reused or deleted when left, unless an analysis is attached.
 - **Coach settings** (`ChatSettingsModal` over `ChatSettingsPanel`) edit a draft written on
   Save; Discard drops it. The dialog repoints `--accent`/`--surface` to the app's palette

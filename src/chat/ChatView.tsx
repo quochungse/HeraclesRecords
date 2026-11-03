@@ -119,7 +119,15 @@ import type { AnalysesModalTarget } from "./analyses/AnalysesModal";
 import { CoachCreationCard } from "./CoachCreationCard";
 import { CoachBriefCard } from "./CoachBriefCard";
 import { CoachScheduleChangeCard } from "./CoachScheduleChangeCard";
-import { changeDayLabel, lineViewEyebrow, lineViews, proposedLines, scheduleChangeIds } from "./scheduleChangeModel";
+import {
+  changeDayLabel,
+  isUntouched,
+  lineViewEyebrow,
+  lineViews,
+  proposedLines,
+  scheduleChangeIds,
+  supersededChangeSets
+} from "./scheduleChangeModel";
 import type { WorkoutView } from "../calendar/WorkoutViewModal";
 import { CoachOutlineCard } from "./CoachOutlineCard";
 import { CoachStepTrail, stepRunEvent, type StepRun } from "./CoachStepTrail";
@@ -162,6 +170,16 @@ import {
   withCreationIndex
 } from "../../electron/chatContextCompaction";
 import { ClaudeCodeLoginCard } from "./ClaudeCodeLoginCard";
+import {
+  answerQuestions,
+  isPicked,
+  isSkipped,
+  lastWaitingQuestions,
+  questionsAt,
+  waitingQuestionsAround,
+  type QuestionPick
+} from "./coachQuestions";
+import { CoachQuestionCard, CoachQuestionsCard } from "./CoachQuestionCards";
 import { ChatSidebar } from "./ChatSidebar";
 import { ChatConversationHeader } from "./ChatConversationHeader";
 import {
@@ -555,64 +573,6 @@ const ThinkingDisclosure = memo(function ThinkingDisclosure({
     </details>
   );
 });
-
-function CoachInputCard({
-  prompt,
-  disabled,
-  onChoose,
-  onCustom
-}: {
-  prompt: CoachInputPrompt;
-  disabled: boolean;
-  onChoose: (choice: CoachInputChoice) => void;
-  onCustom: () => void;
-}) {
-  const answered = prompt.answeredAt !== undefined;
-  return (
-    <section
-      className={`chat-coach-prompt${answered ? " is-answered" : ""}`}
-      aria-labelledby={`coach-prompt-${prompt.promptId}`}
-    >
-      <header className="chat-coach-prompt-header">
-        <span className="chat-coach-prompt-status">
-          <MessageCircle size={14} aria-hidden="true" />
-          {answered ? t("chat.prompt.answered") : t("chat.prompt.waiting")}
-        </span>
-        <h4 id={`coach-prompt-${prompt.promptId}`}>{prompt.question}</h4>
-      </header>
-      <div className="chat-coach-prompt-choices" role="group" aria-label={t("chat.prompt.choices")}>
-        {prompt.choices.map((choice, index) => {
-          const selected = prompt.selectedChoiceId === choice.id;
-          return (
-            <button
-              key={choice.id}
-              type="button"
-              className={`chat-coach-prompt-choice${selected ? " is-selected" : ""}`}
-              onClick={() => onChoose(choice)}
-              disabled={disabled || answered}
-            >
-              <span>
-                {choice.label}
-                {!answered && index === 0 ? <em>{t("chat.prompt.recommended")}</em> : null}
-              </span>
-              {choice.description ? <small>{choice.description}</small> : null}
-            </button>
-          );
-        })}
-      </div>
-      {!answered && prompt.allowCustom ? (
-        <button
-          type="button"
-          className="chat-coach-prompt-custom"
-          onClick={onCustom}
-          disabled={disabled}
-        >
-          {t("chat.prompt.other")}
-        </button>
-      ) : null}
-    </section>
-  );
-}
 
 /**
  * An analysis run streaming into the conversation that is open. Deliberately
@@ -1648,9 +1608,12 @@ export function ChatView({
   // Interaction cards are appended after the assistant's final text so the
   // question and its choices stay in a natural reading order.
   const pendingCoachPromptsRef = useRef<CoachInputPrompt[]>([]);
+  /** What is picked on a card of several questions, by question, until it is sent (`CoachQuestionsCard`). */
+  const [questionPicks, setQuestionPicks] = useState<Record<string, QuestionPick>>({});
   // Kept only while a paused Coach turn is resuming, so a failed/cancelled
-  // request can restore the question instead of silently losing it.
-  const resumedCoachPromptRef = useRef<CoachInputPrompt | null>(null);
+  // request can restore the questions it answered instead of silently losing
+  // them — every question of a card answered together.
+  const resumedCoachPromptRef = useRef<CoachInputPrompt[]>([]);
   // Same reason as activeRequestIdRef: the push handlers have to recognise the
   // analysis's stream without re-subscribing.
   const liveAnalysisRef = useRef<LiveAnalysisRun | null>(null);
@@ -1863,7 +1826,7 @@ export function ChatView({
     // belong to it, not to whatever is on screen (UAT).
     if (!activeRequestIdRef.current) {
       pendingCoachPromptsRef.current = [];
-      resumedCoachPromptRef.current = null;
+      resumedCoachPromptRef.current = [];
     }
   };
 
@@ -2755,14 +2718,13 @@ export function ChatView({
   useEffect(() => {
     if (!api) return;
     const restoreResumedCoachPrompt = () => {
-      const originalPrompt = resumedCoachPromptRef.current;
-      resumedCoachPromptRef.current = null;
-      if (!originalPrompt) return;
+      const originals = new Map(resumedCoachPromptRef.current.map((prompt) => [prompt.promptId, prompt]));
+      resumedCoachPromptRef.current = [];
+      if (!originals.size) return;
       turnTimeline((prev) => {
         const next = prev.map((entry): ChatEntry =>
-          entry.kind === "coachPrompt" &&
-          entry.prompt.promptId === originalPrompt.promptId
-            ? { ...entry, prompt: originalPrompt }
+          entry.kind === "coachPrompt" && originals.has(entry.prompt.promptId)
+            ? { ...entry, prompt: originals.get(entry.prompt.promptId)! }
             : entry
         );
         persistTurn(next);
@@ -2806,7 +2768,7 @@ export function ChatView({
         });
         return;
       }
-      resumedCoachPromptRef.current = null;
+      resumedCoachPromptRef.current = [];
       if (finalText || coachPrompts.length > 0) {
         turnTimeline((prev) => {
           const closing: ChatEntry[] = [];
@@ -3028,7 +2990,7 @@ export function ChatView({
           // answer says it was cut short — the banner alone is gone by the
           // next reload, and the athlete should not take a truncated answer
           // for a finished one.
-          resumedCoachPromptRef.current = null;
+          resumedCoachPromptRef.current = [];
           turnTimeline((prev) => {
             let next = settleTurnEntries(
               prev,
@@ -3061,7 +3023,7 @@ export function ChatView({
           });
           // The notice under the answer says it, but only to someone reading there.
           failTurn(null);
-        } else if (resumedCoachPromptRef.current || turnPipelineRef.current) {
+        } else if (resumedCoachPromptRef.current.length > 0 || turnPipelineRef.current) {
           // Nothing reached the athlete, so the turn is simply undone: the
           // card goes back to waiting for an answer they can give again, and
           // a pipeline step's own card offers it again.
@@ -3675,21 +3637,29 @@ export function ChatView({
     return true;
   };
 
+  /**
+   * Whether a turn can start now. One turn at a time (UAT review): the view
+   * holds one turn's state, so a second conversation cannot answer while
+   * another does, and is told so.
+   */
+  const turnCanStart = (): boolean => {
+    if (!api || exportingLatestActivity) return false;
+    if (streaming) {
+      if (turnSessionIdRef.current !== activeSessionIdRef.current) onMessage?.(answeringElsewhere);
+      return false;
+    }
+    return true;
+  };
+
   const sendMessage = async (
     trimmed: string,
-    answeredPrompt?: { promptId: string; choiceId: string },
+    answeredPrompt?: { promptId: string; choiceId?: string },
     /** What the question is about, when a chip says so rather than the composer. */
     aboutRefs?: PlanRef[],
     /** A step of the plan pipeline (P2.2): the words shown, the step's turn sent. */
     pipeline?: ChatPipelineStep
   ): Promise<boolean> => {
-    if (!api || !trimmed || exportingLatestActivity) return false;
-    if (streaming) {
-      // One turn at a time (UAT review): the view holds one turn's state, so a
-      // second conversation cannot answer while another does.
-      if (turnSessionIdRef.current !== activeSessionIdRef.current) onMessage?.(answeringElsewhere);
-      return false;
-    }
+    if (!trimmed || !turnCanStart()) return false;
     if (isLatestActivityFileRequest(trimmed)) {
       await handleLatestActivityFileRequest(trimmed);
       return true;
@@ -3705,35 +3675,37 @@ export function ChatView({
             entry.prompt.answeredAt === undefined
         )
       : -1;
+    // Words typed while a card of several questions waits answer none of them
+    // in particular: they go as a message, and the card closes with what was
+    // picked on it, the rest skipped.
+    let closing = new Set<string>();
     if (answeredPromptIndex < 0 && !pipeline) {
-      for (let index = timeline.length - 1; index >= 0; index -= 1) {
-        const entry = timeline[index];
-        if (entry.kind === "coachPrompt" && entry.prompt.answeredAt === undefined) {
-          answeredPromptIndex = index;
-          break;
-        }
-      }
+      const waiting = lastWaitingQuestions(timeline);
+      if (waiting.length > 1) closing = new Set(questionsAt(timeline, waiting).map((prompt) => prompt.promptId));
+      else if (waiting.length === 1) answeredPromptIndex = waiting[0]!;
     }
     const promptEntry =
       answeredPromptIndex >= 0 ? timeline[answeredPromptIndex] : undefined;
     const originalPrompt =
       promptEntry?.kind === "coachPrompt" ? promptEntry.prompt : null;
-    const answeredTimeline = timeline.map((entry, index): ChatEntry =>
-      index === answeredPromptIndex && entry.kind === "coachPrompt"
-        ? {
-            ...entry,
-            prompt: {
-              ...entry.prompt,
-              answer: trimmed,
-              answeredAt: Date.now(),
-              selectedChoiceId:
-                answeredPrompt?.promptId === entry.prompt.promptId
-                  ? answeredPrompt.choiceId
-                  : undefined
-            }
-          }
-        : entry
-    );
+    const answeredTimeline = closing.size
+      ? answerQuestions(timeline, closing, questionPicks, Date.now())
+      : timeline.map((entry, index): ChatEntry =>
+          index === answeredPromptIndex && entry.kind === "coachPrompt"
+            ? {
+                ...entry,
+                prompt: {
+                  ...entry.prompt,
+                  answer: trimmed,
+                  answeredAt: Date.now(),
+                  selectedChoiceId:
+                    answeredPrompt?.promptId === entry.prompt.promptId
+                      ? answeredPrompt.choiceId
+                      : undefined
+                }
+              }
+            : entry
+        );
     const refs = originalPrompt ? [] : aboutRefs ?? pendingRefs;
     // A step and an answer to Coach's question are not about the calendar chips.
     const scheduleRefs = originalPrompt || aboutRefs || pipeline ? [] : pendingScheduleRefs;
@@ -3749,7 +3721,7 @@ export function ChatView({
         ];
     if (refs.length && !aboutRefs) setPendingRefs([]);
     if (scheduleRefs.length) setPendingScheduleRefs([]);
-    await startTurn(nextEntries, { previous: timeline, originalPrompt, pipeline });
+    await startTurn(nextEntries, { previous: timeline, originalPrompts: originalPrompt ? [originalPrompt] : [], pipeline });
     return true;
   };
 
@@ -3762,13 +3734,14 @@ export function ChatView({
     nextEntries: ChatEntry[],
     {
       previous,
-      originalPrompt = null,
+      originalPrompts = [],
       pipeline,
       persist = true
     }: {
       /** The timeline before this turn, put back when a step is refused. */
       previous: ChatEntry[];
-      originalPrompt?: CoachInputPrompt | null;
+      /** The questions this turn answers, as they were before: put back if it never answers. */
+      originalPrompts?: CoachInputPrompt[];
       pipeline?: ChatPipelineStep;
       persist?: boolean;
     }
@@ -3787,14 +3760,14 @@ export function ChatView({
     turnStartRef.current = nextEntries.length;
     turnQuestionRef.current = lastTurnQuestion(nextEntries);
     turnPipelineRef.current = Boolean(pipeline);
-    resumedCoachPromptRef.current = originalPrompt;
+    resumedCoachPromptRef.current = originalPrompts;
     sourceRef.current = null;
     setCurrentSource(null);
     setTimeline(nextEntries);
     // Keep the unanswered card durable until the resumed turn completes. If
     // the app closes mid-request, reloading the session can safely offer it
     // again instead of leaving an answered-but-incomplete invisible entry.
-    if (!originalPrompt && persist) {
+    if (!originalPrompts.length && persist) {
       persistHistory(sessionId, nextEntries, true);
     }
     setStreaming(true);
@@ -3863,12 +3836,12 @@ export function ChatView({
       setStreaming(false);
       // Written through the turn's own copy (`turnTimeline`), never the
       // screen's: the athlete may be reading another conversation by now.
-      if (originalPrompt) {
-        resumedCoachPromptRef.current = null;
+      if (originalPrompts.length) {
+        resumedCoachPromptRef.current = [];
+        const originals = new Map(originalPrompts.map((prompt) => [prompt.promptId, prompt]));
         const restoredEntries = previous.map((entry): ChatEntry =>
-          entry.kind === "coachPrompt" &&
-          entry.prompt.promptId === originalPrompt.promptId
-            ? { ...entry, prompt: originalPrompt }
+          entry.kind === "coachPrompt" && originals.has(entry.prompt.promptId)
+            ? { ...entry, prompt: originals.get(entry.prompt.promptId)! }
             : entry
         );
         turnTimeline(() => restoredEntries);
@@ -4171,7 +4144,8 @@ export function ChatView({
 
   /** Where in the transcript something waits on the athlete (R3), in order. */
   const waitingIndices = timeline.flatMap((entry, index) => {
-    if (entry.kind === "coachPrompt") return entry.prompt.answeredAt === undefined ? [index] : [];
+    // A card of several questions is one place to go, drawn at its first.
+    if (entry.kind === "coachPrompt") return waitingQuestionsAround(timeline, index)[0] === index ? [index] : [];
     if (entry.kind === "scheduleChange") {
       const set = scheduleChanges[entry.changeSetId];
       return set && proposedLines(set).length ? [index] : [];
@@ -4186,6 +4160,7 @@ export function ChatView({
   const waitingCount = waitingIndices.reduce((count, index) => {
     const entry = timeline[index];
     const set = entry?.kind === "scheduleChange" ? scheduleChanges[entry.changeSetId] : null;
+    if (entry?.kind === "coachPrompt") return count + waitingQuestionsAround(timeline, index).length;
     return count + (set ? proposedLines(set).length : 1);
   }, 0);
   const [waitingCursor, setWaitingCursor] = useState(0);
@@ -4202,8 +4177,32 @@ export function ChatView({
     });
   };
 
-  const handleCustomCoachAnswer = () => {
-    composerRef.current?.focus();
+  /** Words typed on a single question's card answer it, as a choice would. */
+  const handleCoachPromptWords = async (prompt: CoachInputPrompt, words: string) => {
+    await sendMessage(words, { promptId: prompt.promptId });
+  };
+
+  const pickQuestion = (promptId: string, pick: QuestionPick | undefined) =>
+    setQuestionPicks((current) => {
+      const next = { ...current };
+      if (pick?.choiceId || pick?.text) next[promptId] = pick;
+      else delete next[promptId];
+      return next;
+    });
+
+  /** A card of several questions, sent: every pick in one turn, the rest skipped. */
+  const sendCoachAnswers = async (prompts: readonly CoachInputPrompt[]) => {
+    if (!turnCanStart() || !providerReady()) return;
+    if (!prompts.some((prompt) => isPicked(questionPicks[prompt.promptId]))) return;
+    const ids = new Set(prompts.map((prompt) => prompt.promptId));
+    await startTurn(answerQuestions(timeline, ids, questionPicks, Date.now()), {
+      previous: timeline,
+      originalPrompts: timeline.flatMap((entry) =>
+        entry.kind === "coachPrompt" && ids.has(entry.prompt.promptId) && entry.prompt.answeredAt === undefined
+          ? [entry.prompt]
+          : []
+      )
+    });
   };
 
   /* Stop is asked of the main process and answered when the turn ends, which
@@ -4447,16 +4446,45 @@ export function ChatView({
     });
   };
 
+  /**
+   * Applying a later proposal dismisses the untouched ones of earlier answers
+   * (`supersededChangeSets`), each read again first: a line applied on the
+   * other machine meanwhile makes that card the athlete's to finish.
+   */
+  const dismissSuperseded = async (changeSetId: string) => {
+    if (!api) return;
+    const candidates = supersededChangeSets(timeline, changeSetId, scheduleChanges);
+    if (!candidates.length) return;
+    const fresh = await api.getScheduleChanges(candidates).catch(() => []);
+    for (const earlier of fresh.filter(isUntouched)) {
+      try {
+        const dismissed = await api.dismissScheduleChange(earlier.changeSetId);
+        setScheduleChanges((current) => ({ ...current, [earlier.changeSetId]: dismissed }));
+      } catch {
+        // Left as it was, still offering its lines.
+      }
+    }
+  };
+
   const settleScheduleChange = async (changeSetId: string, lineId: string | undefined, apply: boolean) => {
     if (!api || applyingChange) return;
     setApplyingChange({ changeSetId, lineId: lineId ?? "*" });
     onError(null);
+    const before = scheduleChanges[changeSetId];
     try {
       const set = apply
         ? await api.applyScheduleChange(changeSetId, lineId)
         : await api.dismissScheduleChange(changeSetId, lineId);
       setScheduleChanges((current) => ({ ...current, [changeSetId]: set }));
       if (apply) onPlanUploaded?.();
+      // Only once something landed: an apply that went stale or failed leaves
+      // the earlier proposal as the one still to hand.
+      const landed = set.lines.some(
+        (line) =>
+          line.status === "applied" &&
+          before?.lines.find((old) => old.lineId === line.lineId)?.status !== "applied"
+      );
+      if (apply && landed) await dismissSuperseded(changeSetId);
     } catch (caught) {
       onError(remoteErrorMessage(caught, apply ? t("chat.err.notApplied") : t("chat.err.notDismissed")));
       // What COROS did before the failure is in the row: read it again.
@@ -4558,12 +4586,9 @@ export function ChatView({
   const answeringElsewhere = `Coach is still answering in "${
     sessions.find((session) => session.id === turnSessionId)?.title ?? "another conversation"
   }". Send this when it has finished.`;
-  const waitingForCoachAnswer = [...timeline]
-    .reverse()
-    .some(
-      (entry) =>
-        entry.kind === "coachPrompt" && entry.prompt.answeredAt === undefined
-    );
+  // Words typed answer a single waiting question; next to a card of several
+  // they are a message of their own, so the composer does not call them an answer.
+  const waitingForCoachAnswer = lastWaitingQuestions(timeline).length === 1;
   const showLoginGate = isChatGptProvider && !authStatus?.signedIn;
   const showClaudeGate =
     isClaudeProvider && claudeStatus?.state !== "connected";
@@ -5252,7 +5277,7 @@ export function ChatView({
         <span className="chat-stream-status">
           {compacting
             ? t("chat.status.compacting")
-            : resumedCoachPromptRef.current
+            : resumedCoachPromptRef.current.length > 0
               ? t("chat.status.resuming")
               : t("chat.status.working")}
         </span>
@@ -5437,9 +5462,15 @@ export function ChatView({
           </>
         )
       : null;
+  /* A running turn's cards — a change set, a plan, a workout — wait for the
+     answer that proposes them, as its questions do (`pendingCoachPromptsRef`):
+     drawn the moment the tool returned, a card stood under an answer not yet
+     written and read as unexplained. A pipeline step is the exception, the
+     trail under its card is the step's progress. */
+  const holdTurnCards = turnHere && !stepActive;
   // `rows` is the timeline mapped one to one, so a row's index is its entry's.
   // The answer streams where it will settle (`settleTurnEntries`): under the
-  // turn's charts, above its other cards.
+  // turn's charts, with its other cards held back until it does.
   const withStreamingRow = (rows: ReactNode[]): ReactNode[] => {
     const at = Math.min(Math.max(0, turnStartRef.current), rows.length);
     const placed = streamingRow
@@ -5575,6 +5606,11 @@ export function ChatView({
             // Above the window: brought in by `TranscriptEarlier`. The row
             // stays in the list as a null so a row's index is still its entry's.
             if (index < renderFrom) return null;
+            if (holdTurnCards && index >= turnStartRef.current && !isChatVisualEntry(entry)) {
+              // Mounted by the settle, however the turn ends, so drawn as it is (`ChatRow`).
+              settledEntriesRef.current.add(entry);
+              return null;
+            }
             if (!chatSettings.visualizationsEnabled && isChatVisualEntry(entry)) {
               return null;
             }
@@ -5619,9 +5655,37 @@ export function ChatView({
                   >
                     <span className="chat-asked-kicker">{t("chat.asked")}</span>
                     <span className="chat-asked-question">{entry.prompt.question}</span>
-                    <span className="chat-asked-answer">
-                      {chosen?.label ?? entry.prompt.answer ?? ""}
+                    <span className={`chat-asked-answer${isSkipped(entry.prompt) ? " is-skipped" : ""}`}>
+                      {isSkipped(entry.prompt) ? t("chat.prompt.skipped") : chosen?.label ?? entry.prompt.answer ?? ""}
                     </span>
+                  </ChatRow>
+                );
+              }
+              const asked = waitingQuestionsAround(timeline, index);
+              // A card of several questions is drawn once, at its first question
+              // in the drawn window: one whose first question is above the
+              // window's top still shows.
+              if (asked.find((at) => at >= renderFrom) !== index) return null;
+              if (asked.length > 1) {
+                return (
+                  <ChatRow
+                    key={entry.prompt.promptId}
+                    settled={settled}
+                    className="chat-row chat-row-assistant"
+                    data-chat-entry-index={index}
+                  >
+                    <div className="chat-avatar chat-avatar-assistant">
+                      <MessageCircle size={16} aria-hidden="true" />
+                    </div>
+                    <div className="chat-bubble chat-bubble-coach-prompt">
+                      <CoachQuestionsCard
+                        prompts={questionsAt(timeline, asked)}
+                        picks={questionPicks}
+                        disabled={streaming || exportingLatestActivity}
+                        onPick={pickQuestion}
+                        onSend={() => void sendCoachAnswers(questionsAt(timeline, asked))}
+                      />
+                    </div>
                   </ChatRow>
                 );
               }
@@ -5636,13 +5700,13 @@ export function ChatView({
                     <MessageCircle size={16} aria-hidden="true" />
                   </div>
                   <div className="chat-bubble chat-bubble-coach-prompt">
-                    <CoachInputCard
+                    <CoachQuestionCard
                       prompt={entry.prompt}
                       disabled={streaming || exportingLatestActivity}
                       onChoose={(choice) =>
                         void handleCoachPromptChoice(entry.prompt, choice)
                       }
-                      onCustom={handleCustomCoachAnswer}
+                      onAnswer={(words) => void handleCoachPromptWords(entry.prompt, words)}
                     />
                   </div>
                 </ChatRow>

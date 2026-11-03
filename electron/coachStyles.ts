@@ -84,8 +84,8 @@ export function coachStyleInstructions(style: CoachStyle | undefined): string | 
   if (!entry.prompt) return undefined;
   return (
     "## Coach style\n" +
-    "Tone only: facts, advice and safety rules are unchanged, and card text (names, descriptions) stays " +
-    "plain — it goes to COROS and the watch.\n" +
+    "Tone only: facts, advice, safety rules and when to ask are unchanged, and card text (names, " +
+    "descriptions) stays plain — it goes to COROS and the watch.\n" +
     entry.prompt
   );
 }

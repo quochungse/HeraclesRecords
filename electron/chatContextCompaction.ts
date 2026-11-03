@@ -1,6 +1,7 @@
 import type {
   ChatMessage,
   ChatTokenUsage,
+  CoachInputPrompt,
   CompactContextSettings,
   CompactModelChoice,
   ContextDetail,
@@ -344,7 +345,8 @@ export function toWireMessages(
     }
     wire.push(message);
   };
-  for (const entry of entries) {
+  for (let index = 0; index < entries.length; index += 1) {
+    const entry = entries[index]!;
     if (entry.kind === "message") {
       // A placeholder names a chart of the turn it was written in; on a later
       // turn it would name nothing, or the wrong chart.
@@ -355,18 +357,69 @@ export function toWireMessages(
     } else if (ridesOnNextMessage(entry)) {
       events.push(wireNote(entry));
     } else if (entry.kind === "coachPrompt") {
-      const choices = entry.prompt.choices
-        .map((choice) => `- ${choice.label}`)
-        .join("\n");
+      const asked = askedTogether(entries, index);
+      index += asked.length - 1;
+      if (asked.length === 1) {
+        push({
+          role: "assistant",
+          content: `I need the athlete's answer before continuing:\n${entry.prompt.question}\n${choiceLines(entry.prompt)}`
+        });
+        if (isClosed(entry.prompt)) push({ role: "user", content: entry.prompt.answer || NO_ANSWER });
+        continue;
+      }
       push({
         role: "assistant",
-        content: `I need the athlete's answer before continuing:\n${entry.prompt.question}\n${choices}`
+        content: `I need the athlete's answers before continuing:\n${asked
+          .map((prompt, n) => `${n + 1}. ${prompt.question}\n${choiceLines(prompt)}`)
+          .join("\n")}`
       });
-      if (entry.prompt.answer) push({ role: "user", content: entry.prompt.answer });
+      if (asked.some(isClosed)) {
+        push({
+          role: "user",
+          content: asked.map((prompt, n) => `${n + 1}. ${prompt.answer || NO_ANSWER}`).join("\n")
+        });
+      }
     }
   }
   flushEvents();
   return wire;
+}
+
+/**
+ * A question the athlete has closed — answered, or skipped with nothing picked.
+ * A closed question always has its answer line, a skipped one `(no answer)`:
+ * a transcript cut by compaction can start inside a card, and one that ended
+ * on the coach's question would be a prefill, which Opus 4.6 and later refuse.
+ * A question still waiting has none.
+ */
+function isClosed(prompt: CoachInputPrompt): boolean {
+  return prompt.answeredAt !== undefined || Boolean(prompt.answer);
+}
+
+const NO_ANSWER = "(no answer)";
+
+/** A question's choices as the coach offered them, a line each. */
+function choiceLines(prompt: CoachInputPrompt): string {
+  return prompt.choices.map((choice) => `- ${choice.label}`).join("\n");
+}
+
+/**
+ * The questions asked in one call, from the one at `start`: the coach's
+ * questions that follow it with the same `answeredAt`, answered together or
+ * all still waiting. Two single questions from turns of their own can sit side
+ * by side — a turn that only asked, answered, then another — and were
+ * answered apart, so they stay two exchanges.
+ */
+function askedTogether(entries: readonly PersistedChatEntry[], start: number): CoachInputPrompt[] {
+  const first = entries[start];
+  if (first?.kind !== "coachPrompt") return [];
+  const asked = [first.prompt];
+  for (let index = start + 1; index < entries.length; index += 1) {
+    const entry = entries[index]!;
+    if (entry.kind !== "coachPrompt" || entry.prompt.answeredAt !== first.prompt.answeredAt) break;
+    asked.push(entry.prompt);
+  }
+  return asked;
 }
 
 type WireNoteEntry = Extract<PersistedChatEntry, { kind: "planEvent" | "planRefs" | "scheduleRefs" }>;

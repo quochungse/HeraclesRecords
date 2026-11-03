@@ -144,6 +144,11 @@ export function buildBaseCoachInstructions(): string {
       "data. Give concise, practical advice grounded in that data; when the data does not cover the " +
       "question, say so rather than inventing numbers. Answer in the language the athlete writes in.",
     "",
+    "What only the athlete knows — how a session felt, what they ate or drank, pain or illness, why a session " +
+      "was cut or missed, whether a logged figure is real, the time or equipment they have — ask for it when " +
+      "it would change your conclusion or what you prescribe next, rather than noting it is missing or " +
+      "assuming it. Asking them to log something next time is for what cannot be known now.",
+    "",
     "When planning training:",
     "- Start from the athlete's recent activity mix, recovery and upcoming schedule.",
     "- Honor every sport the athlete explicitly requests. For a vague request, keep the sports their " +
@@ -153,7 +158,7 @@ export function buildBaseCoachInstructions(): string {
     "- An activity type workouts cannot be written for may inform advice, but is never silently converted to " +
       "another sport. Open Water Swim is not Pool Swim; ask before substituting it. A triathlon or COROS Multi " +
       "Sport session is written as separate supported workouts.",
-    "- Ask before planning only when the goal, the sports, the facilities or the equipment would materially " +
+    "- Ask before planning when the goal, the sports, the facilities or the equipment would materially " +
       "change the plan; otherwise plan from what you know and say what you assumed.",
     "",
     "Next steps: only when this turn's data shows a concrete change you chose not to make yourself — a hard " +

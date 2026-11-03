@@ -327,3 +327,33 @@ function englishCardDay(day: string): string {
 export function scheduleChangeIds(entries: readonly (ChatEntry | PersistedChatEntry)[]): string[] {
   return [...new Set(entries.flatMap((entry) => (entry.kind === "scheduleChange" ? [entry.changeSetId] : [])))];
 }
+
+/** Nothing on it decided yet: every line still proposed. */
+export function isUntouched(set: ScheduleChangeSet): boolean {
+  return set.lines.length > 0 && set.lines.every((line) => line.status === "proposed");
+}
+
+/**
+ * The proposals of earlier answers that `changeSetId`, once applied, replaces:
+ * a later answer that proposes again is Coach updating what it proposed, and
+ * an untouched card above it would still offer the old version.
+ *
+ * Earlier means above the nearest message or question over the card: the
+ * cards one answer leaves sit together under it, and an answer to Coach's
+ * question writes no message of its own. Only a set read untouched is named;
+ * one the athlete has acted on is theirs to finish.
+ */
+export function supersededChangeSets(
+  entries: readonly (ChatEntry | PersistedChatEntry)[],
+  changeSetId: string,
+  sets: Readonly<Record<string, ScheduleChangeSet | null | undefined>>
+): string[] {
+  const at = entries.findIndex((entry) => entry.kind === "scheduleChange" && entry.changeSetId === changeSetId);
+  let answer = at - 1;
+  while (answer >= 0 && entries[answer].kind !== "message" && entries[answer].kind !== "coachPrompt") answer -= 1;
+  if (answer < 0) return [];
+  return scheduleChangeIds(entries.slice(0, answer)).filter((id) => {
+    const set = sets[id];
+    return id !== changeSetId && Boolean(set) && isUntouched(set!);
+  });
+}

@@ -164,6 +164,9 @@ const { MAX_CUSTOM_COACH_INSTRUCTIONS } = await import(
   `${distUrl("types.js")}?cacheBust=${Date.now()}`
 );
 const baseCoachInstructions = buildBaseCoachInstructions();
+// What only the athlete knows is asked for, not noted as missing or assumed.
+assert.match(baseCoachInstructions, /What only the athlete knows[\s\S]*?ask for it when\s+it would change your conclusion/);
+assert.doesNotMatch(baseCoachInstructions, /Ask before planning only when/);
 assert.equal(buildCoachInstructions(), baseCoachInstructions);
 assert.equal(buildCoachInstructions("   \n\t"), baseCoachInstructions);
 const customized = buildCoachInstructions("  Only schedule runs on Tue/Thu/Sat.  ");
@@ -188,7 +191,8 @@ assert.equal(
 
 const interactionTool = getChatInteractionTools()[0];
 assert.equal(interactionTool.name, "request_coach_input");
-assert.deepEqual(interactionTool.inputSchema.required, ["question", "choices"]);
+assert.deepEqual(interactionTool.inputSchema.required, ["questions"]);
+assert.equal(interactionTool.inputSchema.properties.questions.maxItems, 3, "a turn asks at most three questions");
 
 const prompt = buildCoachInputPrompt(
   {
@@ -232,7 +236,30 @@ const interactionResult = JSON.parse(
   )
 );
 assert.equal(interactionResult.status, "waiting_for_athlete");
-assert.equal(emittedPrompt.allowCustom, false);
+assert.equal(emittedPrompt.allowCustom, false, "the one-question shape of old still asks one question");
+
+// One call carries up to three questions, each its own card, in order.
+{
+  const emitted = [];
+  const ask = (count) => ({
+    questions: Array.from({ length: count }, (_, n) => ({
+      question: `Question ${n + 1}?`,
+      choices: [{ label: "Yes" }, { label: "No" }]
+    }))
+  });
+  const result = JSON.parse(handleChatInteractionTool("request_coach_input", ask(3), (next) => emitted.push(next)));
+  assert.deepEqual(emitted.map((next) => next.question), ["Question 1?", "Question 2?", "Question 3?"]);
+  assert.deepEqual(result.prompt_ids, emitted.map((next) => next.promptId));
+  assert.equal(new Set(result.prompt_ids).size, 3);
+  // Past the limit the call is refused whole, as an answer rather than an
+  // error: the athlete sees no error line, and nothing is asked.
+  const refused = JSON.parse(handleChatInteractionTool("request_coach_input", ask(4), () => assert.fail("nothing is asked")));
+  assert.deepEqual([refused.ok, refused.error_code], [false, "question_limit"]);
+  assert.match(refused.action, /at most 3/);
+  const spent = JSON.parse(handleChatInteractionTool("request_coach_input", ask(1), () => assert.fail("nothing is asked"), "interactive", 3));
+  assert.match(spent.action, /End this response now/, "a turn that has asked three asks no more");
+  assert.throws(() => handleChatInteractionTool("request_coach_input", { questions: [] }), /at least one question/);
+}
 
 const responsesRequest = buildResponsesRequest(
   "gpt-test",
@@ -1266,7 +1293,7 @@ assert.equal(
       continue;
     }
     assert.match(block, /^## Coach style\n/);
-    assert.match(block, /Tone only: facts, advice and safety rules are unchanged/, `${style} changes tone, not facts`);
+    assert.match(block, /Tone only: facts, advice, safety rules and when to ask are unchanged/, `${style} changes tone, not facts or asking`);
     assert.match(block, /card text \(names, descriptions\) stays plain/, `${style} never reaches a card`);
   }
   const unfiltered = coachStyleInstructions("unfiltered");

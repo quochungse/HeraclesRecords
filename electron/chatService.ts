@@ -1888,6 +1888,7 @@ export async function streamChat(
   } finally {
     if (ownsReach) runTools.delete(requestId);
     turnSessions.delete(requestId);
+    turnQuestions.delete(requestId);
     runCards.delete(requestId);
     turnCharts.delete(requestId);
   }
@@ -1895,6 +1896,9 @@ export async function streamChat(
 
 /** The conversation each turn in flight belongs to, for the tools that file something under it. */
 const turnSessions = new Map<string, string>();
+
+/** How many questions each turn in flight has asked the athlete, against `MAX_COACH_QUESTIONS`. */
+const turnQuestions = new Map<string, number>();
 
 /**
  * The cards an analysis run has left, by request id (P3.4, D4): a run nobody
@@ -3419,17 +3423,21 @@ async function executeChatTool(
     });
   }
   if (isChatInteractionTool(name)) {
+    // A turn's questions are one card, however many calls asked them: a model
+    // that splits them into parallel calls still asks, up to the turn's limit.
     return handleChatInteractionTool(
       name as ChatInteractionToolName,
       args,
       (prompt) => {
+        turnQuestions.set(requestId, (turnQuestions.get(requestId) ?? 0) + 1);
         send("chat:streamInfo", {
           requestId,
           kind: "coachPrompt",
           prompt
         });
       },
-      toolPolicy
+      toolPolicy,
+      turnQuestions.get(requestId) ?? 0
     );
   }
   if (isChatWorkoutTool(name)) {
@@ -3570,6 +3578,7 @@ export function drawChartForTests(requestId: string, previewId: string): string 
 
 export function endRunForTests(requestId: string): void {
   turnSessions.delete(requestId);
+  turnQuestions.delete(requestId);
   turnCharts.delete(requestId);
   runCards.delete(requestId);
 }
@@ -3614,6 +3623,12 @@ async function resolveModelAndOpenStream(
     // Resolve for each actual candidate (Auto can try another model). Never
     // send a level absent from that model's account-provided configuration.
     const effort = reasoningEffortForModel("chatgpt", selectedEffort ?? "", catalog?.find((entry) => entry.value === model));
+    // ChatGPT routes its prompt cache by this header, so it names the
+    // conversation, not the turn: with a new id per turn the next turn read
+    // none of the prefix the last one wrote (0 of 17.9k tokens, probed), with
+    // the conversation's it read 17.7k. Both spellings go: Codex sent
+    // session_id and now sends session-id, and the backend read either.
+    const cacheSession = turnSessions.get(requestId) ?? requestId;
     const open = (includeReasoningSummary: boolean) =>
       fetch(RESPONSES_URL, {
         method: "POST",
@@ -3625,7 +3640,8 @@ async function resolveModelAndOpenStream(
           "OpenAI-Beta": "responses=experimental",
           originator: RESPONSES_ORIGINATOR,
           "User-Agent": RESPONSES_USER_AGENT,
-          session_id: requestId,
+          session_id: cacheSession,
+          "session-id": cacheSession,
           ...(token.account_id ? { "chatgpt-account-id": token.account_id } : {})
         },
         body: JSON.stringify(
@@ -3831,10 +3847,12 @@ export function withLiveToolInstructions(
     sections.push(
       "",
       "## Athlete questions",
-      "When you need an answer before continuing, call request_coach_input — at most once per turn — with one " +
-        "concise question and 2–5 distinct choices, the recommended one first, each description stating the " +
-        "tradeoff that matters. Never ask a clarifying question only in prose. After calling it, stop and wait " +
-        "for the athlete's next message."
+      "Ask the athlete through request_coach_input — once per turn, with one to three concise questions in that " +
+        "call, only as many as are worth asking — each with 2–5 distinct choices, the recommended one first, each " +
+        "description stating the tradeoff that matters. Never ask a question only in prose. When your answer can " +
+        "stand without theirs, write it first and ask at the end; ask first only when you cannot answer without " +
+        "it, and then before reading data the answer would change. After calling it, stop and wait for the " +
+        "athlete's next message."
     );
   }
   return sections.join("\n");
@@ -3876,7 +3894,8 @@ function workoutToolGuide(
       ? "- Rearranging the calendar (a missed day, an illness, a busy week) → read it with " +
         "list_scheduled_workouts, then call propose_schedule_changes once with every move, replacement, removal " +
         "and addition the week needs, rather than drafting new workouts: a plan's session moved or replaced " +
-        "that way stays in its plan."
+        "that way stays in its plan. A revised proposal restates every change still wanted, since applying it " +
+        "dismisses the earlier proposals the athlete has not touched."
       : undefined,
     has("propose_schedule_changes")
       ? "- Changing part of a saved workout (a calendar session or a library workout: a target, a pace, the reps, " +

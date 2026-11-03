@@ -27,6 +27,7 @@ Module._load = function patchedLoad(request, ...rest) {
 };
 
 const {
+  callChatToolForTests,
   countableUsage,
   createCollectorSink,
   createWindowSink,
@@ -226,6 +227,23 @@ endRunForTests("turn-a");
 assert.equal(drawChartForTests("turn-a", "trend"), "c1", "a finished turn's handles go with it");
 endRunForTests("turn-a");
 endRunForTests("turn-b");
+// A turn asks at most three questions, however many calls ask them — a model
+// splitting them into parallel calls still asks, and they land side by side as
+// one card. Past three a call is refused as an answer, not an error.
+{
+  const asking = (count) => ({
+    questions: Array.from({ length: count }, (_, n) => ({ question: `Q${n}?`, choices: [{ label: "Yes" }, { label: "No" }] }))
+  });
+  const run = { requestId: "turn-ask", toolPolicy: "interactive" };
+  const ask = async (count) => JSON.parse(await callChatToolForTests("request_coach_input", asking(count), run));
+  assert.equal((await ask(1)).status, "waiting_for_athlete");
+  assert.equal((await ask(2)).status, "waiting_for_athlete", "a second call fills the turn's three");
+  const refused = await ask(1);
+  assert.deepEqual([refused.ok, refused.error_code], [false, "question_limit"], "a fourth question is refused");
+  endRunForTests("turn-ask");
+  assert.equal((await ask(3)).status, "waiting_for_athlete", "the next turn asks again");
+  endRunForTests("turn-ask");
+}
 const chartGuide = withLiveToolInstructions("Coach.", [
   { name: "get_activity_detail", description: "", inputSchema: {} }
 ]);
@@ -264,7 +282,8 @@ for (const rule of [
   /exercise_resolution_required/,
   /call the same draft tool again in the same response/,
   /typed intensity field/,
-  /request_coach_input — at most once per turn/,
+  /request_coach_input — once per turn, with one to three concise questions/,
+  /write it first and ask\s+at the end/,
   /Nothing you call writes to COROS/,
   /Every sport takes step kinds/
 ]) {

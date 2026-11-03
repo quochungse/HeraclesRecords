@@ -988,7 +988,7 @@ export async function streamClaudeCodeCompletion(
     const stream = sdk.query({
       prompt: options.plainPrompt
         ? options.messages.map((message) => message.content).join("\n\n")
-        : formatClaudePrompt(options.messages),
+        : claudePrompt(options.messages),
       options: {
         abortController: controller,
         pathToClaudeCodeExecutable: options.executablePath,
@@ -1170,22 +1170,41 @@ function jsonSchemaToZodShape(
   return shape;
 }
 
-function formatClaudePrompt(messages: ChatMessage[]): string {
-  // Every message, as every other provider sends them: what a conversation
-  // sends is bounded where it is planned (`planTranscriptContext`). A cut to the
-  // last 30 here took the condensed layer between the summary and the tail —
-  // turns neither sent nor summarised, and past what recall could reach.
-  const transcript = messages
-    .map(
-      (message) =>
-        `${message.role === "assistant" ? "Assistant" : "Athlete"}: ${message.content}`
-    )
-    .join("\n\n");
-  return (
-    "Continue the Heracles Records Coach conversation below. Answer the athlete's latest " +
-    "message, using approved tools only when they materially help.\n\n" +
-    transcript
-  );
+/**
+ * The conversation as Claude Code is handed it: one user message, a text block
+ * saying what it is, then a block per message. Claude Code caches by block, so
+ * the blocks the last turn sent are a prefix this turn reads back and only the
+ * new ones are written. Joined into one string, the transcript was a new block
+ * every turn and went into the cache again in full: 19.2k tokens written where
+ * the same transcript in blocks wrote 0.8k (probed).
+ *
+ * Every message, as every other provider sends them: what a conversation
+ * sends is bounded where it is planned (`planTranscriptContext`). A cut to the
+ * last 30 here took the condensed layer between the summary and the tail —
+ * turns neither sent nor summarised, and past what recall could reach.
+ */
+export function claudePromptBlocks(messages: ChatMessage[]): { type: "text"; text: string }[] {
+  return [
+    {
+      type: "text",
+      text:
+        "Continue the Heracles Records Coach conversation below. Answer the athlete's latest " +
+        "message, using approved tools only when they materially help."
+    },
+    ...messages.map((message) => ({
+      type: "text" as const,
+      text: `${message.role === "assistant" ? "Assistant" : "Athlete"}: ${message.content}`
+    }))
+  ];
+}
+
+async function* claudePrompt(messages: ChatMessage[]) {
+  yield {
+    type: "user" as const,
+    session_id: "",
+    parent_tool_use_id: null,
+    message: { role: "user" as const, content: claudePromptBlocks(messages) }
+  };
 }
 
 async function execClaude(

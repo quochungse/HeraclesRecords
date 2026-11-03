@@ -7,8 +7,10 @@
 //   * the card is read from its row through its anchor, so it is there after
 //     a reload with the state its lines settled in;
 //   * a line is applied on its own, and Apply all names how many are left;
-//   * a proposal that arrives in a turn is drawn at once and anchored in the
-//     saved transcript;
+//   * a proposal that arrives in a turn waits for its answer and is anchored
+//     in the saved transcript;
+//   * applying a later answer's proposal dismisses the earlier ones nobody
+//     has touched;
 //   * a delete card from before change sets is drawn and offers nothing.
 import assert from "node:assert/strict";
 import path from "node:path";
@@ -234,7 +236,8 @@ async function main() {
   await waitFor(async () => (await lineStates())[2][0] === "dismissed", "the line is dismissed");
   assert.deepEqual((await harness("calls", "dismissScheduleChange"))[0].args, ["sc-1", "l3"]);
 
-  // A proposal that arrives in a turn is drawn at once and saved as an anchor.
+  // A proposal that arrives in a turn waits for the answer, is drawn under it,
+  // and is saved as an anchor.
   await harness("mount", "ChatView", {}, { ...BASE_SCRIPT, getChatSession: TRANSCRIPT.slice(0, 2), getScheduleChanges: [] });
   await waitFor(() => harness("exists", ".chat-composer textarea, textarea"), "the composer is up");
   await harness("setValue", "textarea", "Move my long run");
@@ -247,15 +250,95 @@ async function main() {
     kind: "scheduleChange",
     changeSet: { ...SET, changeSetId: "sc-2", summary: "Long run to Sunday", lines: [SET.lines[0]] }
   });
-  await waitFor(async () => (await harness("text", ".chat-change-card h4")) === "Long run to Sunday", "drawn as it arrives");
-  assert.equal(await harness("exists", ".chat-change-card .chat-plan-upload"), false, "one line needs no Apply all");
+  await settle();
+  assert.equal(await harness("exists", ".chat-change-card"), false, "not drawn before the answer that proposes it");
   await harness("emit", "onChatStreamDone", { requestId, fullText: "Moved to Sunday, if you apply it." });
+  await waitFor(async () => (await harness("text", ".chat-change-card h4")) === "Long run to Sunday", "drawn once the turn settles");
+  assert.equal(
+    await page(`(() => {
+      const rows = [...document.querySelectorAll(".chat-thread > .chat-row")];
+      const card = rows.findIndex((row) => row.querySelector(".chat-change-card"));
+      return card > 0 && /Moved to Sunday/.test(rows[card - 1].textContent);
+    })()`),
+    true,
+    "under the answer"
+  );
+  assert.equal(await harness("exists", ".chat-change-card .chat-plan-upload"), false, "one line needs no Apply all");
   await settle();
   const saved = (await harness("calls", "saveChatSession")).at(-1)?.args[1] ?? [];
   assert.ok(
     saved.some((entry) => entry.kind === "scheduleChange" && entry.changeSetId === "sc-2" && Object.keys(entry).length === 2),
     "the transcript keeps an anchor, not the set"
   );
+
+  // Applying a later answer's proposal dismisses the earlier ones nobody has
+  // touched; one with a line applied, and another card of the same answer, stay.
+  {
+    const set = (changeSetId, summary, lines) => ({ ...SET, changeSetId, summary, lines });
+    const EARLIER = set("sc-a", "First go", [line("l1", "move", 'Move "Long run" to Sun 28 Sep'), line("l2", "remove", 'Remove "Strides" from Fri 26 Sep')]);
+    const TOUCHED = set("sc-b", "Touched", [line("l1", "move", 'Move "Tempo" to Fri 26 Sep', "applied"), line("l2", "remove", 'Remove "Hills" from Wed 24 Sep')]);
+    const SIBLING = set("sc-c", "Same answer", [line("l1", "remove", 'Remove "Core" from Thu 25 Sep')]);
+    const LATER = set("sc-d", "Second go", [line("l1", "move", 'Move "Long run" to Sat 27 Sep')]);
+    const transcript = [
+      { kind: "message", role: "user", content: "I'm ill this week, rearrange it" },
+      { kind: "message", role: "assistant", content: "Here is a gentler week." },
+      { kind: "scheduleChange", changeSetId: "sc-a" },
+      { kind: "scheduleChange", changeSetId: "sc-b" },
+      {
+        kind: "coachPrompt",
+        prompt: {
+          promptId: "q-1",
+          question: "Saturday or Sunday?",
+          allowCustom: false,
+          choices: [{ id: "sat", label: "Saturday", response: "Saturday" }],
+          selectedChoiceId: "sat",
+          answeredAt: "2026-09-26T06:05:00.000Z"
+        }
+      },
+      { kind: "message", role: "assistant", content: "Saturday it is." },
+      { kind: "scheduleChange", changeSetId: "sc-c" },
+      { kind: "scheduleChange", changeSetId: "sc-d" }
+    ];
+    const cardStates = (changeSetId) =>
+      page(`[...document.querySelectorAll('.chat-change-card[data-change-set-id="${changeSetId}"] .chat-change-line')].sort((a, b) => a.dataset.lineId.localeCompare(b.dataset.lineId)).map((row) => row.dataset.status)`);
+    const script = (applied) => ({
+      ...BASE_SCRIPT,
+      getChatSession: transcript,
+      __byArg: {
+        getScheduleChanges: { '["sc-a"]': [EARLIER], "*": [EARLIER, TOUCHED, SIBLING, LATER] },
+        dismissScheduleChange: { '"sc-a"': { ...EARLIER, lines: EARLIER.lines.map((item) => ({ ...item, status: "dismissed" })) } }
+      },
+      applyScheduleChange: { ...LATER, lines: [{ ...LATER.lines[0], ...applied }] }
+    });
+
+    // An apply that lands nothing leaves the earlier proposal to hand.
+    await harness("mount", "ChatView", {}, script({ status: "stale", reason: "Sat 27 Sep has passed." }));
+    await waitFor(async () => (await harness("count", ".chat-change-card")) === 4, "every proposal is drawn");
+    await harness("clearCalls");
+    await harness("click", '.chat-change-card[data-change-set-id="sc-d"] .chat-change-apply');
+    await waitFor(async () => (await cardStates("sc-d"))[0] === "stale", "the later line goes out of date");
+    await settle();
+    assert.equal(await harness("callCount", "dismissScheduleChange"), 0, "nothing landed, so nothing is dismissed");
+
+    await harness("mount", "ChatView", {}, script({ status: "applied" }));
+    await waitFor(async () => (await harness("count", ".chat-change-card")) === 4, "every proposal is drawn again");
+    await harness("clearCalls");
+    await harness("click", '.chat-change-card[data-change-set-id="sc-d"] .chat-change-apply');
+    await waitFor(async () => (await cardStates("sc-a")).every((status) => status === "dismissed"), "the earlier proposal is dismissed");
+    assert.deepEqual(
+      (await harness("calls", "getScheduleChanges")).at(-1).args[0],
+      ["sc-a"],
+      "only the untouched proposal of an earlier answer is read again"
+    );
+    assert.deepEqual(
+      (await harness("calls", "dismissScheduleChange")).map((call) => call.args[0]),
+      ["sc-a"],
+      "and only it is dismissed"
+    );
+    assert.deepEqual(await cardStates("sc-b"), ["applied", "proposed"], "a proposal already acted on is the athlete's to finish");
+    assert.deepEqual(await cardStates("sc-c"), ["proposed"], "a card of the same answer is not replaced by its sibling");
+    assert.deepEqual(await cardStates("sc-d"), ["applied"]);
+  }
 
   // P3.5: the calendar points at a session, and the chip rides in front of the question.
   const REF = { scope: "session", day: "20260927", planId: "R1", idInPlan: "5", label: "Sat 27 Sep · Long run" };
