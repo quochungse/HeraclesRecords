@@ -3614,6 +3614,12 @@ async function resolveModelAndOpenStream(
     // Resolve for each actual candidate (Auto can try another model). Never
     // send a level absent from that model's account-provided configuration.
     const effort = reasoningEffortForModel("chatgpt", selectedEffort ?? "", catalog?.find((entry) => entry.value === model));
+    // ChatGPT routes its prompt cache by this header, so it names the
+    // conversation, not the turn: with a new id per turn the next turn read
+    // none of the prefix the last one wrote (0 of 17.9k tokens, probed), with
+    // the conversation's it read 17.7k. Both spellings go: Codex sent
+    // session_id and now sends session-id, and the backend read either.
+    const cacheSession = turnSessions.get(requestId) ?? requestId;
     const open = (includeReasoningSummary: boolean) =>
       fetch(RESPONSES_URL, {
         method: "POST",
@@ -3625,7 +3631,8 @@ async function resolveModelAndOpenStream(
           "OpenAI-Beta": "responses=experimental",
           originator: RESPONSES_ORIGINATOR,
           "User-Agent": RESPONSES_USER_AGENT,
-          session_id: requestId,
+          session_id: cacheSession,
+          "session-id": cacheSession,
           ...(token.account_id ? { "chatgpt-account-id": token.account_id } : {})
         },
         body: JSON.stringify(

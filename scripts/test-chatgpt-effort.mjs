@@ -40,24 +40,27 @@ const models = parseCodexModels({ models: [
 database.setSetting(MODEL_CATALOG_KEYS.chatgpt, serializeCatalog(models));
 
 let requests = [];
+let sessionHeaders = [];
 let rejectSummary = false;
 let rejectSavedModel = false;
 globalThis.fetch = async (url, init) => {
   assert.equal(url, "https://chatgpt.com/backend-api/codex/responses", "no external request escapes the stub");
   const body = JSON.parse(init.body);
   requests.push(body);
+  sessionHeaders.push([init.headers.session_id, init.headers["session-id"]]);
   if (rejectSavedModel && body.model === "gpt-saved") return new Response("model is not supported", { status: 400 });
   if (rejectSummary && body.reasoning?.summary) return new Response("reasoning summary unsupported", { status: 400 });
   return new Response('data: {"type":"response.output_text.delta","delta":"Ready"}\n\ndata: {"type":"response.completed","response":{}}\n\n', {
     headers: { "Content-Type": "text/event-stream" }
   });
 };
-async function run(runtime = {}) {
+async function run(runtime = {}, sessionId) {
   requests = [];
+  sessionHeaders = [];
   const events = [];
   await chat.streamChat({ emit: (channel, payload) => events.push({ channel, payload }) },
     `effort-${Date.now()}`, [{ role: "user", content: "Test reasoning" }], {
-      runtime, toolPolicy: "none", textJob: { system: "Reply briefly" }
+      runtime, toolPolicy: "none", textJob: { system: "Reply briefly" }, ...(sessionId ? { sessionId } : {})
     });
   assert.equal(events.some((event) => event.channel === "chat:streamDone"), true, JSON.stringify(events));
   assert.equal(events.some((event) => event.channel === "chat:streamError"), false);
@@ -97,7 +100,12 @@ const compression = resolveCompressionRuntime(undefined, auto, {
 assert.deepEqual(compression.runtime, { ...auto, effort: "low" },
   "conversation-model compression preserves Auto through to the provider request");
 assert.equal((await run(compression.runtime))[0].model, "gpt-override");
-console.log("ChatGPT effort OK — dynamic metadata, saved settings, runtime overrides, defaults, summary retry, Auto fallback");
+for (let turn = 0; turn < 2; turn++) {
+  await run({}, "conversation-a");
+  assert.deepEqual(sessionHeaders[0], ["conversation-a", "conversation-a"],
+    "every turn of a conversation sends the header ChatGPT routes its prompt cache by");
+}
+console.log("ChatGPT effort OK — dynamic metadata, saved settings, runtime overrides, defaults, summary retry, Auto fallback, cache session");
 database.closeDatabase();
 fs.rmSync(temporary, { recursive: true, force: true });
 process.exit(0);
