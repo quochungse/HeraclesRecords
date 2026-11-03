@@ -1888,7 +1888,7 @@ export async function streamChat(
   } finally {
     if (ownsReach) runTools.delete(requestId);
     turnSessions.delete(requestId);
-    turnsAsked.delete(requestId);
+    turnQuestions.delete(requestId);
     runCards.delete(requestId);
     turnCharts.delete(requestId);
   }
@@ -1897,8 +1897,8 @@ export async function streamChat(
 /** The conversation each turn in flight belongs to, for the tools that file something under it. */
 const turnSessions = new Map<string, string>();
 
-/** The turns in flight that have asked the athlete already: one call each. */
-const turnsAsked = new Set<string>();
+/** How many questions each turn in flight has asked the athlete, against `MAX_COACH_QUESTIONS`. */
+const turnQuestions = new Map<string, number>();
 
 /**
  * The cards an analysis run has left, by request id (P3.4, D4): a run nobody
@@ -3423,28 +3423,22 @@ async function executeChatTool(
     });
   }
   if (isChatInteractionTool(name)) {
-    // Every question of a turn goes in its one call: they are drawn as one
-    // card answered together, and a second call would be a second card the
-    // athlete answers apart, a turn each.
-    if (turnsAsked.has(requestId)) {
-      throw new Error(
-        "request_coach_input was already called in this response; the athlete has those questions. End this response now."
-      );
-    }
-    const answer = handleChatInteractionTool(
+    // A turn's questions are one card, however many calls asked them: a model
+    // that splits them into parallel calls still asks, up to the turn's limit.
+    return handleChatInteractionTool(
       name as ChatInteractionToolName,
       args,
       (prompt) => {
+        turnQuestions.set(requestId, (turnQuestions.get(requestId) ?? 0) + 1);
         send("chat:streamInfo", {
           requestId,
           kind: "coachPrompt",
           prompt
         });
       },
-      toolPolicy
+      toolPolicy,
+      turnQuestions.get(requestId) ?? 0
     );
-    turnsAsked.add(requestId);
-    return answer;
   }
   if (isChatWorkoutTool(name)) {
     const generation = planGenerations.get(requestId);
@@ -3584,7 +3578,7 @@ export function drawChartForTests(requestId: string, previewId: string): string 
 
 export function endRunForTests(requestId: string): void {
   turnSessions.delete(requestId);
-  turnsAsked.delete(requestId);
+  turnQuestions.delete(requestId);
   turnCharts.delete(requestId);
   runCards.delete(requestId);
 }

@@ -251,8 +251,13 @@ assert.equal(emittedPrompt.allowCustom, false, "the one-question shape of old st
   assert.deepEqual(emitted.map((next) => next.question), ["Question 1?", "Question 2?", "Question 3?"]);
   assert.deepEqual(result.prompt_ids, emitted.map((next) => next.promptId));
   assert.equal(new Set(result.prompt_ids).size, 3);
-  assert.throws(() => handleChatInteractionTool("request_coach_input", ask(4), () => assert.fail("nothing is asked")),
-    /at most 3 questions/, "four questions are refused whole");
+  // Past the limit the call is refused whole, as an answer rather than an
+  // error: the athlete sees no error line, and nothing is asked.
+  const refused = JSON.parse(handleChatInteractionTool("request_coach_input", ask(4), () => assert.fail("nothing is asked")));
+  assert.deepEqual([refused.ok, refused.error_code], [false, "question_limit"]);
+  assert.match(refused.action, /at most 3/);
+  const spent = JSON.parse(handleChatInteractionTool("request_coach_input", ask(1), () => assert.fail("nothing is asked"), "interactive", 3));
+  assert.match(spent.action, /End this response now/, "a turn that has asked three asks no more");
   assert.throws(() => handleChatInteractionTool("request_coach_input", { questions: [] }), /at least one question/);
 }
 

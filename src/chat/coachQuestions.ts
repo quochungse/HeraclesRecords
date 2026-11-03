@@ -57,19 +57,31 @@ export function answerQuestion(prompt: CoachInputPrompt, pick: QuestionPick | un
   };
 }
 
-/** The entries with these questions answered from their picks, all at one moment. */
+/**
+ * The entries with these questions answered from their picks, all at one
+ * moment — the moment that says, on the wire, they were answered together.
+ * Named by id, not position: what a card was drawn from may have moved by the
+ * time it is sent.
+ */
 export function answerQuestions(
   entries: readonly ChatEntry[],
-  indices: readonly number[],
+  promptIds: ReadonlySet<string>,
   picks: Readonly<Record<string, QuestionPick>>,
   at: number
 ): ChatEntry[] {
-  const chosen = new Set(indices);
-  return entries.map((entry, index): ChatEntry =>
-    chosen.has(index) && entry.kind === "coachPrompt"
+  return entries.map((entry): ChatEntry =>
+    entry.kind === "coachPrompt" && entry.prompt.answeredAt === undefined && promptIds.has(entry.prompt.promptId)
       ? { ...entry, prompt: answerQuestion(entry.prompt, picks[entry.prompt.promptId], at) }
       : entry
   );
+}
+
+/** The questions at these positions. */
+export function questionsAt(entries: readonly ChatEntry[], indices: readonly number[]): CoachInputPrompt[] {
+  return indices.flatMap((index) => {
+    const entry = entries[index];
+    return entry?.kind === "coachPrompt" ? [entry.prompt] : [];
+  });
 }
 
 /** A question closed with nothing picked. */

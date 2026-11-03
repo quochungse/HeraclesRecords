@@ -227,16 +227,21 @@ endRunForTests("turn-a");
 assert.equal(drawChartForTests("turn-a", "trend"), "c1", "a finished turn's handles go with it");
 endRunForTests("turn-a");
 endRunForTests("turn-b");
-// A turn asks once: every question goes in its one call, so a second call is
-// refused rather than drawn as a second card answered apart.
+// A turn asks at most three questions, however many calls ask them — a model
+// splitting them into parallel calls still asks, and they land side by side as
+// one card. Past three a call is refused as an answer, not an error.
 {
-  const asked = { questions: [{ question: "Carbs?", choices: [{ label: "Yes" }, { label: "No" }] }] };
+  const asking = (count) => ({
+    questions: Array.from({ length: count }, (_, n) => ({ question: `Q${n}?`, choices: [{ label: "Yes" }, { label: "No" }] }))
+  });
   const run = { requestId: "turn-ask", toolPolicy: "interactive" };
-  assert.equal(JSON.parse(await callChatToolForTests("request_coach_input", asked, run)).status, "waiting_for_athlete");
-  await assert.rejects(callChatToolForTests("request_coach_input", asked, run), /already called in this response/);
+  const ask = async (count) => JSON.parse(await callChatToolForTests("request_coach_input", asking(count), run));
+  assert.equal((await ask(1)).status, "waiting_for_athlete");
+  assert.equal((await ask(2)).status, "waiting_for_athlete", "a second call fills the turn's three");
+  const refused = await ask(1);
+  assert.deepEqual([refused.ok, refused.error_code], [false, "question_limit"], "a fourth question is refused");
   endRunForTests("turn-ask");
-  assert.equal(JSON.parse(await callChatToolForTests("request_coach_input", asked, run)).status, "waiting_for_athlete",
-    "the next turn asks again");
+  assert.equal((await ask(3)).status, "waiting_for_athlete", "the next turn asks again");
   endRunForTests("turn-ask");
 }
 const chartGuide = withLiveToolInstructions("Coach.", [

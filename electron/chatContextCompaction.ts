@@ -359,31 +359,48 @@ export function toWireMessages(
     } else if (entry.kind === "coachPrompt") {
       const asked = askedTogether(entries, index);
       index += asked.length - 1;
-      const choices = (prompt: CoachInputPrompt) => prompt.choices.map((choice) => `- ${choice.label}`).join("\n");
       if (asked.length === 1) {
         push({
           role: "assistant",
-          content: `I need the athlete's answer before continuing:\n${entry.prompt.question}\n${choices(entry.prompt)}`
+          content: `I need the athlete's answer before continuing:\n${entry.prompt.question}\n${choiceLines(entry.prompt)}`
         });
-        if (entry.prompt.answer) push({ role: "user", content: entry.prompt.answer });
+        if (isClosed(entry.prompt)) push({ role: "user", content: entry.prompt.answer || NO_ANSWER });
         continue;
       }
       push({
         role: "assistant",
         content: `I need the athlete's answers before continuing:\n${asked
-          .map((prompt, n) => `${n + 1}. ${prompt.question}\n${choices(prompt)}`)
+          .map((prompt, n) => `${n + 1}. ${prompt.question}\n${choiceLines(prompt)}`)
           .join("\n")}`
       });
-      if (asked.some((prompt) => prompt.answer)) {
+      if (asked.some(isClosed)) {
         push({
           role: "user",
-          content: asked.map((prompt, n) => `${n + 1}. ${prompt.answer || "(no answer)"}`).join("\n")
+          content: asked.map((prompt, n) => `${n + 1}. ${prompt.answer || NO_ANSWER}`).join("\n")
         });
       }
     }
   }
   flushEvents();
   return wire;
+}
+
+/**
+ * A question the athlete has closed — answered, or skipped with nothing picked.
+ * A closed question always has its answer line, a skipped one `(no answer)`:
+ * a transcript cut by compaction can start inside a card, and one that ended
+ * on the coach's question would be a prefill, which Opus 4.6 and later refuse.
+ * A question still waiting has none.
+ */
+function isClosed(prompt: CoachInputPrompt): boolean {
+  return prompt.answeredAt !== undefined || Boolean(prompt.answer);
+}
+
+const NO_ANSWER = "(no answer)";
+
+/** A question's choices as the coach offered them, a line each. */
+function choiceLines(prompt: CoachInputPrompt): string {
+  return prompt.choices.map((choice) => `- ${choice.label}`).join("\n");
 }
 
 /**

@@ -167,9 +167,11 @@ import {
   isPicked,
   isSkipped,
   lastWaitingQuestions,
+  questionsAt,
   waitingQuestionsAround,
   type QuestionPick
 } from "./coachQuestions";
+import { CoachQuestionCard, CoachQuestionsCard } from "./CoachQuestionCards";
 import { ChatSidebar } from "./ChatSidebar";
 import { ChatConversationHeader } from "./ChatConversationHeader";
 import {
@@ -563,171 +565,6 @@ const ThinkingDisclosure = memo(function ThinkingDisclosure({
     </details>
   );
 });
-
-function CoachInputCard({
-  prompt,
-  disabled,
-  onChoose,
-  onCustom
-}: {
-  prompt: CoachInputPrompt;
-  disabled: boolean;
-  onChoose: (choice: CoachInputChoice) => void;
-  onCustom: () => void;
-}) {
-  const answered = prompt.answeredAt !== undefined;
-  return (
-    <section
-      className={`chat-coach-prompt${answered ? " is-answered" : ""}`}
-      aria-labelledby={`coach-prompt-${prompt.promptId}`}
-    >
-      <header className="chat-coach-prompt-header">
-        <span className="chat-coach-prompt-status">
-          <MessageCircle size={14} aria-hidden="true" />
-          {answered ? t("chat.prompt.answered") : t("chat.prompt.waiting")}
-        </span>
-        <h4 id={`coach-prompt-${prompt.promptId}`}>{prompt.question}</h4>
-      </header>
-      <div className="chat-coach-prompt-choices" role="group" aria-label={t("chat.prompt.choices")}>
-        {prompt.choices.map((choice, index) => {
-          const selected = prompt.selectedChoiceId === choice.id;
-          return (
-            <button
-              key={choice.id}
-              type="button"
-              className={`chat-coach-prompt-choice${selected ? " is-selected" : ""}`}
-              onClick={() => onChoose(choice)}
-              disabled={disabled || answered}
-            >
-              <span>
-                {choice.label}
-                {!answered && index === 0 ? <em>{t("chat.prompt.recommended")}</em> : null}
-              </span>
-              {choice.description ? <small>{choice.description}</small> : null}
-            </button>
-          );
-        })}
-      </div>
-      {!answered && prompt.allowCustom ? (
-        <button
-          type="button"
-          className="chat-coach-prompt-custom"
-          onClick={onCustom}
-          disabled={disabled}
-        >
-          {t("chat.prompt.other")}
-        </button>
-      ) : null}
-    </section>
-  );
-}
-
-/**
- * Coach's questions asked together, as one card: each picked or answered in
- * words, changed freely, then sent in one turn. What is left blank is skipped
- * — the coach goes on with its own assumption — so Send waits only for one
- * answer, not for all of them.
- */
-function CoachQuestionsCard({
-  prompts,
-  picks,
-  disabled,
-  onPick,
-  onSend
-}: {
-  prompts: CoachInputPrompt[];
-  picks: Readonly<Record<string, QuestionPick>>;
-  disabled: boolean;
-  onPick: (promptId: string, pick: QuestionPick | undefined) => void;
-  onSend: () => void;
-}) {
-  const [typing, setTyping] = useState<ReadonlySet<string>>(() => new Set());
-  const answered = prompts.filter((prompt) => isPicked(picks[prompt.promptId])).length;
-  return (
-    <section className="chat-coach-prompt" aria-label={t("chat.prompt.waitingMany")}>
-      <header className="chat-coach-prompt-header">
-        <span className="chat-coach-prompt-status">
-          <MessageCircle size={14} aria-hidden="true" />
-          {t("chat.prompt.waitingMany")}
-        </span>
-      </header>
-      <ol className="chat-coach-prompt-list">
-        {prompts.map((prompt, position) => {
-          const pick = picks[prompt.promptId];
-          const words = pick?.choiceId ? "" : pick?.text ?? "";
-          const writing = typing.has(prompt.promptId) || Boolean(words);
-          return (
-            <li key={prompt.promptId} className="chat-coach-prompt-item">
-              <h4 id={`coach-prompt-${prompt.promptId}`}>
-                <span className="chat-coach-prompt-number">{position + 1}</span>
-                {prompt.question}
-              </h4>
-              <div
-                className="chat-coach-prompt-choices"
-                role="group"
-                aria-labelledby={`coach-prompt-${prompt.promptId}`}
-              >
-                {prompt.choices.map((choice, index) => {
-                  const selected = pick?.choiceId === choice.id;
-                  return (
-                    <button
-                      key={choice.id}
-                      type="button"
-                      className={`chat-coach-prompt-choice${selected ? " is-selected" : ""}`}
-                      aria-pressed={selected}
-                      onClick={() => onPick(prompt.promptId, selected ? undefined : { choiceId: choice.id })}
-                      disabled={disabled}
-                    >
-                      <span>
-                        {choice.label}
-                        {index === 0 ? <em>{t("chat.prompt.recommended")}</em> : null}
-                      </span>
-                      {choice.description ? <small>{choice.description}</small> : null}
-                    </button>
-                  );
-                })}
-              </div>
-              {prompt.allowCustom ? (
-                writing ? (
-                  <input
-                    type="text"
-                    className="chat-coach-prompt-input"
-                    value={words}
-                    placeholder={t("chat.prompt.customPlaceholder")}
-                    aria-label={t("chat.prompt.customPlaceholder")}
-                    autoFocus={!words}
-                    disabled={disabled}
-                    onChange={(event) =>
-                      onPick(prompt.promptId, event.target.value ? { text: event.target.value } : undefined)
-                    }
-                  />
-                ) : (
-                  <button
-                    type="button"
-                    className="chat-coach-prompt-custom"
-                    onClick={() => setTyping((current) => new Set(current).add(prompt.promptId))}
-                    disabled={disabled}
-                  >
-                    {t("chat.prompt.other")}
-                  </button>
-                )
-              ) : null}
-            </li>
-          );
-        })}
-      </ol>
-      <footer className="chat-coach-prompt-foot">
-        <span>
-          {t("chat.prompt.progress", { answered, total: prompts.length })}
-          {answered < prompts.length ? ` · ${t("chat.prompt.skipNote")}` : ""}
-        </span>
-        <button type="button" className="chat-plan-upload" disabled={disabled || answered === 0} onClick={onSend}>
-          {t("chat.prompt.send")}
-        </button>
-      </footer>
-    </section>
-  );
-}
 
 /**
  * An analysis run streaming into the conversation that is open. Deliberately
@@ -3792,21 +3629,29 @@ export function ChatView({
     return true;
   };
 
+  /**
+   * Whether a turn can start now. One turn at a time (UAT review): the view
+   * holds one turn's state, so a second conversation cannot answer while
+   * another does, and is told so.
+   */
+  const turnCanStart = (): boolean => {
+    if (!api || exportingLatestActivity) return false;
+    if (streaming) {
+      if (turnSessionIdRef.current !== activeSessionIdRef.current) onMessage?.(answeringElsewhere);
+      return false;
+    }
+    return true;
+  };
+
   const sendMessage = async (
     trimmed: string,
-    answeredPrompt?: { promptId: string; choiceId: string },
+    answeredPrompt?: { promptId: string; choiceId?: string },
     /** What the question is about, when a chip says so rather than the composer. */
     aboutRefs?: PlanRef[],
     /** A step of the plan pipeline (P2.2): the words shown, the step's turn sent. */
     pipeline?: ChatPipelineStep
   ): Promise<boolean> => {
-    if (!api || !trimmed || exportingLatestActivity) return false;
-    if (streaming) {
-      // One turn at a time (UAT review): the view holds one turn's state, so a
-      // second conversation cannot answer while another does.
-      if (turnSessionIdRef.current !== activeSessionIdRef.current) onMessage?.(answeringElsewhere);
-      return false;
-    }
+    if (!trimmed || !turnCanStart()) return false;
     if (isLatestActivityFileRequest(trimmed)) {
       await handleLatestActivityFileRequest(trimmed);
       return true;
@@ -3825,17 +3670,17 @@ export function ChatView({
     // Words typed while a card of several questions waits answer none of them
     // in particular: they go as a message, and the card closes with what was
     // picked on it, the rest skipped.
-    let closing: number[] = [];
+    let closing = new Set<string>();
     if (answeredPromptIndex < 0 && !pipeline) {
       const waiting = lastWaitingQuestions(timeline);
-      if (waiting.length > 1) closing = waiting;
+      if (waiting.length > 1) closing = new Set(questionsAt(timeline, waiting).map((prompt) => prompt.promptId));
       else if (waiting.length === 1) answeredPromptIndex = waiting[0]!;
     }
     const promptEntry =
       answeredPromptIndex >= 0 ? timeline[answeredPromptIndex] : undefined;
     const originalPrompt =
       promptEntry?.kind === "coachPrompt" ? promptEntry.prompt : null;
-    const answeredTimeline = closing.length
+    const answeredTimeline = closing.size
       ? answerQuestions(timeline, closing, questionPicks, Date.now())
       : timeline.map((entry, index): ChatEntry =>
           index === answeredPromptIndex && entry.kind === "coachPrompt"
@@ -4324,8 +4169,9 @@ export function ChatView({
     });
   };
 
-  const handleCustomCoachAnswer = () => {
-    composerRef.current?.focus();
+  /** Words typed on a single question's card answer it, as a choice would. */
+  const handleCoachPromptWords = async (prompt: CoachInputPrompt, words: string) => {
+    await sendMessage(words, { promptId: prompt.promptId });
   };
 
   const pickQuestion = (promptId: string, pick: QuestionPick | undefined) =>
@@ -4337,21 +4183,17 @@ export function ChatView({
     });
 
   /** A card of several questions, sent: every pick in one turn, the rest skipped. */
-  const sendCoachAnswers = async (indices: readonly number[]) => {
-    if (!api || exportingLatestActivity) return;
-    if (streaming) {
-      if (turnSessionIdRef.current !== activeSessionIdRef.current) onMessage?.(answeringElsewhere);
-      return;
-    }
-    if (!providerReady()) return;
-    const prompts = indices.flatMap((index) => {
-      const entry = timeline[index];
-      return entry?.kind === "coachPrompt" && entry.prompt.answeredAt === undefined ? [entry.prompt] : [];
-    });
+  const sendCoachAnswers = async (prompts: readonly CoachInputPrompt[]) => {
+    if (!turnCanStart() || !providerReady()) return;
     if (!prompts.some((prompt) => isPicked(questionPicks[prompt.promptId]))) return;
-    await startTurn(answerQuestions(timeline, indices, questionPicks, Date.now()), {
+    const ids = new Set(prompts.map((prompt) => prompt.promptId));
+    await startTurn(answerQuestions(timeline, ids, questionPicks, Date.now()), {
       previous: timeline,
-      originalPrompts: prompts
+      originalPrompts: timeline.flatMap((entry) =>
+        entry.kind === "coachPrompt" && ids.has(entry.prompt.promptId) && entry.prompt.answeredAt === undefined
+          ? [entry.prompt]
+          : []
+      )
     });
   };
 
@@ -5772,8 +5614,10 @@ export function ChatView({
                 );
               }
               const asked = waitingQuestionsAround(timeline, index);
-              // A card of several questions is drawn once, at its first.
-              if (asked[0] !== index) return null;
+              // A card of several questions is drawn once, at its first question
+              // in the drawn window: one whose first question is above the
+              // window's top still shows.
+              if (asked.find((at) => at >= renderFrom) !== index) return null;
               if (asked.length > 1) {
                 return (
                   <ChatRow
@@ -5787,14 +5631,11 @@ export function ChatView({
                     </div>
                     <div className="chat-bubble chat-bubble-coach-prompt">
                       <CoachQuestionsCard
-                        prompts={asked.flatMap((at) => {
-                          const question = timeline[at];
-                          return question?.kind === "coachPrompt" ? [question.prompt] : [];
-                        })}
+                        prompts={questionsAt(timeline, asked)}
                         picks={questionPicks}
                         disabled={streaming || exportingLatestActivity}
                         onPick={pickQuestion}
-                        onSend={() => void sendCoachAnswers(asked)}
+                        onSend={() => void sendCoachAnswers(questionsAt(timeline, asked))}
                       />
                     </div>
                   </ChatRow>
@@ -5811,13 +5652,13 @@ export function ChatView({
                     <MessageCircle size={16} aria-hidden="true" />
                   </div>
                   <div className="chat-bubble chat-bubble-coach-prompt">
-                    <CoachInputCard
+                    <CoachQuestionCard
                       prompt={entry.prompt}
                       disabled={streaming || exportingLatestActivity}
                       onChoose={(choice) =>
                         void handleCoachPromptChoice(entry.prompt, choice)
                       }
-                      onCustom={handleCustomCoachAnswer}
+                      onAnswer={(words) => void handleCoachPromptWords(entry.prompt, words)}
                     />
                   </div>
                 </ChatRow>

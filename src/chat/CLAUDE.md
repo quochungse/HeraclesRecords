@@ -259,12 +259,14 @@ Coach never writes to COROS directly; it writes drafts and change sets the athle
 - **A turn belongs to its conversation** (`turnSessionId`): leaving mid-turn parks it
   (`parkedTurnRef`) and its stream writes into the parked copy, saved to its own row. **Two
   turns at once are refused**, not queued.
-- **Coach asks at most three questions, all in one call** (`request_coach_input`; a fourth, or
-  a second call in the turn, is refused). Each is its own `coachPrompt` entry, answered in its
-  own fields — no new field. While they wait they are one card (`coachQuestions.ts`), sent in
-  one turn; on the wire they are one numbered exchange with a blank one `(no answer)`, so the
-  transcript still ends on the athlete (an assistant turn last is a prefill, refused by Opus
-  4.6+). Words typed beside such a card are a message and close it. `test:chat-coach-questions`.
+- **Coach asks at most three questions a turn** (`request_coach_input`, counted per turn across
+  calls; past three a call is refused as an answer, never thrown — a thrown tool error is an
+  error line in the transcript). Each is its own `coachPrompt` entry, answered in its own
+  fields — no new field. While they wait they are one card (`coachQuestions.ts`), sent in one
+  turn; on the wire they are one numbered exchange, and a closed question with no words is
+  `(no answer)`, so the transcript never ends on a question already closed (an assistant turn
+  last is a prefill, refused by Opus 4.6+). Words typed beside such a card are a message and
+  close it. `test:chat-coach-questions`.
 - A blank conversation is reused or deleted when left, unless an analysis is attached.
 - **Coach settings** (`ChatSettingsModal` over `ChatSettingsPanel`) edit a draft written on
   Save; Discard drops it. The dialog repoints `--accent`/`--surface` to the app's palette

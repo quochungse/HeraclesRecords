@@ -127,9 +127,15 @@ async function main() {
     "next to several questions, typed words are a message, not an answer"
   );
 
+  // Every question has a field for words of the athlete's own, in plain sight;
+  // on this card the words wait for Send, so a field has no send of its own.
+  assert.equal(await harness("count", ".chat-coach-prompt-field input"), 3);
+  assert.equal(await harness("count", ".chat-coach-prompt-field-send"), 0);
+
   // Picking and writing send nothing; Send then sends one turn.
-  assert.equal(await harness("clickNth", ".chat-coach-prompt-custom", 2), true, "the third question takes words");
-  await harness("setValue", ".chat-coach-prompt-input", "Dời vai tay sang thứ Sáu");
+  const THIRD_FIELD = ".chat-coach-prompt-item:nth-child(3) .chat-coach-prompt-field input";
+  await harness("setValue", THIRD_FIELD, "Dời vai tay sang thứ Sáu");
+  await harness("keyDown", THIRD_FIELD, "Enter");
   assert.equal(await harness("clickText", ".chat-coach-prompt-choice", "40–45 g, bụng ổn"), true);
   assert.equal(await harness("callCount", "sendChat"), 1, "a pick is not a turn");
   assert.match((await harness("text", ".chat-coach-prompt-foot")) ?? "", /2 of 3 answered · anything left blank is skipped/);
@@ -142,7 +148,7 @@ async function main() {
   await harness("emit", "onChatStreamError", { requestId: sent.args[0], message: "Claude is unreachable" });
   await settle();
   assert.equal(await harness("count", ".chat-coach-prompt-item"), 3, "the card comes back");
-  assert.equal(await harness("value", ".chat-coach-prompt-input"), "Dời vai tay sang thứ Sáu", "with what was written");
+  assert.equal(await harness("value", THIRD_FIELD), "Dời vai tay sang thứ Sáu", "with what was written");
   assert.equal(await harness("count", ".chat-coach-prompt-choice.is-selected"), 1, "and what was picked");
 
   await harness("click", SEND);
@@ -189,8 +195,39 @@ async function main() {
   assert.equal(await harness("clickText", ".chat-coach-prompt-choice", "Tối"), true);
   sent = await waitFor(async () => (await harness("calls", "sendChat"))[6], "one press sends");
   assert.equal(sent.args[1].at(-1).content, "Tối.");
+  await harness("emit", "onChatStreamStart", { requestId: sent.args[0] });
+  await harness("emit", "onChatStreamDone", { requestId: sent.args[0], fullText: "Tối thì nhẹ." });
+  await settle();
+
+  // Or words in its field: Enter sends them as the answer, and the arrow beside
+  // them waits for words before it can.
+  await turnAsking("Còn thứ Bảy?", [question("s2", "Thứ Bảy tập gym lúc nào?", ["Sáng", "Chiều"])]);
+  assert.equal(await disabled(".chat-coach-prompt-field-send"), true, "no words, nothing to send");
+  await harness("setValue", ".chat-coach-prompt-field input", "Sau giờ làm, khoảng 18h");
+  assert.equal(await disabled(".chat-coach-prompt-field-send"), false);
+  await harness("keyDown", ".chat-coach-prompt-field input", "Enter");
+  sent = await waitFor(async () => (await harness("calls", "sendChat"))[8], "Enter sends the words");
+  assert.deepEqual(sent.args[1].slice(-2).map((message) => message.content), [
+    "I need the athlete's answer before continuing:\nThứ Bảy tập gym lúc nào?\n- Sáng\n- Chiều",
+    "Sau giờ làm, khoảng 18h"
+  ]);
 
   assert.deepEqual(await harness("consoleErrors"), [], "nothing complained");
+
+  // A waiting card straddling the top of the drawn window (the last 40
+  // entries) still shows, at its first question inside the window.
+  {
+    const talk = (n) => ({ kind: "message", role: n % 2 ? "assistant" : "user", content: `Tin ${n}` });
+    const entries = [
+      ...Array.from({ length: 20 }, (_, n) => talk(n)),
+      ...["w1", "w2", "w3"].map((id) => ({ kind: "coachPrompt", prompt: question(id, `Câu ${id}?`, ["Có", "Không"]) })),
+      ...Array.from({ length: 39 }, (_, n) => talk(n + 20))
+    ];
+    await harness("mount", "ChatView", {}, { ...BASE_SCRIPT, getChatSession: entries });
+    await waitFor(() => harness("exists", ".chat-coach-prompt-list"), "the straddling card is drawn");
+    assert.equal(await harness("count", ".chat-coach-prompt-item"), 3, "with every question on it");
+    assert.deepEqual(await harness("consoleErrors"), []);
+  }
   console.log("chat coach questions tests passed");
 }
 

@@ -1597,7 +1597,14 @@ function derivePreviewFromEntries(entries: PersistedChatEntry[]): string {
       continue;
     }
     if (entry.kind === "coachPrompt" && !entry.prompt.answeredAt) {
-      return `Waiting for your answer: ${entry.prompt.question}`;
+      // Questions asked together wait side by side, the one that matters most first.
+      let question = entry.prompt.question;
+      for (let before = index - 1; before >= 0; before -= 1) {
+        const earlier = entries[before];
+        if (earlier?.kind !== "coachPrompt" || earlier.prompt.answeredAt) break;
+        question = earlier.prompt.question;
+      }
+      return `Waiting for your answer: ${question}`;
     }
   }
   for (let index = entries.length - 1; index >= 0; index -= 1) {

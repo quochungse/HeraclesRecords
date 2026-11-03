@@ -153,18 +153,12 @@ export const NO_ATHLETE_AVAILABLE_RESPONSE =
 /**
  * Every question of one call, each its own prompt. A call in the shape this
  * tool had before it took several questions — `question` and `choices` at the
- * top — is still one question. More than the limit is refused whole, so the
- * model asks again with the ones that matter rather than losing the last.
+ * top — is still one question.
  */
 export function buildCoachInputPrompts(args: Record<string, unknown>): CoachInputPrompt[] {
   const questions = Array.isArray(args.questions) ? args.questions : args.question !== undefined ? [args] : [];
   if (questions.length === 0) {
     throw new Error("request_coach_input requires at least one question.");
-  }
-  if (questions.length > MAX_COACH_QUESTIONS) {
-    throw new Error(
-      `request_coach_input asks at most ${MAX_COACH_QUESTIONS} questions at once; ask again with the ones that matter most.`
-    );
   }
   return questions.map((question) =>
     buildCoachInputPrompt(
@@ -179,12 +173,29 @@ export function handleChatInteractionTool(
   name: ChatInteractionToolName,
   args: Record<string, unknown>,
   onCoachPrompt?: (prompt: CoachInputPrompt) => void,
-  toolPolicy: ChatToolPolicy = "interactive"
+  toolPolicy: ChatToolPolicy = "interactive",
+  /** Questions this turn has asked already, in earlier calls. */
+  askedThisTurn = 0
 ): string {
   if (name !== "request_coach_input") {
     throw new Error(`Unsupported Coach interaction tool: ${name}`);
   }
   const prompts = buildCoachInputPrompts(args);
+  // Past the limit the call is refused whole and nothing is asked — answered,
+  // not thrown, so the athlete sees no error line and the model asks again
+  // with the ones that matter, or stops.
+  const left = MAX_COACH_QUESTIONS - askedThisTurn;
+  if (prompts.length > left) {
+    return JSON.stringify({
+      ok: false,
+      error_code: "question_limit",
+      errors: [`A turn asks the athlete at most ${MAX_COACH_QUESTIONS} questions; ${left} left in this one.`],
+      action:
+        left > 0
+          ? `Ask again with at most ${left}, the ones that matter most.`
+          : "The athlete has your questions. End this response now."
+    });
+  }
   for (const prompt of prompts) onCoachPrompt?.(prompt);
   const promptIds = prompts.map((prompt) => prompt.promptId);
   if (toolPolicy === "read-only") {

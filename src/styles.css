@@ -11219,12 +11219,6 @@ label.chat-settings-toggle-row {
     var(--glass-inset);
 }
 
-.chat-coach-prompt.is-answered {
-  border-color: var(--glass-border);
-  background: var(--glass-bg);
-  box-shadow: var(--glass-inset);
-}
-
 .chat-coach-prompt-header {
   display: grid;
   gap: 7px;
@@ -11240,10 +11234,6 @@ label.chat-settings-toggle-row {
   font-weight: 600;
   letter-spacing: 0.06em;
   text-transform: uppercase;
-}
-
-.chat-coach-prompt.is-answered .chat-coach-prompt-status {
-  color: var(--text-muted);
 }
 
 .chat-coach-prompt-header h4 {
@@ -11321,24 +11311,71 @@ label.chat-settings-toggle-row {
   opacity: 1;
 }
 
-.chat-coach-prompt-custom {
-  width: fit-content;
+/* Words of the athlete's own: an input's ground, a pencil and a placeholder,
+   so it reads as a field and not as one more choice. */
+.chat-coach-prompt-field {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  padding: 0 4px 0 12px;
+  color: var(--text-muted);
+  cursor: text;
+  transition: border-color var(--dur-fast) var(--ease);
+}
+
+.chat-coach-prompt-field:focus-within {
+  border-color: var(--accent);
+}
+
+.chat-coach-prompt-field:has(input:focus-visible) {
+  outline: var(--focus-ring);
+  outline-offset: 2px;
+}
+
+.chat-coach-prompt-field input {
+  flex: 1;
+  min-width: 0;
   border: 0;
   background: transparent;
-  color: var(--text-secondary);
-  padding: 0;
-  font-size: 12px;
-  font-weight: 600;
+  color: var(--text-primary);
+  padding: 10px 0;
+  font: inherit;
+  font-size: 13px;
+  outline: none;
+}
+
+.chat-coach-prompt-field input::placeholder {
+  color: var(--text-muted);
+}
+
+.chat-coach-prompt-field input:disabled {
+  cursor: default;
+}
+
+.chat-coach-prompt-field-send {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--accent-strong);
   cursor: pointer;
 }
 
-.chat-coach-prompt-custom:hover:not(:disabled) {
-  color: var(--accent-strong);
-}
-
-.chat-coach-prompt-custom:disabled {
+.chat-coach-prompt-field-send:disabled {
+  color: var(--text-muted);
   opacity: 0.55;
   cursor: default;
+}
+
+.chat-coach-prompt-field-send:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: 2px;
 }
 
 /* Several questions asked together: numbered, picked one by one, sent at the foot. */
@@ -11368,22 +11405,6 @@ label.chat-settings-toggle-row {
 .chat-coach-prompt-number {
   color: var(--accent-strong);
   font-variant-numeric: tabular-nums;
-}
-
-.chat-coach-prompt-input {
-  width: 100%;
-  border: 1px solid var(--glass-border);
-  border-radius: var(--radius-sm);
-  background: color-mix(in srgb, var(--surface) 58%, transparent);
-  color: var(--text-primary);
-  padding: 8px 12px;
-  font: inherit;
-  font-size: 13px;
-}
-
-.chat-coach-prompt-input:focus-visible {
-  outline: var(--focus-ring);
-  outline-offset: 2px;
 }
 
 .chat-coach-prompt-foot {
@@ -14643,12 +14664,15 @@ label.chat-settings-toggle-row {
 :root[data-theme="paper"] :is(
     .chat-plan-card:not(.chat-delete-card),
     .chat-visual-card,
-    .chat-coach-prompt,
-    .chat-coach-prompt.is-answered
+    .chat-coach-prompt
   ) {
   border-color: transparent;
   background: var(--glass-bg-elevated);
   box-shadow: var(--shadow-card);
+}
+
+:root[data-theme="paper"] .chat-coach-prompt-field {
+  background: var(--glass-bg);
 }
 
 :root[data-theme="paper"] .chat-inline-chart > .chat-visual-card {

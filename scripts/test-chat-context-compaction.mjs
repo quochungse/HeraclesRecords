@@ -219,8 +219,17 @@ assert.deepEqual(
   assert.match(wire[1].content, /^I need the athlete's answers before continuing:\n1\. Carbs[\s\S]*\n2\. Why was Thursday missed\?\n- Yes\n- No\n3\. Gym tomorrow\?/);
   assert.equal(wire[2].content, "1. Yes, stomach fine\n2. (no answer)\n3. No");
 
+  // Closed with nothing picked still answers, so the transcript ends on the
+  // athlete — even where compaction cut it inside the card, or the card was
+  // a single question.
   const allSkipped = toWireMessages([question("q1", "One?", ""), question("q2", "Two?", "")]);
-  assert.deepEqual(allSkipped.map((message) => message.role), ["assistant"], "nothing answered sends no answer");
+  assert.deepEqual(allSkipped.map((message) => message.role), ["assistant", "user"]);
+  assert.equal(allSkipped[1].content, "1. (no answer)\n2. (no answer)");
+  assert.deepEqual(toWireMessages([question("q3", "Three?", "")]).map((message) => message.content.split("\n")[0]),
+    ["I need the athlete's answer before continuing:", "(no answer)"]);
+  // Still waiting: the questions alone.
+  const waiting = (promptId) => ({ kind: "coachPrompt", prompt: { promptId, question: "Later?", choices: [] } });
+  assert.deepEqual(toWireMessages([waiting("w1"), waiting("w2")]).map((message) => message.role), ["assistant"]);
 
   // Two single questions answered apart stay two exchanges.
   const apart = toWireMessages([
