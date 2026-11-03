@@ -3838,10 +3838,11 @@ export function withLiveToolInstructions(
     sections.push(
       "",
       "## Athlete questions",
-      "When you need an answer before continuing, call request_coach_input — at most once per turn — with one " +
-        "concise question and 2–5 distinct choices, the recommended one first, each description stating the " +
-        "tradeoff that matters. Never ask a clarifying question only in prose. After calling it, stop and wait " +
-        "for the athlete's next message."
+      "Ask the athlete through request_coach_input — at most once per turn — with one concise question and " +
+        "2–5 distinct choices, the recommended one first, each description stating the tradeoff that matters. " +
+        "Never ask a question only in prose. When your answer can stand without theirs, write it first and ask " +
+        "at the end; ask first only when you cannot answer without it, and then before reading data the answer " +
+        "would change. After calling it, stop and wait for the athlete's next message."
     );
   }
   return sections.join("\n");

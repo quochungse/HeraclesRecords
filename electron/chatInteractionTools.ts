@@ -22,7 +22,8 @@ export function getChatInteractionTools(): CorosMcpTool[] {
     {
       name: "request_coach_input",
       description:
-        "Pause and ask the athlete one necessary clarifying question using clickable choices. " +
+        "Ask the athlete one question using clickable choices: something only they know, or a choice " +
+        "that is theirs. " +
         "Use this instead of asking a question only in prose. Put the recommended choice first. " +
         "Call it at most once per response, then stop and wait for the athlete's next message.",
       inputSchema: {

@@ -164,6 +164,9 @@ const { MAX_CUSTOM_COACH_INSTRUCTIONS } = await import(
   `${distUrl("types.js")}?cacheBust=${Date.now()}`
 );
 const baseCoachInstructions = buildBaseCoachInstructions();
+// What only the athlete knows is asked for, not noted as missing or assumed.
+assert.match(baseCoachInstructions, /What only the athlete knows[\s\S]*?ask for it when\s+it would change your conclusion/);
+assert.doesNotMatch(baseCoachInstructions, /Ask before planning only when/);
 assert.equal(buildCoachInstructions(), baseCoachInstructions);
 assert.equal(buildCoachInstructions("   \n\t"), baseCoachInstructions);
 const customized = buildCoachInstructions("  Only schedule runs on Tue/Thu/Sat.  ");
@@ -1266,7 +1269,7 @@ assert.equal(
       continue;
     }
     assert.match(block, /^## Coach style\n/);
-    assert.match(block, /Tone only: facts, advice and safety rules are unchanged/, `${style} changes tone, not facts`);
+    assert.match(block, /Tone only: facts, advice, safety rules and when to ask are unchanged/, `${style} changes tone, not facts or asking`);
     assert.match(block, /card text \(names, descriptions\) stays plain/, `${style} never reaches a card`);
   }
   const unfiltered = coachStyleInstructions("unfiltered");

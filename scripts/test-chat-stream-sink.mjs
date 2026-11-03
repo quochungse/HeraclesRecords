@@ -265,6 +265,7 @@ for (const rule of [
   /call the same draft tool again in the same response/,
   /typed intensity field/,
   /request_coach_input — at most once per turn/,
+  /write it first and ask\s+at the end/,
   /Nothing you call writes to COROS/,
   /Every sport takes step kinds/
 ]) {
