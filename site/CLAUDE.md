@@ -13,8 +13,9 @@ ships the license of every package in the root lockfile with the app, and the in
 - **Activities and Plan & Library are directories** (`/activities/`, `/plan/`) with a page per
   sport or screen; `site/src/sections.ts` lists them for the header, `SubNav` and the sitemap.
   A directory page is linked with its trailing slash (`/activities/strength/`).
-- **The Heracles Training Load page computes its numbers**: `site/src/trainingLoad.ts` runs
-  `electron/heraclesLoad.ts` at build time for every table and the worked example. Its words
+- **The Heracles Training Load page computes its numbers**, and so does the showcase closing
+  the Strength page (`TrainingLoadShowcase`): `site/src/trainingLoad.ts` runs
+  `electron/heraclesLoad.ts` at build time for every table and the worked example. Their words
   follow `docs/heracles-training-load.md` and change with the formula.
 - **GitHub is linked for talking, not for reading**: the footer and About link the
   repository, Issues and Discussions, and a page that asks for a report or an opinion links
@@ -29,8 +30,9 @@ ships the license of every package in the root lockfile with the app, and the in
 - **Link-preview cards are committed images**: `npm run site:og` renders
   `scripts/site-og/og.html` with Electron into `site/public/og/*.jpg`; the build never runs
   Electron.
-- **No em dash** in the site's copy (or the README's); text taken from the app or changelog is
-  restyled at render time (`plain()`). No analytics, no cookies.
+- **No em dash or en dash** in the site's copy (or the README's); a range takes a plain hyphen
+  (`2-3×`). Text taken from the app or changelog has its em dashes restyled at render time
+  (`plain()`). No analytics, no cookies.
 - **The domain is written in four places that must agree**: `site/public/CNAME`, `site` in
   `astro.config.mjs`, `robots.txt`, and the footer of `scripts/site-og/og.html`. DNS at
   Cloudflare is **DNS only** (grey cloud) — GitHub issues the certificate.

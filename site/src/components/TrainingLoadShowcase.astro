@@ -1,0 +1,832 @@
+---
+// Heracles Training Load, told as the formula, what it means and what it is for. The
+// set and the load a minute are the app's own engine at build time
+// (site/src/trainingLoad.ts); the words follow docs/heracles-training-load.md.
+import { loadPerMinute } from "../../../electron/heraclesLoad";
+import { TRAINING_LOAD_PAGE } from "../sections";
+import { example, EXAMPLE_BODY_KG } from "../trainingLoad";
+
+// Load a minute of lifting rated 5 to 7 out of 10. The one read by heart rate is
+// PMData's, as the formula page states it; Heracles TL's is the curve.
+const SCALE_MAX = 2;
+const ranges = [
+  { label: "Read by heart rate", from: 0.55, to: 0.8, text: "0.55-0.8" },
+  {
+    label: "Heracles TL",
+    from: loadPerMinute(5),
+    to: loadPerMinute(7),
+    text: `${loadPerMinute(5).toFixed(2)}-${loadPerMinute(7).toFixed(2)}`,
+    ours: true,
+  },
+].map((row) => ({ ...row, style: `--from: ${(row.from / SCALE_MAX) * 100}%; --to: ${(row.to / SCALE_MAX) * 100}%` }));
+const ticks = [0, 0.5, 1, 1.5, 2];
+
+const terms = [
+  {
+    name: "COROS TL",
+    text: "The floor. A session never scores less than COROS gave it: COROS's part is the cardio, what Heracles adds is the muscular work.",
+  },
+  {
+    name: "f(RPE)",
+    text: "What a minute weighs: COROS's own TRIMP weighting, at the share of heart-rate reserve a steady effort at that rating usually reaches.",
+  },
+  {
+    name: "Set minutes",
+    text: "The work and the rest after it, up to three minutes: the time a set holds you at its effort.",
+  },
+  {
+    name: "Minutes between sets",
+    text: "The warm-up, changing lifts, stretching, a watch left running, all at RPE 1.5, very easy.",
+  },
+];
+
+// The first bench press set of the formula page's worked example.
+const set = example.exercises[0]!.sets[0]!;
+const setMinutes = (example.workSec + example.restSec) / 60;
+const steps = [
+  {
+    name: "The set",
+    value: "70",
+    unit: "kg × 10",
+    text: "What it moves: the weight, plus the share of your body the movement lifts.",
+  },
+  {
+    name: "Your max",
+    value: String(example.benchCapacity),
+    unit: "kg for one rep",
+    text: `Implied by your best set in 120 days, ${example.best.weightKg} kg × ${example.best.reps}, taken as two reps short of failure.`,
+  },
+  {
+    name: "Reps in reserve",
+    value: String(set.rir),
+    unit: `at ${set.percent}% of max`,
+    text: "Reps to failure at that share of your max, from a meta-regression of 7,289 people (Nuzzo 2024), less the reps done.",
+  },
+  {
+    name: "Effort",
+    value: String(set.rpe),
+    unit: "RPE",
+    text: "Reps in reserve on the 0 to 10 scale lifters rate a set by (Zourdos 2016).",
+  },
+  {
+    name: "Load",
+    value: String(set.load),
+    unit: "TL",
+    text: `f(${set.rpe}) for the set's ${setMinutes} minutes of work and rest.`,
+  },
+];
+
+const principles = [
+  {
+    title: "One formula, from research",
+    text: "Every constant is published, or fitted on many people. None is tuned on your own data.",
+  },
+  {
+    title: "Measured against your strength",
+    text: "Each set is judged by how close to failure it went for you, from the most you have lifted on that exercise.",
+  },
+  {
+    title: "Open to checking",
+    text: "Every step, source and known limit is written out, and the fit is a script in the app's source, ready to run again.",
+  },
+];
+---
+
+<section class="htl" aria-labelledby="htl-title">
+  <div class="wrap">
+    <header class="htl-head">
+      <h2 id="htl-title">Heracles Training Load</h2>
+      <p class="htl-tagline">Every set, counted for <span class="htl-shine">what it cost</span>.</p>
+      <p class="htl-lede">
+        A strength session measured by the work in it: the weight, the reps, your body weight and
+        the most you have lifted on each exercise. Each set is scored by how close to failure it
+        went, so your week's load, your fitness and your recommended range count the gym for what
+        it really took.
+      </p>
+    </header>
+
+    <div class="htl-block htl-gap">
+      <div class="htl-gap-text">
+        <p class="htl-kicker">Why heart rate is not enough</p>
+        <p class="htl-number"><span class="htl-number-figure">2-3×</span> <span class="htl-number-word">too low</span></p>
+        <p class="htl-gap-claim">A strength session read by heart rate counts two to three times lighter than it felt.</p>
+        <p>
+          A hard set lasts half a minute. Heart rate climbs after it and falls through the rest,
+          while the muscles do work the heart barely sees. A load read from heart rate, COROS's
+          TRIMP, misses most of it.
+        </p>
+        <p class="htl-fine">
+          PMData: weights sessions rated 5 to 7 out of 10, beside the heart rate the watch
+          recorded. Over ten real sessions read set by set, Heracles TL came to about 2.4 times
+          COROS's figure.
+        </p>
+      </div>
+
+      <figure class="htl-chart">
+        <figcaption>
+          <strong>Load a minute</strong>
+          <span>lifting rated 5 to 7 out of 10</span>
+        </figcaption>
+        <ul class="htl-ranges">
+          {
+            ranges.map((row) => (
+              <li class:list={{ ours: row.ours }}>
+                <span class="htl-range-label">{row.label}</span>
+                <span class="htl-range-value">{row.text}</span>
+                <span class="htl-track" aria-hidden="true">
+                  <span class="htl-bar" style={row.style} />
+                </span>
+              </li>
+            ))
+          }
+        </ul>
+        <div class="htl-axis" aria-hidden="true">
+          {ticks.map((tick) => <span style={`--at: ${(tick / SCALE_MAX) * 100}%`}>{tick}</span>)}
+        </div>
+      </figure>
+    </div>
+
+    <div class="htl-block htl-formula">
+      <p class="htl-kicker">The formula</p>
+      <h3>Every minute, charged by its effort.</h3>
+      <p
+        class="htl-eq"
+        role="math"
+        aria-label="Heracles TL equals the larger of COROS TL, and the sum over the sets of f of RPE times set minutes, plus f of 1.5 times minutes between sets."
+      >
+        <span class="htl-eq-part"><span class="htl-eq-lhs">Heracles TL</span> <span class="op">=</span></span>
+        <span class="htl-eq-part"><span class="op">max(</span><span class="term">COROS TL</span><sup>1</sup><span class="op">,</span></span>
+        <span class="htl-eq-part"><span class="op big">Σ</span> <span class="term">f(RPE)</span><sup>2</sup> <span class="op">×</span> <span class="term">set minutes</span><sup>3</sup></span>
+        <span class="htl-eq-part"><span class="op">+</span> f(1.5) <span class="op">×</span> <span class="htl-eq-end"><span class="term">minutes between sets</span><sup>4</sup> <span class="op">)</span></span></span>
+      </p>
+      <p class="htl-eq-sub">
+        <code>f(RPE) = h × 0.2445 × e<sup>3.411 h</sup></code>
+        <code>h = 0.48 + 0.031 × RPE</code>
+      </p>
+      <ol class="htl-terms">
+        {
+          terms.map((term) => (
+            <li>
+              <h4>{term.name}</h4>
+              <p>{term.text}</p>
+            </li>
+          ))
+        }
+      </ol>
+    </div>
+
+    <div class="htl-block htl-walk">
+      <div class="htl-walk-head">
+        <p class="htl-kicker">One set, step by step</p>
+        <h3>What one set of bench press weighs.</h3>
+        <p>
+          A {EXAMPLE_BODY_KG} kg athlete benches 70 kg ten times, then rests {example.restSec / 60}
+          minutes.
+        </p>
+      </div>
+      <ol class="htl-steps">
+        {
+          steps.map((step, index) => (
+            <li>
+              <span class="htl-step-index" aria-hidden="true">{String(index + 1).padStart(2, "0")}</span>
+              <h4>{step.name}</h4>
+              <p class="htl-step-value">
+                <span>{step.value}</span> <small>{step.unit}</small>
+              </p>
+              <p class="htl-step-text">{step.text}</p>
+            </li>
+          ))
+        }
+      </ol>
+    </div>
+
+    <ul class="htl-block htl-principles">
+      {
+        principles.map((item) => (
+          <li>
+            <h4>{item.title}</h4>
+            <p>{item.text}</p>
+          </li>
+        ))
+      }
+    </ul>
+
+    <div class="htl-cta">
+      <a class="button primary" href={TRAINING_LOAD_PAGE}>Read the whole formula</a>
+      <a class="more" href={`${TRAINING_LOAD_PAGE}#limits`}>Its known limits</a>
+      <p>Built on Nuzzo 2024, Zourdos 2016, Helms 2016, Steele 2017, Foster 2001 and PMData 2020.</p>
+    </div>
+  </div>
+</section>
+
+<style>
+  .htl {
+    --htl-shine-from: #ffe2a1;
+    --htl-shine-to: #d39a38;
+    --htl-name-from: #ffffff;
+    --htl-name-to: #b4b4ba;
+    --htl-panel: rgba(255, 255, 255, 0.025);
+    --htl-muted-bar: rgba(255, 255, 255, 0.3);
+    --htl-rail: rgba(255, 255, 255, 0.05);
+    --htl-grid: rgba(255, 255, 255, 0.05);
+
+    position: relative;
+    margin-top: 128px;
+    padding-top: 120px;
+    overflow: hidden;
+    isolation: isolate;
+  }
+
+  @media (prefers-color-scheme: light) {
+    .htl {
+      --htl-shine-from: #b5801f;
+      --htl-shine-to: #6f480d;
+      --htl-name-from: rgb(19, 26, 40);
+      --htl-name-to: rgba(19, 26, 40, 0.78);
+      --htl-panel: rgba(255, 255, 255, 0.6);
+      --htl-muted-bar: rgba(19, 26, 40, 0.3);
+      --htl-rail: rgba(19, 26, 40, 0.06);
+      --htl-grid: rgba(19, 26, 40, 0.045);
+    }
+  }
+
+  /* A gold light from above over a faint grid, both fading out: no edge to the band. */
+  .htl::before {
+    content: "";
+    position: absolute;
+    inset: 0 0 auto;
+    z-index: -1;
+    height: 900px;
+    background:
+      radial-gradient(ellipse 55% 60% at 50% 0%, var(--accent-soft), transparent 70%),
+      linear-gradient(var(--htl-grid) 1px, transparent 1px) 0 0 / 56px 56px,
+      linear-gradient(90deg, var(--htl-grid) 1px, transparent 1px) 0 0 / 56px 56px;
+    mask-image: radial-gradient(ellipse 70% 75% at 50% 0%, #000 30%, transparent 75%);
+  }
+
+  .htl::after {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 50%;
+    z-index: -1;
+    width: min(720px, 90%);
+    height: 1px;
+    background: linear-gradient(90deg, transparent, var(--accent), transparent);
+    transform: translateX(-50%);
+  }
+
+  .htl-shine {
+    white-space: nowrap;
+  }
+
+  .htl-shine,
+  .htl-number-figure,
+  .htl-steps li:last-child .htl-step-value span {
+    background: linear-gradient(120deg, var(--htl-shine-from), var(--accent) 45%, var(--htl-shine-to));
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+
+  /* The opening */
+
+  .htl-head {
+    display: grid;
+    justify-items: center;
+    text-align: center;
+  }
+
+  /* The name is the headline, the largest words in the section. */
+  .htl-head h2 {
+    margin: 0;
+    padding-bottom: 0.06em;
+    background: linear-gradient(180deg, var(--htl-name-from) 35%, var(--htl-name-to));
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    font: 700 clamp(44px, 7vw, 92px) / 1.02 var(--font-display);
+    letter-spacing: -0.035em;
+    text-wrap: balance;
+  }
+
+  .htl-tagline {
+    margin: 18px 0 0;
+    font: 500 clamp(22px, 2.6vw, 30px) / 1.3 var(--font-title);
+    letter-spacing: -0.01em;
+    text-wrap: balance;
+  }
+
+  .htl-lede {
+    max-width: 660px;
+    margin: 24px 0 0;
+    color: var(--ink-2);
+    font-size: clamp(17px, 1.6vw, 19px);
+    line-height: 1.6;
+  }
+
+  .htl-block {
+    margin-top: 112px;
+  }
+
+  .htl-kicker {
+    margin: 0 0 14px;
+    color: var(--accent);
+    font: 600 13px/1.4 var(--font-display);
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+  }
+
+  .htl h3 {
+    margin: 0;
+    font: 600 clamp(26px, 3vw, 34px) / 1.2 var(--font-title);
+    letter-spacing: -0.02em;
+    text-wrap: balance;
+  }
+
+  .htl h4 {
+    margin: 0;
+    font-size: 16px;
+    font-weight: 600;
+    line-height: 1.35;
+  }
+
+  /* Why: the gap, and the chart that shows it */
+
+  .htl-gap {
+    display: grid;
+    grid-template-columns: minmax(0, 5fr) minmax(0, 6fr);
+    gap: 48px 64px;
+    align-items: center;
+  }
+
+  .htl-number {
+    margin: 0;
+    font: 700 clamp(56px, 5.6vw, 72px) / 0.95 var(--font-display);
+    letter-spacing: -0.04em;
+  }
+
+  .htl-number-word {
+    color: var(--ink);
+    font-size: 0.5em;
+    letter-spacing: -0.02em;
+  }
+
+  .htl-gap-claim {
+    margin: 18px 0 0;
+    color: var(--ink);
+    font: 600 clamp(20px, 2.2vw, 24px) / 1.3 var(--font-title);
+    text-wrap: balance;
+  }
+
+  .htl-gap-text p:not([class]) {
+    margin: 16px 0 0;
+    color: var(--ink-2);
+    font-size: 16px;
+  }
+
+  .htl-fine {
+    margin: 16px 0 0;
+    color: var(--ink-3);
+    font-size: 13px;
+    line-height: 1.55;
+  }
+
+  .htl-chart {
+    margin: 0;
+    padding: 28px 28px 22px;
+    border: 1px solid var(--line);
+    border-radius: 22px;
+    background: var(--htl-panel);
+    box-shadow: var(--shot-shadow);
+  }
+
+  .htl-chart figcaption {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 2px 10px;
+    margin-bottom: 26px;
+    font-size: 15px;
+  }
+
+  .htl-chart figcaption span {
+    color: var(--ink-3);
+    font-size: 14px;
+  }
+
+  .htl-ranges {
+    display: grid;
+    gap: 22px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .htl-ranges li {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 8px 12px;
+  }
+
+  .htl-range-label {
+    color: var(--ink-2);
+    font-size: 14px;
+  }
+
+  .htl-range-value {
+    color: var(--ink-2);
+    font-size: 14px;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .htl-ranges li.ours .htl-range-label,
+  .htl-ranges li.ours .htl-range-value {
+    color: var(--ink);
+    font-weight: 600;
+  }
+
+  /* Each range sits on a rail the width of the scale, 0 to 2. */
+  .htl-track {
+    position: relative;
+    grid-column: 1 / -1;
+    height: 12px;
+    border-radius: 4px;
+    background: var(--htl-rail);
+  }
+
+  .htl-bar {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: var(--from);
+    right: calc(100% - var(--to));
+    border-radius: 4px;
+    background: var(--htl-muted-bar);
+  }
+
+  .ours .htl-bar {
+    background: var(--accent);
+    box-shadow: 0 0 24px var(--accent-soft), 0 0 0 4px var(--accent-soft);
+  }
+
+  .htl-axis {
+    position: relative;
+    height: 18px;
+    margin-top: 12px;
+    color: var(--ink-3);
+    font-size: 12px;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .htl-axis span {
+    position: absolute;
+    left: var(--at);
+    transform: translateX(-50%);
+  }
+
+  .htl-axis span:first-child {
+    transform: none;
+  }
+
+  .htl-axis span:last-child {
+    transform: translateX(-100%);
+  }
+
+  /* The formula */
+
+  .htl-formula {
+    padding: clamp(36px, 6vw, 72px) clamp(20px, 5vw, 64px);
+    border: 1px solid var(--line);
+    border-radius: 28px;
+    background:
+      radial-gradient(ellipse 60% 70% at 50% 0%, var(--glow), transparent 70%),
+      var(--htl-panel);
+    text-align: center;
+  }
+
+  .htl-eq {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 6px 14px;
+    max-width: 980px;
+    margin: 40px auto 0;
+    font: 400 clamp(20px, 2.6vw, 30px) / 1.5 var(--font-title);
+  }
+
+  .htl-eq-part,
+  .htl-eq-end {
+    white-space: nowrap;
+  }
+
+  .htl-eq-lhs {
+    font-weight: 600;
+  }
+
+  .htl-eq .op {
+    color: var(--ink-3);
+  }
+
+  .htl-eq .op.big {
+    font-size: 1.2em;
+  }
+
+  .htl-eq .term {
+    color: var(--ink);
+    text-decoration: underline 2px var(--accent);
+    text-underline-offset: 0.28em;
+  }
+
+  .htl-eq sup {
+    margin-left: 2px;
+    color: var(--accent);
+    font: 600 0.45em/1 var(--font-display);
+    vertical-align: 1.1em;
+  }
+
+  .htl-eq-sub {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 6px 28px;
+    margin: 20px 0 0;
+    color: var(--ink-2);
+    font-size: 15px;
+  }
+
+  .htl-eq-sub code {
+    white-space: nowrap;
+  }
+
+  .htl-eq-sub sup {
+    font-size: 0.75em;
+  }
+
+  .htl-terms {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 28px;
+    margin: 56px 0 0;
+    padding: 0;
+    list-style: none;
+    counter-reset: term;
+    text-align: left;
+  }
+
+  .htl-terms li {
+    padding-top: 18px;
+    border-top: 1px solid var(--line);
+    counter-increment: term;
+  }
+
+  .htl-terms h4::before {
+    content: counter(term);
+    display: inline-grid;
+    place-items: center;
+    width: 20px;
+    height: 20px;
+    margin-right: 10px;
+    border-radius: 50%;
+    background: var(--accent);
+    color: var(--on-accent);
+    font: 700 11px/1 var(--font-display);
+    vertical-align: 2px;
+  }
+
+  .htl-terms p {
+    margin: 8px 0 0;
+    color: var(--ink-2);
+    font-size: 14px;
+    line-height: 1.55;
+  }
+
+  /* One set, step by step */
+
+  .htl-walk-head {
+    display: grid;
+    justify-items: center;
+    text-align: center;
+  }
+
+  .htl-walk-head p:not(.htl-kicker) {
+    margin: 14px 0 0;
+    color: var(--ink-2);
+    font-size: 17px;
+  }
+
+  .htl-steps {
+    position: relative;
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: 28px;
+    margin: 56px 0 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  /* The rail the steps sit on, ending in gold at the load. */
+  .htl-steps::before {
+    content: "";
+    position: absolute;
+    top: 18px;
+    left: 18px;
+    right: calc((100% - 4 * 28px) / 5 - 18px);
+    height: 1px;
+    background: linear-gradient(90deg, var(--line), var(--line) 60%, var(--accent));
+  }
+
+  .htl-steps li {
+    position: relative;
+  }
+
+  .htl-step-index {
+    display: grid;
+    place-items: center;
+    width: 36px;
+    height: 36px;
+    margin-bottom: 20px;
+    border: 1px solid var(--line);
+    border-radius: 50%;
+    background: var(--bg);
+    color: var(--ink-2);
+    font: 600 12px/1 var(--font-display);
+    letter-spacing: 0.04em;
+  }
+
+  .htl-steps li:last-child .htl-step-index {
+    border-color: var(--accent);
+    background: var(--accent);
+    color: var(--on-accent);
+    box-shadow: 0 0 0 6px var(--accent-soft);
+  }
+
+  .htl-steps h4 {
+    color: var(--ink-2);
+    font-size: 13px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+  }
+
+  .htl-step-value {
+    margin: 6px 0 0;
+    font: 600 clamp(30px, 3.4vw, 40px) / 1.1 var(--font-display);
+    letter-spacing: -0.02em;
+  }
+
+  .htl-step-value small {
+    display: block;
+    margin-top: 4px;
+    color: var(--ink-3);
+    font: 500 14px/1.3 var(--font-sans);
+    letter-spacing: 0;
+  }
+
+  .htl-step-text {
+    margin: 12px 0 0;
+    color: var(--ink-2);
+    font-size: 14px;
+    line-height: 1.55;
+  }
+
+  /* Principles and the way on */
+
+  .htl-principles {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 32px;
+    padding: 0;
+    list-style: none;
+  }
+
+  .htl-principles li {
+    padding-top: 22px;
+    border-top: 1px solid var(--line);
+  }
+
+  .htl-principles h4 {
+    font: 600 21px/1.3 var(--font-title);
+  }
+
+  .htl-principles h4::before {
+    content: "";
+    display: block;
+    width: 28px;
+    height: 2px;
+    margin: -23px 0 21px;
+    background: var(--accent);
+  }
+
+  .htl-principles p {
+    margin: 10px 0 0;
+    color: var(--ink-2);
+    font-size: 15px;
+  }
+
+  .htl-cta {
+    display: grid;
+    justify-items: center;
+    margin-top: 80px;
+    text-align: center;
+  }
+
+  .htl-cta .button {
+    padding: 14px 26px;
+    font-size: 16px;
+  }
+
+  .htl-cta .button::after {
+    content: " \2192";
+  }
+
+  .htl-cta .more {
+    margin-top: 14px;
+  }
+
+  .htl-cta p {
+    max-width: 640px;
+    margin: 20px 0 0;
+    color: var(--ink-3);
+    font-size: 13px;
+  }
+
+  @media (max-width: 960px) {
+    .htl-terms {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .htl-steps {
+      grid-template-columns: 1fr;
+      gap: 28px;
+    }
+
+    /* Stacked, the rail runs node to node, so it stops at the load. */
+    .htl-steps::before {
+      content: none;
+    }
+
+    .htl-steps li:not(:last-child)::before {
+      content: "";
+      position: absolute;
+      top: 36px;
+      bottom: -28px;
+      left: 18px;
+      width: 1px;
+      background: var(--line);
+    }
+
+    .htl-steps li:nth-last-child(2)::before {
+      background: linear-gradient(180deg, var(--line), var(--accent));
+    }
+
+    .htl-steps li {
+      display: grid;
+      grid-template-columns: 36px minmax(0, 1fr);
+      column-gap: 20px;
+    }
+
+    .htl-step-index {
+      grid-row: span 3;
+      margin: 0;
+    }
+
+    .htl-step-value small {
+      display: inline;
+      margin-left: 6px;
+    }
+  }
+
+  @media (max-width: 860px) {
+    .htl {
+      margin-top: 96px;
+      padding-top: 88px;
+    }
+
+    .htl-block {
+      margin-top: 88px;
+    }
+
+    .htl-gap {
+      grid-template-columns: 1fr;
+    }
+
+    .htl-chart {
+      padding: 22px 20px 18px;
+    }
+
+    .htl-principles {
+      grid-template-columns: 1fr;
+      gap: 28px;
+    }
+  }
+
+  @media (max-width: 560px) {
+    .htl-terms {
+      grid-template-columns: 1fr;
+    }
+
+    .htl-eq-part {
+      white-space: normal;
+    }
+  }
+</style>

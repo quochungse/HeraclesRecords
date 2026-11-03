@@ -1,4 +1,5 @@
-// The figures on the Heracles Training Load page, worked out at build time by
+// The figures on the Heracles Training Load page (and the Strength page's
+// TrainingLoadShowcase), worked out at build time by
 // the app's own engine (electron/heraclesLoad.ts, node-free), so the page
 // cannot state a number the app does not compute. The worked example is a real
 // run of the engine over two invented sessions.
