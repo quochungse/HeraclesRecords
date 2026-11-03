@@ -7,13 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [1.4.5] - 2026-10-31
+## [1.4.5] - 2026-11-02
 
 Improve app performance and stability.
 
 ### Fixed
-- Fix a crash on muscle details cellcause by missing Heracles TL data.
-
+- Strength no longer crashes when a muscle's details are opened with the body map showing Load.
 
 ## [1.4.4] - 2026-10-31
 
