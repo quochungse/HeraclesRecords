@@ -5425,9 +5425,15 @@ export function ChatView({
           </>
         )
       : null;
+  /* A running turn's cards — a change set, a plan, a workout — wait for the
+     answer that proposes them, as its questions do (`pendingCoachPromptsRef`):
+     drawn the moment the tool returned, a card stood under an answer not yet
+     written and read as unexplained. A pipeline step is the exception, the
+     trail under its card is the step's progress. */
+  const holdTurnCards = turnHere && !stepActive;
   // `rows` is the timeline mapped one to one, so a row's index is its entry's.
   // The answer streams where it will settle (`settleTurnEntries`): under the
-  // turn's charts, above its other cards.
+  // turn's charts, with its other cards held back until it does.
   const withStreamingRow = (rows: ReactNode[]): ReactNode[] => {
     const at = Math.min(Math.max(0, turnStartRef.current), rows.length);
     const placed = streamingRow
@@ -5563,6 +5569,11 @@ export function ChatView({
             // Above the window: brought in by `TranscriptEarlier`. The row
             // stays in the list as a null so a row's index is still its entry's.
             if (index < renderFrom) return null;
+            if (holdTurnCards && index >= turnStartRef.current && !isChatVisualEntry(entry)) {
+              // Mounted by the settle, however the turn ends, so drawn as it is (`ChatRow`).
+              settledEntriesRef.current.add(entry);
+              return null;
+            }
             if (!chatSettings.visualizationsEnabled && isChatVisualEntry(entry)) {
               return null;
             }

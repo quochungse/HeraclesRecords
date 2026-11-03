@@ -10,7 +10,7 @@
 //   * an undated plan reads as its weeks, off the document the draft becomes,
 //     not as one "Unscheduled" pile with "0 weeks";
 //   * a turn's answer sits under the charts the turn produced and above its
-//     other cards, while it streams and once it has settled.
+//     other cards, which wait off screen until the answer has settled.
 import assert from "node:assert/strict";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -340,7 +340,8 @@ async function main() {
   );
 
   // -------------------------------------------------------------------------
-  // A turn's answer sits under its charts and above its other cards
+  // A turn's answer sits under its charts and above its other cards, which
+  // wait for it
   // -------------------------------------------------------------------------
   await harness("mount", "ChatView", {}, {
     ...BASE_SCRIPT,
@@ -378,9 +379,9 @@ async function main() {
   await harness("emit", "onChatStreamToken", { requestId, delta: "Here is a four-week block." });
   await waitFor(() => harness("exists", ".chat-bubble-streaming"), "the answer is streaming");
   assert.deepEqual(
-    (await threadOrder()).slice(-4),
-    ["user", "visual", "streaming", "card"],
-    "while it streams, the answer is under the chart and above the card"
+    (await threadOrder()).slice(-3),
+    ["user", "visual", "streaming"],
+    "while it streams, the answer is under the chart and the card waits for it"
   );
 
   await harness("emit", "onChatStreamDone", {
@@ -391,7 +392,12 @@ async function main() {
   assert.deepEqual(
     (await threadOrder()).slice(-4),
     ["user", "visual", "assistant", "card"],
-    "once settled, the answer is still between the chart and the card"
+    "once settled, the card is drawn under the answer"
+  );
+  assert.equal(
+    await page(`[...document.querySelectorAll(".chat-thread > .chat-row")].at(-1).classList.contains("is-settled")`),
+    true,
+    "the card the settle mounts is drawn as it is, not faded in from nothing"
   );
   await settle();
   const saved = (await harness("calls", "saveChatSession")).at(-1)?.args[1] ?? [];

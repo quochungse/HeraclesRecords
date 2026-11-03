@@ -207,7 +207,9 @@ Coach never writes to COROS directly; it writes drafts and change sets the athle
   row. `npm run test:chat-turn-actions`.
 - **A turn reads chart, answer, then creations** (`orderTurn`, `isChartKind` in node-free
   `electron/chartPlacement.ts`, used by the settle, the streaming bubble and the headless
-  sink). An answer may place a chart with `[[chart:c2]]` on a line of its own; nothing is
+  sink). While an ordinary turn runs its creations stay off screen (`holdTurnCards`) and
+  mount at the settle, drawn as they are — shown as the tool returned, a card stood under an
+  answer not yet written; a pipeline step shows its cards as they land. An answer may place a chart with `[[chart:c2]]` on a line of its own; nothing is
   stored beside the entry, and every reader of the words as text strips placeholders
   (`stripChartPlaceholders`).
 - **Rows a settle or reload mounts do not animate in** (`ChatRow`, `.is-settled`, marked by

@@ -234,7 +234,8 @@ async function main() {
   await waitFor(async () => (await lineStates())[2][0] === "dismissed", "the line is dismissed");
   assert.deepEqual((await harness("calls", "dismissScheduleChange"))[0].args, ["sc-1", "l3"]);
 
-  // A proposal that arrives in a turn is drawn at once and saved as an anchor.
+  // A proposal that arrives in a turn waits for the answer, is drawn under it,
+  // and is saved as an anchor.
   await harness("mount", "ChatView", {}, { ...BASE_SCRIPT, getChatSession: TRANSCRIPT.slice(0, 2), getScheduleChanges: [] });
   await waitFor(() => harness("exists", ".chat-composer textarea, textarea"), "the composer is up");
   await harness("setValue", "textarea", "Move my long run");
@@ -247,9 +248,20 @@ async function main() {
     kind: "scheduleChange",
     changeSet: { ...SET, changeSetId: "sc-2", summary: "Long run to Sunday", lines: [SET.lines[0]] }
   });
-  await waitFor(async () => (await harness("text", ".chat-change-card h4")) === "Long run to Sunday", "drawn as it arrives");
-  assert.equal(await harness("exists", ".chat-change-card .chat-plan-upload"), false, "one line needs no Apply all");
+  await settle();
+  assert.equal(await harness("exists", ".chat-change-card"), false, "not drawn before the answer that proposes it");
   await harness("emit", "onChatStreamDone", { requestId, fullText: "Moved to Sunday, if you apply it." });
+  await waitFor(async () => (await harness("text", ".chat-change-card h4")) === "Long run to Sunday", "drawn once the turn settles");
+  assert.equal(
+    await page(`(() => {
+      const rows = [...document.querySelectorAll(".chat-thread > .chat-row")];
+      const card = rows.findIndex((row) => row.querySelector(".chat-change-card"));
+      return card > 0 && /Moved to Sunday/.test(rows[card - 1].textContent);
+    })()`),
+    true,
+    "under the answer"
+  );
+  assert.equal(await harness("exists", ".chat-change-card .chat-plan-upload"), false, "one line needs no Apply all");
   await settle();
   const saved = (await harness("calls", "saveChatSession")).at(-1)?.args[1] ?? [];
   assert.ok(
