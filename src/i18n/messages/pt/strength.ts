@@ -203,7 +203,6 @@ const strength: StrengthMessages = {
   "strength.log.bestReps": "melhor: {count} reps",
   "strength.col.e1rmShort": "e1RM",
   "strength.col.workRest": "Trabalho / descanso",
-  "strength.metric.time": "Tempo sob carga",
   "strength.unit.sets": "séries",
   "strength.empty.volume": "Sem carga",
   "strength.empty.sets": "Não treinado",

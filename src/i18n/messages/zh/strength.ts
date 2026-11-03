@@ -203,7 +203,6 @@ const strength: StrengthMessages = {
   "strength.log.bestReps": "最多 {count} 次",
   "strength.col.e1rmShort": "e1RM",
   "strength.col.workRest": "训练 / 休息",
-  "strength.metric.time": "负重时间",
   "strength.unit.sets": "组",
   "strength.empty.volume": "无负重",
   "strength.empty.sets": "未训练",

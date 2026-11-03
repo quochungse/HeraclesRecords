@@ -203,7 +203,6 @@ const strength: StrengthMessages = {
   "strength.log.bestReps": "tốt nhất {count} lần",
   "strength.col.e1rmShort": "e1RM",
   "strength.col.workRest": "Tập / nghỉ",
-  "strength.metric.time": "Thời gian chịu tải",
   "strength.unit.sets": "hiệp",
   "strength.empty.volume": "Không có tạ",
   "strength.empty.sets": "Chưa tập",

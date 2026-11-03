@@ -203,7 +203,6 @@ const strength: StrengthMessages = {
   "strength.log.bestReps": "terbaik {count} rep",
   "strength.col.e1rmShort": "e1RM",
   "strength.col.workRest": "Kerja / istirahat",
-  "strength.metric.time": "Waktu di bawah beban",
   "strength.unit.sets": "set",
   "strength.empty.volume": "Tanpa beban",
   "strength.empty.sets": "Belum dilatih",

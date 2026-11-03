@@ -203,7 +203,6 @@ const strength: StrengthMessages = {
   "strength.log.bestReps": "ดีที่สุด {count} ครั้ง",
   "strength.col.e1rmShort": "e1RM",
   "strength.col.workRest": "ทำ / พัก",
-  "strength.metric.time": "เวลาใต้แรงต้าน",
   "strength.unit.sets": "เซ็ต",
   "strength.empty.volume": "ไม่มีน้ำหนัก",
   "strength.empty.sets": "ยังไม่ได้ฝึก",

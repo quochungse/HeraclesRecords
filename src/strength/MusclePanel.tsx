@@ -14,7 +14,6 @@ import {
   type MuscleStat,
   type MuscleWeekPoint
 } from "./strengthAnalytics";
-import { formatDurationSeconds } from "../training/formatters";
 import { formatCount, formatDecimal, plural, t } from "../i18n/core";
 
 interface MusclePanelProps {
@@ -225,7 +224,7 @@ function MuscleRecovery({ recovery }: { recovery: Recovery | undefined }) {
   );
 }
 
-type StatCellId = HeatMetric | "time" | "repRange" | "perSession";
+type StatCellId = HeatMetric | "repRange" | "perSession";
 
 interface StatCell {
   id: StatCellId;
@@ -293,15 +292,6 @@ function statCells(
       note:
         stat.loadTl > 0 && stat.sessions > 0
           ? t("strength.cell.perSession", { value: formatMetric(stat.loadTl / stat.sessions, "load", unitSystem).value })
-          : undefined
-    },
-    time: {
-      id: "time",
-      label: t("strength.metric.time"),
-      value: formatDurationSeconds(Math.round(stat.workSec)),
-      note:
-        stat.workSec > 0 && stat.sessions > 0
-          ? t("strength.cell.perSession", { value: formatDurationSeconds(Math.round(stat.workSec / stat.sessions)) })
           : undefined
     },
     repRange: {

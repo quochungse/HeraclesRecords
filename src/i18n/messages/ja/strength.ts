@@ -203,7 +203,6 @@ const strength: StrengthMessages = {
   "strength.log.bestReps": "ベスト {count} レップ",
   "strength.col.e1rmShort": "e1RM",
   "strength.col.workRest": "運動 / 休息",
-  "strength.metric.time": "負荷時間",
   "strength.unit.sets": "セット",
   "strength.empty.volume": "負荷なし",
   "strength.empty.sets": "未トレーニング",

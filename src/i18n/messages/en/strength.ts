@@ -204,7 +204,6 @@ const strength = {
   "strength.log.bestReps": "{count} best reps",
   "strength.col.e1rmShort": "e1RM",
   "strength.col.workRest": "Work / rest",
-  "strength.metric.time": "Time under load",
   "strength.unit.sets": "sets",
   "strength.empty.volume": "No load",
   "strength.empty.sets": "Not trained",

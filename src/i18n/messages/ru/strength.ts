@@ -231,7 +231,6 @@ const strength: StrengthMessages = {
   "strength.log.bestReps": "лучшее: {count} повт.",
   "strength.col.e1rmShort": "e1RM",
   "strength.col.workRest": "Работа / отдых",
-  "strength.metric.time": "Время под нагрузкой",
   "strength.unit.sets": "подх.",
   "strength.empty.volume": "Без веса",
   "strength.empty.sets": "Не тренировалась",
