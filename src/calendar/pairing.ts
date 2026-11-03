@@ -14,7 +14,8 @@ import {
   type PlannedTargets,
   type WeeklyStats
 } from "./calendarTypes";
-import { buildScheduledWorkoutView, type ScheduledStructureTotals } from "./scheduledStructure";
+import { buildScheduledWorkoutView } from "./scheduledStructure";
+import { corosProgramFigures, sessionFigures, type StepFigures } from "../../electron/workoutFigures";
 import {
   activitySportFamily,
   isStrengthStyleWorkout,
@@ -110,12 +111,10 @@ function plannedTargets(
 
 /**
  * How far and how long a planned session goes, said the same way on its
- * Calendar card, in its session panel and in its completion: COROS's own
- * estimates first, else the sum of the steps when every one of them is in
- * that unit. COROS estimates the whole session — its `distance` counts the
- * timed steps too (probed: 14.5 km of distance steps and 20 timed minutes
- * came to 17.08 km) — and a sum over some of the steps read as the whole
- * session's: a 14 km run with a timed float was "3:00", a 17 km run "14.5 km".
+ * Calendar card, in its session panel and in its completion: the one rule
+ * every workout figure goes through (`electron/workoutFigures.ts`) — COROS's
+ * own estimates first, else the sum of the steps when every one of them is in
+ * that unit.
  *
  * `known` is what a caller already holds of COROS's estimates for an entry
  * that arrived without its program (Overview's row). The main process's
@@ -125,48 +124,21 @@ function plannedTargets(
  */
 export function plannedSessionFigures(
   scheduled: TrainingHubScheduledWorkoutEntry,
-  totals: Pick<
-    ScheduledStructureTotals,
-    "distanceMeters" | "durationSeconds" | "stepCount" | "timedSteps" | "distanceSteps"
-  >,
+  totals: StepFigures,
   known: { meters?: number; seconds?: number } = {}
 ): PlannedTargets {
+  const coros = corosProgramFigures(scheduled.rawProgram);
   const volumeKm = totals.stepCount === 0 ? parseUpcomingWorkoutDistanceKm(scheduled.volume) : null;
-  const meters = expectedMeters(scheduled) ?? known.meters ?? (volumeKm ? volumeKm * 1000 : undefined);
-  const seconds = expectedSeconds(scheduled) ?? known.seconds;
-  const everyStep = (count: number) => totals.stepCount > 0 && count === totals.stepCount;
+  const seconds = coros.durationSeconds ?? known.seconds;
+  const figures = sessionFigures(totals, {
+    distanceMeters: coros.distanceMeters ?? known.meters ?? (volumeKm ? volumeKm * 1000 : undefined),
+    durationSeconds: seconds
+  });
   return {
-    distanceMeters: meters ?? (everyStep(totals.distanceSteps) ? totals.distanceMeters : undefined),
-    plannedSeconds: seconds ?? (everyStep(totals.timedSteps) ? totals.durationSeconds : undefined),
+    distanceMeters: figures.distanceMeters,
+    plannedSeconds: figures.durationSeconds,
     expectedSeconds: seconds
   };
-}
-
-/**
- * COROS's own estimate of the session's length, off the raw program. On a
- * COROS program a `0` is a field nobody filled in, so it is no estimate.
- */
-function expectedSeconds(scheduled: TrainingHubScheduledWorkoutEntry): number | undefined {
-  const raw = scheduled.rawProgram;
-  for (const value of [raw?.estimatedTime, raw?.duration]) {
-    const seconds = Number(value);
-    if (Number.isFinite(seconds) && seconds > 0) {
-      return seconds;
-    }
-  }
-  return undefined;
-}
-
-/** COROS's own estimate of the session's distance, in metres (it writes centimetres; `0` is none). */
-function expectedMeters(scheduled: TrainingHubScheduledWorkoutEntry): number | undefined {
-  const raw = scheduled.rawProgram;
-  for (const value of [raw?.distance, raw?.estimatedDistance]) {
-    const centimetres = Number(value);
-    if (Number.isFinite(centimetres) && centimetres > 0) {
-      return centimetres / 100;
-    }
-  }
-  return undefined;
 }
 
 /**

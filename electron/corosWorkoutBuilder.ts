@@ -45,6 +45,7 @@ import {
   corosTextLimitError
 } from "./corosTextLimits";
 import { describePlanShape } from "./trainingPlanDomain";
+import { workoutFigures } from "./workoutFigures";
 import {
   HYROX_RUN_STEP_NAME,
   poolLengthPresetId,
@@ -1164,19 +1165,26 @@ function isValidScheduleDay(day: string): boolean {
   );
 }
 
+/**
+ * A draft's volume in a word: its distance when that is the whole session's
+ * (`workoutFigures`: COROS's arithmetic on the account's `context`), else its
+ * sets. The distance steps of a run with a timed warm-up are not its
+ * distance: a 14 km long run read "11.5 km".
+ */
 function formatEntryVolume(
   entry: PlanWorkoutEntry,
-  unitSystem: UnitSystem = "metric"
+  unitSystem: UnitSystem = "metric",
+  context?: WorkoutEditorContext
 ): string | undefined {
-  if (entry.distance_km !== undefined && entry.distance_km > 0) {
-    return formatDistanceValue(entry.distance_km * 1_000, unitSystem, {
+  const { distanceMeters } = workoutFigures(entry, { context });
+  if (distanceMeters) {
+    return formatDistanceValue(distanceMeters, unitSystem, {
       swim: entry.sport === "swim"
     });
   }
   if (!entry.steps || entry.steps.length === 0) {
     return undefined;
   }
-  let totalMeters = 0;
   let repeatSets = 0;
   let strengthSets = 0;
 
@@ -1187,23 +1195,12 @@ function formatEntryVolume(
         if (entry.sport === "strength" && sub.kind === "training") {
           strengthSets += (sub.sets ?? 1) * step.repeat;
         }
-        if (sub.target_distance_meters) {
-          totalMeters += sub.target_distance_meters * step.repeat;
-        }
       }
-    } else {
-      if (entry.sport === "strength" && step.kind === "training") {
-        strengthSets += step.sets ?? 1;
-      }
-      if (step.target_distance_meters) totalMeters += step.target_distance_meters;
+    } else if (entry.sport === "strength" && step.kind === "training") {
+      strengthSets += step.sets ?? 1;
     }
   }
 
-  if (totalMeters > 0) {
-    return formatDistanceValue(totalMeters, unitSystem, {
-      swim: entry.sport === "swim"
-    });
-  }
   if (strengthSets > 0) {
     return `${strengthSets} ${strengthSets === 1 ? "set" : "sets"}`;
   }
@@ -1483,6 +1480,8 @@ export function buildPlanPreview(
     scheduleConflicts?: string[];
     unitSystem?: UnitSystem;
     artifactType?: "plan" | "workout";
+    /** The account's, for a heart-rate session's distance (`formatEntryVolume`). */
+    context?: WorkoutEditorContext;
   }
 ): PlanDraftPreview {
   const entries: PlanDraftPreviewEntry[] = draft.workouts.map((entry) => ({
@@ -1492,7 +1491,7 @@ export function buildPlanPreview(
     scheduleDate: entry.schedule_date
       ? formatScheduleDate(entry.schedule_date)
       : undefined,
-    volume: formatEntryVolume(entry, options?.unitSystem),
+    volume: formatEntryVolume(entry, options?.unitSystem, options?.context),
     saveToLibrary: entry.save_to_library !== false,
     workoutType: inferWorkoutType(entry),
     stepsSummary: formatEntryStepsSummary(entry, options?.unitSystem),

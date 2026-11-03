@@ -122,6 +122,7 @@ import {
 } from "./planReaderModel";
 import { heraclesEntryLoad } from "./planHeraclesLoads";
 import { usePlanHeraclesLoads } from "./usePlanHeraclesLoads";
+import { useAthleteContext } from "../calendar/useAthleteContext";
 import { PlanOriginBadge, SportMixDots, dominantSport, sportAccentStyle, sportChipStyle, sportTheme } from "./sportTheme";
 import { workoutSportLabel } from "../training/workoutSport";
 import { formatCount, formatDecimal, plural, t, weekdayNames } from "../i18n/core";
@@ -285,14 +286,15 @@ export function PlanEditor({
      and is not the place to be told a session was missed. */
   const shaped = useMemo(() => [{ ...plan, ...shape }], [shape]);
   const heraclesLoads = usePlanHeraclesLoads(shaped);
+  const athlete = useAthleteContext(api);
   const reading = useMemo(
-    () => readPlan({ ...plan, ...shape, startDate: undefined, calendar: "unscheduled" }, [], heraclesLoads),
+    () => readPlan({ ...plan, ...shape, startDate: undefined, calendar: "unscheduled" }, [], heraclesLoads, athlete),
     // The day labels and stage names are in the language on screen.
-    [shape, locale, heraclesLoads]
+    [shape, locale, heraclesLoads, athlete]
   );
   const summary = useMemo(
-    () => summarizeTrainingPlan(shaped[0], heraclesEntryLoad(plan, heraclesLoads)),
-    [shaped, heraclesLoads]
+    () => summarizeTrainingPlan(shaped[0], heraclesEntryLoad(plan, heraclesLoads), athlete),
+    [shaped, heraclesLoads, athlete]
   );
   const validation = useMemo(() => validateTrainingPlan(plan), [plan]);
   const errors = validation.filter((issue) => issue.severity === "error");

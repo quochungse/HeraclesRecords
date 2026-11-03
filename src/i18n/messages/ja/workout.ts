@@ -327,6 +327,7 @@ const workout: WorkoutMessages = {
   "workout.v.estLoad": "推定負荷",
   "workout.v.distance": "距離",
   "workout.v.timedSteps": "時間指定ステップ",
+  "workout.v.distanceSteps": "距離指定ステップ",
   "workout.v.duration": "時間",
   "workout.v.step": "ステップ",
   "workout.v.steps": "ステップ",

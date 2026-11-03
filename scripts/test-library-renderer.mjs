@@ -218,8 +218,8 @@ const PLAN = {
         name: "Tempo",
         sport: "run",
         steps: [
-          { target_duration_seconds: 900, target_load: 25 },
-          { target_duration_seconds: 1920, target_distance_meters: 8000, target_load: 65 }
+          { target_type: "time", target_duration_seconds: 900, target_load: 25 },
+          { target_type: "time", target_duration_seconds: 1920, target_load: 65 }
         ]
       }
     }),

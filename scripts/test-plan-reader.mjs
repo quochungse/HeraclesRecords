@@ -128,9 +128,10 @@ function match(idInPlan, status, overrides = {}) {
 // 2. A session's figures are the ones the library row totals
 // ---------------------------------------------------------------------------
 {
+  const pace = (low, high) => ({ type: "pace", lowSecondsPerKm: low, highSecondsPerKm: high, displayUnit: "km" });
   const steps = [
-    { target_duration_seconds: 600, target_load: 20 },
-    { target_duration_seconds: 1800, target_distance_meters: 6000, target_load: 70 }
+    { target_type: "time", target_duration_seconds: 600, target_load: 20, intensity: pace(360, 390) },
+    { target_type: "distance", target_distance_meters: 6000, target_load: 70, intensity: pace(300, 320) }
   ];
   const structured = entry({
     title: "Tempo",
@@ -150,9 +151,12 @@ function match(idInPlan, status, overrides = {}) {
   const reading = readPlan(document);
   const facts = reading.weeks[0].days[0].entries[0];
 
-  assert.equal(facts.durationSeconds, 2400, "the steps' own duration");
+  /* The whole session by COROS's arithmetic: 10 minutes at 6:15/km is 1.6 km,
+     6 km at 5:10/km is 31 minutes. */
+  assert.equal(facts.durationSeconds, 2460, "the timed step, and the distance step at its pace");
+  assert.equal(facts.durationComplete, true);
   assert.equal(facts.trainingLoad, 90);
-  assert.equal(facts.distanceMeters, 6000);
+  assert.equal(facts.distanceMeters, 7600, "the distance step, and the timed step at its pace");
   assert.equal(facts.stepCount, 2);
   assert.equal(facts.sport, "run");
 
@@ -172,6 +176,49 @@ function match(idInPlan, status, overrides = {}) {
     "the plan row's load and the sessions inside it have to add up, or the " +
       "screen contradicts the row that opened it"
   );
+}
+
+// ---------------------------------------------------------------------------
+// 2a. COROS's estimate is the session's, ahead of the steps
+// ---------------------------------------------------------------------------
+{
+  /* A plan's running copy: 6.5 + 5 km of distance steps and 20 timed
+     minutes, which COROS estimates at 14.08 km and 1:38:03 — the figures the
+     Calendar shows for the same session. */
+  const longRun = entry({
+    title: "Long run 14 km",
+    corosProgram: { distance: 0, duration: 0, estimatedDistance: 1407974, estimatedTime: 5883 },
+    workout: {
+      key: "w1",
+      name: "Long run 14 km",
+      sport: "run",
+      steps: [
+        { kind: "warmup", target_type: "time", target_duration_seconds: 900, intensity: { type: "heartRate", lowBpm: 125, highBpm: 150 } },
+        { kind: "training", target_type: "distance", target_distance_meters: 6500, intensity: { type: "heartRate", lowBpm: 135, highBpm: 156 } },
+        { kind: "training", target_type: "distance", target_distance_meters: 5000, intensity: { type: "heartRate", lowBpm: 135, highBpm: 160 } },
+        { kind: "cooldown", target_type: "time", target_duration_seconds: 300, intensity: { type: "heartRate", lowBpm: 110, highBpm: 145 } }
+      ]
+    }
+  });
+  const facts = readPlan(plan({ entries: [longRun] })).weeks[0].days[0].entries[0];
+  assert.equal(facts.distanceMeters, 14079.74, "COROS's distance counts the timed steps");
+  assert.equal(facts.durationSeconds, 5883, "and its time the distance steps");
+  assert.equal(facts.durationComplete, true);
+
+  /* Edited, the session has no COROS figures; its heart-rate steps go as far
+     as COROS's arithmetic on the account says. */
+  const edited = plan({ entries: [{ ...longRun, corosProgram: undefined }] });
+  const athlete = {
+    distanceUnit: "metric", paceUnit: "km", heartRateBasis: "reserve", zones: {}, lthrZones: [],
+    defaultPoolLength: { value: 25, unit: "m" }, climbSystems: {},
+    restingHr: 52, maxHr: 190, lthrBpm: 168, thresholdPaceSecondsPerKm: 321, maxHrPaceSecondsPerKm: 285
+  };
+  const known = readPlan(edited, [], undefined, athlete).weeks[0].days[0].entries[0];
+  assert.equal(known.distanceMeters, 14079.74, "the account's thresholds give what COROS would");
+  assert.equal(known.durationSeconds, 5883);
+  const unknown = readPlan(edited).weeks[0].days[0].entries[0];
+  assert.equal(unknown.distanceMeters, 11500, "without the account, the distance steps alone");
+  assert.equal(unknown.durationComplete, false, "and no length is stated for the session");
 }
 
 // ---------------------------------------------------------------------------

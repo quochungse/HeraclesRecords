@@ -21,6 +21,7 @@ import type {
   TrainingActivityMatch,
   TrainingPlanDocument,
   TrainingPlanEntry,
+  WorkoutEditorContext,
   WorkoutSport
 } from "../../electron/types";
 import {
@@ -45,13 +46,14 @@ export interface PlanEntryFacts {
   sport?: WorkoutSport;
   durationSeconds: number;
   /**
-   * Whether `durationSeconds` is the whole session or only its timed steps.
+   * Whether `durationSeconds` is the whole session or only its timed steps
+   * (`planEntryMetrics`: COROS's estimate, else every step timed).
    *
-   * The figure is a sum of `target_duration_seconds`, so a run written as a
-   * 1 km warm-up, 6.5 km easy and a 500 m cool-down comes to zero, and one with
-   * five 90 s jogs between strides comes to nine minutes. Drawn beside "8 km"
-   * that read as a nine-minute session, and summed over a 31 km week it read as
-   * "0.1 hours". A duration is only stated when every step carries one.
+   * Without an estimate the figure is a sum of `target_duration_seconds`, so a
+   * run written as a 1 km warm-up, 6.5 km easy and a 500 m cool-down comes to
+   * zero, and one with five 90 s jogs between strides comes to nine minutes.
+   * Drawn beside "8 km" that read as a nine-minute session, and summed over a
+   * 31 km week it read as "0.1 hours".
    */
   durationComplete: boolean;
   distanceMeters: number;
@@ -147,25 +149,6 @@ export function stageForWeek(
 }
 
 /**
- * Whether every step of a session names a duration. A session with no steps
- * is timed when the plan states a planned duration for it, which is the one
- * figure it has.
- */
-function stepsAreTimed(steps: readonly RunWorkoutStepInput[]): boolean {
-  return steps.every((node) =>
-    "repeat" in node
-      ? stepsAreTimed(node.steps)
-      : (node.target_duration_seconds ?? 0) > 0
-  );
-}
-
-function durationIsComplete(entry: TrainingPlanEntry, durationSeconds: number): boolean {
-  if (!durationSeconds) return false;
-  const steps = entry.workout.steps;
-  return steps?.length ? stepsAreTimed(steps) : Boolean(entry.plannedDurationSeconds);
-}
-
-/**
  * Steps as the session view counts them: a repeat group's children once each,
  * the group itself not at all. Counting top-level nodes made a warm-up, five
  * strides and a cool-down "4 steps" on the row and "5 steps" one press later.
@@ -195,9 +178,10 @@ function entryFacts(
   plan: TrainingPlanDocument,
   entry: TrainingPlanEntry,
   matchByKey: Map<string, TrainingActivityMatch>,
-  loads: PlanHeraclesLoads | undefined
+  loads: PlanHeraclesLoads | undefined,
+  context: WorkoutEditorContext | undefined
 ): PlanEntryFacts {
-  const metrics = planEntryMetrics(entry);
+  const metrics = planEntryMetrics(entry, context);
   const heraclesLoad = heraclesEntryLoad(plan, loads)?.(entry);
   const onCalendar = plan.calendar !== "unscheduled" && plan.remoteId && entry.idInPlan;
   const match = onCalendar ? matchByKey.get(`${plan.remoteId}:${entry.idInPlan}`) : undefined;
@@ -206,7 +190,7 @@ function entryFacts(
     title: entry.title.trim() || entry.workout.name.trim() || t("library.untitledSession"),
     sport: entry.workout.sport,
     durationSeconds: metrics.durationSeconds,
-    durationComplete: durationIsComplete(entry, metrics.durationSeconds),
+    durationComplete: metrics.durationWhole,
     distanceMeters: metrics.distanceMeters,
     trainingLoad: heraclesLoad ?? metrics.trainingLoad,
     strengthSets: metrics.strengthSets,
@@ -231,9 +215,14 @@ function entryFacts(
 export function readPlan(
   plan: TrainingPlanDocument,
   matches: readonly TrainingActivityMatch[] = [],
-  loads?: PlanHeraclesLoads
+  loads?: PlanHeraclesLoads,
+  /**
+   * The account's (`useAthleteContext`): a session not on COROS states its
+   * distance and time by COROS's arithmetic on it (`planEntryMetrics`).
+   */
+  context?: WorkoutEditorContext
 ): PlanReading {
-  const summary = summarizeTrainingPlan(plan, heraclesEntryLoad(plan, loads));
+  const summary = summarizeTrainingPlan(plan, heraclesEntryLoad(plan, loads), context);
   const matchByKey = new Map(
     matches.map((match) => [`${match.schedulePlanId}:${match.scheduleIdInPlan}`, match])
   );
@@ -253,7 +242,7 @@ export function readPlan(
         date: date ? isoDay(date) : undefined,
         entries: inWeek
           .filter((entry) => entry.dayIndex === dayIndex)
-          .map((entry) => entryFacts(plan, entry, matchByKey, loads))
+          .map((entry) => entryFacts(plan, entry, matchByKey, loads, context))
       };
     });
 

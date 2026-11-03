@@ -328,6 +328,7 @@ const workout = {
   "workout.v.estLoad": "Est. load",
   "workout.v.distance": "Distance",
   "workout.v.timedSteps": "Timed steps",
+  "workout.v.distanceSteps": "Distance steps",
   "workout.v.duration": "Duration",
   "workout.v.step": "Step",
   "workout.v.steps": "Steps",

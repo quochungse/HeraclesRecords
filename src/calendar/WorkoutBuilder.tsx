@@ -73,13 +73,12 @@ import {
   builderStructureCounts,
   builderTargetLabel,
   builderTargetTypeLabel,
-  builderWorkoutTotals,
+  builderSessionFigures,
   changeBuilderRowKind,
   cloneBuilderRow,
   editorDraftToBuilderRows,
   emptyRow,
   exerciseSelectionFields,
-  formatBuilderDistance,
   formatBuilderMinutes,
   formatBuilderToken,
   moveBuilderRow,
@@ -91,6 +90,7 @@ import {
   type BuilderRow,
   type RowSeed
 } from "./workoutBuilderRows";
+import { formatStepDistanceLabel } from "./scheduledStructure";
 import { workoutSportLabel } from "../training/workoutSport";
 import { messageRecord, plural, t } from "../i18n/core";
 import { intensityTypeLabel, swimStrokeLabel, zoneOptionText } from "../i18n/workoutWords";
@@ -1273,7 +1273,10 @@ export function useWorkoutBuilder(api: HeraclesRecordsApi, options: UseWorkoutBu
     )
   );
   const builderSportMeta = BUILDER_SPORT_META[builderSport];
-  const builderTotals = useMemo(() => builderWorkoutTotals(rows, builderSport), [rows, builderSport]);
+  const builderFigures = useMemo(
+    () => builderSessionFigures(rows, builderSport, unitSystem, builderContext),
+    [rows, builderSport, unitSystem, builderContext]
+  );
   const builderStructure = useMemo(() => builderStructureCounts(rows), [rows]);
   const builderStepKinds = useMemo<BuilderKind[]>(() => {
     const supported = WORKOUT_SPORT_CAPABILITIES[builderSport].stepKinds;
@@ -1372,7 +1375,7 @@ export function useWorkoutBuilder(api: HeraclesRecordsApi, options: UseWorkoutBu
     builderReorderMessage,
     builderValid,
     builderSportMeta,
-    builderTotals,
+    builderFigures,
     builderStructure,
     builderStepKinds,
     builderSeed,
@@ -1445,7 +1448,7 @@ export function WorkoutBuilderWorkspace({
     setDropTargetBuilderRowId,
     builderReorderMessage,
     builderSportMeta,
-    builderTotals,
+    builderFigures,
     builderStructure,
     builderStepKinds,
     builderSeed,
@@ -1847,20 +1850,24 @@ export function WorkoutBuilderWorkspace({
             <ListTree size={11} aria-hidden="true" />
             {structureText}
           </span>
-          {builderTotals.minutes >= 1 ? (
-            <span className="calendar-builder-total" title={t("workout.b.w.estTime")}>
+          {/* The workout view's figures for the same steps (`builderSessionFigures`):
+              the whole session's, or a step sum titled as only that. */}
+          {(builderFigures.durationSeconds ?? 0) >= 60 ? (
+            <span
+              className="calendar-builder-total"
+              title={builderFigures.durationWhole ? t("workout.b.w.estTime") : t("workout.v.timedSteps")}
+            >
               <Timer size={11} aria-hidden="true" />
-              ≈{formatBuilderMinutes(builderTotals.minutes)}
+              {builderFigures.durationWhole ? "≈" : ""}{formatBuilderMinutes(builderFigures.durationSeconds! / 60)}
             </span>
           ) : null}
-          {builderTotals.distance > 0 ? (
-            <span className="calendar-builder-total" title={t("workout.b.w.totalDistance")}>
+          {builderFigures.distanceMeters ? (
+            <span
+              className="calendar-builder-total"
+              title={builderFigures.distanceWhole ? t("workout.b.w.totalDistance") : t("workout.v.distanceSteps")}
+            >
               <Route size={11} aria-hidden="true" />
-              {formatBuilderDistance(
-                builderTotals.distance,
-                builderTotals.distanceUnit,
-                unitSystem
-              )}
+              {formatStepDistanceLabel(builderFigures.distanceMeters, unitSystem, builderSport === "swim")}
             </span>
           ) : null}
           {totalsExtra}

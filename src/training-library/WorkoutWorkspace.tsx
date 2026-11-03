@@ -866,6 +866,7 @@ export function WorkoutWorkspace({
                     context={previewDocument.context}
                     exercisesById={exerciseCatalog.byId}
                     title={active.name}
+                    estimate={previewDocument.estimate}
                     estimatedLoad={estimatedLoad}
                     heroAside={
                       <button

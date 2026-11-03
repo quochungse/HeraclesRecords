@@ -31,7 +31,7 @@ import {
   listTrainingPlanMetadata
 } from "./database";
 import { getNativeTrainingPlan, getTrainingLibrarySnapshot } from "./trainingLibraryService";
-import { getWorkoutForEdit, listLibraryWorkouts, listWorkoutExercises } from "./trainingHubService";
+import { getWorkoutForEdit, lastReadWorkoutEditorContext, listLibraryWorkouts, listWorkoutExercises } from "./trainingHubService";
 import { corosText, loadCorosLocale } from "./corosLocale";
 import { editorDraftToPlanWorkoutInput } from "./planWorkoutEditor";
 import { WORKOUT_SPORTS, workoutSportFromType } from "./workoutCapabilities";
@@ -562,11 +562,15 @@ function sessionLine(
 }
 
 function volume(entry: TrainingPlanEntry, unitSystem: UnitSystem): string | undefined {
-  const metrics = planEntryMetrics(entry);
+  const metrics = planEntryMetrics(entry, lastReadWorkoutEditorContext());
   const parts: string[] = [];
-  if (metrics.durationSeconds) parts.push(`${Math.round(metrics.durationSeconds / 60)} min`);
+  // A sum over some of the steps is said as one, never as the session's.
+  if (metrics.durationSeconds) {
+    parts.push(`${Math.round(metrics.durationSeconds / 60)} min${metrics.durationWhole ? "" : " of timed steps"}`);
+  }
   if (metrics.distanceMeters) {
-    parts.push(formatDistanceValue(metrics.distanceMeters, unitSystem, { swim: entry.workout.sport === "swim" }));
+    const distance = formatDistanceValue(metrics.distanceMeters, unitSystem, { swim: entry.workout.sport === "swim" });
+    parts.push(metrics.distanceWhole ? distance : `${distance} of distance steps`);
   }
   if (!parts.length && metrics.strengthSets) parts.push(`${metrics.strengthSets} sets`);
   return parts.length ? parts.join(" / ") : undefined;

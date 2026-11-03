@@ -5,7 +5,9 @@
  * distance, "3 steps". What it cannot say is *which* three: the warm-up's
  * heart-rate band, the five strides and the jog between them. That is the
  * thing an athlete opens a session to find out, and the plan already holds it
- * (`entry.workout.steps`), so this draws it without asking COROS for anything.
+ * (`entry.workout.steps`), so this draws it without asking COROS for it; the
+ * account's thresholds (`useAthleteContext`, read once an hour) only turn its
+ * heart-rate steps into a distance.
  *
  * **The body is the workout view the Workouts tab and the Calendar draw**
  * (`WorkoutReadOnlyBody`), fed a draft converted from the plan's own step
@@ -27,16 +29,18 @@ import {
   ListChecks,
   MessageCircle
 } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useMemo } from "react";
 import type {
   TrainingPlanEntry,
   UnitSystem,
   WorkoutEditorContext
 } from "../../electron/types";
 import { planWorkoutInputToEditorDraft } from "../../electron/planWorkoutEditor";
+import { planEntryEstimate } from "../../electron/trainingPlanDomain";
 import type { HeraclesRecordsApi } from "../heraclesrecords-api";
 import { WorkoutReadOnlyBody } from "../calendar/WorkoutViewModal";
 import { useWorkoutExerciseCatalog } from "../calendar/useWorkoutExerciseCatalog";
+import { useAthleteContext } from "../calendar/useAthleteContext";
 import { formatDurationSeconds, formatHappenDayLabel } from "../training/formatters";
 import { formatDistanceValue } from "../units/units";
 import {
@@ -72,11 +76,9 @@ interface PlanSessionViewProps {
 }
 
 /**
- * The two fields `WorkoutReadOnlyBody` reads off a context are the pool length
- * and the climbing grade system, and both are only a fallback for a draft that
- * does not state its own. Everything else here is never read, so a session
- * that states both — or is neither a swim nor a climb — needs no COROS round
- * trip to be drawn.
+ * What the session is drawn on until the account's context arrives: the pool
+ * length and grade system a draft states nothing of, and no thresholds — so a
+ * heart-rate step's distance waits for the account (`workoutFigures`).
  */
 const LOCAL_CONTEXT: WorkoutEditorContext = {
   distanceUnit: "metric",
@@ -87,16 +89,6 @@ const LOCAL_CONTEXT: WorkoutEditorContext = {
   defaultPoolLength: { value: 25, unit: "m" },
   climbSystems: {}
 };
-
-function needsAccountContext(entry: TrainingPlanEntry | undefined): boolean {
-  const workout = entry?.workout;
-  if (!workout) return false;
-  if (workout.sport === "swim") return !workout.sport_options?.poolLength;
-  if (workout.sport === "indoorClimb" || workout.sport === "bouldering") {
-    return !workout.sport_options?.gradingSystem;
-  }
-  return false;
-}
 
 /** `2026-09-15` or COROS's `20260915`, as the day it names. */
 function dayLabel(value: string): string {
@@ -125,21 +117,7 @@ export function PlanSessionView({
   );
   const { byId: exercises } = useWorkoutExerciseCatalog(api, workout?.sport);
 
-  const [context, setContext] = useState<WorkoutEditorContext>(LOCAL_CONTEXT);
-  const wantsContext = needsAccountContext(entry);
-  useEffect(() => {
-    if (!wantsContext || !api) return;
-    let live = true;
-    void api
-      .getWorkoutEditorContext(unitSystem)
-      .then((next) => {
-        if (live) setContext(next);
-      })
-      .catch(() => undefined);
-    return () => {
-      live = false;
-    };
-  }, [api, unitSystem, wantsContext]);
+  const context = useAthleteContext(api, unitSystem) ?? LOCAL_CONTEXT;
 
   const tone = statusTone(facts.status);
   const label = statusLabel(facts.status);
@@ -257,6 +235,7 @@ export function PlanSessionView({
           draft={draft}
           context={context}
           exercisesById={exercises}
+          estimate={entry ? planEntryEstimate(entry) : undefined}
           title={facts.title}
           subtitleAside={statusChip}
           heroFooter={placement}
