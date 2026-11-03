@@ -1,5 +1,6 @@
 import type { CoachStyle } from "./coachStyles";
 import type { ActivityReading } from "./activityReading";
+import type { WorkoutFigures } from "./workoutFigures";
 
 /** User-selected measurement system for Heracles Records presentation and writes. */
 export type UnitSystem = "metric" | "imperial";
@@ -4148,6 +4149,12 @@ export interface WorkoutEditorContext {
   maxHr?: number;
   restingHr?: number;
   thresholdPaceSecondsPerKm?: number;
+  /**
+   * The pace COROS assumes at max heart rate when it turns a heart-rate
+   * target into a distance: the fast edge of pace zone 6 (`ltspZone[5].pace`,
+   * threshold pace / 112.6% in whole seconds). `workoutFigures.ts` reads it.
+   */
+  maxHrPaceSecondsPerKm?: number;
   ftp?: number;
   criticalPower?: number;
   zones: Partial<Record<
@@ -4166,6 +4173,8 @@ export interface WorkoutEditorDocument {
   context: WorkoutEditorContext;
   canEdit: boolean;
   unsupportedReason?: string;
+  /** COROS's own estimate of the whole session, off the program read (`corosProgramFigures`). */
+  estimate?: WorkoutFigures;
 }
 
 export interface WorkoutEditPreview {

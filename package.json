@@ -61,6 +61,7 @@
     "test:calendar-pairing": "cross-env ELECTRON_RUN_AS_NODE=1 electron --experimental-strip-types --import ./scripts/register-ts-ext.mjs scripts/test-calendar-pairing.mjs",
     "test:calendar-renderer": "npm run build:renderer-harness && node scripts/run-electron-gui.mjs scripts/test-calendar-renderer.mjs",
     "test:scheduled-structure": "node --experimental-strip-types --import ./scripts/register-ts-ext.mjs scripts/test-scheduled-structure.mjs",
+    "test:workout-figures": "npm run build:electron && node scripts/test-workout-figures.mjs",
     "test:rpe-load": "node --experimental-strip-types scripts/test-rpe-load.mjs",
     "test:heracles-load": "node --experimental-strip-types --import ./scripts/register-ts-ext.mjs scripts/test-heracles-load.mjs",
     "test:heracles-fitness": "node --experimental-strip-types --import ./scripts/register-ts-ext.mjs scripts/test-heracles-fitness.mjs",

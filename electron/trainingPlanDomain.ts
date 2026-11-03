@@ -7,10 +7,12 @@ import type {
   TrainingPlanDocument,
   TrainingPlanEntry,
   TrainingPlanWeekStage,
+  WorkoutEditorContext,
   WorkoutSport
 } from "./types";
 import { screenPlural, screenText } from "./screenText";
 import { COROS_NAME_MAX_BYTES, COROS_PLAN_DESCRIPTION_MAX_BYTES, corosUtf8Length } from "./corosTextLimits";
+import { corosProgramFigures, statedWorkoutFigures, type WorkoutFigures } from "./workoutFigures";
 
 export interface TrainingPlanValidationIssue {
   path: string;
@@ -331,20 +333,12 @@ function isRepeatGroup(step: RunWorkoutStepInput): step is RunWorkoutCreateRepea
 }
 
 function workoutMetrics(workout?: PlanWorkoutEntryInput): {
-  durationSeconds: number;
-  distanceMeters: number;
   trainingLoad: number;
   strengthSets: number;
 } {
-  let durationSeconds = 0;
-  let distanceMeters = (workout?.distance_km ?? 0) * 1000;
   let trainingLoad = 0;
   let strengthSets = 0;
   const count = (step: RunWorkoutCreateStep, multiplier: number) => {
-    durationSeconds += (step.target_duration_seconds ?? 0) * multiplier;
-    if (!workout?.distance_km) {
-      distanceMeters += (step.target_distance_meters ?? 0) * multiplier;
-    }
     trainingLoad += (step.target_load ?? 0) * multiplier;
     strengthSets += (step.sets ?? (step.target_reps ? 1 : 0)) * multiplier;
   };
@@ -355,33 +349,57 @@ function workoutMetrics(workout?: PlanWorkoutEntryInput): {
       count(node, 1);
     }
   }
-  return { durationSeconds, distanceMeters, trainingLoad, strengthSets };
+  return { trainingLoad, strengthSets };
+}
+
+/**
+ * COROS's own estimate of a plan session's whole length and distance: a
+ * simple run's `distance_km`, the planned figures read with the session, else
+ * its program's (`corosProgramFigures` — a plan's running copy carries only
+ * `estimatedDistance`/`estimatedTime`). An edited session has none: the edit
+ * drops the program and these with it.
+ */
+export function planEntryEstimate(entry: TrainingPlanEntry): WorkoutFigures {
+  const coros = corosProgramFigures(entry.corosProgram);
+  const distanceKm = entry.workout?.distance_km ?? 0;
+  return {
+    distanceMeters: (distanceKm > 0 ? distanceKm * 1000 : undefined) ?? entry.plannedDistanceMeters ?? coros.distanceMeters,
+    durationSeconds: entry.plannedDurationSeconds ?? coros.durationSeconds
+  };
 }
 
 /**
  * What one planned session amounts to.
  *
- * The steps' own figures where there are steps, falling back per figure to
- * the entry's `planned*` fields — a COROS program often carries a planned
- * load and no step structure, and a hand-built session the reverse. Per
- * figure rather than per entry, because a plan can state a distance and
- * leave the load to the steps.
+ * Distance and time go through the one rule (`workoutFigures`): COROS's
+ * stored estimate, else COROS's arithmetic on the athlete's `context`, else
+ * the steps when every one is in that unit — `durationWhole`/`distanceWhole`
+ * say which. Otherwise the figure is only what the steps in that unit add up
+ * to, which a week's total may count and a session must not state as its own
+ * length. Load and sets are the steps' own,
+ * else the entry's planned figures — a COROS program often carries a planned
+ * load and no step structure, and a hand-built session the reverse.
  *
  * Exported because the reader draws these numbers for one session and the
  * library row draws their total, and two implementations of that arithmetic
  * would disagree in front of the athlete — the same reason `activityMetrics`
  * is shared rather than copied into the view.
  */
-export function planEntryMetrics(entry: TrainingPlanEntry): {
+export function planEntryMetrics(entry: TrainingPlanEntry, context?: WorkoutEditorContext): {
   durationSeconds: number;
   distanceMeters: number;
+  durationWhole: boolean;
+  distanceWhole: boolean;
   trainingLoad: number;
   strengthSets: number;
 } {
+  const stated = statedWorkoutFigures(entry.workout ?? {}, { coros: planEntryEstimate(entry), context });
   const calculated = workoutMetrics(entry.workout);
   return {
-    durationSeconds: calculated.durationSeconds || entry.plannedDurationSeconds || 0,
-    distanceMeters: calculated.distanceMeters || entry.plannedDistanceMeters || 0,
+    durationSeconds: stated.durationSeconds ?? 0,
+    distanceMeters: stated.distanceMeters ?? 0,
+    durationWhole: stated.durationWhole,
+    distanceWhole: stated.distanceWhole,
     trainingLoad: calculated.trainingLoad || entry.plannedTrainingLoad || 0,
     strengthSets: calculated.strengthSets || entry.plannedStrengthSets || 0
   };
@@ -453,7 +471,9 @@ export function weekStageOf(plan: Pick<TrainingPlanDocument, "weekStages">, week
  */
 export function summarizeTrainingPlan(
   plan: TrainingPlanDocument,
-  entryLoad?: (entry: TrainingPlanEntry) => number | undefined
+  entryLoad?: (entry: TrainingPlanEntry) => number | undefined,
+  /** The account's, for a heart-rate step's distance (`planEntryMetrics`). */
+  context?: WorkoutEditorContext
 ): TrainingPlanSummary {
   const weekly: TrainingPlanWeekSummary[] = Array.from({ length: plan.weekCount }, (_, weekIndex) => ({
     weekIndex,
@@ -469,7 +489,7 @@ export function summarizeTrainingPlan(
   let strengthSets = 0;
 
   for (const entry of plan.entries) {
-    const metrics = planEntryMetrics(entry);
+    const metrics = planEntryMetrics(entry, context);
     metrics.trainingLoad = entryLoad?.(entry) ?? metrics.trainingLoad;
     durationSeconds += metrics.durationSeconds;
     distanceMeters += metrics.distanceMeters;

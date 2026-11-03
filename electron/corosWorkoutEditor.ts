@@ -1088,6 +1088,13 @@ export function parseWorkoutEditorContext(
     ftp: configuredZones(zoneArray("cyclePowerZone", "ftpZone"), ftpDefinitions)
   };
   const lthrZones: WorkoutLthrZone[] = zones.lthr ?? [];
+  /* COROS's own seconds, not threshold pace over the rounded percent the
+     zones above keep: 321 / 1.126 is 285 where 321 / 1.13 would be 284. */
+  const paceZoneSix = zoneArray("ltspZone", "thresholdPaceZone", "paceZone")
+    .map((entry) => (entry && typeof entry === "object" ? entry as Record<string, unknown> : {}))
+    .find((entry) => numberValue(entry.index) === 5);
+  const maxHrPaceSecondsPerKm = firstNumber(paceZoneSix?.pace) ??
+    (thresholdPaceSecondsPerKm ? Math.round(thresholdPaceSecondsPerKm / 1.126) : undefined);
   const selectedUnitSystem = normalizeUnitSystem(unitSystem);
   const imperial = selectedUnitSystem === "imperial";
   const poolLengthUnit = imperial ? "yd" : "m";
@@ -1119,6 +1126,7 @@ export function parseWorkoutEditorContext(
     ...(maxHr ? { maxHr: Math.round(maxHr) } : {}),
     ...(restingHr ? { restingHr: Math.round(restingHr) } : {}),
     ...(thresholdPaceSecondsPerKm ? { thresholdPaceSecondsPerKm } : {}),
+    ...(maxHrPaceSecondsPerKm ? { maxHrPaceSecondsPerKm } : {}),
     ...(ftp ? { ftp: Math.round(ftp) } : {}),
     ...(criticalPower ? { criticalPower: Math.round(criticalPower) } : {}),
     zones,

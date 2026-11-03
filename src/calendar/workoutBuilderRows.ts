@@ -58,7 +58,8 @@ import {
   withHeartRateBasis,
   type StepDefaults
 } from "../../electron/workoutDefaults";
-import { planWorkoutInputToEditorDraft } from "../../electron/planWorkoutEditor";
+import { editorDraftToPlanWorkoutInput, planWorkoutInputToEditorDraft } from "../../electron/planWorkoutEditor";
+import { statedWorkoutFigures, type StatedFigures } from "../../electron/workoutFigures";
 import {
   CLIMB_GRADES,
   CLIMB_SYSTEM_IDS,
@@ -69,7 +70,7 @@ import {
   validateWorkoutIntensity,
   workoutSportType
 } from "../../electron/workoutCapabilities";
-import { formatCount, formatDecimal, messageRecord, plural, t } from "../i18n/core";
+import { messageRecord, plural, t } from "../i18n/core";
 import { zoneName } from "../i18n/zoneNames";
 import { intensityTypeLabel, swimStrokeLabel } from "../i18n/workoutWords";
 
@@ -849,49 +850,48 @@ export function builderRowSummary(
   return details;
 }
 
-export interface BuilderWorkoutTotals {
-  minutes: number;
-  /** Distance in the unit the sport logs (km, or m for pool swims). */
-  distance: number;
-  distanceUnit: "land" | "swim";
-}
-
 /**
- * Best-effort estimate of the workout's moving time and distance. Targets
- * that can't be converted (load, HR recovery, reps, routes, open steps) are
- * skipped — the footer presents these as estimates, never promises.
+ * The footer's time and distance: what the workout view states of the same
+ * steps (`statedWorkoutFigures`) — COROS's arithmetic on the account's
+ * context, which counts a timed warm-up into the distance and the distance
+ * steps into the time, else a step sum the footer names as only that.
+ *
+ * Strength keeps its own clock — the sets of each timed movement and the rest
+ * between them — because COROS's arithmetic has no speed for a set to run at
+ * and the view states no time for strength at all.
  */
-export function builderWorkoutTotals(rows: BuilderRow[], sport: WorkoutSport): BuilderWorkoutTotals {
-  let minutes = 0;
-  let distance = 0;
-  const addRow = (row: BuilderRow, multiplier = 1) => {
-    if (row.locked) return;
-    if (row.kind === "intervals") {
-      const repeats = Math.max(1, Number(row.repeats) || 1);
-      for (const child of row.children ?? []) {
-        addRow(child, multiplier * repeats);
+export function builderSessionFigures(
+  rows: readonly BuilderRow[],
+  sport: WorkoutSport,
+  unitSystem: UnitSystem,
+  context?: WorkoutEditorContext
+): StatedFigures {
+  if (sport === "strength") {
+    let seconds = 0;
+    const addRow = (row: BuilderRow, multiplier = 1) => {
+      if (row.locked) return;
+      if (row.kind === "intervals") {
+        const repeats = Math.max(1, Number(row.repeats) || 1);
+        for (const child of row.children ?? []) addRow(child, multiplier * repeats);
+        return;
       }
-      return;
-    }
-    if (row.targetType === "time") {
+      if (row.targetType !== "time") return;
       const value = Number(row.targetValue) || 0;
-      if (sport === "strength") {
-        // Strength time targets are per set, in seconds, with rest between.
-        const sets = row.kind === "training" ? Math.max(1, Number(row.sets) || 1) : 1;
-        const restSec = row.kind === "training" ? Number(row.restSeconds) || 0 : 0;
-        minutes += multiplier * (sets * value + Math.max(0, sets - 1) * restSec) / 60;
-      } else {
-        minutes += multiplier * value;
-      }
-    }
-    if (row.targetType === "distance") {
-      distance += multiplier * (Number(row.targetValue) || 0);
-    }
-  };
-  for (const row of rows) {
-    addRow(row);
+      // Strength time targets are per set, in seconds, with rest between.
+      const sets = row.kind === "training" ? Math.max(1, Number(row.sets) || 1) : 1;
+      const restSec = row.kind === "training" ? Number(row.restSeconds) || 0 : 0;
+      seconds += multiplier * (sets * value + Math.max(0, sets - 1) * restSec);
+    };
+    for (const row of rows) addRow(row);
+    return { ...(seconds > 0 ? { durationSeconds: seconds } : {}), durationWhole: true, distanceWhole: false };
   }
-  return { minutes, distance, distanceUnit: sport === "swim" ? "swim" : "land" };
+  try {
+    const draft = builderRowsToEditorDraft(rows, { sport, name: "", description: "" }, unitSystem);
+    return statedWorkoutFigures(editorDraftToPlanWorkoutInput(draft, { key: "builder", name: "", sport }), { context });
+  } catch {
+    // A row mid-edit the draft cannot hold yet: nothing to state until it can.
+    return { distanceWhole: false, durationWhole: false };
+  }
 }
 
 export function builderStructureCounts(rows: BuilderRow[]): {
@@ -920,18 +920,6 @@ export function formatBuilderMinutes(totalMinutes: number): string {
   const hours = Math.floor(rounded / 60);
   const remainder = rounded % 60;
   return remainder > 0 ? t("units.duration.hm", { h: hours, m: remainder }) : t("units.duration.h", { h: hours });
-}
-
-export function formatBuilderDistance(
-  distance: number,
-  unit: "land" | "swim",
-  unitSystem: UnitSystem
-): string {
-  if (unit === "swim") {
-    return `${formatCount(Math.round(distance))} ${swimDistanceUnit(unitSystem)}`;
-  }
-  const rounded = Math.round(distance * 10) / 10;
-  return `${formatDecimal(rounded, Number.isInteger(rounded) ? 0 : 1)} ${distanceUnit(unitSystem)}`;
 }
 
 export function formatBuilderToken(value: string): string {

@@ -59,8 +59,8 @@ fingerprint>/<activityId>.json.br` (brotli 5), and only a summary reaches SQLite
   swept oldest-first with orphans first, unreadable files deleted on read.
 - **The parsed detail does not carry its payload**; the development "raw JSON" view has its
   own channel, `trainingHub:getActivityDetailRaw`.
-- `activityMetrics.ts`, `unitSystem.ts`, `sleepMetrics.ts`, `chartPlacement.ts` and other
-  modules the renderer imports must stay free of `node:` imports.
+- `activityMetrics.ts`, `unitSystem.ts`, `sleepMetrics.ts`, `chartPlacement.ts`,
+  `workoutFigures.ts` and other modules the renderer imports must stay free of `node:` imports.
 - `npm run test:activity-detail-cache`.
 
 ## COROS facts for reading

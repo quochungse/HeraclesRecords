@@ -194,6 +194,17 @@ follows the choice: COROS's own figure plus the same arithmetic on what Heracles
 figure, the chosen one; both appear (`loadPairTitle`, `figurePairTitle`) only where the figure
 differs from what the COROS app shows — the week's load and range, and those fitness figures.
 
+**A planned workout's distance and time are the whole session's** (`electron/workoutFigures.ts`,
+`npm run test:workout-figures`): COROS's stored estimate first (`corosProgramFigures`), else
+COROS's own arithmetic done here on the account's context (`estimateWorkoutFigures`, probed
+against `/training/program/calculate`: a pace band's middle, a heart-rate band's whole middle bpm
+through the account's thresholds), else the steps' sum only when every step is in that unit. A
+step COROS cannot convert (no target, power, cadence) leaves that figure unknown, except a rest.
+The Calendar, the workout view's hero, the builder's footer, the plan reader (`planEntryMetrics`,
+context from `useAthleteContext`) and Coach's draft volume (`lastReadWorkoutEditorContext`) all
+go through it. A partial sum is named as one ("Distance steps", "Timed steps"), never as the
+session's.
+
 **Loading is not empty.** An array that has not arrived reads like one that came back
 empty; each load states where it stands (`TrainingHubLoadStatus`, `initializing`,
 `loading`), and loading copy outranks both the empty copy and the MCP copy.

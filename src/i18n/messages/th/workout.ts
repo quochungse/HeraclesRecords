@@ -327,6 +327,7 @@ const workout: WorkoutMessages = {
   "workout.v.estLoad": "โหลดโดยประมาณ",
   "workout.v.distance": "ระยะทาง",
   "workout.v.timedSteps": "ขั้นที่จับเวลา",
+  "workout.v.distanceSteps": "ขั้นที่กำหนดระยะทาง",
   "workout.v.duration": "ระยะเวลา",
   "workout.v.step": "ขั้น",
   "workout.v.steps": "ขั้น",

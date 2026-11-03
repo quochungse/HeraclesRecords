@@ -327,6 +327,7 @@ const workout: WorkoutMessages = {
   "workout.v.estLoad": "Carga est.",
   "workout.v.distance": "Distancia",
   "workout.v.timedSteps": "Pasos con tiempo",
+  "workout.v.distanceSteps": "Pasos con distancia",
   "workout.v.duration": "Duración",
   "workout.v.step": "Paso",
   "workout.v.steps": "Pasos",

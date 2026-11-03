@@ -29,9 +29,7 @@ read-only: `WorkoutViewModal` and `WorkoutReadOnlyBody` (Library reader, plan re
   session (`DayOverview`). A card is two lines (sport icon and name; distance · time · load, or
   "Plan"/"Missed"), three per month cell before "+N more". **A planned session's distance and time
   are one pair of figures** (`plannedSessionFigures`) on its card, in its panel and in its
-  completion: COROS's estimates (`distance`, `estimatedTime`: the whole session, timed steps
-  included), else the steps' sum only when every step is in that unit — a sum over some steps
-  read as the whole session's.
+  completion, by the root rule for workout figures (`electron/workoutFigures.ts`).
 - **A plan's figures are its program's**, never the entity's `sportData`, which is the activity
   COROS recorded as the session done; that activity's id (`labelId`, carried as
   `completedActivityId`) pairs it before any guess. There is no pairing by hand: the panel's

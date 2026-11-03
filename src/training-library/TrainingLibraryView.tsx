@@ -21,7 +21,8 @@ import type {
   TrainingLibrarySnapshot,
   TrainingPlanDocument,
   TrainingPlanDraftRecord,
-  TrainingPlanMetadataPatch
+  TrainingPlanMetadataPatch,
+  WorkoutEditorContext
 } from "../../electron/types";
 import {
   createTrainingPlan,
@@ -75,6 +76,7 @@ import {
 } from "./planReaderModel";
 import { heraclesEntryLoad, type PlanHeraclesLoads } from "./planHeraclesLoads";
 import { usePlanHeraclesLoads } from "./usePlanHeraclesLoads";
+import { useAthleteContext } from "../calendar/useAthleteContext";
 import { defaultPlanName } from "./planEditorModel";
 import { PlanReader, type PlanCalendarAction } from "./PlanReader";
 import { TrainingPlanCalendarDialog } from "./TrainingPlanCalendarDialog";
@@ -1068,10 +1070,11 @@ function planView(
   plan: TrainingPlanDocument,
   summary: ReturnType<typeof summarizeTrainingPlan> | undefined,
   compliance: PlanCompliance | undefined,
-  heraclesLoads: PlanHeraclesLoads | undefined
+  heraclesLoads: PlanHeraclesLoads | undefined,
+  athlete: WorkoutEditorContext | undefined
 ) {
   /* The reader's own measure, so the tile and the ridge it opens onto agree. */
-  const { weeks } = readPlan(plan, [], heraclesLoads);
+  const { weeks } = readPlan(plan, [], heraclesLoads, athlete);
   const measure = ridgeMeasure(weeks);
   const values = weekRidgeValues(weeks, measure);
   const peak = Math.max(0, ...values);
@@ -1304,9 +1307,10 @@ function PlanInProgress({
   const dated = run ?? plan;
   const position = planWeekPosition(dated);
   const progress = planProgress(dated);
+  const athlete = useAthleteContext();
   const next = useMemo(
-    () => nextPlanSession(readPlan(dated, matches, heraclesLoads)),
-    [dated, matches, locale, heraclesLoads]
+    () => nextPlanSession(readPlan(dated, matches, heraclesLoads, athlete)),
+    [dated, matches, locale, heraclesLoads, athlete]
   );
   const nextFigures = next ? plannedFigures(next.entry, unitSystem).slice(0, 2) : [];
   const currentWeek = position ? position.week - 1 : undefined;
@@ -1423,12 +1427,13 @@ function PlanIndex({
   /* One request for every tile's strength sessions, drafts included. */
   const shown = useMemo(() => [...plans, ...drafts.loose.map((draft) => draft.plan)], [plans, drafts.loose]);
   const heraclesLoads = usePlanHeraclesLoads(shown);
+  const athlete = useAthleteContext();
   const summaries = useMemo(
     () =>
       new Map(
-        plans.map((plan) => [plan.id, summarizeTrainingPlan(plan, heraclesEntryLoad(plan, heraclesLoads))])
+        plans.map((plan) => [plan.id, summarizeTrainingPlan(plan, heraclesEntryLoad(plan, heraclesLoads), athlete)])
       ),
-    [plans, heraclesLoads]
+    [plans, heraclesLoads, athlete]
   );
 
   /* Joined once for the whole list: the matcher produces a few hundred rows
@@ -1504,13 +1509,14 @@ function PlanIndex({
           draft.id,
           planView(
             draft.plan,
-            summarizeTrainingPlan(draft.plan, heraclesEntryLoad(draft.plan, heraclesLoads)),
+            summarizeTrainingPlan(draft.plan, heraclesEntryLoad(draft.plan, heraclesLoads), athlete),
             undefined,
-            heraclesLoads
+            heraclesLoads,
+            athlete
           )
         ])
       ),
-    [drafts.loose, locale, heraclesLoads]
+    [drafts.loose, locale, heraclesLoads, athlete]
   );
   /* Once per plan, not per render: a view reads the whole plan week by week,
      and a keystroke in the search re-renders every tile. */
@@ -1519,10 +1525,10 @@ function PlanIndex({
       new Map(
         plans.map((plan) => [
           plan.id,
-          planView(plan, summaries.get(plan.id), compliance.get(plan.id), heraclesLoads)
+          planView(plan, summaries.get(plan.id), compliance.get(plan.id), heraclesLoads, athlete)
         ])
       ),
-    [plans, summaries, compliance, locale, heraclesLoads]
+    [plans, summaries, compliance, locale, heraclesLoads, athlete]
   );
   const viewOf = (plan: TrainingPlanDocument) => views.get(plan.id)!;
 

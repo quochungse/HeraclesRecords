@@ -21,6 +21,7 @@ import {
   scheduledWorkoutEditRef,
   getWorkoutForEdit,
   getWorkoutEditorContext,
+  lastReadWorkoutEditorContext,
   calculateExistingWorkoutProgram,
   resolveTrainingPlanExercises,
   searchWorkoutExercises,
@@ -1157,7 +1158,8 @@ async function handleDraftTrainingPlan(
   const preview = buildPlanPreview(draftId, prepared.draft, {
     scheduleConflicts: prepared.conflicts,
     unitSystem,
-    artifactType
+    artifactType,
+    context: lastReadWorkoutEditorContext()
   });
   preview.conflicts = prepared.conflicts;
 
@@ -1348,7 +1350,8 @@ function storeRevision(
   const preview = buildPlanPreview(draftId, prepared.draft, {
     scheduleConflicts: prepared.conflicts,
     unitSystem,
-    artifactType
+    artifactType,
+    context: lastReadWorkoutEditorContext()
   });
   preview.conflicts = prepared.conflicts;
   const stored: StoredPlanDraft = {
@@ -2978,7 +2981,8 @@ function writeVersion(
   const preview = buildPlanPreview(draftId, plan, {
     scheduleConflicts: options.conflicts,
     unitSystem: options.unitSystem,
-    artifactType
+    artifactType,
+    context: lastReadWorkoutEditorContext()
   });
   preview.conflicts = options.conflicts;
   // An existing field, and what the card's status and Coach's index read as

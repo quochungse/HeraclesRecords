@@ -169,6 +169,7 @@ import {
 import { parseStrengthDetail } from "./strengthDetail";
 import { strengthProgramFromSchedule } from "./strengthExerciseMetadata";
 import { parseSessionSets } from "./sessionSets";
+import { corosProgramFigures } from "./workoutFigures";
 import {
   formatSwimPace,
   readsMovement,
@@ -3132,10 +3133,29 @@ async function loadWorkoutEditorAccount(): Promise<Record<string, unknown>> {
   }
 }
 
+/**
+ * The account's workout context as last read, however long ago — for the
+ * figures Coach's tools state of a draft (`workoutFigures`: a heart-rate
+ * step's distance needs the account's thresholds), worked out where nothing
+ * waits on `/account/query`. Every read refreshes it; the Coach screen's own
+ * (`useAthleteContext`) is the one that usually has. Forgotten with the
+ * account.
+ */
+let lastReadEditorContext: WorkoutEditorContext | undefined;
+
+export function lastReadWorkoutEditorContext(): WorkoutEditorContext | undefined {
+  return lastReadEditorContext;
+}
+
+function remembered(context: WorkoutEditorContext): WorkoutEditorContext {
+  if (context.maxHr && context.restingHr && context.lthrBpm) lastReadEditorContext = context;
+  return context;
+}
+
 export async function getWorkoutEditorContext(
   unitSystem: UnitSystem = "metric"
 ): Promise<WorkoutEditorContext> {
-  return parseWorkoutEditorContext(await loadWorkoutEditorAccount(), unitSystem);
+  return remembered(parseWorkoutEditorContext(await loadWorkoutEditorAccount(), unitSystem));
 }
 
 async function documentFromWorkoutEditSource(
@@ -3143,7 +3163,7 @@ async function documentFromWorkoutEditSource(
   unitSystem: UnitSystem = "metric"
 ): Promise<WorkoutEditorDocument> {
   const account = await loadWorkoutEditorAccount();
-  const context = parseWorkoutEditorContext(account, unitSystem);
+  const context = remembered(parseWorkoutEditorContext(account, unitSystem));
   const sportType = toOptionalNumber(source.program.sportType);
   const isPastOccurrence =
     source.ref.kind === "scheduled" &&
@@ -3164,12 +3184,14 @@ async function documentFromWorkoutEditSource(
         (draft.sport === "bouldering" ? "vScale" : "yds")
     };
   }
+  const estimate = corosProgramFigures(source.program);
   return {
     ref: source.ref,
     revision: workoutEditRevision(source),
     draft,
     context,
     canEdit,
+    ...(estimate.distanceMeters || estimate.durationSeconds ? { estimate } : {}),
     ...(canEdit
       ? {}
       : {
@@ -3247,21 +3269,14 @@ function toProgramFigure(value: unknown): number | undefined {
 }
 
 function previewFromProgram(program: Record<string, unknown>): WorkoutEditPreview {
-  const durationSeconds =
-    toProgramFigure(program.planDuration) ??
-    toProgramFigure(program.duration) ??
-    toProgramFigure(program.estimatedTime);
-  const distanceRaw =
-    toProgramFigure(program.planDistance) ??
-    toProgramFigure(program.distance) ??
-    toProgramFigure(program.estimatedDistance);
+  const { durationSeconds, distanceMeters } = corosProgramFigures(program);
   const trainingLoad =
     toProgramFigure(program.planTrainingLoad) ??
     toProgramFigure(program.trainingLoad) ??
     toProgramFigure(program.essence);
   return {
     ...(durationSeconds !== undefined ? { durationSeconds } : {}),
-    ...(distanceRaw !== undefined ? { distanceMeters: distanceRaw / 100 } : {}),
+    ...(distanceMeters !== undefined ? { distanceMeters } : {}),
     ...(trainingLoad !== undefined ? { trainingLoad } : {})
   };
 }
@@ -8868,6 +8883,7 @@ function buildTrainingHubHeaders(
 function clearTrainingHubAuth(): void {
   refreshWorkoutCaches();
   invalidateCorosProfileCache();
+  lastReadEditorContext = undefined;
   deleteSettings([
     SETTINGS.accessToken,
     SETTINGS.userId,

@@ -24,6 +24,7 @@ import { WeekCard } from "../training-library/PlanReader";
 import { PlanSessionView } from "../training-library/PlanSessionView";
 import { PlanWeekRidge } from "../training-library/PlanWeekRidge";
 import { planSessions, readPlan } from "../training-library/planReaderModel";
+import { useAthleteContext } from "../calendar/useAthleteContext";
 import { sportTheme } from "../training-library/sportTheme";
 import "../training-library/trainingLibrary.css";
 import { creationFigures } from "./CoachCreationCard";
@@ -384,8 +385,9 @@ function ArtifactView({
     () => (planDocument ? datedForReading(planDocument) : undefined),
     [planDocument]
   );
-  const reading = useMemo(() => (drawn ? readPlan(drawn) : undefined), [drawn]);
-  const figures = planDocument && !isWorkout ? creationFigures(planDocument) : undefined;
+  const athlete = useAthleteContext(api);
+  const reading = useMemo(() => (drawn ? readPlan(drawn, [], undefined, athlete) : undefined), [drawn, athlete]);
+  const figures = planDocument && !isWorkout ? creationFigures(planDocument, athlete) : undefined;
   const sessions = reading ? planSessions(reading) : [];
   const saved = siblings.some((item) => item.uploadedAt) || Boolean(newest.uploadedAt || newest.uploadResult);
   // Hidden rather than removed once any version is saved: the plan on COROS

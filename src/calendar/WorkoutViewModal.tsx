@@ -23,7 +23,8 @@ import type {
   WorkoutExerciseOption,
   WorkoutSport
 } from "../../electron/types";
-import { planWorkoutInputToEditorDraft } from "../../electron/planWorkoutEditor";
+import { editorDraftToPlanWorkoutInput, planWorkoutInputToEditorDraft } from "../../electron/planWorkoutEditor";
+import { statedWorkoutFigures, type StatedFigures, type WorkoutFigures } from "../../electron/workoutFigures";
 import type { HeraclesRecordsApi } from "../heraclesrecords-api";
 import { OptionGroup } from "../components/OptionGroup";
 import { remoteErrorMessage } from "../chat/remoteError";
@@ -100,7 +101,7 @@ const LOCAL_CONTEXT: WorkoutEditorContext = {
   climbSystems: {}
 };
 
-type ViewDocument = { draft: RunWorkoutEditorDraft; context: WorkoutEditorContext };
+type ViewDocument = { draft: RunWorkoutEditorDraft; context: WorkoutEditorContext; estimate?: WorkoutFigures };
 type ViewState = { document?: ViewDocument; error?: string };
 
 export function WorkoutViewModal({ api, views, initialView, eyebrow, onClose }: WorkoutViewModalProps) {
@@ -125,12 +126,22 @@ export function WorkoutViewModal({ api, views, initialView, eyebrow, onClose }: 
     const settle = (id: string, state: ViewState) => {
       if (!cancelled) setLoaded((previous) => ({ ...previous, [id]: state }));
     };
+    const amend = (id: string, change: Partial<ViewDocument>) => {
+      if (cancelled) return;
+      setLoaded((previous) => {
+        const document = previous[id]?.document;
+        return document ? { ...previous, [id]: { document: { ...document, ...change } } } : previous;
+      });
+    };
     for (const [id, source] of JSON.parse(viewsKey) as [string, WorkoutViewSource][]) {
       if (source.kind === "proposed") {
         const draft = planWorkoutInputToEditorDraft(source.workout);
         settle(id, { document: { draft, context: LOCAL_CONTEXT } });
+        // The account's context also drives the hero's distance and time
+        // (`workoutFigures`): a heart-rate step goes as far as COROS's
+        // arithmetic on the athlete's own thresholds says.
         void api.getWorkoutEditorContext(unitSystem).then((context) => {
-          settle(id, { document: { draft, context } });
+          amend(id, { context });
         }).catch(() => undefined);
       } else {
         void api.getWorkoutForEdit(source, unitSystem).then((document) => {
@@ -270,6 +281,7 @@ function WorkoutViewCell({ api, state, shown }: { api: HeraclesRecordsApi; state
           draft={state.document.draft}
           context={state.document.context}
           exercisesById={exercisesById}
+          estimate={state.document.estimate}
         />
       ) : state?.error !== undefined ? (
         <div className="workout-editor-state is-error">
@@ -285,6 +297,28 @@ function WorkoutViewCell({ api, state, shown }: { api: HeraclesRecordsApi; state
 }
 
 /**
+ * The hero's distance and time (`statedWorkoutFigures`), off the draft as the
+ * plan input it saves as. A draft that will not convert — a field an older
+ * build left out — still states its step sums, named as only that, rather
+ * than taking the view down with it.
+ */
+function heroFigures(
+  draft: RunWorkoutEditorDraft,
+  totals: { distanceMeters?: number; durationSeconds?: number },
+  estimate: WorkoutFigures | undefined,
+  context: WorkoutEditorContext
+): StatedFigures {
+  try {
+    return statedWorkoutFigures(
+      editorDraftToPlanWorkoutInput(draft, { key: "view", name: draft.name, sport: draft.sport }),
+      { coros: estimate, context }
+    );
+  } catch {
+    return { ...totals, distanceWhole: false, durationWhole: false };
+  }
+}
+
+/**
  * A workout, read.
  *
  * View mode used to be the edit form with `disabled` on every control, which
@@ -297,8 +331,9 @@ function WorkoutViewCell({ api, state, shown }: { api: HeraclesRecordsApi; state
  *
  * So this draws the same view the day drawer draws for a scheduled workout,
  * off the same `ScheduledStructureView` and through the same renderer. Every
- * figure is computed from the draft rather than asked of COROS: a view that
- * waits on a round trip to say how long a workout is has no reason to.
+ * figure is computed from the draft rather than asked of COROS — the
+ * session's distance and time by COROS's own arithmetic (`workoutFigures`),
+ * unless the caller holds COROS's stored estimate.
  *
  * **Exported, because the Training Library reads workouts too.** Its detail
  * pane drew its own hero, its own metric list and its own step list off the
@@ -315,6 +350,7 @@ export function WorkoutReadOnlyBody({
   heroAside,
   subtitleAside,
   heroFooter,
+  estimate,
   estimatedLoad
 }: {
   draft: RunWorkoutEditorDraft;
@@ -343,6 +379,12 @@ export function WorkoutReadOnlyBody({
   subtitleAside?: ReactNode;
   /** A closing line inside the hero, under its figures. */
   heroFooter?: ReactNode;
+  /**
+   * COROS's stored estimate of the whole session (`corosProgramFigures`).
+   * Without one the hero does COROS's arithmetic on the account's `context`
+   * (`workoutFigures`), and names a partial sum as one where it cannot.
+   */
+  estimate?: WorkoutFigures;
   /**
    * Heracles Training Load's estimate of the workout, with what its hover
    * says: the Training Library's strength workout while that load is chosen.
@@ -390,22 +432,21 @@ export function WorkoutReadOnlyBody({
       });
     }
   } else {
-    if (view.totals.distanceMeters) {
+    // The whole session's figures where they are known (`workoutFigures`);
+    // otherwise what the steps in that unit add up to, named as only that.
+    const figures = heroFigures(draft, view.totals, estimate, context);
+    if (figures.distanceMeters) {
       stats.push({
         icon: Route,
-        label: t("workout.v.distance"),
-        value: formatStepDistanceLabel(
-          view.totals.distanceMeters,
-          unitSystem,
-          draft.sport === "swim"
-        )
+        label: figures.distanceWhole ? t("workout.v.distance") : t("workout.v.distanceSteps"),
+        value: formatStepDistanceLabel(figures.distanceMeters, unitSystem, draft.sport === "swim")
       });
     }
-    if (view.totals.durationSeconds) {
+    if (figures.durationSeconds) {
       stats.push({
         icon: Clock,
-        label: view.totals.distanceMeters ? t("workout.v.timedSteps") : t("workout.v.duration"),
-        value: formatStepTimeLabel(view.totals.durationSeconds)
+        label: figures.durationWhole ? t("workout.v.duration") : t("workout.v.timedSteps"),
+        value: formatStepTimeLabel(figures.durationSeconds)
       });
     }
     stats.push({

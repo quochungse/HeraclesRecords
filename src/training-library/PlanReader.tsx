@@ -52,6 +52,7 @@ import type {
 import { summarizeTrainingPlan } from "../../electron/trainingPlanDomain";
 import { heraclesEntryLoad } from "./planHeraclesLoads";
 import { usePlanHeraclesLoads } from "./usePlanHeraclesLoads";
+import { useAthleteContext } from "../calendar/useAthleteContext";
 import type { HeraclesRecordsApi } from "../heraclesrecords-api";
 import { useUnitSystem } from "../units/UnitSystemProvider";
 import { formatDistanceValue } from "../units/units";
@@ -151,13 +152,17 @@ export function PlanReader({
   const { unitSystem } = useUnitSystem();
   const plans = useMemo(() => [plan], [plan]);
   const heraclesLoads = usePlanHeraclesLoads(plans);
+  const athlete = useAthleteContext(api);
   const summary = useMemo(
-    () => summarizeTrainingPlan(plan, heraclesEntryLoad(plan, heraclesLoads)),
-    [plan, heraclesLoads]
+    () => summarizeTrainingPlan(plan, heraclesEntryLoad(plan, heraclesLoads), athlete),
+    [plan, heraclesLoads, athlete]
   );
   const { locale } = useI18n();
   // The day labels and stage names are in the language on screen.
-  const reading = useMemo(() => readPlan(plan, matches, heraclesLoads), [plan, matches, locale, heraclesLoads]);
+  const reading = useMemo(
+    () => readPlan(plan, matches, heraclesLoads, athlete),
+    [plan, matches, locale, heraclesLoads, athlete]
+  );
   const compliance = useMemo(() => planCompliance(plan, matches), [plan, matches]);
 
   const onCalendar = isOnCalendar(plan);

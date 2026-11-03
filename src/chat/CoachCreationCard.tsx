@@ -6,7 +6,8 @@ import type {
   TrainingPlanDestination,
   TrainingPlanDocument,
   UploadPlanResult,
-  WorkoutSport
+  WorkoutSport,
+  WorkoutEditorContext
 } from "../../electron/types";
 import { parsePlanDay, formatPlanDay } from "../../electron/trainingPlanDomain";
 import {
@@ -21,6 +22,7 @@ import { PlanWeekRidge } from "../training-library/PlanWeekRidge";
 import { sportChipStyle } from "../training-library/sportTheme";
 import { CreationActions } from "./CreationActions";
 import { datedForReading } from "./planDating";
+import { useAthleteContext } from "../calendar/useAthleteContext";
 import type { CreationCalendar } from "./creationCalendar";
 import { creationStatus } from "./creationChoices";
 import { workoutSportLabel } from "../training/workoutSport";
@@ -70,8 +72,8 @@ export function outsideSpan(date: string | undefined, span: CreationFigures["spa
  * first date, so the strip names the days it will actually fall on. That date
  * is only for the drawing: a plan has no start date of its own.
  */
-export function creationFigures(document: TrainingPlanDocument): CreationFigures {
-  const weeks = readPlan(datedForReading(document)).weeks;
+export function creationFigures(document: TrainingPlanDocument, athlete?: WorkoutEditorContext): CreationFigures {
+  const weeks = readPlan(datedForReading(document), [], undefined, athlete).weeks;
   const busy = weeks.filter((week) => week.summary.workouts > 0);
   const counts = busy.map((week) => week.summary.workouts);
   const low = counts.length ? Math.min(...counts) : 0;
@@ -195,6 +197,7 @@ export function CoachCreationCard({
   onOpenSession?: (entryId: string) => void;
 }) {
   const isWorkout = draft.artifactType === "workout";
+  const athlete = useAthleteContext();
   const status = creationStatus(
     uploaded && !draft.uploadResult
       ? {
@@ -208,7 +211,7 @@ export function CoachCreationCard({
       : draft,
     onCoros
   );
-  const figures = !isWorkout && document ? creationFigures(document) : undefined;
+  const figures = !isWorkout && document ? creationFigures(document, athlete) : undefined;
   // A bar of the ridge picks the week the strip shows; the full view is Open's.
   const [pickedWeek, setPickedWeek] = useState<number>();
   const shownWeek =

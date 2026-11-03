@@ -343,6 +343,7 @@ const workout: WorkoutMessages = {
   "workout.v.estLoad": "Расчётная нагрузка",
   "workout.v.distance": "Дистанция",
   "workout.v.timedSteps": "Шаги по времени",
+  "workout.v.distanceSteps": "Шаги по дистанции",
   "workout.v.duration": "Длительность",
   "workout.v.step": "Шаг",
   "workout.v.steps": "Шаги",

@@ -8,7 +8,7 @@
  * the preview costs no request.
  */
 import type { PlanRef, ScheduleRef, TrainingPlanDocument, WorkoutSport } from "../../electron/types";
-import type { UnitSystem } from "../../electron/types";
+import type { UnitSystem, WorkoutEditorContext } from "../../electron/types";
 import { distanceUnit, metersToDisplayDistance } from "../../electron/unitSystem";
 import { datedForReading } from "./planDating";
 import { readPlan, ridgeMeasure, weekRidgeValues } from "../training-library/planReaderModel";
@@ -50,7 +50,9 @@ function formatDistance(meters: number, unitSystem: UnitSystem): string {
 export function planRefPreview(
   ref: PlanRef,
   document: TrainingPlanDocument | null | undefined,
-  unitSystem: UnitSystem
+  unitSystem: UnitSystem,
+  /** The account's, for a heart-rate session's distance and time (`useAthleteContext`). */
+  athlete?: WorkoutEditorContext
 ): RefPreview {
   const bare: RefPreview = {
     kind: ref.scope === "plan" ? "plan" : ref.scope,
@@ -60,7 +62,7 @@ export function planRefPreview(
   };
   if (!document) return bare;
 
-  const weeks = readPlan(datedForReading(document)).weeks;
+  const weeks = readPlan(datedForReading(document), [], undefined, athlete).weeks;
   const measure = ridgeMeasure(weeks);
   const values = weekRidgeValues(weeks, measure);
   const peak = Math.max(0, ...values);
