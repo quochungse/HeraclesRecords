@@ -33,6 +33,7 @@ import {
   type TrainingPlanWeekSummary
 } from "../../electron/trainingPlanDomain";
 import { WORKOUT_SPORTS } from "../../electron/workoutCapabilities";
+import { combineMarks, markFigure, type FigureMark } from "../../electron/workoutFigures";
 import { formatDecimal, getIntlLocale, messageRecord, plural, t, weekdayNames } from "../i18n/core";
 import { planStageLabel } from "../i18n/workoutWords";
 import { heraclesEntryLoad, type PlanHeraclesLoads } from "./planHeraclesLoads";
@@ -44,19 +45,18 @@ export interface PlanEntryFacts {
   id: string;
   title: string;
   sport?: WorkoutSport;
+  /** The whole session's time and distance (`planEntryMetrics`), 0 where it states none. */
   durationSeconds: number;
-  /**
-   * Whether `durationSeconds` is the whole session or only its timed steps
-   * (`planEntryMetrics`: COROS's estimate, else every step timed).
-   *
-   * Without an estimate the figure is a sum of `target_duration_seconds`, so a
-   * run written as a 1 km warm-up, 6.5 km easy and a 500 m cool-down comes to
-   * zero, and one with five 90 s jogs between strides comes to nine minutes.
-   * Drawn beside "8 km" that read as a nine-minute session, and summed over a
-   * 31 km week it read as "0.1 hours".
-   */
-  durationComplete: boolean;
   distanceMeters: number;
+  /** How each is known, which it is drawn with (`markFigure`): "≈" worked out, "+" only at least. */
+  durationMark: FigureMark;
+  distanceMark: FigureMark;
+  /**
+   * The figure waits for the account's thresholds, still being read: drawn
+   * as nothing yet rather than as a figure about to change.
+   */
+  durationPending: boolean;
+  distancePending: boolean;
   trainingLoad: number;
   strengthSets: number;
   /** How many steps the structure holds, a repeat's counted once; 0 when COROS served none. */
@@ -105,8 +105,8 @@ export interface PlanReaderWeek {
    */
   outcomes: { done: number; missed: number; ahead: number };
   summary: TrainingPlanWeekSummary;
-  /** Every session this week states its whole duration — see `durationComplete`. */
-  timed: boolean;
+  /** A session's figure waits for the account's thresholds, still being read: the sums are not drawn yet. */
+  pending: boolean;
   days: PlanReaderDay[];
 }
 
@@ -114,8 +114,8 @@ export interface PlanReading {
   weeks: PlanReaderWeek[];
   /** True once any entry has a status — i.e. the plan is on the calendar. */
   tracked: boolean;
-  /** Every session in the plan states its whole duration. */
-  timed: boolean;
+  /** A session's figure waits for the account's thresholds, still being read. */
+  pending: boolean;
 }
 
 /** Monday first, in the language on screen. */
@@ -179,7 +179,8 @@ function entryFacts(
   entry: TrainingPlanEntry,
   matchByKey: Map<string, TrainingActivityMatch>,
   loads: PlanHeraclesLoads | undefined,
-  context: WorkoutEditorContext | undefined
+  context: WorkoutEditorContext | undefined,
+  contextPending: boolean
 ): PlanEntryFacts {
   const metrics = planEntryMetrics(entry, context);
   const heraclesLoad = heraclesEntryLoad(plan, loads)?.(entry);
@@ -190,8 +191,11 @@ function entryFacts(
     title: entry.title.trim() || entry.workout.name.trim() || t("library.untitledSession"),
     sport: entry.workout.sport,
     durationSeconds: metrics.durationSeconds,
-    durationComplete: metrics.durationWhole,
     distanceMeters: metrics.distanceMeters,
+    durationMark: metrics.durationMark,
+    distanceMark: metrics.distanceMark,
+    durationPending: contextPending && metrics.durationAwaits,
+    distancePending: contextPending && metrics.distanceAwaits,
     trainingLoad: heraclesLoad ?? metrics.trainingLoad,
     strengthSets: metrics.strengthSets,
     stepCount: leafStepCount(entry.workout.steps ?? []),
@@ -220,7 +224,9 @@ export function readPlan(
    * The account's (`useAthleteContext`): a session not on COROS states its
    * distance and time by COROS's arithmetic on it (`planEntryMetrics`).
    */
-  context?: WorkoutEditorContext
+  context?: WorkoutEditorContext,
+  /** That context is still being read (`useAthleteContextRead`). */
+  contextPending = false
 ): PlanReading {
   const summary = summarizeTrainingPlan(plan, heraclesEntryLoad(plan, loads), context);
   const matchByKey = new Map(
@@ -242,7 +248,7 @@ export function readPlan(
         date: date ? isoDay(date) : undefined,
         entries: inWeek
           .filter((entry) => entry.dayIndex === dayIndex)
-          .map((entry) => entryFacts(plan, entry, matchByKey, loads, context))
+          .map((entry) => entryFacts(plan, entry, matchByKey, loads, context, contextPending))
       };
     });
 
@@ -266,18 +272,20 @@ export function readPlan(
         workouts: 0,
         durationSeconds: 0,
         distanceMeters: 0,
+        durationMark: "exact",
+        distanceMark: "exact",
+        awaits: false,
         trainingLoad: 0
       },
-      timed: all.length > 0 && all.every((facts) => facts.durationComplete),
+      pending: contextPending && (summary.weekly[weekIndex]?.awaits ?? false),
       days
     };
   });
 
-  const populated = weeks.filter((week) => week.summary.workouts > 0);
   return {
     weeks,
     tracked,
-    timed: populated.length > 0 && populated.every((week) => week.timed)
+    pending: contextPending && summary.awaits
   };
 }
 
@@ -320,8 +328,14 @@ export function ridgeMeasure(weeks: readonly PlanReaderWeek[]): RidgeMeasure {
   const busy = weeks.filter((week) => weekWorkouts(week).length > 0);
   if (!busy.length) return "sessions";
   if (busy.every((week) => week.summary.trainingLoad > 0)) return "load";
-  if (busy.every((week) => week.timed && week.summary.durationSeconds > 0)) return "hours";
+  // Bars of hours only some of which are known would draw a short week as an easy one.
+  if (busy.every((week) => !week.pending && week.summary.durationMark !== "atLeast" && week.summary.durationSeconds > 0)) return "hours";
   return "sessions";
+}
+
+/** How a ridge's values are known: hours worked out from an intensity are "≈"; a load or a count is as it is. */
+export function ridgeMark(weeks: readonly PlanReaderWeek[], measure: RidgeMeasure): FigureMark {
+  return measure === "hours" ? combineMarks(...weeks.map((week) => week.summary.durationMark)) : "exact";
 }
 
 export interface RidgeSegment {
@@ -360,14 +374,16 @@ export function weekRidgeValues(weeks: readonly PlanReaderWeek[], measure: Ridge
   );
 }
 
-/** "3 sessions · 4.5 hr · 180 load": the figures a week states, and no zeros. */
+/** "3 sessions · 4.5 hr · 180 load": the figures a week states, and no zeros; "4.5+ hr" when a session's time is not all known. */
 export function formatWeekLine(week: PlanReaderWeek): string {
   const load = Math.round(week.summary.trainingLoad);
-  const hours = week.timed ? Math.round(week.summary.durationSeconds / 360) / 10 : 0;
+  const hours = week.pending ? 0 : Math.round(week.summary.durationSeconds / 360) / 10;
   const count = week.summary.workouts;
   return [
     plural("library.sessions", count),
-    hours ? t("library.week.hours", { n: formatDecimal(hours, Number.isInteger(hours) ? 0 : 1) }) : "",
+    hours
+      ? markFigure(t("library.week.hours", { n: formatDecimal(hours, Number.isInteger(hours) ? 0 : 1) }), week.summary.durationMark)
+      : "",
     load ? t("library.entry.load", { n: load }) : ""
   ]
     .filter(Boolean)

@@ -3,19 +3,17 @@ import type {
   TrainingHubDailyMetric,
   TrainingHubScheduledWorkoutEntry
 } from "../../electron/types";
+import type { FigureMark } from "../../electron/workoutFigures";
 
 /** What the plan asked for, in base units (`plannedSessionFigures`). */
 export interface PlannedTargets {
-  /** The whole session's distance: COROS's estimate, else every step's in distance. */
+  /** The whole session's distance: COROS's estimate, else what its steps add up to. */
   distanceMeters?: number;
-  /** The whole session's time: COROS's estimate, else every step's in time. */
+  /** The whole session's time: COROS's estimate, else what its steps add up to. */
   plannedSeconds?: number;
-  /**
-   * COROS's estimate alone (`estimatedTime`, which every scheduled entry
-   * carries, strength included): the week sums only these, since a total
-   * over some of the sessions would read as the whole plan's.
-   */
-  expectedSeconds?: number;
+  /** How each is known, which it is drawn with (`markFigure`): "≈" worked out, "+" only at least. */
+  distanceMark: FigureMark;
+  durationMark: FigureMark;
 }
 
 /** A scheduled workout matched (or not) to the completed activity on the same day. */
@@ -27,7 +25,7 @@ export interface PlannedActualPair {
   /** What that percentage was read from, for the line that states it. */
   completionBasis?:
     | { kind: "coros" }
-    | { kind: "load" | "distance" | "time"; done: number; planned: number };
+    | { kind: "load" | "distance" | "time"; done: number; planned: number; plannedMark?: FigureMark };
   /**
    * Computed once while pairing and carried so a chip can label its volume
    * without walking the workout structure again for every day in a month.
@@ -70,8 +68,9 @@ export interface WeeklyStats {
   plannedSessionsDone: number;
   /** Load still to come: planned sessions not done, on a day not gone. */
   remainingLoad: number;
-  /** COROS's expected time over every planned session; absent when one lacks it. */
+  /** The planned sessions' time, absent with none planned; at least that where one's is not all known. */
   plannedSeconds?: number;
+  plannedSecondsMark: FigureMark;
   /** Time recorded by the activities that answered a planned session. */
   plannedDoneSeconds: number;
   elevationGain: number;

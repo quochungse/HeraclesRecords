@@ -4,6 +4,7 @@ import type { PlannedActualPair } from "./calendarTypes";
 import { formatDistanceMeters, formatDurationSpan } from "../training/formatters";
 import { useUnitSystem } from "../units/UnitSystemProvider";
 import { t } from "../i18n/core";
+import { markFigure } from "../../electron/workoutFigures";
 
 /**
  * How much of its plan a done session covered, as its panel says it, with
@@ -25,7 +26,9 @@ export function completionLine(
       : basis.kind === "time"
         ? formatDurationSpan(value)
         : t("units.trainingLoadShort", { value: Math.round(value) });
-  return { text, note: t("calendar.plan.ofPlanned", { done: figure(basis.done), planned: figure(basis.planned) }) };
+  // The plan's figure as its card marks it: "≈" worked out, "+" only at least.
+  const planned = markFigure(figure(basis.planned), basis.plannedMark, basis.kind === "time" ? "end" : "number");
+  return { text, note: t("calendar.plan.ofPlanned", { done: figure(basis.done), planned }) };
 }
 
 /**

@@ -17,6 +17,7 @@ import {
   weightUnit
 } from "../units/units";
 import { decodeCorosIntensity } from "../../electron/workoutCapabilities";
+import { markFigure, type FigureMark } from "../../electron/workoutFigures";
 import { workoutIntensityText } from "../i18n/workoutWords";
 import { formatCount, formatDecimal, messageRecord, plural, t } from "../i18n/core";
 
@@ -769,17 +770,21 @@ export function formatPlannedVolume(
    * so the calendar can pass the `PlannedTargets` it already computed while
    * pairing instead of rebuilding the whole structure view for a chip.
    */
-  totals: Pick<ScheduledStructureTotals, "distanceMeters" | "durationSeconds">,
+  totals: Pick<ScheduledStructureTotals, "distanceMeters" | "durationSeconds"> & {
+    /** How each is known (`PlannedTargets`): "≈" worked out, "+" only at least. */
+    distanceMark?: FigureMark;
+    durationMark?: FigureMark;
+  },
   unitSystem: UnitSystem,
   swim: boolean,
   /* Lazy: COROS's string is only formatted when the steps had nothing to say. */
   fallback: () => string
 ): string {
   if (totals.distanceMeters) {
-    return formatStepDistanceLabel(totals.distanceMeters, unitSystem, swim);
+    return markFigure(formatStepDistanceLabel(totals.distanceMeters, unitSystem, swim), totals.distanceMark);
   }
   if (totals.durationSeconds) {
-    return formatStepTimeLabel(totals.durationSeconds);
+    return markFigure(formatStepTimeLabel(totals.durationSeconds), totals.durationMark, "end");
   }
   return fallback();
 }

@@ -122,7 +122,9 @@ import {
 } from "./planReaderModel";
 import { heraclesEntryLoad } from "./planHeraclesLoads";
 import { usePlanHeraclesLoads } from "./usePlanHeraclesLoads";
-import { useAthleteContext } from "../calendar/useAthleteContext";
+import { useAthleteContextRead } from "../calendar/useAthleteContext";
+import { markFigure } from "../../electron/workoutFigures";
+import { plannedFigures } from "./PlanEntryRow";
 import { PlanOriginBadge, SportMixDots, dominantSport, sportAccentStyle, sportChipStyle, sportTheme } from "./sportTheme";
 import { workoutSportLabel } from "../training/workoutSport";
 import { formatCount, formatDecimal, plural, t, weekdayNames } from "../i18n/core";
@@ -213,14 +215,9 @@ function slotLabel(slot: PlanSlot, week: PlanReaderWeek | undefined): string {
   return t("library.ed.slot", { n: slot.weekIndex + 1, day: week?.days[slot.dayIndex]?.label ?? weekdayNames("short")[slot.dayIndex] });
 }
 
-/** Only figures the session states — the reader's rule, for the same reason. */
+/** Only figures the session states — the reader's rule (`plannedFigures`), for the same reason. */
 function entryFigures(entry: PlanEntryFacts, unitSystem: ReturnType<typeof useUnitSystem>["unitSystem"]): string[] {
-  return [
-    entry.durationComplete ? formatPlannedDuration(entry.durationSeconds) : null,
-    entry.distanceMeters ? formatDistanceValue(entry.distanceMeters, unitSystem, { digits: 1 }) : null,
-    entry.trainingLoad ? t("library.entry.load", { n: Math.round(entry.trainingLoad) }) : null,
-    entry.strengthSets ? plural("workout.sets", entry.strengthSets) : null
-  ].filter((figure): figure is string => Boolean(figure));
+  return plannedFigures(entry, unitSystem);
 }
 
 function isTextField(target: EventTarget | null): boolean {
@@ -286,11 +283,11 @@ export function PlanEditor({
      and is not the place to be told a session was missed. */
   const shaped = useMemo(() => [{ ...plan, ...shape }], [shape]);
   const heraclesLoads = usePlanHeraclesLoads(shaped);
-  const athlete = useAthleteContext(api);
+  const { context: athlete, pending: athletePending } = useAthleteContextRead(api);
   const reading = useMemo(
-    () => readPlan({ ...plan, ...shape, startDate: undefined, calendar: "unscheduled" }, [], heraclesLoads, athlete),
+    () => readPlan({ ...plan, ...shape, startDate: undefined, calendar: "unscheduled" }, [], heraclesLoads, athlete, athletePending),
     // The day labels and stage names are in the language on screen.
-    [shape, locale, heraclesLoads, athlete]
+    [shape, locale, heraclesLoads, athlete, athletePending]
   );
   const summary = useMemo(
     () => summarizeTrainingPlan(shaped[0], heraclesEntryLoad(plan, heraclesLoads), athlete),
@@ -551,13 +548,15 @@ export function PlanEditor({
 
   /* ------------------------------------------------------------ render */
 
-  const hours = reading.timed ? Math.round(summary.durationSeconds / 360) / 10 : 0;
+  const hours = reading.pending ? 0 : Math.round(summary.durationSeconds / 360) / 10;
   const figures = [
     { label: plural("library.fig.weeks", plan.weekCount), value: formatCount(plan.weekCount) },
     { label: plural("library.fig.sessions", summary.workouts), value: formatCount(summary.workouts) },
-    hours ? { label: plural("library.fig.hours", hours), value: formatDecimal(hours, Number.isInteger(hours) ? 0 : 1) } : null,
-    summary.distanceMeters
-      ? { label: t("library.fig.distance"), value: formatDistanceValue(summary.distanceMeters, unitSystem, { digits: 0 }) }
+    hours
+      ? { label: plural("library.fig.hours", hours), value: markFigure(formatDecimal(hours, Number.isInteger(hours) ? 0 : 1), summary.durationMark) }
+      : null,
+    summary.distanceMeters && !reading.pending
+      ? { label: t("library.fig.distance"), value: markFigure(formatDistanceValue(summary.distanceMeters, unitSystem, { digits: 0 }), summary.distanceMark) }
       : null,
     summary.trainingLoad ? { label: t("library.fig.load"), value: String(Math.round(summary.trainingLoad)) } : null
   ].filter((figure): figure is { label: string; value: string } => Boolean(figure));

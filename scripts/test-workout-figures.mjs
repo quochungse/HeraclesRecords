@@ -21,8 +21,16 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const load = (file) => import(pathToFileURL(path.join(repoRoot, "dist-electron", file)).href + "?cacheBust=" + Date.now());
-const { corosProgramFigures, estimateWorkoutFigures, sessionFigures, statedWorkoutFigures, stepFigures, workoutFigures } =
-  await load("workoutFigures.js");
+const {
+  combineMarks,
+  corosProgramFigures,
+  corosProgramStated,
+  estimateWorkoutFigures,
+  figureInWords,
+  markFigure,
+  sessionFigures,
+  statedWorkoutFigures
+} = await load("workoutFigures.js");
 const { parseWorkoutEditorContext } = await load("corosWorkoutEditor.js");
 
 const ACCOUNT = {
@@ -171,37 +179,139 @@ const LONG_RUN = [timed(900, hr(125, 150), "warmup"), dist(6500, hr(135, 156)), 
   assert.deepEqual(estimateWorkoutFigures({ sport: "strength", steps: [{ kind: "training", target_type: "reps", target_reps: 12 }] }, context), {});
 }
 
-// 6. The rule: COROS's stored figure, else its arithmetic, else a sum only when every step is in its unit.
+// 6. The rule: COROS's stored figure, else its arithmetic, each marked by how its steps let it be known:
+//    "exact" written in the steps, "estimated" worked out from an intensity, "atLeast" short of a
+//    step nothing works out (an untargeted warm-up's distance, an open step, a swim length's time).
 {
-  assert.deepEqual(workoutFigures(run(LONG_RUN), { context }), { distanceMeters: 14079.74, durationSeconds: 5883 });
+  const marks = (distanceMark, durationMark) => ({ distanceMark, durationMark, distanceAwaits: false, durationAwaits: false });
   assert.deepEqual(
-    workoutFigures(run(LONG_RUN), { coros: { distanceMeters: 14100, durationSeconds: 5900 }, context }),
-    { distanceMeters: 14100, durationSeconds: 5900 },
-    "a stored COROS figure outranks the arithmetic"
+    statedWorkoutFigures(run(LONG_RUN), { context }),
+    { distanceMeters: 14079.74, durationSeconds: 5883, ...marks("estimated", "estimated") },
+    "every step at heart rate: both worked out"
   );
-  assert.deepEqual(workoutFigures(run(LONG_RUN)), {}, "11.5 km of steps is not a 14 km run's distance");
+  assert.deepEqual(
+    statedWorkoutFigures(run(LONG_RUN), { coros: { distanceMeters: 14100, durationSeconds: 5900 }, context }),
+    { distanceMeters: 14100, durationSeconds: 5900, ...marks("estimated", "estimated") },
+    "a stored COROS figure outranks the arithmetic, and is marked by the same steps"
+  );
   assert.deepEqual(
     statedWorkoutFigures(run(LONG_RUN)),
-    { distanceMeters: 11500, durationSeconds: 1200, distanceWhole: false, durationWhole: false },
-    "a screen may still name the partial sums as such"
+    { distanceMeters: 11500, durationSeconds: 1200, distanceMark: "atLeast", durationMark: "atLeast", distanceAwaits: true, durationAwaits: true },
+    "before the account's thresholds: at least what the other steps add up to, waiting for them"
   );
   assert.deepEqual(
-    workoutFigures({ sport: "bike", steps: [dist(20000, hr(140, 140)), dist(10000, hr(150, 150))] }, { context }),
-    { distanceMeters: 30000 },
-    "every step in distance: their sum is the session's"
+    statedWorkoutFigures(run(LONG_RUN), { coros: { distanceMeters: 14100, durationSeconds: 5900 } }),
+    { distanceMeters: 14100, durationSeconds: 5900, ...marks("estimated", "estimated") },
+    "COROS converted those steps: its figure waits for nothing"
   );
-  assert.deepEqual(workoutFigures({ sport: "run", distance_km: 8 }), { distanceMeters: 8000 }, "a simple run's distance");
+  const EASY8 = [timed(600, hr(120, 150), "warmup"), dist(6500, hr(135, 154)), timed(300, { type: "none" }, "cooldown")];
+  assert.deepEqual(
+    statedWorkoutFigures(run(EASY8), { context }),
+    { distanceMeters: 7797.96, durationSeconds: 3602, ...marks("atLeast", "estimated") },
+    "an untargeted cool-down adds no distance it has: 7.80+ km, ≈1:00:02"
+  );
+  assert.deepEqual(
+    statedWorkoutFigures(run(EASY8), { coros: { distanceMeters: 7797.96, durationSeconds: 3602 }, context }),
+    { distanceMeters: 7797.96, durationSeconds: 3602, ...marks("atLeast", "estimated") },
+    "the same on the Calendar, from COROS's figure"
+  );
+  assert.deepEqual(
+    statedWorkoutFigures(run([dist(10000, pace(300, 330))]), { context }),
+    { distanceMeters: 10000, durationSeconds: 3150, ...marks("exact", "estimated") },
+    "a distance written is exact; its time at a pace is worked out"
+  );
+  assert.deepEqual(
+    statedWorkoutFigures(run([{ repeat: 10, steps: [dist(400, pace(300, 330), "interval"), timed(90, undefined, "rest")] }]), { context }),
+    { distanceMeters: 4000, durationSeconds: 2160, ...marks("exact", "estimated") },
+    "a rest stands still: its 0 m is exact"
+  );
+  assert.deepEqual(
+    statedWorkoutFigures(run([timed(600, hr(140, 140), "warmup"), dist(5000, hr(140, 140)), { kind: "cooldown", target_type: "open" }]), { context }),
+    { distanceMeters: 6378.81, durationSeconds: 2776, ...marks("atLeast", "atLeast") },
+    "an open step leaves both at least"
+  );
+  const swimSet = (meters, rest) => [dist(meters, undefined, "interval"), timed(rest, undefined, "rest")];
+  assert.deepEqual(
+    statedWorkoutFigures({ sport: "swim", steps: [{ repeat: 2, steps: swimSet(100, 30) }, { repeat: 6, steps: swimSet(100, 15) }] }, { context }),
+    { distanceMeters: 800, durationSeconds: 150, ...marks("exact", "atLeast") },
+    "a swim's lengths are exact; its time is at least its rests'"
+  );
+  assert.deepEqual(
+    statedWorkoutFigures({ sport: "bike", steps: [dist(20000, hr(140, 140)), dist(10000, hr(150, 150))] }, { context }),
+    { distanceMeters: 30000, ...marks("exact", "atLeast") },
+    "a ride in kilometres: exact, and no time to state"
+  );
+  assert.deepEqual(
+    statedWorkoutFigures({ sport: "bike", steps: [timed(3000, hr(130, 140))] }, { context }),
+    { durationSeconds: 3000, ...marks("atLeast", "exact") },
+    "a timed ride's distance is at least 0: not stated"
+  );
+  const core = { sport: "strength", steps: [{ kind: "training", target_type: "reps", target_reps: 12 }, timed(360)] };
+  assert.deepEqual(statedWorkoutFigures(core), { durationSeconds: 360, ...marks("atLeast", "atLeast") }, "the timed holds alone: at least that");
+  assert.deepEqual(
+    statedWorkoutFigures(core, { coros: { durationSeconds: 1620 } }),
+    { durationSeconds: 1620, ...marks("atLeast", "estimated") },
+    "COROS times a strength session's reps itself: its figure is an estimate, not a floor"
+  );
+  assert.deepEqual(statedWorkoutFigures({ sport: "run", distance_km: 8 }), { distanceMeters: 8000, ...marks("exact", "exact") }, "a simple run's distance");
 }
 
-// 7. The pieces the rule is built from.
+// 7. A COROS program read straight off COROS (the Calendar, Overview): its own figure, marked by its own steps.
 {
-  assert.deepEqual(stepFigures(LONG_RUN), { distanceMeters: 11500, durationSeconds: 1200, stepCount: 4, distanceSteps: 2, timedSteps: 2 });
-  assert.equal(
-    stepFigures([{ kind: "training", target_distance_meters: 8000, target_duration_seconds: 1920 }]).durationSeconds,
-    undefined,
-    "a step is in one unit: with no `target_type`, distance first, as the write reads it"
+  const exercise = (exerciseType, targetType, targetValue, intensityType = 0, extra = {}) =>
+    ({ exerciseType, targetType, targetValue, intensityType, sets: 1, ...extra });
+  const easy8 = {
+    sportType: 1,
+    estimatedDistance: 779796,
+    estimatedTime: 3602,
+    exercises: [exercise(1, 2, 600, 2), exercise(2, 5, 650000, 2), exercise(3, 2, 300, 0)]
+  };
+  assert.deepEqual(
+    corosProgramStated(easy8),
+    { distanceMeters: 7797.96, durationSeconds: 3602, distanceMark: "atLeast", durationMark: "estimated", distanceAwaits: false, durationAwaits: false },
+    "the Calendar's Easy 8 km marks as the proposal did"
   );
-  assert.deepEqual(sessionFigures(stepFigures([timed(2700), { kind: "cooldown", target_type: "open" }])), {});
+  // P10305 as COROS stores it: group rows carry the repeat, their steps name them in `groupId`.
+  const group = (id, sets) => ({ id, isGroup: true, sets, targetType: 0, targetValue: 0 });
+  const swim = {
+    sportType: 3,
+    exercises: [
+      group("a", 2), exercise(2, 5, 10000, 5, { groupId: "a" }), exercise(4, 2, 30, 0, { groupId: "a" }),
+      group("b", 2), exercise(2, 5, 20000, 5, { groupId: "b" }), exercise(4, 2, 30, 0, { groupId: "b" }),
+      group("c", 6), exercise(2, 5, 10000, 5, { groupId: "c" }), exercise(4, 2, 15, 0, { groupId: "c" }),
+      group("d", 2), exercise(2, 5, 10000, 5, { groupId: "d" }), exercise(4, 2, 60, 0, { groupId: "d" })
+    ]
+  };
+  assert.deepEqual(
+    corosProgramStated(swim),
+    { distanceMeters: 1400, durationSeconds: 330, distanceMark: "exact", durationMark: "atLeast", distanceAwaits: false, durationAwaits: false },
+    "a repeat counts per pass: 1400 m, at least 5:30"
+  );
+  assert.deepEqual(
+    corosProgramStated({ sportType: 4, estimatedTime: 1620 }),
+    { durationSeconds: 1620, distanceMark: "exact", durationMark: "exact", distanceAwaits: false, durationAwaits: false },
+    "no steps to mark it by: stated as COROS has it"
+  );
+  assert.equal(
+    corosProgramStated({ sportType: 1, exercises: easy8.exercises }, { distanceMeters: 7797.96 }).distanceMeters,
+    7797.96,
+    "what a caller already holds of COROS's estimate stands in for a field the program left out"
+  );
+}
+
+// 8. The marks, drawn and said.
+{
+  assert.equal(markFigure("7.80 km", "estimated"), "≈7.80 km");
+  assert.equal(markFigure("7.80 km", "atLeast"), "7.80+ km", "the plus follows the number");
+  assert.equal(markFigure("4.5 hr", "atLeast"), "4.5+ hr");
+  assert.equal(markFigure("1h 12m", "atLeast", "end"), "1h 12m+", "a time in parts takes it at its end");
+  assert.equal(markFigure("1400 m", "exact"), "1400 m");
+  assert.equal(combineMarks("exact", "estimated", "exact"), "estimated");
+  assert.equal(combineMarks("estimated", "atLeast"), "atLeast", "both estimated and short: only at least");
+  assert.equal(combineMarks(), "exact");
+  assert.equal(figureInWords("7.8 km", "atLeast"), "at least 7.8 km");
+  assert.equal(figureInWords("60 min", "estimated"), "about 60 min");
+  assert.deepEqual(sessionFigures({ stepCount: 2, distanceSteps: 0, timedSteps: 1, durationSeconds: 2700 }), {});
   const runningCopy = { distance: 0, duration: 0, estimatedDistance: 1407974, estimatedTime: 5883 };
   assert.deepEqual(corosProgramFigures(runningCopy), { distanceMeters: 14079.74, durationSeconds: 5883 });
   assert.deepEqual(
@@ -212,4 +322,4 @@ const LONG_RUN = [timed(900, hr(125, 150), "warmup"), dist(6500, hr(135, 156)), 
   assert.deepEqual(corosProgramFigures({ distance: 0, estimatedTime: 0 }), {}, "a 0 is a field nobody filled in");
 }
 
-console.log("workout figures OK — COROS's arithmetic (within centimetres) (pace, effort pace, heart rate through the account, nothing for power or cadence), a stored COROS figure first, a sum only when every step is in its unit");
+console.log("workout figures OK — COROS's arithmetic (within centimetres) (pace, effort pace, heart rate through the account, nothing for power or cadence), a stored COROS figure first, each figure marked exact, ≈ or +");

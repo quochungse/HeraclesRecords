@@ -15,7 +15,14 @@ import {
   type WeeklyStats
 } from "./calendarTypes";
 import { buildScheduledWorkoutView } from "./scheduledStructure";
-import { corosProgramFigures, sessionFigures, type StepFigures } from "../../electron/workoutFigures";
+import {
+  combineMarks,
+  corosProgramFigures,
+  corosProgramStated,
+  sessionFigures,
+  type FigureMark,
+  type StepFigures
+} from "../../electron/workoutFigures";
 import {
   activitySportFamily,
   isStrengthStyleWorkout,
@@ -113,31 +120,42 @@ function plannedTargets(
  * How far and how long a planned session goes, said the same way on its
  * Calendar card, in its session panel and in its completion: the one rule
  * every workout figure goes through (`electron/workoutFigures.ts`) — COROS's
- * own estimates first, else the sum of the steps when every one of them is in
- * that unit.
+ * own estimates first, else what its steps add up to — each marked by how
+ * COROS's own steps let it be known (`corosProgramStated`).
  *
  * `known` is what a caller already holds of COROS's estimates for an entry
- * that arrived without its program (Overview's row). The main process's
- * `volume` string stands in only where there are no steps to say anything (a
- * run whose target COROS keeps at the program's level, an entry with no
- * program): beside steps it may be a sum of some of them.
+ * that arrived without its program (Overview's row). An entry whose program
+ * carries no steps of COROS's own cannot be marked: COROS's figure, else its
+ * steps when every one is in that unit, else the main process's `volume`
+ * string where there are no steps at all (a run whose target COROS keeps at
+ * the program's level, an entry with no program), stated as they are.
  */
 export function plannedSessionFigures(
   scheduled: TrainingHubScheduledWorkoutEntry,
   totals: StepFigures,
   known: { meters?: number; seconds?: number } = {}
 ): PlannedTargets {
+  const exercises = (scheduled.rawProgram as { exercises?: unknown } | undefined)?.exercises;
+  if (Array.isArray(exercises) && exercises.length > 0) {
+    const stated = corosProgramStated(scheduled.rawProgram, { distanceMeters: known.meters, durationSeconds: known.seconds });
+    return {
+      distanceMeters: stated.distanceMeters,
+      plannedSeconds: stated.durationSeconds,
+      distanceMark: stated.distanceMark,
+      durationMark: stated.durationMark
+    };
+  }
   const coros = corosProgramFigures(scheduled.rawProgram);
   const volumeKm = totals.stepCount === 0 ? parseUpcomingWorkoutDistanceKm(scheduled.volume) : null;
-  const seconds = coros.durationSeconds ?? known.seconds;
   const figures = sessionFigures(totals, {
     distanceMeters: coros.distanceMeters ?? known.meters ?? (volumeKm ? volumeKm * 1000 : undefined),
-    durationSeconds: seconds
+    durationSeconds: coros.durationSeconds ?? known.seconds
   });
   return {
     distanceMeters: figures.distanceMeters,
     plannedSeconds: figures.durationSeconds,
-    expectedSeconds: seconds
+    distanceMark: "exact",
+    durationMark: "exact"
   };
 }
 
@@ -173,13 +191,13 @@ function completion(
   if (targets.distanceMeters && activity.distance !== undefined) {
     return {
       completionPct: pct(activity.distance, targets.distanceMeters),
-      completionBasis: { kind: "distance", done: activity.distance, planned: targets.distanceMeters }
+      completionBasis: { kind: "distance", done: activity.distance, planned: targets.distanceMeters, plannedMark: targets.distanceMark }
     };
   }
   if (targets.plannedSeconds && activity.duration !== undefined) {
     return {
       completionPct: pct(activity.duration, targets.plannedSeconds),
-      completionBasis: { kind: "time", done: activity.duration, planned: targets.plannedSeconds }
+      completionBasis: { kind: "time", done: activity.duration, planned: targets.plannedSeconds, plannedMark: targets.durationMark }
     };
   }
   return {};
@@ -329,7 +347,8 @@ export function computeWeeklyStats(days: CalendarDay[], loadSource: StrengthLoad
   let plannedSessionsDone = 0;
   let remainingLoad = 0;
   let remainingCorosLoad = 0;
-  let plannedSeconds: number | undefined = 0;
+  let plannedSeconds = 0;
+  let plannedSecondsMark: FigureMark = "exact";
   let plannedDoneSeconds = 0;
   let elevationGain = 0;
 
@@ -354,11 +373,12 @@ export function computeWeeklyStats(days: CalendarDay[], loadSource: StrengthLoad
         remainingLoad += plannedLoadOf(pair.scheduled, loadSource) ?? 0;
         remainingCorosLoad += pair.scheduled.trainingLoad ?? 0;
       }
-      // A total over some of the sessions would read as the whole plan's.
-      plannedSeconds =
-        plannedSeconds !== undefined && pair.targets.expectedSeconds
-          ? plannedSeconds + pair.targets.expectedSeconds
-          : undefined;
+      // A session with no time to state still takes some: the week's is then at least the rest's.
+      plannedSeconds += pair.targets.plannedSeconds ?? 0;
+      plannedSecondsMark = combineMarks(
+        plannedSecondsMark,
+        pair.targets.plannedSeconds ? pair.targets.durationMark : "atLeast"
+      );
     }
   }
 
@@ -374,7 +394,8 @@ export function computeWeeklyStats(days: CalendarDay[], loadSource: StrengthLoad
     plannedSessions,
     plannedSessionsDone,
     remainingLoad: Math.round(remainingLoad),
-    plannedSeconds: plannedSessions ? plannedSeconds : undefined,
+    plannedSeconds: plannedSessions && plannedSeconds > 0 ? plannedSeconds : undefined,
+    plannedSecondsMark,
     plannedDoneSeconds,
     elevationGain: Math.round(elevationGain),
     baseFitness: lastDefined(metrics, (metric) => metric.cti),

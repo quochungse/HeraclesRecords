@@ -37,6 +37,7 @@
 import assert from "node:assert/strict";
 import {
   formatPlannedDuration,
+  formatWeekLine,
   nextPlanSession,
   planSessions,
   stageForWeek,
@@ -154,7 +155,8 @@ function match(idInPlan, status, overrides = {}) {
   /* The whole session by COROS's arithmetic: 10 minutes at 6:15/km is 1.6 km,
      6 km at 5:10/km is 31 minutes. */
   assert.equal(facts.durationSeconds, 2460, "the timed step, and the distance step at its pace");
-  assert.equal(facts.durationComplete, true);
+  assert.equal(facts.durationMark, "estimated", "worked out from the pace: drawn ≈");
+  assert.equal(facts.distanceMark, "estimated");
   assert.equal(facts.trainingLoad, 90);
   assert.equal(facts.distanceMeters, 7600, "the distance step, and the timed step at its pace");
   assert.equal(facts.stepCount, 2);
@@ -203,7 +205,7 @@ function match(idInPlan, status, overrides = {}) {
   const facts = readPlan(plan({ entries: [longRun] })).weeks[0].days[0].entries[0];
   assert.equal(facts.distanceMeters, 14079.74, "COROS's distance counts the timed steps");
   assert.equal(facts.durationSeconds, 5883, "and its time the distance steps");
-  assert.equal(facts.durationComplete, true);
+  assert.equal(facts.durationMark, "estimated", "COROS worked it out from heart rate");
 
   /* Edited, the session has no COROS figures; its heart-rate steps go as far
      as COROS's arithmetic on the account says. */
@@ -218,7 +220,12 @@ function match(idInPlan, status, overrides = {}) {
   assert.equal(known.durationSeconds, 5883);
   const unknown = readPlan(edited).weeks[0].days[0].entries[0];
   assert.equal(unknown.distanceMeters, 11500, "without the account, the distance steps alone");
-  assert.equal(unknown.durationComplete, false, "and no length is stated for the session");
+  assert.equal(unknown.distanceMark, "atLeast", "as at least that");
+  assert.equal(unknown.durationMark, "atLeast");
+  assert.equal(unknown.distancePending, false, "an account that answered without thresholds: drawn as at least");
+  const waiting = readPlan(edited, [], undefined, undefined, true).weeks[0].days[0].entries[0];
+  assert.equal(waiting.distancePending, true, "while the account is read, nothing is drawn yet");
+  assert.equal(waiting.durationPending, true);
 }
 
 // ---------------------------------------------------------------------------
@@ -375,7 +382,7 @@ function match(idInPlan, status, overrides = {}) {
 }
 
 // ---------------------------------------------------------------------------
-// 8. A duration is only stated when it is the whole session
+// 8. A duration a session cannot wholly state is at least what it can, and so are its week's and plan's
 // ---------------------------------------------------------------------------
 {
   const strides = entry({
@@ -428,25 +435,33 @@ function match(idInPlan, status, overrides = {}) {
   const [first, second] = reading.weeks[0].days.flatMap((day) => day.entries);
   assert.equal(first.durationSeconds, 450, "the timed jogs still sum as before");
   assert.equal(
-    first.durationComplete,
-    false,
-    "but a heart-rate distance step with no account to time it leaves the session's length unknown"
+    first.durationMark,
+    "atLeast",
+    "an untimed stride and a heart-rate distance step with no account to time it: at least that"
   );
-  assert.equal(second.durationComplete, true, "every step timed, repeats included");
+  assert.equal(first.distanceMark, "exact", "every metre written, the jogs standing still");
+  assert.equal(second.durationMark, "exact", "every step timed, repeats included");
+  assert.equal(second.distanceMeters, 0, "an untargeted timed session covers ground nothing works out: not stated");
   assert.equal(
-    reading.weeks[1].days[0].entries[0].durationComplete,
-    true,
+    reading.weeks[1].days[0].entries[0].durationMark,
+    "exact",
     "a session with no steps is timed by its planned duration"
   );
-  assert.equal(reading.weeks[0].timed, false, "one untimed session makes the week's hours unknown");
-  assert.equal(reading.weeks[1].timed, true);
-  assert.equal(reading.timed, false, "and so the plan's");
+  assert.equal(reading.weeks[0].summary.durationMark, "atLeast", "one session short makes the week's hours at least theirs");
+  assert.match(formatWeekLine(reading.weeks[0]), /\+ /, "and the week line says so");
+  assert.equal(reading.weeks[1].summary.durationMark, "exact");
+  assert.equal(summarizeTrainingPlan(plan({ entries: [strides, intervals, planned] })).durationMark, "atLeast", "and so the plan's");
+  assert.equal(reading.pending, false);
+  const loading = readPlan(plan({ entries: [strides, intervals, planned] }), [], undefined, undefined, true);
+  assert.equal(loading.weeks[0].pending, true, "a week waiting for the account draws no hours yet");
+  assert.doesNotMatch(formatWeekLine(loading.weeks[0]), / hr/);
+  assert.equal(loading.weeks[1].pending, false);
 
   assert.equal(first.stepCount, 3, "warm-up, stride, jog: a repeat's children once, the group not at all");
   assert.equal(second.stepCount, 3);
 
   const empty = readPlan(plan());
-  assert.equal(empty.timed, false, "a plan with nothing in it has no hours to state");
+  assert.equal(empty.pending, false, "a plan with nothing in it waits for nothing");
 }
 
 // ---------------------------------------------------------------------------

@@ -91,6 +91,8 @@ import {
   type RowSeed
 } from "./workoutBuilderRows";
 import { formatStepDistanceLabel } from "./scheduledStructure";
+import { markFigure } from "../../electron/workoutFigures";
+import { figureWords } from "./figureWords";
 import { workoutSportLabel } from "../training/workoutSport";
 import { messageRecord, plural, t } from "../i18n/core";
 import { intensityTypeLabel, swimStrokeLabel, zoneOptionText } from "../i18n/workoutWords";
@@ -1168,6 +1170,8 @@ export function useWorkoutBuilder(api: HeraclesRecordsApi, options: UseWorkoutBu
   const [builderExercises, setBuilderExercises] = useState<WorkoutExerciseOption[]>([]);
   const [builderExercisesLoading, setBuilderExercisesLoading] = useState(false);
   const [builderContext, setBuilderContext] = useState<WorkoutEditorContext>();
+  // Until the account's context answers, a heart-rate step's figure waits for it.
+  const [builderContextPending, setBuilderContextPending] = useState(true);
   const [builderName, setBuilderNameState] = useState(seed?.name ?? "");
   const [builderDescription, setBuilderDescriptionState] = useState(seed?.overview ?? "");
   /*
@@ -1237,7 +1241,8 @@ export function useWorkoutBuilder(api: HeraclesRecordsApi, options: UseWorkoutBu
           setBuilderPoolLengthState(String(Number(context.defaultPoolLength.value.toFixed(2))));
         }
       })
-      .catch(() => undefined);
+      .catch(() => undefined)
+      .finally(() => setBuilderContextPending(false));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [api, unitSystem]);
 
@@ -1274,8 +1279,17 @@ export function useWorkoutBuilder(api: HeraclesRecordsApi, options: UseWorkoutBu
   );
   const builderSportMeta = BUILDER_SPORT_META[builderSport];
   const builderFigures = useMemo(
-    () => builderSessionFigures(rows, builderSport, unitSystem, builderContext),
-    [rows, builderSport, unitSystem, builderContext]
+    () => {
+      const figures = builderSessionFigures(rows, builderSport, unitSystem, builderContext);
+      // `…Awaits` here means still waiting: once the account has answered, a
+      // figure short of a heart-rate step is drawn as at least what it is.
+      return {
+        ...figures,
+        distanceAwaits: builderContextPending && figures.distanceAwaits,
+        durationAwaits: builderContextPending && figures.durationAwaits
+      };
+    },
+    [rows, builderSport, unitSystem, builderContext, builderContextPending]
   );
   const builderStructure = useMemo(() => builderStructureCounts(rows), [rows]);
   const builderStepKinds = useMemo<BuilderKind[]>(() => {
@@ -1850,26 +1864,36 @@ export function WorkoutBuilderWorkspace({
             <ListTree size={11} aria-hidden="true" />
             {structureText}
           </span>
-          {/* The workout view's figures for the same steps (`builderSessionFigures`):
-              the whole session's, or a step sum titled as only that. */}
-          {(builderFigures.durationSeconds ?? 0) >= 60 ? (
-            <span
-              className="calendar-builder-total"
-              title={builderFigures.durationWhole ? t("workout.b.w.estTime") : t("workout.v.timedSteps")}
-            >
-              <Timer size={11} aria-hidden="true" />
-              {builderFigures.durationWhole ? "≈" : ""}{formatBuilderMinutes(builderFigures.durationSeconds! / 60)}
+          {/* The workout view's figures for the same steps (`builderSessionFigures`),
+              marked as it marks them: "≈" worked out, "+" only at least. */}
+          {builderFigures.durationAwaits ? (
+            <span className="calendar-builder-total" title={t("workout.figure.pending")}>
+              <Timer size={11} aria-hidden="true" />…
             </span>
-          ) : null}
-          {builderFigures.distanceMeters ? (
-            <span
-              className="calendar-builder-total"
-              title={builderFigures.distanceWhole ? t("workout.b.w.totalDistance") : t("workout.v.distanceSteps")}
-            >
-              <Route size={11} aria-hidden="true" />
-              {formatStepDistanceLabel(builderFigures.distanceMeters, unitSystem, builderSport === "swim")}
+          ) : (builderFigures.durationSeconds ?? 0) >= 60 ? (() => {
+            const text = formatBuilderMinutes(builderFigures.durationSeconds! / 60);
+            const words = figureWords(text, builderFigures.durationMark);
+            return (
+              <span className="calendar-builder-total" title={words ?? t("workout.v.duration")} aria-label={words}>
+                <Timer size={11} aria-hidden="true" />
+                {markFigure(text, builderFigures.durationMark, "end")}
+              </span>
+            );
+          })() : null}
+          {builderFigures.distanceAwaits ? (
+            <span className="calendar-builder-total" title={t("workout.figure.pending")}>
+              <Route size={11} aria-hidden="true" />…
             </span>
-          ) : null}
+          ) : builderFigures.distanceMeters ? (() => {
+            const text = formatStepDistanceLabel(builderFigures.distanceMeters, unitSystem, builderSport === "swim");
+            const words = figureWords(text, builderFigures.distanceMark);
+            return (
+              <span className="calendar-builder-total" title={words ?? t("workout.b.w.totalDistance")} aria-label={words}>
+                <Route size={11} aria-hidden="true" />
+                {markFigure(text, builderFigures.distanceMark)}
+              </span>
+            );
+          })() : null}
           {totalsExtra}
           <span className="calendar-builder-total calendar-builder-total-sport">
             <builderSportMeta.Icon size={11} aria-hidden="true" />

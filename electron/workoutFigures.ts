@@ -12,13 +12,14 @@ import { encodeCorosIntensity } from "./workoutCapabilities";
  * view (Coach's proposed change, the Library, a plan session), the workout
  * builder's footer, the plan reader and Coach's plan text.
  *
- * **A figure is the whole session's or it is not stated as one.** COROS's
- * stored estimate comes first; else COROS's own arithmetic, done here
- * (`estimateWorkoutFigures`), which counts the timed steps into the distance
- * and the distance steps into the time; else the steps' sum when every step
- * is in that unit. A sum over some of the steps read as the whole session's:
- * a 14 km long run with a timed warm-up and cool-down said "Distance 11.5 km"
- * beside the Calendar's 14.08.
+ * **A figure is the whole session's, marked by how it is known**
+ * (`FigureMark`). COROS's stored estimate comes first; else COROS's own
+ * arithmetic, done here (`estimateWorkoutFigures`), which counts the timed
+ * steps into the distance and the distance steps into the time. Written in
+ * the steps it is stated as it is, worked out from an intensity "≈", short of
+ * a step nothing can be worked out for "+" — never a sum over some of the
+ * steps read as the whole session's: a 14 km long run with a timed warm-up
+ * and cool-down said "Distance 11.5 km" beside the Calendar's 14.08.
  *
  * Node-free: the renderer imports it as it is.
  */
@@ -29,7 +30,7 @@ export interface WorkoutFigures {
   durationSeconds?: number;
 }
 
-/** What a workout's steps add up to, one unit at a time. */
+/** What a workout's steps add up to, one unit at a time (the Calendar's `computeTotals`). */
 export interface StepFigures {
   /** Over the steps written in distance only. */
   distanceMeters?: number;
@@ -79,32 +80,6 @@ function leafSteps(steps: readonly RunWorkoutStepInput[] | undefined): Array<{ s
   );
 }
 
-/** What a plan or Coach step list adds up to, one unit at a time. */
-export function stepFigures(steps: readonly RunWorkoutStepInput[] | undefined): StepFigures {
-  let distanceMeters = 0;
-  let durationSeconds = 0;
-  let distanceSteps = 0;
-  let timedSteps = 0;
-  const leaves = leafSteps(steps);
-  for (const { step, repeat } of leaves) {
-    const type = targetOf(step);
-    if (type === "distance" && (step.target_distance_meters ?? 0) > 0) {
-      distanceMeters += step.target_distance_meters! * repeat;
-      distanceSteps += 1;
-    } else if (type === "time" && (step.target_duration_seconds ?? 0) > 0) {
-      durationSeconds += step.target_duration_seconds! * repeat;
-      timedSteps += 1;
-    }
-  }
-  return {
-    ...(distanceMeters > 0 ? { distanceMeters } : {}),
-    ...(durationSeconds > 0 ? { durationSeconds } : {}),
-    stepCount: leaves.length,
-    distanceSteps,
-    timedSteps
-  };
-}
-
 /** The rule over step sums: the estimate figure by figure, else the steps' sum when every step is in that unit. */
 export function sessionFigures(steps: StepFigures, estimate: WorkoutFigures = {}): WorkoutFigures {
   const everyStep = (count: number) => steps.stepCount > 0 && count === steps.stepCount;
@@ -119,55 +94,273 @@ export function sessionFigures(steps: StepFigures, estimate: WorkoutFigures = {}
 }
 
 /**
- * The rule for a workout held as steps: COROS's stored estimate figure by
- * figure (`coros`, from `corosProgramFigures`), else COROS's arithmetic done
- * here, else the steps' sum when every step is in that unit.
+ * How a figure is known, which every screen marks it by: written in the
+ * steps (`exact`, stated as it is), worked out from an intensity the way
+ * COROS works it (`estimated`, "≈7.80 km"), or short of steps nothing works
+ * out — an open step, an untargeted warm-up's distance, a swim's lengths'
+ * time — so only at least that (`atLeast`, "7.80+ km"). A rest stands still:
+ * the 0 it adds is exact. A figure both estimated and short is only `atLeast`.
  */
-export function workoutFigures(
-  workout: FiguredWorkout,
-  options: FigureOptions = {}
-): WorkoutFigures {
-  return wholeFigures(workout, stepFigures(workout.steps), options);
+export type FigureMark = "exact" | "estimated" | "atLeast";
+
+const MARK_ORDER: Record<FigureMark, number> = { exact: 0, estimated: 1, atLeast: 2 };
+
+/** The mark of a sum: the least certain of its parts. */
+export function combineMarks(...marks: Array<FigureMark | undefined>): FigureMark {
+  return marks.reduce<FigureMark>(
+    (least, mark) => (mark && MARK_ORDER[mark] > MARK_ORDER[least] ? mark : least),
+    "exact"
+  );
+}
+
+/**
+ * A figure's text with its mark: "≈7.80 km", "7.80+ km", "4.5+ hr". The "+"
+ * follows the number; a time written in parts ("1h 12m", "5:30") takes it at
+ * its end ("1h 12m+").
+ */
+export function markFigure(text: string, mark: FigureMark | undefined, plusAt: "number" | "end" = "number"): string {
+  if (mark === "estimated") return `≈${text}`;
+  if (mark !== "atLeast") return text;
+  if (plusAt === "end") return `${text}+`;
+  return text.replace(/(\d)(?!.*\d)/, "$1+");
+}
+
+/** A figure in words, for text a model reads: "about 7.8 km", "at least 7.8 km". */
+export function figureInWords(text: string, mark: FigureMark | undefined): string {
+  return mark === "estimated" ? `about ${text}` : mark === "atLeast" ? `at least ${text}` : text;
+}
+
+/** What a screen states of a workout: each figure and how it is known. A figure that would be 0 is not stated. */
+export interface StatedFigures {
+  distanceMeters?: number;
+  durationSeconds?: number;
+  distanceMark: FigureMark;
+  durationMark: FigureMark;
+  /**
+   * The figure is short of a heart-rate step whose speed waits for the
+   * account's thresholds (its mark says `atLeast`): a screen still reading
+   * them shows it as loading rather than as a figure that is about to change.
+   */
+  distanceAwaits: boolean;
+  durationAwaits: boolean;
 }
 
 type FiguredWorkout = Pick<PlanWorkoutEntryInput, "sport" | "steps" | "distance_km">;
 type FigureOptions = { coros?: WorkoutFigures; context?: WorkoutEditorContext };
 
-function wholeFigures(workout: FiguredWorkout, steps: StepFigures, options: FigureOptions): WorkoutFigures {
-  const coros = options.coros ?? {};
-  const known = positive(coros.distanceMeters) !== undefined && positive(coros.durationSeconds) !== undefined;
-  const estimated = known ? {} : estimateWorkoutFigures(workout, options.context);
-  return sessionFigures(steps, {
-    distanceMeters: positive(coros.distanceMeters) ?? estimated.distanceMeters,
-    durationSeconds: positive(coros.durationSeconds) ?? estimated.durationSeconds
-  });
-}
-
-/** What a screen states of a workout: each figure the whole session's where the rule knows it, else the steps' sum in that unit. */
-export interface StatedFigures {
-  distanceMeters?: number;
-  durationSeconds?: number;
-  /** `distanceMeters` is the whole session's; otherwise only its distance steps', to be named as such. */
-  distanceWhole: boolean;
-  /** `durationSeconds` is the whole session's; otherwise only its timed steps'. */
-  durationWhole: boolean;
-}
-
-/** `workoutFigures`, with the partial sums a screen names as such where the rule has no whole figure. */
+/**
+ * The rule for a workout held as steps: COROS's stored estimate figure by
+ * figure (`coros`, from `corosProgramFigures`), else COROS's arithmetic done
+ * here; each figure marked by how its steps let it be known.
+ */
 export function statedWorkoutFigures(
   workout: FiguredWorkout,
   options: FigureOptions = {}
 ): StatedFigures {
-  const steps = stepFigures(workout.steps);
-  const whole = wholeFigures(workout, steps, options);
-  const distanceMeters = whole.distanceMeters ?? steps.distanceMeters;
-  const durationSeconds = whole.durationSeconds ?? steps.durationSeconds;
+  const coros = options.coros ?? {};
+  const steps = planFigureSteps(workout, options.context);
+  if (!steps.length) {
+    const distanceKm = workout.distance_km ?? 0;
+    return unmarked({
+      distanceMeters: positive(coros.distanceMeters) ?? (distanceKm > 0 ? distanceKm * 1000 : undefined),
+      durationSeconds: positive(coros.durationSeconds)
+    });
+  }
+  return statedFromTally(tally(steps), coros, workout.sport ?? "run");
+}
+
+/**
+ * A COROS program's figures as a screen states them: COROS's stored
+ * estimate (else `known`, what a caller already holds of it), else what its
+ * steps add up to; marked by its steps either way. COROS's own speeds are
+ * not worked out here, so a program COROS left without a figure is stated
+ * only as at least its steps in that unit.
+ */
+export function corosProgramStated(
+  program: Record<string, unknown> | undefined,
+  known: WorkoutFigures = {}
+): StatedFigures {
+  const stored = corosProgramFigures(program);
+  const coros = {
+    distanceMeters: stored.distanceMeters ?? positive(known.distanceMeters),
+    durationSeconds: stored.durationSeconds ?? positive(known.durationSeconds)
+  };
+  const steps = corosFigureSteps(program);
+  if (!steps.length) return unmarked(coros);
+  return statedFromTally(tally(steps), coros, SPORT_BY_COROS_TYPE[Number(program?.sportType)] ?? "run");
+}
+
+function unmarked(figures: WorkoutFigures): StatedFigures {
+  return {
+    ...(positive(figures.distanceMeters) !== undefined ? { distanceMeters: figures.distanceMeters } : {}),
+    ...(positive(figures.durationSeconds) !== undefined ? { durationSeconds: figures.durationSeconds } : {}),
+    distanceMark: "exact",
+    durationMark: "exact",
+    distanceAwaits: false,
+    durationAwaits: false
+  };
+}
+
+/** One step as the figures read it, its repeat's passes folded into `amount`. */
+interface FigureStep {
+  unit: "time" | "distance" | "none";
+  /** Seconds or metres, every pass of it. */
+  amount: number;
+  rest: boolean;
+  /** COROS turns its intensity into a speed (Run and Trail Run only). */
+  converts: boolean;
+  /** That speed, metres a second; undefined where it waits for the account. */
+  speed?: number;
+}
+
+/** What steps add up to, and why a figure is short or estimated. */
+interface StepTally {
+  meters: number;
+  seconds: number;
+  distanceEstimated: boolean;
+  durationEstimated: boolean;
+  /** A step adds nothing it has (an untargeted warm-up's distance). */
+  distanceShort: boolean;
+  durationShort: boolean;
+  /** A step with no length at all — open, reps, load — leaves the time short. */
+  durationUnitless: boolean;
+  distanceAwaits: boolean;
+  durationAwaits: boolean;
+}
+
+function tally(steps: readonly FigureStep[]): StepTally {
+  const sum: StepTally = {
+    meters: 0,
+    seconds: 0,
+    distanceEstimated: false,
+    durationEstimated: false,
+    distanceShort: false,
+    durationShort: false,
+    durationUnitless: false,
+    distanceAwaits: false,
+    durationAwaits: false
+  };
+  for (const step of steps) {
+    if (step.unit === "none") {
+      if (!step.rest) {
+        sum.distanceShort = true;
+        sum.durationUnitless = true;
+      }
+      continue;
+    }
+    const timed = step.unit === "time";
+    if (timed) sum.seconds += step.amount;
+    else sum.meters += step.amount;
+    // The other unit goes through the step's speed, or a rest's standing still, or nothing.
+    if (step.converts) {
+      if (timed) sum.distanceEstimated = true;
+      else sum.durationEstimated = true;
+      if (step.speed === undefined) {
+        if (timed) sum.distanceAwaits = true;
+        else sum.durationAwaits = true;
+      } else if (timed) {
+        sum.meters += step.amount * step.speed;
+      } else if (step.speed > 0) {
+        sum.seconds += step.amount / step.speed;
+      }
+    } else if (!step.rest) {
+      if (timed) sum.distanceShort = true;
+      else sum.durationShort = true;
+    }
+  }
+  return sum;
+}
+
+/**
+ * A tally's figures, COROS's stored ones first. COROS converted every step
+ * its figure counts, so a step waiting here for the account is an estimate
+ * there; and on a strength session COROS gives a set of reps or an open hold
+ * time of its own, an estimate, where this adds none.
+ */
+function statedFromTally(sum: StepTally, coros: WorkoutFigures, sport: string): StatedFigures {
+  const corosDistance = positive(coros.distanceMeters);
+  const corosDuration = positive(coros.durationSeconds);
+  const setsTimed = STRENGTH_STYLE_SPORTS.has(sport);
+  const distanceMark: FigureMark = sum.distanceShort
+    ? "atLeast"
+    : !corosDistance && sum.distanceAwaits
+      ? "atLeast"
+      : sum.distanceEstimated ? "estimated" : "exact";
+  const durationMark: FigureMark = sum.durationShort || (sum.durationUnitless && !(corosDuration && setsTimed))
+    ? "atLeast"
+    : !corosDuration && sum.durationAwaits
+      ? "atLeast"
+      : sum.durationEstimated || sum.durationUnitless ? "estimated" : "exact";
+  const distanceMeters = corosDistance ?? positive(Math.round(sum.meters * 100) / 100);
+  const durationSeconds = corosDuration ?? positive(Math.round(sum.seconds));
   return {
     ...(distanceMeters !== undefined ? { distanceMeters } : {}),
     ...(durationSeconds !== undefined ? { durationSeconds } : {}),
-    distanceWhole: whole.distanceMeters !== undefined,
-    durationWhole: whole.durationSeconds !== undefined
+    distanceMark,
+    durationMark,
+    distanceAwaits: !corosDistance && sum.distanceAwaits,
+    durationAwaits: !corosDuration && sum.durationAwaits
   };
+}
+
+/** A plan or Coach workout's steps as the figures read them, each driven at COROS's speed for it. */
+function planFigureSteps(workout: FiguredWorkout, context?: WorkoutEditorContext): FigureStep[] {
+  const converting = CONVERTING_SPORTS.has(workout.sport ?? "run");
+  return leafSteps(workout.steps).map(({ step, repeat }) => {
+    const type = targetOf(step);
+    const unit = type === "time" ? "time" : type === "distance" ? "distance" : "none";
+    const amount = unit === "time"
+      ? (step.target_duration_seconds ?? 0) * repeat
+      : unit === "distance" ? (step.target_distance_meters ?? 0) * repeat : 0;
+    const converts = converting && drivesAtSpeed(step);
+    return {
+      unit,
+      amount,
+      rest: step.kind === "rest",
+      converts,
+      ...(converts ? { speed: stepSpeed(step, context) } : {})
+    };
+  });
+}
+
+/** COROS's sport codes, for the figures of a program read straight off COROS. */
+const SPORT_BY_COROS_TYPE: Record<number, string> = {
+  1: "run", 2: "bike", 3: "swim", 4: "strength", 5: "trailRun", 6: "indoorClimb", 7: "bouldering", 8: "xcSki", 9: "hyrox"
+};
+const STRENGTH_STYLE_SPORTS = new Set(["strength", "hyrox"]);
+/** COROS intensity codes it turns into a speed: heart rate, pace, effort pace. */
+const COROS_SPEED_INTENSITY_TYPES = new Set([2, 3, 8]);
+
+/**
+ * A COROS program's steps as the figures read them: `targetType` 2 is time,
+ * 5 distance in centimetres, anything else (1 open, 3 reps, 6 load…) no
+ * length; `exerciseType` 4 is a rest; a group row's `sets` is its repeat
+ * count, its steps naming it in `groupId`. No speed: COROS's own figure is
+ * the one stated wherever it has one.
+ */
+function corosFigureSteps(program: Record<string, unknown> | undefined): FigureStep[] {
+  const exercises = (Array.isArray(program?.exercises) ? program.exercises : []).filter(
+    (item): item is Record<string, unknown> => Boolean(item) && typeof item === "object"
+  );
+  const repeats = new Map<string, number>();
+  for (const exercise of exercises) {
+    if (exercise.isGroup) repeats.set(String(exercise.id ?? ""), Math.max(1, Number(exercise.sets) || 1));
+  }
+  const converting = CONVERTING_SPORTS.has(SPORT_BY_COROS_TYPE[Number(program?.sportType)] ?? "");
+  return exercises
+    .filter((exercise) => !exercise.isGroup)
+    .map((exercise) => {
+      const targetType = Number(exercise.targetType);
+      const value = Math.max(0, Number(exercise.targetValue) || 0);
+      const passes = Math.max(1, Number(exercise.sets) || 1) * (repeats.get(String(exercise.groupId ?? "")) ?? 1);
+      const unit = targetType === 2 ? "time" : targetType === 5 ? "distance" : "none";
+      return {
+        unit,
+        amount: unit === "time" ? value * passes : unit === "distance" ? (value / 100) * passes : 0,
+        rest: Number(exercise.exerciseType) === 4,
+        converts: converting && COROS_SPEED_INTENSITY_TYPES.has(Number(exercise.intensityType))
+      };
+    });
 }
 
 /*
@@ -194,41 +387,32 @@ export function statedWorkoutFigures(
  */
 const CONVERTING_SPORTS = new Set(["run", "trailRun"]);
 
-/** COROS's whole-session figures for a workout nobody has saved, as `calculate` would answer. */
+/**
+ * COROS's whole-session figures for a workout nobody has saved, as `calculate`
+ * would answer: a figure short of a step whose speed waits for the account is
+ * left out, as one that comes to 0 is.
+ */
 export function estimateWorkoutFigures(
   workout: FiguredWorkout,
   context?: WorkoutEditorContext
 ): WorkoutFigures {
-  const sport = workout.sport ?? "run";
   if ((workout.distance_km ?? 0) > 0 && !workout.steps?.length) {
     return { distanceMeters: workout.distance_km! * 1000 };
   }
-  const leaves = leafSteps(workout.steps);
-  if (!leaves.length) return {};
-  const converts = CONVERTING_SPORTS.has(sport);
-  let meters: number | undefined = 0;
-  let seconds: number | undefined = 0;
-  for (const { step, repeat } of leaves) {
-    if (meters === undefined && seconds === undefined) return {};
-    const type = targetOf(step);
-    const speed = converts ? stepSpeed(step, context) : 0;
-    if (type === "time") {
-      const stepSeconds = (step.target_duration_seconds ?? 0) * repeat;
-      if (seconds !== undefined) seconds += stepSeconds;
-      if (meters !== undefined) meters = speed === undefined ? undefined : meters + stepSeconds * speed;
-    } else if (type === "distance") {
-      const stepMeters = (step.target_distance_meters ?? 0) * repeat;
-      if (meters !== undefined) meters += stepMeters;
-      if (seconds !== undefined) seconds = speed === undefined ? undefined : seconds + (speed > 0 ? stepMeters / speed : 0);
-    } else if (type !== "open") {
-      // Reps, load, a recovery to a heart rate: no length COROS's arithmetic is known for.
-      return {};
-    }
-  }
+  const steps = planFigureSteps(workout, context);
+  if (!steps.length) return {};
+  const sum = tally(steps);
   return {
-    ...(meters ? { distanceMeters: Math.round(meters * 100) / 100 } : {}),
-    ...(seconds ? { durationSeconds: Math.round(seconds) } : {})
+    ...(sum.meters > 0 && !sum.distanceAwaits ? { distanceMeters: Math.round(sum.meters * 100) / 100 } : {}),
+    ...(sum.seconds > 0 && !sum.durationAwaits ? { durationSeconds: Math.round(sum.seconds) } : {})
   };
+}
+
+/** A step whose intensity COROS turns into a speed, on a sport where it does. */
+function drivesAtSpeed(step: RunWorkoutCreateStep): boolean {
+  return step.intensity
+    ? SPEED_INTENSITIES.has(step.intensity.type)
+    : COROS_SPEED_INTENSITY_TYPES.has(Number(step.intensity_type ?? 0));
 }
 
 /** The intensities COROS turns into a speed; anything else is not handed to the encoder at all. */

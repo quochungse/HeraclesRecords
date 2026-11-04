@@ -46,6 +46,7 @@ import {
   sportMixOf,
   weekStageOf
 } from "./trainingPlanDomain";
+import { figureInWords } from "./workoutFigures";
 import { formatDistanceValue } from "./unitSystem.js";
 import type {
   CorosMcpTool,
@@ -564,13 +565,14 @@ function sessionLine(
 function volume(entry: TrainingPlanEntry, unitSystem: UnitSystem): string | undefined {
   const metrics = planEntryMetrics(entry, lastReadWorkoutEditorContext());
   const parts: string[] = [];
-  // A sum over some of the steps is said as one, never as the session's.
+  // The whole session's, in words for how each is known: "about" worked out
+  // from an intensity, "at least" short of a step nothing works out.
   if (metrics.durationSeconds) {
-    parts.push(`${Math.round(metrics.durationSeconds / 60)} min${metrics.durationWhole ? "" : " of timed steps"}`);
+    parts.push(figureInWords(`${Math.round(metrics.durationSeconds / 60)} min`, metrics.durationMark));
   }
   if (metrics.distanceMeters) {
     const distance = formatDistanceValue(metrics.distanceMeters, unitSystem, { swim: entry.workout.sport === "swim" });
-    parts.push(metrics.distanceWhole ? distance : `${distance} of distance steps`);
+    parts.push(figureInWords(distance, metrics.distanceMark));
   }
   if (!parts.length && metrics.strengthSets) parts.push(`${metrics.strengthSets} sets`);
   return parts.length ? parts.join(" / ") : undefined;

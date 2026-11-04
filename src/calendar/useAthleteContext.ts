@@ -24,9 +24,26 @@ export function useAthleteContext(
   api: HeraclesRecordsApi | undefined = typeof window === "undefined" ? undefined : window.heraclesRecords,
   unitSystem: UnitSystem = "metric"
 ): WorkoutEditorContext | undefined {
+  return useAthleteContextRead(api, unitSystem).context;
+}
+
+/**
+ * `useAthleteContext`, and whether its read is still out: a figure waiting
+ * for the thresholds (`StatedFigures.distanceAwaits`) is drawn as loading
+ * while it is, and as only at least what it adds up to once it has answered
+ * without them.
+ */
+export function useAthleteContextRead(
+  api: HeraclesRecordsApi | undefined = typeof window === "undefined" ? undefined : window.heraclesRecords,
+  unitSystem: UnitSystem = "metric"
+): { context?: WorkoutEditorContext; pending: boolean } {
   const [context, setContext] = useState(() => answered.get(unitSystem));
+  const [pending, setPending] = useState(() => Boolean(api) && !answered.has(unitSystem));
   useEffect(() => {
-    if (!api) return;
+    if (!api) {
+      setPending(false);
+      return;
+    }
     let live = true;
     let entry = cached.get(unitSystem);
     if (!entry || Date.now() - entry.at > CONTEXT_TTL_MS) {
@@ -46,11 +63,13 @@ export function useAthleteContext(
       cached.set(unitSystem, entry);
     }
     void entry.promise.then((value) => {
-      if (live && value) setContext(value);
+      if (!live) return;
+      if (value) setContext(value);
+      setPending(false);
     });
     return () => {
       live = false;
     };
   }, [api, unitSystem]);
-  return context;
+  return { context, pending };
 }

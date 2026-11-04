@@ -272,7 +272,7 @@ const activity = (overrides) => ({
     100,
     "the plan's own distance, not the load: COROS's planned load ran a steady 1.6x under what runs scored"
   );
-  assert.deepEqual(pairs[0].completionBasis, { kind: "distance", done: 10000, planned: 10000 });
+  assert.deepEqual(pairs[0].completionBasis, { kind: "distance", done: 10000, planned: 10000, plannedMark: "exact" });
 }
 
 {
@@ -394,8 +394,7 @@ const activity = (overrides) => ({
   const longRun = scheduled({ idInPlan: "long", sportType: 1, trainingLoad: 200, rawProgram: { estimatedTime: 0, duration: 7320 } });
 
   const { pairs } = pairPlannedWithActual([gym], [], "metric");
-  assert.equal(pairs[0].targets.expectedSeconds, 2616, "a strength session has COROS's own time, where its steps have none");
-  assert.equal(pairs[0].targets.plannedSeconds, 2616);
+  assert.equal(pairs[0].targets.plannedSeconds, 2616, "a strength session has COROS's own time, where its steps have none");
 
   const stats = computeWeeklyStats([
     day("20261005", true, [easy], [activity({ sportType: 100, trainingLoad: 58, duration: 3300 }), activity({ activityId: "extra", sportType: 400, trainingLoad: 30, duration: 2400 })]),
@@ -410,8 +409,10 @@ const activity = (overrides) => ({
   assert.equal(stats.remainingLoad, 290, "what is still to come: days not gone, sessions not done — the missed gym day is neither");
   assert.equal(stats.plannedSeconds, 3277 + 2616 + 3540 + 7320, "a 0 is no estimate, so the duration stands in");
 
+  assert.equal(stats.plannedSecondsMark, "exact");
   const untimed = computeWeeklyStats([day("20261005", true, [easy, scheduled({ idInPlan: "x", sportType: 4 })], [])]);
-  assert.equal(untimed.plannedSeconds, undefined, "a total over some of the plan would read as all of it");
+  assert.equal(untimed.plannedSeconds, 3277, "the sessions that state a time");
+  assert.equal(untimed.plannedSecondsMark, "atLeast", "and one that does not leaves the week's at least that");
 }
 
 /* --- 9b2. COROS's own link -------------------------------------------------- */
@@ -440,9 +441,9 @@ const activity = (overrides) => ({
 /* --- 9c. the distance and time a card, the panel and completion state ----- */
 
 {
-  // A run of 10 km in kilometres and one timed float: its steps sum to 10 km
-  // and 3:00, and neither is a figure for the session. COROS's estimates are;
-  // without them, only a session in one unit throughout adds up to itself.
+  // A run of 10 km in kilometres and one timed float, none of it targeted:
+  // COROS's estimates first; without them, at least what the steps add up to,
+  // each figure short of the steps in the other unit.
   const step = (id, targetType, targetValue) => ({ id, exerciseType: 2, targetType, targetValue, sets: 1, sortNo: Number(id) });
   const mixed = (rawExtra = {}) => scheduled({
     sportType: 1,
@@ -450,12 +451,23 @@ const activity = (overrides) => ({
   });
   const target = (entry) => pairPlannedWithActual([entry], [], "metric").pairs[0].targets;
 
-  assert.equal(target(mixed()).plannedSeconds, undefined, "a float is not the session's length");
-  assert.equal(target(mixed()).distanceMeters, undefined, "nor are its distance steps the session's distance");
+  assert.deepEqual(
+    target(mixed()),
+    { distanceMeters: 10000, plannedSeconds: 180, distanceMark: "atLeast", durationMark: "atLeast" },
+    "a float adds no distance it has, and 10 km of untargeted steps no time: at least each"
+  );
   assert.equal(target(mixed({ estimatedTime: 4320 })).plannedSeconds, 4320, "COROS's estimate first");
   assert.equal(target(mixed({ distance: 1170800 })).distanceMeters, 11708, "COROS's distance counts the float too");
-  assert.equal(target(scheduled({ sportType: 1, ...timedProgram(2700) })).plannedSeconds, 2700, "every step timed adds up to the session");
-  assert.equal(target(scheduled({ sportType: 1, ...runProgram(10000) })).distanceMeters, 10000, "every step in distance adds up too");
+  assert.deepEqual(
+    target(scheduled({ sportType: 1, ...timedProgram(2700) })),
+    { distanceMeters: undefined, plannedSeconds: 2700, distanceMark: "atLeast", durationMark: "exact" },
+    "every step timed adds up to the session; its distance is at least 0, not stated"
+  );
+  assert.deepEqual(
+    target(scheduled({ sportType: 1, ...runProgram(10000) })),
+    { distanceMeters: 10000, plannedSeconds: undefined, distanceMark: "exact", durationMark: "atLeast" },
+    "every step in distance adds up too"
+  );
 
   // Completion by time reads the session's time, not its timed steps': a core
   // session of planks (6 timed minutes) that COROS gives 27 minutes, done in 31.
@@ -470,7 +482,7 @@ const activity = (overrides) => ({
   // Overview's row arrives without its program and states COROS's figures itself.
   assert.deepEqual(
     plannedSessionFigures(scheduled({ volume: "3 set(s)" }), { stepCount: 0, timedSteps: 0, distanceSteps: 0 }, { meters: 17080, seconds: 7080 }),
-    { distanceMeters: 17080, plannedSeconds: 7080, expectedSeconds: 7080 }
+    { distanceMeters: 17080, plannedSeconds: 7080, distanceMark: "exact", durationMark: "exact" }
   );
 }
 

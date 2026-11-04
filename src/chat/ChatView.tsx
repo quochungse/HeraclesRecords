@@ -112,7 +112,7 @@ import { McpSessionPrompt } from "./McpSessionPrompt";
 import { ComposerRefs, SportRefIcon, type ComposerRef } from "./ComposerRefs";
 import { clearComposerDraft, loadComposerDraft, saveComposerDraft } from "./composerDrafts";
 import { planRefPreview, refPlaceholder, scheduleRefPreview } from "./refPreview";
-import { useAthleteContext } from "../calendar/useAthleteContext";
+import { useAthleteContextRead } from "../calendar/useAthleteContext";
 import { ConversationAnalyses } from "./analyses/ConversationAnalyses";
 import { AnalysesModal } from "./analyses/AnalysesModal";
 import type { AnalysesModalTarget } from "./analyses/AnalysesModal";
@@ -1092,7 +1092,7 @@ export function ChatView({
 }: ChatViewProps) {
   useI18n();
   const { unitSystem } = useUnitSystem();
-  const athlete = useAthleteContext(api);
+  const { context: athlete, pending: athletePending } = useAthleteContextRead(api);
   const [authStatus, setAuthStatus] = useState<ChatAuthStatus | null>(null);
   const [chatSettings, setChatSettings] =
     useState<ChatSettings>(DEFAULT_CHAT_SETTINGS);
@@ -4849,7 +4849,7 @@ export function ChatView({
     })),
     ...pendingRefs.map((ref) => ({
       key: `p:${refKey(ref)}`,
-      preview: planRefPreview(ref, documentForDraft(ref.draftId), unitSystem, athlete),
+      preview: planRefPreview(ref, documentForDraft(ref.draftId), unitSystem, athlete, athletePending),
       onRemove: () => setPendingRefs((current) => current.filter((item) => refKey(item) !== refKey(ref)))
     }))
   ];
@@ -6243,7 +6243,7 @@ export function ChatView({
                         openerOf={refOpener}
                         sportOf={(ref) =>
                           ref.scope === "session"
-                            ? planRefPreview(ref, documentForDraft(ref.draftId), unitSystem, athlete).sport
+                            ? planRefPreview(ref, documentForDraft(ref.draftId), unitSystem, athlete, athletePending).sport
                             : undefined
                         }
                       />

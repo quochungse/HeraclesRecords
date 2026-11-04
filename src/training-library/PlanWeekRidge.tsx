@@ -22,10 +22,12 @@ import {
   RIDGE_CAPTIONS as CAPTIONS,
   RIDGE_UNITS as UNITS,
   formatRidgeValue as formatValue,
+  ridgeMark,
   ridgeMeasure,
   weekRidgeSegments,
   type PlanReaderWeek
 } from "./planReaderModel";
+import { markFigure } from "../../electron/workoutFigures";
 import { sportChipStyle } from "./sportTheme";
 import { workoutSportLabel } from "../training/workoutSport";
 import { t } from "../i18n/core";
@@ -74,7 +76,7 @@ export function PlanWeekRidge({ weeks, currentWeek, selectedWeek, onJump }: Plan
     >
       <div className="plan-ridge-caption">
         <span>{CAPTIONS[measure]}</span>
-        <b>{formatValue(peak, measure)}</b>
+        <b>{markFigure(formatValue(peak, measure), ridgeMark(weeks, measure))}</b>
         <small>{t("library.ridge.peak")}</small>
         {sports.length > 1 ? (
           <span className="plan-ridge-legend">
@@ -104,7 +106,7 @@ export function PlanWeekRidge({ weeks, currentWeek, selectedWeek, onJump }: Plan
               : "";
           const label =
             `Week ${index + 1}${week.stage ? `, ${week.stage}` : ""}: ` +
-            `${formatValue(value, measure)} ${unit}${breakdown}${current ? ", this week" : ""}`;
+            `${markFigure(formatValue(value, measure), ridgeMark([week], measure))} ${unit}${breakdown}${current ? ", this week" : ""}`;
           return (
             <button
               type="button"

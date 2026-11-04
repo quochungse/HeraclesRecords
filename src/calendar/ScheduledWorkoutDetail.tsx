@@ -38,6 +38,7 @@ import {
 } from "./scheduledStructure";
 import { WorkoutStructure } from "./WorkoutStructureView";
 import { plannedSessionFigures } from "./pairing";
+import { markFigure } from "../../electron/workoutFigures";
 import { plural, t } from "../i18n/core";
 
 interface ScheduledWorkoutDetailProps {
@@ -116,8 +117,11 @@ export function ScheduledWorkoutDetail({
   // strength session a load.
   const volume = isStrength
     ? formatUpcomingWorkoutVolumeDisplay(entry.volume, unitSystem)
-    : formatPlannedVolume({ distanceMeters: planned.distanceMeters }, unitSystem, sport === "swim", () =>
-        formatUpcomingWorkoutVolumeDisplay(entry.volume, unitSystem)
+    : formatPlannedVolume(
+        { distanceMeters: planned.distanceMeters, distanceMark: planned.distanceMark },
+        unitSystem,
+        sport === "swim",
+        () => formatUpcomingWorkoutVolumeDisplay(entry.volume, unitSystem)
       );
   const load = plannedLoad(entry, source);
   const stats: Array<{ icon: LucideIcon; label: string; value: string; note?: string }> = [];
@@ -136,7 +140,7 @@ export function ScheduledWorkoutDetail({
     stats.push({
       icon: Clock,
       label: t("workout.detail.estDuration"),
-      value: formatDurationSpan(planned.plannedSeconds)
+      value: markFigure(formatDurationSpan(planned.plannedSeconds), planned.durationMark, "end")
     });
   }
   const structureSummary = view.totals.stepCount > 0

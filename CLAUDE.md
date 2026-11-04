@@ -199,12 +199,18 @@ differs from what the COROS app shows — the week's load and range, and those f
 COROS's own arithmetic done here on the account's context (`estimateWorkoutFigures`, probed
 against `/training/program/calculate`: a pace band's middle, a heart-rate band's whole middle bpm
 through the account's thresholds; a step with no target, power or cadence, an open step and any
-step of a sport other than Run and Trail Run at 0, as COROS counts them), else the steps' sum only
-when every step is in that unit.
-The Calendar, the workout view's hero, the builder's footer, the plan reader (`planEntryMetrics`,
-context from `useAthleteContext`) and Coach's draft volume (`lastReadWorkoutEditorContext`) all
-go through it. A partial sum is named as one ("Distance steps", "Timed steps"), never as the
-session's.
+step of a sport other than Run and Trail Run at 0, as COROS counts them). **Each figure carries a
+`FigureMark`, from the steps whichever side gave the value:** written in the steps it is stated as
+it is, worked out from an intensity "≈7.80 km", short of a step counted at 0 that is not — an
+untargeted warm-up's distance, an open step, a swim length's time — "7.80+ km" (both: only "+").
+A rest stands still, so its 0 is exact; a figure that comes to 0 is not stated; on a strength
+session COROS's own time is "≈" (it times reps itself). A figure short of a heart-rate step waiting
+for the account's thresholds (`…Awaits`) shows as loading while they are read
+(`useAthleteContextRead`), as "+" once read without them. Sums take the least certain mark
+(`combineMarks`; a session with no time leaves a week's hours "+"). The Calendar
+(`corosProgramStated` over COROS's own steps), the workout view's hero, the builder's footer, the
+plan reader (`planEntryMetrics`) and Coach's text (`figureInWords`: "about", "at least") all go
+through it; `markFigure` draws the mark, `figureWords` says it for a title or a screen reader.
 
 **Loading is not empty.** An array that has not arrived reads like one that came back
 empty; each load states where it stands (`TrainingHubLoadStatus`, `initializing`,
