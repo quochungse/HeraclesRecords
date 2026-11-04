@@ -77,6 +77,7 @@ import {
   SPORT_CHART_WEEKS,
   type SessionTypeCount
 } from "./sportModel";
+import { markFigure } from "../../../electron/workoutFigures";
 
 const WINDOW_DAYS = 28;
 
@@ -480,7 +481,7 @@ function RunningSection({
   const distUnit = distanceUnit(unitSystem);
   // Worked out once a change, not once a render: the summary sweep renders
   // the section again with every few summaries it reads.
-  const { weeks, values, average, plannedDistance, totals, surfaces, longest, last } = useMemo(() => {
+  const { weeks, values, average, plannedDistance, plannedMark, totals, surfaces, longest, last } = useMemo(() => {
     const runWeeks = buildRunWeeks(runs, { weeks: SPORT_CHART_WEEKS, nowMs });
     const distances = runWeeks.map((week) => metersToDisplayDistance(week.distance, unitSystem));
     const planned = plannedThisWeek(upcomingWorkouts, activities, "run", new Date(nowMs));
@@ -489,6 +490,7 @@ function RunningSection({
       values: distances,
       average: previousWeeksAverage(distances),
       plannedDistance: metersToDisplayDistance(planned.km * 1000, unitSystem),
+      plannedMark: planned.mark,
       totals: summariseRuns(window),
       surfaces: runSurfaceBreakdown(window),
       ...longestAndLast(window, runs)
@@ -521,7 +523,7 @@ function RunningSection({
             note:
               plannedDistance > 0
                 ? t("overview.sport.plannedAvg", {
-                    planned: formatDecimal(plannedDistance, 1),
+                    planned: markFigure(formatDecimal(plannedDistance, 1), plannedMark),
                     avg: formatDecimal(average ?? 0, 1)
                   })
                 : t("overview.sport.average", { value: formatDecimal(average ?? 0, 1) })
@@ -562,7 +564,7 @@ function RunningSection({
               facts: [
                 { label: t("overview.sport.distance"), value: `${formatDecimal(values[index], 1)} ${distUnit}` },
                 ...(planned && planned > 0
-                  ? [{ label: t("overview.today.plannedTag"), value: `${formatDecimal(planned, 1)} ${distUnit}` }]
+                  ? [{ label: t("overview.today.plannedTag"), value: markFigure(`${formatDecimal(planned, 1)} ${distUnit}`, plannedMark) }]
                   : []),
                 ...weekFacts(week, t("overview.sport.runsLabel"))
               ]
@@ -900,14 +902,17 @@ function SwimmingSection({
   const { unitSystem, nowMs, upcomingWorkouts, activities, summaries, onOpenActivity, onOpenView } = context;
   const swimUnit = swimDistanceUnit(unitSystem);
   const inUnit = (meters: number) => metersToSwimDistance(meters, unitSystem);
-  const { weeks, values, average, plannedMeters, totals, longest, last } = useMemo(() => {
+  const { weeks, values, average, plannedMeters, plannedMark, totals, longest, last } = useMemo(() => {
     const swimWeeks = buildSwimWeeks(swims, { weeks: SPORT_CHART_WEEKS, nowMs });
     const distances = swimWeeks.map((week) => metersToSwimDistance(week.distance, unitSystem));
     return {
       weeks: swimWeeks,
       values: distances,
       average: previousWeeksAverage(distances),
-      plannedMeters: plannedThisWeek(upcomingWorkouts, activities, "swim", new Date(nowMs)).km * 1000,
+      ...(() => {
+        const planned = plannedThisWeek(upcomingWorkouts, activities, "swim", new Date(nowMs));
+        return { plannedMeters: planned.km * 1000, plannedMark: planned.mark };
+      })(),
       totals: summariseSwims(window),
       ...longestAndLast(window, swims)
     };
@@ -951,7 +956,7 @@ function SwimmingSection({
             unit: swimUnit,
             note:
               planned > 0
-                ? t("overview.sport.plannedAvg", { planned: whole(planned), avg: whole(average ?? 0) })
+                ? t("overview.sport.plannedAvg", { planned: markFigure(whole(planned), plannedMark), avg: whole(average ?? 0) })
                 : t("overview.sport.average", { value: whole(average ?? 0) })
           },
           {
@@ -995,7 +1000,7 @@ function SwimmingSection({
               facts: [
                 { label: t("overview.sport.distance"), value: `${whole(values[index])} ${swimUnit}` },
                 ...(plannedHere && plannedHere > 0
-                  ? [{ label: t("overview.today.plannedTag"), value: `${whole(plannedHere)} ${swimUnit}` }]
+                  ? [{ label: t("overview.today.plannedTag"), value: markFigure(`${whole(plannedHere)} ${swimUnit}`, plannedMark) }]
                   : []),
                 ...weekFacts(week, t("swim.swims"))
               ]

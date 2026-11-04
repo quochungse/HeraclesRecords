@@ -3,7 +3,8 @@ import { CalendarPlus, Eye, Library, LoaderCircle, RefreshCw, Search, X } from "
 import { useEffect, useMemo, useState } from "react";
 import type { TrainingHubLibraryWorkout } from "../../electron/types";
 import type { HeraclesRecordsApi } from "../heraclesrecords-api";
-import { formatHappenDayLabel, getLocalHappenDayKey } from "../training/formatters";
+import { formatHappenDayLabel, formatMarkedVolume, getLocalHappenDayKey } from "../training/formatters";
+import { useUnitSystem } from "../units/UnitSystemProvider";
 import { scheduledWorkoutSport, workoutSportLabel } from "../training/workoutSport";
 import { refreshWorkoutExerciseCatalogs } from "./useWorkoutExerciseCatalog";
 import { t } from "../i18n/core";
@@ -41,6 +42,7 @@ function inputDateToKey(value: string): string {
 }
 
 export function WorkoutLibraryModal({ api, onClose, onView, onScheduled, onError, covered = false }: WorkoutLibraryModalProps) {
+  const { unitSystem } = useUnitSystem();
   const reducedMotion = useReducedMotion();
   const today = getLocalHappenDayKey();
   const [items, setItems] = useState<TrainingHubLibraryWorkout[] | null>(null);
@@ -143,7 +145,7 @@ export function WorkoutLibraryModal({ api, onClose, onView, onScheduled, onError
               const supported = Boolean(sport);
               return <article key={item.id} className={`workout-library-row ${selected === item.id ? "is-selected" : ""}`}>
                 <button type="button" className="workout-library-select" aria-pressed={selected === item.id} onClick={() => setSelected(item.id)}>
-                  <span><strong>{item.name}</strong><small>{[item.volume, item.trainingLoad !== undefined ? t("units.trainingLoadShort", { value: Math.round(item.trainingLoad) }) : null].filter(Boolean).join(" · ") || t("workout.libraryModal.noTotals")}</small></span>
+                  <span><strong>{item.name}</strong><small>{[formatMarkedVolume(item.volume, item.distanceMark, unitSystem), item.trainingLoad !== undefined ? t("units.trainingLoadShort", { value: Math.round(item.trainingLoad) }) : null].filter(Boolean).join(" · ") || t("workout.libraryModal.noTotals")}</small></span>
                   <span className={`workout-library-sport ${supported ? "is-supported" : ""}`}>{sport ? workoutSportLabel(sport) : t("workout.libraryModal.viewOnly")}</span>
                 </button>
                 {supported ? <button type="button" className="ghost-button workout-library-edit" onClick={() => onView(item.id)}><Eye size={14} aria-hidden="true" /> {t("workout.libraryModal.view")}</button> : <span className="workout-library-readonly">{t("workout.libraryModal.noPreview")}</span>}

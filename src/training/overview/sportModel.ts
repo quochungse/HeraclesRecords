@@ -14,6 +14,7 @@ import {
 } from "../trainingBenefit";
 import { scheduledSportFamily, type SportFamily } from "../workoutSport";
 import { pairTodayPlan } from "./comingUpModel";
+import { combineMarks, sessionSumMarks, type FigureMark } from "../../../electron/workoutFigures";
 
 /*
  * What Overview's per-sport sections share: the window they cover, the weeks
@@ -95,7 +96,7 @@ export function plannedThisWeek(
   activities: readonly TrainingHubActivity[],
   family: SportFamily,
   now = new Date()
-): { count: number; km: number } {
+): { count: number; km: number; mark: FigureMark } {
   const today = getLocalHappenDayKey(now);
   const sunday = new Date(now);
   sunday.setDate(now.getDate() + ((7 - now.getDay()) % 7));
@@ -111,13 +112,15 @@ export function plannedThisWeek(
   ];
   return {
     count: open.length,
+    // As certain as its least certain session ("+" where one's distance is only at least).
+    mark: combineMarks(...open.map((workout) => sessionSumMarks(workout).distance)),
     // A structured session's volume is a set count, so its own distance first.
     km: open.reduce(
       (sum, workout) =>
         sum +
         (workout.distanceMeters !== undefined
           ? workout.distanceMeters / 1000
-          : (parseUpcomingWorkoutDistanceKm(workout.volume) ?? 0)),
+          : (parseUpcomingWorkoutDistanceKm(workout.volume) ?? (workout.hiddenDistanceMeters ?? 0) / 1000)),
       0
     )
   };

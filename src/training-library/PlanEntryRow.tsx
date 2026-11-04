@@ -10,6 +10,7 @@
 import { ChevronRight } from "lucide-react";
 import type { UnitSystem } from "../../electron/types";
 import { formatDistanceValue } from "../units/units";
+import { markFigure } from "../../electron/workoutFigures";
 import {
   formatPlannedDuration,
   statusLabel,
@@ -32,13 +33,13 @@ interface PlanEntryRowProps {
  * would be this screen inventing a target.
  */
 export function plannedFigures(entry: PlanEntryFacts, unitSystem: UnitSystem): string[] {
-  /* Only a duration that is the whole session: a sum of the timed steps
-     beside a distance reads as the session's length and is not. */
-  const duration = entry.durationComplete
-    ? formatPlannedDuration(entry.durationSeconds)
+  /* The whole session's, marked by how it is known ("≈1:05", "7.8+ km"); a
+     figure still waiting for the account's thresholds is not drawn yet. */
+  const duration = entry.durationSeconds && !entry.durationPending
+    ? markFigure(formatPlannedDuration(entry.durationSeconds) ?? "", entry.durationMark, "end")
     : null;
-  const distance = entry.distanceMeters
-    ? formatDistanceValue(entry.distanceMeters, unitSystem, { digits: 1 })
+  const distance = entry.distanceMeters && !entry.distancePending
+    ? markFigure(formatDistanceValue(entry.distanceMeters, unitSystem, { digits: 1 }), entry.distanceMark)
     : null;
   return [
     duration,

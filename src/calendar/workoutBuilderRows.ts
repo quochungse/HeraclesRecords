@@ -854,7 +854,7 @@ export function builderRowSummary(
  * The footer's time and distance: what the workout view states of the same
  * steps (`statedWorkoutFigures`) — COROS's arithmetic on the account's
  * context, which counts a timed warm-up into the distance and the distance
- * steps into the time, else a step sum the footer names as only that.
+ * steps into the time — each with the mark it is drawn with.
  *
  * Strength keeps its own clock — the sets of each timed movement and the rest
  * between them — because COROS's arithmetic has no speed for a set to run at
@@ -868,6 +868,8 @@ export function builderSessionFigures(
 ): StatedFigures {
   if (sport === "strength") {
     let seconds = 0;
+    // A rep row has no time to add: the sum is then only at least the timed rows'.
+    let everyRowTimed = true;
     const addRow = (row: BuilderRow, multiplier = 1) => {
       if (row.locked) return;
       if (row.kind === "intervals") {
@@ -875,7 +877,10 @@ export function builderSessionFigures(
         for (const child of row.children ?? []) addRow(child, multiplier * repeats);
         return;
       }
-      if (row.targetType !== "time") return;
+      if (row.targetType !== "time") {
+        everyRowTimed = false;
+        return;
+      }
       const value = Number(row.targetValue) || 0;
       // Strength time targets are per set, in seconds, with rest between.
       const sets = row.kind === "training" ? Math.max(1, Number(row.sets) || 1) : 1;
@@ -883,14 +888,20 @@ export function builderSessionFigures(
       seconds += multiplier * (sets * value + Math.max(0, sets - 1) * restSec);
     };
     for (const row of rows) addRow(row);
-    return { ...(seconds > 0 ? { durationSeconds: seconds } : {}), durationWhole: true, distanceWhole: false };
+    return {
+      ...(seconds > 0 ? { durationSeconds: seconds } : {}),
+      durationMark: everyRowTimed ? "exact" : "atLeast",
+      distanceMark: "exact",
+      durationAwaits: false,
+      distanceAwaits: false
+    };
   }
   try {
     const draft = builderRowsToEditorDraft(rows, { sport, name: "", description: "" }, unitSystem);
     return statedWorkoutFigures(editorDraftToPlanWorkoutInput(draft, { key: "builder", name: "", sport }), { context });
   } catch {
     // A row mid-edit the draft cannot hold yet: nothing to state until it can.
-    return { distanceWhole: false, durationWhole: false };
+    return { distanceMark: "exact", durationMark: "exact", distanceAwaits: false, durationAwaits: false };
   }
 }
 

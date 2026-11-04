@@ -1,6 +1,6 @@
 import type { CoachStyle } from "./coachStyles";
 import type { ActivityReading } from "./activityReading";
-import type { WorkoutFigures } from "./workoutFigures";
+import type { FigureMark, WorkoutFigures } from "./workoutFigures";
 
 /** User-selected measurement system for Heracles Records presentation and writes. */
 export type UnitSystem = "metric" | "imperial";
@@ -1141,6 +1141,16 @@ export interface TrainingHubUpcomingWorkout {
    * structured session, whose `volume` reads as a set count instead.
    */
   distanceMeters?: number;
+  /**
+   * How the distance (and `volume`, when it is one) and the time are known,
+   * off COROS's own steps (`corosProgramStated`): "≈" worked out, "+" only at
+   * least. Absent where the program carries no steps to say.
+   */
+  distanceMark?: FigureMark;
+  durationMark?: FigureMark;
+  /** A figure hidden as mostly short (absent above): what it does state, which a sum counts and marks "+". */
+  hiddenDistanceMeters?: number;
+  hiddenDurationSeconds?: number;
   sportType?: number;
   sortNo?: number;
   /** The session's description (the program's `overview`), absent when it has none. */
@@ -4007,6 +4017,9 @@ export interface TrainingHubLibraryWorkout {
   exerciseCount?: number;
   setCount?: number;
   createTimestamp?: number;
+  /** How `volume` (a distance) and `durationSeconds` are known (`corosProgramStated`). */
+  distanceMark?: FigureMark;
+  durationMark?: FigureMark;
 }
 
 export interface WorkoutExerciseOption {

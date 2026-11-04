@@ -20,6 +20,7 @@ import { sportColorCategory, type SportColorCategory } from "../training/sportCo
 import { isSwimSportType } from "../training/sportTypes";
 import { activityWorkoutSport } from "../training/askCoachAbout";
 import { sportTheme } from "../training-library/sportTheme";
+import { markFigure } from "../../electron/workoutFigures";
 import {
   CALENDAR_DRAG_MIME,
   createCalendarDragPayload,
@@ -94,21 +95,22 @@ function activityAmounts(activity: TrainingHubActivity, unitSystem: UnitSystem, 
 }
 
 /**
- * What the plan asked for: the steps' distance and COROS's own estimate of the
- * time, so a strength session says how long it runs rather than nothing.
- * COROS's `volume` string stands in only when both are missing — it reports a
+ * What the plan asked for (`plannedSessionFigures`), each figure marked by how
+ * it is known: "≈" worked out, "+" only at least. COROS's `volume` string
+ * stands in only when both are missing — it reports a
  * step count whenever a program has more than one step, so a 13 km long run
  * built as warm-up, main and cool-down reads "3 set(s)".
  */
 function plannedAmounts(pair: PlannedActualPair, unitSystem: UnitSystem, swim: boolean): string[] {
-  const { distanceMeters, plannedSeconds: seconds } = pair.targets;
+  const { distanceMeters, plannedSeconds: seconds, distanceMark, durationMark } = pair.targets;
+  const distance = cardDistance(distanceMeters, unitSystem, swim);
   const parts = [
-    cardDistance(distanceMeters, unitSystem, swim),
-    seconds ? formatDurationSpan(seconds) : undefined
+    distance ? markFigure(distance, distanceMark) : undefined,
+    seconds ? markFigure(formatDurationSpan(seconds), durationMark, "end") : undefined
   ].filter((part): part is string => Boolean(part));
-  if (!parts.length) {
-    const volume = formatUpcomingWorkoutVolumeDisplay(pair.scheduled.volume, unitSystem);
-    if (volume) parts.push(volume);
+  // No volume either: nothing to state, rather than the "--" the display formatter draws.
+  if (!parts.length && pair.scheduled.volume) {
+    parts.push(formatUpcomingWorkoutVolumeDisplay(pair.scheduled.volume, unitSystem));
   }
   return parts;
 }

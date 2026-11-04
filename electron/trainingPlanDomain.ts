@@ -12,7 +12,14 @@ import type {
 } from "./types";
 import { screenPlural, screenText } from "./screenText";
 import { COROS_NAME_MAX_BYTES, COROS_PLAN_DESCRIPTION_MAX_BYTES, corosUtf8Length } from "./corosTextLimits";
-import { corosProgramFigures, statedWorkoutFigures, type WorkoutFigures } from "./workoutFigures";
+import {
+  combineMarks,
+  corosProgramFigures,
+  sessionSumMarks,
+  statedWorkoutFigures,
+  type FigureMark,
+  type WorkoutFigures
+} from "./workoutFigures";
 
 export interface TrainingPlanValidationIssue {
   path: string;
@@ -25,6 +32,11 @@ export interface TrainingPlanWeekSummary {
   workouts: number;
   durationSeconds: number;
   distanceMeters: number;
+  /** How the week's sums are known (`sessionSumMarks`). */
+  durationMark: FigureMark;
+  distanceMark: FigureMark;
+  /** A session's figure waits for the account's thresholds (`StatedFigures`). */
+  awaits: boolean;
   trainingLoad: number;
 }
 
@@ -35,6 +47,9 @@ export interface TrainingPlanSummary {
   workouts: number;
   durationSeconds: number;
   distanceMeters: number;
+  durationMark: FigureMark;
+  distanceMark: FigureMark;
+  awaits: boolean;
   trainingLoad: number;
   strengthSets: number;
   sportDistribution: Partial<Record<WorkoutSport, number>>;
@@ -371,12 +386,10 @@ export function planEntryEstimate(entry: TrainingPlanEntry): WorkoutFigures {
 /**
  * What one planned session amounts to.
  *
- * Distance and time go through the one rule (`workoutFigures`): COROS's
- * stored estimate, else COROS's arithmetic on the athlete's `context`, else
- * the steps when every one is in that unit — `durationWhole`/`distanceWhole`
- * say which. Otherwise the figure is only what the steps in that unit add up
- * to, which a week's total may count and a session must not state as its own
- * length. Load and sets are the steps' own,
+ * Distance and time go through the one rule (`statedWorkoutFigures`):
+ * COROS's stored estimate, else COROS's arithmetic on the athlete's
+ * `context`, each with the mark a screen states it by. Load and sets are the
+ * steps' own,
  * else the entry's planned figures — a COROS program often carries a planned
  * load and no step structure, and a hand-built session the reverse.
  *
@@ -388,8 +401,13 @@ export function planEntryEstimate(entry: TrainingPlanEntry): WorkoutFigures {
 export function planEntryMetrics(entry: TrainingPlanEntry, context?: WorkoutEditorContext): {
   durationSeconds: number;
   distanceMeters: number;
-  durationWhole: boolean;
-  distanceWhole: boolean;
+  /** What a week's or a plan's sums count: the figure, or what a hidden one does state. */
+  sumDurationSeconds: number;
+  sumDistanceMeters: number;
+  durationMark: FigureMark;
+  distanceMark: FigureMark;
+  durationAwaits: boolean;
+  distanceAwaits: boolean;
   trainingLoad: number;
   strengthSets: number;
 } {
@@ -398,12 +416,17 @@ export function planEntryMetrics(entry: TrainingPlanEntry, context?: WorkoutEdit
   return {
     durationSeconds: stated.durationSeconds ?? 0,
     distanceMeters: stated.distanceMeters ?? 0,
-    durationWhole: stated.durationWhole,
-    distanceWhole: stated.distanceWhole,
+    sumDurationSeconds: stated.durationSeconds ?? stated.hiddenDurationSeconds ?? 0,
+    sumDistanceMeters: stated.distanceMeters ?? stated.hiddenDistanceMeters ?? 0,
+    durationMark: stated.durationMark,
+    distanceMark: stated.distanceMark,
+    durationAwaits: stated.durationAwaits,
+    distanceAwaits: stated.distanceAwaits,
     trainingLoad: calculated.trainingLoad || entry.plannedTrainingLoad || 0,
     strengthSets: calculated.strengthSets || entry.plannedStrengthSets || 0
   };
 }
+
 
 /**
  * What stops a plan being saved to COROS. A draft is saved whatever this says
@@ -480,26 +503,40 @@ export function summarizeTrainingPlan(
     workouts: 0,
     durationSeconds: 0,
     distanceMeters: 0,
+    durationMark: "exact",
+    distanceMark: "exact",
+    awaits: false,
     trainingLoad: 0
   }));
   const sportDistribution: Partial<Record<WorkoutSport, number>> = {};
   let durationSeconds = 0;
   let distanceMeters = 0;
+  let durationMark: FigureMark = "exact";
+  let distanceMark: FigureMark = "exact";
+  let awaits = false;
   let trainingLoad = 0;
   let strengthSets = 0;
 
   for (const entry of plan.entries) {
     const metrics = planEntryMetrics(entry, context);
     metrics.trainingLoad = entryLoad?.(entry) ?? metrics.trainingLoad;
-    durationSeconds += metrics.durationSeconds;
-    distanceMeters += metrics.distanceMeters;
+    const marks = sessionSumMarks(metrics);
+    const waits = metrics.durationAwaits || metrics.distanceAwaits;
+    durationSeconds += metrics.sumDurationSeconds;
+    distanceMeters += metrics.sumDistanceMeters;
+    durationMark = combineMarks(durationMark, marks.duration);
+    distanceMark = combineMarks(distanceMark, marks.distance);
+    awaits ||= waits;
     trainingLoad += metrics.trainingLoad;
     strengthSets += metrics.strengthSets;
     const week = weekly[entry.weekIndex];
     if (week) {
       week.workouts += 1;
-      week.durationSeconds += metrics.durationSeconds;
-      week.distanceMeters += metrics.distanceMeters;
+      week.durationSeconds += metrics.sumDurationSeconds;
+      week.distanceMeters += metrics.sumDistanceMeters;
+      week.durationMark = combineMarks(week.durationMark, marks.duration);
+      week.distanceMark = combineMarks(week.distanceMark, marks.distance);
+      week.awaits ||= waits;
       week.trainingLoad += metrics.trainingLoad;
     }
     const sport = entry.workout.sport ?? "run";
@@ -516,6 +553,9 @@ export function summarizeTrainingPlan(
     workouts: plan.entries.length,
     durationSeconds,
     distanceMeters,
+    durationMark,
+    distanceMark,
+    awaits,
     trainingLoad,
     strengthSets,
     sportDistribution,

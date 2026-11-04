@@ -24,7 +24,8 @@ import type {
   WorkoutSport
 } from "../../electron/types";
 import { editorDraftToPlanWorkoutInput, planWorkoutInputToEditorDraft } from "../../electron/planWorkoutEditor";
-import { statedWorkoutFigures, type StatedFigures, type WorkoutFigures } from "../../electron/workoutFigures";
+import { markFigure, statedWorkoutFigures, type FigureMark, type StatedFigures, type WorkoutFigures } from "../../electron/workoutFigures";
+import { figureWords } from "./figureWords";
 import type { HeraclesRecordsApi } from "../heraclesrecords-api";
 import { OptionGroup } from "../components/OptionGroup";
 import { remoteErrorMessage } from "../chat/remoteError";
@@ -101,7 +102,13 @@ const LOCAL_CONTEXT: WorkoutEditorContext = {
   climbSystems: {}
 };
 
-type ViewDocument = { draft: RunWorkoutEditorDraft; context: WorkoutEditorContext; estimate?: WorkoutFigures };
+type ViewDocument = {
+  draft: RunWorkoutEditorDraft;
+  context: WorkoutEditorContext;
+  /** The account's context is still being read: a heart-rate step's figure waits for it. */
+  contextPending?: boolean;
+  estimate?: WorkoutFigures;
+};
 type ViewState = { document?: ViewDocument; error?: string };
 
 export function WorkoutViewModal({ api, views, initialView, eyebrow, onClose }: WorkoutViewModalProps) {
@@ -129,13 +136,15 @@ export function WorkoutViewModal({ api, views, initialView, eyebrow, onClose }: 
     for (const [id, source] of JSON.parse(viewsKey) as [string, WorkoutViewSource][]) {
       if (source.kind === "proposed") {
         const draft = planWorkoutInputToEditorDraft(source.workout);
-        settle(id, { document: { draft, context: LOCAL_CONTEXT } });
+        settle(id, { document: { draft, context: LOCAL_CONTEXT, contextPending: true } });
         // The account's context also drives the hero's distance and time
-        // (`workoutFigures`): a heart-rate step goes as far as COROS's
+        // (`statedWorkoutFigures`): a heart-rate step goes as far as COROS's
         // arithmetic on the athlete's own thresholds says.
         void api.getWorkoutEditorContext(unitSystem).then((context) => {
           settle(id, { document: { draft, context } });
-        }).catch(() => undefined);
+        }).catch(() => {
+          settle(id, { document: { draft, context: LOCAL_CONTEXT } });
+        });
       } else {
         void api.getWorkoutForEdit(source, unitSystem).then((document) => {
           settle(id, { document });
@@ -273,6 +282,7 @@ function WorkoutViewCell({ api, state, shown }: { api: HeraclesRecordsApi; state
         <WorkoutReadOnlyBody
           draft={state.document.draft}
           context={state.document.context}
+          contextPending={state.document.contextPending}
           exercisesById={exercisesById}
           estimate={state.document.estimate}
         />
@@ -292,7 +302,7 @@ function WorkoutViewCell({ api, state, shown }: { api: HeraclesRecordsApi; state
 /**
  * The hero's distance and time (`statedWorkoutFigures`), off the draft as the
  * plan input it saves as. A draft that will not convert — a field an older
- * build left out — still states its step sums, named as only that, rather
+ * build left out — still states its step sums, as only at least that, rather
  * than taking the view down with it.
  */
 function heroFigures(
@@ -307,7 +317,7 @@ function heroFigures(
       { coros: estimate, context }
     );
   } catch {
-    return { ...totals, distanceWhole: false, durationWhole: false };
+    return { ...totals, distanceMark: "atLeast", durationMark: "atLeast", distanceAwaits: false, durationAwaits: false };
   }
 }
 
@@ -325,7 +335,7 @@ function heroFigures(
  * So this draws the same view the day drawer draws for a scheduled workout,
  * off the same `ScheduledStructureView` and through the same renderer. Every
  * figure is computed from the draft rather than asked of COROS — the
- * session's distance and time by COROS's own arithmetic (`workoutFigures`),
+ * session's distance and time by COROS's own arithmetic (`statedWorkoutFigures`),
  * unless the caller holds COROS's stored estimate.
  *
  * **Exported, because the Training Library reads workouts too.** Its detail
@@ -338,6 +348,7 @@ function heroFigures(
 export function WorkoutReadOnlyBody({
   draft,
   context,
+  contextPending = false,
   exercisesById,
   title,
   heroAside,
@@ -348,6 +359,11 @@ export function WorkoutReadOnlyBody({
 }: {
   draft: RunWorkoutEditorDraft;
   context: WorkoutEditorContext;
+  /**
+   * `context` stands in while the account's is read: a figure waiting for its
+   * thresholds shows as loading rather than as one about to change.
+   */
+  contextPending?: boolean;
   exercisesById: ReadonlyMap<string, WorkoutExerciseOption>;
   /**
    * The workout's name, for a surface that has no title bar of its own. Given
@@ -375,7 +391,7 @@ export function WorkoutReadOnlyBody({
   /**
    * COROS's stored estimate of the whole session (`corosProgramFigures`).
    * Without one the hero does COROS's arithmetic on the account's `context`
-   * (`workoutFigures`), and names a partial sum as one where it cannot.
+   * (`statedWorkoutFigures`); either way each figure carries its mark.
    */
   estimate?: WorkoutFigures;
   /**
@@ -407,7 +423,7 @@ export function WorkoutReadOnlyBody({
 
   // Only figures the draft actually holds. A strength session has no distance
   // and an open-ended run has no duration; a "--" in a box is not information.
-  const stats: Array<{ icon: LucideIcon; label: string; value: string; note?: string }> = [];
+  const stats: Array<{ icon: LucideIcon; label: string; value: string; note?: string; spoken?: string }> = [];
   if (isStrength) {
     stats.push({ icon: Dumbbell, label: t("workout.v.exercises"), value: formatCount(strength.exercises) });
     if (strength.sets > 0) {
@@ -429,22 +445,30 @@ export function WorkoutReadOnlyBody({
       });
     }
   } else {
-    // The whole session's figures where they are known (`workoutFigures`);
-    // otherwise what the steps in that unit add up to, named as only that.
-    if (figures.distanceMeters) {
-      stats.push({
-        icon: Route,
-        label: figures.distanceWhole ? t("workout.v.distance") : t("workout.v.distanceSteps"),
-        value: formatStepDistanceLabel(figures.distanceMeters, unitSystem, draft.sport === "swim")
-      });
-    }
-    if (figures.durationSeconds) {
-      stats.push({
-        icon: Clock,
-        label: figures.durationWhole ? t("workout.v.duration") : t("workout.v.timedSteps"),
-        value: formatStepTimeLabel(figures.durationSeconds)
-      });
-    }
+    // The whole session's figures, marked by how they are known: "≈" worked
+    // out from an intensity, "+" only at least; one waiting for the account's
+    // thresholds shows as loading until they arrive.
+    const figure = (
+      icon: LucideIcon,
+      label: string,
+      amount: number | undefined,
+      mark: FigureMark,
+      awaits: boolean,
+      text: (amount: number) => string,
+      plusAt: "number" | "end"
+    ) => {
+      if (contextPending && awaits) {
+        stats.push({ icon, label, value: "…", note: t("workout.figure.pending") });
+      } else if (amount) {
+        const value = markFigure(text(amount), mark, plusAt);
+        const words = figureWords(text(amount), mark);
+        stats.push({ icon, label, value, note: words, spoken: words });
+      }
+    };
+    figure(Route, t("workout.v.distance"), figures.distanceMeters, figures.distanceMark, figures.distanceAwaits,
+      (meters) => formatStepDistanceLabel(meters, unitSystem, draft.sport === "swim"), "number");
+    figure(Clock, t("workout.v.duration"), figures.durationSeconds, figures.durationMark, figures.durationAwaits,
+      formatStepTimeLabel, "end");
     stats.push({
       icon: ListChecks,
       label: view.totals.stepCount === 1 ? t("workout.v.step") : t("workout.v.steps"),
@@ -509,7 +533,7 @@ export function WorkoutReadOnlyBody({
                 <stat.icon size={12} aria-hidden="true" />
                 {stat.label}
               </dt>
-              <dd className="sched-stat-value">{stat.value}</dd>
+              <dd className="sched-stat-value" aria-label={stat.spoken}>{stat.value}</dd>
             </div>
           ))}
         </dl>

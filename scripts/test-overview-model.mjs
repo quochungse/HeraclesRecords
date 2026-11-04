@@ -505,10 +505,15 @@ const plans = [
   { happenDay: "20261025", name: "Long run", sportType: 1, volume: "20.00km" },
   { happenDay: "20261026", name: "Next week", sportType: 1, volume: "10.00km" }
 ];
-assert.deepEqual(plannedThisWeek(plans, [], "run", now), { count: 2, km: 28 }, "today's run and Sunday's, not Monday's");
+assert.deepEqual(plannedThisWeek(plans, [], "run", now), { count: 2, km: 28, mark: "exact" }, "today's run and Sunday's, not Monday's");
+assert.equal(
+  plannedThisWeek([{ ...plans[0], distanceMark: "estimated" }, { ...plans[2], distanceMark: "atLeast" }], [], "run", now).mark,
+  "atLeast",
+  "as certain as its least certain session: 28+ km"
+);
 assert.deepEqual(
   plannedThisWeek(plans, [{ activityId: "done", sportType: 100, startTime: at(24, 7) }], "run", now),
-  { count: 1, km: 20 },
+  { count: 1, km: 20, mark: "exact" },
   "today's run, done, is no longer planned"
 );
 assert.deepEqual(
@@ -518,7 +523,7 @@ assert.deepEqual(
     "run",
     now
   ),
-  { count: 1, km: 12 },
+  { count: 1, km: 12, mark: "exact" },
   "a structured session's distance, where its volume is a set count"
 );
 // The window on a Monday is three weeks and a day, not four.

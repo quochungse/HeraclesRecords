@@ -45,7 +45,7 @@ import {
   corosTextLimitError
 } from "./corosTextLimits";
 import { describePlanShape } from "./trainingPlanDomain";
-import { workoutFigures } from "./workoutFigures";
+import { figureInWords, statedWorkoutFigures } from "./workoutFigures";
 import {
   HYROX_RUN_STEP_NAME,
   poolLengthPresetId,
@@ -1166,21 +1166,19 @@ function isValidScheduleDay(day: string): boolean {
 }
 
 /**
- * A draft's volume in a word: its distance when that is the whole session's
- * (`workoutFigures`: COROS's arithmetic on the account's `context`), else its
- * sets. The distance steps of a run with a timed warm-up are not its
- * distance: a 14 km long run read "11.5 km".
+ * A draft's volume in a word: the whole session's distance
+ * (`statedWorkoutFigures`: COROS's arithmetic on the account's `context`), in
+ * words for how it is known ("about 14.1 km", "at least 7.80 km"), else its
+ * sets.
  */
 function formatEntryVolume(
   entry: PlanWorkoutEntry,
   unitSystem: UnitSystem = "metric",
   context?: WorkoutEditorContext
 ): string | undefined {
-  const { distanceMeters } = workoutFigures(entry, { context });
+  const { distanceMeters, distanceMark } = statedWorkoutFigures(entry, { context });
   if (distanceMeters) {
-    return formatDistanceValue(distanceMeters, unitSystem, {
-      swim: entry.sport === "swim"
-    });
+    return figureInWords(formatDistanceValue(distanceMeters, unitSystem, { swim: entry.sport === "swim" }), distanceMark);
   }
   if (!entry.steps || entry.steps.length === 0) {
     return undefined;

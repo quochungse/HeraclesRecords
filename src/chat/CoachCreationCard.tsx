@@ -14,6 +14,7 @@ import {
   RIDGE_UNITS,
   formatRidgeValue,
   readPlan,
+  ridgeMark,
   ridgeMeasure,
   weekRidgeValues,
   type PlanReaderWeek
@@ -22,7 +23,8 @@ import { PlanWeekRidge } from "../training-library/PlanWeekRidge";
 import { sportChipStyle } from "../training-library/sportTheme";
 import { CreationActions } from "./CreationActions";
 import { datedForReading } from "./planDating";
-import { useAthleteContext } from "../calendar/useAthleteContext";
+import { useAthleteContextRead } from "../calendar/useAthleteContext";
+import { markFigure } from "../../electron/workoutFigures";
 import type { CreationCalendar } from "./creationCalendar";
 import { creationStatus } from "./creationChoices";
 import { workoutSportLabel } from "../training/workoutSport";
@@ -72,8 +74,13 @@ export function outsideSpan(date: string | undefined, span: CreationFigures["spa
  * first date, so the strip names the days it will actually fall on. That date
  * is only for the drawing: a plan has no start date of its own.
  */
-export function creationFigures(document: TrainingPlanDocument, athlete?: WorkoutEditorContext): CreationFigures {
-  const weeks = readPlan(datedForReading(document), [], undefined, athlete).weeks;
+export function creationFigures(
+  document: TrainingPlanDocument,
+  athlete?: WorkoutEditorContext,
+  /** That context is still being read (`useAthleteContextRead`). */
+  athletePending = false
+): CreationFigures {
+  const weeks = readPlan(datedForReading(document), [], undefined, athlete, athletePending).weeks;
   const busy = weeks.filter((week) => week.summary.workouts > 0);
   const counts = busy.map((week) => week.summary.workouts);
   const low = counts.length ? Math.min(...counts) : 0;
@@ -86,7 +93,7 @@ export function creationFigures(document: TrainingPlanDocument, athlete?: Workou
   return {
     weeks: weeks.length,
     sessionsPerWeek: low === high ? `${high}` : `${low}–${high}`,
-    peakWeek: `${formatRidgeValue(peak, measure)} ${RIDGE_UNITS[measure]}`,
+    peakWeek: `${markFigure(formatRidgeValue(peak, measure), ridgeMark(weeks, measure))} ${RIDGE_UNITS[measure]}`,
     sports: sports.map((sport) => workoutSportLabel(sport)).join(", "),
     reading: weeks,
     firstWeek: busy[0],
@@ -197,7 +204,7 @@ export function CoachCreationCard({
   onOpenSession?: (entryId: string) => void;
 }) {
   const isWorkout = draft.artifactType === "workout";
-  const athlete = useAthleteContext();
+  const { context: athlete, pending: athletePending } = useAthleteContextRead();
   const status = creationStatus(
     uploaded && !draft.uploadResult
       ? {
@@ -211,7 +218,7 @@ export function CoachCreationCard({
       : draft,
     onCoros
   );
-  const figures = !isWorkout && document ? creationFigures(document, athlete) : undefined;
+  const figures = !isWorkout && document ? creationFigures(document, athlete, athletePending) : undefined;
   // A bar of the ridge picks the week the strip shows; the full view is Open's.
   const [pickedWeek, setPickedWeek] = useState<number>();
   const shownWeek =

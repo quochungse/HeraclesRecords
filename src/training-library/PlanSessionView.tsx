@@ -40,7 +40,8 @@ import { planEntryEstimate } from "../../electron/trainingPlanDomain";
 import type { HeraclesRecordsApi } from "../heraclesrecords-api";
 import { WorkoutReadOnlyBody } from "../calendar/WorkoutViewModal";
 import { useWorkoutExerciseCatalog } from "../calendar/useWorkoutExerciseCatalog";
-import { useAthleteContext } from "../calendar/useAthleteContext";
+import { useAthleteContextRead } from "../calendar/useAthleteContext";
+import { markFigure } from "../../electron/workoutFigures";
 import { formatDurationSeconds, formatHappenDayLabel } from "../training/formatters";
 import { formatDistanceValue } from "../units/units";
 import {
@@ -117,7 +118,8 @@ export function PlanSessionView({
   );
   const { byId: exercises } = useWorkoutExerciseCatalog(api, workout?.sport);
 
-  const context = useAthleteContext(api, unitSystem) ?? LOCAL_CONTEXT;
+  const athlete = useAthleteContextRead(api, unitSystem);
+  const context = athlete.context ?? LOCAL_CONTEXT;
 
   const tone = statusTone(facts.status);
   const label = statusLabel(facts.status);
@@ -158,18 +160,18 @@ export function PlanSessionView({
    * nothing to be compared with.
    */
   const outcome = facts.outcome;
-  const plannedDuration = facts.durationComplete ? facts.durationSeconds : 0;
+  const plannedDuration = facts.durationPending ? 0 : facts.durationSeconds;
   const comparison = outcome
     ? [
         {
           label: t("library.session.duration"),
-          planned: plannedDuration ? formatPlannedDuration(plannedDuration) : null,
+          planned: plannedDuration ? markFigure(formatPlannedDuration(plannedDuration) ?? "", facts.durationMark, "end") : null,
           done: outcome.durationSeconds ? formatDurationSeconds(outcome.durationSeconds) : null
         },
         {
           label: t("library.session.distance"),
-          planned: facts.distanceMeters
-            ? formatDistanceValue(facts.distanceMeters, unitSystem, { digits: 1 })
+          planned: facts.distanceMeters && !facts.distancePending
+            ? markFigure(formatDistanceValue(facts.distanceMeters, unitSystem, { digits: 1 }), facts.distanceMark)
             : null,
           done: outcome.distanceMeters
             ? formatDistanceValue(outcome.distanceMeters, unitSystem, { digits: 1 })
@@ -234,6 +236,7 @@ export function PlanSessionView({
         <WorkoutReadOnlyBody
           draft={draft}
           context={context}
+          contextPending={athlete.pending}
           exercisesById={exercises}
           estimate={entry ? planEntryEstimate(entry) : undefined}
           title={facts.title}

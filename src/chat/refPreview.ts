@@ -12,6 +12,7 @@ import type { UnitSystem, WorkoutEditorContext } from "../../electron/types";
 import { distanceUnit, metersToDisplayDistance } from "../../electron/unitSystem";
 import { datedForReading } from "./planDating";
 import { readPlan, ridgeMeasure, weekRidgeValues } from "../training-library/planReaderModel";
+import { markFigure } from "../../electron/workoutFigures";
 import { plural, t, weekdayNames } from "../i18n/core";
 
 export interface RefPreview {
@@ -52,7 +53,9 @@ export function planRefPreview(
   document: TrainingPlanDocument | null | undefined,
   unitSystem: UnitSystem,
   /** The account's, for a heart-rate session's distance and time (`useAthleteContext`). */
-  athlete?: WorkoutEditorContext
+  athlete?: WorkoutEditorContext,
+  /** That context is still being read (`useAthleteContextRead`). */
+  athletePending = false
 ): RefPreview {
   const bare: RefPreview = {
     kind: ref.scope === "plan" ? "plan" : ref.scope,
@@ -62,7 +65,7 @@ export function planRefPreview(
   };
   if (!document) return bare;
 
-  const weeks = readPlan(datedForReading(document), [], undefined, athlete).weeks;
+  const weeks = readPlan(datedForReading(document), [], undefined, athlete, athletePending).weeks;
   const measure = ridgeMeasure(weeks);
   const values = weekRidgeValues(weeks, measure);
   const peak = Math.max(0, ...values);
@@ -95,11 +98,12 @@ export function planRefPreview(
     if (!week) return bare;
     const days = week.days.filter((day) => day.entries.length).map((day) => shortDay(day.dayIndex));
     const count = week.summary.workouts;
-    const volume =
-      week.timed && week.summary.durationSeconds > 0
-        ? formatHours(week.summary.durationSeconds)
+    const volume = week.pending
+      ? undefined
+      : week.summary.durationSeconds > 0
+        ? markFigure(formatHours(week.summary.durationSeconds), week.summary.durationMark)
         : week.summary.distanceMeters > 0
-          ? formatDistance(week.summary.distanceMeters, unitSystem)
+          ? markFigure(formatDistance(week.summary.distanceMeters, unitSystem), week.summary.distanceMark)
           : undefined;
     return {
       kind: "week",
@@ -121,15 +125,18 @@ export function planRefPreview(
       for (const day of week.days) {
         const facts = day.entries.find((item) => item.id === entry.id);
         if (!facts) continue;
-        const time =
-          facts.durationComplete && facts.durationSeconds > 0 ? formatSessionTime(facts.durationSeconds) : undefined;
+        const time = facts.durationSeconds > 0 && !facts.durationPending
+          ? markFigure(formatSessionTime(facts.durationSeconds), facts.durationMark, "end")
+          : undefined;
         const name = `${shortDay(day.dayIndex)} · ${facts.title}`;
         return {
           kind: "session",
           context: `${ref.name} · ${t("chat.refs.weekLower", { n: week.weekIndex + 1 })}`,
           title: time ? `${name} ${time}` : name,
           chip: name,
-          ...(facts.distanceMeters > 0 ? { detail: formatDistance(facts.distanceMeters, unitSystem) } : {}),
+          ...(facts.distanceMeters > 0 && !facts.distancePending
+            ? { detail: markFigure(formatDistance(facts.distanceMeters, unitSystem), facts.distanceMark) }
+            : {}),
           ...(facts.sport ? { sport: facts.sport } : {})
         };
       }

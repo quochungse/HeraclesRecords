@@ -114,7 +114,7 @@ function TodayEntry({
   if (item.kind === "planned") {
     const view = plannedView(item.workout);
     const tag = planTag(item.workout);
-    const stats = formatUpcomingWorkoutRowStats(item.workout.volume, plannedLoad(item.workout, loadSource), unitSystem);
+    const stats = formatUpcomingWorkoutRowStats(item.workout.volume, plannedLoad(item.workout, loadSource), unitSystem, item.workout.distanceMark);
     return (
       <button type="button" className={className} onClick={() => onOpenWorkout(item.workout)}>
         <SportTile category={view.category} icon={view.icon} />
@@ -291,7 +291,7 @@ export function OverviewComingUp({
               {later.map((workout, index) => {
                 const labels = dayLabels(workout.happenDay, now);
                 const tag = planTag(workout);
-                const stats = formatUpcomingWorkoutRowStats(workout.volume, plannedLoad(workout, loadSource), unitSystem);
+                const stats = formatUpcomingWorkoutRowStats(workout.volume, plannedLoad(workout, loadSource), unitSystem, workout.distanceMark);
                 return (
                   <li key={`${workout.happenDay}:${index}`}>
                     <button

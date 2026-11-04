@@ -272,6 +272,7 @@ import { ScreenError } from "./screenText";
 import { mainText } from "./mainText";
 import { getSleepHistory } from "./sleepHistoryService";
 import { SLEEP_HR_BASELINE_NIGHTS } from "./sleepHeartRate";
+import { figureInWords, type FigureMark } from "./workoutFigures";
 
 // =========================================================================
 // OpenAI "Sign in with ChatGPT" provider details.
@@ -4210,17 +4211,22 @@ async function buildTrainingContext(
 
 function formatUpcomingVolume(
   volume: string | undefined,
-  unitSystem: UnitSystem
+  unitSystem: UnitSystem,
+  /** How the distance is known, in words ("about", "at least"). */
+  distanceMark?: FigureMark
 ): string {
   const value = volume?.trim() ?? "";
   const match = value.match(/^([\d.]+)\s*(km|m)$/i);
   if (!match) return value;
   const amount = Number(match[1]);
   if (!Number.isFinite(amount)) return value;
-  return formatDistanceValue(
-    amount * (match[2]?.toLowerCase() === "km" ? 1_000 : 1),
-    unitSystem,
-    { swim: match[2]?.toLowerCase() === "m" }
+  return figureInWords(
+    formatDistanceValue(
+      amount * (match[2]?.toLowerCase() === "km" ? 1_000 : 1),
+      unitSystem,
+      { swim: match[2]?.toLowerCase() === "m" }
+    ),
+    distanceMark
   );
 }
 
@@ -4241,7 +4247,7 @@ function formatUpcoming(
         workout.happenDay,
         formatUpcomingWorkoutSport(workout.sportType),
         workout.name,
-        formatUpcomingVolume(workout.volume, unitSystem),
+        formatUpcomingVolume(workout.volume, unitSystem, workout.distanceMark),
         workout.trainingLoad ? `load ${workout.trainingLoad}` : "",
         formatHeraclesLoadPart(workout) ?? "",
         exerciseDetail ? `exercises: ${exerciseDetail}` : ""

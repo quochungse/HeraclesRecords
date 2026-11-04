@@ -169,7 +169,7 @@ import {
 import { parseStrengthDetail } from "./strengthDetail";
 import { strengthProgramFromSchedule } from "./strengthExerciseMetadata";
 import { parseSessionSets } from "./sessionSets";
-import { corosProgramFigures } from "./workoutFigures";
+import { corosProgramFigures, corosProgramStated, type FigureMark } from "./workoutFigures";
 import {
   formatSwimPace,
   readsMovement,
@@ -3023,17 +3023,7 @@ export async function listLibraryWorkouts(): Promise<TrainingHubLibraryWorkout[]
   const programs = await listLibraryWorkoutPrograms();
   return programs
     .filter((program) => program.id !== undefined && program.id !== null)
-    .map((program) => ({
-      id: String(program.id),
-      name: pickString(program, ["name"]) ?? "Workout",
-      sportType: toOptionalNumber(program.sportType),
-      volume: formatUpcomingWorkoutVolume(program),
-      trainingLoad: resolveUpcomingWorkoutLoad(program),
-      durationSeconds: previewFromProgram(program).durationSeconds,
-      exerciseCount: toProgramFigure(program.exerciseNum),
-      setCount: toProgramFigure(program.totalSets) ?? toProgramFigure(program.sets),
-      createTimestamp: toOptionalNumber(program.createTimestamp)
-    }))
+    .map((program) => libraryWorkoutOf(program, toOptionalNumber(program.createTimestamp)))
     .sort((left, right) => (right.createTimestamp ?? 0) - (left.createTimestamp ?? 0));
 }
 
@@ -3077,17 +3067,27 @@ export async function duplicateLibraryWorkout(
   duplicate.sportType = targetSport;
   const created = await createWorkoutProgram(duplicate);
   return {
+    ...libraryWorkoutOf(created.program, Date.now()),
     id: created.programId,
-    name: String(created.program.name ?? duplicate.name),
-    sportType: toOptionalNumber(created.program.sportType),
-    volume: formatUpcomingWorkoutVolume(created.program),
-    trainingLoad: resolveUpcomingWorkoutLoad(created.program),
-    durationSeconds: previewFromProgram(created.program).durationSeconds,
-    exerciseCount: toProgramFigure(created.program.exerciseNum),
-    setCount:
-      toProgramFigure(created.program.totalSets) ??
-      toProgramFigure(created.program.sets),
-    createTimestamp: Date.now()
+    name: String(created.program.name ?? duplicate.name)
+  };
+}
+
+/** A library workout's row: its figures marked, one hidden as mostly unknown left out (`programFigures`). */
+function libraryWorkoutOf(program: Record<string, unknown>, createTimestamp: number | undefined): TrainingHubLibraryWorkout {
+  const figures = programFigures(program);
+  return {
+    id: String(program.id),
+    name: pickString(program, ["name"]) ?? "Workout",
+    sportType: toOptionalNumber(program.sportType),
+    volume: formatUpcomingWorkoutVolume(program, figures),
+    trainingLoad: resolveUpcomingWorkoutLoad(program),
+    durationSeconds: figures.hideDuration ? undefined : previewFromProgram(program).durationSeconds,
+    exerciseCount: toProgramFigure(program.exerciseNum),
+    setCount: toProgramFigure(program.totalSets) ?? toProgramFigure(program.sets),
+    createTimestamp,
+    ...(figures.distanceMark ? { distanceMark: figures.distanceMark } : {}),
+    ...(figures.durationMark ? { durationMark: figures.durationMark } : {})
   };
 }
 
@@ -4385,15 +4385,17 @@ export function parseUpcomingWorkouts(
       programs
     );
 
+    const figures = programFigures(program);
     workouts.push({
       happenDay,
       name: resolveUpcomingWorkoutName(program, entity),
-      volume: formatUpcomingWorkoutVolume(program),
+      volume: formatUpcomingWorkoutVolume(program, figures),
       trainingLoad: resolveUpcomingWorkoutLoad(program),
-      durationSeconds: program
+      durationSeconds: program && !figures.hideDuration
         ? (toProgramFigure(program.estimatedTime) ?? toProgramFigure(program.duration))
         : undefined,
-      distanceMeters: resolveUpcomingWorkoutDistanceMeters(program),
+      distanceMeters: resolveUpcomingWorkoutDistanceMeters(program, figures),
+      ...programFigureFields(figures),
       sportType: toOptionalNumber(program?.sportType),
       sortNo: toOptionalNumber(entity.sortNoInSchedule ?? entity.sortNo),
       ...scheduledWorkoutDescription(program),
@@ -4555,10 +4557,58 @@ function corosWorkoutDistanceToMeters(value?: number): number {
   return value / 100;
 }
 
+/**
+ * How a program's distance and time are known, off COROS's own steps
+ * (`corosProgramStated`), worked out once per program: their marks, which
+ * `volume`, `distanceMeters` and `durationSeconds` are drawn with, and
+ * whether its steps leave a figure mostly unknown — a 200 m warm-up and two
+ * untargeted hours have no distance to state — so it is stated nowhere, only
+ * counted toward a sum (`hidden…`). A program without steps is as COROS has it.
+ */
+interface ProgramFigures {
+  distanceMark?: FigureMark;
+  durationMark?: FigureMark;
+  hiddenDistanceMeters?: number;
+  hiddenDurationSeconds?: number;
+  hideDistance: boolean;
+  hideDuration: boolean;
+}
+
+function programFigures(program: Record<string, unknown> | undefined): ProgramFigures {
+  if (!Array.isArray(program?.exercises) || !program.exercises.length) {
+    return { hideDistance: false, hideDuration: false };
+  }
+  const stated = corosProgramStated(program);
+  return {
+    distanceMark: stated.distanceMark,
+    durationMark: stated.durationMark,
+    ...(stated.hiddenDistanceMeters !== undefined ? { hiddenDistanceMeters: stated.hiddenDistanceMeters } : {}),
+    ...(stated.hiddenDurationSeconds !== undefined ? { hiddenDurationSeconds: stated.hiddenDurationSeconds } : {}),
+    hideDistance: stated.distanceMeters === undefined,
+    hideDuration: stated.durationSeconds === undefined
+  };
+}
+
+/** What a session states of itself beside its volume: the marks, and a hidden figure's part for sums. */
+function programFigureFields(figures: ProgramFigures): Pick<
+  ProgramFigures,
+  "distanceMark" | "durationMark" | "hiddenDistanceMeters" | "hiddenDurationSeconds"
+> {
+  const { distanceMark, durationMark, hiddenDistanceMeters, hiddenDurationSeconds } = figures;
+  return {
+    ...(distanceMark ? { distanceMark } : {}),
+    ...(durationMark ? { durationMark } : {}),
+    ...(hiddenDistanceMeters !== undefined ? { hiddenDistanceMeters } : {}),
+    ...(hiddenDurationSeconds !== undefined ? { hiddenDurationSeconds } : {})
+  };
+}
+
 /** The distance a scheduled session states, as the volume reads it; undefined for none. */
 function resolveUpcomingWorkoutDistanceMeters(
-  program: Record<string, unknown> | undefined
+  program: Record<string, unknown> | undefined,
+  figures = programFigures(program)
 ): number | undefined {
+  if (figures.hideDistance) return undefined;
   const meters = resolveWorkoutDistanceMeters(program);
   return meters > 0 ? meters : undefined;
 }
@@ -4570,7 +4620,8 @@ function resolveUpcomingWorkoutDistanceMeters(
  * sport both count steps, which is no volume: "4 set(s)" was a 17 km run.
  */
 function formatUpcomingWorkoutVolume(
-  program: Record<string, unknown> | undefined
+  program: Record<string, unknown> | undefined,
+  figures = programFigures(program)
 ): string | undefined {
   if (!program) {
     return undefined;
@@ -4582,6 +4633,7 @@ function formatUpcomingWorkoutVolume(
     return sets > 0 ? `${sets} set(s)` : undefined;
   }
 
+  if (figures.hideDistance) return undefined;
   const distanceMeters = resolveWorkoutDistanceMeters(program);
   return distanceMeters > 0 ? `${(distanceMeters / 1000).toFixed(2)}km` : undefined;
 }
@@ -4620,21 +4672,31 @@ function resolveWorkoutDistanceMeters(
     return corosWorkoutDistanceToMeters(programTargetValue);
   }
 
-  const exercises = Array.isArray(program.exercises) ? program.exercises : [];
+  const exercises = (Array.isArray(program.exercises) ? program.exercises : []).filter(
+    (item): item is Record<string, unknown> => Boolean(item) && typeof item === "object"
+  );
+  // A repeat is a group row whose `sets` is the repeat count; its steps carry
+  // their own `sets` (1) and the group's id in `groupId`. A 2×(200 m) swim
+  // counted once each read 500 m of a 1400 m session.
+  const repeats = new Map<string, number>();
+  for (const exercise of exercises) {
+    if (exercise.isGroup) {
+      repeats.set(String(exercise.id ?? ""), Math.max(1, toOptionalNumber(exercise.sets) ?? 1));
+    }
+  }
   let total = 0;
 
-  for (const item of exercises) {
-    if (!item || typeof item !== "object") {
+  for (const exercise of exercises) {
+    if (exercise.isGroup) {
       continue;
     }
-
-    const exercise = item as Record<string, unknown>;
     const targetType = toOptionalNumber(exercise.targetType);
     const targetValue = toOptionalNumber(exercise.targetValue);
     const sets = Math.max(1, toOptionalNumber(exercise.sets) ?? 1);
+    const repeat = repeats.get(String(exercise.groupId ?? "")) ?? 1;
 
     if (targetType === 5 && targetValue) {
-      total += corosWorkoutDistanceToMeters(targetValue) * sets;
+      total += corosWorkoutDistanceToMeters(targetValue) * sets * repeat;
     }
   }
 

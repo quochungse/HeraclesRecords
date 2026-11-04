@@ -96,8 +96,16 @@ export function DayOverview({
             item.kind === "activity"
               ? activityLine(item.activity, unitSystem, source)
               : [
-                  formatPlannedVolume({ distanceMeters: pair?.targets.distanceMeters, durationSeconds: pair?.targets.plannedSeconds }, unitSystem, sport === "swim", () =>
-                    formatUpcomingWorkoutVolumeDisplay(item.entry.volume, unitSystem)
+                  formatPlannedVolume(
+                    {
+                      distanceMeters: pair?.targets.distanceMeters,
+                      durationSeconds: pair?.targets.plannedSeconds,
+                      distanceMark: pair?.targets.distanceMark,
+                      durationMark: pair?.targets.durationMark
+                    },
+                    unitSystem,
+                    sport === "swim",
+                    () => item.entry.volume ? formatUpcomingWorkoutVolumeDisplay(item.entry.volume, unitSystem) : ""
                   ),
                   loadPart(plannedLoad(item.entry, source))
                 ]

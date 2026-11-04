@@ -71,12 +71,14 @@ import {
   formatRidgeValue,
   nextPlanSession,
   readPlan,
+  ridgeMark,
   ridgeMeasure,
   weekRidgeValues
 } from "./planReaderModel";
 import { heraclesEntryLoad, type PlanHeraclesLoads } from "./planHeraclesLoads";
 import { usePlanHeraclesLoads } from "./usePlanHeraclesLoads";
-import { useAthleteContext } from "../calendar/useAthleteContext";
+import { useAthleteContextRead } from "../calendar/useAthleteContext";
+import { markFigure } from "../../electron/workoutFigures";
 import { defaultPlanName } from "./planEditorModel";
 import { PlanReader, type PlanCalendarAction } from "./PlanReader";
 import { TrainingPlanCalendarDialog } from "./TrainingPlanCalendarDialog";
@@ -1071,10 +1073,11 @@ function planView(
   summary: ReturnType<typeof summarizeTrainingPlan> | undefined,
   compliance: PlanCompliance | undefined,
   heraclesLoads: PlanHeraclesLoads | undefined,
-  athlete: WorkoutEditorContext | undefined
+  athlete: WorkoutEditorContext | undefined,
+  athletePending: boolean
 ) {
   /* The reader's own measure, so the tile and the ridge it opens onto agree. */
-  const { weeks } = readPlan(plan, [], heraclesLoads, athlete);
+  const { weeks } = readPlan(plan, [], heraclesLoads, athlete, athletePending);
   const measure = ridgeMeasure(weeks);
   const values = weekRidgeValues(weeks, measure);
   const peak = Math.max(0, ...values);
@@ -1108,7 +1111,7 @@ function planView(
      * shape of every week with one session is flat whatever the sessions cost.
      */
     ridgeCaption: RIDGE_CAPTIONS[measure],
-    ridgePeak: peak > 0 ? formatRidgeValue(peak, measure) : undefined,
+    ridgePeak: peak > 0 ? markFigure(formatRidgeValue(peak, measure), ridgeMark(weeks, measure)) : undefined,
     ridge: {
       values,
       peakWeek: measure === "load" ? summary?.peakWeek : undefined,
@@ -1307,10 +1310,10 @@ function PlanInProgress({
   const dated = run ?? plan;
   const position = planWeekPosition(dated);
   const progress = planProgress(dated);
-  const athlete = useAthleteContext();
+  const { context: athlete, pending: athletePending } = useAthleteContextRead();
   const next = useMemo(
-    () => nextPlanSession(readPlan(dated, matches, heraclesLoads, athlete)),
-    [dated, matches, locale, heraclesLoads, athlete]
+    () => nextPlanSession(readPlan(dated, matches, heraclesLoads, athlete, athletePending)),
+    [dated, matches, locale, heraclesLoads, athlete, athletePending]
   );
   const nextFigures = next ? plannedFigures(next.entry, unitSystem).slice(0, 2) : [];
   const currentWeek = position ? position.week - 1 : undefined;
@@ -1427,7 +1430,7 @@ function PlanIndex({
   /* One request for every tile's strength sessions, drafts included. */
   const shown = useMemo(() => [...plans, ...drafts.loose.map((draft) => draft.plan)], [plans, drafts.loose]);
   const heraclesLoads = usePlanHeraclesLoads(shown);
-  const athlete = useAthleteContext();
+  const { context: athlete, pending: athletePending } = useAthleteContextRead();
   const summaries = useMemo(
     () =>
       new Map(
@@ -1512,11 +1515,12 @@ function PlanIndex({
             summarizeTrainingPlan(draft.plan, heraclesEntryLoad(draft.plan, heraclesLoads), athlete),
             undefined,
             heraclesLoads,
-            athlete
+            athlete,
+            athletePending
           )
         ])
       ),
-    [drafts.loose, locale, heraclesLoads, athlete]
+    [drafts.loose, locale, heraclesLoads, athlete, athletePending]
   );
   /* Once per plan, not per render: a view reads the whole plan week by week,
      and a keystroke in the search re-renders every tile. */
@@ -1525,10 +1529,10 @@ function PlanIndex({
       new Map(
         plans.map((plan) => [
           plan.id,
-          planView(plan, summaries.get(plan.id), compliance.get(plan.id), heraclesLoads, athlete)
+          planView(plan, summaries.get(plan.id), compliance.get(plan.id), heraclesLoads, athlete, athletePending)
         ])
       ),
-    [plans, summaries, compliance, locale, heraclesLoads, athlete]
+    [plans, summaries, compliance, locale, heraclesLoads, athlete, athletePending]
   );
   const viewOf = (plan: TrainingPlanDocument) => views.get(plan.id)!;
 

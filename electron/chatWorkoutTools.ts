@@ -110,6 +110,7 @@ import {
   type ExerciseSearchMuscle,
   type WorkoutExerciseSearchResult
 } from "./exerciseCatalogSearch";
+import { corosProgramStated, figureInWords } from "./workoutFigures";
 
 interface StoredPlanDraft {
   draftId: string;
@@ -1830,7 +1831,7 @@ async function handleListScheduledWorkouts(
     workouts: shown.map((entry) => ({
       schedule_date: entry.happenDay,
       name: entry.name,
-      volume: formatScheduledVolume(entry.volume, unitSystem),
+      volume: formatScheduledVolume(entry.volume, unitSystem, entry.rawProgram),
       training_load: entry.trainingLoad,
       ...(coachHeraclesLoadValue(entry) !== undefined ? { heracles_load: coachHeraclesLoadValue(entry) } : {}),
       ...(entry.revision ? { revision: entry.revision } : {}),
@@ -1897,7 +1898,9 @@ function runningPlanNames(): (planId: string) => string | undefined {
 
 function formatScheduledVolume(
   volume: string | undefined,
-  unitSystem: UnitSystem
+  unitSystem: UnitSystem,
+  /** The session's COROS program: its steps say how the distance is known ("about", "at least"). */
+  program?: Record<string, unknown>
 ): string | undefined {
   const value = volume?.trim();
   if (!value) return volume;
@@ -1906,7 +1909,10 @@ function formatScheduledVolume(
   const amount = Number(match[1]);
   if (!Number.isFinite(amount)) return volume;
   const swim = match[2]?.toLowerCase() === "m";
-  return formatDistanceValue(amount * (swim ? 1 : 1_000), unitSystem, { swim });
+  const distanceMark = Array.isArray(program?.exercises) && program.exercises.length
+    ? corosProgramStated(program).distanceMark
+    : undefined;
+  return figureInWords(formatDistanceValue(amount * (swim ? 1 : 1_000), unitSystem, { swim }), distanceMark);
 }
 
 /**

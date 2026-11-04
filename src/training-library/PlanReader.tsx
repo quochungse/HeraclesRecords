@@ -52,7 +52,8 @@ import type {
 import { summarizeTrainingPlan } from "../../electron/trainingPlanDomain";
 import { heraclesEntryLoad } from "./planHeraclesLoads";
 import { usePlanHeraclesLoads } from "./usePlanHeraclesLoads";
-import { useAthleteContext } from "../calendar/useAthleteContext";
+import { useAthleteContextRead } from "../calendar/useAthleteContext";
+import { markFigure } from "../../electron/workoutFigures";
 import type { HeraclesRecordsApi } from "../heraclesrecords-api";
 import { useUnitSystem } from "../units/UnitSystemProvider";
 import { formatDistanceValue } from "../units/units";
@@ -152,7 +153,7 @@ export function PlanReader({
   const { unitSystem } = useUnitSystem();
   const plans = useMemo(() => [plan], [plan]);
   const heraclesLoads = usePlanHeraclesLoads(plans);
-  const athlete = useAthleteContext(api);
+  const { context: athlete, pending: athletePending } = useAthleteContextRead(api);
   const summary = useMemo(
     () => summarizeTrainingPlan(plan, heraclesEntryLoad(plan, heraclesLoads), athlete),
     [plan, heraclesLoads, athlete]
@@ -160,8 +161,8 @@ export function PlanReader({
   const { locale } = useI18n();
   // The day labels and stage names are in the language on screen.
   const reading = useMemo(
-    () => readPlan(plan, matches, heraclesLoads, athlete),
-    [plan, matches, locale, heraclesLoads, athlete]
+    () => readPlan(plan, matches, heraclesLoads, athlete, athletePending),
+    [plan, matches, locale, heraclesLoads, athlete, athletePending]
   );
   const compliance = useMemo(() => planCompliance(plan, matches), [plan, matches]);
 
@@ -363,15 +364,17 @@ export function PlanReader({
    * written in distances — and a row of them under an empty plan read as a
    * plan that had been measured and found to be nothing.
    */
-  const hours = reading.timed ? Math.round(summary.durationSeconds / 360) / 10 : 0;
+  const hours = reading.pending ? 0 : Math.round(summary.durationSeconds / 360) / 10;
   const figures = [
     { label: plural("library.fig.weeks", plan.weekCount), value: formatCount(plan.weekCount) },
     { label: plural("library.fig.sessions", summary.workouts), value: formatCount(summary.workouts) },
-    hours ? { label: plural("library.fig.hours", hours), value: formatDecimal(hours, Number.isInteger(hours) ? 0 : 1) } : null,
-    summary.distanceMeters
+    hours
+      ? { label: plural("library.fig.hours", hours), value: markFigure(formatDecimal(hours, Number.isInteger(hours) ? 0 : 1), summary.durationMark) }
+      : null,
+    summary.distanceMeters && !reading.pending
       ? {
           label: t("library.fig.distance"),
-          value: formatDistanceValue(summary.distanceMeters, unitSystem, { digits: 0 })
+          value: markFigure(formatDistanceValue(summary.distanceMeters, unitSystem, { digits: 0 }), summary.distanceMark)
         }
       : null,
     summary.trainingLoad ? { label: t("library.fig.load"), value: String(Math.round(summary.trainingLoad)) } : null

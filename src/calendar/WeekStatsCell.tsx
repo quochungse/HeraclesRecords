@@ -10,6 +10,7 @@ import { useUnitSystem } from "../units/UnitSystemProvider";
 import { elevationUnit, formatDistanceValue, metersToElevation } from "../units/units";
 import { formatCount, formatDecimal, t } from "../i18n/core";
 import { useI18n } from "../i18n/useI18n";
+import { markFigure } from "../../electron/workoutFigures";
 
 interface WeekStatsCellProps {
   stats: WeeklyStats;
@@ -134,7 +135,7 @@ export function WeekStatsCell({
     if (stats.plannedSeconds !== undefined) {
       rows.push({
         label: t("calendar.week.plannedTime"),
-        value: `${formatDurationSpan(stats.plannedDoneSeconds)} / ${formatDurationSpan(stats.plannedSeconds)}`
+        value: `${formatDurationSpan(stats.plannedDoneSeconds)} / ${markFigure(formatDurationSpan(stats.plannedSeconds), stats.plannedSecondsMark, "end")}`
       });
     }
   }
