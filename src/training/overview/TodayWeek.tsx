@@ -13,6 +13,7 @@ import {
   useSelectionPreference
 } from "../../preferences/selectionPreferences";
 import { formatDurationSpan } from "../formatters";
+import { combineMarks, markFigure, sessionSumMarks, type FigureMark } from "../../../electron/workoutFigures";
 import { happenDayToDate, mergeTrainingDayLists } from "../parsers";
 import { SPORT_COLOR_LABELS } from "../sportColors";
 import { enrichDayListWithActivityTotals, getCalendarWeekDateKeys } from "../weeklyActivity";
@@ -100,14 +101,14 @@ function amount(value: number, measure: WeekMeasure, unitSystem: UnitSystem): st
   return measure === "distance" ? distance(value, unitSystem) : figure(value);
 }
 
-/** A session's figures, time, distance and load, each only where it has one. */
+/** A session's figures, time, distance and load, each only where it has one, a planned one's marked ("≈", "+"). */
 function blockFigures(
-  block: { seconds: number; meters: number; load: number },
+  block: { seconds: number; meters: number; load: number; secondsMark?: FigureMark; metersMark?: FigureMark },
   unitSystem: UnitSystem
 ): string {
   return [
-    block.seconds > 0 ? formatDurationSpan(block.seconds) : null,
-    block.meters > 0 ? distance(block.meters, unitSystem) : null,
+    block.seconds > 0 ? markFigure(formatDurationSpan(block.seconds), block.secondsMark, "end") : null,
+    block.meters > 0 ? markFigure(distance(block.meters, unitSystem), block.metersMark) : null,
     block.load > 0 ? t("units.trainingLoadShort", { value: Math.round(block.load) }) : null
   ]
     .filter(Boolean)
@@ -171,12 +172,19 @@ function WeekDay({
   const rest = column.isPast && column.blocks.length === 0;
   const listed = column.blocks.slice(0, TIP_SESSIONS);
   const totals = column.blocks.reduce(
-    (sum, block) => ({
-      seconds: sum.seconds + block.seconds,
-      meters: sum.meters + block.meters,
-      load: sum.load + block.load
-    }),
-    { seconds: 0, meters: 0, load: 0 }
+    (sum, block) => {
+      const marks = block.planned
+        ? sessionSumMarks({ durationSeconds: block.seconds, durationMark: block.secondsMark, distanceMark: block.metersMark })
+        : { duration: "exact" as const, distance: "exact" as const };
+      return {
+        seconds: sum.seconds + block.seconds,
+        meters: sum.meters + block.meters,
+        load: sum.load + block.load,
+        secondsMark: combineMarks(sum.secondsMark, marks.duration),
+        metersMark: combineMarks(sum.metersMark, marks.distance)
+      };
+    },
+    { seconds: 0, meters: 0, load: 0, secondsMark: "exact" as FigureMark, metersMark: "exact" as FigureMark }
   );
   const empty = column.isPast
     ? t("overview.heatmap.rest")
@@ -216,7 +224,11 @@ function WeekDay({
               style={{ height: `${(block.value / chart.axisMax) * 100}%` }}
             />
           ))}
-          {total > 0 ? <span className="overview-week-value figure">{amount(total, chart.measure, unitSystem)}</span> : null}
+          {total > 0 ? (
+            <span className="overview-week-value figure">
+              {markFigure(amount(total, chart.measure, unitSystem), column.mark, chart.measure === "time" ? "end" : "number")}
+            </span>
+          ) : null}
           {rest ? <span className="overview-week-rest">{t("overview.heatmap.rest")}</span> : null}
         </div>
       </div>

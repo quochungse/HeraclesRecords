@@ -38,7 +38,7 @@ import {
 } from "./scheduledStructure";
 import { WorkoutStructure } from "./WorkoutStructureView";
 import { plannedSessionFigures } from "./pairing";
-import { markFigure } from "../../electron/workoutFigures";
+import { markFigure, type FigureMark } from "../../electron/workoutFigures";
 import { plural, t } from "../i18n/core";
 
 interface ScheduledWorkoutDetailProps {
@@ -61,6 +61,8 @@ interface ScheduledWorkoutDetailProps {
    */
   estimatedSeconds?: number;
   estimatedMeters?: number;
+  /** How those are known, as main read them off the program's steps ("≈", "+"). */
+  estimatedMarks?: { distanceMark?: FigureMark; durationMark?: FigureMark };
 }
 
 export function ScheduledWorkoutDetail({
@@ -68,7 +70,8 @@ export function ScheduledWorkoutDetail({
   sportTypes,
   api,
   estimatedSeconds,
-  estimatedMeters
+  estimatedMeters,
+  estimatedMarks
 }: ScheduledWorkoutDetailProps) {
   const { unitSystem } = useUnitSystem();
   const { source } = useLoadSource();
@@ -109,7 +112,8 @@ export function ScheduledWorkoutDetail({
   // 17 km run built of 14.5 km and 20 timed minutes said 14.5 km.
   const planned = plannedSessionFigures(entry, view.totals, {
     meters: estimatedMeters,
-    seconds: estimatedSeconds
+    seconds: estimatedSeconds,
+    ...estimatedMarks
   });
   // A strength or HYROX session's volume is its sets, never the time of its
   // holds or the metres of its carries ("6:00" for 21 sets). Only figures the

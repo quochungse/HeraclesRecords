@@ -39,7 +39,7 @@ import {
   swimDistanceToMeters,
   swimDistanceUnit
 } from "../units/units";
-import { formatHappenDayLabel, getLocalHappenDayKey } from "../training/formatters";
+import { formatHappenDayLabel, formatMarkedVolume, getLocalHappenDayKey } from "../training/formatters";
 import { dateFromKey } from "./dateUtils";
 import {
   SWIM_STROKE_IDS,
@@ -1209,7 +1209,7 @@ export function AddWorkoutModal({
                       >
                         <span className="calendar-chip-name">{item.name}</span>
                         <span className="calendar-chip-meta">
-                          {[item.volume, item.trainingLoad !== undefined ? t("units.trainingLoadShort", { value: Math.round(item.trainingLoad) }) : null]
+                          {[formatMarkedVolume(item.volume, item.distanceMark, unitSystem), item.trainingLoad !== undefined ? t("units.trainingLoadShort", { value: Math.round(item.trainingLoad) }) : null]
                             .filter(Boolean)
                             .join(" · ") || t("workout.libraryModal.noTotals")}
                         </span>

@@ -125,6 +125,25 @@ export function markFigure(text: string, mark: FigureMark | undefined, plusAt: "
   return text.replace(/(\d)(?!.*\d)/, "$1+");
 }
 
+/**
+ * How one session's figures count toward a sum of sessions (a week, a plan,
+ * the days ahead): each its own mark; a session with no time to state still
+ * takes some, so the sum's is then at least; a distance it states none of
+ * counts by its mark — a ride of timed steps leaves the kilometres short, a
+ * strength session's nothing is exact.
+ */
+export function sessionSumMarks(figures: {
+  distanceMeters?: number;
+  durationSeconds?: number;
+  distanceMark?: FigureMark;
+  durationMark?: FigureMark;
+}): { distance: FigureMark; duration: FigureMark } {
+  return {
+    distance: figures.distanceMark ?? "exact",
+    duration: figures.durationSeconds ? figures.durationMark ?? "exact" : "atLeast"
+  };
+}
+
 /** A figure in words, for text a model reads: "about 7.8 km", "at least 7.8 km". */
 export function figureInWords(text: string, mark: FigureMark | undefined): string {
   return mark === "estimated" ? `about ${text}` : mark === "atLeast" ? `at least ${text}` : text;
@@ -281,11 +300,13 @@ function statedFromTally(sum: StepTally, coros: WorkoutFigures, sport: string): 
   const corosDistance = positive(coros.distanceMeters);
   const corosDuration = positive(coros.durationSeconds);
   const setsTimed = STRENGTH_STYLE_SPORTS.has(sport);
-  const distanceMark: FigureMark = sum.distanceShort
-    ? "atLeast"
-    : !corosDistance && sum.distanceAwaits
+  const distanceMark: FigureMark = !COVERS_GROUND(sport)
+    ? "exact"
+    : sum.distanceShort
       ? "atLeast"
-      : sum.distanceEstimated ? "estimated" : "exact";
+      : !corosDistance && sum.distanceAwaits
+        ? "atLeast"
+        : sum.distanceEstimated ? "estimated" : "exact";
   const durationMark: FigureMark = sum.durationShort || (sum.durationUnitless && !(corosDuration && setsTimed))
     ? "atLeast"
     : !corosDuration && sum.durationAwaits
@@ -328,6 +349,8 @@ const SPORT_BY_COROS_TYPE: Record<number, string> = {
   1: "run", 2: "bike", 3: "swim", 4: "strength", 5: "trailRun", 6: "indoorClimb", 7: "bouldering", 8: "xcSki", 9: "hyrox"
 };
 const STRENGTH_STYLE_SPORTS = new Set(["strength", "hyrox"]);
+/** A strength or climbing session covers no ground: the distance it has none of is exact, not short. */
+const COVERS_GROUND = (sport: string) => !["strength", "indoorClimb", "bouldering"].includes(sport);
 /** COROS intensity codes it turns into a speed: heart rate, pace, effort pace. */
 const COROS_SPEED_INTENSITY_TYPES = new Set([2, 3, 8]);
 

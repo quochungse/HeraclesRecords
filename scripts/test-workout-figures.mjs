@@ -247,10 +247,14 @@ const LONG_RUN = [timed(900, hr(125, 150), "warmup"), dist(6500, hr(135, 156)), 
     "a timed ride's distance is at least 0: not stated"
   );
   const core = { sport: "strength", steps: [{ kind: "training", target_type: "reps", target_reps: 12 }, timed(360)] };
-  assert.deepEqual(statedWorkoutFigures(core), { durationSeconds: 360, ...marks("atLeast", "atLeast") }, "the timed holds alone: at least that");
+  assert.deepEqual(
+    statedWorkoutFigures(core),
+    { durationSeconds: 360, ...marks("exact", "atLeast") },
+    "the timed holds alone: at least that; a strength session covers no ground, so no distance is exact"
+  );
   assert.deepEqual(
     statedWorkoutFigures(core, { coros: { durationSeconds: 1620 } }),
-    { durationSeconds: 1620, ...marks("atLeast", "estimated") },
+    { durationSeconds: 1620, ...marks("exact", "estimated") },
     "COROS times a strength session's reps itself: its figure is an estimate, not a floor"
   );
   assert.deepEqual(statedWorkoutFigures({ sport: "run", distance_km: 8 }), { distanceMeters: 8000, ...marks("exact", "exact") }, "a simple run's distance");

@@ -19,6 +19,7 @@ import { activityWorkoutSport } from "../askCoachAbout";
 import { happenDayFromTimestamp } from "../formatters";
 import { pairTodayPlan } from "./comingUpModel";
 import { displayDistanceToMeters, metersToDisplayDistance } from "../../units/units";
+import { combineMarks, sessionSumMarks, type FigureMark } from "../../../electron/workoutFigures";
 
 /*
  * The arithmetic behind Overview's Readiness panel, out of the components so a
@@ -241,6 +242,9 @@ export interface WeekBlock {
   /** The sport it is drawn with; undefined for the leftover and an unknown code. */
   sport?: WorkoutSport | "hiking";
   planned: boolean;
+  /** How a planned session's time and distance are known ("≈", "+"); what was done is as it is. */
+  secondsMark?: FigureMark;
+  metersMark?: FigureMark;
 }
 
 export interface WeekColumn {
@@ -253,6 +257,21 @@ export interface WeekColumn {
   /** The column's two parts in the chart's measure. */
   done: number;
   planned: number;
+  /** How the column's figure in that measure is known: its planned sessions' least certain mark. */
+  mark: FigureMark;
+}
+
+/** How a column's figure in `measure` is known (`sessionSumMarks`): load is counted, time and distance may be worked out or short. */
+function measureMark(blocks: readonly WeekBlock[], measure: WeekMeasure): FigureMark {
+  if (measure === "load") return "exact";
+  return combineMarks(
+    ...blocks
+      .filter((block) => block.planned)
+      .map((block) => {
+        const marks = sessionSumMarks({ durationSeconds: block.seconds, durationMark: block.secondsMark, distanceMark: block.metersMark });
+        return measure === "time" ? marks.duration : marks.distance;
+      })
+  );
 }
 
 export interface WeekChart {
@@ -429,7 +448,9 @@ export function buildWeekChart({
           name: workout.name,
           category: scheduledSportCategory(workout.sportType) ?? "other",
           sport: scheduledWorkoutSport(workout.sportType),
-          planned: true
+          planned: true,
+          secondsMark: workout.durationMark,
+          metersMark: workout.distanceMark
         });
       });
     }
@@ -440,7 +461,8 @@ export function buildWeekChart({
       isPast: day.happenDay < todayKey,
       blocks,
       done,
-      planned
+      planned,
+      mark: measureMark(blocks, measure)
     };
   });
 

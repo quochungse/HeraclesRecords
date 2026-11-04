@@ -124,7 +124,7 @@ function plannedTargets(
  * COROS's own steps let it be known (`corosProgramStated`).
  *
  * `known` is what a caller already holds of COROS's estimates for an entry
- * that arrived without its program (Overview's row). An entry whose program
+ * that arrived without its program (Overview's row), with their marks. An entry whose program
  * carries no steps of COROS's own cannot be marked: COROS's figure, else its
  * steps when every one is in that unit, else the main process's `volume`
  * string where there are no steps at all (a run whose target COROS keeps at
@@ -133,7 +133,7 @@ function plannedTargets(
 export function plannedSessionFigures(
   scheduled: TrainingHubScheduledWorkoutEntry,
   totals: StepFigures,
-  known: { meters?: number; seconds?: number } = {}
+  known: { meters?: number; seconds?: number; distanceMark?: FigureMark; durationMark?: FigureMark } = {}
 ): PlannedTargets {
   const exercises = (scheduled.rawProgram as { exercises?: unknown } | undefined)?.exercises;
   if (Array.isArray(exercises) && exercises.length > 0) {
@@ -154,8 +154,9 @@ export function plannedSessionFigures(
   return {
     distanceMeters: figures.distanceMeters,
     plannedSeconds: figures.durationSeconds,
-    distanceMark: "exact",
-    durationMark: "exact"
+    // Overview's row carries the marks main read off the same program's steps.
+    distanceMark: known.distanceMark ?? "exact",
+    durationMark: known.durationMark ?? "exact"
   };
 }
 

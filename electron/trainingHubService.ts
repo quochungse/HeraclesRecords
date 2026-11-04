@@ -169,7 +169,7 @@ import {
 import { parseStrengthDetail } from "./strengthDetail";
 import { strengthProgramFromSchedule } from "./strengthExerciseMetadata";
 import { parseSessionSets } from "./sessionSets";
-import { corosProgramFigures } from "./workoutFigures";
+import { corosProgramFigures, corosProgramStated, type FigureMark } from "./workoutFigures";
 import {
   formatSwimPace,
   readsMovement,
@@ -3032,7 +3032,8 @@ export async function listLibraryWorkouts(): Promise<TrainingHubLibraryWorkout[]
       durationSeconds: previewFromProgram(program).durationSeconds,
       exerciseCount: toProgramFigure(program.exerciseNum),
       setCount: toProgramFigure(program.totalSets) ?? toProgramFigure(program.sets),
-      createTimestamp: toOptionalNumber(program.createTimestamp)
+      createTimestamp: toOptionalNumber(program.createTimestamp),
+      ...programFigureMarks(program)
     }))
     .sort((left, right) => (right.createTimestamp ?? 0) - (left.createTimestamp ?? 0));
 }
@@ -4394,6 +4395,7 @@ export function parseUpcomingWorkouts(
         ? (toProgramFigure(program.estimatedTime) ?? toProgramFigure(program.duration))
         : undefined,
       distanceMeters: resolveUpcomingWorkoutDistanceMeters(program),
+      ...programFigureMarks(program),
       sportType: toOptionalNumber(program?.sportType),
       sortNo: toOptionalNumber(entity.sortNoInSchedule ?? entity.sortNo),
       ...scheduledWorkoutDescription(program),
@@ -4553,6 +4555,19 @@ function corosWorkoutDistanceToMeters(value?: number): number {
 
   // COROS schedule workout distance fields are stored in centimeters.
   return value / 100;
+}
+
+/**
+ * How a program's distance and time are known, off COROS's own steps
+ * (`corosProgramStated`): what `volume`, `distanceMeters` and
+ * `durationSeconds` are drawn with. Nothing where it carries no steps.
+ */
+function programFigureMarks(
+  program: Record<string, unknown> | undefined
+): { distanceMark?: FigureMark; durationMark?: FigureMark } {
+  if (!Array.isArray(program?.exercises) || !program.exercises.length) return {};
+  const { distanceMark, durationMark } = corosProgramStated(program);
+  return { distanceMark, durationMark };
 }
 
 /** The distance a scheduled session states, as the volume reads it; undefined for none. */

@@ -15,6 +15,7 @@ import { COROS_NAME_MAX_BYTES, COROS_PLAN_DESCRIPTION_MAX_BYTES, corosUtf8Length
 import {
   combineMarks,
   corosProgramFigures,
+  sessionSumMarks,
   statedWorkoutFigures,
   type FigureMark,
   type WorkoutFigures
@@ -31,7 +32,7 @@ export interface TrainingPlanWeekSummary {
   workouts: number;
   durationSeconds: number;
   distanceMeters: number;
-  /** How the week's sums are known (`planTotalMarks`). */
+  /** How the week's sums are known (`sessionSumMarks`). */
   durationMark: FigureMark;
   distanceMark: FigureMark;
   /** A session's figure waits for the account's thresholds (`StatedFigures`). */
@@ -421,26 +422,6 @@ export function planEntryMetrics(entry: TrainingPlanEntry, context?: WorkoutEdit
   };
 }
 
-/** Sports a session of covers ground, so a distance it cannot state leaves a total short. */
-const DISTANCE_SPORTS = new Set<WorkoutSport>(["run", "trailRun", "bike", "swim", "xcSki"]);
-
-/**
- * How one session counts toward a week's or a plan's sums: a session with no
- * time to state still took some, so the hours are at least theirs; a session
- * with no distance leaves the kilometres short only where it covers ground —
- * a strength session's nothing is exact.
- */
-export function planTotalMarks(
-  metrics: Pick<ReturnType<typeof planEntryMetrics>, "durationSeconds" | "distanceMeters" | "durationMark" | "distanceMark">,
-  sport: WorkoutSport | undefined
-): { duration: FigureMark; distance: FigureMark } {
-  return {
-    duration: metrics.durationSeconds > 0 ? metrics.durationMark : "atLeast",
-    distance: metrics.distanceMeters > 0
-      ? metrics.distanceMark
-      : DISTANCE_SPORTS.has(sport ?? "run") && metrics.distanceMark === "atLeast" ? "atLeast" : "exact"
-  };
-}
 
 /**
  * What stops a plan being saved to COROS. A draft is saved whatever this says
@@ -534,7 +515,7 @@ export function summarizeTrainingPlan(
   for (const entry of plan.entries) {
     const metrics = planEntryMetrics(entry, context);
     metrics.trainingLoad = entryLoad?.(entry) ?? metrics.trainingLoad;
-    const marks = planTotalMarks(metrics, entry.workout.sport);
+    const marks = sessionSumMarks(metrics);
     const waits = metrics.durationAwaits || metrics.distanceAwaits;
     durationSeconds += metrics.durationSeconds;
     distanceMeters += metrics.distanceMeters;

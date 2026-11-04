@@ -237,7 +237,7 @@ async function getWorkoutLibrary(args: Record<string, unknown>, options: ChatPla
         `workout_id ${workout.id}`,
         workout.name,
         workoutSportFromType(workout.sportType) ?? "other",
-        workout.durationSeconds ? `${Math.round(workout.durationSeconds / 60)} min` : undefined,
+        workout.durationSeconds ? figureInWords(`${Math.round(workout.durationSeconds / 60)} min`, workout.durationMark) : undefined,
         workout.exerciseCount ? `${workout.exerciseCount} exercises` : undefined,
         workout.setCount ? `${workout.setCount} sets` : undefined
       ]

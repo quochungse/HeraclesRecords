@@ -10,6 +10,7 @@ import {
   secondsPerKmToDisplayPace
 } from "../units/units";
 import { formatDecimal, getIntlLocale, getLocale, plural, t } from "../i18n/core";
+import { combineMarks, markFigure, sessionSumMarks, type FigureMark } from "../../electron/workoutFigures";
 
 export function formatTrainingTimestamp(value?: number): string {
   if (!value) {
@@ -457,6 +458,20 @@ export function parseUpcomingWorkoutDistanceKm(
   return null;
 }
 
+/** A library workout's or a session's `volume`, in the unit on screen and marked: "13.0 km", "7.80+ km", "4 sets". */
+export function formatMarkedVolume(
+  volume: string | undefined,
+  distanceMark: FigureMark | undefined,
+  unitSystem: UnitSystem
+): string | undefined {
+  return volume ? markUpcomingVolume(formatUpcomingWorkoutVolumeDisplay(volume, unitSystem), volume, distanceMark) : undefined;
+}
+
+/** A `volume` drawn with its distance's mark, where it is a distance and not a set count. */
+export function markUpcomingVolume(label: string, volume: string | undefined, distanceMark: FigureMark | undefined): string {
+  return volume && /^[\d.]+\s*k?m$/i.test(volume.trim()) ? markFigure(label, distanceMark) : label;
+}
+
 export function formatUpcomingWorkoutVolumeDisplay(
   volume: string | undefined,
   unitSystem: UnitSystem
@@ -541,7 +556,7 @@ export function inferUpcomingWorkoutCategory(name: string): string {
 }
 
 export function formatUpcomingWorkoutStats(
-  workouts: Array<{ volume?: string; trainingLoad?: number }>,
+  workouts: Array<{ volume?: string; trainingLoad?: number; distanceMark?: FigureMark }>,
   unitSystem: UnitSystem
 ): string {
   const count = workouts.length;
@@ -568,7 +583,9 @@ export function formatUpcomingWorkoutStats(
     const rounded = Math.abs(displayed - Math.round(displayed)) < 0.05
       ? Math.round(displayed)
       : Number(displayed.toFixed(1)); // i18n-ignore: rounded as a number, written below
-    parts.push(`${formatDecimal(rounded, Number.isInteger(rounded) ? 0 : 1)} ${distanceUnit(unitSystem)}`);
+    // The days' kilometres are as certain as their least certain session's (`sessionSumMarks`).
+    const mark = combineMarks(...workouts.map((workout) => sessionSumMarks(workout).distance));
+    parts.push(markFigure(`${formatDecimal(rounded, Number.isInteger(rounded) ? 0 : 1)} ${distanceUnit(unitSystem)}`, mark));
   }
 
   if (totalLoad > 0) {
@@ -581,9 +598,11 @@ export function formatUpcomingWorkoutStats(
 export function formatUpcomingWorkoutRowStats(
   volume: string | undefined,
   trainingLoad: number | undefined,
-  unitSystem: UnitSystem
+  unitSystem: UnitSystem,
+  /** How the session's distance is known, when `volume` is one: "≈" worked out, "+" only at least. */
+  distanceMark?: FigureMark
 ): string | null {
-  const volumeLabel = formatUpcomingWorkoutVolumeDisplay(volume, unitSystem);
+  const volumeLabel = markUpcomingVolume(formatUpcomingWorkoutVolumeDisplay(volume, unitSystem), volume, distanceMark);
   const loadLabel = formatUpcomingWorkoutLoad(trainingLoad);
   const parts: string[] = [];
 

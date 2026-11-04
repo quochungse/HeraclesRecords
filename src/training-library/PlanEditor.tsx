@@ -1088,7 +1088,7 @@ function LibraryRow({
   const Icon = sportTheme(sport).icon;
   const facts = [
     workoutSportLabel(sport ?? "run"),
-    workout.durationSeconds ? formatPlannedDuration(workout.durationSeconds) : null,
+    workout.durationSeconds ? markFigure(formatPlannedDuration(workout.durationSeconds) ?? "", workout.durationMark, "end") : null,
     workout.setCount ? plural("workout.sets", workout.setCount) : null
   ].filter(Boolean);
   return (

@@ -158,6 +158,7 @@ export function UpcomingWorkoutDetailPanel({
                 api={api}
                 estimatedSeconds={workout.durationSeconds}
                 estimatedMeters={workout.distanceMeters}
+                estimatedMarks={{ distanceMark: workout.distanceMark, durationMark: workout.durationMark }}
               />
             </div>
           </motion.aside>
