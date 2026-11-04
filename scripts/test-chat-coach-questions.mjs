@@ -13,7 +13,8 @@ const { app, BrowserWindow } = require("electron");
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
-app.commandLine.appendSwitch("no-sandbox");
+// No `no-sandbox`: a window under it dies at start-up on Linux ("Creating
+// shared memory in /dev/shm … failed").
 app.disableHardwareAcceleration();
 
 const BASE_SCRIPT = {
@@ -105,6 +106,11 @@ const SEND = ".chat-coach-prompt-foot .chat-plan-upload";
 async function main() {
   await app.whenReady();
   win = new BrowserWindow({ show: false, width: 1600, height: 1200, webPreferences: { backgroundThrottling: false } });
+  // A dead renderer answers no executeJavaScript: fail now, not at a timeout.
+  win.webContents.on("render-process-gone", (_event, details) => {
+    console.error(`renderer process gone: ${details.reason} (exit ${details.exitCode})`);
+    app.exit(1);
+  });
   await win.loadFile(path.join(repoRoot, "dist-harness", "index.html"));
   assert.equal(await harness("dev"), true, "the harness must be the dev build");
 
