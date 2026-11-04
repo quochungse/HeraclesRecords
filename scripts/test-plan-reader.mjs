@@ -384,7 +384,12 @@ function match(idInPlan, status, overrides = {}) {
       name: "Easy + strides",
       sport: "run",
       steps: [
-        { kind: "warmup", target_type: "distance", target_distance_meters: 7000 },
+        {
+          kind: "warmup",
+          target_type: "distance",
+          target_distance_meters: 7000,
+          intensity: { type: "heartRate", lowBpm: 120, highBpm: 150 }
+        },
         {
           repeat: 5,
           steps: [
@@ -425,7 +430,7 @@ function match(idInPlan, status, overrides = {}) {
   assert.equal(
     first.durationComplete,
     false,
-    "but a session with a distance-only step does not know how long it is"
+    "but a heart-rate distance step with no account to time it leaves the session's length unknown"
   );
   assert.equal(second.durationComplete, true, "every step timed, repeats included");
   assert.equal(

@@ -198,8 +198,8 @@ differs from what the COROS app shows — the week's load and range, and those f
 `npm run test:workout-figures`): COROS's stored estimate first (`corosProgramFigures`), else
 COROS's own arithmetic done here on the account's context (`estimateWorkoutFigures`, probed
 against `/training/program/calculate`: a pace band's middle, a heart-rate band's whole middle bpm
-through the account's thresholds), else the steps' sum only when every step is in that unit. A
-step COROS cannot convert (no target, power, cadence) leaves that figure unknown, except a rest.
+through the account's thresholds; a step with no target, power or cadence at 0, as COROS counts
+it), else the steps' sum only when every step is in that unit.
 The Calendar, the workout view's hero, the builder's footer, the plan reader (`planEntryMetrics`,
 context from `useAthleteContext`) and Coach's draft volume (`lastReadWorkoutEditorContext`) all
 go through it. A partial sum is named as one ("Distance steps", "Timed steps"), never as the

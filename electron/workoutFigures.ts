@@ -181,10 +181,11 @@ export function statedWorkoutFigures(
  *     Heart rate: the middle bpm, whole (`floor`: 135-156 is 145), through
  *     `heartRateSpeed`. `%`, `hrType` and the zone id are not read.
  *   - No intensity, power or cadence: COROS drives these at 0 — a timed
- *     warm-up adds no distance, a 7 km warm-up no time — which is a sum over
- *     some of the steps stated as the session's. Here they leave that figure
- *     unknown, as an open step leaves both; only a rest is taken at 0, which
- *     is what standing still between repeats is.
+ *     warm-up adds no distance, a 7 km warm-up no time — and so does this,
+ *     or a workout nobody has saved would state another figure than the
+ *     Calendar beside it once it is. Only a step this cannot convert yet (a
+ *     heart rate before the account's thresholds arrive) leaves that figure
+ *     unknown, as an open step leaves both.
  *   - The session is the sum: distance in centimetres, time in whole seconds.
  *
  * The real 14 km long run (15 min @125-150, 6.5 km @135-156, 5 km @135-160,
@@ -208,7 +209,7 @@ export function estimateWorkoutFigures(
   for (const { step, repeat } of leaves) {
     if (meters === undefined && seconds === undefined) return {};
     const type = targetOf(step);
-    const speed = stepSpeed(step, context) ?? (step.kind === "rest" && !hasIntensity(step) ? 0 : undefined);
+    const speed = stepSpeed(step, context);
     if (type === "time") {
       const stepSeconds = (step.target_duration_seconds ?? 0) * repeat;
       if (seconds !== undefined) seconds += stepSeconds;
@@ -228,18 +229,14 @@ export function estimateWorkoutFigures(
   };
 }
 
-function hasIntensity(step: RunWorkoutCreateStep): boolean {
-  return step.intensity ? step.intensity.type !== "none" : Boolean(step.intensity_type);
-}
-
 /** The intensities COROS turns into a speed; anything else is not handed to the encoder at all. */
 const SPEED_INTENSITIES = new Set([
   "heartRate", "heartRatePercent", "lthrPercent", "pace", "effortPace", "thresholdPacePercent", "effortPacePercent"
 ]);
 
-/** Metres a second COROS drives a step at; undefined where it converts nothing or cannot be known here. */
+/** Metres a second COROS drives a step at: 0 where it converts nothing, undefined where it cannot be known here. */
 function stepSpeed(step: RunWorkoutCreateStep, context?: WorkoutEditorContext): number | undefined {
-  if (step.intensity && !SPEED_INTENSITIES.has(step.intensity.type)) return undefined;
+  if (step.intensity && !SPEED_INTENSITIES.has(step.intensity.type)) return 0;
   const encoded = step.intensity
     ? encodeCorosIntensity(step.intensity, context)
     : {
@@ -256,8 +253,8 @@ function stepSpeed(step: RunWorkoutCreateStep, context?: WorkoutEditorContext): 
       return low > 0 && high > 0 ? 1_000_000 / ((low + high) / 2) : undefined;
     case 2: // heart rate, in bpm
       return low > 0 && high > 0 ? heartRateSpeed(Math.floor((low + high) / 2), context) : undefined;
-    default:
-      return undefined;
+    default: // none, power, cadence
+      return 0;
   }
 }
 

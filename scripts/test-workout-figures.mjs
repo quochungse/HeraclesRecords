@@ -77,7 +77,7 @@ const LONG_RUN = [timed(900, hr(125, 150), "warmup"), dist(6500, hr(135, 156)), 
   assert.equal(band(145, 146), 2433, "the middle is whole: 145.5 is 145, not 2446");
 }
 
-// 2. Distance steps take time at the step's speed; with no intensity there is no time to state.
+// 2. Distance steps take time at the step's speed; with no intensity they take none, as COROS has it.
 {
   assert.equal(estimateWorkoutFigures(run([dist(5000, hr(140, 140))]), context).durationSeconds, 2176);
   assert.equal(estimateWorkoutFigures(run([dist(5000, hr(175, 175))]), context).durationSeconds, 1564);
@@ -85,13 +85,13 @@ const LONG_RUN = [timed(900, hr(125, 150), "warmup"), dist(6500, hr(135, 156)), 
   assert.deepEqual(estimateWorkoutFigures(run([dist(5000)]), context), { distanceMeters: 5000 }, "no intensity, no time");
   assert.equal(
     estimateWorkoutFigures(run([dist(7000), dist(500, hr(140, 140))]), context).durationSeconds,
-    undefined,
-    "COROS would say 3:38 for 7.5 km, counting the warm-up at 0 s; that is a sum over some steps"
+    218,
+    "COROS says 3:38 for 7.5 km, counting the untargeted 7 km at 0 s"
   );
 }
 
-// 3. Pace and effort pace convert; power, cadence and nothing do not (COROS counts them at 0);
-//    a rest with no target stands still, as COROS has it; an open step has no length.
+// 3. Pace and effort pace convert; power, cadence and nothing do not (COROS counts them at 0,
+//    and so does this); an open step has no length.
 {
   assert.equal(estimateWorkoutFigures(run([timed(1000, pace(300, 330))])).distanceMeters, 3174.6, "pace needs no account");
   assert.equal(estimateWorkoutFigures(run([timed(1000, pace(300, 330, "effortPace"))])).distanceMeters, 3174.6);
@@ -104,8 +104,14 @@ const LONG_RUN = [timed(900, hr(125, 150), "warmup"), dist(6500, hr(135, 156)), 
   );
   assert.equal(
     estimateWorkoutFigures(run([timed(600, undefined, "warmup"), timed(600, hr(140, 140))]), context).distanceMeters,
-    undefined,
-    "an untargeted warm-up is not 0 m, whatever COROS adds"
+    1378.81,
+    "an untargeted warm-up adds 0 m, as it does on COROS's Calendar"
+  );
+  // "Easy 8 km (HR ≤154)", proposed by Coach: COROS stored 7797.96 m and 3602 s for it, where
+  // leaving the untargeted cool-down unknown said "Distance steps 6.50 km" beside the Calendar's 7.80.
+  assert.deepEqual(
+    estimateWorkoutFigures(run([timed(600, hr(120, 150), "warmup"), dist(6500, hr(135, 154)), timed(300, { type: "none" }, "cooldown")]), context),
+    { distanceMeters: 7797.96, durationSeconds: 3602 }
   );
   assert.deepEqual(estimateWorkoutFigures(run([{ kind: "training", target_type: "open", intensity: hr(140, 140) }]), context), {});
   assert.deepEqual(
