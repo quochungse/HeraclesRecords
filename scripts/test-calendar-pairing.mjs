@@ -453,10 +453,26 @@ const activity = (overrides) => ({
 
   assert.deepEqual(
     target(mixed()),
-    { distanceMeters: 10000, plannedSeconds: 180, distanceMark: "atLeast", durationMark: "atLeast" },
-    "a float adds no distance it has, and 10 km of untargeted steps no time: at least each"
+    { distanceMeters: 10000, plannedSeconds: undefined, distanceMark: "atLeast", durationMark: "atLeast" },
+    "a float adds no distance it has (10.0+ km); 10 km nothing times leave 3:00 no figure for the session"
   );
-  assert.equal(target(mixed({ estimatedTime: 4320 })).plannedSeconds, 4320, "COROS's estimate first");
+  const paced = (rawExtra = {}) => scheduled({
+    sportType: 1,
+    rawProgram: {
+      sportType: 1,
+      ...rawExtra,
+      exercises: [
+        { ...step("1", 5, 500000), intensityType: 3, intensityValue: 330000, intensityValueExtend: 300000 },
+        step("2", 2, 180),
+        { ...step("3", 5, 500000), intensityType: 3, intensityValue: 330000, intensityValueExtend: 300000 }
+      ]
+    }
+  });
+  assert.deepEqual(
+    target(paced({ estimatedTime: 4320 })),
+    { distanceMeters: 10000, plannedSeconds: 4320, distanceMark: "atLeast", durationMark: "estimated" },
+    "COROS's estimate first, marked by its steps"
+  );
   assert.equal(target(mixed({ distance: 1170800 })).distanceMeters, 11708, "COROS's distance counts the float too");
   assert.deepEqual(
     target(scheduled({ sportType: 1, ...timedProgram(2700) })),

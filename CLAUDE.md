@@ -204,7 +204,12 @@ step of a sport other than Run and Trail Run at 0, as COROS counts them). **Each
 it is, worked out from an intensity "≈7.80 km", short of a step counted at 0 that is not — an
 untargeted warm-up's distance, an open step, a swim length's time — "7.80+ km" (both: only "+").
 A rest stands still, so its 0 is exact; a figure that comes to 0 is not stated; on a strength
-session COROS's own time is "≈" (it times reps itself). A figure short of a heart-rate step waiting
+session COROS's own time is "≈" (it times reps itself). **A figure mostly short is hidden**, COROS's
+own included: the short steps weighed in the unit they are exact in (the distance's in time, the
+time's in distance; a step with no speed of its own at its sport's `WEIGHING_SPEED`, which only
+weighs and is never shown) over a third of the session, or an open or rep main step — "200 m+" for
+a 200 m warm-up and two untargeted hours read as the session. Main hides it everywhere it states a
+program (`hiddenProgramFigures`); a sum leaves a hidden figure out and is "+". A figure short of a heart-rate step waiting
 for the account's thresholds (`…Awaits`) shows as loading while they are read
 (`useAthleteContextRead`), as "+" once read without them. Sums take the least certain mark
 (`combineMarks`; a session with no time leaves a week's hours "+"). The Calendar

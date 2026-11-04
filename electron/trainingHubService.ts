@@ -3029,7 +3029,7 @@ export async function listLibraryWorkouts(): Promise<TrainingHubLibraryWorkout[]
       sportType: toOptionalNumber(program.sportType),
       volume: formatUpcomingWorkoutVolume(program),
       trainingLoad: resolveUpcomingWorkoutLoad(program),
-      durationSeconds: previewFromProgram(program).durationSeconds,
+      durationSeconds: hiddenProgramFigures(program).duration ? undefined : previewFromProgram(program).durationSeconds,
       exerciseCount: toProgramFigure(program.exerciseNum),
       setCount: toProgramFigure(program.totalSets) ?? toProgramFigure(program.sets),
       createTimestamp: toOptionalNumber(program.createTimestamp),
@@ -3083,7 +3083,7 @@ export async function duplicateLibraryWorkout(
     sportType: toOptionalNumber(created.program.sportType),
     volume: formatUpcomingWorkoutVolume(created.program),
     trainingLoad: resolveUpcomingWorkoutLoad(created.program),
-    durationSeconds: previewFromProgram(created.program).durationSeconds,
+    durationSeconds: hiddenProgramFigures(created.program).duration ? undefined : previewFromProgram(created.program).durationSeconds,
     exerciseCount: toProgramFigure(created.program.exerciseNum),
     setCount:
       toProgramFigure(created.program.totalSets) ??
@@ -4391,7 +4391,7 @@ export function parseUpcomingWorkouts(
       name: resolveUpcomingWorkoutName(program, entity),
       volume: formatUpcomingWorkoutVolume(program),
       trainingLoad: resolveUpcomingWorkoutLoad(program),
-      durationSeconds: program
+      durationSeconds: program && !hiddenProgramFigures(program).duration
         ? (toProgramFigure(program.estimatedTime) ?? toProgramFigure(program.duration))
         : undefined,
       distanceMeters: resolveUpcomingWorkoutDistanceMeters(program),
@@ -4570,10 +4570,23 @@ function programFigureMarks(
   return { distanceMark, durationMark };
 }
 
+/**
+ * A program's figures its own steps leave mostly unknown — a 200 m warm-up
+ * and two untargeted hours have no distance to state (`corosProgramStated`) —
+ * stated nowhere: not in `volume`, not as a figure. Only a program carrying
+ * its steps is weighed.
+ */
+function hiddenProgramFigures(program: Record<string, unknown> | undefined): { distance: boolean; duration: boolean } {
+  if (!Array.isArray(program?.exercises) || !program.exercises.length) return { distance: false, duration: false };
+  const stated = corosProgramStated(program);
+  return { distance: stated.distanceMeters === undefined, duration: stated.durationSeconds === undefined };
+}
+
 /** The distance a scheduled session states, as the volume reads it; undefined for none. */
 function resolveUpcomingWorkoutDistanceMeters(
   program: Record<string, unknown> | undefined
 ): number | undefined {
+  if (hiddenProgramFigures(program).distance) return undefined;
   const meters = resolveWorkoutDistanceMeters(program);
   return meters > 0 ? meters : undefined;
 }
@@ -4597,6 +4610,7 @@ function formatUpcomingWorkoutVolume(
     return sets > 0 ? `${sets} set(s)` : undefined;
   }
 
+  if (hiddenProgramFigures(program).distance) return undefined;
   const distanceMeters = resolveWorkoutDistanceMeters(program);
   return distanceMeters > 0 ? `${(distanceMeters / 1000).toFixed(2)}km` : undefined;
 }
