@@ -101,7 +101,7 @@ export function sessionFigures(steps: StepFigures, estimate: WorkoutFigures = {}
  * time — so only at least that (`atLeast`, "7.80+ km"). A rest stands still:
  * the 0 it adds is exact. A figure both estimated and short is only `atLeast`.
  * One whose short steps are more than a third of the session, or whose main
- * step is open, is not stated at all (`UNKNOWN_SHARE_LIMIT`).
+ * step has no length, is not stated at all (`UNKNOWN_SHARE_LIMIT`).
  */
 export type FigureMark = "exact" | "estimated" | "atLeast";
 
@@ -160,6 +160,13 @@ export function figureInWords(text: string, mark: FigureMark | undefined): strin
 export interface StatedFigures {
   distanceMeters?: number;
   durationSeconds?: number;
+  /**
+   * A figure hidden as mostly short: what its steps (or COROS's figure) do
+   * state, which a sum of sessions counts and marks "+". Never on screen as
+   * the session's own.
+   */
+  hiddenDistanceMeters?: number;
+  hiddenDurationSeconds?: number;
   distanceMark: FigureMark;
   durationMark: FigureMark;
   /**
@@ -192,8 +199,7 @@ export function statedWorkoutFigures(
       durationSeconds: positive(coros.durationSeconds)
     });
   }
-  const sport = workout.sport ?? "run";
-  return statedFromTally(tally(steps, weighingSpeedOf(sport)), coros, sport);
+  return statedFromTally(tally(steps), coros, workout.sport ?? "run");
 }
 
 /**
@@ -214,8 +220,7 @@ export function corosProgramStated(
   };
   const steps = corosFigureSteps(program);
   if (!steps.length) return unmarked(coros);
-  const sport = SPORT_BY_COROS_TYPE[Number(program?.sportType)] ?? "run";
-  return statedFromTally(tally(steps, weighingSpeedOf(sport)), coros, sport);
+  return statedFromTally(tally(steps), coros, SPORT_BY_COROS_TYPE[Number(program?.sportType)] ?? "run");
 }
 
 function unmarked(figures: WorkoutFigures): StatedFigures {
@@ -237,13 +242,18 @@ interface FigureStep {
   rest: boolean;
   /** The session's work (training, interval, send-off), not a warm-up, a cool-down or a rest. */
   main: boolean;
+  /**
+   * A step with no length covers ground (an open step, a load, a climb):
+   * its distance is unknown. A set of reps or a climbing route covers none.
+   */
+  ground: boolean;
   /** COROS turns its intensity into a speed (Run and Trail Run only). */
   converts: boolean;
   /** That speed, metres a second; undefined where it waits for the account. */
   speed?: number;
 }
 
-/** What steps add up to, and why a figure is short or estimated. */
+/** What steps add up to, why a figure is short or estimated, and what weighs the short steps. */
 interface StepTally {
   meters: number;
   seconds: number;
@@ -256,18 +266,30 @@ interface StepTally {
   durationUnitless: boolean;
   distanceAwaits: boolean;
   durationAwaits: boolean;
-  /** An open or rep step is the session's work: nothing says how long or how far it goes. */
-  openMain: boolean;
-  /**
-   * How much of the session the steps short of a figure are, weighed in the
-   * unit they are exact in: the distance's in time (the timed steps it cannot
-   * count), the time's in distance (the distance steps it cannot time).
+  /** The session's work is a step with no length: nothing says how far it goes (`ground`) or how long. */
+  openMainDistance: boolean;
+  openMainDuration: boolean;
+  /*
+   * The weighing (`statedFromTally`): every step in each unit, the steps
+   * short of the other figure, and what the converting steps come to in the
+   * other unit through their own speed — or, where it waits, how much of
+   * them waits.
    */
-  distanceUnknownShare: number;
-  durationUnknownShare: number;
+  timedSeconds: number;
+  distanceStepMeters: number;
+  /** Timed steps nothing converts, not rests: the distance's unknown part. */
+  shortSeconds: number;
+  /** Distance steps nothing converts, not rests: the time's unknown part. */
+  shortMeters: number;
+  /** Distance steps nothing converts, rests included: their time is the sport's speed's. */
+  unconvertedMeters: number;
+  convertedMeters: number;
+  convertedSeconds: number;
+  awaitingSeconds: number;
+  awaitingMeters: number;
 }
 
-function tally(steps: readonly FigureStep[], weighingSpeed: number): StepTally {
+function tally(steps: readonly FigureStep[]): StepTally {
   const sum: StepTally = {
     meters: 0,
     seconds: 0,
@@ -278,57 +300,70 @@ function tally(steps: readonly FigureStep[], weighingSpeed: number): StepTally {
     durationUnitless: false,
     distanceAwaits: false,
     durationAwaits: false,
-    openMain: false,
-    distanceUnknownShare: 0,
-    durationUnknownShare: 0
+    openMainDistance: false,
+    openMainDuration: false,
+    timedSeconds: 0,
+    distanceStepMeters: 0,
+    shortSeconds: 0,
+    shortMeters: 0,
+    unconvertedMeters: 0,
+    convertedMeters: 0,
+    convertedSeconds: 0,
+    awaitingSeconds: 0,
+    awaitingMeters: 0
   };
-  // The weighing: the short steps against the rest, each in the unit it is exact in.
-  let unknownSeconds = 0;
-  let knownSeconds = 0;
-  let unknownMeters = 0;
-  let knownMeters = 0;
   for (const step of steps) {
     if (step.unit === "none") {
       if (!step.rest) {
-        sum.distanceShort = true;
         sum.durationUnitless = true;
-        if (step.main) sum.openMain = true;
+        if (step.main) sum.openMainDuration = true;
+        if (step.ground) {
+          sum.distanceShort = true;
+          if (step.main) sum.openMainDistance = true;
+        }
       }
       continue;
     }
     const timed = step.unit === "time";
-    if (timed) sum.seconds += step.amount;
-    else sum.meters += step.amount;
-    const short = !step.converts && !step.rest;
-    const speed = step.converts && step.speed !== undefined ? step.speed : weighingSpeed;
     if (timed) {
-      if (short) unknownSeconds += step.amount;
-      else knownSeconds += step.amount;
-      knownMeters += step.rest && !step.converts ? 0 : step.amount * speed;
+      sum.seconds += step.amount;
+      sum.timedSeconds += step.amount;
     } else {
-      if (short) unknownMeters += step.amount;
-      else knownMeters += step.amount;
-      if (speed > 0) knownSeconds += step.amount / speed;
+      sum.meters += step.amount;
+      sum.distanceStepMeters += step.amount;
     }
     // The other unit goes through the step's speed, or a rest's standing still, or nothing.
     if (step.converts) {
       if (timed) sum.distanceEstimated = true;
       else sum.durationEstimated = true;
       if (step.speed === undefined) {
-        if (timed) sum.distanceAwaits = true;
-        else sum.durationAwaits = true;
+        if (timed) {
+          sum.distanceAwaits = true;
+          sum.awaitingSeconds += step.amount;
+        } else {
+          sum.durationAwaits = true;
+          sum.awaitingMeters += step.amount;
+        }
       } else if (timed) {
         sum.meters += step.amount * step.speed;
+        sum.convertedMeters += step.amount * step.speed;
       } else if (step.speed > 0) {
         sum.seconds += step.amount / step.speed;
+        sum.convertedSeconds += step.amount / step.speed;
       }
-    } else if (!step.rest) {
-      if (timed) sum.distanceShort = true;
-      else sum.durationShort = true;
+    } else {
+      if (!timed) sum.unconvertedMeters += step.amount;
+      if (!step.rest) {
+        if (timed) {
+          sum.distanceShort = true;
+          sum.shortSeconds += step.amount;
+        } else {
+          sum.durationShort = true;
+          sum.shortMeters += step.amount;
+        }
+      }
     }
   }
-  sum.distanceUnknownShare = unknownSeconds > 0 ? unknownSeconds / (unknownSeconds + knownSeconds) : 0;
-  sum.durationUnknownShare = unknownMeters > 0 ? unknownMeters / (unknownMeters + knownMeters) : 0;
   return sum;
 }
 
@@ -341,8 +376,9 @@ const UNKNOWN_SHARE_LIMIT = 1 / 3;
 
 /**
  * A steady speed for each sport, metres a second, that only weighs a step
- * nothing converts against the rest of its session (`UNKNOWN_SHARE_LIMIT`):
- * never a figure on screen, nor anyone's own pace.
+ * with no target, which has no speed of its own, against the rest of its
+ * session (`UNKNOWN_SHARE_LIMIT`): never a figure on screen, nor anyone's
+ * own pace.
  */
 const WEIGHING_SPEED: Record<string, number> = {
   run: 1000 / 360, // 6:00/km, an easy pace
@@ -356,40 +392,65 @@ const WEIGHING_SPEED: Record<string, number> = {
   bouldering: 1000 / 720
 };
 
-function weighingSpeedOf(sport: string): number {
-  return WEIGHING_SPEED[sport] ?? WEIGHING_SPEED.run;
+/**
+ * How much of a session the steps short of each figure are, weighed in the
+ * unit they are exact in: the distance's in time (the timed steps it cannot
+ * count), the time's in distance (the distance steps it cannot time). The
+ * rest of the session goes through its own speeds: on a COROS figure, what
+ * that figure holds beyond the steps written in its unit — COROS's own
+ * conversion of them — else each converting step's speed; a step with no
+ * target, or one still waiting for the account, at its sport's speed.
+ */
+function unknownShares(sum: StepTally, coros: WorkoutFigures, sport: string): { distance: number; duration: number } {
+  const steady = WEIGHING_SPEED[sport] ?? WEIGHING_SPEED.run;
+  const convertedDistanceStepsTime = coros.durationSeconds !== undefined
+    ? Math.max(0, coros.durationSeconds - sum.timedSeconds)
+    : sum.convertedSeconds + sum.awaitingMeters / steady;
+  const convertedTimedStepsMeters = coros.distanceMeters !== undefined
+    ? Math.max(0, coros.distanceMeters - sum.distanceStepMeters)
+    : sum.convertedMeters + sum.awaitingSeconds * steady;
+  const knownTime = sum.timedSeconds - sum.shortSeconds + convertedDistanceStepsTime + sum.unconvertedMeters / steady;
+  const knownMeters = sum.distanceStepMeters - sum.shortMeters + convertedTimedStepsMeters + sum.shortSeconds * steady;
+  return {
+    distance: sum.shortSeconds > 0 ? sum.shortSeconds / (sum.shortSeconds + knownTime) : 0,
+    duration: sum.shortMeters > 0 ? sum.shortMeters / (sum.shortMeters + knownMeters) : 0
+  };
 }
 
 /**
  * A tally's figures, COROS's stored ones first. COROS converted every step
  * its figure counts, so a step waiting here for the account is an estimate
  * there; and on a strength session COROS gives a set of reps or an open hold
- * time of its own, an estimate, where this adds none.
+ * time of its own, an estimate, where this adds none. A figure hidden as
+ * mostly short keeps what it does state for a sum of sessions (`hidden…`).
  */
 function statedFromTally(sum: StepTally, coros: WorkoutFigures, sport: string): StatedFigures {
   const corosDistance = positive(coros.distanceMeters);
   const corosDuration = positive(coros.durationSeconds);
   const setsTimed = STRENGTH_STYLE_SPORTS.has(sport);
-  const distanceMark: FigureMark = !COVERS_GROUND(sport)
+  const ground = COVERS_GROUND(sport);
+  const distanceMark: FigureMark = !ground
     ? "exact"
     : sum.distanceShort
       ? "atLeast"
       : !corosDistance && sum.distanceAwaits
         ? "atLeast"
         : sum.distanceEstimated ? "estimated" : "exact";
-  const durationMark: FigureMark = sum.durationShort || (sum.durationUnitless && !(corosDuration && setsTimed))
+  const unitlessTimed = Boolean(corosDuration) && setsTimed;
+  const durationMark: FigureMark = sum.durationShort || (sum.durationUnitless && !unitlessTimed)
     ? "atLeast"
     : !corosDuration && sum.durationAwaits
       ? "atLeast"
       : sum.durationEstimated || sum.durationUnitless ? "estimated" : "exact";
-  // A figure mostly short of steps nothing works out is not stated at all, COROS's included.
-  const hideDistance = COVERS_GROUND(sport) && (sum.openMain || sum.distanceUnknownShare > UNKNOWN_SHARE_LIMIT);
-  const hideDuration = (sum.openMain && !(corosDuration && setsTimed)) || sum.durationUnknownShare > UNKNOWN_SHARE_LIMIT;
-  const distanceMeters = hideDistance ? undefined : corosDistance ?? positive(Math.round(sum.meters * 100) / 100);
-  const durationSeconds = hideDuration ? undefined : corosDuration ?? positive(Math.round(sum.seconds));
+  // A figure mostly short of steps nothing works out is not stated, COROS's included.
+  const shares = unknownShares(sum, { distanceMeters: corosDistance, durationSeconds: corosDuration }, sport);
+  const hideDistance = ground && (sum.openMainDistance || shares.distance > UNKNOWN_SHARE_LIMIT);
+  const hideDuration = (sum.openMainDuration && !unitlessTimed) || shares.duration > UNKNOWN_SHARE_LIMIT;
+  const distance = corosDistance ?? positive(Math.round(sum.meters * 100) / 100);
+  const duration = corosDuration ?? positive(Math.round(sum.seconds));
   return {
-    ...(distanceMeters !== undefined ? { distanceMeters } : {}),
-    ...(durationSeconds !== undefined ? { durationSeconds } : {}),
+    ...(distance !== undefined ? (hideDistance ? { hiddenDistanceMeters: distance } : { distanceMeters: distance }) : {}),
+    ...(duration !== undefined ? (hideDuration ? { hiddenDurationSeconds: duration } : { durationSeconds: duration }) : {}),
     distanceMark,
     durationMark,
     distanceAwaits: !hideDistance && !corosDistance && sum.distanceAwaits,
@@ -412,6 +473,7 @@ function planFigureSteps(workout: FiguredWorkout, context?: WorkoutEditorContext
       amount,
       rest: step.kind === "rest",
       main: step.kind === "training" || step.kind === "interval" || step.kind === "sendOff",
+      ground: type !== "reps" && type !== "routes",
       converts,
       ...(converts ? { speed: stepSpeed(step, context) } : {})
     };
@@ -457,6 +519,8 @@ function corosFigureSteps(program: Record<string, unknown> | undefined): FigureS
         rest: Number(exercise.exerciseType) === 4,
         // 2 training, 5 a swim's send-off; 1 and 3 are the warm-up and the cool-down.
         main: Number(exercise.exerciseType) === 2 || Number(exercise.exerciseType) === 5,
+        // 3 reps, 9 a climbing route: no ground covered.
+        ground: targetType !== 3 && targetType !== 9,
         converts: converting && COROS_SPEED_INTENSITY_TYPES.has(Number(exercise.intensityType))
       };
     });
@@ -500,7 +564,7 @@ export function estimateWorkoutFigures(
   }
   const steps = planFigureSteps(workout, context);
   if (!steps.length) return {};
-  const sum = tally(steps, weighingSpeedOf(workout.sport ?? "run"));
+  const sum = tally(steps);
   return {
     ...(sum.meters > 0 && !sum.distanceAwaits ? { distanceMeters: Math.round(sum.meters * 100) / 100 } : {}),
     ...(sum.seconds > 0 && !sum.durationAwaits ? { durationSeconds: Math.round(sum.seconds) } : {})

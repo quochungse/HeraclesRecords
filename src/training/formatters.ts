@@ -556,15 +556,16 @@ export function inferUpcomingWorkoutCategory(name: string): string {
 }
 
 export function formatUpcomingWorkoutStats(
-  workouts: Array<{ volume?: string; trainingLoad?: number; distanceMark?: FigureMark }>,
+  workouts: Array<{ volume?: string; trainingLoad?: number; distanceMark?: FigureMark; hiddenDistanceMeters?: number }>,
   unitSystem: UnitSystem
 ): string {
   const count = workouts.length;
   const workoutLabel = plural("units.workouts", count);
 
+  // A session whose distance is hidden as mostly unknown still counts what it does state.
   const totalKm = workouts.reduce((sum, workout) => {
-    const km = parseUpcomingWorkoutDistanceKm(workout.volume);
-    return km === null ? sum : sum + km;
+    const km = parseUpcomingWorkoutDistanceKm(workout.volume) ?? (workout.hiddenDistanceMeters ?? 0) / 1000;
+    return sum + km;
   }, 0);
 
   const totalLoad = workouts.reduce((sum, workout) => {

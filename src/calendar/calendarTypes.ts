@@ -14,6 +14,9 @@ export interface PlannedTargets {
   /** How each is known, which it is drawn with (`markFigure`): "≈" worked out, "+" only at least. */
   distanceMark: FigureMark;
   durationMark: FigureMark;
+  /** A figure hidden as mostly short: what it does state, for the week's sums only. */
+  hiddenDistanceMeters?: number;
+  hiddenSeconds?: number;
 }
 
 /** A scheduled workout matched (or not) to the completed activity on the same day. */

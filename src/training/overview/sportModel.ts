@@ -120,7 +120,7 @@ export function plannedThisWeek(
         sum +
         (workout.distanceMeters !== undefined
           ? workout.distanceMeters / 1000
-          : (parseUpcomingWorkoutDistanceKm(workout.volume) ?? 0)),
+          : (parseUpcomingWorkoutDistanceKm(workout.volume) ?? (workout.hiddenDistanceMeters ?? 0) / 1000)),
       0
     )
   };

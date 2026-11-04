@@ -142,7 +142,9 @@ export function plannedSessionFigures(
       distanceMeters: stated.distanceMeters,
       plannedSeconds: stated.durationSeconds,
       distanceMark: stated.distanceMark,
-      durationMark: stated.durationMark
+      durationMark: stated.durationMark,
+      ...(stated.hiddenDistanceMeters !== undefined ? { hiddenDistanceMeters: stated.hiddenDistanceMeters } : {}),
+      ...(stated.hiddenDurationSeconds !== undefined ? { hiddenSeconds: stated.hiddenDurationSeconds } : {})
     };
   }
   const coros = corosProgramFigures(scheduled.rawProgram);
@@ -365,7 +367,7 @@ export function computeWeeklyStats(days: CalendarDay[], loadSource: StrengthLoad
       plannedLoad += plannedLoadOf(pair.scheduled, loadSource) ?? 0;
       // The same figures the completion badge reads, so a week's planned column
       // and the chips inside it cannot disagree about what was prescribed.
-      plannedDistanceKm += (pair.targets.distanceMeters ?? 0) / 1000;
+      plannedDistanceKm += (pair.targets.distanceMeters ?? pair.targets.hiddenDistanceMeters ?? 0) / 1000;
       plannedSessions += 1;
       if (pair.activity) {
         plannedSessionsDone += 1;
@@ -374,8 +376,8 @@ export function computeWeeklyStats(days: CalendarDay[], loadSource: StrengthLoad
         remainingLoad += plannedLoadOf(pair.scheduled, loadSource) ?? 0;
         remainingCorosLoad += pair.scheduled.trainingLoad ?? 0;
       }
-      // A session with no time to state still takes some: the week's is then at least the rest's.
-      plannedSeconds += pair.targets.plannedSeconds ?? 0;
+      // A session with no time to state still takes some: the week's is then at least what is known.
+      plannedSeconds += pair.targets.plannedSeconds ?? pair.targets.hiddenSeconds ?? 0;
       plannedSecondsMark = combineMarks(
         plannedSecondsMark,
         pair.targets.plannedSeconds ? pair.targets.durationMark : "atLeast"

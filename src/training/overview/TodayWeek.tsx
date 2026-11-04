@@ -177,8 +177,8 @@ function WeekDay({
         ? sessionSumMarks({ durationSeconds: block.seconds, durationMark: block.secondsMark, distanceMark: block.metersMark })
         : { duration: "exact" as const, distance: "exact" as const };
       return {
-        seconds: sum.seconds + block.seconds,
-        meters: sum.meters + block.meters,
+        seconds: sum.seconds + block.seconds + (block.hiddenSeconds ?? 0),
+        meters: sum.meters + block.meters + (block.hiddenMeters ?? 0),
         load: sum.load + block.load,
         secondsMark: combineMarks(sum.secondsMark, marks.duration),
         metersMark: combineMarks(sum.metersMark, marks.distance)

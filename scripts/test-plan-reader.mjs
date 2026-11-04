@@ -460,6 +460,26 @@ function match(idInPlan, status, overrides = {}) {
   assert.equal(first.stepCount, 3, "warm-up, stride, jog: a repeat's children once, the group not at all");
   assert.equal(second.stepCount, 3);
 
+  // A swim's rests are not its time, so the session states none — but its week still counts them.
+  const swim = entry({
+    weekIndex: 1,
+    dayIndex: 3,
+    workout: {
+      key: "swim",
+      name: "Swim",
+      sport: "swim",
+      steps: [{ repeat: 4, steps: [
+        { kind: "interval", target_type: "distance", target_distance_meters: 100 },
+        { kind: "rest", target_type: "time", target_duration_seconds: 30 }
+      ] }]
+    }
+  });
+  const withSwim = readPlan(plan({ entries: [strides, intervals, planned, swim] }));
+  const swimFacts = withSwim.weeks[1].days[3].entries[0];
+  assert.equal(swimFacts.durationSeconds, 0, "no time stated for the swim itself");
+  assert.equal(withSwim.weeks[1].summary.durationSeconds, 3600 + 120, "the week counts the hour and the swim's two minutes of rests");
+  assert.equal(withSwim.weeks[1].summary.durationMark, "atLeast", "as at least that");
+
   const empty = readPlan(plan());
   assert.equal(empty.pending, false, "a plan with nothing in it waits for nothing");
 }

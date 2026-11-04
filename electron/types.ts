@@ -1148,6 +1148,9 @@ export interface TrainingHubUpcomingWorkout {
    */
   distanceMark?: FigureMark;
   durationMark?: FigureMark;
+  /** A figure hidden as mostly short (absent above): what it does state, which a sum counts and marks "+". */
+  hiddenDistanceMeters?: number;
+  hiddenDurationSeconds?: number;
   sportType?: number;
   sortNo?: number;
   /** The session's description (the program's `overview`), absent when it has none. */

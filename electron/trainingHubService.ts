@@ -3023,18 +3023,7 @@ export async function listLibraryWorkouts(): Promise<TrainingHubLibraryWorkout[]
   const programs = await listLibraryWorkoutPrograms();
   return programs
     .filter((program) => program.id !== undefined && program.id !== null)
-    .map((program) => ({
-      id: String(program.id),
-      name: pickString(program, ["name"]) ?? "Workout",
-      sportType: toOptionalNumber(program.sportType),
-      volume: formatUpcomingWorkoutVolume(program),
-      trainingLoad: resolveUpcomingWorkoutLoad(program),
-      durationSeconds: hiddenProgramFigures(program).duration ? undefined : previewFromProgram(program).durationSeconds,
-      exerciseCount: toProgramFigure(program.exerciseNum),
-      setCount: toProgramFigure(program.totalSets) ?? toProgramFigure(program.sets),
-      createTimestamp: toOptionalNumber(program.createTimestamp),
-      ...programFigureMarks(program)
-    }))
+    .map((program) => libraryWorkoutOf(program, toOptionalNumber(program.createTimestamp)))
     .sort((left, right) => (right.createTimestamp ?? 0) - (left.createTimestamp ?? 0));
 }
 
@@ -3078,17 +3067,27 @@ export async function duplicateLibraryWorkout(
   duplicate.sportType = targetSport;
   const created = await createWorkoutProgram(duplicate);
   return {
+    ...libraryWorkoutOf(created.program, Date.now()),
     id: created.programId,
-    name: String(created.program.name ?? duplicate.name),
-    sportType: toOptionalNumber(created.program.sportType),
-    volume: formatUpcomingWorkoutVolume(created.program),
-    trainingLoad: resolveUpcomingWorkoutLoad(created.program),
-    durationSeconds: hiddenProgramFigures(created.program).duration ? undefined : previewFromProgram(created.program).durationSeconds,
-    exerciseCount: toProgramFigure(created.program.exerciseNum),
-    setCount:
-      toProgramFigure(created.program.totalSets) ??
-      toProgramFigure(created.program.sets),
-    createTimestamp: Date.now()
+    name: String(created.program.name ?? duplicate.name)
+  };
+}
+
+/** A library workout's row: its figures marked, one hidden as mostly unknown left out (`programFigures`). */
+function libraryWorkoutOf(program: Record<string, unknown>, createTimestamp: number | undefined): TrainingHubLibraryWorkout {
+  const figures = programFigures(program);
+  return {
+    id: String(program.id),
+    name: pickString(program, ["name"]) ?? "Workout",
+    sportType: toOptionalNumber(program.sportType),
+    volume: formatUpcomingWorkoutVolume(program, figures),
+    trainingLoad: resolveUpcomingWorkoutLoad(program),
+    durationSeconds: figures.hideDuration ? undefined : previewFromProgram(program).durationSeconds,
+    exerciseCount: toProgramFigure(program.exerciseNum),
+    setCount: toProgramFigure(program.totalSets) ?? toProgramFigure(program.sets),
+    createTimestamp,
+    ...(figures.distanceMark ? { distanceMark: figures.distanceMark } : {}),
+    ...(figures.durationMark ? { durationMark: figures.durationMark } : {})
   };
 }
 
@@ -4386,16 +4385,17 @@ export function parseUpcomingWorkouts(
       programs
     );
 
+    const figures = programFigures(program);
     workouts.push({
       happenDay,
       name: resolveUpcomingWorkoutName(program, entity),
-      volume: formatUpcomingWorkoutVolume(program),
+      volume: formatUpcomingWorkoutVolume(program, figures),
       trainingLoad: resolveUpcomingWorkoutLoad(program),
-      durationSeconds: program && !hiddenProgramFigures(program).duration
+      durationSeconds: program && !figures.hideDuration
         ? (toProgramFigure(program.estimatedTime) ?? toProgramFigure(program.duration))
         : undefined,
-      distanceMeters: resolveUpcomingWorkoutDistanceMeters(program),
-      ...programFigureMarks(program),
+      distanceMeters: resolveUpcomingWorkoutDistanceMeters(program, figures),
+      ...programFigureFields(figures),
       sportType: toOptionalNumber(program?.sportType),
       sortNo: toOptionalNumber(entity.sortNoInSchedule ?? entity.sortNo),
       ...scheduledWorkoutDescription(program),
@@ -4559,34 +4559,56 @@ function corosWorkoutDistanceToMeters(value?: number): number {
 
 /**
  * How a program's distance and time are known, off COROS's own steps
- * (`corosProgramStated`): what `volume`, `distanceMeters` and
- * `durationSeconds` are drawn with. Nothing where it carries no steps.
+ * (`corosProgramStated`), worked out once per program: their marks, which
+ * `volume`, `distanceMeters` and `durationSeconds` are drawn with, and
+ * whether its steps leave a figure mostly unknown — a 200 m warm-up and two
+ * untargeted hours have no distance to state — so it is stated nowhere, only
+ * counted toward a sum (`hidden…`). A program without steps is as COROS has it.
  */
-function programFigureMarks(
-  program: Record<string, unknown> | undefined
-): { distanceMark?: FigureMark; durationMark?: FigureMark } {
-  if (!Array.isArray(program?.exercises) || !program.exercises.length) return {};
-  const { distanceMark, durationMark } = corosProgramStated(program);
-  return { distanceMark, durationMark };
+interface ProgramFigures {
+  distanceMark?: FigureMark;
+  durationMark?: FigureMark;
+  hiddenDistanceMeters?: number;
+  hiddenDurationSeconds?: number;
+  hideDistance: boolean;
+  hideDuration: boolean;
 }
 
-/**
- * A program's figures its own steps leave mostly unknown — a 200 m warm-up
- * and two untargeted hours have no distance to state (`corosProgramStated`) —
- * stated nowhere: not in `volume`, not as a figure. Only a program carrying
- * its steps is weighed.
- */
-function hiddenProgramFigures(program: Record<string, unknown> | undefined): { distance: boolean; duration: boolean } {
-  if (!Array.isArray(program?.exercises) || !program.exercises.length) return { distance: false, duration: false };
+function programFigures(program: Record<string, unknown> | undefined): ProgramFigures {
+  if (!Array.isArray(program?.exercises) || !program.exercises.length) {
+    return { hideDistance: false, hideDuration: false };
+  }
   const stated = corosProgramStated(program);
-  return { distance: stated.distanceMeters === undefined, duration: stated.durationSeconds === undefined };
+  return {
+    distanceMark: stated.distanceMark,
+    durationMark: stated.durationMark,
+    ...(stated.hiddenDistanceMeters !== undefined ? { hiddenDistanceMeters: stated.hiddenDistanceMeters } : {}),
+    ...(stated.hiddenDurationSeconds !== undefined ? { hiddenDurationSeconds: stated.hiddenDurationSeconds } : {}),
+    hideDistance: stated.distanceMeters === undefined,
+    hideDuration: stated.durationSeconds === undefined
+  };
+}
+
+/** What a session states of itself beside its volume: the marks, and a hidden figure's part for sums. */
+function programFigureFields(figures: ProgramFigures): Pick<
+  ProgramFigures,
+  "distanceMark" | "durationMark" | "hiddenDistanceMeters" | "hiddenDurationSeconds"
+> {
+  const { distanceMark, durationMark, hiddenDistanceMeters, hiddenDurationSeconds } = figures;
+  return {
+    ...(distanceMark ? { distanceMark } : {}),
+    ...(durationMark ? { durationMark } : {}),
+    ...(hiddenDistanceMeters !== undefined ? { hiddenDistanceMeters } : {}),
+    ...(hiddenDurationSeconds !== undefined ? { hiddenDurationSeconds } : {})
+  };
 }
 
 /** The distance a scheduled session states, as the volume reads it; undefined for none. */
 function resolveUpcomingWorkoutDistanceMeters(
-  program: Record<string, unknown> | undefined
+  program: Record<string, unknown> | undefined,
+  figures = programFigures(program)
 ): number | undefined {
-  if (hiddenProgramFigures(program).distance) return undefined;
+  if (figures.hideDistance) return undefined;
   const meters = resolveWorkoutDistanceMeters(program);
   return meters > 0 ? meters : undefined;
 }
@@ -4598,7 +4620,8 @@ function resolveUpcomingWorkoutDistanceMeters(
  * sport both count steps, which is no volume: "4 set(s)" was a 17 km run.
  */
 function formatUpcomingWorkoutVolume(
-  program: Record<string, unknown> | undefined
+  program: Record<string, unknown> | undefined,
+  figures = programFigures(program)
 ): string | undefined {
   if (!program) {
     return undefined;
@@ -4610,7 +4633,7 @@ function formatUpcomingWorkoutVolume(
     return sets > 0 ? `${sets} set(s)` : undefined;
   }
 
-  if (hiddenProgramFigures(program).distance) return undefined;
+  if (figures.hideDistance) return undefined;
   const distanceMeters = resolveWorkoutDistanceMeters(program);
   return distanceMeters > 0 ? `${(distanceMeters / 1000).toFixed(2)}km` : undefined;
 }

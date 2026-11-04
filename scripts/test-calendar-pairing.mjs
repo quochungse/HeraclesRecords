@@ -453,9 +453,14 @@ const activity = (overrides) => ({
 
   assert.deepEqual(
     target(mixed()),
-    { distanceMeters: 10000, plannedSeconds: undefined, distanceMark: "atLeast", durationMark: "atLeast" },
+    { distanceMeters: 10000, plannedSeconds: undefined, distanceMark: "atLeast", durationMark: "atLeast", hiddenSeconds: 180 },
     "a float adds no distance it has (10.0+ km); 10 km nothing times leave 3:00 no figure for the session"
   );
+  const mixedWeek = computeWeeklyStats([
+    { dateKey: "20261005", inMonth: true, isToday: false, isPast: false, scheduled: [mixed()], activities: [], ...pairPlannedWithActual([mixed()], [], "metric") , unplannedActivities: [] }
+  ]);
+  assert.equal(mixedWeek.plannedSeconds, 180, "the week still counts the 3:00 the hidden time does state");
+  assert.equal(mixedWeek.plannedSecondsMark, "atLeast", "as at least that");
   const paced = (rawExtra = {}) => scheduled({
     sportType: 1,
     rawProgram: {

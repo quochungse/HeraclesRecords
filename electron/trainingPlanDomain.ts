@@ -401,6 +401,9 @@ export function planEntryEstimate(entry: TrainingPlanEntry): WorkoutFigures {
 export function planEntryMetrics(entry: TrainingPlanEntry, context?: WorkoutEditorContext): {
   durationSeconds: number;
   distanceMeters: number;
+  /** What a week's or a plan's sums count: the figure, or what a hidden one does state. */
+  sumDurationSeconds: number;
+  sumDistanceMeters: number;
   durationMark: FigureMark;
   distanceMark: FigureMark;
   durationAwaits: boolean;
@@ -413,6 +416,8 @@ export function planEntryMetrics(entry: TrainingPlanEntry, context?: WorkoutEdit
   return {
     durationSeconds: stated.durationSeconds ?? 0,
     distanceMeters: stated.distanceMeters ?? 0,
+    sumDurationSeconds: stated.durationSeconds ?? stated.hiddenDurationSeconds ?? 0,
+    sumDistanceMeters: stated.distanceMeters ?? stated.hiddenDistanceMeters ?? 0,
     durationMark: stated.durationMark,
     distanceMark: stated.distanceMark,
     durationAwaits: stated.durationAwaits,
@@ -517,8 +522,8 @@ export function summarizeTrainingPlan(
     metrics.trainingLoad = entryLoad?.(entry) ?? metrics.trainingLoad;
     const marks = sessionSumMarks(metrics);
     const waits = metrics.durationAwaits || metrics.distanceAwaits;
-    durationSeconds += metrics.durationSeconds;
-    distanceMeters += metrics.distanceMeters;
+    durationSeconds += metrics.sumDurationSeconds;
+    distanceMeters += metrics.sumDistanceMeters;
     durationMark = combineMarks(durationMark, marks.duration);
     distanceMark = combineMarks(distanceMark, marks.distance);
     awaits ||= waits;
@@ -527,8 +532,8 @@ export function summarizeTrainingPlan(
     const week = weekly[entry.weekIndex];
     if (week) {
       week.workouts += 1;
-      week.durationSeconds += metrics.durationSeconds;
-      week.distanceMeters += metrics.distanceMeters;
+      week.durationSeconds += metrics.sumDurationSeconds;
+      week.distanceMeters += metrics.sumDistanceMeters;
       week.durationMark = combineMarks(week.durationMark, marks.duration);
       week.distanceMark = combineMarks(week.distanceMark, marks.distance);
       week.awaits ||= waits;

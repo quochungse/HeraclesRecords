@@ -245,6 +245,9 @@ export interface WeekBlock {
   /** How a planned session's time and distance are known ("≈", "+"); what was done is as it is. */
   secondsMark?: FigureMark;
   metersMark?: FigureMark;
+  /** A planned figure hidden as mostly unknown: what it does state, in the bar and the total only. */
+  hiddenSeconds?: number;
+  hiddenMeters?: number;
 }
 
 export interface WeekColumn {
@@ -435,7 +438,9 @@ export function buildWeekChart({
         const load = positive(plannedLoad(workout, loadSource)) ?? 0;
         const time = amount(workout.durationSeconds);
         const meters = amount(workout.distanceMeters);
-        const value = pick(load, time, meters);
+        const hiddenSeconds = amount(workout.hiddenDurationSeconds);
+        const hiddenMeters = amount(workout.hiddenDistanceMeters);
+        const value = pick(load, time + hiddenSeconds, meters + hiddenMeters);
         planned += value;
         blocks.push({
           // Its place in the day's plan, not among what is still open: the key
@@ -450,7 +455,9 @@ export function buildWeekChart({
           sport: scheduledWorkoutSport(workout.sportType),
           planned: true,
           secondsMark: workout.durationMark,
-          metersMark: workout.distanceMark
+          metersMark: workout.distanceMark,
+          ...(hiddenSeconds ? { hiddenSeconds } : {}),
+          ...(hiddenMeters ? { hiddenMeters } : {})
         });
       });
     }
