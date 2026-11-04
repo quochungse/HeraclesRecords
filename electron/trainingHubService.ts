@@ -4620,21 +4620,31 @@ function resolveWorkoutDistanceMeters(
     return corosWorkoutDistanceToMeters(programTargetValue);
   }
 
-  const exercises = Array.isArray(program.exercises) ? program.exercises : [];
+  const exercises = (Array.isArray(program.exercises) ? program.exercises : []).filter(
+    (item): item is Record<string, unknown> => Boolean(item) && typeof item === "object"
+  );
+  // A repeat is a group row whose `sets` is the repeat count; its steps carry
+  // their own `sets` (1) and the group's id in `groupId`. A 2×(200 m) swim
+  // counted once each read 500 m of a 1400 m session.
+  const repeats = new Map<string, number>();
+  for (const exercise of exercises) {
+    if (exercise.isGroup) {
+      repeats.set(String(exercise.id ?? ""), Math.max(1, toOptionalNumber(exercise.sets) ?? 1));
+    }
+  }
   let total = 0;
 
-  for (const item of exercises) {
-    if (!item || typeof item !== "object") {
+  for (const exercise of exercises) {
+    if (exercise.isGroup) {
       continue;
     }
-
-    const exercise = item as Record<string, unknown>;
     const targetType = toOptionalNumber(exercise.targetType);
     const targetValue = toOptionalNumber(exercise.targetValue);
     const sets = Math.max(1, toOptionalNumber(exercise.sets) ?? 1);
+    const repeat = repeats.get(String(exercise.groupId ?? "")) ?? 1;
 
     if (targetType === 5 && targetValue) {
-      total += corosWorkoutDistanceToMeters(targetValue) * sets;
+      total += corosWorkoutDistanceToMeters(targetValue) * sets * repeat;
     }
   }
 

@@ -106,9 +106,9 @@ function plannedAmounts(pair: PlannedActualPair, unitSystem: UnitSystem, swim: b
     cardDistance(distanceMeters, unitSystem, swim),
     seconds ? formatDurationSpan(seconds) : undefined
   ].filter((part): part is string => Boolean(part));
-  if (!parts.length) {
-    const volume = formatUpcomingWorkoutVolumeDisplay(pair.scheduled.volume, unitSystem);
-    if (volume) parts.push(volume);
+  // No volume either: nothing to state, rather than the "--" the display formatter draws.
+  if (!parts.length && pair.scheduled.volume) {
+    parts.push(formatUpcomingWorkoutVolumeDisplay(pair.scheduled.volume, unitSystem));
   }
   return parts;
 }

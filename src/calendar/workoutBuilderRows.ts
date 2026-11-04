@@ -868,6 +868,8 @@ export function builderSessionFigures(
 ): StatedFigures {
   if (sport === "strength") {
     let seconds = 0;
+    // A rep row has no time to add: the sum is then only the timed rows', and says so.
+    let everyRowTimed = true;
     const addRow = (row: BuilderRow, multiplier = 1) => {
       if (row.locked) return;
       if (row.kind === "intervals") {
@@ -875,7 +877,10 @@ export function builderSessionFigures(
         for (const child of row.children ?? []) addRow(child, multiplier * repeats);
         return;
       }
-      if (row.targetType !== "time") return;
+      if (row.targetType !== "time") {
+        everyRowTimed = false;
+        return;
+      }
       const value = Number(row.targetValue) || 0;
       // Strength time targets are per set, in seconds, with rest between.
       const sets = row.kind === "training" ? Math.max(1, Number(row.sets) || 1) : 1;
@@ -883,7 +888,7 @@ export function builderSessionFigures(
       seconds += multiplier * (sets * value + Math.max(0, sets - 1) * restSec);
     };
     for (const row of rows) addRow(row);
-    return { ...(seconds > 0 ? { durationSeconds: seconds } : {}), durationWhole: true, distanceWhole: false };
+    return { ...(seconds > 0 ? { durationSeconds: seconds } : {}), durationWhole: everyRowTimed, distanceWhole: false };
   }
   try {
     const draft = builderRowsToEditorDraft(rows, { sport, name: "", description: "" }, unitSystem);
