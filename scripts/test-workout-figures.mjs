@@ -91,7 +91,7 @@ const LONG_RUN = [timed(900, hr(125, 150), "warmup"), dist(6500, hr(135, 156)), 
 }
 
 // 3. Pace and effort pace convert; power, cadence and nothing do not (COROS counts them at 0,
-//    and so does this); an open step has no length.
+//    and so does this); an open step, ended by the lap button, counts 0 m and 0 s.
 {
   assert.equal(estimateWorkoutFigures(run([timed(1000, pace(300, 330))])).distanceMeters, 3174.6, "pace needs no account");
   assert.equal(estimateWorkoutFigures(run([timed(1000, pace(300, 330, "effortPace"))])).distanceMeters, 3174.6);
@@ -114,6 +114,11 @@ const LONG_RUN = [timed(900, hr(125, 150), "warmup"), dist(6500, hr(135, 156)), 
     { distanceMeters: 7797.96, durationSeconds: 3602 }
   );
   assert.deepEqual(estimateWorkoutFigures(run([{ kind: "training", target_type: "open", intensity: hr(140, 140) }]), context), {});
+  assert.deepEqual(
+    estimateWorkoutFigures(run([timed(600, hr(140, 140), "warmup"), dist(5000, hr(140, 140)), { kind: "cooldown", target_type: "open" }]), context),
+    { distanceMeters: 6378.81, durationSeconds: 2776 },
+    "an open cool-down adds nothing, and the steps around it still count"
+  );
   assert.deepEqual(
     estimateWorkoutFigures(run([timed(600, { type: "unheardOf" })]), context),
     { durationSeconds: 600 },
@@ -142,10 +147,27 @@ const LONG_RUN = [timed(900, hr(125, 150), "warmup"), dist(6500, hr(135, 156)), 
   assert.deepEqual(estimateWorkoutFigures(run(LONG_RUN, "trailRun"), context), { distanceMeters: 14079.74, durationSeconds: 5883 }, "Trail Run alike");
 }
 
-// 5. What cannot be worked out is not stated: no account for heart rate, a ride, a strength set.
+// 5. What cannot be worked out is not stated: no account for heart rate, a strength set. A ride or a
+//    swim converts nothing, so each step counts in its own unit, as COROS stores it.
 {
   assert.deepEqual(estimateWorkoutFigures(run(LONG_RUN)), {}, "heart rate waits for the account");
-  assert.deepEqual(estimateWorkoutFigures(run(LONG_RUN, "bike"), context), {}, "COROS converts nothing on a ride");
+  assert.deepEqual(
+    estimateWorkoutFigures(run(LONG_RUN, "bike"), context),
+    { distanceMeters: 11500, durationSeconds: 1200 },
+    "COROS converts nothing on a ride: each step counts in its own unit only"
+  );
+  // P10305, a COROS swim: 2×(100 m, 30 s), 2×(200 m, 30 s), 6×(100 m, 15 s), 2×(100 m, 60 s);
+  // COROS stored 140000 cm and 330 s, its rests alone.
+  const swimSet = (meters, rest) => [dist(meters, undefined, "interval"), timed(rest, undefined, "rest")];
+  assert.deepEqual(
+    estimateWorkoutFigures({ sport: "swim", steps: [
+      { repeat: 2, steps: swimSet(100, 30) },
+      { repeat: 2, steps: swimSet(200, 30) },
+      { repeat: 6, steps: swimSet(100, 15) },
+      { repeat: 2, steps: swimSet(100, 60) }
+    ] }, context),
+    { distanceMeters: 1400, durationSeconds: 330 }
+  );
   assert.deepEqual(estimateWorkoutFigures({ sport: "strength", steps: [{ kind: "training", target_type: "reps", target_reps: 12 }] }, context), {});
 }
 

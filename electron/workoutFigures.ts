@@ -174,18 +174,19 @@ export function statedWorkoutFigures(
  * COROS's arithmetic, probed against `/training/program/calculate` on
  * 2026-11-03 (an account at max HR 190, resting 52, LTHR 168, threshold pace
  * 321, pace zone 6 at 285 s/km; `scripts/test-workout-figures.mjs` holds the
- * answers). Run and Trail Run only: a ride's heart-rate step is 0 m there.
+ * answers). Only Run and Trail Run convert an intensity: a ride's heart-rate
+ * step is 0 m there, and a swim's stored time is its timed rests alone.
  *
  *   - A step is driven at one speed, from its intensity as the write encodes
  *     it. Pace and effort pace: the middle of the band (300-330 s/km is 315).
  *     Heart rate: the middle bpm, whole (`floor`: 135-156 is 145), through
  *     `heartRateSpeed`. `%`, `hrType` and the zone id are not read.
- *   - No intensity, power or cadence: COROS drives these at 0 — a timed
- *     warm-up adds no distance, a 7 km warm-up no time — and so does this,
- *     or a workout nobody has saved would state another figure than the
- *     Calendar beside it once it is. Only a step this cannot convert yet (a
- *     heart rate before the account's thresholds arrive) leaves that figure
- *     unknown, as an open step leaves both.
+ *   - No intensity, power or cadence, any step of another sport, an open
+ *     step: COROS drives these at 0 — a timed warm-up adds no distance, a
+ *     7 km warm-up no time, an open step neither — and so does this, or a
+ *     workout nobody has saved would state another figure than the Calendar
+ *     beside it once it is. Only a step this cannot convert yet (a heart rate
+ *     before the account's thresholds arrive) leaves that figure unknown.
  *   - The session is the sum: distance in centimetres, time in whole seconds.
  *
  * The real 14 km long run (15 min @125-150, 6.5 km @135-156, 5 km @135-160,
@@ -203,13 +204,14 @@ export function estimateWorkoutFigures(
     return { distanceMeters: workout.distance_km! * 1000 };
   }
   const leaves = leafSteps(workout.steps);
-  if (!leaves.length || !CONVERTING_SPORTS.has(sport)) return {};
+  if (!leaves.length) return {};
+  const converts = CONVERTING_SPORTS.has(sport);
   let meters: number | undefined = 0;
   let seconds: number | undefined = 0;
   for (const { step, repeat } of leaves) {
     if (meters === undefined && seconds === undefined) return {};
     const type = targetOf(step);
-    const speed = stepSpeed(step, context);
+    const speed = converts ? stepSpeed(step, context) : 0;
     if (type === "time") {
       const stepSeconds = (step.target_duration_seconds ?? 0) * repeat;
       if (seconds !== undefined) seconds += stepSeconds;
@@ -218,8 +220,8 @@ export function estimateWorkoutFigures(
       const stepMeters = (step.target_distance_meters ?? 0) * repeat;
       if (meters !== undefined) meters += stepMeters;
       if (seconds !== undefined) seconds = speed === undefined ? undefined : seconds + (speed > 0 ? stepMeters / speed : 0);
-    } else {
-      // Open, reps, load, a recovery to a heart rate: no length to add.
+    } else if (type !== "open") {
+      // Reps, load, a recovery to a heart rate: no length COROS's arithmetic is known for.
       return {};
     }
   }
