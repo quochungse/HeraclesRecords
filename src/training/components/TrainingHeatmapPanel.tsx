@@ -46,6 +46,7 @@ import {
 } from "../weeklyActivity";
 import { inLoadSource } from "../loadFigures";
 import { useLoadSource } from "../loadSource";
+import { useTodayKey } from "../useTodayKey";
 import { usePrefersReducedMotion } from "./trendChartParts";
 import {
   buildDominantSportByDay,
@@ -156,6 +157,7 @@ export function TrainingHeatmapPanel({
 }: TrainingHeatmapPanelProps) {
   const { unitSystem } = useUnitSystem();
   const reducedMotion = usePrefersReducedMotion();
+  const todayKey = useTodayKey();
   const [range, setRange] = useSelectionPreference(HEATMAP_RANGE_PREFERENCE);
   const [strengthSessions, setStrengthSessions] = useState<StrengthSession[]>(
     []
@@ -733,9 +735,10 @@ export function TrainingHeatmapPanel({
                               </li>
                             ) : null}
                           </ul>
-                        ) : (
+                        ) : cell.happenDay < todayKey ? (
+                          // Today is not over: an empty card is not a rest day yet.
                           <span className="training-heatmap-card-rest">{t("overview.heatmap.rest")}</span>
-                        )}
+                        ) : null}
 
                         <span className="training-heatmap-tooltip" role="tooltip">
                           <strong>{cell.label}</strong>
