@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.4.7] - 2026-11-05
+
+Make an image of any session to post, and planned figures that say how they are known.
+
+### What's new
+- **Create and Share image** - Create image on a run, ride, hike, swim or strength session, makes a picture of it to post.
+- **Planned figures say how they are known** - a planned distance or time written in the steps is stated as it is, one worked out from a pace or a heart rate reads "≈7.80 km", and one short of a step COROS counts as nothing (a warm-up with no target, an open step, the time of a swim's lengths) reads "7.80+ km". A figure that would be mostly a guess is not stated at all, so a 200 m warm-up before two hours with no target no longer reads as 200 m. Overview, the Calendar, the Training Library, the workout builder and Coach mark them alike, and a week's or a plan's total is as certain as its least certain part.
+
+### Fixed
+- A workout not yet saved to COROS states what COROS will once it is: a step with no target, power or cadence counts as COROS counts it, so a Coach proposal no longer reads shorter than the same workout on the Calendar. A ride, a swim and a workout with an open step have their figures before they are saved too.
+- A library workout counts each of its repeats.
+- Reps and climbing cover no ground, so a HYROX session's stations no longer hide its distance of running.
+- A Calendar card with no figure to show is blank instead of "--".
+- Training load heatmap: today's card stays empty until you train, instead of reading Rest.
+
 ## [1.4.6] - 2026-11-03
 
 Improve coach response and optimize token costs.
