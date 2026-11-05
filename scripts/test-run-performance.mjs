@@ -182,7 +182,7 @@ assert.ok(flatRead < shapedRead, `read flat, a long run is marked down for its o
 close(shapedRead, 48, 0.6, "against the usual curve a long run reads the runner");
 
 // ---------------------------------------------------------------------------
-// Baseline, scale, verdict, durability.
+// Baseline, scale, verdict.
 // ---------------------------------------------------------------------------
 
 const runs = history.map((points) => ({ points, corosVo2max: 47 }));
@@ -197,16 +197,11 @@ assert.equal(perf.performanceVerdict(49.5, 48), "better");
 assert.equal(perf.performanceVerdict(47, 48), "usual", "within 3% is as usual");
 assert.equal(perf.performanceVerdict(46.5, 48), "worse");
 
-const durability = perf.performanceDurability(longRun, shape, 95 * 60);
-assert.ok(durability.change < -3, `the end of a long run falls: ${durability.change}`);
-close(
-  durability.usual,
-  (perf.shapeAt(shape, shape.lastMinute * 60) - 1) * 100,
-  1e-9,
+assert.equal(
+  perf.shapeAt(shape, (shape.lastMinute + 30) * 60),
+  perf.shapeAt(shape, shape.lastMinute * 60),
   "past the minutes the history reaches, the usual is held at its last level"
 );
-assert.equal(durability.fromMinute, 75);
-assert.equal(perf.performanceDurability(history[4], shape, 45 * 60), undefined, "under an hour says nothing about durability");
 
 // ---------------------------------------------------------------------------
 // The summary keeps the curve for road and track runs only.
@@ -337,5 +332,13 @@ assert.deepEqual(model.niceScale(-13, 27, { includeZero: true }), { domain: [-20
 assert.deepEqual(model.niceScale(-4, 3, { includeZero: true }).ticks, [-4, -2, 0, 2, 4]);
 assert.deepEqual(model.niceScale(-9.6, 4, { symmetric: true }).domain, [-10, 10], "a quadrant is centred");
 assert.deepEqual(model.niceScale(44.3, 49.1).ticks, [44, 45, 46, 47, 48, 49, 50]);
+
+// The better/worse split sits at zero in the painted shape's own box, not the
+// plot's: a line from −2 to +8 on a −10…+10 axis splits at 0.8, not 0.5.
+close(model.zeroOffsetIn(-2, 8), 0.8, 1e-9, "zero in the line's box");
+assert.equal(model.zeroOffsetIn(1, 5), 1, "wholly above zero is all better");
+assert.equal(model.zeroOffsetIn(-5, -1), 0, "wholly below zero is all worse");
+assert.equal(model.zeroOffsetIn(3, 3), 1, "a flat line above zero is better");
+assert.equal(model.zeroOffsetIn(-3, -3), 0, "a flat line below zero is worse");
 
 console.log("run performance: ok");

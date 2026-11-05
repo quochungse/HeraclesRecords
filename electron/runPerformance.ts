@@ -564,34 +564,3 @@ export function performanceVerdict(value: number, usual: number): PerformanceVer
   const change = value / usual - 1;
   return change >= PERFORMANCE_BAND ? "better" : change <= -PERFORMANCE_BAND ? "worse" : "usual";
 }
-
-/** A run must last this long before its end says anything about durability. */
-const DURABILITY_MIN_SECONDS = 60 * 60;
-const DURABILITY_TAIL_SECONDS = 20 * 60;
-
-export interface PerformanceDurability {
-  /** The last twenty minutes against minutes 10–40, percent. */
-  change: number;
-  /** The same on the usual curve, percent; absent without one. */
-  usual?: number;
-  fromMinute: number;
-  toMinute: number;
-}
-
-export function performanceDurability(
-  points: readonly PerformancePoint[],
-  shape: PerformanceShape | undefined,
-  durationSeconds: number
-): PerformanceDurability | undefined {
-  if (durationSeconds < DURABILITY_MIN_SECONDS) return undefined;
-  const level = runLevel(points);
-  const tail = points.filter((point) => point.t >= durationSeconds - DURABILITY_TAIL_SECONDS);
-  if (level === undefined || tail.length < MIN_SESSION_POINTS) return undefined;
-  const change = (median(tail.map((point) => point.value)) / level - 1) * 100;
-  return {
-    change,
-    ...(shape ? { usual: (median(tail.map((point) => shapeAt(shape, point.t))) - 1) * 100 } : {}),
-    fromMinute: Math.round((durationSeconds - DURABILITY_TAIL_SECONDS) / 60),
-    toMinute: Math.round(durationSeconds / 60)
-  };
-}

@@ -977,8 +977,23 @@
 
 /* ---------------------------------------------------------- performance -- */
 
+/* The verdict rides on the figure it is about: the change takes its colour and
+   arrow, the words beside it say against what. */
 .run-performance-change {
   color: var(--text-primary);
+}
+
+.run-performance-change.is-better .run-performance-delta {
+  color: var(--success-text);
+}
+
+.run-performance-change.is-worse .run-performance-delta {
+  color: var(--warning-text);
+}
+
+.run-performance-delta svg {
+  margin-right: 2px;
+  vertical-align: -2px;
 }
 
 /* How the figure is read, and along what: two switches at the head's end. */
@@ -988,44 +1003,6 @@
   align-items: center;
   justify-content: flex-end;
   gap: 8px;
-}
-
-.run-performance-tags {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
-.run-performance-tags:empty {
-  display: none;
-}
-
-.run-performance-pill {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 3px 10px;
-  border-radius: var(--radius-pill);
-  background: var(--run-raised);
-  color: var(--text-primary);
-  font-size: 12px;
-  font-weight: 600;
-  line-height: 1.3;
-}
-
-.run-performance-pill i {
-  width: 8px;
-  height: 8px;
-  border-radius: var(--radius-pill);
-  background: var(--text-muted);
-}
-
-.run-performance-pill.is-better i {
-  background: var(--success-text);
-}
-
-.run-performance-pill.is-worse i {
-  background: var(--warning-text);
 }
 
 .run-performance-plot-title {

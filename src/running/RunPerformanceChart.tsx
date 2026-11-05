@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { ArrowDownRight, ArrowUpRight, Minus } from "lucide-react";
 import {
   Area,
   CartesianGrid,
@@ -23,7 +24,6 @@ import {
   PERFORMANCE_STEP_SECONDS,
   PERFORMANCE_WARM_UP_SECONDS,
   performanceCurveFromSteps,
-  performanceDurability,
   performanceGapKind,
   performanceRun,
   performanceVerdict,
@@ -33,7 +33,8 @@ import {
   shapeAt,
   type PerformanceGapKind,
   type PerformanceGapReason,
-  type PerformanceProfile
+  type PerformanceProfile,
+  type PerformanceVerdict
 } from "../../electron/runPerformance";
 import { OptionGroup } from "../components/OptionGroup";
 import { useI18n } from "../i18n/useI18n";
@@ -49,7 +50,7 @@ import {
 import { formatPaceSecondsPerKm } from "../training/formatters";
 import { useChartColors } from "../training/useChartColors";
 import { useUnitSystem } from "../units/UnitSystemProvider";
-import { niceScale, performanceContext, performanceHistory } from "./runPerformanceModel";
+import { niceScale, performanceContext, performanceHistory, zeroOffsetIn } from "./runPerformanceModel";
 
 type Reading = "percent" | "absolute";
 
@@ -70,11 +71,22 @@ const GAP_REASON_KEYS = {
   heartRateSettling: "run.perf.reason.heartRateSettling"
 } as const;
 
+/**
+ * The run's verdict is said with its figure, in the head — a pill of its own
+ * under the head read as a key to the chart's colours. The usual's own figure
+ * is not stated: the scale pins it to COROS's VO2max, a whole number that holds
+ * for months, so it repeated that number on every run.
+ */
 const VERDICT_KEYS = {
-  better: "run.perf.verdict.better",
-  usual: "run.perf.verdict.usual",
-  worse: "run.perf.verdict.worse"
+  better: "run.perf.against.better",
+  usual: "run.perf.against.usual",
+  worse: "run.perf.against.worse"
 } as const;
+
+function VerdictIcon({ verdict }: { verdict: PerformanceVerdict }) {
+  const Icon = verdict === "better" ? ArrowUpRight : verdict === "worse" ? ArrowDownRight : Minus;
+  return <Icon aria-hidden="true" size={16} strokeWidth={2.25} />;
+}
 
 interface RunPerformanceChartProps {
   activity: TrainingHubActivity;
@@ -166,7 +178,6 @@ export function RunPerformanceChart({
   const raw = sessionPerformance(own.points, shape);
   const change = raw !== undefined && baseline ? (raw / baseline.value - 1) * 100 : undefined;
   const verdict = raw !== undefined && baseline ? performanceVerdict(raw, baseline.value) : undefined;
-  const durability = performanceDurability(own.points, shape, durationSeconds);
   const held = shape && durationSeconds / 60 > shape.lastMinute ? shape.lastMinute : undefined;
 
   // The steps stop where the series does, as the chart below does, or a step
@@ -246,8 +257,14 @@ export function RunPerformanceChart({
   const yMax = Math.max(effective === "percent" ? 6 : -Infinity, ...values);
   const { domain, ticks: yTicks } = niceScale(yMin, yMax, { includeZero: effective === "percent" });
   const hoverRows = rows.map((row) => ({ ...row, hover: domain[0] }));
-  // Where zero falls in the plot, for the gradient that colours above and below it.
-  const zeroAt = Math.min(1, Math.max(0, domain[1] / (domain[1] - domain[0])));
+  // Where zero falls, for the gradients that colour above and below it — each in
+  // its own shape's box, not the plot's: the line spans its readings, the fill
+  // its readings down (or up) to zero.
+  const readings = rows.flatMap((row) => (row.value !== undefined ? [row.value] : []));
+  const lowest = Math.min(...readings);
+  const highest = Math.max(...readings);
+  const lineZeroAt = zeroOffsetIn(lowest, highest);
+  const fillZeroAt = zeroOffsetIn(Math.min(0, lowest), Math.max(0, highest));
   const xTicks = activityAxisTicks(xExtent[0], xExtent[1], axis, unitSystem);
 
   if (own.points.length === 0) {
@@ -267,13 +284,14 @@ export function RunPerformanceChart({
           <h3>
             {raw !== undefined ? formatDecimal(raw * scale, 1) : "—"}
             <span className="run-block-sub"> {t("run.perf.unit")}</span>
-            {change !== undefined ? (
-              <span className="run-performance-change">
+            {change !== undefined && verdict ? (
+              <span className={`run-performance-change is-${verdict}`}>
                 {" "}
-                {signed(change)}%{" "}
-                <span className="run-block-sub">
-                  {t("run.perf.vsUsual", { value: formatDecimal(baseline!.value * scale, 1) })}
-                </span>
+                <span className="run-performance-delta">
+                  <VerdictIcon verdict={verdict} />
+                  {signed(change)}%
+                </span>{" "}
+                <span className="run-block-sub">{t(VERDICT_KEYS[verdict])}</span>
               </span>
             ) : null}
           </h3>
@@ -300,36 +318,6 @@ export function RunPerformanceChart({
         </div>
       </header>
 
-      <div className="run-performance-tags">
-        {verdict ? (
-          <span className={`run-performance-pill is-${verdict}`}>
-            <i aria-hidden="true" />
-            {t(VERDICT_KEYS[verdict])}
-          </span>
-        ) : null}
-        {durability ? (
-          <span
-            className={`run-performance-pill${
-              durability.usual !== undefined && durability.change - durability.usual <= -2
-                ? " is-worse"
-                : ""
-            }`}
-            title={t("run.perf.durabilityTitle", {
-              from: durability.fromMinute,
-              to: durability.toMinute
-            })}
-          >
-            <i aria-hidden="true" />
-            {durability.usual !== undefined
-              ? t("run.perf.durability", {
-                  change: signed(durability.change),
-                  usual: signed(durability.usual)
-                })
-              : t("run.perf.durabilityAlone", { change: signed(durability.change) })}
-          </span>
-        ) : null}
-      </div>
-
       <div className="run-block-plot">
         <ResponsiveContainer width="100%" height={260}>
           <ComposedChart data={hoverRows} margin={{ top: 8, right: 8, bottom: 4, left: 0 }}>
@@ -347,12 +335,12 @@ export function RunPerformanceChart({
                 <circle cx="3" cy="3" r="1" fill={colors.cursor} />
               </pattern>
               <linearGradient id="run-performance-split" x1="0" y1="0" x2="0" y2="1">
-                <stop offset={zeroAt} stopColor={colors.better} />
-                <stop offset={zeroAt} stopColor={colors.worse} />
+                <stop offset={lineZeroAt} stopColor={colors.better} />
+                <stop offset={lineZeroAt} stopColor={colors.worse} />
               </linearGradient>
               <linearGradient id="run-performance-split-fill" x1="0" y1="0" x2="0" y2="1">
-                <stop offset={zeroAt} stopColor={colors.better} stopOpacity={0.18} />
-                <stop offset={zeroAt} stopColor={colors.worse} stopOpacity={0.18} />
+                <stop offset={fillZeroAt} stopColor={colors.better} stopOpacity={0.18} />
+                <stop offset={fillZeroAt} stopColor={colors.worse} stopOpacity={0.18} />
               </linearGradient>
             </defs>
             <CartesianGrid stroke={colors.grid} strokeDasharray="3 3" vertical={false} />

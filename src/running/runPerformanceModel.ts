@@ -263,4 +263,16 @@ export function niceScale(
   return { domain: [from, to], ticks };
 }
 
+/**
+ * Where zero falls, 0 at the top to 1 at the bottom, in the box around values
+ * spanning `min`–`max`. An SVG gradient's offsets count in the bounding box of
+ * the shape it paints, not the plot, so a split at the plot's zero landed above
+ * zero on a curve that never reached the axis's ends, painting better minutes
+ * as worse. A curve wholly above zero is all above (1), wholly below all below (0).
+ */
+export function zeroOffsetIn(min: number, max: number): number {
+  if (!(max > min)) return max >= 0 ? 1 : 0;
+  return Math.min(1, Math.max(0, max / (max - min)));
+}
+
 export { MIN_BASELINE_RUNS };
