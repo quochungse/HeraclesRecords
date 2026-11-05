@@ -11,3 +11,13 @@ export function entryTimeFromMid(mid: string | undefined): number | undefined {
   const match = /^1-([0-9a-f]{12})-/.exec(mid);
   return match ? parseInt(match[1]!, 16) : undefined;
 }
+
+/**
+ * The machine whose store minted an entry's `mid` (`sync/deviceIdentity.ts`):
+ * for a question, the machine it was asked on, which is the only one that can
+ * be answering it. The ids that give no time give no machine either.
+ */
+export function entryDeviceFromMid(mid: string | undefined): string | undefined {
+  if (!mid || mid.includes("~")) return undefined;
+  return /^1-[0-9a-f]{12}-[0-9a-f]{4}-([0-9a-f]{16})$/.exec(mid)?.[1];
+}

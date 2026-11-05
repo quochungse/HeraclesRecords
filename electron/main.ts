@@ -1856,6 +1856,10 @@ function registerIpcHandlers(): void {
     getChatSessionEntries(sessionId)
   );
 
+  // The machine this one's transcript entries are stamped with, so the window
+  // can tell a question asked here from one asked on the other machine.
+  ipcMain.handle("chat:getDeviceId", () => syncDeviceId());
+
   ipcMain.handle("chat:createSession", (_event, provider: ChatProvider) =>
     createChatSessionForProvider(provider)
   );

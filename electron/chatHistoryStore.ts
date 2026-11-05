@@ -1134,7 +1134,7 @@ function parseAnalysisMarker(
   }
 
   // `bindingId` keeps its old position rather than being appended last, because
-  // `foreignTail` compares entries as `JSON.stringify` of what this parser
+  // `contentKey` compares entries as `JSON.stringify` of what this parser
   // built and `saveChatSession` skips a write when the serialized row is
   // unchanged. Reordering a key would make every transcript holding one look
   // rewritten on its next save.
@@ -1771,90 +1771,125 @@ export function createChatSession(
 }
 
 /**
- * The entries a save would silently destroy: everything the row holds past the
- * point the caller knows about and is not itself sending. Position finds the
- * candidates — the analysis runner only ever appends, so a foreign write is
- * always a tail — and content rules out the ones the caller already holds.
+ * Which stored entries the caller read, and so may rewrite or leave out; `null`
+ * when the caller said nothing, which replaces the row outright.
  *
- * A caller that knows nothing (0) therefore keeps everything, which is the
- * safe direction for the accident this guards against.
+ * By identity where the caller names them (`knownIds`): a pull files another
+ * machine's entries *inside* the row, in `mid` order, so a count of the
+ * entries read covers whichever ones now sit at those positions — once the
+ * pulled question, which the save then deleted, and not the caller's own
+ * question, which it then appended a second time. The count still speaks for
+ * an entry stored without an identity, which no position can have moved.
+ *
+ * The count is clamped to what the caller sent: claiming more is asserting a
+ * deletion, and nothing deletes entries — the window only appends to its own
+ * timeline or rewrites it in place. A caller that knows nothing (0) keeps
+ * everything, which is the safe direction for the accident this guards.
  */
-function foreignTail(
-  stored: PersistedChatEntry[],
-  knownEntryCount: number | undefined,
-  incoming: PersistedChatEntry[]
-): PersistedChatEntry[] {
-  if (knownEntryCount === undefined || !Number.isFinite(knownEntryCount)) {
-    return [];
-  }
-  // Clamped to what the caller actually sent. The count says "my array accounts
-  // for this many of the row's entries", so a caller claiming more than it sent
-  // is asserting a deletion — and nothing deletes entries: the window only ever
-  // appends to its own timeline or rewrites it in place. Honouring the claim
-  // would drop the entries between the two numbers with nothing to notice it,
-  // which is the wrong direction for a guard whose whole point is that the
-  // accident fails harmlessly.
-  const claimed = Math.max(0, Math.floor(knownEntryCount));
-  const known = Math.min(claimed, incoming.length);
-  if (stored.length <= known) {
-    return [];
-  }
-  const tail = stored.slice(known);
+function storedEntriesKnown(
+  stored: readonly PersistedChatEntry[],
+  options: SaveChatSessionOptions,
+  sentCount: number
+): boolean[] | null {
+  const { knownEntryCount, knownIds } = options;
+  const ids = Array.isArray(knownIds)
+    ? new Set(knownIds.filter((id): id is string => typeof id === "string" && id !== ""))
+    : undefined;
+  const counted = typeof knownEntryCount === "number" && Number.isFinite(knownEntryCount);
+  if (!ids && !counted) return null;
+  const known = counted ? Math.min(Math.max(0, Math.floor(knownEntryCount)), sentCount) : 0;
+  return stored.map((entry, index) => (ids && entry.mid ? ids.has(entry.mid) : index < known));
+}
 
-  // The count can understate what the caller holds — a save that never fired
-  // leaves it behind while the timeline keeps growing — and then the "foreign"
-  // tail is not foreign at all: the caller is sending those very entries. The
-  // guard used to append them anyway, which is how one conversation ended up
-  // with eight entries written twice, a repeated stretch of its own history,
-  // and two chart cards sharing a `previewId` — the duplicate React key that
-  // surfaced it.
-  //
-  // So the position test stands, and the content settles it: the longest head
-  // of the tail the caller's array holds anywhere past the entries it accounts
-  // for is dropped. Only an identical run of entries in the same order matches,
-  // so a run's genuine append — a playbook turn and an answer nothing else
-  // wrote — is still kept.
-  //
-  // Anywhere past, not only at the very end: a stale count is followed by more
-  // turns, so the array usually holds the row's entries *and* the new ones
-  // after them. An ends-with test finds no overlap there and appends the whole
-  // tail again — the same duplication, one turn later.
-  //
-  // Compared as they will be stored, not as they were sent: an entry the store
-  // rejects never reaches the row, so leaving it in would put a hole in the
-  // caller's array that no stored entry can match — and the overlap would read
-  // as none.
-  // Content, with `mid` and `mrev` taken off. A stored entry carries them and
-  // the caller's copy of that same entry does not — the renderer rebuilds
-  // entries field by field on the way out — so comparing the raw JSON would
-  // find no overlap at all and append the tail the caller is already sending.
-  const canonical = (entry: PersistedChatEntry | null): string =>
-    entry === null ? "null" : contentKey(entry);
-  const accepted = incoming.map((entry) => parseEntry(entry));
-  const start = accepted.slice(0, known).filter((entry) => entry !== null).length;
-  const incomingText = accepted
-    .filter((entry): entry is PersistedChatEntry => entry !== null)
-    .map(canonical);
-  // `tail` comes from `parseChatTranscriptJson`, so it is already what the
-  // store accepts; only `incoming` still needs putting through the parser.
-  const tailText = tail.map((entry) => canonical(entry));
-  let held = 0;
-  for (
-    let offset = start;
-    offset < incomingText.length && held < tailText.length;
-    offset++
-  ) {
-    let length = 0;
-    while (
-      length < tailText.length &&
-      offset + length < incomingText.length &&
-      incomingText[offset + length] === tailText[length]
-    ) {
-      length++;
+/**
+ * The caller's array with every entry it would silently destroy put back: an
+ * entry the row holds that the caller neither read nor is sending — a coach
+ * analysis writing from this process, a turn pulled from the other machine.
+ *
+ * Which stored entry the caller is sending is matched the way `stampEntries`
+ * recovers identities, by content and then by the card's own id: the
+ * renderer strips `mid` on the way out. The entries it read are matched first.
+ * The rest newest first, because the caller's own writes since it read the row
+ * — its question, saved at send — are the newest entries it holds, and a
+ * question pulled from the other machine in the same words ("how did today
+ * go?" is asked every run) must not pass for it.
+ *
+ * Where a kept entry goes: past everything the caller accounts for, after
+ * everything it sends — an analysis only ever appends, and its turn followed
+ * whatever the window held. Anywhere earlier it is an entry a pull filed
+ * there, and it goes back after the entry it followed.
+ */
+function withEntriesKeptFromRow(
+  stored: readonly PersistedChatEntry[],
+  incoming: readonly PersistedChatEntry[],
+  known: readonly boolean[]
+): PersistedChatEntry[] {
+  const byContent = new Map<string, number[]>();
+  const byLogical = new Map<string, number[]>();
+  const push = (map: Map<string, number[]>, key: string, index: number) => {
+    const held = map.get(key);
+    if (held) held.push(index);
+    else map.set(key, [index]);
+  };
+  incoming.forEach((entry, index) => {
+    push(byContent, contentKey(entry), index);
+    const logical = logicalKey(entry);
+    if (logical) push(byLogical, logical, index);
+  });
+  const taken = new Set<number>();
+  const take = (map: Map<string, number[]>, key: string | undefined): number | undefined => {
+    if (!key) return undefined;
+    const queue = map.get(key);
+    while (queue && queue.length > 0) {
+      const index = queue.shift() as number;
+      if (!taken.has(index)) {
+        taken.add(index);
+        return index;
+      }
     }
-    held = Math.max(held, length);
+    return undefined;
+  };
+
+  // Where the caller is sending each stored entry, if it is.
+  const sentAt: (number | undefined)[] = stored.map(() => undefined);
+  const match = (indices: number[]) => {
+    for (const index of indices) sentAt[index] = take(byContent, contentKey(stored[index]));
+    for (const index of indices) {
+      if (sentAt[index] === undefined) sentAt[index] = take(byLogical, logicalKey(stored[index]));
+    }
+  };
+  const read = stored.flatMap((_entry, index) => (known[index] ? [index] : []));
+  const unread = stored.flatMap((_entry, index) => (known[index] ? [] : [index])).reverse();
+  match(read);
+  match(unread);
+
+  const kept = unread.filter((index) => sentAt[index] === undefined).reverse();
+  if (kept.length === 0) return [...incoming];
+  let lastAccounted = -1;
+  stored.forEach((_entry, index) => {
+    if (known[index] || sentAt[index] !== undefined) lastAccounted = index;
+  });
+
+  // Keyed by the index of the sent entry each goes after; -1 is before them all.
+  const after = new Map<number, PersistedChatEntry[]>();
+  const tail: PersistedChatEntry[] = [];
+  for (const index of kept) {
+    if (index > lastAccounted) {
+      tail.push(stored[index]);
+      continue;
+    }
+    let anchor = index - 1;
+    while (anchor >= 0 && sentAt[anchor] === undefined) anchor -= 1;
+    const at = anchor < 0 ? -1 : (sentAt[anchor] as number);
+    const group = after.get(at);
+    if (group) group.push(stored[index]);
+    else after.set(at, [stored[index]]);
   }
-  return tail.slice(held);
+  return [
+    ...(after.get(-1) ?? []),
+    ...incoming.flatMap((entry, index) => [entry, ...(after.get(index) ?? [])]),
+    ...tail
+  ];
 }
 
 /**
@@ -1958,6 +1993,7 @@ function stampEntries(
   stored: PersistedChatEntry[]
 ): PersistedChatEntry[] {
   const storedById = new Map<string, PersistedChatEntry>();
+  const storedIndexById = new Map<string, number>();
   const byContent = new Map<string, number[]>();
   const byLogical = new Map<string, number[]>();
   const push = (map: Map<string, number[]>, key: string, index: number): void => {
@@ -1966,13 +2002,23 @@ function stampEntries(
     else map.set(key, [index]);
   };
   stored.forEach((entry, index) => {
-    if (entry.mid) storedById.set(entry.mid, entry);
+    if (entry.mid) {
+      storedById.set(entry.mid, entry);
+      storedIndexById.set(entry.mid, index);
+    }
     push(byContent, contentKey(entry), index);
     const logical = logicalKey(entry);
     if (logical) push(byLogical, logical, index);
   });
 
-  const claimed = new Set<number>();
+  // An entry that arrives with its identity — one kept from the row — is that
+  // stored entry, so no entry in the same words may take it as well.
+  const claimed = new Set<number>(
+    incoming.flatMap((entry) => {
+      const index = entry.mid ? storedIndexById.get(entry.mid) : undefined;
+      return index === undefined ? [] : [index];
+    })
+  );
   const take = (map: Map<string, number[]>, key: string | undefined) => {
     if (!key) return undefined;
     const queue = map.get(key);
@@ -2047,11 +2093,12 @@ export function saveChatSession(
   // hundreds of kilobytes — measured at 480 kB on a real conversation — so the
   // second parse was pure waste on the hot path of every finished turn.
   const stored = parseChatTranscriptJson(row.messages_json);
+  // Compared as they will be stored, not as they were sent: an entry the store
+  // rejects never reaches the row, so it must not stand in for one that does.
+  const incoming = normalizeEntries(entries);
+  const known = storedEntriesKnown(stored, options, entries.length);
   const normalizedEntries = stampEntries(
-    normalizeEntries([
-      ...entries,
-      ...foreignTail(stored, options.knownEntryCount, entries)
-    ]),
+    known ? withEntriesKeptFromRow(stored, incoming, known) : incoming,
     stored
   );
   const title =

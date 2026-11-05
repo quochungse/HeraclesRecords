@@ -38,9 +38,22 @@ export const ANSWERING_ELSEWHERE_MS = 10 * 60_000;
 
 /**
  * What to say under a question no answer followed, when this window saw no
- * failure: a recent one may still be in flight on the other machine — its
- * question is saved the moment it is sent, its answer only once it is done.
+ * failure: a recent one asked on the other machine may still be in flight
+ * there — its question is saved the moment it is sent, its answer only once
+ * it is done. Only the machine that asked answers (`askedOn`, read off the
+ * question's `mid`), so one asked here, with no turn running here, went
+ * unanswered however recent: a transcript a sync pull had disordered once
+ * showed this machine's own question as being answered elsewhere. `here`
+ * unknown rules no machine out.
  */
-export function unansweredKind(askedAt: number | undefined, now: number): "noAnswer" | "elsewhere" {
-  return askedAt !== undefined && now - askedAt < ANSWERING_ELSEWHERE_MS ? "elsewhere" : "noAnswer";
+export function unansweredKind(
+  question: { askedAt: number | undefined; askedOn: string | undefined },
+  here: string | undefined,
+  now: number
+): "noAnswer" | "elsewhere" {
+  const { askedAt, askedOn } = question;
+  if (askedAt === undefined || now - askedAt >= ANSWERING_ELSEWHERE_MS) return "noAnswer";
+  // No `mid` yet: written in this window, so asked here.
+  if (askedOn === undefined || askedOn === here) return "noAnswer";
+  return "elsewhere";
 }

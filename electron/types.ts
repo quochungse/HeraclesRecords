@@ -1646,6 +1646,13 @@ export interface SaveChatSessionOptions {
    * between.
    */
   knownEntryCount?: number;
+  /**
+   * The `mid` of every entry in the caller's array that it read from the row.
+   * Where given, these, not a position, say which stored entries the caller
+   * accounts for: a sync pull files the other machine's entries inside the
+   * row, so a count covers whichever entries now sit at its positions.
+   */
+  knownIds?: string[];
 }
 
 export interface CoachInputChoice {
@@ -3544,10 +3551,10 @@ export interface PlanDraftPreview {
   /**
    * Set when the athlete removed this creation from the conversation. The
    * entry stays in the transcript and the draft is rewritten in place, because
-   * a save that shortens the array is exactly what `foreignTail` refuses — a
-   * shorter array reads as "the row grew behind my back" and the guard puts the
-   * tail back. Nothing that was already saved to COROS or the library is
-   * touched; only the card goes.
+   * a save that shortens the array is exactly what `withEntriesKeptFromRow`
+   * refuses — a shorter array reads as "the row grew behind my back" and the
+   * guard puts the tail back. Nothing that was already saved to COROS or the
+   * library is touched; only the card goes.
    */
   removedAt?: number;
   uploadResult?: {

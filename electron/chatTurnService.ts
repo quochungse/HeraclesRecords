@@ -49,8 +49,8 @@ import type {
  * conversation from one.
  *
  * Done here rather than by the window saving a shorter transcript: a save
- * that shortens the row is exactly what `foreignTail` refuses — it reads as
- * "the row grew behind my back" and puts the tail back — and an analysis
+ * that shortens the row is exactly what `withEntriesKeptFromRow` refuses — it
+ * reads as "the row grew behind my back" and puts the tail back — and an analysis
  * appending to the same row from this process must not race a delete the
  * window thinks it made. Read, cut and written with nothing awaited between,
  * a turn's removal is atomic against both.
@@ -66,6 +66,11 @@ import type {
  * position and, often, its words to another turn ("ok" asked twice), and a
  * window not yet re-read would otherwise delete that one. Without a `mid`, at
  * the position it names, or the one turn asked in those words.
+ *
+ * A `mid` held twice — a save once appended the window's question again behind
+ * a turn a pull had filed in front of it — is the copy at the position the
+ * window shows; the first copy was taken for "the last question" and deleting
+ * it took the pulled turn with it.
  */
 function resolveTurn(entries: readonly PersistedChatEntry[], ref: TurnRef): TurnRange {
   const turns = turnRanges(entries);
@@ -74,8 +79,13 @@ function resolveTurn(entries: readonly PersistedChatEntry[], ref: TurnRef): Turn
     return question?.kind === "message" && question.content === ref.content;
   };
   if (ref.mid) {
-    const byMid = turns.find((range) => entries[range.question]?.mid === ref.mid);
-    if (byMid) return byMid;
+    const byMid = turns.filter((range) => entries[range.question]?.mid === ref.mid);
+    if (byMid.length === 1) return byMid[0]!;
+    if (byMid.length > 1) {
+      const shown = byMid.find((range) => range.question === ref.index && asked(range));
+      if (shown) return shown;
+      throw new ScreenError("main.coach.turnChanged");
+    }
     // A row no save has stamped yet cannot be asked by identity.
     const stamped = entries.some((entry) => entry.mid);
     const atIndex = stamped ? undefined : turns.find((range) => range.question === ref.index && asked(range));

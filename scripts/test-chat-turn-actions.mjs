@@ -18,7 +18,8 @@
 //   * The window names the turn by its question's identity where it has one,
 //     and otherwise by position and words: a turn found only by its words is
 //     used when they are unique, refused when they are not; one whose identity
-//     is gone is refused whatever its words.
+//     is gone is refused whatever its words, and one held twice is the copy
+//     where the window shows it.
 //   * Asking again is the last turn only; the question keeps its identity,
 //     its answer and what the answer made go.
 //   * A hidden turn stays in the row and out of what Coach reads — an
@@ -29,7 +30,8 @@
 //     same AI and sources, the summary when it covers nothing past the branch
 //     point, and the same turns hidden.
 //   * A failed turn's row is sorted by what the athlete can do about it, and
-//     a recent question with no answer may still be answered elsewhere.
+//     a recent question another machine asked may still be answered there;
+//     one this machine asked never is.
 //
 // Usage:
 //   npm run test:chat-turn-actions
@@ -53,6 +55,7 @@ const context = await import(distUrl("chatContextService.js"));
 const turns = await import(distUrl("chatTurns.js"));
 const service = await import(distUrl("chatTurnService.js"));
 const hiddenModule = await import(distUrl("chatHiddenTurns.js"));
+const entryTime = await import(distUrl("chatEntryTime.js"));
 const chatService = await import(distUrl("chatService.js"));
 const syncBridge = await import(distUrl("sync/syncBridge.js"));
 const { HlcClock, formatHlc } = await import(distUrl("sync/hlc.js"));
@@ -382,6 +385,30 @@ test("a turn is found by its question's identity, and refused once that is gone"
   assert.deepEqual(contents(sessionId), ["Q2", "A2"], "found where it moved to");
 });
 
+test("a question held twice under one identity is the one where the window shows it", async () => {
+  // What a turn's save left when a pull had filed another machine's turn in
+  // front of its question: the question where the window had it, with its
+  // answer, the pulled turn, and the question again at the end. Found by
+  // identity alone, the first copy was "the last question" — asking it again
+  // was refused as not the last, and deleting it took the pulled turn.
+  const sessionId = conversation([user("Q1"), coach("A1"), user("Today?")]);
+  const [q1, a1, today] = history.getChatSession(sessionId);
+  history.saveChatSession(sessionId, [q1, a1, today, coach("First answer"), user("Pulled"), coach("Pulled answer"), today]);
+  assert.equal(history.getChatSession(sessionId).filter((entry) => entry.mid === today.mid).length, 2);
+
+  const last = { index: 6, content: "Today?", mid: today.mid };
+  service.editTurn(sessionId, last, "Today?");
+  await service.deleteTurn(sessionId, last, { deleteCreations: false, rewriteSummary: false }, noRoll);
+  assert.deepEqual(contents(sessionId), ["Q1", "A1", "Today?", "First answer", "Pulled", "Pulled answer"]);
+
+  history.saveChatSession(sessionId, [...history.getChatSession(sessionId), today]);
+  await assert.rejects(
+    service.deleteTurn(sessionId, { ...last, index: 9 }, { deleteCreations: false, rewriteSummary: false }, noRoll),
+    /changed since it was opened/,
+    "neither copy where the window shows it: nothing is guessed"
+  );
+});
+
 // --- asking again ---------------------------------------------------------------
 
 test("only the last question is asked again, keeping its identity and losing its answer", async () => {
@@ -523,9 +550,34 @@ test("a failure is sorted by what can be done about it", () => {
   }
   assert.equal(failure.classifyTurnFailure("anything", true), "auth", "the main process's own word wins");
   const now = Date.UTC(2026, 9, 21, 7);
-  assert.equal(failure.unansweredKind(now - 60_000, now), "elsewhere");
-  assert.equal(failure.unansweredKind(now - failure.ANSWERING_ELSEWHERE_MS, now), "noAnswer");
-  assert.equal(failure.unansweredKind(undefined, now), "noAnswer");
+  const here = "493e78a39227b4b6";
+  const there = "92cdbcf84593f86e";
+  const asked = (ago, device) => {
+    const mid = `1-${(now - ago).toString(16).padStart(12, "0")}-0000-${device}`;
+    return { askedAt: entryTime.entryTimeFromMid(mid), askedOn: entryTime.entryDeviceFromMid(mid) };
+  };
+  assert.equal(failure.unansweredKind(asked(60_000, there), here, now), "elsewhere");
+  assert.equal(
+    failure.unansweredKind(asked(failure.ANSWERING_ELSEWHERE_MS, there), here, now),
+    "noAnswer",
+    "too long ago to be in flight anywhere"
+  );
+  // Only the machine that asked answers. A question this one asked a minute
+  // ago, with no turn running here, went unanswered — however recent.
+  assert.equal(failure.unansweredKind(asked(60_000, here), here, now), "noAnswer");
+  assert.equal(
+    failure.unansweredKind({ askedAt: now - 60_000, askedOn: undefined }, here, now),
+    "noAnswer",
+    "a question written in this window has no mid yet, and was asked here"
+  );
+  assert.equal(
+    failure.unansweredKind(asked(60_000, here), undefined, now),
+    "elsewhere",
+    "this machine not known yet: no machine is ruled out"
+  );
+  assert.equal(failure.unansweredKind({ askedAt: undefined, askedOn: undefined }, here, now), "noAnswer");
+  assert.equal(entryTime.entryDeviceFromMid("0-000003-1a2b3c4d"), undefined, "a backfilled id names no machine");
+  assert.equal(entryTime.entryDeviceFromMid(`1-01a1abf1f9f9-0000-${here}~0000`), undefined);
 });
 
 for (const [name, run] of cases) {

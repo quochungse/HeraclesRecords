@@ -93,6 +93,7 @@ import type {
 } from "../../electron/types";
 import { NOTHING_TO_REPORT } from "../../electron/types";
 import { planDiff } from "../../electron/planDiff";
+import { entryDeviceFromMid } from "../../electron/chatEntryTime";
 import {
   chartHandle,
   holdBackPartialPlaceholder,
@@ -197,6 +198,7 @@ import { ModelOptionsContext } from "./modelOptionsContext";
 import { ProviderSwitch } from "./ProviderSwitch";
 import {
   fromPersistedEntries,
+  readEntryIds,
   toPersistedEntries,
   upsertActivityVisualEntry,
   upsertCoachPromptEntry,
@@ -1443,6 +1445,21 @@ export function ChatView({
   } | null>(null);
   /** The question the running turn asks, for the failure it may end in. */
   const turnQuestionRef = useRef<TurnQuestion | null>(null);
+  /** This machine as a `mid` names it: a question it asked is answered here or nowhere (`unansweredKind`). */
+  const [thisDevice, setThisDevice] = useState<string | undefined>(undefined);
+  useEffect(() => {
+    if (!api) return;
+    let current = true;
+    void Promise.resolve()
+      .then(() => api.getChatDeviceId())
+      .then((id) => {
+        if (current && typeof id === "string") setThisDevice(id);
+      })
+      .catch(() => undefined);
+    return () => {
+      current = false;
+    };
+  }, [api]);
   /** The turn the athlete asked to delete, while the question is up. */
   const [turnDeletion, setTurnDeletion] = useState<{
     sessionId: string;
@@ -1845,7 +1862,7 @@ export function ChatView({
       // earlier save's answer roll the base backwards.
       persistedBaseRef.current = persisted.length;
       const saved: Promise<void> = api
-        .saveChatSession(sessionId, persisted, { knownEntryCount })
+        .saveChatSession(sessionId, persisted, { knownEntryCount, knownIds: readEntryIds(entries) })
         .then((summary) => {
           if (!summary) return;
           setSessions((current) => {
@@ -1906,7 +1923,7 @@ export function ChatView({
     const knownEntryCount = parked.base;
     parked.base = persisted.length;
     const saved: Promise<void> = api
-      .saveChatSession(parked.sessionId, persisted, { knownEntryCount })
+      .saveChatSession(parked.sessionId, persisted, { knownEntryCount, knownIds: readEntryIds(entries) })
       .then((summary) => {
         if (!summary) return;
         setSessions((current) =>
@@ -2423,9 +2440,9 @@ export function ChatView({
       if (!sessionId) return;
       // Mid-turn the copy on screen is the newer one — the athlete's message
       // and the tokens under it are not in the row yet — so replacing it would
-      // take their own words off the screen. `foreignTail` keeps the merged
-      // entries safe in the row meanwhile (5.6b), so this only has to wait for
-      // the turn to end.
+      // take their own words off the screen. The store keeps the merged
+      // entries safe in the row meanwhile (`withEntriesKeptFromRow`, 5.6b), so
+      // this only has to wait for the turn to end.
       if (chatBusyRef.current) {
         syncReloadPendingRef.current = sessionId;
         return;
@@ -4324,7 +4341,8 @@ export function ChatView({
    *
    * A mark on the draft, not a splice: the entry keeps its place in the
    * transcript so the array the window saves is the same length the row holds
-   * — a shorter one is what `foreignTail` reads as a foreign append and undoes.
+   * — a shorter one is what `withEntriesKeptFromRow` reads as a foreign append
+   * and undoes.
    * Whatever was already uploaded to COROS or saved to the library is left
    * alone; this removes the card, not the workout.
    */
@@ -5387,7 +5405,14 @@ export function ChatView({
         : null;
     return known
       ? { kind: known.kind, ...(known.detail ? { detail: known.detail } : {}), question: last.question }
-      : { kind: unansweredKind(question.at, Date.now()), question: last.question };
+      : {
+          kind: unansweredKind(
+            { askedAt: question.at, askedOn: entryDeviceFromMid(question.mid) },
+            thisDevice,
+            Date.now()
+          ),
+          question: last.question
+        };
   })();
   const failureRow = failure ? (
     <ChatRow key="turn-failure" settled className="chat-row chat-row-assistant">

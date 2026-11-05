@@ -507,6 +507,8 @@ export interface HeraclesRecordsApi {
   /** Every conversation, whichever AI answers it (Q1 of the Coach Workbench review). */
   listChatSessions: () => Promise<ChatSessionSummary[]>;
   getChatSession: (sessionId: string) => Promise<PersistedChatEntry[]>;
+  /** The machine this one's transcript entries are stamped with (the device part of a `mid`). */
+  getChatDeviceId: () => Promise<string>;
   createChatSession: (provider: ChatProvider) => Promise<ChatSessionSummary>;
   saveChatSession: (
     sessionId: string,

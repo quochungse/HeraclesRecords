@@ -207,10 +207,16 @@ assert.match(AUTOMATION_OUTPUT_CONTRACT, new RegExp(NOTHING_TO_REPORT));
   // 5.6b: the window saves its whole timeline, so it has to tell the store how
   // much of the row that array accounts for. Without it, a save issued in the
   // moment between a run landing and the reload arriving deletes the answer.
+  // By identity as well as count: a pull files entries inside the row.
   assert.match(
     chatView,
-    /saveChatSession\(sessionId, persisted, \{ knownEntryCount \}\)/,
+    /saveChatSession\(sessionId, persisted, \{ knownEntryCount, knownIds: readEntryIds\(entries\) \}\)/,
     "the window must declare what its array is based on when it saves"
+  );
+  assert.match(
+    chatView,
+    /saveChatSession\(parked\.sessionId, persisted, \{ knownEntryCount, knownIds: readEntryIds\(entries\) \}\)/,
+    "and so must a parked turn's save"
   );
   // Advanced before the call, not in the reply: handlers run in send order, so
   // an earlier save's answer arriving late must not roll the base backwards.

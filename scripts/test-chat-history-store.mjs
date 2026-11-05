@@ -1060,6 +1060,94 @@ assert.deepEqual(
     );
     deleteChatSession(session.id, db);
   }
+
+  // 8. A pull lands inside the row, not after it: a transcript travels entry by
+  // entry and `placeElement` files each one in `mid` order, so a turn asked on
+  // the other machine yesterday goes in *before* the question this window has
+  // just saved. A position cannot describe that — counted, the window's base
+  // covered the pulled question (deleted by the save) and not its own
+  // (appended again, one `mid` twice). Deleting the "last" turn then took
+  // yesterday's turn and the first answer, and retrying it was refused as not
+  // the last. The window names the entries it read instead (`knownIds`).
+  {
+    const { placeElement } = await import(`${distUrl("sync/transcriptItems.js")}?cacheBust=${Date.now()}`);
+    const at = (millis, n, device) =>
+      `1-${millis.toString(16).padStart(12, "0")}-${n.toString(16).padStart(4, "0")}-${device}`;
+    const opened = [
+      { ...athleteOpening, mid: at(0x100, 0, "aaaa"), mrev: at(0x100, 0, "aaaa") },
+      { kind: "message", role: "assistant", content: "Morning to you.", mid: at(0x200, 0, "aaaa"), mrev: at(0x200, 0, "aaaa") }
+    ];
+    const question = { kind: "message", role: "user", content: "How did today go?" };
+    const answer = { kind: "message", role: "assistant", content: "Well paced." };
+
+    const run = (pulledQuestion) => {
+      const session = createChatSession("local", db);
+      db.updateSession(session.id, "Pulled", JSON.stringify(opened), "2026-11-05T13:41:00.000Z");
+      // What the window read, and the mids on it, which it names when it saves.
+      const read = readChatSession(session.id, db);
+      const knownIds = read.map((entry) => entry.mid);
+      const window = stripMergeMeta(read);
+      // The question is saved at send.
+      saveChatSession(session.id, [...window, question], db, { knownEntryCount: 2, knownIds });
+      const asked = readChatSession(session.id, db);
+      // The pull, as `SqliteSyncTarget.upsertItem` writes it.
+      const pulled = [
+        { ...pulledQuestion, mid: at(0x300, 0, "bbbb"), mrev: at(0x300, 0, "bbbb") },
+        { kind: "message", role: "assistant", content: "Yesterday's answer.", mid: at(0x300, 1, "bbbb"), mrev: at(0x300, 1, "bbbb") }
+      ];
+      let list = asked;
+      for (const element of pulled) list = placeElement(list, element.mid, element).list ?? list;
+      db.updateSession(session.id, "Pulled", JSON.stringify(list), "2026-11-05T13:42:20.000Z");
+      // The turn ends; the reload the pull asked for waits until after this save.
+      saveChatSession(session.id, [...window, question, answer], db, { knownEntryCount: 3, knownIds });
+      const stored = readChatSession(session.id, db);
+      deleteChatSession(session.id, db);
+      return { asked, pulled, stored };
+    };
+
+    {
+      const { asked, pulled, stored } = run({ kind: "message", role: "user", content: "What about Sunday?" });
+      assert.deepEqual(
+        stored.map((entry) => entry.content),
+        ["Morning.", "Morning to you.", "What about Sunday?", "Yesterday's answer.", "How did today go?", "Well paced."],
+        "the pulled turn stays where the pull put it, and the window's turn follows it once"
+      );
+      assert.deepEqual(stored.slice(2, 4).map((entry) => entry.mid), pulled.map((entry) => entry.mid));
+      assert.equal(stored[4].mid, asked[2].mid, "the window's question keeps the identity it was saved with");
+      assert.equal(new Set(stored.map((entry) => entry.mid)).size, stored.length, "no identity twice");
+    }
+
+    // The same words asked on both machines — "how did today go?" is asked
+    // every run — must not let the pulled question pass for the window's own.
+    {
+      const { asked, pulled, stored } = run(question);
+      assert.deepEqual(
+        stored.map((entry) => entry.content),
+        ["Morning.", "Morning to you.", "How did today go?", "Yesterday's answer.", "How did today go?", "Well paced."]
+      );
+      assert.equal(stored[2].mid, pulled[0].mid, "the pulled question keeps its own identity");
+      assert.equal(stored[4].mid, asked[2].mid, "and the window's question keeps its own");
+      assert.equal(new Set(stored.map((entry) => entry.mid)).size, stored.length, "no identity twice");
+    }
+
+    // The tail rule is unchanged under identities: a run that appended after
+    // everything the window holds still lands after what it sends.
+    {
+      const session = createChatSession("local", db);
+      db.updateSession(session.id, "Run", JSON.stringify(opened), "2026-11-05T13:41:00.000Z");
+      const read = readChatSession(session.id, db);
+      saveChatSession(session.id, [...stripMergeMeta(read), ...runEntries], db);
+      saveChatSession(session.id, [...stripMergeMeta(read), athleteReply], db, {
+        knownEntryCount: 2,
+        knownIds: read.map((entry) => entry.mid)
+      });
+      assert.deepEqual(
+        getChatSession(session.id, db).map((entry) => entry.content),
+        ["Morning.", "Morning to you.", "Thanks.", "Debrief the session.", "Easy week, hold it there."]
+      );
+      deleteChatSession(session.id, db);
+    }
+  }
 }
 
 // --- the option survives the whole IPC chain -------------------------------
@@ -1179,8 +1267,8 @@ assert.equal(
 );
 
 // Removing a creation is a mark on the draft that survives a round trip, and
-// a save that keeps the array's length so `foreignTail` has no tail to put
-// back. Both halves matter: `parsePlanDraft` rebuilds the draft field by
+// a save that keeps the array's length so `withEntriesKeptFromRow` has no tail
+// to put back. Both halves matter: `parsePlanDraft` rebuilds the draft field by
 // field, so an unlisted key is dropped, and a save that *shortened* the array
 // would have the guard restore the entry it just removed.
 {

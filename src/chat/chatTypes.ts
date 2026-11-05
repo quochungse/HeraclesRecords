@@ -458,6 +458,15 @@ export function toPersistedEntries(entries: ChatEntry[]): PersistedChatEntry[] {
     .filter((entry): entry is PersistedChatEntry => entry !== null);
 }
 
+/**
+ * The store's identities of the entries a save of `entries` sends back, which
+ * the window read from it (`SaveChatSessionOptions.knownIds`). One it cannot
+ * write back is left out, so the store keeps its copy.
+ */
+export function readEntryIds(entries: ChatEntry[]): string[] {
+  return entries.flatMap((entry) => (entry.mid && persistVisualEntry(entry) ? [entry.mid] : []));
+}
+
 export function fromPersistedEntries(entries: PersistedChatEntry[]): ChatEntry[] {
   return entries.map((entry) => ({
     ...fromPersistedEntry(entry),

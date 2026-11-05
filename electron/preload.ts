@@ -593,6 +593,7 @@ const api = {
     ipcRenderer.invoke("chat:listSessions"),
   getChatSession: (sessionId: string): Promise<PersistedChatEntry[]> =>
     ipcRenderer.invoke("chat:getSession", sessionId),
+  getChatDeviceId: (): Promise<string> => ipcRenderer.invoke("chat:getDeviceId"),
   createChatSession: (provider: ChatProvider): Promise<ChatSessionSummary> =>
     ipcRenderer.invoke("chat:createSession", provider),
   saveChatSession: (

@@ -829,6 +829,37 @@ async function main() {
     await win.webContents.executeJavaScript(`localStorage.removeItem("heraclesrecords.coach.composerDrafts.v1")`, true);
   }
 
+  // -------------------------------------------------------------------------
+  // A question this machine asked a minute ago, with no answer and no turn
+  // running here, went unanswered: only the machine that asked answers. The
+  // same question asked on the other machine may still be in flight there.
+  // -------------------------------------------------------------------------
+  {
+    const here = "493e78a39227b4b6";
+    const there = "92cdbcf84593f86e";
+    const minuteAgo = (Date.now() - 60_000).toString(16).padStart(12, "0");
+    const rowAskedOn = (device) => [
+      { kind: "message", role: "user", content: "Tuần này thế nào?", mid: "q1", mrev: "q1" },
+      { kind: "message", role: "assistant", content: "Tuần này ổn.", mid: "a1", mrev: "a1" },
+      { kind: "message", role: "user", content: "Đánh giá buổi hôm nay đi", mid: `1-${minuteAgo}-0000-${device}`, mrev: `1-${minuteAgo}-0000-${device}` }
+    ];
+    const failureFor = async (device) => {
+      await harness("mount", "ChatView", {}, {
+        ...BASE_SCRIPT,
+        getChatSession: rowAskedOn(device),
+        getHiddenChatTurns: [],
+        getChatDeviceId: here
+      });
+      await waitFor(() => harness("exists", ".chat-failure"), "the row under the unanswered question");
+      await settle();
+      return (await harness("text", ".chat-failure")) ?? "";
+    };
+    const askedHere = await failureFor(here);
+    assert.match(askedHere, /didn't answer this/, "asked here: nothing is answering it");
+    assert.doesNotMatch(askedHere, /another device/);
+    assert.match(await failureFor(there), /answering on another device/, "asked there, a minute ago: it may be");
+  }
+
   console.log("chat transcript race tests passed");
 }
 

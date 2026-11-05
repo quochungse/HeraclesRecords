@@ -194,8 +194,15 @@ Coach never writes to COROS directly; it writes drafts and change sets the athle
 - **Nothing is written during a turn** (the question is saved at send, the rest at the end).
   Anything that re-reads the transcript **flushes this window's pending save first, never
   cancels it** (`reloadTranscript`). `test:chat-transcript-race`.
-- **`foreignTail` decides by content as well as position**: it drops the longest head of the
-  tail the caller's array already holds anywhere past `knownEntryCount`.
+- **A save keeps what the window never read** (`withEntriesKeptFromRow`): the window names the
+  entries it read by `mid` (`knownIds`, from `readEntryIds`), never by count alone — a pull
+  files the other machine's entries *inside* the row, in `mid` order, and a count then covered
+  the pulled question (deleted) and not the window's own (appended twice). A kept entry goes
+  back after the entry it followed; one past everything the window accounts for goes last.
+- **Only the machine that asked answers**: a question with no answer under it reads as being
+  answered elsewhere (`unansweredKind`) only when its `mid` names another machine
+  (`entryDeviceFromMid` against `chat:getDeviceId`) and it is recent; one asked here, with no
+  turn running here, went unanswered.
 - **A turn that errors after producing output keeps it** (with a "stopped before finishing"
   notice); only a turn that produced nothing is undone. `streamedTextRef` exists because state
   is stale inside the subscription.

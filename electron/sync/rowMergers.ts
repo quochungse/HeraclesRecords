@@ -142,10 +142,10 @@ function revisionOf(entry: PersistedChatEntry): string {
  * An entry's content, with the merge bookkeeping taken back off.
  *
  * Exported because `chatHistoryStore` has to ask exactly the same question —
- * `foreignTail` decides what the caller is already sending, `stampEntries`
- * decides which stored entry an unidentified one *is*, and this decides what
- * two machines are holding the same copy of. Two definitions of "the same
- * entry" that drifted apart would put those three quietly out of step.
+ * `withEntriesKeptFromRow` decides what the caller is already sending,
+ * `stampEntries` decides which stored entry an unidentified one *is*, and this
+ * decides what two machines are holding the same copy of. Two definitions of
+ * "the same entry" that drifted apart would put those three quietly out of step.
  *
  * Memoised per object. A transcript entry can be a chart card carrying a full
  * sample series — measured at 32 kB on a real conversation — and the callers
