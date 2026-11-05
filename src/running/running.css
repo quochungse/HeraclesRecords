@@ -550,6 +550,7 @@
 
 .run-detail-hero.has-cover .run-detail-back,
 .run-detail-hero.has-cover .activity-ask-coach,
+.run-detail-hero.has-cover .activity-share,
 .run-detail-hero.has-cover .running-stat {
   pointer-events: auto;
   background: var(--run-cover-glass);

@@ -1,5 +1,7 @@
 /** One figure on the ride page: what it is, its value, and what it means on hover. */
 export interface Stat {
+  /** Stable across languages: what a share image remembers a figure by. */
+  id?: string;
   label: string;
   value: string;
   title?: string;

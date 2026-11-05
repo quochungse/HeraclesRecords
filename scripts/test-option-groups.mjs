@@ -127,6 +127,11 @@ const EXEMPT = [
     why: "The exercise library's value column: a scrolling column of up to sixteen muscles, each a picture of where it sits on the body, its anatomical name and how many movements are filed under it. A chip row holds none of that, and the picture is the point — it is what makes the column readable without knowing the words."
   },
   {
+    file: "src/share/ShareDialog.tsx",
+    marker: "share-bg-tiles",
+    why: "A share image's ground is chosen by its look: each tile is a picture of what it gives — the map style chosen, the athlete's own photo, the colour and its gradient — which a chip holds none of."
+  },
+  {
     file: "src/strength/BodyMapV2.tsx",
     marker: "anatomy-layer-row",
     why: "Muscle group visibility is a list of independent show/hide switches, one per group, not a choice between options."

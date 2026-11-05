@@ -47,6 +47,8 @@ import { ActivityZoneTimePanel } from "../training/components/ActivityZoneTimePa
 import { formatDecimal, getIntlLocale, t } from "../i18n/core";
 import { isRecoveryLap, lapSections } from "../../electron/lapSections";
 import { LapRecoveryMark, LapSectionRow } from "../training/components/LapSections";
+import { ShareButton } from "../share/ShareButton";
+import { buildActivityShareSession } from "../share/buildShareSession";
 
 interface HikeDetailViewProps {
   activity: TrainingHubActivity;
@@ -70,6 +72,8 @@ const MIN_STOPPED_SECONDS_SHOWN = 60;
 const COVER_VISIBLE_BAND = 0.15;
 
 interface Stat {
+  /** Stable across languages: what a share image remembers a figure by. */
+  id?: string;
   label: string;
   value: string;
   title?: string;
@@ -159,10 +163,12 @@ export function HikeDetailView({
 
     const stats: Stat[] = [
       {
+        id: "activity.m.distance",
         label: t("activity.m.distance"),
         value: distance !== undefined && distance > 0 ? formatDistanceMeters(distance, unitSystem) : "—"
       },
       {
+        id: "hike.detail.moving",
         label: t("hike.detail.moving"),
         value: formatDurationSeconds(moving),
         title: movingSeconds !== undefined
@@ -173,6 +179,7 @@ export function HikeDetailView({
 
     if (total !== undefined && moving !== undefined && total - moving >= MIN_STOPPED_SECONDS_SHOWN) {
       stats.push({
+        id: "run.detail.totalTime",
         label: t("run.detail.totalTime"),
         value: formatDurationSeconds(total),
         title: t("ride.detail.totalTimeTitle", { stopped: formatDurationSeconds(total - moving) })
@@ -181,20 +188,22 @@ export function HikeDetailView({
 
     if (distance !== undefined && distance > 0 && moving !== undefined && moving > 0) {
       stats.push({
+        id: "hike.detail.movingSpeed",
         label: t("hike.detail.movingSpeed"),
         value: formatSpeedValue(distance / 1000 / (moving / 3600), unitSystem)
       });
     }
 
     if (ascent !== undefined && ascent > 0) {
-      stats.push({ label: t("hike.ascent"), value: formatElevationMeters(ascent, unitSystem) });
+      stats.push({ id: "hike.ascent", label: t("hike.ascent"), value: formatElevationMeters(ascent, unitSystem) });
     }
     const descent = detail?.elevationLoss;
     if (descent !== undefined && descent > 0) {
-      stats.push({ label: t("activity.m.descent"), value: formatElevationMeters(descent, unitSystem) });
+      stats.push({ id: "activity.m.descent", label: t("activity.m.descent"), value: formatElevationMeters(descent, unitSystem) });
     }
     if (range) {
       stats.push({
+        id: "run.detail.highest",
         label: t("run.detail.highest"),
         value: formatElevationMeters(range.highest, unitSystem),
         title: t("run.detail.lowest", { value: formatElevationMeters(range.lowest, unitSystem) })
@@ -204,6 +213,7 @@ export function HikeDetailView({
     const up = terrain.find((share) => share.kind === "up");
     if (up?.verticalRate !== undefined) {
       stats.push({
+        id: "activity.channel.verticalSpeed",
         label: t("activity.channel.verticalSpeed"),
         value: formatVerticalRate(up.verticalRate, unitSystem),
         title: t("hike.detail.climbingRateTitle")
@@ -213,6 +223,7 @@ export function HikeDetailView({
     if (distance !== undefined && distance > 0 && moving !== undefined && moving > 0 && ascent !== undefined) {
       const book = naismithSeconds(distance, ascent);
       stats.push({
+        id: "hike.detail.naismith",
         label: t("hike.detail.naismith"),
         value: `${formatDecimal(moving / book, 2)}×`,
         title: t("hike.detail.naismithTitle", { book: formatDurationSeconds(book) })
@@ -221,19 +232,19 @@ export function HikeDetailView({
 
     const avgHr = detail?.avgHr ?? activity.avgHr;
     if (avgHr !== undefined) {
-      stats.push({ label: t("activity.m.avgHr"), value: `${avgHr} bpm` });
+      stats.push({ id: "activity.m.avgHr", label: t("activity.m.avgHr"), value: `${avgHr} bpm` });
     }
     const maxHr = detail?.maxHr ?? activity.maxHr;
     if (maxHr !== undefined) {
-      stats.push({ label: t("activity.m.maxHr"), value: `${maxHr} bpm` });
+      stats.push({ id: "activity.m.maxHr", label: t("activity.m.maxHr"), value: `${maxHr} bpm` });
     }
     const load = detail?.trainingLoad ?? activity.trainingLoad;
     if (load !== undefined) {
-      stats.push({ label: t("overview.tiles.load"), value: formatOptionalNumber(Math.round(load)) });
+      stats.push({ id: "overview.tiles.load", label: t("overview.tiles.load"), value: formatOptionalNumber(Math.round(load)) });
     }
     const calories = detail?.calories ?? activity.calories;
     if (calories !== undefined && calories > 0) {
-      stats.push({ label: t("activity.m.calories"), value: `${Math.round(calories)} kcal` });
+      stats.push({ id: "activity.m.calories", label: t("activity.m.calories"), value: `${Math.round(calories)} kcal` });
     }
     return stats;
   }, [activity, detail, movingSeconds, range, terrain, unitSystem, locale]);
@@ -241,22 +252,24 @@ export function HikeDetailView({
   const conditions = useMemo<Stat[]>(() => {
     const stats: Stat[] = [];
     if (detail?.effect?.aerobic !== undefined) {
-      stats.push({ label: t("run.detail.aerobic"), value: formatDecimal(detail.effect.aerobic, 1) });
+      stats.push({ id: "run.detail.aerobic", label: t("run.detail.aerobic"), value: formatDecimal(detail.effect.aerobic, 1) });
     }
     if (detail?.effect?.anaerobic !== undefined) {
-      stats.push({ label: t("run.detail.anaerobic"), value: formatDecimal(detail.effect.anaerobic, 1) });
+      stats.push({ id: "run.detail.anaerobic", label: t("run.detail.anaerobic"), value: formatDecimal(detail.effect.anaerobic, 1) });
     }
     if (detail?.weather?.temperatureC !== undefined) {
       stats.push({
+        id: "run.detail.temperature",
         label: t("run.detail.temperature"),
         value: formatTemperatureValue(detail.weather.temperatureC, temperatureUnit)
       });
     }
     if (detail?.weather?.humidityPct !== undefined) {
-      stats.push({ label: t("run.detail.humidity"), value: `${Math.round(detail.weather.humidityPct)}%` });
+      stats.push({ id: "run.detail.humidity", label: t("run.detail.humidity"), value: `${Math.round(detail.weather.humidityPct)}%` });
     }
     if (detail?.dynamics?.avgCadence !== undefined && detail.dynamics.avgCadence > 0) {
       stats.push({
+        id: "activity.m.cadence",
         label: t("activity.m.cadence"),
         value: `${Math.round(detail.dynamics.avgCadence)} spm`,
         title: t("hike.detail.cadenceTitle")
@@ -293,6 +306,25 @@ export function HikeDetailView({
                   <MessageCircle size={15} aria-hidden="true" />
                   {t("activity.askCoach")}
                 </button>
+              ) : null}
+              {detail ? (
+                <ShareButton
+                  build={() =>
+                    buildActivityShareSession({
+                      sport: "hike",
+                      activity,
+                      detail,
+                      series,
+                      kind: kindLabel,
+                      name: activity.name?.trim() || kindLabel,
+                      stats: [...headline, ...conditions],
+                      defaultStats: ["activity.m.distance", "hike.detail.moving", "run.detail.highest"],
+                      defaultHero: "hike.ascent",
+                      charts: ["elevation", "hr"],
+                      unitSystem
+                    })
+                  }
+                />
               ) : null}
             </div>
             <div className="run-detail-title">

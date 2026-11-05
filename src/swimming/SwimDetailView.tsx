@@ -42,6 +42,8 @@ import {
 import { SWIM_TYPE_LABELS, classifySwimType } from "./swimType";
 import { formatDecimal, t } from "../i18n/core";
 import { useI18n } from "../i18n/useI18n";
+import { ShareButton } from "../share/ShareButton";
+import { buildActivityShareSession, shareSwimLengths } from "../share/buildShareSession";
 
 interface SwimDetailViewProps {
   activity: TrainingHubActivity;
@@ -65,6 +67,8 @@ const MIN_REST_SHOWN_SECONDS = 30;
 const COVER_VISIBLE_BAND = 0.15;
 
 interface Stat {
+  /** Stable across languages: what a share image remembers a figure by. */
+  id?: string;
   label: string;
   value: string;
   title?: string;
@@ -123,10 +127,12 @@ export function SwimDetailView({
     const rest = swim?.restSeconds;
     const stats: Stat[] = [
       {
+        id: "activity.m.distance",
         label: t("activity.m.distance"),
         value: distance !== undefined && distance > 0 ? formatDistanceMeters(distance, unitSystem, true) : "—"
       },
       {
+        id: "swim.detail.swimTime",
         label: t("swim.detail.swimTime"),
         value: formatDurationSeconds(swimming),
         title: swim?.swimSeconds !== undefined ? t("swim.detail.swimTimeTitle") : t("swim.timeTitle")
@@ -134,6 +140,7 @@ export function SwimDetailView({
     ];
     if (rest !== undefined && rest >= MIN_REST_SHOWN_SECONDS) {
       stats.push({
+        id: "swim.sets.rest",
         label: t("swim.sets.rest"),
         value: formatDurationSeconds(Math.round(rest)),
         title: t("swim.detail.restTitle")
@@ -141,6 +148,7 @@ export function SwimDetailView({
     }
     const pace = distance !== undefined && swimming !== undefined ? secondsPer100m(swimming, distance) : undefined;
     stats.push({
+      id: "activity.m.avgPace",
       label: t("activity.m.avgPace"),
       value: formatPer100(pace, unitSystem),
       title: swim?.swimSeconds !== undefined ? t("swim.detail.paceTitle") : t("swim.avgPaceTitle")
@@ -148,6 +156,7 @@ export function SwimDetailView({
     const best100 = best.find((effort) => effort.distance === 100);
     if (best100) {
       stats.push({
+        id: "swim.hero.best100",
         label: t("swim.hero.best100"),
         value: formatClock(best100.seconds),
         title: t("swim.detail.bestTitle")
@@ -157,7 +166,7 @@ export function SwimDetailView({
     // length carries a count.
     const swolf = sessionSwolf(styleTotals) ?? swim?.avgSwolf;
     if (swolf !== undefined) {
-      stats.push({ label: t("swim.m.swolf"), value: formatDecimal(swolf, 0), title: t("swim.m.swolfTitle") });
+      stats.push({ id: "swim.m.swolf", label: t("swim.m.swolf"), value: formatDecimal(swolf, 0), title: t("swim.m.swolfTitle") });
     }
     const counted = styleTotals.reduce(
       (sum, entry) => ({
@@ -168,6 +177,7 @@ export function SwimDetailView({
     );
     if (counted.lengths > 0) {
       stats.push({
+        id: "swim.m.strokesPerLength",
         label: t("swim.m.strokesPerLength"),
         value: formatDecimal(counted.strokes / counted.lengths, 1),
         title: t("swim.m.strokesTitle")
@@ -176,6 +186,7 @@ export function SwimDetailView({
     const rate = swim?.avgStrokeRate ?? detail?.dynamics?.avgCadence;
     if (rate !== undefined && rate > 0) {
       stats.push({
+        id: "swim.m.strokeRate",
         label: t("swim.m.strokeRate"),
         value: t("swim.rateValue", { value: Math.round(rate) }),
         title: t("swim.m.strokeRateTitle")
@@ -185,6 +196,7 @@ export function SwimDetailView({
     const dps = free ? styleDistancePerStroke(free) : undefined;
     if (dps !== undefined) {
       stats.push({
+        id: "swim.m.dps",
         label: t("swim.m.dps"),
         value: formatDistancePerStroke(dps, unitSystem),
         title: t("swim.detail.dpsTitle")
@@ -192,22 +204,23 @@ export function SwimDetailView({
     }
     const avgHr = detail?.avgHr ?? activity.avgHr;
     if (avgHr !== undefined) {
-      stats.push({ label: t("activity.m.avgHr"), value: `${avgHr} bpm`, title: t("swim.detail.hrTitle") });
+      stats.push({ id: "activity.m.avgHr", label: t("activity.m.avgHr"), value: `${avgHr} bpm`, title: t("swim.detail.hrTitle") });
     }
     const maxHr = detail?.maxHr ?? activity.maxHr;
     if (maxHr !== undefined) {
-      stats.push({ label: t("activity.m.maxHr"), value: `${maxHr} bpm` });
+      stats.push({ id: "activity.m.maxHr", label: t("activity.m.maxHr"), value: `${maxHr} bpm` });
     }
     const load = detail?.trainingLoad ?? activity.trainingLoad;
     if (load !== undefined) {
-      stats.push({ label: t("overview.tiles.load"), value: formatOptionalNumber(Math.round(load)) });
+      stats.push({ id: "overview.tiles.load", label: t("overview.tiles.load"), value: formatOptionalNumber(Math.round(load)) });
     }
     const calories = detail?.calories ?? activity.calories;
     if (calories !== undefined && calories > 0) {
-      stats.push({ label: t("activity.m.calories"), value: `${Math.round(calories)} kcal` });
+      stats.push({ id: "activity.m.calories", label: t("activity.m.calories"), value: `${Math.round(calories)} kcal` });
     }
     if (swim?.waterTemperatureC !== undefined) {
       stats.push({
+        id: "swim.detail.water",
         label: t("swim.detail.water"),
         value: formatTemperatureValue(swim.waterTemperatureC, temperatureUnit)
       });
@@ -218,14 +231,15 @@ export function SwimDetailView({
   const effect = useMemo<Stat[]>(() => {
     const stats: Stat[] = [];
     if (detail?.effect?.aerobic !== undefined) {
-      stats.push({ label: t("run.detail.aerobic"), value: formatDecimal(detail.effect.aerobic, 1) });
+      stats.push({ id: "run.detail.aerobic", label: t("run.detail.aerobic"), value: formatDecimal(detail.effect.aerobic, 1) });
     }
     if (detail?.effect?.anaerobic !== undefined) {
-      stats.push({ label: t("run.detail.anaerobic"), value: formatDecimal(detail.effect.anaerobic, 1) });
+      stats.push({ id: "run.detail.anaerobic", label: t("run.detail.anaerobic"), value: formatDecimal(detail.effect.anaerobic, 1) });
     }
     // The 100 stands in the headline; the longer ones are read here.
     for (const effort of best.filter((entry) => entry.distance !== 100)) {
       stats.push({
+        id: "swim.detail.bestOver",
         label: t("swim.detail.bestOver", { distance: formatDistanceMeters(effort.distance, unitSystem, true) }),
         value: formatClock(effort.seconds),
         title: t("swim.detail.bestTitle")
@@ -260,6 +274,26 @@ export function SwimDetailView({
                   <MessageCircle size={15} aria-hidden="true" />
                   {t("activity.askCoach")}
                 </button>
+              ) : null}
+              {detail ? (
+                <ShareButton
+                  build={() =>
+                    buildActivityShareSession({
+                      sport: "swim",
+                      activity,
+                      detail,
+                      series,
+                      kind: kindLabel,
+                      name: activity.name?.trim() || kindLabel,
+                      stats: [...headline, ...effect],
+                      defaultStats: ["swim.detail.swimTime", "activity.m.avgPace", "swim.m.swolf"],
+                      defaultHero: "activity.m.distance",
+                      charts: ["hr"],
+                      unitSystem,
+                      swim: shareSwimLengths(swim, unitSystem)
+                    })
+                  }
+                />
               ) : null}
             </div>
             <div className="run-detail-title">

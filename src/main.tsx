@@ -27,7 +27,16 @@ applySportColors(readStoredSportColors());
 // language is one local chunk, and initLocale falls back to English rather than
 // leaving the window empty if that chunk will not load.
 void initLocale().then(() => {
-  ReactDOM.createRoot(document.getElementById("root")!).render(
+  const root = document.getElementById("root")!;
+  // The hidden window that draws a share image's file loads this page too, and
+  // shows only the card (`src/share/shareRender.tsx`).
+  if (window.location.hash === "#share-render") {
+    void import("./share/shareRender")
+      .then(({ mountShareRender }) => mountShareRender(root))
+      .catch(() => window.heraclesRecords?.notifyShareRendered(false));
+    return;
+  }
+  ReactDOM.createRoot(root).render(
     <React.StrictMode>
       <ThemeProvider>
         <UnitSystemProvider>

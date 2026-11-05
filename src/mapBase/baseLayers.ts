@@ -101,11 +101,24 @@ function fixOnewayArrowsWhenReady(layer: L.MaplibreGL): void {
 }
 
 /**
+ * How a map that is captured as an image needs its vector base map drawn: with
+ * no fade, so what is captured is finished, and with a buffer the capture can
+ * still read after the frame is presented.
+ */
+export interface BaseLayerCapture {
+  capture?: boolean;
+}
+
+/**
  * Builds the base map layer for a style, raster or vector. Every screen goes
  * through here so the two kinds cannot drift apart — and so a caller never has
  * to know which kind it asked for.
  */
-export function createBaseLayer(map: L.Map, config: BaseLayerConfig): L.Layer {
+export function createBaseLayer(
+  map: L.Map,
+  config: BaseLayerConfig,
+  { capture = false }: BaseLayerCapture = {}
+): L.Layer {
   const pane = ensureBasemapPane(map);
   const resolved = resolveBaseLayerConfig(config);
   map
@@ -133,7 +146,10 @@ export function createBaseLayer(map: L.Map, config: BaseLayerConfig): L.Layer {
       // The plugin creates its inner MapLibre map with attributionControl
       // false, so Leaflet's own attribution bar is the only place the credit
       // can appear, and this is where the plugin reads it from.
-      attributionControl: { customAttribution: resolved.attribution }
+      attributionControl: { customAttribution: resolved.attribution },
+      ...(capture
+        ? { fadeDuration: 0, canvasContextAttributes: { preserveDrawingBuffer: true } }
+        : {})
     };
     const layer = L.maplibreGL(options);
     fixOnewayArrowsWhenReady(layer);

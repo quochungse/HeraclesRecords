@@ -759,11 +759,13 @@ export function emitAnalysisChanged(analysis: CoachAnalysis | null): void {
 
 /**
  * Emits to whatever window exists *at emit time*. A run may start, continue or
- * finish with no window at all, so a reference is never captured up front.
+ * finish with no window at all, so a reference is never captured up front. An
+ * offscreen window — the one drawing a share image, listed first while it
+ * lives — subscribes to nothing.
  */
 function emitToAnyWindow(channel: string, payload: unknown): void {
   const target = BrowserWindow.getAllWindows().find(
-    (window) => !window.isDestroyed()
+    (window) => !window.isDestroyed() && !window.webContents.isOffscreen()
   );
   target?.webContents.send(channel, payload);
 }

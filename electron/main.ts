@@ -1,6 +1,7 @@
 import {
   app,
   BrowserWindow,
+  clipboard,
   dialog,
   Menu,
   net,
@@ -187,9 +188,18 @@ import { normalizeUnitSystem } from "./unitSystem.js";
 import { reverseGeocodeLocation } from "./reverseGeocodeService";
 import { openableExternalUrl } from "./externalLinks";
 import { buildManualTcx } from "./tcxBuilder";
+import {
+  markShareRendered,
+  renderShareImage,
+  sameImage,
+  sharePayloadFor,
+  type ShareRenderHost
+} from "./shareImage";
 import type {
   TrainingHubActivity,
   TrainingHubActivityFileType,
+  ShareImageRequest,
+  ShareSaveResult,
   TrainingHubExportResult,
   SampleDataState,
   ManualActivityInput
@@ -619,6 +629,27 @@ function isAppPageUrl(url: string): boolean {
   } catch {
     return false;
   }
+}
+
+/** How long Wayland is given to cancel a refused clipboard write before Copy reads it back. */
+const SHARE_CLIPBOARD_CHECK_MS = 150;
+
+/** Where the share window loads the app's page from: the dev server, or the bundled file. */
+function shareRenderHost(): ShareRenderHost {
+  return {
+    preload: path.join(__dirname, "preload.js"),
+    isAppPageUrl,
+    load: async (window, hash) => {
+      const devServer = devServerUrl();
+      if (devServer) {
+        const url = new URL(devServer);
+        url.hash = hash;
+        await window.loadURL(url.toString());
+      } else {
+        await window.loadFile(path.join(__dirname, "../dist/index.html"), { hash });
+      }
+    }
+  };
 }
 
 function createWindow(): void {
@@ -2462,6 +2493,49 @@ function registerIpcHandlers(): void {
       options?: ActivityDetailSummarySyncOptions
     ) => syncActivityDetailSummaries(activityIds, limit, options)
   );
+
+  ipcMain.handle("share:copyImage", async (_event, request: ShareImageRequest): Promise<void> => {
+    const image = await renderShareImage(request, shareRenderHost());
+    clipboard.writeImage(image);
+    // Wayland refuses a write from a window without the keyboard focus, and
+    // says so only by cancelling it a moment later: read it back, or the
+    // button says Copied over whatever the clipboard held before. Only Linux
+    // has the refusal, and only there is the read-back known to give the
+    // written pixels back exactly.
+    if (process.platform !== "linux") return;
+    await new Promise((resolve) => setTimeout(resolve, SHARE_CLIPBOARD_CHECK_MS));
+    if (!sameImage(clipboard.readImage(), image)) {
+      throw new ScreenError("main.share.copyLost");
+    }
+  });
+
+  ipcMain.handle(
+    "share:saveImage",
+    async (_event, request: ShareImageRequest, suggestedName?: string): Promise<ShareSaveResult> => {
+      const baseName = sanitizeExportFileName(suggestedName) || "heracles-records";
+      const saveOptions = {
+        title: mainText("main.share.saveTitle"),
+        defaultPath: `${baseName}.jpg`,
+        filters: [{ name: mainText("main.share.imageFilter"), extensions: ["jpg", "jpeg"] }]
+      };
+      const result =
+        mainWindow && !mainWindow.isDestroyed()
+          ? await dialog.showSaveDialog(mainWindow, saveOptions)
+          : await dialog.showSaveDialog(saveOptions);
+      if (result.canceled || !result.filePath) {
+        return { saved: false };
+      }
+      const image = await renderShareImage(request, shareRenderHost());
+      await fs.promises.writeFile(result.filePath, image.toJPEG(92));
+      return { saved: true, filePath: result.filePath };
+    }
+  );
+
+  // The share window's own two calls: its payload, and that it has drawn it.
+  ipcMain.handle("share:renderPayload", (event): unknown => sharePayloadFor(event.sender));
+  ipcMain.handle("share:renderReady", (event, drawn: unknown): void => {
+    markShareRendered(event.sender, drawn === true);
+  });
 
   ipcMain.handle(
     "trainingHub:exportActivityFile",

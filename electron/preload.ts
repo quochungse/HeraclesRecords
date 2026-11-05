@@ -43,6 +43,8 @@ import type {
   TrainingHubActivity,
   TrainingHubActivityDetail,
   TrainingHubActivityFileType,
+  ShareImageRequest,
+  ShareSaveResult,
   TrainingHubExportResult,
   TrainingHubAnalytics,
   TrainingHubDailyHealthSummary,
@@ -379,6 +381,12 @@ const api = {
       limit,
       options
     ),
+  copyShareImage: (request: ShareImageRequest): Promise<void> =>
+    ipcRenderer.invoke("share:copyImage", request),
+  saveShareImage: (request: ShareImageRequest, suggestedName?: string): Promise<ShareSaveResult> =>
+    ipcRenderer.invoke("share:saveImage", request, suggestedName),
+  getShareRenderPayload: (): Promise<unknown> => ipcRenderer.invoke("share:renderPayload"),
+  notifyShareRendered: (drawn: boolean): Promise<void> => ipcRenderer.invoke("share:renderReady", drawn),
   exportTrainingHubActivityFile: (
     activityId: string,
     sportType: number,

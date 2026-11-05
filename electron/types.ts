@@ -218,6 +218,19 @@ export const TRAINING_HUB_EXPORT_FORMATS: readonly TrainingHubExportFormat[] = [
   }
 ];
 
+/** A share image to draw: its size in pixels and the card's payload, opaque to the main process. */
+export interface ShareImageRequest {
+  width: number;
+  height: number;
+  payload: unknown;
+}
+
+export interface ShareSaveResult {
+  /** False when the save dialog was cancelled. */
+  saved: boolean;
+  filePath?: string;
+}
+
 export interface TrainingHubExportResult {
   /** False when the user cancelled the save dialog. */
   saved: boolean;

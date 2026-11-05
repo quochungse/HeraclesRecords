@@ -1,4 +1,4 @@
-import { exerciseLabel } from "./strengthAnalytics";
+import { exerciseLabel, heatLevel, metricValue } from "./strengthAnalytics";
 import { useMemo, useState } from "react";
 import { ArrowUpRight, ChevronLeft, ChevronRight, Info, MessageCircle, Trophy } from "lucide-react";
 import type {
@@ -11,11 +11,13 @@ import type {
 import { activityCoachRequest } from "../training/askCoachAbout";
 import { activityLoadNote } from "../training/loadFigures";
 import { useLoadSource } from "../training/loadSource";
+import { resolveSportName } from "../training/sportTypes";
 import { formatDistanceValue } from "../units/units";
 import { useUnitSystem } from "../units/UnitSystemProvider";
 import {
   buildExerciseRows,
   buildSessionStats,
+  sessionHeat,
   type SessionAnalytics,
   type SessionExerciseRow,
   type SessionPersonalRecord,
@@ -30,6 +32,11 @@ import {
   sessionSourceLabel
 } from "./strengthFormat";
 import { formatCount, formatDecimal, getIntlLocale, plural, t } from "../i18n/core";
+import { ShareButton } from "../share/ShareButton";
+import { shareStats, sportColor, type PageStat } from "../share/buildShareSession";
+import { shareFileName } from "../share/shareModel";
+import type { ShareSession } from "../share/shareTypes";
+import type { MuscleId } from "./muscles";
 
 /** Sessions this short open with every exercise's sets showing; longer ones start folded. */
 const EXPANDED_EXERCISE_LIMIT = 3;
@@ -355,6 +362,68 @@ function ExerciseTable({ rows, explorable, onOpenExercise, unitSystem, showLoad 
  * Records moved out of it, into the exercise rows they belong to.
  */
 
+/**
+ * A session as its share image tells it: the header's figures, the muscles it
+ * worked by sets, and its heaviest sets with the records they set. The record
+ * badge counts this window's records, as the header's chip does.
+ */
+function strengthShareSession(entry: SessionAnalytics, unitSystem: UnitSystem, loadSource: StrengthLoadSource): ShareSession {
+  const { session } = entry;
+  const stats = buildSessionStats(session);
+  const heracles = loadSource === "heracles" ? stats.heracles : undefined;
+  const load = heracles ? heracles.value : stats.trainingLoad;
+  const pageStats: PageStat[] = [
+    { id: "activity.m.duration", label: t("activity.m.duration"), value: formatSpan(stats.durationSec) },
+    { id: "strength.stat.workingSets", label: t("strength.stat.workingSets"), value: formatCount(stats.workingSets) },
+    { id: "strength.col.reps", label: t("strength.col.reps"), value: formatCount(stats.reps) },
+    {
+      id: "strength.summary.lifted",
+      label: t("strength.summary.lifted"),
+      value: stats.volumeKg > 0 ? formatTotalWeight(stats.volumeKg, unitSystem) : t("strength.bodyweight")
+    },
+    ...(stats.avgHr !== undefined ? [{ id: "activity.m.heartRate", label: t("activity.m.heartRate"), value: `${Math.round(stats.avgHr)} bpm` }] : []),
+    ...(load !== undefined ? [{ id: "activity.m.trainingLoad", label: t("activity.m.trainingLoad"), value: formatCount(Math.round(load)) }] : []),
+    ...(stats.calories !== undefined ? [{ id: "activity.m.calories", label: t("activity.m.calories"), value: `${formatCount(Math.round(stats.calories))} kcal` }] : [])
+  ];
+  const heat = sessionHeat(entry, "sets");
+  const levels: Partial<Record<MuscleId, number>> = {};
+  for (const [muscle, stat] of Object.entries(heat.muscleById) as [MuscleId, (typeof heat.muscleById)[MuscleId]][]) {
+    const level = heatLevel(metricValue(stat, "sets"), heat.max);
+    if (level > 0) levels[muscle] = level;
+  }
+  const rows = buildExerciseRows(entry).filter((row) => row.topSet);
+  const groups = groupRecords(entry.records);
+  const best = groups.map(headlineRecord).find(Boolean);
+  const name = session.name?.trim() || t("strength.untitled");
+  return {
+    sport: "strength",
+    activityId: session.sourceIds?.coros ?? session.activityId,
+    color: sportColor(session.sportType),
+    kind: resolveSportName(session) ?? t("nav.strength"),
+    date: formatSessionDate(session.startTime),
+    name,
+    stats: shareStats(pageStats),
+    defaultStats: ["activity.m.duration", "strength.stat.workingSets", "activity.m.heartRate"],
+    defaultHero: stats.volumeKg > 0 ? "strength.summary.lifted" : "strength.stat.workingSets",
+    charts: [],
+    record:
+      groups.length > 0
+        ? best
+          ? `${plural("strength.prCount", groups.length)} · ${exerciseLabel(best.exercise)}`
+          : plural("strength.prCount", groups.length)
+        : undefined,
+    strength: {
+      heat: levels,
+      sets: rows.map((row) => ({
+        name: exerciseLabel(row.name),
+        value: `${formatLiftWeight(row.topSet!.weightKg, unitSystem)} × ${formatCount(row.topSet!.reps)}`,
+        record: row.records.length > 0
+      }))
+    },
+    fileName: shareFileName(name, `strength-${session.activityId}`)
+  };
+}
+
 interface StrengthSessionHeaderProps {
   entry: SessionAnalytics;
   showSource: boolean;
@@ -417,6 +486,7 @@ export function StrengthSessionHeader({ entry, showSource, onShowAll, onAskCoach
               {t("activity.askCoach")}
             </button>
           ) : null}
+          <ShareButton build={() => strengthShareSession(entry, unitSystem, loadSource)} />
         </div>
       </div>
 

@@ -22,6 +22,7 @@ import profile from "./profile.ts";
 import records from "./records.ts";
 import chat from "./chat.ts";
 import main from "./main.ts";
+import share from "./share.ts";
 
 /**
  * English, the source every other language is translated from. A key added
@@ -54,6 +55,7 @@ const en = {
   ...records,
   ...chat,
   ...main,
+  ...share,
 };
 
 export default en;
