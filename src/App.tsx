@@ -88,6 +88,7 @@ import {
   type RecordsSamplePreset,
 } from "./records/sampleRecords";
 import { LabourCelebration, LabourToastCard } from "./records/LabourNotices";
+import { ShareFactsProvider } from "./share/ShareFacts";
 // Drawn at 30–42px in the rail: the 128px cut covers a 2× display without
 // bundling the 1024px, 840 KB source.
 import appLogo from "../build/icons/128x128.png";
@@ -1833,6 +1834,7 @@ export default function App() {
     null;
 
   return (
+    <ShareFactsProvider result={hallOfRecords.result}>
     <div className="app">
       {IS_DEVELOPMENT_BUILD ? (
         <DeveloperToolbar
@@ -2335,6 +2337,7 @@ export default function App() {
         />
       ) : null}
     </div>
+    </ShareFactsProvider>
   );
 }
 

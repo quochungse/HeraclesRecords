@@ -23,6 +23,7 @@ import profile from "./profile.ts";
 import records from "./records.ts";
 import chat from "./chat.ts";
 import main from "./main.ts";
+import share from "./share.ts";
 
 /** Tiếng Việt. Written by scripts/i18n-index.mjs. */
 export default {
@@ -50,4 +51,5 @@ export default {
   ...records,
   ...chat,
   ...main,
+  ...share,
 } satisfies Record<keyof typeof en, string>;

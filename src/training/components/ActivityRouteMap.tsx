@@ -4,7 +4,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { MapPin, Maximize2, RotateCcw, X } from "lucide-react";
 import type {
-  TrainingHubActivityDetail,
   TrainingHubActivityTrack,
   TrainingHubTrackPoint
 } from "../../../electron/types";
@@ -40,6 +39,13 @@ import {
 import { useTheme } from "../../theme/ThemeProvider";
 import { curveBetween, curveHead, smoothPath, type SmoothPath } from "./routeSmoothing";
 import {
+  performanceStretchColors,
+  routePerformance,
+  type PerformanceView,
+  type RouteDetail,
+  type ShownView
+} from "./routePerformance";
+import {
   COVER_REPLAY_MAX_MS,
   REPLAY_DELAY_MS,
   buildRouteReplay,
@@ -50,8 +56,6 @@ import {
 import {
   ELEVATION_STOPS,
   HEAT_BANDS,
-  elevationColor,
-  elevationColoring,
   elevationColors,
   heatBand,
   heatColors,
@@ -64,14 +68,10 @@ import {
   routeNeon,
   whitenColor,
   passesBy,
-  performanceColoring,
-  performanceZones,
   rampColorAt,
   routeHeat,
   routeRamp,
-  stretchValues,
   zoneColor,
-  zoneColoring,
   zoneLabel,
   type RouteColorMode,
   type RouteColoring,
@@ -81,36 +81,11 @@ import {
 } from "./routeColoring";
 import { formatDecimal, t } from "../../i18n/core";
 
-/** What the full map colours a route by: the samples, COROS's zones and the sport. */
-type RouteDetail = Partial<
-  Pick<
-    TrainingHubActivityDetail,
-    "series" | "hrZones" | "paceZones" | "sportType" | "sportName"
-  >
->;
-
 interface ActivityRouteMapProps {
   track?: TrainingHubActivityTrack;
   /** The activity's detail, for colouring the full map by pace, heart rate or elevation. */
   detail?: RouteDetail;
 }
-
-/**
- * What Performance shows for one metric: pace and heart rate by the activity's
- * own zones where COROS scored it against some, else a ramp from its slowest
- * stretch to its fastest; elevation by fixed heights. Or why it shows nothing
- * — `recorded` when the metric was recorded but cannot be placed on the route.
- */
-type PerformanceView =
-  | { kind: "zones"; coloring: RouteZoneColoring }
-  | { kind: "ramp"; coloring: RouteColoring }
-  | { kind: "elevation"; heights: (number | null)[] }
-  | { kind: "none"; reason: string; recorded: boolean };
-
-type ShownView = Exclude<PerformanceView, { kind: "none" }>;
-
-/** Heights are coloured to the nearest 5 m, so a flat road is one line, not hundreds. */
-const ELEVATION_COLOR_STEP_M = 5;
 
 const ROUTE_COLOR = "#74c08f";
 const ROUTE_COLOR_PAPER = "#0f7f5f";
@@ -206,11 +181,6 @@ function metricLabel(metric: RouteMetric, speed: boolean): string {
         ? "activity.m.heartRate"
         : "activity.m.elevation"
   );
-}
-
-/** The metric's own key for a sentence about it: "pace", "speed", "hr" or "elevation". */
-function metricKey(metric: RouteMetric, speed: boolean): "pace" | "speed" | "hr" | "elevation" {
-  return metric === "pace" ? (speed ? "speed" : "pace") : metric;
 }
 
 /** Shared by the side-panel map and the full map, so a pick in one is the other's. */
@@ -1264,39 +1234,11 @@ function useRouteAnalysis(
 ): RouteAnalysis {
   const speed = isSpeedSport(detail?.sportType, detail?.sportName);
   const { locale } = useI18n();
-  const performance = useMemo((): Record<RouteMetric, PerformanceView> => {
-    const series = detail?.series ?? [];
-    const timed = (metric: "pace" | "hr"): PerformanceView => {
-      const key = metricKey(metric, speed);
-      const stretches = stretchValues(route, series, metric);
-      if ("missing" in stretches) {
-        return stretches.missing === "unrecorded"
-          ? { kind: "none", reason: t(`activity.route.none.${key}` as const), recorded: false }
-          : {
-              kind: "none",
-              reason: t(`activity.route.untimed.${key}` as const),
-              recorded: true
-            };
-      }
-      const zones = zoneColoring(
-        stretches.values,
-        metric,
-        performanceZones(metric, detail, speed)
-      );
-      return zones
-        ? { kind: "zones", coloring: zones }
-        : { kind: "ramp", coloring: performanceColoring(stretches.values, metric) };
-    };
-    const heights = elevationColoring(route);
-    return {
-      pace: timed("pace"),
-      hr: timed("hr"),
-      elevation: heights
-        ? { kind: "elevation", heights }
-        : { kind: "none", reason: t("activity.route.none.elevation"), recorded: false }
-    };
+  const performance = useMemo(
+    (): Record<RouteMetric, PerformanceView> => routePerformance(route, detail, speed),
     // The reasons are words, so a new language rebuilds them.
-  }, [route, detail, speed, locale]);
+    [route, detail, speed, locale]
+  );
 
   // A choice this activity cannot show falls back rather than drawing nothing:
   // a metric it did not record to the first one it did, and Performance with
@@ -1367,26 +1309,7 @@ function useRouteDrawing(
     if (!view) {
       return undefined;
     }
-    if (view.kind === "elevation") {
-      return {
-        kind: "lines",
-        stretchColors: view.heights.map((meters) =>
-          meters === null
-            ? null
-            : elevationColor(
-                Math.round(meters / ELEVATION_COLOR_STEP_M) * ELEVATION_COLOR_STEP_M,
-                lightGround
-              )
-        )
-      };
-    }
-    const ramp = routeRamp(lightGround);
-    const colorOf =
-      view.kind === "zones" ? zoneColor : (step: number) => ramp[step]!;
-    return {
-      kind: "lines",
-      stretchColors: view.coloring.steps.map((step) => (step === null ? null : colorOf(step)))
-    };
+    return { kind: "lines", stretchColors: performanceStretchColors(view, lightGround) };
   }, [view, heat, lightGround]);
 }
 
@@ -1583,7 +1506,7 @@ function RouteMapModal({
  * The points a route map draws: the track's own route where the main process
  * made one, else the shared points — a track merged from two sources.
  */
-function routePoints(track?: TrainingHubActivityTrack): TrainingHubTrackPoint[] {
+export function routePoints(track?: TrainingHubActivityTrack): TrainingHubTrackPoint[] {
   return track?.route ?? track?.points ?? [];
 }
 

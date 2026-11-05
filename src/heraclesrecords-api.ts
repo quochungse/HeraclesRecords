@@ -40,6 +40,8 @@ import type {
   TrainingHubActivity,
   TrainingHubActivityDetail,
   TrainingHubActivityFileType,
+  ShareImageRequest,
+  ShareSaveResult,
   TrainingHubExportResult,
   TrainingHubAnalytics,
   TrainingHubDailyHealthSummary,
@@ -350,6 +352,14 @@ export interface HeraclesRecordsApi {
       requireSwim?: boolean;
     }
   ) => Promise<ActivityDetailSummarySync>;
+  /** Draws a share image at its full size and puts it on the clipboard. */
+  copyShareImage: (request: ShareImageRequest) => Promise<void>;
+  /** Asks where to save a share image, then draws and writes it as a JPG. */
+  saveShareImage: (request: ShareImageRequest, suggestedName?: string) => Promise<ShareSaveResult>;
+  /** For the share window only: the card it is to draw. */
+  getShareRenderPayload: () => Promise<unknown>;
+  /** For the share window only: the card is drawn and can be captured, or (`false`) it cannot be. */
+  notifyShareRendered: (drawn: boolean) => Promise<void>;
   exportTrainingHubActivityFile: (
     activityId: string,
     sportType: number,

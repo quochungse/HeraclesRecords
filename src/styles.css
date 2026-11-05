@@ -16564,6 +16564,7 @@ label.chat-settings-toggle-row {
    Calendar's ghost button, which is scoped to the calendar's surfaces.
    Activities' Open wears the same pill beside it. */
 .activity-ask-coach,
+.activity-share,
 .activity-open-screen {
   display: inline-flex;
   flex: none;
@@ -16583,12 +16584,14 @@ label.chat-settings-toggle-row {
 }
 
 .activity-ask-coach:hover,
+.activity-share:hover,
 .activity-open-screen:hover {
   background: var(--glass-bg-hover);
   color: var(--text-primary);
 }
 
 .activity-ask-coach:focus-visible,
+.activity-share:focus-visible,
 .activity-open-screen:focus-visible {
   outline: var(--focus-ring);
   outline-offset: 2px;

@@ -1,0 +1,1240 @@
+/* ── Share image ─────────────────────────────────────────────────────────
+   The card is the saved file, laid out in its own pixels (1080 wide, 1440 on
+   4:3) and scaled down for the dialog's preview. Its type is set for that size,
+   so every size here is a token over `--share-k` — the card's scale against the
+   9:16 story — rather than a value on the screen's own scale. Its palette is
+   its own too: an image keeps its colours whatever the app's theme. */
+
+.share-card {
+  --share-k: 1;
+  --share-pad: 72px;
+  --share-pad-top: 72px;
+  --share-pad-bottom: 72px;
+  --share-size-brand: calc(28px * var(--share-k));
+  --share-size-brand-foot: calc(24px * var(--share-k));
+  --share-mark: calc(60px * var(--share-k));
+  --share-mark-foot: calc(48px * var(--share-k));
+  --share-size-eyebrow: calc(21px * var(--share-k));
+  --share-size-title: calc(56px * var(--share-k));
+  --share-size-title-minimal: calc(38px * var(--share-k));
+  --share-size-title-bold: calc(46px * var(--share-k));
+  --share-size-chip: calc(21px * var(--share-k));
+  --share-size-hero: calc(168px * var(--share-k));
+  --share-size-poster-hero: calc(146px * var(--share-k));
+  --share-size-label: calc(19px * var(--share-k));
+  --share-size-stat: calc(52px * var(--share-k));
+  --share-size-stat-minimal: calc(56px * var(--share-k));
+  --share-size-row: calc(40px * var(--share-k));
+  --share-size-poster-title: calc(86px * var(--share-k));
+  --share-size-place: calc(21px * var(--share-k));
+  --share-size-labour: calc(40px * var(--share-k));
+  --share-size-labour-goal: calc(21px * var(--share-k));
+  --share-size-set: calc(38px * var(--share-k));
+  --share-size-credit: 13px;
+  --share-emblem: calc(96px * var(--share-k));
+  --share-emblem-poster: calc(112px * var(--share-k));
+  --share-gap: calc(20px * var(--share-k));
+  --share-chart-height: calc(112px * var(--share-k));
+  --share-bold-size: 120px;
+  /* A unit beside its figure, as a share of the figure's size. */
+  --share-unit: 0.45em;
+  --share-unit-large: 0.3em;
+  --share-columns: 3;
+  --share-row-columns: 1;
+  --share-bold-columns: 1;
+  --share-heat-1: #6b5e4b;
+  --share-heat-2: #957437;
+  --share-heat-3: #ba8827;
+  --share-heat-4: #d06b21;
+  --share-heat-5: #d54628;
+  position: relative;
+  overflow: hidden;
+  background: #07090c;
+  color: var(--share-ink);
+  font-family: Inter, ui-sans-serif, system-ui, sans-serif;
+  line-height: 1.2;
+  -webkit-font-smoothing: antialiased;
+}
+
+.share-card.is-dark {
+  --share-ink: #ffffff;
+  --share-ink-2: rgba(255, 255, 255, 0.8);
+  --share-ink-3: rgba(255, 255, 255, 0.62);
+  --share-hair: rgba(255, 255, 255, 0.22);
+  --share-chip: rgba(255, 255, 255, 0.13);
+  --share-gold: #f2c560;
+  --share-gold-edge: rgba(216, 155, 34, 0.8);
+  --share-gold-soft: rgba(216, 155, 34, 0.38);
+  --share-gold-wash: rgba(216, 155, 34, 0.18);
+  --share-figure: rgba(255, 255, 255, 0.11);
+  --share-figure-muscle: rgba(255, 255, 255, 0.06);
+  --share-shadow: 0 2px 18px rgba(0, 0, 0, 0.35);
+  --share-credit-ink: rgba(255, 255, 255, 0.42);
+}
+
+.share-card.is-light {
+  --share-ink: #151a26;
+  --share-ink-2: rgba(21, 26, 38, 0.78);
+  --share-ink-3: rgba(21, 26, 38, 0.6);
+  --share-hair: rgba(21, 26, 38, 0.18);
+  --share-chip: rgba(21, 26, 38, 0.07);
+  --share-gold: #875709;
+  --share-gold-edge: rgba(144, 94, 14, 0.7);
+  --share-gold-soft: rgba(144, 94, 14, 0.3);
+  --share-gold-wash: rgba(144, 94, 14, 0.09);
+  --share-figure: rgba(21, 26, 38, 0.1);
+  --share-figure-muscle: rgba(21, 26, 38, 0.06);
+  --share-shadow: none;
+  --share-credit-ink: rgba(21, 26, 38, 0.42);
+}
+
+.share-ground,
+.share-scrim,
+.share-card-map,
+.share-route {
+  position: absolute;
+  inset: 0;
+}
+
+/* Its own stacking context: Leaflet's panes carry z-indexes of 200 and up, and
+   would otherwise rise over the words. */
+.share-ground {
+  z-index: 0;
+  overflow: hidden;
+}
+
+/* The map is a backdrop the athlete never touches, and keeps its panes to itself. */
+.share-card-map {
+  z-index: 0;
+  background: #07090c;
+  pointer-events: none;
+}
+
+.share-card.is-light .share-card-map {
+  background: #f1f0eb;
+}
+
+.share-photo {
+  position: absolute;
+  max-width: none;
+  user-select: none;
+  pointer-events: none;
+}
+
+.share-scrim,
+.share-route {
+  pointer-events: none;
+}
+
+.share-ui {
+  position: absolute;
+  z-index: 1;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  gap: calc(28px * var(--share-k));
+  padding: var(--share-pad-top) var(--share-pad) var(--share-pad-bottom);
+  text-shadow: var(--share-shadow);
+}
+
+.share-brand-row {
+  display: flex;
+  flex: none;
+}
+
+.share-brand {
+  display: flex;
+  align-items: center;
+  gap: calc(12px * var(--share-k));
+  color: var(--share-ink);
+  font-size: var(--share-size-brand);
+  font-weight: 600;
+  letter-spacing: 0;
+  line-height: 1;
+}
+
+.share-brand img,
+.share-brand svg {
+  display: block;
+  flex: none;
+  width: var(--share-mark);
+  height: var(--share-mark);
+}
+
+.share-brand.is-gold img {
+  filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.35));
+}
+
+.share-card.is-light .share-brand.is-gold img {
+  filter: none;
+}
+
+.share-brand-row.is-foot .share-brand {
+  gap: calc(10px * var(--share-k));
+  font-size: var(--share-size-brand-foot);
+}
+
+.share-brand-row.is-foot img,
+.share-brand-row.is-foot svg {
+  width: var(--share-mark-foot);
+  height: var(--share-mark-foot);
+}
+
+/* Centred in the margin below the words, outside them. */
+.share-brand-row.is-margin {
+  position: absolute;
+  right: var(--share-pad);
+  bottom: calc((var(--share-pad-bottom) - var(--share-mark-foot)) / 2);
+  left: var(--share-pad);
+  text-shadow: var(--share-shadow);
+}
+
+.share-zone {
+  position: relative;
+  display: flex;
+  flex: 1 1 0;
+  align-items: center;
+  justify-content: center;
+  min-height: 0;
+}
+
+.share-top {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  align-items: center;
+  gap: calc(16px * var(--share-k));
+  text-align: center;
+}
+
+.share-bottom {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  gap: var(--share-gap);
+}
+
+.share-eyebrow {
+  margin: 0;
+  color: var(--share-ink-2);
+  font-size: var(--share-size-eyebrow);
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  line-height: 1.3;
+  text-transform: uppercase;
+}
+
+.share-title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: var(--share-size-title);
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  line-height: 1.2;
+  text-wrap: balance;
+}
+
+.share-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: calc(12px * var(--share-k));
+}
+
+.share-chip,
+.share-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: calc(10px * var(--share-k));
+  padding: calc(9px * var(--share-k)) calc(18px * var(--share-k));
+  border-radius: var(--radius-pill);
+  font-size: var(--share-size-chip);
+  font-weight: 600;
+  line-height: 1.2;
+  text-shadow: none;
+}
+
+.share-chip {
+  background: var(--share-chip);
+  color: var(--share-ink);
+}
+
+.share-chip i {
+  width: calc(12px * var(--share-k));
+  height: calc(12px * var(--share-k));
+  border-radius: var(--radius-pill);
+}
+
+.share-badge {
+  background: var(--share-gold-wash);
+  color: var(--share-gold);
+  box-shadow: inset 0 0 0 2px var(--share-gold-edge);
+}
+
+.share-badge img {
+  width: calc(38px * var(--share-k));
+  height: calc(38px * var(--share-k));
+  margin-block: calc(-8px * var(--share-k));
+  margin-left: calc(-8px * var(--share-k));
+}
+
+.share-labour {
+  display: flex;
+  align-items: center;
+  gap: var(--share-gap);
+  text-shadow: none;
+}
+
+/* The emblem on the hall's black plate, its rim lit by the stage reached. */
+.share-emblem {
+  --share-ring: rgba(216, 155, 34, 0.5);
+  --share-glow: 0px;
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: var(--share-emblem);
+  height: var(--share-emblem);
+  border-radius: 50%;
+  background: radial-gradient(circle at 50% 38%, #24211b, #0a0a0b 72%);
+  box-shadow:
+    inset 0 0 0 calc(3px * var(--share-k)) var(--share-ring),
+    0 0 calc(var(--share-glow) * var(--share-k)) rgba(216, 155, 34, 0.5);
+}
+
+.share-emblem.is-stage-2 {
+  --share-ring: rgba(230, 176, 66, 0.9);
+  --share-glow: 16px;
+}
+
+.share-emblem.is-stage-3 {
+  --share-ring: #f2c560;
+  --share-glow: 34px;
+}
+
+.share-emblem img {
+  display: block;
+  width: 80%;
+  height: 80%;
+  object-fit: contain;
+}
+
+.share-labour-words {
+  display: flex;
+  flex-direction: column;
+  gap: calc(4px * var(--share-k));
+  min-width: 0;
+}
+
+.share-labour-words small {
+  color: var(--share-gold);
+  font-size: var(--share-size-label);
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.share-labour-words b {
+  color: var(--share-ink);
+  font-family: var(--font-title);
+  font-size: var(--share-size-labour);
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+.share-labour-words em {
+  color: var(--share-ink-2);
+  font-size: var(--share-size-labour-goal);
+  font-style: normal;
+}
+
+.share-hero {
+  display: flex;
+  flex-direction: column;
+  gap: calc(6px * var(--share-k));
+}
+
+.share-hero-value,
+.share-stat-value,
+.share-bold-value {
+  font-family: var(--font-display);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.share-hero-value {
+  font-size: var(--share-size-hero);
+  font-weight: 500;
+}
+
+.share-hero-value small,
+.share-stat-value small,
+.share-bold-value small {
+  margin-left: 0.2em;
+  color: var(--share-ink-2);
+  letter-spacing: 0;
+}
+
+.share-hero-value small {
+  font-size: var(--share-unit-large);
+}
+
+.share-label {
+  overflow: hidden;
+  color: var(--share-ink-3);
+  font-size: var(--share-size-label);
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-overflow: ellipsis;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.share-stats {
+  display: grid;
+  grid-template-columns: repeat(var(--share-columns), minmax(0, 1fr));
+  gap: calc(26px * var(--share-k)) calc(24px * var(--share-k));
+  padding-top: calc(26px * var(--share-k));
+  border-top: 2px solid var(--share-hair);
+}
+
+.share-stat {
+  display: flex;
+  flex-direction: column;
+  gap: calc(8px * var(--share-k));
+  min-width: 0;
+}
+
+.share-stat-value {
+  font-size: var(--share-size-stat);
+  font-weight: 500;
+}
+
+.share-stat-value small {
+  font-size: var(--share-unit);
+}
+
+.share-stats.is-divided {
+  gap: calc(20px * var(--share-k)) 0;
+  padding-top: calc(6px * var(--share-k));
+  border-top: 0;
+}
+
+.share-stats.is-divided .share-stat {
+  padding-inline: var(--share-gap);
+  border-left: 2px solid var(--share-hair);
+}
+
+.share-stats.is-divided .share-stat.is-row-start {
+  border-left: 0;
+}
+
+.share-chart {
+  display: flex;
+  flex-direction: column;
+  gap: calc(12px * var(--share-k));
+}
+
+.share-chart-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 20px;
+  color: var(--share-ink-3);
+  font-size: var(--share-size-label);
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.share-chart svg {
+  display: block;
+  width: 100%;
+  height: var(--share-chart-height);
+}
+
+/* Just under the words, so a story's reply bar does not cover it. */
+.share-credit {
+  position: absolute;
+  right: calc(var(--share-pad) * 0.45);
+  bottom: calc(var(--share-pad-bottom) - var(--share-pad) * 0.55);
+  color: var(--share-credit-ink);
+  font-size: var(--share-size-credit);
+  letter-spacing: 0;
+}
+
+/* Minimal: the route is the picture, the words a line under it. */
+.share-card--minimal .share-bottom {
+  align-items: center;
+  gap: calc(18px * var(--share-k));
+  text-align: center;
+}
+
+.share-card--minimal .share-title {
+  font-size: var(--share-size-title-minimal);
+}
+
+.share-card--minimal .share-stats,
+.share-card--minimal .share-chart {
+  width: 100%;
+}
+
+.share-card--minimal .share-stats.is-divided .share-stat {
+  align-items: center;
+}
+
+.share-card--minimal .share-stat-value {
+  font-size: var(--share-size-stat-minimal);
+}
+
+.share-card--minimal .share-labour,
+.share-card--poster .share-labour {
+  flex-direction: column;
+  gap: calc(14px * var(--share-k));
+  text-align: center;
+}
+
+/* Poster: a certificate — a serif title, a gold frame, figures in ruled rows. */
+.share-frame {
+  position: absolute;
+  inset:
+    calc(var(--share-pad-top) - var(--share-pad) * 0.55)
+    calc(var(--share-pad) * 0.45)
+    calc(var(--share-pad-bottom) - var(--share-pad) * 0.55);
+  border: 2px solid var(--share-gold-edge);
+  pointer-events: none;
+}
+
+.share-frame::after {
+  content: "";
+  position: absolute;
+  inset: calc(10px * var(--share-k));
+  border: 1px solid var(--share-gold-soft);
+}
+
+.share-card--poster .share-ui {
+  padding:
+    calc(var(--share-pad-top) + 24px * var(--share-k))
+    calc(var(--share-pad) + 24px * var(--share-k))
+    calc(var(--share-pad-bottom) + 24px * var(--share-k));
+}
+
+.share-card--poster .share-eyebrow {
+  color: var(--share-gold);
+}
+
+.share-card--poster .share-emblem {
+  width: var(--share-emblem-poster);
+  height: var(--share-emblem-poster);
+}
+
+.share-poster-title {
+  margin: 0;
+  font-family: var(--font-title);
+  font-size: var(--share-size-poster-title);
+  font-weight: 600;
+  letter-spacing: 0;
+  line-height: 1.2;
+  text-wrap: balance;
+}
+
+.share-place {
+  color: var(--share-ink-2);
+  font-size: var(--share-size-place);
+  font-weight: 500;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.share-poster-hero {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: calc(6px * var(--share-k));
+}
+
+.share-poster-hero .share-hero-value {
+  font-size: var(--share-size-poster-hero);
+}
+
+.share-rows {
+  display: grid;
+  grid-template-columns: repeat(var(--share-row-columns), minmax(0, 1fr));
+  column-gap: calc(48px * var(--share-k));
+}
+
+.share-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+  min-width: 0;
+  padding-block: calc(15px * var(--share-k));
+  border-top: 2px solid var(--share-gold-soft);
+}
+
+.share-row .share-stat-value {
+  font-size: var(--share-size-row);
+}
+
+/* Bold: the figures stacked as large as they go, each named in the sport's colour. */
+.share-card--bold .share-top {
+  align-items: flex-start;
+  gap: calc(14px * var(--share-k));
+  text-align: left;
+}
+
+.share-card--bold .share-title {
+  font-size: var(--share-size-title-bold);
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.share-bold {
+  display: grid;
+  grid-template-columns: repeat(var(--share-bold-columns), minmax(0, 1fr));
+  gap: calc(24px * var(--share-k)) calc(36px * var(--share-k));
+}
+
+.share-bold-stat {
+  display: flex;
+  flex-direction: column;
+  gap: calc(2px * var(--share-k));
+  min-width: 0;
+}
+
+.share-bold-stat .share-label {
+  font-weight: 700;
+}
+
+.share-bold-value {
+  font-size: calc(var(--share-bold-size) * var(--share-k));
+  font-weight: 600;
+}
+
+.share-bold-value small {
+  font-size: var(--share-unit-large);
+  font-weight: 500;
+}
+
+/* 4:3 lays the words out on the left and the route on the right. */
+.share-card.is-landscape .share-ui {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr);
+  grid-template-rows: auto auto minmax(0, 1fr) auto auto;
+  column-gap: calc(64px * var(--share-k));
+  row-gap: 0;
+}
+
+.share-card.is-landscape .share-brand-row.is-top {
+  grid-area: 1 / 1 / 2 / 3;
+  margin-bottom: calc(28px * var(--share-k));
+}
+
+.share-card.is-landscape .share-top {
+  grid-area: 2 / 1 / 3 / 2;
+  align-self: start;
+}
+
+.share-card.is-landscape .share-zone {
+  grid-area: 2 / 2 / 5 / 3;
+}
+
+.share-card.is-landscape .share-bottom {
+  grid-area: 4 / 1 / 5 / 2;
+  align-self: end;
+}
+
+.share-card.is-landscape .share-brand-row.is-foot {
+  grid-area: 5 / 1 / 6 / 3;
+  margin-top: calc(24px * var(--share-k));
+}
+
+/* A poster's left column holds its title and its figures one above the other,
+   so on 4:3 both are set smaller to leave the rows room. */
+.share-card--poster.is-landscape {
+  --share-size-poster-title: calc(62px * var(--share-k));
+  --share-size-poster-hero: calc(110px * var(--share-k));
+  --share-emblem-poster: calc(84px * var(--share-k));
+}
+
+/* The credit sits inside the poster's frame, not across it. */
+.share-card--poster .share-credit {
+  right: calc(var(--share-pad) * 0.45 + 16px);
+  bottom: calc(var(--share-pad-bottom) + 24px * var(--share-k) - var(--share-pad) * 0.55);
+}
+
+/* A session with no route shows what it was instead. */
+.share-graphic {
+  display: flex;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+}
+
+/* The muscle map sits where the route would, placed and sized like it. */
+.share-body {
+  position: absolute;
+  display: flex;
+  justify-content: space-between;
+  pointer-events: none;
+}
+
+.share-body-figure {
+  display: block;
+  width: auto;
+  height: 100%;
+  aspect-ratio: 1 / 2;
+}
+
+.share-body-outline {
+  fill: var(--share-figure);
+}
+
+.share-body-muscle {
+  fill: var(--share-figure-muscle);
+}
+
+.share-heat-1 {
+  fill: var(--share-heat-1);
+}
+
+.share-heat-2 {
+  fill: var(--share-heat-2);
+}
+
+.share-heat-3 {
+  fill: var(--share-heat-3);
+}
+
+.share-heat-4 {
+  fill: var(--share-heat-4);
+}
+
+.share-heat-5 {
+  fill: var(--share-heat-5);
+}
+
+/* A strength session's heaviest sets, two to a row, with the words. */
+.share-sets {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: calc(14px * var(--share-k)) calc(36px * var(--share-k));
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  text-align: left;
+}
+
+.share-sets li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 4px 16px;
+  padding-bottom: calc(14px * var(--share-k));
+  border-bottom: 2px solid var(--share-hair);
+}
+
+.share-set-name {
+  overflow: hidden;
+  color: var(--share-ink-2);
+  font-size: var(--share-size-label);
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.share-set-value {
+  grid-column: 1;
+  font-family: var(--font-display);
+  font-size: var(--share-size-set);
+  font-weight: 500;
+  letter-spacing: -0.02em;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+.share-set-record {
+  grid-row: 1 / span 2;
+  grid-column: 2;
+  padding: calc(6px * var(--share-k)) calc(12px * var(--share-k));
+  border-radius: var(--radius-pill);
+  background: var(--share-gold-wash);
+  box-shadow: inset 0 0 0 2px var(--share-gold-edge);
+  color: var(--share-gold);
+  font-size: var(--share-size-label);
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-shadow: none;
+}
+
+.share-graphic-swim {
+  flex-direction: column;
+  align-items: stretch;
+  gap: calc(18px * var(--share-k));
+  max-height: 640px;
+}
+
+.share-graphic-swim svg {
+  display: block;
+  flex: 1 1 0;
+  width: 100%;
+  min-height: 0;
+}
+
+.share-legend {
+  display: flex;
+  flex: none;
+  flex-wrap: wrap;
+  gap: calc(28px * var(--share-k));
+  color: var(--share-ink-2);
+  font-size: var(--share-size-label);
+  font-weight: 600;
+}
+
+.share-legend i {
+  display: inline-block;
+  width: calc(18px * var(--share-k));
+  height: calc(18px * var(--share-k));
+  margin-right: calc(10px * var(--share-k));
+  border-radius: var(--radius-xs);
+  vertical-align: -2px;
+}
+
+/* The window that draws the file shows the card at the top left and nothing else. */
+.share-render-page,
+.share-render-page body {
+  margin: 0;
+  overflow: hidden;
+  background: #07090c;
+}
+
+/* ── The dialog ─────────────────────────────────────────────────────────── */
+
+.share-dialog {
+  width: min(1180px, 96vw);
+  max-height: min(94vh, 980px);
+}
+
+.share-dialog-subtitle {
+  overflow: hidden;
+  color: var(--text-muted);
+  font-size: 13px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.share-dialog-body {
+  display: grid;
+  flex: 1;
+  grid-template-columns: minmax(0, 1fr) 360px;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.share-stage {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  min-width: 0;
+  padding: 20px;
+  overflow: auto;
+  background: var(--glass-bg);
+}
+
+/* The preview is grabbed, never selected or dragged out as a picture. */
+.share-preview {
+  position: relative;
+  flex: none;
+  overflow: hidden;
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-card);
+  touch-action: none;
+  user-select: none;
+  -webkit-user-drag: none;
+}
+
+.share-preview-card {
+  position: absolute;
+  top: 0;
+  left: 0;
+  transform-origin: 0 0;
+}
+
+.share-stage-foot {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 4px 14px;
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 12px;
+  text-align: center;
+}
+
+.share-stage-foot b {
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+
+.share-drop {
+  position: absolute;
+  inset: 12px;
+  display: grid;
+  place-items: center;
+  border: 2px dashed var(--accent);
+  border-radius: var(--radius-md);
+  background: var(--glass-bg-elevated);
+  color: var(--text-primary);
+  font-weight: 600;
+  pointer-events: none;
+}
+
+.share-controls {
+  min-height: 0;
+  padding: 0 16px 16px;
+  overflow-y: auto;
+  border-left: 1px solid var(--glass-border);
+}
+
+.share-section {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding-block: 14px;
+  border-bottom: 1px solid var(--glass-border);
+}
+
+.share-section:last-child {
+  border-bottom: 0;
+}
+
+.share-section h3 {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.share-section h3 span {
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+/* The grounds are chosen by their look, so each is a picture over its name:
+   the map style chosen, the photo, the colour. Marked as OptionChips' tiles
+   mark a chosen one. */
+.share-bg-tiles {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.share-bg-tile {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+  padding: 4px 4px 6px;
+  border: 1px solid var(--option-edge);
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--text-muted);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition:
+    border-color var(--dur-fast) var(--ease),
+    background var(--dur-fast) var(--ease),
+    color var(--dur-fast) var(--ease);
+}
+
+.share-bg-tile:hover:not(:disabled) {
+  color: var(--text-primary);
+}
+
+.share-bg-tile[aria-pressed="true"] {
+  border-color: color-mix(in srgb, var(--accent) 45%, var(--option-edge));
+  background: var(--accent-soft);
+  color: var(--accent-strong);
+}
+
+:root[data-theme="paper"] .share-bg-tile {
+  background: var(--glass-bg);
+}
+
+:root[data-theme="paper"] .share-bg-tile[aria-pressed="true"] {
+  border-color: transparent;
+  background: var(--option-raised);
+  box-shadow:
+    0 0 0 1.5px color-mix(in srgb, var(--accent) 55%, transparent),
+    var(--option-lift);
+}
+
+.share-bg-picture {
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  height: 48px;
+  border-radius: var(--radius-sm);
+  background: var(--glass-bg);
+  color: var(--text-muted);
+}
+
+.share-bg-fill {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* What a choice opens sits under it, indented on a rule, so it reads as that
+   choice's own and not as another choice beside it. */
+.share-subsection {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-left: 4px;
+  padding-left: 12px;
+  border-left: 2px solid var(--glass-border);
+}
+
+.share-subsection-label {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.share-note {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.share-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+
+.share-switch {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.share-switch-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.share-switch-text small {
+  overflow: hidden;
+  color: var(--text-muted);
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.share-switch:has(input:disabled) {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+/* The switch is the checkbox itself, so the focus ring is on the control that has focus. */
+.share-switch input {
+  position: relative;
+  flex: none;
+  width: 34px;
+  height: 20px;
+  margin: 0;
+  border-radius: var(--radius-pill);
+  background: var(--glass-bg-hover);
+  box-shadow: inset 0 0 0 1px var(--glass-border);
+  appearance: none;
+  cursor: inherit;
+  transition: background-color var(--dur-fast) var(--ease);
+}
+
+.share-switch input::after {
+  content: "";
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 16px;
+  height: 16px;
+  border-radius: var(--radius-pill);
+  background: #ffffff;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+  transition: transform var(--dur-base) var(--ease);
+}
+
+.share-switch input:checked {
+  background: var(--accent);
+}
+
+.share-switch input:checked::after {
+  transform: translateX(14px);
+}
+
+.share-range {
+  display: grid;
+  grid-template-columns: 64px minmax(0, 1fr) 44px;
+  align-items: center;
+  gap: 10px;
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+
+.share-range input {
+  width: 100%;
+  accent-color: var(--accent);
+}
+
+.share-range output {
+  color: var(--text-muted);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.share-photo-button {
+  align-self: flex-start;
+  min-height: 32px;
+  padding: 0 12px;
+  font-size: 13px;
+}
+
+/* Size and a way back to the middle, for the route or the muscle map. */
+.share-placement {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.share-placement .share-range {
+  flex: 1;
+  min-width: 0;
+}
+
+.share-reset {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px;
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+  transition: color var(--dur-fast) var(--ease), background-color var(--dur-fast) var(--ease);
+}
+
+.share-reset:hover:not(:disabled) {
+  background: var(--glass-bg-hover);
+  color: var(--text-primary);
+}
+
+/* The dialog's own controls; the shared buttons and option groups bring theirs. */
+.share-bg-tile:focus-visible,
+.share-switch input:focus-visible,
+.share-range input:focus-visible,
+.share-color-pick input:focus-visible,
+.share-name-input:focus-visible,
+.share-reset:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: 2px;
+}
+
+.share-bg-tile:disabled,
+.share-reset:disabled {
+  cursor: default;
+  opacity: 0.45;
+}
+
+.share-colors {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.share-swatch {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border-radius: var(--radius-pill);
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.25);
+}
+
+.share-color-pick {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text-secondary);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.share-color-pick input {
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: none;
+  cursor: pointer;
+}
+
+.share-name-input {
+  width: 100%;
+  padding: 7px 10px;
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-sm);
+  background: var(--glass-bg);
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 13px;
+}
+
+.share-name-input:disabled {
+  opacity: 0.5;
+}
+
+.share-footer .share-note {
+  flex: 1;
+  min-width: 180px;
+}
+
+@media (max-width: 900px) {
+  .share-dialog-body {
+    grid-template-columns: 1fr;
+    overflow-y: auto;
+  }
+
+  .share-controls {
+    overflow: visible;
+    border-top: 1px solid var(--glass-border);
+    border-left: 0;
+  }
+}

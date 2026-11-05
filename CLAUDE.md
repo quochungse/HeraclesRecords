@@ -70,7 +70,8 @@ Development variants: `dev:simulate-plan-ai` (plan steps without a provider),
 `sample:coach` (sample Coach conversations; app closed). Generators whose output is
 committed and never run by a build: `fonts:fetch`, `admin-regions:fetch`,
 `body-shapes:fetch`, `body-figures:bake`, `sample-rides:fetch`, `sample-hikes:fetch`,
-`icons:generate`, `site:og`, `signin-art:generate`.
+`icons:generate`, `site:og`, `signin-art:generate`, `share-wreath:generate` (python3 with numpy
+and Pillow).
 
 ## Tests
 
@@ -250,6 +251,7 @@ in". The COROS API notes are in `electron/CLAUDE.md`.
 | Where you've been, places, geocoding | `src/trainingMap/`, `reverseGeocodeService.ts` | `src/trainingMap/CLAUDE.md` |
 | Base maps | `src/mapBase/` | `src/mapBase/CLAUDE.md` |
 | Hall of Records | `src/records/` | `src/records/CLAUDE.md` |
+| Share image (the dialog, the card, the offscreen render) | `src/share/`, `electron/shareImage.ts` | `src/share/CLAUDE.md` |
 | Website | `site/` | `site/CLAUDE.md` |
 
 A nested `CLAUDE.md` loads only when you read files under its directory. **Before changing

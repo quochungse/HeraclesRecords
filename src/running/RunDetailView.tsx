@@ -53,6 +53,8 @@ import { sportHasRunPerformance, type PerformanceProfile } from "../../electron/
 import { RunPerformanceChart } from "./RunPerformanceChart";
 import { isRecoveryLap, lapSections } from "../../electron/lapSections";
 import { LapRecoveryMark, LapSectionRow } from "../training/components/LapSections";
+import { ShareButton } from "../share/ShareButton";
+import { buildActivityShareSession, shareTrainingLabel } from "../share/buildShareSession";
 
 interface RunDetailViewProps {
   activity: TrainingHubActivity;
@@ -96,6 +98,8 @@ const MIN_PAUSED_SECONDS_SHOWN = 60;
 const COVER_VISIBLE_BAND = 0.15;
 
 interface Stat {
+  /** Stable across languages: what a share image remembers a figure by. */
+  id?: string;
   label: string;
   value: string;
   title?: string;
@@ -183,13 +187,14 @@ export function RunDetailView({
     const pace = paceSecondsPerKm({ ...activity, distance, duration: active });
 
     const stats: Stat[] = [
-      { label: t("activity.m.distance"), value: formatDistanceMeters(distance, unitSystem) },
+      { id: "activity.m.distance", label: t("activity.m.distance"), value: formatDistanceMeters(distance, unitSystem) },
       {
+        id: "activity.m.time",
         label: t("activity.m.time"),
         value: formatDurationSeconds(active),
         title: t("run.detail.timeTitle")
       },
-      { label: t("activity.m.pace"), value: formatPaceSecondsPerKm(pace, unitSystem) }
+      { id: "activity.m.pace", label: t("activity.m.pace"), value: formatPaceSecondsPerKm(pace, unitSystem) }
     ];
 
     if (
@@ -198,6 +203,7 @@ export function RunDetailView({
       total - active >= MIN_PAUSED_SECONDS_SHOWN
     ) {
       stats.push({
+        id: "run.detail.totalTime",
         label: t("run.detail.totalTime"),
         value: formatDurationSeconds(total),
         title: t("run.detail.totalTimeTitle", { paused: formatDurationSeconds(total - active) })
@@ -206,6 +212,7 @@ export function RunDetailView({
 
     if (detail?.adjustedPace !== undefined) {
       stats.push({
+        id: "run.detail.gap",
         label: t("run.detail.gap"),
         value: formatPaceSecondsPerKm(detail.adjustedPace, unitSystem),
         title: t("run.detail.gapTitle")
@@ -214,25 +221,26 @@ export function RunDetailView({
 
     const avgHr = detail?.avgHr ?? activity.avgHr;
     if (avgHr !== undefined) {
-      stats.push({ label: t("activity.m.avgHr"), value: `${avgHr} bpm` });
+      stats.push({ id: "activity.m.avgHr", label: t("activity.m.avgHr"), value: `${avgHr} bpm` });
     }
     const maxHr = detail?.maxHr ?? activity.maxHr;
     if (maxHr !== undefined) {
-      stats.push({ label: t("activity.m.maxHr"), value: `${maxHr} bpm` });
+      stats.push({ id: "activity.m.maxHr", label: t("activity.m.maxHr"), value: `${maxHr} bpm` });
     }
 
     const climb = detail?.elevationGain ?? activity.elevationGain;
     if (climb !== undefined) {
-      stats.push({ label: t("activity.m.climb"), value: formatElevationMeters(climb, unitSystem) });
+      stats.push({ id: "activity.m.climb", label: t("activity.m.climb"), value: formatElevationMeters(climb, unitSystem) });
     }
 
     if (ground) {
       const descent = detail?.elevationLoss;
       if (descent !== undefined && descent > 0) {
-        stats.push({ label: t("activity.m.descent"), value: formatElevationMeters(descent, unitSystem) });
+        stats.push({ id: "activity.m.descent", label: t("activity.m.descent"), value: formatElevationMeters(descent, unitSystem) });
       }
       if (ground.range) {
         stats.push({
+          id: "run.detail.highest",
           label: t("run.detail.highest"),
           value: formatElevationMeters(ground.range.highest, unitSystem),
           title: t("run.detail.lowest", { value: formatElevationMeters(ground.range.lowest, unitSystem) })
@@ -241,6 +249,7 @@ export function RunDetailView({
       const up = ground.terrain.find((share) => share.kind === "up");
       if (up?.verticalRate !== undefined) {
         stats.push({
+          id: "activity.channel.verticalSpeed",
           label: t("activity.channel.verticalSpeed"),
           value: formatVerticalRate(up.verticalRate, unitSystem),
           title: t(`run.detail.climbingRateTitle.${unitSystem === "imperial" ? "imperial" : "metric"}` as const)
@@ -250,7 +259,7 @@ export function RunDetailView({
 
     const load = detail?.trainingLoad ?? activity.trainingLoad;
     if (load !== undefined) {
-      stats.push({ label: t("overview.tiles.load"), value: formatOptionalNumber(Math.round(load)) });
+      stats.push({ id: "overview.tiles.load", label: t("overview.tiles.load"), value: formatOptionalNumber(Math.round(load)) });
     }
 
     return stats;
@@ -264,6 +273,7 @@ export function RunDetailView({
       decoupling === undefined || trail
         ? null
         : {
+            id: "run.detail.decoupling",
             label: t("run.detail.decoupling"),
             value: `${decoupling.percent > 0 ? "+" : ""}${formatDecimal(decoupling.percent, 1)}%`,
             title: t("run.detail.decouplingTitle")
@@ -279,25 +289,26 @@ export function RunDetailView({
 
     const stats: Stat[] = [];
     if (source.avgCadence !== undefined) {
-      stats.push({ label: t("activity.m.cadence"), value: `${Math.round(source.avgCadence)} spm` });
+      stats.push({ id: "activity.m.cadence", label: t("activity.m.cadence"), value: `${Math.round(source.avgCadence)} spm` });
     }
     if (source.strideLength !== undefined) {
-      stats.push({ label: t("activity.m.stride"), value: `${formatDecimal(source.strideLength, 2)} m` });
+      stats.push({ id: "activity.m.stride", label: t("activity.m.stride"), value: `${formatDecimal(source.strideLength, 2)} m` });
     }
     if (source.groundTime !== undefined) {
-      stats.push({ label: t("activity.m.groundContact"), value: `${Math.round(source.groundTime)} ms` });
+      stats.push({ id: "activity.m.groundContact", label: t("activity.m.groundContact"), value: `${Math.round(source.groundTime)} ms` });
     }
     if (source.verticalOscillation !== undefined) {
       stats.push({
+        id: "run.detail.vertOsc",
         label: t("run.detail.vertOsc"),
         value: `${formatDecimal(source.verticalOscillation, 1)} cm`
       });
     }
     if (source.verticalRatio !== undefined) {
-      stats.push({ label: t("activity.channel.verticalRatio"), value: `${formatDecimal(source.verticalRatio, 1)}%` });
+      stats.push({ id: "activity.channel.verticalRatio", label: t("activity.channel.verticalRatio"), value: `${formatDecimal(source.verticalRatio, 1)}%` });
     }
     if (source.avgPower !== undefined) {
-      stats.push({ label: t("activity.m.power"), value: `${Math.round(source.avgPower)} W` });
+      stats.push({ id: "activity.m.power", label: t("activity.m.power"), value: `${Math.round(source.avgPower)} W` });
     }
     return stats;
   }, [detail, locale]);
@@ -305,22 +316,23 @@ export function RunDetailView({
   const conditions = useMemo<Stat[]>(() => {
     const stats: Stat[] = [];
     if (detail?.effect?.aerobic !== undefined) {
-      stats.push({ label: t("run.detail.aerobic"), value: formatDecimal(detail.effect.aerobic, 1) });
+      stats.push({ id: "run.detail.aerobic", label: t("run.detail.aerobic"), value: formatDecimal(detail.effect.aerobic, 1) });
     }
     if (detail?.effect?.anaerobic !== undefined) {
-      stats.push({ label: t("run.detail.anaerobic"), value: formatDecimal(detail.effect.anaerobic, 1) });
+      stats.push({ id: "run.detail.anaerobic", label: t("run.detail.anaerobic"), value: formatDecimal(detail.effect.anaerobic, 1) });
     }
     if (detail?.effect?.vo2max !== undefined) {
-      stats.push({ label: "VO₂max", value: formatOptionalNumber(detail.effect.vo2max) });
+      stats.push({ id: "vo2max", label: "VO₂max", value: formatOptionalNumber(detail.effect.vo2max) });
     }
     if (detail?.weather?.temperatureC !== undefined) {
       stats.push({
+        id: "run.detail.temperature",
         label: t("run.detail.temperature"),
         value: formatTemperatureValue(detail.weather.temperatureC, temperatureUnit)
       });
     }
     if (detail?.weather?.humidityPct !== undefined) {
-      stats.push({ label: t("run.detail.humidity"), value: `${Math.round(detail.weather.humidityPct)}%` });
+      stats.push({ id: "run.detail.humidity", label: t("run.detail.humidity"), value: `${Math.round(detail.weather.humidityPct)}%` });
     }
     return stats;
   }, [detail, locale]);
@@ -351,6 +363,28 @@ export function RunDetailView({
                   <MessageCircle size={15} aria-hidden="true" />
                   {t("activity.askCoach")}
                 </button>
+              ) : null}
+              {detail ? (
+                <ShareButton
+                  build={() =>
+                    buildActivityShareSession({
+                      sport: "run",
+                      activity,
+                      detail,
+                      series,
+                      kind: surface ? RUN_SURFACE_LABELS[surface] : t("run.run"),
+                      name:
+                        activity.name?.trim() ||
+                        (surface ? t(`run.detail.untitled.${surface}` as const) : t("run.run")),
+                      stats: [...headline, ...(decouplingStat ? [decouplingStat] : []), ...dynamics, ...conditions],
+                      defaultStats: ["activity.m.time", "activity.m.pace", "activity.m.avgHr"],
+                      defaultHero: "activity.m.distance",
+                      trainingLabel: shareTrainingLabel(benefit),
+                      charts: trail ? ["elevation", "pace", "hr", "splits"] : ["splits", "pace", "hr", "elevation"],
+                      unitSystem
+                    })
+                  }
+                />
               ) : null}
             </div>
             <div className="run-detail-title">
