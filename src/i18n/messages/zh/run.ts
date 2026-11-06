@@ -85,7 +85,7 @@ const run: RunMessages = {
   "run.perf.against.worse": "低于平常",
   "run.perf.held": "第 {minute} 分钟后保持不变",
   "run.perf.heldNote": "跑过第 {minute} 分钟的记录不足三次，因此平常值保持在该分钟的水平。",
-  "run.perf.scaleNote": "以 COROS 的 VO2max 尺度表示：相对心率代价的速度。尺度按你过去一年的跑步一次性确定。平常值取自前六周的平稳跑（储备心率的 {low}–{high}%）。",
+  "run.perf.scaleNote": "以 COROS 的 VO2max 尺度表示：相对心率代价的速度。尺度按你过去一年的跑步确定。平常值取自前六周的平稳跑（储备心率的 {low}–{high}%）。",
   "run.perf.noBaseline": "读取到前六周的三次跑步后，平常值才会出现。",
   "run.perf.noReadings": "本次跑步没有足够平稳、可以读取的区间：配速或心率一直在变。",
   "run.perf.needProfile": "请在 COROS 中设置最大心率和静息心率以查看跑步表现。",

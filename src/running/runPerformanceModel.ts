@@ -144,8 +144,10 @@ export function performanceAthleteScale(
 /**
  * The usual as of a moment, from the runs before it (`history`), on the
  * athlete's scale (`performanceAthleteScale`) — the same on every screen.
- * `own` is the run being read, which anchors the scale on its own when no run
- * of the year has COROS's VO2max.
+ * Until the year is read, or when none of its runs carries COROS's VO2max,
+ * the scale is read off these runs and `own`, the run being read: a figure
+ * left unscaled read 40 where COROS says 47, for as long as the year's
+ * curves took to arrive.
  */
 export function performanceContext(
   history: readonly TrainingHubActivity[],
@@ -156,7 +158,7 @@ export function performanceContext(
 ): PerformanceContext {
   const runs = storedRuns(history, summaries, profile);
   const baseline = performanceBaseline(runs);
-  const scale = athleteScaleValue ?? (own ? athleteScale([own]) : undefined);
+  const scale = athleteScaleValue ?? athleteScale(own ? [...runs, own] : runs);
   return {
     ...(baseline ? { baseline } : {}),
     ...(scale !== undefined ? { scale } : {}),

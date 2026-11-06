@@ -47,16 +47,17 @@ Swain's share of HR reserve. Road and track runs only (100, 103).
 - **One scale onto COROS's VO2max per athlete, over the year before now** (`athleteScale`,
   `performanceScaleRuns`), the same on the Running screen and every run's page. A six-week scale
   pinned the usual to COROS's figure (a 5% fall read as none) and re-valued every run as the
-  window rolled. COROS's VO2max is drawn beside the usual instead: a dotted step line on the
-  Running screen, a dotted line on a run's ml/kg/min reading.
+  window rolled. Until the year is read, the screen's own six weeks (and a page's run) stand in
+  for it, never no scale. COROS's VO2max is drawn beside the usual instead: a dotted step line
+  on the Running screen, a dotted line on a run's ml/kg/min reading.
 - **Read on demand, bounded**: Running sweeps with `requirePerformance` for the runs shown and
   the six weeks before; a run's page for the six weeks before it; never under Trail. **The
   scale's year is a read of its own** (a second `useActivityDetailSummaries`, keyed by the year's
-  runs alone, opened once the screen's own read settles and left open), and the scale is
-  memoised on it alone (`performanceAthleteScale`): keyed with the screen's runs, a period
-  switch or a run's page read the whole year out of SQLite again. `test:running-renderer` holds
-  it. The line is a rolling seven-day median (`performanceRollingMedian`).
-  `npm run test:run-performance`.
+  runs alone, opened the first time in a session once the screen's own read settles, and left
+  open), and the scale is memoised on it alone (`performanceAthleteScale`): keyed with the
+  screen's runs, a period switch or a run's page read the whole year out of SQLite again.
+  `test:running-renderer` holds it. The line is a rolling seven-day median
+  (`performanceRollingMedian`). `npm run test:run-performance`.
 
 ## Cycling (`src/cycling/`)
 

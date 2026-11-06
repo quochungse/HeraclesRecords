@@ -268,8 +268,9 @@ export function RunPerformanceChart({
     });
   }, [lastSecond, rows, xAt]);
 
-  // COROS's own figure, beside the usual on the ml/kg/min reading.
-  const corosLine = effective === "absolute" ? corosVo2max : undefined;
+  // COROS's own figure, beside the usual on the ml/kg/min reading: the one the
+  // curve kept, which is checked to be a VO2max at all.
+  const corosLine = effective === "absolute" ? own.corosVo2max : undefined;
   const values = [
     ...rows.flatMap((row) => [...(row.value !== undefined ? [row.value] : []), ...(row.band ?? [])]),
     ...(corosLine !== undefined ? [corosLine] : [])

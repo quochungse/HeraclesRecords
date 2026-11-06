@@ -85,7 +85,7 @@ const run: RunMessages = {
   "run.perf.against.worse": "di bawah biasanya",
   "run.perf.held": "Tetap mulai menit {minute}",
   "run.perf.heldNote": "Kurang dari tiga lari Anda melewati menit {minute}, jadi nilai biasa Anda ditahan di level menit itu.",
-  "run.perf.scaleNote": "Kecepatan untuk detak jantung yang dikorbankan, pada skala VO2max COROS, ditetapkan sekali dari lari Anda setahun terakhir. Nilai biasa Anda adalah lari stabil, {low}–{high}% cadangan detak, dalam enam minggu sebelumnya.",
+  "run.perf.scaleNote": "Kecepatan untuk detak jantung yang dikorbankan, pada skala VO2max COROS, dihitung dari lari Anda setahun terakhir. Nilai biasa Anda adalah lari stabil, {low}–{high}% cadangan detak, dalam enam minggu sebelumnya.",
   "run.perf.noBaseline": "Nilai biasa muncul setelah tiga lari dari enam minggu sebelumnya terbaca.",
   "run.perf.noReadings": "Tidak ada bagian lari ini yang cukup stabil untuk dibaca: pace atau detak jantung terus berubah.",
   "run.perf.needProfile": "Atur detak jantung maksimal dan saat istirahat di COROS untuk membaca performa.",

@@ -345,18 +345,22 @@ export function oxygenCost(speed: number): number {
   return 0.2 * speed + 3.5;
 }
 
+/** The figure for `speed` at this share of the reserve, or nothing outside the shares that can be read. */
+function vo2maxAtShare(speed: number, share: number): number | undefined {
+  if (!(share >= MIN_RESERVE_SHARE) || share > MAX_RESERVE_SHARE) {
+    return undefined;
+  }
+  const value = 3.5 + (oxygenCost(speed) - 3.5) / share;
+  return Number.isFinite(value) && value > 0 ? value : undefined;
+}
+
 /** Effective VO2max of a stretch, or nothing when the effort is too light or past the maximum. */
 export function effectiveVo2max(
   speed: number,
   heartRate: number,
   profile: PerformanceProfile
 ): number | undefined {
-  const share = reserveShare(heartRate, profile);
-  if (!(share >= MIN_RESERVE_SHARE) || share > MAX_RESERVE_SHARE) {
-    return undefined;
-  }
-  const value = 3.5 + (oxygenCost(speed) - 3.5) / share;
-  return Number.isFinite(value) && value > 0 ? value : undefined;
+  return vo2maxAtShare(speed, reserveShare(heartRate, profile));
 }
 
 /**
@@ -393,9 +397,10 @@ export function performancePoints(
   }
   const out: PerformancePoint[] = [];
   for (const [t, speed, heartRate] of curve.points) {
-    const value = effectiveVo2max(speed, heartRate, profile);
+    const share = reserveShare(heartRate, profile);
+    const value = vo2maxAtShare(speed, share);
     if (value !== undefined) {
-      out.push({ t, value, speed, heartRate, share: reserveShare(heartRate, profile) });
+      out.push({ t, value, speed, heartRate, share });
     }
   }
   return out;

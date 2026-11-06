@@ -85,7 +85,7 @@ const run: RunMessages = {
   "run.perf.against.worse": "unter deinem Üblichen",
   "run.perf.held": "Ab Minute {minute} festgehalten",
   "run.perf.heldNote": "Weniger als drei deiner Läufe gingen über Minute {minute} hinaus, daher bleibt dein Übliches auf dem Stand dieser Minute.",
-  "run.perf.scaleNote": "Tempo im Verhältnis zur Herzfrequenz, die es gekostet hat, auf der VO2max-Skala von COROS, einmal über deine Läufe des letzten Jahres festgelegt. Dein Übliches ist dein gleichmäßiges Laufen bei {low}–{high} % der HF-Reserve aus den sechs Wochen davor.",
+  "run.perf.scaleNote": "Tempo im Verhältnis zur Herzfrequenz, die es gekostet hat, auf der VO2max-Skala von COROS, aus deinen Läufen des letzten Jahres bestimmt. Dein Übliches ist dein gleichmäßiges Laufen bei {low}–{high} % der HF-Reserve aus den sechs Wochen davor.",
   "run.perf.noBaseline": "Dein Übliches erscheint, sobald drei Läufe aus den sechs Wochen davor gelesen sind.",
   "run.perf.noReadings": "Kein Abschnitt dieses Laufs war gleichmäßig genug, um ihn zu lesen: Tempo oder Herzfrequenz änderten sich ständig.",
   "run.perf.needProfile": "Hinterlege bei COROS deine maximale Herzfrequenz und deinen Ruhepuls, um die Leistung zu lesen.",

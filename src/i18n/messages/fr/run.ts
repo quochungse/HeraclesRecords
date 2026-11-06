@@ -85,7 +85,7 @@ const run: RunMessages = {
   "run.perf.against.worse": "en dessous de votre habitude",
   "run.perf.held": "Figé à partir de la minute {minute}",
   "run.perf.heldNote": "Moins de trois de vos sorties ont dépassé la minute {minute} : votre habitude reste à son niveau de cette minute.",
-  "run.perf.scaleNote": "La vitesse obtenue pour l’effort cardiaque, sur l’échelle de VO2max de COROS, fixée une fois sur vos sorties de la dernière année. Votre habitude est votre course régulière, à {low}–{high} % de la FC de réserve, des six semaines précédentes.",
+  "run.perf.scaleNote": "La vitesse obtenue pour l’effort cardiaque, sur l’échelle de VO2max de COROS, établie sur vos sorties de la dernière année. Votre habitude est votre course régulière, à {low}–{high} % de la FC de réserve, des six semaines précédentes.",
   "run.perf.noBaseline": "Votre habitude apparaît dès que trois sorties des six semaines précédentes sont lues.",
   "run.perf.noReadings": "Aucun passage de cette sortie n’était assez régulier pour être lu : l’allure ou la fréquence cardiaque n’a cessé de changer.",
   "run.perf.needProfile": "Renseignez votre fréquence cardiaque maximale et de repos sur COROS pour lire la performance.",

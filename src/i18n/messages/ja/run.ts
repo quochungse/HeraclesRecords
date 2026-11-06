@@ -85,7 +85,7 @@ const run: RunMessages = {
   "run.perf.against.worse": "いつもより下",
   "run.perf.held": "{minute} 分以降は固定",
   "run.perf.heldNote": "{minute} 分を超えたランが 3 本未満のため、いつもの値はその時点の水準で固定しています。",
-  "run.perf.scaleNote": "心拍の負担に対するスピードを COROS の VO2max の尺度で表示します。尺度は直近 1 年のランから一度だけ決めます。いつもの値は、直前 6 週間の安定した走り（予備心拍の {low}–{high}%）から求めます。",
+  "run.perf.scaleNote": "心拍の負担に対するスピードを COROS の VO2max の尺度で表示します。尺度は直近 1 年のランから求めます。いつもの値は、直前 6 週間の安定した走り（予備心拍の {low}–{high}%）から求めます。",
   "run.perf.noBaseline": "直前 6 週間のランが 3 本読み込まれると、いつもの値が表示されます。",
   "run.perf.noReadings": "このランには読み取れるほど安定した区間がありません。ペースか心拍が変わり続けていました。",
   "run.perf.needProfile": "パフォーマンスを読むには、COROS で最大心拍数と安静時心拍数を設定してください。",

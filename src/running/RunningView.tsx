@@ -107,6 +107,13 @@ const PERIOD_OPTIONS = periodGroupOptions([28, 90, 365, null]);
 const DEFAULT_PERIOD_DAYS = 90;
 
 /**
+ * Whether the year the performance scale is read over has been opened this
+ * session. Once its sweep has started there is nothing to wait for on the way
+ * back to this screen, and waiting showed the stand-in scale for a moment.
+ */
+let yearOpenedThisSession = false;
+
+/**
  * Running on a screen of its own.
  *
  * One sport read down the time axis, which is the thing Activities cannot do:
@@ -280,13 +287,16 @@ export function RunningView({
   // The year the performance scale is read over, as a read of its own: keyed by
   // the year's runs alone, it is read once and again only when a run joins or
   // leaves the year — a period switch or a run's page changes the list above,
-  // and that list read the whole year again each time. It starts once the
-  // screen's own runs are in, so its sweep follows theirs rather than racing
-  // them, and stays on after: a gate that closed with every run's page would
-  // read the year again each time it opened.
-  const [yearOpen, setYearOpen] = useState(false);
+  // and that list read the whole year again each time. The first time in a
+  // session it starts once the screen's own runs are in, so its sweep follows
+  // theirs rather than racing them, and it stays on after: a gate that closed
+  // with every run's page would read the year again each time it opened.
+  const [yearOpen, setYearOpen] = useState(yearOpenedThisSession);
   useEffect(() => {
-    if (readsPerformance && summariesSettled) setYearOpen(true);
+    if (readsPerformance && summariesSettled) {
+      yearOpenedThisSession = true;
+      setYearOpen(true);
+    }
   }, [readsPerformance, summariesSettled]);
   const scaleRuns = useMemo(() => performanceScaleRuns(allRuns, nowMs), [allRuns, nowMs]);
   const scaleSummaries = useActivityDetailSummaries({

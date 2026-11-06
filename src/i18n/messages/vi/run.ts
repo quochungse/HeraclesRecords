@@ -85,7 +85,7 @@ const run: RunMessages = {
   "run.perf.against.worse": "thấp hơn mức thường",
   "run.perf.held": "Giữ mức từ phút {minute}",
   "run.perf.heldNote": "Chưa đủ ba buổi chạy quá phút {minute}, nên mức thường lệ được giữ ở mức của phút đó.",
-  "run.perf.scaleNote": "Tốc độ so với nhịp tim phải bỏ ra, trên thang VO2max của COROS, quy đổi một lần theo các buổi chạy trong năm qua. Mức thường lệ là phần chạy đều của bạn, {low}–{high}% nhịp dự trữ, trong sáu tuần trước.",
+  "run.perf.scaleNote": "Tốc độ so với nhịp tim phải bỏ ra, trên thang VO2max của COROS, quy đổi theo các buổi chạy trong năm qua. Mức thường lệ là phần chạy đều của bạn, {low}–{high}% nhịp dự trữ, trong sáu tuần trước.",
   "run.perf.noBaseline": "Mức thường lệ xuất hiện khi đã đọc được ba buổi trong sáu tuần trước.",
   "run.perf.noReadings": "Buổi này không có đoạn nào đủ ổn định để đọc: pace hoặc nhịp tim thay đổi liên tục.",
   "run.perf.needProfile": "Đặt nhịp tim tối đa và nhịp tim nghỉ trên COROS để đọc hiệu suất.",

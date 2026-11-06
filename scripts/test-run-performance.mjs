@@ -390,7 +390,14 @@ assert.equal(model.performanceTrend(weeks.slice(-1)), undefined, "a single week 
   );
 }
 
-// No anchor in the year: the run alone anchors the scale, so the figure is still on COROS's scale.
+// The year not read yet: the six weeks stand in for it, so the figures are on
+// COROS's scale rather than raw.
+{
+  const waiting = model.performanceContext(model.performanceHistory(all, NOW), summaries, PROFILE, undefined);
+  close(waiting.scale, context.scale, 1e-9, "the six weeks' own scale until the year is read");
+}
+
+// Nothing anchored at all: the run alone anchors the scale, so the figure is still on COROS's scale.
 const own = perf.performanceRun(curveOf(48, 46), PROFILE);
 const alone = model.performanceContext([], summaries, PROFILE, undefined, own);
 assert.equal(alone.baseline, undefined);

@@ -85,7 +85,7 @@ const run: RunMessages = {
   "run.perf.against.worse": "por debajo de tu habitual",
   "run.perf.held": "Fijo desde el minuto {minute}",
   "run.perf.heldNote": "Menos de tres de tus carreras pasaron del minuto {minute}, así que tu habitual se mantiene en su nivel de ese minuto.",
-  "run.perf.scaleNote": "Velocidad por el pulso que costó, en la escala de VO2max de COROS, fijada una vez con tus carreras del último año. Tu habitual es tu carrera constante, al {low}–{high}% de la FC de reserva, de las seis semanas anteriores.",
+  "run.perf.scaleNote": "Velocidad por el pulso que costó, en la escala de VO2max de COROS, calculada con tus carreras del último año. Tu habitual es tu carrera constante, al {low}–{high}% de la FC de reserva, de las seis semanas anteriores.",
   "run.perf.noBaseline": "Tu habitual aparece en cuanto se leen tres carreras de las seis semanas anteriores.",
   "run.perf.noReadings": "Ningún tramo de esta carrera fue lo bastante estable para leerlo: el ritmo o el pulso no dejaron de cambiar.",
   "run.perf.needProfile": "Configura en COROS tu frecuencia cardiaca máxima y en reposo para ver el rendimiento.",

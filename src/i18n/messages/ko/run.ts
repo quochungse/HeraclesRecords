@@ -85,7 +85,7 @@ const run: RunMessages = {
   "run.perf.against.worse": "평소보다 낮음",
   "run.perf.held": "{minute}분부터 고정",
   "run.perf.heldNote": "{minute}분을 넘긴 러닝이 세 번 미만이라 평소 값을 그 시점 수준으로 고정했습니다.",
-  "run.perf.scaleNote": "심박이 치른 비용 대비 속도를 COROS VO2max 척도로 보여 줍니다. 척도는 지난 1년의 러닝으로 한 번 정합니다. 평소 값은 직전 6주의 꾸준한 달리기(여유 심박의 {low}–{high}%)에서 구합니다.",
+  "run.perf.scaleNote": "심박이 치른 비용 대비 속도를 COROS VO2max 척도로 보여 줍니다. 척도는 지난 1년의 러닝으로 정합니다. 평소 값은 직전 6주의 꾸준한 달리기(여유 심박의 {low}–{high}%)에서 구합니다.",
   "run.perf.noBaseline": "직전 6주의 러닝 세 번이 읽히면 평소 값이 나타납니다.",
   "run.perf.noReadings": "이번 러닝에는 읽을 만큼 안정된 구간이 없습니다. 페이스나 심박이 계속 바뀌었습니다.",
   "run.perf.needProfile": "퍼포먼스를 보려면 COROS에서 최대 심박수와 안정 시 심박수를 설정하세요.",

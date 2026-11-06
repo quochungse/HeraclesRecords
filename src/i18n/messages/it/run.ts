@@ -85,7 +85,7 @@ const run: RunMessages = {
   "run.perf.against.worse": "sotto il tuo solito",
   "run.perf.held": "Fisso dal minuto {minute}",
   "run.perf.heldNote": "Meno di tre delle tue corse hanno superato il minuto {minute}, quindi il tuo solito resta al livello di quel minuto.",
-  "run.perf.scaleNote": "La velocità ottenuta per il battito che è costata, sulla scala del VO2max di COROS, fissata una volta sulle tue corse dell’ultimo anno. Il tuo solito è la tua corsa regolare, al {low}–{high}% della FC di riserva, delle sei settimane precedenti.",
+  "run.perf.scaleNote": "La velocità ottenuta per il battito che è costata, sulla scala del VO2max di COROS, ricavata dalle tue corse dell’ultimo anno. Il tuo solito è la tua corsa regolare, al {low}–{high}% della FC di riserva, delle sei settimane precedenti.",
   "run.perf.noBaseline": "Il tuo solito compare quando vengono lette tre corse delle sei settimane precedenti.",
   "run.perf.noReadings": "Nessun tratto di questa corsa è stato abbastanza regolare da leggere: il ritmo o la frequenza cardiaca hanno continuato a cambiare.",
   "run.perf.needProfile": "Imposta su COROS la frequenza cardiaca massima e a riposo per leggere la prestazione.",
