@@ -33,11 +33,13 @@ import {
   performanceForm,
   performanceHistory,
   performanceRunsNeeded,
+  performanceScaleRuns,
   performanceSessions,
   performanceRollingMedian,
   performanceTrend,
   TREND_DAYS,
   performanceWeeks,
+  STEADY_BAND_PERCENT,
   type PerformanceSession,
   type PerformanceTrendPoint
 } from "./runPerformanceModel";
@@ -74,10 +76,22 @@ interface TrendPoint {
   session?: PerformanceSession;
 }
 
+interface CorosPoint {
+  x: number;
+  coros: number;
+}
+
+/** A step line ends at its last step; COROS's figure stands until today. */
+function heldToNow(points: CorosPoint[], nowMs: number): CorosPoint[] {
+  const last = points[points.length - 1];
+  return last && last.x < nowMs ? [...points, { x: nowMs, coros: last.coros }] : points;
+}
+
 /**
  * Running performance across the period, in place of the efficiency chart.
- * Every road and track run with a stretch steady enough to read counts — no
- * easy-only filter, since the figure no longer favours a faster run.
+ * Every road and track run with a stretch steady enough to read is drawn; the
+ * usual it is set against is read from steady aerobic running alone
+ * (`STEADY_SHARE_MIN`…`MAX`), where the figure does not lean with effort.
  */
 export function RunPerformancePanel({
   runs,
@@ -94,13 +108,18 @@ export function RunPerformancePanel({
   const { unitSystem } = useUnitSystem();
 
   const coverage = useMemo(
-    () => performanceCoverage(performanceRunsNeeded(allRuns, runs), summaries),
-    [allRuns, runs, summaries]
+    () => performanceCoverage(performanceRunsNeeded(allRuns, runs, nowMs), summaries),
+    [allRuns, nowMs, runs, summaries]
   );
 
   const model = useMemo(() => {
     if (!profile) return null;
-    const context = performanceContext(performanceHistory(allRuns, nowMs + 1), summaries, profile);
+    const context = performanceContext(
+      performanceHistory(allRuns, nowMs + 1),
+      summaries,
+      profile,
+      performanceScaleRuns(allRuns, nowMs)
+    );
     const sessions = performanceSessions(runs, summaries, profile, context);
     const rows = performanceWeeks(sessions, weeks, nowMs);
     return {
@@ -116,17 +135,32 @@ export function RunPerformancePanel({
   const usual = model?.context.baseline ? model.context.baseline.value * scale : undefined;
   // In ml/kg/min only: the screen states the figure, and how far a run sits
   // from the usual is the dashed line and each dot's colour.
-  const { trendPoints, trendLine } = useMemo(() => {
-    if (!model) return { trendPoints: [] as TrendPoint[], trendLine: [] as PerformanceTrendPoint[] };
+  const { trendPoints, trendLine, corosLine } = useMemo(() => {
+    if (!model) {
+      return {
+        trendPoints: [] as TrendPoint[],
+        trendLine: [] as PerformanceTrendPoint[],
+        corosLine: [] as CorosPoint[]
+      };
+    }
     return {
       trendPoints: model.sessions.map<TrendPoint>((session) => ({
         x: session.startedAtMs,
         y: session.value,
         session
       })),
-      trendLine: performanceRollingMedian(model.sessions)
+      trendLine: performanceRollingMedian(model.sessions),
+      // COROS's VO2max as each run left it, held until the next: drawn beside
+      // the usual so the two can part, as they could not when the usual was
+      // scaled to be it.
+      corosLine: heldToNow(
+        model.sessions.flatMap<CorosPoint>((session) =>
+          session.coros === undefined ? [] : [{ x: session.startedAtMs, coros: session.coros }]
+        ),
+        nowMs
+      )
     };
-  }, [model]);
+  }, [model, nowMs]);
 
   const quadrant = useMemo(() => {
     if (!model?.context.baseline) return [];
@@ -169,7 +203,11 @@ export function RunPerformancePanel({
   // From the Monday the period starts on, as its runs are cut: `now − weeks`
   // reached back into the week before, days no run on the chart can sit in.
   const start = Math.min(model?.rows[0]?.weekStartMs ?? nowMs, ...trendPoints.map((point) => point.x));
-  const yValues = [...trendPoints.map((point) => point.y), ...trendLine.map((point) => point.median)];
+  const yValues = [
+    ...trendPoints.map((point) => point.y),
+    ...trendLine.map((point) => point.median),
+    ...corosLine.map((point) => point.coros)
+  ];
   const band =
     usual === undefined ? undefined : [usual * (1 - PERFORMANCE_BAND), usual * (1 + PERFORMANCE_BAND)];
   const trendScale = niceScale(Math.min(...yValues, ...(band ?? [])), Math.max(...yValues, ...(band ?? [])));
@@ -252,6 +290,20 @@ export function RunPerformancePanel({
                   activeDot={false}
                   isAnimationActive={false}
                 />
+                {corosLine.length > 0 ? (
+                  <Line
+                    data={corosLine}
+                    dataKey="coros"
+                    type="stepAfter"
+                    stroke={colors.text}
+                    strokeWidth={1.5}
+                    strokeDasharray="1 4"
+                    strokeLinecap="round"
+                    dot={false}
+                    activeDot={false}
+                    isAnimationActive={false}
+                  />
+                ) : null}
                 <Tooltip
                   cursor={{ stroke: colors.cursor }}
                   content={(props: TooltipContentProps) => (
@@ -260,11 +312,12 @@ export function RunPerformancePanel({
                 />
               </ComposedChart>
             </ResponsiveContainer>
-            {usual !== undefined ? (
-              <p className="run-block-note">{t("run.perf.usualLine", { value: formatDecimal(usual, 1) })}</p>
-            ) : (
-              <p className="run-block-note">{t("run.perf.noBaseline")}</p>
-            )}
+            <p className="run-block-note">
+              {usual !== undefined
+                ? t("run.perf.usualLine", { value: formatDecimal(usual, 1), ...STEADY_BAND_PERCENT })
+                : t("run.perf.noBaseline")}
+              {corosLine.length > 0 ? ` ${t("run.perf.corosNote")}` : ""}
+            </p>
           </div>
 
           {quadrant.length > 0 && usualPace !== undefined && quadrantScale ? (
@@ -358,7 +411,10 @@ function SessionTooltip({
   formatPace
 }: TooltipContentProps & { usual?: number; formatPace: (pace: number) => string }) {
   if (!active || !payload?.length) return null;
-  const session = (payload[0]?.payload as { session?: PerformanceSession } | undefined)?.session;
+  // The run's own dot, wherever it falls among the lines drawn over it.
+  const session = payload
+    .map((entry) => (entry?.payload as { session?: PerformanceSession } | undefined)?.session)
+    .find((candidate) => candidate !== undefined);
   if (!session) return null;
   return (
     <div className="training-chart-tooltip">
@@ -378,6 +434,12 @@ function SessionTooltip({
           <li className="training-chart-tooltip-row">
             <span className="training-chart-tooltip-key">{t("activity.m.pace")}</span>
             <strong>{formatPace(session.pace)}</strong>
+          </li>
+        ) : null}
+        {session.coros !== undefined ? (
+          <li className="training-chart-tooltip-row">
+            <span className="training-chart-tooltip-key">{t("run.perf.tip.coros")}</span>
+            <strong>{formatDecimal(session.coros, 0)}</strong>
           </li>
         ) : null}
       </ul>

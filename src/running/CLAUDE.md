@@ -28,8 +28,11 @@ scroll). **Shared, never copied**:
   word is "Climb", Hiking's "Ascent". `test:run-metrics`.
 
 **Running efficiency** (`electron/runPerformance.ts` reads, `runPerformanceModel.ts` arranges):
-speed bought for heart rate, on the VO2max scale — Daniels & Gilbert's oxygen cost of the GAP
-over Swain's share of HR reserve. Road and track runs only (100, 103).
+speed bought for heart rate, on the VO2max scale — ACSM's running equation on the GAP over
+Swain's share of HR reserve. Road and track runs only (100, 103).
+- **Not Daniels & Gilbert's cost**: on 545 lab treadmill tests (Málaga, PhysioNet) it read a
+  person 15% fitter at 75–88% of the reserve than at 55–70% (ACSM: 3%), so the chart ranked runs
+  and runners by how much tempo they ran.
 - **The summary keeps a raw curve, not a figure** (`performance` on
   `training_activity_summaries`, `PERFORMANCE_SUMMARY_VERSION`): every 30 s past a 10-minute
   warm-up, 90 s of GAP against 90 s of heart rate **40 s later** (measured lag), kept only with
@@ -37,10 +40,19 @@ over Swain's share of HR reserve. Road and track runs only (100, 103).
   says why (`runPerformanceSteps`: *no data* dotted, *not steady* hatched; above the profile
   maximum is its own reason, `readingGapReason`). No profile figure is in the curve.
 - **Each minute is read against the athlete's usual at that minute** (median of six weeks of
-  runs, each levelled over minutes 10–40), scaled onto COROS's VO2max. Heat is not taken out.
-- **Read on demand, bounded**: Running sweeps with `requirePerformance` for the runs shown and
-  six weeks before; a run's page for six weeks before it; never under Trail. The line is a
-  rolling seven-day median (`performanceRollingMedian`). `npm run test:run-performance`.
+  runs, each levelled over minutes 10–40). Heat is not taken out.
+- **The usual and the scale read steady readings only, 55–80% of the reserve**
+  (`STEADY_SHARE_*`; every reading when fewer than three runs have enough): above it the figure
+  still leans up, and a tempo block moved the usual. A run is still read and drawn whole.
+- **One scale onto COROS's VO2max per athlete, over the year before now** (`athleteScale`,
+  `performanceScaleRuns`), the same on the Running screen and every run's page. A six-week scale
+  pinned the usual to COROS's figure (a 5% fall read as none) and re-valued every run as the
+  window rolled. COROS's VO2max is drawn beside the usual instead: a dotted step line on the
+  Running screen, a dotted line on a run's ml/kg/min reading.
+- **Read on demand, bounded**: Running sweeps with `requirePerformance` for the runs shown, the
+  six weeks before and the scale's year; a run's page for the six weeks before it and the year;
+  never under Trail. The line is a rolling seven-day median (`performanceRollingMedian`).
+  `npm run test:run-performance`.
 
 ## Cycling (`src/cycling/`)
 

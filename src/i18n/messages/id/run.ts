@@ -85,8 +85,8 @@ const run: RunMessages = {
   "run.perf.against.worse": "di bawah biasanya",
   "run.perf.held": "Tetap mulai menit {minute}",
   "run.perf.heldNote": "Kurang dari tiga lari Anda melewati menit {minute}, jadi nilai biasa Anda ditahan di level menit itu.",
-  "run.perf.scaleNote": "Kecepatan untuk detak jantung yang dikorbankan, pada skala VO2max COROS: nilai biasa Anda dalam enam minggu sebelumnya sama dengan VO2max COROS Anda.",
-  "run.perf.noBaseline": "Nilai biasa muncul setelah tiga lari dari enam minggu sebelumnya terbaca. Sampai saat itu, hanya lari ini yang menempatkan angka pada skala VO2max COROS.",
+  "run.perf.scaleNote": "Kecepatan untuk detak jantung yang dikorbankan, pada skala VO2max COROS, ditetapkan sekali dari lari Anda setahun terakhir. Nilai biasa Anda adalah lari stabil, {low}–{high}% cadangan detak, dalam enam minggu sebelumnya.",
+  "run.perf.noBaseline": "Nilai biasa muncul setelah tiga lari dari enam minggu sebelumnya terbaca.",
   "run.perf.noReadings": "Tidak ada bagian lari ini yang cukup stabil untuk dibaca: pace atau detak jantung terus berubah.",
   "run.perf.needProfile": "Atur detak jantung maksimal dan saat istirahat di COROS untuk membaca performa.",
   "run.perf.form": "ml/kg/menit · median {period}",
@@ -96,7 +96,7 @@ const run: RunMessages = {
   "run.perf.waiting": "Membaca lari Anda. Grafik terisi saat setiap lari terbaca.",
   "run.perf.none": "Tidak ada lari jalan raya atau lintasan dalam periode ini yang punya bagian cukup stabil untuk dibaca.",
   "run.perf.rolling": "Setiap lari, dan median {days} hari",
-  "run.perf.usualLine": "Putus-putus: nilai biasa Anda, {value}, yaitu VO2max COROS Anda. Pitanya ±3%.",
+  "run.perf.usualLine": "Putus-putus: nilai biasa Anda, {value}, dari lari stabil ({low}–{high}% cadangan detak) dalam enam minggu terakhir. Pitanya ±3%.",
   "run.perf.quadrant": "Cepat atau lambat, dan apakah efisien · {period}",
   "run.perf.quadrantNote": "Mendatar: pace rata-rata lari. Tegak: performanya dibanding biasanya. Garisnya adalah pace biasa dan nilai biasa Anda.",
   "run.perf.q.slowGood": "Lambat tapi efisien",
@@ -120,6 +120,8 @@ const run: RunMessages = {
   "run.perf.reason.heartRateSettling": "Detak jantung masih menyusul",
   "run.perf.tip.run": "Lari ini",
   "run.perf.tip.usual": "Biasanya",
+  "run.perf.tip.coros": "VO2max COROS",
+  "run.perf.corosNote": "Titik-titik: VO2max COROS Anda; nilai biasa bisa berada di atas atau di bawahnya.",
 };
 
 export default run;

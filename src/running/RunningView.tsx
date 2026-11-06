@@ -32,7 +32,7 @@ import { distanceUnit, elevationUnit } from "../units/units";
 import type { PrimaryView } from "../navigation/primaryNav";
 import { RunDetailView } from "./RunDetailView";
 import { RunPerformancePanel } from "./RunPerformancePanel";
-import { performanceHistory, performanceRunsNeeded } from "./runPerformanceModel";
+import { performanceHistory, performanceRunsNeeded, performanceScaleRuns } from "./runPerformanceModel";
 import { performanceProfile, sportHasRunPerformance } from "../../electron/runPerformance";
 import { RunIntensityPanel } from "./RunIntensityPanel";
 import { RunningHero, runningThresholdZones } from "./RunningHero";
@@ -247,11 +247,12 @@ export function RunningView({
   // land.
   //
   // Performance needs more than the runs on screen: each is read against the
-  // six weeks before it, so those runs' curves are asked for too — on the list,
-  // the weeks before the oldest run shown; on a run's page, the weeks before
-  // that run, once its own detail is in. Nothing outside those windows is read.
-  // Only where a performance block is drawn: the list off the Trail filter, or
-  // a road or track run's page.
+  // six weeks before it, and every figure on the one scale read over the year
+  // before now, so those runs' curves are asked for too — on the list, the
+  // weeks before the oldest run shown; on a run's page, the weeks before that
+  // run, once its own detail is in; on both, the year. Nothing outside those
+  // windows is read. Only where a performance block is drawn: the list off the
+  // Trail filter, or a road or track run's page.
   const ownDetailLoaded = selectedRunId !== null && detail?.activityId === selectedRunId;
   const readsPerformance = selectedRun ? sportHasRunPerformance(selectedRun.sportType) : !trail;
   const summaryRuns = useMemo(() => {
@@ -259,12 +260,18 @@ export function RunningView({
       return selectedRun ? [selectedRun] : runs;
     }
     if (selectedRun) {
-      return [selectedRun, ...performanceHistory(allRuns, (selectedRun.startTime ?? 0) * 1000)];
+      const history = performanceHistory(allRuns, (selectedRun.startTime ?? 0) * 1000);
+      const listed = new Set([selectedRun, ...history].map((activity) => activity.activityId));
+      return [
+        selectedRun,
+        ...history,
+        ...performanceScaleRuns(allRuns, nowMs).filter((activity) => !listed.has(activity.activityId))
+      ];
     }
-    const needed = performanceRunsNeeded(allRuns, runs);
+    const needed = performanceRunsNeeded(allRuns, runs, nowMs);
     const shown = new Set(runs.map((activity) => activity.activityId));
     return [...runs, ...needed.filter((activity) => !shown.has(activity.activityId))];
-  }, [allRuns, readsPerformance, runs, selectedRun]);
+  }, [allRuns, nowMs, readsPerformance, runs, selectedRun]);
   const summaries = useActivityDetailSummaries({
     api,
     activities: summaryRuns,
@@ -317,6 +324,7 @@ export function RunningView({
         performanceProfile={perfProfile}
         allRuns={allRuns}
         summaries={summaries}
+        nowMs={nowMs}
       />
     );
   }

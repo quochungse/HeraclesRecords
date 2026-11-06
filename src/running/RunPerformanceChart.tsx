@@ -50,7 +50,14 @@ import {
 import { formatPaceSecondsPerKm } from "../training/formatters";
 import { useChartColors } from "../training/useChartColors";
 import { useUnitSystem } from "../units/UnitSystemProvider";
-import { niceScale, performanceContext, performanceHistory, zeroOffsetIn } from "./runPerformanceModel";
+import {
+  niceScale,
+  performanceContext,
+  performanceHistory,
+  performanceScaleRuns,
+  STEADY_BAND_PERCENT,
+  zeroOffsetIn
+} from "./runPerformanceModel";
 
 type Reading = "percent" | "absolute";
 
@@ -74,8 +81,7 @@ const GAP_REASON_KEYS = {
 /**
  * The run's verdict is said with its figure, in the head — a pill of its own
  * under the head read as a key to the chart's colours. The usual's own figure
- * is not stated: the scale pins it to COROS's VO2max, a whole number that holds
- * for months, so it repeated that number on every run.
+ * is read on the ml/kg/min reading and in the tooltip, beside COROS's VO2max.
  */
 const VERDICT_KEYS = {
   better: "run.perf.against.better",
@@ -92,13 +98,15 @@ interface RunPerformanceChartProps {
   activity: TrainingHubActivity;
   /** The run on activity time, pauses out. */
   series: readonly TrainingHubActivitySeriesPoint[];
-  /** COROS's VO2max as of this run, which anchors the scale without history. */
+  /** COROS's VO2max as of this run, drawn on the ml/kg/min reading; it anchors the scale without history. */
   corosVo2max?: number;
   durationSeconds: number;
   profile: PerformanceProfile;
-  /** Every run, for the six weeks before this one. */
+  /** Every run, for the six weeks before this one and the year the scale is read over. */
   allRuns: readonly TrainingHubActivity[];
   summaries: ReadonlyMap<string, ActivityDetailSummary>;
+  /** The Running screen's now, so the scale's year is the one the screen reads. */
+  nowMs: number;
 }
 
 interface Row {
@@ -140,7 +148,8 @@ export function RunPerformanceChart({
   durationSeconds,
   profile,
   allRuns,
-  summaries
+  summaries,
+  nowMs
 }: RunPerformanceChartProps) {
   // Subscribed, so the chart's words follow a change of language.
   useI18n();
@@ -167,8 +176,14 @@ export function RunPerformanceChart({
 
   const context = useMemo(() => {
     const at = (activity.startTime ?? 0) * 1000;
-    return performanceContext(performanceHistory(allRuns, at), summaries, profile, own);
-  }, [activity.startTime, allRuns, own, profile, summaries]);
+    return performanceContext(
+      performanceHistory(allRuns, at),
+      summaries,
+      profile,
+      performanceScaleRuns(allRuns, nowMs),
+      own
+    );
+  }, [activity.startTime, allRuns, nowMs, own, profile, summaries]);
 
   const baseline = context.baseline;
   const shape = baseline?.shape;
@@ -249,10 +264,12 @@ export function RunPerformanceChart({
     });
   }, [lastSecond, rows, xAt]);
 
-  const values = rows.flatMap((row) => [
-    ...(row.value !== undefined ? [row.value] : []),
-    ...(row.band ?? [])
-  ]);
+  // COROS's own figure, beside the usual on the ml/kg/min reading.
+  const corosLine = effective === "absolute" ? corosVo2max : undefined;
+  const values = [
+    ...rows.flatMap((row) => [...(row.value !== undefined ? [row.value] : []), ...(row.band ?? [])]),
+    ...(corosLine !== undefined ? [corosLine] : [])
+  ];
   const yMin = Math.min(effective === "percent" ? -6 : Infinity, ...values);
   const yMax = Math.max(effective === "percent" ? 6 : -Infinity, ...values);
   const { domain, ticks: yTicks } = niceScale(yMin, yMax, { includeZero: effective === "percent" });
@@ -415,6 +432,10 @@ export function RunPerformanceChart({
                 isAnimationActive={false}
               />
             )}
+            {corosLine !== undefined ? (
+              // Dotted where the usual is dashed, in the same quiet ink: a reference, not the run.
+              <ReferenceLine y={corosLine} stroke={colors.text} strokeWidth={1.5} strokeDasharray="1 4" strokeLinecap="round" />
+            ) : null}
             {held !== undefined ? (
               <ReferenceLine
                 x={xAt(held * 60)}
@@ -487,8 +508,9 @@ export function RunPerformanceChart({
 
       <p className="run-block-note">
         {baseline
-          ? t("run.perf.scaleNote", { runs: baseline.runs })
+          ? t("run.perf.scaleNote", STEADY_BAND_PERCENT)
           : t("run.perf.noBaseline")}
+        {corosLine !== undefined ? ` ${t("run.perf.corosNote")}` : ""}
         {held !== undefined ? ` ${t("run.perf.heldNote", { minute: held })}` : ""}
       </p>
     </section>

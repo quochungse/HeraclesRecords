@@ -5,7 +5,7 @@ import type { RunPerformanceCurve, TrainingHubActivitySeriesPoint } from "./type
  * reserve it spent, on the VO2max scale (ml/kg/min), so a run is comparable
  * with the athlete's other runs and with other people's.
  *
- *  - The oxygen a speed costs is Daniels & Gilbert's, read off the
+ *  - The oxygen a speed costs is ACSM's running equation, read off the
  *    grade-adjusted pace so a climb is not counted as running slowly.
  *  - The share of the reserve spent is (HR − resting) ÷ (max − resting), which
  *    Swain & Leutholtz found equal to the share of VO2 reserve.
@@ -15,11 +15,12 @@ import type { RunPerformanceCurve, TrainingHubActivitySeriesPoint } from "./type
  * replaced metres per beat: dividing by the whole heart rate made a faster run
  * at the same fitness read as a more efficient one.
  *
- * The raw figure runs well under a VO2max on easy running in the heat — 28
- * against COROS's 47 on the athlete this was built for — so the number shown
- * is scaled onto COROS's own VO2max: the usual run reads as COROS's estimate,
- * and a run reads above or below it by as much as it beat or fell short of
- * the usual. A percentage needs no scale; only the ml/kg/min figure does.
+ * The raw figure runs under a VO2max on easy running in the heat — 40 against
+ * COROS's 47 on the athlete this was built for — so the number shown is
+ * scaled onto COROS's own VO2max, by one scale over the athlete's last year of
+ * runs (`athleteScale`). A run reads above or below its usual by as much as it
+ * beat or fell short of it, and the usual is free to sit above or below COROS.
+ * A percentage needs no scale; only the ml/kg/min figure does.
  *
  * The main process keeps the raw curve on the summary row — speed and heart
  * rate per step, with no profile in it — because the figure needs the
@@ -81,8 +82,8 @@ const MIN_COVERAGE = 0.7;
 const FASTEST_PACE_S_PER_KM = 150;
 const SLOWEST_PACE_S_PER_KM = 900;
 /**
- * Fewer steps a minute than this is walking. Daniels' cost is a runner's, and a
- * walk to cool down at the end of a run read as a collapse in performance.
+ * Fewer steps a minute than this is walking. The running equation is a runner's,
+ * and a walk to cool down at the end of a run read as a collapse in performance.
  */
 const MIN_RUNNING_CADENCE = 140;
 const MAX_SECONDS = 8 * 3600;
@@ -332,9 +333,16 @@ function reserveShare(heartRate: number, profile: PerformanceProfile): number {
   return (heartRate - profile.restingHr) / (profile.maxHr - profile.restingHr);
 }
 
-/** Daniels & Gilbert: oxygen cost of running at `speed` metres a minute, ml/kg/min. */
+/**
+ * ACSM's running equation: oxygen cost of running at `speed` metres a minute,
+ * ml/kg/min. Not Daniels & Gilbert's curve, fitted on faster runners: on 545
+ * laboratory treadmill tests (Málaga, PhysioNet) it read a person 15% fitter
+ * at 75–88% of the reserve than at 55–70%, which ranked a runner by how much
+ * tempo they ran. This line reads them 3% fitter, and meets the oxygen those
+ * tests measured at 8–9 km/h.
+ */
 export function oxygenCost(speed: number): number {
-  return -4.6 + 0.182258 * speed + 0.000104 * speed * speed;
+  return 0.2 * speed + 3.5;
 }
 
 /** Effective VO2max of a stretch, or nothing when the effort is too light or past the maximum. */
@@ -372,6 +380,8 @@ export interface PerformancePoint {
   /** Grade-adjusted speed, metres a minute, and heart rate 40 s later. */
   speed: number;
   heartRate: number;
+  /** Share of the heart-rate reserve that heart rate spent. */
+  share: number;
 }
 
 export function performancePoints(
@@ -385,7 +395,7 @@ export function performancePoints(
   for (const [t, speed, heartRate] of curve.points) {
     const value = effectiveVo2max(speed, heartRate, profile);
     if (value !== undefined) {
-      out.push({ t, value, speed, heartRate });
+      out.push({ t, value, speed, heartRate, share: reserveShare(heartRate, profile) });
     }
   }
   return out;
@@ -523,14 +533,48 @@ export interface PerformanceBaseline {
   shape?: PerformanceShape;
 }
 
+/**
+ * The share of the reserve a run is compared in: steady aerobic running. The
+ * figure still leans up with effort — on the Málaga tests ACSM's line read
+ * 1.7% high at 75–80% of the reserve, 3.6% at 80–85% and 6% at 85–90%, against
+ * flat from 55% to 75% — so a usual read across every effort moved with a block
+ * of tempo or of nothing but easy running. A run is still read and drawn
+ * whole; only the usual and the scale are read from this band.
+ */
+export const STEADY_SHARE_MIN = 0.55;
+export const STEADY_SHARE_MAX = 0.8;
+
+function steadyPoints(points: readonly PerformancePoint[]): PerformancePoint[] {
+  return points.filter((point) => point.share >= STEADY_SHARE_MIN && point.share <= STEADY_SHARE_MAX);
+}
+
+/**
+ * Each run's figure for the usual and the scale: its steady readings, or all of
+ * them when too few runs have enough in the band — someone whose every run sits
+ * above it still has a usual, and a lone run still anchors a scale.
+ */
+function comparableSessions(
+  runs: readonly PerformanceRun[],
+  shape: PerformanceShape | undefined
+): { value: number; run: PerformanceRun }[] {
+  const read = (pick: (points: readonly PerformancePoint[]) => readonly PerformancePoint[]) =>
+    runs.flatMap((run) => {
+      const value = sessionPerformance(pick(run.points), shape);
+      return value === undefined ? [] : [{ value, run }];
+    });
+  const steady = read(steadyPoints);
+  const enough = Math.min(MIN_BASELINE_RUNS, runs.length);
+  return steady.length > 0 && steady.length >= enough ? steady : read((points) => points);
+}
+
 /** The usual from a set of past runs, or nothing when there are too few. */
 export function performanceBaseline(
   runs: readonly PerformanceRun[]
 ): PerformanceBaseline | undefined {
+  // The fall over a long run is read from every reading: its last minutes are
+  // the ones most likely to have drifted out of the band.
   const shape = performanceShape(runs.map((run) => run.points));
-  const sessions = runs
-    .map((run) => sessionPerformance(run.points, shape))
-    .filter((value): value is number => value !== undefined);
+  const sessions = comparableSessions(runs, shape).map((session) => session.value);
   if (sessions.length < MIN_BASELINE_RUNS) {
     return undefined;
   }
@@ -548,14 +592,26 @@ export function performanceScale(
 ): number | undefined {
   const raw: number[] = [];
   const coros: number[] = [];
-  for (const run of runs) {
-    const value = sessionPerformance(run.points, shape);
-    if (value === undefined || run.corosVo2max === undefined) continue;
+  for (const { value, run } of comparableSessions(runs, shape)) {
+    if (run.corosVo2max === undefined) continue;
     raw.push(value);
     coros.push(run.corosVo2max);
   }
   if (raw.length === 0) return undefined;
   return median(coros) / median(raw);
+}
+
+/** The runs the scale is read over: the year before now. */
+export const SCALE_DAYS = 365;
+
+/**
+ * The athlete's one scale onto COROS's VO2max, over the year's runs: the same
+ * for the Running screen and every run's page, so a run reads the same wherever
+ * and whenever it is opened. Read over six weeks, it pinned the usual to COROS's
+ * figure — a 5% fall in the usual read as no change, the scale rising to cover it.
+ */
+export function athleteScale(runs: readonly PerformanceRun[]): number | undefined {
+  return performanceScale(runs, performanceShape(runs.map((run) => run.points)));
 }
 
 export type PerformanceVerdict = "better" | "usual" | "worse";

@@ -3,10 +3,13 @@ import {
   BASELINE_DAYS,
   MIN_BASELINE_RUNS,
   PERFORMANCE_SUMMARY_VERSION,
+  SCALE_DAYS,
+  STEADY_SHARE_MAX,
+  STEADY_SHARE_MIN,
+  athleteScale,
   median,
   performanceBaseline,
   performanceRun,
-  performanceScale,
   sessionPerformance,
   sportHasRunPerformance,
   type PerformanceBaseline,
@@ -23,6 +26,12 @@ import { buildRunWeeks, paceSecondsPerKm, startOfRunWeekMs } from "./runMetrics"
  */
 
 const DAY_MS = 86_400_000;
+
+/** The band the usual is read in, as the notes under the charts state it. */
+export const STEADY_BAND_PERCENT = {
+  low: Math.round(STEADY_SHARE_MIN * 100),
+  high: Math.round(STEADY_SHARE_MAX * 100)
+} as const;
 
 function startedAtMs(activity: TrainingHubActivity): number | undefined {
   return typeof activity.startTime === "number" && activity.startTime > 0
@@ -42,10 +51,26 @@ export function performanceHistory(
   });
 }
 
-/** The runs whose curves a screen needs: those it shows and the six weeks before the oldest. */
+/** Road and track runs in the year before `nowMs`, which the scale is read over. */
+export function performanceScaleRuns(
+  runs: readonly TrainingHubActivity[],
+  nowMs: number
+): TrainingHubActivity[] {
+  const from = nowMs - SCALE_DAYS * DAY_MS;
+  return runs.filter((activity) => {
+    const at = startedAtMs(activity);
+    return at !== undefined && at >= from && at <= nowMs && sportHasRunPerformance(activity.sportType);
+  });
+}
+
+/**
+ * The runs whose curves a screen needs: those it shows, the six weeks before
+ * the oldest, and the year before now that the scale is read over.
+ */
 export function performanceRunsNeeded(
   allRuns: readonly TrainingHubActivity[],
-  shown: readonly TrainingHubActivity[]
+  shown: readonly TrainingHubActivity[],
+  nowMs: number
 ): TrainingHubActivity[] {
   let oldest = Infinity;
   for (const activity of shown) {
@@ -53,7 +78,7 @@ export function performanceRunsNeeded(
     if (at !== undefined) oldest = Math.min(oldest, at);
   }
   if (!Number.isFinite(oldest)) return [];
-  const from = oldest - BASELINE_DAYS * DAY_MS;
+  const from = Math.min(oldest - BASELINE_DAYS * DAY_MS, nowMs - SCALE_DAYS * DAY_MS);
   return allRuns.filter((activity) => {
     const at = startedAtMs(activity);
     return at !== undefined && at >= from && sportHasRunPerformance(activity.sportType);
@@ -93,21 +118,25 @@ export interface PerformanceContext {
 }
 
 /**
- * The usual as of a moment, from the runs before it. `own` is the run being
- * read, which anchors the scale on its own when there is no history yet.
+ * The usual as of a moment, from the runs before it (`history`), and the
+ * athlete's scale, from the year's runs (`scaleRuns`, `performanceScaleRuns`) —
+ * the same on every screen. `own` is the run being read, which anchors the
+ * scale on its own when no run of the year has COROS's VO2max.
  */
 export function performanceContext(
   history: readonly TrainingHubActivity[],
   summaries: ReadonlyMap<string, ActivityDetailSummary>,
   profile: PerformanceProfile,
+  scaleRuns: readonly TrainingHubActivity[],
   own?: PerformanceRun
 ): PerformanceContext {
-  const runs = history
-    .map((activity) => storedRun(activity, summaries, profile))
-    .filter((run): run is PerformanceRun => run !== undefined && run.points.length > 0);
+  const read = (activities: readonly TrainingHubActivity[]) =>
+    activities
+      .map((activity) => storedRun(activity, summaries, profile))
+      .filter((run): run is PerformanceRun => run !== undefined && run.points.length > 0);
+  const runs = read(history);
   const baseline = performanceBaseline(runs);
-  const anchors = baseline || !own ? runs : [...runs, own];
-  const scale = performanceScale(anchors, baseline?.shape);
+  const scale = athleteScale(read(scaleRuns)) ?? (own ? athleteScale([own]) : undefined);
   return {
     ...(baseline ? { baseline } : {}),
     ...(scale !== undefined ? { scale } : {}),
@@ -124,6 +153,8 @@ export interface PerformanceSession {
   change?: number;
   /** Seconds per km over the whole run, from the activity list. */
   pace?: number;
+  /** COROS's VO2max as of the run, drawn beside the usual rather than as it. */
+  coros?: number;
 }
 
 /** Each run's figure, read against one context. Runs with no figure are left out. */
@@ -146,7 +177,8 @@ export function performanceSessions(
       startedAtMs: at,
       value: raw * (context.scale ?? 1),
       ...(context.baseline ? { change: (raw / context.baseline.value - 1) * 100 } : {}),
-      ...(pace !== undefined ? { pace } : {})
+      ...(pace !== undefined ? { pace } : {}),
+      ...(run.corosVo2max !== undefined ? { coros: run.corosVo2max } : {})
     });
   }
   return sessions.sort((a, b) => a.startedAtMs - b.startedAtMs);
