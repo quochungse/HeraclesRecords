@@ -1048,10 +1048,7 @@ export async function streamClaudeCodeCompletion(
       }
       if (message.type === "rate_limit_event") {
         if (message.rate_limit_info.status === "rejected") {
-          throw new ClaudeCodeProviderError(
-            "Your Claude usage limit may have been reached. Try again later or choose another provider.",
-            "usage-limit"
-          );
+          throw usageLimitError(message.rate_limit_info.resetsAt);
         }
         continue;
       }
@@ -1078,10 +1075,7 @@ export async function streamClaudeCodeCompletion(
         if (message.subtype === "success") {
           resultText = message.result;
           if (message.api_error_status === 429) {
-            throw new ClaudeCodeProviderError(
-              "Your Claude usage limit may have been reached. Try again later or choose another provider.",
-              "usage-limit"
-            );
+            throw usageLimitError();
           }
         } else {
           throw new Error(message.errors.join("\n") || message.subtype);
@@ -1111,6 +1105,27 @@ export async function streamClaudeCodeCompletion(
   }
 }
 
+const USAGE_LIMIT_MESSAGE =
+  "Your Claude usage limit may have been reached. Try again later or choose another provider.";
+
+/**
+ * The usage-limit failure, with the moment the limit resets when Claude Code
+ * said so: a rejected `rate_limit_event` carries `resetsAt`, in seconds since
+ * the epoch (the `anthropic-ratelimit-unified-reset` header). The instant rides
+ * in the message, as ISO, because the message is what a stopped turn stores;
+ * the screen reads it back (`limitResetsAt` in `src/chat/turnFailure.ts`).
+ */
+export function usageLimitError(resetsAt?: number): ClaudeCodeProviderError {
+  const at =
+    typeof resetsAt === "number" && Number.isFinite(resetsAt) && resetsAt > 0
+      ? new Date(resetsAt < 1e12 ? resetsAt * 1000 : resetsAt).toISOString()
+      : undefined;
+  return new ClaudeCodeProviderError(
+    at ? `${USAGE_LIMIT_MESSAGE} Resets at ${at}.` : USAGE_LIMIT_MESSAGE,
+    "usage-limit"
+  );
+}
+
 export function normalizeClaudeCodeError(
   caught: unknown
 ): ClaudeCodeProviderError {
@@ -1125,10 +1140,7 @@ export function normalizeClaudeCodeError(
     );
   }
   if (/usage limit|rate.?limit|credits_required|hit your .*limit|429/i.test(detail)) {
-    return new ClaudeCodeProviderError(
-      "Your Claude usage limit may have been reached. Try again later or choose another provider.",
-      "usage-limit"
-    );
+    return usageLimitError();
   }
   if (/enoent|not found|does not exist/i.test(detail)) {
     return new ClaudeCodeProviderError(

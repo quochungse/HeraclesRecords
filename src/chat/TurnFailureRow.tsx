@@ -11,15 +11,27 @@ import {
   type LucideIcon
 } from "lucide-react";
 import type { ReactNode } from "react";
-import { t, type MessageKey } from "../i18n/core";
+import { getIntlLocale, t, type MessageKey } from "../i18n/core";
 import { useI18n } from "../i18n/useI18n";
-import type { TurnFailureRowKind } from "./turnFailure";
+import { limitResetsAt, type TurnFailureRowKind } from "./turnFailure";
+
+/** A reset later today by its time alone, another day's with its day. */
+function resetTime(at: Date, now: Date): string {
+  const sameDay = at.toDateString() === now.toDateString();
+  return new Intl.DateTimeFormat(
+    getIntlLocale(),
+    sameDay
+      ? { hour: "numeric", minute: "2-digit" }
+      : { weekday: "short", day: "numeric", month: "short", hour: "numeric", minute: "2-digit" }
+  ).format(at);
+}
 
 /** What each row says and looks like: a passing trouble is a warning, one to act on an error. */
 const ROWS: Record<
   TurnFailureRowKind,
   { icon: LucideIcon; tone: "warning" | "error" | "neutral"; title: MessageKey; body: MessageKey }
 > = {
+  limit: { icon: Clock, tone: "warning", title: "chat.fail.limit.title", body: "chat.fail.limit.body" },
   busy: { icon: Clock, tone: "warning", title: "chat.fail.busy.title", body: "chat.fail.busy.body" },
   offline: { icon: WifiOff, tone: "warning", title: "chat.fail.offline.title", body: "chat.fail.offline.body" },
   auth: { icon: KeyRound, tone: "error", title: "chat.fail.auth.title", body: "chat.fail.auth.body" },
@@ -61,6 +73,11 @@ export function TurnFailureRow({
   useI18n();
   const row = ROWS[kind];
   const Icon = row.icon;
+  // A usage limit says when it resets, when the provider said so and it is still ahead.
+  const now = new Date();
+  const resets = kind === "limit" ? limitResetsAt(detail) : undefined;
+  const body =
+    resets && resets > now ? t("chat.fail.limit.bodyAt", { time: resetTime(resets, now) }) : t(row.body);
   const button = (key: string, label: string, icon: ReactNode, onClick: () => void, primary = false) => (
     <button
       key={key}
@@ -85,7 +102,7 @@ export function TurnFailureRow({
         <Icon size={16} aria-hidden="true" />
         <div>
           <strong>{t(row.title)}</strong>
-          <p>{t(row.body)}</p>
+          <p>{body}</p>
         </div>
       </div>
       <div className="chat-plan-actions">

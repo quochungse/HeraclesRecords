@@ -13442,6 +13442,37 @@ label.chat-settings-toggle-row {
   outline-offset: 2px;
 }
 
+/* Show all / Show fewer under a plan's week strips. */
+.chat-creation-more {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 8px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  color: var(--text-secondary);
+  background: transparent;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.chat-creation-more:hover {
+  color: var(--text-primary);
+  background: var(--glass-bg);
+}
+
+.chat-creation-more[aria-expanded="true"] svg {
+  transform: rotate(180deg);
+}
+
+.chat-creation-more:focus-visible {
+  --focus-ring-color: var(--chat-signal);
+  outline: var(--focus-ring);
+  outline-offset: 2px;
+}
+
 @media (max-width: 560px) {
   .chat-creation-figures {
     grid-template-columns: repeat(2, minmax(0, 1fr));

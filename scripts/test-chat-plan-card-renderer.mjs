@@ -208,8 +208,8 @@ async function main() {
   await harness("mount", "ChatView", {}, BASE_SCRIPT);
   await waitFor(() => harness("exists", ".chat-creation-card"), "the plan card is drawn");
   await waitFor(
-    () => harness("exists", ".chat-creation-card .plan-ridge"),
-    "the card reads its plan document and draws the ridge"
+    () => harness("exists", ".chat-creation-card .chat-creation-week"),
+    "the card reads its plan document and draws its weeks"
   );
 
   // -------------------------------------------------------------------------
@@ -241,37 +241,17 @@ async function main() {
     "Peak week": "4 hr",
     Sports: "Run"
   });
-  assert.equal(await harness("count", ".chat-creation-card .plan-ridge-week"), 3);
-  assert.equal(
-    await harness("text", ".chat-creation-week-label"),
-    "Week 1",
-    "the strip shows the plan's first week"
+  // Every week of a plan up to four has its strip; only a longer plan folds
+  // behind Show all, with the ridge as its overview.
+  assert.deepEqual(
+    await page(`[...document.querySelectorAll(".chat-creation-week-label")].map((node) => node.textContent)`),
+    ["Week 1", "Week 2", "Week 3"],
+    "the card shows every week of the plan"
   );
-  assert.equal(await harness("count", ".chat-creation-days > li"), 7);
-  assert.equal(await harness("count", ".chat-creation-days > li.is-rest"), 4);
-  assert.equal(
-    await harness("count", '.chat-creation-card .plan-ridge-week.is-selected[aria-pressed="true"]'),
-    1,
-    "the ridge marks the week the strip shows"
-  );
-
-  // A bar picks the week the strip shows; it does not open the Workbench.
-  await page(`document.querySelector('.chat-creation-card .plan-ridge-week[aria-label^="Week 2"]').click()`);
-  await waitFor(
-    async () => (await harness("text", ".chat-creation-week-label")) === "Week 2",
-    "pressing week 2 shows week 2 under the ridge"
-  );
-  await settle();
-  assert.equal(await harness("exists", ".chat-workbench"), false, "a bar does not open the Workbench");
-  assert.match(
-    await page(`document.querySelector('.chat-creation-card .plan-ridge-week.is-selected').getAttribute("aria-label")`),
-    /^Week 2/
-  );
-  await page(`document.querySelector('.chat-creation-card .plan-ridge-week[aria-label^="Week 1"]').click()`);
-  await waitFor(
-    async () => (await harness("text", ".chat-creation-week-label")) === "Week 1",
-    "and back to week 1"
-  );
+  assert.equal(await harness("count", ".chat-creation-days > li"), 21);
+  assert.equal(await harness("count", ".chat-creation-days > li.is-rest"), 12);
+  assert.equal(await harness("exists", ".chat-creation-card .plan-ridge"), false, "no ridge while nothing folds");
+  assert.equal(await harness("exists", ".chat-creation-more"), false, "and nothing to unfold");
 
   // An undated plan is a programme: it saves to COROS as one plan first.
   assert.equal(
@@ -1654,7 +1634,7 @@ async function main() {
   );
   assert.ok((await gapToEnd()) <= 2, "it opens at its end");
   assert.equal(await harness("resolvePending", "getPlanDraftDocument", DOCUMENT), true);
-  await waitFor(() => harness("exists", ".chat-creation-card .plan-ridge"), "the document arrives and the card grows");
+  await waitFor(() => harness("exists", ".chat-creation-card .chat-creation-week"), "the document arrives and the card grows");
   await settle();
   assert.ok((await gapToEnd()) <= 2, `and it is still at its end once the card has grown (${await gapToEnd()}px short)`);
   // Reading further up is left alone while the thread grows under it.

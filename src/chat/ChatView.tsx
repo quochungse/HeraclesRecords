@@ -222,7 +222,13 @@ import {
 import { getIntlLocale, plural, screenSentence, t } from "../i18n/core";
 import { useI18n } from "../i18n/useI18n";
 import { displaySessionTitle, NEW_PLAN_TITLE } from "./sessionTitle";
-import { displayStoredNotice, stoppedEarlyNotice, stoppedEarlyReason } from "./storedNotice";
+import {
+  displayStoredNotice,
+  noWordsNotice,
+  stoppedEarlyNotice,
+  stoppedEarlyReason,
+  stoppedReasonOnScreen
+} from "./storedNotice";
 import { DeleteTurnDialog, HideTurnDialog } from "./TurnDialogs";
 import { TurnActions } from "./TurnActions";
 import { TurnFailureRow } from "./TurnFailureRow";
@@ -2748,6 +2754,20 @@ export function ChatView({
         return next;
       });
     };
+    /**
+     * Whether the running turn has put a chart or a card in its timeline, read
+     * off the copy last rendered (or the parked one): a card lands with its
+     * tool's result, well before the turn can end. A plan event is not one —
+     * the athlete's own edit lands there too — as the failure row counts it.
+     * Not asked of a pipeline step, whose card is the whole of its answer and
+     * whose failure its own card offers again.
+     */
+    const turnMadeEntries = () =>
+      !turnPipelineRef.current &&
+      (parkedTurnRef.current?.timeline ?? timelineRef.current)
+        .slice(turnStartRef.current)
+        .some((entry) => entry.kind !== "planEvent");
+
     const finishStreaming = (done: {
       fullText: string;
       finishReason?: string;
@@ -2816,6 +2836,24 @@ export function ChatView({
           persistTurn(next);
           return next;
         });
+      } else if (turnMadeEntries()) {
+        // A turn can end on its charts or cards without a word — Claude Code
+        // has reported success with nothing written right after revising a
+        // plan. Left as it was, the timeline's own save kept the cards with
+        // nothing under them, and the failure row hid behind a card, so the
+        // turn read as answered. It ends as a cut-off turn does.
+        turnTimeline((prev) => {
+          const next = settleTurnEntries(
+            prev,
+            turnStartRef.current,
+            source?.mcpError ? [{ kind: "toolNotice", message: source.mcpError }] : []
+          );
+          next.push({ kind: "toolNotice", message: noWordsNotice() });
+          markSettled(prev, next);
+          persistTurn(next);
+          return next;
+        });
+        failTurn(null);
       } else {
         endedEmpty();
       }
@@ -2992,7 +3030,9 @@ export function ChatView({
         setActiveTool(null);
         setCurrentSource(null);
         sourceRef.current = null;
-        if (partialText || coachPrompts.length > 0) {
+        // A chart or a card on screen is output too: without it here, a turn
+        // that broke after its cards kept them with no word of the failure.
+        if (partialText || coachPrompts.length > 0 || turnMadeEntries()) {
           // A failure that lands after the answer is not a failed answer. This
           // used to throw the whole turn away: the streamed text, the question
           // card the coach had just asked, and — through the restore below —
@@ -5388,7 +5428,14 @@ export function ChatView({
           ? stoppedEarlyReason(closing.content)
           : undefined;
     if (stopped !== undefined) {
-      return { kind: "partial", detail: screenSentence(stopped), replaces: last.end - 1, question: last.question };
+      // Cut off by the plan's usage limit, the row says so, not just "stopped":
+      // a Retry right away meets the same limit.
+      return {
+        kind: classifyTurnFailure(stopped) === "limit" ? "limit" : "partial",
+        detail: stoppedReasonOnScreen(stopped),
+        replaces: last.end - 1,
+        question: last.question
+      };
     }
     // A card counts: a turn can end on charts or a plan with no words after
     // them, and Retry would delete what it made. A plan event is the

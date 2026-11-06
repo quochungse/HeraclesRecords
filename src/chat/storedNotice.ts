@@ -10,10 +10,21 @@ import { english, interpolate, screenSentence, t } from "../i18n/core";
 
 const STOPPED_EARLY = english("chat.stoppedEarly");
 const STOPPED_EARLY_PREFIX = STOPPED_EARLY.slice(0, STOPPED_EARLY.indexOf("{message}"));
+const NO_WORDS = english("chat.fail.noWords");
 
 /** The notice as it is stored, with the reason the turn ended. */
 export function stoppedEarlyNotice(reason: string): string {
   return interpolate(STOPPED_EARLY, { message: reason });
+}
+
+/** The notice under a turn that ended on its charts or cards without a word. */
+export function noWordsNotice(): string {
+  return stoppedEarlyNotice(NO_WORDS);
+}
+
+/** A stored reason in the language on screen: the app's own sentences are said again, the rest as written. */
+export function stoppedReasonOnScreen(reason: string): string {
+  return reason === NO_WORDS ? t("chat.fail.noWords") : screenSentence(reason);
 }
 
 /**
@@ -24,7 +35,7 @@ export function stoppedEarlyNotice(reason: string): string {
 export function displayStoredNotice(content: string): string {
   if (content.startsWith(STOPPED_EARLY_PREFIX)) {
     return t("chat.stoppedEarly", {
-      message: screenSentence(content.slice(STOPPED_EARLY_PREFIX.length))
+      message: stoppedReasonOnScreen(content.slice(STOPPED_EARLY_PREFIX.length))
     });
   }
   return screenSentence(content);

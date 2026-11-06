@@ -540,6 +540,7 @@ test("a failure is sorted by what can be done about it", () => {
   const kinds = {
     "529 overloaded_error: Overloaded": "busy",
     "Rate limit reached for requests": "busy",
+    "Your Claude usage limit may have been reached. Try again later or choose another provider.": "limit",
     "TypeError: fetch failed (getaddrinfo ENOTFOUND api.anthropic.com)": "offline",
     "prompt is too long: 212480 tokens > 200000 maximum": "tooLong",
     "authentication_error: invalid x-api-key": "auth",

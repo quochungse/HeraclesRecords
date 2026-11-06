@@ -197,11 +197,10 @@ async function main() {
       "a pull mid-turn must not disturb the turn on screen"
     );
 
-    // The turn ends with no answer — the "stop" in the report. `finishStreaming`
-    // writes nothing when there is no final text, so the only copy of the chart
-    // is still the one on screen, and the whole turn now rests on the autosave
-    // that the end of the turn releases. The deferred re-read fires on this
-    // same tick, and used to cancel exactly that save.
+    // The turn ends with no answer — the "stop" in the report. Until the end
+    // of the turn the only copy of the chart is the one on screen, and the
+    // whole turn rests on the save the end of the turn makes. The deferred
+    // re-read fires on this same tick, and used to cancel exactly that save.
     await harness("emit", "onChatStreamDone", { requestId, fullText: "" });
     await settle();
 

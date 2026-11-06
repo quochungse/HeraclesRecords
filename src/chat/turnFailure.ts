@@ -7,11 +7,13 @@
 // of its own (`storedNotice.ts`).
 
 /** Why a turn produced nothing: what the provider's error says, sorted by what the athlete can do about it. */
-export type TurnFailureKind = "busy" | "offline" | "auth" | "tooLong" | "other";
+export type TurnFailureKind = "limit" | "busy" | "offline" | "auth" | "tooLong" | "other";
 
 /** Every row the transcript can draw under a question. */
 export type TurnFailureRowKind = TurnFailureKind | "partial" | "noAnswer" | "elsewhere";
 
+/** A subscription's usage limit: Claude Code's own "usage limit" or "hit your … limit", not a passing rate limit. */
+const LIMIT = /usage limit|session limit|hit your [^.]*limit|credits_required/i;
 const BUSY = /\b(429|529)\b|overloaded|rate[ _-]?limit|too many requests|capacity/i;
 const OFFLINE =
   /ENOTFOUND|ECONNRESET|ECONNREFUSED|ETIMEDOUT|EAI_AGAIN|ENETUNREACH|fetch failed|network|socket hang up|getaddrinfo/i;
@@ -27,10 +29,22 @@ const AUTH = /\b401\b|unauthori[sz]ed|authentication_error|invalid (?:x-)?api[ -
 export function classifyTurnFailure(message: string, authError = false): TurnFailureKind {
   if (authError) return "auth";
   if (TOO_LONG.test(message)) return "tooLong";
+  if (LIMIT.test(message)) return "limit";
   if (BUSY.test(message)) return "busy";
   if (OFFLINE.test(message)) return "offline";
   if (AUTH.test(message)) return "auth";
   return "other";
+}
+
+/**
+ * When a usage limit resets, as the main process writes it into the failure
+ * ("… Resets at <ISO instant>.", `usageLimitError`) — read off the words, which
+ * are also what a stopped turn stores.
+ */
+export function limitResetsAt(message: string | undefined): Date | undefined {
+  const at = message?.match(/\bResets at (\d{4}-\d\d-\d\dT[\d:.]+Z)\./)?.[1];
+  const date = at ? new Date(at) : undefined;
+  return date && Number.isFinite(date.getTime()) ? date : undefined;
 }
 
 /** How long a question with no answer may still be one being answered on another device. */

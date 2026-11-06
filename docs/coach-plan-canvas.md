@@ -194,8 +194,9 @@ Không kind mới, không bảng mới. P0.1 nên ở một bản phát hành c�
 **P0.2 Card plan/workout nằm trong câu trả lời** · M
 - `planDraft` được vẽ inline ở mọi độ rộng, không có phép đo nào (bài học của lần gỡ ngày
   10/9). `removedAt` → không vẽ.
-- Card inline là **card gọn, chỉ đọc**: kicker, tên, một dòng tóm tắt, bốn con số, ridge (từ 3
-  tuần trở lên), tuần đầu dạng dải 7 ngày, nút chính và nút phụ theo P0.5, nút **Open**. Ở P0,
+- Card inline là **card gọn, chỉ đọc**: kicker, tên, một dòng tóm tắt, bốn con số, mỗi tuần một
+  dải 7 ngày (plan dài hơn 4 tuần: 4 tuần đầu, phần còn lại sau **Show all**, kèm ridge để nhìn
+  tổng quan và nhảy tới một tuần), nút chính và nút phụ theo P0.5, nút **Open**. Ở P0,
   Open mở `CoachCreationModal` như hiện nay; P1 đổi thành canvas.
 - Plan không có ngày: card và modal đọc bố cục tuần/ngày qua `chat:planDraftDocument` (đã có,
   tôn trọng `layout`), không nhóm tất cả vào "Unscheduled".

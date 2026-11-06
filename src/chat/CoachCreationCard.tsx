@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { CircleCheck, Maximize2 } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { ChevronDown, CircleCheck, Maximize2 } from "lucide-react";
 import type {
   PlanDraftPreview,
   PlanDraftSaveOptions,
@@ -30,6 +30,9 @@ import { creationStatus } from "./creationChoices";
 import { workoutSportLabel } from "../training/workoutSport";
 import { t } from "../i18n/core";
 
+/** The weeks a plan card shows before Show all: a month reads at a glance. */
+const CARD_WEEKS = 4;
+
 export interface CreationFigures {
   weeks: number;
   /** "4–5", or "4" when every week holds the same. */
@@ -38,8 +41,6 @@ export interface CreationFigures {
   peakWeek: string;
   sports: string;
   reading: PlanReaderWeek[];
-  /** The first week with a session in it, for the strip under the ridge. */
-  firstWeek?: PlanReaderWeek;
   /**
    * First and last day of a plan whose every session is dated, `YYYY-MM-DD`.
    * A day of the strip outside it is not a rest day: the plan is not running
@@ -81,8 +82,7 @@ export function creationFigures(
   athletePending = false
 ): CreationFigures {
   const weeks = readPlan(datedForReading(document), [], undefined, athlete, athletePending).weeks;
-  const busy = weeks.filter((week) => week.summary.workouts > 0);
-  const counts = busy.map((week) => week.summary.workouts);
+  const counts = weeks.filter((week) => week.summary.workouts > 0).map((week) => week.summary.workouts);
   const low = counts.length ? Math.min(...counts) : 0;
   const high = counts.length ? Math.max(...counts) : 0;
   const measure = ridgeMeasure(weeks);
@@ -96,22 +96,24 @@ export function creationFigures(
     peakWeek: `${markFigure(formatRidgeValue(peak, measure), ridgeMark(weeks, measure))} ${RIDGE_UNITS[measure]}`,
     sports: sports.map((sport) => workoutSportLabel(sport)).join(", "),
     reading: weeks,
-    firstWeek: busy[0],
     span: datedSpan(document)
   };
 }
 
 function WeekStrip({
   week,
+  position,
   span,
   onOpenSession
 }: {
   week: PlanReaderWeek;
+  /** Its place in the plan's weeks, for the ridge to find it by. */
+  position: number;
   span?: CreationFigures["span"];
   onOpenSession?: (entryId: string) => void;
 }) {
   return (
-    <div className="chat-creation-week">
+    <div className="chat-creation-week" data-week={position}>
       <span className="chat-creation-week-label">{t("chat.refs.week", { n: week.weekIndex + 1 })}</span>
       <ol className="chat-creation-days">
         {week.days.map((day) => {
@@ -219,12 +221,28 @@ export function CoachCreationCard({
     onCoros
   );
   const figures = !isWorkout && document ? creationFigures(document, athlete, athletePending) : undefined;
-  // A bar of the ridge picks the week the strip shows; the full view is Open's.
-  const [pickedWeek, setPickedWeek] = useState<number>();
-  const shownWeek =
-    pickedWeek !== undefined && figures?.reading[pickedWeek]
-      ? figures.reading[pickedWeek]
-      : figures?.firstWeek;
+  // Every week has its strip: the first CARD_WEEKS, the rest behind Show all.
+  // Only a plan that folds has the ridge, its overview; a bar unfolds the plan
+  // and brings that week's strip into view.
+  const [allWeeks, setAllWeeks] = useState(false);
+  // A new object on every press, so pressing the same bar again scrolls again.
+  const [picked, setPicked] = useState<{ week: number }>();
+  const cardRef = useRef<HTMLElement>(null);
+  const weekCount = figures?.reading.length ?? 0;
+  const folds = weekCount > CARD_WEEKS;
+  const strips = !figures ? [] : folds && !allWeeks ? figures.reading.slice(0, CARD_WEEKS) : figures.reading;
+  useEffect(() => {
+    if (!picked) return;
+    cardRef.current?.querySelector(`[data-week="${picked.week}"]`)?.scrollIntoView({ block: "nearest" });
+  }, [picked]);
+  const jumpToWeek = (week: number) => {
+    if (week >= CARD_WEEKS) setAllWeeks(true);
+    setPicked({ week });
+  };
+  const toggleWeeks = () => {
+    if (allWeeks && picked && picked.week >= CARD_WEEKS) setPicked(undefined);
+    setAllWeeks(!allWeeks);
+  };
   const entry = draft.entries[0];
   // The line says what the figures below cannot: when a dated plan runs. For
   // an undated one it would repeat them, so it stands in only until they load.
@@ -232,7 +250,7 @@ export function CoachCreationCard({
   const showSummary = !figures || dated;
 
   return (
-    <article className="chat-plan-card chat-creation-card" data-draft-id={draft.draftId}>
+    <article ref={cardRef} className="chat-plan-card chat-creation-card" data-draft-id={draft.draftId}>
       <header className="chat-creation-head">
         <div>
           <span className="chat-creation-kicker">
@@ -286,14 +304,24 @@ export function CoachCreationCard({
         </dl>
       ) : null}
 
-      {figures && figures.reading.length > 2 ? (
-        <PlanWeekRidge
-          weeks={figures.reading}
-          selectedWeek={shownWeek ? figures.reading.indexOf(shownWeek) : undefined}
-          onJump={setPickedWeek}
-        />
+      {figures && folds ? (
+        <PlanWeekRidge weeks={figures.reading} selectedWeek={picked?.week} onJump={jumpToWeek} />
       ) : null}
-      {figures && shownWeek ? <WeekStrip week={shownWeek} span={figures.span} onOpenSession={onOpenSession} /> : null}
+      {strips.map((week, position) => (
+        <WeekStrip
+          key={position}
+          week={week}
+          position={position}
+          span={figures?.span}
+          onOpenSession={onOpenSession}
+        />
+      ))}
+      {folds ? (
+        <button type="button" className="chat-creation-more" aria-expanded={allWeeks} onClick={toggleWeeks}>
+          {allWeeks ? t("chat.card.fewerWeeks") : t("chat.card.allWeeks", { n: weekCount })}
+          <ChevronDown size={14} aria-hidden="true" />
+        </button>
+      ) : null}
 
       {isWorkout && entry?.stepsSummary ? (
         // Summaries written before the builder stopped printing an empty
