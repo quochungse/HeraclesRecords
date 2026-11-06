@@ -10,7 +10,7 @@
 //
 // Installer names come from the release's own assets, matched by shape; they
 // are never rebuilt from the artifactName patterns (test:release-artifacts
-// holds those against updaterService.ts).
+// holds the build to those).
 
 import https from "node:https";
 

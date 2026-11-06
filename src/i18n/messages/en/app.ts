@@ -9,7 +9,7 @@ const app = {
   "app.update.notInstalled": "Updates are only available in installed builds.",
   "app.update.latest": "You're on the latest version.",
   "app.update.checkFailed": "Could not check for updates.",
-  "app.update.openedDownload": "Opened the GitHub download page. Install the new build over Heracles Records in Applications.",
+  "app.update.openedDownload": "Opened the download page on heraclesrecords.com. Install the new build over Heracles Records in Applications.",
   "app.coros.enterCode": "Enter the verification code we emailed you.",
   "app.coros.connected": "COROS Training Hub connected.",
   "app.coros.codeResent": "We sent a new verification code to your email.",
@@ -33,7 +33,7 @@ const app = {
   "app.update.restartAndUpdate": "Restart and update",
   "app.update.now": "Update now",
   "app.update.downloadingRestart": "Downloading {percent}%. Keep working — Heracles Records asks before it restarts.",
-  "app.update.installerInBrowser": "The installer will open in your browser.",
+  "app.update.installerInBrowser": "The download page will open in your browser.",
   "app.update.downloaded": "The update is downloaded and ready to install.",
   "app.update.willDownload": "Heracles Records downloads the update in the background and asks before it restarts to install it.",
   "app.update.available": "Update available",
@@ -88,7 +88,8 @@ const app = {
   "app.update.passwordNote": "Your system will ask for an administrator password to install it.",
   "app.update.installingBody": "Installing Heracles Records {version}. The app restarts as soon as it is done.",
   "app.update.installCancelled": "Not installed: the password request was cancelled. Restart to try again.",
-  "app.update.installFailed": "The update could not be installed from here. Download it from GitHub instead.",
+  "app.update.installBusy": "Not installed: the system is busy installing other updates. Wait a few minutes, then restart to try again.",
+  "app.update.installFailed": "The update could not be installed from here. Download it from <link>{site}</link> instead.",
   "app.update.restartNow": "Restart now",
 };
 

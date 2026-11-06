@@ -5,6 +5,8 @@
 // 1. /privacy.html exists at that exact path. Google's OAuth consent screen
 //    links to it; a build that wrote privacy/index.html instead would leave
 //    Drive sync pointing at a 404.
+//    /download.html likewise: every update the app cannot install itself
+//    sends the athlete there (electron/updaterService.ts).
 // 2. .nojekyll is published. GitHub Pages runs Jekyll otherwise, and Jekyll
 //    drops every directory starting with an underscore, which is where Astro
 //    puts every stylesheet, font and image (_astro/).
@@ -25,7 +27,7 @@ const src = join(root, "site", "src");
 
 assert.ok(existsSync(dist), "site/dist is missing: run `npm run site:build` first");
 
-for (const file of ["index.html", "privacy.html", "404.html", ".nojekyll"]) {
+for (const file of ["index.html", "privacy.html", "download.html", "404.html", ".nojekyll"]) {
   assert.ok(existsSync(join(dist, file)), `site/dist/${file} is missing`);
 }
 assert.ok(!existsSync(join(dist, "privacy", "index.html")), "privacy must be privacy.html, not privacy/index.html");

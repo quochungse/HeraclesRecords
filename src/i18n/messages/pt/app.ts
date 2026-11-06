@@ -8,7 +8,7 @@ const app: AppMessages = {
   "app.update.notInstalled": "As atualizações só estão disponíveis nas versões instaladas.",
   "app.update.latest": "Você já está na versão mais recente.",
   "app.update.checkFailed": "Não foi possível verificar atualizações.",
-  "app.update.openedDownload": "A página de download do GitHub foi aberta. Instale a nova versão por cima do Heracles Records em Aplicativos.",
+  "app.update.openedDownload": "A página de download do heraclesrecords.com foi aberta. Instale a nova versão por cima do Heracles Records em Aplicativos.",
   "app.coros.enterCode": "Digite o código de verificação que enviamos por e-mail.",
   "app.coros.connected": "COROS Training Hub conectado.",
   "app.coros.codeResent": "Enviamos um novo código de verificação para o seu e-mail.",
@@ -32,7 +32,7 @@ const app: AppMessages = {
   "app.update.restartAndUpdate": "Reiniciar e atualizar",
   "app.update.now": "Atualizar agora",
   "app.update.downloadingRestart": "Baixando {percent}%. Pode continuar usando — o Heracles Records pergunta antes de reiniciar.",
-  "app.update.installerInBrowser": "O instalador vai abrir no seu navegador.",
+  "app.update.installerInBrowser": "A página de download vai abrir no seu navegador.",
   "app.update.downloaded": "A atualização foi baixada e está pronta para instalar.",
   "app.update.willDownload": "O Heracles Records baixa a atualização em segundo plano e pergunta antes de reiniciar para instalá-la.",
   "app.update.available": "Atualização disponível",
@@ -87,7 +87,8 @@ const app: AppMessages = {
   "app.update.passwordNote": "O sistema vai pedir uma senha de administrador para instalar.",
   "app.update.installingBody": "Instalando o Heracles Records {version}. O app reinicia assim que terminar.",
   "app.update.installCancelled": "Não instalada: o pedido de senha foi cancelado. Reinicie para tentar de novo.",
-  "app.update.installFailed": "Não foi possível instalar a atualização por aqui. Baixe-a pelo GitHub.",
+  "app.update.installBusy": "Não instalada: o sistema está instalando outras atualizações. Aguarde alguns minutos e reinicie para tentar de novo.",
+  "app.update.installFailed": "Não foi possível instalar a atualização por aqui. Baixe-a em <link>{site}</link>.",
   "app.update.restartNow": "Reiniciar agora",
 };
 

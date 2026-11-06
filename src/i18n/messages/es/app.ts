@@ -8,7 +8,7 @@ const app: AppMessages = {
   "app.update.notInstalled": "Las actualizaciones solo están disponibles en las versiones instaladas.",
   "app.update.latest": "Tienes la versión más reciente.",
   "app.update.checkFailed": "No se pudieron buscar actualizaciones.",
-  "app.update.openedDownload": "Se abrió la página de descarga de GitHub. Instala la nueva versión encima de Heracles Records en Aplicaciones.",
+  "app.update.openedDownload": "Se abrió la página de descarga de heraclesrecords.com. Instala la nueva versión encima de Heracles Records en Aplicaciones.",
   "app.coros.enterCode": "Introduce el código de verificación que te enviamos por correo.",
   "app.coros.connected": "COROS Training Hub conectado.",
   "app.coros.codeResent": "Te enviamos un nuevo código de verificación por correo.",
@@ -32,7 +32,7 @@ const app: AppMessages = {
   "app.update.restartAndUpdate": "Reiniciar y actualizar",
   "app.update.now": "Actualizar ahora",
   "app.update.downloadingRestart": "Descargando {percent} %. Sigue trabajando: Heracles Records preguntará antes de reiniciarse.",
-  "app.update.installerInBrowser": "El instalador se abrirá en tu navegador.",
+  "app.update.installerInBrowser": "La página de descarga se abrirá en tu navegador.",
   "app.update.downloaded": "La actualización está descargada y lista para instalar.",
   "app.update.willDownload": "Heracles Records descarga la actualización en segundo plano y pregunta antes de reiniciarse para instalarla.",
   "app.update.available": "Actualización disponible",
@@ -87,7 +87,8 @@ const app: AppMessages = {
   "app.update.passwordNote": "El sistema pedirá una contraseña de administrador para instalarla.",
   "app.update.installingBody": "Instalando Heracles Records {version}. La app se reiniciará en cuanto termine.",
   "app.update.installCancelled": "No se instaló: se canceló la solicitud de contraseña. Reinicia para volver a intentarlo.",
-  "app.update.installFailed": "No se pudo instalar la actualización desde aquí. Descárgala de GitHub.",
+  "app.update.installBusy": "No se instaló: el sistema está instalando otras actualizaciones. Espera unos minutos y reinicia para volver a intentarlo.",
+  "app.update.installFailed": "No se pudo instalar la actualización desde aquí. Descárgala de <link>{site}</link>.",
   "app.update.restartNow": "Reiniciar ahora",
 };
 

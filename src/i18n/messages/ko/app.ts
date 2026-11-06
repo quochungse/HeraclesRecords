@@ -8,7 +8,7 @@ const app: AppMessages = {
   "app.update.notInstalled": "업데이트는 설치된 버전에서만 사용할 수 있습니다.",
   "app.update.latest": "최신 버전을 사용 중입니다.",
   "app.update.checkFailed": "업데이트를 확인하지 못했습니다.",
-  "app.update.openedDownload": "GitHub 다운로드 페이지를 열었습니다. 응용 프로그램 폴더의 Heracles Records 위에 새 버전을 설치하세요.",
+  "app.update.openedDownload": "heraclesrecords.com 다운로드 페이지를 열었습니다. 응용 프로그램 폴더의 Heracles Records 위에 새 버전을 설치하세요.",
   "app.coros.enterCode": "이메일로 보내 드린 인증 코드를 입력하세요.",
   "app.coros.connected": "COROS Training Hub에 연결했습니다.",
   "app.coros.codeResent": "새 인증 코드를 이메일로 보냈습니다.",
@@ -32,7 +32,7 @@ const app: AppMessages = {
   "app.update.restartAndUpdate": "다시 시작하고 업데이트",
   "app.update.now": "지금 업데이트",
   "app.update.downloadingRestart": "다운로드 중 {percent}%. 계속 사용하셔도 됩니다. 다시 시작하기 전에 물어봅니다.",
-  "app.update.installerInBrowser": "설치 프로그램이 브라우저에서 열립니다.",
+  "app.update.installerInBrowser": "다운로드 페이지가 브라우저에서 열립니다.",
   "app.update.downloaded": "업데이트를 다운로드했으며 설치할 준비가 되었습니다.",
   "app.update.willDownload": "Heracles Records가 업데이트를 백그라운드에서 다운로드하고, 설치를 위해 다시 시작하기 전에 물어봅니다.",
   "app.update.available": "업데이트 가능",
@@ -87,7 +87,8 @@ const app: AppMessages = {
   "app.update.passwordNote": "설치하려면 시스템에서 관리자 비밀번호를 묻습니다.",
   "app.update.installingBody": "Heracles Records {version}을(를) 설치하는 중입니다. 끝나는 대로 앱이 다시 시작됩니다.",
   "app.update.installCancelled": "비밀번호 요청이 취소되어 설치되지 않았습니다. 다시 시작해 다시 시도하세요.",
-  "app.update.installFailed": "여기서 업데이트를 설치하지 못했습니다. GitHub에서 다운로드하세요.",
+  "app.update.installBusy": "시스템이 다른 업데이트를 설치하는 중이라 설치되지 않았습니다. 몇 분 기다린 뒤 다시 시작해 다시 시도하세요.",
+  "app.update.installFailed": "여기서 업데이트를 설치하지 못했습니다. <link>{site}</link>에서 다운로드하세요.",
   "app.update.restartNow": "지금 다시 시작",
 };
 

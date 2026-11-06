@@ -8,7 +8,7 @@ const app: AppMessages = {
   "app.update.notInstalled": "Gli aggiornamenti sono disponibili solo nelle versioni installate.",
   "app.update.latest": "Hai già l’ultima versione.",
   "app.update.checkFailed": "Impossibile cercare aggiornamenti.",
-  "app.update.openedDownload": "Pagina di download di GitHub aperta. Installa la nuova versione sopra Heracles Records in Applicazioni.",
+  "app.update.openedDownload": "Pagina di download di heraclesrecords.com aperta. Installa la nuova versione sopra Heracles Records in Applicazioni.",
   "app.coros.enterCode": "Inserisci il codice di verifica che ti abbiamo inviato via email.",
   "app.coros.connected": "COROS Training Hub collegato.",
   "app.coros.codeResent": "Ti abbiamo inviato un nuovo codice di verifica via email.",
@@ -32,7 +32,7 @@ const app: AppMessages = {
   "app.update.restartAndUpdate": "Riavvia e aggiorna",
   "app.update.now": "Aggiorna ora",
   "app.update.downloadingRestart": "Download {percent}%. Continua pure a lavorare: Heracles Records chiederà prima di riavviarsi.",
-  "app.update.installerInBrowser": "Il programma di installazione si aprirà nel browser.",
+  "app.update.installerInBrowser": "La pagina di download si aprirà nel browser.",
   "app.update.downloaded": "L’aggiornamento è scaricato e pronto da installare.",
   "app.update.willDownload": "Heracles Records scarica l’aggiornamento in background e chiede prima di riavviarsi per installarlo.",
   "app.update.available": "Aggiornamento disponibile",
@@ -87,7 +87,8 @@ const app: AppMessages = {
   "app.update.passwordNote": "Il sistema chiederà una password di amministratore per installarlo.",
   "app.update.installingBody": "Installazione di Heracles Records {version}. L’app si riavvierà appena finito.",
   "app.update.installCancelled": "Non installato: la richiesta della password è stata annullata. Riavvia per riprovare.",
-  "app.update.installFailed": "Non è stato possibile installare l’aggiornamento da qui. Scaricalo invece da GitHub.",
+  "app.update.installBusy": "Non installato: il sistema sta installando altri aggiornamenti. Attendi qualche minuto, poi riavvia per riprovare.",
+  "app.update.installFailed": "Non è stato possibile installare l’aggiornamento da qui. Scaricalo invece da <link>{site}</link>.",
   "app.update.restartNow": "Riavvia ora",
 };
 

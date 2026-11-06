@@ -2,7 +2,8 @@
 // installers to. Two things break a release without failing its build: an
 // installer changed after electron-builder hashed it into latest*.yml (every
 // update is then refused for a checksum mismatch), and an installer named other
-// than updaterService.ts spells it (every "download manually" link 404s).
+// than package.json's artifactName patterns spell it (the README and the site
+// find each installer in the release by the shape of its name).
 //
 // Mode: plain node, no build step.
 //   node scripts/test-verify-release-artifacts.mjs
@@ -79,36 +80,7 @@ assert.deepEqual(
 );
 
 // ---------------------------------------------------------------------------
-// 2. Every link updaterService.ts builds by hand names a file the build makes.
-
-{
-  const source = fs.readFileSync(path.join(repoRoot, "electron", "updaterService.ts"), "utf8");
-  const templates = [...source.matchAll(/\/download\/v\$\{version\}\/([^`]+)`/g)].map(
-    (match) => match[1]
-  );
-  // Linux has two: a deb install is sent to the deb, an AppImage to the AppImage.
-  const platformFor = { dmg: "macos", exe: "windows", AppImage: "linux", deb: "linux" };
-  assert.deepEqual(
-    templates.map((template) => platformFor[template.split(".").pop()]).sort(),
-    ["linux", "linux", "macos", "windows"],
-    "updaterService.ts builds one manual download link per installer kind"
-  );
-  for (const template of templates) {
-    const platform = platformFor[template.split(".").pop()];
-    const built = expectedInstallers(platform, version).map((installer) => installer.name);
-    const arches = template.includes("${arch}") ? ["arm64", "x64"] : ["x64"];
-    for (const arch of arches) {
-      const link = template.replaceAll("${version}", version).replaceAll("${arch}", arch);
-      assert.ok(
-        built.includes(link),
-        `updaterService.ts links to ${link}, which the ${platform} build does not produce (it makes ${built.join(", ")})`
-      );
-    }
-  }
-}
-
-// ---------------------------------------------------------------------------
-// 3. A complete Windows build passes.
+// 2. A complete Windows build passes.
 
 const WINDOWS_INSTALLER = `HeraclesRecords-Setup-${version}.exe`;
 
@@ -168,7 +140,7 @@ withReleaseDir((releaseDir) => {
 });
 
 // ---------------------------------------------------------------------------
-// 4. macOS: both architectures, dmg and zip, every one hashed. Only the zips
+// 3. macOS: both architectures, dmg and zip, every one hashed. Only the zips
 //    carry a blockmap: the dmg's is read by nothing and is not published.
 
 const MAC_INSTALLERS = expectedInstallers("macos", version).map((installer) => installer.name);
@@ -241,7 +213,7 @@ withReleaseDir((releaseDir) => {
 });
 
 // ---------------------------------------------------------------------------
-// 5. Linux: an AppImage and a deb, both in latest-linux.yml, no blockmap file.
+// 4. Linux: an AppImage and a deb, both in latest-linux.yml, no blockmap file.
 
 const APP_IMAGE = `HeraclesRecords-${version}.AppImage`;
 const DEB = `HeraclesRecords-${version}.deb`;

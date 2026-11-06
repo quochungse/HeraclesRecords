@@ -19,6 +19,7 @@ export type UpdateScenario =
   | "windows"
   | "linux-deb"
   | "linux-deb-cancel"
+  | "linux-deb-busy"
   | "linux-deb-fail"
   | "linux-appimage"
   | "download-fail";
@@ -30,7 +31,7 @@ interface ScenarioSpec {
   installMethod: "restart" | "manual";
   installNeedsPassword?: boolean;
   /** What Restart does: leave (macOS, Windows) or install in the app (Linux). */
-  install: "quit" | "linux" | "linux-cancel-once" | "linux-fail";
+  install: "quit" | "linux" | "linux-cancel-once" | "linux-busy-once" | "linux-fail";
   downloadFails?: boolean;
 }
 
@@ -44,7 +45,7 @@ export const UPDATE_SCENARIOS: Record<UpdateScenario, ScenarioSpec> = {
   },
   "mac-manual": {
     label: "macOS ad-hoc",
-    detail: "Unsigned build: the DMG opens in the browser.",
+    detail: "Unsigned build: the site's download page opens in the browser.",
     platform: "darwin",
     installMethod: "manual",
     install: "quit",
@@ -72,9 +73,17 @@ export const UPDATE_SCENARIOS: Record<UpdateScenario, ScenarioSpec> = {
     installNeedsPassword: true,
     install: "linux-cancel-once",
   },
+  "linux-deb-busy": {
+    label: "Linux deb · busy",
+    detail: "Another program keeps dpkg's lock past the wait once; Restart again succeeds.",
+    platform: "linux",
+    installMethod: "restart",
+    installNeedsPassword: true,
+    install: "linux-busy-once",
+  },
   "linux-deb-fail": {
     label: "Linux deb · fails",
-    detail: "dpkg fails; the prompt offers the download instead.",
+    detail: "apt-get fails; the prompt links the site's download page.",
     platform: "linux",
     installMethod: "restart",
     installNeedsPassword: true,
@@ -174,9 +183,7 @@ export function useUpdateSimulation({ onMessage, onFinished }: UpdateSimulationC
           installMethod: spec.installMethod,
           installNeedsPassword: spec.installNeedsPassword,
           manualInstallUrl:
-            spec.installMethod === "manual"
-              ? "https://github.com/quochungse/HeraclesRecords/releases"
-              : undefined,
+            spec.installMethod === "manual" ? "https://heraclesrecords.com/download" : undefined,
           installFailure: undefined,
         });
         return;
@@ -240,7 +247,7 @@ export function useUpdateSimulation({ onMessage, onFinished }: UpdateSimulationC
 
     if (spec.installMethod === "manual") {
       callbacks.current.onMessage(
-        "Simulated: the DMG download page would open in the browser. The update stays ready.",
+        "Simulated: heraclesrecords.com/download would open in the browser. The update stays ready.",
       );
       return true;
     }
@@ -262,12 +269,16 @@ export function useUpdateSimulation({ onMessage, onFinished }: UpdateSimulationC
         patch({
           status: "downloaded",
           installFailure: "failed",
-          manualInstallUrl: "https://github.com/quochungse/HeraclesRecords/releases",
+          manualInstallUrl: "https://heraclesrecords.com/download",
         });
         return;
       }
       if (spec.install === "linux-cancel-once" && attempt === 1) {
         patch({ status: "downloaded", installFailure: "cancelled" });
+        return;
+      }
+      if (spec.install === "linux-busy-once" && attempt === 1) {
+        patch({ status: "downloaded", installFailure: "busy" });
         return;
       }
       finish(`Simulated: ${version} is installed and the app would relaunch now.`);

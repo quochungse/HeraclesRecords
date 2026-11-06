@@ -8,7 +8,7 @@ const app: AppMessages = {
   "app.update.notInstalled": "Pembaruan hanya tersedia di versi yang terpasang.",
   "app.update.latest": "Anda sudah memakai versi terbaru.",
   "app.update.checkFailed": "Tidak dapat memeriksa pembaruan.",
-  "app.update.openedDownload": "Halaman unduhan GitHub sudah dibuka. Pasang versi baru di atas Heracles Records di folder Applications.",
+  "app.update.openedDownload": "Halaman unduhan heraclesrecords.com sudah dibuka. Pasang versi baru di atas Heracles Records di folder Applications.",
   "app.coros.enterCode": "Masukkan kode verifikasi yang kami kirim lewat email.",
   "app.coros.connected": "COROS Training Hub terhubung.",
   "app.coros.codeResent": "Kami sudah mengirim kode verifikasi baru ke email Anda.",
@@ -32,7 +32,7 @@ const app: AppMessages = {
   "app.update.restartAndUpdate": "Mulai ulang dan perbarui",
   "app.update.now": "Perbarui sekarang",
   "app.update.downloadingRestart": "Mengunduh {percent}%. Silakan lanjutkan — Heracles Records akan bertanya sebelum memulai ulang.",
-  "app.update.installerInBrowser": "Penginstal akan terbuka di browser Anda.",
+  "app.update.installerInBrowser": "Halaman unduhan akan terbuka di browser Anda.",
   "app.update.downloaded": "Pembaruan sudah diunduh dan siap dipasang.",
   "app.update.willDownload": "Heracles Records mengunduh pembaruan di latar belakang dan bertanya sebelum memulai ulang untuk memasangnya.",
   "app.update.available": "Pembaruan tersedia",
@@ -87,7 +87,8 @@ const app: AppMessages = {
   "app.update.passwordNote": "Sistem akan meminta kata sandi administrator untuk memasangnya.",
   "app.update.installingBody": "Memasang Heracles Records {version}. Aplikasi akan dimulai ulang begitu selesai.",
   "app.update.installCancelled": "Belum terpasang: permintaan kata sandi dibatalkan. Mulai ulang untuk mencoba lagi.",
-  "app.update.installFailed": "Pembaruan tidak bisa dipasang dari sini. Unduh dari GitHub saja.",
+  "app.update.installBusy": "Belum terpasang: sistem sedang memasang pembaruan lain. Tunggu beberapa menit, lalu mulai ulang untuk mencoba lagi.",
+  "app.update.installFailed": "Pembaruan tidak bisa dipasang dari sini. Unduh dari <link>{site}</link> saja.",
   "app.update.restartNow": "Mulai ulang sekarang",
 };
 

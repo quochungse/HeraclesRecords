@@ -8,7 +8,7 @@ const app: AppMessages = {
   "app.update.notInstalled": "Updates gibt es nur in installierten Versionen.",
   "app.update.latest": "Du hast die neueste Version.",
   "app.update.checkFailed": "Es konnte nicht nach Updates gesucht werden.",
-  "app.update.openedDownload": "Die GitHub-Downloadseite ist geöffnet. Installiere die neue Version über Heracles Records in „Programme“.",
+  "app.update.openedDownload": "Die Downloadseite auf heraclesrecords.com ist geöffnet. Installiere die neue Version über Heracles Records in „Programme“.",
   "app.coros.enterCode": "Gib den Bestätigungscode ein, den wir dir per E-Mail geschickt haben.",
   "app.coros.connected": "COROS Training Hub verbunden.",
   "app.coros.codeResent": "Wir haben dir einen neuen Bestätigungscode geschickt.",
@@ -32,7 +32,7 @@ const app: AppMessages = {
   "app.update.restartAndUpdate": "Neu starten und aktualisieren",
   "app.update.now": "Jetzt aktualisieren",
   "app.update.downloadingRestart": "Wird geladen: {percent} %. Arbeite ruhig weiter – Heracles Records fragt, bevor es neu startet.",
-  "app.update.installerInBrowser": "Das Installationsprogramm öffnet sich in deinem Browser.",
+  "app.update.installerInBrowser": "Die Downloadseite öffnet sich in deinem Browser.",
   "app.update.downloaded": "Das Update ist heruntergeladen und bereit zur Installation.",
   "app.update.willDownload": "Heracles Records lädt das Update im Hintergrund und fragt, bevor es zur Installation neu startet.",
   "app.update.available": "Update verfügbar",
@@ -87,7 +87,8 @@ const app: AppMessages = {
   "app.update.passwordNote": "Dein System fragt zur Installation nach einem Administratorpasswort.",
   "app.update.installingBody": "Heracles Records {version} wird installiert. Die App startet neu, sobald es fertig ist.",
   "app.update.installCancelled": "Nicht installiert: Die Passwortabfrage wurde abgebrochen. Starte neu, um es noch einmal zu versuchen.",
-  "app.update.installFailed": "Das Update ließ sich hier nicht installieren. Lade es stattdessen von GitHub herunter.",
+  "app.update.installBusy": "Nicht installiert: Das System installiert gerade andere Updates. Warte ein paar Minuten und starte dann neu, um es noch einmal zu versuchen.",
+  "app.update.installFailed": "Das Update ließ sich hier nicht installieren. Lade es stattdessen von <link>{site}</link> herunter.",
   "app.update.restartNow": "Jetzt neu starten",
 };
 

@@ -279,16 +279,18 @@ What a release publishes is what something reads: per Mac arch a dmg and a zip +
 (the updater), the Windows exe + blockmap, `latest*.yml`, a Linux AppImage **and** a deb.
 **The AppImage must stay the first Linux target**, or it is packed with the deb's
 `resources/package-type` and updates itself as a deb. `artifactName` patterns spell
-`HeraclesRecords` with no space (GitHub rewrites spaces) and must change together with the
-hand-built download URLs in `electron/updaterService.ts` (`test:release-artifacts`,
+`HeraclesRecords` with no space (GitHub rewrites spaces) and keep the shapes
+`scripts/lib/release-data.mjs` finds installers by (`test:release-artifacts`,
 `test:release-data`). Linux icons are the `build/icons/<n>x<n>.png` set (`icons:generate`).
 
 **Updates download in the background and never restart unasked**; `UpdateRestartPrompt`
 asks once the file is on disk. Per platform (`quitAndInstallUpdate`): Windows runs NSIS
 silently; Linux installs inside the running app, asynchronously (a deb through one
-`pkexec`, an AppImage by rename) — electron-updater's own `spawnSync` froze the window; on
-macOS an ad-hoc build cannot update in place (Squirrel needs a stable designated
-requirement), so `isMacAdHocSigned` sends the athlete to the DMG.
+`pkexec` apt-get that waits out dpkg's lock, an AppImage by rename) — electron-updater's own
+`spawnSync` froze the window; on macOS an ad-hoc build cannot update in place (Squirrel
+needs a stable designated requirement), so `isMacAdHocSigned` sends the athlete to the
+site's download page. Every update the app cannot install itself goes there (a failed Linux
+install, a 404), never to GitHub.
 
 A packaged build needs `HERACLES_GOOGLE_OAUTH_ID`/`_KEY` (baked by
 `scripts/prepare-google-client.mjs` from the environment or a root `.env`) for Drive sync to

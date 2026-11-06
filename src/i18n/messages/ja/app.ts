@@ -8,7 +8,7 @@ const app: AppMessages = {
   "app.update.notInstalled": "アップデートはインストール版でのみ利用できます。",
   "app.update.latest": "最新バージョンです。",
   "app.update.checkFailed": "アップデートを確認できませんでした。",
-  "app.update.openedDownload": "GitHub のダウンロードページを開きました。アプリケーションフォルダの Heracles Records に上書きでインストールしてください。",
+  "app.update.openedDownload": "heraclesrecords.com のダウンロードページを開きました。アプリケーションフォルダの Heracles Records に上書きでインストールしてください。",
   "app.coros.enterCode": "メールでお送りした確認コードを入力してください。",
   "app.coros.connected": "COROS Training Hub に接続しました。",
   "app.coros.codeResent": "新しい確認コードをメールでお送りしました。",
@@ -32,7 +32,7 @@ const app: AppMessages = {
   "app.update.restartAndUpdate": "再起動してアップデート",
   "app.update.now": "今すぐアップデート",
   "app.update.downloadingRestart": "ダウンロード中 {percent}%。作業はそのまま続けられます。再起動の前に確認します。",
-  "app.update.installerInBrowser": "インストーラーはブラウザーで開きます。",
+  "app.update.installerInBrowser": "ダウンロードページがブラウザーで開きます。",
   "app.update.downloaded": "アップデートのダウンロードが完了し、インストールの準備ができました。",
   "app.update.willDownload": "Heracles Records はアップデートをバックグラウンドでダウンロードし、インストールのために再起動する前に確認します。",
   "app.update.available": "アップデートがあります",
@@ -87,7 +87,8 @@ const app: AppMessages = {
   "app.update.passwordNote": "インストールには管理者パスワードの入力を求められます。",
   "app.update.installingBody": "Heracles Records {version} をインストールしています。完了するとアプリが再起動します。",
   "app.update.installCancelled": "パスワードの要求がキャンセルされたため、インストールされていません。再起動してもう一度お試しください。",
-  "app.update.installFailed": "ここからはアップデートをインストールできませんでした。GitHub からダウンロードしてください。",
+  "app.update.installBusy": "システムが別の更新をインストール中のため、インストールされていません。数分待ってから再起動して、もう一度お試しください。",
+  "app.update.installFailed": "ここからはアップデートをインストールできませんでした。<link>{site}</link> からダウンロードしてください。",
   "app.update.restartNow": "今すぐ再起動",
 };
 

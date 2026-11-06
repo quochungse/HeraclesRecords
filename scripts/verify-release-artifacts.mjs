@@ -5,9 +5,9 @@
 // unless its size and sha512 agree with the metadata, so anything that touches
 // an installer after electron-builder wrote the metadata — a signing step added
 // later, say — breaks every update while the release itself looks fine. And
-// updaterService.ts builds its download links by hand, so the installers must
-// carry exactly the names package.json's artifactName patterns give them;
-// `test:release-artifacts` holds those links to the same names.
+// the README and the site find each installer in the release by the shape of
+// its name, so the installers must carry exactly the names package.json's
+// artifactName patterns give them.
 
 import crypto from "node:crypto";
 import fs from "node:fs";

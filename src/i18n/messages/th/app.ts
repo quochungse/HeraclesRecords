@@ -8,7 +8,7 @@ const app: AppMessages = {
   "app.update.notInstalled": "การอัปเดตใช้ได้เฉพาะเวอร์ชันที่ติดตั้งแล้ว",
   "app.update.latest": "คุณใช้เวอร์ชันล่าสุดแล้ว",
   "app.update.checkFailed": "ตรวจหาอัปเดตไม่ได้",
-  "app.update.openedDownload": "เปิดหน้าดาวน์โหลดบน GitHub แล้ว ติดตั้งเวอร์ชันใหม่ทับ Heracles Records ในโฟลเดอร์ Applications",
+  "app.update.openedDownload": "เปิดหน้าดาวน์โหลดบน heraclesrecords.com แล้ว ติดตั้งเวอร์ชันใหม่ทับ Heracles Records ในโฟลเดอร์ Applications",
   "app.coros.enterCode": "ใส่รหัสยืนยันที่เราส่งไปทางอีเมล",
   "app.coros.connected": "เชื่อมต่อ COROS Training Hub แล้ว",
   "app.coros.codeResent": "ส่งรหัสยืนยันใหม่ไปที่อีเมลของคุณแล้ว",
@@ -32,7 +32,7 @@ const app: AppMessages = {
   "app.update.restartAndUpdate": "รีสตาร์ทและอัปเดต",
   "app.update.now": "อัปเดตเลย",
   "app.update.downloadingRestart": "กำลังดาวน์โหลด {percent}% ใช้งานต่อได้เลย Heracles Records จะถามก่อนรีสตาร์ท",
-  "app.update.installerInBrowser": "ตัวติดตั้งจะเปิดในเบราว์เซอร์",
+  "app.update.installerInBrowser": "หน้าดาวน์โหลดจะเปิดในเบราว์เซอร์",
   "app.update.downloaded": "ดาวน์โหลดอัปเดตแล้ว พร้อมติดตั้ง",
   "app.update.willDownload": "Heracles Records จะดาวน์โหลดอัปเดตเบื้องหลัง และถามก่อนรีสตาร์ทเพื่อติดตั้ง",
   "app.update.available": "มีอัปเดตใหม่",
@@ -87,7 +87,8 @@ const app: AppMessages = {
   "app.update.passwordNote": "ระบบจะขอรหัสผ่านผู้ดูแลระบบเพื่อติดตั้ง",
   "app.update.installingBody": "กำลังติดตั้ง Heracles Records {version} แอปจะรีสตาร์ททันทีที่เสร็จ",
   "app.update.installCancelled": "ยังไม่ได้ติดตั้ง เพราะคำขอรหัสผ่านถูกยกเลิก รีสตาร์ทเพื่อลองอีกครั้ง",
-  "app.update.installFailed": "ติดตั้งอัปเดตจากตรงนี้ไม่ได้ โปรดดาวน์โหลดจาก GitHub แทน",
+  "app.update.installBusy": "ยังไม่ได้ติดตั้ง เพราะระบบกำลังติดตั้งอัปเดตอื่นอยู่ รอสักครู่แล้วรีสตาร์ทเพื่อลองอีกครั้ง",
+  "app.update.installFailed": "ติดตั้งอัปเดตจากตรงนี้ไม่ได้ โปรดดาวน์โหลดจาก <link>{site}</link> แทน",
   "app.update.restartNow": "รีสตาร์ทเลย",
 };
 

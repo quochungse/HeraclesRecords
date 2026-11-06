@@ -8,7 +8,7 @@ const app: AppMessages = {
   "app.update.notInstalled": "Chỉ bản đã cài đặt mới cập nhật được.",
   "app.update.latest": "Bạn đang dùng bản mới nhất.",
   "app.update.checkFailed": "Không kiểm tra được bản cập nhật.",
-  "app.update.openedDownload": "Đã mở trang tải về trên GitHub. Hãy cài bản mới đè lên Heracles Records trong Applications.",
+  "app.update.openedDownload": "Đã mở trang tải về trên heraclesrecords.com. Hãy cài bản mới đè lên Heracles Records trong Applications.",
   "app.coros.enterCode": "Nhập mã xác minh mà chúng tôi đã gửi qua email.",
   "app.coros.connected": "Đã kết nối COROS Training Hub.",
   "app.coros.codeResent": "Đã gửi mã xác minh mới tới email của bạn.",
@@ -32,7 +32,7 @@ const app: AppMessages = {
   "app.update.restartAndUpdate": "Khởi động lại và cập nhật",
   "app.update.now": "Cập nhật ngay",
   "app.update.downloadingRestart": "Đang tải {percent}%. Bạn cứ tiếp tục dùng — Heracles Records sẽ hỏi trước khi khởi động lại.",
-  "app.update.installerInBrowser": "Trình cài đặt sẽ mở trong trình duyệt.",
+  "app.update.installerInBrowser": "Trang tải về sẽ mở trong trình duyệt.",
   "app.update.downloaded": "Bản cập nhật đã tải xong và sẵn sàng cài đặt.",
   "app.update.willDownload": "Heracles Records sẽ tải bản cập nhật trong nền và hỏi trước khi khởi động lại để cài đặt.",
   "app.update.available": "Có bản cập nhật",
@@ -87,7 +87,8 @@ const app: AppMessages = {
   "app.update.passwordNote": "Hệ thống sẽ hỏi mật khẩu quản trị để cài đặt.",
   "app.update.installingBody": "Đang cài đặt Heracles Records {version}. Ứng dụng sẽ khởi động lại ngay khi xong.",
   "app.update.installCancelled": "Chưa cài đặt vì yêu cầu mật khẩu đã bị huỷ. Khởi động lại để thử lại.",
-  "app.update.installFailed": "Không cài được bản cập nhật từ đây. Hãy tải về từ GitHub.",
+  "app.update.installBusy": "Chưa cài đặt vì hệ thống đang cài các bản cập nhật khác. Đợi vài phút rồi khởi động lại để thử lại.",
+  "app.update.installFailed": "Không cài được bản cập nhật từ đây. Hãy tải về từ <link>{site}</link>.",
   "app.update.restartNow": "Khởi động lại",
 };
 

@@ -1994,6 +1994,12 @@ input::placeholder {
   font-size: 12px;
 }
 
+.update-prompt-failure a {
+  color: inherit;
+  font-weight: 600;
+  text-decoration: underline;
+}
+
 .update-prompt-actions a.primary-button {
   text-decoration: none;
 }

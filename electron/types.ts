@@ -1443,16 +1443,17 @@ export interface AppUpdateSnapshot {
   downloadPercent?: number;
   releaseNotes?: string;
   error?: string;
-  /** macOS ad-hoc builds cannot self-install; user must open the release asset. */
+  /** macOS ad-hoc builds cannot self-install; the athlete installs from the site's download page. */
   installMethod?: "restart" | "manual";
   manualInstallUrl?: string;
   /** Linux .deb: installing asks for an administrator password (pkexec). */
   installNeedsPassword?: boolean;
   /**
    * Linux: why the last in-app install did not finish. The update stays
-   * "downloaded", so Restart can be pressed again.
+   * "downloaded", so Restart can be pressed again; "busy" is another program
+   * holding dpkg's lock, and "failed" sends the athlete to the download page.
    */
-  installFailure?: "cancelled" | "failed";
+  installFailure?: "cancelled" | "busy" | "failed";
   /** When false, the app does not check for updates automatically on startup. */
   autoCheck: boolean;
   /** When false, available updates are not downloaded until the user asks. */

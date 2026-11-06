@@ -8,7 +8,7 @@ const app: AppMessages = {
   "app.update.notInstalled": "Les mises à jour ne sont disponibles que dans les versions installées.",
   "app.update.latest": "Vous avez la dernière version.",
   "app.update.checkFailed": "Impossible de rechercher des mises à jour.",
-  "app.update.openedDownload": "La page de téléchargement GitHub est ouverte. Installez la nouvelle version par-dessus Heracles Records dans Applications.",
+  "app.update.openedDownload": "La page de téléchargement de heraclesrecords.com est ouverte. Installez la nouvelle version par-dessus Heracles Records dans Applications.",
   "app.coros.enterCode": "Saisissez le code de vérification envoyé par e-mail.",
   "app.coros.connected": "COROS Training Hub connecté.",
   "app.coros.codeResent": "Un nouveau code de vérification vous a été envoyé par e-mail.",
@@ -32,7 +32,7 @@ const app: AppMessages = {
   "app.update.restartAndUpdate": "Redémarrer et mettre à jour",
   "app.update.now": "Mettre à jour",
   "app.update.downloadingRestart": "Téléchargement {percent} %. Continuez à travailler : Heracles Records demandera avant de redémarrer.",
-  "app.update.installerInBrowser": "Le programme d’installation s’ouvrira dans votre navigateur.",
+  "app.update.installerInBrowser": "La page de téléchargement s’ouvrira dans votre navigateur.",
   "app.update.downloaded": "La mise à jour est téléchargée et prête à être installée.",
   "app.update.willDownload": "Heracles Records télécharge la mise à jour en arrière-plan et demande avant de redémarrer pour l’installer.",
   "app.update.available": "Mise à jour disponible",
@@ -87,7 +87,8 @@ const app: AppMessages = {
   "app.update.passwordNote": "Votre système demandera un mot de passe administrateur pour l’installer.",
   "app.update.installingBody": "Installation de Heracles Records {version}. L’app redémarrera dès que ce sera fait.",
   "app.update.installCancelled": "Non installée : la demande de mot de passe a été annulée. Redémarrez pour réessayer.",
-  "app.update.installFailed": "La mise à jour n’a pas pu être installée d’ici. Téléchargez-la plutôt depuis GitHub.",
+  "app.update.installBusy": "Non installée : le système installe d’autres mises à jour. Patientez quelques minutes, puis redémarrez pour réessayer.",
+  "app.update.installFailed": "La mise à jour n’a pas pu être installée d’ici. Téléchargez-la plutôt depuis <link>{site}</link>.",
   "app.update.restartNow": "Redémarrer maintenant",
 };
 

@@ -58,29 +58,12 @@ function isMacAdHocSigned(): boolean {
   );
 }
 
-// Must stay in step with the `artifactName` patterns in package.json's build
-// config. Those deliberately spell "HeraclesRecords" without a space: GitHub
-// only accepts [0-9A-Za-z._-] in asset names, so a space would be rewritten on
-// upload and every URL built here would 404.
-const RELEASES_URL = "https://github.com/quochungse/HeraclesRecords/releases";
-
-function getManualInstallUrl(version: string): string {
-  const arch = process.arch === "arm64" ? "arm64" : "x64";
-
-  if (process.platform === "darwin") {
-    return `${RELEASES_URL}/download/v${version}/HeraclesRecords-${version}-${arch}.dmg`;
-  }
-
-  if (process.platform === "win32") {
-    return `${RELEASES_URL}/download/v${version}/HeraclesRecords-Setup-${version}.exe`;
-  }
-
-  if (linuxInstallRoute() === "deb") {
-    return `${RELEASES_URL}/download/v${version}/HeraclesRecords-${version}.deb`;
-  }
-
-  return `${RELEASES_URL}/download/v${version}/HeraclesRecords-${version}.AppImage`;
-}
+/**
+ * The site's download page, which lists the latest release's installers:
+ * where every update the app cannot install itself sends the athlete — an
+ * ad-hoc signed Mac, a Linux install that failed, a download that 404s.
+ */
+const DOWNLOAD_PAGE_URL = "https://heraclesrecords.com/download";
 
 /**
  * How a downloaded update reaches the disk on this machine.
@@ -114,14 +97,6 @@ function linuxInstallRoute(): LinuxInstallRoute {
   }
 }
 
-function getReleasePageUrl(version?: string): string {
-  if (!version) {
-    return `${RELEASES_URL}/latest`;
-  }
-
-  return `${RELEASES_URL}/tag/v${version}`;
-}
-
 function formatUpdaterError(error: unknown): string {
   const message =
     error instanceof Error
@@ -136,24 +111,22 @@ function formatUpdaterError(error: unknown): string {
     // been published for this platform (true of every build before the first
     // one), not a download that failed.
     if (!version) {
-      return `No published release was found to check against. Releases are listed at ${RELEASES_URL}.`;
+      return `No published release was found to check against. Downloads are at ${DOWNLOAD_PAGE_URL}.`;
     }
-    return `Update download failed. Download Heracles Records ${version} from GitHub: ${getReleasePageUrl(version)}`;
+    return `Update download failed. Download Heracles Records ${version} from ${DOWNLOAD_PAGE_URL}`;
   }
 
   return message;
 }
 
-function resolveInstallDetails(
-  version: string
-): Pick<
+function resolveInstallDetails(): Pick<
   AppUpdateSnapshot,
   "installMethod" | "manualInstallUrl" | "installNeedsPassword"
 > {
   if (process.platform === "darwin" && isMacAdHocSigned()) {
     return {
       installMethod: "manual",
-      manualInstallUrl: getManualInstallUrl(version)
+      manualInstallUrl: DOWNLOAD_PAGE_URL
     };
   }
 
@@ -322,7 +295,7 @@ function registerAutoUpdaterListeners(): void {
       availableVersion: info.version,
       downloadPercent: 100,
       error: undefined,
-      ...resolveInstallDetails(info.version)
+      ...resolveInstallDetails()
     });
   });
 
@@ -449,10 +422,7 @@ export async function quitAndInstallUpdate(): Promise<{
   }
 
   if (snapshot.installMethod === "manual") {
-    const url =
-      snapshot.manualInstallUrl ??
-      getManualInstallUrl(snapshot.availableVersion);
-    await shell.openExternal(url);
+    await shell.openExternal(snapshot.manualInstallUrl ?? DOWNLOAD_PAGE_URL);
     return { installMethod: "manual" };
   }
 
@@ -461,7 +431,7 @@ export async function quitAndInstallUpdate(): Promise<{
     if (route !== "updater" && downloadedFile) {
       // Answered at once: the install runs on, reported through the snapshot,
       // and ends in a relaunch — or back at "downloaded" with the reason.
-      void installOnLinux(route, downloadedFile, snapshot.availableVersion);
+      void installOnLinux(route, downloadedFile);
       return { installMethod: "restart" };
     }
   }
@@ -479,11 +449,12 @@ export async function quitAndInstallUpdate(): Promise<{
 }
 
 class LinuxInstallCancelled extends Error {}
+/** Another program held dpkg's lock past the wait — the system's own updates, usually. */
+class LinuxInstallBusy extends Error {}
 
 async function installOnLinux(
   route: Exclude<LinuxInstallRoute, "updater">,
-  file: string,
-  version: string
+  file: string
 ): Promise<void> {
   setSnapshot({ status: "installing", error: undefined, installFailure: undefined });
 
@@ -499,22 +470,33 @@ async function installOnLinux(
   } catch (error) {
     console.warn("[updater] could not install the update", error);
     // Back to ready, so Restart can be pressed again: a dismissed password
-    // dialog is the usual way here, and it is not a failed update. The
-    // renderer words it, in the language on screen.
+    // dialog or the system busy with its own updates is the usual way here,
+    // and neither is a failed update. The renderer words it, in the language
+    // on screen.
     setSnapshot({
       status: "downloaded",
       installFailure:
-        error instanceof LinuxInstallCancelled ? "cancelled" : "failed",
-      manualInstallUrl: getManualInstallUrl(version)
+        error instanceof LinuxInstallCancelled
+          ? "cancelled"
+          : error instanceof LinuxInstallBusy
+            ? "busy"
+            : "failed",
+      manualInstallUrl: DOWNLOAD_PAGE_URL
     });
   }
 }
 
+/** apt's words, under `LC_ALL=C`, for a lock another program still holds. */
+const DPKG_LOCK_HELD =
+  /Could not get lock|Unable to acquire the dpkg frontend lock|Unable to lock (the administration )?directory/;
+
 /**
- * `pkexec` for one authorisation covering both steps: dpkg leaves a package
- * whose dependencies are missing unconfigured, and `apt-get -f` finishes it —
- * the same two steps electron-updater runs, which there cost two prompts. The
- * path travels as `$1`, never inside the script, so no quoting can break it.
+ * One `pkexec` authorisation, one apt-get: it installs the package and any
+ * dependency it lacks in one step, and waits up to five minutes for dpkg's
+ * lock. unattended-upgrades holds that lock for minutes after a boot, and
+ * dpkg, which never waits, failed on it outright. The path travels as `$1`,
+ * never inside the script, so no quoting can break it; `LC_ALL=C` keeps apt's
+ * errors in the English `DPKG_LOCK_HELD` reads.
  */
 function installDebPackage(file: string): Promise<void> {
   return new Promise((resolve, reject) => {
@@ -524,7 +506,7 @@ function installDebPackage(file: string): Promise<void> {
         "--disable-internal-agent",
         "/bin/sh",
         "-c",
-        'dpkg -i "$1" || apt-get install -f -y',
+        'LC_ALL=C exec apt-get install -y -o DPkg::Lock::Timeout=300 "$1"',
         "sh",
         file
       ],
@@ -547,8 +529,10 @@ function installDebPackage(file: string): Promise<void> {
       } else if (code === 126 || code === 127) {
         // pkexec: the dialog was dismissed (126) or the password refused (127).
         reject(new LinuxInstallCancelled("pkexec authorisation was not given"));
+      } else if (DPKG_LOCK_HELD.test(stderr)) {
+        reject(new LinuxInstallBusy(`dpkg is locked by another program: ${stderr.trim()}`));
       } else {
-        reject(new Error(`dpkg exited with ${code}: ${stderr.trim()}`));
+        reject(new Error(`apt-get exited with ${code}: ${stderr.trim()}`));
       }
     });
   });

@@ -6,6 +6,7 @@ import rehypeSanitize from "rehype-sanitize";
 import remarkGfm from "remark-gfm";
 import type { AppUpdateSnapshot } from "../../electron/types";
 import { t } from "../i18n/core";
+import { renderRich } from "../i18n/useI18n";
 import { UpdateGlyph } from "./UpdateGlyph";
 
 const DISMISSED_UPDATE_VERSION_KEY =
@@ -269,6 +270,9 @@ export function UpdateRestartPrompt({
   const version = snapshot.availableVersion ?? "";
   const manual = snapshot.installMethod === "manual";
   const failed = snapshot.installFailure === "failed";
+  // The site's download page, written out in the sentence as well as behind
+  // the button.
+  const downloadPage = failed ? snapshot.manualInstallUrl : undefined;
   const body = installing
     ? t("app.update.installingBody", { version })
     : manual
@@ -282,12 +286,26 @@ export function UpdateRestartPrompt({
         : platform === "win32"
           ? t("app.update.windowsNote")
           : null;
-  const failure =
-    !installing && snapshot.installFailure === "cancelled"
+  const failure = installing
+    ? null
+    : snapshot.installFailure === "cancelled"
       ? t("app.update.installCancelled")
-      : !installing && failed
-        ? t("app.update.installFailed")
-        : null;
+      : snapshot.installFailure === "busy"
+        ? t("app.update.installBusy")
+        : downloadPage
+          ? renderRich(
+              t("app.update.installFailed", {
+                site: downloadPage.replace(/^https?:\/\//, ""),
+              }),
+              {
+                link: (chunk) => (
+                  <a href={downloadPage} target="_blank" rel="noreferrer">
+                    {chunk}
+                  </a>
+                ),
+              },
+            )
+          : null;
 
   return (
     <div className="update-prompt-backdrop" role="presentation">
@@ -333,10 +351,10 @@ export function UpdateRestartPrompt({
             >
               {t("app.update.notNow")}
             </button>
-            {failed && snapshot.manualInstallUrl ? (
+            {downloadPage ? (
               <a
                 className="primary-button"
-                href={snapshot.manualInstallUrl}
+                href={downloadPage}
                 target="_blank"
                 rel="noreferrer"
                 onClick={onLater}

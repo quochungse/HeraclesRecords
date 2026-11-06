@@ -8,7 +8,7 @@ const app: AppMessages = {
   "app.update.notInstalled": "只有安装版才能更新。",
   "app.update.latest": "已是最新版本。",
   "app.update.checkFailed": "无法检查更新。",
-  "app.update.openedDownload": "已打开 GitHub 下载页面。请将新版本覆盖安装到“应用程序”中的 Heracles Records。",
+  "app.update.openedDownload": "已打开 heraclesrecords.com 下载页面。请将新版本覆盖安装到“应用程序”中的 Heracles Records。",
   "app.coros.enterCode": "请输入我们通过邮件发送的验证码。",
   "app.coros.connected": "已连接 COROS Training Hub。",
   "app.coros.codeResent": "新的验证码已发送到你的邮箱。",
@@ -32,7 +32,7 @@ const app: AppMessages = {
   "app.update.restartAndUpdate": "重启并更新",
   "app.update.now": "立即更新",
   "app.update.downloadingRestart": "正在下载 {percent}%。可以继续使用，Heracles Records 重启前会先询问你。",
-  "app.update.installerInBrowser": "安装程序将在浏览器中打开。",
+  "app.update.installerInBrowser": "下载页面将在浏览器中打开。",
   "app.update.downloaded": "更新已下载，可以安装。",
   "app.update.willDownload": "Heracles Records 会在后台下载更新，并在重启安装前先询问你。",
   "app.update.available": "有可用更新",
@@ -87,7 +87,8 @@ const app: AppMessages = {
   "app.update.passwordNote": "系统会要求输入管理员密码以完成安装。",
   "app.update.installingBody": "正在安装 Heracles Records {version}，完成后应用会立即重启。",
   "app.update.installCancelled": "未安装：密码请求已取消。重启即可重试。",
-  "app.update.installFailed": "无法在此安装更新，请改从 GitHub 下载。",
+  "app.update.installBusy": "未安装：系统正在安装其他更新。请稍等几分钟，然后重启重试。",
+  "app.update.installFailed": "无法在此安装更新，请改从 <link>{site}</link> 下载。",
   "app.update.restartNow": "立即重启",
 };
 
