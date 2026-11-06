@@ -21685,6 +21685,13 @@ label.chat-settings-toggle-row {
 .workout-editor-sport.is-strength { --workout-sport: var(--sport-strength); }
 .workout-editor-sport.is-swim { --workout-sport: var(--sport-swim); }
 
+/* An option group clips (`overflow: hidden`), which lets a flex item shrink to
+   nothing: a long title beside it squeezed the switch and cut its chips. The
+   title wraps instead. */
+.workout-view-switch {
+  flex: none;
+}
+
 .workout-editor-header h2 {
   margin: 3px 0 0;
   color: var(--text-primary);
