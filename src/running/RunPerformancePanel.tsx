@@ -28,6 +28,7 @@ import { secondsPerKmToDisplayPace } from "../units/units";
 import { periodLabel, periodPhrase, type PeriodDays } from "../preferences/periodScale";
 import {
   niceScale,
+  performanceAthleteScale,
   performanceContext,
   performanceCoverage,
   performanceForm,
@@ -50,6 +51,8 @@ interface RunPerformancePanelProps {
   /** Every run, for the usual. */
   allRuns: readonly TrainingHubActivity[];
   summaries: ReadonlyMap<string, ActivityDetailSummary>;
+  /** The year the scale is read over, read on its own (`performanceScaleRuns`). */
+  scaleSummaries: ReadonlyMap<string, ActivityDetailSummary>;
   profile: PerformanceProfile | undefined;
   weeks: number;
   /** The period chosen on the screen, which the headline and the quadrant read. */
@@ -97,6 +100,7 @@ export function RunPerformancePanel({
   runs,
   allRuns,
   summaries,
+  scaleSummaries,
   profile,
   weeks,
   periodDays,
@@ -107,9 +111,24 @@ export function RunPerformancePanel({
   const { colors } = useChartColors();
   const { unitSystem } = useUnitSystem();
 
-  const coverage = useMemo(
-    () => performanceCoverage(performanceRunsNeeded(allRuns, runs, nowMs), summaries),
-    [allRuns, nowMs, runs, summaries]
+  const scaleRuns = useMemo(() => performanceScaleRuns(allRuns, nowMs), [allRuns, nowMs]);
+
+  // The runs on screen with their six weeks, and the scale's year: each read
+  // into its own map, so a run counts as read when either holds its curve.
+  const coverage = useMemo(() => {
+    const needed = performanceRunsNeeded(allRuns, runs);
+    const listed = new Set(needed.map((activity) => activity.activityId));
+    const held = new Map([...scaleSummaries, ...summaries]);
+    return performanceCoverage(
+      [...needed, ...scaleRuns.filter((activity) => !listed.has(activity.activityId))],
+      held
+    );
+  }, [allRuns, runs, scaleRuns, scaleSummaries, summaries]);
+
+  // Worked out apart from the period: it moves only when the year does.
+  const athleteScaleValue = useMemo(
+    () => (profile ? performanceAthleteScale(scaleRuns, scaleSummaries, profile) : undefined),
+    [profile, scaleRuns, scaleSummaries]
   );
 
   const model = useMemo(() => {
@@ -118,7 +137,7 @@ export function RunPerformancePanel({
       performanceHistory(allRuns, nowMs + 1),
       summaries,
       profile,
-      performanceScaleRuns(allRuns, nowMs)
+      athleteScaleValue
     );
     const sessions = performanceSessions(runs, summaries, profile, context);
     const rows = performanceWeeks(sessions, weeks, nowMs);
@@ -129,7 +148,7 @@ export function RunPerformancePanel({
       form: performanceForm(sessions),
       trend: performanceTrend(rows)
     };
-  }, [allRuns, nowMs, profile, runs, summaries, weeks]);
+  }, [allRuns, athleteScaleValue, nowMs, profile, runs, summaries, weeks]);
 
   const scale = model?.context.scale ?? 1;
   const usual = model?.context.baseline ? model.context.baseline.value * scale : undefined;

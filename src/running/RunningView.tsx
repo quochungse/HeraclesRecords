@@ -47,7 +47,10 @@ import {
   surfacesPresent,
   type RunZoneScale
 } from "./runMetrics";
-import { useActivityDetailSummaries } from "../training/useActivityDetailSummaries";
+import {
+  useActivityDetailSummaries,
+  useActivityDetailSummariesState
+} from "../training/useActivityDetailSummaries";
 import { useSessionPage, weeksForPeriod, withinPeriod } from "./sportPage";
 import { RunnerIcon } from "./runnerIcon";
 import {
@@ -247,12 +250,11 @@ export function RunningView({
   // land.
   //
   // Performance needs more than the runs on screen: each is read against the
-  // six weeks before it, and every figure on the one scale read over the year
-  // before now, so those runs' curves are asked for too — on the list, the
-  // weeks before the oldest run shown; on a run's page, the weeks before that
-  // run, once its own detail is in; on both, the year. Nothing outside those
-  // windows is read. Only where a performance block is drawn: the list off the
-  // Trail filter, or a road or track run's page.
+  // six weeks before it, so those runs' curves are asked for too — on the list,
+  // the weeks before the oldest run shown; on a run's page, the weeks before
+  // that run, once its own detail is in. Nothing outside those windows is read.
+  // Only where a performance block is drawn: the list off the Trail filter, or
+  // a road or track run's page.
   const ownDetailLoaded = selectedRunId !== null && detail?.activityId === selectedRunId;
   const readsPerformance = selectedRun ? sportHasRunPerformance(selectedRun.sportType) : !trail;
   const summaryRuns = useMemo(() => {
@@ -260,25 +262,38 @@ export function RunningView({
       return selectedRun ? [selectedRun] : runs;
     }
     if (selectedRun) {
-      const history = performanceHistory(allRuns, (selectedRun.startTime ?? 0) * 1000);
-      const listed = new Set([selectedRun, ...history].map((activity) => activity.activityId));
-      return [
-        selectedRun,
-        ...history,
-        ...performanceScaleRuns(allRuns, nowMs).filter((activity) => !listed.has(activity.activityId))
-      ];
+      return [selectedRun, ...performanceHistory(allRuns, (selectedRun.startTime ?? 0) * 1000)];
     }
-    const needed = performanceRunsNeeded(allRuns, runs, nowMs);
+    const needed = performanceRunsNeeded(allRuns, runs);
     const shown = new Set(runs.map((activity) => activity.activityId));
     return [...runs, ...needed.filter((activity) => !shown.has(activity.activityId))];
-  }, [allRuns, nowMs, readsPerformance, runs, selectedRun]);
-  const summaries = useActivityDetailSummaries({
+  }, [allRuns, readsPerformance, runs, selectedRun]);
+  const { summaries, settled: summariesSettled } = useActivityDetailSummariesState({
     api,
     activities: summaryRuns,
     enabled: connected && (selectedRunId === null || ownDetailLoaded),
     // The list's rows wear their training label; a page reads its own off the detail.
     requireIntensity: selectedRun === null,
     requirePerformance: readsPerformance
+  });
+
+  // The year the performance scale is read over, as a read of its own: keyed by
+  // the year's runs alone, it is read once and again only when a run joins or
+  // leaves the year — a period switch or a run's page changes the list above,
+  // and that list read the whole year again each time. It starts once the
+  // screen's own runs are in, so its sweep follows theirs rather than racing
+  // them, and stays on after: a gate that closed with every run's page would
+  // read the year again each time it opened.
+  const [yearOpen, setYearOpen] = useState(false);
+  useEffect(() => {
+    if (readsPerformance && summariesSettled) setYearOpen(true);
+  }, [readsPerformance, summariesSettled]);
+  const scaleRuns = useMemo(() => performanceScaleRuns(allRuns, nowMs), [allRuns, nowMs]);
+  const scaleSummaries = useActivityDetailSummaries({
+    api,
+    activities: scaleRuns,
+    enabled: connected && yearOpen,
+    requirePerformance: true
   });
 
   if (!connected) {
@@ -324,6 +339,7 @@ export function RunningView({
         performanceProfile={perfProfile}
         allRuns={allRuns}
         summaries={summaries}
+        scaleSummaries={scaleSummaries}
         nowMs={nowMs}
       />
     );
@@ -497,6 +513,7 @@ export function RunningView({
                 runs={runs}
                 allRuns={allRuns}
                 summaries={summaries}
+                scaleSummaries={scaleSummaries}
                 profile={perfProfile}
                 weeks={chartWeeks}
                 periodDays={periodDays as PeriodDays}

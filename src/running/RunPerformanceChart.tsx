@@ -52,6 +52,7 @@ import { useChartColors } from "../training/useChartColors";
 import { useUnitSystem } from "../units/UnitSystemProvider";
 import {
   niceScale,
+  performanceAthleteScale,
   performanceContext,
   performanceHistory,
   performanceScaleRuns,
@@ -105,6 +106,8 @@ interface RunPerformanceChartProps {
   /** Every run, for the six weeks before this one and the year the scale is read over. */
   allRuns: readonly TrainingHubActivity[];
   summaries: ReadonlyMap<string, ActivityDetailSummary>;
+  /** The year the scale is read over, read on its own (`performanceScaleRuns`). */
+  scaleSummaries: ReadonlyMap<string, ActivityDetailSummary>;
   /** The Running screen's now, so the scale's year is the one the screen reads. */
   nowMs: number;
 }
@@ -149,6 +152,7 @@ export function RunPerformanceChart({
   profile,
   allRuns,
   summaries,
+  scaleSummaries,
   nowMs
 }: RunPerformanceChartProps) {
   // Subscribed, so the chart's words follow a change of language.
@@ -174,16 +178,16 @@ export function RunPerformanceChart({
     return { own: performanceRun(performanceCurveFromSteps(steps, corosVo2max), profile), gapAt: reasons };
   }, [corosVo2max, profile, series]);
 
+  // The Running screen's scale, worked out from the year's own read.
+  const athleteScaleValue = useMemo(
+    () => performanceAthleteScale(performanceScaleRuns(allRuns, nowMs), scaleSummaries, profile),
+    [allRuns, nowMs, profile, scaleSummaries]
+  );
+
   const context = useMemo(() => {
     const at = (activity.startTime ?? 0) * 1000;
-    return performanceContext(
-      performanceHistory(allRuns, at),
-      summaries,
-      profile,
-      performanceScaleRuns(allRuns, nowMs),
-      own
-    );
-  }, [activity.startTime, allRuns, nowMs, own, profile, summaries]);
+    return performanceContext(performanceHistory(allRuns, at), summaries, profile, athleteScaleValue, own);
+  }, [activity.startTime, allRuns, athleteScaleValue, own, profile, summaries]);
 
   const baseline = context.baseline;
   const shape = baseline?.shape;

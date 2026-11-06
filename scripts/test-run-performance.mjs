@@ -278,16 +278,16 @@ assert.deepEqual(
   "six weeks before the run, road and track only, the run itself excluded"
 );
 assert.deepEqual(
-  model.performanceRunsNeeded(all, [all[3 + 2], all[6]], NOW).map((a) => a.activityId),
-  ["old", "r1", "r2", "r3", "r4"],
-  "the runs shown, the six weeks before the oldest, and the year the scale is read over"
+  model.performanceRunsNeeded(all, [all[3 + 2], all[6]]).map((a) => a.activityId),
+  ["r1", "r2", "r3", "r4"],
+  "the runs shown and the six weeks before the oldest; the scale's year is a read of its own"
 );
 assert.deepEqual(
   model.performanceScaleRuns([...all, activity("y-old", 400)], NOW).map((a) => a.activityId),
   ["old", "r1", "r2", "r3", "r4"],
   "the scale's year: road and track runs, none older than a year"
 );
-assert.deepEqual(model.performanceRunsNeeded(all, [], NOW), [], "nothing shown, nothing needed");
+assert.deepEqual(model.performanceRunsNeeded(all, []), [], "nothing shown, nothing needed");
 
 const curveOf = (level, coros = 47) => ({
   ...perf.runPerformanceCurve(drifting(50, level), coros)
@@ -321,7 +321,7 @@ const context = model.performanceContext(
   model.performanceHistory(all, NOW),
   summaries,
   PROFILE,
-  model.performanceScaleRuns(all, NOW)
+  model.performanceAthleteScale(model.performanceScaleRuns(all, NOW), summaries, PROFILE)
 );
 assert.equal(context.runs, 4);
 close(context.baseline.value * context.scale, 47, 0.01, "over the same runs, the usual reads as COROS's VO2max");
@@ -370,32 +370,29 @@ assert.equal(model.performanceTrend(weeks.slice(-1)), undefined, "a single week 
     activity("y4", 150),
     activity("y5", 100)
   ];
-  const fitter = new Map(summaries);
+  // The year's own read holds every run of the year; the screen's holds only
+  // the six weeks its usual needs.
+  const yearRead = new Map(summaries);
   for (const id of ["y1", "y2", "y3", "y4", "y5"]) {
-    fitter.set(id, { ...summaries.get("r1"), activityId: id, performance: curveOf(53) });
+    yearRead.set(id, { ...summaries.get("r1"), activityId: id, performance: curveOf(53) });
   }
-  const screen = model.performanceContext(
-    model.performanceHistory(year, NOW),
-    fitter,
-    PROFILE,
-    model.performanceScaleRuns(year, NOW)
-  );
+  const scale = model.performanceAthleteScale(model.performanceScaleRuns(year, NOW), yearRead, PROFILE);
+  const screen = model.performanceContext(model.performanceHistory(year, NOW), summaries, PROFILE, scale);
+  assert.equal(screen.scale, scale, "the context takes the athlete's scale as given");
   assert.ok(
     screen.baseline.value * screen.scale < 46,
     `six weeks short of the year read below COROS's 47: ${screen.baseline.value * screen.scale}`
   );
-  const page = model.performanceContext(
-    model.performanceHistory(year, NOW - 10 * DAY),
-    fitter,
-    PROFILE,
-    model.performanceScaleRuns(year, NOW)
+  assert.notEqual(
+    model.performanceAthleteScale(model.performanceScaleRuns(year, NOW), summaries, PROFILE),
+    scale,
+    "worked out from the screen's own read, the year's runs would be missing"
   );
-  assert.equal(page.scale, screen.scale, "a run's page and the Running screen share the scale");
 }
 
 // No anchor in the year: the run alone anchors the scale, so the figure is still on COROS's scale.
 const own = perf.performanceRun(curveOf(48, 46), PROFILE);
-const alone = model.performanceContext([], summaries, PROFILE, [], own);
+const alone = model.performanceContext([], summaries, PROFILE, undefined, own);
 assert.equal(alone.baseline, undefined);
 close(perf.sessionPerformance(own.points, undefined) * alone.scale, 46, 0.01, "anchored on its own COROS VO2max");
 

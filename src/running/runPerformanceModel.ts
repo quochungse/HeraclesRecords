@@ -64,13 +64,13 @@ export function performanceScaleRuns(
 }
 
 /**
- * The runs whose curves a screen needs: those it shows, the six weeks before
- * the oldest, and the year before now that the scale is read over.
+ * The runs whose curves a screen needs for its usual: those it shows and the
+ * six weeks before the oldest. The scale's year is read on its own
+ * (`performanceScaleRuns`).
  */
 export function performanceRunsNeeded(
   allRuns: readonly TrainingHubActivity[],
-  shown: readonly TrainingHubActivity[],
-  nowMs: number
+  shown: readonly TrainingHubActivity[]
 ): TrainingHubActivity[] {
   let oldest = Infinity;
   for (const activity of shown) {
@@ -78,7 +78,7 @@ export function performanceRunsNeeded(
     if (at !== undefined) oldest = Math.min(oldest, at);
   }
   if (!Number.isFinite(oldest)) return [];
-  const from = Math.min(oldest - BASELINE_DAYS * DAY_MS, nowMs - SCALE_DAYS * DAY_MS);
+  const from = oldest - BASELINE_DAYS * DAY_MS;
   return allRuns.filter((activity) => {
     const at = startedAtMs(activity);
     return at !== undefined && at >= from && sportHasRunPerformance(activity.sportType);
@@ -117,26 +117,46 @@ export interface PerformanceContext {
   runs: number;
 }
 
+function storedRuns(
+  activities: readonly TrainingHubActivity[],
+  summaries: ReadonlyMap<string, ActivityDetailSummary>,
+  profile: PerformanceProfile
+): PerformanceRun[] {
+  return activities
+    .map((activity) => storedRun(activity, summaries, profile))
+    .filter((run): run is PerformanceRun => run !== undefined && run.points.length > 0);
+}
+
 /**
- * The usual as of a moment, from the runs before it (`history`), and the
- * athlete's scale, from the year's runs (`scaleRuns`, `performanceScaleRuns`) —
- * the same on every screen. `own` is the run being read, which anchors the
- * scale on its own when no run of the year has COROS's VO2max.
+ * The athlete's scale onto COROS's VO2max, from the year's runs
+ * (`performanceScaleRuns`) and their own read of the stored summaries: a
+ * screen works it out apart from its usual, so a change of period or a run's
+ * page reads it again only when the year itself changes.
+ */
+export function performanceAthleteScale(
+  scaleRuns: readonly TrainingHubActivity[],
+  summaries: ReadonlyMap<string, ActivityDetailSummary>,
+  profile: PerformanceProfile
+): number | undefined {
+  return athleteScale(storedRuns(scaleRuns, summaries, profile));
+}
+
+/**
+ * The usual as of a moment, from the runs before it (`history`), on the
+ * athlete's scale (`performanceAthleteScale`) — the same on every screen.
+ * `own` is the run being read, which anchors the scale on its own when no run
+ * of the year has COROS's VO2max.
  */
 export function performanceContext(
   history: readonly TrainingHubActivity[],
   summaries: ReadonlyMap<string, ActivityDetailSummary>,
   profile: PerformanceProfile,
-  scaleRuns: readonly TrainingHubActivity[],
+  athleteScaleValue: number | undefined,
   own?: PerformanceRun
 ): PerformanceContext {
-  const read = (activities: readonly TrainingHubActivity[]) =>
-    activities
-      .map((activity) => storedRun(activity, summaries, profile))
-      .filter((run): run is PerformanceRun => run !== undefined && run.points.length > 0);
-  const runs = read(history);
+  const runs = storedRuns(history, summaries, profile);
   const baseline = performanceBaseline(runs);
-  const scale = athleteScale(read(scaleRuns)) ?? (own ? athleteScale([own]) : undefined);
+  const scale = athleteScaleValue ?? (own ? athleteScale([own]) : undefined);
   return {
     ...(baseline ? { baseline } : {}),
     ...(scale !== undefined ? { scale } : {}),
