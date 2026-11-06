@@ -2601,11 +2601,9 @@ input::placeholder {
 
 /*
  * The chosen chip: the accent as a wash, with the accent's own ink on top.
- * This is the Calendar's Month/Week switch, which had the mark right before
- * the component existed and is now where it comes from. A solid accent fill
- * was the first answer and it shouts — a period picker is chrome, and a filled
- * pill in the header pulled the eye off the chart it describes. A wash reads
- * as clearly chosen at a glance and stays in its place.
+ * A solid accent fill shouts — a period picker is chrome, and a filled pill in
+ * the header pulled the eye off the chart it describes. A wash reads as
+ * clearly chosen at a glance and stays in its place.
  *
  * `quiet` is for a choice that only narrows what the screen already shows: it
  * takes no hue at all, which is the distinction Strength's two pickers drew
@@ -15824,12 +15822,6 @@ label.chat-settings-toggle-row {
   gap: 6px;
 }
 
-/* The Month/Week switch is an `OptionGroup`, which draws its own track and
-   mark — this is only the gap between it and the buttons beside it. */
-.calendar-mode-toggle {
-  flex: 0 0 auto;
-}
-
 /* --- multi-select toolbar --- */
 
 .calendar-selection-bar {
@@ -16006,10 +15998,6 @@ label.chat-settings-toggle-row {
   padding: 6px 6px 8px;
   border-right: 1px solid var(--glass-border);
   transition: background var(--dur-fast) var(--ease);
-}
-
-.calendar-day-week {
-  min-height: 320px;
 }
 
 .calendar-day.is-openable:hover {
@@ -16253,9 +16241,10 @@ label.chat-settings-toggle-row {
 
 /* The header's controls while the screen's chunk loads (`CalendarSkeleton`). */
 .calendar-skeleton-pill {
-  /* The Month/Week toggle's height, the tallest control in the row, so the
-     header — and the grid under it — sits where the real one will. */
-  height: 36px;
+  /* A `.calendar-nav-button`'s height — 13px type at the body's 1.45 leading,
+     7px of padding and a 1px border each side — the tallest control in the
+     row, so the header, and the grid under it, sits where the real one will. */
+  height: calc(13px * 1.45 + 16px);
   border-radius: var(--radius-pill);
 }
 

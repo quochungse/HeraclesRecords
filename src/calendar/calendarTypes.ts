@@ -102,8 +102,6 @@ export interface CalendarWeek {
   stats: WeeklyStats;
 }
 
-export type CalendarMode = "month" | "week";
-
 export type CalendarSelection =
   | { kind: "scheduled"; day: CalendarDay; entry: TrainingHubScheduledWorkoutEntry }
   | { kind: "activity"; day: CalendarDay; activity: TrainingHubActivity }

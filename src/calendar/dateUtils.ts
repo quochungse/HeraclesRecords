@@ -42,16 +42,6 @@ export function monthGridWeeks(year: number, monthIndex: number): string[][] {
   return weeks;
 }
 
-export function weekRow(referenceDate: Date): string[] {
-  const cursor = mondayOf(referenceDate);
-  const week: string[] = [];
-  for (let i = 0; i < 7; i += 1) {
-    week.push(keyFromDate(cursor));
-    cursor.setDate(cursor.getDate() + 1);
-  }
-  return week;
-}
-
 export function monthLabel(year: number, monthIndex: number): string {
   return capitalizeFirst(
     new Intl.DateTimeFormat(getIntlLocale(), {

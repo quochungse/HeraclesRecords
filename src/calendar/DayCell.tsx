@@ -39,7 +39,6 @@ import { useI18n } from "../i18n/useI18n";
 
 interface DayCellProps {
   day: CalendarDay;
-  mode: "month" | "week";
   onSelectScheduled: (entry: TrainingHubScheduledWorkoutEntry) => void;
   onSelectActivity: (activity: TrainingHubActivity) => void;
   onToggleScheduled: (entry: TrainingHubScheduledWorkoutEntry) => void;
@@ -57,10 +56,7 @@ interface DayCellProps {
   placeholderDelayMs?: number;
 }
 
-/**
- * Cards a month cell shows before the rest fold into "+N more", which opens
- * the day. A week row is tall enough to hold every one.
- */
+/** Cards a cell shows before the rest fold into "+N more", which opens the day. */
 const MONTH_CARDS = 3;
 
 /**
@@ -303,7 +299,6 @@ function SessionCard({
 
 export function DayCell({
   day,
-  mode,
   onSelectScheduled,
   onSelectActivity,
   onToggleScheduled,
@@ -327,7 +322,7 @@ export function DayCell({
   /* A day that already holds something (a week shared with the month before,
      still on screen) shows it; only an empty one waits. */
   const waiting = placeholderDelayMs !== undefined && cards.length === 0;
-  const shown = mode === "month" && cards.length > MONTH_CARDS ? cards.slice(0, MONTH_CARDS - 1) : cards;
+  const shown = cards.length > MONTH_CARDS ? cards.slice(0, MONTH_CARDS - 1) : cards;
   const hidden = cards.length - shown.length;
   const dayLabel = formatHappenDayLabel(day.dateKey);
 
@@ -335,7 +330,6 @@ export function DayCell({
     <div
       className={[
         "calendar-day",
-        mode === "week" && "calendar-day-week",
         !day.inMonth && "is-outside",
         day.isToday && "is-today",
         day.isPast && "is-past",
@@ -403,7 +397,6 @@ export function DayCell({
           {waiting ? (
             <DaySkeletonChips
               dateKey={day.dateKey}
-              mode={mode}
               delayMs={placeholderDelayMs ?? 0}
             />
           ) : null}

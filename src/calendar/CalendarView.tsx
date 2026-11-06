@@ -22,7 +22,6 @@ import type { HeraclesRecordsApi } from "../heraclesrecords-api";
 import { formatHappenDayLabel } from "../training/formatters";
 import { scheduledWorkoutSport } from "../training/workoutSport";
 import { activityWorkoutSport } from "../training/askCoachAbout";
-import { OptionGroup } from "../components/OptionGroup";
 import { ConfirmDialog } from "../training-library/ConfirmDialog";
 /* For ConfirmDialog, which is drawn in the library's `tl-dialog` chrome. The
    Coach's plan editor pulls the stylesheet in the same way; this screen is
@@ -45,15 +44,12 @@ import {
   isKeyInMonth,
   monthGridWeeks,
   monthLabel,
-  weekRangeLabel,
-  weekRow
+  weekRangeLabel
 } from "./dateUtils";
 import { useCalendarData } from "./useCalendarData";
 import { WorkoutViewModal } from "./WorkoutViewModal";
 import { WorkoutBuilderModal } from "./WorkoutBuilderModal";
 import { WorkoutLibraryModal } from "./WorkoutLibraryModal";
-import { useSelectionPreference } from "../preferences/selectionPreferences";
-import { CALENDAR_MODE_PREFERENCE } from "./CalendarSkeleton";
 import { formatCount, plural, t } from "../i18n/core";
 
 interface CalendarViewProps {
@@ -122,7 +118,6 @@ export function CalendarView({
   onOpenCoach,
   onScheduleChanged
 }: CalendarViewProps) {
-  const [mode, setMode] = useSelectionPreference(CALENDAR_MODE_PREFERENCE);
   const [anchor, setAnchor] = useState(() => new Date());
   const [selection, setSelection] = useState<CalendarSelection | null>(null);
   /* The day a thing was opened from, so its panel can step back to it. */
@@ -163,17 +158,13 @@ export function CalendarView({
   const anchorMonth = anchor.getMonth();
 
   const weekKeys = useMemo(
-    () =>
-      mode === "month"
-        ? monthGridWeeks(anchorYear, anchorMonth)
-        : [weekRow(anchor)],
-    [mode, anchor, anchorYear, anchorMonth]
+    () => monthGridWeeks(anchorYear, anchorMonth),
+    [anchorYear, anchorMonth]
   );
 
   const isInMonth = useCallback(
-    (dateKey: string) =>
-      mode === "week" ? true : isKeyInMonth(dateKey, anchorYear, anchorMonth),
-    [mode, anchorYear, anchorMonth]
+    (dateKey: string) => isKeyInMonth(dateKey, anchorYear, anchorMonth),
+    [anchorYear, anchorMonth]
   );
 
   const authenticated = Boolean(status?.authenticated);
@@ -240,10 +231,7 @@ export function CalendarView({
       selectedWorkoutKeys.has(scheduledWorkoutKey(entry))
     );
 
-  const headline =
-    mode === "month"
-      ? monthLabel(anchorYear, anchorMonth)
-      : weekRangeLabel(weekKeys[0] ?? []);
+  const headline = monthLabel(anchorYear, anchorMonth);
 
   const exitSelectionMode = useCallback(() => {
     setSelectionMode(false);
@@ -290,12 +278,8 @@ export function CalendarView({
     exitSelectionMode();
     setAnchor((current) => {
       const next = new Date(current);
-      if (mode === "month") {
-        next.setDate(1);
-        next.setMonth(next.getMonth() + direction);
-      } else {
-        next.setDate(next.getDate() + direction * 7);
-      }
+      next.setDate(1);
+      next.setMonth(next.getMonth() + direction);
       return next;
     });
   };
@@ -529,7 +513,7 @@ export function CalendarView({
               type="button"
               className="calendar-nav-button calendar-nav-arrow"
               onClick={() => navigate(-1)}
-              aria-label={mode === "month" ? t("calendar.prevMonth") : t("calendar.prevWeek")}
+              aria-label={t("calendar.prevMonth")}
             >
               <ChevronLeft size={16} aria-hidden="true" />
             </button>
@@ -537,7 +521,7 @@ export function CalendarView({
               type="button"
               className="calendar-nav-button calendar-nav-arrow"
               onClick={() => navigate(1)}
-              aria-label={mode === "month" ? t("calendar.nextMonth") : t("calendar.nextWeek")}
+              aria-label={t("calendar.nextMonth")}
             >
               <ChevronRight size={16} aria-hidden="true" />
             </button>
@@ -587,19 +571,6 @@ export function CalendarView({
           >
             <RefreshCw size={14} aria-hidden="true" />
           </button>
-          <OptionGroup
-            label={t("calendar.range")}
-            className="calendar-mode-toggle"
-            value={mode}
-            options={[
-              { value: "month", label: t("calendar.month") },
-              { value: "week", label: t("calendar.week") }
-            ]}
-            onChange={(next) => {
-              exitSelectionMode();
-              setMode(next);
-            }}
-          />
         </div>
       </header>
 
@@ -658,7 +629,6 @@ export function CalendarView({
 
       <CalendarGrid
         weeks={weeks}
-        mode={mode}
         loading={loading}
         rangeLoaded={rangeLoaded}
         placeholder={!rangeLoaded && !error}

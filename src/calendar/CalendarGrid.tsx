@@ -6,7 +6,6 @@ import { useLayoutEffect, useRef } from "react";
 import {
   scheduledWorkoutKey,
   type CalendarDay,
-  type CalendarMode,
   type CalendarWeek
 } from "./calendarTypes";
 import type { CalendarDragPayload } from "./calendarDrag";
@@ -18,7 +17,6 @@ import { t } from "../i18n/core";
 
 interface CalendarGridProps {
   weeks: CalendarWeek[];
-  mode: CalendarMode;
   loading: boolean;
   /** Whether the range on screen has been read at least once. */
   rangeLoaded: boolean;
@@ -43,7 +41,6 @@ interface CalendarGridProps {
 
 export function CalendarGrid({
   weeks,
-  mode,
   loading,
   rangeLoaded,
   placeholder,
@@ -103,13 +100,10 @@ export function CalendarGrid({
     });
 
     return () => window.cancelAnimationFrame(frame);
-  }, [loading, mode, rangeKey, todayWeekKey]);
+  }, [loading, rangeKey, todayWeekKey]);
 
   return (
-    <div
-      className={`calendar-grid ${mode === "week" ? "calendar-grid-week" : ""}`}
-      aria-busy={busy || placeholder}
-    >
+    <div className="calendar-grid" aria-busy={busy || placeholder}>
       <div className="calendar-grid-header">
         {weekdayLabels().map((label) => (
           <div key={label} className="calendar-grid-header-cell">
@@ -134,7 +128,6 @@ export function CalendarGrid({
                 <DayCell
                   key={day.dateKey}
                   day={day}
-                  mode={mode}
                   placeholderDelayMs={
                     placeholder ? skeletonDelay(weekIndex, dayIndex) : undefined
                   }
