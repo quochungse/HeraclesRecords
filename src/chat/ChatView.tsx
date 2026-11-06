@@ -424,6 +424,25 @@ const AssistantMarkdown = memo(function AssistantMarkdown({
   );
 });
 
+/**
+ * The athlete's words, each line ended by a `<br>` rather than a bare newline
+ * shown by `white-space: pre-wrap`. A copy carries HTML beside the text, and an
+ * editor that pastes the HTML (a ProseMirror composer, Obsidian) reads a
+ * newline inside a span as a space: the whole question landed on one line.
+ */
+function QuestionText({ text }: { text: string }) {
+  return (
+    <>
+      {text.split(/\r?\n/).map((line, at) => (
+        <Fragment key={at}>
+          {at ? <br /> : null}
+          {line}
+        </Fragment>
+      ))}
+    </>
+  );
+}
+
 /** Stays visible between output chunks, independently of the last Markdown block. */
 function RespondingIndicator() {
   return (
@@ -6319,7 +6338,7 @@ export function ChatView({
                             : undefined
                         }
                       />
-                      {displayStepText(entry.content)}
+                      <QuestionText text={displayStepText(entry.content)} />
                     </>
                   )}
                 </div>
