@@ -28,16 +28,19 @@ import { secondsPerKmToDisplayPace } from "../units/units";
 import { periodLabel, periodPhrase, type PeriodDays } from "../preferences/periodScale";
 import {
   niceScale,
+  performanceAthleteScale,
   performanceContext,
   performanceCoverage,
   performanceForm,
   performanceHistory,
   performanceRunsNeeded,
+  performanceScaleRuns,
   performanceSessions,
   performanceRollingMedian,
   performanceTrend,
   TREND_DAYS,
   performanceWeeks,
+  STEADY_BAND_PERCENT,
   type PerformanceSession,
   type PerformanceTrendPoint
 } from "./runPerformanceModel";
@@ -48,6 +51,8 @@ interface RunPerformancePanelProps {
   /** Every run, for the usual. */
   allRuns: readonly TrainingHubActivity[];
   summaries: ReadonlyMap<string, ActivityDetailSummary>;
+  /** The year the scale is read over, read on its own (`performanceScaleRuns`). */
+  scaleSummaries: ReadonlyMap<string, ActivityDetailSummary>;
   profile: PerformanceProfile | undefined;
   weeks: number;
   /** The period chosen on the screen, which the headline and the quadrant read. */
@@ -76,13 +81,15 @@ interface TrendPoint {
 
 /**
  * Running performance across the period, in place of the efficiency chart.
- * Every road and track run with a stretch steady enough to read counts — no
- * easy-only filter, since the figure no longer favours a faster run.
+ * Every road and track run with a stretch steady enough to read is drawn; the
+ * usual it is set against is read from steady aerobic running alone
+ * (`STEADY_SHARE_MIN`…`MAX`), where the figure does not lean with effort.
  */
 export function RunPerformancePanel({
   runs,
   allRuns,
   summaries,
+  scaleSummaries,
   profile,
   weeks,
   periodDays,
@@ -93,14 +100,34 @@ export function RunPerformancePanel({
   const { colors } = useChartColors();
   const { unitSystem } = useUnitSystem();
 
-  const coverage = useMemo(
-    () => performanceCoverage(performanceRunsNeeded(allRuns, runs), summaries),
-    [allRuns, runs, summaries]
+  const scaleRuns = useMemo(() => performanceScaleRuns(allRuns, nowMs), [allRuns, nowMs]);
+
+  // The runs on screen with their six weeks, and the scale's year: each read
+  // into its own map, so a run counts as read when either holds its curve.
+  const coverage = useMemo(() => {
+    const needed = performanceRunsNeeded(allRuns, runs);
+    const listed = new Set(needed.map((activity) => activity.activityId));
+    const held = new Map([...scaleSummaries, ...summaries]);
+    return performanceCoverage(
+      [...needed, ...scaleRuns.filter((activity) => !listed.has(activity.activityId))],
+      held
+    );
+  }, [allRuns, runs, scaleRuns, scaleSummaries, summaries]);
+
+  // Worked out apart from the period: it moves only when the year does.
+  const athleteScaleValue = useMemo(
+    () => (profile ? performanceAthleteScale(scaleRuns, scaleSummaries, profile) : undefined),
+    [profile, scaleRuns, scaleSummaries]
   );
 
   const model = useMemo(() => {
     if (!profile) return null;
-    const context = performanceContext(performanceHistory(allRuns, nowMs + 1), summaries, profile);
+    const context = performanceContext(
+      performanceHistory(allRuns, nowMs + 1),
+      summaries,
+      profile,
+      athleteScaleValue
+    );
     const sessions = performanceSessions(runs, summaries, profile, context);
     const rows = performanceWeeks(sessions, weeks, nowMs);
     return {
@@ -110,7 +137,7 @@ export function RunPerformancePanel({
       form: performanceForm(sessions),
       trend: performanceTrend(rows)
     };
-  }, [allRuns, nowMs, profile, runs, summaries, weeks]);
+  }, [allRuns, athleteScaleValue, nowMs, profile, runs, summaries, weeks]);
 
   const scale = model?.context.scale ?? 1;
   const usual = model?.context.baseline ? model.context.baseline.value * scale : undefined;
@@ -261,7 +288,9 @@ export function RunPerformancePanel({
               </ComposedChart>
             </ResponsiveContainer>
             {usual !== undefined ? (
-              <p className="run-block-note">{t("run.perf.usualLine", { value: formatDecimal(usual, 1) })}</p>
+              <p className="run-block-note">
+                {t("run.perf.usualLine", { value: formatDecimal(usual, 1), ...STEADY_BAND_PERCENT })}
+              </p>
             ) : (
               <p className="run-block-note">{t("run.perf.noBaseline")}</p>
             )}
@@ -378,6 +407,12 @@ function SessionTooltip({
           <li className="training-chart-tooltip-row">
             <span className="training-chart-tooltip-key">{t("activity.m.pace")}</span>
             <strong>{formatPace(session.pace)}</strong>
+          </li>
+        ) : null}
+        {session.coros !== undefined ? (
+          <li className="training-chart-tooltip-row">
+            <span className="training-chart-tooltip-key">{t("run.perf.tip.coros")}</span>
+            <strong>{formatDecimal(session.coros, 0)}</strong>
           </li>
         ) : null}
       </ul>

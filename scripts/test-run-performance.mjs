@@ -1,8 +1,9 @@
 // Running performance: the raw curve `electron/runPerformance.ts` keeps on a
 // road or track run's summary, how it is read on the account's heart-rate
-// figures (Daniels & Gilbert's oxygen cost over Swain's share of the reserve),
-// the usual curve that a minute is compared with, the scale onto COROS's
-// VO2max, and the Running screen's model over them (`runPerformanceModel.ts`).
+// figures (ACSM's running equation over Swain's share of the reserve), the
+// usual curve that a minute is compared with and the steady band it is read
+// in, the athlete's one scale onto COROS's VO2max, and the Running screen's
+// model over them (`runPerformanceModel.ts`).
 //
 // Launched through Electron rather than plain node because the modules are
 // TypeScript and a distro Node built without Amaro cannot strip them; the
@@ -57,8 +58,9 @@ assert.equal(perf.sportHasRunPerformance(101), false, "a treadmill's pace is the
 assert.equal(perf.sportHasRunPerformance(102), false, "on a trail the ground decides the pace");
 assert.equal(perf.sportHasRunPerformance(200), false);
 
-// 200 m/min at 150 bpm on 190/52: cost 36.01, 71.0% of the reserve.
-close(perf.effectiveVo2max(200, 150, PROFILE), 49.28, 0.02, "Daniels' cost over Swain's share");
+// 200 m/min at 150 bpm on 190/52: cost 43.5, 71.0% of the reserve.
+close(perf.oxygenCost(200), 43.5, 1e-9, "ACSM: 0.2 ml/kg a metre, and 3.5 at rest");
+close(perf.effectiveVo2max(200, 150, PROFILE), 59.83, 0.02, "ACSM's cost over Swain's share");
 assert.equal(perf.effectiveVo2max(120, 100, PROFILE), undefined, "under 40% of the reserve is a walk, not a reading");
 assert.equal(perf.effectiveVo2max(300, 200, PROFILE), undefined, "past the maximum is a strap fault");
 // The run page says which of the two a step was, and an out-of-date maximum is
@@ -88,6 +90,7 @@ const possible = (40 * 60 - perf.PERFORMANCE_WARM_UP_SECONDS) / perf.PERFORMANCE
 assert.ok(steadyCurve.points.length >= possible * 0.8, `a steady run is read almost whole, got ${steadyCurve.points.length}/${possible}`);
 for (const point of perf.performancePoints(steadyCurve, PROFILE)) {
   close(point.value, 48, 0.3, `steady running reads the runner's figure at ${point.t}s`);
+  close(point.share, (point.heartRate - PROFILE.restingHr) / (PROFILE.maxHr - PROFILE.restingHr), 1e-9, "each reading keeps its share of the reserve");
 }
 assert.equal(perf.runPerformanceCurve(steady.slice(0, 9 * 60)).points.length, 0, "under ten minutes nothing is read");
 assert.equal(perf.runPerformanceCurve(steady, 7).corosVo2max, undefined, "a VO2max of 7 is not one");
@@ -97,7 +100,7 @@ assert.deepEqual(
   "the run page's curve, built from the steps it draws, is the one the summary keeps"
 );
 
-// Intervals: 4-minute reps at 4:15 with 2-minute jogs. No reading where the
+// Intervals: 4-minute reps at 4:45 with 2-minute jogs. No reading where the
 // heart is still catching up with the legs; what is read is still the runner.
 const changes = [];
 const intervals = simulate({
@@ -105,7 +108,7 @@ const intervals = simulate({
   paceAt: (t) => {
     if (t < 900) return 360;
     const cycle = (t - 900) % 360;
-    return cycle < 240 ? 255 : 410;
+    return cycle < 240 ? 285 : 410;
   }
 });
 for (let t = 900; t < 3600; t += 360) changes.push(t, t + 240);
@@ -154,11 +157,15 @@ assert.ok(restlessRead >= possible * 0.8, `a restless pulse on steady running is
 // The usual curve, and a run read against it.
 // ---------------------------------------------------------------------------
 
-/** A run whose true figure falls 6% between minute 50 and minute 90, as long runs do. */
+/**
+ * A run whose true figure falls 6% between minute 50 and minute 90, as long
+ * runs do — at 6:20/km, steady aerobic running for these figures (66–76% of the
+ * reserve), the band the usual is read in.
+ */
 const drifting = (minutes, level = 48) =>
   simulate({
     seconds: minutes * 60,
-    paceAt: () => 340,
+    paceAt: () => 380,
     effAt: (t) => level * (1 - 0.06 * Math.min(1, Math.max(0, (t / 60 - 50) / 40)))
   });
 const history = [95, 92, 70, 60, 45].map((minutes) =>
@@ -192,6 +199,25 @@ close(baseline.value, 48, 0.6, "the usual is the median run");
 const scale = perf.performanceScale(runs, baseline.shape);
 close(scale * baseline.value, 47, 0.01, "scaled, the usual reads as COROS's VO2max");
 assert.equal(perf.performanceScale(history.map((points) => ({ points })), baseline.shape), undefined, "no anchor, no scale");
+close(perf.athleteScale(runs), scale, 1e-9, "the athlete's scale reads its own shape over the same runs");
+
+// The usual is read in the steady band. A tempo run — every reading above 80%
+// of the reserve — is drawn but does not move it, however it went; a block of
+// nothing but hard running still has a usual.
+const tempoRun = (level) =>
+  perf.performanceRun(perf.runPerformanceCurve(simulate({ seconds: 45 * 60, paceAt: () => 280, effAt: () => level }), 47), PROFILE);
+const tempo = tempoRun(55);
+assert.ok(tempo.points.length > 20, "a tempo run is read");
+assert.ok(tempo.points.every((point) => point.share > perf.STEADY_SHARE_MAX), "and sits above the band");
+close(perf.performanceBaseline([...runs, tempo, tempo]).value, baseline.value, 1e-9, "tempo runs leave the usual where it was");
+close(
+  perf.performanceScale([...runs, tempo, tempo], baseline.shape),
+  scale,
+  1e-9,
+  "or the scale"
+);
+const hardBlock = [tempoRun(54), tempoRun(55), tempoRun(56)];
+close(perf.performanceBaseline(hardBlock).value, 55, 0.3, "with too few steady runs, every reading counts");
 
 assert.equal(perf.performanceVerdict(49.5, 48), "better");
 assert.equal(perf.performanceVerdict(47, 48), "usual", "within 3% is as usual");
@@ -254,8 +280,14 @@ assert.deepEqual(
 assert.deepEqual(
   model.performanceRunsNeeded(all, [all[3 + 2], all[6]]).map((a) => a.activityId),
   ["r1", "r2", "r3", "r4"],
-  "the runs shown and the six weeks before the oldest"
+  "the runs shown and the six weeks before the oldest; the scale's year is a read of its own"
 );
+assert.deepEqual(
+  model.performanceScaleRuns([...all, activity("y-old", 400)], NOW).map((a) => a.activityId),
+  ["r4", "r3", "r2", "r1", "old"],
+  "the scale's year: road and track runs, none older than a year, newest first so a capped sweep reads the recent months"
+);
+assert.deepEqual(model.performanceRunsNeeded(all, []), [], "nothing shown, nothing needed");
 
 const curveOf = (level, coros = 47) => ({
   ...perf.runPerformanceCurve(drifting(50, level), coros)
@@ -285,9 +317,14 @@ assert.deepEqual(
   "an older curve counts as unread; a treadmill and a trail run count as nothing"
 );
 
-const context = model.performanceContext(model.performanceHistory(all, NOW), summaries, PROFILE);
+const context = model.performanceContext(
+  model.performanceHistory(all, NOW),
+  summaries,
+  PROFILE,
+  model.performanceAthleteScale(model.performanceScaleRuns(all, NOW), summaries, PROFILE)
+);
 assert.equal(context.runs, 4);
-close(context.baseline.value * context.scale, 47, 0.01, "the usual reads as COROS's VO2max");
+close(context.baseline.value * context.scale, 47, 0.01, "over the same runs, the usual reads as COROS's VO2max");
 const sessions = model.performanceSessions(all, summaries, PROFILE, context);
 assert.deepEqual(
   sessions.map((session) => session.activity.activityId),
@@ -321,9 +358,48 @@ assert.equal(model.performanceTrend(weeks.slice(-1)), undefined, "a single week 
   assert.equal(model.performanceForm([]), undefined);
 }
 
-// No history: the run alone anchors the scale, so the figure is still on COROS's scale.
+// One scale over the year, not over the six weeks: earlier, fitter months with
+// the same COROS figure leave the last six weeks' usual below it, and a run's
+// page reads with the scale the Running screen does.
+{
+  const year = [
+    ...all,
+    activity("y1", 300),
+    activity("y2", 250),
+    activity("y3", 200),
+    activity("y4", 150),
+    activity("y5", 100)
+  ];
+  // The year's own read holds every run of the year; the screen's holds only
+  // the six weeks its usual needs.
+  const yearRead = new Map(summaries);
+  for (const id of ["y1", "y2", "y3", "y4", "y5"]) {
+    yearRead.set(id, { ...summaries.get("r1"), activityId: id, performance: curveOf(53) });
+  }
+  const scale = model.performanceAthleteScale(model.performanceScaleRuns(year, NOW), yearRead, PROFILE);
+  const screen = model.performanceContext(model.performanceHistory(year, NOW), summaries, PROFILE, scale);
+  assert.equal(screen.scale, scale, "the context takes the athlete's scale as given");
+  assert.ok(
+    screen.baseline.value * screen.scale < 46,
+    `six weeks short of the year read below COROS's 47: ${screen.baseline.value * screen.scale}`
+  );
+  assert.notEqual(
+    model.performanceAthleteScale(model.performanceScaleRuns(year, NOW), summaries, PROFILE),
+    scale,
+    "worked out from the screen's own read, the year's runs would be missing"
+  );
+}
+
+// The year not read yet: the six weeks stand in for it, so the figures are on
+// COROS's scale rather than raw.
+{
+  const waiting = model.performanceContext(model.performanceHistory(all, NOW), summaries, PROFILE, undefined);
+  close(waiting.scale, context.scale, 1e-9, "the six weeks' own scale until the year is read");
+}
+
+// Nothing anchored at all: the run alone anchors the scale, so the figure is still on COROS's scale.
 const own = perf.performanceRun(curveOf(48, 46), PROFILE);
-const alone = model.performanceContext([], summaries, PROFILE, own);
+const alone = model.performanceContext([], summaries, PROFILE, undefined, own);
 assert.equal(alone.baseline, undefined);
 close(perf.sessionPerformance(own.points, undefined) * alone.scale, 46, 0.01, "anchored on its own COROS VO2max");
 

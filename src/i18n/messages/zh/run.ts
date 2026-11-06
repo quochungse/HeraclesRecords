@@ -85,8 +85,8 @@ const run: RunMessages = {
   "run.perf.against.worse": "低于平常",
   "run.perf.held": "第 {minute} 分钟后保持不变",
   "run.perf.heldNote": "跑过第 {minute} 分钟的记录不足三次，因此平常值保持在该分钟的水平。",
-  "run.perf.scaleNote": "以 COROS 的 VO2max 尺度表示：相对心率代价的速度。前六周的平常值即为你的 COROS VO2max。",
-  "run.perf.noBaseline": "读取到前六周的三次跑步后，平常值才会出现。在此之前，仅凭本次跑步将数值放到 COROS 的 VO2max 尺度上。",
+  "run.perf.scaleNote": "以 COROS 的 VO2max 尺度表示：相对心率代价的速度。尺度按你过去一年的跑步确定。平常值取自前六周的平稳跑（储备心率的 {low}–{high}%）。",
+  "run.perf.noBaseline": "读取到前六周的三次跑步后，平常值才会出现。",
   "run.perf.noReadings": "本次跑步没有足够平稳、可以读取的区间：配速或心率一直在变。",
   "run.perf.needProfile": "请在 COROS 中设置最大心率和静息心率以查看跑步表现。",
   "run.perf.form": "ml/kg/分钟 · {period}的中位数",
@@ -96,7 +96,7 @@ const run: RunMessages = {
   "run.perf.waiting": "正在读取你的跑步记录，每读完一次图表就会补上一点。",
   "run.perf.none": "此时间段内没有足够平稳、可以读取的路跑或跑道跑。",
   "run.perf.rolling": "每次跑步与 {days} 天中位数",
-  "run.perf.usualLine": "虚线：你的平常值 {value}，即 COROS VO2max。色带为 ±3%。",
+  "run.perf.usualLine": "虚线：你的平常值 {value}，取自最近六周的平稳跑（储备心率的 {low}–{high}%）。色带为 ±3%。",
   "run.perf.quadrant": "快还是慢，效率如何 · {period}",
   "run.perf.quadrantNote": "横轴：本次平均配速。纵轴：相对平常的表现。两条线分别是平常配速和平常值。",
   "run.perf.q.slowGood": "慢而高效",
@@ -120,6 +120,7 @@ const run: RunMessages = {
   "run.perf.reason.heartRateSettling": "心率尚未跟上",
   "run.perf.tip.run": "本次",
   "run.perf.tip.usual": "平常",
+  "run.perf.tip.coros": "COROS VO2max",
 };
 
 export default run;

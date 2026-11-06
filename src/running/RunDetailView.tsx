@@ -78,6 +78,10 @@ interface RunDetailViewProps {
   /** Every run, and their stored summaries, for the usual this run is read against. */
   allRuns?: readonly TrainingHubActivity[];
   summaries?: ReadonlyMap<string, ActivityDetailSummary>;
+  /** The stored summaries of the year the performance scale is read over, read on their own. */
+  scaleSummaries?: ReadonlyMap<string, ActivityDetailSummary>;
+  /** The Running screen's now, which the year the performance scale is read over ends at. */
+  nowMs: number;
 }
 
 const NO_SUMMARIES: ReadonlyMap<string, ActivityDetailSummary> = new Map();
@@ -124,7 +128,9 @@ export function RunDetailView({
   benefitFamily,
   performanceProfile,
   allRuns = [],
-  summaries = NO_SUMMARIES
+  summaries = NO_SUMMARIES,
+  scaleSummaries = NO_SUMMARIES,
+  nowMs
 }: RunDetailViewProps) {
   const { unitSystem, temperatureUnit } = useUnitSystem();
   const { locale } = useI18n();
@@ -497,6 +503,8 @@ export function RunDetailView({
           profile={performanceProfile}
           allRuns={allRuns}
           summaries={summaries}
+          scaleSummaries={scaleSummaries}
+          nowMs={nowMs}
         />
       ) : null}
 

@@ -86,8 +86,8 @@ const run = {
   "run.perf.against.worse": "below your usual",
   "run.perf.held": "Held from {minute}′",
   "run.perf.heldNote": "Fewer than three of your runs went past minute {minute}, so your usual is held at its level there.",
-  "run.perf.scaleNote": "Speed for the heart rate it cost, on COROS's VO2max scale: your usual over the six weeks before reads as your COROS VO2max.",
-  "run.perf.noBaseline": "Your usual appears once three runs from the six weeks before are read. Until then this run alone places the figure on COROS's VO2max scale.",
+  "run.perf.scaleNote": "Speed for the heart rate it cost, on COROS's VO2max scale, read over your last year of runs. Your usual is your steady running, {low}–{high}% of heart-rate reserve, in the six weeks before.",
+  "run.perf.noBaseline": "Your usual appears once three runs from the six weeks before are read.",
   "run.perf.noReadings": "No stretch of this run was steady enough to read: the pace or the heart rate kept changing.",
   "run.perf.needProfile": "Set your maximum and resting heart rate on COROS to read your running efficiency.",
   "run.perf.form": "ml/kg/min · median over {period}",
@@ -97,7 +97,7 @@ const run = {
   "run.perf.waiting": "Reading your runs. The chart fills in as each one is read.",
   "run.perf.none": "No road or track run in this window has a stretch steady enough to read.",
   "run.perf.rolling": "Each run, and the {days}-day median",
-  "run.perf.usualLine": "Dashed: your usual, {value}, which is your COROS VO2max. The band is ±3%.",
+  "run.perf.usualLine": "Dashed: your usual, {value}, from your steady running ({low}–{high}% of heart-rate reserve) over the last six weeks. The band is ±3%.",
   "run.perf.quadrant": "Fast or slow, and was it efficient · {period}",
   "run.perf.quadrantNote": "Across: the run's average pace. Up: its performance against your usual. The lines are your usual pace and your usual.",
   "run.perf.q.slowGood": "Slow and efficient",
@@ -121,6 +121,7 @@ const run = {
   "run.perf.reason.heartRateSettling": "Heart rate catching up",
   "run.perf.tip.run": "This run",
   "run.perf.tip.usual": "Usual",
+  "run.perf.tip.coros": "COROS VO2max",
 };
 
 export default run;

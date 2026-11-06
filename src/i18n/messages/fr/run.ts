@@ -85,8 +85,8 @@ const run: RunMessages = {
   "run.perf.against.worse": "en dessous de votre habitude",
   "run.perf.held": "Figé à partir de la minute {minute}",
   "run.perf.heldNote": "Moins de trois de vos sorties ont dépassé la minute {minute} : votre habitude reste à son niveau de cette minute.",
-  "run.perf.scaleNote": "La vitesse obtenue pour l’effort cardiaque, sur l’échelle de VO2max de COROS : votre habitude des six semaines précédentes correspond à votre VO2max COROS.",
-  "run.perf.noBaseline": "Votre habitude apparaît dès que trois sorties des six semaines précédentes sont lues. D’ici là, cette sortie seule place le chiffre sur l’échelle de VO2max de COROS.",
+  "run.perf.scaleNote": "La vitesse obtenue pour l’effort cardiaque, sur l’échelle de VO2max de COROS, établie sur vos sorties de la dernière année. Votre habitude est votre course régulière, à {low}–{high} % de la FC de réserve, des six semaines précédentes.",
+  "run.perf.noBaseline": "Votre habitude apparaît dès que trois sorties des six semaines précédentes sont lues.",
   "run.perf.noReadings": "Aucun passage de cette sortie n’était assez régulier pour être lu : l’allure ou la fréquence cardiaque n’a cessé de changer.",
   "run.perf.needProfile": "Renseignez votre fréquence cardiaque maximale et de repos sur COROS pour lire la performance.",
   "run.perf.form": "ml/kg/min · médiane sur {period}",
@@ -96,7 +96,7 @@ const run: RunMessages = {
   "run.perf.waiting": "Lecture de vos sorties. Le graphique se remplit à mesure que chacune est lue.",
   "run.perf.none": "Aucune sortie sur route ou sur piste de cette période n’a de passage assez régulier pour être lue.",
   "run.perf.rolling": "Chaque sortie, et la médiane sur {days} jours",
-  "run.perf.usualLine": "En pointillé : votre habitude, {value}, soit votre VO2max COROS. La bande vaut ±3 %.",
+  "run.perf.usualLine": "En pointillé : votre habitude, {value}, tirée de votre course régulière ({low}–{high} % de la FC de réserve) des six dernières semaines. La bande vaut ±3 %.",
   "run.perf.quadrant": "Rapide ou lent, et était-ce efficace ? · {period}",
   "run.perf.quadrantNote": "Horizontal : l’allure moyenne de la sortie. Vertical : sa performance par rapport à l’habitude. Les lignes sont votre allure habituelle et votre habitude.",
   "run.perf.q.slowGood": "Lent et efficace",
@@ -120,6 +120,7 @@ const run: RunMessages = {
   "run.perf.reason.heartRateSettling": "Le cœur rattrape l’allure",
   "run.perf.tip.run": "Cette sortie",
   "run.perf.tip.usual": "Habitude",
+  "run.perf.tip.coros": "VO2max COROS",
 };
 
 export default run;

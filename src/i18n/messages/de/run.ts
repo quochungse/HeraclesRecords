@@ -85,8 +85,8 @@ const run: RunMessages = {
   "run.perf.against.worse": "unter deinem Üblichen",
   "run.perf.held": "Ab Minute {minute} festgehalten",
   "run.perf.heldNote": "Weniger als drei deiner Läufe gingen über Minute {minute} hinaus, daher bleibt dein Übliches auf dem Stand dieser Minute.",
-  "run.perf.scaleNote": "Tempo im Verhältnis zur Herzfrequenz, die es gekostet hat, auf der VO2max-Skala von COROS: Dein Übliches aus den sechs Wochen davor entspricht deiner COROS-VO2max.",
-  "run.perf.noBaseline": "Dein Übliches erscheint, sobald drei Läufe aus den sechs Wochen davor gelesen sind. Bis dahin setzt dieser Lauf allein den Wert auf die VO2max-Skala von COROS.",
+  "run.perf.scaleNote": "Tempo im Verhältnis zur Herzfrequenz, die es gekostet hat, auf der VO2max-Skala von COROS, aus deinen Läufen des letzten Jahres bestimmt. Dein Übliches ist dein gleichmäßiges Laufen bei {low}–{high} % der HF-Reserve aus den sechs Wochen davor.",
+  "run.perf.noBaseline": "Dein Übliches erscheint, sobald drei Läufe aus den sechs Wochen davor gelesen sind.",
   "run.perf.noReadings": "Kein Abschnitt dieses Laufs war gleichmäßig genug, um ihn zu lesen: Tempo oder Herzfrequenz änderten sich ständig.",
   "run.perf.needProfile": "Hinterlege bei COROS deine maximale Herzfrequenz und deinen Ruhepuls, um die Leistung zu lesen.",
   "run.perf.form": "ml/kg/min · Median über {period}",
@@ -96,7 +96,7 @@ const run: RunMessages = {
   "run.perf.waiting": "Deine Läufe werden gelesen. Das Diagramm füllt sich mit jedem gelesenen Lauf.",
   "run.perf.none": "Kein Straßen- oder Bahnlauf in diesem Zeitraum hat einen Abschnitt, der gleichmäßig genug zum Lesen ist.",
   "run.perf.rolling": "Jeder Lauf und der {days}-Tage-Median",
-  "run.perf.usualLine": "Gestrichelt: dein Übliches, {value}, also deine COROS-VO2max. Das Band ist ±3 %.",
+  "run.perf.usualLine": "Gestrichelt: dein Übliches, {value}, aus deinem gleichmäßigen Laufen ({low}–{high} % der HF-Reserve) der letzten sechs Wochen. Das Band ist ±3 %.",
   "run.perf.quadrant": "Schnell oder langsam, und war es effizient? · {period}",
   "run.perf.quadrantNote": "Waagerecht: das Durchschnittstempo des Laufs. Senkrecht: seine Leistung gegenüber dem Üblichen. Die Linien sind dein übliches Tempo und dein Übliches.",
   "run.perf.q.slowGood": "Langsam und effizient",
@@ -120,6 +120,7 @@ const run: RunMessages = {
   "run.perf.reason.heartRateSettling": "Herzfrequenz holt auf",
   "run.perf.tip.run": "Dieser Lauf",
   "run.perf.tip.usual": "Üblich",
+  "run.perf.tip.coros": "COROS-VO2max",
 };
 
 export default run;

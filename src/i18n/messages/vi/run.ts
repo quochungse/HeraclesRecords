@@ -85,8 +85,8 @@ const run: RunMessages = {
   "run.perf.against.worse": "thấp hơn mức thường",
   "run.perf.held": "Giữ mức từ phút {minute}",
   "run.perf.heldNote": "Chưa đủ ba buổi chạy quá phút {minute}, nên mức thường lệ được giữ ở mức của phút đó.",
-  "run.perf.scaleNote": "Tốc độ so với nhịp tim phải bỏ ra, trên thang VO2max của COROS: mức thường của bạn trong sáu tuần trước bằng VO2max COROS.",
-  "run.perf.noBaseline": "Mức thường lệ xuất hiện khi đã đọc được ba buổi trong sáu tuần trước. Tới lúc đó, chỉ buổi này đặt con số lên thang VO2max của COROS.",
+  "run.perf.scaleNote": "Tốc độ so với nhịp tim phải bỏ ra, trên thang VO2max của COROS, quy đổi theo các buổi chạy trong năm qua. Mức thường lệ là phần chạy đều của bạn, {low}–{high}% nhịp dự trữ, trong sáu tuần trước.",
+  "run.perf.noBaseline": "Mức thường lệ xuất hiện khi đã đọc được ba buổi trong sáu tuần trước.",
   "run.perf.noReadings": "Buổi này không có đoạn nào đủ ổn định để đọc: pace hoặc nhịp tim thay đổi liên tục.",
   "run.perf.needProfile": "Đặt nhịp tim tối đa và nhịp tim nghỉ trên COROS để đọc hiệu suất.",
   "run.perf.form": "ml/kg/phút · trung vị {period}",
@@ -96,7 +96,7 @@ const run: RunMessages = {
   "run.perf.waiting": "Đang đọc các buổi chạy. Biểu đồ sẽ đầy dần khi từng buổi được đọc.",
   "run.perf.none": "Không có buổi chạy đường hay chạy sân nào trong khoảng này có đoạn đủ ổn định để đọc.",
   "run.perf.rolling": "Từng buổi, và trung vị {days} ngày",
-  "run.perf.usualLine": "Nét đứt: mức thường của bạn, {value}, chính là VO2max COROS. Dải là ±3%.",
+  "run.perf.usualLine": "Nét đứt: mức thường của bạn, {value}, từ phần chạy đều ({low}–{high}% nhịp dự trữ) trong sáu tuần qua. Dải là ±3%.",
   "run.perf.quadrant": "Nhanh hay chậm, có hiệu quả không · {period}",
   "run.perf.quadrantNote": "Ngang: pace trung bình của buổi. Dọc: hiệu suất so với thường lệ. Hai đường là pace thường lệ và mức thường lệ.",
   "run.perf.q.slowGood": "Chậm mà hiệu quả",
@@ -120,6 +120,7 @@ const run: RunMessages = {
   "run.perf.reason.heartRateSettling": "Nhịp tim chưa theo kịp",
   "run.perf.tip.run": "Buổi này",
   "run.perf.tip.usual": "Thường lệ",
+  "run.perf.tip.coros": "VO2max COROS",
 };
 
 export default run;

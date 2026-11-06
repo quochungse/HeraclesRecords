@@ -85,8 +85,8 @@ const run: RunMessages = {
   "run.perf.against.worse": "いつもより下",
   "run.perf.held": "{minute} 分以降は固定",
   "run.perf.heldNote": "{minute} 分を超えたランが 3 本未満のため、いつもの値はその時点の水準で固定しています。",
-  "run.perf.scaleNote": "心拍の負担に対するスピードを COROS の VO2max の尺度で表示します。直前 6 週間のいつもの値が COROS の VO2max になります。",
-  "run.perf.noBaseline": "直前 6 週間のランが 3 本読み込まれると、いつもの値が表示されます。それまではこのランだけで COROS の VO2max の尺度に合わせます。",
+  "run.perf.scaleNote": "心拍の負担に対するスピードを COROS の VO2max の尺度で表示します。尺度は直近 1 年のランから求めます。いつもの値は、直前 6 週間の安定した走り（予備心拍の {low}–{high}%）から求めます。",
+  "run.perf.noBaseline": "直前 6 週間のランが 3 本読み込まれると、いつもの値が表示されます。",
   "run.perf.noReadings": "このランには読み取れるほど安定した区間がありません。ペースか心拍が変わり続けていました。",
   "run.perf.needProfile": "パフォーマンスを読むには、COROS で最大心拍数と安静時心拍数を設定してください。",
   "run.perf.form": "ml/kg/分・{period}の中央値",
@@ -96,7 +96,7 @@ const run: RunMessages = {
   "run.perf.waiting": "ランを読み込んでいます。読み込むたびにグラフが埋まっていきます。",
   "run.perf.none": "この期間には、読み取れるほど安定した区間のあるロードまたはトラックのランがありません。",
   "run.perf.rolling": "各ランと{days}日間の中央値",
-  "run.perf.usualLine": "破線：いつもの値 {value}（COROS の VO2max）。帯は ±3% です。",
+  "run.perf.usualLine": "破線：いつもの値 {value}（直近 6 週間の安定した走り、予備心拍の {low}–{high}%）。帯は ±3% です。",
   "run.perf.quadrant": "速いか遅いか、効率は良かったか・{period}",
   "run.perf.quadrantNote": "横軸：ランの平均ペース。縦軸：いつもと比べたパフォーマンス。線はいつものペースといつもの値です。",
   "run.perf.q.slowGood": "遅くて効率的",
@@ -120,6 +120,7 @@ const run: RunMessages = {
   "run.perf.reason.heartRateSettling": "心拍が追いついていない",
   "run.perf.tip.run": "このラン",
   "run.perf.tip.usual": "いつも",
+  "run.perf.tip.coros": "COROS の VO2max",
 };
 
 export default run;

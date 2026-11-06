@@ -85,8 +85,8 @@ const run: RunMessages = {
   "run.perf.against.worse": "por debajo de tu habitual",
   "run.perf.held": "Fijo desde el minuto {minute}",
   "run.perf.heldNote": "Menos de tres de tus carreras pasaron del minuto {minute}, así que tu habitual se mantiene en su nivel de ese minuto.",
-  "run.perf.scaleNote": "Velocidad por el pulso que costó, en la escala de VO2max de COROS: tu habitual de las seis semanas anteriores equivale a tu VO2max de COROS.",
-  "run.perf.noBaseline": "Tu habitual aparece en cuanto se leen tres carreras de las seis semanas anteriores. Hasta entonces, solo esta carrera sitúa la cifra en la escala de VO2max de COROS.",
+  "run.perf.scaleNote": "Velocidad por el pulso que costó, en la escala de VO2max de COROS, calculada con tus carreras del último año. Tu habitual es tu carrera constante, al {low}–{high}% de la FC de reserva, de las seis semanas anteriores.",
+  "run.perf.noBaseline": "Tu habitual aparece en cuanto se leen tres carreras de las seis semanas anteriores.",
   "run.perf.noReadings": "Ningún tramo de esta carrera fue lo bastante estable para leerlo: el ritmo o el pulso no dejaron de cambiar.",
   "run.perf.needProfile": "Configura en COROS tu frecuencia cardiaca máxima y en reposo para ver el rendimiento.",
   "run.perf.form": "ml/kg/min · mediana de {period}",
@@ -96,7 +96,7 @@ const run: RunMessages = {
   "run.perf.waiting": "Leyendo tus carreras. El gráfico se completa a medida que se lee cada una.",
   "run.perf.none": "Ninguna carrera en carretera o pista de este periodo tiene un tramo lo bastante estable para leerlo.",
   "run.perf.rolling": "Cada carrera, y la mediana de {days} días",
-  "run.perf.usualLine": "Discontinua: tu habitual, {value}, que es tu VO2max de COROS. La franja es ±3%.",
+  "run.perf.usualLine": "Discontinua: tu habitual, {value}, de tu carrera constante ({low}–{high}% de la FC de reserva) en las últimas seis semanas. La franja es ±3%.",
   "run.perf.quadrant": "Rápido o lento, y ¿fue eficiente? · {period}",
   "run.perf.quadrantNote": "Horizontal: el ritmo medio de la carrera. Vertical: su rendimiento frente a tu habitual. Las líneas son tu ritmo habitual y tu habitual.",
   "run.perf.q.slowGood": "Lento y eficiente",
@@ -120,6 +120,7 @@ const run: RunMessages = {
   "run.perf.reason.heartRateSettling": "El pulso aún se ajusta",
   "run.perf.tip.run": "Esta carrera",
   "run.perf.tip.usual": "Habitual",
+  "run.perf.tip.coros": "VO2max de COROS",
 };
 
 export default run;

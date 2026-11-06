@@ -26,7 +26,20 @@ const SUMMARY_CHUNK = 4;
  * buy another allowance.
  */
 const SESSION_FETCH_CAP = 300;
-let fetchedThisSession = 0;
+
+/**
+ * An allowance of fetches a session, drawn on by every read that names it. The
+ * screens share one; a read that is not a screen's own — Running's year for its
+ * performance scale — takes its own, or a first sweep of it spends what the
+ * screens would have read with.
+ */
+export interface SummaryFetchBudget {
+  name: string;
+  cap: number;
+}
+
+const SCREENS_BUDGET: SummaryFetchBudget = { name: "screens", cap: SESSION_FETCH_CAP };
+const fetchedThisSession = new Map<string, number>();
 
 const EMPTY: ReadonlyMap<string, ActivityDetailSummary> = new Map();
 
@@ -62,6 +75,8 @@ export interface ActivityDetailSummariesInput {
   requirePerformance?: boolean;
   /** Also count a swim as missing until it carries its strokes, pool and best efforts. */
   requireSwim?: boolean;
+  /** The allowance this read's fetches are charged to; the screens' shared one when left out. */
+  budget?: SummaryFetchBudget;
 }
 
 export interface ActivityDetailSummariesState {
@@ -86,8 +101,10 @@ export function useActivityDetailSummariesState({
   enabled,
   requireIntensity = false,
   requirePerformance = false,
-  requireSwim = false
+  requireSwim = false,
+  budget = SCREENS_BUDGET
 }: ActivityDetailSummariesInput): ActivityDetailSummariesState {
+  const { name: budgetName, cap: budgetCap } = budget;
   const [summaries, setSummaries] =
     useState<ReadonlyMap<string, ActivityDetailSummary>>(EMPTY);
   // The ids whose read last stopped, so a new set reads as unsettled at once
@@ -124,7 +141,7 @@ export function useActivityDetailSummariesState({
         }
         setSummaries((current) => withSummaries(current, stored));
 
-        while (!cancelled && fetchedThisSession < SESSION_FETCH_CAP) {
+        while (!cancelled && (fetchedThisSession.get(budgetName) ?? 0) < budgetCap) {
           const pass = await api.syncActivityDetailSummaries(
             ids,
             SUMMARY_CHUNK,
@@ -134,7 +151,10 @@ export function useActivityDetailSummariesState({
           // this effect is still around to see them, and a period change tears
           // it down mid-pass often enough that charging afterwards left the cap
           // bounding nothing.
-          fetchedThisSession += pass.computed + pass.failed;
+          fetchedThisSession.set(
+            budgetName,
+            (fetchedThisSession.get(budgetName) ?? 0) + pass.computed + pass.failed
+          );
           if (cancelled) {
             return;
           }
@@ -163,7 +183,7 @@ export function useActivityDetailSummariesState({
     return () => {
       cancelled = true;
     };
-  }, [api, enabled, key, requireIntensity, requirePerformance, requireSwim]);
+  }, [api, budgetCap, budgetName, enabled, key, requireIntensity, requirePerformance, requireSwim]);
 
   return { summaries, settled: !api || key.length === 0 || settledKey === key };
 }

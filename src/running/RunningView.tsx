@@ -32,7 +32,7 @@ import { distanceUnit, elevationUnit } from "../units/units";
 import type { PrimaryView } from "../navigation/primaryNav";
 import { RunDetailView } from "./RunDetailView";
 import { RunPerformancePanel } from "./RunPerformancePanel";
-import { performanceHistory, performanceRunsNeeded } from "./runPerformanceModel";
+import { performanceHistory, performanceRunsNeeded, performanceScaleRuns } from "./runPerformanceModel";
 import { performanceProfile, sportHasRunPerformance } from "../../electron/runPerformance";
 import { RunIntensityPanel } from "./RunIntensityPanel";
 import { RunningHero, runningThresholdZones } from "./RunningHero";
@@ -47,7 +47,11 @@ import {
   surfacesPresent,
   type RunZoneScale
 } from "./runMetrics";
-import { useActivityDetailSummaries } from "../training/useActivityDetailSummaries";
+import {
+  useActivityDetailSummaries,
+  useActivityDetailSummariesState,
+  type SummaryFetchBudget
+} from "../training/useActivityDetailSummaries";
 import { useSessionPage, weeksForPeriod, withinPeriod } from "./sportPage";
 import { RunnerIcon } from "./runnerIcon";
 import {
@@ -102,6 +106,21 @@ export interface RunningViewProps {
 const PERIOD_OPTIONS = periodGroupOptions([28, 90, 365, null]);
 
 const DEFAULT_PERIOD_DAYS = 90;
+
+/**
+ * Whether the year the performance scale is read over has been opened this
+ * session. Once its sweep has started there is nothing to wait for on the way
+ * back to this screen, and waiting showed the stand-in scale for a moment.
+ */
+let yearOpenedThisSession = false;
+
+/**
+ * What the year's sweep may fetch a session, apart from the screens' own
+ * allowance: a year of runs read for the first time would otherwise spend it.
+ * The scale is a median, so the year's newest runs read first are enough to
+ * stand on; the rest are read on later visits.
+ */
+const SCALE_YEAR_BUDGET: SummaryFetchBudget = { name: "runningScaleYear", cap: 100 };
 
 /**
  * Running on a screen of its own.
@@ -265,13 +284,36 @@ export function RunningView({
     const shown = new Set(runs.map((activity) => activity.activityId));
     return [...runs, ...needed.filter((activity) => !shown.has(activity.activityId))];
   }, [allRuns, readsPerformance, runs, selectedRun]);
-  const summaries = useActivityDetailSummaries({
+  const { summaries, settled: summariesSettled } = useActivityDetailSummariesState({
     api,
     activities: summaryRuns,
     enabled: connected && (selectedRunId === null || ownDetailLoaded),
     // The list's rows wear their training label; a page reads its own off the detail.
     requireIntensity: selectedRun === null,
     requirePerformance: readsPerformance
+  });
+
+  // The year the performance scale is read over, as a read of its own: keyed by
+  // the year's runs alone, it is read once and again only when a run joins or
+  // leaves the year — a period switch or a run's page changes the list above,
+  // and that list read the whole year again each time. The first time in a
+  // session it starts once the screen's own runs are in, so its sweep follows
+  // theirs rather than racing them, and it stays on after: a gate that closed
+  // with every run's page would read the year again each time it opened.
+  const [yearOpen, setYearOpen] = useState(yearOpenedThisSession);
+  useEffect(() => {
+    if (readsPerformance && summariesSettled) {
+      yearOpenedThisSession = true;
+      setYearOpen(true);
+    }
+  }, [readsPerformance, summariesSettled]);
+  const scaleRuns = useMemo(() => performanceScaleRuns(allRuns, nowMs), [allRuns, nowMs]);
+  const scaleSummaries = useActivityDetailSummaries({
+    api,
+    activities: scaleRuns,
+    enabled: connected && yearOpen,
+    requirePerformance: true,
+    budget: SCALE_YEAR_BUDGET
   });
 
   if (!connected) {
@@ -317,6 +359,8 @@ export function RunningView({
         performanceProfile={perfProfile}
         allRuns={allRuns}
         summaries={summaries}
+        scaleSummaries={scaleSummaries}
+        nowMs={nowMs}
       />
     );
   }
@@ -489,6 +533,7 @@ export function RunningView({
                 runs={runs}
                 allRuns={allRuns}
                 summaries={summaries}
+                scaleSummaries={scaleSummaries}
                 profile={perfProfile}
                 weeks={chartWeeks}
                 periodDays={periodDays as PeriodDays}

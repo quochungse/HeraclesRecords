@@ -85,8 +85,8 @@ const run: RunMessages = {
   "run.perf.against.worse": "sotto il tuo solito",
   "run.perf.held": "Fisso dal minuto {minute}",
   "run.perf.heldNote": "Meno di tre delle tue corse hanno superato il minuto {minute}, quindi il tuo solito resta al livello di quel minuto.",
-  "run.perf.scaleNote": "La velocità ottenuta per il battito che è costata, sulla scala del VO2max di COROS: il tuo solito delle sei settimane precedenti corrisponde al tuo VO2max COROS.",
-  "run.perf.noBaseline": "Il tuo solito compare quando vengono lette tre corse delle sei settimane precedenti. Fino ad allora è solo questa corsa a porre il valore sulla scala del VO2max di COROS.",
+  "run.perf.scaleNote": "La velocità ottenuta per il battito che è costata, sulla scala del VO2max di COROS, ricavata dalle tue corse dell’ultimo anno. Il tuo solito è la tua corsa regolare, al {low}–{high}% della FC di riserva, delle sei settimane precedenti.",
+  "run.perf.noBaseline": "Il tuo solito compare quando vengono lette tre corse delle sei settimane precedenti.",
   "run.perf.noReadings": "Nessun tratto di questa corsa è stato abbastanza regolare da leggere: il ritmo o la frequenza cardiaca hanno continuato a cambiare.",
   "run.perf.needProfile": "Imposta su COROS la frequenza cardiaca massima e a riposo per leggere la prestazione.",
   "run.perf.form": "ml/kg/min · mediana ({period})",
@@ -96,7 +96,7 @@ const run: RunMessages = {
   "run.perf.waiting": "Lettura delle tue corse. Il grafico si riempie man mano che ognuna viene letta.",
   "run.perf.none": "Nessuna corsa su strada o in pista di questo periodo ha un tratto abbastanza regolare da leggere.",
   "run.perf.rolling": "Ogni corsa, e la mediana su {days} giorni",
-  "run.perf.usualLine": "Tratteggiata: il tuo solito, {value}, cioè il tuo VO2max COROS. La fascia è ±3%.",
+  "run.perf.usualLine": "Tratteggiata: il tuo solito, {value}, dalla tua corsa regolare ({low}–{high}% della FC di riserva) nelle ultime sei settimane. La fascia è ±3%.",
   "run.perf.quadrant": "Veloce o lento, ed è stato efficiente? · {period}",
   "run.perf.quadrantNote": "In orizzontale: il ritmo medio della corsa. In verticale: la prestazione rispetto al solito. Le linee sono il tuo ritmo solito e il tuo solito.",
   "run.perf.q.slowGood": "Lento ed efficiente",
@@ -120,6 +120,7 @@ const run: RunMessages = {
   "run.perf.reason.heartRateSettling": "Il cuore sta recuperando",
   "run.perf.tip.run": "Questa corsa",
   "run.perf.tip.usual": "Solito",
+  "run.perf.tip.coros": "VO2max COROS",
 };
 
 export default run;

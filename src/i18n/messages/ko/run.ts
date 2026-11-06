@@ -85,8 +85,8 @@ const run: RunMessages = {
   "run.perf.against.worse": "평소보다 낮음",
   "run.perf.held": "{minute}분부터 고정",
   "run.perf.heldNote": "{minute}분을 넘긴 러닝이 세 번 미만이라 평소 값을 그 시점 수준으로 고정했습니다.",
-  "run.perf.scaleNote": "심박이 치른 비용 대비 속도를 COROS VO2max 척도로 보여 줍니다. 직전 6주의 평소 값이 COROS VO2max가 됩니다.",
-  "run.perf.noBaseline": "직전 6주의 러닝 세 번이 읽히면 평소 값이 나타납니다. 그전까지는 이번 러닝만으로 COROS VO2max 척도에 맞춥니다.",
+  "run.perf.scaleNote": "심박이 치른 비용 대비 속도를 COROS VO2max 척도로 보여 줍니다. 척도는 지난 1년의 러닝으로 정합니다. 평소 값은 직전 6주의 꾸준한 달리기(여유 심박의 {low}–{high}%)에서 구합니다.",
+  "run.perf.noBaseline": "직전 6주의 러닝 세 번이 읽히면 평소 값이 나타납니다.",
   "run.perf.noReadings": "이번 러닝에는 읽을 만큼 안정된 구간이 없습니다. 페이스나 심박이 계속 바뀌었습니다.",
   "run.perf.needProfile": "퍼포먼스를 보려면 COROS에서 최대 심박수와 안정 시 심박수를 설정하세요.",
   "run.perf.form": "ml/kg/분 · {period} 중앙값",
@@ -96,7 +96,7 @@ const run: RunMessages = {
   "run.perf.waiting": "러닝을 읽는 중입니다. 하나씩 읽힐 때마다 차트가 채워집니다.",
   "run.perf.none": "이 기간에는 읽을 만큼 안정된 구간이 있는 로드·트랙 러닝이 없습니다.",
   "run.perf.rolling": "러닝별 값과 {days}일 중앙값",
-  "run.perf.usualLine": "점선: 평소 값 {value}, 곧 COROS VO2max입니다. 띠는 ±3%입니다.",
+  "run.perf.usualLine": "점선: 평소 값 {value}, 최근 6주의 꾸준한 달리기(여유 심박의 {low}–{high}%)에서 구했습니다. 띠는 ±3%입니다.",
   "run.perf.quadrant": "빨랐나 느렸나, 효율은 어땠나 · {period}",
   "run.perf.quadrantNote": "가로: 러닝의 평균 페이스. 세로: 평소 대비 퍼포먼스. 두 선은 평소 페이스와 평소 값입니다.",
   "run.perf.q.slowGood": "느리지만 효율적",
@@ -120,6 +120,7 @@ const run: RunMessages = {
   "run.perf.reason.heartRateSettling": "심박이 따라오는 중",
   "run.perf.tip.run": "이번 러닝",
   "run.perf.tip.usual": "평소",
+  "run.perf.tip.coros": "COROS VO2max",
 };
 
 export default run;

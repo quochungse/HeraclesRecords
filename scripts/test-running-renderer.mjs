@@ -995,6 +995,39 @@ async function main() {
       "and asks for the labels its rows wear and the performance curves the road and track runs need, and no swim's lengths"
     );
 
+    // The year the performance scale is read over is a read of its own, after
+    // the screen's, and opening a run's page and coming back never reads it
+    // again: keyed with the screen's runs, every page read a whole year back
+    // out of SQLite, on the way in and on the way out. The year here is all
+    // thirty runs; a page reads its run and the six weeks before it.
+    const yearSweep = (call) =>
+      call.args[2].requireIntensity === false && call.args[0].length === RUNS.length;
+    assert.deepEqual(
+      sweeps.find(yearSweep)?.args[2],
+      { requireIntensity: false, requirePerformance: true, requireSwim: false },
+      "the scale's year is swept for its performance curves"
+    );
+    assert.ok(sweeps.findIndex(yearSweep) > 0, "once the screen's own sweep has been asked for, not racing it");
+    const sweptBefore = sweeps.length;
+    await win.webContents.executeJavaScript(
+      `[...document.querySelectorAll(".running-list-panel tbody tr")].find((row) => row.textContent.includes(${JSON.stringify(RUNS[0].name)})).click()`,
+      true
+    );
+    await waitFor(() => harness("exists", ".run-detail"), "a run opens");
+    await harness("setProps", {
+      detail: { activityId: RUNS[0].activityId, distance: RUNS[0].distance, duration: RUNS[0].duration, laps: [], hrZones: [] }
+    });
+    await settle();
+    await harness("click", ".run-detail-back");
+    await waitFor(() => harness("exists", ".running-list-panel"), "back on the list");
+    await settle();
+    const sweptAfter = (await harness("calls", "syncActivityDetailSummaries")).slice(sweptBefore);
+    assert.ok(
+      sweptAfter.some((call) => call.args[0][0] === RUNS[0].activityId && call.args[0].length < RUNS.length),
+      "the page sweeps its run and the six weeks before it"
+    );
+    assert.equal(sweptAfter.filter(yearSweep).length, 0, "and leaves the year as it was read");
+
     assert.equal(
       await hasText("2 of 30 runs are split by their time in each zone"),
       true,

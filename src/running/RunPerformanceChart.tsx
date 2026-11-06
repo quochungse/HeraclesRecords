@@ -50,7 +50,15 @@ import {
 import { formatPaceSecondsPerKm } from "../training/formatters";
 import { useChartColors } from "../training/useChartColors";
 import { useUnitSystem } from "../units/UnitSystemProvider";
-import { niceScale, performanceContext, performanceHistory, zeroOffsetIn } from "./runPerformanceModel";
+import {
+  niceScale,
+  performanceAthleteScale,
+  performanceContext,
+  performanceHistory,
+  performanceScaleRuns,
+  STEADY_BAND_PERCENT,
+  zeroOffsetIn
+} from "./runPerformanceModel";
 
 type Reading = "percent" | "absolute";
 
@@ -74,8 +82,7 @@ const GAP_REASON_KEYS = {
 /**
  * The run's verdict is said with its figure, in the head — a pill of its own
  * under the head read as a key to the chart's colours. The usual's own figure
- * is not stated: the scale pins it to COROS's VO2max, a whole number that holds
- * for months, so it repeated that number on every run.
+ * is read on the ml/kg/min reading and in the tooltip.
  */
 const VERDICT_KEYS = {
   better: "run.perf.against.better",
@@ -96,9 +103,13 @@ interface RunPerformanceChartProps {
   corosVo2max?: number;
   durationSeconds: number;
   profile: PerformanceProfile;
-  /** Every run, for the six weeks before this one. */
+  /** Every run, for the six weeks before this one and the year the scale is read over. */
   allRuns: readonly TrainingHubActivity[];
   summaries: ReadonlyMap<string, ActivityDetailSummary>;
+  /** The year the scale is read over, read on its own (`performanceScaleRuns`). */
+  scaleSummaries: ReadonlyMap<string, ActivityDetailSummary>;
+  /** The Running screen's now, so the scale's year is the one the screen reads. */
+  nowMs: number;
 }
 
 interface Row {
@@ -140,7 +151,9 @@ export function RunPerformanceChart({
   durationSeconds,
   profile,
   allRuns,
-  summaries
+  summaries,
+  scaleSummaries,
+  nowMs
 }: RunPerformanceChartProps) {
   // Subscribed, so the chart's words follow a change of language.
   useI18n();
@@ -165,10 +178,16 @@ export function RunPerformanceChart({
     return { own: performanceRun(performanceCurveFromSteps(steps, corosVo2max), profile), gapAt: reasons };
   }, [corosVo2max, profile, series]);
 
+  // The Running screen's scale, worked out from the year's own read.
+  const athleteScaleValue = useMemo(
+    () => performanceAthleteScale(performanceScaleRuns(allRuns, nowMs), scaleSummaries, profile),
+    [allRuns, nowMs, profile, scaleSummaries]
+  );
+
   const context = useMemo(() => {
     const at = (activity.startTime ?? 0) * 1000;
-    return performanceContext(performanceHistory(allRuns, at), summaries, profile, own);
-  }, [activity.startTime, allRuns, own, profile, summaries]);
+    return performanceContext(performanceHistory(allRuns, at), summaries, profile, athleteScaleValue, own);
+  }, [activity.startTime, allRuns, athleteScaleValue, own, profile, summaries]);
 
   const baseline = context.baseline;
   const shape = baseline?.shape;
@@ -487,7 +506,7 @@ export function RunPerformanceChart({
 
       <p className="run-block-note">
         {baseline
-          ? t("run.perf.scaleNote", { runs: baseline.runs })
+          ? t("run.perf.scaleNote", STEADY_BAND_PERCENT)
           : t("run.perf.noBaseline")}
         {held !== undefined ? ` ${t("run.perf.heldNote", { minute: held })}` : ""}
       </p>

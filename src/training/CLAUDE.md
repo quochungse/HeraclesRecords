@@ -21,7 +21,9 @@ screens; Activities links out with the session (`SportScreenRequest`).
 
 `ActivitySeriesChart`, `activityChannels.ts`, `useActivityDetailSummaries.ts` — shared by every
 sport (anything two screens need moves here rather than being copied). A screen that must tell
-"still reading" from "none" takes `useActivityDetailSummariesState` (`settled`).
+"still reading" from "none" takes `useActivityDetailSummariesState` (`settled`). Its fetches
+are charged to a session allowance (`SummaryFetchBudget`): the screens share one (300); a read
+that is not a screen's own names its own, as Running's scale year does.
 - **The line is drawn from what was recorded**: `smoothActivitySeries` averages noisy channels
   over a few seconds (never heart rate), then `envelopeActivitySeries` cuts to 1 000 rows of
   per-bucket min and max. Every figure the page *states*, the segment line included, comes off

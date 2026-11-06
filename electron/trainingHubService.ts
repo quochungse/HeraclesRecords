@@ -2088,8 +2088,8 @@ export interface ActivityDetailSummarySyncOptions {
   /**
    * Count a road or track run's summary as missing until it carries the
    * current performance curve (`PERFORMANCE_SUMMARY_VERSION`). Only the Running
-   * screen asks: the curve is read for the runs it shows and the six weeks
-   * before them, not swept across the whole history.
+   * screen asks: the curve is read for the runs it shows, the six weeks before
+   * them and the year the scale is read over, not swept across the whole history.
    */
   requirePerformance?: boolean;
   /**
