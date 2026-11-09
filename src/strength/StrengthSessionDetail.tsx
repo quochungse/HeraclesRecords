@@ -248,12 +248,19 @@ function ExerciseTable({ rows, explorable, onOpenExercise, unitSystem, showLoad 
                 >
                   <ChevronRight className="strength-session-exercise-chevron" size={15} aria-hidden="true" />
                   <span className="strength-session-exercise-name">
-                    <strong>{exerciseLabel(row.name)}</strong>
-                    {group ? (
-                      <span className="strength-session-record-badge" title={t("strength.record.badgeTitle")}>
-                        <Trophy size={10} aria-hidden="true" />
-                        {t("strength.pr")}
-                      </span>
+                    <span className="strength-session-exercise-title">
+                      <strong>{exerciseLabel(row.name)}</strong>
+                      {group ? (
+                        <span className="strength-session-record-badge" title={t("strength.record.badgeTitle")}>
+                          <Trophy size={10} aria-hidden="true" />
+                          {t("strength.pr")}
+                        </span>
+                      ) : null}
+                    </span>
+                    {/* The movement is the row's name; the name this set was
+                        given ("KĐ Bench 40 kg") is under it. */}
+                    {row.label ? (
+                      <span className="strength-session-exercise-label" title={row.label}>{row.label}</span>
                     ) : null}
                   </span>
                   <span className="strength-session-exercise-facts">

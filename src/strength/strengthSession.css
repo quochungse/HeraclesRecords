@@ -733,9 +733,24 @@
 
 .strength-session-exercise-name {
   display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.strength-session-exercise-title {
+  display: flex;
   align-items: center;
   gap: 8px;
   min-width: 0;
+}
+
+.strength-session-exercise-label {
+  overflow: hidden;
+  color: var(--text-secondary);
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .strength-session-exercise-name strong {

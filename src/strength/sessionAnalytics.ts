@@ -7,10 +7,11 @@ import type {
   StrengthSetType
 } from "../../electron/types";
 import type { MuscleId } from "./muscles";
+import { exerciseStepLabel } from "../training/exerciseNames";
 import {
   buildStrengthAnalytics,
   estimateOneRepMax,
-  exerciseDisplayName,
+  exerciseMovementName,
   exerciseTargets,
   UNNAMED_EXERCISE,
   type HeatMetric,
@@ -142,7 +143,7 @@ interface LiftBest {
 function sessionLiftBests(session: StrengthSession): Map<string, LiftBest> {
   const bests = new Map<string, LiftBest>();
   for (const exercise of session.detail.exercises) {
-    const name = exerciseDisplayName(exercise.nameKey, exercise.rawName);
+    const name = exerciseMovementName(exercise);
     if (name === UNNAMED_EXERCISE) continue;
     const targets = exerciseTargets(exercise);
     if (targets.generic || targets.mobility) continue;
@@ -332,7 +333,10 @@ export interface ExerciseSetRow {
 export interface SessionExerciseRow {
   /** Stable within a session even when a superset lists one exercise twice. */
   key: string;
+  /** The movement, as the session's records and the explorer know it. */
   name: string;
+  /** The name the step was given, when it says more than the movement's (`exerciseStepLabel`). */
+  label?: string;
   sets: ExerciseSetRow[];
   reps: number;
   /** Seconds over the timed sets. */
@@ -369,9 +373,11 @@ export function buildExerciseRows(entry: SessionAnalytics): SessionExerciseRow[]
           : best,
       undefined
     );
+    const label = exerciseStepLabel(exercise);
     return {
       key: `${index}-${exercise.nameKey}`,
-      name: exerciseDisplayName(exercise.nameKey, exercise.rawName),
+      name: exerciseMovementName(exercise),
+      ...(label ? { label } : {}),
       sets,
       reps: sets.reduce((total, set) => total + set.reps, 0),
       timedSec: sets.reduce((total, set) => total + (set.timed ? set.workSec : 0), 0),

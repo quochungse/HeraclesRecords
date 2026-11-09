@@ -1,6 +1,6 @@
 import type { MessageKey } from "../i18n/core";
 import type { StrengthSession, StrengthSet } from "../../electron/types";
-import { estimateOneRepMax, exerciseDisplayName } from "./strengthAnalytics";
+import { estimateOneRepMax, exerciseMovementName } from "./strengthAnalytics";
 import { formatDecimal, plural, t } from "../i18n/core";
 
 const EPSILON = 0.01;
@@ -231,7 +231,7 @@ export function buildExerciseExplorer(
     const entries = session.detail.exercises
       .filter(
         (exercise) =>
-          exerciseDisplayName(exercise.nameKey, exercise.rawName) === exerciseName
+          exerciseMovementName(exercise) === exerciseName
       )
       .flatMap((exercise) => exercise.entries);
 

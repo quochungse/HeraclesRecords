@@ -17,7 +17,9 @@ read-only: `WorkoutViewModal` and `WorkoutReadOnlyBody` (Library reader, plan re
 - An existing workout keeps its sport (stated, never a locked dropdown). Defaults come from
   `electron/workoutDefaults.ts` (see `electron/CLAUDE.md`).
 - `scheduledStructure.ts` + `WorkoutStructureView.tsx` draw a workout read-only; each strength
-  exercise states its rest after a set. `test:scheduled-structure`.
+  exercise states its rest after a set. **A movement step's title is the movement** (catalog,
+  else the step's movement words) and a name of its own ("KĐ Bench 40 kg") is its `label`,
+  drawn under it (`stepTitle`). `test:scheduled-structure`.
 
 ## The Calendar screen
 

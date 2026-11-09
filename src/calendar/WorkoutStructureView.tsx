@@ -2,6 +2,7 @@ import {
   ChevronDown,
   Dumbbell,
   Flame,
+  MessageSquareQuote,
   Pause,
   Play,
   Repeat,
@@ -59,6 +60,20 @@ const KIND_ORDER: ScheduledStepKind[] = [
   "cooldown",
   "sendOff"
 ];
+
+/**
+ * The name a movement step was given, under the movement: quieter than the
+ * title, marked as words written for this step, and whole in its hover when
+ * the row cuts it.
+ */
+function StepLabel({ label, className }: { label: string; className: string }) {
+  return (
+    <span className={className} title={label}>
+      <MessageSquareQuote size={11} aria-hidden="true" />
+      <span>{label}</span>
+    </span>
+  );
+}
 
 function stepMagnitudeLabel(
   step: ScheduledStepView,
@@ -144,6 +159,7 @@ function buildBarSegments(
     const magnitude = stepMagnitudeLabel(step, unitSystem, swim);
     const label = [
       step.name,
+      step.label,
       repeat && repeat > 1 ? `×${repeat}` : null,
       magnitude ?? step.targetLabel ?? null
     ]
@@ -273,6 +289,7 @@ function StepRow({ step }: { step: ScheduledStepView }) {
           {step.name}
           {setsSuffix}
         </span>
+        {step.label ? <StepLabel className="sched-step-label" label={step.label} /> : null}
         {step.intensityLabel ? (
           <span className="sched-step-intensity">{step.intensityLabel}</span>
         ) : null}
@@ -370,7 +387,9 @@ function buildStrengthBarSegments(view: ScheduledStructureView): BarSegment[] {
           ? step.reps * 4
           : 120;
     const scheme = liftSchemeLabel(step);
-    const label = [step.name, repeat && repeat > 1 ? `×${repeat}` : null, scheme, liftRestLabel(step)]
+    // A warm-up set and the working sets of one lift are two segments; the
+    // name each was given is what tells them apart in the hover.
+    const label = [step.name, step.label, repeat && repeat > 1 ? `×${repeat}` : null, scheme, liftRestLabel(step)]
       .filter(Boolean)
       .join(" · ");
     segments.push({ key, kind: step.kind, grow: sets * perSet, label });
@@ -494,6 +513,7 @@ function LiftCard({
       )}
       <div className="sched-lift-text">
         <span className="sched-lift-name">{step.name}</span>
+        {step.label ? <StepLabel className="sched-lift-label" label={step.label} /> : null}
         {scheme || rest ? (
           <span className="sched-lift-scheme">
             {scheme}

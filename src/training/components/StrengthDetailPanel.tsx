@@ -1,6 +1,6 @@
 import type { HeraclesLoad, StrengthDetail } from "../../../electron/types";
 import { formatDurationSeconds, formatOptionalNumber } from "../formatters";
-import { resolveExerciseName } from "../exerciseNames";
+import { exerciseStepLabel, resolveMovementName, type NamedExercise } from "../exerciseNames";
 import { useUnitSystem } from "../../units/UnitSystemProvider";
 import { formatVolumeKg, formatWeightKg } from "../../strength/strengthAnalytics";
 import { formatCount, formatDecimal, t } from "../../i18n/core";
@@ -20,16 +20,23 @@ function restLabel(seconds: number): string {
   return seconds > 0 ? formatDurationSeconds(seconds) : "—";
 }
 
-// Resolve a display name, falling back to a generic "Exercise N" label when the
-// key is still an unresolved COROS code (rare: an exercise absent from both the
-// catalogue dictionary and the body-region table).
-function displayExerciseName(
-  nameKey: string,
-  rawName: string | undefined,
-  index: number
-): string {
-  const resolved = resolveExerciseName(nameKey, rawName);
+// The movement, even when the step was named for its set (that name is drawn
+// under it, `exerciseStepLabel`), falling back to a generic "Exercise N" label
+// when the key is still an unresolved COROS code (rare: an exercise absent from
+// both the catalogue dictionary and the body-region table).
+function displayExerciseName(exercise: NamedExercise, index: number): string {
+  const resolved = resolveMovementName(exercise);
   return /^[TS]\d/.test(resolved) ? `Exercise ${index + 1}` : resolved;
+}
+
+function ExerciseName({ exercise, index }: { exercise: NamedExercise; index: number }) {
+  const label = exerciseStepLabel(exercise);
+  return (
+    <span className="strength-exercise-name">
+      {index + 1}. {displayExerciseName(exercise, index)}
+      {label ? <small className="strength-exercise-label">{label}</small> : null}
+    </span>
+  );
 }
 
 /** `heraclesLoad` is the list row's: COROS's detail does not carry it. */
@@ -75,9 +82,7 @@ export function StrengthDetailPanel({ strength, heraclesLoad }: { strength: Stre
             key={`${exercise.nameKey}-${index}`}
           >
             <h3 className="strength-exercise-head">
-              <span className="strength-exercise-name">
-                {index + 1}. {displayExerciseName(exercise.nameKey, exercise.rawName, index)}
-              </span>
+              <ExerciseName exercise={exercise} index={index} />
               <span className="strength-exercise-meta">
                 {t("activity.strength.setsReps", { sets: exercise.sets, reps: exercise.totalReps })}
               </span>

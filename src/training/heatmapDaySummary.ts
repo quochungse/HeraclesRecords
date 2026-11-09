@@ -3,7 +3,7 @@ import type {
   TrainingHubActivity,
   UnitSystem
 } from "../../electron/types";
-import { resolveExerciseName } from "./exerciseNames";
+import { resolveMovementName } from "./exerciseNames";
 import { formatDistanceMeters } from "./formatters";
 import {
   happenDayFromTimestamp,
@@ -49,7 +49,9 @@ export function formatStrengthFocus(session?: StrengthSession): string {
   const names: string[] = [];
 
   for (const exercise of session?.detail?.exercises ?? []) {
-    const name = resolveExerciseName(exercise.nameKey, exercise.rawName).trim();
+    // The movement, not the name a set was given: a warm-up set and the
+    // working sets of one lift are one lift worked.
+    const name = resolveMovementName(exercise).trim();
     if (name && !names.includes(name)) {
       names.push(name);
     }

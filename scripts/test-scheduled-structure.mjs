@@ -542,4 +542,75 @@ assert.equal(liftRestLabel(restedDraft.nodes[0].step), "Rest 3:00");
 assert.equal(liftSchemeLabel(restedDraft.nodes[0].step), "4 × 15 reps");
 assert.equal(liftRestLabel(restedDraft.nodes[1].step), undefined);
 
+// --- a movement named for its set: the movement leads, the name is its label ---
+// Coach names a warm-up set "KĐ Bench 40 kg" and a working set "Bench 60 kg
+// 4x6-10"; read back from COROS both are `name` and `exerciseName` alike. The
+// title is the movement either way, and the name is kept beside it.
+const benchCatalog = new Map([["425831217146019840", { name: "Bench Press" }]]);
+const namedSets = buildEditorDraftView(
+  {
+    sport: "strength",
+    nodes: [
+      step({ id: "a", exerciseId: "425831217146019840", name: "KĐ Bench 40 kg", exerciseName: "KĐ Bench 40 kg" }),
+      step({ id: "b", exerciseId: "425831217146019840", name: "bench press", exerciseName: "bench press" }),
+      step({ id: "c", exerciseId: "425831217146019840", name: "Training", exerciseName: "T1041" }),
+      // A plan's step: its own name, and the movement's words resolved for it.
+      step({ id: "d", name: "Bench 60 kg 4x6-10", exerciseName: "Bench Press" })
+    ]
+  },
+  "metric",
+  benchCatalog
+);
+assert.deepEqual(
+  namedSets.nodes.map((node) => [node.step.name, node.step.label]),
+  [
+    ["Bench Press", "KĐ Bench 40 kg"],
+    ["Bench Press", undefined],
+    ["Bench Press", undefined],
+    ["Bench Press", "Bench 60 kg 4x6-10"]
+  ],
+  "the movement's own words, in any case, and the kind's stored name are no label"
+);
+// Without the catalog a renamed COROS step has nothing but its name, so the
+// name is the title, as before.
+const namedNoCatalog = buildEditorDraftView(
+  { sport: "strength", nodes: [step({ exerciseId: "425831217146019840", name: "KĐ Bench 40 kg", exerciseName: "KĐ Bench 40 kg" })] },
+  "metric"
+);
+assert.equal(namedNoCatalog.nodes[0].step.name, "KĐ Bench 40 kg");
+assert.equal(namedNoCatalog.nodes[0].step.label, undefined);
+// A run's step has no movement: its own name is its title, with no label.
+const namedRun = buildEditorDraftView(
+  { sport: "run", nodes: [step({ name: "Easy, HR ≤156", exerciseName: "Easy, HR ≤156" })] },
+  "metric"
+);
+assert.equal(namedRun.nodes[0].step.name, "Easy, HR ≤156");
+assert.equal(namedRun.nodes[0].step.label, undefined);
+
+// The scheduled path: COROS keeps the set's name on the step and the movement
+// on `originId`.
+const scheduledNamed = buildScheduledWorkoutView(
+  {
+    rawProgram: {
+      sportType: 4,
+      exercises: [
+        { id: "1", exerciseType: 2, name: "KĐ Bench 40 kg", originId: "425831217146019840", targetType: 3, targetValue: 8, sets: 1, sortNo: 1 },
+        { id: "2", exerciseType: 2, name: "T1041", originId: "425831217146019840", targetType: 3, targetValue: 10, sets: 4, sortNo: 2 }
+      ]
+    }
+  },
+  "metric",
+  benchCatalog
+);
+assert.deepEqual(
+  scheduledNamed.nodes.map((node) => [node.step.name, node.step.label]),
+  [["Bench Press", "KĐ Bench 40 kg"], ["Bench Press", undefined]]
+);
+const scheduledNamedNoCatalog = buildScheduledWorkoutView(
+  { rawProgram: { sportType: 4, exercises: [{ id: "1", exerciseType: 2, name: "KĐ Bench 40 kg", originId: "425831217146019840", targetType: 3, targetValue: 8, sets: 1, sortNo: 1 }] } },
+  "metric"
+);
+assert.equal(scheduledNamedNoCatalog.nodes[0].step.name, "KĐ Bench 40 kg");
+assert.equal(scheduledNamedNoCatalog.nodes[0].step.label, undefined);
+
 console.log("scheduled-structure tests passed");

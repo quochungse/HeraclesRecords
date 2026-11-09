@@ -19,6 +19,7 @@ import {
 import { decodeCorosIntensity } from "../../electron/workoutCapabilities";
 import { markFigure, type FigureMark } from "../../electron/workoutFigures";
 import { workoutIntensityText } from "../i18n/workoutWords";
+import { sameExerciseName } from "../training/exerciseNames";
 import { formatCount, formatDecimal, messageRecord, plural, t } from "../i18n/core";
 
 /**
@@ -37,7 +38,14 @@ export type ScheduledStepKind =
 export interface ScheduledStepView {
   id: string;
   kind: ScheduledStepKind;
+  /** The movement, for a step that is one; otherwise the step's own name or its kind. */
   name: string;
+  /**
+   * The name the step was given, when it is a movement named in words of its
+   * own ("KĐ Bench 40 kg", "Bench 60 kg 4x6-10") that say more than the
+   * movement's. Drawn under the movement, never in its place.
+   */
+  label?: string;
   /** Compact target text — "800 m", "10:00", "12 reps", "Open". */
   targetLabel?: string;
   /** Intensity text decoded from the raw payload — "140–150 bpm", "5:00–5:10/km". */
@@ -315,6 +323,43 @@ function friendlyStepName(rawName: string, kind: ScheduledStepKind): string {
   return trimmed;
 }
 
+/**
+ * A movement step's title and the name it was given.
+ *
+ * The movement is the step's identity — its clip, its muscles, its history —
+ * so it is the title whenever it is known: the catalog's name, else the
+ * movement words the step carries (`exerciseName`, a plan step's resolved
+ * name). A name of the step's own (Coach writes "KĐ Bench 40 kg" for a warm-up
+ * set, "A1 …" for a superset's first half) is kept as `label` when it says
+ * more than the movement's name; a key, the kind's stored name and the
+ * movement's own words are not names of its own. A step with no movement is
+ * drawn as before, by its own name or its kind.
+ */
+function stepTitle(
+  ownName: string,
+  movement: string | undefined,
+  kind: ScheduledStepKind
+): Pick<ScheduledStepView, "name" | "label"> {
+  const own = ownName.trim();
+  const title = movement?.trim() && !/^[TS]\d+$/i.test(movement.trim()) ? movement.trim() : undefined;
+  if (!title) return { name: friendlyStepName(own, kind) };
+  const named = own && !isKindName(own) && !sameExerciseName(own, title);
+  return { name: title, ...(named ? { label: own } : {}) };
+}
+
+/**
+ * A name nobody gave: a key, a kind as COROS stores it or as it is drawn, or a
+ * plan step's bare kind ("warmup").
+ */
+function isKindName(name: string): boolean {
+  if (/^[TS]\d+$/i.test(name)) return true;
+  return (Object.keys(STORED_KIND_NAME) as ScheduledStepKind[]).some((kind) =>
+    sameExerciseName(name, kind) ||
+    sameExerciseName(name, STORED_KIND_NAME[kind]) ||
+    sameExerciseName(name, FRIENDLY_KIND_NAME[kind])
+  );
+}
+
 function parseRawStep(
   exercise: Record<string, unknown>,
   index: number,
@@ -340,10 +385,12 @@ function parseRawStep(
     ? exercises?.get(originId)?.name
     : undefined;
 
+  // A raw step carries no movement words but the catalog's: until it is in
+  // hand the step's own name stands alone, as COROS stores it.
   return {
     id,
     kind,
-    name: friendlyStepName(catalogName ?? String(exercise.name ?? ""), kind),
+    ...stepTitle(String(exercise.name ?? ""), catalogName, kind),
     targetLabel: target.label,
     intensityLabel: intensity.label,
     magnitude: target.magnitude,
@@ -693,9 +740,11 @@ function draftStepView(
 ): ScheduledStepView {
   const target = draftTargetView(step.target, step.kind, unitSystem, swim);
   const intensity = localizeIntensity(step.intensity, unitSystem);
-  // A strength step's own name is the kind ("Training") and its `exerciseName`
-  // is a COROS key, so the catalog is asked first and `friendlyStepName`
-  // turns whatever is left into the kind rather than showing the key.
+  // A strength step read from COROS has the kind ("Training") or a name of
+  // its own for `name`, and its `exerciseName` is a COROS key or that same
+  // name; a plan's step has the movement's words there. So the catalog is
+  // asked first, then `exerciseName`, and `stepTitle` turns a key into the
+  // kind rather than showing it.
   const catalogName = step.exerciseId
     ? exercises?.get(step.exerciseId)?.name
     : undefined;
@@ -703,7 +752,7 @@ function draftStepView(
   return {
     id: step.id || `step-${index}`,
     kind: step.kind,
-    name: friendlyStepName(catalogName ?? step.exerciseName ?? step.name, step.kind),
+    ...stepTitle(step.name, catalogName ?? step.exerciseName, step.kind),
     targetLabel: target.label,
     intensityLabel: intensity.label,
     magnitude: target.magnitude,

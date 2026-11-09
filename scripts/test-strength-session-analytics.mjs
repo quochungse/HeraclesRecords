@@ -302,4 +302,38 @@ assert.equal(
   assert.equal(rows[1].records.length, 0, "Squats had no earlier session to beat");
 }
 
+// ---- 8. A lift named per set is one lift ----
+// Coach names a warm-up set "KĐ Bench 40 kg" and the working sets "Bench 60 kg
+// 4x6-10"; the watch records those words in place of T1041, and the movement
+// comes back only as `corosKey`. Grouped by the words, one Bench Press was
+// three lifts with three histories and three records.
+
+{
+  const named = (words, entries) => exercise(words, entries, { rawName: words, corosKey: "T1041", ...strengthExerciseMetadata("T1041") });
+  const history = [
+    session("n0", now - 9 * DAY, [named("Bench 55 kg 4x10", sets(4, 10, 55))]),
+    session("n1", now - 2 * DAY, [
+      named("KĐ Bench 40 kg", sets(1, 8, 40)),
+      named("Bench 60 kg 4x6-10", sets(4, 8, 60)),
+      exercise("T1061", sets(3, 5, 100))
+    ])
+  ];
+  const index = buildStrengthSessionIndex(history);
+  const rows = buildExerciseRows(index.byId.get("n1"));
+  assert.deepEqual(
+    rows.map((row) => [row.name, row.label]),
+    [["Bench Press", "KĐ Bench 40 kg"], ["Bench Press", "Bench 60 kg 4x6-10"], ["Squats", undefined]],
+    "the movement is the row's name; the name the set was given is its label"
+  );
+  assert.ok(
+    rows[1].records.some((record) => record.exercise === "Bench Press"),
+    "60 kg beats last week's 55 kg as the same lift"
+  );
+
+  const analytics = buildStrengthAnalytics(history, 30);
+  const bench = analytics.exercises.filter((stat) => /bench/i.test(stat.name));
+  assert.deepEqual(bench.map((stat) => stat.name), ["Bench Press"], "one lift, not three");
+  assert.equal(bench[0].sets, 9);
+}
+
 console.log("strength session analytics OK");

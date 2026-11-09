@@ -17464,6 +17464,31 @@ label.chat-settings-toggle-row {
   color: var(--text-muted);
 }
 
+/* The name the step was given, under the movement it is: the title's words
+   stay the movement's, these are the ones written for this set. */
+.sched-lift-label,
+.sched-step-label {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.sched-lift-label > svg,
+.sched-step-label > svg {
+  flex: none;
+  color: var(--text-muted);
+}
+
+.sched-lift-label > span,
+.sched-step-label > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .sched-lift-rest {
   display: inline-flex;
   align-items: center;
@@ -22940,6 +22965,15 @@ body.is-backgrounded .spin {
   font-weight: 500;
   font-size: 14px;
   white-space: nowrap;
+}
+
+/* The name the step was given, under the movement it is. */
+.strength-exercise-label {
+  display: block;
+  margin-top: 2px;
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 400;
 }
 
 .strength-exercise .table-shell table {

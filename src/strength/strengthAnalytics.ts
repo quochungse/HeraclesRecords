@@ -11,7 +11,7 @@ import type {
   StrengthSession,
   UnitSystem
 } from "../../electron/types";
-import { resolveExerciseName } from "../training/exerciseNames";
+import { resolveMovementName, type NamedExercise } from "../training/exerciseNames";
 import { kilogramsToDisplayWeight, weightUnit } from "../units/units";
 import {
   MUSCLES,
@@ -268,12 +268,16 @@ export function exerciseLabel(name: string): string {
   return name === UNNAMED_EXERCISE ? t("strength.unnamedExercise") : name;
 }
 
-/** The display name an exercise is grouped under everywhere on the Strength screen. */
-export function exerciseDisplayName(nameKey: string, rawName: string | undefined): string {
-  const resolved = resolveExerciseName(nameKey, rawName);
-  return /^[TS]\d/.test(resolved)
-    ? UNNAMED_EXERCISE
-    : canonicalExerciseDisplayName(resolved);
+/**
+ * The movement an exercise is: the name it is grouped under everywhere on the
+ * Strength screen (`resolveMovementName`, canonicalised; a code nothing names
+ * is the one unnamed exercise). Grouped by the name the watch recorded, a lift
+ * Coach named per set ("KĐ Bench 40 kg", "Bench 60 kg 4x6-10") was as many
+ * lifts as it had names, its records and progress split among them.
+ */
+export function exerciseMovementName(exercise: NamedExercise): string {
+  const resolved = resolveMovementName(exercise);
+  return /^[TS]\d/.test(resolved) ? UNNAMED_EXERCISE : canonicalExerciseDisplayName(resolved);
 }
 
 export function buildStrengthAnalytics(
@@ -332,7 +336,7 @@ export function buildStrengthAnalytics(
     }
 
     for (const [exerciseIndex, exercise] of session.detail.exercises.entries()) {
-      const name = exerciseDisplayName(exercise.nameKey, exercise.rawName);
+      const name = exerciseMovementName(exercise);
       const targets = exerciseTargets(exercise);
       const setCount = exercise.entries.length;
       const exerciseLoadTl = (session.heracles?.sets?.[exerciseIndex] ?? []).reduce(

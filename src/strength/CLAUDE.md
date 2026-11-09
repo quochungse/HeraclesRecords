@@ -30,6 +30,11 @@ views, and exercises map selection, empty data and the saved metric preference.
   16 roll-up, 17 rest between exercises. Exercises are grouped by index *and* name; a set with
   `targetType` 2 is timed (reps 0). A run's laps carry exercise keys too (`S4208`) under modes
   0–2 and are no sets.
+- **A done exercise is grouped by its movement, never by the name the watch recorded**
+  (`resolveMovementName`, `exerciseMovementName`): a step Coach named for its set ("KĐ Bench
+  40 kg") is recorded under those words in place of the key, and grouped by them one lift had
+  as many histories and records as names. The movement is `corosKey`; the step's own name is
+  drawn under it (`exerciseStepLabel`), here, in Activities and in a workout's structure.
 - **A movement's muscles come from its identity, never its display name**
   (`electron/strengthExerciseMetadata.ts`, `src/strength/exerciseTargets.ts`). Metadata is
   taken lap → roll-up → program step → catalogue row, then the Exercises Library's review is
