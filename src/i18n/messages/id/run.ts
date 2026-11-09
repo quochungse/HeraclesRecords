@@ -120,6 +120,7 @@ const run: RunMessages = {
   "run.perf.reason.heartRateSettling": "Detak jantung masih menyusul",
   "run.perf.tip.run": "Lari ini",
   "run.perf.tip.usual": "Biasanya",
+  "run.perf.tip.median": "Median {days} hari",
   "run.perf.tip.coros": "VO2max COROS",
 };
 

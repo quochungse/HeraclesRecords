@@ -121,6 +121,7 @@ const run = {
   "run.perf.reason.heartRateSettling": "Heart rate catching up",
   "run.perf.tip.run": "This run",
   "run.perf.tip.usual": "Usual",
+  "run.perf.tip.median": "{days}-day median",
   "run.perf.tip.coros": "COROS VO2max",
 };
 

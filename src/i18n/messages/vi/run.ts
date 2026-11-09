@@ -120,6 +120,7 @@ const run: RunMessages = {
   "run.perf.reason.heartRateSettling": "Nhịp tim chưa theo kịp",
   "run.perf.tip.run": "Buổi này",
   "run.perf.tip.usual": "Thường lệ",
+  "run.perf.tip.median": "Trung vị {days} ngày",
   "run.perf.tip.coros": "VO2max COROS",
 };
 

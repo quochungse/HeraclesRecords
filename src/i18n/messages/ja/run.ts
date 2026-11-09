@@ -120,6 +120,7 @@ const run: RunMessages = {
   "run.perf.reason.heartRateSettling": "心拍が追いついていない",
   "run.perf.tip.run": "このラン",
   "run.perf.tip.usual": "いつも",
+  "run.perf.tip.median": "{days}日間の中央値",
   "run.perf.tip.coros": "COROS の VO2max",
 };
 

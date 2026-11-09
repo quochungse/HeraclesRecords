@@ -122,6 +122,7 @@ const run: RunMessages = {
   "run.perf.reason.heartRateSettling": "Пульс ещё догоняет",
   "run.perf.tip.run": "Эта пробежка",
   "run.perf.tip.usual": "Обычно",
+  "run.perf.tip.median": "Медиана за {days} дней",
   "run.perf.tip.coros": "VO2max COROS",
 };
 

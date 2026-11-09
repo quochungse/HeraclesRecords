@@ -41,8 +41,7 @@ import {
   TREND_DAYS,
   performanceWeeks,
   STEADY_BAND_PERCENT,
-  type PerformanceSession,
-  type PerformanceTrendPoint
+  type PerformanceSession
 } from "./runPerformanceModel";
 
 interface RunPerformancePanelProps {
@@ -73,10 +72,12 @@ function dayLabel(ms: number): string {
   return new Date(ms).toLocaleDateString(getIntlLocale(), { month: "short", day: "numeric" });
 }
 
+/** A run's dot and the rolling median through it, in one row. */
 interface TrendPoint {
   x: number;
   y: number;
-  session?: PerformanceSession;
+  median: number;
+  session: PerformanceSession;
 }
 
 /**
@@ -143,16 +144,18 @@ export function RunPerformancePanel({
   const usual = model?.context.baseline ? model.context.baseline.value * scale : undefined;
   // In ml/kg/min only: the screen states the figure, and how far a run sits
   // from the usual is the dashed line and each dot's colour.
-  const { trendPoints, trendLine } = useMemo(() => {
-    if (!model) return { trendPoints: [] as TrendPoint[], trendLine: [] as PerformanceTrendPoint[] };
-    return {
-      trendPoints: model.sessions.map<TrendPoint>((session) => ({
-        x: session.startedAtMs,
-        y: session.value,
-        session
-      })),
-      trendLine: performanceRollingMedian(model.sessions)
-    };
+  // One data array on the chart, not one on each series: a ComposedChart's
+  // tooltip reads by the axis, and with a series' own data it found the
+  // median's point first and the dot's by an index, so it showed nothing.
+  const trendPoints = useMemo<TrendPoint[]>(() => {
+    if (!model) return [];
+    const rolling = performanceRollingMedian(model.sessions);
+    return model.sessions.map((session, index) => ({
+      x: session.startedAtMs,
+      y: session.value,
+      median: rolling[index]!.median,
+      session
+    }));
   }, [model]);
 
   const quadrant = useMemo(() => {
@@ -196,7 +199,7 @@ export function RunPerformancePanel({
   // From the Monday the period starts on, as its runs are cut: `now − weeks`
   // reached back into the week before, days no run on the chart can sit in.
   const start = Math.min(model?.rows[0]?.weekStartMs ?? nowMs, ...trendPoints.map((point) => point.x));
-  const yValues = [...trendPoints.map((point) => point.y), ...trendLine.map((point) => point.median)];
+  const yValues = trendPoints.flatMap((point) => [point.y, point.median]);
   const band =
     usual === undefined ? undefined : [usual * (1 - PERFORMANCE_BAND), usual * (1 + PERFORMANCE_BAND)];
   const trendScale = niceScale(Math.min(...yValues, ...(band ?? [])), Math.max(...yValues, ...(band ?? [])));
@@ -240,7 +243,7 @@ export function RunPerformancePanel({
           <div className="run-block-plot">
             <p className="run-performance-plot-title">{t("run.perf.rolling", { days: TREND_DAYS })}</p>
             <ResponsiveContainer width="100%" height={230}>
-              <ComposedChart margin={{ top: 8, right: 8, bottom: 0, left: 0 }}>
+              <ComposedChart data={trendPoints} margin={{ top: 8, right: 8, bottom: 0, left: 0 }}>
                 <CartesianGrid stroke={colors.grid} strokeDasharray="3 3" vertical={false} />
                 <XAxis
                   dataKey="x"
@@ -268,9 +271,8 @@ export function RunPerformancePanel({
                     strokeDasharray="5 4"
                   />
                 ) : null}
-                <Scatter data={trendPoints} dataKey="y" isAnimationActive={false} shape={<TrendDot colors={colors} usual={usual} />} />
+                <Scatter dataKey="y" isAnimationActive={false} shape={<TrendDot colors={colors} usual={usual} />} />
                 <Line
-                  data={trendLine}
                   dataKey="median"
                   type="monotone"
                   stroke={colors.text}
@@ -387,7 +389,8 @@ function SessionTooltip({
   formatPace
 }: TooltipContentProps & { usual?: number; formatPace: (pace: number) => string }) {
   if (!active || !payload?.length) return null;
-  const session = (payload[0]?.payload as { session?: PerformanceSession } | undefined)?.session;
+  const row = payload[0]?.payload as { session?: PerformanceSession; median?: number } | undefined;
+  const session = row?.session;
   if (!session) return null;
   return (
     <div className="training-chart-tooltip">
@@ -403,6 +406,18 @@ function SessionTooltip({
             {usual !== undefined ? ` · ${signed((session.value / usual - 1) * 100)}%` : ""}
           </strong>
         </li>
+        {usual !== undefined ? (
+          <li className="training-chart-tooltip-row">
+            <span className="training-chart-tooltip-key">{t("run.perf.tip.usual")}</span>
+            <strong>{formatDecimal(usual, 1)}</strong>
+          </li>
+        ) : null}
+        {row.median !== undefined ? (
+          <li className="training-chart-tooltip-row">
+            <span className="training-chart-tooltip-key">{t("run.perf.tip.median", { days: TREND_DAYS })}</span>
+            <strong>{formatDecimal(row.median, 1)}</strong>
+          </li>
+        ) : null}
         {session.pace !== undefined ? (
           <li className="training-chart-tooltip-row">
             <span className="training-chart-tooltip-key">{t("activity.m.pace")}</span>

@@ -120,6 +120,7 @@ const run: RunMessages = {
   "run.perf.reason.heartRateSettling": "ชีพจรยังตามไม่ทัน",
   "run.perf.tip.run": "ครั้งนี้",
   "run.perf.tip.usual": "ปกติ",
+  "run.perf.tip.median": "ค่ามัธยฐาน {days} วัน",
   "run.perf.tip.coros": "VO2max ของ COROS",
 };
 

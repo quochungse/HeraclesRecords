@@ -120,6 +120,7 @@ const run: RunMessages = {
   "run.perf.reason.heartRateSettling": "Le cœur rattrape l’allure",
   "run.perf.tip.run": "Cette sortie",
   "run.perf.tip.usual": "Habitude",
+  "run.perf.tip.median": "Médiane sur {days} jours",
   "run.perf.tip.coros": "VO2max COROS",
 };
 

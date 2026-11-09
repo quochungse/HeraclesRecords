@@ -120,6 +120,7 @@ const run: RunMessages = {
   "run.perf.reason.heartRateSettling": "심박이 따라오는 중",
   "run.perf.tip.run": "이번 러닝",
   "run.perf.tip.usual": "평소",
+  "run.perf.tip.median": "{days}일 중앙값",
   "run.perf.tip.coros": "COROS VO2max",
 };
 

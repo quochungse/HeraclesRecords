@@ -120,6 +120,7 @@ const run: RunMessages = {
   "run.perf.reason.heartRateSettling": "Herzfrequenz holt auf",
   "run.perf.tip.run": "Dieser Lauf",
   "run.perf.tip.usual": "Üblich",
+  "run.perf.tip.median": "{days}-Tage-Median",
   "run.perf.tip.coros": "COROS-VO2max",
 };
 

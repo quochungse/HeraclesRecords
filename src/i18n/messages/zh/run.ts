@@ -120,6 +120,7 @@ const run: RunMessages = {
   "run.perf.reason.heartRateSettling": "心率尚未跟上",
   "run.perf.tip.run": "本次",
   "run.perf.tip.usual": "平常",
+  "run.perf.tip.median": "{days} 天中位数",
   "run.perf.tip.coros": "COROS VO2max",
 };
 
