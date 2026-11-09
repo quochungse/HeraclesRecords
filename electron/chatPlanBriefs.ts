@@ -180,6 +180,17 @@ export function briefForSessions(artifactId: string): PlanBrief & { outline: Pla
   return brief as PlanBrief & { outline: PlanBriefOutline };
 }
 
+/**
+ * The athlete's Discard brief: a brief not yet a plan goes, its outline with
+ * it, and stops waiting on them. The anchor stays in the transcript and draws
+ * nothing, as a brief deleted on another machine does.
+ */
+export function discardPlanBrief(artifactId: string): void {
+  if (!planBriefOf(artifactId)) return;
+  if (hasVersions(artifactId)) throw new ScreenError("main.coach.briefIsPlan");
+  deleteChatPlanArtifactRow(artifactId);
+}
+
 export function deletePlanBriefs(artifactIds: readonly string[]): void {
   for (const artifactId of artifactIds) deleteChatPlanArtifactRow(artifactId);
 }

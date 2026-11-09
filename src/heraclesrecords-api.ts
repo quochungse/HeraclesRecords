@@ -477,6 +477,8 @@ export interface HeraclesRecordsApi {
   getPlanBriefs: (artifactIds: string[]) => Promise<PlanBrief[]>;
   /** The athlete's edit of a brief; a field changed loses its "from chat" or "from data". */
   updatePlanBrief: (artifactId: string, request: PlanBriefRequest) => Promise<PlanBrief>;
+  /** The athlete's Discard brief: a brief not yet a plan goes, its outline with it. */
+  discardPlanBrief: (artifactId: string) => Promise<void>;
   /** A new conversation's brief (P2.5): the athlete's, or the defaults when absent. */
   createPlanBrief: (sessionId: string, request?: PlanBriefRequest) => Promise<PlanBrief>;
   /** The athlete's adjustment of a brief's outline; refused when it breaks the brief (P2.2). */

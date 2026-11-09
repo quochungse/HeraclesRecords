@@ -287,6 +287,7 @@ import {
   setConversationSettings,
   listConversationPlanBriefs,
   editPlanBrief,
+  dropPlanBrief,
   adjustPlanOutline,
   createPlanBriefForSession,
   findChatSessionForDraft,
@@ -1811,6 +1812,7 @@ function registerIpcHandlers(): void {
     "chat:updatePlanBrief",
     (_event, artifactId: string, request: import("./types").PlanBriefRequest) => editPlanBrief(artifactId, request)
   );
+  ipcMain.handle("chat:discardPlanBrief", (_event, artifactId: string) => dropPlanBrief(artifactId));
   ipcMain.handle("chat:createPlanBrief", (_event, sessionId: string, request?: import("./types").PlanBriefRequest) =>
     createPlanBriefForSession(sessionId, request)
   );

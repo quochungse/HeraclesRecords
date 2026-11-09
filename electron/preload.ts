@@ -568,6 +568,7 @@ const api = {
   getPlanBriefs: (artifactIds: string[]): Promise<PlanBrief[]> => ipcRenderer.invoke("chat:planBriefs", artifactIds),
   updatePlanBrief: (artifactId: string, request: PlanBriefRequest): Promise<PlanBrief> =>
     ipcRenderer.invoke("chat:updatePlanBrief", artifactId, request),
+  discardPlanBrief: (artifactId: string): Promise<void> => ipcRenderer.invoke("chat:discardPlanBrief", artifactId),
   createPlanBrief: (sessionId: string, request?: PlanBriefRequest): Promise<PlanBrief> =>
     ipcRenderer.invoke("chat:createPlanBrief", sessionId, request),
   updatePlanOutline: (artifactId: string, outline: TrainingPlanOutline): Promise<PlanBrief> =>

@@ -72,6 +72,7 @@ import {
   briefWaiting,
   createPlanBrief,
   deletePlanBriefs,
+  discardPlanBrief,
   listPlanBriefs,
   savePlanOutline,
   updatePlanBrief,
@@ -3035,6 +3036,11 @@ export function listConversationPlanBriefs(artifactIds: string[]): PlanBrief[] {
 /** The athlete's edit of a brief, from its own screen. */
 export function editPlanBrief(artifactId: string, request: PlanBriefRequest): PlanBrief {
   return updatePlanBrief(artifactId, request);
+}
+
+/** The athlete's Discard brief, from its card: the brief and its outline go. */
+export function dropPlanBrief(artifactId: string): void {
+  if (typeof artifactId === "string" && artifactId) discardPlanBrief(artifactId);
 }
 
 export function listPlanArtifactVersions(draftIds: string[]): PlanArtifactVersion[] {

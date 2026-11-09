@@ -22,7 +22,8 @@ export function CoachBriefCard({
   editing = false,
   busy = false,
   onEdit,
-  onDrawOutline
+  onDrawOutline,
+  onDiscard
 }: {
   brief: PlanBrief;
   firstMonday: string;
@@ -30,7 +31,7 @@ export function CoachBriefCard({
   sources?: TrainingPlanDataSources;
   /** Its screen is open: the way on is back into it. */
   editing?: boolean;
-  /** A turn is running: the outline waits for it. */
+  /** A turn is running: the outline and a discard wait for it. */
   busy?: boolean;
   onEdit?: () => void;
   /**
@@ -38,6 +39,8 @@ export function CoachBriefCard({
    * leads from then on — and while the brief still misses what it needs.
    */
   onDrawOutline?: () => void;
+  /** Throw the brief away (its outline with it); absent once it is a plan. */
+  onDiscard?: () => void;
 }) {
   const rows = briefRows(brief, firstMonday);
   const open = briefOpenProblems(brief.request, sources);
@@ -97,6 +100,11 @@ export function CoachBriefCard({
           {onEdit ? (
             <button type="button" className="chat-plan-review" onClick={onEdit}>
               {editing ? t("library.reader.continue") : t("chat.brief.edit")}
+            </button>
+          ) : null}
+          {onDiscard ? (
+            <button type="button" className="chat-plan-review" disabled={busy} onClick={onDiscard}>
+              {t("chat.brief.discard")}
             </button>
           ) : null}
         </div>

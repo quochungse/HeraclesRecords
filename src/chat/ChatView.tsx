@@ -1396,6 +1396,25 @@ export function ChatView({
   };
   /** A brief changed under its outline: whether to have it redrawn (P2.2). */
   const [redrawAsk, setRedrawAsk] = useState<string | null>(null);
+  /** A brief the athlete asked to discard, waiting on their yes. */
+  const [discardAsk, setDiscardAsk] = useState<string | null>(null);
+  const discardBrief = async (artifactId: string) => {
+    if (!api) return;
+    onError(null);
+    try {
+      await api.discardPlanBrief(artifactId);
+      // Read as gone, as a brief deleted on another machine is: its cards draw nothing.
+      setPlanBriefs((current) => ({ ...current, [artifactId]: null }));
+      setEditingBriefId((current) => (current === artifactId ? null : current));
+      setEditingOutlineId((current) => (current === artifactId ? null : current));
+      setRedrawAsk((current) => (current === artifactId ? null : current));
+    } catch (caught) {
+      onError(remoteErrorMessage(caught, t("chat.err.briefNotDiscarded")));
+    } finally {
+      // The row's "1 brief" counts the briefs from the table.
+      void refreshSessions().catch(() => undefined);
+    }
+  };
   /** The outline whose Adjust screen is open, and how its save is going (P2.2). */
   const [editingOutlineId, setEditingOutlineId] = useState<string | null>(null);
   const [outlineSave, setOutlineSave] = useState<{ saving: boolean; error?: string }>({ saving: false });
@@ -5880,6 +5899,7 @@ export function ChatView({
                           ? undefined
                           : () => void drawOutline(brief.artifactId)
                       }
+                      onDiscard={briefIsPlan(brief.artifactId) ? undefined : () => setDiscardAsk(brief.artifactId)}
                       busy={streaming}
                     />
                   </div>
@@ -6587,6 +6607,24 @@ export function ChatView({
                 void drawOutline(artifactId);
               }}
               onCancel={() => setRedrawAsk(null)}
+            />,
+            document.body
+          )
+        : null}
+      {discardAsk && planBriefs[discardAsk]
+        ? createPortal(
+            <ConfirmDialog
+              title={t("chat.brief.discardTitle")}
+              description={t("chat.brief.discardBody")}
+              cancelLabel={t("chat.brief.keep")}
+              confirmLabel={t("chat.brief.discard")}
+              danger
+              onConfirm={() => {
+                const artifactId = discardAsk;
+                setDiscardAsk(null);
+                void discardBrief(artifactId);
+              }}
+              onCancel={() => setDiscardAsk(null)}
             />,
             document.body
           )
