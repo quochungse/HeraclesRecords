@@ -78,6 +78,8 @@ const activity: ActivityMessages = {
   "activity.route.layer.heatmap.description": "Más intenso donde más veces pasaste",
   "activity.route.expand": "Ampliar mapa",
   "activity.route.replay": "Reproducir ruta",
+  "activity.route.replaySpeed": "Velocidad de reproducción",
+  "activity.route.replaySpeedNow": "Velocidad de reproducción: {speed}",
   "activity.route.closeExpanded": "Cerrar mapa ampliado",
   "activity.route.expandedLabel": "Mapa ampliado de la ruta",
   "activity.route.metric": "Métrica de rendimiento",

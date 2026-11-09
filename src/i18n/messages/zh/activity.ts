@@ -78,6 +78,8 @@ const activity: ActivityMessages = {
   "activity.route.layer.heatmap.description": "经过越多次，颜色越热",
   "activity.route.expand": "放大地图",
   "activity.route.replay": "回放路线",
+  "activity.route.replaySpeed": "回放速度",
+  "activity.route.replaySpeedNow": "回放速度：{speed}",
   "activity.route.closeExpanded": "关闭放大地图",
   "activity.route.expandedLabel": "放大的活动路线地图",
   "activity.route.metric": "表现指标",

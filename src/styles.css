@@ -6633,6 +6633,22 @@ td span {
   z-index: 1100;
 }
 
+/* Its speed under it: a second layer control, its menu opening in its place.
+   Below the layer picker too, so the layer menu covers it. */
+.map-frame .basemap-control.map-replay-speed {
+  top: 96px;
+  z-index: 1100;
+}
+
+/* The button's face is the speed, written small enough that 0.25× fits. */
+.map-replay-speed .basemap-toggle {
+  padding: 0;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+}
+
 /* Expand takes the corner and the picker moves down a place under it, so its
    menu still opens below its own button. A route cover's corner is the same,
    its picker holding only the route's colouring. */

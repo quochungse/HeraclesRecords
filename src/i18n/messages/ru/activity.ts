@@ -78,6 +78,8 @@ const activity: ActivityMessages = {
   "activity.route.layer.heatmap.description": "Чем чаще вы здесь проходили, тем ярче",
   "activity.route.expand": "Развернуть карту",
   "activity.route.replay": "Воспроизвести маршрут",
+  "activity.route.replaySpeed": "Скорость воспроизведения",
+  "activity.route.replaySpeedNow": "Скорость воспроизведения: {speed}",
   "activity.route.closeExpanded": "Закрыть развёрнутую карту",
   "activity.route.expandedLabel": "Развёрнутая карта маршрута",
   "activity.route.metric": "Показатель",

@@ -1,5 +1,5 @@
 import { Layers, X } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { BASE_LAYERS, BASE_LAYER_ORDER, type BaseLayerId } from "./constants";
 import { t } from "../i18n/core";
 
@@ -11,7 +11,7 @@ import { t } from "../i18n/core";
 export interface MapLayerSection<T extends string> {
   title: string;
   value: T;
-  options: { value: T; label: string; description: string; disabled?: boolean }[];
+  options: { value: T; label: string; description?: string; disabled?: boolean }[];
   onChange: (value: T) => void;
 }
 
@@ -29,12 +29,23 @@ export function hasOpenLayerMenu(root: ParentNode): boolean {
  * Floating layer switcher (top-right of the map): the base map, then the map's
  * own choices. A map drawn on the theme's own base map offers no base map to
  * pick, and leaves `value` and `onChange` out: its menu is `section` alone.
+ *
+ * A map's other menus — the route's replay speed — are this control with a
+ * button of their own (`toggle`), so every popup on a map opens, closes on
+ * Escape or a press outside, and reports itself open (`hasOpenLayerMenu`) alike.
  */
 export function MapLayerControl<T extends string = never>({
   value,
   onChange,
-  section
-}: { section?: MapLayerSection<T> } & (
+  section,
+  toggle,
+  className
+}: {
+  section?: MapLayerSection<T>;
+  /** The button's face and name, in place of the layers icon. */
+  toggle?: { content: ReactNode; label: string };
+  className?: string;
+} & (
   | { value: BaseLayerId; onChange: (layer: BaseLayerId) => void }
   | { value?: undefined; onChange?: undefined }
 )) {
@@ -76,7 +87,10 @@ export function MapLayerControl<T extends string = never>({
   }, [open]);
 
   return (
-    <div ref={rootRef} className={`basemap-control${open ? " is-open" : ""}`}>
+    <div
+      ref={rootRef}
+      className={`basemap-control${open ? " is-open" : ""}${className ? ` ${className}` : ""}`}
+    >
       {open ? (
         <div className="basemap-menu">
           <div className="basemap-head">
@@ -131,7 +145,7 @@ export function MapLayerControl<T extends string = never>({
                   }}
                 >
                   <strong>{option.label}</strong>
-                  <em>{option.description}</em>
+                  {option.description ? <em>{option.description}</em> : null}
                 </button>
               ))}
             </>
@@ -143,10 +157,10 @@ export function MapLayerControl<T extends string = never>({
           type="button"
           className="basemap-toggle"
           onClick={() => setOpen(true)}
-          title={t("app.map.changeLayers")}
-          aria-label={t("app.map.changeLayers")}
+          title={toggle?.label ?? t("app.map.changeLayers")}
+          aria-label={toggle?.label ?? t("app.map.changeLayers")}
         >
-          <Layers size={18} aria-hidden="true" />
+          {toggle?.content ?? <Layers size={18} aria-hidden="true" />}
         </button>
       )}
     </div>

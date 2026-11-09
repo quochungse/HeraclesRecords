@@ -78,6 +78,8 @@ const activity: ActivityMessages = {
   "activity.route.layer.heatmap.description": "よく通った場所ほど濃く表示",
   "activity.route.expand": "地図を拡大",
   "activity.route.replay": "ルートを再生",
+  "activity.route.replaySpeed": "再生速度",
+  "activity.route.replaySpeedNow": "再生速度：{speed}",
   "activity.route.closeExpanded": "拡大地図を閉じる",
   "activity.route.expandedLabel": "アクティビティのルート地図（拡大）",
   "activity.route.metric": "パフォーマンス指標",

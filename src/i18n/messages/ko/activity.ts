@@ -78,6 +78,8 @@ const activity: ActivityMessages = {
   "activity.route.layer.heatmap.description": "자주 지난 곳일수록 진하게 표시",
   "activity.route.expand": "지도 크게 보기",
   "activity.route.replay": "경로 재생",
+  "activity.route.replaySpeed": "재생 속도",
+  "activity.route.replaySpeedNow": "재생 속도: {speed}",
   "activity.route.closeExpanded": "큰 지도 닫기",
   "activity.route.expandedLabel": "활동 경로 지도(확대)",
   "activity.route.metric": "퍼포먼스 지표",

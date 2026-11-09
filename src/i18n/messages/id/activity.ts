@@ -78,6 +78,8 @@ const activity: ActivityMessages = {
   "activity.route.layer.heatmap.description": "Makin panas di tempat yang makin sering dilewati",
   "activity.route.expand": "Perbesar peta",
   "activity.route.replay": "Putar ulang rute",
+  "activity.route.replaySpeed": "Kecepatan putar ulang",
+  "activity.route.replaySpeedNow": "Kecepatan putar ulang: {speed}",
   "activity.route.closeExpanded": "Tutup peta besar",
   "activity.route.expandedLabel": "Peta rute aktivitas yang diperbesar",
   "activity.route.metric": "Metrik performa",

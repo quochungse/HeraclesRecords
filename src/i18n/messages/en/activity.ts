@@ -79,6 +79,8 @@ const activity = {
   "activity.route.layer.heatmap.description": "Hotter where it was passed more often",
   "activity.route.expand": "Expand map",
   "activity.route.replay": "Replay route",
+  "activity.route.replaySpeed": "Replay speed",
+  "activity.route.replaySpeedNow": "Replay speed: {speed}",
   "activity.route.closeExpanded": "Close expanded map",
   "activity.route.expandedLabel": "Expanded activity route map",
   "activity.route.metric": "Performance metric",

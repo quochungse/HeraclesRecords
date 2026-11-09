@@ -78,6 +78,8 @@ const activity: ActivityMessages = {
   "activity.route.layer.heatmap.description": "ยิ่งผ่านบ่อย สียิ่งร้อน",
   "activity.route.expand": "ขยายแผนที่",
   "activity.route.replay": "เล่นเส้นทางซ้ำ",
+  "activity.route.replaySpeed": "ความเร็วในการเล่นซ้ำ",
+  "activity.route.replaySpeedNow": "ความเร็วในการเล่นซ้ำ: {speed}",
   "activity.route.closeExpanded": "ปิดแผนที่ที่ขยาย",
   "activity.route.expandedLabel": "แผนที่เส้นทางกิจกรรมแบบขยาย",
   "activity.route.metric": "ตัวชี้วัดประสิทธิภาพ",

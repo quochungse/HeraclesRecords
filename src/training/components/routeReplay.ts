@@ -39,16 +39,10 @@ const REPLAY_MS_PER_KM = 400;
  */
 const LONG_GAP_FACTOR = 3;
 
-/**
- * A route cover's ceiling: the cover is a picture behind a page's heading, read
- * at a glance on the way to the figures, so a long route is drawn in 2 s there
- * and the full map keeps the time to watch it.
- */
-export const COVER_REPLAY_MAX_MS = 2000;
-
-export function replayDurationMs(meters: number, ceilingMs = REPLAY_MAX_MS): number {
+/** How long a replay runs at 1×; the full map's speed divides it. */
+export function replayDurationMs(meters: number): number {
   const ms = REPLAY_BASE_MS + (meters / 1000) * REPLAY_MS_PER_KM;
-  return Math.min(ceilingMs, Math.max(REPLAY_MIN_MS, ms));
+  return Math.min(REPLAY_MAX_MS, Math.max(REPLAY_MIN_MS, ms));
 }
 
 function metersBetween(a: [number, number], b: [number, number]): number {

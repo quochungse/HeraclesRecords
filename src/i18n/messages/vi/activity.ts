@@ -78,6 +78,8 @@ const activity: ActivityMessages = {
   "activity.route.layer.heatmap.description": "Càng đi qua nhiều lần càng nóng",
   "activity.route.expand": "Phóng to bản đồ",
   "activity.route.replay": "Phát lại lộ trình",
+  "activity.route.replaySpeed": "Tốc độ phát lại",
+  "activity.route.replaySpeedNow": "Tốc độ phát lại: {speed}",
   "activity.route.closeExpanded": "Đóng bản đồ phóng to",
   "activity.route.expandedLabel": "Bản đồ lộ trình phóng to",
   "activity.route.metric": "Chỉ số hiệu suất",

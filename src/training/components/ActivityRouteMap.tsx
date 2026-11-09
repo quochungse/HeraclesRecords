@@ -46,7 +46,6 @@ import {
   type ShownView
 } from "./routePerformance";
 import {
-  COVER_REPLAY_MAX_MS,
   REPLAY_DELAY_MS,
   buildRouteReplay,
   replayDurationMs,
@@ -79,7 +78,7 @@ import {
   type RouteMetric,
   type RouteZoneColoring
 } from "./routeColoring";
-import { formatDecimal, t } from "../../i18n/core";
+import { formatDecimal, getIntlLocale, t } from "../../i18n/core";
 
 interface ActivityRouteMapProps {
   track?: TrainingHubActivityTrack;
@@ -169,6 +168,20 @@ const ROUTE_METRIC_PREFERENCE = defineSelectionPreference<RouteMetric>({
   defaultValue: "pace",
   validate: selectionIsOneOf(ROUTE_METRICS)
 });
+
+/** The full map's replay speeds, against `replayDurationMs` at 1×. */
+const REPLAY_SPEEDS = ["0.25", "0.5", "1", "2"] as const;
+type ReplaySpeed = (typeof REPLAY_SPEEDS)[number];
+
+const REPLAY_SPEED_PREFERENCE = defineSelectionPreference<ReplaySpeed>({
+  key: "training.activityRoute.replaySpeed",
+  defaultValue: "1",
+  validate: selectionIsOneOf(REPLAY_SPEEDS)
+});
+
+function replaySpeedLabel(speed: ReplaySpeed): string {
+  return `${new Intl.NumberFormat(getIntlLocale()).format(Number(speed))}×`;
+}
 
 /** A metric's name. On a ride the pace channel is read out as speed. */
 function metricLabel(metric: RouteMetric, speed: boolean): string {
@@ -723,7 +736,8 @@ function RouteMapCanvas({
   visibleBand,
   baseLayer,
   animate = true,
-  replayCeilingMs,
+  ends = true,
+  replaySpeed = 1,
   replayToken = 0,
   drawing,
   ariaLabel
@@ -737,11 +751,16 @@ function RouteMapCanvas({
   scrollWheelZoom?: boolean;
   /**
    * Replay the route when the map opens. False for a map that is only a quick
-   * look (the side panel): the route is drawn whole, finish marker in place.
+   * look (the side panel, a route cover): the route is drawn whole.
    */
   animate?: boolean;
-  /** The longest the replay may run, in ms; see `replayDurationMs`. */
-  replayCeilingMs?: number;
+  /** The start and finish markers. False for a route cover, a picture. */
+  ends?: boolean;
+  /**
+   * How fast the replay runs against `replayDurationMs`. Read on every frame,
+   * so a change takes the replay under way from where it is.
+   */
+  replaySpeed?: number;
   /** Raised to replay the route again, without rebuilding the map. */
   replayToken?: number;
   /**
@@ -770,6 +789,8 @@ function RouteMapCanvas({
   // What the map on screen is drawn with, so the redraw effect below can tell
   // a change from what a rebuild has just drawn.
   const drawnRef = useRef(drawing);
+  const replaySpeedRef = useRef(replaySpeed);
+  replaySpeedRef.current = replaySpeed;
   // Read by the init effect without retriggering it: layer switches swap
   // tiles in place instead of rebuilding the map.
   const baseLayerPropRef = useRef(baseLayer);
@@ -832,7 +853,7 @@ function RouteMapCanvas({
     const start = route.latLngs[0]!;
     const end = route.latLngs[route.latLngs.length - 1]!;
 
-    const startMarker = routeEndMarker(map, start, "start").addTo(map);
+    const startMarker = ends ? routeEndMarker(map, start, "start").addTo(map) : undefined;
 
     const fitRoute = () => {
       const band =
@@ -846,10 +867,10 @@ function RouteMapCanvas({
       });
     };
     fitRoute();
-    const routeEnds = bindRouteEnds(map);
+    const routeEnds = ends ? bindRouteEnds(map) : undefined;
     // The heatmap's canvas is hidden through a zoom; the lines are not.
     const endsHideWithRoute = (next: RouteDrawing | undefined) =>
-      routeEnds.hideWhileZooming(next?.kind === "glow");
+      routeEnds?.hideWhileZooming(next?.kind === "glow");
     endsHideWithRoute(drawingRef.current);
     mapRef.current = map;
     tileLayerRef.current = tileLayer;
@@ -858,42 +879,55 @@ function RouteMapCanvas({
     // The replay: a still half second when the map opens, then the line grows
     // at the pace the activity was done (sped up, linear, so a slow stretch
     // reads as slow) with the finish marker riding its head to the finish.
-    const endMarker = routeEndMarker(map, end, "end");
+    const endMarker = ends ? routeEndMarker(map, end, "end") : undefined;
 
     let animationFrame = 0;
-    const replayMs = replayDurationMs(route.meters, replayCeilingMs);
+    const replayMs = replayDurationMs(route.meters);
 
     // The markers sit on the line as drawn, which the heatmap moves off the
     // recorded points.
     const paintAt = (progress: number) => {
-      const ends = painter.paint(progress);
-      startMarker.setLatLng(ends.start);
-      return ends.head;
+      const drawn = painter.paint(progress);
+      startMarker?.setLatLng(drawn.start);
+      return drawn.head;
     };
 
     const showWhole = () => {
       window.cancelAnimationFrame(animationFrame);
-      endMarker.setLatLng(paintAt(1)).addTo(map);
+      const head = paintAt(1);
+      endMarker?.setLatLng(head).addTo(map);
     };
 
     const play = (delayMs: number) => {
       window.cancelAnimationFrame(animationFrame);
       paintAt(0);
-      endMarker.remove();
-      let animationStart: number | undefined;
+      endMarker?.remove();
+      let previous: number | undefined;
+      let waiting = delayMs;
+      let progress = 0;
 
+      // Progress is summed frame by frame at the speed of that frame, so a new
+      // speed carries on from where the head is rather than jumping.
       const animateRoute = (timestamp: number) => {
-        animationStart ??= timestamp;
-        const elapsed = timestamp - animationStart - delayMs;
-        if (elapsed < 0) {
-          animationFrame = window.requestAnimationFrame(animateRoute);
-          return;
+        let step = previous === undefined ? 0 : timestamp - previous;
+        previous = timestamp;
+        if (waiting > 0) {
+          const waited = Math.min(waiting, step);
+          waiting -= waited;
+          step -= waited;
+          if (waiting > 0) {
+            animationFrame = window.requestAnimationFrame(animateRoute);
+            return;
+          }
         }
 
-        const progress = Math.min(elapsed / replayMs, 1);
-        endMarker.setLatLng(paintAt(progress));
-        if (!map.hasLayer(endMarker)) {
-          endMarker.addTo(map);
+        progress = Math.min(progress + (step * replaySpeedRef.current) / replayMs, 1);
+        const head = paintAt(progress);
+        if (endMarker) {
+          endMarker.setLatLng(head);
+          if (!map.hasLayer(endMarker)) {
+            endMarker.addTo(map);
+          }
         }
 
         if (progress < 1) {
@@ -952,7 +986,7 @@ function RouteMapCanvas({
       mapRef.current = null;
       tileLayerRef.current = null;
     };
-  }, [route, theme, scrollWheelZoom, interactive, visibleBand, animate, replayCeilingMs]);
+  }, [route, theme, scrollWheelZoom, interactive, visibleBand, animate, ends]);
 
   useEffect(() => {
     if (replayToken > 0) {
@@ -1324,10 +1358,12 @@ function RouteMapFrame({
   scrollWheelZoom,
   animate,
   replayToken,
+  replaySpeed,
   drawing,
   ariaLabel,
   onExpand,
   onReplay,
+  onReplaySpeedChange,
   layerSection
 }: {
   route: RouteReplay;
@@ -1344,6 +1380,9 @@ function RouteMapFrame({
   onExpand?: () => void;
   /** Present on a map that replays its route: a button under the layer picker. */
   onReplay?: () => void;
+  /** With `onReplaySpeedChange`, the speeds offered under Replay. */
+  replaySpeed?: ReplaySpeed;
+  onReplaySpeedChange?: (speed: ReplaySpeed) => void;
 }) {
   const [creditOpen, toggleCredit] = useFoldingCredit();
   return (
@@ -1353,6 +1392,7 @@ function RouteMapFrame({
         scrollWheelZoom={scrollWheelZoom}
         animate={animate}
         replayToken={replayToken}
+        {...(replaySpeed ? { replaySpeed: Number(replaySpeed) } : {})}
         drawing={drawing}
         baseLayer={layers.baseLayer}
         ariaLabel={ariaLabel}
@@ -1387,6 +1427,25 @@ function RouteMapFrame({
           <RotateCcw size={16} aria-hidden="true" />
         </button>
       ) : null}
+      {onReplay && replaySpeed && onReplaySpeedChange ? (
+        // Under Replay, in its look, with the speeds in a menu like the layers'.
+        <MapLayerControl
+          className="map-replay-speed"
+          toggle={{
+            content: replaySpeedLabel(replaySpeed),
+            label: t("activity.route.replaySpeedNow", { speed: replaySpeedLabel(replaySpeed) })
+          }}
+          section={{
+            title: t("activity.route.replaySpeed"),
+            value: replaySpeed,
+            options: REPLAY_SPEEDS.map((speed) => ({
+              value: speed,
+              label: replaySpeedLabel(speed)
+            })),
+            onChange: onReplaySpeedChange
+          }}
+        />
+      ) : null}
       <MapCreditButton open={creditOpen} onToggle={toggleCredit} />
     </div>
   );
@@ -1409,6 +1468,7 @@ function RouteMapModal({
   onClose: () => void;
 }) {
   const [replayToken, setReplayToken] = useState(0);
+  const [replaySpeed, setReplaySpeed] = useSelectionPreference(REPLAY_SPEED_PREFERENCE);
   const dialogRef = useRef<HTMLDivElement>(null);
   const lightGround = isLightBaseLayer(layers.baseLayer);
   const drawing = useRouteDrawing(analysis, lightGround);
@@ -1469,6 +1529,8 @@ function RouteMapModal({
             scrollWheelZoom
             replayToken={replayToken}
             onReplay={() => setReplayToken((token) => token + 1)}
+            replaySpeed={replaySpeed}
+            onReplaySpeedChange={setReplaySpeed}
             drawing={drawing}
             ariaLabel={t("activity.route.expandedLabel")}
             layerSection={layerSection}
@@ -1591,9 +1653,10 @@ interface ActivityRouteCoverProps {
  * The route as a picture behind a page's heading: nothing to drag or zoom, and
  * a click anywhere on it opens the full map. Its corner holds Expand and the
  * layer picker, as the side-panel map's does, but the picker offers only how
- * the route is coloured: the cover is drawn on the theme's own base map. Its
- * replay is kept to `COVER_REPLAY_MAX_MS`. Renders nothing without a route —
- * the caller decides what the heading looks like then.
+ * the route is coloured: the cover is drawn on the theme's own base map. It is
+ * drawn whole, with no replay and no start or finish: the full map has those.
+ * Renders nothing without a route — the caller decides what the heading looks
+ * like then.
  */
 export function ActivityRouteCover({
   track,
@@ -1667,7 +1730,8 @@ function RouteCover({
             route={route}
             interactive={false}
             visibleBand={visibleBand}
-            replayCeilingMs={COVER_REPLAY_MAX_MS}
+            animate={false}
+            ends={false}
             drawing={drawing}
             ariaLabel={t("activity.m.route")}
           />
