@@ -1646,13 +1646,50 @@ export function ChatView({
     setTranscriptWindow({ sessionId: activeSessionId, from });
   };
   const pendingEntryScrollRef = useRef<(() => void) | null>(null);
-  /** Hands an entry's row to `scroll`, drawing the entries down to it first when it is above the window. */
+  /**
+   * A jump to an entry on its way, until it lands: the transcript's end does
+   * not take the view back, and the earlier entries wait (`revealEarlier`).
+   */
+  const entryJumpRef = useRef<{ moved: boolean } | null>(null);
+  /** Earlier entries asked for while a jump was on its way, drawn once it lands. */
+  const earlierAfterJumpRef = useRef<(() => void) | null>(null);
+  /**
+   * Hands an entry's row to `scroll`, drawing the entries down to it first when it is above the window.
+   * A jump leaves the end: held there, the thread growing by the rows drawn
+   * above pulled the view straight back down, short of the entry.
+   */
   const withEntryRow = (index: number, scroll: (row: HTMLElement) => void) => {
+    stickToEndRef.current = false;
+    const jump = { moved: false };
+    entryJumpRef.current = jump;
+    // A newer jump owns the flag: an earlier one landing does not let it go.
+    const land = () => {
+      if (entryJumpRef.current !== jump) return;
+      entryJumpRef.current = null;
+      // A jump that ended at the end holds it again, as a scroll there does.
+      const transcript = scrollRef.current;
+      if (transcript && transcript.scrollHeight - transcript.scrollTop - transcript.clientHeight < 40) {
+        stickToEndRef.current = true;
+      }
+      const earlier = earlierAfterJumpRef.current;
+      earlierAfterJumpRef.current = null;
+      earlier?.();
+    };
+    // However it ends: a scroll the athlete took over, or a row that never came.
+    setTimeout(land, 3000);
     const run = () => {
-      const row = scrollRef.current?.querySelector<HTMLElement>(
-        `[data-chat-entry-index="${index}"]`
-      );
-      if (row) scroll(row);
+      const transcript = scrollRef.current;
+      const row = transcript?.querySelector<HTMLElement>(`[data-chat-entry-index="${index}"]`);
+      if (!transcript || !row) {
+        land();
+        return;
+      }
+      transcript.addEventListener("scrollend", land, { once: true });
+      scroll(row);
+      // A row already in place scrolls not at all, so no scrollend comes.
+      setTimeout(() => {
+        if (!jump.moved) land();
+      }, 150);
     };
     if (index >= renderFrom) {
       run();
@@ -1660,6 +1697,17 @@ export function ChatView({
     }
     pendingEntryScrollRef.current = run;
     revealTranscriptFrom(index);
+  };
+  /*
+   * The earlier entries `TranscriptEarlier` draws as it comes near, held while
+   * a jump is on its way: it sits right above an entry a jump drew, and rows
+   * landing above mid-scroll left the jump short of its entry by their height.
+   * Drawn once it lands, scroll anchoring keeps the entry where it is.
+   */
+  const revealEarlier = () => {
+    const reveal = () => revealTranscriptFrom(renderFrom - TRANSCRIPT_STEP);
+    if (entryJumpRef.current) earlierAfterJumpRef.current = reveal;
+    else reveal();
   };
   useLayoutEffect(() => {
     const run = pendingEntryScrollRef.current;
@@ -3209,8 +3257,10 @@ export function ChatView({
   const handleTranscriptScroll = (event: { currentTarget: HTMLDivElement }) => {
     const transcript = event.currentTarget;
     readRailPosition(transcript);
+    if (entryJumpRef.current) entryJumpRef.current.moved = true;
     if (transcript.scrollHeight - transcript.scrollTop - transcript.clientHeight < 40) {
-      stickToEndRef.current = true;
+      // A jump's first steps up are still near the end; they are not a return to it.
+      if (!entryJumpRef.current) stickToEndRef.current = true;
     } else if (transcript.scrollTop < lastScrollTopRef.current) {
       stickToEndRef.current = false;
     }
@@ -5666,7 +5716,7 @@ export function ChatView({
           {renderFrom > 0 ? (
             <TranscriptEarlier
               hidden={renderFrom}
-              onReveal={() => revealTranscriptFrom(renderFrom - TRANSCRIPT_STEP)}
+              onReveal={revealEarlier}
               scrollRef={scrollRef}
             />
           ) : null}

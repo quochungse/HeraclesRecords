@@ -9956,12 +9956,15 @@ label.chat-settings-toggle-row {
   gap: 26px;
 }
 
-/* Message rows */
+/* Message rows. The entrances fill backwards only: a row still holding its
+   last frame's transform is never chosen as the scroll anchor, so the
+   earlier entries drawn above it pushed the page being read down by their
+   height, and a jump to an entry landed that far short. */
 .chat-row {
   display: flex;
   gap: 12px;
   align-items: flex-start;
-  animation: chat-row-enter 0.42s cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation: chat-row-enter 0.42s cubic-bezier(0.22, 1, 0.36, 1) backwards;
 }
 
 /* A row that replaces what was already on screen — the answer a turn streamed,
@@ -10007,7 +10010,7 @@ label.chat-settings-toggle-row {
   border-radius: 50%;
   display: grid;
   place-items: center;
-  animation: chat-avatar-pop 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+  animation: chat-avatar-pop 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) backwards;
 }
 
 .chat-avatar-assistant {
