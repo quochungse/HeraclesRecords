@@ -442,6 +442,7 @@ const library: LibraryMessages = {
   "library.x.primary": "주동근",
   "library.x.involved": "보조근",
   "library.x.noMuscles": "COROS가 이 동작의 근육을 명시하지 않았습니다.",
+  "library.x.description": "설명",
   "library.gate.body": "COROS Training Hub에 연결하면 운동, 계획, 완료한 활동을 불러올 수 있습니다.",
   "library.gate.failed": "라이브러리를 불러오지 못했습니다",
   "library.msg.keptEdits": "‘{name}’의 편집을 저장했습니다. 저장하기 전까지 COROS의 계획은 그대로입니다.",

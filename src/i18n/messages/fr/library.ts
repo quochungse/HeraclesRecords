@@ -442,6 +442,7 @@ const library: LibraryMessages = {
   "library.x.primary": "Principal",
   "library.x.involved": "Secondaire",
   "library.x.noMuscles": "COROS n'indique aucun muscle pour cet exercice.",
+  "library.x.description": "Description",
   "library.gate.body": "Connectez COROS Training Hub pour charger vos séances, vos plans et vos activités réalisées.",
   "library.gate.failed": "La bibliothèque ne s’est pas chargée",
   "library.msg.keptEdits": "Modifications de « {name} » gardées. Le plan COROS ne change pas tant que vous ne les enregistrez pas.",

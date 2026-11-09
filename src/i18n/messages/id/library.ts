@@ -442,6 +442,7 @@ const library: LibraryMessages = {
   "library.x.primary": "Utama",
   "library.x.involved": "Terlibat",
   "library.x.noMuscles": "COROS tidak mencantumkan otot untuk gerakan ini.",
+  "library.x.description": "Deskripsi",
   "library.gate.body": "Hubungkan COROS Training Hub untuk memuat latihan, rencana, dan aktivitas yang sudah selesai.",
   "library.gate.failed": "Pustaka gagal dimuat",
   "library.msg.keptEdits": "Suntingan \"{name}\" disimpan. Rencana di COROS tetap sampai Anda menyimpannya.",

@@ -442,6 +442,7 @@ const library: LibraryMessages = {
   "library.x.primary": "Cơ chính",
   "library.x.involved": "Cơ phụ",
   "library.x.noMuscles": "COROS không ghi nhóm cơ nào cho động tác này.",
+  "library.x.description": "Mô tả",
   "library.gate.body": "Kết nối COROS Training Hub để tải bài tập, giáo án và các hoạt động đã hoàn thành.",
   "library.gate.failed": "Không tải được thư viện",
   "library.msg.keptEdits": "Đã lưu chỉnh sửa cho “{name}”. Giáo án trên COROS giữ nguyên đến khi bạn lưu.",

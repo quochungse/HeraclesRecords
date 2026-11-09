@@ -212,4 +212,40 @@ assert.equal(model.bodyCounts(stations, { ...model.NO_EXERCISE_FILTER, hyroxOnly
 assert.deepEqual(model.pickMuscle({ part: null, muscle: null }, "glutes"), { part: "legs", muscle: "glutes" });
 assert.deepEqual(model.pickMuscle({ part: "legs", muscle: "glutes" }, "glutes"), { part: "legs", muscle: null });
 
+// How COROS says to do a movement, cut into its parts. The house variations
+// are COROS's own: a dash before the label, "\r\n", blank lines between parts,
+// the label once on the text's line, and a text with no label at all.
+assert.deepEqual(
+  model.exerciseInstructions("-Starting Position:\nStand tall.\r\n\r\n-Action:\nBend.\nHold for 1-2 seconds.\n\n-Tip:\nBreathe."),
+  [
+    { heading: "Starting Position", lines: ["Stand tall."] },
+    { heading: "Action", lines: ["Bend.", "Hold for 1-2 seconds."] },
+    { heading: "Tip", lines: ["Breathe."] }
+  ]
+);
+assert.deepEqual(
+  model.exerciseInstructions("Starting Point: Stand facing the wall.\n\nAction:\nThrow."),
+  [
+    { heading: "Starting Point", lines: ["Stand facing the wall."] },
+    { heading: "Action", lines: ["Throw."] }
+  ],
+  "a label written on its text's own line"
+);
+assert.deepEqual(
+  model.exerciseInstructions("Starting Point: Hold the ball. Action: Squat, then throw. Tips: Watch the target."),
+  [
+    { heading: "Starting Point", lines: ["Hold the ball."] },
+    { heading: "Action", lines: ["Squat, then throw."] },
+    { heading: "Tips", lines: ["Watch the target."] }
+  ],
+  "three parts run on in one paragraph, as Wall Balls is written"
+);
+assert.deepEqual(
+  model.exerciseInstructions("Please follow your training program.\nKeep: your shoulders down."),
+  [{ lines: ["Please follow your training program.", "Keep: your shoulders down."] }],
+  "no label: one part with no heading, and a sentence with a colon is not a label"
+);
+assert.deepEqual(model.exerciseInstructions("Action:\n\n"), [], "a label with no text says nothing");
+assert.deepEqual(model.exerciseInstructions(undefined), []);
+
 console.log("exercise library tests passed");

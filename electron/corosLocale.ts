@@ -139,6 +139,22 @@ export function loadCorosLocale(): Promise<void> {
   return loading;
 }
 
+/**
+ * How COROS says to do one of its movements, by the movement's key (`T1041`):
+ * the table holds it under `T1041_desc` ("Starting Position: … Action: …
+ * Tips: …"), and the web app reads `_DESC` first, then `_desc`, as here. Only
+ * a key is looked up: COROS asks the same of a step's name, so a step named in
+ * words of its own came out as "Bench 60 kg 4x6-10_desc" there, and nothing
+ * here repeats that. Undefined while the table is missing or holds none.
+ */
+export function corosExerciseDescription(key: string | undefined): string | undefined {
+  const trimmed = key?.trim().toUpperCase();
+  if (!strings || !trimmed || !/^[TS]\d+$/.test(trimmed)) return undefined;
+  const text = strings.get(`${trimmed}_DESC`) ?? strings.get(`${trimmed}_desc`);
+  const normalized = text?.replace(/\r\n?/g, "\n").trim();
+  return normalized || undefined;
+}
+
 /** The words for a COROS key, or the value unchanged. */
 export function corosText(value: string): string;
 export function corosText(value: string | undefined): string | undefined;

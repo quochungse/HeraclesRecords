@@ -142,7 +142,7 @@ import {
   withProgramIdentity,
   type CorosExerciseCatalog
 } from "./corosExerciseCatalog";
-import { corosText, hasCorosLocaleTable, loadCorosLocale } from "./corosLocale";
+import { corosExerciseDescription, corosText, hasCorosLocaleTable, loadCorosLocale } from "./corosLocale";
 import { COROS_NAME_MAX_BYTES, assertCorosTextLimit, corosCopyName } from "./corosTextLimits";
 import {
   WORKOUT_SPORT_CAPABILITIES,
@@ -3898,7 +3898,11 @@ export async function listWorkoutExercises(
   const catalog = await loadWorkoutExerciseCatalog(sport);
   return [...new Map(catalog.flatMap((row) => {
     const option = workoutExerciseOption(row);
-    return option ? [[option.id, option] as const] : [];
+    if (!option) return [];
+    // Put on the option, never on the row: a row is cloned into the steps
+    // written to COROS, and a field of ours would ride along.
+    const description = corosExerciseDescription(option.corosKey);
+    return [[option.id, description ? { ...option, description } : option] as const];
   })).values()].sort((left, right) => left.name.localeCompare(right.name));
 }
 

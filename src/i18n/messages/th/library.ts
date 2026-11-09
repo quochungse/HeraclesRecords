@@ -442,6 +442,7 @@ const library: LibraryMessages = {
   "library.x.primary": "หลัก",
   "library.x.involved": "ร่วม",
   "library.x.noMuscles": "COROS ไม่ได้ระบุกล้ามเนื้อของท่านี้",
+  "library.x.description": "คำอธิบาย",
   "library.gate.body": "เชื่อมต่อ COROS Training Hub เพื่อโหลดการฝึก แผน และกิจกรรมที่ทำเสร็จแล้ว",
   "library.gate.failed": "โหลดคลังไม่สำเร็จ",
   "library.msg.keptEdits": "เก็บการแก้ไข \"{name}\" ไว้แล้ว แผนใน COROS ยังคงเดิมจนกว่าคุณจะบันทึก",

@@ -474,6 +474,7 @@ const library: LibraryMessages = {
   "library.x.primary": "Основные",
   "library.x.involved": "Вспомогательные",
   "library.x.noMuscles": "COROS не указывает мышцы для этого упражнения.",
+  "library.x.description": "Описание",
   "library.gate.body": "Подключите COROS Training Hub, чтобы загрузить тренировки, планы и выполненные активности.",
   "library.gate.failed": "Библиотека не загрузилась",
   "library.msg.keptEdits": "Правки в «{name}» сохранены здесь. План в COROS не изменится, пока вы их не сохраните.",

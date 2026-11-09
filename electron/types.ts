@@ -4061,6 +4061,11 @@ export interface WorkoutExerciseOption {
   targetType?: number;
   /** COROS's default working weight (`intensityValue`, grams); 0 for a movement with none. */
   defaultLoad?: number;
+  /**
+   * How COROS says to do the movement (its `<key>_desc` string, English), for
+   * the Exercises Library. Only COROS's own movements have one.
+   */
+  description?: string;
 }
 
 export interface WorkoutExerciseMedia {

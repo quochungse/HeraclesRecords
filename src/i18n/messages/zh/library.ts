@@ -442,6 +442,7 @@ const library: LibraryMessages = {
   "library.x.primary": "主动肌",
   "library.x.involved": "协同肌",
   "library.x.noMuscles": "COROS 未标注这个动作的肌肉。",
+  "library.x.description": "描述",
   "library.gate.body": "连接 COROS Training Hub 以加载你的训练、计划和已完成的活动。",
   "library.gate.failed": "训练库未能加载",
   "library.msg.keptEdits": "已保存对“{name}”的修改。保存前 COROS 上的计划保持不变。",

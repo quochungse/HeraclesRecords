@@ -2489,7 +2489,7 @@
 
 /* The clip is shot on a white cyclorama, so on paper its plate is plain white:
    the grey vignette left a white rectangle standing in a grey letterbox. */
-:root[data-theme="paper"] .training-library-view :is(.tl-exercise-clip .exercise-preview-stage, .tl-exercise-muscles-body) {
+:root[data-theme="paper"] .training-library-view :is(.tl-exercise-clip .exercise-preview-stage, .tl-exercise-muscles-body, .tl-exercise-description-body) {
   border-color: transparent;
   background: var(--surface);
   box-shadow: var(--shadow-soft);
@@ -4263,17 +4263,50 @@
   grid-template: minmax(0, 1fr) / minmax(0, 1fr);
 }
 
-.tl-exercise-muscles {
+.tl-exercise-muscles,
+.tl-exercise-description {
   display: flex;
   flex-direction: column;
   gap: 10px;
 }
 
-.tl-exercise-muscles > h3 {
+.tl-exercise-muscles > h3,
+.tl-exercise-description > h3 {
   margin: 0;
   color: var(--text-primary);
   font-size: 14px;
   font-weight: 600;
+}
+
+/* How COROS says to do it: its parts one under another, each label a quiet
+   head over its text, in the same well as the muscles below. */
+.tl-exercise-description-body {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 16px 18px;
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-md);
+}
+
+.tl-exercise-description-part {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.tl-exercise-description-part h4 {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.tl-exercise-description-part p {
+  margin: 0;
+  color: var(--text-primary);
+  font-size: 13px;
+  line-height: 1.6;
 }
 
 .tl-exercise-muscles-body {

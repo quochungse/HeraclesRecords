@@ -48,7 +48,10 @@ const script = `window.en_US={
   "T1120": "Warm Up",
   "T4000": "Training",
   "T1122": "Cool Down",
-  "T1016": "Seated Dumbbell Press"
+  "T1016": "Seated Dumbbell Press",
+  "T1016_desc": "Starting Position:\\nSit down.\\r\\n\\r\\nAction:\\nPress.",
+  "T1041_DESC": "Upper case first",
+  "T1041_desc": "lower case second"
 }`;
 {
   const table = locale.parseCorosLocaleScript(script);
@@ -65,6 +68,15 @@ const script = `window.en_US={
   assert.equal(locale.corosText("P1 tempo"), "P1 tempo", "only a whole value that is a key");
   assert.equal(locale.corosText("P99999"), "P99999", "a key the table lacks is left as it came");
   assert.equal(locale.corosText(undefined), undefined);
+
+  // A movement's description is its key + "_desc", read as COROS reads it:
+  // `_DESC` first, line breaks made plain, and only for a key.
+  assert.equal(locale.corosExerciseDescription("T1016"), "Starting Position:\nSit down.\n\nAction:\nPress.");
+  assert.equal(locale.corosExerciseDescription(" t1016 "), locale.corosExerciseDescription("T1016"));
+  assert.equal(locale.corosExerciseDescription("T1041"), "Upper case first");
+  assert.equal(locale.corosExerciseDescription("T1120"), undefined, "a key with no description has none");
+  assert.equal(locale.corosExerciseDescription("Bench 60 kg 4x6-10"), undefined, "a name is never looked up");
+  assert.equal(locale.corosExerciseDescription(undefined), undefined);
 }
 
 // ---------------------------------------------------------------------------

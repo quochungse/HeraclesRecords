@@ -125,7 +125,10 @@ order), two cards at 35/65, nothing docked under the reader.
   name. Equipment uses COROS's 14 codes (`COROS_EQUIPMENT`). The abductors are a muscle of
   their own (COROS 10), drawn for this app in `body-shapes:fetch`.
 - Everything said comes from `optionFacets` (`exerciseLibraryModel.ts`) and effort from
-  `exerciseEffort.ts`. Favourites: `exercise_library_favorites` (`personal`).
+  `exerciseEffort.ts`; the Description is COROS's own text (`option.description`, from
+  `corosExerciseDescription`), English like the names, cut into parts by `exerciseInstructions`.
+  It is shown here only: workout lists stay without it. Favourites:
+  `exercise_library_favorites` (`personal`).
   `npm run test:exercise-library`.
 
 ## Paper

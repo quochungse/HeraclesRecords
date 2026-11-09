@@ -54,6 +54,7 @@ import {
   bodyCounts,
   effortStep,
   equipmentCounts,
+  exerciseInstructions,
   libraryExercises,
   muscleShares,
   narrowExercises,
@@ -449,6 +450,7 @@ function ExerciseReader({
   const step = effortStep(exercise);
   const kit = exercise.facets.equipment.map((entry) => EQUIPMENT_LABELS[entry]);
   const top = shares[0]?.share ?? 1;
+  const instructions = exerciseInstructions(exercise.option.description);
 
   return (
     <div className="tl-reader-scroll">
@@ -521,6 +523,22 @@ function ExerciseReader({
 
         {hasClip(exercise.option) ? (
           <ExercisePreview option={exercise.option} name={exercise.name} className="tl-exercise-clip" />
+        ) : null}
+
+        {/* COROS's own words for the movement, as it writes them: English,
+            like the movement's name, hence `lang`. */}
+        {instructions.length ? (
+          <section className="tl-exercise-description" aria-label={t("library.x.description")}>
+            <h3>{t("library.x.description")}</h3>
+            <div className="tl-exercise-description-body" lang="en">
+              {instructions.map((section, index) => (
+                <div className="tl-exercise-description-part" key={`${index}-${section.heading ?? ""}`}>
+                  {section.heading ? <h4>{section.heading}</h4> : null}
+                  {section.lines.map((line, lineIndex) => <p key={lineIndex}>{line}</p>)}
+                </div>
+              ))}
+            </div>
+          </section>
         ) : null}
 
         <section className="tl-exercise-muscles" aria-label={t("library.x.muscles")}>

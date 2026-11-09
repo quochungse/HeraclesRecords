@@ -271,6 +271,52 @@ export function effortStep(exercise: LibraryExercise): number {
   }
 }
 
+/** One part of how COROS says to do a movement: "Action" and its lines. */
+export interface InstructionSection {
+  heading?: string;
+  lines: string[];
+}
+
+/** The labels COROS also writes on the same line as their text ("Starting Point: Stand …"). */
+const LABELS = "starting (?:position|point)|actions?|tips?|cues?|notes?|practical application|transition";
+const INLINE_HEADING = new RegExp(`^(${LABELS})\\s*:\\s*(\\S.*)$`, "i");
+/** …and once after a sentence of the part before ("… cupping the ball. Action: Perform …"). */
+const RUN_ON_HEADING = new RegExp(`(?<=[.!?])\\s+(${LABELS})\\s*:\\s*`, "gi");
+
+/**
+ * COROS's description of a movement, cut into the parts it is written in.
+ *
+ * The text is "Starting Position:\n…\n\nAction:\n…\n\nTips:\n…" for nearly
+ * all of COROS's ~380 movements, with house variations read off the table on
+ * 2026-11-09: a leading dash ("-Action:"), "Tip"/"Tips", "Starting Point",
+ * `\r\n` breaks, the label on its text's own line, once all three parts run
+ * on in one paragraph (Wall Balls), and a few with no label at all. A line
+ * that is only a short label ending in a colon starts a part; text before any
+ * label is a part with no heading. Blank lines only separate.
+ */
+export function exerciseInstructions(text: string | undefined): InstructionSection[] {
+  const sections: InstructionSection[] = [];
+  let current: InstructionSection | undefined;
+  const lines = (text ?? "").replace(/\r\n?/g, "\n").replace(RUN_ON_HEADING, "\n$1: ").split("\n");
+  for (const raw of lines) {
+    const line = raw.trim();
+    if (!line) continue;
+    const alone = line.match(/^[-•*]?\s*([\p{L}][\p{L} ]{1,38}):$/u);
+    const inline = alone ? null : line.replace(/^[-•*]\s*/, "").match(INLINE_HEADING);
+    if (alone || inline) {
+      current = { heading: (alone ? alone[1]! : inline![1]!).trim(), lines: inline ? [inline[2]!.trim()] : [] };
+      sections.push(current);
+      continue;
+    }
+    if (!current) {
+      current = { lines: [] };
+      sections.push(current);
+    }
+    current.lines.push(line);
+  }
+  return sections.filter((section) => section.lines.length > 0);
+}
+
 /**
  * The body control's state after a muscle is picked. A muscle carries its
  * part with it, so the control can say "Legs › Glutes"; picking the muscle

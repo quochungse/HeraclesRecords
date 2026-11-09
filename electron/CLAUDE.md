@@ -84,6 +84,10 @@ fingerprint>/<activityId>.json.br` (brotli 5), and only a summary reaches SQLite
   `corosLocale.ts` against COROS's CDN string table (cached in `<userData>/coros-locale/`);
   `corosText` swaps a value that is a key and nothing else. `test:coros-official-plan`.
 - `1001 Service exceptions` answers both "gone" and "could not serve now".
+- **COROS describes one of its movements by the step's name**: `t(name + "_desc")` (`_DESC`
+  first) in its web app, so a movement step named in words of its own shows "<name>_desc"
+  there, and the watch records the activity under those words, not the key. The text itself
+  is the string table's `T####_desc` (`corosExerciseDescription`, the Exercises Library's).
 
 ## Writing to COROS
 

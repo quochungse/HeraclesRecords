@@ -442,6 +442,7 @@ const library: LibraryMessages = {
   "library.x.primary": "主動筋",
   "library.x.involved": "協働筋",
   "library.x.noMuscles": "COROS はこの種目の筋肉を示していません。",
+  "library.x.description": "説明",
   "library.gate.body": "COROS Training Hub に接続すると、ワークアウト、プラン、完了したアクティビティを読み込めます。",
   "library.gate.failed": "ライブラリを読み込めませんでした",
   "library.msg.keptEdits": "「{name}」の編集を保存しました。保存するまで COROS のプランは変わりません。",

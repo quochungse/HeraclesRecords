@@ -443,6 +443,7 @@ const library = {
   "library.x.primary": "Primary",
   "library.x.involved": "Involved",
   "library.x.noMuscles": "COROS names no muscles for this movement.",
+  "library.x.description": "Description",
   "library.gate.body": "Connect COROS Training Hub to load your workouts, plans, and completed activities.",
   "library.gate.failed": "The library didn’t load",
   "library.msg.keptEdits": "Kept your edits to \"{name}\". The plan on COROS is unchanged until you save them.",
