@@ -4806,9 +4806,20 @@ td span {
    padding-right on the card would charge every line of a ~100px card for a
    collision none of the others can have. It is not conditional on the card
    being full: one entry whose title wraps to two lines already starts high
-   enough to run under the date. */
-.training-heatmap-card-entry:first-child .training-heatmap-card-title {
-  padding-right: 22px;
+   enough to run under the date.
+   The step aside is a float one line tall, not a padding: only the first line
+   can meet the date, and a padding took the width off every line of the
+   title. Its width is the widest date ("28/10" is ~32px at 10px bold with the
+   tracking) plus the date's 7px inset, less the card's 9px of border and
+   padding, plus a gap — it was 22px, which cleared "1/9" and ran a two-digit
+   day and month under the title. A word that does not fit beside it drops to
+   the next line rather than breaking, because a float shortens a line instead
+   of narrowing the box. */
+.training-heatmap-card-entry:first-child .training-heatmap-card-title::before {
+  content: "";
+  float: right;
+  width: 34px;
+  height: 1em;
 }
 
 .training-heatmap-cell.is-card {
